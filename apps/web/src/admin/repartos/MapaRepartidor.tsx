@@ -51,15 +51,27 @@ interface MapaRepartidorProps {
   vistaClave: string;
   alTocar: (id: string) => void;
   alAbrirOpciones: (id: string, pos: PosicionMarcador) => void;
-  /** Segunda línea (ruta sugerida elegida), en otro estilo. */
-  lineaSugerida?: Array<[number, number]>;
+  /** Rutas sugeridas: todas se dibujan finas; la elegida, gruesa y opaca. Tocar una línea la elige. */
+  sugeridas?: LineaSugerida[];
+  alElegirSugerida?: (id: string) => void;
+  /** Un toque sobre el mapa vacío (no un arrastre ni un marcador). */
+  alTocarMapa?: () => void;
+  /** Encuadra una sola vez cada vez que cambia `clave`, dejando libre `margenInferior` px (la hoja). */
+  encuadre?: { clave: string; coords: Array<[number, number]>; margenInferior: number };
+}
+
+export interface LineaSugerida {
+  id: string;
+  color: string;
+  coords: Array<[number, number]>;
+  elegida: boolean;
 }
 
 const SEDE: [number, number] = [COORDENADAS_TIENDA_DEFECTO.lat, COORDENADAS_TIENDA_DEFECTO.lng];
 const ZOOM_BARRIO = 16;
 const ZOOM_MAXIMO_ENCUADRE = 17;
-// Margen alrededor del encuadre que se deja recorrer: lo justo para no perderse en zonas de más
-const HOLGURA_PANEO = 0.4;
+// Margen alrededor del encuadre que se deja recorrer. Con 0.4 el mapa casi no se movía (parecía congelado)
+const HOLGURA_PANEO = 2;
 
 const estiloMarcador: CSSProperties = {
   position: 'absolute',
@@ -74,7 +86,8 @@ const estiloMarcador: CSSProperties = {
   alignItems: 'center',
   pointerEvents: 'auto',
   cursor: 'pointer',
-  touchAction: 'manipulation',
+  // none: el dedo sobre un marcador sigue mandando eventos para poder reenviar el arrastre al mapa
+  touchAction: 'none',
   userSelect: 'none',
   WebkitUserSelect: 'none',
   WebkitTouchCallout: 'none',
@@ -87,16 +100,20 @@ function Marcador({
   enRuta,
   alTocar,
   alAbrirOpciones,
+  alPanear,
 }: {
   punto: PuntoRepartidor;
   pos: PosicionMarcador;
   enRuta: boolean;
   alTocar: (id: string) => void;
   alAbrirOpciones: (id: string, pos: PosicionMarcador) => void;
+  alPanear: (dx: number, dy: number) => void;
 }) {
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const largo = useRef(false);
   const inicio = useRef<{ x: number; y: number } | null>(null);
+  const ultimo = useRef<{ x: number; y: number } | null>(null);
+  const arrastrando = useRef(false);
   const posRef = useRef(pos);
   posRef.current = pos;
 
@@ -114,16 +131,24 @@ function Marcador({
   const alBajar = (e: PointerEvent<HTMLButtonElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     largo.current = false;
+    arrastrando.current = false;
     inicio.current = { x: e.clientX, y: e.clientY };
+    ultimo.current = inicio.current;
     cancelar();
     temporizador.current = setTimeout(abrir, MS_PRESION_LARGA);
   };
 
   const alMover = (e: PointerEvent<HTMLButtonElement>) => {
     const i = inicio.current;
-    if (!i || !temporizador.current) return;
-    // Si el dedo se arrastra es un gesto del mapa, no una presión larga
-    if (Number.isFinite(e.clientX) && Math.hypot(e.clientX - i.x, e.clientY - i.y) > 12) cancelar();
+    if (!i || !Number.isFinite(e.clientX)) return;
+    // Si el dedo se arrastra es un gesto del mapa, no una presión larga: se cancela y se mueve el mapa.
+    // Los marcadores viven fuera del panel de Leaflet, así que el arrastre no le llega solo.
+    if (!arrastrando.current && Math.hypot(e.clientX - i.x, e.clientY - i.y) > 12) {
+      arrastrando.current = true;
+      cancelar();
+    }
+    if (arrastrando.current && ultimo.current) alPanear(ultimo.current.x - e.clientX, ultimo.current.y - e.clientY);
+    ultimo.current = { x: e.clientX, y: e.clientY };
   };
 
   const alTeclado = (e: KeyboardEvent<HTMLButtonElement>) => {
@@ -150,8 +175,9 @@ function Marcador({
       aria-label={`Pedido ${punto.codigo} de ${punto.cliente}, ${descripcion}. Mantén presionado para ver opciones`}
       aria-pressed={punto.disponible ? enRuta : undefined}
       onClick={() => {
-        if (largo.current) {
+        if (largo.current || arrastrando.current) {
           largo.current = false;
+          arrastrando.current = false;
           return;
         }
         alTocar(punto.id);
@@ -220,11 +246,17 @@ function Marcador({
  * Mapa del repartidor. Los marcadores son botones de React sobre el mapa (no iconos de Leaflet) para que
  * tengan teclado, aria-label y presión larga; se reposicionan con la proyección del mapa al moverlo.
  */
-export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpciones, lineaSugerida }: MapaRepartidorProps) {
+export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpciones, sugeridas, alElegirSugerida, alTocarMapa, encuadre }: MapaRepartidorProps) {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<L.Map | null>(null);
   const lineaRef = useRef<L.Polyline | null>(null);
-  const sugeridaRef = useRef<L.Polyline | null>(null);
+  const sugeridasRef = useRef<L.Polyline[]>([]);
+  const alTocarMapaRef = useRef(alTocarMapa);
+  alTocarMapaRef.current = alTocarMapa;
+  const alElegirRef = useRef(alElegirSugerida);
+  alElegirRef.current = alElegirSugerida;
+  const encuadreRef = useRef(encuadre);
+  encuadreRef.current = encuadre;
   const puntosRef = useRef(puntos);
   puntosRef.current = puntos;
   const [capa, setCapa] = useState<HTMLElement | null>(null);
@@ -255,6 +287,8 @@ export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpci
       });
     };
     map.on('move zoom resize', redibujar);
+    // Leaflet no dispara click al terminar un arrastre, así que esto es un toque de verdad
+    map.on('click', () => alTocarMapaRef.current?.());
     const alRedimensionar = () => map.invalidateSize();
     window.addEventListener('resize', alRedimensionar);
     const retraso = setTimeout(() => map.invalidateSize(), 150);
@@ -267,7 +301,7 @@ export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpci
       map.remove();
       mapaRef.current = null;
       lineaRef.current = null;
-      sugeridaRef.current = null;
+      sugeridasRef.current = [];
     };
   }, []);
 
@@ -303,12 +337,40 @@ export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpci
   useEffect(() => {
     const map = mapaRef.current;
     if (!map) return;
-    sugeridaRef.current?.remove();
-    sugeridaRef.current = null;
-    if (lineaSugerida && lineaSugerida.length >= 2) {
-      sugeridaRef.current = L.polyline(lineaSugerida, { color: '#0B2C3E', weight: 3.5, dashArray: '8, 6', opacity: 0.85 }).addTo(map);
+    sugeridasRef.current.forEach((l) => l.remove());
+    sugeridasRef.current = [];
+    // La elegida se dibuja al final para que quede encima
+    const orden = [...(sugeridas ?? [])].sort((a, b) => Number(a.elegida) - Number(b.elegida));
+    for (const r of orden) {
+      if (r.coords.length < 2) continue;
+      const elegir = () => alElegirRef.current?.(r.id);
+      // Línea ancha e invisible debajo: el dedo no acierta a una línea fina
+      const toque = L.polyline(r.coords, { color: r.color, weight: 24, opacity: 0, bubblingMouseEvents: false }).addTo(map);
+      const visible = L.polyline(r.coords, {
+        color: r.color,
+        weight: r.elegida ? 6 : 3,
+        opacity: r.elegida ? 1 : 0.5,
+        lineJoin: 'round',
+        lineCap: 'round',
+        bubblingMouseEvents: false,
+      }).addTo(map);
+      toque.on?.('click', elegir);
+      visible.on?.('click', elegir);
+      sugeridasRef.current.push(toque, visible);
     }
-  }, [lineaSugerida]);
+  }, [sugeridas]);
+
+  // 4. Encuadre de las rutas sugeridas: una sola vez por cambio de clave, con la hoja descontada
+  const claveEncuadre = encuadre?.clave;
+  useEffect(() => {
+    const map = mapaRef.current;
+    const e = encuadreRef.current;
+    if (!map || !e) return;
+    const limites = L.latLngBounds([SEDE, ...e.coords]);
+    // Las rutas pueden salir del conjunto de pedidos: se amplía lo que se puede recorrer
+    map.setMaxBounds(L.latLngBounds([SEDE, ...puntosRef.current.map((p) => [p.lat, p.lng] as [number, number]), ...e.coords]).pad(HOLGURA_PANEO));
+    map.fitBounds(limites, { paddingTopLeft: [36, 72], paddingBottomRight: [36, e.margenInferior + 16], maxZoom: ZOOM_MAXIMO_ENCUADRE });
+  }, [claveEncuadre]);
 
   const proyectar = (lat: number, lng: number): PosicionMarcador => {
     const pt = mapaRef.current?.latLngToContainerPoint([lat, lng]);
@@ -371,6 +433,7 @@ export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpci
                 enRuta={p.numero != null}
                 alTocar={alTocar}
                 alAbrirOpciones={alAbrirOpciones}
+                alPanear={(dx, dy) => mapaRef.current?.panBy([dx, dy], { animate: false })}
               />
             ))}
           </>,

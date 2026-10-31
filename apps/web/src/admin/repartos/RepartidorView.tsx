@@ -9,7 +9,8 @@ import { Icono } from '../../comun/Icono';
 import { ModalReportarFalla } from './ModalReportarFalla';
 import { MapaRepartidor, type PuntoRepartidor, type PosicionMarcador } from './MapaRepartidor';
 import { HojaInferior } from './HojaInferior';
-import { OpcionesRutaSugerida } from './OpcionesRutaSugerida';
+import { colorOpcion } from './OpcionesRutaSugerida';
+import { HojaRutasSugeridas, ALTO_PLEGADA_PX, FRACCION_MEDIA, type AlturaRutas } from './HojaRutasSugeridas';
 import { useRutasSugeridas } from './useRutasSugeridas';
 import { useAccionesReparto } from './useAccionesReparto';
 import {
@@ -551,6 +552,9 @@ export function RepartidorView() {
   const [ejecutando, setEjecutando] = useState(false);
   const [pedidoParaFalla, setPedidoParaFalla] = useState<PedidoReparto | null>(null);
   const [opcionSugeridaId, setOpcionSugeridaId] = useState<string | null>(null);
+  const [alturaRutas, setAlturaRutas] = useState<AlturaRutas>('plegada');
+  const [verTodoRutas, setVerTodoRutas] = useState(0);
+  const raizRef = useRef<HTMLDivElement>(null);
 
   const maxPedidos = config.maxPedidosPorRepartidor || CONFIG_REPARTO_DEFECTO.maxPedidosPorRepartidor;
 
@@ -701,7 +705,33 @@ export function RepartidorView() {
     return paradas.length ? [SEDE, ...paradas] : [];
   }, [puntos]);
 
-  const lineaSugerida = hoja?.tipo === 'rutas' && opcionSugerida ? opcionSugerida.ruta : undefined;
+  /* Rutas sugeridas sobre el mapa: la ruta propia (miRuta y su línea) no se toca, solo se muestran encima */
+  const hojaRutas = hoja?.tipo === 'rutas';
+  const opcionesSug = sugeridas.datos?.opciones;
+  const lineasSugeridas = useMemo(
+    () => (hojaRutas && opcionesSug ? opcionesSug.map((o, i) => ({ id: o.id, color: colorOpcion(i), coords: o.ruta, elegida: o.id === opcionSugeridaId })) : undefined),
+    [hojaRutas, opcionesSug, opcionSugeridaId],
+  );
+  // Con una ruta elegida sus pedidos salen numerados en el orden de la ruta (aunque no estén en la pestaña)
+  const puntosMapa = useMemo(() => {
+    if (!hojaRutas || !opcionSugerida) return puntos;
+    const orden = new Map(opcionSugerida.pedidos.map((p) => [p.id, p.orden]));
+    const base = puntos.map((p) => ({ ...p, numero: orden.get(p.id) }));
+    const faltan = opcionSugerida.pedidos
+      .filter((p) => !puntos.some((q) => q.id === p.id))
+      .map((p): PuntoRepartidor => ({ id: p.id, lat: p.lat, lng: p.lng, cliente: p.cliente, codigo: p.codigo, color: 'verde', numero: p.orden, disponible: true }));
+    return [...base, ...faltan];
+  }, [hojaRutas, opcionSugerida, puntos]);
+  const encuadreRutas = useMemo(() => {
+    if (!hojaRutas || !opcionesSug || opcionesSug.length === 0) return undefined;
+    const alto = raizRef.current?.clientHeight ?? 0;
+    return {
+      clave: `${opcionSugeridaId ?? 'todas'}|${verTodoRutas}`,
+      coords: (opcionSugerida ? [opcionSugerida] : opcionesSug).flatMap((o) => o.ruta),
+      margenInferior: alturaRutas === 'media' ? Math.round(alto * FRACCION_MEDIA) : ALTO_PLEGADA_PX,
+    };
+    // La altura solo cuenta al encuadrar: no debe provocar otro encuadre al plegar la hoja
+  }, [hojaRutas, opcionesSug, opcionSugerida, opcionSugeridaId, verTodoRutas]);
 
   /* ---------- Acciones ---------- */
 
@@ -779,6 +809,10 @@ export function RepartidorView() {
 
   const abrirHoja = (h: Hoja) => {
     setHoja(h);
+    if (h?.tipo === 'rutas') {
+      setAlturaRutas('plegada');
+      setOpcionSugeridaId(null);
+    }
     setMasAbierto(false);
     setMenuMarcador(null);
   };
@@ -888,6 +922,7 @@ export function RepartidorView() {
 
   return (
     <div
+      ref={raizRef}
       data-testid="vista-repartidor"
       style={{
         position: 'relative',
@@ -903,9 +938,15 @@ export function RepartidorView() {
       {/* Mapa: todo el espacio menos la barra inferior */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: BARRA_TOTAL }}>
         <MapaRepartidor
-          puntos={puntos}
+          puntos={puntosMapa}
           linea={linea}
-          lineaSugerida={lineaSugerida}
+          sugeridas={lineasSugeridas}
+          alElegirSugerida={(id) => {
+            setOpcionSugeridaId(id);
+            setAlturaRutas('media');
+          }}
+          alTocarMapa={() => setAlturaRutas('plegada')}
+          encuadre={encuadreRutas}
           vistaClave={vista}
           alTocar={tocarMarcador}
           alAbrirOpciones={(id, pos) => setMenuMarcador({ id, pos })}
@@ -1012,7 +1053,7 @@ export function RepartidorView() {
       )}
 
       {/* Hoja inferior: detalle de un pedido u otras secciones */}
-      {hoja && (
+      {hoja && hoja.tipo !== 'rutas' && (
         <HojaInferior titulo={tituloHoja} desdeAbajo={BARRA_TOTAL} alCerrar={() => setHoja(null)}>
           {hoja.tipo === 'detalle' && (
             <DetallePedido
@@ -1029,24 +1070,6 @@ export function RepartidorView() {
             />
           )}
           {hoja.tipo === 'hechos' && <HechosHoy hechos={hechosHoy} />}
-          {hoja.tipo === 'rutas' && (
-            <OpcionesRutaSugerida
-              datos={sugeridas.datos}
-              cargando={sugeridas.cargando}
-              error={sugeridas.error}
-              alReintentar={sugeridas.recargar}
-              seleccionadaId={opcionSugeridaId}
-              alSeleccionar={setOpcionSugeridaId}
-              alCambiar={() => {
-                sugeridas.recargar();
-                cargarDatos();
-              }}
-              alTomada={() => {
-                setHoja(null);
-                setVista('mios');
-              }}
-            />
-          )}
           {hoja.tipo === 'falla' &&
             (pedidosActivos.length === 0 ? (
               <div style={{ color: 'var(--cp-soft)', fontWeight: 700 }}>No tienes pedidos en ruta.</div>
@@ -1070,6 +1093,33 @@ export function RepartidorView() {
               </div>
             ))}
         </HojaInferior>
+      )}
+
+      {hoja?.tipo === 'rutas' && (
+        <HojaRutasSugeridas
+          datos={sugeridas.datos}
+          cargando={sugeridas.cargando}
+          error={sugeridas.error}
+          alReintentar={sugeridas.recargar}
+          seleccionadaId={opcionSugeridaId}
+          alSeleccionar={setOpcionSugeridaId}
+          altura={alturaRutas}
+          alCambiarAltura={setAlturaRutas}
+          alCerrar={() => setHoja(null)}
+          alVerTodo={() => {
+            setOpcionSugeridaId(null);
+            setVerTodoRutas((n) => n + 1);
+          }}
+          alCambiar={() => {
+            sugeridas.recargar();
+            cargarDatos();
+          }}
+          alTomada={() => {
+            setHoja(null);
+            setVista('mios');
+          }}
+          desdeAbajo={BARRA_TOTAL}
+        />
       )}
 
       <BarraInferior vista={vista} masAbierto={masAbierto} alVista={cambiarVista} alMas={() => setMasAbierto((v) => !v)} />
