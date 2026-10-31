@@ -9,7 +9,7 @@ import type {
   RespuestaListarAuditoria,
   ResultadoVerificacionCadena,
 } from './tipos';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 const OPCIONES_MODULOS = [
   { id: '', n: 'Todos' },
@@ -311,8 +311,8 @@ export function AuditoriaView() {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <div style={{ flex: '2 1 240px', minWidth: 0 }}>
+        <BarraFiltros>
+          <div style={{ flex: '2 1 220px', minWidth: 0 }}>
             <label htmlFor="au-q" style={{ position: 'absolute', left: '-9999px' }}>Buscar en el historial</label>
             <input
               id="au-q"
@@ -363,10 +363,11 @@ export function AuditoriaView() {
               <option value="4">Marcos Cocina (4)</option>
             </select>
           </div>
-        </div>
+        </BarraFiltros>
 
-        {/* Chips TIPO */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+        {/* Filtros en combo: tipo, módulo, resultado y fecha */}
+        <BarraFiltros>
+        {/* Tipo */}
           <FiltroCombo
             etiqueta="Tipo"
             valor={filtroTipo}
@@ -378,10 +379,8 @@ export function AuditoriaView() {
             ]}
             alCambiar={setFiltroTipo}
           />
-        </div>
 
-        {/* Chips MÓDULO */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+        {/* Módulo */}
           <FiltroCombo
             etiqueta="Módulo"
             valor={filtroModulo}
@@ -391,10 +390,8 @@ export function AuditoriaView() {
               setPagina(1);
             }}
           />
-        </div>
 
-        {/* Chips RESULTADO */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+        {/* Resultado */}
           <FiltroCombo
             etiqueta="Resultado"
             valor={filtroResultado}
@@ -405,10 +402,8 @@ export function AuditoriaView() {
             ]}
             alCambiar={setFiltroResultado}
           />
-        </div>
 
-        {/* Chips FECHA */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+        {/* Fecha y rango de fechas */}
           <FiltroCombo
             etiqueta="Fecha"
             valor={filtroFecha}
@@ -420,7 +415,7 @@ export function AuditoriaView() {
             ]}
             alCambiar={setFiltroFecha}
           />
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginLeft: '6px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', marginLeft: '6px' }}>
             <span style={{ fontSize: '12px', fontWeight: 700 }}>Desde</span>
             <input
               type="date"
@@ -453,7 +448,7 @@ export function AuditoriaView() {
               Limpiar filtros
             </button>
           </div>
-        </div>
+        </BarraFiltros>
       </div>
 
       {/* Lista de Registros con Encabezado por Fecha */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useUrlArchivo } from '../../comun/useUrlArchivo';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
@@ -721,7 +721,7 @@ export function ProductosView() {
           gap: 6,
         }}
       >
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <BarraFiltros>
           <label htmlFor="prod-q" style={{ position: 'absolute', left: -9999 }}>
             Buscar
           </label>
@@ -735,7 +735,7 @@ export function ProductosView() {
             }}
             placeholder="Buscar producto"
             style={{
-              flex: 1,
+              flex: '2 1 220px',
               minWidth: 0,
               boxSizing: 'border-box',
               minHeight: 44,
@@ -801,7 +801,22 @@ export function ProductosView() {
               </span>
             )}
           </button>
-        </div>
+          {/* Registro: activos / desactivados / todos */}
+          <FiltroCombo
+            etiqueta="Registro"
+            valor={filtroRegistro}
+            valorPorDefecto="activos"
+            opciones={[
+              { valor: 'activos', etiqueta: 'Activos', cantidad: productos.filter((x) => !x.oculto).length },
+              { valor: 'desactivados', etiqueta: 'Desactivados', cantidad: productos.filter((x) => x.oculto).length },
+              { valor: 'todos', etiqueta: 'Todos', cantidad: productos.length },
+            ]}
+            alCambiar={(v) => {
+              setFiltroRegistro(v as typeof filtroRegistro);
+              setPagina(1);
+            }}
+          />
+        </BarraFiltros>
 
         {/* Resumen de filtros */}
         {filtrosActivosCount > 0 && (
@@ -812,15 +827,7 @@ export function ProductosView() {
 
         {/* Panel de filtros expandible */}
         {filtrosAbiertos && (
-          <div
-            style={{
-              borderTop: '1px solid var(--cp-line)',
-              paddingTop: 8,
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px 20px',
-            }}
-          >
+          <BarraFiltros style={{ borderTop: '1px solid var(--cp-line)', paddingTop: 8 }}>
             {/* Filtros en combo: disponibilidad, orden y promoción */}
             <FiltroCombo
               etiqueta="Disponibilidad"
@@ -895,26 +902,9 @@ export function ProductosView() {
                 Listo
               </button>
             </div>
-          </div>
+          </BarraFiltros>
         )}
 
-        {/* Registro: activos / desactivados / todos */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <FiltroCombo
-            etiqueta="Registro"
-            valor={filtroRegistro}
-            valorPorDefecto="activos"
-            opciones={[
-              { valor: 'activos', etiqueta: 'Activos', cantidad: productos.filter((x) => !x.oculto).length },
-              { valor: 'desactivados', etiqueta: 'Desactivados', cantidad: productos.filter((x) => x.oculto).length },
-              { valor: 'todos', etiqueta: 'Todos', cantidad: productos.length },
-            ]}
-            alCambiar={(v) => {
-              setFiltroRegistro(v as typeof filtroRegistro);
-              setPagina(1);
-            }}
-          />
-        </div>
 
         {/* Resumen inferior del box de búsqueda */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

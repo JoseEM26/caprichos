@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export interface HistorialMovimiento {
   t: string;
@@ -131,32 +131,34 @@ export function ModalHistorialCupones({
           </button>
         </div>
 
-        <input
-          type="search"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por cupón, código, pedido o persona"
-          aria-label="Buscar en el historial"
-          style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            minHeight: '48px',
-            borderRadius: '12px',
-            border: '1.5px solid var(--cp-line)',
-            backgroundColor: 'var(--cp-white)',
-            padding: '0 14px',
-            fontSize: '15px',
-          }}
-        />
+        <BarraFiltros>
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por cupón, código, pedido o persona"
+            aria-label="Buscar en el historial"
+            style={{
+              flex: '2 1 220px',
+              minWidth: 0,
+              width: '100%',
+              boxSizing: 'border-box',
+              minHeight: '48px',
+              borderRadius: '12px',
+              border: '1.5px solid var(--cp-line)',
+              backgroundColor: 'var(--cp-white)',
+              padding: '0 14px',
+              fontSize: '15px',
+            }}
+          />
 
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           <FiltroCombo
             etiqueta="Movimiento"
             valor={filtroTag}
             opciones={CHIPS_HISTORIAL.map((c) => ({ valor: c.clave, etiqueta: c.label }))}
             alCambiar={setFiltroTag}
           />
-        </div>
+        </BarraFiltros>
 
         <div
           style={{

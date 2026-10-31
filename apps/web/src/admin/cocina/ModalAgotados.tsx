@@ -7,7 +7,7 @@ import {
   reactivarAgotado,
 } from './cocinaApi';
 import { Confirmar } from '../../comun/Confirmar';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { EstadoError } from '../../comun/EstadoError';
 import { useSesion } from '../../comun/sesion';
 import { useTiempoReal } from '../../comun/socket';
@@ -360,7 +360,7 @@ export function ModalAgotados({ abierto, alCerrar }: ModalAgotadosProps) {
 
         {/* Filtro por categoría (combo) */}
         {categoriasDisponibles.length > 0 && (
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <BarraFiltros>
             <FiltroCombo
               etiqueta="Categoría"
               valor={categoriaFiltro}
@@ -371,7 +371,7 @@ export function ModalAgotados({ abierto, alCerrar }: ModalAgotadosProps) {
               ]}
               alCambiar={setCategoriaFiltro}
             />
-          </div>
+          </BarraFiltros>
         )}
 
         {/* Modal/panel de selección de duración al pulsar Agotado */}

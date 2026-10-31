@@ -8,7 +8,7 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
 
 import { formatearUnidad, qty1 } from './formato';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 interface MovimientosTabProps {
   insumos: InsumoItem[];
@@ -197,7 +197,7 @@ export function MovimientosTab({ insumos, lugares }: MovimientosTabProps) {
         </div>
 
         {mostrarFiltros && (
-          <div style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <BarraFiltros style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '8px' }}>
             <FiltroCombo
               etiqueta="Tipo de movimiento"
               valor={filtroTipo}
@@ -205,7 +205,7 @@ export function MovimientosTab({ insumos, lugares }: MovimientosTabProps) {
               opciones={tipoChips.map((c) => ({ valor: c.id, etiqueta: c.label }))}
               alCambiar={setFiltroTipo}
             />
-          </div>
+          </BarraFiltros>
         )}
       </div>
 

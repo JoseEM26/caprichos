@@ -19,7 +19,7 @@ import {
 } from './utilidades';
 import './reclamos.css';
 import { QuejasWhatsAppTab } from '../reclamos/QuejasWhatsAppTab';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export function ReclamosAdminView() {
   const { usuario, tiene } = useSesion();
@@ -260,7 +260,7 @@ export function ReclamosAdminView() {
 
       {/* 2. Barra de filtros con píldoras */}
       <div className="reclamos-filtros-seccion">
-        <div className="reclamos-grupo-pildoras">
+        <BarraFiltros>
           <FiltroCombo
             etiqueta="Estado"
             valor={filtroEstado}
@@ -290,7 +290,7 @@ export function ReclamosAdminView() {
               setPagina(1);
             }}
           />
-        </div>
+        </BarraFiltros>
 
         <div className="reclamos-contador-resumen">
           {busqueda.trim()

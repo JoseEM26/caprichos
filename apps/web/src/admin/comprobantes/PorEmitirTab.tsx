@@ -11,7 +11,7 @@ import { Campo } from '../../comun/Campo';
 import { comprobantesApi } from './comprobantesApi';
 import { enmascararDocumento, formatearSoles } from './utilidades';
 import type { ComprobantePorEmitir } from './tipos';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 interface PorEmitirTabProps {
   alVerNota?: (pedidoId: string) => void;
@@ -207,7 +207,7 @@ export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
 
         {/* Fila de píldoras de filtro */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <BarraFiltros style={{ flex: '1 1 400px' }}>
             <FiltroCombo
               etiqueta="Tipo"
               valor={filtroTipo}
@@ -229,7 +229,7 @@ export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
               ]}
               alCambiar={(v) => setFiltroEstado(v as typeof filtroEstado)}
             />
-          </div>
+          </BarraFiltros>
 
           <div style={{ fontSize: '13px', color: 'var(--cp-soft)', fontWeight: 700 }}>
             {comprobantesFiltrados.length} {comprobantesFiltrados.length === 1 ? 'pendiente' : 'pendientes'}

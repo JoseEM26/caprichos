@@ -15,7 +15,7 @@ import { ModalHistorialCupones, HistorialMovimiento } from './ModalHistorialCupo
 import { ModalConfirmacion } from './ModalConfirmacion';
 import { ModalPrevisualizacionCarta } from './ModalPrevisualizacionCarta';
 import { api } from '../../comun/api';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 const NOMBRES_DIAS_CORTO: Record<number, string> = {
   1: 'Lun',
@@ -1381,24 +1381,26 @@ export function OfertasAdminView() {
               <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '15px' }}>
                 Cupones emitidos
               </div>
-              <input
-                type="search"
-                value={busquedaEmitidos}
-                onChange={(e) => setBusquedaEmitidos(e.target.value)}
-                placeholder="Buscar por código o pedido"
-                aria-label="Buscar cupón emitido"
-                style={{
+              <BarraFiltros>
+                <input
+                  type="search"
+                  value={busquedaEmitidos}
+                  onChange={(e) => setBusquedaEmitidos(e.target.value)}
+                  placeholder="Buscar por código o pedido"
+                  aria-label="Buscar cupón emitido"
+                  style={{
+                  flex: '2 1 220px',
+                  minWidth: 0,
                   width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: '44px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-line)',
-                  backgroundColor: 'var(--cp-cream)',
-                  padding: '0 12px',
-                  fontSize: '14px',
-                }}
-              />
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    boxSizing: 'border-box',
+                    minHeight: '44px',
+                    borderRadius: '10px',
+                    border: '1.5px solid var(--cp-line)',
+                    backgroundColor: 'var(--cp-cream)',
+                    padding: '0 12px',
+                    fontSize: '14px',
+                  }}
+                />
                 <FiltroCombo
                   etiqueta="Estado"
                   valor={filtroEstadoEmitidos}
@@ -1406,7 +1408,7 @@ export function OfertasAdminView() {
                   opciones={['Todos', 'Vigentes', 'Canjeados', 'Vencidos', 'Anulados'].map((st) => ({ valor: st, etiqueta: st }))}
                   alCambiar={setFiltroEstadoEmitidos}
                 />
-              </div>
+              </BarraFiltros>
 
               {emitidosFiltrados.length === 0 && (
                 <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>

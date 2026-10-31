@@ -8,7 +8,7 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { Paginacion } from '../../comun/Paginacion';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export interface QuejasWhatsAppTabProps {
   puedeResponder: boolean;
@@ -246,7 +246,7 @@ export function QuejasWhatsAppTab({ puedeResponder }: QuejasWhatsAppTabProps) {
           borderRadius: '12px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <BarraFiltros>
           <FiltroCombo
             etiqueta="Estado"
             valor={filtroEstado}
@@ -262,7 +262,7 @@ export function QuejasWhatsAppTab({ puedeResponder }: QuejasWhatsAppTabProps) {
               setPagina(1);
             }}
           />
-        </div>
+        </BarraFiltros>
 
         <Boton
           variante="secundario"

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import { Icono } from './Icono';
 
 export interface OpcionFiltro {
@@ -19,6 +19,29 @@ export interface FiltroComboProps {
   deshabilitado?: boolean;
 }
 
+/** Marca que el combo está dentro de una BarraFiltros: entonces comparte el ancho de la fila. */
+const EnBarraFiltros = createContext(false);
+
+export interface BarraFiltrosProps extends HTMLAttributes<HTMLDivElement> {
+  children: ReactNode;
+  /** Ajustes extra del contenedor (margen, alineación...). */
+  style?: CSSProperties;
+}
+
+/**
+ * Fila de filtros: los combos (y el buscador, si va) quedan lado a lado y alineados.
+ * En celular se acomodan en filas sin desbordar; los combos se reparten el ancho por igual.
+ */
+export function BarraFiltros({ children, style, ...atributos }: BarraFiltrosProps) {
+  return (
+    <EnBarraFiltros.Provider value={true}>
+      <div {...atributos} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', ...style }}>
+        {children}
+      </div>
+    </EnBarraFiltros.Provider>
+  );
+}
+
 /**
  * Filtro desplegable compacto: reemplaza una fila de botones (un botón por opción) por un solo combo.
  * Muestra «Etiqueta: opción elegida» y, al abrir, la lista con la cantidad de resultados de cada una.
@@ -28,6 +51,7 @@ export function FiltroCombo({ etiqueta, valor, opciones, alCambiar, valorPorDefe
   const raiz = useRef<HTMLDivElement>(null);
   const idLista = useId();
 
+  const enBarra = useContext(EnBarraFiltros);
   const porDefecto = valorPorDefecto ?? opciones[0]?.valor;
   const actual = opciones.find((o) => o.valor === valor);
   const filtrado = valor !== porDefecto;
@@ -54,7 +78,14 @@ export function FiltroCombo({ etiqueta, valor, opciones, alCambiar, valorPorDefe
   };
 
   return (
-    <div ref={raiz} style={{ position: 'relative', display: 'inline-block', minWidth: 170 }}>
+    <div
+      ref={raiz}
+      style={
+        enBarra
+          ? { position: 'relative', flex: '1 1 160px', minWidth: 160 }
+          : { position: 'relative', display: 'inline-block', minWidth: 170 }
+      }
+    >
       <button
         type="button"
         disabled={deshabilitado}

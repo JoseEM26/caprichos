@@ -7,7 +7,7 @@ import { DIAS, formatoHoras, horasTurno } from './horario';
 import { CrearUsuarioModal, ETIQUETAS_ROLES } from './CrearUsuarioModal';
 import { EditarUsuarioModal } from './EditarUsuarioModal';
 import { ClaveInicialModal } from './ClaveInicialModal';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 type PestanaUsuario = 'personal' | 'clientes' | 'horarios' | 'roles';
 
@@ -582,6 +582,7 @@ export function UsuariosView() {
               </div>
             </div>
 
+            <BarraFiltros>
             {/* Input de Búsqueda */}
             <label htmlFor="uv-q" style={{ position: 'absolute', left: '-9999px' }}>
               Buscar por usuario o nombre
@@ -596,6 +597,8 @@ export function UsuariosView() {
               }}
               placeholder="Buscar por nombre o DNI (usuario)..."
               style={{
+                flex: '2 1 220px',
+                minWidth: 0,
                 minHeight: '48px',
                 borderRadius: '9999px',
                 border: '1.5px solid var(--cp-line)',
@@ -609,60 +612,70 @@ export function UsuariosView() {
               }}
             />
 
-            {/* Filtros: cargo */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <FiltroCombo
-                etiqueta="Cargo"
-                valor={filtroCargo}
-                opciones={[
-                  { valor: 'todos', etiqueta: 'Todos', cantidad: totalPersonal },
-                  { valor: 'admin', etiqueta: 'Administrador', cantidad: conteoRoles.admin },
-                  { valor: 'cajero', etiqueta: 'Cajero', cantidad: conteoRoles.cajero },
-                  { valor: 'produccion', etiqueta: 'Producción', cantidad: conteoRoles.produccion },
-                  { valor: 'mozo', etiqueta: 'Mozo', cantidad: conteoRoles.mozo },
-                  { valor: 'callcenter', etiqueta: 'Call center', cantidad: conteoRoles.callcenter },
-                  { valor: 'repartidor', etiqueta: 'Motorizado', cantidad: conteoRoles.repartidor },
-                ]}
-                alCambiar={(v) => {
-                  setFiltroCargo(v);
-                  setPagina(1);
-                }}
-              />
-            </div>
+            {/* Cargo */}
+            <FiltroCombo
+              etiqueta="Cargo"
+              valor={filtroCargo}
+              opciones={[
+                { valor: 'todos', etiqueta: 'Todos', cantidad: totalPersonal },
+                { valor: 'admin', etiqueta: 'Administrador', cantidad: conteoRoles.admin },
+                { valor: 'cajero', etiqueta: 'Cajero', cantidad: conteoRoles.cajero },
+                { valor: 'produccion', etiqueta: 'Producción', cantidad: conteoRoles.produccion },
+                { valor: 'mozo', etiqueta: 'Mozo', cantidad: conteoRoles.mozo },
+                { valor: 'callcenter', etiqueta: 'Call center', cantidad: conteoRoles.callcenter },
+                { valor: 'repartidor', etiqueta: 'Motorizado', cantidad: conteoRoles.repartidor },
+              ]}
+              alCambiar={(v) => {
+                setFiltroCargo(v);
+                setPagina(1);
+              }}
+            />
 
-            {/* Filtros: estado */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <FiltroCombo
-                etiqueta="Estado"
-                valor={filtroEstado}
-                opciones={[
-                  { valor: 'todos', etiqueta: 'Todos', cantidad: totalPersonal },
-                  { valor: 'activos', etiqueta: 'Activos', cantidad: totalActivos },
-                  { valor: 'inactivos', etiqueta: 'Inactivos', cantidad: totalInactivos },
-                ]}
-                alCambiar={(v) => {
-                  setFiltroEstado(v);
-                  setPagina(1);
-                }}
-              />
-            </div>
+            {/* Estado */}
+            <FiltroCombo
+              etiqueta="Estado"
+              valor={filtroEstado}
+              opciones={[
+                { valor: 'todos', etiqueta: 'Todos', cantidad: totalPersonal },
+                { valor: 'activos', etiqueta: 'Activos', cantidad: totalActivos },
+                { valor: 'inactivos', etiqueta: 'Inactivos', cantidad: totalInactivos },
+              ]}
+              alCambiar={(v) => {
+                setFiltroEstado(v);
+                setPagina(1);
+              }}
+            />
 
-            {/* Filtros: fecha de alta */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <FiltroCombo
-                etiqueta="Creado"
-                valor={filtroCreado}
-                opciones={[
-                  { valor: 'todos', etiqueta: 'Cualquier fecha' },
-                  { valor: 'hoy', etiqueta: 'Hoy' },
-                  { valor: '7', etiqueta: 'Últimos 7 días' },
-                  { valor: '30', etiqueta: 'Últimos 30 días' },
-                  { valor: 'ano', etiqueta: 'Este año' },
-                  { valor: 'mas90', etiqueta: 'Hace más de 90 días' },
-                ]}
-                alCambiar={setFiltroCreado}
-              />
-            </div>
+            {/* Creado */}
+            <FiltroCombo
+              etiqueta="Creado"
+              valor={filtroCreado}
+              opciones={[
+                { valor: 'todos', etiqueta: 'Cualquier fecha' },
+                { valor: 'hoy', etiqueta: 'Hoy' },
+                { valor: '7', etiqueta: 'Últimos 7 días' },
+                { valor: '30', etiqueta: 'Últimos 30 días' },
+                { valor: 'ano', etiqueta: 'Este año' },
+                { valor: 'mas90', etiqueta: 'Hace más de 90 días' },
+              ]}
+              alCambiar={setFiltroCreado}
+            />
+
+            {/* Último acceso */}
+            <FiltroCombo
+              etiqueta="Último acceso"
+              valor={filtroAcceso}
+              opciones={[
+                { valor: 'todos', etiqueta: 'Cualquiera' },
+                { valor: 'hoy', etiqueta: 'Hoy' },
+                { valor: '7', etiqueta: 'Últimos 7 días' },
+                { valor: '30', etiqueta: 'Últimos 30 días' },
+                { valor: 'mas30', etiqueta: 'Hace más de 30 días' },
+                { valor: 'nunca', etiqueta: 'Nunca ingresó' },
+              ]}
+              alCambiar={setFiltroAcceso}
+            />
+            </BarraFiltros>
 
             {/* Entre fechas */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'flex-end' }}>
@@ -715,22 +728,6 @@ export function UsuariosView() {
               </div>
             </div>
 
-            {/* Filtros: último acceso */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <FiltroCombo
-                etiqueta="Último acceso"
-                valor={filtroAcceso}
-                opciones={[
-                  { valor: 'todos', etiqueta: 'Cualquiera' },
-                  { valor: 'hoy', etiqueta: 'Hoy' },
-                  { valor: '7', etiqueta: 'Últimos 7 días' },
-                  { valor: '30', etiqueta: 'Últimos 30 días' },
-                  { valor: 'mas30', etiqueta: 'Hace más de 30 días' },
-                  { valor: 'nunca', etiqueta: 'Nunca ingresó' },
-                ]}
-                alCambiar={setFiltroAcceso}
-              />
-            </div>
           </div>
 
           {/* Estado de error o vacío */}
@@ -1125,40 +1122,38 @@ export function UsuariosView() {
                   </div>
                 </div>
 
+                <BarraFiltros>
                 <input
                   type="search"
                   value={busquedaCli}
                   onChange={(e) => setBusquedaCli(e.target.value)}
                   placeholder="Buscar por nombre, teléfono o correo"
-                  style={{ minHeight: '48px', borderRadius: '9999px', border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', padding: '0 16px', fontFamily: 'inherit', fontSize: '14px', color: 'var(--cp-navy)' }}
+                  style={{ flex: '2 1 220px', minWidth: 0, minHeight: '48px', borderRadius: '9999px', border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', padding: '0 16px', fontFamily: 'inherit', fontSize: '14px', color: 'var(--cp-navy)' }}
                 />
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                  <FiltroCombo
-                    etiqueta="Tipo"
-                    valor={filtroCliTipo}
-                    opciones={[
-                      { valor: '', etiqueta: 'Todos' },
-                      { valor: 'Persona', etiqueta: 'Personas' },
-                      { valor: 'Empresa', etiqueta: 'Empresas' },
-                      { valor: 'Personal', etiqueta: 'Personal' },
-                    ]}
-                    alCambiar={setFiltroCliTipo}
-                  />
-                </div>
+                <FiltroCombo
+                  etiqueta="Tipo"
+                  valor={filtroCliTipo}
+                  opciones={[
+                    { valor: '', etiqueta: 'Todos' },
+                    { valor: 'Persona', etiqueta: 'Personas' },
+                    { valor: 'Empresa', etiqueta: 'Empresas' },
+                    { valor: 'Personal', etiqueta: 'Personal' },
+                  ]}
+                  alCambiar={setFiltroCliTipo}
+                />
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                  <FiltroCombo
-                    etiqueta="Cuenta"
-                    valor={filtroCliCuenta}
-                    opciones={[
-                      { valor: 'todos', etiqueta: 'Todos' },
-                      { valor: 'cuenta', etiqueta: 'Con cuenta' },
-                      { valor: 'invitado', etiqueta: 'Invitados' },
-                    ]}
-                    alCambiar={setFiltroCliCuenta}
-                  />
-                </div>
+                <FiltroCombo
+                  etiqueta="Cuenta"
+                  valor={filtroCliCuenta}
+                  opciones={[
+                    { valor: 'todos', etiqueta: 'Todos' },
+                    { valor: 'cuenta', etiqueta: 'Con cuenta' },
+                    { valor: 'invitado', etiqueta: 'Invitados' },
+                  ]}
+                  alCambiar={setFiltroCliCuenta}
+                />
+                </BarraFiltros>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px', padding: '10px 12px' }}>

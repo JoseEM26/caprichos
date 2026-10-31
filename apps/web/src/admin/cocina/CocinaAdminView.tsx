@@ -33,7 +33,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export type ModoCocina = 'area' | 'hist';
 
@@ -708,15 +708,7 @@ export function CocinaAdminView() {
       </div>
 
       {/* 5. Selector de Área y Pantalla completa */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-          alignItems: 'center',
-          marginTop: '4px',
-        }}
-      >
+      <BarraFiltros style={{ marginTop: '4px' }}>
         <FiltroCombo
           etiqueta="Área"
           valor={areaActiva}
@@ -743,7 +735,7 @@ export function CocinaAdminView() {
         >
           Pantalla completa, sin desplazar
         </button>
-      </div>
+      </BarraFiltros>
 
       {/* 6. Selector de Pestañas: Pantalla del área / Despejadas hoy */}
       <div

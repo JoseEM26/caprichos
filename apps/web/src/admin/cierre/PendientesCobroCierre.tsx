@@ -6,7 +6,7 @@ import { cierreApi, PendienteCobro } from './cierreApi';
 import { ErrorApi } from '../../comun/api';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { EstadoError } from '../../comun/EstadoError';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import './pendientes-cierre.css';
 
 /** Grupos que se pueden enfocar desde un aviso del cierre. «cola» y «antiguos» son filtros. */
@@ -362,7 +362,7 @@ export function PendientesCobroCierre({
         </div>
       )}
 
-      <div className="pdc-barra">
+      <BarraFiltros>
         <div className="pdc-buscador">
           <input
             type="search"
@@ -372,22 +372,20 @@ export function PendientesCobroCierre({
             onChange={(e) => setTexto(e.target.value)}
           />
         </div>
-        <div className="pdc-chips">
-          <FiltroCombo
-            etiqueta="Filtrar"
-            valor={chip}
-            valorPorDefecto="todos"
-            opciones={[
-              { valor: 'todos', etiqueta: 'Todos', cantidad: pendientes.length },
-              { valor: 'cobrar', etiqueta: 'Por cobrar', cantidad: resumen.cobrar.n },
-              { valor: 'cola', etiqueta: 'En cola', cantidad: resumen.cola.n },
-              { valor: 'coordinados', etiqueta: 'Coordinados', cantidad: resumen.coordinados.n },
-              { valor: 'antiguos', etiqueta: 'Antiguos de días anteriores', cantidad: resumen.antiguos.n },
-            ]}
-            alCambiar={(v) => setChip(v as Chip)}
-          />
-        </div>
-      </div>
+        <FiltroCombo
+          etiqueta="Filtrar"
+          valor={chip}
+          valorPorDefecto="todos"
+          opciones={[
+            { valor: 'todos', etiqueta: 'Todos', cantidad: pendientes.length },
+            { valor: 'cobrar', etiqueta: 'Por cobrar', cantidad: resumen.cobrar.n },
+            { valor: 'cola', etiqueta: 'En cola', cantidad: resumen.cola.n },
+            { valor: 'coordinados', etiqueta: 'Coordinados', cantidad: resumen.coordinados.n },
+            { valor: 'antiguos', etiqueta: 'Antiguos de días anteriores', cantidad: resumen.antiguos.n },
+          ]}
+          alCambiar={(v) => setChip(v as Chip)}
+        />
+      </BarraFiltros>
 
       <div className="pdc-lista">
         {grupos.length === 0 && <div className="pdc-vacio">Ningún pedido coincide con el filtro o la búsqueda.</div>}

@@ -37,7 +37,7 @@ import {
   PedidoPerdido,
 } from './repartosApi';
 import { RepartidorView } from './RepartidorView';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 type ModoVista = 'mapa' | 'lista';
 type FiltroRetraso = 'todos' | NivelEspera;
@@ -577,14 +577,7 @@ function RepartosAdminView() {
         }}
       >
         {/* Selector de Repartidor / Caja (solo para admin/cajero o si puede liquidar) */}
-        <div
-          style={{
-            display: pantallaCompleta ? 'none' : 'flex',
-            gap: '6px',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-          }}
-        >
+        <BarraFiltros style={{ display: pantallaCompleta ? 'none' : 'flex' }}>
           <FiltroCombo
             etiqueta={esRolRepartidor ? 'Soy' : 'Ver como'}
             valor={filtroRider}
@@ -600,7 +593,7 @@ function RepartosAdminView() {
               setPedidoSeleccionadoId(null);
             }}
           />
-        </div>
+        </BarraFiltros>
 
         {/* Doble vista [Mapa] [Lista], Botón Pantalla Completa y Botón «?» (Decisiones 1 y 2) */}
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -713,16 +706,10 @@ function RepartosAdminView() {
       </div>
 
       {/* 2) TRES FILTROS DE TIEMPO DE ESPERA ARRIBA DEL MAPA (Decisión 3 del dueño) */}
-      <div
+      <BarraFiltros
         role="group"
         aria-label="Filtros por tiempo de espera"
-        style={{
-          display: 'flex',
-          gap: '8px',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          padding: '0 4px',
-        }}
+        style={{ padding: '0 4px' }}
       >
         <FiltroCombo
           etiqueta="Espera"
@@ -757,7 +744,7 @@ function RepartosAdminView() {
             Zona {filtroZona} × (quitar filtro)
           </button>
         )}
-      </div>
+      </BarraFiltros>
 
       {/* Contador visible de pedidos esperando repartidor */}
       <div
@@ -933,10 +920,9 @@ function RepartosAdminView() {
         /* VISTA LISTA SECUNDARIA (Doble Vista, Decisión 2) */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Filtro por zona para la lista */}
-          <div
+          <BarraFiltros
             role="group"
             aria-label="Filtrar por zona"
-            style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}
           >
             <FiltroCombo
               etiqueta="Zona"
@@ -948,7 +934,7 @@ function RepartosAdminView() {
               ]}
               alCambiar={setFiltroZona}
             />
-          </div>
+          </BarraFiltros>
 
           {listaPorEspera.length === 0 ? (
             <EstadoVacio

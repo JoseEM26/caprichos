@@ -7,7 +7,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
 import { formatearUnidad, qty1 } from './formato';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 interface InsumosTabProps {
   lugares: LugarStockItem[];
@@ -139,22 +139,20 @@ export function InsumosTab({ lugares }: InsumosTabProps) {
       </div>
 
       {/* Barra de filtros MOSTRAR y botones de acción idéntica al mockup */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-          <FiltroCombo
-            etiqueta="Mostrar"
-            valor={filtroChip}
-            valorPorDefecto="todos"
-            opciones={[
-              { valor: 'todos', etiqueta: 'Todos', cantidad: insumos.length },
-              { valor: 'agotados', etiqueta: 'Agotados', cantidad: insumosAgotados.length },
-              { valor: 'bajo', etiqueta: 'Stock bajo', cantidad: insumosBajos.length },
-              { valor: 'regular', etiqueta: 'Regular', cantidad: insumosRegulares.length },
-              { valor: 'suficiente', etiqueta: 'Suficiente', cantidad: insumosSuficientes.length },
-            ]}
-            alCambiar={(v) => setFiltroChip(v as typeof filtroChip)}
-          />
-        </div>
+      <BarraFiltros style={{ justifyContent: 'space-between' }}>
+        <FiltroCombo
+          etiqueta="Mostrar"
+          valor={filtroChip}
+          valorPorDefecto="todos"
+          opciones={[
+            { valor: 'todos', etiqueta: 'Todos', cantidad: insumos.length },
+            { valor: 'agotados', etiqueta: 'Agotados', cantidad: insumosAgotados.length },
+            { valor: 'bajo', etiqueta: 'Stock bajo', cantidad: insumosBajos.length },
+            { valor: 'regular', etiqueta: 'Regular', cantidad: insumosRegulares.length },
+            { valor: 'suficiente', etiqueta: 'Suficiente', cantidad: insumosSuficientes.length },
+          ]}
+          alCambiar={(v) => setFiltroChip(v as typeof filtroChip)}
+        />
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
           <button
@@ -193,7 +191,7 @@ export function InsumosTab({ lugares }: InsumosTabProps) {
             Pedir lo que falta a los proveedores
           </button>
         </div>
-      </div>
+      </BarraFiltros>
 
       {/* Alertas por correo */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '12px', color: 'var(--cp-soft)' }}>

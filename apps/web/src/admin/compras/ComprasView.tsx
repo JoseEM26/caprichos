@@ -12,7 +12,7 @@ import { ModalCompraRapida } from './ModalCompraRapida';
 import { ModalProveedor } from './ModalProveedor';
 import { ModalHistorialProveedor } from './ModalHistorialProveedor';
 import { ModalDetalleCompra } from './ModalDetalleCompra';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 const getInitialTab = (): 'pedir' | 'compras' | 'proveedores' => {
   if (typeof window !== 'undefined') {
@@ -542,7 +542,7 @@ export const ComprasView: React.FC = () => {
       {/* CONTENIDO PESTAÑA 2: COMPRAS */}
       {tabActiva === 'compras' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <BarraFiltros>
             <FiltroCombo
               etiqueta="Proveedor"
               valor={filtroProveedor}
@@ -553,7 +553,7 @@ export const ComprasView: React.FC = () => {
               ]}
               alCambiar={setFiltroProveedor}
             />
-          </div>
+          </BarraFiltros>
 
           <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
             {comprasFiltradas.length} {comprasFiltradas.length === 1 ? 'compra' : 'compras'} · total sin

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { Confirmar } from '../../comun/Confirmar';
 import {
   catalogoApi,
@@ -1011,7 +1011,7 @@ export function ListasCategoriasView() {
           {/* CASO 2: Dónde se pregunta cada grupo */}
           {itemIzquierdaActual.id === 'preg' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div>
+              <BarraFiltros>
                 <FiltroCombo
                   etiqueta="Grupos"
                   valor={filtroGrupos}
@@ -1023,7 +1023,7 @@ export function ListasCategoriasView() {
                   ]}
                   alCambiar={(v) => setFiltroGrupos(v as typeof filtroGrupos)}
                 />
-              </div>
+              </BarraFiltros>
               {gruposVisibles.length === 0 ? (
                 <div
                   style={{

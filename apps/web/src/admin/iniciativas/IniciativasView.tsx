@@ -13,7 +13,7 @@ import {
 import { NuevaIniciativaModal } from './NuevaIniciativaModal';
 import { FotoIniciativa } from './FotoIniciativa';
 import { VisorCapturaModal } from './VisorCapturaModal';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 const COLOR_TIPO: Record<string, string> = {
   QUEJA: '#BA1A1A',
@@ -256,8 +256,8 @@ export function IniciativasView() {
         </div>
       </div>
 
-      {/* Botón nueva iniciativa y buscador */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Botón nueva iniciativa, buscador y filtros en combo */}
+      <BarraFiltros>
         <button
           type="button"
           onClick={() => setModalNuevaAbierto(true)}
@@ -276,7 +276,7 @@ export function IniciativasView() {
         >
           + Nueva iniciativa
         </button>
-        <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+        <div style={{ flex: '2 1 220px', minWidth: 0 }}>
           <label htmlFor="in-q" style={{ position: 'absolute', left: '-9999px' }}>
             Buscar iniciativas
           </label>
@@ -299,10 +299,7 @@ export function IniciativasView() {
             }}
           />
         </div>
-      </div>
-
-      {/* Filtros en combo: tipo, estado y responsable */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+        {/* Filtros en combo: tipo, estado y responsable */}
         <FiltroCombo
           etiqueta="Tipo"
           valor={filtroTipo}
@@ -338,7 +335,7 @@ export function IniciativasView() {
           ]}
           alCambiar={(v) => setSoloMias(v === 'mias')}
         />
-      </div>
+      </BarraFiltros>
 
       {/* Contador de resultados */}
       <div style={{ fontSize: '13px', fontWeight: 700 }}>

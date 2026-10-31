@@ -8,7 +8,7 @@ import { ModalFormularioReserva } from './componentes/ModalFormularioReserva';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { useSalonSocket } from './useSalonSocket';
 import { salonApi } from './api';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export interface SolicitudWhatsApp {
   id: string;
@@ -1205,7 +1205,7 @@ export function ReservasView() {
           gap: '8px',
         }}
       >
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <BarraFiltros>
           <input
             id="t-q"
             type="search"
@@ -1213,7 +1213,7 @@ export function ReservasView() {
             onChange={(e) => setBusquedaTabla(e.target.value)}
             placeholder="Buscar por cliente o código"
             style={{
-              flex: '1 1 0%',
+              flex: '2 1 220px',
               minWidth: 0,
               boxSizing: 'border-box',
               minHeight: '44px',
@@ -1261,18 +1261,10 @@ export function ReservasView() {
             </svg>
             Filtros
           </button>
-        </div>
+        </BarraFiltros>
 
         {filtrosAbiertos && (
-          <div
-            style={{
-              borderTop: '1px solid var(--cp-line)',
-              paddingTop: '8px',
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px 20px',
-            }}
-          >
+          <BarraFiltros style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '8px' }}>
             <FiltroCombo
               etiqueta="Estado"
               valor={filtroEstado}
@@ -1293,7 +1285,7 @@ export function ReservasView() {
               ]}
               alCambiar={setFiltroPersonas}
             />
-          </div>
+          </BarraFiltros>
         )}
 
         {/* Grilla de tarjetas de reservas */}

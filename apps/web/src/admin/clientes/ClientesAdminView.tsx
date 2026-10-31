@@ -8,7 +8,7 @@ import {
 import { ModalNuevoCliente } from './ModalNuevoCliente';
 import { ModalFichaCliente } from './ModalFichaCliente';
 import { ModalEditarCliente } from './ModalEditarCliente';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export function ClientesAdminView() {
   const [, startTransition] = useTransition();
@@ -260,15 +260,7 @@ export function ClientesAdminView() {
 
         {/* Panel de Filtros desplegable */}
         {filtrosAbiertos && (
-          <div
-            style={{
-              borderTop: '1px solid var(--cp-line)',
-              paddingTop: 8,
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px 20px',
-            }}
-          >
+          <BarraFiltros style={{ borderTop: '1px solid var(--cp-line)', paddingTop: 8 }}>
             {/* Filtros en combo: tipo, crédito del personal y registro */}
             <FiltroCombo
               etiqueta="Tipo"
@@ -334,7 +326,7 @@ export function ClientesAdminView() {
                 Listo
               </button>
             </div>
-          </div>
+          </BarraFiltros>
         )}
 
         <div style={{ fontSize: 13, color: 'var(--cp-soft)', fontWeight: 600 }}>

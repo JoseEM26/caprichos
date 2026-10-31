@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { Paginacion } from '../../comun/Paginacion';
 import { useSesion } from '../../comun/sesion';
 import {
@@ -117,7 +117,7 @@ export function HistorialCierres() {
         <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
           Todos los cierres quedan guardados. No se pueden editar ni borrar.
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <BarraFiltros style={{ alignItems: 'flex-end' }}>
           <div>
             <label
               htmlFor="cj-f"
@@ -166,20 +166,18 @@ export function HistorialCierres() {
               }}
             />
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <FiltroCombo
-              etiqueta="Resultado"
-              valor={filtroEstado}
-              opciones={[
-                { valor: 'todos', etiqueta: 'Todos' },
-                { valor: 'cuadrado', etiqueta: 'Cuadrados' },
-                { valor: 'sobrante', etiqueta: 'Sobrantes' },
-                { valor: 'faltante', etiqueta: 'Faltantes' },
-              ]}
-              alCambiar={(v) => setFiltroEstado(v as typeof filtroEstado)}
-            />
-          </div>
-        </div>
+          <FiltroCombo
+            etiqueta="Resultado"
+            valor={filtroEstado}
+            opciones={[
+              { valor: 'todos', etiqueta: 'Todos' },
+              { valor: 'cuadrado', etiqueta: 'Cuadrados' },
+              { valor: 'sobrante', etiqueta: 'Sobrantes' },
+              { valor: 'faltante', etiqueta: 'Faltantes' },
+            ]}
+            alCambiar={(v) => setFiltroEstado(v as typeof filtroEstado)}
+          />
+        </BarraFiltros>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>
           {total} {total === 1 ? 'cierre' : 'cierres'} con esas fechas
         </div>

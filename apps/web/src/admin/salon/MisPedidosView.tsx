@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos } from '../../comun/socket';
 import { salonApi } from './api';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
@@ -206,7 +206,7 @@ export function MisPedidosView() {
         </div>
       </section>
 
-      <div className="mp-chips">
+      <BarraFiltros>
         <FiltroCombo
           etiqueta="Periodo"
           valor={rango}
@@ -224,7 +224,7 @@ export function MisPedidosView() {
           )}
           alCambiar={(v) => setFiltro(v as FiltroEstado)}
         />
-      </div>
+      </BarraFiltros>
 
       {error && (
         <EstadoError
