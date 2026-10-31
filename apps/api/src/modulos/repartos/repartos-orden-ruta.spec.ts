@@ -10,7 +10,7 @@ import { RutaService } from './ruta.service';
 
 const rep = { partyId: 10n, rol: 'REPARTIDOR', debeCambiar: false } as any;
 const ped = (id: bigint, orden: number | null, lat: number, estado = 'LISTO') => ({
-  id, codigo: `CP-${id}`, estado, orden_ruta: orden, repartidor_party_id: 10n, entrega_lat: lat, entrega_lng: -77,
+  id, codigo: `CP-${id}`, estado, orden_ruta: orden, numero_ruta: orden, ruta_reparto_id: null as bigint | null, repartidor_party_id: 10n, entrega_lat: lat, entrega_lng: -77,
   modalidad: 'DELIVERY', zona: null, lineas: [],
 });
 
@@ -20,9 +20,11 @@ function montar(pedidos: any[], saltosPrevios = 0) {
       .sort((a, b) => a.orden_ruta - b.orden_ruta);
   const tx: any = {
     pedido: {
-      findMany: jest.fn(async ({ where }: any) => pendientes(where)),
+      findMany: jest.fn(async ({ where }: any) =>
+        where.ruta_reparto_id !== undefined ? pedidos.filter((p) => p.ruta_reparto_id === where.ruta_reparto_id) : pendientes(where)),
       update: jest.fn(async ({ where, data }: any) => Object.assign(pedidos.find((p) => p.id === where.id), data)),
     },
+    rutaReparto: { findFirst: jest.fn(async () => (pedidos.some((p) => p.ruta_reparto_id === 7n) ? { id: 7n } : null)) },
     pedidoEstadoHistorial: { create: jest.fn(), count: jest.fn(async () => saltosPrevios) },
   };
   const prisma: any = {
@@ -60,6 +62,22 @@ describe('orden de entrega obligatorio', () => {
     expect(r.orden.map((o) => o.codigo)).toEqual(['CP-4', 'CP-2', 'CP-3', 'CP-1']);
     expect(pedidos.map((p) => [p.id, p.orden_ruta])).toEqual([[1n, 4], [2n, 2], [3n, 3], [4n, 1]]);
     expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'EMPEZAR_POR', partyId: 10n }));
+  });
+
+  it('empezar-por numera después de los ya entregados de la ruta en curso', async () => {
+    const entregado = { ...ped(1n, null, -12.0, 'ENTREGADO'), numero_ruta: 1, ruta_reparto_id: 7n };
+    const { service, pedidos } = montar([entregado, ped(2n, 2, -12.1), ped(3n, 3, -12.2)]);
+    await service.empezarPor('3', rep);
+    expect(pedidos.map((p) => p.numero_ruta)).toEqual([1, 3, 2]);
+  });
+
+  it('saltar #2 conserva su numero y toca el siguiente pendiente (#3); el entregado #1 no cambia nada', async () => {
+    const entregado = { ...ped(1n, null, -12.0, 'ENTREGADO'), numero_ruta: 1, ruta_reparto_id: 7n };
+    const { service, pedidos } = montar([entregado, ped(2n, 2, -12.1), ped(3n, 3, -12.2), ped(4n, 4, -12.3)]);
+    const r = await service.saltar('2', { motivo: 'NO_CONTESTA' }, rep);
+    expect(r).toMatchObject({ numeroRuta: 2, siguienteNumeroRuta: 3 });
+    expect(pedidos.map((p) => p.numero_ruta)).toEqual([1, 2, 3, 4]);
+    expect(pedidos[1].orden_ruta).toBe(5);
   });
 
   it('empezar-por no se puede cuando ya salió con un pedido', async () => {

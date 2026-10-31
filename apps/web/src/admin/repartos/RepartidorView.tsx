@@ -525,7 +525,7 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
 }
 
 /** Punto gris de un pedido terminado: check si se entregó, X si no; con la hora de cierre. */
-function puntoTerminado(p: { id: string; lat: number; lng: number; cliente: string | null; codigo: string; estadoFinal: NonNullable<PedidoDeRuta['estadoFinal']>; horaFinal: string | null }): PuntoRepartidor {
+function puntoTerminado(p: { id: string; lat: number; lng: number; cliente: string | null; codigo: string; estadoFinal: NonNullable<PedidoDeRuta['estadoFinal']>; horaFinal: string | null; numeroRuta?: number | null }): PuntoRepartidor {
   return {
     id: p.id,
     lat: p.lat,
@@ -535,6 +535,7 @@ function puntoTerminado(p: { id: string; lat: number; lng: number; cliente: stri
     color: 'verde',
     disponible: false,
     estadoFinal: p.estadoFinal,
+    numeroParada: p.numeroRuta ?? undefined,
     estadoTexto: `${TEXTO_ESTADO_FINAL[p.estadoFinal]}${p.horaFinal ? ` ${horaLima(p.horaFinal)}` : ''}`,
   };
 }
@@ -754,8 +755,13 @@ export function RepartidorView() {
     if (!pedidoParaSaltar) return;
     setSaltando(true);
     try {
-      await repartosApi.saltar(pedidoParaSaltar.id, { motivo, detalle });
-      setAviso({ tipo: 'ok', texto: `${pedidoParaSaltar.codigo} pasó al final de tu ruta` });
+      const r = await repartosApi.saltar(pedidoParaSaltar.id, { motivo, detalle });
+      setAviso({
+        tipo: 'ok',
+        texto: r?.numeroRuta != null && r.siguienteNumeroRuta != null
+          ? `Saltaste el #${r.numeroRuta}; sigue el #${r.siguienteNumeroRuta}`
+          : `${pedidoParaSaltar.codigo} pasó al final de tu ruta`,
+      });
       setHoja(null);
     } catch (err: any) {
       setAviso({ tipo: 'error', texto: err?.message || 'No se pudo saltar el pedido' });
@@ -805,7 +811,7 @@ export function RepartidorView() {
       return rutaDibujada.pedidos.flatMap((p): PuntoRepartidor[] =>
         p.lat == null || p.lng == null || !p.estadoFinal
           ? []
-          : [puntoTerminado({ id: p.id, lat: p.lat, lng: p.lng, cliente: p.clienteNombre, codigo: p.codigo, estadoFinal: p.estadoFinal, horaFinal: p.horaFinal })],
+          : [puntoTerminado({ id: p.id, lat: p.lat, lng: p.lng, cliente: p.clienteNombre, codigo: p.codigo, estadoFinal: p.estadoFinal, horaFinal: p.horaFinal, numeroRuta: p.numeroRuta })],
       );
     }
     if (vista === 'mios') {
@@ -819,7 +825,7 @@ export function RepartidorView() {
               cliente: p.cliente_nombre || 'Cliente',
               codigo: p.codigo,
               color: clasificarEspera(p.minutosEspera, config).color,
-              numero: idx + 1,
+              numero: p.numeroRuta ?? idx + 1,
               disponible: true,
               siguiente: ordenRuta.siguiente?.id === p.id,
             }],
@@ -827,7 +833,7 @@ export function RepartidorView() {
       const hechos = terminados.flatMap((p): PuntoRepartidor[] =>
         p.lat == null || p.lng == null || !p.estadoFinal
           ? []
-          : [puntoTerminado({ id: p.id, lat: p.lat, lng: p.lng, cliente: p.cliente_nombre, codigo: p.codigo, estadoFinal: p.estadoFinal, horaFinal: p.horaFinal })],
+          : [puntoTerminado({ id: p.id, lat: p.lat, lng: p.lng, cliente: p.cliente_nombre, codigo: p.codigo, estadoFinal: p.estadoFinal, horaFinal: p.horaFinal, numeroRuta: p.numeroRuta })],
       );
       return [...pendientes, ...hechos];
     }
@@ -874,13 +880,13 @@ export function RepartidorView() {
       const coords = rutaDibujada.pedidos.filter((p) => p.lat != null && p.lng != null).map((p): [number, number] => [p.lat!, p.lng!]);
       return coords.length ? [SEDE, ...coords] : [];
     }
-    const paradas = puntos
-      .filter((p) => p.numero != null)
-      .sort((a, b) => a.numero! - b.numero!)
+    // En 'mios' los puntos ya vienen en el orden de entrega (un saltado conserva su número pero va al final)
+    const conNumero = puntos.filter((p) => p.numero != null);
+    const paradas = (vista === 'mios' ? conNumero : conNumero.sort((a, b) => a.numero! - b.numero!))
       .map((p): [number, number] => [p.lat, p.lng]);
     const desde = lineaTenue.length ? lineaTenue[lineaTenue.length - 1] : SEDE;
     return paradas.length ? [desde, ...paradas] : [];
-  }, [puntos, lineaTenue, rutaDibujada]);
+  }, [puntos, lineaTenue, rutaDibujada, vista]);
 
   /* Rutas sugeridas sobre el mapa: la ruta propia (miRuta y su línea) no se toca, solo se muestran encima */
   const hojaRutas = hoja?.tipo === 'rutas';

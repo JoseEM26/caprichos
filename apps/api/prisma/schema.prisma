@@ -476,6 +476,7 @@ model Pedido {
   motivo_falla           String?
   // Posición en la ruta que eligió el repartidor al tomar (1 = primera parada); null si no eligió orden
   orden_ruta             Int?
+  numero_ruta            Int?
   // Ruta de reparto (salida del repartidor) a la que pertenece; se conserva al entregar o fallar
   ruta_reparto_id        BigInt?
   // Salón (Ola 6)
