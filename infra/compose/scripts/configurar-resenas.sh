@@ -6,7 +6,7 @@
 #   printf '%s' "$CLAVE" | ./configurar-resenas.sh <demo|prod>
 #
 # Solo toca estas dos variables de /opt/caprichos/<ambiente>/.env:
-#   OPENWEBNINJA_API_KEY=<clave>
+#   OPENWEBNINJA_API_KEY='<clave>'   (entre comillas simples; la clave no puede llevar comilla simple)
 #   RESENAS_ACTUALIZAR_AUTO=si   (solo prod; en demo queda en no)
 # Flujo: copia fechada del .env (600) -> cambia esas variables -> redespliega con el MISMO TAG
 # (desplegar.sh) -> comprueba que la API responde /salud y que recibe la clave -> si algo falla,
@@ -81,13 +81,14 @@ if (( QUITADOS > 0 )); then
   NOTA_INVISIBLES="se quitaron ${QUITADOS} caracteres invisibles (espacio duro/ancho cero/BOM)"
 fi
 
-# Solo caracteres que no necesitan comillas en el .env ni interpolación en docker compose
-RE_CLAVE='^[A-Za-z0-9._~+/=-]+$'
+# ASCII imprimible 0x21–0x7E ([:graph:] con LC_ALL=C), sin espacios; la comilla simple se rechaza aparte
+# porque es la única que rompe el valor entre comillas simples que se guarda en el .env
+RE_CLAVE='^[[:graph:]]+$'
 if [[ -z "$CLAVE" ]]; then
   echo "ERROR: no llegó ninguna clave por la entrada estándar (¿el secreto OPENWEBNINJA_API_KEY está vacío?)." >&2
   exit 1
 fi
-if (( LONG < 10 || LONG > 200 )) || [[ ! "$CLAVE" =~ $RE_CLAVE ]]; then
+if (( LONG < 10 || LONG > 200 )) || [[ "$CLAVE" == *"'"* ]] || [[ ! "$CLAVE" =~ $RE_CLAVE ]]; then
   # Diagnóstico sin revelar la clave: solo longitud y tipo de problema
   echo "ERROR: la clave no tiene formato válido (${LONG} caracteres tras quitar espacios y comillas de los extremos):" >&2
   if (( LONG < 10 )); then echo "  - muy corta: mínimo 10 caracteres" >&2; fi
@@ -100,12 +101,14 @@ if (( LONG < 10 || LONG > 200 )) || [[ ! "$CLAVE" =~ $RE_CLAVE ]]; then
     ESP="${CLAVE//[^[:space:]]/}"
     echo "  - tiene espacios, tabuladores o saltos de línea en medio (${#ESP} caracteres de separación)" >&2
   fi
-  OTROS="${CLAVE//[A-Za-z0-9._~+\/=-]/}"
-  OTROS="${OTROS//[[:space:]]/}"
-  if [[ -n "$OTROS" ]]; then
-    echo "  - tiene caracteres fuera de A-Za-z0-9._~+/=- (${#OTROS} caracteres)" >&2
+  if [[ "$CLAVE" == *"'"* ]]; then
+    echo "  - tiene comilla simple, no permitida" >&2
   fi
-  echo "Permitido: letras, números y . _ ~ + / = -, de 10 a 200 caracteres." >&2
+  CONTROL_N=$(printf '%s' "$CLAVE" | tr -d '[:graph:][:space:]\200-\377' | wc -c | tr -d ' ')
+  if (( CONTROL_N > 0 )); then
+    echo "  - tiene ${CONTROL_N} caracteres de control (no imprimibles)" >&2
+  fi
+  echo "Permitido: caracteres ASCII imprimibles (letras, números y símbolos) sin espacios ni comilla simple, de 10 a 200 caracteres." >&2
   exit 1
 fi
 
@@ -170,7 +173,8 @@ restaurar() {
   "$DESPLEGAR" "$AMBIENTE" "$TAG" || echo "AVISO: el redespliegue de restauración falló; revisar a mano."
 }
 
-if ! { fijar OPENWEBNINJA_API_KEY "$CLAVE" && fijar RESENAS_ACTUALIZAR_AUTO "$AUTO"; }; then
+# Entre comillas simples: bash (source) y docker compose v2 la leen literal ($, #, ", `, \ y ! incluidos)
+if ! { fijar OPENWEBNINJA_API_KEY "'${CLAVE}'" && fijar RESENAS_ACTUALIZAR_AUTO "$AUTO"; }; then
   echo "ERROR: no se pudo escribir el .env." >&2
   restaurar
   exit 1
