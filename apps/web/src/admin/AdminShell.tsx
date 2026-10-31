@@ -786,7 +786,8 @@ export function AdminShell() {
       </div>
 
       {/* Barra inferior del repartidor en celular (Decisión 6 del dueño) */}
-      {esRepartidorMovil && barraInferiorRepartidor}
+      {/* En /admin/repartos la pantalla del repartidor trae su propia barra (Pedidos, Mis pedidos, Más) */}
+      {esRepartidorMovil && location.pathname !== '/admin/repartos' && barraInferiorRepartidor}
 
       <Confirmar
         abierto={confirmarSalida}

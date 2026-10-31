@@ -26,6 +26,8 @@ export interface PedidoReparto {
   cobroPendienteEfectivo?: boolean;
   paga_con: number | null;
   repartidor_party_id: string | null;
+  /** Posición del pedido en la ruta del repartidor (1, 2, 3...). Solo en /mios. */
+  ordenRuta?: number | null;
   tomado_en: string | null;
   salio_en: string | null;
   llego_en: string | null;
@@ -50,6 +52,38 @@ export interface PedidoReparto {
   recargoReprogramacion?: number | null;
   /** Pedido que volvió a Para elegir tras reprogramar (marca Reprogramado). */
   reprogramado?: boolean;
+}
+
+/** Pedido que aún no se puede tomar (en cocina o por validar): el repartidor solo lo ve. */
+export interface PedidoProximo {
+  id: string;
+  codigo: string;
+  clienteNombre: string;
+  lat: number | null;
+  lng: number | null;
+  zona: string | null;
+  estado: 'POR_VALIDAR' | 'EN_COCINA';
+  estadoTexto: string;
+  minutosEspera: number;
+  creadoEn: string;
+  cantidadProductos: number;
+}
+
+/** Detalle de un pedido para la hoja del repartidor. dirección y teléfono solo vienen si el pedido es suyo. */
+export interface ResumenRepartidor {
+  id: string;
+  codigo: string;
+  clienteNombre: string;
+  estado: string;
+  estadoTexto: string;
+  minutosEspera: number;
+  productos: Array<{ cantidad: number; nombre: string }>;
+  nota: string | null;
+  zona: string | null;
+  puedeTomar: boolean;
+  motivoNoTomar: string | null;
+  direccion?: string | null;
+  telefono?: string | null;
 }
 
 export interface AvisoRepartidor {
@@ -168,6 +202,16 @@ export const repartosApi = {
 
   listarMios: () =>
     api.get<RespuestaMios>('/admin/repartos/mios'),
+
+  listarProximos: () =>
+    api.get<PedidoProximo[]>('/admin/repartos/proximos'),
+
+  obtenerResumenRepartidor: (id: string) =>
+    api.get<ResumenRepartidor>(`/admin/repartos/${id}/resumen-repartidor`),
+
+  /** Toma varios pedidos a la vez en el orden elegido. Un 409 trae el motivo en el mensaje. */
+  tomarRuta: (ids: string[]) =>
+    api.post<unknown>('/admin/repartos/tomar-ruta', { ids }),
 
   obtenerResumen: () =>
     api.get<ResumenRepartos>('/admin/repartos/resumen'),
