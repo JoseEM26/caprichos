@@ -63,6 +63,9 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['reseñas de Google: se vuelven a traer de la API en cada ambiente (con su propio negocio y cupo)', [
     'resena_google',
   ]],
+  ['lectura de notificaciones por persona: cada usuario tiene su propio estado, no se migra', [
+    'notificacion_lectura',
+  ]],
   ['trazas y control técnico', [
     'auditoria', 'sys_control', 'iniciativa', 'iniciativa_comentario',
   ]],

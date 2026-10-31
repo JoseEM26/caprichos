@@ -1715,6 +1715,18 @@ model Notificacion {
   @@map("notificacion")
 }
 
+/// Estado de lectura de cada notificación POR PERSONA (clave `n:<id>` o `c:<tipo>:<firma>`).
+/// leida_en NULL = marcada como no leída de forma explícita (sobrescribe el leida_en heredado de notificacion).
+model NotificacionLectura {
+  party_id  BigInt
+  clave     String
+  leida_en  DateTime? @default(now()) @db.Timestamptz
+
+  @@id([party_id, clave])
+  @@index([party_id, leida_en])
+  @@map("notificacion_lectura")
+}
+
 model VersionCarta {
   id            BigInt    @id @default(autoincrement())
   estado        String    // BORRADOR | PUBLICADA | ARCHIVADA

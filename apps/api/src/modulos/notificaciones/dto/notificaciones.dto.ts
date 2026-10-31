@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class FiltroHistorialDto {
   @IsOptional()
@@ -23,6 +23,17 @@ export class FiltroHistorialDto {
 }
 
 export class MarcarLeidaDto {
+  @IsOptional()
+  @IsBoolean()
+  leida?: boolean;
+}
+
+export class MarcarClaveDto {
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(80)
+  clave!: string;
+
   @IsOptional()
   @IsBoolean()
   leida?: boolean;

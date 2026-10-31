@@ -8,8 +8,10 @@ import { GRUPOS_MODULOS, MODULOS } from './modulos';
 import { TITULOS_VISTA } from './titulos';
 import { useSocketConectado } from '../comun/socket';
 import { useNotificaciones } from './useNotificaciones';
-import type { NotificacionAdmin } from './useNotificaciones';
-import { marcarNotificacionLeida } from './notificaciones/notificacionesApi';
+import { marcarTodasNotificacionesLeidas } from './notificaciones/notificacionesApi';
+import { CampanaNotificaciones } from './notificaciones/CampanaNotificaciones';
+import { AvisosEmergentes, useTituloContador } from './notificaciones/AvisosNotificaciones';
+import { hayQueSonar, useSonidoAvisos } from './notificaciones/sonidoAviso';
 
 // Carga diferida de la ayuda con Capri para no penalizar el tiempo de carga del panel
 const AyudaCapri = lazy(() => import('./ayuda/AyudaCapri'));
@@ -26,6 +28,7 @@ const COLOR_ROL: Record<string, string> = {
   ALMACEN: '#D9B38C',
   PRODUCCION: '#C9A6D9',
   REPARTIDOR: '#9BD3AB',
+  SUPERVISOR: 'var(--cp-gold)',
 };
 const NOMBRE_ROL: Record<string, string> = {
   ADMIN: 'Administrador',
@@ -36,9 +39,8 @@ const NOMBRE_ROL: Record<string, string> = {
   ALMACEN: 'Almacén',
   PRODUCCION: 'Producción',
   REPARTIDOR: 'Repartidor',
+  SUPERVISOR: 'Supervisor',
 };
-const COLOR_PRIORIDAD: Record<NotificacionAdmin['prioridad'], string> = { ALTA: '#C73E2A', MEDIA: '#E2812C', BAJA: '#8FA9B8' };
-const TEXTO_PRIORIDAD: Record<NotificacionAdmin['prioridad'], string> = { ALTA: 'Urgente', MEDIA: 'Pendiente', BAJA: 'Cuando puedas' };
 
 const leerContraido = (): boolean => {
   try {
@@ -46,14 +48,6 @@ const leerContraido = (): boolean => {
   } catch {
     return false;
   }
-};
-
-const esperaTexto = (desde: string | null): string => {
-  if (!desde) return '';
-  const min = Math.max(0, Math.floor((Date.now() - new Date(desde).getTime()) / 60000));
-  if (min < 60) return `espera ${min} min`;
-  const h = Math.floor(min / 60);
-  return h < 24 ? `espera ${h} h ${min % 60} min` : `espera ${Math.floor(h / 24)} d`;
 };
 
 const horaLima = (d: Date): string =>
@@ -73,9 +67,6 @@ export function AdminShell() {
   const [contraido, setContraido] = useState<boolean>(leerContraido);
   const [menuMovil, setMenuMovil] = useState(false);
   const [gruposCerrados, setGruposCerrados] = useState<Record<string, boolean>>({});
-  const [campanaAbierta, setCampanaAbierta] = useState(false);
-  const [aMarcarLeida, setAMarcarLeida] = useState<NotificacionAdmin | null>(null);
-  const [marcandoLeida, setMarcandoLeida] = useState(false);
   const [confirmarSalida, setConfirmarSalida] = useState(false);
   const [saliendo, setSaliendo] = useState(false);
   const [ahora, setAhora] = useState(() => new Date());
@@ -105,7 +96,6 @@ export function AdminShell() {
 
   useEffect(() => {
     setMenuMovil(false);
-    setCampanaAbierta(false);
   }, [location.pathname]);
 
   const alternarContraido = () => {
@@ -134,7 +124,7 @@ export function AdminShell() {
     : (moduloActual && TITULOS_VISTA[moduloActual.clave]) || { titulo: moduloActual?.nombre ?? 'Caprichos', subtitulo: '' };
 
   const cuenta = (clave: string): number =>
-    clave === 'notificaciones' ? resumen.notificaciones.length : (resumen.conteos[clave] ?? 0);
+    clave === 'notificaciones' ? totalNotif : (resumen.conteos[clave] ?? 0);
 
   const rol = (usuario?.rol || '').toUpperCase();
   const colorRol = COLOR_ROL[rol] ?? 'var(--cp-orange)';
@@ -163,23 +153,21 @@ export function AdminShell() {
     setMenuMovil(false);
   };
 
-  /** Marca leído el aviso guardado: sale de la cola y de la insignia; sigue en el historial. */
-  const confirmarMarcarLeida = async () => {
-    if (!aMarcarLeida) return;
-    setMarcandoLeida(true);
+  /** Marca todas como leídas para este usuario; el resto de usuarios no se entera */
+  const marcarTodasLeidas = async () => {
     try {
-      await marcarNotificacionLeida(aMarcarLeida.id);
-      await resumen.refrescar();
+      await marcarTodasNotificacionesLeidas();
     } catch {
-      // sin conexión o sin permiso: el aviso se queda en la cola
-    } finally {
-      setMarcandoLeida(false);
-      setAMarcarLeida(null);
+      // sin conexión o sin permiso: se quedan como están
     }
+    await resumen.refrescar();
   };
 
-  const prioritaria = resumen.notificaciones[0];
-  const totalNotif = resumen.notificaciones.length;
+  // Lo no leído (urgente primero) es lo que suena, cuenta en la campanita y en el título
+  const noLeidasAhora = resumen.notificaciones.filter((n) => !n.leida);
+  const totalNotif = noLeidasAhora.length;
+  const sonido = useSonidoAvisos(hayQueSonar(resumen.notificaciones));
+  useTituloContador(totalNotif);
 
   // ---- piezas del menú ----
   const itemMenu = (m: (typeof modulos)[number], pequeno: boolean) => {
@@ -421,97 +409,13 @@ export function AdminShell() {
         {!enLinea ? 'Sin internet' : socketConectado ? 'En línea' : 'Reconectando…'}
       </span>
       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-soft)', fontVariantNumeric: 'tabular-nums' }}>{horaLima(ahora)}</span>
-      <button
-        type="button"
-        onClick={() => setCampanaAbierta((v) => !v)}
-        aria-label={`Notificaciones: ${totalNotif}`}
-        aria-expanded={campanaAbierta}
-        style={{ position: 'relative', flex: 'none', width: 44, height: 44, padding: 0, border: '1.5px solid var(--cp-navy)', borderRadius: 22, background: 'var(--cp-white)', color: 'var(--cp-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Icono nombre="notificaciones" tamano={22} />
-        {totalNotif > 0 && (
-          <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, boxSizing: 'border-box', borderRadius: 10, background: COLOR_PRIORIDAD[prioritaria.prioridad], color: 'var(--cp-white)', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
-            {totalNotif}
-          </span>
-        )}
-      </button>
-      {campanaAbierta && (
-        <>
-          <div onClick={() => setCampanaAbierta(false)} style={{ position: 'fixed', inset: 0, zIndex: 36 }} />
-          <div
-            role="dialog"
-            aria-label="Notificaciones"
-            style={{ position: 'absolute', zIndex: 37, top: 'calc(100% + 6px)', right: 12, width: 'min(400px, calc(100% - 24px))', maxHeight: 'min(70vh, 520px)', overflowY: 'auto', background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: 16, boxShadow: '0 16px 40px rgba(11,44,62,0.28)', display: 'flex', flexDirection: 'column' }}
-          >
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--cp-sand)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 16 }}>Notificaciones</span>
-              <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Primero lo más urgente; lo que lleva más tiempo esperando sube.</span>
-            </div>
-            {totalNotif === 0 && <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 14, color: 'var(--cp-soft)' }}>Todo al día. No hay nada pendiente.</div>}
-            {resumen.notificaciones.map((n) => (
-              <div key={n.id} style={{ display: 'flex', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--cp-sand)' }}>
-                <span style={{ flex: 'none', width: 6, borderRadius: 3, background: COLOR_PRIORIDAD[n.prioridad] }} />
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
-                    <span style={{ fontWeight: 800, fontSize: 14, lineHeight: '19px', overflowWrap: 'anywhere' }}>{n.titulo}</span>
-                    <span style={{ flex: 'none', fontSize: 12, fontWeight: 800, color: 'var(--cp-white)', background: COLOR_PRIORIDAD[n.prioridad], borderRadius: 9999, padding: '2px 8px', whiteSpace: 'nowrap' }}>
-                      {TEXTO_PRIORIDAD[n.prioridad]}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft)' }}>{n.detalle}</div>
-                  {n.desde && <div style={{ fontSize: 12, color: 'var(--cp-soft)', fontVariantNumeric: 'tabular-nums' }}>{esperaTexto(n.desde)}</div>}
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (n.ruta) {
-                          ir(n.ruta);
-                        } else if (n.modulo === 'compras') {
-                          ir('/admin/compras?tab=pedir');
-                        } else {
-                          const m = MODULOS.find((x) => x.clave === n.modulo);
-                          if (m) ir(m.ruta);
-                        }
-                        setCampanaAbierta(false);
-                      }}
-                      style={{ minHeight: 44, padding: '0 14px', border: '1.5px solid var(--cp-navy)', borderRadius: 10, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 13 }}
-                    >
-                      {n.accion}
-                    </button>
-                    {n.marcable && (
-                      <button
-                        type="button"
-                        onClick={() => setAMarcarLeida(n)}
-                        style={{ minHeight: 44, padding: '0 14px', border: '1.5px solid var(--cp-soft)', borderRadius: 10, background: 'var(--cp-white)', color: 'var(--cp-soft)', fontWeight: 700, fontSize: 13 }}
-                      >
-                        Leído
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                setCampanaAbierta(false);
-                navigate('/admin/notificaciones');
-              }}
-              style={{ minHeight: 48, border: 0, background: 'var(--cp-cream)', color: 'var(--cp-navy)', fontWeight: 700, borderRadius: '0 0 16px 16px' }}
-            >
-              Ver todas las notificaciones
-            </button>
-          </div>
-        </>
-      )}
-      <Confirmar
-        abierto={aMarcarLeida !== null}
-        titulo="¿Marcar como leída esta notificación?"
-        mensaje={aMarcarLeida?.titulo}
-        textoSi="Sí, marcar leída"
-        cargando={marcandoLeida}
-        alConfirmar={confirmarMarcarLeida}
-        alCancelar={() => setAMarcarLeida(null)}
+      <CampanaNotificaciones
+        notificaciones={resumen.notificaciones}
+        sonidoSoportado={sonido.soportado}
+        sonidoBloqueado={sonido.bloqueado}
+        onMarcar={resumen.marcar}
+        onMarcarTodas={marcarTodasLeidas}
+        onActivarSonido={() => void sonido.activar()}
       />
     </div>
   );
@@ -883,6 +787,9 @@ export function AdminShell() {
         alConfirmar={alSalir}
         alCancelar={() => setConfirmarSalida(false)}
       />
+
+      {/* Avisos grandes que aparecen al llegar algo nuevo, montados una vez para todo el panel */}
+      <AvisosEmergentes notificaciones={resumen.notificaciones} listo={resumen.cargado} onMarcar={resumen.marcar} />
 
       {/* Asistente de ayuda del administrador (Capri) montado una vez para todo el panel */}
       {/* El repartidor trabaja en la calle con una barra inferior propia: no se le muestra el botón flotante */}

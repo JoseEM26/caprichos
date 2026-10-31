@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { AdminShell } from '../AdminShell';
 import * as ayudaApi from '../ayuda/ayudaApi';
-import * as notifApi from '../notificaciones/notificacionesApi';
 
 vi.mock('../../comun/sesion', () => ({
   useSesion: () => ({
@@ -19,7 +18,9 @@ const resumenPrueba = vi.hoisted(() => ({
   valor: {
     notificaciones: [] as any[],
     conteos: {} as Record<string, number>,
+    cargado: true,
     refrescar: vi.fn(async () => {}),
+    marcar: vi.fn(async () => true),
   },
 }));
 
@@ -28,7 +29,8 @@ vi.mock('../useNotificaciones', () => ({
 }));
 
 vi.mock('../notificaciones/notificacionesApi', () => ({
-  marcarNotificacionLeida: vi.fn(async () => ({ ok: true, id: '5', leida: true })),
+  marcarNotificacion: vi.fn(async () => ({ ok: true, clave: 'n:5', leida: true })),
+  marcarTodasNotificacionesLeidas: vi.fn(async () => ({ ok: true })),
 }));
 
 vi.mock('../ayuda/ayudaApi', () => ({
@@ -66,34 +68,51 @@ describe('AdminShell - Integración de AyudaCapri', () => {
     expect(botonAyuda).toBeInTheDocument();
   });
 
-  it('campanita: el aviso guardado tiene Leído con confirmación; al confirmar lo marca y refresca la cola', async () => {
+  it('campanita: cada aviso tiene su botón Leída que lo marca para este usuario', async () => {
     resumenPrueba.valor = {
       conteos: {},
+      cargado: true,
       refrescar: vi.fn(async () => {}),
+      marcar: vi.fn(async () => true),
       notificaciones: [
         {
           id: '5',
+          clave: 'n:5',
           titulo: 'Mensaje interno de turno',
           detalle: 'Turno de tarde',
           prioridad: 'MEDIA',
           desde: null,
           modulo: 'notificaciones',
           accion: 'Ver en el historial',
-          marcable: true,
+          leida: false,
+          leidaEn: null,
         },
         {
           id: 'stock-bajo',
+          clave: 'c:stock-bajo:0123456789ab',
           titulo: '1 insumo con stock bajo',
           detalle: 'Insumos bajo el mínimo.',
           prioridad: 'ALTA',
           desde: null,
           modulo: 'compras',
           accion: 'Pedir al proveedor',
-          marcable: false,
+          leida: false,
+          leidaEn: null,
+        },
+        {
+          id: '9',
+          clave: 'n:9',
+          titulo: 'Ya atendida',
+          detalle: '',
+          prioridad: 'BAJA',
+          desde: null,
+          modulo: 'notificaciones',
+          accion: 'Ver en el historial',
+          leida: true,
+          leidaEn: new Date().toISOString(),
         },
       ],
     };
-
     await act(async () => {
       render(
         <MemoryRouter initialEntries={['/admin/caja']}>
@@ -102,18 +121,15 @@ describe('AdminShell - Integración de AyudaCapri', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Notificaciones: 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Notificaciones: 2 sin leer' }));
 
-    // Solo el aviso guardado tiene el botón; la alerta calculada no
-    const leidos = screen.getAllByRole('button', { name: 'Leído' });
-    expect(leidos).toHaveLength(1);
-    fireEvent.click(leidos[0]);
+    const leidas = screen.getAllByRole('button', { name: 'Leída' });
+    expect(leidas).toHaveLength(2);
+    fireEvent.click(leidas[0]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar leída' }));
-
+    // la campanita muestra la lista en el orden que trae el resumen; la primera fila es n:5
     await waitFor(() => {
-      expect(notifApi.marcarNotificacionLeida).toHaveBeenCalledWith('5');
-      expect(resumenPrueba.valor.refrescar).toHaveBeenCalled();
+      expect(resumenPrueba.valor.marcar).toHaveBeenCalledWith('n:5', true);
     });
   });
 });

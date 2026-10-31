@@ -1893,22 +1893,7 @@ export class EjecutorConversacionService {
             );
             codigoFinal = pedidoCreado.codigo;
             await this.registrarEleccionPuntos(conversacion.id, accion.puntos, pedidoCreado.codigo);
-
-            // Notificación campana a Caja/Admin
-            const tituloNotif = `Nuevo pedido WhatsApp: ${pedidoCreado.codigo}`;
-            const notif = await this.prisma.notificacion.create({
-              data: {
-                tipo: 'PEDIDO_NUEVO',
-                rol_destino: null,
-                titulo: tituloNotif,
-                mensaje: `Nuevo pedido ${pedidoCreado.codigo} por S/ ${Number(pedidoCreado.total).toFixed(2)} (${nombreMostrar}).`,
-                enlace: '/admin/pedidos',
-              },
-            });
-            this.eventos?.emitirAdmin('notificaciones:nueva', {
-              id: notif.id.toString(),
-              titulo: tituloNotif,
-            });
+            // La campana del pedido nuevo la crea PedidosService.crear (igual para carta, mozo y WhatsApp)
           }
         } catch (err: any) {
           this.logger.error(`Error creando pedido desde chatbot: ${err.message}`, err.stack);
@@ -2010,8 +1995,12 @@ export class EjecutorConversacionService {
           });
 
           // Notificación campana para Caja y Salón (ADMIN, CAJA, MOZO)
-          const tituloNotif = `Nueva solicitud de reserva: ${accion.nombre} (${accion.personas} pers.)`;
-          const mensajeNotif = `Solicitud para ${accion.personas} personas el ${accion.fechaTexto} a las ${accion.hora}. Tel: ${accion.telefono}${accion.nota ? ' · Nota: ' + accion.nota : ''}`;
+          // Título con lo esencial para decidir de un vistazo: cuántos y cuándo (día corto en hora de Lima)
+          const diaCorto = new Intl.DateTimeFormat('es-PE', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Lima' })
+            .format(fechaHora)
+            .replace(/\./g, '');
+          const tituloNotif = `Reserva nueva para ${accion.personas} personas, ${diaCorto} ${accion.hora}`;
+          const mensajeNotif = `${accion.nombre}. Solicitud para ${accion.personas} personas el ${accion.fechaTexto} a las ${accion.hora}. Tel: ${accion.telefono}${accion.nota ? ' · Nota: ' + accion.nota : ''}`;
 
           const notif = await this.prisma.notificacion.create({
             data: {

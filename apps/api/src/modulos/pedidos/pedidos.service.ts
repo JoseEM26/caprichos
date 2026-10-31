@@ -855,6 +855,25 @@ export class PedidosService {
       // Ignorar si el servidor de websocket no está listo en pruebas
     }
 
+    // 10.1. Aviso en la campana: cada pedido nuevo (carta, mozo o WhatsApp) es su propia notificación
+    try {
+      const avisoPedido = await this.prisma.notificacion.create({
+        data: {
+          tipo: 'PEDIDO_NUEVO',
+          rol_destino: null,
+          titulo: `Pedido nuevo ${pedidoCreado.codigo}`,
+          mensaje: `${pedidoCreado.canal} · ${pedidoCreado.modalidad} · S/ ${Number(pedidoCreado.total).toFixed(2)}`,
+          enlace: '/admin/pedidos',
+        },
+      });
+      this.eventosGateway.emitirAdmin('notificaciones:nueva', {
+        id: avisoPedido.id.toString(),
+        titulo: avisoPedido.titulo,
+      });
+    } catch {
+      // Un fallo del aviso no debe deshacer un pedido ya creado
+    }
+
     // 10.5. Envío de los avisos encolados en la transacción del pedido (tras el commit)
     this.avisosInternosService?.despertarOutbox();
 

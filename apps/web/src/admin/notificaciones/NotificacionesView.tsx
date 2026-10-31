@@ -4,7 +4,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { useEventos } from '../../comun/socket';
 import {
   listarHistorialNotificaciones,
-  marcarNotificacionLeida,
+  marcarNotificacion,
   marcarTodasNotificacionesLeidas,
 } from './notificacionesApi';
 import {
@@ -131,7 +131,7 @@ export function NotificacionesView() {
   // Acciones individuales
   const handleToggleLeida = async (item: NotificacionHistorialItem) => {
     try {
-      await marcarNotificacionLeida(item.id, !item.leida);
+      await marcarNotificacion(`n:${item.id}`, !item.leida);
       await cargar();
     } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
   };
@@ -139,7 +139,7 @@ export function NotificacionesView() {
   const handleMarcarPendienteLeida = async () => {
     if (!pendienteLeida) return;
     try {
-      await marcarNotificacionLeida(pendienteLeida.id);
+      await marcarNotificacion(pendienteLeida.clave);
       await cargar();
     } catch { /* best-effort: el refresco es opcional, la vista ya cargo */ }
     setPendienteLeida(null);
@@ -399,7 +399,7 @@ export function NotificacionesView() {
                       >
                         {p.accion}
                       </button>
-                      {p.marcable && (
+                      {(
                         <button
                           style={{
                             minHeight: '44px',
