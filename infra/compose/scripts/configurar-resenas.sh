@@ -33,7 +33,22 @@ DESPLEGAR="${RAIZ}/scripts/desplegar.sh"
 COMPOSE_DIR="${RAIZ}/compose"
 
 # La clave llega por stdin: no queda en la línea de comandos ni en los procesos del servidor
-CLAVE=$(cat)
+# Se lee entera (el sufijo x evita que $(...) quite saltos de línea finales)
+CLAVE=$(cat; printf x)
+CLAVE="${CLAVE%x}"
+
+# Normaliza: quita espacios, tabuladores, \r y \n de los extremos y, si la clave va entre comillas, las quita
+recortar() {
+  local v="$1"
+  v="${v#"${v%%[![:space:]]*}"}"
+  v="${v%"${v##*[![:space:]]}"}"
+  printf '%s' "$v"
+}
+CLAVE=$(recortar "$CLAVE")
+if (( ${#CLAVE} >= 2 )) && { [[ "$CLAVE" == \"*\" ]] || [[ "$CLAVE" == \'*\' ]]; }; then
+  CLAVE="${CLAVE:1:${#CLAVE}-2}"
+  CLAVE=$(recortar "$CLAVE")
+fi
 LONG=${#CLAVE}
 
 # Solo caracteres que no necesitan comillas en el .env ni interpolación en docker compose
@@ -43,7 +58,20 @@ if [[ -z "$CLAVE" ]]; then
   exit 1
 fi
 if (( LONG < 10 || LONG > 200 )) || [[ ! "$CLAVE" =~ $RE_CLAVE ]]; then
-  echo "ERROR: la clave no tiene formato válido: 10 a 200 caracteres, solo letras, números y . _ ~ + / = -" >&2
+  # Diagnóstico sin revelar la clave: solo longitud y tipo de problema
+  echo "ERROR: la clave no tiene formato válido (${LONG} caracteres tras quitar espacios y comillas de los extremos):" >&2
+  if (( LONG < 10 )); then echo "  - muy corta: mínimo 10 caracteres" >&2; fi
+  if (( LONG > 200 )); then echo "  - muy larga: máximo 200 caracteres" >&2; fi
+  if [[ "$CLAVE" == *[[:space:]]* ]]; then
+    ESP="${CLAVE//[^[:space:]]/}"
+    echo "  - tiene espacios, tabuladores o saltos de línea en medio (${#ESP} caracteres de separación)" >&2
+  fi
+  OTROS="${CLAVE//[A-Za-z0-9._~+\/=-]/}"
+  OTROS="${OTROS//[[:space:]]/}"
+  if [[ -n "$OTROS" ]]; then
+    echo "  - tiene caracteres fuera de A-Za-z0-9._~+/=- (${#OTROS} caracteres)" >&2
+  fi
+  echo "Permitido: letras, números y . _ ~ + / = -, de 10 a 200 caracteres." >&2
   exit 1
 fi
 
