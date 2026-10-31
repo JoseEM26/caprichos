@@ -21,6 +21,7 @@ export interface CandidatoResena {
   direccion: string | null;
   rating: number | null;
   total: number | null;
+  enlaceLocal: string | null;
 }
 
 export interface ResenaAdmin {
@@ -126,7 +127,13 @@ export function TarjetaResenasGoogleConfiguracion({ esAdmin: esAdminProp }: { es
     setExito(null);
     try {
       if (accion.tipo === 'negocio') {
-        await api.put('/admin/resenas/negocio', { businessId: accion.candidato.businessId, nombre: accion.candidato.nombre, rating: accion.candidato.rating ?? undefined, total: accion.candidato.total ?? undefined });
+        await api.put('/admin/resenas/negocio', {
+          businessId: accion.candidato.businessId,
+          nombre: accion.candidato.nombre,
+          rating: accion.candidato.rating ?? undefined,
+          total: accion.candidato.total ?? undefined,
+          enlaceLocal: accion.candidato.enlaceLocal ?? undefined,
+        });
         setCandidatos(null);
         setConsulta('');
         setExito('Local guardado. Ya puedes cargar las reseñas.');

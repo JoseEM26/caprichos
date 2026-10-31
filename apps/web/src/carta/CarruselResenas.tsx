@@ -15,6 +15,7 @@ export interface ResenaCarta {
 export interface RespuestaResenasCarta {
   resenas: ResenaCarta[];
   resumen: { rating: number; total: number } | null;
+  enlaceLocal?: string | null;
 }
 
 const INTERVALO_MS = 6000;
@@ -269,6 +270,16 @@ export function CarruselResenas() {
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>{`${datos.resumen.rating} en Google · ${total} ${total === 1 ? 'reseña' : 'reseñas'}`}</span>
                 </span>
               </div>
+            )}
+            {datos.enlaceLocal && (
+              <a
+                href={datos.enlaceLocal}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'var(--cp-cream)', fontWeight: 700, fontSize: 13, textDecoration: 'underline', minHeight: 32, display: 'inline-flex', alignItems: 'center' }}
+              >
+                Ver todas en Google
+              </a>
             )}
             {!movil && flechas}
           </div>

@@ -33,7 +33,7 @@ export class ResenasAdminController {
   @Permiso('configuracion', 'editar')
   async guardarNegocio(@Body() dto: GuardarNegocioDto, @Req() req: any, @Ip() ip: string) {
     soloAdmin(req);
-    return this.resenas.guardarNegocio(dto.businessId, dto.nombre, req.usuario, ip, dto.rating, dto.total);
+    return this.resenas.guardarNegocio(dto.businessId, dto.nombre, req.usuario, ip, dto.rating, dto.total, dto.enlaceLocal);
   }
 
   @Post('carga-inicial')

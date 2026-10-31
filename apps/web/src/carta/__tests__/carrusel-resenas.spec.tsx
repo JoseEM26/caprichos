@@ -63,6 +63,20 @@ describe('CarruselResenas', () => {
     expect(screen.getByRole('img', { name: '5 de 5 estrellas' })).toBeInTheDocument();
   });
 
+  it('Ver todas en Google aparece junto al resumen si hay enlaceLocal', async () => {
+    await montar({ resenas: [resena('a')], resumen: { rating: 4.8, total: 778 }, enlaceLocal: 'https://www.google.com/maps/place/local' });
+    const todas = screen.getByRole('link', { name: 'Ver todas en Google' });
+    expect(todas).toHaveAttribute('href', 'https://www.google.com/maps/place/local');
+    expect(todas).toHaveAttribute('target', '_blank');
+    expect(todas).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('sin enlaceLocal no muestra Ver todas en Google; tarjeta sin enlace no muestra Ver en Google Maps', async () => {
+    await montar({ resenas: [resena('a', undefined, { enlace: null })], resumen: { rating: 4.8, total: 778 }, enlaceLocal: null });
+    expect(screen.queryByRole('link', { name: 'Ver todas en Google' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Ver en Google Maps' })).toBeNull();
+  });
+
   it('recorta el texto a unos 220 caracteres con puntos suspensivos', () => {
     const largo = 'a'.repeat(300);
     expect(recortarTexto(largo)).toBe('a'.repeat(220) + '...');

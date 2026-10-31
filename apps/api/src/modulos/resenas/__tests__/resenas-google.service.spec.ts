@@ -150,12 +150,28 @@ describe('ResenasGoogleService', () => {
     fetchMock.mockResolvedValueOnce(
       respuesta(200, {
         status: 'OK',
-        data: [{ business_id: 'biz-9', name: 'Caprichos Campoy', full_address: 'Av. X', rating: 4.8, review_count: 778 }],
+        data: [
+          {
+            business_id: 'biz-9',
+            name: 'Caprichos Campoy',
+            full_address: 'Av. X',
+            rating: 4.8,
+            review_count: 778,
+            reviews_link: 'https://www.google.com/maps/place/Caprichos/reviews',
+          },
+        ],
       }),
     );
     const r: any = await svc.buscarNegocio('caprichos campoy', AHORA);
     expect(r.ok).toBe(true);
-    expect(r.candidatos[0]).toEqual({ businessId: 'biz-9', nombre: 'Caprichos Campoy', direccion: 'Av. X', rating: 4.8, total: 778 });
+    expect(r.candidatos[0]).toEqual({
+      businessId: 'biz-9',
+      nombre: 'Caprichos Campoy',
+      direccion: 'Av. X',
+      rating: 4.8,
+      total: 778,
+      enlaceLocal: 'https://www.google.com/maps/place/Caprichos/reviews',
+    });
     expect(fp.params.get(`resenas_consumo_${mesActual}`)).toBe(3);
     expect(fp.params.has('resenas_negocio')).toBe(false);
     const url = String(fetchMock.mock.calls[0][0]);
@@ -269,13 +285,56 @@ describe('ResenasGoogleService', () => {
     const { svc } = crear({
       params: { resenas_resumen: { rating: 4.8, total: 778 } },
       filas: [
-        { id: 1n, google_review_id: 'a', visible: true, autor_nombre: 'Ana', autor_foto_url: null, calificacion: 5, texto: LARGO, publicada_en: new Date('2026-10-01T00:00:00Z'), enlace_resena: 'L' },
+        { id: 1n, google_review_id: 'a', visible: true, autor_nombre: 'Ana', autor_foto_url: null, calificacion: 5, texto: LARGO, publicada_en: new Date('2026-10-01T00:00:00Z'), enlace_resena: 'https://g.co/L' },
         { id: 2n, google_review_id: 'b', visible: false, autor_nombre: 'Luis', calificacion: 5, texto: LARGO, publicada_en: null, enlace_resena: null },
       ],
     });
     const r: any = await svc.listarPublico();
     expect(r.resenas.map((x: any) => x.id)).toEqual(['1']);
-    expect(r.resenas[0]).toEqual({ id: '1', autor: 'Ana', foto: null, estrellas: 5, texto: LARGO, fecha: '2026-10-01T00:00:00.000Z', enlace: 'L' });
+    expect(r.resenas[0]).toEqual({ id: '1', autor: 'Ana', foto: null, estrellas: 5, texto: LARGO, fecha: '2026-10-01T00:00:00.000Z', enlace: 'https://g.co/L' });
     expect(r.resumen).toEqual({ rating: 4.8, total: 778 });
+    expect(r.enlaceLocal).toBeNull();
+  });
+
+  it('listarPublico: review_link válido se usa tal cual', async () => {
+    const { svc } = crear({
+      params: { resenas_negocio: { businessId: 'biz-1', nombre: 'X', enlaceLocal: 'https://www.google.com/maps/place/local' } },
+      filas: [{ id: 1n, google_review_id: 'a', visible: true, autor_nombre: 'Ana', calificacion: 5, texto: LARGO, enlace_resena: 'https://maps.google.com/?cid=1' }],
+    });
+    const r: any = await svc.listarPublico();
+    expect(r.resenas[0].enlace).toBe('https://maps.google.com/?cid=1');
+    expect(r.enlaceLocal).toBe('https://www.google.com/maps/place/local');
+  });
+
+  it('listarPublico: review_link inválido cae al enlace del local', async () => {
+    const { svc } = crear({
+      params: { resenas_negocio: { businessId: 'biz-1', nombre: 'X', enlaceLocal: 'https://www.google.com/maps/place/local' } },
+      filas: [
+        { id: 1n, google_review_id: 'a', visible: true, autor_nombre: 'Ana', calificacion: 5, texto: LARGO, enlace_resena: 'http://google.com/maps/x' },
+        { id: 2n, google_review_id: 'b', visible: true, autor_nombre: 'Luis', calificacion: 5, texto: LARGO, enlace_resena: 'https://evil.com/google.com' },
+      ],
+    });
+    const r: any = await svc.listarPublico();
+    expect(r.resenas.map((x: any) => x.enlace)).toEqual(['https://www.google.com/maps/place/local', 'https://www.google.com/maps/place/local']);
+  });
+
+  it('listarPublico: sin review_link válido ni enlace del local, enlace null', async () => {
+    const { svc } = crear({
+      params: { resenas_negocio: { businessId: 'biz-1', nombre: 'X' } },
+      filas: [{ id: 1n, google_review_id: 'a', visible: true, autor_nombre: 'Ana', calificacion: 5, texto: LARGO, enlace_resena: null }],
+    });
+    const r: any = await svc.listarPublico();
+    expect(r.resenas[0].enlace).toBeNull();
+    expect(r.enlaceLocal).toBeNull();
+  });
+
+  it('guardarNegocio guarda el enlace del local solo si es de Google', async () => {
+    const { svc, fp } = crear({ params: {} });
+    await svc.guardarNegocio('biz-9', 'Caprichos Campoy', undefined, undefined, 4.8, 778, 'https://www.google.com/maps/place/local');
+    expect(fp.params.get('resenas_negocio')).toEqual({ businessId: 'biz-9', nombre: 'Caprichos Campoy', enlaceLocal: 'https://www.google.com/maps/place/local' });
+
+    const otro = crear({ params: {} });
+    await otro.svc.guardarNegocio('biz-9', 'Caprichos Campoy', undefined, undefined, 4.8, 778, 'https://evil.com/x');
+    expect(otro.fp.params.get('resenas_negocio')).toEqual({ businessId: 'biz-9', nombre: 'Caprichos Campoy', enlaceLocal: null });
   });
 });

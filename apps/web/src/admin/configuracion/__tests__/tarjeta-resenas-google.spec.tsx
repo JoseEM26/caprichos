@@ -46,7 +46,7 @@ describe('Tarjeta de Reseñas de Google (admin)', () => {
     vi.spyOn(api, 'get').mockResolvedValue({ estado: estado({ negocio: null }), resenas: [] });
     const post = vi.spyOn(api, 'post').mockResolvedValue({
       ok: true,
-      candidatos: [{ businessId: 'biz-9', nombre: 'Caprichos Campoy', direccion: 'Av. Campoy 1', rating: 4.8, total: 778 }],
+      candidatos: [{ businessId: 'biz-9', nombre: 'Caprichos Campoy', direccion: 'Av. Campoy 1', rating: 4.8, total: 778, enlaceLocal: 'https://www.google.com/maps/place/local' }],
     });
     const put = vi.spyOn(api, 'put').mockResolvedValue({});
     render(<TarjetaResenasGoogleConfiguracion esAdmin />);
@@ -58,7 +58,15 @@ describe('Tarjeta de Reseñas de Google (admin)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Usar este local' }));
     expect(put).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /Sí, confirmar/ }));
-    await waitFor(() => expect(put).toHaveBeenCalledWith('/admin/resenas/negocio', { businessId: 'biz-9', nombre: 'Caprichos Campoy', rating: 4.8, total: 778 }));
+    await waitFor(() =>
+      expect(put).toHaveBeenCalledWith('/admin/resenas/negocio', {
+        businessId: 'biz-9',
+        nombre: 'Caprichos Campoy',
+        rating: 4.8,
+        total: 778,
+        enlaceLocal: 'https://www.google.com/maps/place/local',
+      }),
+    );
   });
 
   it('muestra consumo, totales y deshabilita Actualizar ahora con el motivo', async () => {

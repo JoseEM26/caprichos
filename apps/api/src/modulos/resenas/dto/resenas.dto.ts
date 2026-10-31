@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsString, IsUrl, Length, MaxLength } from 'class-validator';
 
 export class BuscarNegocioDto {
   @IsString()
@@ -22,6 +22,11 @@ export class GuardarNegocioDto {
   @IsOptional()
   @IsNumber()
   total?: number;
+
+  @IsOptional()
+  @IsUrl({ protocols: ['https'], require_protocol: true }, { message: 'El enlace del local debe ser una URL https' })
+  @MaxLength(500)
+  enlaceLocal?: string;
 }
 
 export class CargaInicialDto {

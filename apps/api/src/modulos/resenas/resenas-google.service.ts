@@ -42,6 +42,7 @@ export interface Fallo {
 export interface NegocioGuardado {
   businessId: string;
   nombre: string;
+  enlaceLocal: string | null;
 }
 
 const MENSAJES: Record<MotivoResenas, string> = {
@@ -59,6 +60,32 @@ const MENSAJES: Record<MotivoResenas, string> = {
 };
 
 const fallo = (motivo: MotivoResenas): Fallo => ({ ok: false, motivo, mensaje: MENSAJES[motivo] });
+
+const HOSTS_GOOGLE_EXACTOS = ['g.co', 'goo.gl', 'maps.app.goo.gl'];
+
+/** Enlace seguro a Google: solo https y dominios de Google (google.com y subdominios, g.co, goo.gl). Otro valor da null. */
+export function enlaceGoogleSeguro(valor: unknown): string | null {
+  if (typeof valor !== 'string' || valor.length > 500) return null;
+  let u: URL;
+  try {
+    u = new URL(valor.trim());
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase();
+  const esGoogle = host === 'google.com' || host.endsWith('.google.com') || HOSTS_GOOGLE_EXACTOS.includes(host);
+  return u.protocol === 'https:' && !u.username && !u.password && esGoogle ? u.toString() : null;
+}
+
+/** Enlace del local desde /search: reviews_link o place_link; si no vienen, se arma con el place_id. */
+function enlaceLocalDe(x: any): string | null {
+  const placeId = typeof x.place_id === 'string' ? x.place_id : '';
+  return (
+    enlaceGoogleSeguro(x.reviews_link) ??
+    enlaceGoogleSeguro(x.place_link) ??
+    (placeId ? enlaceGoogleSeguro(`https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(placeId)}`) : null)
+  );
+}
 
 /**
  * Reseñas de Google Maps para la carta. La carta solo lee la base; la API externa se llama
@@ -125,7 +152,9 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
 
   private async negocio(): Promise<NegocioGuardado | null> {
     const v = await this.param('resenas_negocio');
-    return v && typeof v.businessId === 'string' && v.businessId ? { businessId: v.businessId, nombre: String(v.nombre ?? '') } : null;
+    return v && typeof v.businessId === 'string' && v.businessId
+      ? { businessId: v.businessId, nombre: String(v.nombre ?? ''), enlaceLocal: enlaceGoogleSeguro(v.enlaceLocal) }
+      : null;
   }
 
   private async consumoMes(ahora: Date): Promise<number> {
@@ -240,16 +269,17 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
         direccion: x.full_address ?? null,
         rating: x.rating ?? null,
         total: x.review_count ?? null,
+        enlaceLocal: enlaceLocalDe(x),
       }))
       .filter((c: any) => c.businessId && c.nombre);
     return { ok: true, candidatos };
   }
 
   /** Guarda el negocio elegido. Una vez configurado no se cambia desde la app (evita mezclar reseñas de dos locales). */
-  async guardarNegocio(businessId: string, nombre: string, usuario?: UsuarioAutenticado, ip?: string, rating?: number, total?: number) {
+  async guardarNegocio(businessId: string, nombre: string, usuario?: UsuarioAutenticado, ip?: string, rating?: number, total?: number, enlaceLocal?: string) {
     const actual = await this.negocio();
     if (actual && actual.businessId !== businessId) throw new ConflictException(fallo('NEGOCIO_YA_CONFIGURADO'));
-    const nuevo = { businessId, nombre };
+    const nuevo = { businessId, nombre, enlaceLocal: enlaceGoogleSeguro(enlaceLocal) };
     await this.guardarParam('resenas_negocio', nuevo);
     // El resumen (4.8 · 778) sale de la búsqueda: business-reviews no lo trae de forma confiable
     if (Number.isFinite(rating) && Number.isFinite(total)) await this.guardarParam('resenas_resumen', { rating, total });
@@ -481,20 +511,24 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
   }
 
   async listarPublico() {
-    const [filas, resumen] = await Promise.all([
+    const [filas, resumen, negocio] = await Promise.all([
       this.prisma.resenaGoogle.findMany({
         where: { visible: true },
         orderBy: [{ publicada_en: 'desc' }, { id: 'desc' }],
         take: 30,
       }),
       this.param('resenas_resumen'),
+      this.negocio(),
     ]);
+    const enlaceLocal = negocio?.enlaceLocal ?? null;
     return {
       resenas: filas.map((r) => {
-        const { id, autor, foto, estrellas, texto, fecha, enlace } = this.serializarAdmin(r);
-        return { id, autor, foto, estrellas, texto, fecha, enlace };
+        const { id, autor, foto, estrellas, texto, fecha } = this.serializarAdmin(r);
+        // La reseña enlaza a su propia página si el enlace es válido; si no, al local
+        return { id, autor, foto, estrellas, texto, fecha, enlace: enlaceGoogleSeguro(r.enlace_resena) ?? enlaceLocal };
       }),
       resumen: resumen && typeof resumen.rating === 'number' && typeof resumen.total === 'number' ? { rating: resumen.rating, total: resumen.total } : null,
+      enlaceLocal,
     };
   }
 
