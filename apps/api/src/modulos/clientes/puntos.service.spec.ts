@@ -85,6 +85,35 @@ describe('PuntosService', () => {
       );
     });
 
+    it('party de puntos (sin cuenta, solo celular) suma puntos del pedido de carta', async () => {
+      prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 120n,
+        canal: 'CARTA',
+        party_id: null,
+        cliente_party_id: 300n,
+        total: '70.00',
+        envio: '0.00',
+        cupon_id: null,
+        cupon_emitido_id: null,
+        puntos_canjeados: '0',
+      });
+      prismaMock.partyRole.findFirst.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.party_id === 300n ? { id: 60n, party_id: 300n, customer_detail: { party_role_id: 60n, puntos: '0' } } : null),
+      );
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'puntos_porcentaje', valor: 5 });
+      prismaMock.pedidoLinea.findMany.mockResolvedValue([
+        { id: 1n, producto_id: 7n, oferta_id: null, linea_combo_id: null, cantidad: 2, precio_unit: '35.00', subtotal: '70.00', producto: { no_suma_beneficios: false } },
+      ]);
+
+      const res = await service.acumularPorPedido(120n);
+
+      expect(res.sumados).toBe(true);
+      expect(prismaMock.movimientoPuntos.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ party_id: 300n, tipo: 'SUMA' }) }),
+      );
+    });
+
     it('pedido de MOZO sin DNI (invitado) no suma puntos aunque party_id sea el mozo', async () => {
       prismaMock.movimientoPuntos.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({

@@ -1,5 +1,7 @@
 // El gateway importa @nestjs/jwt (ESM): en las pruebas basta con un doble
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
+// party-puntos.service importa clientes.service (@nestjs/jwt, ESM): en las pruebas basta con un doble
+jest.mock('../clientes/party-puntos.service', () => ({ PartyPuntosService: class {} }));
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
@@ -15,6 +17,7 @@ import { ZonasService } from '../zonas/zonas.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { PuntosService } from '../clientes/puntos.service';
 import { DireccionesClienteService } from '../clientes/direcciones-cliente.service';
+import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { PagoPlanService } from './pago-plan.service';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
@@ -28,6 +31,7 @@ describe('PedidosService', () => {
   let ofertasServiceMock: any;
   let puntosServiceMock: any;
   let direccionesMock: any;
+  let partyPuntosMock: any;
 
   const mockProductoCafe = {
     id: 1n,
@@ -193,9 +197,14 @@ describe('PedidosService', () => {
       registrarUso: jest.fn().mockResolvedValue({ id: '1' }),
     };
 
+    partyPuntosMock = {
+      resolverOCrear: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PedidosService,
+        { provide: PartyPuntosService, useValue: partyPuntosMock },
         { provide: DireccionesClienteService, useValue: direccionesMock },
         { provide: PrismaService, useValue: prismaMock },
         { provide: LocalService, useValue: localServiceMock },
@@ -649,6 +658,23 @@ describe('PedidosService', () => {
     });
 
     describe('canje de puntos (DT-55)', () => {
+      beforeEach(() => {
+        direccionesMock.datosCuentaActiva.mockResolvedValue({ nombre: 'Ana', telefono: '987654321' });
+      });
+
+      it('un party de puntos sin cuenta activa no puede canjear: PUNTOS_REQUIEREN_CUENTA', async () => {
+        direccionesMock.datosCuentaActiva.mockResolvedValue(null);
+        puntosServiceMock.obtenerSaldo.mockResolvedValue(50);
+
+        const err = await service
+          .crear({ ...pedidoBaseDto, puntosCanje: 10 }, 'idemp-canje-sin-cuenta', { canal: 'CARTA', clientePartyId: 300n })
+          .catch((e) => e);
+
+        expect(err.getResponse()).toMatchObject({ codigo: 'PUNTOS_REQUIEREN_CUENTA' });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        expect(puntosServiceMock.canjear).not.toHaveBeenCalled();
+      });
+
       it('rechaza un canje mayor al monto elegible con TOPE_CANJE_EXCEDIDO', async () => {
         // Subtotal = 28 sin descuento: elegible = 28. Canje de 30 excede el monto de productos
         puntosServiceMock.obtenerSaldo.mockResolvedValue(50);
@@ -1043,6 +1069,112 @@ describe('PedidosService', () => {
 
       expect(direccionesMock.resolverPartyPorTelefono).not.toHaveBeenCalled();
       expect(capturado.data.cliente_party_id ?? null).toBeNull();
+    });
+  });
+
+  describe('celular sin cuenta suma puntos y regla del invitado', () => {
+    const crearCapturado = () => {
+      const capturado: { data?: any } = {};
+      prismaMock.pedido.create.mockImplementation(({ data }: any) => {
+        capturado.data = data;
+        return Promise.resolve({
+          id: 310n,
+          codigo: 'CP-W310',
+          estado: 'COLA',
+          subtotal: Number(data.subtotal),
+          descuento: 0,
+          envio: data.envio !== null ? Number(data.envio) : null,
+          total: Number(data.total),
+        });
+      });
+      return capturado;
+    };
+    const conParametro = (clave: string, valor: string | null) => {
+      const base = prismaMock.parametro.findUnique.getMockImplementation();
+      prismaMock.parametro.findUnique.mockImplementation(({ where }: any) =>
+        where.clave === clave ? Promise.resolve(valor === null ? null : { clave, valor }) : base({ where }),
+      );
+    };
+
+    beforeEach(() => {
+      partyPuntosMock.resolverOCrear.mockResolvedValue(300n);
+    });
+
+    it('CARTA sin sesión con celular: el pedido queda en el party de puntos de ese celular', async () => {
+      const capturado = crearCapturado();
+      await service.crear(pedidoBaseDto, 'idemp-pp-carta', undefined);
+      expect(partyPuntosMock.resolverOCrear).toHaveBeenCalledWith('987654321');
+      expect(capturado.data.cliente_party_id).toBe(300n);
+    });
+
+    it('WhatsApp con teléfono de quien escribe: usa el party de puntos', async () => {
+      const capturado = crearCapturado();
+      await service.crear(pedidoBaseDto, 'idemp-pp-wa', { canal: 'WHATSAPP', telefonoRemitente: '987654321' });
+      expect(partyPuntosMock.resolverOCrear).toHaveBeenCalledWith('987654321');
+      expect(capturado.data.cliente_party_id).toBe(300n);
+    });
+
+    it('WhatsApp «No, gracias» (sinCuentaCliente) no crea ni busca party de puntos', async () => {
+      crearCapturado();
+      await service.crear(pedidoBaseDto, 'idemp-pp-wa-no', { canal: 'WHATSAPP', telefonoRemitente: '987654321', sinCuentaCliente: true });
+      expect(partyPuntosMock.resolverOCrear).not.toHaveBeenCalled();
+    });
+
+    it('MOZO con celular sin cuenta: usa el party de puntos en vez de CLIENTE_NO_ENCONTRADO', async () => {
+      const capturado = crearCapturado();
+      await service.crear({ ...pedidoBaseDto, clienteTelefono: '912345678' } as any, 'idemp-pp-mozo', { canal: 'MOZO', mesaNombre: 'Mesa 2' });
+      expect(partyPuntosMock.resolverOCrear).toHaveBeenCalledWith('912345678');
+      expect(capturado.data.cliente_party_id).toBe(300n);
+    });
+
+    it('MOZO con celular que no se puede usar (inválido o desactivado): CLIENTE_NO_ENCONTRADO', async () => {
+      partyPuntosMock.resolverOCrear.mockResolvedValue(null);
+      const err = await service
+        .crear({ ...pedidoBaseDto, clienteTelefono: '912345678' } as any, 'idemp-pp-mozo-no', { canal: 'MOZO', mesaNombre: 'Mesa 2' })
+        .catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'CLIENTE_NO_ENCONTRADO' });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('CELULAR_REQUERIDO: carta sin sesión, sin celular y con invitado apagado (sin parámetro)', async () => {
+      const err = await service
+        .crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana' } } as any, 'idemp-celular-off', { canal: 'CARTA' })
+        .catch((e) => e);
+      expect(err.getResponse()).toEqual({
+        codigo: 'CELULAR_REQUERIDO',
+        mensaje: 'Escribe tu celular para hacer tu pedido y sumar puntos',
+      });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('CELULAR_REQUERIDO: el placeholder 999999999 cuenta como sin celular', async () => {
+      const err = await service
+        .crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana', telefono: '999999999' } } as any, 'idemp-celular-relleno', { canal: 'CARTA' })
+        .catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'CELULAR_REQUERIDO' });
+    });
+
+    it('invitado apagado (valor «no») también exige celular', async () => {
+      conParametro('carta_invitado_activo', 'no');
+      const err = await service
+        .crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana' } } as any, 'idemp-celular-no', { canal: 'CARTA' })
+        .catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'CELULAR_REQUERIDO' });
+    });
+
+    it('invitado encendido: pide sin celular, queda como invitado (sin party de puntos)', async () => {
+      conParametro('carta_invitado_activo', 'si');
+      const capturado = crearCapturado();
+      await service.crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana' } } as any, 'idemp-invitado-on', { canal: 'CARTA' });
+      expect(partyPuntosMock.resolverOCrear).not.toHaveBeenCalled();
+      expect(capturado.data.cliente_party_id).toBeNull();
+      expect(capturado.data.cliente_telefono).toBeNull();
+    });
+
+    it('invitado apagado con celular válido: pide y suma puntos', async () => {
+      const capturado = crearCapturado();
+      await service.crear(pedidoBaseDto, 'idemp-celular-ok', { canal: 'CARTA' });
+      expect(capturado.data.cliente_party_id).toBe(300n);
     });
   });
 });

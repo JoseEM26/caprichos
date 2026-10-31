@@ -949,7 +949,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
       <NotificacionAgregado />
 
       {/* Cuenta del cliente */}
-      <PanelCuenta alVerPedidos={() => setListaPedidosAbierta(true)} />
+      <PanelCuenta alVerPedidos={() => setListaPedidosAbierta(true)} invitadoPermitido={datosLocal?.invitadoPermitido === true} />
         </>
       )}
     </div>

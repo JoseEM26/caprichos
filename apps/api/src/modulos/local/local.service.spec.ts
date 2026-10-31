@@ -452,6 +452,15 @@ describe('LocalService', () => {
       expect(res.horario[1].dia).toBe('Martes');
     });
 
+    it('obtenerDatosPublicosLocal indica si pedir como invitado está permitido (false si no existe el parámetro)', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'carta_invitado_activo', valor: 'si' }]);
+      prismaMock.horarioDia.findMany.mockResolvedValue([]);
+      expect((await service.obtenerDatosPublicosLocal()).invitadoPermitido).toBe(true);
+
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      expect((await service.obtenerDatosPublicosLocal()).invitadoPermitido).toBe(false);
+    });
+
     it('obtenerDatosPublicosLocal devuelve lat y lng personalizados cuando existen en local_datos', async () => {
       prismaMock.parametro.findMany.mockResolvedValue([
         {

@@ -16,6 +16,7 @@ import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiqueta
 import { TarjetaAyudaIaConfiguracion } from './TarjetaAyudaIaConfiguracion';
 import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion';
 import { TarjetaControlAlmacenConfiguracion } from './TarjetaControlAlmacenConfiguracion';
+import { TarjetaInvitadoConfiguracion } from './TarjetaInvitadoConfiguracion';
 import { TarjetaPantallaIngresoConfiguracion } from './TarjetaPantallaIngresoConfiguracion';
 import { BuscadorConfiguracion } from './BuscadorConfiguracion';
 import { NavegacionConfiguracion, useEsMovil, grupoDe } from './NavegacionConfiguracion';
@@ -896,6 +897,7 @@ export function ConfiguracionLocalView() {
           {!TABS_PROPIAS.includes(tabId) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && <TarjetaControlAlmacenConfiguracion />}
+              {tabId === 'operacion' && <TarjetaInvitadoConfiguracion />}
               {tabId === 'operacion' && (
                 <div
                   style={{

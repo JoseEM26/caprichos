@@ -322,6 +322,12 @@ describe('ConfiguracionService', () => {
       expect(prismaMock.parametro.upsert).not.toHaveBeenCalled();
     });
 
+    it('carta_invitado_activo acepta booleano o si/no y lo guarda como si/no; otro valor se rechaza', async () => {
+      expect(await service.actualizar('carta_invitado_activo', true, adminAuth)).toEqual({ clave: 'carta_invitado_activo', valor: 'si' });
+      expect(await service.actualizar('carta_invitado_activo', 'no', adminAuth)).toEqual({ clave: 'carta_invitado_activo', valor: 'no' });
+      await expect(service.actualizar('carta_invitado_activo', 'quizas', adminAuth)).rejects.toThrow(BadRequestException);
+    });
+
     it('ayuda_ia_activo acepta booleano y lo guarda como si/no', async () => {
       const res = await service.actualizar('ayuda_ia_activo', true, adminAuth);
       expect(res).toEqual({ clave: 'ayuda_ia_activo', valor: 'si' });

@@ -76,8 +76,9 @@ describe('PanelCuenta ▸ acceso con celular', () => {
     expect(screen.getByLabelText('Contraseña')).toHaveAttribute('type', 'text');
   });
 
-  it('crear cuenta no pide DNI, usa el consentimiento del servidor y manda lo nuevo', async () => {
+  it('crear cuenta: primero envía el código por WhatsApp, luego crea la cuenta con ese código', async () => {
     const registrar = vi.fn().mockResolvedValue(undefined);
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ ok: true });
     mockCuenta({ registrar });
     render(<PanelCuenta />);
 
@@ -88,20 +89,75 @@ describe('PanelCuenta ▸ acceso con celular', () => {
     escribir('Nombre', 'Ana Pérez');
     escribir('Celular', '912345678');
     escribir('Contraseña', 'clave');
-    fireEvent.click(screen.getByRole('button', { name: 'Crear mi cuenta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('al menos 8 caracteres');
 
     escribir('Contraseña', 'ClaveSegura2026!');
     expect(screen.getByRole('status')).toHaveTextContent('buena');
-    fireEvent.click(screen.getByRole('button', { name: 'Crear mi cuenta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Debes aceptar');
 
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Crear mi cuenta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/carta/cuenta/registro/codigo', { telefono: '912345678' }));
+    expect(registrar).not.toHaveBeenCalled();
+
+    escribir('Código de 6 dígitos (llega por WhatsApp)', '123456');
+    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
     await waitFor(() => expect(registrar).toHaveBeenCalledTimes(1));
     const enviado = registrar.mock.calls[0][0];
-    expect(enviado).toEqual(expect.objectContaining({ nombre: 'Ana Pérez', telefono: '912345678', aceptaDatos: true }));
+    expect(enviado).toEqual(expect.objectContaining({ nombre: 'Ana Pérez', telefono: '912345678', codigo: '123456', aceptaDatos: true }));
     expect(enviado).not.toHaveProperty('dni');
+  });
+
+  it('crear cuenta: el código tiene 6 dígitos, el reenvío espera 60 s y el DNI es opcional con 8 dígitos', async () => {
+    const registrar = vi.fn().mockResolvedValue(undefined);
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ ok: true });
+    mockCuenta({ registrar });
+    render(<PanelCuenta />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
+    escribir('Nombre', 'Ana Pérez');
+    escribir('Celular', '912345678');
+    escribir('Contraseña', 'ClaveSegura2026');
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByLabelText('DNI (opcional)')).toBeInTheDocument();
+    expect(screen.getByText('Lo pides solo si quieres: tu celular es lo que te identifica.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
+
+    expect(await screen.findByRole('button', { name: 'Reenviar código en 60 s' })).toBeDisabled();
+    escribir('Código de 6 dígitos (llega por WhatsApp)', '12');
+    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('El código tiene 6 dígitos.');
+    expect(registrar).not.toHaveBeenCalled();
+
+    escribir('DNI (opcional)', '1234');
+    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('El DNI debe tener 8 dígitos');
+    expect(registrar).not.toHaveBeenCalled();
+
+    escribir('DNI (opcional)', '12345678');
+    escribir('Código de 6 dígitos (llega por WhatsApp)', '654321');
+    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+    await waitFor(() => expect(registrar).toHaveBeenCalledTimes(1));
+    expect(registrar.mock.calls[0][0]).toEqual(expect.objectContaining({ codigo: '654321', dni: '12345678' }));
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  it('código incorrecto muestra el mensaje del servidor sin crear la cuenta', async () => {
+    const registrar = vi.fn().mockRejectedValue(new ErrorApi('CODIGO_INVALIDO', 'El código no es correcto o ya venció. Pide uno nuevo.', 400));
+    vi.spyOn(api, 'post').mockResolvedValue({ ok: true });
+    mockCuenta({ registrar });
+    render(<PanelCuenta />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
+    escribir('Nombre', 'Ana Pérez');
+    escribir('Celular', '912345678');
+    escribir('Contraseña', 'ClaveSegura2026');
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
+    await screen.findByLabelText('Código de 6 dígitos (llega por WhatsApp)');
+    escribir('Código de 6 dígitos (llega por WhatsApp)', '000000');
+    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('El código no es correcto o ya venció. Pide uno nuevo.');
   });
 
   it('los enlaces legales abren el texto del servidor con títulos y párrafos', async () => {
@@ -127,7 +183,11 @@ describe('PanelCuenta ▸ acceso con celular', () => {
     escribir('Celular', '912345678');
     escribir('Contraseña', 'ClaveSegura2026');
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Crear mi cuenta' }));
+    vi.spyOn(api, 'post').mockResolvedValue({ ok: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código por WhatsApp' }));
+    await screen.findByLabelText('Código de 6 dígitos (llega por WhatsApp)');
+    escribir('Código de 6 dígitos (llega por WhatsApp)', '123456');
+    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Ese celular ya tiene cuenta: ingresa o recupera tu contraseña.');
   });
 
@@ -176,14 +236,15 @@ describe('PanelCuenta ▸ acceso con celular', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('El código no es correcto o ya venció.');
   });
 
-  it('el panel de la cuenta no menciona el DNI en ninguna pestaña', async () => {
+  it('el DNI aparece solo como dato opcional al crear la cuenta, nunca para ingresar ni recuperar', async () => {
     mockCuenta({});
     const { container } = render(<PanelCuenta />);
     expect(container.textContent).not.toMatch(/DNI/i);
     fireEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
     await screen.findByText(/Acepto que Caprichos/);
-    expect(container.textContent).not.toMatch(/DNI/i);
+    expect(screen.getByLabelText('DNI (opcional)')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Ingresar' }));
+    expect(container.textContent).not.toMatch(/DNI/i);
     fireEvent.click(screen.getByRole('button', { name: '¿Olvidaste tu contraseña?' }));
     expect(container.textContent).not.toMatch(/DNI/i);
   });

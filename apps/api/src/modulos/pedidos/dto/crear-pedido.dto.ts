@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  ValidateIf,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -19,9 +20,11 @@ export class ClienteDto {
   @IsNotEmpty({ message: 'El nombre del cliente es requerido' })
   nombre!: string;
 
+  /** Opcional en la carta cuando se pide como invitado (el servicio exige el celular si el invitado está apagado). */
+  @ValidateIf((o: ClienteDto) => !!o.telefono)
   @IsString({ message: 'El teléfono debe ser un texto' })
   @Matches(/^9\d{8}$/, { message: 'El teléfono debe tener 9 dígitos y empezar con 9' })
-  telefono!: string;
+  telefono?: string;
 }
 
 export class EntregaDto {

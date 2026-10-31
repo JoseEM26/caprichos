@@ -98,6 +98,7 @@ export const CLAVES_TEXTO = [
   'carta_aviso_entrada',
   'ayuda_ia_activo',
   'stock_control_activo',
+  'carta_invitado_activo',
   'terminos_texto',
   'privacidad_texto',
   'chatbot_activo',
@@ -201,6 +202,7 @@ export class ConfiguracionService {
         clave === 'carta_aviso_entrada' ||
         clave === 'ayuda_ia_activo' ||
         clave === 'stock_control_activo' ||
+        clave === 'carta_invitado_activo' ||
         clave === 'chatbot_activo' ||
         clave === 'chatbot_ia_activo' ||
         clave === 'chatbot_avisos_equipo_activo' ||

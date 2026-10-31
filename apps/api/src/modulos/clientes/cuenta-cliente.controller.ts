@@ -21,6 +21,7 @@ import { PuntosService } from './puntos.service';
 import { ClientesService } from './clientes.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 import { RecuperarClaveService } from './recuperar-clave.service';
+import { CodigoRegistroService } from './codigo-registro.service';
 import { IngresoClienteDto, PerfilClienteDto, RegistroClienteDto } from './clientes.tipos';
 
 @Controller('carta/cuenta')
@@ -31,6 +32,7 @@ export class CuentaClienteController {
     private readonly direcciones: DireccionesClienteService,
     private readonly puntos: PuntosService,
     private readonly recuperar: RecuperarClaveService,
+    private readonly codigoRegistro: CodigoRegistroService,
   ) {}
 
   @Post('registro')
@@ -52,6 +54,13 @@ export class CuentaClienteController {
     });
 
     return { cliente };
+  }
+
+  /** Envía por WhatsApp el código de 6 dígitos que pide crear la cuenta. Responde lo mismo, salvo si ya tiene cuenta. */
+  @Post('registro/codigo')
+  @HttpCode(200)
+  async solicitarCodigoRegistro(@Body('telefono') telefono: string) {
+    return this.codigoRegistro.solicitar(telefono);
   }
 
   @Post('ingresar')

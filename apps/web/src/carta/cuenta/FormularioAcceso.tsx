@@ -104,7 +104,7 @@ function VentanaLegal({ info, cual, alCerrar }: { info: CartaLegalInfo | null; c
 }
 
 /** Acceso de quien no tiene sesión: ingresar, crear cuenta y recuperar contraseña (celular + contraseña, sin DNI). */
-export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () => void }) {
+export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }: { alSeguirInvitado: () => void; invitadoPermitido?: boolean }) {
   const { ingresar, registrar } = useCuenta();
   const [modo, setModo] = useState<Modo>('in');
   const [nombre, setNombre] = useState('');
@@ -114,6 +114,8 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
   const [correo, setCorreo] = useState('');
   const [acepta, setAcepta] = useState(false);
   const [codigo, setCodigo] = useState('');
+  const [dni, setDni] = useState('');
+  const [codigoEnviado, setCodigoEnviado] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [aviso, setAviso] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -139,6 +141,7 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
   const ir = (m: Modo) => {
     setModo(m);
     setMensaje('');
+    setCodigoEnviado(false);
     if (m !== 'in') setAviso('');
   };
 
@@ -171,11 +174,32 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
     if (contrasena.length < 8) return setMensaje('La contraseña debe tener al menos 8 caracteres.');
     if (correo && !CORREO_VALIDO.test(correo)) return setMensaje('El correo no es válido.');
     if (!acepta) return setMensaje('Debes aceptar el uso de tus datos para crear la cuenta.');
+    if (dni && !/^\d{8}$/.test(dni)) return setMensaje('El DNI debe tener 8 dígitos. Déjalo vacío si no quieres darlo.');
+    if (!codigoEnviado) return enviarCodigoRegistro();
+    if (!/^\d{6}$/.test(codigo)) return setMensaje('El código tiene 6 dígitos.');
     return correr(async () => {
-      await registrar({ nombre: nombre.trim(), telefono, contrasena, correo: correo.trim() || undefined, cumpleanos: cumple || undefined, aceptaDatos: true });
+      await registrar({
+        nombre: nombre.trim(),
+        telefono,
+        contrasena,
+        codigo,
+        ...(dni ? { dni } : {}),
+        correo: correo.trim() || undefined,
+        cumpleanos: cumple || undefined,
+        aceptaDatos: true,
+      });
       setContrasena('');
     }, 'No se pudo crear la cuenta. Intenta de nuevo.');
   };
+
+  /** Registro: antes de crear la cuenta, el código de 6 dígitos llega por WhatsApp al celular. */
+  const enviarCodigoRegistro = () =>
+    correr(async () => {
+      await api.post('/carta/cuenta/registro/codigo', { telefono });
+      setAviso('Te enviamos un código por WhatsApp. Vence en 10 minutos.');
+      setCodigoEnviado(true);
+      setEspera(60);
+    }, 'No se pudo enviar el código. Intenta de nuevo.');
 
   const pedirCodigo = async () => {
     if (!TELEFONO_VALIDO.test(telefono)) return setMensaje(MENSAJE_TELEFONO);
@@ -214,7 +238,7 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
   return (
     <>
       <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cp-soft)' }}>
-        Con tu cuenta acumulas <b>puntos por lo que pagas</b> y los usas en tus siguientes pedidos. Es opcional: también puedes pedir como invitado, sin cuenta.
+        Con tu cuenta acumulas <b>puntos por lo que pagas</b> y los usas en tus siguientes pedidos. {invitadoPermitido ? 'Es opcional: también puedes pedir como invitado, sin cuenta.' : 'Es opcional: también puedes pedir con tu celular, sin cuenta.'}
       </div>
       {pestanas}
       {aviso && modo !== 'rec2' && <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-ok)' }}>{aviso}</div>}
@@ -241,6 +265,11 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
             <div style={ayuda}>Para enviarte tu cupón de cumpleaños.</div>
           </div>
           <div>
+            <label htmlFor="ac-dni" style={etiqueta}>DNI (opcional)</label>
+            <input id="ac-dni" type="text" inputMode="numeric" maxLength={8} value={dni} onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 8))} style={campo} />
+            <div style={ayuda}>Lo pides solo si quieres: tu celular es lo que te identifica.</div>
+          </div>
+          <div>
             <label htmlFor="ac-e" style={etiqueta}>Correo personal (opcional)</label>
             <input id="ac-e" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} placeholder="Solo si quieres recibir avisos" style={campo} />
           </div>
@@ -263,6 +292,18 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
         </div>
       )}
 
+      {modo === 'new' && codigoEnviado && (
+        <>
+          <div>
+            <label htmlFor="ac-cr" style={etiqueta}>Código de 6 dígitos (llega por WhatsApp)</label>
+            <input id="ac-cr" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" style={{ ...campo, letterSpacing: 8, textAlign: 'center', fontSize: 20, fontWeight: 800 }} />
+          </div>
+          <button type="button" onClick={enviarCodigoRegistro} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
+            {espera > 0 ? `Reenviar código en ${espera} s` : 'Reenviar código'}
+          </button>
+        </>
+      )}
+
       {modo === 'rec2' && (
         <>
           <div role="status" style={{ fontSize: 13, fontWeight: 700 }}>{aviso}</div>
@@ -282,7 +323,7 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
       )}
 
       <button onClick={modo === 'rec1' ? pedirCodigo : modo === 'rec2' ? confirmar : enviar} disabled={enviando} style={botonPrincipal}>
-        {enviando ? 'Un momento...' : { in: 'Ingresar', new: 'Crear mi cuenta', rec1: 'Enviarme el código', rec2: 'Cambiar mi contraseña' }[modo]}
+        {enviando ? 'Un momento...' : { in: 'Ingresar', new: codigoEnviado ? 'Crear cuenta' : 'Enviar código por WhatsApp', rec1: 'Enviarme el código', rec2: 'Cambiar mi contraseña' }[modo]}
       </button>
       {(modo === 'rec1' || modo === 'rec2') && (
         <button type="button" onClick={() => ir('in')} style={botonSecundario}>Volver a ingresar</button>
@@ -290,7 +331,7 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--cp-soft)', fontSize: 12 }}>
         <span style={{ flex: 1, height: 1, background: 'var(--cp-line)' }} />o<span style={{ flex: 1, height: 1, background: 'var(--cp-line)' }} />
       </div>
-      <button onClick={alSeguirInvitado} style={botonSecundario}>Seguir como invitado</button>
+      {invitadoPermitido && <button onClick={alSeguirInvitado} style={botonSecundario}>Seguir como invitado</button>}
       {verLegal && <VentanaLegal info={legal} cual={verLegal} alCerrar={() => setVerLegal(null)} />}
     </>
   );

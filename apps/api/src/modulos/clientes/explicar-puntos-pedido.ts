@@ -64,7 +64,7 @@ export function explicarPuntosPedido(pedido: PedidoParaPuntos, ctx: ContextoPunt
     return no('ANULADO', 'Pedido anulado: no suma puntos');
   }
   if (!partyClienteDelPedido(pedido)) {
-    return no('INVITADO', 'Se pidió como invitado: ingresa con tu celular para sumar puntos');
+    return no('INVITADO', 'Escribe tu celular al pedir para sumar puntos');
   }
   if (pedido.cupon_id || pedido.cupon_emitido_id) {
     return no('CUPON', 'Este pedido no suma puntos porque usaste un cupón');

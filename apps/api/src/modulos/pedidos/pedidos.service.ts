@@ -26,8 +26,10 @@ import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
-import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
+import { TELEFONO_PLACEHOLDER, tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { PagoPlanService } from './pago-plan.service';
+import { PartyPuntosService } from '../clientes/party-puntos.service';
+import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO' | 'CAJA' | 'WHATSAPP' | 'BOT';
@@ -64,6 +66,7 @@ export class PedidosService {
     @Inject(forwardRef(() => AvisosPedidoService))
     private readonly avisosPedidoService?: AvisosPedidoService,
     @Optional() private readonly direcciones?: DireccionesClienteService,
+    @Optional() private readonly puntosParty?: PartyPuntosService,
   ) {}
 
   /**
@@ -81,8 +84,11 @@ export class PedidosService {
         });
       if (dto.clienteTelefono) {
         const partyId = await this.direcciones.resolverPartyPorTelefono(dto.clienteTelefono);
-        if (!partyId) throw noEncontrado();
-        return partyId;
+        if (partyId) return partyId;
+        // Sin cuenta: el celular suma puntos en un party de puntos (si es inválido o la cuenta está desactivada, no)
+        const nuevo = (await this.puntosParty?.resolverOCrear(dto.clienteTelefono)) ?? null;
+        if (!nuevo) throw noEncontrado();
+        return nuevo;
       }
       if (dto.clientePartyId) {
         const partyId = BigInt(dto.clientePartyId);
@@ -102,10 +108,14 @@ export class PedidosService {
       }
       return partyId;
     }
-    if (origen?.telefonoRemitente && this.direcciones) {
-      return this.direcciones.resolverPartyPorTelefono(origen.telefonoRemitente);
+    // Sin sesión: el celular (carta o WhatsApp) suma puntos en su party de puntos
+    if (canal !== 'CARTA' && origen?.telefonoRemitente && this.direcciones) {
+      const cuenta = await this.direcciones.resolverPartyPorTelefono(origen.telefonoRemitente);
+      if (cuenta) return cuenta;
     }
-    return null;
+    const telefono = canal === 'CARTA' ? dto.cliente?.telefono : origen?.telefonoRemitente;
+    if (!telefono || !this.puntosParty) return null;
+    return this.puntosParty.resolverOCrear(telefono);
   }
 
   /**
@@ -190,8 +200,22 @@ export class PedidosService {
         });
       }
 
-      telefonoLimpio = dto.cliente?.telefono?.trim();
-      if (!telefonoLimpio || !/^9\d{8}$/.test(telefonoLimpio)) {
+      telefonoLimpio = dto.cliente?.telefono?.trim() || null;
+      const celularValido = !!telefonoLimpio && /^9\d{8}$/.test(telefonoLimpio) && telefonoLimpio !== TELEFONO_PLACEHOLDER;
+      const esCartaSinSesion = (origen?.canal ?? 'CARTA') === 'CARTA' && !origen?.clientePartyId && !origen?.sinCuentaCliente;
+      if (esCartaSinSesion && !celularValido && !(await invitadoCartaPermitido(this.prisma))) {
+        throw new BadRequestException({
+          codigo: 'CELULAR_REQUERIDO',
+          mensaje: 'Escribe tu celular para hacer tu pedido y sumar puntos',
+        });
+      }
+      if (telefonoLimpio && !/^9\d{8}$/.test(telefonoLimpio)) {
+        throw new BadRequestException({
+          codigo: 'TELEFONO_INVALIDO',
+          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+        });
+      }
+      if (!telefonoLimpio && !esCartaSinSesion) {
         throw new BadRequestException({
           codigo: 'TELEFONO_INVALIDO',
           mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
@@ -545,7 +569,8 @@ export class PedidosService {
     const puntosCanje = Number(Number(dto.puntosCanje || 0).toFixed(2));
     if (puntosCanje > 0) {
       const partyCliente = origen?.clientePartyId;
-      if (!partyCliente || !this.puntosService) {
+      const cuentaActiva = partyCliente && this.direcciones ? await this.direcciones.datosCuentaActiva(BigInt(partyCliente)) : null;
+      if (!partyCliente || !this.puntosService || !cuentaActiva) {
         throw new BadRequestException({
           codigo: 'PUNTOS_REQUIEREN_CUENTA',
           mensaje: 'Ingresa con tu cuenta para usar tus puntos',
