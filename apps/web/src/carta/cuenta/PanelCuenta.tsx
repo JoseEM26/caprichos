@@ -187,10 +187,10 @@ export function PanelCuenta({ alVerPedidos, invitadoPermitido = false }: { alVer
           color: 'var(--cp-navy)',
           borderRadius: 20,
           boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
-          padding: 20,
+          padding: 18,
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 10,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
