@@ -60,6 +60,9 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['seguridad y llaves: secretos, llaves de dispositivos y colas de impresión', [
     'supervisor_secreto', 'device_key', 'print_job', 'sesion',
   ]],
+  ['reseñas de Google: se vuelven a traer de la API en cada ambiente (con su propio negocio y cupo)', [
+    'resena_google',
+  ]],
   ['trazas y control técnico', [
     'auditoria', 'sys_control', 'iniciativa', 'iniciativa_comentario',
   ]],
@@ -87,6 +90,7 @@ export const COLUMNAS_SECRETAS: string[] = ['hash', 'pin_hash', 'secreto_cifrado
  */
 export function parametroMigrable(clave: string): boolean {
   if (clave === 'entorno') return false;
+  if (/^resenas_/.test(clave)) return false; // negocio, cupo y fechas de las reseñas: cada ambiente los suyos
   if (/^wa_media:/.test(clave)) return false;
   if (/^wa_aviso_consumo:/.test(clave)) return false;
   if (/_borrador$/.test(clave)) return false;

@@ -2073,3 +2073,22 @@ model PedidoPagoPlan {
   @@index([pedido_id])
   @@map("pedido_pago_plan")
 }
+
+// Reseñas de Google Maps que se muestran en la carta (las trae el servicio de reseñas; visible lo decide el admin)
+model ResenaGoogle {
+  id               BigInt    @id @default(autoincrement())
+  google_review_id String    @unique
+  autor_nombre     String
+  autor_foto_url   String?
+  autor_enlace     String?
+  calificacion     Int
+  texto            String
+  idioma           String?
+  publicada_en     DateTime? @db.Timestamptz
+  enlace_resena    String?
+  visible          Boolean   @default(true)
+  creado_en        DateTime  @default(now()) @db.Timestamptz
+  actualizado_en   DateTime  @updatedAt
+
+  @@map("resena_google")
+}

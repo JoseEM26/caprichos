@@ -36,6 +36,7 @@ import { DecoracionAnimada } from './contenido/DecoracionAnimada';
 import { VisorHistoriasModal, extraerOffDeUrl, limpiarUrlFoto } from './contenido/VisorHistoriasModal';
 import type { HistoriaCírculo } from './contenido/VisorHistoriasModal';
 import { FormularioComentarios } from './contenido/FormularioComentarios';
+import { CarruselResenas } from './CarruselResenas';
 import { FranjaNovedades, ordenarNovedadesCarta } from './PaginaNovedades';
 import type { NovedadCarta } from './PaginaNovedades';
 import type { BannerCarta } from './PortadaCarta';
@@ -768,6 +769,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
         disp.secciones.map((sec) =>
           ed ? ed.bloque(`seccion:${sec.id}`, renderSeccion(sec.id)) : sec.visible ? <Fragment key={sec.id}>{renderSeccion(sec.id)}</Fragment> : null,
         )}
+      {pagina === 'carta' && !vistaPrevia && <CarruselResenas />}
       {pagina === 'carta' && !vistaPrevia && <FormularioComentarios />}
 
       {visor !== null && destacadasVisibles.length > 0 && (

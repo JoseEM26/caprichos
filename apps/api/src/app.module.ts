@@ -45,6 +45,7 @@ import { AyudaAdminModule } from './modulos/ayuda-admin/ayuda-admin.module';
 import { VouchersModule } from './modulos/vouchers/vouchers.module';
 import { MascotaModule } from './modulos/mascota/mascota.module';
 import { PantallaIngresoModule } from './modulos/pantalla-ingreso/pantalla-ingreso.module';
+import { ResenasModule } from './modulos/resenas/resenas.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -93,6 +94,7 @@ import { PantallaIngresoModule } from './modulos/pantalla-ingreso/pantalla-ingre
     VouchersModule,
     MascotaModule,
     PantallaIngresoModule,
+    ResenasModule,
   ],
   providers: [
     PinoLoggerService,
