@@ -20,6 +20,14 @@ function origen(): FakeDb {
       { clave: 'wa_media:12:abc', valor: 'media-id' },
       { clave: 'contenido_conocenos_borrador', valor: { titulo: 'borrador' } },
       { clave: 'entorno', valor: 'DEMO' },
+      { clave: 'resenas_negocio', valor: { businessId: 'biz-1', nombre: 'Caprichos Campoy' } },
+      { clave: 'resenas_carga_inicial', valor: { fecha: '2026-10-31', paginas: 3, guardadas: 2, total: 2 } },
+      { clave: 'resenas_consumo_202610', valor: 7 },
+      { clave: 'resenas_ultima_manual', valor: '2026-10-31' },
+    ],
+    resena_google: [
+      { id: 1, google_review_id: 'rv-1', autor_nombre: 'Ana', autor_foto_url: null, autor_enlace: null, calificacion: 5, texto: 'Excelente café y la atención fue muy amable.', idioma: 'es', publicada_en: new Date('2026-10-01'), enlace_resena: null, visible: true, creado_en: FECHA, actualizado_en: FECHA },
+      { id: 2, google_review_id: 'rv-2', autor_nombre: 'Luis', autor_foto_url: null, autor_enlace: null, calificacion: 4, texto: 'Buen lugar, volveremos pronto con la familia.', idioma: 'es', publicada_en: new Date('2026-10-02'), enlace_resena: null, visible: false, creado_en: FECHA, actualizado_en: FECHA },
     ],
     area_cocina: [{ id: 1, nombre: 'Barra', propia: true, impresora: '', etiquetera: '', activo: true }],
     categoria: [
@@ -95,7 +103,8 @@ describe('exportar e importar el paquete de la empresa (base en memoria)', () =>
     expect(d.party.map((p: any) => p.documento)).toEqual(['DNI:12345678']);
     expect(d.producto[0].categoria).toEqual({ nombre: 'Bebidas' });
     expect(d.producto[0].foto).toEqual({ sha256: expect.stringMatching(/^[0-9a-f]{64}$/) });
-    expect(d.parametro.map((p: any) => p.clave).sort()).toEqual(['local_datos', 'voucher_ia_activo']);
+    expect(d.parametro.map((p: any) => p.clave).sort()).toEqual(['local_datos', 'resenas_carga_inicial', 'resenas_negocio', 'voucher_ia_activo']);
+    expect(d.resena_google.map((r: any) => [r.google_review_id, r.visible])).toEqual([['rv-1', true], ['rv-2', false]]);
     expect(r.conteos.producto).toBe(1);
     expect(r.reporte).toContain('Chicha');
     expect(r.reporte).toContain('Escondida');
@@ -160,7 +169,7 @@ describe('exportar e importar el paquete de la empresa (base en memoria)', () =>
     });
     expect(r.ejecutado).toBe(true);
     expect(destino.tablas.producto.map((p) => p.nombre)).toEqual(['Chicha']);
-    expect(destino.tablas.parametro.length).toBe(2);
+    expect(destino.tablas.parametro.length).toBe(4);
     const cuenta = destino.tablas.user_account[0];
     expect(cuenta.hash).toBe('HASH_NUEVO');
     expect(cuenta.debe_cambiar).toBe(true);
@@ -172,6 +181,16 @@ describe('exportar e importar el paquete de la empresa (base en memoria)', () =>
     expect(fs.readFileSync(path.join(uploadsDestino, ruta), 'utf8')).toBe(CONTENIDO_FOTO);
     expect(destino.tablas.producto[0].foto_archivo_id).toBe(destino.tablas.archivo[0].id);
     expect(destino.tablas.version_carta[0].contenido.banner.imagen).toBe(`/archivos/${ruta}`);
+  });
+
+  it('reseñas: viajan con su visibilidad y la carga ya hecha; el cupo del mes y la última actualización se quedan', async () => {
+    const { salida } = await exportarDesde(origen());
+    const destino = new FakeDb({});
+    await importar(destino.proxy(), salida, { uploadsDir: uploadsDestino, entorno: 'local', ejecutar: true, sobrescribir: false, hashClave: async () => 'H' });
+    expect(destino.tablas.resena_google.map((r) => [r.google_review_id, r.visible])).toEqual([['rv-1', true], ['rv-2', false]]);
+    const claves = destino.tablas.parametro.map((p) => p.clave);
+    expect(claves).toEqual(expect.arrayContaining(['resenas_negocio', 'resenas_carga_inicial']));
+    expect(claves.filter((c) => c.startsWith('resenas_consumo_') || c === 'resenas_ultima_manual')).toEqual([]);
   });
 
   it('idempotente: una segunda importación no crea, no duplica y no audita de nuevo', async () => {

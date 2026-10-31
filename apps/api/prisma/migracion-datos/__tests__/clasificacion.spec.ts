@@ -71,6 +71,17 @@ describe('clasificación de tablas de la migración de datos', () => {
     }
   });
 
+  it('reseñas: resena_google migra con su clave natural; de los parámetros resenas_ solo migran negocio, resumen y carga inicial', () => {
+    expect(MIGRAR).toContain('resena_google');
+    expect(ESPECIFICACION.resena_google.clave).toEqual(['google_review_id']);
+    expect(parametroMigrable('resenas_negocio')).toBe(true);
+    expect(parametroMigrable('resenas_resumen')).toBe(true);
+    expect(parametroMigrable('resenas_carga_inicial')).toBe(true);
+    expect(parametroMigrable('resenas_consumo_202610')).toBe(false);
+    expect(parametroMigrable('resenas_ultima_manual')).toBe(false);
+    expect(parametroMigrable('resenas_ultima_actualizacion')).toBe(false);
+  });
+
   it('parámetros de caché, contadores, borradores y el marcador de entorno no migran; la configuración sí', () => {
     expect(parametroMigrable('wa_media:12:abc123')).toBe(false);
     expect(parametroMigrable('wa_aviso_consumo:2026-10:bot')).toBe(false);

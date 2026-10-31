@@ -10,12 +10,13 @@ import { obtenerFechaHoraLima } from '../local/local.util';
 const BASE_API = 'https://api.openwebninja.com/local-business-data';
 const COSTO_BUSQUEDA = 3; // máximo de negocios que puede devolver /search
 const COSTO_PAGINA = 1; // una página de business-reviews = 1 unidad
-const TOPE_POR_DEFECTO = 40;
-const CARGA_MAX_POR_DEFECTO = 200;
+const TOPE_POR_DEFECTO = 80;
+const CARGA_MAX_POR_DEFECTO = 1000;
+const ACTUALIZAR_DIAS_POR_DEFECTO = 7;
 const PAGINA = 20;
 const CALIFICACION_MINIMA = 4;
 const LARGO_MINIMO_TEXTO = 30;
-const SEMANA_MS = 7 * 86400000;
+const DIA_MS = 86400000;
 const REVISION_MS = 3600000;
 const PAUSA_PAGINAS_MS = 500;
 const TIMEOUT_API_MS = 15000;
@@ -133,6 +134,13 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
     const v = this.config.get<string>('RESENAS_TOPE_MENSUAL');
     const n = Number(v);
     return v !== undefined && v !== '' && Number.isFinite(n) && n >= 0 ? n : TOPE_POR_DEFECTO;
+  }
+
+  /** Días entre actualizaciones automáticas (1 a 60). Fuera de ese rango, 7. */
+  private actualizarDias(): number {
+    const v = this.config.get<string>('RESENAS_ACTUALIZAR_DIAS');
+    const n = Number(v);
+    return v !== undefined && v !== '' && Number.isInteger(n) && n >= 1 && n <= 60 ? n : ACTUALIZAR_DIAS_POR_DEFECTO;
   }
 
   private cargaMax(): number {
@@ -344,8 +352,9 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Carga inicial: pagina business-reviews (sort_by=highest_ranking) de 20 en 20 hasta juntar
-   * RESENAS_CARGA_MAX reseñas guardadas, una página vacía, el tope mensual o un error.
-   * Lo ya traído se guarda aunque una página falle. Solo se repite si se confirma (repetir).
+   * RESENAS_CARGA_MAX reseñas guardadas, una página vacía o corta, una página sin ninguna de 4
+   * estrellas o más (con el orden por mejor calificación ya no vendrán buenas), el tope mensual
+   * o un error. Lo ya traído se guarda aunque una página falle. Solo se repite si se confirma (repetir).
    */
   async cargaInicial(opciones: { repetir: boolean; usuario?: UsuarioAutenticado; ip?: string; ahora?: Date }): Promise<any> {
     const ahora = opciones.ahora ?? new Date();
@@ -396,6 +405,8 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
         nuevas += res.nuevas;
         actualizadas += res.actualizadas;
         if (data.length < PAGINA) break;
+        // Página entera por debajo de 4 estrellas: el orden es por mejor calificación, no vendrán buenas
+        if (data.every((x: any) => Number(x?.rating) < CALIFICACION_MINIMA)) break;
         offset += PAGINA;
         await this.esperar(PAUSA_PAGINAS_MS);
       }
@@ -557,7 +568,7 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  /** Tarea semanal: con candado Redis (un solo contenedor) y solo si la última actualización tiene más de 7 días. */
+  /** Tarea automática (RESENAS_ACTUALIZAR_AUTO=si): con candado Redis (un solo contenedor) y solo si pasaron RESENAS_ACTUALIZAR_DIAS desde la última actualización. */
   async revisarSemanal(ahora = new Date()): Promise<{ actualizado: boolean; motivo?: string }> {
     if (!this.autoActiva()) return { actualizado: false, motivo: 'DESACTIVADA' };
     const cliente = this.redis.obtenerCliente();
@@ -567,7 +578,7 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
     try {
       if (!(await this.negocio())) return { actualizado: false, motivo: 'SIN_NEGOCIO' };
       const ult = await this.param('resenas_ultima_actualizacion');
-      if (ult && ahora.getTime() - new Date(ult).getTime() < SEMANA_MS) return { actualizado: false, motivo: 'RECIENTE' };
+      if (ult && ahora.getTime() - new Date(ult).getTime() < this.actualizarDias() * DIA_MS) return { actualizado: false, motivo: 'RECIENTE' };
       const r = await this.actualizar({ manual: false, ahora });
       return r.ok ? { actualizado: true } : { actualizado: false, motivo: r.motivo };
     } finally {

@@ -58,7 +58,7 @@ function fakePrisma() {
   };
 }
 
-const config = (env: Record<string, string>) => ({ get: (k: string) => env[k] });
+const config = (env: Record<string, string | undefined>) => ({ get: (k: string) => env[k] });
 const redis = { obtenerCliente: () => ({ set: jest.fn().mockResolvedValue('OK'), eval: jest.fn().mockResolvedValue(1) }) };
 const respuesta = (status: number, body: any) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const resena = (id: string, rating: number, texto = LARGO, extra: any = {}) => ({
@@ -71,7 +71,7 @@ const resena = (id: string, rating: number, texto = LARGO, extra: any = {}) => (
   ...extra,
 });
 
-function crear(opts: { env?: Record<string, string>; params?: Record<string, any>; filas?: any[] } = {}) {
+function crear(opts: { env?: Record<string, string | undefined>; params?: Record<string, any>; filas?: any[] } = {}) {
   const fp = fakePrisma();
   for (const [k, v] of Object.entries(opts.params ?? { resenas_negocio: { businessId: 'biz-1', nombre: 'Caprichos Campoy' } })) fp.params.set(k, v);
   fp.filas = opts.filas ?? [];
@@ -370,5 +370,72 @@ describe('ResenasGoogleService', () => {
     const otro = crear({ params: {} });
     await otro.svc.guardarNegocio('biz-9', 'Caprichos Campoy', undefined, undefined, 4.8, 778, 'https://evil.com/x');
     expect(otro.fp.params.get('resenas_negocio')).toEqual({ businessId: 'biz-9', nombre: 'Caprichos Campoy', enlaceLocal: null });
+  });
+});
+
+describe('ResenasGoogleService: carga inicial masiva y periodicidad en días', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const pagina = (n: number, base: number, rating = 5) =>
+    respuesta(200, { status: 'OK', data: Array.from({ length: n }, (_, i) => resena(`q${base + i}`, rating)) });
+
+  it('la carga se detiene en la primera página entera por debajo de 4 estrellas', async () => {
+    const { svc, fp, fetchMock } = crear();
+    fetchMock.mockResolvedValueOnce(pagina(20, 0, 5)).mockResolvedValueOnce(pagina(20, 20, 3)).mockResolvedValueOnce(pagina(20, 40, 5));
+    const r = await svc.cargaInicial({ repetir: false, ahora: AHORA });
+    expect(r).toMatchObject({ ok: true, paginas: 2, guardadas: 20 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fp.filas).toHaveLength(20);
+  });
+
+  it('una página mixta (algún 4 o 5) no detiene la carga', async () => {
+    const { svc, fetchMock } = crear();
+    const mixta = respuesta(200, {
+      status: 'OK',
+      data: [...Array.from({ length: 19 }, (_, i) => resena(`m${i}`, 2)), resena('buena', 4)],
+    });
+    fetchMock.mockResolvedValueOnce(mixta).mockResolvedValueOnce(pagina(20, 100, 2));
+    const r = await svc.cargaInicial({ repetir: false, ahora: AHORA });
+    expect(r).toMatchObject({ ok: true, paginas: 2, guardadas: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('por defecto el tope mensual es 80: con 80 usadas no llama a la API', async () => {
+    const { svc, fetchMock } = crear({ env: { RESENAS_TOPE_MENSUAL: undefined }, params: { resenas_negocio: { businessId: 'biz-1', nombre: 'X' }, [`resenas_consumo_${mesActual}`]: 80 } });
+    expect(await svc.actualizar({ manual: false, ahora: AHORA })).toMatchObject({ ok: false, motivo: 'TOPE_MENSUAL' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('por defecto la carga llega a 1000 reseñas (50 páginas de 20) y se corta ahí', async () => {
+    const { svc, fp, fetchMock } = crear({ env: { RESENAS_CARGA_MAX: undefined, RESENAS_TOPE_MENSUAL: undefined } });
+    for (let p = 0; p < 51; p++) fetchMock.mockResolvedValueOnce(pagina(20, p * 20, 5));
+    const r = await svc.cargaInicial({ repetir: false, ahora: AHORA });
+    expect(r).toMatchObject({ ok: true, paginas: 50, totalGuardadas: 1000 });
+    expect(fetchMock).toHaveBeenCalledTimes(50);
+    expect(fp.filas).toHaveLength(1000);
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('limit')).toBe('20');
+  });
+
+  it('la actualización automática cada RESENAS_ACTUALIZAR_DIAS días, no cada 7 fijos', async () => {
+    const params = { resenas_negocio: { businessId: 'biz-1', nombre: 'X' }, resenas_ultima_actualizacion: '2026-10-30T10:00:00Z' };
+    const tresDias = crear({ env: { RESENAS_ACTUALIZAR_AUTO: 'si', RESENAS_ACTUALIZAR_DIAS: '2' }, params });
+    expect(await tresDias.svc.revisarSemanal(AHORA)).toEqual({ actualizado: false, motivo: 'RECIENTE' });
+    expect(tresDias.fetchMock).not.toHaveBeenCalled();
+
+    const cuatroDias = crear({ env: { RESENAS_ACTUALIZAR_AUTO: 'si', RESENAS_ACTUALIZAR_DIAS: '2' }, params: { ...params, resenas_ultima_actualizacion: '2026-10-28T10:00:00Z' } });
+    cuatroDias.fetchMock.mockResolvedValueOnce(respuesta(200, { status: 'OK', data: [] }));
+    expect(await cuatroDias.svc.revisarSemanal(AHORA)).toEqual({ actualizado: true });
+    expect(new URL(String(cuatroDias.fetchMock.mock.calls[0][0])).searchParams.get('sort_by')).toBe('newest');
+  });
+
+  it('RESENAS_ACTUALIZAR_DIAS fuera de 1 a 60 o no entero cae a 7 días', async () => {
+    const hace5Dias = { resenas_negocio: { businessId: 'biz-1', nombre: 'X' }, resenas_ultima_actualizacion: '2026-10-26T10:00:00Z' };
+    for (const valor of ['0', '61', '2.5', 'abc']) {
+      const { svc, fetchMock } = crear({ env: { RESENAS_ACTUALIZAR_AUTO: 'si', RESENAS_ACTUALIZAR_DIAS: valor }, params: hace5Dias });
+      expect(await svc.revisarSemanal(AHORA)).toEqual({ actualizado: false, motivo: 'RECIENTE' });
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
   });
 });
