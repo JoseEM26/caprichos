@@ -23,6 +23,8 @@ const MOTIVO_MINIMO = 5;
 export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: ModalConfirmarPagoProps) {
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   const [contactado, setContactado] = useState(false);
+  // Pasos: 1 Cliente · 2 Pago y comprobante · 3 Revisar y confirmar (los tres quedan montados: no se pierde lo subido al volver)
+  const [paso, setPaso] = useState<1 | 2 | 3>(1);
   const [medio, setMedio] = useState<string>(pedido.pago_metodo || pedido.pago_preferido || 'Yape');
   const [montoPagaCon, setMontoPagaCon] = useState(pedido.paga_con ? String(pedido.paga_con) : '');
   const [codigoOp, setCodigoOp] = useState('');
@@ -57,14 +59,17 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
 
   const handleConfirmar = () => {
     if (!contactado) {
+      setPaso(1);
       setMsg('Marca la casilla confirmando que hablaste con el cliente.');
       return;
     }
     if (esDelivery && !tieneUbicacion) {
+      setPaso(1);
       setMsg('Para delivery primero ubica la dirección en el mapa (calcula la zona y el envío).');
       return;
     }
     if ((esDigital || multiples) && !comprobanteListo) {
+      setPaso(2);
       if (!sinVoucher) {
         setMsg('Sube el comprobante del pago para continuar.');
         return;
@@ -115,16 +120,52 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
     }
   };
 
+  const irASiguiente = () => {
+    if (paso === 1 && !contactado) {
+      setMsg('Marca la casilla confirmando que hablaste con el cliente.');
+      return;
+    }
+    setMsg('');
+    setPaso((p) => (p < 3 ? ((p + 1) as 1 | 2 | 3) : p));
+  };
+
+  const PASOS: Array<{ n: 1 | 2 | 3; titulo: string }> = [
+    { n: 1, titulo: 'Cliente' },
+    { n: 2, titulo: 'Pago y comprobante' },
+    { n: 3, titulo: 'Revisar y confirmar' },
+  ];
+
+  const tarjeta: React.CSSProperties = {
+    border: '1.5px solid var(--cp-line, #E3D6C6)',
+    background: 'var(--cp-white, #FFFFFF)',
+    borderRadius: 14,
+    padding: 14,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  };
+  const subtitulo: React.CSSProperties = { fontWeight: 800, fontSize: 15, color: 'var(--cp-navy, #0B2C3E)' };
+  const campo: React.CSSProperties = {
+    width: '100%',
+    boxSizing: 'border-box',
+    minHeight: 44,
+    borderRadius: 10,
+    border: '1.5px solid var(--cp-line, #E3D6C6)',
+    background: 'var(--cp-white, #FFFFFF)',
+    padding: '0 12px',
+    fontSize: 14,
+  };
+  const lineasTexto =
+    pedido.lineas && pedido.lineas.length > 0
+      ? pedido.lineas.map((l) => `${l.cantidad}× ${l.nombre}`).join('\n')
+      : `Total a cobrar: S/ ${Number(pedido.total).toFixed(2)}`;
+  const mostrar = (n: number): React.CSSProperties => ({ display: paso === n ? 'flex' : 'none', flexDirection: 'column', gap: 14 });
+
   return (
     <>
       <div
         onClick={alCerrar}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 50,
-          background: 'rgba(11,44,62,0.55)',
-        }}
+        style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(11,44,62,0.55)' }}
       />
       <div
         role="dialog"
@@ -136,253 +177,229 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
           left: '50%',
           top: '50%',
           transform: 'translate(-50%,-50%)',
-          width: 'min(670px,calc(100% - 24px))',
+          width: 'min(880px,calc(100% - 24px))',
           maxHeight: 'calc(100% - 24px)',
-          overflowY: 'auto',
           background: 'var(--cp-cream, #FBF4EC)',
           borderRadius: 20,
           boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
-          padding: 20,
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          overflow: 'hidden',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 20, color: 'var(--cp-navy, #0B2C3E)' }}>
-            Confirmar {pedido.codigo}
-          </div>
-          <button
-            onClick={alCerrar}
-            aria-label="Cerrar"
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              border: '1.5px solid var(--cp-navy, #0B2C3E)',
-              background: 'transparent',
-              color: 'var(--cp-navy, #0B2C3E)',
-              fontSize: 20,
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft, #2C4C5D)' }}>
-          Habla con el cliente por WhatsApp para confirmar que todo esté bien y verificar el pago. Solo después de confirmar pasa a las pantallas de cocina.
-        </div>
-
-        {/* 1. Contacto con el cliente */}
-        <div style={{ border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontWeight: 800 }}>1. Contacto con el cliente</div>
-          <div style={{ fontSize: 13 }}>
-            Cliente: <b>{pedido.cliente_nombre || 'Cliente'}</b> · {pedido.cliente_telefono || 'Sin teléfono'}
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--cp-soft, #2C4C5D)',
-              background: 'var(--cp-white, #FFFFFF)',
-              border: '1px solid var(--cp-line, #E3D6C6)',
-              borderRadius: 8,
-              padding: '8px 10px',
-              whiteSpace: 'pre-line',
-              maxHeight: 200,
-              overflowY: 'auto',
-            }}
-          >
-            {pedido.lineas && pedido.lineas.length > 0
-              ? pedido.lineas.map((l) => `${l.cantidad}× ${l.nombre}`).join('\n')
-              : `Total a cobrar: S/ ${Number(pedido.total).toFixed(2)}`}
-          </div>
-
-          <BotonAbrirChatCliente telefono={pedido.cliente_telefono} />
-
-          <button
-            type="button"
-            onClick={() => {
-              setContactado(!contactado);
-              setMsg('');
-            }}
-            role="checkbox"
-            aria-checked={contactado}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              textAlign: 'left',
-              minHeight: 44,
-              padding: '4px 0',
-              border: 0,
-              background: 'transparent',
-              color: 'var(--cp-navy, #0B2C3E)',
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            <span
-              style={{
-                flex: 'none',
-                width: 24,
-                height: 24,
-                borderRadius: 6,
-                border: '2px solid var(--cp-navy, #0B2C3E)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                background: contactado ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                color: contactado ? 'var(--cp-cream, #FBF4EC)' : 'transparent',
-              }}
+        {/* Cabecera y pasos */}
+        <div style={{ padding: '16px 20px 12px', display: 'flex', flexDirection: 'column', gap: 12, borderBottom: '1px solid var(--cp-line, #E3D6C6)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 20, color: 'var(--cp-navy, #0B2C3E)' }}>
+              Confirmar {pedido.codigo}
+            </div>
+            <button
+              onClick={alCerrar}
+              aria-label="Cerrar"
+              style={{ width: 44, height: 44, borderRadius: 22, border: '1.5px solid var(--cp-navy, #0B2C3E)', background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontSize: 20, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              ✓
-            </span>
-            <span>Ya hablé con el cliente y el pedido está bien</span>
-          </button>
-        </div>
-
-        {/* Comprobantes ya enlazados al pedido (carta, WhatsApp, mozo): con su lectura, no obligan a subir otra */}
-        <SeccionVouchersPedido
-          pedidoId={pedido.id}
-          recargarClave={voucherSubido}
-          total={pedido.total}
-          medio={medio}
-          alCargar={setVouchersPedido}
-        />
-
-        {/* 2. Medio de pago */}
-        <div style={{ border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontWeight: 800 }}>2. Medio de pago</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {MEDIOS_PC.map((m) => {
-              const activo = mismoMedio(medio, m);
+              ×
+            </button>
+          </div>
+          <ol data-testid="pasos-confirmar" style={{ display: 'flex', gap: 8, listStyle: 'none', margin: 0, padding: 0, flexWrap: 'wrap' }}>
+            {PASOS.map((p) => {
+              const activo = paso === p.n;
+              const hecho = paso > p.n;
+              const permitido = p.n === 1 || contactado;
               return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    setMedio(m);
-                    setMsg('');
-                  }}
-                  style={{
-                    minHeight: 42,
-                    padding: '0 14px',
-                    borderRadius: 9999,
-                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                    background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                    color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {m}
-                </button>
+                <li key={p.n} style={{ flex: '1 1 160px' }}>
+                  <button
+                    type="button"
+                    aria-current={activo ? 'step' : undefined}
+                    disabled={!permitido}
+                    onClick={() => {
+                      setMsg('');
+                      setPaso(p.n);
+                    }}
+                    style={{
+                      width: '100%',
+                      minHeight: 44,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '0 12px',
+                      borderRadius: 12,
+                      border: `1.5px solid ${activo ? 'var(--cp-navy, #0B2C3E)' : 'var(--cp-line, #E3D6C6)'}`,
+                      background: activo ? 'var(--cp-navy, #0B2C3E)' : 'var(--cp-white, #FFFFFF)',
+                      color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                      fontWeight: 800,
+                      fontSize: 13,
+                      cursor: permitido ? 'pointer' : 'not-allowed',
+                      opacity: permitido ? 1 : 0.55,
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ width: 24, height: 24, borderRadius: 12, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, background: activo ? 'var(--cp-orange, #E67929)' : hecho ? 'var(--cp-green, #2F7A45)' : 'var(--cp-sand, #F1E6D6)', color: activo ? 'var(--cp-navy, #0B2C3E)' : hecho ? '#fff' : 'var(--cp-navy, #0B2C3E)' }}>
+                      {hecho ? '✓' : p.n}
+                    </span>
+                    {p.titulo}
+                  </button>
+                </li>
               );
             })}
-          </div>
+          </ol>
+        </div>
 
-          {esEfectivo && (
-            <div>
-              <label htmlFor="pc-m" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                ¿Con cuánto paga? (para el vuelto, opcional)
-              </label>
-              <input
-                id="pc-m"
-                type="text"
-                value={montoPagaCon}
-                onChange={(e) => setMontoPagaCon(e.target.value)}
-                placeholder="s/"
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 44,
-                  borderRadius: 10,
-                  border: '1.5px solid var(--cp-line, #E3D6C6)',
-                  background: 'var(--cp-white, #FFFFFF)',
-                  padding: '0 12px',
-                  fontSize: 14,
-                }}
-              />
-              <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>
-                El efectivo se cobra al entregar o al recoger. No hace falta comprobante.
+        {/* Contenido del paso */}
+        <div style={{ padding: 20, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {/* Paso 1 · Cliente */}
+          <div style={mostrar(1)}>
+            <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft, #2C4C5D)' }}>
+              Habla con el cliente por WhatsApp para confirmar que todo esté bien. Solo después de confirmar el pedido pasa a las pantallas de cocina.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+              <div style={tarjeta}>
+                <div style={subtitulo}>1. Contacto con el cliente</div>
+                <div style={{ fontSize: 14 }}>
+                  Cliente: <b>{pedido.cliente_nombre || 'Cliente'}</b>
+                </div>
+                <div style={{ fontSize: 14 }}>Teléfono: <b>{pedido.cliente_telefono || 'Sin teléfono'}</b></div>
+                <BotonAbrirChatCliente telefono={pedido.cliente_telefono} />
+              </div>
+              <div style={tarjeta}>
+                <div style={subtitulo}>Pedido</div>
+                <div style={{ fontSize: 13, color: 'var(--cp-navy, #0B2C3E)', whiteSpace: 'pre-line', maxHeight: 190, overflowY: 'auto' }}>{lineasTexto}</div>
+                <div style={{ fontSize: 13, fontWeight: 800 }}>Total: S/ {Number(pedido.total).toFixed(2)}</div>
               </div>
             </div>
-          )}
+            <button
+              type="button"
+              onClick={() => {
+                setContactado(!contactado);
+                setMsg('');
+              }}
+              role="checkbox"
+              aria-checked={contactado}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', minHeight: 48, padding: '6px 12px', border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, background: contactado ? 'var(--cp-white, #FFFFFF)' : 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+            >
+              <span
+                style={{ flex: 'none', width: 24, height: 24, borderRadius: 6, border: '2px solid var(--cp-navy, #0B2C3E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, background: contactado ? 'var(--cp-navy, #0B2C3E)' : 'transparent', color: contactado ? 'var(--cp-cream, #FBF4EC)' : 'transparent' }}
+              >
+                ✓
+              </span>
+              <span>Ya hablé con el cliente y el pedido está bien</span>
+            </button>
+          </div>
 
-          {esTarjeta && (
-            <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
-              La tarjeta se cobra al entregar o al recoger. No hace falta comprobante.
-            </div>
-          )}
-
-          {esDigital && (
-            <div>
-              <label htmlFor="pc-r" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                Código de operación (opcional)
-              </label>
-              <input
-                id="pc-r"
-                type="text"
-                value={codigoOp}
-                onChange={(e) => setCodigoOp(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 44,
-                  borderRadius: 10,
-                  border: '1.5px solid var(--cp-line, #E3D6C6)',
-                  background: 'var(--cp-white, #FFFFFF)',
-                  padding: '0 12px',
-                  fontSize: 14,
-                }}
-              />
-              {!multiples && !comprobanteListo && medioVoucher && !sinVoucher && (
-                <>
-                  <div style={{ fontWeight: 700, fontSize: 13, marginTop: 8, marginBottom: 4 }}>
-                    Comprobante del pago (obligatorio)
+          {/* Paso 2 · Pago y comprobante */}
+          <div style={mostrar(2)}>
+            <div style={tarjeta}>
+              <div style={subtitulo}>2. Medio de pago</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {MEDIOS_PC.map((m) => {
+                  const activo = mismoMedio(medio, m);
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        setMedio(m);
+                        setMsg('');
+                      }}
+                      style={{ minHeight: 44, padding: '0 16px', borderRadius: 9999, border: '1.5px solid var(--cp-navy, #0B2C3E)', background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent', color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+              {esEfectivo && (
+                <div>
+                  <label htmlFor="pc-m" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
+                    ¿Con cuánto paga? (para el vuelto, opcional)
+                  </label>
+                  <input id="pc-m" type="text" value={montoPagaCon} onChange={(e) => setMontoPagaCon(e.target.value)} placeholder="s/" style={campo} />
+                  <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>
+                    El efectivo se cobra al entregar o al recoger. No hace falta comprobante.
                   </div>
-                  {/* Mismo camino que el cobro en caja: la foto se guarda como voucher del pedido y la IA solo informa */}
-                  <SubirVoucherMozo
-                    key={medioVoucher}
-                    pedidoId={pedido.id}
-                    medio={medioVoucher}
-                    ofrecerExcepcion
-                    alVoucherValido={(info) => {
-                      if (info.legible) setVoucherSubido(info.id);
-                    }}
-                  />
+                </div>
+              )}
+              {esTarjeta && (
+                <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                  La tarjeta se cobra al entregar o al recoger. No hace falta comprobante.
+                </div>
+              )}
+            </div>
+
+            {/* Comprobantes ya enlazados al pedido (carta, WhatsApp, mozo): el actual arriba, los anteriores plegados */}
+            <SeccionVouchersPedido
+              pedidoId={pedido.id}
+              recargarClave={voucherSubido}
+              total={pedido.total}
+              medio={medio}
+              alCargar={setVouchersPedido}
+            />
+
+            {esDigital && !multiples && !comprobanteListo && medioVoucher && !sinVoucher && (
+              <div style={tarjeta}>
+                <div style={subtitulo}>Comprobante del pago (obligatorio)</div>
+                {/* Mismo camino que el cobro en caja: la foto se guarda como voucher del pedido y la IA solo informa */}
+                <SubirVoucherMozo
+                  key={medioVoucher}
+                  pedidoId={pedido.id}
+                  medio={medioVoucher}
+                  ofrecerExcepcion
+                  alVoucherValido={(info) => {
+                    if (info.legible) setVoucherSubido(info.id);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSinVoucher(true);
+                    setMsg('');
+                  }}
+                  style={{ minHeight: 44, border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 10, background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start', padding: '0 14px' }}
+                >
+                  Confirmar sin comprobante
+                </button>
+              </div>
+            )}
+            {esDigital && !multiples && !comprobanteListo && medioVoucher && sinVoucher && (
+              <div style={tarjeta}>
+                <ExcepcionSinVoucher
+                  motivo={motivoSinVoucher}
+                  onMotivo={setMotivoSinVoucher}
+                  pin={pinSupervisor}
+                  onPin={setPinSupervisor}
+                  alVolver={() => {
+                    setSinVoucher(false);
+                    setMotivoSinVoucher('');
+                    setPinSupervisor('');
+                    setMsg('');
+                  }}
+                />
+              </div>
+            )}
+            {esDigital && comprobanteListo && !multiples && (
+              <div data-testid="voucher-listo-confirmar" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
+                Comprobante del pedido listo para confirmar.
+              </div>
+            )}
+
+            {/* Pago dividido con 2 o más medios digitales: una captura por cada uno (el servidor exige cada una) */}
+            {multiples && (
+              <div style={tarjeta}>
+                <div style={subtitulo}>Comprobantes de los pagos digitales</div>
+                <CapturasPlanDigital pedidoId={pedido.id} planPago={pedido.planPago ?? []} alCambiar={setFaltanCapturas} />
+                {!comprobanteListo && !sinVoucher && (
                   <button
                     type="button"
                     onClick={() => {
                       setSinVoucher(true);
                       setMsg('');
                     }}
-                    style={{
-                      minHeight: 44,
-                      marginTop: 8,
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      borderRadius: 10,
-                      background: 'transparent',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                    }}
+                    style={{ minHeight: 44, border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 10, background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start', padding: '0 14px' }}
                   >
                     Confirmar sin comprobante
                   </button>
-                </>
-              )}
-              {!multiples && !comprobanteListo && medioVoucher && sinVoucher && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                )}
+                {!comprobanteListo && sinVoucher && (
                   <ExcepcionSinVoucher
                     motivo={motivoSinVoucher}
                     onMotivo={setMotivoSinVoucher}
@@ -395,107 +412,99 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
                       setMsg('');
                     }}
                   />
-                </div>
-              )}
-              {comprobanteListo && (
-                <div data-testid="voucher-listo-confirmar" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)', marginTop: 8 }}>
-                  Comprobante del pedido listo para confirmar.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Pago dividido con 2 o más medios digitales: una captura por cada uno (el servidor exige cada una) */}
-        {multiples && (
-          <div style={{ border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontWeight: 800 }}>Comprobantes de los pagos digitales</div>
-            <CapturasPlanDigital pedidoId={pedido.id} planPago={pedido.planPago ?? []} alCambiar={setFaltanCapturas} />
-            {!comprobanteListo && !sinVoucher && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSinVoucher(true);
-                  setMsg('');
-                }}
-                style={{
-                  minHeight: 44,
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  borderRadius: 10,
-                  background: 'transparent',
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                Confirmar sin comprobante
-              </button>
-            )}
-            {!comprobanteListo && sinVoucher && (
-              <ExcepcionSinVoucher
-                motivo={motivoSinVoucher}
-                onMotivo={setMotivoSinVoucher}
-                pin={pinSupervisor}
-                onPin={setPinSupervisor}
-                alVolver={() => {
-                  setSinVoucher(false);
-                  setMotivoSinVoucher('');
-                  setPinSupervisor('');
-                  setMsg('');
-                }}
-              />
-            )}
-            {comprobanteListo && (
-              <div data-testid="voucher-listo-confirmar" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
-                Todas las capturas están subidas. Listo para confirmar.
+                )}
+                {comprobanteListo && (
+                  <div data-testid="voucher-listo-confirmar" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
+                    Todas las capturas están subidas. Listo para confirmar.
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
 
-        {msg && (
-          <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-            {msg}
+          {/* Paso 3 · Revisar y confirmar */}
+          <div style={mostrar(3)}>
+            <div style={tarjeta}>
+              <div style={subtitulo}>3. Revisa y confirma</div>
+              <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '6px 14px', fontSize: 14 }}>
+                <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Cliente</dt>
+                <dd style={{ margin: 0, fontWeight: 700 }}>{pedido.cliente_nombre || 'Cliente'} · {pedido.cliente_telefono || 'Sin teléfono'}</dd>
+                <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Pedido</dt>
+                <dd style={{ margin: 0, whiteSpace: 'pre-line' }}>{lineasTexto}</dd>
+                <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Total</dt>
+                <dd style={{ margin: 0, fontWeight: 800 }}>S/ {Number(pedido.total).toFixed(2)}</dd>
+                <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Medio de pago</dt>
+                <dd style={{ margin: 0, fontWeight: 700 }}>{medio}</dd>
+                <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Comprobante</dt>
+                <dd style={{ margin: 0, fontWeight: 700, color: !(esDigital || multiples) || comprobanteListo ? 'var(--cp-green, #2F7A45)' : sinVoucher ? 'var(--cp-orange, #E67929)' : 'var(--cp-rust, #B2500F)' }}>
+                  {!(esDigital || multiples)
+                    ? 'No hace falta (se cobra al entregar o recoger)'
+                    : comprobanteListo
+                      ? 'Listo'
+                      : sinVoucher
+                        ? 'Sin comprobante, con motivo y supervisor'
+                        : 'Falta subirlo (paso 2)'}
+                </dd>
+              </dl>
+            </div>
+            {esDigital && (
+              <div style={tarjeta}>
+                <label htmlFor="pc-r" style={{ fontWeight: 700, fontSize: 13 }}>
+                  Código de operación (opcional)
+                </label>
+                <input id="pc-r" type="text" value={codigoOp} onChange={(e) => setCodigoOp(e.target.value)} style={campo} />
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            onClick={handleConfirmar}
-            disabled={enviando}
-            style={{
-              flex: 1,
-              minHeight: 52,
-              border: 0,
-              borderRadius: 12,
-              background: 'var(--cp-orange, #E67929)',
-              color: 'var(--cp-navy, #0B2C3E)',
-              fontFamily: 'Montserrat,sans-serif',
-              fontWeight: 800,
-              fontSize: 15,
-              cursor: enviando ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {enviando ? 'Confirmando...' : 'Confirmar y enviar a cocina'}
-          </button>
-          <button
-            type="button"
-            onClick={alCerrar}
-            style={{
-              flex: 1,
-              minHeight: 52,
-              border: '1.5px solid var(--cp-navy, #0B2C3E)',
-              borderRadius: 12,
-              background: 'transparent',
-              color: 'var(--cp-navy, #0B2C3E)',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Cancelar
-          </button>
+        {/* Pie con los botones del paso */}
+        <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--cp-line, #E3D6C6)', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--cp-cream, #FBF4EC)' }}>
+          {msg && (
+            <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+              {msg}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {paso === 1 ? (
+              <button
+                type="button"
+                onClick={alCerrar}
+                style={{ flex: '1 1 140px', minHeight: 52, border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 800, cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setMsg('');
+                  setPaso((p) => (p > 1 ? ((p - 1) as 1 | 2 | 3) : p));
+                }}
+                style={{ flex: '1 1 140px', minHeight: 52, border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 800, cursor: 'pointer' }}
+              >
+                Atrás
+              </button>
+            )}
+            {paso < 3 ? (
+              <button
+                type="button"
+                onClick={irASiguiente}
+                style={{ flex: '2 1 220px', minHeight: 52, border: 0, borderRadius: 12, background: 'var(--cp-navy, #0B2C3E)', color: 'var(--cp-cream, #FBF4EC)', fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
+              >
+                Siguiente
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConfirmar}
+                disabled={enviando}
+                style={{ flex: '2 1 220px', minHeight: 52, border: 0, borderRadius: 12, background: 'var(--cp-orange, #E67929)', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 15, cursor: enviando ? 'not-allowed' : 'pointer' }}
+              >
+                {enviando ? 'Confirmando...' : 'Confirmar y enviar a cocina'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import { HistorialVoucher } from '../salon/HistorialVoucher';
 import { reducirImagenVoucher } from './reducirImagenVoucher';
 import { ErrorApi } from '../../comun/api';
 import { usePideCodigo } from '../../comun/usePideCodigo';
+import { MotivoCambioVoucher, MOTIVO_MINIMO } from './MotivoCambioVoucher';
 import type { RespuestaSubirVoucher, RespuestaSubirVoucherMozo } from './tipos';
 
 export interface SubirVoucherMozoProps {
@@ -32,6 +33,8 @@ export interface SubirVoucherMozoProps {
   quitable?: boolean;
   /** Se llama tras quitar el voucher: la ventana vuelve a estar sin foto. */
   alQuitado?: () => void;
+  /** Arranca directo en «elegir la foto nueva» (sin el paso «Voucher actual › Cambiar voucher»): Caja ya pulsó «Reemplazar voucher». */
+  cambioDirecto?: boolean;
 }
 
 export function SubirVoucherMozo({
@@ -47,6 +50,7 @@ export function SubirVoucherMozo({
   motivoCambio,
   quitable = false,
   alQuitado,
+  cambioDirecto = false,
 }: SubirVoucherMozoProps) {
   const pideCodigo = usePideCodigo();
   // Id del voucher que acaba de subir: «Quitar voucher» lo retira (queda en el historial)
@@ -70,7 +74,7 @@ export function SubirVoucherMozo({
   // Voucher vigente del pedido para este medio (se muestra antes de cambiarlo) y cuántos anteriores hay
   const [actual, setActual] = useState<ItemHistorialVoucher | null>(null);
   const [anteriores, setAnteriores] = useState(0);
-  const [cambiando, setCambiando] = useState(false);
+  const [cambiando, setCambiando] = useState(cambioDirecto);
   const [confirmandoCambio, setConfirmandoCambio] = useState(false);
 
   const cargarActual = () => {
@@ -438,7 +442,7 @@ export function SubirVoucherMozo({
         textoSi="Sí, cambiar"
         textoNo="No"
         alConfirmar={() => {
-          if (motivoLocal.trim().length < 5 || !archivo) return;
+          if (motivoLocal.trim().length < MOTIVO_MINIMO || !archivo) return;
           setConfirmandoCambio(false);
           void procesarYSubir(archivo);
         }}
@@ -448,27 +452,22 @@ export function SubirVoucherMozo({
           setVistaPreviaUrl(null);
         }}
       >
-        <div data-testid="comparar-voucher" style={{ display: 'flex', gap: '8px', margin: '8px 0' }}>
-          <div style={{ flex: 1, minWidth: 0, fontSize: '12px', fontWeight: 700 }}>
-            Antes
-            {actual?.archivoId && <FotoAmpliable archivoId={actual.archivoId} alt="Voucher anterior" alturaMaxima={120} />}
-            {actual && <div style={{ fontWeight: 400 }}>{fechaHora(actual.subidoEn)}</div>}
-          </div>
-          <div style={{ flex: 1, minWidth: 0, fontSize: '12px', fontWeight: 700 }}>
-            Nuevo
-            {vistaPreviaUrl && <img src={vistaPreviaUrl} alt="Voucher nuevo" style={{ display: 'block', maxWidth: '100%', maxHeight: 120, borderRadius: 8, objectFit: 'contain' }} />}
-          </div>
+        <div data-testid="comparar-voucher" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '10px 0 6px' }}>
+          {[
+            { rotulo: 'Antes', nota: actual ? fechaHora(actual.subidoEn) : '', contenido: actual?.archivoId ? <FotoAmpliable archivoId={actual.archivoId} alt="Voucher anterior" alturaMaxima={150} /> : null },
+            { rotulo: 'Nuevo', nota: 'Foto elegida ahora', contenido: vistaPreviaUrl ? <img src={vistaPreviaUrl} alt="Voucher nuevo" style={{ display: 'block', maxWidth: '100%', maxHeight: 150, borderRadius: 8, objectFit: 'contain', margin: '0 auto' }} /> : null },
+          ].map((c) => (
+            <div
+              key={c.rotulo}
+              style={{ minWidth: 0, border: `1.5px solid ${c.rotulo === 'Nuevo' ? 'var(--cp-green, #2F7A45)' : 'var(--cp-line, #E3D6C6)'}`, borderRadius: 12, padding: 8, background: 'var(--cp-white, #FFFFFF)', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: c.rotulo === 'Nuevo' ? 'var(--cp-green, #2F7A45)' : 'var(--cp-soft, #2C4C5D)' }}>{c.rotulo}</div>
+              {c.contenido}
+              {c.nota && <div style={{ fontSize: 11.5, fontWeight: 400, color: 'var(--cp-soft, #2C4C5D)' }}>{c.nota}</div>}
+            </div>
+          ))}
         </div>
-        <label htmlFor={`motivo-nuevo-${pedidoId}-${medio}`} style={{ fontSize: '13px', fontWeight: 700 }}>
-          Motivo del cambio (mínimo 5 caracteres)
-        </label>
-        <textarea
-          id={`motivo-nuevo-${pedidoId}-${medio}`}
-          rows={2}
-          value={motivoLocal}
-          onChange={(e) => setMotivoLocal(e.target.value)}
-          style={{ width: '100%', boxSizing: 'border-box', minHeight: '44px', border: '1.5px solid var(--cp-line, #E3D6C6)', borderRadius: '8px', padding: '8px 10px', fontSize: '14px', fontFamily: 'inherit' }}
-        />
+        <MotivoCambioVoucher id={`motivo-nuevo-${pedidoId}-${medio}`} valor={motivoLocal} alCambiar={setMotivoLocal} />
       </Confirmar>
       {anteriores > 0 && (
         <HistorialVoucher key={anteriores} pedidoId={pedidoId} total={anteriores} rotulo="Ver vouchers anteriores" soloAnteriores />
@@ -667,18 +666,7 @@ export function SubirVoucherMozo({
           data-testid="motivo-cambio-voucher"
           style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--cp-white, #FFFFFF)', border: '1.5px solid var(--cp-orange, #E67929)', borderRadius: '10px', padding: '10px 12px' }}
         >
-          <label htmlFor={`motivo-cambio-${pedidoId}-${medio}`} style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
-            Este pedido ya tenía un voucher. ¿Por qué lo cambias?
-          </label>
-          <textarea
-            id={`motivo-cambio-${pedidoId}-${medio}`}
-            rows={2}
-            value={motivoLocal}
-            onChange={(e) => setMotivoLocal(e.target.value)}
-            placeholder="Ej.: el cliente envió la captura correcta"
-            style={{ width: '100%', boxSizing: 'border-box', minHeight: '44px', border: '1.5px solid var(--cp-line, #E3D6C6)', borderRadius: '8px', padding: '8px 10px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
-          />
-          <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)' }}>Mínimo 5 caracteres. El voucher anterior no se borra: queda en el historial.</div>
+          <MotivoCambioVoucher id={`motivo-cambio-${pedidoId}-${medio}`} valor={motivoLocal} alCambiar={setMotivoLocal} pregunta="Este pedido ya tenía un voucher. ¿Por qué lo cambias?" />
           <button
             type="button"
             disabled={motivoLocal.trim().length < 5}

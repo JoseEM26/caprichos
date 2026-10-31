@@ -787,6 +787,22 @@ describe('PedidosEstadoService', () => {
       expect(acumular).toHaveBeenCalledWith(10n);
     });
 
+    it('al confirmar Caja el pago de un pedido que sigue en cocina, encola sus etiquetas (la carta nace en COLA); si ya salió de cocina, no', async () => {
+      const encolar = jest.fn().mockResolvedValue(undefined);
+      (service as any).impresionService = { encolarEtiquetasPedido: encolar, encolarTicketPedido: jest.fn().mockResolvedValue(undefined) };
+      const base = { id: 10n, codigo: 'CP-W014', pago_metodo: null, pago_estado: 'PENDIENTE' };
+
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...base, estado: 'COLA' });
+      prismaMock.pedido.update.mockResolvedValue({ ...base, estado: 'COLA', pago_metodo: 'EFECTIVO', pago_estado: 'COORDINADO' });
+      await service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth);
+      expect(encolar).toHaveBeenCalledWith(10n);
+
+      encolar.mockClear();
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...base, estado: 'EN_CAMINO' });
+      await service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'PAGADO' }, cajeroAuth);
+      expect(encolar).not.toHaveBeenCalled();
+    });
+
     it('debe rechazar método de pago inválido', async () => {
       const pedidoMock = { id: 10n };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);

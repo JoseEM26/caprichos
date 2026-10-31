@@ -59,14 +59,27 @@ describe('ModalConfirmarPago', () => {
   const marcarContacto = () =>
     fireEvent.click(screen.getByRole('checkbox', { name: /Ya hablé con el cliente/ }));
 
-  const confirmar = async () => {
+  const siguiente = () => fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+  /** Paso 1 → 2 (Pago y comprobante) tras marcar que se habló con el cliente. */
+  const irAlPaso2 = () => {
     marcarContacto();
+    siguiente();
+  };
+  /** Paso 1 → 3 (Revisar y confirmar). */
+  const irAlPaso3 = () => {
+    irAlPaso2();
+    siguiente();
+  };
+
+  const confirmar = async () => {
+    irAlPaso3();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar' }));
   };
 
   it('preselecciona el medio que eligió el cliente aunque llegue en mayúsculas (YAPE)', async () => {
     abrir(pedidoCarta());
+    irAlPaso2();
 
     // Yape marcado: el botón lleva el fondo navy y se pide la foto de Yape
     expect(screen.getByRole('button', { name: 'Yape' }).style.background).toContain('var(--cp-navy');
@@ -76,7 +89,7 @@ describe('ModalConfirmarPago', () => {
 
   it('digital sin voucher bloquea la confirmación y no registra el pago', async () => {
     abrir(pedidoCarta());
-    marcarContacto();
+    irAlPaso3();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
 
     expect(screen.getByRole('alert').textContent).toMatch(/Sube el comprobante del pago/);
@@ -142,15 +155,20 @@ describe('ModalConfirmarPago', () => {
   describe('confirmar sin comprobante (excepción con supervisor)', () => {
     const abrirSinComprobante = async () => {
       abrir(pedidoCarta());
+      irAlPaso2();
       fireEvent.click(await screen.findByRole('button', { name: 'Confirmar sin comprobante' }));
-      marcarContacto();
+    };
+    /** Con la excepción llena en el paso 2, se pasa al 3 y se pulsa Confirmar. */
+    const confirmarDesdePaso3 = () => {
+      siguiente();
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
     };
 
     it('motivo corto bloquea la confirmación y no registra el pago', async () => {
       await abrirSinComprobante();
       fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'nop' } });
       fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
+      confirmarDesdePaso3();
 
       expect(screen.getByRole('alert').textContent).toMatch(/al menos 5 caracteres/);
       expect(screen.queryByRole('button', { name: 'Sí, confirmar' })).toBeNull();
@@ -160,7 +178,7 @@ describe('ModalConfirmarPago', () => {
     it('código de supervisor vacío bloquea la confirmación y no registra el pago', async () => {
       await abrirSinComprobante();
       fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'El cliente no tenía señal' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
+      confirmarDesdePaso3();
 
       expect(screen.getByRole('alert').textContent).toMatch(/6 dígitos/);
       expect(pedidosApi.registrarPago).not.toHaveBeenCalled();
@@ -170,7 +188,7 @@ describe('ModalConfirmarPago', () => {
       await abrirSinComprobante();
       fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'El cliente no tenía señal' } });
       fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
+      confirmarDesdePaso3();
       fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar' }));
 
       await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
@@ -179,6 +197,37 @@ describe('ModalConfirmarPago', () => {
         pinSupervisor: '123456',
       });
     });
+  });
+
+  it('tiene tres pasos: Siguiente exige haber hablado con el cliente y Atrás conserva lo hecho', async () => {
+    abrir(pedidoCarta());
+    const pasos = screen.getByTestId('pasos-confirmar');
+    expect(pasos.textContent).toMatch(/Cliente/);
+    expect(pasos.textContent).toMatch(/Pago y comprobante/);
+    expect(pasos.textContent).toMatch(/Revisar y confirmar/);
+
+    siguiente();
+    expect(screen.getByRole('alert').textContent).toMatch(/hablaste con el cliente/);
+    expect(screen.queryByRole('button', { name: 'Confirmar y enviar a cocina' })).toBeNull();
+
+    irAlPaso3();
+    expect(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Atrás' }));
+    expect(screen.getByRole('button', { name: 'Yape' })).toBeDefined();
+  });
+
+  it('las capturas anteriores van plegadas en su propio apartado y la actual queda arriba', async () => {
+    vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([
+      { ...voucher('CONFIABLE', '30'), creadoEn: '2026-10-28T10:00:00Z' },
+      { ...voucher('ILEGIBLE', '29'), creadoEn: '2026-10-27T10:00:00Z' },
+    ]);
+    abrir(pedidoCarta());
+    irAlPaso2();
+
+    expect(await screen.findByText('Comprobantes del pedido (2)')).toBeDefined();
+    const anteriores = screen.getByTestId('capturas-anteriores');
+    expect(anteriores.textContent).toMatch(/Capturas anteriores \(1\)/);
+    expect(anteriores.hasAttribute('open')).toBe(false);
   });
 
   it('efectivo no pide comprobante y confirma directo', async () => {

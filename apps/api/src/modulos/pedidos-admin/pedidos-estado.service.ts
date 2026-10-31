@@ -1065,6 +1065,17 @@ export class PedidosEstadoService {
       ip,
     });
 
+    // Al confirmar Caja el pago de un pedido que sigue en cocina, salen sus etiquetas. Un pedido de la carta o de
+    // WhatsApp nace ya en COLA: nunca pasa por «cambiar a COLA», que era lo único que encolaba las etiquetas.
+    // Es idempotente (una clave por etiqueta) y nunca bloquea el pago.
+    if (['COLA', 'PREPARANDO'].includes(String(pedido.estado).toUpperCase())) {
+      try {
+        await this.impresionService?.encolarEtiquetasPedido(pedido.id);
+      } catch {
+        // las etiquetas se pueden reimprimir desde el pedido
+      }
+    }
+
     // PAGADO por aquí (p. ej. el repartidor cobra) nunca pasa por Caja → cobrar, así que suma aquí
     // los puntos del cliente; es idempotente y, si falla, no deshace el pago
     if (dto.estado === 'PAGADO') {
