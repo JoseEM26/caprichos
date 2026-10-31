@@ -69,6 +69,11 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
 
   if (vouchers.length === 0) return null;
 
+  // «Actual»: el más reciente que se pueda leer (si todos son ilegibles, el más reciente); el resto va plegado
+  const ordenados = [...vouchers].sort((x, y) => String(y.creadoEn).localeCompare(String(x.creadoEn)));
+  const actual = ordenados.find((v) => v.semaforo !== 'ILEGIBLE') ?? ordenados[0];
+  const anteriores = ordenados.filter((v) => v !== actual);
+
   return (
     <div
       data-testid="seccion-vouchers-pedido"
@@ -92,23 +97,19 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
         Comprobantes del pedido ({vouchers.length})
       </div>
       <HistorialVoucher pedidoId={pedidoId} />
-      {vouchers.map((v) => (
-        <div key={String(v.id)} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <FotoAmpliable archivoId={v.archivoId} />
-          <TarjetaLecturaVoucher
-            voucher={{
-              id: v.id,
-              semaforo: v.semaforo,
-              motivos: v.motivos,
-              extraido: v.extraido,
-              medio: v.medio ?? medio ?? null,
-            }}
-            pedido={{ total: total ?? null, medio: medio ?? null }}
-            puedeVer
-          />
-          <ReasignarVoucherBoton voucherId={v.id} onReasignado={() => setRecarga((n) => n + 1)} />
-        </div>
-      ))}
+      <TarjetaComprobante v={actual} medio={medio} total={total} onReasignado={() => setRecarga((n) => n + 1)} />
+      {anteriores.length > 0 && (
+        <details data-testid="capturas-anteriores" style={{ border: '1px dashed var(--cp-line, #E3D6C6)', borderRadius: 10, padding: '6px 10px', background: 'var(--cp-cream, #FBF4EC)' }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 13, minHeight: 32, display: 'flex', alignItems: 'center', color: 'var(--cp-navy, #0B2C3E)' }}>
+            Capturas anteriores ({anteriores.length})
+          </summary>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            {anteriores.map((v) => (
+              <TarjetaComprobante key={String(v.id)} v={v} medio={medio} total={total} onReasignado={() => setRecarga((n) => n + 1)} />
+            ))}
+          </div>
+        </details>
+      )}
       {!reemplazando ? (
         <Boton
           variante="secundario"
@@ -174,6 +175,35 @@ export function SeccionVouchersPedido({ pedidoId, recargarClave, total, medio, a
           </Boton>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Un comprobante: la foto a un lado y su lectura al otro (en pantalla ancha); apilado en celular. */
+function TarjetaComprobante({
+  v,
+  medio,
+  total,
+  onReasignado,
+}: {
+  v: VoucherPagoItem;
+  medio?: string | null;
+  total?: number | string | null;
+  onReasignado: () => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' }}>
+      <div style={{ flex: '0 0 190px', maxWidth: '100%' }}>
+        <FotoAmpliable archivoId={v.archivoId} />
+      </div>
+      <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <TarjetaLecturaVoucher
+          voucher={{ id: v.id, semaforo: v.semaforo, motivos: v.motivos, extraido: v.extraido, medio: v.medio ?? medio ?? null }}
+          pedido={{ total: total ?? null, medio: medio ?? null }}
+          puedeVer
+        />
+        <ReasignarVoucherBoton voucherId={v.id} onReasignado={onReasignado} />
+      </div>
     </div>
   );
 }
