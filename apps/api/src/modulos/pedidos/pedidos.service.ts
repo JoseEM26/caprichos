@@ -38,6 +38,8 @@ export interface OrigenPedido {
   clientePartyId?: bigint | string | number;
   /** Teléfono de quien escribe por WhatsApp: si tiene cuenta, el pedido queda a su nombre */
   telefonoRemitente?: string;
+  /** WhatsApp: celular elegido para sumar puntos (puede no ser el de quien escribe); gana sobre telefonoRemitente */
+  telefonoPuntos?: string;
   /** WhatsApp: el cliente eligió no sumar puntos; no se busca ninguna cuenta por teléfono */
   sinCuentaCliente?: boolean;
   esPersonal?: boolean;
@@ -108,12 +110,13 @@ export class PedidosService {
       }
       return partyId;
     }
-    // Sin sesión: el celular (carta o WhatsApp) suma puntos en su party de puntos
-    if (canal !== 'CARTA' && origen?.telefonoRemitente && this.direcciones) {
-      const cuenta = await this.direcciones.resolverPartyPorTelefono(origen.telefonoRemitente);
+    // Sin sesión: el celular (carta o WhatsApp) suma puntos en su party de puntos. En WhatsApp manda el celular elegido.
+    const telefonoPuntos = canal === 'CARTA' ? undefined : (origen?.telefonoPuntos ?? origen?.telefonoRemitente);
+    if (telefonoPuntos && this.direcciones) {
+      const cuenta = await this.direcciones.resolverPartyPorTelefono(telefonoPuntos);
       if (cuenta) return cuenta;
     }
-    const telefono = canal === 'CARTA' ? dto.cliente?.telefono : origen?.telefonoRemitente;
+    const telefono = canal === 'CARTA' ? dto.cliente?.telefono : telefonoPuntos;
     if (!telefono || !this.puntosParty) return null;
     return this.puntosParty.resolverOCrear(telefono);
   }

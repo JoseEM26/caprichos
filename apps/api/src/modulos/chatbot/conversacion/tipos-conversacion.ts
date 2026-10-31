@@ -161,7 +161,7 @@ export interface AccionCrearPedido {
   esPagoDigital: boolean;
   datosPagoTexto?: string;
   /** A qué cuenta suma el pedido; NINGUNO = invitado de verdad (no se resuelve por teléfono) */
-  puntos?: { modo: 'TELEFONO_PROPIO' | 'TELEFONO_DICTADO' | 'NINGUNO'; partyId?: string };
+  puntos?: { modo: 'TELEFONO_PROPIO' | 'TELEFONO_DICTADO' | 'NINGUNO'; partyId?: string; telefono?: string };
 }
 
 /**
@@ -293,7 +293,9 @@ export interface MemoriaPuntosBot {
   partyId?: string;
   /** Solo con TELEFONO_PROPIO: el nombre coincide con el número de quien escribe */
   primerNombre?: string;
-  /** Últimos 3 dígitos del número dictado */
+  /** Celular de 9 dígitos elegido para sumar (el de quien escribe o uno que dictó) */
+  telefono?: string;
+  /** Últimos 3 dígitos del celular elegido */
   terminacion?: string;
   /** Epoch ms de la decisión */
   en: number;
@@ -304,8 +306,6 @@ export interface ContextoPuntosBot {
   porcentaje: number;
   /** Cuenta del propio teléfono de quien escribe, con su saldo */
   cuentaTelefono?: { partyId: string; primerNombre: string; saldo: number } | null;
-  /** Resultado de buscar el número dictado: sin nombre ni datos */
-  busqueda?: { telefono: string; partyId: string | null; terminacion: string } | null;
 }
 
 /**

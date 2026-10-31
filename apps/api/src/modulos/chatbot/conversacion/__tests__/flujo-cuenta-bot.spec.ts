@@ -10,9 +10,9 @@ const base: ContextoConversacion = {
   datosLocal: { abierta: true, abre: '12:00', cierra: '23:00', direccion: 'x', enlaceMapa: 'x', telefono: '1' } as any,
   datosLocalPublicos: { tiempo_base: 25, tiempo_maximo: 35, mediosPagoVisibles: {} },
 };
-const ctx = (cuenta: boolean, busqueda: any = null): ContextoConversacion => ({
+const ctx = (cuenta: boolean): ContextoConversacion => ({
   ...base,
-  puntos: { porcentaje: 5, cuentaTelefono: cuenta ? { partyId: '7', primerNombre: 'José', saldo: 10 } : null, busqueda },
+  puntos: { porcentaje: 5, cuentaTelefono: cuenta ? { partyId: '7', primerNombre: 'José', saldo: 10 } : null },
 });
 const flujoAlCierre = (): FlujoConversacion => ({
   version: 1,
@@ -37,114 +37,92 @@ const crear = (r: any, c: ContextoConversacion) =>
   transicionarEstado({ ...r.nuevoFlujo, estado: 'PEDIDO_RESUMEN_CONFIRMAR' }, btn('ped_confirmar'), c).acciones.find((a) => a.tipo === 'crearPedido') as any;
 const inicio = (c: ContextoConversacion) => transicionarEstado(flujoAlCierre(), txt('omitir'), c);
 
-describe('Bienvenida y cuenta por celular en el bot', () => {
-  describe('número CON cuenta', () => {
-    it('saluda por el primer nombre con 3 botones', () => {
-      const r = inicio(ctx(true));
-      expect(texto(r)).toBe('¡Hola, José! 💛 Qué bueno verte de nuevo. ¿Sumamos los puntos de hoy a tu cuenta o prefieres seguir como invitado?');
-      expect(botones(r)).toEqual(['Sumar puntos', 'Seguir como invitado', 'Usar otro número']);
-    });
-    it('Sumar puntos: suma a su cuenta', () => {
+describe('Puntos por celular en el bot (sin cuenta, sin nombre ni contraseña)', () => {
+  describe('número CON cuenta identificada', () => {
+    it('no pregunta: va directo al resumen sumando a su cuenta', () => {
       const c = ctx(true);
-      const r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_si'), c);
+      const r = inicio(c);
+      expect(r.nuevoEstado).toBe('PEDIDO_RESUMEN_CONFIRMAR');
       expect(crear(r, c).puntos).toEqual({ modo: 'TELEFONO_PROPIO', partyId: '7' });
-    });
-    it('Seguir como invitado: invitado real', () => {
-      const c = ctx(true);
-      const r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_no'), c);
-      expect(crear(r, c).puntos?.modo).toBe('NINGUNO');
-    });
-    it('Usar otro número: pide el número, encuentra ***123 sin revelar nombre y suma ahí', () => {
-      const c = ctx(true);
-      let r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_otro'), c);
-      expect(r.nuevoEstado).toBe('PEDIDO_PUNTOS_NUMERO');
-      const c2 = ctx(true, { telefono: '912345123', partyId: '9', terminacion: '123' });
-      r = transicionarEstado(r.nuevoFlujo, txt('912345123'), c2);
-      expect(texto(r)).toBe('Encontré una cuenta que termina en ***123, ¿sumo ahí?');
-      r = transicionarEstado(r.nuevoFlujo, btn('puntos_si'), c2);
-      expect(crear(r, c2).puntos).toEqual({ modo: 'TELEFONO_DICTADO', partyId: '9' });
-    });
-    it('una sola bienvenida: con la decisión recordada solo hay recordatorio breve', () => {
-      const c = ctx(true);
-      const r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_si'), c);
-      const segundo = transicionarEstado({ ...flujoAlCierre(), puntos: r.nuevoFlujo.puntos }, txt('omitir'), c);
-      expect(texto(segundo)).toContain('como antes');
-      expect(texto(segundo)).not.toContain('Qué bueno verte');
-      const inv = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_no'), c);
-      const tercero = transicionarEstado({ ...flujoAlCierre(), puntos: inv.nuevoFlujo.puntos }, txt('omitir'), c);
-      expect(tercero.nuevoEstado).toBe('PEDIDO_RESUMEN_CONFIRMAR');
     });
   });
 
   describe('número SIN cuenta', () => {
     const c = ctx(false);
-    it('ofrece crear la cuenta con este número', () => {
+    it('pregunta si quiere sumar y con qué número, con tres botones cortos', () => {
       const r = inicio(c);
-      expect(texto(r)).toBe('¡Hola! 👋 Este número todavía no tiene cuenta en Caprichos. ¿Quieres crearla con este mismo número para sumar puntos, o prefieres seguir como invitado?');
-      expect(botones(r)).toEqual(['Crear mi cuenta', 'Seguir como invitado', 'Tengo otro número']);
+      expect(r.nuevoEstado).toBe('PEDIDO_PUNTOS_PREGUNTA');
+      expect(botones(r)).toEqual(['Este número', 'Otro número', 'No, gracias']);
       expect(botones(r).every((t: string) => t.length <= 20)).toBe(true);
+      expect(texto(r)).toContain('¿A qué número los sumo?');
     });
-    it('Crear mi cuenta: pide solo el nombre, valida 2+ letras, muestra consentimiento con enlaces y botones', () => {
-      let r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_crear'), c);
-      expect(r.nuevoEstado).toBe('PEDIDO_CUENTA_NOMBRE');
-      r = transicionarEstado(r.nuevoFlujo, txt('A'), c);
-      expect(r.nuevoEstado).toBe('PEDIDO_CUENTA_NOMBRE');
-      expect(texto(r)).toContain('2 letras');
-      r = transicionarEstado(r.nuevoFlujo, txt('Ana Pérez'), c);
-      expect(r.nuevoEstado).toBe('PEDIDO_CUENTA_CONSENT');
-      expect(texto(r)).toContain('https://carta.caprichos.pe/legal/terminos');
-      expect(texto(r)).toContain('https://carta.caprichos.pe/legal/privacidad');
-      expect(botones(r)).toEqual(['Acepto', 'No, gracias']);
-    });
-    it('Acepto: emite crearCuentaCliente (sin contraseña) y sigue con puntos a la cuenta nueva', () => {
-      let r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_crear'), c);
-      r = transicionarEstado(r.nuevoFlujo, txt('Ana Pérez'), c);
-      r = transicionarEstado(r.nuevoFlujo, btn('cuenta_acepto'), c);
-      expect(r.acciones[0]).toEqual({ tipo: 'crearCuentaCliente', nombre: 'Ana Pérez' });
+
+    it('Este número: suma al celular de quien escribe y no pide nombre ni contraseña', () => {
+      const r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_este'), c);
       expect(r.nuevoEstado).toBe('PEDIDO_RESUMEN_CONFIRMAR');
-      expect(crear(r, c).puntos).toEqual({ modo: 'TELEFONO_PROPIO', partyId: undefined });
+      expect(texto(r)).toContain('Listo, sumarás puntos con el ***321.');
+      expect(crear(r, c).puntos).toEqual({ modo: 'TELEFONO_DICTADO', telefono: '987654321' });
     });
-    it('No, gracias: invitado y no se crea nada', () => {
-      let r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_crear'), c);
-      r = transicionarEstado(r.nuevoFlujo, txt('Ana'), c);
-      r = transicionarEstado(r.nuevoFlujo, btn('cuenta_no'), c);
+
+    it('Otro número válido: pide el celular, lo guarda y no pide nombre', () => {
+      let r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_otro'), c);
+      expect(r.nuevoEstado).toBe('PEDIDO_PUNTOS_NUMERO');
+      r = transicionarEstado(r.nuevoFlujo, txt('912345678'), c);
+      expect(r.nuevoEstado).toBe('PEDIDO_RESUMEN_CONFIRMAR');
+      expect(texto(r)).toContain('Listo, sumarás puntos con el ***678.');
+      expect(crear(r, c).puntos).toEqual({ modo: 'TELEFONO_DICTADO', telefono: '912345678' });
+    });
+
+    it('Otro número inválido: repite con mensaje claro; «No, gracias» deja salir', () => {
+      let r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_otro'), c);
+      r = transicionarEstado(r.nuevoFlujo, txt('8123'), c);
+      expect(r.nuevoEstado).toBe('PEDIDO_PUNTOS_NUMERO');
+      expect(texto(r)).toContain('no es válido');
+      expect(botones(r)).toEqual(['No, gracias']);
+      r = transicionarEstado(r.nuevoFlujo, btn('puntos_no'), c);
+      expect(r.nuevoEstado).toBe('PEDIDO_RESUMEN_CONFIRMAR');
+      expect(crear(r, c).puntos?.modo).toBe('NINGUNO');
+    });
+
+    it('No, gracias: invitado, sin oferta de crear cuenta', () => {
+      const r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_no'), c);
       expect(r.acciones.some((a) => a.tipo === 'crearCuentaCliente')).toBe(false);
       expect(crear(r, c).puntos?.modo).toBe('NINGUNO');
     });
-    it('Seguir como invitado: invitado real', () => {
+
+    it('una sola pregunta: con la decisión recordada el siguiente pedido solo trae el recordatorio breve', () => {
+      const r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_este'), c);
+      const segundo = transicionarEstado({ ...flujoAlCierre(), puntos: r.nuevoFlujo.puntos }, txt('omitir'), c);
+      expect(texto(segundo)).toContain('como antes');
+      expect(texto(segundo)).not.toContain('¿A qué número los sumo?');
+      expect(texto(segundo)).not.toContain('Qué bueno verte');
+    });
+
+    it('con «No, gracias» recordado no vuelve a preguntar', () => {
       const r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_no'), c);
-      expect(crear(r, c).puntos?.modo).toBe('NINGUNO');
-    });
-    it('Tengo otro número: usa el flujo del número dictado', () => {
-      const r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_otro'), c);
-      expect(r.nuevoEstado).toBe('PEDIDO_PUNTOS_NUMERO');
-    });
-    it('tras crear la cuenta el siguiente pedido ya es recordatorio, no bienvenida', () => {
-      const cc = ctx(true);
-      let r = transicionarEstado(inicio(c).nuevoFlujo, btn('puntos_crear'), c);
-      r = transicionarEstado(r.nuevoFlujo, txt('Ana'), c);
-      r = transicionarEstado(r.nuevoFlujo, btn('cuenta_acepto'), c);
-      const otro = transicionarEstado({ ...flujoAlCierre(), puntos: r.nuevoFlujo.puntos }, txt('omitir'), cc);
-      expect(texto(otro)).toContain('como antes');
+      const tercero = transicionarEstado({ ...flujoAlCierre(), puntos: r.nuevoFlujo.puntos }, txt('omitir'), c);
+      expect(tercero.nuevoEstado).toBe('PEDIDO_RESUMEN_CONFIRMAR');
     });
   });
 
-  it('textos: nunca piden contraseña y no mencionan DNI de la cuenta', () => {
+  it('textos: nunca piden nombre, contraseña ni DNI de la cuenta', () => {
     const todos = [
-      TEXTOS_BOT.puntosCuentaPropia('José'),
-      TEXTOS_BOT.puntosSinCuentaBienvenida(),
+      TEXTOS_BOT.puntosPregunta(),
       TEXTOS_BOT.puntosPedirNumero(),
-      TEXTOS_BOT.puntosEncontrado('123'),
-      TEXTOS_BOT.cuentaPedirNombre(),
-      TEXTOS_BOT.cuentaNombreInvalido(),
-      TEXTOS_BOT.cuentaConsentimiento('Ana', TEXTOS_BOT.cuentaEnlacesLegales('t', 'p')),
-      TEXTOS_BOT.puntosSinCuenta('https://x'),
-      TEXTOS_BOT.puntosNoEncontrado('https://x'),
-      TEXTOS_BOT.puntosTopeIntentos('https://x'),
+      TEXTOS_BOT.puntosNumeroInvalido(),
+      TEXTOS_BOT.puntosListo('678'),
+      TEXTOS_BOT.puntosRecordatorio('tu número que termina en ***678'),
     ].join('\n');
     expect(todos).not.toMatch(/dni/i);
-    expect(todos).not.toMatch(/escribe.*contraseña|tu contraseña es|envía.*contraseña/i);
-    expect(TEXTOS_BOT.cuentaCreada('Ana')).toBe('¡Listo, Ana! Tu cuenta quedó creada con este número. Para entrar en caprichos.pe define tu contraseña con “¿Olvidaste tu contraseña?”; te llegará un código por aquí.');
+    expect(todos).not.toMatch(/tu nombre|cómo te llamas|define tu contraseña|escribe tu contraseña/i);
+    expect(TEXTOS_BOT.puntosListo('678')).toBe('Listo, sumarás puntos con el ***678. ⭐');
     expect(TEXTOS_BOT.pedidoComprobanteDni()).toContain('solo para tu comprobante');
+  });
+
+  it('la confirmación del pedido dice con qué celular suma (si suma)', () => {
+    const conPuntos = TEXTOS_BOT.pedidoConfirmadoExito({ codigo: 'CP-W1', tiempoMin: 20, tiempoMax: 30, esPagoDigital: false, puntosTerminacion: '678' });
+    expect(conPuntos).toContain('Sumas puntos con el ***678.');
+    const sinPuntos = TEXTOS_BOT.pedidoConfirmadoExito({ codigo: 'CP-W1', tiempoMin: 20, tiempoMax: 30, esPagoDigital: false });
+    expect(sinPuntos).not.toContain('Sumas puntos');
   });
 });

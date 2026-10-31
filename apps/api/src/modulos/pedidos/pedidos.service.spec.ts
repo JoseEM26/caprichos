@@ -1114,6 +1114,23 @@ describe('PedidosService', () => {
       expect(capturado.data.cliente_party_id).toBe(300n);
     });
 
+    it('WhatsApp con telefonoPuntos (celular elegido en el chat): suma a ese celular, no al de quien escribe', async () => {
+      const capturado = crearCapturado();
+      await service.crear(pedidoBaseDto, 'idemp-pp-tp', { canal: 'WHATSAPP', telefonoRemitente: '987654321', telefonoPuntos: '912345678' });
+      expect(direccionesMock.resolverPartyPorTelefono).toHaveBeenCalledWith('912345678');
+      expect(partyPuntosMock.resolverOCrear).toHaveBeenCalledWith('912345678');
+      expect(partyPuntosMock.resolverOCrear).not.toHaveBeenCalledWith('987654321');
+      expect(capturado.data.cliente_party_id).toBe(300n);
+    });
+
+    it('WhatsApp con telefonoPuntos que ya tiene cuenta: usa esa cuenta', async () => {
+      const capturado = crearCapturado();
+      direccionesMock.resolverPartyPorTelefono.mockResolvedValueOnce(77n);
+      await service.crear(pedidoBaseDto, 'idemp-pp-tp-2', { canal: 'WHATSAPP', telefonoRemitente: '987654321', telefonoPuntos: '912345678' });
+      expect(capturado.data.cliente_party_id).toBe(77n);
+      expect(partyPuntosMock.resolverOCrear).not.toHaveBeenCalled();
+    });
+
     it('WhatsApp «No, gracias» (sinCuentaCliente) no crea ni busca party de puntos', async () => {
       crearCapturado();
       await service.crear(pedidoBaseDto, 'idemp-pp-wa-no', { canal: 'WHATSAPP', telefonoRemitente: '987654321', sinCuentaCliente: true });

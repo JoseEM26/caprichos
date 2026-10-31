@@ -91,7 +91,7 @@ export class EjecutorConversacionService {
    * confía en lo guardado); TELEFONO_DICTADO lleva la cuenta elegida, que el servidor valida; NINGUNO = invitado de verdad.
    */
   private async origenPedidoWhatsapp(
-    puntos: { modo: string; partyId?: string } | undefined,
+    puntos: { modo: string; partyId?: string; telefono?: string } | undefined,
     conversacion: { telefono: string },
   ): Promise<any> {
     const base = { canal: 'WHATSAPP' as const, telefonoRemitente: conversacion.telefono };
@@ -101,13 +101,15 @@ export class EjecutorConversacionService {
       const propia = await this.direccionesService?.cuentaPorTelefono(conversacion.telefono);
       return propia ? { ...base, clientePartyId: propia.partyId } : { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
     }
+    // Celular elegido en el chat (sin cuenta previa): el party de puntos de ese celular, no el de quien escribe
+    if (puntos.telefono) return { ...base, telefonoPuntos: puntos.telefono };
     return puntos.partyId ? { ...base, telefonoRemitente: undefined, clientePartyId: puntos.partyId } : { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
   }
 
   /** Deja en el chat qué cuenta se eligió y cómo (TELEFONO_PROPIO | TELEFONO_DICTADO | invitado). */
   private async registrarEleccionPuntos(
     conversacionId: bigint | string,
-    puntos: { modo: string; partyId?: string } | undefined,
+    puntos: { modo: string; partyId?: string; telefono?: string } | undefined,
     codigoPedido: string,
   ): Promise<void> {
     if (!puntos) return;
@@ -953,7 +955,7 @@ export class EjecutorConversacionService {
       }
     }
 
-    // Puntos: la cuenta del propio número (con saldo) y, si dictó otro número, solo si existe (sin nombre ni datos)
+    // Puntos: la cuenta del propio número (con saldo). El celular que elige el cliente se guarda en el flujo, sin consultarlo
     let puntosCtx: ContextoConversacion['puntos'] = undefined;
     const estadoPrevio = String(flujoPrevio?.estado ?? '');
     const textoEntradaPuntos = normalizarEntrada(entradaRaw);
@@ -973,20 +975,7 @@ export class EjecutorConversacionService {
           cuentaTelefono: propia
             ? { partyId: propia.partyId.toString(), primerNombre: propia.primerNombre, saldo: await this.puntosService.obtenerSaldo(propia.partyId) }
             : null,
-          busqueda: null,
         };
-        // Número dictado: tope de 3 por conversación y respeta el límite general de consultas
-        const dig = (entradaRaw.texto ?? '').replace(/\D/g, '');
-        const celular = dig.length === 11 && dig.startsWith('51') ? dig.slice(2) : dig;
-        if (
-          estadoPrevio === 'PEDIDO_PUNTOS_NUMERO' &&
-          /^9\d{8}$/.test(celular) &&
-          Number((flujoPrevio as any)?.puntosIntentos ?? 0) < 3 &&
-          !limiteConsultasExcedido
-        ) {
-          const hallada = await this.direccionesService.cuentaPorTelefono(celular);
-          puntosCtx.busqueda = { telefono: celular, partyId: hallada ? hallada.partyId.toString() : null, terminacion: celular.slice(-3) };
-        }
       } catch (err: any) {
         this.logger.warn(`Error consultando puntos del cliente: ${err.message}`);
         puntosCtx = undefined;
@@ -1964,6 +1953,8 @@ export class EjecutorConversacionService {
           continue;
         }
 
+        // Con qué celular suma el pedido: el elegido en el chat, o el de quien escribe si eligió su propia cuenta
+        const celularPuntos = accion.puntos?.telefono ?? (accion.puntos?.modo === 'TELEFONO_PROPIO' ? conversacion.telefono : undefined);
         const textoConfirmacion = TEXTOS_BOT.pedidoConfirmadoExito({
           codigo: codigoFinal,
           tiempoMin: accion.tiempoEstimadoMin,
@@ -1973,6 +1964,7 @@ export class EjecutorConversacionService {
             ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio),
           ),
           datosPago: accion.datosPagoTexto,
+          puntosTerminacion: celularPuntos ? celularPuntos.slice(-3) : undefined,
         });
 
         let metaId: string | null = null;
