@@ -36,6 +36,15 @@ q "SELECT v.id, v.origen, v.medio, v.semaforo,
           CASE WHEN v.retirado THEN 'RETIRADO' WHEN v.reemplazado_en IS NOT NULL THEN 'REEMPLAZADO' ELSE 'VIGENTE' END AS estado,
           to_char(v.creado_en AT TIME ZONE 'America/Lima','MM-DD HH24:MI') AS subido
    FROM voucher_pago v JOIN pedido p ON p.id=v.pedido_id WHERE p.codigo='${COD}' ORDER BY v.id"
+echo "== Impresión de etiquetas (print_job) =="
+q "SELECT j.id, j.tipo, j.estado, j.intentos, left(coalesce(j.error,''),60) AS error,
+          to_char(j.creado_en AT TIME ZONE 'America/Lima','MM-DD HH24:MI') AS creado,
+          to_char(j.impreso_en AT TIME ZONE 'America/Lima','MM-DD HH24:MI') AS impreso
+   FROM print_job j JOIN pedido p ON p.id=j.pedido_id WHERE p.codigo='${COD}' ORDER BY j.id"
+echo "== Comandas por área (cocina) =="
+q "SELECT c.area_id, c.estado, to_char(c.llego_en AT TIME ZONE 'America/Lima','MM-DD HH24:MI') AS llego,
+          to_char(c.despejada_en AT TIME ZONE 'America/Lima','MM-DD HH24:MI') AS despejada
+   FROM comanda_area c JOIN pedido p ON p.id=c.pedido_id WHERE p.codigo='${COD}' ORDER BY c.llego_en" 
 echo "== Pedidos con código parecido =="
 q "SELECT codigo, estado, canal, pago_estado, total, to_char(creado_en AT TIME ZONE 'America/Lima','MM-DD HH24:MI') AS creado
    FROM pedido WHERE codigo ILIKE '%'||right('${COD}',3)||'%' OR codigo ILIKE '${COD}%' ORDER BY creado_en DESC LIMIT 8"
