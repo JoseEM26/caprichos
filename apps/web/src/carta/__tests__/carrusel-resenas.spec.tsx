@@ -78,39 +78,49 @@ describe('CarruselResenas', () => {
     expect(lista).toEqual([1, 2, 3, 4]);
   });
 
+  const cuatro = () => ({ resenas: ['a', 'b', 'c', 'd'].map((x) => resena(x)), resumen: null });
+  const primeraVisible = () => screen.getAllByRole('link', { name: 'Ver en Google Maps' })[0].getAttribute('href');
+
   it('avanza solo cada 6 segundos', async () => {
-    await montar({ resenas: [resena('a', 'Primera reseña con texto suficiente para la prueba.'), resena('b', 'Segunda reseña con texto suficiente para la prueba.')], resumen: null });
-    expect(screen.getByText('Primera reseña con texto suficiente para la prueba.')).toBeInTheDocument();
+    await montar(cuatro());
+    expect(primeraVisible()).toBe('https://maps.google.com/?r=a');
     await act(async () => {
       vi.advanceTimersByTime(6000);
     });
-    expect(screen.getByText('Segunda reseña con texto suficiente para la prueba.')).toBeInTheDocument();
+    expect(primeraVisible()).toBe('https://maps.google.com/?r=b');
   });
 
   it('se pausa con el cursor encima', async () => {
-    const { container } = await montar({ resenas: [resena('a', 'Primera reseña con texto suficiente para la prueba.'), resena('b', 'Segunda reseña con texto suficiente para la prueba.')], resumen: null });
+    const { container } = await montar(cuatro());
     fireEvent.mouseEnter(container.querySelector('section') as HTMLElement);
     await act(async () => {
       vi.advanceTimersByTime(12000);
     });
-    expect(screen.getByText('Primera reseña con texto suficiente para la prueba.')).toBeInTheDocument();
+    expect(primeraVisible()).toBe('https://maps.google.com/?r=a');
   });
 
   it('respeta prefers-reduced-motion: sin avance automatico', async () => {
     (window as any).matchMedia = vi.fn().mockImplementation(() => ({ matches: true, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} }));
-    await montar({ resenas: [resena('a', 'Primera reseña con texto suficiente para la prueba.'), resena('b', 'Segunda reseña con texto suficiente para la prueba.')], resumen: null });
+    await montar(cuatro());
     await act(async () => {
       vi.advanceTimersByTime(12000);
     });
-    expect(screen.getByText('Primera reseña con texto suficiente para la prueba.')).toBeInTheDocument();
+    expect(primeraVisible()).toBe('https://maps.google.com/?r=a');
     fireEvent.click(screen.getByRole('button', { name: 'Reseña siguiente' }));
-    expect(screen.getByText('Segunda reseña con texto suficiente para la prueba.')).toBeInTheDocument();
+    expect(primeraVisible()).toBe('https://maps.google.com/?r=b');
   });
 
   it('flechas y puntos tienen aria-label', async () => {
-    await montar({ resenas: [resena('a'), resena('b')], resumen: null });
+    await montar({ resenas: ['a', 'b', 'c', 'd'].map((x) => resena(x)), resumen: null });
     expect(screen.getByRole('button', { name: 'Reseña anterior' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ver reseña 2 de 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver reseña 4 de 4' })).toBeInTheDocument();
+  });
+
+  it('en PC muestra tres tarjetas a la vez y oculta al lector las que quedan fuera', async () => {
+    await montar({ resenas: ['a', 'b', 'c', 'd'].map((x) => resena(x)), resumen: null });
+    expect(screen.getAllByRole('link', { name: 'Ver en Google Maps' })).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Reseña siguiente' }));
+    expect(screen.getAllByRole('link', { name: 'Ver en Google Maps' })[0]).toHaveAttribute('href', 'https://maps.google.com/?r=b');
   });
 
   it('la foto que falla cambia a la inicial del nombre', async () => {
