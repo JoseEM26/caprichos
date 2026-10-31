@@ -501,48 +501,22 @@ export function PedidosAdminView() {
 
   return (
     <div>
-    <BannerCajaCerrada />
-    <FranjaImpresion />
+    {/* Caja cerrada e impresoras: una sola línea de chips, sin ocupar la pantalla */}
+    <div className="cj-estado">
+      <BannerCajaCerrada compacto />
+      <FranjaImpresion />
+    </div>
     <div className="cj-grid">
       {/* PANEL IZQUIERDO */}
       <div className="cj-left">
-        <div className="cj-head">
-          {/* Botón Nuevo pedido (solo si tiene permiso) */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  const r = await salonApi.obtenerMesas();
-                  setPisosSalon(r.pisos || []);
-                } catch {
-                  setPisosSalon([]);
-                }
-                setNuevoPedidoAbierto(true);
-              }}
-              style={{
-                flex: '1 1 150px',
-                minHeight: 52,
-                border: 0,
-                borderRadius: 12,
-                background: 'var(--cp-orange, #E67929)',
-                color: 'var(--cp-navy, #0B2C3E)',
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: 15,
-                cursor: 'pointer',
-              }}
-            >
-              Nuevo pedido
-            </button>
-          </div>
+        <div className="cj-head cj-cabecera">
+          {/* Fila 1: día, vista, atajos y Nuevo pedido (en PC van lado a lado) */}
+          <div className="cj-barra">
+            {/* Día o rango de la lista (hoy por defecto); no cambia la caja del día */}
+            <FiltroDiasPedidos rango={rango} pendientesAnteriores={pendientesAnteriores} alCambiar={cambiarRango} />
 
-          {/* Día o rango de la lista (hoy por defecto); no cambia la caja del día */}
-          <FiltroDiasPedidos rango={rango} pendientesAnteriores={pendientesAnteriores} alCambiar={cambiarRango} />
-
-          {/* Vista de la lista: un combo con la cantidad de cada grupo (antes 5 pestañas) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ minWidth: 260 }}>
+            {/* Vista de la lista: un combo con la cantidad de cada grupo (antes 5 pestañas) */}
+            <div className="cj-barra-vista">
               <FiltroCombo
                 etiqueta="Ver pedidos"
                 valor={tabActiva}
@@ -574,125 +548,132 @@ export function PedidosAdminView() {
                 {noEntregados?.total} no {noEntregados?.total === 1 ? 'entregado' : 'entregados'}
               </button>
             )}
+
+            <button
+              type="button"
+              className="cj-nuevo"
+              onClick={async () => {
+                try {
+                  const r = await salonApi.obtenerMesas();
+                  setPisosSalon(r.pisos || []);
+                } catch {
+                  setPisosSalon([]);
+                }
+                setNuevoPedidoAbierto(true);
+              }}
+              style={{
+                minHeight: 44,
+                padding: '0 18px',
+                border: 0,
+                borderRadius: 12,
+                background: 'var(--cp-orange, #E67929)',
+                color: 'var(--cp-navy, #0B2C3E)',
+                fontFamily: 'Montserrat, sans-serif',
+                fontWeight: 800,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              Nuevo pedido
+            </button>
           </div>
 
-          {/* Buscador y Filtros (no aplican a No entregados) */}
+          {/* Fila 2: buscador y filtros (no aplican a No entregados) */}
           {tabActiva !== 'no_entregados' && (
-          <div
-            style={{
-              background: 'var(--cp-white, #FFFFFF)',
-              border: '1px solid var(--cp-line, #E3D6C6)',
-              borderRadius: 12,
-              padding: 8,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-            }}
-          >
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <label htmlFor="ord-q" style={{ position: 'absolute', left: -9999 }}>
-                Buscar
-              </label>
-              <input
-                id="ord-q"
-                type="search"
-                value={busqueda}
-                onChange={(e) => {
-                  setBusqueda(e.target.value);
-                  setPaginaActual(1);
-                }}
-                placeholder="Buscar por código o cliente"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  boxSizing: 'border-box',
-                  minHeight: 44,
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-line, #E3D6C6)',
-                  background: 'var(--cp-cream, #FBF4EC)',
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  padding: '0 14px',
-                  fontSize: 14,
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setFcOpen(!fcOpen)}
-                aria-expanded={fcOpen}
-                style={{
-                  flex: 'none',
-                  minHeight: 44,
-                  padding: '0 12px',
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  background: fcOpen ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                  color: fcOpen ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  display: 'inline-flex',
-                  gap: 6,
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                }}
+          <div className="cj-barra">
+            <label htmlFor="ord-q" style={{ position: 'absolute', left: -9999 }}>
+              Buscar
+            </label>
+            <input
+              id="ord-q"
+              type="search"
+              value={busqueda}
+              onChange={(e) => {
+                setBusqueda(e.target.value);
+                setPaginaActual(1);
+              }}
+              placeholder="Buscar por código o cliente"
+              style={{
+                flex: '1 1 180px',
+                minWidth: 0,
+                boxSizing: 'border-box',
+                minHeight: 44,
+                borderRadius: 9999,
+                border: '1.5px solid var(--cp-line, #E3D6C6)',
+                background: 'var(--cp-cream, #FBF4EC)',
+                color: 'var(--cp-navy, #0B2C3E)',
+                padding: '0 14px',
+                fontSize: 14,
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setFcOpen(!fcOpen)}
+              aria-expanded={fcOpen}
+              style={{
+                flex: 'none',
+                minHeight: 44,
+                padding: '0 12px',
+                borderRadius: 9999,
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                background: fcOpen ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                color: fcOpen ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 700,
+                fontSize: 13,
+                display: 'inline-flex',
+                gap: 6,
+                alignItems: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="16"
-                  height="16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+                <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+              </svg>
+              Filtros
+              {fcCount > 0 && (
+                <span
+                  style={{
+                    minWidth: 20,
+                    height: 20,
+                    boxSizing: 'border-box',
+                    borderRadius: 10,
+                    background: 'var(--cp-orange, #E67929)',
+                    color: 'var(--cp-navy, #0B2C3E)',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 5px',
+                  }}
                 >
-                  <path d="M3 5h18l-7 8v6l-4 2v-8z" />
-                </svg>
-                Filtros
-                {fcCount > 0 && (
-                  <span
-                    style={{
-                      minWidth: 20,
-                      height: 20,
-                      boxSizing: 'border-box',
-                      borderRadius: 10,
-                      background: 'var(--cp-orange, #E67929)',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontSize: 12,
-                      fontWeight: 800,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0 5px',
-                    }}
-                  >
-                    {fcCount}
-                  </span>
-                )}
-              </button>
-            </div>
+                  {fcCount}
+                </span>
+              )}
+            </button>
+            <span style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido' : 'pedidos'}
+            </span>
 
             {fcSummary && (
-              <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft, #2C4C5D)' }}>
+              <div style={{ flex: '1 1 100%', fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft, #2C4C5D)' }}>
                 <b>Filtrando:</b> {fcSummary}
               </div>
             )}
 
-            <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)', fontWeight: 600 }}>
-              {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido' : 'pedidos'}
-            </div>
-
-            {/* Filtros desplegables (un combo por grupo, en una fila) */}
+            {/* Filtros desplegables: Canal, Modalidad y Cobro en una segunda fila pegada */}
             {fcOpen && (
-              <div
-                style={{
-                  borderTop: '1px solid var(--cp-line, #E3D6C6)',
-                  paddingTop: 8,
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                }}
-              >
+              <div className="cj-barra-filtros">
                 <FiltroCombo
                   etiqueta="Canal"
                   valor={canalFiltro}

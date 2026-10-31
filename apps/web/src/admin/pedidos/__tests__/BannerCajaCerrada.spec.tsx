@@ -29,6 +29,18 @@ describe('Franja de caja cerrada', () => {
     expect(screen.getByRole('link', { name: 'Abrir caja' }).getAttribute('href')).toBe('/admin/cierre');
   });
 
+  it('en la variante compacta muestra una línea «Caja cerrada» con el enlace a Caja y cierres', async () => {
+    conPermisos(['caja/ver', 'caja/abrir']);
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: false } as any);
+
+    render(<BannerCajaCerrada compacto />);
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso).toHaveTextContent('Caja cerrada');
+    expect(aviso.getAttribute('title')).toBe('La caja está cerrada. Abre caja para cobrar y aprobar pagos.');
+    expect(screen.getByRole('link', { name: 'Abrir caja' }).getAttribute('href')).toBe('/admin/cierre');
+  });
+
   it('con la caja abierta no muestra nada', async () => {
     conPermisos(['caja/ver', 'caja/abrir']);
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true } as any);
