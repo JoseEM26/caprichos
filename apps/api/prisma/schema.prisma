@@ -473,6 +473,8 @@ model Pedido {
   salio_en               DateTime?               @db.Timestamptz
   llego_en               DateTime?               @db.Timestamptz
   motivo_falla           String?
+  // Posición en la ruta que eligió el repartidor al tomar (1 = primera parada); null si no eligió orden
+  orden_ruta             Int?
   // Salón (Ola 6)
   mesa_nombre            String?
   entregado_mesa_en      DateTime?               @db.Timestamptz
