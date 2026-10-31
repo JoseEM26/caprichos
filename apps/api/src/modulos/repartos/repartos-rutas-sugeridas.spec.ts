@@ -34,6 +34,7 @@ function montar(maxPedidos = 3) {
       findMany: jest.fn(async () => filas.map((f) => ({ ...f, pago_estado: 'PAGADO', total: 10, creado_en: new Date(), lineas: [] }))),
     },
     pedidoEstadoHistorial: { create: jest.fn(async (a: any) => historial.push(a)) },
+    rutaReparto: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 1n }), update: jest.fn(), delete: jest.fn() },
   };
   const prisma: any = {
     parametro: { findMany: jest.fn().mockResolvedValue([{ clave: 'rep_max_pedidos', valor: maxPedidos }]) },

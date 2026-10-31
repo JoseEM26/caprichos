@@ -13,6 +13,7 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { RepartosService } from './repartos.service';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
+import { FiltrarRutasDto } from './dto/filtrar-rutas.dto';
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
 import { ResolverFallaDto } from './dto/resolver-falla.dto';
 import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto';
@@ -62,6 +63,20 @@ export class RepartosController {
   @Permiso('repartos', 'ver')
   async listarMios(@Req() req: any) {
     return this.repartosService.listarMios(req.usuario);
+  }
+
+  /** Rutas del repartidor que consulta (ignora cualquier filtro de repartidor). */
+  @Get('mis-rutas')
+  @Permiso('repartos', 'ver')
+  async listarMisRutas(@Query() filtros: FiltrarRutasDto, @Req() req: any) {
+    return this.repartosService.listarRutas(filtros, req.usuario, true);
+  }
+
+  /** Rutas de cualquier repartidor para caja/admin; si lo llama un repartidor ve solo las suyas. */
+  @Get('rutas')
+  @Permiso('repartos', 'ver')
+  async listarRutas(@Query() filtros: FiltrarRutasDto, @Req() req: any) {
+    return this.repartosService.listarRutas(filtros, req.usuario);
   }
 
   @Get('proximos')

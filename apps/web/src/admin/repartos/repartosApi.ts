@@ -93,8 +93,63 @@ export interface AvisoRepartidor {
   en: string;
 }
 
+export type EstadoFinalPedido = 'ENTREGADO' | 'NO_ENTREGADO' | 'ANULADO';
+
+/** Pedido de la ruta en curso: los terminados traen estadoFinal y horaFinal; los pendientes, estadoFinal null. */
+export interface PedidoDeRuta extends PedidoReparto {
+  estadoFinal: EstadoFinalPedido | null;
+  horaFinal: string | null;
+  /** Posición en la ruta (los terminados primero, por hora de cierre). */
+  orden: number;
+}
+
+/** Salida del repartidor con TODOS sus pedidos, también los ya terminados. */
+export interface RutaEnCurso {
+  id: string;
+  iniciadaEn: string;
+  estado: 'EN_CURSO' | 'TERMINADA';
+  pedidos: PedidoDeRuta[];
+}
+
+export interface PedidoHistorialRuta {
+  id: string;
+  codigo: string;
+  clienteNombre: string | null;
+  direccion: string | null;
+  lat: number | null;
+  lng: number | null;
+  estadoFinal: EstadoFinalPedido | null;
+  horaFinal: string | null;
+  orden: number;
+}
+
+/** Una ruta ya hecha (o en curso) para el historial: sin montos. */
+export interface RutaHistorial {
+  id: string;
+  repartidorId: string;
+  repartidorNombre: string;
+  iniciadaEn: string;
+  terminadaEn: string | null;
+  estado: 'EN_CURSO' | 'TERMINADA';
+  totalPedidos: number;
+  entregados: number;
+  fallidos: number;
+  distanciaKm: number;
+  pedidos: PedidoHistorialRuta[];
+}
+
+export interface RespuestaRutas {
+  rutas: RutaHistorial[];
+  pagina: number;
+  limite: number;
+  total: number;
+  totalPaginas: number;
+}
+
 export interface RespuestaMios {
   pedidos: PedidoReparto[];
+  /** Ruta en curso con todos sus pedidos (la API la llama rutaReparto porque `ruta` es el trazado). */
+  rutaReparto?: RutaEnCurso | null;
   orden: string[];
   paso: string[];
   ruta: Array<[number, number]>;
@@ -189,6 +244,13 @@ export interface RespuestaRutasSugeridas {
   cupo: number;
 }
 
+function consultaRutas(filtros?: Record<string, string | number | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(filtros ?? {})) if (v !== undefined && v !== '') params.set(k, String(v));
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const repartosApi = {
   listarRutasSugeridas: () =>
     api.get<RespuestaRutasSugeridas>('/admin/repartos/rutas-sugeridas'),
@@ -204,6 +266,14 @@ export const repartosApi = {
 
   listarMios: () =>
     api.get<RespuestaMios>('/admin/repartos/mios'),
+
+  /** Rutas propias del repartidor (por defecto hoy, hora de Lima). Fechas YYYY-MM-DD. */
+  listarMisRutas: (filtros?: { desde?: string; hasta?: string; pagina?: number }) =>
+    api.get<RespuestaRutas>(`/admin/repartos/mis-rutas${consultaRutas(filtros)}`),
+
+  /** Rutas de cualquier repartidor (caja/admin). */
+  listarRutas: (filtros?: { repartidor?: string; desde?: string; hasta?: string; pagina?: number }) =>
+    api.get<RespuestaRutas>(`/admin/repartos/rutas${consultaRutas(filtros)}`),
 
   listarProximos: () =>
     api.get<PedidoProximo[]>('/admin/repartos/proximos'),

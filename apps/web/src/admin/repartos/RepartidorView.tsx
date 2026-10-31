@@ -14,9 +14,13 @@ import { colorOpcion } from './OpcionesRutaSugerida';
 import { HojaRutasSugeridas, ALTO_PLEGADA_PX, FRACCION_MEDIA, type AlturaRutas } from './HojaRutasSugeridas';
 import { useRutasSugeridas } from './useRutasSugeridas';
 import { useAccionesReparto } from './useAccionesReparto';
+import { MisRutas, fechaLima } from './MisRutas';
+import { horaLima, TEXTO_ESTADO_FINAL } from './ListaRutas';
 import {
   repartosApi,
   AvisoRepartidor,
+  PedidoDeRuta,
+  RutaHistorial,
   PedidoProximo,
   PedidoReparto,
   MotivoSalto,
@@ -31,6 +35,7 @@ type EtapaId = 'salir' | 'llegue' | 'entregar';
 type Hoja =
   | { tipo: 'detalle'; id: string }
   | { tipo: 'hechos' }
+  | { tipo: 'misRutas' }
   | { tipo: 'rutas' }
   | { tipo: 'falla' }
   | null;
@@ -519,6 +524,42 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
   );
 }
 
+/** Punto gris de un pedido terminado: check si se entregó, X si no; con la hora de cierre. */
+function puntoTerminado(p: { id: string; lat: number; lng: number; cliente: string | null; codigo: string; estadoFinal: NonNullable<PedidoDeRuta['estadoFinal']>; horaFinal: string | null }): PuntoRepartidor {
+  return {
+    id: p.id,
+    lat: p.lat,
+    lng: p.lng,
+    cliente: p.cliente || 'Cliente',
+    codigo: p.codigo,
+    color: 'verde',
+    disponible: false,
+    estadoFinal: p.estadoFinal,
+    estadoTexto: `${TEXTO_ESTADO_FINAL[p.estadoFinal]}${p.horaFinal ? ` ${horaLima(p.horaFinal)}` : ''}`,
+  };
+}
+
+/** Detalle de solo lectura de un pedido ya terminado de la ruta en curso (sin acciones). */
+function DetalleTerminado({ p }: { p: PedidoDeRuta }) {
+  const fila: CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 14 };
+  const bien = p.estadoFinal === 'ENTREGADO';
+  return (
+    <div data-testid="detalle-terminado" style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: FUENTE_TEXTO, color: 'var(--cp-navy)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        <strong style={{ fontFamily: FUENTE_TITULOS, fontSize: 18 }}>{p.codigo}</strong>
+        <span style={chip(bien ? '#E8F5E9' : '#FDE8E8', bien ? 'var(--cp-green)' : 'var(--cp-rust)')}>
+          {p.estadoFinal ? TEXTO_ESTADO_FINAL[p.estadoFinal] : ''}
+          {p.horaFinal ? ` ${horaLima(p.horaFinal)}` : ''}
+        </span>
+      </div>
+      <div style={fila}><span>Cliente</span><strong>{p.cliente_nombre}</strong></div>
+      {p.direccion && <div style={fila}><span>Dirección</span><strong style={{ textAlign: 'right' }}>{p.direccion}</strong></div>}
+      {p.motivo_falla && <div style={fila}><span>Motivo</span><strong>{p.motivo_falla}</strong></div>}
+      <div style={{ color: 'var(--cp-soft)', fontSize: 13, fontWeight: 700 }}>Este pedido ya terminó: solo lectura.</div>
+    </div>
+  );
+}
+
 /** Entregas del día y total en efectivo a liquidar (lo que antes era la pestaña Hechos hoy). */
 function HechosHoy({ hechos }: { hechos: PedidoReparto[] }) {
   const totalEfectivo = hechos.reduce(
@@ -577,6 +618,10 @@ export function RepartidorView() {
   const [hechosHoy, setHechosHoy] = useState<PedidoReparto[]>([]);
   const [config, setConfig] = useState<ConfigReparto>(CONFIG_REPARTO_DEFECTO);
   const [recarga, setRecarga] = useState(0);
+  // Ruta ya hecha que se está viendo dibujada en el mapa (solo lectura)
+  const [rutaDibujada, setRutaDibujada] = useState<RutaHistorial | null>(null);
+  // Id de la ruta en curso de la carga anterior: si desaparece, la ruta terminó
+  const rutaPrevRef = useRef<string | null>(null);
 
   // Ruta que arma el repartidor tocando puntos: ids en el orden en que los eligió
   const [miRuta, setMiRuta] = useState<string[]>([]);
@@ -599,6 +644,22 @@ export function RepartidorView() {
 
   const maxPedidos = config.maxPedidosPorRepartidor || CONFIG_REPARTO_DEFECTO.maxPedidosPorRepartidor;
 
+  // La ruta en curso se cerró (todos sus pedidos terminaron): aviso con el resumen y el mapa vuelve a Pedidos
+  const avisarRutaTerminada = useCallback((rutaId: string) => {
+    repartosApi
+      .listarMisRutas({ desde: fechaLima(2), hasta: fechaLima(0) })
+      .then((r) => {
+        const x = r.rutas.find((q) => q.id === rutaId);
+        if (!x || x.estado !== 'TERMINADA') return;
+        const entregados = `${x.entregados} ${x.entregados === 1 ? 'entregado' : 'entregados'}`;
+        const no = x.fallidos > 0 ? `, ${x.fallidos} no ${x.fallidos === 1 ? 'entregado' : 'entregados'}` : '';
+        setAviso({ tipo: 'ok', texto: `Ruta terminada: ${entregados}${no}` });
+        setVista('pedidos');
+        setMenuMarcador(null);
+      })
+      .catch(() => {});
+  }, []);
+
   // Carga centralizada. Un fallo de «Mis pedidos» o «Pedidos» se avisa en pantalla (no queda en silencio).
   const cargarDatos = useCallback(async () => {
     try {
@@ -615,7 +676,13 @@ export function RepartidorView() {
         repartosApi.listarTodos({ estado: 'ENTREGADO', historial: 'true' }).catch(() => [] as PedidoReparto[]),
         repartosApi.obtenerConfig().catch(() => CONFIG_REPARTO_DEFECTO),
       ]);
-      if (miosRes) setDatosMios(miosRes);
+      if (miosRes) {
+        setDatosMios(miosRes);
+        const rutaId = miosRes.rutaReparto?.id ?? null;
+        const previa = rutaPrevRef.current;
+        rutaPrevRef.current = rutaId;
+        if (previa && previa !== rutaId) avisarRutaTerminada(previa);
+      }
       if (dispRes) setDisponibles(dispRes);
       setProximos(Array.isArray(proxRes) ? proxRes : []);
       setHechosHoy(entregadosRes);
@@ -624,7 +691,7 @@ export function RepartidorView() {
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [avisarRutaTerminada]);
 
   useEffect(() => {
     cargarDatos();
@@ -655,6 +722,14 @@ export function RepartidorView() {
   }, [datosMios]);
 
   const cupo = Math.max(0, maxPedidos - pedidosActivos.length);
+
+  // Pedidos ya terminados de la ruta en curso: se quedan en el mapa en gris; no cuentan para el orden ni el límite
+  const rutaActual = datosMios.rutaReparto ?? null;
+  const terminados = useMemo(
+    () => (rutaActual?.pedidos ?? []).filter((p) => p.estadoFinal != null).sort((a, b) => a.orden - b.orden),
+    [rutaActual],
+  );
+  const entregadosRuta = terminados.filter((p) => p.estadoFinal === 'ENTREGADO').length;
 
   // Orden de entrega vigente: le toca el de menor orden aún pendiente (los sin orden no cuentan)
   const ordenRuta = useMemo(() => {
@@ -726,8 +801,15 @@ export function RepartidorView() {
   /* ---------- Puntos y líneas del mapa ---------- */
 
   const puntos: PuntoRepartidor[] = useMemo(() => {
+    if (rutaDibujada) {
+      return rutaDibujada.pedidos.flatMap((p): PuntoRepartidor[] =>
+        p.lat == null || p.lng == null || !p.estadoFinal
+          ? []
+          : [puntoTerminado({ id: p.id, lat: p.lat, lng: p.lng, cliente: p.clienteNombre, codigo: p.codigo, estadoFinal: p.estadoFinal, horaFinal: p.horaFinal })],
+      );
+    }
     if (vista === 'mios') {
-      return pedidosActivos.flatMap((p, idx) =>
+      const pendientes = pedidosActivos.flatMap((p, idx) =>
         p.lat == null || p.lng == null
           ? []
           : [{
@@ -742,6 +824,12 @@ export function RepartidorView() {
               siguiente: ordenRuta.siguiente?.id === p.id,
             }],
       );
+      const hechos = terminados.flatMap((p): PuntoRepartidor[] =>
+        p.lat == null || p.lng == null || !p.estadoFinal
+          ? []
+          : [puntoTerminado({ id: p.id, lat: p.lat, lng: p.lng, cliente: p.cliente_nombre, codigo: p.codigo, estadoFinal: p.estadoFinal, horaFinal: p.horaFinal })],
+      );
+      return [...pendientes, ...hechos];
     }
     const libres: PuntoRepartidor[] = disponibles.flatMap((p) =>
       p.lat == null || p.lng == null
@@ -772,15 +860,27 @@ export function RepartidorView() {
           }],
     );
     return [...libres, ...grises];
-  }, [vista, pedidosActivos, disponibles, proximos, miRuta, config, ordenRuta]);
+  }, [vista, pedidosActivos, disponibles, proximos, miRuta, config, ordenRuta, terminados, rutaDibujada]);
+
+  // Tramo recorrido (sede y paradas terminadas): se mantiene más tenue; la línea viva sigue desde la última terminada
+  const lineaTenue: Array<[number, number]> = useMemo(() => {
+    if (rutaDibujada || vista !== 'mios') return [];
+    const hechos = terminados.filter((p) => p.lat != null && p.lng != null).map((p): [number, number] => [p.lat!, p.lng!]);
+    return hechos.length ? [SEDE, ...hechos] : [];
+  }, [terminados, vista, rutaDibujada]);
 
   const linea: Array<[number, number]> = useMemo(() => {
+    if (rutaDibujada) {
+      const coords = rutaDibujada.pedidos.filter((p) => p.lat != null && p.lng != null).map((p): [number, number] => [p.lat!, p.lng!]);
+      return coords.length ? [SEDE, ...coords] : [];
+    }
     const paradas = puntos
       .filter((p) => p.numero != null)
       .sort((a, b) => a.numero! - b.numero!)
       .map((p): [number, number] => [p.lat, p.lng]);
-    return paradas.length ? [SEDE, ...paradas] : [];
-  }, [puntos]);
+    const desde = lineaTenue.length ? lineaTenue[lineaTenue.length - 1] : SEDE;
+    return paradas.length ? [desde, ...paradas] : [];
+  }, [puntos, lineaTenue, rutaDibujada]);
 
   /* Rutas sugeridas sobre el mapa: la ruta propia (miRuta y su línea) no se toca, solo se muestran encima */
   const hojaRutas = hoja?.tipo === 'rutas';
@@ -854,6 +954,7 @@ export function RepartidorView() {
 
   const cambiarVista = (v: VistaRepartidor) => {
     setVista(v);
+    setRutaDibujada(null);
     setAviso(null);
     setMenuMarcador(null);
     setMasAbierto(false);
@@ -861,6 +962,7 @@ export function RepartidorView() {
 
   const tocarMarcador = (id: string) => {
     setMenuMarcador(null);
+    if (rutaDibujada) return; // ruta ya hecha: solo se mira
     if (vista === 'mios') {
       setHoja({ tipo: 'detalle', id });
       return;
@@ -899,13 +1001,16 @@ export function RepartidorView() {
   const idMenu = menuMarcador?.id ?? null;
   const menuEsDisponible = idMenu != null && vista === 'pedidos' && dispPorId.has(idMenu);
   const codigoDe = (id: string) =>
-    pedidosActivos.find((p) => p.id === id)?.codigo ?? dispPorId.get(id)?.codigo ?? proximos.find((p) => p.id === id)?.codigo ?? '';
+    pedidosActivos.find((p) => p.id === id)?.codigo ??
+    terminados.find((p) => p.id === id)?.codigo ?? dispPorId.get(id)?.codigo ?? proximos.find((p) => p.id === id)?.codigo ?? '';
 
   const tituloHoja =
     hoja?.tipo === 'detalle'
       ? `Pedido ${codigoDe(hoja.id)}`.trim()
       : hoja?.tipo === 'hechos'
       ? 'Hechos hoy'
+      : hoja?.tipo === 'misRutas'
+      ? 'Mis rutas'
       : hoja?.tipo === 'rutas'
       ? 'Rutas sugeridas'
       : 'Reportar falla';
@@ -932,7 +1037,21 @@ export function RepartidorView() {
         boxShadow: '0 4px 14px rgba(11, 44, 62, 0.35)',
       }}
     >
-      {vista === 'pedidos' ? (
+      {rutaDibujada ? (
+        <>
+          <span data-testid="chip-ruta-dibujada">
+            Ruta de {horaLima(rutaDibujada.iniciadaEn)}: solo lectura
+          </span>
+          <button
+            type="button"
+            data-testid="btn-cerrar-ruta-dibujada"
+            onClick={() => setRutaDibujada(null)}
+            style={{ ...botonBase, minHeight: 44, fontSize: 13, background: 'rgba(255,255,255,.14)', color: 'var(--cp-cream)' }}
+          >
+            Cerrar
+          </button>
+        </>
+      ) : vista === 'pedidos' ? (
         <>
           <span>
             Mi ruta: {miRuta.length} de {cupo}
@@ -960,6 +1079,11 @@ export function RepartidorView() {
         <span style={{ paddingRight: 6 }}>
           Llevas {pedidosActivos.length} / {maxPedidos} pedidos
           {pedidosActivos.length === 0 ? ': arma tu ruta en Pedidos' : ''}
+          {rutaActual && (
+            <span data-testid="chip-progreso-ruta">
+              {' · '}Ruta en curso: {entregadosRuta} de {rutaActual.pedidos.length} {entregadosRuta === 1 ? 'entregado' : 'entregados'}
+            </span>
+          )}
         </span>
       )}
     </div>
@@ -1017,6 +1141,7 @@ export function RepartidorView() {
         <MapaRepartidor
           puntos={puntosMapa}
           linea={linea}
+          lineaTenue={lineaTenue}
           sugeridas={lineasSugeridas}
           alElegirSugerida={(id) => {
             setOpcionSugeridaId(id);
@@ -1101,6 +1226,10 @@ export function RepartidorView() {
               <Icono nombre="historial" tamano={18} />
               Hechos hoy ({hechosHoy.length})
             </button>
+            <button type="button" role="menuitem" style={itemMenu} onClick={() => abrirHoja({ tipo: 'misRutas' })}>
+              <Icono nombre="mapa" tamano={18} />
+              Mis rutas
+            </button>
             {pedidosActivos.length > 0 && (
               <button type="button" role="menuitem" style={itemMenu} onClick={() => abrirHoja({ tipo: 'falla' })}>
                 <Icono nombre="alerta" tamano={18} />
@@ -1132,7 +1261,19 @@ export function RepartidorView() {
       {/* Hoja inferior: detalle de un pedido u otras secciones */}
       {hoja && hoja.tipo !== 'rutas' && (
         <HojaInferior titulo={tituloHoja} desdeAbajo={BARRA_TOTAL} alCerrar={() => setHoja(null)}>
-          {hoja.tipo === 'detalle' && (
+          {hoja.tipo === 'detalle' && terminados.some((p) => p.id === hoja.id) && (
+            <DetalleTerminado p={terminados.find((p) => p.id === hoja.id)!} />
+          )}
+          {hoja.tipo === 'misRutas' && (
+            <MisRutas
+              alDibujar={(r) => {
+                setRutaDibujada(r);
+                setHoja(null);
+                setMenuMarcador(null);
+              }}
+            />
+          )}
+          {hoja.tipo === 'detalle' && !terminados.some((p) => p.id === hoja.id) && (
             <DetallePedido
               id={hoja.id}
               mio={pedidosActivos.find((p) => p.id === hoja.id)}

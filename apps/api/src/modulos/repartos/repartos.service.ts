@@ -24,6 +24,15 @@ import { TomarRutaDto } from './dto/tomar-ruta.dto';
 import { TomarRutaSugeridaDto } from './dto/tomar-ruta-sugerida.dto';
 import { leerConfigEta } from './eta-entrega';
 import { idOpcion as calcularIdOpcion, sugerirRutas } from './rutas-sugeridas';
+import {
+  estadoFinalEnRuta,
+  horaFinalPedido,
+  hoyLima,
+  limitesDiaLima,
+  sincronizarRuta,
+  sumarARuta,
+} from './rutas-reparto';
+import { FiltrarRutasDto } from './dto/filtrar-rutas.dto';
 
 /** Estados de pedido que siguen vivos en el reparto: los únicos que muestra la vista activa. */
 export const ESTADOS_ACTIVOS_REPARTO = ['LISTO', 'EN_CAMINO'] as const;
@@ -414,8 +423,10 @@ export class RepartosService {
       data: {
         repartidor_party_id: null,
         tomado_en: null,
+        ruta_reparto_id: null,
       },
     });
+    await sincronizarRuta(this.prisma, partyId);
 
     const pedidosPropios = await this.prisma.pedido.findMany({
       where: {
@@ -507,6 +518,9 @@ export class RepartosService {
 
     return {
       pedidos: propiosFormateados,
+      // Ruta en curso con TODOS sus pedidos (también los ya entregados, fallidos o anulados)
+      // (`ruta` ya es la línea del trazado; por eso este campo se llama rutaReparto)
+      rutaReparto: await this.rutaEnCurso(partyId, config, ahora, usuario),
       avisos: await this.avisosRetiro(partyId),
       orden: ordenCompleto,
       paso: rutaCalculada.paso,
@@ -515,6 +529,142 @@ export class RepartosService {
       distanciaKm: rutaCalculada.distanciaKm,
       tiempoMin: rutaCalculada.tiempoMin,
       velocidadKmh: rutaCalculada.velocidadKmh,
+    };
+  }
+
+  /** Ruta EN_CURSO del repartidor con todos sus pedidos (pendientes y ya terminados), o null si no tiene. */
+  private async rutaEnCurso(partyId: bigint, config: ParametrosReparto, ahora: Date, usuario: UsuarioAutenticado) {
+    const ruta = await this.prisma.rutaReparto.findFirst({
+      where: { repartidor_party_id: partyId, estado: 'EN_CURSO' },
+      orderBy: { id: 'desc' },
+    });
+    if (!ruta) return null;
+    const filas = await this.pedidosDeRuta([ruta.id]);
+    return {
+      id: String(ruta.id),
+      iniciadaEn: ruta.iniciada_en,
+      estado: ruta.estado,
+      pedidos: this.ordenarPedidosRuta(filas, partyId).map((p) => ({
+        ...this.formatearPedidoReparto(p, config, ahora, usuario),
+        ordenRuta: p.orden_ruta ?? null,
+        estadoFinal: p.estadoFinal,
+        horaFinal: p.horaFinal,
+        orden: p.orden,
+      })),
+    };
+  }
+
+  private pedidosDeRuta(rutaIds: bigint[]) {
+    return this.prisma.pedido.findMany({
+      where: { ruta_reparto_id: { in: rutaIds } },
+      include: {
+        zona: true,
+        lineas: { select: { cantidad: true } },
+        incidentes: { orderBy: { en: 'desc' }, take: 1, select: { en: true } },
+      },
+    });
+  }
+
+  /** Primero los ya terminados por hora de cierre, luego los pendientes por orden_ruta; `orden` es la posición en la ruta. */
+  private ordenarPedidosRuta(filas: any[], partyId: bigint) {
+    const conEstado = filas.map((p) => {
+      const estadoFinal = estadoFinalEnRuta(p, partyId);
+      return { ...p, estadoFinal, horaFinal: horaFinalPedido(p, estadoFinal) };
+    });
+    const t = (d: Date | null) => (d ? new Date(d).getTime() : Infinity);
+    conEstado.sort((a, b) => {
+      if ((a.estadoFinal == null) !== (b.estadoFinal == null)) return a.estadoFinal == null ? 1 : -1;
+      if (a.estadoFinal != null) return t(a.horaFinal) - t(b.horaFinal) || Number(a.id - b.id);
+      return (a.orden_ruta ?? Infinity) - (b.orden_ruta ?? Infinity) || Number(a.id - b.id);
+    });
+    return conEstado.map((p, i) => ({ ...p, orden: i + 1 }));
+  }
+
+  /** Suma en línea recta sede -> paradas en orden (km, aproximada). */
+  private distanciaRutaKm(paradas: any[], sede: Coordenadas): number {
+    let km = 0;
+    let ant = sede;
+    for (const p of paradas) {
+      if (p.entrega_lat == null || p.entrega_lng == null) continue;
+      const act = { lat: Number(p.entrega_lat), lng: Number(p.entrega_lng) };
+      km += this.rutaService.haversineKm(ant.lat, ant.lng, act.lat, act.lng);
+      ant = act;
+    }
+    return Math.round(km * 10) / 10;
+  }
+
+  /**
+   * GET /admin/repartos/mis-rutas (solo el repartidor, sus rutas) y /admin/repartos/rutas (caja/admin).
+   * Rutas agrupadas con sus pedidos en orden; por defecto hoy (hora de Lima), 20 por página.
+   * Sin montos: solo código, cliente, estado final y hora.
+   */
+  async listarRutas(filtros: FiltrarRutasDto, usuario: UsuarioAutenticado, soloPropias = false) {
+    const esRepartidor = usuario.rol === 'REPARTIDOR' || soloPropias;
+    const where: Prisma.RutaRepartoWhereInput = {};
+    if (esRepartidor) {
+      // Aislamiento: el repartidor solo ve las suyas, ignore el filtro que mande
+      where.repartidor_party_id = BigInt(usuario.partyId);
+      await sincronizarRuta(this.prisma, BigInt(usuario.partyId));
+    } else if (filtros.repartidor) {
+      if (!/^\d+$/.test(filtros.repartidor)) {
+        throw new BadRequestException({ codigo: 'REPARTIDOR_INVALIDO', mensaje: 'Repartidor no válido' });
+      }
+      where.repartidor_party_id = BigInt(filtros.repartidor);
+    }
+    const hoy = hoyLima();
+    const { inicio, fin } = limitesDiaLima(filtros.desde ?? hoy, filtros.hasta ?? filtros.desde ?? hoy);
+    where.iniciada_en = { gte: inicio, lte: fin };
+
+    const limite = 20;
+    const pagina = Math.max(1, Number(filtros.pagina) || 1);
+    const [total, rutas, config] = await Promise.all([
+      this.prisma.rutaReparto.count({ where }),
+      this.prisma.rutaReparto.findMany({
+        where,
+        orderBy: { iniciada_en: 'desc' },
+        skip: (pagina - 1) * limite,
+        take: limite,
+        include: { repartidor: { include: { persona: true } } },
+      }),
+      this.obtenerParametrosReparto(),
+    ]);
+    const filas = rutas.length ? await this.pedidosDeRuta(rutas.map((r) => r.id)) : [];
+
+    return {
+      rutas: rutas.map((r) => {
+        const pedidos = this.ordenarPedidosRuta(
+          filas.filter((p) => p.ruta_reparto_id === r.id),
+          r.repartidor_party_id,
+        );
+        const per = r.repartidor?.persona;
+        return {
+          id: String(r.id),
+          repartidorId: String(r.repartidor_party_id),
+          repartidorNombre: per ? `${per.nombres} ${per.apellidos ?? ''}`.trim() : `Repartidor #${r.repartidor_party_id}`,
+          iniciadaEn: r.iniciada_en,
+          terminadaEn: r.terminada_en,
+          estado: r.estado,
+          totalPedidos: pedidos.length,
+          entregados: pedidos.filter((p) => p.estadoFinal === 'ENTREGADO').length,
+          fallidos: pedidos.filter((p) => p.estadoFinal === 'NO_ENTREGADO' || p.estadoFinal === 'ANULADO').length,
+          distanciaKm: this.distanciaRutaKm(pedidos, config.localCoords),
+          pedidos: pedidos.map((p) => ({
+            id: String(p.id),
+            codigo: p.codigo,
+            clienteNombre: p.cliente_nombre ?? null,
+            direccion: p.entrega_direccion ?? null,
+            lat: p.entrega_lat != null ? Number(p.entrega_lat) : null,
+            lng: p.entrega_lng != null ? Number(p.entrega_lng) : null,
+            estadoFinal: p.estadoFinal,
+            horaFinal: p.horaFinal,
+            orden: p.orden,
+          })),
+        };
+      }),
+      pagina,
+      limite,
+      total,
+      totalPaginas: Math.max(1, Math.ceil(total / limite)),
     };
   }
 
@@ -898,6 +1048,9 @@ export class RepartosService {
       });
     }
 
+    // Se suma a la ruta en curso del repartidor (o abre una)
+    await sumarARuta(this.prisma, partyId, [pedidoId], 'INDIVIDUAL', ahora);
+
     const pedido = await this.prisma.pedido.findUniqueOrThrow({
       where: { id: pedidoId },
       include: {
@@ -1213,6 +1366,9 @@ export class RepartosService {
     });
     this.avisos?.despertar();
 
+    // Si era el último pendiente de su ruta, la ruta se cierra sola
+    if (pedido.repartidor_party_id != null) await sincronizarRuta(this.prisma, BigInt(pedido.repartidor_party_id), ahora);
+
     // Auditoría
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -1363,6 +1519,9 @@ export class RepartosService {
         estado: 'LISTO',
       },
     });
+
+    // El pedido se queda en su ruta como no entregado; si era el último pendiente, la ruta se cierra
+    if (pedido.repartidor_party_id != null) await sincronizarRuta(this.prisma, BigInt(pedido.repartidor_party_id), ahora);
 
     // Historial
     await this.prisma.pedidoEstadoHistorial.create({
@@ -1893,6 +2052,8 @@ export class RepartosService {
           tomadosIds.push(p.id);
         }
 
+        await sumarARuta(tx, partyId, tomadosIds, 'INDIVIDUAL', ahora);
+
         const tomadosFilas = tomadosIds.length > 0
           ? await tx.pedido.findMany({
               where: { id: { in: tomadosIds } },
@@ -2005,9 +2166,12 @@ export class RepartosService {
         tomado_en: null,
         salio_en: null,
         estado: 'LISTO',
+        // Liberado antes de salir: sale de la ruta; si ya había salido, queda en ella como no entregado
+        ...(pedido.salio_en == null ? { ruta_reparto_id: null } : {}),
       },
       include: { zona: true },
     });
+    await sincronizarRuta(this.prisma, BigInt(anteriorRepartidorId), ahora);
 
     await this.prisma.pedidoEstadoHistorial.create({
       data: {
@@ -2123,9 +2287,13 @@ export class RepartosService {
         repartidor_party_id: nuevoRepartidorPartyId,
         tomado_en: ahora,
         estado: pedido.estado === 'EN_CAMINO' ? 'EN_CAMINO' : 'LISTO',
+        ruta_reparto_id: null,
       },
       include: { zona: true },
     });
+    // Sale de la ruta del anterior y entra en la del nuevo repartidor
+    if (anteriorRepartidorId != null) await sincronizarRuta(this.prisma, BigInt(anteriorRepartidorId), ahora);
+    await sumarARuta(this.prisma, nuevoRepartidorPartyId, [pedidoId], 'INDIVIDUAL', ahora);
 
     await this.prisma.pedidoEstadoHistorial.create({
       data: {
@@ -2473,6 +2641,7 @@ export class RepartosService {
         for (let i = 0; i < ids.length; i++) {
           await tx.pedido.update({ where: { id: BigInt(ids[i]) }, data: { orden_ruta: previosFuera + i + 1 } });
         }
+        await sumarARuta(tx, partyId, idsAsc, 'TOMAR_RUTA', ahora);
         const filas = await tx.pedido.findMany({
           where: { id: { in: idsAsc } },
           include: { zona: true, lineas: { select: { cantidad: true } } },
@@ -2689,6 +2858,7 @@ export class RepartosService {
             });
           }
         }
+        await sumarARuta(tx, destino, nuevos, 'SUGERIDA', ahora);
         const filas = await tx.pedido.findMany({
           where: { id: { in: idsAsc } },
           include: { zona: true, lineas: { select: { cantidad: true } } },

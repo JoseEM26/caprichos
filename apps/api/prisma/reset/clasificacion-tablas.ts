@@ -88,7 +88,7 @@ export const CONSERVAR: string[] = [
   'pedido_linea', 'pedido_linea_opcion', 'pedido_mesa', 'pedido_pago_plan', 'pedido_proveedor',
   'pedido_proveedor_linea', 'permiso', 'piso', 'print_job', 'produccion', 'producto',
   'producto_grupo', 'producto_tamano', 'queja_whatsapp', 'ranking_mes', 'receta', 'receta_linea',
-  'regla_acumulacion', 'reemplazo_dia', 'resena_google', 'reserva', 'reserva_mesa', 'respuesta_rapida', 'rol', 'rol_permiso',
+  'regla_acumulacion', 'reemplazo_dia', 'resena_google', 'reserva', 'reserva_mesa', 'ruta_reparto', 'respuesta_rapida', 'rol', 'rol_permiso',
   'sabor', 'saliente_whatsapp', 'secuencia_comprobante', 'secuencia_pedido', 'solicitud_cambio',
   'solicitud_reserva', 'stock', 'supervisor_secreto', 'supplier_detail', 'sys_control', 'traslado',
   'user_account', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje',
@@ -105,7 +105,7 @@ export const FK_PARTY_DESVINCULADAS = [
 export const FK_PARTY_PERSONAL = [
   'user_account.party_id', 'organization.party_id', 'horario_trabajo.party_id',
   'cobertura_turno.cubre_party_id', 'cobertura_turno.reemplaza_party_id',
-  'pedido.repartidor_party_id', 'liquidacion.repartidor_party_id', 'comprobante.emitido_por',
+  'pedido.repartidor_party_id', 'ruta_reparto.repartidor_party_id', 'liquidacion.repartidor_party_id', 'comprobante.emitido_por',
   'reclamo.respondido_por', 'voucher_pago.reemplazado_por', 'pedido_proveedor.proveedor_party_id',
   'compra.proveedor_party_id', 'pedido_interno.avisado_party_id', 'consumo_personal.party_id',
   'reemplazo_dia.party_id', 'reemplazo_dia.reemplaza_party_id',

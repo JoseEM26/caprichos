@@ -34,6 +34,7 @@ function montar(pedidos: any[], maxPedidos = 3) {
       update: jest.fn(async ({ where, data }: any) => Object.assign(pedidos.find((p) => p.id === where.id), data)),
     },
     pedidoEstadoHistorial: { create: jest.fn() },
+    rutaReparto: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 1n }), update: jest.fn(), delete: jest.fn() },
   };
   const prisma: any = {
     parametro: { findMany: jest.fn().mockResolvedValue([{ clave: 'rep_max_pedidos', valor: maxPedidos }]) },

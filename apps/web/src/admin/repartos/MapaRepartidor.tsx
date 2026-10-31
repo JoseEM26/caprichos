@@ -38,6 +38,8 @@ export interface PuntoRepartidor {
   estadoTexto?: string;
   /** El pedido que le toca entregar ahora: borde grueso y etiqueta «Siguiente». */
   siguiente?: boolean;
+  /** Pedido ya terminado de la ruta: gris con check (entregado) o X (no entregado, anulado); solo lectura. */
+  estadoFinal?: 'ENTREGADO' | 'NO_ENTREGADO' | 'ANULADO';
 }
 
 export interface PosicionMarcador {
@@ -49,6 +51,8 @@ interface MapaRepartidorProps {
   puntos: PuntoRepartidor[];
   /** Línea a dibujar: sede y paradas en el orden de la ruta. */
   linea: Array<[number, number]>;
+  /** Tramo ya recorrido de la ruta (sede y paradas terminadas): se dibuja más tenue. */
+  lineaTenue?: Array<[number, number]>;
   /** Cambia con la pestaña: fuerza a encuadrar de nuevo. */
   vistaClave: string;
   alTocar: (id: string) => void;
@@ -171,8 +175,12 @@ function Marcador({
   };
 
   const fondo = punto.disponible ? COLOR_ESPERA_VAR[punto.color] : COLOR_GRIS;
-  const textoNumero = punto.numero != null ? String(punto.numero) : punto.disponible ? '+' : '';
-  const descripcion = punto.disponible
+  const textoNumero = punto.estadoFinal
+    ? punto.estadoFinal === 'ENTREGADO' ? '✓' : '✕'
+    : punto.numero != null ? String(punto.numero) : punto.disponible ? '+' : '';
+  const descripcion = punto.estadoFinal
+    ? `terminado, ${punto.estadoTexto ?? ''}`
+    : punto.disponible
     ? punto.numero != null
       ? `en tu ruta, parada ${punto.numero}`
       : 'disponible'
@@ -184,6 +192,7 @@ function Marcador({
       data-testid={`marcador-${punto.id}`}
       data-color={punto.disponible ? punto.color : 'gris'}
       data-numero={punto.numero ?? ''}
+      data-estado-final={punto.estadoFinal}
       data-siguiente={punto.siguiente ? 'true' : undefined}
       aria-label={`Pedido ${punto.codigo} de ${punto.cliente}, ${descripcion}. Mantén presionado para ver opciones`}
       aria-pressed={punto.disponible ? enRuta : undefined}
@@ -270,10 +279,11 @@ function Marcador({
  * Mapa del repartidor. Los marcadores son botones de React sobre el mapa (no iconos de Leaflet) para que
  * tengan teclado, aria-label y presión larga; se reposicionan con la proyección del mapa al moverlo.
  */
-export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpciones, sugeridas, alElegirSugerida, alTocarMapa, encuadre }: MapaRepartidorProps) {
+export function MapaRepartidor({ puntos, linea, lineaTenue, vistaClave, alTocar, alAbrirOpciones, sugeridas, alElegirSugerida, alTocarMapa, encuadre }: MapaRepartidorProps) {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<L.Map | null>(null);
   const lineaRef = useRef<L.Polyline | null>(null);
+  const lineaTenueRef = useRef<L.Polyline | null>(null);
   const sugeridasRef = useRef<L.Polyline[]>([]);
   const alTocarMapaRef = useRef(alTocarMapa);
   alTocarMapaRef.current = alTocarMapa;
@@ -330,6 +340,7 @@ export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpci
       map.remove();
       mapaRef.current = null;
       lineaRef.current = null;
+      lineaTenueRef.current = null;
       sugeridasRef.current = [];
     };
   }, []);
@@ -362,6 +373,17 @@ export function MapaRepartidor({ puntos, linea, vistaClave, alTocar, alAbrirOpci
       lineaRef.current = L.polyline(linea, { color: '#E67929', weight: 4.5, opacity: 0.95, lineJoin: 'round', lineCap: 'round' }).addTo(map);
     }
   }, [linea]);
+
+  // Tramo recorrido: la misma ruta pero más tenue
+  useEffect(() => {
+    const map = mapaRef.current;
+    if (!map) return;
+    lineaTenueRef.current?.remove();
+    lineaTenueRef.current = null;
+    if (lineaTenue && lineaTenue.length >= 2) {
+      lineaTenueRef.current = L.polyline(lineaTenue, { color: '#E67929', weight: 4, opacity: 0.3, dashArray: '2 8', lineJoin: 'round', lineCap: 'round' }).addTo(map);
+    }
+  }, [lineaTenue]);
 
   useEffect(() => {
     const map = mapaRef.current;

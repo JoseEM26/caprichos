@@ -37,9 +37,10 @@ import {
   PedidoPerdido,
 } from './repartosApi';
 import { RepartidorView } from './RepartidorView';
+import { RutasAdmin } from './RutasAdmin';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
-type ModoVista = 'mapa' | 'lista';
+type ModoVista = 'mapa' | 'lista' | 'rutas';
 type FiltroRetraso = 'todos' | NivelEspera;
 
 
@@ -62,7 +63,7 @@ function RepartosAdminView() {
   // Modo de vista: 'mapa' por defecto; sincronizado con URL si viene ?vista=lista o ?vista=mios
   const vistaUrl = searchParams.get('vista');
   const [modoVista, setModoVista] = useState<ModoVista>(
-    vistaUrl === 'lista' || vistaUrl === 'mios' ? 'lista' : 'mapa',
+    vistaUrl === 'rutas' ? 'rutas' : vistaUrl === 'lista' || vistaUrl === 'mios' ? 'lista' : 'mapa',
   );
 
   // Filtro de rol / repartidor: arranca en 'all' ("Todos (caja)") o el id del repartidor
@@ -650,6 +651,27 @@ function RepartosAdminView() {
             >
               Lista
             </button>
+            <button
+              type="button"
+              aria-pressed={modoVista === 'rutas'}
+              onClick={() => {
+                setModoVista('rutas');
+                setSearchParams({ vista: 'rutas' });
+              }}
+              style={{
+                minHeight: '36px',
+                padding: '0 14px',
+                borderRadius: '9px',
+                border: 'none',
+                background: modoVista === 'rutas' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                color: modoVista === 'rutas' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              Rutas
+            </button>
           </div>
 
           {/* Botón Pantalla Completa en PC y Celular (Decisión 2) */}
@@ -784,7 +806,9 @@ function RepartosAdminView() {
         )}
       </div>
 
-      {cargando ? (
+      {modoVista === 'rutas' ? (
+        <RutasAdmin />
+      ) : cargando ? (
         <div style={{ padding: '60px 0' }}>
           <Cargando mensaje="Cargando pedidos de reparto..." />
         </div>

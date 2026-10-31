@@ -31,6 +31,7 @@ model Party {
   vouchersReemplazadosPor  VoucherPago[]          @relation("VoucherReemplazadoPor")
   pedidos                  Pedido[]               @relation("ClientePedido")
   pedidosRepartidos        Pedido[]               @relation("RepartidorPedido")
+  rutasReparto             RutaReparto[]          @relation("RepartidorRuta")
   liquidaciones            Liquidacion[]          @relation("LiquidacionesRepartidor")
   comprobantesEmitidos     Comprobante[]          @relation("ComprobantesEmitidos")
   reclamosRespondidos      Reclamo[]              @relation("ReclamosRespondidos")
@@ -475,12 +476,15 @@ model Pedido {
   motivo_falla           String?
   // Posición en la ruta que eligió el repartidor al tomar (1 = primera parada); null si no eligió orden
   orden_ruta             Int?
+  // Ruta de reparto (salida del repartidor) a la que pertenece; se conserva al entregar o fallar
+  ruta_reparto_id        BigInt?
   // Salón (Ola 6)
   mesa_nombre            String?
   entregado_mesa_en      DateTime?               @db.Timestamptz
 
   party                  Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
+  rutaReparto            RutaReparto?            @relation(fields: [ruta_reparto_id], references: [id])
   zona                   ZonaReparto?            @relation(fields: [zona_id], references: [id])
   oferta                 Oferta?                 @relation(fields: [oferta_id], references: [id])
   cupon                  Cupon?                  @relation(fields: [cupon_id], references: [id])
@@ -513,7 +517,25 @@ model Pedido {
   clienteIdentificado    Party?                 @relation("ClienteIdentificadoPedido", fields: [cliente_party_id], references: [id])
 
   @@index([cliente_party_id], map: "pedido_cliente_party_id_idx")
+  @@index([ruta_reparto_id], map: "pedido_ruta_reparto_id_idx")
   @@map("pedido")
+}
+
+// Una salida del repartidor con sus pedidos: se cierra sola cuando todos llegan a un estado final
+model RutaReparto {
+  id                  BigInt    @id @default(autoincrement())
+  repartidor_party_id BigInt
+  iniciada_en         DateTime  @default(now()) @db.Timestamptz
+  terminada_en        DateTime? @db.Timestamptz
+  estado              String    @default("EN_CURSO") // EN_CURSO | TERMINADA
+  origen              String // TOMAR_RUTA | SUGERIDA | INDIVIDUAL
+  creada_en           DateTime  @default(now()) @db.Timestamptz
+
+  repartidor          Party     @relation("RepartidorRuta", fields: [repartidor_party_id], references: [id])
+  pedidos             Pedido[]
+
+  @@index([repartidor_party_id, estado], map: "ruta_reparto_repartidor_estado_idx")
+  @@map("ruta_reparto")
 }
 
 model ClienteDireccion {
