@@ -271,7 +271,7 @@ export class LocalService {
    * Obtiene los datos públicos del local para la carta virtual.
    */
   async obtenerDatosPublicosLocal() {
-    const [parametros, horarios, fotos] = await Promise.all([
+    const [parametros, horarios] = await Promise.all([
       this.prisma.parametro.findMany({
         where: {
           clave: {
@@ -290,7 +290,6 @@ export class LocalService {
       this.prisma.horarioDia.findMany({
         orderBy: { dia_semana: 'asc' },
       }),
-      this.listarFotosLocal(),
     ]);
 
     const datosParam = parametros.find((p) => p.clave === 'local_datos')?.valor as any;
@@ -347,7 +346,6 @@ export class LocalService {
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,
       puntosPorcentaje: puntosPorcentaje > 0 ? puntosPorcentaje : 5,
       invitadoPermitido,
-      fotos,
     };
   }
 

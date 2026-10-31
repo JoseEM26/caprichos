@@ -9,6 +9,13 @@ describe('PaginaConocenos', () => {
     expect(screen.getByText('CONÓCENOS')).toBeTruthy();
     expect(screen.getByText('Cafetería artesanal en San Juan de Lurigancho')).toBeTruthy();
     expect(screen.getByText('Dónde estamos')).toBeTruthy();
+    // Sin fotos propias no hay mosaico ni título vacío: no se rellena con fotos de otra pantalla
+    expect(screen.queryByText('Momentos Caprichos')).toBeNull();
+  });
+
+  it('con fotos propias muestra Momentos Caprichos', () => {
+    const galeria = ['a', 'b', 'c', 'd'].map((id) => ({ id, url: `/archivos/${id}.webp`, activo: true }));
+    render(<PaginaConocenos datosLocal={null} estadoLocal={null} contenido={{ galeria }} />);
     expect(screen.getByText('Momentos Caprichos')).toBeTruthy();
   });
 

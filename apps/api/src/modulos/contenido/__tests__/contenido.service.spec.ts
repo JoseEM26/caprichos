@@ -599,7 +599,7 @@ describe('ContenidoService', () => {
       expect(r.tieneBorrador).toBe(false);
       expect(r.contenido.titulo).toBe('Cafetería artesanal en San Juan de Lurigancho');
       expect(r.contenido.bloques.map((b) => b.id)).toEqual(['donde', 'horario', 'contacto', 'redes', 'momentos']);
-      expect(r.contenido.momentosCantidad).toBe(8);
+      expect(r.contenido.galeria).toEqual([]);
     });
 
     it('el admin ve el borrador y la carta solo lo publicado', async () => {
@@ -619,13 +619,13 @@ describe('ContenidoService', () => {
 
     it('guardar borrador normaliza, respeta el orden y audita', async () => {
       const r = await service.guardarBorradorConocenos(
-        { titulo: ' Nuevo ', bloques: [{ id: 'redes', titulo: 'Redes', visible: false }, { id: 'zzz' }], momentosCantidad: 99 },
+        { titulo: ' Nuevo ', bloques: [{ id: 'redes', titulo: 'Redes', visible: false }, { id: 'zzz' }], galeria: [{ id: 'a', url: '/archivos/a.webp', activo: false }] },
         mockUsuario as any,
       );
       expect(r.contenido.titulo).toBe('Nuevo');
       expect(r.contenido.bloques.map((b) => b.id)).toEqual(['redes', 'donde', 'horario', 'contacto', 'momentos']);
       expect(r.contenido.bloques[0].visible).toBe(false);
-      expect(r.contenido.momentosCantidad).toBe(24);
+      expect(r.contenido.galeria).toEqual([{ id: 'a', url: '/archivos/a.webp', activo: false }]);
       expect(prisma.parametro.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { clave: BOR } }));
       expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'GUARDAR_BORRADOR_CONOCENOS' }));
     });
@@ -643,6 +643,106 @@ describe('ContenidoService', () => {
       prisma.parametro.findUnique.mockResolvedValue(null);
       await service.descartarConocenos(mockUsuario as any);
       expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({ where: { clave: BOR } });
+    });
+  });
+
+  describe('NOVEDADES: Momentos Caprichos propios (no reutilizan las fotos de las tarjetas)', () => {
+    const BORM = 'contenido_novedades_momentos_borrador';
+    const PUBM = 'contenido_novedades_momentos';
+
+    it('sin borrador devuelve lo publicado; con borrador devuelve el borrador', async () => {
+      prisma.parametro.findUnique.mockImplementation(async ({ where }: any) =>
+        where.clave === PUBM ? { valor: { fotos: [{ id: 'p1', url: '/archivos/p1.webp', activo: true }] } } : null,
+      );
+      expect((await service.obtenerNovedadesMomentosAdmin()).fotos.map((f) => f.id)).toEqual(['p1']);
+      expect((await service.obtenerNovedadesMomentosAdmin()).tieneBorrador).toBe(false);
+
+      prisma.parametro.findUnique.mockImplementation(async ({ where }: any) =>
+        where.clave === BORM ? { valor: { fotos: [{ id: 'b1', url: '/archivos/b1.webp', activo: true }] } } : null,
+      );
+      const r = await service.obtenerNovedadesMomentosAdmin();
+      expect(r.fotos.map((f) => f.id)).toEqual(['b1']);
+      expect(r.tieneBorrador).toBe(true);
+    });
+
+    it('guardar borrador quita imágenes incrustadas, valida URL y audita; rechaza lo que no es lista', async () => {
+      const r = await service.guardarNovedadesMomentosBorrador(
+        [
+          { id: 'a', url: '/archivos/a.webp', activo: true },
+          { id: 'b', url: 'data:image/png;base64,AAAA', activo: true },
+          { id: 'c', url: 'javascript:alert(1)', activo: true },
+          { id: 'd', url: '/archivos/d.webp', activo: false },
+        ],
+        mockUsuario as any,
+      );
+      expect(r.fotos).toEqual([
+        { id: 'a', url: '/archivos/a.webp', activo: true },
+        { id: 'd', url: '/archivos/d.webp', activo: false },
+      ]);
+      expect(prisma.parametro.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { clave: BORM } }));
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'GUARDAR_BORRADOR_MOMENTOS' }));
+      await expect(service.guardarNovedadesMomentosBorrador('no' as any)).rejects.toThrow(BadRequestException);
+    });
+
+    it('publicarNovedades promueve el borrador de momentos y lo borra', async () => {
+      prisma.novedad.findMany.mockResolvedValue([]);
+      prisma.parametro.findUnique.mockImplementation(async ({ where }: any) =>
+        where.clave === BORM ? { valor: { fotos: [{ id: 'b1', url: '/archivos/b1.webp', activo: true }] } } : null,
+      );
+      prisma.parametro.upsert.mockResolvedValue({});
+      prisma.parametro.deleteMany.mockResolvedValue({});
+
+      await service.publicarNovedades(mockUsuario as any);
+
+      expect(prisma.parametro.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { clave: PUBM }, update: { valor: { fotos: [{ id: 'b1', url: '/archivos/b1.webp', activo: true }] } } }),
+      );
+      expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({ where: { clave: BORM } });
+    });
+
+    it('descartarNovedadesEncabezado también tira el borrador de momentos', async () => {
+      prisma.parametro.deleteMany.mockResolvedValue({});
+      prisma.parametro.findUnique.mockResolvedValue(null);
+      await service.descartarNovedadesEncabezado(mockUsuario as any);
+      expect(prisma.parametro.deleteMany).toHaveBeenCalledWith({ where: { clave: BORM } });
+    });
+
+    it('la carta pública trae solo las fotos activas de Momentos, en su orden', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue(null);
+      prisma.novedad.findMany.mockResolvedValue([]);
+      prisma.destacada.findMany.mockResolvedValue([]);
+      prisma.rankingMes.findMany.mockResolvedValue([]);
+      prisma.parametro.findUnique.mockImplementation(async ({ where }: any) =>
+        where.clave === PUBM
+          ? { valor: { fotos: [{ id: 'x', url: '/archivos/x.webp', activo: false }, { id: 'y', url: '/archivos/y.webp', activo: true }] } }
+          : null,
+      );
+      const carta = await service.obtenerContenidoPublicoCarta();
+      expect(carta.novedadesMomentos).toEqual([{ id: 'y', url: '/archivos/y.webp', activo: true }]);
+    });
+  });
+
+  describe('CONÓCENOS: galería propia', () => {
+    it('guarda la galería sin imágenes incrustadas ni ids repetidos y conserva el orden', async () => {
+      const r = await service.guardarBorradorConocenos({
+        galeria: [
+          { id: 'x', url: '/archivos/1.webp', activo: true },
+          { id: 'x', url: '/archivos/2.webp', activo: true },
+          { id: 'z', url: 'data:image/jpeg;base64,AAAA', activo: true },
+          { id: 'w', url: '/archivos/3.webp', activo: false },
+        ],
+      } as any);
+      expect(r.contenido.galeria.map((f) => [f.id, f.url, f.activo])).toEqual([
+        ['x', '/archivos/1.webp', true],
+        ['x-x', '/archivos/2.webp', true],
+        ['w', '/archivos/3.webp', false],
+      ]);
+    });
+
+    it('una fila sin galería (versión anterior) se lee con galería vacía', async () => {
+      prisma.parametro.findUnique.mockResolvedValue({ valor: { titulo: 'Antes' } });
+      const r = await service.obtenerConocenosAdmin();
+      expect(r.contenido.galeria).toEqual([]);
     });
   });
 

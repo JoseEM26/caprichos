@@ -4,6 +4,7 @@ import { useEsMovil } from './useEsMovil';
 import { NovedadDetalle } from './NovedadDetalle';
 import { EstadoError } from '../comun/EstadoError';
 import { MosaicoMomentos } from './MosaicoMomentos';
+import type { FotoMosaico } from './MosaicoMomentos';
 import { TextoEd, useEdicion } from './edicion';
 
 export interface FotoNovedad {
@@ -40,6 +41,8 @@ interface PaginaNovedadesProps {
     titulo?: string;
     subtitulo?: string;
   };
+  /** Fotos propias de «Momentos Caprichos» (no son las de las tarjetas). */
+  momentos?: FotoMosaico[];
 }
 
 export type TamanoNovedad = 'CHICO' | 'MEDIANO' | 'GRANDE' | 'ANCHO';
@@ -336,6 +339,7 @@ export function TarjetaMosaicoNovedad({
 
 export function PaginaNovedades({
   novedades = [],
+  momentos = [],
   datosLocal,
   estadoLocal,
   onVerCarta,
@@ -350,8 +354,8 @@ export function PaginaNovedades({
   const [abierta, setAbierta] = useState<NovedadCarta | null>(null);
 
   const newsAll = ordenarNovedadesCarta(novedades);
-  // Fotos reales de las novedades: el mosaico de Momentos las muestra primero.
-  const fotosDeNovedades = newsAll.flatMap((n) => n.fotos.map((f) => f.url)).filter(Boolean);
+  // Momentos: sus propias fotos. En edición se ven también las ocultas; en la carta, solo las activas.
+  const fotosMomentos = ed ? momentos : momentos.filter((f) => f.activo !== false);
   const heroItems = newsAll
     .filter((n) => esNovedadDestacada(n) || (n.tipo || '').toUpperCase() === 'BANNER')
     .slice(0, 5);
@@ -810,7 +814,7 @@ export function PaginaNovedades({
       )}
 
       {!cargando && !error && (
-        <MosaicoMomentos titulo="Momentos Caprichos" fotos={fotosDeNovedades} cantidad={8} />
+        <MosaicoMomentos titulo="Momentos Caprichos" fotos={fotosMomentos} claveFotos="momento" conAgregar />
       )}
 
       {redes.length > 0 && (

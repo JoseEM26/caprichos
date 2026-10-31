@@ -9,7 +9,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { resolverDisposicionCarta } from './disposicion-carta';
-import { normalizarConocenos } from './conocenos';
+import { normalizarConocenos, normalizarGaleria } from './conocenos';
 import {
   ActualizarBorradorDisenoDto,
   ActualizarDestacadaDto,
@@ -24,6 +24,7 @@ import {
 
 const CLAVE_CONOCENOS = 'contenido_conocenos';
 const CLAVE_NOVEDADES_BORRADOR = 'contenido_novedades_borrador';
+const CLAVE_NOVEDADES_MOMENTOS = 'contenido_novedades_momentos';
 
 export const NOVEDADES_ENCABEZADO_DEFAULT = {
   etiqueta: 'NOVEDADES',
@@ -380,6 +381,9 @@ export class ContenidoService {
     const paramConocenos = await this.prisma.parametro.findUnique({
       where: { clave: CLAVE_CONOCENOS },
     });
+    const paramMomentos = await this.prisma.parametro.findUnique({
+      where: { clave: CLAVE_NOVEDADES_MOMENTOS },
+    });
 
     return {
       versionCarta: {
@@ -398,6 +402,7 @@ export class ContenidoService {
       estrellasVisibles,
       novedadesEncabezado,
       conocenos: normalizarConocenos(paramConocenos?.valor),
+      novedadesMomentos: normalizarGaleria((paramMomentos?.valor as any)?.fotos).filter((f) => f.activo),
       banner: contenidoConfig.banner ?? {
         activo: false,
         tag: '',
@@ -974,6 +979,7 @@ export class ContenidoService {
       where: { clave: 'contenido_novedades_encabezado_borrador' },
     });
     await this.prisma.parametro.deleteMany({ where: { clave: CLAVE_NOVEDADES_BORRADOR } });
+    await this.prisma.parametro.deleteMany({ where: { clave: `${CLAVE_NOVEDADES_MOMENTOS}_borrador` } });
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -1131,8 +1137,52 @@ export class ContenidoService {
     await this.prisma.parametro.deleteMany({ where: { clave: CLAVE_NOVEDADES_BORRADOR } });
   }
 
+  // --- Novedades: fotos de «Momentos Caprichos». Son propias: no reutilizan las fotos de las tarjetas ---
+
+  async obtenerNovedadesMomentosAdmin() {
+    const [pub, bor] = await Promise.all([
+      this.prisma.parametro.findUnique({ where: { clave: CLAVE_NOVEDADES_MOMENTOS } }),
+      this.prisma.parametro.findUnique({ where: { clave: `${CLAVE_NOVEDADES_MOMENTOS}_borrador` } }),
+    ]);
+    const tieneBorrador = Boolean(bor);
+    const fuente = tieneBorrador ? bor : pub;
+    return { fotos: normalizarGaleria((fuente?.valor as any)?.fotos), tieneBorrador };
+  }
+
+  async guardarNovedadesMomentosBorrador(fotos: unknown, usuario?: UsuarioAutenticado) {
+    if (!Array.isArray(fotos)) throw new BadRequestException('Las fotos de Momentos deben ser una lista');
+    const limpias = normalizarGaleria(sinDataUrls(fotos));
+    await this.prisma.parametro.upsert({
+      where: { clave: `${CLAVE_NOVEDADES_MOMENTOS}_borrador` },
+      update: { valor: { fotos: limpias } as any },
+      create: { clave: `${CLAVE_NOVEDADES_MOMENTOS}_borrador`, valor: { fotos: limpias } as any },
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'novedades',
+      accion: 'GUARDAR_BORRADOR_MOMENTOS',
+      resultado: 'OK',
+      partyId: usuario?.partyId,
+      despues: { cantidad: limpias.length },
+    });
+    return { ok: true, fotos: limpias, tieneBorrador: true };
+  }
+
   async publicarNovedades(usuario?: UsuarioAutenticado) {
     await this.aplicarNovedadesBorrador(usuario);
+
+    // Momentos: si hay borrador, pasa a publicado tal cual (sus fotos son las suyas)
+    const borradorMomentos = await this.prisma.parametro.findUnique({
+      where: { clave: `${CLAVE_NOVEDADES_MOMENTOS}_borrador` },
+    });
+    if (borradorMomentos) {
+      await this.prisma.parametro.upsert({
+        where: { clave: CLAVE_NOVEDADES_MOMENTOS },
+        update: { valor: borradorMomentos.valor as any },
+        create: { clave: CLAVE_NOVEDADES_MOMENTOS, valor: borradorMomentos.valor as any },
+      });
+      await this.prisma.parametro.deleteMany({ where: { clave: `${CLAVE_NOVEDADES_MOMENTOS}_borrador` } });
+    }
 
     // Si hay borrador de encabezado de novedades, promoverlo a publicado
     const borradorEncabezado = await this.prisma.parametro.findUnique({

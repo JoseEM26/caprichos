@@ -1,31 +1,15 @@
-import { IMAGENES_MARCA_FABRICA } from '../comun/imagenesMarca';
+import { Fragment } from 'react';
 import { useEsMovil } from './useEsMovil';
-import { TextoEd } from './edicion';
-
-/** Paso de la secuencia de relleno. Con 5 fotos y paso 2, dos vecinas nunca son la misma. */
-const PASO_RELLENO = 2;
+import { TextoEd, useEdicion } from './edicion';
 
 /** Relaciones de aspecto variadas para que el mosaico se vea como una colección y no como una tabla. */
 const RELACIONES = ['4 / 5', '1 / 1', '3 / 4', '4 / 5', '2 / 3'];
 
-export const CANTIDAD_MOMENTOS_POR_DEFECTO = 8;
-
-/**
- * Arma la lista de fotos del mosaico: primero las propias (Diseñador / Novedades, sin repetir),
- * y luego las de fábrica repetidas hasta completar `cantidad`, en orden alternado.
- */
-export function armarMosaicoMomentos(
-  fotosPropias: string[],
-  cantidad: number = CANTIDAD_MOMENTOS_POR_DEFECTO,
-  fabrica: readonly string[] = IMAGENES_MARCA_FABRICA,
-): string[] {
-  const propias = Array.from(new Set(fotosPropias.filter((f) => typeof f === 'string' && f.length > 0)));
-  const total = Math.max(cantidad, propias.length);
-  const relleno = Array.from(
-    { length: Math.max(0, total - propias.length) },
-    (_, k) => fabrica[(k * PASO_RELLENO) % fabrica.length],
-  );
-  return [...propias, ...relleno];
+/** Foto propia de un mosaico. `id` es la clave con la que el editor la cambia, la ordena u oculta. */
+export interface FotoMosaico {
+  id: string;
+  url: string;
+  activo?: boolean;
 }
 
 /** Reparte los elementos en columnas (round robin): la lectura por filas sigue el orden de la lista. */
@@ -36,36 +20,68 @@ export function repartirEnColumnas<T>(items: T[], columnas: number): T[][] {
 }
 
 export interface MosaicoMomentosProps {
-  /** Fotos reales (Diseñador / Novedades). Tienen prioridad y se muestran primero. */
-  fotos?: string[];
-  /** Cuántas celdas llenar en total. */
-  cantidad?: number;
-  /** Columnas. Por defecto 2 en celular y 4 en PC. */
+  /** Fotos propias de este mosaico, en su orden. Nunca se rellena con fotos de otro lugar. */
+  fotos?: FotoMosaico[];
+  /** Columnas. Por defecto 2 en celular y 4 en PC; con menos fotos, menos columnas. */
   columnas?: number;
   /** Encabezado opcional, por ejemplo "Momentos Caprichos". */
   titulo?: string;
   /** Si el título se puede editar en sitio, su clave. */
   claveTitulo?: string;
+  /** Prefijo de la clave de edición de cada foto: el editor recibe `${claveFotos}:${id}`. */
+  claveFotos?: string;
+  /** En edición, muestra «+ Agregar foto» al final del mosaico. */
+  conAgregar?: boolean;
   /** Primera pantalla: carga inmediata de las primeras imágenes. */
   prioritaria?: boolean;
 }
 
-/** Mosaico de fotos sin huecos ni cajas vacías. Las imágenes de fábrica se repiten si hace falta. */
+/**
+ * Mosaico de fotos sin huecos ni cajas vacías. Muestra solo las fotos que recibe: si no hay ninguna,
+ * en la carta no se pinta nada, y en edición queda el «+ Agregar foto».
+ */
 export function MosaicoMomentos({
   fotos = [],
-  cantidad = CANTIDAD_MOMENTOS_POR_DEFECTO,
   columnas,
   titulo,
   claveTitulo,
+  claveFotos = 'foto',
+  conAgregar = false,
   prioritaria = false,
 }: MosaicoMomentosProps) {
+  const ed = useEdicion();
   const movil = useEsMovil();
-  const cols = columnas ?? (movil ? 2 : 4);
+  if (!ed && fotos.length === 0) return null;
+
+  const maximo = columnas ?? (movil ? 2 : 4);
+  const cols = Math.max(1, Math.min(maximo, fotos.length || 1));
   const espacio = movil ? 8 : 14;
-  const celdas = armarMosaicoMomentos(fotos, cantidad);
   const columnasRepartidas = repartirEnColumnas(
-    celdas.map((src, indice) => ({ src, indice })),
+    fotos.map((f, indice) => ({ f, indice })),
     cols,
+  );
+
+  const celda = (f: FotoMosaico, indice: number) => (
+    <div
+      style={{
+        position: 'relative',
+        width: '100%',
+        aspectRatio: RELACIONES[indice % RELACIONES.length],
+        borderRadius: 16,
+        overflow: 'hidden',
+        background: 'var(--cp-sand)',
+        boxShadow: '0 4px 14px rgba(11, 44, 62, 0.12)',
+        opacity: f.activo === false ? 0.45 : 1,
+      }}
+    >
+      <img
+        src={f.url}
+        alt={`Momento Caprichos ${indice + 1}`}
+        loading={prioritaria && indice < cols ? 'eager' : 'lazy'}
+        decoding="async"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    </div>
   );
 
   return (
@@ -86,31 +102,13 @@ export function MosaicoMomentos({
       >
         {columnasRepartidas.map((columna, c) => (
           <div key={c} style={{ display: 'flex', flexDirection: 'column', gap: espacio, minWidth: 0 }}>
-            {columna.map(({ src, indice }) => (
-              <div
-                key={indice}
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  aspectRatio: RELACIONES[indice % RELACIONES.length],
-                  borderRadius: 16,
-                  overflow: 'hidden',
-                  background: 'var(--cp-sand)',
-                  boxShadow: '0 4px 14px rgba(11, 44, 62, 0.12)',
-                }}
-              >
-                <img
-                  src={src}
-                  alt={`Momento Caprichos ${indice + 1}`}
-                  loading={prioritaria && indice < cols ? 'eager' : 'lazy'}
-                  decoding="async"
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              </div>
+            {columna.map(({ f, indice }) => (
+              <Fragment key={f.id}>{ed ? ed.bloque(`${claveFotos}:${f.id}`, celda(f, indice)) : celda(f, indice)}</Fragment>
             ))}
           </div>
         ))}
       </div>
+      {ed && conAgregar && ed.agregar(claveFotos, 'Agregar foto', { marginTop: espacio, minHeight: 44 })}
     </section>
   );
 }

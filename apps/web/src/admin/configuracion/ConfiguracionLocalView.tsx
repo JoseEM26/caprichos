@@ -4,7 +4,6 @@ import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { HorarioTab } from './HorarioTab';
-import { FotosLocalSeccion } from './FotosLocalSeccion';
 import { PagosTab } from './PagosTab';
 import { FechasEspecialesTab } from './FechasEspecialesTab';
 import { ZonasRepartoView } from './ZonasRepartoView';
@@ -1021,9 +1020,6 @@ export function ConfiguracionLocalView() {
         </div>
         )}
       </div>
-
-      {/* Tarjeta Fotos del Local (a todo el ancho): se guardan en el servidor */}
-      {(!esMovil || verDetalle) && <FotosLocalSeccion puedeEditar={puedeEditar} />}
 
       {/* Modales Confirmar */}
       <Confirmar
