@@ -13,6 +13,7 @@ import {
   listarAreasCocina,
   listarComandasArea,
   listarHistorialCocina,
+  obtenerAjustesCocina,
   obtenerAltaDemanda,
   pedirInsumosAlmacen,
   registrarMermaIndividual,
@@ -33,6 +34,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export type ModoCocina = 'area' | 'hist';
 
@@ -119,6 +121,9 @@ export function CocinaAdminView() {
   const [error, setError] = useState<string | null>(null);
   const [mensajeAccion, setMensajeAccion] = useState<string | null>(null);
 
+  // Ajuste «Confirmar al despejar» (Configuración › Cocina). Por defecto, pide confirmación.
+  const [confirmarDespejar, setConfirmarDespejar] = useState<boolean>(true);
+
   // Audio
   const [silenciado, setSilenciadoEstado] = useState<boolean>(estaSilenciado());
 
@@ -181,6 +186,15 @@ export function CocinaAdminView() {
       // Ignorar fallo secundario
     }
   }, []);
+
+  // Ajustes de cocina: si no se pueden leer, se queda con la confirmación encendida
+  useEffect(() => {
+    if (!puedeVer) return;
+    Promise.resolve()
+      .then(() => obtenerAjustesCocina())
+      .then((a) => setConfirmarDespejar(a?.confirmarDespejar !== false))
+      .catch(() => setConfirmarDespejar(true));
+  }, [puedeVer]);
 
   // Inicialización (montaje inicial)
   useEffect(() => {
@@ -285,24 +299,29 @@ export function CocinaAdminView() {
     setAreaSeleccionada(match ? match.id : areaId);
   };
 
-  // Despejar comanda
-  const ejecutarDespeje = async () => {
-    if (!comandaParaDespejar) return;
+  // Despejar comanda. Con «Confirmar al despejar» apagado, el toque despeja directo (sin Sí/No).
+  const pedirDespeje = (comanda: Comanda) => {
+    if (confirmarDespejar) setComandaParaDespejar(comanda);
+    else void ejecutarDespeje(comanda);
+  };
+
+  const ejecutarDespeje = async (comanda: Comanda | null = comandaParaDespejar) => {
+    if (!comanda) return;
     try {
       setDespejando(true);
       await despejarComanda(
-        comandaParaDespejar.pedidoId,
-        comandaParaDespejar.areaId,
+        comanda.pedidoId,
+        comanda.areaId,
       );
 
-      const cod = comandaParaDespejar.ticket || comandaParaDespejar.codigo;
+      const cod = comanda.ticket || comanda.codigo;
       const nomArea =
         areaActiva === 'todas'
           ? ''
           : ` (${AREAS_MOCKUP.find((a) => a.id === areaActiva)?.n || areaActiva})`;
       setUndoInfo({
-        pedidoId: comandaParaDespejar.pedidoId,
-        areaId: comandaParaDespejar.areaId,
+        pedidoId: comanda.pedidoId,
+        areaId: comanda.areaId,
         texto: `${cod}: despejado${nomArea}`,
       });
 
@@ -707,43 +726,14 @@ export function CocinaAdminView() {
       </div>
 
       {/* 5. Selector de Área y Pantalla completa */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-          alignItems: 'center',
-          marginTop: '4px',
-        }}
-      >
-        <span style={{ fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>
-          Área
-        </span>
-
-        {AREAS_MOCKUP.map((a) => {
-          const activa = areaActiva === a.id;
-          return (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => seleccionarAreaMockup(a.id)}
-              style={{
-                minHeight: '44px',
-                padding: '0 16px',
-                borderRadius: '9999px',
-                border: '1.5px solid var(--cp-navy)',
-                background: activa ? 'var(--cp-navy)' : 'transparent',
-                color: activa ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {a.n}
-            </button>
-          );
-        })}
+      <BarraFiltros style={{ marginTop: '4px' }}>
+        <FiltroCombo
+          etiqueta="Área"
+          valor={areaActiva}
+          valorPorDefecto="todas"
+          opciones={AREAS_MOCKUP.map((a) => ({ valor: a.id, etiqueta: a.n }))}
+          alCambiar={seleccionarAreaMockup}
+        />
 
         <button
           type="button"
@@ -763,7 +753,7 @@ export function CocinaAdminView() {
         >
           Pantalla completa, sin desplazar
         </button>
-      </div>
+      </BarraFiltros>
 
       {/* 6. Selector de Pestañas: Pantalla del área / Despejadas hoy */}
       <div
@@ -850,7 +840,7 @@ export function CocinaAdminView() {
                   mostrarArea={enTodas}
                   soloArea={!enTodas}
                   soloLectura={enTodas}
-                  onDespejar={puedeDespejar && !enTodas ? (com) => setComandaParaDespejar(com) : undefined}
+                  onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                   despejando={despejando}
                 />
               ))}
@@ -1060,7 +1050,7 @@ export function CocinaAdminView() {
                       mostrarArea={enTodas}
                       soloArea={!enTodas}
                       soloLectura={enTodas}
-                      onDespejar={puedeDespejar && !enTodas ? (com) => setComandaParaDespejar(com) : undefined}
+                      onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                       despejando={despejando}
                     />
                   ))}
@@ -1080,7 +1070,7 @@ export function CocinaAdminView() {
         mensaje="Tu área quedará lista. El pedido sale de cocina cuando todas sus áreas estén listas."
         textoConfirmar="Sí, despejar"
         textoNo="No, cancelar"
-        alConfirmar={ejecutarDespeje}
+        alConfirmar={() => ejecutarDespeje(comandaParaDespejar)}
         alCancelar={() => setComandaParaDespejar(null)}
       />
 

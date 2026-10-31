@@ -37,8 +37,10 @@ import {
   PedidoPerdido,
 } from './repartosApi';
 import { RepartidorView } from './RepartidorView';
+import { RutasAdmin } from './RutasAdmin';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
-type ModoVista = 'mapa' | 'lista';
+type ModoVista = 'mapa' | 'lista' | 'rutas';
 type FiltroRetraso = 'todos' | NivelEspera;
 
 
@@ -61,7 +63,7 @@ function RepartosAdminView() {
   // Modo de vista: 'mapa' por defecto; sincronizado con URL si viene ?vista=lista o ?vista=mios
   const vistaUrl = searchParams.get('vista');
   const [modoVista, setModoVista] = useState<ModoVista>(
-    vistaUrl === 'lista' || vistaUrl === 'mios' ? 'lista' : 'mapa',
+    vistaUrl === 'rutas' ? 'rutas' : vistaUrl === 'lista' || vistaUrl === 'mios' ? 'lista' : 'mapa',
   );
 
   // Filtro de rol / repartidor: arranca en 'all' ("Todos (caja)") o el id del repartidor
@@ -576,70 +578,23 @@ function RepartosAdminView() {
         }}
       >
         {/* Selector de Repartidor / Caja (solo para admin/cajero o si puede liquidar) */}
-        <div
-          style={{
-            display: pantallaCompleta ? 'none' : 'flex',
-            gap: '6px',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-          }}
-        >
-          <span style={{ fontWeight: 800, fontSize: '13px', color: 'var(--cp-navy, #0B2C3E)' }}>
-            {esRolRepartidor ? 'Soy:' : 'Ver como:'}
-          </span>
-          {(!esRolRepartidor || puedeLiquidar) && (
-            <button
-              type="button"
-              onClick={() => {
-                setFiltroRider('all');
-                setPedidoSeleccionadoId(null);
-              }}
-              style={{
-                minHeight: '38px',
-                padding: '0 12px',
-                borderRadius: '9999px',
-                border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                background: filtroRider === 'all' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                color: filtroRider === 'all' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              Todos (caja)
-            </button>
-          )}
-          {[
-            { id: 'r1', n: 'Repartidor 1' },
-            { id: 'r2', n: 'Repartidor 2' },
-            { id: 'r3', n: 'Repartidor 3' },
-          ].map((r) => {
-            const activo = filtroRider === r.id;
-            return (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => {
-                  setFiltroRider(r.id);
-                  setPedidoSeleccionadoId(null);
-                }}
-                style={{
-                  minHeight: '38px',
-                  padding: '0 12px',
-                  borderRadius: '9999px',
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                  color: activo ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                {r.n}
-              </button>
-            );
-          })}
-        </div>
+        <BarraFiltros style={{ display: pantallaCompleta ? 'none' : 'flex' }}>
+          <FiltroCombo
+            etiqueta={esRolRepartidor ? 'Soy' : 'Ver como'}
+            valor={filtroRider}
+            valorPorDefecto="all"
+            opciones={[
+              { valor: 'all', etiqueta: !esRolRepartidor || puedeLiquidar ? 'Todos (caja)' : 'Sin elegir' },
+              { valor: 'r1', etiqueta: 'Repartidor 1' },
+              { valor: 'r2', etiqueta: 'Repartidor 2' },
+              { valor: 'r3', etiqueta: 'Repartidor 3' },
+            ]}
+            alCambiar={(v) => {
+              setFiltroRider(v);
+              setPedidoSeleccionadoId(null);
+            }}
+          />
+        </BarraFiltros>
 
         {/* Doble vista [Mapa] [Lista], Botón Pantalla Completa y Botón «?» (Decisiones 1 y 2) */}
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -695,6 +650,27 @@ function RepartosAdminView() {
               }}
             >
               Lista
+            </button>
+            <button
+              type="button"
+              aria-pressed={modoVista === 'rutas'}
+              onClick={() => {
+                setModoVista('rutas');
+                setSearchParams({ vista: 'rutas' });
+              }}
+              style={{
+                minHeight: '36px',
+                padding: '0 14px',
+                borderRadius: '9px',
+                border: 'none',
+                background: modoVista === 'rutas' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                color: modoVista === 'rutas' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              Rutas
             </button>
           </div>
 
@@ -752,120 +728,23 @@ function RepartosAdminView() {
       </div>
 
       {/* 2) TRES FILTROS DE TIEMPO DE ESPERA ARRIBA DEL MAPA (Decisión 3 del dueño) */}
-      <div
+      <BarraFiltros
         role="group"
         aria-label="Filtros por tiempo de espera"
-        style={{
-          display: 'flex',
-          gap: '8px',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          padding: '0 4px',
-        }}
+        style={{ padding: '0 4px' }}
       >
-        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft, #5A6E78)' }}>
-          Espera:
-        </span>
-
-        {/* Filtro Todos los tiempos */}
-        <button
-          type="button"
-          onClick={() => setFiltroRetraso('todos')}
-          aria-pressed={filtroRetraso === 'todos'}
-          style={{
-            minHeight: '36px',
-            padding: '0 12px',
-            borderRadius: '9999px',
-            border: '1.5px solid var(--cp-navy, #0B2C3E)',
-            background: filtroRetraso === 'todos' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-            color: filtroRetraso === 'todos' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Todos
-        </button>
-
-        {/* 1. Amarillo: Retrasado (desde 20 min) */}
-        <button
-          type="button"
-          onClick={() => setFiltroRetraso((prev) => (prev === 'retrasado' ? 'todos' : 'retrasado'))}
-          aria-pressed={filtroRetraso === 'retrasado'}
-          style={{
-            minHeight: '36px',
-            padding: '0 12px',
-            borderRadius: '9999px',
-            border: '1.5px solid #D99E39',
-            background: filtroRetraso === 'retrasado' ? '#D99E39' : '#FEF3C7',
-            color: '#78350F',
-            fontWeight: 800,
-            fontSize: '12px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <span style={{ width: '8px', height: '8px', borderRadius: '4px', background: '#D99E39' }} />
-          <span>Retrasado ({conteosEspera.retrasados})</span>
-        </button>
-
-        {/* 2. Naranja: Tarde (desde 30 min) */}
-        <button
-          type="button"
-          onClick={() => setFiltroRetraso((prev) => (prev === 'tarde' ? 'todos' : 'tarde'))}
-          aria-pressed={filtroRetraso === 'tarde'}
-          style={{
-            minHeight: '36px',
-            padding: '0 12px',
-            borderRadius: '9999px',
-            border: '1.5px solid #E67929',
-            background: filtroRetraso === 'tarde' ? '#E67929' : '#FFEDD5',
-            color: '#7C2D12',
-            fontWeight: 800,
-            fontSize: '12px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <span style={{ width: '8px', height: '8px', borderRadius: '4px', background: '#E67929' }} />
-          <span>Tarde ({conteosEspera.tardes})</span>
-        </button>
-
-        {/* 3. Rojo palpitando: Muy tarde (desde 45 min) */}
-        <button
-          type="button"
-          onClick={() => setFiltroRetraso((prev) => (prev === 'muy_tarde' ? 'todos' : 'muy_tarde'))}
-          aria-pressed={filtroRetraso === 'muy_tarde'}
-          style={{
-            minHeight: '36px',
-            padding: '0 12px',
-            borderRadius: '9999px',
-            border: '1.5px solid #C4412B',
-            background: filtroRetraso === 'muy_tarde' ? '#C4412B' : '#FEE2E2',
-            color: filtroRetraso === 'muy_tarde' ? '#FFFFFF' : '#991B1B',
-            fontWeight: 800,
-            fontSize: '12px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <span
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '4px',
-              background: '#C4412B',
-              animation: 'cp-pin-palpita 0.9s ease-in-out infinite alternate',
-            }}
-          />
-          <span>Muy tarde ({conteosEspera.muyTardes})</span>
-        </button>
+        <FiltroCombo
+          etiqueta="Espera"
+          valor={filtroRetraso}
+          valorPorDefecto="todos"
+          opciones={[
+            { valor: 'todos', etiqueta: 'Todos' },
+            { valor: 'retrasado', etiqueta: 'Retrasado (desde 20 min)', cantidad: conteosEspera.retrasados },
+            { valor: 'tarde', etiqueta: 'Tarde (desde 30 min)', cantidad: conteosEspera.tardes },
+            { valor: 'muy_tarde', etiqueta: 'Muy tarde (desde 45 min)', cantidad: conteosEspera.muyTardes },
+          ]}
+          alCambiar={(v) => setFiltroRetraso(v as FiltroRetraso)}
+        />
 
         {/* Pastillas de filtro rápido por zona si hay filtro activo */}
         {filtroZona !== 'todas' && (
@@ -887,7 +766,7 @@ function RepartosAdminView() {
             Zona {filtroZona} × (quitar filtro)
           </button>
         )}
-      </div>
+      </BarraFiltros>
 
       {/* Contador visible de pedidos esperando repartidor */}
       <div
@@ -927,7 +806,9 @@ function RepartosAdminView() {
         )}
       </div>
 
-      {cargando ? (
+      {modoVista === 'rutas' ? (
+        <RutasAdmin />
+      ) : cargando ? (
         <div style={{ padding: '60px 0' }}>
           <Cargando mensaje="Cargando pedidos de reparto..." />
         </div>
@@ -1063,52 +944,21 @@ function RepartosAdminView() {
         /* VISTA LISTA SECUNDARIA (Doble Vista, Decisión 2) */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Filtro por zona para la lista */}
-          <div
+          <BarraFiltros
             role="group"
             aria-label="Filtrar por zona"
-            style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}
           >
-            <button
-              type="button"
-              onClick={() => setFiltroZona('todas')}
-              style={{
-                minHeight: '40px',
-                padding: '0 12px',
-                borderRadius: '9999px',
-                border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                background: filtroZona === 'todas' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                color: filtroZona === 'todas' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              Todas las zonas
-            </button>
-            {Object.entries(conteosPorZona).map(([z, cant]) => {
-              const activo = filtroZona === z;
-              return (
-                <button
-                  key={z}
-                  type="button"
-                  onClick={() => setFiltroZona(activo ? 'todas' : z)}
-                  style={{
-                    minHeight: '40px',
-                    padding: '0 12px',
-                    borderRadius: '9999px',
-                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                    background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                    color: activo ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {z} · {cant}
-                </button>
-              );
-            })}
-          </div>
+            <FiltroCombo
+              etiqueta="Zona"
+              valor={filtroZona}
+              valorPorDefecto="todas"
+              opciones={[
+                { valor: 'todas', etiqueta: 'Todas las zonas' },
+                ...Object.entries(conteosPorZona).map(([z, cant]) => ({ valor: z, etiqueta: z, cantidad: cant })),
+              ]}
+              alCambiar={setFiltroZona}
+            />
+          </BarraFiltros>
 
           {listaPorEspera.length === 0 ? (
             <EstadoVacio

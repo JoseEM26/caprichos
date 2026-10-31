@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEsMovil } from './useEsMovil';
+import { alternarEleccion } from './eleccionGrupo';
 import { calcularPrecioLinea } from '@caprichos/compartido';
 import {
   GrupoOpcionesCarta,
@@ -82,48 +83,24 @@ export function VentanaProducto({ producto, onCerrar }: VentanaProductoProps) {
       const copia = prev.map((u, idx) => {
         if (idx !== indexUnidad) return u;
 
-        const yaElegida = u.opciones.some((o) => o.id === opcion.id);
-        const opcionesDelGrupo = u.opciones.filter((o) => o.grupoId === grupo.id);
-
-        let nuevasOpciones: OpcionElegida[];
-
-        if (yaElegida) {
-          // Deseleccionar
-          nuevasOpciones = u.opciones.filter((o) => o.id !== opcion.id);
-        } else {
-          // Si maximo es 1, reemplaza la existente en este grupo
-          if (grupo.maximo === 1) {
-            nuevasOpciones = [
-              ...u.opciones.filter((o) => o.grupoId !== grupo.id),
-              {
-                id: opcion.id,
-                nombre: opcion.nombre,
-                precioExtra: opcion.precioExtra,
-                grupoId: grupo.id,
-                grupoNombre: grupo.nombre,
-              },
-            ];
-          } else {
-            // Si ya alcanzó el máximo, no permitir más
-            if (opcionesDelGrupo.length >= grupo.maximo) {
-              return u;
-            }
-            nuevasOpciones = [
-              ...u.opciones,
-              {
-                id: opcion.id,
-                nombre: opcion.nombre,
-                precioExtra: opcion.precioExtra,
-                grupoId: grupo.id,
-                grupoNombre: grupo.nombre,
-              },
-            ];
-          }
-        }
+        // Elegidas de este grupo; la regla de elección (reemplazar, quitar, tope) vive en alternarEleccion
+        const delGrupo = u.opciones.filter((o) => o.grupoId === grupo.id).map((o) => o.id);
+        const nuevas = alternarEleccion(grupo, delGrupo, opcion.id);
 
         return {
           ...u,
-          opciones: nuevasOpciones,
+          opciones: [
+            ...u.opciones.filter((o) => o.grupoId !== grupo.id),
+            ...grupo.opciones
+              .filter((go) => nuevas.includes(go.id))
+              .map((go): OpcionElegida => ({
+                id: go.id,
+                nombre: go.nombre,
+                precioExtra: go.precioExtra,
+                grupoId: grupo.id,
+                grupoNombre: grupo.nombre,
+              })),
+          ],
         };
       });
 

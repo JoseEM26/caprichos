@@ -8,7 +8,7 @@ import { useCuenta } from './CuentaContext';
 export const campo: CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
-  minHeight: 48,
+  minHeight: 44,
   borderRadius: 12,
   border: '1.5px solid var(--cp-line)',
   background: 'var(--cp-cream)',
@@ -18,17 +18,20 @@ export const campo: CSSProperties = {
 };
 export const etiqueta: CSSProperties = { fontWeight: 700, display: 'block', marginBottom: 4 };
 export const ayuda: CSSProperties = { fontSize: 12, color: 'var(--cp-soft)', marginTop: 3 };
-export const botonPrincipal: CSSProperties = { minHeight: 52, border: 0, borderRadius: 12, background: 'var(--cp-orange)', color: '#fff', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 15 };
-export const botonSecundario: CSSProperties = { minHeight: 48, border: '1.5px solid var(--cp-navy)', borderRadius: 12, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800 };
+export const botonPrincipal: CSSProperties = { minHeight: 48, border: 0, borderRadius: 12, background: 'var(--cp-orange)', color: '#fff', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 15 };
+export const botonSecundario: CSSProperties = { minHeight: 44, border: '1.5px solid var(--cp-navy)', borderRadius: 12, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800 };
 const enlace: CSSProperties = { border: 0, background: 'transparent', color: 'var(--cp-orange)', fontWeight: 800, fontSize: 13, minHeight: 44, padding: '0 4px', textDecoration: 'underline' };
+const separador: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, color: 'var(--cp-soft)', fontSize: 12 };
+const linea: CSSProperties = { flex: 1, height: 1, background: 'var(--cp-line)' };
 
 export const TELEFONO_VALIDO = /^9\d{8}$/;
 const CORREO_VALIDO = /^\S+@\S+\.\S+$/;
 export const MENSAJE_TELEFONO = 'El celular debe tener 9 dígitos y empezar con 9.';
-const CONSENTIMIENTO_POR_DEFECTO = 'Acepto que Caprichos guarde mi celular y mis datos para acumular puntos y enviarme mi cupón de cumpleaños.';
+const CONSENTIMIENTO_POR_DEFECTO = 'Acepto que Caprichos guarde mi celular y mis datos para sumar puntos y enviarme mi cupón de cumpleaños.';
 const hoyISO = (): string => new Date().toISOString().slice(0, 10);
 
 type Modo = 'in' | 'new' | 'rec1' | 'rec2';
+type Paso = 1 | 2;
 type Legal = 'terminos' | 'privacidad';
 
 const mensajeDe = (err: unknown, defecto: string): string => (err instanceof Error && err.message ? err.message : defecto);
@@ -39,6 +42,23 @@ export function fortaleza(c: string): 0 | 1 | 2 {
   if (c.length < 8) return 0;
   const clases = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((r) => r.test(c)).length;
   return clases >= 3 && c.length >= 10 ? 2 : clases >= 2 ? 1 : 0;
+}
+
+/** Indicador del registro en dos pasos: «Paso 1 de 2» con una barra por paso. */
+function IndicadorPasos({ paso }: { paso: Paso }) {
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)', marginBottom: 6 }}>
+        <span>{`Paso ${paso} de 2`}</span>
+        <span>{paso === 1 ? 'Tus datos' : 'Opcional y confirmar'}</span>
+      </div>
+      <div aria-hidden="true" style={{ display: 'flex', gap: 6 }}>
+        {([1, 2] as const).map((n) => (
+          <span key={n} style={{ flex: 1, height: 4, borderRadius: 2, background: n <= paso ? 'var(--cp-orange)' : 'var(--cp-line)' }} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function CampoCelular({ id, valor, alCambiar }: { id: string; valor: string; alCambiar: (v: string) => void }) {
@@ -103,10 +123,11 @@ function VentanaLegal({ info, cual, alCerrar }: { info: CartaLegalInfo | null; c
   );
 }
 
-/** Acceso de quien no tiene sesión: ingresar, crear cuenta y recuperar contraseña (celular + contraseña, sin DNI). */
-export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () => void }) {
+/** Acceso de quien no tiene sesión: ingresar, crear cuenta (en 2 pasos) y recuperar contraseña (celular + contraseña, sin DNI). */
+export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }: { alSeguirInvitado: () => void; invitadoPermitido?: boolean }) {
   const { ingresar, registrar } = useCuenta();
   const [modo, setModo] = useState<Modo>('in');
+  const [paso, setPaso] = useState<Paso>(1);
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [contrasena, setContrasena] = useState('');
@@ -114,12 +135,17 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
   const [correo, setCorreo] = useState('');
   const [acepta, setAcepta] = useState(false);
   const [codigo, setCodigo] = useState('');
+  const [dni, setDni] = useState('');
+  const [codigoEnviado, setCodigoEnviado] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [aviso, setAviso] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [espera, setEspera] = useState(0);
   const [legal, setLegal] = useState<CartaLegalInfo | null>(null);
   const [verLegal, setVerLegal] = useState<Legal | null>(null);
+
+  const paso1 = modo === 'new' && paso === 1;
+  const paso2 = modo === 'new' && paso === 2;
 
   useEffect(() => {
     if (modo !== 'new' || legal) return;
@@ -138,7 +164,9 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
 
   const ir = (m: Modo) => {
     setModo(m);
+    setPaso(1);
     setMensaje('');
+    setCodigoEnviado(false);
     if (m !== 'in') setAviso('');
   };
 
@@ -158,6 +186,21 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
     }
   };
 
+  /** Paso 1 «Tus datos»: nombre y contraseña (el celular se valida antes en enviar). */
+  const errorPaso1 = (): string => {
+    if (nombre.trim().length < 3) return 'Escribe tu nombre.';
+    if (contrasena.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
+    return '';
+  };
+
+  /** Paso 2 «Opcional y confirmar»: correo, DNI y aceptación. */
+  const errorPaso2 = (): string => {
+    if (correo && !CORREO_VALIDO.test(correo)) return 'El correo no es válido.';
+    if (!acepta) return 'Debes aceptar el uso de tus datos para crear la cuenta.';
+    if (dni && !/^\d{8}$/.test(dni)) return 'El DNI debe tener 8 dígitos. Déjalo vacío si no quieres darlo.';
+    return '';
+  };
+
   const enviar = async () => {
     if (!TELEFONO_VALIDO.test(telefono)) return setMensaje(MENSAJE_TELEFONO);
     if (modo === 'in') {
@@ -167,15 +210,39 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
         setContrasena('');
       }, 'Celular o contraseña incorrectos.');
     }
-    if (nombre.trim().length < 3) return setMensaje('Escribe tu nombre.');
-    if (contrasena.length < 8) return setMensaje('La contraseña debe tener al menos 8 caracteres.');
-    if (correo && !CORREO_VALIDO.test(correo)) return setMensaje('El correo no es válido.');
-    if (!acepta) return setMensaje('Debes aceptar el uso de tus datos para crear la cuenta.');
+    if (paso === 1) {
+      const error = errorPaso1();
+      if (error) return setMensaje(error);
+      setMensaje('');
+      return setPaso(2);
+    }
+    const error = errorPaso2();
+    if (error) return setMensaje(error);
+    if (!codigoEnviado) return enviarCodigoRegistro();
+    if (!/^\d{6}$/.test(codigo)) return setMensaje('El código tiene 6 dígitos.');
     return correr(async () => {
-      await registrar({ nombre: nombre.trim(), telefono, contrasena, correo: correo.trim() || undefined, cumpleanos: cumple || undefined, aceptaDatos: true });
+      await registrar({
+        nombre: nombre.trim(),
+        telefono,
+        contrasena,
+        codigo,
+        ...(dni ? { dni } : {}),
+        correo: correo.trim() || undefined,
+        cumpleanos: cumple || undefined,
+        aceptaDatos: true,
+      });
       setContrasena('');
     }, 'No se pudo crear la cuenta. Intenta de nuevo.');
   };
+
+  /** Registro: antes de crear la cuenta, el código de 6 dígitos llega por WhatsApp al celular. */
+  const enviarCodigoRegistro = () =>
+    correr(async () => {
+      await api.post('/carta/cuenta/registro/codigo', { telefono });
+      setAviso('Te enviamos un código por WhatsApp. Vence en 10 minutos.');
+      setCodigoEnviado(true);
+      setEspera(60);
+    }, 'No se pudo enviar el código. Intenta de nuevo.');
 
   const pedirCodigo = async () => {
     if (!TELEFONO_VALIDO.test(telefono)) return setMensaje(MENSAJE_TELEFONO);
@@ -202,55 +269,66 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
 
   const pestanas: ReactNode =
     modo === 'in' || modo === 'new' ? (
-      <div role="tablist" style={{ display: 'flex', gap: 6 }}>
+      <div role="tablist" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 14, background: 'var(--cp-sand)' }}>
         {(['in', 'new'] as const).map((id) => (
-          <button key={id} role="tab" aria-selected={modo === id} onClick={() => ir(id)} style={{ flex: 1, minHeight: 44, borderRadius: 12, border: '1.5px solid var(--cp-navy)', background: modo === id ? 'var(--cp-navy)' : 'transparent', color: modo === id ? 'var(--cp-cream)' : 'var(--cp-navy)', fontWeight: 800, fontSize: 14 }}>
+          <button key={id} role="tab" aria-selected={modo === id} onClick={() => ir(id)} style={{ flex: 1, minHeight: 40, border: 0, borderRadius: 10, background: modo === id ? 'var(--cp-navy)' : 'transparent', color: modo === id ? 'var(--cp-cream)' : 'var(--cp-navy)', fontWeight: 800, fontSize: 14 }}>
             {id === 'in' ? 'Ingresar' : 'Crear cuenta'}
           </button>
         ))}
       </div>
     ) : null;
 
+  const textoBoton = modo === 'new' ? (paso === 1 ? 'Continuar' : codigoEnviado ? 'Crear cuenta' : 'Enviar código por WhatsApp') : ({ in: 'Ingresar', rec1: 'Enviarme el código', rec2: 'Cambiar mi contraseña' } as const)[modo];
+
   return (
     <>
-      <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--cp-soft)' }}>
-        Con tu cuenta acumulas <b>puntos por lo que pagas</b> y los usas en tus siguientes pedidos. Es opcional: también puedes pedir como invitado, sin cuenta.
+      <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft)' }}>
+        Ganas <b>puntos</b> por lo que pagas. {invitadoPermitido ? 'Es opcional: también puedes pedir como invitado.' : 'Es opcional.'}
       </div>
       {pestanas}
+      {modo === 'new' && <IndicadorPasos paso={paso} />}
       {aviso && modo !== 'rec2' && <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-ok)' }}>{aviso}</div>}
 
-      {modo === 'new' && (
+      {paso1 && (
         <div>
           <label htmlFor="ac-n" style={etiqueta}>Nombre</label>
           <input id="ac-n" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} style={campo} />
         </div>
       )}
 
-      {(modo === 'in' || modo === 'new' || modo === 'rec1') && <CampoCelular id="ac-t" valor={telefono} alCambiar={setTelefono} />}
-      {(modo === 'in' || modo === 'new') && <CampoClave id="ac-p" etiquetaTexto="Contraseña" valor={contrasena} alCambiar={setContrasena} nueva={modo === 'new'} />}
+      {(modo === 'in' || modo === 'rec1' || paso1) && <CampoCelular id="ac-t" valor={telefono} alCambiar={setTelefono} />}
+      {(modo === 'in' || paso1) && <CampoClave id="ac-p" etiquetaTexto="Contraseña" valor={contrasena} alCambiar={setContrasena} nueva={paso1} />}
 
       {modo === 'in' && (
         <button type="button" onClick={() => ir('rec1')} style={{ ...enlace, alignSelf: 'flex-start' }}>¿Olvidaste tu contraseña?</button>
       )}
 
-      {modo === 'new' && (
+      {paso2 && (
         <>
-          <div>
-            <label htmlFor="ac-b" style={etiqueta}>Cumpleaños (opcional)</label>
-            <input id="ac-b" type="date" value={cumple} max={hoyISO()} onChange={(e) => setCumple(e.target.value)} style={campo} />
-            <div style={ayuda}>Para enviarte tu cupón de cumpleaños.</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>Datos opcionales</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+            <div>
+              <label htmlFor="ac-b" style={etiqueta}>Cumpleaños (opcional)</label>
+              <input id="ac-b" type="date" value={cumple} max={hoyISO()} onChange={(e) => setCumple(e.target.value)} style={campo} />
+              <div style={ayuda}>Para tu cupón de cumpleaños.</div>
+            </div>
+            <div>
+              <label htmlFor="ac-dni" style={etiqueta}>DNI (opcional)</label>
+              <input id="ac-dni" type="text" inputMode="numeric" maxLength={8} value={dni} onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 8))} style={campo} />
+              <div style={ayuda}>Lo pides solo si quieres: tu celular es lo que te identifica.</div>
+            </div>
           </div>
           <div>
             <label htmlFor="ac-e" style={etiqueta}>Correo personal (opcional)</label>
             <input id="ac-e" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} placeholder="Solo si quieres recibir avisos" style={campo} />
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, lineHeight: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '18px' }}>
             <button type="button" role="checkbox" aria-checked={acepta} aria-label="Acepto el uso de mis datos" onClick={() => setAcepta((v) => !v)} style={{ flex: 'none', width: 44, height: 44, border: 0, background: 'transparent', padding: 0 }}>
               <span style={{ width: 24, height: 24, borderRadius: 6, border: '2px solid var(--cp-navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, margin: '0 auto', background: acepta ? 'var(--cp-orange)' : 'transparent', color: '#fff' }}>{acepta ? '✓' : ''}</span>
             </button>
             <span style={{ paddingTop: 10 }}>
-              {legal?.textoConsentimiento || CONSENTIMIENTO_POR_DEFECTO} Lee los{' '}
-              <button type="button" onClick={() => setVerLegal('terminos')} style={{ ...enlace, minHeight: 0, fontSize: 13 }}>Términos y condiciones</button> y la{' '}
+              {legal?.textoConsentimiento || CONSENTIMIENTO_POR_DEFECTO}{' '}
+              <button type="button" onClick={() => setVerLegal('terminos')} style={{ ...enlace, minHeight: 0, fontSize: 13 }}>Términos y condiciones</button> y{' '}
               <button type="button" onClick={() => setVerLegal('privacidad')} style={{ ...enlace, minHeight: 0, fontSize: 13 }}>Política de privacidad</button>.
             </span>
           </div>
@@ -261,6 +339,18 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
         <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
           Escribe tu celular y te enviamos un código de 6 dígitos por WhatsApp para crear una contraseña nueva.
         </div>
+      )}
+
+      {paso2 && codigoEnviado && (
+        <>
+          <div>
+            <label htmlFor="ac-cr" style={etiqueta}>Código de 6 dígitos (llega por WhatsApp)</label>
+            <input id="ac-cr" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" style={{ ...campo, letterSpacing: 8, textAlign: 'center', fontSize: 20, fontWeight: 800 }} />
+          </div>
+          <button type="button" onClick={enviarCodigoRegistro} disabled={espera > 0 || enviando} style={{ ...enlace, alignSelf: 'flex-start' }}>
+            {espera > 0 ? `Reenviar código en ${espera} s` : 'Reenviar código'}
+          </button>
+        </>
       )}
 
       {modo === 'rec2' && (
@@ -281,16 +371,23 @@ export function FormularioAcceso({ alSeguirInvitado }: { alSeguirInvitado: () =>
         <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>{mensaje}</div>
       )}
 
-      <button onClick={modo === 'rec1' ? pedirCodigo : modo === 'rec2' ? confirmar : enviar} disabled={enviando} style={botonPrincipal}>
-        {enviando ? 'Un momento...' : { in: 'Ingresar', new: 'Crear mi cuenta', rec1: 'Enviarme el código', rec2: 'Cambiar mi contraseña' }[modo]}
-      </button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {paso2 && (
+          <button type="button" onClick={() => { setPaso(1); setMensaje(''); }} style={{ ...botonSecundario, flex: '0 0 96px' }}>Atrás</button>
+        )}
+        <button onClick={modo === 'rec1' ? pedirCodigo : modo === 'rec2' ? confirmar : enviar} disabled={enviando} style={{ ...botonPrincipal, flex: 1 }}>
+          {enviando ? 'Un momento...' : textoBoton}
+        </button>
+      </div>
       {(modo === 'rec1' || modo === 'rec2') && (
         <button type="button" onClick={() => ir('in')} style={botonSecundario}>Volver a ingresar</button>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--cp-soft)', fontSize: 12 }}>
-        <span style={{ flex: 1, height: 1, background: 'var(--cp-line)' }} />o<span style={{ flex: 1, height: 1, background: 'var(--cp-line)' }} />
-      </div>
-      <button onClick={alSeguirInvitado} style={botonSecundario}>Seguir como invitado</button>
+      {invitadoPermitido && (
+        <>
+          <div style={separador}><span style={linea} />o<span style={linea} /></div>
+          <button type="button" onClick={alSeguirInvitado} style={botonSecundario}>Seguir como invitado</button>
+        </>
+      )}
       {verLegal && <VentanaLegal info={legal} cual={verLegal} alCerrar={() => setVerLegal(null)} />}
     </>
   );

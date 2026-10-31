@@ -264,16 +264,36 @@ describe('Módulo Catálogo - ProductosView', () => {
     await waitFor(() => expect(ocultar).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: 'Desactivar Frappe Oreo' }));
     fireEvent.click(screen.getByRole('button', { name: /^Sí/ }));
-    await screen.findByRole('button', { name: 'Activos (1)' });
+    await screen.findByRole('button', { name: 'Registro: Activos' });
     expect(screen.queryByText('Caja x6 Donas Artesanales')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Desactivados (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registro: Activos' }));
+    fireEvent.click(screen.getByRole('option', { name: /Desactivados/ }));
     expect(screen.getByText('Caja x6 Donas Artesanales')).toBeInTheDocument();
     expect(screen.getByText('Desactivado')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Activar Caja x6 Donas Artesanales' }));
     fireEvent.click(screen.getByRole('button', { name: /^Sí/ }));
     await waitFor(() => expect(mostrar).toHaveBeenCalledWith('prod-2'));
-    fireEvent.click(screen.getByRole('button', { name: 'Todos (2)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registro: Desactivados' }));
+    fireEvent.click(screen.getByRole('option', { name: /Todos/ }));
     expect(screen.getByText('Frappe Oreo')).toBeInTheDocument();
+  });
+
+  it('los filtros de Disponibilidad y Ordenar son combos dentro de Filtros', async () => {
+    render(
+      <MemoryRouter>
+        <ProductosView />
+      </MemoryRouter>,
+    );
+    await screen.findByText('Frappe Oreo');
+
+    fireEvent.click(screen.getByRole('button', { name: /Filtros/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disponibilidad: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Solo agotados' }));
+    expect(screen.getByRole('button', { name: 'Disponibilidad: Solo agotados' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ordenar: Nombre A-Z' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Precio mayor' }));
+    expect(screen.getByRole('button', { name: 'Ordenar: Precio mayor' })).toBeInTheDocument();
   });
 
   it('todas las acciones y las insignias quedan dentro de la tarjeta (pt-tarjeta / pt-acciones)', async () => {

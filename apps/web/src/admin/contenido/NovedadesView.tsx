@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { api } from '../../comun/api';
 import { Cargando } from '../../comun/Cargando';
 import { Confirmar } from '../../comun/Confirmar';
@@ -9,12 +10,15 @@ import { CartaVistaPrevia } from '../../carta/CartaPublica';
 import type { ContenidoCarta, VistaPreviaCarta } from '../../carta/CartaPublica';
 import { agruparNovedades } from '../../carta/PaginaNovedades';
 import type { NovedadCarta } from '../../carta/PaginaNovedades';
+import type { FotoGaleria } from '../../carta/conocenosContenido';
 import type { ModoEdicion } from '../../carta/edicion';
 import { normalizarUrlArchivo } from './paletas-constantes';
 import { BarraSuperior } from './edicion/BarraSuperior';
 import { BloqueEditable, BotonBarra } from './edicion/BloqueEditable';
+import { BloqueFoto } from './edicion/BloqueFoto';
 import { Fantasma, LienzoEdicion } from './edicion/LienzoEdicion';
 import { reubicar, siguiente } from './edicion/mover';
+import { agregarFotoArchivo, cambiarActivo, elegirFoto, moverFoto, ponerUrlFoto, reubicarFoto } from './edicion/galeria';
 import { subirFotoEdicion } from './edicion/subirFoto';
 import { useBorrador } from './edicion/useBorrador';
 import { usePublicoCarta } from './edicion/usePublicoCarta';
@@ -45,6 +49,8 @@ interface Encabezado {
 interface EstadoNov {
   encabezado: Encabezado;
   items: NovedadEd[];
+  /** Fotos de «Momentos Caprichos»: propias de esta página, no las de las tarjetas. */
+  momentos: FotoGaleria[];
 }
 
 const ENCABEZADO_DEFAULT: Encabezado = {
@@ -127,12 +133,14 @@ export function NovedadesView() {
   const [sel, setSelRaw] = useState<string | null>(null);
   const [pop, setPop] = useState<string | null>(null);
   const [aEliminar, setAEliminar] = useState<string | null>(null);
+  const [aQuitarFoto, setAQuitarFoto] = useState<string | null>(null);
   const publico = usePublicoCarta();
   const secuencia = useRef(0);
 
   const b = useBorrador<EstadoNov>(async (e) => {
     await api.put('/admin/contenido/novedades/encabezado', e.encabezado);
     await api.put('/admin/contenido/novedades/borrador', { items: e.items });
+    await api.put('/admin/contenido/novedades/momentos', { fotos: e.momentos });
     setHayBorrador(true);
   });
   const { valor: e, cambiar, cargar } = b;
@@ -141,10 +149,11 @@ export function NovedadesView() {
     setCargando(true);
     setError(null);
     try {
-      const [lista, borrador, enc] = await Promise.all([
+      const [lista, borrador, enc, momentos] = await Promise.all([
         api.get<any[]>('/admin/contenido/novedades'),
         api.get<{ items: NovedadEd[] | null; tieneBorrador: boolean }>('/admin/contenido/novedades/borrador').catch(() => ({ items: null, tieneBorrador: false })),
         api.get<{ encabezado: Encabezado; tieneBorrador: boolean }>('/admin/contenido/novedades/encabezado').catch(() => null),
+        api.get<{ fotos: FotoGaleria[]; tieneBorrador: boolean }>('/admin/contenido/novedades/momentos').catch(() => ({ fotos: [], tieneBorrador: false })),
       ]);
       const publicadas: NovedadEd[] = (lista || []).map((n) => ({
         id: String(n.id),
@@ -161,8 +170,8 @@ export function NovedadesView() {
         tamano: n.tamano || 'MEDIANO',
         fotos: (n.fotos || []).map((f: { url: string }) => normalizarUrlArchivo(f.url) || f.url),
       }));
-      cargar({ encabezado: enc?.encabezado ?? ENCABEZADO_DEFAULT, items: borrador?.items ?? publicadas });
-      setHayBorrador(!!borrador?.tieneBorrador || !!enc?.tieneBorrador);
+      cargar({ encabezado: enc?.encabezado ?? ENCABEZADO_DEFAULT, items: borrador?.items ?? publicadas, momentos: momentos?.fotos ?? [] });
+      setHayBorrador(!!borrador?.tieneBorrador || !!enc?.tieneBorrador || !!momentos?.tieneBorrador);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar las novedades');
     } finally {
@@ -188,6 +197,7 @@ export function NovedadesView() {
         ...(publico.contenido ?? {}),
         novedades: aCarta(e.items),
         novedadesEncabezado: e.encabezado,
+        novedadesMomentos: e.momentos,
       } as ContenidoCarta,
     };
   }, [e, publico]);
@@ -236,7 +246,38 @@ export function NovedadesView() {
     });
   };
 
+  /** Cada foto de Momentos se edita sola: cambiar, mover, quitar (con Sí/No) o mostrar. */
+  const momentoEd = (clave: string, hijo: ReactNode) => {
+    const id = clave.slice('momento:'.length);
+    const i = e.momentos.findIndex((f) => f.id === id);
+    const foto = e.momentos[i];
+    if (!foto) return hijo;
+    const cambiarMomentos = (f: (lista: FotoGaleria[]) => FotoGaleria[]) => cambiar((s) => ({ ...s, momentos: f(s.momentos) }));
+    return (
+      <BloqueFoto
+        key={clave}
+        clave={clave}
+        etiqueta={`Momento ${i + 1}`}
+        activa={foto.activo}
+        puedeSubir={i > 0}
+        puedeBajar={i < e.momentos.length - 1}
+        onSubir={() => cambiarMomentos((l) => moverFoto(l, id, -1))}
+        onBajar={() => cambiarMomentos((l) => moverFoto(l, id, 1))}
+        onSoltar={(desde) => cambiarMomentos((l) => reubicarFoto(l, desde, id, 'momento:'))}
+        onFoto={async (archivo) => {
+          const url = await subirFotoEdicion(archivo);
+          cambiar((s) => ({ ...s, momentos: ponerUrlFoto(s.momentos, id, url) }));
+        }}
+        onQuitar={() => setAQuitarFoto(id)}
+        onMostrar={() => cambiarMomentos((l) => cambiarActivo(l, id, true))}
+      >
+        {hijo}
+      </BloqueFoto>
+    );
+  };
+
   const bloque: ModoEdicion['bloque'] = (clave, hijo, o) => {
+    if (clave.startsWith('momento:')) return momentoEd(clave, hijo);
     const id = clave.split(':')[1];
     const n = e.items.find((x) => x.id === id);
     if (!n) return hijo;
@@ -304,18 +345,35 @@ export function NovedadesView() {
         cambiarItem(id, { tema: valor || null });
       }
     },
-    agregar: (_clave, etiqueta, estilo) => (
-      <Fantasma
-        key="agregar-novedad"
-        etiqueta={etiqueta}
-        estilo={estilo}
-        onClick={() => {
-          const nueva = nuevaNovedad();
-          cambiar((s) => ({ ...s, items: [...s.items, nueva] }));
-          setSelRaw(`novedad:${nueva.id}`);
-        }}
-      />
-    ),
+    agregar: (clave, etiqueta, estilo) =>
+      clave === 'momento' ? (
+        <Fantasma
+          key="agregar-momento"
+          etiqueta={etiqueta}
+          estilo={estilo}
+          onClick={() =>
+            elegirFoto(async (archivo) => {
+              try {
+                const nueva = await agregarFotoArchivo(archivo);
+                cambiar((s) => ({ ...s, momentos: [...s.momentos, nueva] }));
+              } catch (err: any) {
+                setMensaje(err?.message || 'No se pudo subir la foto. Revisa tu conexión e inténtalo de nuevo.');
+              }
+            })
+          }
+        />
+      ) : (
+        <Fantasma
+          key="agregar-novedad"
+          etiqueta={etiqueta}
+          estilo={estilo}
+          onClick={() => {
+            const nueva = nuevaNovedad();
+            cambiar((s) => ({ ...s, items: [...s.items, nueva] }));
+            setSelRaw(`novedad:${nueva.id}`);
+          }}
+        />
+      ),
     accion: () => {},
   };
 
@@ -352,13 +410,27 @@ export function NovedadesView() {
         mensajePublicar="La página Novedades de la carta usará este encabezado, estas tarjetas, su orden y lo que ocultaste. Lo que quitaste se elimina."
       />
       <div className="ep-nota" style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-        Esta es la página Novedades tal como la ve el cliente. Toca un texto para escribir encima o una tarjeta para moverla, cambiarle la foto o el tamaño. Todo se guarda solo como borrador.
+        Esta es la página Novedades tal como la ve el cliente. Toca un texto para escribir encima, una tarjeta para moverla, cambiarle la foto o el tamaño, o una foto de Momentos Caprichos para cambiarla, moverla o quitarla. Todo se guarda solo como borrador.
       </div>
       <MarcoDispositivo fiel celular={celular} etiqueta="Novedades en edición">
         <LienzoEdicion ed={ed} sel={sel} setSel={seleccionar}>
           {vistaPrevia ? <CartaVistaPrevia datos={vistaPrevia} movil={celular} pagina="novedades" /> : <Cargando mensaje="Preparando la página..." />}
         </LienzoEdicion>
       </MarcoDispositivo>
+      <Confirmar
+        abierto={aQuitarFoto !== null}
+        titulo="¿Quitar esta foto de Momentos Caprichos?"
+        mensaje="Deja de verse en Novedades. La foto no se borra: puedes volver a mostrarla con Mostrar."
+        textoConfirmar="Sí, quitar"
+        textoNo="No, conservarla"
+        peligro
+        alConfirmar={() => {
+          const id = aQuitarFoto;
+          setAQuitarFoto(null);
+          if (id) cambiar((s) => ({ ...s, momentos: cambiarActivo(s.momentos, id, false) }));
+        }}
+        alCancelar={() => setAQuitarFoto(null)}
+      />
       <Confirmar
         abierto={aEliminar !== null}
         titulo="¿Eliminar esta novedad?"

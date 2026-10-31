@@ -370,6 +370,7 @@ export class MensajesService {
               ? String(contenido.archivoId || (c.flujo as any)?.pago?.comprobanteArchivoId || '') || null
               : null,
           texto: textoDe(m),
+          ubicacion: contenido.ubicacion ?? null,
           hora: hora(m.en),
           estado: estadoMsg,
           errorCodigo,

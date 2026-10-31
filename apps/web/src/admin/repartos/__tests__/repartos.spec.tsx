@@ -337,17 +337,15 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
       expect(screen.getByTestId('pin-4')).toBeInTheDocument();
     });
 
-    // Botones de filtro de tiempo arriba del mapa con sus conteos
-    const btnRetrasado = screen.getByRole('button', { name: /^retrasado \(1\)/i });
-    const btnTarde = screen.getByRole('button', { name: /^tarde \(1\)/i });
-    const btnMuyTarde = screen.getByRole('button', { name: /^muy tarde \(1\)/i });
-
-    expect(btnRetrasado).toBeInTheDocument();
-    expect(btnTarde).toBeInTheDocument();
-    expect(btnMuyTarde).toBeInTheDocument();
+    // Combo «Espera» arriba del mapa con los conteos de cada nivel
+    fireEvent.click(screen.getByRole('button', { name: 'Espera: Todos' }));
+    expect(screen.getByRole('option', { name: /^Retrasado/ })).toHaveTextContent('1');
+    expect(screen.getByRole('option', { name: /^Tarde/ })).toHaveTextContent('1');
+    expect(screen.getByRole('option', { name: /^Muy tarde/ })).toHaveTextContent('1');
 
     // Filtra por "Muy tarde"
-    fireEvent.click(btnMuyTarde);
+    fireEvent.click(screen.getByRole('option', { name: /^Muy tarde/ }));
+    expect(screen.getByRole('button', { name: /^Espera: Muy tarde/ })).toBeInTheDocument();
 
     // Solo el pedido 4 debe estar visible en el mapa
     expect(screen.getByTestId('pin-4')).toBeInTheDocument();
@@ -746,9 +744,11 @@ describe('Reparto de caja: mapa y contadores solo con pedidos activos, sin telé
     expect(screen.queryByTestId('pin-x2')).not.toBeInTheDocument();
 
     // Contadores: 1 retrasado (25), 1 tarde (35), 1 muy tarde (50); los anulados de 80 y 90 min no cuentan
-    expect(screen.getByRole('button', { name: /^retrasado \(1\)/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^tarde \(1\)/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^muy tarde \(1\)/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Espera: Todos' }));
+    expect(screen.getByRole('option', { name: /^Retrasado/ })).toHaveTextContent('1');
+    expect(screen.getByRole('option', { name: /^Tarde/ })).toHaveTextContent('1');
+    expect(screen.getByRole('option', { name: /^Muy tarde/ })).toHaveTextContent('1');
+    fireEvent.keyDown(document, { key: 'Escape' });
 
     // Ningún teléfono ni número largo visible en la página
     const texto = document.body.textContent || '';

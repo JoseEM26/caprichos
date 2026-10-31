@@ -9,9 +9,7 @@ import { TextoEd, useEdicion } from './edicion';
 interface PaginaConocenosProps {
   datosLocal: DatosLocalCarta | null;
   estadoLocal: EstadoLocalCarta | null;
-  /** Fotos reales del Diseñador (Momentos). Si no hay, el mosaico usa las de marca. */
-  fotos?: string[];
-  /** Textos editables; si faltan se usan los de siempre. */
+  /** Textos, bloques y galería propia de Conócenos; si faltan se usan los de siempre. */
   contenido?: Partial<ContenidoConocenos> | null;
 }
 
@@ -49,10 +47,14 @@ function Bloque({ children, gap = 10 }: { children: ReactNode; gap?: number }) {
 }
 
 /** Página «Conócenos» (mockup Main ▸ CONÓCENOS): quiénes somos, dónde estamos, horario y contacto. */
-export function PaginaConocenos({ datosLocal, estadoLocal, fotos = [], contenido }: PaginaConocenosProps) {
+export function PaginaConocenos({ datosLocal, estadoLocal, contenido }: PaginaConocenosProps) {
   const movil = useEsMovil();
   const ed = useEdicion();
   const c = normalizarConocenos(contenido);
+  // Galería propia: las 3 primeras son «Nuestro lugar» y el resto, Momentos. En edición se ven también las ocultas.
+  const galeria = ed ? c.galeria : c.galeria.filter((f) => f.activo);
+  const lugar = galeria.slice(0, 3);
+  const momentos = galeria.slice(3);
   const tituloDe = (id: string) => c.bloques.find((b) => b.id === id)?.titulo ?? '';
   const direccion = datosLocal?.direccion || 'Campoy, San Juan de Lurigancho, Lima';
   const telefono = datosLocal?.telefono || '';
@@ -133,14 +135,18 @@ export function PaginaConocenos({ datosLocal, estadoLocal, fotos = [], contenido
           <span key={i} style={{ fontSize: movil ? 14 : 16, lineHeight: movil ? '21px' : '24px', maxWidth: 720 }}><TextoEd clave={`parrafo.${i}`} valor={p} ayuda="Párrafo" /></span>
         ))}
         {ed && c.parrafos.length < 6 && ed.agregar('parrafo', 'Agregar párrafo', { alignSelf: 'flex-start', minHeight: 44 })}
-        <div style={{ marginTop: 10 }}>
-          <MosaicoMomentos fotos={fotos} cantidad={3} columnas={3} prioritaria />
-        </div>
+        {(ed || lugar.length > 0) && (
+          <div style={{ marginTop: 10 }}>
+            <MosaicoMomentos fotos={lugar} columnas={3} claveFotos="galeria" prioritaria />
+          </div>
+        )}
       </div>
 
       {visibles.map((b, i) => {
         if (b.id === 'momentos') {
-          const mosaico = <MosaicoMomentos key="momentos" titulo={b.titulo} claveTitulo="bloque.momentos.titulo" fotos={fotos} cantidad={c.momentosCantidad} />;
+          const mosaico = (
+            <MosaicoMomentos key="momentos" titulo={b.titulo} claveTitulo="bloque.momentos.titulo" fotos={momentos} claveFotos="galeria" conAgregar />
+          );
           return ed ? ed.bloque('bloque:momentos', mosaico) : mosaico;
         }
         if (i !== primeraTarjeta) return null;

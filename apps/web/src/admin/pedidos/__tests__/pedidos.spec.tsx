@@ -19,6 +19,13 @@ const comoCajero = () => {
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ ...actual, usuario: { partyId: '3', nombres: 'Cajera', rol: 'CAJERO' } } as any);
 };
 
+// La vista de la lista ahora es un combo «Ver pedidos»: lo abre y devuelve la opción buscada
+async function opcionVer(nombre: RegExp) {
+  const boton = await screen.findByRole('button', { name: /^Ver pedidos:/ });
+  if (boton.getAttribute('aria-expanded') !== 'true') fireEvent.click(boton);
+  return screen.getByRole('option', { name: nombre });
+}
+
 describe('Ola F4: Pedidos y Caja', () => {
   const socketCallbacks: Record<string, ((datos: any) => void)[]> = {};
 
@@ -178,22 +185,22 @@ describe('Ola F4: Pedidos y Caja', () => {
 
     render(<PedidosAdminView />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('tab', { name: /Por confirmar · 1/i })).toBeInTheDocument();
+    await waitFor(async () => {
+      expect(await opcionVer(/^Por confirmar\s*1$/i)).toBeInTheDocument();
     });
 
     // Verificar conteos en cada pestaña del mockup:
     // Por confirmar: 1 (CP-001)
-    expect(screen.getByRole('tab', { name: /Por confirmar · 1/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /^Por confirmar\s*1$/i })).toBeInTheDocument();
     // Pago por coordinar: 0
-    expect(screen.getByRole('tab', { name: /Pago por coordinar · 0/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /^Pago por coordinar\s*0$/i })).toBeInTheDocument();
     // En curso: 3 (CP-002 PREPARANDO + CP-003 LISTO + CP-004 EN_CAMINO)
-    expect(screen.getByRole('tab', { name: /En curso · 3/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /^En curso\s*3$/i })).toBeInTheDocument();
     // Cerrados: 2 (CP-005 ENTREGADO + CP-006 ANULADO)
-    expect(screen.getByRole('tab', { name: /Cerrados · 2/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /^Cerrados\s*2$/i })).toBeInTheDocument();
 
     // Cambiar a pestaña En curso y verificar que selecciona automáticamente CP-002 y ya no muestra CP-001
-    fireEvent.click(screen.getByRole('tab', { name: /En curso · 3/i }));
+    fireEvent.click(screen.getByRole('option', { name: /^En curso\s*3$/i }));
     expect(screen.getAllByText('CP-002').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('CP-001')).not.toBeInTheDocument();
   });

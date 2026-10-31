@@ -52,10 +52,10 @@ export const TITULO_SECCION_HORAS = 'Horarios disponibles';
 
 export const TEXTOS_RESERVA = {
   pedirPersonas: () =>
-    '¿Para cuántas personas es la reserva?\n\nElige una opción o si son 7 o más, escribe la cantidad (máximo 10 personas por WhatsApp):',
+    '¿Para cuántas personas es la reserva?\n\nElige una opción o si son 7 o más, escribe la cantidad (máximo 20 personas por WhatsApp):',
 
   personasExcesivas: () =>
-    'Para grupos de más de 10 personas, la reserva se coordina directamente con nuestro equipo para acondicionar las mesas. Te comunico con un asesor.',
+    'Para grupos de más de 20 personas, la reserva se coordina directamente con nuestro equipo para acondicionar las mesas. Te comunico con un asesor.',
 
   limiteSolicitudesExcedido: () =>
     'Ya tienes 3 solicitudes de reserva pendientes de revisión. Por favor espera a que nuestro equipo las confirme o comunícate con un asesor.',

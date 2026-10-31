@@ -23,6 +23,7 @@ export const TITULOS_VISTA: Record<string, { titulo: string; subtitulo: string }
   disenador: { titulo: "Diseño de la carta", subtitulo: "Cambia el orden de las categorías y de los productos, las fotos y qué se ve. No cambia el diseño de la página." },
   novedades: { titulo: "Novedades y publicidad", subtitulo: "La página Novedades de la carta: promociones, imágenes, videos de TikTok o Instagram y avisos." },
   destacadas: { titulo: "Destacadas de la carta", subtitulo: "Los círculos de la carta: cada uno abre imágenes como las historias de Instagram." },
+  resenas: { titulo: "Reseñas de Google", subtitulo: "Las reseñas buenas que se ven en la carta. Oculta las que no quieras mostrar; nada se borra y puedes mostrarlas de nuevo." },
   paleta: { titulo: "Paleta de colores", subtitulo: "Los colores de la carta para cada decoración festiva. Solo cambian mientras la decoración está activa." },
   mirest: { titulo: "Configuración del local", subtitulo: "Los datos que ve el cliente en la carta y en Conócenos: ubicación, contacto, horario, redes, pagos y entrega." },
   usuarios: { titulo: "Usuarios", subtitulo: "Cuentas del personal, su cargo, perfil y local." },

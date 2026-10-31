@@ -17,11 +17,12 @@ export async function listarHistorialNotificaciones(
   return api.get<RespuestaHistorialNotificaciones>(`/admin/notificaciones/historial${qs ? `?${qs}` : ''}`);
 }
 
-export async function marcarNotificacionLeida(
-  id: string,
+/** Marca leída (o no leída) un aviso para el usuario que ha iniciado sesión. */
+export async function marcarNotificacion(
+  clave: string,
   leida = true,
-): Promise<{ ok: boolean; id: string; leida: boolean }> {
-  return api.post<{ ok: boolean; id: string; leida: boolean }>(`/admin/notificaciones/${id}/marcar`, { leida });
+): Promise<{ ok: boolean; clave: string; leida: boolean }> {
+  return api.post<{ ok: boolean; clave: string; leida: boolean }>('/admin/notificaciones/marcar', { clave, leida });
 }
 
 export async function marcarTodasNotificacionesLeidas(

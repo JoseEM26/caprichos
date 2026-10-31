@@ -167,36 +167,18 @@ export const BOTONES_PEDIDO_COMPROBANTE: BotonAccion[] = [
   { id: 'ped_comp_factura', titulo: 'Factura' },
 ];
 
-export const BOTONES_PUNTOS_PROPIA: BotonAccion[] = [
-  { id: 'puntos_si', titulo: 'Sumar puntos' },
-  { id: 'puntos_no', titulo: 'Seguir como invitado' },
-  { id: 'puntos_otro', titulo: 'Usar otro número' },
-];
-// Meta limita el título de un botón a 20 caracteres: «Tengo cuenta con otro número» no cabe
-export const BOTONES_PUNTOS_SIN_CUENTA: BotonAccion[] = [
-  { id: 'puntos_crear', titulo: 'Crear mi cuenta' },
-  { id: 'puntos_no', titulo: 'Seguir como invitado' },
-  { id: 'puntos_otro', titulo: 'Tengo otro número' },
-];
-export const BOTONES_CUENTA_CONSENTIMIENTO: BotonAccion[] = [
-  { id: 'cuenta_acepto', titulo: 'Acepto' },
-  { id: 'cuenta_no', titulo: 'No, gracias' },
+// Pregunta de puntos (sin cuenta identificada): sumar con el número de WhatsApp, con otro celular o no sumar
+export const BOTONES_PUNTOS_PREGUNTA: BotonAccion[] = [
+  { id: 'puntos_este', titulo: 'Este número' },
+  { id: 'puntos_otro', titulo: 'Otro número' },
+  { id: 'puntos_no', titulo: 'No, gracias' },
 ];
 export const BOTONES_PUNTOS_RECORDATORIO: BotonAccion[] = [
   { id: 'puntos_si', titulo: 'Sí' },
   { id: 'puntos_otro', titulo: 'Cambiar' },
   { id: 'puntos_sin', titulo: 'Sin puntos' },
 ];
-export const BOTONES_PUNTOS_DICTADO: BotonAccion[] = [
-  { id: 'puntos_si', titulo: 'Sí, sumar' },
-  { id: 'puntos_otro', titulo: 'No, otro número' },
-  { id: 'puntos_sin', titulo: 'Sin puntos' },
-];
-export const BOTONES_PUNTOS_NO_ENCONTRADO: BotonAccion[] = [
-  { id: 'puntos_otro', titulo: 'Probar otro número' },
-  { id: 'puntos_sin', titulo: 'Seguir sin puntos' },
-];
-export const BOTONES_PUNTOS_NUMERO: BotonAccion[] = [{ id: 'puntos_sin', titulo: 'Sin puntos' }];
+export const BOTONES_PUNTOS_NUMERO: BotonAccion[] = [{ id: 'puntos_no', titulo: 'No, gracias' }];
 
 export const BOTONES_PEDIDO_CONFIRMAR_FINAL: BotonAccion[] = [
   { id: 'ped_confirmar', titulo: 'Confirmar pedido' },
@@ -928,33 +910,17 @@ export const TEXTOS_BOT = {
   },
 
   // --- Puntos (cliente con cuenta, sin clave: se reconoce por el número de WhatsApp) ---
-  puntosCuentaPropia: (primerNombre: string): string =>
-    `¡Hola, ${primerNombre}! 💛 Qué bueno verte de nuevo. ¿Sumamos los puntos de hoy a tu cuenta o prefieres seguir como invitado?`,
-  puntosSinCuentaBienvenida: (): string =>
-    `¡Hola! 👋 Este número todavía no tiene cuenta en Caprichos. ¿Quieres crearla con este mismo número para sumar puntos, o prefieres seguir como invitado?`,
+  puntosPregunta: (): string =>
+    `¿Quieres sumar puntos en este pedido? ⭐ Solo necesitas un celular, sin cuenta ni contraseña. ¿A qué número los sumo?`,
   puntosPedirNumero: (): string =>
-    `Escríbeme el número de celular (9 dígitos) de la cuenta donde quieres sumar, o toca "Sin puntos".`,
-  puntosEncontrado: (terminacion: string): string =>
-    `Encontré una cuenta que termina en ***${terminacion}, ¿sumo ahí?`,
-  cuentaPedirNombre: (): string => `¡Genial! 😊 ¿Cómo te llamas? Escribe tu nombre.`,
-  cuentaNombreInvalido: (): string => `Necesito tu nombre con al menos 2 letras. ¿Cómo te llamas?`,
-  cuentaConsentimiento: (nombre: string, enlaces: string): string =>
-    `Gracias, ${nombre}. Para crear tu cuenta con este número guardaremos tu celular y tu nombre para gestionar tus pedidos, sumar puntos y avisarte por WhatsApp.\n${enlaces}\n¿Aceptas?`,
-  cuentaEnlacesLegales: (terminos: string | null, privacidad: string | null): string =>
-    terminos && privacidad
-      ? `Términos: ${terminos}\nPrivacidad: ${privacidad}`
-      : `Puedes leer los Términos y la Privacidad en nuestra carta.`,
+    `Escríbeme tu celular (9 dígitos, empieza con 9) y sumo tus puntos a ese número. Si no quieres sumar, toca "No, gracias".`,
+  puntosListo: (terminacion: string): string => `Listo, sumarás puntos con el ***${terminacion}. ⭐`,
   cuentaCreada: (nombre: string): string =>
     `¡Listo, ${nombre}! Tu cuenta quedó creada con este número. Para entrar en caprichos.pe define tu contraseña con “¿Olvidaste tu contraseña?”; te llegará un código por aquí.`,
   cuentaNoCreada: (): string =>
     `No pude crear tu cuenta ahora, pero tu pedido sigue en marcha. Puedes crearla después en la carta con este mismo número. 😊`,
-  cuentaSinConsentimiento: (): string => `Sin problema, seguimos como invitado. 😊`,
-  puntosNoEncontrado: (urlCarta: string): string =>
-    `No encontré una cuenta con ese número.\nPuedes crear la tuya con tu celular en ${urlCarta} y sumar en tu próximo pedido.`,
   puntosNumeroInvalido: (): string =>
-    `Necesito un celular de 9 dígitos que empiece con 9 (por ejemplo 987654321), o toca "Sin puntos".`,
-  puntosTopeIntentos: (urlCarta: string): string =>
-    `Ya probamos tres números, así que sigo con tu pedido sin puntos.\nPuedes crear tu cuenta con tu celular en ${urlCarta} y sumar desde el próximo.`,
+    `Ese número no es válido. Necesito un celular de 9 dígitos que empiece con 9 (por ejemplo 987654321). Si no quieres sumar, toca "No, gracias".`,
   puntosRecordatorio: (destino: string): string => `Sumo tus puntos a ${destino} como antes, ¿ok?`,
   puntosLineaResumen: (p: { estimado: number | null; saldo?: number | null; sinPuntos?: boolean }): string => {
     if (p.sinPuntos) return `⭐ Este pedido no suma puntos.`;
@@ -1021,9 +987,12 @@ export const TEXTOS_BOT = {
     datosPago?: string;
     /** Pago dividido: una captura por medio digital, con su monto */
     capturas?: Array<{ medio: string; monto: number }>;
+    /** Últimos 3 dígitos del celular al que suma puntos el pedido (si suma) */
+    puntosTerminacion?: string;
   }): string => {
-    const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago, capturas } = params;
-    const datosBloque = datosPago ? `\n\n${datosPago}` : '';
+    const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago, capturas, puntosTerminacion } = params;
+    const puntosBloque = puntosTerminacion ? `\n\n⭐ Sumas puntos con el ***${puntosTerminacion}.` : '';
+    const datosBloque = `${puntosBloque}${datosPago ? `\n\n${datosPago}` : ''}`;
 
     if (esPagoDigital && capturas && capturas.length >= 1) {
       const nombre = (m: string) => ({ YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia' } as Record<string, string>)[m] ?? m;

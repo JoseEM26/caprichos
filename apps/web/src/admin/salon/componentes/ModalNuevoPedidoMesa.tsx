@@ -6,6 +6,7 @@ import { api } from '../../../comun/api';
 import { MapaUbicacion } from '../../../comun/mapa/MapaUbicacion';
 import type { Punto as CoordenadaMapa } from '../../../comun/mapa/MapaUbicacion';
 import { BuscadorDireccion } from '../../../comun/mapa/BuscadorDireccion';
+import { UbicacionRapidaDelivery } from './UbicacionRapidaDelivery';
 import { SEDE_DEFECTO, cargarSede } from '../../../comun/mapa/sedeDefecto';
 import { CategoriaCarta, ProductoCarta, OpcionCarta as OpcionProducto } from '../../../carta/tipos';
 import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from '../tipos';
@@ -347,6 +348,9 @@ export function ModalNuevoPedidoMesa({
   const cliListo =
     datosCliListos &&
     (modalidad !== 'delivery' || cliDireccion.trim().length > 0 || cliPuntoMapa !== null);
+  // Celular del cliente del delivery (cuenta o invitado): para ver si mandó su ubicación por WhatsApp
+  const telUbicacionDelivery = modoCli === 'cuenta' ? telCli : cliTelefono.replace(/\D/g, '');
+  const telefonoUbicacionDelivery = /^9\d{8}$/.test(telUbicacionDelivery) ? telUbicacionDelivery : null;
   // Con cuenta y direcciones guardadas, el formulario de dirección aparece solo si elige «Dirección nueva»
   const mostrarFormDireccion =
     modoCli === 'invitado' ||
@@ -2143,6 +2147,14 @@ export function ModalNuevoPedidoMesa({
                         if (!cliDireccion.trim() && texto) {
                           setCliDireccion(texto.split(',').slice(0, 2).join(',').trim());
                         }
+                      }}
+                    />
+
+                    <UbicacionRapidaDelivery
+                      telefono={telefonoUbicacionDelivery}
+                      onElegir={(p, direccionAprox) => {
+                        setCliPuntoMapa(p);
+                        if (direccionAprox && !cliDireccion.trim()) setCliDireccion(direccionAprox);
                       }}
                     />
 

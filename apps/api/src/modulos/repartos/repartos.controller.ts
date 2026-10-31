@@ -13,12 +13,15 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { RepartosService } from './repartos.service';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
+import { FiltrarRutasDto } from './dto/filtrar-rutas.dto';
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
 import { ResolverFallaDto } from './dto/resolver-falla.dto';
 import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto';
 import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
 import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
 import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
+import { SaltarPedidoDto } from './dto/saltar-pedido.dto';
+import { TomarRutaDto } from './dto/tomar-ruta.dto';
 import { TomarRutaSugeridaDto } from './dto/tomar-ruta-sugerida.dto';
 
 @Controller('admin/repartos')
@@ -60,6 +63,39 @@ export class RepartosController {
   @Permiso('repartos', 'ver')
   async listarMios(@Req() req: any) {
     return this.repartosService.listarMios(req.usuario);
+  }
+
+  /** Rutas del repartidor que consulta (ignora cualquier filtro de repartidor). */
+  @Get('mis-rutas')
+  @Permiso('repartos', 'ver')
+  async listarMisRutas(@Query() filtros: FiltrarRutasDto, @Req() req: any) {
+    return this.repartosService.listarRutas(filtros, req.usuario, true);
+  }
+
+  /** Rutas de cualquier repartidor para caja/admin; si lo llama un repartidor ve solo las suyas. */
+  @Get('rutas')
+  @Permiso('repartos', 'ver')
+  async listarRutas(@Query() filtros: FiltrarRutasDto, @Req() req: any) {
+    return this.repartosService.listarRutas(filtros, req.usuario);
+  }
+
+  @Get('proximos')
+  @Permiso('repartos', 'ver')
+  async listarProximos(@Req() req: any) {
+    return this.repartosService.listarProximos(req.usuario);
+  }
+
+  @Post('tomar-ruta')
+  @Permiso('repartos', 'tomar')
+  async tomarRuta(@Body() dto: TomarRutaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.tomarRuta(dto, req.usuario, ip);
+  }
+
+  @Get(':id/resumen-repartidor')
+  @Permiso('repartos', 'ver')
+  async resumenRepartidor(@Param('id') id: string, @Req() req: any) {
+    return this.repartosService.resumenRepartidor(id, req.usuario);
   }
 
   @Get('rutas-sugeridas')
@@ -156,6 +192,20 @@ export class RepartosController {
   async entregar(@Param('id') id: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.repartosService.entregar(id, req.usuario, ip);
+  }
+
+  @Post(':id/empezar-por')
+  @Permiso('repartos', 'tomar')
+  async empezarPor(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.empezarPor(id, req.usuario, ip);
+  }
+
+  @Post(':id/saltar')
+  @Permiso('repartos', 'entregar')
+  async saltar(@Param('id') id: string, @Body() dto: SaltarPedidoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosService.saltar(id, dto, req.usuario, ip);
   }
 
   @Post(':id/reportar')

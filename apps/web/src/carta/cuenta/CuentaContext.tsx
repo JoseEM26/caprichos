@@ -16,6 +16,10 @@ export interface DatosRegistro {
   nombre: string;
   contrasena: string;
   telefono: string;
+  /** Código de 6 dígitos que llegó por WhatsApp (POST /carta/cuenta/registro/codigo) */
+  codigo: string;
+  /** DNI opcional: 8 dígitos o no se envía */
+  dni?: string;
   correo?: string;
   cumpleanos?: string;
   aceptaDatos: boolean;

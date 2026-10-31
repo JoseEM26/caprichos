@@ -10,7 +10,7 @@ export const limpiarAutorizacionSupervisor = () => {
   hasta = 0;
 };
 
-/** El ADMIN nunca pide el código del supervisor: sería él mismo aprobándose (el servidor lo deja pasar igual). */
+/** El ADMIN y el SUPERVISOR nunca piden el código: se autorizan solos (el servidor lo deja pasar igual y audita a su nombre). */
 export function requiereCodigo(usuario?: { rol?: string } | null): boolean {
-  return (usuario?.rol ?? '').toUpperCase() !== 'ADMIN';
+  return !['ADMIN', 'SUPERVISOR'].includes((usuario?.rol ?? '').toUpperCase());
 }

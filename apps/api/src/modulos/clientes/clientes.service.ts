@@ -17,8 +17,11 @@ import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ArchivosService } from '../archivos/archivos.service';
 import { PuntosService } from './puntos.service';
+import { CodigoRegistroService } from './codigo-registro.service';
+import { enmascararDni, validarDni } from '../comprobantes/comprobantes.util';
 import { versionConsentimiento, versionesLegales } from '../reclamos/textos-legales';
 import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
+import { CELULAR_OTRA_PERSONA, partyDeCelular } from './celular-party.util';
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { explicarPedidosPorId } from './explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from './explicar-puntos-pedido';
@@ -46,6 +49,19 @@ export function tipoImagenPorBytes(buf: Buffer): string | null {
     return 'image/webp';
   }
   return null;
+}
+
+/** DNI opcional: vacío o ausente = null; si viene, debe tener exactamente 8 dígitos. */
+export function dniOpcional(raw?: string | null): string | null {
+  const limpio = String(raw ?? '').trim();
+  if (!limpio) return null;
+  if (!validarDni(limpio)) {
+    throw new BadRequestException({
+      codigo: 'DNI_INVALIDO',
+      mensaje: 'El DNI debe tener 8 dígitos. Déjalo vacío si no quieres darlo.',
+    });
+  }
+  return limpio;
 }
 
 /** Celular de 9 dígitos que empieza en 9 (acepta 51 delante, espacios o guiones), o null. */
@@ -121,6 +137,7 @@ export class ClientesService {
     private readonly auditoria: AuditoriaService,
     private readonly puntosService: PuntosService,
     private readonly archivos: ArchivosService,
+    private readonly codigoRegistro: CodigoRegistroService,
   ) {}
 
   /**
@@ -218,6 +235,9 @@ export class ClientesService {
 
     validarContrasena(dto.contrasena);
 
+    // DNI opcional: vacío = no se guarda; si viene, exactamente 8 dígitos
+    const dni = dniOpcional(dto.dni);
+
     if (dto.aceptaDatos !== true) {
       throw new BadRequestException({
         codigo: 'CONSENTIMIENTO_REQUERIDO',
@@ -272,6 +292,9 @@ export class ClientesService {
       partyId = suelto?.party_id ?? null;
     }
 
+    // El celular solo es de quien tiene el código que llega por WhatsApp: se consume antes de crear o vincular
+    await this.codigoRegistro.consumir(tel, dto.codigo);
+
     const hashPw = await argon2.hash(dto.contrasena);
     const versionTexto = versionConsentimiento(await versionesLegales(this.prisma));
     try {
@@ -316,6 +339,7 @@ export class ClientesService {
           update: { hash: hashPw, telefono: tel, activo: true },
         });
         await this.guardarTelefono(tx, id, tel);
+        if (dni) await this.guardarDni(tx, id, dni);
         if (correo && !(await tx.contactMechanism.findFirst({ where: { party_id: id, tipo: 'CORREO', valor: correo } }))) {
           await tx.contactMechanism.create({ data: { party_id: id, tipo: 'CORREO', valor: correo, principal: false } });
         }
@@ -460,10 +484,12 @@ export class ClientesService {
           where: { rol: 'CLIENTE', hasta: null },
           include: { customer_detail: true },
         },
+        documentos: { where: { tipo: 'DNI' }, select: { numero: true } },
       },
     });
 
     if (!party) return null;
+    const dni = party.documentos?.[0]?.numero;
 
     const puntos = await this.puntosService.obtenerSaldo(id);
     const fotoId = party.persona?.foto_archivo_id;
@@ -477,6 +503,8 @@ export class ClientesService {
       fotoUrl: foto ? `/archivos/${foto.ruta}` : null,
       cumpleanos: formatearCumpleanos(party.persona?.cumple_dia, party.persona?.cumple_mes),
       puntos,
+      // El DNI es opcional: solo se muestra enmascarado y solo si la cuenta lo tiene
+      ...(dni ? { dniMascara: enmascararDni(dni) } : {}),
     };
   }
 
@@ -503,6 +531,8 @@ export class ClientesService {
         });
       }
     }
+
+    const dni = dniOpcional(dto.dni);
 
     const correo = dto.correo !== undefined ? String(dto.correo).trim() : undefined;
     if (correo && !/^\S+@\S+\.\S+$/.test(correo)) {
@@ -531,6 +561,7 @@ export class ClientesService {
           },
         });
       }
+      if (dni) await this.guardarDni(tx, id, dni);
     });
 
     await this.auditoria.registrar({
@@ -636,7 +667,25 @@ export class ClientesService {
   /**
    * Deja el celular como contacto TELEFONO principal (el mismo que lee y edita el admin de Clientes).
    */
+  /**
+   * Guarda el DNI opcional como identificador del party. Si ese DNI ya es de otra persona (o el party ya tiene uno),
+   * no se guarda y no se revela nada: el registro sigue igual.
+   */
+  private async guardarDni(tx: Prisma.TransactionClient, partyId: bigint, dni: string) {
+    const usado = await tx.partyIdentifier.findFirst({ where: { tipo: 'DNI', numero: dni }, select: { id: true } });
+    if (usado) return;
+    const propio = await tx.partyIdentifier.findFirst({ where: { party_id: partyId, tipo: 'DNI' }, select: { id: true } });
+    if (propio) return;
+    await tx.partyIdentifier.create({ data: { party_id: partyId, tipo: 'DNI', numero: dni } });
+  }
+
   private async guardarTelefono(tx: Prisma.TransactionClient, partyId: bigint, telefono: string) {
+    // Si el party ya tiene ese celular activo (p. ej. como WHATSAPP), no se duplica: el índice único no lo admite
+    const mismo = await tx.contactMechanism.findFirst({
+      where: { party_id: partyId, tipo: { in: ['TELEFONO', 'WHATSAPP'] }, valor: { in: [telefono, `51${telefono}`] }, activo: true },
+      select: { id: true },
+    });
+    if (mismo) return;
     const existente = await tx.contactMechanism.findFirst({
       where: { party_id: partyId, tipo: 'TELEFONO' },
     });
@@ -1005,6 +1054,10 @@ export class ClientesService {
         mensaje: esEmpresa ? 'Ya existe un cliente con ese RUC.' : 'Ya existe un cliente con ese celular.',
       });
     }
+    // Una persona = un party: el celular no puede estar activo en otro party (aunque no tenga cuenta)
+    if (!esEmpresa && (await partyDeCelular(this.prisma, tel!))) {
+      throw new ConflictException(CELULAR_OTRA_PERSONA);
+    }
 
     const versionTexto = versionConsentimiento(await versionesLegales(this.prisma));
     const nuevoParty = await this.prisma.$transaction(async (tx) => {
@@ -1084,6 +1137,10 @@ export class ClientesService {
       });
 
       return party;
+    }).catch((err: any) => {
+      // Celular que otro party ya tiene (carrera): 409 claro, nunca 500
+      if (err?.code === 'P2002') throw new ConflictException(CELULAR_OTRA_PERSONA);
+      throw err;
     });
 
     await this.auditoria.registrar({

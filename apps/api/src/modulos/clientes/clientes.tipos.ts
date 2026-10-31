@@ -6,12 +6,16 @@ export interface ClienteSesion {
   fotoUrl: string | null;
   cumpleanos: string | null;
   puntos: number;
+  /** DNI enmascarado, solo si la cuenta tiene uno guardado */
+  dniMascara?: string;
 }
 
 export interface RegistroClienteDto {
   nombre: string;
   telefono: string; // celular de 9 dígitos que empieza con 9: es el usuario de la cuenta
   contrasena: string; // mínimo 8 caracteres
+  codigo: string; // 6 dígitos que llegan por WhatsApp (POST /carta/cuenta/registro/codigo)
+  dni?: string; // opcional: 8 dígitos; el celular es lo que identifica
   correo?: string;
   cumpleanos?: string; // YYYY-MM-DD o DD/MM
   aceptaDatos: boolean;
@@ -20,6 +24,7 @@ export interface RegistroClienteDto {
 export interface PerfilClienteDto {
   nombre?: string;
   telefono?: string; // solo se acepta el mismo celular de la cuenta
+  dni?: string; // opcional: 8 dígitos, para agregarlo (vacío = no cambia)
   correo?: string;
   cumpleanos?: string; // YYYY-MM-DD o DD/MM
 }

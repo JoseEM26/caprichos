@@ -34,6 +34,11 @@ describe('Ejecutor: a qué cuenta suma un pedido de WhatsApp', () => {
     expect(o).toMatchObject({ clientePartyId: '9', telefonoRemitente: undefined });
   });
 
+  it('celular elegido en el chat: viaja como telefonoPuntos y conserva el remitente para el contacto', async () => {
+    const o = await servicio.origenPedidoWhatsapp({ modo: 'TELEFONO_DICTADO', telefono: '912345678' }, conv);
+    expect(o).toEqual({ canal: 'WHATSAPP', telefonoRemitente: '51987654321', telefonoPuntos: '912345678' });
+  });
+
   it('NINGUNO: invitado de verdad', async () => {
     const o = await servicio.origenPedidoWhatsapp({ modo: 'NINGUNO' }, conv);
     expect(o).toMatchObject({ sinCuentaCliente: true, telefonoRemitente: undefined });

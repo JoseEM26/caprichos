@@ -17,20 +17,26 @@ import {
   calcularSiguienteMedianocheLima,
   ColorEspera,
   extraerNombreCombo,
+  confirmarDespejarActivo,
   extraerOpciones,
   obtenerInicioDiaLima,
 } from './cocina.util';
+import { opcionesMenosPedidasPorProducto } from './opcion-menos-pedida';
 
 export interface DescuentoPedidoHook {
   descontarPedido(pedidoId: bigint | string | number): Promise<any> | any;
 }
 
-/** Líneas del pedido que pertenecen a un área, con los campos que usa la pantalla de cocina. */
-function lineasDeArea(lineas: any[], areaId: bigint) {
+/**
+ * Líneas del pedido que pertenecen a un área, con los campos que usa la pantalla de cocina.
+ * `marcadas`: por producto, las opciones «menos pedida»; cada opción elegida lleva `pocoPedida`.
+ */
+function lineasDeArea(lineas: any[], areaId: bigint, marcadas: Map<string, Set<string>> = new Map()) {
   return lineas
     .filter((l) => (l.area_id ?? l.producto?.categoria?.area_id) === areaId)
     .map((l) => {
       const comboNombre = extraerNombreCombo(l);
+      const menosPedidas = l.producto_id ? marcadas.get(String(l.producto_id)) : undefined;
       return {
         id: l.id.toString(),
         nombre: l.nombre,
@@ -39,7 +45,10 @@ function lineasDeArea(lineas: any[], areaId: bigint) {
         sabor: l.sabor ?? null,
         combo: comboNombre,
         combo_nombre: comboNombre,
-        opciones: extraerOpciones(l),
+        opciones: extraerOpciones(l).map((o) => ({
+          ...o,
+          pocoPedida: Boolean(o.id && menosPedidas?.has(o.id)),
+        })),
         personas: l.nombres_persona ?? [],
         nota: l.nota ?? null,
       };
@@ -282,6 +291,29 @@ export class ComandasService {
   }
 
   /**
+   * Opciones «menos pedida» de los productos dados (ids repetidos o nulos se ignoran).
+   * Si el cálculo falla, la cocina sigue funcionando sin resaltado.
+   */
+  private async opcionesMenosPedida(productoIds: Array<string | null>): Promise<Map<string, Set<string>>> {
+    const ids = productoIds.filter((id): id is string => !!id);
+    if (ids.length === 0) return new Map();
+    try {
+      return await opcionesMenosPedidasPorProducto(this.prisma, ids);
+    } catch {
+      return new Map();
+    }
+  }
+
+  /**
+   * GET /admin/cocina/ajustes
+   * Ajustes de la pantalla de cocina que lee el personal. Hoy: si despejar pide confirmación (por defecto, sí).
+   */
+  async obtenerAjustes(): Promise<{ confirmarDespejar: boolean }> {
+    const p = await this.prisma.parametro.findUnique({ where: { clave: 'cocina_confirmar_despejar' } });
+    return { confirmarDespejar: confirmarDespejarActivo(p?.valor) };
+  }
+
+  /**
    * GET /admin/cocina/comandas?area=<id o código>
    * Sincroniza pedidos en COLA/PREPARANDO y devuelve comandas pendientes del área.
    * NUNCA devuelve teléfono ni dirección (RQ-COC-01-12).
@@ -357,6 +389,11 @@ export class ComandasService {
       ],
     });
 
+    // Opciones «menos pedida» de los productos de estos pedidos (caché de 10 min, una consulta por producto)
+    const marcadas = await this.opcionesMenosPedida(
+      comandas.flatMap((c) => c.pedido.lineas.map((l) => (l.producto_id ? l.producto_id.toString() : null))),
+    );
+
     const lista = comandas.map((c) => {
       const p = c.pedido;
       const creadoEn = new Date(p.creado_en);
@@ -373,7 +410,7 @@ export class ComandasService {
           areaId: x.area_id.toString(),
           areaNombre: x.area_id === area.id ? area.nombre : (x.area?.nombre ?? ''),
           despejada: x.estado === 'DESPEJADA',
-          lineas: lineasDeArea(p.lineas, x.area_id),
+          lineas: lineasDeArea(p.lineas, x.area_id, marcadas),
         }))
         .sort((x, y) => Number(BigInt(x.areaId) - BigInt(y.areaId)));
 
@@ -399,7 +436,7 @@ export class ComandasService {
         colorEspera: color,
         llego_en: c.llego_en,
         creado_en: p.creado_en,
-        lineas: lineasDeArea(p.lineas, area.id),
+        lineas: lineasDeArea(p.lineas, area.id, marcadas),
         // Aditivo: la propia área ya despejó (solo seguimiento) y el estado de las áreas del pedido
         despejada: c.estado === 'DESPEJADA',
         areas,

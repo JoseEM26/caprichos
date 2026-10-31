@@ -11,6 +11,7 @@ import { Campo } from '../../comun/Campo';
 import { comprobantesApi } from './comprobantesApi';
 import { enmascararDocumento, formatearSoles } from './utilidades';
 import type { ComprobantePorEmitir } from './tipos';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 interface PorEmitirTabProps {
   alVerNota?: (pedidoId: string) => void;
@@ -206,50 +207,29 @@ export function PorEmitirTab({ alVerNota }: PorEmitirTabProps) {
 
         {/* Fila de píldoras de filtro */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-            <div className="comprobantes-pildoras-grupo">
-              <span className="comprobantes-pildora-etiqueta">Tipo:</span>
-              <button
-                type="button"
-                className={`comprobantes-pildora ${filtroTipo === 'TODOS' ? 'activa' : ''}`}
-                onClick={() => setFiltroTipo('TODOS')}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                className={`comprobantes-pildora ${filtroTipo === 'BOLETA' ? 'activa' : ''}`}
-                onClick={() => setFiltroTipo('BOLETA')}
-              >
-                Boletas
-              </button>
-              <button
-                type="button"
-                className={`comprobantes-pildora ${filtroTipo === 'FACTURA' ? 'activa' : ''}`}
-                onClick={() => setFiltroTipo('FACTURA')}
-              >
-                Facturas
-              </button>
-            </div>
-
-            <div className="comprobantes-pildoras-grupo">
-              <span className="comprobantes-pildora-etiqueta">Estado:</span>
-              <button
-                type="button"
-                className={`comprobantes-pildora ${filtroEstado === 'TODOS' ? 'activa' : ''}`}
-                onClick={() => setFiltroEstado('TODOS')}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                className={`comprobantes-pildora ${filtroEstado === 'POR_EMITIR' ? 'activa' : ''}`}
-                onClick={() => setFiltroEstado('POR_EMITIR')}
-              >
-                Por emitir
-              </button>
-            </div>
-          </div>
+          <BarraFiltros style={{ flex: '1 1 400px' }}>
+            <FiltroCombo
+              etiqueta="Tipo"
+              valor={filtroTipo}
+              valorPorDefecto="TODOS"
+              opciones={[
+                { valor: 'TODOS', etiqueta: 'Todos' },
+                { valor: 'BOLETA', etiqueta: 'Boletas' },
+                { valor: 'FACTURA', etiqueta: 'Facturas' },
+              ]}
+              alCambiar={(v) => setFiltroTipo(v as typeof filtroTipo)}
+            />
+            <FiltroCombo
+              etiqueta="Estado"
+              valor={filtroEstado}
+              valorPorDefecto="TODOS"
+              opciones={[
+                { valor: 'TODOS', etiqueta: 'Todos' },
+                { valor: 'POR_EMITIR', etiqueta: 'Por emitir' },
+              ]}
+              alCambiar={(v) => setFiltroEstado(v as typeof filtroEstado)}
+            />
+          </BarraFiltros>
 
           <div style={{ fontSize: '13px', color: 'var(--cp-soft)', fontWeight: 700 }}>
             {comprobantesFiltrados.length} {comprobantesFiltrados.length === 1 ? 'pendiente' : 'pendientes'}

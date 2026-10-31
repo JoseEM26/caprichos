@@ -16,7 +16,8 @@ export interface LineaComanda {
   sabor?: string | null;
   combo?: string | null;
   combo_nombre?: string | null;
-  opciones?: Array<string | { id?: string; nombre: string; grupo?: string }>;
+  /** pocoPedida: esta opción elegida es la menos pedida de su grupo (últimos 30 días) y el producto tiene el check. */
+  opciones?: Array<string | { id?: string; nombre: string; grupo?: string; pocoPedida?: boolean }>;
   personas?: string[];
   nota?: string | null;
   area?: string;

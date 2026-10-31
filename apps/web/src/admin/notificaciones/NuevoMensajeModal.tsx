@@ -13,6 +13,7 @@ const ROLES_DESTINO = [
   { clave: '', nombre: 'Todos los roles' },
   { clave: 'ADMIN', nombre: 'Administrador' },
   { clave: 'CAJERO', nombre: 'Cajero' },
+  { clave: 'SUPERVISOR', nombre: 'Supervisor' },
   { clave: 'COCINA', nombre: 'Cocina y barra' },
   { clave: 'MOZO', nombre: 'Mozo' },
   { clave: 'REPARTIDOR', nombre: 'Repartidor' },

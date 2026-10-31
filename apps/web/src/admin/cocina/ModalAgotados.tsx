@@ -7,6 +7,7 @@ import {
   reactivarAgotado,
 } from './cocinaApi';
 import { Confirmar } from '../../comun/Confirmar';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { EstadoError } from '../../comun/EstadoError';
 import { useSesion } from '../../comun/sesion';
 import { useTiempoReal } from '../../comun/socket';
@@ -357,54 +358,20 @@ export function ModalAgotados({ abierto, alCerrar }: ModalAgotadosProps) {
           </div>
         </div>
 
-        {/* Filtros rápidos por categoría */}
+        {/* Filtro por categoría (combo) */}
         {categoriasDisponibles.length > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              gap: '6px',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setCategoriaFiltro('todas')}
-              style={{
-                minHeight: '36px',
-                padding: '0 14px',
-                borderRadius: '9999px',
-                border: '1.5px solid var(--cp-navy)',
-                background: categoriaFiltro === 'todas' ? 'var(--cp-navy)' : 'transparent',
-                color: categoriaFiltro === 'todas' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              Todas
-            </button>
-            {categoriasDisponibles.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setCategoriaFiltro(cat)}
-                style={{
-                  minHeight: '36px',
-                  padding: '0 14px',
-                  borderRadius: '9999px',
-                  border: '1.5px solid var(--cp-navy)',
-                  background: categoriaFiltro === cat ? 'var(--cp-navy)' : 'transparent',
-                  color: categoriaFiltro === cat ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+          <BarraFiltros>
+            <FiltroCombo
+              etiqueta="Categoría"
+              valor={categoriaFiltro}
+              valorPorDefecto="todas"
+              opciones={[
+                { valor: 'todas', etiqueta: 'Todas' },
+                ...categoriasDisponibles.map((cat) => ({ valor: cat, etiqueta: cat })),
+              ]}
+              alCambiar={setCategoriaFiltro}
+            />
+          </BarraFiltros>
         )}
 
         {/* Modal/panel de selección de duración al pulsar Agotado */}

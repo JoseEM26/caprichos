@@ -7,6 +7,7 @@ import {
   GrupoOpcionesCarta as GrupoOpciones,
 } from '../../../carta/tipos';
 import type { OfertaItem } from '../../ofertas/ofertasApi';
+import { alternarEleccion } from '../../../carta/eleccionGrupo';
 import {
   AvisoReemplazoCombo,
   eleccionesCombo,
@@ -133,29 +134,15 @@ export function VentanaOpcionesProducto({
   const alternarOpcion = (grupo: GrupoOpciones, opcion: OpcionProducto) => {
     const idx = personalizarPorUnidad ? unidadActualIdx : 0;
     const lista = opcionesPorUnidad[idx] || [];
-    const yaSeleccionada = lista.some((o) => o.id === opcion.id);
 
-    let nuevaLista: OpcionProducto[];
-    if ((grupo as any).tipo === 'RADIO' || grupo.maximo === 1) {
-      // Reemplazar opción de este grupo
-      const grupoOpcionIds = new Set(grupo.opciones.map((o: OpcionProducto) => o.id));
-      nuevaLista = lista.filter((o) => !grupoOpcionIds.has(o.id));
-      if (!yaSeleccionada) {
-        nuevaLista.push(opcion);
-      }
-    } else {
-      if (yaSeleccionada) {
-        nuevaLista = lista.filter((o) => o.id !== opcion.id);
-      } else {
-        const opcionesDeEsteGrupo = lista.filter((o) =>
-          grupo.opciones.some((go: OpcionProducto) => go.id === o.id),
-        );
-        if (grupo.maximo && opcionesDeEsteGrupo.length >= grupo.maximo) {
-          return;
-        }
-        nuevaLista = [...lista, opcion];
-      }
-    }
+    // Elegidas de este grupo; la regla de elección vive en alternarEleccion (igual que la carta)
+    const deEsteGrupo = (o: OpcionProducto) => grupo.opciones.some((go: OpcionProducto) => go.id === o.id);
+    const reglas = (grupo as any).tipo === 'RADIO' ? { minimo: grupo.minimo, maximo: 1 } : grupo;
+    const nuevas = alternarEleccion(reglas, lista.filter(deEsteGrupo).map((o) => o.id), opcion.id);
+    const nuevaLista: OpcionProducto[] = [
+      ...lista.filter((o) => !deEsteGrupo(o)),
+      ...grupo.opciones.filter((go: OpcionProducto) => nuevas.includes(go.id)),
+    ];
 
     setOpcionesPorUnidad((prev) => ({
       ...prev,

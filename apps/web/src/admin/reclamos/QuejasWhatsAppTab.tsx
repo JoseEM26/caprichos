@@ -8,6 +8,7 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { Paginacion } from '../../comun/Paginacion';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export interface QuejasWhatsAppTabProps {
   puedeResponder: boolean;
@@ -245,28 +246,23 @@ export function QuejasWhatsAppTab({ puedeResponder }: QuejasWhatsAppTabProps) {
           borderRadius: '12px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>Filtrar estado:</span>
-          {(['todos', 'NUEVA', 'EN_REVISION', 'RESUELTA'] as const).map((est) => (
-            <button
-              key={est}
-              type="button"
-              onClick={() => {
-                setFiltroEstado(est);
-                setPagina(1);
-              }}
-              className={`reclamos-pildora-btn ${filtroEstado === est ? 'activa' : ''}`}
-            >
-              {est === 'todos'
-                ? 'Todas'
-                : est === 'NUEVA'
-                ? 'Nuevas'
-                : est === 'EN_REVISION'
-                ? 'En revisión'
-                : 'Resueltas'}
-            </button>
-          ))}
-        </div>
+        <BarraFiltros>
+          <FiltroCombo
+            etiqueta="Estado"
+            valor={filtroEstado}
+            valorPorDefecto="todos"
+            opciones={[
+              { valor: 'todos', etiqueta: 'Todas' },
+              { valor: 'NUEVA', etiqueta: 'Nuevas' },
+              { valor: 'EN_REVISION', etiqueta: 'En revisión' },
+              { valor: 'RESUELTA', etiqueta: 'Resueltas' },
+            ]}
+            alCambiar={(v) => {
+              setFiltroEstado(v);
+              setPagina(1);
+            }}
+          />
+        </BarraFiltros>
 
         <Boton
           variante="secundario"

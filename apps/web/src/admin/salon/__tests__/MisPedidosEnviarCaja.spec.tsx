@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
-import { vouchersApi } from '../../vouchers/vouchersApi';
 
 vi.mock('../../../comun/sesion', () => ({ useSesion: () => ({ tiene: () => true }) }));
 vi.mock('../api', () => ({
@@ -15,7 +14,7 @@ vi.mock('../componentes/ModalNuevoPedidoMesa', () => ({
   ModalNuevoPedidoMesa: () => null,
 }));
 vi.mock('../../vouchers/vouchersApi', () => ({
-  vouchersApi: { subirVoucher: vi.fn(), enviarACaja: vi.fn() },
+  vouchersApi: { subirVoucher: vi.fn(), enviarACaja: vi.fn(), quitarVoucher: vi.fn() },
 }));
 
 const pedido = (extra: Record<string, unknown>) => ({
@@ -46,41 +45,20 @@ const respuesta = {
 
 const tarjetaDe = (codigo: string) => screen.getByText(codigo).closest('li') as HTMLElement;
 
-describe('MisPedidosView: Enviar a Caja (solo pedidos de mesa abiertos)', () => {
+describe('MisPedidosView: sin Enviar a Caja (la cuenta de mesa se cobra desde Mesas)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(salonApi.obtenerMesas).mockResolvedValue({ pisos: [] });
     vi.mocked(salonApi.misPedidos).mockResolvedValue(respuesta as any);
   });
 
-  it('el botón Enviar a Caja aparece solo en mesa, no anulada, no entregada y no cobrada', async () => {
+  it('ningún pedido de mesa abierto muestra el botón Enviar a Caja', async () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-M012');
 
-    expect(screen.getAllByRole('button', { name: 'Enviar a Caja' })).toHaveLength(1);
-    expect(within(tarjetaDe('CP-M012')).getByRole('button', { name: 'Enviar a Caja' })).toBeInTheDocument();
-    for (const codigo of ['CP-M013', 'CP-M014', 'CP-M015', 'CP-D016']) {
+    expect(screen.queryByRole('button', { name: 'Enviar a Caja' })).toBeNull();
+    for (const codigo of ['CP-M012', 'CP-M013', 'CP-M014', 'CP-M015', 'CP-D016']) {
       expect(within(tarjetaDe(codigo)).queryByRole('button', { name: 'Enviar a Caja' })).toBeNull();
     }
-  });
-
-  it('abre la precuenta de la mesa y envía el cobro a Caja con el medio elegido', async () => {
-    vi.mocked(vouchersApi.enviarACaja).mockResolvedValue({ ok: true });
-    render(<MisPedidosView />);
-    await screen.findByText('CP-M012');
-
-    fireEvent.click(within(tarjetaDe('CP-M012')).getByRole('button', { name: 'Enviar a Caja' }));
-
-    const precuenta = await screen.findByRole('dialog', { name: 'Precuenta' });
-    expect(within(precuenta).getByText('Mesa 3')).toBeInTheDocument();
-    expect(within(precuenta).getByText('S/ 24.50')).toBeInTheDocument();
-
-    fireEvent.click(within(precuenta).getByRole('button', { name: 'Yape' }));
-    fireEvent.click(within(precuenta).getByTestId('btn-enviar-caja'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, enviar a Caja' }));
-
-    await waitFor(() =>
-      expect(vouchersApi.enviarACaja).toHaveBeenCalledWith('12', 'YAPE', [{ medio: 'YAPE', monto: 24.5 }]),
-    );
   });
 });

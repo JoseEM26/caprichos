@@ -110,6 +110,18 @@ export class ContenidoAdminController {
     return this.contenidoService.descartarNovedadesEncabezado(req.usuario);
   }
 
+  @Get('novedades/momentos')
+  @Permiso('novedades', 'ver')
+  async obtenerNovedadesMomentos() {
+    return this.contenidoService.obtenerNovedadesMomentosAdmin();
+  }
+
+  @Put('novedades/momentos')
+  @Permiso('novedades', 'editar')
+  async guardarNovedadesMomentos(@Body() dto: { fotos?: unknown }, @Req() req: any) {
+    return this.contenidoService.guardarNovedadesMomentosBorrador(dto?.fotos, req.usuario);
+  }
+
   @Get('conocenos')
   @Permiso('novedades', 'ver')
   async obtenerConocenos() {

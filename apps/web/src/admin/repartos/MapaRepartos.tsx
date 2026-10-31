@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { L, ATRIBUCION, URL_TESELAS } from '../../comun/mapa/leaflet';
 import { ZonaGeoItem, ZONAS_GEO_DEFECTO } from './zonasGeo';
 import { COORDENADAS_TIENDA_DEFECTO, RutaSugeridaSector } from './calculoRuta';
 import type { ColorEspera } from './repartosApi';
 import { planificarEtiquetas, nombreEtiqueta, anchoTexto, ModoEtiqueta } from './etiquetasMapa';
+import { claveConjuntoMapa } from './ajusteVistaMapa';
 
 export interface PuntoRepartoMapa {
   id: string;
@@ -83,7 +84,7 @@ export function MapaRepartos({
   puntos,
   zonas: _zonas = ZONAS_GEO_DEFECTO,
   conteoPorZona: _conteoPorZona = {},
-  zonaFiltroActiva: _zonaFiltroActiva,
+  zonaFiltroActiva,
   onSeleccionarZona: _onSeleccionarZona,
   seleccionadoId,
   onSeleccionarPunto,
@@ -104,7 +105,14 @@ export function MapaRepartos({
   const mapaRef = useRef<L.Map | null>(null);
   const capaRutasSugeridasRef = useRef<L.LayerGroup | null>(null);
   const capaMarcadoresRef = useRef<L.LayerGroup | null>(null);
-  const puntosAjustadosRef = useRef<PuntoRepartoMapa[] | null>(null);
+  // Zoom automático: solo al cambiar el conjunto de pedidos activos o el filtro (ver ajusteVistaMapa.ts)
+  const puntosRef = useRef<PuntoRepartoMapa[]>(puntos);
+  puntosRef.current = puntos;
+  const claveAjusteRef = useRef<string | null>(null);
+  const claveConjunto = claveConjuntoMapa(
+    puntos.map((p) => p.id),
+    zonaFiltroActiva,
+  );
 
   const alSeleccionarPuntoRef = useRef(onSeleccionarPunto);
   alSeleccionarPuntoRef.current = onSeleccionarPunto;
@@ -162,6 +170,19 @@ export function MapaRepartos({
       capaRutasSugeridasRef.current = null;
       capaMarcadoresRef.current = null;
     };
+  }, []);
+
+  /** Encuadra la sede y todos los pedidos activos con margen; sin pedidos, centra en la sede con el zoom actual. */
+  const ajustarVista = useCallback(() => {
+    const map = mapaRef.current;
+    if (!map) return;
+    const ptos = puntosRef.current;
+    if (ptos.length > 0) {
+      const coords: L.LatLngTuple[] = [CENTRO_LIMA, ...ptos.map((p) => [p.lat, p.lng] as L.LatLngTuple)];
+      map.fitBounds(L.latLngBounds(coords), { padding: [45, 45], maxZoom: 17 });
+    } else {
+      map.setView(CENTRO_LIMA, map.getZoom());
+    }
   }, []);
 
   // Invalidate size al cambiar pantalla completa o altura
@@ -250,11 +271,8 @@ export function MapaRepartos({
     });
     marcadorTienda.addTo(gMarcadores);
 
-    const todasCoords: L.LatLngTuple[] = [CENTRO_LIMA];
-
     puntos.forEach((p) => {
       const pos: L.LatLngTuple = [p.lat, p.lng];
-      todasCoords.push(pos);
 
       const esElegido = p.id === seleccionadoId;
       const esResaltado = resaltadosIds?.includes(p.id) ?? false;
@@ -351,19 +369,15 @@ export function MapaRepartos({
     recalcularEtiquetasRef.current = recalcularEtiquetas;
     recalcularEtiquetas();
 
-    // Solo se reajusta la vista cuando cambian los puntos, no al resaltar o seleccionar uno
-    if (puntos !== puntosAjustadosRef.current) {
-      puntosAjustadosRef.current = puntos;
-      if (todasCoords.length > 1) {
-        map.fitBounds(L.latLngBounds(todasCoords), {
-          padding: [45, 45],
-          maxZoom: 17,
-        });
-      } else {
-        map.setView(CENTRO_LIMA, 14);
-      }
-    }
   }, [puntos, seleccionadoId, resaltadosIds]);
+
+  // Zoom automático: solo cuando cambia el conjunto de pedidos o el filtro. Si el usuario mueve o hace zoom,
+  // el mapa no vuelve a encuadrar hasta que cambie ese conjunto o pulse «Ver todos los pedidos».
+  useEffect(() => {
+    if (claveAjusteRef.current === claveConjunto) return;
+    claveAjusteRef.current = claveConjunto;
+    ajustarVista();
+  }, [claveConjunto, ajustarVista]);
 
   return (
     <div
@@ -516,6 +530,34 @@ export function MapaRepartos({
             </button>
           )}
         </div>
+
+        {/* Vuelve a encuadrar todos los pedidos activos y la sede (tras moverse a mano por el mapa) */}
+        <button
+          type="button"
+          data-testid="btn-ver-todos-pedidos"
+          onClick={(e) => {
+            e.stopPropagation();
+            ajustarVista();
+          }}
+          style={{
+            position: 'absolute',
+            left: '12px',
+            bottom: '96px',
+            zIndex: 1100,
+            minHeight: '44px',
+            padding: '0 14px',
+            borderRadius: '10px',
+            border: '1.5px solid var(--cp-navy, #0B2C3E)',
+            background: 'rgba(255, 255, 255, 0.95)',
+            color: 'var(--cp-navy, #0B2C3E)',
+            fontWeight: 800,
+            fontSize: '13px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(11, 44, 62, 0.2)',
+          }}
+        >
+          Ver todos los pedidos
+        </button>
 
         {/* Estilos CSS específicos */}
         <style>{`

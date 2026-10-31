@@ -16,6 +16,8 @@ export const ROLES: readonly DefinicionRol[] = [
   { codigo: 'CALLCENTER', nombre: 'Call Center' },
   { codigo: 'ALMACEN', nombre: 'Almacén' },
   { codigo: 'REPARTIDOR', nombre: 'Repartidor' },
+  // Persona encargada del local: caja, salón y ve el código de supervisor. Sin administración.
+  { codigo: 'SUPERVISOR', nombre: 'Supervisor' },
 ] as const;
 
 export const PERMISOS: readonly DefinicionPermiso[] = [
@@ -156,8 +158,12 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pantallas', accion: 'ver' },
   { modulo: 'pantallas', accion: 'vincular' },
   { modulo: 'pantallas', accion: 'desactivar' },
+  // Escritorio operativo del supervisor: solo conteos y horarios, sin dinero
+  { modulo: 'escritorio', accion: 'operativo' },
   // Supervisor: código rotativo general (TOTP)
   { modulo: 'supervisor', accion: 'ver_codigo' },
+  // Generar, rotar el secreto y desbloquear operadores: solo ADMIN
+  { modulo: 'supervisor', accion: 'gestionar_codigo' },
   // Vouchers y lectura IA (vch-api)
   { modulo: 'vouchers', accion: 'subir' },
   { modulo: 'vouchers', accion: 'ver' },
@@ -288,3 +294,9 @@ export const MATRIZ: Record<string, string[]> = {
     'notificaciones/marcar',
   ],
 };
+
+// Supervisor: la unión de lo que tienen CAJERO y MOZO, más ver el código rotativo de 6 dígitos.
+// No recibe diseño de carta, Novedades, informes, usuarios, configuración ni compras (ver la tabla del informe).
+// Y su escritorio operativo (conteos, sin montos).
+MATRIZ.SUPERVISOR = [...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo'])];
+

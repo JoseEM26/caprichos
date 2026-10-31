@@ -468,6 +468,7 @@ export function EditorOpcionesTamanos({
         tamanos: estado.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: Number(t.precio) || 0, activo: t.activo })),
         grupos: estado.grupos.map((g, orden) => ({ grupoId: g.grupoId, orden })),
         sincronizarGrupos: true,
+        resaltarOpcionMenosPedida: estado.resaltarMenosPedida === true,
       });
       // El orden de los tamaños vive en la lista (vale para todos): se reasigna entre los mismos huecos.
       const vals = listaTamano?.valores || [];
@@ -568,6 +569,22 @@ export function EditorOpcionesTamanos({
         <div className="eo-titulo">Opciones que se le preguntan al cliente</div>
         <div className="eo-micro">
           Cada grupo (tipo de leche, endulzante, shots, extras…) se crea y se edita aquí. Elige en cuáles productos se pregunta. Los cambios del grupo valen para todos los que lo usan.
+        </div>
+        <label
+          style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, margin: '8px 0', cursor: bloqueado ? 'default' : 'pointer', fontWeight: 700, fontSize: 14, color: 'var(--cp-navy)' }}
+        >
+          <input
+            type="checkbox"
+            aria-describedby="resaltar-menos-pedida-ayuda"
+            checked={estado.resaltarMenosPedida === true}
+            disabled={bloqueado}
+            onChange={(e) => setEstado({ ...estado, resaltarMenosPedida: e.target.checked })}
+            style={{ width: 20, height: 20, flexShrink: 0 }}
+          />
+          Resaltar en cocina la opción menos pedida
+        </label>
+        <div id="resaltar-menos-pedida-ayuda" className="eo-micro">
+          Por cada grupo de este producto, la cocina marca la opción que menos se eligió en los últimos 30 días (si nadie la eligió, cuenta 0). Apagado, la cocina no marca nada.
         </div>
         {grupos.map((g) => (
           <GrupoCard key={`${g.id}-${g.opciones.length}-${g.nombre}-${g.maximo}-${g.minimo}-${g.obligatorio}`} g={g}

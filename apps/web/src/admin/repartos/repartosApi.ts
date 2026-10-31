@@ -26,6 +26,8 @@ export interface PedidoReparto {
   cobroPendienteEfectivo?: boolean;
   paga_con: number | null;
   repartidor_party_id: string | null;
+  /** Posición del pedido en la ruta del repartidor (1, 2, 3...). Solo en /mios. */
+  ordenRuta?: number | null;
   tomado_en: string | null;
   salio_en: string | null;
   llego_en: string | null;
@@ -52,6 +54,38 @@ export interface PedidoReparto {
   reprogramado?: boolean;
 }
 
+/** Pedido que aún no se puede tomar (en cocina o por validar): el repartidor solo lo ve. */
+export interface PedidoProximo {
+  id: string;
+  codigo: string;
+  clienteNombre: string;
+  lat: number | null;
+  lng: number | null;
+  zona: string | null;
+  estado: 'POR_VALIDAR' | 'EN_COCINA';
+  estadoTexto: string;
+  minutosEspera: number;
+  creadoEn: string;
+  cantidadProductos: number;
+}
+
+/** Detalle de un pedido para la hoja del repartidor. dirección y teléfono solo vienen si el pedido es suyo. */
+export interface ResumenRepartidor {
+  id: string;
+  codigo: string;
+  clienteNombre: string;
+  estado: string;
+  estadoTexto: string;
+  minutosEspera: number;
+  productos: Array<{ cantidad: number; nombre: string }>;
+  nota: string | null;
+  zona: string | null;
+  puedeTomar: boolean;
+  motivoNoTomar: string | null;
+  direccion?: string | null;
+  telefono?: string | null;
+}
+
 export interface AvisoRepartidor {
   pedido_id: string;
   codigo: string;
@@ -59,8 +93,63 @@ export interface AvisoRepartidor {
   en: string;
 }
 
+export type EstadoFinalPedido = 'ENTREGADO' | 'NO_ENTREGADO' | 'ANULADO';
+
+/** Pedido de la ruta en curso: los terminados traen estadoFinal y horaFinal; los pendientes, estadoFinal null. */
+export interface PedidoDeRuta extends PedidoReparto {
+  estadoFinal: EstadoFinalPedido | null;
+  horaFinal: string | null;
+  /** Posición en la ruta (los terminados primero, por hora de cierre). */
+  orden: number;
+}
+
+/** Salida del repartidor con TODOS sus pedidos, también los ya terminados. */
+export interface RutaEnCurso {
+  id: string;
+  iniciadaEn: string;
+  estado: 'EN_CURSO' | 'TERMINADA';
+  pedidos: PedidoDeRuta[];
+}
+
+export interface PedidoHistorialRuta {
+  id: string;
+  codigo: string;
+  clienteNombre: string | null;
+  direccion: string | null;
+  lat: number | null;
+  lng: number | null;
+  estadoFinal: EstadoFinalPedido | null;
+  horaFinal: string | null;
+  orden: number;
+}
+
+/** Una ruta ya hecha (o en curso) para el historial: sin montos. */
+export interface RutaHistorial {
+  id: string;
+  repartidorId: string;
+  repartidorNombre: string;
+  iniciadaEn: string;
+  terminadaEn: string | null;
+  estado: 'EN_CURSO' | 'TERMINADA';
+  totalPedidos: number;
+  entregados: number;
+  fallidos: number;
+  distanciaKm: number;
+  pedidos: PedidoHistorialRuta[];
+}
+
+export interface RespuestaRutas {
+  rutas: RutaHistorial[];
+  pagina: number;
+  limite: number;
+  total: number;
+  totalPaginas: number;
+}
+
 export interface RespuestaMios {
   pedidos: PedidoReparto[];
+  /** Ruta en curso con todos sus pedidos (la API la llama rutaReparto porque `ruta` es el trazado). */
+  rutaReparto?: RutaEnCurso | null;
   orden: string[];
   paso: string[];
   ruta: Array<[number, number]>;
@@ -119,6 +208,8 @@ export interface ResolverFallaDto {
   recargo?: number;
 }
 
+export type MotivoSalto = 'NO_CONTESTA' | 'DIRECCION_NO_ENCONTRADA' | 'TRAFICO' | 'OTRO';
+
 export interface ParadaOpcionRuta {
   id: string;
   codigo: string;
@@ -153,6 +244,13 @@ export interface RespuestaRutasSugeridas {
   cupo: number;
 }
 
+function consultaRutas(filtros?: Record<string, string | number | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(filtros ?? {})) if (v !== undefined && v !== '') params.set(k, String(v));
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const repartosApi = {
   listarRutasSugeridas: () =>
     api.get<RespuestaRutasSugeridas>('/admin/repartos/rutas-sugeridas'),
@@ -168,6 +266,24 @@ export const repartosApi = {
 
   listarMios: () =>
     api.get<RespuestaMios>('/admin/repartos/mios'),
+
+  /** Rutas propias del repartidor (por defecto hoy, hora de Lima). Fechas YYYY-MM-DD. */
+  listarMisRutas: (filtros?: { desde?: string; hasta?: string; pagina?: number }) =>
+    api.get<RespuestaRutas>(`/admin/repartos/mis-rutas${consultaRutas(filtros)}`),
+
+  /** Rutas de cualquier repartidor (caja/admin). */
+  listarRutas: (filtros?: { repartidor?: string; desde?: string; hasta?: string; pagina?: number }) =>
+    api.get<RespuestaRutas>(`/admin/repartos/rutas${consultaRutas(filtros)}`),
+
+  listarProximos: () =>
+    api.get<PedidoProximo[]>('/admin/repartos/proximos'),
+
+  obtenerResumenRepartidor: (id: string) =>
+    api.get<ResumenRepartidor>(`/admin/repartos/${id}/resumen-repartidor`),
+
+  /** Toma varios pedidos a la vez en el orden elegido. Un 409 trae el motivo en el mensaje. */
+  tomarRuta: (ids: string[]) =>
+    api.post<unknown>('/admin/repartos/tomar-ruta', { ids }),
 
   obtenerResumen: () =>
     api.get<ResumenRepartos>('/admin/repartos/resumen'),
@@ -198,6 +314,14 @@ export const repartosApi = {
 
   salir: (id: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/salir`),
+
+  /** Reordena la ruta por cercanía empezando por este pedido (solo antes de salir). */
+  empezarPor: (id: string) =>
+    api.post<{ orden: Array<{ id: string; codigo: string; ordenRuta: number }> }>(`/admin/repartos/${id}/empezar-por`),
+
+  /** El pedido que toca pasa al final del orden; la API guarda el motivo y limita a 2 saltos. */
+  saltar: (id: string, dto: { motivo: MotivoSalto; detalle?: string }) =>
+    api.post<{ id: string; ordenRuta: number }>(`/admin/repartos/${id}/saltar`, dto),
 
   llegue: (id: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/llegue`),

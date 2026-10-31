@@ -59,6 +59,7 @@ describe('RepartosService', () => {
         findUnique: jest.fn(),
         upsert: jest.fn(),
       },
+      rutaReparto: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 1n }), update: jest.fn(), delete: jest.fn() },
       zonaReparto: {
         findMany: jest.fn(),
       },

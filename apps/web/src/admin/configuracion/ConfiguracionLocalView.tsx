@@ -4,7 +4,6 @@ import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { HorarioTab } from './HorarioTab';
-import { FotosLocalSeccion } from './FotosLocalSeccion';
 import { PagosTab } from './PagosTab';
 import { FechasEspecialesTab } from './FechasEspecialesTab';
 import { ZonasRepartoView } from './ZonasRepartoView';
@@ -16,6 +15,10 @@ import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiqueta
 import { TarjetaAyudaIaConfiguracion } from './TarjetaAyudaIaConfiguracion';
 import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion';
 import { TarjetaControlAlmacenConfiguracion } from './TarjetaControlAlmacenConfiguracion';
+import { TarjetaNotificacionesConfiguracion } from './TarjetaNotificacionesConfiguracion';
+import { TarjetaConfirmarDespejarConfiguracion } from './TarjetaConfirmarDespejarConfiguracion';
+import { TarjetaResenasGoogleConfiguracion } from './TarjetaResenasGoogleConfiguracion';
+import { TarjetaInvitadoConfiguracion } from './TarjetaInvitadoConfiguracion';
 import { TarjetaPantallaIngresoConfiguracion } from './TarjetaPantallaIngresoConfiguracion';
 import { BuscadorConfiguracion } from './BuscadorConfiguracion';
 import { NavegacionConfiguracion, useEsMovil, grupoDe } from './NavegacionConfiguracion';
@@ -159,6 +162,12 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     fields: [],
   },
   {
+    id: 'cocina',
+    n: 'Cocina',
+    d: 'Confirmación al despejar las comandas',
+    fields: [],
+  },
+  {
     id: 'zonas',
     n: 'Zonas de reparto (mapa)',
     d: 'Puntos que limitan cada zona',
@@ -260,7 +269,7 @@ const CLAVES_DATOS_LOCAL: Array<keyof InfoLocalState> = [
 const RUC_VALIDO = /^(10|15|17|20)\d{9}$/;
 
 /** Pestañas con componente propio: no usan el formulario genérico. */
-const TABS_PROPIAS = ['horario', 'pagos', 'zonas', 'demanda', 'reparto', 'parametros', 'chatbot', 'impresion', 'ayuda', 'vouchers', 'ingreso'];
+const TABS_PROPIAS = ['horario', 'pagos', 'zonas', 'demanda', 'cocina', 'reparto', 'parametros', 'chatbot', 'impresion', 'ayuda', 'vouchers', 'ingreso'];
 
 const estiloInputCoord = {
   width: '100%',
@@ -853,6 +862,8 @@ export function ConfiguracionLocalView() {
           {tabId === 'pagos' && <PagosTab puedeEditar={puedeEditar} />}
 
           {/* Subcaso: ALTA DEMANDA Y PAUSA DE PEDIDOS */}
+          {tabId === 'cocina' && <TarjetaConfirmarDespejarConfiguracion />}
+
           {tabId === 'demanda' && (
             <SeccionAltaDemanda puedeEditar={puedeEditarDemanda} />
           )}
@@ -896,6 +907,9 @@ export function ConfiguracionLocalView() {
           {!TABS_PROPIAS.includes(tabId) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tabId === 'operacion' && <TarjetaControlAlmacenConfiguracion />}
+              {tabId === 'operacion' && <TarjetaNotificacionesConfiguracion />}
+              {tabId === 'operacion' && <TarjetaResenasGoogleConfiguracion />}
+              {tabId === 'operacion' && <TarjetaInvitadoConfiguracion />}
               {tabId === 'operacion' && (
                 <div
                   style={{
@@ -1017,9 +1031,6 @@ export function ConfiguracionLocalView() {
         </div>
         )}
       </div>
-
-      {/* Tarjeta Fotos del Local (a todo el ancho): se guardan en el servidor */}
-      {(!esMovil || verDetalle) && <FotosLocalSeccion puedeEditar={puedeEditar} />}
 
       {/* Modales Confirmar */}
       <Confirmar

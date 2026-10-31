@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { CrearMensajeInternoDto, FiltroHistorialDto, MarcarLeidaDto, MarcarTodasDto } from './dto/notificaciones.dto';
+import { CrearMensajeInternoDto, FiltroHistorialDto, MarcarClaveDto, MarcarLeidaDto, MarcarTodasDto } from './dto/notificaciones.dto';
 import { NotificacionesService } from './notificaciones.service';
 
 const ipDe = (req: any): string | undefined => {
@@ -23,6 +23,13 @@ export class NotificacionesController {
   @Permiso('notificaciones', 'ver')
   historial(@Query() filtro: FiltroHistorialDto, @Req() req: any) {
     return this.notificaciones.historial(filtro, req.usuario);
+  }
+
+  /** Marca leída (o no leída) cualquier aviso, guardado o calculado, para el usuario que llama */
+  @Post('marcar')
+  @Permiso('notificaciones', 'marcar')
+  marcarClave(@Body() dto: MarcarClaveDto, @Req() req: any) {
+    return this.notificaciones.marcarClave(dto.clave, dto.leida ?? true, req.usuario);
   }
 
   @Post('marcar-todas')

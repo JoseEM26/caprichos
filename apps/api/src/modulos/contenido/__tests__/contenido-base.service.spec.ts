@@ -77,3 +77,72 @@ describe('ContenidoBaseService', () => {
     await expect(servicio.onModuleInit()).resolves.toBeUndefined();
   });
 });
+
+describe('ContenidoBaseService: Fotos del local pasan a Conócenos una sola vez', () => {
+  const fila = (slot: string, id: bigint, orden: number) => ({
+    archivo_id: id,
+    slot,
+    orden,
+    activo: true,
+    archivo: { ruta: `publico/2026/10/${id}.webp` },
+  });
+  const armar = (o: { fotos?: any[]; publicado?: any; borrador?: any } = {}) => {
+    const parametro = {
+      findUnique: jest.fn().mockImplementation(async ({ where }: any) =>
+        where.clave === 'contenido_conocenos' ? o.publicado ?? null : where.clave === 'contenido_conocenos_borrador' ? o.borrador ?? null : null,
+      ),
+      create: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
+    };
+    const prisma: any = { fotoLocal: { findMany: jest.fn().mockResolvedValue(o.fotos ?? []) }, parametro };
+    return { prisma, servicio: new ContenidoBaseService(prisma, { get: () => '' } as any) };
+  };
+
+  it('crea la galería publicada con las fotos activas del local, en su orden, con su lugar de origen', async () => {
+    const { prisma, servicio } = armar({ fotos: [fila('Fachada', 7n, 0), fila('Terraza', 9n, 3)] });
+    expect(await servicio.copiarFotosLocalAConocenos()).toBe(1);
+    expect(prisma.parametro.create).toHaveBeenCalledWith({
+      data: {
+        clave: 'contenido_conocenos',
+        valor: {
+          galeria: [
+            { id: 'local-7', url: '/archivos/publico/2026/10/7.webp', activo: true, origen: 'Fachada' },
+            { id: 'local-9', url: '/archivos/publico/2026/10/9.webp', activo: true, origen: 'Terraza' },
+          ],
+        },
+      },
+    });
+  });
+
+  it('si ya hay galería guardada no vuelve a copiar (queda independiente)', async () => {
+    const { prisma, servicio } = armar({
+      fotos: [fila('Fachada', 7n, 0)],
+      publicado: { valor: { titulo: 'X', galeria: [] } },
+      borrador: { valor: { galeria: [{ id: 'a', url: '/archivos/a.webp', activo: true }] } },
+    });
+    expect(await servicio.copiarFotosLocalAConocenos()).toBe(0);
+    expect(prisma.parametro.update).not.toHaveBeenCalled();
+    expect(prisma.parametro.create).not.toHaveBeenCalled();
+  });
+
+  it('una fila anterior sin galería recibe la copia y conserva lo demás; también el borrador', async () => {
+    const { prisma, servicio } = armar({
+      fotos: [fila('Fachada', 7n, 0)],
+      publicado: { valor: { titulo: 'Publicado' } },
+      borrador: { valor: { titulo: 'Borrador' } },
+    });
+    expect(await servicio.copiarFotosLocalAConocenos()).toBe(2);
+    const llamadas = prisma.parametro.update.mock.calls.map((c: any) => c[0]);
+    expect(llamadas[0].where.clave).toBe('contenido_conocenos');
+    expect(llamadas[0].data.valor.titulo).toBe('Publicado');
+    expect(llamadas[0].data.valor.galeria).toHaveLength(1);
+    expect(llamadas[1].where.clave).toBe('contenido_conocenos_borrador');
+    expect(llamadas[1].data.valor.titulo).toBe('Borrador');
+  });
+
+  it('sin fotos en el local no crea fila: Conócenos queda sin galería', async () => {
+    const { prisma, servicio } = armar({ fotos: [] });
+    expect(await servicio.copiarFotosLocalAConocenos()).toBe(0);
+    expect(prisma.parametro.create).not.toHaveBeenCalled();
+  });
+});

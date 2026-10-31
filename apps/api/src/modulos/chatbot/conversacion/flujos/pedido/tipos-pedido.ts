@@ -37,8 +37,6 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_COMPROBANTE_RAZON'
   | 'PEDIDO_PUNTOS_PREGUNTA'
   | 'PEDIDO_PUNTOS_NUMERO'
-  | 'PEDIDO_CUENTA_NOMBRE'
-  | 'PEDIDO_CUENTA_CONSENT'
   | 'PEDIDO_RESUMEN_CONFIRMAR'
   | 'PEDIDO_CANCELAR_CONFIRMAR';
 
@@ -163,9 +161,5 @@ export interface EstadoCarritoPedido {
   /** Ya se resolvió a qué cuenta suman los puntos de este pedido */
   puntosResuelto?: boolean;
   /** Qué se le está preguntando al cliente en PEDIDO_PUNTOS_PREGUNTA */
-  puntosModo?: 'PROPIA' | 'SIN_CUENTA' | 'RECORDATORIO' | 'DICTADO_CONFIRMAR';
-  /** Cuenta encontrada con el número dictado, a la espera del Sí del cliente */
-  puntosPendiente?: { partyId: string; terminacion: string };
-  /** Nombre dado por el cliente para crear su cuenta desde el bot (solo mientras acepta el consentimiento) */
-  cuentaNombre?: string;
+  puntosModo?: 'SIN_CUENTA' | 'RECORDATORIO';
 }

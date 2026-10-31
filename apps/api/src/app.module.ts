@@ -25,6 +25,7 @@ import { SalonModule } from './modulos/salon/salon.module';
 import { ComprobantesModule } from './modulos/comprobantes/comprobantes.module';
 import { ReclamosModule } from './modulos/reclamos/reclamos.module';
 import { NotificacionesModule } from './modulos/notificaciones/notificaciones.module';
+import { EscritorioModule } from './modulos/escritorio/escritorio.module';
 import { DireccionesModule } from './modulos/direcciones/direcciones.module';
 import { StockModule } from './modulos/stock/stock.module';
 import { ComprasModule } from './modulos/compras/compras.module';
@@ -45,6 +46,7 @@ import { AyudaAdminModule } from './modulos/ayuda-admin/ayuda-admin.module';
 import { VouchersModule } from './modulos/vouchers/vouchers.module';
 import { MascotaModule } from './modulos/mascota/mascota.module';
 import { PantallaIngresoModule } from './modulos/pantalla-ingreso/pantalla-ingreso.module';
+import { ResenasModule } from './modulos/resenas/resenas.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -77,6 +79,7 @@ import { PantallaIngresoModule } from './modulos/pantalla-ingreso/pantalla-ingre
     ReclamosModule,
     DireccionesModule,
     NotificacionesModule,
+    EscritorioModule,
     InformesModule,
     OfertasModule,
     ClientesModule,
@@ -93,6 +96,7 @@ import { PantallaIngresoModule } from './modulos/pantalla-ingreso/pantalla-ingre
     VouchersModule,
     MascotaModule,
     PantallaIngresoModule,
+    ResenasModule,
   ],
   providers: [
     PinoLoggerService,

@@ -28,6 +28,12 @@ const DESTACADAS_BASE = [
  * Al arrancar deja la carta con contenido mínimo: fotos base de los productos que no tienen y los círculos
  * «Caprichos del mes» y «Momentos Caprichos» si no hay ninguna destacada. Solo AGREGA: nunca pisa lo del admin.
  */
+const CLAVE_CONOCENOS = 'contenido_conocenos';
+
+/** Una fila sin la clave `galeria` todavía es la versión anterior (antes de «Fotos del local» en Conócenos). */
+const sinGaleria = (valor: unknown): boolean =>
+  !!valor && typeof valor === 'object' && !Array.isArray(valor) && (valor as Record<string, unknown>).galeria === undefined;
+
 @Injectable()
 export class ContenidoBaseService implements OnModuleInit {
   private readonly logger = new Logger(ContenidoBaseService.name);
@@ -41,6 +47,55 @@ export class ContenidoBaseService implements OnModuleInit {
     } catch (err: any) {
       this.logger.warn(`No se pudo asegurar el contenido base de la carta: ${err.message}`);
     }
+    try {
+      const copiadas = await this.copiarFotosLocalAConocenos();
+      if (copiadas > 0) this.logger.log(`Conócenos: ${copiadas} fila(s) recibieron la galería copiada de Fotos del local`);
+    } catch (err: any) {
+      this.logger.warn(`No se pudo copiar Fotos del local a Conócenos: ${err.message}`);
+    }
+  }
+
+  /**
+   * Copia UNA vez las fotos activas de «Fotos del local» a la galería de Conócenos (publicada y borrador).
+   * Una vez copiada, la fila ya tiene la clave `galeria` y no se vuelve a tocar: desde ahí son independientes.
+   */
+  async copiarFotosLocalAConocenos(): Promise<number> {
+    const filas = await this.prisma.fotoLocal.findMany({
+      where: { activo: true, slot: { not: null } },
+      include: { archivo: { select: { ruta: true } } },
+      orderBy: { orden: 'asc' },
+    });
+    const galeria = filas.map((f) => ({
+      id: `local-${f.archivo_id.toString()}`,
+      url: `/archivos/${f.archivo.ruta}`,
+      activo: true,
+      origen: f.slot as string,
+    }));
+
+    let copiadas = 0;
+    const publicado = await this.prisma.parametro.findUnique({ where: { clave: CLAVE_CONOCENOS } });
+    if (!publicado) {
+      if (galeria.length > 0) {
+        await this.prisma.parametro.create({ data: { clave: CLAVE_CONOCENOS, valor: { galeria } as any } });
+        copiadas++;
+      }
+    } else if (sinGaleria(publicado.valor)) {
+      await this.prisma.parametro.update({
+        where: { clave: CLAVE_CONOCENOS },
+        data: { valor: { ...(publicado.valor as object), galeria } as any },
+      });
+      copiadas++;
+    }
+
+    const borrador = await this.prisma.parametro.findUnique({ where: { clave: `${CLAVE_CONOCENOS}_borrador` } });
+    if (borrador && sinGaleria(borrador.valor)) {
+      await this.prisma.parametro.update({
+        where: { clave: `${CLAVE_CONOCENOS}_borrador` },
+        data: { valor: { ...(borrador.valor as object), galeria } as any },
+      });
+      copiadas++;
+    }
+    return copiadas;
   }
 
   async asegurar() {

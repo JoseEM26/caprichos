@@ -4,6 +4,11 @@ import { CampoCodigoSupervisor } from '../../../comun/CampoCodigoSupervisor';
 import { CodigoSupervisorView } from '../CodigoSupervisorView';
 import { api, ErrorApi } from '../../../comun/api';
 
+// La vista pregunta si el usuario puede gestionar el código (ADMIN); en estas pruebas es el ADMIN
+vi.mock('../../../comun/sesion', () => ({
+  useSesion: () => ({ tiene: () => true }),
+}));
+
 describe('Componentes del Código del Supervisor', () => {
   beforeEach(() => {
     vi.clearAllMocks();

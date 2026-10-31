@@ -452,6 +452,15 @@ describe('LocalService', () => {
       expect(res.horario[1].dia).toBe('Martes');
     });
 
+    it('obtenerDatosPublicosLocal indica si pedir como invitado está permitido (false si no existe el parámetro)', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'carta_invitado_activo', valor: 'si' }]);
+      prismaMock.horarioDia.findMany.mockResolvedValue([]);
+      expect((await service.obtenerDatosPublicosLocal()).invitadoPermitido).toBe(true);
+
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      expect((await service.obtenerDatosPublicosLocal()).invitadoPermitido).toBe(false);
+    });
+
     it('obtenerDatosPublicosLocal devuelve lat y lng personalizados cuando existen en local_datos', async () => {
       prismaMock.parametro.findMany.mockResolvedValue([
         {
@@ -577,14 +586,15 @@ describe('LocalService', () => {
       ]);
     });
 
-    it('obtenerDatosPublicosLocal incluye las fotos activas en "fotos"', async () => {
+    it('obtenerDatosPublicosLocal ya no lleva fotos: Conócenos tiene su propia galería', async () => {
       prismaMock.fotoLocal.findMany.mockResolvedValue([fotoFila('Fachada', 7n, 0)]);
       prismaMock.parametro.findMany.mockResolvedValue([]);
       prismaMock.horarioDia.findMany.mockResolvedValue([]);
 
       const res = await service.obtenerDatosPublicosLocal();
 
-      expect(res.fotos).toEqual([{ slot: 'Fachada', orden: 0, archivoId: '7', url: '/archivos/publico/2026/10/7.webp' }]);
+      expect(res).not.toHaveProperty('fotos');
+      expect(prismaMock.fotoLocal.findMany).not.toHaveBeenCalled();
     });
 
     it('subirFotoLocal guarda el archivo en el slot y retira la foto anterior sin borrarla', async () => {

@@ -136,12 +136,12 @@ describe('Admin ▸ Clientes UI', () => {
     const btnFiltros = screen.getByRole('button', { name: /Filtros/i });
     fireEvent.click(btnFiltros);
 
-    expect(screen.getByText('TIPO')).toBeInTheDocument();
-    expect(screen.getByText('REGISTRO')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tipo: Todos' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Registro: Todos' })).toBeInTheDocument();
 
-    // Filtra por Empresa
-    const btnEmpresa = screen.getByRole('button', { name: 'Empresa' });
-    fireEvent.click(btnEmpresa);
+    // Filtra por Empresa desde el combo Tipo
+    fireEvent.click(screen.getByRole('button', { name: 'Tipo: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Empresa' }));
 
     await waitFor(() => {
       expect(clientesApi.listarClientes).toHaveBeenCalledWith(

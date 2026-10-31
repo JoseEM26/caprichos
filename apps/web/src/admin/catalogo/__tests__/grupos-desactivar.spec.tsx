@@ -42,7 +42,8 @@ describe('Grupos de opciones: desactivar / activar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sí' }));
     await waitFor(() => expect(patch).toHaveBeenCalledWith('1', { activo: false }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Desactivados' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Grupos: Activos' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Desactivados' }));
     expect(await screen.findByText('Extras (opcional)')).toBeInTheDocument();
     expect(screen.getAllByText('Desactivado').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole('button', { name: 'Activar grupo' }).length).toBeGreaterThanOrEqual(1);

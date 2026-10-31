@@ -5,6 +5,8 @@ import { RecuperarClaveService } from './recuperar-clave.service';
 import { ClientesService } from './clientes.service';
 import { PuntosService } from './puntos.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
+import { PartyPuntosService } from './party-puntos.service';
+import { CodigoRegistroService } from './codigo-registro.service';
 import { CuentaClienteController } from './cuenta-cliente.controller';
 import { ClientesAdminController } from './clientes-admin.controller';
 
@@ -22,11 +24,14 @@ import { ClientesAdminController } from './clientes-admin.controller';
     RecuperarClaveService,
     PuntosService,
     DireccionesClienteService,
+    PartyPuntosService,
+    CodigoRegistroService,
   ],
   exports: [
     ClientesService,
     PuntosService,
     DireccionesClienteService,
+    PartyPuntosService,
   ],
 })
 export class ClientesModule {}

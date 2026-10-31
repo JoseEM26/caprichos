@@ -5,7 +5,7 @@ export interface CategoriaNav { id: string; n: string; d: string; }
 
 export const GRUPOS_CONFIG: Array<{ id: string; titulo: string; tabs: string[] }> = [
   { id: 'local', titulo: 'Mi local', tabs: ['local', 'ubicacion', 'contacto', 'horario', 'redes', 'empresa'] },
-  { id: 'ventas', titulo: 'Ventas y reparto', tabs: ['pagos', 'entrega', 'zonas', 'reparto', 'fallas', 'demanda', 'operacion'] },
+  { id: 'ventas', titulo: 'Ventas y reparto', tabs: ['pagos', 'entrega', 'zonas', 'reparto', 'fallas', 'demanda', 'cocina', 'operacion'] },
   { id: 'clientes', titulo: 'Comunicación con clientes', tabs: ['textos', 'chatbot', 'vouchers', 'ayuda'] },
   { id: 'equipos', titulo: 'Equipos y dispositivos', tabs: ['impresion', 'ingreso'] },
   { id: 'sistema', titulo: 'Sistema', tabs: ['parametros'] },
@@ -30,6 +30,7 @@ const D: Record<string, string> = {
   reparto: 'M5 18a3 3 0 1 0 0-.01M19 18a3 3 0 1 0 0-.01M8 18h8l-3-8h-3M13 10l3-3h3',
   fallas: 'M12 3l10 18H2zM12 10v5M12 18v.01',
   demanda: 'M13 2L4 14h7l-1 8 9-12h-7z',
+  cocina: 'M7 10h10M5 10a7 7 0 0 1 14 0M4 18h16M9 6V4M15 6V4',
   operacion: 'M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6',
   areas: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   textos: 'M5 4h14v16H5zM8 9h8M8 13h8M8 17h5',

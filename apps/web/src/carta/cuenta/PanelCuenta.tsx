@@ -112,7 +112,7 @@ function BotonesFoto() {
 }
 
 /** Ventana «Tu cuenta Caprichos»: ingresar, crear cuenta, ver mis puntos y editar mi perfil (mockup Main ▸ cuenta). */
-export function PanelCuenta({ alVerPedidos }: { alVerPedidos?: () => void } = {}) {
+export function PanelCuenta({ alVerPedidos, invitadoPermitido = false }: { alVerPedidos?: () => void; invitadoPermitido?: boolean } = {}) {
   const { cliente, panelAbierto, cerrarPanel, actualizarPerfil, salir } = useCuenta();
   const [confirmarSalida, setConfirmarSalida] = useState(false);
 
@@ -187,10 +187,10 @@ export function PanelCuenta({ alVerPedidos }: { alVerPedidos?: () => void } = {}
           color: 'var(--cp-navy)',
           borderRadius: 20,
           boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
-          padding: 20,
+          padding: 18,
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 10,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -306,7 +306,7 @@ export function PanelCuenta({ alVerPedidos }: { alVerPedidos?: () => void } = {}
             />
           </>
         ) : (
-          <FormularioAcceso alSeguirInvitado={cerrarPanel} />
+          <FormularioAcceso alSeguirInvitado={cerrarPanel} invitadoPermitido={invitadoPermitido} />
         )}
       </div>
     </>

@@ -41,6 +41,18 @@ describe('ColaImpresion', () => {
     expect(screen.getByText(/no se imprimen aunque la impresora vuelva/)).toBeInTheDocument();
   });
 
+  it('el filtro de la cola es un combo «Ver»: elegir Fallidos pide esa lista y vuelve a la página 1', async () => {
+    render(<ColaImpresion alCerrar={() => {}} />);
+    await screen.findByTestId('cola-grupo');
+    expect(impresionApi.listarCola).toHaveBeenLastCalledWith('pendientes', 1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver: Pendientes' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Fallidos' }));
+
+    expect(screen.getByRole('button', { name: 'Ver: Fallidos' })).toBeInTheDocument();
+    await waitFor(() => expect(impresionApi.listarCola).toHaveBeenLastCalledWith('fallidos', 1));
+  });
+
   it('vaciar exige motivo y confirmación Sí/No que dice cuántas se descartan', async () => {
     vi.mocked(impresionApi.vaciarCola).mockResolvedValue({ ok: true, descartadas: 30, mensaje: 'Se descartaron 30 etiqueta(s); no se imprimirán' });
     render(<ColaImpresion alCerrar={() => {}} />);

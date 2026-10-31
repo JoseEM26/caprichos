@@ -19,6 +19,7 @@ import { BannerMesCarta, FranjaDatosCarta } from './PortadaCarta';
 import { PaginaConocenos } from './PaginaConocenos';
 import type { ContenidoConocenos } from './conocenosContenido';
 import { PaginaNovedades } from './PaginaNovedades';
+import type { FotoMosaico } from './MosaicoMomentos';
 import { CuentaProvider } from './cuenta/CuentaContext';
 import { PanelCuenta } from './cuenta/PanelCuenta';
 import { useEsMovil } from './useEsMovil';
@@ -36,6 +37,7 @@ import { DecoracionAnimada } from './contenido/DecoracionAnimada';
 import { VisorHistoriasModal, extraerOffDeUrl, limpiarUrlFoto } from './contenido/VisorHistoriasModal';
 import type { HistoriaCírculo } from './contenido/VisorHistoriasModal';
 import { FormularioComentarios } from './contenido/FormularioComentarios';
+import { CarruselResenas } from './CarruselResenas';
 import { FranjaNovedades, ordenarNovedadesCarta } from './PaginaNovedades';
 import type { NovedadCarta } from './PaginaNovedades';
 import type { BannerCarta } from './PortadaCarta';
@@ -72,6 +74,8 @@ export interface ContenidoCarta {
     titulo: string;
     subtitulo: string;
   };
+  /** Fotos propias de «Momentos Caprichos» de Novedades (solo las activas en la carta). */
+  novedadesMomentos?: FotoMosaico[];
 }
 
 // El administrativo guarda la paleta por rol; la carta la lee con sus variables --cp-*
@@ -244,18 +248,6 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   );
   const organizacion = contenido?.organizacion ?? 'SECCIONES';
   const disp = useMemo(() => resolverDisposicion(contenido?.disposicion), [contenido]);
-
-  const fotosDestacadas = useMemo(() => {
-    return (contenido?.destacadas ?? []).flatMap((d) =>
-      d.activo !== false && Array.isArray(d.fotos) ? d.fotos.map((f) => limpiarUrlFoto(f.url)) : [],
-    ).filter(Boolean);
-  }, [contenido]);
-
-  /** Galería «Nuestro lugar»: las fotos del local (servidor); si no hay ninguna, las fotos de las destacadas de siempre. */
-  const fotosNuestroLugar = useMemo(() => {
-    const delLocal = (datosLocal?.fotos ?? []).map((f) => f.url).filter(Boolean);
-    return delLocal.length > 0 ? delLocal : fotosDestacadas;
-  }, [datosLocal, fotosDestacadas]);
 
   const destacadasVisibles = useMemo(() => {
     return (contenido?.destacadas ?? [])
@@ -753,7 +745,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
         storageKey={vistaPrevia ? 'caprichos_preview_franja_aviso' : undefined}
       />
 
-      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} fotos={fotosNuestroLugar} contenido={contenido?.conocenos} />}
+      {pagina === 'conocenos' && <PaginaConocenos datosLocal={datosLocal} estadoLocal={estadoLocal} contenido={contenido?.conocenos} />}
       {pagina === 'novedades' && (
         <PaginaNovedades
           novedades={novedadesEnriquecidas}
@@ -761,6 +753,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
           estadoLocal={estadoLocal}
           onVerCarta={irACarta}
           encabezado={contenido?.novedadesEncabezado}
+          momentos={contenido?.novedadesMomentos}
         />
       )}
 
@@ -768,6 +761,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
         disp.secciones.map((sec) =>
           ed ? ed.bloque(`seccion:${sec.id}`, renderSeccion(sec.id)) : sec.visible ? <Fragment key={sec.id}>{renderSeccion(sec.id)}</Fragment> : null,
         )}
+      {pagina === 'carta' && !vistaPrevia && <CarruselResenas />}
       {pagina === 'carta' && !vistaPrevia && <FormularioComentarios />}
 
       {visor !== null && destacadasVisibles.length > 0 && (
@@ -949,7 +943,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
       <NotificacionAgregado />
 
       {/* Cuenta del cliente */}
-      <PanelCuenta alVerPedidos={() => setListaPedidosAbierta(true)} />
+      <PanelCuenta alVerPedidos={() => setListaPedidosAbierta(true)} invitadoPermitido={datosLocal?.invitadoPermitido === true} />
         </>
       )}
     </div>

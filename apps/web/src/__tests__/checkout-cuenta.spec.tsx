@@ -17,6 +17,7 @@ const estado: EstadoLocalCarta = {
 };
 
 const datosLocal: DatosLocalCarta = {
+  invitadoPermitido: true,
   nombre: 'Caprichos',
   direccion: 'Av. Las Delicias 123',
   telefono: '999888777',

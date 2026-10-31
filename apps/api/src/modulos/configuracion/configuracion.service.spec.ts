@@ -197,6 +197,18 @@ describe('ConfiguracionService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('cocina_confirmar_despejar: guarda si/no (true -> si, false -> no) y rechaza otros valores', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'cocina_confirmar_despejar', valor: 'no' });
+      const res = await service.actualizar('cocina_confirmar_despejar', false, adminAuth);
+      expect(res.valor).toBe('no');
+      expect(prismaMock.parametro.upsert.mock.calls[0][0].update.valor).toBe('no');
+
+      await expect(
+        service.actualizar('cocina_confirmar_despejar', 'quizas', adminAuth),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('protección contra spam: acepta valores en rango y rechaza con 400 los de fuera', async () => {
       prismaMock.parametro.findUnique.mockResolvedValue(null);
       prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
@@ -240,6 +252,40 @@ describe('ConfiguracionService', () => {
       await expect(
         service.actualizar('reparto_velocidad_kmh', 2, adminAuth),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('avisos: sonido y «Marcar todas leídas»', () => {
+    beforeEach(() => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
+    });
+
+    it('el intervalo del sonido acepta 5..600 segundos enteros (15, 30, 60 y otros)', async () => {
+      for (const v of [5, 15, 37, 600]) {
+        await expect(service.actualizar('notif_sonido_intervalo_seg', v, adminAuth)).resolves.toEqual({
+          clave: 'notif_sonido_intervalo_seg',
+          valor: v,
+        });
+      }
+    });
+
+    it.each([4, 601, 10.5, 0])('el intervalo %s fuera de 5..600 o no entero → 400', async (v) => {
+      await expect(service.actualizar('notif_sonido_intervalo_seg', v, adminAuth)).rejects.toBeInstanceOf(BadRequestException);
+      expect(prismaMock.parametro.upsert).not.toHaveBeenCalled();
+    });
+
+    it('el alcance solo acepta TODOS_NO_LEIDOS, SOLO_URGENTES o SOLO_HOY', async () => {
+      await expect(service.actualizar('notif_sonido_alcance', 'solo_urgentes', adminAuth)).resolves.toMatchObject({
+        valor: 'SOLO_URGENTES',
+      });
+      await expect(service.actualizar('notif_sonido_alcance', 'TODOS', adminAuth)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('los interruptores se guardan como si/no y se auditan', async () => {
+      await expect(service.actualizar('notif_marcar_todas_activo', false, adminAuth)).resolves.toMatchObject({ valor: 'no' });
+      await expect(service.actualizar('notif_sonido_activo', 'si', adminAuth)).resolves.toMatchObject({ valor: 'si' });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'PARAMETRO' }));
     });
   });
 
@@ -320,6 +366,12 @@ describe('ConfiguracionService', () => {
         response: expect.objectContaining({ codigo: 'RANGO_INVALIDO' }),
       });
       expect(prismaMock.parametro.upsert).not.toHaveBeenCalled();
+    });
+
+    it('carta_invitado_activo acepta booleano o si/no y lo guarda como si/no; otro valor se rechaza', async () => {
+      expect(await service.actualizar('carta_invitado_activo', true, adminAuth)).toEqual({ clave: 'carta_invitado_activo', valor: 'si' });
+      expect(await service.actualizar('carta_invitado_activo', 'no', adminAuth)).toEqual({ clave: 'carta_invitado_activo', valor: 'no' });
+      await expect(service.actualizar('carta_invitado_activo', 'quizas', adminAuth)).rejects.toThrow(BadRequestException);
     });
 
     it('ayuda_ia_activo acepta booleano y lo guarda como si/no', async () => {

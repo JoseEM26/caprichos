@@ -121,16 +121,27 @@ describe('FlujoReservaSubFlujo (Ola 3, Agente F — Reservar mesa por WhatsApp)'
       expect(res?.nuevoFlujo.reserva?.datos.personas).toBe(8);
     });
 
-    it('para grupos mayores a 10 personas deriva a persona (seguridad)', () => {
+    it('acepta reservas de hasta 20 personas por WhatsApp', () => {
       const flujo = crearFlujoBase('RESERVA_PERSONAS', { estadoInterno: 'RESERVA_PERSONAS', datos: {} });
-      const entrada = normalizar('somos 15 personas');
+      const ctx = crearContextoBase();
+
+      for (const n of [12, 15, 20]) {
+        const res = subflujo.transicionar(flujo, normalizar(`somos ${n} personas`), ctx);
+        expect(res?.nuevoEstado).toBe('RESERVA_FECHA');
+        expect(res?.nuevoFlujo.reserva?.datos.personas).toBe(n);
+      }
+    });
+
+    it('para grupos mayores a 20 personas deriva a persona (seguridad)', () => {
+      const flujo = crearFlujoBase('RESERVA_PERSONAS', { estadoInterno: 'RESERVA_PERSONAS', datos: {} });
+      const entrada = normalizar('somos 21 personas');
       const ctx = crearContextoBase();
 
       const res = subflujo.transicionar(flujo, entrada, ctx);
       expect(res?.nuevoEstado).toBe('ATENCION_PERSONA');
       const accionPersona = res?.acciones.find((a) => a.tipo === 'pasarAPersona');
       expect(accionPersona).toBeDefined();
-      expect((res?.acciones[0] as any).texto).toContain('Para grupos de más de 10 personas');
+      expect((res?.acciones[0] as any).texto).toContain('Para grupos de más de 20 personas');
     });
 
     it('repregunta si el usuario ingresa 0 o texto no numérico', () => {

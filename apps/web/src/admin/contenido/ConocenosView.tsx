@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
+import { Confirmar } from '../../comun/Confirmar';
 import { EstadoError } from '../../comun/EstadoError';
 import { EditorPantalla } from '../../comun/PantallaCompleta';
 import { MarcoDispositivo } from '../../comun/MarcoDispositivo';
@@ -12,9 +14,20 @@ import { CONOCENOS_DEFAULT, normalizarConocenos } from '../../carta/conocenosCon
 import type { ContenidoConocenos } from '../../carta/conocenosContenido';
 import type { ModoEdicion } from '../../carta/edicion';
 import { BarraSuperior } from './edicion/BarraSuperior';
-import { BloqueEditable, BotonBarra } from './edicion/BloqueEditable';
+import { BloqueEditable } from './edicion/BloqueEditable';
+import { BloqueFoto } from './edicion/BloqueFoto';
 import { Fantasma, LienzoEdicion } from './edicion/LienzoEdicion';
 import { moverIndice, reubicar } from './edicion/mover';
+import {
+  agregarFotoArchivo,
+  cambiarActivo,
+  ponerUrlFoto,
+  elegirFoto,
+  moverFoto,
+  recuperarFotosDelNavegador,
+  reubicarFoto,
+} from './edicion/galeria';
+import { subirFotoEdicion } from './edicion/subirFoto';
 import { useBorrador } from './edicion/useBorrador';
 import { usePublicoCarta } from './edicion/usePublicoCarta';
 
@@ -32,6 +45,9 @@ const NOMBRE_BLOQUE: Record<string, string> = {
   momentos: 'Mosaico de momentos',
 };
 
+/** Las 3 primeras fotos de la galería van en «Nuestro lugar»; el resto, en Momentos Caprichos. */
+const FOTOS_NUESTRO_LUGAR = 3;
+
 /** Editor en sitio de la página Conócenos: la misma página de la carta, con el texto y los bloques editables. */
 export function ConocenosView() {
   const navigate = useNavigate();
@@ -42,6 +58,7 @@ export function ConocenosView() {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [sel, setSelRaw] = useState<string | null>(null);
   const [avisoLocal, setAvisoLocal] = useState(false);
+  const [aQuitar, setAQuitar] = useState<string | null>(null);
   const publico = usePublicoCarta();
 
   const b = useBorrador<ContenidoConocenos>(async (c) => {
@@ -55,8 +72,16 @@ export function ConocenosView() {
     setError(null);
     try {
       const r = await api.get<RespuestaConocenos>('/admin/contenido/conocenos');
-      cargar(normalizarConocenos(r.contenido));
+      const inicial = normalizarConocenos(r.contenido);
+      cargar(inicial);
       setHayBorrador(!!r.tieneBorrador);
+      // Fotos que quedaron solo en este navegador (versión anterior): pasan a la galería del borrador.
+      try {
+        const recuperadas = await recuperarFotosDelNavegador(inicial.galeria);
+        if (recuperadas.length > 0) cambiar((s) => ({ ...s, galeria: [...s.galeria, ...recuperadas] }));
+      } catch {
+        // Si falla, las fotos siguen en el navegador y se reintenta al abrir la página otra vez
+      }
     } catch (err: any) {
       setError(err?.message || 'No se pudo cargar Conócenos');
     } finally {
@@ -95,9 +120,38 @@ export function ConocenosView() {
   };
   const cambiarBloque = (id: string, parche: Partial<ContenidoConocenos['bloques'][number]>) =>
     cambiar((s) => ({ ...s, bloques: s.bloques.map((x) => (x.id === id ? { ...x, ...parche } : x)) }));
-  const cantidadFotos = (n: number) => cambiar((s) => ({ ...s, momentosCantidad: Math.min(24, Math.max(1, s.momentosCantidad + n)) }));
+
+  /** Cada foto de la galería se edita sola: cambiar, mover, quitar (con Sí/No) o mostrar. */
+  const fotoEd = (clave: string, hijo: ReactNode) => {
+    const id = clave.slice('galeria:'.length);
+    const i = c.galeria.findIndex((f) => f.id === id);
+    const foto = c.galeria[i];
+    if (!foto) return hijo;
+    return (
+      <BloqueFoto
+        key={clave}
+        clave={clave}
+        etiqueta={`Foto ${i + 1}${i < FOTOS_NUESTRO_LUGAR ? ' (Nuestro lugar)' : ''}`}
+        activa={foto.activo}
+        puedeSubir={i > 0}
+        puedeBajar={i < c.galeria.length - 1}
+        onSubir={() => cambiar((s) => ({ ...s, galeria: moverFoto(s.galeria, id, -1) }))}
+        onBajar={() => cambiar((s) => ({ ...s, galeria: moverFoto(s.galeria, id, 1) }))}
+        onSoltar={(desde) => cambiar((s) => ({ ...s, galeria: reubicarFoto(s.galeria, desde, id, 'galeria:') }))}
+        onFoto={async (archivo) => {
+          const url = await subirFotoEdicion(archivo);
+          cambiar((s) => ({ ...s, galeria: ponerUrlFoto(s.galeria, id, url) }));
+        }}
+        onQuitar={() => setAQuitar(id)}
+        onMostrar={() => cambiar((s) => ({ ...s, galeria: cambiarActivo(s.galeria, id, true) }))}
+      >
+        {hijo}
+      </BloqueFoto>
+    );
+  };
 
   const bloque: ModoEdicion['bloque'] = (clave, hijo) => {
+    if (clave.startsWith('galeria:')) return fotoEd(clave, hijo);
     const id = clave.split(':')[1];
     const i = c.bloques.findIndex((x) => x.id === id);
     const bl = c.bloques[i];
@@ -117,19 +171,6 @@ export function ConocenosView() {
           cambiar((s) => ({ ...s, bloques: reubicar(s.bloques, s.bloques.findIndex((x) => `bloque:${x.id}` === desde), s.bloques.findIndex((x) => x.id === id)) }))
         }
         onOcultar={() => cambiarBloque(id, { visible: !bl.visible })}
-        acciones={
-          id === 'momentos' ? (
-            <>
-              <span className="ed-etiqueta">Fotos: {c.momentosCantidad}</span>
-              <BotonBarra aria-label="Menos fotos" disabled={c.momentosCantidad <= 1} onClick={() => cantidadFotos(-1)}>
-                −
-              </BotonBarra>
-              <BotonBarra aria-label="Más fotos" disabled={c.momentosCantidad >= 24} onClick={() => cantidadFotos(1)}>
-                +
-              </BotonBarra>
-            </>
-          ) : undefined
-        }
         popover={
           avisoLocal && sel === clave ? (
             <>
@@ -158,9 +199,26 @@ export function ConocenosView() {
         if (valor) cambiarBloque(id, { titulo: valor });
       }
     },
-    agregar: (_clave, etiqueta, estilo) => (
-      <Fantasma key="agregar-parrafo" etiqueta={etiqueta} estilo={estilo} onClick={() => cambiar((s) => ({ ...s, parrafos: [...s.parrafos, 'Nuevo párrafo'] }))} />
-    ),
+    agregar: (clave, etiqueta, estilo) =>
+      clave === 'galeria' ? (
+        <Fantasma
+          key="agregar-foto"
+          etiqueta={etiqueta}
+          estilo={estilo}
+          onClick={() =>
+            elegirFoto(async (archivo) => {
+              try {
+                const nueva = await agregarFotoArchivo(archivo);
+                cambiar((s) => ({ ...s, galeria: [...s.galeria, nueva] }));
+              } catch (err: any) {
+                setMensaje(err?.message || 'No se pudo subir la foto. Revisa tu conexión e inténtalo de nuevo.');
+              }
+            })
+          }
+        />
+      ) : (
+        <Fantasma key="agregar-parrafo" etiqueta={etiqueta} estilo={estilo} onClick={() => cambiar((s) => ({ ...s, parrafos: [...s.parrafos, 'Nuevo párrafo'] }))} />
+      ),
     accion(clave) {
       if (clave === 'local') setAvisoLocal(true);
     },
@@ -197,16 +255,30 @@ export function ConocenosView() {
         onPublicar={publicar}
         onDescartar={descartar}
         mensaje={mensaje}
-        mensajePublicar="Los clientes verán estos textos y este orden en la página Conócenos de la carta virtual."
+        mensajePublicar="Los clientes verán estos textos, estas fotos y este orden en la página Conócenos de la carta virtual."
       />
       <div className="ep-nota" style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-        Esta es la página Conócenos tal como la ve el cliente. Toca un texto para escribir encima o un bloque para moverlo u ocultarlo. Los datos del local se editan en Configuración del local.
+        Esta es la página Conócenos tal como la ve el cliente. Toca un texto para escribir encima, un bloque para moverlo u ocultarlo, o una foto para cambiarla, moverla o quitarla. Los datos del local se editan en Configuración del local.
       </div>
       <MarcoDispositivo fiel celular={celular} etiqueta="Conócenos en edición">
         <LienzoEdicion ed={ed} sel={sel} setSel={seleccionar}>
           {vistaPrevia ? <CartaVistaPrevia datos={vistaPrevia} movil={celular} pagina="conocenos" /> : <Cargando mensaje="Preparando la página..." />}
         </LienzoEdicion>
       </MarcoDispositivo>
+      <Confirmar
+        abierto={aQuitar !== null}
+        titulo="¿Quitar esta foto de Conócenos?"
+        mensaje="Deja de verse en la página. La foto no se borra: puedes volver a mostrarla con Mostrar."
+        textoConfirmar="Sí, quitar"
+        textoNo="No, conservarla"
+        peligro
+        alConfirmar={() => {
+          const id = aQuitar;
+          setAQuitar(null);
+          if (id) cambiar((s) => ({ ...s, galeria: cambiarActivo(s.galeria, id, false) }));
+        }}
+        alCancelar={() => setAQuitar(null)}
+      />
     </EditorPantalla>
   );
 }

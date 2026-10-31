@@ -28,6 +28,8 @@ export const MIGRAR: string[] = [
   'insumo', 'receta', 'receta_linea', 'ajuste_opcion',
   // Contenido de la carta y de la web
   'novedad', 'novedad_foto', 'destacada', 'destacada_foto', 'respuesta_rapida', 'version_carta',
+  // Reseñas de Google ya traídas (con su visibilidad): así la carga de la demo pasa a producción igualita
+  'resena_google',
 ];
 
 /** Tablas que NO se migran, agrupadas por motivo. */
@@ -35,7 +37,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['transacciones de venta: pedidos, cobros, comprobantes y reclamos', [
     'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_estado_historial', 'secuencia_pedido',
     'pedido_mesa', 'comprobante', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
-    'incidente_entrega', 'pedido_pago_plan', 'voucher_pago',
+    'incidente_entrega', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto',
   ]],
   ['caja y cierres: dinero real del día', [
     'caja', 'cobro', 'cobro_pago', 'movimiento_caja', 'liquidacion', 'cierre_caja', 'conteo_cierre',
@@ -60,6 +62,9 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['seguridad y llaves: secretos, llaves de dispositivos y colas de impresión', [
     'supervisor_secreto', 'device_key', 'print_job', 'sesion',
   ]],
+  ['lectura de notificaciones por persona: cada usuario tiene su propio estado, no se migra', [
+    'notificacion_lectura',
+  ]],
   ['trazas y control técnico', [
     'auditoria', 'sys_control', 'iniciativa', 'iniciativa_comentario',
   ]],
@@ -81,12 +86,18 @@ export const TABLAS_SENSIBLES: string[] = [
 /** Columnas que NUNCA se exportan, en ninguna tabla (contraseñas, hashes, PIN). */
 export const COLUMNAS_SECRETAS: string[] = ['hash', 'pin_hash', 'secreto_cifrado', 'iv', 'tag', 'device_key'];
 
+/** Parámetros de reseñas que sí migran; el resto de resenas_* se queda en cada ambiente. */
+export const RESENAS_MIGRABLES = new Set(['resenas_negocio', 'resenas_resumen', 'resenas_carga_inicial']);
+
 /**
  * Filas de `parametro` que no se migran: cachés y contadores de la operación, avisos de consumo,
  * borradores sin publicar y el marcador de entorno (cada base lleva el suyo).
  */
 export function parametroMigrable(clave: string): boolean {
   if (clave === 'entorno') return false;
+  // Negocio, resumen y carga inicial sí viajan (la carga ya hecha no se repite en producción);
+  // cupo mensual y fechas de actualización son de cada ambiente
+  if (/^resenas_/.test(clave)) return RESENAS_MIGRABLES.has(clave);
   if (/^wa_media:/.test(clave)) return false;
   if (/^wa_aviso_consumo:/.test(clave)) return false;
   if (/_borrador$/.test(clave)) return false;

@@ -2,12 +2,35 @@ export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 
 export interface NotificacionPendiente {
   id: string;
+  /** Clave para marcar leída: `n:<id>` (guardada) o `c:<tipo>:<firma>` (calculada) */
+  clave: string;
   titulo: string;
   detalle: string;
   prioridad: Prioridad;
   desde: string | null;
   modulo: string;
   accion: string;
+  ruta?: string;
+  /** Leída por ESTE usuario */
+  leida: boolean;
+  leidaEn: string | null;
+}
+
+const RANGO_PRIORIDAD: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
+
+/**
+ * Mismo orden que el servidor: no leídas por urgencia y, dentro de cada una, las más nuevas arriba;
+ * después las leídas, la última leída primero. Sirve para reordenar al instante al marcar.
+ */
+export function ordenarNotificaciones(lista: NotificacionPendiente[]): NotificacionPendiente[] {
+  const ahora = new Date().toISOString();
+  const noLeidas = lista
+    .filter((n) => !n.leida)
+    .sort((a, b) => RANGO_PRIORIDAD[a.prioridad] - RANGO_PRIORIDAD[b.prioridad] || (b.desde ?? ahora).localeCompare(a.desde ?? ahora));
+  const leidas = lista
+    .filter((n) => n.leida)
+    .sort((a, b) => (b.leidaEn ?? '').localeCompare(a.leidaEn ?? ''));
+  return [...noLeidas, ...leidas];
 }
 
 export interface NotificacionHistorialItem {
@@ -37,7 +60,26 @@ export interface MetricasNotificaciones {
   rolNombre: string;
 }
 
+/** Ajustes que cambia el ADMIN en Configuración (llegan con el resumen y con el historial) */
+export type AlcanceSonido = 'TODOS_NO_LEIDOS' | 'SOLO_URGENTES' | 'SOLO_HOY';
+
+export interface AjustesNotificaciones {
+  sonidoActivo: boolean;
+  sonidoIntervaloSeg: number;
+  sonidoAlcance: AlcanceSonido;
+  marcarTodasActivo: boolean;
+}
+
+/** Mismos valores que el servidor: se usan si aún no llegó el resumen */
+export const AJUSTES_NOTIFICACIONES_DEFECTO: AjustesNotificaciones = {
+  sonidoActivo: true,
+  sonidoIntervaloSeg: 15,
+  sonidoAlcance: 'TODOS_NO_LEIDOS',
+  marcarTodasActivo: true,
+};
+
 export interface RespuestaHistorialNotificaciones {
+  ajustes?: AjustesNotificaciones;
   metricas: MetricasNotificaciones;
   pendientes: NotificacionPendiente[];
   conteosPorTipo: Record<string, number>;

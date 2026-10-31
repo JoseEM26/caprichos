@@ -52,6 +52,12 @@ export class CocinaController {
     return this.comandasService.despejar(pedidoId, areaId, req.usuario, ip);
   }
 
+  @Get('ajustes')
+  @Permiso('cocina', 'ver')
+  async obtenerAjustes() {
+    return this.comandasService.obtenerAjustes();
+  }
+
   @Get('historial')
   @Permiso('cocina', 'ver')
   async historial(@Query() query: HistorialQueryDto) {

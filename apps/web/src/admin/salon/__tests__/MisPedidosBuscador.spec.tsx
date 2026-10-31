@@ -94,14 +94,15 @@ describe('MisPedidosView: buscador en cliente', () => {
     expect((caja as HTMLInputElement).value).toBe('');
   });
 
-  it('se combina con el chip de estado', async () => {
+  it('se combina con el filtro de estado', async () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-W021');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Entregados' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Entregados' }));
     fireEvent.change(screen.getByPlaceholderText('Buscar por nombre, código o mesa'), { target: { value: 'juan' } });
 
-    // Juan está en PREPARANDO: el chip Entregados lo deja fuera
+    // Juan está en PREPARANDO: el filtro Entregados lo deja fuera
     expect(codigosVisibles()).toEqual([]);
     expect(screen.getByText('Ningún pedido coincide con tu búsqueda')).toBeInTheDocument();
   });

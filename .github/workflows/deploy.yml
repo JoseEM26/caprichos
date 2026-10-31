@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), configurar-resenas (guarda el secreto OPENWEBNINJA_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), cargar-resenas (carga inicial de reseñas de Google del local buscado en consulta_resenas; demo o prod, prod exige PRODUCCION y no es lo normal), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto)'
         required: false
         default: 'desplegar'
         type: choice
@@ -34,6 +34,8 @@ on:
           - respaldar-demo
           - exportar-datos-demo
           - configurar-dominios-demo
+          - configurar-resenas
+          - cargar-resenas
           - preparar-produccion
           - crear-admin-produccion
           - sincronizar-proxy
@@ -80,6 +82,17 @@ on:
         default: true
         type: boolean
 
+      consulta_resenas:
+        description: 'Solo cargar-resenas: Texto para buscar el local o business_id; ej. Caprichos Campoy'
+        required: false
+        default: ''
+        type: string
+      repetir_resenas:
+        description: 'Solo cargar-resenas: true = vuelve a cargar aunque ya haya reseñas'
+        required: false
+        default: false
+        type: boolean
+
 permissions:
   contents: read
   packages: write
@@ -112,6 +125,8 @@ jobs:
           IN_FRASE: ${{ github.event.inputs.frase_datos }}
           IN_PAQUETE: ${{ github.event.inputs.paquete }}
           IN_DNI: ${{ github.event.inputs.dni_admin }}
+          IN_CONSULTA: ${{ github.event.inputs.consulta_resenas }}
+          IN_REPETIR: ${{ github.event.inputs.repetir_resenas }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
@@ -212,6 +227,39 @@ jobs:
             ACCION="probar-restauracion"
             if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
               echo "::error::probar-restauracion en demo se lanza desde la rama preprod."
+              exit 1
+            fi
+          fi
+
+          # Claves de reseñas (OpenWebNinja): manual; producción pasa por la validación de prod (PRODUCCION + tag en main) de más abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "configurar-resenas" ]; then
+            ACCION="configurar-resenas"
+            if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::configurar-resenas en demo se lanza desde la rama preprod."
+              exit 1
+            fi
+          fi
+
+          # Carga inicial de reseñas (comando de la API): manual; producción pasa por la validación de prod de más abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "cargar-resenas" ]; then
+            ACCION="cargar-resenas"
+            if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::cargar-resenas en demo se lanza desde la rama preprod."
+              exit 1
+            fi
+            if [ -z "$IN_CONSULTA" ]; then
+              echo "::error::Indique en consulta_resenas el local a buscar (ej. Caprichos Campoy) o su business_id."
+              exit 1
+            fi
+            if [ "${#IN_CONSULTA}" -gt 120 ]; then
+              echo "::error::consulta_resenas tiene más de 120 caracteres."
+              exit 1
+            fi
+            case "$IN_CONSULTA" in
+              *\"*|*\'*|*\\*|*\$*|*\`*) echo "::error::consulta_resenas no puede llevar comillas, barra invertida, \$ ni acento grave."; exit 1 ;;
+            esac
+            if [[ "$IN_CONSULTA" =~ [[:cntrl:]] ]]; then
+              echo "::error::consulta_resenas no puede llevar caracteres de control ni saltos de línea."
               exit 1
             fi
           fi
@@ -758,6 +806,168 @@ jobs:
             echo ""
             echo '```'
             grep -E "^(Hoy|Quedaría|DNS|AVISO|OK|ERROR|Sin cambios|Simulacro|Copia)" dominios.log || echo "(sin datos: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Guarda la clave de OpenWebNinja (secreto OPENWEBNINJA_API_KEY) en el .env del ambiente y redespliega con el mismo tag.
+  # La clave viaja por la entrada estándar del ssh: no aparece en la línea de comandos ni en el log.
+  configurar-resenas:
+    name: Configurar reseñas de Google (clave OpenWebNinja)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'configurar-resenas'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: configurar-resenas
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del commit o del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Guardar la clave y redesplegar (sin mostrar la clave)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          CLAVE: ${{ secrets.OPENWEBNINJA_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ -z "$CLAVE" ]; then
+            echo "::error::Falta el secreto OPENWEBNINJA_API_KEY. Guárdelo con: gh secret set OPENWEBNINJA_API_KEY"
+            exit 1
+          fi
+          printf '%s' "$CLAVE" | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/configurar-resenas.sh '${AMBIENTE}'" 2>&1 | tee resenas.log
+
+      - name: Resumen (sin secretos)
+        if: always()
+        run: |
+          {
+            echo "## Reseñas de Google (clave OpenWebNinja)"
+            echo ""
+            echo '```'
+            grep -E "^(== |OPENWEBNINJA|RESENAS|TAG=|OK|ERROR|AVISO|Copia|Se restauró)" resenas.log || echo "(sin datos: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Carga inicial de reseñas: ejecuta en el contenedor de la API el comando resenas-carga-inicial (demo o prod).
+  cargar-resenas:
+    name: Cargar reseñas de Google (carga inicial)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'cargar-resenas'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: cargar-resenas
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del commit o del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Cargar reseñas (comando de la API; salida tal cual)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          CONSULTA: ${{ github.event.inputs.consulta_resenas }}
+          REPETIR: ${{ github.event.inputs.repetir_resenas }}
+        run: |
+          set -o pipefail
+          if [ "$REPETIR" = "true" ]; then SI_NO=si; else SI_NO=no; fi
+          if [ "$AMBIENTE" = "prod" ]; then
+            echo "::warning::Lo normal es NO cargar reseñas en producción; los datos de la empresa llegan con importar-datos-produccion. Se ejecuta porque se pidió."
+          fi
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/cargar-resenas.sh '${AMBIENTE}' '${CONSULTA}' '${SI_NO}'" 2>&1 | tee resenas-carga.log
+
+      - name: Resumen (salida del comando; sin secretos)
+        if: always()
+        run: |
+          {
+            echo "## Carga inicial de reseñas (${{ needs.validar-y-determinar.outputs.ambiente }})"
+            echo ""
+            if [ "${{ needs.validar-y-determinar.outputs.ambiente }}" = "prod" ]; then
+              echo "> **Aviso:** lo normal es NO cargar reseñas en producción; los datos de la empresa llegan con importar-datos-produccion."
+              echo ""
+            fi
+            echo '```'
+            tail -n 120 resenas-carga.log 2>/dev/null || echo "(sin salida: revise el log del paso anterior)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

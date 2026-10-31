@@ -3,6 +3,7 @@ import { api } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { Boton } from '../../comun/Boton';
 import { Icono } from '../../comun/Icono';
+import { useSesion } from '../../comun/sesion';
 
 interface CodigoRespuesta {
   codigo: string;
@@ -17,6 +18,9 @@ interface Bloqueado {
 }
 
 export function CodigoSupervisorView() {
+  // Ver el código lo tiene quien tiene supervisor/ver_codigo; generar, rotar y desbloquear es solo del ADMIN
+  const { tiene } = useSesion();
+  const puedeGestionar = tiene('supervisor/gestionar_codigo');
   const [bloqueados, setBloqueados] = useState<Bloqueado[]>([]);
   const [aDesbloquear, setADesbloquear] = useState<Bloqueado | null>(null);
   const handleDesbloquear = async () => {
@@ -235,13 +239,19 @@ export function CodigoSupervisorView() {
             El código rotativo de supervisor aún no está configurado para este local. Genera el secreto criptográfico inicial para habilitar las autorizaciones de caja, pedidos y almacén.
           </p>
 
-          <Boton
-            variante="primario"
-            onClick={() => setModalGenerar(true)}
-            data-testid="btn-generar-secreto"
-          >
-            Generar secreto
-          </Boton>
+          {puedeGestionar ? (
+            <Boton
+              variante="primario"
+              onClick={() => setModalGenerar(true)}
+              data-testid="btn-generar-secreto"
+            >
+              Generar secreto
+            </Boton>
+          ) : (
+            <p data-testid="aviso-solo-admin-secreto" style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>
+              Pide al administrador que lo genere.
+            </p>
+          )}
         </div>
       ) : (
         /* Tarjeta principal del código */
@@ -377,15 +387,17 @@ export function CodigoSupervisorView() {
               {copiado ? 'Copiado' : 'Copiar código'}
             </Boton>
 
-            <Boton
-              variante="secundario"
-              onClick={() => setModalRotar(true)}
-              deshabilitado={cargando}
-              data-testid="btn-rotar-secreto"
-              style={{ minWidth: '140px' }}
-            >
-              Rotar secreto
-            </Boton>
+            {puedeGestionar && (
+              <Boton
+                variante="secundario"
+                onClick={() => setModalRotar(true)}
+                deshabilitado={cargando}
+                data-testid="btn-rotar-secreto"
+                style={{ minWidth: '140px' }}
+              >
+                Rotar secreto
+              </Boton>
+            )}
           </div>
         </div>
       )}
@@ -396,7 +408,7 @@ export function CodigoSupervisorView() {
           {bloqueados.map((b) => (
             <div key={b.partyId} style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
               <span>{b.nombre} ({b.segundosRestantes} s)</span>
-              <Boton variante="secundario" onClick={() => setADesbloquear(b)}>Desbloquear</Boton>
+              {puedeGestionar && <Boton variante="secundario" onClick={() => setADesbloquear(b)}>Desbloquear</Boton>}
             </div>
           ))}
         </div>

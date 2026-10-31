@@ -14,6 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { ClientesService, enmascararDoc, parsearCumpleanos } from './clientes.service';
+import { CodigoRegistroService } from './codigo-registro.service';
 import { PuntosService } from './puntos.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
@@ -35,6 +36,7 @@ describe('ClientesService', () => {
   let auditoriaMock: any;
   let puntosMock: any;
   let archivosMock: any;
+  let codigoRegistroMock: any;
 
   beforeEach(async () => {
     prismaMock = {
@@ -113,6 +115,8 @@ describe('ClientesService', () => {
       obtenerSaldo: jest.fn().mockResolvedValue(10),
     };
 
+    codigoRegistroMock = { consumir: jest.fn().mockResolvedValue(undefined) };
+
     archivosMock = {
       subirArchivo: jest.fn().mockResolvedValue({ id: '55', url: '/archivos/publico/2026/10/foto.webp' }),
     };
@@ -132,6 +136,7 @@ describe('ClientesService', () => {
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: PuntosService, useValue: puntosMock },
         { provide: ArchivosService, useValue: archivosMock },
+        { provide: CodigoRegistroService, useValue: codigoRegistroMock },
       ],
     }).compile();
 
@@ -266,6 +271,7 @@ describe('ClientesService', () => {
       nombre: 'Ana Pérez',
       contrasena: 'ClaveSegura2026',
       telefono: '912345678',
+      codigo: '123456',
       aceptaDatos: true as const,
     };
     const ficha = () =>
@@ -379,6 +385,44 @@ describe('ClientesService', () => {
       expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { party_id: 88n } }));
     });
 
+    it('sin código válido no crea ni vincula nada (CODIGO_INVALIDO se propaga)', async () => {
+      ficha();
+      codigoRegistroMock.consumir.mockRejectedValueOnce(
+        new BadRequestException({ codigo: 'CODIGO_INVALIDO', mensaje: 'El código no es correcto o ya venció. Pide uno nuevo.' }),
+      );
+      await expect(service.registro(dtoOk)).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
+      expect(codigoRegistroMock.consumir).toHaveBeenCalledWith('912345678', '123456');
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
+      expect(prismaMock.customerAccount.upsert).not.toHaveBeenCalled();
+    });
+
+    it('con DNI válido lo guarda como DNI del party de la cuenta', async () => {
+      ficha();
+      prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
+      await service.registro({ ...dtoOk, dni: '12345678' });
+      expect(prismaMock.partyIdentifier.create).toHaveBeenCalledWith({
+        data: { party_id: 100n, tipo: 'DNI', numero: '12345678' },
+      });
+    });
+
+    it('DNI con formato inválido responde DNI_INVALIDO sin crear nada', async () => {
+      await expect(service.registro({ ...dtoOk, dni: '1234567' })).rejects.toMatchObject({ response: { codigo: 'DNI_INVALIDO' } });
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
+    });
+
+    it('DNI ya usado por otra persona se ignora sin error y el registro sigue', async () => {
+      ficha();
+      prismaMock.partyIdentifier.findFirst.mockResolvedValue({ id: 9n, party_id: 555n });
+      await expect(service.registro({ ...dtoOk, dni: '12345678' })).resolves.toBeDefined();
+      expect(prismaMock.partyIdentifier.create).not.toHaveBeenCalled();
+    });
+
+    it('sin DNI (vacío) el registro funciona igual y no toca party_identifier', async () => {
+      ficha();
+      await expect(service.registro({ ...dtoOk, dni: '  ' })).resolves.toBeDefined();
+      expect(prismaMock.partyIdentifier.create).not.toHaveBeenCalled();
+    });
+
     it('una carrera por el mismo teléfono (índice único) responde 409', async () => {
       prismaMock.$transaction.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }));
       await expect(service.registro(dtoOk)).rejects.toMatchObject({ response: { codigo: 'TELEFONO_REGISTRADO' } });
@@ -479,18 +523,32 @@ describe('ClientesService', () => {
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CLIENTE_PERFIL_EDITADO', partyId: 100n }));
     });
 
-    it('actualizarPerfil nunca cambia el DNI ni la contraseña aunque se envíen', async () => {
+    it('actualizarPerfil nunca cambia la contraseña aunque se envíe', async () => {
       prismaMock.person.update.mockResolvedValue({});
       prismaMock.party.findUnique.mockResolvedValue(cuentaYo());
 
-      await service.actualizarPerfil(100n, { nombre: 'Ana Pérez', dni: '11111111', contrasena: 'OtraClave2026' } as any);
+      await service.actualizarPerfil(100n, { nombre: 'Ana Pérez', contrasena: 'OtraClave2026' } as any);
 
       const datos = prismaMock.person.update.mock.calls[0][0].data;
-      expect(datos).not.toHaveProperty('dni');
       expect(datos).not.toHaveProperty('contrasena');
-      expect(prismaMock.partyIdentifier.create).not.toHaveBeenCalled();
       expect(prismaMock.customerAccount.upsert).not.toHaveBeenCalled();
       expect(prismaMock.customerAccount.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('actualizarPerfil agrega el DNI opcional si la cuenta no tiene uno; vacío no cambia nada; inválido responde DNI_INVALIDO', async () => {
+      prismaMock.party.findUnique.mockResolvedValue(cuentaYo());
+      prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
+
+      await service.actualizarPerfil(100n, { nombre: 'Ana Pérez', dni: '11111111' });
+      expect(prismaMock.partyIdentifier.create).toHaveBeenCalledWith({ data: { party_id: 100n, tipo: 'DNI', numero: '11111111' } });
+
+      prismaMock.partyIdentifier.create.mockClear();
+      await service.actualizarPerfil(100n, { nombre: 'Ana Pérez', dni: '' });
+      expect(prismaMock.partyIdentifier.create).not.toHaveBeenCalled();
+
+      await expect(service.actualizarPerfil(100n, { nombre: 'Ana Pérez', dni: '123' })).rejects.toMatchObject({
+        response: { codigo: 'DNI_INVALIDO' },
+      });
     });
 
     it('actualizarPerfil rechaza nombre corto, correo inválido y cumpleaños inválido', async () => {

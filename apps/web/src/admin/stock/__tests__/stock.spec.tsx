@@ -111,6 +111,22 @@ describe('Módulo Stock y recetas (Front)', () => {
     });
   });
 
+  it('1b. InsumosTab: el filtro Mostrar es un combo con cantidades y filtra la lista', async () => {
+    render(
+      <MemoryRouter>
+        <InsumosTab lugares={mockLugares} />
+      </MemoryRouter>,
+    );
+    await screen.findByText('Café en grano');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar: Todos' }));
+    expect(screen.getByRole('option', { name: /Agotados/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /Agotados/ }));
+
+    expect(screen.getByRole('button', { name: 'Mostrar: Agotados' })).toBeInTheDocument();
+    expect(screen.queryByText('Café en grano')).not.toBeInTheDocument();
+  });
+
   it('2. ModalInsumo valida niveles (mínimo < intermedio < máximo) y proveedores repetidos', () => {
     const handleGuardar = vi.fn();
     render(

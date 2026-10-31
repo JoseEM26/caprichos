@@ -1,60 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import {
-  armarMosaicoMomentos,
-  MosaicoMomentos,
-  repartirEnColumnas,
-} from '../MosaicoMomentos';
-import { IMAGENES_MARCA_FABRICA } from '../../comun/imagenesMarca';
+import { MosaicoMomentos, repartirEnColumnas } from '../MosaicoMomentos';
+import type { FotoMosaico } from '../MosaicoMomentos';
+import { ProveedorEdicion } from '../edicion';
+import type { ModoEdicion } from '../edicion';
 
-const esDeFabrica = (src: string) => IMAGENES_MARCA_FABRICA.includes(src);
-
-/** Vecinas en la misma fila (índices consecutivos) y en la misma columna (saltos de `columnas`). */
-function hayVecinasIguales(lista: string[], columnas: number): boolean {
-  for (let i = 0; i < lista.length; i++) {
-    if (i + 1 < lista.length && lista[i] === lista[i + 1]) return true;
-    if (i + columnas < lista.length && lista[i] === lista[i + columnas]) return true;
-  }
-  return false;
-}
-
-describe('armarMosaicoMomentos', () => {
-  it('sin fotos propias llena con las de fábrica repetidas, sin vecinas iguales', () => {
-    for (const cantidad of [4, 8, 12, 20]) {
-      const lista = armarMosaicoMomentos([], cantidad);
-      expect(lista).toHaveLength(cantidad);
-      expect(lista.every(esDeFabrica)).toBe(true);
-      expect(hayVecinasIguales(lista, 2)).toBe(false);
-      expect(hayVecinasIguales(lista, 3)).toBe(false);
-      expect(hayVecinasIguales(lista, 4)).toBe(false);
-    }
-  });
-
-  it('usa las 5 fotos de fábrica (no solo una) al repetir', () => {
-    const lista = armarMosaicoMomentos([], 10);
-    expect(new Set(lista).size).toBe(5);
-  });
-
-  it('pone primero las fotos propias y completa con fábrica', () => {
-    const propias = ['/archivos/publico/2026/10/a.webp', '/archivos/publico/2026/10/b.webp'];
-    const lista = armarMosaicoMomentos(propias, 6);
-    expect(lista).toHaveLength(6);
-    expect(lista.slice(0, 2)).toEqual(propias);
-    expect(lista.slice(2).every(esDeFabrica)).toBe(true);
-  });
-
-  it('muestra todas las propias aunque superen la cantidad, sin repetir', () => {
-    const propias = ['/a.webp', '/b.webp', '/a.webp', '/c.webp', '/d.webp'];
-    const lista = armarMosaicoMomentos(propias, 3);
-    expect(lista).toEqual(['/a.webp', '/b.webp', '/c.webp', '/d.webp']);
-  });
-
-  it('ignora entradas vacías', () => {
-    const lista = armarMosaicoMomentos(['', '/x.webp'], 2);
-    expect(lista[0]).toBe('/x.webp');
-    expect(lista).toHaveLength(2);
-  });
-});
+const fotos = (n: number, prefijo = 'f'): FotoMosaico[] =>
+  Array.from({ length: n }, (_, i) => ({ id: `${prefijo}${i}`, url: `/archivos/${prefijo}${i}.webp` }));
 
 describe('repartirEnColumnas', () => {
   it('reparte en columnas por turnos sin perder elementos', () => {
@@ -71,12 +23,21 @@ describe('MosaicoMomentos (render)', () => {
     delete (window as any).matchMedia;
   });
 
-  it('en PC usa 4 columnas y llena la cantidad pedida con imágenes con alt y lazy por defecto', () => {
-    render(<MosaicoMomentos cantidad={8} />);
+  it('muestra solo sus fotos, sin repetirlas ni rellenar con imágenes de otro lugar', () => {
+    render(<MosaicoMomentos fotos={fotos(3)} />);
+    const imagenes = Array.from(screen.getByTestId('mosaico-momentos').querySelectorAll('img'));
+    expect(imagenes.map((i) => i.getAttribute('src'))).toEqual(['/archivos/f0.webp', '/archivos/f1.webp', '/archivos/f2.webp']);
+  });
 
+  it('en la carta pública sin fotos no pinta nada', () => {
+    const { container } = render(<MosaicoMomentos titulo="Momentos Caprichos" fotos={[]} />);
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('en PC usa 4 columnas con 8 fotos e imágenes con alt y lazy por defecto', () => {
+    render(<MosaicoMomentos fotos={fotos(8)} />);
     const grilla = screen.getByTestId('mosaico-momentos');
     expect(grilla.style.gridTemplateColumns).toBe('repeat(4, minmax(0, 1fr))');
-
     const imagenes = grilla.querySelectorAll('img');
     expect(imagenes).toHaveLength(8);
     imagenes.forEach((img) => {
@@ -91,24 +52,47 @@ describe('MosaicoMomentos (render)', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     })) as any;
-
-    render(<MosaicoMomentos cantidad={6} />);
+    render(<MosaicoMomentos fotos={fotos(6)} />);
     expect(screen.getByTestId('mosaico-momentos').style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
   });
 
   it('muestra el encabezado y carga la primera fila de forma inmediata si es prioritaria', () => {
-    render(<MosaicoMomentos titulo="Momentos Caprichos" cantidad={8} prioritaria />);
-
+    render(<MosaicoMomentos titulo="Momentos Caprichos" fotos={fotos(8)} prioritaria />);
     expect(screen.getByText('Momentos Caprichos')).toBeInTheDocument();
     const imagenes = Array.from(screen.getByTestId('mosaico-momentos').querySelectorAll('img'));
-    // Con 4 columnas, la primera fila (4 imágenes) carga de inmediato y el resto de forma perezosa.
     expect(imagenes.filter((img) => img.getAttribute('loading') === 'eager')).toHaveLength(4);
     expect(imagenes.filter((img) => img.getAttribute('loading') === 'lazy')).toHaveLength(4);
   });
 
-  it('prioriza las fotos propias al renderizar', () => {
-    render(<MosaicoMomentos fotos={['/archivos/publico/2026/10/propia.webp']} cantidad={3} columnas={1} />);
-    const imagenes = Array.from(screen.getByTestId('mosaico-momentos').querySelectorAll('img'));
-    expect(imagenes[0].getAttribute('src')).toBe('/archivos/publico/2026/10/propia.webp');
+  it('en edición envuelve cada foto con su clave propia y ofrece «+ Agregar foto»', () => {
+    const ed: ModoEdicion = {
+      cambiarTexto: vi.fn(),
+      bloque: vi.fn((clave: string, hijo: any) => <div data-testid={`bloque-${clave}`}>{hijo}</div>),
+      agregar: vi.fn((clave: string, etiqueta: string) => <button key="agregar">{etiqueta} ({clave})</button>),
+      accion: vi.fn(),
+    };
+    render(
+      <ProveedorEdicion value={ed}>
+        <MosaicoMomentos fotos={fotos(2, 'g')} claveFotos="galeria" conAgregar />
+      </ProveedorEdicion>,
+    );
+    expect(screen.getByTestId('bloque-galeria:g0')).toBeTruthy();
+    expect(screen.getByTestId('bloque-galeria:g1')).toBeTruthy();
+    expect(screen.getByText('Agregar foto (galeria)')).toBeTruthy();
+  });
+
+  it('en edición sin fotos igual muestra «+ Agregar foto» para empezar', () => {
+    const ed: ModoEdicion = {
+      cambiarTexto: vi.fn(),
+      bloque: vi.fn((_c: string, hijo: any) => hijo),
+      agregar: vi.fn((_c: string, etiqueta: string) => <button key="a">{etiqueta}</button>),
+      accion: vi.fn(),
+    };
+    render(
+      <ProveedorEdicion value={ed}>
+        <MosaicoMomentos fotos={[]} claveFotos="momento" conAgregar />
+      </ProveedorEdicion>,
+    );
+    expect(screen.getByText('Agregar foto')).toBeTruthy();
   });
 });

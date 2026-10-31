@@ -2,7 +2,20 @@
   display: flex;
   gap: 16px;
   align-items: stretch;
-  height: clamp(560px, calc(100vh - 230px), 900px);
+  height: clamp(520px, calc(100vh - 196px), 900px);
+}
+
+/* Caja cerrada e impresoras: una línea de chips encima de la lista */
+.cj-estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cj-estado:empty {
+  display: none;
 }
 
 .cj-left,
@@ -18,7 +31,7 @@
 }
 
 .cj-left {
-  flex: 0 0 clamp(340px, 38%, 460px);
+  flex: 0 0 clamp(380px, 42%, 500px);
 }
 
 .cj-right {
@@ -35,6 +48,41 @@
   flex: none;
   max-height: 55%;
   overflow-y: auto;
+}
+
+/* Cabecera de la lista: sin límite de alto, así los desplegables no quedan recortados */
+.cj-cabecera {
+  padding: 10px 12px;
+  gap: 8px;
+  max-height: none;
+  overflow: visible;
+}
+
+/* Barras de la cabecera: se acomodan en filas con wrap (PC: lado a lado; celular: en filas) */
+.cj-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cj-barra-vista {
+  flex: 0 1 240px;
+  min-width: 0;
+}
+
+.cj-nuevo {
+  margin-left: auto;
+}
+
+.cj-barra-filtros {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--cp-line, #E3D6C6);
 }
 
 .cj-scroll {

@@ -8,6 +8,7 @@ import { ModalFormularioReserva } from './componentes/ModalFormularioReserva';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { useSalonSocket } from './useSalonSocket';
 import { salonApi } from './api';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export interface SolicitudWhatsApp {
   id: string;
@@ -1204,7 +1205,7 @@ export function ReservasView() {
           gap: '8px',
         }}
       >
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <BarraFiltros>
           <input
             id="t-q"
             type="search"
@@ -1212,7 +1213,7 @@ export function ReservasView() {
             onChange={(e) => setBusquedaTabla(e.target.value)}
             placeholder="Buscar por cliente o código"
             style={{
-              flex: '1 1 0%',
+              flex: '2 1 220px',
               minWidth: 0,
               boxSizing: 'border-box',
               minHeight: '44px',
@@ -1260,88 +1261,31 @@ export function ReservasView() {
             </svg>
             Filtros
           </button>
-        </div>
+        </BarraFiltros>
 
         {filtrosAbiertos && (
-          <div
-            style={{
-              borderTop: '1px solid var(--cp-line)',
-              paddingTop: '8px',
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px 20px',
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  color: 'var(--cp-soft)',
-                }}
-              >
-                ESTADO
-              </span>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {['todos', 'Confirmada', 'Pendiente', 'Cancelada', 'Atendida'].map((est) => (
-                  <button
-                    key={est}
-                    type="button"
-                    onClick={() => setFiltroEstado(est)}
-                    style={{
-                      minHeight: '34px',
-                      padding: '0 12px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy)',
-                      background: filtroEstado === est ? 'var(--cp-navy)' : 'transparent',
-                      color: filtroEstado === est ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {est === 'todos' ? 'Todos' : est}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  color: 'var(--cp-soft)',
-                }}
-              >
-                PERSONAS
-              </span>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {['todos', '2', '4', '6'].map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setFiltroPersonas(p)}
-                    style={{
-                      minHeight: '34px',
-                      padding: '0 12px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy)',
-                      background: filtroPersonas === p ? 'var(--cp-navy)' : 'transparent',
-                      color: filtroPersonas === p ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {p === 'todos' ? 'Todas' : `${p} personas`}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          <BarraFiltros style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '8px' }}>
+            <FiltroCombo
+              etiqueta="Estado"
+              valor={filtroEstado}
+              valorPorDefecto="todos"
+              opciones={[
+                { valor: 'todos', etiqueta: 'Todos' },
+                ...['Confirmada', 'Pendiente', 'Cancelada', 'Atendida'].map((e) => ({ valor: e, etiqueta: e })),
+              ]}
+              alCambiar={setFiltroEstado}
+            />
+            <FiltroCombo
+              etiqueta="Personas"
+              valor={filtroPersonas}
+              valorPorDefecto="todos"
+              opciones={[
+                { valor: 'todos', etiqueta: 'Todas' },
+                ...['2', '4', '6'].map((p) => ({ valor: p, etiqueta: `${p} personas` })),
+              ]}
+              alCambiar={setFiltroPersonas}
+            />
+          </BarraFiltros>
         )}
 
         {/* Grilla de tarjetas de reservas */}

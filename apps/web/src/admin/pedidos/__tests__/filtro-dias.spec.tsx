@@ -60,6 +60,12 @@ describe('Filtro de días en Pedidos y caja', () => {
     vi.restoreAllMocks();
   });
 
+  /** Abre el combo «Mostrar» y elige una opción */
+  const elegirPeriodo = (opcion: RegExp) => {
+    fireEvent.click(screen.getByRole('button', { name: /^Mostrar: / }));
+    fireEvent.click(screen.getByRole('option', { name: opcion }));
+  };
+
   /** Llamadas a listar que piden la lista (no el conteo ligero de pendientes, limite 1) */
   const llamadasLista = () =>
     listar.mock.calls.map((c) => c[0]).filter((f: any) => !(f?.pendientes && f?.limite === 1));
@@ -69,7 +75,7 @@ describe('Filtro de días en Pedidos y caja', () => {
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
     expect(llamadasLista()[0]).toEqual({ desde: HOY, hasta: HOY, limite: 100 });
-    expect(screen.getByRole('button', { name: 'Hoy' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Mostrar: Hoy' })).toBeInTheDocument();
     expect(screen.getByText(/Mostrando:/)).toHaveTextContent('hoy, 28 oct');
     expect(screen.queryByRole('button', { name: 'Volver a hoy' })).not.toBeInTheDocument();
   });
@@ -83,7 +89,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     render(<PedidosAdminView />);
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ayer' }));
+    elegirPeriodo(/Ayer/);
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(2));
     expect(llamadasLista()[1]).toEqual({ desde: '2026-10-27', hasta: '2026-10-27', limite: 100 });
@@ -99,7 +105,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     render(<PedidosAdminView />);
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Últimos 7 días' }));
+    elegirPeriodo(/Últimos 7 días/);
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(2));
     expect(llamadasLista()[1]).toEqual({ desde: '2026-10-22', hasta: HOY, limite: 100 });
@@ -109,7 +115,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     render(<PedidosAdminView />);
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Elegir día / rango' }));
+    elegirPeriodo(/Elegir día \/ rango/);
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-10-20' } });
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-10-25' } });
     fireEvent.click(screen.getByRole('button', { name: 'Ver estos días' }));
@@ -123,7 +129,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     render(<PedidosAdminView />);
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Elegir día / rango' }));
+    elegirPeriodo(/Elegir día \/ rango/);
 
     // Desde posterior a hasta
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-10-26' } });
@@ -143,14 +149,17 @@ describe('Filtro de días en Pedidos y caja', () => {
   it('pendientes de días anteriores: el aviso cuenta y al tocarlo lista solo esos', async () => {
     render(<PedidosAdminView />);
 
-    const aviso = await screen.findByRole('button', { name: '3 pendientes de días anteriores' });
+    await screen.findByRole('button', { name: /^Mostrar: / });
     expect(listar).toHaveBeenCalledWith({ pendientes: true, limite: 1 });
 
-    fireEvent.click(aviso);
+    fireEvent.click(screen.getByRole('button', { name: /^Mostrar: / }));
+    const opcion = screen.getByRole('option', { name: /Pendientes de días anteriores/ });
+    expect(opcion).toHaveTextContent('3');
+    fireEvent.click(opcion);
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(2));
     expect(llamadasLista()[1]).toEqual({ pendientes: true, limite: 100 });
-    expect(screen.getByRole('button', { name: 'Pendientes anteriores · 3' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Mostrar: Pendientes de días anteriores' })).toBeInTheDocument();
     expect(screen.getByText(/Mostrando:/)).toHaveTextContent('pendientes de días anteriores');
   });
 

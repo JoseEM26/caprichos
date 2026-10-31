@@ -5,6 +5,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { formatearUnidad, qty1 } from './formato';
 
 interface RecetasTabProps {
@@ -344,77 +345,19 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
           </div>
 
           {/* Filtros de la tabla */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => setFiltroTipo('TODOS')}
-                style={{
-                  minHeight: 38,
-                  padding: '0 14px',
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  background: filtroTipo === 'TODOS' ? 'var(--cp-navy)' : 'transparent',
-                  color: filtroTipo === 'TODOS' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                Todos ({conteos.todos})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroTipo('VENTA')}
-                style={{
-                  minHeight: 38,
-                  padding: '0 14px',
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  background: filtroTipo === 'VENTA' ? 'var(--cp-navy)' : 'transparent',
-                  color: filtroTipo === 'VENTA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                Se vende ({conteos.venta})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroTipo('PRODUCCION')}
-                style={{
-                  minHeight: 38,
-                  padding: '0 14px',
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  background: filtroTipo === 'PRODUCCION' ? 'var(--cp-navy)' : 'transparent',
-                  color: filtroTipo === 'PRODUCCION' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                Se prepara por tanda ({conteos.produccion})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroTipo('SIN_RECETA')}
-                style={{
-                  minHeight: 38,
-                  padding: '0 14px',
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  background: filtroTipo === 'SIN_RECETA' ? 'var(--cp-navy)' : 'transparent',
-                  color: filtroTipo === 'SIN_RECETA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                Sin receta ({conteos.sinReceta})
-              </button>
-            </div>
+          <BarraFiltros style={{ justifyContent: 'space-between', marginTop: 4 }}>
+            <FiltroCombo
+              etiqueta="Mostrar"
+              valor={filtroTipo}
+              valorPorDefecto="TODOS"
+              opciones={[
+                { valor: 'TODOS', etiqueta: 'Todos', cantidad: conteos.todos },
+                { valor: 'VENTA', etiqueta: 'Se vende', cantidad: conteos.venta },
+                { valor: 'PRODUCCION', etiqueta: 'Se prepara por tanda', cantidad: conteos.produccion },
+                { valor: 'SIN_RECETA', etiqueta: 'Sin receta', cantidad: conteos.sinReceta },
+              ]}
+              alCambiar={(v) => setFiltroTipo(v as typeof filtroTipo)}
+            />
 
             <input
               type="search"
@@ -422,6 +365,8 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               style={{
+                flex: '2 1 220px',
+                minWidth: 0,
                 minHeight: 38,
                 padding: '0 12px',
                 borderRadius: 8,
@@ -431,7 +376,7 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
                 width: 240,
               }}
             />
-          </div>
+          </BarraFiltros>
 
           {/* Tabla de productos y márgenes */}
           <div className="tabla-tactil-envoltura" style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '12px' }}>

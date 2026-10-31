@@ -120,6 +120,8 @@ export function FormularioCheckout({
   const clienteCuenta = cuentaCtx?.cliente ?? null;
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
   const [comoInvitado, setComoInvitado] = useState(false);
+  // Sin invitado permitido, quien pide sin cuenta debe escribir su celular (así suma puntos): no se ofrece «invitado»
+  const invitadoPermitido = datosLocal?.invitadoPermitido === true;
   const [verPuntos, setVerPuntos] = useState(false);
   // Con sesión el pedido usa el nombre y el teléfono de la cuenta; el teléfono puede cambiarse solo para este pedido
   const [otroTelefono, setOtroTelefono] = useState(false);
@@ -355,15 +357,20 @@ export function FormularioCheckout({
 
   // Validaciones del formulario separadas por apartado
   const validarPaso1 = (): string | null => {
-    if (!clienteCuenta && !comoInvitado) {
+    if (!clienteCuenta && !comoInvitado && invitadoPermitido) {
       return 'Elige si ingresas con tu cuenta o continúas como invitado';
     }
     if (!nombre.trim()) {
       return 'El nombre es obligatorio';
     }
     const telLimpio = telefono.trim();
-    if (!/^9\d{8}$/.test(telLimpio)) {
+    if (telLimpio && !/^9\d{8}$/.test(telLimpio)) {
       return 'El teléfono debe tener 9 dígitos y empezar con 9';
+    }
+    if (!telLimpio) {
+      // Con cuenta el celular es obligatorio; como invitado solo si el dueño no permite pedir sin celular
+      if (clienteCuenta) return 'El teléfono debe tener 9 dígitos y empezar con 9';
+      if (!invitadoPermitido) return 'Escribe tu celular para hacer tu pedido y sumar puntos';
     }
     return null;
   };
@@ -543,7 +550,7 @@ export function FormularioCheckout({
     const payload = {
       cliente: {
         nombre: nombre.trim(),
-        telefono: telefono.trim(),
+        ...(telefono.trim() ? { telefono: telefono.trim() } : {}),
       },
       modalidad,
       entrega:
@@ -611,6 +618,9 @@ export function FormularioCheckout({
           setErrorEnvio('La carta se encuentra cerrada. No es posible enviar pedidos ahora.');
         } else if (err.codigo === 'FUERA_DE_COBERTURA') {
           setErrorEnvio('La dirección indicada está fuera de nuestra zona de cobertura.');
+        } else if (err.codigo === 'CELULAR_REQUERIDO') {
+          setPaso(1);
+          setErrorEnvio('Escribe tu celular para hacer tu pedido y sumar puntos.');
         } else if (err.codigo === 'FACTURA_DATOS_INCOMPLETOS') {
           setErrorEnvio('La factura exige un RUC de 11 dígitos y razón social válida.');
         } else {
@@ -928,7 +938,7 @@ export function FormularioCheckout({
                   </div>
 
                   {/* Acceso (cuenta o invitado) */}
-                  {!clienteCuenta && !comoInvitado && (
+                  {!clienteCuenta && !comoInvitado && invitadoPermitido && (
                     <div
                       style={{
                         backgroundColor: 'var(--cp-white)',
@@ -999,7 +1009,7 @@ export function FormularioCheckout({
                   )}
 
                   {/* Datos de contacto */}
-                  {(clienteCuenta || comoInvitado) && (
+                  {(clienteCuenta || comoInvitado || !invitadoPermitido) && (
                     <div
                       style={{
                         backgroundColor: 'var(--cp-white)',
@@ -1027,7 +1037,9 @@ export function FormularioCheckout({
                         </div>
                       ) : (
                         <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                          Sigues como invitado: solo necesitamos tu nombre y celular.{' '}
+                          {invitadoPermitido
+                            ? 'Sigues como invitado: solo necesitamos tu nombre.'
+                            : 'Pides sin cuenta: solo necesitamos tu nombre y tu celular.'}{' '}
                           <button type="button" onClick={() => cuentaCtx?.abrirPanel()} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}>
                             Ingresar para acumular puntos
                           </button>{' '}
@@ -1111,7 +1123,7 @@ export function FormularioCheckout({
                           value={telefono}
                           onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
                           placeholder="Ej.: 987654321"
-                          required
+                          required={!invitadoPermitido}
                           style={{
                             width: '100%',
                             minHeight: '44px',
@@ -1123,6 +1135,11 @@ export function FormularioCheckout({
                             fontSize: '14px',
                           }}
                         />
+                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '4px' }}>
+                          {invitadoPermitido
+                            ? 'Opcional. Con tu celular sumas puntos.'
+                            : 'Tu celular: sumas puntos con tu numero, sin contrasena.'}
+                        </div>
                       </div>
                           {clienteCuenta && otroTelefono && clienteCuenta.telefono && (
                             <button

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { api } from '../../comun/api';
 import { useNotificaciones } from '../useNotificaciones';
+import { EscritorioSupervisorView } from './EscritorioSupervisorView';
 
 interface ResumenApi {
   kpisS?: { n: string; v: string; dTxt?: string; dCol?: string }[];
@@ -36,7 +37,14 @@ function formatearIso(d: Date): string {
   return `${y}-${m}-${dia}`;
 }
 
+/** Escritorio del administrador, cajero, mozo y demás; el SUPERVISOR tiene el suyo, sin montos. */
 export function EscritorioView() {
+  const { usuario } = useSesion();
+  if ((usuario?.rol || '').toUpperCase() === 'SUPERVISOR') return <EscritorioSupervisorView />;
+  return <EscritorioGeneral />;
+}
+
+function EscritorioGeneral() {
   const { usuario, tiene } = useSesion();
   const puedeVerInformes = tiene('informes/ver');
   const navigate = useNavigate();

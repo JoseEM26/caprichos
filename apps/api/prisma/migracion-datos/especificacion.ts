@@ -201,6 +201,8 @@ export const ESPECIFICACION: Record<string, Espec> = {
     refs: { destacada: ref('destacada_id', 'destacada'), archivo: ref('archivo_id', 'archivo') },
   },
   respuesta_rapida: { clave: ['titulo'], activo: activoCampo },
+  // Sin activo: sale toda la tabla, también las ocultas (visible viaja y el upsert lo conserva)
+  resena_google: { clave: ['google_review_id'] },
   version_carta: {
     clave: ['estado', 'publicada_en'],
     omitir: ['publicada_por'],

@@ -4,6 +4,7 @@ import { calcularPrecioLinea } from '@caprichos/compartido';
 import { GrupoOpcionesCarta, OpcionElegida, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
+import { alternarEleccion } from './eleccionGrupo';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import {
   AvisoReemplazoCombo,
@@ -98,13 +99,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && producto.grupos.every((g) => (sel[g.id] ?? []).length >= g.minimo);
 
   const alternar = (g: GrupoOpcionesCarta, oid: string) => {
-    setSel((prev) => {
-      let actual = [...(prev[g.id] ?? [])];
-      if (g.maximo === 1) actual = [oid];
-      else if (actual.includes(oid)) actual = actual.filter((x) => x !== oid);
-      else if (actual.length < g.maximo) actual.push(oid);
-      return { ...prev, [g.id]: actual };
-    });
+    setSel((prev) => ({ ...prev, [g.id]: alternarEleccion(g, prev[g.id] ?? [], oid) }));
   };
 
   const consejoHielo = /poco hielo|menos hielo/i.test(nota)

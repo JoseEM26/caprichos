@@ -9,6 +9,11 @@ import type { VistaPreviaCarta } from '../../../carta/CartaPublica';
 import { CONOCENOS_DEFAULT } from '../../../carta/conocenosContenido';
 import { api } from '../../../comun/api';
 
+// La subida de fotos no toca el servidor en estas pruebas: devuelve siempre la misma imagen nueva.
+vi.mock('../../../comun/subidaImagen', () => ({
+  subirImagenAlServidor: vi.fn(async () => ({ id: '9', url: '/archivos/nueva.webp' })),
+}));
+
 function rutas(mapa: Record<string, unknown>) {
   vi.spyOn(api, 'get').mockImplementation(async (url: string) => (url in mapa ? mapa[url] : null) as any);
   vi.spyOn(api, 'put').mockResolvedValue({ ok: true } as any);
@@ -329,13 +334,10 @@ describe('Conócenos: la página real en edición', () => {
     await waitFor(() => expect(ultimaPut('/admin/contenido/conocenos')?.bloques.find((b: any) => b.id === 'donde').visible).toBe(false), { timeout: 3000 });
   });
 
-  it('+ y − cambian la cantidad de fotos del mosaico', async () => {
+  it('el mosaico ya no tiene contador de fotos de fábrica: las fotos son las que se suben', async () => {
     await abrir();
-    fireEvent.click(screen.getByRole('group', { name: 'Mosaico de momentos' }));
-    fireEvent.click(screen.getByLabelText('Más fotos'));
-    await waitFor(() => expect(ultimaPut('/admin/contenido/conocenos')?.momentosCantidad).toBe(9), { timeout: 3000 });
-    fireEvent.click(screen.getByLabelText('Menos fotos'));
-    await waitFor(() => expect(ultimaPut('/admin/contenido/conocenos')?.momentosCantidad).toBe(8), { timeout: 3000 });
+    expect(screen.queryByLabelText('Más fotos')).toBeNull();
+    expect(screen.queryByLabelText('Menos fotos')).toBeNull();
   });
 
   it('tocar la dirección avisa «Se edita en Configuración del local» y no deja editarla', async () => {
@@ -357,5 +359,128 @@ describe('Conócenos: la página real en edición', () => {
     fireEvent.click(screen.getByText('Sí, publicar'));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/contenido/conocenos/publicar', {}), { timeout: 3000 });
     expect(ultimaPut('/admin/contenido/conocenos')?.etiqueta).toBe('NOSOTROS');
+  });
+});
+
+describe('Conócenos: cada foto se edita sola', () => {
+  const local = { nombre: 'Caprichos', direccion: 'Av. Campoy 123', telefono: '999 111 222', whatsapp: '999111222', horario: [], redes: {} };
+  const fotosPrueba = [
+    { id: 'a', url: '/archivos/a.webp', activo: true },
+    { id: 'b', url: '/archivos/b.webp', activo: true },
+    { id: 'c', url: '/archivos/c.webp', activo: true },
+    { id: 'd', url: '/archivos/d.webp', activo: true },
+  ];
+  const conGaleria = { ...CONOCENOS_DEFAULT, galeria: fotosPrueba };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    rutas({ '/admin/contenido/conocenos': { contenido: conGaleria, publicado: conGaleria, tieneBorrador: false }, '/carta': categorias, '/carta/local': local });
+  });
+
+  const abrir = async () => {
+    render(<MemoryRouter><ConocenosView /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByText('Av. Campoy 123').length).toBeGreaterThan(0));
+  };
+  const seleccionarFoto = (nombre: string) => fireEvent.click(screen.getByRole('group', { name: nombre }));
+  const galeriaGuardada = () => ultimaPut('/admin/contenido/conocenos')?.galeria as { id: string; url: string; activo: boolean }[] | undefined;
+
+  it('Bajar cambia el orden de la foto y se guarda en el borrador de Conócenos', async () => {
+    await abrir();
+    seleccionarFoto('Foto 1 (Nuestro lugar)');
+    fireEvent.click(screen.getByLabelText('Bajar Foto 1 (Nuestro lugar)'));
+    await waitFor(() => expect(galeriaGuardada()?.map((f) => f.id)).toEqual(['b', 'a', 'c', 'd']), { timeout: 3000 });
+  });
+
+  it('Quitar pide Sí/No: No no cambia nada; Sí la oculta y Mostrar la vuelve a poner', async () => {
+    await abrir();
+    seleccionarFoto('Foto 2 (Nuestro lugar)');
+    fireEvent.click(screen.getByText('Quitar'));
+    expect(screen.getByText('¿Quitar esta foto de Conócenos?')).toBeTruthy();
+    fireEvent.click(screen.getByText('No, conservarla'));
+    expect(api.put).not.toHaveBeenCalledWith('/admin/contenido/conocenos', expect.anything());
+
+    fireEvent.click(screen.getByText('Quitar'));
+    fireEvent.click(screen.getByText('Sí, quitar'));
+    await waitFor(() => expect(galeriaGuardada()?.find((f) => f.id === 'b')?.activo).toBe(false), { timeout: 3000 });
+    expect(galeriaGuardada()?.length).toBe(4); // nada se borra
+    expect(screen.getByText('Oculta')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Mostrar'));
+    await waitFor(() => expect(galeriaGuardada()?.find((f) => f.id === 'b')?.activo).toBe(true), { timeout: 3000 });
+  });
+
+  it('Cambiar foto sube la imagen y la pone en el lugar de la anterior', async () => {
+    await abrir();
+    seleccionarFoto('Foto 1 (Nuestro lugar)');
+    const entrada = screen.getByLabelText('Elegir foto para Foto 1 (Nuestro lugar)');
+    fireEvent.change(entrada, { target: { files: [new File(['x'], 'x.jpg', { type: 'image/jpeg' })] } });
+    await waitFor(() => expect(galeriaGuardada()?.[0]).toEqual({ id: 'a', url: '/archivos/nueva.webp', activo: true }), { timeout: 3000 });
+  });
+
+  it('+ Agregar foto añade una foto al final de la galería', async () => {
+    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (this: HTMLInputElement) {
+      Object.defineProperty(this, 'files', { value: [new File(['x'], 'nueva.jpg', { type: 'image/jpeg' })] });
+      (this as any).onchange?.(new Event('change'));
+    });
+    await abrir();
+    fireEvent.click(screen.getByText('+ Agregar foto'));
+    await waitFor(() => expect(galeriaGuardada()).toHaveLength(5), { timeout: 3000 });
+    expect(galeriaGuardada()?.[4].url).toBe('/archivos/nueva.webp');
+    expect(galeriaGuardada()?.[4].activo).toBe(true);
+  });
+
+  it('la cuarta foto queda en Momentos, sin la etiqueta de Nuestro lugar', async () => {
+    await abrir();
+    expect(screen.getByRole('group', { name: 'Foto 4' })).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Foto 4 (Nuestro lugar)' })).toBeNull();
+  });
+});
+
+describe('Novedades: Momentos Caprichos propios', () => {
+  const momentos = [
+    { id: 'm1', url: '/archivos/m1.webp', activo: true },
+    { id: 'm2', url: '/archivos/m2.webp', activo: true },
+  ];
+  const encabezado = { etiqueta: 'NOVEDADES', titulo: 'Lo nuevo', subtitulo: 'Sub' };
+  const local = { nombre: 'Caprichos', direccion: 'Av. Campoy 123', telefono: '999', whatsapp: '999', horario: [], redes: {} };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    rutas({
+      '/admin/contenido/novedades': [],
+      '/admin/contenido/novedades/borrador': { items: null, tieneBorrador: false },
+      '/admin/contenido/novedades/encabezado': { encabezado, tieneBorrador: false },
+      '/admin/contenido/novedades/momentos': { fotos: momentos, tieneBorrador: false },
+      '/carta': categorias,
+      '/carta/local': local,
+    });
+  });
+
+  const abrir = async () => {
+    render(<MemoryRouter><NovedadesView /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Momento 1' })).toBeTruthy());
+  };
+  const momentosGuardados = () => ultimaPut('/admin/contenido/novedades/momentos')?.fotos as { id: string; activo: boolean }[] | undefined;
+
+  it('Quitar una foto de Momentos pide Sí/No y no la borra', async () => {
+    await abrir();
+    fireEvent.click(screen.getByRole('group', { name: 'Momento 2' }));
+    fireEvent.click(screen.getByText('Quitar'));
+    fireEvent.click(screen.getByText('No, conservarla'));
+    fireEvent.click(screen.getByText('Quitar'));
+    fireEvent.click(screen.getByText('Sí, quitar'));
+    await waitFor(() => expect(momentosGuardados()?.find((f) => f.id === 'm2')?.activo).toBe(false), { timeout: 3000 });
+    expect(momentosGuardados()).toHaveLength(2);
+  });
+
+  it('+ Agregar foto en Momentos añade a Momentos y no toca las tarjetas', async () => {
+    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (this: HTMLInputElement) {
+      Object.defineProperty(this, 'files', { value: [new File(['x'], 'nueva.jpg', { type: 'image/jpeg' })] });
+      (this as any).onchange?.(new Event('change'));
+    });
+    await abrir();
+    fireEvent.click(screen.getByText('+ Agregar foto'));
+    await waitFor(() => expect(momentosGuardados()).toHaveLength(3), { timeout: 3000 });
+    expect(ultimaPut('/admin/contenido/novedades/borrador')?.items ?? []).toEqual([]);
   });
 });

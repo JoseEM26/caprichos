@@ -9,6 +9,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { PausaAltaDemandaDto } from './dto/pausa-alta-demanda.dto';
 
 export const CLAVES_NUMERICAS = [
+  'notif_sonido_intervalo_seg',
   'tiempo_prometido_min',
   'tiempo_max_min',
   'envio_gratis_monto',
@@ -75,6 +76,8 @@ export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]>
   eta_extra_por_producto_min: [0.5, 30, false, 'Los minutos de empaque por unidad deben estar entre 0.5 y 30'],
   eta_parada_min: [0.5, 30, false, 'Los minutos por parada previa deben estar entre 0.5 y 30'],
   eta_margen_min: [1, 60, true, 'El ancho mínimo del rango debe ser un entero entre 1 y 60 minutos'],
+  // Cada cuánto suena el aviso sin leer (Notificaciones; decisión del dueño)
+  notif_sonido_intervalo_seg: [5, 600, true, 'El intervalo del sonido debe ser un entero entre 5 y 600 segundos'],
   eta_paso_min: [1, 30, true, 'El redondeo debe ser un entero entre 1 y 30 minutos'],
   eta_base_sin_zona_min: [0.5, 60, false, 'Los minutos de puerta sin zona deben estar entre 0.5 y 60'],
   reserva_tolerancia_min: [1, 180, true, 'La tolerancia de reserva debe ser un entero entre 1 y 180 minutos'],
@@ -98,6 +101,7 @@ export const CLAVES_TEXTO = [
   'carta_aviso_entrada',
   'ayuda_ia_activo',
   'stock_control_activo',
+  'carta_invitado_activo',
   'terminos_texto',
   'privacidad_texto',
   'chatbot_activo',
@@ -125,7 +129,15 @@ export const CLAVES_TEXTO = [
   'whatsapp_aviso_entregado_activo',
   'whatsapp_aviso_recibido_activo',
   'whatsapp_aviso_encuesta_activo',
+  'cocina_confirmar_despejar',
+  // Notificaciones: sonido y «Marcar todas leídas» (si/no), alcance del sonido
+  'notif_sonido_activo',
+  'notif_sonido_alcance',
+  'notif_marcar_todas_activo',
 ] as const;
+
+/** Alcances del sonido de avisos (valor guardado en `notif_sonido_alcance`). */
+export const ALCANCES_SONIDO_NOTIF = ['TODOS_NO_LEIDOS', 'SOLO_URGENTES', 'SOLO_HOY'] as const;
 
 export const CLAVES_OBJETO = [
   'pausa_alta_demanda',
@@ -201,9 +213,13 @@ export class ConfiguracionService {
         clave === 'carta_aviso_entrada' ||
         clave === 'ayuda_ia_activo' ||
         clave === 'stock_control_activo' ||
+        clave === 'carta_invitado_activo' ||
         clave === 'chatbot_activo' ||
         clave === 'chatbot_ia_activo' ||
         clave === 'chatbot_avisos_equipo_activo' ||
+        clave === 'cocina_confirmar_despejar' ||
+        clave === 'notif_sonido_activo' ||
+        clave === 'notif_marcar_todas_activo' ||
         clave.startsWith('chatbot_funcion_') ||
         clave.startsWith('whatsapp_aviso_')
       ) {
@@ -222,6 +238,15 @@ export class ConfiguracionService {
           });
         }
         valor = valNorm;
+      } else if (clave === 'notif_sonido_alcance') {
+        const alcance = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
+        if (!(ALCANCES_SONIDO_NOTIF as readonly string[]).includes(alcance)) {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'El alcance debe ser TODOS_NO_LEIDOS, SOLO_URGENTES o SOLO_HOY',
+          });
+        }
+        valor = alcance;
       } else if (clave === 'reprog_recargo_modo') {
         // Mismos valores que MODOS_RECARGO_REPROG (repartos/recargo-reprogramacion.ts)
         const modo = typeof valor === 'string' ? valor.trim().toUpperCase() : '';

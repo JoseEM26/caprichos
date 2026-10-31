@@ -21,12 +21,15 @@ describe('NotificacionesView (/admin/notificaciones)', () => {
     pendientes: [
       {
         id: 'p1',
+        clave: 'n:p1',
         titulo: 'La impresora de cocina no responde',
         detalle: 'Los tickets quedan en pantalla. Revisa el cable o el papel.',
         prioridad: 'ALTA' as const,
         desde: '2026-10-15T19:40:00Z',
         modulo: 'cocina',
         accion: 'Ir a Cocina',
+        leida: false,
+        leidaEn: null,
       },
     ],
     conteosPorTipo: {
@@ -82,7 +85,7 @@ describe('NotificacionesView (/admin/notificaciones)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(api, 'listarHistorialNotificaciones').mockResolvedValue(mockData);
-    vi.spyOn(api, 'marcarNotificacionLeida').mockResolvedValue({ ok: true, id: '1', leida: true });
+    vi.spyOn(api, 'marcarNotificacion').mockResolvedValue({ ok: true, clave: 'n:1', leida: true });
     vi.spyOn(api, 'marcarTodasNotificacionesLeidas').mockResolvedValue({ ok: true });
     vi.spyOn(api, 'crearMensajeInterno').mockResolvedValue({ ok: true, id: '10' });
   });
@@ -115,7 +118,7 @@ describe('NotificacionesView (/admin/notificaciones)', () => {
     fireEvent.click(screen.getByText('Marcar como leída'));
 
     await waitFor(() => {
-      expect(api.marcarNotificacionLeida).toHaveBeenCalledWith('1', true);
+      expect(api.marcarNotificacion).toHaveBeenCalledWith('n:1', true);
     });
   });
 
@@ -155,6 +158,62 @@ describe('NotificacionesView (/admin/notificaciones)', () => {
         titulo: 'Aviso de turno',
         mensaje: 'Turno de tarde inicia 15:00',
       });
+    });
+  });
+
+  it('4. Todo pendiente tiene el botón Leído, guardado o calculado', async () => {
+    vi.spyOn(api, 'listarHistorialNotificaciones').mockResolvedValue({
+      ...mockData,
+      pendientes: [
+        ...mockData.pendientes,
+        {
+          id: 'por-cobrar',
+          clave: 'c:por-cobrar:0123456789ab',
+          titulo: '2 pedidos por cobrar',
+          detalle: 'Pedidos activos que aún no tienen el cobro registrado.',
+          prioridad: 'MEDIA' as const,
+          desde: null,
+          modulo: 'caja',
+          accion: 'Ir a Pedidos y caja',
+          leida: false,
+          leidaEn: null,
+        },
+      ],
+    });
+    render(
+      <MemoryRouter>
+        <NotificacionesView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('2 pedidos por cobrar')).toBeInTheDocument();
+    });
+    expect(screen.getAllByRole('button', { name: 'Leído' })).toHaveLength(2);
+    const botones = screen.getAllByRole('button', { name: 'Leído' });
+    for (const b of botones) {
+      expect(b.getAttribute('style')).toContain('min-height: 44px');
+    }
+  });
+
+  it('5. Leído pide confirmación Sí/No y, con Sí, marca el aviso como leído', async () => {
+    render(
+      <MemoryRouter>
+        <NotificacionesView />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Leído' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Leído' }));
+    expect(api.marcarNotificacion).not.toHaveBeenCalledWith('n:p1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar leída' }));
+
+    await waitFor(() => {
+      expect(api.marcarNotificacion).toHaveBeenCalledWith('n:p1');
     });
   });
 });

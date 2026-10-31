@@ -60,6 +60,7 @@ describe('Aislamiento estricto en servidor para rol REPARTIDOR', () => {
         update: jest.fn(),
         count: jest.fn(),
       },
+      rutaReparto: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 1n }), update: jest.fn(), delete: jest.fn() },
       mensajeReparto: {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),

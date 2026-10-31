@@ -69,11 +69,14 @@ describe('MisPedidosView', () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-M012');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Entregados' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Entregados' }));
+    expect(screen.getByRole('button', { name: 'Estado: Entregados' })).toBeInTheDocument();
     expect(screen.getByText('CP-M012')).toBeInTheDocument();
     expect(screen.queryByText('CP-M011')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'En curso' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Estado: Entregados' }));
+    fireEvent.click(screen.getByRole('option', { name: 'En curso' }));
     expect(screen.getByText('CP-M011')).toBeInTheDocument();
     expect(screen.queryByText('CP-M012')).not.toBeInTheDocument();
   });
@@ -117,7 +120,8 @@ describe('MisPedidosView', () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-M012');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ayer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Periodo: Hoy' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Ayer' }));
 
     await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith('ayer'));
   });

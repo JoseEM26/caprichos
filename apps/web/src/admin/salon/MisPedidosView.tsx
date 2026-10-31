@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos } from '../../comun/socket';
 import { salonApi } from './api';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
@@ -10,7 +11,6 @@ import { ModalVoucherPedido } from './ModalVoucherPedido';
 import { HistorialVoucher } from './HistorialVoucher';
 import { Confirmar } from '../../comun/Confirmar';
 import { vouchersApi } from '../vouchers/vouchersApi';
-import { ModalPrecuenta } from './componentes/ModalPrecuenta';
 import { ProgresoPedido } from './ProgresoPedido';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
 import type { MiPedido, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
@@ -65,10 +65,6 @@ const lugar = (p: MiPedido) => p.mesaNombre || MODALIDAD[p.modalidad] || p.modal
 
 const resumenLineas = (p: MiPedido) => p.lineas.map((l) => `${l.cantidad} x ${l.nombre}`).join(', ');
 
-/** La cuenta de una mesa se envía a Caja mientras el pedido no esté anulado, entregado ni cobrado. */
-const puedeEnviarACaja = (p: MiPedido) =>
-  p.modalidad === 'MESA' && p.estado !== 'ANULADO' && p.estado !== 'ENTREGADO' && p.pagoEstado !== 'PAGADO';
-
 const RESUMEN_VACIO = { cantidad: 0, total: 0, enCurso: 0, entregados: 0 };
 
 /** Pedidos que tomó el mozo: resumen del rango, filtro por estado y detalle de solo lectura. */
@@ -119,7 +115,6 @@ export function MisPedidosView() {
   const [quitando, setQuitando] = useState(false);
   const [errorQuitar, setErrorQuitar] = useState<string | null>(null);
   const [voucherPedido, setVoucherPedido] = useState<{ pedido: MiPedido; medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number } | null>(null);
-  const [cuentaPedido, setCuentaPedido] = useState<MiPedido | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
   const ultimaSolicitud = useRef(0);
 
@@ -211,45 +206,25 @@ export function MisPedidosView() {
         </div>
       </section>
 
-      <div className="mp-chips" role="group" aria-label="Rango de fechas">
-        {RANGOS.map((r) => (
-          <button
-            key={r.valor}
-            type="button"
-            className="mp-chip"
-            aria-pressed={rango === r.valor}
-            onClick={() => setRango(r.valor)}
-          >
-            {r.etiqueta}
-          </button>
-        ))}
-      </div>
-
-      <div className="mp-chips" role="group" aria-label="Estado del pedido">
-        {FILTROS.map((f) =>
-          f.valor === 'faltaVoucher' ? (
-            <button
-              key={f.valor}
-              type="button"
-              className="mp-chip mpv-chip-falta"
-              aria-pressed={filtro === f.valor}
-              onClick={() => setFiltro(f.valor)}
-            >
-              Falta voucher ({cuantosFaltan})
-            </button>
-          ) : (
-            <button
-              key={f.valor}
-              type="button"
-              className="mp-chip"
-              aria-pressed={filtro === f.valor}
-              onClick={() => setFiltro(f.valor)}
-            >
-              {f.etiqueta}
-            </button>
-          ),
-        )}
-      </div>
+      <BarraFiltros>
+        <FiltroCombo
+          etiqueta="Periodo"
+          valor={rango}
+          valorPorDefecto="hoy"
+          opciones={RANGOS.map((r) => ({ valor: r.valor, etiqueta: r.etiqueta }))}
+          alCambiar={(v) => setRango(v as RangoMisPedidos)}
+        />
+        <FiltroCombo
+          etiqueta="Estado"
+          valor={filtro}
+          opciones={FILTROS.map((f) =>
+            f.valor === 'faltaVoucher'
+              ? { valor: f.valor, etiqueta: f.etiqueta, cantidad: cuantosFaltan }
+              : { valor: f.valor, etiqueta: f.etiqueta },
+          )}
+          alCambiar={(v) => setFiltro(v as FiltroEstado)}
+        />
+      </BarraFiltros>
 
       {error && (
         <EstadoError
@@ -340,14 +315,6 @@ export function MisPedidosView() {
                   </div>
                 )}
 
-                {puedeEnviarACaja(p) && (
-                  <div className="mpv-fila">
-                    <button type="button" className="mpv-boton" onClick={() => setCuentaPedido(p)}>
-                      Enviar a Caja
-                    </button>
-                  </div>
-                )}
-
                 {p.plan && p.plan.length > 0 && (
                   <p className="mpv-ayuda">
                     {p.plan.map((f) => `${nombreMedioPlan(f.medio)} ${soles(f.monto)}`).join(' · ')}
@@ -399,24 +366,6 @@ export function MisPedidosView() {
           pisos={pisos}
           alCerrar={() => setModalAbierto(false)}
           alExitoPedido={() => void cargar()}
-        />
-      )}
-
-      {cuentaPedido && (
-        <ModalPrecuenta
-          abierto={true}
-          alCerrar={() => {
-            setCuentaPedido(null);
-            void cargar();
-          }}
-          mesa={cuentaPedido.mesaNombre || 'Mesa'}
-          lineas={cuentaPedido.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, detalle: '' }))}
-          total={cuentaPedido.total}
-          plan={cuentaPedido.plan}
-          pedidoId={cuentaPedido.id}
-          pagoMetodo={cuentaPedido.pagoMetodo}
-          vouchersPorMedio={cuentaPedido.vouchersPorMedio}
-          puedeCambiarVoucher={cuentaPedido.puedeCambiarVoucher}
         />
       )}
 

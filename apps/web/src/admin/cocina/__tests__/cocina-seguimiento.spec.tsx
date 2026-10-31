@@ -233,7 +233,8 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
         expect(screen.getByTestId('comanda-CP-301')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Todas' }));
+      fireEvent.click(screen.getByRole('button', { name: /^Área: / }));
+      fireEvent.click(screen.getByRole('option', { name: 'Todas' }));
 
       await waitFor(() => {
         expect(screen.getAllByTestId('comanda-CP-301')).toHaveLength(1);
@@ -275,7 +276,8 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
       await waitFor(() => {
         expect(screen.getByTestId('comanda-CP-301')).toBeInTheDocument();
       });
-      fireEvent.click(screen.getByRole('button', { name: 'Todas' }));
+      fireEvent.click(screen.getByRole('button', { name: /^Área: / }));
+      fireEvent.click(screen.getByRole('option', { name: 'Todas' }));
       fireEvent.click(screen.getByRole('button', { name: /Pantalla completa/i }));
 
       const fs = await screen.findByTestId('pantalla-completa-cocina');

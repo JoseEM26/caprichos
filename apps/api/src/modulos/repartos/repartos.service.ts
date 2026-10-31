@@ -19,9 +19,20 @@ import {
 } from './ruta.service';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
 import { montoPendienteReprogramacion } from './recargo-reprogramacion';
+import { SaltarPedidoDto } from './dto/saltar-pedido.dto';
+import { TomarRutaDto } from './dto/tomar-ruta.dto';
 import { TomarRutaSugeridaDto } from './dto/tomar-ruta-sugerida.dto';
 import { leerConfigEta } from './eta-entrega';
 import { idOpcion as calcularIdOpcion, sugerirRutas } from './rutas-sugeridas';
+import {
+  estadoFinalEnRuta,
+  horaFinalPedido,
+  hoyLima,
+  limitesDiaLima,
+  sincronizarRuta,
+  sumarARuta,
+} from './rutas-reparto';
+import { FiltrarRutasDto } from './dto/filtrar-rutas.dto';
 
 /** Estados de pedido que siguen vivos en el reparto: los únicos que muestra la vista activa. */
 export const ESTADOS_ACTIVOS_REPARTO = ['LISTO', 'EN_CAMINO'] as const;
@@ -412,8 +423,10 @@ export class RepartosService {
       data: {
         repartidor_party_id: null,
         tomado_en: null,
+        ruta_reparto_id: null,
       },
     });
+    await sincronizarRuta(this.prisma, partyId);
 
     const pedidosPropios = await this.prisma.pedido.findMany({
       where: {
@@ -444,9 +457,10 @@ export class RepartosService {
     });
 
     const ahora = new Date();
-    const propiosFormateados = pedidosPropios.map((p) =>
-      this.formatearPedidoReparto(p, config, ahora, usuario),
-    );
+    const propiosFormateados = pedidosPropios.map((p) => ({
+      ...this.formatearPedidoReparto(p, config, ahora, usuario),
+      ordenRuta: p.orden_ruta ?? null,
+    }));
 
     const inputPropios: PedidoRutaInput[] = pedidosPropios
       .filter((p) => p.entrega_lat != null && p.entrega_lng != null)
@@ -504,6 +518,9 @@ export class RepartosService {
 
     return {
       pedidos: propiosFormateados,
+      // Ruta en curso con TODOS sus pedidos (también los ya entregados, fallidos o anulados)
+      // (`ruta` ya es la línea del trazado; por eso este campo se llama rutaReparto)
+      rutaReparto: await this.rutaEnCurso(partyId, config, ahora, usuario),
       avisos: await this.avisosRetiro(partyId),
       orden: ordenCompleto,
       paso: rutaCalculada.paso,
@@ -512,6 +529,142 @@ export class RepartosService {
       distanciaKm: rutaCalculada.distanciaKm,
       tiempoMin: rutaCalculada.tiempoMin,
       velocidadKmh: rutaCalculada.velocidadKmh,
+    };
+  }
+
+  /** Ruta EN_CURSO del repartidor con todos sus pedidos (pendientes y ya terminados), o null si no tiene. */
+  private async rutaEnCurso(partyId: bigint, config: ParametrosReparto, ahora: Date, usuario: UsuarioAutenticado) {
+    const ruta = await this.prisma.rutaReparto.findFirst({
+      where: { repartidor_party_id: partyId, estado: 'EN_CURSO' },
+      orderBy: { id: 'desc' },
+    });
+    if (!ruta) return null;
+    const filas = await this.pedidosDeRuta([ruta.id]);
+    return {
+      id: String(ruta.id),
+      iniciadaEn: ruta.iniciada_en,
+      estado: ruta.estado,
+      pedidos: this.ordenarPedidosRuta(filas, partyId).map((p) => ({
+        ...this.formatearPedidoReparto(p, config, ahora, usuario),
+        ordenRuta: p.orden_ruta ?? null,
+        estadoFinal: p.estadoFinal,
+        horaFinal: p.horaFinal,
+        orden: p.orden,
+      })),
+    };
+  }
+
+  private pedidosDeRuta(rutaIds: bigint[]) {
+    return this.prisma.pedido.findMany({
+      where: { ruta_reparto_id: { in: rutaIds } },
+      include: {
+        zona: true,
+        lineas: { select: { cantidad: true } },
+        incidentes: { orderBy: { en: 'desc' }, take: 1, select: { en: true } },
+      },
+    });
+  }
+
+  /** Primero los ya terminados por hora de cierre, luego los pendientes por orden_ruta; `orden` es la posición en la ruta. */
+  private ordenarPedidosRuta(filas: any[], partyId: bigint) {
+    const conEstado = filas.map((p) => {
+      const estadoFinal = estadoFinalEnRuta(p, partyId);
+      return { ...p, estadoFinal, horaFinal: horaFinalPedido(p, estadoFinal) };
+    });
+    const t = (d: Date | null) => (d ? new Date(d).getTime() : Infinity);
+    conEstado.sort((a, b) => {
+      if ((a.estadoFinal == null) !== (b.estadoFinal == null)) return a.estadoFinal == null ? 1 : -1;
+      if (a.estadoFinal != null) return t(a.horaFinal) - t(b.horaFinal) || Number(a.id - b.id);
+      return (a.orden_ruta ?? Infinity) - (b.orden_ruta ?? Infinity) || Number(a.id - b.id);
+    });
+    return conEstado.map((p, i) => ({ ...p, orden: i + 1 }));
+  }
+
+  /** Suma en línea recta sede -> paradas en orden (km, aproximada). */
+  private distanciaRutaKm(paradas: any[], sede: Coordenadas): number {
+    let km = 0;
+    let ant = sede;
+    for (const p of paradas) {
+      if (p.entrega_lat == null || p.entrega_lng == null) continue;
+      const act = { lat: Number(p.entrega_lat), lng: Number(p.entrega_lng) };
+      km += this.rutaService.haversineKm(ant.lat, ant.lng, act.lat, act.lng);
+      ant = act;
+    }
+    return Math.round(km * 10) / 10;
+  }
+
+  /**
+   * GET /admin/repartos/mis-rutas (solo el repartidor, sus rutas) y /admin/repartos/rutas (caja/admin).
+   * Rutas agrupadas con sus pedidos en orden; por defecto hoy (hora de Lima), 20 por página.
+   * Sin montos: solo código, cliente, estado final y hora.
+   */
+  async listarRutas(filtros: FiltrarRutasDto, usuario: UsuarioAutenticado, soloPropias = false) {
+    const esRepartidor = usuario.rol === 'REPARTIDOR' || soloPropias;
+    const where: Prisma.RutaRepartoWhereInput = {};
+    if (esRepartidor) {
+      // Aislamiento: el repartidor solo ve las suyas, ignore el filtro que mande
+      where.repartidor_party_id = BigInt(usuario.partyId);
+      await sincronizarRuta(this.prisma, BigInt(usuario.partyId));
+    } else if (filtros.repartidor) {
+      if (!/^\d+$/.test(filtros.repartidor)) {
+        throw new BadRequestException({ codigo: 'REPARTIDOR_INVALIDO', mensaje: 'Repartidor no válido' });
+      }
+      where.repartidor_party_id = BigInt(filtros.repartidor);
+    }
+    const hoy = hoyLima();
+    const { inicio, fin } = limitesDiaLima(filtros.desde ?? hoy, filtros.hasta ?? filtros.desde ?? hoy);
+    where.iniciada_en = { gte: inicio, lte: fin };
+
+    const limite = 20;
+    const pagina = Math.max(1, Number(filtros.pagina) || 1);
+    const [total, rutas, config] = await Promise.all([
+      this.prisma.rutaReparto.count({ where }),
+      this.prisma.rutaReparto.findMany({
+        where,
+        orderBy: { iniciada_en: 'desc' },
+        skip: (pagina - 1) * limite,
+        take: limite,
+        include: { repartidor: { include: { persona: true } } },
+      }),
+      this.obtenerParametrosReparto(),
+    ]);
+    const filas = rutas.length ? await this.pedidosDeRuta(rutas.map((r) => r.id)) : [];
+
+    return {
+      rutas: rutas.map((r) => {
+        const pedidos = this.ordenarPedidosRuta(
+          filas.filter((p) => p.ruta_reparto_id === r.id),
+          r.repartidor_party_id,
+        );
+        const per = r.repartidor?.persona;
+        return {
+          id: String(r.id),
+          repartidorId: String(r.repartidor_party_id),
+          repartidorNombre: per ? `${per.nombres} ${per.apellidos ?? ''}`.trim() : `Repartidor #${r.repartidor_party_id}`,
+          iniciadaEn: r.iniciada_en,
+          terminadaEn: r.terminada_en,
+          estado: r.estado,
+          totalPedidos: pedidos.length,
+          entregados: pedidos.filter((p) => p.estadoFinal === 'ENTREGADO').length,
+          fallidos: pedidos.filter((p) => p.estadoFinal === 'NO_ENTREGADO' || p.estadoFinal === 'ANULADO').length,
+          distanciaKm: this.distanciaRutaKm(pedidos, config.localCoords),
+          pedidos: pedidos.map((p) => ({
+            id: String(p.id),
+            codigo: p.codigo,
+            clienteNombre: p.cliente_nombre ?? null,
+            direccion: p.entrega_direccion ?? null,
+            lat: p.entrega_lat != null ? Number(p.entrega_lat) : null,
+            lng: p.entrega_lng != null ? Number(p.entrega_lng) : null,
+            estadoFinal: p.estadoFinal,
+            horaFinal: p.horaFinal,
+            orden: p.orden,
+          })),
+        };
+      }),
+      pagina,
+      limite,
+      total,
+      totalPaginas: Math.max(1, Math.ceil(total / limite)),
     };
   }
 
@@ -845,6 +998,7 @@ export class RepartosService {
       data: {
         repartidor_party_id: partyId,
         tomado_en: ahora,
+        orden_ruta: null,
       },
     });
 
@@ -893,6 +1047,9 @@ export class RepartosService {
         mensaje: 'Otro repartidor ya tomó este pedido',
       });
     }
+
+    // Se suma a la ruta en curso del repartidor (o abre una)
+    await sumarARuta(this.prisma, partyId, [pedidoId], 'INDIVIDUAL', ahora);
 
     const pedido = await this.prisma.pedido.findUniqueOrThrow({
       where: { id: pedidoId },
@@ -968,6 +1125,8 @@ export class RepartosService {
         });
       }
     }
+
+    await this.verificarTurno(pedido);
 
     if (pedido.estado !== 'LISTO') {
       throw new BadRequestException({
@@ -1059,6 +1218,8 @@ export class RepartosService {
         });
       }
     }
+
+    await this.verificarTurno(pedido);
 
     if (pedido.estado !== 'EN_CAMINO') {
       throw new BadRequestException({
@@ -1155,6 +1316,8 @@ export class RepartosService {
       }
     }
 
+    await this.verificarTurno(pedido);
+
     if (pedido.estado !== 'EN_CAMINO') {
       throw new BadRequestException({
         codigo: 'ESTADO_INVALIDO',
@@ -1202,6 +1365,9 @@ export class RepartosService {
       return actualizado;
     });
     this.avisos?.despertar();
+
+    // Si era el último pendiente de su ruta, la ruta se cierra sola
+    if (pedido.repartidor_party_id != null) await sincronizarRuta(this.prisma, BigInt(pedido.repartidor_party_id), ahora);
 
     // Auditoría
     await this.auditoria.registrar({
@@ -1353,6 +1519,9 @@ export class RepartosService {
         estado: 'LISTO',
       },
     });
+
+    // El pedido se queda en su ruta como no entregado; si era el último pendiente, la ruta se cierra
+    if (pedido.repartidor_party_id != null) await sincronizarRuta(this.prisma, BigInt(pedido.repartidor_party_id), ahora);
 
     // Historial
     await this.prisma.pedidoEstadoHistorial.create({
@@ -1883,6 +2052,8 @@ export class RepartosService {
           tomadosIds.push(p.id);
         }
 
+        await sumarARuta(tx, partyId, tomadosIds, 'INDIVIDUAL', ahora);
+
         const tomadosFilas = tomadosIds.length > 0
           ? await tx.pedido.findMany({
               where: { id: { in: tomadosIds } },
@@ -1995,9 +2166,12 @@ export class RepartosService {
         tomado_en: null,
         salio_en: null,
         estado: 'LISTO',
+        // Liberado antes de salir: sale de la ruta; si ya había salido, queda en ella como no entregado
+        ...(pedido.salio_en == null ? { ruta_reparto_id: null } : {}),
       },
       include: { zona: true },
     });
+    await sincronizarRuta(this.prisma, BigInt(anteriorRepartidorId), ahora);
 
     await this.prisma.pedidoEstadoHistorial.create({
       data: {
@@ -2113,9 +2287,13 @@ export class RepartosService {
         repartidor_party_id: nuevoRepartidorPartyId,
         tomado_en: ahora,
         estado: pedido.estado === 'EN_CAMINO' ? 'EN_CAMINO' : 'LISTO',
+        ruta_reparto_id: null,
       },
       include: { zona: true },
     });
+    // Sale de la ruta del anterior y entra en la del nuevo repartidor
+    if (anteriorRepartidorId != null) await sincronizarRuta(this.prisma, BigInt(anteriorRepartidorId), ahora);
+    await sumarARuta(this.prisma, nuevoRepartidorPartyId, [pedidoId], 'INDIVIDUAL', ahora);
 
     await this.prisma.pedidoEstadoHistorial.create({
       data: {
@@ -2148,6 +2326,349 @@ export class RepartosService {
     });
 
     return this.formatearPedidoReparto(actualizado, config, ahora);
+  }
+
+  /** Pedidos que aún no se pueden tomar pero ya vienen: por validar pago o en cocina (solo delivery con ubicación). */
+  private whereProximos(): Prisma.PedidoWhereInput {
+    return {
+      modalidad: 'DELIVERY',
+      estado: { in: ['COLA', 'PREPARANDO'] },
+      repartidor_party_id: null,
+      anulado_en: null,
+      motivo_falla: null,
+      es_personal: false,
+    };
+  }
+
+  /** Por validar = pago digital pendiente aún en cola (falta aprobar el voucher); el resto está en cocina. */
+  private estadoProximo(p: { estado: string; pago_estado: string | null; pago_metodo: string | null; pago_preferido: string | null }) {
+    const digital = [p.pago_metodo, p.pago_preferido].some((m) => m != null && ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(m));
+    return p.estado === 'COLA' && p.pago_estado === 'PENDIENTE' && digital
+      ? ({ estado: 'POR_VALIDAR', estadoTexto: 'Por validar pago' } as const)
+      : ({ estado: 'EN_COCINA', estadoTexto: 'En cocina' } as const);
+  }
+
+  /**
+   * GET /admin/repartos/proximos (repartos/ver): pedidos delivery que todavía no se pueden tomar.
+   * Aislamiento: solo nombre del cliente, ubicación, zona y conteo; sin teléfono, dirección ni montos.
+   */
+  async listarProximos(_usuario?: UsuarioAutenticado) {
+    const filas = await this.prisma.pedido.findMany({
+      where: { ...this.whereProximos(), entrega_lat: { not: null }, entrega_lng: { not: null } },
+      include: { zona: true, lineas: { select: { cantidad: true } } },
+      orderBy: { creado_en: 'asc' },
+    });
+    const ahora = new Date();
+    return filas.map((p) => ({
+      id: String(p.id),
+      codigo: p.codigo,
+      clienteNombre: p.cliente_nombre ?? null,
+      lat: Number(p.entrega_lat),
+      lng: Number(p.entrega_lng),
+      zona: p.zona?.codigo ?? null,
+      ...this.estadoProximo(p),
+      minutosEspera: this.calcularMinutosYColor(p.creado_en, ahora).minutosEspera,
+      creadoEn: p.creado_en,
+      cantidadProductos: p.lineas.reduce((a, l) => a + (Number(l.cantidad) || 0), 0),
+    }));
+  }
+
+  /**
+   * GET /admin/repartos/:id/resumen-repartidor (repartos/ver): detalle de la hoja inferior para un pedido
+   * disponible, propio o próximo. Dirección y teléfono solo si el pedido es de quien pregunta.
+   */
+  async resumenRepartidor(id: string, usuario: UsuarioAutenticado) {
+    const pedidoId = this.parsearId(id);
+    const partyId = BigInt(usuario.partyId);
+    const config = await this.obtenerParametrosReparto();
+    const p = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: { zona: true, lineas: { select: { cantidad: true, nombre: true } } },
+    });
+    const esMio = p?.repartidor_party_id != null && BigInt(p.repartidor_party_id) === partyId;
+    const esProximo = p != null && ['COLA', 'PREPARANDO'].includes(p.estado) && p.repartidor_party_id == null && p.anulado_en == null;
+    const esDisponible = p != null && p.estado === 'LISTO' && p.repartidor_party_id == null && p.motivo_falla == null;
+    const visible = esMio || ((esProximo || esDisponible) && !p?.es_personal);
+    if (!p || p.modalidad !== 'DELIVERY' || !visible) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+
+    let puedeTomar = false;
+    let motivoNoTomar: string | null = null;
+    if (esMio) {
+      motivoNoTomar = 'Este pedido ya es tuyo';
+    } else if (esProximo) {
+      motivoNoTomar = 'Aún no está disponible';
+    } else if (p.entrega_lat == null || p.entrega_lng == null) {
+      motivoNoTomar = 'El pedido no tiene ubicación';
+    } else {
+      const activos = await this.prisma.pedido.count({
+        where: { repartidor_party_id: partyId, estado: { in: ['LISTO', 'EN_CAMINO'] } },
+      });
+      if (activos >= config.maxPedidos) motivoNoTomar = `Ya llevas ${config.maxPedidos} pedidos: entrega alguno antes de tomar otro`;
+      else puedeTomar = true;
+    }
+
+    const prox = esProximo ? this.estadoProximo(p) : null;
+    const minutosEspera = this.calcularMinutosYColor(p.creado_en).minutosEspera;
+    return {
+      id: String(p.id),
+      codigo: p.codigo,
+      clienteNombre: p.cliente_nombre ?? null,
+      estado: prox?.estado ?? p.estado,
+      estadoTexto: prox?.estadoTexto ?? (p.estado === 'EN_CAMINO' ? 'En camino' : 'Listo para entrega'),
+      minutosEspera,
+      productos: p.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre })),
+      nota: p.nota ?? null,
+      zona: p.zona?.codigo ?? null,
+      puedeTomar,
+      motivoNoTomar,
+      ...(esMio
+        ? {
+            direccion: p.entrega_direccion,
+            referencia: p.entrega_referencia,
+            telefono: p.cliente_telefono,
+          }
+        : {}),
+    };
+  }
+
+  /**
+   * Orden obligatorio: si el pedido tiene orden_ruta, solo puede avanzar el de menor orden entre los
+   * pendientes (LISTO o EN_CAMINO) del mismo repartidor. Sin orden_ruta (flujo viejo) no se bloquea.
+   */
+  private async verificarTurno(pedido: { id: bigint; orden_ruta?: number | null; repartidor_party_id?: bigint | null }) {
+    if (pedido.orden_ruta == null || pedido.repartidor_party_id == null) return;
+    const toca = await this.prisma.pedido.findFirst({
+      where: {
+        repartidor_party_id: pedido.repartidor_party_id,
+        orden_ruta: { not: null },
+        estado: { in: ['LISTO', 'EN_CAMINO'] },
+      },
+      orderBy: { orden_ruta: 'asc' },
+      select: { id: true, codigo: true },
+    });
+    if (toca && toca.id !== pedido.id) {
+      throw new ConflictException({ codigo: 'ORDEN_RUTA', pedido: toca.codigo, mensaje: `Primero entrega ${toca.codigo}` });
+    }
+  }
+
+  /** Pedidos pendientes del repartidor que ya tienen orden, de menor a mayor orden. */
+  private async pendientesConOrden(tx: any, partyId: bigint) {
+    return tx.pedido.findMany({
+      where: { repartidor_party_id: partyId, orden_ruta: { not: null }, estado: { in: ['LISTO', 'EN_CAMINO'] } },
+      select: { id: true, codigo: true, estado: true, orden_ruta: true, entrega_lat: true, entrega_lng: true },
+      orderBy: { orden_ruta: 'asc' },
+    });
+  }
+
+  /**
+   * POST /admin/repartos/:id/empezar-por (repartos/tomar): el repartidor elige con cuál empieza y el resto se
+   * reordena por vecino más cercano (distancia en línea recta). Solo antes de salir con alguno.
+   */
+  async empezarPor(id: string | bigint, usuario: UsuarioAutenticado, ip?: string) {
+    const pedidoId = this.parsearId(id);
+    const partyId = BigInt(usuario.partyId);
+    const orden = await this.prisma.$transaction(async (tx) => {
+      const lista: any[] = await this.pendientesConOrden(tx, partyId);
+      const elegido = lista.find((p) => p.id === pedidoId);
+      if (!elegido) {
+        throw new ConflictException({ codigo: 'NO_EN_RUTA', mensaje: 'Ese pedido no está en tu ruta' });
+      }
+      if (lista.some((p) => p.estado === 'EN_CAMINO')) {
+        throw new ConflictException({ codigo: 'RUTA_EN_CURSO', mensaje: 'Ya saliste con un pedido: el orden ya no se puede cambiar' });
+      }
+      const sinCoord = lista.filter((p) => p.id !== pedidoId && (p.entrega_lat == null || p.entrega_lng == null));
+      let pendientes = lista.filter((p) => p.id !== pedidoId && !sinCoord.includes(p));
+      const resultado = [elegido];
+      let actual = elegido;
+      while (pendientes.length > 0 && actual.entrega_lat != null) {
+        let mejor = pendientes[0];
+        let mejorKm = Infinity;
+        for (const c of pendientes) {
+          const km = this.rutaService.haversineKm(Number(actual.entrega_lat), Number(actual.entrega_lng), Number(c.entrega_lat), Number(c.entrega_lng));
+          if (km < mejorKm) { mejorKm = km; mejor = c; }
+        }
+        resultado.push(mejor);
+        pendientes = pendientes.filter((p) => p !== mejor);
+        actual = mejor;
+      }
+      resultado.push(...pendientes, ...sinCoord);
+      for (let i = 0; i < resultado.length; i++) {
+        await tx.pedido.update({ where: { id: resultado[i].id }, data: { orden_ruta: i + 1 } });
+      }
+      await tx.pedidoEstadoHistorial.create({
+        data: {
+          pedido_id: pedidoId, estado_anterior: elegido.estado, estado_nuevo: elegido.estado,
+          motivo: 'Empezar por este: ruta reordenada por cercanía', por_party_id: partyId, en: new Date(),
+        },
+      });
+      return resultado.map((p, i) => ({ id: String(p.id), codigo: p.codigo, ordenRuta: i + 1 }));
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO', modulo: 'repartos', accion: 'EMPEZAR_POR', resultado: 'OK',
+      entidad: 'pedido', entidadId: pedidoId, partyId, ip, despues: { orden },
+    });
+    this.eventosGateway?.emitirAdmin('reparto:rutas', {});
+    return { orden };
+  }
+
+  /**
+   * POST /admin/repartos/:id/saltar (repartos/entregar): el pedido que toca pasa al final del orden.
+   * Pide motivo, queda en el historial del pedido y en auditoría; máximo 2 saltos por pedido.
+   */
+  async saltar(id: string | bigint, dto: SaltarPedidoDto, usuario: UsuarioAutenticado, ip?: string) {
+    const pedidoId = this.parsearId(id);
+    const partyId = BigInt(usuario.partyId);
+    const texto: Record<string, string> = {
+      NO_CONTESTA: 'Cliente no contesta',
+      DIRECCION_NO_ENCONTRADA: 'Dirección no encontrada',
+      TRAFICO: 'Tráfico o vía cerrada',
+      OTRO: 'Otro',
+    };
+    const detalle = (dto.detalle ?? '').trim();
+    if (dto.motivo === 'OTRO' && !detalle) {
+      throw new BadRequestException({ codigo: 'DETALLE_REQUERIDO', mensaje: 'Cuéntanos el motivo del salto' });
+    }
+    const motivo = `Salto de orden: ${texto[dto.motivo]}${detalle ? ` (${detalle})` : ''}`;
+    const nuevoOrden = await this.prisma.$transaction(async (tx) => {
+      const lista: any[] = await this.pendientesConOrden(tx, partyId);
+      const pedido = lista.find((p) => p.id === pedidoId);
+      if (!pedido) throw new ConflictException({ codigo: 'NO_EN_RUTA', mensaje: 'Ese pedido no está en tu ruta' });
+      if (lista[0].id !== pedidoId) {
+        throw new ConflictException({ codigo: 'ORDEN_RUTA', pedido: lista[0].codigo, mensaje: `Primero entrega ${lista[0].codigo}` });
+      }
+      if (lista.length < 2) {
+        throw new ConflictException({ codigo: 'SIN_OTROS', mensaje: 'No hay otro pedido en tu ruta al que pasar el turno' });
+      }
+      const previos = await tx.pedidoEstadoHistorial.count({
+        where: { pedido_id: pedidoId, motivo: { startsWith: 'Salto de orden' } },
+      });
+      if (previos >= 2) {
+        throw new ConflictException({ codigo: 'TOPE_SALTOS', mensaje: 'Ya saltaste este pedido 2 veces: reporta la falla' });
+      }
+      const ultimo = Math.max(...lista.map((p) => p.orden_ruta as number)) + 1;
+      await tx.pedido.update({ where: { id: pedidoId }, data: { orden_ruta: ultimo } });
+      await tx.pedidoEstadoHistorial.create({
+        data: { pedido_id: pedidoId, estado_anterior: pedido.estado, estado_nuevo: pedido.estado, motivo, por_party_id: partyId, en: new Date() },
+      });
+      return ultimo;
+    });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO', modulo: 'repartos', accion: 'SALTAR', resultado: 'OK',
+      entidad: 'pedido', entidadId: pedidoId, partyId, ip, motivo, despues: { ordenRuta: nuevoOrden },
+    });
+    this.eventosGateway?.emitirAdmin('reparto:rutas', {});
+    return { id: String(pedidoId), ordenRuta: nuevoOrden };
+  }
+
+  /**
+   * POST /admin/repartos/tomar-ruta (repartos/tomar): toma los pedidos en el orden elegido por el repartidor.
+   * Todo o nada: una transacción con SELECT ... FOR UPDATE; si alguno falla responde 409 con el código del pedido.
+   * Guarda orden_ruta (1 = primera parada, a continuación de lo que ya lleva).
+   */
+  async tomarRuta(dto: TomarRutaDto, usuario: UsuarioAutenticado, ip?: string) {
+    const partyId = BigInt(usuario.partyId);
+    const config = await this.obtenerParametrosReparto();
+    const ids = [...new Set((dto?.ids ?? []).map((i) => String(i).trim()).filter(Boolean))];
+    if (ids.length === 0 || ids.some((i) => !/^\d+$/.test(i))) {
+      throw new BadRequestException({ codigo: 'IDS_INVALIDOS', mensaje: 'Elige al menos un pedido para la ruta' });
+    }
+    const idsAsc = ids.map((i) => BigInt(i)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const ahora = new Date();
+    const conflicto = (codigo: string, pedido: string, mensaje: string) =>
+      new ConflictException({ codigo, pedido, mensaje });
+
+    const { nuevos, filas } = await this.prisma.$transaction(
+      async (tx) => {
+        const bloqueadas: any[] = await tx.$queryRaw`
+          SELECT p.id, p.codigo, p.modalidad, p.estado, p.repartidor_party_id,
+                 p.anulado_en, p.motivo_falla, p.entrega_lat, p.entrega_lng
+          FROM pedido p
+          WHERE p.id IN (${Prisma.join(idsAsc)})
+          ORDER BY p.id ASC
+          FOR UPDATE
+        `;
+        const porId = new Map<string, any>(bloqueadas.map((r) => [String(r.id), r]));
+        const nuevos: bigint[] = [];
+        for (const id of ids) {
+          const r = porId.get(id);
+          if (!r || r.modalidad !== 'DELIVERY' || r.anulado_en != null) {
+            throw conflicto('NO_DISPONIBLE', r?.codigo ?? id, `El pedido ${r?.codigo ?? id} ya no está disponible`);
+          }
+          if (r.repartidor_party_id != null) {
+            if (BigInt(r.repartidor_party_id) === partyId && r.estado === 'LISTO') continue; // ya suyo: solo se reordena
+            throw conflicto('YA_TOMADO', r.codigo, `El pedido ${r.codigo} ya lo tomó otro repartidor`);
+          }
+          if (['COLA', 'PREPARANDO'].includes(r.estado)) {
+            throw conflicto('AUN_NO_DISPONIBLE', r.codigo, `El pedido ${r.codigo} aún no está disponible`);
+          }
+          if (r.estado !== 'LISTO' || r.motivo_falla != null || r.entrega_lat == null || r.entrega_lng == null) {
+            throw conflicto('NO_DISPONIBLE', r.codigo, `El pedido ${r.codigo} ya no está disponible`);
+          }
+          nuevos.push(r.id);
+        }
+
+        const previos = await tx.pedido.findMany({
+          where: { repartidor_party_id: partyId, estado: { in: ['LISTO', 'EN_CAMINO'] } },
+          select: { id: true },
+        });
+        const previosFuera = previos.filter((x) => !ids.includes(String(x.id))).length;
+        if (previos.length + nuevos.length > config.maxPedidos) {
+          throw new ConflictException({
+            codigo: 'LIMITE_PEDIDOS',
+            mensaje: `Tu ruta supera el máximo de ${config.maxPedidos} pedidos: entrega alguno antes de tomar otro`,
+          });
+        }
+
+        if (nuevos.length > 0) {
+          const act = await tx.pedido.updateMany({
+            where: { id: { in: nuevos }, estado: 'LISTO', repartidor_party_id: null },
+            data: { repartidor_party_id: partyId, tomado_en: ahora },
+          });
+          if (act.count !== nuevos.length) {
+            throw conflicto('YA_TOMADO', '', 'Otro repartidor tomó parte de la ruta');
+          }
+          for (const id of nuevos) {
+            await tx.pedidoEstadoHistorial.create({
+              data: {
+                pedido_id: id, estado_anterior: 'LISTO', estado_nuevo: 'LISTO',
+                motivo: 'Tomado por repartidor (ruta propia)', por_party_id: partyId, en: ahora,
+              },
+            });
+          }
+        }
+        for (let i = 0; i < ids.length; i++) {
+          await tx.pedido.update({ where: { id: BigInt(ids[i]) }, data: { orden_ruta: previosFuera + i + 1 } });
+        }
+        await sumarARuta(tx, partyId, idsAsc, 'TOMAR_RUTA', ahora);
+        const filas = await tx.pedido.findMany({
+          where: { id: { in: idsAsc } },
+          include: { zona: true, lineas: { select: { cantidad: true } } },
+        });
+        return { nuevos, filas };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 10000 },
+    );
+
+    for (const id of nuevos) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO', modulo: 'repartos', accion: 'TOMAR', resultado: 'OK',
+        entidad: 'pedido', entidadId: id, partyId, ip,
+      });
+    }
+    for (const f of filas.filter((x) => nuevos.includes(x.id))) {
+      this.eventosGateway?.emitirAdmin('pedido:estado', {
+        id: Number(f.id), codigo: f.codigo, estado: f.estado, repartidor_party_id: String(partyId),
+      });
+    }
+
+    const pos = new Map(ids.map((id, i) => [id, i]));
+    return {
+      tomados: filas
+        .sort((a, b) => (pos.get(String(a.id)) ?? 0) - (pos.get(String(b.id)) ?? 0))
+        .map((f) => ({ ...this.formatearPedidoReparto(f, config, ahora, usuario), ordenRuta: f.orden_ruta })),
+    };
   }
 
   /**
@@ -2319,7 +2840,7 @@ export class RepartosService {
           }
           const act = await tx.pedido.updateMany({
             where: { id: { in: nuevos }, estado: 'LISTO', repartidor_party_id: null },
-            data: { repartidor_party_id: destino, tomado_en: ahora },
+            data: { repartidor_party_id: destino, tomado_en: ahora, orden_ruta: null },
           });
           if (act.count !== nuevos.length) {
             throw new ConflictException({ codigo: 'RUTA_YA_TOMADA', mensaje: 'Otro repartidor tomó parte de esta ruta; actualizamos las opciones', pedidos: [] });
@@ -2337,6 +2858,7 @@ export class RepartosService {
             });
           }
         }
+        await sumarARuta(tx, destino, nuevos, 'SUGERIDA', ahora);
         const filas = await tx.pedido.findMany({
           where: { id: { in: idsAsc } },
           include: { zona: true, lineas: { select: { cantidad: true } } },

@@ -15,10 +15,15 @@ import { ConfigService } from '@nestjs/config';
 import { CuentaClienteController } from './cuenta-cliente.controller';
 import { ClientesService } from './clientes.service';
 import { RecuperarClaveService } from './recuperar-clave.service';
+import { CodigoRegistroService } from './codigo-registro.service';
 import { DireccionesClienteService } from './direcciones-cliente.service';
 
 describe('CuentaClienteController', () => {
   let controller: CuentaClienteController;
+  const codigoRegistroMock = {
+    solicitar: jest.fn().mockResolvedValue({ ok: true, mensaje: 'Te enviamos un código por WhatsApp.' }),
+    consumir: jest.fn().mockResolvedValue(undefined),
+  };
   const recuperarMock = { solicitar: jest.fn().mockResolvedValue({ ok: true }), confirmar: jest.fn().mockResolvedValue({ ok: true }) };
   let clientesServiceMock: any;
   let configServiceMock: any;
@@ -47,6 +52,7 @@ describe('CuentaClienteController', () => {
         { provide: ConfigService, useValue: configServiceMock },
         { provide: DireccionesClienteService, useValue: { listar: jest.fn(), desactivar: jest.fn() } },
         { provide: RecuperarClaveService, useValue: recuperarMock },
+        { provide: CodigoRegistroService, useValue: codigoRegistroMock },
       ],
     }).compile();
 
@@ -63,7 +69,7 @@ describe('CuentaClienteController', () => {
     const req: any = { ip: '127.0.0.1' };
 
     const r = await controller.registro(
-      { nombre: 'Ana', contrasena: '12345678', telefono: '912345678', aceptaDatos: true },
+      { nombre: 'Ana', contrasena: '12345678', telefono: '912345678', codigo: '123456', aceptaDatos: true },
       req,
       res,
     );
@@ -205,5 +211,10 @@ describe('CuentaClienteController', () => {
     const dto = { telefono: '912345678', codigo: '123456', contrasenaNueva: 'NuevaClave2026' };
     await controller.confirmarRecuperacion(dto, { ip: '1.1.1.1' } as any);
     expect(recuperarMock.confirmar).toHaveBeenCalledWith(dto, '1.1.1.1');
+  });
+  it('registro/codigo envía el código y responde sin revelar si el celular existe', async () => {
+    const r = await controller.solicitarCodigoRegistro('912345678');
+    expect(codigoRegistroMock.solicitar).toHaveBeenCalledWith('912345678');
+    expect(r).toMatchObject({ ok: true });
   });
 });

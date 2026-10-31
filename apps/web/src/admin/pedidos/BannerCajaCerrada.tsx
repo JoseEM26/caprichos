@@ -57,10 +57,49 @@ export function EtiquetaCajaCerrada() {
   );
 }
 
-/** Franja roja fija arriba: aparece mientras la caja de hoy no está abierta y quien mira puede abrirla. */
-export function BannerCajaCerrada() {
+/**
+ * Franja roja: aparece mientras la caja de hoy no está abierta y quien mira puede abrirla.
+ * `compacto`: una sola línea (chip) para la barra de Pedidos y caja; el texto completo queda en el tooltip.
+ */
+export function BannerCajaCerrada({ compacto = false }: { compacto?: boolean }) {
   const { abierta, puedeAbrir } = useEstadoCajaHoy();
   if (!puedeAbrir || abierta !== false) return null;
+
+  if (compacto) {
+    return (
+      <div
+        role="alert"
+        title={TEXTO_CAJA_CERRADA}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'stretch',
+          minHeight: 44,
+          borderRadius: 12,
+          background: '#B3261E',
+          color: '#FFFFFF',
+          fontWeight: 700,
+          fontSize: 13,
+          overflow: 'hidden',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px' }}>Caja cerrada</span>
+        <a
+          href="/admin/cierre"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 14px',
+            background: '#FFFFFF',
+            color: '#B3261E',
+            textDecoration: 'none',
+            fontWeight: 800,
+          }}
+        >
+          Abrir caja
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -159,3 +159,13 @@ export function extraerOpciones(linea: any): Array<{ id?: string; nombre: string
 
   return [];
 }
+
+/**
+ * Parámetro `cocina_confirmar_despejar` («si»/«no»). Sin parámetro, o cualquier valor distinto de «no», queda encendido:
+ * despejar pide confirmación Sí/No, como antes.
+ */
+export function confirmarDespejarActivo(valor: unknown): boolean {
+  if (valor === false) return false;
+  if (typeof valor === 'string' && valor.trim().toLowerCase() === 'no') return false;
+  return true;
+}

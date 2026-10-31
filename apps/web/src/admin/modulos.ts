@@ -30,6 +30,7 @@ import {
   PaletaView,
 } from './contenido';
 import { MascotaAdminView } from './mascota';
+import { ResenasView } from './resenas/ResenasView';
 import { CodigoSupervisorView } from './supervisor/CodigoSupervisorView';
 
 export type GrupoModulo =
@@ -294,7 +295,7 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Novedades y publicidad',
     grupo: 'Configuración',
     ruta: '/admin/novedades',
-    permisoMinimo: 'catalogo/ver',
+    permisoMinimo: 'novedades/ver',
     componente: NovedadesView,
     icono: 'novedades',
   },
@@ -303,7 +304,7 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Conócenos',
     grupo: 'Configuración',
     ruta: '/admin/conocenos',
-    permisoMinimo: 'catalogo/ver',
+    permisoMinimo: 'novedades/ver',
     componente: ConocenosView,
     icono: 'novedades',
   },
@@ -312,9 +313,18 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Destacadas de la carta',
     grupo: 'Configuración',
     ruta: '/admin/destacadas',
-    permisoMinimo: 'catalogo/ver',
+    permisoMinimo: 'destacadas/ver',
     componente: DestacadasView,
     icono: 'destacadas',
+  },
+  {
+    clave: 'resenas',
+    nombre: 'Reseñas de Google',
+    grupo: 'Configuración',
+    ruta: '/admin/resenas',
+    permisoMinimo: 'configuracion/ver',
+    componente: ResenasView,
+    icono: 'estrella',
   },
   {
     clave: 'paleta',

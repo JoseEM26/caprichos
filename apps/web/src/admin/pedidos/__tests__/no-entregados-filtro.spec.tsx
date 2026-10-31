@@ -88,6 +88,13 @@ function montarVista(permisoLiquidar: boolean) {
   vi.spyOn(pedidosApi, 'obtenerPorId').mockResolvedValue(pedidoEnCurso);
 }
 
+// La vista de la lista ahora es un combo «Ver pedidos»: lo abre y devuelve la opción buscada
+async function opcionVer(nombre: RegExp) {
+  const boton = await screen.findByRole('button', { name: /^Ver pedidos:/ });
+  if (boton.getAttribute('aria-expanded') !== 'true') fireEvent.click(boton);
+  return screen.getByRole('option', { name: nombre });
+}
+
 describe('Pedidos y caja: pestaña No entregados', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,7 +110,7 @@ describe('Pedidos y caja: pestaña No entregados', () => {
     montarVista(true);
     render(<PedidosAdminView />);
 
-    expect(await screen.findByRole('tab', { name: 'No entregados · 2' })).toBeInTheDocument();
+    expect(await opcionVer(/^No entregados\s*2$/)).toBeInTheDocument();
     expect(pedidosApi.listarNoEntregados).toHaveBeenCalled();
   });
 
@@ -111,7 +118,7 @@ describe('Pedidos y caja: pestaña No entregados', () => {
     montarVista(true);
     render(<PedidosAdminView />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: 'No entregados · 2' }));
+    fireEvent.click(await opcionVer(/^No entregados/));
 
     const panel = await screen.findByTestId('panel-no-entregados');
     expect(within(panel).getByTestId('grupo-reprogramar')).toHaveTextContent('Por reprogramar · 1');
@@ -119,14 +126,14 @@ describe('Pedidos y caja: pestaña No entregados', () => {
     expect(within(panel).getByTestId('no-entregado-CP-R01')).toBeInTheDocument();
     expect(within(panel).getByTestId('revisar-devolucion-CP-R02')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reprogramar / Reenviar a reparto' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'No entregados · 2' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: 'Ver pedidos: No entregados' })).toBeInTheDocument();
   });
 
   it('sin permiso repartos/liquidar la pestaña funciona pero no aparece el botón de reenvío', async () => {
     montarVista(false);
     render(<PedidosAdminView />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: 'No entregados · 2' }));
+    fireEvent.click(await opcionVer(/^No entregados/));
 
     await screen.findByTestId('panel-no-entregados');
     expect(screen.getByTestId('no-entregado-CP-R01')).toBeInTheDocument();
@@ -137,10 +144,10 @@ describe('Pedidos y caja: pestaña No entregados', () => {
     montarVista(true);
     render(<PedidosAdminView />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: 'No entregados · 2' }));
+    fireEvent.click(await opcionVer(/^No entregados/));
     await screen.findByTestId('panel-no-entregados');
 
-    fireEvent.click(screen.getByRole('tab', { name: /En curso · 1/ }));
+    fireEvent.click(await opcionVer(/^En curso\s*1$/));
     await waitFor(() => expect(screen.queryByTestId('panel-no-entregados')).not.toBeInTheDocument());
     expect(screen.getAllByText('CP-001').length).toBeGreaterThan(0);
   });
@@ -150,8 +157,8 @@ describe('Pedidos y caja: pestaña No entregados', () => {
     vi.spyOn(pedidosApi, 'listarNoEntregados').mockRejectedValue(new Error('caída'));
     render(<PedidosAdminView />);
 
-    expect(await screen.findByRole('tab', { name: 'No entregados · 0' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: /En curso · 1/ }));
+    expect(await opcionVer(/^No entregados\s*0$/)).toBeInTheDocument();
+    fireEvent.click(await opcionVer(/^En curso\s*1$/));
     expect(screen.getAllByText('CP-001').length).toBeGreaterThan(0);
   });
 });

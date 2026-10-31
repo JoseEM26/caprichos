@@ -27,10 +27,17 @@ export const LOCAL_CODIGO_DEFECTO = 'CAPRICHOS';
 export const SEGUNDOS_AUTORIZACION = 5 * 60;
 const claveAutorizacion = (operador: bigint | string) => `supervisor:autorizacion:${operador}`;
 const claveIntentosOperador = (operador: bigint | string) => `pin:supervisor:intentos:${operador}`;
+/** Último ADMIN o SUPERVISOR que mostró el código en pantalla: a su nombre queda la autorización que use el código. */
+const claveVisorCodigo = (localCodigo: string) => `supervisor:visor:${localCodigo}`;
+/** Ventana en la que se atribuye la autorización al último que vio el código (el código cambia cada 30 s). */
+export const SEGUNDOS_VISOR = 120;
+
+/** Roles que se autorizan solos: no escriben el código (serían ellos mismos aprobándose) y queda auditado a su nombre. */
+const ROLES_SIN_CODIGO = ['ADMIN', 'SUPERVISOR'];
 
 /**
- * Regla única: el usuario ADMIN activo no necesita código de supervisor (sería él mismo aprobándose).
- * Audita la acción como AUTORIZACION_SUPERVISOR y devuelve su identidad; null si no es ADMIN.
+ * Regla única: el ADMIN y el SUPERVISOR activos no necesitan código de supervisor.
+ * Audita la acción como AUTORIZACION_SUPERVISOR y devuelve su identidad; null si no es uno de ellos.
  * La usan verificarYConsumirCodigo y los servicios que verifican el PIN por su cuenta.
  */
 export async function autorizarAdminSinCodigo(
@@ -44,8 +51,8 @@ export async function autorizarAdminSinCodigo(
 ): Promise<{ party_id: bigint; id: bigint } | null> {
   if (operadorPartyId === undefined) return null;
   const admin = await prisma.userAccount.findFirst({
-    where: { party_id: BigInt(operadorPartyId), rol: 'ADMIN', activo: true },
-    select: { party_id: true, id: true },
+    where: { party_id: BigInt(operadorPartyId), rol: { in: ROLES_SIN_CODIGO }, activo: true },
+    select: { party_id: true, id: true, rol: true },
   });
   if (!admin) return null;
   await auditoria.registrar({
@@ -55,11 +62,11 @@ export async function autorizarAdminSinCodigo(
     resultado: 'OK',
     entidad: entidad ?? 'supervisor_codigo',
     entidadId,
-    motivo: `Acción ${accion}: autorizado por rol ADMIN (sin código)`,
+    motivo: `Acción ${accion}: autorizado por rol ${admin.rol} (sin código)`,
     partyId: admin.party_id,
     ip,
   });
-  return admin;
+  return { party_id: admin.party_id, id: admin.id };
 }
 
 @Injectable()
@@ -179,7 +186,7 @@ export class SupervisorCodigoService {
 
   /**
    * Obtiene el código TOTP vigente calculado por el servidor y los segundos restantes de la ventana.
-   * Solo el rol ADMIN tiene acceso y la consulta es auditada.
+   * Lo ven el ADMIN y el SUPERVISOR (permiso supervisor/ver_codigo); la consulta es auditada.
    */
   async obtenerCodigoActual(
     partyIdAdmin: bigint,
@@ -212,14 +219,21 @@ export class SupervisorCodigoService {
     const codigo = generarTotp(secretoBytes, ahoraSegundos);
     const segundosRestantes = calcularSegundosRestantes(ahoraSegundos);
 
-    // Auditar que el administrador visualizó el código en pantalla (sin guardar el código)
+    // Recordar quién lo tiene en pantalla, para atribuir la próxima autorización (sin Redis, queda el respaldo)
+    try {
+      await this.redisService.obtenerCliente().set(claveVisorCodigo(localCodigo), String(partyIdAdmin), 'EX', SEGUNDOS_VISOR);
+    } catch {
+      // sin Redis no se puede atribuir por visor; verificarYConsumirCodigo usa el respaldo
+    }
+
+    // Auditar que el ADMIN o el SUPERVISOR visualizó el código en pantalla (sin guardar el código)
     await this.auditoria.registrar({
       categoria: 'ACCESO',
       modulo: 'supervisor',
       accion: 'VER_CODIGO',
       resultado: 'OK',
       entidad: 'supervisor_codigo',
-      motivo: `Consulta de código rotativo en pantalla por administrador para local ${localCodigo}`,
+      motivo: `Consulta de código rotativo en pantalla por ${partyIdAdmin} para local ${localCodigo}`,
       partyId: partyIdAdmin,
       ip,
     });
@@ -320,11 +334,18 @@ export class SupervisorCodigoService {
         : '';
     const formatoValido = /^\d{6}$/.test(codigoLimpio);
 
-    // Obtener un supervisor admin para auditoría e historial
-    const adminSupervisor = await this.prisma.userAccount.findFirst({
-      where: { rol: 'ADMIN', activo: true },
-      select: { party_id: true, id: true },
-    });
+    // Quien autoriza es quien mostró el código por última vez (ADMIN o SUPERVISOR). Si nadie lo mostró en la
+    // ventana reciente, se usa el respaldo de siempre: un ADMIN activo (queda visible en auditoría).
+    const visor = await this.leerVisorCodigo(redis, localCodigo);
+    const adminSupervisor = visor
+      ? await this.prisma.userAccount.findUnique({
+          where: { party_id: visor },
+          select: { party_id: true, id: true },
+        })
+      : await this.prisma.userAccount.findFirst({
+          where: { rol: 'ADMIN', activo: true },
+          select: { party_id: true, id: true },
+        });
     const supervisorPartyId = adminSupervisor?.party_id ?? BigInt(1);
     const supervisorId = adminSupervisor?.id ?? BigInt(1);
 
@@ -461,7 +482,7 @@ export class SupervisorCodigoService {
       resultado: 'OK',
       entidad: entidad ?? 'supervisor_codigo',
       entidadId,
-      motivo: `Acción ${accion} autorizada exitosamente mediante código rotativo (desfase de reloj: ${desfase > 0 ? '+' : ''}${desfase} paso)`,
+      motivo: `Acción ${accion} autorizada exitosamente mediante código rotativo (desfase de reloj: ${desfase > 0 ? '+' : ''}${desfase} paso). Autoriza el supervisor ${supervisorPartyId}`,
       partyId: partyIdOperadorNum,
       ip,
     });
@@ -472,6 +493,16 @@ export class SupervisorCodigoService {
       supervisorPartyId,
       supervisorId,
     };
+  }
+
+  /** Party del ADMIN o SUPERVISOR que mostró el código en la ventana reciente; null si no hay o Redis falla. */
+  private async leerVisorCodigo(redis: any, localCodigo: string): Promise<bigint | null> {
+    try {
+      const valor = await redis.get(claveVisorCodigo(localCodigo));
+      return valor && /^\d+$/.test(String(valor)) ? BigInt(valor) : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Operadores bloqueados por intentos fallidos (para que el ADMIN los desbloquee). */
@@ -497,7 +528,7 @@ export class SupervisorCodigoService {
     return res;
   }
 
-  /** El ADMIN borra el contador de fallos de un operador (queda auditado). */
+  /** El ADMIN borra el contador de fallos de un operador (queda auditado). Lo exige el permiso supervisor/gestionar_codigo. */
   async desbloquearOperador(operadorPartyId: bigint | string, partyIdAdmin: bigint, ip?: string): Promise<{ ok: boolean }> {
     if (!/^\d+$/.test(String(operadorPartyId))) {
       throw new HttpException({ codigo: 'OPERADOR_INVALIDO', mensaje: 'Operador inválido' }, HttpStatus.BAD_REQUEST);

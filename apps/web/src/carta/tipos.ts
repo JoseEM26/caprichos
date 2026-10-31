@@ -92,10 +92,10 @@ export interface DatosLocalCarta {
   envioGratisModo?: 'desde' | 'mas_de' | string;
   pedidoMinimo: number | null;
   puntosPorcentaje?: number;
+  /** Pedir como invitado (sin celular): lo decide el dueño en Configuración. Sin dato = no permitido. */
+  invitadoPermitido?: boolean;
   lat?: number;
   lng?: number;
-  /** Fotos del local (Admin ▸ Configuración ▸ Fotos del local), en orden. Alimentan la galería «Nuestro lugar». */
-  fotos?: Array<{ slot: string; orden: number; archivoId: string; url: string }>;
 }
 
 export interface ConsultaEnvioRespuesta {

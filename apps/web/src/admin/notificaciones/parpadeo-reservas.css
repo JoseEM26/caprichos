@@ -1,0 +1,46 @@
+/* Reservas nuevas sin atender: la entrada del menú y su fila de la campanita llaman la atención en --cp-orange.
+   Con «prefers-reduced-motion» no hay animación: solo un contorno fuerte. */
+@keyframes cp-parpadeo-insignia {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes cp-pulso-fila {
+  0%,
+  100% {
+    box-shadow: inset 4px 0 0 var(--cp-orange);
+  }
+  50% {
+    box-shadow: inset 4px 0 0 var(--cp-orange), inset 0 0 0 2px var(--cp-orange);
+  }
+}
+
+.cp-parpadea-insignia {
+  animation: cp-parpadeo-insignia 1s ease-in-out infinite;
+  box-shadow: 0 0 0 2px var(--cp-orange);
+}
+
+.cp-parpadea-fila {
+  animation: cp-pulso-fila 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-parpadea-insignia,
+  .cp-parpadea-fila {
+    animation: none;
+  }
+
+  .cp-parpadea-insignia {
+    outline: 2px solid var(--cp-orange);
+    outline-offset: 1px;
+  }
+
+  .cp-parpadea-fila {
+    box-shadow: inset 4px 0 0 var(--cp-orange), inset 0 0 0 2px var(--cp-orange);
+  }
+}

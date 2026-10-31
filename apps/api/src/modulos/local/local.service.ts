@@ -271,7 +271,7 @@ export class LocalService {
    * Obtiene los datos públicos del local para la carta virtual.
    */
   async obtenerDatosPublicosLocal() {
-    const [parametros, horarios, fotos] = await Promise.all([
+    const [parametros, horarios] = await Promise.all([
       this.prisma.parametro.findMany({
         where: {
           clave: {
@@ -282,6 +282,7 @@ export class LocalService {
               'envio_gratis_modo',
               'pedido_minimo',
               'puntos_porcentaje',
+              'carta_invitado_activo',
             ],
           },
         },
@@ -289,7 +290,6 @@ export class LocalService {
       this.prisma.horarioDia.findMany({
         orderBy: { dia_semana: 'asc' },
       }),
-      this.listarFotosLocal(),
     ]);
 
     const datosParam = parametros.find((p) => p.clave === 'local_datos')?.valor as any;
@@ -298,6 +298,9 @@ export class LocalService {
     const envioGratisModo = parametros.find((p) => p.clave === 'envio_gratis_modo')?.valor;
     const pedidoMinimo = parametros.find((p) => p.clave === 'pedido_minimo')?.valor;
     const puntosPorcentaje = Number(parametros.find((p) => p.clave === 'puntos_porcentaje')?.valor);
+    // Sin parámetro o «no»: pedir como invitado NO permitido (debe poner su celular para sumar puntos)
+    const invitadoParam = parametros.find((p) => p.clave === 'carta_invitado_activo')?.valor;
+    const invitadoPermitido = String(invitadoParam ?? '').toLowerCase().trim() === 'si';
 
     const datos = datosParam ?? DATOS_LOCAL_DEFAULT;
     const pagos = pagosParam ?? PAGOS_DEFAULT;
@@ -342,7 +345,7 @@ export class LocalService {
       envioGratisModo: typeof envioGratisModo === 'string' ? envioGratisModo : 'mas_de',
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,
       puntosPorcentaje: puntosPorcentaje > 0 ? puntosPorcentaje : 5,
-      fotos,
+      invitadoPermitido,
     };
   }
 
