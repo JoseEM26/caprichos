@@ -28,6 +28,8 @@ export interface PedidoReparto {
   repartidor_party_id: string | null;
   /** Posición del pedido en la ruta del repartidor (1, 2, 3...). Solo en /mios. */
   ordenRuta?: number | null;
+  /** Número fijo de la parada en la ruta en curso (no cambia al entregar ni al saltar). */
+  numeroRuta?: number | null;
   tomado_en: string | null;
   salio_en: string | null;
   llego_en: string | null;
@@ -121,6 +123,7 @@ export interface PedidoHistorialRuta {
   estadoFinal: EstadoFinalPedido | null;
   horaFinal: string | null;
   orden: number;
+  numeroRuta?: number | null;
 }
 
 /** Una ruta ya hecha (o en curso) para el historial: sin montos. */
@@ -317,11 +320,11 @@ export const repartosApi = {
 
   /** Reordena la ruta por cercanía empezando por este pedido (solo antes de salir). */
   empezarPor: (id: string) =>
-    api.post<{ orden: Array<{ id: string; codigo: string; ordenRuta: number }> }>(`/admin/repartos/${id}/empezar-por`),
+    api.post<{ orden: Array<{ id: string; codigo: string; ordenRuta: number; numeroRuta?: number }> }>(`/admin/repartos/${id}/empezar-por`),
 
   /** El pedido que toca pasa al final del orden; la API guarda el motivo y limita a 2 saltos. */
   saltar: (id: string, dto: { motivo: MotivoSalto; detalle?: string }) =>
-    api.post<{ id: string; ordenRuta: number }>(`/admin/repartos/${id}/saltar`, dto),
+    api.post<{ id: string; ordenRuta: number; numeroRuta?: number | null; siguienteNumeroRuta?: number | null }>(`/admin/repartos/${id}/saltar`, dto),
 
   llegue: (id: string) =>
     api.post<PedidoReparto>(`/admin/repartos/${id}/llegue`),

@@ -107,6 +107,25 @@ describe('RepartidorView: la ruta como unidad', () => {
     expect(screen.getByTestId('marcador-3')).toHaveAttribute('data-numero', '1');
   });
 
+  it('al entregar el #1 los pendientes conservan 2, 3 y 4 y el entregado queda tenue con su número', async () => {
+    const r = enCurso();
+    r.pedidos = [
+      pedido('1', { estado: 'ENTREGADO', estadoFinal: 'ENTREGADO', horaFinal: '2026-10-31T15:04:00Z', numeroRuta: 1 }),
+      pedido('2', { numeroRuta: 2 }), pedido('3', { numeroRuta: 3 }), pedido('4', { numeroRuta: 4 }),
+    ];
+    vi.spyOn(repartosApi, 'listarMios').mockResolvedValue({
+      pedidos: [pedido('2', { ordenRuta: 1, numeroRuta: 2 }), pedido('3', { ordenRuta: 2, numeroRuta: 3 }), pedido('4', { ordenRuta: 3, numeroRuta: 4 })],
+      orden: ['2', '3', '4'], paso: [], ruta: [], rutaReparto: r,
+    });
+    await abrirMios();
+    expect(await screen.findByTestId('marcador-2')).toHaveAttribute('data-numero', '2');
+    expect(screen.getByTestId('marcador-3')).toHaveAttribute('data-numero', '3');
+    expect(screen.getByTestId('marcador-4')).toHaveAttribute('data-numero', '4');
+    const hecho = screen.getByTestId('marcador-1');
+    expect(hecho).toHaveTextContent('✓');
+    expect(hecho).toHaveAttribute('aria-label', expect.stringContaining('parada 1, terminado'));
+  });
+
   it('el chip muestra el avance de la ruta en curso y no cuenta los terminados como pedidos que lleva', async () => {
     await abrirMios();
     expect(await screen.findByTestId('chip-progreso-ruta')).toHaveTextContent('Ruta en curso: 1 de 3 entregado');

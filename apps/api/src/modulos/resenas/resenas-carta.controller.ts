@@ -7,7 +7,7 @@ export class ResenasCartaController {
   constructor(private readonly resenas: ResenasGoogleService) {}
 
   @Get('resenas')
-  @Header('Cache-Control', 'public, max-age=3600')
+  @Header('Cache-Control', 'public, max-age=600')
   async listar() {
     return this.resenas.listarPublico();
   }

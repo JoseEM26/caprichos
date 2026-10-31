@@ -90,9 +90,9 @@ describe('ResenasAdminController (lote de visibilidad)', () => {
 });
 
 describe('ResenasCartaController', () => {
-  it('GET /carta/resenas es publico con cache de 1 hora', () => {
+  it('GET /carta/resenas es publico con cache de 10 minutos', () => {
     const headers = Reflect.getMetadata('__headers__', ResenasCartaController.prototype.listar) ?? [];
-    expect(JSON.stringify(headers)).toContain('public, max-age=3600');
+    expect(JSON.stringify(headers)).toContain('public, max-age=600');
     expect(Reflect.getMetadata(GUARDS_METADATA, ResenasCartaController)).toBeUndefined();
   });
 });

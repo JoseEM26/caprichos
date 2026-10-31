@@ -14,6 +14,7 @@ const TOPE_POR_DEFECTO = 80;
 const CARGA_MAX_POR_DEFECTO = 1000;
 const ACTUALIZAR_DIAS_POR_DEFECTO = 7;
 const PAGINA = 20;
+const RESENAS_CARTA = 15;
 const CALIFICACION_MINIMA = 4;
 const LARGO_MINIMO_TEXTO = 30;
 const DIA_MS = 86400000;
@@ -66,6 +67,16 @@ const MENSAJES: Record<MotivoResenas, string> = {
 const CODIGOS_CONEXION = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ENETUNREACH', 'EHOSTUNREACH', 'UND_ERR_SOCKET']);
 
 const fallo = (motivo: MotivoResenas): Fallo => ({ ok: false, motivo, mensaje: MENSAJES[motivo] });
+
+/** Fisher-Yates sobre una copia: devuelve un arreglo nuevo en orden aleatorio. */
+function barajar<T>(lista: T[]): T[] {
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
 
 const HOSTS_GOOGLE_EXACTOS = ['g.co', 'goo.gl', 'maps.app.goo.gl'];
 
@@ -574,15 +585,14 @@ export class ResenasGoogleService implements OnModuleInit, OnModuleDestroy {
     const [filas, resumen, negocio] = await Promise.all([
       this.prisma.resenaGoogle.findMany({
         where: { visible: true },
-        orderBy: [{ publicada_en: 'desc' }, { id: 'desc' }],
-        take: 30,
+        take: 500, // tope de seguridad; de aquí se eligen RESENAS_CARTA al azar
       }),
       this.param('resenas_resumen'),
       this.negocio(),
     ]);
     const enlaceLocal = negocio?.enlaceLocal ?? null;
     return {
-      resenas: filas.map((r) => {
+      resenas: barajar(filas).slice(0, RESENAS_CARTA).map((r) => {
         const { id, autor, foto, estrellas, texto, fecha } = this.serializarAdmin(r);
         // La reseña enlaza a su propia página si el enlace es válido; si no, al local
         return { id, autor, foto, estrellas, texto, fecha, enlace: enlaceGoogleSeguro(r.enlace_resena) ?? enlaceLocal };

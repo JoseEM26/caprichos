@@ -369,6 +369,14 @@ describe('ResenasGoogleService', () => {
     expect(r.enlaceLocal).toBeNull();
   });
 
+  it('listarPublico devuelve 15 reseñas aunque haya 40 visibles', async () => {
+    const filas = Array.from({ length: 40 }, (_, i) => ({ id: BigInt(i + 1), google_review_id: `g${i}`, visible: true, autor_nombre: `A${i}`, calificacion: 5, texto: LARGO, publicada_en: new Date(2026, 0, i + 1) }));
+    const { svc } = crear({ filas });
+    const r: any = await svc.listarPublico();
+    expect(r.resenas).toHaveLength(15);
+    expect(new Set(r.resenas.map((x: any) => x.id)).size).toBe(15);
+  });
+
   it('listarPublico: review_link válido se usa tal cual', async () => {
     const { svc } = crear({
       params: { resenas_negocio: { businessId: 'biz-1', nombre: 'X', enlaceLocal: 'https://www.google.com/maps/place/local' } },

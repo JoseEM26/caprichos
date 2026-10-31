@@ -32,6 +32,8 @@ export interface PuntoRepartidor {
   color: ColorEspera;
   /** Posición en la ruta (1, 2, 3...); sin número si todavía no está en ella. */
   numero?: number;
+  /** Número que tuvo la parada ya terminada (se conserva para el lector de pantalla). */
+  numeroParada?: number;
   /** false = en cocina o por validar: gris y sin poder elegirse. */
   disponible: boolean;
   /** Texto de estado de los grises ("En cocina", "Por validar"). */
@@ -179,7 +181,7 @@ function Marcador({
     ? punto.estadoFinal === 'ENTREGADO' ? '✓' : '✕'
     : punto.numero != null ? String(punto.numero) : punto.disponible ? '+' : '';
   const descripcion = punto.estadoFinal
-    ? `terminado, ${punto.estadoTexto ?? ''}`
+    ? `${punto.numeroParada != null ? `parada ${punto.numeroParada}, ` : ''}terminado, ${punto.estadoTexto ?? ''}`
     : punto.disponible
     ? punto.numero != null
       ? `en tu ruta, parada ${punto.numero}`
@@ -245,6 +247,7 @@ function Marcador({
           fontSize: 15,
           lineHeight: 1,
           flexShrink: 0,
+          opacity: punto.estadoFinal ? 0.45 : undefined,
         }}
       >
         {textoNumero}

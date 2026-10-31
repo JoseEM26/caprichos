@@ -14,7 +14,7 @@ const base = (o: any) => ({
   entrega_lat: -12.01, entrega_lng: -77.0, creado_en: new Date(Date.now() - 5 * 60000), zona: null,
   pago_estado: 'PAGADO', pago_metodo: 'EFECTIVO', pago_preferido: null, es_personal: false,
   cliente_nombre: 'Ana', cliente_telefono: '999', entrega_direccion: 'Calle 1', entrega_referencia: 'ref',
-  nota: 'sin ají', total: 50, orden_ruta: null,
+  nota: 'sin ají', total: 50, orden_ruta: null, numero_ruta: null, ruta_reparto_id: null,
   lineas: [{ cantidad: 2, nombre: 'Pizza' }, { cantidad: 1, nombre: 'Chicha' }], ...o,
 });
 
@@ -109,8 +109,24 @@ describe('tomarRuta', () => {
     expect(pedidos.map((p) => [p.id, p.orden_ruta])).toEqual([[1n, 2], [2n, 3], [3n, 1]]);
     expect(r.tomados.map((t) => t.codigo)).toEqual(['CP-3', 'CP-1', 'CP-2']);
     expect(r.tomados[0].ordenRuta).toBe(1);
+    expect(pedidos.map((p) => p.numero_ruta)).toEqual([2, 3, 1]);
+    expect(r.tomados[0].numeroRuta).toBe(1);
     expect(auditoria.registrar).toHaveBeenCalledTimes(3);
     expect(gateway.emitirAdmin).toHaveBeenCalledTimes(3);
+  });
+
+  it('con #1 entregado y 3 pendientes en la ruta, un pedido más recibe el 5', async () => {
+    const mio = (id: bigint, n: number, estado: string) =>
+      base({ id, codigo: `CP-${id}`, repartidor_party_id: 9n, estado, numero_ruta: n, orden_ruta: n, ruta_reparto_id: 7n });
+    const { service, pedidos } = montar(
+      [mio(1n, 1, 'ENTREGADO'), mio(2n, 2, 'LISTO'), mio(3n, 3, 'LISTO'), mio(4n, 4, 'LISTO'), base({ id: 5n, codigo: 'CP-5' })], 6,
+    );
+    const tx: any = await (service as any).prisma.$transaction((t: any) => t);
+    tx.rutaReparto.findFirst.mockResolvedValue({ id: 7n });
+    tx.pedido.findMany.mockImplementation(async (a: any) =>
+      a.where.ruta_reparto_id !== undefined ? pedidos.filter((p) => p.ruta_reparto_id === 7n) : pedidos.filter((p) => p.repartidor_party_id === a.where.repartidor_party_id));
+    await service.tomarRuta({ ids: ['5'] }, rep(9n));
+    expect(pedidos.map((p) => p.numero_ruta)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('409 AUN_NO_DISPONIBLE y no toma ninguno', async () => {
