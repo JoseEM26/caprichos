@@ -142,7 +142,7 @@ describe('Pedidos y caja: estructura de dos columnas', () => {
   it('renderiza la lista a la izquierda y el detalle a la derecha sin errores', async () => {
     const { container } = render(<PedidosAdminView />);
 
-    expect(await screen.findByRole('tab', { name: /Por confirmar/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Ver pedidos: Por confirmar' })).toBeInTheDocument();
     const grid = container.querySelector('.cj-grid');
     expect(grid).not.toBeNull();
     expect(grid!.querySelector('.cj-left')).not.toBeNull();

@@ -540,53 +540,40 @@ export function PedidosAdminView() {
           {/* Día o rango de la lista (hoy por defecto); no cambia la caja del día */}
           <FiltroDiasPedidos rango={rango} pendientesAnteriores={pendientesAnteriores} alCambiar={cambiarRango} />
 
-          {/* 4 Pestañas principales */}
-          <div role="tablist" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {TABS_CAJA.map((t) => {
-              const activo = tabActiva === t.id;
-              return (
-                <button
-                  key={t.id}
-                  role="tab"
-                  aria-selected={activo}
-                  type="button"
-                  onClick={() => cambiarTab(t.id)}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 14px',
-                    borderRadius: 9999,
-                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                    background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                    color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t.n} · {conteosTabs[t.id]}
-                </button>
-              );
-            })}
-            <button
-              key="no_entregados"
-              role="tab"
-              aria-selected={tabActiva === 'no_entregados'}
-              type="button"
-              onClick={() => cambiarTab('no_entregados')}
-              style={{
-                minHeight: 44,
-                padding: '0 14px',
-                borderRadius: 9999,
-                border: '1.5px solid var(--cp-rust, #B2500F)',
-                background: tabActiva === 'no_entregados' ? 'var(--cp-rust, #B2500F)' : 'transparent',
-                color: tabActiva === 'no_entregados' ? 'var(--cp-white, #FFFFFF)' : 'var(--cp-rust, #B2500F)',
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
-            >
-              No entregados · {noEntregados?.total ?? 0}
-            </button>
+          {/* Vista de la lista: un combo con la cantidad de cada grupo (antes 5 pestañas) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 260 }}>
+              <FiltroCombo
+                etiqueta="Ver pedidos"
+                valor={tabActiva}
+                valorPorDefecto="nuevo"
+                opciones={[
+                  ...TABS_CAJA.map((t) => ({ valor: t.id, etiqueta: t.n, cantidad: conteosTabs[t.id] })),
+                  { valor: 'no_entregados', etiqueta: 'No entregados', cantidad: noEntregados?.total ?? 0 },
+                ]}
+                alCambiar={(v) => cambiarTab(v as ClaveTabCaja)}
+              />
+            </div>
+            {/* Atajo visible: lo que necesita atención no queda escondido dentro del combo */}
+            {TABS_CAJA.filter((t) => t.id !== tabActiva && t.id === 'nuevo' && conteosTabs[t.id] > 0).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => cambiarTab(t.id)}
+                style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: '1.5px solid var(--cp-orange, #E67929)', background: 'var(--cp-cream, #FBF4EC)', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+              >
+                {conteosTabs[t.id]} por confirmar
+              </button>
+            ))}
+            {tabActiva !== 'no_entregados' && (noEntregados?.total ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => cambiarTab('no_entregados')}
+                style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: '1.5px solid var(--cp-rust, #B2500F)', background: 'transparent', color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+              >
+                {noEntregados?.total} no {noEntregados?.total === 1 ? 'entregado' : 'entregados'}
+              </button>
+            )}
           </div>
 
           {/* Buscador y Filtros (no aplican a No entregados) */}
