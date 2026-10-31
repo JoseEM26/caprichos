@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { pedidosApi, Pedido, RespuestaNoEntregados } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
@@ -188,9 +189,6 @@ export function PedidosAdminView() {
   const [canalFiltro, setCanalFiltro] = useState<string>('all');
   const [modalidadFiltro, setModalidadFiltro] = useState<string>('all');
   const [cobroFiltro, setCobroFiltro] = useState<string>('all');
-
-  // Dropdown open states
-  const [openGroup, setOpenGroup] = useState<'canal' | 'modal' | 'cobro' | null>(null);
 
   // Paginación
   const [paginaActual, setPaginaActual] = useState<number>(1);
@@ -697,7 +695,7 @@ export function PedidosAdminView() {
               {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido' : 'pedidos'}
             </div>
 
-            {/* Dropdown groups */}
+            {/* Filtros desplegables (un combo por grupo, en una fila) */}
             {fcOpen && (
               <div
                 style={{
@@ -705,242 +703,36 @@ export function PedidosAdminView() {
                   paddingTop: 8,
                   display: 'flex',
                   flexWrap: 'wrap',
-                  gap: '8px 20px',
+                  gap: 8,
                 }}
               >
-                {/* CANAL */}
-                <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft, #2C4C5D)', marginBottom: 3 }}>
-                    CANAL
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOpenGroup(openGroup === 'canal' ? null : 'canal')}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: 44,
-                      padding: '0 12px',
-                      borderRadius: 10,
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      background: canalFiltro !== 'all' ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-white, #FFFFFF)',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span>{CANALES_OPCIONES.find((c) => c.id === canalFiltro)?.n}</span>
-                    <span aria-hidden="true" style={{ flex: 'none', fontSize: 12 }}>
-                      {openGroup === 'canal' ? '▲' : '▼'}
-                    </span>
-                  </button>
-                  {openGroup === 'canal' && (
-                    <div
-                      role="listbox"
-                      style={{
-                        position: 'absolute',
-                        zIndex: 20,
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: 4,
-                        border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                        borderRadius: 10,
-                        background: 'var(--cp-white, #FFFFFF)',
-                        overflow: 'hidden',
-                        boxShadow: '0 4px 12px rgba(11,44,62,0.15)',
-                      }}
-                    >
-                      {CANALES_OPCIONES.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => {
-                            setCanalFiltro(c.id);
-                            setOpenGroup(null);
-                            setPaginaActual(1);
-                          }}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            minHeight: 40,
-                            padding: '0 12px',
-                            border: 0,
-                            borderBottom: '1px solid var(--cp-line, #E3D6C6)',
-                            background: canalFiltro === c.id ? 'var(--cp-sand, #EDE1D1)' : 'transparent',
-                            color: 'var(--cp-navy, #0B2C3E)',
-                            fontWeight: canalFiltro === c.id ? 800 : 500,
-                            textAlign: 'left',
-                            fontSize: 13,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {c.n}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* MODALIDAD */}
-                <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft, #2C4C5D)', marginBottom: 3 }}>
-                    MODALIDAD
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOpenGroup(openGroup === 'modal' ? null : 'modal')}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: 44,
-                      padding: '0 12px',
-                      borderRadius: 10,
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      background: modalidadFiltro !== 'all' ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-white, #FFFFFF)',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span>{MODALIDADES_OPCIONES.find((m) => m.id === modalidadFiltro)?.n}</span>
-                    <span aria-hidden="true" style={{ flex: 'none', fontSize: 12 }}>
-                      {openGroup === 'modal' ? '▲' : '▼'}
-                    </span>
-                  </button>
-                  {openGroup === 'modal' && (
-                    <div
-                      role="listbox"
-                      style={{
-                        position: 'absolute',
-                        zIndex: 20,
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: 4,
-                        border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                        borderRadius: 10,
-                        background: 'var(--cp-white, #FFFFFF)',
-                        overflow: 'hidden',
-                        boxShadow: '0 4px 12px rgba(11,44,62,0.15)',
-                      }}
-                    >
-                      {MODALIDADES_OPCIONES.map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => {
-                            setModalidadFiltro(m.id);
-                            setOpenGroup(null);
-                            setPaginaActual(1);
-                          }}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            minHeight: 40,
-                            padding: '0 12px',
-                            border: 0,
-                            borderBottom: '1px solid var(--cp-line, #E3D6C6)',
-                            background: modalidadFiltro === m.id ? 'var(--cp-sand, #EDE1D1)' : 'transparent',
-                            color: 'var(--cp-navy, #0B2C3E)',
-                            fontWeight: modalidadFiltro === m.id ? 800 : 500,
-                            textAlign: 'left',
-                            fontSize: 13,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {m.n}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* COBRO */}
-                <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--cp-soft, #2C4C5D)', marginBottom: 3 }}>
-                    COBRO
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOpenGroup(openGroup === 'cobro' ? null : 'cobro')}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: 44,
-                      padding: '0 12px',
-                      borderRadius: 10,
-                      border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                      background: cobroFiltro !== 'all' ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-white, #FFFFFF)',
-                      color: 'var(--cp-navy, #0B2C3E)',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span>{COBRO_OPCIONES.find((c) => c.id === cobroFiltro)?.n}</span>
-                    <span aria-hidden="true" style={{ flex: 'none', fontSize: 12 }}>
-                      {openGroup === 'cobro' ? '▲' : '▼'}
-                    </span>
-                  </button>
-                  {openGroup === 'cobro' && (
-                    <div
-                      role="listbox"
-                      style={{
-                        position: 'absolute',
-                        zIndex: 20,
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: 4,
-                        border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                        borderRadius: 10,
-                        background: 'var(--cp-white, #FFFFFF)',
-                        overflow: 'hidden',
-                        boxShadow: '0 4px 12px rgba(11,44,62,0.15)',
-                      }}
-                    >
-                      {COBRO_OPCIONES.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => {
-                            setCobroFiltro(c.id);
-                            setOpenGroup(null);
-                            setPaginaActual(1);
-                          }}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            minHeight: 40,
-                            padding: '0 12px',
-                            border: 0,
-                            borderBottom: '1px solid var(--cp-line, #E3D6C6)',
-                            background: cobroFiltro === c.id ? 'var(--cp-sand, #EDE1D1)' : 'transparent',
-                            color: 'var(--cp-navy, #0B2C3E)',
-                            fontWeight: cobroFiltro === c.id ? 800 : 500,
-                            textAlign: 'left',
-                            fontSize: 13,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {c.n}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <FiltroCombo
+                  etiqueta="Canal"
+                  valor={canalFiltro}
+                  opciones={CANALES_OPCIONES.map((c) => ({ valor: c.id, etiqueta: c.n }))}
+                  alCambiar={(v) => {
+                    setCanalFiltro(v);
+                    setPaginaActual(1);
+                  }}
+                />
+                <FiltroCombo
+                  etiqueta="Modalidad"
+                  valor={modalidadFiltro}
+                  opciones={MODALIDADES_OPCIONES.map((m) => ({ valor: m.id, etiqueta: m.n }))}
+                  alCambiar={(v) => {
+                    setModalidadFiltro(v);
+                    setPaginaActual(1);
+                  }}
+                />
+                <FiltroCombo
+                  etiqueta="Cobro"
+                  valor={cobroFiltro}
+                  opciones={COBRO_OPCIONES.map((c) => ({ valor: c.id, etiqueta: c.n }))}
+                  alCambiar={(v) => {
+                    setCobroFiltro(v);
+                    setPaginaActual(1);
+                  }}
+                />
               </div>
             )}
           </div>

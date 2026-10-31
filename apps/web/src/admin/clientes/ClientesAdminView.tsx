@@ -8,6 +8,7 @@ import {
 import { ModalNuevoCliente } from './ModalNuevoCliente';
 import { ModalFichaCliente } from './ModalFichaCliente';
 import { ModalEditarCliente } from './ModalEditarCliente';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 export function ClientesAdminView() {
   const [, startTransition] = useTransition();
@@ -268,116 +269,25 @@ export function ClientesAdminView() {
               gap: '8px 20px',
             }}
           >
-            {/* Filtro: Tipo */}
-            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  color: 'var(--cp-soft)',
-                  marginBottom: 4,
-                }}
-              >
-                TIPO
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {['Todos', 'Persona', 'Empresa', 'Personal'].map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setFiltroTipo(opt)}
-                    style={{
-                      minHeight: 34,
-                      padding: '0 12px',
-                      borderRadius: 9999,
-                      border: '1.5px solid var(--cp-navy)',
-                      background: filtroTipo === opt ? 'var(--cp-navy)' : 'transparent',
-                      color: filtroTipo === opt ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Filtro: Crédito del personal */}
-            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  color: 'var(--cp-soft)',
-                  marginBottom: 4,
-                }}
-              >
-                CRÉDITO DEL PERSONAL
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {['Todos', 'Sí', 'No'].map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setFiltroCredito(opt)}
-                    style={{
-                      minHeight: 34,
-                      padding: '0 12px',
-                      borderRadius: 9999,
-                      border: '1.5px solid var(--cp-navy)',
-                      background: filtroCredito === opt ? 'var(--cp-navy)' : 'transparent',
-                      color: filtroCredito === opt ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Filtro: Registro (Activos / Desactivados) */}
-            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  color: 'var(--cp-soft)',
-                  marginBottom: 4,
-                }}
-              >
-                REGISTRO
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {['Todos', 'Activos', 'Desactivados'].map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setFiltroRegistro(opt)}
-                    style={{
-                      minHeight: 34,
-                      padding: '0 12px',
-                      borderRadius: 9999,
-                      border: '1.5px solid var(--cp-navy)',
-                      background: filtroRegistro === opt ? 'var(--cp-navy)' : 'transparent',
-                      color: filtroRegistro === opt ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Filtros en combo: tipo, crédito del personal y registro */}
+            <FiltroCombo
+              etiqueta="Tipo"
+              valor={filtroTipo}
+              opciones={['Todos', 'Persona', 'Empresa', 'Personal'].map((o) => ({ valor: o, etiqueta: o }))}
+              alCambiar={setFiltroTipo}
+            />
+            <FiltroCombo
+              etiqueta="Crédito del personal"
+              valor={filtroCredito}
+              opciones={['Todos', 'Sí', 'No'].map((o) => ({ valor: o, etiqueta: o }))}
+              alCambiar={setFiltroCredito}
+            />
+            <FiltroCombo
+              etiqueta="Registro"
+              valor={filtroRegistro}
+              opciones={['Todos', 'Activos', 'Desactivados'].map((o) => ({ valor: o, etiqueta: o }))}
+              alCambiar={setFiltroRegistro}
+            />
 
             {/* Botones Limpiar y Listo */}
             <div

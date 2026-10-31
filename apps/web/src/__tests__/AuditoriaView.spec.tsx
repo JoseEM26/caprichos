@@ -153,6 +153,30 @@ describe('AuditoriaView (/admin/historial)', () => {
     });
   });
 
+  it('los filtros de Historial son combos: Resultado Rechazados pide solo los rechazados', async () => {
+    setupSesion(true);
+    const spyGet = vi.spyOn(api, 'get').mockImplementation(async (ruta: string) => {
+      if (ruta.startsWith('/admin/auditoria/verificar')) return { valida: true, totalFilas: 2, discrepancias: 0 };
+      if (ruta.startsWith('/admin/auditoria')) return { total: 2, pagina: 1, limite: 20, paginas: 1, datos: REGISTROS_MOCK };
+      return {};
+    });
+
+    render(
+      <MemoryRouter>
+        <AuditoriaView />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Resultado: Todos' })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resultado: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Rechazados' }));
+
+    expect(screen.getByRole('button', { name: 'Resultado: Rechazados' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(spyGet).toHaveBeenLastCalledWith(expect.stringContaining('resultado=RECHAZADO'));
+    });
+  });
+
   it('muestra pantalla sin permiso si el usuario no tiene auditoria/ver', async () => {
     setupSesion(false);
 

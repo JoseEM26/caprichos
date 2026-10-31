@@ -19,6 +19,7 @@ import {
 } from './utilidades';
 import './reclamos.css';
 import { QuejasWhatsAppTab } from '../reclamos/QuejasWhatsAppTab';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 export function ReclamosAdminView() {
   const { usuario, tiene } = useSesion();
@@ -260,43 +261,35 @@ export function ReclamosAdminView() {
       {/* 2. Barra de filtros con píldoras */}
       <div className="reclamos-filtros-seccion">
         <div className="reclamos-grupo-pildoras">
-          <span className="reclamos-pildora-etiqueta">Estado:</span>
-          {(['todos', 'RECIBIDO', 'EN_REVISION', 'RESPONDIDO'] as const).map((est) => (
-            <button
-              key={est}
-              type="button"
-              onClick={() => {
-                setFiltroEstado(est);
-                setPagina(1);
-              }}
-              className={`reclamos-pildora-btn ${filtroEstado === est ? 'activa' : ''}`}
-            >
-              {est === 'todos'
-                ? 'Todos'
-                : est === 'EN_REVISION'
-                ? 'En revisión'
-                : est === 'RECIBIDO'
-                ? 'Recibidos'
-                : 'Respondidos'}
-            </button>
-          ))}
-        </div>
-
-        <div className="reclamos-grupo-pildoras">
-          <span className="reclamos-pildora-etiqueta">Tipo:</span>
-          {(['todos', 'RECLAMO', 'QUEJA'] as const).map((tipo) => (
-            <button
-              key={tipo}
-              type="button"
-              onClick={() => {
-                setFiltroTipo(tipo);
-                setPagina(1);
-              }}
-              className={`reclamos-pildora-btn ${filtroTipo === tipo ? 'activa' : ''}`}
-            >
-              {tipo === 'todos' ? 'Todos' : tipo === 'RECLAMO' ? 'Reclamos' : 'Quejas'}
-            </button>
-          ))}
+          <FiltroCombo
+            etiqueta="Estado"
+            valor={filtroEstado}
+            valorPorDefecto="todos"
+            opciones={[
+              { valor: 'todos', etiqueta: 'Todos' },
+              { valor: 'RECIBIDO', etiqueta: 'Recibidos' },
+              { valor: 'EN_REVISION', etiqueta: 'En revisión' },
+              { valor: 'RESPONDIDO', etiqueta: 'Respondidos' },
+            ]}
+            alCambiar={(v) => {
+              setFiltroEstado(v);
+              setPagina(1);
+            }}
+          />
+          <FiltroCombo
+            etiqueta="Tipo"
+            valor={filtroTipo}
+            valorPorDefecto="todos"
+            opciones={[
+              { valor: 'todos', etiqueta: 'Todos' },
+              { valor: 'RECLAMO', etiqueta: 'Reclamos' },
+              { valor: 'QUEJA', etiqueta: 'Quejas' },
+            ]}
+            alCambiar={(v) => {
+              setFiltroTipo(v);
+              setPagina(1);
+            }}
+          />
         </div>
 
         <div className="reclamos-contador-resumen">

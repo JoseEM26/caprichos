@@ -5,6 +5,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 import { formatearUnidad, qty1 } from './formato';
 
 interface RecetasTabProps {
@@ -346,74 +347,18 @@ export function RecetasTab({ insumos }: RecetasTabProps) {
           {/* Filtros de la tabla */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => setFiltroTipo('TODOS')}
-                style={{
-                  minHeight: 38,
-                  padding: '0 14px',
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  background: filtroTipo === 'TODOS' ? 'var(--cp-navy)' : 'transparent',
-                  color: filtroTipo === 'TODOS' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                Todos ({conteos.todos})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroTipo('VENTA')}
-                style={{
-                  minHeight: 38,
-                  padding: '0 14px',
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  background: filtroTipo === 'VENTA' ? 'var(--cp-navy)' : 'transparent',
-                  color: filtroTipo === 'VENTA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                Se vende ({conteos.venta})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroTipo('PRODUCCION')}
-                style={{
-                  minHeight: 38,
-                  padding: '0 14px',
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  background: filtroTipo === 'PRODUCCION' ? 'var(--cp-navy)' : 'transparent',
-                  color: filtroTipo === 'PRODUCCION' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                Se prepara por tanda ({conteos.produccion})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltroTipo('SIN_RECETA')}
-                style={{
-                  minHeight: 38,
-                  padding: '0 14px',
-                  borderRadius: 9999,
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  background: filtroTipo === 'SIN_RECETA' ? 'var(--cp-navy)' : 'transparent',
-                  color: filtroTipo === 'SIN_RECETA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                Sin receta ({conteos.sinReceta})
-              </button>
+              <FiltroCombo
+                etiqueta="Mostrar"
+                valor={filtroTipo}
+                valorPorDefecto="TODOS"
+                opciones={[
+                  { valor: 'TODOS', etiqueta: 'Todos', cantidad: conteos.todos },
+                  { valor: 'VENTA', etiqueta: 'Se vende', cantidad: conteos.venta },
+                  { valor: 'PRODUCCION', etiqueta: 'Se prepara por tanda', cantidad: conteos.produccion },
+                  { valor: 'SIN_RECETA', etiqueta: 'Sin receta', cantidad: conteos.sinReceta },
+                ]}
+                alCambiar={(v) => setFiltroTipo(v as typeof filtroTipo)}
+              />
             </div>
 
             <input

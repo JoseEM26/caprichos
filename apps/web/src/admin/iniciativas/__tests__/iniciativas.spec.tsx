@@ -98,9 +98,23 @@ describe('IniciativasView', () => {
     expect(screen.getByText('+ Nueva iniciativa')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Buscar por título, texto o persona')).toBeInTheDocument();
 
-    expect(screen.getByText('Quejas (1)')).toBeInTheDocument();
-    expect(screen.getByText('Mejoras (1)')).toBeInTheDocument();
-    expect(screen.getByText('Ideas (1)')).toBeInTheDocument();
+    // Los filtros son combos con su cantidad dentro de la lista
+    fireEvent.click(screen.getByRole('button', { name: 'Tipo: Todas' }));
+    expect(screen.getByRole('option', { name: /Quejas/ })).toHaveTextContent('1');
+    expect(screen.getByRole('option', { name: /Mejoras/ })).toHaveTextContent('1');
+    expect(screen.getByRole('option', { name: /Ideas/ })).toHaveTextContent('1');
+
+    fireEvent.click(screen.getByRole('option', { name: /Quejas/ }));
+    expect(screen.getByRole('button', { name: 'Tipo: Quejas' })).toBeInTheDocument();
+
+    // Estado y «Solo las mías» también son combos
+    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: /En revisión/ }));
+    expect(screen.getByRole('button', { name: 'Estado: En revisión' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver: Todas' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Solo las mías' }));
+    expect(screen.getByRole('button', { name: 'Ver: Solo las mías' })).toBeInTheDocument();
   });
 
   it('permite abrir "Ver y comentar", ver comentarios y escribir un comentario', async () => {

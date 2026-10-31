@@ -67,6 +67,18 @@ describe('PantallasView (/admin/pantallas)', () => {
     });
   });
 
+  it('5. el filtro de estación es un combo dentro de Filtros y pide la lista de esa estación', async () => {
+    render(<PantallasView />);
+    await screen.findByText('TV cocina');
+
+    fireEvent.click(screen.getByRole('button', { name: /Filtros/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Estación: Todas' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Solo barra' }));
+
+    expect(screen.getByRole('button', { name: 'Estación: Solo barra' })).toBeInTheDocument();
+    await waitFor(() => expect(api.listarPantallas).toHaveBeenLastCalledWith('', 'Solo barra'));
+  });
+
   it('2. Permite desactivar una pantalla con diálogo de confirmación Sí/No', async () => {
     render(<PantallasView />);
     await waitFor(() => {

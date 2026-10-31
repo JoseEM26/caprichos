@@ -12,6 +12,7 @@ import { ModalCompraRapida } from './ModalCompraRapida';
 import { ModalProveedor } from './ModalProveedor';
 import { ModalHistorialProveedor } from './ModalHistorialProveedor';
 import { ModalDetalleCompra } from './ModalDetalleCompra';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 const getInitialTab = (): 'pedir' | 'compras' | 'proveedores' => {
   if (typeof window !== 'undefined') {
@@ -541,48 +542,17 @@ export const ComprasView: React.FC = () => {
       {/* CONTENIDO PESTAÑA 2: COMPRAS */}
       {tabActiva === 'compras' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>Proveedor</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setFiltroProveedor('')}
-              style={{
-                minHeight: 44,
-                padding: '0 12px',
-                borderRadius: 9999,
-                border: '1.5px solid var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: 12,
-                background: !filtroProveedor ? 'var(--cp-navy)' : 'transparent',
-                color: !filtroProveedor ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                cursor: 'pointer',
-              }}
-            >
-              Todos
-            </button>
-            {proveedoresConCompras.map((nombre) => {
-              const activo = filtroProveedor.toLowerCase() === (nombre || '').toLowerCase();
-              return (
-                <button
-                  key={nombre}
-                  type="button"
-                  onClick={() => setFiltroProveedor(nombre)}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 12px',
-                    borderRadius: 9999,
-                    border: '1.5px solid var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    background: activo ? 'var(--cp-navy)' : 'transparent',
-                    color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {nombre}
-                </button>
-              );
-            })}
+            <FiltroCombo
+              etiqueta="Proveedor"
+              valor={filtroProveedor}
+              valorPorDefecto=""
+              opciones={[
+                { valor: '', etiqueta: 'Todos' },
+                ...proveedoresConCompras.map((nombre) => ({ valor: nombre, etiqueta: nombre })),
+              ]}
+              alCambiar={setFiltroProveedor}
+            />
           </div>
 
           <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>

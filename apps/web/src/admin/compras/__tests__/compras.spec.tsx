@@ -163,6 +163,16 @@ describe('ComprasView', () => {
     });
   });
 
+  it('el filtro por proveedor de Compras es un combo con los proveedores que tienen compras', async () => {
+    render(<ComprasView />);
+    await screen.findByRole('button', { name: 'Proveedor: Todos' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Proveedor: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Lácteos del Norte' }));
+
+    expect(screen.getByRole('button', { name: 'Proveedor: Lácteos del Norte' })).toBeInTheDocument();
+  });
+
   it('abre el modal de registrar compra al hacer clic en + Registrar compra', async () => {
     render(<ComprasView />);
 

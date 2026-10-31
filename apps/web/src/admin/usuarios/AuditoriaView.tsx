@@ -9,6 +9,7 @@ import type {
   RespuestaListarAuditoria,
   ResultadoVerificacionCadena,
 } from './tipos';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 const OPCIONES_MODULOS = [
   { id: '', n: 'Todos' },
@@ -366,141 +367,59 @@ export function AuditoriaView() {
 
         {/* Chips TIPO */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-          <span style={{ flex: 'none', minWidth: '70px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>TIPO</span>
-          {[
-            ['todos', `Todos (${total || registros.length})`],
-            ['cambio', `Cambios (${totalCambios || 17})`],
-            ['acceso', `Accesos (5)`],
-            ['sensible', `Lecturas sensibles (${totalSensibles || 3})`],
-          ].map(([t, label]) => {
-            const activo = filtroTipo === t;
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  setFiltroTipo(t);
-                  setPagina(1);
-                }}
-                style={{
-                  minHeight: '40px',
-                  padding: '0 12px',
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: '9999px',
-                  background: activo ? 'var(--cp-navy)' : 'transparent',
-                  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
+          <FiltroCombo
+            etiqueta="Tipo"
+            valor={filtroTipo}
+            opciones={[
+              { valor: 'todos', etiqueta: 'Todos', cantidad: total || registros.length },
+              { valor: 'cambio', etiqueta: 'Cambios', cantidad: totalCambios || 17 },
+              { valor: 'acceso', etiqueta: 'Accesos', cantidad: 5 },
+              { valor: 'sensible', etiqueta: 'Lecturas sensibles', cantidad: totalSensibles || 3 },
+            ]}
+            alCambiar={setFiltroTipo}
+          />
         </div>
 
         {/* Chips MÓDULO */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-          <span style={{ flex: 'none', minWidth: '70px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>MÓDULO</span>
-          {OPCIONES_MODULOS.map((m) => {
-            const activo = filtroModulo === m.id;
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => {
-                  setFiltroModulo(m.id);
-                  setPagina(1);
-                }}
-                style={{
-                  minHeight: '40px',
-                  padding: '0 12px',
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: '9999px',
-                  background: activo ? 'var(--cp-navy)' : 'transparent',
-                  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                {m.n}
-              </button>
-            );
-          })}
+          <FiltroCombo
+            etiqueta="Módulo"
+            valor={filtroModulo}
+            opciones={OPCIONES_MODULOS.map((m) => ({ valor: m.id, etiqueta: m.n }))}
+            alCambiar={(v) => {
+              setFiltroModulo(v);
+              setPagina(1);
+            }}
+          />
         </div>
 
         {/* Chips RESULTADO */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-          <span style={{ flex: 'none', minWidth: '70px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>RESULTADO</span>
-          {[
-            ['todos', 'Todos'],
-            ['correctos', 'Correctos'],
-            ['rechazados', 'Rechazados'],
-          ].map(([r, label]) => {
-            const activo = filtroResultado === r;
-            return (
-              <button
-                key={r}
-                type="button"
-                onClick={() => {
-                  setFiltroResultado(r);
-                  setPagina(1);
-                }}
-                style={{
-                  minHeight: '40px',
-                  padding: '0 12px',
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: '9999px',
-                  background: activo ? 'var(--cp-navy)' : 'transparent',
-                  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
+          <FiltroCombo
+            etiqueta="Resultado"
+            valor={filtroResultado}
+            opciones={[
+              { valor: 'todos', etiqueta: 'Todos' },
+              { valor: 'correctos', etiqueta: 'Correctos' },
+              { valor: 'rechazados', etiqueta: 'Rechazados' },
+            ]}
+            alCambiar={setFiltroResultado}
+          />
         </div>
 
         {/* Chips FECHA */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-          <span style={{ flex: 'none', minWidth: '70px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>FECHA</span>
-          {[
-            ['todos', 'Todo'],
-            ['hoy', 'Hoy'],
-            ['ayer', 'Ayer'],
-            ['7', 'Últimos 7 días'],
-          ].map(([f, label]) => {
-            const activo = filtroFecha === f;
-            return (
-              <button
-                key={f}
-                type="button"
-                onClick={() => {
-                  setFiltroFecha(f);
-                  setPagina(1);
-                }}
-                style={{
-                  minHeight: '40px',
-                  padding: '0 12px',
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: '9999px',
-                  background: activo ? 'var(--cp-navy)' : 'transparent',
-                  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-
+          <FiltroCombo
+            etiqueta="Fecha"
+            valor={filtroFecha}
+            opciones={[
+              { valor: 'todos', etiqueta: 'Todo' },
+              { valor: 'hoy', etiqueta: 'Hoy' },
+              { valor: 'ayer', etiqueta: 'Ayer' },
+              { valor: '7', etiqueta: 'Últimos 7 días' },
+            ]}
+            alCambiar={setFiltroFecha}
+          />
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginLeft: '6px' }}>
             <span style={{ fontSize: '12px', fontWeight: 700 }}>Desde</span>
             <input

@@ -678,8 +678,8 @@ describe('Ola F5: Comprobantes y Obligaciones Legales', () => {
     expect(screen.getByText('LR-2026-000002')).toBeInTheDocument();
 
     // Clic en píldora "Recibidos"
-    const pildoraRecibidos = screen.getByRole('button', { name: /^Recibidos$/i });
-    fireEvent.click(pildoraRecibidos);
+    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: /^Recibidos$/i }));
 
     await waitFor(() => {
       expect(spyListar).toHaveBeenCalledWith(
@@ -690,8 +690,8 @@ describe('Ola F5: Comprobantes y Obligaciones Legales', () => {
     });
 
     // Clic en píldora "Quejas"
-    const pildoraQuejas = screen.getByRole('button', { name: /^Quejas$/i });
-    fireEvent.click(pildoraQuejas);
+    fireEvent.click(screen.getByRole('button', { name: 'Tipo: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: /^Quejas$/i }));
 
     await waitFor(() => {
       expect(spyListar).toHaveBeenCalledWith(

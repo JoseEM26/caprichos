@@ -8,6 +8,7 @@ import { EstadoVacio } from '../../comun/EstadoVacio';
 import { EstadoError } from '../../comun/EstadoError';
 
 import { formatearUnidad, qty1 } from './formato';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 interface MovimientosTabProps {
   insumos: InsumoItem[];
@@ -197,31 +198,13 @@ export function MovimientosTab({ insumos, lugares }: MovimientosTabProps) {
 
         {mostrarFiltros && (
           <div style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
-              QUÉ TIPO DE MOVIMIENTO
-            </div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {tipoChips.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setFiltroTipo(c.id)}
-                  style={{
-                    minHeight: '44px',
-                    padding: '0 14px',
-                    borderRadius: '9999px',
-                    border: '1.5px solid var(--cp-navy)',
-                    background: filtroTipo === c.id ? 'var(--cp-navy)' : 'transparent',
-                    color: filtroTipo === c.id ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
+            <FiltroCombo
+              etiqueta="Tipo de movimiento"
+              valor={filtroTipo}
+              valorPorDefecto=""
+              opciones={tipoChips.map((c) => ({ valor: c.id, etiqueta: c.label }))}
+              alCambiar={setFiltroTipo}
+            />
           </div>
         )}
       </div>

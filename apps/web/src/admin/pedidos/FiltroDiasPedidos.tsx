@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { FiltroCombo, type OpcionFiltro } from '../../comun/FiltroCombo';
 import {
   MAX_DIAS_RANGO,
   RangoPedidos,
@@ -26,38 +27,33 @@ export function FiltroDiasPedidos({ rango, pendientesAnteriores, alCambiar }: Pr
   const [hastaBorrador, setHastaBorrador] = useState<string>(rango.hasta);
   const errorBorrador = panelAbierto ? errorRangoPersonalizado(desdeBorrador, hastaBorrador, hoy) : null;
 
-  const chip = (activo: boolean) => ({
-    'aria-pressed': activo,
-    className: `fd-chip${activo ? ' fd-chip--activo' : ''}`,
-  });
+  // Un solo combo en lugar de una fila de botones; «Elegir día / rango» abre el panel de fechas
+  const valorCombo = panelAbierto ? 'rango' : rango.modo;
+  const opciones: OpcionFiltro[] = [
+    { valor: 'hoy', etiqueta: 'Hoy' },
+    { valor: 'ayer', etiqueta: 'Ayer' },
+    { valor: 'semana', etiqueta: 'Últimos 7 días' },
+    { valor: 'rango', etiqueta: 'Elegir día / rango' },
+    ...(pendientesAnteriores > 0 || rango.modo === 'pendientes'
+      ? [{ valor: 'pendientes', etiqueta: 'Pendientes de días anteriores', cantidad: pendientesAnteriores }]
+      : []),
+  ];
+
+  const elegirOpcion = (v: string) => {
+    if (v === 'rango') {
+      setPanelAbierto(true);
+      return;
+    }
+    setPanelAbierto(false);
+    if (v === 'hoy') alCambiar(rangoHoy(hoy));
+    else if (v === 'pendientes') alCambiar({ modo: 'pendientes', desde: '', hasta: '' });
+    else alCambiar(rangoPara(v as 'ayer' | 'semana', hoy));
+  };
 
   return (
     <div className="fd" aria-label="Filtro de días">
-      <div className="fd-chips" role="group" aria-label="Mostrar pedidos de">
-        <button type="button" {...chip(rango.modo === 'hoy')} onClick={() => { setPanelAbierto(false); alCambiar(rangoHoy(hoy)); }}>
-          Hoy
-        </button>
-        <button type="button" {...chip(rango.modo === 'ayer')} onClick={() => { setPanelAbierto(false); alCambiar(rangoPara('ayer', hoy)); }}>
-          Ayer
-        </button>
-        <button type="button" {...chip(rango.modo === 'semana')} onClick={() => { setPanelAbierto(false); alCambiar(rangoPara('semana', hoy)); }}>
-          Últimos 7 días
-        </button>
-        <button type="button" {...chip(panelAbierto || rango.modo === 'rango')} onClick={() => setPanelAbierto((v) => !v)}>
-          Elegir día / rango
-        </button>
-        {(pendientesAnteriores > 0 || rango.modo === 'pendientes') && (
-          <button
-            type="button"
-            aria-pressed={rango.modo === 'pendientes'}
-            className={`fd-chip fd-chip--pendientes${rango.modo === 'pendientes' ? ' fd-chip--activo' : ''}`}
-            onClick={() => { setPanelAbierto(false); alCambiar({ modo: 'pendientes', desde: '', hasta: '' }); }}
-          >
-            {rango.modo === 'pendientes'
-              ? `Pendientes anteriores · ${pendientesAnteriores}`
-              : `${pendientesAnteriores} pendientes de días anteriores`}
-          </button>
-        )}
+      <div className="fd-chips">
+        <FiltroCombo etiqueta="Mostrar" valor={valorCombo} valorPorDefecto="hoy" opciones={opciones} alCambiar={elegirOpcion} />
       </div>
 
       {panelAbierto && (

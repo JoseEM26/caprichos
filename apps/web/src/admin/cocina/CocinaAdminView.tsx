@@ -33,6 +33,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 export type ModoCocina = 'area' | 'hist';
 
@@ -716,34 +717,13 @@ export function CocinaAdminView() {
           marginTop: '4px',
         }}
       >
-        <span style={{ fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>
-          Área
-        </span>
-
-        {AREAS_MOCKUP.map((a) => {
-          const activa = areaActiva === a.id;
-          return (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => seleccionarAreaMockup(a.id)}
-              style={{
-                minHeight: '44px',
-                padding: '0 16px',
-                borderRadius: '9999px',
-                border: '1.5px solid var(--cp-navy)',
-                background: activa ? 'var(--cp-navy)' : 'transparent',
-                color: activa ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {a.n}
-            </button>
-          );
-        })}
+        <FiltroCombo
+          etiqueta="Área"
+          valor={areaActiva}
+          valorPorDefecto="todas"
+          opciones={AREAS_MOCKUP.map((a) => ({ valor: a.id, etiqueta: a.n }))}
+          alCambiar={seleccionarAreaMockup}
+        />
 
         <button
           type="button"

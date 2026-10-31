@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useUrlArchivo } from '../../comun/useUrlArchivo';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
@@ -97,8 +98,6 @@ export function ProductosView() {
   const [pagina, setPagina] = useState(1);
 
   // Dropdowns en filtros
-  const [ddDispAbierto, setDdDispAbierto] = useState(false);
-  const [ddOrdenAbierto, setDdOrdenAbierto] = useState(false);
 
   // Modales
   const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
@@ -822,223 +821,37 @@ export function ProductosView() {
               gap: '8px 20px',
             }}
           >
-            {/* Disponibilidad */}
-            <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  color: 'var(--cp-soft)',
-                  marginBottom: 3,
-                }}
-              >
-                DISPONIBILIDAD
-              </div>
-              <button
-                onClick={() => setDdDispAbierto(!ddDispAbierto)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 44,
-                  padding: '0 12px',
-                  borderRadius: 10,
-                  border: '1.5px solid var(--cp-navy)',
-                  background: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 8,
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                }}
-              >
-                <span>
-                  {filtroDisponibilidad === 'all'
-                    ? 'Todos'
-                    : filtroDisponibilidad === 'avail'
-                    ? 'Solo disponibles'
-                    : 'Solo agotados'}
-                </span>
-                <span>▾</span>
-              </button>
-              {ddDispAbierto && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 20,
-                    marginTop: 4,
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: 10,
-                    background: 'var(--cp-white)',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {[
-                    { id: 'all', n: 'Todos' },
-                    { id: 'avail', n: 'Solo disponibles' },
-                    { id: 'off', n: 'Solo agotados' },
-                  ].map((o) => (
-                    <button
-                      key={o.id}
-                      onClick={() => {
-                        setFiltroDisponibilidad(o.id as any);
-                        setDdDispAbierto(false);
-                      }}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        minHeight: 44,
-                        padding: '0 12px',
-                        border: 0,
-                        borderBottom: '1px solid var(--cp-sand)',
-                        background:
-                          filtroDisponibilidad === o.id ? 'var(--cp-cream)' : 'var(--cp-white)',
-                        color: 'var(--cp-navy)',
-                        fontWeight: filtroDisponibilidad === o.id ? 800 : 600,
-                        fontSize: 13,
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {o.n}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Ordenar */}
-            <div style={{ flex: '1 1 200px', minWidth: 0, position: 'relative' }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  color: 'var(--cp-soft)',
-                  marginBottom: 3,
-                }}
-              >
-                ORDENAR
-              </div>
-              <button
-                onClick={() => setDdOrdenAbierto(!ddOrdenAbierto)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 44,
-                  padding: '0 12px',
-                  borderRadius: 10,
-                  border: '1.5px solid var(--cp-navy)',
-                  background: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 8,
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                }}
-              >
-                <span>
-                  {filtroOrden === 'name-asc'
-                    ? 'Nombre A-Z'
-                    : filtroOrden === 'name-desc'
-                    ? 'Nombre Z-A'
-                    : filtroOrden === 'price-asc'
-                    ? 'Precio menor'
-                    : 'Precio mayor'}
-                </span>
-                <span>▾</span>
-              </button>
-              {ddOrdenAbierto && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 20,
-                    marginTop: 4,
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: 10,
-                    background: 'var(--cp-white)',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {[
-                    { id: 'name-asc', n: 'Nombre A-Z' },
-                    { id: 'name-desc', n: 'Nombre Z-A' },
-                    { id: 'price-asc', n: 'Precio menor' },
-                    { id: 'price-desc', n: 'Precio mayor' },
-                  ].map((o) => (
-                    <button
-                      key={o.id}
-                      onClick={() => {
-                        setFiltroOrden(o.id as any);
-                        setDdOrdenAbierto(false);
-                      }}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        minHeight: 44,
-                        padding: '0 12px',
-                        border: 0,
-                        borderBottom: '1px solid var(--cp-sand)',
-                        background:
-                          filtroOrden === o.id ? 'var(--cp-cream)' : 'var(--cp-white)',
-                        color: 'var(--cp-navy)',
-                        fontWeight: filtroOrden === o.id ? 800 : 600,
-                        fontSize: 13,
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {o.n}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Promoción */}
-            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  color: 'var(--cp-soft)',
-                  marginBottom: 3,
-                }}
-              >
-                PROMOCIÓN
-              </div>
-              <button
-                onClick={() => setFiltroPromo(!filtroPromo)}
-                style={{
-                  minHeight: 44,
-                  padding: '0 12px',
-                  borderRadius: 10,
-                  border: '1.5px solid var(--cp-navy)',
-                  background: filtroPromo ? 'var(--cp-navy)' : 'transparent',
-                  color: filtroPromo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                Con promoción
-              </button>
-            </div>
+            {/* Filtros en combo: disponibilidad, orden y promoción */}
+            <FiltroCombo
+              etiqueta="Disponibilidad"
+              valor={filtroDisponibilidad}
+              opciones={[
+                { valor: 'all', etiqueta: 'Todos' },
+                { valor: 'avail', etiqueta: 'Solo disponibles' },
+                { valor: 'off', etiqueta: 'Solo agotados' },
+              ]}
+              alCambiar={(v) => setFiltroDisponibilidad(v as typeof filtroDisponibilidad)}
+            />
+            <FiltroCombo
+              etiqueta="Ordenar"
+              valor={filtroOrden}
+              opciones={[
+                { valor: 'name-asc', etiqueta: 'Nombre A-Z' },
+                { valor: 'name-desc', etiqueta: 'Nombre Z-A' },
+                { valor: 'price-asc', etiqueta: 'Precio menor' },
+                { valor: 'price-desc', etiqueta: 'Precio mayor' },
+              ]}
+              alCambiar={(v) => setFiltroOrden(v as typeof filtroOrden)}
+            />
+            <FiltroCombo
+              etiqueta="Promoción"
+              valor={filtroPromo ? 'si' : 'no'}
+              opciones={[
+                { valor: 'no', etiqueta: 'Todos' },
+                { valor: 'si', etiqueta: 'Con promoción' },
+              ]}
+              alCambiar={(v) => setFiltroPromo(v === 'si')}
+            />
 
             {/* Botones inferiores del panel de filtros */}
             <div
@@ -1085,38 +898,22 @@ export function ProductosView() {
           </div>
         )}
 
-        {/* Registro: activos / desactivados */}
-        <div role="group" aria-label="Registro" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>Registro</span>
-          {(
-            [
-              ['activos', 'Activos', productos.filter((x) => !x.oculto).length],
-              ['desactivados', 'Desactivados', productos.filter((x) => x.oculto).length],
-              ['todos', 'Todos', productos.length],
-            ] as const
-          ).map(([id, n, c]) => (
-            <button
-              key={id}
-              aria-pressed={filtroRegistro === id}
-              onClick={() => {
-                setFiltroRegistro(id);
-                setPagina(1);
-              }}
-              style={{
-                minHeight: 44,
-                padding: '0 14px',
-                border: '1.5px solid var(--cp-navy)',
-                borderRadius: 9999,
-                background: filtroRegistro === id ? 'var(--cp-navy)' : 'transparent',
-                color: filtroRegistro === id ? 'var(--cp-white)' : 'var(--cp-navy)',
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              {n} ({c})
-            </button>
-          ))}
+        {/* Registro: activos / desactivados / todos */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <FiltroCombo
+            etiqueta="Registro"
+            valor={filtroRegistro}
+            valorPorDefecto="activos"
+            opciones={[
+              { valor: 'activos', etiqueta: 'Activos', cantidad: productos.filter((x) => !x.oculto).length },
+              { valor: 'desactivados', etiqueta: 'Desactivados', cantidad: productos.filter((x) => x.oculto).length },
+              { valor: 'todos', etiqueta: 'Todos', cantidad: productos.length },
+            ]}
+            alCambiar={(v) => {
+              setFiltroRegistro(v as typeof filtroRegistro);
+              setPagina(1);
+            }}
+          />
         </div>
 
         {/* Resumen inferior del box de búsqueda */}

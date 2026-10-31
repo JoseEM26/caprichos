@@ -103,15 +103,16 @@ describe('Pantalla de Cocina Simple e Intuitiva - Componentes', () => {
         expect(screen.getByText('Waffle de Lúcuma')).toBeInTheDocument();
       });
 
-      // Filtro rápido por categoría "Cafetería"
-      const btnCafeteria = screen.getByRole('button', { name: 'Cafetería' });
-      fireEvent.click(btnCafeteria);
+      // Combo de categoría: elegir "Cafetería"
+      fireEvent.click(screen.getByRole('button', { name: 'Categoría: Todas' }));
+      fireEvent.click(screen.getByRole('option', { name: 'Cafetería' }));
 
       expect(screen.queryByText('Waffle de Lúcuma')).not.toBeInTheDocument();
       expect(screen.getByText('Café Americano')).toBeInTheDocument();
 
       // Volver a "Todas"
-      fireEvent.click(screen.getByRole('button', { name: 'Todas' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Categoría: Cafetería' }));
+      fireEvent.click(screen.getByRole('option', { name: 'Todas' }));
       expect(screen.getByText('Waffle de Lúcuma')).toBeInTheDocument();
 
       // Buscador opcional

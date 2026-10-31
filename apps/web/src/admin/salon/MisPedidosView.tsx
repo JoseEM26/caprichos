@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos } from '../../comun/socket';
 import { salonApi } from './api';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
@@ -211,44 +212,24 @@ export function MisPedidosView() {
         </div>
       </section>
 
-      <div className="mp-chips" role="group" aria-label="Rango de fechas">
-        {RANGOS.map((r) => (
-          <button
-            key={r.valor}
-            type="button"
-            className="mp-chip"
-            aria-pressed={rango === r.valor}
-            onClick={() => setRango(r.valor)}
-          >
-            {r.etiqueta}
-          </button>
-        ))}
-      </div>
-
-      <div className="mp-chips" role="group" aria-label="Estado del pedido">
-        {FILTROS.map((f) =>
-          f.valor === 'faltaVoucher' ? (
-            <button
-              key={f.valor}
-              type="button"
-              className="mp-chip mpv-chip-falta"
-              aria-pressed={filtro === f.valor}
-              onClick={() => setFiltro(f.valor)}
-            >
-              Falta voucher ({cuantosFaltan})
-            </button>
-          ) : (
-            <button
-              key={f.valor}
-              type="button"
-              className="mp-chip"
-              aria-pressed={filtro === f.valor}
-              onClick={() => setFiltro(f.valor)}
-            >
-              {f.etiqueta}
-            </button>
-          ),
-        )}
+      <div className="mp-chips">
+        <FiltroCombo
+          etiqueta="Periodo"
+          valor={rango}
+          valorPorDefecto="hoy"
+          opciones={RANGOS.map((r) => ({ valor: r.valor, etiqueta: r.etiqueta }))}
+          alCambiar={(v) => setRango(v as RangoMisPedidos)}
+        />
+        <FiltroCombo
+          etiqueta="Estado"
+          valor={filtro}
+          opciones={FILTROS.map((f) =>
+            f.valor === 'faltaVoucher'
+              ? { valor: f.valor, etiqueta: f.etiqueta, cantidad: cuantosFaltan }
+              : { valor: f.valor, etiqueta: f.etiqueta },
+          )}
+          alCambiar={(v) => setFiltro(v as FiltroEstado)}
+        />
       </div>
 
       {error && (

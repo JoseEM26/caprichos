@@ -122,6 +122,21 @@ describe('Admin - Quejas de WhatsApp y Configuración Chatbot', () => {
     });
   });
 
+  it('5. el filtro de estado es un combo: elegir Resueltas pide solo las resueltas', async () => {
+    render(<QuejasWhatsAppTab puedeResponder={true} />);
+    await screen.findByText('Carlos Mendoza');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todas' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Resueltas' }));
+
+    expect(screen.getByRole('button', { name: 'Estado: Resueltas' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(comprobantesApi.listarQuejasWhatsApp).toHaveBeenLastCalledWith(
+        expect.objectContaining({ estado: 'RESUELTA' }),
+      ),
+    );
+  });
+
   it('3. Al hacer clic en Ver detalle y cambiar estado a EN_REVISION solicita confirmación Sí/No', async () => {
     render(<QuejasWhatsAppTab puedeResponder={true} />);
 

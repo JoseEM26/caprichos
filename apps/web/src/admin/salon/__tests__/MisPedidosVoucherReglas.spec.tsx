@@ -193,14 +193,15 @@ describe('MisPedidosView: nombre del cliente y filtro Falta voucher', () => {
     expect(nombre.getAttribute('title')).toBe('Ana López');
   });
 
-  it('el chip Falta voucher cuenta los no anulados sin voucher vigente y filtra solo esos', async () => {
+  it('la opción Falta voucher del combo Estado cuenta los no anulados sin voucher vigente y filtra solo esos', async () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-W021');
-    const chip = screen.getByRole('button', { name: 'Falta voucher (1)' });
-    expect(chip.className).toContain('mpv-chip-falta');
-    expect(screen.getByRole('button', { name: 'Todos' }).className).not.toContain('mpv-chip-falta');
+    // El filtro Estado es un combo; la opción «Falta voucher» lleva la cantidad
+    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
+    expect(screen.getByRole('option', { name: /Falta voucher/ })).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('option', { name: /Falta voucher/ }));
+    expect(screen.getByRole('button', { name: 'Estado: Falta voucher' })).toBeInTheDocument();
 
-    fireEvent.click(chip);
     expect(screen.getByText('CP-W021')).toBeDefined();
     expect(screen.queryByText('CP-W022')).toBeNull();
     expect(screen.queryByText('CP-W023')).toBeNull();

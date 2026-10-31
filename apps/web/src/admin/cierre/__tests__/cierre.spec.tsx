@@ -414,4 +414,38 @@ describe('Ola F5: Caja y Cierres', () => {
     render(<HistorialCierres />);
     expect(await screen.findByText(/23\/10\/2026/)).toBeInTheDocument();
   });
+
+  it('el resultado del cierre se filtra con un combo: Sobrantes deja solo el cierre con sobrante', async () => {
+    const cierre = (cajaId: number, fecha: string, diferencia: number) => ({
+      cajaId,
+      fecha,
+      apertura: 0,
+      cerradaPor: 2,
+      cerradaEn: fecha,
+      cierre: {
+        resultado: diferencia === 0 ? 'CUADRA' : 'NO_CUADRA',
+        aprobadoPor: null,
+        nota: null,
+        medios: [{ medio: 'EFECTIVO', sistema: 100, visto: 100 + diferencia, diferencia }],
+      },
+    });
+    vi.spyOn(cierreApi, 'obtenerHistorial').mockResolvedValue({
+      cierres: [cierre(1, '2026-10-22T00:00:00.000Z', 0), cierre(2, '2026-10-21T00:00:00.000Z', 5)],
+      total: 2,
+      pagina: 1,
+      limite: 20,
+      totalPaginas: 1,
+    } as any);
+
+    render(<HistorialCierres />);
+    expect(await screen.findByText(/22\/10\/2026/)).toBeInTheDocument();
+    expect(screen.getByText(/21\/10\/2026/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resultado: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Sobrantes' }));
+
+    expect(screen.getByRole('button', { name: 'Resultado: Sobrantes' })).toBeInTheDocument();
+    expect(screen.getByText(/21\/10\/2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/22\/10\/2026/)).not.toBeInTheDocument();
+  });
 });

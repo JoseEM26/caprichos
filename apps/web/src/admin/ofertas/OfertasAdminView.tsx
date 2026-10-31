@@ -15,6 +15,7 @@ import { ModalHistorialCupones, HistorialMovimiento } from './ModalHistorialCupo
 import { ModalConfirmacion } from './ModalConfirmacion';
 import { ModalPrevisualizacionCarta } from './ModalPrevisualizacionCarta';
 import { api } from '../../comun/api';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 const NOMBRES_DIAS_CORTO: Record<number, string> = {
   1: 'Lun',
@@ -1398,26 +1399,13 @@ export function OfertasAdminView() {
                 }}
               />
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {['Todos', 'Vigentes', 'Canjeados', 'Vencidos', 'Anulados'].map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => setFiltroEstadoEmitidos(st)}
-                    style={{
-                      minHeight: '44px',
-                      padding: '0 12px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      backgroundColor: filtroEstadoEmitidos === st ? 'var(--cp-navy)' : 'transparent',
-                      color: filtroEstadoEmitidos === st ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {st}
-                  </button>
-                ))}
+                <FiltroCombo
+                  etiqueta="Estado"
+                  valor={filtroEstadoEmitidos}
+                  valorPorDefecto="Todos"
+                  opciones={['Todos', 'Vigentes', 'Canjeados', 'Vencidos', 'Anulados'].map((st) => ({ valor: st, etiqueta: st }))}
+                  alCambiar={setFiltroEstadoEmitidos}
+                />
               </div>
 
               {emitidosFiltrados.length === 0 && (

@@ -7,6 +7,7 @@ import { DIAS, formatoHoras, horasTurno } from './horario';
 import { CrearUsuarioModal, ETIQUETAS_ROLES } from './CrearUsuarioModal';
 import { EditarUsuarioModal } from './EditarUsuarioModal';
 import { ClaveInicialModal } from './ClaveInicialModal';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 type PestanaUsuario = 'personal' | 'clientes' | 'horarios' | 'roles';
 
@@ -608,119 +609,59 @@ export function UsuariosView() {
               }}
             />
 
-            {/* Chips CARGO */}
+            {/* Filtros: cargo */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
-                CARGO
-              </span>
-              {[
-                ['todos', `Todos (${totalPersonal})`],
-                ['admin', `Administrador (${conteoRoles.admin})`],
-                ['cajero', `Cajero (${conteoRoles.cajero})`],
-                ['produccion', `Producción (${conteoRoles.produccion})`],
-                ['mozo', `Mozo (${conteoRoles.mozo})`],
-                ['callcenter', `Call center (${conteoRoles.callcenter})`],
-                ['repartidor', `Motorizado (${conteoRoles.repartidor})`],
-              ].map(([c, label]) => {
-                const activo = filtroCargo === c;
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => {
-                      setFiltroCargo(c);
-                      setPagina(1);
-                    }}
-                    style={{
-                      minHeight: '40px',
-                      padding: '0 12px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy)',
-                      background: activo ? 'var(--cp-navy)' : 'transparent',
-                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+              <FiltroCombo
+                etiqueta="Cargo"
+                valor={filtroCargo}
+                opciones={[
+                  { valor: 'todos', etiqueta: 'Todos', cantidad: totalPersonal },
+                  { valor: 'admin', etiqueta: 'Administrador', cantidad: conteoRoles.admin },
+                  { valor: 'cajero', etiqueta: 'Cajero', cantidad: conteoRoles.cajero },
+                  { valor: 'produccion', etiqueta: 'Producción', cantidad: conteoRoles.produccion },
+                  { valor: 'mozo', etiqueta: 'Mozo', cantidad: conteoRoles.mozo },
+                  { valor: 'callcenter', etiqueta: 'Call center', cantidad: conteoRoles.callcenter },
+                  { valor: 'repartidor', etiqueta: 'Motorizado', cantidad: conteoRoles.repartidor },
+                ]}
+                alCambiar={(v) => {
+                  setFiltroCargo(v);
+                  setPagina(1);
+                }}
+              />
             </div>
 
-            {/* Chips ESTADO */}
+            {/* Filtros: estado */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
-                ESTADO
-              </span>
-              {[
-                ['todos', `Todos (${totalPersonal})`],
-                ['activos', `Activos (${totalActivos})`],
-                ['inactivos', `Inactivos (${totalInactivos})`],
-              ].map(([st, label]) => {
-                const activo = filtroEstado === st;
-                return (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => {
-                      setFiltroEstado(st);
-                      setPagina(1);
-                    }}
-                    style={{
-                      minHeight: '40px',
-                      padding: '0 12px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy)',
-                      background: activo ? 'var(--cp-navy)' : 'transparent',
-                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+              <FiltroCombo
+                etiqueta="Estado"
+                valor={filtroEstado}
+                opciones={[
+                  { valor: 'todos', etiqueta: 'Todos', cantidad: totalPersonal },
+                  { valor: 'activos', etiqueta: 'Activos', cantidad: totalActivos },
+                  { valor: 'inactivos', etiqueta: 'Inactivos', cantidad: totalInactivos },
+                ]}
+                alCambiar={(v) => {
+                  setFiltroEstado(v);
+                  setPagina(1);
+                }}
+              />
             </div>
 
-            {/* Chips CREADO */}
+            {/* Filtros: fecha de alta */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
-                CREADO
-              </span>
-              {[
-                ['todos', 'Cualquier fecha'],
-                ['hoy', 'Hoy'],
-                ['7', 'Últimos 7 días'],
-                ['30', 'Últimos 30 días'],
-                ['ano', 'Este año'],
-                ['mas90', 'Hace más de 90 días'],
-              ].map(([cr, label]) => {
-                const activo = filtroCreado === cr;
-                return (
-                  <button
-                    key={cr}
-                    type="button"
-                    onClick={() => setFiltroCreado(cr)}
-                    style={{
-                      minHeight: '40px',
-                      padding: '0 12px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy)',
-                      background: activo ? 'var(--cp-navy)' : 'transparent',
-                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+              <FiltroCombo
+                etiqueta="Creado"
+                valor={filtroCreado}
+                opciones={[
+                  { valor: 'todos', etiqueta: 'Cualquier fecha' },
+                  { valor: 'hoy', etiqueta: 'Hoy' },
+                  { valor: '7', etiqueta: 'Últimos 7 días' },
+                  { valor: '30', etiqueta: 'Últimos 30 días' },
+                  { valor: 'ano', etiqueta: 'Este año' },
+                  { valor: 'mas90', etiqueta: 'Hace más de 90 días' },
+                ]}
+                alCambiar={setFiltroCreado}
+              />
             </div>
 
             {/* Entre fechas */}
@@ -774,41 +715,21 @@ export function UsuariosView() {
               </div>
             </div>
 
-            {/* Chips ÚLTIMO ACCESO */}
+            {/* Filtros: último acceso */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-              <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
-                ÚLTIMO ACCESO
-              </span>
-              {[
-                ['todos', 'Cualquiera'],
-                ['hoy', 'Hoy'],
-                ['7', 'Últimos 7 días'],
-                ['30', 'Últimos 30 días'],
-                ['mas30', 'Hace más de 30 días'],
-                ['nunca', 'Nunca ingresó'],
-              ].map(([acc, label]) => {
-                const activo = filtroAcceso === acc;
-                return (
-                  <button
-                    key={acc}
-                    type="button"
-                    onClick={() => setFiltroAcceso(acc)}
-                    style={{
-                      minHeight: '40px',
-                      padding: '0 12px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy)',
-                      background: activo ? 'var(--cp-navy)' : 'transparent',
-                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+              <FiltroCombo
+                etiqueta="Último acceso"
+                valor={filtroAcceso}
+                opciones={[
+                  { valor: 'todos', etiqueta: 'Cualquiera' },
+                  { valor: 'hoy', etiqueta: 'Hoy' },
+                  { valor: '7', etiqueta: 'Últimos 7 días' },
+                  { valor: '30', etiqueta: 'Últimos 30 días' },
+                  { valor: 'mas30', etiqueta: 'Hace más de 30 días' },
+                  { valor: 'nunca', etiqueta: 'Nunca ingresó' },
+                ]}
+                alCambiar={setFiltroAcceso}
+              />
             </div>
           </div>
 
@@ -1213,31 +1134,30 @@ export function UsuariosView() {
                 />
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                  <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>TIPO</span>
-                  {[['', 'Todos'], ['Persona', 'Personas'], ['Empresa', 'Empresas'], ['Personal', 'Personal']].map(([v, n]) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setFiltroCliTipo(v)}
-                      style={{ minHeight: '40px', padding: '0 12px', borderRadius: '9999px', border: '1.5px solid var(--cp-navy)', background: filtroCliTipo === v ? 'var(--cp-navy)' : 'transparent', color: filtroCliTipo === v ? 'var(--cp-cream)' : 'var(--cp-navy)', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
-                    >
-                      {n}
-                    </button>
-                  ))}
+                  <FiltroCombo
+                    etiqueta="Tipo"
+                    valor={filtroCliTipo}
+                    opciones={[
+                      { valor: '', etiqueta: 'Todos' },
+                      { valor: 'Persona', etiqueta: 'Personas' },
+                      { valor: 'Empresa', etiqueta: 'Empresas' },
+                      { valor: 'Personal', etiqueta: 'Personal' },
+                    ]}
+                    alCambiar={setFiltroCliTipo}
+                  />
                 </div>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                  <span style={{ flex: 'none', minWidth: '96px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>CUENTA</span>
-                  {[['todos', 'Todos'], ['cuenta', 'Con cuenta'], ['invitado', 'Invitados']].map(([v, n]) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setFiltroCliCuenta(v)}
-                      style={{ minHeight: '40px', padding: '0 12px', borderRadius: '9999px', border: '1.5px solid var(--cp-navy)', background: filtroCliCuenta === v ? 'var(--cp-navy)' : 'transparent', color: filtroCliCuenta === v ? 'var(--cp-cream)' : 'var(--cp-navy)', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
-                    >
-                      {n}
-                    </button>
-                  ))}
+                  <FiltroCombo
+                    etiqueta="Cuenta"
+                    valor={filtroCliCuenta}
+                    opciones={[
+                      { valor: 'todos', etiqueta: 'Todos' },
+                      { valor: 'cuenta', etiqueta: 'Con cuenta' },
+                      { valor: 'invitado', etiqueta: 'Invitados' },
+                    ]}
+                    alCambiar={setFiltroCliCuenta}
+                  />
                 </div>
               </div>
 

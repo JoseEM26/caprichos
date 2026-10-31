@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 export interface HistorialMovimiento {
   t: string;
@@ -149,29 +150,12 @@ export function ModalHistorialCupones({
         />
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {CHIPS_HISTORIAL.map((c) => {
-            const activo = filtroTag === c.clave;
-            return (
-              <button
-                key={c.clave}
-                type="button"
-                onClick={() => setFiltroTag(c.clave)}
-                style={{
-                  minHeight: '44px',
-                  padding: '0 14px',
-                  borderRadius: '9999px',
-                  border: '1.5px solid var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  backgroundColor: activo ? 'var(--cp-navy)' : 'transparent',
-                  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  cursor: 'pointer',
-                }}
-              >
-                {c.label}
-              </button>
-            );
-          })}
+          <FiltroCombo
+            etiqueta="Movimiento"
+            valor={filtroTag}
+            opciones={CHIPS_HISTORIAL.map((c) => ({ valor: c.clave, etiqueta: c.label }))}
+            alCambiar={setFiltroTag}
+          />
         </div>
 
         <div

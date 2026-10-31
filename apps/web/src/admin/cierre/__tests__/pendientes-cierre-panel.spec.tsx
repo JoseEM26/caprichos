@@ -104,12 +104,14 @@ describe('Cierre: panel de pedidos pendientes escalable', () => {
       />,
     );
 
-    // Chip «En cola» deja solo el pedido en cola
-    fireEvent.click(screen.getByRole('button', { name: /En cola \(1\)/ }));
+    // Combo «Filtrar»: la opción «En cola» deja solo el pedido en cola
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: /En cola/ }));
     expect(screen.getByText('CP-002')).toBeInTheDocument();
     expect(screen.queryByText('CP-001')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Todos \(3\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar: En cola' }));
+    fireEvent.click(screen.getByRole('option', { name: /Todos/ }));
     // Buscar por nombre sin acentos
     fireEvent.change(screen.getByLabelText(/Buscar pedido/i), { target: { value: 'quispe' } });
     expect(screen.getByText('CP-001')).toBeInTheDocument();

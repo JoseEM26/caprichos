@@ -6,6 +6,7 @@ import { EstadoError } from '../../comun/EstadoError';
 import { useEventos } from '../../comun/socket';
 import { EstadoAdminImpresion } from '@caprichos/compartido';
 import { FiltroCola, GrupoCola, RespuestaCola, impresionApi } from './impresionApi';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 import './cola-impresion.css';
 
 const FILTROS: Array<[FiltroCola, string]> = [
@@ -147,12 +148,17 @@ export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
           </div>
         )}
 
-        <div className="cola-filtros" role="group" aria-label="Filtrar cola">
-          {FILTROS.map(([id, texto]) => (
-            <button key={id} type="button" aria-pressed={filtro === id} onClick={() => { setFiltro(id); setPagina(1); }}>
-              {texto}
-            </button>
-          ))}
+        <div className="cola-filtros">
+          <FiltroCombo
+            etiqueta="Ver"
+            valor={filtro}
+            valorPorDefecto="pendientes"
+            opciones={FILTROS.map(([id, texto]) => ({ valor: id, etiqueta: texto }))}
+            alCambiar={(v) => {
+              setFiltro(v as FiltroCola);
+              setPagina(1);
+            }}
+          />
         </div>
 
         {error && <EstadoError mensaje={error} alReintentar={() => void cargar()} />}

@@ -13,6 +13,7 @@ import {
 import { NuevaIniciativaModal } from './NuevaIniciativaModal';
 import { FotoIniciativa } from './FotoIniciativa';
 import { VisorCapturaModal } from './VisorCapturaModal';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 
 const COLOR_TIPO: Record<string, string> = {
   QUEJA: '#BA1A1A',
@@ -300,188 +301,43 @@ export function IniciativasView() {
         </div>
       </div>
 
-      {/* Filtros Tipo */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-        <span style={{ flex: '0 0 auto', minWidth: '70px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
-          TIPO
-        </span>
-        <button
-          type="button"
-          onClick={() => setFiltroTipo('TODOS')}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: filtroTipo === 'TODOS' ? 'var(--cp-navy)' : 'transparent',
-            color: filtroTipo === 'TODOS' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Todas
-        </button>
-        <button
-          type="button"
-          onClick={() => setFiltroTipo('QUEJA')}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: filtroTipo === 'QUEJA' ? 'var(--cp-navy)' : 'transparent',
-            color: filtroTipo === 'QUEJA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Quejas ({conteos.quejas})
-        </button>
-        <button
-          type="button"
-          onClick={() => setFiltroTipo('MEJORA')}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: filtroTipo === 'MEJORA' ? 'var(--cp-navy)' : 'transparent',
-            color: filtroTipo === 'MEJORA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Mejoras ({conteos.mejoras})
-        </button>
-        <button
-          type="button"
-          onClick={() => setFiltroTipo('IDEA')}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: filtroTipo === 'IDEA' ? 'var(--cp-navy)' : 'transparent',
-            color: filtroTipo === 'IDEA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Ideas ({conteos.ideas})
-        </button>
-      </div>
-
-      {/* Filtros Estado */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-        <span style={{ flex: '0 0 auto', minWidth: '70px', fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
-          ESTADO
-        </span>
-        <button
-          type="button"
-          onClick={() => setFiltroEstado('TODOS')}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: filtroEstado === 'TODOS' ? 'var(--cp-navy)' : 'transparent',
-            color: filtroEstado === 'TODOS' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Todos
-        </button>
-        <button
-          type="button"
-          onClick={() => setFiltroEstado('NUEVA')}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: filtroEstado === 'NUEVA' ? 'var(--cp-navy)' : 'transparent',
-            color: filtroEstado === 'NUEVA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Nueva ({conteos.nuevas})
-        </button>
-        <button
-          type="button"
-          onClick={() => setFiltroEstado('EN_REVISION')}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: filtroEstado === 'EN_REVISION' ? 'var(--cp-navy)' : 'transparent',
-            color: filtroEstado === 'EN_REVISION' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          En revisión ({conteos.enRevision})
-        </button>
-        <button
-          type="button"
-          onClick={() => setFiltroEstado('HECHA')}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: filtroEstado === 'HECHA' ? 'var(--cp-navy)' : 'transparent',
-            color: filtroEstado === 'HECHA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Hecha ({conteos.hechas})
-        </button>
-        <button
-          type="button"
-          onClick={() => setFiltroEstado('NO_POR_AHORA')}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: filtroEstado === 'NO_POR_AHORA' ? 'var(--cp-navy)' : 'transparent',
-            color: filtroEstado === 'NO_POR_AHORA' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          No por ahora ({conteos.noPorAhora})
-        </button>
-        <button
-          type="button"
-          onClick={() => setSoloMias((prev) => !prev)}
-          style={{
-            minHeight: '40px',
-            padding: '0 12px',
-            border: '1.5px solid var(--cp-navy)',
-            borderRadius: '9999px',
-            background: soloMias ? 'var(--cp-navy)' : 'transparent',
-            color: soloMias ? 'var(--cp-cream)' : 'var(--cp-navy)',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Solo las mías
-        </button>
+      {/* Filtros en combo: tipo, estado y responsable */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+        <FiltroCombo
+          etiqueta="Tipo"
+          valor={filtroTipo}
+          valorPorDefecto="TODOS"
+          opciones={[
+            { valor: 'TODOS', etiqueta: 'Todas', cantidad: conteos.total },
+            { valor: 'QUEJA', etiqueta: 'Quejas', cantidad: conteos.quejas },
+            { valor: 'MEJORA', etiqueta: 'Mejoras', cantidad: conteos.mejoras },
+            { valor: 'IDEA', etiqueta: 'Ideas', cantidad: conteos.ideas },
+          ]}
+          alCambiar={(v) => setFiltroTipo(v)}
+        />
+        <FiltroCombo
+          etiqueta="Estado"
+          valor={filtroEstado}
+          valorPorDefecto="TODOS"
+          opciones={[
+            { valor: 'TODOS', etiqueta: 'Todos' },
+            { valor: 'NUEVA', etiqueta: 'Nueva', cantidad: conteos.nuevas },
+            { valor: 'EN_REVISION', etiqueta: 'En revisión', cantidad: conteos.enRevision },
+            { valor: 'HECHA', etiqueta: 'Hecha', cantidad: conteos.hechas },
+            { valor: 'NO_POR_AHORA', etiqueta: 'No por ahora', cantidad: conteos.noPorAhora },
+          ]}
+          alCambiar={(v) => setFiltroEstado(v)}
+        />
+        <FiltroCombo
+          etiqueta="Ver"
+          valor={soloMias ? 'mias' : 'todas'}
+          valorPorDefecto="todas"
+          opciones={[
+            { valor: 'todas', etiqueta: 'Todas' },
+            { valor: 'mias', etiqueta: 'Solo las mías' },
+          ]}
+          alCambiar={(v) => setSoloMias(v === 'mias')}
+        />
       </div>
 
       {/* Contador de resultados */}

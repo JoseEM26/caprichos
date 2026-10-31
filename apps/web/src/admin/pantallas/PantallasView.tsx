@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos } from '../../comun/socket';
 import { EditarPantallaModal } from './EditarPantallaModal';
 import {
@@ -198,28 +199,13 @@ export function PantallasView() {
               flexWrap: 'wrap',
             }}
           >
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
-              Estación:
-            </span>
-            {['Todas', 'Cocina y barra', 'Solo barra', 'Solo cocina'].map((est) => (
-              <button
-                key={est}
-                style={{
-                  minHeight: '36px',
-                  padding: '0 12px',
-                  borderRadius: '9999px',
-                  border: '1px solid var(--cp-line)',
-                  background: filtroEstacion === est ? 'var(--cp-navy)' : 'var(--cp-white)',
-                  color: filtroEstacion === est ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-                onClick={() => setFiltroEstacion(est)}
-              >
-                {est}
-              </button>
-            ))}
+            <FiltroCombo
+              etiqueta="Estación"
+              valor={filtroEstacion}
+              valorPorDefecto="Todas"
+              opciones={['Todas', 'Cocina y barra', 'Solo barra', 'Solo cocina'].map((est) => ({ valor: est, etiqueta: est }))}
+              alCambiar={setFiltroEstacion}
+            />
           </div>
         )}
 

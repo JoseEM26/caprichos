@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 import { Paginacion } from '../../comun/Paginacion';
 import { useSesion } from '../../comun/sesion';
 import {
@@ -165,35 +166,18 @@ export function HistorialCierres() {
               }}
             />
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {[
-              { id: 'todos', n: 'Todos' },
-              { id: 'cuadrado', n: 'Cuadrados' },
-              { id: 'sobrante', n: 'Sobrantes' },
-              { id: 'faltante', n: 'Faltantes' },
-            ].map((e) => {
-              const activo = filtroEstado === e.id;
-              return (
-                <button
-                  key={e.id}
-                  type="button"
-                  onClick={() => setFiltroEstado(e.id as any)}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 12px',
-                    borderRadius: 9999,
-                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                    background: activo ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                    color: activo ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {e.n}
-                </button>
-              );
-            })}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <FiltroCombo
+              etiqueta="Resultado"
+              valor={filtroEstado}
+              opciones={[
+                { valor: 'todos', etiqueta: 'Todos' },
+                { valor: 'cuadrado', etiqueta: 'Cuadrados' },
+                { valor: 'sobrante', etiqueta: 'Sobrantes' },
+                { valor: 'faltante', etiqueta: 'Faltantes' },
+              ]}
+              alCambiar={(v) => setFiltroEstado(v as typeof filtroEstado)}
+            />
           </div>
         </div>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>

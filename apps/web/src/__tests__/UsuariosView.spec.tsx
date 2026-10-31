@@ -104,6 +104,32 @@ describe('UsuariosView (/admin/usuarios)', () => {
     });
   });
 
+  it('filtro Estado en combo: elegir Inactivos pide solo los inactivos', async () => {
+    setupSesion('ADMIN');
+    const spyGet = vi.spyOn(api, 'get').mockResolvedValue({
+      total: 3,
+      pagina: 1,
+      limite: 15,
+      totalPaginas: 1,
+      elementos: USUARIOS_MOCK,
+    });
+
+    render(
+      <MemoryRouter>
+        <UsuariosView />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getAllByText(/Carlos Mendoza/i)[0]).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
+    fireEvent.click(screen.getByRole('option', { name: /Inactivos/ }));
+
+    expect(screen.getByRole('button', { name: 'Estado: Inactivos' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(spyGet).toHaveBeenLastCalledWith(expect.stringContaining('activo=false'));
+    });
+  });
+
   it('2. La contraseña inicial se muestra una sola vez y desaparece al cerrar', async () => {
     setupSesion('ADMIN');
 

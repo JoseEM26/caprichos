@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
+import { FiltroCombo } from '../../comun/FiltroCombo';
 import { Confirmar } from '../../comun/Confirmar';
 import {
   catalogoApi,
@@ -1010,28 +1011,18 @@ export function ListasCategoriasView() {
           {/* CASO 2: Dónde se pregunta cada grupo */}
           {itemIzquierdaActual.id === 'preg' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Filtrar grupos">
-                {(['activos', 'desactivados', 'todos'] as const).map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    aria-pressed={filtroGrupos === f}
-                    onClick={() => setFiltroGrupos(f)}
-                    style={{
-                      minHeight: 44,
-                      padding: '0 14px',
-                      borderRadius: 9999,
-                      border: '1.5px solid var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      background: filtroGrupos === f ? 'var(--cp-navy)' : 'transparent',
-                      color: filtroGrupos === f ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {f === 'activos' ? 'Activos' : f === 'desactivados' ? 'Desactivados' : 'Todos'}
-                  </button>
-                ))}
+              <div>
+                <FiltroCombo
+                  etiqueta="Grupos"
+                  valor={filtroGrupos}
+                  valorPorDefecto="activos"
+                  opciones={[
+                    { valor: 'activos', etiqueta: 'Activos' },
+                    { valor: 'desactivados', etiqueta: 'Desactivados' },
+                    { valor: 'todos', etiqueta: 'Todos' },
+                  ]}
+                  alCambiar={(v) => setFiltroGrupos(v as typeof filtroGrupos)}
+                />
               </div>
               {gruposVisibles.length === 0 ? (
                 <div
