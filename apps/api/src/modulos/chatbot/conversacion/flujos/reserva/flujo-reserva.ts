@@ -28,6 +28,9 @@ import {
   TEXTOS_RESERVA,
 } from '../../textos-reserva';
 
+/** Máximo de personas que se reservan por WhatsApp; más va con un asesor. */
+export const MAX_PERSONAS_RESERVA_WHATSAPP = 20;
+
 const PALABRAS_RESERVA = [
   'reservar',
   'reservar mesa',
@@ -469,8 +472,8 @@ export class FlujoReservaSubFlujo implements SubFlujoConversacion {
         };
       }
 
-      // Seguridad: máx 10 personas por WhatsApp. Más de 10 deriva a persona
-      if (personasElegidas > 10) {
+      // Seguridad: máx 20 personas por WhatsApp. Más de 20 deriva a persona
+      if (personasElegidas > MAX_PERSONAS_RESERVA_WHATSAPP) {
         return {
           nuevoEstado: 'ATENCION_PERSONA',
           acciones: [
