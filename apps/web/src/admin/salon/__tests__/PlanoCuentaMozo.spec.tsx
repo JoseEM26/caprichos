@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { PlanoView } from '../PlanoView';
 import { salonApi } from '../api';
 import { vouchersApi } from '../../vouchers/vouchersApi';
@@ -88,6 +88,50 @@ describe('Plano del mozo: cuenta de la mesa ocupada', () => {
       expect(enviar).toHaveBeenCalledWith('121', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 24 }]);
     });
     expect(await screen.findByTestId('aviso-enviado-caja')).toBeDefined();
+  });
+
+  it('mesa ocupada: en la mesa se ven el cliente (o el mozo si no hay) y la cantidad de productos', async () => {
+    render(<PlanoView />);
+    const resumen = await screen.findByTestId('resumen-mesa-5');
+    expect(resumen.textContent).toBe('Mozo Prueba · 2 prod.');
+  });
+
+  it('mesa ocupada: con cliente, la mesa muestra su nombre y al tocarla la tarjeta con líneas y total', async () => {
+    const mesa = pisosSalon[0].mesas[0];
+    (salonApi.obtenerMesas as any).mockResolvedValue({
+      pisos: [
+        {
+          ...pisosSalon[0],
+          mesas: [
+            {
+              ...mesa,
+              pedido: {
+                ...mesa.pedido,
+                cliente: 'Ana',
+                total: 24,
+                estado: 'COLA',
+                lineas: [
+                  { cantidad: 2, nombre: 'Café Filtro', detalle: '' },
+                  { cantidad: 1, nombre: 'Limonada', detalle: 'Sin azúcar' },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    render(<PlanoView />);
+
+    expect((await screen.findByTestId('resumen-mesa-5')).textContent).toBe('Ana · 3 prod.');
+
+    fireEvent.click(await screen.findByTestId('elemento-plano-5'));
+    const tarjeta = await screen.findByTestId('tarjeta-pedido-mesa');
+    expect(within(tarjeta).getByText('Ana')).toBeDefined();
+    expect(within(tarjeta).getByText('Mozo: Mozo Prueba · CP-W106 · COLA')).toBeDefined();
+    expect(within(tarjeta).getByText('2 × Café Filtro')).toBeDefined();
+    expect(within(tarjeta).getByText('1 × Limonada')).toBeDefined();
+    expect(within(tarjeta).getByText('Sin azúcar')).toBeDefined();
+    expect(within(tarjeta).getByText('Total: S/ 24.00')).toBeDefined();
   });
 
   it('mesa libre: no ofrece cobrar la cuenta', async () => {

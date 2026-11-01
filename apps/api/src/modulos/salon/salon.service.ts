@@ -86,6 +86,7 @@ export class SalonService {
               codigo: string;
               estado?: string;
               mozo: string | null;
+              cliente: string | null;
               total?: number;
               lineas?: Array<{ cantidad: number; nombre: string; detalle: string }>;
             } | null = null;
@@ -114,6 +115,7 @@ export class SalonService {
                 codigo: ped.codigo,
                 estado: ped.estado,
                 mozo: mozoNombre || null,
+                cliente: ped.cliente_nombre?.trim() || null,
                 total: ped.total ? Number(ped.total) : (ped.subtotal ? Number(ped.subtotal) : 0),
                 lineas: ((ped as any).lineas || []).map((l: any) => ({
                   cantidad: l.cantidad,
@@ -239,7 +241,9 @@ export class SalonService {
     // Sin cuenta, el nombre lo escribe el mozo (obligatorio). Con cuenta, nombre y teléfono salen de la cuenta
     // (pedidos.service). El teléfono es opcional: sin él el pedido se guarda sin teléfono real.
     const identificado = Boolean(dto.clienteTelefono || dto.clientePartyId);
-    const nombreEnviado = dto.cliente?.nombre?.trim() ?? '';
+    // cliente.nombre (flujo de la mesa) manda; clienteNombre solo completa cuando no viene y el pedido no es de cuenta
+    const nombreCorto = dto.clienteNombre?.trim() ?? '';
+    const nombreEnviado = dto.cliente?.nombre?.trim() || (identificado ? '' : nombreCorto);
     if (!identificado && nombreEnviado.length < 2) {
       throw new BadRequestException({
         codigo: 'CLIENTE_NOMBRE_REQUERIDO',

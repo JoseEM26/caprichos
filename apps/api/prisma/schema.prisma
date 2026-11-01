@@ -482,8 +482,12 @@ model Pedido {
   // Salón (Ola 6)
   mesa_nombre            String?
   entregado_mesa_en      DateTime?               @db.Timestamptz
+  // Cobro por mozo (envío a Caja): cuándo, medio(s) con que lo cobró y el mozo; null si no se envió
+  cobro_mozo_en          DateTime?               @db.Timestamp(3)
+  cobro_mozo_medio       String?
+  cobro_mozo_party_id    BigInt?
 
-  party                  Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
+  party                 Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
   rutaReparto            RutaReparto?            @relation(fields: [ruta_reparto_id], references: [id])
   zona                   ZonaReparto?            @relation(fields: [zona_id], references: [id])

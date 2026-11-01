@@ -943,6 +943,19 @@ export function PlanoView() {
                       />
                     )}
                     <span>{e.tipo.toLowerCase() === 'pared' ? '' : esMesa ? (numMesa ? String(numMesa) : e.nombre || 'M') : e.nombre || t.n}</span>
+                    {ocupadaSalon && mesaSalonElem?.pedido && (
+                      <span
+                        data-testid={`resumen-mesa-${e.id}`}
+                        style={{ fontSize: '9px', fontWeight: 700, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      >
+                        {[
+                          mesaSalonElem.pedido.cliente || mesaSalonElem.pedido.mozo || null,
+                          mesaSalonElem.pedido.lineas ? `${mesaSalonElem.pedido.lineas.reduce((acc, l) => acc + l.cantidad, 0)} prod.` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    )}
                     {ocupadaSalon && (
                       <span style={{ fontSize: '9px', fontWeight: 800 }}>ocupada</span>
                     )}
@@ -1123,6 +1136,41 @@ export function PlanoView() {
                   {mesaSalonSeleccionada.estado === 'OCUPADA'
                     ? `Ocupada${mesaSalonSeleccionada.pedido?.codigo ? ` · pedido ${mesaSalonSeleccionada.pedido.codigo}` : ''}${mesaSalonSeleccionada.pedido?.estado ? ` (${mesaSalonSeleccionada.pedido.estado})` : ''}`
                     : 'Libre'}
+                </div>
+              )}
+
+              {/* Tarjeta de la cuenta: quién es, mozo, pedido, líneas y total */}
+              {elementoSeleccionado.tipo.toLowerCase() === 'mesa' && mesaSalonSeleccionada?.estado === 'OCUPADA' && mesaSalonSeleccionada.pedido && (
+                <div
+                  data-testid="tarjeta-pedido-mesa"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--cp-line)',
+                    background: 'var(--cp-cream)',
+                  }}
+                >
+                  <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '14px', color: 'var(--cp-navy)' }}>
+                    {mesaSalonSeleccionada.pedido.cliente || mesaSalonSeleccionada.pedido.mozo || 'Sin nombre'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                    Mozo: {mesaSalonSeleccionada.pedido.mozo || 'sin asignar'} · {mesaSalonSeleccionada.pedido.codigo}
+                    {mesaSalonSeleccionada.pedido.estado ? ` · ${mesaSalonSeleccionada.pedido.estado}` : ''}
+                  </div>
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {(mesaSalonSeleccionada.pedido.lineas || []).map((l, i) => (
+                      <li key={i} style={{ fontSize: '12px', color: 'var(--cp-navy)' }}>
+                        {l.cantidad} × {l.nombre}
+                        {l.detalle && <span style={{ display: 'block', fontSize: '11px', color: 'var(--cp-soft)' }}>{l.detalle}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--cp-navy)' }}>
+                    Total: S/ {Number(mesaSalonSeleccionada.pedido.total ?? 0).toFixed(2)}
+                  </div>
                 </div>
               )}
 

@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
+  MaxLength,
   Matches,
   ValidateNested,
 } from 'class-validator';
@@ -77,6 +78,12 @@ export class AbrirPedidoMesaDto {
   @ValidateNested()
   @Type(() => ClienteMesaDto)
   cliente?: ClienteMesaDto;
+
+  /** Nombre corto opcional para reconocer la mesa en el plano. Solo se usa si no viene cliente.nombre y el pedido no es de cuenta. */
+  @IsOptional()
+  @IsString({ message: 'El nombre del cliente debe ser un texto' })
+  @MaxLength(40, { message: 'El nombre del cliente no puede pasar de 40 caracteres' })
+  clienteNombre?: string;
 
   @IsOptional()
   @ValidateNested()

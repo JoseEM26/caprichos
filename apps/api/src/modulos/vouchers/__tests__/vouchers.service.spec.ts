@@ -622,7 +622,12 @@ describe('VouchersService', () => {
         }),
       });
       expect(prismaMock.voucherPago.findFirst).not.toHaveBeenCalled();
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+      // Solo marca el cobro del mozo: no toca el estado de pago ni hace transacción de plan
+      expect(prismaMock.pedido.update).toHaveBeenCalledTimes(1);
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith({
+        where: { id: 50n },
+        data: expect.objectContaining({ cobro_mozo_medio: 'EFECTIVO', cobro_mozo_party_id: 101n }),
+      });
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'ENVIADO_CAJA', entidadId: 50n }),
@@ -714,7 +719,7 @@ describe('VouchersService', () => {
         await service.enviarACaja('50', '', mozoUsuario, undefined, planValido);
 
         for (const [args] of prismaMock.pedido.update.mock.calls) {
-          expect(Object.keys(args.data).sort()).toEqual(['pago_metodo', 'pago_preferido']);
+          expect(args.data).not.toHaveProperty('pago_estado');
         }
       });
 
@@ -782,6 +787,41 @@ describe('VouchersService', () => {
       });
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'AVISO_SIN_FOTO', entidadId: 50n }),
+      );
+    });
+  });
+
+  describe('Cobro por mozo: el pedido queda marcado al enviar a Caja', () => {
+    it('efectivo: guarda cobro_mozo_en, el medio y el mozo, sin tocar pago_estado', async () => {
+      await service.enviarACaja('50', 'efectivo', mozoUsuario);
+
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith({
+        where: { id: 50n },
+        data: { cobro_mozo_en: expect.any(Date), cobro_mozo_medio: 'EFECTIVO', cobro_mozo_party_id: 101n },
+      });
+      for (const [args] of prismaMock.pedido.update.mock.calls) {
+        expect(args.data).not.toHaveProperty('pago_estado');
+      }
+    });
+
+    it('plan dividido: guarda los medios del plan separados por +', async () => {
+      await service.enviarACaja('50', '', mozoUsuario, undefined, [
+        { medio: 'EFECTIVO', monto: 20 },
+        { medio: 'YAPE', monto: 15 },
+      ]);
+
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith({
+        where: { id: 50n },
+        data: expect.objectContaining({ cobro_mozo_medio: 'EFECTIVO+YAPE', cobro_mozo_party_id: 101n }),
+      });
+    });
+
+    it('si el aviso falla antes de confirmar, no marca el pedido', async () => {
+      prismaMock.notificacion.create.mockRejectedValueOnce(new Error('db caída'));
+
+      await expect(service.enviarACaja('50', 'YAPE', mozoUsuario)).rejects.toThrow('db caída');
+      expect(prismaMock.pedido.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ cobro_mozo_en: expect.anything() }) }),
       );
     });
   });

@@ -16,6 +16,7 @@ import { BannerCajaCerrada, EtiquetaCajaCerrada, esperaCajaCerrada, useEstadoCaj
 import './pedidos.css';
 import { FiltroDiasPedidos } from './FiltroDiasPedidos';
 import { RangoPedidos, parametrosDeRango, rangoHoy } from './filtroDias';
+import { nombreMedio } from './planPago';
 
 export function canalLabel(c?: string | null) {
   if (!c) return 'Web';
@@ -67,6 +68,29 @@ export function getBadge(p: Pedido) {
     default:
       return { l: p.estado, bg: 'var(--cp-sand, #EDE1D1)', fg: 'var(--cp-navy, #0B2C3E)' };
   }
+}
+
+/** Chip «Cobrado por mozo · Yape»; en naranja y «falta voucher» si el medio digital no tiene foto legible. */
+export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
+  if (!cobro) return null;
+  const alerta = cobro.faltaVoucher;
+  return (
+    <span
+      style={{
+        alignSelf: 'flex-start',
+        fontSize: 12,
+        fontWeight: 700,
+        borderRadius: 9999,
+        padding: '2px 10px',
+        background: alerta ? '#FFF0E6' : 'var(--cp-sand, #EDE1D1)',
+        color: alerta ? 'var(--cp-rust, #B2500F)' : 'var(--cp-navy, #0B2C3E)',
+        border: alerta ? '1.5px solid var(--cp-rust, #B2500F)' : '1.5px solid transparent',
+      }}
+    >
+      Cobrado por mozo · {cobro.medio.split('+').map(nombreMedio).join(' + ')}
+      {alerta && <strong> · falta voucher</strong>}
+    </span>
+  );
 }
 
 export type ClaveTabCaja = 'nuevo' | 'coord' | 'curso' | 'cerrado' | 'no_entregados';
@@ -777,6 +801,7 @@ export function PedidosAdminView() {
                   <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
                     {canalLabel(o.canal)} · {modLabel(o.modalidad)} · {o.cliente_nombre || 'Cliente'}
                   </div>
+                  <ChipCobroMozo cobro={o.cobroMozo} />
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
                       {itemsTexto || '1 producto'}

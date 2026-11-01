@@ -734,6 +734,15 @@ export class VouchersService {
     this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: notif.titulo });
     this.avisarVoucher([pedido.id], 'enviado_caja', pedido.codigo);
 
+    // Marca de cobro del mozo: Caja y Pedidos la muestran. No cambia pago_estado ni la mesa (lo cobra el cajero).
+    const medioCobro = planValidado
+      ? [...new Set(planValidado.map((f) => f.medio))].join('+')
+      : medioNormalizado;
+    await this.prisma.pedido.update({
+      where: { id },
+      data: { cobro_mozo_en: new Date(), cobro_mozo_medio: medioCobro, cobro_mozo_party_id: usuario.partyId },
+    });
+
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'vouchers',

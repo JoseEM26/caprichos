@@ -1,6 +1,6 @@
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import { PuntosService } from '../clientes/puntos.service';
-import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
+import { MEDIOS_DIGITALES_PLAN, mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
 import { StockService } from '../stock/stock.service';
@@ -283,6 +283,7 @@ export class PedidosEstadoService {
 
     const ahora = new Date();
     const esAdmin = usuarioActual?.rol === 'ADMIN';
+    const cobrosMozo = await this.cobrosMozoDe(pedidos);
 
     const items = pedidos.map((p) => {
       const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
@@ -297,6 +298,7 @@ export class PedidosEstadoService {
       return {
         ...p,
         cobro_vigente_id: cobroVigenteId,
+        cobroMozo: cobrosMozo.get(String(p.id)) ?? null,
         comprobante_doc: esAdmin ? p.comprobante_doc : enmascararDni(p.comprobante_doc || ''),
         minutosEspera,
         color,
@@ -596,6 +598,62 @@ export class PedidosEstadoService {
   /**
    * Obtiene el detalle completo de un pedido con enmascaramiento de DNI/RUC según rol (DT-75).
    */
+  /**
+   * Cobro por mozo (Caja y Pedidos): cuándo lo envió, medio(s), nombre del mozo y si falta el voucher digital.
+   * null si no lo envió o el pedido ya está PAGADO (la etiqueta se quita al confirmar el cobro).
+   */
+  private async cobrosMozoDe(
+    pedidos: Array<{
+      id: bigint;
+      pago_estado: string | null;
+      cobro_mozo_en: Date | null;
+      cobro_mozo_medio: string | null;
+      cobro_mozo_party_id: bigint | null;
+    }>,
+  ): Promise<Map<string, { en: Date; medio: string; mozo: string | null; faltaVoucher: boolean } | null>> {
+    const mapa = new Map<string, { en: Date; medio: string; mozo: string | null; faltaVoucher: boolean } | null>();
+    const vigentes = pedidos.filter((p) => p.cobro_mozo_en && p.pago_estado !== 'PAGADO');
+    const idsPedidos = vigentes.map((p) => p.id);
+    const idsMozos = [...new Set(vigentes.map((p) => p.cobro_mozo_party_id).filter((v): v is bigint => v != null))];
+
+    const [conVoucher, personas] = await Promise.all([
+      idsPedidos.length
+        ? this.prisma.voucherPago.findMany({
+            // Misma regla que enviarACaja: voucher vigente y legible
+            where: { pedido_id: { in: idsPedidos }, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
+            select: { pedido_id: true },
+            distinct: ['pedido_id'],
+          })
+        : Promise.resolve([]),
+      idsMozos.length
+        ? this.prisma.person.findMany({
+            where: { party_id: { in: idsMozos } },
+            select: { party_id: true, nombres: true, apellidos: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const pedidosConVoucher = new Set(conVoucher.map((v) => String(v.pedido_id)));
+    const nombreMozo = new Map(
+      personas.map((per) => [String(per.party_id), `${per.nombres} ${per.apellidos || ''}`.trim()]),
+    );
+
+    for (const p of pedidos) {
+      if (!p.cobro_mozo_en || p.pago_estado === 'PAGADO' || !p.cobro_mozo_medio) {
+        mapa.set(String(p.id), null);
+        continue;
+      }
+      const medios = p.cobro_mozo_medio.split('+');
+      const digital = medios.some((m) => (MEDIOS_DIGITALES_PLAN as readonly string[]).includes(m));
+      mapa.set(String(p.id), {
+        en: p.cobro_mozo_en,
+        medio: p.cobro_mozo_medio,
+        mozo: p.cobro_mozo_party_id != null ? nombreMozo.get(String(p.cobro_mozo_party_id)) || null : null,
+        faltaVoucher: digital && !pedidosConVoucher.has(String(p.id)),
+      });
+    }
+    return mapa;
+  }
+
   async obtenerPorId(
     id: bigint | string | number,
     usuarioActual?: UsuarioAutenticado,
@@ -667,10 +725,13 @@ export class PedidosEstadoService {
 
     const puntos = (await explicarPedidosPorId(this.prisma, [pedido.id]).catch(() => null))?.get(String(pedido.id)) ?? null;
 
+    const cobroMozo = (await this.cobrosMozoDe([pedido])).get(String(pedido.id)) ?? null;
+
     return {
       ...pedido,
       puntos,
       cobro_vigente_id: cobroVigenteId,
+      cobroMozo,
       comprobante_doc: esAdmin
         ? pedido.comprobante_doc
         : enmascararDni(pedido.comprobante_doc || ''),

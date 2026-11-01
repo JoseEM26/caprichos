@@ -792,4 +792,101 @@ describe('SalonService', () => {
       });
     });
   });
+
+  describe('Nombre corto del cliente en la mesa (clienteNombre)', () => {
+    const mesaConPedido = (cliente_nombre: string | null) => [
+      {
+        id: 101n,
+        piso_id: 1n,
+        tipo: 'MESA',
+        numero: 1,
+        nombre: 'Mesa 1',
+        asientos: 4,
+        x: 1,
+        y: 1,
+        ancho: 2,
+        alto: 2,
+        activo: true,
+        pedidosMesa: [
+          {
+            id: 501n,
+            abierta: true,
+            pedido: {
+              id: 1001n,
+              codigo: 'CP-W001',
+              estado: 'COLA',
+              total: 24,
+              cliente_nombre,
+              party: null,
+              historial: [],
+              lineas: [],
+            },
+          },
+        ],
+        reservasMesa: [],
+      },
+    ];
+
+    it('obtenerMesas devuelve cliente con el nombre del pedido (null si no hay)', async () => {
+      prismaMock.piso.findMany.mockResolvedValue([
+        { id: 1n, nombre: 'Piso 1', activo: true, cuadricula_ancho: 20, cuadricula_alto: 12, elementos: mesaConPedido('Ana') },
+      ]);
+      const con: any = await service.obtenerMesas();
+      expect(con.pisos[0].mesas[0].pedido.cliente).toBe('Ana');
+
+      prismaMock.piso.findMany.mockResolvedValue([
+        { id: 1n, nombre: 'Piso 1', activo: true, cuadricula_ancho: 20, cuadricula_alto: 12, elementos: mesaConPedido(null) },
+      ]);
+      const sin: any = await service.obtenerMesas();
+      expect(sin.pisos[0].mesas[0].pedido.cliente).toBeNull();
+    });
+
+    it('sin cliente.nombre, clienteNombre pasa como nombre del pedido de mesa', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '83', codigo: 'CP-M083', total: 10 });
+
+      await service.abrirPedido({ mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }], clienteNombre: '  Ana  ' });
+
+      const [dtoEnviado] = pedidosServiceMock.crear.mock.calls[0];
+      expect(dtoEnviado.cliente.nombre).toBe('Ana');
+    });
+
+    it('cliente.nombre manda sobre clienteNombre; con cuenta (teléfono) clienteNombre no cambia el nombre', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '84', codigo: 'CP-M084', total: 10 });
+
+      await service.abrirPedido({
+        mesas: [6],
+        lineas: [{ productoId: 1, cantidad: 1 }],
+        cliente: { nombre: 'Lucía Pérez' },
+        clienteNombre: 'Ana',
+      });
+      await service.abrirPedido({
+        mesas: [6],
+        lineas: [{ productoId: 1, cantidad: 1 }],
+        clienteTelefono: '912340170',
+        clienteNombre: 'Ana',
+      });
+
+      expect(pedidosServiceMock.crear.mock.calls[0][0].cliente.nombre).toBe('Lucía Pérez');
+      expect(pedidosServiceMock.crear.mock.calls[1][0].cliente.nombre).toBe('');
+    });
+
+    it('el DTO rechaza un nombre corto de más de 40 caracteres', async () => {
+      const { validate } = await import('class-validator');
+      const { plainToInstance } = await import('class-transformer');
+      const { AbrirPedidoMesaDto } = await import('./dto/abrir-pedido-mesa.dto');
+      const dto = plainToInstance(AbrirPedidoMesaDto, {
+        mesas: [6],
+        lineas: [],
+        clienteNombre: 'x'.repeat(41),
+      });
+      const errores = await validate(dto, { whitelist: false });
+      expect(errores.map((e) => e.property)).toContain('clienteNombre');
+    });
+  });
 });

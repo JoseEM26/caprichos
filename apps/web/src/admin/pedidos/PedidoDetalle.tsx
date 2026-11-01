@@ -10,7 +10,7 @@ import { ModalUbicar } from './ModalUbicar';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { EtiquetasPedido } from './EtiquetasPedido';
-import { canalLabel, modLabel, getBadge } from './PedidosAdminView';
+import { canalLabel, modLabel, getBadge, ChipCobroMozo } from './PedidosAdminView';
 import { EtiquetaCajaCerrada, esperaCajaCerrada } from './BannerCajaCerrada';
 import {
   listarPersonalActivo,
@@ -205,6 +205,20 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
           </span>
           {esperaCajaCerrada(pedido, cajaAbierta ?? null) && <EtiquetaCajaCerrada />}
         </div>
+
+        {pedido.cobroMozo && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+            <ChipCobroMozo cobro={pedido.cobroMozo} />
+            <span style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+              Mozo: {pedido.cobroMozo.mozo || 'sin nombre'} · a las{' '}
+              {new Date(pedido.cobroMozo.en).toLocaleTimeString('es-PE', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'America/Lima',
+              })}
+            </span>
+          </div>
+        )}
 
         <div style={{ fontSize: 13, lineHeight: '19px', color: 'var(--cp-soft, #2C4C5D)' }}>
           {canalLabel(pedido.canal)} · {modLabel(pedido.modalidad)}

@@ -63,6 +63,8 @@ export interface MesaSalon {
     codigo: string;
     estado?: string;
     mozo: string | null;
+    /** Nombre corto del cliente del pedido (o null) */
+    cliente?: string | null;
     total?: number;
     lineas?: Array<{ cantidad: number; nombre: string; detalle: string }>;
   } | null;
@@ -165,6 +167,8 @@ export interface AreaProgreso {
   nombre: string;
   estado: 'PENDIENTE' | 'PREPARANDO' | 'LISTA';
   lineas: number;
+  /** Líneas del área, para decir qué falta (nombre y cantidad). */
+  productos?: { nombre: string; cantidad: number }[];
 }
 
 export interface ProgresoPedido {

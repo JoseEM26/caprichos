@@ -67,6 +67,8 @@ export interface Pedido {
   pago_estado?: string | null;
   pago_preferido?: string | null;
   cobro_vigente_id?: string | number | null;
+  /** Cobro por mozo (envío a Caja): null si no lo envió o el pedido ya está PAGADO */
+  cobroMozo?: { en: string; medio: string; mozo: string | null; faltaVoucher: boolean } | null;
   paga_con?: string | number | null;
   /** Pago dividido: monto por medio (vacío si el pedido no tiene plan) */
   planPago?: Array<{ medio: string; monto: string | number }>;
