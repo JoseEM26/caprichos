@@ -36,6 +36,13 @@ function indiceActual(progreso: Progreso, pasos: string[]): number {
   }
 }
 
+/** «Bebidas (2 Frappé, 1 Limonada)», o solo el nombre si el área no trae productos. */
+function textoArea(area: AreaProgreso): string {
+  const productos = area.productos ?? [];
+  if (productos.length === 0) return area.nombre;
+  return `${area.nombre} (${productos.map((p) => `${p.cantidad} ${p.nombre}`).join(', ')})`;
+}
+
 interface Props {
   progreso?: Progreso | null;
   modalidad: string;
@@ -50,6 +57,8 @@ export function ProgresoPedido({ progreso, modalidad, variante, sinLinea = false
   const pasos = modalidad === 'DELIVERY' ? PASOS_DELIVERY : PASOS_RECOGER;
   const actual = indiceActual(progreso, pasos);
   const completo = variante === 'completo';
+  const faltan = progreso.areas.filter((a) => a.estado !== 'LISTA');
+  const textoFaltan = faltan.map(textoArea).join(' · ');
 
   return (
     <div className={`pp pp--${variante}`} data-etapa={progreso.etapa}>
@@ -84,13 +93,27 @@ export function ProgresoPedido({ progreso, modalidad, variante, sinLinea = false
         </div>
       )}
 
+      {!completo && !anulado && faltan.length > 0 && (
+        <p className="pp-falta" title={`Falta: ${textoFaltan}`}>
+          Falta: {textoFaltan}
+        </p>
+      )}
+
       {completo && !anulado && progreso.areas.length > 0 && (
         <ul className="pp-areas" aria-label="Estado por área">
           {progreso.areas.map((area) => (
-            <li key={area.nombre}>
-              <span className={`pp-area pp-area--${area.estado.toLowerCase()}`}>
-                {area.nombre}: {TEXTO_AREA[area.estado]}
-              </span>
+            <li key={area.nombre} className="pp-area-bloque">
+              <div className="pp-area-cab">
+                <span className="pp-area-nombre">{area.nombre}</span>
+                <span className={`pp-area pp-area--${area.estado.toLowerCase()}`}>{TEXTO_AREA[area.estado]}</span>
+              </div>
+              {(area.productos ?? []).length > 0 && (
+                <ul className="pp-productos">
+                  {(area.productos ?? []).map((p, i) => (
+                    <li key={i}>{`${p.cantidad} × ${p.nombre}`}</li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>

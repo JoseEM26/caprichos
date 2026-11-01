@@ -173,12 +173,12 @@ describe('F5: Pantallas de Cocina', () => {
       expect(screen.getByText('CP-101')).toBeInTheDocument();
     });
 
-    const botonDespejar = screen.getByRole('button', { name: /^Despejar$/i });
+    const botonDespejar = screen.getByRole('button', { name: /^Listo$/i });
     fireEvent.click(botonDespejar);
 
     // Diálogo de confirmación
     expect(
-      screen.getByText(/¿Despejar comanda CP-101\?/i),
+      screen.getByText(/¿Marcar como listo\?/i),
     ).toBeInTheDocument();
     expect(spyDespejar).not.toHaveBeenCalled();
 
@@ -189,7 +189,7 @@ describe('F5: Pantallas de Cocina', () => {
 
     // Confirmar
     fireEvent.click(botonDespejar);
-    const botonConfirmar = screen.getByRole('button', { name: /Sí, despejar/i });
+    const botonConfirmar = screen.getByRole('button', { name: /Sí, marcar listo/i });
     fireEvent.click(botonConfirmar);
 
     await waitFor(() => {
@@ -428,6 +428,6 @@ describe('F5: Pantallas de Cocina', () => {
     });
 
     // En modo TV no debe existir botón «Despejar»
-    expect(screen.queryByRole('button', { name: /^Despejar$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Listo$/i })).not.toBeInTheDocument();
   });
 });

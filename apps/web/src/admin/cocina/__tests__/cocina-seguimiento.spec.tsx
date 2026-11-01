@@ -81,7 +81,7 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
       const onDespejar = vi.fn();
       render(<ComandaTarjeta comanda={comandaBase({ areas: pedidoAreas({ '2': true }) })} onDespejar={onDespejar} />);
 
-      fireEvent.click(screen.getByRole('button', { name: /^Despejar$/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^Listo$/i }));
       expect(onDespejar).toHaveBeenCalledTimes(1);
       expect(screen.queryByTestId('aviso-area-lista')).toBeNull();
     });
@@ -94,7 +94,7 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
         />,
       );
 
-      expect(screen.queryByRole('button', { name: /^Despejar$/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Listo$/i })).toBeNull();
       expect(screen.getByTestId('aviso-area-lista')).toHaveTextContent(
         'Tu área ya está lista, falta: Cocina',
       );
@@ -218,7 +218,7 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
       expect(screen.getByText('EN COCINA · 1')).toBeInTheDocument();
       expect(screen.getByTestId('aviso-area-lista')).toBeInTheDocument();
       // Solo la pendiente tiene Despejar
-      expect(screen.getAllByRole('button', { name: /^Despejar$/i })).toHaveLength(1);
+      expect(screen.getAllByRole('button', { name: /^Listo$/i })).toHaveLength(1);
     });
 
     it('en la vista Todas el pedido es una sola boleta con sus áreas, sin Despejar', async () => {
@@ -242,7 +242,7 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
       expect(screen.getByText('EN COCINA · 1')).toBeInTheDocument();
       expect(screen.getByText('Americano')).toBeInTheDocument();
       expect(screen.getByText('Waffle')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /^Despejar$/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Listo$/i })).toBeNull();
     });
 
     it('Despejar sigue pidiendo Confirmar Sí/No antes de llamar a la API', async () => {
@@ -255,11 +255,11 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
         expect(screen.getByTestId('comanda-CP-301')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: /^Despejar$/i }));
-      expect(screen.getByText(/¿Despejar comanda CP-301\?/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /^Listo$/i }));
+      expect(screen.getByText(/¿Marcar como listo\?/i)).toBeInTheDocument();
       expect(spyDespejar).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByRole('button', { name: /Sí, despejar/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Sí, marcar listo/i }));
       await waitFor(() => {
         expect(spyDespejar).toHaveBeenCalledWith('301', '1');
       });
@@ -285,7 +285,7 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
       expect(within(fs).getByText('EN COCINA · 1')).toBeInTheDocument();
       expect(within(fs).getByTestId('estado-area-1')).toBeInTheDocument();
       expect(within(fs).getByTestId('estado-area-2')).toBeInTheDocument();
-      expect(within(fs).queryByRole('button', { name: /^Despejar$/i })).toBeNull();
+      expect(within(fs).queryByRole('button', { name: /^Listo$/i })).toBeNull();
     });
 
     it('pantalla completa en Barra y Salados: cada área ve solo sus líneas y su Despejar', async () => {
@@ -311,7 +311,7 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
       // Barra (area inicial): solo su línea y su Despejar
       expect(within(fs).getByText('Americano')).toBeInTheDocument();
       expect(within(fs).queryByText('Waffle')).toBeNull();
-      expect(within(fs).getAllByRole('button', { name: /^Despejar$/i })).toHaveLength(1);
+      expect(within(fs).getAllByRole('button', { name: /^Listo$/i })).toHaveLength(1);
 
       // Salados (Cocina): solo el waffle, con su propio Despejar
       fireEvent.click(within(fs).getByRole('button', { name: 'Salados' }));
@@ -319,7 +319,7 @@ describe('Cocina: seguimiento de áreas por pedido', () => {
         expect(within(fs).getByText('Waffle')).toBeInTheDocument();
       });
       expect(within(fs).queryByText('Americano')).toBeNull();
-      expect(within(fs).getAllByRole('button', { name: /^Despejar$/i })).toHaveLength(1);
+      expect(within(fs).getAllByRole('button', { name: /^Listo$/i })).toHaveLength(1);
     });
   });
 });

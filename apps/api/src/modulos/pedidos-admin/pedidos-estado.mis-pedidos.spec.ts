@@ -144,8 +144,8 @@ describe('PedidosEstadoService.misPedidos', () => {
       etapa: 'PARCIAL',
       etiqueta: 'Cocina: listas Bebidas, faltan Salados',
       areas: [
-        { nombre: 'Bebidas', estado: 'LISTA', lineas: 1 },
-        { nombre: 'Salados', estado: 'PREPARANDO', lineas: 1 },
+        { nombre: 'Bebidas', estado: 'LISTA', lineas: 1, productos: [{ nombre: 'Limonada', cantidad: 1 }] },
+        { nombre: 'Salados', estado: 'PREPARANDO', lineas: 1, productos: [{ nombre: 'Lomo', cantidad: 1 }] },
       ],
       listasDe: 1,
       totalAreas: 2,

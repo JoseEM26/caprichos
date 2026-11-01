@@ -664,8 +664,9 @@ export function PantallaCocinaView() {
                           style={{
                             fontSize: '16px',
                             fontWeight: 800,
-                            color: '#B2500F',
-                            background: '#FBE3CF',
+                            color: '#0B2C3E',
+                            background: '#FFF3C4',
+                            border: '2px solid #D99E39',
                             borderRadius: '8px',
                             padding: '2px 8px',
                           }}

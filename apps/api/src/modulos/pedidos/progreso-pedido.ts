@@ -21,6 +21,8 @@ export interface AreaProgreso {
   nombre: string;
   estado: EstadoAreaProgreso;
   lineas: number;
+  /** Líneas del área: nombre y cantidad (nada más del producto). */
+  productos: { nombre: string; cantidad: number }[];
 }
 
 export interface ProgresoPedido {
@@ -45,7 +47,12 @@ export interface EntradaProgreso {
   eta_min?: number | null;
   eta_max?: number | null;
   comandas?: { area_id: bigint; estado: string; area: { nombre: string } }[];
-  lineas?: { area_id?: bigint | null; producto?: { categoria?: { area_id: bigint | null } | null } | null }[];
+  lineas?: {
+    nombre: string;
+    cantidad: number;
+    area_id?: bigint | null;
+    producto?: { categoria?: { area_id: bigint | null } | null } | null;
+  }[];
 }
 
 /** Parámetros del tiempo y reloj: solo hacen falta para el «llega en» de un pedido en camino. */
@@ -74,7 +81,7 @@ export function progresoDelPedido(p: EntradaProgreso, ctx?: ContextoProgreso): P
   const mesa = p.modalidad === 'MESA';
   const entregadoEnMesa = mesa && !!p.entregado_mesa_en;
   if (p.estado === 'ENTREGADO' || entregadoEnMesa) {
-    const areas = (p.comandas ?? []).map((c) => ({ nombre: c.area.nombre, estado: 'LISTA' as const, lineas: contarLineas(p, c.area_id) }));
+    const areas = (p.comandas ?? []).map((c) => areaProgreso(p, c.area_id, c.area.nombre, 'LISTA'));
     return {
       etapa: 'ENTREGADO',
       etiqueta: entregadoEnMesa && p.estado !== 'ENTREGADO' ? 'Entregado en mesa' : 'Entregado',
@@ -148,8 +155,16 @@ export function progresoDelPedido(p: EntradaProgreso, ctx?: ContextoProgreso): P
   };
 }
 
-function contarLineas(p: EntradaProgreso, areaId: bigint): number {
-  return (p.lineas ?? []).filter((l) => areaDeLinea(l) === areaId).length;
+/** Líneas del pedido que van a esa área (nombre y cantidad). */
+function productosDeArea(p: EntradaProgreso, areaId: bigint): AreaProgreso['productos'] {
+  return (p.lineas ?? [])
+    .filter((l) => areaDeLinea(l) === areaId)
+    .map((l) => ({ nombre: l.nombre, cantidad: l.cantidad }));
+}
+
+function areaProgreso(p: EntradaProgreso, areaId: bigint, nombre: string, estado: EstadoAreaProgreso): AreaProgreso {
+  const productos = productosDeArea(p, areaId);
+  return { nombre, estado, lineas: productos.length, productos };
 }
 
 /** Áreas del pedido con su estado. Si la cocina ya terminó, todas quedan lista. */
@@ -161,6 +176,6 @@ function areasDePedido(p: EntradaProgreso, todasListas: boolean): ProgresoPedido
         : p.estado === 'PREPARANDO'
           ? 'PREPARANDO'
           : 'PENDIENTE';
-    return { nombre: c.area.nombre, estado, lineas: contarLineas(p, c.area_id) };
+    return areaProgreso(p, c.area_id, c.area.nombre, estado);
   });
 }

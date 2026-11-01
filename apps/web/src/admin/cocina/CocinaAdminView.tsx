@@ -322,13 +322,13 @@ export function CocinaAdminView() {
       setUndoInfo({
         pedidoId: comanda.pedidoId,
         areaId: comanda.areaId,
-        texto: `${cod}: despejado${nomArea}`,
+        texto: `${cod}: marcado listo${nomArea}`,
       });
 
       setComandaParaDespejar(null);
       await cargarComandas(areaSeleccionada);
     } catch (err: any) {
-      setError(err?.message || 'Error al despejar la comanda');
+      setError(err?.message || 'Error al marcar la comanda como lista');
       setComandaParaDespejar(null);
     } finally {
       setDespejando(false);
@@ -1064,11 +1064,11 @@ export function CocinaAdminView() {
       {/* Confirmación Sí/No de Despeje */}
       <Confirmar
         abierto={!!comandaParaDespejar}
-        titulo={`¿Despejar comanda ${
+        titulo="¿Marcar como listo?"
+        mensaje={`Comanda ${
           comandaParaDespejar?.ticket || comandaParaDespejar?.codigo
-        }?`}
-        mensaje="Tu área quedará lista. El pedido sale de cocina cuando todas sus áreas estén listas."
-        textoConfirmar="Sí, despejar"
+        }. Tu área quedará lista. El pedido sale de cocina cuando todas sus áreas estén listas.`}
+        textoConfirmar="Sí, marcar listo"
         textoNo="No, cancelar"
         alConfirmar={() => ejecutarDespeje(comandaParaDespejar)}
         alCancelar={() => setComandaParaDespejar(null)}

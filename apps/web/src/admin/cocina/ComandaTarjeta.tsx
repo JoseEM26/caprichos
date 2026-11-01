@@ -80,7 +80,22 @@ function DescripcionLinea({ it }: { it: LineaComanda }) {
       ),
     );
   });
-  if (it.nota) partes.push(<span key="nota">{it.nota}</span>);
+  if (it.nota)
+    partes.push(
+      <span
+        key="nota"
+        data-testid="linea-nota"
+        style={{
+          fontWeight: 700,
+          color: 'var(--cp-navy)',
+          background: '#FFF3C4',
+          padding: '0 4px',
+          borderRadius: '4px',
+        }}
+      >
+        {it.nota}
+      </span>,
+    );
 
   if (partes.length === 0) return null;
   return (
@@ -475,21 +490,27 @@ export function ComandaTarjeta({
 
       <EstadoAreas comanda={comanda} areaActual={soloArea ? comanda.areaId : undefined} />
 
-      <LineasComanda comanda={comanda} mostrarArea={mostrarArea} soloArea={soloArea} />
-
       {comanda.nota && (
         <div
+          data-testid="comanda-nota"
           style={{
-            border: '1.5px dashed var(--cp-soft)',
+            background: '#FFF3C4',
+            border: '2px solid #D99E39',
             borderRadius: '10px',
-            padding: '6px 8px',
-            fontSize: '12px',
-            color: 'var(--cp-navy)',
+            padding: '8px 10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
           }}
         >
-          Nota: {comanda.nota}
+          <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--cp-navy)' }}>NOTA DEL CLIENTE</span>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--cp-navy)', overflowWrap: 'anywhere' }}>
+            {comanda.nota}
+          </span>
         </div>
       )}
+
+      <LineasComanda comanda={comanda} mostrarArea={mostrarArea} soloArea={soloArea} />
 
       {!soloLectura && onDespejar && !despejada && (
         <button
@@ -508,7 +529,7 @@ export function ComandaTarjeta({
             marginTop: 'auto',
           }}
         >
-          Despejar
+          Listo
         </button>
       )}
     </div>

@@ -170,7 +170,7 @@ const SELECCION_SEGUIMIENTO = {
   entrega_lat: true,
   entrega_lng: true,
   zona: { select: { minutos_min: true, minutos_max: true } },
-  lineas: { where: { linea_combo_id: null }, select: { cantidad: true, ...SELECCION_AREA_LINEA } },
+  lineas: { where: { linea_combo_id: null }, select: { nombre: true, cantidad: true, ...SELECCION_AREA_LINEA } },
   comandas: SELECCION_COMANDAS,
   historial: {
     select: { estado_nuevo: true, en: true },
@@ -209,7 +209,7 @@ type PedidoSeguimiento = {
   zona: { minutos_min: number | null; minutos_max: number | null } | null;
   entregado_mesa_en: Date | null;
   repartidor_party_id: unknown;
-  lineas: { cantidad: number; area_id?: bigint | null; producto?: { categoria?: { area_id: bigint | null } | null } | null }[];
+  lineas: { nombre: string; cantidad: number; area_id?: bigint | null; producto?: { categoria?: { area_id: bigint | null } | null } | null }[];
   comandas: { area_id: bigint; estado: string; area: { nombre: string } }[];
   historial: { estado_nuevo: string; en: Date }[];
 };

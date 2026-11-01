@@ -17,10 +17,10 @@ function pedido(extra: Partial<EntradaProgreso> & { bebidas?: string; salados?: 
       { area_id: SALADOS, estado: salados, area: { nombre: 'Salados' } },
     ],
     lineas: [
-      { area_id: BEBIDAS },
-      { area_id: BEBIDAS },
+      { nombre: 'Frappé', cantidad: 2, area_id: BEBIDAS },
+      { nombre: 'Limonada', cantidad: 1, area_id: BEBIDAS },
       // Línea sin área propia: se cuenta por la categoría del producto
-      { area_id: null, producto: { categoria: { area_id: SALADOS } } },
+      { nombre: 'Torta', cantidad: 1, area_id: null, producto: { categoria: { area_id: SALADOS } } },
     ],
     ...resto,
   };
@@ -39,8 +39,16 @@ describe('progresoDelPedido', () => {
       enCamino: false,
     });
     expect(res.areas).toEqual([
-      { nombre: 'Bebidas', estado: 'PENDIENTE', lineas: 2 },
-      { nombre: 'Salados', estado: 'PENDIENTE', lineas: 1 },
+      {
+        nombre: 'Bebidas',
+        estado: 'PENDIENTE',
+        lineas: 2,
+        productos: [
+          { nombre: 'Frappé', cantidad: 2 },
+          { nombre: 'Limonada', cantidad: 1 },
+        ],
+      },
+      { nombre: 'Salados', estado: 'PENDIENTE', lineas: 1, productos: [{ nombre: 'Torta', cantidad: 1 }] },
     ]);
   });
 
@@ -147,6 +155,7 @@ describe('progresoDelPedido', () => {
     expect(Object.keys(res).sort()).toEqual(
       ['areas', 'enCamino', 'etapa', 'etiqueta', 'listasDe', 'porcentaje', 'totalAreas'].sort(),
     );
-    expect(Object.keys(res.areas[0]).sort()).toEqual(['estado', 'lineas', 'nombre']);
+    expect(Object.keys(res.areas[0]).sort()).toEqual(['estado', 'lineas', 'nombre', 'productos']);
+    expect(Object.keys(res.areas[0].productos[0]).sort()).toEqual(['cantidad', 'nombre']);
   });
 });

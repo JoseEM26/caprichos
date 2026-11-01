@@ -108,11 +108,11 @@ describe('Pantalla de cocina: despejar según Confirmar al despejar', () => {
     const despejar = vi.spyOn(cocinaApi, 'despejarComanda').mockResolvedValue({ ok: true });
     renderVista();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Despejar' }));
-    expect(await screen.findByText(/¿Despejar comanda CP-0007\?/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Listo' }));
+    expect(await screen.findByText(/¿Marcar como listo\?/)).toBeInTheDocument();
     expect(despejar).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, despejar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, marcar listo' }));
     await waitFor(() => expect(despejar).toHaveBeenCalledWith('7', '1'));
   });
 
@@ -121,10 +121,10 @@ describe('Pantalla de cocina: despejar según Confirmar al despejar', () => {
     const despejar = vi.spyOn(cocinaApi, 'despejarComanda').mockResolvedValue({ ok: true });
     renderVista();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Despejar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Listo' }));
     await waitFor(() => expect(despejar).toHaveBeenCalledWith('7', '1'));
-    expect(screen.queryByText(/¿Despejar comanda/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Sí, despejar' })).toBeNull();
+    expect(screen.queryByText(/¿Marcar como listo/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sí, marcar listo' })).toBeNull();
   });
 
   it('si no se pueden leer los ajustes, queda la confirmación encendida', async () => {
@@ -132,8 +132,8 @@ describe('Pantalla de cocina: despejar según Confirmar al despejar', () => {
     const despejar = vi.spyOn(cocinaApi, 'despejarComanda').mockResolvedValue({ ok: true });
     renderVista();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Despejar' }));
-    expect(await screen.findByText(/¿Despejar comanda CP-0007\?/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Listo' }));
+    expect(await screen.findByText(/¿Marcar como listo\?/)).toBeInTheDocument();
     expect(despejar).not.toHaveBeenCalled();
   });
 });
