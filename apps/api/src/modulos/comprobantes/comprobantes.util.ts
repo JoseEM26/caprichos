@@ -22,7 +22,7 @@ export function validarRuc(ruc?: string | null): boolean {
 /**
  * Valida los datos requeridos según el tipo de comprobante solicitado.
  * - NOTA_VENTA: no exige documento ni razón social.
- * - BOLETA: exige DNI válido de 8 dígitos.
+ * - BOLETA: DNI opcional; si se escribe, debe tener 8 dígitos.
  * - FACTURA: exige RUC válido de 11 dígitos (10, 15, 17 o 20) y razón social no vacía.
  */
 export function validarDocumentoComprobante(
@@ -37,7 +37,9 @@ export function validarDocumentoComprobante(
   }
 
   if (tipoNormalizado === 'BOLETA') {
-    if (!doc || !validarDni(doc)) {
+    // DNI opcional (decisión del dueño): sin documento la boleta es válida; si se escribe, 8 dígitos
+    if (!doc) return { valido: true };
+    if (!validarDni(doc)) {
       return {
         valido: false,
         motivo: 'El DNI debe tener exactamente 8 dígitos numéricos',

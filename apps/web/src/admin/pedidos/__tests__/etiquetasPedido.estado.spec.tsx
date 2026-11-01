@@ -5,6 +5,12 @@ import { EtiquetasPedido } from '../EtiquetasPedido';
 import { PedidoDetalle } from '../PedidoDetalle';
 import { Pedido } from '../pedidosApi';
 import { impresionApi, EstadoEtiquetasPedido } from '../../impresion/impresionApi';
+// PedidoDetalle usa useSesion (botón de rechazo del cobro del mozo): sin sesión en estas pruebas, sin permisos extra
+vi.mock('../../../comun/sesion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../comun/sesion')>()),
+  useSesion: () => ({ tiene: () => false, usuario: null }),
+}));
+
 
 vi.mock('../../creditos/creditosApi', () => ({
   listarPersonalActivo: vi.fn().mockResolvedValue([]),

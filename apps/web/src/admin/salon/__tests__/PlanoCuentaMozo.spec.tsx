@@ -5,6 +5,13 @@ import { salonApi } from '../api';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 import * as sesionModulo from '../../../comun/sesion';
 
+/** Con efectivo en el plan, «¿Con cuánto paga?» es obligatorio: lo escribe el mozo antes de enviar. */
+const llenarPagaCon = () => {
+  const campo = screen.queryByPlaceholderText(/^Mínimo S\/|^Obligatorio$/);
+  if (campo) fireEvent.change(campo, { target: { value: '100' } });
+};
+
+
 // El mozo ve la cuenta de una mesa ocupada en el plano y la envía a Caja (no la cobra)
 vi.mock('../api', () => ({
   salonApi: { obtenerPlano: vi.fn(), obtenerMesas: vi.fn() },
@@ -81,11 +88,12 @@ describe('Plano del mozo: cuenta de la mesa ocupada', () => {
     expect(screen.getByRole('dialog', { name: 'Precuenta' })).toBeDefined();
     expect(screen.queryByTestId('btn-confirmar-cobro-mozo')).toBeNull();
 
+    llenarPagaCon();
     fireEvent.click(screen.getByTestId('btn-enviar-caja'));
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));
 
     await waitFor(() => {
-      expect(enviar).toHaveBeenCalledWith('121', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 24 }]);
+      expect(enviar).toHaveBeenCalledWith('121', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 24 }], expect.anything());
     });
     expect(await screen.findByTestId('aviso-enviado-caja')).toBeDefined();
   });

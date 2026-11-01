@@ -6,7 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Comprobante, Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -82,8 +82,9 @@ export class ComprobantesService {
     const db = tx ?? this.prisma;
 
     // 1. Idempotencia: verificar si ya existe
-    const existente = await db.comprobante.findUnique({
-      where: { pedido_id: pedidoId },
+    // La anulada (anulado_en) no cuenta: si el pedido se vuelve a cobrar, la nota nueva es otra fila
+    const existente = await db.comprobante.findFirst({
+      where: { pedido_id: pedidoId, anulado_en: null },
     });
 
     if (existente) {
@@ -339,7 +340,7 @@ export class ComprobantesService {
         lineas: {
           include: { opcionesElegidas: true },
         },
-        comprobante: true,
+        comprobante: { where: { anulado_en: null } },
       },
     });
 
@@ -362,7 +363,7 @@ export class ComprobantesService {
     }
 
     // Si por algún motivo aún no existe la fila comprobante (ej. cobro previo), emitirla
-    let comprobante = pedido.comprobante;
+    let comprobante: Comprobante | null = pedido.comprobante[0] ?? null;
     if (!comprobante) {
       const emitido = await this.emitirParaPedido(pedido.id, undefined, usuario, ip);
       comprobante = await this.prisma.comprobante.findUnique({
@@ -407,7 +408,7 @@ export class ComprobantesService {
         lineas: {
           include: { opcionesElegidas: true },
         },
-        comprobante: true,
+        comprobante: { where: { anulado_en: null } },
       },
     });
 
@@ -428,7 +429,7 @@ export class ComprobantesService {
       );
     }
 
-    let comprobante = pedido.comprobante;
+    let comprobante: Comprobante | null = pedido.comprobante[0] ?? null;
     if (!comprobante) {
       const emitido = await this.emitirParaPedido(pedido.id, undefined, usuario, ip);
       comprobante = await this.prisma.comprobante.findUnique({

@@ -4,6 +4,13 @@ import { ModalPrecuenta } from '../componentes/ModalPrecuenta';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 import * as reducirModulo from '../../vouchers/reducirImagenVoucher';
 
+/** Con efectivo en el plan, «¿Con cuánto paga?» es obligatorio: lo escribe el mozo antes de enviar. */
+const llenarPagaCon = () => {
+  const campo = screen.queryByPlaceholderText(/^Mínimo S\/|^Obligatorio$/);
+  if (campo) fireEvent.change(campo, { target: { value: '100' } });
+};
+
+
 describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -59,6 +66,7 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
     expect(screen.getByLabelText('Monto en Yape')).toBeInTheDocument();
     expect(screen.getByLabelText('Resumen del pago')).toHaveTextContent('Efectivo S/ 20.00 · Yape S/ 12.00');
 
+    llenarPagaCon();
     fireEvent.click(botonEnviar());
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));
 
@@ -66,7 +74,7 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
       expect(enviar).toHaveBeenCalledWith('P-20', 'YAPE', [
         { medio: 'EFECTIVO', monto: 20 },
         { medio: 'YAPE', monto: 12 },
-      ]);
+      ], expect.anything());
     });
   });
 
@@ -76,6 +84,7 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio de pago' }));
     fireEvent.change(screen.getByLabelText('Monto en Yape'), { target: { value: '12' } });
 
+    llenarPagaCon();
     fireEvent.click(botonEnviar());
     expect(screen.getByText(/Caja cobrará S\/ 32\.00 \(Efectivo S\/ 20\.00 · Yape S\/ 12\.00\)/)).toBeInTheDocument();
     expect(screen.getByTestId('seccion-subir-voucher-mozo')).toBeInTheDocument();
@@ -89,6 +98,7 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Indica el monto de cada medio');
     expect(botonEnviar()).toBeDisabled();
+    llenarPagaCon();
     fireEvent.click(botonEnviar());
     expect(screen.queryByText('Sí, enviar a Caja')).toBeNull();
     expect(enviar).not.toHaveBeenCalled();
@@ -141,13 +151,15 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
       .mockResolvedValueOnce({ ok: true });
     render(<ModalPrecuenta {...propsBase} />);
 
+    llenarPagaCon();
     fireEvent.click(botonEnviar());
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Sin conexión con el servidor'));
 
+    llenarPagaCon();
     fireEvent.click(botonEnviar());
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));
     await waitFor(() => expect(screen.getByTestId('aviso-enviado-caja')).toBeInTheDocument());
-    expect(enviar).toHaveBeenNthCalledWith(2, 'P-20', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 32 }]);
+    expect(enviar).toHaveBeenNthCalledWith(2, 'P-20', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 32 }], expect.anything());
   });
 });

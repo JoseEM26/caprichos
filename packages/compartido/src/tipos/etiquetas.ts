@@ -39,6 +39,8 @@ export interface TicketPagoDatos {
   pagos: { medio: string; monto: number; recibido?: number | null; vuelto?: number | null }[];
   plan?: { medio: string; monto: number }[];
   comprobante?: { tipo: string; numero: string } | null;
+  /** Nota de venta enviada por el mozo: nombre de quien cobró en mesa. */
+  cobradoPorMozo?: string | null;
 }
 
 export type EstadoPrintJob = 'PENDIENTE' | 'IMPRIMIENDO' | 'IMPRESO' | 'FALLIDO';

@@ -40,6 +40,7 @@ import {
 } from './caja.calculo';
 import { CobrarDto } from './dto/cobrar.dto';
 import { AnularCobroDto } from './dto/anular-cobro.dto';
+import { RechazarCobroMozoDto } from './dto/rechazar-cobro-mozo.dto';
 import { MarcarCoordinadoDto } from './dto/marcar-coordinado.dto';
 import { exigirComprobanteDigital } from './comprobante-pago.util';
 
@@ -503,6 +504,91 @@ export class CobrosService {
         recibido: p.recibido !== null && p.recibido !== undefined ? Number(p.recibido) : null,
         vuelto: p.vuelto !== null && p.vuelto !== undefined ? Number(p.vuelto) : null,
       })),
+    };
+  }
+
+  /**
+   * Caja rechaza el cobro que envió el mozo (todavía sin cobro): quita la marca y anula con motivo la nota de
+   * venta que se emitió al enviarlo. No cambia pago_estado: el pedido sigue por cobrar. El voucher no se borra.
+   */
+  async rechazarCobroMozo(
+    id: bigint | string | number,
+    dto: RechazarCobroMozoDto,
+    usuario: any,
+    ip?: string,
+  ) {
+    const motivo = dto?.motivo?.trim() || '';
+    if (motivo.length < 5) {
+      throw new BadRequestException({
+        codigo: 'MOTIVO_REQUERIDO',
+        mensaje: 'El motivo es obligatorio y debe tener al menos 5 caracteres',
+      });
+    }
+    const pedidoId = this.parsearId(id);
+    const ahora = new Date();
+
+    const { previo, nota } = await this.prisma.$transaction(async (tx) => {
+      const previo = await tx.pedido.findUnique({
+        where: { id: pedidoId },
+        select: { cobro_mozo_en: true, cobro_mozo_medio: true, cobro_mozo_recibido: true, pago_estado: true },
+      });
+      if (!previo) {
+        throw new HttpException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' }, HttpStatus.NOT_FOUND);
+      }
+      if (!previo.cobro_mozo_en || previo.pago_estado === 'PAGADO') {
+        throw new HttpException(
+          { codigo: 'COBRO_MOZO_NO_VIGENTE', mensaje: 'El mozo no envió un cobro pendiente de este pedido' },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const nota = await tx.comprobante.findFirst({
+        where: { pedido_id: pedidoId, tipo: 'NOTA_VENTA', anulado_en: null },
+      });
+      if (nota) {
+        await tx.comprobante.update({
+          where: { id: nota.id },
+          data: { anulado_en: ahora, anulado_motivo: motivo },
+        });
+      }
+
+      await tx.pedido.update({
+        where: { id: pedidoId },
+        data: { cobro_mozo_en: null, cobro_mozo_medio: null, cobro_mozo_party_id: null, cobro_mozo_recibido: null },
+      });
+      return { previo, nota };
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'caja',
+      accion: 'RECHAZAR_COBRO_MOZO',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedidoId,
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      motivo,
+      antes: {
+        cobro_mozo_en: previo.cobro_mozo_en?.toISOString() ?? null,
+        cobro_mozo_medio: previo.cobro_mozo_medio,
+        cobro_mozo_recibido: previo.cobro_mozo_recibido != null ? Number(previo.cobro_mozo_recibido) : null,
+        nota_venta: nota?.numero_texto ?? null,
+      },
+      despues: { cobro_mozo_en: null, nota_anulada: nota ? nota.numero_texto : null, motivo },
+      ip,
+    });
+
+    // Caja y Pedidos quitan la marca del mozo al recibir el aviso
+    this.eventosGateway?.emitirAdmin?.('pedido:pago', {
+      id: pedidoId.toString(),
+      pago_estado: 'PENDIENTE',
+      cambio: 'cobro_mozo_rechazado',
+    });
+
+    return {
+      id: pedidoId.toString(),
+      cobro_mozo: null,
+      nota_anulada: nota?.numero_texto ?? null,
     };
   }
 

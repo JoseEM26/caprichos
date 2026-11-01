@@ -11,7 +11,7 @@ import type { RespuestaSubirVoucher, RespuestaSubirVoucherMozo } from './tipos';
 
 export interface SubirVoucherMozoProps {
   pedidoId: string | number;
-  medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+  medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA' | 'TARJETA';
   alVoucherValido: (info: { id: string | number; legible: boolean }) => void;
   /** Respuesta completa de la API (semáforo y datos). Lo usa Caja; el mozo nunca la ve. */
   alRespuesta?: (respuesta: RespuestaSubirVoucher) => void;
@@ -235,7 +235,7 @@ export function SubirVoucherMozo({
           color: 'var(--cp-navy, #0B2C3E)',
         }}
       >
-        Foto del voucher ({medio})
+        {medio === 'TARJETA' ? 'Foto de la copia del POS' : `Foto del voucher (${medio})`}
       </div>
 
       <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)', lineHeight: 1.4 }}>

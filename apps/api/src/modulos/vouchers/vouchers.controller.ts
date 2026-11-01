@@ -62,6 +62,8 @@ export class VouchersController {
       ? 'YAPE'
       : medioTexto.includes('TRANSF')
       ? 'TRANSFERENCIA'
+      : medioTexto.includes('TARJ')
+      ? 'TARJETA'
       : undefined;
 
     const ip = extraerIp(req);
@@ -92,7 +94,8 @@ export class VouchersController {
 
   /**
    * POST /admin/vouchers/enviar-a-caja
-   * El mozo envía a Caja el cobro de la mesa. Forma nueva: plan [{medio, monto}] (pago dividido).
+   * El mozo envía a Caja el cobro de la mesa. Forma nueva: plan [{medio, monto}] (pago dividido),
+   * recibido (efectivo) y comprobante {tipo, doc, razon}.
    * Forma anterior: medio (EFECTIVO | YAPE | PLIN | TRANSFERENCIA).
    * No cobra: Caja revisa el voucher y cobra. Permiso: vouchers/subir (MOZO, CAJERO, ADMIN)
    */
@@ -102,6 +105,8 @@ export class VouchersController {
     @Body('pedidoId') pedidoIdRaw: any,
     @Body('medio') medioRaw: any,
     @Body('plan') planRaw: any,
+    @Body('recibido') recibidoRaw: any,
+    @Body('comprobante') comprobanteRaw: any,
     @Req() req: any,
   ) {
     const pedidoId = pedidoIdRaw ? String(pedidoIdRaw).trim() : '';
@@ -111,6 +116,10 @@ export class VouchersController {
       req.usuario,
       extraerIp(req),
       planRaw ?? undefined,
+      {
+        recibido: recibidoRaw ?? undefined,
+        comprobante: comprobanteRaw && typeof comprobanteRaw === 'object' ? comprobanteRaw : undefined,
+      },
     );
   }
 

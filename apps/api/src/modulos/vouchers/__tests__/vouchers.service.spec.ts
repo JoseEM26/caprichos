@@ -11,6 +11,8 @@ import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
 import { obtenerFechaHoraLima } from '../../local/local.util';
 import { PagoPlanService } from '../../pedidos/pago-plan.service';
+import { ComprobantesService } from '../../comprobantes/comprobantes.service';
+import { ImpresionService } from '../../impresion/impresion.service';
 
 describe('VouchersService', () => {
   let service: VouchersService;
@@ -674,10 +676,17 @@ describe('VouchersService', () => {
       expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
     });
 
-    it('TARJETA sin plan: no pide voucher, avisa a Caja como pago en mesa', async () => {
+    it('TARJETA sin foto de la copia del POS: 400 VOUCHER_REQUERIDO y no avisa', async () => {
+      await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario)).rejects.toThrow(BadRequestException);
+      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('TARJETA con la foto del POS vigente: avisa con voucher, no como efectivo', async () => {
+      prismaMock.voucherPago.findFirst.mockResolvedValue({ id: 5n, semaforo: 'SIN_LECTURA' });
       await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario)).resolves.toEqual({ ok: true });
       expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ tipo: 'PAGO_EFECTIVO_MOZO' }),
+        data: expect.objectContaining({ tipo: 'VOUCHER_PENDIENTE_MOZO' }),
       });
     });
 
@@ -797,7 +806,7 @@ describe('VouchersService', () => {
 
       expect(prismaMock.pedido.update).toHaveBeenCalledWith({
         where: { id: 50n },
-        data: { cobro_mozo_en: expect.any(Date), cobro_mozo_medio: 'EFECTIVO', cobro_mozo_party_id: 101n },
+        data: expect.objectContaining({ cobro_mozo_en: expect.any(Date), cobro_mozo_medio: 'EFECTIVO', cobro_mozo_party_id: 101n }),
       });
       for (const [args] of prismaMock.pedido.update.mock.calls) {
         expect(args.data).not.toHaveProperty('pago_estado');
@@ -824,5 +833,162 @@ describe('VouchersService', () => {
         expect.objectContaining({ data: expect.objectContaining({ cobro_mozo_en: expect.anything() }) }),
       );
     });
+  });
+});
+
+describe('Envío a Caja: nota de venta, boleta/factura y efectivo recibido', () => {
+  let svc: VouchersService;
+  let prisma: any;
+  let comprobantesMock: any;
+  let impresionMock: any;
+  const mozo: UsuarioAutenticado = { partyId: 101n, rol: 'MOZO', debeCambiar: false };
+  const planEfectivo = [{ medio: 'EFECTIVO', monto: 35 }];
+  const planYape = [{ medio: 'YAPE', monto: 35 }];
+
+  beforeEach(async () => {
+    prisma = {
+      pedido: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 50n, codigo: 'PED-50', total: 35, pago_estado: 'PENDIENTE',
+          comprobante_tipo: 'BOLETA', comprobante_doc: null, comprobante_razon: null,
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      pedidoPagoPlan: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      comprobante: { findFirst: jest.fn().mockResolvedValue(null) },
+      person: { findUnique: jest.fn().mockResolvedValue({ nombres: 'Juan', apellidos: 'Mozo' }) },
+      voucherPago: { findFirst: jest.fn().mockResolvedValue(null) },
+      notificacion: { create: jest.fn().mockResolvedValue({ id: 99n, titulo: 'x' }) },
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
+    };
+    comprobantesMock = {
+      emitirParaPedido: jest.fn().mockResolvedValue({ id: '7', tipo: 'NOTA_VENTA', numero_texto: 'NV01-000001', advertencia: null }),
+    };
+    impresionMock = { encolarNotaMozo: jest.fn().mockResolvedValue(undefined) };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        VouchersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: ArchivosService, useValue: { subirArchivo: jest.fn() } },
+        { provide: AuditoriaService, useValue: { registrar: jest.fn().mockResolvedValue(undefined) } },
+        { provide: VouchersIaService, useValue: {} },
+        { provide: PagoPlanService, useValue: new PagoPlanService() },
+        { provide: EventosGateway, useValue: { emitirAdmin: jest.fn() } },
+        { provide: ComprobantesService, useValue: comprobantesMock },
+        { provide: ImpresionService, useValue: impresionMock },
+      ],
+    }).compile();
+    svc = module.get<VouchersService>(VouchersService);
+  });
+
+  it('nota de venta: se emite con correlativo antes de guardar el cobro, y se imprime en la ticketera de Caja', async () => {
+    await svc.enviarACaja('50', '', mozo, undefined, planEfectivo, { recibido: 50, comprobante: { tipo: 'NOTA_VENTA' } });
+
+    expect(prisma.pedido.update).toHaveBeenCalledWith({
+      where: { id: 50n },
+      data: expect.objectContaining({
+        comprobante_tipo: 'NOTA_VENTA',
+        comprobante_doc: null,
+        cobro_mozo_recibido: 50,
+      }),
+    });
+    expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledWith(50n, undefined, mozo, undefined);
+    expect(prisma.pedido.update.mock.invocationCallOrder[0]).toBeLessThan(
+      comprobantesMock.emitirParaPedido.mock.invocationCallOrder[0],
+    );
+    expect(impresionMock.encolarNotaMozo).toHaveBeenCalledWith(50n, expect.objectContaining({ numero_texto: 'NV01-000001' }), {
+      pagos: [{ medio: 'EFECTIVO', monto: 35 }],
+      recibido: 50,
+      mozo: 'Juan Mozo',
+    });
+  });
+
+  it('sin elegir comprobante: nota de venta por defecto aunque el pedido diga BOLETA sin DNI', async () => {
+    await svc.enviarACaja('50', 'EFECTIVO', mozo);
+    expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledTimes(1);
+    expect(prisma.pedido.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ comprobante_tipo: 'NOTA_VENTA' }) }),
+    );
+  });
+
+  it('boleta: el mozo no emite nota ni imprime; guarda el DNI', async () => {
+    prisma.voucherPago.findFirst.mockResolvedValue({ semaforo: 'CONFIABLE' });
+    await svc.enviarACaja('50', '', mozo, undefined, planYape, { comprobante: { tipo: 'BOLETA', doc: '12345678' } });
+
+    expect(comprobantesMock.emitirParaPedido).not.toHaveBeenCalled();
+    expect(impresionMock.encolarNotaMozo).not.toHaveBeenCalled();
+    expect(prisma.pedido.update).toHaveBeenCalledWith({
+      where: { id: 50n },
+      data: expect.objectContaining({ comprobante_tipo: 'BOLETA', comprobante_doc: '12345678', comprobante_razon: null }),
+    });
+  });
+
+  it('boleta sin DNI se acepta (DNI opcional)', async () => {
+    prisma.voucherPago.findFirst.mockResolvedValue({ semaforo: 'CONFIABLE' });
+    await expect(
+      svc.enviarACaja('50', '', mozo, undefined, planYape, { comprobante: { tipo: 'BOLETA', doc: '' } }),
+    ).resolves.toEqual({ ok: true });
+    expect(prisma.pedido.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ comprobante_tipo: 'BOLETA', comprobante_doc: null }) }),
+    );
+  });
+
+  it('factura: RUC de 10 dígitos o sin razón social se rechaza antes de guardar nada', async () => {
+    prisma.voucherPago.findFirst.mockResolvedValue({ semaforo: 'CONFIABLE' });
+    await expect(
+      svc.enviarACaja('50', '', mozo, undefined, planYape, { comprobante: { tipo: 'FACTURA', doc: '1234567890', razon: 'Acme SAC' } }),
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      svc.enviarACaja('50', '', mozo, undefined, planYape, { comprobante: { tipo: 'FACTURA', doc: '20123456789', razon: '' } }),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
+    expect(prisma.notificacion.create).not.toHaveBeenCalled();
+  });
+
+  it('factura válida: guarda RUC y razón social, sin nota', async () => {
+    prisma.voucherPago.findFirst.mockResolvedValue({ semaforo: 'CONFIABLE' });
+    await svc.enviarACaja('50', '', mozo, undefined, planYape, {
+      comprobante: { tipo: 'FACTURA', doc: '20123456789', razon: 'Acme SAC' },
+    });
+    expect(prisma.pedido.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ comprobante_tipo: 'FACTURA', comprobante_doc: '20123456789', comprobante_razon: 'Acme SAC' }),
+      }),
+    );
+    expect(comprobantesMock.emitirParaPedido).not.toHaveBeenCalled();
+  });
+
+  it('boleta cuando ya hay nota de venta vigente: 409, pide rechazar el cobro del mozo antes', async () => {
+    prisma.comprobante.findFirst.mockResolvedValue({ id: 7n });
+    prisma.voucherPago.findFirst.mockResolvedValue({ semaforo: 'CONFIABLE' });
+    await expect(
+      svc.enviarACaja('50', '', mozo, undefined, planYape, { comprobante: { tipo: 'BOLETA', doc: '12345678' } }),
+    ).rejects.toThrow(ConflictException);
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
+  });
+
+  it('efectivo: «Pagó con» menor que el efectivo se rechaza; igual o mayor se guarda', async () => {
+    await expect(
+      svc.enviarACaja('50', '', mozo, undefined, planEfectivo, { recibido: 30 }),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
+
+    await svc.enviarACaja('50', '', mozo, undefined, planEfectivo, { recibido: 35 });
+    expect(prisma.pedido.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ cobro_mozo_recibido: 35 }) }),
+    );
+  });
+
+  it('efectivo sin «Pagó con»: se guarda sin recibido (la nota sale sin vuelto)', async () => {
+    await svc.enviarACaja('50', '', mozo, undefined, planEfectivo, {});
+    expect(impresionMock.encolarNotaMozo).toHaveBeenCalledWith(
+      50n,
+      expect.anything(),
+      expect.objectContaining({ recibido: null }),
+    );
   });
 });

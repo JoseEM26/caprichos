@@ -980,6 +980,7 @@ describe('PedidosEstadoService', () => {
         findMany: jest.fn().mockResolvedValue([{ party_id: 7n, nombres: 'Juan', apellidos: 'Mozo' }]),
       };
       prismaMock.voucherPago.findMany = jest.fn().mockResolvedValue([]);
+      prismaMock.pedidoPagoPlan = { findMany: jest.fn().mockResolvedValue([]) };
     });
 
     it('lista: digital sin voucher legible lleva faltaVoucher, mozo y hora', async () => {
@@ -987,7 +988,7 @@ describe('PedidosEstadoService', () => {
 
       const res = await service.listar({}, cajeroAuth);
 
-      expect(res.items[0].cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: true });
+      expect(res.items[0].cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: true, recibido: null, vuelto: null, pide: null });
     });
 
     it('lista: con voucher vigente y legible no falta voucher; un ILEGIBLE no cuenta (filtro en la consulta)', async () => {
@@ -1038,7 +1039,7 @@ describe('PedidosEstadoService', () => {
     it('detalle: entrega cobroMozo con mozo y falta de voucher; null si ya está PAGADO', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoBase);
       const pendiente = await service.obtenerPorId(10n, cajeroAuth);
-      expect(pendiente.cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: true });
+      expect(pendiente.cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: true, recibido: null, vuelto: null, pide: null });
 
       prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoBase, pago_estado: 'PAGADO' });
       const pagado = await service.obtenerPorId(10n, cajeroAuth);

@@ -88,6 +88,7 @@ export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
       }}
     >
       Cobrado por mozo · {cobro.medio.split('+').map(nombreMedio).join(' + ')}
+      {cobro.pide && <> · pide {cobro.pide === 'FACTURA' ? 'Factura' : 'Boleta'}</>}
       {alerta && <strong> · falta voucher</strong>}
     </span>
   );

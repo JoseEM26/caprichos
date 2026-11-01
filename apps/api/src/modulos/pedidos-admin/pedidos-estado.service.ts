@@ -1,6 +1,6 @@
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import { PuntosService } from '../clientes/puntos.service';
-import { MEDIOS_DIGITALES_PLAN, mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
+import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
 import { StockService } from '../stock/stock.service';
@@ -32,6 +32,7 @@ import {
 } from '../supervisor-codigo/supervisor-codigo.service';
 import { exigirComprobanteDigital, voucherCubreMedio } from '../caja/comprobante-pago.util';
 import { puedeCambiarVoucher, puedeSubirVoucher } from '../vouchers/regla-cambio-voucher';
+import { MEDIOS_CON_VOUCHER_CAJA } from '../vouchers/vouchers.service';
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
@@ -78,6 +79,18 @@ export const METODOS_PAGO_PERMITIDOS = [
   'TARJETA',
   'TRANSFERENCIA',
 ] as const;
+
+export interface CobroMozoVista {
+  en: Date;
+  medio: string;
+  mozo: string | null;
+  faltaVoucher: boolean;
+  /** Efectivo que el mozo recibió (Pagó con S/); null si no hubo efectivo o no lo escribió. */
+  recibido: number | null;
+  vuelto: number | null;
+  /** Comprobante que pidió el mozo; null si es nota de venta. */
+  pide: 'BOLETA' | 'FACTURA' | null;
+}
 
 @Injectable()
 export class PedidosEstadoService {
@@ -609,14 +622,16 @@ export class PedidosEstadoService {
       cobro_mozo_en: Date | null;
       cobro_mozo_medio: string | null;
       cobro_mozo_party_id: bigint | null;
+      cobro_mozo_recibido?: unknown;
+      comprobante_tipo?: string | null;
     }>,
-  ): Promise<Map<string, { en: Date; medio: string; mozo: string | null; faltaVoucher: boolean } | null>> {
-    const mapa = new Map<string, { en: Date; medio: string; mozo: string | null; faltaVoucher: boolean } | null>();
+  ): Promise<Map<string, CobroMozoVista | null>> {
+    const mapa = new Map<string, CobroMozoVista | null>();
     const vigentes = pedidos.filter((p) => p.cobro_mozo_en && p.pago_estado !== 'PAGADO');
     const idsPedidos = vigentes.map((p) => p.id);
     const idsMozos = [...new Set(vigentes.map((p) => p.cobro_mozo_party_id).filter((v): v is bigint => v != null))];
 
-    const [conVoucher, personas] = await Promise.all([
+    const [conVoucher, personas, efectivos] = await Promise.all([
       idsPedidos.length
         ? this.prisma.voucherPago.findMany({
             // Misma regla que enviarACaja: voucher vigente y legible
@@ -631,11 +646,22 @@ export class PedidosEstadoService {
             select: { party_id: true, nombres: true, apellidos: true },
           })
         : Promise.resolve([]),
+      // Efectivo del plan: el vuelto es lo recibido menos esto
+      idsPedidos.length
+        ? this.prisma.pedidoPagoPlan.findMany({
+            where: { pedido_id: { in: idsPedidos }, medio: 'EFECTIVO' },
+            select: { pedido_id: true, monto: true },
+          })
+        : Promise.resolve([]),
     ]);
     const pedidosConVoucher = new Set(conVoucher.map((v) => String(v.pedido_id)));
     const nombreMozo = new Map(
       personas.map((per) => [String(per.party_id), `${per.nombres} ${per.apellidos || ''}`.trim()]),
     );
+    const efectivoDe = new Map<string, number>();
+    for (const e of efectivos) {
+      efectivoDe.set(String(e.pedido_id), (efectivoDe.get(String(e.pedido_id)) ?? 0) + Number(e.monto));
+    }
 
     for (const p of pedidos) {
       if (!p.cobro_mozo_en || p.pago_estado === 'PAGADO' || !p.cobro_mozo_medio) {
@@ -643,12 +669,19 @@ export class PedidosEstadoService {
         continue;
       }
       const medios = p.cobro_mozo_medio.split('+');
-      const digital = medios.some((m) => (MEDIOS_DIGITALES_PLAN as readonly string[]).includes(m));
+      const conVouch = medios.some((m) => (MEDIOS_CON_VOUCHER_CAJA as readonly string[]).includes(m));
+      const recibido = p.cobro_mozo_recibido != null ? Number(p.cobro_mozo_recibido) : null;
+      const vuelto =
+        recibido != null ? Math.round((recibido - (efectivoDe.get(String(p.id)) ?? 0)) * 100) / 100 : null;
+      const tipo = p.comprobante_tipo;
       mapa.set(String(p.id), {
         en: p.cobro_mozo_en,
         medio: p.cobro_mozo_medio,
         mozo: p.cobro_mozo_party_id != null ? nombreMozo.get(String(p.cobro_mozo_party_id)) || null : null,
-        faltaVoucher: digital && !pedidosConVoucher.has(String(p.id)),
+        faltaVoucher: conVouch && !pedidosConVoucher.has(String(p.id)),
+        recibido,
+        vuelto,
+        pide: tipo === 'BOLETA' || tipo === 'FACTURA' ? tipo : null,
       });
     }
     return mapa;

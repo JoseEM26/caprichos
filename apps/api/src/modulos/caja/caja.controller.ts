@@ -16,6 +16,7 @@ import { CobrosService } from './cobros.service';
 import { AbrirCajaDto } from './dto/abrir-caja.dto';
 import { CobrarDto } from './dto/cobrar.dto';
 import { AnularCobroDto } from './dto/anular-cobro.dto';
+import { RechazarCobroMozoDto } from './dto/rechazar-cobro-mozo.dto';
 import { CrearMovimientoDto } from './dto/movimiento.dto';
 import { AnularMovimientoDto } from './dto/anular-movimiento.dto';
 import { MarcarCoordinadoDto } from './dto/marcar-coordinado.dto';
@@ -49,6 +50,13 @@ export class CajaController {
   async cobrar(@Body() dto: CobrarDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.cobrosService.cobrar(dto, req.usuario, ip);
+  }
+
+  @Post('pedidos/:id/rechazar-cobro-mozo')
+  @Permiso('caja', 'cobrar')
+  async rechazarCobroMozo(@Param('id') id: string, @Body() dto: RechazarCobroMozoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.cobrosService.rechazarCobroMozo(id, dto, req.usuario, ip);
   }
 
   @Post('cobros/:id/anular')

@@ -68,7 +68,17 @@ export interface Pedido {
   pago_preferido?: string | null;
   cobro_vigente_id?: string | number | null;
   /** Cobro por mozo (envío a Caja): null si no lo envió o el pedido ya está PAGADO */
-  cobroMozo?: { en: string; medio: string; mozo: string | null; faltaVoucher: boolean } | null;
+  cobroMozo?: {
+    en: string;
+    medio: string;
+    mozo: string | null;
+    faltaVoucher: boolean;
+    /** Efectivo que recibió el mozo (Pagó con) y el vuelto; null si no hubo efectivo */
+    recibido?: number | null;
+    vuelto?: number | null;
+    /** Comprobante que pidió el mozo (Caja lo emite al cobrar); null si es nota de venta */
+    pide?: 'BOLETA' | 'FACTURA' | null;
+  } | null;
   paga_con?: string | number | null;
   /** Pago dividido: monto por medio (vacío si el pedido no tiene plan) */
   planPago?: Array<{ medio: string; monto: string | number }>;
@@ -373,6 +383,11 @@ export const pedidosApi = {
 
   async cobrar(dto: CobrarDto): Promise<any> {
     return api.post<any>('/admin/caja/cobrar', dto);
+  },
+
+  /** Caja rechaza el cobro que envió el mozo: quita la marca y anula la nota de venta emitida. */
+  async rechazarCobroMozo(id: string | number, motivo: string): Promise<{ nota_anulada: string | null }> {
+    return api.post<{ nota_anulada: string | null }>(`/admin/caja/pedidos/${id}/rechazar-cobro-mozo`, { motivo });
   },
 
   async anularCobro(id: string | number, motivo: string, pinSupervisor: string): Promise<any> {

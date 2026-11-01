@@ -1,14 +1,23 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ChipCobroMozo } from '../PedidosAdminView';
 import { PedidoDetalle } from '../PedidoDetalle';
 import { Pedido } from '../pedidosApi';
+import * as sesionModulo from '../../../comun/sesion';
 
 vi.mock('../../creditos/creditosApi', () => ({
   listarPersonalActivo: vi.fn().mockResolvedValue([]),
   registrarConsumoCredito: vi.fn(),
 }));
+
+let permisos: string[] = ['caja/cobrar'];
+beforeEach(() => {
+  vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
+    tiene: (permiso: string) => permisos.includes(permiso),
+  } as any);
+  permisos = ['caja/cobrar'];
+});
 
 const base = {
   id: 'ped-9',
@@ -70,5 +79,41 @@ describe('PedidoDetalle: cobro del mozo en el encabezado', () => {
       </MemoryRouter>,
     );
     expect(screen.queryByText(/Cobrado por mozo/)).toBeNull();
+  });
+});
+
+describe('PedidoDetalle: rechazar el cobro del mozo solo con caja/cobrar', () => {
+  const pedidoConCobro = {
+    ...base,
+    cobroMozo: { en: '2026-10-30T20:00:00.000Z', medio: 'EFECTIVO', mozo: 'Juan Mozo', faltaVoucher: false, recibido: 50, vuelto: 18, pide: null },
+  } as Pedido;
+
+  it('con caja/cobrar muestra el botón y el recibido con el vuelto', () => {
+    render(<MemoryRouter><PedidoDetalle pedido={pedidoConCobro} alActualizar={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: 'Rechazar cobro del mozo' })).toBeInTheDocument();
+    expect(screen.getByText(/Recibió S\/ 50\.00 · vuelto S\/ 18\.00/)).toBeInTheDocument();
+  });
+
+  it('sin caja/cobrar no muestra el botón', () => {
+    permisos = ['caja/ver'];
+    render(<MemoryRouter><PedidoDetalle pedido={pedidoConCobro} alActualizar={() => {}} /></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: 'Rechazar cobro del mozo' })).toBeNull();
+    expect(screen.getByText(/Cobrado por mozo/)).toBeInTheDocument();
+  });
+
+  it('pedido ya PAGADO no muestra el botón aunque tenga permiso', () => {
+    render(<MemoryRouter><PedidoDetalle pedido={{ ...pedidoConCobro, pago_estado: 'PAGADO' } as Pedido} alActualizar={() => {}} /></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: 'Rechazar cobro del mozo' })).toBeNull();
+  });
+});
+
+describe('ChipCobroMozo: comprobante que pidió el mozo', () => {
+  it('muestra «pide Factura» cuando el mozo la pidió; sin pide, el chip no cambia', () => {
+    const { rerender } = render(
+      <ChipCobroMozo cobro={{ en: '2026-10-30T20:00:00.000Z', medio: 'EFECTIVO', mozo: 'Juan', faltaVoucher: false, pide: 'FACTURA' }} />,
+    );
+    expect(screen.getByText(/pide Factura/)).toBeInTheDocument();
+    rerender(<ChipCobroMozo cobro={{ en: '2026-10-30T20:00:00.000Z', medio: 'EFECTIVO', mozo: 'Juan', faltaVoucher: false, pide: null }} />);
+    expect(screen.queryByText(/pide/)).toBeNull();
   });
 });

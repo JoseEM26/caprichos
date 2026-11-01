@@ -4,6 +4,13 @@ import { ModalPrecuenta } from '../componentes/ModalPrecuenta';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 import * as reducirModulo from '../../vouchers/reducirImagenVoucher';
 
+/** Con efectivo en el plan, «¿Con cuánto paga?» es obligatorio: lo escribe el mozo antes de enviar. */
+const llenarPagaCon = () => {
+  const campo = screen.queryByPlaceholderText(/^Mínimo S\/|^Obligatorio$/);
+  if (campo) fireEvent.change(campo, { target: { value: '100' } });
+};
+
+
 describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -20,6 +27,7 @@ describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => 
   };
 
   const elegirYPedirConfirmacion = () => {
+    llenarPagaCon();
     fireEvent.click(screen.getByTestId('btn-enviar-caja'));
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));
   };
@@ -39,12 +47,13 @@ describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => 
     expect(screen.queryByTestId('seccion-subir-voucher-mozo')).toBeNull();
     expect(screen.getByTestId('aviso-efectivo-caja')).toBeDefined();
 
+    llenarPagaCon();
     fireEvent.click(screen.getByTestId('btn-enviar-caja'));
     expect(screen.getByText('¿Enviar a Caja el cobro de Mesa 4?')).toBeDefined();
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));
 
     await waitFor(() => {
-      expect(enviar).toHaveBeenCalledWith('P-20', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 32 }]);
+      expect(enviar).toHaveBeenCalledWith('P-20', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 32 }], expect.anything());
     });
     expect(screen.getByTestId('aviso-enviado-caja').textContent).toContain('Enviado a Caja, ellos lo revisan.');
     expect(screen.queryByTestId('btn-enviar-caja')).toBeNull();
@@ -71,7 +80,7 @@ describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => 
     elegirYPedirConfirmacion();
 
     await waitFor(() => {
-      expect(enviar).toHaveBeenCalledWith('P-20', 'YAPE', [{ medio: 'YAPE', monto: 32 }]);
+      expect(enviar).toHaveBeenCalledWith('P-20', 'YAPE', [{ medio: 'YAPE', monto: 32 }], expect.anything());
     });
     expect(screen.getByTestId('aviso-enviado-caja')).toBeDefined();
   });
@@ -102,6 +111,7 @@ describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => 
     const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
     render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
 
+    llenarPagaCon();
     fireEvent.click(screen.getByTestId('btn-enviar-caja'));
     fireEvent.click(screen.getByText('No, cancelar'));
 

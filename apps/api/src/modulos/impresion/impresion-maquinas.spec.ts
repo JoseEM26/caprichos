@@ -69,7 +69,7 @@ describe('ImpresionService: ticket y vinculación', () => {
         }),
       },
       parametro: { findUnique: jest.fn().mockResolvedValue({ valor: { nombre: 'Caprichos', ruc: '2060' } }) },
-      comprobante: { findUnique: jest.fn().mockResolvedValue({ tipo: 'NOTA_VENTA', numero_texto: 'N001-1' }) },
+      comprobante: { findFirst: jest.fn().mockResolvedValue({ tipo: 'NOTA_VENTA', numero_texto: 'N001-1' }) },
       deviceKey: {
         findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn(), create: jest.fn().mockResolvedValue({ id: 1n }),
         deleteMany: jest.fn(),
