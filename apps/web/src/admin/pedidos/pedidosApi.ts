@@ -91,6 +91,7 @@ export interface Pedido {
   comprobante_tipo?: string | null;
   comprobante_doc?: string | null;
   comprobante_razon?: string | null;
+  comprobante_direccion?: string | null;
   nota?: string | null;
   mesa_nombre?: string | null;
   es_personal?: boolean;

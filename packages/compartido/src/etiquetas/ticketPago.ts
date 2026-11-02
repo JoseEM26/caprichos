@@ -15,6 +15,30 @@ function fila(izq: string, der: string, cols: number): string {
   return `${izq.length > max ? izq.slice(0, max) : izq.padEnd(max)} ${der}`;
 }
 
+/** Parte un texto en renglones de `cols` columnas, cortando por palabras (y por bloque si no hay espacios). */
+function envolver(texto: string, cols: number): string[] {
+  const out: string[] = [];
+  let actual = '';
+  for (const palabra of texto.split(/\s+/).filter(Boolean)) {
+    for (let trozo = palabra; trozo.length > 0; ) {
+      const cabe = actual ? actual.length + 1 + trozo.length <= cols : trozo.length <= cols;
+      if (cabe) {
+        actual = actual ? `${actual} ${trozo}` : trozo;
+        break;
+      }
+      if (actual) {
+        out.push(actual);
+        actual = '';
+      } else {
+        out.push(trozo.slice(0, cols));
+        trozo = trozo.slice(cols);
+      }
+    }
+  }
+  if (actual) out.push(actual);
+  return out;
+}
+
 const centrar = (t: string, cols: number) =>
   t.length >= cols ? t.slice(0, cols) : ' '.repeat(Math.floor((cols - t.length) / 2)) + t;
 
@@ -53,6 +77,10 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
   if (t.comprobante) {
     p(linea);
     p(`${t.comprobante.tipo.replace('_', ' ')} ${t.comprobante.numero}`);
+    if (t.comprobante.representacion) for (const r of envolver(t.comprobante.representacion, c)) p(r);
+    if (t.comprobante.hash) for (const h of envolver(`Hash: ${t.comprobante.hash}`, c)) p(h);
+    if (t.comprobante.simulado) p(centrar('SIMULADO - SIN VALOR TRIBUTARIO', c), { centrado: true });
+    // ponytail: el QR (cadena_para_codigo_qr) no sale aún: el generador ESC/POS solo emite texto. Falta GS ( k.
   }
   if (t.cobradoPorMozo) p(`Cobrado por mozo ${t.cobradoPorMozo}`);
   p(linea);

@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
@@ -22,15 +23,134 @@ import {
 } from './comprobantes.util';
 import { MarcarEmitidoDto } from './dto/marcar-emitido.dto';
 import { ListarPorEmitirDto } from './dto/listar-por-emitir.dto';
+import { ConfigFacturacionDto } from './dto/facturacion.dto';
+import { CLAVES_FACTURACION, ConfigFacturacion, interpretarConfig } from './facturacion/facturacion.config';
+import { aCentimos } from './facturacion/facturacion.calculo';
+import { ComprobanteEmision, DatosEmision, EmisorElectronico, ErrorRedEmisor, Proveedor, ResultadoBaja, ResultadoEmision } from './emisor/emisor.tipos';
+import { proveedorDe } from './emisor/proveedor';
+import { SimuladoEmisor } from './emisor/simulado.emisor';
+import { SunatEmisor } from './sunat/sunat.emisor';
+import { ambienteSunat } from './sunat/sunat.config';
+import { bytes, sha256 } from './sunat/sunat.util';
+import { ComprobantesSunatService } from './comprobantes-sunat.service';
+import { siguienteCorrelativo } from './secuencia';
+
+/** Plazo de la comunicación de baja de una factura en SUNAT (días). */
+export const PLAZO_BAJA_FACTURA_DIAS = 7;
+
+/** Series de la nota de venta interna (sin SUNAT). */
+const SERIE_NOTA = 'NV01';
+
+/** Textos que la respuesta de SUNAT deja en la fila (sin secretos: solo lo que devuelve SUNAT). */
+const MAX_TEXTO_RESPUESTA = 1000;
+
+function textoRespuesta(v: unknown): string {
+  if (v == null) return '';
+  const t = typeof v === 'string' ? v : JSON.stringify(v);
+  return t.length > MAX_TEXTO_RESPUESTA ? t.slice(0, MAX_TEXTO_RESPUESTA) : t;
+}
+
+/** Proveedor de una fila: la columna emisor; filas sin ella: simulado o SUNAT según la marca. */
+function proveedorDeFila(c: { emisor?: string | null; simulado?: boolean | null }): Proveedor {
+  if (c.emisor) return proveedorDe(c.emisor);
+  return c.simulado ? 'SIMULADO' : 'SUNAT';
+}
 
 @Injectable()
 export class ComprobantesService {
+  private readonly logger = new Logger(ComprobantesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly localService?: LocalService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() private readonly sunatEmisor?: SunatEmisor,
+    @Optional() private readonly sunatResumen?: ComprobantesSunatService,
   ) {}
+
+  /** Proveedor que de verdad emite: SUNAT solo con sus credenciales; si no, SIMULADO (sin red). */
+  proveedorEfectivo(valor: unknown): Proveedor {
+    const p = proveedorDe(valor);
+    if (p === 'SUNAT' && !this.sunatEmisor?.disponible()) return 'SIMULADO';
+    return p;
+  }
+
+  /** Emisor que atiende una fila según su proveedor guardado. */
+  private emisorPara(proveedor: Proveedor): EmisorElectronico {
+    if (proveedor === 'SUNAT') {
+      if (!this.sunatEmisor) throw new ErrorRedEmisor('SUNAT no está configurado en este servidor');
+      return this.sunatEmisor;
+    }
+    return new SimuladoEmisor();
+  }
+
+  /** Arma los datos del comprobante a partir del pedido (céntimos). Lanza si un monto no sirve. */
+  private async datosDeFila(c: any, cfgIgv: number, direccion: string | null): Promise<DatosEmision> {
+    const pedido: any = c.pedido;
+    return {
+      tipo: c.tipo,
+      serie: c.serie,
+      numero: c.numero,
+      fecha: c.creado_en,
+      documento: c.documento,
+      razon: c.razon_social || pedido.cliente_nombre || null,
+      direccion,
+      correo: null,
+      igvPct: cfgIgv,
+      lineas: (pedido.lineas || []).map((l: any) => ({
+        nombre: l.nombre,
+        cantidad: Number(l.cantidad) || 1,
+        subtotalCents: aCentimos(Number(l.subtotal ?? Number(l.precio_unit) * (Number(l.cantidad) || 1))),
+      })),
+      envioCents: aCentimos(Number(pedido.envio ?? 0)),
+      descuentoCents: aCentimos(Number(pedido.descuento ?? 0)),
+      totalCents: aCentimos(Number(pedido.total)),
+    };
+  }
+
+  private async ultimoArchivo(comprobanteId: bigint, tipo: string): Promise<Buffer | null> {
+    const a = await this.prisma.comprobanteArchivo?.findFirst({
+      where: { comprobante_id: comprobanteId, tipo },
+      orderBy: { id: 'desc' },
+    });
+    return a?.contenido ? Buffer.from(a.contenido) : null;
+  }
+
+  /** Guarda XML, ZIP o CDR del comprobante con su huella SHA-256. Nada se borra: cada envío agrega filas. */
+  private async guardarArchivo(comprobanteId: bigint, a: { tipo: string; nombre: string; contenido: Buffer }) {
+    await this.prisma.comprobanteArchivo.create({
+      data: { comprobante_id: comprobanteId, tipo: a.tipo, nombre: a.nombre, contenido: bytes(a.contenido), sha256: sha256(a.contenido) },
+    });
+  }
+
+  /** Archivo guardado de un comprobante (XML, ZIP o CDR), el más reciente. */
+  async obtenerArchivo(idRaw: bigint | string | number, tipoRaw: string, usuario?: UsuarioAutenticado, ip?: string) {
+    const id = this.parsearId(idRaw, 'comprobante');
+    const tipo = (tipoRaw || '').toUpperCase();
+    if (!['XML', 'ZIP', 'CDR'].includes(tipo)) {
+      throw new BadRequestException({ codigo: 'TIPO_ARCHIVO_INVALIDO', mensaje: 'El archivo debe ser XML, ZIP o CDR' });
+    }
+    const a = await this.prisma.comprobanteArchivo.findFirst({
+      where: { comprobante_id: id, tipo },
+      orderBy: { id: 'desc' },
+    });
+    if (!a) {
+      throw new NotFoundException({ codigo: 'ARCHIVO_NO_ENCONTRADO', mensaje: 'Todavía no hay ese archivo para el comprobante' });
+    }
+    await this.auditoria.registrar({
+      categoria: 'LECTURA_SENSIBLE',
+      modulo: 'comprobantes',
+      accion: 'DESCARGAR_ARCHIVO_ELECTRONICO',
+      resultado: 'OK',
+      entidad: 'comprobante',
+      entidadId: id,
+      despues: { tipo, nombre: a.nombre },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+    return { nombre: a.nombre, tipo: a.tipo, contenido: Buffer.from(a.contenido), sha256: a.sha256 };
+  }
 
   private parsearId(id: bigint | string | number, entidad = 'comprobante'): bigint {
     try {
@@ -62,15 +182,40 @@ export class ComprobantesService {
       emitido_por: c.emitido_por ? c.emitido_por.toString() : null,
       referencia_externa: c.referencia_externa ?? null,
       creado_en: c.creado_en,
+      facturacion_estado: c.facturacion_estado ?? null,
+      facturacion_intentos: c.facturacion_intentos ?? 0,
+      enlace_pdf: c.facturacion_enlace_pdf ?? null,
+      cadena_qr: c.facturacion_cadena_qr ?? null,
+      hash: c.facturacion_hash ?? null,
+      respuesta_sunat: c.facturacion_respuesta ?? null,
+      simulado: c.simulado ?? false,
+      baja_estado: c.baja_estado ?? null,
+      baja_motivo: c.baja_motivo ?? null,
+      baja_en: c.baja_en ?? null,
+      emisor: c.emisor ?? null,
     };
+  }
+
+  /** Series y IGV de la facturación electrónica (parámetros; defecto B002, F002 y 10.5 %). */
+  async leerConfigFacturacion(db: any = this.prisma): Promise<ConfigFacturacion> {
+    const valores: Record<string, unknown> = {};
+    for (const clave of Object.values(CLAVES_FACTURACION)) {
+      try {
+        const p = await db.parametro.findUnique({ where: { clave } });
+        valores[clave] = p?.valor;
+      } catch {
+        valores[clave] = undefined; // sin lectura: valor por defecto
+      }
+    }
+    return interpretarConfig(valores);
   }
 
   /**
    * Emite el comprobante para un pedido cobrado.
    * - Es idempotente: si ya existe el comprobante para el pedido, lo devuelve.
-   * - Crea la fila con su correlativo interno de la serie 'NV01' (UPDATE ... RETURNING atómico).
-   * - Valida los documentos con comprobantes.util.ts.
+   * - NOTA_VENTA: serie NV01 interna. BOLETA/FACTURA válidas: serie B002/F002 (parámetros) y se envían a SUNAT.
    * - Si el documento es inválido, NO bloquea el cobro: lo deja con tipo NOTA_VENTA y lo reporta en la respuesta.
+   * - Con tx (transacción externa) no hace red: la boleta/factura queda PENDIENTE_ENVIO y la tarea la envía.
    */
   async emitirParaPedido(
     pedidoIdRaw: bigint | string | number,
@@ -97,6 +242,7 @@ export class ComprobantesService {
     // 2. Obtener datos del pedido
     const pedido = await db.pedido.findUnique({
       where: { id: pedidoId },
+      include: { lineas: true },
     });
 
     if (!pedido) {
@@ -110,15 +256,17 @@ export class ComprobantesService {
     const tipoSolicitado = (pedido.comprobante_tipo || 'NOTA_VENTA').trim().toUpperCase();
     const docSolicitado = pedido.comprobante_doc?.trim() || null;
     const razonSolicitada = pedido.comprobante_razon?.trim() || null;
+    const direccionSolicitada = pedido.comprobante_direccion?.trim() || null;
 
     const validacion = validarDocumentoComprobante(
       tipoSolicitado,
       docSolicitado,
       razonSolicitada,
+      Number(pedido.total),
     );
 
     let tipoFinal = tipoSolicitado;
-    let emisionFinal: 'INTERNA' | 'POR_EMITIR' | 'EMITIDO' = 'INTERNA';
+    let emisionFinal: 'INTERNA' | 'POR_EMITIR' = 'INTERNA';
     const docFinal = docSolicitado;
     const razonFinal = razonSolicitada;
     let advertencia: string | null = null;
@@ -134,29 +282,15 @@ export class ComprobantesService {
       emisionFinal = 'INTERNA';
     }
 
-    // 4. Obtener correlativo atómico en secuencia_comprobante para serie 'NV01'
-    const serie = 'NV01';
-    let filas = await db.$queryRaw<{ ultimo_numero: number }[]>`
-      UPDATE secuencia_comprobante
-      SET ultimo_numero = ultimo_numero + 1
-      WHERE serie = ${serie}
-      RETURNING ultimo_numero;
-    `;
-
-    if (!filas || filas.length === 0) {
-      filas = await db.$queryRaw<{ ultimo_numero: number }[]>`
-        INSERT INTO secuencia_comprobante (serie, ultimo_numero)
-        VALUES (${serie}, 1)
-        ON CONFLICT (serie) DO UPDATE
-        SET ultimo_numero = secuencia_comprobante.ultimo_numero + 1
-        RETURNING ultimo_numero;
-      `;
-    }
-
-    const numero = Number(filas[0].ultimo_numero);
+    // 4. Serie y correlativo propio de la serie (atómico)
+    const electronico = tipoFinal === 'BOLETA' || tipoFinal === 'FACTURA';
+    const cfg = electronico ? await this.leerConfigFacturacion(db) : null;
+    const proveedor: Proveedor = cfg ? this.proveedorEfectivo(cfg.proveedor) : 'SIMULADO';
+    const serie = !cfg ? SERIE_NOTA : tipoFinal === 'BOLETA' ? cfg.serieBoleta : cfg.serieFactura;
+    const numero = await siguienteCorrelativo(db, serie);
     const numeroTexto = formatearCorrelativo(serie, numero);
 
-    // 5. Crear fila de comprobante
+    // 5. Crear fila de comprobante (BOLETA/FACTURA quedan PENDIENTE_ENVIO hasta que SUNAT responda)
     const nuevo = await db.comprobante.create({
       data: {
         pedido_id: pedidoId,
@@ -168,6 +302,7 @@ export class ComprobantesService {
         razon_social: razonFinal,
         emision: emisionFinal,
         copias_impresas: 0,
+        ...(electronico ? { facturacion_estado: 'PENDIENTE_ENVIO', emisor: proveedor, simulado: proveedor === 'SIMULADO' } : {}),
       },
     });
 
@@ -192,9 +327,317 @@ export class ComprobantesService {
       ip,
     });
 
+    if (!electronico) {
+      return { ...this.serializarComprobante(nuevo), advertencia };
+    }
+
+    // 7. Envío a SUNAT (sin transacción externa: no se mantiene una transacción abierta durante la red)
+    let enviado: any = nuevo;
+    if (!tx) {
+      try {
+        enviado = await this.enviarElectronico(nuevo.id, { direccion: direccionSolicitada, usuario, ip });
+      } catch {
+        // Error inesperado: el cobro sigue; el comprobante queda pendiente con su número y la tarea lo reenvía
+        enviado = await this.prisma.comprobante
+          .update({ where: { id: nuevo.id }, data: { facturacion_estado: 'PENDIENTE_ENVIO', emision: 'POR_EMITIR' } })
+          .catch(() => nuevo);
+      }
+    }
+    return { ...this.serializarComprobante(enviado), advertencia };
+  }
+
+  /**
+   * Envía (o reenvía) una BOLETA/FACTURA al emisor que la atiende (SUNAT o simulado) y guarda el resultado.
+   * - Boleta SUNAT: queda PENDIENTE_RESUMEN (firmada); el resumen diario la envía.
+   * - Sin respuesta (red o tiempo agotado): PENDIENTE_ENVIO con el mismo número; la tarea lo reenvía.
+   * - Si ya hubo un intento, el emisor consulta antes de reenviar para no duplicar.
+   * El cobro nunca se deshace por esta llamada: los errores de red no salen de aquí.
+   */
+  async enviarElectronico(
+    comprobanteId: bigint,
+    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string } = {},
+  ): Promise<any> {
+    const c = await this.prisma.comprobante.findUnique({
+      where: { id: comprobanteId },
+      include: { pedido: { include: { lineas: true } } },
+    });
+    if (!c || (c.tipo !== 'BOLETA' && c.tipo !== 'FACTURA')) return c;
+    if (['EMITIDO_SUNAT', 'PENDIENTE_RESUMEN', 'ENVIADA_RESUMEN'].includes(c.facturacion_estado ?? '')) return c;
+
+    const cfg = await this.leerConfigFacturacion();
+    const pedido: any = c.pedido;
+    const direccion = opciones.direccion ?? pedido.comprobante_direccion ?? null;
+    const proveedor = proveedorDeFila(c);
+
+    let datos: DatosEmision;
+    try {
+      datos = await this.datosDeFila(c, cfg.igvPct, direccion);
+    } catch {
+      return this.guardarResultado(c, { estado: 'RECHAZADO', respuesta: 'Datos: Datos del comprobante no válidos', simulado: false }, opciones);
+    }
+
+    const intentosPrevios = c.facturacion_intentos ?? 0;
+    let res: ResultadoEmision;
+    try {
+      // Un ZIP ya firmado sin respuesta se reenvía tal cual (mismo documento, mismo número)
+      const zipPrevio = c.facturacion_estado === 'PENDIENTE_ENVIO' && intentosPrevios > 0 ? await this.ultimoArchivo(c.id, 'ZIP') : null;
+      if (proveedor !== 'SIMULADO') {
+        await this.prisma.comprobante.update({ where: { id: c.id }, data: { facturacion_intentos: { increment: 1 } } });
+      }
+      const emision: ComprobanteEmision = { id: c.id, tipo: c.tipo as 'BOLETA' | 'FACTURA', serie: c.serie, numero: c.numero, intentos: intentosPrevios, datos, zipPrevio };
+      res = await this.emisorPara(proveedor).generar(emision);
+    } catch (e: any) {
+      if (!(e instanceof ErrorRedEmisor)) this.logger.error(`Emisor ${proveedor}: ${e?.message ?? e}`);
+      res = { estado: 'PENDIENTE_ENVIO', respuesta: 'Sin respuesta del emisor electrónico: se reintenta', simulado: false };
+    }
+    return this.guardarResultado(c, res, opciones);
+  }
+
+  /** Guarda el resultado del envío, sus archivos y la emisión en la fila (y audita). */
+  private async guardarResultado(c: any, res: ResultadoEmision, opciones: { usuario?: UsuarioAutenticado; ip?: string }) {
+    const aceptado = res.estado === 'EMITIDO_SUNAT';
+    const ahora = new Date();
+    const respuesta = textoRespuesta(res.respuesta || 'Sin detalle de SUNAT');
+    const data: any = {
+      facturacion_estado: res.estado,
+      emision: aceptado ? 'EMITIDO' : 'POR_EMITIR',
+      facturacion_respuesta: respuesta,
+      simulado: res.simulado === true,
+    };
+    if (res.hash) data.facturacion_hash = res.hash;
+    if (res.cadenaQr) data.facturacion_cadena_qr = res.cadenaQr;
+    if (res.totalCents !== undefined) {
+      data.sunat_total_cents = res.totalCents;
+      data.sunat_igv_cents = res.igvCents ?? null;
+    }
+    if (aceptado) {
+      data.emitido_en = ahora;
+      data.facturacion_enlace_pdf = res.enlacePdf || null;
+    }
+    const actualizado = await this.prisma.comprobante.update({ where: { id: c.id }, data });
+    for (const a of res.archivos ?? []) await this.guardarArchivo(c.id, a);
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'comprobantes',
+      accion: `FACTURACION_${res.estado}`,
+      resultado: res.estado === 'RECHAZADO' ? 'RECHAZADO' : 'OK',
+      entidad: 'comprobante',
+      entidadId: c.id,
+      despues: {
+        numero_texto: c.numero_texto,
+        emisor: data.simulado ? 'SIMULADO' : proveedorDeFila(c),
+        estado: res.estado,
+        simulado: data.simulado,
+        respuesta: respuesta.slice(0, 300),
+      },
+      partyId: opciones.usuario?.partyId ? BigInt(opciones.usuario.partyId) : undefined,
+      ip: opciones.ip,
+    });
+    return actualizado;
+  }
+
+  /** Reintenta el envío de una BOLETA/FACTURA rechazada o pendiente. Opcional: corrige documento, razón y dirección antes. */
+  async reintentarElectronico(
+    idRaw: bigint | string | number,
+    correccion: { documento?: string | null; razon?: string | null; direccion?: string | null } = {},
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const id = this.parsearId(idRaw, 'comprobante');
+    const c = await this.prisma.comprobante.findUnique({ where: { id } });
+    if (!c || (c.tipo !== 'BOLETA' && c.tipo !== 'FACTURA')) {
+      throw new NotFoundException({ codigo: 'COMPROBANTE_NO_ENCONTRADO', mensaje: 'El comprobante no existe' });
+    }
+    if (c.facturacion_estado === 'EMITIDO_SUNAT') {
+      throw new HttpException(
+        { codigo: 'COMPROBANTE_YA_EMITIDO', mensaje: 'El comprobante ya fue aceptado por SUNAT' },
+        HttpStatus.CONFLICT,
+      );
+    }
+    if (c.facturacion_estado === 'PENDIENTE_RESUMEN' || c.facturacion_estado === 'ENVIADA_RESUMEN') {
+      throw new HttpException(
+        { codigo: 'COMPROBANTE_EN_RESUMEN', mensaje: 'La boleta ya está en el resumen diario de SUNAT: espere la respuesta' },
+        HttpStatus.CONFLICT,
+      );
+    }
+    const cambios: any = {};
+    if (correccion.documento !== undefined) cambios.documento = correccion.documento || null;
+    if (correccion.razon !== undefined) cambios.razon_social = correccion.razon || null;
+    if (Object.keys(cambios).length > 0) {
+      const valido = validarDocumentoComprobante(c.tipo, cambios.documento ?? c.documento, cambios.razon_social ?? c.razon_social);
+      if (!valido.valido) {
+        throw new BadRequestException({ codigo: 'COMPROBANTE_INVALIDO', mensaje: valido.motivo });
+      }
+      await this.prisma.comprobante.update({ where: { id }, data: cambios });
+    }
+    if (correccion.direccion !== undefined) {
+      await this.prisma.pedido.update({
+        where: { id: c.pedido_id },
+        data: { comprobante_direccion: correccion.direccion?.trim() || null },
+      });
+    }
+    const enviado = await this.enviarElectronico(id, { direccion: correccion.direccion ?? undefined, usuario, ip });
+    return this.serializarComprobante(enviado);
+  }
+
+  /** Tarea automática: reenvía las BOLETA/FACTURA PENDIENTE_ENVIO (lotes de 20, las más antiguas primero). */
+  async reintentarPendientes(): Promise<{ revisados: number }> {
+    const pendientes = await this.prisma.comprobante.findMany({
+      where: { facturacion_estado: 'PENDIENTE_ENVIO', tipo: { in: ['BOLETA', 'FACTURA'] } },
+      orderBy: { creado_en: 'asc' },
+      take: 20,
+      select: { id: true },
+    });
+    for (const p of pendientes) {
+      await this.enviarElectronico(p.id);
+    }
+    return { revisados: pendientes.length };
+  }
+
+  /** Datos de emisión de una fila (para anular o reenviar). Lanza BadRequest si un monto no sirve. */
+  private async emisionDeFila(c: any): Promise<ComprobanteEmision> {
+    const cfg = await this.leerConfigFacturacion();
+    const direccion = c.pedido?.comprobante_direccion ?? null;
+    let datos: DatosEmision;
+    try {
+      datos = await this.datosDeFila(c, cfg.igvPct, direccion);
+    } catch {
+      throw new BadRequestException({ codigo: 'COMPROBANTE_INVALIDO', mensaje: 'Los datos del comprobante no son válidos para anularlo' });
+    }
+    return { id: c.id, tipo: c.tipo, serie: c.serie, numero: c.numero, intentos: c.facturacion_intentos ?? 0, datos };
+  }
+
+  /**
+   * Anula una BOLETA/FACTURA aceptada. Pide motivo. Nada se borra: guarda baja_estado, motivo y respuesta.
+   * - Factura SUNAT: comunicación de baja (RA) con ticket, dentro de 7 días.
+   * - Boleta SUNAT aceptada: entra al resumen diario como anulada (estado 3).
+   * - Boleta SUNAT aún sin resumen: se anula sin enviar nada (SUNAT nunca la recibió).
+   * - SUNAT: comunicación de baja. Sin respuesta: 503 y no se registra nada.
+   * ponytail: notas de crédito y débito fuera de alcance; la boleta anulada espera la respuesta del resumen (no se reenvía sola).
+   */
+  async anularElectronico(
+    idRaw: bigint | string | number,
+    motivoRaw: string,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const id = this.parsearId(idRaw, 'comprobante');
+    const motivo = (motivoRaw || '').trim();
+    if (motivo.length < 5) {
+      throw new BadRequestException({ codigo: 'MOTIVO_REQUERIDO', mensaje: 'El motivo es obligatorio y debe tener al menos 5 caracteres' });
+    }
+    const c = await this.prisma.comprobante.findUnique({
+      where: { id },
+      include: { pedido: { include: { lineas: true } } },
+    });
+    if (!c || (c.tipo !== 'BOLETA' && c.tipo !== 'FACTURA')) {
+      throw new NotFoundException({ codigo: 'COMPROBANTE_NO_ENCONTRADO', mensaje: 'El comprobante no existe' });
+    }
+    const proveedor = proveedorDeFila(c);
+    const pendienteResumen = c.tipo === 'BOLETA' && c.facturacion_estado === 'PENDIENTE_RESUMEN' && proveedor === 'SUNAT';
+    const emitida = c.facturacion_estado === 'EMITIDO_SUNAT';
+    const bajaEnCurso = ['SOLICITADA', 'ACEPTADA', 'PENDIENTE_RESUMEN'].includes(c.baja_estado ?? '');
+    if ((!emitida && !pendienteResumen) || bajaEnCurso) {
+      throw new HttpException(
+        { codigo: 'COMPROBANTE_NO_ANULABLE', mensaje: 'Solo se anula una boleta o factura aceptada y que no esté ya dada de baja' },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    let bajaEstado: 'SOLICITADA' | 'ACEPTADA' | 'RECHAZADA' | 'PENDIENTE_RESUMEN';
+    let respuesta: string;
+    let resumenId: bigint | null = null;
+    try {
+      if (pendienteResumen) {
+        bajaEstado = 'ACEPTADA';
+        respuesta = 'Anulada antes de reportarla a SUNAT: no se envió nada';
+      } else if (c.simulado || proveedor === 'SIMULADO') {
+        bajaEstado = 'ACEPTADA';
+        respuesta = 'SIMULADO: baja de prueba, no enviada a SUNAT';
+      } else {
+        if (c.tipo === 'BOLETA') {
+          bajaEstado = 'PENDIENTE_RESUMEN';
+          respuesta = 'Se reporta en el resumen diario de SUNAT';
+        } else {
+          const dias = (Date.now() - new Date(c.creado_en).getTime()) / 86400000;
+          if (dias > PLAZO_BAJA_FACTURA_DIAS) {
+            throw new HttpException(
+              { codigo: 'COMUNICACION_FUERA_PLAZO', mensaje: `La baja de una factura se comunica dentro de ${PLAZO_BAJA_FACTURA_DIAS} días` },
+              HttpStatus.CONFLICT,
+            );
+          }
+          const r: ResultadoBaja = await this.emisorPara('SUNAT').anular(await this.emisionDeFila(c), motivo);
+          if (!r.resumen || !this.sunatResumen) throw new ErrorRedEmisor('SUNAT no está configurado en este servidor');
+          const env = await this.sunatResumen.enviarBajaFactura(r.resumen.nombre, r.resumen.xml, r.resumen.zip);
+          bajaEstado = env.estado;
+          respuesta = env.respuesta;
+          resumenId = env.resumenId;
+        }
+      }
+    } catch (e) {
+      if (e instanceof ErrorRedEmisor) {
+        throw new HttpException(
+          { codigo: 'EMISOR_SIN_RESPUESTA', mensaje: 'El emisor electrónico no respondió: la baja no se registró, intenta de nuevo' },
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+      throw e;
+    }
+
+    const ahora = new Date();
+    const actualizado = await this.prisma.comprobante.update({
+      where: { id },
+      data: {
+        baja_estado: bajaEstado,
+        baja_motivo: motivo,
+        baja_en: ahora,
+        baja_respuesta: textoRespuesta(respuesta) || null,
+        ...(resumenId ? { resumen_baja_id: resumenId } : {}),
+      },
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'comprobantes',
+      accion: 'ANULAR_ELECTRONICO',
+      resultado: bajaEstado === 'RECHAZADA' ? 'RECHAZADO' : 'OK',
+      entidad: 'comprobante',
+      entidadId: c.id,
+      motivo,
+      antes: { baja_estado: c.baja_estado ?? null },
+      despues: { numero_texto: c.numero_texto, emisor: proveedor, baja_estado: bajaEstado },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+    return this.serializarComprobante(actualizado);
+  }
+
+  /** Lista de BOLETA/FACTURA ya enviadas (aceptadas, rechazadas o pendientes), más recientes primero. */
+  async listarElectronicos(pagina = 1, limite = 20) {
+    const where = { tipo: { in: ['BOLETA', 'FACTURA'] }, facturacion_estado: { not: null } };
+    const [total, filas] = await Promise.all([
+      this.prisma.comprobante.count({ where }),
+      this.prisma.comprobante.findMany({
+        where,
+        skip: (pagina - 1) * limite,
+        take: limite,
+        orderBy: { creado_en: 'desc' },
+        include: { pedido: { select: { codigo: true, total: true } } },
+      }),
+    ]);
     return {
-      ...this.serializarComprobante(nuevo),
-      advertencia,
+      total,
+      pagina,
+      limite,
+      totalPaginas: Math.ceil(total / limite),
+      elementos: filas.map((c) => ({
+        ...this.serializarComprobante(c),
+        codigo_pedido: c.pedido.codigo,
+        total: Number(c.pedido.total),
+        numero_texto: c.numero_texto,
+        fecha_lima: formatearFechaHoraLima(c.creado_en),
+      })),
     };
   }
 
@@ -260,7 +703,17 @@ export class ComprobantesService {
     const totalVuelto = pagos.reduce((acc: number, p: any) => acc + (p.vuelto || 0), 0);
 
     const esBoletaOFactura = comprobante.tipo === 'BOLETA' || comprobante.tipo === 'FACTURA';
-    const aviso = esBoletaOFactura ? 'Por emitir en el facturador' : null;
+    const aceptadoSunat = comprobante.facturacion_estado === 'EMITIDO_SUNAT';
+    const aviso = !esBoletaOFactura || aceptadoSunat
+      ? null
+      : comprobante.facturacion_estado === 'RECHAZADO'
+        ? 'Rechazado por SUNAT: revisar en Comprobantes'
+        : comprobante.facturacion_estado === 'PENDIENTE_ENVIO'
+          ? 'Pendiente de envío a SUNAT'
+          : 'Por emitir en el facturador';
+    const representacion = aceptadoSunat
+      ? `Representación impresa de la ${comprobante.tipo === 'FACTURA' ? 'Factura' : 'Boleta'} de venta electrónica`
+      : null;
 
     const cliente = {
       nombre: pedido.cliente_nombre ?? null,
@@ -269,7 +722,10 @@ export class ComprobantesService {
     };
 
     const numeroTexto = comprobante.numero_texto;
-    const tituloBase = `Nota de venta ${numeroTexto}`;
+    const nombreDocumento = aceptadoSunat
+      ? comprobante.tipo === 'FACTURA' ? 'Factura electrónica' : 'Boleta de venta electrónica'
+      : 'Nota de venta';
+    const tituloBase = `${nombreDocumento} ${numeroTexto}`;
     const titulo = esCopia ? `${tituloBase} - COPIA ${comprobante.copias_impresas}` : tituloBase;
 
     return {
@@ -290,6 +746,12 @@ export class ComprobantesService {
         copia_numero: esCopia ? comprobante.copias_impresas : null,
         marca_copia: esCopia ? 'COPIA' : null,
         aviso,
+        representacion,
+        facturacion_estado: comprobante.facturacion_estado ?? null,
+        hash: comprobante.facturacion_hash ?? null,
+        cadena_qr: comprobante.facturacion_cadena_qr ?? null,
+        enlace_pdf: comprobante.facturacion_enlace_pdf ?? null,
+        simulado: comprobante.simulado ?? false,
       },
       pedido: {
         id: pedido.id.toString(),
@@ -588,6 +1050,17 @@ export class ComprobantesService {
       );
     }
 
+    // Con envío pendiente, emitirlo a mano en el facturador duplicaría el comprobante al reenviarse
+    if (comprobante.facturacion_estado === 'PENDIENTE_ENVIO') {
+      throw new HttpException(
+        {
+          codigo: 'COMPROBANTE_PENDIENTE_ENVIO',
+          mensaje: 'Está pendiente de envío a SUNAT: reinténtelo desde Electrónicos SUNAT',
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
     const ahora = new Date();
     const emitidoPor = usuario?.partyId ? BigInt(usuario.partyId) : null;
 
@@ -640,5 +1113,56 @@ export class ComprobantesService {
     }
 
     return this.serializarComprobante(actualizado);
+  }
+
+  /** Configuración de facturación (IGV, series, proveedor) y su estado. Nunca muestra claves ni rutas. */
+  async obtenerConfigFacturacion() {
+    const cfg = await this.leerConfigFacturacion();
+    const sunat = this.sunatEmisor;
+    const vence = sunat?.certificadoVence() ?? null;
+    return {
+      igvPct: cfg.igvPct,
+      serieBoleta: cfg.serieBoleta,
+      serieFactura: cfg.serieFactura,
+      proveedor: cfg.proveedor,
+      proveedor_efectivo: this.proveedorEfectivo(cfg.proveedor),
+      sunat: {
+        ambiente: sunat ? sunat.config().ambiente : ambienteSunat(),
+        credenciales: sunat?.disponible() ?? false,
+        vence_certificado: vence ? vence.toISOString().slice(0, 10) : null,
+      },
+    };
+  }
+
+  /** Guarda IGV, series y proveedor (ADMIN, con Sí/No en la web). Audita el cambio; nada se borra. */
+  async guardarConfigFacturacion(dto: ConfigFacturacionDto, usuario?: UsuarioAutenticado, ip?: string) {
+    const antes = await this.leerConfigFacturacion();
+    const nueva = interpretarConfig({
+      [CLAVES_FACTURACION.igv]: dto.igvPct,
+      [CLAVES_FACTURACION.serieBoleta]: dto.serieBoleta,
+      [CLAVES_FACTURACION.serieFactura]: dto.serieFactura,
+      [CLAVES_FACTURACION.proveedor]: dto.proveedor ?? antes.proveedor,
+    });
+    const valores: Array<[string, unknown]> = [
+      [CLAVES_FACTURACION.igv, nueva.igvPct],
+      [CLAVES_FACTURACION.serieBoleta, nueva.serieBoleta],
+      [CLAVES_FACTURACION.serieFactura, nueva.serieFactura],
+      [CLAVES_FACTURACION.proveedor, nueva.proveedor],
+    ];
+    for (const [clave, valor] of valores) {
+      await this.prisma.parametro.upsert({ where: { clave }, update: { valor: valor as any }, create: { clave, valor: valor as any } });
+    }
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'comprobantes',
+      accion: 'CONFIG_FACTURACION',
+      resultado: 'OK',
+      entidad: 'parametro',
+      antes: { ...antes },
+      despues: { ...nueva },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+    return this.obtenerConfigFacturacion();
   }
 }

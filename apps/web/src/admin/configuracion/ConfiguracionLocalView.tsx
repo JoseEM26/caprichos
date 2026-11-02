@@ -51,6 +51,8 @@ export interface InfoLocalState {
   razonSocial: string;
   ruc: string;
   direccionFiscal: string;
+  /** Ubigeo del domicilio fiscal (6 dígitos): lo usa la facturación electrónica. */
+  ubigeo: string;
   // textos legales de la carta
   terminos: string;
   privacidad: string;
@@ -71,6 +73,7 @@ const INFO_DEFAULT: InfoLocalState = {
   razonSocial: '',
   ruc: '',
   direccionFiscal: '',
+  ubigeo: '',
   terminos: '',
   privacidad: '',
 };
@@ -219,6 +222,7 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
       { k: 'razonSocial', l: 'Razón social', ph: 'Razón social de la empresa' },
       { k: 'ruc', l: 'RUC', ph: 'Número de RUC (11 dígitos)' },
       { k: 'direccionFiscal', l: 'Dirección fiscal', ph: 'Dirección fiscal registrada' },
+      { k: 'ubigeo', l: 'Ubigeo del domicilio fiscal', ph: '6 dígitos (ej. 150132)' },
     ],
   },
   {
@@ -265,7 +269,7 @@ const EJEMPLOS_DEL_SERVIDOR = new Set(['Av. Principal 123', '999999999']);
 /** Campos que viajan a PUT /admin/local/datos (local_datos). Términos y privacidad van a /admin/configuracion/<clave>. */
 const CLAVES_DATOS_LOCAL: Array<keyof InfoLocalState> = [
   'nombre', 'lema', 'direccion', 'lat', 'lng', 'telefono', 'whatsapp',
-  'instagramNombre', 'instagram', 'facebook', 'tiktok', 'razonSocial', 'ruc', 'direccionFiscal',
+  'instagramNombre', 'instagram', 'facebook', 'tiktok', 'razonSocial', 'ruc', 'direccionFiscal', 'ubigeo',
 ];
 const RUC_VALIDO = /^(10|15|17|20)\d{9}$/;
 
@@ -370,6 +374,7 @@ export function ConfiguracionLocalView() {
           cambios.razonSocial = texto(data.razon_social);
           cambios.ruc = texto(data.ruc);
           cambios.direccionFiscal = texto(data.direccion_fiscal);
+          cambios.ubigeo = texto(data.ubigeo);
           cambios.instagram = texto(data.redes?.instagram);
           cambios.facebook = texto(data.redes?.facebook);
           cambios.tiktok = texto(data.redes?.tiktok);
@@ -433,6 +438,7 @@ export function ConfiguracionLocalView() {
       if (!info.direccion.trim()) return 'La dirección es obligatoria.';
       if (!info.telefono.trim()) return 'El teléfono es obligatorio.';
       if (info.ruc.trim() && !RUC_VALIDO.test(info.ruc.trim())) return 'El RUC debe tener 11 dígitos y empezar con 10, 15, 17 o 20.';
+      if (info.ubigeo.trim() && !/^\d{6}$/.test(info.ubigeo.trim())) return 'El ubigeo debe tener 6 dígitos (ej. 150132).';
       const lat = Number(info.lat);
       const lng = Number(info.lng);
       if (!Number.isFinite(lat) || lat < -90 || lat > 90) return 'La latitud debe ser un número entre -90 y 90.';
@@ -470,6 +476,7 @@ export function ConfiguracionLocalView() {
           razon_social: info.razonSocial.trim(),
           ruc: info.ruc.trim(),
           direccion_fiscal: info.direccionFiscal.trim(),
+          ubigeo: info.ubigeo.trim(),
           lat: Number(info.lat),
           lng: Number(info.lng),
         });

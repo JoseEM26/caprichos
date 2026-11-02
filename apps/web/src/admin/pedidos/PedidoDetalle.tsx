@@ -1076,6 +1076,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
             tipo: pedido.comprobante_tipo,
             documento: pedido.comprobante_doc,
             razon: pedido.comprobante_razon,
+            direccion: pedido.comprobante_direccion,
           }}
           alCerrar={() => setAbrirPrecuenta(false)}
           mesa={pedido.mesa_nombre || ''}

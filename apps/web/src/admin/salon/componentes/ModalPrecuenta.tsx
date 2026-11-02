@@ -49,7 +49,7 @@ export interface ModalPrecuentaProps {
   /** Si el mozo aún puede reemplazar un voucher ya subido. */
   puedeCambiarVoucher?: boolean;
   /** Comprobante que ya tiene el pedido: se usa de defecto (boleta o factura con documento); si no, nota de venta. */
-  comprobantePedido?: { tipo?: string | null; documento?: string | null; razon?: string | null } | null;
+  comprobantePedido?: { tipo?: string | null; documento?: string | null; razon?: string | null; direccion?: string | null } | null;
   /** Solo en el salón: pasa el pedido a otra mesa libre (el padre entra en modo elegir destino). */
   alCambiarMesa?: () => void;
 }
@@ -144,6 +144,7 @@ export function ModalPrecuenta({
   const [tipoComp, setTipoComp] = useState<TipoEnvio>(() => tipoInicial(comprobantePedido));
   const [docComp, setDocComp] = useState<string>(() => (tipoInicial(comprobantePedido) === 'NOTA_VENTA' ? '' : comprobantePedido?.documento ?? ''));
   const [razonComp, setRazonComp] = useState<string>(() => comprobantePedido?.razon ?? '');
+  const [direccionComp, setDireccionComp] = useState<string>(() => comprobantePedido?.direccion ?? '');
   // Una captura por medio digital del plan: si cada una se lee
   const [legibles, setLegibles] = useState<Record<string, boolean>>(() =>
     Object.fromEntries((vouchersPorMedio ?? []).filter((v) => v.subido).map((v) => [v.medio, true])),
@@ -233,6 +234,7 @@ export function ModalPrecuenta({
               tipo: tipoComp,
               ...(docComp.trim() ? { doc: docComp.trim() } : {}),
               ...(tipoComp === 'FACTURA' ? { razon: razonComp.trim() } : {}),
+              ...(tipoComp === 'FACTURA' && direccionComp.trim() ? { direccion: direccionComp.trim() } : {}),
             },
     };
     try {
@@ -400,6 +402,15 @@ export function ModalPrecuenta({
                             type="text"
                             value={razonComp}
                             onChange={(e) => setRazonComp(e.target.value)}
+                            style={{ ...campoComprobante, marginTop: 4, fontWeight: 400 }}
+                          />
+                        </label>
+                        <label style={{ fontWeight: 700, fontSize: 13 }}>
+                          Dirección fiscal (opcional)
+                          <input
+                            type="text"
+                            value={direccionComp}
+                            onChange={(e) => setDireccionComp(e.target.value)}
                             style={{ ...campoComprobante, marginTop: 4, fontWeight: 400 }}
                           />
                         </label>

@@ -683,6 +683,7 @@ export class PedidosService {
           comprobante_tipo: comprobanteTipo,
           comprobante_doc: comprobanteDoc,
           comprobante_razon: comprobanteRazon,
+          comprobante_direccion: comprobanteTipo === 'FACTURA' ? dto.comprobante?.direccion?.trim() || null : null,
           nota: dto.nota?.trim() || null,
           es_personal: Boolean(origen?.esPersonal),
           clave_idempotencia: claveIdempotencia,

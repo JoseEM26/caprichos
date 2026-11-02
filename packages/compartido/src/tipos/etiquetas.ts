@@ -38,7 +38,14 @@ export interface TicketPagoDatos {
   total: number;
   pagos: { medio: string; monto: number; recibido?: number | null; vuelto?: number | null }[];
   plan?: { medio: string; monto: number }[];
-  comprobante?: { tipo: string; numero: string } | null;
+  /** Boleta/factura emitida: representación impresa, hash de SUNAT y marca de prueba. El QR aún no se imprime. */
+  comprobante?: {
+    tipo: string;
+    numero: string;
+    representacion?: string | null;
+    hash?: string | null;
+    simulado?: boolean;
+  } | null;
   /** Nota de venta enviada por el mozo: nombre de quien cobró en mesa. */
   cobradoPorMozo?: string | null;
 }

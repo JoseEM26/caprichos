@@ -132,6 +132,11 @@ export class ComprobantePedidoDto {
   @IsOptional()
   @IsString()
   razonSocial?: string;
+
+  /** Dirección fiscal para la factura (opcional) */
+  @IsOptional()
+  @IsString()
+  direccion?: string;
 }
 
 export class CrearPedidoDto {

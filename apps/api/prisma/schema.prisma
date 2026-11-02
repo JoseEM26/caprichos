@@ -456,6 +456,7 @@ model Pedido {
   comprobante_tipo       String                  @default("BOLETA")
   comprobante_doc        String?
   comprobante_razon      String?
+  comprobante_direccion  String?
   nota                   String?
   clave_idempotencia     String?                 @unique
   oferta_id              BigInt?
@@ -1089,12 +1090,65 @@ model Comprobante {
   creado_en          DateTime  @default(now()) @db.Timestamptz
   anulado_en         DateTime? @db.Timestamp(3)
   anulado_motivo     String?
+  // Facturación electrónica (SUNAT): BOLETA/FACTURA. facturacion_estado: EMITIDO_SUNAT | RECHAZADO | PENDIENTE_ENVIO
+  facturacion_estado        String?
+  facturacion_intentos      Int       @default(0)
+  facturacion_enlace_pdf    String?
+  facturacion_cadena_qr     String?
+  facturacion_hash          String?
+  facturacion_respuesta     String?
+  simulado               Boolean   @default(false)
+  // Comunicación de baja (anulación): SOLICITADA | ACEPTADA | RECHAZADA. Nada se borra.
+  baja_estado            String?
+  baja_motivo            String?
+  baja_en                DateTime? @db.Timestamp(3)
+  baja_respuesta         String?
+  // SUNAT directo: proveedor que emitió (SIMULADO | SUNAT), resumen que lleva la emisión y la baja, totales para el RC
+  emisor                 String?
+  resumen_emision_id     BigInt?
+  resumen_baja_id        BigInt?
+  sunat_total_cents      Int?
+  sunat_igv_cents        Int?
 
   pedido             Pedido    @relation(fields: [pedido_id], references: [id])
   emitidoPor         Party?    @relation("ComprobantesEmitidos", fields: [emitido_por], references: [id])
+  archivos           ComprobanteArchivo[]
 
   @@unique([serie, numero])
   @@map("comprobante")
+}
+
+/// XML firmado, ZIP enviado y CDR de cada comprobante electrónico. Se conservan años: nada se borra.
+model ComprobanteArchivo {
+  id             BigInt      @id @default(autoincrement())
+  comprobante_id BigInt
+  tipo           String // XML | ZIP | CDR
+  nombre         String
+  contenido      Bytes
+  sha256         String
+  creado_en      DateTime    @default(now()) @db.Timestamptz
+  comprobante    Comprobante @relation(fields: [comprobante_id], references: [id])
+
+  @@index([comprobante_id, tipo])
+  @@map("comprobante_archivo")
+}
+
+/// Resumen diario (RC) o comunicación de baja (RA) enviado a SUNAT con su ticket, ZIP y CDR.
+model SunatResumen {
+  id               BigInt   @id @default(autoincrement())
+  tipo             String // RC | RA
+  nombre           String   @unique
+  fecha_referencia DateTime @db.Timestamptz
+  ticket           String?
+  estado           String // PENDIENTE_ENVIO | ENVIADO | ACEPTADO | RECHAZADO
+  respuesta        String?
+  xml              Bytes
+  zip              Bytes
+  cdr              Bytes?
+  creado_en        DateTime @default(now()) @db.Timestamptz
+  actualizado_en   DateTime @default(now()) @db.Timestamptz
+
+  @@map("sunat_resumen")
 }
 
 model SecuenciaComprobante {

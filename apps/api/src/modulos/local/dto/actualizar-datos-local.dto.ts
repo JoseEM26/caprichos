@@ -37,6 +37,11 @@ export class ActualizarDatosLocalDto {
   @Matches(/^$|^(10|15|17|20)\d{9}$/, { message: 'ruc debe tener 11 dígitos y comenzar con 10, 15, 17 o 20' })
   ruc?: string;
 
+  /** Ubigeo del domicilio fiscal (6 dígitos, p. ej. 150132). Lo usa la facturación electrónica. Vacío lo quita. */
+  @IsOptional()
+  @Matches(/^$|^\d{6}$/, { message: 'ubigeo debe tener 6 dígitos' })
+  ubigeo?: string;
+
   /** Correo de contacto (aparece en Términos y Privacidad). Vacío lo quita. */
   @IsOptional()
   @Matches(/^$|^\S+@\S+\.\S+$/, { message: 'correo no es válido' })

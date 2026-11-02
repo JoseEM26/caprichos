@@ -223,3 +223,58 @@ export interface EstadoConexionWhatsAppInfo {
   modo: 'meta' | 'simulado';
   razon?: string;
 }
+
+/** Estado de la BOLETA/FACTURA ante SUNAT (la lista de «Electrónicos»): PENDIENTE_RESUMEN y ENVIADA_RESUMEN son de la boleta (resumen diario). */
+export type EstadoFacturacion = 'EMITIDO_SUNAT' | 'RECHAZADO' | 'PENDIENTE_ENVIO' | 'PENDIENTE_RESUMEN' | 'ENVIADA_RESUMEN';
+
+/** Proveedor de facturación electrónica (parámetro facturacion_proveedor). */
+export type ProveedorFacturacion = 'SIMULADO' | 'SUNAT';
+
+/** Estado de la comunicación de baja (factura) o de la anulación en resumen (boleta). */
+export type EstadoBaja = 'SOLICITADA' | 'ACEPTADA' | 'RECHAZADA' | 'PENDIENTE_RESUMEN';
+
+export interface ComprobanteElectronico {
+  id: string;
+  pedido_id: string;
+  codigo_pedido: string;
+  tipo: 'BOLETA' | 'FACTURA' | string;
+  serie: string;
+  numero: number;
+  numero_texto: string;
+  documento: string | null;
+  razon_social: string | null;
+  total: number;
+  fecha_lima: string;
+  emision: string;
+  facturacion_estado: EstadoFacturacion | null;
+  /** Proveedor que emitió: SIMULADO | SUNAT (null en filas anteriores). */
+  emisor?: ProveedorFacturacion | null;
+  facturacion_intentos: number;
+  enlace_pdf: string | null;
+  cadena_qr: string | null;
+  hash: string | null;
+  respuesta_sunat: string | null;
+  simulado: boolean;
+  baja_estado: EstadoBaja | null;
+  baja_motivo: string | null;
+  baja_en: string | null;
+}
+
+export interface RespuestaListarElectronicos {
+  total: number;
+  pagina: number;
+  limite: number;
+  totalPaginas: number;
+  elementos: ComprobanteElectronico[];
+}
+
+export interface ConfigFacturacion {
+  igvPct: number;
+  serieBoleta: string;
+  serieFactura: string;
+  /** Lo que eligió el ADMIN. */
+  proveedor: ProveedorFacturacion;
+  /** Lo que de verdad emite (cae a SIMULADO sin credenciales). */
+  proveedor_efectivo: ProveedorFacturacion;
+  sunat: { ambiente: 'beta' | 'prod'; credenciales: boolean; vence_certificado: string | null };
+}

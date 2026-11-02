@@ -339,7 +339,20 @@ export function construirTicketPago(pedido: any, local: any, comprobante?: any):
       vuelto: p.vuelto == null ? null : num(p.vuelto),
     })),
     plan: (pedido.planPago || []).map((p: any) => ({ medio: p.medio, monto: num(p.monto) })),
-    comprobante: comprobante ? { tipo: comprobante.tipo, numero: comprobante.numero_texto } : null,
+    comprobante: comprobante
+      ? {
+          tipo: comprobante.tipo,
+          numero: comprobante.numero_texto,
+          // Boleta/factura aceptada por SUNAT: representación impresa, hash y marca de prueba
+          ...(comprobante.facturacion_estado === 'EMITIDO_SUNAT'
+            ? {
+                representacion: `Representación impresa de la ${comprobante.tipo === 'FACTURA' ? 'Factura' : 'Boleta'} de venta electrónica`,
+                hash: comprobante.facturacion_hash ?? null,
+                simulado: !!comprobante.simulado,
+              }
+            : {}),
+        }
+      : null,
   };
 }
 

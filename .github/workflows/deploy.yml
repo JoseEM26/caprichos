@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), configurar-resenas (guarda el secreto OPENWEBNINJA_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), cargar-resenas (carga inicial de reseñas de Google del local buscado en consulta_resenas; demo o prod, prod exige PRODUCCION y no es lo normal), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), configurar-resenas (guarda el secreto OPENWEBNINJA_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), cargar-resenas (carga inicial de reseñas de Google del local buscado en consulta_resenas; demo o prod, prod exige PRODUCCION y no es lo normal), configurar-sunat (guarda los secretos SUNAT_AMBIENTE, SUNAT_SOL_USUARIO, SUNAT_SOL_CLAVE, SUNAT_CERT_P12_B64 y SUNAT_CERT_CLAVE en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto)'
         required: false
         default: 'desplegar'
         type: choice
@@ -36,6 +36,7 @@ on:
           - configurar-dominios-demo
           - configurar-resenas
           - cargar-resenas
+          - configurar-sunat
           - preparar-produccion
           - crear-admin-produccion
           - sincronizar-proxy
@@ -242,6 +243,15 @@ jobs:
             ACCION="configurar-resenas"
             if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
               echo "::error::configurar-resenas en demo se lanza desde la rama preprod."
+              exit 1
+            fi
+          fi
+
+          # Facturación electrónica SUNAT directo: manual; producción pasa por la validación de prod de más abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "configurar-sunat" ]; then
+            ACCION="configurar-sunat"
+            if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::configurar-sunat en demo se lanza desde la rama preprod."
               exit 1
             fi
           fi
@@ -900,6 +910,100 @@ jobs:
             echo ""
             echo '```'
             grep -E "^(== |OPENWEBNINJA|RESENAS|TAG=|OK|ERROR|AVISO|Copia|Se restauró)" resenas.log || echo "(sin datos: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Guarda las credenciales de SUNAT directo (SEE) en el .env del ambiente y redespliega con el mismo tag.
+  # Los valores viajan por la entrada estándar del ssh: no aparecen en la línea de comandos ni en el log.
+  configurar-sunat:
+    name: Configurar facturación electrónica (SUNAT directo)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'configurar-sunat'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: configurar-sunat
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del commit o del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Guardar SUNAT y redesplegar (sin mostrar los valores)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          SUNAT_AMBIENTE_VALOR: ${{ secrets.SUNAT_AMBIENTE }}
+          SUNAT_USUARIO_VALOR: ${{ secrets.SUNAT_SOL_USUARIO }}
+          SUNAT_CLAVE_VALOR: ${{ secrets.SUNAT_SOL_CLAVE }}
+          SUNAT_P12_VALOR: ${{ secrets.SUNAT_CERT_P12_B64 }}
+          SUNAT_CLAVE_P12_VALOR: ${{ secrets.SUNAT_CERT_CLAVE }}
+        run: |
+          set -o pipefail
+          faltan=""
+          for v in SUNAT_AMBIENTE SUNAT_SOL_USUARIO SUNAT_SOL_CLAVE SUNAT_CERT_P12_B64 SUNAT_CERT_CLAVE; do
+            case "$v" in
+              SUNAT_AMBIENTE) valor="$SUNAT_AMBIENTE_VALOR" ;;
+              SUNAT_SOL_USUARIO) valor="$SUNAT_USUARIO_VALOR" ;;
+              SUNAT_SOL_CLAVE) valor="$SUNAT_CLAVE_VALOR" ;;
+              SUNAT_CERT_P12_B64) valor="$SUNAT_P12_VALOR" ;;
+              SUNAT_CERT_CLAVE) valor="$SUNAT_CLAVE_P12_VALOR" ;;
+            esac
+            if [ -z "$valor" ]; then faltan="$faltan $v"; fi
+          done
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan los secretos:$faltan. Guárdelos con: gh secret set NOMBRE --repo JoseEM26/caprichos (pegue el valor y pulse Enter)."
+            exit 1
+          fi
+          printf '%s\n%s\n%s\n%s\n%s\n' "$SUNAT_AMBIENTE_VALOR" "$SUNAT_USUARIO_VALOR" "$SUNAT_CLAVE_VALOR" "$SUNAT_P12_VALOR" "$SUNAT_CLAVE_P12_VALOR" | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/configurar-sunat.sh '${AMBIENTE}'" 2>&1 | tee sunat.log
+
+      - name: Resumen (sin secretos)
+        if: always()
+        run: |
+          {
+            echo "## Facturación electrónica (SUNAT directo)"
+            echo ""
+            echo '```'
+            grep -E "^(== |SUNAT|TAG=|OK|ERROR|AVISO|Copia|Se restauró)" sunat.log || echo "(sin datos: revise el log del paso anterior)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

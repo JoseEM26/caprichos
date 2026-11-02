@@ -1,4 +1,4 @@
-import { clienteFetch } from '../../comun/api';
+import { clienteFetch, obtenerBlobAutenticado } from '../../comun/api';
 import type {
   RespuestaListarPorEmitir,
   NotaVentaDatos,
@@ -10,6 +10,9 @@ import type {
   RespuestaListarQuejasWhatsApp,
   QuejaWhatsAppItem,
   EstadoConexionWhatsAppInfo,
+  RespuestaListarElectronicos,
+  ConfigFacturacion,
+  ProveedorFacturacion,
 } from './tipos';
 
 export const comprobantesApi = {
@@ -37,6 +40,55 @@ export const comprobantesApi = {
         method: 'POST',
       },
     );
+  },
+
+  // Facturación electrónica (SUNAT)
+  async listarElectronicos(pagina = 1, limite = 20): Promise<RespuestaListarElectronicos> {
+    const params = new URLSearchParams({ pagina: String(pagina), limite: String(limite) });
+    return clienteFetch<RespuestaListarElectronicos>(`/admin/comprobantes/emitidos?${params.toString()}`);
+  },
+
+  async reintentarElectronico(
+    id: string,
+    correccion: { documento?: string; razon?: string; direccion?: string } = {},
+  ): Promise<{ id: string; facturacion_estado: string | null }> {
+    return clienteFetch(`/admin/comprobantes/${encodeURIComponent(id)}/reintentar`, {
+      method: 'POST',
+      body: JSON.stringify(correccion),
+    });
+  },
+
+  async anularElectronico(id: string, motivo: string): Promise<{ id: string; baja_estado: string | null }> {
+    return clienteFetch(`/admin/comprobantes/${encodeURIComponent(id)}/anular`, {
+      method: 'POST',
+      body: JSON.stringify({ motivo }),
+    });
+  },
+
+  async obtenerFacturacion(): Promise<ConfigFacturacion> {
+    return clienteFetch<ConfigFacturacion>('/admin/comprobantes/facturacion');
+  },
+
+  /** Envía ahora el resumen diario de boletas SUNAT (ADMIN). */
+  async enviarResumenSunat(): Promise<{ resumenes: number; boletas: number }> {
+    return clienteFetch('/admin/comprobantes/sunat/resumen', { method: 'POST' });
+  },
+
+  /** URL (blob) del XML firmado, ZIP o CDR de un comprobante, con la sesión del usuario. */
+  async urlArchivoElectronico(id: string, tipo: 'XML' | 'CDR' | 'ZIP'): Promise<string> {
+    return obtenerBlobAutenticado(`/admin/comprobantes/${encodeURIComponent(id)}/archivos/${tipo}`);
+  },
+
+  async guardarFacturacion(config: {
+    igvPct: number;
+    serieBoleta: string;
+    serieFactura: string;
+    proveedor: ProveedorFacturacion;
+  }): Promise<ConfigFacturacion> {
+    return clienteFetch<ConfigFacturacion>('/admin/comprobantes/facturacion', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
   },
 
   async marcarEmitido(id: string, referenciaExterna: string): Promise<{ id: string; emision: string; referencia_externa: string }> {
