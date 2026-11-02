@@ -167,12 +167,20 @@ export type EtapaProgreso =
   | 'ENTREGADO'
   | 'ANULADO';
 
+export interface ProductoProgreso {
+  lineaId?: string;
+  nombre: string;
+  cantidad: number;
+  listas?: number;
+  despachadas?: number;
+}
+
 export interface AreaProgreso {
   nombre: string;
   estado: 'PENDIENTE' | 'PREPARANDO' | 'LISTA';
   lineas: number;
-  /** Líneas del área, para decir qué falta (nombre y cantidad). */
-  productos?: { nombre: string; cantidad: number }[];
+  /** Líneas del área: unidades, listas y despachadas por producto. */
+  productos?: ProductoProgreso[];
 }
 
 export interface ProgresoPedido {
@@ -185,6 +193,8 @@ export interface ProgresoPedido {
   enCamino: boolean;
   etaMin?: number;
   etaMax?: number;
+  /** Minutos para que esté listo lo que falta (solo mientras cocina trabaja). */
+  estimadoMin?: number;
 }
 
 /** Pedido que tomó el mozo (GET /admin/pedidos/mis-pedidos). */

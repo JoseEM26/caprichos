@@ -27,6 +27,21 @@ export interface DescuentoPedidoHook {
   descontarPedido(pedidoId: bigint | string | number): Promise<any> | any;
 }
 
+/** Área de cocina de una línea: la propia del producto, o la de su categoría. */
+function areaDeLineaPedido(l: { area_id: bigint | null; producto?: { categoria?: { area_id: bigint | null } | null } | null }): bigint | null {
+  return l.area_id ?? l.producto?.categoria?.area_id ?? null;
+}
+
+/** Modalidades que se despachan por producto (delivery sigue su flujo de reparto). */
+const MODALIDADES_DESPACHO = ['MESA', 'RECOGER', 'LLEVAR'];
+/**
+ * La cocina ve un pedido mientras no esté anulado o rechazado. Que Caja lo pase a LISTO o ENTREGADO
+ * no lo quita de cocina: solo la comanda despejada o despachada sale.
+ */
+const ESTADOS_FUERA_DE_COCINA = ['ANULADO', 'RECHAZADO'];
+/** Estados en los que despejar la última área pasa el pedido a LISTO (con historial y avisos). */
+const ESTADOS_PARA_LISTO = ['COLA', 'PREPARANDO'];
+
 /**
  * Líneas del pedido que pertenecen a un área, con los campos que usa la pantalla de cocina.
  * `marcadas`: por producto, las opciones «menos pedida»; cada opción elegida lleva `pocoPedida`.
@@ -41,6 +56,8 @@ function lineasDeArea(lineas: any[], areaId: bigint, marcadas: Map<string, Set<s
         id: l.id.toString(),
         nombre: l.nombre,
         cantidad: l.cantidad,
+        listas: l.listas ?? 0,
+        despachadas: l.despachadas ?? 0,
         tamano: l.tamano ?? null,
         sabor: l.sabor ?? null,
         combo: comboNombre,
@@ -272,7 +289,7 @@ export class ComandasService {
             area_id: area.id,
             estado: 'EN_COCINA',
             pedido: {
-              estado: { in: ['COLA', 'PREPARANDO'] },
+              estado: { notIn: ESTADOS_FUERA_DE_COCINA },
             },
           },
         });
@@ -350,7 +367,7 @@ export class ComandasService {
       where: {
         area_id: area.id,
         pedido: {
-          estado: { in: ['COLA', 'PREPARANDO'] },
+          estado: { notIn: ESTADOS_FUERA_DE_COCINA },
         },
         OR: [
           { estado: 'EN_COCINA' },
@@ -447,9 +464,25 @@ export class ComandasService {
     return lista.sort((x, y) => Number(x.despejada) - Number(y.despejada));
   }
 
+  /** Líneas del pedido que van a cocina (con área), con lo necesario para contar unidades. */
+  private async lineasDeCocina(pId: bigint) {
+    const lineas = await this.prisma.pedidoLinea.findMany({
+      where: { pedido_id: pId },
+      select: {
+        id: true,
+        cantidad: true,
+        listas: true,
+        despachadas: true,
+        area_id: true,
+        producto: { select: { categoria: { select: { area_id: true } } } },
+      },
+    });
+    return lineas.filter((l) => areaDeLineaPedido(l) !== null);
+  }
+
   /**
-   * POST /admin/cocina/comandas/:pedidoId/:areaId/despejar
-   * Marca la comanda despejada (hora y usuario).
+   * GET /admin/cocina/comandas?area=<id o código>
+   * Sincroniza pedidos en COLA/PREPARANDO y devuelve comandas pendientes del área.
    * Si todas las áreas del pedido están despejadas, pasa a LISTO.
    * Si el pedido es ANULADO o no está en COLA/PREPARANDO da 409.
    */
@@ -476,7 +509,7 @@ export class ComandasService {
       });
     }
 
-    if (pedido.estado === 'ANULADO' || !['COLA', 'PREPARANDO'].includes(pedido.estado)) {
+    if (ESTADOS_FUERA_DE_COCINA.includes(pedido.estado)) {
       throw new ConflictException({
         codigo: 'ESTADO_INVALIDO',
         mensaje: `No se puede despejar un pedido en estado ${pedido.estado}`,
@@ -508,6 +541,9 @@ export class ComandasService {
 
     const ahora = new Date();
 
+    // Despejar el área significa que todo lo suyo sale: sus líneas quedan completas
+    await this.completarLineasDeArea(pId, aId, ahora);
+
     // Actualizar comanda a DESPEJADA
     await this.prisma.comandaArea.update({
       where: {
@@ -532,7 +568,8 @@ export class ComandasService {
       todasComandas.length > 0 &&
       todasComandas.every((c) => (c.area_id === aId ? true : c.estado === 'DESPEJADA'));
 
-    if (completo) {
+    // Idempotente: si Caja ya pasó el pedido a LISTO o ENTREGADO, no se regresa ni se repite historial/avisos
+    if (completo && ESTADOS_PARA_LISTO.includes(pedido.estado)) {
       // Transición del pedido a LISTO (con historial, auditoría y evento socket)
       await this.prisma.$transaction(async (tx) => {
         await tx.pedido.update({
@@ -617,6 +654,342 @@ export class ComandasService {
       estado: 'DESPEJADA',
       completo,
     };
+  }
+
+  /** Marca completas (listas = cantidad) las líneas de un área: al despejarla, todo lo suyo sale. */
+  private async completarLineasDeArea(pId: bigint, aId: bigint, ahora: Date) {
+    const lineas = (await this.lineasDeCocina(pId)).filter((l) => areaDeLineaPedido(l) === aId);
+    for (const l of lineas) {
+      if (l.listas < l.cantidad) {
+        await this.prisma.pedidoLinea.update({
+          where: { id: l.id },
+          data: { listas: l.cantidad, listo_en: ahora },
+        });
+      }
+    }
+  }
+
+  /**
+   * POST /admin/cocina/lineas/:lineaId/listas { listas }
+   * Fija las unidades listas de una línea (0..cantidad). Si todas las líneas del área quedan completas,
+   * despeja el área (mismo efecto que el botón Listo). Bajar una línea de un área ya despejada no la reabre.
+   */
+  async marcarListas(
+    lineaId: bigint | string | number,
+    listas: number,
+    usuarioActual: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const lId = this.parsearId(lineaId, 'línea');
+    const linea = await this.prisma.pedidoLinea.findUnique({
+      where: { id: lId },
+      select: {
+        id: true,
+        pedido_id: true,
+        cantidad: true,
+        listas: true,
+        despachadas: true,
+        area_id: true,
+        producto: { select: { categoria: { select: { area_id: true } } } },
+      },
+    });
+    if (!linea) {
+      throw new NotFoundException({ codigo: 'LINEA_NO_ENCONTRADA', mensaje: 'Línea no encontrada' });
+    }
+
+    const pId = linea.pedido_id;
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pId },
+      select: { id: true, codigo: true, estado: true },
+    });
+    if (!pedido || ESTADOS_FUERA_DE_COCINA.includes(pedido.estado)) {
+      throw new ConflictException({
+        codigo: 'ESTADO_INVALIDO',
+        mensaje: 'No se pueden marcar unidades de un pedido anulado o rechazado',
+      });
+    }
+
+    const aId = areaDeLineaPedido(linea);
+    if (aId === null) {
+      throw new ConflictException({ codigo: 'LINEA_SIN_AREA', mensaje: 'La línea no pasa por cocina' });
+    }
+
+    const comanda = await this.prisma.comandaArea.findUnique({
+      where: { pedido_id_area_id: { pedido_id: pId, area_id: aId } },
+    });
+    if (!comanda) {
+      throw new ConflictException({
+        codigo: 'AREA_AJENA',
+        mensaje: 'La línea no tiene comanda de su área en este pedido',
+      });
+    }
+
+    if (!Number.isInteger(listas) || listas < 0 || listas > linea.cantidad) {
+      throw new BadRequestException({
+        codigo: 'LISTAS_INVALIDAS',
+        mensaje: `Las unidades listas deben estar entre 0 y ${linea.cantidad}`,
+      });
+    }
+    if (listas < linea.despachadas) {
+      throw new ConflictException({
+        codigo: 'DESPACHADAS_MAYOR',
+        mensaje: `Ya se despacharon ${linea.despachadas} unidades: no puedes bajar de ese número`,
+      });
+    }
+
+    const ahora = new Date();
+    const completa = listas === linea.cantidad;
+    // listo_en: se fija al llegar a cantidad; se conserva si ya estaba completa; se borra al bajar
+    const listoEn = !completa ? null : linea.listas < linea.cantidad ? ahora : undefined;
+    await this.prisma.pedidoLinea.update({
+      where: { id: lId },
+      data: { listas, listo_en: listoEn },
+    });
+
+    let despejada = false;
+    if (completa && comanda.estado === 'EN_COCINA') {
+      const lineasArea = (await this.lineasDeCocina(pId)).filter((l) => areaDeLineaPedido(l) === aId);
+      if (lineasArea.every((l) => l.listas >= l.cantidad)) {
+        await this.despejar(pId, aId, usuarioActual, ip);
+        despejada = true;
+      }
+    }
+
+    if (!despejada) {
+      this.eventosGateway?.emitirAdmin('cocina:comanda', {
+        pedidoId: Number(pId),
+        areaId: Number(aId),
+        completo: false,
+      });
+    }
+    this.eventosGateway?.emitirAdmin('pedido:progreso', { id: Number(pId), codigo: pedido.codigo });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'cocina',
+      accion: 'MARCAR_LISTAS',
+      resultado: 'OK',
+      entidad: 'pedido_linea',
+      entidadId: lId,
+      antes: { listas: linea.listas },
+      despues: { listas, despejada },
+      partyId: usuarioActual.partyId,
+      ip,
+    });
+
+    return {
+      ok: true,
+      lineaId: lId.toString(),
+      pedidoId: pId.toString(),
+      areaId: aId.toString(),
+      listas,
+      cantidad: linea.cantidad,
+      despejada,
+    };
+  }
+
+  /**
+   * POST /admin/cocina/pedidos/:pedidoId/despachar { lineas? }
+   * Entrega al cliente o al mozo lo que está listo (sin líneas: todo lo listo pendiente de salir).
+   * Solo mesa y para llevar/recoger; delivery sigue su reparto. Cuando todo está despachado, el pedido
+   * queda listo y entregado (mesa: entregado en mesa; recoger/llevar: ENTREGADO). Si Caja ya lo entregó,
+   * solo se registra el despacho.
+   */
+  async despachar(
+    pedidoId: bigint | string | number,
+    lineasPedidas: Array<{ lineaId: string | number; unidades: number }> | undefined,
+    usuarioActual: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const pId = this.parsearId(pedidoId, 'pedido');
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pId },
+      include: {
+        lineas: {
+          select: {
+            id: true,
+            cantidad: true,
+            listas: true,
+            despachadas: true,
+            area_id: true,
+            producto: { select: { categoria: { select: { area_id: true } } } },
+          },
+        },
+      },
+    });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+    if (ESTADOS_FUERA_DE_COCINA.includes(pedido.estado)) {
+      throw new ConflictException({
+        codigo: 'ESTADO_INVALIDO',
+        mensaje: `No se puede despachar un pedido en estado ${pedido.estado}`,
+      });
+    }
+    if (!MODALIDADES_DESPACHO.includes(pedido.modalidad)) {
+      throw new BadRequestException({
+        codigo: 'MODALIDAD_INVALIDA',
+        mensaje: 'Solo se despacha por producto en mesa o para llevar; delivery sigue su reparto',
+      });
+    }
+
+    const lineasCocina = pedido.lineas.filter((l) => areaDeLineaPedido(l) !== null);
+    const porId = new Map(lineasCocina.map((l) => [l.id.toString(), l]));
+
+    // Unidades a despachar por línea
+    const aDespachar = new Map<string, number>();
+    if (lineasPedidas?.length) {
+      for (const d of lineasPedidas) {
+        const id = String(d.lineaId);
+        const linea = porId.get(id);
+        if (!linea) {
+          throw new NotFoundException({ codigo: 'LINEA_NO_ENCONTRADA', mensaje: 'Línea no encontrada en el pedido' });
+        }
+        if (!Number.isInteger(d.unidades) || d.unidades < 1) {
+          throw new BadRequestException({
+            codigo: 'UNIDADES_INVALIDAS',
+            mensaje: 'Las unidades a despachar deben ser al menos 1',
+          });
+        }
+        aDespachar.set(id, (aDespachar.get(id) ?? 0) + d.unidades);
+      }
+      for (const [id, unidades] of aDespachar) {
+        const linea = porId.get(id)!;
+        const disponibles = linea.listas - linea.despachadas;
+        if (unidades > disponibles) {
+          throw new ConflictException({
+            codigo: 'SIN_LISTAS_SUFICIENTES',
+            mensaje: `Solo hay ${Math.max(0, disponibles)} unidades listas para despachar`,
+          });
+        }
+      }
+    } else {
+      for (const l of lineasCocina) {
+        const disponibles = l.listas - l.despachadas;
+        if (disponibles > 0) aDespachar.set(l.id.toString(), disponibles);
+      }
+    }
+    if (aDespachar.size === 0) {
+      throw new ConflictException({
+        codigo: 'NADA_LISTO_PARA_DESPACHAR',
+        mensaje: 'No hay unidades listas por despachar',
+      });
+    }
+
+    const ahora = new Date();
+    // Con todo despachado, la cocina ya cumplió: las comandas pendientes salen
+    const completo = lineasCocina.every((l) => {
+      const extra = aDespachar.get(l.id.toString()) ?? 0;
+      return l.despachadas + extra >= l.cantidad;
+    });
+
+    let estadoFinal: string = pedido.estado;
+    await this.prisma.$transaction(async (tx) => {
+      for (const [id, unidades] of aDespachar) {
+        const linea = porId.get(id)!;
+        await tx.pedidoLinea.update({
+          where: { id: BigInt(id) },
+          data: { despachadas: linea.despachadas + unidades, despachado_en: ahora },
+        });
+      }
+      if (!completo) return;
+
+      await tx.comandaArea.updateMany({
+        where: { pedido_id: pId, estado: 'EN_COCINA' },
+        data: { estado: 'DESPEJADA', despejada_en: ahora, despejada_por: usuarioActual.partyId },
+      });
+
+      if (ESTADOS_PARA_LISTO.includes(pedido.estado)) {
+        await tx.pedido.update({
+          where: { id: pId },
+          data: { estado: 'LISTO', listo_en: ahora, pasa_cocina_en: pedido.pasa_cocina_en ?? ahora },
+        });
+        await tx.pedidoEstadoHistorial.create({
+          data: {
+            pedido_id: pId,
+            estado_anterior: pedido.estado,
+            estado_nuevo: 'LISTO',
+            motivo: 'Todo despachado',
+            por_party_id: usuarioActual.partyId,
+            en: ahora,
+          },
+        });
+        await this.avisos?.avisar(pId, 'LISTO', {}, tx);
+        estadoFinal = 'LISTO';
+      }
+
+      // Para llevar o recoger, lo despachado completo es lo entregado (mesa va por entregado en mesa)
+      if (pedido.modalidad !== 'MESA' && estadoFinal === 'LISTO') {
+        await tx.pedido.update({
+          where: { id: pId },
+          data: { estado: 'ENTREGADO', entregado_en: ahora },
+        });
+        await tx.pedidoEstadoHistorial.create({
+          data: {
+            pedido_id: pId,
+            estado_anterior: 'LISTO',
+            estado_nuevo: 'ENTREGADO',
+            motivo: 'Despachado completo',
+            por_party_id: usuarioActual.partyId,
+            en: ahora,
+          },
+        });
+        await this.avisos?.avisar(pId, 'ENTREGADO', {}, tx);
+        estadoFinal = 'ENTREGADO';
+      }
+    });
+
+    if (estadoFinal !== pedido.estado) {
+      this.avisos?.despertar();
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'pedidos',
+        accion: 'CAMBIAR_ESTADO',
+        resultado: 'OK',
+        entidad: 'pedido',
+        entidadId: pId,
+        antes: { estado: pedido.estado },
+        despues: { estado: estadoFinal, motivo: 'Despacho completo' },
+        motivo: 'Despacho completo',
+        partyId: usuarioActual.partyId,
+        ip,
+      });
+      this.eventosGateway?.emitirAdmin('pedido:estado', {
+        id: Number(pId),
+        codigo: pedido.codigo,
+        estado: estadoFinal,
+      });
+      if (estadoFinal === 'LISTO' && pedido.modalidad === 'MESA') {
+        try {
+          await this.salonService?.avisarListo(pId);
+        } catch {
+          // el aviso es informativo
+        }
+      }
+    }
+
+    // Mesa: lo despachado completo queda entregado en mesa (reusa la lógica del salón)
+    if (completo && pedido.modalidad === 'MESA' && estadoFinal === 'LISTO' && !pedido.entregado_mesa_en) {
+      await this.salonService?.marcarEntregadoMesa(pId, usuarioActual, ip);
+    }
+
+    const despachadas = [...aDespachar].map(([lineaId, unidades]) => ({ lineaId, unidades }));
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'cocina',
+      accion: 'DESPACHAR',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pId,
+      despues: { lineas: despachadas, completo, estado: estadoFinal },
+      partyId: usuarioActual.partyId,
+      ip,
+    });
+
+    this.eventosGateway?.emitirAdmin('pedido:progreso', { id: Number(pId), codigo: pedido.codigo });
+    this.eventosGateway?.emitirAdmin('cocina:comanda', { pedidoId: Number(pId), areaId: null, completo });
+
+    return { ok: true, pedidoId: pId.toString(), despachadas, completo, estado: estadoFinal };
   }
 
   /**

@@ -17,6 +17,7 @@ import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion
 import { TarjetaControlAlmacenConfiguracion } from './TarjetaControlAlmacenConfiguracion';
 import { TarjetaNotificacionesConfiguracion } from './TarjetaNotificacionesConfiguracion';
 import { TarjetaConfirmarDespejarConfiguracion } from './TarjetaConfirmarDespejarConfiguracion';
+import { TarjetaMinutosPreparacionConfiguracion } from './TarjetaMinutosPreparacionConfiguracion';
 import { TarjetaResenasGoogleConfiguracion } from './TarjetaResenasGoogleConfiguracion';
 import { TarjetaInvitadoConfiguracion } from './TarjetaInvitadoConfiguracion';
 import { TarjetaPantallaIngresoConfiguracion } from './TarjetaPantallaIngresoConfiguracion';
@@ -863,6 +864,7 @@ export function ConfiguracionLocalView() {
 
           {/* Subcaso: ALTA DEMANDA Y PAUSA DE PEDIDOS */}
           {tabId === 'cocina' && <TarjetaConfirmarDespejarConfiguracion />}
+          {tabId === 'cocina' && <TarjetaMinutosPreparacionConfiguracion />}
 
           {tabId === 'demanda' && (
             <SeccionAltaDemanda puedeEditar={puedeEditarDemanda} />

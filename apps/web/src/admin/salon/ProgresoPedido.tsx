@@ -1,4 +1,4 @@
-import type { AreaProgreso, ProgresoPedido as Progreso } from './tipos';
+import type { AreaProgreso, ProductoProgreso, ProgresoPedido as Progreso } from './tipos';
 import './progreso-pedido.css';
 
 /**
@@ -36,11 +36,26 @@ function indiceActual(progreso: Progreso, pasos: string[]): number {
   }
 }
 
-/** «Bebidas (2 Frappé, 1 Limonada)», o solo el nombre si el área no trae productos. */
-function textoArea(area: AreaProgreso): string {
-  const productos = area.productos ?? [];
-  if (productos.length === 0) return area.nombre;
-  return `${area.nombre} (${productos.map((p) => `${p.cantidad} ${p.nombre}`).join(', ')})`;
+/** Unidades que aún no están listas de un producto (lo que de verdad falta en cocina). */
+const unidadesFaltan = (p: ProductoProgreso): number => Math.max(0, p.cantidad - (p.listas ?? 0));
+
+/** «Bebidas (1 Frappé, 2 Limonada)»: solo las unidades no listas. Sin productos, solo el nombre del área. */
+function textoFalta(area: AreaProgreso): string {
+  const conFalta = (area.productos ?? []).filter((p) => unidadesFaltan(p) > 0);
+  if (conFalta.length === 0) return area.nombre;
+  return `${area.nombre} (${conFalta.map((p) => `${unidadesFaltan(p)} ${p.nombre}`).join(', ')})`;
+}
+
+/** Estado de un producto: «2 de 3 listos», «Listo», «En preparación» o «Despachado». */
+export function estadoProducto(p: ProductoProgreso): string {
+  const listas = p.listas ?? 0;
+  const despachadas = p.despachadas ?? 0;
+  if (p.cantidad > 0 && despachadas >= p.cantidad) return 'Despachado';
+  if (listas >= p.cantidad) {
+    return despachadas > 0 ? `Listo · ${despachadas} de ${p.cantidad} despachados` : 'Listo';
+  }
+  if (listas > 0) return `${listas} de ${p.cantidad} listos`;
+  return 'En preparación';
 }
 
 interface Props {
@@ -58,7 +73,7 @@ export function ProgresoPedido({ progreso, modalidad, variante, sinLinea = false
   const actual = indiceActual(progreso, pasos);
   const completo = variante === 'completo';
   const faltan = progreso.areas.filter((a) => a.estado !== 'LISTA');
-  const textoFaltan = faltan.map(textoArea).join(' · ');
+  const textoFaltan = faltan.map(textoFalta).join(' · ');
 
   return (
     <div className={`pp pp--${variante}`} data-etapa={progreso.etapa}>
@@ -78,6 +93,12 @@ export function ProgresoPedido({ progreso, modalidad, variante, sinLinea = false
       )}
 
       <p className="pp-etiqueta">{progreso.etiqueta}</p>
+
+      {!anulado && progreso.estimadoMin !== undefined && (
+        <p className="pp-estimado" data-testid="pp-estimado">
+          Listo en ~{progreso.estimadoMin} min
+        </p>
+      )}
 
       {!anulado && progreso.totalAreas > 0 && (
         <div
@@ -110,7 +131,10 @@ export function ProgresoPedido({ progreso, modalidad, variante, sinLinea = false
               {(area.productos ?? []).length > 0 && (
                 <ul className="pp-productos">
                   {(area.productos ?? []).map((p, i) => (
-                    <li key={i}>{`${p.cantidad} × ${p.nombre}`}</li>
+                    <li key={i} data-testid="pp-producto" data-estado={estadoProducto(p)}>
+                      <span>{`${p.cantidad} × ${p.nombre}`}</span>{' '}
+                      <span className="pp-producto-estado">{estadoProducto(p)}</span>
+                    </li>
                   ))}
                 </ul>
               )}

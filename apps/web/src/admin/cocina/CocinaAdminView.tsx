@@ -6,9 +6,12 @@ import type {
   AreaCocina,
   Comanda,
   HistorialComanda,
+  LineaComanda,
 } from './cocinaTipos';
 import {
   despejarComanda,
+  despacharPedido,
+  marcarUnidadesLinea,
   devolverComanda,
   listarAreasCocina,
   listarComandasArea,
@@ -100,6 +103,7 @@ export function CocinaAdminView() {
 
   const puedeVer = tiene('cocina/ver');
   const puedeDespejar = tiene('cocina/despejar');
+  const puedeDespachar = tiene('cocina/despachar');
 
   // Modo de pestañas: 'area' (Pantalla del área), 'hist' (Despejadas hoy)
   const [modo, setModo] = useState<ModoCocina>('area');
@@ -140,6 +144,14 @@ export function CocinaAdminView() {
   // Despeje con confirmación
   const [comandaParaDespejar, setComandaParaDespejar] = useState<Comanda | null>(null);
   const [despejando, setDespejando] = useState<boolean>(false);
+
+  // Despacho (Sí/No, irreversible): una línea con sus unidades, o todo lo listo del pedido
+  const [despachoPendiente, setDespachoPendiente] = useState<{
+    comanda: Comanda;
+    linea?: LineaComanda;
+    unidades?: number;
+  } | null>(null);
+  const [despachando, setDespachando] = useState<boolean>(false);
 
   // Floating Undo toast
   const [undoInfo, setUndoInfo] = useState<{
@@ -332,6 +344,40 @@ export function CocinaAdminView() {
       setComandaParaDespejar(null);
     } finally {
       setDespejando(false);
+    }
+  };
+
+  // Marcar unidades de una línea (la casilla suma una; deshacer baja). Si el área queda completa, el servidor la despeja.
+  const marcarUnidades = async (linea: LineaComanda, listas: number) => {
+    try {
+      setError(null);
+      await marcarUnidadesLinea(linea.id, listas);
+      await cargarComandas(areaSeleccionada);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudieron marcar las unidades');
+    }
+  };
+
+  const pedirDespachoLinea = (comanda: Comanda, linea: LineaComanda, unidades: number) =>
+    setDespachoPendiente({ comanda, linea, unidades });
+  const pedirDespachoTodo = (comanda: Comanda) => setDespachoPendiente({ comanda });
+
+  const ejecutarDespacho = async () => {
+    if (!despachoPendiente) return;
+    const { comanda, linea, unidades } = despachoPendiente;
+    try {
+      setDespachando(true);
+      await despacharPedido(
+        comanda.pedidoId,
+        linea ? [{ lineaId: linea.id, unidades: unidades ?? 0 }] : undefined,
+      );
+      setDespachoPendiente(null);
+      await cargarComandas(areaSeleccionada);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo despachar');
+      setDespachoPendiente(null);
+    } finally {
+      setDespachando(false);
     }
   };
 
@@ -842,6 +888,10 @@ export function CocinaAdminView() {
                   soloLectura={enTodas}
                   onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                   despejando={despejando}
+                  alMarcarUnidades={puedeDespejar && !enTodas ? marcarUnidades : undefined}
+                  puedeDespachar={puedeDespachar && enTodas}
+                  alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
+                  alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
                 />
               ))}
             </div>
@@ -1052,6 +1102,10 @@ export function CocinaAdminView() {
                       soloLectura={enTodas}
                       onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                       despejando={despejando}
+                      alMarcarUnidades={puedeDespejar && !enTodas ? marcarUnidades : undefined}
+                      puedeDespachar={puedeDespachar && enTodas}
+                      alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
+                      alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
                     />
                   ))}
                 </div>
@@ -1060,6 +1114,26 @@ export function CocinaAdminView() {
           </div>
         </div>
       )}
+
+      {/* Confirmación Sí/No de Despacho: irreversible */}
+      <Confirmar
+        abierto={!!despachoPendiente}
+        titulo="Despachar"
+        mensaje={
+          despachoPendiente?.linea
+            ? `Se despachan ${despachoPendiente.unidades} de ${despachoPendiente.linea.nombre} de ${
+                despachoPendiente.comanda.ticket || despachoPendiente.comanda.codigo
+              }. No se puede deshacer. ¿Despachar?`
+            : `Se despacha todo lo listo de ${
+                despachoPendiente?.comanda.ticket || despachoPendiente?.comanda.codigo
+              }. No se puede deshacer. ¿Despachar?`
+        }
+        textoConfirmar="Sí, despachar"
+        textoNo="No"
+        cargando={despachando}
+        alConfirmar={ejecutarDespacho}
+        alCancelar={() => setDespachoPendiente(null)}
+      />
 
       {/* Confirmación Sí/No de Despeje */}
       <Confirmar

@@ -12,6 +12,8 @@ import { nombreMesaSalon, useCambioDeMesa } from './CambioDeMesa';
 export interface SalonMozoProps {
   /** Permiso mesas/liberar: la vista previa ofrece «Forzar liberación» */
   puedeForzar: boolean;
+  /** Permiso cocina/despachar: la vista previa despacha lo listo */
+  puedeDespachar?: boolean;
 }
 
 const PISOS_VACIOS: PisoSalon[] = [];
@@ -20,7 +22,7 @@ const PISOS_VACIOS: PisoSalon[] = [];
  * Pestaña «Salón» de «Mis pedidos»: el croquis del local en vivo.
  * Tocar una libre abre Nuevo pedido con esa mesa; una ocupada, su cuenta; mantener 2 s, la vista previa.
  */
-export function SalonMozo({ puedeForzar }: SalonMozoProps) {
+export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProps) {
   const [pisos, setPisos] = useState<PisoSalon[]>(PISOS_VACIOS);
   const [planos, setPlanos] = useState<PisoPlano[] | null>(null);
   const [pisoId, setPisoId] = useState<string | null>(null);
@@ -165,6 +167,7 @@ export function SalonMozo({ puedeForzar }: SalonMozoProps) {
         <VistaPreviaMesa
           mesa={vista}
           puedeForzar={puedeForzar}
+          puedeDespachar={puedeDespachar}
           alCerrar={() => setVistaId(null)}
           alAbrirCuenta={(m) => {
             setVistaId(null);

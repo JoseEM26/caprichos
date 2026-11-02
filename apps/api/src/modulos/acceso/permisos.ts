@@ -60,6 +60,7 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Cocina, Stock y Recetas (Ola 5)
   { modulo: 'cocina', accion: 'ver' },
   { modulo: 'cocina', accion: 'despejar' },
+  { modulo: 'cocina', accion: 'despachar' },
   { modulo: 'cocina', accion: 'devolver' },
   { modulo: 'cocina', accion: 'agotar' },
   { modulo: 'cocina', accion: 'demanda' },
@@ -202,6 +203,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/cambiar_estado',
     'cocina/ver',
     'cocina/despejar',
+    'cocina/despachar',
     'cocina/devolver',
     'cocina/agotar',
     'cocina/demanda',
@@ -226,6 +228,7 @@ export const MATRIZ: Record<string, string[]> = {
     'mesas/ver',
     'mesas/abrir',
     'mesas/liberar',
+    'cocina/despachar',
     'reservas/ver',
     'reservas/crear',
     'reservas/editar',

@@ -1923,6 +1923,7 @@ export function PlanoView() {
         <VistaPreviaMesa
           mesa={mesasSalonPorId.get(vistaPreviaId) as MesaSalon}
           puedeForzar={puedeForzar}
+          puedeDespachar={tiene('cocina/despachar')}
           alCerrar={() => setVistaPreviaId(null)}
           alAbrirCuenta={(m) => {
             setVistaPreviaId(null);

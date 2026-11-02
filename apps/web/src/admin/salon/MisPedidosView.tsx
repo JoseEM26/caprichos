@@ -225,7 +225,7 @@ export function MisPedidosView() {
 
       {pestana === 'salon' && (
         <div id="mp-panel" role="tabpanel" aria-labelledby="mp-tab-salon">
-          <SalonMozo puedeForzar={tiene('mesas/liberar')} />
+          <SalonMozo puedeForzar={tiene('mesas/liberar')} puedeDespachar={tiene('cocina/despachar')} />
         </div>
       )}
 

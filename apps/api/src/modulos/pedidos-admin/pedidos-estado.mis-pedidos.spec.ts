@@ -144,12 +144,14 @@ describe('PedidosEstadoService.misPedidos', () => {
       etapa: 'PARCIAL',
       etiqueta: 'Cocina: listas Bebidas, faltan Salados',
       areas: [
-        { nombre: 'Bebidas', estado: 'LISTA', lineas: 1, productos: [{ nombre: 'Limonada', cantidad: 1 }] },
-        { nombre: 'Salados', estado: 'PREPARANDO', lineas: 1, productos: [{ nombre: 'Lomo', cantidad: 1 }] },
+        { nombre: 'Bebidas', estado: 'LISTA', lineas: 1, productos: [{ nombre: 'Limonada', cantidad: 1, listas: 1, despachadas: 0 }] },
+        { nombre: 'Salados', estado: 'PREPARANDO', lineas: 1, productos: [{ nombre: 'Lomo', cantidad: 1, listas: 0, despachadas: 0 }] },
       ],
       listasDe: 1,
       totalAreas: 2,
       porcentaje: 50,
+      // Con datos de preparación (defecto) el tiempo que falta: solo cuenta el texto, no el reloj
+      estimadoMin: expect.any(Number),
       enCamino: false,
     });
     const json = JSON.stringify(res);

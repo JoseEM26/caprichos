@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Boton } from '../../../comun/Boton';
+import { Confirmar } from '../../../comun/Confirmar';
+import { ErrorApi } from '../../../comun/api';
+import { despacharPedido } from '../../cocina/cocinaApi';
 import { ProgresoPedido } from '../ProgresoPedido';
 import { salonApi } from '../api';
-import type { MesaSalon } from '../tipos';
+import type { MesaSalon, ProductoProgreso } from '../tipos';
 import { ModalForzarLiberarMesa } from './ModalForzarLiberarMesa';
 import { nombreMesaSalon } from './CambioDeMesa';
 
@@ -16,6 +19,14 @@ export interface VistaPreviaMesaProps {
   alCambiarMesa?: (mesa: MesaSalon) => void;
   /** Tras forzar la liberación: el padre recarga el salón */
   alCambiar: () => void;
+  /** Permiso cocina/despachar: muestra «Despachar» por producto listo y «Despachar todo lo listo» */
+  puedeDespachar?: boolean;
+}
+
+/** Un producto con unidades listas que aún no salieron (con su línea para despachar). */
+interface ListoParaEntregar extends ProductoProgreso {
+  lineaId: string;
+  pendientes: number;
 }
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -32,9 +43,47 @@ function minutosDesde(iso?: string): number | null {
  * Vista previa de una mesa ocupada (mantener 2 s en el croquis): quién, cuánto, qué pidió y qué falta.
  * Desde aquí se abre la cuenta, se cambia de mesa y, con permiso, se fuerza la liberación.
  */
-export function VistaPreviaMesa({ mesa, puedeForzar, alCerrar, alAbrirCuenta, alCambiarMesa, alCambiar }: VistaPreviaMesaProps) {
+export function VistaPreviaMesa({
+  mesa,
+  puedeForzar,
+  alCerrar,
+  alAbrirCuenta,
+  alCambiarMesa,
+  alCambiar,
+  puedeDespachar = false,
+}: VistaPreviaMesaProps) {
   const [forzando, setForzando] = useState(false);
+  // Despacho (Sí/No, irreversible): una línea con sus unidades, o todo lo listo (sin línea)
+  const [despachoPendiente, setDespachoPendiente] = useState<{ linea?: ListoParaEntregar } | null>(null);
+  const [despachando, setDespachando] = useState(false);
+  const [errorDespacho, setErrorDespacho] = useState<string | null>(null);
   const pedido = mesa.pedido;
+  const listos: ListoParaEntregar[] = (pedido?.progreso?.areas ?? []).flatMap((a) =>
+    (a.productos ?? [])
+      .filter((p): p is ProductoProgreso & { lineaId: string } => !!p.lineaId)
+      .map((p) => ({ ...p, pendientes: Math.max(0, (p.listas ?? 0) - (p.despachadas ?? 0)) }))
+      .filter((p) => p.pendientes > 0),
+  );
+
+  const confirmarDespacho = async () => {
+    if (!pedido) return;
+    const linea = despachoPendiente?.linea;
+    setDespachando(true);
+    setErrorDespacho(null);
+    try {
+      await despacharPedido(
+        pedido.id,
+        linea ? [{ lineaId: linea.lineaId, unidades: linea.pendientes }] : undefined,
+      );
+      setDespachoPendiente(null);
+      alCambiar();
+    } catch (err) {
+      setErrorDespacho(err instanceof ErrorApi ? err.message : 'No se pudo despachar');
+      setDespachoPendiente(null);
+    } finally {
+      setDespachando(false);
+    }
+  };
   const nombre = nombreMesaSalon(mesa);
   const mins = minutosDesde(pedido?.creadoEn);
   const cliente = pedido?.cliente || null;
@@ -98,6 +147,60 @@ export function VistaPreviaMesa({ mesa, puedeForzar, alCerrar, alAbrirCuenta, al
           <div style={{ padding: '14px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {pedido?.progreso && <ProgresoPedido progreso={pedido.progreso} modalidad="MESA" variante="completo" />}
 
+            {puedeDespachar && listos.length > 0 && (
+              <div
+                data-testid="vista-previa-despachar"
+                style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--cp-line)', paddingTop: '10px' }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--cp-navy)' }}>Listo para entregar</div>
+                {listos.map((p) => (
+                  <div key={p.lineaId} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ flex: 1, fontSize: '14px', color: 'var(--cp-navy)' }}>
+                      {`${p.pendientes} × ${p.nombre}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDespachoPendiente({ linea: p })}
+                      aria-label={`Despachar ${p.pendientes} de ${p.nombre}`}
+                      style={{
+                        minHeight: '44px',
+                        minWidth: '44px',
+                        padding: '0 12px',
+                        border: 0,
+                        borderRadius: '10px',
+                        background: 'var(--cp-navy)',
+                        color: 'var(--cp-white)',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Despachar
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setDespachoPendiente({})}
+                  style={{
+                    minHeight: '44px',
+                    border: '1.5px solid var(--cp-navy)',
+                    borderRadius: '12px',
+                    background: 'var(--cp-white)',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Despachar todo lo listo
+                </button>
+              </div>
+            )}
+            {errorDespacho && (
+              <div role="alert" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+                {errorDespacho}
+              </div>
+            )}
+
             <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '14px', color: 'var(--cp-navy)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {(pedido?.lineas ?? []).map((l, i) => (
                 <li key={i}>
@@ -151,6 +254,21 @@ export function VistaPreviaMesa({ mesa, puedeForzar, alCerrar, alAbrirCuenta, al
           </div>
         </div>
       </div>
+
+      <Confirmar
+        abierto={!!despachoPendiente}
+        titulo="Despachar"
+        mensaje={
+          despachoPendiente?.linea
+            ? `Se despachan ${despachoPendiente.linea.pendientes} de ${despachoPendiente.linea.nombre}. No se puede deshacer. ¿Despachar?`
+            : 'Se despacha todo lo listo de esta mesa. No se puede deshacer. ¿Despachar?'
+        }
+        textoConfirmar="Sí, despachar"
+        textoNo="No"
+        cargando={despachando}
+        alConfirmar={confirmarDespacho}
+        alCancelar={() => setDespachoPendiente(null)}
+      />
 
       {forzando && (
         <ModalForzarLiberarMesa

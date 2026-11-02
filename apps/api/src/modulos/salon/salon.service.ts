@@ -17,6 +17,7 @@ import { LiberarMesaDto } from './dto/liberar-mesa.dto';
 import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { progresoDelPedido, ProgresoPedido } from '../pedidos/progreso-pedido';
+import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 
 @Injectable()
 export class SalonService {
@@ -37,6 +38,7 @@ export class SalonService {
    */
   async obtenerMesas() {
     const { inicio: inicioDia, fin: finDia } = obtenerRangoHoyLima();
+    const ahora = new Date();
 
     const pisos = await this.prisma.piso.findMany({
       where: { activo: true },
@@ -81,6 +83,17 @@ export class SalonService {
         },
       },
     });
+
+    // Tiempos de preparación por producto para el «Listo en ~N min» de cada mesa ocupada
+    const preparacion = await tiemposPreparacion(
+      this.prisma,
+      pisos
+        .flatMap((p) => p.elementos.flatMap((e) => e.pedidosMesa.flatMap((pm) => pm.pedido.lineas ?? [])))
+        .map((l) => l.producto_id)
+        .filter((id): id is bigint => id != null)
+        .map(String),
+      ahora,
+    );
 
     // Mapear pisos y mesas con su estado derivado
     const pisosFormateados = await Promise.all(
@@ -128,7 +141,7 @@ export class SalonService {
                 cliente: ped.cliente_nombre?.trim() || null,
                 creadoEn: ped.creado_en,
                 total: ped.total ? Number(ped.total) : (ped.subtotal ? Number(ped.subtotal) : 0),
-                progreso: progresoDelPedido(ped as any),
+                progreso: progresoDelPedido(ped as any, { ahora, preparacion }),
                 lineas: ((ped as any).lineas || []).map((l: any) => ({
                   cantidad: l.cantidad,
                   nombre: l.nombre,

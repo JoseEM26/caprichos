@@ -9,9 +9,14 @@ export interface AreaCocina {
 }
 
 export interface LineaComanda {
+  /** Id de la línea del pedido: lo que se marca como lista o se despacha. */
   id: string;
   nombre: string;
   cantidad: number;
+  /** Unidades ya listas en cocina (0..cantidad). */
+  listas?: number;
+  /** Unidades ya despachadas (entregadas al cliente o al mozo). */
+  despachadas?: number;
   tamano?: string | null;
   sabor?: string | null;
   combo?: string | null;

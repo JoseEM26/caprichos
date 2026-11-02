@@ -583,6 +583,13 @@ model PedidoLinea {
   area_id          BigInt?
   adicional        Boolean             @default(false)
   nombres_persona  String[]
+  /// Unidades ya listas en cocina (0..cantidad). Se fija desde la cocina por producto.
+  listas           Int                 @default(0)
+  /// Cuando listas llega a cantidad.
+  listo_en         DateTime?           @db.Timestamptz
+  /// Unidades ya entregadas al cliente o al mozo (despacho). Siempre <= listas.
+  despachadas      Int                 @default(0)
+  despachado_en    DateTime?           @db.Timestamptz
   pedido           Pedido              @relation(fields: [pedido_id], references: [id])
   producto         Producto?           @relation(fields: [producto_id], references: [id])
   oferta           Oferta?             @relation(fields: [oferta_id], references: [id])

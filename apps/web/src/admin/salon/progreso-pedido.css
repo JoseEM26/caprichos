@@ -189,3 +189,16 @@
     transition: none;
   }
 }
+
+.pp-estimado {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-navy);
+}
+
+.pp-producto-estado {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-soft);
+}

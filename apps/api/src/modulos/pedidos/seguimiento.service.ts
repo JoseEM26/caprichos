@@ -215,7 +215,7 @@ type PedidoSeguimiento = {
 };
 
 /** Contexto de cálculo del tiempo: configuración de parámetros y «ahora» (inyectable en pruebas). */
-type ContextoTiempo = ContextoProgreso;
+type ContextoTiempo = ContextoProgreso & { cfg: ConfigEta };
 
 const textoRango = (min: number, max: number) =>
   min === max ? `unos ${min} minutos` : `unos ${min} a ${max} minutos`;

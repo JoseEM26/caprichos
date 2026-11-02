@@ -44,11 +44,16 @@ describe('progresoDelPedido', () => {
         estado: 'PENDIENTE',
         lineas: 2,
         productos: [
-          { nombre: 'Frappé', cantidad: 2 },
-          { nombre: 'Limonada', cantidad: 1 },
+          { nombre: 'Frappé', cantidad: 2, listas: 0, despachadas: 0 },
+          { nombre: 'Limonada', cantidad: 1, listas: 0, despachadas: 0 },
         ],
       },
-      { nombre: 'Salados', estado: 'PENDIENTE', lineas: 1, productos: [{ nombre: 'Torta', cantidad: 1 }] },
+      {
+        nombre: 'Salados',
+        estado: 'PENDIENTE',
+        lineas: 1,
+        productos: [{ nombre: 'Torta', cantidad: 1, listas: 0, despachadas: 0 }],
+      },
     ]);
   });
 
@@ -156,6 +161,8 @@ describe('progresoDelPedido', () => {
       ['areas', 'enCamino', 'etapa', 'etiqueta', 'listasDe', 'porcentaje', 'totalAreas'].sort(),
     );
     expect(Object.keys(res.areas[0]).sort()).toEqual(['estado', 'lineas', 'nombre', 'productos']);
-    expect(Object.keys(res.areas[0].productos[0]).sort()).toEqual(['cantidad', 'nombre']);
+    expect(Object.keys(res.areas[0].productos[0]).sort()).toEqual(
+      ['cantidad', 'despachadas', 'listas', 'nombre'].sort(),
+    );
   });
 });

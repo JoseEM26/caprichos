@@ -2,6 +2,7 @@ import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import { PuntosService } from '../clientes/puntos.service';
 import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
+import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
 import { StockService } from '../stock/stock.service';
 import { ImpresionService } from '../impresion/impresion.service';
@@ -439,6 +440,7 @@ export class PedidosEstadoService {
         pago_coordinado_en: true,
         cliente_nombre: true,
         creado_en: true,
+        pasa_cocina_en: true,
         entregado_mesa_en: true,
         repartidor_party_id: true,
         despachado_en: true,
@@ -446,8 +448,12 @@ export class PedidosEstadoService {
         eta_max: true,
         lineas: {
           select: {
+            id: true,
             nombre: true,
             cantidad: true,
+            listas: true,
+            despachadas: true,
+            producto_id: true,
             // Solo para contar líneas por área del progreso; no se devuelven
             area_id: true,
             producto: { select: { categoria: { select: { area_id: true } } } },
@@ -468,6 +474,12 @@ export class PedidosEstadoService {
     // Parámetros del tiempo (una lectura) para el «llega en» de los pedidos en camino
     const cfg = await leerConfigEta(this.prisma).catch(() => ({ ...CONFIG_ETA_DEFECTO, respaldoMin: 30 }));
     const ahora = new Date();
+    // Tiempos de preparación por producto (promedio de 30 días o el defecto) para el «Listo en ~N min»
+    const preparacion = await tiemposPreparacion(
+      this.prisma,
+      [...new Set(pedidos.flatMap((p) => p.lineas.map((l) => l.producto_id)).filter((id) => id != null).map(String))],
+      ahora,
+    );
 
     return {
       pedidos: pedidos.map((p) => ({
@@ -510,7 +522,7 @@ export class PedidosEstadoService {
         creadoEn: p.creado_en,
         lineas: p.lineas.map((l) => ({ nombre: l.nombre, cantidad: l.cantidad })),
         // Estado de cocina y entrega (misma función que el seguimiento de la carta)
-        progreso: progresoDelPedido(p, { cfg, ahora }),
+        progreso: progresoDelPedido(p, { cfg, ahora, preparacion }),
       })),
       resumen: {
         cantidad: validos.length,
