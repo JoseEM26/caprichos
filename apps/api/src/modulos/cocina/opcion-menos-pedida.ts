@@ -51,7 +51,8 @@ async function calcularParaProducto(prisma: PrismaService, productoId: string, a
   if (!producto?.resaltar_opcion_menos_pedida) return new Set();
 
   const grupos = await prisma.productoGrupo.findMany({
-    where: { producto_id: BigInt(productoId) },
+    // Grupos inactivos no se muestran en la carta: no compiten ni se resaltan
+    where: { producto_id: BigInt(productoId), grupo: { activo: true } },
     orderBy: { orden: 'asc' },
     select: {
       grupo: {

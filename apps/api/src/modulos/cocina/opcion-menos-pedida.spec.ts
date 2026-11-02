@@ -100,6 +100,25 @@ describe('opcionesMenosPedidasPorProducto (consulta, ventana y caché)', () => {
     expect(desde.toISOString()).toBe('2026-10-02T12:00:00.000Z');
   });
 
+  it('grupo inactivo no se resalta: no compite ni marca sus opciones', async () => {
+    // Mock que respeta el filtro grupo.activo de la consulta (como Prisma)
+    const prisma: any = prismaFalso({ conteos: [{ opcion_id: 201n, n: 3 }] });
+    prisma.productoGrupo.findMany.mockImplementation(async (args: any) => {
+      const grupos = [
+        { activo: true, ids: ['201', '202'] },
+        { activo: false, ids: ['301', '302'] },
+      ];
+      return grupos
+        .filter((g) => g.activo === args.where.grupo.activo)
+        .map((g) => ({ grupo: { opciones: g.ids.map((id) => ({ id: BigInt(id) })) } }));
+    });
+
+    const res = await opcionesMenosPedidasPorProducto(prisma, ['10']);
+
+    expect(prisma.productoGrupo.findMany.mock.calls[0][0].where.grupo).toEqual({ activo: true });
+    expect([...res.get('10')!]).toEqual(['202']);
+  });
+
   it('check del producto apagado = nada: no cuenta ni marca', async () => {
     const prisma = prismaFalso({ flag: false });
 
