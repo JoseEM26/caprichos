@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { ColorComanda, Comanda, LineaComanda } from './cocinaTipos';
+import { duracionLegible } from '../../comun/tiempoLegible';
 
 /** Tiempo para deshacer un «completa» (la línea vuelve a 0) antes de que el botón desaparezca. */
 export const SEGUNDOS_DESHACER = 5;
@@ -278,7 +279,22 @@ function LineaFila({
           </span>
         )}
         {despachadas > 0 && (
-          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', marginLeft: '6px' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '12px',
+              fontWeight: 700,
+              color: todoDespachado ? VERDE_LISTO : 'var(--cp-soft)',
+              marginLeft: '6px',
+            }}
+          >
+            {todoDespachado && (
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16">
+                <path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
             {todoDespachado ? 'Despachado' : `${despachadas} de ${it.cantidad} despachados`}
           </span>
         )}
@@ -642,7 +658,7 @@ export function ComandaTarjeta({
             flexShrink: 0,
           }}
         >
-          {minutosEnVivo} min
+          {duracionLegible(minutosEnVivo)}
         </span>
       </div>
 

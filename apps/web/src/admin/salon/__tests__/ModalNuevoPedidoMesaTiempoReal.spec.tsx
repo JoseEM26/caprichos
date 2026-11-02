@@ -110,7 +110,7 @@ describe('ModalNuevoPedidoMesa: el plano de adentro se actualiza en tiempo real'
 
     const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
     expect(within(vista).queryByRole('button', { name: 'Forzar liberación' })).toBeNull();
-    expect(within(vista).queryByRole('button', { name: 'Abrir cuenta' })).toBeNull();
+    expect(within(vista).queryByRole('button', { name: 'Ver cuenta y cobrar' })).toBeNull();
     expect(within(vista).queryByRole('button', { name: 'Cambiar de mesa' })).toBeNull();
   });
 

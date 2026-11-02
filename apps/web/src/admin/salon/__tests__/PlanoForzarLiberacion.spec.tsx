@@ -78,7 +78,7 @@ describe('Plano del local: mantener 2 s una mesa ocupada abre la vista previa', 
     expect(vista.textContent).toContain('Pedido P-0050');
     expect(within(vista).getByRole('button', { name: 'Forzar liberación' })).toBeTruthy();
     expect(within(vista).getByRole('button', { name: 'Cambiar de mesa' })).toBeTruthy();
-    expect(within(vista).getByRole('button', { name: 'Abrir cuenta' })).toBeTruthy();
+    expect(within(vista).getByRole('button', { name: 'Ver cuenta y cobrar' })).toBeTruthy();
   });
 
   it('un toque normal no abre la vista previa', async () => {

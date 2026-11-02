@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Boton } from '../../../comun/Boton';
 import { Confirmar } from '../../../comun/Confirmar';
 import { ErrorApi } from '../../../comun/api';
+import { haceLegible } from '../../../comun/tiempoLegible';
 import { despacharPedido } from '../../cocina/cocinaApi';
 import { ProgresoPedido } from '../ProgresoPedido';
 import { salonApi } from '../api';
@@ -30,13 +31,14 @@ interface ListoParaEntregar extends ProductoProgreso {
 }
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
+const VERDE_ENTREGADO = '#2F7A45';
 
-/** Minutos desde que se tomó el pedido (0 si no se sabe). */
-function minutosDesde(iso?: string): number | null {
-  if (!iso) return null;
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return null;
-  return Math.max(0, Math.round((Date.now() - t) / 60000));
+function IconoEntregado() {
+  return (
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" style={{ flexShrink: 0, color: VERDE_ENTREGADO }}>
+      <path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 /**
@@ -58,12 +60,15 @@ export function VistaPreviaMesa({
   const [despachando, setDespachando] = useState(false);
   const [errorDespacho, setErrorDespacho] = useState<string | null>(null);
   const pedido = mesa.pedido;
-  const listos: ListoParaEntregar[] = (pedido?.progreso?.areas ?? []).flatMap((a) =>
-    (a.productos ?? [])
-      .filter((p): p is ProductoProgreso & { lineaId: string } => !!p.lineaId)
-      .map((p) => ({ ...p, pendientes: Math.max(0, (p.listas ?? 0) - (p.despachadas ?? 0)) }))
-      .filter((p) => p.pendientes > 0),
+  const todos = (pedido?.progreso?.areas ?? []).flatMap((a) =>
+    (a.productos ?? []).filter((p): p is ProductoProgreso & { lineaId: string } => !!p.lineaId),
   );
+  // Lo que ya salió de cocina: con pendientes por despachar y, si ya salió, con check «Entregado»
+  const listos: ListoParaEntregar[] = todos
+    .filter((p) => (p.listas ?? 0) > 0)
+    .map((p) => ({ ...p, pendientes: Math.max(0, (p.listas ?? 0) - (p.despachadas ?? 0)) }));
+  const hayPendientes = listos.some((p) => p.pendientes > 0);
+  const todoEntregado = todos.length > 0 && todos.every((p) => (p.despachadas ?? 0) >= p.cantidad);
 
   const confirmarDespacho = async () => {
     if (!pedido) return;
@@ -85,7 +90,7 @@ export function VistaPreviaMesa({
     }
   };
   const nombre = nombreMesaSalon(mesa);
-  const mins = minutosDesde(pedido?.creadoEn);
+  const hace = haceLegible(pedido?.creadoEn);
   const cliente = pedido?.cliente || null;
   const mozo = pedido?.mozo || null;
 
@@ -140,7 +145,7 @@ export function VistaPreviaMesa({
             <div style={{ fontSize: '13px', color: 'var(--cp-soft)', marginTop: '2px' }}>
               {cliente ?? mozo ?? 'Sin nombre'}
               {mozo && cliente ? ` · Mozo: ${mozo}` : ''}
-              {mins !== null ? ` · Pidió hace ${mins} min` : ''}
+              {hace ? ` · Pidió ${hace}` : ''}
             </div>
           </div>
 
@@ -152,47 +157,75 @@ export function VistaPreviaMesa({
                 data-testid="vista-previa-despachar"
                 style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--cp-line)', paddingTop: '10px' }}
               >
-                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--cp-navy)' }}>Listo para entregar</div>
-                {listos.map((p) => (
-                  <div key={p.lineaId} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ flex: 1, fontSize: '14px', color: 'var(--cp-navy)' }}>
-                      {`${p.pendientes} × ${p.nombre}`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setDespachoPendiente({ linea: p })}
-                      aria-label={`Despachar ${p.pendientes} de ${p.nombre}`}
-                      style={{
-                        minHeight: '44px',
-                        minWidth: '44px',
-                        padding: '0 12px',
-                        border: 0,
-                        borderRadius: '10px',
-                        background: 'var(--cp-navy)',
-                        color: 'var(--cp-white)',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Despachar
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setDespachoPendiente({})}
+                <div
                   style={{
-                    minHeight: '44px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '12px',
-                    background: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '13px',
                     fontWeight: 800,
-                    cursor: 'pointer',
+                    color: todoEntregado ? VERDE_ENTREGADO : 'var(--cp-navy)',
                   }}
                 >
-                  Despachar todo lo listo
-                </button>
+                  {todoEntregado && <IconoEntregado />}
+                  {todoEntregado ? 'Todo entregado' : 'Listo para entregar'}
+                </div>
+                {listos.map((p) =>
+                  p.pendientes > 0 ? (
+                    <div key={p.lineaId} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ flex: 1, fontSize: '14px', color: 'var(--cp-navy)' }}>
+                        {`${p.pendientes} × ${p.nombre}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setDespachoPendiente({ linea: p })}
+                        aria-label={`Despachar ${p.pendientes} de ${p.nombre}`}
+                        style={{
+                          minHeight: '44px',
+                          minWidth: '44px',
+                          padding: '0 12px',
+                          border: 0,
+                          borderRadius: '10px',
+                          background: 'var(--cp-navy)',
+                          color: 'var(--cp-white)',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Despachar
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      key={p.lineaId}
+                      data-testid="vista-previa-entregado"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.6, minHeight: '44px' }}
+                    >
+                      <IconoEntregado />
+                      <span style={{ flex: 1, fontSize: '14px', color: 'var(--cp-soft)' }}>
+                        {`${p.despachadas ?? 0} × ${p.nombre}`}
+                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: 800, color: VERDE_ENTREGADO }}>Entregado</span>
+                    </div>
+                  ),
+                )}
+                {hayPendientes && (
+                  <button
+                    type="button"
+                    onClick={() => setDespachoPendiente({})}
+                    style={{
+                      minHeight: '44px',
+                      border: '1.5px solid var(--cp-navy)',
+                      borderRadius: '12px',
+                      background: 'var(--cp-white)',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Despachar todo lo listo
+                  </button>
+                )}
               </div>
             )}
             {errorDespacho && (
@@ -235,7 +268,7 @@ export function VistaPreviaMesa({
           >
             {alAbrirCuenta && (
               <Boton variante="primario" onClick={() => alAbrirCuenta(mesa)} disabled={!pedido}>
-                Abrir cuenta
+                Ver cuenta y cobrar
               </Boton>
             )}
             {alCambiarMesa && (
