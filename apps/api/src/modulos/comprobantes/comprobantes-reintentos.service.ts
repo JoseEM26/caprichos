@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@ne
 import { RedisService } from '../../comun/redis/redis.service';
 import { adquirirCandado, liberarCandado } from '../../comun/redis/candado.util';
 import { ComprobantesService } from './comprobantes.service';
+import { ComprobantesSaludService } from './comprobantes-salud.service';
 
 /** Cada 5 minutos se reenvían las boletas/facturas pendientes (sin respuesta de SUNAT). */
 export const REINTENTO_FACTURACION_MS = 5 * 60 * 1000;
@@ -19,6 +20,7 @@ export class ComprobantesReintentosService implements OnModuleInit, OnModuleDest
   constructor(
     private readonly comprobantes: ComprobantesService,
     @Optional() private readonly redis?: RedisService,
+    @Optional() private readonly salud?: ComprobantesSaludService,
   ) {}
 
   onModuleInit() {
@@ -38,7 +40,11 @@ export class ComprobantesReintentosService implements OnModuleInit, OnModuleDest
     const candado = await adquirirCandado(cliente, clave, 280000);
     if (!candado.adquirido) return { revisados: 0, motivo: 'OTRO_CONTENEDOR' };
     try {
-      return await this.comprobantes.reintentarPendientes();
+      // 1) barrido de cobros sin comprobante (solo después del corte); 2) reenvío de pendientes; 3) avisos
+      await this.comprobantes.barrerPedidosSinComprobante();
+      const resultado = await this.comprobantes.reintentarPendientes();
+      await this.salud?.revisarAlertas();
+      return resultado;
     } finally {
       await liberarCandado(cliente, clave, candado.token).catch(() => {});
     }

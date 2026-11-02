@@ -13,6 +13,7 @@ import type {
   RespuestaListarElectronicos,
   ConfigFacturacion,
   ProveedorFacturacion,
+  SaludFacturacion,
 } from './tipos';
 
 export const comprobantesApi = {
@@ -46,6 +47,17 @@ export const comprobantesApi = {
   async listarElectronicos(pagina = 1, limite = 20): Promise<RespuestaListarElectronicos> {
     const params = new URLSearchParams({ pagina: String(pagina), limite: String(limite) });
     return clienteFetch<RespuestaListarElectronicos>(`/admin/comprobantes/emitidos?${params.toString()}`);
+  },
+
+  /** Solo los comprobantes con problemas: rechazados, en revisión manual o pendientes con más de 15 min. */
+  async listarProblemasElectronicos(pagina = 1, limite = 50): Promise<RespuestaListarElectronicos> {
+    const params = new URLSearchParams({ pagina: String(pagina), limite: String(limite), problemas: '1' });
+    return clienteFetch<RespuestaListarElectronicos>(`/admin/comprobantes/emitidos?${params.toString()}`);
+  },
+
+  /** Conteos de salud (solo ADMIN). */
+  async saludFacturacion(): Promise<SaludFacturacion> {
+    return clienteFetch<SaludFacturacion>('/admin/comprobantes/salud');
   },
 
   async reintentarElectronico(

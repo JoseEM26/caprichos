@@ -1109,6 +1109,11 @@ model Comprobante {
   resumen_baja_id        BigInt?
   sunat_total_cents      Int?
   sunat_igv_cents        Int?
+  // Resiliencia (outbox): próximo intento, lease de envío en curso, y motivo de la cola de fallos (REVISION_MANUAL)
+  proximo_intento_en     DateTime? @db.Timestamptz
+  enviando_hasta         DateTime? @db.Timestamptz
+  revision_motivo        String?
+  revision_en            DateTime? @db.Timestamptz
 
   pedido             Pedido    @relation(fields: [pedido_id], references: [id])
   emitidoPor         Party?    @relation("ComprobantesEmitidos", fields: [emitido_por], references: [id])

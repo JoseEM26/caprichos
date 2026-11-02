@@ -5,7 +5,7 @@ import { Logger } from '@nestjs/common';
 import { ComprobantesService } from './comprobantes.service';
 import { ComprobantesSunatService, horaMinutoLima } from './comprobantes-sunat.service';
 import { SunatEmisor } from './sunat/sunat.emisor';
-import { ErrorRedEmisor } from './emisor/emisor.tipos';
+import { ErrorCredencialesEmisor, ErrorRedEmisor } from './emisor/emisor.tipos';
 import { certificadoDePrueba, datosDePrueba } from './sunat/sunat.pruebas';
 import { zipUnico } from './sunat/sunat.util';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -70,11 +70,13 @@ describe('SunatEmisor (sin red real: fetch simulado)', () => {
   it('boleta: firmada y lista, sin llamar a SUNAT; QR y hash con el formato de SUNAT', async () => {
     const fetchFn = jest.fn();
     const datos = datosDePrueba({ tipo: 'BOLETA', serie: 'B002', numero: 4, documento: '12345678', razon: 'ANA', fecha: new Date('2026-11-02T15:00:00Z') });
-    const r = await crear(fetchFn).generar({ id: 9n, tipo: 'BOLETA', serie: 'B002', numero: 4, intentos: 0, datos });
+    const guardados: any[] = [];
+    const r = await crear(fetchFn).generar({ id: 9n, tipo: 'BOLETA', serie: 'B002', numero: 4, intentos: 0, datos, alPreparar: async (a) => { guardados.push(...a); } });
     expect(fetchFn).not.toHaveBeenCalled();
     expect(r.estado).toBe('PENDIENTE_RESUMEN');
-    expect(r.archivos?.map((a) => a.tipo)).toEqual(['XML', 'ZIP']);
-    expect(r.archivos?.[0].nombre).toBe('20000000001-03-B002-4.xml');
+    // XML y ZIP se guardan ANTES de cualquier envío (alPreparar), no en el resultado
+    expect(guardados.map((a) => a.tipo)).toEqual(['XML', 'ZIP']);
+    expect(guardados[0].nombre).toBe('20000000001-03-B002-4.xml');
     expect(r.hash).toMatch(/^[A-Za-z0-9+/]{43}=$/);
     // RUC|TIPO|SERIE|NUMERO|IGV|TOTAL|FECHA|TIPODOC|NUMDOC|
     expect(r.cadenaQr).toMatch(/^20000000001\|03\|B002\|4\|\d+\.\d{2}\|\d+\.\d{2}\|2026-11-02\|1\|12345678\|$/);
@@ -82,10 +84,12 @@ describe('SunatEmisor (sin red real: fetch simulado)', () => {
 
   it('factura aceptada: sendBill con WS-Security, CDR guardada y EMITIDO_SUNAT; la clave SOL nunca se registra', async () => {
     const fetchFn = jest.fn().mockResolvedValue(new Response(sobreOk(cdr('0')), { status: 200 }));
-    const r = await crear(fetchFn).generar(comprobanteFactura());
+    const guardados: any[] = [];
+    const r = await crear(fetchFn).generar({ ...comprobanteFactura(), alPreparar: async (a) => { guardados.push(...a); } });
     expect(r.estado).toBe('EMITIDO_SUNAT');
-    expect(r.archivos?.map((a) => a.tipo)).toEqual(['XML', 'ZIP', 'CDR']);
-    expect(r.archivos?.[2].nombre).toBe('R-20000000001-01-F002-1.xml');
+    expect(guardados.map((a) => a.tipo)).toEqual(['XML', 'ZIP']);
+    expect(r.archivos?.map((a) => a.tipo)).toEqual(['CDR']);
+    expect(r.archivos?.[0].nombre).toBe('R-20000000001-01-F002-1.xml');
     const cuerpo = String(fetchFn.mock.calls[0][1].body);
     expect(cuerpo).toContain('<wsse:Username>20000000001MODDATOS</wsse:Username>');
     expect(cuerpo).toContain('<fileName>20000000001-01-F002-1.zip</fileName>');
@@ -103,15 +107,20 @@ describe('SunatEmisor (sin red real: fetch simulado)', () => {
   });
 
   it('fault del cliente (credenciales) rechaza; sin respuesta queda PENDIENTE_ENVIO y el reintento reenvía el mismo ZIP', async () => {
+    // Credenciales inválidas (0109): no es un rechazo del comprobante, sino una pausa de envíos (ErrorCredencialesEmisor)
     const fallo = jest.fn().mockResolvedValue(new Response(sobreFault('soap-env:Client.0109', 'Usuario o clave incorrectos'), { status: 500 }));
-    const rechazada = await crear(fallo).generar(comprobanteFactura());
+    await expect(crear(fallo).generar(comprobanteFactura())).rejects.toBeInstanceOf(ErrorCredencialesEmisor);
+    // Un fault de cliente que no es de credenciales sí es rechazo, con su código
+    const rechazoDatos = jest.fn().mockResolvedValue(new Response(sobreFault('soap-env:Client.2335', 'Dato inválido'), { status: 500 }));
+    const rechazada = await crear(rechazoDatos).generar(comprobanteFactura());
     expect(rechazada.estado).toBe('RECHAZADO');
-    expect(rechazada.respuesta).toContain('0109');
+    expect(rechazada.codigoRechazo).toBe('2335');
 
     const caida = jest.fn().mockRejectedValue(new Error('ECONNRESET'));
-    const pendiente = await crear(caida).generar(comprobanteFactura());
+    const guardados: any[] = [];
+    const pendiente = await crear(caida).generar({ ...comprobanteFactura(), alPreparar: async (a) => { guardados.push(...a); } });
     expect(pendiente.estado).toBe('PENDIENTE_ENVIO');
-    const zipOriginal = pendiente.archivos!.find((a) => a.tipo === 'ZIP')!.contenido;
+    const zipOriginal = guardados.find((a) => a.tipo === 'ZIP')!.contenido;
 
     // Antes de reenviar, SUNAT dice que no tiene la factura (statusCode 127); luego se envía el mismo ZIP
     const ok = jest
@@ -201,7 +210,7 @@ describe('proveedor elegido y resumen diario de boletas (sin red)', () => {
         create: jest.fn(async (a: any) => ({ id: 50n, pedido_id: 100n, creado_en: new Date('2026-11-02T15:00:00Z'), copias_impresas: 0, facturacion_intentos: 0, ...a.data, pedido: pedidoBase() })),
         update: jest.fn(async (a: any) => ({ id: 50n, pedido_id: 100n, tipo: 'BOLETA', serie: 'B002', numero: 1, emisor: 'SUNAT', creado_en: new Date('2026-11-02T15:00:00Z'), ...a.data })),
         findMany: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       pedido: { findUnique: jest.fn().mockResolvedValue(pedidoBase()) },
       parametro: { findUnique: jest.fn(async ({ where }: any) => (where.clave === 'facturacion_proveedor' ? { valor: 'SUNAT' } : null)), upsert: jest.fn() },

@@ -408,6 +408,10 @@ export class CobrosService {
         },
       });
 
+      // Nota de venta, boleta o factura en la MISMA transacción (outbox): si el cobro se deshace, no queda
+      // comprobante ni número consumido. Si el proceso muere después del commit, la fila pendiente la envía el worker.
+      await this.comprobantesService?.emitirParaPedido(pedido.id, tx, usuario, ip);
+
       return {
         cobro: nuevoCobro,
         pedidoActualizado: pedAct,
@@ -421,12 +425,11 @@ export class CobrosService {
     // Se mira antes de emitir (el cobro podría emitir otra nota si el comprobante cambió).
     const ticketYaSalioConMozo = await this.notaDelMozoVigente(cobro.pedido_id).catch(() => false);
 
-    // el cobro genera la nota de venta con su correlativo (RQ-LEG-01-01); es idempotente y también se
-    // crea al consultarla, así que un fallo aquí no deshace el cobro
+    // envío a SUNAT (boleta/factura) justo después del commit; si no sale, queda PENDIENTE_ENVIO y el worker lo reenvía
     try {
-      await this.comprobantesService?.emitirParaPedido(cobro.pedido_id, undefined, usuario);
+      await this.comprobantesService?.enviarPorPedido(cobro.pedido_id);
     } catch {
-      // se genera al pedir el comprobante
+      // el worker de comprobantes lo reintenta
     }
 
     // la mesa se libera al cobrar (RN-CAP-054); si falla no se deshace el cobro: se libera a mano

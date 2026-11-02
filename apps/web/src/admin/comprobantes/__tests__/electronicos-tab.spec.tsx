@@ -145,4 +145,21 @@ describe('ElectronicosTab', () => {
     expect(screen.getByTestId('electronico-8').textContent).toContain('XML firmado');
     expect(screen.getByTestId('electronico-8').textContent).toContain('Anular');
   });
+
+  it('panel «Con problemas»: contador arriba y corrección para una factura en revisión manual', async () => {
+    conRol('ADMIN');
+    const enRevision: ComprobanteElectronico = { ...base, id: '11', tipo: 'FACTURA', numero: 7, numero_texto: 'F002-000007', facturacion_estado: 'REVISION_MANUAL', enlace_pdf: null, revision_motivo: 'Rechazo permanente 2335: RUC inválido' };
+    vi.spyOn(comprobantesApi, 'listarProblemasElectronicos').mockResolvedValue({ total: 1, pagina: 1, limite: 50, totalPaginas: 1, elementos: [enRevision] });
+    vi.spyOn(comprobantesApi, 'saludFacturacion').mockResolvedValue({
+      pendientes: 2, con_problemas: 1, revision_manual: 1, rechazados: 0, pendientes_mas_15_min: 0, edad_pendiente_min: null,
+      boletas_por_reportar: 0, resumenes_sin_respuesta: 0, certificado_vence_en_dias: 300, circuito_abierto: false, credenciales_invalidas: false, generado_en: '2026-11-02T10:00:00Z',
+    });
+    render(<ElectronicosTab />);
+
+    expect(await screen.findByTestId('contador-facturacion')).toBeTruthy();
+    expect(screen.getByText('Pendientes: 2')).toBeTruthy();
+    const panel = await screen.findByRole('region', { name: 'Comprobantes con problemas' });
+    expect(panel.textContent).toContain('Rechazo permanente 2335');
+    expect(screen.getByRole('button', { name: 'Corregir y reintentar' })).toBeTruthy();
+  });
 });

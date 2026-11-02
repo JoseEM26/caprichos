@@ -16,6 +16,8 @@ export interface ComprobanteEmision {
   datos: DatosEmision;
   /** ZIP ya firmado de un intento anterior: se reenvía tal cual (no se vuelve a firmar). */
   zipPrevio?: Buffer | null;
+  /** Guarda XML y ZIP ANTES de la llamada de red: si el proceso muere al enviar, el ZIP queda para reenviar. */
+  alPreparar?: (archivos: ArchivoEmision[]) => Promise<void>;
 }
 
 /** Archivo que el emisor entrega para guardar (XML firmado, ZIP enviado, CDR de SUNAT). */
@@ -42,6 +44,8 @@ export interface ResultadoEmision {
   /** Totales en céntimos (los necesita el resumen diario de boletas). */
   totalCents?: number;
   igvCents?: number;
+  /** Código SUNAT del rechazo (CDR o fault), para decidir si reintentar sirve. */
+  codigoRechazo?: string | null;
 }
 
 /** Resultado de una anulación: SOLICITADA (en proceso de SUNAT), ACEPTADA, RECHAZADA o PENDIENTE_RESUMEN. */
@@ -64,6 +68,13 @@ export interface EmisorElectronico {
 /** No hubo respuesta usable del emisor (red, tiempo agotado, 5xx): el envío queda pendiente. */
 export class ErrorRedEmisor extends Error {
   constructor(mensaje = 'No hubo respuesta del emisor electrónico (red o tiempo agotado)') {
+    super(mensaje);
+  }
+}
+
+/** SUNAT rechazó las credenciales (usuario SOL o clave): se pausan los envíos y se avisa. No es un rechazo del comprobante. */
+export class ErrorCredencialesEmisor extends Error {
+  constructor(mensaje = 'SUNAT rechazó las credenciales (usuario o clave SOL)') {
     super(mensaje);
   }
 }

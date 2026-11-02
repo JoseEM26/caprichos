@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -14,6 +15,7 @@ import { Response } from 'express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { ComprobantesService } from './comprobantes.service';
+import { ComprobantesSaludService } from './comprobantes-salud.service';
 import { ComprobantesSunatService } from './comprobantes-sunat.service';
 import { MarcarEmitidoDto } from './dto/marcar-emitido.dto';
 import { ListarPorEmitirDto } from './dto/listar-por-emitir.dto';
@@ -25,6 +27,7 @@ export class ComprobantesController {
   constructor(
     private readonly comprobantesService: ComprobantesService,
     private readonly sunatService: ComprobantesSunatService,
+    private readonly comprobantesSalud: ComprobantesSaludService,
   ) {}
 
   /**
@@ -87,10 +90,18 @@ export class ComprobantesController {
   /** GET /admin/comprobantes/emitidos?pagina=&limite= : BOLETA/FACTURA enviadas a SUNAT (cualquier estado). */
   @Get('emitidos')
   @Permiso('comprobantes', 'ver')
-  async listarEmitidos(@Query('pagina') pagina?: string, @Query('limite') limite?: string) {
+  async listarEmitidos(@Query('pagina') pagina?: string, @Query('limite') limite?: string, @Query('problemas') problemas?: string) {
     const p = Math.max(1, Number(pagina) || 1);
     const l = Math.max(1, Math.min(100, Number(limite) || 20));
-    return this.comprobantesService.listarElectronicos(p, l);
+    return this.comprobantesService.listarElectronicos(p, l, problemas === '1' || problemas === 'true');
+  }
+
+  /** GET /admin/comprobantes/salud : solo conteos para el monitoreo (ADMIN). Sin datos personales. */
+  @Get('salud')
+  @Permiso('comprobantes', 'ver')
+  async salud(@Req() req: any) {
+    if (req.usuario?.rol !== 'ADMIN') throw new ForbiddenException({ codigo: 'SOLO_ADMIN', mensaje: 'Solo el administrador ve la salud de la facturación' });
+    return this.comprobantesSalud.salud();
   }
 
   /** GET /admin/comprobantes/:id/archivos/:tipo : XML firmado, ZIP o CDR de SUNAT (descarga). */

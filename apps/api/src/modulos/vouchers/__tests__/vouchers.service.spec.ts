@@ -912,7 +912,7 @@ describe('Envío a Caja: nota de venta, boleta/factura y efectivo recibido', () 
         cobro_mozo_recibido: 50,
       }),
     });
-    expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledWith(50n, undefined, mozo, undefined);
+    expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledWith(50n, expect.anything(), mozo, undefined);
     expect(prisma.pedido.update.mock.invocationCallOrder[0]).toBeLessThan(
       comprobantesMock.emitirParaPedido.mock.invocationCallOrder[0],
     );

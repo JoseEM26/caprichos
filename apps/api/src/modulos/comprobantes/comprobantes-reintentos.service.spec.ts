@@ -4,7 +4,7 @@ jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {
 import { ComprobantesReintentosService } from './comprobantes-reintentos.service';
 
 describe('ComprobantesReintentosService (tarea de reenvío)', () => {
-  const comprobantes = { reintentarPendientes: jest.fn().mockResolvedValue({ revisados: 2 }) };
+  const comprobantes = { barrerPedidosSinComprobante: jest.fn().mockResolvedValue({ creados: 0, encontrados: 0 }), reintentarPendientes: jest.fn().mockResolvedValue({ revisados: 2 }) };
 
   beforeEach(() => jest.clearAllMocks());
 

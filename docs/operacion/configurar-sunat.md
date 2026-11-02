@@ -18,7 +18,7 @@ Si se elige **SUNAT directo** pero faltan credenciales en el servidor, los compr
 ## Qué pasa al cobrar
 
 - **Factura**: se firma y se envía al momento (`sendBill`). SUNAT responde con su constancia (CDR). Si acepta, queda `EMITIDO SUNAT`.
-- **Boleta**: se firma y queda `PENDIENTE RESUMEN`. Todos los días a las **22:30 (hora de Lima)** se arma el resumen diario (RC) con las boletas pendientes (máximo 500 líneas por resumen) y se envía. Un segundo proceso consulta el ticket cada 10 minutos hasta que SUNAT responde.
+- **Boleta**: se firma y queda `PENDIENTE RESUMEN`. Todos los días a las **22:30 (hora de Lima)** se arma el resumen diario (RC) con las boletas pendientes (máximo 500 líneas por resumen) y se envía. Un segundo proceso consulta el ticket cada 2 minutos (solo cuando hay tickets pendientes) hasta que SUNAT responde.
 - **Sin respuesta** (red o tiempo agotado): queda `PENDIENTE ENVÍO` con el mismo número. Antes de reenviar, la API pregunta a SUNAT si ya tiene el comprobante, para no duplicarlo. El reenvío es automático cada 5 minutos.
 - **Rechazo**: queda `RECHAZADO` con el código y la descripción de SUNAT. Se corrige y se usa **Reintentar** (mismo número).
 - **Anulación**: nada se borra.
@@ -97,8 +97,65 @@ OK: SUNAT directo configurado en demo (TAG vX.Y.Z, ambiente beta). ...
 - `SUNAT_SOL_USUARIO debe ser el RUC (11 dígitos) seguido del usuario SOL`: revisar que se pegó completo y sin espacios.
 - `SUNAT_CERT_P12_B64 no es un base64 válido`: volver a generar el base64 con `base64 -w0`.
 - `Se restauró ...`: el `.env` volvió a su estado anterior y la API se redespliega con la configuración previa. Revisar el log del job.
-- En la pantalla, un comprobante `RECHAZADO` con código `0109` (o similar): el usuario o la clave SOL no son correctos, o el usuario no tiene permiso de facturación.
-- Un resumen que no avanza: revisar que el ticket aparezca como `ENVIADO`; la tarea lo consulta cada 10 minutos.
+- En la pantalla, aviso «Credenciales SUNAT inválidas» con código `0102` o `0109`: el usuario o la clave SOL no son correctos, o el usuario no tiene permiso de facturación. Los envíos quedan en pausa (los comprobantes siguen pendientes, no se pierden) hasta corregir las credenciales.
+- Un resumen que no avanza: revisar que el ticket aparezca como `ENVIADO`; la tarea lo consulta cada 2 minutos.
+
+## Que no se pierda nada
+
+Ningún comprobante se pierde, se duplica ni deja un hueco de numeración, aunque se caiga la API, SUNAT o la red. Así funciona:
+
+```
+cobro (transacción)                       ── si falla, se deshace TODO (cobro, pedido, número)
+ ├─ pedido PAGADO                         ┐
+ └─ comprobante PENDIENTE_ENVIO + número  ┘ mismo commit = el outbox
+          │
+          ▼  (commit)
+envío inmediato ──┐                       ── lease en la fila: solo uno envía a la vez
+worker (cada 5 min)┘
+          │
+          ├─ XML y ZIP firmados se guardan ANTES de enviar
+          ├─ factura: primero getStatusCdr; si SUNAT ya la tiene, se guarda su CDR y no se reenvía
+          ├─ mismo ZIP en cada reintento
+          ▼
+        SUNAT ── acepta ──► EMITIDO_SUNAT (CDR guardado)
+          ├─ sin respuesta (red, timeout, 5xx) ──► PENDIENTE_ENVIO, próximo intento con espera:
+          │                                         1, 2, 5, 10, 30, 60 min y luego cada 2 h (±10 %)
+          ├─ rechazo 2xxx/3xxx (datos o XML) ──► REVISION_MANUAL (cola de fallos)
+          ├─ rechazo de datos locales ──────────► RECHAZADO (corregir y reintentar)
+          └─ credenciales 0102/0109 ────────────► pausa de envíos y aviso a ADMIN
+```
+
+**Qué pasa en cada fallo**
+
+- **La API se cae antes del commit del cobro:** no queda nada (ni comprobante ni número). El cajero cobra de nuevo.
+- **La API se cae después del commit:** la fila `PENDIENTE_ENVIO` ya existe. El worker la envía en la siguiente pasada.
+- **Se cae la red o SUNAT no responde:** queda `PENDIENTE_ENVIO` con el mismo número. Después de 5 fallos seguidos de SUNAT, el circuito pausa los envíos 5 minutos y avisa una sola vez. Al pasar la pausa, un solo intento de prueba decide.
+- **Dos procesos a la vez:** el candado Redis del worker y el lease de cada fila evitan el doble envío.
+- **Un rechazo de datos:** queda `RECHAZADO`. Se corrige el documento o la razón social y se reintenta con el mismo número.
+
+**Qué significa REVISION_MANUAL y qué hacer**
+
+Es la cola de fallos (dead letter). Llega un comprobante ahí cuando:
+
+- SUNAT lo rechaza con un código de validación 2xxx o 3xxx (el reintento no lo arregla), o
+- no hay respuesta después de 12 intentos (`facturacion_max_intentos`).
+
+Nada se borra: el motivo queda en `revision_motivo`, con el XML, el ZIP y la respuesta de SUNAT. En **Comprobantes › Electrónicos SUNAT**, el panel «Con problemas» lo muestra. Hay que leer el motivo:
+
+- Si es un dato (RUC, dirección, razón social): **Corregir y reintentar**, con el mismo número.
+- Si es una caída de SUNAT que ya pasó: **Reintentar** (una sola vez; si vuelve a fallar, sigue en revisión).
+- Nunca se emite a mano en el facturador externo un comprobante en revisión: podría duplicarse.
+
+**Alertas a ADMIN** (una por problema, sin repetir): comprobante pendiente más de 15 minutos, rechazo o revisión manual, circuito en pausa, credenciales inválidas, boleta sin reportar más de 3 días, resumen o baja sin respuesta más de 1 día, certificado que vence en 60, 30 o 7 días, y hueco de numeración en B002 o F002.
+
+**Monitoreo:** `GET /admin/comprobantes/salud` (solo ADMIN) devuelve solo conteos: pendientes, con problemas, edad del pendiente más viejo, boletas por reportar, días para el vencimiento del certificado, circuito abierto y credenciales inválidas.
+
+**Regla de la fecha de corte (no se emiten pedidos viejos).** Al pasar el selector a SUNAT por primera vez, se fija el parámetro `facturacion_desde` con la fecha y hora de ese momento (con Sí/No y auditoría). Desde ese momento:
+
+- El barrido de recuperación (pedidos cobrados como boleta o factura que no tienen comprobante) solo considera cobros posteriores a `facturacion_desde` y de las últimas 48 horas.
+- Sin `facturacion_desde`, el barrido no hace nada. Los cientos de pedidos históricos nunca salen a SUNAT de golpe.
+- En modo SIMULADO, el barrido solo registra lo que encontraría y nunca crea filas.
+- Cada comprobante que el barrido crea queda en auditoría (`BARRIDO_CREAR_COMPROBANTE`).
 
 ## Verificado y pendiente
 

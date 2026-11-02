@@ -31,9 +31,10 @@ export class AuditoriaService {
    * Inserta un registro en auditoria vía Prisma.
    * Regla de contrato: nunca lanza excepción; si falla, lo registra en el log.
    */
-  async registrar(r: RegistroAuditoria): Promise<void> {
+  async registrar(r: RegistroAuditoria, db: any = this.prisma): Promise<void> {
     try {
-      await this.prisma.auditoria.create({
+      // db: cliente de la transacción en curso (si se pasa, el registro se deshace con ella)
+      await db.auditoria.create({
         data: {
           categoria: r.categoria,
           modulo: r.modulo,

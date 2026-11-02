@@ -803,23 +803,30 @@ export class VouchersService {
     const medioCobro = planValidado
       ? [...new Set(planValidado.map((f) => f.medio))].join('+')
       : medioNormalizado;
-    await this.prisma.pedido.update({
-      where: { id },
-      data: {
-        cobro_mozo_en: new Date(),
-        cobro_mozo_medio: medioCobro,
-        cobro_mozo_party_id: usuario.partyId,
-        cobro_mozo_recibido: recibido,
-        comprobante_tipo: comprobante.tipo,
-        comprobante_doc: comprobante.doc,
-        comprobante_razon: comprobante.razon,
-        comprobante_direccion: comprobante.direccion,
-      },
-    });
+    // Cambio del pedido y nota de venta en una sola transacción: no queda la nota sin el cambio ni al revés
+    const esNotaVenta = comprobante.tipo === 'NOTA_VENTA' && !!this.comprobantes;
+    const datosMozo = {
+      cobro_mozo_en: new Date(),
+      cobro_mozo_medio: medioCobro,
+      cobro_mozo_party_id: usuario.partyId,
+      cobro_mozo_recibido: recibido,
+      comprobante_tipo: comprobante.tipo,
+      comprobante_doc: comprobante.doc,
+      comprobante_razon: comprobante.razon,
+      comprobante_direccion: comprobante.direccion,
+    };
+    let nota: any = null;
+    if (esNotaVenta) {
+      nota = await this.prisma.$transaction(async (tx) => {
+        await tx.pedido.update({ where: { id }, data: datosMozo });
+        // Idempotente: reenviar no emite otra nota ni la vuelve a imprimir
+        return this.comprobantes!.emitirParaPedido(id, tx, usuario, ip);
+      });
+    } else {
+      await this.prisma.pedido.update({ where: { id }, data: datosMozo });
+    }
 
-    if (comprobante.tipo === 'NOTA_VENTA' && this.comprobantes) {
-      // Idempotente: reenviar no emite otra nota ni la vuelve a imprimir
-      const nota = await this.comprobantes.emitirParaPedido(id, undefined, usuario, ip);
+    if (esNotaVenta && nota) {
       const persona = await this.prisma.person.findUnique({
         where: { party_id: usuario.partyId },
         select: { nombres: true, apellidos: true },

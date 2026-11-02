@@ -26,17 +26,29 @@ import { ListarPorEmitirDto } from './dto/listar-por-emitir.dto';
 import { ConfigFacturacionDto } from './dto/facturacion.dto';
 import { CLAVES_FACTURACION, ConfigFacturacion, interpretarConfig } from './facturacion/facturacion.config';
 import { aCentimos } from './facturacion/facturacion.calculo';
-import { ComprobanteEmision, DatosEmision, EmisorElectronico, ErrorRedEmisor, Proveedor, ResultadoBaja, ResultadoEmision } from './emisor/emisor.tipos';
+import { ArchivoEmision, ComprobanteEmision, DatosEmision, EmisorElectronico, ErrorCredencialesEmisor, ErrorRedEmisor, Proveedor, ResultadoBaja, ResultadoEmision } from './emisor/emisor.tipos';
 import { proveedorDe } from './emisor/proveedor';
 import { SimuladoEmisor } from './emisor/simulado.emisor';
 import { SunatEmisor } from './sunat/sunat.emisor';
 import { ambienteSunat } from './sunat/sunat.config';
 import { bytes, sha256 } from './sunat/sunat.util';
 import { ComprobantesSunatService } from './comprobantes-sunat.service';
+import { ComprobantesSaludService, condicionProblemas } from './comprobantes-salud.service';
+import { LEASE_ENVIO_MS, MAX_INTENTOS_DEFECTO, esRechazoPermanente, esperaFacturacionMs } from './comprobantes-politica';
 import { siguienteCorrelativo } from './secuencia';
+import { leerParametroNumerico } from '../impresion/estado-impresion';
 
 /** Plazo de la comunicación de baja de una factura en SUNAT (días). */
 export const PLAZO_BAJA_FACTURA_DIAS = 7;
+
+/** Estados desde los que una boleta/factura puede enviarse (o reenviarse). */
+const ESTADOS_ENVIABLES = ['PENDIENTE_ENVIO', 'RECHAZADO', 'REVISION_MANUAL'];
+const TIPOS_ELECTRONICOS = ['BOLETA', 'FACTURA'];
+
+/** Parámetro con la fecha de corte de la facturación electrónica (ISO). Antes de ella, el barrido no toca nada. */
+export const CLAVE_FECHA_CORTE = 'facturacion_desde';
+/** El barrido solo recupera cobros de las últimas 48 h (además del corte). */
+export const VENTANA_BARRIDO_MS = 48 * 60 * 60 * 1000;
 
 /** Series de la nota de venta interna (sin SUNAT). */
 const SERIE_NOTA = 'NV01';
@@ -67,6 +79,7 @@ export class ComprobantesService {
     @Optional() private readonly eventosGateway?: EventosGateway,
     @Optional() private readonly sunatEmisor?: SunatEmisor,
     @Optional() private readonly sunatResumen?: ComprobantesSunatService,
+    @Optional() private readonly salud?: ComprobantesSaludService,
   ) {}
 
   /** Proveedor que de verdad emite: SUNAT solo con sus credenciales; si no, SIMULADO (sin red). */
@@ -188,6 +201,7 @@ export class ComprobantesService {
       cadena_qr: c.facturacion_cadena_qr ?? null,
       hash: c.facturacion_hash ?? null,
       respuesta_sunat: c.facturacion_respuesta ?? null,
+      revision_motivo: c.revision_motivo ?? null,
       simulado: c.simulado ?? false,
       baja_estado: c.baja_estado ?? null,
       baja_motivo: c.baja_motivo ?? null,
@@ -325,17 +339,18 @@ export class ComprobantesService {
       },
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
-    });
+    }, db);
 
     if (!electronico) {
       return { ...this.serializarComprobante(nuevo), advertencia };
     }
 
-    // 7. Envío a SUNAT (sin transacción externa: no se mantiene una transacción abierta durante la red)
+    // 7. Envío a SUNAT. Con tx no hay red: la fila PENDIENTE_ENVIO es el outbox y el envío lo hace el worker
+    // (o el envío post-commit de Caja). Sin tx, se envía al momento.
     let enviado: any = nuevo;
     if (!tx) {
       try {
-        enviado = await this.enviarElectronico(nuevo.id, { direccion: direccionSolicitada, usuario, ip });
+        enviado = await this.enviarElectronico(nuevo.id, { direccion: direccionSolicitada, usuario, ip, automatico: true });
       } catch {
         // Error inesperado: el cobro sigue; el comprobante queda pendiente con su número y la tarea lo reenvía
         enviado = await this.prisma.comprobante
@@ -355,15 +370,45 @@ export class ComprobantesService {
    */
   async enviarElectronico(
     comprobanteId: bigint,
-    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string } = {},
+    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; automatico?: boolean } = {},
   ): Promise<any> {
+    // Pausa del circuito: el envío automático no sale; la fila queda PENDIENTE_ENVIO con su número
+    if (opciones.automatico && (await this.salud?.circuitoAbierto())) {
+      return this.prisma.comprobante.findUnique({ where: { id: comprobanteId } });
+    }
+    // Reclamo de la fila: solo si está enviable y sin envío en curso. Estado y lease se miran en el mismo UPDATE,
+    // así dos caminos (worker y envío post-commit) no mandan el mismo comprobante.
+    const ahora = new Date();
+    const reclamo = await this.prisma.comprobante.updateMany({
+      where: {
+        id: comprobanteId,
+        tipo: { in: TIPOS_ELECTRONICOS },
+        facturacion_estado: { in: ESTADOS_ENVIABLES },
+        OR: [{ enviando_hasta: null }, { enviando_hasta: { lt: ahora } }],
+      },
+      data: { enviando_hasta: new Date(ahora.getTime() + LEASE_ENVIO_MS) },
+    });
     const c = await this.prisma.comprobante.findUnique({
       where: { id: comprobanteId },
       include: { pedido: { include: { lineas: true } } },
     });
-    if (!c || (c.tipo !== 'BOLETA' && c.tipo !== 'FACTURA')) return c;
-    if (['EMITIDO_SUNAT', 'PENDIENTE_RESUMEN', 'ENVIADA_RESUMEN'].includes(c.facturacion_estado ?? '')) return c;
+    if (!c || !TIPOS_ELECTRONICOS.includes(c.tipo)) return c;
+    if (reclamo.count === 0) {
+      if (opciones.automatico || !ESTADOS_ENVIABLES.includes(c.facturacion_estado ?? '')) return c;
+      throw new HttpException(
+        { codigo: 'COMPROBANTE_EN_ENVIO', mensaje: 'Ese comprobante se está enviando ahora: espere y revise su estado' },
+        HttpStatus.CONFLICT,
+      );
+    }
+    try {
+      return await this.enviarReclamado(c, opciones);
+    } finally {
+      // Libera el lease aunque algo falle a mitad (si guardarResultado llegó, ya quedó en null)
+      await this.prisma.comprobante.updateMany({ where: { id: comprobanteId }, data: { enviando_hasta: null } }).catch(() => undefined);
+    }
+  }
 
+  private async enviarReclamado(c: any, opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string }): Promise<any> {
     const cfg = await this.leerConfigFacturacion();
     const pedido: any = c.pedido;
     const direccion = opciones.direccion ?? pedido.comprobante_direccion ?? null;
@@ -377,32 +422,82 @@ export class ComprobantesService {
     }
 
     const intentosPrevios = c.facturacion_intentos ?? 0;
+    const maxIntentos = await leerParametroNumerico(this.prisma, 'facturacion_max_intentos', MAX_INTENTOS_DEFECTO);
     let res: ResultadoEmision;
     try {
-      // Un ZIP ya firmado sin respuesta se reenvía tal cual (mismo documento, mismo número)
+      // Un intento previo sin respuesta: el ZIP guardado se reenvía tal cual (mismo documento, mismo número)
       const zipPrevio = c.facturacion_estado === 'PENDIENTE_ENVIO' && intentosPrevios > 0 ? await this.ultimoArchivo(c.id, 'ZIP') : null;
       if (proveedor !== 'SIMULADO') {
+        // Se cuenta ANTES de llamar a SUNAT: si el proceso muere en la llamada, el próximo intento consulta antes de reenviar
         await this.prisma.comprobante.update({ where: { id: c.id }, data: { facturacion_intentos: { increment: 1 } } });
       }
-      const emision: ComprobanteEmision = { id: c.id, tipo: c.tipo as 'BOLETA' | 'FACTURA', serie: c.serie, numero: c.numero, intentos: intentosPrevios, datos, zipPrevio };
+      const emision: ComprobanteEmision = {
+        id: c.id,
+        tipo: c.tipo as 'BOLETA' | 'FACTURA',
+        serie: c.serie,
+        numero: c.numero,
+        intentos: intentosPrevios,
+        datos,
+        zipPrevio,
+        alPreparar: (archivos: ArchivoEmision[]) => this.guardarArchivos(c.id, archivos),
+      };
       res = await this.emisorPara(proveedor).generar(emision);
+      // El emisor convierte la falla de red en PENDIENTE_ENVIO (no la lanza): ahí se cuenta el fallo para el circuito
+      if (c.tipo === 'FACTURA' && proveedor === 'SUNAT') {
+        if (res.estado === 'PENDIENTE_ENVIO') await this.salud?.registrarFallo();
+        else await this.salud?.registrarExito();
+      }
     } catch (e: any) {
-      if (!(e instanceof ErrorRedEmisor)) this.logger.error(`Emisor ${proveedor}: ${e?.message ?? e}`);
-      res = { estado: 'PENDIENTE_ENVIO', respuesta: 'Sin respuesta del emisor electrónico: se reintenta', simulado: false };
+      if (e instanceof ErrorCredencialesEmisor) {
+        await this.salud?.registrarCredenciales();
+        res = { estado: 'PENDIENTE_ENVIO', respuesta: 'SUNAT rechazó las credenciales: envío en pausa', simulado: false };
+      } else {
+        if (e instanceof ErrorRedEmisor && proveedor === 'SUNAT') await this.salud?.registrarFallo();
+        if (!(e instanceof ErrorRedEmisor)) this.logger.error(`Emisor ${proveedor}: ${e?.message ?? e}`);
+        res = { estado: 'PENDIENTE_ENVIO', respuesta: 'Sin respuesta del emisor electrónico: se reintenta', simulado: false };
+      }
     }
-    return this.guardarResultado(c, res, opciones);
+
+    // Decisión: sin respuesta muchas veces, o rechazo que no se arregla reintentando, pasa a REVISION_MANUAL (cola de fallos)
+    const intentosTras = intentosPrevios + (proveedor !== 'SIMULADO' ? 1 : 0);
+    let estado: string = res.estado;
+    let revisionMotivo: string | null = null;
+    if (estado === 'PENDIENTE_ENVIO' && intentosTras >= maxIntentos) {
+      estado = 'REVISION_MANUAL';
+      revisionMotivo = `Sin respuesta de SUNAT tras ${intentosTras} intentos: ${res.respuesta}`;
+    } else if (estado === 'RECHAZADO' && esRechazoPermanente(res.codigoRechazo)) {
+      estado = 'REVISION_MANUAL';
+      revisionMotivo = `Rechazo permanente ${res.codigoRechazo}: ${res.respuesta}`;
+    }
+    const proximoIntentoEn = estado === 'PENDIENTE_ENVIO' ? new Date(Date.now() + esperaFacturacionMs(intentosTras)) : null;
+    return this.guardarResultado(c, res, opciones, { estado, revisionMotivo, proximoIntentoEn });
+  }
+
+  /** Guarda XML y ZIP firmados ANTES de la llamada de red (así el reintento puede reenviar el mismo ZIP). */
+  private async guardarArchivos(comprobanteId: bigint, archivos: ArchivoEmision[]): Promise<void> {
+    for (const a of archivos) await this.guardarArchivo(comprobanteId, a);
   }
 
   /** Guarda el resultado del envío, sus archivos y la emisión en la fila (y audita). */
-  private async guardarResultado(c: any, res: ResultadoEmision, opciones: { usuario?: UsuarioAutenticado; ip?: string }) {
-    const aceptado = res.estado === 'EMITIDO_SUNAT';
+  private async guardarResultado(
+    c: any,
+    res: ResultadoEmision,
+    opciones: { usuario?: UsuarioAutenticado; ip?: string },
+    extra: { estado?: string; revisionMotivo?: string | null; proximoIntentoEn?: Date | null } = {},
+  ) {
+    const estado = extra.estado ?? res.estado;
+    const aceptado = estado === 'EMITIDO_SUNAT';
     const ahora = new Date();
     const respuesta = textoRespuesta(res.respuesta || 'Sin detalle de SUNAT');
     const data: any = {
-      facturacion_estado: res.estado,
+      facturacion_estado: estado,
       emision: aceptado ? 'EMITIDO' : 'POR_EMITIR',
       facturacion_respuesta: respuesta,
       simulado: res.simulado === true,
+      enviando_hasta: null,
+      proximo_intento_en: estado === 'PENDIENTE_ENVIO' ? (extra.proximoIntentoEn ?? null) : null,
+      revision_motivo: estado === 'REVISION_MANUAL' ? (extra.revisionMotivo ?? null) : null,
+      revision_en: estado === 'REVISION_MANUAL' ? ahora : null,
     };
     if (res.hash) data.facturacion_hash = res.hash;
     if (res.cadenaQr) data.facturacion_cadena_qr = res.cadenaQr;
@@ -420,20 +515,31 @@ export class ComprobantesService {
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'comprobantes',
-      accion: `FACTURACION_${res.estado}`,
-      resultado: res.estado === 'RECHAZADO' ? 'RECHAZADO' : 'OK',
+      accion: `FACTURACION_${estado}`,
+      resultado: estado === 'RECHAZADO' || estado === 'REVISION_MANUAL' ? 'RECHAZADO' : 'OK',
       entidad: 'comprobante',
       entidadId: c.id,
+      antes: { estado: c.facturacion_estado ?? null },
       despues: {
         numero_texto: c.numero_texto,
         emisor: data.simulado ? 'SIMULADO' : proveedorDeFila(c),
-        estado: res.estado,
+        estado,
         simulado: data.simulado,
         respuesta: respuesta.slice(0, 300),
       },
       partyId: opciones.usuario?.partyId ? BigInt(opciones.usuario.partyId) : undefined,
       ip: opciones.ip,
     });
+
+    if (estado === 'RECHAZADO' || estado === 'REVISION_MANUAL') {
+      await this.salud?.avisar({
+        clave: `comprobante:${c.id}:${estado}:${actualizado.facturacion_intentos}`,
+        titulo: `${c.numero_texto} ${estado === 'RECHAZADO' ? 'rechazado por SUNAT' : 'pasó a revisión manual'}`,
+        mensaje: extra.revisionMotivo ?? respuesta.slice(0, 300),
+        prioridad: 'alta',
+        enlace: '/admin/comprobantes',
+      });
+    }
     return actualizado;
   }
 
@@ -477,22 +583,118 @@ export class ComprobantesService {
         data: { comprobante_direccion: correccion.direccion?.trim() || null },
       });
     }
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'comprobantes',
+      accion: 'REINTENTO_MANUAL',
+      resultado: 'OK',
+      entidad: 'comprobante',
+      entidadId: id,
+      antes: { estado: c.facturacion_estado ?? null, intentos: c.facturacion_intentos ?? 0 },
+      despues: { correcciones: Object.keys(cambios).concat(correccion.direccion !== undefined ? ['direccion'] : []) },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
     const enviado = await this.enviarElectronico(id, { direccion: correccion.direccion ?? undefined, usuario, ip });
     return this.serializarComprobante(enviado);
   }
 
-  /** Tarea automática: reenvía las BOLETA/FACTURA PENDIENTE_ENVIO (lotes de 20, las más antiguas primero). */
-  async reintentarPendientes(): Promise<{ revisados: number }> {
+  /**
+   * Tarea automática (worker): reenvía las BOLETA/FACTURA PENDIENTE_ENVIO cuyo próximo intento ya llegó
+   * (lotes de 20, las más antiguas primero). Con el circuito abierto no envía nada.
+   */
+  async reintentarPendientes(): Promise<{ revisados: number; motivo?: string }> {
+    if (await this.salud?.circuitoAbierto()) return { revisados: 0, motivo: 'CIRCUITO_ABIERTO' };
+    const ahora = new Date();
     const pendientes = await this.prisma.comprobante.findMany({
-      where: { facturacion_estado: 'PENDIENTE_ENVIO', tipo: { in: ['BOLETA', 'FACTURA'] } },
+      where: {
+        facturacion_estado: 'PENDIENTE_ENVIO',
+        tipo: { in: TIPOS_ELECTRONICOS },
+        OR: [{ proximo_intento_en: null }, { proximo_intento_en: { lte: ahora } }],
+      },
       orderBy: { creado_en: 'asc' },
       take: 20,
       select: { id: true },
     });
     for (const p of pendientes) {
-      await this.enviarElectronico(p.id);
+      try {
+        await this.enviarElectronico(p.id, { automatico: true });
+      } catch (e: any) {
+        this.logger.error(`Reenvío del comprobante ${p.id}: ${e?.message ?? e}`);
+      }
     }
     return { revisados: pendientes.length };
+  }
+
+  /**
+   * Envío inmediato de la boleta/factura de un pedido, justo después del commit del cobro.
+   * Si no sale, la fila queda PENDIENTE_ENVIO y el worker la reenvía.
+   */
+  async enviarPorPedido(pedidoIdRaw: bigint | string | number) {
+    const pedidoId = this.parsearId(pedidoIdRaw, 'pedido');
+    const c = await this.prisma.comprobante.findFirst({ where: { pedido_id: pedidoId, anulado_en: null }, select: { id: true } });
+    if (!c) return null;
+    return this.enviarElectronico(c.id, { automatico: true });
+  }
+
+  /**
+   * Barrido de recuperación: crea UNA vez el comprobante de los pedidos cobrados como boleta/factura que no lo tienen
+   * (caída entre el cobro y su emisión). Reglas:
+   *  - Sin parámetro facturacion_desde (fecha de corte) no hace nada: los pedidos históricos nunca salen a SUNAT.
+   *  - Solo cobros posteriores al corte y dentro de las últimas 48 h.
+   *  - En modo SIMULADO solo registra lo que encontró; no crea filas.
+   */
+  async barrerPedidosSinComprobante(ahora = new Date()): Promise<{ creados: number; encontrados: number; motivo?: string }> {
+    const corte = await this.leerFechaCorteFacturacion();
+    if (!corte) return { creados: 0, encontrados: 0, motivo: 'SIN_FECHA_DE_CORTE' };
+    const cfg = await this.leerConfigFacturacion();
+    const simulado = this.proveedorEfectivo(cfg.proveedor) === 'SIMULADO';
+    const desde = new Date(Math.max(corte.getTime(), ahora.getTime() - VENTANA_BARRIDO_MS));
+    const pedidos = await this.prisma.pedido.findMany({
+      where: {
+        pago_estado: 'PAGADO',
+        comprobante_tipo: { in: TIPOS_ELECTRONICOS },
+        cobros: { some: { anulado_en: null, en: { gte: desde } } },
+        comprobante: { none: { anulado_en: null } },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+      take: 20,
+    });
+    if (simulado) {
+      this.logger.log(JSON.stringify({ evento: 'barrido_comprobantes_simulado', encontrados: pedidos.length }));
+      return { creados: 0, encontrados: pedidos.length, motivo: 'SIMULADO' };
+    }
+    let creados = 0;
+    for (const p of pedidos) {
+      try {
+        await this.emitirParaPedido(p.id);
+        creados++;
+        await this.auditoria.registrar({
+          categoria: 'CAMBIO',
+          modulo: 'comprobantes',
+          accion: 'BARRIDO_CREAR_COMPROBANTE',
+          resultado: 'OK',
+          entidad: 'pedido',
+          entidadId: p.id,
+          despues: { pedidoId: p.id.toString(), corte: corte.toISOString() },
+        });
+      } catch (e: any) {
+        this.logger.error(`Barrido del pedido ${p.id}: ${e?.message ?? e}`);
+      }
+    }
+    return { creados, encontrados: pedidos.length };
+  }
+
+  /** Fecha de corte de la facturación electrónica (parámetro facturacion_desde), o null si no está fijada. */
+  async leerFechaCorteFacturacion(): Promise<Date | null> {
+    try {
+      const p = await this.prisma.parametro.findUnique({ where: { clave: CLAVE_FECHA_CORTE } });
+      const d = typeof p?.valor === 'string' ? new Date(p.valor) : null;
+      return d && !Number.isNaN(d.getTime()) ? d : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Datos de emisión de una fila (para anular o reenviar). Lanza BadRequest si un monto no sirve. */
@@ -576,7 +778,7 @@ export class ComprobantesService {
         }
       }
     } catch (e) {
-      if (e instanceof ErrorRedEmisor) {
+      if (e instanceof ErrorRedEmisor || e instanceof ErrorCredencialesEmisor) {
         throw new HttpException(
           { codigo: 'EMISOR_SIN_RESPUESTA', mensaje: 'El emisor electrónico no respondió: la baja no se registró, intenta de nuevo' },
           HttpStatus.SERVICE_UNAVAILABLE,
@@ -614,8 +816,10 @@ export class ComprobantesService {
   }
 
   /** Lista de BOLETA/FACTURA ya enviadas (aceptadas, rechazadas o pendientes), más recientes primero. */
-  async listarElectronicos(pagina = 1, limite = 20) {
-    const where = { tipo: { in: ['BOLETA', 'FACTURA'] }, facturacion_estado: { not: null } };
+  async listarElectronicos(pagina = 1, limite = 20, soloProblemas = false) {
+    const where: any = soloProblemas
+      ? condicionProblemas(new Date())
+      : { tipo: { in: ['BOLETA', 'FACTURA'] }, facturacion_estado: { not: null } };
     const [total, filas] = await Promise.all([
       this.prisma.comprobante.count({ where }),
       this.prisma.comprobante.findMany({
@@ -1051,7 +1255,7 @@ export class ComprobantesService {
     }
 
     // Con envío pendiente, emitirlo a mano en el facturador duplicaría el comprobante al reenviarse
-    if (comprobante.facturacion_estado === 'PENDIENTE_ENVIO') {
+    if (comprobante.facturacion_estado === 'PENDIENTE_ENVIO' || comprobante.facturacion_estado === 'REVISION_MANUAL') {
       throw new HttpException(
         {
           codigo: 'COMPROBANTE_PENDIENTE_ENVIO',
@@ -1120,7 +1324,9 @@ export class ComprobantesService {
     const cfg = await this.leerConfigFacturacion();
     const sunat = this.sunatEmisor;
     const vence = sunat?.certificadoVence() ?? null;
+    const corte = await this.leerFechaCorteFacturacion();
     return {
+      facturacion_desde: corte ? corte.toISOString() : null,
       igvPct: cfg.igvPct,
       serieBoleta: cfg.serieBoleta,
       serieFactura: cfg.serieFactura,
@@ -1152,6 +1358,16 @@ export class ComprobantesService {
     for (const [clave, valor] of valores) {
       await this.prisma.parametro.upsert({ where: { clave }, update: { valor: valor as any }, create: { clave, valor: valor as any } });
     }
+    // Primera vez que el selector pasa a SUNAT: se fija la fecha de corte. Los pedidos anteriores no se emiten nunca.
+    let corteFijado: string | null = null;
+    if (nueva.proveedor === 'SUNAT' && antes.proveedor !== 'SUNAT' && !(await this.leerFechaCorteFacturacion())) {
+      corteFijado = new Date().toISOString();
+      await this.prisma.parametro.upsert({
+        where: { clave: CLAVE_FECHA_CORTE },
+        update: { valor: corteFijado },
+        create: { clave: CLAVE_FECHA_CORTE, valor: corteFijado },
+      });
+    }
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'comprobantes',
@@ -1159,7 +1375,7 @@ export class ComprobantesService {
       resultado: 'OK',
       entidad: 'parametro',
       antes: { ...antes },
-      despues: { ...nueva },
+      despues: { ...nueva, ...(corteFijado ? { facturacion_desde: corteFijado } : {}) },
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
     });

@@ -3,6 +3,7 @@ import { ComprobantesController } from './comprobantes.controller';
 import { ComprobantesService } from './comprobantes.service';
 import { ComprobantesReintentosService } from './comprobantes-reintentos.service';
 import { ComprobantesSunatService } from './comprobantes-sunat.service';
+import { ComprobantesSaludService } from './comprobantes-salud.service';
 import { SunatEmisor } from './sunat/sunat.emisor';
 import { siguienteCorrelativo } from './secuencia';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -15,6 +16,7 @@ import { LocalModule } from '../local/local.module';
     ComprobantesService,
     ComprobantesReintentosService,
     ComprobantesSunatService,
+    ComprobantesSaludService,
     {
       provide: SunatEmisor,
       inject: [PrismaService],

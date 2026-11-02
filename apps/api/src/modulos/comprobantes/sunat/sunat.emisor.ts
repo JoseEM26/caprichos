@@ -1,5 +1,6 @@
-import { ArchivoEmision, ComprobanteEmision, EmisorElectronico, ErrorRedEmisor, ResultadoBaja, ResultadoEmision } from '../emisor/emisor.tipos';
+import { ArchivoEmision, ComprobanteEmision, EmisorElectronico, ErrorCredencialesEmisor, ErrorRedEmisor, ResultadoBaja, ResultadoEmision } from '../emisor/emisor.tipos';
 import { ComprobanteInvalidoError } from '../facturacion/facturacion.datos';
+import { esCodigoAutenticacion } from '../comprobantes-politica';
 import { ConfigSunat, RUC_PRUEBA_BETA, configSunat } from './sunat.config';
 import { EmisorXml, armarBajaXml, armarFacturaXml, validarEmisorXml } from './sunat.xml';
 import { CertificadoFirma, digestDeFirma, firmarXml, leerCertificadoP12 } from './sunat.firma';
@@ -134,17 +135,22 @@ export class SunatEmisor implements EmisorElectronico {
     ];
   }
 
+  /** Datos comunes del resultado. Los archivos (XML y ZIP) ya se guardaron antes de enviar (alPreparar). */
   private comun(f: Firmado) {
-    return { simulado: false, hash: f.digest, cadenaQr: f.qr, totalCents: f.totalCents, igvCents: f.igvCents, archivos: this.archivosDe(f) };
+    return { simulado: false, hash: f.digest, cadenaQr: f.qr, totalCents: f.totalCents, igvCents: f.igvCents };
   }
 
   async generar(c: ComprobanteEmision): Promise<ResultadoEmision> {
-    if (c.tipo === 'FACTURA' && c.zipPrevio) {
-      // Reintento sin respuesta: primero se pregunta a SUNAT si ya tiene la factura; si no, se reenvía el mismo ZIP
+    if (c.tipo === 'FACTURA' && c.intentos > 0) {
+      // Hubo un intento antes (quizá llegó a SUNAT sin respuesta): primero se pregunta si ya la tiene.
+      // Si SUNAT no responde a la consulta, lanza ErrorRedEmisor y no se reenvía nada.
       const previa = await this.consultar(c);
       if (previa) return previa;
+    }
+    if (c.tipo === 'FACTURA' && c.zipPrevio) {
+      // Mismo ZIP del intento anterior: mismo documento, mismo número, sin volver a firmar
       const emisor = await this.emisorXml();
-      return this.enviarFactura(`${emisor.ruc}-01-${c.serie}-${c.numero}`, c.zipPrevio, { simulado: false, archivos: [] });
+      return this.enviarFactura(`${emisor.ruc}-01-${c.serie}-${c.numero}`, c.zipPrevio, { simulado: false });
     }
     let f: Firmado & { codigoTipo: string };
     try {
@@ -154,6 +160,8 @@ export class SunatEmisor implements EmisorElectronico {
       if (e instanceof ComprobanteInvalidoError) return { estado: 'RECHAZADO', respuesta: `Datos: ${e.motivo}`, simulado: false };
       throw e;
     }
+    // XML y ZIP firmados a disco ANTES de la red: si el proceso muere al enviar, el reintento reenvía este mismo ZIP
+    if (c.alPreparar) await c.alPreparar(this.archivosDe(f));
     // ponytail: SUNAT admite sendBill individual de boletas en ciertos casos (por confirmar); hoy todas van por resumen diario (RC)
     if (c.tipo === 'BOLETA') {
       return { ...this.comun(f), estado: 'PENDIENTE_RESUMEN', respuesta: 'Firmada: se reporta en el resumen diario de SUNAT' };
@@ -168,7 +176,9 @@ export class SunatEmisor implements EmisorElectronico {
       const xml = await enviarSoap(cfg.urlFactura, sobreSoap('sendBill', cuerpoEnvio(`${nombre}.zip`, zip), cfg.usuario, cfg.clave), this.fetchFn);
       const r = parsearSoap(xml);
       if (r.fault) {
-        if (esFaultCliente(r.fault)) return { ...comunes, estado: 'RECHAZADO', respuesta: `${codigoFault(r.fault)}: ${r.fault.mensaje}` };
+        const codigo = codigoFault(r.fault);
+        if (esCodigoAutenticacion(codigo)) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigo})`);
+        if (esFaultCliente(r.fault)) return { ...comunes, estado: 'RECHAZADO', respuesta: `${codigo}: ${r.fault.mensaje}`, codigoRechazo: codigo };
         throw new ErrorRedEmisor('SUNAT devolvió un error del servidor');
       }
       const cdr = leerCdr(r.textos.applicationResponse ?? '');
@@ -177,7 +187,8 @@ export class SunatEmisor implements EmisorElectronico {
         ...comunes,
         estado: estado === 'RECHAZADA' ? 'RECHAZADO' : 'EMITIDO_SUNAT',
         respuesta: textoCdr(cdr),
-        archivos: [...(comunes.archivos ?? []), { tipo: 'CDR', nombre: cdr.nombre, contenido: cdr.xml }],
+        codigoRechazo: estado === 'RECHAZADA' ? String(cdr.codigo) : null,
+        archivos: [{ tipo: 'CDR', nombre: cdr.nombre, contenido: cdr.xml }],
       };
     } catch (e) {
       if (e instanceof ErrorRedEmisor) return { ...comunes, estado: 'PENDIENTE_ENVIO', respuesta: 'Sin respuesta de SUNAT: se reintenta' };
@@ -185,7 +196,10 @@ export class SunatEmisor implements EmisorElectronico {
     }
   }
 
-  /** Factura: pregunta a SUNAT por su CDR (getStatusCdr) antes de reenviar. Boleta: no aplica (resumen). */
+  /**
+   * Factura: pregunta a SUNAT por su CDR (getStatusCdr). Devuelve el resultado si SUNAT ya la tiene,
+   * o null si no consta. Un error del servidor o la red lanza ErrorRedEmisor: en ese caso no se reenvía.
+   */
   async consultar(c: ComprobanteEmision): Promise<ResultadoEmision | null> {
     if (c.tipo !== 'FACTURA') return null;
     const cfg = this.config();
@@ -195,12 +209,20 @@ export class SunatEmisor implements EmisorElectronico {
       `<serieComprobante>${c.serie}</serieComprobante><numeroComprobante>${c.numero}</numeroComprobante>`;
     const xml = await enviarSoap(cfg.urlConsulta, sobreSoap('getStatusCdr', cuerpo, cfg.usuario, cfg.clave), this.fetchFn);
     const r = parsearSoap(xml);
-    if (r.fault || r.textos.statusCode !== '0' || !r.textos.content) return null;
+    if (r.fault) {
+      const codigo = codigoFault(r.fault);
+      if (esCodigoAutenticacion(codigo)) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigo})`);
+      // Fault de cliente: SUNAT no tiene el comprobante. Fault de servidor: no se sabe, no se reenvía.
+      if (!esFaultCliente(r.fault)) throw new ErrorRedEmisor('SUNAT no pudo confirmar si ya tiene el comprobante');
+      return null;
+    }
+    if (r.textos.statusCode !== '0' || !r.textos.content) return null;
     const cdr = leerCdr(r.textos.content);
     return {
       estado: estadoCdr(cdr) === 'RECHAZADA' ? 'RECHAZADO' : 'EMITIDO_SUNAT',
       respuesta: textoCdr(cdr),
       simulado: false,
+      codigoRechazo: estadoCdr(cdr) === 'RECHAZADA' ? String(cdr.codigo) : null,
       archivos: [{ tipo: 'CDR', nombre: cdr.nombre, contenido: cdr.xml }],
     };
   }
@@ -239,6 +261,7 @@ export class SunatEmisor implements EmisorElectronico {
     const xml = await enviarSoap(cfg.urlFactura, sobreSoap('sendSummary', cuerpoEnvio(`${nombre}.zip`, zip), cfg.usuario, cfg.clave), this.fetchFn);
     const r = parsearSoap(xml);
     if (r.fault) {
+      if (esCodigoAutenticacion(codigoFault(r.fault))) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigoFault(r.fault)})`);
       if (esFaultCliente(r.fault)) return { rechazo: `${codigoFault(r.fault)}: ${r.fault.mensaje}` };
       throw new ErrorRedEmisor('SUNAT devolvió un error del servidor');
     }
@@ -252,6 +275,7 @@ export class SunatEmisor implements EmisorElectronico {
     const xml = await enviarSoap(cfg.urlFactura, sobreSoap('getStatus', `<ticket>${ticket}</ticket>`, cfg.usuario, cfg.clave), this.fetchFn);
     const r = parsearSoap(xml);
     if (r.fault) {
+      if (esCodigoAutenticacion(codigoFault(r.fault))) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigoFault(r.fault)})`);
       if (esFaultCliente(r.fault)) return { estado: 'RECHAZADO', respuesta: `${codigoFault(r.fault)}: ${r.fault.mensaje}` };
       throw new ErrorRedEmisor('SUNAT devolvió un error del servidor');
     }

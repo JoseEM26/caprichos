@@ -9,7 +9,7 @@ import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
 import { comprobantesApi } from './comprobantesApi';
 import { formatearSoles } from './utilidades';
-import type { ComprobanteElectronico, ConfigFacturacion, ProveedorFacturacion } from './tipos';
+import type { ComprobanteElectronico, ConfigFacturacion, ProveedorFacturacion, SaludFacturacion } from './tipos';
 
 const ALTO_TOQUE = '44px';
 
@@ -22,6 +22,7 @@ function estadoDe(c: ComprobanteElectronico): { texto: string; variante: Variant
   if (c.facturacion_estado === 'PENDIENTE_ENVIO') return { texto: 'Pendiente de envío', variante: 'aviso' };
   if (c.facturacion_estado === 'PENDIENTE_RESUMEN') return { texto: 'Pendiente de resumen diario', variante: 'aviso' };
   if (c.facturacion_estado === 'ENVIADA_RESUMEN') return { texto: 'En resumen diario (espera a SUNAT)', variante: 'aviso' };
+  if (c.facturacion_estado === 'REVISION_MANUAL') return { texto: 'Revisión manual', variante: 'peligro' };
   return { texto: 'Rechazado', variante: 'peligro' };
 }
 
@@ -45,11 +46,26 @@ function insigniaProveedor(config: ConfigFacturacion): { texto: string; variante
   return { texto: 'Modo simulado (sin SUNAT)', variante: 'aviso' };
 }
 
+/** Fecha y hora de Lima de la fecha de corte (ISO). */
+const fechaHoraCorta = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+/** Lo que el panel «Con problemas» dice de cada caso: qué hacer. */
+function accionDe(c: ComprobanteElectronico): string {
+  if (c.facturacion_estado === 'REVISION_MANUAL' || c.facturacion_estado === 'RECHAZADO') return 'Corregir y reintentar';
+  return 'Reintentar';
+}
+
 export function ElectronicosTab() {
   const { usuario } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN';
 
   const [filas, setFilas] = useState<ComprobanteElectronico[]>([]);
+  const [problemas, setProblemas] = useState<ComprobanteElectronico[]>([]);
+  const [salud, setSalud] = useState<SaludFacturacion | null>(null);
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [cargando, setCargando] = useState(true);
@@ -76,6 +92,19 @@ export function ElectronicosTab() {
   const [motivo, setMotivo] = useState('');
   const [errorMotivo, setErrorMotivo] = useState<string | null>(null);
 
+  /** Panel «Con problemas» y contador: si fallan, la pestaña sigue funcionando sin ellos. */
+  const cargarProblemas = useCallback(async () => {
+    if (!esAdmin) return;
+    try {
+      const [p, s] = await Promise.all([comprobantesApi.listarProblemasElectronicos(1, 50), comprobantesApi.saludFacturacion()]);
+      setProblemas(p.elementos);
+      setSalud(s);
+    } catch {
+      setProblemas([]);
+      setSalud(null);
+    }
+  }, [esAdmin]);
+
   const cargar = useCallback(async (p = 1) => {
     setCargando(true);
     setError(null);
@@ -89,7 +118,8 @@ export function ElectronicosTab() {
     } finally {
       setCargando(false);
     }
-  }, []);
+    void cargarProblemas();
+  }, [cargarProblemas]);
 
   useEffect(() => {
     cargar(1);
@@ -212,6 +242,9 @@ export function ElectronicosTab() {
         {config && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 10, fontSize: 13 }}>
             <span>Proveedor elegido: <strong>{NOMBRE_PROVEEDOR[config.proveedor ?? 'SIMULADO']}</strong></span>
+            {config.facturacion_desde && (
+              <span>Facturación desde: <strong>{fechaHoraCorta(config.facturacion_desde)}</strong> (pedidos cobrados antes no se emiten)</span>
+            )}
             {(config.proveedor === 'SUNAT' || config.sunat?.credenciales) && (
               <>
                 <span>Ambiente: <strong>{config.sunat?.ambiente === 'prod' ? 'producción' : 'beta (pruebas)'}</strong></span>
@@ -262,6 +295,14 @@ export function ElectronicosTab() {
         {errorConfig && <div role="alert" style={{ color: 'var(--cp-red, #b00020)', marginTop: 8 }}>{errorConfig}</div>}
       </section>
 
+      {esAdmin && salud && (
+        <div data-testid="contador-facturacion" role="status" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontWeight: 700 }}>
+          <span>Pendientes: {salud.pendientes}</span>
+          <span style={{ color: salud.con_problemas > 0 ? 'var(--cp-red, #b00020)' : undefined }}>Con problemas: {salud.con_problemas}</span>
+          {salud.circuito_abierto && <span>SUNAT en pausa</span>}
+          {salud.credenciales_invalidas && <span style={{ color: 'var(--cp-red, #b00020)' }}>Credenciales SUNAT inválidas</span>}
+        </div>
+      )}
       {aviso && <div role="status" style={{ fontWeight: 600 }}>{aviso}</div>}
       {error && <EstadoError mensaje={error} />}
 
@@ -273,7 +314,7 @@ export function ElectronicosTab() {
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filas.map((c) => {
             const estado = estadoDe(c);
-            const puedeReintentar = esAdmin && (c.facturacion_estado === 'RECHAZADO' || c.facturacion_estado === 'PENDIENTE_ENVIO');
+            const puedeReintentar = esAdmin && (c.facturacion_estado === 'RECHAZADO' || c.facturacion_estado === 'PENDIENTE_ENVIO' || c.facturacion_estado === 'REVISION_MANUAL');
             const puedeAnular =
               esAdmin &&
               (c.facturacion_estado === 'EMITIDO_SUNAT' || c.facturacion_estado === 'PENDIENTE_RESUMEN') &&
@@ -327,10 +368,40 @@ export function ElectronicosTab() {
 
       {totalPaginas > 1 && <Paginacion paginaActual={pagina} totalPaginas={totalPaginas} alCambiarPagina={(p) => cargar(p)} />}
 
+      {esAdmin && problemas.length > 0 && (
+        <section aria-label="Comprobantes con problemas" style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-red, #b00020)', borderRadius: 16, padding: 16 }}>
+          <strong>Con problemas ({problemas.length})</strong>
+          <p style={{ fontSize: 13, margin: '4px 0 10px' }}>
+            Rechazados por SUNAT, en revisión manual o pendientes de envío hace más de 15 minutos. Nada se borra: corrija los datos o reintente con el mismo número.
+          </p>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {problemas.map((c) => {
+              const estado = estadoDe(c);
+              return (
+                <li key={`problema-${c.id}`} data-testid={`problema-${c.id}`} style={{ borderTop: '1px solid var(--cp-line)', paddingTop: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                    <strong>{tipoTexto(c.tipo)} {c.numero_texto}</strong>
+                    <Insignia variante={estado.variante}>{estado.texto}</Insignia>
+                  </div>
+                  {(c.revision_motivo || c.respuesta_sunat) && (
+                    <div style={{ fontSize: 12, marginTop: 4, wordBreak: 'break-word' }}>{c.revision_motivo || c.respuesta_sunat}</div>
+                  )}
+                  <div style={{ marginTop: 8 }}>
+                    <Boton variante="secundario" onClick={() => abrirReintento(c)} style={{ minHeight: ALTO_TOQUE }}>
+                      {accionDe(c)}
+                    </Boton>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       <Confirmar
         abierto={confirmarConfig}
         titulo="Guardar configuración de facturación"
-        mensaje={`¿Guardar proveedor ${NOMBRE_PROVEEDOR[formProveedor]}, IGV ${formIgv}%, serie de boleta ${formSerieB.toUpperCase()} y serie de factura ${formSerieF.toUpperCase()}? Los comprobantes nuevos usarán estos datos.`}
+        mensaje={`¿Guardar proveedor ${NOMBRE_PROVEEDOR[formProveedor]}, IGV ${formIgv}%, serie de boleta ${formSerieB.toUpperCase()} y serie de factura ${formSerieF.toUpperCase()}? Los comprobantes nuevos usarán estos datos.${formProveedor === 'SUNAT' && config?.proveedor !== 'SUNAT' && !config?.facturacion_desde ? ' Al pasar a SUNAT se fija la fecha de corte: los pedidos cobrados antes no se emiten.' : ''}`}
         textoSi="Sí, guardar"
         textoNo="No"
         cargando={guardandoConfig}
@@ -348,7 +419,10 @@ export function ElectronicosTab() {
         alConfirmar={confirmarReintento}
         alCancelar={() => setReintentarDe(null)}
       >
-        {reintentarDe?.facturacion_estado === 'RECHAZADO' && (
+        {reintentarDe && reintentarDe.facturacion_estado === 'REVISION_MANUAL' && reintentarDe.revision_motivo && (
+          <div style={{ fontSize: 13, marginTop: 8, wordBreak: 'break-word' }}>Motivo: {reintentarDe.revision_motivo}</div>
+        )}
+        {(reintentarDe?.facturacion_estado === 'RECHAZADO' || reintentarDe?.facturacion_estado === 'REVISION_MANUAL') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
             <label style={{ fontWeight: 700, fontSize: 13 }}>
               Documento (DNI o RUC)

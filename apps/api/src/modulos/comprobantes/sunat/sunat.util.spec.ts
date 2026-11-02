@@ -1,3 +1,4 @@
+jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { esc, fechaIsoLima, horaLima, leerZip, montoEnLetras, montoXml, numeroEnLetras, zipUnico } from './sunat.util';
 import { horaMinutoLima } from '../comprobantes-sunat.service';
 import { proveedorDe } from '../emisor/proveedor';

@@ -477,7 +477,7 @@ describe('CobrosService', () => {
       );
     });
 
-    it('al cobrar genera la nota de venta y si eso falla el cobro igual queda registrado', async () => {
+    it('al cobrar genera la nota de venta dentro de la transacción; si falla, el cobro se deshace', async () => {
       prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
       prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock });
       prismaMock.cobro.create.mockResolvedValue({
@@ -493,10 +493,8 @@ describe('CobrosService', () => {
       prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'YAPE' });
       comprobantesMock.emitirParaPedido.mockRejectedValue(new Error('serie sin configurar'));
 
-      const res = await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 50 }] }, cajeroUsuario);
-
-      expect(res.id).toBe('32');
-      expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledWith(100n, undefined, cajeroUsuario);
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 50 }] }, cajeroUsuario)).rejects.toThrow('serie sin configurar');
+      expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledWith(100n, expect.anything(), cajeroUsuario, undefined);
     });
 
     it('al cobrar libera las mesas del pedido y si falla el cobro igual queda registrado', async () => {

@@ -3,15 +3,16 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { adquirirCandado, liberarCandado } from '../../comun/redis/candado.util';
-import { ErrorRedEmisor } from './emisor/emisor.tipos';
+import { ErrorCredencialesEmisor, ErrorRedEmisor } from './emisor/emisor.tipos';
+import { ComprobantesSaludService } from './comprobantes-salud.service';
 import { SunatEmisor } from './sunat/sunat.emisor';
 import { EmisorXml, LineaResumen, armarResumenDiarioXml } from './sunat/sunat.xml';
 import { bytes, fechaIsoLima, yyyymmddLima } from './sunat/sunat.util';
 import { siguienteCorrelativo } from './secuencia';
 import { CLAVES_FACTURACION, interpretarConfig } from './facturacion/facturacion.config';
 
-/** Cada 10 minutos: reenvía resúmenes sin respuesta, consulta tickets y, de 22:30 a 22:39 (Lima), envía el resumen diario. */
-export const INTERVALO_SUNAT_MS = 10 * 60 * 1000;
+/** Cada 2 minutos: reenvía resúmenes sin respuesta, consulta tickets pendientes y, de 22:30 a 22:39 (Lima), envía el resumen diario. */
+export const INTERVALO_SUNAT_MS = 2 * 60 * 1000;
 /** Máximo de boletas por resumen diario (SUNAT). */
 export const MAX_LINEAS_RESUMEN = 500;
 
@@ -37,6 +38,7 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     @Optional() private readonly sunat?: SunatEmisor,
     @Optional() private readonly redis?: RedisService,
+    @Optional() private readonly salud?: ComprobantesSaludService,
   ) {}
 
   onModuleInit() {
@@ -52,6 +54,7 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
   /** Una pasada con candado: reenvíos, tickets y, en la ventana de 22:30, el resumen diario. */
   async tick(ahora = new Date()): Promise<{ motivo?: string }> {
     if (!this.sunat || !this.sunat.disponible()) return { motivo: 'SIN_CONFIGURAR' };
+    if (await this.salud?.circuitoAbierto(ahora)) return { motivo: 'CIRCUITO_ABIERTO' };
     const cliente = this.redis?.obtenerCliente() ?? null;
     const clave = 'lock:comprobantes:sunat';
     const candado = await adquirirCandado(cliente, clave, TTL_CANDADO_MS);
@@ -192,9 +195,17 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
     try {
       r = await this.sunat.enviarResumen(fila.nombre, Buffer.from(fila.zip));
     } catch (e) {
-      if (e instanceof ErrorRedEmisor) return; // sigue PENDIENTE_ENVIO; se reintenta en el siguiente tick
+      if (e instanceof ErrorCredencialesEmisor) {
+        await this.salud?.registrarCredenciales();
+        return;
+      }
+      if (e instanceof ErrorRedEmisor) {
+        await this.salud?.registrarFallo();
+        return; // sigue PENDIENTE_ENVIO; se reintenta en el siguiente tick (mismo ZIP)
+      }
       throw e;
     }
+    await this.salud?.registrarExito();
     if ('rechazo' in r) {
       await this.prisma.sunatResumen.update({ where: { id }, data: { estado: 'RECHAZADO', respuesta: r.rechazo } });
       await this.aplicar(id, 'RECHAZADO', r.rechazo);
@@ -215,9 +226,17 @@ export class ComprobantesSunatService implements OnModuleInit, OnModuleDestroy {
       try {
         estado = await this.sunat.consultarTicket(e.ticket as string);
       } catch (err) {
-        if (err instanceof ErrorRedEmisor) continue;
+        if (err instanceof ErrorCredencialesEmisor) {
+          await this.salud?.registrarCredenciales();
+          break;
+        }
+        if (err instanceof ErrorRedEmisor) {
+          await this.salud?.registrarFallo();
+          continue;
+        }
         throw err;
       }
+      await this.salud?.registrarExito();
       if (estado.estado === 'EN_PROCESO') continue;
       const aceptado = estado.estado === 'ACEPTADO';
       await this.prisma.sunatResumen.update({
