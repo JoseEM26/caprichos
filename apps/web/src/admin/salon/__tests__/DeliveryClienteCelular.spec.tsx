@@ -159,7 +159,10 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     await escribirCelular('955512345');
 
     expect(await screen.findByText('No hay cuenta con ese celular.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continuar a productos →' })).toBeDisabled();
+    // Sin cuenta el botón sigue activo: al tocarlo dice qué falta y no avanza
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar a productos →' }));
+    expect(screen.getByText('Busca y elige la cuenta del cliente')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Ej.: Lucía o Mesa 4')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Seguir como invitado' }));
 
@@ -228,7 +231,9 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
       screen.queryByText('¿Usar una ubicación anterior?'),
     ).toBeNull();
     expect(screen.getByPlaceholderText('Jr. / Av. / Calle y número')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continuar a productos →' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar a productos →' }));
+    expect(screen.getByText('Escribe la dirección o marca el punto en el mapa')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Jr. / Av. / Calle y número')).toHaveFocus();
   });
 
   it('invitado no envía clienteTelefono y pide nombre y teléfono', async () => {
