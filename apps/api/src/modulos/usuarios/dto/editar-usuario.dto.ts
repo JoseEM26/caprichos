@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsArray, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { TIPOS_DOCUMENTO } from '../../acceso/roles-usuario';
 
 export class EditarUsuarioDto {
   @IsOptional()
@@ -15,10 +16,31 @@ export class EditarUsuarioDto {
   @IsNotEmpty({ message: 'El rol no puede estar vacío' })
   rol?: string;
 
-  /** Solo ADMIN. Es el usuario de ingreso. */
+  /** Solo ADMIN. Tipo del documento de ingreso (por defecto, el actual). */
   @IsOptional()
-  @Matches(/^\d{8}$/, { message: 'El DNI debe tener exactamente 8 dígitos' })
+  @IsIn([...TIPOS_DOCUMENTO], { message: 'El tipo de documento no es válido' })
+  tipoDocumento?: string;
+
+  /** Solo ADMIN. Número del documento de ingreso. Reemplaza a `dni` (alias). */
+  @IsOptional()
+  @IsString()
+  documento?: string;
+
+  /** Alias de `documento` (compatibilidad). */
+  @IsOptional()
+  @IsString()
   dni?: string;
+
+  /** Roles extra: reemplazan el conjunto actual. Vacío = sin roles extra. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  otrosRoles?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80, { message: 'El país de nacimiento es demasiado largo' })
+  paisNacimiento?: string;
 
   /** Vacío quita el correo. */
   @IsOptional()

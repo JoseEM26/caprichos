@@ -37,7 +37,7 @@ function montar() {
     userAccount: {
       // Respeta el where como Prisma: con party_id busca ese usuario y su rol; sin party_id es el respaldo del ADMIN activo
       findFirst: jest.fn(async ({ where }: any) => {
-        const roles: string[] = where.rol?.in ?? [where.rol];
+        const roles: string[] = (where.OR ?? [where]).flatMap((c: any) => c.rol?.in ?? (c.rol ? [c.rol] : []));
         if (where.party_id === undefined) return roles.includes('ADMIN') ? { party_id: ADMIN, id: 10n, rol: 'ADMIN' } : null;
         if (where.party_id === ADMIN && roles.includes('ADMIN')) return { party_id: ADMIN, id: 10n, rol: 'ADMIN' };
         if (where.party_id === SUPERVISOR && roles.includes('SUPERVISOR')) return { party_id: SUPERVISOR, id: 30n, rol: 'SUPERVISOR' };

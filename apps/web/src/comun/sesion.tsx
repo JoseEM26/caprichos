@@ -12,7 +12,10 @@ import { api, setTokenAcceso, limpiarCacheBlobs } from './api';
 export interface UsuarioSesion {
   partyId: string;
   nombres: string;
+  /** Rol principal. */
   rol: string;
+  /** Principal primero, luego los extra. */
+  roles?: string[];
   fotoUrl?: string | null;
 }
 
@@ -76,6 +79,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
         nombres: string;
         fotoUrl: string | null;
         rol: string;
+        roles?: string[];
         debeCambiar: boolean;
         permisos: string[];
       }>('/auth/yo');
@@ -84,6 +88,7 @@ export function SesionProvider({ children }: SesionProviderProps) {
         partyId: yo.partyId,
         nombres: yo.nombres,
         rol: yo.rol,
+        roles: yo.roles ?? [yo.rol],
         fotoUrl: yo.fotoUrl ?? null,
       });
       setPermisos(yo.permisos || []);

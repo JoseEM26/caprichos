@@ -468,7 +468,8 @@ export class ImpresionService {
   }
 
   private exigirRolDescartar(usuario?: UsuarioAutenticado) {
-    if (!ROLES_DESCARTAR.includes(String(usuario?.rol || '').toUpperCase())) {
+    const rolesUsuario = (usuario?.roles ?? [usuario?.rol ?? '']).map((r) => String(r || '').toUpperCase());
+    if (!rolesUsuario.some((r) => ROLES_DESCARTAR.includes(r))) {
       throw new ForbiddenException({
         codigo: 'SIN_PERMISO_DESCARTAR',
         mensaje: 'Solo Caja o un administrador pueden descartar etiquetas de la cola',

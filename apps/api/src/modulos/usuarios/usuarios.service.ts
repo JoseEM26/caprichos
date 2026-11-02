@@ -12,10 +12,32 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { FilaImportarPersonalDto } from './dto/fila-importar-personal.dto';
+import {
+  aTexto,
+  diaAnterior,
+  duracion,
+  errorPeriodo,
+  formatoDuracion,
+  formatoTotal,
+  hoyLima,
+  tiempoTotal,
+  vecesQueSalio,
+  type Periodo,
+} from './periodos-laborales';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ArchivosService } from '../archivos/archivos.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { ROLES } from '../acceso/permisos';
+import {
+  TIPOS_DOCUMENTO,
+  documentoValido,
+  errorCombinacionRoles,
+  rolesDeCuenta,
+} from '../acceso/roles-usuario';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
 import { CambiarClaveUsuarioDto } from './dto/cambiar-clave-usuario.dto';
@@ -40,6 +62,26 @@ import {
 
 /** Mismo límite que la foto de Mi perfil (acceso/mi-perfil.service.ts). */
 const FOTO_MAX_BYTES = 2 * 1024 * 1024;
+
+/** Mensaje de un error de Nest (ErrorBase con codigo/mensaje) o uno genérico. */
+function mensajeDeError(err: unknown): string {
+  const r: any = (err as any)?.getResponse?.();
+  if (r && typeof r === 'object' && typeof r.mensaje === 'string') return r.mensaje;
+  return 'No se pudo crear esta fila';
+}
+
+/** AAAA-MM-DD a fecha (solo día). Vacío = null; una fecha inexistente (p. ej. 2026-02-30) = 400. */
+function fechaDe(valor: string | undefined | null, etiqueta: string): Date | null {
+  if (!valor) return null;
+  const d = new Date(`${valor}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== valor) {
+    throw new BadRequestException({ codigo: 'FECHA_INVALIDA', mensaje: `La fecha ${etiqueta} no es válida` });
+  }
+  return d;
+}
+
+const iguales = (a: string[], b: string[]): boolean =>
+  a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
 
 @Injectable()
 export class UsuariosService {
@@ -76,7 +118,8 @@ export class UsuariosService {
     const where: any = {};
 
     if (rol) {
-      where.rol = rol;
+      // Cuenta por su principal o por cualquiera de sus roles extra
+      where.OR = [{ rol }, { rolesExtra: { some: { rol } } }];
     }
 
     if (activo !== undefined) {
@@ -98,7 +141,7 @@ export class UsuariosService {
           {
             documentos: {
               some: {
-                tipo: 'DNI',
+                tipo: { in: [...TIPOS_DOCUMENTO] },
                 numero: { contains: q },
               },
             },
@@ -118,10 +161,11 @@ export class UsuariosService {
             include: {
               persona: true,
               documentos: {
-                where: { tipo: 'DNI' },
+                where: { tipo: { in: [...TIPOS_DOCUMENTO] } },
               },
             },
           },
+          rolesExtra: true,
         },
         orderBy: { id: 'asc' },
       }),
@@ -135,7 +179,10 @@ export class UsuariosService {
         nombres: u.party?.persona?.nombres ?? '',
         apellidos: u.party?.persona?.apellidos ?? '',
         dni: enmascararDni(dniDoc),
+        tipoDocumento: u.party?.documentos?.[0]?.tipo ?? 'DNI',
         rol: u.rol,
+        roles: [u.rol, ...(u.rolesExtra ?? []).map((r) => r.rol)],
+        paisNacimiento: u.party?.persona?.pais_nacimiento ?? null,
         activo: u.activo,
         debeCambiar: u.debe_cambiar,
         altaEn: u.alta_en,
@@ -169,7 +216,7 @@ export class UsuariosService {
       include: {
         party: {
           include: {
-            documentos: { where: { tipo: 'DNI' } },
+            documentos: { where: { tipo: { in: [...TIPOS_DOCUMENTO] } } },
           },
         },
       },
@@ -208,23 +255,48 @@ export class UsuariosService {
   }
 
   /**
-   * Crea un nuevo usuario en una sola transacción: Party (PERSONA) + Person + PartyIdentifier (DNI) + UserAccount.
+   * Crea un nuevo usuario en una sola transacción: Party (PERSONA) + Person + PartyIdentifier (documento) + UserAccount.
    * Genera contraseña aleatoria de 12 caracteres con hash argon2id y la devuelve una única vez como claveInicial.
    */
   async crear(dto: CrearUsuarioDto, usuarioActual?: UsuarioAutenticado, ip?: string) {
-    const dniLimpio = dto.dni.trim();
-    const celular9 = dto.celular ?? null;
+    return this.crearUno(dto, usuarioActual, ip, true);
+  }
 
-    // Una persona = un party. Si el DNI (o el celular) ya es de un party SIN usuario, se reutiliza y se le suma
-    // el usuario del personal. Si ya tiene usuario, es otra persona: error.
-    const dniExistente = await this.prisma.partyIdentifier.findUnique({
-      where: {
-        tipo_numero: {
-          tipo: 'DNI',
-          numero: dniLimpio,
-        },
-      },
+  /** Alta de una cuenta. La importación la llama con auditar=false y audita una sola vez al final. */
+  private async crearUno(
+    dto: CrearUsuarioDto,
+    usuarioActual: UsuarioAutenticado | undefined,
+    ip: string | undefined,
+    auditar: boolean,
+    claveFija?: string,
+  ) {
+    const { tipo: tipoDoc, numero: dniLimpio } = this.documentoDeDto(dto.tipoDocumento, dto.documento ?? dto.dni);
+    const extras = this.rolesExtraValidos(dto.rol, dto.otrosRoles);
+    const fechaIngreso = fechaDe(dto.fechaIngreso, 'de ingreso');
+    const fechaReingreso = fechaDe(dto.fechaReingreso, 'de reingreso');
+    if (fechaReingreso && !fechaIngreso) {
+      throw new BadRequestException({ codigo: 'FECHA_INVALIDA', mensaje: 'Indica la fecha de ingreso para registrar el reingreso' });
+    }
+    if (fechaReingreso && fechaIngreso && fechaReingreso.getTime() <= fechaIngreso.getTime()) {
+      throw new BadRequestException({ codigo: 'FECHA_INVALIDA', mensaje: 'El reingreso debe ser posterior al ingreso' });
+    }
+    // Sin fecha de salida registrada: si hay reingreso, el primer periodo queda sin cerrar hasta corregirlo
+    const avisos = fechaReingreso ? ['Fecha de salida no registrada: corregir en el historial laboral.'] : [];
+    const celular9 = dto.celular ?? null;
+    const activo = dto.activo ?? true;
+
+    // Un documento (de cualquier tipo del personal) es único: si el número ya existe con otro tipo, es conflicto.
+    // Si el documento (o el celular) ya es de un party SIN usuario, se reutiliza y se le suma el usuario del personal.
+    // Si ya tiene usuario, es otra persona: error.
+    const dniExistente = await this.prisma.partyIdentifier.findFirst({
+      where: { numero: dniLimpio, tipo: { in: [...TIPOS_DOCUMENTO] } },
     });
+    if (dniExistente && dniExistente.tipo !== tipoDoc) {
+      throw new ConflictException({
+        codigo: 'DNI_DUPLICADO',
+        mensaje: 'El número de documento ya se encuentra registrado con otro tipo de documento',
+      });
+    }
 
     let reutilizarId: bigint | null = null;
     if (dniExistente) {
@@ -245,7 +317,7 @@ export class UsuariosService {
       }
     }
 
-    const claveInicial = generarClaveAleatoria(12);
+    const claveInicial = claveFija ?? generarClaveAleatoria(12);
     const hash = await argon2.hash(claveInicial, { type: argon2.argon2id });
 
     let nuevo;
@@ -263,6 +335,7 @@ export class UsuariosService {
         const nombres = dto.nombres.trim();
         const apellidos = dto.apellidos.trim();
         const correo = dto.correo ? dto.correo.trim().toLowerCase() : null;
+        const pais = dto.paisNacimiento?.trim() || null;
         const cumple = dto.fechaNacimiento
           ? {
               cumple_mes: Number(dto.fechaNacimiento.slice(5, 7)),
@@ -280,6 +353,7 @@ export class UsuariosService {
                 apellidos: personaPrevia.apellidos || apellidos,
                 correo: personaPrevia.correo || correo,
                 ...(cumple && personaPrevia.cumple_mes == null ? cumple : {}),
+                ...(pais && !personaPrevia.pais_nacimiento ? { pais_nacimiento: pais } : {}),
               },
             })
           : await tx.person.create({
@@ -289,6 +363,7 @@ export class UsuariosService {
                 apellidos,
                 ...(correo ? { correo } : {}),
                 ...(cumple ?? {}),
+                ...(pais ? { pais_nacimiento: pais } : {}),
               },
             });
 
@@ -296,22 +371,12 @@ export class UsuariosService {
           await asegurarContactoCelular(tx, party.id, celular9, 'WHATSAPP');
         }
 
-        if (dto.descuentoPct !== undefined && dto.descuentoPct !== null) {
-          await tx.partyRole.create({
-            data: {
-              party_id: party.id,
-              rol: 'TRABAJADOR',
-              employee_detail: { create: { descuento_pct: dto.descuentoPct } },
-            },
-          });
-        }
-
         const partyIdentifier =
           dniExistente ??
           (await tx.partyIdentifier.create({
             data: {
               party_id: party.id,
-              tipo: 'DNI',
+              tipo: tipoDoc,
               numero: dniLimpio,
             },
           }));
@@ -322,9 +387,36 @@ export class UsuariosService {
             rol: dto.rol,
             hash,
             debe_cambiar: true,
-            activo: true,
+            activo,
           },
         });
+
+        if (extras.length) {
+          await tx.userAccountRol.createMany({
+            data: extras.map((rol) => ({ user_account_id: userAccount.id, rol })),
+          });
+        }
+
+        // Historial laboral: cada periodo es un party_role TRABAJADOR. Con reingreso: ingreso → día antes; reingreso → abierto.
+        const periodos: Periodo[] = fechaReingreso
+          ? [
+              { desde: fechaIngreso!, hasta: diaAnterior(fechaReingreso) },
+              { desde: fechaReingreso, hasta: null },
+            ]
+          : [{ desde: fechaIngreso ?? hoyLima(), hasta: null }];
+        const conDescuento = dto.descuentoPct !== undefined && dto.descuentoPct !== null;
+        for (const [k, p] of periodos.entries()) {
+          const ultimo = k === periodos.length - 1;
+          await tx.partyRole.create({
+            data: {
+              party_id: party.id,
+              rol: 'TRABAJADOR',
+              desde: p.desde,
+              hasta: p.hasta,
+              ...(ultimo && conDescuento ? { employee_detail: { create: { descuento_pct: dto.descuentoPct } } } : {}),
+            },
+          });
+        }
 
         if (dto.horarios || dto.reemplazos) {
           await guardarHorarioTx(tx, party.id, dto);
@@ -334,9 +426,9 @@ export class UsuariosService {
       });
     } catch (error: any) {
       if (error?.code === 'P2002') {
-        // Choque de unicidad en la carrera: si el DNI existe ya es el DNI; si no, el celular de otra persona
-        const dniAhora = await this.prisma.partyIdentifier.findUnique({
-          where: { tipo_numero: { tipo: 'DNI', numero: dniLimpio } },
+        // Choque de unicidad en la carrera: si el documento existe ya es el documento; si no, el celular de otra persona
+        const dniAhora = await this.prisma.partyIdentifier.findFirst({
+          where: { numero: dniLimpio, tipo: { in: [...TIPOS_DOCUMENTO] } },
         });
         if (dniAhora) {
           throw new ConflictException({
@@ -349,27 +441,32 @@ export class UsuariosService {
       throw error;
     }
 
-    await this.auditoria.registrar({
-      categoria: 'CAMBIO',
-      modulo: 'usuarios',
-      accion: 'CREAR',
-      resultado: 'OK',
-      entidad: 'user_account',
-      entidadId: nuevo.userAccount.id,
-      antes: null,
-      despues: {
-        nombres: dto.nombres.trim(),
-        apellidos: dto.apellidos.trim(),
-        dni: enmascararDni(dniLimpio),
-        rol: dto.rol,
-        activo: true,
-        debeCambiar: true,
-        diasTrabaja: dto.horarios?.length ?? 0,
-        reemplazosFijos: dto.reemplazos?.length ?? 0,
-      },
-      partyId: usuarioActual?.partyId,
-      ip,
-    });
+    const roles = [dto.rol, ...extras];
+    if (auditar) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'usuarios',
+        accion: 'CREAR',
+        resultado: 'OK',
+        entidad: 'user_account',
+        entidadId: nuevo.userAccount.id,
+        antes: null,
+        despues: {
+          nombres: dto.nombres.trim(),
+          apellidos: dto.apellidos.trim(),
+          dni: enmascararDni(dniLimpio),
+          tipoDocumento: tipoDoc,
+          rol: dto.rol,
+          roles,
+          activo,
+          debeCambiar: true,
+          diasTrabaja: dto.horarios?.length ?? 0,
+          reemplazosFijos: dto.reemplazos?.length ?? 0,
+        },
+        partyId: usuarioActual?.partyId,
+        ip,
+      });
+    }
 
     return {
       id: nuevo.userAccount.id.toString(),
@@ -377,11 +474,225 @@ export class UsuariosService {
       nombres: nuevo.person.nombres,
       apellidos: nuevo.person.apellidos,
       dni: enmascararDni(dniLimpio),
+      tipoDocumento: tipoDoc,
       rol: nuevo.userAccount.rol,
+      roles,
       activo: nuevo.userAccount.activo,
       debeCambiar: nuevo.userAccount.debe_cambiar,
       claveInicial,
+      avisos,
     };
+  }
+
+  /** Tipo (por defecto DNI) y número validados. El número de documento no se repite entre tipos. */
+  private documentoDeDto(tipoRaw: string | undefined, numeroRaw: string | undefined): { tipo: string; numero: string } {
+    const tipo = (tipoRaw || 'DNI').trim().toUpperCase();
+    if (!(TIPOS_DOCUMENTO as readonly string[]).includes(tipo)) {
+      throw new BadRequestException({ codigo: 'TIPO_DOCUMENTO_INVALIDO', mensaje: 'El tipo de documento no es válido' });
+    }
+    const numero = tipo === 'DNI' ? (numeroRaw ?? '').trim() : (numeroRaw ?? '').trim().toUpperCase();
+    if (!numero) {
+      throw new BadRequestException({ codigo: 'DOCUMENTO_REQUERIDO', mensaje: 'El número de documento es requerido' });
+    }
+    if (!documentoValido(tipo, numero)) {
+      throw new BadRequestException({
+        codigo: 'DOCUMENTO_INVALIDO',
+        mensaje: tipo === 'DNI' ? 'El DNI debe tener exactamente 8 dígitos' : `El ${tipo} debe tener de 7 a 12 letras o números`,
+      });
+    }
+    return { tipo, numero };
+  }
+
+  /** Roles extra validados contra el catálogo y las reglas de combinación. Devuelve solo los extra. */
+  private rolesExtraValidos(rol: string, otros: string[] | undefined): string[] {
+    const extras = [...new Set((otros ?? []).map((r) => String(r).trim()).filter(Boolean))];
+    const catalogo = ROLES.map((r) => r.codigo as string);
+    const desconocido = [rol, ...extras].find((r) => !catalogo.includes(r));
+    if (desconocido) {
+      throw new BadRequestException({ codigo: 'ROL_INVALIDO', mensaje: `El rol ${desconocido} no existe` });
+    }
+    const error = errorCombinacionRoles(rol, extras);
+    if (error) {
+      throw new BadRequestException({ codigo: 'ROLES_INVALIDOS', mensaje: error });
+    }
+    return extras;
+  }
+
+  /** Revisa una fila sin escribir: documento, roles, fechas y si el documento ya existe. */
+  private async revisarFilaImportacion(fila: unknown): Promise<{
+    estado: 'OK' | 'YA_EXISTE' | 'ERROR';
+    motivo?: string;
+    tipo?: string;
+    numero?: string;
+    objeto?: FilaImportarPersonalDto;
+  }> {
+    const objeto = plainToInstance(FilaImportarPersonalDto, fila ?? {});
+    const erroresFila = await validate(objeto);
+    if (erroresFila.length) {
+      return { estado: 'ERROR', motivo: Object.values(erroresFila[0].constraints ?? {})[0] ?? 'Fila no válida' };
+    }
+    try {
+      const doc = this.documentoDeDto(objeto.tipoDocumento, objeto.documento);
+      this.rolesExtraValidos(objeto.rol, objeto.otrosRoles);
+      fechaDe(objeto.fechaIngreso, 'de ingreso');
+      fechaDe(objeto.fechaReingreso, 'de reingreso');
+      const existe = await this.prisma.partyIdentifier.findFirst({
+        where: { numero: doc.numero, tipo: { in: [...TIPOS_DOCUMENTO] } },
+        select: { id: true },
+      });
+      return { estado: existe ? 'YA_EXISTE' : 'OK', tipo: doc.tipo, numero: doc.numero, objeto };
+    } catch (err) {
+      return { estado: 'ERROR', motivo: mensajeDeError(err) };
+    }
+  }
+
+  /**
+   * Importa personal desde la consola (sin sesión: la auditoría queda como sistema).
+   * simular: solo revisa y devuelve por fila OK / YA_EXISTE / ERROR / DUPLICADO_EN_ARCHIVO; no escribe ni audita.
+   * Si no: crea cada fila en su propia transacción con la clave inicial = su documento (debe_cambiar = true);
+   * omite los documentos que ya existen (sin tocarlos) y los repetidos en el archivo. Audita una vez con conteos.
+   */
+  async importarPersonal(
+    filas: FilaImportarPersonalDto[],
+    opciones: { simular: boolean },
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    if (!Array.isArray(filas)) {
+      throw new BadRequestException({ codigo: 'FILAS_REQUERIDAS', mensaje: 'Envía la lista de filas a importar' });
+    }
+    if (filas.length > 200) {
+      throw new BadRequestException({ codigo: 'DEMASIADAS_FILAS', mensaje: 'Se importan como máximo 200 filas por vez' });
+    }
+
+    const resultados: Array<{ indice: number; estado: string; motivo?: string; avisos?: string[] }> = [];
+    const vistos = new Set<string>();
+    let creadas = 0;
+
+    for (const [indice, fila] of filas.entries()) {
+      const r = await this.revisarFilaImportacion(fila);
+      if (r.numero) {
+        const clave = `${r.tipo}:${r.numero}`;
+        if (vistos.has(clave)) {
+          resultados.push({ indice, estado: 'DUPLICADO_EN_ARCHIVO' });
+          continue;
+        }
+        vistos.add(clave);
+      }
+      if (r.estado !== 'OK') {
+        resultados.push({ indice, estado: r.estado, motivo: r.motivo });
+        continue;
+      }
+      if (opciones.simular) {
+        resultados.push({ indice, estado: 'OK' });
+        continue;
+      }
+      try {
+        const alta = await this.crearUno(
+          { ...r.objeto!, tipoDocumento: r.tipo, documento: r.numero } as CrearUsuarioDto,
+          usuarioActual,
+          ip,
+          false,
+          r.numero,
+        );
+        creadas++;
+        resultados.push({ indice, estado: 'CREADA', avisos: alta.avisos });
+      } catch (err) {
+        resultados.push({ indice, estado: 'ERROR', motivo: mensajeDeError(err) });
+      }
+    }
+
+    if (opciones.simular) return { filas: filas.length, simulacion: true, resultados };
+
+    const omitidas = resultados.filter((x) => x.estado === 'YA_EXISTE' || x.estado === 'DUPLICADO_EN_ARCHIVO').length;
+    const errores = resultados.filter((x) => x.estado === 'ERROR').length;
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'usuarios',
+      accion: 'IMPORTAR_PERSONAL',
+      resultado: 'OK',
+      entidad: 'user_account',
+      antes: null,
+      despues: { filas: filas.length, creados: creadas, omitidos: omitidas, errores },
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+
+    return { filas: filas.length, simulacion: false, resultados };
+  }
+
+  /** Historial laboral: periodos (party_role TRABAJADOR), tiempo total, veces que salió y si está en licencia. */
+  async historialLaboral(id: bigint | string | number) {
+    const cuenta = await this.cuentaConParty(id);
+    const filas = await this.prisma.partyRole.findMany({
+      where: { party_id: cuenta.party_id, rol: 'TRABAJADOR' },
+      orderBy: { desde: 'asc' },
+    });
+    const hoy = hoyLima();
+    const periodos = filas.map((f) => ({
+      id: f.id.toString(),
+      desde: aTexto(f.desde),
+      hasta: f.hasta ? aTexto(f.hasta) : null,
+      abierto: f.hasta === null,
+      duracion: formatoDuracion(duracion(f.desde, f.hasta ?? hoy)),
+    }));
+    const total = tiempoTotal(
+      filas.map((f) => ({ desde: f.desde, hasta: f.hasta })),
+      hoy,
+    );
+    return {
+      activo: cuenta.activo,
+      enLicencia: !cuenta.activo && filas.some((f) => f.hasta === null),
+      periodos,
+      tiempoTotal: formatoTotal(total),
+      vecesSalio: vecesQueSalio(filas.map((f) => ({ desde: f.desde, hasta: f.hasta }))),
+    };
+  }
+
+  /** Corrige un periodo (solo ADMIN): desde ≤ hasta y sin días compartidos con otro periodo de la misma persona. */
+  async editarPeriodo(
+    id: bigint | string | number,
+    periodoId: bigint | string | number,
+    dto: { desde: string; hasta?: string | null },
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    this.exigirAdmin(usuarioActual);
+    const cuenta = await this.cuentaConParty(id);
+    const periodo = await this.prisma.partyRole.findFirst({
+      where: { id: this.parsearId(periodoId), party_id: cuenta.party_id, rol: 'TRABAJADOR' },
+    });
+    if (!periodo) {
+      throw new NotFoundException({ codigo: 'PERIODO_NO_ENCONTRADO', mensaje: 'Periodo no encontrado' });
+    }
+    const desde = fechaDe(dto.desde, 'de ingreso');
+    if (!desde) {
+      throw new BadRequestException({ codigo: 'FECHA_INVALIDA', mensaje: 'Indica la fecha de ingreso del periodo' });
+    }
+    const hasta = dto.hasta ? fechaDe(dto.hasta, 'de salida') : null;
+    const otros = await this.prisma.partyRole.findMany({
+      where: { party_id: cuenta.party_id, rol: 'TRABAJADOR', id: { not: periodo.id } },
+      select: { desde: true, hasta: true },
+    });
+    const error = errorPeriodo({ desde, hasta }, otros);
+    if (error) {
+      throw new BadRequestException({ codigo: 'PERIODO_INVALIDO', mensaje: error });
+    }
+
+    await this.prisma.partyRole.update({ where: { id: periodo.id }, data: { desde, hasta } });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'usuarios',
+      accion: 'PERIODO_EDITAR',
+      resultado: 'OK',
+      entidad: 'party_role',
+      entidadId: periodo.id,
+      antes: { desde: aTexto(periodo.desde), hasta: periodo.hasta ? aTexto(periodo.hasta) : null },
+      despues: { desde: aTexto(desde), hasta: hasta ? aTexto(hasta) : null },
+      partyId: usuarioActual?.partyId,
+      ip,
+    });
+    return this.historialLaboral(id);
   }
 
   private async tienePartyUsuario(partyId: bigint): Promise<boolean> {
@@ -507,9 +818,9 @@ export class UsuariosService {
   }
 
   /**
-   * Edita nombres, apellidos, correo, DNI o rol. No permite quitar el rol al último ADMIN activo.
-   * El DNI solo lo cambia el ADMIN y exige su clave; si cambia la cuenta propia, se revocan sus sesiones
-   * y la respuesta trae reingresar=true.
+   * Edita nombres, apellidos, correo, documento, roles, fechas o país. No permite quitar el rol al último ADMIN activo.
+   * El documento solo lo cambia el ADMIN y exige su clave; si cambia la cuenta propia, se revocan sus sesiones
+   * y la respuesta trae reingresar=true. Cambiar roles es solo ADMIN y queda auditado (CAMBIAR_ROLES).
    */
   async editar(id: bigint | string | number, dto: EditarUsuarioDto, usuarioActual?: UsuarioAutenticado, ip?: string) {
     const accountId = this.parsearId(id);
@@ -519,9 +830,10 @@ export class UsuariosService {
         party: {
           include: {
             persona: true,
-            documentos: { where: { tipo: 'DNI' } },
+            documentos: { where: { tipo: { in: [...TIPOS_DOCUMENTO] } } },
           },
         },
+        rolesExtra: true,
       },
     });
 
@@ -532,8 +844,19 @@ export class UsuariosService {
       });
     }
 
+    // Roles: el principal y los extra. Si cambia el principal y no llegan extras, se conservan los extra sin el nuevo principal.
+    const rolNuevo = dto.rol !== undefined ? dto.rol : usuario.rol;
+    const rolesExtraAntes = (usuario.rolesExtra ?? []).map((r) => r.rol).sort();
+    const rolesAntes = [usuario.rol, ...rolesExtraAntes];
+    const rolesPedidos = dto.rol !== undefined || dto.otrosRoles !== undefined;
+    const extrasNuevos = rolesPedidos
+      ? this.rolesExtraValidos(rolNuevo, dto.otrosRoles !== undefined ? dto.otrosRoles : rolesExtraAntes.filter((r) => r !== rolNuevo))
+      : rolesExtraAntes;
+    const rolesDespues = [rolNuevo, ...extrasNuevos];
+    const rolesCambian = !iguales(rolesAntes, rolesDespues);
+
     // Proteger último ADMIN activo si se intenta cambiar de rol
-    if (usuario.rol === 'ADMIN' && usuario.activo && dto.rol && dto.rol !== 'ADMIN') {
+    if (usuario.rol === 'ADMIN' && usuario.activo && rolNuevo !== 'ADMIN') {
       const adminActivos = await this.prisma.userAccount.count({
         where: { rol: 'ADMIN', activo: true },
       });
@@ -545,21 +868,30 @@ export class UsuariosService {
       }
     }
 
+    // Documento: tipo y número. Si llega cualquiera de los dos, el par se valida completo.
     const esPropia = usuarioActual?.partyId === usuario.party_id;
-    const dniAnterior = usuario.party?.documentos?.[0]?.numero ?? '';
-    const dniNuevo = dto.dni !== undefined ? dto.dni.trim() : dniAnterior;
-    const dniCambia = dto.dni !== undefined && dniNuevo !== dniAnterior;
+    const docAnterior = usuario.party?.documentos?.[0];
+    const tipoAnterior = docAnterior?.tipo ?? 'DNI';
+    const numeroAnterior = docAnterior?.numero ?? '';
+    const docEntrada = dto.documento ?? dto.dni;
+    const docPedido = dto.tipoDocumento !== undefined || docEntrada !== undefined;
+    const doc = docPedido
+      ? this.documentoDeDto(dto.tipoDocumento ?? tipoAnterior, docEntrada ?? numeroAnterior)
+      : { tipo: tipoAnterior, numero: numeroAnterior };
+    const dniCambia = docPedido && (doc.numero !== numeroAnterior || doc.tipo !== tipoAnterior);
+
     const correoAnterior = usuario.party?.persona?.correo ?? null;
     const correoNuevo = dto.correo !== undefined ? dto.correo.trim().toLowerCase() || null : correoAnterior;
     const correoCambia = dto.correo !== undefined && correoNuevo !== correoAnterior;
+    const paisNuevo = dto.paisNacimiento !== undefined ? dto.paisNacimiento.trim() || null : undefined;
 
-    if (dto.dni !== undefined || dto.correo !== undefined) this.exigirAdmin(usuarioActual);
+    if (docPedido || dto.correo !== undefined || rolesCambian) this.exigirAdmin(usuarioActual);
     if (dniCambia) {
       await this.exigirClaveAdmin(usuarioActual, dto.claveAdmin);
-      const otro = await this.prisma.partyIdentifier.findUnique({
-        where: { tipo_numero: { tipo: 'DNI', numero: dniNuevo } },
+      const otro = await this.prisma.partyIdentifier.findFirst({
+        where: { numero: doc.numero, tipo: { in: [...TIPOS_DOCUMENTO] } },
       });
-      if (otro && otro.party_id !== usuario.party_id) {
+      if (otro && otro.id !== docAnterior?.id) {
         throw new ConflictException({ codigo: 'DNI_DUPLICADO', mensaje: 'El DNI ya se encuentra registrado en el sistema' });
       }
     }
@@ -569,45 +901,58 @@ export class UsuariosService {
       nombres: usuario.party?.persona?.nombres ?? '',
       apellidos: usuario.party?.persona?.apellidos ?? '',
       rol: usuario.rol,
-      dni: enmascararDni(dniAnterior),
+      roles: rolesAntes,
+      dni: enmascararDni(numeroAnterior),
+      tipoDocumento: tipoAnterior,
     };
 
     const despues = {
       nombres: dto.nombres !== undefined ? dto.nombres.trim() : antes.nombres,
       apellidos: dto.apellidos !== undefined ? dto.apellidos.trim() : antes.apellidos,
-      rol: dto.rol !== undefined ? dto.rol : antes.rol,
-      dni: enmascararDni(dniNuevo),
+      rol: rolNuevo,
+      roles: rolesDespues,
+      dni: enmascararDni(doc.numero),
+      tipoDocumento: doc.tipo,
     };
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        if (dto.nombres !== undefined || dto.apellidos !== undefined || correoCambia) {
+        if (dto.nombres !== undefined || dto.apellidos !== undefined || correoCambia || paisNuevo !== undefined) {
           await tx.person.update({
             where: { party_id: usuario.party_id },
             data: {
               ...(dto.nombres !== undefined ? { nombres: dto.nombres.trim() } : {}),
               ...(dto.apellidos !== undefined ? { apellidos: dto.apellidos.trim() } : {}),
               ...(correoCambia ? { correo: correoNuevo } : {}),
+              ...(paisNuevo !== undefined ? { pais_nacimiento: paisNuevo } : {}),
             },
           });
         }
 
         if (dniCambia) {
-          const doc = usuario.party?.documentos?.[0];
-          if (doc) {
-            await tx.partyIdentifier.update({ where: { id: doc.id }, data: { numero: dniNuevo } });
+          if (docAnterior) {
+            await tx.partyIdentifier.update({ where: { id: docAnterior.id }, data: { tipo: doc.tipo, numero: doc.numero } });
           } else {
             await tx.partyIdentifier.create({
-              data: { party_id: usuario.party_id, tipo: 'DNI', numero: dniNuevo },
+              data: { party_id: usuario.party_id, tipo: doc.tipo, numero: doc.numero },
             });
           }
         }
 
-        if (dto.rol !== undefined) {
-          await tx.userAccount.update({
-            where: { id: usuario.id },
-            data: { rol: dto.rol },
-          });
+        const cuentaData: Record<string, unknown> = {};
+        if (dto.rol !== undefined) cuentaData.rol = rolNuevo;
+        if (Object.keys(cuentaData).length) {
+          await tx.userAccount.update({ where: { id: usuario.id }, data: cuentaData });
+        }
+
+        // Los extra se reemplazan por completo (la asignación de un rol extra no tiene estado «activo»).
+        if (rolesCambian) {
+          await tx.userAccountRol.deleteMany({ where: { user_account_id: usuario.id } });
+          if (extrasNuevos.length) {
+            await tx.userAccountRol.createMany({
+              data: extrasNuevos.map((rol) => ({ user_account_id: usuario.id, rol })),
+            });
+          }
         }
 
         if (reingresar) {
@@ -638,13 +983,30 @@ export class UsuariosService {
       ip,
     });
 
+    if (rolesCambian) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'usuarios',
+        accion: 'CAMBIAR_ROLES',
+        resultado: 'OK',
+        entidad: 'user_account',
+        entidadId: usuario.id,
+        antes: { rol: usuario.rol, roles: rolesAntes },
+        despues: { rol: rolNuevo, roles: rolesDespues },
+        partyId: usuarioActual?.partyId,
+        ip,
+      });
+    }
+
     return {
       id: usuario.id.toString(),
       partyId: usuario.party_id.toString(),
       nombres: despues.nombres,
       apellidos: despues.apellidos,
       dni: despues.dni,
+      tipoDocumento: doc.tipo,
       rol: despues.rol,
+      roles: rolesDespues,
       activo: usuario.activo,
       debeCambiar: usuario.debe_cambiar,
       reingresar,
@@ -774,14 +1136,19 @@ export class UsuariosService {
    * Desactiva un usuario y revoca todas sus sesiones activas.
    * No permite auto-desactivación ni desactivar al último ADMIN activo.
    */
-  async desactivar(id: bigint | string | number, usuarioActual?: UsuarioAutenticado, ip?: string) {
+  async desactivar(
+    id: bigint | string | number,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+    datos: { fechaSalida?: string; motivo?: string } = {},
+  ) {
     const accountId = this.parsearId(id);
     const usuario = await this.prisma.userAccount.findUnique({
       where: { id: accountId },
       include: {
         party: {
           include: {
-            documentos: { where: { tipo: 'DNI' } },
+            documentos: { where: { tipo: { in: [...TIPOS_DOCUMENTO] } } },
           },
         },
       },
@@ -817,11 +1184,28 @@ export class UsuariosService {
 
     const dniDoc = usuario.party?.documentos?.[0]?.numero ?? '';
 
+    // Salida: cierra el periodo abierto (si lo hay) con la fecha indicada; por defecto hoy.
+    const fechaSalida = fechaDe(datos.fechaSalida, 'de salida') ?? hoyLima();
+    const periodoAbierto = await this.prisma.partyRole.findFirst({
+      where: { party_id: usuario.party_id, rol: 'TRABAJADOR', hasta: null },
+    });
+    if (periodoAbierto && fechaSalida.getTime() < periodoAbierto.desde.getTime()) {
+      throw new BadRequestException({
+        codigo: 'FECHA_INVALIDA',
+        mensaje: 'La fecha de salida no puede ser anterior al ingreso del periodo abierto',
+      });
+    }
+    const motivo = datos.motivo?.trim() || undefined;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.userAccount.update({
         where: { id: usuario.id },
         data: { activo: false },
       });
+
+      if (periodoAbierto) {
+        await tx.partyRole.update({ where: { id: periodoAbierto.id }, data: { hasta: fechaSalida } });
+      }
 
       await tx.sesion.updateMany({
         where: { party_id: usuario.party_id, revocada_en: null },
@@ -837,7 +1221,14 @@ export class UsuariosService {
       entidad: 'user_account',
       entidadId: usuario.id,
       antes: { activo: true, rol: usuario.rol, dni: enmascararDni(dniDoc) },
-      despues: { activo: false, rol: usuario.rol, dni: enmascararDni(dniDoc) },
+      despues: {
+        activo: false,
+        rol: usuario.rol,
+        dni: enmascararDni(dniDoc),
+        fechaSalida: aTexto(fechaSalida),
+        periodoCerrado: Boolean(periodoAbierto),
+      },
+      motivo,
       partyId: usuarioActual?.partyId,
       ip,
     });
@@ -851,14 +1242,19 @@ export class UsuariosService {
   /**
    * Reactiva un usuario previamente desactivado.
    */
-  async reactivar(id: bigint | string | number, usuarioActual?: UsuarioAutenticado, ip?: string) {
+  async reactivar(
+    id: bigint | string | number,
+    usuarioActual?: UsuarioAutenticado,
+    ip?: string,
+    datos: { fechaReingreso?: string } = {},
+  ) {
     const accountId = this.parsearId(id);
     const usuario = await this.prisma.userAccount.findUnique({
       where: { id: accountId },
       include: {
         party: {
           include: {
-            documentos: { where: { tipo: 'DNI' } },
+            documentos: { where: { tipo: { in: [...TIPOS_DOCUMENTO] } } },
           },
         },
       },
@@ -873,9 +1269,43 @@ export class UsuariosService {
 
     const dniDoc = usuario.party?.documentos?.[0]?.numero ?? '';
 
-    await this.prisma.userAccount.update({
-      where: { id: usuario.id },
-      data: { activo: true },
+    // Reingreso: abre un periodo nuevo, salvo que ya haya uno abierto (licencia: solo vuelve a activarse la cuenta)
+    const fechaReingreso = fechaDe(datos.fechaReingreso, 'de reingreso') ?? hoyLima();
+    const periodos = await this.prisma.partyRole.findMany({
+      where: { party_id: usuario.party_id, rol: 'TRABAJADOR' },
+      orderBy: { desde: 'asc' },
+      include: { employee_detail: true },
+    });
+    const abierto = periodos.some((p) => p.hasta === null);
+    if (!abierto) {
+      const error = errorPeriodo(
+        { desde: fechaReingreso, hasta: null },
+        periodos.map((p) => ({ desde: p.desde, hasta: p.hasta })),
+      );
+      if (error) {
+        throw new BadRequestException({ codigo: 'PERIODO_INVALIDO', mensaje: error });
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userAccount.update({
+        where: { id: usuario.id },
+        data: { activo: true },
+      });
+      if (!abierto) {
+        // El descuento de personal sigue al nuevo periodo
+        const ultimo = periodos[periodos.length - 1];
+        const descuento = ultimo?.employee_detail?.descuento_pct;
+        await tx.partyRole.create({
+          data: {
+            party_id: usuario.party_id,
+            rol: 'TRABAJADOR',
+            desde: fechaReingreso,
+            hasta: null,
+            ...(descuento !== undefined && descuento !== null ? { employee_detail: { create: { descuento_pct: descuento } } } : {}),
+          },
+        });
+      }
     });
 
     await this.auditoria.registrar({
@@ -886,7 +1316,13 @@ export class UsuariosService {
       entidad: 'user_account',
       entidadId: usuario.id,
       antes: { activo: false, rol: usuario.rol, dni: enmascararDni(dniDoc) },
-      despues: { activo: true, rol: usuario.rol, dni: enmascararDni(dniDoc) },
+      despues: {
+        activo: true,
+        rol: usuario.rol,
+        dni: enmascararDni(dniDoc),
+        fechaReingreso: aTexto(fechaReingreso),
+        periodoNuevo: !abierto,
+      },
       partyId: usuarioActual?.partyId,
       ip,
     });
@@ -908,7 +1344,7 @@ export class UsuariosService {
       include: {
         party: {
           include: {
-            documentos: { where: { tipo: 'DNI' } },
+            documentos: { where: { tipo: { in: [...TIPOS_DOCUMENTO] } } },
           },
         },
       },

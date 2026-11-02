@@ -82,7 +82,7 @@ describe('Editar usuario: controles de administración', () => {
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith(
         '/admin/usuarios/5',
-        expect.objectContaining({ dni: '87654321', claveAdmin: 'Clave-admin-1' }),
+        expect.objectContaining({ tipoDocumento: 'DNI', documento: '87654321', claveAdmin: 'Clave-admin-1' }),
       ),
     );
   });

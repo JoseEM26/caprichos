@@ -4,6 +4,7 @@ import { useSesion } from '../../comun/sesion';
 import { api } from '../../comun/api';
 import { useNotificaciones } from '../useNotificaciones';
 import { EscritorioSupervisorView } from './EscritorioSupervisorView';
+import { tieneRolUsuario } from '../../comun/rolesUsuario';
 
 interface ResumenApi {
   kpisS?: { n: string; v: string; dTxt?: string; dCol?: string }[];
@@ -40,7 +41,7 @@ function formatearIso(d: Date): string {
 /** Escritorio del administrador, cajero, mozo y demás; el SUPERVISOR tiene el suyo, sin montos. */
 export function EscritorioView() {
   const { usuario } = useSesion();
-  if ((usuario?.rol || '').toUpperCase() === 'SUPERVISOR') return <EscritorioSupervisorView />;
+  if (tieneRolUsuario(usuario, 'SUPERVISOR')) return <EscritorioSupervisorView />;
   return <EscritorioGeneral />;
 }
 

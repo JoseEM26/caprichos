@@ -25,6 +25,9 @@ import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 import { ConfigurarHorarioDto } from './dto/horario.dto';
 import { AsignarPinDto } from './dto/asignar-pin.dto';
 import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.dto';
+import { DesactivarUsuarioDto } from './dto/desactivar-usuario.dto';
+import { ReactivarUsuarioDto } from './dto/reactivar-usuario.dto';
+import { EditarPeriodoDto } from './dto/editar-periodo.dto';
 
 @Controller('admin/usuarios')
 @UseGuards(AccesoGuard)
@@ -73,7 +76,7 @@ export class UsuariosController {
   @Patch(':id')
   @Permiso('usuarios', 'editar')
   @RequiereCodigoSupervisor('usuarios/cambiar_rol', {
-    condicion: (req) => Boolean(req.body?.rol),
+    condicion: (req) => Boolean(req.body?.rol) || req.body?.otrosRoles !== undefined,
   })
   async editar(
     @Param('id') id: string,
@@ -87,16 +90,31 @@ export class UsuariosController {
   @Post(':id/desactivar')
   @Permiso('usuarios', 'desactivar')
   @RequiereCodigoSupervisor('usuarios/desactivar')
-  async desactivar(@Param('id') id: string, @Req() req: any) {
+  async desactivar(@Param('id') id: string, @Body() dto: DesactivarUsuarioDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.usuariosService.desactivar(id, req.usuario, ip);
+    return this.usuariosService.desactivar(id, req.usuario, ip, dto ?? {});
   }
 
   @Post(':id/reactivar')
   @Permiso('usuarios', 'reactivar')
-  async reactivar(@Param('id') id: string, @Req() req: any) {
+  async reactivar(@Param('id') id: string, @Body() dto: ReactivarUsuarioDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.usuariosService.reactivar(id, req.usuario, ip);
+    return this.usuariosService.reactivar(id, req.usuario, ip, dto ?? {});
+  }
+
+  /** Historial laboral: periodos, tiempo total, veces que salió y licencia. */
+  @Get(':id/periodos')
+  @Permiso('usuarios', 'ver')
+  async historial(@Param('id') id: string) {
+    return this.usuariosService.historialLaboral(id);
+  }
+
+  /** Corrige un periodo (solo ADMIN). */
+  @Patch(':id/periodos/:periodoId')
+  @Permiso('usuarios', 'editar')
+  async editarPeriodo(@Param('id') id: string, @Param('periodoId') periodoId: string, @Body() dto: EditarPeriodoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.usuariosService.editarPeriodo(id, periodoId, dto, req.usuario, ip);
   }
 
   @Post(':id/restablecer')

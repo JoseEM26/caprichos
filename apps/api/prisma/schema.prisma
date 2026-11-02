@@ -68,6 +68,7 @@ model Person {
   cumple_mes      Int?      @db.SmallInt
   correo          String?
   foto_archivo_id BigInt?
+  pais_nacimiento String?
   party           Party     @relation(fields: [party_id], references: [id])
 
   @@map("person")
@@ -89,9 +90,21 @@ model Rol {
   nombre         String
   permisos       RolPermiso[]
   usuarios       UserAccount[]
+  usuariosExtra  UserAccountRol[]
   notificaciones Notificacion[]
 
   @@map("rol")
+}
+
+/// Roles adicionales de una cuenta. El rol principal sigue en user_account.rol.
+model UserAccountRol {
+  user_account_id BigInt
+  rol             String
+  cuenta          UserAccount @relation(fields: [user_account_id], references: [id])
+  r               Rol         @relation(fields: [rol], references: [codigo])
+
+  @@id([user_account_id, rol])
+  @@map("user_account_rol")
 }
 
 model Permiso {
@@ -127,6 +140,7 @@ model UserAccount {
   alertas_whatsapp_confirmado_en DateTime?              @db.Timestamptz
   party                 Party                  @relation(fields: [party_id], references: [id])
   r                     Rol                    @relation(fields: [rol], references: [codigo])
+  rolesExtra            UserAccountRol[]
   iniciativasCreadas    Iniciativa[]           @relation("IniciativasCreadas")
   iniciativasCambiadas  Iniciativa[]           @relation("IniciativasCambiadas")
   iniciativaComentarios IniciativaComentario[]

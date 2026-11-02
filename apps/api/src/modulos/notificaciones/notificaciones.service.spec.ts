@@ -73,7 +73,7 @@ describe('NotificacionesService', () => {
       // el cajero tiene caja/ver; el mozo y el resto no tienen permisos
       rolPermiso: {
         findMany: jest.fn().mockImplementation(({ where }: any) =>
-          Promise.resolve(where?.rol === 'CAJERO' ? [{ permiso: { modulo: 'caja', accion: 'ver' } }] : []),
+          Promise.resolve((where?.rol?.in ?? [where?.rol]).includes('CAJERO') ? [{ permiso: { modulo: 'caja', accion: 'ver' } }] : []),
         ),
       },
       pedido: {
@@ -141,6 +141,15 @@ describe('NotificacionesService', () => {
     expect(prisma.pedido.findMany).not.toHaveBeenCalled();
     // sin permisos solo ve los tipos sin restricción (aquí, consumo de WhatsApp)
     expect(r.notificaciones.map((n) => n.clave)).toEqual(['n:5']);
+  });
+
+  it('un aviso dirigido a CAJERO lo ve quien tiene CAJERO como rol extra, aunque su principal sea MOZO', async () => {
+    const mozoConCaja = { partyId: 9n, rol: 'MOZO', roles: ['MOZO', 'CAJERO'], debeCambiar: false };
+    const r = await service.resumen(mozoConCaja);
+    expect(r.notificaciones.map((n) => n.clave)).toContain('n:4');
+    // sin el extra no lo ve
+    const soloMozo = await service.resumen({ partyId: 8n, rol: 'MOZO', roles: ['MOZO'], debeCambiar: false });
+    expect(soloMozo.notificaciones.map((n) => n.clave)).not.toContain('n:4');
   });
 
   it('un pedido nuevo lo ve quien tiene caja o pedidos, no el mozo', async () => {

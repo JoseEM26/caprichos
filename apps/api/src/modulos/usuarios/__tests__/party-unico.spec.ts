@@ -37,7 +37,7 @@ describe('Usuarios: una persona = un party', () => {
       partyRole: { create: jest.fn() },
     };
     prisma = {
-      partyIdentifier: { findUnique: jest.fn().mockResolvedValue(null) },
+      partyIdentifier: { findFirst: jest.fn().mockResolvedValue(null) },
       contactMechanism: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
       userAccount: { findUnique: jest.fn().mockResolvedValue(null) },
       person: { findUnique: jest.fn() },
@@ -56,7 +56,7 @@ describe('Usuarios: una persona = un party', () => {
   });
 
   it('DNI de un party de puntos (sin usuario): se reutiliza, no crea party ni DNI, reemplaza el placeholder Cliente', async () => {
-    prisma.partyIdentifier.findUnique.mockResolvedValue({ id: 3n, party_id: 20n, tipo: 'DNI', numero: '12345678' });
+    prisma.partyIdentifier.findFirst.mockResolvedValue({ id: 3n, party_id: 20n, tipo: 'DNI', numero: '12345678' });
     tx.person.findUnique.mockResolvedValue({ party_id: 20n, nombres: 'Cliente', apellidos: null, correo: null, cumple_mes: null });
 
     const r = await service.crear({ ...base, celular: '987654321' });
@@ -71,7 +71,7 @@ describe('Usuarios: una persona = un party', () => {
   });
 
   it('reutilizado: si el nombre ya es real no lo pisa', async () => {
-    prisma.partyIdentifier.findUnique.mockResolvedValue({ id: 3n, party_id: 20n, tipo: 'DNI', numero: '12345678' });
+    prisma.partyIdentifier.findFirst.mockResolvedValue({ id: 3n, party_id: 20n, tipo: 'DNI', numero: '12345678' });
     tx.person.findUnique.mockResolvedValue({ party_id: 20n, nombres: 'Rosa', apellidos: 'Lopez', correo: 'r@x.pe', cumple_mes: 3 });
 
     await service.crear(base);
@@ -96,7 +96,7 @@ describe('Usuarios: una persona = un party', () => {
   });
 
   it('DNI de un party que ya tiene usuario: 409 DNI_DUPLICADO y no toca nada', async () => {
-    prisma.partyIdentifier.findUnique.mockResolvedValue({ id: 3n, party_id: 20n, tipo: 'DNI', numero: '12345678' });
+    prisma.partyIdentifier.findFirst.mockResolvedValue({ id: 3n, party_id: 20n, tipo: 'DNI', numero: '12345678' });
     prisma.userAccount.findUnique.mockResolvedValue({ id: 9n, party_id: 20n });
 
     await expect(service.crear(base)).rejects.toMatchObject({ response: { codigo: 'DNI_DUPLICADO' } });
@@ -132,7 +132,7 @@ describe('Usuarios: una persona = un party', () => {
 
   it('choque de unicidad (P2002) cuando el DNI ya existe al reintentar: 409 DNI_DUPLICADO', async () => {
     prisma.$transaction.mockRejectedValueOnce({ code: 'P2002' });
-    prisma.partyIdentifier.findUnique
+    prisma.partyIdentifier.findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 3n, party_id: 40n, tipo: 'DNI', numero: '12345678' });
 

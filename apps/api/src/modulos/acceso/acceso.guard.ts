@@ -12,6 +12,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CLAVE_PERMISO, CLAVE_SOLO_CAMBIO_CLAVE } from './permiso.decorator';
 import { UsuarioAutenticado } from './acceso.tipos';
+import { rolesDeCuenta } from './roles-usuario';
 
 @Injectable()
 export class AccesoGuard implements CanActivate {
@@ -81,10 +82,12 @@ export class AccesoGuard implements CanActivate {
       );
     }
 
+    const roles = await rolesDeCuenta(this.prisma, userAccount.id, userAccount.rol);
     const usuario: UsuarioAutenticado = {
       partyId: userAccount.party_id,
       rol: userAccount.rol,
       debeCambiar: userAccount.debe_cambiar,
+      roles,
     };
 
     req.usuario = usuario;
@@ -111,9 +114,10 @@ export class AccesoGuard implements CanActivate {
         ? permisoRequerido
         : [permisoRequerido];
 
+      // Unión de permisos: basta que cualquiera de los roles de la cuenta lo tenga
       const rolPermiso = await this.prisma.rolPermiso.findFirst({
         where: {
-          rol: userAccount.rol,
+          rol: { in: roles },
           OR: lista.map((p) => ({
             permiso: {
               modulo: p.modulo,

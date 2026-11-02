@@ -45,6 +45,7 @@ on:
           - consultar-pedido
           - programar-respaldos
           - importar-datos-produccion
+          - importar-personal
       paquete:
         description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
         required: false
@@ -89,6 +90,11 @@ on:
         type: string
       repetir_resenas:
         description: 'Solo cargar-resenas: true = vuelve a cargar aunque ya haya reseñas'
+        required: false
+        default: false
+        type: boolean
+      aplicar_personal:
+        description: 'Solo importar-personal: false = simulacro (no escribe, por defecto); true = crea las cuentas. El CSV sale del secreto PERSONAL_CSV_B64 (base64)'
         required: false
         default: false
         type: boolean
@@ -260,6 +266,15 @@ jobs:
             esac
             if [[ "$IN_CONSULTA" =~ [[:cntrl:]] ]]; then
               echo "::error::consulta_resenas no puede llevar caracteres de control ni saltos de línea."
+              exit 1
+            fi
+          fi
+
+          # Importación de personal (script de consola de la API): manual; la validación de prod (PRODUCCION + tag en main) va abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "importar-personal" ]; then
+            ACCION="importar-personal"
+            if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::importar-personal en demo se lanza desde la rama preprod."
               exit 1
             fi
           fi
@@ -968,6 +983,97 @@ jobs:
             fi
             echo '```'
             tail -n 120 resenas-carga.log 2>/dev/null || echo "(sin salida: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Importación de personal desde el CSV del secreto PERSONAL_CSV_B64 (base64). Simulacro por defecto; aplicar_personal=true crea las cuentas.
+  importar-personal:
+    name: Importar personal (script de consola)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'importar-personal'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: importar-personal
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del commit o del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Comprobar el secreto del CSV (sin mostrarlo)
+        env:
+          PERSONAL_CSV_B64: ${{ secrets.PERSONAL_CSV_B64 }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+        run: |
+          if [ -z "$PERSONAL_CSV_B64" ]; then
+            echo "::error::Falta el secreto PERSONAL_CSV_B64 en el ambiente $AMBIENTE. Guárdalo con: gh secret set PERSONAL_CSV_B64 --env $AMBIENTE < archivo.b64 (ver docs/operacion/importar-personal.md)."
+            exit 1
+          fi
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Importar personal (el CSV viaja por stdin; salida del script tal cual)
+        env:
+          PERSONAL_CSV_B64: ${{ secrets.PERSONAL_CSV_B64 }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          APLICAR: ${{ github.event.inputs.aplicar_personal }}
+        run: |
+          set -o pipefail
+          if [ "$APLICAR" = "true" ]; then SI_NO=si; else SI_NO=no; fi
+          if [ "$AMBIENTE" = "prod" ] && [ "$SI_NO" = "si" ]; then
+            echo "::warning::Se crean cuentas reales en PRODUCCIÓN (clave inicial = documento de cada persona)."
+          fi
+          printf '%s\n' "$PERSONAL_CSV_B64" | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/importar-personal.sh '${AMBIENTE}' '${SI_NO}'" 2>&1 | tee personal-importacion.log
+
+      - name: Resumen (salida del script)
+        if: always()
+        run: |
+          {
+            echo "## Importación de personal (${{ needs.validar-y-determinar.outputs.ambiente }})"
+            echo ""
+            echo "Modo: ${{ github.event.inputs.aplicar_personal == 'true' && 'APLICAR (crea cuentas)' || 'simulacro (no escribe)' }}"
+            echo ""
+            echo '```'
+            tail -n 200 personal-importacion.log 2>/dev/null || echo "(sin salida: revise el log del paso anterior)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

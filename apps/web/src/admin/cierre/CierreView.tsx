@@ -12,6 +12,7 @@ import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { SeccionVouchersCierre } from '../vouchers/SeccionVouchersCierre';
 import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
+import { tieneRolUsuario } from '../../comun/rolesUsuario';
 
 type TabCierre = 'turno' | 'historial';
 
@@ -25,7 +26,7 @@ export function CierreView() {
   const { usuario, tiene } = useSesion();
   const pideCodigo = usePideCodigo();
   const { confirmar, dialogo } = useConfirmarAsync();
-  const puedeVer = tiene('caja/ver') || tiene('caja/cerrar') || usuario?.rol === 'ADMIN' || usuario?.rol === 'CAJERO';
+  const puedeVer = tiene('caja/ver') || tiene('caja/cerrar') || usuario?.rol === 'ADMIN' || tieneRolUsuario(usuario, 'CAJERO');
   const esAdmin = usuario?.rol === 'ADMIN';
 
   const [tabActiva, setTabActiva] = useState<TabCierre>('turno');

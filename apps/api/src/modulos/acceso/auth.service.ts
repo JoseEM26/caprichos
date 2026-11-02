@@ -11,6 +11,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CambiarContrasenaDto, IngresarDto } from './auth.dto';
+import { permisosDeRoles, rolesDeCuenta, TIPOS_DOCUMENTO } from './roles-usuario';
 
 export function enmascararDni(dni: string): string {
   if (!dni || dni.length < 4) {
@@ -30,6 +31,7 @@ export interface RespuestaAutenticacion {
     partyId: string;
     nombres: string;
     rol: string;
+    roles: string[];
   };
 }
 
@@ -55,6 +57,7 @@ export class AuthService {
     nombres: string;
     fotoUrl: string | null;
     rol: string;
+    roles: string[];
     debeCambiar: boolean;
     permisos: string[];
   }> {
@@ -70,17 +73,15 @@ export class AuthService {
     }
     const fotoId = cuenta.party.persona?.foto_archivo_id;
     const foto = fotoId ? await this.prisma.archivo.findUnique({ where: { id: fotoId } }) : null;
-    const filas = await this.prisma.rolPermiso.findMany({
-      where: { rol: cuenta.rol },
-      include: { permiso: true },
-    });
+    const roles = await rolesDeCuenta(this.prisma, cuenta.id, cuenta.rol);
     return {
       partyId: cuenta.party_id.toString(),
       nombres: cuenta.party.persona?.nombres || '',
       fotoUrl: foto ? `/archivos/${foto.ruta}` : null,
       rol: cuenta.rol,
+      roles,
       debeCambiar: cuenta.debe_cambiar,
-      permisos: filas.map((f) => `${f.permiso.modulo}/${f.permiso.accion}`).sort(),
+      permisos: await permisosDeRoles(this.prisma, roles),
     };
   }
 
@@ -104,13 +105,12 @@ export class AuthService {
       );
     }
 
-    // 2. Buscar usuario por DNI sin revelar existencia
-    const identificador = await this.prisma.partyIdentifier.findUnique({
+    // 2. Buscar usuario por su documento (DNI, CE, cédula o pasaporte) sin revelar existencia.
+    // El número es único entre tipos de documento del personal (lo cuida el alta de usuarios).
+    const identificador = await this.prisma.partyIdentifier.findFirst({
       where: {
-        tipo_numero: {
-          tipo: 'DNI',
-          numero: dto.dni,
-        },
+        numero: dto.dni,
+        tipo: { in: [...TIPOS_DOCUMENTO] },
       },
       include: {
         party: {
@@ -207,10 +207,12 @@ export class AuthService {
     const jwtExpiraMin = Number(this.configService.get<string | number>('JWT_EXPIRA_MIN', 15));
     const refreshDias = Number(this.configService.get<string | number>('REFRESH_DIAS', 7));
 
+    const roles = await rolesDeCuenta(this.prisma, usuario.id, usuario.rol);
     const payload = {
       sub: usuario.party_id.toString(),
       partyId: usuario.party_id.toString(),
       rol: usuario.rol,
+      roles,
       debeCambiar: usuario.debe_cambiar,
     };
 
@@ -252,6 +254,7 @@ export class AuthService {
           partyId: usuario.party_id.toString(),
           nombres: identificador.party.persona?.nombres || '',
           rol: usuario.rol,
+          roles,
         },
       },
       rawRefreshToken,
@@ -317,10 +320,12 @@ export class AuthService {
     const jwtExpiraMin = Number(this.configService.get<string | number>('JWT_EXPIRA_MIN', 15));
     const refreshDias = Number(this.configService.get<string | number>('REFRESH_DIAS', 7));
 
+    const roles = await rolesDeCuenta(this.prisma, usuario.id, usuario.rol);
     const payload = {
       sub: sesion.party_id.toString(),
       partyId: sesion.party_id.toString(),
       rol: usuario.rol,
+      roles,
       debeCambiar: usuario.debe_cambiar,
     };
 
@@ -352,6 +357,7 @@ export class AuthService {
           partyId: sesion.party_id.toString(),
           nombres: sesion.party.persona?.nombres || '',
           rol: usuario.rol,
+          roles,
         },
       },
       rawRefreshToken: nuevoRawRefreshToken,
@@ -417,6 +423,21 @@ export class AuthService {
           codigo: 'CONTRASENA_INVALIDA',
           mensaje:
             'La nueva contraseña debe tener mínimo 8 caracteres, al menos una letra y un número, y ser distinta de la actual',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // La clave inicial es el número de documento: la clave nueva no puede serlo
+    const documentos = await this.prisma.partyIdentifier.findMany({
+      where: { party_id: partyId, tipo: { in: [...TIPOS_DOCUMENTO] } },
+      select: { numero: true },
+    });
+    if (documentos.some((d) => d.numero.toUpperCase() === dto.contrasenaNueva.toUpperCase())) {
+      throw new HttpException(
+        {
+          codigo: 'CONTRASENA_ES_DOCUMENTO',
+          mensaje: 'La nueva contraseña no puede ser tu número de documento. Elige otra.',
         },
         HttpStatus.BAD_REQUEST,
       );

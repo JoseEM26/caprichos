@@ -70,7 +70,7 @@ describe('Administración de cuenta por el ADMIN (DNI, correo, foto, clave)', ()
         count: jest.fn().mockResolvedValue(2),
       },
       partyIdentifier: {
-        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({}),
         create: jest.fn().mockResolvedValue({}),
       },
@@ -112,7 +112,7 @@ describe('Administración de cuenta por el ADMIN (DNI, correo, foto, clave)', ()
 
       expect(prismaMock.partyIdentifier.update).toHaveBeenCalledWith({
         where: { id: 77n },
-        data: { numero: '87654321' },
+        data: { tipo: 'DNI', numero: '87654321' },
       });
       expect(prismaMock.sesion.updateMany).not.toHaveBeenCalled();
       expect(res.reingresar).toBe(false);
@@ -127,7 +127,7 @@ describe('Administración de cuenta por el ADMIN (DNI, correo, foto, clave)', ()
     });
 
     it('DNI ya usado por otra persona: 409 DNI_DUPLICADO y no escribe nada', async () => {
-      prismaMock.partyIdentifier.findUnique.mockResolvedValue({ id: 99n, party_id: 20n, tipo: 'DNI', numero: '87654321' });
+      prismaMock.partyIdentifier.findFirst.mockResolvedValue({ id: 99n, party_id: 20n, tipo: 'DNI', numero: '87654321' });
 
       await expect(
         service.editar('5', { dni: '87654321', claveAdmin: CLAVE_ADMIN_PRUEBA }, admin),

@@ -3,8 +3,14 @@ export interface UsuarioItem {
   partyId: string;
   nombres: string;
   apellidos: string;
+  /** Documento enmascarado (12****78). */
   dni: string;
+  tipoDocumento?: string;
+  /** Rol principal. */
   rol: string;
+  /** Principal primero, luego los extra. */
+  roles?: string[];
+  paisNacimiento?: string | null;
   activo: boolean;
   debeCambiar: boolean;
   altaEn?: string;

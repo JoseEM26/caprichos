@@ -35,6 +35,7 @@ describe('Mi perfil con debe_cambiar=true (primer ingreso)', () => {
         }),
       },
       rolPermiso: { findFirst: jest.fn() },
+      userAccountRol: { findMany: jest.fn().mockResolvedValue([]) },
     };
     guard = new AccesoGuard(
       new Reflector(),

@@ -39,6 +39,7 @@ import {
   RespuestaRapida,
 } from './mensajesTipos';
 import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
+import { tieneRolUsuario } from '../../comun/rolesUsuario';
 
 function esUsuarioWhatsApp(c?: { identificador_tipo?: string; telefono?: string } | null): boolean {
   if (!c) return false;
@@ -149,7 +150,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     tieneVouchersVer =
       Boolean(sesion?.tiene?.('vouchers/ver')) ||
       sesion?.usuario?.rol === 'ADMIN' ||
-      sesion?.usuario?.rol === 'CAJERO';
+      tieneRolUsuario(sesion?.usuario, 'CAJERO');
   } catch {
     tieneVouchersVer = true;
   }
@@ -1647,7 +1648,7 @@ export function MensajesView() {
     puedeSalientes =
       Boolean(sesion?.tiene?.('whatsapp_salientes/ver')) ||
       sesion?.usuario?.rol === 'ADMIN' ||
-      sesion?.usuario?.rol === 'CAJERO';
+      tieneRolUsuario(sesion?.usuario, 'CAJERO');
   } catch {
     puedeSalientes = false;
   }

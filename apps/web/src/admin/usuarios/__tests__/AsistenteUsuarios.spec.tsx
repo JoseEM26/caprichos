@@ -83,7 +83,8 @@ describe('Asistente Nuevo usuario', () => {
     const [ruta, cuerpo] = vi.mocked(api.post).mock.calls[0] as [string, any];
     expect(ruta).toBe('/admin/usuarios');
     expect(cuerpo).toMatchObject({
-      dni: '12345678',
+      tipoDocumento: 'DNI',
+      documento: '12345678',
       celular: '987654321',
       horarios: [{ dia: 2, entrada: '09:00', salida: '17:00' }],
       reemplazos: [],

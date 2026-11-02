@@ -308,9 +308,11 @@ export class MensajesService {
 
     // Voucher de la conversación para quien tenga permiso vouchers/ver
     let voucherDetalle: any = null;
-    const rol = (usuario?.rol || '').toUpperCase();
+    // Cualquiera de sus roles (principal o extra) con permiso; ADMIN solo como principal
+    const rolesUsuario = (usuario?.roles ?? [usuario?.rol ?? '']).map((r) => String(r || '').toUpperCase());
     const tienePermisoVerVouchers =
-      rol === 'ADMIN' || (Boolean(MATRIZ[rol]) && MATRIZ[rol].includes('vouchers/ver'));
+      rolesUsuario.includes('ADMIN') ||
+      rolesUsuario.some((r) => Boolean(MATRIZ[r]) && MATRIZ[r].includes('vouchers/ver'));
 
     if (tienePermisoVerVouchers && pedido?.id) {
       // Solo vouchers del pedido en espera: nunca el último de la conversación ni de otro pedido

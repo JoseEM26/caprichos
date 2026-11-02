@@ -19,6 +19,7 @@ import {
 import { EditorOpcionesTamanos } from './EditorOpcionesTamanos';
 import { BotonVistaPrevia } from './VistaPreviaProducto';
 import { ESTADO_VACIO, EstadoOpciones, validarTamanos } from './editorOpcionesTipos';
+import { esSoloMozoUsuario, tieneRolUsuario } from '../../comun/rolesUsuario';
 
 const PPAGE = 24;
 
@@ -73,8 +74,8 @@ export function ProductosView() {
 
   // Roles y permisos
   const esAdmin = usuario?.rol === 'ADMIN' || tiene('catalogo/crear');
-  const esCajero = usuario?.rol === 'CAJERO';
-  const esMozo = usuario?.rol === 'MOZO';
+  const esCajero = tieneRolUsuario(usuario, 'CAJERO');
+  const esMozo = esSoloMozoUsuario(usuario);
   const puedeEditar = (esAdmin || esCajero) && !esMozo;
   const puedeGestionarListas = esAdmin || tiene('catalogo/ver');
 

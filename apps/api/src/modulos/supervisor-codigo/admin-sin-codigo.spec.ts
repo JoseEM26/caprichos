@@ -18,7 +18,7 @@ function montar() {
   const prisma: any = {
     userAccount: {
       findFirst: jest.fn(async ({ where }: any) => {
-        const roles: string[] = where.rol?.in ?? [where.rol];
+        const roles: string[] = (where.OR ?? [where]).flatMap((c: any) => c.rol?.in ?? (c.rol ? [c.rol] : []));
         if (where.party_id === undefined) return roles.includes('ADMIN') ? { party_id: ADMIN, id: 10n, rol: 'ADMIN' } : null;
         if (where.party_id === ADMIN && roles.includes('ADMIN')) return { party_id: ADMIN, id: 10n, rol: 'ADMIN' };
         return null;

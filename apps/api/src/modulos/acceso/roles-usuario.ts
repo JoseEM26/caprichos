@@ -1,0 +1,63 @@
+import { PrismaService } from '../../comun/prisma/prisma.service';
+
+/** Roles que no se combinan con ningún otro (ADMIN por control total; REPARTIDOR por aislamiento). */
+export const ROLES_SIN_COMBINAR = ['ADMIN', 'REPARTIDOR'] as const;
+
+/** Tipos de documento del personal (party_identifier.tipo). DNI = 8 dígitos; el resto, 7 a 12 alfanuméricos. */
+export const TIPOS_DOCUMENTO = ['DNI', 'CE', 'CEDULA', 'PASAPORTE'] as const;
+
+export function documentoValido(tipo: string, numero: string): boolean {
+  if (tipo === 'DNI') return /^\d{8}$/.test(numero);
+  return /^[A-Za-z0-9]{7,12}$/.test(numero);
+}
+
+/** Mensaje si la combinación de roles no es válida; null si lo es. */
+export function errorCombinacionRoles(principal: string, extras: string[]): string | null {
+  const todos = [principal, ...extras];
+  if (new Set(todos).size !== todos.length) return 'Un rol no puede repetirse';
+  if (todos.length > 1) {
+    const exclusivo = ROLES_SIN_COMBINAR.find((r) => todos.includes(r));
+    if (exclusivo) return `El rol ${exclusivo} no se combina con otros roles`;
+  }
+  return null;
+}
+
+/** Roles de la cuenta: principal primero, luego los extra. */
+export async function rolesDeCuenta(prisma: PrismaService, userAccountId: bigint, rolPrincipal: string): Promise<string[]> {
+  const extras = await prisma.userAccountRol.findMany({
+    where: { user_account_id: userAccountId },
+    select: { rol: true },
+    orderBy: { rol: 'asc' },
+  });
+  return [rolPrincipal, ...extras.map((e) => e.rol).filter((r) => r !== rolPrincipal)];
+}
+
+/** Pertenencia: el usuario tiene el rol como principal o como extra. Sin lista de roles, cuenta solo el principal. */
+export function tieneRol(usuario: { rol: string; roles?: string[] }, rol: string): boolean {
+  return (usuario.roles ?? [usuario.rol]).includes(rol);
+}
+
+/** Unión de permisos (modulo/accion) de varios roles. */
+export async function permisosDeRoles(prisma: PrismaService, roles: string[]): Promise<string[]> {
+  const filas = await prisma.rolPermiso.findMany({
+    where: { rol: { in: roles } },
+    include: { permiso: true },
+  });
+  return [...new Set(filas.map((f) => `${f.permiso.modulo}/${f.permiso.accion}`))].sort();
+}
+
+/** Roles de alcance amplio: si la cuenta tiene uno, manda sobre la restricción de «solo mis pedidos» del mozo. */
+export const ROLES_ALCANCE_AMPLIO = ['ADMIN', 'CAJERO', 'SUPERVISOR'] as const;
+
+/** Mozo que solo es mozo: tiene MOZO y ningún rol de alcance amplio. El rol más amplio manda. */
+export function esSoloMozo(usuario: { rol: string; roles?: string[] }): boolean {
+  const roles = usuario.roles ?? [usuario.rol];
+  return roles.includes('MOZO') && !roles.some((r) => (ROLES_ALCANCE_AMPLIO as readonly string[]).includes(r));
+}
+
+/** Rol con el que se aplican las reglas por rol: MOZO si es solo mozo; si no, el de alcance amplio que tenga (o el principal). */
+export function rolEfectivoMozo(usuario: { rol: string; roles?: string[] }): string {
+  if (esSoloMozo(usuario)) return 'MOZO';
+  const roles = usuario.roles ?? [usuario.rol];
+  return roles.find((r) => (ROLES_ALCANCE_AMPLIO as readonly string[]).includes(r)) ?? usuario.rol;
+}

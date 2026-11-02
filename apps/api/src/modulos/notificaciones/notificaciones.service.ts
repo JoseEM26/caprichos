@@ -171,13 +171,14 @@ const claveCalculada = (tipo: string, valores: Array<string | number | bigint>):
  * Roles cuyos avisos ve cada rol. El SUPERVISOR ve también los del CAJERO (decisión del dueño):
  * la caja es suya y cada uno marca su propio Leído.
  */
-const ROLES_QUE_VE = (rol: string): string[] => (rol === 'SUPERVISOR' ? ['SUPERVISOR', 'CAJERO'] : [rol]);
+const ROLES_QUE_VE = (roles: string[]): string[] =>
+  [...new Set(roles.flatMap((rol) => (rol === 'SUPERVISOR' ? ['SUPERVISOR', 'CAJERO'] : [rol])))];
 
 /** Condición de visibilidad por rol: el administrador ve todo; el resto, lo de su rol (y el de los que hereda) o lo de todos. */
 const aRol = (usuario: UsuarioAutenticado, condicion: Prisma.NotificacionWhereInput): Prisma.NotificacionWhereInput =>
   usuario.rol === 'ADMIN'
     ? condicion
-    : { AND: [{ OR: [{ rol_destino: null }, { rol_destino: { in: ROLES_QUE_VE(usuario.rol) } }] }, condicion] };
+    : { AND: [{ OR: [{ rol_destino: null }, { rol_destino: { in: ROLES_QUE_VE(usuario.roles ?? [usuario.rol]) } }] }, condicion] };
 
 const haceHoras = (horas: number): Date => new Date(Date.now() - horas * 3600000);
 const ABIERTOS = ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
@@ -233,8 +234,9 @@ export class NotificacionesService {
 
   private async permisosDe(usuario: UsuarioAutenticado): Promise<(m: string) => boolean> {
     if (usuario.rol === 'ADMIN') return () => true;
+    // Unión de permisos de todos sus roles (principal y extra)
     const filas = await this.prisma.rolPermiso.findMany({
-      where: { rol: usuario.rol },
+      where: { rol: { in: usuario.roles ?? [usuario.rol] } },
       include: { permiso: true },
     });
     const modulos = new Set(filas.map((f) => `${f.permiso.modulo}/${f.permiso.accion}`));
