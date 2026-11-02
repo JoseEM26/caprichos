@@ -190,6 +190,7 @@ export const MATRIZ: Record<string, string[]> = {
     'comprobantes/ver',
     'comprobantes/reimprimir',
     'mesas/ver',
+    'mesas/abrir',
     'mesas/liberar',
     'repartos/ver',
     'repartos/liquidar',

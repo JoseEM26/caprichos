@@ -50,6 +50,8 @@ export interface ModalPrecuentaProps {
   puedeCambiarVoucher?: boolean;
   /** Comprobante que ya tiene el pedido: se usa de defecto (boleta o factura con documento); si no, nota de venta. */
   comprobantePedido?: { tipo?: string | null; documento?: string | null; razon?: string | null } | null;
+  /** Solo en el salón: pasa el pedido a otra mesa libre (el padre entra en modo elegir destino). */
+  alCambiarMesa?: () => void;
 }
 
 type TipoEnvio = 'NOTA_VENTA' | 'BOLETA' | 'FACTURA';
@@ -130,6 +132,7 @@ export function ModalPrecuenta({
   vouchersPorMedio,
   puedeCambiarVoucher = false,
   comprobantePedido,
+  alCambiarMesa,
 }: ModalPrecuentaProps) {
   const [confirmarImprimir, setConfirmarImprimir] = useState(false);
   const [imprimiendo, setImprimiendo] = useState(false);
@@ -504,6 +507,11 @@ export function ModalPrecuenta({
             <button type="button" onClick={() => setConfirmarImprimir(true)} className="pc-btn pc-btn-primario">
               Imprimir precuenta
             </button>
+            {alCambiarMesa && (
+              <button type="button" onClick={alCambiarMesa} className="pc-btn pc-btn-secundario">
+                Cambiar de mesa
+              </button>
+            )}
             <button type="button" onClick={alCerrar} className="pc-btn pc-btn-secundario">
               Cerrar
             </button>

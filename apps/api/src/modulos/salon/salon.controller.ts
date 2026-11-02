@@ -13,6 +13,7 @@ import { Permiso } from '../acceso/permiso.decorator';
 import { SalonService } from './salon.service';
 import { AbrirPedidoMesaDto } from './dto/abrir-pedido-mesa.dto';
 import { LiberarMesaDto } from './dto/liberar-mesa.dto';
+import { CambiarMesaDto } from './dto/cambiar-mesa.dto';
 
 @Controller('admin/salon')
 @UseGuards(AccesoGuard)
@@ -59,6 +60,17 @@ export class SalonController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.salonService.liberarMesaManual(id, dto, req.usuario, ip);
+  }
+
+  /**
+   * 5) POST /admin/salon/pedidos/:id/cambiar-mesa (mesas/abrir) { mesaId }
+   * Mueve el pedido de mesa a una mesa libre (cualquier mozo, caja o supervisor con mesas/abrir).
+   */
+  @Post('pedidos/:id/cambiar-mesa')
+  @Permiso('mesas', 'abrir')
+  async cambiarMesa(@Param('id') id: string, @Body() dto: CambiarMesaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.salonService.cambiarMesaPedido(id, dto.mesaId, req.usuario, ip);
   }
 
   /**

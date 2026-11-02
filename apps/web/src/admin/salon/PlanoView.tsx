@@ -8,7 +8,8 @@ import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ModalPrecuenta } from './componentes/ModalPrecuenta';
 import { useSalonSocket } from './useSalonSocket';
 import { useMantenerPresionado } from './useMantenerPresionado';
-import { ModalForzarLiberarMesa } from './componentes/ModalForzarLiberarMesa';
+import { VistaPreviaMesa } from './componentes/VistaPreviaMesa';
+import { useCambioDeMesa } from './componentes/CambioDeMesa';
 import { salonApi } from './api';
 import './salon.css';
 
@@ -55,9 +56,10 @@ export function PlanoView() {
   const [modalNuevoPedidoAbierto, setModalNuevoPedidoAbierto] = useState(false);
   // Cuenta de una mesa ocupada: el mozo la envía a Caja (no la cobra)
   const [mesaParaCuenta, setMesaParaCuenta] = useState<MesaSalon | null>(null);
-  const [mesaParaForzar, setMesaParaForzar] = useState<MesaSalon | null>(null);
-  // Mesa ocupada mantenida presionada 3 s -> Forzar liberación (solo con permiso mesas/liberar, fuera de edición)
-  const mantenerMesa = useMantenerPresionado<MesaSalon>((mesa) => setMesaParaForzar(mesa));
+  // Mesa ocupada mantenida presionada 2 s -> vista previa (ahí viven cuenta, cambio de mesa y forzar liberación)
+  const [vistaPreviaId, setVistaPreviaId] = useState<string | null>(null);
+  const mantenerMesa = useMantenerPresionado<MesaSalon>((mesa) => setVistaPreviaId(String(mesa.id)), 2000);
+  const cambio = useCambioDeMesa(() => void cargarDatos());
   const [mesasParaPedido, setMesasParaPedido] = useState<string[]>([]);
 
   // Confirmaciones obligatorias Sí/No
@@ -837,6 +839,7 @@ export function PlanoView() {
             </span>
           </div>
 
+          {cambio.ui}
           {/* Contenedor del plano con aspecto exacto del mockup */}
           <div
             className="salon-lienzo"
@@ -878,9 +881,7 @@ export function PlanoView() {
                 const ocupadaSalon = mesaSalonElem?.estado === 'OCUPADA';
                 const libreSalon = mesaSalonElem?.estado === 'LIBRE';
                 const pulsaMesa =
-                  puedeForzar && mesaSalonElem?.estado === 'OCUPADA'
-                    ? mantenerMesa.manejadores(mesaSalonElem)
-                    : null;
+                  mesaSalonElem?.estado === 'OCUPADA' ? mantenerMesa.manejadores(mesaSalonElem) : null;
 
                 return (
                   <div
@@ -892,6 +893,11 @@ export function PlanoView() {
                     {...(pulsaMesa ?? {})}
                     onClick={(ev) => {
                       ev.stopPropagation();
+                      // Eligiendo destino de un cambio de mesa, tocar una libre es la elección
+                      if (cambio.modoDestino) {
+                        if (mesaSalonElem) cambio.tocarMesa(mesaSalonElem);
+                        return;
+                      }
                       setElementoSeleccionadoId(e.id);
                       setHerramientaActiva(null);
                     }}
@@ -916,6 +922,8 @@ export function PlanoView() {
                       color: t.fg,
                       border: sel
                         ? '3px solid var(--cp-orange)'
+                        : cambio.modoDestino && libreSalon
+                        ? '2.5px solid var(--cp-orange)'
                         : e.activo
                         ? `1.5px solid ${ocupadaSalon ? 'var(--cp-orange)' : libreSalon ? 'var(--cp-ok)' : t.bd}`
                         : `1.5px dashed ${t.bd}`,
@@ -1888,6 +1896,11 @@ export function PlanoView() {
           total={Number(mesaParaCuenta.pedido.total || 0)}
           mozo={mesaParaCuenta.pedido.mozo}
           pedidoId={mesaParaCuenta.pedido.id}
+          alCambiarMesa={() => {
+            const m = mesaParaCuenta;
+            if (m?.pedido) cambio.iniciar({ pedidoId: m.pedido.id, codigo: m.pedido.codigo, mesa: m });
+            setMesaParaCuenta(null);
+          }}
         />
       )}
 
@@ -1906,15 +1919,20 @@ export function PlanoView() {
         />
       )}
 
-      {mesaParaForzar && (
-        <ModalForzarLiberarMesa
-          mesa={mesaParaForzar}
-          alCerrar={() => setMesaParaForzar(null)}
-          alForzar={async (mesaId, motivo) => {
-            await salonApi.liberarMesaManual(mesaId, motivo, true);
-            setMesaParaForzar(null);
-            await cargarDatos();
+      {vistaPreviaId && mesasSalonPorId.get(vistaPreviaId) && (
+        <VistaPreviaMesa
+          mesa={mesasSalonPorId.get(vistaPreviaId) as MesaSalon}
+          puedeForzar={puedeForzar}
+          alCerrar={() => setVistaPreviaId(null)}
+          alAbrirCuenta={(m) => {
+            setVistaPreviaId(null);
+            setMesaParaCuenta(m);
           }}
+          alCambiarMesa={(m) => {
+            setVistaPreviaId(null);
+            if (m.pedido) cambio.iniciar({ pedidoId: m.pedido.id, codigo: m.pedido.codigo, mesa: m });
+          }}
+          alCambiar={() => void cargarDatos()}
         />
       )}
     </div>

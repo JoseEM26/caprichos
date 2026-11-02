@@ -12,10 +12,23 @@ import { HistorialVoucher } from './HistorialVoucher';
 import { Confirmar } from '../../comun/Confirmar';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import { ProgresoPedido } from './ProgresoPedido';
+import { SalonMozo } from './componentes/SalonMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
 import type { MiPedido, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
 import './mis-pedidos.css';
 import './mis-pedidos-voucher.css';
+
+type Pestana = 'salon' | 'lista';
+const CLAVE_PESTANA = 'caprichos.misPedidos.pestana';
+
+/** Pestaña recordada en este equipo (Salón por defecto). Sin acceso a localStorage, Salón. */
+function pestanaGuardada(): Pestana {
+  try {
+    return localStorage.getItem(CLAVE_PESTANA) === 'lista' ? 'lista' : 'salon';
+  } catch {
+    return 'salon';
+  }
+}
 
 const RANGOS: Array<{ valor: RangoMisPedidos; etiqueta: string }> = [
   { valor: 'hoy', etiqueta: 'Hoy' },
@@ -116,7 +129,17 @@ export function MisPedidosView() {
   const [errorQuitar, setErrorQuitar] = useState<string | null>(null);
   const [voucherPedido, setVoucherPedido] = useState<{ pedido: MiPedido; medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number } | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
+  const [pestana, setPestanaState] = useState<Pestana>(pestanaGuardada);
   const ultimaSolicitud = useRef(0);
+
+  const setPestana = (p: Pestana) => {
+    setPestanaState(p);
+    try {
+      localStorage.setItem(CLAVE_PESTANA, p);
+    } catch {
+      // Sin almacenamiento: la pestaña vale solo para esta vista
+    }
+  };
 
   const cargar = useCallback(async () => {
     // Solo cuenta la última respuesta: si cambia el rango mientras llega otra, la vieja se descarta
@@ -171,10 +194,43 @@ export function MisPedidosView() {
 
   return (
     <div className="mp" aria-busy={cargando}>
+      <div role="tablist" aria-label="Vista de mis pedidos" className="mpv-pestanas">
+        <button
+          type="button"
+          role="tab"
+          id="mp-tab-salon"
+          aria-selected={pestana === 'salon'}
+          aria-controls="mp-panel"
+          className="mpv-pestana"
+          onClick={() => setPestana('salon')}
+        >
+          Salón
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="mp-tab-lista"
+          aria-selected={pestana === 'lista'}
+          aria-controls="mp-panel"
+          className="mpv-pestana"
+          onClick={() => setPestana('lista')}
+        >
+          Lista
+        </button>
+      </div>
+
       <button type="button" className="mp-nuevo" onClick={() => setModalAbierto(true)}>
         Nuevo pedido
       </button>
 
+      {pestana === 'salon' && (
+        <div id="mp-panel" role="tabpanel" aria-labelledby="mp-tab-salon">
+          <SalonMozo puedeForzar={tiene('mesas/liberar')} />
+        </div>
+      )}
+
+      {pestana === 'lista' && (
+      <div id="mp-panel" role="tabpanel" aria-labelledby="mp-tab-lista" style={{ display: 'contents' }}>
       <div className="mpv-buscar">
         <input
           type="search"
@@ -367,6 +423,9 @@ export function MisPedidosView() {
           alCerrar={() => setModalAbierto(false)}
           alExitoPedido={() => void cargar()}
         />
+      )}
+
+      </div>
       )}
 
       {errorQuitar && (

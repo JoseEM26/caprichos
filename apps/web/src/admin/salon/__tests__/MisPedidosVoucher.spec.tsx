@@ -4,6 +4,11 @@ import { MisPedidosView } from '../MisPedidosView';
 import { salonApi } from '../api';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 
+// Los casos de la lista parten de la pestaña Lista (la inicial es Salón)
+beforeEach(() => {
+  localStorage.setItem('caprichos.misPedidos.pestana', 'lista');
+});
+
 vi.mock('../../../comun/sesion', () => ({ useSesion: () => ({ tiene: () => true }) }));
 vi.mock('../api', () => ({
   salonApi: { misPedidos: vi.fn(), obtenerMesas: vi.fn() },

@@ -15,7 +15,7 @@ import { comboDeProducto } from '../../../carta/ReemplazoCombo';
 import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
 import { ModalLiberarMesa } from './ModalLiberarMesa';
-import { ModalForzarLiberarMesa } from './ModalForzarLiberarMesa';
+import { VistaPreviaMesa } from './VistaPreviaMesa';
 import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
 import { salonApi } from '../api';
 import '../salon.css';
@@ -546,7 +546,8 @@ export function ModalNuevoPedidoMesa({
 
   // Modal Liberar mesa
   const [mesaParaLiberar, setMesaParaLiberar] = useState<MesaSalon | null>(null);
-  const [mesaParaForzar, setMesaParaForzar] = useState<MesaSalon | null>(null);
+  // Mesa ocupada mantenida 2 s: vista previa (forzar liberación solo ahí, con permiso mesas/liberar)
+  const [vistaPreviaId, setVistaPreviaId] = useState<string | null>(null);
 
   // Aviso al tocar una mesa que no se puede elegir
   const [avisoMesa, setAvisoMesa] = useState<string | null>(null);
@@ -1680,8 +1681,7 @@ export function ModalNuevoPedidoMesa({
                   mesasSalon={mesasPiso}
                   mesasSeleccionadasIds={mesasSeleccionadas}
                   onSeleccionarMesaSalon={handleClicMesa}
-                  alMantenerMesaSalon={setMesaParaForzar}
-                  puedeForzarLiberacion={puedeForzarLiberacion}
+                  alMantenerMesaSalon={(m) => setVistaPreviaId(String(m.id))}
                 />
               </div>
               {avisoMesa && (
@@ -3060,14 +3060,13 @@ export function ModalNuevoPedidoMesa({
         />
       )}
 
-      {/* Forzar liberación: mesa ocupada mantenida presionada 3 s (solo con permiso mesas/liberar) */}
-      {mesaParaForzar && (
-        <ModalForzarLiberarMesa
-          mesa={mesaParaForzar}
-          alCerrar={() => setMesaParaForzar(null)}
-          alForzar={async (mesaId: string, motivo: string) => {
-            await salonApi.liberarMesaManual(mesaId, motivo, true);
-            setMesaParaForzar(null);
+      {/* Vista previa de la mesa ocupada (mantener 2 s): forzar liberación solo con permiso mesas/liberar */}
+      {vistaPreviaId && pisos.flatMap((p) => p.mesas || []).find((m) => String(m.id) === vistaPreviaId) && (
+        <VistaPreviaMesa
+          mesa={pisos.flatMap((p) => p.mesas || []).find((m) => String(m.id) === vistaPreviaId) as MesaSalon}
+          puedeForzar={puedeForzarLiberacion}
+          alCerrar={() => setVistaPreviaId(null)}
+          alCambiar={async () => {
             await refrescarMesas();
             await alRefrescarMesas?.();
           }}

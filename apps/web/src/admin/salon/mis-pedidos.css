@@ -464,3 +464,71 @@
     transition: none !important;
   }
 }
+
+/* Pestañas «Salón» / «Lista» de Mis pedidos (celular y tablet: 44 px) */
+.mpv-pestanas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--cp-line);
+}
+
+.mpv-pestana {
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cp-navy);
+  font-family: var(--fuente-titulos);
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.mpv-pestana[aria-selected='true'] {
+  background: var(--cp-white);
+  box-shadow: 0 2px 6px rgba(11, 44, 62, 0.12);
+}
+
+.mpv-pestana:focus-visible {
+  outline: 3px solid var(--cp-gold);
+  outline-offset: 2px;
+}
+
+/* Croquis del salón en «Mis pedidos» */
+.smz {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.smz-ayuda {
+  margin: 0;
+  font-size: 13px;
+  color: var(--cp-soft);
+}
+
+.smz-pisos {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.smz-piso {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--cp-navy);
+  background: transparent;
+  color: var(--cp-navy);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.smz-piso--activo {
+  background: var(--cp-navy);
+  color: var(--cp-cream);
+}

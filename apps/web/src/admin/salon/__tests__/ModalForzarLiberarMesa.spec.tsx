@@ -89,7 +89,7 @@ describe('ModalForzarLiberarMesa', () => {
   });
 });
 
-describe('Plano de mesas: mantener presionada una mesa ocupada', () => {
+describe('Plano de mesas: mantener 2 s una mesa ocupada', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -105,9 +105,9 @@ describe('Plano de mesas: mantener presionada una mesa ocupada', () => {
     fireEvent.pointerDown(el, { button: 0, clientX: 10, clientY: 10 });
   };
 
-  it('con permiso, tras 3 s avisa de la mesa ocupada; sin permiso no hace nada', () => {
+  it('mantener 2 s una mesa ocupada llama a alMantenerMesaSalon (antes de 2 s, no)', () => {
     const alMantener = vi.fn();
-    const { rerender } = render(
+    render(
       <CuadriculaPlano
         columnas={10}
         filas={10}
@@ -116,29 +116,23 @@ describe('Plano de mesas: mantener presionada una mesa ocupada', () => {
         mesasSalon={[mesa]}
         onSeleccionarMesaSalon={vi.fn()}
         alMantenerMesaSalon={alMantener}
-        puedeForzarLiberacion={false}
       />,
     );
     pulsar(screen.getByTestId('elemento-plano-5'));
-    act(() => vi.advanceTimersByTime(3500));
+    act(() => vi.advanceTimersByTime(1500));
     expect(alMantener).not.toHaveBeenCalled();
-
-    rerender(
-      <CuadriculaPlano
-        columnas={10}
-        filas={10}
-        elementos={elementos}
-        modoSalon
-        mesasSalon={[mesa]}
-        onSeleccionarMesaSalon={vi.fn()}
-        alMantenerMesaSalon={alMantener}
-        puedeForzarLiberacion
-      />,
-    );
-    pulsar(screen.getByTestId('elemento-plano-5'));
-    act(() => vi.advanceTimersByTime(3000));
+    act(() => vi.advanceTimersByTime(700));
     expect(alMantener).toHaveBeenCalledTimes(1);
     expect(alMantener.mock.calls[0][0].id).toBe('5');
+  });
+
+  it('sin alMantenerMesaSalon, mantener no hace nada (el gesto de 3 s ya no existe)', () => {
+    render(
+      <CuadriculaPlano columnas={10} filas={10} elementos={elementos} modoSalon mesasSalon={[mesa]} onSeleccionarMesaSalon={vi.fn()} />,
+    );
+    pulsar(screen.getByTestId('elemento-plano-5'));
+    act(() => vi.advanceTimersByTime(4000));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('una mesa libre no se puede forzar', () => {
@@ -152,7 +146,6 @@ describe('Plano de mesas: mantener presionada una mesa ocupada', () => {
         mesasSalon={[{ ...mesa, estado: 'LIBRE', pedido: null }]}
         onSeleccionarMesaSalon={vi.fn()}
         alMantenerMesaSalon={alMantener}
-        puedeForzarLiberacion
       />,
     );
     pulsar(screen.getByTestId('elemento-plano-5'));

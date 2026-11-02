@@ -889,4 +889,117 @@ describe('SalonService', () => {
       expect(errores.map((e) => e.property)).toContain('clienteNombre');
     });
   });
+
+  describe('7. Cambiar de mesa (cambiarMesaPedido)', () => {
+    const mesaLibre = (id: bigint, numero: number) => ({ id, tipo: 'MESA', numero, nombre: null, activo: true });
+
+    it('mesa destino ocupada -> 409 MESA_OCUPADA y no mueve nada', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [{ mesa_id: 8n, mesa_nombre: 'Mesa 1', abierta: true, mesa: { numero: 1 } }],
+      });
+      prismaMock.elementoPlano.findUnique.mockResolvedValue(mesaLibre(9n, 5));
+      prismaMock.pedidoMesa.findFirst.mockResolvedValue({ id: 1n, mesa_id: 9n, abierta: true });
+
+      await expect(service.cambiarMesaPedido('300', '9', undefined, undefined)).rejects.toMatchObject({
+        response: { codigo: 'MESA_OCUPADA', mensaje: 'La mesa 5 ya está ocupada' },
+      });
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+    });
+
+    it('cierra la mesa vieja, abre la nueva, actualiza el nombre del pedido, audita y emite', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [{ mesa_id: 8n, mesa_nombre: 'Mesa 1', abierta: true, mesa: { numero: 1 } }],
+      });
+      prismaMock.elementoPlano.findUnique.mockResolvedValue(mesaLibre(9n, 5));
+      prismaMock.pedidoMesa.findFirst.mockResolvedValue(null);
+
+      const res = await service.cambiarMesaPedido('300', '9', { partyId: '7' } as any, '10.0.0.1');
+
+      expect(prismaMock.pedidoMesa.updateMany).toHaveBeenCalledWith({
+        where: { pedido_id: 300n, abierta: true },
+        data: { abierta: false },
+      });
+      expect(prismaMock.pedidoMesa.create).toHaveBeenCalledWith({
+        data: { pedido_id: 300n, mesa_id: 9n, mesa_nombre: 'Mesa 5', abierta: true },
+      });
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith({ where: { id: 300n }, data: { mesa_nombre: 'Mesa 5' } });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'CAMBIAR_MESA',
+          entidad: 'pedido',
+          entidadId: 300n,
+          antes: { mesas: [{ mesaId: '8', mesa: 'Mesa 1' }] },
+          despues: { mesaId: '9', mesa: 'Mesa 5' },
+          partyId: 7n,
+          ip: '10.0.0.1',
+        }),
+      );
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('salon:mesa', { mesaId: '8', estado: 'LIBRE' });
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('salon:mesa', { mesaId: '9', estado: 'OCUPADA' });
+      expect(res).toMatchObject({ ok: true, pedidoId: '300', mesaId: '9', mesa: 'Mesa 5' });
+    });
+
+    it('varias mesas juntas pasan a una sola: cierra todas y abre solo la destino', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'PREPARANDO',
+        mesas: [
+          { mesa_id: 8n, mesa_nombre: 'Mesa 1', abierta: true, mesa: { numero: 1 } },
+          { mesa_id: 6n, mesa_nombre: 'Mesa 2', abierta: true, mesa: { numero: 2 } },
+        ],
+      });
+      prismaMock.elementoPlano.findUnique.mockResolvedValue(mesaLibre(9n, 5));
+      prismaMock.pedidoMesa.findFirst.mockResolvedValue(null);
+
+      await service.cambiarMesaPedido('300', '9');
+
+      expect(prismaMock.pedidoMesa.updateMany).toHaveBeenCalledTimes(1);
+      expect(prismaMock.pedidoMesa.create).toHaveBeenCalledTimes(1);
+      const avisos = eventosGatewayMock.emitirAdmin.mock.calls.filter((c: any[]) => c[0] === 'salon:mesa');
+      expect(avisos).toEqual(
+        expect.arrayContaining([
+          ['salon:mesa', { mesaId: '8', estado: 'LIBRE' }],
+          ['salon:mesa', { mesaId: '6', estado: 'LIBRE' }],
+          ['salon:mesa', { mesaId: '9', estado: 'OCUPADA' }],
+        ]),
+      );
+    });
+
+    it('pedido que no está abierto en ninguna mesa -> 409 PEDIDO_SIN_MESA', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'LISTO', mesas: [] });
+
+      await expect(service.cambiarMesaPedido('300', '9')).rejects.toMatchObject({
+        response: { codigo: 'PEDIDO_SIN_MESA' },
+      });
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('pedido inexistente -> 404 PEDIDO_NO_ENCONTRADO', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(null);
+
+      await expect(service.cambiarMesaPedido('999', '9')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('mesa destino inexistente o que no es mesa -> 404 MESA_NO_ENCONTRADA', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [{ mesa_id: 8n, mesa_nombre: 'Mesa 1', abierta: true, mesa: { numero: 1 } }],
+      });
+      prismaMock.elementoPlano.findUnique.mockResolvedValue({ id: 9n, tipo: 'PARED', activo: true });
+
+      await expect(service.cambiarMesaPedido('300', '9')).rejects.toMatchObject({
+        response: { codigo: 'MESA_NO_ENCONTRADA' },
+      });
+    });
+
+    it('pedido que no es de mesa (DELIVERY) -> 400 MODALIDAD_INVALIDA', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ id: 300n, codigo: 'P-0300', modalidad: 'DELIVERY', estado: 'COLA', mesas: [] });
+
+      await expect(service.cambiarMesaPedido('300', '9')).rejects.toMatchObject({
+        response: { codigo: 'MODALIDAD_INVALIDA' },
+      });
+    });
+  });
 });

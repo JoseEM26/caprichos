@@ -66,7 +66,11 @@ export interface MesaSalon {
     /** Nombre corto del cliente del pedido (o null) */
     cliente?: string | null;
     total?: number;
-    lineas?: Array<{ cantidad: number; nombre: string; detalle: string }>;
+    /** Hora en que se tomó el pedido (ISO) */
+    creadoEn?: string;
+    /** Cocina y entrega en vivo (misma función que «Mis pedidos») */
+    progreso?: ProgresoPedido;
+    lineas?: Array<{ cantidad: number; nombre: string; detalle: string; opciones?: string[] }>;
   } | null;
   pedidoCodigo?: string | null;
   mozo?: string | null;
