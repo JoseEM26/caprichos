@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
+import { Campo } from '../../comun/Campo';
 import type { UsuarioItem, RespuestaListarUsuarios, PersonalHorario } from './tipos';
 import { DIAS, formatoHoras, horasTurno } from './horario';
 import { CrearUsuarioModal, ETIQUETAS_ROLES } from './CrearUsuarioModal';
@@ -120,8 +121,17 @@ export function UsuariosView() {
   const [claveInicialTemporal, setClaveInicialTemporal] = useState<{ clave: string; nombre: string } | null>(null);
 
   // Confirmar Sí/No
+  // Desactivar pide fecha de salida y motivo; reactivar pide fecha de reingreso (Sí/No al final)
+  const hoyLima = () => new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  const [formAccion, setFormAccion] = useState({ fecha: '', motivo: '' });
+  const formAccionRef = useRef(formAccion);
+  useEffect(() => {
+    formAccionRef.current = formAccion;
+  }, [formAccion]);
+
   const [confirmarAccion, setConfirmarAccion] = useState<{
     abierto: boolean;
+    tipo?: 'desactivar' | 'reactivar';
     titulo: string;
     mensaje: string;
     textoSi?: string;
@@ -276,16 +286,19 @@ export function UsuariosView() {
 
   // Desactivar / Reactivar
   const solicitarDesactivar = (usuario: UsuarioItem) => {
+    setFormAccion({ fecha: hoyLima(), motivo: '' });
     setConfirmarAccion({
       abierto: true,
+      tipo: 'desactivar',
       titulo: '¿Desactivar usuario?',
-      mensaje: `¿Seguro que deseas desactivar a ${usuario.nombres} ${usuario.apellidos}? No podrá iniciar sesión y sus sesiones abiertas se revocarán inmediatamente.`,
+      mensaje: `¿Seguro que deseas desactivar a ${usuario.nombres} ${usuario.apellidos}? No podrá iniciar sesión y sus sesiones abiertas se revocarán inmediatamente. Su periodo laboral se cierra con la fecha de salida.`,
       textoSi: 'Sí, desactivar',
       textoNo: 'Cancelar',
       peligro: true,
       ejecutar: async () => {
         try {
-          await api.post(`/admin/usuarios/${usuario.id}/desactivar`);
+          const { fecha, motivo } = formAccionRef.current;
+          await api.post(`/admin/usuarios/${usuario.id}/desactivar`, { fechaSalida: fecha, ...(motivo.trim() ? { motivo: motivo.trim() } : {}) });
           await cargarUsuarios();
         } catch (e: any) {
           setError(e.message || 'Error al desactivar');
@@ -297,16 +310,18 @@ export function UsuariosView() {
   };
 
   const solicitarReactivar = (usuario: UsuarioItem) => {
+    setFormAccion({ fecha: hoyLima(), motivo: '' });
     setConfirmarAccion({
       abierto: true,
+      tipo: 'reactivar',
       titulo: '¿Reactivar usuario?',
-      mensaje: `¿Deseas reactivar la cuenta de ${usuario.nombres} ${usuario.apellidos}? Podrá ingresar nuevamente al sistema.`,
+      mensaje: `¿Deseas reactivar la cuenta de ${usuario.nombres} ${usuario.apellidos}? Podrá ingresar nuevamente al sistema y se abre un nuevo periodo laboral desde la fecha de reingreso.`,
       textoSi: 'Sí, reactivar',
       textoNo: 'Cancelar',
       peligro: false,
       ejecutar: async () => {
         try {
-          await api.post(`/admin/usuarios/${usuario.id}/reactivar`);
+          await api.post(`/admin/usuarios/${usuario.id}/reactivar`, { fechaReingreso: formAccionRef.current.fecha });
           await cargarUsuarios();
         } catch (e: any) {
           setError(e.message || 'Error al reactivar');
@@ -799,7 +814,8 @@ export function UsuariosView() {
                         {u.nombres} {u.apellidos}
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                        <span style={{ fontWeight: 700 }}>{u.dni.slice(0, 4)}</span> · {ETIQUETAS_ROLES[u.rol] || u.rol} · CAPRICHOS
+                        <span style={{ fontWeight: 700 }}>{u.dni.slice(0, 4)}</span> · {ETIQUETAS_ROLES[u.rol] || u.rol}
+                        {(u.roles ?? []).filter((r) => r !== u.rol).map((r) => ` + ${(ETIQUETAS_ROLES[r] || r).split(' (')[0]}`).join('')} · CAPRICHOS
                       </div>
                     </div>
                     <span
@@ -1482,7 +1498,37 @@ export function UsuariosView() {
         peligro={confirmarAccion.peligro}
         alConfirmar={confirmarAccion.ejecutar}
         alCancelar={() => setConfirmarAccion((p) => ({ ...p, abierto: false }))}
-      />
+      >
+        {confirmarAccion.tipo === 'desactivar' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+            <Campo
+              id="accion-fecha-salida"
+              etiqueta="Fecha de salida"
+              type="date"
+              value={formAccion.fecha}
+              onChange={(e) => setFormAccion((f) => ({ ...f, fecha: e.target.value }))}
+            />
+            <Campo
+              id="accion-motivo"
+              etiqueta="Motivo (opcional)"
+              type="text"
+              value={formAccion.motivo}
+              onChange={(e) => setFormAccion((f) => ({ ...f, motivo: e.target.value }))}
+            />
+          </div>
+        )}
+        {confirmarAccion.tipo === 'reactivar' && (
+          <div style={{ marginTop: '10px' }}>
+            <Campo
+              id="accion-fecha-reingreso"
+              etiqueta="Fecha de reingreso"
+              type="date"
+              value={formAccion.fecha}
+              onChange={(e) => setFormAccion((f) => ({ ...f, fecha: e.target.value }))}
+            />
+          </div>
+        )}
+      </Confirmar>
     </div>
   );
 }

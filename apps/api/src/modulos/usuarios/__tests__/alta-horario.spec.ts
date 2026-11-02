@@ -31,7 +31,7 @@ describe('Alta y edición con horario y reemplazos', () => {
       reemplazoDia: { upsert: jest.fn(), updateMany: jest.fn() },
     };
     prisma = {
-      partyIdentifier: { findUnique: jest.fn().mockResolvedValue(null) },
+      partyIdentifier: { findFirst: jest.fn().mockResolvedValue(null) },
       contactMechanism: { findFirst: jest.fn().mockResolvedValue(null) },
       userAccount: { findUnique: jest.fn().mockResolvedValue({ id: 5n, party_id: 10n }) },
       horarioTrabajo: { findMany: jest.fn().mockResolvedValue([]) },

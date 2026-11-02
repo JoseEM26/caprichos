@@ -54,6 +54,7 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
     p(linea);
     p(`${t.comprobante.tipo.replace('_', ' ')} ${t.comprobante.numero}`);
   }
+  if (t.cobradoPorMozo) p(`Cobrado por mozo ${t.cobradoPorMozo}`);
   p(linea);
   p(centrar('Gracias por tu visita', c));
   return o;

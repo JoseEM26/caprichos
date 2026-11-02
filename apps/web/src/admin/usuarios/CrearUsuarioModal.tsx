@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { ROLES_SISTEMA } from '@caprichos/compartido';
 import { api, ErrorApi } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
 import { Campo } from '../../comun/Campo';
@@ -8,6 +7,17 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Icono } from '../../comun/Icono';
 import type { UsuarioItem } from './tipos';
 import { EditorHorario } from './EditorHorario';
+import {
+  ETIQUETAS_ROLES,
+  ROLES_ASIGNABLES,
+  TIPOS_DOCUMENTO,
+  documentoValido,
+  errorCombinacionRoles,
+  mensajeDocumento,
+} from './roles';
+import { SelectorOtrosRoles } from './SelectorOtrosRoles';
+
+export { ETIQUETAS_ROLES };
 import { EditorReemplazos } from './EditorReemplazos';
 import {
   DIAS,
@@ -27,18 +37,8 @@ export interface CrearUsuarioModalProps {
   alUsuarioCreado: (usuario: UsuarioItem, claveInicial: string) => void;
 }
 
-export const ETIQUETAS_ROLES: Record<string, string> = {
-  ADMIN: 'Administrador (Control total)',
-  CAJERO: 'Cajero/a (Ventas y cobros)',
-  MOZO: 'Mozo (Mesas y pedidos salón)',
-  COCINA: 'Cocina (Comandas y preparación)',
-  BARRA: 'Barra (Bebidas y postres)',
-  REPARTIDOR: 'Repartidor (Delivery)',
-  CALLCENTER: 'Call center (Atención y pedidos)',
-  SUPERVISOR: 'Supervisor (Caja y salón, y ve el código de supervisor)',
-};
 
-const OPCIONES_ROLES = Object.values(ROLES_SISTEMA).map((rol) => ({
+const OPCIONES_ROLES = ROLES_ASIGNABLES.map((rol) => ({
   valor: rol,
   etiqueta: ETIQUETAS_ROLES[rol] || rol,
 }));
@@ -74,13 +74,18 @@ export function CrearUsuarioModal({
   alUsuarioCreado,
 }: CrearUsuarioModalProps) {
   const [paso, setPaso] = useState(0);
-  const [dni, setDni] = useState('');
+  const [tipoDoc, setTipoDoc] = useState('DNI');
+  const [documento, setDocumento] = useState('');
   const [nombres, setNombres] = useState('');
   const [apellidos, setApellidos] = useState('');
   const [celular, setCelular] = useState('');
   const [correo, setCorreo] = useState('');
   const [fechaNacimiento, setFechaNacimiento] = useState('');
-  const [rol, setRol] = useState<string>(ROLES_SISTEMA.CAJERO);
+  const [paisNacimiento, setPaisNacimiento] = useState('');
+  const [rol, setRol] = useState<string>('CAJERO');
+  const [otrosRoles, setOtrosRoles] = useState<string[]>([]);
+  const [fechaIngreso, setFechaIngreso] = useState('');
+  const [fechaReingreso, setFechaReingreso] = useState('');
   const [descuento, setDescuento] = useState('');
   const [horario, setHorario] = useState<HorarioEstado>(horarioVacio);
   const [reemplazos, setReemplazos] = useState<ReemplazosEstado>({});
@@ -98,9 +103,9 @@ export function CrearUsuarioModal({
   function validarPaso(p: number): boolean {
     const e: Record<string, string> = {};
     if (p === 0) {
-      const dniLimpio = dni.trim();
-      if (!dniLimpio) e.dni = 'El DNI es obligatorio';
-      else if (!/^\d{8}$/.test(dniLimpio)) e.dni = 'El DNI debe tener exactamente 8 dígitos numéricos';
+      const docLimpio = documento.trim();
+      if (!docLimpio) e.documento = tipoDoc === 'DNI' ? 'El DNI es obligatorio' : 'El número de documento es obligatorio';
+      else if (!documentoValido(tipoDoc, docLimpio)) e.documento = mensajeDocumento(tipoDoc);
       if (!nombres.trim()) e.nombres = 'Los nombres son requeridos';
       if (!apellidos.trim()) e.apellidos = 'Los apellidos son requeridos';
       if (celular && !/^9\d{8}$/.test(celular)) e.celular = 'El celular debe tener 9 dígitos y empezar en 9';
@@ -110,6 +115,11 @@ export function CrearUsuarioModal({
       }
     } else if (p === 1) {
       if (!rol) e.rol = 'Selecciona un rol para el usuario';
+      const combinacion = errorCombinacionRoles(rol, otrosRoles);
+      if (combinacion) e.otrosRoles = combinacion;
+      if (fechaIngreso && fechaReingreso && fechaReingreso < fechaIngreso) {
+        e.fechaReingreso = 'La fecha de reingreso no puede ser anterior al ingreso';
+      }
       if (descuento.trim() !== '') {
         const n = Number(descuento);
         if (Number.isNaN(n) || n < 0 || n > 100) e.descuento = 'El descuento debe estar entre 0 y 100';
@@ -158,10 +168,15 @@ export function CrearUsuarioModal({
         debeCambiar: boolean;
         claveInicial: string;
       }>('/admin/usuarios', {
-        dni: dni.trim(),
+        tipoDocumento: tipoDoc,
+        documento: documento.trim(),
         nombres: nombres.trim(),
         apellidos: apellidos.trim(),
         rol,
+        ...(otrosRoles.length ? { otrosRoles } : {}),
+        ...(fechaIngreso ? { fechaIngreso } : {}),
+        ...(fechaReingreso ? { fechaReingreso } : {}),
+        ...(paisNacimiento.trim() ? { paisNacimiento: paisNacimiento.trim() } : {}),
         ...(celular ? { celular } : {}),
         ...(correo.trim() ? { correo: correo.trim() } : {}),
         ...(fechaNacimiento ? { fechaNacimiento } : {}),
@@ -170,14 +185,19 @@ export function CrearUsuarioModal({
         reemplazos: reemplazosParaEnviar(reemplazos),
       });
 
-      setDni('');
+      setTipoDoc('DNI');
+      setDocumento('');
       setNombres('');
       setApellidos('');
       setCelular('');
       setCorreo('');
       setFechaNacimiento('');
+      setPaisNacimiento('');
       setDescuento('');
-      setRol(ROLES_SISTEMA.CAJERO);
+      setRol('CAJERO');
+      setOtrosRoles([]);
+      setFechaIngreso('');
+      setFechaReingreso('');
       setHorario(horarioVacio());
       setReemplazos({});
       setErrores({});
@@ -200,7 +220,7 @@ export function CrearUsuarioModal({
       if (err instanceof ErrorApi) {
         if (err.codigo === 'DNI_DUPLICADO') {
           setPaso(0);
-          setErrorServidor('El DNI ingresado ya se encuentra registrado en el sistema.');
+          setErrorServidor('El documento ingresado ya se encuentra registrado en el sistema.');
         } else {
           setErrorServidor(err.message || 'Error al crear el usuario.');
         }
@@ -283,19 +303,33 @@ export function CrearUsuarioModal({
         <form onSubmit={pedirConfirmacion} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} noValidate>
           {paso === 0 && (
             <>
+              <Combo
+                etiqueta="Tipo de documento"
+                opciones={TIPOS_DOCUMENTO}
+                valor={tipoDoc}
+                alCambiar={(nuevo) => {
+                  setTipoDoc(nuevo);
+                  setDocumento('');
+                  limpiarError('documento');
+                }}
+                deshabilitado={guardando}
+              />
               <Campo
                 id="crear-dni"
-                etiqueta="DNI (8 dígitos)"
+                etiqueta={tipoDoc === 'DNI' ? 'DNI (8 dígitos)' : 'Número de documento'}
                 type="text"
-                inputMode="numeric"
-                maxLength={8}
-                placeholder="12345678"
-                value={dni}
+                inputMode={tipoDoc === 'DNI' ? 'numeric' : 'text'}
+                maxLength={tipoDoc === 'DNI' ? 8 : 12}
+                placeholder={tipoDoc === 'DNI' ? '12345678' : 'AB1234567'}
+                value={documento}
                 onChange={(e) => {
-                  setDni(e.target.value.replace(/\D/g, '').slice(0, 8));
-                  limpiarError('dni');
+                  const limpio = tipoDoc === 'DNI'
+                    ? e.target.value.replace(/\D/g, '').slice(0, 8)
+                    : e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 12).toUpperCase();
+                  setDocumento(limpio);
+                  limpiarError('documento');
                 }}
-                error={errores.dni}
+                error={errores.documento}
                 disabled={guardando}
               />
               <Campo
@@ -364,24 +398,64 @@ export function CrearUsuarioModal({
                 error={errores.fechaNacimiento}
                 disabled={guardando}
               />
+              <Campo
+                id="crear-pais"
+                etiqueta="País de nacimiento (opcional)"
+                type="text"
+                value={paisNacimiento}
+                onChange={(e) => setPaisNacimiento(e.target.value)}
+                disabled={guardando}
+              />
             </>
           )}
 
           {paso === 1 && (
             <>
               <Combo
-                etiqueta="Rol o cargo en el sistema"
+                etiqueta="Rol principal"
                 opciones={OPCIONES_ROLES}
                 valor={rol}
                 alCambiar={(nuevoRol) => {
                   setRol(nuevoRol);
+                  setOtrosRoles((previos) => previos.filter((r) => r !== nuevoRol));
                   limpiarError('rol');
+                  limpiarError('otrosRoles');
                 }}
                 error={errores.rol}
                 deshabilitado={guardando}
               />
+              <SelectorOtrosRoles
+                principal={rol}
+                valor={otrosRoles}
+                alCambiar={(nuevos) => {
+                  setOtrosRoles(nuevos);
+                  limpiarError('otrosRoles');
+                }}
+                error={errores.otrosRoles}
+                deshabilitado={guardando}
+              />
+              <Campo
+                id="crear-ingreso"
+                etiqueta="Inició trabajando (opcional)"
+                type="date"
+                value={fechaIngreso}
+                onChange={(e) => setFechaIngreso(e.target.value)}
+                disabled={guardando}
+              />
+              <Campo
+                id="crear-reingreso"
+                etiqueta="Reingresó (opcional)"
+                type="date"
+                value={fechaReingreso}
+                onChange={(e) => {
+                  setFechaReingreso(e.target.value);
+                  limpiarError('fechaReingreso');
+                }}
+                error={errores.fechaReingreso}
+                disabled={guardando}
+              />
               <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                Cocina y Barra son las áreas de producción. Entra al sistema con su DNI; la clave inicial se genera al crear.
+                Entra al sistema con su documento; la clave inicial se genera al crear.
               </div>
               <Campo
                 id="crear-descuento"
@@ -428,14 +502,17 @@ export function CrearUsuarioModal({
           {enResumen && (
             <>
               <Bloque titulo="Datos personales" onEditar={() => irAEditar(0)}>
-                {nombres.trim()} {apellidos.trim()} · DNI {dni.trim()}
+                {nombres.trim()} {apellidos.trim()} · {tipoDoc === 'DNI' ? 'DNI' : TIPOS_DOCUMENTO.find((t) => t.valor === tipoDoc)?.etiqueta} {documento.trim()}
                 <br />
                 Celular: {celular || 'No indicado'} · Correo: {correo.trim() || 'No indicado'}
                 <br />
-                Nacimiento: {fechaNacimiento || 'No indicado'}
+                Nacimiento: {fechaNacimiento || 'No indicado'} · País: {paisNacimiento.trim() || 'No indicado'}
               </Bloque>
               <Bloque titulo="Puesto" onEditar={() => irAEditar(1)}>
                 {ETIQUETAS_ROLES[rol] || rol}
+                {otrosRoles.length > 0 && <> · También: {otrosRoles.map((r) => ETIQUETAS_ROLES[r] || r).join(', ')}</>}
+                <br />
+                Ingreso: {fechaIngreso || 'No indicado'} · Reingreso: {fechaReingreso || 'No indicado'}
                 <br />
                 Descuento de personal: {descuento.trim() !== '' ? `${descuento}%` : 'No indicado'}
               </Bloque>
@@ -489,7 +566,7 @@ export function CrearUsuarioModal({
         <Confirmar
           abierto={confirmarAbierto}
           titulo="Crear usuario"
-          mensaje={`¿Crear la cuenta de ${nombres.trim()} ${apellidos.trim()} con DNI ${dni.trim()}? Se generará una contraseña inicial que se mostrará una sola vez.`}
+          mensaje={`¿Crear la cuenta de ${nombres.trim()} ${apellidos.trim()} con ${tipoDoc === 'DNI' ? 'DNI' : 'documento'} ${documento.trim()}? Se generará una contraseña inicial que se mostrará una sola vez.`}
           textoSi="Sí, crear"
           textoNo="No"
           alConfirmar={crear}

@@ -31,6 +31,31 @@ export async function despejarComanda(
   );
 }
 
+/**
+ * Fija las unidades listas de una línea (0..cantidad). Si el área queda completa, el servidor la despeja.
+ * Bajar unidades de un área recién despejada (mismo usuario, 15 s) la reabre: `reabierta` lo confirma.
+ */
+export async function marcarUnidadesLinea(
+  lineaId: string,
+  listas: number,
+): Promise<{ despejada: boolean; reabierta?: boolean }> {
+  return api.post<{ despejada: boolean; reabierta?: boolean }>(
+    `/admin/cocina/lineas/${encodeURIComponent(lineaId)}/listas`,
+    { listas },
+  );
+}
+
+/** Despacha lo listo de un pedido: sin líneas, todo lo listo; con líneas, solo esas unidades. */
+export async function despacharPedido(
+  pedidoId: string,
+  lineas?: Array<{ lineaId: string; unidades: number }>,
+): Promise<{ completo: boolean; estado: string }> {
+  return api.post<{ completo: boolean; estado: string }>(
+    `/admin/cocina/pedidos/${encodeURIComponent(pedidoId)}/despachar`,
+    lineas ? { lineas } : {},
+  );
+}
+
 /** Ajustes de la pantalla que lee el personal (GET /admin/cocina/ajustes). */
 export async function obtenerAjustesCocina(): Promise<{ confirmarDespejar: boolean }> {
   return api.get<{ confirmarDespejar: boolean }>('/admin/cocina/ajustes');

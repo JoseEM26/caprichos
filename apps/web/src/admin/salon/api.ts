@@ -137,6 +137,10 @@ export const salonApi = {
       { motivo, ...(forzar ? { forzar: true } : {}) },
     ),
 
+  /** Pasa el pedido de mesa a otra mesa libre (409 MESA_OCUPADA si no lo está) */
+  cambiarMesaPedido: (pedidoId: string, mesaId: string) =>
+    api.post<{ ok: boolean; mesa: string }>(`/admin/salon/pedidos/${pedidoId}/cambiar-mesa`, { mesaId }),
+
   marcarEntregadoMesa: (pedidoId: string) =>
     api.post<{ ok: boolean; id: string; codigo: string }>(
       `/admin/salon/pedidos/${pedidoId}/entregado-mesa`,

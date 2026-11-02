@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ROLES_SISTEMA } from '@caprichos/compartido';
 import { api, ErrorApi } from '../../comun/api';
 import { Boton } from '../../comun/Boton';
 import { Campo } from '../../comun/Campo';
@@ -9,7 +8,16 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Icono } from '../../comun/Icono';
 import { useSesion } from '../../comun/sesion';
 import type { UsuarioItem } from './tipos';
-import { ETIQUETAS_ROLES } from './CrearUsuarioModal';
+import { SelectorOtrosRoles } from './SelectorOtrosRoles';
+import { HistorialLaboral } from './HistorialLaboral';
+import {
+  ETIQUETAS_ROLES,
+  ROLES_ASIGNABLES,
+  TIPOS_DOCUMENTO,
+  documentoValido,
+  errorCombinacionRoles,
+  mensajeDocumento,
+} from './roles';
 import { EditorHorario } from './EditorHorario';
 import { EditorReemplazos } from './EditorReemplazos';
 import {
@@ -35,10 +43,13 @@ export interface EditarUsuarioModalProps {
   alUsuarioEditado: (usuario: UsuarioItem) => void;
 }
 
-const OPCIONES_ROLES = Object.values(ROLES_SISTEMA).map((rol) => ({
+const OPCIONES_ROLES = ROLES_ASIGNABLES.map((rol) => ({
   valor: rol,
   etiqueta: ETIQUETAS_ROLES[rol] || rol,
 }));
+
+const iguales = (a: string[], b: string[]): boolean =>
+  a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
 
 export function EditarUsuarioModal({
   usuario,
@@ -56,9 +67,12 @@ export function EditarUsuarioModal({
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
 
-  // Solo ADMIN: DNI nuevo (vacío = no cambia), correo y contraseña del administrador para el DNI.
+  // Solo ADMIN: documento nuevo (vacío = no cambia), correo y contraseña del administrador para el documento.
   const [dniNuevo, setDniNuevo] = useState('');
+  const [tipoDocNuevo, setTipoDocNuevo] = useState('DNI');
   const [claveAdminDni, setClaveAdminDni] = useState('');
+  const [otrosRoles, setOtrosRoles] = useState<string[]>([]);
+  const [paisNacimiento, setPaisNacimiento] = useState('');
   const [correoNuevo, setCorreoNuevo] = useState('');
   const [quitarCorreo, setQuitarCorreo] = useState(false);
   const [cambiarClaveAbierto, setCambiarClaveAbierto] = useState(false);
@@ -114,9 +128,12 @@ export function EditarUsuarioModal({
       setNombres(usuario.nombres);
       setApellidos(usuario.apellidos);
       setRol(usuario.rol);
+      setOtrosRoles((usuario.roles ?? []).filter((r) => r !== usuario.rol));
+      setPaisNacimiento(usuario.paisNacimiento ?? '');
       setErrores({});
       setErrorServidor(null);
       setDniNuevo('');
+      setTipoDocNuevo(usuario.tipoDocumento ?? 'DNI');
       setClaveAdminDni('');
       setCorreoNuevo('');
       setQuitarCorreo(false);
@@ -139,10 +156,12 @@ export function EditarUsuarioModal({
     if (!rol) {
       nuevosErrores.rol = 'El rol es requerido';
     }
+    const combinacion = errorCombinacionRoles(rol, otrosRoles);
+    if (combinacion) nuevosErrores.otrosRoles = combinacion;
 
     if (esAdmin) {
-      if (dniNuevo.trim() && !/^\d{8}$/.test(dniNuevo.trim())) {
-        nuevosErrores.dni = 'El DNI debe tener exactamente 8 dígitos';
+      if (dniNuevo.trim() && !documentoValido(tipoDocNuevo, dniNuevo.trim())) {
+        nuevosErrores.dni = mensajeDocumento(tipoDocNuevo);
       } else if (dniNuevo.trim() && !claveAdminDni) {
         nuevosErrores.claveAdmin = 'Escribe tu contraseña de administrador para cambiar el DNI';
       }
@@ -172,18 +191,23 @@ export function EditarUsuarioModal({
     if (!usuario) return;
     setGuardando(true);
     try {
-      const cuerpo: Record<string, string> = {
+      const cuerpo: Record<string, unknown> = {
         nombres: nombres.trim(),
         apellidos: apellidos.trim(),
         rol,
       };
       if (esAdmin) {
         if (dniNuevo.trim()) {
-          cuerpo.dni = dniNuevo.trim();
+          cuerpo.tipoDocumento = tipoDocNuevo;
+          cuerpo.documento = dniNuevo.trim();
           cuerpo.claveAdmin = claveAdminDni;
         }
         if (quitarCorreo) cuerpo.correo = '';
         else if (correoNuevo.trim()) cuerpo.correo = correoNuevo.trim();
+        if (!iguales(otrosRoles, (usuario.roles ?? []).filter((r) => r !== usuario.rol))) {
+          cuerpo.otrosRoles = otrosRoles;
+        }
+        if (paisNacimiento.trim() !== (usuario.paisNacimiento ?? '')) cuerpo.paisNacimiento = paisNacimiento.trim();
       }
 
       const resp = await api.patch<UsuarioItem & { reingresar?: boolean }>(`/admin/usuarios/${usuario.id}`, cuerpo);
@@ -343,29 +367,54 @@ export function EditarUsuarioModal({
           <form hidden={seccion !== 'datos'} onSubmit={handleSolicitarGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <Campo
               id="editar-dni"
-              etiqueta="DNI actual (Documento de identidad)"
+              etiqueta={!usuario.tipoDocumento || usuario.tipoDocumento === 'DNI' ? 'DNI actual (Documento de identidad)' : 'Documento actual'}
               type="text"
               value={usuario.dni}
               disabled={true}
-              ayuda={esAdmin ? undefined : 'El DNI está asociado a la persona y no es editable.'}
+              ayuda={esAdmin ? undefined : 'El documento está asociado a la persona y no es editable.'}
             />
 
             {esAdmin && (
-              <Campo
-                id="editar-dni-nuevo"
-                etiqueta="Nuevo DNI (deja vacío para no cambiarlo)"
-                type="text"
-                inputMode="numeric"
-                maxLength={8}
-                value={dniNuevo}
-                onChange={(e) => {
-                  setDniNuevo(e.target.value.replace(/\D/g, ''));
-                  if (errores.dni) setErrores((prev) => ({ ...prev, dni: '' }));
-                }}
-                error={errores.dni}
-                ayuda="Es el usuario con el que la persona entra. Debe tener 8 dígitos."
-                disabled={guardando}
-              />
+              <>
+                <Combo
+                  etiqueta="Tipo de documento"
+                  opciones={TIPOS_DOCUMENTO}
+                  valor={tipoDocNuevo}
+                  alCambiar={(nuevo) => {
+                    setTipoDocNuevo(nuevo);
+                    setDniNuevo('');
+                    if (errores.dni) setErrores((prev) => ({ ...prev, dni: '' }));
+                  }}
+                  deshabilitado={guardando}
+                />
+                <Campo
+                  id="editar-dni-nuevo"
+                  etiqueta={
+                    tipoDocNuevo === 'DNI'
+                      ? 'Nuevo DNI (deja vacío para no cambiarlo)'
+                      : 'Nuevo número de documento (deja vacío para no cambiarlo)'
+                  }
+                  type="text"
+                  inputMode={tipoDocNuevo === 'DNI' ? 'numeric' : 'text'}
+                  maxLength={tipoDocNuevo === 'DNI' ? 8 : 12}
+                  value={dniNuevo}
+                  onChange={(e) => {
+                    const limpio =
+                      tipoDocNuevo === 'DNI'
+                        ? e.target.value.replace(/\D/g, '')
+                        : e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                    setDniNuevo(limpio);
+                    if (errores.dni) setErrores((prev) => ({ ...prev, dni: '' }));
+                  }}
+                  error={errores.dni}
+                  ayuda={
+                    tipoDocNuevo === 'DNI'
+                      ? 'Es el usuario con el que la persona entra. Debe tener 8 dígitos.'
+                      : 'Es el usuario con el que la persona entra. De 7 a 12 letras o números.'
+                  }
+                  disabled={guardando}
+                />
+              </>
             )}
 
             {esAdmin && dniNuevo.trim() && (
@@ -454,16 +503,43 @@ export function EditarUsuarioModal({
             )}
 
             <Combo
-              etiqueta="Rol o cargo en el sistema"
+              etiqueta="Rol principal"
               opciones={OPCIONES_ROLES}
               valor={rol}
               alCambiar={(nuevoRol) => {
                 setRol(nuevoRol);
+                setOtrosRoles((previos) => previos.filter((r) => r !== nuevoRol));
                 if (errores.rol) setErrores((prev) => ({ ...prev, rol: '' }));
               }}
               error={errores.rol}
-              deshabilitado={guardando}
+              deshabilitado={guardando || !esAdmin}
             />
+
+            <SelectorOtrosRoles
+              principal={rol}
+              valor={otrosRoles}
+              alCambiar={(nuevos) => {
+                setOtrosRoles(nuevos);
+                if (errores.otrosRoles) setErrores((prev) => ({ ...prev, otrosRoles: '' }));
+              }}
+              error={errores.otrosRoles}
+              deshabilitado={guardando || !esAdmin}
+            />
+
+            {esAdmin && (
+              <>
+                <Campo
+                  id="editar-pais"
+                  etiqueta="País de nacimiento (opcional)"
+                  type="text"
+                  value={paisNacimiento}
+                  onChange={(e) => setPaisNacimiento(e.target.value)}
+                  disabled={guardando}
+                />
+              </>
+            )}
+
+            <HistorialLaboral usuarioId={usuario.id} esAdmin={esAdmin} deshabilitado={guardando} />
 
             {puedeRecibirAlertasWhatsApp(rol) && (
               <BloqueAlertasWhatsApp

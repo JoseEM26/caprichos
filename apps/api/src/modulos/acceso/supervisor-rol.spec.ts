@@ -60,10 +60,12 @@ describe('rol SUPERVISOR: decisiones del guard por ruta real', () => {
     userAccount: {
       findUnique: jest.fn(async () => ({ party_id: 7n, rol: rolActual, activo: true, debe_cambiar: false })),
     },
+    userAccountRol: { findMany: jest.fn().mockResolvedValue([]) },
     rolPermiso: {
       findFirst: jest.fn(async ({ where }: any) => {
         const claves = where.OR.map((c: any) => `${c.permiso.modulo}/${c.permiso.accion}`);
-        return claves.some((c: string) => MATRIZ[where.rol]?.includes(c)) ? { rol: where.rol } : null;
+        const roles: string[] = where.rol.in;
+        return claves.some((c: string) => roles.some((r) => MATRIZ[r]?.includes(c))) ? { rol: roles[0] } : null;
       }),
     },
   };

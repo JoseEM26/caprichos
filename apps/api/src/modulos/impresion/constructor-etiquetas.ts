@@ -342,3 +342,33 @@ export function construirTicketPago(pedido: any, local: any, comprobante?: any):
     comprobante: comprobante ? { tipo: comprobante.tipo, numero: comprobante.numero_texto } : null,
   };
 }
+
+/**
+ * Ticket de la nota de venta que el mozo envía a Caja: aún no hay cobro, así que el pago sale del plan.
+ * Efectivo con «Recibido» y «Vuelto» (vuelto contra el renglón de efectivo) y «Cobrado por mozo».
+ */
+export function construirTicketNotaMozo(
+  pedido: any,
+  local: any,
+  comprobante: { tipo: string; numero_texto: string },
+  pagos: Array<{ medio: string; monto: number }>,
+  recibido: number | null,
+  mozo: string | null,
+): TicketPagoDatos {
+  const base = construirTicketPago({ ...pedido, cobros: [] }, local, comprobante);
+  const efectivo = pagos.filter((p) => p.medio === 'EFECTIVO').reduce((acc, p) => acc + Number(p.monto), 0);
+  return {
+    ...base,
+    pagos: pagos.map((p) => {
+      const conRecibido = p.medio === 'EFECTIVO' && recibido != null;
+      return {
+        medio: p.medio,
+        monto: num(p.monto),
+        recibido: conRecibido ? num(recibido) : null,
+        vuelto: conRecibido ? num(Number(recibido) - efectivo) : null,
+      };
+    }),
+    plan: [],
+    cobradoPorMozo: mozo,
+  };
+}

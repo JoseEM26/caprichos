@@ -6,9 +6,12 @@ import type {
   AreaCocina,
   Comanda,
   HistorialComanda,
+  LineaComanda,
 } from './cocinaTipos';
 import {
   despejarComanda,
+  despacharPedido,
+  marcarUnidadesLinea,
   devolverComanda,
   listarAreasCocina,
   listarComandasArea,
@@ -24,7 +27,7 @@ import {
   reproducirCampanaCocina,
   setSilenciado,
 } from './audioAlerta';
-import { ComandaTarjeta } from './ComandaTarjeta';
+import { ComandaTarjeta, SEGUNDOS_DESHACER } from './ComandaTarjeta';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
 import { ModalPedirAlmacen } from './ModalPedirAlmacen';
@@ -100,6 +103,7 @@ export function CocinaAdminView() {
 
   const puedeVer = tiene('cocina/ver');
   const puedeDespejar = tiene('cocina/despejar');
+  const puedeDespachar = tiene('cocina/despachar');
 
   // Modo de pestañas: 'area' (Pantalla del área), 'hist' (Despejadas hoy)
   const [modo, setModo] = useState<ModoCocina>('area');
@@ -120,6 +124,13 @@ export function CocinaAdminView() {
   const [cargandoInicial, setCargandoInicial] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [mensajeAccion, setMensajeAccion] = useState<string | null>(null);
+  // Área que la última unidad acaba de despejar: sigue en pantalla en verde con «Deshacer» unos segundos
+  const [saliendo, setSaliendo] = useState<{ comanda: Comanda; linea: LineaComanda; previas: number } | null>(null);
+  useEffect(() => {
+    if (!saliendo) return;
+    const t = setTimeout(() => setSaliendo(null), SEGUNDOS_DESHACER * 1000);
+    return () => clearTimeout(t);
+  }, [saliendo]);
 
   // Ajuste «Confirmar al despejar» (Configuración › Cocina). Por defecto, pide confirmación.
   const [confirmarDespejar, setConfirmarDespejar] = useState<boolean>(true);
@@ -140,6 +151,14 @@ export function CocinaAdminView() {
   // Despeje con confirmación
   const [comandaParaDespejar, setComandaParaDespejar] = useState<Comanda | null>(null);
   const [despejando, setDespejando] = useState<boolean>(false);
+
+  // Despacho (Sí/No, irreversible): una línea con sus unidades, o todo lo listo del pedido
+  const [despachoPendiente, setDespachoPendiente] = useState<{
+    comanda: Comanda;
+    linea?: LineaComanda;
+    unidades?: number;
+  } | null>(null);
+  const [despachando, setDespachando] = useState<boolean>(false);
 
   // Floating Undo toast
   const [undoInfo, setUndoInfo] = useState<{
@@ -322,16 +341,73 @@ export function CocinaAdminView() {
       setUndoInfo({
         pedidoId: comanda.pedidoId,
         areaId: comanda.areaId,
-        texto: `${cod}: despejado${nomArea}`,
+        texto: `${cod}: marcado listo${nomArea}`,
       });
 
       setComandaParaDespejar(null);
       await cargarComandas(areaSeleccionada);
     } catch (err: any) {
-      setError(err?.message || 'Error al despejar la comanda');
+      setError(err?.message || 'Error al marcar la comanda como lista');
       setComandaParaDespejar(null);
     } finally {
       setDespejando(false);
+    }
+  };
+
+  // Marcar unidades de una línea (la casilla suma una; deshacer baja). Si el área queda completa, el servidor la despeja:
+  // la tarjeta se queda en verde con «Deshacer» unos segundos antes de salir de la lista.
+  const marcarUnidades = async (comanda: Comanda, linea: LineaComanda, listas: number) => {
+    try {
+      setError(null);
+      const res = await marcarUnidadesLinea(linea.id, listas);
+      if (res.despejada) {
+        const completada: Comanda = {
+          ...comanda,
+          despejada: true,
+          lineas: comanda.lineas.map((l) => (l.id === linea.id ? { ...l, listas: l.cantidad } : l)),
+          areas: comanda.areas?.map((a) => (a.areaId === comanda.areaId ? { ...a, despejada: true } : a)),
+        };
+        setSaliendo({ comanda: completada, linea, previas: linea.listas ?? 0 });
+      }
+      await cargarComandas(areaSeleccionada);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudieron marcar las unidades');
+    }
+  };
+
+  // Deshacer durante la salida: baja la unidad y el servidor reabre el área (15 s, mismo usuario)
+  const deshacerSalida = async () => {
+    if (!saliendo) return;
+    try {
+      setError(null);
+      await marcarUnidadesLinea(saliendo.linea.id, saliendo.previas);
+      setSaliendo(null);
+      await cargarComandas(areaSeleccionada);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo deshacer');
+    }
+  };
+
+  const pedirDespachoLinea = (comanda: Comanda, linea: LineaComanda, unidades: number) =>
+    setDespachoPendiente({ comanda, linea, unidades });
+  const pedirDespachoTodo = (comanda: Comanda) => setDespachoPendiente({ comanda });
+
+  const ejecutarDespacho = async () => {
+    if (!despachoPendiente) return;
+    const { comanda, linea, unidades } = despachoPendiente;
+    try {
+      setDespachando(true);
+      await despacharPedido(
+        comanda.pedidoId,
+        linea ? [{ lineaId: linea.id, unidades: unidades ?? 0 }] : undefined,
+      );
+      setDespachoPendiente(null);
+      await cargarComandas(areaSeleccionada);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo despachar');
+      setDespachoPendiente(null);
+    } finally {
+      setDespachando(false);
     }
   };
 
@@ -352,7 +428,14 @@ export function CocinaAdminView() {
 
   // En Todas: una boleta por pedido, sin Despejar (no hay un área actual que despeje)
   const enTodas = areaActiva === 'todas';
-  const tarjetas = enTodas ? agruparPorPedido(comandas) : comandas;
+  const tarjetasDelServidor = enTodas ? agruparPorPedido(comandas) : comandas;
+  // Mientras dura «Deshacer», la tarjeta se ve aunque una recarga en vivo ya no la liste
+  const enSalida = !enTodas && saliendo ? saliendo : null;
+  const tarjetas = enSalida
+    ? tarjetasDelServidor.some((c) => c.id === enSalida.comanda.id)
+      ? tarjetasDelServidor.map((c) => (c.id === enSalida.comanda.id ? enSalida.comanda : c))
+      : [enSalida.comanda, ...tarjetasDelServidor]
+    : tarjetasDelServidor;
 
   if (!puedeVer) {
     return (
@@ -842,6 +925,11 @@ export function CocinaAdminView() {
                   soloLectura={enTodas}
                   onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                   despejando={despejando}
+                  alMarcarUnidades={puedeDespejar && !enTodas ? (linea, listas) => marcarUnidades(c, linea, listas) : undefined}
+                      alDeshacerSalida={enSalida?.comanda.id === c.id ? deshacerSalida : undefined}
+                  puedeDespachar={puedeDespachar && enTodas}
+                  alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
+                  alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
                 />
               ))}
             </div>
@@ -1052,6 +1140,11 @@ export function CocinaAdminView() {
                       soloLectura={enTodas}
                       onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                       despejando={despejando}
+                      alMarcarUnidades={puedeDespejar && !enTodas ? (linea, listas) => marcarUnidades(c, linea, listas) : undefined}
+                      alDeshacerSalida={enSalida?.comanda.id === c.id ? deshacerSalida : undefined}
+                      puedeDespachar={puedeDespachar && enTodas}
+                      alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
+                      alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
                     />
                   ))}
                 </div>
@@ -1061,14 +1154,34 @@ export function CocinaAdminView() {
         </div>
       )}
 
+      {/* Confirmación Sí/No de Despacho: irreversible */}
+      <Confirmar
+        abierto={!!despachoPendiente}
+        titulo="Despachar"
+        mensaje={
+          despachoPendiente?.linea
+            ? `Se despachan ${despachoPendiente.unidades} de ${despachoPendiente.linea.nombre} de ${
+                despachoPendiente.comanda.ticket || despachoPendiente.comanda.codigo
+              }. No se puede deshacer. ¿Despachar?`
+            : `Se despacha todo lo listo de ${
+                despachoPendiente?.comanda.ticket || despachoPendiente?.comanda.codigo
+              }. No se puede deshacer. ¿Despachar?`
+        }
+        textoConfirmar="Sí, despachar"
+        textoNo="No"
+        cargando={despachando}
+        alConfirmar={ejecutarDespacho}
+        alCancelar={() => setDespachoPendiente(null)}
+      />
+
       {/* Confirmación Sí/No de Despeje */}
       <Confirmar
         abierto={!!comandaParaDespejar}
-        titulo={`¿Despejar comanda ${
+        titulo="¿Marcar como listo?"
+        mensaje={`Comanda ${
           comandaParaDespejar?.ticket || comandaParaDespejar?.codigo
-        }?`}
-        mensaje="Tu área quedará lista. El pedido sale de cocina cuando todas sus áreas estén listas."
-        textoConfirmar="Sí, despejar"
+        }. Tu área quedará lista. El pedido sale de cocina cuando todas sus áreas estén listas.`}
+        textoConfirmar="Sí, marcar listo"
         textoNo="No, cancelar"
         alConfirmar={() => ejecutarDespeje(comandaParaDespejar)}
         alCancelar={() => setComandaParaDespejar(null)}

@@ -33,7 +33,7 @@ describe('Formulario de ingreso (/admin/ingresar)', () => {
     const botonIngresar = screen.getByRole('button', { name: /Iniciar sesión/i });
 
     // Ingresar solo 7 dígitos
-    fireEvent.change(inputDni, { target: { value: '1234567' } });
+    fireEvent.change(inputDni, { target: { value: '12345' } });
     fireEvent.change(inputClave, { target: { value: 'clave123' } });
     fireEvent.click(botonIngresar);
 

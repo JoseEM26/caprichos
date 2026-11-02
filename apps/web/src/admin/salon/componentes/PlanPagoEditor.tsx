@@ -18,7 +18,7 @@ export interface PlanPagoEditorProps {
   /** Con cuánto paga en efectivo (solo si hay una fila de EFECTIVO). Texto para el input. */
   pagaCon: string;
   onPagaCon: (valor: string) => void;
-  /** Delivery: el repartidor sale con el vuelto, así que «con cuánto paga» es obligatorio si hay efectivo. */
+  /** Con efectivo en el plan, «con cuánto paga» es obligatorio: de ahí sale el vuelto (delivery y mesa). */
   pagaConObligatorio?: boolean;
 }
 
@@ -224,7 +224,7 @@ export function PlanPagoEditor({ total, filas, onChange, pagaCon, onPagaCon, pag
           <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
             ¿Con cuánto paga?{' '}
             <span style={{ fontWeight: 400, fontSize: '12px' }}>
-              {pagaConObligatorio ? '(obligatorio para el vuelto del repartidor)' : '(opcional)'}
+              {pagaConObligatorio ? '(obligatorio para calcular el vuelto)' : '(opcional)'}
             </span>
           </label>
           <input

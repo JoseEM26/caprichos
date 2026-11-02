@@ -15,6 +15,7 @@ import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
+import { ImpresionService } from '../impresion/impresion.service';
 
 describe('CobrosService', () => {
   let service: CobrosService;
@@ -25,6 +26,7 @@ describe('CobrosService', () => {
   let eventosGatewayMock: any;
   let salonMock: any;
   let comprobantesMock: any;
+  let impresionMock: any;
   let supervisorCodigoMock: any;
 
   const cajeroUsuario = {
@@ -59,6 +61,7 @@ describe('CobrosService', () => {
 
     salonMock = { liberarMesasDePedido: jest.fn().mockResolvedValue(0) };
     comprobantesMock = { emitirParaPedido: jest.fn().mockResolvedValue({ id: '1' }) };
+    impresionMock = { encolarTicketPedido: jest.fn().mockResolvedValue(undefined) };
     eventosGatewayMock = {
       emitirAdmin: jest.fn(),
     };
@@ -145,6 +148,7 @@ describe('CobrosService', () => {
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: SalonService, useValue: salonMock },
         { provide: ComprobantesService, useValue: comprobantesMock },
+        { provide: ImpresionService, useValue: impresionMock },
         { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
       ],
     }).compile();
@@ -1329,6 +1333,70 @@ describe('CobrosService', () => {
         service.cobrarEnCierre(7n, { pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 42 }] }, cajeroUsuario),
       ).rejects.toMatchObject({ response: { codigo: 'CAJA_CERRADA' } });
       expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ticket de pago al confirmar el cobro', () => {
+    const cajaAbierta = { id: 10n, fecha: new Date('2026-10-21T00:00:00.000Z'), estado: 'ABIERTA' };
+    const pedido = {
+      id: 100n,
+      codigo: 'CP-0100',
+      total: new Prisma.Decimal(50),
+      estado: 'ENTREGADO',
+      pago_estado: 'PENDIENTE',
+      pago_metodo: null,
+      es_personal: false,
+      cobros: [],
+    };
+
+    /** El mozo envió el cobro (cobro_mozo_en) y, si `notaVigente`, emitió la nota de venta al enviar. */
+    const preparar = (mozo: { enviadoPorMozo: boolean; notaVigente: boolean }) => {
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbierta);
+      prismaMock.pedido.findUnique.mockImplementation(async (args: any) =>
+        args?.select?.comprobante
+          ? {
+              cobro_mozo_en: mozo.enviadoPorMozo ? new Date() : null,
+              comprobante: mozo.notaVigente ? [{ id: 5n }] : [],
+            }
+          : pedido,
+      );
+      prismaMock.cobro.create.mockResolvedValue({
+        id: 77n,
+        pedido_id: 100n,
+        caja_id: 10n,
+        total: new Prisma.Decimal(50),
+        credito_personal: false,
+        cobrado_por: 2n,
+        en: new Date(),
+        pagos: [],
+      });
+      prismaMock.pedido.update.mockResolvedValue({ ...pedido, pago_estado: 'PAGADO', pago_metodo: 'EFECTIVO' });
+    };
+    const cobrarEfectivo = () =>
+      service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 50, recibido: 50 }] }, cajeroUsuario);
+
+    it('nota de venta ya emitida por el mozo al enviar a Caja: al confirmar no se encola el ticket de pago', async () => {
+      preparar({ enviadoPorMozo: true, notaVigente: true });
+
+      await cobrarEfectivo();
+
+      expect(impresionMock.encolarTicketPedido).not.toHaveBeenCalled();
+    });
+
+    it('cobro normal sin envío del mozo: se encola el ticket de pago como siempre', async () => {
+      preparar({ enviadoPorMozo: false, notaVigente: false });
+
+      await cobrarEfectivo();
+
+      expect(impresionMock.encolarTicketPedido).toHaveBeenCalledWith(100n);
+    });
+
+    it('el mozo envió con boleta (sin nota de venta): sí se encola el ticket de pago', async () => {
+      preparar({ enviadoPorMozo: true, notaVigente: false });
+
+      await cobrarEfectivo();
+
+      expect(impresionMock.encolarTicketPedido).toHaveBeenCalledWith(100n);
     });
   });
 });

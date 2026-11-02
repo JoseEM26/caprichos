@@ -63,8 +63,14 @@ export interface MesaSalon {
     codigo: string;
     estado?: string;
     mozo: string | null;
+    /** Nombre corto del cliente del pedido (o null) */
+    cliente?: string | null;
     total?: number;
-    lineas?: Array<{ cantidad: number; nombre: string; detalle: string }>;
+    /** Hora en que se tomó el pedido (ISO) */
+    creadoEn?: string;
+    /** Cocina y entrega en vivo (misma función que «Mis pedidos») */
+    progreso?: ProgresoPedido;
+    lineas?: Array<{ cantidad: number; nombre: string; detalle: string; opciones?: string[] }>;
   } | null;
   pedidoCodigo?: string | null;
   mozo?: string | null;
@@ -161,10 +167,20 @@ export type EtapaProgreso =
   | 'ENTREGADO'
   | 'ANULADO';
 
+export interface ProductoProgreso {
+  lineaId?: string;
+  nombre: string;
+  cantidad: number;
+  listas?: number;
+  despachadas?: number;
+}
+
 export interface AreaProgreso {
   nombre: string;
   estado: 'PENDIENTE' | 'PREPARANDO' | 'LISTA';
   lineas: number;
+  /** Líneas del área: unidades, listas y despachadas por producto. */
+  productos?: ProductoProgreso[];
 }
 
 export interface ProgresoPedido {
@@ -177,6 +193,8 @@ export interface ProgresoPedido {
   enCamino: boolean;
   etaMin?: number;
   etaMax?: number;
+  /** Minutos para que esté listo lo que falta (solo mientras cocina trabaja). */
+  estimadoMin?: number;
 }
 
 /** Pedido que tomó el mozo (GET /admin/pedidos/mis-pedidos). */

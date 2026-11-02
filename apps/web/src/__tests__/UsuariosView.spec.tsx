@@ -187,7 +187,8 @@ describe('UsuariosView (/admin/usuarios)', () => {
 
     await waitFor(() => {
       expect(spyPost).toHaveBeenCalledWith('/admin/usuarios', {
-        dni: '88776655',
+        tipoDocumento: 'DNI',
+        documento: '88776655',
         nombres: 'Nuevo',
         apellidos: 'Personal',
         rol: 'CAJERO',
@@ -339,7 +340,7 @@ describe('UsuariosView (/admin/usuarios)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Sí, desactivar/i }));
 
     await waitFor(() => {
-      expect(spyPost).toHaveBeenCalledWith('/admin/usuarios/2/desactivar');
+      expect(spyPost).toHaveBeenCalledWith('/admin/usuarios/2/desactivar', expect.objectContaining({ fechaSalida: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }));
     });
   });
 

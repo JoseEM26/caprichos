@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { instalarPointerEvent } from './PolyfillPointer';
@@ -80,14 +80,38 @@ describe('ModalNuevoPedidoMesa: el plano de adentro se actualiza en tiempo real'
     montar([pisoCon(mesaOcupada)]);
 
     await screen.findByTestId('elemento-plano-5');
-    expect(textoMesa()).toContain('ocupada');
+    expect(textoMesa()).toContain('Mesa 1 · Ana');
 
     await act(async () => {
       socket.onMesaCambio?.({ mesaId: '5', estado: 'LIBRE' });
     });
 
-    await waitFor(() => expect(textoMesa()).not.toContain('ocupada'));
+    await waitFor(() => expect(textoMesa()).not.toContain('Ana'));
     expect(salonApi.obtenerMesas).toHaveBeenCalled();
+  });
+
+  it('sin permiso mesas/liberar, mantener 2 s abre la vista previa pero sin Forzar liberación', async () => {
+    vi.useFakeTimers();
+    vi.mocked(salonApi.obtenerMesas).mockResolvedValue({ pisos: [pisoCon(mesaOcupada)] } as any);
+    render(
+      <ModalNuevoPedidoMesa
+        abierto
+        alCerrar={vi.fn()}
+        pisos={[pisoCon(mesaOcupada)] as any}
+        puedeForzarLiberacion={false}
+      />,
+    );
+
+    const mesa = screen.getByTestId('elemento-plano-5');
+    fireEvent.pointerDown(mesa, { button: 0, clientX: 5, clientY: 5 });
+    act(() => vi.advanceTimersByTime(2100));
+    fireEvent.pointerUp(mesa);
+    vi.useRealTimers();
+
+    const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
+    expect(within(vista).queryByRole('button', { name: 'Forzar liberación' })).toBeNull();
+    expect(within(vista).queryByRole('button', { name: 'Abrir cuenta' })).toBeNull();
+    expect(within(vista).queryByRole('button', { name: 'Cambiar de mesa' })).toBeNull();
   });
 
   it('tras forzar la liberación con éxito, el modal refresca sus mesas aunque no le pasen alRefrescarMesas', async () => {
@@ -99,18 +123,21 @@ describe('ModalNuevoPedidoMesa: el plano de adentro se actualiza en tiempo real'
 
     const mesa = screen.getByTestId('elemento-plano-5');
     fireEvent.pointerDown(mesa, { button: 0, clientX: 5, clientY: 5 });
-    act(() => vi.advanceTimersByTime(3100));
+    act(() => vi.advanceTimersByTime(2100));
     fireEvent.pointerUp(mesa);
     vi.useRealTimers();
 
-    await screen.findByRole('dialog', { name: /Forzar liberación de Mesa 1/ });
-    fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: 'Mesa trabada tras cobro' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Forzar liberación' }));
+    // Mantener 2 s abre la vista previa; forzar sale de ahí
+    const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
+    fireEvent.click(within(vista).getByRole('button', { name: 'Forzar liberación' }));
+    const modal = await screen.findByRole('dialog', { name: /Forzar liberación de Mesa 1/ });
+    fireEvent.change(within(modal).getByLabelText(/Motivo/), { target: { value: 'Mesa trabada tras cobro' } });
+    fireEvent.click(within(modal).getByRole('button', { name: 'Forzar liberación' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, forzar liberación' }));
 
     await waitFor(() =>
       expect(salonApi.liberarMesaManual).toHaveBeenCalledWith('5', 'Mesa trabada tras cobro', true),
     );
-    await waitFor(() => expect(textoMesa()).not.toContain('ocupada'));
+    await waitFor(() => expect(textoMesa()).not.toContain('Ana'));
   });
 });

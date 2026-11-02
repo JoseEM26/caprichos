@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { ColorComanda, Comanda, LineaComanda } from './cocinaTipos';
 
+/** Tiempo para deshacer un «completa» (la línea vuelve a 0) antes de que el botón desaparezca. */
+export const SEGUNDOS_DESHACER = 5;
+
 export interface ComandaTarjetaProps {
   comanda: Comanda;
   onDespejar?: (comanda: Comanda) => void;
@@ -10,6 +13,14 @@ export interface ComandaTarjetaProps {
   mostrarArea?: boolean;
   /** Vista de un área: la boleta muestra solo las líneas de esa área y resalta su casilla. */
   soloArea?: boolean;
+  /** Vista de un área: cada toque en la casilla de una línea suma una unidad lista. */
+  alMarcarUnidades?: (linea: LineaComanda, listas: number) => void;
+  /** Vista Todas, con permiso cocina/despachar: botones de despachar por línea y de despachar todo. */
+  puedeDespachar?: boolean;
+  alDespacharLinea?: (linea: LineaComanda, unidades: number) => void;
+  alDespacharTodo?: (comanda: Comanda) => void;
+  /** La última unidad acaba de despejar el área: la tarjeta queda en verde con «Deshacer» un rato. */
+  alDeshacerSalida?: () => void;
 }
 
 export function obtenerColorMinutos(minutos: number): ColorComanda {
@@ -80,7 +91,22 @@ function DescripcionLinea({ it }: { it: LineaComanda }) {
       ),
     );
   });
-  if (it.nota) partes.push(<span key="nota">{it.nota}</span>);
+  if (it.nota)
+    partes.push(
+      <span
+        key="nota"
+        data-testid="linea-nota"
+        style={{
+          fontWeight: 700,
+          color: 'var(--cp-navy)',
+          background: '#FFF3C4',
+          padding: '0 4px',
+          borderRadius: '4px',
+        }}
+      >
+        {it.nota}
+      </span>,
+    );
 
   if (partes.length === 0) return null;
   return (
@@ -134,20 +160,128 @@ function IconoListo({ listo }: { listo: boolean }) {
   );
 }
 
+/** Casilla de 44 px por unidad: vacía, con el avance o con check verde cuando está completa. */
+function CasillaUnidad({ listas, cantidad }: { listas: number; cantidad: number }) {
+  const completa = listas >= cantidad;
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '28px',
+        height: '28px',
+        borderRadius: '8px',
+        border: `2px solid ${completa ? VERDE_LISTO : 'var(--cp-soft)'}`,
+        background: completa ? VERDE_LISTO : 'var(--cp-white)',
+        color: completa ? '#FFFFFF' : 'var(--cp-navy)',
+        fontWeight: 800,
+        fontSize: '12px',
+      }}
+    >
+      {completa ? (
+        <svg width="16" height="16" viewBox="0 0 16 16">
+          <path d="M3.5 8.5l3 3 6-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        listas
+      )}
+    </span>
+  );
+}
+
+interface MarcarLinea {
+  onTocar: () => void;
+}
+
+interface DespachoLinea {
+  onDespachar: (unidades: number) => void;
+}
+
 function LineaFila({
   it,
   etiquetaArea,
   listo,
+  marcar,
+  despacho,
 }: {
   it: LineaComanda;
   etiquetaArea?: string;
   listo?: boolean;
+  marcar?: MarcarLinea;
+  despacho?: DespachoLinea;
 }) {
+  const listas = it.listas ?? (listo ? it.cantidad : 0);
+  const despachadas = it.despachadas ?? 0;
+  const completa = listas >= it.cantidad;
+  const todoDespachado = it.cantidad > 0 && despachadas >= it.cantidad;
+  const pendientesDespacho = Math.max(0, listas - despachadas);
+  const atenuada = completa;
+
   return (
-    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+    <div
+      data-testid={`linea-${it.id}`}
+      data-completa={completa ? 'true' : 'false'}
+      style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', opacity: atenuada || todoDespachado ? 0.6 : 1 }}
+    >
+      {marcar && (
+        <button
+          type="button"
+          onClick={marcar.onTocar}
+          aria-label={
+            completa
+              ? `${it.nombre}: ${listas} de ${it.cantidad} listas. Tocar para volver a pendiente`
+              : `${it.nombre}: ${listas} de ${it.cantidad} listas. Tocar para sumar una lista`
+          }
+          style={{
+            minWidth: '44px',
+            minHeight: '44px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 0,
+            background: 'transparent',
+            padding: 0,
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          <CasillaUnidad listas={listas} cantidad={it.cantidad} />
+        </button>
+      )}
       <span style={{ fontWeight: 800, color: 'var(--cp-navy)' }}>{it.cantidad}×</span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontWeight: 700, color: 'var(--cp-navy)' }}>{it.nombre}</span>
+        <span
+          style={{
+            fontWeight: 700,
+            color: todoDespachado ? 'var(--cp-soft)' : 'var(--cp-navy)',
+            textDecoration: todoDespachado ? 'line-through' : undefined,
+          }}
+        >
+          {it.nombre}
+        </span>
+        {it.cantidad > 1 && !todoDespachado && (
+          <span
+            data-testid="unidades-linea"
+            style={{
+              fontSize: '12px',
+              fontWeight: 700,
+              border: '1px solid var(--cp-soft)',
+              borderRadius: '9999px',
+              padding: '0 6px',
+              color: 'var(--cp-navy)',
+              marginLeft: '6px',
+            }}
+          >
+            {`${listas} de ${it.cantidad}`}
+          </span>
+        )}
+        {despachadas > 0 && (
+          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', marginLeft: '6px' }}>
+            {todoDespachado ? 'Despachado' : `${despachadas} de ${it.cantidad} despachados`}
+          </span>
+        )}
         {etiquetaArea && (
           <span
             style={{
@@ -165,7 +299,29 @@ function LineaFila({
         )}
         <DescripcionLinea it={it} />
       </span>
-      {listo !== undefined && <IconoListo listo={listo} />}
+      {despacho && pendientesDespacho > 0 && (
+        <button
+          type="button"
+          onClick={() => despacho.onDespachar(pendientesDespacho)}
+          aria-label={`Despachar ${pendientesDespacho} de ${it.nombre}`}
+          style={{
+            minHeight: '44px',
+            minWidth: '44px',
+            padding: '0 12px',
+            border: 0,
+            borderRadius: '10px',
+            background: 'var(--cp-navy)',
+            color: 'var(--cp-white)',
+            fontWeight: 800,
+            fontSize: '13px',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          Despachar
+        </button>
+      )}
+      {!marcar && listo !== undefined && <IconoListo listo={listo} />}
     </div>
   );
 }
@@ -243,6 +399,16 @@ function EstadoAreas({ comanda, areaActual }: { comanda: Comanda; areaActual?: s
 }
 
 /**
+ * Un toque en la casilla: suma una unidad. Si la línea ya está completa, vuelve a lo que ya salió
+ * (0 si nada salió; si ya despachó algo, eso queda). Quien la llama muestra «Deshacer».
+ */
+function tocarLinea(it: LineaComanda, alMarcar: (linea: LineaComanda, listas: number) => void) {
+  const listas = it.listas ?? 0;
+  if (listas >= it.cantidad) alMarcar(it, it.despachadas ?? 0);
+  else alMarcar(it, listas + 1);
+}
+
+/**
  * Líneas del pedido. En la vista de un área (soloArea) muestra solo sus líneas, con el check
  * de listo de esa área. Si el servidor trae las áreas del pedido, en la vista Todas se agrupan
  * por área (subtítulo pequeño) con un check por línea. Sin áreas (respuesta anterior), lista plana.
@@ -251,10 +417,14 @@ export function LineasComanda({
   comanda,
   mostrarArea = true,
   soloArea = false,
+  alMarcarUnidades,
+  alDespacharLinea,
 }: {
   comanda: Comanda;
   mostrarArea?: boolean;
   soloArea?: boolean;
+  alMarcarUnidades?: (linea: LineaComanda, listas: number) => void;
+  alDespacharLinea?: (linea: LineaComanda, unidades: number) => void;
 }) {
   const areas = comanda.areas || [];
   const conAreas = areas.length > 0;
@@ -267,6 +437,11 @@ export function LineasComanda({
             it={it}
             etiquetaArea={mostrarArea ? it.area || comanda.areaNombre || undefined : undefined}
             listo={soloArea && conAreas ? comanda.despejada === true : undefined}
+            marcar={
+              alMarcarUnidades && !comanda.despejada
+                ? { onTocar: () => tocarLinea(it, alMarcarUnidades) }
+                : undefined
+            }
           />
         ))}
       </div>
@@ -293,7 +468,14 @@ export function LineasComanda({
             {area.areaNombre}
           </div>
           {area.lineas.map((it, idx) => (
-            <LineaFila key={it.id || idx} it={it} listo={area.despejada} />
+            <LineaFila
+              key={it.id || idx}
+              it={it}
+              listo={area.despejada}
+              despacho={
+                alDespacharLinea ? { onDespachar: (unidades) => alDespacharLinea(it, unidades) } : undefined
+              }
+            />
           ))}
         </div>
       ))}
@@ -308,7 +490,20 @@ export function ComandaTarjeta({
   soloLectura = false,
   mostrarArea = true,
   soloArea = false,
+  alMarcarUnidades,
+  puedeDespachar = false,
+  alDespacharLinea,
+  alDespacharTodo,
+  alDeshacerSalida,
 }: ComandaTarjetaProps) {
+  // Última línea que se completó: se puede deshacer unos segundos (vuelve a su cantidad anterior)
+  const [deshacer, setDeshacer] = useState<{ linea: LineaComanda; previas: number } | null>(null);
+  useEffect(() => {
+    if (!deshacer) return;
+    const t = setTimeout(() => setDeshacer(null), SEGUNDOS_DESHACER * 1000);
+    return () => clearTimeout(t);
+  }, [deshacer]);
+
   const [minutosEnVivo, setMinutosEnVivo] = useState<number>(() => {
     if (comanda.creado_en) {
       const creadoMs = new Date(comanda.creado_en).getTime();
@@ -473,23 +668,145 @@ export function ComandaTarjeta({
         </div>
       )}
 
-      <EstadoAreas comanda={comanda} areaActual={soloArea ? comanda.areaId : undefined} />
-
-      <LineasComanda comanda={comanda} mostrarArea={mostrarArea} soloArea={soloArea} />
-
-      {comanda.nota && (
+      {despejada && alDeshacerSalida && (
         <div
+          role="status"
+          data-testid="deshacer-salida"
           style={{
-            border: '1.5px dashed var(--cp-soft)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+            border: '1.5px solid var(--cp-soft)',
             borderRadius: '10px',
-            padding: '6px 8px',
-            fontSize: '12px',
+            padding: '4px 8px',
+            fontSize: '13px',
+            fontWeight: 700,
             color: 'var(--cp-navy)',
           }}
         >
-          Nota: {comanda.nota}
+          <span>Sale de la pantalla en unos segundos</span>
+          <button
+            type="button"
+            onClick={alDeshacerSalida}
+            style={{
+              minHeight: '44px',
+              minWidth: '44px',
+              padding: '0 12px',
+              border: '1.5px solid var(--cp-navy)',
+              borderRadius: '10px',
+              background: 'var(--cp-white)',
+              color: 'var(--cp-navy)',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Deshacer
+          </button>
         </div>
       )}
+
+      <EstadoAreas comanda={comanda} areaActual={soloArea ? comanda.areaId : undefined} />
+
+      {deshacer && alMarcarUnidades && (
+        <div
+          role="status"
+          data-testid="deshacer-unidades"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+            border: '1.5px solid var(--cp-soft)',
+            borderRadius: '10px',
+            padding: '4px 8px',
+            fontSize: '13px',
+            fontWeight: 700,
+            color: 'var(--cp-navy)',
+          }}
+        >
+          <span>{`${deshacer.linea.nombre}: vuelve a pendiente`}</span>
+          <button
+            type="button"
+            onClick={() => {
+              alMarcarUnidades(deshacer.linea, deshacer.previas);
+              setDeshacer(null);
+            }}
+            style={{
+              minHeight: '44px',
+              minWidth: '44px',
+              padding: '0 12px',
+              border: '1.5px solid var(--cp-navy)',
+              borderRadius: '10px',
+              background: 'var(--cp-white)',
+              color: 'var(--cp-navy)',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Deshacer
+          </button>
+        </div>
+      )}
+
+      {comanda.nota && (
+        <div
+          data-testid="comanda-nota"
+          style={{
+            background: '#FFF3C4',
+            border: '2px solid #D99E39',
+            borderRadius: '10px',
+            padding: '8px 10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--cp-navy)' }}>NOTA DEL CLIENTE</span>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--cp-navy)', overflowWrap: 'anywhere' }}>
+            {comanda.nota}
+          </span>
+        </div>
+      )}
+
+      <LineasComanda
+        comanda={comanda}
+        mostrarArea={mostrarArea}
+        soloArea={soloArea}
+        alMarcarUnidades={
+          alMarcarUnidades
+            ? (linea, listas) => {
+                const previas = linea.listas ?? 0;
+                // Una línea completa que vuelve a pendiente se puede deshacer unos segundos
+                if (previas >= linea.cantidad && listas < previas) setDeshacer({ linea, previas });
+                alMarcarUnidades(linea, listas);
+              }
+            : undefined
+        }
+        alDespacharLinea={puedeDespachar && comanda.modalidad?.toUpperCase() !== 'DELIVERY' ? alDespacharLinea : undefined}
+      />
+
+      {puedeDespachar &&
+        alDespacharTodo &&
+        comanda.modalidad?.toUpperCase() !== 'DELIVERY' &&
+        (comanda.areas ?? []).some((a) => a.lineas.some((l) => (l.listas ?? 0) > (l.despachadas ?? 0))) && (
+          <button
+            type="button"
+            onClick={() => alDespacharTodo(comanda)}
+            style={{
+              minHeight: '44px',
+              border: '1.5px solid var(--cp-navy)',
+              borderRadius: '12px',
+              background: 'var(--cp-white)',
+              color: 'var(--cp-navy)',
+              fontWeight: 800,
+              fontSize: '14px',
+              cursor: 'pointer',
+            }}
+          >
+            Despachar todo lo listo
+          </button>
+        )}
 
       {!soloLectura && onDespejar && !despejada && (
         <button
@@ -508,7 +825,7 @@ export function ComandaTarjeta({
             marginTop: 'auto',
           }}
         >
-          Despejar
+          Listo
         </button>
       )}
     </div>

@@ -68,6 +68,11 @@ describe('comprobantes.util', () => {
       expect(validarDocumentoComprobante('BOLETA', '76543210')).toEqual({ valido: true });
     });
 
+    it('acepta BOLETA sin DNI (opcional)', () => {
+      expect(validarDocumentoComprobante('BOLETA')).toEqual({ valido: true });
+      expect(validarDocumentoComprobante('BOLETA', '', null)).toEqual({ valido: true });
+    });
+
     it('rechaza BOLETA con DNI inválido', () => {
       const res = validarDocumentoComprobante('BOLETA', '12345');
       expect(res.valido).toBe(false);

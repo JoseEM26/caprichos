@@ -34,6 +34,7 @@ describe('ComprobantesService', () => {
       $queryRaw: jest.fn(),
       comprobante: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -78,7 +79,7 @@ describe('ComprobantesService', () => {
 
   describe('1. correlativo secuencial y atómico en emitirParaPedido', () => {
     it('genera NV01-000001 de forma atómica con UPDATE ... RETURNING', async () => {
-      prismaMock.comprobante.findUnique.mockResolvedValue(null);
+      prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 100n,
         comprobante_tipo: 'NOTA_VENTA',
@@ -104,7 +105,7 @@ describe('ComprobantesService', () => {
     });
 
     it('genera el siguiente correlativo atómico NV01-000002 en la siguiente llamada', async () => {
-      prismaMock.comprobante.findUnique.mockResolvedValue(null);
+      prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 101n,
         comprobante_tipo: 'NOTA_VENTA',
@@ -142,7 +143,7 @@ describe('ComprobantesService', () => {
         creado_en: fechaFija,
       };
 
-      prismaMock.comprobante.findUnique.mockResolvedValue(comprobanteExistente);
+      prismaMock.comprobante.findFirst.mockResolvedValue(comprobanteExistente);
 
       const res = await service.emitirParaPedido(100n);
 
@@ -156,7 +157,7 @@ describe('ComprobantesService', () => {
 
   describe('3. boleta con DNI válido e inválido', () => {
     it('boleta con DNI válido (8 dígitos) se guarda como BOLETA y POR_EMITIR', async () => {
-      prismaMock.comprobante.findUnique.mockResolvedValue(null);
+      prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 102n,
         comprobante_tipo: 'BOLETA',
@@ -178,8 +179,30 @@ describe('ComprobantesService', () => {
       expect(res.advertencia).toBeNull();
     });
 
+    it('boleta sin DNI es válida: se emite BOLETA POR_EMITIR sin advertencia', async () => {
+      prismaMock.comprobante.findFirst.mockResolvedValue(null);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 104n,
+        comprobante_tipo: 'BOLETA',
+        comprobante_doc: null,
+        comprobante_razon: null,
+      });
+      prismaMock.$queryRaw.mockResolvedValue([{ ultimo_numero: 5 }]);
+      prismaMock.comprobante.create.mockImplementation((args: any) => ({
+        id: 14n,
+        ...args.data,
+        creado_en: fechaFija,
+      }));
+
+      const res = await service.emitirParaPedido(104n);
+
+      expect(res.tipo).toBe('BOLETA');
+      expect(res.emision).toBe('POR_EMITIR');
+      expect(res.advertencia).toBeNull();
+    });
+
     it('boleta con DNI inválido no bloquea: se emite como NOTA_VENTA interna con advertencia', async () => {
-      prismaMock.comprobante.findUnique.mockResolvedValue(null);
+      prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 103n,
         comprobante_tipo: 'BOLETA',
@@ -203,7 +226,7 @@ describe('ComprobantesService', () => {
 
   describe('4. factura con RUC de 10 dígitos rechazado (RQ-LEG-01-02)', () => {
     it('factura con RUC de 10 dígitos se rechaza y pasa a NOTA_VENTA interna con advertencia', async () => {
-      prismaMock.comprobante.findUnique.mockResolvedValue(null);
+      prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 104n,
         comprobante_tipo: 'FACTURA',
@@ -225,7 +248,7 @@ describe('ComprobantesService', () => {
     });
 
     it('factura con RUC de 11 dígitos válido y razón social se emite como FACTURA POR_EMITIR', async () => {
-      prismaMock.comprobante.findUnique.mockResolvedValue(null);
+      prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 105n,
         comprobante_tipo: 'FACTURA',
@@ -251,7 +274,7 @@ describe('ComprobantesService', () => {
 
   describe('5. nota de venta por defecto', () => {
     it('pedido con NOTA_VENTA por defecto emite NOTA_VENTA INTERNA', async () => {
-      prismaMock.comprobante.findUnique.mockResolvedValue(null);
+      prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 106n,
         comprobante_tipo: 'NOTA_VENTA',
@@ -322,7 +345,7 @@ describe('ComprobantesService', () => {
             opcionesElegidas: [{ opcion_id: 1n, opcion_nombre: 'Sin cebolla' }],
           },
         ],
-        comprobante: {
+        comprobante: [{
           id: 20n,
           pedido_id: 108n,
           tipo: 'BOLETA',
@@ -334,7 +357,7 @@ describe('ComprobantesService', () => {
           emision: 'POR_EMITIR',
           copias_impresas: 0,
           creado_en: fechaFija,
-        },
+        }],
       };
 
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -368,7 +391,7 @@ describe('ComprobantesService', () => {
         pago_metodo: 'EFECTIVO',
         cobros: [{ id: 2n, en: fechaFija, anulado_en: null, pagos: [{ id: 2n, medio: 'EFECTIVO', monto: 10, recibido: 10, vuelto: 0 }] }],
         lineas: [],
-        comprobante: {
+        comprobante: [{
           id: 2n,
           pedido_id: 109n,
           tipo: 'NOTA_VENTA',
@@ -380,7 +403,7 @@ describe('ComprobantesService', () => {
           emision: 'POR_EMITIR',
           copias_impresas: 0,
           creado_en: fechaFija,
-        },
+        }],
       });
       const res = await service.obtenerPorPedido(109n, cajeroUsuario);
       expect(res.local.razon_social).toBeNull();
@@ -403,7 +426,7 @@ describe('ComprobantesService', () => {
         total: 30,
         cobros: [{ id: 2n, en: fechaFija, anulado_en: null, pagos: [] }],
         lineas: [],
-        comprobante: {
+        comprobante: [{
           id: 30n,
           pedido_id: 109n,
           tipo: 'NOTA_VENTA',
@@ -415,12 +438,12 @@ describe('ComprobantesService', () => {
           emision: 'INTERNA',
           copias_impresas: 0,
           creado_en: fechaFija,
-        },
+        }],
       };
 
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
       prismaMock.comprobante.update.mockResolvedValue({
-        ...pedidoMock.comprobante,
+        ...pedidoMock.comprobante[0],
         copias_impresas: 1,
       });
 

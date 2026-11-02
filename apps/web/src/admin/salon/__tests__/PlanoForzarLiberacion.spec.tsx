@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react';
 import { PlanoView } from '../PlanoView';
 import { salonApi } from '../api';
 import * as sesionModulo from '../../../comun/sesion';
@@ -52,7 +52,7 @@ async function montarConMesaOcupada(permisos: string[]) {
   return screen.findByTestId('elemento-plano-5');
 }
 
-describe('Plano del local: forzar liberación con mantener presionada', () => {
+describe('Plano del local: mantener 2 s una mesa ocupada abre la vista previa', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (salonApi.obtenerPlano as any).mockResolvedValue(pisos);
@@ -63,23 +63,25 @@ describe('Plano del local: forzar liberación con mantener presionada', () => {
     vi.useRealTimers();
   });
 
-  it('con mesas/liberar, mantener 3 s la mesa ocupada abre Forzar liberación con su pedido', async () => {
+  it('con mesas/liberar, mantener 2 s la mesa ocupada abre la vista previa con su pedido y Forzar liberación', async () => {
     const mesa = await montarConMesaOcupada(['plano/ver', 'mesas/liberar']);
 
     vi.useFakeTimers();
     fireEvent.pointerDown(mesa, { button: 0, clientX: 5, clientY: 5 });
-    act(() => vi.advanceTimersByTime(2000));
-    expect(screen.queryByRole('dialog', { name: /Forzar liberación de/ })).toBeNull();
-    act(() => vi.advanceTimersByTime(1100));
+    act(() => vi.advanceTimersByTime(1500));
+    expect(screen.queryByRole('dialog', { name: /Vista previa de/ })).toBeNull();
+    act(() => vi.advanceTimersByTime(700));
     fireEvent.pointerUp(mesa);
     vi.useRealTimers();
 
-    const dialogo = await screen.findByRole('dialog', { name: /Forzar liberación de Mesa 1/ });
-    expect(dialogo.textContent).toContain('Pedido P-0050');
-    expect(dialogo.textContent).toContain('Libera solo la mesa; el pedido no se anula ni se cobra.');
+    const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
+    expect(vista.textContent).toContain('Pedido P-0050');
+    expect(within(vista).getByRole('button', { name: 'Forzar liberación' })).toBeTruthy();
+    expect(within(vista).getByRole('button', { name: 'Cambiar de mesa' })).toBeTruthy();
+    expect(within(vista).getByRole('button', { name: 'Abrir cuenta' })).toBeTruthy();
   });
 
-  it('un toque normal no abre la ventana', async () => {
+  it('un toque normal no abre la vista previa', async () => {
     const mesa = await montarConMesaOcupada(['plano/ver', 'mesas/liberar']);
 
     vi.useFakeTimers();
@@ -89,31 +91,39 @@ describe('Plano del local: forzar liberación con mantener presionada', () => {
     act(() => vi.advanceTimersByTime(4000));
     vi.useRealTimers();
 
-    expect(screen.queryByRole('dialog', { name: /Forzar liberación de/ })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: /Vista previa de/ })).toBeNull();
   });
 
-  it('sin mesas/liberar no aparece la opcion aunque se mantenga presionada', async () => {
+  it('sin mesas/liberar la vista previa abre, pero no ofrece Forzar liberación', async () => {
     const mesa = await montarConMesaOcupada(['plano/ver']);
 
     vi.useFakeTimers();
     fireEvent.pointerDown(mesa, { button: 0, clientX: 5, clientY: 5 });
-    act(() => vi.advanceTimersByTime(4000));
+    act(() => vi.advanceTimersByTime(2100));
+    fireEvent.pointerUp(mesa);
     vi.useRealTimers();
 
-    expect(screen.queryByRole('dialog', { name: /Forzar liberación de/ })).toBeNull();
+    const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
+    expect(within(vista).queryByRole('button', { name: 'Forzar liberación' })).toBeNull();
   });
 
-  it('confirma con motivo y llama a liberarMesaManual con forzar=true', async () => {
+  it('desde la vista previa: Forzar liberación pide motivo y Sí, y llama a liberarMesaManual con forzar=true', async () => {
     const mesa = await montarConMesaOcupada(['plano/ver', 'mesas/liberar']);
 
     vi.useFakeTimers();
     fireEvent.pointerDown(mesa, { button: 0, clientX: 5, clientY: 5 });
-    act(() => vi.advanceTimersByTime(3100));
+    act(() => vi.advanceTimersByTime(2100));
+    fireEvent.pointerUp(mesa);
     vi.useRealTimers();
 
-    await screen.findByRole('dialog', { name: /Forzar liberación de Mesa 1/ });
-    fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: 'Mesa trabada tras cobro' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Forzar liberación' }));
+    const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
+    fireEvent.click(within(vista).getByRole('button', { name: 'Forzar liberación' }));
+
+    const modal = await screen.findByRole('dialog', { name: /Forzar liberación de Mesa 1/ });
+    expect(modal.textContent).toContain('Pedido P-0050');
+    expect(modal.textContent).toContain('Libera solo la mesa; el pedido no se anula ni se cobra.');
+    fireEvent.change(within(modal).getByLabelText(/Motivo/), { target: { value: 'Mesa trabada tras cobro' } });
+    fireEvent.click(within(modal).getByRole('button', { name: 'Forzar liberación' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, forzar liberación' }));
 
     await waitFor(() =>

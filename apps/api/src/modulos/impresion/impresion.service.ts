@@ -36,6 +36,7 @@ import {
   construirEtiquetasBebida,
   construirTodasLasEtiquetas,
   construirTicketPago,
+  construirTicketNotaMozo,
 } from './constructor-etiquetas';
 import {
   consultarEstadoAgente,
@@ -467,7 +468,8 @@ export class ImpresionService {
   }
 
   private exigirRolDescartar(usuario?: UsuarioAutenticado) {
-    if (!ROLES_DESCARTAR.includes(String(usuario?.rol || '').toUpperCase())) {
+    const rolesUsuario = (usuario?.roles ?? [usuario?.rol ?? '']).map((r) => String(r || '').toUpperCase());
+    if (!rolesUsuario.some((r) => ROLES_DESCARTAR.includes(r))) {
       throw new ForbiddenException({
         codigo: 'SIN_PERMISO_DESCARTAR',
         mensaje: 'Solo Caja o un administrador pueden descartar etiquetas de la cola',
@@ -732,7 +734,7 @@ export class ImpresionService {
       }
       const [local, comprobante] = await Promise.all([
         this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null),
-        this.prisma.comprobante.findUnique({ where: { pedido_id: pedido.id } }).catch(() => null),
+        this.prisma.comprobante.findFirst({ where: { pedido_id: pedido.id, anulado_en: null } }).catch(() => null),
       ]);
       const payload = construirTicketPago(pedido, (local?.valor as any) || {}, comprobante);
       const clave = `${pedido.id}-TICKET_PAGO`;
@@ -754,6 +756,48 @@ export class ImpresionService {
       }
     } catch (err: any) {
       this.logger.error(`Error al encolar el ticket del pedido ${pedidoIdInput}: ${err.message}`, err.stack);
+    }
+  }
+
+  /**
+   * Nota de venta que el mozo envía a Caja: se imprime en la ticketera de Caja con su correlativo.
+   * La clave es por comprobante: reenviar el pedido no vuelve a imprimir la misma nota.
+   */
+  async encolarNotaMozo(
+    pedidoIdInput: bigint | string | number,
+    comprobante: { id: string | number | bigint; tipo: string; numero_texto: string },
+    datos: { pagos: Array<{ medio: string; monto: number }>; recibido: number | null; mozo: string | null },
+  ): Promise<void> {
+    const pedidoId = BigInt(pedidoIdInput);
+    const pedido: any = await this.prisma.pedido.findUnique({ where: { id: pedidoId }, include: { lineas: true } });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+    const local = await this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null);
+    const payload = construirTicketNotaMozo(
+      pedido,
+      (local?.valor as any) || {},
+      { tipo: comprobante.tipo, numero_texto: comprobante.numero_texto },
+      datos.pagos,
+      datos.recibido,
+      datos.mozo,
+    );
+    const clave = `${pedido.id}-NOTA_MOZO-${comprobante.id}`;
+    await this.prisma.printJob.upsert({
+      where: { clave_idempotencia: clave },
+      create: {
+        pedido_id: pedido.id,
+        tipo: 'TICKET_PAGO',
+        clave_idempotencia: clave,
+        payload: payload as any,
+        copia: false,
+        estado: 'PENDIENTE',
+      },
+      update: {},
+    });
+    const estado = await consultarEstadoAgente(this.prisma).catch(() => null);
+    if (estado) {
+      this.eventos?.emitirAdmin('impresion:cola', { pedidoId: pedido.id.toString(), tipo: 'TICKET_PAGO' });
     }
   }
 

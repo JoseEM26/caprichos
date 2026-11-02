@@ -1,3 +1,4 @@
+import { esSoloMozo } from '../acceso/roles-usuario';
 import {
   Body,
   Controller,
@@ -49,7 +50,7 @@ export class PedidosAdminController {
       idempotencyKey ||
       `adm-${req.usuario?.partyId ?? 'anon'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const canal =
-      dto.canal || (req.usuario?.rol === 'MOZO' ? 'MOZO' : 'CAJA');
+      dto.canal || (req.usuario && esSoloMozo(req.usuario) ? 'MOZO' : 'CAJA');
     const res = await this.pedidosService!.crear(dto, key, {
       canal,
       usuarioPartyId: req.usuario?.partyId,

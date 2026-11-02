@@ -53,6 +53,11 @@ describe('ComandasService', () => {
       pedidoEstadoHistorial: {
         create: jest.fn(),
       },
+      pedidoLinea: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
       areaCocina: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -581,7 +586,7 @@ describe('ComandasService', () => {
 
       expect(lista).toEqual([]);
       const where = prisma.comandaArea.findMany.mock.calls[0][0].where;
-      expect(where.pedido.estado).toEqual({ in: ['COLA', 'PREPARANDO'] });
+      expect(where.pedido.estado).toEqual({ notIn: ['ANULADO', 'RECHAZADO'] });
       expect(pedido.comandas.every((c: any) => c.estado === 'DESPEJADA')).toBe(true);
     });
 

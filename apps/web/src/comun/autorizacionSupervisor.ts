@@ -1,3 +1,4 @@
+import { tieneRolUsuario } from './rolesUsuario';
 /** Autorización del supervisor: un código válido vale 5 min en el servidor; aquí se recuerda para no pedirlo de nuevo. */
 const VIGENCIA_MS = 5 * 60 * 1000;
 let hasta = 0;
@@ -11,6 +12,7 @@ export const limpiarAutorizacionSupervisor = () => {
 };
 
 /** El ADMIN y el SUPERVISOR nunca piden el código: se autorizan solos (el servidor lo deja pasar igual y audita a su nombre). */
-export function requiereCodigo(usuario?: { rol?: string } | null): boolean {
-  return !['ADMIN', 'SUPERVISOR'].includes((usuario?.rol ?? '').toUpperCase());
+export function requiereCodigo(usuario?: { rol?: string; roles?: string[] } | null): boolean {
+  // ADMIN solo como principal; SUPERVISOR como principal o como rol extra
+  return !(usuario?.rol?.toUpperCase() === 'ADMIN' || tieneRolUsuario(usuario, 'SUPERVISOR'));
 }

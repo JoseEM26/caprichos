@@ -19,6 +19,8 @@ import { ComandasQueryDto } from './dto/comandas-query.dto';
 import { HistorialQueryDto } from './dto/historial-query.dto';
 import { AgotarDto } from './dto/agotar.dto';
 import { AltaDemandaDto } from './dto/alta-demanda.dto';
+import { MarcarListasDto } from './dto/marcar-listas.dto';
+import { DespacharDto } from './dto/despachar.dto';
 
 @Controller('admin/cocina')
 @UseGuards(AccesoGuard)
@@ -62,6 +64,20 @@ export class CocinaController {
   @Permiso('cocina', 'ver')
   async historial(@Query() query: HistorialQueryDto) {
     return this.comandasService.historial(query.area);
+  }
+
+  @Post('lineas/:lineaId/listas')
+  @Permiso('cocina', 'despejar')
+  async marcarListas(@Param('lineaId') lineaId: string, @Body() dto: MarcarListasDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.comandasService.marcarListas(lineaId, dto.listas, req.usuario, ip);
+  }
+
+  @Post('pedidos/:pedidoId/despachar')
+  @Permiso('cocina', 'despachar')
+  async despacharPedido(@Param('pedidoId') pedidoId: string, @Body() dto: DespacharDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.comandasService.despachar(pedidoId, dto.lineas, req.usuario, ip);
   }
 
   @Post('comandas/:pedidoId/:areaId/devolver')

@@ -33,8 +33,14 @@ describe('UsuariosService', () => {
 
   beforeEach(async () => {
     prismaMock = {
+      partyRole: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
       partyIdentifier: {
-        findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
       userAccount: {
         findUnique: jest.fn(),
@@ -66,7 +72,7 @@ describe('UsuariosService', () => {
 
   describe('crear', () => {
     it('debe crear un usuario y devolver la claveInicial UNA sola vez', async () => {
-      prismaMock.partyIdentifier.findUnique.mockResolvedValue(null);
+      prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
 
       const mockParty = { id: 10n, tipo: 'PERSONA', estado: 'ACTIVO' };
       const mockPerson = { party_id: 10n, nombres: 'Carlos', apellidos: 'Perez' };
@@ -86,6 +92,7 @@ describe('UsuariosService', () => {
           person: { create: jest.fn().mockResolvedValue(mockPerson) },
           partyIdentifier: { create: jest.fn().mockResolvedValue(mockPartyIdentifier) },
           userAccount: { create: jest.fn().mockResolvedValue(mockUserAccount) },
+          partyRole: { create: jest.fn().mockResolvedValue({}) },
         };
         return callback(tx);
       });
@@ -130,7 +137,7 @@ describe('UsuariosService', () => {
     });
 
     it('DNI duplicado → 409 DNI_DUPLICADO', async () => {
-      prismaMock.partyIdentifier.findUnique.mockResolvedValue({
+      prismaMock.partyIdentifier.findFirst.mockResolvedValue({
         id: 1n,
         party_id: 10n,
         tipo: 'DNI',
@@ -171,7 +178,7 @@ describe('UsuariosService', () => {
     });
 
     it('DNI duplicado por error de carrera P2002 → 409 DNI_DUPLICADO', async () => {
-      prismaMock.partyIdentifier.findUnique.mockResolvedValue(null);
+      prismaMock.partyIdentifier.findFirst.mockResolvedValue(null);
       prismaMock.$transaction.mockRejectedValue({ code: 'P2002' });
 
       await expect(

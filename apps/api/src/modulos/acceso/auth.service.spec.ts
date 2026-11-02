@@ -44,7 +44,8 @@ describe('AuthService', () => {
 
     prisma = {
       partyIdentifier: {
-        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       sesion: {
         create: jest.fn(),
@@ -58,6 +59,9 @@ describe('AuthService', () => {
       },
       rolPermiso: {
         findMany: jest.fn(),
+      },
+      userAccountRol: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
 
@@ -112,7 +116,7 @@ describe('AuthService', () => {
       redisClient.get.mockResolvedValue('0');
       redisClient.incr.mockResolvedValue(1);
 
-      prisma.partyIdentifier.findUnique.mockResolvedValue({
+      prisma.partyIdentifier.findFirst.mockResolvedValue({
         id: BigInt(1),
         tipo: 'DNI',
         numero: '12345678',
@@ -164,7 +168,7 @@ describe('AuthService', () => {
     it('debe lanzar 401 CREDENCIALES_INVALIDAS sin revelar si el DNI no existe', async () => {
       redisClient.get.mockResolvedValue('0');
       redisClient.incr.mockResolvedValue(1);
-      prisma.partyIdentifier.findUnique.mockResolvedValue(null);
+      prisma.partyIdentifier.findFirst.mockResolvedValue(null);
 
       await expect(
         service.ingresar(
@@ -213,7 +217,7 @@ describe('AuthService', () => {
       );
 
       // No debe consultar base de datos si ya está bloqueado
-      expect(prisma.partyIdentifier.findUnique).not.toHaveBeenCalled();
+      expect(prisma.partyIdentifier.findFirst).not.toHaveBeenCalled();
     });
   });
 
@@ -223,7 +227,7 @@ describe('AuthService', () => {
       const hash = await argon2.hash(contrasena);
 
       redisClient.get.mockResolvedValue('0');
-      prisma.partyIdentifier.findUnique.mockResolvedValue({
+      prisma.partyIdentifier.findFirst.mockResolvedValue({
         id: BigInt(1),
         tipo: 'DNI',
         numero: '12345678',
@@ -272,7 +276,7 @@ describe('AuthService', () => {
       const hash = await argon2.hash(contrasena);
 
       redisClient.get.mockResolvedValue('2');
-      prisma.partyIdentifier.findUnique.mockResolvedValue({
+      prisma.partyIdentifier.findFirst.mockResolvedValue({
         id: BigInt(1),
         tipo: 'DNI',
         numero: '12345678',
@@ -323,9 +327,41 @@ describe('AuthService', () => {
           partyId: '10',
           nombres: 'Ana Torres',
           rol: 'ADMIN',
+          roles: ['ADMIN'],
         },
       });
       expect(resultado.rawRefreshToken).toBeDefined();
+    });
+  });
+
+  describe('ingresar con CE de 7 caracteres y roles extra', () => {
+    it('busca el documento en los tipos del personal, acepta el CE y pone los roles en el token', async () => {
+      const hash = await argon2.hash('ContrasenaCorrecta1');
+      redisClient.get.mockResolvedValue('0');
+      redisClient.incr.mockResolvedValue(1);
+      prisma.partyIdentifier.findFirst.mockResolvedValue({
+        id: BigInt(1),
+        tipo: 'CE',
+        numero: 'AB12345',
+        party: {
+          id: BigInt(10),
+          usuario: { id: BigInt(5), party_id: BigInt(10), rol: 'CAJERO', hash, activo: true, debe_cambiar: false },
+          persona: { nombres: 'Ana' },
+        },
+      });
+      prisma.userAccountRol = { findMany: jest.fn().mockResolvedValue([{ rol: 'MOZO' }]) };
+      prisma.sesion.create.mockResolvedValue({});
+
+      const r = await service.ingresar({ dni: 'AB12345', contrasena: 'ContrasenaCorrecta1' }, '1.1.1.1', 'UA');
+
+      expect(prisma.partyIdentifier.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { numero: 'AB12345', tipo: { in: ['DNI', 'CE', 'CEDULA', 'PASAPORTE'] } } }),
+      );
+      expect(jwtService.signAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ roles: ['CAJERO', 'MOZO'], rol: 'CAJERO' }),
+        expect.anything(),
+      );
+      expect(r.respuesta.usuario.roles).toEqual(['CAJERO', 'MOZO']);
     });
   });
 
@@ -413,6 +449,21 @@ describe('AuthService', () => {
   });
 
   describe('cambiarContrasena - Caso 4: debe_cambiar y cambio de clave', () => {
+    it('no deja poner el número de documento como contraseña nueva', async () => {
+      const hash = await argon2.hash('RealClave123');
+      prisma.userAccount.findUnique.mockResolvedValue({ party_id: BigInt(10), hash, debe_cambiar: true });
+      prisma.partyIdentifier.findMany.mockResolvedValue([{ numero: 'AB123456' }]);
+
+      await expect(
+        service.cambiarContrasena(BigInt(10), { contrasenaActual: 'RealClave123', contrasenaNueva: 'ab123456' }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.BAD_REQUEST,
+          response: expect.objectContaining({ codigo: 'CONTRASENA_ES_DOCUMENTO' }),
+        }),
+      );
+    });
+
     it('debe rechazar contraseñas que no cumplan requisitos de seguridad', async () => {
       // Menos de 8 caracteres
       await expect(
@@ -560,11 +611,12 @@ describe('AuthService', () => {
         nombres: 'Luis',
         fotoUrl: null,
         rol: 'COCINA',
+        roles: ['COCINA'],
         debeCambiar: false,
         permisos: ['cocina/despejar', 'cocina/ver'],
       });
       expect(prisma.rolPermiso.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { rol: 'COCINA' } }),
+        expect.objectContaining({ where: { rol: { in: ['COCINA'] } } }),
       );
     });
 

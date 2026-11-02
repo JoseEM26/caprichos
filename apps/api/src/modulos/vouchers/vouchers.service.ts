@@ -1,3 +1,4 @@
+import { esSoloMozo, rolEfectivoMozo } from '../acceso/roles-usuario';
 import {
   BadRequestException,
   ConflictException,
@@ -19,6 +20,9 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { VouchersIaService } from './vouchers-ia.service';
+import { ComprobantesService } from '../comprobantes/comprobantes.service';
+import { validarDocumentoComprobante } from '../comprobantes/comprobantes.util';
+import { ImpresionService } from '../impresion/impresion.service';
 import {
   montoDeMedioDigital,
   mediosDigitalesDelPedido,
@@ -37,7 +41,7 @@ import {
 
 export interface SubirVoucherOpciones {
   pedidoId?: string | number | bigint;
-  medio?: 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
+  medio?: 'YAPE' | 'PLIN' | 'TRANSFERENCIA' | 'TARJETA';
   origen?: 'MOZO' | 'WHATSAPP' | 'CAJA' | 'CARTA';
   /** Obligatorio (≥5 caracteres) para CAJERO/ADMIN cuando reemplaza un voucher vigente. */
   motivoCambio?: string;
@@ -45,6 +49,14 @@ export interface SubirVoucherOpciones {
 
 /** Medios que el mozo puede enviar a Caja desde la mesa. */
 const MEDIOS_ENVIO_CAJA = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'] as const;
+/** Medios que llevan captura (voucher o foto de la copia del POS): no son solo efectivo. */
+export const MEDIOS_CON_VOUCHER_CAJA = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
+
+/** Lo que el mozo elige al enviar a Caja: vuelto (efectivo) y comprobante (nota de venta por defecto). */
+export interface EnviarACajaOpciones {
+  recibido?: unknown;
+  comprobante?: { tipo?: unknown; doc?: unknown; razon?: unknown };
+}
 const NOMBRE_MEDIO_CAJA: Record<string, string> = {
   EFECTIVO: 'Efectivo',
   YAPE: 'Yape',
@@ -64,6 +76,8 @@ export class VouchersService {
     private readonly vouchersIaService: VouchersIaService,
     private readonly pagoPlan: PagoPlanService,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly comprobantes?: ComprobantesService,
+    @Optional() private readonly impresion?: ImpresionService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -177,14 +191,14 @@ export class VouchersService {
       // Primer voucher: puedeSubirVoucher. Reemplazo: puedeCambiarVoucher. Mismo criterio que quitar.
       const esReemplazo = vigentesReemplazados.length > 0;
       const permitido = esReemplazo
-        ? puedeCambiarVoucher(pedido, usuario.rol)
-        : puedeSubirVoucher(pedido, usuario.rol);
+        ? puedeCambiarVoucher(pedido, rolEfectivoMozo(usuario))
+        : puedeSubirVoucher(pedido, rolEfectivoMozo(usuario));
       if (!permitido) {
         throw new HttpException(
           {
             codigo: 'VOUCHER_CAMBIO_BLOQUEADO',
             mensaje:
-              usuario.rol === 'MOZO'
+              esSoloMozo(usuario)
                 ? 'Caja ya aprobó el pago de este pedido; pide a Caja que cambie el voucher'
                 : 'El pago ya está cobrado; no se puede cambiar el voucher',
           },
@@ -193,7 +207,7 @@ export class VouchersService {
       }
     }
     if (usuario && pedido && vigentesReemplazados.length > 0) {
-      const faltaMotivo = usuario.rol !== 'MOZO' && !motivoCambio;
+      const faltaMotivo = !esSoloMozo(usuario) && !motivoCambio;
       if (faltaMotivo || (motivoCambio && motivoCambio.length < 5)) {
         throw new HttpException(
           { codigo: 'MOTIVO_CAMBIO_REQUERIDO', mensaje: 'Escribe el motivo del cambio (mínimo 5 caracteres)' },
@@ -214,13 +228,17 @@ export class VouchersService {
     const { fechaIso } = obtenerFechaHoraLima();
 
     // 5. Análisis con IA de Visión (reutilizando client / token / config). Sin usuario (carta) se limita por IP.
-    const analisisIa = await this.vouchersIaService.analizarVoucher(
-      file.buffer,
-      file.mimetype,
-      {
-        identificadorRateLimit: usuario?.partyId?.toString() ?? ip ?? null,
-      },
-    );
+    // Tarjeta: la copia del POS no se lee con IA (el validador es de Yape/Plin); basta la foto, queda SIN_LECTURA
+    const analisisIa =
+      opciones.medio === 'TARJETA'
+        ? { extraido: null, sinLectura: true }
+        : await this.vouchersIaService.analizarVoucher(
+            file.buffer,
+            file.mimetype,
+            {
+              identificadorRateLimit: usuario?.partyId?.toString() ?? ip ?? null,
+            },
+          );
 
     const extraido: DatosVoucherExtraidos | null = analisisIa.extraido;
 
@@ -269,7 +287,7 @@ export class VouchersService {
 
     const evaluacion: ResultadoSemaforo = calcularSemaforo(extraido, contexto);
 
-    const origen = opciones.origen || (usuario?.rol === 'MOZO' ? 'MOZO' : usuario ? 'CAJA' : 'CARTA');
+    const origen = opciones.origen || ((usuario ? esSoloMozo(usuario) : false) ? 'MOZO' : usuario ? 'CAJA' : 'CARTA');
 
     // 8. Guardar registro en la tabla voucher_pago (siempre, sea cual sea la lectura de la IA)
     const voucher = await this.prisma.voucherPago.create({
@@ -342,7 +360,7 @@ export class VouchersService {
     // 11. Respuesta según el rol:
     // Al mozo y al cliente de la carta SOLO se entrega legible y mensaje, NUNCA el semáforo ni los datos extraídos
     // legible sigue la misma regla que el cobro: un ILEGIBLE (aunque la IA lo lea) no cuenta como comprobante
-    if (!usuario || usuario.rol === 'MOZO') {
+    if (!usuario || esSoloMozo(usuario)) {
       const legible = voucher.semaforo !== 'ILEGIBLE';
       return {
         id: voucher.id.toString(),
@@ -637,10 +655,11 @@ export class VouchersService {
   }
 
   /**
-   * El mozo envía a Caja el cobro de una mesa. No cobra ni marca el pedido como pagado (ni libera la mesa):
-   * Caja revisa el voucher (con su semáforo) y es quien cobra. Efectivo: aviso de cobro en efectivo.
-   * Digital: aviso con el voucher ya enlazado, o sin foto legible (Caja resuelve con su excepción).
-   * Con `plan` (pago dividido) reemplaza el plan guardado del pedido; el medio principal sale del plan.
+   * El mozo envía a Caja el cobro de la mesa (plan de pago, vuelto y comprobante). No cobra: Caja revisa y cobra.
+   * - Efectivo: «Pagó con» (recibido) no puede ser menor que lo que va en efectivo; se guarda para el vuelto.
+   * - Nota de venta (por defecto): se emite ya con su correlativo y se imprime en la ticketera de Caja.
+   *   Boleta o factura: el mozo no las emite; Caja las emite después (al cobrar).
+   * - Tarjeta y medios digitales llevan captura: un voucher vigente y legible ya cubre el aviso.
    * Sin `plan` se usa solo `medio` (forma anterior) y no se toca el plan guardado.
    * Al mozo solo se le responde ok: nunca el semáforo ni los datos del voucher.
    */
@@ -650,6 +669,7 @@ export class VouchersService {
     usuario: UsuarioAutenticado,
     ip?: string,
     plan?: unknown,
+    opciones: EnviarACajaOpciones = {},
   ) {
     if (plan != null && !Array.isArray(plan)) {
       throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'El plan de pago debe ser una lista de medios y montos' });
@@ -662,7 +682,15 @@ export class VouchersService {
     const id = this.parsearId(pedidoId);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
-      select: { id: true, codigo: true, total: true, pago_estado: true },
+      select: {
+        id: true,
+        codigo: true,
+        total: true,
+        pago_estado: true,
+        comprobante_tipo: true,
+        comprobante_doc: true,
+        comprobante_razon: true,
+      },
     });
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
@@ -677,37 +705,72 @@ export class VouchersService {
       ? planValidado.map((f) => `${NOMBRE_MEDIO_CAJA[f.medio]} S/ ${f.monto.toFixed(2)}`).join(' · ')
       : null;
     if (planValidado) medioNormalizado = this.pagoPlan.pagoPrincipal(planValidado);
-    const soloEfectivo = planValidado ? montoDigitalDePlan(planValidado) === 0 : ['EFECTIVO', 'TARJETA'].includes(medioNormalizado);
 
-    let aviso: { tipo: string; titulo: string; mensaje: string };
-    if (soloEfectivo) {
-      aviso = {
-        tipo: 'PAGO_EFECTIVO_MOZO',
-        titulo: 'Mesa paga en efectivo o tarjeta',
-        mensaje: `El mozo avisa que el pedido ${pedido.codigo} se paga en efectivo o tarjeta en mesa. Cóbralo en Caja.`,
-      };
-    } else {
-      const etiqueta = desglose ?? medioNormalizado;
-      const ultimo = await this.prisma.voucherPago.findFirst({
-        // Un voucher vigente y legible (subido por el mozo, Caja o WhatsApp) ya cubre el aviso
-        where: { pedido_id: id, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
-        orderBy: { creado_en: 'desc' },
-        select: { semaforo: true },
+    // Validaciones antes de tocar nada: efectivo recibido y comprobante elegido
+    const montoEfectivo = planValidado
+      ? planValidado.filter((f) => f.medio === 'EFECTIVO').reduce((acc, f) => acc + f.monto, 0)
+      : medioNormalizado === 'EFECTIVO'
+        ? Number(pedido.total)
+        : 0;
+    const recibido = this.recibidoEfectivo(opciones.recibido, montoEfectivo);
+    const comprobante = this.comprobanteDelEnvio(pedido, opciones.comprobante);
+    if (comprobante.tipo !== 'NOTA_VENTA') {
+      const notaVigente = await this.prisma.comprobante.findFirst({
+        where: { pedido_id: id, tipo: 'NOTA_VENTA', anulado_en: null },
+        select: { id: true },
       });
-      const legible = !!ultimo && ultimo.semaforo !== 'ILEGIBLE';
-      aviso = legible
-        ? {
-            tipo: 'VOUCHER_PENDIENTE_MOZO',
-            titulo: 'Voucher listo para revisar',
-            mensaje: `El mozo envía el pedido ${pedido.codigo} (${etiqueta}) con la foto del voucher. Revísala y cobra.`,
-          }
-        : {
-            tipo: 'VOUCHER_PENDIENTE_MOZO',
-            titulo: 'Pago digital sin foto legible',
-            mensaje: `El mozo envía el pedido ${pedido.codigo} (${etiqueta}) sin foto legible. Pide la foto o cobra con tu excepción.`,
-          };
+      if (notaVigente) {
+        throw new ConflictException({
+          codigo: 'NOTA_YA_EMITIDA',
+          mensaje: 'Ya se emitió la nota de venta de este pedido. Pide a Caja que rechace el cobro del mozo antes de cambiar a boleta o factura',
+        });
+      }
     }
-    if (planValidado && soloEfectivo) {
+
+    // Medios que llevan captura: digitales (voucher) y tarjeta (copia del POS, sin lectura IA)
+    const mediosConFoto = planValidado
+      ? [...new Set(planValidado.map((f) => f.medio))].filter((m) => MEDIOS_CON_VOUCHER_CAJA.includes(m))
+      : MEDIOS_CON_VOUCHER_CAJA.includes(medioNormalizado)
+        ? [medioNormalizado]
+        : [];
+    const conVoucher = mediosConFoto.length > 0;
+    // Sin la foto vigente (no ILEGIBLE) de cada medio que la lleva, no se envía: nada se guarda ni se avisa
+    const sinFoto: string[] = [];
+    for (const medio of mediosConFoto) {
+      const foto = await this.prisma.voucherPago.findFirst({
+        where: {
+          pedido_id: id,
+          reemplazado_en: null,
+          semaforo: { not: 'ILEGIBLE' },
+          OR: [{ medio }, { medio: null }],
+        },
+        select: { id: true },
+      });
+      if (!foto) sinFoto.push(medio);
+    }
+    if (sinFoto.length > 0) {
+      const digitalFalta = sinFoto.some((m) => m !== 'TARJETA');
+      throw new BadRequestException({
+        codigo: 'VOUCHER_REQUERIDO',
+        faltan: sinFoto,
+        mensaje: digitalFalta
+          ? 'Sube la foto del pago (Yape/Plin/transferencia) antes de enviar a Caja'
+          : 'Falta la foto de la copia del POS. Súbela y luego envía a Caja.',
+      });
+    }
+
+    const aviso = conVoucher
+      ? {
+          tipo: 'VOUCHER_PENDIENTE_MOZO',
+          titulo: 'Voucher listo para revisar',
+          mensaje: `El mozo envía el pedido ${pedido.codigo} (${desglose ?? medioNormalizado}) con la foto del voucher. Revísala y cobra.`,
+        }
+      : {
+          tipo: 'PAGO_EFECTIVO_MOZO',
+          titulo: 'Mesa paga en efectivo',
+          mensaje: `El mozo avisa que el pedido ${pedido.codigo} se paga en efectivo en mesa. Cóbralo en Caja.`,
+        };
+    if (planValidado && !conVoucher) {
       aviso.mensaje = `${aviso.mensaje} Desglose: ${desglose}.`;
     }
 
@@ -734,6 +797,41 @@ export class VouchersService {
     this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: notif.titulo });
     this.avisarVoucher([pedido.id], 'enviado_caja', pedido.codigo);
 
+    // Marca de cobro del mozo y comprobante elegido. No cambia pago_estado ni la mesa (lo cobra el cajero).
+    // Va antes de emitir la nota: la emisión lee el tipo que quedó guardado en el pedido.
+    const medioCobro = planValidado
+      ? [...new Set(planValidado.map((f) => f.medio))].join('+')
+      : medioNormalizado;
+    await this.prisma.pedido.update({
+      where: { id },
+      data: {
+        cobro_mozo_en: new Date(),
+        cobro_mozo_medio: medioCobro,
+        cobro_mozo_party_id: usuario.partyId,
+        cobro_mozo_recibido: recibido,
+        comprobante_tipo: comprobante.tipo,
+        comprobante_doc: comprobante.doc,
+        comprobante_razon: comprobante.razon,
+      },
+    });
+
+    if (comprobante.tipo === 'NOTA_VENTA' && this.comprobantes) {
+      // Idempotente: reenviar no emite otra nota ni la vuelve a imprimir
+      const nota = await this.comprobantes.emitirParaPedido(id, undefined, usuario, ip);
+      const persona = await this.prisma.person.findUnique({
+        where: { party_id: usuario.partyId },
+        select: { nombres: true, apellidos: true },
+      });
+      const pagos = planValidado
+        ? planValidado.map((f) => ({ medio: f.medio, monto: f.monto }))
+        : [{ medio: medioNormalizado, monto: Number(pedido.total) }];
+      await this.impresion?.encolarNotaMozo(id, nota, {
+        pagos,
+        recibido,
+        mozo: persona ? `${persona.nombres} ${persona.apellidos ?? ''}`.trim() : null,
+      });
+    }
+
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'vouchers',
@@ -743,10 +841,65 @@ export class VouchersService {
       entidadId: pedido.id,
       partyId: usuario.partyId,
       ip,
-      despues: { pedidoId: pedido.id.toString(), medio: medioNormalizado, ...(desglose ? { plan: desglose } : {}) },
+      despues: {
+        pedidoId: pedido.id.toString(),
+        medio: medioNormalizado,
+        comprobante: comprobante.tipo,
+        ...(recibido != null ? { recibido } : {}),
+        ...(desglose ? { plan: desglose } : {}),
+      },
     });
 
     return { ok: true };
+  }
+
+  /** Efectivo con el que paga el cliente: null si no hay efectivo o no lo escribieron. Nunca menor que el efectivo. */
+  private recibidoEfectivo(raw: unknown, montoEfectivo: number): number | null {
+    if (montoEfectivo <= 0 || raw == null || raw === '') return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) {
+      throw new BadRequestException({ codigo: 'RECIBIDO_INVALIDO', mensaje: 'Escribe con cuánto paga (un número)' });
+    }
+    if (Math.round(n * 100) < Math.round(montoEfectivo * 100)) {
+      throw new BadRequestException({
+        codigo: 'EFECTIVO_INSUFICIENTE',
+        mensaje: `Con S/ ${n.toFixed(2)} no alcanza: el efectivo es S/ ${montoEfectivo.toFixed(2)}`,
+      });
+    }
+    return Math.round(n * 100) / 100;
+  }
+
+  /**
+   * Comprobante del envío. Sin elección: lo que ya tenga el pedido si es boleta o factura con documento;
+   * si no, nota de venta. Boleta: DNI opcional; factura exige RUC y razón social (regla compartida).
+   */
+  private comprobanteDelEnvio(
+    pedido: { comprobante_tipo: string | null; comprobante_doc: string | null; comprobante_razon: string | null },
+    elegido?: EnviarACajaOpciones['comprobante'],
+  ): { tipo: string; doc: string | null; razon: string | null } {
+    let tipo: string;
+    let doc: string | null;
+    let razon: string | null;
+    if (elegido?.tipo) {
+      tipo = String(elegido.tipo).trim().toUpperCase();
+      doc = String(elegido.doc ?? '').trim() || null;
+      razon = String(elegido.razon ?? '').trim() || null;
+    } else {
+      const tipoPedido = String(pedido.comprobante_tipo ?? '').trim().toUpperCase();
+      const usaPedido = (tipoPedido === 'BOLETA' || tipoPedido === 'FACTURA') && !!pedido.comprobante_doc?.trim();
+      tipo = usaPedido ? tipoPedido : 'NOTA_VENTA';
+      doc = usaPedido ? pedido.comprobante_doc!.trim() : null;
+      razon = usaPedido ? pedido.comprobante_razon?.trim() || null : null;
+    }
+    if (tipo === 'NOTA_VENTA') return { tipo, doc: null, razon: null };
+    if (tipo !== 'BOLETA' && tipo !== 'FACTURA') {
+      throw new BadRequestException({ codigo: 'COMPROBANTE_INVALIDO', mensaje: 'Elige Nota de venta, Boleta o Factura' });
+    }
+    const validacion = validarDocumentoComprobante(tipo, doc, razon);
+    if (!validacion.valido) {
+      throw new BadRequestException({ codigo: 'COMPROBANTE_INVALIDO', mensaje: validacion.motivo });
+    }
+    return { tipo, doc, razon: tipo === 'FACTURA' ? razon : null };
   }
 
   /**
@@ -990,10 +1143,10 @@ export class VouchersService {
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
     }
-    if (usuario.rol === 'MOZO' && (pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {
+    if (esSoloMozo(usuario) && (pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {
       throw new ForbiddenException({ codigo: 'PEDIDO_AJENO', mensaje: 'Solo puedes cambiar el plan de tus pedidos' });
     }
-    if (usuario.rol === 'MOZO' && !puedeSubirVoucher(pedido, 'MOZO')) {
+    if (esSoloMozo(usuario) && !puedeSubirVoucher(pedido, 'MOZO')) {
       throw new ConflictException({ codigo: 'PLAN_BLOQUEADO', mensaje: 'El pago ya fue aprobado; pide a Caja cualquier cambio del plan' });
     }
     const planValidado = this.pagoPlan.validar(plan as PlanPagoItem[], Number(pedido.total));
@@ -1047,20 +1200,20 @@ export class VouchersService {
           select: { id: true, party_id: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true, total: true },
         })
       : null;
-    if (usuario.rol === 'MOZO' && (!pedido || pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {
+    if (esSoloMozo(usuario) && (!pedido || pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {
       throw new ForbiddenException({ codigo: 'PEDIDO_AJENO', mensaje: 'Solo puedes quitar vouchers de tus pedidos' });
     }
-    if (pedido && !puedeCambiarVoucher(pedido, usuario.rol)) {
+    if (pedido && !puedeCambiarVoucher(pedido, rolEfectivoMozo(usuario))) {
       throw new ConflictException({
         codigo: 'VOUCHER_CAMBIO_BLOQUEADO',
         mensaje:
-          usuario.rol === 'MOZO'
+          esSoloMozo(usuario)
             ? 'Caja ya aprobó el pago de este pedido; pide a Caja que cambie el voucher'
             : 'El pago ya está cobrado; no se puede quitar el voucher',
       });
     }
     const motivoTexto = typeof motivo === 'string' ? motivo.trim() : '';
-    if (usuario.rol !== 'MOZO' && motivoTexto.length < 5) {
+    if (!esSoloMozo(usuario) && motivoTexto.length < 5) {
       throw new BadRequestException({ codigo: 'MOTIVO_CAMBIO_REQUERIDO', mensaje: 'Escribe el motivo (mínimo 5 caracteres)' });
     }
     const ahora = new Date();
@@ -1099,7 +1252,7 @@ export class VouchersService {
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
     }
-    const esMozo = usuario.rol === 'MOZO';
+    const esMozo = esSoloMozo(usuario);
     if (esMozo && (pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {
       throw new ForbiddenException({ codigo: 'PEDIDO_AJENO', mensaje: 'Solo puedes ver los vouchers de tus pedidos' });
     }

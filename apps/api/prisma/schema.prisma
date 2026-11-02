@@ -68,6 +68,7 @@ model Person {
   cumple_mes      Int?      @db.SmallInt
   correo          String?
   foto_archivo_id BigInt?
+  pais_nacimiento String?
   party           Party     @relation(fields: [party_id], references: [id])
 
   @@map("person")
@@ -89,9 +90,21 @@ model Rol {
   nombre         String
   permisos       RolPermiso[]
   usuarios       UserAccount[]
+  usuariosExtra  UserAccountRol[]
   notificaciones Notificacion[]
 
   @@map("rol")
+}
+
+/// Roles adicionales de una cuenta. El rol principal sigue en user_account.rol.
+model UserAccountRol {
+  user_account_id BigInt
+  rol             String
+  cuenta          UserAccount @relation(fields: [user_account_id], references: [id])
+  r               Rol         @relation(fields: [rol], references: [codigo])
+
+  @@id([user_account_id, rol])
+  @@map("user_account_rol")
 }
 
 model Permiso {
@@ -127,6 +140,7 @@ model UserAccount {
   alertas_whatsapp_confirmado_en DateTime?              @db.Timestamptz
   party                 Party                  @relation(fields: [party_id], references: [id])
   r                     Rol                    @relation(fields: [rol], references: [codigo])
+  rolesExtra            UserAccountRol[]
   iniciativasCreadas    Iniciativa[]           @relation("IniciativasCreadas")
   iniciativasCambiadas  Iniciativa[]           @relation("IniciativasCambiadas")
   iniciativaComentarios IniciativaComentario[]
@@ -482,8 +496,14 @@ model Pedido {
   // Salón (Ola 6)
   mesa_nombre            String?
   entregado_mesa_en      DateTime?               @db.Timestamptz
+  // Cobro por mozo (envío a Caja): cuándo, medio(s) con que lo cobró y el mozo; null si no se envió
+  cobro_mozo_en          DateTime?               @db.Timestamp(3)
+  cobro_mozo_medio       String?
+  cobro_mozo_party_id    BigInt?
+  // Efectivo que el mozo recibió (Pagó con S/); el vuelto se calcula contra el renglón de efectivo del plan
+  cobro_mozo_recibido    Decimal?                @db.Decimal(12, 2)
 
-  party                  Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
+  party                 Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
   rutaReparto            RutaReparto?            @relation(fields: [ruta_reparto_id], references: [id])
   zona                   ZonaReparto?            @relation(fields: [zona_id], references: [id])
@@ -499,7 +519,7 @@ model Pedido {
   movimientosStock       MovimientoStock[]
   mesas                  PedidoMesa[]
   reservas               Reserva[]
-  comprobante            Comprobante?
+  comprobante            Comprobante[]
   reclamos               Reclamo[]
   cuponesEmitidosOrigen  CuponEmitido[]          @relation("CuponesEmitidosOrigen")
   cuponesEmitidosCanje   CuponEmitido[]          @relation("CuponesEmitidosCanje")
@@ -577,6 +597,13 @@ model PedidoLinea {
   area_id          BigInt?
   adicional        Boolean             @default(false)
   nombres_persona  String[]
+  /// Unidades ya listas en cocina (0..cantidad). Se fija desde la cocina por producto.
+  listas           Int                 @default(0)
+  /// Cuando listas llega a cantidad.
+  listo_en         DateTime?           @db.Timestamptz
+  /// Unidades ya entregadas al cliente o al mozo (despacho). Siempre <= listas.
+  despachadas      Int                 @default(0)
+  despachado_en    DateTime?           @db.Timestamptz
   pedido           Pedido              @relation(fields: [pedido_id], references: [id])
   producto         Producto?           @relation(fields: [producto_id], references: [id])
   oferta           Oferta?             @relation(fields: [oferta_id], references: [id])
@@ -1046,7 +1073,8 @@ model PedidoMesa {
 
 model Comprobante {
   id                 BigInt    @id @default(autoincrement())
-  pedido_id          BigInt    @unique
+  // Una sola vigente por pedido (índice parcial en la migración); la anulada se conserva
+  pedido_id          BigInt
   tipo               String    // NOTA_VENTA | BOLETA | FACTURA
   serie              String
   numero             Int
@@ -1059,6 +1087,8 @@ model Comprobante {
   referencia_externa String?
   copias_impresas    Int       @default(0)
   creado_en          DateTime  @default(now()) @db.Timestamptz
+  anulado_en         DateTime? @db.Timestamp(3)
+  anulado_motivo     String?
 
   pedido             Pedido    @relation(fields: [pedido_id], references: [id])
   emitidoPor         Party?    @relation("ComprobantesEmitidos", fields: [emitido_por], references: [id])

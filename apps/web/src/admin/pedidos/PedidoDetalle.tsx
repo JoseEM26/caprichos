@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Confirmar } from '../../comun/Confirmar';
+import { useSesion } from '../../comun/sesion';
 import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { ModalAnular } from './ModalAnular';
+import { ModalRechazarCobroMozo } from './ModalRechazarCobroMozo';
 import { ModalUbicar } from './ModalUbicar';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { EtiquetasPedido } from './EtiquetasPedido';
-import { canalLabel, modLabel, getBadge } from './PedidosAdminView';
+import { canalLabel, modLabel, getBadge, ChipCobroMozo } from './PedidosAdminView';
 import { EtiquetaCajaCerrada, esperaCajaCerrada } from './BannerCajaCerrada';
 import {
   listarPersonalActivo,
@@ -41,6 +43,7 @@ function FilaDato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 }
 
 export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: PedidoDetalleProps) {
+  const { tiene } = useSesion();
   const [tab, setTab] = useState<TabDetalle>('pedido');
 
   // Modales
@@ -48,6 +51,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
   const [abrirAnular, setAbrirAnular] = useState(false);
   const [abrirUbicar, setAbrirUbicar] = useState(false);
   const [abrirPrecuenta, setAbrirPrecuenta] = useState(false);
+  const [abrirRechazarMozo, setAbrirRechazarMozo] = useState(false);
   const [abrirConfirmarPago, setAbrirConfirmarPago] = useState(false);
   const [abrirCreditoPersonal, setAbrirCreditoPersonal] = useState(false);
 
@@ -205,6 +209,45 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
           </span>
           {esperaCajaCerrada(pedido, cajaAbierta ?? null) && <EtiquetaCajaCerrada />}
         </div>
+
+        {pedido.cobroMozo && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+            <ChipCobroMozo cobro={pedido.cobroMozo} />
+            <span style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+              Mozo: {pedido.cobroMozo.mozo || 'sin nombre'} · a las{' '}
+              {new Date(pedido.cobroMozo.en).toLocaleTimeString('es-PE', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'America/Lima',
+              })}
+            </span>
+            {pedido.cobroMozo.recibido != null && (
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
+                Recibió S/ {Number(pedido.cobroMozo.recibido).toFixed(2)} · vuelto S/{' '}
+                {Number(pedido.cobroMozo.vuelto ?? 0).toFixed(2)}
+              </span>
+            )}
+            {tiene('caja/cobrar') && pedido.pago_estado !== 'PAGADO' && (
+              <button
+                type="button"
+                onClick={() => setAbrirRechazarMozo(true)}
+                style={{
+                  minHeight: 44,
+                  padding: '0 14px',
+                  borderRadius: 10,
+                  border: '1.5px solid var(--cp-rust, #B2500F)',
+                  background: 'var(--cp-white, #FFFFFF)',
+                  color: 'var(--cp-rust, #B2500F)',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Rechazar cobro del mozo
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ fontSize: 13, lineHeight: '19px', color: 'var(--cp-soft, #2C4C5D)' }}>
           {canalLabel(pedido.canal)} · {modLabel(pedido.modalidad)}
@@ -1013,10 +1056,27 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
         />
       )}
 
+      {abrirRechazarMozo && (
+        <ModalRechazarCobroMozo
+          pedidoId={pedido.id}
+          codigoPedido={pedido.codigo}
+          alCerrar={() => setAbrirRechazarMozo(false)}
+          alRechazar={() => {
+            setAbrirRechazarMozo(false);
+            alActualizar();
+          }}
+        />
+      )}
+
       {abrirPrecuenta && (
         <ModalPrecuenta
           abierto={true}
           pedidoId={pedido.id}
+          comprobantePedido={{
+            tipo: pedido.comprobante_tipo,
+            documento: pedido.comprobante_doc,
+            razon: pedido.comprobante_razon,
+          }}
           alCerrar={() => setAbrirPrecuenta(false)}
           mesa={pedido.mesa_nombre || ''}
           lineas={(pedido.lineas || []).map((l) => ({

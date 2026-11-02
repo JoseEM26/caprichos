@@ -6,6 +6,12 @@ import { PedidosAdminView } from '../PedidosAdminView';
 import { Pedido, pedidosApi } from '../pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
 import * as socketModulo from '../../../comun/socket';
+// PedidoDetalle usa useSesion (botón de rechazo del cobro del mozo): sin sesión en estas pruebas, sin permisos extra
+vi.mock('../../../comun/sesion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../comun/sesion')>()),
+  useSesion: () => ({ tiene: () => false, usuario: null }),
+}));
+
 
 vi.mock('../../creditos/creditosApi', () => ({
   listarPersonalActivo: vi.fn().mockResolvedValue([]),

@@ -950,4 +950,100 @@ describe('PedidosEstadoService', () => {
       expect(res).toHaveLength(1);
     });
   });
+
+  describe('cobro por mozo (cobroMozo) en la lista y el detalle', () => {
+    const horaCobro = new Date('2026-10-30T12:00:00Z');
+    const pedidoBase = {
+      id: 10n,
+      codigo: 'CP-W010',
+      estado: 'COLA',
+      modalidad: 'MESA',
+      canal: 'MOZO',
+      total: 35,
+      subtotal: 35,
+      descuento: 0,
+      creado_en: new Date(),
+      pago_estado: 'PENDIENTE',
+      pago_metodo: 'YAPE',
+      cobro_mozo_en: horaCobro,
+      cobro_mozo_medio: 'YAPE',
+      cobro_mozo_party_id: 7n,
+      lineas: [],
+      historial: [],
+      cobros: [],
+      zona: null,
+      comprobante_doc: null,
+    };
+
+    beforeEach(() => {
+      prismaMock.person = {
+        findMany: jest.fn().mockResolvedValue([{ party_id: 7n, nombres: 'Juan', apellidos: 'Mozo' }]),
+      };
+      prismaMock.voucherPago.findMany = jest.fn().mockResolvedValue([]);
+      prismaMock.pedidoPagoPlan = { findMany: jest.fn().mockResolvedValue([]) };
+    });
+
+    it('lista: digital sin voucher legible lleva faltaVoucher, mozo y hora', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([pedidoBase]);
+
+      const res = await service.listar({}, cajeroAuth);
+
+      expect(res.items[0].cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: true, recibido: null, vuelto: null, pide: null });
+    });
+
+    it('lista: con voucher vigente y legible no falta voucher; un ILEGIBLE no cuenta (filtro en la consulta)', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([pedidoBase]);
+      prismaMock.voucherPago.findMany.mockResolvedValue([{ pedido_id: 10n }]);
+
+      const res = await service.listar({}, cajeroAuth);
+
+      expect(res.items[0].cobroMozo?.faltaVoucher).toBe(false);
+      expect(prismaMock.voucherPago.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { pedido_id: { in: [10n] }, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
+        }),
+      );
+    });
+
+    it('lista: plan con efectivo y digital sigue marcando el voucher; solo efectivo no lo pide', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([
+        { ...pedidoBase, id: 11n, cobro_mozo_medio: 'EFECTIVO+YAPE' },
+        { ...pedidoBase, id: 12n, cobro_mozo_medio: 'EFECTIVO' },
+      ]);
+
+      const res = await service.listar({}, cajeroAuth);
+
+      expect(res.items[0].cobroMozo).toMatchObject({ medio: 'EFECTIVO+YAPE', faltaVoucher: true });
+      expect(res.items[1].cobroMozo).toMatchObject({ medio: 'EFECTIVO', faltaVoucher: false });
+    });
+
+    it('pedido PAGADO: cobroMozo es null aunque el mozo lo haya enviado', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([{ ...pedidoBase, pago_estado: 'PAGADO' }]);
+
+      const res = await service.listar({}, cajeroAuth);
+
+      expect(res.items[0].cobroMozo).toBeNull();
+    });
+
+    it('sin envío del mozo: cobroMozo es null y no consulta vouchers', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([
+        { ...pedidoBase, cobro_mozo_en: null, cobro_mozo_medio: null, cobro_mozo_party_id: null },
+      ]);
+
+      const res = await service.listar({}, cajeroAuth);
+
+      expect(res.items[0].cobroMozo).toBeNull();
+      expect(prismaMock.voucherPago.findMany).not.toHaveBeenCalled();
+    });
+
+    it('detalle: entrega cobroMozo con mozo y falta de voucher; null si ya está PAGADO', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoBase);
+      const pendiente = await service.obtenerPorId(10n, cajeroAuth);
+      expect(pendiente.cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: true, recibido: null, vuelto: null, pide: null });
+
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoBase, pago_estado: 'PAGADO' });
+      const pagado = await service.obtenerPorId(10n, cajeroAuth);
+      expect(pagado.cobroMozo).toBeNull();
+    });
+  });
 });

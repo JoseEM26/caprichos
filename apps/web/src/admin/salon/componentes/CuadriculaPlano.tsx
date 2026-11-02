@@ -17,9 +17,10 @@ export interface CuadriculaPlanoProps {
   mesasSeleccionadasIds?: string[];
   onSeleccionarMesaSalon?: (mesa: MesaSalon) => void;
   modoSalon?: boolean;
-  // Mantener presionada una mesa ocupada (3 s) abre Forzar liberación; solo con permiso mesas/liberar
+  /** Elegir destino de un cambio de mesa: las mesas libres se resaltan */
+  modoDestino?: boolean;
+  // Mantener presionada una mesa ocupada (2 s) llama a esto (vista previa de la mesa)
   alMantenerMesaSalon?: (mesa: MesaSalon) => void;
-  puedeForzarLiberacion?: boolean;
 }
 
 export const ESTILOS_ELEMENTOS: Record<
@@ -100,6 +101,13 @@ export const ESTILOS_ELEMENTOS: Record<
   },
 };
 
+/** Mesa ocupada: «Mesa 3 · José» (cliente, o el mozo si no hay). Se recorta con elipsis en la celda. */
+function etiquetaMesaOcupada(elem: ElementoPlano, mesa: MesaSalon): string {
+  const nombre = elem.nombre || (elem.numero ? `Mesa ${elem.numero}` : 'Mesa');
+  const quien = mesa.pedido?.cliente || mesa.pedido?.mozo || '';
+  return quien ? `${nombre} · ${quien}` : nombre;
+}
+
 export function CuadriculaPlano({
   columnas,
   filas,
@@ -113,11 +121,11 @@ export function CuadriculaPlano({
   mesasSeleccionadasIds = [],
   onSeleccionarMesaSalon,
   modoSalon = false,
+  modoDestino = false,
   alMantenerMesaSalon,
-  puedeForzarLiberacion = false,
 }: CuadriculaPlanoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mantener = useMantenerPresionado<MesaSalon>((mesa) => alMantenerMesaSalon?.(mesa));
+  const mantener = useMantenerPresionado<MesaSalon>((mesa) => alMantenerMesaSalon?.(mesa), 2000);
 
   // Estado para arrastre suave con puntero táctil o ratón
   const [arrastre, setArrastre] = useState<{
@@ -398,7 +406,7 @@ export function CuadriculaPlano({
             } else {
               // Libre
               bg = 'var(--cp-greenbg)';
-              bd = 'var(--cp-ok)';
+              bd = modoDestino ? 'var(--cp-orange)' : 'var(--cp-ok)';
               fg = 'var(--cp-navy)';
             }
           }
@@ -408,9 +416,10 @@ export function CuadriculaPlano({
           }
 
           const tieneReserva = esMesa && mesaSalon?.reserva;
-          const forzable =
-            puedeForzarLiberacion && modoSalon && esMesa && mesaSalon?.estado === 'OCUPADA' && !!alMantenerMesaSalon;
-          const pulsa = forzable && mesaSalon ? mantener.manejadores(mesaSalon) : null;
+          // Mantener 2 s una mesa ocupada abre su vista previa (la decide quien usa el croquis)
+          const mantenible =
+            modoSalon && esMesa && mesaSalon?.estado === 'OCUPADA' && !!alMantenerMesaSalon;
+          const pulsa = mantenible && mesaSalon ? mantener.manejadores(mesaSalon) : null;
 
           return (
             <div
@@ -455,7 +464,7 @@ export function CuadriculaPlano({
                 fontWeight: 700,
                 textAlign: 'center',
                 // En modo edición el elemento se arrastra con el dedo (no desplaza el lienzo)
-                touchAction: modoSalon ? (forzable ? 'manipulation' : undefined) : 'none',
+                touchAction: modoSalon ? (mantenible ? 'manipulation' : undefined) : 'none',
                 userSelect: 'none',
                 WebkitUserSelect: 'none',
                 WebkitTouchCallout: 'none',
@@ -531,15 +540,17 @@ export function CuadriculaPlano({
                   maxWidth: '100%',
                 }}
               >
-                {modoSalon && esMesa && elem.numero
-                  ? elem.numero
-                  : modoSalon && elem.tipo === 'PARED'
-                    ? ''
-                    : elem.nombre || (elem.numero ? `Mesa ${elem.numero}` : config.nombre)}
+                {modoSalon && esMesa && mesaSalon?.estado === 'OCUPADA'
+                  ? etiquetaMesaOcupada(elem, mesaSalon)
+                  : modoSalon && esMesa && elem.numero
+                    ? elem.numero
+                    : modoSalon && elem.tipo === 'PARED'
+                      ? ''
+                      : elem.nombre || (elem.numero ? `Mesa ${elem.numero}` : config.nombre)}
               </span>
 
-              {/* Subtítulo: asientos o estado */}
-              {esMesa && elem.asientos !== null && (
+              {/* Subtítulo: asientos (las mesas ocupadas ya llevan su nombre arriba) */}
+              {esMesa && elem.asientos !== null && !(modoSalon && mesaSalon?.estado === 'OCUPADA') && (
                 <span
                   style={{
                     fontSize: '9px',
@@ -548,7 +559,7 @@ export function CuadriculaPlano({
                     lineHeight: '11px',
                   }}
                 >
-                  {modoSalon && mesaSalon?.estado === 'OCUPADA' ? 'ocupada' : `${elem.asientos} pers.`}
+                  {`${elem.asientos} pers.`}
                 </span>
               )}
 

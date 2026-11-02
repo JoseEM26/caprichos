@@ -1,4 +1,5 @@
 import { restanteEnCamino, ConfigEta } from '../repartos/eta-entrega';
+import type { TiemposPreparacion } from '../cocina/tiempo-preparacion';
 
 /**
  * Fuente de verdad del progreso de un pedido: lo usan el mozo («Mis pedidos»)
@@ -21,6 +22,17 @@ export interface AreaProgreso {
   nombre: string;
   estado: EstadoAreaProgreso;
   lineas: number;
+  /** Líneas del área: nombre, unidades y cuántas están listas y despachadas. */
+  productos: ProductoProgreso[];
+}
+
+export interface ProductoProgreso {
+  /** Id de la línea del pedido: lo usa cocina para despachar (no es dato de cocina de otros pedidos). */
+  lineaId?: string;
+  nombre: string;
+  cantidad: number;
+  listas: number;
+  despachadas: number;
 }
 
 export interface ProgresoPedido {
@@ -33,6 +45,8 @@ export interface ProgresoPedido {
   enCamino: boolean;
   etaMin?: number;
   etaMax?: number;
+  /** Minutos para que esté listo lo que falta (solo mientras cocina trabaja). */
+  estimadoMin?: number;
 }
 
 /** Forma mínima que necesita el cálculo (los selects de Prisma de pedidos y del seguimiento). */
@@ -44,14 +58,29 @@ export interface EntradaProgreso {
   despachado_en?: Date | null;
   eta_min?: number | null;
   eta_max?: number | null;
+  creado_en?: Date | null;
+  pasa_cocina_en?: Date | null;
   comandas?: { area_id: bigint; estado: string; area: { nombre: string } }[];
-  lineas?: { area_id?: bigint | null; producto?: { categoria?: { area_id: bigint | null } | null } | null }[];
+  lineas?: {
+    id?: bigint | string;
+    nombre: string;
+    cantidad: number;
+    listas?: number;
+    despachadas?: number;
+    producto_id?: bigint | null;
+    area_id?: bigint | null;
+    producto?: { categoria?: { area_id: bigint | null } | null } | null;
+  }[];
 }
 
-/** Parámetros del tiempo y reloj: solo hacen falta para el «llega en» de un pedido en camino. */
+/**
+ * Reloj y datos opcionales. `cfg` solo hace falta para el «llega en» de un pedido en camino;
+ * `preparacion` (tiempos de preparación por producto) solo para el «Listo en ~N min» de cocina.
+ */
 export interface ContextoProgreso {
-  cfg: ConfigEta;
+  cfg?: ConfigEta;
   ahora: Date;
+  preparacion?: TiemposPreparacion;
 }
 
 const unir = (nombres: string[]) =>
@@ -74,7 +103,7 @@ export function progresoDelPedido(p: EntradaProgreso, ctx?: ContextoProgreso): P
   const mesa = p.modalidad === 'MESA';
   const entregadoEnMesa = mesa && !!p.entregado_mesa_en;
   if (p.estado === 'ENTREGADO' || entregadoEnMesa) {
-    const areas = (p.comandas ?? []).map((c) => ({ nombre: c.area.nombre, estado: 'LISTA' as const, lineas: contarLineas(p, c.area_id) }));
+    const areas = (p.comandas ?? []).map((c) => areaProgreso(p, c.area_id, c.area.nombre, 'LISTA'));
     return {
       etapa: 'ENTREGADO',
       etiqueta: entregadoEnMesa && p.estado !== 'ENTREGADO' ? 'Entregado en mesa' : 'Entregado',
@@ -88,7 +117,7 @@ export function progresoDelPedido(p: EntradaProgreso, ctx?: ContextoProgreso): P
 
   if (p.estado === 'EN_CAMINO') {
     const prometido = p.eta_min != null && p.eta_max != null ? { min: p.eta_min, max: p.eta_max } : null;
-    const rango = ctx
+    const rango = ctx?.cfg
       ? restanteEnCamino(prometido, ctx.cfg.respaldoMin, p.despachado_en ?? null, ctx.ahora, ctx.cfg.pasoMin)
       : null;
     const etiqueta = rango ? `En camino, llega en ${textoRango(rango.min, rango.max)}` : 'En camino';
@@ -128,12 +157,23 @@ export function progresoDelPedido(p: EntradaProgreso, ctx?: ContextoProgreso): P
 
   // Todavía en cocina (o recibido, si no hay comandas)
   const porcentaje = total > 0 ? Math.round((listas * 100) / total) : 0;
+  const estimadoMin = estimadoDelPedido(p, ctx);
+  const conEstimado = estimadoMin !== undefined ? { estimadoMin } : {};
   if (total === 0 && p.estado === 'COLA') {
-    return { ...vacio, areas, etapa: 'RECIBIDO', etiqueta: 'Pedido recibido', porcentaje: 0 };
+    return { ...vacio, areas, etapa: 'RECIBIDO', etiqueta: 'Pedido recibido', porcentaje: 0, ...conEstimado };
   }
   if (listas === 0) {
     const etiqueta = p.estado === 'PREPARANDO' ? 'En cocina, en preparación' : 'En cocina';
-    return { areas, listasDe: 0, totalAreas: total, enCamino: false, etapa: 'EN_COCINA', etiqueta, porcentaje };
+    return {
+      areas,
+      listasDe: 0,
+      totalAreas: total,
+      enCamino: false,
+      etapa: 'EN_COCINA',
+      etiqueta,
+      porcentaje,
+      ...conEstimado,
+    };
   }
   const listasNombres = areas.filter((a) => a.estado === 'LISTA').map((a) => a.nombre);
   const faltan = areas.filter((a) => a.estado !== 'LISTA').map((a) => a.nombre);
@@ -145,11 +185,52 @@ export function progresoDelPedido(p: EntradaProgreso, ctx?: ContextoProgreso): P
     etapa: 'PARCIAL',
     etiqueta: `Cocina: listas ${unir(listasNombres)}, faltan ${unir(faltan)}`,
     porcentaje,
+    ...conEstimado,
   };
 }
 
-function contarLineas(p: EntradaProgreso, areaId: bigint): number {
-  return (p.lineas ?? []).filter((l) => areaDeLinea(l) === areaId).length;
+/**
+ * Minutos para que esté lo que falta: el mayor, entre los productos no listos, de (su tiempo promedio
+ * - lo que ya lleva en cocina), mínimo 1. Sin nada pendiente no hay estimado.
+ */
+function estimadoDelPedido(p: EntradaProgreso, ctx?: ContextoProgreso): number | undefined {
+  if (!ctx?.preparacion) return undefined;
+  const despejadas = new Set((p.comandas ?? []).filter((c) => c.estado === 'DESPEJADA').map((c) => String(c.area_id)));
+  const pendientes = (p.lineas ?? []).filter((l) => {
+    const area = areaDeLinea(l);
+    if (area === null || despejadas.has(String(area))) return false;
+    return (l.listas ?? 0) < l.cantidad;
+  });
+  if (pendientes.length === 0) return undefined;
+
+  const inicio = p.pasa_cocina_en ?? p.creado_en ?? ctx.ahora;
+  const transcurrido = Math.max(0, Math.floor((ctx.ahora.getTime() - new Date(inicio).getTime()) / 60000));
+  const { porProducto, defectoMin } = ctx.preparacion;
+  const restante = Math.max(
+    ...pendientes.map((l) => (porProducto.get(String(l.producto_id ?? '')) ?? defectoMin) - transcurrido),
+  );
+  return Math.max(1, restante);
+}
+
+/**
+ * Líneas del pedido que van a esa área. Si el área ya está lista (despejada o cocina terminó), sus
+ * unidades cuentan como listas aunque el pedido viejo no traiga el conteo.
+ */
+function productosDeArea(p: EntradaProgreso, areaId: bigint, areaLista: boolean): ProductoProgreso[] {
+  return (p.lineas ?? [])
+    .filter((l) => areaDeLinea(l) === areaId)
+    .map((l) => ({
+      ...(l.id !== undefined ? { lineaId: String(l.id) } : {}),
+      nombre: l.nombre,
+      cantidad: l.cantidad,
+      listas: areaLista ? l.cantidad : (l.listas ?? 0),
+      despachadas: l.despachadas ?? 0,
+    }));
+}
+
+function areaProgreso(p: EntradaProgreso, areaId: bigint, nombre: string, estado: EstadoAreaProgreso): AreaProgreso {
+  const productos = productosDeArea(p, areaId, estado === 'LISTA');
+  return { nombre, estado, lineas: productos.length, productos };
 }
 
 /** Áreas del pedido con su estado. Si la cocina ya terminó, todas quedan lista. */
@@ -161,6 +242,6 @@ function areasDePedido(p: EntradaProgreso, todasListas: boolean): ProgresoPedido
         : p.estado === 'PREPARANDO'
           ? 'PREPARANDO'
           : 'PENDIENTE';
-    return { nombre: c.area.nombre, estado, lineas: contarLineas(p, c.area_id) };
+    return areaProgreso(p, c.area_id, c.area.nombre, estado);
   });
 }

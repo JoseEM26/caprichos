@@ -49,6 +49,9 @@ describe('AccesoGuard', () => {
       rolPermiso: {
         findFirst: jest.fn(),
       },
+      userAccountRol: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     auditoriaService = {
@@ -210,6 +213,7 @@ describe('AccesoGuard', () => {
       partyId: BigInt(10),
       rol: 'ADMIN',
       debeCambiar: true,
+      roles: ['ADMIN'],
     });
   });
 
@@ -299,6 +303,7 @@ describe('AccesoGuard', () => {
       partyId: BigInt(30),
       rol: 'ADMIN',
       debeCambiar: false,
+      roles: ['ADMIN'],
     });
   });
 
@@ -340,7 +345,7 @@ describe('AccesoGuard', () => {
     expect(resultado).toBe(true);
     expect(prisma.rolPermiso.findFirst).toHaveBeenCalledWith({
       where: {
-        rol: 'MOZO',
+        rol: { in: ['MOZO'] },
         OR: [
           { permiso: { modulo: 'archivos', accion: 'ver' } },
           { permiso: { modulo: 'iniciativas', accion: 'ver' } },

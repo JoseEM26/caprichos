@@ -1,4 +1,5 @@
 import {
+  construirTicketNotaMozo,
   esLineaBebida,
   construirEtiquetaGeneral,
   construirEtiquetasArea,
@@ -144,5 +145,41 @@ describe('Constructor server-side de etiquetas', () => {
       comboBase({ nombre: 'Frappe Moca', cantidad: 2, categoria: { nombre: 'Frappes' }, nombres_persona: ['Ana', 'Luis'] }),
     );
     expect(b.map((x) => x.persona)).toEqual(['Ana', 'Luis']);
+  });
+});
+
+describe('construirTicketNotaMozo (nota que el mozo envía a Caja)', () => {
+  const pedido = { codigo: 'PED-50', total: 35, lineas: [{ cantidad: 1, nombre: 'Lomo', subtotal: 35 }], cobros: [] };
+
+  it('efectivo con Recibido y Vuelto, nota con número y «Cobrado por mozo»', () => {
+    const t = construirTicketNotaMozo(
+      pedido,
+      { nombre: 'Caprichos' },
+      { tipo: 'NOTA_VENTA', numero_texto: 'NV01-000001' },
+      [{ medio: 'EFECTIVO', monto: 35 }],
+      100,
+      'Juan Mozo',
+    );
+    expect(t.pagos).toEqual([{ medio: 'EFECTIVO', monto: 35, recibido: 100, vuelto: 65 }]);
+    expect(t.comprobante).toEqual({ tipo: 'NOTA_VENTA', numero: 'NV01-000001' });
+    expect(t.cobradoPorMozo).toBe('Juan Mozo');
+    expect(t.total).toBe(35);
+  });
+
+  it('pago dividido: el vuelto sale del renglón de efectivo, no del total', () => {
+    const t = construirTicketNotaMozo(
+      pedido,
+      {},
+      { tipo: 'NOTA_VENTA', numero_texto: 'NV01-000002' },
+      [
+        { medio: 'EFECTIVO', monto: 20 },
+        { medio: 'YAPE', monto: 15 },
+      ],
+      25,
+      null,
+    );
+    expect(t.pagos[0]).toEqual({ medio: 'EFECTIVO', monto: 20, recibido: 25, vuelto: 5 });
+    expect(t.pagos[1]).toEqual({ medio: 'YAPE', monto: 15, recibido: null, vuelto: null });
+    expect(t.cobradoPorMozo).toBeNull();
   });
 });

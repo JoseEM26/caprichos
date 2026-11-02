@@ -50,8 +50,13 @@ export async function autorizarAdminSinCodigo(
   entidadId?: bigint,
 ): Promise<{ party_id: bigint; id: bigint } | null> {
   if (operadorPartyId === undefined) return null;
+  // ADMIN solo como principal (no se combina); SUPERVISOR como principal o como rol extra
   const admin = await prisma.userAccount.findFirst({
-    where: { party_id: BigInt(operadorPartyId), rol: { in: ROLES_SIN_CODIGO }, activo: true },
+    where: {
+      party_id: BigInt(operadorPartyId),
+      activo: true,
+      OR: [{ rol: { in: ROLES_SIN_CODIGO } }, { rolesExtra: { some: { rol: 'SUPERVISOR' } } }],
+    },
     select: { party_id: true, id: true, rol: true },
   });
   if (!admin) return null;

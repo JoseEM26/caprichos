@@ -8,6 +8,8 @@ import { VouchersController } from './vouchers.controller';
 import { VouchersService } from './vouchers.service';
 import { VouchersIaService } from './vouchers-ia.service';
 import { PagoPlanService } from '../pedidos/pago-plan.service';
+import { ComprobantesModule } from '../comprobantes/comprobantes.module';
+import { ImpresionModule } from '../impresion/impresion.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { PagoPlanService } from '../pedidos/pago-plan.service';
     AuditoriaModule,
     ChatbotIaModule,
     forwardRef(() => AvisosInternosModule),
+    ComprobantesModule,
+    ImpresionModule,
   ],
   controllers: [VouchersController],
   // PagoPlanService no se importa de PedidosModule (ciclo: pedidos ya importa vouchers). Es sin estado.

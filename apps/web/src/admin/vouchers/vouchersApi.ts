@@ -6,6 +6,12 @@ import {
 } from './tipos';
 import type { PlanPagoItem } from '../pedidos/planPago';
 
+/** Lo que el mozo elige al enviar a Caja: efectivo con el que paga y comprobante (nota de venta por defecto). */
+export interface EnvioCajaExtra {
+  recibido?: number;
+  comprobante?: { tipo: 'NOTA_VENTA' | 'BOLETA' | 'FACTURA'; doc?: string; razon?: string };
+}
+
 export interface FiltrosListarVouchers {
   pedidoId?: string | number;
   conversacionId?: string | number;
@@ -69,7 +75,7 @@ export const vouchersApi = {
   async subirVoucher(
     archivo: File | Blob,
     pedidoId: string | number,
-    medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA',
+    medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA' | 'TARJETA',
     /** Solo al reemplazar un voucher vigente: obligatorio (≥5) para Caja y Admin. */
     motivoCambio?: string,
   ): Promise<RespuestaSubirVoucher> {
@@ -132,11 +138,14 @@ export const vouchersApi = {
     pedidoId: string | number,
     medio: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA',
     plan?: PlanPagoItem[],
+    extra?: EnvioCajaExtra,
   ): Promise<{ ok: boolean }> {
     return api.post<{ ok: boolean }>('/admin/vouchers/enviar-a-caja', {
       pedidoId: String(pedidoId),
       medio,
       ...(plan ? { plan } : {}),
+      ...(extra?.recibido !== undefined ? { recibido: extra.recibido } : {}),
+      ...(extra?.comprobante ? { comprobante: extra.comprobante } : {}),
     });
   },
 

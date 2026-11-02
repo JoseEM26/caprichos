@@ -176,14 +176,20 @@ export function Ingresar() {
     setErrorTexto('');
     setErrorApi('');
 
+    // Entra con su documento: DNI (8 dígitos) o CE, cédula y pasaporte (de 7 a 12 letras o números)
     const limpio = usuarioTexto.trim();
     if (!limpio) {
+      setErrorTexto('Escribe tu documento.');
+      return;
+    }
+
+    if (/^\d+$/.test(limpio) && limpio.length < 7) {
       setErrorTexto('El DNI debe tener 8 dígitos numéricos.');
       return;
     }
 
-    if (/^\d+$/.test(limpio) && limpio.length !== 8) {
-      setErrorTexto('El DNI debe tener 8 dígitos numéricos.');
+    if (!/^[A-Za-z0-9]{7,12}$/.test(limpio)) {
+      setErrorTexto('El documento debe tener de 7 a 12 letras o números.');
       return;
     }
 

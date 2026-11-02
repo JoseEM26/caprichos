@@ -130,6 +130,8 @@ export const CLAVES_TEXTO = [
   'whatsapp_aviso_recibido_activo',
   'whatsapp_aviso_encuesta_activo',
   'cocina_confirmar_despejar',
+  // Minutos de preparación por defecto (enteros 1–120) para productos sin datos de los últimos 30 días
+  'cocina_minutos_preparacion_defecto',
   // Notificaciones: sonido y «Marcar todas leídas» (si/no), alcance del sonido
   'notif_sonido_activo',
   'notif_sonido_alcance',
@@ -206,6 +208,12 @@ export class ConfiguracionService {
         throw new BadRequestException({
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El valor debe ser un número mayor o igual a 0',
+        });
+      }
+      if (clave === 'cocina_minutos_preparacion_defecto' && (!Number.isInteger(valor) || valor < 1 || valor > 120)) {
+        throw new BadRequestException({
+          codigo: 'VALOR_INVALIDO',
+          mensaje: 'Los minutos de preparación deben ser un número entero entre 1 y 120',
         });
       }
     } else if ((CLAVES_TEXTO as readonly string[]).includes(clave)) {
