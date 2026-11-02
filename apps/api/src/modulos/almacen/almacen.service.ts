@@ -634,7 +634,7 @@ export class AlmacenService {
       },
     });
 
-    const cocinaLugar = await this.obtenerLugarPorNombre('Cocina');
+    const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
     const almacenLugar = await this.obtenerLugarPorNombre('Almacén central');
 
     const resultado: any[] = [];
@@ -731,7 +731,7 @@ export class AlmacenService {
       tandasCalculadas = 1;
     }
 
-    const cocinaLugar = await this.obtenerLugarPorNombre('Cocina');
+    const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
 
     const faltantes: string[] = [];
 
@@ -886,7 +886,7 @@ export class AlmacenService {
       });
     }
 
-    const cocinaLugar = await this.obtenerLugarPorNombre('Cocina');
+    const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
 
     await this.prisma.$transaction(async (tx) => {
       await tx.produccion.update({
@@ -1028,7 +1028,7 @@ export class AlmacenService {
     ip?: string,
   ) {
     const hoy = dto.fecha ? new Date(dto.fecha) : new Date();
-    const cocinaLugar = await this.obtenerLugarPorNombre('Cocina');
+    const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
 
     const resultado = await this.prisma.$transaction(async (tx) => {
       for (const fila of dto.filas) {
@@ -1164,7 +1164,7 @@ export class AlmacenService {
 
     return pedidos.map((p) => ({
       id: p.id.toString(),
-      area: p.area?.nombre || 'Cocina',
+      area: p.area?.nombre || 'Salados',
       detalle: p.detalle,
       estado: p.estado,
       en: p.en,
@@ -1200,7 +1200,7 @@ export class AlmacenService {
     const areaRecord = await this.prisma.areaCocina.findUnique({
       where: { id: areaId },
     });
-    const areaNombre = areaRecord?.nombre || 'Cocina';
+    const areaNombre = areaRecord?.nombre || 'Salados';
 
     const pedido = await this.prisma.pedidoInterno.create({
       data: {
@@ -1273,7 +1273,7 @@ export class AlmacenService {
     }
 
     const almacenLugar = await this.obtenerLugarPorNombre('Almacén central');
-    const destinoLugar = await this.obtenerLugarPorNombre(ped.area?.nombre || 'Cocina');
+    const destinoLugar = await this.obtenerLugarPorNombre(ped.area?.nombre || 'Salados');
     const ahora = new Date();
 
     const detalleObj: any = ped.detalle;

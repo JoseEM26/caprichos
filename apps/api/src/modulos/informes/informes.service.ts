@@ -1046,7 +1046,7 @@ export class InformesService {
           new Date(m.en).toLocaleDateString('es-PE'),
           m.insumo?.nombre || 'Insumo',
           `${Number(m.cantidad)} ${m.insumo?.unidad_almacen || 'u.'}`,
-          m.lugar?.nombre || 'Cocina',
+          m.lugar?.nombre || 'Salados',
           m.nota || 'Desecho de producción',
           `MER-${m.id}`,
         ]);

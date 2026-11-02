@@ -112,15 +112,15 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
 
     // 2. Áreas de cocina y Lugares de stock
     const barraArea = await prisma.areaCocina.upsert({
-      where: { nombre: 'Barra' },
+      where: { nombre: 'Bebidas' },
       update: { propia: true, activo: true },
-      create: { nombre: 'Barra', propia: true, activo: true },
+      create: { nombre: 'Bebidas', propia: true, activo: true },
     });
 
     const cocinaArea = await prisma.areaCocina.upsert({
-      where: { nombre: 'Cocina' },
+      where: { nombre: 'Salados' },
       update: { propia: true, activo: true },
-      create: { nombre: 'Cocina', propia: true, activo: true },
+      create: { nombre: 'Salados', propia: true, activo: true },
     });
 
     const almacenCentral = await prisma.lugarStock.upsert({
@@ -130,15 +130,15 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
     });
 
     const barraStock = await prisma.lugarStock.upsert({
-      where: { nombre: 'Barra' },
+      where: { nombre: 'Bebidas' },
       update: { tipo: 'AREA', area_id: barraArea.id },
-      create: { nombre: 'Barra', tipo: 'AREA', area_id: barraArea.id },
+      create: { nombre: 'Bebidas', tipo: 'AREA', area_id: barraArea.id },
     });
 
     const cocinaStock = await prisma.lugarStock.upsert({
-      where: { nombre: 'Cocina' },
+      where: { nombre: 'Salados' },
       update: { tipo: 'AREA', area_id: cocinaArea.id },
-      create: { nombre: 'Cocina', tipo: 'AREA', area_id: cocinaArea.id },
+      create: { nombre: 'Salados', tipo: 'AREA', area_id: cocinaArea.id },
     });
 
     // 2.5 Lista de Tamaños

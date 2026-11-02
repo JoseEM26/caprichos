@@ -23,7 +23,7 @@ export class CocinaExistenciasController {
     const lugares = await this.prisma.lugarStock.findMany({
       where: {
         OR: [
-          { nombre: { contains: 'Cocina', mode: 'insensitive' } },
+          { nombre: { contains: 'Salados', mode: 'insensitive' } },
           { nombre: { contains: 'Almacén', mode: 'insensitive' } },
           { tipo: 'ALMACEN' },
         ],
@@ -31,7 +31,7 @@ export class CocinaExistenciasController {
     });
 
     const cocinaLugar = lugares.find((l) =>
-      l.nombre.toLowerCase().includes('cocina'),
+      l.nombre.toLowerCase().includes('salados'),
     );
     const almacenLugar =
       lugares.find((l) => l.nombre.toLowerCase().includes('almacén')) ||

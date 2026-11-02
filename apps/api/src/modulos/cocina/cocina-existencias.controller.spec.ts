@@ -26,8 +26,8 @@ describe('CocinaExistenciasController', () => {
       lugarStock: {
         findMany: jest.fn().mockResolvedValue([
           { id: BigInt(1), nombre: 'Almacén central', tipo: 'ALMACEN' },
-          { id: BigInt(2), nombre: 'Cocina', tipo: 'AREA' },
-          { id: BigInt(3), nombre: 'Barra', tipo: 'AREA' },
+          { id: BigInt(2), nombre: 'Salados', tipo: 'AREA' },
+          { id: BigInt(3), nombre: 'Bebidas', tipo: 'AREA' },
         ]),
       },
       insumo: {

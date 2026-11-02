@@ -48,7 +48,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(25),
       maximo: new Prisma.Decimal(60),
       costo_unit: new Prisma.Decimal(4.5),
-      lugarConsumo: 'Barra',
+      lugarConsumo: 'Bebidas',
     },
     {
       nombre: 'Leche de almendras',
@@ -61,7 +61,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(12),
       maximo: new Prisma.Decimal(30),
       costo_unit: new Prisma.Decimal(8.5),
-      lugarConsumo: 'Barra',
+      lugarConsumo: 'Bebidas',
     },
     {
       nombre: 'Café en grano',
@@ -74,7 +74,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(15),
       maximo: new Prisma.Decimal(40),
       costo_unit: new Prisma.Decimal(45.0),
-      lugarConsumo: 'Barra',
+      lugarConsumo: 'Bebidas',
     },
     {
       nombre: 'Azúcar blanca',
@@ -87,7 +87,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(30),
       maximo: new Prisma.Decimal(100),
       costo_unit: new Prisma.Decimal(3.2),
-      lugarConsumo: 'Barra',
+      lugarConsumo: 'Bebidas',
     },
     {
       nombre: 'Harina sin preparar',
@@ -100,7 +100,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(25),
       maximo: new Prisma.Decimal(80),
       costo_unit: new Prisma.Decimal(3.5),
-      lugarConsumo: 'Cocina',
+      lugarConsumo: 'Salados',
     },
     {
       nombre: 'Huevos frescos',
@@ -113,7 +113,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(120),
       maximo: new Prisma.Decimal(300),
       costo_unit: new Prisma.Decimal(0.5),
-      lugarConsumo: 'Cocina',
+      lugarConsumo: 'Salados',
     },
     {
       nombre: 'Pollo deshilachado',
@@ -126,7 +126,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(12),
       maximo: new Prisma.Decimal(30),
       costo_unit: new Prisma.Decimal(18.0),
-      lugarConsumo: 'Cocina',
+      lugarConsumo: 'Salados',
     },
     {
       nombre: 'Jamón inglés',
@@ -139,7 +139,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(8),
       maximo: new Prisma.Decimal(20),
       costo_unit: new Prisma.Decimal(26.0),
-      lugarConsumo: 'Cocina',
+      lugarConsumo: 'Salados',
     },
     {
       nombre: 'Queso edam',
@@ -152,7 +152,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(9),
       maximo: new Prisma.Decimal(25),
       costo_unit: new Prisma.Decimal(32.0),
-      lugarConsumo: 'Cocina',
+      lugarConsumo: 'Salados',
     },
     {
       nombre: 'Crema chantilly',
@@ -165,7 +165,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(10),
       maximo: new Prisma.Decimal(24),
       costo_unit: new Prisma.Decimal(14.0),
-      lugarConsumo: 'Barra',
+      lugarConsumo: 'Bebidas',
     },
     {
       nombre: 'Hielo',
@@ -178,7 +178,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(50),
       maximo: new Prisma.Decimal(150),
       costo_unit: new Prisma.Decimal(1.0),
-      lugarConsumo: 'Barra',
+      lugarConsumo: 'Bebidas',
     },
     {
       nombre: 'Jarabe de chocolate',
@@ -191,7 +191,7 @@ export async function main() {
       intermedio: new Prisma.Decimal(6),
       maximo: new Prisma.Decimal(15),
       costo_unit: new Prisma.Decimal(22.0),
-      lugarConsumo: 'Barra',
+      lugarConsumo: 'Bebidas',
     },
   ];
 

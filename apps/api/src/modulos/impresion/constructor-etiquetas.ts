@@ -161,7 +161,7 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
   const areaMap = new Map<string, any[]>();
   lineas.forEach((l) => {
     const areaRaw = l.area?.nombre?.trim();
-    const areaNombre = (areaRaw || 'COCINA').toUpperCase();
+    const areaNombre = (areaRaw || 'SALADOS').toUpperCase();
     if (!areaMap.has(areaNombre)) {
       areaMap.set(areaNombre, []);
     }
