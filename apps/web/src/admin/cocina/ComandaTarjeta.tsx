@@ -19,6 +19,8 @@ export interface ComandaTarjetaProps {
   puedeDespachar?: boolean;
   alDespacharLinea?: (linea: LineaComanda, unidades: number) => void;
   alDespacharTodo?: (comanda: Comanda) => void;
+  /** La última unidad acaba de despejar el área: la tarjeta queda en verde con «Deshacer» un rato. */
+  alDeshacerSalida?: () => void;
 }
 
 export function obtenerColorMinutos(minutos: number): ColorComanda {
@@ -492,6 +494,7 @@ export function ComandaTarjeta({
   puedeDespachar = false,
   alDespacharLinea,
   alDespacharTodo,
+  alDeshacerSalida,
 }: ComandaTarjetaProps) {
   // Última línea que se completó: se puede deshacer unos segundos (vuelve a su cantidad anterior)
   const [deshacer, setDeshacer] = useState<{ linea: LineaComanda; previas: number } | null>(null);
@@ -662,6 +665,44 @@ export function ComandaTarjeta({
         >
           Tu área ya está lista
           {faltan.length > 0 ? `, falta: ${faltan.join(', ')}` : ''}
+        </div>
+      )}
+
+      {despejada && alDeshacerSalida && (
+        <div
+          role="status"
+          data-testid="deshacer-salida"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px',
+            border: '1.5px solid var(--cp-soft)',
+            borderRadius: '10px',
+            padding: '4px 8px',
+            fontSize: '13px',
+            fontWeight: 700,
+            color: 'var(--cp-navy)',
+          }}
+        >
+          <span>Sale de la pantalla en unos segundos</span>
+          <button
+            type="button"
+            onClick={alDeshacerSalida}
+            style={{
+              minHeight: '44px',
+              minWidth: '44px',
+              padding: '0 12px',
+              border: '1.5px solid var(--cp-navy)',
+              borderRadius: '10px',
+              background: 'var(--cp-white)',
+              color: 'var(--cp-navy)',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Deshacer
+          </button>
         </div>
       )}
 

@@ -198,6 +198,21 @@ export class CobrosService {
     }
   }
 
+  /**
+   * Nota de venta vigente que el mozo emitió al enviar el cobro a Caja: el envío marca cobro_mozo_en y
+   * emite la nota (su ticket ya salió en la ticketera). Una anulada (rechazo del cobro) no cuenta.
+   */
+  private async notaDelMozoVigente(pedidoId: bigint): Promise<boolean> {
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      select: {
+        cobro_mozo_en: true,
+        comprobante: { where: { tipo: 'NOTA_VENTA', anulado_en: null }, select: { id: true }, take: 1 },
+      },
+    });
+    return !!pedido?.cobro_mozo_en && (pedido.comprobante?.length ?? 0) > 0;
+  }
+
   /** Enlaza una foto ya subida al pedido que se cobra (prueba del cobro). Dentro de la transacción del cobro. */
   private async vincularVoucherAPedido(
     tx: Prisma.TransactionClient,
@@ -402,6 +417,10 @@ export class CobrosService {
       };
     });
 
+    // Si el mozo ya emitió la nota de venta al enviar a Caja, su ticket salió ya en la ticketera: no se repite.
+    // Se mira antes de emitir (el cobro podría emitir otra nota si el comprobante cambió).
+    const ticketYaSalioConMozo = await this.notaDelMozoVigente(cobro.pedido_id).catch(() => false);
+
     // el cobro genera la nota de venta con su correlativo (RQ-LEG-01-01); es idempotente y también se
     // crea al consultarla, así que un fallo aquí no deshace el cobro
     try {
@@ -433,10 +452,12 @@ export class CobrosService {
     }
 
     // ticket de pago para la ticketera: idempotente, nunca deshace el cobro
-    try {
-      await this.impresionService?.encolarTicketPedido(cobro.pedido_id);
-    } catch {
-      // se puede reimprimir desde el pedido
+    if (!ticketYaSalioConMozo) {
+      try {
+        await this.impresionService?.encolarTicketPedido(cobro.pedido_id);
+      } catch {
+        // se puede reimprimir desde el pedido
+      }
     }
 
     // 8. Auditar

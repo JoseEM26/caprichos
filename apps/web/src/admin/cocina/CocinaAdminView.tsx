@@ -27,7 +27,7 @@ import {
   reproducirCampanaCocina,
   setSilenciado,
 } from './audioAlerta';
-import { ComandaTarjeta } from './ComandaTarjeta';
+import { ComandaTarjeta, SEGUNDOS_DESHACER } from './ComandaTarjeta';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
 import { ModalPedirAlmacen } from './ModalPedirAlmacen';
@@ -124,6 +124,13 @@ export function CocinaAdminView() {
   const [cargandoInicial, setCargandoInicial] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [mensajeAccion, setMensajeAccion] = useState<string | null>(null);
+  // Área que la última unidad acaba de despejar: sigue en pantalla en verde con «Deshacer» unos segundos
+  const [saliendo, setSaliendo] = useState<{ comanda: Comanda; linea: LineaComanda; previas: number } | null>(null);
+  useEffect(() => {
+    if (!saliendo) return;
+    const t = setTimeout(() => setSaliendo(null), SEGUNDOS_DESHACER * 1000);
+    return () => clearTimeout(t);
+  }, [saliendo]);
 
   // Ajuste «Confirmar al despejar» (Configuración › Cocina). Por defecto, pide confirmación.
   const [confirmarDespejar, setConfirmarDespejar] = useState<boolean>(true);
@@ -347,14 +354,37 @@ export function CocinaAdminView() {
     }
   };
 
-  // Marcar unidades de una línea (la casilla suma una; deshacer baja). Si el área queda completa, el servidor la despeja.
-  const marcarUnidades = async (linea: LineaComanda, listas: number) => {
+  // Marcar unidades de una línea (la casilla suma una; deshacer baja). Si el área queda completa, el servidor la despeja:
+  // la tarjeta se queda en verde con «Deshacer» unos segundos antes de salir de la lista.
+  const marcarUnidades = async (comanda: Comanda, linea: LineaComanda, listas: number) => {
     try {
       setError(null);
-      await marcarUnidadesLinea(linea.id, listas);
+      const res = await marcarUnidadesLinea(linea.id, listas);
+      if (res.despejada) {
+        const completada: Comanda = {
+          ...comanda,
+          despejada: true,
+          lineas: comanda.lineas.map((l) => (l.id === linea.id ? { ...l, listas: l.cantidad } : l)),
+          areas: comanda.areas?.map((a) => (a.areaId === comanda.areaId ? { ...a, despejada: true } : a)),
+        };
+        setSaliendo({ comanda: completada, linea, previas: linea.listas ?? 0 });
+      }
       await cargarComandas(areaSeleccionada);
     } catch (err: any) {
       setError(err?.message || 'No se pudieron marcar las unidades');
+    }
+  };
+
+  // Deshacer durante la salida: baja la unidad y el servidor reabre el área (15 s, mismo usuario)
+  const deshacerSalida = async () => {
+    if (!saliendo) return;
+    try {
+      setError(null);
+      await marcarUnidadesLinea(saliendo.linea.id, saliendo.previas);
+      setSaliendo(null);
+      await cargarComandas(areaSeleccionada);
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo deshacer');
     }
   };
 
@@ -398,7 +428,14 @@ export function CocinaAdminView() {
 
   // En Todas: una boleta por pedido, sin Despejar (no hay un área actual que despeje)
   const enTodas = areaActiva === 'todas';
-  const tarjetas = enTodas ? agruparPorPedido(comandas) : comandas;
+  const tarjetasDelServidor = enTodas ? agruparPorPedido(comandas) : comandas;
+  // Mientras dura «Deshacer», la tarjeta se ve aunque una recarga en vivo ya no la liste
+  const enSalida = !enTodas && saliendo ? saliendo : null;
+  const tarjetas = enSalida
+    ? tarjetasDelServidor.some((c) => c.id === enSalida.comanda.id)
+      ? tarjetasDelServidor.map((c) => (c.id === enSalida.comanda.id ? enSalida.comanda : c))
+      : [enSalida.comanda, ...tarjetasDelServidor]
+    : tarjetasDelServidor;
 
   if (!puedeVer) {
     return (
@@ -888,7 +925,8 @@ export function CocinaAdminView() {
                   soloLectura={enTodas}
                   onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                   despejando={despejando}
-                  alMarcarUnidades={puedeDespejar && !enTodas ? marcarUnidades : undefined}
+                  alMarcarUnidades={puedeDespejar && !enTodas ? (linea, listas) => marcarUnidades(c, linea, listas) : undefined}
+                      alDeshacerSalida={enSalida?.comanda.id === c.id ? deshacerSalida : undefined}
                   puedeDespachar={puedeDespachar && enTodas}
                   alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                   alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
@@ -1102,7 +1140,8 @@ export function CocinaAdminView() {
                       soloLectura={enTodas}
                       onDespejar={puedeDespejar && !enTodas ? pedirDespeje : undefined}
                       despejando={despejando}
-                      alMarcarUnidades={puedeDespejar && !enTodas ? marcarUnidades : undefined}
+                      alMarcarUnidades={puedeDespejar && !enTodas ? (linea, listas) => marcarUnidades(c, linea, listas) : undefined}
+                      alDeshacerSalida={enSalida?.comanda.id === c.id ? deshacerSalida : undefined}
                       puedeDespachar={puedeDespachar && enTodas}
                       alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                       alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}

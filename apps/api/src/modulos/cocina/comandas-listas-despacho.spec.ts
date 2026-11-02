@@ -127,6 +127,64 @@ describe('ComandasService: listo por producto y despacho', () => {
         expect.objectContaining({ data: expect.objectContaining({ estado: 'LISTO' }) }),
       );
     });
+
+    describe('deshacer un despeje (15 s, mismo usuario)', () => {
+      const area = (despejadaHaceMs: number, despejadaPor: bigint = 100n) => ({
+        estado: 'DESPEJADA',
+        despejada_en: new Date(Date.now() - despejadaHaceMs),
+        despejada_por: despejadaPor,
+      });
+
+      it('bajar una unidad dentro de 15 s reabre el área (quita despejada_en) y el pedido LISTO vuelve a COLA', async () => {
+        prisma.pedidoLinea.findUnique.mockResolvedValue(lineaBd(1, 1));
+        prisma.pedido.findUnique.mockResolvedValue({ id: 1n, codigo: 'A-1', estado: 'LISTO' });
+        prisma.comandaArea.findUnique.mockResolvedValue(area(5000));
+
+        const res = await service.marcarListas(10n, 0, usuario);
+
+        expect(prisma.comandaArea.update).toHaveBeenCalledWith({
+          where: { pedido_id_area_id: { pedido_id: 1n, area_id: 5n } },
+          data: { estado: 'EN_COCINA', despejada_en: null, despejada_por: null },
+        });
+        expect(prisma.pedido.update).toHaveBeenCalledWith({ where: { id: 1n }, data: { estado: 'COLA' } });
+        expect(res).toMatchObject({ reabierta: true, despejada: false, listas: 0 });
+      });
+
+      it('si Caja ya cerró el pedido, reabre el área pero no cambia el estado del pedido', async () => {
+        prisma.pedidoLinea.findUnique.mockResolvedValue(lineaBd(1, 1));
+        prisma.pedido.findUnique.mockResolvedValue({ id: 1n, codigo: 'A-1', estado: 'ENTREGADO' });
+        prisma.comandaArea.findUnique.mockResolvedValue(area(5000));
+
+        const res = await service.marcarListas(10n, 0, usuario);
+
+        expect(prisma.comandaArea.update).toHaveBeenCalled();
+        expect(prisma.pedido.update).not.toHaveBeenCalled();
+        expect(res.reabierta).toBe(true);
+      });
+
+      it('pasados 15 s no reabre: la línea baja pero el área sigue despejada', async () => {
+        prisma.pedidoLinea.findUnique.mockResolvedValue(lineaBd(1, 1));
+        prisma.pedido.findUnique.mockResolvedValue({ id: 1n, codigo: 'A-1', estado: 'LISTO' });
+        prisma.comandaArea.findUnique.mockResolvedValue(area(16000));
+
+        const res = await service.marcarListas(10n, 0, usuario);
+
+        expect(prisma.comandaArea.update).not.toHaveBeenCalled();
+        expect(prisma.pedido.update).not.toHaveBeenCalled();
+        expect(res.reabierta).toBe(false);
+      });
+
+      it('otro usuario no reabre el área despejada', async () => {
+        prisma.pedidoLinea.findUnique.mockResolvedValue(lineaBd(1, 1));
+        prisma.pedido.findUnique.mockResolvedValue({ id: 1n, codigo: 'A-1', estado: 'LISTO' });
+        prisma.comandaArea.findUnique.mockResolvedValue(area(5000, 999n));
+
+        const res = await service.marcarListas(10n, 0, usuario);
+
+        expect(prisma.comandaArea.update).not.toHaveBeenCalled();
+        expect(res.reabierta).toBe(false);
+      });
+    });
   });
 
   describe('despejar', () => {

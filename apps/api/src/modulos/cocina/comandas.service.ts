@@ -41,6 +41,8 @@ const MODALIDADES_DESPACHO = ['MESA', 'RECOGER', 'LLEVAR'];
 const ESTADOS_FUERA_DE_COCINA = ['ANULADO', 'RECHAZADO'];
 /** Estados en los que despejar la última área pasa el pedido a LISTO (con historial y avisos). */
 const ESTADOS_PARA_LISTO = ['COLA', 'PREPARANDO'];
+/** Ventana para deshacer un despeje: bajar unidades en esos segundos (mismo usuario) reabre el área. */
+const VENTANA_DESHACER_DESPEJE_MS = 15_000;
 
 /**
  * Líneas del pedido que pertenecen a un área, con los campos que usa la pantalla de cocina.
@@ -672,7 +674,9 @@ export class ComandasService {
   /**
    * POST /admin/cocina/lineas/:lineaId/listas { listas }
    * Fija las unidades listas de una línea (0..cantidad). Si todas las líneas del área quedan completas,
-   * despeja el área (mismo efecto que el botón Listo). Bajar una línea de un área ya despejada no la reabre.
+   * despeja el área (mismo efecto que el botón Listo). Deshacer: bajar unidades de un área despejada por el
+   * mismo usuario hace menos de 15 s la reabre (quita despejada_en). Si el despeje había pasado el pedido a
+   * LISTO, vuelve a COLA; si Caja ya lo cerró, el estado del pedido no cambia.
    */
   async marcarListas(
     lineaId: bigint | string | number,
@@ -746,6 +750,38 @@ export class ComandasService {
       data: { listas, listo_en: listoEn },
     });
 
+    // Deshacer un despeje reciente: el mismo usuario baja una unidad dentro de la ventana y el área vuelve a cocina
+    let reabierta = false;
+    const haceMs = comanda.despejada_en ? ahora.getTime() - new Date(comanda.despejada_en).getTime() : Infinity;
+    if (
+      !completa &&
+      listas < linea.listas &&
+      comanda.estado === 'DESPEJADA' &&
+      comanda.despejada_por != null &&
+      comanda.despejada_por === usuarioActual.partyId &&
+      haceMs <= VENTANA_DESHACER_DESPEJE_MS
+    ) {
+      await this.prisma.comandaArea.update({
+        where: { pedido_id_area_id: { pedido_id: pId, area_id: aId } },
+        data: { estado: 'EN_COCINA', despejada_en: null, despejada_por: null },
+      });
+      if (pedido.estado === 'LISTO') {
+        await this.prisma.pedido.update({ where: { id: pId }, data: { estado: 'COLA' } });
+        await this.prisma.pedidoEstadoHistorial.create({
+          data: {
+            pedido_id: pId,
+            estado_anterior: 'LISTO',
+            estado_nuevo: 'COLA',
+            motivo: 'Despeje deshecho desde cocina',
+            por_party_id: usuarioActual.partyId,
+            en: ahora,
+          },
+        });
+        this.eventosGateway?.emitirAdmin('pedido:estado', { id: Number(pId), codigo: pedido.codigo, estado: 'COLA' });
+      }
+      reabierta = true;
+    }
+
     let despejada = false;
     if (completa && comanda.estado === 'EN_COCINA') {
       const lineasArea = (await this.lineasDeCocina(pId)).filter((l) => areaDeLineaPedido(l) === aId);
@@ -772,7 +808,7 @@ export class ComandasService {
       entidad: 'pedido_linea',
       entidadId: lId,
       antes: { listas: linea.listas },
-      despues: { listas, despejada },
+      despues: { listas, despejada, reabierta },
       partyId: usuarioActual.partyId,
       ip,
     });
@@ -785,6 +821,7 @@ export class ComandasService {
       listas,
       cantidad: linea.cantidad,
       despejada,
+      reabierta,
     };
   }
 

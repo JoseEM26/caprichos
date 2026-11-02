@@ -651,17 +651,29 @@ describe('VouchersService', () => {
       expect(res.semaforo).toBeUndefined();
     });
 
-    it('digital sin foto legible: aviso igual, con el texto de sin foto legible', async () => {
-      prismaMock.voucherPago.findFirst.mockResolvedValue({ semaforo: 'ILEGIBLE' });
-
-      await service.enviarACaja('50', 'PLIN', mozoUsuario);
-
-      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          tipo: 'VOUCHER_PENDIENTE_MOZO',
-          titulo: 'Pago digital sin foto legible',
-        }),
+    it('digital sin foto vigente: 400 VOUCHER_REQUERIDO con el mensaje de la foto, y no avisa ni guarda el plan', async () => {
+      await expect(service.enviarACaja('50', 'PLIN', mozoUsuario)).rejects.toMatchObject({
+        response: {
+          codigo: 'VOUCHER_REQUERIDO',
+          faltan: ['PLIN'],
+          mensaje: 'Sube la foto del pago (Yape/Plin/transferencia) antes de enviar a Caja',
+        },
       });
+      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('digital con foto ILEGIBLE: no cuenta como foto; 400 y no avisa', async () => {
+      // La consulta filtra semaforo != ILEGIBLE: sin resultado no hay foto vigente
+      prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+
+      await expect(service.enviarACaja('50', 'PLIN', mozoUsuario)).rejects.toBeInstanceOf(BadRequestException);
+      expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ semaforo: { not: 'ILEGIBLE' }, reemplazado_en: null }),
+        }),
+      );
+      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
     });
 
     it('pedido ya cobrado: no avisa a Caja', async () => {
@@ -691,6 +703,8 @@ describe('VouchersService', () => {
     });
 
     describe('pago dividido (plan)', () => {
+      // Con Yape en el plan, la foto vigente de Yape ya está subida
+      beforeEach(() => prismaMock.voucherPago.findFirst.mockResolvedValue({ id: 5n, semaforo: 'CONFIABLE' }));
       const planValido = [
         { medio: 'EFECTIVO', monto: 20 },
         { medio: 'YAPE', monto: 15 },
@@ -801,6 +815,8 @@ describe('VouchersService', () => {
   });
 
   describe('Cobro por mozo: el pedido queda marcado al enviar a Caja', () => {
+    beforeEach(() => prismaMock.voucherPago.findFirst.mockResolvedValue({ id: 5n, semaforo: 'CONFIABLE' }));
+
     it('efectivo: guarda cobro_mozo_en, el medio y el mozo, sin tocar pago_estado', async () => {
       await service.enviarACaja('50', 'efectivo', mozoUsuario);
 

@@ -199,7 +199,8 @@ export function ModalPrecuenta({
         : null;
   // Comprobante: la API valida otra vez; esto evita enviar datos que ya se sabe que no sirven
   const errorComprobante = errorDatosComprobante(tipoComp, docComp, razonComp);
-  const listoParaEnviar = planListo && errorPagaCon === null && errorComprobante === null;
+  // Con parte digital o tarjeta, la foto de cada medio tiene que estar subida y leerse antes de enviar (lo exige el servidor)
+  const listoParaEnviar = planListo && errorPagaCon === null && errorComprobante === null && (!hayDigital || voucherOk);
   const subidoAntes = (medio: string) => (vpm ?? []).some((v) => v.medio === medio && v.subido);
   // El plan se guarda antes de cada captura: el servidor compara contra el monto de ese medio
   const guardarPlan = async () => {
@@ -253,11 +254,7 @@ export function ModalPrecuenta({
     tipoComp === 'NOTA_VENTA'
       ? 'Se emite la nota de venta y sale en la ticketera de Caja.'
       : `${ETIQUETA_TIPO[tipoComp]}: Caja la emite al cobrar.`,
-    hayDigital
-      ? voucherOk
-        ? `Caja revisará los vouchers ya subidos (${digitalesPlan.map((f) => nombreMedio(f.medio)).join(', ')}).`
-        : `Falta foto legible de ${faltanVouchers.join(', ')}: Caja pedirá la foto o resolverá el cobro.`
-      : null,
+    hayDigital ? `Caja revisará los vouchers ya subidos (${digitalesPlan.map((f) => nombreMedio(f.medio)).join(', ')}).` : null,
     'Tú no cierras el cobro.',
   ]
     .filter(Boolean)
@@ -468,7 +465,7 @@ export function ModalPrecuenta({
                 )}
 
                 {hayDigital && !voucherOk && (
-                  <div className="pc-nota-envio">Si no hay foto o no se lee, Caja lo revisa y resuelve el cobro.</div>
+                  <div className="pc-nota-envio">Falta la foto de {faltanVouchers.join(', ')}: súbela antes de enviar a Caja.</div>
                 )}
                 {voucherOk && digitalesPlan.every((f) => subidoAntes(f.medio)) && (
                   <div className="pc-nota-envio">Caja revisará los vouchers ya subidos.</div>

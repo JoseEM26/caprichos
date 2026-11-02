@@ -59,7 +59,8 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
 
   it('pago dividido: envía el plan completo y el medio principal (el digital)', async () => {
     const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
-    render(<ModalPrecuenta {...propsBase} />);
+    // La foto de Yape ya está subida y se lee: sin ella Caja no recibe el envío
+    render(<ModalPrecuenta {...propsBase} vouchersPorMedio={[{ medio: 'YAPE', monto: 12, subido: true }]} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio de pago' }));
     fireEvent.change(screen.getByLabelText('Monto en Yape'), { target: { value: '12' } });
@@ -79,7 +80,7 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
   });
 
   it('pago dividido: la confirmación muestra el desglose y no pide foto para la parte en efectivo', () => {
-    render(<ModalPrecuenta {...propsBase} />);
+    render(<ModalPrecuenta {...propsBase} vouchersPorMedio={[{ medio: 'YAPE', monto: 12, subido: true }]} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio de pago' }));
     fireEvent.change(screen.getByLabelText('Monto en Yape'), { target: { value: '12' } });
@@ -87,7 +88,19 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
     llenarPagaCon();
     fireEvent.click(botonEnviar());
     expect(screen.getByText(/Caja cobrará S\/ 32\.00 \(Efectivo S\/ 20\.00 · Yape S\/ 12\.00\)/)).toBeInTheDocument();
-    expect(screen.getByTestId('seccion-subir-voucher-mozo')).toBeInTheDocument();
+    expect(screen.getByTestId('voucher-ya-subido-YAPE')).toBeInTheDocument();
+    expect(screen.queryByText(/Voucher Efectivo/)).toBeNull();
+  });
+
+  it('pago dividido con Yape sin foto subida: Enviar a Caja queda bloqueado y pide la foto', () => {
+    render(<ModalPrecuenta {...propsBase} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio de pago' }));
+    fireEvent.change(screen.getByLabelText('Monto en Yape'), { target: { value: '12' } });
+    llenarPagaCon();
+
+    expect(botonEnviar()).toBeDisabled();
+    expect(screen.getByText(/Falta la foto de Yape/)).toBeInTheDocument();
   });
 
   it('segundo medio sin monto: bloquea Enviar a Caja y pide el monto', () => {
