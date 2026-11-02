@@ -4,7 +4,6 @@ import { Confirmar } from '../../../comun/Confirmar';
 import { ErrorApi } from '../../../comun/api';
 import { haceLegible } from '../../../comun/tiempoLegible';
 import { despacharPedido } from '../../cocina/cocinaApi';
-import { ProgresoPedido } from '../ProgresoPedido';
 import { salonApi } from '../api';
 import type { MesaSalon, ProductoProgreso } from '../tipos';
 import { ModalForzarLiberarMesa } from './ModalForzarLiberarMesa';
@@ -20,13 +19,19 @@ export interface VistaPreviaMesaProps {
   alCambiarMesa?: (mesa: MesaSalon) => void;
   /** Tras forzar la liberación: el padre recarga el salón */
   alCambiar: () => void;
-  /** Permiso cocina/despachar: muestra «Despachar» por producto listo y «Despachar todo lo listo» */
+  /** Permiso cocina/despachar: muestra las casillas de entrega y «Marcar como entregado» */
   puedeDespachar?: boolean;
 }
 
-/** Un producto con unidades listas que aún no salieron (con su línea para despachar). */
-interface ListoParaEntregar extends ProductoProgreso {
+/** Una línea del pedido en la lista de entrega, con su área y las unidades listas sin entregar. */
+interface FilaEntrega {
   lineaId: string;
+  nombre: string;
+  cantidad: number;
+  area: string;
+  listas: number;
+  despachadas: number;
+  /** Listas y todavía sin entregar: lo que se despacha al marcar la fila */
   pendientes: number;
 }
 
@@ -41,9 +46,17 @@ function IconoEntregado() {
   );
 }
 
+/** Texto y color del estado de una línea: en preparación, parcial, listo o entregado. */
+function estadoFila(f: FilaEntrega): { texto: string; color: string } {
+  if (f.despachadas >= f.cantidad) return { texto: 'Entregado', color: VERDE_ENTREGADO };
+  if (f.listas === 0) return { texto: 'En preparación', color: 'var(--cp-soft)' };
+  if (f.listas < f.cantidad) return { texto: `${f.listas} de ${f.cantidad} listos`, color: 'var(--cp-orange)' };
+  return { texto: 'Listo', color: VERDE_ENTREGADO };
+}
+
 /**
  * Vista previa de una mesa ocupada (mantener 2 s en el croquis): quién, cuánto, qué pidió y qué falta.
- * Desde aquí se abre la cuenta, se cambia de mesa y, con permiso, se fuerza la liberación.
+ * Desde aquí se marca lo entregado, se abre la cuenta, se cambia de mesa y, con permiso, se fuerza la liberación.
  */
 export function VistaPreviaMesa({
   mesa,
@@ -55,38 +68,58 @@ export function VistaPreviaMesa({
   puedeDespachar = false,
 }: VistaPreviaMesaProps) {
   const [forzando, setForzando] = useState(false);
-  // Despacho (Sí/No, irreversible): una línea con sus unidades, o todo lo listo (sin línea)
-  const [despachoPendiente, setDespachoPendiente] = useState<{ linea?: ListoParaEntregar } | null>(null);
-  const [despachando, setDespachando] = useState(false);
-  const [errorDespacho, setErrorDespacho] = useState<string | null>(null);
+  // Líneas marcadas para entregar (solo seleccionan; el envío pide confirmación Sí/No)
+  const [seleccion, setSeleccion] = useState<Set<string>>(() => new Set());
+  const [confirmandoEntrega, setConfirmandoEntrega] = useState(false);
+  const [entregando, setEntregando] = useState(false);
+  const [errorEntrega, setErrorEntrega] = useState<string | null>(null);
   const pedido = mesa.pedido;
-  const todos = (pedido?.progreso?.areas ?? []).flatMap((a) =>
-    (a.productos ?? []).filter((p): p is ProductoProgreso & { lineaId: string } => !!p.lineaId),
+  const filas: FilaEntrega[] = (pedido?.progreso?.areas ?? []).flatMap((a) =>
+    (a.productos ?? [])
+      .filter((p): p is ProductoProgreso & { lineaId: string } => !!p.lineaId)
+      .map((p) => {
+        const listas = p.listas ?? 0;
+        const despachadas = p.despachadas ?? 0;
+        return {
+          lineaId: p.lineaId,
+          nombre: p.nombre,
+          cantidad: p.cantidad,
+          area: a.nombre,
+          listas,
+          despachadas,
+          pendientes: Math.max(0, listas - despachadas),
+        };
+      }),
   );
-  // Lo que ya salió de cocina: con pendientes por despachar y, si ya salió, con check «Entregado»
-  const listos: ListoParaEntregar[] = todos
-    .filter((p) => (p.listas ?? 0) > 0)
-    .map((p) => ({ ...p, pendientes: Math.max(0, (p.listas ?? 0) - (p.despachadas ?? 0)) }));
-  const hayPendientes = listos.some((p) => p.pendientes > 0);
-  const todoEntregado = todos.length > 0 && todos.every((p) => (p.despachadas ?? 0) >= p.cantidad);
+  const todoEntregado = filas.length > 0 && filas.every((f) => f.despachadas >= f.cantidad);
+  const marcables = filas.filter((f) => f.pendientes > 0);
+  const elegidas = marcables.filter((f) => seleccion.has(f.lineaId));
 
-  const confirmarDespacho = async () => {
-    if (!pedido) return;
-    const linea = despachoPendiente?.linea;
-    setDespachando(true);
-    setErrorDespacho(null);
+  const alternar = (lineaId: string) =>
+    setSeleccion((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineaId)) next.delete(lineaId);
+      else next.add(lineaId);
+      return next;
+    });
+
+  const entregar = async () => {
+    if (!pedido || elegidas.length === 0) return;
+    setEntregando(true);
+    setErrorEntrega(null);
     try {
       await despacharPedido(
         pedido.id,
-        linea ? [{ lineaId: linea.lineaId, unidades: linea.pendientes }] : undefined,
+        elegidas.map((f) => ({ lineaId: f.lineaId, unidades: f.pendientes })),
       );
-      setDespachoPendiente(null);
+      setSeleccion(new Set());
+      setConfirmandoEntrega(false);
       alCambiar();
     } catch (err) {
-      setErrorDespacho(err instanceof ErrorApi ? err.message : 'No se pudo despachar');
-      setDespachoPendiente(null);
+      setErrorEntrega(err instanceof ErrorApi ? err.message : 'No se pudo marcar como entregado');
+      setConfirmandoEntrega(false);
     } finally {
-      setDespachando(false);
+      setEntregando(false);
     }
   };
   const nombre = nombreMesaSalon(mesa);
@@ -150,87 +183,148 @@ export function VistaPreviaMesa({
           </div>
 
           <div style={{ padding: '14px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {pedido?.progreso && <ProgresoPedido progreso={pedido.progreso} modalidad="MESA" variante="completo" />}
-
-            {puedeDespachar && listos.length > 0 && (
-              <div
-                data-testid="vista-previa-despachar"
+            {filas.length > 0 && (
+              <section
+                data-testid="vista-previa-productos"
+                aria-label="Productos"
                 style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--cp-line)', paddingTop: '10px' }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '13px',
-                    fontWeight: 800,
-                    color: todoEntregado ? VERDE_ENTREGADO : 'var(--cp-navy)',
-                  }}
-                >
-                  {todoEntregado && <IconoEntregado />}
-                  {todoEntregado ? 'Todo entregado' : 'Listo para entregar'}
-                </div>
-                {listos.map((p) =>
-                  p.pendientes > 0 ? (
-                    <div key={p.lineaId} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ flex: 1, fontSize: '14px', color: 'var(--cp-navy)' }}>
-                        {`${p.pendientes} × ${p.nombre}`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setDespachoPendiente({ linea: p })}
-                        aria-label={`Despachar ${p.pendientes} de ${p.nombre}`}
-                        style={{
-                          minHeight: '44px',
-                          minWidth: '44px',
-                          padding: '0 12px',
-                          border: 0,
-                          borderRadius: '10px',
-                          background: 'var(--cp-navy)',
-                          color: 'var(--cp-white)',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Despachar
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      key={p.lineaId}
-                      data-testid="vista-previa-entregado"
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.6, minHeight: '44px' }}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '13px',
+                      fontWeight: 800,
+                      color: todoEntregado ? VERDE_ENTREGADO : 'var(--cp-navy)',
+                    }}
+                  >
+                    {todoEntregado && <IconoEntregado />}
+                    {todoEntregado ? 'Todo entregado' : 'Productos'}
+                  </div>
+                  {puedeDespachar && marcables.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSeleccion(new Set(marcables.map((f) => f.lineaId)))}
+                      style={{
+                        minHeight: '44px',
+                        padding: '0 8px',
+                        border: 0,
+                        background: 'none',
+                        color: 'var(--cp-navy)',
+                        fontSize: '13px',
+                        fontWeight: 800,
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                      }}
                     >
-                      <IconoEntregado />
-                      <span style={{ flex: 1, fontSize: '14px', color: 'var(--cp-soft)' }}>
-                        {`${p.despachadas ?? 0} × ${p.nombre}`}
-                      </span>
-                      <span style={{ fontSize: '12px', fontWeight: 800, color: VERDE_ENTREGADO }}>Entregado</span>
-                    </div>
-                  ),
-                )}
-                {hayPendientes && (
+                      Seleccionar todo lo listo
+                    </button>
+                  )}
+                </div>
+
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {filas.map((f) => {
+                    const entregado = f.despachadas >= f.cantidad;
+                    const marcable = f.pendientes > 0;
+                    const estado = estadoFila(f);
+                    return (
+                      <li
+                        key={f.lineaId}
+                        data-testid="vista-previa-fila"
+                        data-estado={estado.texto}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', minHeight: '44px', opacity: entregado ? 0.6 : 1 }}
+                      >
+                        {puedeDespachar && (
+                          <label
+                            style={{
+                              minWidth: '44px',
+                              minHeight: '44px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              cursor: marcable ? 'pointer' : 'not-allowed',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={entregado || seleccion.has(f.lineaId)}
+                              disabled={!marcable}
+                              aria-disabled={!marcable}
+                              title={entregado ? 'Entregado' : marcable ? undefined : 'Aún en preparación'}
+                              aria-label={`${f.cantidad} × ${f.nombre}`}
+                              onChange={() => alternar(f.lineaId)}
+                              style={{ width: '22px', height: '22px', margin: 0, accentColor: 'var(--cp-navy)', cursor: 'inherit' }}
+                            />
+                          </label>
+                        )}
+                        <span
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: '14px',
+                            color: entregado ? 'var(--cp-soft)' : 'var(--cp-navy)',
+                          }}
+                        >
+                          {`${f.cantidad} × ${f.nombre}`}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: 'var(--cp-soft)',
+                            border: '1px solid var(--cp-line)',
+                            borderRadius: '999px',
+                            padding: '2px 8px',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {f.area}
+                        </span>
+                        <span
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '12px',
+                            fontWeight: 800,
+                            color: estado.color,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {entregado && <IconoEntregado />}
+                          {estado.texto}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {puedeDespachar && elegidas.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setDespachoPendiente({})}
+                    onClick={() => setConfirmandoEntrega(true)}
+                    disabled={entregando}
                     style={{
                       minHeight: '44px',
-                      border: '1.5px solid var(--cp-navy)',
+                      border: 0,
                       borderRadius: '12px',
-                      background: 'var(--cp-white)',
-                      color: 'var(--cp-navy)',
+                      background: 'var(--cp-navy)',
+                      color: 'var(--cp-white)',
                       fontWeight: 800,
                       cursor: 'pointer',
                     }}
                   >
-                    Despachar todo lo listo
+                    {`Marcar como entregado (${elegidas.length})`}
                   </button>
                 )}
-              </div>
+              </section>
             )}
-            {errorDespacho && (
+            {errorEntrega && (
               <div role="alert" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
-                {errorDespacho}
+                {errorEntrega}
               </div>
             )}
 
@@ -289,18 +383,14 @@ export function VistaPreviaMesa({
       </div>
 
       <Confirmar
-        abierto={!!despachoPendiente}
-        titulo="Despachar"
-        mensaje={
-          despachoPendiente?.linea
-            ? `Se despachan ${despachoPendiente.linea.pendientes} de ${despachoPendiente.linea.nombre}. No se puede deshacer. ¿Despachar?`
-            : 'Se despacha todo lo listo de esta mesa. No se puede deshacer. ¿Despachar?'
-        }
-        textoConfirmar="Sí, despachar"
+        abierto={confirmandoEntrega}
+        titulo="Marcar como entregado"
+        mensaje={elegidas.length === 1 ? "¿Marcar 1 producto como entregado en la mesa?" : `¿Marcar ${elegidas.length} productos como entregados en la mesa?`}
+        textoConfirmar="Sí"
         textoNo="No"
-        cargando={despachando}
-        alConfirmar={confirmarDespacho}
-        alCancelar={() => setDespachoPendiente(null)}
+        cargando={entregando}
+        alConfirmar={entregar}
+        alCancelar={() => setConfirmandoEntrega(false)}
       />
 
       {forzando && (

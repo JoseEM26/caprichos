@@ -1,17 +1,27 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { VistaPreviaMesa } from '../componentes/VistaPreviaMesa';
 import type { MesaSalon, ProgresoPedido as Progreso } from '../tipos';
+import * as cocinaApi from '../../cocina/cocinaApi';
 
-const progreso = (productos: Array<{ lineaId: string; nombre: string; cantidad: number; listas: number; despachadas: number }>): Progreso => ({
-  etapa: 'PARCIAL',
-  etiqueta: 'Cocina',
-  areas: [{ nombre: 'Bebidas', estado: 'PENDIENTE', lineas: productos.length, productos }],
-  listasDe: 0,
-  totalAreas: 1,
-  porcentaje: 0,
-  enCamino: false,
-});
+type Linea = { lineaId: string; nombre: string; cantidad: number; listas: number; despachadas: number; area?: string };
+
+const progreso = (productos: Linea[]): Progreso => {
+  const porArea = new Map<string, Linea[]>();
+  for (const p of productos) {
+    const area = p.area ?? 'Barra';
+    porArea.set(area, [...(porArea.get(area) ?? []), p]);
+  }
+  return {
+    etapa: 'PARCIAL',
+    etiqueta: 'Cocina',
+    areas: [...porArea].map(([nombre, prods]) => ({ nombre, estado: 'PENDIENTE', lineas: prods.length, productos: prods })),
+    listasDe: 0,
+    totalAreas: porArea.size,
+    porcentaje: 0,
+    enCamino: false,
+  };
+};
 
 const mesaCon = (p: Progreso, creadoEn = new Date().toISOString()): MesaSalon =>
   ({
@@ -46,37 +56,160 @@ const render1 = (mesa: MesaSalon, extra: Partial<Parameters<typeof VistaPreviaMe
     <VistaPreviaMesa mesa={mesa} puedeForzar={false} alCerrar={vi.fn()} alCambiar={vi.fn()} puedeDespachar {...extra} />,
   );
 
-describe('VistaPreviaMesa: producto despachado', () => {
-  it('despachado: check verde y «Entregado», sin botón Despachar; el pendiente sí tiene botón', () => {
+const casilla = (nombre: string) => screen.getByRole('checkbox', { name: nombre }) as HTMLInputElement;
+
+describe('VistaPreviaMesa: lista de entrega', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('cada producto aparece una sola vez, con su área y su estado', () => {
     render1(
       mesaCon(
         progreso([
-          { lineaId: '1', nombre: 'Latte', cantidad: 2, listas: 2, despachadas: 2 },
+          { lineaId: '1', nombre: 'Latte', cantidad: 2, listas: 2, despachadas: 0, area: 'Barra' },
+          { lineaId: '2', nombre: 'Torta', cantidad: 3, listas: 0, despachadas: 0, area: 'Postres' },
+        ]),
+      ),
+    );
+
+    expect(screen.getAllByText('2 × Latte')).toHaveLength(1);
+    expect(screen.getAllByText('3 × Torta')).toHaveLength(1);
+    expect(screen.queryByText('Listo para entregar')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Despachar/ })).toBeNull();
+
+    const filas = screen.getAllByTestId('vista-previa-fila');
+    expect(filas.map((f) => f.getAttribute('data-estado'))).toEqual(['Listo', 'En preparación']);
+    expect(within(filas[0]).getByText('Barra')).toBeInTheDocument();
+    expect(within(filas[1]).getByText('Postres')).toBeInTheDocument();
+  });
+
+  it('estados: parcial en naranja, listo, en preparación y entregado con check y atenuado', () => {
+    render1(
+      mesaCon(
+        progreso([
+          { lineaId: '1', nombre: 'Frappé', cantidad: 3, listas: 2, despachadas: 0 },
+          { lineaId: '2', nombre: 'Limonada', cantidad: 1, listas: 1, despachadas: 0 },
+          { lineaId: '3', nombre: 'Agua', cantidad: 1, listas: 0, despachadas: 0 },
+          { lineaId: '4', nombre: 'Té', cantidad: 2, listas: 2, despachadas: 2 },
+        ]),
+      ),
+    );
+
+    const filas = screen.getAllByTestId('vista-previa-fila');
+    expect(filas.map((f) => f.getAttribute('data-estado'))).toEqual([
+      '2 de 3 listos',
+      'Listo',
+      'En preparación',
+      'Entregado',
+    ]);
+    expect(within(filas[0]).getByText('2 de 3 listos').style.color).toBe('var(--cp-orange)');
+    expect(within(filas[1]).getByText('Listo').style.color).toBe('rgb(47, 122, 69)');
+    const entregado = filas[3];
+    expect(entregado.style.opacity).toBe('0.6');
+    expect(entregado.querySelector('svg')).not.toBeNull();
+    expect(within(entregado).getByText('Entregado')).toBeInTheDocument();
+  });
+
+  it('en preparación: casilla deshabilitada con aria-disabled y title «Aún en preparación»', () => {
+    render1(mesaCon(progreso([{ lineaId: '3', nombre: 'Agua', cantidad: 1, listas: 0, despachadas: 0 }])));
+
+    const c = casilla('1 × Agua');
+    expect(c.disabled).toBe(true);
+    expect(c.getAttribute('aria-disabled')).toBe('true');
+    expect(c.title).toBe('Aún en preparación');
+    expect(c.checked).toBe(false);
+    expect(screen.queryByRole('button', { name: /Marcar como entregado/ })).toBeNull();
+  });
+
+  it('entregado: la casilla aparece marcada y deshabilitada', () => {
+    render1(mesaCon(progreso([{ lineaId: '4', nombre: 'Té', cantidad: 2, listas: 2, despachadas: 2 }])));
+
+    const c = casilla('2 × Té');
+    expect(c.checked).toBe(true);
+    expect(c.disabled).toBe(true);
+    expect(c.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('marcar casillas solo selecciona: el botón aparece con el contador y no llama al endpoint', () => {
+    const despachar = vi.spyOn(cocinaApi, 'despacharPedido').mockResolvedValue({ completo: false, estado: 'PREPARANDO' });
+    render1(
+      mesaCon(
+        progreso([
+          { lineaId: '1', nombre: 'Latte', cantidad: 2, listas: 2, despachadas: 0 },
           { lineaId: '2', nombre: 'Torta', cantidad: 2, listas: 1, despachadas: 0 },
         ]),
       ),
     );
 
-    const bloque = screen.getByTestId('vista-previa-despachar');
-    const entregado = within(bloque).getByTestId('vista-previa-entregado');
-    expect(entregado).toHaveTextContent('2 × Latte');
-    expect(entregado).toHaveTextContent('Entregado');
-    expect(entregado.querySelector('svg')).not.toBeNull();
-    expect(entregado.style.opacity).toBe('0.6');
-    expect(within(entregado).queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Marcar como entregado/ })).toBeNull();
+    fireEvent.click(casilla('2 × Latte'));
+    expect(casilla('2 × Latte').checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Marcar como entregado (1)' })).toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'Despachar 1 de Torta' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Despachar 2 de Latte/ })).toBeNull();
+    fireEvent.click(casilla('2 × Torta'));
+    expect(screen.getByRole('button', { name: 'Marcar como entregado (2)' })).toBeInTheDocument();
+    expect(despachar).not.toHaveBeenCalled();
   });
 
-  it('«Despachar todo lo listo» oculto si no hay unidades por despachar', () => {
+  it('Sí/No propio: No no despacha; Sí llama al endpoint con las unidades listas sin entregar y refresca', async () => {
+    const despachar = vi.spyOn(cocinaApi, 'despacharPedido').mockResolvedValue({ completo: false, estado: 'PREPARANDO' });
+    const alCambiar = vi.fn();
+    render1(
+      mesaCon(
+        progreso([
+          { lineaId: '1', nombre: 'Latte', cantidad: 3, listas: 2, despachadas: 1 },
+          { lineaId: '2', nombre: 'Torta', cantidad: 2, listas: 2, despachadas: 0 },
+          { lineaId: '3', nombre: 'Agua', cantidad: 1, listas: 0, despachadas: 0 },
+        ]),
+      ),
+      { alCambiar },
+    );
+
+    fireEvent.click(casilla('3 × Latte'));
+    fireEvent.click(casilla('2 × Torta'));
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como entregado (2)' }));
+
+    expect(screen.getByText('¿Marcar 2 productos como entregados en la mesa?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'No' }));
+    expect(despachar).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como entregado (2)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí' }));
+    await waitFor(() =>
+      expect(despachar).toHaveBeenCalledWith('9', [
+        { lineaId: '1', unidades: 1 },
+        { lineaId: '2', unidades: 2 },
+      ]),
+    );
+    await waitFor(() => expect(alCambiar).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: /Marcar como entregado/ })).toBeNull();
+  });
+
+  it('«Seleccionar todo lo listo» marca solo las filas con unidades listas sin entregar', () => {
+    render1(
+      mesaCon(
+        progreso([
+          { lineaId: '1', nombre: 'Latte', cantidad: 2, listas: 2, despachadas: 2 },
+          { lineaId: '2', nombre: 'Torta', cantidad: 2, listas: 1, despachadas: 0 },
+          { lineaId: '3', nombre: 'Agua', cantidad: 1, listas: 0, despachadas: 0 },
+        ]),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar todo lo listo' }));
+    expect(casilla('2 × Torta').checked).toBe(true);
+    expect(casilla('1 × Agua').checked).toBe(false);
+    expect(screen.getByRole('button', { name: 'Marcar como entregado (1)' })).toBeInTheDocument();
+  });
+
+  it('«Seleccionar todo lo listo» no aparece si nada está listo sin entregar', () => {
     render1(mesaCon(progreso([{ lineaId: '1', nombre: 'Latte', cantidad: 2, listas: 2, despachadas: 2 }])));
 
-    expect(screen.queryByRole('button', { name: 'Despachar todo lo listo' })).toBeNull();
-    expect(screen.queryByText('No hay unidades listas por despachar')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Seleccionar todo lo listo' })).toBeNull();
   });
 
-  it('con todo entregado el bloque dice «Todo entregado» con check, y no hay botón de despacho', () => {
+  it('con todo entregado el encabezado dice «Todo entregado» con check', () => {
     render1(
       mesaCon(
         progreso([
@@ -86,27 +219,27 @@ describe('VistaPreviaMesa: producto despachado', () => {
       ),
     );
 
-    const bloque = screen.getByTestId('vista-previa-despachar');
-    expect(within(bloque).getByText('Todo entregado')).toBeInTheDocument();
-    expect(within(bloque).queryByText('Listo para entregar')).toBeNull();
-    expect(within(bloque).getAllByTestId('vista-previa-entregado')).toHaveLength(2);
-    expect(within(bloque).queryByRole('button')).toBeNull();
+    const lista = screen.getByTestId('vista-previa-productos');
+    expect(within(lista).getByText('Todo entregado')).toBeInTheDocument();
+    expect(within(lista).queryByText('Productos')).toBeNull();
+    expect(within(lista).getAllByRole('checkbox')).toHaveLength(2);
   });
 
-  it('con algo sin despachar el bloque sigue en «Listo para entregar» y muestra «Despachar todo lo listo»', () => {
+  it('sin permiso cocina/despachar la lista se muestra sin casillas ni botón', () => {
     render1(
       mesaCon(
         progreso([
-          { lineaId: '1', nombre: 'Latte', cantidad: 2, listas: 2, despachadas: 2 },
-          { lineaId: '2', nombre: 'Torta', cantidad: 2, listas: 1, despachadas: 0 },
+          { lineaId: '1', nombre: 'Latte', cantidad: 2, listas: 2, despachadas: 0 },
+          { lineaId: '2', nombre: 'Torta', cantidad: 1, listas: 0, despachadas: 0 },
         ]),
       ),
+      { puedeDespachar: false },
     );
 
-    const bloque = screen.getByTestId('vista-previa-despachar');
-    expect(within(bloque).getByText('Listo para entregar')).toBeInTheDocument();
-    expect(within(bloque).queryByText('Todo entregado')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Despachar todo lo listo' })).toBeInTheDocument();
+    expect(screen.getAllByText('2 × Latte')).toHaveLength(1);
+    expect(screen.getByText('Listo')).toBeInTheDocument();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Seleccionar todo lo listo' })).toBeNull();
   });
 });
 

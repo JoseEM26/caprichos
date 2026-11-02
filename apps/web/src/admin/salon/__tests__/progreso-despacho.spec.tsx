@@ -69,7 +69,7 @@ describe('ProgresoPedido: por producto y tiempo estimado', () => {
   });
 });
 
-describe('VistaPreviaMesa: despachar', () => {
+describe('VistaPreviaMesa: entrega por casillas', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -111,33 +111,36 @@ describe('VistaPreviaMesa: despachar', () => {
     },
   } as unknown as MesaSalon;
 
-  it('despacha la línea lista tras Sí, y sin permiso no muestra el botón', async () => {
+  it('marca la línea lista, pide Sí y despacha solo sus unidades listas; sin permiso no hay casillas', async () => {
     const despachar = vi.spyOn(cocinaApi, 'despacharPedido').mockResolvedValue({ completo: false, estado: 'PREPARANDO' });
     const alCambiar = vi.fn();
     const { unmount } = render(
       <VistaPreviaMesa mesa={mesa} puedeForzar={false} alCerrar={vi.fn()} alCambiar={alCambiar} puedeDespachar />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Despachar 1 de Lomo' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, despachar' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '2 × Lomo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como entregado (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí' }));
     await waitFor(() => expect(despachar).toHaveBeenCalledWith('9', [{ lineaId: '55', unidades: 1 }]));
     expect(alCambiar).toHaveBeenCalled();
     unmount();
 
     render(<VistaPreviaMesa mesa={mesa} puedeForzar={false} alCerrar={vi.fn()} alCambiar={vi.fn()} />);
-    expect(screen.queryByRole('button', { name: 'Despachar todo lo listo' })).toBeNull();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /Marcar como entregado/ })).toBeNull();
   });
 
-  it('despachar todo lo listo pide Sí o No', async () => {
+  it('«Seleccionar todo lo listo» y luego marcar pide Sí o No antes de despachar', async () => {
     const despachar = vi.spyOn(cocinaApi, 'despacharPedido').mockResolvedValue({ completo: false, estado: 'PREPARANDO' });
     render(<VistaPreviaMesa mesa={mesa} puedeForzar={false} alCerrar={vi.fn()} alCambiar={vi.fn()} puedeDespachar />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Despachar todo lo listo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar todo lo listo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como entregado (1)' }));
     fireEvent.click(await screen.findByRole('button', { name: 'No' }));
     expect(despachar).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Despachar todo lo listo' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, despachar' }));
-    await waitFor(() => expect(despachar).toHaveBeenCalledWith('9', undefined));
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como entregado (1)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí' }));
+    await waitFor(() => expect(despachar).toHaveBeenCalledWith('9', [{ lineaId: '55', unidades: 1 }]));
   });
 });
