@@ -8,8 +8,8 @@ export async function main() {
   // 1. Lugares de stock: Almacén central, Cocina, Barra, Producción, Merma
   const lugares = [
     { nombre: 'Almacén central', tipo: 'ALMACEN' },
-    { nombre: 'Cocina', tipo: 'AREA' },
-    { nombre: 'Barra', tipo: 'AREA' },
+    { nombre: 'Salados', tipo: 'AREA' },
+    { nombre: 'Bebidas', tipo: 'AREA' },
     { nombre: 'Producción', tipo: 'AREA' },
   ];
 
@@ -50,7 +50,7 @@ export async function main() {
 
   // 3. Pedidos internos (REQ-044, REQ-045)
   const areaCocina = await prisma.areaCocina.findFirst({
-    where: { nombre: 'Cocina' },
+    where: { nombre: 'Salados' },
   });
 
   if (areaCocina) {

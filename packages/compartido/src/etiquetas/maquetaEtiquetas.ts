@@ -276,7 +276,7 @@ export function maquetarGeneral(d: EtiquetaGeneralDatos, f: FormatoMaqueta = {})
 }
 
 export function maquetarArea(d: EtiquetaAreaDatos, f: FormatoMaqueta = {}): Maqueta {
-  const C = inicio(f, d.areaNombre || 'COCINA', `Area ${d.areaIndex || 1} de ${d.totalAreas || 1}`);
+  const C = inicio(f, d.areaNombre || 'SALADOS', `Area ${d.areaIndex || 1} de ${d.totalAreas || 1}`);
   let y = 124;
   const pillTxt = (d.modalidadPill || 'SALON').toUpperCase();
   pillDerecha(C, y, pillTxt);

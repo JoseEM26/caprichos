@@ -206,7 +206,7 @@ export function ModalPedirAlmacen({
         await pedirInsumosAlmacen({
           items: itemsSeleccionados,
           nota: nota.trim(),
-          area: 'Cocina',
+          area: 'Salados',
         });
       }
 

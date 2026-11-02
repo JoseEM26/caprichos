@@ -233,6 +233,9 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     fireEvent.change(screen.getByLabelText('Monto en Efectivo'), { target: { value: '9' } });
 
     expect(screen.getByRole('alert')).toHaveTextContent('Sobra S/ 0.50');
-    expect(screen.getByRole('button', { name: 'Registrar pedido' })).toBeDisabled();
+    // El botón sigue activo; al tocarlo no abre la confirmación y deja el aviso del plan
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    expect(screen.queryByRole('button', { name: 'Sí, registrar' })).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent('Sobra S/ 0.50');
   });
 });

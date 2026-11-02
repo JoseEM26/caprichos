@@ -125,11 +125,11 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     expect(insumoHarina).not.toBeNull();
 
     const stockAlmInicial = Number(await obtenerStockInsumo('Harina de trigo', 'Almacén central'));
-    const stockCocInicial = Number(await obtenerStockInsumo('Harina de trigo', 'Cocina'));
+    const stockCocInicial = Number(await obtenerStockInsumo('Harina de trigo', 'Salados'));
 
     // 3. Cocina solicita insumos al almacén (crea pedido interno)
     const areaCocina = await prisma.areaCocina.findFirst({
-      where: { nombre: 'Cocina' },
+      where: { nombre: 'Salados' },
     });
     expect(areaCocina).not.toBeNull();
 
@@ -173,7 +173,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     expect(stockAlmPostEntrega).toBe(stockAlmInicial - 5);
 
     // - Stock de cocina todavía NO sube
-    const stockCocPostEntrega = Number(await obtenerStockInsumo('Harina de trigo', 'Cocina'));
+    const stockCocPostEntrega = Number(await obtenerStockInsumo('Harina de trigo', 'Salados'));
     expect(stockCocPostEntrega).toBe(stockCocInicial);
 
     // - Traslado creado en estado POR_RECIBIR con enviado = 5
@@ -203,7 +203,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
 
     // 7. Verificaciones tras confirmación de recepción:
     // - Stock de cocina sube exactamente en 4 KG
-    const stockCocFinal = Number(await obtenerStockInsumo('Harina de trigo', 'Cocina'));
+    const stockCocFinal = Number(await obtenerStockInsumo('Harina de trigo', 'Salados'));
     expect(stockCocFinal).toBe(stockCocInicial + 4);
 
     // - Stock de almacén central se mantiene en el valor ya descontado
@@ -277,7 +277,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     await dialogMov.getByRole('button', { name: /Café en grano/i }).click();
 
     // Origen Cocina (donde hay 0 KG de Café en grano)
-    await inputOrigen.fill('Cocina');
+    await inputOrigen.fill('Salados');
     await inputCantidad.fill('500');
 
     await dialogMov.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
@@ -290,7 +290,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     await dialogMov.getByRole('button', { name: 'Cancelar' }).click();
 
     // Stock de cocina sigue sin ser negativo
-    const stockCocina = Number(await obtenerStockInsumo('Café en grano', 'Cocina'));
+    const stockCocina = Number(await obtenerStockInsumo('Café en grano', 'Salados'));
     expect(stockCocina).toBeGreaterThanOrEqual(0);
   });
 
@@ -313,7 +313,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
 
     // Stock previo de Harina de trigo y Torta de Chocolate
     const stockHarinaTotalPrevio = Number(await obtenerStockInsumo('Harina de trigo'));
-    const stockTortaCocinaPrevio = Number(await obtenerStockProducto('Torta de Chocolate', 'Cocina'));
+    const stockTortaCocinaPrevio = Number(await obtenerStockProducto('Torta de Chocolate', 'Salados'));
 
     // 2. Registrar producción por tanda 100% por la UI
     await loginPorUi(page, 'ALMACEN');
@@ -349,7 +349,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     expect(stockHarinaPostProd).toBe(stockHarinaTotalPrevio - 1);
 
     // Torta de Chocolate aumentó en 10 unidades en Cocina
-    const stockTortaPostProd = Number(await obtenerStockProducto('Torta de Chocolate', 'Cocina'));
+    const stockTortaPostProd = Number(await obtenerStockProducto('Torta de Chocolate', 'Salados'));
     expect(stockTortaPostProd).toBe(stockTortaCocinaPrevio + 10);
 
     // Movimientos generados en BD
@@ -381,7 +381,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     expect(resAnularProd.ok).toBe(true);
 
     // Verificaciones tras anulación (reversión exacta)
-    const stockTortaFinal = Number(await obtenerStockProducto('Torta de Chocolate', 'Cocina'));
+    const stockTortaFinal = Number(await obtenerStockProducto('Torta de Chocolate', 'Salados'));
     expect(stockTortaFinal).toBe(stockTortaCocinaPrevio);
 
     const stockHarinaFinal = Number(await obtenerStockInsumo('Harina de trigo'));
@@ -477,11 +477,11 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     });
     expect(prodTorta).not.toBeNull();
     const cocinaLugar = await prisma.lugarStock.findFirst({
-      where: { nombre: 'Cocina' },
+      where: { nombre: 'Salados' },
     });
     expect(cocinaLugar).not.toBeNull();
 
-    const stockProdPrevio = Number(await obtenerStockProducto('Torta de Chocolate', 'Cocina'));
+    const stockProdPrevio = Number(await obtenerStockProducto('Torta de Chocolate', 'Salados'));
 
     // Crear un movimiento manual para producto terminado
     const movProdManual = await prisma.movimientoStock.create({
@@ -500,7 +500,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
       data: { cantidad: { increment: 6 } },
     });
 
-    expect(Number(await obtenerStockProducto('Torta de Chocolate', 'Cocina'))).toBe(stockProdPrevio + 6);
+    expect(Number(await obtenerStockProducto('Torta de Chocolate', 'Salados'))).toBe(stockProdPrevio + 6);
 
     // Anular el movimiento del producto terminado
     limpiarRedisSupervisor();
@@ -522,7 +522,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     expect(resAnularProd.ok).toBe(true);
 
     // Stock de producto terminado vuelve exactamente al valor previo
-    const stockProdRestaurado = Number(await obtenerStockProducto('Torta de Chocolate', 'Cocina'));
+    const stockProdRestaurado = Number(await obtenerStockProducto('Torta de Chocolate', 'Salados'));
     expect(stockProdRestaurado).toBe(stockProdPrevio);
 
     const movAnulacionProd = await prisma.movimientoStock.findFirst({
@@ -565,7 +565,7 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     });
 
     // Asegurar que Torta de Chocolate tiene stock elaborado disponible en Cocina (> 0)
-    const stockTortaCocina = Number(await obtenerStockProducto('Torta de Chocolate', 'Cocina'));
+    const stockTortaCocina = Number(await obtenerStockProducto('Torta de Chocolate', 'Salados'));
     expect(stockTortaCocina).toBeGreaterThan(0);
 
     // 1. Simular agotamiento de Café en grano (insumo de receta unitaria)

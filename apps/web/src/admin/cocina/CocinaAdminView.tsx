@@ -1232,7 +1232,7 @@ export function CocinaAdminView() {
             await pedirInsumosAlmacen({
               items: datos.items,
               nota: datos.nota,
-              area: 'Cocina',
+              area: 'Salados',
             });
             setMensajeAccion('Pedido de insumos enviado al almacén con éxito.');
           } catch (err: any) {

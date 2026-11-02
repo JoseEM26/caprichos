@@ -344,7 +344,7 @@ test.describe('Suite E2E - Módulo de Compras y Producción', () => {
       where: { nombre: 'Harina de trigo' },
     });
     const lugarCocina = await prisma.lugarStock.findFirst({
-      where: { nombre: 'Cocina' },
+      where: { nombre: 'Salados' },
     });
 
     expect(prodTorta).not.toBeNull();
@@ -363,10 +363,10 @@ test.describe('Suite E2E - Módulo de Compras y Producción', () => {
     });
 
     const stockInsumoCocinaPrevio = Number(
-      await obtenerStockInsumo('Harina de trigo', 'Cocina'),
+      await obtenerStockInsumo('Harina de trigo', 'Salados'),
     );
     const stockProdCocinaPrevio = Number(
-      await obtenerStockProducto('Torta de Chocolate', 'Cocina'),
+      await obtenerStockProducto('Torta de Chocolate', 'Salados'),
     );
 
     // 2. Iniciar sesión como ALMACEN y navegar a Almacén
@@ -413,13 +413,13 @@ test.describe('Suite E2E - Módulo de Compras y Producción', () => {
     // 10. Verificaciones en Base de Datos
     // Stock de Torta de Chocolate en Cocina aumentó en 20
     const stockProdCocinaFinal = Number(
-      await obtenerStockProducto('Torta de Chocolate', 'Cocina'),
+      await obtenerStockProducto('Torta de Chocolate', 'Salados'),
     );
     expect(stockProdCocinaFinal).toBe(stockProdCocinaPrevio + 20);
 
     // Stock de Harina en Cocina disminuyó en 2 KG
     const stockInsumoCocinaFinal = Number(
-      await obtenerStockInsumo('Harina de trigo', 'Cocina'),
+      await obtenerStockInsumo('Harina de trigo', 'Salados'),
     );
     expect(stockInsumoCocinaFinal).toBe(stockInsumoCocinaPrevio - 2);
 

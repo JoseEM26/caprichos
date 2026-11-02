@@ -149,7 +149,7 @@ export const AlmacenView: React.FC = () => {
       await almacenApi.entregarPedidoInterno(pedidoEntregarId);
       setConfirmarEntregarAbierto(false);
       setPedidoEntregarId(null);
-      setMensajeExito('Pedido interno entregado: insumos trasladados a Cocina.');
+      setMensajeExito('Pedido interno entregado: insumos trasladados a Salados.');
       cargarDatos();
       setTimeout(() => setMensajeExito(''), 4000);
     } catch (err: any) {
@@ -377,7 +377,7 @@ export const AlmacenView: React.FC = () => {
                 >
                   <div style={{ flex: '1 1 240px' }}>
                     <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy)' }}>
-                      Pedido #{p.id} · {p.area || 'Cocina'}
+                      Pedido #{p.id} · {p.area || 'Salados'}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--cp-navy)', marginTop: 2 }}>
                       {itemsStr || 'Insumos solicitados'}

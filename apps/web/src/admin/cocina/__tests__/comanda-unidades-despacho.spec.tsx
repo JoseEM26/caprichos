@@ -123,6 +123,7 @@ describe('ComandaTarjeta: despachar en la vista Todas', () => {
 
     const nombre = screen.getByText('Torta');
     expect(nombre.style.textDecoration).toBe('line-through');
+    expect(screen.getByText('Despachado').querySelector('svg')).not.toBeNull();
     expect(screen.queryByRole('button', { name: /Despachar 1 de Torta/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Despachar todo lo listo' })).toBeNull();
   });

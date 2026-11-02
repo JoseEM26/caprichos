@@ -342,12 +342,18 @@ export function ModalNuevoPedidoMesa({
     setCliPuntoMapa(null);
   };
 
-  // Con cuenta basta con la cuenta encontrada (nombre y teléfono vienen de ella); si no, nombre obligatorio
-  const datosCliListos = modoCli === 'cuenta' ? cuenta !== null : cliNombre.trim().length > 0;
-  // Delivery: hace falta dirección (escrita o en el mapa), venga de la libreta o sea nueva
-  const cliListo =
-    datosCliListos &&
-    (modalidad !== 'delivery' || cliDireccion.trim().length > 0 || cliPuntoMapa !== null);
+  // Datos del cliente (para llevar / delivery). «Continuar» no se deshabilita: al tocarlo muestra qué falta
+  // y lleva el foco al campo (ver intentarContinuarCli). Con cuenta basta la cuenta; si no, nombre de 2+ letras.
+  // Delivery: hace falta dirección (escrita o en el mapa), venga de la libreta o sea nueva.
+  const errorDatosCli =
+    modoCli === 'cuenta' && cuenta === null
+      ? { mensaje: 'Busca y elige la cuenta del cliente', foco: ['#cli-cel'] }
+      : modoCli === 'invitado' && cliNombre.trim().length < 2
+        ? { mensaje: 'Escribe el nombre del cliente (mínimo 2 letras)', foco: ['#cli-nombre'] }
+        : modalidad === 'delivery' && cliDireccion.trim().length === 0 && cliPuntoMapa === null
+          ? { mensaje: 'Escribe la dirección o marca el punto en el mapa', foco: ['#cli-direccion'] }
+          : null;
+  const cliListo = errorDatosCli === null;
   // Celular del cliente del delivery (cuenta o invitado): para ver si mandó su ubicación por WhatsApp
   const telUbicacionDelivery = modoCli === 'cuenta' ? telCli : cliTelefono.replace(/\D/g, '');
   const telefonoUbicacionDelivery = /^9\d{8}$/.test(telUbicacionDelivery) ? telUbicacionDelivery : null;
@@ -535,6 +541,15 @@ export function ModalNuevoPedidoMesa({
   // Diálogo de confirmación
   const [confirmarEnviar, setConfirmarEnviar] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  // Se activa al tocar el botón con datos incompletos: desde ahí cada falta se muestra junto a su campo
+  const [intentoEnvio, setIntentoEnvio] = useState(false);
+  const [intentoCli, setIntentoCli] = useState(false);
+  useEffect(() => {
+    if (!abierto) {
+      setIntentoEnvio(false);
+      setIntentoCli(false);
+    }
+  }, [abierto]);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
   // Cómo paga (mesa, llevar y delivery): un medio o pago dividido. La parte digital pide voucher opcional.
@@ -770,10 +785,70 @@ export function ModalNuevoPedidoMesa({
   const nombreMesaDeStaff = pideMode === 'personal' && staffElegido ? staffElegido.nombre : null;
   const nombreMesaFijo = nombreMesaDeCuenta ?? nombreMesaDeStaff;
   const nombreMesa = (nombreMesaFijo ?? cliNombre).trim();
-  const nombreMesaListo =
-    modalidad !== 'local' || (pideMode === 'cliente' ? clienteEncontrado !== null : nombreMesa.length >= 2);
+  const errorNombreMesa =
+    pideMode === 'cliente'
+      ? clienteEncontrado
+        ? null
+        : 'Busca y elige la cuenta del cliente'
+      : nombreMesa.length >= 2
+        ? null
+        : 'Escribe el nombre del cliente (mínimo 2 letras)';
   const telefonoMesa = cliTelefono.replace(/\D/g, '');
   const telefonoMesaValido = telefonoMesa === '' || /^9\d{8}$/.test(telefonoMesa);
+
+  // Todo lo que bloquea «Enviar» en el paso de productos, en orden de revisión. El botón no se deshabilita:
+  // al tocarlo se muestra el primer mensaje y el foco va a su campo (intentarEnviar).
+  type ErrorEnvio = { campo: 'productos' | 'mesa' | 'nombre' | 'telefono' | 'plan' | 'pagaCon'; mensaje: string; foco: string[] };
+  const errorPagaCon =
+    modalidad === 'delivery' && montoEfectivoAhora > 0 && pagaConValido() === undefined
+      ? `Indica con cuánto paga: debe ser S/ ${montoEfectivoAhora.toFixed(2)} o más`
+      : null;
+  const erroresEnvio: ErrorEnvio[] = [];
+  if (lineas.length === 0)
+    erroresEnvio.push({ campo: 'productos', mensaje: 'Agrega al menos un producto para enviarlo.', foco: [] });
+  if (modalidad === 'local' && mesasSeleccionadas.length === 0)
+    erroresEnvio.push({ campo: 'mesa', mensaje: 'Elige una mesa para enviarlo.', foco: [] });
+  if (modalidad === 'local' && errorNombreMesa)
+    erroresEnvio.push({ campo: 'nombre', mensaje: errorNombreMesa, foco: ['#np-nombre-mesa'] });
+  if (modalidad === 'local' && pideMode !== 'cliente' && !telefonoMesaValido)
+    erroresEnvio.push({
+      campo: 'telefono',
+      mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+      foco: ['#np-telefono-mesa'],
+    });
+  if (errorPlanAhora)
+    erroresEnvio.push({ campo: 'plan', mensaje: errorPlanAhora, foco: ['#np-plan-pago input', '#np-plan-pago button'] });
+  if (errorPagaCon) erroresEnvio.push({ campo: 'pagaCon', mensaje: errorPagaCon, foco: ['#plan-paga-con'] });
+  // Mensaje fijo bajo el botón (productos o mesa, siempre visible como antes)
+  const motivoNoEnviar = erroresEnvio.find((e) => e.campo === 'productos' || e.campo === 'mesa')?.mensaje ?? '';
+
+  const enfocarCampo = (selectores: string[]) => {
+    for (const selector of selectores) {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (el) {
+        el.scrollIntoView?.({ block: 'center' });
+        el.focus();
+        return;
+      }
+    }
+  };
+  const intentarEnviar = () => {
+    const primero = erroresEnvio[0];
+    if (primero) {
+      setIntentoEnvio(true);
+      enfocarCampo(primero.foco);
+      return;
+    }
+    setConfirmarEnviar(true);
+  };
+  const intentarContinuarCli = () => {
+    if (errorDatosCli) {
+      setIntentoCli(true);
+      enfocarCampo(errorDatosCli.foco);
+      return;
+    }
+    setPaso('items');
+  };
 
   // Enviar pedido a cocina o registrar pedido (Para llevar / Delivery)
   const handleEnviarPedido = async () => {
@@ -978,13 +1053,6 @@ export function ModalNuevoPedidoMesa({
     }
     return '';
   }, [paso, modalidad, pisosActivos, pisoActual, textoMesas, cliNombre]);
-
-  const motivoNoEnviar =
-    lineas.length === 0
-      ? 'Agrega al menos un producto para enviarlo.'
-      : modalidad === 'local' && mesasSeleccionadas.length === 0
-        ? 'Elige una mesa para enviarlo.'
-        : '';
 
   if (!abierto) return null;
 
@@ -1910,6 +1978,7 @@ export function ModalNuevoPedidoMesa({
                     Nombre *
                   </label>
                   <input
+                    id="cli-nombre"
                     type="text"
                     value={cliNombre}
                     onChange={(e) => setCliNombre(e.target.value)}
@@ -2041,6 +2110,7 @@ export function ModalNuevoPedidoMesa({
                         Dirección *
                       </label>
                       <input
+                        id="cli-direccion"
                         type="text"
                         value={cliDireccion}
                         onChange={(e) => setCliDireccion(e.target.value)}
@@ -2190,10 +2260,14 @@ export function ModalNuevoPedidoMesa({
                 </>
               )}
 
+              {intentoCli && errorDatosCli && (
+                <span role="alert" style={{ fontSize: '12px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                  {errorDatosCli.mensaje}
+                </span>
+              )}
               <button
                 type="button"
-                disabled={!cliListo}
-                onClick={() => setPaso('items')}
+                onClick={intentarContinuarCli}
                 style={{
                   minHeight: '48px',
                   borderRadius: '12px',
@@ -2426,17 +2500,23 @@ export function ModalNuevoPedidoMesa({
                         value={cliNombre}
                         onChange={(e) => setCliNombre(e.target.value)}
                         placeholder="Ej.: María López"
+                        aria-invalid={intentoEnvio && !!errorNombreMesa}
                         style={{
                           width: '100%',
                           boxSizing: 'border-box',
                           minHeight: '40px',
                           borderRadius: '10px',
-                          border: '1.5px solid var(--cp-line)',
+                          border: `1.5px solid ${intentoEnvio && errorNombreMesa ? 'var(--cp-rust)' : 'var(--cp-line)'}`,
                           background: 'var(--cp-white)',
                           padding: '0 12px',
                           fontSize: '14px',
                         }}
                       />
+                    )}
+                    {intentoEnvio && errorNombreMesa && nombreMesaFijo === null && (
+                      <span role="alert" style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                        {errorNombreMesa}
+                      </span>
                     )}
                     {pideMode !== 'cliente' && (
                       <>
@@ -2947,26 +3027,27 @@ export function ModalNuevoPedidoMesa({
                   </div>
                 </div>
 
-                <PlanPagoEditor
-                  total={total}
-                  filas={filasPlan}
-                  onChange={setFilasPlan}
-                  pagaCon={cliPagaCon}
-                  onPagaCon={setCliPagaCon}
-                  pagaConObligatorio={modalidad === 'delivery'}
-                />
+                <div id="np-plan-pago">
+                  <PlanPagoEditor
+                    total={total}
+                    filas={filasPlan}
+                    onChange={setFilasPlan}
+                    pagaCon={cliPagaCon}
+                    onPagaCon={setCliPagaCon}
+                    pagaConObligatorio={modalidad === 'delivery'}
+                    pagaConInvalido={intentoEnvio && errorPagaCon !== null}
+                  />
+                  {intentoEnvio && errorPagaCon && (
+                    <span role="alert" style={{ fontSize: '12px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                      {errorPagaCon}
+                    </span>
+                  )}
+                </div>
 
-                {/* Botón Enviar a cocina / Registrar pedido */}
+                {/* Botón Enviar a cocina / Registrar pedido: no se deshabilita; al tocarlo muestra qué falta */}
                 <button
                   type="button"
-                  disabled={
-                    lineas.length === 0 ||
-                    (modalidad === 'local' && mesasSeleccionadas.length === 0) ||
-                    (modalidad === 'local' && (!nombreMesaListo || !telefonoMesaValido)) ||
-                    errorPlanAhora !== null ||
-                    (modalidad === 'delivery' && montoEfectivoAhora > 0 && pagaConValido() === undefined)
-                  }
-                  onClick={() => setConfirmarEnviar(true)}
+                  onClick={intentarEnviar}
                   className="salon-pie-fijo np-enviar"
                   aria-label={
                     modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'

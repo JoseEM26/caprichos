@@ -38,7 +38,7 @@ describe('AlmacenService', () => {
 
     stockService = {
       obtenerOcrearLugarAlmacen: jest.fn().mockResolvedValue({ id: 10n, nombre: 'Almacén Principal' }),
-      obtenerOcrearLugarCocina: jest.fn().mockResolvedValue({ id: 11n, nombre: 'Cocina' }),
+      obtenerOcrearLugarCocina: jest.fn().mockResolvedValue({ id: 11n, nombre: 'Salados' }),
       actualizarStockInsumo: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -51,17 +51,17 @@ describe('AlmacenService', () => {
       },
       lugarStock: {
         findFirst: jest.fn().mockImplementation(async (args: any) => {
-          if (args?.where?.nombre?.contains && /cocina/i.test(args.where.nombre.contains)) {
-            return { id: 11n, nombre: 'Cocina' };
+          if (args?.where?.nombre?.contains && /salados/i.test(args.where.nombre.contains)) {
+            return { id: 11n, nombre: 'Salados' };
           }
           return { id: 10n, nombre: 'Almacén Principal' };
         }),
         findUnique: jest.fn().mockImplementation(async (args: any) => {
-          if (args?.where?.nombre && /cocina/i.test(args.where.nombre)) {
-            return { id: 11n, nombre: 'Cocina' };
+          if (args?.where?.nombre && /salados/i.test(args.where.nombre)) {
+            return { id: 11n, nombre: 'Salados' };
           }
           if (args?.where?.id === 11n) {
-            return { id: 11n, nombre: 'Cocina' };
+            return { id: 11n, nombre: 'Salados' };
           }
           return { id: 10n, nombre: 'Almacén central' };
         }),
@@ -106,8 +106,8 @@ describe('AlmacenService', () => {
         findMany: jest.fn(),
       },
       areaCocina: {
-        findFirst: jest.fn().mockResolvedValue({ id: 1n, nombre: 'Cocina' }),
-        findUnique: jest.fn().mockResolvedValue({ id: 1n, nombre: 'Cocina' }),
+        findFirst: jest.fn().mockResolvedValue({ id: 1n, nombre: 'Salados' }),
+        findUnique: jest.fn().mockResolvedValue({ id: 1n, nombre: 'Salados' }),
       },
       traslado: {
         create: jest.fn().mockResolvedValue({ id: 50n }),
@@ -366,8 +366,8 @@ describe('AlmacenService', () => {
         ],
       });
       prisma.lugarStock.findFirst.mockImplementation(async (args: any) => {
-        if (args?.where?.nombre?.contains === 'Cocina') {
-          return { id: 11n, nombre: 'Cocina' };
+        if (args?.where?.nombre?.contains === 'Salados') {
+          return { id: 11n, nombre: 'Salados' };
         }
         return { id: 10n, nombre: 'Almacén central' };
       });
@@ -414,8 +414,8 @@ describe('AlmacenService', () => {
         ],
       });
       prisma.lugarStock.findFirst.mockImplementation(async (args: any) => {
-        if (args?.where?.nombre?.contains === 'Cocina') {
-          return { id: 11n, nombre: 'Cocina' };
+        if (args?.where?.nombre?.contains === 'Salados') {
+          return { id: 11n, nombre: 'Salados' };
         }
         return { id: 10n, nombre: 'Almacén central' };
       });
@@ -471,8 +471,8 @@ describe('AlmacenService', () => {
         ],
       });
       prisma.lugarStock.findFirst.mockImplementation(async (args: any) => {
-        if (args?.where?.nombre?.contains === 'Cocina') {
-          return { id: 11n, nombre: 'Cocina' };
+        if (args?.where?.nombre?.contains === 'Salados') {
+          return { id: 11n, nombre: 'Salados' };
         }
         return { id: 10n, nombre: 'Almacén central' };
       });
@@ -554,7 +554,7 @@ describe('AlmacenService', () => {
         nombre: 'Leche entera',
         unidad_almacen: 'L',
       });
-      prisma.lugarStock.findUnique.mockResolvedValue({ id: 11n, nombre: 'Cocina' });
+      prisma.lugarStock.findUnique.mockResolvedValue({ id: 11n, nombre: 'Salados' });
       prisma.stock.findFirst.mockResolvedValue({
         id: 25n,
         insumo_id: 1n,
@@ -569,7 +569,7 @@ describe('AlmacenService', () => {
             {
               insumoId: 1,
               cantidad: 3,
-              origen: 'Cocina',
+              origen: 'Salados',
               destino: 'Desecho',
             },
           ],
@@ -612,7 +612,7 @@ describe('AlmacenService', () => {
         nombre: 'Donas artesanales',
         unidad_almacen: 'UNIDAD',
       });
-      prisma.lugarStock.findUnique.mockResolvedValue({ id: 11n, nombre: 'Cocina' });
+      prisma.lugarStock.findUnique.mockResolvedValue({ id: 11n, nombre: 'Salados' });
       prisma.stock.findFirst.mockResolvedValue({
         id: 26n,
         insumo_id: 2n,
@@ -627,7 +627,7 @@ describe('AlmacenService', () => {
               {
                 insumoId: 2,
                 cantidad: 8,
-                origen: 'Cocina',
+                origen: 'Salados',
                 destino: 'Caída',
               },
             ],
@@ -643,7 +643,7 @@ describe('AlmacenService', () => {
         id: 50n,
         nombre: 'Galletas de Avena',
       });
-      prisma.lugarStock.findUnique.mockResolvedValue({ id: 11n, nombre: 'Cocina' });
+      prisma.lugarStock.findUnique.mockResolvedValue({ id: 11n, nombre: 'Salados' });
       prisma.stock.findFirst.mockResolvedValue({
         id: 70n,
         producto_id: 50n,
@@ -658,7 +658,7 @@ describe('AlmacenService', () => {
             {
               insumoId: 50,
               cantidad: 4,
-              origen: 'Cocina',
+              origen: 'Salados',
               destino: 'Personal',
             },
           ],

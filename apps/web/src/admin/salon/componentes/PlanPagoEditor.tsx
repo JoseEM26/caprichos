@@ -20,6 +20,8 @@ export interface PlanPagoEditorProps {
   onPagaCon: (valor: string) => void;
   /** Con efectivo en el plan, «con cuánto paga» es obligatorio: de ahí sale el vuelto (delivery y mesa). */
   pagaConObligatorio?: boolean;
+  /** Marca el campo «¿Con cuánto paga?» en rojo (lo usa el alta de mesa tras un intento de enviar). */
+  pagaConInvalido?: boolean;
 }
 
 const ALTO_TOQUE = '44px';
@@ -30,7 +32,15 @@ const ALTO_TOQUE = '44px';
  * «Agregar otro medio de pago»: aparecen los montos. La primera fila queda con lo que falta del total;
  * las demás se escriben y cada una tiene «Quitar». Un medio por fila; el contenedor tiene scroll propio.
  */
-export function PlanPagoEditor({ total, filas, onChange, pagaCon, onPagaCon, pagaConObligatorio = false }: PlanPagoEditorProps) {
+export function PlanPagoEditor({
+  total,
+  filas,
+  onChange,
+  pagaCon,
+  onPagaCon,
+  pagaConObligatorio = false,
+  pagaConInvalido = false,
+}: PlanPagoEditorProps) {
   // La vista siempre sale de ajustarPlan (no depende de que el padre ya haya aplicado el ajuste)
   const vista = ajustarPlan(total, filas);
 
@@ -228,6 +238,7 @@ export function PlanPagoEditor({ total, filas, onChange, pagaCon, onPagaCon, pag
             </span>
           </label>
           <input
+            id="plan-paga-con"
             type="number"
             step="0.50"
             min="0"
@@ -235,12 +246,13 @@ export function PlanPagoEditor({ total, filas, onChange, pagaCon, onPagaCon, pag
             onChange={(e) => onPagaCon(e.target.value)}
             placeholder={montoEf > 0 ? `Mínimo S/ ${montoEf.toFixed(2)}` : pagaConObligatorio ? 'Obligatorio' : 'Opcional'}
             aria-required={pagaConObligatorio}
+            aria-invalid={pagaConInvalido}
             style={{
               width: '100%',
               boxSizing: 'border-box',
               minHeight: ALTO_TOQUE,
               borderRadius: '10px',
-              border: '1.5px solid var(--cp-line)',
+              border: `1.5px solid ${pagaConInvalido ? 'var(--cp-rust)' : 'var(--cp-line)'}`,
               background: 'var(--cp-white)',
               padding: '0 12px',
               fontSize: '14px',

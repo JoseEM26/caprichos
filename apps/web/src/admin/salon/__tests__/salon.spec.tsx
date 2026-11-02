@@ -299,11 +299,12 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     // Seleccionar mesa 1 (atajo de «Mesas libres»)
     fireEvent.click(screen.getByRole('button', { name: /Mesa 1/i }));
 
-    // En el paso 2 sin productos, el botón "Enviar directo a cocina" está deshabilitado
+    // En el paso 2 sin productos, «Enviar directo a cocina» no envía y dice qué falta
     const botonEnviar = screen.getByRole('button', {
       name: 'Enviar directo a cocina',
     });
-    expect(botonEnviar).toBeDisabled();
+    fireEvent.click(botonEnviar);
+    expect(screen.getByText('Agrega al menos un producto para enviarlo.')).toBeInTheDocument();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
   });
 

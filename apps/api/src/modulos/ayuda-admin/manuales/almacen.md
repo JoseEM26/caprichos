@@ -19,7 +19,7 @@ Permite supervisar y registrar el flujo interno de mercaderias e insumos entre l
 ## Como se hace: Registrar un traslado a cocina o barra
 1. En la parte superior del modulo, pulsa el boton naranja "Registrar movimiento".
 2. En el campo "Tipo de movimiento", selecciona "Traslado a cocina" (o el area de destino correspondiente).
-3. Selecciona la ubicacion de origen (Almacen) y la ubicacion de destino (Cocina o Barra).
+3. Selecciona la ubicacion de origen (Almacen) y la ubicacion de destino (Salados o Bebidas).
 4. Elige el insumo a trasladar, escribe la cantidad exacta en su unidad de medida y anade una observacion si es necesario.
 5. Pulsa "Guardar movimiento". Las existencias se descontaran de la ubicacion de origen y aumentaran en el destino de manera automatica.
 Antes: [[stock]]

@@ -170,11 +170,11 @@ export function armarEtiquetas(pedido: Pedido): ResumenEtiquetas {
   };
 
   // 2. Por Área
-  // Agrupa las líneas por linea.area.nombre; si no trae área usa 'COCINA'
+  // Agrupa las líneas por linea.area.nombre; si no trae área usa 'SALADOS'
   const areaMap = new Map<string, LineaPedido[]>();
   lineas.forEach((l) => {
     const areaRaw = l.area?.nombre?.trim();
-    const areaNombre = (areaRaw || 'COCINA').toUpperCase();
+    const areaNombre = (areaRaw || 'SALADOS').toUpperCase();
     if (!areaMap.has(areaNombre)) {
       areaMap.set(areaNombre, []);
     }

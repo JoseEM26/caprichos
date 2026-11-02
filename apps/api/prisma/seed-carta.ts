@@ -54,8 +54,8 @@ export async function main() {
 
   // 1. Áreas de cocina
   const areas = [
-    { nombre: 'Barra', propia: true, impresora: 'ticketera_barra' },
-    { nombre: 'Cocina', propia: true, impresora: 'ticketera_cocina' },
+    { nombre: 'Bebidas', propia: true, impresora: 'ticketera_barra' },
+    { nombre: 'Salados', propia: true, impresora: 'ticketera_cocina' },
     { nombre: 'Postres', propia: true, impresora: 'ticketera_postres' },
   ];
 
@@ -71,14 +71,14 @@ export async function main() {
 
   // 2. Categorías
   const catAreaMap: Record<string, string> = {
-    combos: 'Cocina',
-    frappes: 'Barra',
-    iced: 'Barra',
-    frozen: 'Barra',
-    calientes: 'Barra',
-    waffles: 'Cocina',
-    salados: 'Cocina',
-    croissants: 'Cocina',
+    combos: 'Salados',
+    frappes: 'Bebidas',
+    iced: 'Bebidas',
+    frozen: 'Bebidas',
+    calientes: 'Bebidas',
+    waffles: 'Salados',
+    salados: 'Salados',
+    croissants: 'Salados',
     complementos: 'Postres',
   };
 
@@ -86,7 +86,7 @@ export async function main() {
   let ordenCat = 1;
   for (const cat of CATS) {
     if (cat.id === 'all') continue;
-    const nombreArea = catAreaMap[cat.id] || 'Cocina';
+    const nombreArea = catAreaMap[cat.id] || 'Salados';
     const areaId = mapaAreas.get(nombreArea)!;
 
     const categoria = await prisma.categoria.upsert({

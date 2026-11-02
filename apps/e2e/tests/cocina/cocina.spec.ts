@@ -39,7 +39,7 @@ test.describe('Suite E2E - Pantalla de Cocina Simple e Intuitiva', () => {
       where: { nombre: { contains: 'Almacén', mode: 'insensitive' } },
     });
     const cocinaStock = await prisma.lugarStock.findFirst({
-      where: { nombre: { contains: 'Cocina', mode: 'insensitive' } },
+      where: { nombre: { contains: 'Salados', mode: 'insensitive' } },
     });
 
     if (almacenCentral && cocinaStock) {
@@ -152,7 +152,7 @@ test.describe('Suite E2E - Pantalla de Cocina Simple e Intuitiva', () => {
       where: { nombre: { contains: 'Almacén', mode: 'insensitive' } },
     });
     const cocinaStock = await prisma.lugarStock.findFirst({
-      where: { nombre: { contains: 'Cocina', mode: 'insensitive' } },
+      where: { nombre: { contains: 'Salados', mode: 'insensitive' } },
     });
     if (almacenCentral && cocinaStock) {
       const insumoHarina = await prisma.insumo.findFirst({ where: { nombre: 'Harina de trigo' } });
@@ -494,7 +494,7 @@ test.describe('Suite E2E - Pantalla de Cocina Simple e Intuitiva', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // 8. Confirmar recepción parcial (enviaron 2 kg, recibimos 1.5 kg)
-    const stockCocinaAntes = await obtenerStockInsumo('Harina de trigo', 'Cocina');
+    const stockCocinaAntes = await obtenerStockInsumo('Harina de trigo', 'Salados');
     await btnConfirmarRecibido.click();
 
     const dialogRecepcion = page.getByRole('dialog', { name: 'Confirmar recepción de insumo', exact: true });
@@ -520,7 +520,7 @@ test.describe('Suite E2E - Pantalla de Cocina Simple e Intuitiva', () => {
     await expect(dialogPedir.getByText(/1\.5 de Harina de trigo/i)).toBeVisible({ timeout: 10000 });
 
     // 9. Verificar stock en BD
-    const stockCocinaDespues = await obtenerStockInsumo('Harina de trigo', 'Cocina');
+    const stockCocinaDespues = await obtenerStockInsumo('Harina de trigo', 'Salados');
     expect(Number(stockCocinaDespues)).toBe(Number(stockCocinaAntes) + 1.5);
   });
 });

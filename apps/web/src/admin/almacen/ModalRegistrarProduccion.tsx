@@ -184,8 +184,8 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
             justifyContent: 'space-between',
           }}
         >
-          <span>Se descuenta de: <strong>Cocina</strong></span>
-          <span style={{ fontSize: 11, color: 'var(--cp-soft)' }}>Ingresa a: <strong>Cocina</strong></span>
+          <span>Se descuenta de: <strong>Salados</strong></span>
+          <span style={{ fontSize: 11, color: 'var(--cp-soft)' }}>Ingresa a: <strong>Salados</strong></span>
         </div>
 
         {errorMsg && (
@@ -303,7 +303,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
                         • {ins.nombre}: {ins.gasto} {ins.unidad}
                       </span>
                       <span>
-                        (Cocina disponible: {ins.stockCocina} {ins.unidad})
+                        (Salados disponible: {ins.stockCocina} {ins.unidad})
                         {ins.falta && ' - Insuficiente'}
                       </span>
                     </div>
@@ -320,7 +320,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
                     marginTop: 4,
                   }}
                 >
-                  Atención: No hay suficiente stock en Cocina para completar esta cantidad.
+                  Atención: No hay suficiente stock en Salados para completar esta cantidad.
                 </div>
               )}
             </div>
@@ -381,7 +381,7 @@ export const ModalRegistrarProduccion: React.FC<ModalRegistrarProduccionProps> =
         <Confirmar
           abierto={confirmarAbierto}
           titulo="¿Confirmar producción del día?"
-          mensaje={`Se prepararon ${unidadesNum} unidades de ${recetaSel?.nombre || 'producto'}. Se descontará materia prima de Cocina y sumará al stock de Cocina.`}
+          mensaje={`Se prepararon ${unidadesNum} unidades de ${recetaSel?.nombre || 'producto'}. Se descontará materia prima de Salados y sumará al stock de Salados.`}
           textoConfirmar="Sí, registrar producción"
           alConfirmar={ejecutarGuardar}
           alCancelar={() => setConfirmarAbierto(false)}

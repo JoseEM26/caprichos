@@ -246,8 +246,8 @@ export async function main() {
   }
 
   // 7. Pantallas TV de cocina y barra con códigos de vínculo (FT-COC-01)
-  const areaCocina = await prisma.areaCocina.findFirst({ where: { nombre: 'Cocina' } });
-  const areaBarra = await prisma.areaCocina.findFirst({ where: { nombre: 'Barra' } });
+  const areaCocina = await prisma.areaCocina.findFirst({ where: { nombre: 'Salados' } });
+  const areaBarra = await prisma.areaCocina.findFirst({ where: { nombre: 'Bebidas' } });
 
   const tvCocinaHash = crypto.createHash('sha256').update('tv-cocina-key-2026').digest('hex');
   const tvBarraHash = crypto.createHash('sha256').update('tv-barra-key-2026').digest('hex');

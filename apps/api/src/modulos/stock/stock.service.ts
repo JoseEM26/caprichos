@@ -614,7 +614,7 @@ export class StockService {
       where: { tipo: 'ALMACEN' },
     });
     const lugarCocina = await runner.lugarStock.findFirst({
-      where: { nombre: 'Cocina' },
+      where: { nombre: 'Salados' },
     });
     const lugaresAreas =
       (await runner.lugarStock.findMany({
