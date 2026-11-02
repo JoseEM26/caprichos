@@ -77,7 +77,7 @@ model Person {
 model PartyIdentifier {
   id       BigInt @id @default(autoincrement())
   party_id BigInt
-  tipo     String // DNI | RUC | CE
+  tipo     String // DNI | RUC | CE | CEDULA | PASAPORTE
   numero   String
   party    Party  @relation(fields: [party_id], references: [id])
 
