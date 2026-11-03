@@ -61,8 +61,22 @@ describe('Bot solo con menús (decisión del dueño)', () => {
       expect(r.nuevoEstado).toBe('MENU');
     });
 
-    it('no agrega ninguna línea de promoción mientras lineaPromoSaludo devuelva null', () => {
+    it('sin promoción marcada el saludo queda igual (lineaPromoSaludo devuelve null)', () => {
       expect(lineaPromoSaludo()).toBeNull();
+      expect(lineaPromoSaludo(null)).toBeNull();
+      const conPromoNula = (ejecutar({ texto: 'Hola' }, contextoBase({ promoSaludo: null })).acciones[0] as any).texto;
+      const sinCampo = (ejecutar({ texto: 'Hola' }).acciones[0] as any).texto;
+      expect(conPromoNula).not.toContain('🎁');
+      expect(conPromoNula).toBe(sinCampo);
+    });
+
+    it('con promoción marcada agrega su línea con el enlace a la carta antes de los puntos', () => {
+      const promo = { texto: '25 % de descuento en tu primera compra en nuestra carta online.', enlaceCarta: URL_CARTA };
+      const r = ejecutar({ texto: 'Hola' }, contextoBase({ promoSaludo: promo }));
+      const texto: string = (r.acciones[0] as any).texto;
+      expect(lineaPromoSaludo(promo)).toBe(`🎁 ${promo.texto}\n👉 ${URL_CARTA}`);
+      expect(texto).toContain(`🎁 ${promo.texto}\n👉 ${URL_CARTA}`);
+      expect(texto.indexOf('🎁')).toBeLessThan(texto.indexOf('puntos en nuestra carta virtual'));
     });
 
     it('el primer contacto (INICIO) con texto sin intención también saluda', () => {

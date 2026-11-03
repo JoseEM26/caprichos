@@ -1104,11 +1104,20 @@ export class EjecutorConversacionService {
       }
     }
 
+    // Promoción del saludo: si falla, el saludo sale sin ella
+    let promoSaludo: { titulo: string; texto: string; enlaceCarta: string } | null = null;
+    try {
+      promoSaludo = (await this.ofertasService?.promoParaSaludo()) ?? null;
+    } catch (err: any) {
+      this.logger.warn(`Sin promoción para el saludo: ${err.message}`);
+    }
+
     const contexto: ContextoConversacion = {
       conversacionId: conversacion.id.toString(),
       nombreCliente: nombreMostrar,
       telefonoCliente,
       cartaUrlPublica,
+      promoSaludo,
       datosLocal,
       datosLocalPublicos,
       categoriasCarta,

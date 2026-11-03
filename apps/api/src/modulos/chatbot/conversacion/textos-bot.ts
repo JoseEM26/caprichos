@@ -1068,11 +1068,11 @@ export const TEXTOS_SOLO_MENUS = {
 };
 
 /**
- * Punto de extensión del saludo: aquí se enchufa una línea de promoción (hoy no hay ninguna).
- * Devuelve null cuando no hay nada que mostrar.
+ * Línea de promoción del saludo (la promo la marca el local en Ofertas). Null cuando no hay promoción.
  */
-export function lineaPromoSaludo(): string | null {
-  return null;
+export function lineaPromoSaludo(promo?: { texto: string; enlaceCarta: string } | null): string | null {
+  if (!promo) return null;
+  return `🎁 ${promo.texto}\n👉 ${promo.enlaceCarta}`;
 }
 
 export * from './textos-reserva';

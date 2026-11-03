@@ -151,7 +151,7 @@ describe('Oferta de primera compra y saludo del bot', () => {
       expect(res).toEqual({
         titulo: 'primera',
         texto: '25 % de descuento en tu primera compra en nuestra carta online. No aplica a promociones ni combos.',
-        enlaceCarta: 'https://caprichos.pe/carta',
+        enlaceCarta: 'https://caprichos.pe',
       });
       delete process.env.CARTA_URL_PUBLICA;
     });

@@ -1943,7 +1943,7 @@ function transicionarSoloMenus(
   const saludo = () => {
     const cuerpo = [
       TEXTOS_BOT.saludoBienvenida(contexto.nombreCliente, contexto.datosLocal, contexto.textosPersonalizados?.chatbot_texto_bienvenida),
-      lineaPromoSaludo(),
+      lineaPromoSaludo(contexto.promoSaludo),
       TEXTOS_SOLO_MENUS.lineaPuntosSaludo(url),
     ]
       .filter(Boolean)

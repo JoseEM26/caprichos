@@ -1918,7 +1918,8 @@ export class OfertasService {
       ? `${oferta.descuento_tipo === 'MONTO' ? `S/ ${Number(oferta.descuento_valor)}` : `${Number(oferta.descuento_valor)} %`} de descuento en tu primera compra en nuestra carta online. No aplica a promociones ni combos.`
       : `${(oferta.descripcion || oferta.nombre).trim()}. Pide en nuestra carta online.`;
     const origen = urlPublicaCarta((clave) => process.env[clave]) || 'https://caprichos.pe';
-    return { titulo: oferta.nombre, texto, enlaceCarta: `${origen.replace(/\/$/, '')}/carta` };
+    // La carta web vive en la raíz (/); /carta lo atiende la API (JSON), así que no se agrega
+    return { titulo: oferta.nombre, texto, enlaceCarta: origen.replace(/\/$/, '') };
   }
 
   private mapearOferta(o: any, canal?: string): OfertaItem {
