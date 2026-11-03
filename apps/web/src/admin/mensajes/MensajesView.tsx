@@ -21,125 +21,25 @@ import {
   soltarChat,
   tomarChat,
 } from './mensajesApi';
-import { ModalEditarNombre, IconoLapiz } from './ModalEditarNombre';
+import { ModalEditarNombre } from './ModalEditarNombre';
 import { useSesion } from '../../comun/sesion';
-import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
-import { ReasignarVoucherBoton } from '../vouchers/ReasignarVoucherBoton';
-import { SalientesWhatsApp } from './SalientesWhatsApp';
-import { TarjetaUbicacion } from './TarjetaUbicacion';
-import { InsigniaBloqueoSpam, ModalDesbloquearSpam } from './BloqueoSpam';
+import { ModalDesbloquearSpam } from './BloqueoSpam';
 import { salientesApi } from './salientesApi';
-import { FotoAmpliable } from '../vouchers/FotoAmpliable';
-import { VoucherResumenChat } from '../vouchers/tipos';
-import {
-  ChatResumen,
-  DetalleConversacion,
-  EstadoChat,
-  FiltroChat,
-  RespuestaRapida,
-} from './mensajesTipos';
+import { SalientesWhatsApp } from './SalientesWhatsApp';
+import { ChatResumen, DetalleConversacion, FiltroChat, RespuestaRapida } from './mensajesTipos';
 import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
+import { ListaChats } from './ListaChats';
+import { CabeceraChat } from './CabeceraChat';
+import { AvisosChat } from './AvisosChat';
+import { FlujoMensajes } from './FlujoMensajes';
+import { PanelPedido } from './PanelPedido';
+import { CuadroEscribir } from './CuadroEscribir';
+import { MasAcciones } from './MasAcciones';
+import { ModalRechazoCambio } from './ModalRechazoCambio';
+import { esUsuarioWhatsApp, telefonoDeUrl } from './utilidadesChat';
 
-function esUsuarioWhatsApp(c?: { identificador_tipo?: string; telefono?: string } | null): boolean {
-  if (!c) return false;
-  return c.identificador_tipo === 'USUARIO_WA' || (Boolean(c.telefono) && c.telefono!.startsWith('wa-user:'));
-}
-
-const ESTADOS_BG: Record<EstadoChat, string> = {
-  atencion: '#FBE9DF',
-  validar: '#FFF1C9',
-  bot: 'var(--cp-line)',
-  pausado: '#F0F2F5',
-  atendido: 'var(--cp-greenbg)',
-};
-
-const ESTADOS_LABEL: Record<EstadoChat, string> = {
-  atencion: 'Requiere atención',
-  validar: 'Validar pago',
-  bot: 'El bot atiende',
-  pausado: 'Pausado',
-  atendido: 'Atendido',
-};
-
-const BANNERS_TEXTO: Record<EstadoChat, [string, string]> = {
-  atencion: ['Este cliente pidió hablar con una persona. El bot ya no responde: contesta tú.', '#FFF1C9'],
-  validar: ['Revisa el comprobante y aprueba o rechaza el pago. El bot espera tu decisión.', '#FFF1C9'],
-  bot: ['El bot está atendiendo solo. Entra únicamente si hace falta.', '#E7F5EE'],
-  pausado: ['El bot está en pausa en este chat: solo respondes tú.', '#F0F2F5'],
-  atendido: ['Chat atendido. Si el cliente escribe de nuevo, vuelve a la lista de pendientes.', '#E7F5EE'],
-};
-
-const COLORES_AVATAR = ['#B5651D', '#6B4E9B', '#2E7D32', '#AD4A4A', '#1F7A8C', '#D97706'];
-
-const obtenerColorAvatar = (id: string) => {
-  let num = 0;
-  for (let i = 0; i < id.length; i++) num += id.charCodeAt(i);
-  return COLORES_AVATAR[num % COLORES_AVATAR.length];
-};
-
-const obtenerIniciales = (nombre: string) => {
-  const partes = (nombre || '').trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) return 'WA';
-  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
-  return (partes[0][0] + partes[1][0]).toUpperCase();
-};
-
-/** Foto del chat (voucher): privada, con miniatura y pantalla completa */
-function FotoMensaje({
-  archivoId,
-  voucher,
-  puedeVer = true,
-}: {
-  archivoId?: string | null;
-  voucher?: VoucherResumenChat | null;
-  puedeVer?: boolean;
-}) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <FotoAmpliable archivoId={archivoId} alt="Foto enviada por el cliente" />
-      {voucher && puedeVer && <TarjetaLecturaVoucher voucher={voucher} puedeVer={puedeVer} />}
-    </div>
-  );
-}
-
-/** Desde cuántos minutos sin respuesta se destaca el chat en la lista. */
-export const SIN_RESPUESTA_MIN_VISIBLE = 3;
-
-export function obtenerEstiloEspera(minutos: number) {
-  if (minutos > 15) {
-    return {
-      fondo: '#FBEDE9',
-      borde: '1px solid var(--cp-rust, #B2500F)',
-      color: 'var(--cp-rust, #B2500F)',
-      label: `${minutos} min`,
-    };
-  }
-  if (minutos > 5) {
-    return {
-      fondo: '#FEF9EE',
-      borde: '1px solid var(--cp-gold, #D99E39)',
-      color: 'var(--cp-gold, #D99E39)',
-      label: `${minutos} min`,
-    };
-  }
-  return {
-    fondo: '#F0F2F5',
-    borde: '1px solid var(--cp-line, #E3D6C6)',
-    color: 'var(--cp-soft, #2C4C5D)',
-    label: `${minutos} min`,
-  };
-}
-
-/** Teléfono de la URL (?telefono=...) reducido a sus últimos 9 dígitos; vacío si no viene. */
-function telefonoDeUrl(): string {
-  try {
-    const digitos = (new URLSearchParams(window.location.search).get('telefono') || '').replace(/\D/g, '');
-    return digitos.length >= 9 ? digitos.slice(-9) : '';
-  } catch {
-    return '';
-  }
-}
+export { obtenerEstiloEspera, SIN_RESPUESTA_MIN_VISIBLE } from './utilidadesChat';
 
 function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   let tieneVouchersVer = true;
@@ -658,11 +558,6 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     setPantallaCompleta((prev) => !prev);
   };
 
-  const bannerInfo = useMemo(() => {
-    if (!detalle) return null;
-    return BANNERS_TEXTO[detalle.estado] || BANNERS_TEXTO.bot;
-  }, [detalle]);
-
   return (
     <div className="cv-root" data-fs={pantallaCompleta ? '1' : '0'}>
       <style>{`
@@ -786,173 +681,23 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
         data-open={chatAbiertoMovil ? '1' : '0'}
         style={{ '--cvz': zoom / 100, zoom: zoom / 100 } as React.CSSProperties}
       >
-        {/* Columna Izquierda: Lista de Chats */}
-        <div className="cv-list">
-          <div className="cv-lhead">
-            <span className="cv-title">Chats</span>
-            <span className="cv-sub">
-              {conteos.atender === 0 ? 'Todo al día' : `${conteos.atender} por atender`}
-            </span>
-            {controles}
-          </div>
-
-          <div className="cv-search">
-            <input
-              type="text"
-              placeholder="Buscar un chat o un celular"
-              aria-label="Buscar un chat"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
-          </div>
-
-          <div className="cv-tabs">
-            {[
-              { id: 'todos', label: 'Todos', count: conteos.todos },
-              { id: 'atender', label: 'Por atender', count: conteos.atender },
-              { id: 'bot', label: 'Con el bot', count: conteos.bot },
-              { id: 'atendidos', label: 'Atendidos', count: conteos.atendidos },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                className="cv-tab"
-                style={{
-                  background: filtro === tab.id ? '#D9FDD3' : '#F0F2F5',
-                  color: filtro === tab.id ? '#005C4B' : '#54656F',
-                }}
-                onClick={() => setFiltro(tab.id as FiltroChat)}
-              >
-                {tab.label} <b>{tab.count}</b>
-              </button>
-            ))}
-            {((conteos.bloqueadosSpam ?? 0) > 0 || soloBloqueados) && (
-              <button
-                className="cv-tab"
-                aria-pressed={soloBloqueados}
-                data-testid="filtro-bloqueados-spam"
-                style={{
-                  background: soloBloqueados ? '#FFE0A3' : '#F0F2F5',
-                  color: soloBloqueados ? '#7A4A00' : '#54656F',
-                }}
-                onClick={() => setSoloBloqueados((v) => !v)}
-              >
-                Bloqueados por spam ({conteos.bloqueadosSpam})
-              </button>
-            )}
-          </div>
-
-          <div className="cv-rows">
-            {cargando ? (
-              <div className="cv-empty">Cargando conversaciones...</div>
-            ) : chatsOrdenados.length === 0 ? (
-              <div className="cv-empty">No hay conversaciones en esta pestaña.</div>
-            ) : (
-              chatsOrdenados.map((c) => {
-                const seleccionado = c.id === chatSeleccionadoId;
-                const tieneSinLeer = c.sinLeer > 0;
-                return (
-                  <button
-                    key={c.id}
-                    className="cv-row"
-                    style={{
-                      background: seleccionado ? '#F0F2F5' : '#FFFFFF',
-                    }}
-                    onClick={() => {
-                      setChatSeleccionadoId(c.id);
-                      setChatAbiertoMovil(true);
-                    }}
-                  >
-                    <span className="cv-av" style={{ background: obtenerColorAvatar(c.id) }}>
-                      {obtenerIniciales(c.nombre)}
-                    </span>
-                    <span className="cv-rb">
-                      <span className="cv-r1">
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                          <b className="cv-rn">{c.nombre}</b>
-                          {esUsuarioWhatsApp(c) && (
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                padding: '1px 6px',
-                                borderRadius: '10px',
-                                background: '#E0F2FE',
-                                color: '#0369A1',
-                                border: '1px solid #BAE6FD',
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0,
-                              }}
-                            >
-                              Usuario de WhatsApp
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          className="cv-rt"
-                          style={{ color: tieneSinLeer ? '#00A884' : '#667781' }}
-                        >
-                          {c.hora}
-                        </span>
-                      </span>
-                      <span className="cv-r2">
-                        <span className="cv-last">{c.ultimo}</span>
-                        {tieneSinLeer && <span className="cv-badge">{c.sinLeer}</span>}
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span
-                          className="cv-pill"
-                          style={{
-                            background: c.urgente ? '#F8C9C9' : ESTADOS_BG[c.estado] || '#F0F2F5',
-                          }}
-                        >
-                          {c.urgente ? `URGENTE · ${ESTADOS_LABEL[c.estado]}` : ESTADOS_LABEL[c.estado]}
-                        </span>
-                        <InsigniaBloqueoSpam bloqueo={c.bloqueoSpam} id={c.id} />
-                        {typeof c.sinRespuestaMin === 'number' && c.sinRespuestaMin >= SIN_RESPUESTA_MIN_VISIBLE && (
-                          <span
-                            data-testid={`sin-respuesta-${c.id}`}
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              padding: '2px 8px',
-                              borderRadius: '10px',
-                              background: '#C0392B',
-                              color: '#fff',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            Sin respuesta hace {c.sinRespuestaMin} min
-                          </span>
-                        )}
-                        {c.esperaMin !== undefined && c.esperaMin !== null && (
-                          <span
-                            data-testid={`espera-badge-${c.id}`}
-                            className="cv-espera-badge"
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              padding: '2px 8px',
-                              borderRadius: '10px',
-                              background: obtenerEstiloEspera(c.esperaMin).fondo,
-                              border: obtenerEstiloEspera(c.esperaMin).borde,
-                              color: obtenerEstiloEspera(c.esperaMin).color,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={`Tiempo de espera: ${c.esperaMin} minutos`}
-                          >
-                            Espera: {c.esperaMin} min
-                          </span>
-                        )}
-                      </div>
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
+        <ListaChats
+          controles={controles}
+          conteos={conteos}
+          busqueda={busqueda}
+          onBuscar={setBusqueda}
+          filtro={filtro}
+          onFiltro={setFiltro}
+          soloBloqueados={soloBloqueados}
+          onToggleSoloBloqueados={() => setSoloBloqueados((v) => !v)}
+          cargando={cargando}
+          chats={chatsOrdenados}
+          chatSeleccionadoId={chatSeleccionadoId}
+          onSeleccionar={(id) => {
+            setChatSeleccionadoId(id);
+            setChatAbiertoMovil(true);
+          }}
+        />
 
         {/* Columna Derecha: Conversación */}
         <div className="cv-chat">
@@ -966,538 +711,60 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
             </div>
           ) : (
             <>
-              {/* Cabecera del Chat */}
-              <div className="cv-chead">
-                <button
-                  className="cv-back"
-                  aria-label="Volver a la lista de chats"
-                  onClick={() => setChatAbiertoMovil(false)}
-                >
-                  ←
-                </button>
-                <span className="cv-av" style={{ background: obtenerColorAvatar(detalle.id) }}>
-                  {obtenerIniciales(detalle.nombre)}
-                </span>
-                <span className="cv-hb">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <b className="cv-hn">{detalle.nombre}</b>
-                    {esUsuarioWhatsApp(detalle) && (
-                      <span
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          background: '#E0F2FE',
-                          color: '#0369A1',
-                          border: '1px solid #BAE6FD',
-                        }}
-                      >
-                        Usuario de WhatsApp
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setModalEditarAbierto(true)}
-                      title="Editar nombre"
-                      aria-label="Editar nombre"
-                      style={{
-                        background: '#FFFFFF',
-                        border: '1px solid var(--cp-line, #CBD5E1)',
-                        borderRadius: '6px',
-                        padding: '2px 8px',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: 'var(--cp-navy, #0B2C3E)',
-                      }}
-                    >
-                      <IconoLapiz tamano={13} />
-                      <span>Editar nombre</span>
-                    </button>
-                  </span>
-                  <span className="cv-hs">
-                    {esUsuarioWhatsApp(detalle) ? 'Usuario de WhatsApp' : detalle.telefono}
-                    {detalle.modalidad ? ` · ${detalle.modalidad}` : ''}
-                  </span>
-                </span>
-                <span
-                  className="cv-pill"
-                  style={{
-                    background: detalle.urgente ? '#F8C9C9' : ESTADOS_BG[detalle.estado] || '#F0F2F5',
-                  }}
-                >
-                  {detalle.urgente ? `URGENTE · ${ESTADOS_LABEL[detalle.estado]}` : ESTADOS_LABEL[detalle.estado]}
-                </span>
-                <InsigniaBloqueoSpam bloqueo={detalle.bloqueoSpam} id={`detalle-${detalle.id}`} />
-                {detalle.bloqueoSpam?.activo && puedeDesbloquear && (
-                  <button
-                    type="button"
-                    data-testid="btn-desbloquear-spam"
-                    onClick={() => setModalDesbloqueo(true)}
-                    style={{ minHeight: 44, padding: '0 14px', borderRadius: 8, border: '1px solid #B45309', background: '#FFFFFF', color: '#B45309', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Desbloquear
-                  </button>
-                )}
-              </div>
-
-              {/* Modo Simulado Banner */}
-              {detalle.simulado && (
-                <div
-                  role="status"
-                  className="cv-banner"
-                  style={{ background: '#FFF7ED', color: '#9A3412', borderBottom: '1px solid #FED7AA' }}
-                >
-                  <span>Modo simulado: no se envia a WhatsApp</span>
-                </div>
-              )}
-
-              {/* Ventana de 24 horas cerrada Banner */}
-              {detalle.ventanaAbierta === false && (
-                <div
-                  role="status"
-                  className="cv-banner"
-                  style={{ background: '#FEF3C7', color: '#92400E', borderBottom: '1px solid #FDE68A' }}
-                >
-                  <span>
-                    Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada.
-                  </span>
-                  <button
-                    type="button"
-                    className="cv-bbtn"
-                    style={{ borderColor: '#B45309', color: '#B45309' }}
-                    onClick={handleReabrirPlantilla}
-                  >
-                    Reabrir con plantilla
-                  </button>
-                </div>
-              )}
-
-              {/* Motivo de derivación si existe */}
-              {detalle.motivoDerivacion && (
-                <div
-                  role="status"
-                  className="cv-banner"
-                  style={{ background: '#FFF1C9', color: '#8A5800', borderBottom: '1px solid #FFE29A', fontWeight: 600 }}
-                  data-testid="banner-motivo-derivacion"
-                >
-                  <span>⚠️ Derivado a asesor: {detalle.motivoDerivacion}</span>
-                </div>
-              )}
-
-              {/* Banner Informativo */}
-              {bannerInfo && (
-                <div className="cv-banner" style={{ background: bannerInfo[1] }}>
-                  <span>{bannerInfo[0]}</span>
-                  <button className="cv-bbtn" onClick={handleTogglePausaBot}>
-                    {detalle.estado === 'pausado' ? 'Reanudar el bot' : 'Pausar el bot'}
-                  </button>
-                </div>
-              )}
-
-              {/* Control de Dueño / Tomar Chat */}
-              <div className="cv-owner">
-                <span>
-                  {detalle.dueno
-                    ? detalle.esMio
-                      ? 'Lo atiendes tú: el bot no responde en este chat.'
-                      : `Lo atiende ${detalle.dueno}: el bot no responde y tú no puedes escribir.`
-                    : 'Chat libre: el bot atiende automáticamente.'}
-                </span>
-                <button onClick={() => (detalle.esMio ? handleSoltarChat() : handleTomarChat(false))}>
-                  {detalle.esMio ? 'Soltar el chat' : 'Tomar el chat'}
-                </button>
-              </div>
-
-              {/* Mensajes del Chat */}
-              <div className="cv-msgs">
-                {detalle.mensajes
-                  .slice()
-                  .reverse()
-                  .map((m) => {
-                    const esCliente = m.autor === 'CLIENTE';
-                    const esBot = m.autor === 'BOT';
-                    const bg = esCliente ? '#FFFFFF' : esBot ? '#E1F3FB' : '#D9FDD3';
-                    const alineacion = esCliente ? 'flex-start' : 'flex-end';
-                    return (
-                      <div
-                        key={m.id}
-                        className="cv-bub"
-                        style={{ alignSelf: alineacion, background: bg }}
-                      >
-                        {!esCliente && (
-                          <div
-                            className="cv-who"
-                            style={{ color: esBot ? '#1F7A8C' : '#008069' }}
-                          >
-                            {esBot ? 'Capri (bot)' : 'Equipo'}
-                          </div>
-                        )}
-                        {m.imagen && (
-                          <FotoMensaje
-                            archivoId={m.imagenId}
-                            voucher={
-                              m.imagenId &&
-                              detalle?.voucher?.archivoId &&
-                              String(m.imagenId) === String(detalle.voucher.archivoId)
-                                ? detalle.voucher
-                                : undefined
-                            }
-                            puedeVer={tieneVouchersVer}
-                          />
-                        )}
-                        {m.ubicacion ? (
-                          <TarjetaUbicacion ubicacion={m.ubicacion} />
-                        ) : (
-                          <div className="cv-txt">{m.texto}</div>
-                        )}
-                        <div className="cv-meta" style={{ flexWrap: 'wrap', gap: '6px' }}>
-                          <span>{m.hora}</span>
-                          {!esCliente && (
-                            <>
-                              {m.estado === 'FALLIDO' ? (
-                                <span
-                                  style={{
-                                    color: '#C0392B',
-                                    fontWeight: 700,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                  }}
-                                >
-                                  <span>
-                                    {m.motivoFallo
-                                      ? `No se pudo enviar: ${m.motivoFallo}`
-                                      : 'No se pudo enviar'}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReintentarMensaje(m.id)}
-                                    style={{
-                                      border: '1px solid #C0392B',
-                                      background: '#FFFFFF',
-                                      color: '#C0392B',
-                                      borderRadius: '4px',
-                                      padding: '1px 6px',
-                                      fontSize: '11px',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    Reintentar
-                                  </button>
-                                </span>
-                              ) : m.estado === 'SIMULADO' ? (
-                                <span style={{ color: '#667781' }}>
-                                  Modo simulado: no se envia a WhatsApp
-                                </span>
-                              ) : m.estado === 'LEIDO' ? (
-                                <span style={{ color: '#0284C7', fontWeight: 600 }}>Leido</span>
-                              ) : m.estado === 'ENTREGADO' ? (
-                                <span style={{ color: '#667781' }}>Entregado</span>
-                              ) : (
-                                <span style={{ color: '#667781' }}>Enviado</span>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                <div className="cv-day">
-                  <span>HOY</span>
-                </div>
-              </div>
-
-              {/* Cambio, reserva, pedido y pago: zona propia con su scroll para no aplastar la conversación */}
-              <div className="cv-panels">
-              {/* Solicitud de cambio si existe */}
-              {detalle.solicitud && (
-                <div className="cv-order" style={{ borderLeftColor: '#E67929' }} data-testid="seccion-solicitud-cambio">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <b style={{ color: '#C05621' }}>
-                      Solicitud de {detalle.solicitud.tipo === 'DIRECCION' ? 'cambio de dirección' : detalle.solicitud.tipo === 'CANCELAR' ? 'cancelación' : 'cambio de pedido'}
-                    </b>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        background: detalle.solicitud.estadoSolicitud === 'APLICADA' ? '#D1FAE5' : detalle.solicitud.estadoSolicitud === 'RECHAZADA' ? '#FEE2E2' : '#FEF3C7',
-                        color: detalle.solicitud.estadoSolicitud === 'APLICADA' ? '#065F46' : detalle.solicitud.estadoSolicitud === 'RECHAZADA' ? '#991B1B' : '#92400E',
-                      }}
-                    >
-                      {detalle.solicitud.estadoSolicitud || 'PENDIENTE'}
-                    </span>
-                  </div>
-                  <div><b>Detalle:</b> {detalle.solicitud.detalle}</div>
-                  {detalle.solicitud.nuevaDireccion && (
-                    <div style={{ marginTop: '2px' }}>
-                      <b>Nueva dirección:</b> {detalle.solicitud.nuevaDireccion}
-                    </div>
-                  )}
-                  {detalle.solicitud.nuevaReferencia && (
-                    <div style={{ color: '#54656F', fontSize: '13px' }}>
-                      Ref: {detalle.solicitud.nuevaReferencia}
-                    </div>
-                  )}
-                  {detalle.solicitud.nuevaZonaNombre && (
-                    <div style={{ marginTop: '2px', fontSize: '13px', color: '#1E293B' }}>
-                      <b>Zona:</b> {detalle.solicitud.nuevaZonaNombre}
-                      {detalle.solicitud.recargoEnvio !== undefined && detalle.solicitud.recargoEnvio !== null && detalle.solicitud.recargoEnvio > 0 ? (
-                        <span style={{ color: '#C05621', fontWeight: 600 }}>
-                          {' '}(Recargo: +s/ {Number(detalle.solicitud.recargoEnvio).toFixed(2)} · Envío nuevo: s/ {Number(detalle.solicitud.nuevoEnvio || 0).toFixed(2)})
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                  <div style={{ color: '#54656F', fontSize: '12px', marginTop: '4px' }}>
-                    Pedido {detalle.solicitud.pedido} · Estado pedido: {detalle.solicitud.estadoPedido} · Solicitado a las {detalle.solicitud.hora}
-                  </div>
-                  {(!detalle.solicitud.estadoSolicitud || detalle.solicitud.estadoSolicitud === 'PENDIENTE') && (
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                      <button
-                        className="cv-ok"
-                        style={{ padding: '6px 12px', fontSize: '13px' }}
-                        onClick={handleAplicarCambio}
-                      >
-                        Aplicar cambio
-                      </button>
-                      <button
-                        className="cv-no"
-                        style={{ padding: '6px 12px', fontSize: '13px' }}
-                        onClick={handleAbrirRechazarCambio}
-                      >
-                        Rechazar cambio
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Solicitud de reserva si existe */}
-              {detalle.solicitudReserva && (
-                <div className="cv-order" style={{ borderLeftColor: '#E67929' }}>
-                  <b>Solicitud de reserva pendiente</b>
-                  <div>
-                    {detalle.solicitudReserva.personas} personas · {detalle.solicitudReserva.fecha} a las {detalle.solicitudReserva.hora}
-                  </div>
-                  {detalle.solicitudReserva.nota && (
-                    <div style={{ fontSize: '13px', color: '#54656F' }}>
-                      Nota: {detalle.solicitudReserva.nota}
-                    </div>
-                  )}
-                  <div style={{ marginTop: '6px' }}>
-                    <a
-                      href="/admin/reservas"
-                      style={{
-                        color: 'var(--cp-navy)',
-                        fontWeight: 700,
-                        textDecoration: 'underline',
-                        fontSize: '13px',
-                      }}
-                    >
-                      Ver y gestionar en Reservas
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* Pedido armado si existe */}
-              {detalle.pedido && (
-                <div className="cv-order">
-                  <b>Pedido armado</b>
-                  {detalle.pedido.lineas.map((linea, idx) => (
-                    <div key={idx}>{linea}</div>
-                  ))}
-                  <div className="cv-total">Total s/ {detalle.pedido.total}</div>
-                </div>
-              )}
-
-              {/* Acciones de Validar Pago */}
-              {detalle.estado === 'validar' && detalle.pedido && (
-                <div className="cv-pay">
-                  <div className="cv-paynote">
-                    {detalle.altaDemanda
-                      ? `Alta demanda activa: el tiempo prometido es de ${detalle.tiempoPrometidoMin || 25} minutos.`
-                      : `Tiempo prometido: ${detalle.tiempoPrometidoMin || 25} minutos.`}
-                  </div>
-
-                  {/* Lectura del voucher con IA si existe voucher en la conversación */}
-                  {detalle.voucher?.archivoId && tieneVouchersVer && (
-                    <FotoAmpliable archivoId={detalle.voucher.archivoId} alt="Comprobante de pago" alturaMaxima={220} />
-                  )}
-                  {detalle.voucher && (
-                    <TarjetaLecturaVoucher
-                      voucher={detalle.voucher}
-                      pedido={detalle.pedido}
-                      puedeVer={tieneVouchersVer}
-                    />
-                  )}
-                  {detalle.voucher && (
-                    <ReasignarVoucherBoton
-                      voucherId={detalle.voucher.id}
-                      onReasignado={() => cargarDetalle(detalle.id)}
-                    />
-                  )}
-                  {!detalle.voucher && detalle.pedido && (
-                    <div className="cv-paynote" data-testid="sin-voucher-pedido">
-                      Aún no envió el voucher de {detalle.pedido.codigo}.
-                    </div>
-                  )}
-
-                  <div className="cv-payb">
-                    <button className="cv-ok" onClick={handleAprobarPago}>
-                      Aprobar el pago
-                    </button>
-                    <button className="cv-no" onClick={handleRechazarPago}>
-                      Rechazar
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              </div>
-
-              {/* Respuestas rápidas */}
-              <div className="cv-quick">
-                {respuestasRapidas.map((q) => (
-                  <button
-                    key={q.id}
-                    className="cv-qb"
-                    onClick={() => setTextoMensaje(q.texto)}
-                  >
-                    {q.titulo}
-                  </button>
-                ))}
-              </div>
-
-              {/* Vista previa de Pulir Mensaje */}
-              {textoPulido && (
-                <div className="cv-pol" role="status">
-                  <div className="cv-pollbl">Así quedaría tu mensaje, más amable y bien escrito:</div>
-                  <div className="cv-polx">{textoPulido}</div>
-                  <div className="cv-polb">
-                    <button
-                      className="cv-ok"
-                      style={{ minHeight: '44px' }}
-                      onClick={() => {
-                        setTextoMensaje(textoPulido);
-                        setTextoPulido(null);
-                        setPulirError(null);
-                      }}
-                    >
-                      Usar este texto
-                    </button>
-                    <button
-                      className="cv-no"
-                      style={{ minHeight: '44px', borderColor: '#54656F', color: '#54656F' }}
-                      onClick={() => setTextoPulido(null)}
-                    >
-                      Dejar el mío
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {pulirError && (
-                <div role="status" style={{ padding: '0 14px 4px', fontSize: '12px', fontWeight: 700, color: '#C0392B' }}>
-                  {pulirError}
-                </div>
-              )}
-
-              {/* Compositor de mensaje */}
-              {!detalle.telefono || !detalle.telefono.trim() ? (
-                <div
-                  role="alert"
-                  style={{
-                    padding: '12px 16px',
-                    margin: '8px 14px',
-                    borderRadius: '10px',
-                    background: 'var(--cp-sand, #F8FAFC)',
-                    color: 'var(--cp-navy, #0B2C3E)',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    border: '1px solid var(--cp-line, #CBD5E1)',
-                  }}
-                >
-                  Este contacto no tiene ningun identificador: no se puede responder
-                </div>
-              ) : (
-                <div className="cv-comp">
-                  <input
-                    type="text"
-                    placeholder="Escribe un mensaje"
-                    aria-label="Escribe un mensaje"
-                    value={textoMensaje}
-                    disabled={detalle.ocupado}
-                    onChange={(e) => setTextoMensaje(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleEnviarMensaje();
-                    }}
-                  />
-                  <button
-                    className="cv-polbtn"
-                    aria-label="Pulir el mensaje para que sea más amable"
-                    disabled={detalle.ocupado}
-                    onClick={handlePulir}
-                  >
-                    Pulir
-                  </button>
-                  <button
-                    className="cv-send"
-                    aria-label="Enviar mensaje"
-                    disabled={detalle.ocupado || enviando}
-                    onClick={() => handleEnviarMensaje()}
-                  >
-                    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-                      <path d="M3 20l18-8L3 4v6l11 2-11 2z" fill="#fff" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-
-              {/* Menú Más Acciones */}
-              <details className="cv-more">
-                <summary>Más acciones</summary>
-                <div className="cv-moreb">
-                  {detalle.estado !== 'atendido' && (
-                    <button onClick={handleMarcarAtendido}>Marcar atendido</button>
-                  )}
-                  <button onClick={handleCopiarProductos}>Copiar solo productos</button>
-                  {!esUsuarioWhatsApp(detalle) && (
-                    <>
-                      <button onClick={handleCopiarCelular}>Copiar celular</button>
-                      <a
-                        href={`https://wa.me/51${detalle.telefono.replace(/\D/g, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Abrir en WhatsApp
-                      </a>
-                    </>
-                  )}
-                </div>
-                {mensajeCopiado && (
-                  <div
-                    role="status"
-                    style={{
-                      whiteSpace: 'pre-line',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      color: 'var(--cp-green)',
-                      padding: '0 10px 8px',
-                    }}
-                  >
-                    {mensajeCopiado}
-                  </div>
-                )}
-              </details>
+              <CabeceraChat
+                detalle={detalle}
+                puedeDesbloquear={puedeDesbloquear}
+                onVolver={() => setChatAbiertoMovil(false)}
+                onEditarNombre={() => setModalEditarAbierto(true)}
+                onDesbloquear={() => setModalDesbloqueo(true)}
+              />
+              <AvisosChat
+                detalle={detalle}
+                onReabrirPlantilla={handleReabrirPlantilla}
+                onTogglePausaBot={handleTogglePausaBot}
+                onTomarChat={() => handleTomarChat(false)}
+                onSoltarChat={handleSoltarChat}
+              />
+              <FlujoMensajes
+                mensajes={detalle.mensajes}
+                voucher={detalle.voucher}
+                puedeVer={tieneVouchersVer}
+                onReintentar={handleReintentarMensaje}
+              />
+              <PanelPedido
+                detalle={detalle}
+                tieneVouchersVer={tieneVouchersVer}
+                onAplicarCambio={handleAplicarCambio}
+                onAbrirRechazarCambio={handleAbrirRechazarCambio}
+                onAprobarPago={handleAprobarPago}
+                onRechazarPago={handleRechazarPago}
+                onRecargar={cargarDetalle}
+              />
+              <CuadroEscribir
+                detalle={detalle}
+                respuestasRapidas={respuestasRapidas}
+                textoMensaje={textoMensaje}
+                onCambiarTexto={setTextoMensaje}
+                textoPulido={textoPulido}
+                pulirError={pulirError}
+                enviando={enviando}
+                onElegirRapida={setTextoMensaje}
+                onPulir={handlePulir}
+                onUsarPulido={(texto) => {
+                  setTextoMensaje(texto);
+                  setTextoPulido(null);
+                  setPulirError(null);
+                }}
+                onDejarPulido={() => setTextoPulido(null)}
+                onEnviar={() => handleEnviarMensaje()}
+              />
+              <MasAcciones
+                detalle={detalle}
+                mensajeCopiado={mensajeCopiado}
+                onMarcarAtendido={handleMarcarAtendido}
+                onCopiarProductos={handleCopiarProductos}
+                onCopiarCelular={handleCopiarCelular}
+              />
             </>
           )}
         </div>
@@ -1542,96 +809,13 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
         />
       )}
 
-      {/* Modal Rechazar Solicitud de Cambio */}
       {modalRechazoCambio.abierto && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              background: '#FFFFFF',
-              borderRadius: '12px',
-              padding: '24px',
-              maxWidth: '440px',
-              width: '90%',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-            }}
-          >
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
-              ¿Rechazar solicitud de cambio?
-            </h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#64748B' }}>
-              Ingresa el motivo del rechazo. Este motivo se enviará al cliente por WhatsApp con honestidad y empatía.
-            </p>
-            <textarea
-              rows={3}
-              value={modalRechazoCambio.motivo}
-              onChange={(e) => setModalRechazoCambio((prev) => ({ ...prev, motivo: e.target.value }))}
-              placeholder="Ej. El pedido ya está empacado y en la puerta para salir..."
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: '1px solid #CBD5E1',
-                fontSize: '14px',
-                fontFamily: 'inherit',
-                boxSizing: 'border-box',
-                resize: 'vertical',
-              }}
-            />
-            {modalRechazoCambio.error && (
-              <div style={{ color: '#DC2626', fontSize: '13px', marginTop: '6px' }}>
-                {modalRechazoCambio.error}
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
-              <button
-                type="button"
-                onClick={() => setModalRechazoCambio({ abierto: false, motivo: '', enviando: false, error: null })}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  padding: '8px 16px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  color: '#475569',
-                }}
-              >
-                No, cancelar
-              </button>
-              <button
-                type="button"
-                disabled={!modalRechazoCambio.motivo.trim() || modalRechazoCambio.enviando}
-                onClick={handleConfirmarRechazoCambio}
-                style={{
-                  background: '#DC2626',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '8px 16px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: modalRechazoCambio.motivo.trim() && !modalRechazoCambio.enviando ? 'pointer' : 'not-allowed',
-                  opacity: modalRechazoCambio.motivo.trim() && !modalRechazoCambio.enviando ? 1 : 0.6,
-                }}
-              >
-                {modalRechazoCambio.enviando ? 'Rechazando...' : 'Sí, rechazar cambio'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ModalRechazoCambio
+          estado={modalRechazoCambio}
+          onCambiarMotivo={(motivo) => setModalRechazoCambio((prev) => ({ ...prev, motivo }))}
+          onCancelar={() => setModalRechazoCambio({ abierto: false, motivo: '', enviando: false, error: null })}
+          onConfirmar={handleConfirmarRechazoCambio}
+        />
       )}
     </div>
   );
