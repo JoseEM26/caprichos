@@ -20,14 +20,14 @@ describe('AvisoCuentaService (aviso de seguridad de la cuenta)', () => {
     const dato = outbox.encolar.mock.calls[0][0];
     expect(dato).toMatchObject({ telefono: '51912345678', tipo: 'TEXTO', clave: 'cuenta-creada-100', origen: 'AVISO_CUENTA' });
     expect(dato.carga.plantillaClave).toBe('CUENTA_AVISO_SEGURIDAD');
-    expect(dato.carga.textoLibre).toContain('fue creada');
+    expect(dato.carga.textoLibre).toContain('se creó tu cuenta');
     expect(outbox.despertar).toHaveBeenCalled();
   });
 
   it('al cambiar la contraseña avisa cada vez (clave con marca de tiempo)', async () => {
     await servicio.avisar('100', '912345678', 'CLAVE_CAMBIADA');
     expect(outbox.encolar.mock.calls[0][0].clave).toMatch(/^cuenta-clave_cambiada-100-\d+$/);
-    expect(outbox.encolar.mock.calls[0][0].carga.textoLibre).toContain('cambió tu contraseña');
+    expect(outbox.encolar.mock.calls[0][0].carga.textoLibre).toContain('se cambió tu contraseña');
   });
 
   it('con el parámetro apagado no encola nada', async () => {

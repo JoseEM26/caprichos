@@ -171,8 +171,8 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     categoria: 'UTILITY',
     idioma: 'es',
     variables: ['detalle_cuenta'],
-    texto: 'Hola. Tu cuenta de Caprichos {{1}}. Si no fuiste tú, escríbenos por WhatsApp de inmediato.',
-    descripcion: 'Aviso de seguridad al crear la cuenta (detalle «fue creada») o al cambiar la contraseña (detalle «cambió tu contraseña»). Pendiente de aprobar en Meta (UTILITY) antes de activar whatsapp_aviso_cuenta_activo en producción.',
+    texto: 'Hola. Te avisamos de un cambio de seguridad en tu cuenta de Caprichos: {{1}}. Si no fuiste tú, escríbenos por WhatsApp de inmediato.',
+    descripcion: 'Aviso de seguridad al crear la cuenta (detalle «se creó tu cuenta») o al cambiar la contraseña (detalle «se cambió tu contraseña»). Pendiente de aprobar en Meta (UTILITY) antes de activar whatsapp_aviso_cuenta_activo en producción.',
   },
   DELIVERY_ENTREGADO: {
     nombre: 'caprichos_delivery_entregado',
