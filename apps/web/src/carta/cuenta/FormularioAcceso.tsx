@@ -189,7 +189,8 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
 
   /** Paso 3 «Tus datos»: nombre, contraseña nueva, correo, DNI opcional y aceptación. */
   const errorPaso3 = (): string => {
-    if (nombre.trim().length < 3) return 'Escribe tu nombre.';
+    if (nombre.trim().length < 2) return 'Escribe tu nombre.';
+    if (!cumple) return 'Escribe tu cumpleaños, para saludarte.';
     if (contrasena.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
     if (correo && !CORREO_VALIDO.test(correo)) return 'El correo no es válido.';
     if (!acepta) return 'Debes aceptar el uso de tus datos para crear la cuenta.';
@@ -225,7 +226,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
         contrasena,
         ...(dni ? { dni } : {}),
         correo: correo.trim() || undefined,
-        cumpleanos: cumple || undefined,
+        cumpleanos: cumple,
         aceptaDatos: true,
       });
       setContrasena('');
@@ -308,13 +309,13 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
 
       {paso3 && (
         <>
+          <div>
+            <label htmlFor="ac-b" style={etiqueta}>Tu cumpleaños, para saludarte</label>
+            <input id="ac-b" type="date" value={cumple} max={hoyISO()} required aria-required="true" onChange={(e) => setCumple(e.target.value)} style={campo} />
+            <div style={ayuda}>Solo para saludarte en tu día.</div>
+          </div>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>Datos opcionales</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
-            <div>
-              <label htmlFor="ac-b" style={etiqueta}>Cumpleaños (opcional)</label>
-              <input id="ac-b" type="date" value={cumple} max={hoyISO()} onChange={(e) => setCumple(e.target.value)} style={campo} />
-              <div style={ayuda}>Para tu cupón de cumpleaños.</div>
-            </div>
             <div>
               <label htmlFor="ac-dni" style={etiqueta}>DNI (opcional)</label>
               <input id="ac-dni" type="text" inputMode="numeric" maxLength={8} value={dni} onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 8))} style={campo} />

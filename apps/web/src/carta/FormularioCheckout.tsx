@@ -69,6 +69,8 @@ export function FormularioCheckout({
   // Cliente
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
+  // Cumpleaños: lo pide quien da de alta su celular sin sesión, y quien con cuenta aún no lo tiene
+  const [cumpleCliente, setCumpleCliente] = useState('');
 
   // Entrega
   const [direccion, setDireccion] = useState('');
@@ -119,6 +121,8 @@ export function FormularioCheckout({
   const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
+  const cumpleFaltaCuenta = !!clienteCuenta && (!clienteCuenta.cumpleanos || clienteCuenta.cumpleanos === '—');
+  const pideCumple = cumpleFaltaCuenta || (!clienteCuenta && telefono.trim().length > 0);
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
   const [comoInvitado, setComoInvitado] = useState(false);
   // Sin invitado permitido, quien pide sin cuenta debe escribir su celular (así suma puntos): no se ofrece «invitado»
@@ -394,6 +398,8 @@ export function FormularioCheckout({
       if (clienteCuenta) return 'El teléfono debe tener 9 dígitos y empezar con 9';
       if (!invitadoPermitido) return 'Escribe tu celular para hacer tu pedido y sumar puntos';
     }
+    if (!clienteCuenta && telLimpio && nombre.trim().length < 2) return 'Escribe tu nombre completo para sumar puntos con tu celular';
+    if (!clienteCuenta && telLimpio && !cumpleCliente) return 'Escribe tu cumpleaños, para saludarte';
     return null;
   };
 
@@ -573,6 +579,7 @@ export function FormularioCheckout({
       cliente: {
         nombre: nombre.trim(),
         ...(telefono.trim() ? { telefono: telefono.trim() } : {}),
+        ...(pideCumple && cumpleCliente ? { cumpleanos: cumpleCliente } : {}),
       },
       modalidad,
       entrega:
@@ -1173,6 +1180,36 @@ export function FormularioCheckout({
                             </button>
                           )}
                         </>
+                      )}
+
+                      {pideCumple && (
+                        <div>
+                          <label
+                            htmlFor="f-cumple"
+                            style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', display: 'block', marginBottom: '4px' }}
+                          >
+                            Tu cumpleaños, para saludarte
+                          </label>
+                          <input
+                            id="f-cumple"
+                            type="date"
+                            value={cumpleCliente}
+                            max={new Date().toISOString().slice(0, 10)}
+                            onChange={(e) => setCumpleCliente(e.target.value)}
+                            required
+                            aria-required="true"
+                            style={{
+                              width: '100%',
+                              minHeight: '44px',
+                              borderRadius: '10px',
+                              border: '1.5px solid var(--cp-line)',
+                              backgroundColor: 'var(--cp-cream)',
+                              color: 'var(--cp-navy)',
+                              padding: '0 12px',
+                              fontSize: '14px',
+                            }}
+                          />
+                        </div>
                       )}
                     </div>
                   )}

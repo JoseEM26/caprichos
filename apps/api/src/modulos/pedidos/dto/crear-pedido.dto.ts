@@ -25,6 +25,11 @@ export class ClienteDto {
   @IsString({ message: 'El teléfono debe ser un texto' })
   @Matches(/^9\d{8}$/, { message: 'El teléfono debe tener 9 dígitos y empezar con 9' })
   telefono?: string;
+
+  /** Cumpleaños (YYYY-MM-DD o DD/MM): obligatorio al darse de alta con el celular; lo valida el servicio. */
+  @IsOptional()
+  @IsString({ message: 'La fecha de cumpleaños debe ser un texto' })
+  cumpleanos?: string;
 }
 
 export class EntregaDto {

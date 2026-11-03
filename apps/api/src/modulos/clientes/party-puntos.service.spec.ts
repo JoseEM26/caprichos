@@ -27,7 +27,7 @@ describe('PartyPuntosService', () => {
       partyRole: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 900n }) },
       customerDetail: { create: jest.fn() },
       party: { create: jest.fn().mockResolvedValue({ id: 500n }) },
-      person: { create: jest.fn() },
+      person: { create: jest.fn(), findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn() },
     };
     prisma.$transaction = jest.fn(async (cb: any) => cb(prisma));
 
@@ -122,5 +122,21 @@ describe('PartyPuntosService', () => {
     prisma.party.create.mockRejectedValueOnce(Object.assign(new Error('unique'), { code: 'P2002' }));
 
     expect(await service.resolverOCrear('987654321')).toBeNull();
+  });
+
+  describe('completarDatos (checkout)', () => {
+    it('completa nombre y cumpleaños de un party que aún no los tiene', async () => {
+      prisma.person.findUnique.mockResolvedValue({ nombres: 'Cliente', cumple_dia: null });
+      await service.completarDatos(500n, { nombre: 'Ana Quispe', cumple: { dia: 14, mes: 3 } });
+      expect(prisma.person.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { party_id: 500n }, update: { nombres: 'Ana Quispe', cumple_dia: 14, cumple_mes: 3 } }),
+      );
+    });
+
+    it('no pisa un nombre real ni un cumpleaños ya guardado', async () => {
+      prisma.person.findUnique.mockResolvedValue({ nombres: 'Ana Quispe', cumple_dia: 1, cumple_mes: 2 });
+      await service.completarDatos(500n, { nombre: 'Otro', cumple: { dia: 14, mes: 3 } });
+      expect(prisma.person.upsert).not.toHaveBeenCalled();
+    });
   });
 });

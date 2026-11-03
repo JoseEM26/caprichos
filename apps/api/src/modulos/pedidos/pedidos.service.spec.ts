@@ -85,6 +85,7 @@ describe('PedidosService', () => {
     cliente: {
       nombre: 'Juan Perez',
       telefono: '987654321',
+      cumpleanos: '1990-03-14',
     },
     modalidad: 'DELIVERY',
     entrega: {
@@ -199,6 +200,7 @@ describe('PedidosService', () => {
 
     partyPuntosMock = {
       resolverOCrear: jest.fn().mockResolvedValue(null),
+      completarDatos: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -1107,6 +1109,17 @@ describe('PedidosService', () => {
       expect(capturado.data.cliente_party_id).toBe(300n);
     });
 
+    it('alta por celular sin sesión: guarda nombre y cumpleaños en el party y no los devuelve en la respuesta', async () => {
+      const capturado = crearCapturado();
+      const res: any = await service.crear(pedidoBaseDto, 'idemp-cumple-ok', undefined);
+      expect(partyPuntosMock.completarDatos).toHaveBeenCalledWith(300n, {
+        nombre: 'Juan Perez',
+        cumple: { dia: 14, mes: 3 },
+      });
+      expect(JSON.stringify(res)).not.toMatch(/1990|03-14|14\/03/);
+      expect(JSON.stringify(capturado.data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))).not.toMatch(/1990|03-14|14\/03/);
+    });
+
     it('WhatsApp con teléfono de quien escribe: usa el party de puntos', async () => {
       const capturado = crearCapturado();
       await service.crear(pedidoBaseDto, 'idemp-pp-wa', { canal: 'WHATSAPP', telefonoRemitente: '987654321' });
@@ -1162,6 +1175,15 @@ describe('PedidosService', () => {
         mensaje: 'Escribe tu celular para hacer tu pedido y sumar puntos',
       });
       expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('alta por celular sin sesión: exige cumpleaños antes de crear el pedido', async () => {
+      const err = await service
+        .crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana', telefono: '987654321' } } as any, 'idemp-cumple-falta', { canal: 'CARTA' })
+        .catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'CUMPLEANOS_REQUERIDO' });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      expect(partyPuntosMock.completarDatos).not.toHaveBeenCalled();
     });
 
     it('CELULAR_REQUERIDO: el placeholder 999999999 cuenta como sin celular', async () => {

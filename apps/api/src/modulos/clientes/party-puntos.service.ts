@@ -4,6 +4,8 @@ import { TELEFONO_PLACEHOLDER } from '../chatbot/utilidades/enmascarar.util';
 import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
 
 const TIPOS_TELEFONO = ['TELEFONO', 'WHATSAPP'];
+/** Nombre provisional del party que crea el puntos por celular, hasta que el cliente diga el suyo. */
+const NOMBRE_PROVISIONAL = 'Cliente';
 
 /** Celular de 9 dígitos que empieza en 9 (mismo criterio que celular9De de clientes.service). */
 function celular9(raw: string | null | undefined): string | null {
@@ -39,6 +41,26 @@ export class PartyPuntosService {
       const otra = await this.buscar(tel);
       return otra === 'INACTIVA' ? null : otra;
     }
+  }
+
+  /**
+   * Completa nombre y cumpleaños del party que el checkout acaba de identificar, solo si le faltan.
+   * Nunca pisa un nombre real ni un cumpleaños ya guardado.
+   */
+  async completarDatos(partyId: bigint, datos: { nombre?: string; cumple?: { dia: number; mes: number } }): Promise<void> {
+    const persona = await this.prisma.person.findUnique({ where: { party_id: partyId }, select: { nombres: true, cumple_dia: true } });
+    const data: { nombres?: string; cumple_dia?: number; cumple_mes?: number } = {};
+    if (datos.nombre && (!persona || persona.nombres === NOMBRE_PROVISIONAL)) data.nombres = datos.nombre;
+    if (datos.cumple && persona?.cumple_dia == null) {
+      data.cumple_dia = datos.cumple.dia;
+      data.cumple_mes = datos.cumple.mes;
+    }
+    if (Object.keys(data).length === 0) return;
+    await this.prisma.person.upsert({
+      where: { party_id: partyId },
+      create: { party_id: partyId, nombres: data.nombres ?? NOMBRE_PROVISIONAL, cumple_dia: data.cumple_dia ?? null, cumple_mes: data.cumple_mes ?? null },
+      update: data,
+    });
   }
 
   private async buscar(tel: string): Promise<bigint | 'INACTIVA' | null> {
@@ -102,7 +124,7 @@ export class PartyPuntosService {
   private async crear(tel: string): Promise<bigint> {
     return this.prisma.$transaction(async (tx) => {
       const party = await tx.party.create({ data: { tipo: 'PERSONA', estado: 'ACTIVO' } });
-      await tx.person.create({ data: { party_id: party.id, nombres: 'Cliente' } });
+      await tx.person.create({ data: { party_id: party.id, nombres: NOMBRE_PROVISIONAL } });
       await tx.contactMechanism.create({ data: { party_id: party.id, tipo: 'TELEFONO', valor: tel, principal: true } });
       const rol = await tx.partyRole.create({ data: { party_id: party.id, rol: 'CLIENTE' } });
       await tx.customerDetail.create({ data: { party_role_id: rol.id, puntos: 0 } });
