@@ -223,3 +223,85 @@ export interface EstadoConexionWhatsAppInfo {
   modo: 'meta' | 'simulado';
   razon?: string;
 }
+
+/** Estado de la BOLETA/FACTURA ante SUNAT (la lista de «Electrónicos»): PENDIENTE_RESUMEN y ENVIADA_RESUMEN son de la boleta (resumen diario). */
+export type EstadoFacturacion = 'EMITIDO_SUNAT' | 'RECHAZADO' | 'PENDIENTE_ENVIO' | 'PENDIENTE_RESUMEN' | 'ENVIADA_RESUMEN' | 'REVISION_MANUAL';
+
+/** Proveedor de facturación electrónica (parámetro facturacion_proveedor). */
+export type ProveedorFacturacion = 'SIMULADO' | 'SUNAT';
+
+/** Estado de la comunicación de baja (factura) o de la anulación en resumen (boleta). */
+export type EstadoBaja = 'SOLICITADA' | 'ACEPTADA' | 'RECHAZADA' | 'PENDIENTE_RESUMEN';
+
+export interface ComprobanteElectronico {
+  id: string;
+  pedido_id: string;
+  codigo_pedido: string;
+  tipo: 'BOLETA' | 'FACTURA' | string;
+  serie: string;
+  numero: number;
+  numero_texto: string;
+  documento: string | null;
+  razon_social: string | null;
+  total: number;
+  fecha_lima: string;
+  emision: string;
+  facturacion_estado: EstadoFacturacion | null;
+  /** Proveedor que emitió: SIMULADO | SUNAT (null en filas anteriores). */
+  emisor?: ProveedorFacturacion | null;
+  facturacion_intentos: number;
+  /** Motivo de la cola de fallos (REVISION_MANUAL): rechazo permanente o intentos agotados. */
+  revision_motivo?: string | null;
+  enlace_pdf: string | null;
+  cadena_qr: string | null;
+  hash: string | null;
+  respuesta_sunat: string | null;
+  simulado: boolean;
+  baja_estado: EstadoBaja | null;
+  baja_motivo: string | null;
+  baja_en: string | null;
+}
+
+export interface RespuestaListarElectronicos {
+  total: number;
+  pagina: number;
+  limite: number;
+  totalPaginas: number;
+  elementos: ComprobanteElectronico[];
+}
+
+export interface ConfigFacturacion {
+  igvPct: number;
+  serieBoleta: string;
+  serieFactura: string;
+  /** Lo que eligió el ADMIN. */
+  proveedor: ProveedorFacturacion;
+  /** Lo que de verdad emite (cae a SIMULADO sin credenciales). */
+  proveedor_efectivo: ProveedorFacturacion;
+  sunat: { ambiente: 'beta' | 'prod'; credenciales: boolean; vence_certificado: string | null };
+  /** Fecha de corte (ISO): los pedidos cobrados antes no se emiten a SUNAT. Null si aún no se fijó. */
+  facturacion_desde?: string | null;
+}
+
+/** Conteos de salud de la facturación (solo ADMIN; sin datos personales). */
+export interface SaludFacturacion {
+  pendientes: number;
+  con_problemas: number;
+  revision_manual: number;
+  rechazados: number;
+  pendientes_mas_15_min: number;
+  edad_pendiente_min: number | null;
+  boletas_por_reportar: number;
+  resumenes_sin_respuesta: number;
+  certificado_vence_en_dias: number | null;
+  circuito_abierto: boolean;
+  credenciales_invalidas: boolean;
+  generado_en: string;
+}
+
+/** Comprobante por defecto: boleta electrónica si hay SUNAT real (en simulado no cambia nada). */
+export interface BoletaPorDefecto {
+  activo: boolean;
+  proveedor_efectivo: ProveedorFacturacion;
+  aplica: boolean;
+}

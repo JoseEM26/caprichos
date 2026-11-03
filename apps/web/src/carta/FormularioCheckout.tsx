@@ -954,7 +954,7 @@ export function FormularioCheckout({
                         ¿Cómo quieres continuar?
                       </div>
                       <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-                        Ingresa con tu cuenta para acumular puntos en este pedido, o sigue como invitado.
+                        Tus puntos se suman con tu celular, sin contraseña. Ingresa solo si quieres ver tus puntos, o sigue como invitado.
                       </div>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button
@@ -971,7 +971,7 @@ export function FormularioCheckout({
                             fontSize: '14px',
                           }}
                         >
-                          Ingresar con mi cuenta
+                          Ver mis puntos
                         </button>
                         <button
                           type="button"
@@ -1038,10 +1038,10 @@ export function FormularioCheckout({
                       ) : (
                         <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
                           {invitadoPermitido
-                            ? 'Sigues como invitado: solo necesitamos tu nombre.'
-                            : 'Pides sin cuenta: solo necesitamos tu nombre y tu celular.'}{' '}
+                            ? 'Sigues como invitado: solo necesitamos tu nombre. Como invitado no se suman puntos.'
+                            : 'Tus puntos se suman con tu celular, sin contraseña. Solo necesitamos tu nombre y tu celular. ¿Quieres verlos?'}{' '}
                           <button type="button" onClick={() => cuentaCtx?.abrirPanel()} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}>
-                            Ingresar para acumular puntos
+                            Ver mis puntos
                           </button>{' '}
                           <button type="button" onClick={() => setVerPuntos((v) => !v)} aria-expanded={verPuntos} aria-label="¿Cómo funcionan los puntos?" style={{ width: 20, height: 20, minWidth: 20, minHeight: 20, borderRadius: 10, border: '1.5px solid var(--cp-navy)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontSize: '11px', fontWeight: 800, cursor: 'pointer', lineHeight: '16px', padding: 0 }}>?</button>
                           {verPuntos && (
@@ -1138,7 +1138,7 @@ export function FormularioCheckout({
                         <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '4px' }}>
                           {invitadoPermitido
                             ? 'Opcional. Con tu celular sumas puntos.'
-                            : 'Tu celular: sumas puntos con tu numero, sin contrasena.'}
+                            : 'Tu celular: sumas puntos con tu número, sin contraseña.'}
                         </div>
                       </div>
                           {clienteCuenta && otroTelefono && clienteCuenta.telefono && (

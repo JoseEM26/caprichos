@@ -3,7 +3,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { enmascararTelefono, telefonoEnviable } from '../utilidades/enmascarar.util';
 import { CargaSaliente, OutboxWhatsappService } from './outbox-whatsapp.service';
-import { EtapaAvisoReparto, TEXTOS_REPARTO, PayloadAvisoReparto } from '../conversacion/textos-reparto';
+import { EtapaAvisoReparto, TEXTOS_REPARTO, PayloadAvisoReparto, conBienvenidaPuntos, conPuntosEntregado } from '../conversacion/textos-reparto';
+import { partyClienteDelPedido } from '../../clientes/cliente-del-pedido';
+import { urlPublicaCarta } from './carrusel.util';
+import { parametroActivoConDefecto, whatsappSimulado } from '../utilidades/modo-whatsapp.util';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
 import { calcularEtaEntrega, formatearEta, leerConfigEta } from '../../repartos/eta-entrega';
 
@@ -33,6 +36,10 @@ export const ETAPAS_AVISO: Record<
   // Recordatorio del voucher de un pedido digital de la carta que aún no lo envió (una vez por pedido)
   VOUCHER_RECORDATORIO: { numero: 14, parametro: 'whatsapp_aviso_recibido_activo', cualquierModalidad: true },
 };
+
+type ExtraPuntos =
+  | { tipo: 'BIENVENIDA'; enlace: string }
+  | { tipo: 'PUNTOS'; ganados: number; total: number };
 
 /** Medios digitales que llevan voucher y pasan la conversación a una persona. Nombre que se lee al cliente. */
 const MEDIOS_DIGITALES: Record<string, string> = {
@@ -129,6 +136,10 @@ export class AvisosPedidoService {
         total: true,
         pago_metodo: true,
         pago_preferido: true,
+        canal: true,
+        party_id: true,
+        cliente_party_id: true,
+        puntos_ganados: true,
       },
     });
     if (!pedido) return { estado: 'OMITIDO', motivo: 'PEDIDO_NO_ENCONTRADO' };
@@ -151,15 +162,8 @@ export class AvisosPedidoService {
     }
     const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
 
-    const payload = await this.construirPayload(etapa, nombre, pedido.codigo, datos, medio);
-    const carga: CargaSaliente = {
-      ...payload,
-      autor: 'BOT',
-      nombre,
-      repartoNumero: cfg.numero,
-      pedidoCodigo: pedido.codigo,
-      etapa,
-    };
+    // Línea de puntos (bienvenida o puntos ganados): se decide aquí y el marcador «una sola vez» se escribe en encolar
+    const extraPuntos = await this.extraPuntos(db, etapa, pedido);
 
     // Idempotencia: la fila (pedido, etapa) se crea una sola vez; si ya existe, el aviso ya se encoló
     const encolar = async (t: Prisma.TransactionClient): Promise<boolean> => {
@@ -168,6 +172,21 @@ export class AvisosPedidoService {
         select: { numero: true },
       });
       if (previa) return false;
+      let extra = extraPuntos;
+      if (extra?.tipo === 'BIENVENIDA') {
+        // Una sola bienvenida por celular: si otra transacción ya la marcó, este aviso sale sin la línea
+        const marca = await t.avisoClienteUnico.createMany({ data: { telefono: telefono.slice(-9), aviso: 'BIENVENIDA_PUNTOS' }, skipDuplicates: true });
+        if (marca.count === 0) extra = null;
+      }
+      const payload = await this.payloadConPuntos(etapa, nombre, pedido.codigo, datos, medio, extra);
+      const carga: CargaSaliente = {
+        ...payload,
+        autor: 'BOT',
+        nombre,
+        repartoNumero: cfg.numero,
+        pedidoCodigo: pedido.codigo,
+        etapa,
+      };
       await t.mensajeReparto.create({
         data: { pedido_id: pedidoId, numero: cfg.numero, enviado_en: new Date(), estado: 'PENDIENTE' },
       });
@@ -247,6 +266,52 @@ export class AvisosPedidoService {
     // Lo prometido queda guardado: el seguimiento cuenta desde la salida con este mismo rango
     await db.pedido.update({ where: { id: pedidoId }, data: { eta_min: rango.min, eta_max: rango.max } });
     return formatearEta(rango, cfg.respaldoMin);
+  }
+
+  /**
+   * Línea de puntos del aviso: RECIBIDO del primer pedido de un celular con puntos (bienvenida, con enlace a la carta)
+   * y ENTREGADO de un pedido que ya sumó puntos («Ganaste N puntos. Total: M»). Solo lee; la marca se escribe al encolar.
+   */
+  private async extraPuntos(
+    db: Prisma.TransactionClient | PrismaService,
+    etapa: EtapaAvisoReparto,
+    pedido: { canal: string; party_id: bigint | null; cliente_party_id: bigint | null; puntos_ganados: unknown },
+  ): Promise<ExtraPuntos | null> {
+    const cliente = partyClienteDelPedido(pedido);
+    if (!cliente) return null;
+    if (etapa === 'RECIBIDO') {
+      const flag = await db.parametro.findUnique({ where: { clave: 'whatsapp_aviso_bienvenida_puntos_activo' } });
+      if (!parametroActivoConDefecto(flag?.valor, whatsappSimulado())) return null;
+      const origen = urlPublicaCarta((clave) => process.env[clave]);
+      if (!origen) return null;
+      return { tipo: 'BIENVENIDA', enlace: `${origen}/?puntos=1` };
+    }
+    if (etapa === 'ENTREGADO') {
+      const ganados = Number(pedido.puntos_ganados ?? 0);
+      if (ganados <= 0) return null;
+      const flag = await db.parametro.findUnique({ where: { clave: 'whatsapp_aviso_puntos_ganados_activo' } });
+      if (!parametroActivoConDefecto(flag?.valor, whatsappSimulado())) return null;
+      const saldo = await db.customerDetail.findFirst({
+        where: { party_role: { party_id: cliente, rol: 'CLIENTE', hasta: null } },
+        select: { puntos: true },
+      });
+      return { tipo: 'PUNTOS', ganados, total: Number(saldo?.puntos ?? 0) };
+    }
+    return null;
+  }
+
+  private async payloadConPuntos(
+    etapa: EtapaAvisoReparto,
+    nombre: string,
+    codigo: string,
+    datos: DatosAviso,
+    medio: string | null,
+    extra: ExtraPuntos | null,
+  ): Promise<PayloadAvisoReparto> {
+    const base = await this.construirPayload(etapa, nombre, codigo, datos, medio);
+    if (extra?.tipo === 'BIENVENIDA') return conBienvenidaPuntos(base, nombre, codigo, extra.enlace, !medio);
+    if (extra?.tipo === 'PUNTOS') return conPuntosEntregado(base, nombre, codigo, extra.ganados, extra.total);
+    return base;
   }
 
   /** Mismo efecto que un voucher recibido por WhatsApp: la conversación queda para una persona (VALIDAR_PAGO, urgente). */

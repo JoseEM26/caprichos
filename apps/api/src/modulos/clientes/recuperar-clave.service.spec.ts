@@ -53,6 +53,7 @@ describe('RecuperarClaveService', () => {
       auditoria,
       clientes,
       { get: () => outbox } as any,
+      { avisar: jest.fn().mockResolvedValue(undefined) } as any,
     );
   });
 

@@ -8,6 +8,7 @@ import { StockModule } from '../stock/stock.module';
 import { PedidosModule } from '../pedidos/pedidos.module';
 import { ImpresionModule } from '../impresion/impresion.module';
 import { UbicarPedidoService } from './ubicar-pedido.service';
+import { PedidoComprobanteService } from './pedido-comprobante.service';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
 
@@ -17,6 +18,7 @@ import { VouchersModule } from '../vouchers/vouchers.module';
   providers: [
     PedidosEstadoService,
     UbicarPedidoService,
+    PedidoComprobanteService,
   ],
   exports: [PedidosEstadoService],
 })

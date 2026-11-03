@@ -1,7 +1,7 @@
 jest.mock('@nestjs/jwt', () => ({ JwtService: class {}, JwtModule: { register: jest.fn().mockReturnValue({ module: class {} }) } }));
 
-import { BadRequestException, ConflictException } from '@nestjs/common';
-import { CodigoRegistroService } from './codigo-registro.service';
+import { BadRequestException } from '@nestjs/common';
+import { CodigoRegistroService, REGISTRO_MAX_SOLICITUDES_IP_HORA } from './codigo-registro.service';
 
 /** Redis en memoria: lo justo para incr/expire/set/get/del (sin TTL real). */
 function redisFalso() {
@@ -72,10 +72,33 @@ describe('CodigoRegistroService', () => {
     expect(guardado).not.toContain(codigoEnviado());
   });
 
-  it('celular que ya tiene cuenta con contraseña: TELEFONO_REGISTRADO y no envía nada', async () => {
+  it('celular que ya tiene cuenta con contraseña: responde igual que siempre y no envía nada (no revela la cuenta)', async () => {
     prisma.customerAccount.findFirst.mockResolvedValue({ hash: '$argon2id$x' });
-    await expect(service.solicitar('912345678')).rejects.toBeInstanceOf(ConflictException);
+    const r = await service.solicitar('912345678');
+    expect(r.ok).toBe(true);
     expect(outbox.encolar).not.toHaveBeenCalled();
+  });
+
+  it('límite por IP: pasado el tope por hora responde igual y no envía', async () => {
+    for (let i = 0; i < REGISTRO_MAX_SOLICITUDES_IP_HORA; i++) await service.solicitar(`9${String(i).padStart(8, '0')}`, '2.2.2.2');
+    const enviadosAntes = outbox.encolar.mock.calls.length;
+    const r = await service.solicitar('912000001', '2.2.2.2');
+    expect(r.ok).toBe(true);
+    expect(outbox.encolar.mock.calls.length).toBe(enviadosAntes);
+  });
+
+  it('verificar: código correcto deja el celular verificado; exigirVerificado lo consume una sola vez', async () => {
+    await service.solicitar('912345678');
+    await service.verificar('912345678', codigoEnviado());
+    await expect(service.exigirVerificado('912345678')).resolves.toBeUndefined();
+    await expect(service.exigirVerificado('912345678')).rejects.toMatchObject({ response: { codigo: 'CELULAR_NO_VERIFICADO' } });
+  });
+
+  it('verificar con código equivocado no deja el celular verificado', async () => {
+    await service.solicitar('912345678');
+    const malo = codigoEnviado() === '000000' ? '111111' : '000000';
+    await expect(service.verificar('912345678', malo)).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
+    await expect(service.exigirVerificado('912345678')).rejects.toMatchObject({ response: { codigo: 'CELULAR_NO_VERIFICADO' } });
   });
 
   it('celular inválido: TELEFONO_INVALIDO', async () => {

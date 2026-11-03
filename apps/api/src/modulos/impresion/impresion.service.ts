@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -15,6 +17,7 @@ import {
   EstadoImpresora,
   RespuestaTomarTrabajos,
   RolImpresora,
+  rolDeTrabajo,
   TipoTrabajoImpresion,
   TicketPagoDatos,
 } from '@caprichos/compartido';
@@ -32,10 +35,12 @@ import {
   claveEtiquetaArea,
   claveEtiquetaBebida,
   construirEtiquetaGeneral,
+  construirEtiquetaPrueba,
   construirEtiquetasArea,
   construirEtiquetasBebida,
   construirTodasLasEtiquetas,
   construirTicketPago,
+  construirTicketPrueba,
   construirTicketNotaMozo,
 } from './constructor-etiquetas';
 import {
@@ -54,6 +59,9 @@ const tiposDeRoles = (roles: RolImpresora[]): string[] => [
 ];
 
 const ESTADOS_EN_COLA = ['PENDIENTE', 'IMPRIMIENDO'];
+
+/** Una prueba de impresión por máquina cada 10 s (las pruebas no tienen pedido: pedido_id NULL). */
+const ESPERA_PRUEBA_MS = 10 * 1000;
 
 /** Estado técnico de print_job -> estado que ve el cajero en cada etiqueta. */
 const ESTADO_ETIQUETA: Record<string, string> = {
@@ -375,7 +383,7 @@ export class ImpresionService {
     return {
       items: items.map((t) => ({
         id: t.id.toString(),
-        pedidoId: t.pedido_id.toString(),
+        pedidoId: t.pedido_id?.toString() ?? null,
         pedidoCodigo: t.pedido?.codigo || '',
         clienteNombre: t.pedido?.cliente_nombre || '',
         tipo: t.tipo,
@@ -420,13 +428,16 @@ export class ImpresionService {
 
     const grupos = new Map<string, any>();
     for (const t of trabajos) {
-      const k = t.pedido_id.toString();
+      // Cada prueba va en su propio grupo (no tiene pedido)
+      const esPrueba = t.pedido_id === null;
+      const k = esPrueba ? `prueba-${t.id}` : t.pedido_id!.toString();
       let g = grupos.get(k);
       if (!g) {
         g = {
-          pedidoId: k,
-          pedidoCodigo: t.pedido?.codigo || '',
-          clienteNombre: t.pedido?.cliente_nombre || '',
+          pedidoId: esPrueba ? null : k,
+          esPrueba,
+          pedidoCodigo: esPrueba ? 'PRUEBA' : (t.pedido?.codigo || ''),
+          clienteNombre: esPrueba ? 'Prueba de impresión' : (t.pedido?.cliente_nombre || ''),
           cantidad: 0,
           estados: {} as Record<string, number>,
           masAntiguaEn: t.en,
@@ -986,6 +997,89 @@ export class ImpresionService {
       cantidad: trabajosCreados.length,
       omitidas,
       trabajoIds: trabajosCreados.map((t) => t.id.toString()),
+    };
+  }
+
+  /**
+   * Prueba de impresión: una etiqueta o un ticket de ejemplo, sin pedido real, por la cola normal.
+   * No cuenta en pedidos ni dispara avisos (pedido_id NULL). Una cada 10 s por máquina.
+   */
+  async encolarPrueba(rol: RolImpresora, usuario?: UsuarioAutenticado, ip?: string) {
+    const reciente = await this.prisma.printJob.findFirst({
+      where: {
+        pedido_id: null,
+        tipo: { in: tiposDeRoles([rol]) },
+        en: { gt: new Date(Date.now() - ESPERA_PRUEBA_MS) },
+      },
+      select: { id: true },
+    });
+    if (reciente) {
+      throw new HttpException(
+        { codigo: 'PRUEBA_FRECUENTE', mensaje: 'Espera unos segundos antes de otra prueba de esta máquina' },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const local = await this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null);
+    const persona = usuario
+      ? await this.prisma.party.findUnique({ where: { id: usuario.partyId }, include: { persona: true } }).catch(() => null)
+      : null;
+    const quien = persona?.persona?.nombres?.split(' ')[0] || 'personal de caja';
+
+    const esTicket = rol === 'TICKETERA';
+    const trabajo = await this.prisma.printJob.create({
+      data: {
+        pedido_id: null,
+        tipo: esTicket ? 'TICKET_PAGO' : 'ETIQUETA_GENERAL',
+        payload: (esTicket
+          ? construirTicketPrueba(local?.valor, quien)
+          : construirEtiquetaPrueba(local?.valor, quien)) as any,
+        copia: false,
+        estado: 'PENDIENTE',
+      },
+    });
+
+    if (this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'IMPRESION_PRUEBA',
+        entidad: 'print_job',
+        entidadId: trabajo.id,
+        partyId: usuario.partyId,
+        despues: { rol },
+        ip,
+      });
+    }
+    this.eventos?.emitirAdmin('impresion:cola', { prueba: true, rol });
+
+    return {
+      ok: true,
+      trabajoId: trabajo.id.toString(),
+      mensaje: esTicket
+        ? 'Ticket de prueba enviado a la cola de la ticketera'
+        : 'Etiqueta de prueba enviada a la cola de la etiquetera',
+    };
+  }
+
+  /** Estado de una prueba (la pantalla lo consulta hasta que sale o falla). */
+  async obtenerPrueba(id: string) {
+    let bigId: bigint;
+    try {
+      bigId = BigInt(id);
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador no válido' });
+    }
+    const t = await this.prisma.printJob.findFirst({ where: { id: bigId, pedido_id: null } });
+    if (!t) {
+      throw new NotFoundException({ codigo: 'PRUEBA_NO_ENCONTRADA', mensaje: 'Prueba de impresión no encontrada' });
+    }
+    return {
+      id: t.id.toString(),
+      rol: rolDeTrabajo(t.tipo),
+      estado: t.estado,
+      intentos: t.intentos,
+      error: t.error,
     };
   }
 

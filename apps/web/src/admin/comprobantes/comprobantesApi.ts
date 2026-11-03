@@ -1,5 +1,6 @@
-import { clienteFetch } from '../../comun/api';
+import { clienteFetch, obtenerBlobAutenticado } from '../../comun/api';
 import type {
+  BoletaPorDefecto,
   RespuestaListarPorEmitir,
   NotaVentaDatos,
   RespuestaListarReclamos,
@@ -10,6 +11,10 @@ import type {
   RespuestaListarQuejasWhatsApp,
   QuejaWhatsAppItem,
   EstadoConexionWhatsAppInfo,
+  RespuestaListarElectronicos,
+  ConfigFacturacion,
+  ProveedorFacturacion,
+  SaludFacturacion,
 } from './tipos';
 
 export const comprobantesApi = {
@@ -37,6 +42,83 @@ export const comprobantesApi = {
         method: 'POST',
       },
     );
+  },
+
+  // Facturación electrónica (SUNAT)
+  async listarElectronicos(pagina = 1, limite = 20): Promise<RespuestaListarElectronicos> {
+    const params = new URLSearchParams({ pagina: String(pagina), limite: String(limite) });
+    return clienteFetch<RespuestaListarElectronicos>(`/admin/comprobantes/emitidos?${params.toString()}`);
+  },
+
+  /** Solo los comprobantes con problemas: rechazados, en revisión manual o pendientes con más de 15 min. */
+  async listarProblemasElectronicos(pagina = 1, limite = 50): Promise<RespuestaListarElectronicos> {
+    const params = new URLSearchParams({ pagina: String(pagina), limite: String(limite), problemas: '1' });
+    return clienteFetch<RespuestaListarElectronicos>(`/admin/comprobantes/emitidos?${params.toString()}`);
+  },
+
+  /** Conteos de salud (solo ADMIN). */
+  async saludFacturacion(): Promise<SaludFacturacion> {
+    return clienteFetch<SaludFacturacion>('/admin/comprobantes/salud');
+  },
+
+  async reintentarElectronico(
+    id: string,
+    correccion: { documento?: string; razon?: string; direccion?: string } = {},
+  ): Promise<{ id: string; facturacion_estado: string | null }> {
+    return clienteFetch(`/admin/comprobantes/${encodeURIComponent(id)}/reintentar`, {
+      method: 'POST',
+      body: JSON.stringify(correccion),
+    });
+  },
+
+  async anularElectronico(id: string, motivo: string): Promise<{ id: string; baja_estado: string | null }> {
+    return clienteFetch(`/admin/comprobantes/${encodeURIComponent(id)}/anular`, {
+      method: 'POST',
+      body: JSON.stringify({ motivo }),
+    });
+  },
+
+  async obtenerFacturacion(): Promise<ConfigFacturacion> {
+    return clienteFetch<ConfigFacturacion>('/admin/comprobantes/facturacion');
+  },
+
+  /** Marca «Boleta electrónica por defecto» y si hoy aplica (solo con SUNAT real). */
+  async obtenerBoletaPorDefecto(): Promise<BoletaPorDefecto> {
+    return clienteFetch<BoletaPorDefecto>('/admin/comprobantes/config/boleta-por-defecto');
+  },
+
+  async guardarBoletaPorDefecto(activo: boolean): Promise<BoletaPorDefecto> {
+    return clienteFetch<BoletaPorDefecto>('/admin/comprobantes/config/boleta-por-defecto', {
+      method: 'PUT',
+      body: JSON.stringify({ activo }),
+    });
+  },
+
+  /** Envía ahora el resumen diario de boletas SUNAT (ADMIN). */
+  async enviarResumenSunat(): Promise<{ resumenes: number; boletas: number }> {
+    return clienteFetch('/admin/comprobantes/sunat/resumen', { method: 'POST' });
+  },
+
+  /** URL (blob) del XML firmado, ZIP o CDR de un comprobante, con la sesión del usuario. */
+  async urlArchivoElectronico(id: string, tipo: 'XML' | 'CDR' | 'ZIP'): Promise<string> {
+    return obtenerBlobAutenticado(`/admin/comprobantes/${encodeURIComponent(id)}/archivos/${tipo}`);
+  },
+
+  /** URL (blob) de la representación impresa en PDF de una boleta o factura electrónica, con la sesión del usuario. */
+  async urlPdfElectronico(id: string): Promise<string> {
+    return obtenerBlobAutenticado(`/admin/comprobantes/${encodeURIComponent(id)}/pdf`);
+  },
+
+  async guardarFacturacion(config: {
+    igvPct: number;
+    serieBoleta: string;
+    serieFactura: string;
+    proveedor: ProveedorFacturacion;
+  }): Promise<ConfigFacturacion> {
+    return clienteFetch<ConfigFacturacion>('/admin/comprobantes/facturacion', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
   },
 
   async marcarEmitido(id: string, referenciaExterna: string): Promise<{ id: string; emision: string; referencia_externa: string }> {

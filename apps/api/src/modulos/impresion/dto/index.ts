@@ -4,3 +4,4 @@ export * from './latido.dto';
 export * from './reimprimir.dto';
 export * from './crear-llave.dto';
 export * from './descartar.dto';
+export * from './prueba-impresion.dto';

@@ -55,7 +55,7 @@ export const MEDIOS_CON_VOUCHER_CAJA = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJET
 /** Lo que el mozo elige al enviar a Caja: vuelto (efectivo) y comprobante (nota de venta por defecto). */
 export interface EnviarACajaOpciones {
   recibido?: unknown;
-  comprobante?: { tipo?: unknown; doc?: unknown; razon?: unknown };
+  comprobante?: { tipo?: unknown; doc?: unknown; razon?: unknown; direccion?: unknown };
 }
 const NOMBRE_MEDIO_CAJA: Record<string, string> = {
   EFECTIVO: 'Efectivo',
@@ -690,6 +690,7 @@ export class VouchersService {
         comprobante_tipo: true,
         comprobante_doc: true,
         comprobante_razon: true,
+        comprobante_direccion: true,
       },
     });
     if (!pedido) {
@@ -802,22 +803,30 @@ export class VouchersService {
     const medioCobro = planValidado
       ? [...new Set(planValidado.map((f) => f.medio))].join('+')
       : medioNormalizado;
-    await this.prisma.pedido.update({
-      where: { id },
-      data: {
-        cobro_mozo_en: new Date(),
-        cobro_mozo_medio: medioCobro,
-        cobro_mozo_party_id: usuario.partyId,
-        cobro_mozo_recibido: recibido,
-        comprobante_tipo: comprobante.tipo,
-        comprobante_doc: comprobante.doc,
-        comprobante_razon: comprobante.razon,
-      },
-    });
+    // Cambio del pedido y nota de venta en una sola transacción: no queda la nota sin el cambio ni al revés
+    const esNotaVenta = comprobante.tipo === 'NOTA_VENTA' && !!this.comprobantes;
+    const datosMozo = {
+      cobro_mozo_en: new Date(),
+      cobro_mozo_medio: medioCobro,
+      cobro_mozo_party_id: usuario.partyId,
+      cobro_mozo_recibido: recibido,
+      comprobante_tipo: comprobante.tipo,
+      comprobante_doc: comprobante.doc,
+      comprobante_razon: comprobante.razon,
+      comprobante_direccion: comprobante.direccion,
+    };
+    let nota: any = null;
+    if (esNotaVenta) {
+      nota = await this.prisma.$transaction(async (tx) => {
+        await tx.pedido.update({ where: { id }, data: datosMozo });
+        // Idempotente: reenviar no emite otra nota ni la vuelve a imprimir
+        return this.comprobantes!.emitirParaPedido(id, tx, usuario, ip);
+      });
+    } else {
+      await this.prisma.pedido.update({ where: { id }, data: datosMozo });
+    }
 
-    if (comprobante.tipo === 'NOTA_VENTA' && this.comprobantes) {
-      // Idempotente: reenviar no emite otra nota ni la vuelve a imprimir
-      const nota = await this.comprobantes.emitirParaPedido(id, undefined, usuario, ip);
+    if (esNotaVenta && nota) {
       const persona = await this.prisma.person.findUnique({
         where: { party_id: usuario.partyId },
         select: { nombres: true, apellidos: true },
@@ -874,32 +883,42 @@ export class VouchersService {
    * si no, nota de venta. Boleta: DNI opcional; factura exige RUC y razón social (regla compartida).
    */
   private comprobanteDelEnvio(
-    pedido: { comprobante_tipo: string | null; comprobante_doc: string | null; comprobante_razon: string | null },
+    pedido: {
+      comprobante_tipo: string | null;
+      comprobante_doc: string | null;
+      comprobante_razon: string | null;
+      comprobante_direccion?: string | null;
+      total?: unknown;
+    },
     elegido?: EnviarACajaOpciones['comprobante'],
-  ): { tipo: string; doc: string | null; razon: string | null } {
+  ): { tipo: string; doc: string | null; razon: string | null; direccion: string | null } {
     let tipo: string;
     let doc: string | null;
     let razon: string | null;
+    let direccion: string | null;
     if (elegido?.tipo) {
       tipo = String(elegido.tipo).trim().toUpperCase();
       doc = String(elegido.doc ?? '').trim() || null;
       razon = String(elegido.razon ?? '').trim() || null;
+      direccion = String(elegido.direccion ?? '').trim() || null;
     } else {
       const tipoPedido = String(pedido.comprobante_tipo ?? '').trim().toUpperCase();
       const usaPedido = (tipoPedido === 'BOLETA' || tipoPedido === 'FACTURA') && !!pedido.comprobante_doc?.trim();
       tipo = usaPedido ? tipoPedido : 'NOTA_VENTA';
       doc = usaPedido ? pedido.comprobante_doc!.trim() : null;
       razon = usaPedido ? pedido.comprobante_razon?.trim() || null : null;
+      direccion = usaPedido ? pedido.comprobante_direccion?.trim() || null : null;
     }
-    if (tipo === 'NOTA_VENTA') return { tipo, doc: null, razon: null };
+    if (tipo === 'NOTA_VENTA') return { tipo, doc: null, razon: null, direccion: null };
     if (tipo !== 'BOLETA' && tipo !== 'FACTURA') {
       throw new BadRequestException({ codigo: 'COMPROBANTE_INVALIDO', mensaje: 'Elige Nota de venta, Boleta o Factura' });
     }
+    // Sin total: el envío a Caja no bloquea la venta por el DNI (la boleta > S/ 700 la exige el cobro)
     const validacion = validarDocumentoComprobante(tipo, doc, razon);
     if (!validacion.valido) {
       throw new BadRequestException({ codigo: 'COMPROBANTE_INVALIDO', mensaje: validacion.motivo });
     }
-    return { tipo, doc, razon: tipo === 'FACTURA' ? razon : null };
+    return { tipo, doc, razon: tipo === 'FACTURA' ? razon : null, direccion: tipo === 'FACTURA' ? direccion : null };
   }
 
   /**

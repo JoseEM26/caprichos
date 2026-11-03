@@ -38,7 +38,20 @@ export interface TicketPagoDatos {
   total: number;
   pagos: { medio: string; monto: number; recibido?: number | null; vuelto?: number | null }[];
   plan?: { medio: string; monto: number }[];
-  comprobante?: { tipo: string; numero: string } | null;
+  /**
+   * Boleta/factura electrónica: representación impresa, hash y marca de prueba. `situacion` dice si el XML está
+   * firmado (FIRMADO), aún no (EN_PROCESO) o SUNAT no lo aceptó (REGULARIZAR: no lleva hash válido).
+   * `cadenaQr` viaja en el trabajo y el agente lo imprime como QR desde su versión nueva (ver docs/operacion/configurar-sunat.md).
+   */
+  comprobante?: {
+    tipo: string;
+    numero: string;
+    representacion?: string | null;
+    hash?: string | null;
+    cadenaQr?: string | null;
+    simulado?: boolean;
+    situacion?: 'FIRMADO' | 'EN_PROCESO' | 'REGULARIZAR';
+  } | null;
   /** Nota de venta enviada por el mozo: nombre de quien cobró en mesa. */
   cobradoPorMozo?: string | null;
 }

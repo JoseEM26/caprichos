@@ -9,10 +9,13 @@ import {
 } from './impresionApi';
 import { EstadoAdminImpresion } from '@caprichos/compartido';
 import { ColaImpresion } from './ColaImpresion';
+import { PruebaImpresion } from './PruebaImpresion';
+import { useEstadoMaquinas } from './useEstadoMaquinas';
 
 export function TarjetaImpresionEtiquetas() {
   const { usuario } = useSesion();
   const esAdmin = (usuario?.rol || '').toUpperCase() === 'ADMIN';
+  const { maquinas } = useEstadoMaquinas();
 
   const [verCola, setVerCola] = useState<boolean>(false);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -370,6 +373,33 @@ export function TarjetaImpresionEtiquetas() {
         </div>
       </div>
 
+      {/* Pruebas de impresión: comprueban cada máquina sin hacer un pedido */}
+      <div
+        data-testid="pruebas-impresion"
+        style={{ borderTop: '1px solid var(--cp-line, #E3D6C6)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}
+      >
+        <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 15, color: 'var(--cp-navy, #0B2C3E)' }}>
+          Pruebas de impresión
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+          Imprimen una pieza de ejemplo marcada como PRUEBA para comprobar que la máquina está bien conectada. No hacen ningún pedido.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>
+              Etiquetera: {maquinas?.ETIQUETERA?.conectada ? 'conectada' : 'no conectada'}
+            </div>
+            <PruebaImpresion rol="ETIQUETERA" maquina={maquinas?.ETIQUETERA} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>
+              Ticketera: {maquinas?.TICKETERA?.conectada ? 'conectada' : 'no conectada'}
+            </div>
+            <PruebaImpresion rol="TICKETERA" maquina={maquinas?.TICKETERA} />
+          </div>
+        </div>
+      </div>
+
       {/* Lista de trabajos fallidos */}
       {mostrarFallidos && (estado?.fallidos || 0) > 0 && (
         <div
@@ -408,7 +438,7 @@ export function TarjetaImpresionEtiquetas() {
               >
                 <div>
                   <div style={{ fontWeight: 800, fontSize: 13 }}>
-                    Trabajo #{f.id} · {f.tipo} · Pedido {f.pedidoCodigo}
+                    Trabajo #{f.id} · {f.tipo} · {f.pedidoId ? `Pedido ${f.pedidoCodigo}` : 'Prueba de impresión'}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
                     Intentos: {f.intentos}/5 · Error: {f.error || 'Sin detalle de error'}

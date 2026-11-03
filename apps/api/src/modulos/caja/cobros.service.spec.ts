@@ -60,7 +60,11 @@ describe('CobrosService', () => {
     };
 
     salonMock = { liberarMesasDePedido: jest.fn().mockResolvedValue(0) };
-    comprobantesMock = { emitirParaPedido: jest.fn().mockResolvedValue({ id: '1' }) };
+    comprobantesMock = {
+      emitirParaPedido: jest.fn().mockResolvedValue({ id: '1' }),
+      firmarPorPedido: jest.fn().mockResolvedValue(undefined),
+      transmitirEnSegundoPlano: jest.fn(),
+    };
     impresionMock = { encolarTicketPedido: jest.fn().mockResolvedValue(undefined) };
     eventosGatewayMock = {
       emitirAdmin: jest.fn(),
@@ -477,7 +481,7 @@ describe('CobrosService', () => {
       );
     });
 
-    it('al cobrar genera la nota de venta y si eso falla el cobro igual queda registrado', async () => {
+    it('al cobrar genera la nota de venta dentro de la transacción; si falla, el cobro se deshace', async () => {
       prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
       prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock });
       prismaMock.cobro.create.mockResolvedValue({
@@ -493,10 +497,55 @@ describe('CobrosService', () => {
       prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'YAPE' });
       comprobantesMock.emitirParaPedido.mockRejectedValue(new Error('serie sin configurar'));
 
-      const res = await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 50 }] }, cajeroUsuario);
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 50 }] }, cajeroUsuario)).rejects.toThrow('serie sin configurar');
+      expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledWith(100n, expect.anything(), cajeroUsuario, undefined);
+    });
 
-      expect(res.id).toBe('32');
-      expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledWith(100n, undefined, cajeroUsuario);
+    it('al cobrar firma el comprobante ANTES de encolar el ticket y transmite a SUNAT sin esperarla', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock });
+      prismaMock.cobro.create.mockResolvedValue({
+        id: 32n,
+        pedido_id: 100n,
+        caja_id: 10n,
+        total: new Prisma.Decimal(50.0),
+        credito_personal: false,
+        cobrado_por: 2n,
+        en: new Date(),
+        pagos: [{ id: 41n, medio: 'YAPE', monto: new Prisma.Decimal(50.0), recibido: null, vuelto: null }],
+      });
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'YAPE' });
+      // SUNAT nunca responde: la transmisión queda en segundo plano y el cobro igual termina
+      comprobantesMock.transmitirEnSegundoPlano.mockImplementation(() => new Promise(() => undefined));
+
+      await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 50 }] }, cajeroUsuario);
+
+      const firma = comprobantesMock.firmarPorPedido.mock.invocationCallOrder[0];
+      const ticket = impresionMock.encolarTicketPedido.mock.invocationCallOrder[0];
+      const transmision = comprobantesMock.transmitirEnSegundoPlano.mock.invocationCallOrder[0];
+      expect(firma).toBeLessThan(ticket);
+      expect(ticket).toBeLessThan(transmision);
+      expect(comprobantesMock.transmitirEnSegundoPlano).toHaveBeenCalledWith(100n);
+    });
+
+    it('si la firma falla, el cobro no se deshace y el ticket sale igual', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock });
+      prismaMock.cobro.create.mockResolvedValue({
+        id: 32n,
+        pedido_id: 100n,
+        caja_id: 10n,
+        total: new Prisma.Decimal(50.0),
+        credito_personal: false,
+        cobrado_por: 2n,
+        en: new Date(),
+        pagos: [{ id: 41n, medio: 'YAPE', monto: new Prisma.Decimal(50.0), recibido: null, vuelto: null }],
+      });
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'YAPE' });
+      comprobantesMock.firmarPorPedido.mockRejectedValue(new Error('certificado vencido'));
+
+      await expect(service.cobrar({ pedidoId: '100', pagos: [{ medio: 'YAPE', monto: 50 }] }, cajeroUsuario)).resolves.toBeDefined();
+      expect(impresionMock.encolarTicketPedido).toHaveBeenCalledWith(100n);
     });
 
     it('al cobrar libera las mesas del pedido y si falla el cobro igual queda registrado', async () => {

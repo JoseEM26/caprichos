@@ -129,6 +129,10 @@ export const CLAVES_TEXTO = [
   'whatsapp_aviso_entregado_activo',
   'whatsapp_aviso_recibido_activo',
   'whatsapp_aviso_encuesta_activo',
+  // Puntos y avisos de la carta: bienvenida al primer pedido, puntos al entregar y aviso de seguridad de la cuenta
+  'whatsapp_aviso_bienvenida_puntos_activo',
+  'whatsapp_aviso_puntos_ganados_activo',
+  'whatsapp_aviso_cuenta_activo',
   'cocina_confirmar_despejar',
   // Minutos de preparación por defecto (enteros 1–120) para productos sin datos de los últimos 30 días
   'cocina_minutos_preparacion_defecto',

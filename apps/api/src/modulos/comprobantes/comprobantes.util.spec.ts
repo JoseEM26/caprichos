@@ -163,4 +163,10 @@ describe('comprobantes.util', () => {
       expect(extraerOpciones(null)).toEqual([]);
     });
   });
+
+  it('boleta sin DNI por más de S/ 700 no es válida; con DNI o hasta S/ 700 sí', () => {
+    expect(validarDocumentoComprobante('BOLETA', null, null, 700).valido).toBe(true);
+    expect(validarDocumentoComprobante('BOLETA', null, null, 700.01).valido).toBe(false);
+    expect(validarDocumentoComprobante('BOLETA', '12345678', null, 900).valido).toBe(true);
+  });
 });

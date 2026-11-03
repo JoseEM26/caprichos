@@ -469,6 +469,10 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
         valor: {
           nombre: 'Caprichos Test',
           direccion: 'Av. Test 123, Lima',
+          ruc: '20611290064',
+          razon_social: 'CAPRICHOS TEST SAC',
+          direccion_fiscal: 'Av. Test 123, Lima',
+          ubigeo: '150132',
           telefono: '999999999',
           whatsapp: '999999999',
           redes: { instagram: '', facebook: '', tiktok: '' },

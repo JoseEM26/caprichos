@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { RolImpresora } from '@caprichos/compartido';
 import { MaquinasImpresion, NOMBRE_MAQUINA, programaApagado } from './useEstadoMaquinas';
 import { PanelInstalarPrograma } from './PanelInstalarPrograma';
+import { PruebaImpresion } from './PruebaImpresion';
 
 /**
  * Dos chips compactos «Etiquetera» y «Ticketera» con un punto de color (verde conectada, rojo no).
@@ -102,6 +103,7 @@ export function IndicadoresMaquinas({
             <strong>{NOMBRE_MAQUINA[abierto]}: {maquinas[abierto].conectada ? 'conectada' : 'no conectada'}</strong>
             {!maquinas[abierto].conectada && maquinas[abierto].motivo && <div style={{ color: 'var(--cp-soft, #2C4C5D)', marginTop: 2 }}>{maquinas[abierto].motivo}</div>}
           </div>
+          <PruebaImpresion rol={abierto} maquina={maquinas[abierto]} />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {alVerCola && (
               <button type="button" className="cola-btn" onClick={() => { setAbierto(null); alVerCola(); }}>Ver cola</button>

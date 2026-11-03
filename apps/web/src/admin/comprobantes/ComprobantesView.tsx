@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PorEmitirTab } from './PorEmitirTab';
 import { NotaVentaVista } from './NotaVentaVista';
+import { ElectronicosTab } from './ElectronicosTab';
 import './comprobantes.css';
 
 /**
@@ -18,12 +19,17 @@ export function abrirNotaDeVenta(pedidoId: string): void {
   }
 }
 
+type TabComprobantes = 'electronicos' | 'emitir' | 'nota';
+const TABS: TabComprobantes[] = ['electronicos', 'emitir', 'nota'];
+
 export function ComprobantesView() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab') === 'nota' ? 'nota' : 'emitir';
+  const tabParam: TabComprobantes = TABS.includes(searchParams.get('tab') as TabComprobantes)
+    ? (searchParams.get('tab') as TabComprobantes)
+    : 'emitir';
   const pedidoIdParam = searchParams.get('pedidoId') || '';
 
-  const [tabActivo, setTabActivo] = useState<'emitir' | 'nota'>(tabParam);
+  const [tabActivo, setTabActivo] = useState<TabComprobantes>(tabParam);
   const [pedidoIdSeleccionado, setPedidoIdSeleccionado] = useState(pedidoIdParam);
 
   // Escuchar eventos globales disparados por abrirNotaDeVenta
@@ -47,17 +53,15 @@ export function ComprobantesView() {
   useEffect(() => {
     const t = searchParams.get('tab');
     const p = searchParams.get('pedidoId');
-    if (t === 'nota') {
-      setTabActivo('nota');
-    } else if (t === 'emitir') {
-      setTabActivo('emitir');
+    if (t && TABS.includes(t as TabComprobantes)) {
+      setTabActivo(t as TabComprobantes);
     }
     if (p) {
       setPedidoIdSeleccionado(p);
     }
   }, [searchParams]);
 
-  const cambiarTab = (tab: 'emitir' | 'nota') => {
+  const cambiarTab = (tab: TabComprobantes) => {
     setTabActivo(tab);
     if (tab === 'nota' && pedidoIdSeleccionado) {
       setSearchParams({ tab: 'nota', pedidoId: pedidoIdSeleccionado });
@@ -78,6 +82,15 @@ export function ComprobantesView() {
     <div className="comprobantes-contenedor">
       {/* Pestañas de navegación tipo píldora - Sin título duplicado */}
       <div className="comprobantes-tabs no-imprimir" role="tablist" aria-label="Secciones de comprobantes">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tabActivo === 'electronicos'}
+          className={`comprobantes-tab-btn ${tabActivo === 'electronicos' ? 'activo' : ''}`}
+          onClick={() => cambiarTab('electronicos')}
+        >
+          Electrónicos SUNAT
+        </button>
         <button
           type="button"
           role="tab"
@@ -129,6 +142,8 @@ export function ComprobantesView() {
           Nota de venta
         </button>
       </div>
+
+      {tabActivo === 'electronicos' && <ElectronicosTab />}
 
       {tabActivo === 'emitir' && <PorEmitirTab alVerNota={irANotaDeVenta} />}
 

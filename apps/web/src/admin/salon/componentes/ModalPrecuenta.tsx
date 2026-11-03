@@ -18,6 +18,14 @@ import {
   type MedioPlan,
 } from '../../pedidos/planPago';
 import { PlanPagoEditor } from './PlanPagoEditor';
+import {
+  SelectorComprobante,
+  aPayloadComprobante,
+  errorValorComprobante,
+  etiquetaComprobante,
+  type TipoComprobanteSel,
+  type ValorComprobante,
+} from '../../pedidos/SelectorComprobante';
 
 export interface LineaPrecuenta {
   cantidad: number;
@@ -49,55 +57,26 @@ export interface ModalPrecuentaProps {
   /** Si el mozo aún puede reemplazar un voucher ya subido. */
   puedeCambiarVoucher?: boolean;
   /** Comprobante que ya tiene el pedido: se usa de defecto (boleta o factura con documento); si no, nota de venta. */
-  comprobantePedido?: { tipo?: string | null; documento?: string | null; razon?: string | null } | null;
+  comprobantePedido?: { tipo?: string | null; documento?: string | null; razon?: string | null; direccion?: string | null } | null;
   /** Solo en el salón: pasa el pedido a otra mesa libre (el padre entra en modo elegir destino). */
   alCambiarMesa?: () => void;
 }
 
-type TipoEnvio = 'NOTA_VENTA' | 'BOLETA' | 'FACTURA';
-const ETIQUETA_TIPO: Record<TipoEnvio, string> = { NOTA_VENTA: 'Nota de venta', BOLETA: 'Boleta', FACTURA: 'Factura' };
 
 const DIGITALES = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 /** Medios del plan que llevan captura: los digitales y la copia del POS (tarjeta). */
 const MEDIOS_CON_VOUCHER = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
 
-const tipoInicial = (c: ModalPrecuentaProps['comprobantePedido']): TipoEnvio => {
+/** Comprobante del pedido de defecto: boleta o factura guardadas (la boleta puede no tener DNI); si no, nota de venta. */
+const valorInicial = (c: ModalPrecuentaProps['comprobantePedido']): ValorComprobante => {
   const t = String(c?.tipo ?? '').toUpperCase();
-  return (t === 'BOLETA' || t === 'FACTURA') && c?.documento ? t : 'NOTA_VENTA';
-};
-
-/** Espejo de validarDocumentoComprobante de la API (la que manda): DNI de 8 dígitos si se escribe; RUC y razón social. */
-const errorDatosComprobante = (tipo: TipoEnvio, doc: string, razon: string): string | null => {
-  const d = doc.trim();
-  if (tipo === 'BOLETA') return d !== '' && !/^\d{8}$/.test(d) ? 'El DNI debe tener 8 dígitos (o déjalo vacío)' : null;
-  if (tipo === 'FACTURA') {
-    if (!/^(10|15|17|20)\d{9}$/.test(d)) return 'El RUC debe tener 11 dígitos y empezar con 10, 15, 17 o 20';
-    if (razon.trim() === '') return 'Escribe la razón social';
-  }
-  return null;
-};
-
-const botonComprobante = (activo: boolean) => ({
-  minHeight: '44px',
-  padding: '0 12px',
-  borderRadius: '10px',
-  border: activo ? '2px solid var(--cp-navy)' : '1.5px solid var(--cp-line)',
-  background: activo ? 'var(--cp-navy)' : 'var(--cp-white)',
-  color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-  fontWeight: 700,
-  fontSize: '13px',
-  cursor: 'pointer',
-});
-
-const campoComprobante = {
-  minHeight: '44px',
-  borderRadius: '10px',
-  border: '1.5px solid var(--cp-line)',
-  background: 'var(--cp-white)',
-  padding: '0 12px',
-  fontSize: '14px',
-  width: '100%',
-  boxSizing: 'border-box' as const,
+  const tipo: TipoComprobanteSel = t === 'BOLETA' || t === 'FACTURA' ? t : 'NOTA_VENTA';
+  return {
+    tipo,
+    doc: tipo === 'NOTA_VENTA' ? '' : c?.documento ?? '',
+    razon: c?.razon ?? '',
+    direccion: c?.direccion ?? '',
+  };
 };
 
 /** Filas iniciales: el plan guardado; sin plan, el medio del pedido (si es digital) o efectivo, por el total. */
@@ -141,9 +120,7 @@ export function ModalPrecuenta({
   // Envío del cobro a Caja: el mozo reparte el pago (uno o varios medios) y, si hay parte digital, puede subir el voucher
   const [filas, setFilas] = useState<FilaPlan[]>(() => filasIniciales(plan, total, pagoMetodo));
   const [pagaCon, setPagaCon] = useState<string>('');
-  const [tipoComp, setTipoComp] = useState<TipoEnvio>(() => tipoInicial(comprobantePedido));
-  const [docComp, setDocComp] = useState<string>(() => (tipoInicial(comprobantePedido) === 'NOTA_VENTA' ? '' : comprobantePedido?.documento ?? ''));
-  const [razonComp, setRazonComp] = useState<string>(() => comprobantePedido?.razon ?? '');
+  const [valorComp, setValorComp] = useState<ValorComprobante>(() => valorInicial(comprobantePedido));
   // Una captura por medio digital del plan: si cada una se lee
   const [legibles, setLegibles] = useState<Record<string, boolean>>(() =>
     Object.fromEntries((vouchersPorMedio ?? []).filter((v) => v.subido).map((v) => [v.medio, true])),
@@ -198,7 +175,8 @@ export function ModalPrecuenta({
         ? `Con S/ ${pagaConNum.toFixed(2)} no alcanza: el efectivo es S/ ${efectivoPlan.toFixed(2)}`
         : null;
   // Comprobante: la API valida otra vez; esto evita enviar datos que ya se sabe que no sirven
-  const errorComprobante = errorDatosComprobante(tipoComp, docComp, razonComp);
+  const tipoComp: TipoComprobanteSel = valorComp.tipo ?? 'NOTA_VENTA';
+  const errorComprobante = errorValorComprobante(valorComp)?.mensaje ?? null;
   // Con parte digital o tarjeta, la foto de cada medio tiene que estar subida y leerse antes de enviar (lo exige el servidor)
   const listoParaEnviar = planListo && errorPagaCon === null && errorComprobante === null && (!hayDigital || voucherOk);
   const subidoAntes = (medio: string) => (vpm ?? []).some((v) => v.medio === medio && v.subido);
@@ -226,14 +204,7 @@ export function ModalPrecuenta({
     if (pedidoId === undefined || !listoParaEnviar) return;
     const extra: EnvioCajaExtra = {
       ...(efectivoPlan > 0 ? { recibido: pagaConNum } : {}),
-      comprobante:
-        tipoComp === 'NOTA_VENTA'
-          ? { tipo: 'NOTA_VENTA' }
-          : {
-              tipo: tipoComp,
-              ...(docComp.trim() ? { doc: docComp.trim() } : {}),
-              ...(tipoComp === 'FACTURA' ? { razon: razonComp.trim() } : {}),
-            },
+      comprobante: aPayloadComprobante({ ...valorComp, tipo: tipoComp }),
     };
     try {
       setEnviando(true);
@@ -253,7 +224,7 @@ export function ModalPrecuenta({
     efectivoPlan > 0 ? `Paga con S/ ${pagaConNum.toFixed(2)}, vuelto S/ ${(pagaConNum - efectivoPlan).toFixed(2)}.` : null,
     tipoComp === 'NOTA_VENTA'
       ? 'Se emite la nota de venta y sale en la ticketera de Caja.'
-      : `${ETIQUETA_TIPO[tipoComp]}: Caja la emite al cobrar.`,
+      : `${etiquetaComprobante(tipoComp)}: Caja la emite al cobrar.`,
     hayDigital ? `Caja revisará los vouchers ya subidos (${digitalesPlan.map((f) => nombreMedio(f.medio)).join(', ')}).` : null,
     'Tú no cierras el cobro.',
   ]
@@ -350,65 +321,9 @@ export function ModalPrecuenta({
 
                 {!enviado && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>Comprobante</div>
-                    <div role="group" aria-label="Comprobante" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {(['NOTA_VENTA', 'BOLETA', 'FACTURA'] as TipoEnvio[]).map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          aria-pressed={tipoComp === t}
-                          data-testid={`comprobante-${t}`}
-                          onClick={() => setTipoComp(t)}
-                          style={botonComprobante(tipoComp === t)}
-                        >
-                          {ETIQUETA_TIPO[t]}
-                        </button>
-                      ))}
-                    </div>
+                    <SelectorComprobante idPrefijo="pc-comp" valor={valorComp} onChange={setValorComp} total={total} />
                     {tipoComp === 'NOTA_VENTA' && (
                       <div className="pc-nota-envio">Se imprime ya en la ticketera de Caja con su número.</div>
-                    )}
-                    {tipoComp === 'BOLETA' && (
-                      <label style={{ fontWeight: 700, fontSize: 13 }}>
-                        DNI (opcional)
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={8}
-                          value={docComp}
-                          onChange={(e) => setDocComp(e.target.value.replace(/\D/g, ''))}
-                          style={{ ...campoComprobante, marginTop: 4, fontWeight: 400 }}
-                        />
-                      </label>
-                    )}
-                    {tipoComp === 'FACTURA' && (
-                      <>
-                        <label style={{ fontWeight: 700, fontSize: 13 }}>
-                          RUC
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={11}
-                            value={docComp}
-                            onChange={(e) => setDocComp(e.target.value.replace(/\D/g, ''))}
-                            style={{ ...campoComprobante, marginTop: 4, fontWeight: 400 }}
-                          />
-                        </label>
-                        <label style={{ fontWeight: 700, fontSize: 13 }}>
-                          Razón social
-                          <input
-                            type="text"
-                            value={razonComp}
-                            onChange={(e) => setRazonComp(e.target.value)}
-                            style={{ ...campoComprobante, marginTop: 4, fontWeight: 400 }}
-                          />
-                        </label>
-                      </>
-                    )}
-                    {errorComprobante && (
-                      <div role="alert" className="pc-error">
-                        {errorComprobante}
-                      </div>
                     )}
                   </div>
                 )}

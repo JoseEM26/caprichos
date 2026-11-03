@@ -16,6 +16,8 @@
 
 /** Orden de borrado (hijas antes que party). */
 export const BORRAR_CUENTAS: string[] = [
+  // Marca por celular (bienvenida a los puntos): dato personal, se borra con las cuentas de cliente
+  'aviso_cliente_unico',
   'movimiento_puntos', 'cliente_direccion', 'data_request', 'customer_detail', 'party_role',
   'party_identifier', 'person', 'contact_mechanism', 'consent', 'customer_account', 'sesion',
   'party',
@@ -89,7 +91,7 @@ export const CONSERVAR: string[] = [
   'pedido_proveedor_linea', 'permiso', 'piso', 'print_job', 'produccion', 'producto',
   'producto_grupo', 'producto_tamano', 'queja_whatsapp', 'ranking_mes', 'receta', 'receta_linea',
   'regla_acumulacion', 'reemplazo_dia', 'resena_google', 'reserva', 'reserva_mesa', 'ruta_reparto', 'respuesta_rapida', 'rol', 'rol_permiso',
-  'sabor', 'saliente_whatsapp', 'secuencia_comprobante', 'secuencia_pedido', 'solicitud_cambio',
+  'sabor', 'saliente_whatsapp', 'secuencia_comprobante', 'secuencia_pedido', 'solicitud_cambio', 'comprobante_archivo', 'sunat_resumen',
   'solicitud_reserva', 'stock', 'supervisor_secreto', 'supplier_detail', 'sys_control', 'traslado',
   'user_account', 'user_account_rol', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje',
   'zona_reparto',

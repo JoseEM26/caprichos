@@ -26,6 +26,41 @@ describe('ComprobantesService', () => {
 
   const fechaFija = new Date('2026-10-21T18:00:00.000Z'); // 13:00 en America/Lima
 
+  /** Pedido mínimo cuadrado: una línea de S/ 11.80 con IGV (total = subtotal - descuento + envío). */
+  function pedidoEmision(extra: Record<string, unknown> = {}) {
+    return {
+      id: 100n,
+      comprobante_tipo: 'NOTA_VENTA',
+      comprobante_doc: null,
+      comprobante_razon: null,
+      comprobante_direccion: null,
+      cliente_nombre: 'Juan Perez',
+      subtotal: 11.8,
+      descuento: 0,
+      envio: 0,
+      total: 11.8,
+      lineas: [{ nombre: 'Frappe Oreo', cantidad: 1, precio_unit: 11.8, subtotal: 11.8 }],
+      ...extra,
+    };
+  }
+
+  /** Fila de comprobante que el mock guarda en create, releída en findUnique y actualizada en update. */
+  function prepararEmision(pedido: any, ultimoNumero: number) {
+    let fila: any = null;
+    prismaMock.pedido.findUnique.mockResolvedValue(pedido);
+    prismaMock.$queryRaw.mockResolvedValue([{ ultimo_numero: ultimoNumero }]);
+    prismaMock.comprobante.findFirst.mockResolvedValue(null);
+    prismaMock.comprobante.create.mockImplementation(async (args: any) => {
+      fila = { id: 50n, creado_en: fechaFija, copias_impresas: 0, facturacion_intentos: 0, ...args.data, pedido };
+      return fila;
+    });
+    prismaMock.comprobante.findUnique.mockImplementation(async () => fila);
+    prismaMock.comprobante.update.mockImplementation(async (args: any) => {
+      fila = { ...fila, ...args.data };
+      return fila;
+    });
+  }
+
   beforeEach(() => {
     jest.useFakeTimers();
     jest.setSystemTime(fechaFija);
@@ -38,6 +73,7 @@ describe('ComprobantesService', () => {
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn(),
       },
       pedido: {
@@ -156,50 +192,7 @@ describe('ComprobantesService', () => {
   });
 
   describe('3. boleta con DNI válido e inválido', () => {
-    it('boleta con DNI válido (8 dígitos) se guarda como BOLETA y POR_EMITIR', async () => {
-      prismaMock.comprobante.findFirst.mockResolvedValue(null);
-      prismaMock.pedido.findUnique.mockResolvedValue({
-        id: 102n,
-        comprobante_tipo: 'BOLETA',
-        comprobante_doc: '12345678',
-        comprobante_razon: null,
-      });
-      prismaMock.$queryRaw.mockResolvedValue([{ ultimo_numero: 3 }]);
-      prismaMock.comprobante.create.mockImplementation((args: any) => ({
-        id: 12n,
-        ...args.data,
-        creado_en: fechaFija,
-      }));
 
-      const res = await service.emitirParaPedido(102n);
-
-      expect(res.tipo).toBe('BOLETA');
-      expect(res.emision).toBe('POR_EMITIR');
-      expect(res.documento).toBe('12345678');
-      expect(res.advertencia).toBeNull();
-    });
-
-    it('boleta sin DNI es válida: se emite BOLETA POR_EMITIR sin advertencia', async () => {
-      prismaMock.comprobante.findFirst.mockResolvedValue(null);
-      prismaMock.pedido.findUnique.mockResolvedValue({
-        id: 104n,
-        comprobante_tipo: 'BOLETA',
-        comprobante_doc: null,
-        comprobante_razon: null,
-      });
-      prismaMock.$queryRaw.mockResolvedValue([{ ultimo_numero: 5 }]);
-      prismaMock.comprobante.create.mockImplementation((args: any) => ({
-        id: 14n,
-        ...args.data,
-        creado_en: fechaFija,
-      }));
-
-      const res = await service.emitirParaPedido(104n);
-
-      expect(res.tipo).toBe('BOLETA');
-      expect(res.emision).toBe('POR_EMITIR');
-      expect(res.advertencia).toBeNull();
-    });
 
     it('boleta con DNI inválido no bloquea: se emite como NOTA_VENTA interna con advertencia', async () => {
       prismaMock.comprobante.findFirst.mockResolvedValue(null);
@@ -247,25 +240,61 @@ describe('ComprobantesService', () => {
       expect(res.advertencia).toContain('Documento inválido para FACTURA');
     });
 
-    it('factura con RUC de 11 dígitos válido y razón social se emite como FACTURA POR_EMITIR', async () => {
-      prismaMock.comprobante.findFirst.mockResolvedValue(null);
-      prismaMock.pedido.findUnique.mockResolvedValue({
-        id: 105n,
+  });
+
+  describe('3b. boleta y factura en modo simulado (sin red)', () => {
+    it('boleta con DNI válido (8 dígitos) se emite con el emisor simulado y queda EMITIDO con serie B002', async () => {
+      const pedido = pedidoEmision({ comprobante_tipo: 'BOLETA', comprobante_doc: '12345678' });
+      prepararEmision(pedido, 3);
+
+      const res = await service.emitirParaPedido(102n);
+
+      expect(res.tipo).toBe('BOLETA');
+      expect(res.serie).toBe('B002');
+      expect(res.numero_texto).toBe('B002-000003');
+      expect(res.emision).toBe('EMITIDO');
+      expect(res.facturacion_estado).toBe('EMITIDO_SUNAT');
+      expect(res.simulado).toBe(true);
+      expect(res.documento).toBe('12345678');
+      expect(res.advertencia).toBeNull();
+    });
+
+    it('boleta sin DNI es válida (hasta S/ 700): se emite BOLETA sin advertencia', async () => {
+      const pedido = pedidoEmision({ comprobante_tipo: 'BOLETA', comprobante_doc: null });
+      prepararEmision(pedido, 5);
+
+      const res = await service.emitirParaPedido(104n);
+
+      expect(res.tipo).toBe('BOLETA');
+      expect(res.emision).toBe('EMITIDO');
+      expect(res.advertencia).toBeNull();
+    });
+
+    it('boleta sin DNI por más de S/ 700 no se emite como boleta: NOTA_VENTA con advertencia', async () => {
+      const pedido = pedidoEmision({ comprobante_tipo: 'BOLETA', comprobante_doc: null, total: 720, subtotal: 720 });
+      prepararEmision(pedido, 7);
+
+      const res = await service.emitirParaPedido(104n);
+
+      expect(res.tipo).toBe('NOTA_VENTA');
+      expect(res.serie).toBe('NV01');
+      expect(res.advertencia).toContain('mayor a S/ 700');
+    });
+
+    it('factura con RUC de 11 dígitos válido y razón social se emite con serie F002', async () => {
+      const pedido = pedidoEmision({
         comprobante_tipo: 'FACTURA',
         comprobante_doc: '20601234567',
         comprobante_razon: 'Inversiones Aybar S.A.C.',
       });
-      prismaMock.$queryRaw.mockResolvedValue([{ ultimo_numero: 6 }]);
-      prismaMock.comprobante.create.mockImplementation((args: any) => ({
-        id: 15n,
-        ...args.data,
-        creado_en: fechaFija,
-      }));
+      prepararEmision(pedido, 6);
 
       const res = await service.emitirParaPedido(105n);
 
       expect(res.tipo).toBe('FACTURA');
-      expect(res.emision).toBe('POR_EMITIR');
+      expect(res.serie).toBe('F002');
+      expect(res.numero_texto).toBe('F002-000006');
+      expect(res.emision).toBe('EMITIDO');
       expect(res.documento).toBe('20601234567');
       expect(res.razon_social).toBe('Inversiones Aybar S.A.C.');
       expect(res.advertencia).toBeNull();

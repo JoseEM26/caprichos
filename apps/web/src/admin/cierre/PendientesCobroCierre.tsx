@@ -7,6 +7,7 @@ import { ErrorApi } from '../../comun/api';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { EstadoError } from '../../comun/EstadoError';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 import './pendientes-cierre.css';
 
 /** Grupos que se pueden enfocar desde un aviso del cierre. «cola» y «antiguos» son filtros. */
@@ -154,7 +155,9 @@ export function PendientesCobroCierre({
   const [visibles, setVisibles] = useState<Record<Grupo, number>>({ cobrar: PAGINA, coordinados: PAGINA });
   const seccionRef = useRef<HTMLElement>(null);
 
-  const mostrarLista = esAdmin || desbloqueado;
+  // ADMIN y SUPERVISOR no escriben código (el servidor los deja pasar): ven la lista de entrada
+  const pideCodigo = usePideCodigo();
+  const mostrarLista = esAdmin || !pideCodigo || desbloqueado;
   const hoy = diaLima(new Date());
 
   const resumen = useMemo(() => resumenPendientes(pendientes, hoy), [pendientes, hoy]);

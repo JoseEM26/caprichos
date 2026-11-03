@@ -36,7 +36,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'demanda', titulo: 'Alta demanda', claves: ['pausa_alta_demanda', 'alta_demanda_min_base'] },
   { id: 'puerta', titulo: 'Entrega fallida y reprogramación', claves: ['reparto_insistencia_min', 'reparto_espera_max_min', 'reprog_recargo_modo', 'reparto_recargo_reprogramacion', 'reprog_respuesta_min', 'reprog_max_intentos'] },
   { id: 'encuesta', titulo: 'Encuesta posventa', claves: ['encuesta_espera_min', 'encuesta_puntaje_queja', 'encuesta_ventana_dias'] },
-  { id: 'avisos', titulo: 'Avisos automáticos por WhatsApp al cliente', claves: ['chatbot_activo', 'whatsapp_aviso_recibido_activo', 'whatsapp_aviso_pago_confirmado_activo', 'whatsapp_aviso_listo_activo', 'whatsapp_aviso_recojo_activo', 'whatsapp_aviso_salida_activo', 'whatsapp_aviso_llegada_activo', 'whatsapp_aviso_espera_activo', 'whatsapp_aviso_entregado_activo', 'whatsapp_aviso_encuesta_activo'] },
+  { id: 'avisos', titulo: 'Avisos automáticos por WhatsApp al cliente', claves: ['chatbot_activo', 'whatsapp_aviso_recibido_activo', 'whatsapp_aviso_pago_confirmado_activo', 'whatsapp_aviso_listo_activo', 'whatsapp_aviso_recojo_activo', 'whatsapp_aviso_salida_activo', 'whatsapp_aviso_llegada_activo', 'whatsapp_aviso_espera_activo', 'whatsapp_aviso_entregado_activo', 'whatsapp_aviso_encuesta_activo', 'whatsapp_aviso_bienvenida_puntos_activo', 'whatsapp_aviso_puntos_ganados_activo', 'whatsapp_aviso_cuenta_activo'] },
   { id: 'pago', titulo: 'Pagos digitales por el chat', claves: ['chatbot_pago_recordatorio_activo', 'chatbot_pago_recordatorio_min', 'chatbot_pago_expira_min'] },
   { id: 'ia', titulo: 'Inteligencia artificial', claves: ['chatbot_ia_activo', 'chatbot_ia_tope_mensual_usd', 'chatbot_ia_max_por_hora_telefono', 'ayuda_ia_activo'] },
   { id: 'alertas', titulo: 'Alertas internas y modo asistido', claves: ['alerta_voucher_min_1', 'alerta_voucher_min_2', 'espera_cliente_aviso_min', 'chat_tomado_liberar_min', 'alerta_pedido_sin_confirmar_min', 'asistido_espera_min'] },
@@ -313,6 +313,18 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
   whatsapp_aviso_recibido_activo: {
     grupo: 'avisos', titulo: 'Aviso: pedido recibido desde la carta',
     ...aviso('Con Yape, Plin o transferencia, también avisa que un asesor gestiona el voucher por ese chat y lo recuerda si falta.', 'al enviar un pedido desde la carta virtual', 'En «Sí», quien pide por la carta recibe «Recibimos tu pedido».', ['pedido recibido', 'carta', 'confirmacion de pedido', 'voucher']),
+  },
+  whatsapp_aviso_bienvenida_puntos_activo: {
+    grupo: 'avisos', titulo: 'Aviso: bienvenida a los puntos (primer pedido)',
+    ...aviso('Solo la primera vez que un celular hace un pedido de la carta, el aviso de «pedido recibido» agrega que ya suma puntos y el enlace para verlos. Requiere la plantilla de Meta aprobada (ver docs/operacion/puntos-y-avisos-carta.md).', 'en el primer pedido de la carta de cada celular', 'En «Sí», ese primer aviso trae la línea de puntos y el enlace a la carta.', ['bienvenida', 'puntos', 'primer pedido', 'celular']),
+  },
+  whatsapp_aviso_puntos_ganados_activo: {
+    grupo: 'avisos', titulo: 'Aviso: puntos ganados al entregar',
+    ...aviso('Cuando un pedido que ya sumó puntos se entrega, el aviso de «entregado» dice cuántos puntos ganó y el total. Requiere la plantilla de Meta aprobada.', 'al entregar un pedido que sumó puntos', 'En «Sí», el aviso de entregado trae «Ganaste N puntos. Total: M».', ['puntos', 'ganaste', 'entregado', 'total']),
+  },
+  whatsapp_aviso_cuenta_activo: {
+    grupo: 'avisos', titulo: 'Aviso: seguridad de la cuenta',
+    ...aviso('Avisa por WhatsApp cuando se crea una cuenta de cliente o cambia su contraseña, con la indicación de escribir si no fue la persona. Requiere la plantilla de Meta aprobada.', 'al crear la cuenta o cambiar la contraseña', 'En «Sí», el cliente recibe el aviso de seguridad.', ['cuenta', 'contrasena', 'seguridad', 'clave']),
   },
   whatsapp_aviso_pago_confirmado_activo: {
     grupo: 'avisos', titulo: 'Aviso: pago confirmado',

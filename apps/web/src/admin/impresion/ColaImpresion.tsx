@@ -91,7 +91,13 @@ export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
   };
 
   const reimprimir = (g: GrupoCola) =>
-    ejecutar(() => impresionApi.reimprimirTodas(g.pedidoId), () => undefined);
+    ejecutar(() => impresionApi.reimprimirTodas(g.pedidoId as string), () => undefined);
+
+  // Una prueba es un trabajo suelto (sin pedido): se descarta por trabajo, no por pedido
+  const descartarGrupo = (g: GrupoCola) =>
+    g.esPrueba
+      ? impresionApi.descartarTrabajo(g.trabajoIds[0])
+      : impresionApi.descartarPedido(g.pedidoId as string);
 
   return (
     <div className="cola-fondo" onClick={alCerrar}>
@@ -170,9 +176,12 @@ export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
         {cola?.items.map((g) => {
           const descartable = (g.estados.PENDIENTE || 0) + (g.estados.FALLIDO || 0) > 0;
           return (
-            <div key={g.pedidoId} className="cola-grupo" data-testid="cola-grupo">
+            <div key={g.pedidoId ?? g.trabajoIds[0]} className="cola-grupo" data-testid="cola-grupo">
               <div className="cola-grupo-cab">
-                <strong>{g.pedidoCodigo} · {g.clienteNombre || 'Sin nombre'}</strong>
+                <strong>
+                  {g.esPrueba && <span className="cola-prueba-tag">Prueba</span> }
+                  {g.pedidoCodigo} · {g.clienteNombre || 'Sin nombre'}
+                </strong>
                 <span>{g.cantidad} etiqueta(s) · {haceCuanto(g.masAntiguaEn)}</span>
               </div>
               <small>{textoEstados(g)}{g.error ? ` · ${g.error}` : ''}</small>
@@ -182,9 +191,11 @@ export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
                     Descartar
                   </button>
                 )}
-                <button type="button" className="cola-btn" disabled={trabajando} onClick={() => void reimprimir(g)}>
-                  Reimprimir
-                </button>
+                {!g.esPrueba && (
+                  <button type="button" className="cola-btn" disabled={trabajando} onClick={() => void reimprimir(g)}>
+                    Reimprimir
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -226,7 +237,7 @@ export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
         alCancelar={() => setGrupoDescartar(null)}
         alConfirmar={() =>
           ejecutar(
-            () => impresionApi.descartarPedido(grupoDescartar!.pedidoId),
+            () => descartarGrupo(grupoDescartar!),
             () => setGrupoDescartar(null),
           )
         }

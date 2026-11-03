@@ -24,6 +24,13 @@ import { pedidosApi } from '../../pedidos/pedidosApi';
 import { ModalVoucherPedido } from '../ModalVoucherPedido';
 import { PlanPagoEditor } from './PlanPagoEditor';
 import {
+  SelectorComprobante,
+  VALOR_COMPROBANTE_VACIO,
+  aComprobanteAlta,
+  errorValorComprobante,
+  type ValorComprobante,
+} from '../../pedidos/SelectorComprobante';
+import {
   aPlan,
   errorPlan,
   medioDigitalDelPlan,
@@ -548,10 +555,13 @@ export function ModalNuevoPedidoMesa({
     if (!abierto) {
       setIntentoEnvio(false);
       setIntentoCli(false);
+      setValorComp(VALOR_COMPROBANTE_VACIO);
     }
   }, [abierto]);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
+  // Comprobante que pide Caja (solo en Pedidos y caja). Sin elegir, el pedido sale con el comprobante por defecto.
+  const [valorComp, setValorComp] = useState<ValorComprobante>(VALOR_COMPROBANTE_VACIO);
   // Cómo paga (mesa, llevar y delivery): un medio o pago dividido. La parte digital pide voucher opcional.
   const [filasPlan, setFilasPlan] = useState<FilaPlan[]>(() => planInicial('EFECTIVO', 0));
   const [pedidoVoucher, setPedidoVoucher] = useState<{
@@ -798,7 +808,9 @@ export function ModalNuevoPedidoMesa({
 
   // Todo lo que bloquea «Enviar» en el paso de productos, en orden de revisión. El botón no se deshabilita:
   // al tocarlo se muestra el primer mensaje y el foco va a su campo (intentarEnviar).
-  type ErrorEnvio = { campo: 'productos' | 'mesa' | 'nombre' | 'telefono' | 'plan' | 'pagaCon'; mensaje: string; foco: string[] };
+  type ErrorEnvio = { campo: 'productos' | 'mesa' | 'nombre' | 'telefono' | 'plan' | 'pagaCon' | 'comprobante'; mensaje: string; foco: string[] };
+  const esCaja = (canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO')) === 'CAJA';
+  const errorComprobanteCaja = esCaja ? errorValorComprobante(valorComp) : null;
   const errorPagaCon =
     modalidad === 'delivery' && montoEfectivoAhora > 0 && pagaConValido() === undefined
       ? `Indica con cuánto paga: debe ser S/ ${montoEfectivoAhora.toFixed(2)} o más`
@@ -819,6 +831,12 @@ export function ModalNuevoPedidoMesa({
   if (errorPlanAhora)
     erroresEnvio.push({ campo: 'plan', mensaje: errorPlanAhora, foco: ['#np-plan-pago input', '#np-plan-pago button'] });
   if (errorPagaCon) erroresEnvio.push({ campo: 'pagaCon', mensaje: errorPagaCon, foco: ['#plan-paga-con'] });
+  if (errorComprobanteCaja)
+    erroresEnvio.push({
+      campo: 'comprobante',
+      mensaje: errorComprobanteCaja.mensaje,
+      foco: [errorComprobanteCaja.campo === 'razon' ? '#np-comp-razon' : '#np-comp-doc'],
+    });
   // Mensaje fijo bajo el botón (productos o mesa, siempre visible como antes)
   const motivoNoEnviar = erroresEnvio.find((e) => e.campo === 'productos' || e.campo === 'mesa')?.mensaje ?? '';
 
@@ -898,6 +916,7 @@ export function ModalNuevoPedidoMesa({
             esPersonal: pideMode === 'personal',
             colaboradorPartyId: staffElegido?.partyId,
             clientePartyId: clientePideId,
+            comprobante: esCaja ? aComprobanteAlta(valorComp) : undefined,
             pago: {
               metodo: metodoPrincipalAhora,
               pagaCon: pagaConValido(),
@@ -947,6 +966,7 @@ export function ModalNuevoPedidoMesa({
             esPersonal: pideMode === 'personal',
             colaboradorPartyId: staffElegido?.partyId,
             canal: canalEnvio,
+            comprobante: esCaja ? aComprobanteAlta(valorComp) : undefined,
             // Solo con cuenta: el pedido suma puntos y guarda la dirección en su libreta
             clienteTelefono: modoCli === 'cuenta' && cuenta ? telCli : undefined,
             clientePartyId: clientePideId,
@@ -3043,6 +3063,19 @@ export function ModalNuevoPedidoMesa({
                     </span>
                   )}
                 </div>
+
+                {esCaja && (
+                  <div id="np-comprobante" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <SelectorComprobante
+                      idPrefijo="np-comp"
+                      valor={valorComp}
+                      onChange={setValorComp}
+                      total={total}
+                      permiteSinElegir
+                      ayuda="Sin elegir, el pedido sale con el comprobante por defecto del local."
+                    />
+                  </div>
+                )}
 
                 {/* Botón Enviar a cocina / Registrar pedido: no se deshabilita; al tocarlo muestra qué falta */}
                 <button

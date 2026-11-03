@@ -5,6 +5,8 @@ export interface LineaTicket {
   texto: string;
   centrado?: boolean;
   negrita?: boolean;
+  /** Bloque del código QR (cadena de SUNAT). El agente lo imprime con GS ( k; la vista previa lo deja en blanco. */
+  qr?: string;
 }
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -13,6 +15,30 @@ const soles = (n: number) => `S/ ${n.toFixed(2)}`;
 function fila(izq: string, der: string, cols: number): string {
   const max = Math.max(1, cols - der.length - 1);
   return `${izq.length > max ? izq.slice(0, max) : izq.padEnd(max)} ${der}`;
+}
+
+/** Parte un texto en renglones de `cols` columnas, cortando por palabras (y por bloque si no hay espacios). */
+function envolver(texto: string, cols: number): string[] {
+  const out: string[] = [];
+  let actual = '';
+  for (const palabra of texto.split(/\s+/).filter(Boolean)) {
+    for (let trozo = palabra; trozo.length > 0; ) {
+      const cabe = actual ? actual.length + 1 + trozo.length <= cols : trozo.length <= cols;
+      if (cabe) {
+        actual = actual ? `${actual} ${trozo}` : trozo;
+        break;
+      }
+      if (actual) {
+        out.push(actual);
+        actual = '';
+      } else {
+        out.push(trozo.slice(0, cols));
+        trozo = trozo.slice(cols);
+      }
+    }
+  }
+  if (actual) out.push(actual);
+  return out;
 }
 
 const centrar = (t: string, cols: number) =>
@@ -53,6 +79,11 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
   if (t.comprobante) {
     p(linea);
     p(`${t.comprobante.tipo.replace('_', ' ')} ${t.comprobante.numero}`);
+    if (t.comprobante.representacion) for (const r of envolver(t.comprobante.representacion, c)) p(r);
+    // Bloque del QR entre la representación y el hash: si no hay cadena, el ticket sale como antes (sin bloque)
+    if (t.comprobante.cadenaQr) p('', { centrado: true, qr: t.comprobante.cadenaQr });
+    if (t.comprobante.hash) for (const h of envolver(`Hash: ${t.comprobante.hash}`, c)) p(h);
+    if (t.comprobante.simulado) p(centrar('SIMULADO - SIN VALOR TRIBUTARIO', c), { centrado: true });
   }
   if (t.cobradoPorMozo) p(`Cobrado por mozo ${t.cobradoPorMozo}`);
   p(linea);

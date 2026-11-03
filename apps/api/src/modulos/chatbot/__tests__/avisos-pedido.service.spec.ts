@@ -150,3 +150,111 @@ describe('AvisosPedidoService (avisos de reparto al cliente, encolados en el out
     await expect(servicio.avisar(77, 'LLEGADA', {}, prisma as any)).rejects.toThrow('BD caída');
   });
 });
+
+describe('AvisosPedidoService: puntos en los avisos de la carta', () => {
+  let servicio: AvisosPedidoService;
+  let prisma: any;
+  let outbox: any;
+  let marcas: Set<string>;
+  let parametrosPuntos: Record<string, unknown>;
+
+  beforeEach(() => {
+    process.env.CARTA_URL_PUBLICA = 'https://carta.test';
+    marcas = new Set<string>();
+    parametrosPuntos = { whatsapp_aviso_bienvenida_puntos_activo: 'si', whatsapp_aviso_puntos_ganados_activo: 'si' };
+    prisma = {
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
+      pedido: {
+        findUnique: jest.fn(async () => ({
+          id: BigInt(90),
+          codigo: 'CP-090',
+          cliente_nombre: 'Lucia',
+          cliente_telefono: '987654321',
+          modalidad: 'DELIVERY',
+          total: 30,
+          pago_metodo: 'EFECTIVO',
+          pago_preferido: 'EFECTIVO',
+          canal: 'CARTA',
+          party_id: BigInt(500),
+          cliente_party_id: BigInt(500),
+          puntos_ganados: 12.5,
+        })),
+      },
+      parametro: { findUnique: jest.fn(async ({ where }: any) => ({ valor: parametrosPuntos[where.clave] ?? 'si' })) },
+      mensajeReparto: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
+      avisoClienteUnico: {
+        // Primer aviso del celular: la marca se inserta; después ya existe y no se vuelve a insertar
+        createMany: jest.fn(async ({ data }: any) => {
+          const clave = `${data.telefono}:${data.aviso}`;
+          if (marcas.has(clave)) return { count: 0 };
+          marcas.add(clave);
+          return { count: 1 };
+        }),
+      },
+      customerDetail: { findFirst: jest.fn(async () => ({ puntos: 40 })) },
+    };
+    outbox = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn() };
+    servicio = new AvisosPedidoService(prisma, outbox);
+  });
+
+  afterEach(() => {
+    delete process.env.CARTA_URL_PUBLICA;
+  });
+
+  const cargaEncolada = () => outbox.encolar.mock.calls.at(-1)[0].carga;
+
+  it('primer pedido de un celular: RECIBIDO con la línea de puntos y el enlace, en plantilla con variable', async () => {
+    const r = await servicio.avisar(90, 'RECIBIDO', {}, undefined);
+    expect(r.estado).toBe('ENCOLADO');
+    expect(cargaEncolada().textoLibre).toContain('Ya sumas puntos con este número. Ve tus puntos aquí: https://carta.test/?puntos=1');
+    expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_BIENVENIDA_PUNTOS');
+    expect(cargaEncolada().variablesPlantilla).toEqual(['Lucia', 'CP-090', 'https://carta.test/?puntos=1']);
+    expect(prisma.avisoClienteUnico.createMany).toHaveBeenCalledWith({ data: { telefono: '987654321', aviso: 'BIENVENIDA_PUNTOS' }, skipDuplicates: true });
+  });
+
+  it('segundo pedido del mismo celular: RECIBIDO normal, sin la línea de puntos', async () => {
+    await servicio.avisar(90, 'RECIBIDO', {}, undefined);
+    await servicio.avisar(90, 'RECIBIDO', {}, undefined);
+    expect(cargaEncolada().textoLibre).not.toContain('Ya sumas puntos');
+    expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_EFECTIVO');
+  });
+
+  it('con el parámetro en «no» el RECIBIDO sale como siempre y no marca nada', async () => {
+    parametrosPuntos.whatsapp_aviso_bienvenida_puntos_activo = 'no';
+    await servicio.avisar(90, 'RECIBIDO', {}, undefined);
+    expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_EFECTIVO');
+    expect(prisma.avisoClienteUnico.createMany).not.toHaveBeenCalled();
+  });
+
+  it('pedido sin cliente con cuenta o de invitado: sin línea de puntos', async () => {
+    prisma.pedido.findUnique = jest.fn(async () => ({
+      id: BigInt(91), codigo: 'CP-091', cliente_nombre: 'Ana', cliente_telefono: '987654321', modalidad: 'DELIVERY', total: 20,
+      pago_metodo: 'EFECTIVO', pago_preferido: 'EFECTIVO', canal: 'CARTA', party_id: null, cliente_party_id: null, puntos_ganados: 0,
+    }));
+    await servicio.avisar(91, 'RECIBIDO', {}, undefined);
+    expect(cargaEncolada().textoLibre).not.toContain('Ya sumas puntos');
+  });
+
+  it('ENTREGADO de un pedido que sumó puntos: agrega «Ganaste N puntos. Total: M» con plantilla de puntos', async () => {
+    await servicio.avisar(90, 'ENTREGADO');
+    expect(cargaEncolada().textoLibre).toContain('Ganaste 12.5 puntos. Total: 40.');
+    expect(cargaEncolada().plantillaClave).toBe('DELIVERY_ENTREGADO_PUNTOS');
+    expect(cargaEncolada().variablesPlantilla).toEqual(['Lucia', 'CP-090', '12.5', '40']);
+  });
+
+  it('ENTREGADO sin puntos ganados o con el parámetro apagado: aviso normal', async () => {
+    prisma.pedido.findUnique = jest.fn(async () => ({
+      id: BigInt(92), codigo: 'CP-092', cliente_nombre: 'Rosa', cliente_telefono: '987654321', modalidad: 'DELIVERY', total: 20,
+      pago_metodo: 'EFECTIVO', pago_preferido: 'EFECTIVO', canal: 'CARTA', party_id: BigInt(500), cliente_party_id: BigInt(500), puntos_ganados: 0,
+    }));
+    await servicio.avisar(92, 'ENTREGADO');
+    expect(cargaEncolada().plantillaClave).toBe('DELIVERY_ENTREGADO');
+    parametrosPuntos.whatsapp_aviso_puntos_ganados_activo = 'no';
+    prisma.pedido.findUnique = jest.fn(async () => ({
+      id: BigInt(93), codigo: 'CP-093', cliente_nombre: 'Rosa', cliente_telefono: '987654321', modalidad: 'DELIVERY', total: 20,
+      pago_metodo: 'EFECTIVO', pago_preferido: 'EFECTIVO', canal: 'CARTA', party_id: BigInt(500), cliente_party_id: BigInt(500), puntos_ganados: 5,
+    }));
+    await servicio.avisar(93, 'ENTREGADO');
+    expect(cargaEncolada().plantillaClave).toBe('DELIVERY_ENTREGADO');
+  });
+});

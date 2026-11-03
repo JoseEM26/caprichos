@@ -36,7 +36,7 @@ export const MIGRAR: string[] = [
 const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['transacciones de venta: pedidos, cobros, comprobantes y reclamos', [
     'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_estado_historial', 'secuencia_pedido',
-    'pedido_mesa', 'comprobante', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
+    'pedido_mesa', 'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
     'incidente_entrega', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto',
   ]],
   ['caja y cierres: dinero real del día', [
@@ -46,7 +46,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['clientes: cuentas, puntos, direcciones y consentimientos', [
     'customer_account', 'customer_detail', 'consent', 'contact_mechanism', 'cliente_direccion',
     'movimiento_puntos', 'cupon_emitido', 'cupon_canje_compartido', 'cliente_whatsapp_consentimiento',
-    'data_request', 'encuesta', 'encuesta_posventa', 'ranking_mes',
+    'data_request', 'encuesta', 'encuesta_posventa', 'ranking_mes', 'aviso_cliente_unico',
   ]],
   ['reservas y solicitudes operativas', [
     'reserva', 'reserva_mesa', 'solicitud_reserva', 'solicitud_cambio', 'agotado', 'alta_demanda',
@@ -80,7 +80,7 @@ export const NO_MIGRAR: Record<string, string> = Object.fromEntries(
 /** Tablas que jamás pueden estar en MIGRAR (la prueba jest lo verifica). */
 export const TABLAS_SENSIBLES: string[] = [
   'sesion', 'supervisor_secreto', 'device_key', 'print_job', 'auditoria', 'voucher_pago',
-  'comprobante', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
+  'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
   'contact_mechanism', 'cliente_direccion', 'conversacion', 'mensaje_chat', 'whatsapp_mensaje',
   'saliente_whatsapp', 'notificacion', 'cobro', 'caja', 'cierre_caja', 'pedido', 'reserva',
   'reclamo', 'encuesta', 'stock', 'movimiento_stock', 'ia_consumo', 'data_request',

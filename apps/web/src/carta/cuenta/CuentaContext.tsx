@@ -16,8 +16,6 @@ export interface DatosRegistro {
   nombre: string;
   contrasena: string;
   telefono: string;
-  /** Código de 6 dígitos que llegó por WhatsApp (POST /carta/cuenta/registro/codigo) */
-  codigo: string;
   /** DNI opcional: 8 dígitos o no se envía */
   dni?: string;
   correo?: string;
@@ -86,6 +84,19 @@ export function CuentaProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hayIndicio()) void refrescar();
   }, [refrescar]);
+
+  // Enlace «ve tus puntos aquí» del aviso de WhatsApp (?puntos=1): abre el acceso solo para consultar
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('puntos') !== '1') return;
+      setPanelAbierto(true);
+      url.searchParams.delete('puntos');
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // sin URL legible: la carta sigue normal
+    }
+  }, []);
 
   const ingresar = useCallback(async (telefono: string, contrasena: string) => {
     const r = await api.post<{ cliente: ClienteCuenta }>('/carta/cuenta/ingresar', { telefono, contrasena });

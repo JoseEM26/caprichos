@@ -59,8 +59,16 @@ export class CuentaClienteController {
   /** Envía por WhatsApp el código de 6 dígitos que pide crear la cuenta. Responde lo mismo, salvo si ya tiene cuenta. */
   @Post('registro/codigo')
   @HttpCode(200)
-  async solicitarCodigoRegistro(@Body('telefono') telefono: string) {
-    return this.codigoRegistro.solicitar(telefono);
+  async solicitarCodigoRegistro(@Body('telefono') telefono: string, @Req() req: Request) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.codigoRegistro.solicitar(telefono, ip);
+  }
+
+  /** Paso 2 de crear cuenta (o ver tus puntos): confirma el código de 6 dígitos que llegó por WhatsApp. */
+  @Post('registro/verificar')
+  @HttpCode(200)
+  async verificarCodigoRegistro(@Body() dto: { telefono: string; codigo: string }) {
+    return this.codigoRegistro.verificar(dto.telefono, dto.codigo);
   }
 
   @Post('ingresar')

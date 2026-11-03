@@ -40,6 +40,22 @@ const ROLES_SIN_CODIGO = ['ADMIN', 'SUPERVISOR'];
  * Audita la acción como AUTORIZACION_SUPERVISOR y devuelve su identidad; null si no es uno de ellos.
  * La usan verificarYConsumirCodigo y los servicios que verifican el PIN por su cuenta.
  */
+export async function esOperadorSinCodigo(
+  prisma: PrismaService,
+  operadorPartyId: bigint | string | undefined,
+): Promise<{ party_id: bigint; id: bigint; rol: string } | null> {
+  if (operadorPartyId === undefined) return null;
+  // ADMIN solo como principal (no se combina); SUPERVISOR como principal o como rol extra
+  return prisma.userAccount.findFirst({
+    where: {
+      party_id: BigInt(operadorPartyId),
+      activo: true,
+      OR: [{ rol: { in: ROLES_SIN_CODIGO } }, { rolesExtra: { some: { rol: 'SUPERVISOR' } } }],
+    },
+    select: { party_id: true, id: true, rol: true },
+  });
+}
+
 export async function autorizarAdminSinCodigo(
   prisma: PrismaService,
   auditoria: AuditoriaService,
@@ -49,16 +65,7 @@ export async function autorizarAdminSinCodigo(
   entidad?: string,
   entidadId?: bigint,
 ): Promise<{ party_id: bigint; id: bigint } | null> {
-  if (operadorPartyId === undefined) return null;
-  // ADMIN solo como principal (no se combina); SUPERVISOR como principal o como rol extra
-  const admin = await prisma.userAccount.findFirst({
-    where: {
-      party_id: BigInt(operadorPartyId),
-      activo: true,
-      OR: [{ rol: { in: ROLES_SIN_CODIGO } }, { rolesExtra: { some: { rol: 'SUPERVISOR' } } }],
-    },
-    select: { party_id: true, id: true, rol: true },
-  });
+  const admin = await esOperadorSinCodigo(prisma, operadorPartyId);
   if (!admin) return null;
   await auditoria.registrar({
     categoria: 'ACCESO',

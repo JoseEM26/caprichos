@@ -122,7 +122,7 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
         { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
         { provide: EventosGateway, useValue: { emitirAdmin: jest.fn() } },
         { provide: SalonService, useValue: { liberarMesasDePedido: jest.fn() } },
-        { provide: ComprobantesService, useValue: { emitirParaPedido: jest.fn() } },
+        { provide: ComprobantesService, useValue: { emitirParaPedido: jest.fn(), firmarPorPedido: jest.fn(), transmitirEnSegundoPlano: jest.fn() } },
       ],
     }).compile();
 

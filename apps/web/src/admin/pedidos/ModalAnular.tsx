@@ -320,7 +320,7 @@ export function ModalAnular({
           <Boton
             variante="peligro"
             cargando={enviando}
-            disabled={enviando || motivo.trim().length < 5 || (!autorizado && codigo.length !== 6)}
+            disabled={enviando || motivo.trim().length < 5 || (pideCodigo && !autorizado && codigo.length !== 6)}
             onClick={iniciarAnulacion}
             style={{ minHeight: 44, borderRadius: 12, fontWeight: 800 }}
           >
@@ -337,7 +337,7 @@ export function ModalAnular({
               ? `¿Anular el cobro de ${codigoPedido}?`
               : `¿Anular el pedido ${codigoPedido}?`
           }
-          mensaje={`Motivo: ${motivo.trim()}. Esta acción requiere el PIN del supervisor ingresado.`}
+          mensaje={`Motivo: ${motivo.trim()}.${pideCodigo ? ' Esta acción requiere el PIN del supervisor ingresado.' : ''}`}
           textoSi="Sí, anular"
           peligro
           alConfirmar={ejecutarAnulacion}

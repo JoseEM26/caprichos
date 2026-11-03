@@ -91,6 +91,7 @@ export interface Pedido {
   comprobante_tipo?: string | null;
   comprobante_doc?: string | null;
   comprobante_razon?: string | null;
+  comprobante_direccion?: string | null;
   nota?: string | null;
   mesa_nombre?: string | null;
   es_personal?: boolean;
@@ -232,6 +233,13 @@ export interface CobrarDto {
 }
 
 export const pedidosApi = {
+  /** Cambia el comprobante antes de cobrar (Caja). 409 si ya está cobrado o con comprobante emitido. */
+  cambiarComprobante: (pedidoId: string, dto: { tipo: 'NOTA_VENTA' | 'BOLETA' | 'FACTURA'; doc?: string; razon?: string; direccion?: string }) =>
+    api.patch<{ id: string; codigo: string; comprobante_tipo: string; comprobante_doc: string | null; comprobante_razon: string | null; comprobante_direccion: string | null }>(
+      `/admin/pedidos/${pedidoId}/comprobante`,
+      dto,
+    ),
+
   async listar(filtros: FiltrosListarPedidos = {}): Promise<RespuestaListarPedidos> {
     const params = new URLSearchParams();
     if (filtros.estado) params.append('estado', filtros.estado);
@@ -326,10 +334,11 @@ export const pedidosApi = {
         origen?: 'GPS' | 'ESCRITA' | 'MAPA' | 'WHATSAPP' | 'ENLACE';
       };
       comprobante?: {
-        tipo: 'BOLETA' | 'FACTURA';
+        tipo: 'NOTA_VENTA' | 'BOLETA' | 'FACTURA';
         dni?: string;
         ruc?: string;
         razonSocial?: string;
+        direccion?: string;
       };
       nota?: string;
       cuponCodigo?: string;

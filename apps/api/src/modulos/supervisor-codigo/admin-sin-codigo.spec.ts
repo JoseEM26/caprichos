@@ -3,7 +3,7 @@ jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {
 
 import { HttpException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { SupervisorCodigoService, autorizarAdminSinCodigo } from './supervisor-codigo.service';
+import { SupervisorCodigoService, autorizarAdminSinCodigo, esOperadorSinCodigo } from './supervisor-codigo.service';
 import { SupervisorCodigoGuard } from './supervisor-codigo.guard';
 import { LocalController } from '../local/local.controller';
 import { CobrosService } from '../caja/cobros.service';
@@ -147,5 +147,48 @@ describe('ADMIN sin código de supervisor', () => {
       expect(redis.incr).not.toHaveBeenCalled();
       await expect(s.verificarPinSupervisor(undefined, CAJERO, '1', 7n)).rejects.toMatchObject({ status: 403 });
     });
+  });
+});
+
+describe('SUPERVISOR sin código de supervisor (misma regla que el ADMIN)', () => {
+  const SUPERVISOR = 3n;
+  const montarSupervisor = () => {
+    const prisma: any = {
+      userAccount: {
+        findFirst: jest.fn(async ({ where }: any) =>
+          where.party_id === SUPERVISOR ? { party_id: SUPERVISOR, id: 30n, rol: 'SUPERVISOR' } : null,
+        ),
+      },
+    };
+    const auditoria: any = { registrar: jest.fn(async () => ({})) };
+    return { prisma, auditoria };
+  };
+
+  it('SUPERVISOR activo: devuelve su identidad y audita con el motivo de rol SUPERVISOR', async () => {
+    const { prisma, auditoria } = montarSupervisor();
+    const r = await autorizarAdminSinCodigo(prisma, auditoria, SUPERVISOR, 'cierre', '10.0.0.2', 'caja', 7n);
+    expect(r).toEqual({ party_id: SUPERVISOR, id: 30n });
+    expect(auditoria.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accion: 'AUTORIZACION_SUPERVISOR',
+        resultado: 'OK',
+        entidad: 'caja',
+        entidadId: 7n,
+        motivo: 'Acción cierre: autorizado por rol SUPERVISOR (sin código)',
+      }),
+    );
+  });
+
+  it('el operador sin rol de supervisor ni admin no se autoriza y no deja registro', async () => {
+    const { prisma, auditoria } = montarSupervisor();
+    const r = await autorizarAdminSinCodigo(prisma, auditoria, 2n, 'cierre');
+    expect(r).toBeNull();
+    expect(registrosAdmin(auditoria)).toHaveLength(0);
+  });
+
+  it('esOperadorSinCodigo: sin party no consulta nada', async () => {
+    const { prisma } = montarSupervisor();
+    expect(await esOperadorSinCodigo(prisma, undefined)).toBeNull();
+    expect(prisma.userAccount.findFirst).not.toHaveBeenCalled();
   });
 });

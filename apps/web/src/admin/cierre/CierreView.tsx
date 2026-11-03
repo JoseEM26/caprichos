@@ -28,6 +28,8 @@ export function CierreView() {
   const { confirmar, dialogo } = useConfirmarAsync();
   const puedeVer = tiene('caja/ver') || tiene('caja/cerrar') || usuario?.rol === 'ADMIN' || tieneRolUsuario(usuario, 'CAJERO');
   const esAdmin = usuario?.rol === 'ADMIN';
+  // ADMIN y SUPERVISOR no escriben código: el servidor los autoriza solos (misma regla que requiereCodigo)
+  const sinCodigo = !pideCodigo;
 
   const [tabActiva, setTabActiva] = useState<TabCierre>('turno');
 
@@ -125,8 +127,8 @@ export function CierreView() {
         // En mock mode puede fallar
       }
 
-      // 2. Esperado: solo el administrador lo pide. El cajero cuenta a ciegas (DT-61).
-      if (esAdmin) {
+      // 2. Esperado: lo piden el administrador y el supervisor. El cajero cuenta a ciegas (DT-61).
+      if (sinCodigo) {
         try {
           const esp = await cierreApi.obtenerEsperado();
           if (esp) {
@@ -165,9 +167,9 @@ export function CierreView() {
         setRepartidores([]);
       }
 
-      // 5. Pedidos sin cobrar de cualquier día (los que bloquean el cierre; el admin los ve de entrada,
+      // 5. Pedidos sin cobrar de cualquier día (los que bloquean el cierre; el admin y el supervisor los ven de entrada,
       // el cajero los ve con el PIN de supervisor)
-      if (esAdmin) {
+      if (sinCodigo) {
         try {
           setPedidosAbiertos(await cierreApi.listarPendientesDeCobro());
           setErrorPendientes(false);
@@ -181,7 +183,7 @@ export function CierreView() {
     } finally {
       setCargando(false);
     }
-  }, [esAdmin]);
+  }, [sinCodigo]);
 
   useEffect(() => {
     cargarTurno();
@@ -236,7 +238,7 @@ export function CierreView() {
     : [];
   const cuadraEnSistema = filasCuadre.length > 0 && filasCuadre.every((f) => Math.abs(f.dif) < 0.005);
   // El admin ve la diferencia y la supervisora firma con su PIN; el cajero, si el arqueo no cuadra o ya van 3 arqueos que no cuadraron
-  const necesitaPin = esAdmin ? !cuadraEnSistema : revisadoCuadra === false || arqueosNoCuadra >= 3 || requierePin;
+  const necesitaPin = sinCodigo ? !cuadraEnSistema : revisadoCuadra === false || arqueosNoCuadra >= 3 || requierePin;
   // El administrador no escribe código (él mismo sería el aprobador); la nota sigue siendo obligatoria si no cuadra
   const pideCodigoCierre = pideCodigo && necesitaPin;
 
@@ -455,12 +457,12 @@ export function CierreView() {
       setMsgCierreError('Hay efectivo de repartidores sin liquidar. Liquídalo antes de cerrar.');
       return;
     }
-    if (!esAdmin && revisadoCuadra === null) {
+    if (!sinCodigo && revisadoCuadra === null) {
       setMsgCierreError('Toca «Revisar» para saber si cuadra antes de cerrar.');
       return;
     }
     if (necesitaPin) {
-      if (!esAdmin && !pinVerificado) {
+      if (!sinCodigo && !pinVerificado) {
         setMsgCierreError('No cuadra: la supervisora debe escribir su código para revisar el detalle y cerrar.');
         return;
       }
@@ -476,7 +478,7 @@ export function CierreView() {
 
     // El cajero no ve la diferencia (cierre ciego): la pregunta es neutra
     let titulo = '¿Cerrar la caja?';
-    if (esAdmin) {
+    if (sinCodigo) {
       const difTot = Math.round((totalEfectivoContado - efectivoEsperado) * 100) / 100;
       const txtDif = Math.abs(difTot) < 0.005 ? 'cuadrada' : `con una diferencia de s/ ${Math.abs(difTot).toFixed(2)} ${difTot > 0 ? 'de sobrante' : 'de faltante'}`;
       titulo = `¿Cerrar la caja ${txtDif}?`;
@@ -1617,8 +1619,8 @@ export function CierreView() {
                   </div>
                 </div>
 
-                {/* Botón Revisar si cuadra para cajeros */}
-                {!esAdmin && (
+                {/* Botón Revisar si cuadra: solo para el cajero (ADMIN y SUPERVISOR no lo necesitan) */}
+                {!sinCodigo && (
                   <div>
                     <button
                       type="button"
@@ -1689,7 +1691,7 @@ export function CierreView() {
                 )}
 
                 {/* Detalle de comparación si es Admin o si el código fue validado */}
-                {(esAdmin || pinVerificado) && filasCuadre.length > 0 && (
+                {(sinCodigo || pinVerificado) && filasCuadre.length > 0 && (
                   <div
                     data-testid="detalle-cuadre"
                     style={{
@@ -1703,7 +1705,7 @@ export function CierreView() {
                     }}
                   >
                     <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 2 }}>
-                      {esAdmin ? 'Resultado del cuadre' : 'Detalle (abierto con código del supervisor)'}
+                      {sinCodigo ? 'Resultado del cuadre' : 'Detalle (abierto con código del supervisor)'}
                     </div>
                     {filasCuadre.map((f) => (
                       <div

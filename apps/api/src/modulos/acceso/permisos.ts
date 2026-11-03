@@ -82,6 +82,7 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'comprobantes', accion: 'ver' },
   { modulo: 'comprobantes', accion: 'reimprimir' },
   { modulo: 'comprobantes', accion: 'emitir' },
+  { modulo: 'comprobantes', accion: 'anular' },
   { modulo: 'reclamos', accion: 'ver' },
   { modulo: 'reclamos', accion: 'responder' },
   // Ofertas, cupones, clientes y puntos (Fase Siguiente - Ola S1)

@@ -95,12 +95,28 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
     });
   });
 
+  it('apagado: «Ver mis puntos» abre el acceso solo para consultar; el pedido no exige iniciar sesión', () => {
+    const abrirPanel = vi.fn();
+    vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue({ cliente: null, abrirPanel } as any);
+    render(
+      <CarritoProvider>
+        <Pagina invitadoPermitido={false} />
+      </CarritoProvider>,
+    );
+    fireEvent.click(screen.getByText('Abrir pedido'));
+    expect(screen.getByText(/Tus puntos se suman con tu celular, sin contraseña/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ingresar para acumular puntos/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mis puntos' }));
+    expect(abrirPanel).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText(/Teléfono celular/i)).toBeRequired();
+  });
+
   it('apagado: no se ofrece «Continuar como invitado», el celular es obligatorio y se explica que suma puntos', async () => {
     abrirPedido(false);
 
     expect(screen.queryByRole('button', { name: /Continuar como invitado/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Paso 1: Tus datos \(actual\)/)).toBeInTheDocument();
-    expect(screen.getByText('Tu celular: sumas puntos con tu numero, sin contrasena.')).toBeInTheDocument();
+    expect(screen.getByText('Tu celular: sumas puntos con tu número, sin contraseña.')).toBeInTheDocument();
     expect(screen.getByLabelText(/Teléfono celular/i)).toBeRequired();
 
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });

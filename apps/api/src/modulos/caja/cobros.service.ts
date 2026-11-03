@@ -4,6 +4,7 @@ import { StockService } from '../stock/stock.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { SalonService } from '../salon/salon.service';
 import { ComprobantesService } from '../comprobantes/comprobantes.service';
+import { validarDocumentoComprobante } from '../comprobantes/comprobantes.util';
 import {
   BadRequestException,
   HttpException,
@@ -320,6 +321,23 @@ export class CobrosService {
         );
       }
 
+      // Boleta o factura sin documento válido (p. ej. boleta de más de S/ 700 sin DNI): no se cobra en silencio
+      const docComprobante = validarDocumentoComprobante(
+        pedido.comprobante_tipo,
+        pedido.comprobante_doc,
+        pedido.comprobante_razon,
+        Number(pedido.total),
+      );
+      if (!docComprobante.valido) {
+        throw new HttpException(
+          {
+            codigo: 'COMPROBANTE_DATOS_FALTANTES',
+            mensaje: `${docComprobante.motivo}. Usa «Cambiar comprobante» para corregirlo antes de cobrar.`,
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       // Los montos de los pagos deben sumar exactamente el total (en céntimos, sin floats)
       const totalPedido = aCentimos(pedido.total);
       const totalPagos = dto.pagos.reduce((acc, p) => acc + aCentimos(p.monto), 0);
@@ -408,6 +426,10 @@ export class CobrosService {
         },
       });
 
+      // Nota de venta, boleta o factura en la MISMA transacción (outbox): si el cobro se deshace, no queda
+      // comprobante ni número consumido. Si el proceso muere después del commit, la fila pendiente la envía el worker.
+      await this.comprobantesService?.emitirParaPedido(pedido.id, tx, usuario, ip);
+
       return {
         cobro: nuevoCobro,
         pedidoActualizado: pedAct,
@@ -421,12 +443,12 @@ export class CobrosService {
     // Se mira antes de emitir (el cobro podría emitir otra nota si el comprobante cambió).
     const ticketYaSalioConMozo = await this.notaDelMozoVigente(cobro.pedido_id).catch(() => false);
 
-    // el cobro genera la nota de venta con su correlativo (RQ-LEG-01-01); es idempotente y también se
-    // crea al consultarla, así que un fallo aquí no deshace el cobro
+    // Boleta/factura electrónica: se FIRMA aquí (local, sin red) para que el ticket salga con hash y QR.
+    // Si la firma falla, el cobro no se deshace: la fila queda PENDIENTE_ENVIO con aviso y el envío la reintenta.
     try {
-      await this.comprobantesService?.emitirParaPedido(cobro.pedido_id, undefined, usuario);
+      await this.comprobantesService?.firmarPorPedido(cobro.pedido_id, usuario, ip);
     } catch {
-      // se genera al pedir el comprobante
+      // el servicio ya lo registra y avisa
     }
 
     // la mesa se libera al cobrar (RN-CAP-054); si falla no se deshace el cobro: se libera a mano
@@ -458,6 +480,13 @@ export class CobrosService {
       } catch {
         // se puede reimprimir desde el pedido
       }
+    }
+
+    // La transmisión a SUNAT va en segundo plano: el cobro y el ticket no esperan a SUNAT (sin doble envío: lease).
+    try {
+      this.comprobantesService?.transmitirEnSegundoPlano(cobro.pedido_id);
+    } catch {
+      // nunca deshace ni retrasa el cobro: el worker de comprobantes lo envía
     }
 
     // 8. Auditar

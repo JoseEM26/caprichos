@@ -29,6 +29,7 @@ export function validarDocumentoComprobante(
   tipo?: string | null,
   doc?: string | null,
   razon?: string | null,
+  total?: number,
 ): { valido: boolean; motivo?: string } {
   const tipoNormalizado = (tipo || 'NOTA_VENTA').trim().toUpperCase();
 
@@ -38,7 +39,13 @@ export function validarDocumentoComprobante(
 
   if (tipoNormalizado === 'BOLETA') {
     // DNI opcional (decisión del dueño): sin documento la boleta es válida; si se escribe, 8 dígitos
-    if (!doc) return { valido: true };
+    // SUNAT: boleta sin identificar hasta S/ 700; por encima exige DNI o CE (total, si se conoce)
+    if (!doc) {
+      if (typeof total === 'number' && total > 700) {
+        return { valido: false, motivo: 'La boleta mayor a S/ 700 exige DNI' };
+      }
+      return { valido: true };
+    }
     if (!validarDni(doc)) {
       return {
         valido: false,
