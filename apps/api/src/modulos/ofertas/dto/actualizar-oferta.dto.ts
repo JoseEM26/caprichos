@@ -112,6 +112,14 @@ export class ActualizarOfertaDto {
   noSumaBeneficios?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  mostrarEnSaludoBot?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  soloPrimeraCompra?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   orden?: number;

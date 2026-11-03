@@ -77,6 +77,8 @@ export function ModalDescuento({
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
+  const [mostrarEnSaludo, setMostrarEnSaludo] = useState(false);
+  const [soloPrimeraCompra, setSoloPrimeraCompra] = useState(false);
   const [minima, setMinima] = useState('');
 
   // Paso 3: Beneficio
@@ -132,6 +134,8 @@ export function ModalDescuento({
       setFechaDesde(fDesde ? fDesde.slice(0, 10) : '');
       setFechaHasta(fHasta ? fHasta.slice(0, 10) : '');
       setCanal(descuentoAEditar.canales && descuentoAEditar.canales[0] ? descuentoAEditar.canales[0].toLowerCase() : 'todos');
+      setMostrarEnSaludo(Boolean(descuentoAEditar.mostrarEnSaludoBot));
+      setSoloPrimeraCompra(Boolean(descuentoAEditar.soloPrimeraCompra));
       setPaso(1);
       setMensajeError('');
       setProductoComboAbierto(false);
@@ -152,6 +156,8 @@ export function ModalDescuento({
       setFechaDesde('');
       setFechaHasta('');
       setCanal('todos');
+      setMostrarEnSaludo(false);
+      setSoloPrimeraCompra(false);
       setPaso(1);
       setMensajeError('');
       setProductoComboAbierto(false);
@@ -482,7 +488,10 @@ export function ModalDescuento({
         fechaInicio: fechaDesde || undefined,
         fechaHasta: fechaHasta || undefined,
         fechaFin: fechaHasta || undefined,
-        canales: canal === 'todos' ? ['CARTA', 'ADMIN', 'BOT'] : [canal.toUpperCase()],
+        // La primera compra solo se canjea en la carta web
+        canales: soloPrimeraCompra ? ['CARTA'] : canal === 'todos' ? ['CARTA', 'ADMIN', 'BOT'] : [canal.toUpperCase()],
+        mostrarEnSaludoBot: mostrarEnSaludo,
+        soloPrimeraCompra,
         imagenArchivoId: fotoArchivoId,
       };
 
@@ -1056,6 +1065,40 @@ export function ModalDescuento({
                   style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
                 />
               </div>
+            </div>
+
+            {/* Saludo del chat y primera compra */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+              <label htmlFor="desc-saludo" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '13px', fontWeight: 600 }}>
+                <input
+                  id="desc-saludo"
+                  type="checkbox"
+                  checked={mostrarEnSaludo}
+                  onChange={(e) => setMostrarEnSaludo(e.target.checked)}
+                  style={{ marginTop: '3px' }}
+                />
+                <span>
+                  Mostrar al inicio del chat de WhatsApp
+                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 400, color: 'var(--cp-soft)' }}>
+                    Cuando el cliente escribe «hola», el bot le ofrece esta promoción para pedir en la carta online (sin costo por mensaje). Solo se muestra una: la de menor orden que esté vigente hoy.
+                  </span>
+                </span>
+              </label>
+              <label htmlFor="desc-primera" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '13px', fontWeight: 600 }}>
+                <input
+                  id="desc-primera"
+                  type="checkbox"
+                  checked={soloPrimeraCompra}
+                  onChange={(e) => setSoloPrimeraCompra(e.target.checked)}
+                  style={{ marginTop: '3px' }}
+                />
+                <span>
+                  Solo primera compra del cliente (celular con sesión)
+                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 400, color: 'var(--cp-soft)' }}>
+                    Se aplica solo si el cliente inició sesión en la carta online y su celular nunca tuvo un pedido válido. No aplica a promociones ni combos. Solo en la carta web y como máximo un mes: pon una fecha de fin.
+                  </span>
+                </span>
+              </label>
             </div>
 
             {/* Canales, Fechas y Compra mínima */}

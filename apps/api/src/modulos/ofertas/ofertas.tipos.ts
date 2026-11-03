@@ -46,6 +46,10 @@ export interface OfertaItem {
   limiteUsos: number | null;
   usosActuales: number;
   noSumaBeneficios: boolean;
+  /** Se muestra en el saludo del chat de WhatsApp (una sola, la de menor orden vigente) */
+  mostrarEnSaludoBot: boolean;
+  /** Descuento solo para la primera compra del cliente con sesión (celular sin pedidos válidos) */
+  soloPrimeraCompra: boolean;
   orden: number;
   activo: boolean;
   creadoEn: string;

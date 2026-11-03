@@ -26,6 +26,7 @@ import {
   ModalidadEntrega,
   TipoComprobante,
 } from './tipos';
+import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 
 interface FormularioCheckoutProps {
   estadoLocal: EstadoLocalCarta | null;
@@ -131,6 +132,8 @@ export function FormularioCheckout({
     if (clienteCuenta.telefono && !otroTelefono) setTelefono(clienteCuenta.telefono);
   }, [clienteCuenta, otroTelefono]);
   const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
+  // Promoción de primera compra (solo con sesión iniciada): se muestra a quien no ha entrado a su cuenta
+  const [primeraCompra, setPrimeraCompra] = useState<{ nombre: string; descuento: string } | null>(null);
 
   // Idempotency-Key único por intento
   const claveIdempotenciaRef = useRef<string>(
@@ -151,7 +154,8 @@ export function FormularioCheckout({
   };
 
   // lo que descontará el servidor (promociones automáticas y cupón), para mostrar el mismo total que se cobra
-  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo]);
+  const tieneSesion = Boolean(clienteCuenta);
+  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion]);
   useEffect(() => {
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
@@ -166,6 +170,24 @@ export function FormularioCheckout({
       vigente = false;
     };
   }, [checkoutAbierto, clavePromos]);
+
+  // Sin sesión: se avisa que la primera compra se aplica al iniciar sesión (la validación real es del servidor)
+  useEffect(() => {
+    if (!checkoutAbierto || tieneSesion) return;
+    let vigente = true;
+    api
+      .get<OfertaItem[]>('/carta/ofertas')
+      .then((r) => {
+        const oferta = (Array.isArray(r) ? r : []).find((o) => o.soloPrimeraCompra && o.vigenteAhora);
+        if (vigente) {
+          setPrimeraCompra(oferta ? { nombre: oferta.nombre, descuento: oferta.descuentoTipo === 'MONTO' ? `S/ ${oferta.descuentoValor ?? 0}` : `${oferta.descuentoValor ?? 0} %` } : null);
+        }
+      })
+      .catch(() => vigente && setPrimeraCompra(null));
+    return () => {
+      vigente = false;
+    };
+  }, [checkoutAbierto, tieneSesion]);
 
   // Direcciones guardadas del cliente con cuenta; si falla, se sigue como sin libreta
   const clientePartyId = clienteCuenta?.partyId ?? null;
@@ -1947,6 +1969,12 @@ export function FormularioCheckout({
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
                         <span>Puntos canjeados</span>
                         <span style={{ fontWeight: 700 }}>−S/ {puntosAplicados.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    {primeraCompra && !tieneSesion && (
+                      <div role="note" style={{ fontSize: '13px', color: 'var(--cp-navy)', background: 'var(--cp-sand)', borderRadius: '8px', padding: '8px 10px', lineHeight: '18px' }}>
+                        Tienes {primeraCompra.descuento} de descuento en tu primera compra. Inicia sesión con tu celular para aplicarlo. No aplica a promociones ni combos.
                       </div>
                     )}
 
