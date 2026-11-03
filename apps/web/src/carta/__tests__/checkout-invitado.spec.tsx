@@ -125,7 +125,8 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
     expect(screen.queryByLabelText(/Paso 2: Ubicación \(actual\)/)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
-    fireEvent.change(screen.getByLabelText(/Tu cumpleaños, para saludarte/i), { target: { value: '1990-03-14' } });
+    // El pedido sin cuenta no pide cumpleaños: solo nombre y celular
+    expect(screen.queryByLabelText(/Tu cumpleaños/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   });
@@ -134,7 +135,6 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
     abrirPedido(false);
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
-    fireEvent.change(screen.getByLabelText(/Tu cumpleaños, para saludarte/i), { target: { value: '1990-03-14' } });
     await irAEnviar();
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything()));
@@ -163,4 +163,84 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
     const payload = vi.mocked(api.post).mock.calls.find((c) => c[0] === '/pedidos')![1] as any;
     expect(payload.cliente).toEqual({ nombre: 'Luis' });
   });
+});
+
+describe('Checkout ▸ dirección del último pedido del celular (sin cuenta)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockImplementation(async (ruta: string) => {
+      if (ruta.startsWith('/carta/envio')) return { cubierto: true, zona: 'Z1', tarifa: 5, tarifaZona: 5, gratisDesde: 70, modoGratis: 'mas_de' };
+      throw new Error(`ruta no esperada: ${ruta}`);
+    });
+  });
+
+  /** Respuesta de la pista pública; el pedido siempre responde error para no seguir el flujo. */
+  function conPista(respuestaPista: unknown) {
+    vi.mocked(api.post).mockImplementation(async (ruta: string) => {
+      if (ruta === '/pedidos') throw new ErrorApi('CELULAR_REQUERIDO', 'Escribe tu celular para hacer tu pedido y sumar puntos', 400);
+      if (ruta === '/pedidos/pista-direccion') return respuestaPista;
+      return { descuentoTotal: 0, detalles: [] };
+    });
+  }
+
+  /** Paso 1 con nombre y celular completos, y avanza al paso 2 (delivery por defecto). */
+  async function llegarUbicacion() {
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
+  }
+
+  it('con celular que tuvo un pedido con dirección: muestra la pista enmascarada y la opción de reutilizarla', async () => {
+    conPista({ existe: true, zona: 'SJL', direccion: 'Av. Los G••••' });
+    abrirPedido(false);
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(await screen.findByText('Av. Los G•••• · zona SJL')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Usar la dirección de mi último pedido/i })).toBeInTheDocument();
+    expect(api.post).toHaveBeenCalledWith('/pedidos/pista-direccion', { telefono: '912345678' });
+  });
+
+  it('al elegir la dirección anterior, el formulario de dirección se oculta y el pedido manda solo la marca', async () => {
+    conPista({ existe: true, zona: 'SJL', direccion: 'Av. Los G••••' });
+    abrirPedido(false);
+    await llegarUbicacionConPista();
+    fireEvent.click(screen.getByRole('button', { name: /Usar la dirección de mi último pedido/i }));
+    expect(screen.getByText('Enviaremos a la dirección de tu último pedido')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Dirección escrita/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Enviar pedido/i }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything()));
+    const payload = vi.mocked(api.post).mock.calls.find((c) => c[0] === '/pedidos')![1] as any;
+    expect(payload.entrega).toEqual({ reutilizarUltimaDireccion: true });
+  });
+
+  it('«Usar otra dirección» vuelve al formulario normal', async () => {
+    conPista({ existe: true, zona: 'SJL', direccion: 'Av. Los G••••' });
+    abrirPedido(false);
+    await llegarUbicacionConPista();
+    fireEvent.click(screen.getByRole('button', { name: /Usar la dirección de mi último pedido/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Usar otra dirección/i }));
+    expect(screen.getByLabelText(/Dirección escrita/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Usar la dirección de mi último pedido/i })).toBeInTheDocument();
+  });
+
+  it('sin pedido previo con ese celular: no se ofrece la pista', async () => {
+    conPista({ existe: false });
+    abrirPedido(false);
+    await llegarUbicacion();
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/pedidos/pista-direccion', { telefono: '912345678' }));
+    expect(screen.queryByRole('button', { name: /Usar la dirección de mi último pedido/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Dirección escrita/i)).toBeInTheDocument();
+  });
+
+  /** Como llegarAUbicacion, pero espera a que llegue la pista. */
+  async function llegarUbicacionConPista() {
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(await screen.findByRole('button', { name: /Usar la dirección de mi último pedido/i })).toBeInTheDocument();
+  }
 });

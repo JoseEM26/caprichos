@@ -69,7 +69,7 @@ export function FormularioCheckout({
   // Cliente
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
-  // Cumpleaños: lo pide quien da de alta su celular sin sesión, y quien con cuenta aún no lo tiene
+  // Cumpleaños: solo lo pide quien tiene cuenta y aún no lo tiene (el pedido sin cuenta no lo pide)
   const [cumpleCliente, setCumpleCliente] = useState('');
 
   // Entrega
@@ -91,6 +91,9 @@ export function FormularioCheckout({
   const [opcionDireccion, setOpcionDireccion] = useState<string | 'nueva' | null>(null);
   const [eligiendoDireccion, setEligiendoDireccion] = useState(false);
   const [avisoDireccion, setAvisoDireccion] = useState<string | null>(null);
+  // Sin cuenta con celular: pista enmascarada de la dirección del último pedido (la completa la pone el servidor)
+  const [pistaDireccion, setPistaDireccion] = useState<{ zona: string | null; direccion: string | null } | null>(null);
+  const [usarUltimaDireccion, setUsarUltimaDireccion] = useState(false);
 
   // Comprobante (Boleta o Factura)
   const [tipoComprobante, setTipoComprobante] = useState<TipoComprobante>('BOLETA');
@@ -122,7 +125,7 @@ export function FormularioCheckout({
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
   const cumpleFaltaCuenta = !!clienteCuenta && (!clienteCuenta.cumpleanos || clienteCuenta.cumpleanos === '—');
-  const pideCumple = cumpleFaltaCuenta || (!clienteCuenta && telefono.trim().length > 0);
+  const pideCumple = cumpleFaltaCuenta;
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
   const [comoInvitado, setComoInvitado] = useState(false);
   // Sin invitado permitido, quien pide sin cuenta debe escribir su celular (así suma puntos): no se ofrece «invitado»
@@ -135,6 +138,24 @@ export function FormularioCheckout({
     setNombre(clienteCuenta.nombre);
     if (clienteCuenta.telefono && !otroTelefono) setTelefono(clienteCuenta.telefono);
   }, [clienteCuenta, otroTelefono]);
+  // Sin cuenta, con un celular completo: pedimos la pista de la dirección anterior (sin dirección completa)
+  const tieneCuenta = Boolean(clienteCuenta);
+  useEffect(() => {
+    setPistaDireccion(null);
+    setUsarUltimaDireccion(false);
+    const tel = telefono.trim();
+    if (tieneCuenta || !/^9\d{8}$/.test(tel)) return;
+    let vigente = true;
+    api
+      .post<{ existe?: boolean; zona?: string | null; direccion?: string | null }>('/pedidos/pista-direccion', { telefono: tel })
+      .then((r) => {
+        if (vigente && r?.existe) setPistaDireccion({ zona: r.zona ?? null, direccion: r.direccion ?? null });
+      })
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [telefono, tieneCuenta]);
   const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
   // Promoción de primera compra (solo con sesión iniciada): se muestra a quien no ha entrado a su cuenta
   const [primeraCompra, setPrimeraCompra] = useState<{ nombre: string; descuento: string } | null>(null);
@@ -381,6 +402,17 @@ export function FormularioCheckout({
     );
   };
 
+  // Dirección del último pedido de este celular: el servidor la toma; aquí solo se marca y se limpia el mapa
+  const usarDireccionDelUltimoPedido = () => {
+    setUsarUltimaDireccion(true);
+    setDireccion('');
+    setReferencia('');
+    setCoordenadas(null);
+    setUbicacionConfirmada(false);
+    setZonaEnvio(null);
+    setTarifaZona(null);
+  };
+
   // Validaciones del formulario separadas por apartado
   const validarPaso1 = (): string | null => {
     if (!clienteCuenta && !comoInvitado && invitadoPermitido) {
@@ -399,12 +431,12 @@ export function FormularioCheckout({
       if (!invitadoPermitido) return 'Escribe tu celular para hacer tu pedido y sumar puntos';
     }
     if (!clienteCuenta && telLimpio && nombre.trim().length < 2) return 'Escribe tu nombre completo para sumar puntos con tu celular';
-    if (!clienteCuenta && telLimpio && !cumpleCliente) return 'Escribe tu cumpleaños, para saludarte';
     return null;
   };
 
   const validarPaso2 = (): string | null => {
     if (modalidad === 'DELIVERY') {
+      if (usarUltimaDireccion) return null;
       if (pideEleccionDireccion) {
         return 'Elige a dónde lo enviamos: una de tus direcciones anteriores o una nueva';
       }
@@ -584,13 +616,15 @@ export function FormularioCheckout({
       modalidad,
       entrega:
         modalidad === 'DELIVERY'
-          ? {
-              direccion: direccion.trim() || undefined,
-              referencia: referencia.trim() || undefined,
-              lat: coordenadas?.lat,
-              lng: coordenadas?.lng,
-              origen: coordenadas ? origenPunto : ('ESCRITA' as const),
-            }
+          ? usarUltimaDireccion
+            ? { reutilizarUltimaDireccion: true }
+            : {
+                direccion: direccion.trim() || undefined,
+                referencia: referencia.trim() || undefined,
+                lat: coordenadas?.lat,
+                lng: coordenadas?.lng,
+                origen: coordenadas ? origenPunto : ('ESCRITA' as const),
+              }
           : undefined,
       lineas: lineasDto,
       pago: {
@@ -1230,7 +1264,49 @@ export function FormularioCheckout({
                         alNueva={elegirDireccionNueva}
                       />
                     )}
-                    {!pideEleccionDireccion && (
+                    {!clienteCuenta && pistaDireccion && (
+                      <div
+                        style={{
+                          backgroundColor: 'var(--cp-white)',
+                          padding: '14px 16px',
+                          borderRadius: '14px',
+                          border: '1px solid var(--cp-line)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                        }}
+                      >
+                        {usarUltimaDireccion ? (
+                          <>
+                            <div style={{ fontWeight: 700, fontSize: '14px' }}>Enviaremos a la dirección de tu último pedido</div>
+                            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+                              {[pistaDireccion.direccion, pistaDireccion.zona ? `zona ${pistaDireccion.zona}` : null].filter(Boolean).join(' · ')}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setUsarUltimaDireccion(false)}
+                              style={{ alignSelf: 'flex-start', minHeight: '44px', background: 'none', border: 'none', padding: '0 4px', fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}
+                            >
+                              Usar otra dirección
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={usarDireccionDelUltimoPedido}
+                              style={{ minHeight: '44px', borderRadius: '10px', border: '1.5px solid var(--cp-navy)', backgroundColor: 'var(--cp-sand)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px' }}
+                            >
+                              Usar la dirección de mi último pedido
+                            </button>
+                            <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                              {[pistaDireccion.direccion, pistaDireccion.zona ? `zona ${pistaDireccion.zona}` : null].filter(Boolean).join(' · ')}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {!pideEleccionDireccion && !usarUltimaDireccion && (
                     <div
                       style={{
                         backgroundColor: 'var(--cp-white)',

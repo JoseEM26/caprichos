@@ -10,7 +10,7 @@ import {
 import type { Request } from 'express';
 import { ClientesService } from '../clientes/clientes.service';
 import { PedidosService } from './pedidos.service';
-import { CrearPedidoDto } from './dto/crear-pedido.dto';
+import { CrearPedidoDto, PistaDireccionDto } from './dto/crear-pedido.dto';
 
 @Controller('pedidos')
 export class PedidosController {
@@ -18,6 +18,13 @@ export class PedidosController {
     private readonly pedidosService: PedidosService,
     private readonly clientesService: ClientesService,
   ) {}
+
+  /** Pista pública (carta sin sesión): zona y dirección enmascarada del último pedido de ese celular. */
+  @Post('pista-direccion')
+  @HttpCode(HttpStatus.OK)
+  async pistaDireccion(@Body() dto: PistaDireccionDto, @Req() req?: Request) {
+    return this.pedidosService.pistaUltimaDireccion(dto.telefono, req?.ip);
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
