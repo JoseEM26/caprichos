@@ -49,4 +49,12 @@ describe('AvisosEquipoCorreoService (carga de turnos y envío)', () => {
     await expect(servicio.avisar({ clave: 'c', origen: 'T', asunto: 'a', texto: 't' })).resolves.toBeNull();
     expect(correo.enviar).not.toHaveBeenCalled();
   });
+  it('avisarAdministradores envía a los ADMIN con casilla sin mirar el horario', async () => {
+    const prisma: any = { userAccount: { findMany: jest.fn().mockResolvedValue([{ party: { persona: { correo: 'Admin@Caprichos.pe' } } }]) } };
+    const correo = { enviar: jest.fn().mockResolvedValue({ enviados: 1, simulados: 0, fallidos: 0, omitidos: 0 }) };
+    const servicio = new AvisosEquipoCorreoService(prisma, correo as any);
+    await servicio.avisarAdministradores({ clave: 'k', origen: 'O', asunto: 'a', texto: 't' });
+    expect(prisma.userAccount.findMany.mock.calls[0][0].where).toMatchObject({ activo: true, avisos_correo: true });
+    expect(correo.enviar).toHaveBeenCalledWith({ clave: 'k', origen: 'O', asunto: 'a', texto: 't', destinatarios: ['admin@caprichos.pe'] });
+  });
 });

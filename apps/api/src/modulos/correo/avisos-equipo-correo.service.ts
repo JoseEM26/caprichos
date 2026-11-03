@@ -47,6 +47,25 @@ export class AvisosEquipoCorreoService {
     }
   }
 
+  /** Aviso a todos los ADMIN activos con casilla, sin mirar el horario (p. ej. vencimiento del certificado). Nunca lanza. */
+  async avisarAdministradores(aviso: Omit<AvisoEquipo, 'ahora'>): Promise<ResultadoCorreo | null> {
+    try {
+      const cuentas = await this.prisma.userAccount.findMany({
+        where: {
+          activo: true,
+          avisos_correo: true,
+          OR: [{ rol: 'ADMIN' }, { rolesExtra: { some: { rol: 'ADMIN' } } }],
+        },
+        select: { party: { select: { persona: { select: { correo: true } } } } },
+      });
+      const destinatarios = cuentas.map((c) => c.party?.persona?.correo?.trim().toLowerCase()).filter((c): c is string => !!c);
+      return await this.correo.enviar({ ...aviso, destinatarios });
+    } catch (err: any) {
+      this.logger.error(JSON.stringify({ evento: 'correo_aviso_error', origen: aviso.origen, error: err?.message ?? 'DESCONOCIDO' }));
+      return null;
+    }
+  }
+
   private async cargar(fecha: string) {
     const cuentas = await this.prisma.userAccount.findMany({
       where: { activo: true },
