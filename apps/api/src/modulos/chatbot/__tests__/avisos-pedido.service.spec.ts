@@ -1,5 +1,6 @@
 jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { AvisosPedidoService } from '../servicios/avisos-pedido.service';
+import { generarTokenSeguimiento } from '../../pedidos/seguimiento.tokens';
 
 /**
  * Los avisos ya no llaman a Meta: se encolan en el outbox dentro de la transacción del cambio de estado.
@@ -161,7 +162,11 @@ describe('AvisosPedidoService: puntos en los avisos de la carta', () => {
   beforeEach(() => {
     process.env.CARTA_URL_PUBLICA = 'https://carta.test';
     marcas = new Set<string>();
-    parametrosPuntos = { whatsapp_aviso_bienvenida_puntos_activo: 'si', whatsapp_aviso_puntos_ganados_activo: 'si' };
+    parametrosPuntos = {
+      whatsapp_aviso_bienvenida_puntos_activo: 'si',
+      whatsapp_aviso_puntos_ganados_activo: 'si',
+      whatsapp_plantilla_recibido_seguimiento_activa: 'no',
+    };
     prisma = {
       $transaction: jest.fn(async (fn: any) => fn(prisma)),
       pedido: {
@@ -224,6 +229,46 @@ describe('AvisosPedidoService: puntos en los avisos de la carta', () => {
     await servicio.avisar(90, 'RECIBIDO', {}, undefined);
     expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_EFECTIVO');
     expect(prisma.avisoClienteUnico.createMany).not.toHaveBeenCalled();
+  });
+
+  describe('enlace de seguimiento en RECIBIDO', () => {
+    beforeEach(() => {
+      parametrosPuntos.whatsapp_aviso_bienvenida_puntos_activo = 'no';
+    });
+
+    it('efectivo con ventana abierta: el texto libre trae el enlace con código y token firmado', async () => {
+      await servicio.avisar(90, 'RECIBIDO', {}, undefined);
+      const token = generarTokenSeguimiento(BigInt(90));
+      expect(cargaEncolada().textoLibre).toContain(`Sigue tu pedido aquí: https://carta.test/?seguimiento=CP-090&t=${token}`);
+      expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_EFECTIVO');
+    });
+
+    it('efectivo fuera de la ventana: la plantilla nueva solo con el parámetro en «Sí»', async () => {
+      parametrosPuntos.whatsapp_plantilla_recibido_seguimiento_activa = 'si';
+      await servicio.avisar(90, 'RECIBIDO', {}, undefined);
+      const token = generarTokenSeguimiento(BigInt(90));
+      expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_SEGUIMIENTO');
+      expect(cargaEncolada().variablesPlantilla).toEqual(['Lucia', 'CP-090', `https://carta.test/?seguimiento=CP-090&t=${token}`]);
+    });
+
+    it('sin origen público configurado: sin enlace y con la plantilla vigente aunque el parámetro esté en «Sí»', async () => {
+      delete process.env.CARTA_URL_PUBLICA;
+      parametrosPuntos.whatsapp_plantilla_recibido_seguimiento_activa = 'si';
+      await servicio.avisar(90, 'RECIBIDO', {}, undefined);
+      expect(cargaEncolada().textoLibre).not.toContain('Sigue tu pedido');
+      expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_EFECTIVO');
+    });
+
+    it('pago digital: el texto libre trae el enlace y la plantilla de voucher no cambia', async () => {
+      prisma.pedido.findUnique = jest.fn(async () => ({
+        id: BigInt(92), codigo: 'CP-092', cliente_nombre: 'Ana', cliente_telefono: '987654321', modalidad: 'DELIVERY', total: 20,
+        pago_metodo: 'YAPE', pago_preferido: 'YAPE', canal: 'CARTA', party_id: null, cliente_party_id: null, puntos_ganados: 0,
+      }));
+      parametrosPuntos.whatsapp_plantilla_recibido_seguimiento_activa = 'si';
+      await servicio.avisar(92, 'RECIBIDO', {}, undefined);
+      expect(cargaEncolada().textoLibre).toContain('Sigue tu pedido aquí: https://carta.test/?seguimiento=CP-092&t=');
+      expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_DIGITAL');
+    });
   });
 
   it('pedido sin cliente con cuenta o de invitado: sin línea de puntos', async () => {

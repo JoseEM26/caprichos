@@ -6,7 +6,10 @@ const LOCAL = CONFIG_ETA_DEFECTO.local;
 const alNorte = (km: number) => ({ lat: LOCAL.lat + km / 111, lng: LOCAL.lng });
 
 /** Pedidos del mismo repartidor en camino: cada uno con su zona y su punto. */
-function construir(pedidos: Array<{ id: number; zona?: { minutos_min: number; minutos_max: number } | null; km: number | null; unidades?: number }>) {
+function construir(
+  pedidos: Array<{ id: number; zona?: { minutos_min: number; minutos_max: number } | null; km: number | null; unidades?: number }>,
+  salidaActiva = true,
+) {
   const porId = new Map(pedidos.map((p) => [BigInt(p.id), p]));
   const fila = (p: (typeof pedidos)[number]) => {
     const pt = p.km == null ? { lat: null, lng: null } : alNorte(p.km);
@@ -37,7 +40,9 @@ function construir(pedidos: Array<{ id: number; zona?: { minutos_min: number; mi
       ),
     },
     parametro: {
-      findUnique: jest.fn(async ({ where }: any) => (where.clave === 'whatsapp_aviso_salida_activo' ? { valor: 'si' } : { valor: 30 })),
+      findUnique: jest.fn(async ({ where }: any) =>
+        where.clave === 'whatsapp_aviso_salida_activo' ? { valor: salidaActiva ? 'si' : 'no' } : { valor: 30 },
+      ),
       findMany: jest.fn(async () => []),
     },
     mensajeReparto: {
@@ -47,7 +52,7 @@ function construir(pedidos: Array<{ id: number; zona?: { minutos_min: number; mi
   };
   prisma.pedido.update = jest.fn(async () => ({}));
   const outbox: any = { encolar: jest.fn(async () => true), despertar: jest.fn() };
-  return { servicio: new AvisosPedidoService(prisma, outbox), outbox };
+  return { servicio: new AvisosPedidoService(prisma, outbox), outbox, prisma };
 }
 
 const textoDe = (outbox: any) => outbox.encolar.mock.calls[0][0].carga.textoLibre as string;
@@ -71,6 +76,13 @@ describe('Aviso SALIDA con tiempo estimado propio', () => {
     expect(primero).toContain('Tiempo estimado: 15 a 20 minutos');
     expect(segundo).not.toEqual(primero);
     expect(segundo).toContain('Tiempo estimado: 20 a 25 minutos');
+  });
+
+  it('con el aviso SALIDA apagado no envía, pero guarda el tiempo prometido que usa el seguimiento', async () => {
+    const { servicio, outbox, prisma } = construir([{ id: 4, zona: { minutos_min: 25, minutos_max: 30 }, km: 2 }], false);
+    expect(await servicio.avisar(4, 'SALIDA')).toEqual({ estado: 'OMITIDO', motivo: 'DESACTIVADO' });
+    expect(outbox.encolar).not.toHaveBeenCalled();
+    expect(prisma.pedido.update).toHaveBeenCalledWith({ where: { id: BigInt(4) }, data: { eta_min: 25, eta_max: 30 } });
   });
 
   it('sin zona ni coordenadas cae al respaldo tiempo_prometido_min', async () => {

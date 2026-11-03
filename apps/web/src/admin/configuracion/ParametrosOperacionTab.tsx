@@ -304,6 +304,16 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Avisa al cliente cuando se crea su cuenta o cambia su contraseña. Requiere la plantilla aprobada en Meta.',
     tipo: 'sino',
   },
+  whatsapp_aviso_voucher_recordatorio_activo: {
+    nombre: 'Aviso WhatsApp: Recordatorio del voucher',
+    descripcion: 'Recuerda al cliente con pago digital que envíe el voucher si pasan unos minutos sin recibirlo. Es independiente del aviso de pedido recibido.',
+    tipo: 'sino',
+  },
+  whatsapp_plantilla_recibido_seguimiento_activa: {
+    nombre: 'Aviso WhatsApp: Pedido recibido con enlace (plantilla)',
+    descripcion: 'Usa la plantilla con el enlace de seguimiento fuera de la ventana de 24 h. Solo en «Sí» cuando Meta apruebe la plantilla.',
+    tipo: 'sino',
+  },
   whatsapp_aviso_recibido_activo: {
     nombre: 'Aviso WhatsApp: Pedido recibido desde la carta',
     descripcion: 'Avisa al cliente que recibimos su pedido de la carta virtual. Con Yape, Plin o transferencia, avisa que un asesor gestiona el voucher por este chat.',
@@ -321,7 +331,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   },
   chatbot_pago_recordatorio_activo: {
     nombre: 'Recordatorio WhatsApp: Comprobante de pago pendiente',
-    descripcion: 'Envía un recordatorio automático cordial al cliente si pasan los minutos configurados sin enviar la captura del pago digital.',
+    descripcion: 'Envía un recordatorio automático cordial al cliente si pasan los minutos configurados sin enviar la captura del pago digital. Viene apagado.',
     tipo: 'sino',
   },
   chatbot_pago_recordatorio_min: {

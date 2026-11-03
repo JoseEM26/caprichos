@@ -73,6 +73,26 @@ describe('consumo mensual de WhatsApp', () => {
     expect(await svc.revisarAvisos(new Date('2026-11-10T15:00:00Z'))).toEqual(['AVISO']);
   });
 
+  it('todo envío saliente cuenta contra el tope, plantillas incluidas, y dispara el aviso', async () => {
+    const { svc, notificaciones } = montar([...filas(600), ...filas(500, { tipo: 'PLANTILLA', plantilla: 'aviso_pedido' })]);
+    const c = await svc.obtener(ahora);
+    expect(c).toMatchObject({ servicio: 600, plantillas: 500, total: 1100, porcentaje: 110 });
+    expect(await svc.revisarAvisos(ahora)).toEqual(['AVISO', 'TOPE']);
+    expect(notificaciones).toHaveLength(2);
+  });
+
+  it('costo estimado: lo que pasa el tope a S/ 0.10 por defecto, y el precio es editable', async () => {
+    const { svc } = montar([...filas(1100)]);
+    expect(await svc.obtener(ahora)).toMatchObject({ precioMensaje: 0.1, costoEstimadoPen: 10 });
+    await svc.actualizarParametros({ precioMensaje: 0.25 });
+    expect(await svc.obtener(ahora)).toMatchObject({ precioMensaje: 0.25, costoEstimadoPen: 25 });
+  });
+
+  it('bajo el tope el costo es cero', async () => {
+    const { svc } = montar(filas(40));
+    expect(await svc.obtener(ahora)).toMatchObject({ total: 40, costoEstimadoPen: 0 });
+  });
+
   it('el tope y el umbral son configurables', async () => {
     const { svc, notificaciones } = montar(filas(50), { wa_gratis_mes: 100, wa_aviso_pct: 50 });
     expect((await svc.obtener(ahora)).porcentaje).toBe(50);

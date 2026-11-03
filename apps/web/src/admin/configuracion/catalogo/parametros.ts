@@ -36,7 +36,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'demanda', titulo: 'Alta demanda', claves: ['pausa_alta_demanda', 'alta_demanda_min_base'] },
   { id: 'puerta', titulo: 'Entrega fallida y reprogramación', claves: ['reparto_insistencia_min', 'reparto_espera_max_min', 'reprog_recargo_modo', 'reparto_recargo_reprogramacion', 'reprog_respuesta_min', 'reprog_max_intentos'] },
   { id: 'encuesta', titulo: 'Encuesta posventa', claves: ['encuesta_espera_min', 'encuesta_puntaje_queja', 'encuesta_ventana_dias'] },
-  { id: 'avisos', titulo: 'Avisos automáticos por WhatsApp al cliente', claves: ['chatbot_activo', 'whatsapp_aviso_recibido_activo', 'whatsapp_aviso_pago_confirmado_activo', 'whatsapp_aviso_listo_activo', 'whatsapp_aviso_recojo_activo', 'whatsapp_aviso_salida_activo', 'whatsapp_aviso_llegada_activo', 'whatsapp_aviso_espera_activo', 'whatsapp_aviso_entregado_activo', 'whatsapp_aviso_encuesta_activo', 'whatsapp_aviso_bienvenida_puntos_activo', 'whatsapp_aviso_puntos_ganados_activo', 'whatsapp_aviso_cuenta_activo'] },
+  { id: 'avisos', titulo: 'Avisos automáticos por WhatsApp al cliente', claves: ['chatbot_activo', 'whatsapp_aviso_recibido_activo', 'whatsapp_aviso_pago_confirmado_activo', 'whatsapp_aviso_listo_activo', 'whatsapp_aviso_recojo_activo', 'whatsapp_aviso_salida_activo', 'whatsapp_aviso_llegada_activo', 'whatsapp_aviso_espera_activo', 'whatsapp_aviso_entregado_activo', 'whatsapp_aviso_encuesta_activo', 'whatsapp_aviso_voucher_recordatorio_activo', 'whatsapp_plantilla_recibido_seguimiento_activa', 'whatsapp_aviso_bienvenida_puntos_activo', 'whatsapp_aviso_puntos_ganados_activo', 'whatsapp_aviso_cuenta_activo'] },
   { id: 'pago', titulo: 'Pagos digitales por el chat', claves: ['chatbot_pago_recordatorio_activo', 'chatbot_pago_recordatorio_min', 'chatbot_pago_expira_min'] },
   { id: 'ia', titulo: 'Inteligencia artificial', claves: ['chatbot_ia_activo', 'chatbot_ia_tope_mensual_usd', 'chatbot_ia_max_por_hora_telefono', 'ayuda_ia_activo'] },
   { id: 'alertas', titulo: 'Alertas internas y modo asistido', claves: ['alerta_voucher_min_1', 'alerta_voucher_min_2', 'espera_cliente_aviso_min', 'chat_tomado_liberar_min', 'alerta_pedido_sin_confirmar_min', 'asistido_espera_min'] },
@@ -314,6 +314,17 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     grupo: 'avisos', titulo: 'Aviso: pedido recibido desde la carta',
     ...aviso('Con Yape, Plin o transferencia, también avisa que un asesor gestiona el voucher por ese chat y lo recuerda si falta.', 'al enviar un pedido desde la carta virtual', 'En «Sí», quien pide por la carta recibe «Recibimos tu pedido».', ['pedido recibido', 'carta', 'confirmacion de pedido', 'voucher']),
   },
+  whatsapp_aviso_voucher_recordatorio_activo: {
+    grupo: 'avisos', titulo: 'Aviso: recordatorio del voucher',
+    ...aviso('Si el pago digital de un pedido de la carta sigue sin voucher a los pocos minutos, se le recuerda por WhatsApp. Es independiente del aviso de pedido recibido.', 'si no envía el voucher de su pago digital', 'En «Sí», a los 3 minutos sin voucher el cliente recibe el recordatorio.', ['voucher', 'recordatorio', 'comprobante', 'yape', 'plin']),
+  },
+  whatsapp_plantilla_recibido_seguimiento_activa: {
+    grupo: 'avisos', titulo: 'Usar la plantilla de pedido recibido con enlace',
+    descripcion: 'Cuando el cliente no está en la ventana de 24 h, el aviso de pedido recibido en efectivo usa la plantilla con el enlace de seguimiento. Dejarlo en «No» usa la plantilla anterior, sin enlace. Ponerlo en «Sí» solo después de que Meta apruebe la plantilla «caprichos_pedido_recibido_seguimiento».',
+    ejemplo: 'Con «No», un pedido en efectivo fuera de la ventana de 24 h recibe el mensaje de siempre.',
+    efecto: 'Con la ventana abierta el enlace siempre sale en el texto. Este interruptor solo cambia el envío fuera de la ventana de 24 h.',
+    porDefecto: 'No', rango: SI_NO, palabras: ['plantilla', 'enlace', 'seguimiento', 'pedido recibido', 'meta'], peligro: 'medio',
+  },
   whatsapp_aviso_bienvenida_puntos_activo: {
     grupo: 'avisos', titulo: 'Aviso: bienvenida a los puntos (primer pedido)',
     ...aviso('Solo la primera vez que un celular hace un pedido de la carta, el aviso de «pedido recibido» agrega que ya suma puntos y el enlace para verlos. Requiere la plantilla de Meta aprobada (ver docs/operacion/puntos-y-avisos-carta.md).', 'en el primer pedido de la carta de cada celular', 'En «Sí», ese primer aviso trae la línea de puntos y el enlace a la carta.', ['bienvenida', 'puntos', 'primer pedido', 'celular']),
@@ -361,9 +372,9 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
   chatbot_pago_recordatorio_activo: {
     grupo: 'pago', titulo: 'Recordatorio de comprobante de pago pendiente',
     descripcion: 'Envía un recordatorio amable al cliente que eligió pago digital y no ha mandado la captura del pago.',
-    ejemplo: 'En «Sí», a los 10 minutos sin voucher el cliente recibe el recordatorio.',
+    ejemplo: 'En «Sí», a los 10 minutos sin voucher el cliente recibe el recordatorio. Viene en «No».',
     efecto: 'En «No» el cliente no recibe recordatorios; Caja puede quedar con pedidos sin voucher sin que nadie lo empuje.',
-    porDefecto: 'Sí', rango: SI_NO, palabras: ['recordatorio', 'voucher', 'comprobante', 'captura de pago', 'yape', 'plin', 'pago pendiente'], peligro: 'medio',
+    porDefecto: 'No', rango: SI_NO, palabras: ['recordatorio', 'voucher', 'comprobante', 'captura de pago', 'yape', 'plin', 'pago pendiente'], peligro: 'medio',
   },
   chatbot_pago_recordatorio_min: {
     grupo: 'pago', titulo: 'Minutos para el recordatorio de pago digital',
