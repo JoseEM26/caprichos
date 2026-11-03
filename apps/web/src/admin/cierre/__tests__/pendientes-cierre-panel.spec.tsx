@@ -29,12 +29,14 @@ function Host({
   errorLista = false,
   alReintentar = vi.fn(),
   foco = null,
+  fechaCaja,
 }: {
   esAdmin?: boolean;
   inicial?: PendienteCobro[];
   errorLista?: boolean;
   alReintentar?: () => void;
   foco?: FocoPendientes | null;
+  fechaCaja?: string;
 }) {
   const [lista, setLista] = useState<PendienteCobro[]>(inicial);
   return (
@@ -46,6 +48,7 @@ function Host({
       errorLista={errorLista}
       alReintentar={alReintentar}
       foco={foco}
+      fechaCaja={fechaCaja}
     />
   );
 }
@@ -133,6 +136,23 @@ describe('Cierre: panel de pedidos pendientes escalable', () => {
     render(<Host inicial={[pendiente(1, { fecha: hace2Dias() }), pendiente(2)]} />);
     expect(screen.getAllByText(/día anterior/)).toHaveLength(1);
     expect(screen.getByText(/día anterior/)).toHaveClass('pdc-antiguo');
+  });
+
+  it('separa los pedidos de otros días de los de la caja que se cierra y lo dice en el resumen', () => {
+    // Caja de un día fijo: el de hoy (ahora) es «de otro día» y el de hace 2 días también
+    const { unmount } = render(<Host fechaCaja="2099-01-01" inicial={[pendiente(1), pendiente(2, { fecha: hace2Dias() })]} />);
+    expect(screen.getByText(/de días anteriores/)).toHaveTextContent('2 de días anteriores');
+    unmount();
+
+    // Caja de hoy: solo el de hace 2 días es de otro día; el resumen lo cuenta y la fila muestra su fecha
+    render(<Host inicial={[pendiente(1), pendiente(2, { fecha: hace2Dias() })]} />);
+    expect(screen.getByText(/de días anteriores/)).toHaveTextContent('1 de días anteriores');
+    expect(screen.getAllByText(/día anterior/)).toHaveLength(1);
+  });
+
+  it('sin pedidos de otros días no muestra el resumen de días anteriores', () => {
+    render(<Host inicial={[pendiente(1)]} />);
+    expect(screen.queryByText(/de días anteriores/)).not.toBeInTheDocument();
   });
 
   it('cada pedido es una tarjeta con sus acciones y el panel no usa clases de la precuenta', () => {

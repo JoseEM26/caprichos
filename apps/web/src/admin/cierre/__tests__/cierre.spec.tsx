@@ -237,6 +237,8 @@ describe('Ola F5: Caja y Cierres', () => {
     vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValueOnce({
       cajaId: 10,
       fecha: `${hoy}T00:00:00.000Z`,
+      cobrados: [],
+      movimientos: [],
       apertura: 50,
       efectivoEsperado: 355,
       medios: {
@@ -289,6 +291,8 @@ describe('Ola F5: Caja y Cierres', () => {
     vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValue({
       cajaId: 7,
       fecha: '2026-10-22T00:00:00.000Z',
+      cobrados: [],
+      movimientos: [],
       apertura: 10,
       efectivoEsperado: 170,
       medios: { efectivo: 170, yape: 0, plin: 0, transferencia: 0, tarjeta: 0 },

@@ -34,6 +34,8 @@ import {
   efectivoDelRepartidor,
   enPesos,
   esCentimosValidos,
+  mapearCobrosCaja,
+  mapearMovimientosCaja,
   pedidosRepartoDelDia,
 } from '../caja/caja.calculo';
 import { ArqueoDto } from './dto/arqueo.dto';
@@ -485,8 +487,8 @@ export class CierreService {
   }
 
   /**
-   * Consulta los montos esperados por el sistema en vivo antes de cerrar.
-   * Solo el rol ADMIN puede acceder a este endpoint (cierre ciego para cajeros).
+   * Montos esperados por el sistema y el turno (cobros y movimientos) de la caja ABIERTA, sea del día que sea.
+   * Solo ADMIN o con PIN de supervisora (cierre ciego para cajeros): sin eso no sale ningún monto.
    */
   async obtenerEsperado(usuario: UsuarioAutenticado, pinSupervisor?: string, ip?: string) {
     const caja = await this.obtenerCajaAbierta();
@@ -495,10 +497,21 @@ export class CierreService {
       await this.verificarPinSupervisor(pinSupervisor, usuario?.partyId, ip, caja.id);
     }
     const montos = await this.calcularMontosSistema(caja.id);
+    // Mismos cobros y movimientos que la caja de hoy, pero de la caja que se cierra: totales y listas cuadran
+    const cobros = await this.prisma.cobro.findMany({
+      where: { caja_id: caja.id },
+      include: { pagos: true, pedido: { select: { codigo: true, cliente_nombre: true } } },
+    });
+    const movimientos = await this.prisma.movimientoCaja.findMany({
+      where: { caja_id: caja.id },
+      orderBy: { id: 'asc' },
+    });
 
     return {
       cajaId: Number(caja.id),
       fecha: caja.fecha,
+      cobrados: mapearCobrosCaja(cobros),
+      movimientos: mapearMovimientosCaja(movimientos),
       apertura: Number(caja.apertura),
       efectivoEsperado: montos.esperadoEfectivo,
       medios: {

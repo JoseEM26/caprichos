@@ -19,6 +19,8 @@
 
 .vm-meta { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; font-size: 13px; color: var(--cp-soft, #2C4C5D); }
 .vm-estado { padding: 2px 10px; border-radius: 999px; background: var(--cp-white, #FFF); border: 1px solid var(--cp-green, #2F7A45); color: var(--cp-green, #2F7A45); font-weight: 800; font-size: 12px; }
+.vm-estado-anterior { border-color: var(--cp-rust, #B2500F); color: var(--cp-rust, #B2500F); }
+.vm-aviso-dia { background: #FFF1E6; border: 1px solid var(--cp-rust, #B2500F); border-radius: 12px; padding: 8px 12px; font-size: 13px; font-weight: 700; color: var(--cp-rust, #B2500F); }
 
 .vm-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .vm-tarjeta { background: var(--cp-white, #FFF); border: 1px solid var(--cp-sand, #EDE1D1); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }

@@ -16,7 +16,10 @@ export interface ResumenAdmin {
 }
 
 interface Props {
+  /** Fecha AAAA-MM-DD de la caja abierta que se cierra (no necesariamente la de hoy) */
   fecha: string;
+  /** La caja abierta es de un día anterior al de hoy: se avisa y no se mezcla con la de hoy */
+  diaAnterior?: boolean;
   cajero: string;
   /** Solo la supervisora ve lo esperado (cierre ciego): para el cajero va null */
   resumen: ResumenAdmin | null;
@@ -31,6 +34,9 @@ interface Props {
   onContinuar: () => void;
   onVolver: () => void;
 }
+
+/** AAAA-MM-DD → dd/mm/aaaa */
+const fechaDmy = (f: string) => f.split('-').reverse().join('/');
 
 const Tarjeta = ({ t, v, ayuda, fuerte }: { t: string; v: number; ayuda?: string; fuerte?: boolean }) => (
   <div className={`vm-tarjeta${fuerte ? ' vm-tarjeta-fuerte' : ''}`} data-testid="vm-tarjeta">
@@ -56,10 +62,17 @@ export function VerificarMovimientos(p: Props) {
   return (
     <>
       <div className="vm-cuerpo">
+        {p.diaAnterior && (
+          <div className="vm-aviso-dia" role="alert">
+            Esta caja es del {fechaDmy(p.fecha)} y sigue abierta. Ciérrala antes de trabajar con la de hoy.
+          </div>
+        )}
         <div className="vm-meta">
           <span>Turno del <b>{p.fecha}</b></span>
           <span>Cajero: <b>{p.cajero}</b></span>
-          <span className="vm-estado">Caja abierta</span>
+          <span className={p.diaAnterior ? 'vm-estado vm-estado-anterior' : 'vm-estado'}>
+            {p.diaAnterior ? 'Caja abierta (día anterior)' : 'Caja abierta'}
+          </span>
         </div>
 
         <div className="vm-resumen">
