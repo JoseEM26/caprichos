@@ -9,9 +9,11 @@ import { SunatEmisor } from './sunat/sunat.emisor';
 import { siguienteCorrelativo } from './secuencia';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { LocalModule } from '../local/local.module';
+import { CorreoModule } from '../correo/correo.module';
+import { ComprobantesCertificadoAvisoService } from './comprobantes-certificado-aviso.service';
 
 @Module({
-  imports: [LocalModule],
+  imports: [LocalModule, CorreoModule],
   controllers: [ComprobantesController],
   providers: [
     ComprobantesService,
@@ -19,6 +21,7 @@ import { LocalModule } from '../local/local.module';
     ComprobantesSunatService,
     ComprobantesSaludService,
     ComprobanteDefectoService,
+    ComprobantesCertificadoAvisoService,
     {
       provide: SunatEmisor,
       inject: [PrismaService],
