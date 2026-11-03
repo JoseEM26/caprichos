@@ -56,7 +56,7 @@ export class CuentaClienteController {
     return { cliente };
   }
 
-  /** Envía por WhatsApp el código de 6 dígitos que pide crear la cuenta. Responde lo mismo, salvo si ya tiene cuenta. */
+  /** Envía por WhatsApp el código de 6 dígitos que pide crear la cuenta. Errores: CUENTA_EXISTENTE (409) y DEMASIADOS_CODIGOS (429). */
   @Post('registro/codigo')
   @HttpCode(200)
   async solicitarCodigoRegistro(@Body('telefono') telefono: string, @Req() req: Request) {

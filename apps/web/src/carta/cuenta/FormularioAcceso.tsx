@@ -138,6 +138,8 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
   const [codigo, setCodigo] = useState('');
   const [dni, setDni] = useState('');
   const [mensaje, setMensaje] = useState('');
+  /** El celular ya tiene cuenta (409 CUENTA_EXISTENTE): se ofrecen «Ingresar» y «Olvidé mi contraseña». */
+  const [cuentaExistente, setCuentaExistente] = useState(false);
   const [aviso, setAviso] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [espera, setEspera] = useState(0);
@@ -167,6 +169,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
     setModo(m);
     setPaso(1);
     setMensaje('');
+    setCuentaExistente(false);
     setCodigo('');
     if (m !== 'in') setAviso('');
   };
@@ -174,11 +177,14 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
   const correr = async (fn: () => Promise<void>, defecto: string) => {
     setEnviando(true);
     setMensaje('');
+    setCuentaExistente(false);
     try {
       await fn();
     } catch (err) {
+      const codigo = codigoDe(err);
+      setCuentaExistente(codigo === 'CUENTA_EXISTENTE');
       setMensaje(
-        codigoDe(err) === 'TELEFONO_REGISTRADO'
+        codigo === 'TELEFONO_REGISTRADO'
           ? 'Ese celular ya tiene cuenta: ingresa o recupera tu contraseña.'
           : mensajeDe(err, defecto),
       );
@@ -373,6 +379,12 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
 
       {mensaje && (
         <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>{mensaje}</div>
+      )}
+      {paso1 && cuentaExistente && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" onClick={() => ir('in')} style={{ ...botonPrincipal, flex: 1 }}>Ingresar</button>
+          <button type="button" onClick={() => ir('rec1')} style={{ ...botonSecundario, flex: 1 }}>Olvidé mi contraseña</button>
+        </div>
       )}
 
       <div style={{ display: 'flex', gap: 8 }}>

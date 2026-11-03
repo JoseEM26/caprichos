@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt, timingSafeEqual } from 'crypto';
@@ -19,6 +19,10 @@ export const RESPUESTA_CODIGO_REGISTRO = {
   ok: true,
   mensaje: 'Te enviamos un código por WhatsApp. Vence en 10 minutos.',
 };
+
+const MENSAJE_LIMITE_CELULAR = 'Pediste varios códigos seguidos. Espera una hora e inténtalo de nuevo.';
+const MENSAJE_LIMITE_IP = 'Hay demasiados intentos desde tu conexión. Espera una hora e inténtalo de nuevo.';
+const demasiadosCodigos = (mensaje: string) => new HttpException({ codigo: 'DEMASIADOS_CODIGOS', mensaje }, HttpStatus.TOO_MANY_REQUESTS);
 
 /**
  * Código de 6 dígitos por WhatsApp que demuestra que la persona tiene el celular antes de crear la contraseña.
@@ -49,8 +53,13 @@ export class CodigoRegistroService {
   }
 
   /**
-   * Envía el código. Responde SIEMPRE lo mismo: si el celular ya tiene cuenta con contraseña no envía nada
-   * (así no se revela si el celular existe); quien tiene cuenta usa «Ingresar» o «¿Olvidaste tu contraseña?».
+   * Envía el código por WhatsApp. Errores controlados que la web muestra tal cual:
+   *  - CUENTA_EXISTENTE (409): el celular ya tiene cuenta con contraseña; no se envía nada.
+   *  - DEMASIADOS_CODIGOS (429): más de REGISTRO_MAX_SOLICITUDES_HORA por celular, o más de
+   *    REGISTRO_MAX_SOLICITUDES_IP_HORA por IP en una hora; tampoco se envía nada.
+   * Contrapartida de seguridad (decisión del dueño): con CUENTA_EXISTENTE se puede saber si un celular tiene cuenta.
+   * Se acepta porque el cliente necesita saber qué hacer; se mitiga con los límites por celular e IP.
+   * recuperar-clave.service NO cambia: sigue respondiendo igual exista o no la cuenta.
    */
   async solicitar(telefono: string, ip?: string): Promise<typeof RESPUESTA_CODIGO_REGISTRO> {
     const tel = this.celular(telefono);
@@ -66,16 +75,21 @@ export class CodigoRegistroService {
       const claveSol = `cliente:reg:sol:${tel}`;
       const n = await redis.incr(claveSol);
       if (n === 1) await redis.expire(claveSol, 3600);
-      if (n > REGISTRO_MAX_SOLICITUDES_HORA) return RESPUESTA_CODIGO_REGISTRO;
+      if (n > REGISTRO_MAX_SOLICITUDES_HORA) throw demasiadosCodigos(MENSAJE_LIMITE_CELULAR);
       if (ip) {
         const claveIp = `cliente:reg:ip:${ip}`;
         const m = await redis.incr(claveIp);
         if (m === 1) await redis.expire(claveIp, 3600);
-        if (m > REGISTRO_MAX_SOLICITUDES_IP_HORA) return RESPUESTA_CODIGO_REGISTRO;
+        if (m > REGISTRO_MAX_SOLICITUDES_IP_HORA) throw demasiadosCodigos(MENSAJE_LIMITE_IP);
       }
 
       const cuenta = await this.prisma.customerAccount.findFirst({ where: { telefono: tel, activo: true }, select: { hash: true } });
-      if (cuenta?.hash) return RESPUESTA_CODIGO_REGISTRO;
+      if (cuenta?.hash) {
+        throw new ConflictException({
+          codigo: 'CUENTA_EXISTENTE',
+          mensaje: 'Este celular ya tiene cuenta. Ingresa con tu contraseña o usa «¿Olvidaste tu contraseña?».',
+        });
+      }
 
       const outbox = this.outbox();
       if (!outbox) return RESPUESTA_CODIGO_REGISTRO;
@@ -97,8 +111,9 @@ export class CodigoRegistroService {
         },
       });
       outbox.despertar();
-    } catch {
-      // Un fallo interno tampoco cambia la respuesta
+    } catch (err) {
+      // Los errores controlados llegan a la web; un fallo interno no cambia la respuesta
+      if (err instanceof HttpException) throw err;
     }
     return RESPUESTA_CODIGO_REGISTRO;
   }
