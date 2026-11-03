@@ -93,7 +93,7 @@ export const CONSERVAR: string[] = [
   'regla_acumulacion', 'reemplazo_dia', 'resena_google', 'reserva', 'reserva_mesa', 'ruta_reparto', 'respuesta_rapida', 'rol', 'rol_permiso',
   'sabor', 'saliente_whatsapp', 'secuencia_comprobante', 'secuencia_pedido', 'solicitud_cambio', 'comprobante_archivo', 'sunat_resumen',
   'solicitud_reserva', 'stock', 'supervisor_secreto', 'supplier_detail', 'sys_control', 'traslado',
-  'user_account', 'user_account_rol', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje',
+  'user_account', 'user_account_rol', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje', 'correo_envio',
   'zona_reparto',
 ];
 

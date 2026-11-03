@@ -1217,7 +1217,7 @@ export class EjecutorConversacionService {
         textoNorm.includes('hablar con persona');
 
       if (esCarta) {
-        const urlCarta = contexto.cartaUrlPublica || 'https://caprichos.pe/carta';
+        const urlCarta = contexto.cartaUrlPublica || 'https://caprichos.pe';
         const textoCarta = `Puedes revisar nuestra carta completa aquí:\n👉 ${urlCarta}\n\nSeguimos revisando tu pago en Caja.`;
         const botones = [
           { id: 'btn_esp_esperar', titulo: 'Seguir esperando' },

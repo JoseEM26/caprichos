@@ -995,7 +995,7 @@ export function transicionarEstado(
 
   // 5.b Intención: "¿Cuántos puntos tengo?" (solo el saldo del propio número de WhatsApp; nunca el de otro)
   if (idInteractivo === 'mispuntos' || coincideAlgunaPalabra(texto, PALABRAS_MIS_PUNTOS)) {
-    const url = contexto.cartaUrlPublica || 'https://caprichos.pe/carta';
+    const url = contexto.cartaUrlPublica || 'https://caprichos.pe';
     const cuenta = contexto.puntos?.cuentaTelefono;
     const textoPuntos = !contexto.puntos
       ? TEXTOS_BOT.puntosNoDisponible()
@@ -1930,7 +1930,7 @@ function transicionarSoloMenus(
 ): ResultadoTransicion {
   const texto = entrada.texto;
   const id = entrada.id ?? '';
-  const url = contexto.cartaUrlPublica || 'https://caprichos.pe/carta';
+  const url = contexto.cartaUrlPublica || 'https://caprichos.pe';
   const enPersona = flujo.estado === 'ATENCION_PERSONA';
   const esId = (...ids: string[]) => ids.includes(id);
   const hay = (palabras: string[]) => coincideAlgunaPalabra(texto, palabras);
