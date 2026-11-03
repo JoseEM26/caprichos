@@ -128,6 +128,14 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     texto: '¡Hola {{1}}! 😊 Recibimos tu pedido {{2}}, ¡gracias por tu compra! Ya está en proceso. 🙏',
     descripcion: 'Aviso al cliente al crear un pedido de la carta pagado en efectivo (ventana cerrada).',
   },
+  CARTA_RECIBIDO_SEGUIMIENTO: {
+    nombre: 'caprichos_pedido_recibido_seguimiento',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente', 'codigo_pedido', 'enlace_seguimiento'],
+    texto: '¡Hola {{1}}! 😊 Recibimos tu pedido {{2}}, ¡gracias por tu compra! Ya está en proceso. Sigue tu pedido aquí: {{3}}. ¡Gracias por preferir Caprichos! 💛',
+    descripcion: 'Aviso al cliente al crear un pedido de la carta pagado en efectivo, con el enlace de seguimiento. Sustituye a caprichos_pedido_recibido_efectivo solo con el parámetro whatsapp_plantilla_recibido_seguimiento_activa en «Sí» (ventana cerrada). Pendiente de aprobar en Meta (UTILITY); ver docs/operacion/plantilla-recibido-seguimiento.md.',
+  },
   CARTA_RECIBIDO_BIENVENIDA_PUNTOS: {
     nombre: 'caprichos_pedido_recibido_bienvenida_puntos',
     categoria: 'UTILITY',

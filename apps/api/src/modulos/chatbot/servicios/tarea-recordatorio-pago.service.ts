@@ -35,7 +35,7 @@ export class TareaRecordatorioPagoService {
 
   /**
    * Carga los parámetros operativos desde la base de datos (tabla parametro).
-   * - chatbot_pago_recordatorio_activo: 'si' / 'no' (por defecto 'si')
+   * - chatbot_pago_recordatorio_activo: 'si' / 'no' (por defecto 'no': apagado si no existe)
    * - chatbot_pago_recordatorio_min: número de minutos (por defecto 10)
    * - chatbot_pago_expira_min: número de minutos (por defecto 30; 0 apaga aviso)
    */
@@ -59,7 +59,7 @@ export class TareaRecordatorioPagoService {
       const valActivo = mapa.get('chatbot_pago_recordatorio_activo');
       const recordatorioActivo =
         valActivo === undefined || valActivo === null
-          ? true
+          ? false
           : String(valActivo).toLowerCase().trim() === 'si' ||
             valActivo === true ||
             String(valActivo) === 'true';
@@ -78,7 +78,7 @@ export class TareaRecordatorioPagoService {
     } catch (err: any) {
       this.logger.warn(`Error al leer parámetros de pago: ${err.message}. Usando valores por defecto.`);
       return {
-        recordatorioActivo: true,
+        recordatorioActivo: false,
         recordatorioMin: 10,
         expiraMin: 30,
       };
