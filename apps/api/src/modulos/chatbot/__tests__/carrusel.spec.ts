@@ -1,8 +1,5 @@
 jest.mock('@nestjs/jwt', () => ({ JwtService: jest.fn(), JwtModule: { registerAsync: jest.fn().mockReturnValue({ module: class {} }) } }));
 jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
-import { transicionarEstado } from '../conversacion/maquina-estados';
-import { normalizarEntrada } from '../conversacion/normalizador-entrada.util';
-import { ContextoConversacion } from '../conversacion/tipos-conversacion';
 import { OutboxWhatsappService } from '../servicios/outbox-whatsapp.service';
 import {
   carruselEnviable,
@@ -153,131 +150,6 @@ describe('ranking por ventas', () => {
   });
 });
 
-describe('flujo del bot: carrusel de productos y promociones', () => {
-  const productos = (n: number, extra: any = {}) =>
-    Array.from({ length: n }, (_, i) => ({ id: String(i + 1), nombre: `Frappe ${i + 1}`, precio: 10, disponible: true, fotoUrl: null, tamanos: [], ...extra }));
-  const ctx = (cats: any[], extra: Partial<ContextoConversacion> = {}): ContextoConversacion => ({
-    cartaUrlPublica: BASE,
-    datosLocal: { abierta: true, abre: '12:00', cierra: '23:00', direccion: 'x', enlaceMapa: '', telefono: '1' } as any,
-    categoriasCarta: cats,
-    ofertas: [],
-    ...extra,
-  });
-  const aCategorias = (c: ContextoConversacion) => {
-    let r = transicionarEstado(null, normalizarEntrada({ listRowId: 'pedir' }), c);
-    r = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_mod_recojer' }), c);
-    return r;
-  };
-  const elegir = (c: ContextoConversacion, id = 'ped_cat_c1') => {
-    const r = aCategorias(c);
-    return transicionarEstado(r.nuevoFlujo, normalizarEntrada({ listRowId: id }), c);
-  };
-
-  it('primer envío = solo los 10 más vendidos + botones «Ver más» / «Ver lista completa»', () => {
-    const ventas: Record<string, number> = { '25': 100, '24': 90 };
-    const r = elegir(ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(25) }], { ventasProductos: ventas }));
-    const [a, b, ...resto] = r.acciones as any[];
-    expect(resto).toHaveLength(0);
-    expect(a.tipo).toBe('enviarCarrusel');
-    expect(a.carga.cuerpo).toContain('favoritos');
-    expect(a.carga.cuerpo).toContain('de 25');
-    expect(a.carga.tarjetas.map((t: any) => t.boton.id).slice(0, 3)).toEqual(['ped_prod_25', 'ped_prod_24', 'ped_prod_1']);
-    expect(a.carga.tarjetas).toHaveLength(10);
-    expect(a.carga.respaldo.filas.length).toBeGreaterThan(0);
-    expect(b.tipo).toBe('enviarBotones');
-    expect(b.botones.map((x: any) => x.id)).toEqual(['ped_prod_mas_2', 'ped_prod_lista', 'btn_categorias']);
-    expect(a.carga.tarjetas[0].imagenUrl).toBe('https://caprichos.pe/carta/productos/25/imagen-wa.jpg?v=F');
-  });
-  it('«Ver más» trae la siguiente página de 10, luego la última; con 1 sobrante va como lista', () => {
-    const c = ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(25) }]);
-    const r = elegir(c);
-    const p2 = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_mas_2' }), c);
-    const [a2, b2] = p2.acciones as any[];
-    expect(a2.tipo).toBe('enviarCarrusel');
-    expect(a2.carga.cuerpo).toContain('Más opciones');
-    expect(a2.carga.tarjetas.map((t: any) => t.boton.id)[0]).toBe('ped_prod_11');
-    expect(b2.botones[0].id).toBe('ped_prod_mas_3');
-    const p3 = transicionarEstado(p2.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_mas_3' }), c);
-    expect(p3.acciones.map((x: any) => x.tipo)).toEqual(['enviarCarrusel']);
-    expect((p3.acciones[0] as any).carga.tarjetas).toHaveLength(5);
-    const c11 = ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(11) }]);
-    const q = transicionarEstado(elegir(c11).nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_mas_2' }), c11);
-    expect(q.acciones.map((x: any) => x.tipo)).toEqual(['enviarLista']);
-    expect((q.acciones[0] as any).filas[0].id).toBe('ped_prod_11');
-  });
-  it('hasta 10 productos: solo el carrusel, sin botones de «Ver más»', () => {
-    const r = elegir(ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(10) }]));
-    expect(r.acciones.map((x: any) => x.tipo)).toEqual(['enviarCarrusel']);
-  });
-  it('«Desde S/ X» si tiene tamaños', () => {
-    const ps = productos(2, { tamanos: [{ nombre: 'M', precio: 12 }, { nombre: 'G', precio: 15 }] });
-    const r = elegir(ctx([{ id: 'c1', nombre: 'Frappes', productos: ps }]));
-    expect((r.acciones[0] as any).carga.tarjetas[0].cuerpo).toContain('Desde S/ 12.00');
-  });
-  it('categoría con 1 solo producto: lista directa, sin carrusel', () => {
-    const r = elegir(ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(1) }]));
-    expect(r.acciones.map((a: any) => a.tipo)).toEqual(['enviarLista']);
-  });
-  it('ignora agotados al armar el carrusel', () => {
-    const ps = productos(3);
-    ps[0].disponible = false;
-    const r = elegir(ctx([{ id: 'c1', nombre: 'Frappes', productos: ps }]));
-    expect((r.acciones[0] as any).carga.tarjetas).toHaveLength(2);
-  });
-  it('«Ver lista completa» muestra la lista; «Pedir este» entra a la configuración del producto', () => {
-    const c = ctx([{ id: 'c1', nombre: 'Frappes', productos: productos(25) }]);
-    const r = elegir(c);
-    const lista = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_lista' }), c);
-    expect(lista.acciones[0].tipo).toBe('enviarLista');
-    const pedir = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_3' }), c);
-    expect(pedir.nuevoFlujo?.pedido?.itemEnConfiguracion?.productoId).toBe('3');
-  });
-  it('promociones: carrusel con 2 o más vigentes de producto, ordenadas por ventas; con 1, botones como hoy', () => {
-    const cats = [{ id: 'c1', nombre: 'Frappes', productos: productos(3) }];
-    const of = (id: string, p: string) => ({ nombre: `Promo ${id}`, vigenteAhora: true, alcanceProductoId: p, imagenUrl: null });
-    const c = ctx(cats, { ofertas: [of('a', '1'), of('b', '2')], ventasProductos: { '2': 5 } });
-    const r = transicionarEstado(null, normalizarEntrada({ listRowId: 'menu_promos' }), c);
-    const acc = r.acciones as any[];
-    if (acc[0].tipo === 'enviarCarrusel') {
-      expect(acc[0].carga.tarjetas.map((t: any) => t.boton.id)).toEqual(['ped_prod_2', 'ped_prod_1']);
-      expect(acc[1].soloSiCarruselSalio).toBe(true);
-    } else {
-      throw new Error('se esperaba carrusel; id del menú de promos distinto: ' + JSON.stringify(acc[0]));
-    }
-    const uno = transicionarEstado(null, normalizarEntrada({ listRowId: 'menu_promos' }), ctx(cats, { ofertas: [of('a', '1')] }));
-    expect(uno.acciones[0].tipo).toBe('enviarBotones');
-  });
-});
-
-describe('promociones con más de 10: «Ver más»', () => {
-  const cats = (n: number) => [{ id: 'c1', nombre: 'Frappes', productos: Array.from({ length: n }, (_, i) => ({ id: String(i + 1), nombre: `Frappe ${i + 1}`, precio: 10, disponible: true, tamanos: [] })) }];
-  const ctxP = (n: number): ContextoConversacion => ({
-    cartaUrlPublica: BASE,
-    datosLocal: { abierta: true, abre: '12:00', cierra: '23:00', direccion: 'x', enlaceMapa: '', telefono: '1' } as any,
-    categoriasCarta: cats(n),
-    ofertas: Array.from({ length: n }, (_, i) => ({ nombre: `Promo ${i + 1}`, vigenteAhora: true, alcanceProductoId: String(i + 1), imagenUrl: null })),
-  } as any);
-  it('11 promos: carrusel de 10 + botones «Ver más»; la página 2 con 1 va como lista', () => {
-    const c = ctxP(11);
-    const r = transicionarEstado(null, normalizarEntrada({ listRowId: 'menu_promos' }), c);
-    const [a, b] = r.acciones as any[];
-    expect(a.tipo).toBe('enviarCarrusel');
-    expect(a.carga.tarjetas).toHaveLength(10);
-    expect(b.tipo).toBe('enviarBotones');
-    expect(b.botones.map((x: any) => x.id)).toEqual(['promo_mas_2', 'btn_carta', 'btn_menu']);
-    const p2 = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'promo_mas_2' }), c);
-    expect(p2.acciones.map((x: any) => x.tipo)).toEqual(['enviarLista', 'enviarBotones']);
-    expect((p2.acciones[0] as any).filas[0].id).toBe('ped_prod_11');
-  });
-  it('25 promos: la página 2 es otro carrusel de 10 con su «Ver más»', () => {
-    const c = ctxP(25);
-    const p2 = transicionarEstado(null, normalizarEntrada({ buttonPayload: 'promo_mas_2' }), c);
-    const [a, b] = p2.acciones as any[];
-    expect(a.carga.tarjetas).toHaveLength(10);
-    expect(b.botones[0].id).toBe('promo_mas_3');
-  });
-});
-
 describe('respaldo a lista y outbox', () => {
   const respaldo = { texto: 'Elige', botonTexto: 'Ver productos', filas: [{ id: 'ped_prod_1', titulo: 'Prod 1' }] };
   it('si Meta rechaza el carrusel, reenvía como lista', async () => {
@@ -326,31 +198,6 @@ describe('respaldo a lista y outbox', () => {
     const chat = prisma.mensajeChat.create.mock.calls.at(-1)[0].data;
     expect(chat.contenido.texto).toBe('Carrusel: Prod 1, Prod 2');
     expect(chat.tipo).toBe('BOTON');
-  });
-});
-
-describe('un solo camino para productos de una categoría', () => {
-  const productos = Array.from({ length: 12 }, (_, i) => ({ id: String(i + 1), nombre: `Frappe ${i + 1}`, precio: 10, disponible: true, fotoUrl: null, tamanos: [] }));
-  const c: ContextoConversacion = {
-    cartaUrlPublica: BASE,
-    datosLocal: { abierta: true, abre: '12:00', cierra: '23:00', direccion: 'x', enlaceMapa: '', telefono: '1' } as any,
-    categoriasCarta: [{ id: 'c1', nombre: 'Frappes', productos }],
-    ofertas: [],
-  };
-  it('tras la referencia de entrega, elegir categoría envía el carrusel', () => {
-    const flujo: any = { version: 2, repreguntasFallidas: 0, estado: 'PEDIDO_REFERENCIA', pedido: { estadoInterno: 'PEDIDO_REFERENCIA', items: [], modalidad: 'DELIVERY', entrega: { modalidad: 'DELIVERY' } } };
-    const cats = transicionarEstado(flujo, normalizarEntrada({ text: 'frente al parque' } as any), c);
-    const r = transicionarEstado(cats.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_cat_c1' }), c);
-    expect(r.acciones.map((a: any) => a.tipo)).toEqual(['enviarCarrusel', 'enviarBotones']);
-  });
-  it('«Ver la carta» → categoría usa el mismo carrusel, y «Ver más» sigue funcionando', () => {
-    const r = transicionarEstado({ version: 2, repreguntasFallidas: 0, estado: 'CARTA_CATEGORIAS' } as any, normalizarEntrada({ listRowId: 'cat_c1' }), c);
-    expect(r.acciones.map((a: any) => a.tipo)).toEqual(['enviarCarrusel', 'enviarBotones']);
-    expect(r.nuevoEstado).toBe('CARTA_PRODUCTOS');
-    expect(r.nuevoFlujo.pedido ?? null).toBeNull();
-    const mas = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_prod_mas_2' }), c);
-    expect(mas.acciones.map((a: any) => a.tipo)).toEqual(['enviarCarrusel']);
-    expect((mas.acciones[0] as any).carga.tarjetas[0].boton.id).toBe('ped_prod_11');
   });
 });
 

@@ -16,9 +16,7 @@ import {
   InfoProductoCierre,
 } from '../cierre-comercial.util';
 import { redondearMonto } from '@caprichos/compartido';
-import { transicionarEstado } from '../maquina-estados';
-import { normalizarEntrada } from '../normalizador-entrada.util';
-import { ContextoConversacion, FlujoConversacion } from '../tipos-conversacion';
+import { ContextoConversacion } from '../tipos-conversacion';
 
 describe('Cierre Comercial Determinista y Promociones (cta-bot)', () => {
   const productoSandwich: InfoProductoCierre = {
@@ -279,30 +277,6 @@ describe('Cierre Comercial Determinista y Promociones (cta-bot)', () => {
   // ---------------------------------------------------------------------------
   // 3. Botón Pedir inicia el flujo directamente en ese producto
   // ---------------------------------------------------------------------------
-  describe('3. Botón Pedir inicia el flujo en ese producto con su tamaño', () => {
-    it('inicia directamente en PEDIDO_TAMANO si el producto tiene múltiples tamaños', () => {
-      const entrada = normalizarEntrada({ buttonPayload: 'ped_prod_prod_frappe_oreo' });
-      const resultado = transicionarEstado(null, entrada, contextoBase);
-
-      expect(resultado.nuevoEstado).toBe('PEDIDO_TAMANO');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].botones).toHaveLength(2);
-        expect(resultado.acciones[0].botones[0].id).toBe('ped_tam_tam_12oz');
-        expect(resultado.acciones[0].botones[1].id).toBe('ped_tam_tam_16oz');
-      }
-      expect(resultado.nuevoFlujo.pedido?.productoSeleccionadoId).toBe('prod_frappe_oreo');
-    });
-
-    it('si el producto no tiene tamaños múltiples, avanza directamente a cantidad/opciones', () => {
-      const entrada = normalizarEntrada({ buttonPayload: 'ped_prod_prod_sw_especial' });
-      const resultado = transicionarEstado(null, entrada, contextoBase);
-
-      expect(resultado.nuevoEstado).toBe('PEDIDO_CANTIDAD');
-      expect(resultado.nuevoFlujo.pedido?.productoSeleccionadoId).toBe('prod_sw_especial');
-      expect(resultado.nuevoFlujo.pedido?.itemEnConfiguracion?.productoNombre).toBe('Sándwich Especial');
-    });
-  });
 
   // ---------------------------------------------------------------------------
   // 4. Respeta interruptor de pedido apagado

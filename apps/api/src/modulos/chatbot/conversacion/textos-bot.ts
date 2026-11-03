@@ -26,49 +26,39 @@ export const TITULO_SECCION_MENU = 'Menú';
 export const TITULO_SECCION_CATEGORIAS = 'Categorías';
 export const TITULO_SECCION_PREGUNTAS = 'Preguntas';
 
-// Filas del Menú Principal (mockup línea 415: start)
+// Filas del Menú Principal (bot solo con menús: el pedido se hace en la carta virtual web)
 export const FILAS_MENU_PRINCIPAL: FilaLista[] = [
   {
-    id: 'pedir',
-    titulo: '☕ Hacer un pedido',
-    descripcion: 'Pide para delivery o para recoger',
-  },
-  {
-    id: 'reservar',
-    titulo: '📅 Reservar mesa',
-    descripcion: 'Solicita tu reserva de mesa',
+    id: 'horario',
+    titulo: '🕒 Horario y ubicación',
+    descripcion: 'Horario, dirección y cómo llegar',
   },
   {
     id: 'carta',
     titulo: '🧁 Ver la carta',
-    descripcion: 'Navega productos, precios y promociones',
+    descripcion: 'Productos destacados y el enlace a la carta',
   },
   {
     id: 'mipedido',
-    titulo: '📦 Mi pedido',
-    descripcion: 'Consulta el estado y tiempo estimado',
-  },
-  {
-    id: 'mispuntos',
-    titulo: '⭐ Mis puntos',
-    descripcion: 'Consulta tu saldo de puntos',
-  },
-  {
-    id: 'preguntar',
-    titulo: '💬 Preguntar algo',
-    descripcion: 'Horario, dirección, carta y dudas frecuentes',
+    titulo: '📦 Estado de mi pedido',
+    descripcion: 'Cómo va tu pedido de hoy',
   },
   {
     id: 'persona',
     titulo: '🙋 Hablar con persona',
-    descripcion: 'Hablar con una persona del equipo',
+    descripcion: 'Te atiende alguien del equipo',
+  },
+  {
+    id: 'preguntar',
+    titulo: '💬 Preguntas frecuentes',
+    descripcion: 'Pagos, delivery, promociones y más',
   },
 ];
 
 // Botones de respuesta rápida comunes
 export const BOTONES_MENU_PRINCIPAL: BotonAccion[] = [
-  { id: 'btn_pedido', titulo: 'Hacer un pedido' },
-  { id: 'btn_horario_ubicacion', titulo: 'Horario y ubicacion' },
+  { id: 'btn_horario_ubicacion', titulo: 'Horario y ubicación' },
+  { id: 'btn_carta', titulo: 'Ver la carta' },
   { id: 'btn_persona', titulo: 'Hablar con persona' },
 ];
 
@@ -1035,6 +1025,55 @@ export const TEXTOS_BOT = {
     return 'Has alcanzado el límite de 10 pedidos diarios por WhatsApp. Un asesor te atenderá personalmente.';
   },
 };
+
+/**
+ * Bot solo con menús (decisión del dueño): el pedido, los puntos y la reserva no se toman por chat.
+ * Se responde con la carta virtual web o con una persona del equipo.
+ */
+export const TEXTOS_SOLO_MENUS = {
+  pedidoEnCarta: (url: string): string =>
+    `Para pedir, entra a nuestra carta virtual, elige lo que quieres y confirma tu pedido ahí: ${url}`,
+
+  puntosEnCarta: (url: string): string =>
+    `Puedes ver y canjear tus puntos en nuestra carta virtual 💛\n👉 ${url}`,
+
+  lineaPuntosSaludo: (url: string): string =>
+    `💛 También puedes pedir y ver o canjear tus puntos en nuestra carta virtual: ${url}`,
+
+  reservaPorPersona: (telefono?: string | null): string => {
+    const tel = String(telefono || '').trim();
+    return tel
+      ? `Para reservar una mesa, llámanos al ${tel} o habla con una persona de nuestro equipo.`
+      : 'Para reservar una mesa, habla con una persona de nuestro equipo.';
+  },
+
+  cartaDestacados: (url: string): string =>
+    `Estos son nuestros favoritos 💛\nVe toda la carta y pide en: ${url}`,
+
+  cartaSinProductos: (url: string): string =>
+    `Nuestra carta está en actualización. Revísala aquí: ${url}`,
+
+  productoEnCarta: (nombre: string, url: string): string =>
+    `*${nombre}* lo encuentras en nuestra carta virtual, donde también lo puedes pedir: ${url}`,
+
+  estadoPedido: (codigo: string, estado: string, pagoEstado: string | null | undefined, url: string): string =>
+    `Tu pedido *${codigo}* está en estado: *${estado}*${pagoEstado ? ` (Pago: *${pagoEstado}*)` : ''}.\nPuedes seguirlo en nuestra carta virtual: ${url}`,
+
+  sinPedidoActivo: (url: string): string =>
+    `No encontramos un pedido activo a tu número. Puedes revisar tu pedido o hacer uno nuevo en nuestra carta virtual: ${url}`,
+
+  menuNoEntiendo: (textoPersonalizado?: string | null): string =>
+    textoPersonalizado?.trim() ||
+    'Elige una opción del menú y te ayudo. Si necesitas algo más, toca «Hablar con una persona».',
+};
+
+/**
+ * Punto de extensión del saludo: aquí se enchufa una línea de promoción (hoy no hay ninguna).
+ * Devuelve null cuando no hay nada que mostrar.
+ */
+export function lineaPromoSaludo(): string | null {
+  return null;
+}
 
 export * from './textos-reserva';
 export * from './flujos/pago/textos-pago';

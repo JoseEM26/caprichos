@@ -3,7 +3,6 @@ import { normalizarEntrada } from '../normalizador-entrada.util';
 import {
   ContextoConversacion,
   ESQUEMA_FLUJO_VERSION,
-  FlujoConversacion,
 } from '../tipos-conversacion';
 import {
   BOTON_HABLAR_PERSONA,
@@ -15,11 +14,9 @@ import {
   BOTON_VER_CARTA,
   BOTON_VOLVER_CATEGORIAS,
   BOTON_VOLVER_MENU,
-  BOTONES_MENU_PRINCIPAL,
   BOTONES_MI_PEDIDO,
   FILAS_MENU_PRINCIPAL,
   FILAS_PREGUNTAS_FRECUENTES,
-  TEXTOS_BOT,
   TITULO_SECCION_CATEGORIAS,
   TITULO_SECCION_MENU,
   TITULO_SECCION_PREGUNTAS,
@@ -202,15 +199,13 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
         expect(resultado.acciones[0].texto).toContain('Soy Capri');
         expect(resultado.acciones[0].botonTexto).toBe('Ver opciones');
         expect(resultado.acciones[0].tituloSeccion).toBe('Menú');
-        expect(resultado.acciones[0].filas).toHaveLength(7);
+        expect(resultado.acciones[0].filas).toHaveLength(5);
         expect(resultado.acciones[0].filas.map((f) => f.id)).toEqual([
-          'pedir',
-          'reservar',
+          'horario',
           'carta',
           'mipedido',
-          'mispuntos',
-          'preguntar',
           'persona',
+          'preguntar',
         ]);
       }
     });
@@ -285,338 +280,6 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
       expect(resultado.acciones[0].tipo).toBe('enviarLista');
     });
 
-    it('personaliza la fila de Mi pedido si ya se conoce un código de pedido activo', () => {
-      const entrada = normalizarEntrada({ texto: 'menu' });
-      const flujoConPedido: FlujoConversacion = {
-        version: 1,
-        estado: 'MENU',
-        repreguntasFallidas: 0,
-        codigoPedido: 'CP-0110',
-      };
-      const resultado = transicionarEstado(flujoConPedido, entrada, contextoBase);
-
-      if (resultado.acciones[0].tipo === 'enviarLista') {
-        const filaPedido = resultado.acciones[0].filas.find((f) => f.id === 'mipedido');
-        expect(filaPedido?.titulo).toBe('📦 Mi pedido CP-0110');
-      }
-    });
-  });
-
-  describe('2. Flujo de Pedidos (Ola 2) y Reservar mesa honesta (Ola 3)', () => {
-    it('al pulsar "pedir" inicia el flujo real de pedido preguntando la modalidad', () => {
-      const entrada = normalizarEntrada({ listRowId: 'pedir' });
-      const resultado = transicionarEstado(null, entrada, contextoBase);
-
-      expect(resultado.nuevoEstado).toBe('PEDIDO_MODALIDAD');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('Perfecto. ¿Cómo lo quieres?');
-        expect(resultado.acciones[0].botones).toHaveLength(2);
-        expect(resultado.acciones[0].botones.map((b) => b.id)).toEqual([
-          'ped_mod_delivery',
-          'ped_mod_recojer',
-        ]);
-      }
-    });
-
-    it('al pulsar "reservar" inicia el flujo de reservas y pide cantidad de personas (Ola 3)', () => {
-      const entrada = normalizarEntrada({ listRowId: 'reservar' });
-      const resultado = transicionarEstado(null, entrada, contextoBase);
-
-      expect(resultado.nuevoEstado).toBe('RESERVA_PERSONAS');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('¿Para cuántas personas');
-      }
-    });
-  });
-
-  describe('3. Ver la carta navegable dentro del chat (requisitos a, b, c)', () => {
-    it('al seleccionar "carta" muestra la lista interactiva de categorías reales', () => {
-      const entrada = normalizarEntrada({ listRowId: 'carta' });
-      const resultado = transicionarEstado(null, entrada, contextoBase);
-
-      expect(resultado.nuevoEstado).toBe('CARTA_CATEGORIAS');
-      expect(resultado.acciones[0].tipo).toBe('enviarLista');
-      if (resultado.acciones[0].tipo === 'enviarLista') {
-        expect(resultado.acciones[0].botonTexto).toBe('Ver categorías');
-        expect(resultado.acciones[0].tituloSeccion).toBe('Categorías');
-        expect(resultado.acciones[0].filas).toHaveLength(3);
-        expect(resultado.acciones[0].filas[0].id).toBe('cat_1');
-        expect(resultado.acciones[0].filas[0].titulo).toBe('Frappes');
-      }
-    });
-
-    it('paginación de categorías: cuando hay más de 9 categorías, añade fila "Ver más categorías"', () => {
-      const muchasCategorias = Array.from({ length: 15 }, (_, i) => ({
-        id: String(i + 1),
-        nombre: `Categoría ${i + 1}`,
-        productos: [{ id: `prod_${i}`, nombre: `P ${i}`, precio: 10, disponible: true }],
-      }));
-
-      const contextoMuchas = { ...contextoBase, categoriasCarta: muchasCategorias };
-      const entrada = normalizarEntrada({ listRowId: 'carta' });
-      const resultado = transicionarEstado(null, entrada, contextoMuchas);
-
-      if (resultado.acciones[0].tipo === 'enviarLista') {
-        expect(resultado.acciones[0].filas).toHaveLength(10);
-        expect(resultado.acciones[0].filas[9].id).toBe('cat_mas_1');
-        expect(resultado.acciones[0].filas[9].titulo).toBe('Ver más categorías');
-      }
-
-      // Al pulsar "Ver más categorías" muestra la página siguiente
-      const entradaMas = normalizarEntrada({ listRowId: 'cat_mas_1' });
-      const resPag2 = transicionarEstado(resultado.nuevoFlujo, entradaMas, contextoMuchas);
-      if (resPag2.acciones[0].tipo === 'enviarLista') {
-        expect(resPag2.acciones[0].filas[0].titulo).toBe('Categoría 10');
-      }
-    });
-
-    it('al elegir una categoría muestra sus productos disponibles por el camino único del pedido', () => {
-      const entrada = normalizarEntrada({ listRowId: 'cat_1' });
-      const resultado = transicionarEstado(null, entrada, contextoBase);
-
-      expect(resultado.nuevoEstado).toBe('CARTA_PRODUCTOS');
-      expect(resultado.acciones[0].tipo).toBe('enviarLista');
-      if (resultado.acciones[0].tipo === 'enviarLista') {
-        expect(resultado.acciones[0].botonTexto).toBe('Ver productos');
-        // Mismo camino que el pedido: solo disponibles (el agotado no se ofrece); con 1 sola, lista directa
-        expect(resultado.acciones[0].filas).toHaveLength(1);
-        expect(resultado.acciones[0].filas[0].titulo).toBe('Frappe Oreo');
-      }
-    });
-
-    it('si toda una categoría está agotada, responde avisándolo con botones para volver (requisito b)', () => {
-      const categoriaAgotada = [
-        {
-          id: '10',
-          nombre: 'Donas',
-          productos: [
-            { id: 'd1', nombre: 'Dona Manjar', precio: 6, disponible: false },
-            { id: 'd2', nombre: 'Dona Oreo', precio: 7, disponible: false },
-          ],
-        },
-      ];
-      const contextoAgotada = { ...contextoBase, categoriasCarta: categoriaAgotada };
-      const entrada = normalizarEntrada({ listRowId: 'cat_10' });
-      const resultado = transicionarEstado(null, entrada, contextoAgotada);
-
-      expect(resultado.nuevoEstado).toBe('CARTA_PRODUCTOS');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain(
-          'Todos los productos de la categoría Donas están agotados por el momento',
-        );
-        expect(resultado.acciones[0].botones).toEqual([BOTON_VOLVER_CATEGORIAS, BOTON_VOLVER_MENU]);
-      }
-    });
-
-    it('al elegir un producto muestra descripción, presentaciones, opciones y enlace web (requisito a)', () => {
-      const entrada = normalizarEntrada({ listRowId: 'prod_p1' });
-      const resultado = transicionarEstado(null, entrada, contextoBase);
-
-      expect(resultado.nuevoEstado).toBe('CARTA_PRODUCTO_DETALLE');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('FRAPPE OREO');
-        expect(resultado.acciones[0].texto).toContain('Regular 12 oz: s/ 14.50');
-        expect(resultado.acciones[0].texto).toContain('Grande 16 oz: s/ 16.50');
-        expect(resultado.acciones[0].texto).toContain('Leche sin lactosa');
-        expect(resultado.acciones[0].texto).toContain('Pídelo en nuestra carta virtual');
-        expect(resultado.acciones[0].botones).toEqual([
-          { id: 'ped_prod_p1', titulo: 'Pedir este producto' },
-          BOTON_VOLVER_MENU,
-          { id: 'btn_persona', titulo: 'Hablar con persona' },
-        ]);
-      }
-    });
-
-    it('producto agotado muestra aviso claro y hora de regreso si está programada (requisito b)', () => {
-      const entrada = normalizarEntrada({ listRowId: 'prod_p2' });
-      const resultado = transicionarEstado(null, entrada, contextoBase);
-
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('Por ahora no está disponible');
-        expect(resultado.acciones[0].texto).toContain('regresa aprox. 22:00');
-      }
-    });
-
-    it('promociones de hoy muestra vigentes con condición y no vigentes con "Hoy no aplica" (requisito c)', () => {
-      const entrada = normalizarEntrada({ listRowId: 'promos' });
-      const resultado = transicionarEstado(null, entrada, contextoBase);
-
-      expect(resultado.nuevoEstado).toBe('CARTA_PROMOS');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('Vigentes hoy:');
-        expect(resultado.acciones[0].texto).toContain('2x1 Frappe Oreo');
-        expect(resultado.acciones[0].texto).toContain('Paga 1 y lleva 2');
-        expect(resultado.acciones[0].texto).toContain('Hoy no aplica (Aplica: Domingos)');
-        expect(resultado.acciones[0].botones).toEqual([BOTON_VER_CARTA, BOTON_VOLVER_MENU]);
-      }
-    });
-  });
-
-  describe('4. Mi pedido y ¿Cuánto falta? (requisito d, mockup líneas 268-285)', () => {
-    it('al seleccionar Mi pedido sin código activo solicita el código CP-xxxx', () => {
-      const entrada = normalizarEntrada({ listRowId: 'mipedido' });
-      const resultado = transicionarEstado(null, entrada, { ...contextoBase, pedidoActivo: null });
-
-      expect(resultado.nuevoEstado).toBe('MI_PEDIDO');
-      expect(resultado.acciones[0].tipo).toBe('enviarTexto');
-      if (resultado.acciones[0].tipo === 'enviarTexto') {
-        expect(resultado.acciones[0].texto).toContain('Por favor escribe el código de tu pedido (ejemplo: CP-0110)');
-      }
-    });
-
-    it('cuando el usuario escribe su código válido muestra opciones ¿Cuánto falta?, Cambiar dirección y Asesor', () => {
-      const entrada = normalizarEntrada({ texto: 'CP-0110' });
-      const contextoConPedido: ContextoConversacion = {
-        ...contextoBase,
-        pedidoActivo: {
-          codigo: 'CP-0110',
-          estado: 'PREPARANDO',
-          creado_en: new Date(),
-        },
-      };
-      const resultado = transicionarEstado(null, entrada, contextoConPedido);
-
-      expect(resultado.nuevoEstado).toBe('MI_PEDIDO_DETALLE');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('¿Qué necesitas de tu pedido CP-0110?');
-        expect(resultado.acciones[0].botones).toEqual(BOTONES_MI_PEDIDO);
-      }
-    });
-
-    it('rechaza pedido ajeno o inexistente con el mensaje del mockup (seguridad)', () => {
-      const entrada = normalizarEntrada({ texto: 'CP-9999' });
-      const contextoPedidoInvalido: ContextoConversacion = {
-        ...contextoBase,
-        pedidoActivo: null, // Rechazado por ejecutor por no pertenecer al teléfono
-      };
-      const resultado = transicionarEstado(null, entrada, contextoPedidoInvalido);
-
-      expect(resultado.nuevoEstado).toBe('MENU');
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toBe(
-          'No encuentro un pedido activo con tu número. ¿Quieres hacer uno ahora?',
-        );
-      }
-    });
-
-    it('responde "¿Cuánto falta?" cuando el pedido está en cocina con tiempo estimado', () => {
-      const entrada = normalizarEntrada({ buttonPayload: 'c_eta' });
-      const contextoPedidoCocina: ContextoConversacion = {
-        ...contextoBase,
-        pedidoActivo: {
-          codigo: 'CP-0110',
-          estado: 'PREPARANDO',
-          creado_en: new Date(Date.now() - 5 * 60000), // Hace 5 minutos
-        },
-      };
-      const resultado = transicionarEstado(
-        { version: 1, estado: 'MI_PEDIDO_DETALLE', codigoPedido: 'CP-0110', repreguntasFallidas: 0 },
-        entrada,
-        contextoPedidoCocina,
-      );
-
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('Tu pedido CP-0110 está en cocina');
-        expect(resultado.acciones[0].texto).toContain('minutos');
-      }
-    });
-
-    it('responde "¿Cuánto falta?" cuando el pedido ya está en camino con repartidor', () => {
-      const entrada = normalizarEntrada({ texto: 'cuanto falta para que llegue?' });
-      const contextoEnCamino: ContextoConversacion = {
-        ...contextoBase,
-        pedidoActivo: {
-          codigo: 'CP-0110',
-          estado: 'EN_CAMINO',
-          creado_en: new Date(Date.now() - 20 * 60000),
-        },
-      };
-      const resultado = transicionarEstado(
-        { version: 1, estado: 'MI_PEDIDO_DETALLE', codigoPedido: 'CP-0110', repreguntasFallidas: 0 },
-        entrada,
-        contextoEnCamino,
-      );
-
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('ya está en camino con el repartidor 🛵');
-      }
-    });
-
-    it('si el pedido superó el tiempo prometido, avisa la demora y transfiere automáticamente a persona', () => {
-      const entrada = normalizarEntrada({ buttonPayload: 'c_eta' });
-      const contextoTarde: ContextoConversacion = {
-        ...contextoBase,
-        pedidoActivo: {
-          codigo: 'CP-0110',
-          estado: 'PREPARANDO',
-          creado_en: new Date(Date.now() - 50 * 60000), // 50 minutos (superó los 35 max)
-        },
-      };
-      const resultado = transicionarEstado(
-        { version: 1, estado: 'MI_PEDIDO_DETALLE', codigoPedido: 'CP-0110', repreguntasFallidas: 0 },
-        entrada,
-        contextoTarde,
-      );
-
-      expect(resultado.nuevoEstado).toBe('ATENCION_PERSONA');
-      expect(resultado.acciones.some((a) => a.tipo === 'pasarAPersona')).toBe(true);
-      const accionTexto = resultado.acciones.find((a) => a.tipo === 'enviarTexto');
-      expect(accionTexto?.tipo === 'enviarTexto' && accionTexto.texto).toContain(
-        'Disculpa la demora: ya avisé al equipo para apurarlo y una persona te escribe',
-      );
-    });
-
-    it('cambio de dirección: en preparación deriva normal; en camino deriva urgente', () => {
-      // 1. En preparación
-      const entradaDirPrep = normalizarEntrada({ buttonPayload: 'c_dir' });
-      const resPrep = transicionarEstado(
-        { version: 1, estado: 'MI_PEDIDO_DETALLE', codigoPedido: 'CP-0110', repreguntasFallidas: 0 },
-        entradaDirPrep,
-        {
-          ...contextoBase,
-          pedidoActivo: { codigo: 'CP-0110', estado: 'PREPARANDO' },
-        },
-      );
-      expect(resPrep.nuevoEstado).toBe('ATENCION_PERSONA');
-      const txtPrep = resPrep.acciones.find((a) => a.tipo === 'enviarTexto');
-      expect(txtPrep?.tipo === 'enviarTexto' && txtPrep.texto).toContain(
-        'Tu pedido ya está en preparación. Ya avisé a un asesor para ver si se puede cambiar la dirección',
-      );
-
-      // 2. En camino (urgente)
-      const resRuta = transicionarEstado(
-        { version: 1, estado: 'MI_PEDIDO_DETALLE', codigoPedido: 'CP-0110', repreguntasFallidas: 0 },
-        entradaDirPrep,
-        {
-          ...contextoBase,
-          pedidoActivo: { codigo: 'CP-0110', estado: 'EN_CAMINO' },
-        },
-      );
-      const accPaso = resRuta.acciones.find((a) => a.tipo === 'pasarAPersona');
-      expect(accPaso?.tipo === 'pasarAPersona' && accPaso.motivo).toBe('CAMBIO_DIRECCION_URGENTE');
-    });
-
-    it('bloquea si el cliente excede 5 consultas por minuto', () => {
-      const entrada = normalizarEntrada({ listRowId: 'mipedido' });
-      const contextoBloqueado = {
-        ...contextoBase,
-        limiteConsultasExcedido: true,
-      };
-      const resultado = transicionarEstado(null, entrada, contextoBloqueado);
-
-      expect(resultado.nuevoEstado).toBe('MENU');
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain(
-          'Has consultado tu pedido varias veces en poco tiempo. Por favor espera un momento',
-        );
-      }
-    });
   });
 
   describe('5. Preguntas frecuentes con datos de base de datos (requisito e)', () => {
@@ -716,25 +379,5 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
       );
     });
 
-    it('repregunta una vez ante mensaje confuso y a la segunda deriva a persona', () => {
-      const entradaConfusa = normalizarEntrada({ texto: 'xyz123 no entiendo nada' });
-
-      // 1er intento confuso
-      const res1 = transicionarEstado(
-        { version: 1, estado: 'MENU', repreguntasFallidas: 0 },
-        entradaConfusa,
-        contextoBase,
-      );
-      expect(res1.nuevoFlujo.repreguntasFallidas).toBe(1);
-      expect(res1.acciones[0].tipo).toBe('enviarLista');
-
-      // 2do intento confuso consecutivo
-      const res2 = transicionarEstado(res1.nuevoFlujo, entradaConfusa, contextoBase);
-      expect(res2.nuevoEstado).toBe('ATENCION_PERSONA');
-      expect(res2.acciones[0].tipo).toBe('pasarAPersona');
-      expect(res2.acciones[1].tipo === 'enviarTexto' && res2.acciones[1].texto).toContain(
-        'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte',
-      );
-    });
   });
 });

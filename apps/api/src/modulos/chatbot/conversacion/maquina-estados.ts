@@ -1,4 +1,4 @@
-import { accionesPaginaCarrusel, ordenarPorVentas, tarjetaProducto, urlPublicaFoto } from '../servicios/carrusel.util';
+import { accionesPaginaCarrusel, LIMITES_CARRUSEL, ordenarPorVentas, tarjetaProducto, urlPublicaFoto } from '../servicios/carrusel.util';
 import {
   BOTON_HABLAR_PERSONA,
   BOTON_LISTA_CATEGORIAS,
@@ -16,6 +16,8 @@ import {
   FILAS_PREGUNTAS_FRECUENTES,
   TEXTO_ASISTIDO_FRASE_FIJA,
   TEXTOS_BOT,
+  TEXTOS_SOLO_MENUS,
+  lineaPromoSaludo,
   TITULO_SECCION_CATEGORIAS,
   TITULO_SECCION_MENU,
   TITULO_SECCION_PREGUNTAS,
@@ -237,6 +239,21 @@ const PALABRAS_DESPEDIDA = [
   'nos vemos',
 ];
 
+/** Bot solo con menús: true = el motor nuevo atiende todo; false = motor anterior (IA, pedidos por chat). */
+export const MODO_SOLO_MENUS = true;
+
+/** Palabras que sí significan «hablar con una persona» en texto libre (sin «atención», «ayuda», etc.). */
+const PALABRAS_PERSONA_SOLO = [
+  'persona',
+  'humano',
+  'asesor',
+  'operador',
+  'hablar con alguien',
+  'hablar con una persona',
+  'hablar con persona',
+  'hablar con asesor',
+];
+
 function coincideAlgunaPalabra(texto: string, lista: string[]): boolean {
   return lista.some((palabra) => {
     const regex = new RegExp(`(^|\\s)${palabra}(\\s|$)`, 'i');
@@ -358,6 +375,16 @@ export function transicionarEstado(
         repreguntasFallidas: 0,
       },
     };
+  }
+
+  // 1.b Bot solo con menús (decisión del dueño): el camino normal no usa IA ni toma pedidos por chat.
+  // Con MODO_SOLO_MENUS en false se vuelve al motor anterior (código que queda como respaldo).
+  if (MODO_SOLO_MENUS) {
+    // Chat tomado por una persona: el bot calla (misma regla de antes)
+    if (flujo.estado === 'ATENCION_PERSONA' && (contexto.chatTomado || contexto.humanoHabloReciente)) {
+      return { nuevoEstado: 'ATENCION_PERSONA', acciones: [], nuevoFlujo: flujo };
+    }
+    return transicionarSoloMenus(flujo, entrada, contexto);
   }
 
   // 2. Modo asistido: cuando la conversación está en manos de una persona (ATENCION_PERSONA)
@@ -1775,6 +1802,364 @@ export function transicionarEstado(
       repreguntasFallidas: flujo.repreguntasFallidas + 1,
     },
   };
+}
+
+/** Carrusel de «Ver la carta»: productos destacados (más vendidos primero) y el enlace a la carta web. */
+function accionesCartaSoloMenus(contexto: ContextoConversacion, url: string): any[] {
+  const unicos = new Map<string, any>();
+  for (const c of contexto.categoriasCarta || []) {
+    for (const p of c.productos || []) {
+      if (p.disponible !== false && !unicos.has(String(p.id))) unicos.set(String(p.id), p);
+    }
+  }
+  if (unicos.size === 0) {
+    return [{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.cartaSinProductos(url), botones: [BOTON_VOLVER_MENU] }];
+  }
+  const destacados = ordenarPorVentas([...unicos.values()], contexto.ventasProductos).slice(0, LIMITES_CARRUSEL.max);
+  const tarjetas = destacados.map((p) => ({
+    ...tarjetaProducto(p, contexto.cartaUrlPublica),
+    boton: { id: `carta_p_${p.id}`, titulo: 'Ver en la carta' },
+  }));
+  const cuerpo = TEXTOS_SOLO_MENUS.cartaDestacados(url);
+  if (tarjetas.length < LIMITES_CARRUSEL.min) {
+    return [{ tipo: 'enviarBotones', texto: cuerpo, botones: [BOTON_VOLVER_MENU] }];
+  }
+  return [
+    {
+      tipo: 'enviarCarrusel',
+      carga: {
+        cuerpo,
+        tarjetas,
+        botonComun: BOTON_VOLVER_MENU,
+        respaldo: { texto: cuerpo, botones: [BOTON_VOLVER_MENU] },
+      },
+    },
+  ];
+}
+
+/** Respuesta de una pregunta frecuente (lactosa, bebidas calientes, postres, pagos, delivery, promociones). */
+function respuestaFaqSoloMenus(clave: string, contexto: ContextoConversacion): any {
+  const botones = [BOTON_OTRAS_PREGUNTAS, BOTON_VOLVER_MENU];
+  const enviar = (texto: string) => ({ tipo: 'enviarBotones', texto, botones });
+
+  if (clave === 'lactosa') {
+    let opcionesLeche: { nombre: string; extra: number; disponible: boolean }[] = [];
+    for (const cat of contexto.categoriasCarta || []) {
+      for (const prod of cat.productos || []) {
+        for (const grp of prod.grupos || []) {
+          if (/leche/i.test(grp.nombre || '')) {
+            opcionesLeche = (grp.opciones || []).map((o: any) => ({
+              nombre: o.nombre,
+              extra: Number(o.precioExtra || 0),
+              disponible: !!o.disponible,
+            }));
+            break;
+          }
+        }
+        if (opcionesLeche.length > 0) break;
+      }
+      if (opcionesLeche.length > 0) break;
+    }
+    if (opcionesLeche.length === 0) {
+      opcionesLeche = [
+        { nombre: 'leche sin lactosa', extra: 0, disponible: true },
+        { nombre: 'bebida de almendra', extra: 2.5, disponible: true },
+      ];
+    }
+    return enviar(TEXTOS_BOT.faqLactosa(opcionesLeche));
+  }
+
+  if (clave === 'calientes') {
+    const catCalientes = (contexto.categoriasCarta || []).find((c: any) => /caliente/i.test(c.nombre));
+    const productos = (catCalientes?.productos || []).map((p: any) => ({ nombre: p.nombre, disponible: !!p.disponible }));
+    return enviar(TEXTOS_BOT.faqCalientes(productos));
+  }
+
+  if (clave === 'postres') {
+    const catPostres = (contexto.categoriasCarta || []).find((c: any) => /waffle|postre|dulce/i.test(c.nombre));
+    const productos = (catPostres?.productos || []).map((p: any) => ({ nombre: p.nombre, disponible: !!p.disponible }));
+    return enviar(TEXTOS_BOT.faqPostres(productos));
+  }
+
+  if (clave === 'pagos') {
+    return enviar(TEXTOS_BOT.faqPagos(contexto.datosLocalPublicos?.mediosPago || {}));
+  }
+
+  if (clave === 'delivery') {
+    return enviar(
+      TEXTOS_BOT.faqDelivery(contexto.datosLocalPublicos?.pedidoMinimo, contexto.datosLocalPublicos?.envioGratisDesde),
+    );
+  }
+
+  return enviar(TEXTOS_BOT.promocionesHoy(contexto.ofertas || []));
+}
+
+/** Clave de la pregunta frecuente pedida (por botón o por palabra clave), o null. */
+function claveFaqSoloMenus(id: string, texto: string): string | null {
+  const porBoton: Record<string, string> = {
+    faq_lactosa: 'lactosa',
+    faq_calientes: 'calientes',
+    faq_postres: 'postres',
+    faq_pagos: 'pagos',
+    faq_delivery: 'delivery',
+    faq_promos: 'promos',
+  };
+  if (porBoton[id]) return porBoton[id];
+  const reglas: [string, string[]][] = [
+    ['lactosa', ['lactosa', 'intolerante', 'leche vegetal']],
+    ['calientes', ['bebidas calientes', 'calientes', 'cafes', 'cafe']],
+    ['postres', ['postres', 'waffles', 'dulces', 'donas']],
+    ['pagos', ['pago', 'pagos', 'yape', 'plin', 'tarjeta', 'efectivo']],
+    ['delivery', ['delivery', 'costo envio', 'envio gratis', 'zonas reparto']],
+    ['promos', PALABRAS_PROMOS],
+  ];
+  const hit = reglas.find(([, palabras]) => coincideAlgunaPalabra(texto, palabras));
+  return hit ? hit[0] : null;
+}
+
+/**
+ * Motor del bot solo con menús. Responde a botones y a texto libre con el menú (un solo mensaje).
+ * No toma pedidos, no toca puntos ni reservas, no llama a la IA. El silencio de ATENCION_PERSONA
+ * (chat tomado por una persona) se decide antes, en transicionarEstado.
+ */
+function transicionarSoloMenus(
+  flujo: FlujoConversacion,
+  entrada: EntradaNormalizada,
+  contexto: ContextoConversacion,
+): ResultadoTransicion {
+  const texto = entrada.texto;
+  const id = entrada.id ?? '';
+  const url = contexto.cartaUrlPublica || 'https://caprichos.pe/carta';
+  const enPersona = flujo.estado === 'ATENCION_PERSONA';
+  const esId = (...ids: string[]) => ids.includes(id);
+  const hay = (palabras: string[]) => coincideAlgunaPalabra(texto, palabras);
+
+  const respuesta = (acciones: any[], estado: EstadoConversacion = enPersona ? 'ATENCION_PERSONA' : 'MENU') => ({
+    nuevoEstado: estado,
+    acciones,
+    nuevoFlujo: { ...flujo, estado, pedido: null, repreguntasFallidas: 0 },
+  });
+
+  const saludo = () => {
+    const cuerpo = [
+      TEXTOS_BOT.saludoBienvenida(contexto.nombreCliente, contexto.datosLocal, contexto.textosPersonalizados?.chatbot_texto_bienvenida),
+      lineaPromoSaludo(),
+      TEXTOS_SOLO_MENUS.lineaPuntosSaludo(url),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+    return respuesta(
+      [{ tipo: 'enviarLista', texto: cuerpo, botonTexto: BOTON_LISTA_MENU, tituloSeccion: TITULO_SECCION_MENU, filas: FILAS_MENU_PRINCIPAL }],
+    );
+  };
+
+  // 0. Saludo y regreso al menú
+  if (esId('menu', 'btn_menu', 'volver_menu', 'inicio') || esSaludoPuro(texto) || texto === '0') {
+    return saludo();
+  }
+
+  // Con una persona atendiendo, el texto libre (que no sea saludo) no se contesta salvo modo asistido
+  // Con una persona atendiendo, el texto libre no se contesta salvo modo asistido (regla de siempre)
+  if (enPersona && !id && !contexto.modoAsistido) {
+    return { nuevoEstado: 'ATENCION_PERSONA', acciones: [], nuevoFlujo: flujo };
+  }
+
+  // 1. Producto de la carta (botón del carrusel): el enlace a la carta, sin pedir por chat
+  if (id.startsWith('carta_p_')) {
+    const pid = id.slice('carta_p_'.length);
+    let nombre: string | null = null;
+    for (const c of contexto.categoriasCarta || []) {
+      const p = (c.productos || []).find((x: any) => String(x.id) === pid);
+      if (p) {
+        nombre = String(p.nombre);
+        break;
+      }
+    }
+    return respuesta([
+      {
+        tipo: 'enviarBotones',
+        texto: nombre ? TEXTOS_SOLO_MENUS.productoEnCarta(nombre, url) : TEXTOS_SOLO_MENUS.cartaDestacados(url),
+        botones: [BOTON_VOLVER_MENU],
+      },
+    ]);
+  }
+
+  // 2. Queja escrita: urgente, a una persona (igual que antes)
+  if (hay(PALABRAS_QUEJA)) {
+    return {
+      nuevoEstado: 'ATENCION_PERSONA',
+      acciones: [
+        {
+          tipo: 'pasarAPersona',
+          motivo: 'QUEJA_ESCRITA_URGENTE',
+          mensajeCliente: entrada.textoOriginal,
+          esUrgente: true,
+          crearQueja: true,
+          quejaTexto: entrada.textoOriginal,
+        },
+        { tipo: 'enviarTexto', texto: TEXTOS_CAMBIOS.quejaUrgenteRecibida() },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'ATENCION_PERSONA', pedido: null, repreguntasFallidas: 0 },
+    };
+  }
+
+  // 3. Hablar con una persona
+  if (esId('persona', 'btn_persona', 'btn_asi_persona', 'btn_esp_persona') || hay(PALABRAS_PERSONA_SOLO)) {
+    const estaCerrado = contexto.datosLocal && contexto.datosLocal.abierta === false;
+    const horaAbre = contexto.datosLocal?.abre || '15:00';
+    const horaCierra = contexto.datosLocal?.cierra || '23:00';
+    return {
+      nuevoEstado: 'ATENCION_PERSONA',
+      acciones: [
+        {
+          tipo: 'pasarAPersona',
+          motivo: estaCerrado ? 'FUERA_DE_HORARIO' : 'CLIENTE_SOLICITO_PERSONA',
+          mensajeCliente: entrada.textoOriginal,
+        },
+        {
+          tipo: 'enviarTexto',
+          texto: estaCerrado
+            ? TEXTOS_CAMBIOS.fueraDeHorario(horaAbre, horaCierra, horaAbre)
+            : TEXTOS_BOT.pasarAPersona(contexto.textosPersonalizados?.chatbot_texto_pase_persona),
+        },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'ATENCION_PERSONA', pedido: null, repreguntasFallidas: 0 },
+    };
+  }
+
+  // 4. Cambiar dirección o cancelar/cambiar pedido: pasa a una persona
+  const pideCambioDir = esId('c_dir') || hay(PALABRAS_CAMBIO_DIR);
+  const pideCambioPed = esId('c_ped') || hay([...PALABRAS_CAMBIO_PED, 'cancelar', 'anular']);
+  if (pideCambioDir || pideCambioPed) {
+    const enRuta = ['en_camino', 'ruta'].includes(String(contexto.pedidoActivo?.estado || '').toLowerCase());
+    const motivo = pideCambioDir ? 'CAMBIO_DIRECCION' : 'CAMBIO_CANCELACION_PEDIDO';
+    const texto = pideCambioDir
+      ? TEXTOS_BOT.miPedidoCambioDireccion(enRuta)
+      : TEXTOS_BOT.miPedidoCambioOAnulacion(enRuta);
+    return {
+      nuevoEstado: 'ATENCION_PERSONA',
+      acciones: [
+        { tipo: 'pasarAPersona', motivo, mensajeCliente: entrada.textoOriginal },
+        { tipo: 'enviarTexto', texto },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'ATENCION_PERSONA', pedido: null, repreguntasFallidas: 0 },
+    };
+  }
+
+  // 5. Horario y ubicación (antes que «estado», porque «donde estan» contiene «donde esta»)
+  if (
+    esId('horario', 'btn_horario', 'btn_horario_ubicacion', 'btn_ubicacion', 'ubicacion', 'faq_horario', 'faq_ubicacion') ||
+    hay(['horario', 'ubicacion', 'ubicado', 'donde estan', 'mapa', 'como llego', 'abren', 'cierran', 'hasta que hora', 'direccion'])
+  ) {
+    return respuesta([
+      {
+        tipo: 'enviarBotones',
+        texto: TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal),
+        botones: [BOTON_VER_CARTA, BOTON_VOLVER_MENU],
+      },
+    ]);
+  }
+
+  // 6. Estado de mi pedido (el activo de este número)
+  if (
+    esId('mipedido', 'btn_mipedido', 'btn_asi_pedido', 'c_eta') ||
+    id.startsWith('ord_') ||
+    /CP-\d{4}/i.test(entrada.textoOriginal || '') ||
+    hay([...PALABRAS_MI_PEDIDO, ...PALABRAS_ETA])
+  ) {
+    if (contexto.limiteConsultasExcedido) {
+      return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_BOT.miPedidoDemasiadasConsultas(), botones: [BOTON_VOLVER_MENU] }]);
+    }
+    const p = contexto.pedidoActivo;
+    if (!p) {
+      return respuesta([
+        { tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.sinPedidoActivo(url), botones: [BOTON_VER_CARTA, BOTON_VOLVER_MENU] },
+      ]);
+    }
+    return respuesta([
+      {
+        tipo: 'enviarBotones',
+        texto: TEXTOS_SOLO_MENUS.estadoPedido(String(p.codigo), String(p.estado), p.pago_estado, url),
+        botones: [BOTON_VOLVER_MENU, BOTON_HABLAR_PERSONA],
+      },
+    ]);
+  }
+
+  // 7. Quiere pedir: el pedido es la carta virtual web
+  if (esId('pedir', 'btn_pedido', 'btn_pedir', 'delivery', 'recojo') || hay([...PALABRAS_PEDIDO, 'nuevo pedido'])) {
+    return respuesta([
+      { tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.pedidoEnCarta(url), botones: [BOTON_VOLVER_MENU, BOTON_HABLAR_PERSONA] },
+    ]);
+  }
+
+  // 8. Reservar mesa: por teléfono o con una persona
+  if (esId('reservar', 'btn_reserva') || hay(PALABRAS_RESERVA)) {
+    return respuesta([
+      {
+        tipo: 'enviarBotones',
+        texto: TEXTOS_SOLO_MENUS.reservaPorPersona(contexto.datosLocal?.telefono),
+        botones: [BOTON_HABLAR_PERSONA, BOTON_VOLVER_MENU],
+      },
+    ]);
+  }
+
+  // 9. Puntos: se ven y canjean en la carta virtual (abre el panel de puntos)
+  if (esId('mispuntos') || /\bpuntos?\b/.test(texto)) {
+    const enlace = `${url}${url.includes('?') ? '&' : '?'}puntos=1`;
+    return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.puntosEnCarta(enlace), botones: [BOTON_VOLVER_MENU] }]);
+  }
+
+  // 10. Preguntas frecuentes concretas
+  const faq = claveFaqSoloMenus(id, texto);
+  if (faq) {
+    return respuesta([respuestaFaqSoloMenus(faq, contexto)]);
+  }
+
+  // 11. Ver la carta
+  if (esId('carta', 'btn_carta', 'btn_asi_carta', 'btn_categorias', 'btn_esp_carta') || id.startsWith('cat_') || texto === 'carta' || hay(PALABRAS_CARTA)) {
+    return respuesta(accionesCartaSoloMenus(contexto, url));
+  }
+
+  // 12. Preguntas frecuentes (lista)
+  if (esId('preguntar', 'btn_preguntas') || hay(PALABRAS_PREGUNTAR)) {
+    return respuesta(
+      [
+        {
+          tipo: 'enviarLista',
+          texto: TEXTOS_BOT.preguntasCuerpo(),
+          botonTexto: BOTON_LISTA_PREGUNTAS,
+          tituloSeccion: TITULO_SECCION_PREGUNTAS,
+          filas: FILAS_PREGUNTAS_FRECUENTES,
+        },
+      ],
+      'PREGUNTAS',
+    );
+  }
+
+  // 13. Despedida o agradecimiento
+  if (hay(PALABRAS_DESPEDIDA)) {
+    return respuesta([
+      {
+        tipo: 'enviarBotones',
+        texto: TEXTOS_BOT.despedida(contexto.textosPersonalizados?.chatbot_texto_despedida),
+        botones: [BOTON_VOLVER_MENU],
+      },
+    ]);
+  }
+
+  // 14. Primer contacto sin intención clara: saludo con el menú
+  if (flujo.estado === 'INICIO') return saludo();
+
+  // 15. Cualquier otro texto o botón: el menú de botones, en un solo mensaje
+  return respuesta([
+    {
+      tipo: 'enviarLista',
+      texto: TEXTOS_SOLO_MENUS.menuNoEntiendo(contexto.textosPersonalizados?.chatbot_texto_no_entiendo),
+      botonTexto: BOTON_LISTA_MENU,
+      tituloSeccion: TITULO_SECCION_MENU,
+      filas: FILAS_MENU_PRINCIPAL,
+    },
+  ]);
 }
 
 /** Tarjetas de las promociones vigentes que apuntan a un producto de la carta, ordenadas por ventas. */
