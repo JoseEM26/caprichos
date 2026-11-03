@@ -12,6 +12,10 @@ export interface SalienteAdmin {
   maxIntentos: number;
   ultimoError: string | null;
   clasificacion: 'PERMANENTE' | 'AGOTADO' | 'TEMPORAL' | null;
+  /** Solo códigos de cuenta: si el envío era de registro o de recuperar contraseña. */
+  proposito: 'REGISTRO' | 'RECUPERAR' | null;
+  /** Lo que Meta aceptó (texto libre o plantilla). Null si no hay registro (pendiente, fallido o simulado). */
+  canal: { tipo: string; plantilla: string | null } | null;
   texto: string | null;
   pedidoCodigo: string | null;
   motivoDescarte: string | null;
@@ -39,8 +43,12 @@ export interface ResumenSalientes {
 }
 
 export const salientesApi = {
-  listar: (estado: string, pagina = 1) =>
-    api.get<ListaSalientes>(`/admin/whatsapp/salientes?estado=${encodeURIComponent(estado)}&pagina=${pagina}`),
+  listar: (estado: string, pagina = 1, origen?: string) => {
+    const q = new URLSearchParams({ pagina: String(pagina) });
+    if (estado) q.set('estado', estado);
+    if (origen) q.set('origen', origen);
+    return api.get<ListaSalientes>(`/admin/whatsapp/salientes?${q.toString()}`);
+  },
   resumen: () => api.get<ResumenSalientes>('/admin/whatsapp/salientes/resumen'),
   reenviar: (id: string) => api.post(`/admin/whatsapp/salientes/${id}/reenviar`),
   descartar: (id: string, motivo: string) => api.post(`/admin/whatsapp/salientes/${id}/descartar`, { motivo }),
@@ -51,6 +59,22 @@ export function formatearLag(segundos: number): string {
   if (segundos < 60) return `${segundos} s`;
   const min = Math.floor(segundos / 60);
   return `${min} min`;
+}
+
+export const ETIQUETA_ESTADO: Record<EstadoSaliente, string> = {
+  PENDIENTE: 'Pendiente',
+  ENVIANDO: 'Enviando',
+  ENVIADO: 'Enviado',
+  FALLIDO: 'Fallido',
+  DESCARTADO: 'Descartado',
+};
+
+/** Cómo salió el mensaje: texto libre o plantilla (lo que Meta aceptó). */
+export function textoCanal(canal: SalienteAdmin['canal']): string {
+  if (!canal) return 'no registrado';
+  if (canal.tipo === 'TEXTO') return 'texto libre';
+  if (canal.tipo === 'PLANTILLA') return `plantilla${canal.plantilla ? ` ${canal.plantilla}` : ''}`;
+  return canal.tipo.toLowerCase();
 }
 
 export const ETIQUETA_CLASIFICACION: Record<string, string> = {

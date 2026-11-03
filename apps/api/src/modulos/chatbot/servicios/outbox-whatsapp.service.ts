@@ -11,7 +11,7 @@ import {
   WhatsAppMensajeriaPuerto,
 } from '../puerto/whatsapp-mensajeria.puerto';
 import { botonCodigoDe, CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
-import { enmascararTelefono } from '../utilidades/enmascarar.util';
+import { enmascararTelefono, ORIGEN_CODIGO_CUENTA, textoParaPersonal } from '../utilidades/enmascarar.util';
 import { PayloadMensajeNegocio, Ventana24hService } from './ventana-24h.service';
 import { enviarCarruselConRespaldo, resumenCarrusel } from './carrusel.util';
 import { CargaInteractivo, normalizarInteractivo, textoConVinetas } from './interactivo.util';
@@ -454,7 +454,7 @@ export class OutboxWhatsappService {
           origen: fila.origen,
           etapa: carga.etapa ?? null,
           pedido: carga.pedidoCodigo ?? null,
-          texto: i?.carrusel ? resumenCarrusel(i.carrusel) : (carga.textoLibre ?? null),
+          texto: i?.carrusel ? resumenCarrusel(i.carrusel) : textoParaPersonal(fila.origen, carga.textoLibre),
           plantilla: carga.plantillaClave ?? null,
           ...(i
             ? {
@@ -604,9 +604,16 @@ export class OutboxWhatsappService {
     return { enviados, descartados };
   }
 
-  /** Lista para la pestaña Salientes: mensajes por estado, con teléfono enmascarado y paginado. */
-  async listar(estado?: string, pagina = 1, limite = 20) {
-    const where: Prisma.SalienteWhatsappWhereInput = estado ? { estado } : {};
+  /**
+   * Lista para la pestaña Salientes: por estado y/o origen, con teléfono enmascarado y paginado.
+   * Canal: lo que Meta aceptó (texto libre o plantilla) se toma de whatsapp_mensaje por wa_message_id;
+   * si no hay ese id (fallido, o simulado) queda null. Los códigos de cuenta salen con los dígitos enmascarados.
+   */
+  async listar(estado?: string, pagina = 1, limite = 20, origen?: string) {
+    const where: Prisma.SalienteWhatsappWhereInput = {
+      ...(estado ? { estado } : {}),
+      ...(origen ? { origen } : {}),
+    };
     const [filas, total] = await Promise.all([
       this.prisma.salienteWhatsapp.findMany({
         where,
@@ -617,23 +624,35 @@ export class OutboxWhatsappService {
       }),
       this.prisma.salienteWhatsapp.count({ where }),
     ]);
+    const waIds = filas.map((f) => f.wa_message_id).filter((x): x is string => !!x);
+    const canales = waIds.length
+      ? await this.prisma.whatsappMensaje.findMany({
+          where: { wa_message_id: { in: waIds } },
+          select: { wa_message_id: true, tipo: true, plantilla: true },
+        })
+      : [];
+    const canalPorWa = new Map(canales.map((c) => [c.wa_message_id, c]));
     return {
       pagina,
       limite,
       total,
       filas: filas.map((f) => {
         const carga = (f.carga ?? {}) as unknown as CargaSaliente;
+        const canal = f.wa_message_id ? canalPorWa.get(f.wa_message_id) : undefined;
+        const esCodigo = f.origen === ORIGEN_CODIGO_CUENTA;
         return {
           id: f.id.toString(),
           telefono: enmascararTelefono(f.telefono_destino),
           origen: f.origen,
+          proposito: esCodigo ? (carga.plantillaClave === 'CODIGO_RECUPERAR' ? 'RECUPERAR' : 'REGISTRO') : null,
           tipo: f.tipo,
           estado: f.estado,
+          canal: canal ? { tipo: canal.tipo, plantilla: canal.plantilla } : null,
           intentos: f.intentos,
           maxIntentos: f.max_intentos,
           ultimoError: f.ultimo_error,
           clasificacion: f.estado === 'FALLIDO' ? clasificarFallo(f.ultimo_error?.match(/^\[([A-Z_]+)\]/)?.[1], f.intentos >= f.max_intentos) : null,
-          texto: carga.textoLibre ?? null,
+          texto: textoParaPersonal(f.origen, carga.textoLibre),
           pedidoCodigo: f.pedido?.codigo ?? null,
           motivoDescarte: f.motivo_descarte,
           creadoEn: f.creado_en,
