@@ -24,6 +24,7 @@ import { versionConsentimiento, versionesLegales } from '../reclamos/textos-lega
 import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
 import { CELULAR_OTRA_PERSONA, partyDeCelular } from './celular-party.util';
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
+import { exigirCumpleanos, formatearCumpleanos, parsearCumpleanos } from './cumpleanos.util';
 import { explicarPedidosPorId } from './explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from './explicar-puntos-pedido';
 import {
@@ -98,30 +99,7 @@ export function enmascararDoc(doc: string): string {
   return s.length > 4 ? `${s.slice(0, 2)}****${s.slice(-2)}` : '****';
 }
 
-export function parsearCumpleanos(fechaStr: string): { dia: number; mes: number } | null {
-  if (!fechaStr) return null;
-  const s = String(fechaStr).trim();
-  // Formato YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const [, m, d] = s.split('-').map(Number);
-    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-      return { dia: d, mes: m };
-    }
-  }
-  // Formato DD/MM
-  if (/^\d{1,2}\/\d{1,2}$/.test(s)) {
-    const [d, m] = s.split('/').map(Number);
-    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-      return { dia: d, mes: m };
-    }
-  }
-  return null;
-}
-
-export function formatearCumpleanos(dia?: number | null, mes?: number | null): string {
-  if (!dia || !mes) return '—';
-  return `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`;
-}
+export { parsearCumpleanos, formatearCumpleanos } from './cumpleanos.util';
 
 export function telefonoDeContactos(contactos: { tipo: string; valor: string }[] = []): string | null {
   const telefono = contactos.find((c) => c.tipo === 'TELEFONO') ?? contactos.find((c) => c.tipo === 'WHATSAPP');
@@ -228,7 +206,7 @@ export class ClientesService {
       });
     }
 
-    if (!dto.nombre || dto.nombre.trim().length < 3) {
+    if (!dto.nombre || dto.nombre.trim().length < 2) {
       throw new BadRequestException({
         codigo: 'NOMBRE_REQUERIDO',
         mensaje: 'Escribe tu nombre.',
@@ -247,13 +225,8 @@ export class ClientesService {
       });
     }
 
-    const cumple = dto.cumpleanos ? parsearCumpleanos(dto.cumpleanos) : null;
-    if (dto.cumpleanos && !cumple) {
-      throw new BadRequestException({
-        codigo: 'FECHA_INVALIDA',
-        mensaje: 'La fecha de cumpleaños no es válida.',
-      });
-    }
+    // Cumpleaños obligatorio: día y mes (año opcional), fecha real, no futura
+    const cumple = exigirCumpleanos(dto.cumpleanos);
 
     const correo = dto.correo?.trim() || null;
     if (correo && !/^\S+@\S+\.\S+$/.test(correo)) {
@@ -769,27 +742,20 @@ export class ClientesService {
   }
 
   /**
-   * Guarda o actualiza la fecha de cumpleaños del cliente desde la carta.
+   * Completa la fecha de cumpleaños desde la carta. Solo la guarda si la cuenta aún no la tiene:
+   * cambiarla es una edición de perfil (actualizarPerfil), no este paso.
    */
   async guardarCumpleanos(partyId: bigint | string, fechaStr: string) {
     const id = BigInt(partyId);
-    const c = parsearCumpleanos(fechaStr);
-    if (!c) {
-      throw new BadRequestException({
-        codigo: 'FECHA_INVALIDA',
-        mensaje: 'La fecha de cumpleaños no es válida.',
-      });
-    }
+    const c = exigirCumpleanos(fechaStr);
 
-    await this.prisma.person.update({
-      where: { party_id: id },
-      data: {
-        cumple_dia: c.dia,
-        cumple_mes: c.mes,
-      },
+    await this.prisma.person.updateMany({
+      where: { party_id: id, cumple_dia: null },
+      data: { cumple_dia: c.dia, cumple_mes: c.mes },
     });
 
-    return { ok: true, cumpleanos: formatearCumpleanos(c.dia, c.mes) };
+    const persona = await this.prisma.person.findUnique({ where: { party_id: id }, select: { cumple_dia: true, cumple_mes: true } });
+    return { ok: true, cumpleanos: formatearCumpleanos(persona?.cumple_dia, persona?.cumple_mes) };
   }
 
   // ========================================================

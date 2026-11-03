@@ -32,6 +32,7 @@ import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { ComprobanteDefectoService } from '../comprobantes/comprobante-defecto.service';
 import { tipoComprobanteEfectivo } from '../comprobantes/comprobante-defecto';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
+import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO' | 'CAJA' | 'WHATSAPP' | 'BOT';
@@ -185,6 +186,7 @@ export class PedidosService {
       origen?.omitirChequeoCarta === true;
     let clienteNombre: string | null = null;
     let telefonoLimpio: string | null = null;
+    let cumpleCliente: Cumpleanos | null = null;
 
     if (esMozo) {
       clienteNombre =
@@ -228,6 +230,15 @@ export class PedidosService {
         });
       }
       clienteNombre = dto.cliente.nombre.trim();
+      // Alta de cliente por celular desde la carta sin sesión: nombre (2+ letras) y cumpleaños obligatorios
+      if (esCartaSinSesion && celularValido) {
+        if (clienteNombre.length < 2) {
+          throw new BadRequestException({ codigo: 'NOMBRE_REQUERIDO', mensaje: 'Escribe tu nombre completo para sumar puntos con tu celular.' });
+        }
+        cumpleCliente = exigirCumpleanos(dto.cliente.cumpleanos);
+      } else if ((origen?.canal ?? 'CARTA') === 'CARTA' && dto.cliente?.cumpleanos) {
+        cumpleCliente = exigirCumpleanos(dto.cliente.cumpleanos);
+      }
     }
 
     // 4. Validar comprobante (sin tipo elegido, el efectivo se decide con el total, más abajo)
@@ -475,6 +486,10 @@ export class PedidosService {
 
     // 5.0. Cliente con cuenta identificado (suma puntos, historial y direcciones)
     const clienteFinal = await this.clienteIdentificado(dto, origen);
+    // Carta con cuenta o celular: completa nombre y cumpleaños solo si el cliente aún no los tiene
+    if (cumpleCliente && clienteFinal && this.puntosParty) {
+      await this.puntosParty.completarDatos(clienteFinal, { nombre: clienteNombre ?? undefined, cumple: cumpleCliente });
+    }
     // Cliente con cuenta de mozo/caja: si el pedido no trae nombre o teléfono propios, se toman de su cuenta
     if (esMozo && clienteFinal && this.direcciones) {
       const cuenta = await this.direcciones.datosCuentaActiva(clienteFinal);
