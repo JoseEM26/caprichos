@@ -109,7 +109,7 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
   });
 
   describe('2.a) Alertas de Voucher sin revisar (5 min y 15 min con urgente)', () => {
-    it('dispara alerta a los 5 minutos sin marcar urgente', async () => {
+    it('a los 6 minutos no avisa todavía (umbral único de 30 min)', async () => {
       const ahora = new Date('2026-10-27T12:06:00Z');
       const timestampCaptura = new Date('2026-10-27T12:00:00Z').getTime(); // 6 min de espera
 
@@ -131,28 +131,14 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
       });
 
       const res = await service.ejecutarCiclo(ahora);
-      expect(res.alertasVoucherEnviadas).toBe(1);
-      expect(avisosInternosMock.enviarAvisoAdmin).toHaveBeenCalledWith(
-        'Voucher sin revisar (5 min)',
-        expect.stringContaining('lleva 6 min esperando'),
-        '/admin/mensajes',
-        undefined,
-        expect.stringContaining('idemp:alerta:voucher:5m:101:1'),
-      );
-      // No debe haber marcado urgente aún (umbral 2 es 15 min)
+      expect(res.alertasVoucherEnviadas).toBe(0);
+      expect(avisosInternosMock.enviarAvisoAdmin).not.toHaveBeenCalled();
       expect(prismaMock.conversacion.update).not.toHaveBeenCalled();
     });
 
-    it('a los 15 minutos marca el chat como urgente y envía alerta crítica', async () => {
-      const ahora = new Date('2026-10-27T12:16:00Z');
-      const timestampCaptura = new Date('2026-10-27T12:00:00Z').getTime(); // 16 min de espera
-
-      // Simular que el umbral de 5m ya fue enviado en Redis
-      const redisClient = redisMock.obtenerCliente();
-      redisClient.set.mockImplementation((clave: string) => {
-        if (clave.includes(':5m:')) return Promise.resolve(null); // ya existía
-        return Promise.resolve('OK');
-      });
+    it('a los 30 minutos marca el chat como urgente y avisa por correo', async () => {
+      const ahora = new Date('2026-10-27T12:31:00Z');
+      const timestampCaptura = new Date('2026-10-27T12:00:00Z').getTime(); // 31 min de espera
 
       prismaMock.conversacion.findMany.mockImplementation(({ where }: any) => {
         if (where?.estado === 'VALIDAR_PAGO') {
@@ -188,11 +174,12 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
 
       // Envía aviso urgente
       expect(avisosInternosMock.enviarAvisoAdmin).toHaveBeenCalledWith(
-        'URGENTE: Voucher sin revisar (15 min)',
+        'Voucher sin revisar (30 min)',
         expect.stringContaining('URGENTE'),
         '/admin/mensajes',
         undefined,
-        expect.stringContaining('idemp:alerta:voucher:15m:101:1'),
+        expect.stringContaining('idemp:alerta:voucher:30m:101:1'),
+        { correo: true },
       );
     });
   });
@@ -353,9 +340,9 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
       );
     });
 
-    it('2.c: alerta si pedido nuevo en Caja no se confirma por más de 5 minutos', async () => {
-      const ahora = new Date('2026-10-27T12:10:00Z');
-      const creadoEn = new Date('2026-10-27T12:02:00Z'); // 8 min
+    it('2.c: alerta por correo si pedido nuevo en Caja no se confirma en 30 minutos', async () => {
+      const ahora = new Date('2026-10-27T12:40:00Z');
+      const creadoEn = new Date('2026-10-27T12:02:00Z'); // 38 min
 
       prismaMock.pedido.findMany.mockResolvedValueOnce([
         {
@@ -372,11 +359,12 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
       const res = await service.ejecutarCiclo(ahora);
       expect(res.alertasCajaEnviadas).toBe(1);
       expect(avisosInternosMock.enviarAvisoAdmin).toHaveBeenCalledWith(
-        'Pedido CP-0505 sin confirmar (8 min)',
+        'Pedido CP-0505 sin confirmar (38 min)',
         expect.stringContaining('Pedro'),
         '/admin/caja',
         expect.any(Array),
         expect.stringContaining('idemp:alerta:pedido:caja:505'),
+        { correo: true },
       );
     });
 
@@ -412,7 +400,8 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
         expect.stringContaining('2.00 KG'),
         '/admin/stock',
         undefined,
-        expect.stringContaining('idemp:alerta:stock:606:2026-10-27'),
+        'almacen:Queso Cheddar:POR_PEDIR:2026-10-27',
+        { correo: true },
       );
 
       expect(avisosInternosMock.enviarAvisoAdmin).toHaveBeenCalledWith(
@@ -421,6 +410,7 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
         '/admin/configuracion',
         undefined,
         expect.stringContaining('idemp:alerta:impresora:707'),
+        { correo: true },
       );
     });
 

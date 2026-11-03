@@ -25,6 +25,9 @@ export interface UmbralesAlertasEspera {
   alertaPedidoSinConfirmarMin: number;
 }
 
+/** Voucher sin revisar o pedido sin confirmar: un solo aviso por correo a los 30 min (sin repetir por caso). */
+export const UMBRAL_SIN_ATENDER_MIN = 30;
+
 export const BOTONES_ESPERA_CLIENTE: BotonAccion[] = [
   { id: 'btn_esp_carta', titulo: 'Ver la carta' },
   { id: 'btn_esp_esperar', titulo: 'Seguir esperando' },
@@ -194,8 +197,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
 
       // =========================================================================
       // 1) SECCIÓN 2.a & 3: Conversaciones en VALIDAR_PAGO
-      // - Alerta 1 a los 5 min (alerta_voucher_min_1)
-      // - Alerta 2 a los 15 min (alerta_voucher_min_2) -> chat marcado como urgente
+      // - Aviso al equipo por correo a los 30 min sin revisar -> chat marcado como urgente
       // - Mensaje único de espera al cliente a los 10 min (espera_cliente_aviso_min)
       // =========================================================================
       const conversacionesVoucher = await this.prisma.conversacion.findMany({
@@ -222,17 +224,26 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
         const codigoPedido = pago.pedidoCodigo ? ` (${pago.pedidoCodigo})` : '';
         const botonesComanda = pago.pedidoId ? BOTONES_AVISO_PEDIDO(pago.pedidoId) : undefined;
 
-        // a) Alerta a los 5 min (Umbral 1)
-        if (minutosEspera >= umbrales.alertaVoucherMin1) {
-          const claveIdemp1 = `idemp:alerta:voucher:5m:${conv.id}:${capturasEnviadas}`;
-          const esPrimero = await this.adquirirIdempotencia(claveIdemp1);
+        // a) Un solo aviso al equipo por correo a los 30 min: el chat queda urgente
+        if (minutosEspera >= UMBRAL_SIN_ATENDER_MIN) {
+          const claveIdemp30 = `idemp:alerta:voucher:30m:${conv.id}:${capturasEnviadas}`;
+          const esPrimero = await this.adquirirIdempotencia(claveIdemp30);
           if (esPrimero) {
+            await this.prisma.conversacion.update({
+              where: { id: conv.id },
+              data: { urgente: true },
+            }).catch(() => {});
+            this.eventosGateway?.emitirAdmin('mensajes:actualizar', {
+              id: conv.id.toString(),
+              urgente: true,
+            });
             await this.avisosInternosService.enviarAvisoAdmin(
-              `Voucher sin revisar (${umbrales.alertaVoucherMin1} min)`,
-              `El comprobante de pago de ${nombreCliente}${codigoPedido} lleva ${minutosEspera} min esperando revisión en Caja.`,
+              `Voucher sin revisar (${UMBRAL_SIN_ATENDER_MIN} min)`,
+              `El comprobante de pago de ${nombreCliente}${codigoPedido} lleva ${minutosEspera} min esperando revisión en Caja. Chat marcado como URGENTE.`,
               '/admin/mensajes',
               botonesComanda,
-              claveIdemp1,
+              claveIdemp30,
+              { correo: true },
             );
             alertasVoucherEnviadas++;
           }
@@ -263,34 +274,6 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
 
               avisosEsperaClienteEnviados++;
             }
-          }
-        }
-
-        // c) Alerta a los 15 min (Umbral 2: marcar urgente y avisar)
-        if (minutosEspera >= umbrales.alertaVoucherMin2) {
-          const claveIdemp2 = `idemp:alerta:voucher:15m:${conv.id}:${capturasEnviadas}`;
-          const esPrimero = await this.adquirirIdempotencia(claveIdemp2);
-          if (esPrimero) {
-            // Marcar conversación como urgente en BD
-            await this.prisma.conversacion.update({
-              where: { id: conv.id },
-              data: { urgente: true },
-            }).catch(() => {});
-
-            // Notificar por WebSocket al panel de Mensajes
-            this.eventosGateway?.emitirAdmin('mensajes:actualizar', {
-              id: conv.id.toString(),
-              urgente: true,
-            });
-
-            await this.avisosInternosService.enviarAvisoAdmin(
-              `URGENTE: Voucher sin revisar (${umbrales.alertaVoucherMin2} min)`,
-              `El comprobante de pago de ${nombreCliente}${codigoPedido} no ha sido revisado en ${minutosEspera} min. Chat marcado como URGENTE.`,
-              '/admin/mensajes',
-              botonesComanda,
-              claveIdemp2,
-            );
-            alertasVoucherEnviadas++;
           }
         }
       }
@@ -425,7 +408,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
 
       for (const ped of pedidosSinConfirmar) {
         const minutosCreado = Math.floor((ahora.getTime() - new Date(ped.creado_en).getTime()) / (60 * 1000));
-        if (minutosCreado >= umbrales.alertaPedidoSinConfirmarMin) {
+        if (minutosCreado >= UMBRAL_SIN_ATENDER_MIN) {
           const claveIdempPed = `idemp:alerta:pedido:caja:${ped.id}`;
           const esPrimero = await this.adquirirIdempotencia(claveIdempPed);
           if (esPrimero) {
@@ -435,6 +418,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
               '/admin/caja',
               BOTONES_AVISO_PEDIDO(ped.id),
               claveIdempPed,
+              { correo: true },
             );
             alertasCajaEnviadas++;
           }
@@ -459,12 +443,14 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
           const esPrimero = await this.adquirirIdempotencia(claveIdempStock);
           if (esPrimero) {
             const estadoTexto = stockTotal <= 0 ? 'AGOTADO' : 'POR_PEDIR';
+            // Misma clave que el aviso instantáneo de almacén: el correo de un insumo y día no se repite
             await this.avisosInternosService.enviarAvisoAdmin(
               `Alerta de Stock: ${insumo.nombre} (${estadoTexto})`,
               `El insumo ${insumo.nombre} tiene stock ${stockTotal.toFixed(2)} ${insumo.unidad_almacen} (Mínimo: ${minimo.toFixed(2)}).`,
               '/admin/stock',
               undefined,
-              claveIdempStock,
+              `almacen:${insumo.nombre.slice(0, 100)}:${estadoTexto}:${fechaHoy}`,
+              { correo: true },
             );
             alertasStockEnviadas++;
           }
@@ -491,6 +477,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
             '/admin/configuracion',
             undefined,
             claveIdempImp,
+            { correo: true },
           );
           alertasImpresoraEnviadas++;
         }
@@ -597,6 +584,9 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
       `Hay ${pendientes} etiqueta(s) en cola desde hace más de ${minutos} min y ${motivo}. ` +
         'Revisa que la PC de la etiquetera esté encendida, con el programa de impresión abierto y con sesión iniciada.',
       '/admin/caja',
+      undefined,
+      `impresion:sin-agente:${masViejo.id}`,
+      { correo: true },
     );
     return 1;
   }
