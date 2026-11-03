@@ -16,6 +16,8 @@
 
 /** Orden de borrado (hijas antes que party). */
 export const BORRAR_CUENTAS: string[] = [
+  // Marca por celular (bienvenida a los puntos): dato personal, se borra con las cuentas de cliente
+  'aviso_cliente_unico',
   'movimiento_puntos', 'cliente_direccion', 'data_request', 'customer_detail', 'party_role',
   'party_identifier', 'person', 'contact_mechanism', 'consent', 'customer_account', 'sesion',
   'party',
