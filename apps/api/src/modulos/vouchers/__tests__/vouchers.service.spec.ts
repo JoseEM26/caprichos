@@ -55,9 +55,12 @@ describe('VouchersService', () => {
           codigo: 'PED-50',
           total: 35.0,
           pago_preferido: 'YAPE',
+          comprobante_tipo: 'BOLETA',
+          comprobante_doc: null,
         }),
         update: jest.fn().mockResolvedValue({}),
       },
+      comprobante: { findFirst: jest.fn().mockResolvedValue(null) },
       pedidoPagoPlan: {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
         createMany: jest.fn().mockResolvedValue({ count: 2 }),
@@ -881,7 +884,7 @@ describe('Envío a Caja: nota de venta, boleta/factura y efectivo recibido', () 
       $transaction: jest.fn(async (fn: any) => fn(prisma)),
     };
     comprobantesMock = {
-      emitirParaPedido: jest.fn().mockResolvedValue({ id: '7', tipo: 'NOTA_VENTA', numero_texto: 'NV01-000001', advertencia: null }),
+      emitirParaPedido: jest.fn(),
     };
     impresionMock = { encolarNotaMozo: jest.fn().mockResolvedValue(undefined) };
 
@@ -901,34 +904,29 @@ describe('Envío a Caja: nota de venta, boleta/factura y efectivo recibido', () 
     svc = module.get<VouchersService>(VouchersService);
   });
 
-  it('nota de venta: se emite con correlativo antes de guardar el cobro, y se imprime en la ticketera de Caja', async () => {
-    await svc.enviarACaja('50', '', mozo, undefined, planEfectivo, { recibido: 50, comprobante: { tipo: 'NOTA_VENTA' } });
-
-    expect(prisma.pedido.update).toHaveBeenCalledWith({
-      where: { id: 50n },
-      data: expect.objectContaining({
-        comprobante_tipo: 'NOTA_VENTA',
-        comprobante_doc: null,
-        cobro_mozo_recibido: 50,
-      }),
-    });
-    expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledWith(50n, expect.anything(), mozo, undefined);
-    expect(prisma.pedido.update.mock.invocationCallOrder[0]).toBeLessThan(
-      comprobantesMock.emitirParaPedido.mock.invocationCallOrder[0],
-    );
-    expect(impresionMock.encolarNotaMozo).toHaveBeenCalledWith(50n, expect.objectContaining({ numero_texto: 'NV01-000001' }), {
-      pagos: [{ medio: 'EFECTIVO', monto: 35 }],
-      recibido: 50,
-      mozo: 'Juan Mozo',
-    });
+  it('nota de venta ya no es comprobante: el envío se rechaza y no guarda nada', async () => {
+    await expect(
+      svc.enviarACaja('50', '', mozo, undefined, planEfectivo, { recibido: 50, comprobante: { tipo: 'NOTA_VENTA' } }),
+    ).rejects.toMatchObject({ response: { codigo: 'COMPROBANTE_OBLIGATORIO' } });
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
+    expect(comprobantesMock.emitirParaPedido).not.toHaveBeenCalled();
   });
 
-  it('sin elegir comprobante: nota de venta por defecto aunque el pedido diga BOLETA sin DNI', async () => {
+  it('sin elegir comprobante: usa el que ya guardó el pedido (boleta sin DNI); el mozo no emite nada', async () => {
     await svc.enviarACaja('50', 'EFECTIVO', mozo);
-    expect(comprobantesMock.emitirParaPedido).toHaveBeenCalledTimes(1);
+    expect(comprobantesMock.emitirParaPedido).not.toHaveBeenCalled();
     expect(prisma.pedido.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ comprobante_tipo: 'NOTA_VENTA' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ comprobante_tipo: 'BOLETA', comprobante_doc: null }) }),
     );
+  });
+
+  it('pedido sin boleta ni factura y sin elegir: 400 COMPROBANTE_OBLIGATORIO', async () => {
+    prisma.pedido.findUnique.mockResolvedValue({
+      id: 50n, codigo: 'PED-50', total: 35, pago_estado: 'PENDIENTE',
+      comprobante_tipo: 'NOTA_VENTA', comprobante_doc: null, comprobante_razon: null,
+    });
+    await expect(svc.enviarACaja('50', 'EFECTIVO', mozo)).rejects.toMatchObject({ response: { codigo: 'COMPROBANTE_OBLIGATORIO' } });
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
   });
 
   it('boleta: el mozo no emite nota ni imprime; guarda el DNI', async () => {
@@ -999,12 +997,10 @@ describe('Envío a Caja: nota de venta, boleta/factura y efectivo recibido', () 
     );
   });
 
-  it('efectivo sin «Pagó con»: se guarda sin recibido (la nota sale sin vuelto)', async () => {
+  it('efectivo sin «Pagó con»: se guarda sin recibido', async () => {
     await svc.enviarACaja('50', '', mozo, undefined, planEfectivo, {});
-    expect(impresionMock.encolarNotaMozo).toHaveBeenCalledWith(
-      50n,
-      expect.anything(),
-      expect.objectContaining({ recibido: null }),
+    expect(prisma.pedido.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ cobro_mozo_recibido: null }) }),
     );
   });
 });

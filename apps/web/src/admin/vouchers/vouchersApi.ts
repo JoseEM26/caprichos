@@ -6,10 +6,10 @@ import {
 } from './tipos';
 import type { PlanPagoItem } from '../pedidos/planPago';
 
-/** Lo que el mozo elige al enviar a Caja: efectivo con el que paga y comprobante (nota de venta por defecto). */
+/** Lo que el mozo elige al enviar a Caja: efectivo con el que paga y comprobante (boleta o factura, obligatorio). */
 export interface EnvioCajaExtra {
   recibido?: number;
-  comprobante?: { tipo: 'NOTA_VENTA' | 'BOLETA' | 'FACTURA'; doc?: string; razon?: string; direccion?: string };
+  comprobante?: { tipo: 'BOLETA' | 'FACTURA'; doc?: string; razon?: string; direccion?: string };
 }
 
 export interface FiltrosListarVouchers {

@@ -499,6 +499,33 @@ describe('PedidosService', () => {
       expect(prismaMock.pedido.create).not.toHaveBeenCalled();
     });
 
+    it('comprobante obligatorio: sin tipo, o nota de venta, -> 400 COMPROBANTE_OBLIGATORIO y no crea el pedido', async () => {
+      for (const comprobante of [undefined, { tipo: 'NOTA_VENTA' } as any]) {
+        await expect(service.crear({ ...pedidoBaseDto, comprobante }, 'idemp-sin-comp')).rejects.toMatchObject({
+          response: { codigo: 'COMPROBANTE_OBLIGATORIO' },
+        });
+      }
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('boleta hasta S/ 700 sin DNI pasa: nunca se rechaza la venta por el DNI', async () => {
+      const sinDni: CrearPedidoDto = { ...pedidoBaseDto, comprobante: { tipo: 'BOLETA' } };
+      prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W002', estado: 'COLA', subtotal: 28.0, envio: 5.0, total: 33.0 });
+      await service.crear(sinDni, 'idemp-boleta-sin-dni');
+      expect(prismaMock.pedido.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ comprobante_tipo: 'BOLETA', comprobante_doc: null }) }),
+      );
+    });
+
+    it('factura sin RUC de 11 dígitos o sin razón social -> 400 FACTURA_DATOS_INCOMPLETOS', async () => {
+      await expect(
+        service.crear({ ...pedidoBaseDto, comprobante: { tipo: 'FACTURA', ruc: '2012345678', razonSocial: 'Acme SAC' } }, 'idemp-f-1'),
+      ).rejects.toMatchObject({ response: { codigo: 'FACTURA_DATOS_INCOMPLETOS' } });
+      await expect(
+        service.crear({ ...pedidoBaseDto, comprobante: { tipo: 'FACTURA', ruc: '20123456789', razonSocial: ' ' } }, 'idemp-f-2'),
+      ).rejects.toMatchObject({ response: { codigo: 'FACTURA_DATOS_INCOMPLETOS' } });
+    });
+
     it('7. factura sin ruc o incompleta -> 400 FACTURA_DATOS_INCOMPLETOS', async () => {
       const pedidoFacturaInvalida: CrearPedidoDto = {
         ...pedidoBaseDto,
@@ -738,6 +765,7 @@ describe('PedidosService', () => {
           modalidad: 'MESA',
           lineas: pedidoBaseDto.lineas,
           pago: { metodo: 'EFECTIVO' },
+          comprobante: { tipo: 'BOLETA' },
         };
 
         let pedidoCreadoData: any = null;

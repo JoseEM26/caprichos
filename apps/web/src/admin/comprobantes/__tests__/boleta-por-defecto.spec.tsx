@@ -23,13 +23,15 @@ beforeEach(() => {
 });
 
 describe('Boleta electrónica por defecto (Electrónicos SUNAT)', () => {
-  it('muestra la marca, explica que en simulado no cambia nada y cambia con Sí/No', async () => {
+  it('muestra la marca como sugerencia (no obliga), en cualquier proveedor, y cambia con Sí/No', async () => {
     vi.spyOn(comprobantesApi, 'obtenerBoletaPorDefecto').mockResolvedValue({ activo: true, aplica: false, proveedor_efectivo: 'SIMULADO' });
     const guardar = vi.spyOn(comprobantesApi, 'guardarBoletaPorDefecto').mockResolvedValue({ activo: false, aplica: false, proveedor_efectivo: 'SIMULADO' });
     render(<ElectronicosTab />);
 
     const seccion = await screen.findByRole('region', { name: 'Boleta electrónica por defecto' });
-    expect(seccion.textContent).toMatch(/en Simulado no cambia nada/);
+    expect(seccion.textContent).toMatch(/selector del mozo y de Caja empieza con Boleta/);
+    expect(seccion.textContent).toMatch(/hay que confirmarla igual/);
+    expect(seccion.textContent).not.toMatch(/sale como nota de venta/);
     expect(screen.getByRole('button', { name: 'Sí' }).getAttribute('aria-pressed')).toBe('true');
 
     fireEvent.click(screen.getByRole('button', { name: 'No' }));

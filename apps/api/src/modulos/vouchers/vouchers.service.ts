@@ -20,9 +20,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { VouchersIaService } from './vouchers-ia.service';
-import { ComprobantesService } from '../comprobantes/comprobantes.service';
-import { validarDocumentoComprobante } from '../comprobantes/comprobantes.util';
-import { ImpresionService } from '../impresion/impresion.service';
+import { esComprobanteElegible, validarDocumentoComprobante } from '../comprobantes/comprobantes.util';
 import {
   montoDeMedioDigital,
   mediosDigitalesDelPedido,
@@ -52,7 +50,7 @@ const MEDIOS_ENVIO_CAJA = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA
 /** Medios que llevan captura (voucher o foto de la copia del POS): no son solo efectivo. */
 export const MEDIOS_CON_VOUCHER_CAJA = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
 
-/** Lo que el mozo elige al enviar a Caja: vuelto (efectivo) y comprobante (nota de venta por defecto). */
+/** Lo que el mozo elige al enviar a Caja: vuelto (efectivo) y comprobante (boleta o factura, obligatorio). */
 export interface EnviarACajaOpciones {
   recibido?: unknown;
   comprobante?: { tipo?: unknown; doc?: unknown; razon?: unknown; direccion?: unknown };
@@ -76,8 +74,6 @@ export class VouchersService {
     private readonly vouchersIaService: VouchersIaService,
     private readonly pagoPlan: PagoPlanService,
     @Optional() private readonly eventos?: EventosGateway,
-    @Optional() private readonly comprobantes?: ComprobantesService,
-    @Optional() private readonly impresion?: ImpresionService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -657,8 +653,7 @@ export class VouchersService {
   /**
    * El mozo envía a Caja el cobro de la mesa (plan de pago, vuelto y comprobante). No cobra: Caja revisa y cobra.
    * - Efectivo: «Pagó con» (recibido) no puede ser menor que lo que va en efectivo; se guarda para el vuelto.
-   * - Nota de venta (por defecto): se emite ya con su correlativo y se imprime en la ticketera de Caja.
-   *   Boleta o factura: el mozo no las emite; Caja las emite después (al cobrar).
+   * - Comprobante: boleta o factura obligatoria. El mozo no lo emite: Caja lo emite al cobrar.
    * - Tarjeta y medios digitales llevan captura: un voucher vigente y legible ya cubre el aviso.
    * Sin `plan` se usa solo `medio` (forma anterior) y no se toca el plan guardado.
    * Al mozo solo se le responde ok: nunca el semáforo ni los datos del voucher.
@@ -715,17 +710,16 @@ export class VouchersService {
         : 0;
     const recibido = this.recibidoEfectivo(opciones.recibido, montoEfectivo);
     const comprobante = this.comprobanteDelEnvio(pedido, opciones.comprobante);
-    if (comprobante.tipo !== 'NOTA_VENTA') {
-      const notaVigente = await this.prisma.comprobante.findFirst({
-        where: { pedido_id: id, tipo: 'NOTA_VENTA', anulado_en: null },
-        select: { id: true },
+    // Una nota de venta emitida antes del cambio de regla (cobro del mozo) bloquea el cambio hasta que Caja la rechace
+    const notaVigente = await this.prisma.comprobante.findFirst({
+      where: { pedido_id: id, tipo: 'NOTA_VENTA', anulado_en: null },
+      select: { id: true },
+    });
+    if (notaVigente) {
+      throw new ConflictException({
+        codigo: 'NOTA_YA_EMITIDA',
+        mensaje: 'Ya se emitió la nota de venta de este pedido. Pide a Caja que rechace el cobro del mozo antes de cambiar a boleta o factura',
       });
-      if (notaVigente) {
-        throw new ConflictException({
-          codigo: 'NOTA_YA_EMITIDA',
-          mensaje: 'Ya se emitió la nota de venta de este pedido. Pide a Caja que rechace el cobro del mozo antes de cambiar a boleta o factura',
-        });
-      }
     }
 
     // Medios que llevan captura: digitales (voucher) y tarjeta (copia del POS, sin lectura IA)
@@ -803,8 +797,6 @@ export class VouchersService {
     const medioCobro = planValidado
       ? [...new Set(planValidado.map((f) => f.medio))].join('+')
       : medioNormalizado;
-    // Cambio del pedido y nota de venta en una sola transacción: no queda la nota sin el cambio ni al revés
-    const esNotaVenta = comprobante.tipo === 'NOTA_VENTA' && !!this.comprobantes;
     const datosMozo = {
       cobro_mozo_en: new Date(),
       cobro_mozo_medio: medioCobro,
@@ -815,31 +807,7 @@ export class VouchersService {
       comprobante_razon: comprobante.razon,
       comprobante_direccion: comprobante.direccion,
     };
-    let nota: any = null;
-    if (esNotaVenta) {
-      nota = await this.prisma.$transaction(async (tx) => {
-        await tx.pedido.update({ where: { id }, data: datosMozo });
-        // Idempotente: reenviar no emite otra nota ni la vuelve a imprimir
-        return this.comprobantes!.emitirParaPedido(id, tx, usuario, ip);
-      });
-    } else {
-      await this.prisma.pedido.update({ where: { id }, data: datosMozo });
-    }
-
-    if (esNotaVenta && nota) {
-      const persona = await this.prisma.person.findUnique({
-        where: { party_id: usuario.partyId },
-        select: { nombres: true, apellidos: true },
-      });
-      const pagos = planValidado
-        ? planValidado.map((f) => ({ medio: f.medio, monto: f.monto }))
-        : [{ medio: medioNormalizado, monto: Number(pedido.total) }];
-      await this.impresion?.encolarNotaMozo(id, nota, {
-        pagos,
-        recibido,
-        mozo: persona ? `${persona.nombres} ${persona.apellidos ?? ''}`.trim() : null,
-      });
-    }
+    await this.prisma.pedido.update({ where: { id }, data: datosMozo });
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -879,8 +847,8 @@ export class VouchersService {
   }
 
   /**
-   * Comprobante del envío. Sin elección: lo que ya tenga el pedido si es boleta o factura con documento;
-   * si no, nota de venta. Boleta: DNI opcional; factura exige RUC y razón social (regla compartida).
+   * Comprobante del envío: el elegido o, si no llega, el que ya guardó el pedido al crearse.
+   * Tiene que ser boleta o factura (obligatorio). Boleta: DNI opcional; factura exige RUC y razón social.
    */
   private comprobanteDelEnvio(
     pedido: {
@@ -892,27 +860,15 @@ export class VouchersService {
     },
     elegido?: EnviarACajaOpciones['comprobante'],
   ): { tipo: string; doc: string | null; razon: string | null; direccion: string | null } {
-    let tipo: string;
-    let doc: string | null;
-    let razon: string | null;
-    let direccion: string | null;
-    if (elegido?.tipo) {
-      tipo = String(elegido.tipo).trim().toUpperCase();
-      doc = String(elegido.doc ?? '').trim() || null;
-      razon = String(elegido.razon ?? '').trim() || null;
-      direccion = String(elegido.direccion ?? '').trim() || null;
-    } else {
-      const tipoPedido = String(pedido.comprobante_tipo ?? '').trim().toUpperCase();
-      const usaPedido = (tipoPedido === 'BOLETA' || tipoPedido === 'FACTURA') && !!pedido.comprobante_doc?.trim();
-      tipo = usaPedido ? tipoPedido : 'NOTA_VENTA';
-      doc = usaPedido ? pedido.comprobante_doc!.trim() : null;
-      razon = usaPedido ? pedido.comprobante_razon?.trim() || null : null;
-      direccion = usaPedido ? pedido.comprobante_direccion?.trim() || null : null;
+    const elegidoTipo = String(elegido?.tipo ?? '').trim().toUpperCase();
+    const usaElegido = elegidoTipo !== '';
+    const tipo = usaElegido ? elegidoTipo : String(pedido.comprobante_tipo ?? '').trim().toUpperCase();
+    if (!esComprobanteElegible(tipo)) {
+      throw new BadRequestException({ codigo: 'COMPROBANTE_OBLIGATORIO', mensaje: 'Elige boleta o factura antes de enviar a Caja' });
     }
-    if (tipo === 'NOTA_VENTA') return { tipo, doc: null, razon: null, direccion: null };
-    if (tipo !== 'BOLETA' && tipo !== 'FACTURA') {
-      throw new BadRequestException({ codigo: 'COMPROBANTE_INVALIDO', mensaje: 'Elige Nota de venta, Boleta o Factura' });
-    }
+    const doc = usaElegido ? String(elegido?.doc ?? '').trim() || null : pedido.comprobante_doc?.trim() || null;
+    const razon = usaElegido ? String(elegido?.razon ?? '').trim() || null : pedido.comprobante_razon?.trim() || null;
+    const direccion = usaElegido ? String(elegido?.direccion ?? '').trim() || null : pedido.comprobante_direccion?.trim() || null;
     // Sin total: el envío a Caja no bloquea la venta por el DNI (la boleta > S/ 700 la exige el cobro)
     const validacion = validarDocumentoComprobante(tipo, doc, razon);
     if (!validacion.valido) {

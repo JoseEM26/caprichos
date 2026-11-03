@@ -88,6 +88,7 @@ describe('Plano del mozo: cuenta de la mesa ocupada', () => {
     expect(screen.getByRole('dialog', { name: 'Precuenta' })).toBeDefined();
     expect(screen.queryByTestId('btn-confirmar-cobro-mozo')).toBeNull();
 
+    fireEvent.click(screen.getByTestId('comprobante-BOLETA'));
     llenarPagaCon();
     fireEvent.click(screen.getByTestId('btn-enviar-caja'));
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));

@@ -67,12 +67,21 @@ describe('Nuevo pedido en Caja: comprobante', () => {
     );
   });
 
-  it('sin elegir no manda comprobante (el pedido sale con el comprobante por defecto)', async () => {
+  it('sin elegir boleta o factura no registra: el selector es obligatorio', async () => {
     await llegarAResumenLlevar();
+    const grupo = screen.getByRole('group', { name: 'Comprobante' });
+    expect(within(grupo).getByTestId('comprobante-BOLETA').getAttribute('aria-pressed')).toBe('false');
+    expect(within(grupo).getByTestId('comprobante-FACTURA').getAttribute('aria-pressed')).toBe('false');
+    expect(screen.queryByRole('button', { name: /Nota de venta|Sin elegir/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    expect(screen.queryByRole('button', { name: 'Sí, registrar' })).toBeNull();
+    expect(pedidosApi.crearPedidoAdmin).not.toHaveBeenCalled();
+
+    fireEvent.click(within(grupo).getByTestId('comprobante-BOLETA'));
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0]).toHaveProperty('comprobante', undefined);
+    expect(vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0]).toHaveProperty('comprobante', { tipo: 'BOLETA' });
   });
 
   it('un RUC de 10 dígitos muestra el error y no registra el pedido', async () => {

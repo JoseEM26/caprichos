@@ -25,6 +25,7 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
     lineas: [{ cantidad: 2, nombre: 'Frappé Moka', detalle: 'Grande · Chantilly' }],
     total: 32,
     pedidoId: 'P-20',
+    comprobantePedido: { tipo: 'BOLETA', documento: null },
   };
 
   const botonEnviar = () => screen.getByTestId('btn-enviar-caja');
