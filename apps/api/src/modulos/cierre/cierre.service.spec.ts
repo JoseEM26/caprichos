@@ -24,6 +24,7 @@ describe('CierreService', () => {
   let redisMock: any;
   let redisServiceMock: any;
   let auditoriaMock: any;
+  let supervisorCodigoMock: any;
   let eventosGatewayMock: any;
 
   const mockUsuarioCajero: UsuarioAutenticado = {
@@ -35,6 +36,12 @@ describe('CierreService', () => {
   const mockUsuarioAdmin: UsuarioAutenticado = {
     partyId: 1n,
     rol: 'ADMIN',
+    debeCambiar: false,
+  };
+
+  const mockUsuarioSupervisor: UsuarioAutenticado = {
+    partyId: 102n,
+    rol: 'SUPERVISOR',
     debeCambiar: false,
   };
 
@@ -208,12 +215,14 @@ describe('CierreService', () => {
       },
       userAccount: {
         findMany: jest.fn().mockResolvedValue([]),
+        // Por defecto nadie es ADMIN/SUPERVISOR activo: solo el cajero
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn().mockImplementation(async (cb) => cb(prismaMock)),
     };
 
-    const supervisorCodigoMock = {
+    supervisorCodigoMock = {
       verificarYConsumirCodigo: jest.fn().mockImplementation(async (codigo: string | undefined, partyId?: any) => {
         const claveIntentos = `pin:supervisor:intentos:${partyId ?? 'general'}`;
         let intentos;
@@ -1048,6 +1057,79 @@ describe('CierreService', () => {
           }),
         }),
       );
+    });
+  });
+  // -------------------------------------------------------------------------
+  // 12. SUPERVISOR se autoriza sin PIN, como el ADMIN (misma regla que verificarYConsumirCodigo)
+  // -------------------------------------------------------------------------
+  describe('12. SUPERVISOR cierra sin PIN', () => {
+    const conteoDescuadrado = { conteo: { '200': 1 }, medios: { yape: 200 }, nota: 'Faltante de turno' } as CerrarCajaDto;
+    const conteoCuadra: CerrarCajaDto = {
+      conteo: { '200': 1, '100': 1, '50': 1, '5': 1 },
+      medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 },
+    };
+
+    beforeEach(() => {
+      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
+        where.party_id === 102n ? { party_id: 102n, id: 30n, rol: 'SUPERVISOR' } : null,
+      );
+    });
+
+    it('con descuadre cierra sin PIN: el servicio de supervisor lo autoriza (y audita) sin código', async () => {
+      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({
+        party_id: 102n,
+        id: 30n,
+        supervisorPartyId: 102n,
+        supervisorId: 30n,
+      });
+
+      const error = await service.cerrar(conteoDescuadrado, mockUsuarioSupervisor, undefined).catch((e) => e);
+
+      expect(error?.response?.codigo).not.toBe('PIN_REQUERIDO');
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
+        undefined,
+        102n,
+        'cierre',
+        undefined,
+        'caja',
+        10n,
+      );
+    });
+
+    it('sin descuadre no pide nada de supervisor', async () => {
+      const error = await service.cerrar(conteoCuadra, mockUsuarioSupervisor, undefined).catch((e) => e);
+
+      expect(error?.response?.codigo).not.toBe('PIN_REQUERIDO');
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
+    });
+
+    it('el arqueo del cuarto intento tampoco le pide PIN', async () => {
+      prismaMock.conteoCierre.count.mockResolvedValue(3);
+      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({
+        party_id: 102n,
+        id: 30n,
+        supervisorPartyId: 102n,
+        supervisorId: 30n,
+      });
+
+      const error = await service.arqueo({ conteo: { '200': 1 }, medios: { yape: 200 } }, mockUsuarioSupervisor, undefined).catch((e) => e);
+
+      expect(error?.response?.codigo).not.toBe('PIN_REQUERIDO');
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
+        undefined,
+        102n,
+        'cierre',
+        undefined,
+        'caja',
+        10n,
+      );
+    });
+
+    it('el cajero sigue necesitando PIN: se rechaza antes de verificar nada', async () => {
+      await expect(service.cerrar(conteoDescuadrado, mockUsuarioCajero, undefined)).rejects.toMatchObject({
+        response: { codigo: 'PIN_REQUERIDO' },
+      });
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
     });
   });
 });

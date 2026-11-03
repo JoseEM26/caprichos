@@ -21,6 +21,7 @@ import { PuntosService } from '../clientes/puntos.service';
 import {
   SupervisorCodigoService,
   autorizarAdminSinCodigo,
+  esOperadorSinCodigo,
 } from '../supervisor-codigo/supervisor-codigo.service';
 import { CobrarDto } from '../caja/dto/cobrar.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -221,7 +222,7 @@ export class CierreService {
         where: { caja_id: caja.id, resultado: 'NO_CUADRA' },
       });
       if (noCuadraPrevios >= ARQUEOS_NO_CUADRA_PARA_PIN) {
-        if (!pinSupervisor && usuario.rol !== 'ADMIN') {
+        if (!pinSupervisor && !(await esOperadorSinCodigo(this.prisma, usuario.partyId))) {
           throw new HttpException(
             {
               codigo: 'PIN_REQUERIDO',
@@ -381,7 +382,7 @@ export class CierreService {
           );
         }
 
-        if (!pinSupervisor && usuario.rol !== 'ADMIN') {
+        if (!pinSupervisor && !(await esOperadorSinCodigo(this.prisma, usuario.partyId))) {
           throw new HttpException(
             {
               codigo: 'PIN_REQUERIDO',
