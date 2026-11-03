@@ -69,6 +69,8 @@ model Person {
   correo          String?
   foto_archivo_id BigInt?
   pais_nacimiento String?
+  /// Disponible 24/7: recibe los avisos por correo si nadie con casilla está de turno.
+  horario_24_7    Boolean   @default(false)
   party           Party     @relation(fields: [party_id], references: [id])
 
   @@map("person")
@@ -138,6 +140,8 @@ model UserAccount {
   alta_en               DateTime               @default(now()) @db.Date
   alertas_whatsapp              Boolean                @default(false)
   alertas_whatsapp_confirmado_en DateTime?              @db.Timestamptz
+  /// Recibe los avisos del sistema al equipo por correo (dentro de su horario).
+  avisos_correo         Boolean                @default(false)
   party                 Party                  @relation(fields: [party_id], references: [id])
   r                     Rol                    @relation(fields: [rol], references: [codigo])
   rolesExtra            UserAccountRol[]
@@ -167,6 +171,23 @@ model Parametro {
   valor Json
 
   @@map("parametro")
+}
+
+/// Registro de correos de avisos al equipo. Una fila por caso y destinatario (clave única).
+model CorreoEnvio {
+  id           BigInt   @id @default(autoincrement())
+  clave        String   @db.VarChar(160)
+  destinatario String   @db.VarChar(160)
+  origen       String   @db.VarChar(40)
+  asunto       String   @db.VarChar(200)
+  estado       String   @db.VarChar(20)
+  proveedor_id String?  @db.VarChar(80)
+  error        String?  @db.VarChar(200)
+  creado_en    DateTime @default(now()) @db.Timestamptz
+
+  @@unique([clave, destinatario])
+  @@index([creado_en])
+  @@map("correo_envio")
 }
 
 // Solo se inserta: los triggers de la migración encadenan el hash y bloquean update y delete.
