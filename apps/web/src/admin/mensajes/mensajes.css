@@ -788,3 +788,114 @@
 .msg-panel[data-abierto='0'] .msg-panel-titulo {
   display: none;
 }
+
+/* Celular y tableta estrecha: dos vistas y hoja inferior */
+@media (max-width: 768px) {
+  .msg-root {
+    font-size: 16px;
+  }
+  .msg-barra {
+    display: none;
+  }
+  .msg-wrap,
+  .msg-wrap[data-panel='0'] {
+    grid-template-columns: 1fr;
+    height: calc(100vh - 150px);
+    min-height: 0;
+    zoom: 1 !important;
+    border: 0;
+    border-radius: 0;
+  }
+  .msg-wrap[data-open='1'] .msg-lista {
+    display: none;
+  }
+  .msg-wrap[data-open='0'] .msg-chat {
+    display: none;
+  }
+  .msg-wrap[data-open='1'] .msg-chat {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+  }
+  .msg-atras,
+  .msg-detalles {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .msg-atras {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 8px;
+    border: 0;
+    background: transparent;
+    color: #0B2C3E;
+    font-weight: 800;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .msg-detalles {
+    min-height: 44px;
+  }
+  .msg-chead {
+    min-height: 64px;
+    padding: 6px 10px;
+    gap: 8px;
+  }
+  .msg-chead-chips .msg-chip-espera {
+    display: none;
+  }
+  .msg-root .msg-btn,
+  .msg-root .msg-tab,
+  .msg-root .msg-rapida,
+  .msg-root .msg-menu-item,
+  .msg-root .msg-pulir-btn,
+  .msg-root .msg-ok,
+  .msg-root .msg-no,
+  .msg-root .msg-accion-ok,
+  .msg-root .msg-accion-no,
+  .msg-root .msg-accion-neutro,
+  .msg-root .msg-zb {
+    min-height: 44px;
+  }
+  .msg-root .msg-fila {
+    min-height: 76px;
+  }
+  .msg-burbuja {
+    max-width: 88%;
+  }
+  .msg-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 300;
+    display: none;
+    max-height: 82vh;
+    border-left: 0;
+    border-top: 1px solid #C9D2D8;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 30px rgba(11, 44, 62, 0.25);
+  }
+  .msg-panel[data-abierto='1'] {
+    display: flex;
+  }
+  .msg-panel[data-abierto='1'] .msg-panel-cab {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #E3E8EB;
+  }
+  .msg-panel[data-abierto='1'] .msg-panel-titulo {
+    display: block;
+  }
+  .msg-hoja-fondo[data-abierto='1'] {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    background: rgba(11, 44, 62, 0.35);
+    border: 0;
+    padding: 0;
+  }
+}

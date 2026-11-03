@@ -26,10 +26,9 @@ export interface ListaChatsProps {
   onSeleccionar: (id: string) => void;
 }
 
-/** Texto del chip de estado. Un chat «atencion» es uno que pidió hablar con una persona (derivado). */
+/** Chip de estado de la lista. */
 function etiquetaEstado(estado: EstadoChat, urgente: boolean): string {
-  const base = estado === 'atencion' ? 'Derivado a asesor' : estado === 'validar' ? 'Voucher por revisar' : ESTADOS_LABEL[estado];
-  return urgente ? `Urgente · ${base}` : base;
+  return urgente ? `Urgente · ${ESTADOS_LABEL[estado]}` : ESTADOS_LABEL[estado];
 }
 
 /** Columna izquierda: buscador, filtros y una fila compacta por chat. */

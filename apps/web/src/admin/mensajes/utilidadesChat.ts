@@ -13,9 +13,10 @@ export const ESTADOS_BG: Record<EstadoChat, string> = {
   atendido: 'var(--cp-greenbg)',
 };
 
+/** Texto del estado del chat; lo mismo en la lista, la cabecera y el panel. */
 export const ESTADOS_LABEL: Record<EstadoChat, string> = {
-  atencion: 'Requiere atención',
-  validar: 'Validar pago',
+  atencion: 'Derivado a asesor',
+  validar: 'Voucher por revisar',
   bot: 'El bot atiende',
   pausado: 'Pausado',
   atendido: 'Atendido',
