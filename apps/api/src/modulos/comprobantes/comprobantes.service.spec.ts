@@ -30,7 +30,7 @@ describe('ComprobantesService', () => {
   function pedidoEmision(extra: Record<string, unknown> = {}) {
     return {
       id: 100n,
-      comprobante_tipo: 'NOTA_VENTA',
+      comprobante_tipo: 'BOLETA',
       comprobante_doc: null,
       comprobante_razon: null,
       comprobante_direccion: null,
@@ -114,87 +114,32 @@ describe('ComprobantesService', () => {
   });
 
   describe('1. correlativo secuencial y atómico en emitirParaPedido', () => {
-    it('genera NV01-000001 de forma atómica con UPDATE ... RETURNING', async () => {
-      prismaMock.comprobante.findFirst.mockResolvedValue(null);
-      prismaMock.pedido.findUnique.mockResolvedValue({
-        id: 100n,
-        comprobante_tipo: 'NOTA_VENTA',
-        comprobante_doc: null,
-        comprobante_razon: null,
-      });
-
-      prismaMock.$queryRaw.mockResolvedValue([{ ultimo_numero: 1 }]);
-      prismaMock.comprobante.create.mockImplementation((args: any) => ({
-        id: 10n,
-        ...args.data,
-        creado_en: fechaFija,
-      }));
-
-      const res = await service.emitirParaPedido(100n, undefined, cajeroUsuario);
-
-      expect(prismaMock.$queryRaw).toHaveBeenCalled();
-      expect(res.serie).toBe('NV01');
-      expect(res.numero).toBe(1);
-      expect(res.numero_texto).toBe('NV01-000001');
-      expect(res.tipo).toBe('NOTA_VENTA');
-      expect(res.emision).toBe('INTERNA');
-    });
-
-    it('genera el siguiente correlativo atómico NV01-000002 en la siguiente llamada', async () => {
-      prismaMock.comprobante.findFirst.mockResolvedValue(null);
-      prismaMock.pedido.findUnique.mockResolvedValue({
-        id: 101n,
-        comprobante_tipo: 'NOTA_VENTA',
-        comprobante_doc: null,
-        comprobante_razon: null,
-      });
-
-      prismaMock.$queryRaw.mockResolvedValue([{ ultimo_numero: 2 }]);
-      prismaMock.comprobante.create.mockImplementation((args: any) => ({
-        id: 11n,
-        ...args.data,
-        creado_en: fechaFija,
-      }));
-
-      const res = await service.emitirParaPedido(101n, undefined, cajeroUsuario);
-
-      expect(res.numero).toBe(2);
-      expect(res.numero_texto).toBe('NV01-000002');
-    });
-  });
-
-  describe('2. idempotencia en emitirParaPedido', () => {
-    it('si ya existe la fila del comprobante para el pedido, la devuelve sin incrementar correlativo', async () => {
-      const comprobanteExistente = {
-        id: 5n,
-        pedido_id: 100n,
-        tipo: 'BOLETA',
-        serie: 'NV01',
-        numero: 1,
-        numero_texto: 'NV01-000001',
-        documento: '12345678',
-        razon_social: null,
-        emision: 'POR_EMITIR',
-        copias_impresas: 0,
-        creado_en: fechaFija,
-      };
-
-      prismaMock.comprobante.findFirst.mockResolvedValue(comprobanteExistente);
+    it('genera B002-000001 de forma atómica con UPDATE ... RETURNING', async () => {
+      prepararEmision(pedidoEmision({ id: 100n }), 1);
 
       const res = await service.emitirParaPedido(100n);
 
-      expect(prismaMock.$queryRaw).not.toHaveBeenCalled();
-      expect(prismaMock.comprobante.create).not.toHaveBeenCalled();
-      expect(res.id).toBe('5');
-      expect(res.numero_texto).toBe('NV01-000001');
-      expect(res.advertencia).toBeNull();
+      expect(prismaMock.$queryRaw).toHaveBeenCalled();
+      expect(res.serie).toBe('B002');
+      expect(res.numero).toBe(1);
+      expect(res.numero_texto).toBe('B002-000001');
+      expect(res.tipo).toBe('BOLETA');
+    });
+
+    it('genera el siguiente correlativo atómico B002-000002 en la siguiente llamada', async () => {
+      prepararEmision(pedidoEmision({ id: 101n }), 2);
+
+      const res = await service.emitirParaPedido(101n);
+
+      expect(res.numero).toBe(2);
+      expect(res.numero_texto).toBe('B002-000002');
     });
   });
 
   describe('3. boleta con DNI válido e inválido', () => {
 
 
-    it('boleta con DNI inválido no bloquea: se emite como NOTA_VENTA interna con advertencia', async () => {
+    it('boleta con DNI inválido se rechaza al emitir: nunca sale como nota de venta', async () => {
       prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 103n,
@@ -209,16 +154,13 @@ describe('ComprobantesService', () => {
         creado_en: fechaFija,
       }));
 
-      const res = await service.emitirParaPedido(103n);
-
-      expect(res.tipo).toBe('NOTA_VENTA');
-      expect(res.emision).toBe('INTERNA');
-      expect(res.advertencia).toContain('Documento inválido para BOLETA');
+      await expect(service.emitirParaPedido(103n)).rejects.toMatchObject({ response: { codigo: 'COMPROBANTE_DATOS_FALTANTES' } });
+      expect(prismaMock.comprobante.create).not.toHaveBeenCalled();
     });
   });
 
   describe('4. factura con RUC de 10 dígitos rechazado (RQ-LEG-01-02)', () => {
-    it('factura con RUC de 10 dígitos se rechaza y pasa a NOTA_VENTA interna con advertencia', async () => {
+    it('factura con RUC de 10 dígitos se rechaza al emitir, sin nota de venta', async () => {
       prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 104n,
@@ -233,11 +175,8 @@ describe('ComprobantesService', () => {
         creado_en: fechaFija,
       }));
 
-      const res = await service.emitirParaPedido(104n);
-
-      expect(res.tipo).toBe('NOTA_VENTA');
-      expect(res.emision).toBe('INTERNA');
-      expect(res.advertencia).toContain('Documento inválido para FACTURA');
+      await expect(service.emitirParaPedido(104n)).rejects.toMatchObject({ response: { codigo: 'COMPROBANTE_DATOS_FALTANTES' } });
+      expect(prismaMock.comprobante.create).not.toHaveBeenCalled();
     });
 
   });
@@ -270,15 +209,12 @@ describe('ComprobantesService', () => {
       expect(res.advertencia).toBeNull();
     });
 
-    it('boleta sin DNI por más de S/ 700 no se emite como boleta: NOTA_VENTA con advertencia', async () => {
+    it('boleta sin DNI por más de S/ 700 no se emite: la exige el cobro, no sale como nota de venta', async () => {
       const pedido = pedidoEmision({ comprobante_tipo: 'BOLETA', comprobante_doc: null, total: 720, subtotal: 720 });
       prepararEmision(pedido, 7);
 
-      const res = await service.emitirParaPedido(104n);
-
-      expect(res.tipo).toBe('NOTA_VENTA');
-      expect(res.serie).toBe('NV01');
-      expect(res.advertencia).toContain('mayor a S/ 700');
+      await expect(service.emitirParaPedido(104n)).rejects.toMatchObject({ response: { mensaje: expect.stringContaining('mayor a S/ 700') } });
+      expect(prismaMock.comprobante.create).not.toHaveBeenCalled();
     });
 
     it('factura con RUC de 11 dígitos válido y razón social se emite con serie F002', async () => {
@@ -301,8 +237,8 @@ describe('ComprobantesService', () => {
     });
   });
 
-  describe('5. nota de venta por defecto', () => {
-    it('pedido con NOTA_VENTA por defecto emite NOTA_VENTA INTERNA', async () => {
+  describe('5. la nota de venta no es comprobante', () => {
+    it('un pedido sin boleta ni factura no se emite: 400 COMPROBANTE_OBLIGATORIO', async () => {
       prismaMock.comprobante.findFirst.mockResolvedValue(null);
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 106n,
@@ -310,18 +246,9 @@ describe('ComprobantesService', () => {
         comprobante_doc: null,
         comprobante_razon: null,
       });
-      prismaMock.$queryRaw.mockResolvedValue([{ ultimo_numero: 7 }]);
-      prismaMock.comprobante.create.mockImplementation((args: any) => ({
-        id: 16n,
-        ...args.data,
-        creado_en: fechaFija,
-      }));
 
-      const res = await service.emitirParaPedido(106n);
-
-      expect(res.tipo).toBe('NOTA_VENTA');
-      expect(res.emision).toBe('INTERNA');
-      expect(res.advertencia).toBeNull();
+      await expect(service.emitirParaPedido(106n)).rejects.toMatchObject({ response: { codigo: 'COMPROBANTE_OBLIGATORIO' } });
+      expect(prismaMock.comprobante.create).not.toHaveBeenCalled();
     });
   });
 

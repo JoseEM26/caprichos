@@ -59,6 +59,8 @@ services:
       SUNAT_SOL_CLAVE: ${SUNAT_SOL_CLAVE:-}
       SUNAT_CERT_P12_B64: ${SUNAT_CERT_P12_B64:-}
       SUNAT_CERT_CLAVE: ${SUNAT_CERT_CLAVE:-}
+      # Avisos al equipo por correo (Resend). Sin clave, el envío queda simulado (solo registro).
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESENAS_ACTUALIZAR_AUTO: ${RESENAS_ACTUALIZAR_AUTO:-no}
       RESENAS_TOPE_MENSUAL: ${RESENAS_TOPE_MENSUAL:-80}
       RESENAS_CARGA_MAX: ${RESENAS_CARGA_MAX:-1000}

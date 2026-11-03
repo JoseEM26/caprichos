@@ -8,18 +8,24 @@ export interface ConsumoWhatsapp {
   servicio: number;
   plantillas: number;
   plantillasPorTipo?: Record<string, number>;
+  /** Servicio + plantillas: todo envío cuenta contra el tope. */
+  total?: number;
   gratisMes: number;
   avisoPct: number;
   porcentaje: number;
   proyeccionFinDeMes: number;
+  precioMensaje?: number;
+  costoEstimadoPen?: number;
 }
 
 const RUTA = '/admin/chatbot/configuracion/consumo-whatsapp';
 const n = (v: number) => v.toLocaleString('es-PE');
+const soles = (v: number) => `S/ ${v.toFixed(2)}`;
 
 export function TarjetaConsumoWhatsapp({ esAdmin = false }: { esAdmin?: boolean }) {
   const [c, setC] = useState<ConsumoWhatsapp | null>(null);
   const [tope, setTope] = useState('1000');
+  const [precio, setPrecio] = useState('0.10');
   const [confirmar, setConfirmar] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +34,7 @@ export function TarjetaConsumoWhatsapp({ esAdmin = false }: { esAdmin?: boolean 
   const aplicar = (r: ConsumoWhatsapp) => {
     setC(r);
     setTope(String(r.gratisMes));
+    setPrecio(String(r.precioMensaje ?? 0.1));
   };
 
   const cargar = useCallback(async () => {
@@ -45,15 +52,19 @@ export function TarjetaConsumoWhatsapp({ esAdmin = false }: { esAdmin?: boolean 
 
   const topeNum = Number(tope);
   const valido = Number.isInteger(topeNum) && topeNum >= 1 && topeNum <= 10_000_000;
+  const precioNum = Number(precio);
+  const precioValido = precio.trim() !== '' && Number.isFinite(precioNum) && precioNum >= 0 && precioNum <= 100;
+  const total = c ? (c.total ?? c.servicio + c.plantillas) : 0;
+  const costo = c ? (c.costoEstimadoPen ?? 0) : 0;
 
   const guardar = async () => {
     setGuardando(true);
     try {
-      aplicar(await api.put<ConsumoWhatsapp>(RUTA, { gratisMes: topeNum }));
+      aplicar(await api.put<ConsumoWhatsapp>(RUTA, { gratisMes: topeNum, precioMensaje: precioNum }));
       setError(null);
       setExito('Guardado');
     } catch (err) {
-      setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar el tope.');
+      setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar el tope ni el precio.');
     } finally {
       setConfirmar(false);
       setGuardando(false);
@@ -62,6 +73,7 @@ export function TarjetaConsumoWhatsapp({ esAdmin = false }: { esAdmin?: boolean 
 
   const pct = c ? Math.min(100, c.porcentaje) : 0;
   const color = !c ? 'var(--cp-green)' : c.porcentaje >= 100 ? 'var(--cp-rust)' : c.porcentaje >= c.avisoPct ? 'var(--cp-gold)' : 'var(--cp-green)';
+  const cambio = c != null && (topeNum !== c.gratisMes || precioNum !== (c.precioMensaje ?? 0.1));
 
   return (
     <div
@@ -75,7 +87,7 @@ export function TarjetaConsumoWhatsapp({ esAdmin = false }: { esAdmin?: boolean 
       {c && (
         <>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>
-            {n(c.servicio)} de {n(c.gratisMes)} gratis ({c.porcentaje}%)
+            {n(total)} de {n(c.gratisMes)} gratis ({c.porcentaje}%)
           </div>
           <div
             role="progressbar"
@@ -85,6 +97,12 @@ export function TarjetaConsumoWhatsapp({ esAdmin = false }: { esAdmin?: boolean 
             style={{ height: 10, borderRadius: 6, background: 'var(--cp-cream)', border: '1px solid var(--cp-line)', overflow: 'hidden' }}
           >
             <div style={{ width: `${pct}%`, height: '100%', background: color }} />
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: costo > 0 ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>
+            Costo estimado este mes: {soles(costo)}
+            <span style={{ fontWeight: 400, color: 'var(--cp-soft)' }}>
+              {' '}({n(Math.max(0, total - c.gratisMes))} sobre el tope x {soles(c.precioMensaje ?? 0.1)} por mensaje)
+            </span>
           </div>
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 12, color: 'var(--cp-soft)' }}>
             <span>De servicio (dentro de 24 h): <b>{n(c.servicio)}</b></span>
@@ -107,9 +125,20 @@ export function TarjetaConsumoWhatsapp({ esAdmin = false }: { esAdmin?: boolean 
               onChange={(e) => { setExito(null); setTope(e.target.value); }}
               style={{ width: 110, minHeight: 44, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--cp-line)', fontWeight: 700, textAlign: 'center' }}
             />
+            <label htmlFor="wa-precio-mensaje" style={{ fontSize: 12, fontWeight: 700 }}>Precio por mensaje (S/)</label>
+            <input
+              id="wa-precio-mensaje"
+              type="number"
+              min={0}
+              step="0.01"
+              value={precio}
+              disabled={!esAdmin || guardando}
+              onChange={(e) => { setExito(null); setPrecio(e.target.value); }}
+              style={{ width: 110, minHeight: 44, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--cp-line)', fontWeight: 700, textAlign: 'center' }}
+            />
             {esAdmin && (
-              <Boton variante="primario" disabled={guardando || !valido || topeNum === c.gratisMes} onClick={() => setConfirmar(true)}>
-                Guardar tope
+              <Boton variante="primario" disabled={guardando || !valido || !precioValido || !cambio} onClick={() => setConfirmar(true)}>
+                Guardar tope y precio
               </Boton>
             )}
             {exito && <span role="status" style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-green)' }}>{exito}</span>}
@@ -117,13 +146,14 @@ export function TarjetaConsumoWhatsapp({ esAdmin = false }: { esAdmin?: boolean 
         </>
       )}
       <p style={{ margin: 0, fontSize: 12, color: 'var(--cp-soft)' }}>
-        Desde el 1 de octubre de 2026 Meta cobra cada mensaje de servicio pasados los {c ? n(c.gratisMes) : '1,000'} gratis al mes por número,
-        y las plantillas se cobran siempre. Se avisa a los administradores al llegar al {c?.avisoPct ?? 80}% y al 100%.
+        Esta cuenta suma todos los envíos (textos y plantillas) contra los {c ? n(c.gratisMes) : '1,000'} gratis al mes, y el costo es una estimación:
+        pasado el tope, Meta cobra cada mensaje de servicio. El cobro real lo muestra Meta; si los números no cuadran, manda el dato de Meta.
+        Se avisa a los administradores al llegar al {c?.avisoPct ?? 80}% y al 100%.
       </p>
       <Confirmar
         abierto={confirmar}
         titulo="¿Cambiar el tope de mensajes gratis?"
-        mensaje={`El aviso se calculará sobre ${valido ? n(topeNum) : tope} mensajes gratis al mes.`}
+        mensaje={`El aviso se calculará sobre ${valido ? n(topeNum) : tope} mensajes gratis al mes, y el costo estimado usará ${precioValido ? soles(precioNum) : precio} por mensaje.`}
         textoSi="Sí, guardar"
         textoNo="No, cancelar"
         cargando={guardando}

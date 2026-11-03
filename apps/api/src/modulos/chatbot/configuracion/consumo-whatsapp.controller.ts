@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 import { AccesoGuard } from '../../acceso/acceso.guard';
 import { Permiso } from '../../acceso/permiso.decorator';
 import { ConsumoWhatsappService } from './consumo-whatsapp.service';
@@ -10,6 +10,9 @@ export class ActualizarConsumoWhatsappDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(99)
   avisoPct?: number;
+
+  @IsOptional() @IsNumber() @Min(0) @Max(100)
+  precioMensaje?: number;
 }
 
 @Controller('admin/chatbot/configuracion/consumo-whatsapp')

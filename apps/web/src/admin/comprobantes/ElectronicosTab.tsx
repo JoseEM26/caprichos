@@ -39,6 +39,9 @@ const fechaCorta = (iso: string) => {
   return a && m && d ? `${d}/${m}/${a}` : iso;
 };
 
+/** Días que faltan para el vencimiento del certificado (negativo si ya venció). */
+const diasParaVencer = (iso: string) => Math.floor((new Date(`${iso}T12:00:00`).getTime() - Date.now()) / 86_400_000);
+
 /** Insignia del proveedor que de verdad emite (sin valores de conexión). */
 function insigniaProveedor(config: ConfigFacturacion): { texto: string; variante: VarianteInsignia } {
   const efectivo: ProveedorFacturacion = config.proveedor_efectivo ?? 'SIMULADO';
@@ -290,6 +293,13 @@ export function ElectronicosTab() {
             )}
           </div>
         )}
+        {config?.sunat?.vence_certificado && diasParaVencer(config.sunat.vence_certificado) <= 60 && (
+          <div role="status" style={{ marginTop: 8, fontSize: 13, color: 'var(--cp-texto-suave, #6b5b4e)' }}>
+            {diasParaVencer(config.sunat.vence_certificado) < 0
+              ? `El certificado de SUNAT ya venció el ${fechaCorta(config.sunat.vence_certificado)}. Hay que cargar uno nuevo.`
+              : `El certificado de SUNAT vence el ${fechaCorta(config.sunat.vence_certificado)} (en ${diasParaVencer(config.sunat.vence_certificado)} días). Renuévalo a tiempo.`}
+          </div>
+        )}
         {config && config.proveedor === 'SUNAT' && config.proveedor_efectivo !== 'SUNAT' && (
           <div role="alert" style={{ color: 'var(--cp-red, #b00020)', marginTop: 8, fontSize: 13 }}>
             Eligió SUNAT, pero faltan credenciales en el servidor: los comprobantes nuevos se emiten en simulado.
@@ -335,8 +345,8 @@ export function ElectronicosTab() {
         <section aria-label="Boleta electrónica por defecto" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ fontWeight: 800 }}>Boleta electrónica por defecto</div>
           <p style={{ margin: 0, fontSize: 13 }}>
-            Un pedido sin comprobante elegido sale como boleta electrónica a «cliente varios» si el total es hasta S/ 700
-            (más de S/ 700 pide el DNI). Solo aplica con SUNAT directo; en Simulado no cambia nada: sigue como nota de venta.
+            El comprobante es obligatorio en todo pedido: boleta o factura (la nota de venta ya no cuenta). Con Sí, el selector
+            del mozo y de Caja empieza con Boleta como sugerencia, pero hay que confirmarla igual. Con No, empieza sin elegir.
           </p>
           <div role="group" aria-label="Boleta electrónica por defecto" style={{ display: 'flex', gap: 8 }}>
             <button
@@ -357,11 +367,9 @@ export function ElectronicosTab() {
             </button>
           </div>
           <div style={{ fontSize: 13 }}>
-            {boleta.aplica
-              ? 'Ahora mismo aplica: los pedidos sin comprobante salen como boleta.'
-              : boleta.activo
-                ? 'Ahora mismo no aplica: el proveedor es Simulado. Los pedidos siguen como nota de venta.'
-                : 'Desactivado: los pedidos sin comprobante salen como nota de venta.'}
+            {boleta.activo
+              ? 'Sugerencia activa: el selector empieza con Boleta. Nunca sale un pedido sin boleta o factura.'
+              : 'Desactivada: el selector empieza sin elegir; hay que elegir boleta o factura.'}
           </div>
           {errorBoleta && <div role="alert" style={{ color: 'var(--cp-red, #b00020)' }}>{errorBoleta}</div>}
         </section>
@@ -478,8 +486,8 @@ export function ElectronicosTab() {
         titulo="Boleta electrónica por defecto"
         mensaje={
           propuestaBoleta
-            ? 'Los pedidos sin comprobante elegido saldrán como boleta electrónica (con SUNAT directo). ¿Activarlo?'
-            : 'Los pedidos sin comprobante elegido volverán a salir como nota de venta. ¿Desactivarlo?'
+            ? 'El selector del mozo y de Caja empezará con Boleta como sugerencia (sin obligar a confirmarla). ¿Activarlo?'
+            : 'El selector del mozo y de Caja empezará sin elegir: habrá que elegir boleta o factura. ¿Desactivarlo?'
         }
         textoSi="Sí, guardar"
         textoNo="No"

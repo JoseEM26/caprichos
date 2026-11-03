@@ -9,6 +9,7 @@ import { urlPublicaCarta } from './carrusel.util';
 import { parametroActivoConDefecto, whatsappSimulado } from '../utilidades/modo-whatsapp.util';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
 import { calcularEtaEntrega, formatearEta, leerConfigEta } from '../../repartos/eta-entrega';
+import { enlaceSeguimientoCarta } from '../../pedidos/seguimiento.tokens';
 
 /**
  * Número de etapa en `mensaje_reparto` (PK pedido_id + numero = idempotencia por pedido y etapa)
@@ -34,7 +35,7 @@ export const ETAPAS_AVISO: Record<
   REPROG_CANCELADA: { numero: 12, parametro: 'whatsapp_aviso_espera_activo' },
   REPROG_SIN_RESPUESTA: { numero: 13, parametro: 'whatsapp_aviso_espera_activo' },
   // Recordatorio del voucher de un pedido digital de la carta que aún no lo envió (una vez por pedido)
-  VOUCHER_RECORDATORIO: { numero: 14, parametro: 'whatsapp_aviso_recibido_activo', cualquierModalidad: true },
+  VOUCHER_RECORDATORIO: { numero: 14, parametro: 'whatsapp_aviso_voucher_recordatorio_activo', cualquierModalidad: true },
 };
 
 type ExtraPuntos =
@@ -72,6 +73,10 @@ export interface DatosAviso {
   recargoModo?: 'IGUAL_ENVIO' | 'FIJO' | 'SIN_COSTO';
   /** SALIDA: rango del tiempo estimado («25 a 30»), calculado al avisar. */
   tiempoTexto?: string | null;
+  /** RECIBIDO: enlace de seguimiento del pedido (null si no hay origen público configurado). */
+  enlaceSeguimiento?: string | null;
+  /** RECIBIDO efectivo: usar la plantilla con enlace (solo si Meta ya la aprobó y el parámetro está en «Sí»). */
+  plantillaSeguimiento?: boolean;
 }
 
 /**
@@ -145,14 +150,8 @@ export class AvisosPedidoService {
     if (!pedido) return { estado: 'OMITIDO', motivo: 'PEDIDO_NO_ENCONTRADO' };
     if (pedido.modalidad !== 'DELIVERY' && !cfg.cualquierModalidad) return { estado: 'OMITIDO', motivo: 'NO_ES_DELIVERY' };
 
-    const telefono = telefonoEnviable(pedido.cliente_telefono);
-    if (!telefono) return { estado: 'OMITIDO', motivo: 'SIN_TELEFONO' };
-
-    const flag = await db.parametro.findUnique({ where: { clave: cfg.parametro } });
-    if (!esParametroActivo(flag?.valor)) return { estado: 'OMITIDO', motivo: 'DESACTIVADO' };
-
-    const nombre = pedido.cliente_nombre || 'Cliente';
-    // SALIDA: tiempo estimado propio del pedido (zona, recorrido de la ruta, empaque) en la misma transacción
+    // SALIDA: el tiempo prometido se calcula y guarda (eta_min/eta_max) aunque el aviso esté apagado
+    // o el cliente no tenga teléfono: el seguimiento cuenta desde ese rango. Un fallo no frena el aviso.
     if (etapa === 'SALIDA') {
       datos = { ...datos, tiempoTexto: await this.tiempoEstimadoSalida(db, pedidoId).catch((err: any) => {
         // Un fallo del cálculo no frena el aviso: sale el respaldo tiempo_prometido_min
@@ -160,8 +159,24 @@ export class AvisosPedidoService {
         return null;
       }) };
     }
-    const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
 
+    const telefono = telefonoEnviable(pedido.cliente_telefono);
+    if (!telefono) return { estado: 'OMITIDO', motivo: 'SIN_TELEFONO' };
+
+    const flag = await db.parametro.findUnique({ where: { clave: cfg.parametro } });
+    if (!esParametroActivo(flag?.valor)) return { estado: 'OMITIDO', motivo: 'DESACTIVADO' };
+
+    const nombre = pedido.cliente_nombre || 'Cliente';
+    const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
+    if (etapa === 'RECIBIDO') {
+      // Enlace de seguimiento en el aviso de pedido recibido; la plantilla nueva solo si Meta ya la aprobó
+      const flagPlantilla = await db.parametro.findUnique({ where: { clave: 'whatsapp_plantilla_recibido_seguimiento_activa' } });
+      datos = {
+        ...datos,
+        enlaceSeguimiento: this.enlaceSeguimiento(pedidoId, pedido.codigo),
+        plantillaSeguimiento: esParametroActivo(flagPlantilla?.valor),
+      };
+    }
     // Línea de puntos (bienvenida o puntos ganados): se decide aquí y el marcador «una sola vez» se escribe en encolar
     const extraPuntos = await this.extraPuntos(db, etapa, pedido);
 
@@ -220,6 +235,13 @@ export class AvisosPedidoService {
     if (!tx) this.outbox.despertar();
     this.logger.log(`Aviso ${etapa} del pedido ${pedido.codigo} encolado a ${enmascararTelefono(telefono)}`);
     return { estado: 'ENCOLADO' };
+  }
+
+  /** Enlace a la carta con el seguimiento del pedido (código y token firmado). Null sin origen público. */
+  private enlaceSeguimiento(pedidoId: bigint, codigo: string): string | null {
+    const origen = urlPublicaCarta((clave) => process.env[clave]);
+    if (!origen) return null;
+    return enlaceSeguimientoCarta(origen, codigo, pedidoId);
   }
 
   /**
@@ -343,8 +365,8 @@ export class AvisosPedidoService {
     switch (etapa) {
       case 'RECIBIDO':
         return medioDigital
-          ? TEXTOS_REPARTO.recibidoDigital(nombre, codigo, medioDigital)
-          : TEXTOS_REPARTO.recibidoEfectivo(nombre, codigo);
+          ? TEXTOS_REPARTO.recibidoDigital(nombre, codigo, medioDigital, datos.enlaceSeguimiento)
+          : TEXTOS_REPARTO.recibidoEfectivo(nombre, codigo, datos.enlaceSeguimiento, datos.plantillaSeguimiento);
       case 'ACEPTADO':
         return TEXTOS_REPARTO.aceptado(nombre, codigo);
       case 'LISTO':

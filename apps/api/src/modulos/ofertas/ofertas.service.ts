@@ -38,7 +38,19 @@ import {
   formatearFecha,
   formatearHora,
   generarCodigoCuponUnico,
+  obtenerAhoraLima,
 } from './ofertas.util';
+import { urlPublicaCarta } from '../chatbot/servicios/carrusel.util';
+
+/** Si la promoción (DESCUENTO o LLEVA_PAGA) alcanza a esta línea según su alcance: categoría, producto o toda la carta. */
+function alcanceCubreLinea(
+  d: { alcance_categoria_id: bigint | null; alcance_producto_id: bigint | null },
+  l: { productoId: bigint; categoriaId?: bigint | null },
+): boolean {
+  if (d.alcance_categoria_id) return !!l.categoriaId && l.categoriaId === d.alcance_categoria_id;
+  if (d.alcance_producto_id) return l.productoId === d.alcance_producto_id;
+  return true;
+}
 
 const INCLUDE_PARTES = {
   include: { reemplazos: { orderBy: { orden: 'asc' as const }, include: { producto: true } } },
@@ -177,6 +189,8 @@ export class OfertasService {
     const horaHastaDate = horaHastaStr ? new Date(`1970-01-01T${horaHastaStr}:00.000Z`) : null;
     const fechaDesdeDate = fechaDesdeStr ? new Date(`${fechaDesdeStr.slice(0, 10)}T00:00:00.000Z`) : null;
     const fechaHastaDate = fechaHastaStr ? new Date(`${fechaHastaStr.slice(0, 10)}T00:00:00.000Z`) : null;
+    const soloPrimeraCompra = dto.soloPrimeraCompra ?? false;
+    this.validarPrimeraCompra({ tipo: tipoFinal, soloPrimeraCompra, fechaDesde: fechaDesdeDate, fechaHasta: fechaHastaDate });
 
     const creada = await this.prisma.$transaction(async (tx) => {
       const oferta = await tx.oferta.create({
@@ -196,9 +210,12 @@ export class OfertasService {
           hora_hasta: horaHastaDate,
           fecha_desde: fechaDesdeDate,
           fecha_hasta: fechaHastaDate,
-          canales: dto.canales ?? ['CARTA', 'ADMIN', 'BOT'],
+          // La primera compra solo se canjea en la carta web
+          canales: soloPrimeraCompra ? ['CARTA'] : dto.canales ?? ['CARTA', 'ADMIN', 'BOT'],
           limite_usos: dto.limiteUsos ?? null,
           no_suma_beneficios: dto.noSumaBeneficios ?? false,
+          mostrar_en_saludo_bot: dto.mostrarEnSaludoBot ?? false,
+          solo_primera_compra: soloPrimeraCompra,
           orden: dto.orden ?? 0,
           activo: dto.activo ?? false,
           imagen_archivo_id: dto.imagenArchivoId ? BigInt(dto.imagenArchivoId) : null,
@@ -421,6 +438,18 @@ export class OfertasService {
     if (dto.canales !== undefined) data.canales = dto.canales ?? [];
     if (dto.limiteUsos !== undefined) data.limite_usos = dto.limiteUsos;
     if (dto.noSumaBeneficios !== undefined) data.no_suma_beneficios = dto.noSumaBeneficios;
+    if (dto.mostrarEnSaludoBot !== undefined) data.mostrar_en_saludo_bot = dto.mostrarEnSaludoBot;
+    if (dto.soloPrimeraCompra !== undefined) data.solo_primera_compra = dto.soloPrimeraCompra;
+    const soloPrimeraFinal = data.solo_primera_compra ?? ofertaExistente.solo_primera_compra;
+    if (soloPrimeraFinal) {
+      this.validarPrimeraCompra({
+        tipo: ofertaExistente.tipo,
+        soloPrimeraCompra: true,
+        fechaDesde: data.fecha_desde !== undefined ? (data.fecha_desde as Date | null) : ofertaExistente.fecha_desde,
+        fechaHasta: data.fecha_hasta !== undefined ? (data.fecha_hasta as Date | null) : ofertaExistente.fecha_hasta,
+      });
+      data.canales = ['CARTA'];
+    }
     if (dto.orden !== undefined) data.orden = dto.orden;
     if (dto.activo !== undefined) data.activo = dto.activo;
     if (dto.imagenArchivoId !== undefined) {
@@ -1403,6 +1432,7 @@ export class OfertasService {
   async vistaPreviaDescuentos(
     lineas: { productoId: string; cantidad: number; subtotal: number; precioUnitario: number }[],
     cuponCodigo?: string,
+    clientePartyId?: string | null,
   ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[] }> {
     const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
     const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
@@ -1425,7 +1455,14 @@ export class OfertasService {
       };
     });
     const subtotal = Number(lineasCalc.reduce((a, l) => a + l.subtotal, 0).toFixed(2));
-    const desglose = await this.calcularDescuentosParaPedido({ subtotal, lineas: lineasCalc, canal: 'CARTA', cuponCodigo: cuponCodigo || null });
+    const desglose = await this.calcularDescuentosParaPedido({
+      subtotal,
+      lineas: lineasCalc,
+      canal: 'CARTA',
+      cuponCodigo: cuponCodigo || null,
+      clientePartyId: clientePartyId || null,
+      clienteConSesion: !!clientePartyId,
+    });
     const conCupon = !!(desglose.cuponId || desglose.cuponEmitidoId);
     const montoCanjeable = montoElegiblePuntos(lineasCalc, conCupon ? [] : desglose.detalles);
     return {
@@ -1451,8 +1488,10 @@ export class OfertasService {
     canal: string;
     cuponCodigo?: string | null;
     clientePartyId?: bigint | string | number | null;
+    /** true solo si el cliente tiene sesión iniciada en la carta (cuenta con celular verificado) */
+    clienteConSesion?: boolean;
   }): Promise<DesgloseDescuentosPedido> {
-    const { subtotal, lineas, canal, cuponCodigo, clientePartyId } = params;
+    const { subtotal, lineas, canal, cuponCodigo, clientePartyId, clienteConSesion } = params;
     const regla = await this.obtenerReglasAcumulacion();
     const ahora = new Date();
 
@@ -1467,6 +1506,9 @@ export class OfertasService {
 
     const descuentosVigentes = descuentosCandidatos.filter((d) => estaVigente(d, canal, ahora));
 
+    // Primera compra: solo sobre líneas que no estén en otra promoción automática vigente (no se acumulan)
+    const promosAutomaticas = descuentosVigentes.filter((d) => !d.solo_primera_compra);
+
     // Un combo tiene precio propio: su producto nunca recibe descuento ni entra a 2x1 (además de no_suma_beneficios, DT-65)
     const combos = await this.prisma.oferta.findMany({
       where: { tipo: 'COMBO', alcance_producto_id: { not: null } },
@@ -1476,6 +1518,9 @@ export class OfertasService {
     const lineasElegibles = lineas.filter(
       (l) => !l.noSumaBeneficios && !productosCombo.has(String(l.productoId)),
     );
+
+    const lineasSinPromo = lineasElegibles.filter((l) => !promosAutomaticas.some((p) => alcanceCubreLinea(p, l)));
+    let primeraCompraPermitida: boolean | null = null;
 
     let mejorDescuentoAutomatico: {
       oferta: any;
@@ -1490,11 +1535,18 @@ export class OfertasService {
       let monto = 0;
       const lineasAfectadas: any[] = [];
 
+      if (d.solo_primera_compra) {
+        if (!clienteConSesion || !clientePartyId) continue;
+        primeraCompraPermitida ??= await this.clienteEsPrimeraCompra(BigInt(clientePartyId));
+        if (!primeraCompraPermitida) continue;
+      }
+
       if (d.tipo === 'DESCUENTO') {
         let baseLinea = 0;
+        const elegibles = d.solo_primera_compra ? lineasSinPromo : lineasElegibles;
 
         if (d.alcance_categoria_id) {
-          const matching = lineasElegibles.filter(
+          const matching = elegibles.filter(
             (l) => l.categoriaId && l.categoriaId === d.alcance_categoria_id,
           );
           for (const m of matching) {
@@ -1507,7 +1559,7 @@ export class OfertasService {
             });
           }
         } else if (d.alcance_producto_id) {
-          const matching = lineasElegibles.filter((l) => l.productoId === d.alcance_producto_id);
+          const matching = elegibles.filter((l) => l.productoId === d.alcance_producto_id);
           for (const m of matching) {
             baseLinea += m.subtotal;
             lineasAfectadas.push({
@@ -1519,8 +1571,8 @@ export class OfertasService {
           }
         } else {
           // Toda la carta
-          baseLinea = lineasElegibles.reduce((acc, l) => acc + l.subtotal, 0);
-          for (const l of lineasElegibles) {
+          baseLinea = elegibles.reduce((acc, l) => acc + l.subtotal, 0);
+          for (const l of elegibles) {
             lineasAfectadas.push({
               productoId: l.productoId.toString(),
               cantidad: l.cantidad,
@@ -1799,6 +1851,77 @@ export class OfertasService {
     return items;
   }
 
+  /** Reglas de la promoción de primera compra: solo descuentos, solo carta web y como máximo un mes de vigencia. */
+  private validarPrimeraCompra(o: { tipo: string; soloPrimeraCompra: boolean; fechaDesde: Date | null; fechaHasta: Date | null }): void {
+    if (!o.soloPrimeraCompra) return;
+    if (o.tipo !== 'DESCUENTO') {
+      throw new BadRequestException({ codigo: 'PRIMERA_COMPRA_SOLO_DESCUENTO', mensaje: 'La promoción de primera compra solo puede ser un descuento automático' });
+    }
+    if (!o.fechaHasta) {
+      throw new BadRequestException({ codigo: 'PRIMERA_COMPRA_VIGENCIA', mensaje: 'La promoción de primera compra debe tener fecha de fin (máximo un mes)' });
+    }
+    const inicio = o.fechaDesde ?? new Date(`${obtenerAhoraLima().fechaIso}T00:00:00.000Z`);
+    const limite = new Date(inicio);
+    limite.setUTCMonth(limite.getUTCMonth() + 1);
+    if (o.fechaHasta > limite) {
+      throw new BadRequestException({ codigo: 'PRIMERA_COMPRA_VIGENCIA', mensaje: 'La promoción de primera compra dura como máximo un mes' });
+    }
+  }
+
+  /**
+   * Primera compra del cliente: su celular (de la cuenta con sesión) no tiene ningún pedido válido (no anulado),
+   * ni de otra cuenta ni de invitado con el mismo número. Un pedido con esta oferta ya es un pedido válido,
+   * así que también cubre "ya usó esta oferta". Se busca por celular, no por nombre.
+   */
+  async clienteEsPrimeraCompra(partyId: bigint): Promise<boolean> {
+    const cuenta = await this.prisma.customerAccount.findFirst({
+      where: { party_id: partyId, activo: true },
+      select: { telefono: true },
+    });
+    const celular = cuenta?.telefono ?? null;
+    if (!celular || !/^9\d{8}$/.test(celular)) return false;
+    const variantes = [celular, `51${celular}`];
+    const [cuentas, contactos] = await Promise.all([
+      this.prisma.customerAccount.findMany({ where: { telefono: celular }, select: { party_id: true } }),
+      this.prisma.contactMechanism.findMany({
+        where: { tipo: { in: ['TELEFONO', 'WHATSAPP'] }, valor: { in: variantes } },
+        select: { party_id: true },
+      }),
+    ]);
+    const partyIds = [partyId, ...cuentas.map((c) => c.party_id), ...contactos.map((c) => c.party_id)];
+    const previo = await this.prisma.pedido.findFirst({
+      where: {
+        estado: { not: 'ANULADO' },
+        OR: [
+          { party_id: { in: partyIds } },
+          { cliente_party_id: { in: partyIds } },
+          { cliente_telefono: { in: variantes } },
+        ],
+      },
+      select: { id: true },
+    });
+    return !previo;
+  }
+
+  /**
+   * Promoción para el saludo del chat de WhatsApp: la activa, vigente hoy, marcada para el saludo y de menor orden.
+   * Solo se muestra una. El bot la enchufa en su saludo.
+   */
+  async promoParaSaludo(ahora: Date = new Date()): Promise<{ titulo: string; texto: string; enlaceCarta: string } | null> {
+    const candidatas = await this.prisma.oferta.findMany({
+      where: { mostrar_en_saludo_bot: true, activo: true, tipo: 'DESCUENTO' },
+      orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+    });
+    const oferta = candidatas.find((o) => estaVigente(o, 'CARTA', ahora));
+    if (!oferta) return null;
+    const texto = oferta.solo_primera_compra
+      ? `${oferta.descuento_tipo === 'MONTO' ? `S/ ${Number(oferta.descuento_valor)}` : `${Number(oferta.descuento_valor)} %`} de descuento en tu primera compra en nuestra carta online. No aplica a promociones ni combos.`
+      : `${(oferta.descripcion || oferta.nombre).trim()}. Pide en nuestra carta online.`;
+    const origen = urlPublicaCarta((clave) => process.env[clave]) || 'https://caprichos.pe';
+    // La carta web vive en la raíz (/); /carta lo atiende la API (JSON), así que no se agrega
+    return { titulo: oferta.nombre, texto, enlaceCarta: origen.replace(/\/$/, '') };
+  }
+
   private mapearOferta(o: any, canal?: string): OfertaItem {
     return {
       id: o.id.toString(),
@@ -1821,6 +1944,8 @@ export class OfertasService {
       limiteUsos: o.limite_usos,
       usosActuales: o.usos_actuales,
       noSumaBeneficios: o.no_suma_beneficios,
+      mostrarEnSaludoBot: o.mostrar_en_saludo_bot ?? false,
+      soloPrimeraCompra: o.solo_primera_compra ?? false,
       orden: o.orden,
       activo: o.activo,
       creadoEn: o.creado_en.toISOString(),

@@ -125,6 +125,7 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
     expect(screen.queryByLabelText(/Paso 2: Ubicación \(actual\)/)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños, para saludarte/i), { target: { value: '1990-03-14' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
   });
@@ -133,6 +134,7 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
     abrirPedido(false);
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños, para saludarte/i), { target: { value: '1990-03-14' } });
     await irAEnviar();
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything()));

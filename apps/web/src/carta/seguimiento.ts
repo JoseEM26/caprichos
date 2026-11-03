@@ -145,6 +145,29 @@ export function usePedidosGuardados(): PedidoGuardado[] {
   return lista;
 }
 
+/** Enlace de seguimiento (?seguimiento=CODIGO&t=TOKEN) que el bot y los avisos mandan al cliente. Null si no trae ese formato. */
+export function leerEnlaceSeguimiento(busqueda: string = window.location.search): { codigo: string; token: string } | null {
+  const params = new URLSearchParams(busqueda);
+  const codigo = params.get('seguimiento') ?? '';
+  const token = params.get('t') ?? '';
+  if (!/^[A-Za-z0-9-]{3,30}$/.test(codigo) || !/^[a-f0-9]{64}$/i.test(token)) return null;
+  return { codigo, token };
+}
+
+/**
+ * Pide el seguimiento con su token al servidor (él valida el token; un código sin token válido no devuelve nada).
+ * Si no coincide o falla, devuelve null y la carta se abre normal.
+ */
+export async function abrirSeguimientoDesdeEnlace(enlace: { codigo: string; token: string }): Promise<EstadoSeguimiento | null> {
+  try {
+    return await api.get<EstadoSeguimiento>(
+      `/carta/seguimiento/${encodeURIComponent(enlace.codigo)}?t=${encodeURIComponent(enlace.token)}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
 // Consulta el estado real a la API cada 15 s mientras la pantalla esté abierta y la pestaña visible
 export function useSeguimientoPedido(codigo: string | null, token: string | null) {
   const [estado, setEstado] = useState<EstadoSeguimiento | null>(null);

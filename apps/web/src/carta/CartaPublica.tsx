@@ -13,6 +13,7 @@ import {
   EstadoLocalCarta,
 } from './tipos';
 import { CarritoProvider, useCarrito } from './CarritoContext';
+import { abrirSeguimientoDesdeEnlace, leerEnlaceSeguimiento } from './seguimiento';
 import { CabeceraCarta } from './CabeceraCarta';
 import type { PaginaCarta } from './CabeceraCarta';
 import { BannerMesCarta, FranjaDatosCarta } from './PortadaCarta';
@@ -118,7 +119,17 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   const movil = useEsMovil();
   const ed = useEdicion();
 
-  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta } = useCarrito();
+  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto } = useCarrito();
+
+  // Enlace del bot o del aviso «pedido recibido»: abre directo el seguimiento de ese pedido (si el token no coincide, no pasa nada)
+  useEffect(() => {
+    if (vistaPrevia) return;
+    const enlace = leerEnlaceSeguimiento();
+    if (!enlace) return;
+    void abrirSeguimientoDesdeEnlace(enlace).then((estado) => {
+      if (estado) setSeguimientoAbierto({ codigo: estado.codigo, token: enlace.token, modalidad: estado.modalidad, nombre: '', creadoEn: '' });
+    });
+  }, []);
 
   const cargarDatos = async () => {
     setCargando(true);

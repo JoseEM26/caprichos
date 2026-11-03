@@ -40,7 +40,7 @@ import {
   obtenerNombreMostrar,
 } from '../../mensajes/utilidades/nombre-contacto.util';
 import { EntradaRawInput, normalizarEntrada, esSaludo } from './normalizador-entrada.util';
-import { transicionarEstado } from './maquina-estados';
+import { transicionarEstado, MODO_SOLO_MENUS } from './maquina-estados';
 import {
   ContextoConversacion,
   DatosHorarioLocal,
@@ -1083,8 +1083,9 @@ export class EjecutorConversacionService {
       this.logger.warn(`Error al consultar reservas para contexto: ${err.message}`);
     }
 
+    // Bot solo con menús: la IA no se consulta en el camino normal (el motor nuevo nunca la pide)
     let chatbotIaActivo = false;
-    if (this.chatbotIaService) {
+    if (this.chatbotIaService && !MODO_SOLO_MENUS) {
       try {
         chatbotIaActivo = await this.chatbotIaService.estaDisponible();
       } catch (err: any) {
@@ -1103,11 +1104,20 @@ export class EjecutorConversacionService {
       }
     }
 
+    // Promoción del saludo: si falla, el saludo sale sin ella
+    let promoSaludo: { titulo: string; texto: string; enlaceCarta: string } | null = null;
+    try {
+      promoSaludo = (await this.ofertasService?.promoParaSaludo()) ?? null;
+    } catch (err: any) {
+      this.logger.warn(`Sin promoción para el saludo: ${err.message}`);
+    }
+
     const contexto: ContextoConversacion = {
       conversacionId: conversacion.id.toString(),
       nombreCliente: nombreMostrar,
       telefonoCliente,
       cartaUrlPublica,
+      promoSaludo,
       datosLocal,
       datosLocalPublicos,
       categoriasCarta,
@@ -1207,7 +1217,7 @@ export class EjecutorConversacionService {
         textoNorm.includes('hablar con persona');
 
       if (esCarta) {
-        const urlCarta = contexto.cartaUrlPublica || 'https://caprichos.pe/carta';
+        const urlCarta = contexto.cartaUrlPublica || 'https://caprichos.pe';
         const textoCarta = `Puedes revisar nuestra carta completa aquí:\n👉 ${urlCarta}\n\nSeguimos revisando tu pago en Caja.`;
         const botones = [
           { id: 'btn_esp_esperar', titulo: 'Seguir esperando' },

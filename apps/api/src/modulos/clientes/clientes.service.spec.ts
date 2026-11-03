@@ -275,6 +275,7 @@ describe('ClientesService', () => {
       nombre: 'Ana Pérez',
       contrasena: 'ClaveSegura2026',
       telefono: '912345678',
+      cumpleanos: '14/03',
       aceptaDatos: true as const,
     };
     const ficha = () =>
@@ -331,6 +332,13 @@ describe('ClientesService', () => {
     it('cumpleaños es opcional', async () => {
       ficha();
       await expect(service.registro(dtoOk)).resolves.toBeDefined();
+    });
+
+    it('exige nombre de 2 letras y cumpleaños válido, sin crear nada si fallan', async () => {
+      await expect(service.registro({ ...dtoOk, nombre: 'A' })).rejects.toMatchObject({ response: { codigo: 'NOMBRE_REQUERIDO' } });
+      await expect(service.registro({ ...dtoOk, cumpleanos: undefined })).rejects.toMatchObject({ response: { codigo: 'CUMPLEANOS_REQUERIDO' } });
+      await expect(service.registro({ ...dtoOk, cumpleanos: '31/02' })).rejects.toMatchObject({ response: { codigo: 'FECHA_INVALIDA' } });
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
     });
 
     it('rechaza teléfono inválido, contraseña corta y falta de consentimiento', async () => {

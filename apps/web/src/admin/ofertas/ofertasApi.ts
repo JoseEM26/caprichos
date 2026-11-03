@@ -70,6 +70,8 @@ export interface OfertaItem {
   limiteUsos?: number | null;
   usosActuales?: number;
   noSumaBeneficios?: boolean;
+  mostrarEnSaludoBot?: boolean;
+  soloPrimeraCompra?: boolean;
   orden?: number;
   activo: boolean;
   creadoEn: string;

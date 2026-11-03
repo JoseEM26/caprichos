@@ -18,7 +18,13 @@ function construir(overrides: Record<string, any> = {}, minAviso = 5) {
     ...overrides.pedido,
   };
   const prisma: any = {
-    parametro: { findUnique: jest.fn(async () => (overrides.minutos === undefined ? null : { valor: overrides.minutos })) },
+    parametro: {
+      findUnique: jest.fn(async ({ where }: any) =>
+        where.clave === 'whatsapp_aviso_voucher_recordatorio_activo'
+          ? { valor: overrides.apagado ? 'no' : 'si' }
+          : overrides.minutos === undefined ? null : { valor: overrides.minutos },
+      ),
+    },
     mensajeReparto: {
       findMany: jest.fn(async ({ where }: any) => {
         const aviso = { pedido_id: pedido.id, enviado_en: HACE(minAviso) };
@@ -58,6 +64,13 @@ describe('Recordatorio de voucher (pedido digital sin comprobante)', () => {
   it('no sale otra vez si el pedido ya tiene el recordatorio (una sola vez)', async () => {
     const { planificador, avisos } = construir({ yaRecordado: true });
     expect(await planificador.avisarFaltaVoucher(AHORA)).toBe(0);
+    expect(avisos.avisar).not.toHaveBeenCalled();
+  });
+
+  it('con su propio aviso apagado no busca pedidos ni envía (el aviso RECIBIDO sigue igual)', async () => {
+    const { planificador, avisos, prisma } = construir({ apagado: true });
+    expect(await planificador.avisarFaltaVoucher(AHORA)).toBe(0);
+    expect(prisma.mensajeReparto.findMany).not.toHaveBeenCalled();
     expect(avisos.avisar).not.toHaveBeenCalled();
   });
 

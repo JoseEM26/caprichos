@@ -19,6 +19,7 @@ import {
   enmascararDni,
   formatearCorrelativo,
   formatearFechaHoraLima,
+  esComprobanteElegible,
   validarDocumentoComprobante,
 } from './comprobantes.util';
 import { MarcarEmitidoDto } from './dto/marcar-emitido.dto';
@@ -53,8 +54,6 @@ export const CLAVE_FECHA_CORTE = 'facturacion_desde';
 /** El barrido solo recupera cobros de las últimas 48 h (además del corte). */
 export const VENTANA_BARRIDO_MS = 48 * 60 * 60 * 1000;
 
-/** Series de la nota de venta interna (sin SUNAT). */
-const SERIE_NOTA = 'NV01';
 
 /** Textos que la respuesta de SUNAT deja en la fila (sin secretos: solo lo que devuelve SUNAT). */
 const MAX_TEXTO_RESPUESTA = 1000;
@@ -269,8 +268,8 @@ export class ComprobantesService {
   /**
    * Emite el comprobante para un pedido cobrado.
    * - Es idempotente: si ya existe el comprobante para el pedido, lo devuelve.
-   * - NOTA_VENTA: serie NV01 interna. BOLETA/FACTURA válidas: serie B002/F002 (parámetros) y se envían a SUNAT.
-   * - Si el documento es inválido, NO bloquea el cobro: lo deja con tipo NOTA_VENTA y lo reporta en la respuesta.
+   * - Solo BOLETA o FACTURA (obligatorio): serie B002/F002 (parámetros) y se envían a SUNAT.
+   * - Sin tipo válido o con documento inválido, falla: nunca sale como nota de venta.
    * - Con tx (transacción externa) no hace red: la boleta/factura queda PENDIENTE_ENVIO y la tarea la envía.
    */
   async emitirParaPedido(
@@ -308,41 +307,28 @@ export class ComprobantesService {
       });
     }
 
-    // 3. Validar tipo y documentos
-    const tipoSolicitado = (pedido.comprobante_tipo || 'NOTA_VENTA').trim().toUpperCase();
-    const docSolicitado = pedido.comprobante_doc?.trim() || null;
-    const razonSolicitada = pedido.comprobante_razon?.trim() || null;
-    const direccionSolicitada = pedido.comprobante_direccion?.trim() || null;
-
-    const validacion = validarDocumentoComprobante(
-      tipoSolicitado,
-      docSolicitado,
-      razonSolicitada,
-      Number(pedido.total),
-    );
-
-    let tipoFinal = tipoSolicitado;
-    let emisionFinal: 'INTERNA' | 'POR_EMITIR' = 'INTERNA';
-    const docFinal = docSolicitado;
-    const razonFinal = razonSolicitada;
-    let advertencia: string | null = null;
-
-    if (!validacion.valido) {
-      tipoFinal = 'NOTA_VENTA';
-      emisionFinal = 'INTERNA';
-      advertencia = `Documento inválido para ${tipoSolicitado}: ${validacion.motivo}. Se emitió NOTA_VENTA interna.`;
-    } else if (tipoFinal === 'BOLETA' || tipoFinal === 'FACTURA') {
-      emisionFinal = 'POR_EMITIR';
-    } else {
-      tipoFinal = 'NOTA_VENTA';
-      emisionFinal = 'INTERNA';
+    // 3. Boleta o factura obligatoria; el documento se valida (la nota de venta ya no es comprobante)
+    if (!esComprobanteElegible(pedido.comprobante_tipo)) {
+      throw new BadRequestException({
+        codigo: 'COMPROBANTE_OBLIGATORIO',
+        mensaje: 'Elige boleta o factura antes de emitir el comprobante',
+      });
     }
+    const tipoFinal = pedido.comprobante_tipo;
+    const docFinal = pedido.comprobante_doc?.trim() || null;
+    const razonFinal = pedido.comprobante_razon?.trim() || null;
+    const direccionSolicitada = pedido.comprobante_direccion?.trim() || null;
+    const validacion = validarDocumentoComprobante(tipoFinal, docFinal, razonFinal, Number(pedido.total));
+    if (!validacion.valido) {
+      throw new BadRequestException({ codigo: 'COMPROBANTE_DATOS_FALTANTES', mensaje: validacion.motivo });
+    }
+    const emisionFinal = 'POR_EMITIR' as const;
+    const advertencia: string | null = null;
 
     // 4. Serie y correlativo propio de la serie (atómico)
-    const electronico = tipoFinal === 'BOLETA' || tipoFinal === 'FACTURA';
-    const cfg = electronico ? await this.leerConfigFacturacion(db) : null;
-    const proveedor: Proveedor = cfg ? this.proveedorEfectivo(cfg.proveedor) : 'SIMULADO';
-    const serie = !cfg ? SERIE_NOTA : tipoFinal === 'BOLETA' ? cfg.serieBoleta : cfg.serieFactura;
+    const cfg = await this.leerConfigFacturacion(db);
+    const proveedor: Proveedor = this.proveedorEfectivo(cfg.proveedor);
+    const serie = tipoFinal === 'BOLETA' ? cfg.serieBoleta : cfg.serieFactura;
     const numero = await siguienteCorrelativo(db, serie);
     const numeroTexto = formatearCorrelativo(serie, numero);
 
@@ -358,7 +344,9 @@ export class ComprobantesService {
         razon_social: razonFinal,
         emision: emisionFinal,
         copias_impresas: 0,
-        ...(electronico ? { facturacion_estado: 'PENDIENTE_ENVIO', emisor: proveedor, simulado: proveedor === 'SIMULADO' } : {}),
+        facturacion_estado: 'PENDIENTE_ENVIO',
+        emisor: proveedor,
+        simulado: proveedor === 'SIMULADO',
       },
     });
 
@@ -382,10 +370,6 @@ export class ComprobantesService {
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
     }, db);
-
-    if (!electronico) {
-      return { ...this.serializarComprobante(nuevo), advertencia };
-    }
 
     // 7. Envío a SUNAT. Con tx no hay red: la fila PENDIENTE_ENVIO es el outbox y el envío lo hace el worker
     // (o el envío post-commit de Caja). Sin tx, se envía al momento.

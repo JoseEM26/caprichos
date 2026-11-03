@@ -4,7 +4,7 @@ import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { Ventana24hService } from './ventana-24h.service';
 import { TareaRecordatorioPagoService } from './tarea-recordatorio-pago.service';
-import { AvisosPedidoService, NUMEROS_INTENTO } from './avisos-pedido.service';
+import { AvisosPedidoService, NUMEROS_INTENTO, esParametroActivo } from './avisos-pedido.service';
 import { ReprogramacionService, MOTIVO_RETIRO } from './reprogramacion.service';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { calcularMontoReprogramacion } from '../../repartos/recargo-reprogramacion';
@@ -514,6 +514,9 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
    * nada desde el aviso. Una sola vez por pedido (la fila 14 de mensaje_reparto es la idempotencia).
    */
   async avisarFaltaVoucher(ahora: Date): Promise<number> {
+    // Apagado: no se busca nada. Sin este corte cada ciclo revisaría los pedidos de la última hora para nada
+    const activo = await this.prisma.parametro.findUnique({ where: { clave: 'whatsapp_aviso_voucher_recordatorio_activo' } });
+    if (!esParametroActivo(activo?.valor)) return 0;
     const param = await this.prisma.parametro.findUnique({ where: { clave: 'voucher_recordatorio_min' } });
     const minutos = Number(param?.valor ?? 3) || 3;
     const corte = new Date(ahora.getTime() - minutos * 60 * 1000);

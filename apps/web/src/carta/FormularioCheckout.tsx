@@ -26,6 +26,7 @@ import {
   ModalidadEntrega,
   TipoComprobante,
 } from './tipos';
+import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 
 interface FormularioCheckoutProps {
   estadoLocal: EstadoLocalCarta | null;
@@ -68,6 +69,8 @@ export function FormularioCheckout({
   // Cliente
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
+  // Cumpleaños: lo pide quien da de alta su celular sin sesión, y quien con cuenta aún no lo tiene
+  const [cumpleCliente, setCumpleCliente] = useState('');
 
   // Entrega
   const [direccion, setDireccion] = useState('');
@@ -118,6 +121,8 @@ export function FormularioCheckout({
   const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
+  const cumpleFaltaCuenta = !!clienteCuenta && (!clienteCuenta.cumpleanos || clienteCuenta.cumpleanos === '—');
+  const pideCumple = cumpleFaltaCuenta || (!clienteCuenta && telefono.trim().length > 0);
   // Acceso: con sesión se usa la cuenta; sin ella el cliente elige ingresar o seguir como invitado
   const [comoInvitado, setComoInvitado] = useState(false);
   // Sin invitado permitido, quien pide sin cuenta debe escribir su celular (así suma puntos): no se ofrece «invitado»
@@ -131,6 +136,8 @@ export function FormularioCheckout({
     if (clienteCuenta.telefono && !otroTelefono) setTelefono(clienteCuenta.telefono);
   }, [clienteCuenta, otroTelefono]);
   const [mensajeCupon, setMensajeCupon] = useState<string | null>(null);
+  // Promoción de primera compra (solo con sesión iniciada): se muestra a quien no ha entrado a su cuenta
+  const [primeraCompra, setPrimeraCompra] = useState<{ nombre: string; descuento: string } | null>(null);
 
   // Idempotency-Key único por intento
   const claveIdempotenciaRef = useRef<string>(
@@ -151,7 +158,8 @@ export function FormularioCheckout({
   };
 
   // lo que descontará el servidor (promociones automáticas y cupón), para mostrar el mismo total que se cobra
-  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo]);
+  const tieneSesion = Boolean(clienteCuenta);
+  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion]);
   useEffect(() => {
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
@@ -166,6 +174,24 @@ export function FormularioCheckout({
       vigente = false;
     };
   }, [checkoutAbierto, clavePromos]);
+
+  // Sin sesión: se avisa que la primera compra se aplica al iniciar sesión (la validación real es del servidor)
+  useEffect(() => {
+    if (!checkoutAbierto || tieneSesion) return;
+    let vigente = true;
+    api
+      .get<OfertaItem[]>('/carta/ofertas')
+      .then((r) => {
+        const oferta = (Array.isArray(r) ? r : []).find((o) => o.soloPrimeraCompra && o.vigenteAhora);
+        if (vigente) {
+          setPrimeraCompra(oferta ? { nombre: oferta.nombre, descuento: oferta.descuentoTipo === 'MONTO' ? `S/ ${oferta.descuentoValor ?? 0}` : `${oferta.descuentoValor ?? 0} %` } : null);
+        }
+      })
+      .catch(() => vigente && setPrimeraCompra(null));
+    return () => {
+      vigente = false;
+    };
+  }, [checkoutAbierto, tieneSesion]);
 
   // Direcciones guardadas del cliente con cuenta; si falla, se sigue como sin libreta
   const clientePartyId = clienteCuenta?.partyId ?? null;
@@ -372,6 +398,8 @@ export function FormularioCheckout({
       if (clienteCuenta) return 'El teléfono debe tener 9 dígitos y empezar con 9';
       if (!invitadoPermitido) return 'Escribe tu celular para hacer tu pedido y sumar puntos';
     }
+    if (!clienteCuenta && telLimpio && nombre.trim().length < 2) return 'Escribe tu nombre completo para sumar puntos con tu celular';
+    if (!clienteCuenta && telLimpio && !cumpleCliente) return 'Escribe tu cumpleaños, para saludarte';
     return null;
   };
 
@@ -551,6 +579,7 @@ export function FormularioCheckout({
       cliente: {
         nombre: nombre.trim(),
         ...(telefono.trim() ? { telefono: telefono.trim() } : {}),
+        ...(pideCumple && cumpleCliente ? { cumpleanos: cumpleCliente } : {}),
       },
       modalidad,
       entrega:
@@ -1151,6 +1180,36 @@ export function FormularioCheckout({
                             </button>
                           )}
                         </>
+                      )}
+
+                      {pideCumple && (
+                        <div>
+                          <label
+                            htmlFor="f-cumple"
+                            style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', display: 'block', marginBottom: '4px' }}
+                          >
+                            Tu cumpleaños, para saludarte
+                          </label>
+                          <input
+                            id="f-cumple"
+                            type="date"
+                            value={cumpleCliente}
+                            max={new Date().toISOString().slice(0, 10)}
+                            onChange={(e) => setCumpleCliente(e.target.value)}
+                            required
+                            aria-required="true"
+                            style={{
+                              width: '100%',
+                              minHeight: '44px',
+                              borderRadius: '10px',
+                              border: '1.5px solid var(--cp-line)',
+                              backgroundColor: 'var(--cp-cream)',
+                              color: 'var(--cp-navy)',
+                              padding: '0 12px',
+                              fontSize: '14px',
+                            }}
+                          />
+                        </div>
                       )}
                     </div>
                   )}
@@ -1947,6 +2006,12 @@ export function FormularioCheckout({
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
                         <span>Puntos canjeados</span>
                         <span style={{ fontWeight: 700 }}>−S/ {puntosAplicados.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    {primeraCompra && !tieneSesion && (
+                      <div role="note" style={{ fontSize: '13px', color: 'var(--cp-navy)', background: 'var(--cp-sand)', borderRadius: '8px', padding: '8px 10px', lineHeight: '18px' }}>
+                        Tienes {primeraCompra.descuento} de descuento en tu primera compra. Inicia sesión con tu celular para aplicarlo. No aplica a promociones ni combos.
                       </div>
                     )}
 

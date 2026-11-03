@@ -5,6 +5,12 @@ import { salonApi } from '../api';
 import { api } from '../../../comun/api';
 import { listarPersonalActivo } from '../../creditos/creditosApi';
 
+/** Elige boleta en el selector obligatorio (si el paso lo muestra y aún no hay elección). */
+const elegirBoleta = () => {
+  const b = screen.queryByTestId('comprobante-BOLETA');
+  if (b && b.getAttribute('aria-pressed') !== 'true') fireEvent.click(b);
+};
+
 vi.mock('../useSalonSocket', () => ({
   useSalonSocket: () => ({ avisoListo: null, cerrarAvisoListo: () => {} }),
 }));
@@ -281,6 +287,8 @@ describe('¿Quién pide? con cliente de cuenta en el pedido enviado', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Ana Pérez/ }));
     expect(screen.getByText('Cliente: Ana Pérez (12 pts)')).toBeInTheDocument();
 
+    elegirBoleta();
+
     fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
     expect(screen.getByText(/Pide Ana Pérez: el pedido suma sus puntos al cobrar/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
@@ -298,6 +306,7 @@ describe('¿Quién pide? con cliente de cuenta en el pedido enviado', () => {
     fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Lucía' } });
     fireEvent.click(screen.getByText('Agregar al pedido'));
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
+    elegirBoleta();
     fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 

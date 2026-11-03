@@ -9,6 +9,12 @@ import { salonApi } from '../api';
 import { ErrorApi } from '../../../comun/api';
 import * as sesionModulo from '../../../comun/sesion';
 
+/** Elige boleta en el selector obligatorio (si el paso lo muestra y aún no hay elección). */
+const elegirBoleta = () => {
+  const b = screen.queryByTestId('comprobante-BOLETA');
+  if (b && b.getAttribute('aria-pressed') !== 'true') fireEvent.click(b);
+};
+
 // Mock de api
 vi.mock('../api', () => ({
   salonApi: {
@@ -303,6 +309,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     const botonEnviar = screen.getByRole('button', {
       name: 'Enviar directo a cocina',
     });
+    elegirBoleta();
     fireEvent.click(botonEnviar);
     expect(screen.getByText('Agrega al menos un producto para enviarlo.')).toBeInTheDocument();
     expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
@@ -405,6 +412,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     await waitFor(() => {
       expect(botonEnviar).not.toBeDisabled();
     });
+    elegirBoleta();
     fireEvent.click(botonEnviar);
 
     // Diálogo confirmar
@@ -767,6 +775,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     fireEvent.change(screen.getByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Lucía' } });
     fireEvent.click(screen.getByText('Agregar al pedido'));
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
+    elegirBoleta();
     fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 

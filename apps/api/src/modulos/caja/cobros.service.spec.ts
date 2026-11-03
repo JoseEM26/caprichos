@@ -173,6 +173,7 @@ describe('CobrosService', () => {
       total: new Prisma.Decimal(50.0),
       estado: 'ENTREGADO',
       pago_estado: 'PENDIENTE',
+      comprobante_tipo: 'BOLETA',
       pago_metodo: null,
       es_personal: false,
       cobros: [],
@@ -666,6 +667,7 @@ describe('CobrosService', () => {
       total: new Prisma.Decimal(50.0),
       estado: 'ENTREGADO',
       pago_estado: 'PENDIENTE',
+      comprobante_tipo: 'BOLETA',
       pago_metodo: null,
       es_personal: false,
       cobros: [],
@@ -1005,6 +1007,7 @@ describe('CobrosService', () => {
       prismaMock.pedido.update.mockResolvedValue({
         id: 100n,
         pago_estado: 'PENDIENTE',
+        comprobante_tipo: 'BOLETA',
       });
 
       const res = await service.anularCobro(
@@ -1047,7 +1050,6 @@ describe('CobrosService', () => {
           total: new Prisma.Decimal(45.0),
           cliente_nombre: 'María López',
           cliente_telefono: '987654321',
-          comprobante_tipo: 'BOLETA',
           comprobante_doc: '45678912',
           comprobante_razon: null,
           creado_en: fechaBase,
@@ -1071,11 +1073,10 @@ describe('CobrosService', () => {
           modalidad: 'LLEVAR',
           estado: 'PREPARANDO',
           pago_estado: 'PENDIENTE',
-          pago_metodo: null,
+          comprobante_tipo: 'BOLETA',
           total: new Prisma.Decimal(45.0),
           cliente_nombre: 'María López',
           cliente_telefono: '987654321',
-          comprobante_tipo: 'BOLETA',
           comprobante_doc: '45678912',
           comprobante_razon: null,
           creado_en: new Date(),
@@ -1100,6 +1101,7 @@ describe('CobrosService', () => {
         codigo: 'CP-W020',
         estado: 'COLA',
         pago_estado: 'PENDIENTE',
+        comprobante_tipo: 'BOLETA',
       });
 
       prismaMock.pedido.update.mockResolvedValue({
@@ -1130,6 +1132,7 @@ describe('CobrosService', () => {
         codigo: 'CP-W020',
         estado: 'ANULADO',
         pago_estado: 'PENDIENTE',
+        comprobante_tipo: 'BOLETA',
       });
 
       await expect(
@@ -1171,6 +1174,7 @@ describe('CobrosService', () => {
       codigo: 'CP-W020',
       estado: 'COLA',
       pago_estado: 'PENDIENTE',
+      comprobante_tipo: 'BOLETA',
       pago_preferido,
       pago_metodo,
     });
@@ -1297,7 +1301,7 @@ describe('CobrosService', () => {
       prismaMock.caja.findUnique.mockResolvedValue({ id: 10n, estado: 'ABIERTA' });
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 100n, codigo: 'CP-0100', total: new Prisma.Decimal(0.3), estado: 'ENTREGADO',
-        pago_estado: 'PENDIENTE', es_personal: false, cobros: [],
+        pago_estado: 'PENDIENTE', comprobante_tipo: 'BOLETA', es_personal: false, cobros: [],
       });
       prismaMock.cobro.create.mockImplementation(({ data }: any) =>
         Promise.resolve({ id: 1n, pedido_id: 100n, caja_id: 10n, total: data.total, credito_personal: false,
@@ -1330,6 +1334,7 @@ describe('CobrosService', () => {
       total: new Prisma.Decimal(42),
       estado: 'ENTREGADO',
       pago_estado: 'PENDIENTE',
+      comprobante_tipo: 'BOLETA',
       pago_metodo: null,
       es_personal: false,
       cobros: [],
@@ -1393,6 +1398,7 @@ describe('CobrosService', () => {
       total: new Prisma.Decimal(50),
       estado: 'ENTREGADO',
       pago_estado: 'PENDIENTE',
+      comprobante_tipo: 'BOLETA',
       pago_metodo: null,
       es_personal: false,
       cobros: [],

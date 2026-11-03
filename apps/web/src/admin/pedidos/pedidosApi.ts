@@ -234,7 +234,7 @@ export interface CobrarDto {
 
 export const pedidosApi = {
   /** Cambia el comprobante antes de cobrar (Caja). 409 si ya está cobrado o con comprobante emitido. */
-  cambiarComprobante: (pedidoId: string, dto: { tipo: 'NOTA_VENTA' | 'BOLETA' | 'FACTURA'; doc?: string; razon?: string; direccion?: string }) =>
+  cambiarComprobante: (pedidoId: string, dto: { tipo: 'BOLETA' | 'FACTURA'; doc?: string; razon?: string; direccion?: string }) =>
     api.patch<{ id: string; codigo: string; comprobante_tipo: string; comprobante_doc: string | null; comprobante_razon: string | null; comprobante_direccion: string | null }>(
       `/admin/pedidos/${pedidoId}/comprobante`,
       dto,
@@ -334,7 +334,7 @@ export const pedidosApi = {
         origen?: 'GPS' | 'ESCRITA' | 'MAPA' | 'WHATSAPP' | 'ENLACE';
       };
       comprobante?: {
-        tipo: 'NOTA_VENTA' | 'BOLETA' | 'FACTURA';
+        tipo: 'BOLETA' | 'FACTURA';
         dni?: string;
         ruc?: string;
         razonSocial?: string;

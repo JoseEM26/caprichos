@@ -19,19 +19,25 @@ describe('ModalPrecuenta - comprobante, Pagó con y foto del POS', () => {
 
   const botonEnviar = () => screen.getByTestId('btn-enviar-caja');
 
-  it('por defecto pide nota de venta y envía el comprobante y el recibido', async () => {
+  it('sin boleta ni factura no deja enviar: hay que elegir el comprobante (no hay nota de venta)', async () => {
     const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
     render(<ModalPrecuenta {...propsBase} pedidoId="P-1" />);
 
-    expect(screen.getByTestId('comprobante-NOTA_VENTA')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('comprobante-BOLETA')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('comprobante-FACTURA')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByTestId('comprobante-NOTA_VENTA')).toBeNull();
     fireEvent.change(screen.getByPlaceholderText(/^Mínimo S\/|^Obligatorio$/), { target: { value: '50' } });
+    expect(botonEnviar()).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('comprobante-BOLETA'));
+    expect(botonEnviar()).not.toBeDisabled();
     fireEvent.click(botonEnviar());
     fireEvent.click(screen.getByText('Sí, enviar a Caja'));
 
     await waitFor(() => expect(enviar).toHaveBeenCalledTimes(1));
     expect(enviar).toHaveBeenCalledWith('P-1', 'EFECTIVO', [{ medio: 'EFECTIVO', monto: 32 }], {
       recibido: 50,
-      comprobante: { tipo: 'NOTA_VENTA' },
+      comprobante: { tipo: 'BOLETA' },
     });
   });
 

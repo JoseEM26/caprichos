@@ -137,3 +137,36 @@ describe('Mi perfil (API)', () => {
     expect(perfil).toMatchObject({ rol: 'MOZO', dniEnmascarado: expect.not.stringContaining('12345678'), activo: true });
   });
 });
+
+describe('Mi perfil: casilla de avisos por correo', () => {
+  function servicioCon(persona: { correo: string | null }) {
+    const prisma: any = {
+      userAccount: {
+        findUnique: jest.fn().mockResolvedValue({
+          party_id: 1n,
+          rol: 'MOZO',
+          activo: true,
+          avisos_correo: false,
+          party: { persona: { nombres: 'Ana', apellidos: null, correo: persona.correo, foto_archivo_id: null }, documentos: [] },
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      person: { update: jest.fn().mockResolvedValue({}) },
+      archivo: { findUnique: jest.fn() },
+    };
+    const auditoria = { registrar: jest.fn() };
+    return { prisma, servicio: new MiPerfilService(prisma, {} as any, auditoria as any) };
+  }
+
+  it('encender la casilla sin correo es error', async () => {
+    const { servicio, prisma } = servicioCon({ correo: null });
+    await expect(servicio.actualizarDatos(1n, { avisosCorreo: true } as any)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.userAccount.update).not.toHaveBeenCalled();
+  });
+
+  it('encender la casilla con correo guarda la casilla de la cuenta', async () => {
+    const { servicio, prisma } = servicioCon({ correo: 'ana@caprichos.pe' });
+    await servicio.actualizarDatos(1n, { avisosCorreo: true } as any);
+    expect(prisma.userAccount.update).toHaveBeenCalledWith({ where: { party_id: 1n }, data: { avisos_correo: true } });
+  });
+});

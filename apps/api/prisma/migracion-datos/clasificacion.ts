@@ -53,7 +53,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ]],
   ['bot, WhatsApp y mensajes: conversaciones, historial y salientes', [
     'conversacion', 'mensaje_chat', 'whatsapp_mensaje', 'saliente_whatsapp', 'queja_whatsapp',
-    'notificacion', 'mensaje_carta', 'ia_consumo', 'uso_externo',
+    'notificacion', 'mensaje_carta', 'ia_consumo', 'uso_externo', 'correo_envio',
   ]],
   ['stock y compras: saldos, movimientos y pedidos a proveedores', [
     'stock', 'movimiento_stock', 'pedido_proveedor', 'pedido_proveedor_linea', 'compra', 'compra_linea',

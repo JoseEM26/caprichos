@@ -111,19 +111,34 @@ export const TEXTOS_REPARTO = {
     variablesPlantilla: [nombre, codigo],
   }),
 
-  /** Pedido de la carta virtual con pago digital: el asesor gestiona el voucher por este chat. `medio` es Yape, Plin o transferencia. */
-  recibidoDigital: (nombre: string, codigo: string, medio: string): PayloadAvisoReparto => ({
-    textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉 En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por ${medio}. Mientras tanto, por favor envíanos la foto de tu voucher por aquí mismo 📸 🙏`,
+  /**
+   * Pedido de la carta virtual con pago digital: el asesor gestiona el voucher por este chat. `medio` es Yape, Plin o transferencia.
+   * El enlace de seguimiento va en el texto libre (ventana abierta). La plantilla no cambia: no tiene la variable.
+   */
+  recibidoDigital: (nombre: string, codigo: string, medio: string, enlace?: string | null): PayloadAvisoReparto => ({
+    textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉 En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por ${medio}. Mientras tanto, por favor envíanos la foto de tu voucher por aquí mismo 📸 🙏${enlace ? ` Sigue tu pedido aquí: ${enlace}` : ''}`,
     plantillaClave: 'CARTA_RECIBIDO_DIGITAL',
     variablesPlantilla: [nombre, codigo, medio],
   }),
 
-  /** Pedido de la carta virtual pagado en efectivo u otro medio no digital. */
-  recibidoEfectivo: (nombre: string, codigo: string): PayloadAvisoReparto => ({
-    textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso. 🙏`,
-    plantillaClave: 'CARTA_RECIBIDO_EFECTIVO',
-    variablesPlantilla: [nombre, codigo],
-  }),
+  /**
+   * Pedido de la carta virtual pagado en efectivo u otro medio no digital, con el enlace de seguimiento.
+   * Ventana cerrada: la plantilla nueva solo si `plantillaSeguimiento` (Meta ya la aprobó); si no, la vigente sin enlace.
+   */
+  recibidoEfectivo: (nombre: string, codigo: string, enlace?: string | null, plantillaSeguimiento = false): PayloadAvisoReparto => {
+    if (enlace && plantillaSeguimiento) {
+      return {
+        textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso. Sigue tu pedido aquí: ${enlace}. ¡Gracias por preferir Caprichos! 💛`,
+        plantillaClave: 'CARTA_RECIBIDO_SEGUIMIENTO',
+        variablesPlantilla: [nombre, codigo, enlace],
+      };
+    }
+    return {
+      textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso. 🙏${enlace ? ` Sigue tu pedido aquí: ${enlace}` : ''}`,
+      plantillaClave: 'CARTA_RECIBIDO_EFECTIVO',
+      variablesPlantilla: [nombre, codigo],
+    };
+  },
 
   /** Recordatorio a los pocos minutos si el pedido digital sigue sin voucher (una sola vez por pedido). */
   voucherRecordatorio: (nombre: string, codigo: string): PayloadAvisoReparto => ({

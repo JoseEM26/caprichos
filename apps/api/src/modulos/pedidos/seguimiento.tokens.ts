@@ -14,6 +14,11 @@ export function generarTokenSeguimiento(
   return createHmac('sha256', secreto).update(`seg:${pedidoId}`).digest('hex');
 }
 
+/** Enlace a la carta web con el seguimiento de ese pedido abierto. La carta web vive en la raíz (/). */
+export function enlaceSeguimientoCarta(origen: string, codigo: string, pedidoId: bigint | string | number): string {
+  return `${origen.replace(/\/$/, '')}/?seguimiento=${encodeURIComponent(codigo)}&t=${generarTokenSeguimiento(pedidoId)}`;
+}
+
 export function verificarTokenSeguimiento(
   pedidoId: bigint | string | number,
   token: string | undefined,

@@ -136,7 +136,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
             color: 'var(--cp-navy)',
           }}
         >
-          ¡Gracias, {pedido.nombre}!
+          {pedido.nombre ? `¡Gracias, ${pedido.nombre}!` : 'Seguimiento de tu pedido'}
         </h2>
         <div
           style={{

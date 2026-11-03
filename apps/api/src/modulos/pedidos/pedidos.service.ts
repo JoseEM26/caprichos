@@ -29,9 +29,9 @@ import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service'
 import { TELEFONO_PLACEHOLDER, tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { PagoPlanService } from './pago-plan.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
-import { ComprobanteDefectoService } from '../comprobantes/comprobante-defecto.service';
-import { tipoComprobanteEfectivo } from '../comprobantes/comprobante-defecto';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
+import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
+import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
 
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO' | 'CAJA' | 'WHATSAPP' | 'BOT';
@@ -71,7 +71,6 @@ export class PedidosService {
     private readonly avisosPedidoService?: AvisosPedidoService,
     @Optional() private readonly direcciones?: DireccionesClienteService,
     @Optional() private readonly puntosParty?: PartyPuntosService,
-    @Optional() private readonly defectoComprobante?: ComprobanteDefectoService,
   ) {}
 
   /**
@@ -185,6 +184,7 @@ export class PedidosService {
       origen?.omitirChequeoCarta === true;
     let clienteNombre: string | null = null;
     let telefonoLimpio: string | null = null;
+    let cumpleCliente: Cumpleanos | null = null;
 
     if (esMozo) {
       clienteNombre =
@@ -228,10 +228,25 @@ export class PedidosService {
         });
       }
       clienteNombre = dto.cliente.nombre.trim();
+      // Alta de cliente por celular desde la carta sin sesión: nombre (2+ letras) y cumpleaños obligatorios
+      if (esCartaSinSesion && celularValido) {
+        if (clienteNombre.length < 2) {
+          throw new BadRequestException({ codigo: 'NOMBRE_REQUERIDO', mensaje: 'Escribe tu nombre completo para sumar puntos con tu celular.' });
+        }
+        cumpleCliente = exigirCumpleanos(dto.cliente.cumpleanos);
+      } else if ((origen?.canal ?? 'CARTA') === 'CARTA' && dto.cliente?.cumpleanos) {
+        cumpleCliente = exigirCumpleanos(dto.cliente.cumpleanos);
+      }
     }
 
-    // 4. Validar comprobante (sin tipo elegido, el efectivo se decide con el total, más abajo)
+    // 4. Comprobante obligatorio en todo canal: boleta o factura (la nota de venta no es comprobante)
     const tipoElegido = dto.comprobante?.tipo;
+    if (!esComprobanteElegible(tipoElegido)) {
+      throw new BadRequestException({
+        codigo: 'COMPROBANTE_OBLIGATORIO',
+        mensaje: 'Elige boleta o factura para tu pedido',
+      });
+    }
     if (tipoElegido === 'FACTURA') {
       const ruc = dto.comprobante?.ruc?.trim();
       const razonSocial = dto.comprobante?.razonSocial?.trim();
@@ -475,6 +490,10 @@ export class PedidosService {
 
     // 5.0. Cliente con cuenta identificado (suma puntos, historial y direcciones)
     const clienteFinal = await this.clienteIdentificado(dto, origen);
+    // Carta con cuenta o celular: completa nombre y cumpleaños solo si el cliente aún no los tiene
+    if (cumpleCliente && clienteFinal && this.puntosParty) {
+      await this.puntosParty.completarDatos(clienteFinal, { nombre: clienteNombre ?? undefined, cumple: cumpleCliente });
+    }
     // Cliente con cuenta de mozo/caja: si el pedido no trae nombre o teléfono propios, se toman de su cuenta
     if (esMozo && clienteFinal && this.direcciones) {
       const cuenta = await this.direcciones.datosCuentaActiva(clienteFinal);
@@ -499,6 +518,8 @@ export class PedidosService {
       canal: canalPedido,
       cuponCodigo: dto.cuponCodigo,
       clientePartyId: clienteFinal,
+      // Solo la carta con sesión iniciada (no WhatsApp, mozo ni celular suelto)
+      clienteConSesion: canalPedido === 'CARTA' && !!origen?.clientePartyId,
     });
 
     const descuentoAplicado = desgloseDescuento.descuentoTotal;
@@ -620,9 +641,8 @@ export class PedidosService {
       });
     }
 
-    // 9. Comprobante efectivo (único punto del tipo por defecto) y creación en transacción
-    const aplicaDefecto = tipoElegido ? false : !!(await this.defectoComprobante?.aplica());
-    const comprobanteTipo = tipoComprobanteEfectivo(tipoElegido, aplicaDefecto);
+    // 9. Comprobante (ya validado arriba) y creación en transacción
+    const comprobanteTipo = tipoElegido;
     const comprobanteDoc =
       comprobanteTipo === 'FACTURA'
         ? dto.comprobante?.ruc?.trim() || null

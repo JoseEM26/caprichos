@@ -295,6 +295,7 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), {
       target: { value: '987654321' },
     });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
 
     // Elegir modalidad Recoger para no pedir dirección
     fireEvent.click(screen.getByText('Recoger en el local'));
@@ -368,6 +369,7 @@ describe('Pruebas de la Carta Pública (front-carta)', () => {
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), {
       target: { value: '987654321' },
     });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
     fireEvent.click(screen.getByText('Recoger en el local'));
 
     // Avanzar paso 1 -> paso 2 -> paso 3 (Pago)
@@ -595,6 +597,7 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Lucía Pérez' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987654321' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
 
     // Avanzar a paso 2
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
@@ -637,6 +640,7 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
 
     // Corregir teléfono y avanzar a Paso 2 en Delivery sin dirección
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
 
     // Ahora en paso 2 sin dirección ni coordenadas
@@ -659,6 +663,7 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Rodrigo Torres' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '998877665' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
 
     // Avanzar a paso 2
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
@@ -733,6 +738,7 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Mariana' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987112233' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
     fireEvent.click(screen.getByRole('button', { name: /Marcar en el mapa/i }));
     fireEvent.change(screen.getByLabelText(/Buscar dirección/i), { target: { value: 'Av. Campoy' } });
@@ -773,6 +779,7 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Mariana' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987112233' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
     fireEvent.click(screen.getByRole('button', { name: /Marcar en el mapa/i }));
     fireEvent.change(screen.getByLabelText(/Buscar dirección/i), { target: { value: 'Av. Campoy' } });
@@ -808,6 +815,7 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Mariana' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987112233' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
 
     // En paso 2 tocar «Marcar en el mapa»
@@ -857,6 +865,7 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Diego' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
 
     // Elegir recoger
     fireEvent.click(screen.getByText('Recoger en el local'));

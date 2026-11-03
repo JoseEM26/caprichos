@@ -194,6 +194,8 @@ describe('UsuariosView (/admin/usuarios)', () => {
         rol: 'CAJERO',
         horarios: [],
         reemplazos: [],
+        avisosCorreo: false,
+        horario24_7: false,
       });
     });
 
