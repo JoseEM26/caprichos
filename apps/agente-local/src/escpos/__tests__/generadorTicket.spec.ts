@@ -58,7 +58,7 @@ describe('generarTicketEscPos con cadena QR', () => {
     const qr = t.indexOf('\x1d(k');
     expect(qr).toBeGreaterThan(t.indexOf('Representación'));
     expect(qr).toBeLessThan(t.indexOf('Hash:'));
-    expect(t.slice(0, qr)).toMatch(/\x1ba\x01$/);
+    expect(t.slice(0, qr).endsWith('\x1ba\x01')).toBe(true);
     expect(t).toContain(CADENA);
   });
 
