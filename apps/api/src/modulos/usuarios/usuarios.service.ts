@@ -46,6 +46,8 @@ import { AsignarPinDto } from './dto/asignar-pin.dto';
 import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.dto';
 import { ConfigurarHorarioDto } from './dto/horario.dto';
 import { deHora, guardarHorarioTx } from './horario.util';
+import { rolRecibeAvisosPorDefecto } from '../correo/roles-avisos';
+import { CORREO_REQUERIDO_AVISOS } from '../correo/avisos-mensajes';
 import { enmascararDni, generarClaveAleatoria } from './usuarios.util';
 import {
   ROLES_ALERTAS_WHATSAPP,
@@ -183,6 +185,9 @@ export class UsuariosService {
         rol: u.rol,
         roles: [u.rol, ...(u.rolesExtra ?? []).map((r) => r.rol)],
         paisNacimiento: u.party?.persona?.pais_nacimiento ?? null,
+        avisosCorreo: Boolean(u.avisos_correo),
+        horario24_7: Boolean(u.party?.persona?.horario_24_7),
+        correo: u.party?.persona?.correo ?? null,
         activo: u.activo,
         debeCambiar: u.debe_cambiar,
         altaEn: u.alta_en,
@@ -335,6 +340,8 @@ export class UsuariosService {
         const nombres = dto.nombres.trim();
         const apellidos = dto.apellidos.trim();
         const correo = dto.correo ? dto.correo.trim().toLowerCase() : null;
+        // Horario 24/7: por defecto, el ADMIN
+        const horario247 = dto.horario24_7 ?? dto.rol === 'ADMIN';
         const pais = dto.paisNacimiento?.trim() || null;
         const cumple = dto.fechaNacimiento
           ? {
@@ -354,6 +361,7 @@ export class UsuariosService {
                 correo: personaPrevia.correo || correo,
                 ...(cumple && personaPrevia.cumple_mes == null ? cumple : {}),
                 ...(pais && !personaPrevia.pais_nacimiento ? { pais_nacimiento: pais } : {}),
+                horario_24_7: horario247,
               },
             })
           : await tx.person.create({
@@ -364,6 +372,7 @@ export class UsuariosService {
                 ...(correo ? { correo } : {}),
                 ...(cumple ?? {}),
                 ...(pais ? { pais_nacimiento: pais } : {}),
+                horario_24_7: horario247,
               },
             });
 
@@ -381,6 +390,9 @@ export class UsuariosService {
             },
           }));
 
+        // Avisos por correo: por defecto ADMIN y SUPERVISOR con correo. Pedirlos sin correo es error.
+        const avisosCorreo = dto.avisosCorreo ?? (rolRecibeAvisosPorDefecto(dto.rol) && Boolean(person.correo));
+        if (avisosCorreo && !person.correo) throw new BadRequestException(CORREO_REQUERIDO_AVISOS);
         const userAccount = await tx.userAccount.create({
           data: {
             party_id: party.id,
@@ -388,6 +400,7 @@ export class UsuariosService {
             hash,
             debe_cambiar: true,
             activo,
+            avisos_correo: avisosCorreo,
           },
         });
 
@@ -422,7 +435,7 @@ export class UsuariosService {
           await guardarHorarioTx(tx, party.id, dto);
         }
 
-        return { party, person, partyIdentifier, userAccount };
+        return { party, person, partyIdentifier, userAccount, avisosCorreo, horario247 };
       });
     } catch (error: any) {
       if (error?.code === 'P2002') {
@@ -460,6 +473,8 @@ export class UsuariosService {
           roles,
           activo,
           debeCambiar: true,
+          avisosCorreo: nuevo.avisosCorreo,
+          horario24_7: nuevo.horario247,
           diasTrabaja: dto.horarios?.length ?? 0,
           reemplazosFijos: dto.reemplazos?.length ?? 0,
         },
@@ -885,7 +900,15 @@ export class UsuariosService {
     const correoCambia = dto.correo !== undefined && correoNuevo !== correoAnterior;
     const paisNuevo = dto.paisNacimiento !== undefined ? dto.paisNacimiento.trim() || null : undefined;
 
-    if (docPedido || dto.correo !== undefined || rolesCambian) this.exigirAdmin(usuarioActual);
+    // Avisos por correo: con la casilla encendida hace falta correo (si se toca correo o casilla)
+    const avisosNuevo = dto.avisosCorreo ?? usuario.avisos_correo;
+    if (avisosNuevo && !correoNuevo && (dto.avisosCorreo !== undefined || dto.correo !== undefined)) {
+      throw new BadRequestException(CORREO_REQUERIDO_AVISOS);
+    }
+    const avisosCambian = dto.avisosCorreo !== undefined && dto.avisosCorreo !== usuario.avisos_correo;
+    const horarioPedido = dto.horario24_7 !== undefined;
+
+    if (docPedido || dto.correo !== undefined || rolesCambian || avisosCambian || horarioPedido) this.exigirAdmin(usuarioActual);
     if (dniCambia) {
       await this.exigirClaveAdmin(usuarioActual, dto.claveAdmin);
       const otro = await this.prisma.partyIdentifier.findFirst({
@@ -904,6 +927,8 @@ export class UsuariosService {
       roles: rolesAntes,
       dni: enmascararDni(numeroAnterior),
       tipoDocumento: tipoAnterior,
+      avisosCorreo: usuario.avisos_correo,
+      horario24_7: Boolean(usuario.party?.persona?.horario_24_7),
     };
 
     const despues = {
@@ -913,6 +938,8 @@ export class UsuariosService {
       roles: rolesDespues,
       dni: enmascararDni(doc.numero),
       tipoDocumento: doc.tipo,
+      avisosCorreo: avisosNuevo,
+      horario24_7: dto.horario24_7 ?? antes.horario24_7,
     };
 
     try {
@@ -939,8 +966,13 @@ export class UsuariosService {
           }
         }
 
+        if (dto.horario24_7 !== undefined) {
+          await tx.person.update({ where: { party_id: usuario.party_id }, data: { horario_24_7: dto.horario24_7 } });
+        }
+
         const cuentaData: Record<string, unknown> = {};
         if (dto.rol !== undefined) cuentaData.rol = rolNuevo;
+        if (avisosCambian) cuentaData.avisos_correo = dto.avisosCorreo;
         if (Object.keys(cuentaData).length) {
           await tx.userAccount.update({ where: { id: usuario.id }, data: cuentaData });
         }

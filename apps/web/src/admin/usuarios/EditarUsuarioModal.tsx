@@ -75,6 +75,8 @@ export function EditarUsuarioModal({
   const [paisNacimiento, setPaisNacimiento] = useState('');
   const [correoNuevo, setCorreoNuevo] = useState('');
   const [quitarCorreo, setQuitarCorreo] = useState(false);
+  const [avisosCorreo, setAvisosCorreo] = useState(false);
+  const [horario247, setHorario247] = useState(false);
   const [cambiarClaveAbierto, setCambiarClaveAbierto] = useState(false);
 
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
@@ -128,6 +130,8 @@ export function EditarUsuarioModal({
       setNombres(usuario.nombres);
       setApellidos(usuario.apellidos);
       setRol(usuario.rol);
+      setAvisosCorreo(Boolean(usuario.avisosCorreo));
+      setHorario247(Boolean(usuario.horario24_7));
       setOtrosRoles((usuario.roles ?? []).filter((r) => r !== usuario.rol));
       setPaisNacimiento(usuario.paisNacimiento ?? '');
       setErrores({});
@@ -208,6 +212,8 @@ export function EditarUsuarioModal({
           cuerpo.otrosRoles = otrosRoles;
         }
         if (paisNacimiento.trim() !== (usuario.paisNacimiento ?? '')) cuerpo.paisNacimiento = paisNacimiento.trim();
+        if (avisosCorreo !== Boolean(usuario.avisosCorreo)) cuerpo.avisosCorreo = avisosCorreo;
+        if (horario247 !== Boolean(usuario.horario24_7)) cuerpo.horario24_7 = horario247;
       }
 
       const resp = await api.patch<UsuarioItem & { reingresar?: boolean }>(`/admin/usuarios/${usuario.id}`, cuerpo);
@@ -487,6 +493,24 @@ export function EditarUsuarioModal({
                     disabled={guardando}
                   />
                   Quitar el correo actual
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '44px', fontSize: '14px', color: 'var(--cp-navy)' }}>
+                  <input
+                    type="checkbox"
+                    checked={avisosCorreo}
+                    onChange={(e) => setAvisosCorreo(e.target.checked)}
+                    disabled={guardando}
+                  />
+                  Recibe los avisos del sistema por correo (necesita correo)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '44px', fontSize: '14px', color: 'var(--cp-navy)' }}>
+                  <input
+                    type="checkbox"
+                    checked={horario247}
+                    onChange={(e) => setHorario247(e.target.checked)}
+                    disabled={guardando}
+                  />
+                  Disponible 24/7 (recibe avisos fuera de su horario si nadie está de turno)
                 </label>
               </div>
             )}

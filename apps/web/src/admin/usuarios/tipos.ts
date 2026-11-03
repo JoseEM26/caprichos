@@ -11,6 +11,10 @@ export interface UsuarioItem {
   /** Principal primero, luego los extra. */
   roles?: string[];
   paisNacimiento?: string | null;
+  /** Recibe los avisos del sistema por correo. */
+  avisosCorreo?: boolean;
+  /** Disponible 24/7 (recibe avisos si nadie con casilla está de turno). */
+  horario24_7?: boolean;
   activo: boolean;
   debeCambiar: boolean;
   altaEn?: string;

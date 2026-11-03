@@ -27,6 +27,7 @@ interface MiPerfil {
   nombres: string;
   apellidos: string;
   correo: string;
+  avisosCorreo: boolean;
   fotoUrl: string | null;
   rol: string;
   dniEnmascarado: string;
@@ -37,6 +38,7 @@ interface DatosForm {
   nombres: string;
   apellidos: string;
   correo: string;
+  avisosCorreo: boolean;
 }
 
 const FORMATO_CORREO = /^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -89,7 +91,7 @@ export function Perfil() {
   const [procesando, setProcesando] = useState(false);
   const subidaFoto = useSubidaArchivo<MiPerfil>();
 
-  const [form, setForm] = useState<DatosForm>({ nombres: '', apellidos: '', correo: '' });
+  const [form, setForm] = useState<DatosForm>({ nombres: '', apellidos: '', correo: '', avisosCorreo: false });
   const [errorDatos, setErrorDatos] = useState('');
   const [confirmarDatos, setConfirmarDatos] = useState(false);
 
@@ -108,7 +110,7 @@ export function Perfil() {
       .then((p) => {
         if (!vivo) return;
         setPerfil(p);
-        setForm({ nombres: p.nombres, apellidos: p.apellidos, correo: p.correo });
+        setForm({ nombres: p.nombres, apellidos: p.apellidos, correo: p.correo, avisosCorreo: Boolean(p.avisosCorreo) });
       })
       .catch((err) => {
         if (vivo) setErrorCarga(mensajeDe(err, 'No pudimos cargar tu perfil. Intenta de nuevo.'));
@@ -139,7 +141,8 @@ export function Perfil() {
     perfil !== null &&
     (form.nombres.trim() !== perfil.nombres ||
       form.apellidos.trim() !== perfil.apellidos ||
-      form.correo.trim() !== perfil.correo);
+      form.correo.trim() !== perfil.correo ||
+      form.avisosCorreo !== Boolean(perfil.avisosCorreo));
 
   // ---- Mis datos ----
   const validarDatos = (): string => {
@@ -147,6 +150,7 @@ export function Perfil() {
     if (form.nombres.trim().length > 60) return 'El nombre no puede pasar de 60 caracteres.';
     if (form.apellidos.trim().length > 60) return 'Los apellidos no pueden pasar de 60 caracteres.';
     if (!FORMATO_CORREO.test(form.correo.trim())) return 'El correo no tiene un formato válido.';
+    if (form.avisosCorreo && !form.correo.trim()) return 'Para recibir avisos por correo escribe tu correo.';
     return '';
   };
 
@@ -171,9 +175,15 @@ export function Perfil() {
         nombres: form.nombres.trim(),
         apellidos: form.apellidos.trim(),
         correo: form.correo.trim(),
+        ...(form.avisosCorreo !== Boolean(perfil?.avisosCorreo) ? { avisosCorreo: form.avisosCorreo } : {}),
       });
       setPerfil(actualizado);
-      setForm({ nombres: actualizado.nombres, apellidos: actualizado.apellidos, correo: actualizado.correo });
+      setForm({
+        nombres: actualizado.nombres,
+        apellidos: actualizado.apellidos,
+        correo: actualizado.correo,
+        avisosCorreo: Boolean(actualizado.avisosCorreo),
+      });
       setMensaje('Tus datos se guardaron.');
       await refrescarYo();
     } catch (err) {
@@ -384,6 +394,14 @@ export function Perfil() {
               onChange={(e) => setForm((f) => ({ ...f, correo: e.target.value }))}
               style={estilosCampo}
             />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, fontSize: 14, color: 'var(--cp-navy)' }}>
+              <input
+                type="checkbox"
+                checked={form.avisosCorreo}
+                onChange={(e) => setForm((f) => ({ ...f, avisosCorreo: e.target.checked }))}
+              />
+              Recibir avisos del sistema por correo (dentro de mi horario)
+            </label>
           </div>
           <div>
             <Boton type="submit" variante="primario" deshabilitado={procesando || !datosCambiados}>

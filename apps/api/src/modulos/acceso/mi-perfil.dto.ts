@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 
 const recortar = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -24,7 +24,12 @@ export class ActualizarMiPerfilDto {
   @Matches(/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'El correo no tiene un formato válido' })
   @MaxLength(120, { message: 'El correo no puede pasar de 120 caracteres' })
   correo?: string;
+
+  /** Recibir los avisos del sistema por correo. Exige correo. */
+  @IsOptional()
+  @IsBoolean({ message: 'El aviso por correo debe ser sí o no' })
+  avisosCorreo?: boolean;
 }
 
 /** Campos que la API acepta de "mi perfil"; el resto se rechaza en el controlador. */
-export const CAMPOS_MI_PERFIL = ['nombres', 'apellidos', 'correo'] as const;
+export const CAMPOS_MI_PERFIL = ['nombres', 'apellidos', 'correo', 'avisosCorreo'] as const;

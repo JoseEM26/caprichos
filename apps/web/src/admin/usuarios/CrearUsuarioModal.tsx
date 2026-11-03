@@ -46,6 +46,9 @@ const OPCIONES_ROLES = ROLES_ASIGNABLES.map((rol) => ({
 const PASOS = ['Datos personales', 'Puesto', 'Horario', 'Reemplazos'];
 const RESUMEN = 4; // índice del resumen final
 
+/** Por defecto reciben los avisos del sistema por correo ADMIN y SUPERVISOR; la casilla se puede cambiar. */
+const rolRecibeAvisos = (rol: string) => rol === 'ADMIN' || rol === 'SUPERVISOR';
+
 const CSS_MODAL = `
 .cp-wiz-overlay{position:fixed;inset:0;z-index:90;background:rgba(11,44,62,.65);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:16px}
 .cp-wiz-panel{width:100%;max-width:560px;max-height:calc(100vh - 32px);overflow-y:auto;overflow-x:hidden;box-sizing:border-box;background:var(--cp-white);border:1.5px solid var(--cp-line);border-radius:16px;padding:24px;box-shadow:0 16px 40px rgba(11,44,62,.25);display:flex;flex-direction:column;gap:16px}
@@ -80,6 +83,10 @@ export function CrearUsuarioModal({
   const [apellidos, setApellidos] = useState('');
   const [celular, setCelular] = useState('');
   const [correo, setCorreo] = useState('');
+  const [avisosCorreo, setAvisosCorreo] = useState(false);
+  const [avisosTocado, setAvisosTocado] = useState(false);
+  const [horario247, setHorario247] = useState(false);
+  const [horario247Tocado, setHorario247Tocado] = useState(false);
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [paisNacimiento, setPaisNacimiento] = useState('');
   const [rol, setRol] = useState<string>('CAJERO');
@@ -110,6 +117,7 @@ export function CrearUsuarioModal({
       if (!apellidos.trim()) e.apellidos = 'Los apellidos son requeridos';
       if (celular && !/^9\d{8}$/.test(celular)) e.celular = 'El celular debe tener 9 dígitos y empezar en 9';
       if (correo.trim() && !REGEX_CORREO.test(correo.trim())) e.correo = 'El correo no es válido';
+      if (avisosCorreo && !correo.trim()) e.avisosCorreo = 'Para recibir avisos por correo indica el correo';
       if (fechaNacimiento && fechaNacimiento > new Date().toISOString().slice(0, 10)) {
         e.fechaNacimiento = 'La fecha de nacimiento no puede ser futura';
       }
@@ -179,6 +187,8 @@ export function CrearUsuarioModal({
         ...(paisNacimiento.trim() ? { paisNacimiento: paisNacimiento.trim() } : {}),
         ...(celular ? { celular } : {}),
         ...(correo.trim() ? { correo: correo.trim() } : {}),
+        avisosCorreo,
+        horario24_7: horario247,
         ...(fechaNacimiento ? { fechaNacimiento } : {}),
         ...(descuento.trim() !== '' ? { descuentoPct: Number(descuento) } : {}),
         horarios: horariosParaEnviar(horario),
@@ -191,6 +201,10 @@ export function CrearUsuarioModal({
       setApellidos('');
       setCelular('');
       setCorreo('');
+      setAvisosCorreo(false);
+      setAvisosTocado(false);
+      setHorario247(false);
+      setHorario247Tocado(false);
       setFechaNacimiento('');
       setPaisNacimiento('');
       setDescuento('');
@@ -386,6 +400,22 @@ export function CrearUsuarioModal({
                 error={errores.correo}
                 disabled={guardando}
               />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '44px', fontSize: '14px', color: 'var(--cp-navy)' }}>
+                <input
+                  type="checkbox"
+                  checked={avisosCorreo}
+                  onChange={(e) => {
+                    setAvisosCorreo(e.target.checked);
+                    setAvisosTocado(true);
+                    limpiarError('avisosCorreo');
+                  }}
+                  disabled={guardando}
+                />
+                Recibir avisos del sistema por correo (dentro de su horario)
+              </label>
+              {errores.avisosCorreo && (
+                <div role="alert" style={{ color: 'var(--cp-rust)', fontSize: '13px', fontWeight: 700 }}>{errores.avisosCorreo}</div>
+              )}
               <Campo
                 id="crear-nacimiento"
                 etiqueta="Fecha de nacimiento (opcional)"
@@ -417,6 +447,8 @@ export function CrearUsuarioModal({
                 valor={rol}
                 alCambiar={(nuevoRol) => {
                   setRol(nuevoRol);
+                  if (!avisosTocado) setAvisosCorreo(rolRecibeAvisos(nuevoRol));
+                  if (!horario247Tocado) setHorario247(nuevoRol === 'ADMIN');
                   setOtrosRoles((previos) => previos.filter((r) => r !== nuevoRol));
                   limpiarError('rol');
                   limpiarError('otrosRoles');
@@ -482,6 +514,18 @@ export function CrearUsuarioModal({
               {errores.horario && (
                 <div role="alert" style={{ color: 'var(--cp-rust)', fontSize: '13px', fontWeight: 700 }}>{errores.horario}</div>
               )}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '44px', fontSize: '14px', color: 'var(--cp-navy)' }}>
+                <input
+                  type="checkbox"
+                  checked={horario247}
+                  onChange={(e) => {
+                    setHorario247(e.target.checked);
+                    setHorario247Tocado(true);
+                  }}
+                  disabled={guardando}
+                />
+                Disponible 24/7 (recibe avisos fuera de su horario si nadie está de turno)
+              </label>
               <EditorHorario valor={horario} alCambiar={setHorario} deshabilitado={guardando} />
             </>
           )}
