@@ -11,6 +11,7 @@ import { ClientesModule } from '../clientes/clientes.module';
 import { AvisosInternosModule } from '../chatbot/avisos-internos/avisos-internos.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
+import { ComprobantesModule } from '../comprobantes/comprobantes.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ChatbotModule } from '../chatbot/chatbot.module';
     OfertasModule,
     ClientesModule,
     VouchersModule,
+    ComprobantesModule,
     forwardRef(() => AvisosInternosModule),
     forwardRef(() => ChatbotModule),
   ],

@@ -263,3 +263,149 @@ describe('Que no se pierda nada: outbox, reintentos, DLQ, circuito y barrido', (
     expect(db.comprobante).toHaveLength(0);
   });
 });
+
+describe('Reenvío seguro: consulta rota, ya registrada (1033) y recuperación de la constancia', () => {
+  beforeEach(() => jest.spyOn(console, 'error').mockImplementation(() => undefined));
+  afterEach(() => jest.restoreAllMocks());
+
+  /** Auditoría que sí escribe en la base falsa, para comprobar que CONSULTA_CDR_FALLO sale una sola vez. */
+  function auditoriaEnBase(m: ReturnType<typeof montar>) {
+    m.auditoria.registrar.mockImplementation(async (a: any) => {
+      m.db.auditoria.push({ accion: a.accion, entidad: a.entidad, entidad_id: a.entidadId });
+    });
+    return m;
+  }
+  const accionesAuditadas = (db: any, accion: string) => db.auditoria.filter((a: any) => a.accion === accion).length;
+
+  it('consulta que falla (fault): reenvía el MISMO ZIP una sola vez y audita CONSULTA_CDR_FALLO una vez', async () => {
+    const fetchFn = fetchSunat({
+      sendBill: async () => sobreAceptado(),
+      getStatusCdr: async () => sobreFault('soap-env:Server.internal'),
+    });
+    const m = auditoriaEnBase(montar({}, fetchFn));
+    const { prisma, db, servicio, f } = { ...m, f: m.fetchFn };
+    await prisma.$transaction(async (tx: any) => servicio.emitirParaPedido(100n, tx, cajero));
+    const id = db.comprobante[0].id;
+    const numeroAntes = db.comprobante[0].numero_texto;
+
+    // Primer envío sin respuesta: el ZIP queda guardado
+    fetchFn.mockImplementationOnce(async () => {
+      throw new Error('ETIMEDOUT');
+    });
+    await servicio.enviarElectronico(id, { automatico: true });
+    const hashAntes = db.comprobante[0].facturacion_hash;
+    expect(estadosDe(db)).toEqual(['PENDIENTE_ENVIO']);
+
+    // Reintento: la consulta falla, se reenvía el mismo ZIP y se acepta
+    await servicio.enviarElectronico(id, { automatico: true });
+    const envios = f.mock.calls.filter(([, i]: any) => String(i.body).includes('<ser:sendBill>'));
+    expect(envios).toHaveLength(2);
+    expect(String(envios[1][1].body)).toContain(String(envios[0][1].body).match(/<contentFile>([^<]+)<\/contentFile>/)![1]);
+    expect(estadosDe(db)).toEqual(['EMITIDO_SUNAT']);
+    expect(db.comprobante[0].facturacion_hash).toBe(hashAntes);
+    expect(db.comprobante[0].numero_texto).toBe(numeroAntes);
+    expect(accionesAuditadas(db, 'CONSULTA_CDR_FALLO')).toBe(1);
+  });
+
+  it('consulta que falla en cada intento: se audita una sola vez por comprobante', async () => {
+    const fetchFn = fetchSunat({
+      sendBill: async () => {
+        throw new Error('ETIMEDOUT');
+      },
+      getStatusCdr: async () => {
+        throw new Error('ECONNRESET');
+      },
+    });
+    const m = auditoriaEnBase(montar({ parametro: [{ clave: 'facturacion_proveedor', valor: 'SUNAT' }, { clave: 'facturacion_max_intentos', valor: 12 }] }, fetchFn));
+    const { prisma, db, servicio } = m;
+    await prisma.$transaction(async (tx: any) => servicio.emitirParaPedido(100n, tx, cajero));
+    const id = db.comprobante[0].id;
+    for (let i = 0; i < 3; i++) await servicio.enviarElectronico(id, { automatico: true });
+    expect(db.comprobante[0].facturacion_intentos).toBe(3);
+    expect(estadosDe(db)).toEqual(['PENDIENTE_ENVIO']);
+    expect(accionesAuditadas(db, 'CONSULTA_CDR_FALLO')).toBe(1);
+  });
+
+  it('1033 (ya registrada): EMITIDO_SUNAT sin reenviar, aviso de prioridad media y la constancia se recupera en la siguiente pasada', async () => {
+    const fetchFn = fetchSunat({
+      sendBill: async () => sobreFault('soap-env:Client.1033'),
+      getStatusCdr: async () => consultaSinComprobante(),
+    });
+    const { prisma, db, servicio, worker } = montar({}, fetchFn);
+    await prisma.$transaction(async (tx: any) => servicio.emitirParaPedido(100n, tx, cajero));
+    const id = db.comprobante[0].id;
+    await servicio.enviarElectronico(id, { automatico: true });
+    expect(estadosDe(db)).toEqual(['EMITIDO_SUNAT']);
+    expect(db.comprobante[0].facturacion_respuesta).toBe('Registrada previamente en SUNAT; constancia (CDR) no recuperada');
+    expect(db.comprobante[0].facturacion_hash).toBeTruthy();
+    const alerta = db.notificacion.find((n: any) => n.tipo === `FACTURACION:registrada-previa:${id}`);
+    expect(alerta).toBeDefined();
+    expect(alerta.titulo.startsWith('URGENTE')).toBe(false);
+    expect(alerta.rol_destino).toBe('ADMIN');
+
+    // Siguiente pasada: SUNAT ya da la constancia; no se envía nada y se guarda el CDR
+    fetchFn.mockClear();
+    fetchFn.mockImplementation(async (_u: string, init: any) => {
+      if (String(init.body).includes('<ser:getStatusCdr>')) return consultaConCdr('0');
+      throw new Error('no debería enviarse otra vez');
+    });
+    await worker.ejecutar();
+    expect(fetchFn.mock.calls.every(([, i]: any) => !String(i.body).includes('<ser:sendBill>'))).toBe(true);
+    expect(db.comprobante[0].facturacion_respuesta).not.toContain('no recuperada');
+    expect(db.comprobanteArchivo.some((a: any) => a.tipo === 'CDR')).toBe(true);
+    expect(estadosDe(db)).toEqual(['EMITIDO_SUNAT']);
+  });
+});
+
+describe('Constancia recuperada: CDR rechazada y alerta 1033 con datos para comparar', () => {
+  beforeEach(() => jest.spyOn(console, 'error').mockImplementation(() => undefined));
+  afterEach(() => jest.restoreAllMocks());
+
+  async function yaRegistradaSinCdr() {
+    const fetchFn = fetchSunat({
+      sendBill: async () => sobreFault('soap-env:Client.1033'),
+      getStatusCdr: async () => consultaSinComprobante(),
+    });
+    const m = montar({}, fetchFn);
+    await m.prisma.$transaction(async (tx: any) => m.servicio.emitirParaPedido(100n, tx, cajero));
+    const id = m.db.comprobante[0].id;
+    await m.servicio.enviarElectronico(id, { automatico: true });
+    return { ...m, id, fetchFn };
+  }
+
+  it('la CDR recuperada viene RECHAZADA: REVISION_MANUAL con el motivo de la CDR, auditoría y aviso ADMIN prioridad alta', async () => {
+    const { db, worker, fetchFn, auditoria, id } = await yaRegistradaSinCdr();
+    fetchFn.mockImplementation(async (_u: string, init: any) => {
+      if (String(init.body).includes('<ser:getStatusCdr>')) return consultaConCdr('2335');
+      throw new Error('no debería enviarse');
+    });
+    await worker.ejecutar();
+    const fila = db.comprobante[0];
+    expect(fila.facturacion_estado).toBe('REVISION_MANUAL');
+    expect(fila.emision).toBe('POR_EMITIR');
+    expect(fila.revision_motivo).toContain('2335');
+    expect(fila.revision_motivo).toContain('Descripción SUNAT');
+    expect(db.comprobanteArchivo.some((a: any) => a.tipo === 'CDR')).toBe(true);
+    expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CDR_RECHAZADA_EN_RECUPERACION', entidadId: id }));
+    const aviso = db.notificacion.find((n: any) => n.tipo === `FACTURACION:cdr-rechazada:${id}`);
+    expect(aviso).toBeDefined();
+    expect(aviso.titulo.startsWith('URGENTE')).toBe(true);
+    expect(aviso.rol_destino).toBe('ADMIN');
+    // Ya no es un comprobante a recuperar: la siguiente pasada no vuelve a consultar
+    fetchFn.mockClear();
+    await worker.ejecutar();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('1033: el aviso dice que SUNAT podría tener otro documento y trae hash y total para comparar en SOL', async () => {
+    const { db, id } = await yaRegistradaSinCdr();
+    const fila = db.comprobante[0];
+    const aviso = db.notificacion.find((n: any) => n.tipo === `FACTURACION:registrada-previa:${id}`);
+    expect(aviso).toBeDefined();
+    expect(aviso.mensaje).toContain('DISTINTO');
+    expect(aviso.mensaje).toContain('SOL');
+    expect(aviso.mensaje).toContain(fila.facturacion_hash);
+    expect(aviso.mensaje).toContain(`S/ ${(fila.sunat_total_cents / 100).toFixed(2)}`);
+    expect(aviso.mensaje).toContain('fecha de emisión');
+  });
+});

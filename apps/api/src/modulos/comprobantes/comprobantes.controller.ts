@@ -19,7 +19,8 @@ import { ComprobantesSaludService } from './comprobantes-salud.service';
 import { ComprobantesSunatService } from './comprobantes-sunat.service';
 import { MarcarEmitidoDto } from './dto/marcar-emitido.dto';
 import { ListarPorEmitirDto } from './dto/listar-por-emitir.dto';
-import { AnularComprobanteDto, ConfigFacturacionDto, ReintentarComprobanteDto } from './dto/facturacion.dto';
+import { AnularComprobanteDto, BoletaPorDefectoDto, ConfigFacturacionDto, ReintentarComprobanteDto } from './dto/facturacion.dto';
+import { ComprobanteDefectoService } from './comprobante-defecto.service';
 
 @Controller('admin/comprobantes')
 @UseGuards(AccesoGuard)
@@ -28,6 +29,7 @@ export class ComprobantesController {
     private readonly comprobantesService: ComprobantesService,
     private readonly sunatService: ComprobantesSunatService,
     private readonly comprobantesSalud: ComprobantesSaludService,
+    private readonly boletaDefecto: ComprobanteDefectoService,
   ) {}
 
   /**
@@ -141,6 +143,21 @@ export class ComprobantesController {
   @Permiso('comprobantes', 'ver')
   async obtenerFacturacion() {
     return this.comprobantesService.obtenerConfigFacturacion();
+  }
+
+  /** GET /admin/comprobantes/config/boleta-por-defecto: la marca y si hoy aplica (solo con SUNAT real). */
+  @Get('config/boleta-por-defecto')
+  @Permiso('comprobantes', 'ver')
+  async obtenerBoletaPorDefecto() {
+    return this.boletaDefecto.estado();
+  }
+
+  /** PUT /admin/comprobantes/config/boleta-por-defecto: sí/no (ADMIN; la web pide Sí/No). */
+  @Put('config/boleta-por-defecto')
+  @Permiso('configuracion', 'editar')
+  async guardarBoletaPorDefecto(@Body() dto: BoletaPorDefectoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.boletaDefecto.guardar(dto.activo, req.usuario, ip);
   }
 
   /** PUT /admin/comprobantes/facturacion: IGV y series (ADMIN; la web pide Sí/No). */

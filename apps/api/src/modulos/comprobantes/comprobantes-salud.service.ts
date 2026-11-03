@@ -38,7 +38,7 @@ export interface AvisoFacturacion {
   titulo: string;
   mensaje: string;
   enlace?: string;
-  prioridad?: 'alta';
+  prioridad?: 'alta' | 'media';
 }
 
 /** Condición de «con problemas»: rechazados, en revisión manual, o pendientes con más de 15 min. */

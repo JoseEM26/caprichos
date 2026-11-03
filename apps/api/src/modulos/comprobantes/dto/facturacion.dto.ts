@@ -1,4 +1,4 @@
-import { IsIn, IsNumber, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /** Reintento de una boleta/factura: correcciones opcionales (los campos que no vienen no cambian). */
@@ -43,3 +43,9 @@ export class ConfigFacturacionDto {
   proveedor?: 'SIMULADO' | 'SUNAT';
 }
 
+
+/** Marca «Boleta electrónica por defecto» (ADMIN; la web pide Sí/No). Solo aplica con SUNAT real. */
+export class BoletaPorDefectoDto {
+  @IsBoolean({ message: 'La marca debe ser sí o no' })
+  activo!: boolean;
+}

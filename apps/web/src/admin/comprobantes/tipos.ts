@@ -298,3 +298,10 @@ export interface SaludFacturacion {
   credenciales_invalidas: boolean;
   generado_en: string;
 }
+
+/** Comprobante por defecto: boleta electrónica si hay SUNAT real (en simulado no cambia nada). */
+export interface BoletaPorDefecto {
+  activo: boolean;
+  proveedor_efectivo: ProveedorFacturacion;
+  aplica: boolean;
+}

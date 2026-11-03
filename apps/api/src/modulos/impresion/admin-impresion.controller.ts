@@ -20,6 +20,7 @@ import {
   DescartarDto,
   VaciarColaDto,
   ReimprimirDto,
+  PruebaImpresionDto,
 } from './dto';
 
 @Controller(['admin/impresion', 'api/admin/impresion'])
@@ -86,6 +87,19 @@ export class AdminImpresionController {
 
   private ip(req: any): string | undefined {
     return (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+  }
+
+  /** Prueba de impresión: etiqueta o ticket de ejemplo sin pedido (quien ve la tarjeta de impresión). */
+  @Post('prueba')
+  @Permiso('pedidos', 'ver')
+  async pruebaImpresion(@Body() dto: PruebaImpresionDto, @Req() req: any) {
+    return this.impresionService.encolarPrueba(dto.rol, req.usuario, this.ip(req));
+  }
+
+  @Get('prueba/:id')
+  @Permiso('pedidos', 'ver')
+  async estadoPrueba(@Param('id') id: string) {
+    return this.impresionService.obtenerPrueba(id);
   }
 
   @Post('trabajos/:id/reintentar')

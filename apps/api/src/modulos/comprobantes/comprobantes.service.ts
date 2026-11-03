@@ -35,7 +35,7 @@ import { TIMEOUT_SUNAT_INTERACTIVO_MS, TIMEOUT_SUNAT_MS } from './sunat/sunat.so
 import { bytes, sha256 } from './sunat/sunat.util';
 import { ComprobantesSunatService } from './comprobantes-sunat.service';
 import { ComprobantesSaludService, condicionProblemas } from './comprobantes-salud.service';
-import { LEASE_ENVIO_MS, MAX_INTENTOS_DEFECTO, esRechazoPermanente, esperaFacturacionMs } from './comprobantes-politica';
+import { LEASE_ENVIO_MS, MAX_INTENTOS_DEFECTO, TEXTO_REGISTRADA_SIN_CDR, esRechazoPermanente, esperaFacturacionMs } from './comprobantes-politica';
 import { siguienteCorrelativo } from './secuencia';
 import { armarDatosPdf } from './pdf/comprobante-datos';
 import { generarPdfComprobante } from './pdf/comprobante-pdf';
@@ -506,6 +506,9 @@ export class ComprobantesService {
       }
     }
 
+    // Consulta previa que falló: se reenvió el mismo ZIP; se audita una sola vez por comprobante
+    if (res.consultaCdrFallo) await this.auditarConsultaFallo(c, opciones);
+
     // Decisión: sin respuesta muchas veces, o rechazo que no se arregla reintentando, pasa a REVISION_MANUAL (cola de fallos)
     const intentosTras = intentosPrevios + (proveedor !== 'SIMULADO' ? 1 : 0);
     let estado: string = res.estado;
@@ -519,6 +522,23 @@ export class ComprobantesService {
     }
     const proximoIntentoEn = estado === 'PENDIENTE_ENVIO' ? new Date(Date.now() + esperaFacturacionMs(intentosTras)) : null;
     return this.guardarResultado(c, res, opciones, { estado, revisionMotivo, proximoIntentoEn });
+  }
+
+  /** Una sola vez por comprobante: la consulta getStatusCdr falló y se reenvió el mismo ZIP. */
+  private async auditarConsultaFallo(c: any, opciones: { usuario?: UsuarioAutenticado; ip?: string }): Promise<void> {
+    const previas = await this.prisma.auditoria.count({ where: { accion: 'CONSULTA_CDR_FALLO', entidad: 'comprobante', entidad_id: c.id } });
+    if (previas > 0) return;
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'comprobantes',
+      accion: 'CONSULTA_CDR_FALLO',
+      resultado: 'OK',
+      entidad: 'comprobante',
+      entidadId: c.id,
+      despues: { numero_texto: c.numero_texto, accion: 'La consulta a SUNAT falló: se reenvió el mismo ZIP (SUNAT no admite dos veces el mismo número)' },
+      partyId: opciones.usuario?.partyId ? BigInt(opciones.usuario.partyId) : undefined,
+      ip: opciones.ip,
+    });
   }
 
   /** Guarda XML y ZIP firmados ANTES de la llamada de red (así el reintento puede reenviar el mismo ZIP). */
@@ -585,6 +605,19 @@ export class ComprobantesService {
         titulo: `${c.numero_texto} ${estado === 'RECHAZADO' ? 'rechazado por SUNAT' : 'pasó a revisión manual'}`,
         mensaje: extra.revisionMotivo ?? respuesta.slice(0, 300),
         prioridad: 'alta',
+        enlace: '/admin/comprobantes',
+      });
+    }
+    if (res.yaRegistrado) {
+      await this.salud?.avisar({
+        clave: `registrada-previa:${c.id}`,
+        titulo: `${c.numero_texto} registrada previamente en SUNAT`,
+        mensaje:
+          `SUNAT respondió «registrado previamente» y no entregó su constancia (CDR). Podría tener un documento DISTINTO con esa serie-número ` +
+          `(«con otros datos»). No se reenvió. Antes de seguir, compárelo en SOL (Consultar Envío de Comprobante de Pago Electrónicos) con ` +
+          `hash ${res.hash ?? 'sin hash'}, total S/ ${((res.totalCents ?? 0) / 100).toFixed(2)} y fecha de emisión ${new Date(c.creado_en).toISOString().slice(0, 10)}. ` +
+          `El sistema seguirá pidiendo la constancia en las próximas pasadas.`,
+        prioridad: 'media',
         enlace: '/admin/comprobantes',
       });
     }
@@ -671,7 +704,78 @@ export class ComprobantesService {
         this.logger.error(`Reenvío del comprobante ${p.id}: ${e?.message ?? e}`);
       }
     }
+    await this.recuperarConstancias();
     return { revisados: pendientes.length };
+  }
+
+  /**
+   * Facturas que SUNAT ya tenía (1033) sin su CDR: en cada pasada se pide la constancia con getStatusCdr.
+   * Sin CDR no cambia nada (queda el aviso). Solo las de los últimos 7 días: ceiling de llamadas a SUNAT.
+   * ponytail: si hiciera falta más, pasar a un contador de intentos por comprobante.
+   */
+  private async recuperarConstancias(): Promise<void> {
+    if (!this.sunatEmisor) return;
+    try {
+      const filas = await this.prisma.comprobante.findMany({
+        where: {
+          tipo: 'FACTURA',
+          facturacion_estado: 'EMITIDO_SUNAT',
+          facturacion_respuesta: TEXTO_REGISTRADA_SIN_CDR,
+          emitido_en: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        },
+        orderBy: { creado_en: 'asc' },
+        take: 5,
+      });
+      for (const f of filas) {
+        try {
+          const r = await this.sunatEmisor.consultar({ tipo: 'FACTURA', serie: f.serie, numero: f.numero, timeoutMs: TIMEOUT_SUNAT_MS });
+          if (!r) continue;
+          await this.guardarArchivos(f.id, r.archivos ?? []);
+          const respuesta = textoRespuesta(r.respuesta);
+          if (r.estado === 'RECHAZADO') {
+            // La constancia dice que SUNAT rechaza lo que tiene registrado: no es una emisión válida, cola de fallos
+            const ahora = new Date();
+            await this.prisma.comprobante.update({
+              where: { id: f.id },
+              data: { facturacion_estado: 'REVISION_MANUAL', emision: 'POR_EMITIR', facturacion_respuesta: respuesta, revision_motivo: respuesta, revision_en: ahora },
+            });
+            await this.auditoria.registrar({
+              categoria: 'CAMBIO',
+              modulo: 'comprobantes',
+              accion: 'CDR_RECHAZADA_EN_RECUPERACION',
+              resultado: 'RECHAZADO',
+              entidad: 'comprobante',
+              entidadId: f.id,
+              antes: { estado: f.facturacion_estado ?? null },
+              despues: { numero_texto: f.numero_texto, estado: 'REVISION_MANUAL', respuesta: respuesta.slice(0, 300) },
+            });
+            await this.salud?.avisar({
+              clave: `cdr-rechazada:${f.id}`,
+              titulo: `${f.numero_texto} rechazada por SUNAT al recuperar su constancia`,
+              mensaje: `SUNAT rechazó el comprobante en su constancia (CDR): ${respuesta}`,
+              prioridad: 'alta',
+              enlace: '/admin/comprobantes',
+            });
+            continue;
+          }
+          await this.prisma.comprobante.update({ where: { id: f.id }, data: { facturacion_respuesta: respuesta } });
+          await this.auditoria.registrar({
+            categoria: 'CAMBIO',
+            modulo: 'comprobantes',
+            accion: 'CONSTANCIA_RECUPERADA',
+            resultado: 'OK',
+            entidad: 'comprobante',
+            entidadId: f.id,
+            despues: { numero_texto: f.numero_texto, respuesta: respuesta.slice(0, 300) },
+          });
+        } catch (e: any) {
+          // Sin constancia por ahora (SUNAT no responde o falla la consulta): se reintenta en la próxima pasada
+          this.logger.warn(`Constancia del comprobante ${f.id} aún no recuperada: ${e?.message ?? e}`);
+        }
+      }
+    } catch (e: any) {
+      this.logger.error(`Recuperación de constancias: ${e?.message ?? e}`);
+    }
   }
 
   /**

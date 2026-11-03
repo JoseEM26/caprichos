@@ -1,5 +1,6 @@
 import { clienteFetch, obtenerBlobAutenticado } from '../../comun/api';
 import type {
+  BoletaPorDefecto,
   RespuestaListarPorEmitir,
   NotaVentaDatos,
   RespuestaListarReclamos,
@@ -79,6 +80,18 @@ export const comprobantesApi = {
 
   async obtenerFacturacion(): Promise<ConfigFacturacion> {
     return clienteFetch<ConfigFacturacion>('/admin/comprobantes/facturacion');
+  },
+
+  /** Marca «Boleta electrónica por defecto» y si hoy aplica (solo con SUNAT real). */
+  async obtenerBoletaPorDefecto(): Promise<BoletaPorDefecto> {
+    return clienteFetch<BoletaPorDefecto>('/admin/comprobantes/config/boleta-por-defecto');
+  },
+
+  async guardarBoletaPorDefecto(activo: boolean): Promise<BoletaPorDefecto> {
+    return clienteFetch<BoletaPorDefecto>('/admin/comprobantes/config/boleta-por-defecto', {
+      method: 'PUT',
+      body: JSON.stringify({ activo }),
+    });
   },
 
   /** Envía ahora el resumen diario de boletas SUNAT (ADMIN). */

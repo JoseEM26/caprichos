@@ -108,7 +108,7 @@ OK: SUNAT directo configurado en demo (TAG vX.Y.Z, ambiente beta). ...
 - `Se restauró ...`: el `.env` volvió a su estado anterior y la API se redespliega con la configuración previa. Revisar el log del job.
 - En la pantalla, aviso «Credenciales SUNAT inválidas» (HTTP 401 de SUNAT, o los códigos 0102 y 0109 que aún no se han visto en beta): el usuario o la clave SOL no son correctos, o el usuario no tiene permiso de facturación. Los envíos quedan en pausa (los comprobantes siguen pendientes, no se pierden) hasta corregir las credenciales.
 - Un comprobante que SUNAT rechazó con un código 2xxx o 3xxx (por ejemplo, `3279`: el total no cuadra con el detalle) va a REVISION_MANUAL. Nunca se reenvía igual.
-- La consulta de si SUNAT ya tiene el comprobante (`getStatusCdr`) responde «Internal Error» en beta incluso para facturas aceptadas. Por eso un fault de esa consulta **no** se toma como «no existe»: el envío se queda pendiente y no se reenvía (así no se duplica).
+- La consulta de si SUNAT ya tiene el comprobante (`getStatusCdr`) responde «Internal Error» en beta incluso para facturas aceptadas. Un fault de esa consulta no prueba que falte el comprobante, pero tampoco bloquea el reenvío: se reenvía el mismo ZIP y queda la auditoría `CONSULTA_CDR_FALLO` (una vez por comprobante). Si SUNAT responde 1033 («registrado previamente»), ver la sección de reintentos.
 - Un resumen que no avanza: revisar que el ticket aparezca como `ENVIADO`; la tarea lo consulta cada 2 minutos.
 
 ## Que no se pierda nada
@@ -125,12 +125,14 @@ envío inmediato ──┐                       ── lease en la fila: solo u
 worker (cada 5 min)┘
           │
           ├─ XML y ZIP firmados se guardan ANTES de enviar
-          ├─ factura: primero getStatusCdr; si SUNAT ya la tiene, se guarda su CDR y no se reenvía
+          ├─ factura con intento previo: primero getStatusCdr; si da CDR, se guarda y no se reenvía;
+          │   si no consta o la consulta falla, se reenvía el MISMO ZIP (SUNAT no admite dos veces la misma serie-número)
           ├─ mismo ZIP en cada reintento
           ▼
         SUNAT ── acepta ──► EMITIDO_SUNAT (CDR guardado)
           ├─ sin respuesta (red, timeout, 5xx) ──► PENDIENTE_ENVIO, próximo intento con espera:
           │                                         1, 2, 5, 10, 30, 60 min y luego cada 2 h (±10 %)
+          ├─ 1033 «ya registrada» ──► EMITIDO_SUNAT sin CDR, sin reenviar; aviso (prioridad media) para verificar en SOL
           ├─ rechazo 2xxx/3xxx (datos o XML) ──► REVISION_MANUAL (cola de fallos)
           ├─ rechazo de datos locales ──────────► RECHAZADO (corregir y reintentar)
           └─ credenciales rechazadas (HTTP 401; 0102/0109) ─► pausa de envíos y aviso a ADMIN
@@ -143,6 +145,8 @@ worker (cada 5 min)┘
 - **Se cae la red o SUNAT no responde:** queda `PENDIENTE_ENVIO` con el mismo número. Después de 5 fallos seguidos de SUNAT, el circuito pausa los envíos 5 minutos y avisa una sola vez. Al pasar la pausa, un solo intento de prueba decide.
 - **Dos procesos a la vez:** el candado Redis del worker y el lease de cada fila evitan el doble envío.
 - **Un rechazo de datos:** queda `RECHAZADO`. Se corrige el documento o la razón social y se reintenta con el mismo número.
+- **La consulta previa falla (fault, 404, timeout):** se reenvía el mismo ZIP una sola vez por intento y se audita `CONSULTA_CDR_FALLO` una vez por comprobante. Nunca se vuelve a firmar ni cambia el hash o el número.
+- **SUNAT responde 1033 («comprobante registrado previamente»):** no es un rechazo. La factura queda `EMITIDO_SUNAT` con la respuesta «Registrada previamente en SUNAT; constancia (CDR) no recuperada», sin reenviar. Sale un aviso de prioridad media al ADMIN para verificarla en SOL (Consultar Envío de Comprobante de Pago Electrónicos) y comparar con el XML guardado. Cada pasada del worker (durante 7 días después de emitirla) pide la constancia con `getStatusCdr`; si SUNAT la da, se guarda el CDR y se audita `CONSTANCIA_RECUPERADA`. Si la CDR viene **rechazada**, el comprobante pasa a REVISION_MANUAL con el motivo de la CDR, se audita `CDR_RECHAZADA_EN_RECUPERACION` y sale un aviso URGENTE al ADMIN. El aviso de 1033 indica el hash y el total propios para compararlos en SOL antes de seguir.
 
 **Qué significa REVISION_MANUAL y qué hacer**
 
@@ -184,6 +188,14 @@ Nada se borra: el motivo queda en `revision_motivo`, con el XML, el ZIP y la res
 - En modo SIMULADO, el barrido solo registra lo que encontraría y nunca crea filas.
 - Cada comprobante que el barrido crea queda en auditoría (`BARRIDO_CREAR_COMPROBANTE`).
 
+## Ticket con QR (agente de impresión de Windows)
+
+- El ticket de pago lleva el bloque del QR (cadena de SUNAT) entre la representación impresa y el hash, cuando el comprobante ya está firmado. El agente lo imprime con el comando ESC/POS `GS ( k` (modelo 2, corrección M, módulo 4 puntos en 58 mm y 6 en 80 mm; valores a calibrar en la caja).
+- Si el trabajo no trae cadena QR (nota de venta, comprobante sin firmar o un agente anterior), el ticket sale como antes.
+- **Fallback:** si la impresora no entiende `GS ( k`, el hash en texto ya sale debajo del bloque, así que el ticket sigue siendo válido.
+- **Pendiente de despliegue:** el código está en el repositorio, pero la PC de la caja tiene instalado el `.exe` anterior, que no imprime el QR. Hay que publicar una nueva versión del agente de Windows con el workflow `agente-windows.yml` y reinstalarla en la PC de la caja. Mientras tanto el ticket sale sin QR, con hash en texto. No se redistribuye nada desde este cambio.
+- **Pendiente de verificación:** no se probó con una impresora física. Confirmar en la caja que el QR sale centrado, escanea y no deja el texto siguiente encima.
+
 ## Verificado y pendiente
 
 **Verificado contra el servicio BETA de SUNAT** (script `apps/api/scripts/sunat-beta-prueba.ts`, con el RUC 20000000001):
@@ -199,10 +211,10 @@ Nada se borra: el motivo queda en `revision_motivo`, con el XML, el ZIP y la res
 |---|---|---|---|
 | (a) Clave SOL incorrecta (`MODDATOS` con otra clave) | billService | **Aceptó** la factura (CDR `0`). No devuelve 0102 ni 0109 | Sin código que clasificar. No se confirmó la clave en beta |
 | (b) Usuario inexistente (`20000000001NOEXISTE`) | billService | **Aceptó** la factura (CDR `0`) con documento nuevo | Sin código que clasificar |
-| (c) Reenviar la misma factura (mismo ZIP) | billService | Vuelve a responder **aceptada** (CDR `0`, mismo número) | Sin 1033 en beta: no se implementó «ya registrada» |
+| (c) Reenviar la misma factura (mismo ZIP) | billService | Vuelve a responder **aceptada** (CDR `0`, mismo número) | Sin 1033 en beta. Si SUNAT lo devolviera: EMITIDO_SUNAT sin reenviar y aviso (ver reintentos) |
 | (c) Mismo número con otro contenido | billService | **Aceptada** (CDR `0`) | Sin 1033 en beta |
-| (d) `getStatusCdr` de factura aceptada | billConsultService | «Internal Error» (fault Client, sin código) | No se toma como «no existe»: queda pendiente, no se reenvía |
-| (d) `getStatusCdr` de factura inexistente | billConsultService | «Internal Error» (fault Client) | Igual que arriba |
+| (d) `getStatusCdr` de factura aceptada | billConsultService | «Internal Error» (fault Client, sin código) | No prueba que falte: se reenvía el mismo ZIP y se audita `CONSULTA_CDR_FALLO` una vez |
+| (d) `getStatusCdr` de factura inexistente | billConsultService | «Internal Error» (fault Client) | Igual que arriba: se reenvía el mismo ZIP |
 | (d) `getStatusCdr` con clave incorrecta | billConsultService | «Internal Error» (fault Client) | Igual que arriba |
 | (e) Total que no cuadra (TaxInclusiveAmount y PayableAmount +100) | billService | **`3279`**: «La sumatoria del Total… no concuerda con la base imponible» | Rechazo permanente: REVISION_MANUAL |
 | Credenciales de pruebas (`MODDATOS`) contra **producción** (`getStatusCdr`) | consulta producción | HTTP **401** «Authentication Failed» (texto, no SOAP) | Credenciales: pausa de envíos |
@@ -218,3 +230,17 @@ Nada se borra: el motivo queda en `revision_motivo`, con el XML, el ZIP y la res
 - Rechazos en producción con el certificado real y el RUC del local: no se probaron.
 - Notas de crédito y débito: fuera de alcance (no implementadas).
 - Impuesto al consumo (IPM): hoy se usa una sola categoría IGV con el porcentaje del local. Confirmar con el contador si el IPM va separado.
+
+## Comprobante por defecto y Caja
+
+**Qué es.** Un pedido sin comprobante elegido sale como **boleta electrónica** a «cliente varios» si el total es hasta S/ 700. Si el total es mayor, la boleta exige el DNI de 8 dígitos. Se configura en Comprobantes › Electrónicos SUNAT, con el interruptor «Boleta electrónica por defecto» (Sí/No, por defecto Sí).
+
+**Solo con SUNAT directo.** Con el proveedor en Simulado (o sin credenciales) el interruptor no cambia nada: el pedido sale como nota de venta y no se gasta ningún número de la serie B002.
+
+**Dónde se decide.** Al crear el pedido (`pedidos.service`, función `tipoComprobanteEfectivo`): el tipo queda guardado en el pedido, así que la web, la precuenta y los tickets muestran el mismo tipo. Pedidos creados antes del cambio conservan su tipo guardado.
+
+**Caja.** En «Nuevo pedido» (Pedidos y caja) hay una sección Comprobante: Nota de venta, Boleta o Factura; «Sin elegir» deja el comprobante por defecto. **Nunca se pierde una venta por el DNI.** Crear el pedido (carta, WhatsApp, mozo o Caja) y enviarlo a Caja no se bloquea por el DNI: una boleta mayor a S/ 700 sin DNI se registra y el selector lo avisa. **Al cobrar** sí se exige: un pedido con boleta mayor a S/ 700 sin DNI, o factura sin RUC o razón social, no se cobra; el mensaje dice qué falta. El cajero lo resuelve pidiendo el DNI al cliente o cambiando el comprobante (**Cambiar comprobante**, pestaña Cobro, Sí/No). La carta web pide el DNI en su formulario cuando el total supera S/ 700; el bot de WhatsApp no pide DNI.
+
+**Cambiar el comprobante.** Solo antes de cobrar y sin comprobante emitido. Una vez cobrado, para corregir se anula el comprobante y se emite otro. La API responde 409 en esos casos. Cada cambio queda auditado con los valores anteriores y nuevos; el DNI y el RUC se muestran enmascarados.
+
+**Pendiente.** Probar con un pedido real que una boleta mayor a S/ 700 sin DNI se cobra solo después de pedir el DNI o cambiar el comprobante.

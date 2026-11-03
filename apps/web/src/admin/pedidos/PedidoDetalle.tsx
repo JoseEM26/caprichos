@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Confirmar } from '../../comun/Confirmar';
+import {
+  SelectorComprobante,
+  aPayloadComprobante,
+  errorValorComprobante,
+  etiquetaComprobante,
+  type TipoComprobanteSel,
+  type ValorComprobante,
+} from './SelectorComprobante';
 import { useSesion } from '../../comun/sesion';
 import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
@@ -42,6 +50,18 @@ function FilaDato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   );
 }
 
+/** Comprobante guardado en el pedido como valor del selector. Sin tipo guardado, nota de venta. */
+function valorDelPedido(pedido: Pedido): ValorComprobante {
+  const t = String(pedido.comprobante_tipo ?? '').toUpperCase();
+  const tipo: TipoComprobanteSel = t === 'BOLETA' || t === 'FACTURA' ? t : 'NOTA_VENTA';
+  return {
+    tipo,
+    doc: tipo === 'NOTA_VENTA' ? '' : pedido.comprobante_doc ?? '',
+    razon: pedido.comprobante_razon ?? '',
+    direccion: pedido.comprobante_direccion ?? '',
+  };
+}
+
 export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: PedidoDetalleProps) {
   const { tiene } = useSesion();
   const [tab, setTab] = useState<TabDetalle>('pedido');
@@ -64,7 +84,13 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
   } | null>(null);
 
   // Estados locales para acciones
-  const [tipoComp, setTipoComp] = useState<string>(pedido.comprobante_tipo || 'Nota de venta');
+  // Comprobante del pedido (el que tiene guardado); se cambia con «Cambiar comprobante» antes de cobrar
+  const tipoComp = etiquetaComprobante(valorDelPedido(pedido).tipo ?? 'NOTA_VENTA');
+  const [cambiandoComp, setCambiandoComp] = useState(false);
+  const [valorCambio, setValorCambio] = useState<ValorComprobante>(() => valorDelPedido(pedido));
+  const [confirmarCambio, setConfirmarCambio] = useState(false);
+  const [guardandoComp, setGuardandoComp] = useState(false);
+  const [errorComp, setErrorComp] = useState<string | null>(null);
   const [msgTicket, setMsgTicket] = useState('');
   const [msgComprobante, setMsgComprobante] = useState('');
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
@@ -450,35 +476,67 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
               <span style={{ fontWeight: 700 }}>{pedido.pago_metodo || pedido.pago_preferido || 'Efectivo'}</span>
             </div>
 
-            {/* Selector de comprobante */}
+            {/* Comprobante: se cambia solo antes de cobrar y sin comprobante emitido (la API lo rechaza si no) */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span>Comprobante</span>
-              <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {['Nota de venta', 'Boleta', 'Factura'].map((n) => {
-                  const sel = tipoComp === n;
-                  return (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setTipoComp(n)}
-                      style={{
-                        minHeight: 44,
-                        padding: '0 12px',
-                        borderRadius: 9999,
-                        border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                        background: sel ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                        color: sel ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {n}
-                    </button>
-                  );
-                })}
-              </span>
+              <span style={{ fontWeight: 700 }}>{tipoComp}</span>
             </div>
+            {tiene('caja/cobrar') && !estaPagado && est !== 'ANULADO' && !cambiandoComp && (
+              <button
+                type="button"
+                onClick={() => {
+                  setValorCambio(valorDelPedido(pedido));
+                  setErrorComp(null);
+                  setCambiandoComp(true);
+                }}
+                style={{
+                  minHeight: 44,
+                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                  borderRadius: 12,
+                  background: 'transparent',
+                  color: 'var(--cp-navy, #0B2C3E)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Cambiar comprobante
+              </button>
+            )}
+            {cambiandoComp && (
+              <div aria-label="Cambiar comprobante" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <SelectorComprobante idPrefijo="pd-comp" valor={valorCambio} onChange={setValorCambio} total={Number(pedido.total)} />
+                {errorComp && (
+                  <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+                    {errorComp}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const err = errorValorComprobante(valorCambio);
+                      if (err) {
+                        setErrorComp(err.mensaje);
+                        document.getElementById(`pd-comp-${err.campo}`)?.focus();
+                        return;
+                      }
+                      setErrorComp(null);
+                      setConfirmarCambio(true);
+                    }}
+                    style={{ flex: '1 1 140px', minHeight: 44, border: 'none', borderRadius: 12, background: 'var(--cp-navy, #0B2C3E)', color: 'var(--cp-cream, #FBF4EC)', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    Guardar comprobante
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCambiandoComp(false)}
+                    style={{ flex: '1 1 140px', minHeight: 44, border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
 
             </section>
             <section className="cj-card" aria-label="Total a cobrar">
@@ -1257,6 +1315,32 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
       )}
 
       {/* Diálogo Confirmar genérico Sí/No */}
+      <Confirmar
+        abierto={confirmarCambio}
+        titulo="Cambiar comprobante"
+        mensaje={`¿Cambiar el comprobante del pedido a ${etiquetaComprobante(valorCambio.tipo ?? 'NOTA_VENTA')}${valorCambio.doc.trim() ? ` (${valorCambio.tipo === 'FACTURA' ? 'RUC' : 'DNI'} ${valorCambio.doc.trim()})` : ''}? Caja lo emitirá al cobrar.`}
+        textoSi="Sí, cambiar"
+        textoNo="No"
+        cargando={guardandoComp}
+        alConfirmar={async () => {
+          setGuardandoComp(true);
+          setErrorComp(null);
+          try {
+            const dto = aPayloadComprobante({ ...valorCambio, tipo: valorCambio.tipo ?? 'NOTA_VENTA' }) ?? { tipo: 'NOTA_VENTA' as const };
+            await pedidosApi.cambiarComprobante(pedido.id, dto);
+            setConfirmarCambio(false);
+            setCambiandoComp(false);
+            setMensajeExito('Comprobante cambiado');
+            alActualizar();
+          } catch (err: any) {
+            setConfirmarCambio(false);
+            setErrorComp(err?.message || 'No se pudo cambiar el comprobante');
+          } finally {
+            setGuardandoComp(false);
+          }
+        }}
+        alCancelar={() => setConfirmarCambio(false)}
+      />
       <Confirmar
         abierto={Boolean(accionConfirmar)}
         titulo={accionConfirmar?.titulo || '¿Confirmar acción?'}

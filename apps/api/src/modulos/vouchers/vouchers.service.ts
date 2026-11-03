@@ -913,7 +913,8 @@ export class VouchersService {
     if (tipo !== 'BOLETA' && tipo !== 'FACTURA') {
       throw new BadRequestException({ codigo: 'COMPROBANTE_INVALIDO', mensaje: 'Elige Nota de venta, Boleta o Factura' });
     }
-    const validacion = validarDocumentoComprobante(tipo, doc, razon, Number(pedido.total));
+    // Sin total: el envío a Caja no bloquea la venta por el DNI (la boleta > S/ 700 la exige el cobro)
+    const validacion = validarDocumentoComprobante(tipo, doc, razon);
     if (!validacion.valido) {
       throw new BadRequestException({ codigo: 'COMPROBANTE_INVALIDO', mensaje: validacion.motivo });
     }

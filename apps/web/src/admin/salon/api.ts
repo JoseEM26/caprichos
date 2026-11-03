@@ -70,6 +70,8 @@ export interface AbrirPedidoMesaPayload {
     pagaCon?: number;
     plan?: PlanPagoItem[];
   };
+  /** Comprobante que pide Caja (sin él, el pedido sale con el comprobante por defecto) */
+  comprobante?: { tipo: 'NOTA_VENTA' | 'BOLETA' | 'FACTURA'; dni?: string; ruc?: string; razonSocial?: string; direccion?: string };
 }
 
 export interface CrearReservaPayload {

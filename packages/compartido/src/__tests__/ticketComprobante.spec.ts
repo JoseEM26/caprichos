@@ -44,4 +44,16 @@ describe('ticket de pago con boleta o factura electrónica', () => {
     expect(textos.some((x) => x.includes('Representación'))).toBe(false);
     expect(textos.some((x) => x.startsWith('Hash'))).toBe(false);
   });
+
+  it('reserva el bloque del QR solo cuando hay cadena, antes del hash', () => {
+    const c = { tipo: 'FACTURA', numero: 'F002-1', representacion: 'Representación impresa de la Factura electrónica', hash: 'H123', simulado: false };
+    const sin = lineasTicketPago({ ...base, comprobante: c }, 32);
+    expect(sin.some((l) => l.qr)).toBe(false);
+    const con = lineasTicketPago({ ...base, comprobante: { ...c, cadenaQr: '20600000001|01|F002|1|1.80|11.80|2026-11-02|6|20600000001|' } }, 32);
+    const i = con.findIndex((l) => l.qr);
+    expect(i).toBeGreaterThan(con.findIndex((l) => l.texto.startsWith('FACTURA')));
+    expect(con[i].centrado).toBe(true);
+    expect(con[i + 1].texto.startsWith('Hash:')).toBe(true);
+    expect(con.filter((l) => l.qr)).toHaveLength(1);
+  });
 });

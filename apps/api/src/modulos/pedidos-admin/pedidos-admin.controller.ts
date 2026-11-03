@@ -6,6 +6,7 @@ import {
   Headers,
   Optional,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -27,6 +28,8 @@ import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { ImpresionService } from '../impresion/impresion.service';
 import { ReimprimirDto } from '../impresion/dto/reimprimir.dto';
 import { VouchersService } from '../vouchers/vouchers.service';
+import { PedidoComprobanteService } from './pedido-comprobante.service';
+import { CambiarComprobanteDto } from './dto/cambiar-comprobante.dto';
 
 @Controller('admin/pedidos')
 @UseGuards(AccesoGuard)
@@ -37,6 +40,7 @@ export class PedidosAdminController {
     @Optional() private readonly pedidosService?: PedidosService,
     @Optional() private readonly impresionService?: ImpresionService,
     @Optional() private readonly vouchersService?: VouchersService,
+    @Optional() private readonly pedidoComprobante?: PedidoComprobanteService,
   ) {}
 
   @Post()
@@ -139,6 +143,14 @@ export class PedidosAdminController {
   }
 
   /** Plan de pago que arma el mozo antes de subir cada captura (el servidor deriva el monto por medio). */
+  /** PATCH /admin/pedidos/:id/comprobante: cambia el comprobante antes de cobrar (Caja). */
+  @Patch(':id/comprobante')
+  @Permiso('caja', 'cobrar')
+  async cambiarComprobante(@Param('id') id: string, @Body() dto: CambiarComprobanteDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.pedidoComprobante!.cambiar(id, dto, req.usuario, ip);
+  }
+
   @Post(':id/plan-pago')
   @Permiso('pedidos', 'crear')
   async guardarPlanPago(@Param('id') id: string, @Body('plan') plan: unknown, @Req() req: any) {

@@ -1,10 +1,10 @@
 import { ArchivoEmision, ComprobanteEmision, EmisorElectronico, ErrorCredencialesEmisor, ErrorRedEmisor, ResultadoBaja, ResultadoEmision } from '../emisor/emisor.tipos';
 import { ComprobanteInvalidoError } from '../facturacion/facturacion.datos';
-import { esCodigoAutenticacion } from '../comprobantes-politica';
+import { TEXTO_REGISTRADA_SIN_CDR, esCodigoAutenticacion } from '../comprobantes-politica';
 import { ConfigSunat, RUC_PRUEBA_BETA, configSunat } from './sunat.config';
 import { EmisorXml, armarBajaXml, armarFacturaXml, validarEmisorXml } from './sunat.xml';
 import { CertificadoFirma, digestDeFirma, firmarXml, leerCertificadoP12 } from './sunat.firma';
-import { Cdr, FetchSoap, codigoFault, cuerpoEnvio, enviarSoap, esFaultCliente, estadoCdr, leerCdr, parsearSoap, sobreSoap, textoCdr } from './sunat.soap';
+import { Cdr, FetchSoap, codigoFault, cuerpoEnvio, enviarSoap, esFaultCliente, esYaRegistrado, estadoCdr, leerCdr, parsearSoap, sobreSoap, textoCdr } from './sunat.soap';
 import { fechaIsoLima, montoXml, yyyymmddLima, zipUnico } from './sunat.util';
 
 export interface OpcionesSunatEmisor {
@@ -21,6 +21,11 @@ export interface EstadoTicket {
   estado: 'EN_PROCESO' | 'ACEPTADO' | 'RECHAZADO';
   respuesta: string;
   cdr?: Cdr;
+}
+
+/** SUNAT ya tiene la factura (1033) pero no da su CDR: se marca emitida sin reenviar y se avisa para verificar en SOL. */
+function sinConstancia(comunes: Omit<ResultadoEmision, 'estado' | 'respuesta'>): ResultadoEmision {
+  return { ...comunes, estado: 'EMITIDO_SUNAT', respuesta: TEXTO_REGISTRADA_SIN_CDR, codigoRechazo: null, yaRegistrado: true };
 }
 
 /** Comprobante firmado, listo para enviar o guardar. */
@@ -160,13 +165,28 @@ export class SunatEmisor implements EmisorElectronico {
     return { ...this.comun(f), estado: 'PENDIENTE_ENVIO', respuesta: 'Firmada: pendiente de envío a SUNAT', archivos };
   }
 
+  /**
+   * Factura con un intento previo: se pregunta a SUNAT por su CDR. Si la tiene, se usa esa respuesta.
+   * Si la consulta no da CDR (no consta) o FALLA (fault, 404, timeout), se reenvía el MISMO ZIP: SUNAT no admite
+   * dos veces la misma serie-número, así que un reenvío no duplica. Una consulta fallida se marca (consultaCdrFallo)
+   * para que el servicio la audite una sola vez. Las credenciales inválidas sí se propagan.
+   */
   async generar(c: ComprobanteEmision): Promise<ResultadoEmision> {
+    let consultaCdrFallo = false;
     if (c.tipo === 'FACTURA' && c.intentos > 0) {
-      // Hubo un intento antes (quizá llegó a SUNAT sin respuesta): primero se pregunta si ya la tiene.
-      // Si SUNAT no responde a la consulta, lanza ErrorRedEmisor y no se reenvía nada.
-      const previa = await this.consultar(c);
-      if (previa) return previa;
+      try {
+        const previa = await this.consultar(c);
+        if (previa) return previa;
+      } catch (e) {
+        if (e instanceof ErrorCredencialesEmisor) throw e;
+        consultaCdrFallo = true;
+      }
     }
+    const resultado = await this.generarSinConsulta(c);
+    return consultaCdrFallo ? { ...resultado, consultaCdrFallo: true } : resultado;
+  }
+
+  private async generarSinConsulta(c: ComprobanteEmision): Promise<ResultadoEmision> {
     if (c.tipo === 'FACTURA' && c.zipPrevio) {
       // Mismo ZIP del intento anterior: mismo documento, mismo número, sin volver a firmar
       const emisor = await this.emisorXml();
@@ -203,10 +223,12 @@ export class SunatEmisor implements EmisorElectronico {
       if (r.fault) {
         const codigo = codigoFault(r.fault);
         if (esCodigoAutenticacion(codigo)) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigo})`);
+        if (esYaRegistrado(codigo, r.fault.mensaje)) return sinConstancia(comunes);
         if (esFaultCliente(r.fault)) return { ...comunes, estado: 'RECHAZADO', respuesta: `${codigo}: ${r.fault.mensaje}`, codigoRechazo: codigo };
         throw new ErrorRedEmisor('SUNAT devolvió un error del servidor');
       }
       const cdr = leerCdr(r.textos.applicationResponse ?? '');
+      if (esYaRegistrado(String(cdr.codigo), cdr.descripcion)) return sinConstancia(comunes);
       const estado = estadoCdr(cdr);
       return {
         ...comunes,
@@ -223,9 +245,11 @@ export class SunatEmisor implements EmisorElectronico {
 
   /**
    * Factura: pregunta a SUNAT por su CDR (getStatusCdr). Devuelve el resultado si SUNAT ya la tiene,
-   * o null si no consta. Un error del servidor o la red lanza ErrorRedEmisor: en ese caso no se reenvía.
+   * o null si no consta (statusCode distinto de 0 sin CDR). Un fault, 404, timeout o error de red lanza
+   * ErrorRedEmisor: el llamador decide (en el reenvío, se reenvía el mismo ZIP igualmente).
+   * Beta: getStatusCdr devuelve "Internal Error" también para facturas que SUNAT sí tiene.
    */
-  async consultar(c: ComprobanteEmision): Promise<ResultadoEmision | null> {
+  async consultar(c: Pick<ComprobanteEmision, 'tipo' | 'serie' | 'numero' | 'timeoutMs'>): Promise<ResultadoEmision | null> {
     if (c.tipo !== 'FACTURA') return null;
     const cfg = this.config();
     const emisor = await this.emisorXml();
@@ -237,8 +261,6 @@ export class SunatEmisor implements EmisorElectronico {
     if (r.fault) {
       const codigo = codigoFault(r.fault);
       if (esCodigoAutenticacion(codigo)) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigo})`);
-      // Observado en beta: la consulta devuelve "Internal Error" (Client) también para facturas que SUNAT sí tiene.
-      // Un fault NO prueba que falte el comprobante: no se reenvía (evita duplicados); se trata como sin respuesta.
       throw new ErrorRedEmisor('SUNAT no pudo confirmar si ya tiene el comprobante');
     }
     if (r.textos.statusCode !== '0' || !r.textos.content) return null;

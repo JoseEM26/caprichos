@@ -41,7 +41,7 @@ export interface TicketPagoDatos {
   /**
    * Boleta/factura electrónica: representación impresa, hash y marca de prueba. `situacion` dice si el XML está
    * firmado (FIRMADO), aún no (EN_PROCESO) o SUNAT no lo aceptó (REGULARIZAR: no lleva hash válido).
-   * `cadenaQr` viaja en el trabajo; el agente instalado (.exe) todavía no lo imprime (ver docs/operacion/configurar-sunat.md).
+   * `cadenaQr` viaja en el trabajo y el agente lo imprime como QR desde su versión nueva (ver docs/operacion/configurar-sunat.md).
    */
   comprobante?: {
     tipo: string;

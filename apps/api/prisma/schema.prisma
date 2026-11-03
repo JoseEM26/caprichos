@@ -1963,7 +1963,7 @@ model DeviceKey {
 
 model PrintJob {
   id                  BigInt      @id @default(autoincrement())
-  pedido_id           BigInt
+  pedido_id           BigInt?     // NULL = prueba de impresión (sin pedido real)
   area_id             BigInt?
   tipo                String      // ETIQUETA_GENERAL | ETIQUETA_AREA | ETIQUETA_BEBIDA
   clave_idempotencia  String?     @unique
@@ -1979,7 +1979,7 @@ model PrintJob {
   impreso_en          DateTime?   @db.Timestamptz
   device_key_id       BigInt?
 
-  pedido              Pedido      @relation(fields: [pedido_id], references: [id])
+  pedido              Pedido?     @relation(fields: [pedido_id], references: [id])
   area                AreaCocina? @relation(fields: [area_id], references: [id])
   deviceKey           DeviceKey?  @relation(fields: [device_key_id], references: [id])
 

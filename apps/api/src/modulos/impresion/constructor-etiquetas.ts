@@ -385,3 +385,53 @@ export function construirTicketNotaMozo(
     cobradoPorMozo: mozo,
   };
 }
+
+/**
+ * Datos de ejemplo para la prueba de la etiquetera: mismo formato que una etiqueta general real,
+ * marcada como prueba (codigo PRUEBA, sin pedido). `quien` es el nombre de quien la pidió.
+ */
+export function construirEtiquetaPrueba(local: any, quien: string, ahora = new Date()): EtiquetaGeneralDatos {
+  const nombreLocal = String(local?.nombre || '').trim() || 'Caprichos';
+  return {
+    tipo: 'ETIQUETA_GENERAL',
+    codigo: 'PRUEBA',
+    modalidad: 'Prueba',
+    modalidadPill: 'PRUEBA',
+    who: quien,
+    canal: nombreLocal,
+    hora: formatearHora(ahora),
+    fecha: formatearFecha(ahora),
+    cantidadProductos: 1,
+    productos: [{ cantidad: 1, nombre: 'Linea de ejemplo', tamano: null }],
+    nota: 'PRUEBA DE ETIQUETA: no es un pedido',
+    printer: 'Etiquetera de caja',
+  };
+}
+
+/**
+ * Datos de ejemplo para la prueba de la ticketera: dos líneas y un pago de ejemplo marcado SIN VALOR.
+ * No lleva comprobante (no inventa números ni hashes).
+ */
+export function construirTicketPrueba(local: any, quien: string, ahora = new Date()): TicketPagoDatos {
+  const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  return {
+    tipo: 'TICKET_PAGO',
+    local: {
+      nombre: texto(local?.nombre) || 'Caprichos',
+      razonSocial: texto(local?.razon_social) || texto(local?.razonSocial),
+      ruc: texto(local?.ruc),
+      direccion: texto(local?.direccion),
+    },
+    codigo: 'PRUEBA',
+    fecha: formatearFecha(ahora),
+    hora: formatearHora(ahora),
+    who: `Prueba pedida por ${quien}`,
+    modalidad: 'PRUEBA DE TICKET (SIN VALOR)',
+    lineas: [
+      { cantidad: 1, nombre: 'Linea de ejemplo 1 SIN VALOR', tamano: null, subtotal: 0 },
+      { cantidad: 1, nombre: 'Linea de ejemplo 2 SIN VALOR', tamano: null, subtotal: 0 },
+    ],
+    total: 0,
+    pagos: [{ medio: 'SIN VALOR', monto: 0 }],
+  };
+}

@@ -4,6 +4,7 @@ import { StockService } from '../stock/stock.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { SalonService } from '../salon/salon.service';
 import { ComprobantesService } from '../comprobantes/comprobantes.service';
+import { validarDocumentoComprobante } from '../comprobantes/comprobantes.util';
 import {
   BadRequestException,
   HttpException,
@@ -317,6 +318,23 @@ export class CobrosService {
             mensaje: 'El pedido ya fue cobrado',
           },
           HttpStatus.CONFLICT,
+        );
+      }
+
+      // Boleta o factura sin documento válido (p. ej. boleta de más de S/ 700 sin DNI): no se cobra en silencio
+      const docComprobante = validarDocumentoComprobante(
+        pedido.comprobante_tipo,
+        pedido.comprobante_doc,
+        pedido.comprobante_razon,
+        Number(pedido.total),
+      );
+      if (!docComprobante.valido) {
+        throw new HttpException(
+          {
+            codigo: 'COMPROBANTE_DATOS_FALTANTES',
+            mensaje: `${docComprobante.motivo}. Usa «Cambiar comprobante» para corregirlo antes de cobrar.`,
+          },
+          HttpStatus.BAD_REQUEST,
         );
       }
 

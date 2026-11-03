@@ -106,6 +106,17 @@ export function parsearSoap(texto: string): RespuestaSoap {
   return { fault, textos };
 }
 
+/**
+ * «Comprobante ya registrado» (1033, o el texto de SUNAT). NO es un rechazo: SUNAT ya tiene un documento con esa
+ * serie-número. No se reenvía; el comprobante se marca emitido y se pide verificarlo en SOL.
+ */
+export const CODIGO_YA_REGISTRADO = '1033';
+const TEXTO_YA_REGISTRADO = /registrado previamente|ya fue informado/i;
+
+export function esYaRegistrado(codigo: string | null | undefined, texto: string | null | undefined): boolean {
+  return codigo === CODIGO_YA_REGISTRADO || TEXTO_YA_REGISTRADO.test(texto ?? '');
+}
+
 /** Un fault de cliente (faultcode con Client) es un rechazo; de servidor se trata como sin respuesta. */
 export function esFaultCliente(fault: { codigo: string }): boolean {
   return /Client/i.test(fault.codigo);

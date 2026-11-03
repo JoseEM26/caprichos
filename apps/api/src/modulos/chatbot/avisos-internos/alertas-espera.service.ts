@@ -476,6 +476,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
       const printJobsFallidos = await this.prisma.printJob.findMany({
         where: {
           estado: 'FALLIDO',
+          pedido_id: { not: null }, // las pruebas de impresión no avisan
           creado_en: { gte: hace2Horas },
         },
       });
@@ -572,7 +573,7 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
     const minutos = await leerParametroNumerico(this.prisma, 'impresion_alerta_min', 5);
     const corte = new Date(ahora.getTime() - minutos * 60 * 1000);
     const masViejo = await this.prisma.printJob.findFirst({
-      where: { estado: 'PENDIENTE', en: { lte: corte } },
+      where: { estado: 'PENDIENTE', en: { lte: corte }, pedido_id: { not: null } }, // las pruebas no avisan
       orderBy: { id: 'asc' },
       select: { id: true },
     });

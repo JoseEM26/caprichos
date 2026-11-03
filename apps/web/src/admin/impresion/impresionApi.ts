@@ -1,9 +1,10 @@
 import { api } from '../../comun/api';
-import { EstadoAdminImpresion, EstadoImpresora } from '@caprichos/compartido';
+import { EstadoAdminImpresion, EstadoImpresora, RolImpresora } from '@caprichos/compartido';
 
 export interface TrabajoImpresionAdmin {
   id: string;
-  pedidoId: string;
+  /** NULL en las pruebas de impresión (no tienen pedido). */
+  pedidoId: string | null;
   pedidoCodigo: string;
   clienteNombre: string;
   tipo: string;
@@ -51,7 +52,9 @@ export interface EstadoEtiquetasPedido {
 }
 
 export interface GrupoCola {
-  pedidoId: string;
+  /** NULL en las pruebas de impresión: cada prueba es su propio grupo. */
+  pedidoId: string | null;
+  esPrueba: boolean;
   pedidoCodigo: string;
   clienteNombre: string;
   cantidad: number;
@@ -122,6 +125,21 @@ export const impresionApi = {
     if (filtros?.limite) params.set('limite', String(filtros.limite));
     const qs = params.toString() ? `?${params.toString()}` : '';
     return api.get(`/admin/impresion/trabajos${qs}`);
+  },
+
+  /** Prueba de impresión: una etiqueta o un ticket de ejemplo, sin pedido real. */
+  pruebaImpresion: async (rol: RolImpresora): Promise<{ ok: boolean; trabajoId: string; mensaje: string }> => {
+    return api.post('/admin/impresion/prueba', { rol });
+  },
+
+  estadoPrueba: async (
+    id: string,
+  ): Promise<{ id: string; rol: RolImpresora; estado: string; intentos: number; error: string | null }> => {
+    return api.get(`/admin/impresion/prueba/${id}`);
+  },
+
+  descartarTrabajo: async (id: string): Promise<{ ok: boolean; descartadas: number; mensaje: string }> => {
+    return api.post(`/admin/impresion/trabajos/${id}/descartar`, {});
   },
 
   reintentarTrabajo: async (id: string): Promise<{ ok: boolean; mensaje: string }> => {

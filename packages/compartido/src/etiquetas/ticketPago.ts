@@ -5,6 +5,8 @@ export interface LineaTicket {
   texto: string;
   centrado?: boolean;
   negrita?: boolean;
+  /** Bloque del código QR (cadena de SUNAT). El agente lo imprime con GS ( k; la vista previa lo deja en blanco. */
+  qr?: string;
 }
 
 const soles = (n: number) => `S/ ${n.toFixed(2)}`;
@@ -78,9 +80,10 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
     p(linea);
     p(`${t.comprobante.tipo.replace('_', ' ')} ${t.comprobante.numero}`);
     if (t.comprobante.representacion) for (const r of envolver(t.comprobante.representacion, c)) p(r);
+    // Bloque del QR entre la representación y el hash: si no hay cadena, el ticket sale como antes (sin bloque)
+    if (t.comprobante.cadenaQr) p('', { centrado: true, qr: t.comprobante.cadenaQr });
     if (t.comprobante.hash) for (const h of envolver(`Hash: ${t.comprobante.hash}`, c)) p(h);
     if (t.comprobante.simulado) p(centrar('SIMULADO - SIN VALOR TRIBUTARIO', c), { centrado: true });
-    // ponytail: el QR (cadena_para_codigo_qr) no sale aún: el generador ESC/POS solo emite texto. Falta GS ( k.
   }
   if (t.cobradoPorMozo) p(`Cobrado por mozo ${t.cobradoPorMozo}`);
   p(linea);

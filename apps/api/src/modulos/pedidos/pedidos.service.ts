@@ -29,6 +29,8 @@ import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service'
 import { TELEFONO_PLACEHOLDER, tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { PagoPlanService } from './pago-plan.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
+import { ComprobanteDefectoService } from '../comprobantes/comprobante-defecto.service';
+import { tipoComprobanteEfectivo } from '../comprobantes/comprobante-defecto';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 
 export interface OrigenPedido {
@@ -69,6 +71,7 @@ export class PedidosService {
     private readonly avisosPedidoService?: AvisosPedidoService,
     @Optional() private readonly direcciones?: DireccionesClienteService,
     @Optional() private readonly puntosParty?: PartyPuntosService,
+    @Optional() private readonly defectoComprobante?: ComprobanteDefectoService,
   ) {}
 
   /**
@@ -227,9 +230,9 @@ export class PedidosService {
       clienteNombre = dto.cliente.nombre.trim();
     }
 
-    // 4. Validar comprobante
-    const comprobanteTipo = dto.comprobante?.tipo || 'BOLETA';
-    if (comprobanteTipo === 'FACTURA') {
+    // 4. Validar comprobante (sin tipo elegido, el efectivo se decide con el total, más abajo)
+    const tipoElegido = dto.comprobante?.tipo;
+    if (tipoElegido === 'FACTURA') {
       const ruc = dto.comprobante?.ruc?.trim();
       const razonSocial = dto.comprobante?.razonSocial?.trim();
       if (!ruc || !/^\d{11}$/.test(ruc) || !razonSocial || razonSocial.length === 0) {
@@ -238,7 +241,7 @@ export class PedidosService {
           mensaje: 'La factura exige RUC de 11 dígitos y razón social',
         });
       }
-    } else if (comprobanteTipo === 'BOLETA') {
+    } else if (tipoElegido === 'BOLETA') {
       const dni = dto.comprobante?.dni?.trim();
       if (dni && !/^\d{8}$/.test(dni)) {
         throw new BadRequestException({
@@ -617,16 +620,22 @@ export class PedidosService {
       });
     }
 
-    // 9. Creación en transacción
+    // 9. Comprobante efectivo (único punto del tipo por defecto) y creación en transacción
+    const aplicaDefecto = tipoElegido ? false : !!(await this.defectoComprobante?.aplica());
+    const comprobanteTipo = tipoComprobanteEfectivo(tipoElegido, aplicaDefecto);
     const comprobanteDoc =
       comprobanteTipo === 'FACTURA'
         ? dto.comprobante?.ruc?.trim() || null
-        : dto.comprobante?.dni?.trim() || null;
+        : comprobanteTipo === 'BOLETA'
+          ? dto.comprobante?.dni?.trim() || null
+          : null;
 
     const comprobanteRazon =
       comprobanteTipo === 'FACTURA'
         ? dto.comprobante?.razonSocial?.trim() || null
         : null;
+
+    // Nunca se rechaza una venta por el DNI: una boleta mayor a S/ 700 sin DNI se crea y el cobro la exige.
 
     const pedidoCreado = await this.prisma.$transaction(async (tx) => {
       // Generación del código correlativo CP-W###

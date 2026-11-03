@@ -9,7 +9,7 @@ import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Boton } from '../../comun/Boton';
 import { comprobantesApi } from './comprobantesApi';
 import { formatearSoles } from './utilidades';
-import type { ComprobanteElectronico, ConfigFacturacion, ProveedorFacturacion, SaludFacturacion } from './tipos';
+import type { BoletaPorDefecto, ComprobanteElectronico, ConfigFacturacion, ProveedorFacturacion, SaludFacturacion } from './tipos';
 
 const ALTO_TOQUE = '44px';
 
@@ -81,6 +81,11 @@ export function ElectronicosTab() {
   const [enviandoResumen, setEnviandoResumen] = useState(false);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [errorConfig, setErrorConfig] = useState<string | null>(null);
+  // Boleta por defecto: valor propuesto (Sí/No) pendiente de confirmar
+  const [boleta, setBoleta] = useState<BoletaPorDefecto | null>(null);
+  const [propuestaBoleta, setPropuestaBoleta] = useState<boolean | null>(null);
+  const [guardandoBoleta, setGuardandoBoleta] = useState(false);
+  const [errorBoleta, setErrorBoleta] = useState<string | null>(null);
 
   const [reintentarDe, setReintentarDe] = useState<ComprobanteElectronico | null>(null);
   const [corrDoc, setCorrDoc] = useState('');
@@ -134,6 +139,27 @@ export function ElectronicosTab() {
       })
       .catch(() => setConfig(null));
   }, [cargar]);
+
+  useEffect(() => {
+    if (!esAdmin) return;
+    comprobantesApi.obtenerBoletaPorDefecto().then(setBoleta).catch(() => setBoleta(null));
+  }, [esAdmin]);
+
+  const guardarBoleta = async () => {
+    if (propuestaBoleta === null) return;
+    setGuardandoBoleta(true);
+    setErrorBoleta(null);
+    try {
+      const r = await comprobantesApi.guardarBoletaPorDefecto(propuestaBoleta);
+      setBoleta(r);
+      setAviso('Comprobante por defecto guardado');
+    } catch (err: any) {
+      setErrorBoleta(err?.message || 'No se pudo guardar el comprobante por defecto');
+    } finally {
+      setGuardandoBoleta(false);
+      setPropuestaBoleta(null);
+    }
+  };
 
   const guardarConfig = async () => {
     setGuardandoConfig(true);
@@ -305,6 +331,42 @@ export function ElectronicosTab() {
         {errorConfig && <div role="alert" style={{ color: 'var(--cp-red, #b00020)', marginTop: 8 }}>{errorConfig}</div>}
       </section>
 
+      {esAdmin && boleta && (
+        <section aria-label="Boleta electrónica por defecto" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontWeight: 800 }}>Boleta electrónica por defecto</div>
+          <p style={{ margin: 0, fontSize: 13 }}>
+            Un pedido sin comprobante elegido sale como boleta electrónica a «cliente varios» si el total es hasta S/ 700
+            (más de S/ 700 pide el DNI). Solo aplica con SUNAT directo; en Simulado no cambia nada: sigue como nota de venta.
+          </p>
+          <div role="group" aria-label="Boleta electrónica por defecto" style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              aria-pressed={boleta.activo}
+              onClick={() => !boleta.activo && setPropuestaBoleta(true)}
+              style={{ minHeight: ALTO_TOQUE, minWidth: 96, borderRadius: 10, fontWeight: 700, cursor: 'pointer', border: boleta.activo ? '2px solid var(--cp-navy)' : '1.5px solid var(--cp-line)', background: boleta.activo ? 'var(--cp-navy)' : 'var(--cp-white)', color: boleta.activo ? 'var(--cp-cream)' : 'var(--cp-navy)' }}
+            >
+              Sí
+            </button>
+            <button
+              type="button"
+              aria-pressed={!boleta.activo}
+              onClick={() => boleta.activo && setPropuestaBoleta(false)}
+              style={{ minHeight: ALTO_TOQUE, minWidth: 96, borderRadius: 10, fontWeight: 700, cursor: 'pointer', border: !boleta.activo ? '2px solid var(--cp-navy)' : '1.5px solid var(--cp-line)', background: !boleta.activo ? 'var(--cp-navy)' : 'var(--cp-white)', color: !boleta.activo ? 'var(--cp-cream)' : 'var(--cp-navy)' }}
+            >
+              No
+            </button>
+          </div>
+          <div style={{ fontSize: 13 }}>
+            {boleta.aplica
+              ? 'Ahora mismo aplica: los pedidos sin comprobante salen como boleta.'
+              : boleta.activo
+                ? 'Ahora mismo no aplica: el proveedor es Simulado. Los pedidos siguen como nota de venta.'
+                : 'Desactivado: los pedidos sin comprobante salen como nota de venta.'}
+          </div>
+          {errorBoleta && <div role="alert" style={{ color: 'var(--cp-red, #b00020)' }}>{errorBoleta}</div>}
+        </section>
+      )}
+
       {esAdmin && salud && (
         <div data-testid="contador-facturacion" role="status" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontWeight: 700 }}>
           <span>Pendientes: {salud.pendientes}</span>
@@ -411,6 +473,20 @@ export function ElectronicosTab() {
         </section>
       )}
 
+      <Confirmar
+        abierto={propuestaBoleta !== null}
+        titulo="Boleta electrónica por defecto"
+        mensaje={
+          propuestaBoleta
+            ? 'Los pedidos sin comprobante elegido saldrán como boleta electrónica (con SUNAT directo). ¿Activarlo?'
+            : 'Los pedidos sin comprobante elegido volverán a salir como nota de venta. ¿Desactivarlo?'
+        }
+        textoSi="Sí, guardar"
+        textoNo="No"
+        cargando={guardandoBoleta}
+        alConfirmar={guardarBoleta}
+        alCancelar={() => setPropuestaBoleta(null)}
+      />
       <Confirmar
         abierto={confirmarConfig}
         titulo="Guardar configuración de facturación"

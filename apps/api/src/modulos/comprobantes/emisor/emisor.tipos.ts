@@ -48,6 +48,10 @@ export interface ResultadoEmision {
   igvCents?: number;
   /** Código SUNAT del rechazo (CDR o fault), para decidir si reintentar sirve. */
   codigoRechazo?: string | null;
+  /** SUNAT ya tenía la factura (1033): EMITIDO_SUNAT sin CDR; hay que verificarla en SOL. */
+  yaRegistrado?: boolean;
+  /** La consulta previa (getStatusCdr) falló antes de reenviar el mismo ZIP. */
+  consultaCdrFallo?: boolean;
 }
 
 /** Resultado de una anulación: SOLICITADA (en proceso de SUNAT), ACEPTADA, RECHAZADA o PENDIENTE_RESUMEN. */
@@ -63,7 +67,7 @@ export interface EmisorElectronico {
   readonly proveedor: Proveedor;
   generar(c: ComprobanteEmision): Promise<ResultadoEmision>;
   /** Consulta si el emisor ya tiene el comprobante, antes de reenviar. null si no aplica. */
-  consultar(c: ComprobanteEmision): Promise<ResultadoEmision | null>;
+  consultar(c: Pick<ComprobanteEmision, 'tipo' | 'serie' | 'numero' | 'timeoutMs'>): Promise<ResultadoEmision | null>;
   anular(c: ComprobanteEmision, motivo: string): Promise<ResultadoBaja>;
 }
 

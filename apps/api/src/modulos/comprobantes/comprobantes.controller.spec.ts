@@ -32,7 +32,7 @@ describe('ComprobantesController', () => {
       marcarEmitido: jest.fn().mockResolvedValue({ id: '1', emision: 'EMITIDO' }),
     };
 
-    controller = new ComprobantesController(serviceMock, { resumenDiario: jest.fn() } as any, { salud: jest.fn() } as any);
+    controller = new ComprobantesController(serviceMock, { resumenDiario: jest.fn() } as any, { salud: jest.fn() } as any, {} as any);
   });
 
   it('GET /admin/comprobantes/por-emitir delega a service.listarPorEmitir', async () => {

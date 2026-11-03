@@ -40,6 +40,9 @@ export function esRechazoPermanente(codigo: string | null | undefined): boolean 
   return !!codigo && /^[23]\d{3}$/.test(codigo);
 }
 
+/** Respuesta de la factura ya registrada en SUNAT sin su CDR: se intenta recuperar la constancia en cada pasada. */
+export const TEXTO_REGISTRADA_SIN_CDR = 'Registrada previamente en SUNAT; constancia (CDR) no recuperada';
+
 export function esCodigoAutenticacion(codigo: string | null | undefined): boolean {
   return !!codigo && CODIGOS_AUTENTICACION.has(codigo);
 }
