@@ -39,6 +39,9 @@ const fechaCorta = (iso: string) => {
   return a && m && d ? `${d}/${m}/${a}` : iso;
 };
 
+/** Días que faltan para el vencimiento del certificado (negativo si ya venció). */
+const diasParaVencer = (iso: string) => Math.floor((new Date(`${iso}T12:00:00`).getTime() - Date.now()) / 86_400_000);
+
 /** Insignia del proveedor que de verdad emite (sin valores de conexión). */
 function insigniaProveedor(config: ConfigFacturacion): { texto: string; variante: VarianteInsignia } {
   const efectivo: ProveedorFacturacion = config.proveedor_efectivo ?? 'SIMULADO';
@@ -288,6 +291,13 @@ export function ElectronicosTab() {
                 {config.sunat?.vence_certificado && <span>Certificado vence: <strong>{fechaCorta(config.sunat.vence_certificado)}</strong></span>}
               </>
             )}
+          </div>
+        )}
+        {config?.sunat?.vence_certificado && diasParaVencer(config.sunat.vence_certificado) <= 60 && (
+          <div role="status" style={{ marginTop: 8, fontSize: 13, color: 'var(--cp-texto-suave, #6b5b4e)' }}>
+            {diasParaVencer(config.sunat.vence_certificado) < 0
+              ? `El certificado de SUNAT ya venció el ${fechaCorta(config.sunat.vence_certificado)}. Hay que cargar uno nuevo.`
+              : `El certificado de SUNAT vence el ${fechaCorta(config.sunat.vence_certificado)} (en ${diasParaVencer(config.sunat.vence_certificado)} días). Renuévalo a tiempo.`}
           </div>
         )}
         {config && config.proveedor === 'SUNAT' && config.proveedor_efectivo !== 'SUNAT' && (
