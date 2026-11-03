@@ -78,6 +78,16 @@ export class CrearUsuarioDto extends ConfigurarHorarioDto {
   @IsEmail({}, { message: 'El correo no es válido' })
   correo?: string;
 
+  /** Recibe los avisos del sistema por correo. Por defecto: ADMIN y SUPERVISOR con correo. Exige correo. */
+  @IsOptional()
+  @IsBoolean()
+  avisosCorreo?: boolean;
+
+  /** Disponible 24/7 (recibe avisos si nadie con casilla está de turno). Por defecto: ADMIN. */
+  @IsOptional()
+  @IsBoolean()
+  horario24_7?: boolean;
+
   /** AAAA-MM-DD. Solo se guarda día y mes (cumpleaños). */
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'La fecha de nacimiento debe ser AAAA-MM-DD' })

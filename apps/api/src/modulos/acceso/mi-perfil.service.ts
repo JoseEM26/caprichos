@@ -10,6 +10,7 @@ import { ArchivosService } from '../archivos/archivos.service';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import { UsuarioAutenticado } from './acceso.tipos';
 import { ActualizarMiPerfilDto } from './mi-perfil.dto';
+import { CORREO_REQUERIDO_AVISOS } from '../correo/avisos-mensajes';
 
 const FOTO_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -17,6 +18,7 @@ export interface MiPerfil {
   nombres: string;
   apellidos: string;
   correo: string;
+  avisosCorreo: boolean;
   fotoUrl: string | null;
   rol: string;
   dniEnmascarado: string;
@@ -41,7 +43,18 @@ export class MiPerfilService {
     const persona = this.personaDe(cuenta);
 
     const datos: { nombres?: string; apellidos?: string | null; correo?: string | null } = {};
+    const datosCuenta: { avisos_correo?: boolean } = {};
     const campos: string[] = [];
+
+    const correoFinal = dto.correo !== undefined ? dto.correo.trim() || null : persona.correo ?? null;
+    const avisosFinal = dto.avisosCorreo ?? cuenta.avisos_correo;
+    if (avisosFinal && !correoFinal && (dto.avisosCorreo !== undefined || dto.correo !== undefined)) {
+      throw new BadRequestException(CORREO_REQUERIDO_AVISOS);
+    }
+    if (dto.avisosCorreo !== undefined && dto.avisosCorreo !== cuenta.avisos_correo) {
+      datosCuenta.avisos_correo = dto.avisosCorreo;
+      campos.push('avisosCorreo');
+    }
 
     if (dto.nombres !== undefined && dto.nombres.trim() !== persona.nombres) {
       datos.nombres = dto.nombres.trim();
@@ -60,7 +73,12 @@ export class MiPerfilService {
       return this.vista(cuenta);
     }
 
-    await this.prisma.person.update({ where: { party_id: partyId }, data: datos });
+    if (Object.keys(datosCuenta).length) {
+      await this.prisma.userAccount.update({ where: { party_id: partyId }, data: datosCuenta });
+    }
+    if (Object.keys(datos).length) {
+      await this.prisma.person.update({ where: { party_id: partyId }, data: datos });
+    }
     // Auditoría sin valores: solo qué campos cambiaron (el correo es dato personal).
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -161,6 +179,7 @@ export class MiPerfilService {
       nombres: persona.nombres,
       apellidos: persona.apellidos ?? '',
       correo: persona.correo ?? '',
+      avisosCorreo: Boolean(cuenta.avisos_correo),
       fotoUrl: foto ? `/archivos/${foto.ruta}` : null,
       rol: cuenta.rol,
       dniEnmascarado: enmascararDni(cuenta.party.documentos?.[0]?.numero ?? ''),

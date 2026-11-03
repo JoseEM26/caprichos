@@ -1,4 +1,4 @@
-import { IsArray, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { TIPOS_DOCUMENTO } from '../../acceso/roles-usuario';
 
 export class EditarUsuarioDto {
@@ -46,6 +46,16 @@ export class EditarUsuarioDto {
   @IsOptional()
   @Matches(/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'El correo no tiene un formato válido' })
   correo?: string;
+
+  /** Solo ADMIN. Recibe los avisos del sistema por correo (exige correo). */
+  @IsOptional()
+  @IsBoolean()
+  avisosCorreo?: boolean;
+
+  /** Solo ADMIN. Disponible 24/7 (recibe avisos si nadie con casilla está de turno). */
+  @IsOptional()
+  @IsBoolean()
+  horario24_7?: boolean;
 
   /** Obligatoria (solo ADMIN) cuando cambia el DNI: contraseña del administrador que opera. */
   @IsOptional()

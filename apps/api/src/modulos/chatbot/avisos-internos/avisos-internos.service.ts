@@ -29,6 +29,7 @@ import {
   TEXTOS_AVISOS,
 } from './avisos-internos.textos';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
+import { AvisosEquipoCorreoService, AvisoEquipo } from '../../correo/avisos-equipo-correo.service';
 import {
   ROLES_ALERTAS_WHATSAPP,
   normalizarCelularPeru,
@@ -50,7 +51,16 @@ export class AvisosInternosService {
     private readonly mensajeria: WhatsAppMensajeriaPuerto,
     private readonly outbox: OutboxWhatsappService,
     @Optional() private readonly eventosGateway?: EventosGateway,
+    @Optional() private readonly correoEquipo?: AvisosEquipoCorreoService,
   ) {}
+
+  /**
+   * Aviso por correo al equipo. No depende de chatbot_avisos_equipo_activo (ese flag es solo de WhatsApp)
+   * y nunca frena ni espera al llamador: el servicio de correo no lanza.
+   */
+  private correoAlEquipo(aviso: AvisoEquipo): void {
+    void this.correoEquipo?.avisar(aviso);
+  }
 
   /**
    * Obtiene la lista de números del equipo configurados en ADMIN_WHATSAPP_NUMBERS.
@@ -394,6 +404,16 @@ export class AvisosInternosService {
    * Notifica al equipo cuando Almacén debe saber algo (insumo agotado o por pedir).
    */
   async notificarAlmacen(datos: DatosAvisoAlmacen, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
+    const etiqueta = datos.tipoAlerta === 'AGOTADO' ? 'agotado' : 'por pedir';
+    this.correoAlEquipo({
+      clave: `almacen:${datos.nombreInsumo.slice(0, 100)}:${datos.tipoAlerta}:${new Date().toISOString().slice(0, 10)}`,
+      origen: 'ALMACEN',
+      asunto: `Almacén: ${datos.nombreInsumo} (${etiqueta})`,
+      texto:
+        `${datos.nombreInsumo}: stock actual ${Number(datos.stockActual).toFixed(2)} ${datos.unidadMedida || 'UND'}` +
+        ` (mínimo ${Number(datos.stockMinimo).toFixed(2)}).\n\nVer en el panel: /admin/stock`,
+    });
+
     const activo = await this.estanAvisosActivos();
     if (!activo) {
       return {
@@ -761,11 +781,20 @@ export class AvisosInternosService {
     enlace: string,
     botones?: BotonAccion[],
     claveIdempotencia?: string,
-    opciones?: { sinCampana?: boolean },
+    opciones?: { sinCampana?: boolean; correo?: boolean },
   ): Promise<ResultadoNotificacionEquipo> {
     // Alerta va SIEMPRE a la campana del panel (respaldo y registro), salvo que quien avisa ya la haya puesto
     if (!opciones?.sinCampana) {
       await this.emitirAvisoCampana(titulo, detalle, enlace);
+    }
+    // Correo solo para los avisos que lo piden (opciones.correo); el WhatsApp sigue detrás del flag
+    if (opciones?.correo) {
+      this.correoAlEquipo({
+        clave: claveIdempotencia ?? `alerta:${randomUUID()}`,
+        origen: 'ALERTA_ADMIN',
+        asunto: titulo,
+        texto: `${detalle}\n\nVer en el panel: ${enlace}`,
+      });
     }
 
     const activo = await this.estanAvisosActivos();
@@ -854,7 +883,7 @@ export class AvisosInternosService {
       enlace,
       undefined,
       `calificacion-baja-${datos.encuestaId.toString()}`,
-      { sinCampana: true },
+      { sinCampana: true, correo: true },
     );
   }
 
