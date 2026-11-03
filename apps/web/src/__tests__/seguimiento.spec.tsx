@@ -154,6 +154,7 @@ describe('seguimiento del pedido en la carta', () => {
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Carlos Mendoza' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987654321' } });
+    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
     fireEvent.click(screen.getByText('Recoger en el local'));
     // Avanzar de paso 1 a 2
     fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));

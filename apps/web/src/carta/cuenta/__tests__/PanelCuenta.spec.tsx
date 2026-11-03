@@ -121,6 +121,8 @@ describe('PanelCuenta ▸ acceso con celular', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Escribe tu nombre.');
 
     escribir('Nombre', 'Ana Pérez');
+
+    escribir('Tu cumpleaños, para saludarte', '1990-05-10');
     escribir('Crea tu contraseña', 'clave');
     fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('al menos 8 caracteres');
@@ -155,6 +157,7 @@ describe('PanelCuenta ▸ acceso con celular', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar código' }));
     expect(await screen.findByText('Paso 3 de 3')).toBeInTheDocument();
     escribir('Nombre', 'Ana Pérez');
+    escribir('Tu cumpleaños, para saludarte', '1990-05-10');
     escribir('Crea tu contraseña', 'ClaveSegura2026');
     fireEvent.click(screen.getByRole('checkbox'));
     expect(screen.getByText('Lo pides solo si quieres: tu celular es lo que te identifica.')).toBeInTheDocument();
@@ -209,6 +212,7 @@ describe('PanelCuenta ▸ acceso con celular', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
     await llenarPaso1();
     escribir('Nombre', 'Ana Pérez');
+    escribir('Tu cumpleaños, para saludarte', '1990-05-10');
     escribir('Crea tu contraseña', 'ClaveSegura2026');
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }));
@@ -298,6 +302,7 @@ describe('PanelCuenta ▸ crear cuenta en 2 pasos e invitado', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Crear cuenta' }));
     await llenarPaso1();
     escribir('Nombre', 'Ana Pérez');
+    escribir('Tu cumpleaños, para saludarte', '1990-05-10');
     escribir('Correo personal (opcional)', 'ana@ejemplo.com');
 
     fireEvent.click(screen.getByRole('button', { name: 'Atrás' }));
