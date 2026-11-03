@@ -8,8 +8,8 @@ export const RUC_PRUEBA_BETA = '20000000001';
 const URLS: Record<AmbienteSunat, { factura: string; consulta: string }> = {
   beta: {
     factura: 'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService',
-    // Por confirmar: la consulta de CDR en beta sigue el patrón de producción
-    consulta: 'https://e-beta.sunat.gob.pe/ol-it-wsconscpegem-beta/billConsultService',
+    // Observado: la ruta ol-it-wsconscpegem-beta responde 404; esta responde SOAP (aunque hoy devuelve Internal Error)
+    consulta: 'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billConsultService',
   },
   prod: {
     factura: 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService',

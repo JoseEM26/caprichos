@@ -18,6 +18,8 @@ export interface ComprobanteEmision {
   zipPrevio?: Buffer | null;
   /** Guarda XML y ZIP ANTES de la llamada de red: si el proceso muere al enviar, el ZIP queda para reenviar. */
   alPreparar?: (archivos: ArchivoEmision[]) => Promise<void>;
+  /** Tiempo máximo de cada llamada de red (ver TIMEOUT_SUNAT_INTERACTIVO_MS y TIMEOUT_SUNAT_MS). */
+  timeoutMs?: number;
 }
 
 /** Archivo que el emisor entrega para guardar (XML firmado, ZIP enviado, CDR de SUNAT). */

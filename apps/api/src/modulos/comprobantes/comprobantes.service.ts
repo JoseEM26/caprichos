@@ -31,11 +31,14 @@ import { proveedorDe } from './emisor/proveedor';
 import { SimuladoEmisor } from './emisor/simulado.emisor';
 import { SunatEmisor } from './sunat/sunat.emisor';
 import { ambienteSunat } from './sunat/sunat.config';
+import { TIMEOUT_SUNAT_INTERACTIVO_MS, TIMEOUT_SUNAT_MS } from './sunat/sunat.soap';
 import { bytes, sha256 } from './sunat/sunat.util';
 import { ComprobantesSunatService } from './comprobantes-sunat.service';
 import { ComprobantesSaludService, condicionProblemas } from './comprobantes-salud.service';
 import { LEASE_ENVIO_MS, MAX_INTENTOS_DEFECTO, esRechazoPermanente, esperaFacturacionMs } from './comprobantes-politica';
 import { siguienteCorrelativo } from './secuencia';
+import { armarDatosPdf } from './pdf/comprobante-datos';
+import { generarPdfComprobante } from './pdf/comprobante-pdf';
 import { leerParametroNumerico } from '../impresion/estado-impresion';
 
 /** Plazo de la comunicación de baja de una factura en SUNAT (días). */
@@ -163,6 +166,45 @@ export class ComprobantesService {
       ip,
     });
     return { nombre: a.nombre, tipo: a.tipo, contenido: Buffer.from(a.contenido), sha256: a.sha256 };
+  }
+
+  /**
+   * Representación impresa (PDF) de una BOLETA/FACTURA electrónica, generada al vuelo desde lo guardado.
+   * Nada se guarda en base. Audita la lectura (datos personales). DNI/RUC completos solo para ADMIN.
+   */
+  async pdfComprobante(idRaw: bigint | string | number, usuario?: UsuarioAutenticado, ip?: string): Promise<{ nombre: string; contenido: Buffer }> {
+    const id = this.parsearId(idRaw, 'comprobante');
+    const c = await this.prisma.comprobante.findUnique({
+      where: { id },
+      include: { pedido: { include: { lineas: true } } },
+    });
+    if (!c) {
+      throw new NotFoundException({ codigo: 'COMPROBANTE_NO_ENCONTRADO', mensaje: 'El comprobante no existe' });
+    }
+    if (!TIPOS_ELECTRONICOS.includes(c.tipo)) {
+      throw new HttpException(
+        { codigo: 'COMPROBANTE_NO_ELECTRONICO', mensaje: 'Solo las boletas y facturas electrónicas tienen representación en PDF' },
+        HttpStatus.CONFLICT,
+      );
+    }
+    const local = ((await this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }))?.valor ?? {}) as Record<string, unknown>;
+    const datos = armarDatosPdf(c, c.pedido, local, {
+      esAdmin: usuario?.rol === 'ADMIN',
+      ambiente: this.sunatEmisor?.config().ambiente ?? ambienteSunat(),
+    });
+    const contenido = await generarPdfComprobante(datos);
+    await this.auditoria.registrar({
+      categoria: 'LECTURA_SENSIBLE',
+      modulo: 'comprobantes',
+      accion: 'VER_PDF_ELECTRONICO',
+      resultado: 'OK',
+      entidad: 'comprobante',
+      entidadId: id,
+      despues: { tipo: c.tipo, numero_texto: c.numero_texto, situacion: datos.situacion },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+    return { nombre: `${c.numero_texto}.pdf`, contenido };
   }
 
   private parsearId(id: bigint | string | number, entidad = 'comprobante'): bigint {
@@ -350,7 +392,7 @@ export class ComprobantesService {
     let enviado: any = nuevo;
     if (!tx) {
       try {
-        enviado = await this.enviarElectronico(nuevo.id, { direccion: direccionSolicitada, usuario, ip, automatico: true });
+        enviado = await this.enviarElectronico(nuevo.id, { direccion: direccionSolicitada, usuario, ip, automatico: true, interactivo: !!usuario });
       } catch {
         // Error inesperado: el cobro sigue; el comprobante queda pendiente con su número y la tarea lo reenvía
         enviado = await this.prisma.comprobante
@@ -370,7 +412,7 @@ export class ComprobantesService {
    */
   async enviarElectronico(
     comprobanteId: bigint,
-    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; automatico?: boolean } = {},
+    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; automatico?: boolean; interactivo?: boolean } = {},
   ): Promise<any> {
     // Pausa del circuito: el envío automático no sale; la fila queda PENDIENTE_ENVIO con su número
     if (opciones.automatico && (await this.salud?.circuitoAbierto())) {
@@ -408,7 +450,10 @@ export class ComprobantesService {
     }
   }
 
-  private async enviarReclamado(c: any, opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string }): Promise<any> {
+  private async enviarReclamado(
+    c: any,
+    opciones: { direccion?: string | null; usuario?: UsuarioAutenticado; ip?: string; interactivo?: boolean },
+  ): Promise<any> {
     const cfg = await this.leerConfigFacturacion();
     const pedido: any = c.pedido;
     const direccion = opciones.direccion ?? pedido.comprobante_direccion ?? null;
@@ -425,8 +470,10 @@ export class ComprobantesService {
     const maxIntentos = await leerParametroNumerico(this.prisma, 'facturacion_max_intentos', MAX_INTENTOS_DEFECTO);
     let res: ResultadoEmision;
     try {
-      // Un intento previo sin respuesta: el ZIP guardado se reenvía tal cual (mismo documento, mismo número)
-      const zipPrevio = c.facturacion_estado === 'PENDIENTE_ENVIO' && intentosPrevios > 0 ? await this.ultimoArchivo(c.id, 'ZIP') : null;
+      // Un intento previo sin respuesta, o una factura ya firmada en el cobro: se reenvía el ZIP guardado tal cual
+      // (mismo documento, mismo número, mismo hash). Nunca se vuelve a firmar algo ya firmado.
+      const yaFirmada = intentosPrevios > 0 || !!c.facturacion_hash;
+      const zipPrevio = c.facturacion_estado === 'PENDIENTE_ENVIO' && yaFirmada ? await this.ultimoArchivo(c.id, 'ZIP') : null;
       if (proveedor !== 'SIMULADO') {
         // Se cuenta ANTES de llamar a SUNAT: si el proceso muere en la llamada, el próximo intento consulta antes de reenviar
         await this.prisma.comprobante.update({ where: { id: c.id }, data: { facturacion_intentos: { increment: 1 } } });
@@ -440,6 +487,7 @@ export class ComprobantesService {
         datos,
         zipPrevio,
         alPreparar: (archivos: ArchivoEmision[]) => this.guardarArchivos(c.id, archivos),
+        timeoutMs: opciones.interactivo ? TIMEOUT_SUNAT_INTERACTIVO_MS : TIMEOUT_SUNAT_MS,
       };
       res = await this.emisorPara(proveedor).generar(emision);
       // El emisor convierte la falla de red en PENDIENTE_ENVIO (no la lanza): ahí se cuenta el fallo para el circuito
@@ -595,7 +643,7 @@ export class ComprobantesService {
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
     });
-    const enviado = await this.enviarElectronico(id, { direccion: correccion.direccion ?? undefined, usuario, ip });
+    const enviado = await this.enviarElectronico(id, { direccion: correccion.direccion ?? undefined, usuario, ip, interactivo: true });
     return this.serializarComprobante(enviado);
   }
 
@@ -624,6 +672,84 @@ export class ComprobantesService {
       }
     }
     return { revisados: pendientes.length };
+  }
+
+  /**
+   * Paso LOCAL del cobro (sin red): firma y guarda el comprobante electrónico del pedido, para que el ticket
+   * salga con hash y QR. Usa el mismo lease que el envío: el worker no firma ni envía la misma fila a la vez.
+   * Nunca lanza. Si la firma falla (p. ej. certificado), la fila queda PENDIENTE_ENVIO con aviso y el envío la reintenta.
+   */
+  async firmarPorPedido(pedidoIdRaw: bigint | string | number, usuario?: UsuarioAutenticado, ip?: string): Promise<void> {
+    const pedidoId = this.parsearId(pedidoIdRaw, 'pedido');
+    const base = await this.prisma.comprobante.findFirst({
+      where: { pedido_id: pedidoId, anulado_en: null, tipo: { in: TIPOS_ELECTRONICOS } },
+      select: { id: true, facturacion_estado: true, facturacion_hash: true, emisor: true, simulado: true },
+    });
+    if (!base || base.facturacion_hash || base.facturacion_estado !== 'PENDIENTE_ENVIO') return;
+    // SIMULADO no tiene red: se emite de una vez (local)
+    if (proveedorDeFila(base) === 'SIMULADO') {
+      await this.enviarElectronico(base.id, { automatico: true, usuario, ip }).catch(() => undefined);
+      return;
+    }
+    if (!this.sunatEmisor) return;
+    const ahora = new Date();
+    const reclamo = await this.prisma.comprobante.updateMany({
+      where: {
+        id: base.id,
+        facturacion_hash: null,
+        facturacion_estado: 'PENDIENTE_ENVIO',
+        OR: [{ enviando_hasta: null }, { enviando_hasta: { lt: ahora } }],
+      },
+      data: { enviando_hasta: new Date(ahora.getTime() + LEASE_ENVIO_MS) },
+    });
+    if (reclamo.count === 0) return;
+    try {
+      const c = await this.prisma.comprobante.findUnique({
+        where: { id: base.id },
+        include: { pedido: { include: { lineas: true } } },
+      });
+      if (!c) return;
+      const cfg = await this.leerConfigFacturacion();
+      let datos: DatosEmision;
+      try {
+        datos = await this.datosDeFila(c, cfg.igvPct, c.pedido.comprobante_direccion ?? null);
+      } catch {
+        await this.guardarResultado(c, { estado: 'RECHAZADO', respuesta: 'Datos: Datos del comprobante no válidos', simulado: false }, { usuario, ip });
+        return;
+      }
+      const res = await this.sunatEmisor.firmarComprobante({
+        id: c.id,
+        tipo: c.tipo as 'BOLETA' | 'FACTURA',
+        serie: c.serie,
+        numero: c.numero,
+        intentos: c.facturacion_intentos ?? 0,
+        datos,
+      });
+      await this.guardarResultado(c, res, { usuario, ip });
+    } catch (e: any) {
+      this.logger.error(`Firma del comprobante ${base.id}: ${e?.message ?? e}`);
+      await this.salud
+        ?.avisar({
+          clave: `comprobante:${base.id}:firma`,
+          titulo: 'Comprobante sin firmar',
+          mensaje: 'No se pudo firmar el comprobante electrónico (revisar el certificado de SUNAT). El envío lo reintentará.',
+          prioridad: 'alta',
+          enlace: '/admin/comprobantes',
+        })
+        .catch(() => undefined);
+    } finally {
+      await this.prisma.comprobante.updateMany({ where: { id: base.id }, data: { enviando_hasta: null } }).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Paso de RED del cobro: se dispara sin esperarlo, fuera del camino del cobro y del ticket.
+   * Lo que falle queda PENDIENTE_ENVIO y el worker lo reintenta (con el ZIP ya firmado, sin duplicar).
+   */
+  transmitirEnSegundoPlano(pedidoIdRaw: bigint | string | number): void {
+    this.enviarPorPedido(pedidoIdRaw).catch((e: any) =>
+      this.logger.error(`Transmisión en segundo plano del pedido ${String(pedidoIdRaw)}: ${e?.message ?? e}`),
+    );
   }
 
   /**

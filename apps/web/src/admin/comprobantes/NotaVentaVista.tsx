@@ -77,6 +77,17 @@ export function NotaVentaVista({ pedidoIdInicial, alCerrar }: NotaVentaVistaProp
     }
   };
 
+  /** Representación impresa en PDF (boleta o factura electrónica), en pestaña nueva. */
+  const handleVerPdf = async (comprobanteId: string) => {
+    setError(null);
+    try {
+      const url = await comprobantesApi.urlPdfElectronico(comprobanteId);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo abrir el PDF');
+    }
+  };
+
   const handleImprimirActual = () => {
     if (typeof window !== 'undefined' && window.print) {
       window.print();
@@ -187,6 +198,11 @@ export function NotaVentaVista({ pedidoIdInicial, alCerrar }: NotaVentaVistaProp
               </svg>
               Imprimir en ticketera (80 mm)
             </Boton>
+            {nota.comprobante && (nota.comprobante.tipo === 'BOLETA' || nota.comprobante.tipo === 'FACTURA') && (
+              <Boton variante="secundario" onClick={() => handleVerPdf(nota.comprobante.id)} style={{ minHeight: '44px', flex: '1 1 180px' }}>
+                Ver PDF
+              </Boton>
+            )}
             <Boton
               variante="oscuro"
               onClick={handleReimprimir}

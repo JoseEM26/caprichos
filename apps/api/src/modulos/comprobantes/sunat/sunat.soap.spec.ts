@@ -1,4 +1,5 @@
-import { ErrorRedEmisor } from '../emisor/emisor.tipos';
+import { ErrorCredencialesEmisor, ErrorRedEmisor } from '../emisor/emisor.tipos';
+import { esRechazoPermanente } from '../comprobantes-politica';
 import { zipUnico } from './sunat.util';
 import { codigoFault, cuerpoEnvio, enviarSoap, esFaultCliente, estadoCdr, leerCdr, parsearSoap, sobreSoap, textoCdr } from './sunat.soap';
 
@@ -69,5 +70,42 @@ describe('sobre SOAP y respuestas de SUNAT (sin red)', () => {
     expect(init.method).toBe('POST');
     expect(init.body).toBe('<sobre/>');
     expect((init.headers as Record<string, string>)['Content-Type']).toContain('text/xml');
+  });
+});
+
+/*
+ * Códigos REALES observados en el beta de SUNAT (scripts/sunat-codigos-beta.ts, 2026-11-02):
+ * - 3279: XML con total que no cuadra (Client). Rechazo permanente: no se reintenta.
+ * - HTTP 401 (texto, no SOAP): credenciales rechazadas en el servicio de consulta y en producción.
+ * - Consulta getStatusCdr: "Internal Error" (Client) aun para una factura aceptada: no prueba que falte.
+ */
+describe('códigos reales de SUNAT beta', () => {
+  const faultBeta3279 = `<?xml version="1.0" encoding="UTF-8"?><soap-env:Envelope xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/"><soap-env:Body><soap-env:Fault><faultcode>soap-env:Client.3279</faultcode><faultstring>La sumatoria del Total del valor de venta más los impuestos no concuerda con la base imponible</faultstring></soap-env:Fault></soap-env:Body></soap-env:Envelope>`;
+
+  it('3279 se lee como fault de cliente con código 3279 y es rechazo permanente', () => {
+    const r = parsearSoap(faultBeta3279);
+    expect(r.fault).toBeDefined();
+    expect(codigoFault(r.fault!)).toBe('3279');
+    expect(esFaultCliente(r.fault!)).toBe(true);
+    expect(esRechazoPermanente('3279')).toBe(true);
+  });
+
+  it('HTTP 401 con texto plano lanza ErrorCredencialesEmisor (no un error de red)', async () => {
+    const fetchFn = async () => new Response('Authentication Failed', { status: 401 });
+    await expect(enviarSoap('https://ejemplo.invalid/x', '<x/>', fetchFn)).rejects.toBeInstanceOf(ErrorCredencialesEmisor);
+  });
+
+  it('timeout configurable: el tiempo de la llamada lo fija el que llama', async () => {
+    jest.useFakeTimers();
+    try {
+      const fetchFn = (_u: string, init: any) =>
+        new Promise<Response>((_, rechazar) => init.signal.addEventListener('abort', () => rechazar(new Error('abort'))));
+      const llamada = enviarSoap('https://ejemplo.invalid/x', '<x/>', fetchFn, 15000);
+      const error = llamada.catch((e) => e);
+      jest.advanceTimersByTime(15000);
+      expect(await error).toBeInstanceOf(ErrorRedEmisor);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

@@ -156,6 +156,16 @@ export function ElectronicosTab() {
     }
   };
 
+  /** Abre el PDF de la boleta o factura en una pestaña nueva. */
+  const verPdf = async (c: ComprobanteElectronico) => {
+    try {
+      const url = await comprobantesApi.urlPdfElectronico(c.id);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo abrir el PDF');
+    }
+  };
+
   const descargar = async (c: ComprobanteElectronico, tipo: 'XML' | 'CDR') => {
     try {
       const url = await comprobantesApi.urlArchivoElectronico(c.id, tipo);
@@ -334,6 +344,9 @@ export function ElectronicosTab() {
                 {c.baja_motivo && <div style={{ fontSize: 12, marginTop: 4 }}>Motivo de baja: {c.baja_motivo}</div>}
                 {c.baja_estado === 'RECHAZADA' && <div style={{ fontSize: 12, marginTop: 4, color: 'var(--cp-red, #b00020)' }}>SUNAT rechazó la baja: revise la respuesta</div>}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                  <Boton variante="secundario" onClick={() => verPdf(c)} style={{ minHeight: ALTO_TOQUE }}>
+                    Ver PDF
+                  </Boton>
                   {c.enlace_pdf && (
                     <a href={c.enlace_pdf} target="_blank" rel="noopener noreferrer" style={{ minHeight: ALTO_TOQUE, display: 'inline-flex', alignItems: 'center', padding: '0 14px', fontWeight: 700 }}>
                       Ver PDF

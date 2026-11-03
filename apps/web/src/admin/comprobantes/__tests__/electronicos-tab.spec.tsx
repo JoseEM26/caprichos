@@ -146,6 +146,22 @@ describe('ElectronicosTab', () => {
     expect(screen.getByTestId('electronico-8').textContent).toContain('Anular');
   });
 
+  it('Ver PDF: cada comprobante electrónico abre su PDF en una pestaña nueva', async () => {
+    conRol('ADMIN');
+    const urlPdf = vi.spyOn(comprobantesApi, 'urlPdfElectronico').mockResolvedValue('blob:pdf-1');
+    const abrir = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(<ElectronicosTab />);
+
+    const botones = await screen.findAllByRole('button', { name: 'Ver PDF' });
+    expect(botones.length).toBeGreaterThanOrEqual(filas.length);
+    expect(botones[0].style.minHeight).toBe('44px');
+    fireEvent.click(botones[0]);
+    await waitFor(() => expect(urlPdf).toHaveBeenCalledWith('5'));
+    expect(abrir).toHaveBeenCalledWith('blob:pdf-1', '_blank', 'noopener,noreferrer');
+    abrir.mockRestore();
+  });
+
   it('panel «Con problemas»: contador arriba y corrección para una factura en revisión manual', async () => {
     conRol('ADMIN');
     const enRevision: ComprobanteElectronico = { ...base, id: '11', tipo: 'FACTURA', numero: 7, numero_texto: 'F002-000007', facturacion_estado: 'REVISION_MANUAL', enlace_pdf: null, revision_motivo: 'Rechazo permanente 2335: RUC inválido' };

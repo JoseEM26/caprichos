@@ -30,8 +30,8 @@ export const HORAS_RESUMEN_SIN_RESPUESTA = 24;
 export const DIAS_AVISO_CERTIFICADO = [60, 30, 7];
 
 /**
- * Códigos SUNAT de credenciales (usuario SOL o clave) inválidas.
- * ponytail: lista basada en la documentación de SUNAT; confirmar con la respuesta real de beta antes de producción.
+ * Códigos SUNAT de credenciales (usuario SOL o clave) inválidas. NO confirmados: en beta la clave incorrecta
+ * no devolvió 0102 ni 0109 (se aceptó). Las credenciales rechazadas sí llegan como HTTP 401 (ver enviarSoap).
  */
 export const CODIGOS_AUTENTICACION = new Set(['0102', '0109']);
 

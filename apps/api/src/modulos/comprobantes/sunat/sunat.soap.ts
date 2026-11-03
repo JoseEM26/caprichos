@@ -1,8 +1,13 @@
 import { DOMParser } from '@xmldom/xmldom';
-import { ErrorRedEmisor } from '../emisor/emisor.tipos';
+import { ErrorCredencialesEmisor, ErrorRedEmisor } from '../emisor/emisor.tipos';
 import { esc, leerZip } from './sunat.util';
 
-/** Tiempo máximo de una llamada a SUNAT. Sin respuesta a tiempo el envío queda pendiente. */
+/**
+ * Tiempos máximos de una llamada a SUNAT. Sin respuesta a tiempo el envío queda pendiente.
+ * - Interactivo: una acción del usuario (reintentar, enviar ahora) espera como mucho esto.
+ * - Segundo plano: transmisión tras el cobro y worker de reintentos; pueden esperar más.
+ */
+export const TIMEOUT_SUNAT_INTERACTIVO_MS = 15000;
 export const TIMEOUT_SUNAT_MS = 60000;
 
 export type OperacionSoap = 'sendBill' | 'sendSummary' | 'getStatus' | 'getStatusCdr';
@@ -39,9 +44,14 @@ export type FetchSoap = (url: string, init: RequestInit) => Promise<Response>;
  * Un SOAP Fault llega con HTTP 500 y se devuelve como texto para interpretarlo.
  * Nunca registra el sobre (lleva la clave SOL).
  */
-export async function enviarSoap(url: string, sobre: string, fetchFn: FetchSoap = (u, i) => fetch(u, i)): Promise<string> {
+export async function enviarSoap(
+  url: string,
+  sobre: string,
+  fetchFn: FetchSoap = (u, i) => fetch(u, i),
+  timeoutMs: number = TIMEOUT_SUNAT_MS,
+): Promise<string> {
   const control = new AbortController();
-  const reloj = setTimeout(() => control.abort(), TIMEOUT_SUNAT_MS);
+  const reloj = setTimeout(() => control.abort(), timeoutMs);
   try {
     const res = await fetchFn(url, {
       method: 'POST',
@@ -50,10 +60,12 @@ export async function enviarSoap(url: string, sobre: string, fetchFn: FetchSoap 
       signal: control.signal,
     });
     const texto = await res.text();
+    // Observado en beta y en producción: credenciales rechazadas llegan como HTTP 401 (texto, no SOAP)
+    if (res.status === 401) throw new ErrorCredencialesEmisor('SUNAT rechazó las credenciales (HTTP 401)');
     if (res.status >= 500 && !/Fault/i.test(texto)) throw new ErrorRedEmisor(`SUNAT respondió ${res.status} sin datos`);
     return texto;
   } catch (e) {
-    if (e instanceof ErrorRedEmisor) throw e;
+    if (e instanceof ErrorRedEmisor || e instanceof ErrorCredencialesEmisor) throw e;
     throw new ErrorRedEmisor();
   } finally {
     clearTimeout(reloj);

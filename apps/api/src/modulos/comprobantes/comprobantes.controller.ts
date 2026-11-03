@@ -117,6 +117,18 @@ export class ComprobantesController {
     res.end(a.contenido);
   }
 
+  /** GET /admin/comprobantes/:id/pdf : representación impresa (PDF) de la boleta o factura electrónica. */
+  @Get(':id/pdf')
+  @Permiso('comprobantes', 'ver')
+  async descargarPdf(@Param('id') id: string, @Req() req: any, @Res() res: Response) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const pdf = await this.comprobantesService.pdfComprobante(id, req.usuario, ip);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${pdf.nombre.replace(/"/g, '')}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(pdf.contenido);
+  }
+
   /** POST /admin/comprobantes/sunat/resumen : envía ahora el resumen diario de boletas pendientes (ADMIN). */
   @Post('sunat/resumen')
   @Permiso('comprobantes', 'emitir')

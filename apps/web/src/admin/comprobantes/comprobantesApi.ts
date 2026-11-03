@@ -91,6 +91,11 @@ export const comprobantesApi = {
     return obtenerBlobAutenticado(`/admin/comprobantes/${encodeURIComponent(id)}/archivos/${tipo}`);
   },
 
+  /** URL (blob) de la representación impresa en PDF de una boleta o factura electrónica, con la sesión del usuario. */
+  async urlPdfElectronico(id: string): Promise<string> {
+    return obtenerBlobAutenticado(`/admin/comprobantes/${encodeURIComponent(id)}/pdf`);
+  },
+
   async guardarFacturacion(config: {
     igvPct: number;
     serieBoleta: string;

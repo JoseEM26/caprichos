@@ -1,3 +1,4 @@
+import { representacionDe } from '../comprobantes/facturacion/representacion';
 import {
   EtiquetaGeneralDatos,
   EtiquetaGeneralProducto,
@@ -343,13 +344,12 @@ export function construirTicketPago(pedido: any, local: any, comprobante?: any):
       ? {
           tipo: comprobante.tipo,
           numero: comprobante.numero_texto,
-          // Boleta/factura aceptada por SUNAT: representación impresa, hash y marca de prueba
-          ...(comprobante.facturacion_estado === 'EMITIDO_SUNAT'
-            ? {
-                representacion: `Representación impresa de la ${comprobante.tipo === 'FACTURA' ? 'Factura' : 'Boleta'} de venta electrónica`,
-                hash: comprobante.facturacion_hash ?? null,
-                simulado: !!comprobante.simulado,
-              }
+          // Boleta/factura electrónica: hash y QR en cuanto el XML está firmado; si SUNAT rechazó, se avisa
+          ...(comprobante.tipo === 'BOLETA' || comprobante.tipo === 'FACTURA'
+            ? (() => {
+                const rep = representacionDe(comprobante);
+                return { representacion: rep.titulo, hash: rep.hash, cadenaQr: rep.cadenaQr, simulado: rep.prueba, situacion: rep.situacion };
+              })()
             : {}),
         }
       : null,

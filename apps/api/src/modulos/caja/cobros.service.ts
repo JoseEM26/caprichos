@@ -425,11 +425,12 @@ export class CobrosService {
     // Se mira antes de emitir (el cobro podría emitir otra nota si el comprobante cambió).
     const ticketYaSalioConMozo = await this.notaDelMozoVigente(cobro.pedido_id).catch(() => false);
 
-    // envío a SUNAT (boleta/factura) justo después del commit; si no sale, queda PENDIENTE_ENVIO y el worker lo reenvía
+    // Boleta/factura electrónica: se FIRMA aquí (local, sin red) para que el ticket salga con hash y QR.
+    // Si la firma falla, el cobro no se deshace: la fila queda PENDIENTE_ENVIO con aviso y el envío la reintenta.
     try {
-      await this.comprobantesService?.enviarPorPedido(cobro.pedido_id);
+      await this.comprobantesService?.firmarPorPedido(cobro.pedido_id, usuario, ip);
     } catch {
-      // el worker de comprobantes lo reintenta
+      // el servicio ya lo registra y avisa
     }
 
     // la mesa se libera al cobrar (RN-CAP-054); si falla no se deshace el cobro: se libera a mano
@@ -461,6 +462,13 @@ export class CobrosService {
       } catch {
         // se puede reimprimir desde el pedido
       }
+    }
+
+    // La transmisión a SUNAT va en segundo plano: el cobro y el ticket no esperan a SUNAT (sin doble envío: lease).
+    try {
+      this.comprobantesService?.transmitirEnSegundoPlano(cobro.pedido_id);
+    } catch {
+      // nunca deshace ni retrasa el cobro: el worker de comprobantes lo envía
     }
 
     // 8. Auditar

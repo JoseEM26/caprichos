@@ -17,8 +17,17 @@ Si se elige **SUNAT directo** pero faltan credenciales en el servidor, los compr
 
 ## Qué pasa al cobrar
 
-- **Factura**: se firma y se envía al momento (`sendBill`). SUNAT responde con su constancia (CDR). Si acepta, queda `EMITIDO SUNAT`.
-- **Boleta**: se firma y queda `PENDIENTE RESUMEN`. Todos los días a las **22:30 (hora de Lima)** se arma el resumen diario (RC) con las boletas pendientes (máximo 500 líneas por resumen) y se envía. Un segundo proceso consulta el ticket cada 2 minutos (solo cuando hay tickets pendientes) hasta que SUNAT responde.
+**Qué pasa al cobrar (boleta o factura electrónica)**
+
+1. **Commit del cobro.** Cobro, pedido y número del comprobante quedan en la misma transacción.
+2. **Firma local (sin red, unos milisegundos).** El XML se firma, se guardan XML y ZIP, y se calculan el hash y la cadena QR. Si la firma falla (por ejemplo, certificado inválido), el cobro **no se deshace**: el comprobante queda `PENDIENTE ENVÍO` sin hash, sale una alerta a ADMIN y el envío lo reintenta.
+3. **Ticket.** Sale con la representación, el hash y el QR (o «en proceso» si aún no está firmado).
+4. **Transmisión a SUNAT en segundo plano.** El cobro y el ticket **no esperan a SUNAT**. Si SUNAT no responde, queda `PENDIENTE ENVÍO` y el worker lo reintenta con el mismo ZIP, sin volver a firmar ni duplicar. Un cobro con SUNAT caído termina igual de rápido.
+
+El mozo solo emite nota de venta (sin SUNAT), así que su flujo no tiene espera de red.
+
+- **Factura**: se firma y luego se envía (`sendBill`) en segundo plano. SUNAT responde con su constancia (CDR). Si acepta, queda `EMITIDO SUNAT`.
+- **Boleta**: se firma y queda `PENDIENTE RESUMEN` (sin red). Todos los días a las **22:30 (hora de Lima)** se arma el resumen diario (RC) con las boletas pendientes (máximo 500 líneas por resumen) y se envía. Un segundo proceso consulta el ticket cada 2 minutos (solo cuando hay tickets pendientes) hasta que SUNAT responde.
 - **Sin respuesta** (red o tiempo agotado): queda `PENDIENTE ENVÍO` con el mismo número. Antes de reenviar, la API pregunta a SUNAT si ya tiene el comprobante, para no duplicarlo. El reenvío es automático cada 5 minutos.
 - **Rechazo**: queda `RECHAZADO` con el código y la descripción de SUNAT. Se corrige y se usa **Reintentar** (mismo número).
 - **Anulación**: nada se borra.
@@ -97,7 +106,9 @@ OK: SUNAT directo configurado en demo (TAG vX.Y.Z, ambiente beta). ...
 - `SUNAT_SOL_USUARIO debe ser el RUC (11 dígitos) seguido del usuario SOL`: revisar que se pegó completo y sin espacios.
 - `SUNAT_CERT_P12_B64 no es un base64 válido`: volver a generar el base64 con `base64 -w0`.
 - `Se restauró ...`: el `.env` volvió a su estado anterior y la API se redespliega con la configuración previa. Revisar el log del job.
-- En la pantalla, aviso «Credenciales SUNAT inválidas» con código `0102` o `0109`: el usuario o la clave SOL no son correctos, o el usuario no tiene permiso de facturación. Los envíos quedan en pausa (los comprobantes siguen pendientes, no se pierden) hasta corregir las credenciales.
+- En la pantalla, aviso «Credenciales SUNAT inválidas» (HTTP 401 de SUNAT, o los códigos 0102 y 0109 que aún no se han visto en beta): el usuario o la clave SOL no son correctos, o el usuario no tiene permiso de facturación. Los envíos quedan en pausa (los comprobantes siguen pendientes, no se pierden) hasta corregir las credenciales.
+- Un comprobante que SUNAT rechazó con un código 2xxx o 3xxx (por ejemplo, `3279`: el total no cuadra con el detalle) va a REVISION_MANUAL. Nunca se reenvía igual.
+- La consulta de si SUNAT ya tiene el comprobante (`getStatusCdr`) responde «Internal Error» en beta incluso para facturas aceptadas. Por eso un fault de esa consulta **no** se toma como «no existe»: el envío se queda pendiente y no se reenvía (así no se duplica).
 - Un resumen que no avanza: revisar que el ticket aparezca como `ENVIADO`; la tarea lo consulta cada 2 minutos.
 
 ## Que no se pierda nada
@@ -122,7 +133,7 @@ worker (cada 5 min)┘
           │                                         1, 2, 5, 10, 30, 60 min y luego cada 2 h (±10 %)
           ├─ rechazo 2xxx/3xxx (datos o XML) ──► REVISION_MANUAL (cola de fallos)
           ├─ rechazo de datos locales ──────────► RECHAZADO (corregir y reintentar)
-          └─ credenciales 0102/0109 ────────────► pausa de envíos y aviso a ADMIN
+          └─ credenciales rechazadas (HTTP 401; 0102/0109) ─► pausa de envíos y aviso a ADMIN
 ```
 
 **Qué pasa en cada fallo**
@@ -148,6 +159,22 @@ Nada se borra: el motivo queda en `revision_motivo`, con el XML, el ZIP y la res
 
 **Alertas a ADMIN** (una por problema, sin repetir): comprobante pendiente más de 15 minutos, rechazo o revisión manual, circuito en pausa, credenciales inválidas, boleta sin reportar más de 3 días, resumen o baja sin respuesta más de 1 día, certificado que vence en 60, 30 o 7 días, y hueco de numeración en B002 o F002.
 
+**Representación impresa (PDF)**
+
+`GET /admin/comprobantes/:id/pdf` (permiso comprobantes/ver) genera el PDF al vuelo desde lo guardado; no se guarda en base. Se audita cada lectura (`VER_PDF_ELECTRONICO`). Está en Electrónicos SUNAT y en la nota del pedido («Ver PDF»).
+
+- Formato: A4 para factura y boleta (decisión: más simple que el ticket de 80 mm; el ticket térmico lleva la misma información resumida).
+- Contenido: razón social, nombre comercial y RUC del local; dirección fiscal; tipo y número; fecha y hora; cliente; detalle; op. gravada, IGV con su porcentaje real, descuento, total y total en letras; hash; cadena QR; leyenda de la representación impresa.
+- Situación: con el XML firmado (PENDIENTE ENVÍO, PENDIENTE RESUMEN, ENVIADA RESUMEN o EMITIDO SUNAT) lleva hash y QR. Sin firmar: «en proceso». RECHAZADO o REVISION_MANUAL: aviso **PENDIENTE DE REGULARIZAR** y sin hash válido.
+- Marca **DOCUMENTO DE PRUEBA — SIN VALOR TRIBUTARIO** (franja y marca de agua) cuando el comprobante es simulado o el ambiente es beta. En producción con comprobante real no aparece.
+- DNI o RUC completos solo para ADMIN; para los demás roles, enmascarados (`20****03`).
+
+**Ticket y QR**
+
+- El ticket de la ticketera ya lleva hash, situación y la cadena QR (en el trabajo de impresión, campo `comprobante.cadenaQr`).
+- **El QR no se imprime todavía.** El agente de impresión (`agente-impresion-*.exe`) lleva el maquetado dentro del ejecutable: hoy solo imprime texto. Para imprimir el QR sin cambiar nada del API: en `apps/agente-local/src/escpos/generadorTicket.ts` agregar el comando nativo ESC/POS `GS ( k` (modelo 2, tamaño, corrección M, almacenar y imprimir) cuando el trabajo traiga `comprobante.cadenaQr`, y en `packages/compartido/src/etiquetas/ticketPago.ts` reservar la línea del QR. Requiere reconstruir y **redistribuir el .exe** (workflow `agente-windows.yml`); hasta entonces el ticket sale con texto (representación, hash o aviso).
+- La reimpresión del ticket es «Imprimir en ticketera (80 mm)» en la nota del pedido.
+
 **Monitoreo:** `GET /admin/comprobantes/salud` (solo ADMIN) devuelve solo conteos: pendientes, con problemas, edad del pendiente más viejo, boletas por reportar, días para el vencimiento del certificado, circuito abierto y credenciales inválidas.
 
 **Regla de la fecha de corte (no se emiten pedidos viejos).** Al pasar el selector a SUNAT por primera vez, se fija el parámetro `facturacion_desde` con la fecha y hora de ese momento (con Sí/No y auditoría). Desde ese momento:
@@ -166,9 +193,26 @@ Nada se borra: el motivo queda en `revision_motivo`, con el XML, el ZIP y la res
 - Resumen diario (RC) con una boleta: `getStatus` 0, «…ha sido aceptado», sin observaciones.
 - La firma se verifica con el mismo certificado (SHA-256 aceptado por beta, no hizo falta SHA-1).
 
+**Códigos observados en beta** (script `apps/api/scripts/sunat-codigos-beta.ts`, 2026-11-02, certificado de prueba autofirmado):
+
+| Caso | Servicio | Lo que respondió SUNAT beta | Cómo lo trata el código |
+|---|---|---|---|
+| (a) Clave SOL incorrecta (`MODDATOS` con otra clave) | billService | **Aceptó** la factura (CDR `0`). No devuelve 0102 ni 0109 | Sin código que clasificar. No se confirmó la clave en beta |
+| (b) Usuario inexistente (`20000000001NOEXISTE`) | billService | **Aceptó** la factura (CDR `0`) con documento nuevo | Sin código que clasificar |
+| (c) Reenviar la misma factura (mismo ZIP) | billService | Vuelve a responder **aceptada** (CDR `0`, mismo número) | Sin 1033 en beta: no se implementó «ya registrada» |
+| (c) Mismo número con otro contenido | billService | **Aceptada** (CDR `0`) | Sin 1033 en beta |
+| (d) `getStatusCdr` de factura aceptada | billConsultService | «Internal Error» (fault Client, sin código) | No se toma como «no existe»: queda pendiente, no se reenvía |
+| (d) `getStatusCdr` de factura inexistente | billConsultService | «Internal Error» (fault Client) | Igual que arriba |
+| (d) `getStatusCdr` con clave incorrecta | billConsultService | «Internal Error» (fault Client) | Igual que arriba |
+| (e) Total que no cuadra (TaxInclusiveAmount y PayableAmount +100) | billService | **`3279`**: «La sumatoria del Total… no concuerda con la base imponible» | Rechazo permanente: REVISION_MANUAL |
+| Credenciales de pruebas (`MODDATOS`) contra **producción** (`getStatusCdr`) | consulta producción | HTTP **401** «Authentication Failed» (texto, no SOAP) | Credenciales: pausa de envíos |
+| Consulta beta en `ol-it-wsconscpegem-beta/billConsultService` | — | **404** | Se cambió a `ol-ti-itcpfegem-beta/billConsultService` (responde SOAP) |
+
+**Conclusiones:** en beta, las credenciales no son una prueba fiable (la clave incorrecta se acepta) y el 1033 no aparece. Por eso 0102, 0109 y 1033 quedan **sin confirmar**: no se marcan como reales en el código. La única fuente firme de rechazo de datos es el 3279. Antes de producción hay que confirmar credenciales y duplicados con el certificado y el RUC reales, y la consulta `getStatusCdr` no es utilizable en beta hoy.
+
 **Pendiente de confirmar:**
 
-- Consulta de CDR por `getStatusCdr` en beta: la URL de beta es la de producción con sufijo `-beta` y no se probó todavía.
+- Consulta de CDR por `getStatusCdr`: en beta responde «Internal Error» a todo (ver tabla). Hasta que funcione, la consulta previa al reenvío no puede confirmar que SUNAT ya tiene una factura.
 - Cadena QR de las boletas sin documento: se usa `0|-`. Confirmar el código de tipo de documento con SUNAT.
 - Rango 4000–4999 (aceptada con observaciones): se trata como aceptada; confirmarlo con el contador y con un caso real.
 - Rechazos en producción con el certificado real y el RUC del local: no se probaron.

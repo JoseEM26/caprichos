@@ -140,6 +140,26 @@ export class SunatEmisor implements EmisorElectronico {
     return { simulado: false, hash: f.digest, cadenaQr: f.qr, totalCents: f.totalCents, igvCents: f.igvCents };
   }
 
+  /**
+   * Paso LOCAL (sin red): arma, firma y empaqueta el comprobante. Devuelve hash, cadena QR y los archivos
+   * (XML y ZIP) para guardarlos. BOLETA queda PENDIENTE_RESUMEN; FACTURA PENDIENTE_ENVIO hasta transmitirla.
+   * Datos inválidos: RECHAZADO sin enviar. Error de certificado: se lanza (el servicio lo avisa).
+   */
+  async firmarComprobante(c: ComprobanteEmision): Promise<ResultadoEmision> {
+    let f: Firmado & { codigoTipo: string };
+    try {
+      f = await this.firmar(c);
+    } catch (e) {
+      if (e instanceof ComprobanteInvalidoError) return { estado: 'RECHAZADO', respuesta: `Datos: ${e.motivo}`, simulado: false };
+      throw e;
+    }
+    const archivos = this.archivosDe(f);
+    if (c.tipo === 'BOLETA') {
+      return { ...this.comun(f), estado: 'PENDIENTE_RESUMEN', respuesta: 'Firmada: se reporta en el resumen diario de SUNAT', archivos };
+    }
+    return { ...this.comun(f), estado: 'PENDIENTE_ENVIO', respuesta: 'Firmada: pendiente de envío a SUNAT', archivos };
+  }
+
   async generar(c: ComprobanteEmision): Promise<ResultadoEmision> {
     if (c.tipo === 'FACTURA' && c.intentos > 0) {
       // Hubo un intento antes (quizá llegó a SUNAT sin respuesta): primero se pregunta si ya la tiene.
@@ -150,7 +170,7 @@ export class SunatEmisor implements EmisorElectronico {
     if (c.tipo === 'FACTURA' && c.zipPrevio) {
       // Mismo ZIP del intento anterior: mismo documento, mismo número, sin volver a firmar
       const emisor = await this.emisorXml();
-      return this.enviarFactura(`${emisor.ruc}-01-${c.serie}-${c.numero}`, c.zipPrevio, { simulado: false });
+      return this.enviarFactura(`${emisor.ruc}-01-${c.serie}-${c.numero}`, c.zipPrevio, { simulado: false }, c.timeoutMs);
     }
     let f: Firmado & { codigoTipo: string };
     try {
@@ -166,14 +186,19 @@ export class SunatEmisor implements EmisorElectronico {
     if (c.tipo === 'BOLETA') {
       return { ...this.comun(f), estado: 'PENDIENTE_RESUMEN', respuesta: 'Firmada: se reporta en el resumen diario de SUNAT' };
     }
-    return this.enviarFactura(f.nombre, f.zip, this.comun(f));
+    return this.enviarFactura(f.nombre, f.zip, this.comun(f), c.timeoutMs);
   }
 
   /** Envía la factura (sendBill) y arma el resultado. Sin respuesta: PENDIENTE_ENVIO con los comunes. */
-  private async enviarFactura(nombre: string, zip: Buffer, comunes: Omit<ResultadoEmision, 'estado' | 'respuesta'>): Promise<ResultadoEmision> {
+  private async enviarFactura(
+    nombre: string,
+    zip: Buffer,
+    comunes: Omit<ResultadoEmision, 'estado' | 'respuesta'>,
+    timeoutMs?: number,
+  ): Promise<ResultadoEmision> {
     const cfg = this.config();
     try {
-      const xml = await enviarSoap(cfg.urlFactura, sobreSoap('sendBill', cuerpoEnvio(`${nombre}.zip`, zip), cfg.usuario, cfg.clave), this.fetchFn);
+      const xml = await enviarSoap(cfg.urlFactura, sobreSoap('sendBill', cuerpoEnvio(`${nombre}.zip`, zip), cfg.usuario, cfg.clave), this.fetchFn, timeoutMs);
       const r = parsearSoap(xml);
       if (r.fault) {
         const codigo = codigoFault(r.fault);
@@ -207,14 +232,14 @@ export class SunatEmisor implements EmisorElectronico {
     const cuerpo =
       `<rucComprobante>${emisor.ruc}</rucComprobante><tipoComprobante>01</tipoComprobante>` +
       `<serieComprobante>${c.serie}</serieComprobante><numeroComprobante>${c.numero}</numeroComprobante>`;
-    const xml = await enviarSoap(cfg.urlConsulta, sobreSoap('getStatusCdr', cuerpo, cfg.usuario, cfg.clave), this.fetchFn);
+    const xml = await enviarSoap(cfg.urlConsulta, sobreSoap('getStatusCdr', cuerpo, cfg.usuario, cfg.clave), this.fetchFn, c.timeoutMs);
     const r = parsearSoap(xml);
     if (r.fault) {
       const codigo = codigoFault(r.fault);
       if (esCodigoAutenticacion(codigo)) throw new ErrorCredencialesEmisor(`SUNAT rechazó las credenciales (${codigo})`);
-      // Fault de cliente: SUNAT no tiene el comprobante. Fault de servidor: no se sabe, no se reenvía.
-      if (!esFaultCliente(r.fault)) throw new ErrorRedEmisor('SUNAT no pudo confirmar si ya tiene el comprobante');
-      return null;
+      // Observado en beta: la consulta devuelve "Internal Error" (Client) también para facturas que SUNAT sí tiene.
+      // Un fault NO prueba que falte el comprobante: no se reenvía (evita duplicados); se trata como sin respuesta.
+      throw new ErrorRedEmisor('SUNAT no pudo confirmar si ya tiene el comprobante');
     }
     if (r.textos.statusCode !== '0' || !r.textos.content) return null;
     const cdr = leerCdr(r.textos.content);
