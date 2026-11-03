@@ -84,7 +84,7 @@ export class RecuperarClaveService {
         origen: 'CODIGO_CUENTA',
         carga: {
           textoLibre: `Tu código de Caprichos es ${codigo}. Vence en 10 minutos. Si no lo pediste, ignora este mensaje.`,
-          plantillaClave: 'CODIGO_CUENTA',
+          plantillaClave: 'CODIGO_RECUPERAR',
           variablesPlantilla: [codigo],
           autor: 'BOT',
         },

@@ -30,6 +30,15 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     texto: 'Tu código de Caprichos es {{1}}. Vence en 10 minutos. Si no lo pediste, ignora este mensaje.',
     descripcion: 'Código de 6 dígitos para crear la cuenta y recuperar la contraseña del cliente. Se registra en Meta como plantilla de categoría AUTHENTICATION con botón «Copiar código»; el texto lo fija Meta (en español, «{{1}} es tu código de verificación...») y el envío lleva el código en el cuerpo y en el botón. Debe quedar APROBADA antes de usarla.',
   },
+  CODIGO_RECUPERAR: {
+    nombre: 'caprichos_codigo_recuperar',
+    categoria: 'AUTHENTICATION',
+    idioma: 'es',
+    variables: ['codigo'],
+    botonCodigo: true,
+    texto: '{{1}} es tu código de recuperación de contraseña.',
+    descripcion: 'Código de 6 dígitos para recuperar la contraseña de la cuenta del cliente. Se crea en Meta desde la biblioteca de plantillas (verify_password_recovery), en español y con el botón «copiar código»; debe quedar APROBADA antes de usarla. Si Meta la entrega sin botón, poner botonCodigo en false.',
+  },
   DELIVERY_SALIDA: {
     nombre: 'caprichos_delivery_en_camino',
     categoria: 'UTILITY',
