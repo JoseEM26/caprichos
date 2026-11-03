@@ -43,7 +43,17 @@ Por defecto la casilla viene encendida para ADMIN y SUPERVISOR, y apagada para e
 
    Al ejecutarlo, `gh` pide el valor y lo guarda cifrado.
 
-3. Pendiente de cablear en `.github/workflows/deploy.yml`: hoy el `docker-compose` ya pasa `RESEND_API_KEY` a la API, pero el valor tiene que llegar al archivo `.env` de cada ambiente en el servidor. Eso se hace igual que con los secretos SUNAT (un paso que lee el secreto y lo escribe en el `.env` sin mostrarlo, y luego redespliega). Falta ese paso.
+3. Pasar la clave al `.env` del servidor y redesplegar con el mismo tag. Desde GitHub Actions (pestaña Actions > Deploy Caprichos por SSH > Run workflow), o por consola:
+
+   ```
+   # demo (desde la rama preprod)
+   gh workflow run deploy.yml --repo JoseEM26/caprichos --ref preprod -f ambiente=demo -f accion=configurar-correo
+
+   # producción (tag de main; exige escribir PRODUCCION)
+   gh workflow run deploy.yml --repo JoseEM26/caprichos --ref main -f ambiente=prod -f tag=vX.Y.Z -f accion=configurar-correo -f confirmacion=PRODUCCION
+   ```
+
+   La acción lee `RESEND_API_KEY` del ambiente, la escribe en el `.env` sin mostrarla, redespliega, comprueba que la API la recibe y, si algo falla, restaura el `.env` anterior. Para ver el resultado: `gh run list --repo JoseEM26/caprichos --workflow deploy.yml`.
 
 Mientras no haya clave, el sistema funciona igual: registra los correos como «simulados» y no envía nada.
 

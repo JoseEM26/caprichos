@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), configurar-resenas (guarda el secreto OPENWEBNINJA_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), cargar-resenas (carga inicial de reseñas de Google del local buscado en consulta_resenas; demo o prod, prod exige PRODUCCION y no es lo normal), configurar-sunat (guarda los secretos SUNAT_AMBIENTE, SUNAT_SOL_USUARIO, SUNAT_SOL_CLAVE, SUNAT_CERT_P12_B64 y SUNAT_CERT_CLAVE en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), configurar-resenas (guarda el secreto OPENWEBNINJA_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), cargar-resenas (carga inicial de reseñas de Google del local buscado en consulta_resenas; demo o prod, prod exige PRODUCCION y no es lo normal), configurar-sunat (guarda los secretos SUNAT_AMBIENTE, SUNAT_SOL_USUARIO, SUNAT_SOL_CLAVE, SUNAT_CERT_P12_B64 y SUNAT_CERT_CLAVE en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), configurar-correo (guarda el secreto RESEND_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto)'
         required: false
         default: 'desplegar'
         type: choice
@@ -37,6 +37,7 @@ on:
           - configurar-resenas
           - cargar-resenas
           - configurar-sunat
+          - configurar-correo
           - preparar-produccion
           - crear-admin-produccion
           - sincronizar-proxy
@@ -252,6 +253,15 @@ jobs:
             ACCION="configurar-sunat"
             if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
               echo "::error::configurar-sunat en demo se lanza desde la rama preprod."
+              exit 1
+            fi
+          fi
+
+          # Clave de Resend (avisos por correo): manual; producción pasa por la validación de prod de más abajo
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "configurar-correo" ]; then
+            ACCION="configurar-correo"
+            if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::configurar-correo en demo se lanza desde la rama preprod."
               exit 1
             fi
           fi
@@ -1004,6 +1014,85 @@ jobs:
             echo ""
             echo '```'
             grep -E "^(== |SUNAT|TAG=|OK|ERROR|AVISO|Copia|Se restauró)" sunat.log || echo "(sin datos: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Guarda la clave de Resend (avisos por correo) en el .env del ambiente y redespliega con el mismo tag.
+  # La clave viaja por la entrada estándar del ssh: no aparece en la línea de comandos ni en el log.
+  configurar-correo:
+    name: Configurar correo de avisos (Resend)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'configurar-correo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: configurar-correo
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del commit o del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Guardar la clave de Resend y redesplegar (sin mostrar la clave)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          CLAVE: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ -z "$CLAVE" ]; then
+            echo "::error::Falta el secreto RESEND_API_KEY. Guárdelo con: gh secret set RESEND_API_KEY --env ${AMBIENTE} --repo JoseEM26/caprichos"
+            exit 1
+          fi
+          printf '%s' "$CLAVE" | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/configurar-correo.sh '${AMBIENTE}'" 2>&1 | tee correo.log
+
+      - name: Resumen (sin secretos)
+        if: always()
+        run: |
+          {
+            echo "## Correo de avisos (Resend)"
+            echo ""
+            echo '```'
+            grep -E "^(== |RESEND|TAG=|OK|ERROR|AVISO|Copia|Se restauró)" correo.log || echo "(sin datos: revise el log del paso anterior)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
