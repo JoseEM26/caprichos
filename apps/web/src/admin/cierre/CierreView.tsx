@@ -51,6 +51,8 @@ export function CierreView() {
   // Enfoque pedido desde un aviso del cierre hacia el panel de pendientes
   const [foco, setFoco] = useState<FocoPendientes | null>(null);
   const [pedidosCobrados, setPedidosCobrados] = useState<CobroTurno[]>([]);
+  // Fecha (AAAA-MM-DD) de la caja que se cierra: la abierta, sea de hoy o de un día anterior
+  const [fechaTurno, setFechaTurno] = useState(hoyLima());
 
   // Mensaje de éxito/notificación y error de la pantalla
   const [cjMsg, setCjMsg] = useState('');
@@ -117,6 +119,7 @@ export function CierreView() {
           setCajaAbierta(cActual.abierta || cActual.caja?.estado === 'ABIERTA');
           // Una caja de otro día sin cerrar también la ve el cajero: no debe leerse como «Caja cerrada»
           setCajaPendiente(cActual.cajaAnteriorAbierta ?? null);
+          setFechaTurno(cActual.cajaAnteriorAbierta?.fecha ?? hoyLima());
           setPedidosCobrados(cActual.cobrados ?? []);
           if (cActual.caja) {
             setCajaId(`CJ-${String(cActual.caja.id).padStart(4, '0')}`);
@@ -128,14 +131,20 @@ export function CierreView() {
       }
 
       // 2. Esperado: lo piden el administrador y el supervisor. El cajero cuenta a ciegas (DT-61).
+      // Con él llegan también los cobros y movimientos de la MISMA caja abierta (sea de hoy o no).
+      let turnoDeCaja = false;
       if (sinCodigo) {
         try {
           const esp = await cierreApi.obtenerEsperado();
           if (esp) {
             setEsperado(esp);
             if (esp.cajaId) {
+              turnoDeCaja = true;
               // La fecha de la caja es un día (UTC medianoche): se compara con el día de Lima
               const fechaCaja = String(esp.fecha).slice(0, 10);
+              setFechaTurno(fechaCaja);
+              setPedidosCobrados(esp.cobrados ?? []);
+              setMovimientos(esp.movimientos ?? []);
               if (fechaCaja === hoyLima()) {
                 setCajaAbierta(true);
                 setCajaId(`CJ-${String(esp.cajaId).padStart(4, '0')}`);
@@ -151,12 +160,14 @@ export function CierreView() {
         }
       }
 
-      // 3. Movimientos
-      try {
-        const movs = await pedidosApi.listarMovimientos();
-        setMovimientos(movs || []);
-      } catch {
-        setMovimientos([]);
+      // 3. Movimientos de hoy (sin caja abierta de por medio: si no, salen los de la caja de arriba)
+      if (!turnoDeCaja) {
+        try {
+          const movs = await pedidosApi.listarMovimientos();
+          setMovimientos(movs || []);
+        } catch {
+          setMovimientos([]);
+        }
       }
 
       // 4. Repartidores
@@ -424,6 +435,10 @@ export function CierreView() {
     try {
       const datos = await cierreApi.verificarPinSupervisor(pin);
       setEsperado(datos);
+      // El turno que se verifica es el de la caja abierta que devuelve el servidor, con sus cobros y movimientos
+      setFechaTurno(String(datos.fecha).slice(0, 10));
+      setPedidosCobrados(datos.cobrados ?? []);
+      setMovimientos(datos.movimientos ?? []);
       setPinVerificado(true);
       setMsgCierreError('');
     } catch (err: any) {
@@ -1103,7 +1118,7 @@ export function CierreView() {
 
               {/* Vouchers digitales del día (Yape/Plin analizados con IA) */}
               <SeccionVouchersCierre
-                fecha={hoyLima()}
+                fecha={fechaTurno}
                 puedeVer={tiene('vouchers/ver') || puedeVer}
               />
             </>
@@ -1454,7 +1469,8 @@ export function CierreView() {
             {/* FASE 1: VERIFICAR MOVIMIENTOS */}
             {faseCierre === 'verificar' && (
               <VerificarMovimientos
-                fecha={hoyLima()}
+                fecha={fechaTurno}
+                diaAnterior={fechaTurno < hoyLima()}
                 cajero={cajeroNombre}
                 resumen={
                   esperado
@@ -1484,6 +1500,7 @@ export function CierreView() {
                     errorLista={errorPendientes}
                     alReintentar={cargarTurno}
                     foco={foco}
+                    fechaCaja={fechaTurno}
                   />
                 }
                 onContinuar={() => setFaseCierre('arqueo')}

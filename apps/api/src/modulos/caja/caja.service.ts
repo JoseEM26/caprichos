@@ -15,6 +15,8 @@ import {
   enPesos,
   errorCajaAnteriorAbierta,
   esCentimosValidos,
+  mapearCobrosCaja,
+  mapearMovimientosCaja,
 } from './caja.calculo';
 import { AbrirCajaDto } from './dto/abrir-caja.dto';
 import { CrearMovimientoDto } from './dto/movimiento.dto';
@@ -224,16 +226,7 @@ export class CajaService {
       },
       abierta: caja.estado === 'ABIERTA',
       // Pedidos cobrados en esta caja (sin montos esperados): los ve cualquier rol que abre la caja
-      cobrados: caja.cobros
-        .filter((c) => !c.anulado_en)
-        .map((c) => ({
-          pedidoId: c.pedido_id.toString(),
-          codigo: c.pedido.codigo,
-          cliente: c.pedido.cliente_nombre,
-          total: enPesos(aCentimos(c.total)),
-          medios: c.pagos.map((p) => (p.medio || '').toUpperCase()),
-          en: c.en,
-        })),
+      cobrados: mapearCobrosCaja(caja.cobros),
     };
 
     if (usuario?.rol !== 'ADMIN') {
@@ -410,15 +403,7 @@ export class CajaService {
       orderBy: { id: 'asc' },
     });
 
-    return movimientos.map((m) => ({
-      id: m.id.toString(),
-      caja_id: m.caja_id.toString(),
-      tipo: m.tipo,
-      monto: Number(m.monto),
-      motivo: m.motivo,
-      anulado_en: m.anulado_en,
-      motivo_anulacion: m.motivo_anulacion,
-    }));
+    return mapearMovimientosCaja(movimientos);
   }
 
   /**

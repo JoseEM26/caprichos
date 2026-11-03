@@ -1,5 +1,5 @@
 import { api } from '../../comun/api';
-import type { CobrarDto } from '../pedidos/pedidosApi';
+import type { CobrarDto, CobroTurno, MovimientoCaja } from '../pedidos/pedidosApi';
 import { marcarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
 
 /** Si el servidor aceptó un código, la autorización queda vigente 5 min. */
@@ -81,7 +81,11 @@ export interface CierreCajaRespuesta {
 
 export interface MontosEsperados {
   cajaId: number;
+  /** Fecha de la caja ABIERTA que se cierra (puede ser de un día anterior) */
   fecha: string;
+  /** Cobros y movimientos de esa misma caja: los mismos que suman los montos de abajo */
+  cobrados: CobroTurno[];
+  movimientos: MovimientoCaja[];
   apertura: number;
   efectivoEsperado: number;
   medios: {
