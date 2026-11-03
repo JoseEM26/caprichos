@@ -49,6 +49,15 @@ input, select, textarea {
   color: var(--cp-navy);
 }
 
+/* Celulares: con menos de 16 px el navegador (iPhone sobre todo) hace zoom al tocar un campo y la pantalla se corre */
+@media (max-width: 768px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 @keyframes cp-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
