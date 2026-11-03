@@ -499,6 +499,8 @@ export class PedidosService {
       canal: canalPedido,
       cuponCodigo: dto.cuponCodigo,
       clientePartyId: clienteFinal,
+      // Solo la carta con sesión iniciada (no WhatsApp, mozo ni celular suelto)
+      clienteConSesion: canalPedido === 'CARTA' && !!origen?.clientePartyId,
     });
 
     const descuentoAplicado = desgloseDescuento.descuentoTotal;

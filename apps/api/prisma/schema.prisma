@@ -1301,6 +1301,10 @@ model Oferta {
   activo               Boolean        @default(false)
   creado_en            DateTime       @default(now()) @db.Timestamptz
   imagen_archivo_id    BigInt?
+  // Se muestra en el saludo del chat de WhatsApp (solo una, la de menor orden, vigente hoy)
+  mostrar_en_saludo_bot Boolean       @default(false)
+  // Solo clientes con sesión iniciada en la carta cuyo celular nunca tuvo un pedido válido (no anulado)
+  solo_primera_compra  Boolean        @default(false)
 
   categoria            Categoria?     @relation(fields: [alcance_categoria_id], references: [id])
   producto             Producto?      @relation(fields: [alcance_producto_id], references: [id])

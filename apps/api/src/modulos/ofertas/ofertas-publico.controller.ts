@@ -1,10 +1,14 @@
 import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { OfertasService } from './ofertas.service';
 import { ValidarCuponDto } from './dto/validar-cupon.dto';
+import { ClientesService } from '../clientes/clientes.service';
 
 @Controller('carta')
 export class OfertasPublicoController {
-  constructor(private readonly ofertasService: OfertasService) {}
+  constructor(
+    private readonly ofertasService: OfertasService,
+    private readonly clientesService: ClientesService,
+  ) {}
 
   @Get('ofertas')
   async listarOfertasCarta() {
@@ -19,8 +23,11 @@ export class OfertasPublicoController {
       lineas: { productoId: string; cantidad: number; subtotal: number; precioUnitario: number }[];
       cuponCodigo?: string;
     },
+    @Req() req: any,
   ) {
-    return this.ofertasService.vistaPreviaDescuentos(dto?.lineas ?? [], dto?.cuponCodigo);
+    // Con sesión iniciada en la carta, la vista previa incluye la primera compra igual que al crear el pedido
+    const cliente = await this.clientesService.clienteDesdeRequest(req).catch(() => null);
+    return this.ofertasService.vistaPreviaDescuentos(dto?.lineas ?? [], dto?.cuponCodigo, cliente?.partyId ?? null);
   }
 
   @Post('cupon/validar')
