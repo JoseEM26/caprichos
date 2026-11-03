@@ -102,6 +102,25 @@ describe('Ventana24hService', () => {
     expect(mockMensajeria.enviarTexto).not.toHaveBeenCalled();
   });
 
+  it('CODIGO_CUENTA fuera de la ventana: pasa el código también como botonCodigo', async () => {
+    mockPrisma.whatsappMensaje.findFirst.mockResolvedValue(null); // Ventana cerrada
+    mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue({ acepta: true });
+
+    await servicio.enviarMensajeNegocio('987654321', {
+      textoLibre: 'Tu código es 482913',
+      plantillaClave: 'CODIGO_CUENTA',
+      variablesPlantilla: ['482913'],
+    });
+
+    expect(mockMensajeria.enviarPlantilla).toHaveBeenCalledWith(
+      '987654321',
+      'caprichos_codigo_cuenta',
+      'es',
+      ['482913'],
+      { botonCodigo: '482913' },
+    );
+  });
+
   it('si la plantilla no existe en el catálogo, registra fallo y avisa a Caja por la campana', async () => {
     mockPrisma.whatsappMensaje.findFirst.mockResolvedValue(null); // Ventana cerrada
     mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue({ acepta: true });

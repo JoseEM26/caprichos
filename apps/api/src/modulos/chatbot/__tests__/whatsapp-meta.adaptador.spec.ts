@@ -719,3 +719,78 @@ describe('WhatsAppMetaAdaptador: carrusel con media ids', () => {
     expect(c.tarjetas.map((t: any) => t.via)).toEqual(['id', 'link']);
   });
 });
+
+describe('WhatsAppMetaAdaptador: plantilla con botón copiar código', () => {
+  let adaptador: WhatsAppMetaAdaptador;
+  let originalFetch: typeof global.fetch;
+  let envios: any[];
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    envios = [];
+    global.fetch = jest.fn().mockImplementation((_url: string, init: any) => {
+      envios.push(JSON.parse(init.body));
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        text: jest.fn().mockResolvedValue(JSON.stringify({ messages: [{ id: 'wamid.tmpl' }] })),
+      });
+    });
+    const config = {
+      get: jest.fn((key: string, def?: any) => {
+        if (key === 'WHATSAPP_TOKEN') return 'EAAB_test_token';
+        if (key === 'WHATSAPP_PHONE_ID') return '109876543210';
+        if (key === 'WHATSAPP_API_VERSION') return 'v20.0';
+        if (key === 'WHATSAPP_TIMEOUT_MS') return 1000;
+        return def;
+      }),
+    };
+    const prisma = {
+      whatsappMensaje: {
+        create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: BigInt(7), ...data })),
+      },
+    };
+    adaptador = new WhatsAppMetaAdaptador(config as any, prisma as any);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.clearAllMocks();
+  });
+
+  it('CODIGO_CUENTA: el código va en el cuerpo y en el botón url index 0', async () => {
+    const r = await adaptador.enviarPlantilla(
+      '51987654321',
+      'caprichos_codigo_cuenta',
+      'es',
+      ['482913'],
+      { botonCodigo: '482913' },
+    );
+
+    expect(r.exito).toBe(true);
+    expect(envios[0].template.components).toEqual([
+      { type: 'body', parameters: [{ type: 'text', text: '482913' }] },
+      {
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: '482913' }],
+      },
+    ]);
+  });
+
+  it('sin botonCodigo: solo el componente body (otras plantillas no cambian)', async () => {
+    await adaptador.enviarPlantilla('51987654321', 'caprichos_delivery_en_camino', 'es', ['Juan', 'CP-1', '25']);
+
+    expect(envios[0].template.components).toEqual([
+      {
+        type: 'body',
+        parameters: [
+          { type: 'text', text: 'Juan' },
+          { type: 'text', text: 'CP-1' },
+          { type: 'text', text: '25' },
+        ],
+      },
+    ]);
+  });
+});

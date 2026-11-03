@@ -10,7 +10,7 @@ import {
   WHATSAPP_MENSAJERIA_PUERTO,
   WhatsAppMensajeriaPuerto,
 } from '../puerto/whatsapp-mensajeria.puerto';
-import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
+import { botonCodigoDe, CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { enmascararTelefono } from '../utilidades/enmascarar.util';
 import { PayloadMensajeNegocio, Ventana24hService } from './ventana-24h.service';
 import { enviarCarruselConRespaldo, resumenCarrusel } from './carrusel.util';
@@ -340,12 +340,13 @@ export class OutboxWhatsappService {
         errorDetalle: `No existe plantilla configurada para la clave '${String(carga.plantillaClave)}'`,
       };
     }
+    const botonCodigo = botonCodigoDe(definicion, carga.variablesPlantilla);
     return this.mensajeria.enviarPlantilla(
       fila.telefono_destino,
       definicion.nombre,
       definicion.idioma,
       carga.variablesPlantilla,
-      opciones,
+      botonCodigo ? { ...opciones, botonCodigo } : opciones,
     );
   }
 

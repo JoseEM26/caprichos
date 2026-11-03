@@ -5,6 +5,18 @@ export interface DefinicionPlantilla {
   texto: string;
   variables: string[];
   descripcion: string;
+  /** Plantilla con botón «copiar código»: la primera variable se manda también en el botón. */
+  botonCodigo?: boolean;
+}
+
+/** Código del botón «copiar código» (la primera variable), si la plantilla lo lleva. */
+export function botonCodigoDe(
+  definicion: DefinicionPlantilla,
+  variables?: Record<string, string> | string[],
+): string | undefined {
+  if (!definicion.botonCodigo || !variables) return undefined;
+  const primera = Array.isArray(variables) ? variables[0] : Object.values(variables)[0];
+  return primera === undefined ? undefined : String(primera);
 }
 
 export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
@@ -13,8 +25,10 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     categoria: 'AUTHENTICATION',
     idioma: 'es',
     variables: ['codigo'],
+    botonCodigo: true,
+    // Solo referencia para el modo simulado: el texto real lo fija Meta.
     texto: 'Tu código de Caprichos es {{1}}. Vence en 10 minutos. Si no lo pediste, ignora este mensaje.',
-    descripcion: 'Código de 6 dígitos para recuperar la contraseña de la cuenta del cliente. Fuera de la ventana de 24 h Meta debe tenerla aprobada: se registra en Meta como categoría AUTHENTICATION (texto y botón «copiar código» según el formato que exige Meta) y debe quedar APROBADA antes de usarla.',
+    descripcion: 'Código de 6 dígitos para crear la cuenta y recuperar la contraseña del cliente. Se registra en Meta como plantilla de categoría AUTHENTICATION con botón «Copiar código»; el texto lo fija Meta (en español, «{{1}} es tu código de verificación...») y el envío lleva el código en el cuerpo y en el botón. Debe quedar APROBADA antes de usarla.',
   },
   DELIVERY_SALIDA: {
     nombre: 'caprichos_delivery_en_camino',
