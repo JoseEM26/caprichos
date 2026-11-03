@@ -1,91 +1,60 @@
-import { IconoLapiz } from './ModalEditarNombre';
 import { InsigniaBloqueoSpam } from './BloqueoSpam';
 import { DetalleConversacion } from './mensajesTipos';
+import { MenuChat, MenuChatProps } from './MenuChat';
 import { ESTADOS_BG, ESTADOS_LABEL, esUsuarioWhatsApp, obtenerColorAvatar, obtenerIniciales } from './utilidadesChat';
 
 export interface CabeceraChatProps {
   detalle: DetalleConversacion;
   puedeDesbloquear: boolean;
   onVolver: () => void;
-  onEditarNombre: () => void;
+  onAbrirDetalles: () => void;
   onDesbloquear: () => void;
+  acciones: Omit<MenuChatProps, 'detalle'>;
 }
 
-/** Cabecera de la conversación: volver (móvil), nombre, teléfono, estado y spam. */
-export function CabeceraChat({ detalle, puedeDesbloquear, onVolver, onEditarNombre, onDesbloquear }: CabeceraChatProps) {
+/** Cabecera de una línea: nombre, teléfono, 2-3 chips de estado y el menú «⋯» con lo secundario. */
+export function CabeceraChat({ detalle, puedeDesbloquear, onVolver, onAbrirDetalles, onDesbloquear, acciones }: CabeceraChatProps) {
+  const etiqueta = detalle.urgente ? `Urgente · ${ESTADOS_LABEL[detalle.estado]}` : ESTADOS_LABEL[detalle.estado];
+  const textoDueno = detalle.dueno ? (detalle.esMio ? 'Lo atiendes tú' : `Lo atiende ${detalle.dueno}`) : 'Chat libre';
+
   return (
-    <div className="cv-chead">
-      <button className="cv-back" aria-label="Volver a la lista de chats" onClick={onVolver}>
-        ←
+    <header className="msg-chead">
+      <button type="button" className="msg-atras" aria-label="Volver a la lista de chats" onClick={onVolver}>
+        ← Atrás
       </button>
-      <span className="cv-av" style={{ background: obtenerColorAvatar(detalle.id) }}>
+      <span className="msg-av" aria-hidden="true" style={{ background: obtenerColorAvatar(detalle.id) }}>
         {obtenerIniciales(detalle.nombre)}
       </span>
-      <span className="cv-hb">
-        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <b className="cv-hn">{detalle.nombre}</b>
-          {esUsuarioWhatsApp(detalle) && (
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: '12px',
-                background: '#E0F2FE',
-                color: '#0369A1',
-                border: '1px solid #BAE6FD',
-              }}
-            >
-              Usuario de WhatsApp
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={onEditarNombre}
-            title="Editar nombre"
-            aria-label="Editar nombre"
-            style={{
-              background: '#FFFFFF',
-              border: '1px solid var(--cp-line, #CBD5E1)',
-              borderRadius: '6px',
-              padding: '2px 8px',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: 'var(--cp-navy, #0B2C3E)',
-            }}
-          >
-            <IconoLapiz tamano={13} />
-            <span>Editar nombre</span>
-          </button>
-        </span>
-        <span className="cv-hs">
+      <div className="msg-chead-id">
+        <h2 className="msg-chead-nombre" title={detalle.nombre}>
+          {detalle.nombre}
+        </h2>
+        <span className="msg-chead-tel">
           {esUsuarioWhatsApp(detalle) ? 'Usuario de WhatsApp' : detalle.telefono}
           {detalle.modalidad ? ` · ${detalle.modalidad}` : ''}
         </span>
-      </span>
-      <span
-        className="cv-pill"
-        style={{
-          background: detalle.urgente ? '#F8C9C9' : ESTADOS_BG[detalle.estado] || '#F0F2F5',
-        }}
-      >
-        {detalle.urgente ? `URGENTE · ${ESTADOS_LABEL[detalle.estado]}` : ESTADOS_LABEL[detalle.estado]}
-      </span>
-      <InsigniaBloqueoSpam bloqueo={detalle.bloqueoSpam} id={`detalle-${detalle.id}`} />
-      {detalle.bloqueoSpam?.activo && puedeDesbloquear && (
-        <button
-          type="button"
-          data-testid="btn-desbloquear-spam"
-          onClick={onDesbloquear}
-          style={{ minHeight: 44, padding: '0 14px', borderRadius: 8, border: '1px solid #B45309', background: '#FFFFFF', color: '#B45309', fontWeight: 700, cursor: 'pointer' }}
-        >
-          Desbloquear
-        </button>
-      )}
-    </div>
+      </div>
+      <div className="msg-chead-chips">
+        <span className="msg-chip" style={{ background: detalle.urgente ? '#F8C9C9' : ESTADOS_BG[detalle.estado] || '#EEF2F4' }}>
+          {etiqueta}
+        </span>
+        <span className="msg-chip">{textoDueno}</span>
+        <InsigniaBloqueoSpam bloqueo={detalle.bloqueoSpam} id={`detalle-${detalle.id}`} />
+        {detalle.bloqueoSpam?.activo && puedeDesbloquear && (
+          <button
+            type="button"
+            className="msg-btn msg-btn-desbloqueo"
+            data-testid="btn-desbloquear-spam"
+            onClick={onDesbloquear}
+          >
+            Desbloquear
+          </button>
+        )}
+      </div>
+      <button type="button" className="msg-btn msg-detalles" onClick={onAbrirDetalles} aria-label="Ver pedido y acciones">
+        Detalles
+      </button>
+      <MenuChat detalle={detalle} {...acciones} />
+    </header>
   );
 }

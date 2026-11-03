@@ -7,6 +7,7 @@ export interface CuadroEscribirProps {
   onCambiarTexto: (texto: string) => void;
   textoPulido: string | null;
   pulirError: string | null;
+  mensajeCopiado: string | null;
   enviando: boolean;
   onElegirRapida: (texto: string) => void;
   onPulir: () => void;
@@ -15,7 +16,7 @@ export interface CuadroEscribirProps {
   onEnviar: () => void;
 }
 
-/** Respuestas rápidas, vista previa de «Pulir», y el cuadro para escribir al cliente. */
+/** Cuadro para escribir, siempre abajo: respuestas rápidas, «Pulir» y enviar. */
 export function CuadroEscribir({
   detalle,
   respuestasRapidas,
@@ -23,6 +24,7 @@ export function CuadroEscribir({
   onCambiarTexto,
   textoPulido,
   pulirError,
+  mensajeCopiado,
   enviando,
   onElegirRapida,
   onPulir,
@@ -30,31 +32,34 @@ export function CuadroEscribir({
   onDejarPulido,
   onEnviar,
 }: CuadroEscribirProps) {
+  const sinIdentificador = !detalle.telefono || !detalle.telefono.trim();
   return (
-    <>
-      {/* Respuestas rápidas */}
-      <div className="cv-quick">
-        {respuestasRapidas.map((q) => (
-          <button key={q.id} className="cv-qb" onClick={() => onElegirRapida(q.texto)}>
-            {q.titulo}
-          </button>
-        ))}
-      </div>
+    <div className="msg-componer">
+      {mensajeCopiado && (
+        <div className="msg-copiado" role="status">
+          {mensajeCopiado}
+        </div>
+      )}
 
-      {/* Vista previa de Pulir Mensaje */}
+      {respuestasRapidas.length > 0 && (
+        <div className="msg-rapidas" aria-label="Respuestas rápidas">
+          {respuestasRapidas.map((q) => (
+            <button key={q.id} type="button" className="msg-rapida" onClick={() => onElegirRapida(q.texto)}>
+              {q.titulo}
+            </button>
+          ))}
+        </div>
+      )}
+
       {textoPulido && (
-        <div className="cv-pol" role="status">
-          <div className="cv-pollbl">Así quedaría tu mensaje, más amable y bien escrito:</div>
-          <div className="cv-polx">{textoPulido}</div>
-          <div className="cv-polb">
-            <button className="cv-ok" style={{ minHeight: '44px' }} onClick={() => onUsarPulido(textoPulido)}>
+        <div className="msg-pulir" role="status">
+          <div className="msg-pulir-etiqueta">Así quedaría tu mensaje, más amable y bien escrito:</div>
+          <div className="msg-pulir-texto">{textoPulido}</div>
+          <div className="msg-pulir-botones">
+            <button type="button" className="msg-ok" onClick={() => onUsarPulido(textoPulido)}>
               Usar este texto
             </button>
-            <button
-              className="cv-no"
-              style={{ minHeight: '44px', borderColor: '#54656F', color: '#54656F' }}
-              onClick={onDejarPulido}
-            >
+            <button type="button" className="msg-no" onClick={onDejarPulido}>
               Dejar el mío
             </button>
           </div>
@@ -62,30 +67,17 @@ export function CuadroEscribir({
       )}
 
       {pulirError && (
-        <div role="status" style={{ padding: '0 14px 4px', fontSize: '12px', fontWeight: 700, color: '#C0392B' }}>
+        <div role="status" className="msg-error">
           {pulirError}
         </div>
       )}
 
-      {/* Compositor de mensaje */}
-      {!detalle.telefono || !detalle.telefono.trim() ? (
-        <div
-          role="alert"
-          style={{
-            padding: '12px 16px',
-            margin: '8px 14px',
-            borderRadius: '10px',
-            background: 'var(--cp-sand, #F8FAFC)',
-            color: 'var(--cp-navy, #0B2C3E)',
-            fontSize: '13px',
-            fontWeight: 600,
-            border: '1px solid var(--cp-line, #CBD5E1)',
-          }}
-        >
+      {sinIdentificador ? (
+        <div role="alert" className="msg-panel-nota" style={{ padding: '12px 14px', margin: 12, borderRadius: 10, background: '#F1F4F6', color: '#1B2A33', fontWeight: 600 }}>
           Este contacto no tiene ningun identificador: no se puede responder
         </div>
       ) : (
-        <div className="cv-comp">
+        <div className="msg-escribir">
           <input
             type="text"
             placeholder="Escribe un mensaje"
@@ -98,7 +90,8 @@ export function CuadroEscribir({
             }}
           />
           <button
-            className="cv-polbtn"
+            type="button"
+            className="msg-pulir-btn"
             aria-label="Pulir el mensaje para que sea más amable"
             disabled={detalle.ocupado}
             onClick={onPulir}
@@ -106,17 +99,18 @@ export function CuadroEscribir({
             Pulir
           </button>
           <button
-            className="cv-send"
+            type="button"
+            className="msg-enviar"
             aria-label="Enviar mensaje"
             disabled={detalle.ocupado || enviando}
             onClick={() => onEnviar()}
           >
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-              <path d="M3 20l18-8L3 4v6l11 2-11 2z" fill="#fff" />
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+              <path d="M3 20l18-8L3 4v6l11 2-11 2z" fill="#FFFFFF" />
             </svg>
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 }

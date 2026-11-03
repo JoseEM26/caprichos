@@ -21,14 +21,6 @@ export const ESTADOS_LABEL: Record<EstadoChat, string> = {
   atendido: 'Atendido',
 };
 
-export const BANNERS_TEXTO: Record<EstadoChat, [string, string]> = {
-  atencion: ['Este cliente pidió hablar con una persona. El bot ya no responde: contesta tú.', '#FFF1C9'],
-  validar: ['Revisa el comprobante y aprueba o rechaza el pago. El bot espera tu decisión.', '#FFF1C9'],
-  bot: ['El bot está atendiendo solo. Entra únicamente si hace falta.', '#E7F5EE'],
-  pausado: ['El bot está en pausa en este chat: solo respondes tú.', '#F0F2F5'],
-  atendido: ['Chat atendido. Si el cliente escribe de nuevo, vuelve a la lista de pendientes.', '#E7F5EE'],
-};
-
 const COLORES_AVATAR = ['#B5651D', '#6B4E9B', '#2E7D32', '#AD4A4A', '#1F7A8C', '#D97706'];
 
 export const obtenerColorAvatar = (id: string) => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { InsigniaBloqueoSpam } from './BloqueoSpam';
-import { ChatResumen, FiltroChat, RespuestaListarChats } from './mensajesTipos';
+import { ChatResumen, EstadoChat, FiltroChat, RespuestaListarChats } from './mensajesTipos';
 import {
   ESTADOS_BG,
   ESTADOS_LABEL,
@@ -26,7 +26,13 @@ export interface ListaChatsProps {
   onSeleccionar: (id: string) => void;
 }
 
-/** Columna izquierda: buscador, pestañas y filas de chats. */
+/** Texto del chip de estado. Un chat «atencion» es uno que pidió hablar con una persona (derivado). */
+function etiquetaEstado(estado: EstadoChat, urgente: boolean): string {
+  const base = estado === 'atencion' ? 'Derivado a asesor' : estado === 'validar' ? 'Voucher por revisar' : ESTADOS_LABEL[estado];
+  return urgente ? `Urgente · ${base}` : base;
+}
+
+/** Columna izquierda: buscador, filtros y una fila compacta por chat. */
 export function ListaChats({
   controles,
   conteos,
@@ -41,17 +47,18 @@ export function ListaChats({
   chatSeleccionadoId,
   onSeleccionar,
 }: ListaChatsProps) {
+  const pendientes = conteos.atender;
   return (
-    <div className="cv-list">
-      <div className="cv-lhead">
-        <span className="cv-title">Chats</span>
-        <span className="cv-sub">
-          {conteos.atender === 0 ? 'Todo al día' : `${conteos.atender} por atender`}
-        </span>
-        {controles}
+    <aside className="msg-lista" aria-label="Lista de chats">
+      <div className="msg-lhead">
+        <div className="msg-lhead-fila">
+          <h2 className="msg-title">Chats</h2>
+          {controles}
+        </div>
+        <span className="msg-sub">{pendientes === 0 ? 'Todo al día' : `${pendientes} por atender`}</span>
       </div>
 
-      <div className="cv-search">
+      <div className="msg-buscar">
         <input
           type="text"
           placeholder="Buscar un chat o un celular"
@@ -61,33 +68,40 @@ export function ListaChats({
         />
       </div>
 
-      <div className="cv-tabs">
+      <div className="msg-tabs">
         {[
           { id: 'todos', label: 'Todos', count: conteos.todos },
           { id: 'atender', label: 'Por atender', count: conteos.atender },
           { id: 'bot', label: 'Con el bot', count: conteos.bot },
           { id: 'atendidos', label: 'Atendidos', count: conteos.atendidos },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            className="cv-tab"
-            style={{
-              background: filtro === tab.id ? '#D9FDD3' : '#F0F2F5',
-              color: filtro === tab.id ? '#005C4B' : '#54656F',
-            }}
-            onClick={() => onFiltro(tab.id as FiltroChat)}
-          >
-            {tab.label} <b>{tab.count}</b>
-          </button>
-        ))}
+        ].map((tab) => {
+          const activa = filtro === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className="msg-tab"
+              aria-pressed={activa}
+              style={{
+                background: activa ? '#D9FDD3' : '#FFFFFF',
+                color: activa ? '#00402F' : '#33434B',
+                borderColor: activa ? '#00594A' : '#C9D2D8',
+              }}
+              onClick={() => onFiltro(tab.id as FiltroChat)}
+            >
+              {tab.label} <b>{tab.count}</b>
+            </button>
+          );
+        })}
         {((conteos.bloqueadosSpam ?? 0) > 0 || soloBloqueados) && (
           <button
-            className="cv-tab"
+            type="button"
+            className="msg-tab"
             aria-pressed={soloBloqueados}
             data-testid="filtro-bloqueados-spam"
             style={{
-              background: soloBloqueados ? '#FFE0A3' : '#F0F2F5',
-              color: soloBloqueados ? '#7A4A00' : '#54656F',
+              background: soloBloqueados ? '#FFE0A3' : '#FFFFFF',
+              color: soloBloqueados ? '#5C3700' : '#33434B',
             }}
             onClick={onToggleSoloBloqueados}
           >
@@ -96,114 +110,77 @@ export function ListaChats({
         )}
       </div>
 
-      <div className="cv-rows">
-        {cargando ? (
-          <div className="cv-empty">Cargando conversaciones...</div>
-        ) : chats.length === 0 ? (
-          <div className="cv-empty">No hay conversaciones en esta pestaña.</div>
-        ) : (
-          chats.map((c) => {
+      {cargando ? (
+        <div className="msg-vacio">Cargando conversaciones...</div>
+      ) : chats.length === 0 ? (
+        <div className="msg-vacio">No hay conversaciones en esta pestaña.</div>
+      ) : (
+        <ul className="msg-filas" aria-label="Conversaciones">
+          {chats.map((c) => {
             const seleccionado = c.id === chatSeleccionadoId;
-            const tieneSinLeer = c.sinLeer > 0;
+            const espera = typeof c.esperaMin === 'number' ? obtenerEstiloEspera(c.esperaMin) : null;
             return (
-              <button
-                key={c.id}
-                className="cv-row"
-                style={{
-                  background: seleccionado ? '#F0F2F5' : '#FFFFFF',
-                }}
-                onClick={() => onSeleccionar(c.id)}
-              >
-                <span className="cv-av" style={{ background: obtenerColorAvatar(c.id) }}>
-                  {obtenerIniciales(c.nombre)}
-                </span>
-                <span className="cv-rb">
-                  <span className="cv-r1">
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                      <b className="cv-rn">{c.nombre}</b>
+              <li key={c.id}>
+                <button
+                  type="button"
+                  className="msg-fila"
+                  aria-current={seleccionado ? 'true' : undefined}
+                  onClick={() => onSeleccionar(c.id)}
+                >
+                  <span className="msg-av" aria-hidden="true" style={{ background: obtenerColorAvatar(c.id) }}>
+                    {obtenerIniciales(c.nombre)}
+                  </span>
+                  <span className="msg-fila-cuerpo">
+                    <span className="msg-fila-l1">
+                      <span className="msg-nombre">{c.nombre}</span>
+                      <span className={c.sinLeer > 0 ? 'msg-hora msg-hora-nueva' : 'msg-hora'}>{c.hora}</span>
+                    </span>
+                    <span className="msg-fila-l2">
+                      <span className="msg-vista" title={c.ultimo}>
+                        {c.ultimo}
+                      </span>
+                      {c.sinLeer > 0 && <span className="msg-sin-leer">{c.sinLeer}</span>}
+                    </span>
+                    <span className="msg-chips">
+                      <span
+                        className="msg-chip"
+                        style={{ background: c.urgente ? '#F8C9C9' : ESTADOS_BG[c.estado] || '#EEF2F4' }}
+                      >
+                        {etiquetaEstado(c.estado, c.urgente)}
+                      </span>
                       {esUsuarioWhatsApp(c) && (
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            padding: '1px 6px',
-                            borderRadius: '10px',
-                            background: '#E0F2FE',
-                            color: '#0369A1',
-                            border: '1px solid #BAE6FD',
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                          }}
-                        >
+                        <span className="msg-chip" style={{ background: '#E0F2FE', borderColor: '#BAE6FD', color: '#0C4A6E' }}>
                           Usuario de WhatsApp
                         </span>
                       )}
-                    </span>
-                    <span
-                      className="cv-rt"
-                      style={{ color: tieneSinLeer ? '#00A884' : '#667781' }}
-                    >
-                      {c.hora}
+                      <InsigniaBloqueoSpam bloqueo={c.bloqueoSpam} id={c.id} />
+                      {typeof c.sinRespuestaMin === 'number' && c.sinRespuestaMin >= SIN_RESPUESTA_MIN_VISIBLE && (
+                        <span
+                          data-testid={`sin-respuesta-${c.id}`}
+                          className="msg-chip"
+                          style={{ background: '#A3261A', borderColor: '#A3261A', color: '#FFFFFF' }}
+                        >
+                          Sin respuesta hace {c.sinRespuestaMin} min
+                        </span>
+                      )}
+                      {espera && (
+                        <span
+                          data-testid={`espera-badge-${c.id}`}
+                          className="msg-chip cv-espera-badge"
+                          style={{ background: espera.fondo, border: espera.borde, color: espera.color }}
+                          title={`Tiempo de espera: ${c.esperaMin} minutos`}
+                        >
+                          Espera: {c.esperaMin} min
+                        </span>
+                      )}
                     </span>
                   </span>
-                  <span className="cv-r2">
-                    <span className="cv-last">{c.ultimo}</span>
-                    {tieneSinLeer && <span className="cv-badge">{c.sinLeer}</span>}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <span
-                      className="cv-pill"
-                      style={{
-                        background: c.urgente ? '#F8C9C9' : ESTADOS_BG[c.estado] || '#F0F2F5',
-                      }}
-                    >
-                      {c.urgente ? `URGENTE · ${ESTADOS_LABEL[c.estado]}` : ESTADOS_LABEL[c.estado]}
-                    </span>
-                    <InsigniaBloqueoSpam bloqueo={c.bloqueoSpam} id={c.id} />
-                    {typeof c.sinRespuestaMin === 'number' && c.sinRespuestaMin >= SIN_RESPUESTA_MIN_VISIBLE && (
-                      <span
-                        data-testid={`sin-respuesta-${c.id}`}
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '10px',
-                          background: '#C0392B',
-                          color: '#fff',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        Sin respuesta hace {c.sinRespuestaMin} min
-                      </span>
-                    )}
-                    {c.esperaMin !== undefined && c.esperaMin !== null && (
-                      <span
-                        data-testid={`espera-badge-${c.id}`}
-                        className="cv-espera-badge"
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '10px',
-                          background: obtenerEstiloEspera(c.esperaMin).fondo,
-                          border: obtenerEstiloEspera(c.esperaMin).borde,
-                          color: obtenerEstiloEspera(c.esperaMin).color,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          whiteSpace: 'nowrap',
-                        }}
-                        title={`Tiempo de espera: ${c.esperaMin} minutos`}
-                      >
-                        Espera: {c.esperaMin} min
-                      </span>
-                    )}
-                  </div>
-                </span>
-              </button>
+                </button>
+              </li>
             );
-          })
-        )}
-      </div>
-    </div>
+          })}
+        </ul>
+      )}
+    </aside>
   );
 }

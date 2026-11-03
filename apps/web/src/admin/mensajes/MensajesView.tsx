@@ -31,13 +31,14 @@ import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { ListaChats } from './ListaChats';
 import { CabeceraChat } from './CabeceraChat';
-import { AvisosChat } from './AvisosChat';
 import { FlujoMensajes } from './FlujoMensajes';
+import { BarraAccionPendiente } from './BarraAccionPendiente';
 import { PanelPedido } from './PanelPedido';
 import { CuadroEscribir } from './CuadroEscribir';
-import { MasAcciones } from './MasAcciones';
 import { ModalRechazoCambio } from './ModalRechazoCambio';
+import { eventosDelChat } from './EventoSistema';
 import { esUsuarioWhatsApp, telefonoDeUrl } from './utilidadesChat';
+import './mensajes.css';
 
 export { obtenerEstiloEspera, SIN_RESPUESTA_MIN_VISIBLE } from './utilidadesChat';
 
@@ -86,6 +87,10 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
 
   // Pantalla completa y zoom
   const [pantallaCompleta, setPantallaCompleta] = useState(false);
+  // Panel «Pedido y acciones»: abierto en pantallas anchas; en celular sale como hoja inferior
+  const [panelAbierto, setPanelAbierto] = useState<boolean>(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 1200px)').matches,
+  );
   const [zoom, setZoom] = useState(85);
 
   // Redacción de mensaje
@@ -558,127 +563,44 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     setPantallaCompleta((prev) => !prev);
   };
 
-  return (
-    <div className="cv-root" data-fs={pantallaCompleta ? '1' : '0'}>
-      <style>{`
-        .cv-wrap{display:grid;grid-template-columns:minmax(270px,350px) 1fr;height:calc((100vh - 200px) / var(--cvz,1));min-height:340px;border:1px solid #D1D7DB;border-radius:14px;overflow:hidden;background:#fff;color:#111B21}
-        .cv-list{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid #E9EDEF;background:#fff}
-        .cv-lhead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 12px 2px;background:#fff}
-        .cv-root[data-fs="1"]{position:fixed;inset:0;z-index:100;background:var(--cp-cream);padding:8px;box-sizing:border-box;display:flex;flex-direction:column}
-        .cv-root[data-fs="1"] .cv-wrap{height:calc((100vh - 70px) / var(--cvz,1)) !important}
-        .cv-title{font-family:Montserrat,sans-serif;font-weight:800;font-size:17px}
-        .cv-sub{font-size:12px;color:#667781}
-        .cv-search{padding:6px 12px}
-        .cv-search input{width:100%;box-sizing:border-box;min-height:44px;border-radius:10px;border:0;background:#F0F2F5;padding:0 14px;font-size:14px;color:#111B21}
-        .cv-tabs{display:flex;gap:6px;padding:4px 12px 8px;overflow-x:auto}
-        .cv-tab{flex:none;min-height:44px;padding:0 12px;border:0;border-radius:9999px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
-        .cv-rows{flex:1;min-height:0;overflow-y:auto}
-        .cv-row{display:flex;gap:10px;width:100%;text-align:left;border:0;border-bottom:1px solid #F0F2F5;padding:6px 12px;cursor:pointer;font-family:inherit;color:#111B21;min-height:56px}
-        .cv-av{flex:none;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px}
-        .cv-rb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-        .cv-r1,.cv-r2{display:flex;justify-content:space-between;align-items:center;gap:8px}
-        .cv-rn{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .cv-rt{flex:none;font-size:12px}
-        .cv-last{font-size:13px;color:#667781;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .cv-badge{flex:none;min-width:20px;height:20px;border-radius:10px;background:#25D366;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;box-sizing:border-box}
-        .cv-pill{align-self:flex-start;padding:1px 10px;border-radius:9999px;font-size:12px;font-weight:700;color:#111B21;white-space:nowrap}
-        .cv-empty{padding:24px 16px;text-align:center;font-size:13px;color:#667781}
-        .cv-chat{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:#EFEAE2}
-        .cv-panels{flex:0 1 auto;max-height:34%;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-top:6px}
-        .cv-chat>*{flex-shrink:0}
-        .cv-chat>.cv-msgs,.cv-chat>.cv-panels{flex-shrink:1}
-        .cv-chead{display:flex;align-items:center;gap:8px;padding:5px 12px;background:#F0F2F5;border-bottom:1px solid #D1D7DB}
-        .cv-hb{flex:1;min-width:0;display:flex;flex-direction:column}
-        .cv-hn{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .cv-hs{font-size:12px;color:#667781}
-        .cv-back{display:none;flex:none;min-width:44px;min-height:44px;border:0;background:transparent;font-size:22px;color:#54656F;cursor:pointer;align-items:center;justify-content:center}
-        .cv-banner{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:4px 12px;font-size:12px;color:#111B21;border-bottom:1px solid #E9EDEF}
-        .cv-bbtn{min-height:44px;padding:0 14px;border:1.5px solid #00A884;border-radius:9999px;background:#fff;color:#008069;font-weight:700;font-size:13px;cursor:pointer}
-        .cv-owner{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:4px 12px;font-size:12px;font-weight:700;border-bottom:1px solid #E9EDEF}
-        .cv-owner button{min-height:44px;padding:0 14px;border:1.5px solid #54656F;border-radius:9999px;background:#fff;color:#111B21;font-weight:700;font-size:12px;cursor:pointer}
-        .cv-msgs{flex:1 1 0;min-height:140px;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column-reverse;gap:3px;padding:8px 4%}
-        .cv-bub{max-width:78%;border-radius:8px;padding:6px 9px 4px;box-shadow:0 1px 0.5px rgba(11,20,26,.13);font-size:14px;line-height:19px;color:#111B21}
-        .cv-who{font-size:12px;font-weight:700;margin-bottom:1px}
-        .cv-txt{white-space:pre-wrap;word-break:break-word}
-        .cv-meta{display:flex;justify-content:flex-end;align-items:center;gap:3px;font-size:11px;color:#667781;margin-top:1px}
-        .cv-ck{color:#53BDEB;font-size:12px;letter-spacing:-3px}
-        .cv-img{height:84px;border-radius:6px;background:#CFD8DC;display:flex;align-items:center;justify-content:center;color:#546E7A;font-size:13px;font-weight:700;margin-bottom:4px}
-        .cv-day{align-self:center;margin:6px 0}
-        .cv-day span{background:#fff;border-radius:8px;padding:3px 12px;font-size:12px;color:#54656F;box-shadow:0 1px 0.5px rgba(11,20,26,.13)}
-        .cv-order{margin:0 12px 6px;background:#fff;border-left:4px solid #25D366;border-radius:8px;padding:8px 12px;font-size:13px}
-        .cv-total{font-weight:800;margin-top:2px}
-        .cv-pay{margin:0 12px 6px;display:flex;flex-direction:column;gap:6px}
-        .cv-paynote{font-size:12px;font-weight:700;color:#54656F}
-        .cv-payb{display:flex;gap:8px;flex-wrap:wrap}
-        .cv-ok{flex:1 1 150px;min-height:48px;border:0;border-radius:24px;background:#00A884;color:#fff;font-weight:800;font-size:14px;cursor:pointer}
-        .cv-no{flex:1 1 150px;min-height:48px;border:1.5px solid #C0392B;border-radius:24px;background:#fff;color:#C0392B;font-weight:800;font-size:14px;cursor:pointer}
-        .cv-quick{display:flex;gap:6px;padding:4px 12px;overflow-x:auto}
-        .cv-qb{flex:none;min-height:44px;padding:0 14px;border:1px solid #D1D7DB;border-radius:9999px;background:#fff;color:#111B21;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
-        .cv-comp{display:flex;gap:8px;align-items:center;padding:6px 12px 8px;background:#F0F2F5}
-        .cv-comp input{flex:1;min-width:0;box-sizing:border-box;min-height:46px;border-radius:24px;border:0;background:#fff;padding:0 16px;font-size:15px;color:#111B21}
-        .cv-polbtn{flex:none;min-height:46px;padding:0 14px;border:1.5px solid #00A884;border-radius:24px;background:#fff;color:#008069;font-weight:700;font-size:13px;cursor:pointer}
-        .cv-send{flex:none;width:46px;height:46px;border:0;border-radius:50%;background:#00A884;display:flex;align-items:center;justify-content:center;cursor:pointer}
-        .cv-more{max-height:40%;overflow-y:auto;background:#F0F2F5;border-top:1px solid #E9EDEF;font-size:13px}
-        .cv-more summary{min-height:44px;display:flex;align-items:center;padding:0 14px;cursor:pointer;color:#54656F;font-weight:600}
-        .cv-moreb{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 8px}
-        .cv-moreb button,.cv-moreb a{min-height:44px;padding:0 14px;border:1px solid #D1D7DB;border-radius:10px;background:#fff;color:#111B21;font-weight:600;font-size:13px;display:flex;align-items:center;text-decoration:none;cursor:pointer;box-sizing:border-box}
-        .cv-pol{margin:0 12px 6px;background:#fff;border-left:4px solid #00A884;border-radius:8px;padding:8px 12px;font-size:13px;display:flex;flex-direction:column;gap:6px}
-        .cv-pollbl{font-size:12px;font-weight:700;color:#54656F}
-        .cv-polx{white-space:pre-wrap;line-height:19px}
-        .cv-polb{display:flex;gap:8px;flex-wrap:wrap}
-        .cv-zb{min-width:44px;min-height:44px;border:1.5px solid var(--cp-navy);border-radius:10px;background:var(--cp-white);color:var(--cp-navy);font-weight:800;font-size:15px;cursor:pointer}
-        @media (max-width:760px){
-          .cv-wrap{grid-template-columns:1fr;height:calc((100vh - 230px) / var(--cvz,1))}
-          .cv-wrap[data-open="0"] .cv-chat{display:none}
-          .cv-wrap[data-open="1"] .cv-list{display:none}
-          .cv-back{display:flex}
-          .cv-msgs{padding:12px 3%}
-          .cv-bub{max-width:88%}
-        }
-      `}</style>
+  const eventos = detalle ? eventosDelChat(detalle) : [];
+  const acciones = {
+    onEditarNombre: () => setModalEditarAbierto(true),
+    onTogglePausaBot: handleTogglePausaBot,
+    onTomarChat: () => handleTomarChat(false),
+    onSoltarChat: handleSoltarChat,
+    onMarcarAtendido: handleMarcarAtendido,
+    onCopiarProductos: handleCopiarProductos,
+    onCopiarCelular: handleCopiarCelular,
+  };
+  const alternarPanel = () => setPanelAbierto((v) => !v);
 
-      {/* Controles de Vista: Zoom y Pantalla completa */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: '8px',
-          flexWrap: 'wrap',
-          marginBottom: '6px',
-        }}
-      >
-        <button
-          className="cv-zb"
-          aria-pressed={pantallaCompleta}
-          style={{ padding: '0 12px', fontSize: '13px' }}
-          onClick={toggleFullscreen}
-        >
+  return (
+    <div className="msg-root" data-fs={pantallaCompleta ? '1' : '0'}>
+      {/* Controles de vista: pantalla completa y zoom (solo escritorio) */}
+      <div className="msg-barra">
+        <button className="msg-zb" aria-pressed={pantallaCompleta} style={{ padding: '0 12px', fontSize: 13 }} onClick={toggleFullscreen}>
           {pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
         </button>
-        <div role="group" aria-label="Tamaño de la vista" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>Zoom</span>
-          <button className="cv-zb" aria-label="Alejar" onClick={() => setZoom((z) => Math.max(60, z - 10))}>
+        <div role="group" aria-label="Tamaño de la vista" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#33434B' }}>Zoom</span>
+          <button className="msg-zb" aria-label="Alejar" onClick={() => setZoom((z) => Math.max(60, z - 10))}>
             −
           </button>
-          <button
-            className="cv-zb"
-            aria-label="Restablecer el tamaño"
-            style={{ minWidth: '60px' }}
-            onClick={() => setZoom(85)}
-          >
+          <button className="msg-zb" aria-label="Restablecer el tamaño" style={{ minWidth: 60 }} onClick={() => setZoom(85)}>
             {zoom}%
           </button>
-          <button className="cv-zb" aria-label="Acercar" onClick={() => setZoom((z) => Math.min(120, z + 10))}>
+          <button className="msg-zb" aria-label="Acercar" onClick={() => setZoom((z) => Math.min(120, z + 10))}>
             +
           </button>
         </div>
       </div>
 
-      {/* Contenedor Principal */}
+      {/* Tres zonas: lista | conversación | pedido y acciones. En celular, dos vistas. */}
       <div
-        className="cv-wrap"
+        className="msg-wrap"
         data-open={chatAbiertoMovil ? '1' : '0'}
+        data-panel={panelAbierto ? '1' : '0'}
         style={{ '--cvz': zoom / 100, zoom: zoom / 100 } as React.CSSProperties}
       >
         <ListaChats
@@ -699,14 +621,13 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
           }}
         />
 
-        {/* Columna Derecha: Conversación */}
-        <div className="cv-chat">
+        <section className="msg-chat" aria-label="Conversación">
           {!chatSeleccionadoId || (!detalle && cargandoDetalle) ? (
-            <div className="cv-empty" style={{ margin: 'auto' }}>
+            <div className="msg-vacio" style={{ margin: 'auto' }}>
               {cargandoDetalle ? 'Cargando conversación...' : 'Selecciona un chat para ver la conversación'}
             </div>
           ) : !detalle ? (
-            <div className="cv-empty" style={{ margin: 'auto' }}>
+            <div className="msg-vacio" style={{ margin: 'auto' }}>
               No se pudo cargar la conversación.
             </div>
           ) : (
@@ -715,30 +636,18 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 detalle={detalle}
                 puedeDesbloquear={puedeDesbloquear}
                 onVolver={() => setChatAbiertoMovil(false)}
-                onEditarNombre={() => setModalEditarAbierto(true)}
+                onAbrirDetalles={() => setPanelAbierto(true)}
                 onDesbloquear={() => setModalDesbloqueo(true)}
+                acciones={acciones}
               />
-              <AvisosChat
+              <FlujoMensajes mensajes={detalle.mensajes} eventos={eventos} onReintentar={handleReintentarMensaje} />
+              <BarraAccionPendiente
                 detalle={detalle}
                 onReabrirPlantilla={handleReabrirPlantilla}
-                onTogglePausaBot={handleTogglePausaBot}
-                onTomarChat={() => handleTomarChat(false)}
-                onSoltarChat={handleSoltarChat}
-              />
-              <FlujoMensajes
-                mensajes={detalle.mensajes}
-                voucher={detalle.voucher}
-                puedeVer={tieneVouchersVer}
-                onReintentar={handleReintentarMensaje}
-              />
-              <PanelPedido
-                detalle={detalle}
-                tieneVouchersVer={tieneVouchersVer}
-                onAplicarCambio={handleAplicarCambio}
-                onAbrirRechazarCambio={handleAbrirRechazarCambio}
                 onAprobarPago={handleAprobarPago}
                 onRechazarPago={handleRechazarPago}
-                onRecargar={cargarDetalle}
+                onAplicarCambio={handleAplicarCambio}
+                onAbrirRechazarCambio={handleAbrirRechazarCambio}
               />
               <CuadroEscribir
                 detalle={detalle}
@@ -747,6 +656,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 onCambiarTexto={setTextoMensaje}
                 textoPulido={textoPulido}
                 pulirError={pulirError}
+                mensajeCopiado={mensajeCopiado}
                 enviando={enviando}
                 onElegirRapida={setTextoMensaje}
                 onPulir={handlePulir}
@@ -758,16 +668,25 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 onDejarPulido={() => setTextoPulido(null)}
                 onEnviar={() => handleEnviarMensaje()}
               />
-              <MasAcciones
-                detalle={detalle}
-                mensajeCopiado={mensajeCopiado}
-                onMarcarAtendido={handleMarcarAtendido}
-                onCopiarProductos={handleCopiarProductos}
-                onCopiarCelular={handleCopiarCelular}
-              />
             </>
           )}
-        </div>
+        </section>
+
+        {detalle && (
+          <PanelPedido
+            detalle={detalle}
+            tieneVouchersVer={tieneVouchersVer}
+            panelAbierto={panelAbierto}
+            onTogglePanel={alternarPanel}
+            onAplicarCambio={handleAplicarCambio}
+            onAbrirRechazarCambio={handleAbrirRechazarCambio}
+            onAprobarPago={handleAprobarPago}
+            onRechazarPago={handleRechazarPago}
+            onRecargar={cargarDetalle}
+            onTomarChat={() => handleTomarChat(false)}
+            onSoltarChat={handleSoltarChat}
+          />
+        )}
       </div>
 
       {/* Modal Confirmar Acción */}
