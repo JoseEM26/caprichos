@@ -22,6 +22,15 @@ export function abrirNotaDeVenta(pedidoId: string): void {
 type TabComprobantes = 'electronicos' | 'emitir' | 'nota';
 const TABS: TabComprobantes[] = ['electronicos', 'emitir', 'nota'];
 
+const DESCRIPCION_TAB: Record<TabComprobantes, string> = {
+  electronicos:
+    'Boletas y facturas enviadas a SUNAT: aquí eliges el proveedor, ves si cada comprobante fue aceptado, reintentas los rechazados, anulas, descargas el XML y envías el resumen diario de boletas.',
+  emitir:
+    'Pedidos cobrados cuya boleta o factura se emite a mano en otro facturador: copia los datos del cliente y márcala como emitida. Con SUNAT directo esta lista queda vacía.',
+  nota:
+    'Busca un pedido cobrado por su ID para ver, imprimir o reimprimir su nota de venta en ticket de 80 mm (la reimpresión sale marcada como COPIA).',
+};
+
 export function ComprobantesView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam: TabComprobantes = TABS.includes(searchParams.get('tab') as TabComprobantes)
@@ -142,6 +151,10 @@ export function ComprobantesView() {
           Nota de venta
         </button>
       </div>
+
+      <p className="no-imprimir" data-testid="descripcion-comprobantes" style={{ margin: '0 0 12px', color: 'var(--cp-soft)', fontSize: 13 }}>
+        {DESCRIPCION_TAB[tabActivo]}
+      </p>
 
       {tabActivo === 'electronicos' && <ElectronicosTab />}
 
