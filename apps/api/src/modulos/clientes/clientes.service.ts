@@ -18,6 +18,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { ArchivosService } from '../archivos/archivos.service';
 import { PuntosService } from './puntos.service';
 import { CodigoRegistroService } from './codigo-registro.service';
+import { AvisoCuentaService } from './aviso-cuenta.service';
 import { enmascararDni, validarDni } from '../comprobantes/comprobantes.util';
 import { versionConsentimiento, versionesLegales } from '../reclamos/textos-legales';
 import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
@@ -138,6 +139,7 @@ export class ClientesService {
     private readonly puntosService: PuntosService,
     private readonly archivos: ArchivosService,
     private readonly codigoRegistro: CodigoRegistroService,
+    private readonly avisoCuenta: AvisoCuentaService,
   ) {}
 
   /**
@@ -261,6 +263,9 @@ export class ClientesService {
       });
     }
 
+    // El celular solo es de quien tiene el código que llega por WhatsApp: antes de revelar nada de la cuenta
+    await this.codigoRegistro.exigirVerificado(tel);
+
     const desactivada = await this.prisma.customerAccount.findFirst({ where: { telefono: tel, activo: false }, select: { id: true } });
     if (desactivada) {
       throw new BadRequestException({
@@ -291,9 +296,6 @@ export class ClientesService {
       });
       partyId = suelto?.party_id ?? null;
     }
-
-    // El celular solo es de quien tiene el código que llega por WhatsApp: se consume antes de crear o vincular
-    await this.codigoRegistro.consumir(tel, dto.codigo);
 
     const hashPw = await argon2.hash(dto.contrasena);
     const versionTexto = versionConsentimiento(await versionesLegales(this.prisma));
@@ -354,6 +356,7 @@ export class ClientesService {
 
     const token = await this.generarTokenCliente(partyId!);
     const cliente = await this.yo(partyId!);
+    await this.avisoCuenta.avisar(partyId!, tel, 'CREADA');
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',

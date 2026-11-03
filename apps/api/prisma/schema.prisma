@@ -805,6 +805,16 @@ model MensajeReparto {
   @@map("mensaje_reparto")
 }
 
+/// Aviso que se envía una sola vez por celular (bienvenida a los puntos). Solo se inserta.
+model AvisoClienteUnico {
+  telefono  String   @db.VarChar(9)
+  aviso     String   @db.VarChar(40)
+  creado_en DateTime @default(now()) @db.Timestamptz
+
+  @@id([telefono, aviso])
+  @@map("aviso_cliente_unico")
+}
+
 // ---------- Ola 5: cocina por áreas, stock y recetas (FT-COC-01..03, FT-STK-01..03) ----------
 
 model ComandaArea {

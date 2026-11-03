@@ -23,6 +23,7 @@ describe('CuentaClienteController', () => {
   const codigoRegistroMock = {
     solicitar: jest.fn().mockResolvedValue({ ok: true, mensaje: 'Te enviamos un código por WhatsApp.' }),
     consumir: jest.fn().mockResolvedValue(undefined),
+    verificar: jest.fn().mockResolvedValue({ ok: true }),
   };
   const recuperarMock = { solicitar: jest.fn().mockResolvedValue({ ok: true }), confirmar: jest.fn().mockResolvedValue({ ok: true }) };
   let clientesServiceMock: any;
@@ -69,7 +70,7 @@ describe('CuentaClienteController', () => {
     const req: any = { ip: '127.0.0.1' };
 
     const r = await controller.registro(
-      { nombre: 'Ana', contrasena: '12345678', telefono: '912345678', codigo: '123456', aceptaDatos: true },
+      { nombre: 'Ana', contrasena: '12345678', telefono: '912345678', aceptaDatos: true },
       req,
       res,
     );
@@ -213,8 +214,13 @@ describe('CuentaClienteController', () => {
     expect(recuperarMock.confirmar).toHaveBeenCalledWith(dto, '1.1.1.1');
   });
   it('registro/codigo envía el código y responde sin revelar si el celular existe', async () => {
-    const r = await controller.solicitarCodigoRegistro('912345678');
-    expect(codigoRegistroMock.solicitar).toHaveBeenCalledWith('912345678');
+    const r = await controller.solicitarCodigoRegistro('912345678', { ip: '1.1.1.1' } as any);
+    expect(codigoRegistroMock.solicitar).toHaveBeenCalledWith('912345678', '1.1.1.1');
     expect(r).toMatchObject({ ok: true });
+  });
+  it('registro/verificar pasa el código al servicio de registro', async () => {
+    const r = await controller.verificarCodigoRegistro({ telefono: '912345678', codigo: '123456' });
+    expect(codigoRegistroMock.verificar).toHaveBeenCalledWith('912345678', '123456');
+    expect(r).toEqual({ ok: true });
   });
 });

@@ -31,7 +31,8 @@ const CONSENTIMIENTO_POR_DEFECTO = 'Acepto que Caprichos guarde mi celular y mis
 const hoyISO = (): string => new Date().toISOString().slice(0, 10);
 
 type Modo = 'in' | 'new' | 'rec1' | 'rec2';
-type Paso = 1 | 2;
+type Paso = 1 | 2 | 3;
+const TITULOS_PASO = ['Tu celular', 'Código', 'Tus datos'] as const;
 type Legal = 'terminos' | 'privacidad';
 
 const mensajeDe = (err: unknown, defecto: string): string => (err instanceof Error && err.message ? err.message : defecto);
@@ -44,16 +45,16 @@ export function fortaleza(c: string): 0 | 1 | 2 {
   return clases >= 3 && c.length >= 10 ? 2 : clases >= 2 ? 1 : 0;
 }
 
-/** Indicador del registro en dos pasos: «Paso 1 de 2» con una barra por paso. */
+/** Indicador del registro en tres pasos: celular, código y datos con contraseña. */
 function IndicadorPasos({ paso }: { paso: Paso }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)', marginBottom: 6 }}>
-        <span>{`Paso ${paso} de 2`}</span>
-        <span>{paso === 1 ? 'Tus datos' : 'Opcional y confirmar'}</span>
+        <span>{`Paso ${paso} de 3`}</span>
+        <span>{TITULOS_PASO[paso - 1]}</span>
       </div>
       <div aria-hidden="true" style={{ display: 'flex', gap: 6 }}>
-        {([1, 2] as const).map((n) => (
+        {([1, 2, 3] as const).map((n) => (
           <span key={n} style={{ flex: 1, height: 4, borderRadius: 2, background: n <= paso ? 'var(--cp-orange)' : 'var(--cp-line)' }} />
         ))}
       </div>
@@ -136,7 +137,6 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
   const [acepta, setAcepta] = useState(false);
   const [codigo, setCodigo] = useState('');
   const [dni, setDni] = useState('');
-  const [codigoEnviado, setCodigoEnviado] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [aviso, setAviso] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -146,6 +146,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
 
   const paso1 = modo === 'new' && paso === 1;
   const paso2 = modo === 'new' && paso === 2;
+  const paso3 = modo === 'new' && paso === 3;
 
   useEffect(() => {
     if (modo !== 'new' || legal) return;
@@ -166,7 +167,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
     setModo(m);
     setPaso(1);
     setMensaje('');
-    setCodigoEnviado(false);
+    setCodigo('');
     if (m !== 'in') setAviso('');
   };
 
@@ -186,15 +187,10 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
     }
   };
 
-  /** Paso 1 «Tus datos»: nombre y contraseña (el celular se valida antes en enviar). */
-  const errorPaso1 = (): string => {
+  /** Paso 3 «Tus datos»: nombre, contraseña nueva, correo, DNI opcional y aceptación. */
+  const errorPaso3 = (): string => {
     if (nombre.trim().length < 3) return 'Escribe tu nombre.';
     if (contrasena.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
-    return '';
-  };
-
-  /** Paso 2 «Opcional y confirmar»: correo, DNI y aceptación. */
-  const errorPaso2 = (): string => {
     if (correo && !CORREO_VALIDO.test(correo)) return 'El correo no es válido.';
     if (!acepta) return 'Debes aceptar el uso de tus datos para crear la cuenta.';
     if (dni && !/^\d{8}$/.test(dni)) return 'El DNI debe tener 8 dígitos. Déjalo vacío si no quieres darlo.';
@@ -210,22 +206,23 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
         setContrasena('');
       }, 'Celular o contraseña incorrectos.');
     }
-    if (paso === 1) {
-      const error = errorPaso1();
-      if (error) return setMensaje(error);
-      setMensaje('');
-      return setPaso(2);
+    if (paso === 1) return enviarCodigoRegistro();
+    if (paso === 2) {
+      if (!/^\d{6}$/.test(codigo)) return setMensaje('El código tiene 6 dígitos.');
+      return correr(async () => {
+        await api.post('/carta/cuenta/registro/verificar', { telefono, codigo });
+        setCodigo('');
+        setMensaje('');
+        setPaso(3);
+      }, 'El código no es correcto o ya venció. Pide uno nuevo.');
     }
-    const error = errorPaso2();
+    const error = errorPaso3();
     if (error) return setMensaje(error);
-    if (!codigoEnviado) return enviarCodigoRegistro();
-    if (!/^\d{6}$/.test(codigo)) return setMensaje('El código tiene 6 dígitos.');
     return correr(async () => {
       await registrar({
         nombre: nombre.trim(),
         telefono,
         contrasena,
-        codigo,
         ...(dni ? { dni } : {}),
         correo: correo.trim() || undefined,
         cumpleanos: cumple || undefined,
@@ -235,12 +232,12 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
     }, 'No se pudo crear la cuenta. Intenta de nuevo.');
   };
 
-  /** Registro: antes de crear la cuenta, el código de 6 dígitos llega por WhatsApp al celular. */
+  /** Paso 1: el código de 6 dígitos llega por WhatsApp al celular antes de pedir la contraseña. */
   const enviarCodigoRegistro = () =>
     correr(async () => {
       await api.post('/carta/cuenta/registro/codigo', { telefono });
-      setAviso('Te enviamos un código por WhatsApp. Vence en 10 minutos.');
-      setCodigoEnviado(true);
+      setAviso('');
+      setPaso(2);
       setEspera(60);
     }, 'No se pudo enviar el código. Intenta de nuevo.');
 
@@ -278,32 +275,38 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
       </div>
     ) : null;
 
-  const textoBoton = modo === 'new' ? (paso === 1 ? 'Continuar' : codigoEnviado ? 'Crear cuenta' : 'Enviar código por WhatsApp') : ({ in: 'Ingresar', rec1: 'Enviarme el código', rec2: 'Cambiar mi contraseña' } as const)[modo];
+  const textoBoton = modo === 'new' ? (['Enviar código por WhatsApp', 'Confirmar código', 'Crear cuenta'] as const)[paso - 1] : ({ in: 'Ingresar', rec1: 'Enviarme el código', rec2: 'Cambiar mi contraseña' } as const)[modo];
 
   return (
     <>
       <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft)' }}>
-        Ganas <b>puntos</b> por lo que pagas. {invitadoPermitido ? 'Es opcional: también puedes pedir como invitado.' : 'Es opcional.'}
+        Ganas <b>puntos</b> por lo que pagas. {invitadoPermitido ? 'Es opcional: también puedes pedir como invitado.' : 'Es opcional.'} Tus puntos se suman con tu celular, sin contraseña.
       </div>
       {pestanas}
       {modo === 'new' && <IndicadorPasos paso={paso} />}
       {aviso && modo !== 'rec2' && <div role="status" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-ok)' }}>{aviso}</div>}
 
       {paso1 && (
+        <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
+          Escribe tu celular y te enviamos un código de 6 dígitos por WhatsApp para confirmarlo. Así creas tu cuenta o ves tus puntos.
+        </div>
+      )}
+
+      {(modo === 'in' || modo === 'rec1' || paso1) && <CampoCelular id="ac-t" valor={telefono} alCambiar={setTelefono} />}
+      {(paso2 || paso3) && <div style={ayuda}>Celular confirmado: <b>{telefono}</b></div>}
+      {paso3 && (
         <div>
           <label htmlFor="ac-n" style={etiqueta}>Nombre</label>
           <input id="ac-n" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} style={campo} />
         </div>
       )}
-
-      {(modo === 'in' || modo === 'rec1' || paso1) && <CampoCelular id="ac-t" valor={telefono} alCambiar={setTelefono} />}
-      {(modo === 'in' || paso1) && <CampoClave id="ac-p" etiquetaTexto="Contraseña" valor={contrasena} alCambiar={setContrasena} nueva={paso1} />}
+      {(modo === 'in' || paso3) && <CampoClave id="ac-p" etiquetaTexto={paso3 ? 'Crea tu contraseña' : 'Contraseña'} valor={contrasena} alCambiar={setContrasena} nueva={paso3} />}
 
       {modo === 'in' && (
         <button type="button" onClick={() => ir('rec1')} style={{ ...enlace, alignSelf: 'flex-start' }}>¿Olvidaste tu contraseña?</button>
       )}
 
-      {paso2 && (
+      {paso3 && (
         <>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>Datos opcionales</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
@@ -341,7 +344,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
         </div>
       )}
 
-      {paso2 && codigoEnviado && (
+      {paso2 && (
         <>
           <div>
             <label htmlFor="ac-cr" style={etiqueta}>Código de 6 dígitos (llega por WhatsApp)</label>
@@ -372,8 +375,8 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
       )}
 
       <div style={{ display: 'flex', gap: 8 }}>
-        {paso2 && (
-          <button type="button" onClick={() => { setPaso(1); setMensaje(''); }} style={{ ...botonSecundario, flex: '0 0 96px' }}>Atrás</button>
+        {(paso2 || paso3) && (
+          <button type="button" onClick={() => { setPaso(paso3 ? 2 : 1); setMensaje(''); }} style={{ ...botonSecundario, flex: '0 0 96px' }}>Atrás</button>
         )}
         <button onClick={modo === 'rec1' ? pedirCodigo : modo === 'rec2' ? confirmar : enviar} disabled={enviando} style={{ ...botonPrincipal, flex: 1 }}>
           {enviando ? 'Un momento...' : textoBoton}

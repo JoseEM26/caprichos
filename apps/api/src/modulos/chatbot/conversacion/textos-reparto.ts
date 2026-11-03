@@ -138,3 +138,36 @@ export const TEXTOS_REPARTO = {
     variablesPlantilla: [nombre, codigo],
   }),
 };
+
+/** Puntos con dos decimales como mucho y sin ceros de más («12», «12.5», «12.75»). */
+export const formatearPuntos = (n: number): string => String(Math.round(Number(n) * 100) / 100);
+
+/**
+ * Primer pedido de un celular: se anexa la línea «ya sumas puntos» al aviso RECIBIDO (un solo mensaje).
+ * Con efectivo la plantilla trae el enlace como variable; con digital la línea viaja solo en texto libre
+ * (dentro de la ventana de 24 h), porque su plantilla no tiene la variable.
+ */
+export function conBienvenidaPuntos(
+  base: PayloadAvisoReparto,
+  nombre: string,
+  codigo: string,
+  enlace: string,
+  efectivo: boolean,
+): PayloadAvisoReparto {
+  const textoLibre = `${base.textoLibre} Ya sumas puntos con este número. Ve tus puntos aquí: ${enlace}`;
+  if (efectivo) {
+    return { textoLibre, plantillaClave: 'CARTA_RECIBIDO_BIENVENIDA_PUNTOS', variablesPlantilla: [nombre, codigo, enlace] };
+  }
+  return { ...base, textoLibre };
+}
+
+/** Aviso ENTREGADO de un pedido que suma puntos: «Ganaste N puntos. Total: M». */
+export function conPuntosEntregado(base: PayloadAvisoReparto, nombre: string, codigo: string, ganados: number, total: number): PayloadAvisoReparto {
+  const g = formatearPuntos(ganados);
+  const t = formatearPuntos(total);
+  return {
+    textoLibre: `${base.textoLibre} Ganaste ${g} puntos. Total: ${t}.`,
+    plantillaClave: 'DELIVERY_ENTREGADO_PUNTOS',
+    variablesPlantilla: [nombre, codigo, g, t],
+  };
+}

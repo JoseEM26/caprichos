@@ -15,6 +15,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { ClientesService, enmascararDoc, parsearCumpleanos } from './clientes.service';
 import { CodigoRegistroService } from './codigo-registro.service';
+import { AvisoCuentaService } from './aviso-cuenta.service';
 import { PuntosService } from './puntos.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
@@ -37,6 +38,7 @@ describe('ClientesService', () => {
   let puntosMock: any;
   let archivosMock: any;
   let codigoRegistroMock: any;
+  let avisoCuentaMock: any;
 
   beforeEach(async () => {
     prismaMock = {
@@ -115,7 +117,8 @@ describe('ClientesService', () => {
       obtenerSaldo: jest.fn().mockResolvedValue(10),
     };
 
-    codigoRegistroMock = { consumir: jest.fn().mockResolvedValue(undefined) };
+    codigoRegistroMock = { consumir: jest.fn().mockResolvedValue(undefined), exigirVerificado: jest.fn().mockResolvedValue(undefined) };
+    avisoCuentaMock = { avisar: jest.fn().mockResolvedValue(undefined) };
 
     archivosMock = {
       subirArchivo: jest.fn().mockResolvedValue({ id: '55', url: '/archivos/publico/2026/10/foto.webp' }),
@@ -137,6 +140,7 @@ describe('ClientesService', () => {
         { provide: PuntosService, useValue: puntosMock },
         { provide: ArchivosService, useValue: archivosMock },
         { provide: CodigoRegistroService, useValue: codigoRegistroMock },
+        { provide: AvisoCuentaService, useValue: avisoCuentaMock },
       ],
     }).compile();
 
@@ -271,7 +275,6 @@ describe('ClientesService', () => {
       nombre: 'Ana Pérez',
       contrasena: 'ClaveSegura2026',
       telefono: '912345678',
-      codigo: '123456',
       aceptaDatos: true as const,
     };
     const ficha = () =>
@@ -385,13 +388,13 @@ describe('ClientesService', () => {
       expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { party_id: 88n } }));
     });
 
-    it('sin código válido no crea ni vincula nada (CODIGO_INVALIDO se propaga)', async () => {
+    it('sin celular verificado no crea ni vincula nada (CELULAR_NO_VERIFICADO se propaga)', async () => {
       ficha();
-      codigoRegistroMock.consumir.mockRejectedValueOnce(
-        new BadRequestException({ codigo: 'CODIGO_INVALIDO', mensaje: 'El código no es correcto o ya venció. Pide uno nuevo.' }),
+      codigoRegistroMock.exigirVerificado.mockRejectedValueOnce(
+        new BadRequestException({ codigo: 'CELULAR_NO_VERIFICADO', mensaje: 'Primero confirma tu celular con el código que llega por WhatsApp.' }),
       );
-      await expect(service.registro(dtoOk)).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
-      expect(codigoRegistroMock.consumir).toHaveBeenCalledWith('912345678', '123456');
+      await expect(service.registro(dtoOk)).rejects.toMatchObject({ response: { codigo: 'CELULAR_NO_VERIFICADO' } });
+      expect(codigoRegistroMock.exigirVerificado).toHaveBeenCalledWith('912345678');
       expect(prismaMock.party.create).not.toHaveBeenCalled();
       expect(prismaMock.customerAccount.upsert).not.toHaveBeenCalled();
     });

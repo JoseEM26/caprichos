@@ -14,7 +14,6 @@ export interface RegistroClienteDto {
   nombre: string;
   telefono: string; // celular de 9 dígitos que empieza con 9: es el usuario de la cuenta
   contrasena: string; // mínimo 8 caracteres
-  codigo: string; // 6 dígitos que llegan por WhatsApp (POST /carta/cuenta/registro/codigo)
   dni?: string; // opcional: 8 dígitos; el celular es lo que identifica
   correo?: string;
   cumpleanos?: string; // YYYY-MM-DD o DD/MM

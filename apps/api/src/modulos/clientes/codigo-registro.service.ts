@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt, timingSafeEqual } from 'crypto';
@@ -12,6 +12,8 @@ import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
 export const REGISTRO_TTL_SEG = 600; // el código vence a los 10 minutos
 export const REGISTRO_MAX_SOLICITUDES_HORA = 3;
 export const REGISTRO_MAX_INTENTOS = 5;
+// Tope de envíos por IP y hora: frena que un solo origen pida códigos para muchos celulares
+export const REGISTRO_MAX_SOLICITUDES_IP_HORA = 20;
 
 export const RESPUESTA_CODIGO_REGISTRO = {
   ok: true,
@@ -46,20 +48,16 @@ export class CodigoRegistroService {
     return n.valido ? (n.celular9 ?? null) : null;
   }
 
-  /** Envía el código. Si el celular ya tiene cuenta con contraseña, responde TELEFONO_REGISTRADO (como registro). */
-  async solicitar(telefono: string): Promise<typeof RESPUESTA_CODIGO_REGISTRO> {
+  /**
+   * Envía el código. Responde SIEMPRE lo mismo: si el celular ya tiene cuenta con contraseña no envía nada
+   * (así no se revela si el celular existe); quien tiene cuenta usa «Ingresar» o «¿Olvidaste tu contraseña?».
+   */
+  async solicitar(telefono: string, ip?: string): Promise<typeof RESPUESTA_CODIGO_REGISTRO> {
     const tel = this.celular(telefono);
     if (!tel) {
       throw new BadRequestException({
         codigo: 'TELEFONO_INVALIDO',
         mensaje: 'El celular debe tener 9 dígitos y empezar con 9.',
-      });
-    }
-    const cuenta = await this.prisma.customerAccount.findFirst({ where: { telefono: tel, activo: true }, select: { hash: true } });
-    if (cuenta?.hash) {
-      throw new ConflictException({
-        codigo: 'TELEFONO_REGISTRADO',
-        mensaje: 'Ese celular ya tiene cuenta. Ingresa o recupera tu contraseña.',
       });
     }
 
@@ -69,6 +67,15 @@ export class CodigoRegistroService {
       const n = await redis.incr(claveSol);
       if (n === 1) await redis.expire(claveSol, 3600);
       if (n > REGISTRO_MAX_SOLICITUDES_HORA) return RESPUESTA_CODIGO_REGISTRO;
+      if (ip) {
+        const claveIp = `cliente:reg:ip:${ip}`;
+        const m = await redis.incr(claveIp);
+        if (m === 1) await redis.expire(claveIp, 3600);
+        if (m > REGISTRO_MAX_SOLICITUDES_IP_HORA) return RESPUESTA_CODIGO_REGISTRO;
+      }
+
+      const cuenta = await this.prisma.customerAccount.findFirst({ where: { telefono: tel, activo: true }, select: { hash: true } });
+      if (cuenta?.hash) return RESPUESTA_CODIGO_REGISTRO;
 
       const outbox = this.outbox();
       if (!outbox) return RESPUESTA_CODIGO_REGISTRO;
@@ -94,6 +101,42 @@ export class CodigoRegistroService {
       // Un fallo interno tampoco cambia la respuesta
     }
     return RESPUESTA_CODIGO_REGISTRO;
+  }
+
+  /**
+   * Paso 2 de crear cuenta: valida el código y lo consume. Si es correcto deja el celular «verificado» por
+   * REGISTRO_TTL_SEG; el registro (paso 3, contraseña) exige esa marca.
+   */
+  async verificar(telefono: string, codigo: string): Promise<{ ok: true }> {
+    const tel = this.celular(telefono);
+    await this.consumir(telefono, codigo);
+    const redis = this.redisService.obtenerCliente();
+    try {
+      await redis.set(`cliente:reg:ok:${tel}`, '1', 'EX', REGISTRO_TTL_SEG);
+    } catch {
+      throw new BadRequestException({ codigo: 'CODIGO_INVALIDO', mensaje: 'El código no es correcto o ya venció. Pide uno nuevo.' });
+    }
+    return { ok: true };
+  }
+
+  /** Registro: el celular debe haber pasado por verificar() hace poco. La marca se consume. */
+  async exigirVerificado(telefono: string): Promise<void> {
+    const tel = this.celular(telefono);
+    const noVerificado = () =>
+      new BadRequestException({
+        codigo: 'CELULAR_NO_VERIFICADO',
+        mensaje: 'Primero confirma tu celular con el código que llega por WhatsApp.',
+      });
+    if (!tel) throw noVerificado();
+    const redis = this.redisService.obtenerCliente();
+    let marca: string | null = null;
+    try {
+      marca = await redis.get(`cliente:reg:ok:${tel}`);
+      if (marca) await redis.del(`cliente:reg:ok:${tel}`);
+    } catch {
+      throw noVerificado();
+    }
+    if (!marca) throw noVerificado();
   }
 
   /** Valida y consume el código de registro. Error genérico: no revela si el código existe o venció. */

@@ -9,6 +9,8 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { OutboxWhatsappService } from '../chatbot/servicios/outbox-whatsapp.service';
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { ClientesService, celular9De, validarContrasena } from './clientes.service';
+import { AvisoCuentaService } from './aviso-cuenta.service';
+import { REGISTRO_MAX_SOLICITUDES_IP_HORA } from './codigo-registro.service';
 
 export const RECUPERAR_TTL_SEG = 600; // el código vence a los 10 minutos
 export const RECUPERAR_MAX_SOLICITUDES_HORA = 3;
@@ -32,6 +34,7 @@ export class RecuperarClaveService {
     private readonly auditoria: AuditoriaService,
     private readonly clientes: ClientesService,
     private readonly moduleRef: ModuleRef,
+    private readonly avisoCuenta: AvisoCuentaService,
   ) {}
 
   /** El outbox es del módulo del chatbot (que importa a Clientes): se busca en tiempo de ejecución para no crear un ciclo. */
@@ -59,6 +62,12 @@ export class RecuperarClaveService {
       const n = await redis.incr(claveSol);
       if (n === 1) await redis.expire(claveSol, 3600);
       if (n > RECUPERAR_MAX_SOLICITUDES_HORA) return RESPUESTA_SOLICITUD;
+      if (ip) {
+        const claveIp = `cliente:rec:ip:${ip}`;
+        const m = await redis.incr(claveIp);
+        if (m === 1) await redis.expire(claveIp, 3600);
+        if (m > REGISTRO_MAX_SOLICITUDES_IP_HORA) return RESPUESTA_SOLICITUD;
+      }
 
       const cuenta = await this.clientes.cuentaPorCelular(tel);
       const outbox = this.outbox();
@@ -144,6 +153,7 @@ export class RecuperarClaveService {
     try {
       await redis.del(claveCod, claveInt, `bloqueo:cliente:${tel}`);
     } catch { /* limpiar bloqueos en Redis es best-effort; expiran por TTL */ }
+    await this.avisoCuenta.avisar(cuenta.party_id, tel, 'CLAVE_CAMBIADA');
 
     await this.auditoria.registrar({
       categoria: 'ACCESO',

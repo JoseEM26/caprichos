@@ -289,6 +289,21 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Avisa al cliente cuando cocina termina su pedido delivery y queda listo para salir con el repartidor.',
     tipo: 'sino',
   },
+  whatsapp_aviso_bienvenida_puntos_activo: {
+    nombre: 'Aviso WhatsApp: Bienvenida a los puntos (primer pedido)',
+    descripcion: 'En el primer pedido de la carta de cada celular, el aviso de pedido recibido dice que ya suma puntos y da el enlace para verlos. Requiere la plantilla aprobada en Meta.',
+    tipo: 'sino',
+  },
+  whatsapp_aviso_puntos_ganados_activo: {
+    nombre: 'Aviso WhatsApp: Puntos ganados al entregar',
+    descripcion: 'Al entregar un pedido que sumó puntos, el aviso dice cuántos puntos ganó y su total. Requiere la plantilla aprobada en Meta.',
+    tipo: 'sino',
+  },
+  whatsapp_aviso_cuenta_activo: {
+    nombre: 'Aviso WhatsApp: Seguridad de la cuenta',
+    descripcion: 'Avisa al cliente cuando se crea su cuenta o cambia su contraseña. Requiere la plantilla aprobada en Meta.',
+    tipo: 'sino',
+  },
   whatsapp_aviso_recibido_activo: {
     nombre: 'Aviso WhatsApp: Pedido recibido desde la carta',
     descripcion: 'Avisa al cliente que recibimos su pedido de la carta virtual. Con Yape, Plin o transferencia, avisa que un asesor gestiona el voucher por este chat.',
