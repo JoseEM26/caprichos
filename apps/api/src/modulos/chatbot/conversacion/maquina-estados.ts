@@ -46,6 +46,7 @@ import {
   adjuntarCierreComercial,
 } from './cierre-comercial.util';
 import { esSaludo as esSaludoPuro } from './normalizador-entrada.util';
+import { enlaceSeguimientoCarta } from '../../pedidos/seguimiento.tokens';
 import './flujos/pedido/flujo-pedido';
 import './flujos/pago/flujo-pago';
 import './flujos/reserva/flujo-reserva';
@@ -2076,10 +2077,13 @@ function transicionarSoloMenus(
         { tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.sinPedidoActivo(url), botones: [BOTON_VER_CARTA, BOTON_VOLVER_MENU] },
       ]);
     }
+    // Enlace de seguimiento del propio pedido activo (token firmado por su id); sin origen, el enlace genérico
+    const enlaceSeguimiento =
+      contexto.cartaUrlPublica && p.id != null ? enlaceSeguimientoCarta(contexto.cartaUrlPublica, String(p.codigo), p.id) : url;
     return respuesta([
       {
         tipo: 'enviarBotones',
-        texto: TEXTOS_SOLO_MENUS.estadoPedido(String(p.codigo), String(p.estado), p.pago_estado, url),
+        texto: TEXTOS_SOLO_MENUS.estadoPedido(String(p.codigo), String(p.estado), p.pago_estado, enlaceSeguimiento),
         botones: [BOTON_VOLVER_MENU, BOTON_HABLAR_PERSONA],
       },
     ]);

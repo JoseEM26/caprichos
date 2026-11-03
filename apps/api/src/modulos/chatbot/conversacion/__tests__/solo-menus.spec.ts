@@ -1,3 +1,4 @@
+import { generarTokenSeguimiento } from '../../../pedidos/seguimiento.tokens';
 import { MODO_SOLO_MENUS, transicionarEstado } from '../maquina-estados';
 import { normalizarEntrada } from '../normalizador-entrada.util';
 import { lineaPromoSaludo } from '../textos-bot';
@@ -140,6 +141,12 @@ describe('Bot solo con menús (decisión del dueño)', () => {
       expect(texto).toContain('CP-0110');
       expect(texto).toContain('COCINA');
       expect(texto).toContain(URL_CARTA);
+    });
+
+    it('el enlace es el seguimiento firmado de ese pedido, no el genérico de la carta', () => {
+      const r = ejecutar({ listRowId: 'mipedido' }, contextoBase({ pedidoActivo: { id: 7n, codigo: 'CP-0110', estado: 'COCINA', pago_estado: null } }));
+      const texto = (r.acciones[0] as any).texto as string;
+      expect(texto).toContain(`${URL_CARTA}/?seguimiento=CP-0110&t=${generarTokenSeguimiento(7n)}`);
     });
 
     it('sin pedido activo lo dice y ofrece la carta', () => {

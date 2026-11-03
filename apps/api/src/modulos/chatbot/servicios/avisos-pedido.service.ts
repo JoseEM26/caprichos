@@ -9,7 +9,7 @@ import { urlPublicaCarta } from './carrusel.util';
 import { parametroActivoConDefecto, whatsappSimulado } from '../utilidades/modo-whatsapp.util';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
 import { calcularEtaEntrega, formatearEta, leerConfigEta } from '../../repartos/eta-entrega';
-import { generarTokenSeguimiento } from '../../pedidos/seguimiento.tokens';
+import { enlaceSeguimientoCarta } from '../../pedidos/seguimiento.tokens';
 
 /**
  * Número de etapa en `mensaje_reparto` (PK pedido_id + numero = idempotencia por pedido y etapa)
@@ -241,7 +241,7 @@ export class AvisosPedidoService {
   private enlaceSeguimiento(pedidoId: bigint, codigo: string): string | null {
     const origen = urlPublicaCarta((clave) => process.env[clave]);
     if (!origen) return null;
-    return `${origen}/?seguimiento=${encodeURIComponent(codigo)}&t=${generarTokenSeguimiento(pedidoId)}`;
+    return enlaceSeguimientoCarta(origen, codigo, pedidoId);
   }
 
   /**
