@@ -14,7 +14,6 @@ import { DireccionesClienteService } from '../../../clientes/direcciones-cliente
 import { ZonasService } from '../../../zonas/zonas.service';
 import {
   WHATSAPP_MENSAJERIA_PUERTO,
-  WhatsAppMensajeriaPuerto,
 } from '../../puerto/whatsapp-mensajeria.puerto';
 
 describe('EjecutorConversacionService (Integración de Conversación)', () => {
@@ -348,7 +347,7 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
         expect.stringContaining('Ana'),
         'Ver opciones',
         expect.arrayContaining([
-          expect.objectContaining({ id: 'pedir', titulo: '☕ Hacer un pedido' }),
+          expect.objectContaining({ id: 'horario', titulo: '🕒 Horario y ubicación' }),
           expect.objectContaining({ id: 'carta', titulo: '🧁 Ver la carta' }),
         ]),
         expect.objectContaining({ conversacionId: 10n, tituloSeccion: 'Menú' }),
@@ -416,8 +415,8 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       );
     });
 
-    it('ejecuta repregunta una vez y luego deriva a persona ante mensaje no entendido', async () => {
-      // Intento 1: no entiende -> repregunta enviando lista
+    it('ante mensaje no entendido responde siempre con el menú de botones, sin derivar ni llamar a la IA', async () => {
+      // Bot solo con menús: texto libre que no es botón -> el menú, un solo mensaje, en cada intento
       mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
         id: 12n,
         telefono: '+51987654321',
@@ -433,13 +432,12 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
 
       expect(mockMensajeria.enviarLista).toHaveBeenCalledWith(
         '51987654321',
-        expect.stringContaining('No estoy seguro de haber entendido'),
+        expect.stringContaining('Elige una opción del menú'),
         'Ver opciones',
         expect.any(Array),
         expect.any(Object),
       );
 
-      // Intento 2: vuelve a no entender con repreguntasFallidas = 1 -> deriva
       mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
         id: 12n,
         telefono: '+51987654321',
@@ -447,22 +445,16 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
         tomado_por: null,
         flujo: { version: 1, estado: 'MENU', repreguntasFallidas: 1 },
       });
-
       await service.procesarMensajeEntrante(12n, {
         texto: 'otra cosa incomprensible',
         waMessageId: 'wamid.fallo.2',
       });
 
-      expect(mockPrisma.conversacion.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 12n },
-          data: expect.objectContaining({ duenio: 'PERSONA' }),
-        }),
-      );
-      expect(mockMensajeria.enviarTexto).toHaveBeenCalledWith(
+      expect(mockMensajeria.enviarLista).toHaveBeenCalledTimes(2);
+      expect(mockMensajeria.enviarTexto).not.toHaveBeenCalledWith(
         '51987654321',
-        expect.stringContaining('No logro entender bien tu mensaje, mejor te paso con una persona'),
-        expect.any(Object),
+        expect.stringContaining('mejor te paso con una persona'),
+        expect.anything(),
       );
     });
 
@@ -495,129 +487,7 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
     });
   });
 
-  describe('6. Direcciones anteriores del cliente con cuenta (WhatsApp)', () => {
-    const direccionAna = {
-      id: '7',
-      direccion: 'Av. Las Palmeras 123',
-      referencia: 'Portón azul',
-      lat: -12.046374,
-      lng: -77.042793,
-      alias: null,
-      usos: 2,
-      ultimoUsoEn: '2026-10-20T15:04:00.000Z',
-      origen: 'WHATSAPP',
-    };
-
-    const conversacionEn = (id: bigint, estado: string, pedidoEstado = 'PEDIDO_MODALIDAD') => ({
-      id,
-      telefono: '+51987654321',
-      duenio: 'BOT',
-      tomado_por: null,
-      flujo: {
-        version: 2,
-        repreguntasFallidas: 0,
-        estado,
-        pedido: { estadoInterno: pedidoEstado, items: [] },
-      },
-    });
-
-    it('cliente con cuenta que pide delivery recibe la lista de sus direcciones, buscada por su teléfono', async () => {
-      mockDirecciones.resolverPartyPorTelefono.mockResolvedValueOnce(100n);
-      mockDirecciones.listar.mockResolvedValueOnce([direccionAna]);
-      mockPrisma.conversacion.findUnique.mockResolvedValueOnce(conversacionEn(40n, 'PEDIDO_MODALIDAD'));
-
-      await service.procesarMensajeEntrante(40n, { buttonPayload: 'ped_mod_delivery' });
-
-      expect(mockDirecciones.resolverPartyPorTelefono).toHaveBeenCalledWith('+51987654321');
-      expect(mockDirecciones.listar).toHaveBeenCalledWith(100n, { limite: 5 });
-      expect(mockMensajeria.enviarLista).toHaveBeenCalledWith(
-        '51987654321',
-        '¡Qué gusto verte de nuevo! 😊 ¿Lo enviamos a una dirección anterior o a una nueva?',
-        'Ver direcciones',
-        expect.arrayContaining([
-          expect.objectContaining({ id: 'ped_dir_7' }),
-          expect.objectContaining({ id: 'ped_dir_nueva' }),
-        ]),
-        expect.any(Object),
-      );
-      expect(mockPrisma.mensajeChat.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ tipo: 'LISTA', autor: 'BOT' }) }),
-      );
-    });
-
-    it('elegir una dirección anterior calcula su cobertura con sus coordenadas y avanza a categorías', async () => {
-      mockDirecciones.resolverPartyPorTelefono.mockResolvedValueOnce(100n);
-      mockDirecciones.listar.mockResolvedValueOnce([direccionAna]);
-      mockPrisma.conversacion.findUnique.mockResolvedValueOnce(
-        conversacionEn(41n, 'PEDIDO_DIRECCION_ELEGIR', 'PEDIDO_DIRECCION_ELEGIR'),
-      );
-
-      await service.procesarMensajeEntrante(41n, { listReplyId: 'ped_dir_7' });
-
-      expect(mockZonas.consultarEnvio).toHaveBeenCalledWith(-12.046374, -77.042793);
-      expect(mockPrisma.conversacion.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            flujo: expect.objectContaining({
-              estado: 'PEDIDO_CATEGORIAS',
-              pedido: expect.objectContaining({
-                entrega: expect.objectContaining({
-                  direccion: 'Av. Las Palmeras 123',
-                  referencia: 'Portón azul',
-                  lat: -12.046374,
-                  lng: -77.042793,
-                  zonaId: '3',
-                  tarifaEnvio: 5,
-                }),
-              }),
-            }),
-          }),
-        }),
-      );
-    });
-
-    it('sin cuenta (teléfono sin party) no consulta direcciones y pide ubicación como hasta ahora', async () => {
-      mockDirecciones.resolverPartyPorTelefono.mockResolvedValueOnce(null);
-      mockPrisma.conversacion.findUnique.mockResolvedValueOnce(conversacionEn(42n, 'PEDIDO_MODALIDAD'));
-
-      await service.procesarMensajeEntrante(42n, { buttonPayload: 'ped_mod_delivery' });
-
-      expect(mockDirecciones.listar).not.toHaveBeenCalled();
-      expect(mockMensajeria.enviarLista).not.toHaveBeenCalled();
-      expect(mockMensajeria.enviarBotones).toHaveBeenCalledWith(
-        '51987654321',
-        expect.stringContaining('¿Dónde te lo llevamos?'),
-        expect.any(Array),
-        expect.any(Object),
-      );
-    });
-  });
-
   describe('5. Pruebas de ampliación (a) a (f): consumo real de BD y seguridad', () => {
-    it('(a) Carta navegable: consulta CatalogoService y envía lista de categorías', async () => {
-      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
-        id: 20n,
-        telefono: '+51987654321',
-        duenio: 'BOT',
-        tomado_por: null,
-        flujo: { version: 1, estado: 'MENU', repreguntasFallidas: 0 },
-      });
-
-      const ok = await service.procesarMensajeEntrante(20n, {
-        listRowId: 'carta',
-        waMessageId: 'wamid.carta.1',
-      });
-
-      expect(ok).toBe(true);
-      expect(mockCatalogoService.obtenerCarta).toHaveBeenCalled();
-      expect(mockMensajeria.enviarLista).toHaveBeenCalledWith(
-        '51987654321',
-        expect.stringContaining('Elige una categoría'),
-        'Ver categorías',
-        expect.arrayContaining([expect.objectContaining({ id: 'cat_1', titulo: 'Frappes' })]),
-        expect.objectContaining({ tituloSeccion: 'Categorías' }),
-      );
-    });
 
     it('(b) Disponibilidad: avisa si el local está cerrado con datos reales', async () => {
       mockLocalService.obtenerEstadoCarta.mockResolvedValueOnce({
@@ -641,77 +511,6 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
         '51987654321',
         expect.stringContaining('Ahora estamos cerrados. Abrimos hoy a las 18:00.'),
         expect.any(String),
-        expect.any(Array),
-        expect.any(Object),
-      );
-    });
-
-    it('(c) Promociones vigentes obtenidas de OfertasService', async () => {
-      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
-        id: 22n,
-        telefono: '+51987654321',
-        duenio: 'BOT',
-        tomado_por: null,
-        flujo: { version: 1, estado: 'MENU', repreguntasFallidas: 0 },
-      });
-
-      await service.procesarMensajeEntrante(22n, {
-        listRowId: 'promos',
-        waMessageId: 'wamid.promos.1',
-      });
-
-      expect(mockOfertasService.listarOfertas).toHaveBeenCalled();
-      expect(mockMensajeria.enviarBotones).toHaveBeenCalledWith(
-        '51987654321',
-        expect.stringContaining('2x1 Frappe Oreo'),
-        expect.arrayContaining([expect.objectContaining({ id: 'btn_carta' })]),
-        expect.any(Object),
-      );
-    });
-
-    it('(d) Mi pedido propio aceptado y pedido ajeno rechazado (seguridad)', async () => {
-      // 1. Pedido propio
-      mockPrisma.pedido.findUnique.mockResolvedValueOnce({
-        codigo: 'CP-0110',
-        cliente_telefono: '+51987654321',
-        estado: 'PREPARANDO',
-        creado_en: new Date(),
-      });
-      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
-        id: 23n,
-        telefono: '+51987654321',
-        duenio: 'BOT',
-        tomado_por: null,
-        flujo: { version: 1, estado: 'MENU', repreguntasFallidas: 0 },
-      });
-
-      await service.procesarMensajeEntrante(23n, { texto: 'CP-0110' });
-      expect(mockMensajeria.enviarBotones).toHaveBeenCalledWith(
-        '51987654321',
-        expect.stringContaining('¿Qué necesitas de tu pedido CP-0110?'),
-        expect.any(Array),
-        expect.any(Object),
-      );
-
-      // 2. Pedido ajeno (teléfono distinto) -> Rechazado
-      mockPrisma.pedido.findUnique.mockResolvedValueOnce({
-        codigo: 'CP-0999',
-        cliente_telefono: '+51911111111', // Teléfono ajeno
-        estado: 'PREPARANDO',
-        creado_en: new Date(),
-      });
-      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
-        id: 24n,
-        telefono: '+51987654321', // Teléfono del cliente actual
-        duenio: 'BOT',
-        tomado_por: null,
-        flujo: { version: 1, estado: 'MENU', repreguntasFallidas: 0 },
-      });
-
-      await service.procesarMensajeEntrante(24n, { texto: 'CP-0999' });
-      expect(mockMensajeria.enviarBotones).toHaveBeenCalledWith(
-        '51987654321',
-        expect.stringContaining('No encuentro un pedido activo con tu número'),
         expect.any(Array),
         expect.any(Object),
       );

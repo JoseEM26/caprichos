@@ -412,28 +412,6 @@ describe('Flujo de Cambios después del Pedido y Derivación a Persona (Ola 3, A
   });
 
   describe('7. Máquina de Estados: repreguntas, fuera de horario y quejas urgentes', () => {
-    it('mensaje no entendido: repregunta la primera vez', () => {
-      const flujo = crearFlujo({ repreguntasFallidas: 0 });
-      const ctx = crearContexto();
-      const entrada = normalizar('palabra inventada que el bot no entiende xyz123');
-
-      const res = transicionarEstado(flujo, entrada, ctx);
-      expect(res.nuevoFlujo.repreguntasFallidas).toBe(1);
-      expect(res.nuevoEstado).toBe('MENU');
-      expect(res.acciones[0].tipo).toBe('enviarLista');
-    });
-
-    it('mensaje no entendido: al segundo fallo consecutivo, deriva a persona', () => {
-      const flujo = crearFlujo({ repreguntasFallidas: 1 });
-      const ctx = crearContexto();
-      const entrada = normalizar('otra cosa incomprensible');
-
-      const res = transicionarEstado(flujo, entrada, ctx);
-      expect(res.nuevoEstado).toBe('ATENCION_PERSONA');
-      const accionPersona = res.acciones.find((a) => a.tipo === 'pasarAPersona');
-      expect(accionPersona).toBeDefined();
-      expect((accionPersona as any).motivo).toBe('MENSAJE_NO_ENTENDIDO');
-    });
 
     it('fuera de horario de atención: bot responde con honestidad e indica hora de apertura', () => {
       const flujo = crearFlujo();

@@ -40,7 +40,7 @@ import {
   obtenerNombreMostrar,
 } from '../../mensajes/utilidades/nombre-contacto.util';
 import { EntradaRawInput, normalizarEntrada, esSaludo } from './normalizador-entrada.util';
-import { transicionarEstado } from './maquina-estados';
+import { transicionarEstado, MODO_SOLO_MENUS } from './maquina-estados';
 import {
   ContextoConversacion,
   DatosHorarioLocal,
@@ -1083,8 +1083,9 @@ export class EjecutorConversacionService {
       this.logger.warn(`Error al consultar reservas para contexto: ${err.message}`);
     }
 
+    // Bot solo con menús: la IA no se consulta en el camino normal (el motor nuevo nunca la pide)
     let chatbotIaActivo = false;
-    if (this.chatbotIaService) {
+    if (this.chatbotIaService && !MODO_SOLO_MENUS) {
       try {
         chatbotIaActivo = await this.chatbotIaService.estaDisponible();
       } catch (err: any) {

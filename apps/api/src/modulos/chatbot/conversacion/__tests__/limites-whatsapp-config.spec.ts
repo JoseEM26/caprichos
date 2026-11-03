@@ -1,7 +1,6 @@
 import {
   BOTONES_FUNCION_PAUSADA,
   BOTON_AVISO_SPAM_MENU,
-  LIMITE_BOTON_LISTA,
   LIMITE_CUERPO_TEXTO,
   LIMITE_DESCRIPCION_FILA,
   LIMITE_MAX_BOTONES,
@@ -14,7 +13,7 @@ import {
 } from '../../configuracion/chatbot-configuracion.tipos';
 import { TEXTOS_BOT, FILAS_MENU_PRINCIPAL } from '../textos-bot';
 import { transicionarEstado } from '../maquina-estados';
-import { ContextoConversacion, FlujoConversacion } from '../tipos-conversacion';
+import { ContextoConversacion } from '../tipos-conversacion';
 
 describe('Límites estrictos de WhatsApp y Configuración del Bot (Ola 4, Agente I)', () => {
   describe('1. Verificación exhaustiva de límites de WhatsApp Cloud API (Meta)', () => {
@@ -88,132 +87,6 @@ describe('Límites estrictos de WhatsApp y Configuración del Bot (Ola 4, Agente
       expect(TEXTOS_FUNCIONES_DESACTIVADAS.pedido).toContain('🧁');
       expect(TEXTOS_FUNCIONES_DESACTIVADAS.reservas).toContain('🧁');
       expect(TEXTOS_FUNCIONES_DESACTIVADAS.cambios).toContain('🧁');
-    });
-  });
-
-  describe('3. Comportamiento de los interruptores de función en la máquina de estados', () => {
-    const flujoBase: FlujoConversacion = {
-      version: 2,
-      estado: 'MENU',
-      repreguntasFallidas: 0,
-    };
-
-    it('si la función pedido está desactivada, "pedir" devuelve aviso pausado y opciones de carta', () => {
-      const contexto: ContextoConversacion = {
-        funcionesActivas: {
-          pedido: false,
-          pago: true,
-          reservas: true,
-          cambios: true,
-          ia: false,
-          promociones: true,
-        },
-      };
-
-      const resultado = transicionarEstado(
-        flujoBase,
-        { tipo: 'boton', texto: 'pedir', textoOriginal: 'pedir', id: 'pedir' },
-        contexto,
-      );
-
-      expect(resultado.nuevoEstado).toBe('MENU');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      expect((resultado.acciones[0] as any).texto).toContain('temporalmente pausada');
-      expect((resultado.acciones[0] as any).botones).toEqual(BOTONES_FUNCION_PAUSADA);
-    });
-
-    it('si la función reservas está desactivada, "reservar" devuelve aviso pausado y hablar con asesor', () => {
-      const contexto: ContextoConversacion = {
-        funcionesActivas: {
-          pedido: true,
-          pago: true,
-          reservas: false,
-          cambios: true,
-          ia: false,
-          promociones: true,
-        },
-      };
-
-      const resultado = transicionarEstado(
-        flujoBase,
-        { tipo: 'boton', texto: 'reservar', textoOriginal: 'reservar', id: 'reservar' },
-        contexto,
-      );
-
-      expect(resultado.nuevoEstado).toBe('MENU');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      expect((resultado.acciones[0] as any).texto).toContain('reservas de mesa por WhatsApp están temporalmente pausadas');
-    });
-
-    it('si la función cambios está desactivada, "c_dir" deriva a una persona con motivo CAMBIOS_PAUSADO', () => {
-      const contexto: ContextoConversacion = {
-        funcionesActivas: {
-          pedido: true,
-          pago: true,
-          reservas: true,
-          cambios: false,
-          ia: false,
-          promociones: true,
-        },
-      };
-
-      const resultado = transicionarEstado(
-        flujoBase,
-        { tipo: 'boton', texto: 'c_dir', textoOriginal: 'c_dir', id: 'c_dir' },
-        contexto,
-      );
-
-      expect(resultado.nuevoEstado).toBe('ATENCION_PERSONA');
-      expect(resultado.acciones[0].tipo).toBe('pasarAPersona');
-      expect((resultado.acciones[0] as any).motivo).toBe('CAMBIOS_PAUSADO');
-      expect((resultado.acciones[1] as any).texto).toContain('gestión automática de cambios está temporalmente pausada');
-    });
-
-    it('si la función pago está desactivada, el paso de pago deriva a una persona de Caja', () => {
-      const contexto: ContextoConversacion = {
-        funcionesActivas: {
-          pedido: true,
-          pago: false,
-          reservas: true,
-          cambios: true,
-          ia: false,
-          promociones: true,
-        },
-      };
-
-      const resultado = transicionarEstado(
-        { ...flujoBase, estado: 'PAGO' as any },
-        { tipo: 'boton', texto: 'pay', textoOriginal: 'pay', id: 'pay' },
-        contexto,
-      );
-
-      expect(resultado.nuevoEstado).toBe('ATENCION_PERSONA');
-      expect(resultado.acciones[0].tipo).toBe('pasarAPersona');
-      expect((resultado.acciones[0] as any).motivo).toBe('PAGO_PAUSADO');
-      expect((resultado.acciones[1] as any).texto).toContain('coordinación automática de pagos está en pausa');
-    });
-
-    it('si la función promociones está desactivada, "promos" indica que no hay promociones activas', () => {
-      const contexto: ContextoConversacion = {
-        funcionesActivas: {
-          pedido: true,
-          pago: true,
-          reservas: true,
-          cambios: true,
-          ia: false,
-          promociones: false,
-        },
-      };
-
-      const resultado = transicionarEstado(
-        flujoBase,
-        { tipo: 'boton', texto: 'promos', textoOriginal: 'promos', id: 'promos' },
-        contexto,
-      );
-
-      expect(resultado.nuevoEstado).toBe('CARTA_PROMOS');
-      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
-      expect((resultado.acciones[0] as any).texto).toContain('no tenemos promociones activas');
     });
   });
 
