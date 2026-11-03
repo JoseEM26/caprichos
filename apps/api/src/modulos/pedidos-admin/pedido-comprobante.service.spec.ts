@@ -72,13 +72,13 @@ describe('PedidoComprobanteService.cambiar (PATCH comprobante)', () => {
 
   it('pedido ya cobrado: 409 y no escribe', async () => {
     const { servicio, prisma } = construir({ pago_estado: 'PAGADO' });
-    await expect(servicio.cambiar('5', { tipo: 'NOTA_VENTA' })).rejects.toBeInstanceOf(ConflictException);
+    await expect(servicio.cambiar('5', { tipo: 'BOLETA' })).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
   });
 
   it('cobrado entre la lectura y la escritura: 409', async () => {
     const { servicio } = construir({}, null, 0);
-    await expect(servicio.cambiar('5', { tipo: 'NOTA_VENTA' })).rejects.toBeInstanceOf(ConflictException);
+    await expect(servicio.cambiar('5', { tipo: 'BOLETA' })).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('con comprobante ya emitido: 409 con el número', async () => {

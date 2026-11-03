@@ -5,6 +5,12 @@ import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 
+/** Elige boleta en el selector obligatorio (si el paso lo muestra y aún no hay elección). */
+const elegirBoleta = () => {
+  const b = screen.queryByTestId('comprobante-BOLETA');
+  if (b && b.getAttribute('aria-pressed') !== 'true') fireEvent.click(b);
+};
+
 vi.mock('../api', () => ({
   salonApi: { obtenerCarta: vi.fn(), obtenerPlano: vi.fn(), abrirPedidoMesa: vi.fn() },
 }));
@@ -74,6 +80,7 @@ async function llegarAResumen(modalidad: 'Para llevar' | 'Delivery', alExitoPedi
 }
 
 async function confirmarRegistro() {
+  elegirBoleta();
   fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
   fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 }
@@ -234,6 +241,7 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
 
     expect(screen.getByRole('alert')).toHaveTextContent('Sobra S/ 0.50');
     // El botón sigue activo; al tocarlo no abre la confirmación y deja el aviso del plan
+    elegirBoleta();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     expect(screen.queryByRole('button', { name: 'Sí, registrar' })).toBeNull();
     expect(screen.getByRole('alert')).toHaveTextContent('Sobra S/ 0.50');

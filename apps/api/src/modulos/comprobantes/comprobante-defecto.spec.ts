@@ -1,8 +1,8 @@
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 
-import { aplicaBoletaPorDefecto, tipoComprobanteEfectivo } from './comprobante-defecto';
+import { aplicaBoletaPorDefecto } from './comprobante-defecto';
 import { ComprobanteDefectoService } from './comprobante-defecto.service';
-import { validarDocumentoComprobante } from './comprobantes.util';
+import { esComprobanteElegible, validarDocumentoComprobante } from './comprobantes.util';
 
 describe('comprobante por defecto', () => {
   it('solo aplica con SUNAT real y la marca activa (en simulado no cambia nada)', () => {
@@ -11,11 +11,12 @@ describe('comprobante por defecto', () => {
     expect(aplicaBoletaPorDefecto('SUNAT', false)).toBe(false);
   });
 
-  it('el tipo elegido gana; sin elegir, boleta si aplica y nota de venta si no', () => {
-    expect(tipoComprobanteEfectivo('FACTURA', true)).toBe('FACTURA');
-    expect(tipoComprobanteEfectivo('NOTA_VENTA', true)).toBe('NOTA_VENTA');
-    expect(tipoComprobanteEfectivo(undefined, true)).toBe('BOLETA');
-    expect(tipoComprobanteEfectivo(null, false)).toBe('NOTA_VENTA');
+  it('solo boleta o factura son comprobantes elegibles: la nota de venta y «sin elegir» no', () => {
+    expect(esComprobanteElegible('BOLETA')).toBe(true);
+    expect(esComprobanteElegible('FACTURA')).toBe(true);
+    expect(esComprobanteElegible('NOTA_VENTA')).toBe(false);
+    expect(esComprobanteElegible(undefined)).toBe(false);
+    expect(esComprobanteElegible(null)).toBe(false);
   });
 
   it('boleta mayor a S/ 700 sin DNI no es válida; con DNI o hasta 700 sí', () => {
@@ -24,7 +25,7 @@ describe('comprobante por defecto', () => {
     expect(validarDocumentoComprobante('BOLETA', '12345678', null, 900).valido).toBe(true);
   });
 
-  describe('ComprobanteDefectoService.aplica', () => {
+  describe('ComprobanteDefectoService.estado', () => {
     const construir = (proveedor: string, activo: unknown) => {
       const prisma = {
         parametro: {
@@ -41,13 +42,13 @@ describe('comprobante por defecto', () => {
     };
 
     it('SUNAT con marca sí: aplica; marca no o simulado: no', async () => {
-      expect(await construir('SUNAT', true).servicio.aplica()).toBe(true);
-      expect(await construir('SUNAT', false).servicio.aplica()).toBe(false);
-      expect(await construir('SIMULADO', true).servicio.aplica()).toBe(false);
+      expect((await construir('SUNAT', true).servicio.estado()).aplica).toBe(true);
+      expect((await construir('SUNAT', false).servicio.estado()).aplica).toBe(false);
+      expect((await construir('SIMULADO', true).servicio.estado()).aplica).toBe(false);
     });
 
     it('sin valor guardado la marca vale sí (defecto)', async () => {
-      expect(await construir('SUNAT', undefined).servicio.aplica()).toBe(true);
+      expect((await construir('SUNAT', undefined).servicio.estado()).activo).toBe(true);
     });
 
     it('guardar audita el valor anterior y el nuevo', async () => {

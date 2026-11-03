@@ -20,6 +20,14 @@ export function validarRuc(ruc?: string | null): boolean {
 }
 
 /**
+ * Tipo de comprobante que hay que elegir al pedir un pedido, cobrarlo o cambiarlo: boleta o factura.
+ * La nota de venta no es comprobante elegible (decisión del dueño, 03/11/2026).
+ */
+export function esComprobanteElegible(tipo?: string | null): tipo is 'BOLETA' | 'FACTURA' {
+  return tipo === 'BOLETA' || tipo === 'FACTURA';
+}
+
+/**
  * Valida los datos requeridos según el tipo de comprobante solicitado.
  * - NOTA_VENTA: no exige documento ni razón social.
  * - BOLETA: DNI opcional; si se escribe, debe tener 8 dígitos.

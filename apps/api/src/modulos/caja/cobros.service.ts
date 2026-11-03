@@ -4,7 +4,7 @@ import { StockService } from '../stock/stock.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { SalonService } from '../salon/salon.service';
 import { ComprobantesService } from '../comprobantes/comprobantes.service';
-import { validarDocumentoComprobante } from '../comprobantes/comprobantes.util';
+import { esComprobanteElegible, validarDocumentoComprobante } from '../comprobantes/comprobantes.util';
 import {
   BadRequestException,
   HttpException,
@@ -318,6 +318,17 @@ export class CobrosService {
             mensaje: 'El pedido ya fue cobrado',
           },
           HttpStatus.CONFLICT,
+        );
+      }
+
+      // Boleta o factura obligatoria (pedidos históricos sin ella: hay que elegirla antes de cobrar)
+      if (!esComprobanteElegible(pedido.comprobante_tipo)) {
+        throw new HttpException(
+          {
+            codigo: 'COMPROBANTE_OBLIGATORIO',
+            mensaje: 'Elige boleta o factura antes de cobrar. Usa «Cambiar comprobante».',
+          },
+          HttpStatus.BAD_REQUEST,
         );
       }
 

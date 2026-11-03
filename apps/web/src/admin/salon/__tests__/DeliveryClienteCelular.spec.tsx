@@ -5,6 +5,12 @@ import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { api } from '../../../comun/api';
 
+/** Elige boleta en el selector obligatorio (si el paso lo muestra y aún no hay elección). */
+const elegirBoleta = () => {
+  const b = screen.queryByTestId('comprobante-BOLETA');
+  if (b && b.getAttribute('aria-pressed') !== 'true') fireEvent.click(b);
+};
+
 vi.mock('../useSalonSocket', () => ({
   useSalonSocket: () => ({ avisoListo: null, cerrarAvisoListo: () => {} }),
 }));
@@ -107,6 +113,7 @@ async function registrarCafe() {
   // En delivery con efectivo «con cuánto paga» es obligatorio (el repartidor sale con el vuelto)
   const pagaCon = await screen.findByPlaceholderText(/Mínimo S\/|Obligatorio/).catch(() => null);
   if (pagaCon) fireEvent.change(pagaCon, { target: { value: '50' } });
+  elegirBoleta();
   fireEvent.click(await screen.findByRole('button', { name: 'Registrar pedido' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
   await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
@@ -281,6 +288,8 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     fireEvent.change(input, { target: { value: 'Luis' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('button', { name: /Luis Quispe/ }));
+
+    elegirBoleta();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));

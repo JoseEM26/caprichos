@@ -1,13 +1,14 @@
 /**
- * Selector de comprobante (nota de venta, boleta o factura) con sus datos.
- * Lo usan la precuenta del mozo, Nuevo pedido en Caja y «Cambiar comprobante» al cobrar.
- * La API valida otra vez (validarDocumentoComprobante); aquí solo se evita enviar datos que ya se sabe que no sirven.
+ * Selector de comprobante obligatorio (boleta o factura) con sus datos.
+ * Lo usan Nuevo pedido (mozo y Caja), la precuenta del mozo y «Cambiar comprobante» al cobrar.
+ * La nota de venta ya no es comprobante elegible. La API valida otra vez (validarDocumentoComprobante);
+ * aquí solo se evita enviar datos que ya se sabe que no sirven.
  */
 
-export type TipoComprobanteSel = 'NOTA_VENTA' | 'BOLETA' | 'FACTURA';
+export type TipoComprobanteSel = 'BOLETA' | 'FACTURA';
 
 export interface ValorComprobante {
-  /** null = sin elegir: el pedido sale con el comprobante por defecto del local */
+  /** null = sin elegir: no se puede enviar ni cobrar hasta elegir boleta o factura */
   tipo: TipoComprobanteSel | null;
   doc: string;
   razon: string;
@@ -19,15 +20,16 @@ export const VALOR_COMPROBANTE_VACIO: ValorComprobante = { tipo: null, doc: '', 
 /** Sobre el que la boleta sin DNI deja de poder emitirse (SUNAT). */
 export const LIMITE_BOLETA_SIN_DNI = 700;
 
-const ETIQUETA: Record<TipoComprobanteSel, string> = { NOTA_VENTA: 'Nota de venta', BOLETA: 'Boleta', FACTURA: 'Factura' };
-export const etiquetaComprobante = (t: TipoComprobanteSel) => ETIQUETA[t];
+const ETIQUETA: Record<TipoComprobanteSel, string> = { BOLETA: 'Boleta', FACTURA: 'Factura' };
+/** Nombre para mostrar. Los pedidos antiguos con nota de venta se muestran como tal (solo lectura). */
+export const etiquetaComprobante = (t: string) => (t === 'BOLETA' || t === 'FACTURA' ? ETIQUETA[t] : 'Nota de venta');
 
 /**
  * Mensaje del primer dato con formato malo, o null. `campo` dice qué campo enfocar.
  * La boleta sin DNI por más de S/ 700 NO es error aquí: nunca se bloquea la venta; la exige el cobro (avisoValorComprobante).
  */
-export function errorValorComprobante(v: ValorComprobante): { campo: 'doc' | 'razon'; mensaje: string } | null {
-  if (v.tipo === null || v.tipo === 'NOTA_VENTA') return null;
+export function errorValorComprobante(v: ValorComprobante): { campo: 'tipo' | 'doc' | 'razon'; mensaje: string } | null {
+  if (v.tipo === null) return { campo: 'tipo', mensaje: 'Elige boleta o factura' };
   const doc = v.doc.trim();
   if (v.tipo === 'BOLETA') {
     if (doc !== '' && !/^\d{8}$/.test(doc)) return { campo: 'doc', mensaje: 'El DNI debe tener 8 dígitos (o déjalo vacío)' };
@@ -42,7 +44,6 @@ export function errorValorComprobante(v: ValorComprobante): { campo: 'doc' | 'ra
 /** Cuerpo del comprobante para la API (sin campos vacíos). Sin tipo elegido, no se manda nada. */
 export function aPayloadComprobante(v: ValorComprobante) {
   if (v.tipo === null) return undefined;
-  if (v.tipo === 'NOTA_VENTA') return { tipo: 'NOTA_VENTA' as const };
   const doc = v.doc.trim();
   return {
     tipo: v.tipo,
@@ -55,7 +56,6 @@ export function aPayloadComprobante(v: ValorComprobante) {
 /** Cuerpo del comprobante para crear el pedido (POST pedidos: dni, ruc, razonSocial). Sin tipo, no se manda nada. */
 export function aComprobanteAlta(v: ValorComprobante) {
   if (v.tipo === null) return undefined;
-  if (v.tipo === 'NOTA_VENTA') return { tipo: 'NOTA_VENTA' as const };
   const doc = v.doc.trim();
   if (v.tipo === 'BOLETA') return { tipo: 'BOLETA' as const, ...(doc ? { dni: doc } : {}) };
   return {
@@ -108,22 +108,18 @@ export interface SelectorComprobanteProps {
   total?: number;
   /** Prefijo de los id de los campos (para enfocarlos desde fuera): `${idPrefijo}-doc`, `${idPrefijo}-razon` */
   idPrefijo: string;
-  /** Texto bajo los botones (p. ej. qué sale si no se elige) */
-  ayuda?: string;
-  /** Sin tipo elegido: ningún botón queda marcado */
-  permiteSinElegir?: boolean;
 }
 
-export function SelectorComprobante({ valor, onChange, total, idPrefijo, ayuda, permiteSinElegir = false }: SelectorComprobanteProps) {
+export function SelectorComprobante({ valor, onChange, total, idPrefijo }: SelectorComprobanteProps) {
   const err = errorValorComprobante(valor);
   const aviso = avisoValorComprobante(valor, total);
   const set = (cambio: Partial<ValorComprobante>) => onChange({ ...valor, ...cambio });
   const sinDocObligatorio = valor.tipo === 'BOLETA' && (total ?? 0) > LIMITE_BOLETA_SIN_DNI;
-  const tipos: TipoComprobanteSel[] = ['NOTA_VENTA', 'BOLETA', 'FACTURA'];
+  const tipos: TipoComprobanteSel[] = ['BOLETA', 'FACTURA'];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontWeight: 700, fontSize: 13 }}>Comprobante</div>
+    <div id={`${idPrefijo}-tipo`} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontWeight: 700, fontSize: 13 }}>Comprobante (obligatorio)</div>
       <div role="group" aria-label="Comprobante" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {tipos.map((t) => (
           <button
@@ -137,13 +133,12 @@ export function SelectorComprobante({ valor, onChange, total, idPrefijo, ayuda, 
             {ETIQUETA[t]}
           </button>
         ))}
-        {permiteSinElegir && valor.tipo !== null && (
-          <button type="button" onClick={() => set({ tipo: null })} style={botonTipo(false)}>
-            Sin elegir
-          </button>
-        )}
       </div>
-      {ayuda && valor.tipo === null && <div style={{ fontSize: 12 }}>{ayuda}</div>}
+      {valor.tipo === null && (
+        <div role="status" style={{ fontSize: 12, fontWeight: 600 }}>
+          Elige boleta o factura para continuar.
+        </div>
+      )}
 
       {valor.tipo === 'BOLETA' && (
         <>

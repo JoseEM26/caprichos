@@ -29,9 +29,8 @@ import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service'
 import { TELEFONO_PLACEHOLDER, tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { PagoPlanService } from './pago-plan.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
-import { ComprobanteDefectoService } from '../comprobantes/comprobante-defecto.service';
-import { tipoComprobanteEfectivo } from '../comprobantes/comprobante-defecto';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
+import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
 
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO' | 'CAJA' | 'WHATSAPP' | 'BOT';
@@ -71,7 +70,6 @@ export class PedidosService {
     private readonly avisosPedidoService?: AvisosPedidoService,
     @Optional() private readonly direcciones?: DireccionesClienteService,
     @Optional() private readonly puntosParty?: PartyPuntosService,
-    @Optional() private readonly defectoComprobante?: ComprobanteDefectoService,
   ) {}
 
   /**
@@ -230,8 +228,14 @@ export class PedidosService {
       clienteNombre = dto.cliente.nombre.trim();
     }
 
-    // 4. Validar comprobante (sin tipo elegido, el efectivo se decide con el total, más abajo)
+    // 4. Comprobante obligatorio en todo canal: boleta o factura (la nota de venta no es comprobante)
     const tipoElegido = dto.comprobante?.tipo;
+    if (!esComprobanteElegible(tipoElegido)) {
+      throw new BadRequestException({
+        codigo: 'COMPROBANTE_OBLIGATORIO',
+        mensaje: 'Elige boleta o factura para tu pedido',
+      });
+    }
     if (tipoElegido === 'FACTURA') {
       const ruc = dto.comprobante?.ruc?.trim();
       const razonSocial = dto.comprobante?.razonSocial?.trim();
@@ -622,9 +626,8 @@ export class PedidosService {
       });
     }
 
-    // 9. Comprobante efectivo (único punto del tipo por defecto) y creación en transacción
-    const aplicaDefecto = tipoElegido ? false : !!(await this.defectoComprobante?.aplica());
-    const comprobanteTipo = tipoComprobanteEfectivo(tipoElegido, aplicaDefecto);
+    // 9. Comprobante (ya validado arriba) y creación en transacción
+    const comprobanteTipo = tipoElegido;
     const comprobanteDoc =
       comprobanteTipo === 'FACTURA'
         ? dto.comprobante?.ruc?.trim() || null

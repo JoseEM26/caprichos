@@ -47,6 +47,7 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
     total: 50.0,
     estado: 'ENTREGADO',
     pago_estado: 'PENDIENTE',
+    comprobante_tipo: 'BOLETA',
     es_personal: false,
     cobros: [],
   };

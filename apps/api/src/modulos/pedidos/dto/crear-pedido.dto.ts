@@ -118,8 +118,8 @@ export class PagoPedidoDto {
 }
 
 export class ComprobantePedidoDto {
-  @IsIn(['NOTA_VENTA', 'BOLETA', 'FACTURA'], { message: 'Tipo de comprobante debe ser nota de venta, BOLETA o FACTURA' })
-  tipo!: 'NOTA_VENTA' | 'BOLETA' | 'FACTURA';
+  @IsIn(['BOLETA', 'FACTURA'], { message: 'Elige boleta o factura' })
+  tipo!: 'BOLETA' | 'FACTURA';
 
   @IsOptional()
   @IsString()

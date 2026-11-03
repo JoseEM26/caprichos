@@ -50,13 +50,13 @@ function FilaDato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   );
 }
 
-/** Comprobante guardado en el pedido como valor del selector. Sin tipo guardado, nota de venta. */
+/** Comprobante guardado en el pedido como valor del selector. Sin boleta ni factura guardada, sin elegir. */
 function valorDelPedido(pedido: Pedido): ValorComprobante {
   const t = String(pedido.comprobante_tipo ?? '').toUpperCase();
-  const tipo: TipoComprobanteSel = t === 'BOLETA' || t === 'FACTURA' ? t : 'NOTA_VENTA';
+  const tipo: TipoComprobanteSel | null = t === 'BOLETA' || t === 'FACTURA' ? t : null;
   return {
     tipo,
-    doc: tipo === 'NOTA_VENTA' ? '' : pedido.comprobante_doc ?? '',
+    doc: tipo === null ? '' : pedido.comprobante_doc ?? '',
     razon: pedido.comprobante_razon ?? '',
     direccion: pedido.comprobante_direccion ?? '',
   };
@@ -85,7 +85,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
 
   // Estados locales para acciones
   // Comprobante del pedido (el que tiene guardado); se cambia con «Cambiar comprobante» antes de cobrar
-  const tipoComp = etiquetaComprobante(valorDelPedido(pedido).tipo ?? 'NOTA_VENTA');
+  const tipoComp = pedido.comprobante_tipo ? etiquetaComprobante(pedido.comprobante_tipo) : 'Sin elegir';
   const [cambiandoComp, setCambiandoComp] = useState(false);
   const [valorCambio, setValorCambio] = useState<ValorComprobante>(() => valorDelPedido(pedido));
   const [confirmarCambio, setConfirmarCambio] = useState(false);
@@ -1318,7 +1318,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
       <Confirmar
         abierto={confirmarCambio}
         titulo="Cambiar comprobante"
-        mensaje={`¿Cambiar el comprobante del pedido a ${etiquetaComprobante(valorCambio.tipo ?? 'NOTA_VENTA')}${valorCambio.doc.trim() ? ` (${valorCambio.tipo === 'FACTURA' ? 'RUC' : 'DNI'} ${valorCambio.doc.trim()})` : ''}? Caja lo emitirá al cobrar.`}
+        mensaje={`¿Cambiar el comprobante del pedido a ${valorCambio.tipo === 'FACTURA' ? 'Factura' : 'Boleta'}${valorCambio.doc.trim() ? ` (${valorCambio.tipo === 'FACTURA' ? 'RUC' : 'DNI'} ${valorCambio.doc.trim()})` : ''}? Caja lo emitirá al cobrar.`}
         textoSi="Sí, cambiar"
         textoNo="No"
         cargando={guardandoComp}
@@ -1326,7 +1326,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
           setGuardandoComp(true);
           setErrorComp(null);
           try {
-            const dto = aPayloadComprobante({ ...valorCambio, tipo: valorCambio.tipo ?? 'NOTA_VENTA' }) ?? { tipo: 'NOTA_VENTA' as const };
+            const dto = aPayloadComprobante(valorCambio);
+            if (!dto) throw new Error('Elige boleta o factura');
             await pedidosApi.cambiarComprobante(pedido.id, dto);
             setConfirmarCambio(false);
             setCambiandoComp(false);

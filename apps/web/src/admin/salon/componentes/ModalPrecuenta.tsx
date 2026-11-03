@@ -56,7 +56,7 @@ export interface ModalPrecuentaProps {
   vouchersPorMedio?: Array<{ medio: string; monto: number; subido: boolean; voucherId?: string | null }>;
   /** Si el mozo aún puede reemplazar un voucher ya subido. */
   puedeCambiarVoucher?: boolean;
-  /** Comprobante que ya tiene el pedido: se usa de defecto (boleta o factura con documento); si no, nota de venta. */
+  /** Comprobante que ya tiene el pedido (boleta o factura). Sin él, hay que elegirlo antes de enviar a Caja. */
   comprobantePedido?: { tipo?: string | null; documento?: string | null; razon?: string | null; direccion?: string | null } | null;
   /** Solo en el salón: pasa el pedido a otra mesa libre (el padre entra en modo elegir destino). */
   alCambiarMesa?: () => void;
@@ -67,13 +67,13 @@ const DIGITALES = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 /** Medios del plan que llevan captura: los digitales y la copia del POS (tarjeta). */
 const MEDIOS_CON_VOUCHER = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
 
-/** Comprobante del pedido de defecto: boleta o factura guardadas (la boleta puede no tener DNI); si no, nota de venta. */
+/** Comprobante guardado en el pedido (la boleta puede no tener DNI); sin boleta ni factura, sin elegir. */
 const valorInicial = (c: ModalPrecuentaProps['comprobantePedido']): ValorComprobante => {
   const t = String(c?.tipo ?? '').toUpperCase();
-  const tipo: TipoComprobanteSel = t === 'BOLETA' || t === 'FACTURA' ? t : 'NOTA_VENTA';
+  const tipo: TipoComprobanteSel | null = t === 'BOLETA' || t === 'FACTURA' ? t : null;
   return {
     tipo,
-    doc: tipo === 'NOTA_VENTA' ? '' : c?.documento ?? '',
+    doc: tipo === null ? '' : c?.documento ?? '',
     razon: c?.razon ?? '',
     direccion: c?.direccion ?? '',
   };
@@ -175,7 +175,7 @@ export function ModalPrecuenta({
         ? `Con S/ ${pagaConNum.toFixed(2)} no alcanza: el efectivo es S/ ${efectivoPlan.toFixed(2)}`
         : null;
   // Comprobante: la API valida otra vez; esto evita enviar datos que ya se sabe que no sirven
-  const tipoComp: TipoComprobanteSel = valorComp.tipo ?? 'NOTA_VENTA';
+  const tipoComp: TipoComprobanteSel | null = valorComp.tipo;
   const errorComprobante = errorValorComprobante(valorComp)?.mensaje ?? null;
   // Con parte digital o tarjeta, la foto de cada medio tiene que estar subida y leerse antes de enviar (lo exige el servidor)
   const listoParaEnviar = planListo && errorPagaCon === null && errorComprobante === null && (!hayDigital || voucherOk);
@@ -204,7 +204,7 @@ export function ModalPrecuenta({
     if (pedidoId === undefined || !listoParaEnviar) return;
     const extra: EnvioCajaExtra = {
       ...(efectivoPlan > 0 ? { recibido: pagaConNum } : {}),
-      comprobante: aPayloadComprobante({ ...valorComp, tipo: tipoComp }),
+      comprobante: aPayloadComprobante(valorComp),
     };
     try {
       setEnviando(true);
@@ -222,9 +222,7 @@ export function ModalPrecuenta({
   const mensajeEnvio = [
     `Caja cobrará S/ ${Number(total || 0).toFixed(2)} (${desgloseEnvio}).`,
     efectivoPlan > 0 ? `Paga con S/ ${pagaConNum.toFixed(2)}, vuelto S/ ${(pagaConNum - efectivoPlan).toFixed(2)}.` : null,
-    tipoComp === 'NOTA_VENTA'
-      ? 'Se emite la nota de venta y sale en la ticketera de Caja.'
-      : `${etiquetaComprobante(tipoComp)}: Caja la emite al cobrar.`,
+    tipoComp ? `${etiquetaComprobante(tipoComp)}: Caja la emite al cobrar.` : null,
     hayDigital ? `Caja revisará los vouchers ya subidos (${digitalesPlan.map((f) => nombreMedio(f.medio)).join(', ')}).` : null,
     'Tú no cierras el cobro.',
   ]
@@ -322,9 +320,6 @@ export function ModalPrecuenta({
                 {!enviado && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <SelectorComprobante idPrefijo="pc-comp" valor={valorComp} onChange={setValorComp} total={total} />
-                    {tipoComp === 'NOTA_VENTA' && (
-                      <div className="pc-nota-envio">Se imprime ya en la ticketera de Caja con su número.</div>
-                    )}
                   </div>
                 )}
 

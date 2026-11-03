@@ -24,6 +24,7 @@ describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => 
     mesa: 'Mesa 4',
     lineas: [{ cantidad: 2, nombre: 'Frappé Moka', detalle: 'Grande · Chantilly' }],
     total: 32.0,
+    comprobantePedido: { tipo: 'BOLETA', documento: null },
   };
 
   const elegirYPedirConfirmacion = () => {

@@ -24,12 +24,6 @@ export class ComprobanteDefectoService {
     }
   }
 
-  /** ¿Un pedido sin tipo elegido sale como boleta ahora? (marca activa y proveedor efectivo SUNAT). */
-  async aplica(db: any = this.prisma): Promise<boolean> {
-    const cfg = await this.comprobantes.leerConfigFacturacion(db);
-    return aplicaBoletaPorDefecto(this.comprobantes.proveedorEfectivo(cfg.proveedor), await this.leerActivo(db));
-  }
-
   async estado() {
     const activo = await this.leerActivo();
     const cfg = await this.comprobantes.leerConfigFacturacion();
