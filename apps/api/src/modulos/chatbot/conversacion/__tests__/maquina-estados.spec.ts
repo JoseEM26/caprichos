@@ -201,11 +201,11 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
         expect(resultado.acciones[0].tituloSeccion).toBe('Menú');
         expect(resultado.acciones[0].filas).toHaveLength(5);
         expect(resultado.acciones[0].filas.map((f) => f.id)).toEqual([
-          'horario',
+          'pedir',
           'carta',
           'mipedido',
-          'persona',
           'preguntar',
+          'persona',
         ]);
       }
     });

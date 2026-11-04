@@ -333,8 +333,6 @@ export interface ContextoConversacion {
   nombreCliente?: string | null;
   telefonoCliente?: string | null;
   cartaUrlPublica?: string;
-  /** Promoción marcada para el saludo (null si no hay ninguna vigente). */
-  promoSaludo?: { texto: string; enlaceCarta: string } | null;
   datosLocal?: DatosHorarioLocal;
   datosLocalPublicos?: any;
   categoriasCarta?: any[];

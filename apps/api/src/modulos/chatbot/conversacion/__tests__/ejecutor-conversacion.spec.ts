@@ -347,8 +347,8 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
         expect.stringContaining('Ana'),
         'Ver opciones',
         expect.arrayContaining([
-          expect.objectContaining({ id: 'horario', titulo: '🕒 Horario y ubicación' }),
-          expect.objectContaining({ id: 'carta', titulo: '🧁 Ver la carta' }),
+          expect.objectContaining({ id: 'pedir', titulo: 'Hacer pedido' }),
+          expect.objectContaining({ id: 'carta', titulo: 'Ver la carta' }),
         ]),
         expect.objectContaining({ conversacionId: 10n, tituloSeccion: 'Menú' }),
       );
