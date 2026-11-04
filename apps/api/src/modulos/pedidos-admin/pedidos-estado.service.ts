@@ -37,6 +37,7 @@ import { MEDIOS_CON_VOUCHER_CAJA } from '../vouchers/vouchers.service';
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
+import { SELECT_PRUEBA_INCIDENTE, construirPruebaEntrega } from '../repartos/prueba-entrega';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { RangoMisPedidos } from './dto/mis-pedidos-query.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
@@ -340,8 +341,8 @@ export class PedidosEstadoService {
       incidentes: {
         where: { motivo: MOTIVO_RETIRO },
         orderBy: { en: 'desc' as const },
-        take: 1,
-        select: { en: true },
+        take: 5,
+        select: { ...SELECT_PRUEBA_INCIDENTE, id: true },
       },
       mensajesReparto: {
         where: { numero: NUMERO_PREGUNTA_REPROG },
@@ -402,8 +403,19 @@ export class PedidosEstadoService {
       };
     };
 
-    const reprogramar = porReprogramar.map((p) => filas(p, true));
-    const cancelacion = cancelados.map((p) => filas(p, false));
+    // Prueba de entrega fallida: la última fila de NO_CONTESTA con llegada registrada (si la hay)
+    const conPrueba = async (lista: any[]) =>
+      Promise.all(
+        lista.map(async (p) => ({
+          ...filas(p, lista === porReprogramar),
+          prueba_entrega: await construirPruebaEntrega(
+            this.prisma,
+            (p.incidentes ?? []).find((i: any) => i.llego_en),
+          ),
+        })),
+      );
+    const reprogramar = await conPrueba(porReprogramar);
+    const cancelacion = await conPrueba(cancelados);
     return {
       reprogramar,
       cancelados: cancelacion,
@@ -724,6 +736,13 @@ export class PedidosEstadoService {
           select: { id: true },
           take: 1,
         },
+        // Última prueba de entrega fallida (cliente no salió con llegada registrada)
+        incidentes: {
+          where: { motivo: 'NO_CONTESTA', llego_en: { not: null } },
+          orderBy: { en: 'desc' },
+          take: 1,
+          select: SELECT_PRUEBA_INCIDENTE,
+        },
       },
     });
 
@@ -772,8 +791,10 @@ export class PedidosEstadoService {
 
     const cobroMozo = (await this.cobrosMozoDe([pedido])).get(String(pedido.id)) ?? null;
 
+    const { incidentes, ...pedidoSinIncidentes } = pedido;
     return {
-      ...pedido,
+      ...pedidoSinIncidentes,
+      prueba_entrega: await construirPruebaEntrega(this.prisma, incidentes?.[0]),
       puntos,
       cobro_vigente_id: cobroVigenteId,
       cobroMozo,

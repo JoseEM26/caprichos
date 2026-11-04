@@ -1,3 +1,4 @@
+import type { PruebaEntregaFallida } from './PruebaEntregaFallida';
 import { marcarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
 import { api } from '../../comun/api';
 import type { PlanPagoItem } from './planPago';
@@ -53,6 +54,7 @@ export interface HistorialEstado {
 export interface Pedido {
   id: string;
   codigo: string;
+  prueba_entrega?: PruebaEntregaFallida | null;
   canal: string;
   modalidad: string;
   repartidor_party_id?: string | number | null;
@@ -137,6 +139,7 @@ export interface NoEntregado {
   pregunta: PreguntaNoEntregado;
   pago_estado: string | null;
   revisar_devolucion: boolean;
+  prueba_entrega?: PruebaEntregaFallida | null;
 }
 
 export interface RespuestaNoEntregados {

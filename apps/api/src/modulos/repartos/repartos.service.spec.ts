@@ -87,6 +87,10 @@ describe('RepartosService', () => {
       },
       person: {
         findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      archivo: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       userAccount: {
         findUnique: jest.fn(),
@@ -438,7 +442,11 @@ describe('RepartosService', () => {
         estado: 'EN_CAMINO',
         repartidor_party_id: 101n,
       };
-      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        ...pedidoMock,
+        llego_en: new Date(Date.now() - 15 * 60000),
+      });
+      prismaMock.archivo.findMany.mockResolvedValue([{ id: 999n }]);
       prismaMock.incidenteEntrega.count.mockResolvedValue(0); // Intento 1
       prismaMock.incidenteEntrega.create.mockResolvedValue({
         id: 501n,
@@ -536,6 +544,97 @@ describe('RepartosService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('5b. Prueba de entrega fallida: cliente no salió (fotos y tiempo de espera)', () => {
+    const minutosAtras = (min: number) => new Date(Date.now() - min * 60000);
+
+    const pedidoEnPuerta = (llegoHaceMin: number | null) => ({
+      id: 60n,
+      codigo: 'CP-0110',
+      estado: 'EN_CAMINO',
+      repartidor_party_id: 101n,
+      llego_en: llegoHaceMin == null ? null : minutosAtras(llegoHaceMin),
+    });
+
+    const reportarNoSalio = (fotoArchivoIds?: (number | string)[]) =>
+      service.reportarFalla(
+        '60',
+        {
+          motivo: 'NO_CONTESTA',
+          contactos: [{ tipo: 'LLAMADA' }, { tipo: 'LLAMADA' }],
+          fotoArchivoIds,
+        },
+        repartidor1,
+      );
+
+    beforeEach(() => {
+      prismaMock.incidenteEntrega.count.mockResolvedValue(0);
+      prismaMock.incidenteEntrega.create.mockResolvedValue({ id: 700n, intento: 1 });
+      prismaMock.pedido.update.mockResolvedValue({ id: 60n, codigo: 'CP-0110', estado: 'LISTO', motivo_falla: 'NO_CONTESTA' });
+      prismaMock.archivo.findMany.mockImplementation(async ({ where }: any) =>
+        where.id.in.map((id: bigint) => ({ id })),
+      );
+    });
+
+    it('sin «Llegué» marcado: rechazado (SIN_LLEGADA)', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoEnPuerta(null));
+      await expect(reportarNoSalio([1])).rejects.toMatchObject({ response: { codigo: 'SIN_LLEGADA' } });
+      expect(prismaMock.incidenteEntrega.create).not.toHaveBeenCalled();
+    });
+
+    it('antes de cumplirse la espera: rechazado con cuántos minutos faltan', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoEnPuerta(4));
+      await expect(reportarNoSalio([1])).rejects.toMatchObject({
+        response: { codigo: 'ESPERA_NO_CUMPLIDA', mensaje: 'Aún no pasó el tiempo de espera (faltan 6 min)' },
+      });
+      expect(prismaMock.incidenteEntrega.create).not.toHaveBeenCalled();
+    });
+
+    it('pasado el tiempo sin foto: rechazado (FOTO_REQUERIDA)', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoEnPuerta(15));
+      await expect(reportarNoSalio([])).rejects.toMatchObject({ response: { codigo: 'FOTO_REQUERIDA' } });
+      expect(prismaMock.incidenteEntrega.create).not.toHaveBeenCalled();
+    });
+
+    it('pasado el tiempo con 2 fotos: guarda llegada, minutos esperados y las fotos en el incidente', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoEnPuerta(15));
+      await reportarNoSalio([11, '12']);
+
+      expect(prismaMock.incidenteEntrega.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          motivo: 'NO_CONTESTA',
+          foto_archivo_id: 11n,
+          llego_en: expect.any(Date),
+          espera_max_min: 10,
+          repartidor_party_id: 101n,
+          fotos: { create: [{ archivo_id: 11n }, { archivo_id: 12n }] },
+        }),
+      });
+    });
+
+    it('acepta 1 a 3 fotos y rechaza más de 3', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoEnPuerta(15));
+      await reportarNoSalio([21]);
+      await reportarNoSalio([21, 22, 23]);
+      expect(prismaMock.incidenteEntrega.create).toHaveBeenCalledTimes(2);
+
+      await expect(reportarNoSalio([1, 2, 3, 4])).rejects.toMatchObject({ response: { codigo: 'DEMASIADAS_FOTOS' } });
+      expect(prismaMock.incidenteEntrega.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('otro motivo (dirección no encontrada) no pide llegada ni foto', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoEnPuerta(null));
+      const res = await service.reportarFalla(
+        '60',
+        { motivo: 'DIRECCION_NO_ENCONTRADA', contactos: [] },
+        repartidor1,
+      );
+      expect(res.ok).toBe(true);
+      expect(prismaMock.incidenteEntrega.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ motivo: 'DIRECCION_NO_ENCONTRADA', llego_en: null, espera_max_min: null }),
+      });
     });
   });
 

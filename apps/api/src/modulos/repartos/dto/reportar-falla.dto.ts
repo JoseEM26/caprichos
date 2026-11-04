@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsEnum,
   IsNotEmpty,
@@ -32,4 +33,10 @@ export class ReportarFallaDto {
 
   @IsOptional()
   fotoArchivoId?: number | string;
+
+  /** Fotos del lugar (prueba de entrega): obligatorias de 1 a 3 para NO_CONTESTA. */
+  @IsOptional()
+  @IsArray({ message: 'Las fotos deben enviarse como lista' })
+  @ArrayMaxSize(3, { message: 'Se admiten como máximo 3 fotos' })
+  fotoArchivoIds?: (number | string)[];
 }

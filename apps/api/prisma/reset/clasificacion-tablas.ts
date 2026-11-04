@@ -83,7 +83,7 @@ export const CONSERVAR: string[] = [
   'compra', 'compra_linea', 'consumo_personal', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta',
   'encuesta_posventa', 'fecha_especial', 'foto_local', 'grupo_opciones', 'horario_dia',
-  'horario_trabajo', 'ia_consumo', 'incidente_entrega', 'iniciativa', 'iniciativa_comentario',
+  'horario_trabajo', 'ia_consumo', 'incidente_entrega', 'incidente_entrega_foto', 'iniciativa', 'iniciativa_comentario',
   'insumo', 'liquidacion', 'lista', 'lista_valor', 'lugar_stock', 'mensaje_carta', 'mensaje_chat',
   'mensaje_reparto', 'movimiento_caja', 'movimiento_stock', 'notificacion_lectura', 'novedad', 'novedad_foto', 'oferta',
   'opcion', 'organization', 'parametro', 'pedido_estado_historial', 'pedido_interno',

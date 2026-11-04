@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
 import { repartosApi, ContactoIntento, PedidoReparto } from './repartosApi';
@@ -18,6 +18,11 @@ export function ModalReportarFalla({
   const [motivo, setMotivo] = useState<'NO_CONTESTA' | 'DIRECCION_NO_ENCONTRADA'>('NO_CONTESTA');
   const [contactos, setContactos] = useState<ContactoIntento[]>([]);
   const [fotoArchivoId, setFotoArchivoId] = useState<string>('');
+  /** Prueba de entrega (cliente no salió): de 1 a 3 fotos del lugar donde esperó. */
+  const [fotos, setFotos] = useState<{ archivo: File; url: string }[]>([]);
+  const fotosRef = useRef(fotos);
+  fotosRef.current = fotos;
+  const esNoSalio = motivo === 'NO_CONTESTA';
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
@@ -39,6 +44,28 @@ export function ModalReportarFalla({
     setContactos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  useEffect(() => () => fotosRef.current.forEach((f) => URL.revokeObjectURL(f.url)), []);
+
+  const agregarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!archivo) return;
+    if (fotos.length >= 3) {
+      setErrorLocal('Se admiten como máximo 3 fotos.');
+      return;
+    }
+    setErrorLocal(null);
+    setFotos((prev) => [...prev, { archivo, url: URL.createObjectURL(archivo) }]);
+  };
+
+  const quitarFoto = (index: number) => {
+    setFotos((prev) => {
+      const quitada = prev[index];
+      if (quitada) URL.revokeObjectURL(quitada.url);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
   const handleIntentarEnviar = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorLocal(null);
@@ -47,6 +74,10 @@ export function ModalReportarFalla({
       setErrorLocal(
         'Se requieren al menos 2 llamadas registradas como evidencia para el motivo NO_CONTESTA',
       );
+      return;
+    }
+    if (esNoSalio && fotos.length < 1) {
+      setErrorLocal('Toma al menos 1 foto del lugar donde esperaste.');
       return;
     }
 
@@ -58,11 +89,17 @@ export function ModalReportarFalla({
     setErrorLocal(null);
 
     try {
-      await repartosApi.reportarFalla(pedido.id, {
-        motivo,
-        contactos,
-        fotoArchivoId: fotoArchivoId.trim() ? fotoArchivoId.trim() : undefined,
-      });
+      if (esNoSalio) {
+        const fotoArchivoIds: string[] = [];
+        for (const f of fotos) fotoArchivoIds.push(await repartosApi.subirFotoPrueba(f.archivo));
+        await repartosApi.reportarFalla(pedido.id, { motivo, contactos, fotoArchivoIds });
+      } else {
+        await repartosApi.reportarFalla(pedido.id, {
+          motivo,
+          contactos,
+          fotoArchivoId: fotoArchivoId.trim() ? fotoArchivoId.trim() : undefined,
+        });
+      }
       setMostrarConfirmacion(false);
       alCompletar();
     } catch (err: any) {
@@ -323,7 +360,77 @@ export function ModalReportarFalla({
               )}
             </div>
 
-            {/* Foto opcional */}
+            {esNoSalio ? (
+              <div
+                style={{
+                  background: 'var(--cp-cream)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
+                  Fotos del lugar donde esperaste (obligatorio, de 1 a 3)
+                </span>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {fotos.map((f, idx) => (
+                    <div key={f.url} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 96 }}>
+                      <img
+                        src={f.url}
+                        alt={`Foto ${idx + 1} del lugar`}
+                        style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--cp-line)' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => quitarFoto(idx)}
+                        aria-label={`Quitar foto ${idx + 1}`}
+                        style={{
+                          minHeight: 44,
+                          border: 0,
+                          background: 'transparent',
+                          color: 'var(--cp-rust)',
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {fotos.length < 3 && (
+                  <label
+                    style={{
+                      minHeight: 48,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 10,
+                      border: '1.5px solid var(--cp-navy)',
+                      background: 'var(--cp-white)',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 800,
+                      fontSize: 14,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {fotos.length === 0 ? 'Tomar foto del lugar' : 'Agregar otra foto'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={agregarFoto}
+                      data-testid="input-foto-prueba"
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                )}
+              </div>
+            ) : (
+            /* Foto opcional */
             <div>
               <label
                 htmlFor="foto-id-input"
@@ -355,6 +462,7 @@ export function ModalReportarFalla({
                 }}
               />
             </div>
+            )}
 
             {errorLocal && (
               <div
@@ -398,8 +506,12 @@ export function ModalReportarFalla({
 
       <Confirmar
         abierto={mostrarConfirmacion}
-        titulo="¿Confirmar reporte de entrega fallida?"
-        mensaje={`El pedido ${pedido.codigo} se marcará con falla "${motivo === 'NO_CONTESTA' ? 'No contesta' : 'Dirección no encontrada'}" y pasará a coordinación de caja.`}
+        titulo={esNoSalio ? '¿Confirmas que el cliente no salió?' : '¿Confirmar reporte de entrega fallida?'}
+        mensaje={
+          esNoSalio
+            ? 'Se devolverá el pedido a la tienda y se reprogramará. ¿Confirmas?'
+            : `El pedido ${pedido.codigo} se marcará con falla "Dirección no encontrada" y pasará a coordinación de caja.`
+        }
         textoSi="Sí, reportar"
         textoNo="No, revisar"
         peligro

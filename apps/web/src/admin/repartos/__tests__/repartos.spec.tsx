@@ -191,6 +191,8 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
   });
 
   it('no se puede reportar NO_CONTESTA con menos de 2 llamadas', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:foto-local');
+    URL.revokeObjectURL = vi.fn();
     const reportarMock = vi.spyOn(repartosApi, 'reportarFalla').mockResolvedValueOnce({
       ok: true,
       incidenteId: '99',
@@ -232,9 +234,18 @@ describe('Ola F5 y Siguiente: Repartos y Mapa (Decisiones del Dueño 1 a 8)', ()
 
     fireEvent.click(botonLlamada);
 
+    // Cliente no salió: la foto del lugar es obligatoria antes de confirmar
+    fireEvent.click(botonEnviar);
+    expect(screen.getByText('Toma al menos 1 foto del lugar donde esperaste.')).toBeInTheDocument();
+    expect(reportarMock).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId('input-foto-prueba'), {
+      target: { files: [new File(['x'], 'lugar.jpg', { type: 'image/jpeg' })] },
+    });
+    vi.spyOn(repartosApi, 'subirFotoPrueba').mockResolvedValue('5');
+
     fireEvent.click(botonEnviar);
 
-    expect(screen.getByText('¿Confirmar reporte de entrega fallida?')).toBeInTheDocument();
+    expect(screen.getByText('¿Confirmas que el cliente no salió?')).toBeInTheDocument();
     const botonConfirmar = screen.getByRole('button', { name: /sí, reportar/i });
     fireEvent.click(botonConfirmar);
 

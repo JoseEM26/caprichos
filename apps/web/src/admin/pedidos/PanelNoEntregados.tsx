@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { repartosApi } from '../repartos/repartosApi';
 import type { NoEntregado, PreguntaNoEntregado, RespuestaNoEntregados } from './pedidosApi';
+import { PruebaEntregaFallida } from './PruebaEntregaFallida';
 
 export interface PanelNoEntregadosProps {
   datos: RespuestaNoEntregados | null;
@@ -113,6 +114,8 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, alAct
           <div>{p.motivo}</div>
           <div>{horaRetiro(p.retirado_en)}</div>
         </div>
+
+        <PruebaEntregaFallida prueba={p.prueba_entrega} />
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span
