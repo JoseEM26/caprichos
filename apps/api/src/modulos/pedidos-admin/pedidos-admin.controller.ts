@@ -30,6 +30,8 @@ import { ReimprimirDto } from '../impresion/dto/reimprimir.dto';
 import { VouchersService } from '../vouchers/vouchers.service';
 import { PedidoComprobanteService } from './pedido-comprobante.service';
 import { CambiarComprobanteDto } from './dto/cambiar-comprobante.dto';
+import { DevolucionPedidoService } from './devolucion-pedido.service';
+import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 
 @Controller('admin/pedidos')
 @UseGuards(AccesoGuard)
@@ -41,6 +43,7 @@ export class PedidosAdminController {
     @Optional() private readonly impresionService?: ImpresionService,
     @Optional() private readonly vouchersService?: VouchersService,
     @Optional() private readonly pedidoComprobante?: PedidoComprobanteService,
+    @Optional() private readonly devolucionPedido?: DevolucionPedidoService,
   ) {}
 
   @Post()
@@ -140,6 +143,26 @@ export class PedidosAdminController {
       ip,
       ...(req.codigoSupervisorVerificado ? [true] : []),
     );
+  }
+
+  /** Datos para la devolución de un pedido cancelado por no recibir y pagado (monto sugerido, medio, comprobante). */
+  @Get(':id/devolucion/sugerencia')
+  @Permiso('pedidos', 'ver')
+  async sugerenciaDevolucion(@Param('id') id: string) {
+    return this.devolucionPedido!.sugerencia(id);
+  }
+
+  /**
+   * Registra la devolución manual. Aprueba la supervisora con su código; el ADMIN y el SUPERVISOR
+   * se autorizan solos (queda auditado a su nombre). El guard deja en req.supervisor quién autorizó.
+   */
+  @Post(':id/devolucion')
+  @Permiso('pedidos', 'cambiar_estado')
+  @RequiereCodigoSupervisor('pedidos/devolucion')
+  async registrarDevolucion(@Param('id') id: string, @Body() dto: RegistrarDevolucionDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const autorizadoPor = req.supervisor?.party_id ?? req.usuario?.partyId;
+    return this.devolucionPedido!.registrar(id, dto, req.usuario, BigInt(autorizadoPor), ip);
   }
 
   /** Plan de pago que arma el mozo antes de subir cada captura (el servidor deriva el monto por medio). */

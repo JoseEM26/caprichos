@@ -11,14 +11,17 @@ import { UbicarPedidoService } from './ubicar-pedido.service';
 import { PedidoComprobanteService } from './pedido-comprobante.service';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
+import { ComprobantesModule } from '../comprobantes/comprobantes.module';
+import { DevolucionPedidoService } from './devolucion-pedido.service';
 
 @Module({
-  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule],
+  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule],
   controllers: [PedidosAdminController],
   providers: [
     PedidosEstadoService,
     UbicarPedidoService,
     PedidoComprobanteService,
+    DevolucionPedidoService,
   ],
   exports: [PedidosEstadoService],
 })

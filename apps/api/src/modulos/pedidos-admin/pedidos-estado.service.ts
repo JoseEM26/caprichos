@@ -4,6 +4,7 @@ import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-pl
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
+import { FILTRO_CANCELADO_NO_RECIBIR, PAGOS_DEVOLVIBLES, nombresDePartes, salidaDevolucion } from './devolucion-pedido.util';
 import { StockService } from '../stock/stock.service';
 import { ImpresionService } from '../impresion/impresion.service';
 import { SalonService } from '../salon/salon.service';
@@ -366,26 +367,23 @@ export class PedidosEstadoService {
         take: 200,
       }),
       this.prisma.pedido.findMany({
-        where: {
-          estado: 'ANULADO',
-          mensajesReparto: {
-            some: {
-              numero: NUMERO_PREGUNTA_REPROG,
-              estado: {
-                in: [ESTADO_REPROG.NO_REPROGRAMAR, ESTADO_REPROG.SIN_RESPUESTA, ESTADO_REPROG.TOPE_ALCANZADO],
-              },
-            },
-          },
-        },
-        include: incluir,
+        where: FILTRO_CANCELADO_NO_RECIBIR,
+        include: { ...incluir, devolucion: true },
         orderBy: { anulado_en: 'desc' },
         take: 200,
       }),
     ]);
 
+    const devoluciones = cancelados.flatMap((p) => (p.devolucion ? [p.devolucion] : []));
+    const nombres = await nombresDePartes(
+      this.prisma,
+      devoluciones.flatMap((d) => [d.por_party_id, d.autorizado_por_party_id]),
+    );
+
     const filas = (p: any, enLista: boolean) => {
       const pago = String(p.pago_estado || '').toUpperCase();
       const pregunta = p.mensajesReparto?.[0]?.estado as string | undefined;
+      const devolucion = p.devolucion ? salidaDevolucion(p.devolucion, nombres) : null;
       return {
         id: String(p.id),
         codigo: p.codigo,
@@ -398,7 +396,8 @@ export class PedidosEstadoService {
         retirado_en: p.incidentes?.[0]?.en ?? null,
         pregunta: PREGUNTA_REPROG_VISTA[pregunta ?? ''] ?? 'SIN_PREGUNTA',
         pago_estado: p.pago_estado ?? null,
-        revisar_devolucion: !enLista && (pago === 'PAGADO' || pago === 'COORDINADO'),
+        revisar_devolucion: !enLista && PAGOS_DEVOLVIBLES.includes(pago) && !devolucion,
+        devolucion,
       };
     };
 
