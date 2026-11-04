@@ -76,6 +76,13 @@ export class CierreController {
     return this.cierreService.obtenerDigitales();
   }
 
+  /** Devoluciones de pedidos de la caja abierta (informativo, para reconciliar Yape/Plin devueltos). */
+  @Get('devoluciones')
+  @Permiso('caja', 'cerrar')
+  async listarDevolucionesTurno() {
+    return this.cierreService.listarDevolucionesTurno();
+  }
+
   /** Correcciones de montos digitales de la caja abierta. */
   @Get('ajustes-medio')
   @Permiso('caja', 'cerrar')

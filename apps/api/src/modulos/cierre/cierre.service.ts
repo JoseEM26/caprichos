@@ -44,6 +44,8 @@ import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { LiquidarRepartidorDto } from './dto/liquidar.dto';
 import { HistorialCierresDto } from './dto/historial.dto';
 import { calcularTotalConteo } from './cierre.util';
+import { inicioDiaLimaDeFecha } from '../cocina/cocina.util';
+import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-pedido.util';
 
 /**
  * Arqueos que NO cuadraron antes de exigir PIN de supervisor. Un arqueo que cuadra no suma.
@@ -290,6 +292,28 @@ export class CierreService {
         }),
       ),
     };
+  }
+
+  /**
+   * Devoluciones de pedidos desde el inicio (día de Lima) de la caja abierta. Solo informativo:
+   * el cuadre no las descuenta (las de efectivo ya salen como egreso de caja).
+   */
+  async listarDevolucionesTurno() {
+    const caja = await this.obtenerCajaAbierta();
+    const filas = await this.prisma.devolucionPedido.findMany({
+      where: { creado_en: { gte: inicioDiaLimaDeFecha(caja.fecha.toISOString().slice(0, 10)) } },
+      include: { pedido: { select: { codigo: true } } },
+      orderBy: { id: 'asc' },
+    });
+    const nombres = await nombresDePartes(
+      this.prisma,
+      filas.flatMap((f) => [f.por_party_id, f.autorizado_por_party_id]),
+    );
+    return filas.map((f) => ({
+      ...salidaDevolucion(f, nombres),
+      pedidoCodigo: f.pedido.codigo,
+      codigoOperacion: f.codigo_operacion,
+    }));
   }
 
   /** Correcciones de montos digitales de la caja abierta, en orden de registro. */
