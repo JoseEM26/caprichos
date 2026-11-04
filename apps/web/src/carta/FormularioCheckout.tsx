@@ -410,6 +410,14 @@ export function FormularioCheckout({
     setTarifaZona(null);
   };
 
+  // Pedido mínimo: solo para DELIVERY, sobre el subtotal de productos. Sin parámetro configurado no hay mínimo.
+  const minimoDelivery = datosLocal?.pedidoMinimo && datosLocal.pedidoMinimo > 0 ? datosLocal.pedidoMinimo : 0;
+  const faltanteMinimo =
+    modalidad === 'DELIVERY' && minimoDelivery > 0 && subtotal < minimoDelivery
+      ? Number((minimoDelivery - subtotal).toFixed(2))
+      : 0;
+  const mensajeMinimo = `Pedido mínimo de delivery S/ ${minimoDelivery.toFixed(2)}. Te faltan S/ ${faltanteMinimo.toFixed(2)}`;
+
   // Validaciones del formulario separadas por apartado
   const validarPaso1 = (): string | null => {
     if (!clienteCuenta && !comoInvitado && invitadoPermitido) {
@@ -433,6 +441,7 @@ export function FormularioCheckout({
 
   const validarPaso2 = (): string | null => {
     if (modalidad === 'DELIVERY') {
+      if (faltanteMinimo > 0) return mensajeMinimo;
       if (usarUltimaDireccion) return null;
       if (pideEleccionDireccion) {
         return 'Elige a dónde lo enviamos: una de tus direcciones anteriores o una nueva';
@@ -681,6 +690,10 @@ export function FormularioCheckout({
         } else if (err.codigo === 'CELULAR_REQUERIDO') {
           setPaso(1);
           setErrorEnvio('Escribe tu celular para hacer tu pedido y sumar puntos.');
+        } else if (err.codigo === 'PEDIDO_MINIMO') {
+          // El servidor manda el mensaje con el faltante; se muestra tal cual y se vuelve a los datos de entrega
+          setPaso(2);
+          setErrorEnvio(err.message);
         } else if (err.codigo === 'FACTURA_DATOS_INCOMPLETOS') {
           setErrorEnvio('La factura exige un RUC de 11 dígitos y razón social válida.');
         } else {
@@ -2178,6 +2191,56 @@ export function FormularioCheckout({
                   S/ {totalCalculado.toFixed(2)}
                 </span>
               </div>
+
+              {/* Aviso de pedido mínimo (solo delivery): no deja enviar hasta cubrirlo */}
+              {faltanteMinimo > 0 && (
+                <div
+                  role="status"
+                  style={{
+                    backgroundColor: 'var(--cp-sand)',
+                    border: '1.5px solid var(--cp-orange)',
+                    borderRadius: '10px',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    fontSize: '13px',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 700,
+                  }}
+                >
+                  <span>{mensajeMinimo}</span>
+                  <div style={{ height: '6px', borderRadius: '3px', backgroundColor: 'var(--cp-line)', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${Math.min(100, (subtotal / minimoDelivery) * 100).toFixed(0)}%`,
+                        backgroundColor: 'var(--cp-orange)',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => cerrarCheckout()}
+                      style={{ border: 0, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                    >
+                      Seguir agregando productos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalidad('RECOGER');
+                        setErrorPaso(null);
+                        setErrorEnvio(null);
+                      }}
+                      style={{ border: 0, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                    >
+                      Cambiar a Recoger
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Mensaje de error del apartado o de la API */}
               {(errorPaso || errorEnvio) && (

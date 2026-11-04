@@ -329,10 +329,23 @@ describe('Máquina de Estados del Bot Conversacional (transicionarEstado)', () =
       const entrada = normalizarEntrada({ listRowId: 'faq_delivery' });
       const resultado = transicionarEstado(null, entrada, contextoBase);
 
-      if (resultado.acciones[0].tipo === 'enviarBotones') {
-        expect(resultado.acciones[0].texto).toContain('s/ 14.50');
-        expect(resultado.acciones[0].texto).toContain('a partir de s/ 70.00');
-      }
+      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
+      const texto = (resultado.acciones[0] as any).texto as string;
+      expect(texto).toContain('El pedido mínimo para delivery es s/ 14.50 en productos');
+      expect(texto).toContain('para recoger en el local no hay mínimo');
+      expect(texto).toContain('a partir de s/ 70.00');
+    });
+
+    it('sin pedido_minimo configurado no menciona ningún mínimo (ni 14.50 ni 15)', () => {
+      const ctx = { ...contextoBase, datosLocalPublicos: { ...contextoBase.datosLocalPublicos!, pedidoMinimo: null } };
+      const resultado = transicionarEstado(null, normalizarEntrada({ listRowId: 'faq_delivery' }), ctx);
+
+      expect(resultado.acciones[0].tipo).toBe('enviarBotones');
+      const texto = (resultado.acciones[0] as any).texto as string;
+      expect(texto).not.toMatch(/mínimo/i);
+      expect(texto).not.toContain('14.50');
+      expect(texto).toContain('a partir de s/ 70.00');
+      expect(texto).toContain('zonas de reparto');
     });
   });
 

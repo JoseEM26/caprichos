@@ -663,6 +663,82 @@ describe('PedidosService', () => {
       expect(res.total).toBe(28.0);
     });
 
+    describe('pedido mínimo (solo delivery, sobre subtotal de productos)', () => {
+      // Subtotal de pedidoBaseDto: 2 × 14 = 28
+      const conMinimo = (valor: number | null) =>
+        prismaMock.parametro.findUnique.mockImplementation(({ where }: any) => {
+          if (where.clave === 'pedido_minimo') {
+            return Promise.resolve(valor === null ? null : { clave: 'pedido_minimo', valor });
+          }
+          if (where.clave === 'envio_gratis_monto') {
+            return Promise.resolve({ clave: 'envio_gratis_monto', valor: 70 });
+          }
+          return Promise.resolve(null);
+        });
+
+      beforeEach(() => {
+        prismaMock.pedido.create.mockImplementation(({ data }: any) =>
+          Promise.resolve({
+            id: 300n,
+            codigo: 'CP-M001',
+            estado: 'COLA',
+            subtotal: Number(data.subtotal),
+            envio: data.envio !== null ? Number(data.envio) : null,
+            total: Number(data.total),
+          }),
+        );
+      });
+
+      it('delivery bajo el mínimo: rechaza con PEDIDO_MINIMO, faltante y no crea el pedido', async () => {
+        conMinimo(30);
+
+        await expect(service.crear(pedidoBaseDto, 'idemp-min-1')).rejects.toMatchObject({
+          response: {
+            codigo: 'PEDIDO_MINIMO',
+            mensaje: 'El pedido mínimo para delivery es S/ 30.00; te faltan S/ 2.00',
+            minimo: 30,
+            faltante: 2,
+          },
+        });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('delivery exactamente en el mínimo: pasa', async () => {
+        conMinimo(28);
+
+        const res = await service.crear(pedidoBaseDto, 'idemp-min-2');
+
+        expect(res.subtotal).toBe(28);
+      });
+
+      it('recoger bajo el mínimo: se acepta sin validar', async () => {
+        conMinimo(30);
+        const dto: any = { ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined };
+
+        const res = await service.crear(dto, 'idemp-min-3');
+
+        expect(res.codigo).toBe('CP-M001');
+        expect(prismaMock.pedido.create).toHaveBeenCalled();
+      });
+
+      it('mesa bajo el mínimo: se acepta sin validar', async () => {
+        conMinimo(30);
+        const dto: any = { ...pedidoBaseDto, modalidad: 'MESA', entrega: undefined };
+
+        const res = await service.crear(dto, 'idemp-min-4');
+
+        expect(res.codigo).toBe('CP-M001');
+      });
+
+      it('sin pedido_minimo configurado no hay mínimo: delivery de cualquier monto pasa', async () => {
+        conMinimo(null);
+
+        const res = await service.crear(pedidoBaseDto, 'idemp-min-5');
+
+        expect(res.subtotal).toBe(28);
+      });
+    });
+
     describe('combo con parte fija y reemplazos', () => {
       const dtoCombo = (): CrearPedidoDto => ({
         ...pedidoBaseDto,

@@ -714,9 +714,10 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   const waNum = String(datosLocal?.whatsapp || '51900000000').replace(/\D/g, '');
   const waUrl = `https://wa.me/${waNum || '51900000000'}`;
   const envioGratis = datosLocal?.envioGratisDesde ?? 70;
-  const pedidoMin = datosLocal?.pedidoMinimo ?? 14.5;
+  // Sin parámetro `pedido_minimo` configurado no se menciona ningún mínimo
+  const pedidoMin = datosLocal?.pedidoMinimo ?? 0;
   const fmtMonto = (m: number) => `s/ ${Number.isInteger(m) ? m : m.toFixed(2)}`;
-  const lineaPie = `Horario: ${horarioTexto} · Delivery gratis por compras de más de ${fmtMonto(envioGratis)} · Pedido mínimo de delivery ${fmtMonto(pedidoMin)}`;
+  const lineaPie = `Horario: ${horarioTexto} · Delivery gratis por compras de más de ${fmtMonto(envioGratis)}${pedidoMin > 0 ? ` · Pedido mínimo de delivery ${fmtMonto(pedidoMin)}` : ''}`;
   const redes = [
     { n: datosLocal?.redes?.instagramNombre || '@caprichos (ejemplo)', url: datosLocal?.redes?.instagram || 'https://www.instagram.com/' },
     { n: 'Facebook', url: datosLocal?.redes?.facebook || 'https://www.facebook.com/' },

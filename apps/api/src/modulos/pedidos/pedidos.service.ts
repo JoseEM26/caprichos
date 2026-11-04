@@ -621,20 +621,26 @@ export class PedidosService {
 
     const descuentoAplicado = desgloseDescuento.descuentoTotal;
 
-    // 6. Validar pedido mínimo si está configurado
-    const paramPedidoMinimo = await this.prisma.parametro.findUnique({
-      where: { clave: 'pedido_minimo' },
-    });
-    const pedidoMinimoVal =
-      typeof paramPedidoMinimo?.valor === 'number'
-        ? paramPedidoMinimo.valor
-        : Number(paramPedidoMinimo?.valor) || 0;
-
-    if (pedidoMinimoVal > 0 && subtotalCalculado < pedidoMinimoVal) {
-      throw new BadRequestException({
-        codigo: 'PEDIDO_MINIMO',
-        mensaje: `El pedido no alcanza el monto mínimo de S/ ${pedidoMinimoVal.toFixed(2)}`,
+    // 6. Pedido mínimo: solo para DELIVERY, sobre el subtotal de productos (sin envío ni descuentos).
+    // Sin parámetro `pedido_minimo` configurado (o 0) no hay mínimo.
+    if (dto.modalidad === 'DELIVERY') {
+      const paramPedidoMinimo = await this.prisma.parametro.findUnique({
+        where: { clave: 'pedido_minimo' },
       });
+      const pedidoMinimoVal =
+        typeof paramPedidoMinimo?.valor === 'number'
+          ? paramPedidoMinimo.valor
+          : Number(paramPedidoMinimo?.valor) || 0;
+
+      if (pedidoMinimoVal > 0 && subtotalCalculado < pedidoMinimoVal) {
+        const faltante = Number((pedidoMinimoVal - subtotalCalculado).toFixed(2));
+        throw new BadRequestException({
+          codigo: 'PEDIDO_MINIMO',
+          mensaje: `El pedido mínimo para delivery es S/ ${pedidoMinimoVal.toFixed(2)}; te faltan S/ ${faltante.toFixed(2)}`,
+          minimo: pedidoMinimoVal,
+          faltante,
+        });
+      }
     }
 
     // 7. Cálculo de envío (solo DELIVERY)
