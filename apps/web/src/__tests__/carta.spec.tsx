@@ -527,7 +527,8 @@ describe('Carta ▸ puntos (reglas vigentes)', () => {
     fireEvent.change(screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i), { target: { value: '20' } });
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
 
-    expect(alAplicar).not.toHaveBeenCalled();
+    expect(alAplicar).not.toHaveBeenCalledWith(20);
+    expect(alAplicar).toHaveBeenLastCalledWith(0);
     expect(
       screen.getByText(
         'Solo puedes usar hasta 12 puntos en este pedido: se aplican a productos sin promoción ni descuento.',

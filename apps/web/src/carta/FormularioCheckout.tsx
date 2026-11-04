@@ -121,7 +121,7 @@ export function FormularioCheckout({
   } | null>(null);
   const [cargandoCupon, setCargandoCupon] = useState(false);
   const [puntosAplicados, setPuntosAplicados] = useState(0);
-  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
+  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { tipo?: string; nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
   const cumpleFaltaCuenta = !!clienteCuenta && (!clienteCuenta.cumpleanos || clienteCuenta.cumpleanos === '—');
@@ -185,7 +185,7 @@ export function FormularioCheckout({
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
     api
-      .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
+      .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { tipo?: string; nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
         lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, subtotal: l.subtotal, precioUnitario: l.precioUnitario })),
         cuponCodigo: cuponAplicado?.codigo,
       })
@@ -241,16 +241,13 @@ export function FormularioCheckout({
       ? textoResumenEnvio(zonaEnvio, tarifaZona, subtotal, reglaEnvio)
       : null;
   const descuentoCupon = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
+  // Descuentos del servidor (promociones + cupón). El cupón se muestra aparte; lo demás son promociones.
+  const descuentosServidor = promos.total > 0 ? promos.total : descuentoCupon;
+  const promoMonto = Math.max(0, Math.round((descuentosServidor - descuentoCupon) * 100) / 100);
+  const puntosMonto = cuponAplicado ? 0 : puntosAplicados;
   const totalCalculado = Math.max(
     0,
-    Number(
-      (
-        calcularTotalPedido({
-          subtotal,
-          envio: costoEnvioEfectivo,
-        }) - (promos.total > 0 ? promos.total : descuentoCupon) - (cuponAplicado ? 0 : puntosAplicados)
-      ).toFixed(2),
-    ),
+    Number((calcularTotalPedido({ subtotal, envio: costoEnvioEfectivo }) - promoMonto - descuentoCupon - puntosMonto).toFixed(2)),
   );
 
   const aplicarCupon = async () => {
@@ -2078,10 +2075,34 @@ export function FormularioCheckout({
                       <span style={{ fontWeight: 700 }}>S/ {subtotal.toFixed(2)}</span>
                     </div>
 
-                    {puntosAplicados > 0 && !cuponAplicado && (
+                    {promoMonto > 0 && (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                          <span>Promociones y descuentos</span>
+                          <span style={{ fontWeight: 700 }}>−S/ {promoMonto.toFixed(2)}</span>
+                        </div>
+                        {promos.detalles
+                          .filter((d) => d.tipo !== 'CUPON' && d.monto > 0)
+                          .map((d, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--cp-soft)', paddingLeft: '10px' }}>
+                              <span>{d.nombre}</span>
+                              <span>−S/ {d.monto.toFixed(2)}</span>
+                            </div>
+                          ))}
+                      </>
+                    )}
+
+                    {cuponAplicado && descuentoCupon > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                        <span>Puntos canjeados</span>
-                        <span style={{ fontWeight: 700 }}>−S/ {puntosAplicados.toFixed(2)}</span>
+                        <span>Cupón {cuponAplicado.codigo}</span>
+                        <span style={{ fontWeight: 700 }}>−S/ {descuentoCupon.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    {puntosMonto > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                        <span>Puntos usados</span>
+                        <span style={{ fontWeight: 700 }}>−S/ {puntosMonto.toFixed(2)}</span>
                       </div>
                     )}
 
@@ -2090,20 +2111,6 @@ export function FormularioCheckout({
                         Tienes {primeraCompra.descuento} de descuento en tu primera compra. Inicia sesión con tu celular para aplicarlo. No aplica a promociones ni combos.
                       </div>
                     )}
-
-                    {promos.detalles.length > 0
-                      ? promos.detalles.map((d, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                            <span>{d.nombre}</span>
-                            <span style={{ fontWeight: 700 }}>−S/ {d.monto.toFixed(2)}</span>
-                          </div>
-                        ))
-                      : cuponAplicado && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                            <span>Cupón {cuponAplicado.codigo}</span>
-                            <span style={{ fontWeight: 700 }}>−S/ {cuponAplicado.descuentoCalculado.toFixed(2)}</span>
-                          </div>
-                        )}
 
                     {modalidad === 'DELIVERY' && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
