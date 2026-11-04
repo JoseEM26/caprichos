@@ -52,6 +52,8 @@ export interface OfertaItem {
   soloPrimeraCompra: boolean;
   orden: number;
   activo: boolean;
+  /** Se muestra en la carta virtual (el descuento sigue vigente aunque esté oculta) */
+  visibleCarta: boolean;
   creadoEn: string;
   combosPrecio?: ComboPrecioItem[];
   combosParte?: ComboParteItem[];

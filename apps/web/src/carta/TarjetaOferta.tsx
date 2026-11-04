@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { CategoriaCarta, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
+import { TextoEd } from './edicion';
 import { useEsMovil } from './useEsMovil';
 
 interface TarjetaOfertaProps {
@@ -349,7 +350,7 @@ export function TarjetaOferta({
             color: 'var(--cp-navy)',
           }}
         >
-          {oferta.nombre}
+          <TextoEd clave={`promo:${oferta.id}:nombre`} valor={oferta.nombre} ayuda="Nombre de la promoción" />
         </div>
 
         {oferta.descripcion && (
@@ -369,7 +370,7 @@ export function TarjetaOferta({
                 : {}),
             }}
           >
-            {oferta.descripcion}
+            <TextoEd clave={`promo:${oferta.id}:descripcion`} valor={oferta.descripcion} ayuda="Descripción de la promoción" />
           </div>
         )}
 

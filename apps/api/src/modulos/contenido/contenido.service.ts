@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { OfertasService } from '../ofertas/ofertas.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { resolverDisposicionCarta } from './disposicion-carta';
@@ -219,6 +220,7 @@ export class ContenidoService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     private readonly eventosGateway: EventosGateway,
+    private readonly ofertas: OfertasService,
   ) {}
 
   // =========================================================================
@@ -656,7 +658,8 @@ export class ContenidoService {
       }
     }
 
-    await this.aplicarMomentosDelBorrador(publicada.id, contenido, usuario);
+    const sinPromos = await this.aplicarPromosDelBorrador(publicada.id, contenido, usuario);
+    await this.aplicarMomentosDelBorrador(publicada.id, sinPromos, usuario);
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -689,6 +692,34 @@ export class ContenidoService {
       data: { ruta, tipo_mime: 'image/webp', bytes: 1024, privado: false },
     });
     return creado.id;
+  }
+
+  /**
+   * Promociones de la carta: el diseñador solo cambia lo visual y de ubicación (nombre, descripción, foto, orden y
+   * visible en la carta). Se aplica con OfertasService.actualizarOferta, sin tocar las reglas del descuento.
+   * Devuelve el contenido sin `promos` (ya aplicado) para que no se arrastre al siguiente borrador.
+   */
+  private async aplicarPromosDelBorrador(versionId: bigint, contenido: any, usuario?: UsuarioAutenticado) {
+    const { promos, ...resto } = contenido ?? {};
+    if (promos === undefined) return contenido;
+    if (promos && typeof promos === 'object' && !Array.isArray(promos)) {
+      for (const [idStr, p] of Object.entries(promos as Record<string, any>)) {
+        if (!/^\d+$/.test(idStr) || !p || typeof p !== 'object') continue;
+        try {
+          const dto: Record<string, unknown> = {};
+          if (typeof p.nombre === 'string' && p.nombre.trim()) dto.nombre = p.nombre.trim();
+          if (typeof p.descripcion === 'string') dto.descripcion = p.descripcion.trim() || null;
+          if (typeof p.orden === 'number') dto.orden = p.orden;
+          if (typeof p.oculto === 'boolean') dto.visibleCarta = !p.oculto;
+          if (typeof p.fotoUrl === 'string' && p.fotoUrl) dto.imagenArchivoId = String(await this.archivoDeRuta(p.fotoUrl));
+          if (Object.keys(dto).length) await this.ofertas.actualizarOferta(idStr, dto as any, usuario);
+        } catch (err) {
+          this.logger.warn(`No se pudo actualizar la promoción ${idStr}: ${err}`);
+        }
+      }
+    }
+    await this.prisma.versionCarta.update({ where: { id: versionId }, data: { contenido: resto } });
+    return resto;
   }
 
   /**

@@ -1351,6 +1351,8 @@ model Oferta {
   mostrar_en_saludo_bot Boolean       @default(false)
   // Solo clientes con sesión iniciada en la carta cuyo celular nunca tuvo un pedido válido (no anulado)
   solo_primera_compra  Boolean        @default(false)
+  // Se muestra en la carta virtual (no apaga el descuento: solo la vista de la promoción)
+  visible_carta        Boolean        @default(true)
 
   categoria            Categoria?     @relation(fields: [alcance_categoria_id], references: [id])
   producto             Producto?      @relation(fields: [alcance_producto_id], references: [id])

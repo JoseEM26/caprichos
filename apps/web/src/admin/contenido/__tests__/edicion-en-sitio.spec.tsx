@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { DisenadorView } from '../DisenadorView';
+import { DisenadorView, aplicarBorradorAPromos } from '../DisenadorView';
 import { NovedadesView } from '../NovedadesView';
 import { ConocenosView } from '../ConocenosView';
 import { CartaVistaPrevia } from '../../../carta/CartaPublica';
@@ -482,5 +482,123 @@ describe('Novedades: Momentos Caprichos propios', () => {
     fireEvent.click(screen.getByText('+ Agregar foto'));
     await waitFor(() => expect(momentosGuardados()).toHaveLength(3), { timeout: 3000 });
     expect(ultimaPut('/admin/contenido/novedades/borrador')?.items ?? []).toEqual([]);
+  });
+});
+
+describe('Diseñador: promociones de la carta en edición (lugar, foto, ocultar; reglas fuera)', () => {
+  const disenador = {
+    tieneBorrador: false,
+    organizacionActual: 'SECCIONES',
+    decoracionActual: 'NINGUNO',
+    contenidoActual: { banner: { activo: true, tag: 'NOVEDAD', title: 'Frappe Frutas', sub: 'Refrescante' } },
+    disposicionActual: undefined,
+    categorias: [{ id: 'c1', nombre: 'BEBIDAS', orden: 1, oculto: false }],
+    productos: [{ id: 'pr1', categoriaId: 'c1', nombre: 'Frappe Fresa', descripcion: 'Fresa', precio: 15, orden: 1, oculto: false, fotoUrl: null }],
+  };
+  const oferta = (id: string, nombre: string, orden: number, extra: Record<string, unknown> = {}) => ({
+    id, tipo: 'DESCUENTO', nombre, descripcion: `Desc ${nombre}`, descuentoTipo: 'PORCENTAJE', descuentoValor: 10,
+    lleva: null, paga: null, alcanceCategoriaId: null, alcanceProductoId: null, compraMinima: null, dias: [],
+    horaDesde: null, horaHasta: null, fechaDesde: null, fechaHasta: null, canales: ['CARTA'], limiteUsos: null,
+    usosActuales: 0, noSumaBeneficios: false, orden, activo: true, creadoEn: '2026-10-01T00:00:00.000Z',
+    vigenteAhora: true, imagenArchivoId: null, imagenUrl: null, combosPrecio: [], combosParte: [], visibleCarta: true,
+    ...extra,
+  });
+  const ofertas = [oferta('31', 'Martes 2x1', 1), oferta('32', 'Jueves 15%', 2)];
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    rutas({ '/admin/contenido/disenador': disenador, '/admin/contenido/destacadas': [], '/carta/ofertas': ofertas });
+  });
+
+  const abrir = async () => {
+    render(<MemoryRouter><DisenadorView /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId('oferta-31')).toBeTruthy(), { timeout: 5000 });
+  };
+  const ultimasPromos = () => ultimaPut('/admin/contenido/disenador/borrador')?.contenido.promos;
+
+  it('cada promoción es un bloque editable con Editar reglas que abre Ofertas en otra pestaña', async () => {
+    await abrir();
+    fireEvent.click(screen.getAllByRole('group', { name: 'Martes 2x1' })[0]);
+    const enlace = screen.getByRole('link', { name: /Editar reglas de Martes 2x1/ });
+    expect(enlace.getAttribute('href')).toBe('/admin/ofertas');
+    expect(enlace.getAttribute('target')).toBe('_blank');
+    expect(screen.getByLabelText('Cambiar foto de Martes 2x1')).toBeTruthy();
+    expect(screen.getByLabelText('Ocultar Martes 2x1')).toBeTruthy();
+  });
+
+  it('el título y la descripción de una promoción se editan en el lugar y van al borrador por id', async () => {
+    await abrir();
+    escribir('Nombre de la promoción', 'Martes 2x1 renovado');
+    await waitFor(() => expect(ultimasPromos()?.['31']?.nombre).toBe('Martes 2x1 renovado'), { timeout: 3000 });
+    escribir('Descripción de la promoción', 'Solo los martes');
+    await waitFor(() => expect(ultimasPromos()?.['31']?.descripcion).toBe('Solo los martes'), { timeout: 3000 });
+    expect(screen.getByRole('group', { name: 'Martes 2x1 renovado' })).toBeTruthy();
+  });
+
+  it('Bajar mueve la promoción y guarda el orden de todas en el borrador', async () => {
+    await abrir();
+    fireEvent.click(screen.getAllByRole('group', { name: 'Martes 2x1' })[0]);
+    fireEvent.click(screen.getByLabelText('Bajar Martes 2x1'));
+    await waitFor(() => expect(ultimasPromos()?.['31']?.orden).toBe(2), { timeout: 3000 });
+    expect(ultimasPromos()['32'].orden).toBe(1);
+  });
+
+  it('Ocultar deja la promoción atenuada con «Oculta» y la marca oculta en el borrador (el descuento no cambia)', async () => {
+    await abrir();
+    fireEvent.click(screen.getAllByRole('group', { name: 'Martes 2x1' })[0]);
+    fireEvent.click(screen.getByLabelText('Ocultar Martes 2x1'));
+    expect(screen.getByText('Oculta')).toBeTruthy();
+    await waitFor(() => expect(ultimasPromos()?.['31']?.oculto).toBe(true), { timeout: 3000 });
+    expect(Object.keys(ultimasPromos()['31']).sort()).toEqual(['oculto']);
+  });
+
+  it('Cambiar foto sube la imagen y la guarda como foto de la promoción', async () => {
+    await abrir();
+    fireEvent.click(screen.getAllByRole('group', { name: 'Martes 2x1' })[0]);
+    const entrada = screen.getByLabelText('Elegir foto para Martes 2x1');
+    fireEvent.change(entrada, { target: { files: [new File(['x'], 'p.png', { type: 'image/png' })] } });
+    await waitFor(() => expect(ultimasPromos()?.['31']?.fotoUrl).toContain('nueva.webp'), { timeout: 3000 });
+  });
+
+  it('Publicar envía las promociones del borrador; las reglas del descuento no viajan en el borrador', async () => {
+    await abrir();
+    fireEvent.click(screen.getAllByRole('group', { name: 'Martes 2x1' })[0]);
+    fireEvent.click(screen.getByLabelText('Ocultar Martes 2x1'));
+    await waitFor(() => expect(ultimasPromos()?.['31']?.oculto).toBe(true), { timeout: 3000 });
+    fireEvent.click(screen.getByText('Publicar'));
+    fireEvent.click(screen.getByText('Sí, publicar'));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/contenido/disenador/publicar', {}), { timeout: 3000 });
+    for (const [, valor] of Object.entries(ultimasPromos())) {
+      expect(Object.keys(valor as object).filter((k) => ['tipo', 'activo', 'descuentoValor', 'descuentoTipo', 'compraMinima', 'fechaDesde', 'canales'].includes(k))).toEqual([]);
+    }
+  });
+});
+
+describe('Carta pública: promociones ocultas no se muestran y el orden de la lista se respeta', () => {
+  it('una promoción con visibleCarta false no aparece fuera del diseñador', () => {
+    const datos: VistaPreviaCarta = {
+      categorias: [],
+      ofertas: [
+        { id: '1', tipo: 'DESCUENTO', nombre: 'Visible', descripcion: null, activo: true, orden: 1, creadoEn: '2026-10-01T00:00:00.000Z', visibleCarta: true, combosPrecio: [], combosParte: [] } as any,
+        { id: '2', tipo: 'DESCUENTO', nombre: 'Oculta en carta', descripcion: null, activo: true, orden: 2, creadoEn: '2026-10-01T00:00:00.000Z', visibleCarta: false, combosPrecio: [], combosParte: [] } as any,
+      ],
+      estadoLocal: null,
+      datosLocal: null,
+      contenido: { decoracion: 'NINGUNO', organizacion: 'SECCIONES', paleta: {}, novedades: [], destacadas: [], rankingMes: [], banner: { activo: false } },
+    };
+    render(<MemoryRouter><CartaVistaPrevia datos={datos} movil={false} /></MemoryRouter>);
+    expect(screen.getByTestId('oferta-1')).toBeTruthy();
+    expect(screen.queryByTestId('oferta-2')).toBeNull();
+  });
+
+  it('aplicarBorradorAPromos: el borrador cambia nombre, foto, orden y visibilidad, y deja intacto lo demás', () => {
+    const base = [
+      { id: 'a', tipo: 'DESCUENTO', nombre: 'A', activo: true, orden: 2, visibleCarta: true, descuentoValor: 10 },
+      { id: 'b', tipo: 'COMBO', nombre: 'B', activo: true, orden: 1, visibleCarta: false, descuentoValor: null },
+    ] as any[];
+    const r = aplicarBorradorAPromos(base, { a: { orden: 1, nombre: 'A nuevo', fotoUrl: '/f.webp', oculto: true }, b: { orden: 2, oculto: false } });
+    expect(r.map((o) => o.id)).toEqual(['a', 'b']);
+    expect(r[0]).toMatchObject({ nombre: 'A nuevo', imagenUrl: '/f.webp', visibleCarta: false, descuentoValor: 10, activo: true });
+    expect(r[1]).toMatchObject({ visibleCarta: true, nombre: 'B', tipo: 'COMBO' });
   });
 });

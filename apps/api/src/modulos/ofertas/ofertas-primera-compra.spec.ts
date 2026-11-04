@@ -159,7 +159,7 @@ describe('Oferta de primera compra y saludo del bot', () => {
     it('busca solo promociones de tipo DESCUENTO activas y marcadas', async () => {
       prisma.oferta.findMany.mockResolvedValueOnce([]);
       await service.promoParaSaludo(ahora);
-      expect(prisma.oferta.findMany.mock.calls[0][0].where).toEqual({ mostrar_en_saludo_bot: true, activo: true, tipo: 'DESCUENTO' });
+      expect(prisma.oferta.findMany.mock.calls[0][0].where).toEqual({ mostrar_en_saludo_bot: true, activo: true, visible_carta: true, tipo: 'DESCUENTO' });
     });
   });
 

@@ -51,6 +51,15 @@ interface DestacadaAdmin {
   fotos: { id: string; url: string; pie?: string }[];
 }
 
+/** Cambios de una promoción en borrador (solo lo visual y de lugar); las reglas del descuento se editan en Ofertas. */
+export interface PromoBorrador {
+  orden?: number;
+  oculto?: boolean;
+  nombre?: string;
+  descripcion?: string;
+  fotoUrl?: string;
+}
+
 /** Cambios de «Momentos Caprichos» en borrador: se aplican a las destacadas al publicar. */
 interface MomentosBorrador {
   orden: string[];
@@ -64,7 +73,7 @@ interface EstadoDis {
   layout: 'secciones' | 'lista' | 'grande';
   theme: string;
   banner: Banner;
-  promos: unknown[];
+  promos: Record<string, PromoBorrador>;
   productosConfig: Record<string, Partial<ProductoAdmin>>;
   categorias: CategoriaAdmin[];
   productos: ProductoAdmin[];
@@ -122,6 +131,22 @@ export function momentosVisibles(base: DestacadaAdmin[], m: MomentosBorrador): H
     const n = m.nuevos.find((x) => x.id === id)!;
     return { id, titulo: it.titulo ?? n.titulo, portada_url: it.portada ?? n.foto, activo: it.activo ?? true, fotos: [{ id, url: n.foto }] };
   });
+}
+
+/** Promociones de la carta con lo que el borrador guardó (nombre, descripción, foto, orden y visible). */
+export function aplicarBorradorAPromos(ofertas: OfertaItem[], cfg: Record<string, PromoBorrador>): OfertaItem[] {
+  const con = ofertas.map((o) => {
+    const c = cfg[o.id] ?? {};
+    return {
+      ...o,
+      nombre: c.nombre ?? o.nombre,
+      descripcion: c.descripcion ?? o.descripcion,
+      imagenUrl: c.fotoUrl ?? o.imagenUrl,
+      visibleCarta: c.oculto !== undefined ? !c.oculto : o.visibleCarta !== false,
+      orden: c.orden ?? o.orden ?? 0,
+    };
+  });
+  return con.sort((a, b) => a.orden - b.orden);
 }
 
 /** Aplica al listado de la base lo que el borrador guardó (orden, ocultos, nombres, precios y fotos de productos). */
@@ -205,7 +230,7 @@ export function DisenadorView() {
         layout: data.organizacionActual === 'LISTA' ? 'lista' : data.organizacionActual === 'TARJETAS' ? 'grande' : 'secciones',
         theme: (data.decoracionActual || 'ninguno').toLowerCase(),
         banner: { ...BANNER_BASE, ...(conf.banner || {}) },
-        promos: Array.isArray(conf.promos) ? conf.promos : [],
+        promos: conf.promos && typeof conf.promos === 'object' && !Array.isArray(conf.promos) ? conf.promos : {},
         productosConfig: pc,
         categorias: cats,
         productos: aplicarBorradorAProductos(prods, pc),
@@ -244,6 +269,7 @@ export function DisenadorView() {
   const alternarPop = (bloque: string, tipo: string) => setPop((p) => (p && p.bloque === bloque && p.tipo === tipo ? null : { bloque, tipo }));
 
   const momentos = useMemo(() => (e ? momentosVisibles(momentosBase, e.momentos) : []), [e, momentosBase]);
+  const promosVisibles = useMemo(() => (e && datosPublicos ? aplicarBorradorAPromos(datosPublicos.ofertas, e.promos) : []), [e, datosPublicos]);
 
   const vistaPrevia: VistaPreviaCarta | null = useMemo(() => {
     if (!e || !datosPublicos) return null;
@@ -277,7 +303,7 @@ export function DisenadorView() {
       .filter((c) => c.productos.length > 0);
     return {
       categorias,
-      ofertas: datosPublicos.ofertas,
+      ofertas: promosVisibles,
       estadoLocal: datosPublicos.estadoLocal,
       datosLocal: datosPublicos.datosLocal,
       contenido: {
@@ -293,7 +319,7 @@ export function DisenadorView() {
         destacadas: momentos,
       } as ContenidoCarta,
     };
-  }, [e, datosPublicos, momentos]);
+  }, [e, datosPublicos, momentos, promosVisibles]);
 
   if (cargando) return <Cargando mensaje="Cargando diseñador de la carta..." />;
   if (error || !e) return <EstadoError mensaje={error || 'No se pudo cargar el diseñador'} alReintentar={cargarDatos} />;
@@ -309,6 +335,9 @@ export function DisenadorView() {
       productos: s.productos.map((p) => (p.id === id ? { ...p, ...parche } : p)),
       productosConfig: { ...s.productosConfig, [id]: { ...s.productosConfig[id], ...parche } },
     }));
+  const setPromo = (id: string, parche: PromoBorrador) => cambiar((s) => ({ ...s, promos: { ...s.promos, [id]: { ...s.promos[id], ...parche } } }));
+  const reordenarPromos = (ids: string[]) =>
+    cambiar((s) => ({ ...s, promos: { ...s.promos, ...Object.fromEntries(ids.map((id, i) => [id, { ...s.promos[id], orden: i + 1 }])) } }));
   const reordenarProductos = (catId: string, ids: string[]) =>
     cambiar((s) => {
       const delCat = ids.map((id) => s.productos.find((p) => p.id === id)!).map((p, i) => ({ ...p, orden: i + 1 }));
@@ -476,6 +505,35 @@ export function DisenadorView() {
       );
     }
 
+    if (tipo === 'promo') {
+      const ids = promosVisibles.map((o) => o.id);
+      const i = ids.indexOf(id);
+      const o = promosVisibles[i];
+      return (
+        <BloqueEditable
+          key={clave}
+          {...comun}
+          etiqueta={o?.nombre ?? 'Promoción'}
+          oculto={o?.visibleCarta === false}
+          puedeSubir={i > 0}
+          puedeBajar={i < ids.length - 1}
+          onSubir={() => reordenarPromos(moverIndice(ids, i, -1))}
+          onBajar={() => reordenarPromos(moverIndice(ids, i, 1))}
+          puedeSoltar={mismoTipo(clave)}
+          onSoltar={(desde) => reordenarPromos(reubicar(ids, ids.indexOf(desde.split(':')[1]), i))}
+          onOcultar={() => setPromo(id, { oculto: o?.visibleCarta !== false })}
+          onFoto={(f) => subirYAplicar(f, (url) => setPromo(id, { fotoUrl: url }))}
+          acciones={
+            <a className="ed-btn" href="/admin/ofertas" target="_blank" rel="noopener noreferrer" aria-label={`Editar reglas de ${o?.nombre ?? 'la promoción'} en Ofertas`}>
+              Editar reglas
+            </a>
+          }
+        >
+          {hijo}
+        </BloqueEditable>
+      );
+    }
+
     if (tipo === 'momento') {
       const ids = ordenMomentos();
       const i = ids.indexOf(id);
@@ -512,6 +570,10 @@ export function DisenadorView() {
         if (valor) setProducto(partes[1], { nombre: valor });
       } else if (partes[0] === 'producto' && partes[2] === 'descripcion') {
         setProducto(partes[1], { descripcion: valor });
+      } else if (partes[0] === 'promo' && partes[2] === 'nombre') {
+        if (valor) setPromo(partes[1], { nombre: valor });
+      } else if (partes[0] === 'promo' && partes[2] === 'descripcion') {
+        setPromo(partes[1], { descripcion: valor });
       } else if (partes[0] === 'momento' && partes[2] === 'titulo') {
         if (valor) setMomento(partes[1], { titulo: valor });
       }

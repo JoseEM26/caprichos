@@ -11,6 +11,7 @@ import { ContenidoService } from '../contenido.service';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
+import { OfertasService } from '../../ofertas/ofertas.service';
 
 /**
  * Las imágenes del diseñador, novedades y destacadas deben quedar como archivos subidos:
@@ -48,6 +49,7 @@ describe('Imágenes de contenido: borrador y publicación', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditoriaService, useValue: { registrar: jest.fn() } },
         { provide: EventosGateway, useValue: { emitirAdmin: jest.fn(), emitirPublico: jest.fn() } },
+        { provide: OfertasService, useValue: { actualizarOferta: jest.fn() } },
       ],
     }).compile();
     service = module.get(ContenidoService);

@@ -74,6 +74,8 @@ export interface OfertaItem {
   soloPrimeraCompra?: boolean;
   orden?: number;
   activo: boolean;
+  /** Se muestra en la carta virtual (el diseñador la oculta sin apagar el descuento) */
+  visibleCarta?: boolean;
   creadoEn: string;
   vigenteAhora?: boolean;
   imagenArchivoId?: string | null;
