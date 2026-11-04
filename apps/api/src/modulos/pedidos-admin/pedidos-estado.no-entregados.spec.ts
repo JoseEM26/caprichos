@@ -4,7 +4,7 @@ jest.mock('../salon/salon.service', () => ({ SalonService: class {} }));
 import { PedidosEstadoService } from './pedidos-estado.service';
 
 describe('PedidosEstadoService.listarNoEntregados', () => {
-  let prisma: { pedido: { findMany: jest.Mock } };
+  let prisma: { pedido: { findMany: jest.Mock }; party: { findMany: jest.Mock } };
   let service: PedidosEstadoService;
 
   const base = (extra: Record<string, unknown>) => ({
@@ -21,7 +21,7 @@ describe('PedidosEstadoService.listarNoEntregados', () => {
   });
 
   beforeEach(() => {
-    prisma = { pedido: { findMany: jest.fn() } };
+    prisma = { pedido: { findMany: jest.fn() }, party: { findMany: jest.fn().mockResolvedValue([]) } };
     service = new PedidosEstadoService(prisma as any, {} as any, {} as any);
   });
 
@@ -111,6 +111,32 @@ describe('PedidosEstadoService.listarNoEntregados', () => {
     const res = await service.listarNoEntregados();
 
     expect(res.cancelados[0].revisar_devolucion).toBe(true);
+  });
+
+  it('con devolución registrada quita la etiqueta y muestra el detalle', async () => {
+    prisma.pedido.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      base({
+        estado: 'ANULADO',
+        pago_estado: 'PAGADO',
+        mensajesReparto: [{ estado: 'NO_REPROGRAMAR' }],
+        devolucion: {
+          id: 3n,
+          pedido_id: 1n,
+          monto_devuelto: 25,
+          medio: 'YAPE',
+          motivo: 'Solo se cobró delivery',
+          comprobante_baja_estado: null,
+          por_party_id: 9n,
+          autorizado_por_party_id: 4n,
+          creado_en: new Date('2026-11-04T15:00:00Z'),
+        },
+      }),
+    ]);
+
+    const res = await service.listarNoEntregados();
+
+    expect(res.cancelados[0].revisar_devolucion).toBe(false);
+    expect(res.cancelados[0].devolucion).toMatchObject({ id: '3', montoDevuelto: 25, medio: 'YAPE' });
   });
 
   it('sin pedidos devuelve listas vacías y total 0', async () => {

@@ -126,6 +126,35 @@ export interface FiltrosListarPedidos {
 /** Pregunta de reprogramar tras el retiro: esperando, dijo sí/no, sin respuesta, tope o sin pregunta. */
 export type PreguntaNoEntregado = 'ESPERANDO' | 'SI' | 'NO' | 'SIN_RESPUESTA' | 'TOPE' | 'SIN_PREGUNTA';
 
+/** Devolución ya registrada de un pedido cancelado por no recibir. */
+export interface DevolucionRegistrada {
+  id: string;
+  montoDevuelto: number;
+  medio: string;
+  motivo: string | null;
+  porNombre: string | null;
+  autorizadoPorNombre: string | null;
+  comprobanteBajaEstado: string | null;
+  creadoEn: string;
+}
+
+/** Datos para prellenar la devolución: lo pagado, el envío, el monto sugerido, el medio y el comprobante vigente. */
+export interface SugerenciaDevolucion {
+  pedidoId: string;
+  codigo: string;
+  montoPagado: number;
+  montoEnvio: number;
+  montoSugerido: number;
+  medioOriginal: string | null;
+  comprobante: { tipo: string; numero: string; bajaEstado: string | null } | null;
+}
+
+export interface RegistroDevolucion extends DevolucionRegistrada {
+  pedidoId: string;
+  /** Si la baja del comprobante no se pudo hacer: consultar al contador. */
+  avisoComprobante: string | null;
+}
+
 export interface NoEntregado {
   id: string;
   codigo: string;
@@ -137,6 +166,7 @@ export interface NoEntregado {
   pregunta: PreguntaNoEntregado;
   pago_estado: string | null;
   revisar_devolucion: boolean;
+  devolucion?: DevolucionRegistrada | null;
 }
 
 export interface RespuestaNoEntregados {
@@ -264,6 +294,23 @@ export const pedidosApi = {
   /** Delivery no entregados: por reprogramar (LISTO sin repartidor) y cancelados por no recibir. */
   async listarNoEntregados(): Promise<RespuestaNoEntregados> {
     return api.get<RespuestaNoEntregados>('/admin/pedidos/no-entregados');
+  },
+
+  async sugerenciaDevolucion(id: string | number): Promise<SugerenciaDevolucion> {
+    return api.get<SugerenciaDevolucion>(`/admin/pedidos/${id}/devolucion/sugerencia`);
+  },
+
+  /** Devolución manual. El código del supervisor va solo si quien registra no es ADMIN ni SUPERVISOR. */
+  async registrarDevolucion(
+    id: string | number,
+    datos: { montoDevuelto: number; medio: string; codigoOperacion?: string; motivo?: string },
+    codigoSupervisor?: string,
+  ): Promise<RegistroDevolucion> {
+    const headers: Record<string, string> = {};
+    if (codigoSupervisor) headers['X-Codigo-Supervisor'] = codigoSupervisor.trim();
+    const r = await api.post<RegistroDevolucion>(`/admin/pedidos/${id}/devolucion`, datos, { headers });
+    if (codigoSupervisor) marcarAutorizacionSupervisor();
+    return r;
   },
 
   async cambiarEstado(

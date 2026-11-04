@@ -58,6 +58,8 @@ model Party {
   direccionesCliente       ClienteDireccion[]
   ajustesMedioPor          CierreAjusteMedio[]   @relation("AjusteMedioPor")
   ajustesMedioAutorizados  CierreAjusteMedio[]   @relation("AjusteMedioAutorizado")
+  devolucionesPor          DevolucionPedido[]    @relation("DevolucionPor")
+  devolucionesAutorizadas  DevolucionPedido[]    @relation("DevolucionAutorizada")
 
   @@map("party")
 }
@@ -559,6 +561,7 @@ model Pedido {
   quejasWhatsapp         QuejaWhatsapp[]
   vouchers               VoucherPago[]
   planPago               PedidoPagoPlan[]
+  devolucion             DevolucionPedido?
   clienteIdentificado    Party?                 @relation("ClienteIdentificadoPedido", fields: [cliente_party_id], references: [id])
 
   @@index([cliente_party_id], map: "pedido_cliente_party_id_idx")
@@ -739,6 +742,7 @@ model MovimientoCaja {
   motivo_anulacion String?
 
   caja             Caja      @relation(fields: [caja_id], references: [id])
+  devolucion       DevolucionPedido[]
 
   @@map("movimiento_caja")
 }
@@ -800,6 +804,32 @@ model CierreMedio {
 
 /// Corrección de un monto digital (Yape, Plin, transferencia o tarjeta) de una caja. Solo se inserta:
 /// el trigger de la migración impide UPDATE y DELETE (historial append-only).
+/// Devolución de un pedido cancelado por no recibir que ya estaba pagado. Manual, una por pedido. Solo se inserta.
+model DevolucionPedido {
+  id                      BigInt         @id @default(autoincrement())
+  pedido_id               BigInt         @unique
+  monto_pagado            Decimal        @db.Decimal(12, 2)
+  monto_envio             Decimal        @db.Decimal(12, 2)
+  monto_sugerido          Decimal        @db.Decimal(12, 2)
+  monto_devuelto          Decimal        @db.Decimal(12, 2)
+  medio                   String
+  codigo_operacion        String?
+  motivo                  String?
+  por_party_id            BigInt
+  autorizado_por_party_id BigInt
+  // Resultado de la comunicación de baja de la boleta/factura (null si no tenía comprobante electrónico)
+  comprobante_baja_estado String?
+  movimiento_caja_id      BigInt?
+  creado_en               DateTime       @default(now()) @db.Timestamptz
+
+  pedido         Pedido          @relation(fields: [pedido_id], references: [id])
+  por            Party           @relation("DevolucionPor", fields: [por_party_id], references: [id])
+  autorizadoPor  Party           @relation("DevolucionAutorizada", fields: [autorizado_por_party_id], references: [id])
+  movimientoCaja MovimientoCaja? @relation(fields: [movimiento_caja_id], references: [id])
+
+  @@map("devolucion_pedido")
+}
+
 model CierreAjusteMedio {
   id                      BigInt   @id @default(autoincrement())
   caja_id                 BigInt

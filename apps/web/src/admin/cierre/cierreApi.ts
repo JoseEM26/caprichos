@@ -164,6 +164,20 @@ export interface DigitalesCaja {
 }
 
 /** Corrección de un monto digital de la caja, con quién la hizo, quién la aprobó y cuándo. */
+/** Devolución de un pedido en la caja abierta (informativa para el cuadre). */
+export interface DevolucionTurno {
+  id: string;
+  pedidoCodigo: string;
+  montoDevuelto: number;
+  medio: string;
+  codigoOperacion: string | null;
+  motivo: string | null;
+  porNombre: string | null;
+  autorizadoPorNombre: string | null;
+  comprobanteBajaEstado: string | null;
+  creadoEn: string;
+}
+
 export interface AjusteMedio {
   id: number;
   medio: string;
@@ -264,6 +278,8 @@ export const cierreApi = {
   obtenerDigitales: () => api.get<DigitalesCaja>('/admin/cierre/digitales'),
 
   listarAjustesMedio: () => api.get<AjusteMedio[]>('/admin/cierre/ajustes-medio'),
+
+  listarDevolucionesTurno: () => api.get<DevolucionTurno[]>('/admin/cierre/devoluciones'),
 
   // ADMIN y SUPERVISOR sin código; el cajero con el código de supervisor (lo valida el servidor)
   registrarAjusteMedio: (dto: { medio: MedioAjustable; montoNuevo: number; motivo: string }, pinSupervisor?: string) => {

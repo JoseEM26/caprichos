@@ -10,6 +10,7 @@ import {
   calcularTotalEfectivo,
   AjusteMedio,
   ClaveDigital,
+  DevolucionTurno,
   DigitalesCaja,
   MedioAjustable,
   PendienteCobro,
@@ -106,6 +107,7 @@ export function CierreView() {
   // solo los corrige por excepción, con motivo y autorización (ver DialogoCorregirMedio).
   const [digitales, setDigitales] = useState<DigitalesCaja | null>(null);
   const [ajustesMedio, setAjustesMedio] = useState<AjusteMedio[]>([]);
+  const [devolucionesTurno, setDevolucionesTurno] = useState<DevolucionTurno[]>([]);
   const [correccion, setCorreccion] = useState<{ medio: MedioAjustable; clave: ClaveDigital } | null>(null);
   const [obsCierre, setObsCierre] = useState('');
   const [pinSupervisora, setPinSupervisora] = useState('');
@@ -119,9 +121,14 @@ export function CierreView() {
   // Montos digitales del sistema y sus correcciones de la caja abierta
   const cargarDigitales = useCallback(async () => {
     try {
-      const [d, a] = await Promise.all([cierreApi.obtenerDigitales(), cierreApi.listarAjustesMedio()]);
+      const [d, a, dev] = await Promise.all([
+        cierreApi.obtenerDigitales(),
+        cierreApi.listarAjustesMedio(),
+        cierreApi.listarDevolucionesTurno().catch(() => [] as DevolucionTurno[]),
+      ]);
       setDigitales(d);
       setAjustesMedio(a);
+      setDevolucionesTurno(dev);
     } catch {
       setDigitales(null);
       setAjustesMedio([]);
@@ -1506,6 +1513,7 @@ export function CierreView() {
             {/* FASE 1: VERIFICAR MOVIMIENTOS */}
             {faseCierre === 'verificar' && (
               <VerificarMovimientos
+                devoluciones={devolucionesTurno}
                 fecha={fechaTurno}
                 diaAnterior={fechaTurno < hoyLima()}
                 cajero={cajeroNombre}

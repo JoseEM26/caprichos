@@ -891,6 +891,7 @@ export function PedidosAdminView() {
             cargando={cargandoNoEntregados}
             error={errorNoEntregados}
             puedeLiquidar={puedeLiquidar}
+            puedeDevolver={tiene('pedidos/cambiar_estado')}
             alActualizar={() => {
               void cargarNoEntregados();
               void cargarDatos();

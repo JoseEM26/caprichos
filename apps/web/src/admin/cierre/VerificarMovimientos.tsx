@@ -1,6 +1,7 @@
 import './verificar-movimientos.css';
 import type { ReactNode } from 'react';
 import type { MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
+import type { DevolucionTurno } from './cierreApi';
 
 
 export const soles = (n: unknown) => `S/ ${Number(n || 0).toFixed(2)}`;
@@ -29,6 +30,8 @@ interface Props {
   pedidosCobrados: CobroTurno[];
   movimientos: MovimientoCaja[];
   pendientesCount: number;
+  /** Devoluciones de pedidos de la caja abierta (solo informativo) */
+  devoluciones?: DevolucionTurno[];
   /** Panel de pendientes ya existente */
   pendientes: ReactNode;
   onContinuar: () => void;
@@ -46,8 +49,18 @@ const Tarjeta = ({ t, v, ayuda, fuerte }: { t: string; v: number; ayuda?: string
   </div>
 );
 
+const MEDIO_DEVOLUCION: Record<string, string> = {
+  EFECTIVO: 'Efectivo',
+  YAPE: 'Yape',
+  PLIN: 'Plin',
+  TRANSFERENCIA: 'Transferencia',
+  TARJETA: 'Tarjeta',
+};
+
 export function VerificarMovimientos(p: Props) {
   const r = p.resumen;
+  const devoluciones = p.devoluciones ?? [];
+  const totalDigital = devoluciones.filter((d) => d.medio !== 'EFECTIVO').reduce((a, d) => a + d.montoDevuelto, 0);
   const medios = r
     ? [
         { n: 'Efectivo', m: r.ventasEfectivo, c: 'EFECTIVO' },
@@ -175,6 +188,40 @@ export function VerificarMovimientos(p: Props) {
             </div>
           )}
           <div className="vm-ayuda">Los movimientos anulados no cuentan en el total de ingresos y egresos.</div>
+        </section>
+
+        <section className="vm-seccion" aria-labelledby="vm-h-dev">
+          <h3 id="vm-h-dev">Devoluciones del turno</h3>
+          {devoluciones.length === 0 ? (
+            <div className="vm-vacio">Sin devoluciones en este turno.</div>
+          ) : (
+            <div className="vm-tabla vm-scroll" role="table" aria-label="Devoluciones del turno">
+              <div className="vm-fila vm-cab vm-fila-4" role="row">
+                <span role="columnheader">Pedido</span>
+                <span role="columnheader">Medio</span>
+                <span role="columnheader">Código</span>
+                <span role="columnheader" className="vm-der">Monto</span>
+              </div>
+              {devoluciones.map((d) => (
+                <div className="vm-fila vm-fila-4" role="row" key={d.id}>
+                  <span role="cell"><b>{d.pedidoCodigo}</b></span>
+                  <span role="cell">{MEDIO_DEVOLUCION[d.medio] ?? d.medio}</span>
+                  <span role="cell">{d.codigoOperacion || '—'}</span>
+                  <span role="cell" className="vm-der vm-monto">{soles(d.montoDevuelto)}</span>
+                </div>
+              ))}
+              <div className="vm-fila vm-fila-4 vm-total" role="row">
+                <span role="cell">Devuelto por Yape, Plin, transferencia y tarjeta</span>
+                <span role="cell" />
+                <span role="cell" />
+                <span role="cell" className="vm-der vm-monto">{soles(totalDigital)}</span>
+              </div>
+            </div>
+          )}
+          <div className="vm-ayuda">
+            Solo para revisar. Las devoluciones en efectivo ya salen como egreso en Movimientos de caja. Las digitales
+            todavía no descuentan del cuadre: compáralas con lo que devolviste por Yape, Plin o transferencia.
+          </div>
         </section>
 
         <section className="vm-seccion" aria-labelledby="vm-h-pend">
