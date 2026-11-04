@@ -153,6 +153,29 @@ export interface HistorialRespuesta {
   totalPaginas: number;
 }
 
+/** Medios digitales que calcula el sistema: el cajero no los teclea. */
+export type ClaveDigital = 'yape' | 'plin' | 'transferencia' | 'tarjeta';
+export type MedioAjustable = 'YAPE' | 'PLIN' | 'TRANSFERENCIA' | 'TARJETA';
+
+export interface DigitalesCaja {
+  cajaId: number;
+  fecha: string;
+  medios: Record<ClaveDigital, { monto: number; sistema: number; cobros: number; corregido: boolean }>;
+}
+
+/** Corrección de un monto digital de la caja, con quién la hizo, quién la aprobó y cuándo. */
+export interface AjusteMedio {
+  id: number;
+  medio: string;
+  montoSistema: number;
+  montoAnterior: number;
+  montoNuevo: number;
+  motivo: string;
+  porNombre: string | null;
+  autorizadoPorNombre: string | null;
+  creadoEn: string;
+}
+
 export interface DetalleCierreCompleto {
   cajaId: number;
   fecha: string;
@@ -165,6 +188,7 @@ export interface DetalleCierreCompleto {
   cerradaEn: string | null;
   conteo: Record<string, number> | null;
   medios: CierreMedioDetalle[];
+  ajustesMedio?: AjusteMedio[];
 }
 
 export const DENOMINACIONES_LISTA: Array<{ valor: number; clave: string; tipo: 'billete' | 'moneda'; etiqueta: string }> = [
@@ -235,6 +259,20 @@ export const cierreApi = {
       headers['x-pin-supervisor'] = pinSupervisor.trim();
     }
     return conAutorizacion(api.get<PendienteCobro[]>('/admin/cierre/pendientes', { headers }), pinSupervisor);
+  },
+
+  obtenerDigitales: () => api.get<DigitalesCaja>('/admin/cierre/digitales'),
+
+  listarAjustesMedio: () => api.get<AjusteMedio[]>('/admin/cierre/ajustes-medio'),
+
+  // ADMIN y SUPERVISOR sin código; el cajero con el código de supervisor (lo valida el servidor)
+  registrarAjusteMedio: (dto: { medio: MedioAjustable; montoNuevo: number; motivo: string }, pinSupervisor?: string) => {
+    const headers: Record<string, string> = {};
+    if (pinSupervisor?.trim()) {
+      headers['x-codigo-supervisor'] = pinSupervisor.trim();
+      headers['x-pin-supervisor'] = pinSupervisor.trim();
+    }
+    return conAutorizacion(api.post<AjusteMedio>('/admin/cierre/ajustes-medio', dto, { headers }), pinSupervisor);
   },
 
   cobrarPendiente: (id: string | number, dto: CobrarDto) =>
