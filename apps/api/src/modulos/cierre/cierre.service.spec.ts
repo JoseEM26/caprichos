@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
@@ -203,6 +205,10 @@ describe('CierreService', () => {
       },
       cierreMedio: {
         create: jest.fn().mockImplementation(({ data }) => Promise.resolve(data)),
+      },
+      cierreAjusteMedio: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 1n, creado_en: new Date('2026-10-21T16:00:00Z'), ...data })),
       },
       pedido: {
         count: jest.fn().mockResolvedValue(0),
@@ -576,10 +582,18 @@ describe('CierreService', () => {
         nota: 'Sobrante en Yape y faltante en terminal de tarjeta',
       };
 
+      // Yape y tarjeta se corrigieron antes con motivo: el cierre guarda esos valores como vistos
+      prismaMock.cierreAjusteMedio.findMany.mockResolvedValue([
+        { id: 1n, caja_id: 10n, medio: 'YAPE', monto_sistema: 200, monto_anterior: 200, monto_nuevo: 210, motivo: 'Voucher leído con 210', por_party_id: 101n, autorizado_por_party_id: 2n, creado_en: new Date() },
+        { id: 2n, caja_id: 10n, medio: 'TARJETA', monto_sistema: 100, monto_anterior: 100, monto_nuevo: 90, motivo: 'Terminal cobró 90 real', por_party_id: 101n, autorizado_por_party_id: 2n, creado_en: new Date() },
+      ]);
+
       const resCerrar = await service.cerrar(dtoCerrar, mockUsuarioCajero, '654321');
 
       // El cajero no recibe el esperado ni la diferencia (DT-61)
       expect(resCerrar.medios).toBeUndefined();
+      const medioYape = prismaMock.cierreMedio.create.mock.calls.map((c: any) => c[0].data).find((d: any) => d.medio === 'YAPE');
+      expect(medioYape).toMatchObject({ sistema: 200, visto: 210 });
 
       // Verificación de consulta GET por ID
       prismaMock.cierreCaja.findUnique.mockResolvedValue({
@@ -1184,6 +1198,202 @@ describe('CierreService', () => {
         response: { codigo: 'PIN_REQUERIDO' },
       });
       expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 13. Medios digitales calculados y correcciones con motivo
+  // -------------------------------------------------------------------------
+  describe('13. medios digitales calculados y correcciones', () => {
+    const motivoValido = 'El voucher de Yape dice 210, no 200';
+    const ajusteYape = {
+      id: 1n,
+      caja_id: 10n,
+      medio: 'YAPE',
+      monto_sistema: 200,
+      monto_anterior: 200,
+      monto_nuevo: 210,
+      motivo: motivoValido,
+      por_party_id: 101n,
+      autorizado_por_party_id: 102n,
+      creado_en: new Date('2026-10-21T16:00:00Z'),
+    };
+
+    it('el cajero recibe solo los 4 montos digitales con cuántos cobros los componen (sin efectivo, esperado ni diferencias)', async () => {
+      const res = await service.obtenerDigitales();
+
+      expect(Object.keys(res.medios).sort()).toEqual(['plin', 'tarjeta', 'transferencia', 'yape']);
+      expect(res).not.toHaveProperty('efectivoEsperado');
+      expect(JSON.stringify(res)).not.toMatch(/efectivo|esperado|diferencia/i);
+      expect(res.medios.yape).toEqual({ monto: 200, cobros: 1, corregido: false });
+      expect(res.medios.transferencia).toEqual({ monto: 50, cobros: 1, corregido: false });
+      expect(res.medios.tarjeta).toEqual({ monto: 100, cobros: 1, corregido: false });
+      expect(res.medios.plin).toEqual({ monto: 0, cobros: 0, corregido: false });
+    });
+
+    it('el monto digital que ve el cajero es el corregido, marcado como corregido', async () => {
+      prismaMock.cierreAjusteMedio.findMany.mockResolvedValue([ajusteYape]);
+      const res = await service.obtenerDigitales();
+      expect(res.medios.yape).toMatchObject({ monto: 210, corregido: true });
+    });
+
+    it('el cajero sin código de supervisor no puede corregir un monto (PIN_REQUERIDO, nada se guarda)', async () => {
+      await expect(
+        service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 210, motivo: motivoValido }, mockUsuarioCajero, undefined),
+      ).rejects.toMatchObject({ response: { codigo: 'PIN_REQUERIDO' }, status: HttpStatus.FORBIDDEN });
+      expect(prismaMock.cierreAjusteMedio.create).not.toHaveBeenCalled();
+    });
+
+    it('el cajero con código de supervisor válido corrige, y el registro queda con quién lo hizo y quién autorizó', async () => {
+      const res = await service.registrarAjusteMedio(
+        { medio: 'YAPE', montoNuevo: 210, motivo: motivoValido },
+        mockUsuarioCajero,
+        '123456',
+        '10.0.0.5',
+      );
+
+      expect(prismaMock.cierreAjusteMedio.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          caja_id: 10n,
+          medio: 'YAPE',
+          monto_sistema: 200,
+          monto_anterior: 200,
+          monto_nuevo: 210,
+          motivo: motivoValido,
+          por_party_id: 101n,
+          autorizado_por_party_id: 99n,
+        }),
+      });
+      expect(res).toMatchObject({ medio: 'YAPE', montoNuevo: 210, montoAnterior: 200 });
+    });
+
+    it('el cajero con código de supervisor inválido no corrige', async () => {
+      await expect(
+        service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 210, motivo: motivoValido }, mockUsuarioCajero, '000000'),
+      ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
+      expect(prismaMock.cierreAjusteMedio.create).not.toHaveBeenCalled();
+    });
+
+    it('el ADMIN corrige sin código y queda auditado a su nombre', async () => {
+      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
+        where.party_id === 1n ? { party_id: 1n, id: 1n, rol: 'ADMIN' } : null,
+      );
+      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({ party_id: 1n, id: 1n, supervisorPartyId: 1n, supervisorId: 1n });
+
+      await service.registrarAjusteMedio({ medio: 'TARJETA', montoNuevo: 90, motivo: 'Terminal cobró 90 real' }, mockUsuarioAdmin, undefined);
+
+      expect(prismaMock.cierreAjusteMedio.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ por_party_id: 1n, autorizado_por_party_id: 1n, medio: 'TARJETA' }),
+      });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ categoria: 'CAMBIO', modulo: 'cierre', accion: 'AJUSTE_MEDIO_DIGITAL', entidad: 'cierre_ajuste_medio', partyId: 1n }),
+      );
+    });
+
+    it('el SUPERVISOR corrige sin código, con su nombre como autorizador', async () => {
+      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
+        where.party_id === 102n ? { party_id: 102n, id: 30n, rol: 'SUPERVISOR' } : null,
+      );
+      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({ party_id: 102n, id: 30n, supervisorPartyId: 102n, supervisorId: 30n });
+
+      await service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 210, motivo: motivoValido }, mockUsuarioSupervisor, undefined);
+
+      expect(prismaMock.cierreAjusteMedio.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ por_party_id: 102n, autorizado_por_party_id: 102n }),
+      });
+    });
+
+    it('rechaza un motivo corto (menos de 10 caracteres sin contar espacios)', async () => {
+      await expect(
+        service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 210, motivo: '  corto  ' }, mockUsuarioSupervisor, undefined),
+      ).rejects.toMatchObject({ response: { codigo: 'MOTIVO_REQUERIDO' }, status: HttpStatus.BAD_REQUEST });
+      expect(prismaMock.cierreAjusteMedio.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza un monto con más de dos decimales y un monto igual al que ya vale', async () => {
+      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
+        where.party_id === 102n ? { party_id: 102n, id: 30n, rol: 'SUPERVISOR' } : null,
+      );
+      await expect(
+        service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 210.555, motivo: motivoValido }, mockUsuarioSupervisor, undefined),
+      ).rejects.toMatchObject({ response: { codigo: 'MONTO_INVALIDO' } });
+      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({ party_id: 102n, id: 30n, supervisorPartyId: 102n, supervisorId: 30n });
+      await expect(
+        service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 200, motivo: motivoValido }, mockUsuarioSupervisor, undefined),
+      ).rejects.toMatchObject({ response: { codigo: 'AJUSTE_SIN_CAMBIO' } });
+      expect(prismaMock.cierreAjusteMedio.create).not.toHaveBeenCalled();
+    });
+
+    it('cierre con un medio distinto del sistema y sin ajuste se rechaza (AJUSTE_REQUERIDO)', async () => {
+      const dto: CerrarCajaDto = {
+        conteo: { '200': 1, '100': 1, '50': 1, '5': 1 },
+        medios: { yape: 210, plin: 0, transferencia: 50, tarjeta: 100 },
+        nota: 'Yape distinto',
+      };
+      await expect(service.cerrar(dto, mockUsuarioAdmin, undefined)).rejects.toMatchObject({
+        response: { codigo: 'AJUSTE_REQUERIDO' },
+        status: HttpStatus.CONFLICT,
+      });
+      expect(prismaMock.cierreCaja.create).not.toHaveBeenCalled();
+    });
+
+    it('cierre con el monto corregido sí pasa: el medio queda visto con el valor ajustado y el resultado sigue NO_CUADRA', async () => {
+      prismaMock.cierreAjusteMedio.findMany.mockResolvedValue([ajusteYape]);
+      // Con diferencia el cierre exige nota y código de supervisora: el ADMIN lo autoriza sin código
+      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
+        where.party_id === 1n ? { party_id: 1n, id: 1n, rol: 'ADMIN' } : null,
+      );
+      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({ party_id: 1n, id: 1n, supervisorPartyId: 1n, supervisorId: 1n });
+      const dto: CerrarCajaDto = {
+        conteo: { '200': 1, '100': 1, '50': 1, '5': 1 },
+        medios: { yape: 210, plin: 0, transferencia: 50, tarjeta: 100 },
+        nota: 'Corrección aprobada',
+      };
+      const res = await service.cerrar(dto, mockUsuarioAdmin, undefined);
+      const medioYape = prismaMock.cierreMedio.create.mock.calls.map((c: any) => c[0].data).find((d: any) => d.medio === 'YAPE');
+      expect(medioYape).toMatchObject({ sistema: 200, visto: 210 });
+      expect(res.resultado).toBe('NO_CUADRA');
+    });
+
+    it('el detalle del cierre devuelve las correcciones de esa caja con nombres', async () => {
+      prismaMock.cierreCaja.findUnique.mockResolvedValue({
+        caja_id: 10n,
+        resultado: 'NO_CUADRA',
+        aprobado_por: 99n,
+        nota: 'Corrección',
+        conteo: {},
+        caja: { ...mockCajaAbierta, estado: 'CERRADA', cerrada_por: 1n, cerrada_en: new Date() },
+        medios: [],
+      });
+      prismaMock.cierreAjusteMedio.findMany.mockResolvedValue([ajusteYape]);
+      prismaMock.party.findMany.mockResolvedValue([
+        { id: 101n, persona: { nombres: 'Ana', apellidos: 'Cajera' } },
+        { id: 102n, persona: { nombres: 'Rosa', apellidos: 'Supervisora' } },
+      ]);
+
+      const detalle = await service.obtenerCierrePorId(10n, mockUsuarioAdmin);
+
+      expect(detalle.ajustesMedio).toEqual([
+        expect.objectContaining({
+          medio: 'YAPE',
+          montoSistema: 200,
+          montoAnterior: 200,
+          montoNuevo: 210,
+          motivo: motivoValido,
+          porNombre: 'Ana Cajera',
+          autorizadoPorNombre: 'Rosa Supervisora',
+        }),
+      ]);
+    });
+
+    it('el historial de correcciones es append-only: la migración bloquea UPDATE y DELETE y el servicio nunca los usa', () => {
+      const sql = fs.readFileSync(
+        path.join(__dirname, '../../../prisma/migrations/20261211100000_cierre_ajuste_medio/migration.sql'),
+        'utf8',
+      );
+      expect(sql).toMatch(/BEFORE UPDATE OR DELETE ON "cierre_ajuste_medio"/);
+      const fuente = fs.readFileSync(path.join(__dirname, 'cierre.service.ts'), 'utf8');
+      expect(fuente).not.toMatch(/cierreAjusteMedio\.(update|delete|upsert|updateMany|deleteMany)/);
     });
   });
 });

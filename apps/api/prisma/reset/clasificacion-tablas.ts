@@ -78,7 +78,7 @@ export const ANONIMIZAR: Record<string, ReglaAnonimizar[]> = {
 
 export const CONSERVAR: string[] = [
   'agotado', 'ajuste_opcion', 'alta_demanda', 'archivo', 'area_cocina', 'auditoria', 'caja',
-  'categoria', 'cierre_caja', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
+  'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
   'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio',
   'compra', 'compra_linea', 'consumo_personal', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta',
@@ -111,6 +111,7 @@ export const FK_PARTY_PERSONAL = [
   'reclamo.respondido_por', 'voucher_pago.reemplazado_por', 'pedido_proveedor.proveedor_party_id',
   'compra.proveedor_party_id', 'pedido_interno.avisado_party_id', 'consumo_personal.party_id',
   'reemplazo_dia.party_id', 'reemplazo_dia.reemplaza_party_id',
+  'cierre_ajuste_medio.por_party_id', 'cierre_ajuste_medio.autorizado_por_party_id',
 ];
 
 /**

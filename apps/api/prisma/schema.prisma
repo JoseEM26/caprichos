@@ -56,6 +56,8 @@ model Party {
   dataRequests             DataRequest[]
   pedidosComoCliente       Pedido[]              @relation("ClienteIdentificadoPedido")
   direccionesCliente       ClienteDireccion[]
+  ajustesMedioPor          CierreAjusteMedio[]   @relation("AjusteMedioPor")
+  ajustesMedioAutorizados  CierreAjusteMedio[]   @relation("AjusteMedioAutorizado")
 
   @@map("party")
 }
@@ -688,6 +690,7 @@ model Caja {
   liquidaciones Liquidacion[]
   cierre        CierreCaja?
   conteos       ConteoCierre[]
+  ajustesMedio  CierreAjusteMedio[]
 
   @@map("caja")
 }
@@ -793,6 +796,28 @@ model CierreMedio {
 
   @@id([caja_id, medio])
   @@map("cierre_medio")
+}
+
+/// Corrección de un monto digital (Yape, Plin, transferencia o tarjeta) de una caja. Solo se inserta:
+/// el trigger de la migración impide UPDATE y DELETE (historial append-only).
+model CierreAjusteMedio {
+  id                      BigInt   @id @default(autoincrement())
+  caja_id                 BigInt
+  medio                   String
+  monto_sistema           Decimal  @db.Decimal(12, 2)
+  monto_anterior          Decimal  @db.Decimal(12, 2)
+  monto_nuevo             Decimal  @db.Decimal(12, 2)
+  motivo                  String
+  por_party_id            BigInt
+  autorizado_por_party_id BigInt
+  creado_en               DateTime @default(now()) @db.Timestamptz
+
+  caja           Caja  @relation(fields: [caja_id], references: [id])
+  por            Party @relation("AjusteMedioPor", fields: [por_party_id], references: [id])
+  autorizado_por Party @relation("AjusteMedioAutorizado", fields: [autorizado_por_party_id], references: [id])
+
+  @@index([caja_id])
+  @@map("cierre_ajuste_medio")
 }
 
 model IncidenteEntrega {
