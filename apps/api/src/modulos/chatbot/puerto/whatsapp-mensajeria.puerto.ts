@@ -17,6 +17,8 @@ export interface OpcionesEnvio {
   replyToWaMessageId?: string;
   plantillaNombre?: string;
   tituloSeccion?: string;
+  /** Código para el botón «copiar código» de una plantilla AUTHENTICATION. Solo lo usa Meta. */
+  botonCodigo?: string;
 }
 
 export interface ResultadoEnvioWhatsApp {

@@ -7,6 +7,8 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { PausaAltaDemandaDto } from './dto/pausa-alta-demanda.dto';
+import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
+import { MODO_CODIGO_PLANTILLA, MODO_WHATSAPP_ENTRANTE } from '../clientes/verificacion-whatsapp.util';
 
 export const CLAVES_NUMERICAS = [
   'notif_sonido_intervalo_seg',
@@ -142,6 +144,9 @@ export const CLAVES_TEXTO = [
   'notif_sonido_activo',
   'notif_sonido_alcance',
   'notif_marcar_todas_activo',
+  // Verificación del celular al crear cuenta o recuperar contraseña (ver clientes/verificacion-whatsapp.util.ts)
+  'verificacion_celular_modo',
+  'verificacion_whatsapp_numero',
 ] as const;
 
 /** Alcances del sonido de avisos (valor guardado en `notif_sonido_alcance`). */
@@ -223,7 +228,31 @@ export class ConfiguracionService {
         });
       }
     } else if ((CLAVES_TEXTO as readonly string[]).includes(clave)) {
-      if (
+      if (clave === 'verificacion_celular_modo') {
+        const modo = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
+        if (modo !== MODO_WHATSAPP_ENTRANTE && modo !== MODO_CODIGO_PLANTILLA) {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'El modo debe ser WHATSAPP_ENTRANTE (el cliente escribe al negocio) o CODIGO_PLANTILLA (código de 6 dígitos por plantilla de Meta)',
+          });
+        }
+        valor = modo;
+      } else if (clave === 'verificacion_whatsapp_numero') {
+        // Vacío = usar el WhatsApp de contacto del local. Si se escribe, debe ser un celular peruano válido.
+        const bruto = typeof valor === 'string' ? valor.trim() : '';
+        if (bruto === '') {
+          valor = '';
+        } else {
+          const n = normalizarCelularPeru(bruto);
+          if (!n.valido || !n.celular9) {
+            throw new BadRequestException({
+              codigo: 'VALOR_INVALIDO',
+              mensaje: 'El número debe ser un celular de 9 dígitos que empiece con 9 (con o sin +51)',
+            });
+          }
+          valor = `51${n.celular9}`;
+        }
+      } else if (
         clave === 'carta_aviso_entrada' ||
         clave === 'ayuda_ia_activo' ||
         clave === 'stock_control_activo' ||

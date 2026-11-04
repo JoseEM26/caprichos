@@ -56,7 +56,7 @@ export class CuentaClienteController {
     return { cliente };
   }
 
-  /** Envía por WhatsApp el código de 6 dígitos que pide crear la cuenta. Responde lo mismo, salvo si ya tiene cuenta. */
+  /** Envía por WhatsApp el código de 6 dígitos que pide crear la cuenta. Errores: CUENTA_EXISTENTE (409) y DEMASIADOS_CODIGOS (429). */
   @Post('registro/codigo')
   @HttpCode(200)
   async solicitarCodigoRegistro(@Body('telefono') telefono: string, @Req() req: Request) {
@@ -64,7 +64,17 @@ export class CuentaClienteController {
     return this.codigoRegistro.solicitar(telefono, ip);
   }
 
-  /** Paso 2 de crear cuenta (o ver tus puntos): confirma el código de 6 dígitos que llegó por WhatsApp. */
+  /**
+   * Modo WHATSAPP_ENTRANTE: la web sondea el estado del token que mostró (cada 2 s). Solo responde
+   * pendiente / verificado / vencido; nunca revela celulares. Con límite por IP.
+   */
+  @Get('verificar/estado')
+  async estadoVerificacionWhatsapp(@Query('token') token: string, @Req() req: Request) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.codigoRegistro.estadoVerificacion(String(token ?? ''), ip);
+  }
+
+  /** Paso 2 de crear cuenta (o ver tus puntos): confirma el código de 6 dígitos que llegó por WhatsApp (modo CODIGO_PLANTILLA). */
   @Post('registro/verificar')
   @HttpCode(200)
   async verificarCodigoRegistro(@Body() dto: { telefono: string; codigo: string }) {
@@ -103,7 +113,7 @@ export class CuentaClienteController {
   @Post('recuperar/confirmar')
   @HttpCode(200)
   async confirmarRecuperacion(
-    @Body() dto: { telefono: string; codigo: string; contrasenaNueva: string },
+    @Body() dto: { telefono: string; codigo?: string; contrasenaNueva: string },
     @Req() req: Request,
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;

@@ -445,6 +445,15 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         });
       }
     }
+    // Plantillas AUTHENTICATION con botón «copiar código»: Meta exige el código también en el botón.
+    if (opciones?.botonCodigo) {
+      components.push({
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: opciones.botonCodigo }],
+      });
+    }
 
     const payload: any = {
       messaging_product: 'whatsapp',

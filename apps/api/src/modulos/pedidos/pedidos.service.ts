@@ -22,8 +22,10 @@ import { ZonasService } from '../zonas/zonas.service';
 import { leerReglaEnvioGratis } from '../zonas/envio-gratis';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { CrearPedidoDto } from './dto/crear-pedido.dto';
+import { CrearPedidoDto, EntregaDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
+import { RedisService } from '../../comun/redis/redis.service';
+import { textoParecePunto } from '../clientes/direcciones-cliente.service';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import { TELEFONO_PLACEHOLDER, tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
@@ -32,6 +34,27 @@ import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
+
+/** Pista pública de la dirección anterior: nunca la dirección completa (ver enmascararDireccion). */
+export type PistaDireccion = { existe: false } | { existe: true; zona: string | null; direccion: string | null };
+
+/**
+ * Dirección con la mayor parte oculta: «Av. Los G••••». Se ven la vía corta («Av.») y un conector corto
+ * («Los»); la palabra siguiente solo deja su inicial y el resto se oculta. Los números no se muestran.
+ * Sin texto útil (vacío o solo coordenadas): null.
+ */
+export function enmascararDireccion(texto: string | null | undefined): string | null {
+  const limpio = texto?.trim();
+  if (!limpio || textoParecePunto(limpio)) return null;
+  const palabras = limpio.split(/\s+/).filter((p) => !/^\d+$/.test(p)).slice(0, 3);
+  return palabras
+    .map((p, i) => {
+      if (/\d/.test(p)) return '•••';
+      if (i < 2 && p.length <= (i === 0 ? 4 : 3)) return p;
+      return `${p[0]}••••`;
+    })
+    .join(' ') || null;
+}
 
 export interface OrigenPedido {
   canal?: 'CARTA' | 'MOZO' | 'CAJA' | 'WHATSAPP' | 'BOT';
@@ -71,7 +94,55 @@ export class PedidosService {
     private readonly avisosPedidoService?: AvisosPedidoService,
     @Optional() private readonly direcciones?: DireccionesClienteService,
     @Optional() private readonly puntosParty?: PartyPuntosService,
+    @Optional() private readonly redis?: RedisService,
   ) {}
+
+  /** Último pedido de delivery con dirección de ese celular (carta sin sesión). Null si no hay. */
+  private async ultimoPedidoDeliveryDelCelular(tel: string) {
+    return this.prisma.pedido.findFirst({
+      where: {
+        cliente_telefono: tel,
+        modalidad: 'DELIVERY',
+        OR: [{ entrega_direccion: { not: null } }, { entrega_lat: { not: null } }],
+      },
+      orderBy: { id: 'desc' },
+      select: { entrega_direccion: true, entrega_referencia: true, entrega_lat: true, entrega_lng: true, entrega_origen: true, zona_id: true },
+    });
+  }
+
+  /**
+   * Pista pública para la carta sin sesión: si ese celular tuvo un delivery con dirección, la zona y el texto
+   * con la mayor parte oculta. La dirección completa nunca sale de aquí; el pedido la toma del servidor.
+   */
+  async pistaUltimaDireccion(telefono: string, ip?: string): Promise<PistaDireccion> {
+    await this.limitarPista(telefono, ip);
+    const ultimo = await this.ultimoPedidoDeliveryDelCelular(telefono);
+    if (!ultimo) return { existe: false };
+    const zona = ultimo.zona_id ? await this.prisma.zonaReparto.findUnique({ where: { id: ultimo.zona_id }, select: { codigo: true } }) : null;
+    return { existe: true, zona: zona?.codigo ?? null, direccion: enmascararDireccion(ultimo.entrega_direccion) };
+  }
+
+  /** Límite por celular (10 por hora) y por IP (30 por hora). Si Redis no responde, no bloquea. */
+  private async limitarPista(tel: string, ip?: string): Promise<void> {
+    if (!this.redis) return;
+    try {
+      const r = this.redis.obtenerCliente();
+      const limites: [string, number][] = [[`pedidos:pista:tel:${tel}`, 10]];
+      if (ip) limites.push([`pedidos:pista:ip:${ip}`, 30]);
+      for (const [clave, max] of limites) {
+        const n = await r.incr(clave);
+        if (n === 1) await r.expire(clave, 3600);
+        if (n > max) {
+          throw new HttpException(
+            { codigo: 'DEMASIADAS_CONSULTAS', mensaje: 'Espera un poco antes de volver a consultar.' },
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+      }
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+    }
+  }
 
   /**
    * Cliente con cuenta del pedido: celular (solo MOZO/CAJA), cuenta de la carta o teléfono de WhatsApp.
@@ -185,6 +256,9 @@ export class PedidosService {
     let clienteNombre: string | null = null;
     let telefonoLimpio: string | null = null;
     let cumpleCliente: Cumpleanos | null = null;
+    let direccionReutilizada: EntregaDto | null = null;
+    // Alta de cliente por celular desde la carta sin sesión: el party de puntos recibe el nombre
+    let altaPorCelular = false;
 
     if (esMozo) {
       clienteNombre =
@@ -228,14 +302,34 @@ export class PedidosService {
         });
       }
       clienteNombre = dto.cliente.nombre.trim();
-      // Alta de cliente por celular desde la carta sin sesión: nombre (2+ letras) y cumpleaños obligatorios
+      // Alta de cliente por celular desde la carta sin sesión: el nombre (2+ letras) es obligatorio.
+      // El cumpleaños no se pide aquí (solo al crear cuenta): el pedido sin cuenta no lo guarda.
       if (esCartaSinSesion && celularValido) {
         if (clienteNombre.length < 2) {
           throw new BadRequestException({ codigo: 'NOMBRE_REQUERIDO', mensaje: 'Escribe tu nombre completo para sumar puntos con tu celular.' });
         }
+        altaPorCelular = true;
+      }
+      // Quien pide con su cuenta puede completar su cumpleaños si aún no lo tiene
+      if ((origen?.canal ?? 'CARTA') === 'CARTA' && origen?.clientePartyId && dto.cliente?.cumpleanos) {
         cumpleCliente = exigirCumpleanos(dto.cliente.cumpleanos);
-      } else if ((origen?.canal ?? 'CARTA') === 'CARTA' && dto.cliente?.cumpleanos) {
-        cumpleCliente = exigirCumpleanos(dto.cliente.cumpleanos);
+      }
+      // Sin sesión: la dirección del último pedido de ese celular la toma el servidor (nunca viaja al navegador)
+      if (esCartaSinSesion && dto.modalidad === 'DELIVERY' && dto.entrega?.reutilizarUltimaDireccion) {
+        const ultimo = celularValido ? await this.ultimoPedidoDeliveryDelCelular(telefonoLimpio!) : null;
+        if (!ultimo) {
+          throw new BadRequestException({
+            codigo: 'SIN_DIRECCION_ANTERIOR',
+            mensaje: 'No encontramos una dirección anterior con ese celular. Escribe tu dirección.',
+          });
+        }
+        direccionReutilizada = {
+          direccion: ultimo.entrega_direccion ?? undefined,
+          referencia: ultimo.entrega_referencia ?? undefined,
+          lat: ultimo.entrega_lat != null ? Number(ultimo.entrega_lat) : undefined,
+          lng: ultimo.entrega_lng != null ? Number(ultimo.entrega_lng) : undefined,
+          origen: (ultimo.entrega_origen as EntregaDto['origen']) ?? undefined,
+        } as EntregaDto;
       }
     }
 
@@ -491,8 +585,11 @@ export class PedidosService {
     // 5.0. Cliente con cuenta identificado (suma puntos, historial y direcciones)
     const clienteFinal = await this.clienteIdentificado(dto, origen);
     // Carta con cuenta o celular: completa nombre y cumpleaños solo si el cliente aún no los tiene
-    if (cumpleCliente && clienteFinal && this.puntosParty) {
-      await this.puntosParty.completarDatos(clienteFinal, { nombre: clienteNombre ?? undefined, cumple: cumpleCliente });
+    if (clienteFinal && this.puntosParty && (cumpleCliente || altaPorCelular)) {
+      await this.puntosParty.completarDatos(clienteFinal, {
+        nombre: clienteNombre ?? undefined,
+        ...(cumpleCliente ? { cumple: cumpleCliente } : {}),
+      });
     }
     // Cliente con cuenta de mozo/caja: si el pedido no trae nombre o teléfono propios, se toman de su cuenta
     if (esMozo && clienteFinal && this.direcciones) {
@@ -541,17 +638,19 @@ export class PedidosService {
     }
 
     // 7. Cálculo de envío (solo DELIVERY)
+    // Dirección del pedido: la de la carta, o la del último pedido de ese celular si la pidió reutilizar
+    const entrega = direccionReutilizada ?? dto.entrega;
     let envio: number | null = 0;
     let zonaId: bigint | null = null;
     let entregaOrigen: string | null = null;
 
     if (dto.modalidad === 'DELIVERY') {
       const tieneCoordenadas =
-        typeof dto.entrega?.lat === 'number' && typeof dto.entrega?.lng === 'number';
+        typeof entrega?.lat === 'number' && typeof entrega?.lng === 'number';
 
       if (tieneCoordenadas) {
-        const lat = dto.entrega!.lat!;
-        const lng = dto.entrega!.lng!;
+        const lat = entrega!.lat!;
+        const lng = entrega!.lng!;
 
         const zonaDetectada = await this.zonasService.detectar(lat, lng);
         if (!zonaDetectada) {
@@ -569,10 +668,10 @@ export class PedidosService {
         const reglaEnvio = await leerReglaEnvioGratis(this.prisma);
         envio = calcularEnvioFinal(subtotalCalculado, zonaDetectada.tarifa, reglaEnvio);
 
-        entregaOrigen = dto.entrega?.origen || 'GPS';
+        entregaOrigen = entrega?.origen || 'GPS';
       } else if (
-        dto.entrega?.direccion &&
-        dto.entrega.direccion.trim().length >= 5
+        entrega?.direccion &&
+        entrega.direccion.trim().length >= 5
       ) {
         // Sin punto, solo dirección escrita de al menos 5 caracteres -> envío null («por calcular»)
         envio = null;
@@ -688,10 +787,10 @@ export class PedidosService {
           // el relleno 999999999 no es un teléfono: el pedido queda sin teléfono (no recibe WhatsApp)
           cliente_telefono: tieneTelefonoReal(telefonoLimpio) ? telefonoLimpio : null,
           mesa_nombre: mesaNombreFinal,
-          entrega_direccion: dto.entrega?.direccion?.trim() || null,
-          entrega_referencia: dto.entrega?.referencia?.trim() || null,
-          entrega_lat: dto.entrega?.lat != null ? new Prisma.Decimal(dto.entrega.lat) : null,
-          entrega_lng: dto.entrega?.lng != null ? new Prisma.Decimal(dto.entrega.lng) : null,
+          entrega_direccion: entrega?.direccion?.trim() || null,
+          entrega_referencia: entrega?.referencia?.trim() || null,
+          entrega_lat: entrega?.lat != null ? new Prisma.Decimal(entrega.lat) : null,
+          entrega_lng: entrega?.lng != null ? new Prisma.Decimal(entrega.lng) : null,
           entrega_origen: entregaOrigen,
           zona_id: zonaId,
           pago_metodo: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
@@ -730,10 +829,10 @@ export class PedidosService {
         await this.direcciones.registrarUso(
           clienteFinal,
           {
-            direccion: dto.entrega?.direccion,
-            referencia: dto.entrega?.referencia,
-            lat: dto.entrega?.lat,
-            lng: dto.entrega?.lng,
+            direccion: entrega?.direccion,
+            referencia: entrega?.referencia,
+            lat: entrega?.lat,
+            lng: entrega?.lng,
             zonaId,
           },
           origenDireccion,

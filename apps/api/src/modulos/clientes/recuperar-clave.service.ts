@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt, timingSafeEqual } from 'crypto';
@@ -10,7 +10,18 @@ import { OutboxWhatsappService } from '../chatbot/servicios/outbox-whatsapp.serv
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { ClientesService, celular9De, validarContrasena } from './clientes.service';
 import { AvisoCuentaService } from './aviso-cuenta.service';
-import { REGISTRO_MAX_SOLICITUDES_IP_HORA } from './codigo-registro.service';
+import { REGISTRO_MAX_SOLICITUDES_IP_HORA, demasiadosCodigos } from './codigo-registro.service';
+import {
+  MODO_WHATSAPP_ENTRANTE,
+  RespuestaVerificacionWhatsapp,
+  claveMarcaVerificacion,
+  iniciarVerificacion,
+  modoVerificacion,
+  numeroVerificacion,
+  respuestaWhatsappEntrante,
+  secretoVerificacion,
+  verificacionNoDisponible,
+} from './verificacion-whatsapp.util';
 
 export const RECUPERAR_TTL_SEG = 600; // el código vence a los 10 minutos
 export const RECUPERAR_MAX_SOLICITUDES_HORA = 3;
@@ -47,8 +58,12 @@ export class RecuperarClaveService {
     return createHmac('sha256', secreto).update(`${tel}:${codigo}`).digest('hex');
   }
 
-  /** Responde SIEMPRE lo mismo, tenga o no cuenta ese celular y se haya excedido o no el límite. */
-  async solicitar(telefono: string, ip?: string): Promise<typeof RESPUESTA_SOLICITUD> {
+  /**
+   * Responde SIEMPRE lo mismo, tenga o no cuenta ese celular y se haya excedido o no el límite (modo CODIGO_PLANTILLA).
+   * En WHATSAPP_ENTRANTE la respuesta tampoco depende de la cuenta (mismo formato, con token), y el exceso de
+   * envíos responde 429: el conteo es por celular e IP, no revela si existe la cuenta.
+   */
+  async solicitar(telefono: string, ip?: string): Promise<typeof RESPUESTA_SOLICITUD | RespuestaVerificacionWhatsapp> {
     const tel = celular9De(telefono);
     if (!tel) {
       throw new BadRequestException({
@@ -58,15 +73,33 @@ export class RecuperarClaveService {
     }
     const redis = this.redisService.obtenerCliente();
     try {
+      const entrante = (await modoVerificacion(this.prisma)) === MODO_WHATSAPP_ENTRANTE;
       const claveSol = `cliente:rec:sol:${tel}`;
       const n = await redis.incr(claveSol);
       if (n === 1) await redis.expire(claveSol, 3600);
-      if (n > RECUPERAR_MAX_SOLICITUDES_HORA) return RESPUESTA_SOLICITUD;
+      if (n > RECUPERAR_MAX_SOLICITUDES_HORA) {
+        if (entrante) throw demasiadosCodigos('Pediste varios códigos seguidos. Espera una hora e inténtalo de nuevo.');
+        return RESPUESTA_SOLICITUD;
+      }
       if (ip) {
         const claveIp = `cliente:rec:ip:${ip}`;
         const m = await redis.incr(claveIp);
         if (m === 1) await redis.expire(claveIp, 3600);
-        if (m > REGISTRO_MAX_SOLICITUDES_IP_HORA) return RESPUESTA_SOLICITUD;
+        if (m > REGISTRO_MAX_SOLICITUDES_IP_HORA) {
+          if (entrante) throw demasiadosCodigos('Hay demasiados intentos desde tu conexión. Espera una hora e inténtalo de nuevo.');
+          return RESPUESTA_SOLICITUD;
+        }
+      }
+
+      if (entrante) {
+        const numero = await numeroVerificacion(this.prisma);
+        if (!numero) throw verificacionNoDisponible();
+        const token = await iniciarVerificacion(redis, secretoVerificacion(this.config), tel, 'RECUPERAR');
+        return respuestaWhatsappEntrante(
+          numero,
+          token,
+          'Toca el botón, envía el mensaje en WhatsApp y vuelve aquí. Vence en 10 minutos.',
+        );
       }
 
       const cuenta = await this.clientes.cuentaPorCelular(tel);
@@ -84,7 +117,7 @@ export class RecuperarClaveService {
         origen: 'CODIGO_CUENTA',
         carga: {
           textoLibre: `Tu código de Caprichos es ${codigo}. Vence en 10 minutos. Si no lo pediste, ignora este mensaje.`,
-          plantillaClave: 'CODIGO_CUENTA',
+          plantillaClave: 'CODIGO_RECUPERAR',
           variablesPlantilla: [codigo],
           autor: 'BOT',
         },
@@ -100,14 +133,15 @@ export class RecuperarClaveService {
         despues: { telefono: enmascararTelefono(tel) },
         ip,
       });
-    } catch {
-      // Un fallo interno tampoco cambia la respuesta
+    } catch (err) {
+      // Los errores controlados (límite, verificación no disponible) llegan a la web; un fallo interno no cambia la respuesta
+      if (err instanceof HttpException) throw err;
     }
     return RESPUESTA_SOLICITUD;
   }
 
   async confirmar(
-    dto: { telefono: string; codigo: string; contrasenaNueva: string },
+    dto: { telefono: string; codigo?: string; contrasenaNueva: string },
     ip?: string,
   ): Promise<{ ok: true }> {
     const invalido = () =>
@@ -116,30 +150,44 @@ export class RecuperarClaveService {
         mensaje: 'El código no es correcto o ya venció. Pide uno nuevo.',
       });
     const tel = celular9De(dto.telefono);
+    // WHATSAPP_ENTRANTE: no hay código que escribir; vale la marca que dejó el mensaje verificado por WhatsApp.
+    // CODIGO_PLANTILLA: el código de 6 dígitos de siempre.
+    const entrante = (await modoVerificacion(this.prisma)) === MODO_WHATSAPP_ENTRANTE;
     const codigo = String(dto.codigo ?? '').trim();
-    if (!tel || !/^\d{6}$/.test(codigo)) throw invalido();
+    if (!tel || (!entrante && !/^\d{6}$/.test(codigo))) throw invalido();
     validarContrasena(dto.contrasenaNueva);
 
     const redis = this.redisService.obtenerCliente();
     const claveCod = `cliente:rec:cod:${tel}`;
     const claveInt = `cliente:rec:int:${tel}`;
-    let guardado: string | null = null;
-    try {
-      const n = await redis.incr(claveInt);
-      if (n === 1) await redis.expire(claveInt, RECUPERAR_TTL_SEG);
-      if (n > RECUPERAR_MAX_INTENTOS) {
-        await redis.del(claveCod);
+    if (entrante) {
+      let marca: string | null = null;
+      try {
+        marca = await redis.get(claveMarcaVerificacion('RECUPERAR', tel));
+        if (marca) await redis.del(claveMarcaVerificacion('RECUPERAR', tel));
+      } catch {
         throw invalido();
       }
-      guardado = await redis.get(claveCod);
-    } catch (err) {
-      if (err instanceof BadRequestException) throw err;
-      throw invalido();
-    }
+      if (!marca) throw invalido();
+    } else {
+      let guardado: string | null = null;
+      try {
+        const n = await redis.incr(claveInt);
+        if (n === 1) await redis.expire(claveInt, RECUPERAR_TTL_SEG);
+        if (n > RECUPERAR_MAX_INTENTOS) {
+          await redis.del(claveCod);
+          throw invalido();
+        }
+        guardado = await redis.get(claveCod);
+      } catch (err) {
+        if (err instanceof BadRequestException) throw err;
+        throw invalido();
+      }
 
-    const esperado = guardado ? Buffer.from(guardado) : null;
-    const recibido = Buffer.from(this.hashCodigo(tel, codigo));
-    if (!esperado || esperado.length !== recibido.length || !timingSafeEqual(esperado, recibido)) throw invalido();
+      const esperado = guardado ? Buffer.from(guardado) : null;
+      const recibido = Buffer.from(this.hashCodigo(tel, codigo));
+      if (!esperado || esperado.length !== recibido.length || !timingSafeEqual(esperado, recibido)) throw invalido();
+    }
 
     const cuenta = await this.clientes.cuentaPorCelular(tel);
     if (!cuenta) throw invalido();

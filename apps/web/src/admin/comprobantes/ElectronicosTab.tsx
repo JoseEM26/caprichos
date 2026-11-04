@@ -205,7 +205,12 @@ export function ElectronicosTab() {
       enlace.click();
       enlace.remove();
     } catch (err: any) {
-      setError(err?.message || `No se pudo descargar el ${tipo}`);
+      const noExiste = /404/.test(String(err?.message ?? ''));
+      setError(
+        noExiste && tipo === 'CDR'
+          ? 'Todavía no hay constancia de SUNAT para este comprobante: aparece cuando SUNAT responde.'
+          : err?.message || `No se pudo descargar el ${tipo}`,
+      );
     }
   };
 
@@ -427,9 +432,12 @@ export function ElectronicosTab() {
                       <Boton variante="secundario" onClick={() => descargar(c, 'XML')} style={{ minHeight: ALTO_TOQUE }}>
                         XML firmado
                       </Boton>
-                      <Boton variante="secundario" onClick={() => descargar(c, 'CDR')} style={{ minHeight: ALTO_TOQUE }}>
-                        CDR SUNAT
-                      </Boton>
+                      {/* La constancia (CDR) existe solo cuando SUNAT ya respondió: en espera de resumen no hay nada que bajar */}
+                      {!['PENDIENTE_ENVIO', 'PENDIENTE_RESUMEN', 'ENVIADA_RESUMEN'].includes(String(c.facturacion_estado)) && (
+                        <Boton variante="secundario" onClick={() => descargar(c, 'CDR')} style={{ minHeight: ALTO_TOQUE }}>
+                          CDR SUNAT
+                        </Boton>
+                      )}
                     </>
                   )}
                   {puedeReintentar && (

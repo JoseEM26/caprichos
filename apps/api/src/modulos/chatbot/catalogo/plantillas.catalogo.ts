@@ -5,6 +5,18 @@ export interface DefinicionPlantilla {
   texto: string;
   variables: string[];
   descripcion: string;
+  /** Plantilla con botón «copiar código»: la primera variable se manda también en el botón. */
+  botonCodigo?: boolean;
+}
+
+/** Código del botón «copiar código» (la primera variable), si la plantilla lo lleva. */
+export function botonCodigoDe(
+  definicion: DefinicionPlantilla,
+  variables?: Record<string, string> | string[],
+): string | undefined {
+  if (!definicion.botonCodigo || !variables) return undefined;
+  const primera = Array.isArray(variables) ? variables[0] : Object.values(variables)[0];
+  return primera === undefined ? undefined : String(primera);
 }
 
 export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
@@ -13,8 +25,19 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     categoria: 'AUTHENTICATION',
     idioma: 'es',
     variables: ['codigo'],
+    botonCodigo: true,
+    // Solo referencia para el modo simulado: el texto real lo fija Meta.
     texto: 'Tu código de Caprichos es {{1}}. Vence en 10 minutos. Si no lo pediste, ignora este mensaje.',
-    descripcion: 'Código de 6 dígitos para recuperar la contraseña de la cuenta del cliente. Fuera de la ventana de 24 h Meta debe tenerla aprobada: se registra en Meta como categoría AUTHENTICATION (texto y botón «copiar código» según el formato que exige Meta) y debe quedar APROBADA antes de usarla.',
+    descripcion: 'Código de 6 dígitos para crear la cuenta y recuperar la contraseña del cliente. Se registra en Meta como plantilla de categoría AUTHENTICATION con botón «Copiar código»; el texto lo fija Meta (en español, «{{1}} es tu código de verificación...») y el envío lleva el código en el cuerpo y en el botón. Debe quedar APROBADA antes de usarla.',
+  },
+  CODIGO_RECUPERAR: {
+    nombre: 'caprichos_codigo_recuperar',
+    categoria: 'AUTHENTICATION',
+    idioma: 'es',
+    variables: ['codigo'],
+    botonCodigo: true,
+    texto: '{{1}} es tu código de recuperación de contraseña.',
+    descripcion: 'Código de 6 dígitos para recuperar la contraseña de la cuenta del cliente. Se crea en Meta desde la biblioteca de plantillas (verify_password_recovery), en español y con el botón «copiar código»; debe quedar APROBADA antes de usarla. Si Meta la entrega sin botón, poner botonCodigo en false.',
   },
   DELIVERY_SALIDA: {
     nombre: 'caprichos_delivery_en_camino',
@@ -157,8 +180,8 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     categoria: 'UTILITY',
     idioma: 'es',
     variables: ['detalle_cuenta'],
-    texto: 'Hola. Tu cuenta de Caprichos {{1}}. Si no fuiste tú, escríbenos por WhatsApp de inmediato.',
-    descripcion: 'Aviso de seguridad al crear la cuenta (detalle «fue creada») o al cambiar la contraseña (detalle «cambió tu contraseña»). Pendiente de aprobar en Meta (UTILITY) antes de activar whatsapp_aviso_cuenta_activo en producción.',
+    texto: 'Hola. Te avisamos de un cambio de seguridad en tu cuenta de Caprichos: {{1}}. Si no fuiste tú, escríbenos por WhatsApp de inmediato.',
+    descripcion: 'Aviso de seguridad al crear la cuenta (detalle «se creó tu cuenta») o al cambiar la contraseña (detalle «se cambió tu contraseña»). Pendiente de aprobar en Meta (UTILITY) antes de activar whatsapp_aviso_cuenta_activo en producción.',
   },
   DELIVERY_ENTREGADO: {
     nombre: 'caprichos_delivery_entregado',

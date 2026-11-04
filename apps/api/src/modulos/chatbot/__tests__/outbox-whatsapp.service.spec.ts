@@ -53,6 +53,7 @@ describe('OutboxWhatsappService (salientes de WhatsApp)', () => {
         findUnique: jest.fn(async ({ where }: any) => ({ valor: parametros[where.clave] })),
       },
       conversacion: { upsert: jest.fn(async () => ({ id: BigInt(5) })) },
+      whatsappMensaje: { findMany: jest.fn(async () => []) },
       mensajeChat: { create: jest.fn(async () => ({})) },
       mensajeReparto: { updateMany: jest.fn(async () => ({ count: 1 })) },
       notificacion: { create: jest.fn(async () => ({ id: BigInt(3) })) },
@@ -254,6 +255,57 @@ describe('OutboxWhatsappService (salientes de WhatsApp)', () => {
       const r = await servicio.resumen();
       expect(r.lagSegundos).toBe(0);
       expect(r.lagAlerta).toBe(false);
+    });
+  });
+
+  describe('vista para el personal: códigos de cuenta', () => {
+    const textoCodigo = 'Tu código para crear tu cuenta en Caprichos es 482913. Vence en 10 minutos. Si no lo pediste, ignora este mensaje.';
+    const filaCodigo = (extra: Partial<Record<string, unknown>> = {}) =>
+      fila({
+        origen: 'CODIGO_CUENTA',
+        tipo: 'TEXTO',
+        carga: { textoLibre: textoCodigo, plantillaClave: 'CODIGO_CUENTA', variablesPlantilla: ['482913'], autor: 'BOT' },
+        ...extra,
+      });
+
+    it('listar por origen: el texto va con los dígitos enmascarados y el canal sale de whatsapp_mensaje', async () => {
+      prisma.salienteWhatsapp.findMany.mockResolvedValueOnce([filaCodigo({ estado: 'ENVIADO', wa_message_id: 'wamid.c', intentos: 1 })]);
+      prisma.whatsappMensaje.findMany.mockResolvedValueOnce([{ wa_message_id: 'wamid.c', tipo: 'PLANTILLA', plantilla: 'codigo_cuenta' }]);
+      const r = await servicio.listar('ENVIADO', 1, 20, 'CODIGO_CUENTA');
+
+      expect(prisma.salienteWhatsapp.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { estado: 'ENVIADO', origen: 'CODIGO_CUENTA' } }));
+      const f = r.filas[0];
+      expect(f.texto).toBe('Tu código para crear tu cuenta en Caprichos es ••••••. Vence en 10 minutos. Si no lo pediste, ignora este mensaje.');
+      expect(f.proposito).toBe('REGISTRO');
+      expect(f.canal).toEqual({ tipo: 'PLANTILLA', plantilla: 'codigo_cuenta' });
+      expect(JSON.stringify(r)).not.toContain('482913');
+    });
+
+    it('recuperar contraseña se distingue y sin canal registrado queda null', async () => {
+      prisma.salienteWhatsapp.findMany.mockResolvedValueOnce([
+        filaCodigo({ estado: 'FALLIDO', ultimo_error: '[NUMERO_INVALIDO] mal', carga: { textoLibre: 'Tu código de Caprichos es 111222. Vence en 10 minutos.', plantillaClave: 'CODIGO_RECUPERAR', variablesPlantilla: ['111222'] } }),
+      ]);
+      const r = await servicio.listar(undefined, 1, 20, 'CODIGO_CUENTA');
+      expect(prisma.salienteWhatsapp.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { origen: 'CODIGO_CUENTA' } }));
+      expect(r.filas[0].proposito).toBe('RECUPERAR');
+      expect(r.filas[0].canal).toBeNull();
+      expect(r.filas[0].texto).toBe('Tu código de Caprichos es ••••••. Vence en 10 minutos.');
+    });
+
+    it('un aviso normal no se enmascara', async () => {
+      prisma.salienteWhatsapp.findMany.mockResolvedValueOnce([fila({ estado: 'FALLIDO', carga: { textoLibre: 'Tu pedido 123456 está listo' } })]);
+      const r = await servicio.listar('FALLIDO');
+      expect(r.filas[0].texto).toBe('Tu pedido 123456 está listo');
+      expect(r.filas[0].proposito).toBeNull();
+    });
+
+    it('el chat del personal tampoco muestra el código al enviarlo', async () => {
+      filasLote = [filaCodigo()];
+      await servicio.procesarLote();
+      expect(prisma.mensajeChat.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ contenido: expect.objectContaining({ texto: expect.stringContaining('••••••') }) }),
+      });
+      expect(JSON.stringify(prisma.mensajeChat.create.mock.calls, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))).not.toContain('482913');
     });
   });
 

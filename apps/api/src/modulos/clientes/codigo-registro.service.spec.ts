@@ -1,7 +1,9 @@
 jest.mock('@nestjs/jwt', () => ({ JwtService: class {}, JwtModule: { register: jest.fn().mockReturnValue({ module: class {} }) } }));
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { CodigoRegistroService, REGISTRO_MAX_SOLICITUDES_IP_HORA } from './codigo-registro.service';
+
+const respuestaDe = (err: any) => err?.getResponse?.();
 
 /** Redis en memoria: lo justo para incr/expire/set/get/del (sin TTL real). */
 function redisFalso() {
@@ -38,7 +40,11 @@ describe('CodigoRegistroService', () => {
 
   beforeEach(() => {
     redis = redisFalso();
-    prisma = { customerAccount: { findFirst: jest.fn().mockResolvedValue(null) } };
+    // Estos tests son del modo CODIGO_PLANTILLA (código de 6 dígitos); el modo por defecto es WHATSAPP_ENTRANTE
+    prisma = {
+      customerAccount: { findFirst: jest.fn().mockResolvedValue(null) },
+      parametro: { findUnique: jest.fn().mockResolvedValue({ valor: 'CODIGO_PLANTILLA' }) },
+    };
     outbox = { encolar: jest.fn().mockResolvedValue(undefined), despertar: jest.fn() };
     service = new CodigoRegistroService(
       prisma,
@@ -72,18 +78,24 @@ describe('CodigoRegistroService', () => {
     expect(guardado).not.toContain(codigoEnviado());
   });
 
-  it('celular que ya tiene cuenta con contraseña: responde igual que siempre y no envía nada (no revela la cuenta)', async () => {
+  it('celular que ya tiene cuenta con contraseña: 409 CUENTA_EXISTENTE y no envía nada', async () => {
     prisma.customerAccount.findFirst.mockResolvedValue({ hash: '$argon2id$x' });
-    const r = await service.solicitar('912345678');
-    expect(r.ok).toBe(true);
+    const err = await service.solicitar('912345678').catch((e) => e);
+    expect(err).toBeInstanceOf(ConflictException);
+    expect(err.getStatus()).toBe(409);
+    expect(respuestaDe(err)).toEqual({
+      codigo: 'CUENTA_EXISTENTE',
+      mensaje: 'Este celular ya tiene cuenta. Ingresa con tu contraseña o usa «¿Olvidaste tu contraseña?».',
+    });
     expect(outbox.encolar).not.toHaveBeenCalled();
   });
 
-  it('límite por IP: pasado el tope por hora responde igual y no envía', async () => {
+  it('límite por IP: pasado el tope por hora responde 429 DEMASIADOS_CODIGOS y no envía', async () => {
     for (let i = 0; i < REGISTRO_MAX_SOLICITUDES_IP_HORA; i++) await service.solicitar(`9${String(i).padStart(8, '0')}`, '2.2.2.2');
     const enviadosAntes = outbox.encolar.mock.calls.length;
-    const r = await service.solicitar('912000001', '2.2.2.2');
-    expect(r.ok).toBe(true);
+    const err = await service.solicitar('912000001', '2.2.2.2').catch((e) => e);
+    expect(err.getStatus()).toBe(429);
+    expect(respuestaDe(err)).toMatchObject({ codigo: 'DEMASIADOS_CODIGOS' });
     expect(outbox.encolar.mock.calls.length).toBe(enviadosAntes);
   });
 
@@ -105,12 +117,16 @@ describe('CodigoRegistroService', () => {
     await expect(service.solicitar('812345678')).rejects.toMatchObject({ response: { codigo: 'TELEFONO_INVALIDO' } });
   });
 
-  it('reenvío: pasado el límite por hora responde igual pero no envía', async () => {
+  it('reenvío: pasado el límite por hora responde 429 con el mensaje de espera y no envía', async () => {
     await service.solicitar('912345678');
     await service.solicitar('912345678');
     await service.solicitar('912345678');
-    const r = await service.solicitar('912345678');
-    expect(r.ok).toBe(true);
+    const err = await service.solicitar('912345678').catch((e) => e);
+    expect(err.getStatus()).toBe(429);
+    expect(respuestaDe(err)).toEqual({
+      codigo: 'DEMASIADOS_CODIGOS',
+      mensaje: 'Pediste varios códigos seguidos. Espera una hora e inténtalo de nuevo.',
+    });
     expect(outbox.encolar).toHaveBeenCalledTimes(3);
   });
 

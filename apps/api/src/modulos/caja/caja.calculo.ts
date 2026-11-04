@@ -35,6 +35,55 @@ export function enPesos(centimos: number): number {
   return centimos / 100;
 }
 
+/**
+ * Cobros vigentes de una caja en el formato que listan Pedidos y el cierre (CobroTurno).
+ * Lo usan la caja de hoy y la caja abierta de cualquier día: así las dos listas son iguales.
+ */
+export function mapearCobrosCaja(
+  cobros: Array<{
+    pedido_id: bigint;
+    total: unknown;
+    en: Date;
+    anulado_en: Date | null;
+    pedido: { codigo: string; cliente_nombre: string | null };
+    pagos: Array<{ medio: string | null }>;
+  }>,
+) {
+  return cobros
+    .filter((c) => !c.anulado_en)
+    .map((c) => ({
+      pedidoId: c.pedido_id.toString(),
+      codigo: c.pedido.codigo,
+      cliente: c.pedido.cliente_nombre,
+      total: enPesos(aCentimos(c.total)),
+      medios: c.pagos.map((p) => (p.medio || '').toUpperCase()),
+      en: c.en,
+    }));
+}
+
+/** Movimientos de caja chica en el formato de la pantalla (incluye los anulados, marcados). */
+export function mapearMovimientosCaja(
+  movimientos: Array<{
+    id: bigint;
+    caja_id: bigint;
+    tipo: string;
+    monto: unknown;
+    motivo: string;
+    anulado_en: Date | null;
+    motivo_anulacion: string | null;
+  }>,
+) {
+  return movimientos.map((m) => ({
+    id: m.id.toString(),
+    caja_id: m.caja_id.toString(),
+    tipo: m.tipo,
+    monto: Number(m.monto),
+    motivo: m.motivo,
+    anulado_en: m.anulado_en,
+    motivo_anulacion: m.motivo_anulacion,
+  }));
+}
+
 /** Un monto válido tiene como máximo dos decimales. */
 export function esCentimosValidos(valor: number): boolean {
   return Math.abs(valor * 100 - Math.round(valor * 100)) < 1e-6;

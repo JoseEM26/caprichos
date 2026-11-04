@@ -28,6 +28,8 @@ export interface PendientesCobroCierreProps {
   alReintentar?: () => void;
   /** Pide enfocar un grupo (lo abre y hace scroll hasta el panel) */
   foco?: FocoPendientes | null;
+  /** Día (AAAA-MM-DD) de la caja que se cierra: lo anterior se marca como «de días anteriores» */
+  fechaCaja?: string;
 }
 
 const PAGINA = 30;
@@ -62,17 +64,18 @@ const esCoordinado = (p: PendienteCobro) => p.pagoEstado === 'COORDINADO';
 const sumaTotal = (lista: PendienteCobro[]) => lista.reduce((s, p) => s + Number(p.total || 0), 0);
 
 /** Conteos y montos del resumen, sobre la lista completa (sin filtros) */
-export function resumenPendientes(lista: PendienteCobro[], hoy = diaLima(new Date())) {
+export function resumenPendientes(lista: PendienteCobro[], fechaCaja = diaLima(new Date())) {
   const cobrar = lista.filter((p) => !esCoordinado(p));
   const coordinados = lista.filter(esCoordinado);
   const cola = lista.filter((p) => ESTADOS_COLA.includes(p.estado));
-  const antiguos = lista.filter((p) => diaLima(p.fecha) < hoy);
+  // «De días anteriores»: pedidos de un día anterior a la caja que se cierra
+  const antiguos = lista.filter((p) => diaLima(p.fecha) < fechaCaja);
   return {
     total: { n: lista.length, monto: sumaTotal(lista) },
     cobrar: { n: cobrar.length, monto: sumaTotal(cobrar) },
     coordinados: { n: coordinados.length, monto: sumaTotal(coordinados) },
     cola: { n: cola.length },
-    antiguos: { n: antiguos.length },
+    antiguos: { n: antiguos.length, monto: sumaTotal(antiguos) },
   };
 }
 
@@ -141,6 +144,7 @@ export function PendientesCobroCierre({
   errorLista = false,
   alReintentar,
   foco = null,
+  fechaCaja,
 }: PendientesCobroCierreProps) {
   const [codigo, setCodigo] = useState('');
   const [desbloqueado, setDesbloqueado] = useState(false);
@@ -158,7 +162,8 @@ export function PendientesCobroCierre({
   // ADMIN y SUPERVISOR no escriben código (el servidor los deja pasar): ven la lista de entrada
   const pideCodigo = usePideCodigo();
   const mostrarLista = esAdmin || !pideCodigo || desbloqueado;
-  const hoy = diaLima(new Date());
+  // Día de la caja que se cierra (no necesariamente hoy)
+  const hoy = fechaCaja ?? diaLima(new Date());
 
   const resumen = useMemo(() => resumenPendientes(pendientes, hoy), [pendientes, hoy]);
   const filtrados = useMemo(() => filtrarPendientes(pendientes, chip, texto, hoy), [pendientes, chip, texto, hoy]);
@@ -349,6 +354,12 @@ export function PendientesCobroCierre({
           <span>En cocina/cola: <b>{resumen.cola.n}</b></span>
           <span>Pedidos sin entregar</span>
         </div>
+        {resumen.antiguos.n > 0 && (
+          <div className="pdc-tarjeta pdc-antiguo">
+            <span><b>{resumen.antiguos.n}</b> de días anteriores</span>
+            <span>{soles(resumen.antiguos.monto)}</span>
+          </div>
+        )}
         <div className="pdc-tarjeta">
           <span>Coordinados sin liquidar: <b>{resumen.coordinados.n}</b></span>
           <span>{soles(resumen.coordinados.monto)}</span>

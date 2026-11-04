@@ -88,3 +88,15 @@ export function hashTelefono(telefono: string): string {
   const norm = normalizarTelefono(telefono);
   return crypto.createHash('sha256').update(norm).digest('hex');
 }
+
+/** Origen de los códigos de un solo uso (crear cuenta y recuperar contraseña). */
+export const ORIGEN_CODIGO_CUENTA = 'CODIGO_CUENTA';
+
+/**
+ * Texto que ve el personal (Salientes y chat). En un código de cuenta los 6 dígitos nunca salen:
+ * «Tu código es 123456» queda «Tu código es ••••••». Otros textos pasan igual.
+ */
+export function textoParaPersonal(origen: string, texto: string | null | undefined): string | null {
+  if (texto == null) return null;
+  return origen === ORIGEN_CODIGO_CUENTA ? texto.replace(/\d{6}/g, '••••••') : texto;
+}

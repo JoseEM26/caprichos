@@ -8,8 +8,8 @@ import { parametroActivoConDefecto, whatsappSimulado } from '../chatbot/utilidad
 export type AvisoCuenta = 'CREADA' | 'CLAVE_CAMBIADA';
 
 const DETALLE: Record<AvisoCuenta, string> = {
-  CREADA: 'fue creada',
-  CLAVE_CAMBIADA: 'cambió tu contraseña',
+  CREADA: 'se creó tu cuenta',
+  CLAVE_CAMBIADA: 'se cambió tu contraseña',
 };
 
 /**
@@ -39,7 +39,7 @@ export class AvisoCuentaService {
         clave: `cuenta-${accion.toLowerCase()}-${String(partyId)}${sufijo}`,
         origen: 'AVISO_CUENTA',
         carga: {
-          textoLibre: `Tu cuenta de Caprichos ${DETALLE[accion]}. Si no fuiste tú, escríbenos por WhatsApp de inmediato.`,
+          textoLibre: `Hola. Te avisamos de un cambio de seguridad en tu cuenta de Caprichos: ${DETALLE[accion]}. Si no fuiste tú, escríbenos por WhatsApp de inmediato.`,
           plantillaClave: 'CUENTA_AVISO_SEGURIDAD',
           variablesPlantilla: [DETALLE[accion]],
           autor: 'BOT',

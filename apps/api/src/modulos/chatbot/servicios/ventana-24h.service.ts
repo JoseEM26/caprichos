@@ -8,7 +8,7 @@ import {
   WHATSAPP_MENSAJERIA_PUERTO,
   WhatsAppMensajeriaPuerto,
 } from '../puerto/whatsapp-mensajeria.puerto';
-import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
+import { botonCodigoDe, CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { enmascararTelefono, hashTelefono } from '../utilidades/enmascarar.util';
 
 export const DURACION_VENTANA_24H_MS = 24 * 60 * 60 * 1000;
@@ -188,12 +188,13 @@ export class Ventana24hService {
       };
     }
 
+    const botonCodigo = botonCodigoDe(definicion, payload.variablesPlantilla);
     const resultadoPlantilla = await this.mensajeria.enviarPlantilla(
       telefono,
       definicion.nombre,
       definicion.idioma,
       payload.variablesPlantilla,
-      opciones,
+      botonCodigo ? { ...opciones, botonCodigo } : opciones,
     );
 
     if (!resultadoPlantilla.exito) {

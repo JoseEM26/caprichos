@@ -235,7 +235,6 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
-    fireEvent.change(screen.getByLabelText(/Tu cumpleaños/i), { target: { value: '1990-05-10' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
 
     expect(await screen.findByLabelText(/Paso 2: Ubicación/i)).toBeInTheDocument();

@@ -26,6 +26,19 @@ interface MetaParametro {
 }
 
 /** Modos del recargo por reprogramar (mismos valores que el servidor). */
+const OPCIONES_VERIFICACION_CELULAR = [
+  {
+    valor: 'WHATSAPP_ENTRANTE',
+    etiqueta: 'El cliente escribe al negocio (recomendado)',
+    ayuda: 'No necesita plantilla de Meta. Sirve mientras las plantillas de código no estén aprobadas.',
+  },
+  {
+    valor: 'CODIGO_PLANTILLA',
+    etiqueta: 'Código de 6 dígitos por WhatsApp',
+    ayuda: 'Requiere las plantillas caprichos_codigo_cuenta y caprichos_codigo_recuperar aprobadas en Meta.',
+  },
+];
+
 const OPCIONES_RECARGO_REPROG = [
   {
     valor: 'IGUAL_ENVIO',
@@ -48,6 +61,19 @@ const OPCIONES_RECARGO_REPROG = [
 const CLAVES_OCULTAS = ['tolerancia_reserva_min'];
 
 export const META_PARAMETROS: Record<string, MetaParametro> = {
+  // Verificación del celular al crear cuenta o recuperar contraseña (ver verificacion-whatsapp.util.ts en la API)
+  verificacion_celular_modo: {
+    nombre: 'Cómo verifica el cliente su celular',
+    descripcion:
+      'WHATSAPP_ENTRANTE: el cliente escribe primero al WhatsApp del negocio con un mensaje ya escrito (no hace falta plantilla de Meta). CODIGO_PLANTILLA: se envía un código de 6 dígitos por plantilla de Meta; úsalo cuando las plantillas caprichos_codigo_cuenta y caprichos_codigo_recuperar estén aprobadas.',
+    tipo: 'selector',
+    opciones: OPCIONES_VERIFICACION_CELULAR,
+  },
+  verificacion_whatsapp_numero: {
+    nombre: 'Número que recibe la verificación',
+    descripcion: 'Celular del negocio con código de país (p. ej. 51914244077). Vacío = usa el WhatsApp de contacto del local.',
+    tipo: 'texto',
+  },
   reprog_recargo_modo: {
     nombre: 'Costo de volver a enviar un pedido',
     descripcion:

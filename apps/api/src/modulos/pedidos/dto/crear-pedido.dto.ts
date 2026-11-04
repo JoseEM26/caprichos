@@ -26,10 +26,17 @@ export class ClienteDto {
   @Matches(/^9\d{8}$/, { message: 'El teléfono debe tener 9 dígitos y empezar con 9' })
   telefono?: string;
 
-  /** Cumpleaños (YYYY-MM-DD o DD/MM): obligatorio al darse de alta con el celular; lo valida el servicio. */
+  /** Cumpleaños (YYYY-MM-DD o DD/MM). Solo lo guarda quien pide con su cuenta; el pedido sin cuenta lo ignora. */
   @IsOptional()
   @IsString({ message: 'La fecha de cumpleaños debe ser un texto' })
   cumpleanos?: string;
+}
+
+/** Consulta pública de la dirección anterior de un celular (la carta sin sesión). */
+export class PistaDireccionDto {
+  @IsString({ message: 'El celular debe ser un texto' })
+  @Matches(/^9\d{8}$/, { message: 'El celular debe tener 9 dígitos y empezar con 9' })
+  telefono!: string;
 }
 
 export class EntregaDto {
@@ -54,6 +61,11 @@ export class EntregaDto {
     message: 'Origen de entrega no válido',
   })
   origen?: 'GPS' | 'ESCRITA' | 'MAPA' | 'WHATSAPP' | 'ENLACE';
+
+  /** Sin sesión: usar la dirección del último pedido de delivery de ese celular. La resuelve el servidor. */
+  @IsOptional()
+  @IsBoolean({ message: 'reutilizarUltimaDireccion debe ser verdadero o falso' })
+  reutilizarUltimaDireccion?: boolean;
 }
 
 export class LineaPedidoDto {

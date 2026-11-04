@@ -289,6 +289,29 @@ describe('ConfiguracionService', () => {
     });
   });
 
+  describe('verificación del celular por WhatsApp', () => {
+    beforeEach(() => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'x', valor: 'y' });
+    });
+
+    it('el modo acepta WHATSAPP_ENTRANTE o CODIGO_PLANTILLA y rechaza cualquier otro valor', async () => {
+      await service.actualizar('verificacion_celular_modo', 'whatsapp_entrante', adminAuth);
+      expect(prismaMock.parametro.upsert.mock.calls.at(-1)[0].update.valor).toBe('WHATSAPP_ENTRANTE');
+      await service.actualizar('verificacion_celular_modo', 'CODIGO_PLANTILLA', adminAuth);
+      expect(prismaMock.parametro.upsert.mock.calls.at(-1)[0].update.valor).toBe('CODIGO_PLANTILLA');
+      await expect(service.actualizar('verificacion_celular_modo', 'SMS', adminAuth)).rejects.toThrow(BadRequestException);
+    });
+
+    it('el número guarda solo dígitos con código de país; vacío significa usar el WhatsApp de contacto', async () => {
+      await service.actualizar('verificacion_whatsapp_numero', '914 244 077', adminAuth);
+      expect(prismaMock.parametro.upsert.mock.calls.at(-1)[0].update.valor).toBe('51914244077');
+      await service.actualizar('verificacion_whatsapp_numero', '', adminAuth);
+      expect(prismaMock.parametro.upsert.mock.calls.at(-1)[0].update.valor).toBe('');
+      await expect(service.actualizar('verificacion_whatsapp_numero', '12345', adminAuth)).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('actualizarPausaAltaDemanda', () => {
     it('activa la pausa por alta demanda y audita', async () => {
       prismaMock.parametro.findUnique.mockResolvedValue({

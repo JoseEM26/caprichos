@@ -127,11 +127,12 @@ describe('MensajesView (/admin/mensajes)', () => {
 
   it('4. Permite pausar el bot con confirmación Sí/No', async () => {
     render(<MensajesView />);
+    // Pausar el bot está en el menú «⋯» de la cabecera
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Pausar el bot' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Más opciones del chat' })).toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Pausar el bot' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Más opciones del chat' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pausar el bot' }));
 
     // Diálogo de Confirmar
     await waitFor(() => {
@@ -153,13 +154,14 @@ describe('MensajesView (/admin/mensajes)', () => {
     });
   });
 
-  it('6. Muestra el botón Editar nombre junto al contacto y abre el modal', async () => {
+  it('6. Ofrece Editar nombre en el menú del chat y abre el modal', async () => {
     render(<MensajesView />);
+    // Editar nombre está en el menú «⋯» de la cabecera
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Editar nombre' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Más opciones del chat' })).toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Editar nombre' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Más opciones del chat' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar nombre' }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: 'Editar nombre de contacto' })).toBeInTheDocument();

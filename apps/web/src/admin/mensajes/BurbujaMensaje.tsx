@@ -1,0 +1,58 @@
+import { FotoAmpliable } from '../vouchers/FotoAmpliable';
+import { MensajeItem } from './mensajesTipos';
+import { TarjetaUbicacion } from './TarjetaUbicacion';
+
+export interface BurbujaMensajeProps {
+  mensaje: MensajeItem;
+  onReintentar: (mensajeId: string) => void;
+}
+
+/** Un mensaje del flujo: cliente, bot o equipo, con su estado de envío. La foto sale en miniatura. */
+export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps) {
+  const esCliente = m.autor === 'CLIENTE';
+  const esBot = m.autor === 'BOT';
+  const quien = esCliente ? 'Cliente' : esBot ? 'Capri (bot)' : 'Equipo';
+  return (
+    <article className="msg-burbuja" data-autor={m.autor}>
+      {!esCliente && (
+        <div className="msg-quien" style={{ color: esBot ? '#105A6B' : '#00594A' }}>
+          {quien}
+        </div>
+      )}
+      {m.imagen && (
+        <div className="msg-foto">
+          <FotoAmpliable archivoId={m.imagenId} alt="Foto enviada por el cliente" alturaMaxima={160} />
+        </div>
+      )}
+      {m.ubicacion ? <TarjetaUbicacion ubicacion={m.ubicacion} /> : m.texto && <div className="msg-texto">{m.texto}</div>}
+      <div className="msg-pie">
+        <span>{m.hora}</span>
+        {!esCliente && (
+          <>
+            {m.estado === 'FALLIDO' ? (
+              <span style={{ color: '#A3261A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span>{m.motivoFallo ? `No se pudo enviar: ${m.motivoFallo}` : 'No se pudo enviar'}</span>
+                <button
+                  type="button"
+                  className="msg-btn"
+                  onClick={() => onReintentar(m.id)}
+                  style={{ minHeight: 32, padding: '0 8px', borderColor: '#A3261A', color: '#A3261A', fontSize: 12 }}
+                >
+                  Reintentar
+                </button>
+              </span>
+            ) : m.estado === 'SIMULADO' ? (
+              <span>Modo simulado: no se envia a WhatsApp</span>
+            ) : m.estado === 'LEIDO' ? (
+              <span style={{ color: '#005A8C', fontWeight: 600 }}>Leido</span>
+            ) : m.estado === 'ENTREGADO' ? (
+              <span>Entregado</span>
+            ) : (
+              <span>Enviado</span>
+            )}
+          </>
+        )}
+      </div>
+    </article>
+  );
+}

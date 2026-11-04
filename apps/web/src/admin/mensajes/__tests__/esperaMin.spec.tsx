@@ -156,7 +156,7 @@ describe('esperaMin y orden en lista Por atender (MensajesView)', () => {
     fireEvent.click(btnAtender);
 
     await waitFor(() => {
-      const rows = screen.getAllByRole('button').filter((b) => b.className.includes('cv-row'));
+      const rows = screen.getAllByRole('button').filter((b) => b.className.includes('msg-fila'));
       expect(rows).toHaveLength(3);
 
       // El más esperado (25 min) debe ser el primero

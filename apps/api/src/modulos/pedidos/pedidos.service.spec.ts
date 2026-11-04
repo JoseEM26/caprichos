@@ -9,8 +9,9 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
-import { PedidosService } from './pedidos.service';
+import { PedidosService, enmascararDireccion } from './pedidos.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { RedisService } from '../../comun/redis/redis.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
@@ -32,6 +33,7 @@ describe('PedidosService', () => {
   let puntosServiceMock: any;
   let direccionesMock: any;
   let partyPuntosMock: any;
+  let redisMock: any;
 
   const mockProductoCafe = {
     id: 1n,
@@ -203,9 +205,12 @@ describe('PedidosService', () => {
       completarDatos: jest.fn().mockResolvedValue(undefined),
     };
 
+    redisMock = { incr: jest.fn().mockResolvedValue(1), expire: jest.fn().mockResolvedValue(1) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PedidosService,
+        { provide: RedisService, useValue: { obtenerCliente: () => redisMock } },
         { provide: PartyPuntosService, useValue: partyPuntosMock },
         { provide: DireccionesClienteService, useValue: direccionesMock },
         { provide: PrismaService, useValue: prismaMock },
@@ -1137,13 +1142,10 @@ describe('PedidosService', () => {
       expect(capturado.data.cliente_party_id).toBe(300n);
     });
 
-    it('alta por celular sin sesión: guarda nombre y cumpleaños en el party y no los devuelve en la respuesta', async () => {
+    it('alta por celular sin sesión: guarda el nombre en el party y nunca el cumpleaños', async () => {
       const capturado = crearCapturado();
       const res: any = await service.crear(pedidoBaseDto, 'idemp-cumple-ok', undefined);
-      expect(partyPuntosMock.completarDatos).toHaveBeenCalledWith(300n, {
-        nombre: 'Juan Perez',
-        cumple: { dia: 14, mes: 3 },
-      });
+      expect(partyPuntosMock.completarDatos).toHaveBeenCalledWith(300n, { nombre: 'Juan Perez' });
       expect(JSON.stringify(res)).not.toMatch(/1990|03-14|14\/03/);
       expect(JSON.stringify(capturado.data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))).not.toMatch(/1990|03-14|14\/03/);
     });
@@ -1205,13 +1207,134 @@ describe('PedidosService', () => {
       expect(prismaMock.pedido.create).not.toHaveBeenCalled();
     });
 
-    it('alta por celular sin sesión: exige cumpleaños antes de crear el pedido', async () => {
-      const err = await service
-        .crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana', telefono: '987654321' } } as any, 'idemp-cumple-falta', { canal: 'CARTA' })
-        .catch((e) => e);
-      expect(err.getResponse()).toMatchObject({ codigo: 'CUMPLEANOS_REQUERIDO' });
-      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
-      expect(partyPuntosMock.completarDatos).not.toHaveBeenCalled();
+    it('alta por celular sin sesión: el pedido se crea sin cumpleaños y no se guarda ninguno', async () => {
+      const capturado = crearCapturado();
+      await service.crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana', telefono: '987654321' } } as any, 'idemp-cumple-no', { canal: 'CARTA' });
+      expect(capturado.data.cliente_party_id).toBe(300n);
+      expect(partyPuntosMock.completarDatos).toHaveBeenCalledWith(300n, { nombre: 'Ana' });
+    });
+
+    it('sin sesión, un cumpleaños inválido se ignora: no bloquea el pedido ni se guarda', async () => {
+      const capturado = crearCapturado();
+      await service.crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana', telefono: '987654321', cumpleanos: '31/02' } } as any, 'idemp-cumple-invalido', { canal: 'CARTA' });
+      expect(capturado.data.cliente_party_id).toBe(300n);
+      expect(partyPuntosMock.completarDatos).not.toHaveBeenCalledWith(300n, expect.objectContaining({ cumple: expect.anything() }));
+    });
+
+    it('con sesión iniciada, el cumpleaños sí se guarda si la cuenta aún no lo tiene', async () => {
+      crearCapturado();
+      await service.crear(pedidoBaseDto, 'idemp-cumple-sesion', { canal: 'CARTA', clientePartyId: 55n });
+      expect(partyPuntosMock.completarDatos).toHaveBeenCalledWith(55n, { nombre: 'Juan Perez', cumple: { dia: 14, mes: 3 } });
+    });
+
+    describe('dirección del último pedido por celular', () => {
+      const ultimoPedido = {
+        entrega_direccion: 'Av. Los Girasoles 123',
+        entrega_referencia: 'Portón negro',
+        entrega_lat: 1.5,
+        entrega_lng: -77.04,
+        entrega_origen: 'GPS',
+        zona_id: 2n,
+      };
+
+      beforeEach(() => {
+        prismaMock.pedido.findFirst = jest.fn().mockResolvedValue(null);
+        prismaMock.zonaReparto = { findUnique: jest.fn().mockResolvedValue({ codigo: 'SJL' }) };
+      });
+
+      it('la pista sale con zona y dirección enmascarada, sin la dirección completa ni el punto', async () => {
+        prismaMock.pedido.findFirst.mockResolvedValue(ultimoPedido);
+        const res = await service.pistaUltimaDireccion('987654321', '10.0.0.1');
+        expect(res).toEqual({ existe: true, zona: 'SJL', direccion: 'Av. Los G••••' });
+        expect(JSON.stringify(res)).not.toMatch(/Girasoles|123|Portón|1\.5|77\.04/);
+        expect(prismaMock.pedido.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({ where: expect.objectContaining({ cliente_telefono: '987654321', modalidad: 'DELIVERY' }) }),
+        );
+      });
+
+      it('sin pedidos previos con dirección: existe false, sin más datos', async () => {
+        expect(await service.pistaUltimaDireccion('987654321')).toEqual({ existe: false });
+      });
+
+      it('la pista de un pedido que solo tiene punto en el mapa no muestra texto, pero sí la zona', async () => {
+        prismaMock.pedido.findFirst.mockResolvedValue({ ...ultimoPedido, entrega_direccion: '-12.04, -77.04' });
+        expect(await service.pistaUltimaDireccion('987654321')).toEqual({ existe: true, zona: 'SJL', direccion: null });
+      });
+
+      it('la pista rechaza con 429 al pasar de 10 consultas por celular en una hora', async () => {
+        redisMock.incr.mockResolvedValueOnce(11);
+        const err = await service.pistaUltimaDireccion('987654321', '10.0.0.1').catch((e) => e);
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+        expect(err.getResponse()).toMatchObject({ codigo: 'DEMASIADAS_CONSULTAS' });
+        expect(prismaMock.pedido.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('la pista rechaza con 429 al pasar de 30 consultas por IP en una hora', async () => {
+        redisMock.incr.mockResolvedValueOnce(1).mockResolvedValueOnce(31);
+        const err = await service.pistaUltimaDireccion('987654321', '10.0.0.1').catch((e) => e);
+        expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+      });
+
+      it('si Redis no responde, la pista sigue (el texto ya va enmascarado)', async () => {
+        redisMock.incr.mockRejectedValueOnce(new Error('redis caído'));
+        prismaMock.pedido.findFirst.mockResolvedValue(ultimoPedido);
+        expect(await service.pistaUltimaDireccion('987654321', '10.0.0.1')).toMatchObject({ existe: true, direccion: 'Av. Los G••••' });
+      });
+
+      it('con la marca, el pedido usa la dirección, coordenadas y zona de su último pedido', async () => {
+        const capturado = crearCapturado();
+        prismaMock.pedido.findFirst.mockResolvedValue(ultimoPedido);
+        await service.crear(
+          { ...pedidoBaseDto, cliente: { nombre: 'Ana', telefono: '987654321' }, entrega: { reutilizarUltimaDireccion: true } } as any,
+          'idemp-reutiliza-ok',
+          { canal: 'CARTA' },
+        );
+        expect(zonasServiceMock.detectar).toHaveBeenCalledWith(1.5, -77.04);
+        expect(capturado.data.entrega_direccion).toBe('Av. Los Girasoles 123');
+        expect(capturado.data.entrega_referencia).toBe('Portón negro');
+        expect(capturado.data.entrega_origen).toBe('GPS');
+        expect(capturado.data.zona_id).toBe(2n);
+      });
+
+      it('con la marca y sin pedido previo, el pedido se rechaza con mensaje claro', async () => {
+        const err = await service
+          .crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana', telefono: '987654321' }, entrega: { reutilizarUltimaDireccion: true } } as any, 'idemp-reutiliza-no', { canal: 'CARTA' })
+          .catch((e) => e);
+        expect(err.getResponse()).toEqual({
+          codigo: 'SIN_DIRECCION_ANTERIOR',
+          mensaje: 'No encontramos una dirección anterior con ese celular. Escribe tu dirección.',
+        });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('con sesión iniciada la marca no se usa: manda la dirección que llegue en el pedido', async () => {
+        const capturado = crearCapturado();
+        prismaMock.pedido.findFirst.mockResolvedValue(ultimoPedido);
+        await service.crear(
+          { ...pedidoBaseDto, entrega: { reutilizarUltimaDireccion: true, direccion: 'Calle Nueva 456', lat: -12.046374, lng: -77.042793 } } as any,
+          'idemp-reutiliza-sesion',
+          { canal: 'CARTA', clientePartyId: 55n },
+        );
+        expect(capturado.data.entrega_direccion).toBe('Calle Nueva 456');
+        expect(prismaMock.pedido.findFirst).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('enmascararDireccion', () => {
+      it('oculta la mayor parte de la dirección y no muestra números', () => {
+        expect(enmascararDireccion('Av. Los Girasoles 123')).toBe('Av. Los G••••');
+        expect(enmascararDireccion('Jr. Lima')).toBe('Jr. L••••');
+        expect(enmascararDireccion('123 Calle')).toBe('C••••');
+        expect(enmascararDireccion('Av. Lima 1234')).toBe('Av. L••••');
+        expect(enmascararDireccion('Pasaje')).toBe('P••••');
+      });
+
+      it('sin texto o solo con coordenadas no devuelve nada', () => {
+        expect(enmascararDireccion(null)).toBeNull();
+        expect(enmascararDireccion('   ')).toBeNull();
+        expect(enmascararDireccion('-12.046374, -77.042793')).toBeNull();
+      });
     });
 
     it('CELULAR_REQUERIDO: el placeholder 999999999 cuenta como sin celular', async () => {

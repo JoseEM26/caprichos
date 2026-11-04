@@ -41,6 +41,7 @@ import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { interpretarPuntajeEncuesta } from './encuesta-posventa.util';
 import { ubicacionValida, UbicacionCliente } from './ubicacion-cliente.util';
 import { DireccionesService } from '../../direcciones/direcciones.service';
+import { atenderMensajeVerificacion, secretoVerificacion } from '../../clientes/verificacion-whatsapp.util';
 import { textoGraciasEncuesta } from '../conversacion/textos-encuesta';
 import { leerParametroNumerico } from '../../impresion/estado-impresion';
 import {
@@ -668,6 +669,12 @@ export class WhatsappWebhookService {
 
     if (tipo === 'reaction') return true;
 
+    // Verificación del celular (modo WHATSAPP_ENTRANTE): «Mi código: TOKEN» verifica el número que escribe.
+    // Va ANTES del menú del bot: ese mensaje no recibe menú ni cuenta como conversación normal.
+    if (clasificacion.clase === 'TEXTO' && telefonoNorm && !(await this.spamBloqueado(identificador))) {
+      if (await this.atenderVerificacionCelular(telefonoNorm, texto)) return true;
+    }
+
     // Audio, video, sticker, documento, etc.: no avanzan el flujo ni cuentan como calificación, reprogramación o voucher.
     // El bot avisa y repite el paso (ver atenderNoCompatible).
     if (esNoCompatible) {
@@ -907,6 +914,28 @@ export class WhatsappWebhookService {
     } catch (err: any) {
       this.logger.warn(`No se pudo atender un mensaje no compatible: ${err.message}`);
     }
+  }
+
+  /**
+   * Responde a un mensaje de verificación del celular. Devuelve true si el mensaje era de verificación (y ya
+   * se respondió), false si es un mensaje normal. Un fallo interno no pasa el mensaje al bot: no se contesta nada.
+   */
+  private async atenderVerificacionCelular(telefonoNorm: string, texto: string): Promise<boolean> {
+    if (!this.redis) return false;
+    try {
+      const respuesta = await atenderMensajeVerificacion(
+        this.redis.obtenerCliente(),
+        secretoVerificacion(this.configService),
+        texto,
+        telefonoNorm,
+      );
+      if (!respuesta) return false;
+      // Dentro de la ventana de 24 h (el cliente acaba de escribir): texto libre, sin plantilla
+      await this.mensajeria.enviarTexto(telefonoNorm, respuesta);
+    } catch (err: any) {
+      this.logger.warn(`No se pudo atender la verificación del celular: ${err.message}`);
+    }
+    return true;
   }
 
   /** true si el contacto tiene un bloqueo temporal por spam vigente. Si Redis no responde, no bloquea (fail-open). */

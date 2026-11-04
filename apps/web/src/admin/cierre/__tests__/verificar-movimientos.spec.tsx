@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import * as sesionModulo from '../../../comun/sesion';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { cierreApi } from '../cierreApi';
@@ -53,6 +53,43 @@ describe('Verificar movimientos del turno', () => {
     expect(base.onVolver).toHaveBeenCalled();
   });
 
+  it('caja de un día anterior: título con su fecha, franja de aviso y estado propio', () => {
+    render(<VerificarMovimientos {...base} resumen={resumen} diaAnterior />);
+    expect(screen.getByText('2026-10-29', { selector: 'b' }).parentElement).toHaveTextContent('Turno del 2026-10-29');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Esta caja es del 29/10/2026 y sigue abierta. Ciérrala antes de trabajar con la de hoy.',
+    );
+    expect(screen.getByText('Caja abierta (día anterior)')).toBeInTheDocument();
+  });
+
+  it('caja de hoy: sin franja de aviso y con el estado de siempre', () => {
+    render(<VerificarMovimientos {...base} resumen={resumen} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('Caja abierta')).toBeInTheDocument();
+  });
+
+  it('la cantidad de pedidos por medio cuadra con la lista de pedidos cobrados', () => {
+    const pedidosCobrados = [
+      { pedidoId: 'a', codigo: 'P-1', cliente: 'Ana', total: 150, medios: ['YAPE'], en: '' },
+      { pedidoId: 'b', codigo: 'P-2', cliente: null, total: 80, medios: ['EFECTIVO'], en: '' },
+    ];
+    render(<VerificarMovimientos {...base} pedidosCobrados={pedidosCobrados} resumen={{ ...resumen, ventasEfectivo: 80 }} />);
+
+    const tabla = screen.getByRole('table', { name: 'Cobros por medio de pago' });
+    const celdasDe = (medio: string) =>
+      within(within(tabla).getByText(medio).closest('[role="row"]') as HTMLElement)
+        .getAllByRole('cell')
+        .map((c) => c.textContent);
+    expect(celdasDe('Efectivo')).toEqual(['Efectivo', '1', 'S/ 80.00']);
+    expect(celdasDe('Yape')).toEqual(['Yape', '1', 'S/ 150.00']);
+
+    // La lista muestra los mismos dos pedidos y el mismo total
+    const lista = screen.getByRole('table', { name: 'Pedidos cobrados en el turno' });
+    expect(within(lista).getByText('P-1')).toBeInTheDocument();
+    expect(within(lista).getByText('P-2')).toBeInTheDocument();
+    expect(within(lista).getByText('S/ 230.00')).toBeInTheDocument();
+  });
+
   it('el modal del cierre usa la clase ancha y titulo accesible', async () => {
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
       usuario: { partyId: '2', nombres: 'Carmen', rol: 'CAJERO' }, permisos: [], tiene: vi.fn().mockReturnValue(true),
@@ -67,5 +104,49 @@ describe('Verificar movimientos del turno', () => {
     expect(dlg).toHaveClass('vm-ancho');
     fireEvent.click(screen.getByRole('button', { name: 'Ya revisé: continuar al conteo' }));
     expect(screen.getByRole('dialog', { name: 'Cerrar caja y cuadrar' })).not.toHaveClass('vm-ancho');
+  });
+
+  it('admin con la caja abierta de ayer y una de hoy: todo el turno sale de la de ayer, sin mezclar', async () => {
+    // Ayer en Lima (la caja de hoy no existe abierta; la de ayer sigue abierta)
+    const ayer = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    const [a, m, d] = ayer.split('-');
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
+      usuario: { partyId: '1', nombres: 'Admin Kevin', rol: 'ADMIN' },
+      permisos: ['caja/ver', 'caja/cerrar'],
+      tiene: vi.fn().mockReturnValue(true),
+    } as any);
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: false, caja: null, cajaAnteriorAbierta: { fecha: ayer } } as any);
+    vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
+    vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
+    vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
+    vi.spyOn(cierreApi, 'listarPendientesDeCobro').mockResolvedValue([]);
+    vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValue({
+      cajaId: 7,
+      fecha: `${ayer}T00:00:00.000Z`,
+      apertura: 0,
+      efectivoEsperado: 0,
+      medios: { efectivo: 0, yape: 56, plin: 0, transferencia: 0, tarjeta: 0 },
+      desglose: { ventasEfectivo: 0, ingresos: 0, egresos: 0 },
+      cobrados: [{ pedidoId: '5', codigo: 'CP-005', cliente: 'Rosa', total: 56, medios: ['YAPE'], en: '' }],
+      movimientos: [],
+    } as any);
+
+    render(<CierreView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
+    const dlg = screen.getByRole('dialog', { name: 'Verificar movimientos del turno' });
+
+    expect(within(dlg).getByText(ayer, { selector: 'b' })).toBeInTheDocument();
+    expect(within(dlg).getByRole('alert')).toHaveTextContent(
+      `Esta caja es del ${d}/${m}/${a} y sigue abierta. Ciérrala antes de trabajar con la de hoy.`,
+    );
+    expect(within(dlg).getByText('Caja abierta (día anterior)')).toBeInTheDocument();
+
+    // Lista, total y conteo por medio son los mismos cobros de la caja de ayer
+    const lista = within(dlg).getByRole('table', { name: 'Pedidos cobrados en el turno' });
+    expect(within(lista).getByText('CP-005')).toBeInTheDocument();
+    const tablaMedios = within(dlg).getByRole('table', { name: 'Cobros por medio de pago' });
+    const filaYape = within(tablaMedios).getByText('Yape').closest('[role="row"]') as HTMLElement;
+    expect(within(filaYape).getAllByRole('cell').map((c) => c.textContent)).toEqual(['Yape', '1', 'S/ 56.00']);
+    expect(within(dlg).queryByText('Sin pedidos cobrados aún.')).not.toBeInTheDocument();
   });
 });

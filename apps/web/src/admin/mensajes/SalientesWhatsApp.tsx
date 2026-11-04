@@ -2,19 +2,27 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import {
   ETIQUETA_CLASIFICACION,
+  ETIQUETA_ESTADO,
   EstadoSaliente,
   ResumenSalientes,
   SalienteAdmin,
   formatearLag,
   salientesApi,
+  textoCanal,
 } from './salientesApi';
 
-const FILTROS: Array<{ id: EstadoSaliente; label: string }> = [
+/** «CODIGOS» no es un estado: son los códigos de cuenta (registro y recuperar) en cualquier estado. */
+type Filtro = EstadoSaliente | 'CODIGOS';
+const FILTROS: Array<{ id: Filtro; label: string }> = [
   { id: 'FALLIDO', label: 'Fallidos' },
   { id: 'PENDIENTE', label: 'En cola' },
   { id: 'ENVIADO', label: 'Enviados' },
   { id: 'DESCARTADO', label: 'Descartados' },
+  { id: 'CODIGOS', label: 'Códigos de cuenta' },
 ];
+const LIMITE = 20;
+const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+const ETIQUETA_PROPOSITO = { REGISTRO: 'registro de cuenta', RECUPERAR: 'recuperar contraseña' } as const;
 
 type Accion = { tipo: 'reenviar' | 'descartar'; fila: SalienteAdmin } | null;
 
@@ -24,7 +32,9 @@ type Accion = { tipo: 'reenviar' | 'descartar'; fila: SalienteAdmin } | null;
  */
 export function SalientesWhatsApp({ controles }: { controles?: ReactNode } = {}) {
   const [resumen, setResumen] = useState<ResumenSalientes | null>(null);
-  const [estado, setEstado] = useState<EstadoSaliente>('FALLIDO');
+  const [filtro, setFiltro] = useState<Filtro>('FALLIDO');
+  const [pagina, setPagina] = useState(1);
+  const [total, setTotal] = useState(0);
   const [filas, setFilas] = useState<SalienteAdmin[]>([]);
   const [cargando, setCargando] = useState(true);
   const [accion, setAccion] = useState<Accion>(null);
@@ -33,16 +43,26 @@ export function SalientesWhatsApp({ controles }: { controles?: ReactNode } = {})
   const [enviando, setEnviando] = useState(false);
 
   const cargar = useCallback(async () => {
+    const codigos = filtro === 'CODIGOS';
     try {
-      const [r, l] = await Promise.all([salientesApi.resumen(), salientesApi.listar(estado)]);
+      const [r, l] = await Promise.all([
+        salientesApi.resumen(),
+        codigos ? salientesApi.listar('', pagina, 'CODIGO_CUENTA') : salientesApi.listar(filtro, pagina),
+      ]);
       setResumen(r);
       setFilas(l.filas);
+      setTotal(l.total);
     } catch {
       setError('No se pudo cargar la cola de WhatsApp.');
     } finally {
       setCargando(false);
     }
-  }, [estado]);
+  }, [filtro, pagina]);
+
+  const elegirFiltro = (f: Filtro) => {
+    setFiltro(f);
+    setPagina(1);
+  };
 
   useEffect(() => {
     void cargar();
@@ -119,15 +139,15 @@ export function SalientesWhatsApp({ controles }: { controles?: ReactNode } = {})
           <button
             key={f.id}
             type="button"
-            onClick={() => setEstado(f.id)}
-            aria-pressed={estado === f.id}
+            onClick={() => elegirFiltro(f.id)}
+            aria-pressed={filtro === f.id}
             style={{
               minHeight: 36,
               padding: '0 12px',
               borderRadius: 10,
               border: 'none',
-              background: estado === f.id ? '#D9FDD3' : '#F0F2F5',
-              color: estado === f.id ? '#005C4B' : '#54656F',
+              background: filtro === f.id ? '#D9FDD3' : '#F0F2F5',
+              color: filtro === f.id ? '#005C4B' : '#54656F',
               fontWeight: 700,
               cursor: 'pointer',
             }}
@@ -138,6 +158,18 @@ export function SalientesWhatsApp({ controles }: { controles?: ReactNode } = {})
       </div>
 
       {error && <div role="alert" style={{ color: 'var(--cp-rust, #B2500F)', marginBottom: 8 }}>{error}</div>}
+
+      {total > LIMITE && (
+        <nav aria-label="Paginación de salientes" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, fontSize: 13 }}>
+          <button type="button" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} style={{ minHeight: 36, padding: '0 12px', borderRadius: 10, border: 'none', background: '#F0F2F5', fontWeight: 700 }}>
+            Anterior
+          </button>
+          <span>Página {pagina} de {Math.ceil(total / LIMITE)}</span>
+          <button type="button" disabled={pagina >= Math.ceil(total / LIMITE)} onClick={() => setPagina((p) => p + 1)} style={{ minHeight: 36, padding: '0 12px', borderRadius: 10, border: 'none', background: '#F0F2F5', fontWeight: 700 }}>
+            Siguiente
+          </button>
+        </nav>
+      )}
 
       {cargando ? (
         <div>Cargando...</div>
@@ -154,13 +186,17 @@ export function SalientesWhatsApp({ controles }: { controles?: ReactNode } = {})
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <b>{f.telefono}</b>
                 <span style={{ fontSize: 12, color: '#54656F' }}>
-                  {new Date(f.actualizadoEn).toLocaleString('es-PE')}
+                  Creado {hora(f.creadoEn)} · Actualizado {new Date(f.actualizadoEn).toLocaleString('es-PE')}
                 </span>
               </div>
               <div style={{ fontSize: 13, marginTop: 4 }}>
-                Origen: {f.origen}
+                {`Estado: ${ETIQUETA_ESTADO[f.estado]} · Origen: ${f.origen}`}
+                {f.proposito ? ` (${ETIQUETA_PROPOSITO[f.proposito]})` : ''}
                 {f.pedidoCodigo ? ` · Pedido ${f.pedidoCodigo}` : ''} · Intentos {f.intentos}/{f.maxIntentos}
               </div>
+              {(f.estado === 'ENVIADO' || f.estado === 'FALLIDO') && (
+                <div style={{ fontSize: 13, marginTop: 2, color: '#54656F' }}>Salió como: {textoCanal(f.canal)}</div>
+              )}
               {f.texto && <div style={{ fontSize: 13, marginTop: 4, color: '#54656F' }}>{f.texto.slice(0, 160)}</div>}
               {f.estado === 'FALLIDO' && (
                 <div style={{ fontSize: 13, marginTop: 6, color: 'var(--cp-rust, #B2500F)' }}>

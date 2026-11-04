@@ -176,7 +176,15 @@ describe('CierreService', () => {
         update: jest.fn().mockResolvedValue({ ...mockCajaAbierta, estado: 'CERRADA' }),
       },
       cobro: {
-        findMany: jest.fn().mockResolvedValue(mockCobros),
+        // Con el include de pedido que pide obtenerEsperado para la lista de cobros del turno
+        findMany: jest.fn().mockResolvedValue(
+          mockCobros.map((c) => ({
+            ...c,
+            pedido_id: c.id,
+            en: new Date('2026-10-21T15:00:00Z'),
+            pedido: { codigo: `PED-${c.id}`, cliente_nombre: 'Ana' },
+          })),
+        ),
       },
       movimientoCaja: {
         findMany: jest.fn().mockResolvedValue(mockMovimientos),
@@ -814,6 +822,52 @@ describe('CierreService', () => {
           },
         }),
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 8b. Turno de la caja abierta: cobros y movimientos de ESA caja, no de la de hoy
+  // -------------------------------------------------------------------------
+  describe('8b. turno de la caja abierta de cualquier día', () => {
+    const cajaAyer = { ...mockCajaAbierta, id: 7n, fecha: new Date('2026-11-02') };
+    const cajaHoy = { ...mockCajaAbierta, id: 8n, fecha: new Date('2026-11-03'), estado: 'CERRADA' };
+
+    beforeEach(() => {
+      // Caja de ayer abierta y una de hoy (cerrada) en la base: el turno sale de la abierta
+      prismaMock.caja.findFirst.mockResolvedValue(cajaAyer);
+      prismaMock.caja.findUnique.mockImplementation(async ({ where }: any) => (where.id === 7n ? cajaAyer : cajaHoy));
+    });
+
+    it('el ADMIN recibe los cobros y movimientos de la caja abierta de ayer, con los mismos totales', async () => {
+      const esperado = await service.obtenerEsperado(mockUsuarioAdmin);
+
+      expect(esperado.cajaId).toBe(7);
+      expect(prismaMock.cobro.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { caja_id: 7n } }));
+      expect(prismaMock.movimientoCaja.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { caja_id: 7n } }),
+      );
+      expect(esperado.cobrados).toHaveLength(4);
+      expect(esperado.cobrados[0]).toEqual({
+        pedidoId: '1',
+        codigo: 'PED-1',
+        cliente: 'Ana',
+        total: 90,
+        medios: ['EFECTIVO'],
+        en: new Date('2026-10-21T15:00:00Z'),
+      });
+      // Lo que suman las listas es lo mismo que los totales por medio: 300 + 200 + 50 + 100
+      const sumaCobros = esperado.cobrados.reduce((a, c) => a + c.total, 0);
+      const { yape, plin, transferencia, tarjeta } = esperado.medios;
+      const sumaMedios = esperado.desglose.ventasEfectivo + yape + plin + transferencia + tarjeta;
+      expect(sumaCobros).toBe(650);
+      expect(sumaMedios).toBe(650);
+      expect(esperado.movimientos.map((m) => m.motivo)).toEqual(['Sencillo inicial extra', 'Compra de hielo']);
+    });
+
+    it('el cajero sin PIN no recibe cobros ni movimientos (cierre ciego, DT-61)', async () => {
+      await expect(service.obtenerEsperado(mockUsuarioCajero)).rejects.toThrow(HttpException);
+      expect(prismaMock.cobro.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.movimientoCaja.findMany).not.toHaveBeenCalled();
     });
   });
 
