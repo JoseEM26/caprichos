@@ -11,6 +11,7 @@ import { ContenidoService } from '../contenido.service';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
+import { OfertasService } from '../../ofertas/ofertas.service';
 import { DISPOSICION_CARTA_DEFECTO } from '../disposicion-carta';
 
 describe('Diseño de la carta: disposición en borrador y carta pública', () => {
@@ -32,6 +33,7 @@ describe('Diseño de la carta: disposición en borrador y carta pública', () =>
         { provide: PrismaService, useValue: prisma },
         { provide: AuditoriaService, useValue: { registrar: jest.fn() } },
         { provide: EventosGateway, useValue: { emitirAdmin: jest.fn() } },
+        { provide: OfertasService, useValue: { actualizarOferta: jest.fn() } },
       ],
     }).compile();
     service = module.get(ContenidoService);

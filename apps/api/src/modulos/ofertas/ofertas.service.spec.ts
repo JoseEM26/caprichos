@@ -773,6 +773,29 @@ describe('OfertasService', () => {
     });
   });
 
+  describe('visible en la carta (diseñador)', () => {
+    const fila = (visible: boolean) => ({
+      id: 1n, tipo: 'DESCUENTO', nombre: 'Martes 2x1', descripcion: null, lleva: null, paga: null,
+      alcance_categoria_id: null, alcance_producto_id: null, descuento_tipo: 'PORCENTAJE', descuento_valor: 10,
+      compra_minima: null, dias: [], hora_desde: null, hora_hasta: null, fecha_desde: null, fecha_hasta: null,
+      canales: ['CARTA'], limite_usos: null, usos_actuales: 0, no_suma_beneficios: false, orden: 2, activo: true,
+      creado_en: new Date(), categoria: null, producto: null, imagen_archivo_id: null, imagen_archivo: null,
+      combosPrecio: [], combosParte: [], mostrar_en_saludo_bot: false, solo_primera_compra: false, visible_carta: visible,
+    });
+
+    it('ocultar en la carta cambia solo visible_carta: el descuento y activo no se tocan', async () => {
+      prismaMock.oferta.findUnique.mockResolvedValue(fila(false));
+      await service.actualizarOferta('1', { visibleCarta: false }, { partyId: 1n });
+      expect(prismaMock.oferta.update).toHaveBeenCalledWith({ where: { id: 1n }, data: { visible_carta: false } });
+    });
+
+    it('el saludo del bot no usa una promoción oculta en la carta', async () => {
+      prismaMock.oferta.findMany.mockResolvedValueOnce([]);
+      await service.promoParaSaludo(new Date('2026-12-12T15:00:00Z'));
+      expect(prismaMock.oferta.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ visible_carta: true }) }));
+    });
+  });
+
   describe('soporte de imagen en oferta', () => {
     it('mapea correctamente imagenArchivoId e imagenUrl si la oferta tiene archivo', async () => {
       prismaMock.oferta.findUnique.mockResolvedValueOnce({

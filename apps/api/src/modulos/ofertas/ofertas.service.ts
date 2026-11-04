@@ -452,6 +452,7 @@ export class OfertasService {
     }
     if (dto.orden !== undefined) data.orden = dto.orden;
     if (dto.activo !== undefined) data.activo = dto.activo;
+    if (dto.visibleCarta !== undefined) data.visible_carta = dto.visibleCarta;
     if (dto.imagenArchivoId !== undefined) {
       data.imagen_archivo = dto.imagenArchivoId
         ? { connect: { id: BigInt(dto.imagenArchivoId) } }
@@ -1909,7 +1910,7 @@ export class OfertasService {
    */
   async promoParaSaludo(ahora: Date = new Date()): Promise<{ titulo: string; texto: string; enlaceCarta: string } | null> {
     const candidatas = await this.prisma.oferta.findMany({
-      where: { mostrar_en_saludo_bot: true, activo: true, tipo: 'DESCUENTO' },
+      where: { mostrar_en_saludo_bot: true, activo: true, visible_carta: true, tipo: 'DESCUENTO' },
       orderBy: [{ orden: 'asc' }, { id: 'asc' }],
     });
     const oferta = candidatas.find((o) => estaVigente(o, 'CARTA', ahora));
@@ -1948,6 +1949,7 @@ export class OfertasService {
       soloPrimeraCompra: o.solo_primera_compra ?? false,
       orden: o.orden,
       activo: o.activo,
+      visibleCarta: o.visible_carta ?? true,
       creadoEn: o.creado_en.toISOString(),
       categoriaNombre: o.categoria?.nombre || null,
       productoNombre: o.producto?.nombre || null,

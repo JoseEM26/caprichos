@@ -105,7 +105,7 @@ export interface VistaPreviaCarta {
 
 function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: VistaPreviaCarta; paginaInicial?: PaginaCarta }) {
   const [categorias, setCategorias] = useState<CategoriaCarta[]>([]);
-  const [ofertas, setOfertas] = useState<OfertaItem[]>([]);
+  const [ofertasBase, setOfertas] = useState<OfertaItem[]>([]);
   const [estadoLocal, setEstadoLocal] = useState<EstadoLocalCarta | null>(null);
   const [datosLocal, setDatosLocal] = useState<DatosLocalCarta | null>(null);
   const [contenido, setContenido] = useState<ContenidoCarta | null>(null);
@@ -118,6 +118,8 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   const [pagina, setPagina] = useState<PaginaCarta>(paginaInicial ?? 'carta');
   const movil = useEsMovil();
   const ed = useEdicion();
+  // En la carta pública las promociones ocultas no existen; en el diseñador se ven atenuadas para poder mostrarlas.
+  const ofertas = useMemo(() => (ed ? ofertasBase : ofertasBase.filter((o) => o.visibleCarta !== false)), [ofertasBase, ed]);
 
   const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto } = useCarrito();
 
@@ -549,18 +551,21 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
                     gap: '16px',
                   }}
                 >
-                  {ofertasFiltradas.map((ofe) => (
-                    <TarjetaOferta
-                      key={ofe.id}
-                      oferta={ofe}
-                      productos={todosLosProductos}
-                      categorias={categorias}
-                      onSeleccionarCategoria={(catId) => {
-                        setCategoriaActivaId(catId);
-                        setBusqueda('');
-                      }}
-                    />
-                  ))}
+                  {ofertasFiltradas.map((ofe) => {
+                    const tarjeta = (
+                      <TarjetaOferta
+                        key={ofe.id}
+                        oferta={ofe}
+                        productos={todosLosProductos}
+                        categorias={categorias}
+                        onSeleccionarCategoria={(catId) => {
+                          setCategoriaActivaId(catId);
+                          setBusqueda('');
+                        }}
+                      />
+                    );
+                    return ed ? ed.bloque(`promo:${ofe.id}`, tarjeta) : tarjeta;
+                  })}
                 </div>
               </section>
             )}

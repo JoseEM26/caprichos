@@ -12,6 +12,7 @@ import { ContenidoService } from '../contenido.service';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
+import { OfertasService } from '../../ofertas/ofertas.service';
 import { CrearNovedadDto } from '../contenido.dto';
 
 describe('ContenidoService', () => {
@@ -19,6 +20,7 @@ describe('ContenidoService', () => {
   let prisma: any;
   let auditoria: any;
   let eventosGateway: any;
+  let ofertasService: any;
 
   const mockUsuario = {
     partyId: BigInt(10),
@@ -96,6 +98,7 @@ describe('ContenidoService', () => {
       registrar: jest.fn().mockResolvedValue(undefined),
     };
 
+    ofertasService = { actualizarOferta: jest.fn().mockResolvedValue({}) };
     eventosGateway = {
       emitirAdmin: jest.fn(),
       emitirPublico: jest.fn(),
@@ -107,6 +110,7 @@ describe('ContenidoService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditoriaService, useValue: auditoria },
         { provide: EventosGateway, useValue: eventosGateway },
+        { provide: OfertasService, useValue: ofertasService },
       ],
     }).compile();
 
@@ -843,6 +847,38 @@ describe('ContenidoService', () => {
       expect(llamadas).toEqual(expect.arrayContaining([[BigInt(4), 1, 'Primero'], [BigInt(11), 2, undefined], [BigInt(3), 3, undefined]]));
       const ultima = prisma.versionCarta.update.mock.calls.at(-1)[0];
       expect(ultima.data.contenido.momentos).toBeUndefined();
+    });
+
+    it('publicar aplica a la oferta solo lo visual y de lugar (nombre, descripción, foto, orden, visible), sin reglas del descuento', async () => {
+      prisma.versionCarta.findFirst.mockResolvedValue({
+        id: BigInt(8),
+        estado: 'BORRADOR',
+        contenido: {
+          promos: {
+            '3': { nombre: 'Martes 2x1 renovado', descripcion: '  ', orden: 1, oculto: true, fotoUrl: '/archivos/publico/p.webp' },
+            '5': { orden: 2 },
+          },
+        },
+      });
+      prisma.versionCarta.updateMany.mockResolvedValue({});
+      prisma.versionCarta.update.mockResolvedValue({ id: BigInt(8), estado: 'PUBLICADA', decoracion: 'NINGUNO' });
+      prisma.archivo.findFirst.mockResolvedValue({ id: BigInt(4) });
+      prisma.parametro.findUnique.mockResolvedValue(null);
+
+      await service.publicarDiseno(mockUsuario as any);
+
+      expect(ofertasService.actualizarOferta).toHaveBeenCalledWith(
+        '3',
+        { nombre: 'Martes 2x1 renovado', descripcion: null, orden: 1, visibleCarta: false, imagenArchivoId: '4' },
+        mockUsuario,
+      );
+      expect(ofertasService.actualizarOferta).toHaveBeenCalledWith('5', { orden: 2 }, mockUsuario);
+      const reglas = ['tipo', 'activo', 'descuentoTipo', 'descuentoValor', 'compraMinima', 'fechaDesde', 'fechaHasta', 'canales', 'limiteUsos', 'dias', 'alcanceProductoId'];
+      for (const [, dto] of ofertasService.actualizarOferta.mock.calls) {
+        expect(Object.keys(dto).filter((k) => reglas.includes(k))).toEqual([]);
+      }
+      const ultima = prisma.versionCarta.update.mock.calls.at(-1)[0];
+      expect(ultima.data.contenido.promos).toBeUndefined();
     });
   });
 });

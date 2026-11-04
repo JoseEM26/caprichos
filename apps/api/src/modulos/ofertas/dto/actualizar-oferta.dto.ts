@@ -128,6 +128,11 @@ export class ActualizarOfertaDto {
   @IsBoolean()
   activo?: boolean;
 
+  /** Mostrar u ocultar en la carta virtual (no cambia el descuento ni `activo`). */
+  @IsOptional()
+  @IsBoolean()
+  visibleCarta?: boolean;
+
   @IsOptional()
   imagenArchivoId?: string | number | null;
 
