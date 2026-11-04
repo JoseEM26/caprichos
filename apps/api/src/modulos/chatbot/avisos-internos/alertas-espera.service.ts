@@ -16,6 +16,7 @@ import { BotonAccion } from '../puerto/whatsapp-mensajeria.puerto';
 import { BOTONES_AVISO_PEDIDO } from './avisos-internos.textos';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { consultarEstadoAgente, leerParametroNumerico } from '../../impresion/estado-impresion';
+import { controlAlmacenActivo } from '../../stock/control-almacen';
 
 export interface UmbralesAlertasEspera {
   alertaVoucherMin1: number;
@@ -428,12 +429,14 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
       // =========================================================================
       // 5) SECCIÓN 2.d: Stock bajo (una vez al día por insumo) y falla de impresora
       // =========================================================================
-      // a) Stock bajo diario
+      // a) Stock bajo diario: solo con el «Control de almacén» encendido (apagado, no hay aviso de insumos)
       const fechaHoy = ahora.toISOString().slice(0, 10);
-      const insumos = await this.prisma.insumo.findMany({
-        where: { activo: true },
-        include: { stocks: true },
-      });
+      const insumos = (await controlAlmacenActivo(this.prisma))
+        ? await this.prisma.insumo.findMany({
+            where: { activo: true },
+            include: { stocks: true },
+          })
+        : [];
 
       for (const insumo of insumos) {
         const stockTotal = insumo.stocks.reduce((acc, s) => acc + Number(s.cantidad), 0);

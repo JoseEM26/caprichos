@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
+import { controlAlmacenActivo } from '../../stock/control-almacen';
 import { ConfiguracionService } from '../../configuracion/configuracion.service';
 import {
   BotonAccion,
@@ -34,6 +35,15 @@ import {
   ROLES_ALERTAS_WHATSAPP,
   normalizarCelularPeru,
 } from '../../usuarios/alertas-whatsapp.util';
+
+/** Con el «Control de almacén» apagado no se crea ningún aviso de insumo (ni correo, ni WhatsApp, ni campana). */
+const sinAvisoAlmacenApagado = (): ResultadoNotificacionEquipo => ({
+  omitido: true,
+  motivo: 'DESACTIVADO',
+  destinatariosTotal: 0,
+  enviosExitosos: 0,
+  detalles: [],
+});
 
 @Injectable()
 export class AvisosInternosService {
@@ -503,6 +513,7 @@ export class AvisosInternosService {
    * Helper conveniente para notificar cuando un insumo ha llegado a stock 0 o negativo.
    */
   async notificarInsumoAgotado(insumoId: bigint | string, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
+    if (!(await controlAlmacenActivo(this.prisma))) return sinAvisoAlmacenApagado();
     const insumo = await this.prisma.insumo.findUnique({
       where: { id: BigInt(insumoId) },
       include: {
@@ -538,6 +549,7 @@ export class AvisosInternosService {
    * Helper conveniente para notificar cuando un insumo se encuentra por debajo de su stock mínimo.
    */
   async notificarInsumoBajoStock(insumoId: bigint | string, tx?: Prisma.TransactionClient): Promise<ResultadoNotificacionEquipo> {
+    if (!(await controlAlmacenActivo(this.prisma))) return sinAvisoAlmacenApagado();
     const insumo = await this.prisma.insumo.findUnique({
       where: { id: BigInt(insumoId) },
       include: {
