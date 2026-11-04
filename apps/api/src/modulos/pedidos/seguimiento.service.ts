@@ -131,6 +131,19 @@ export interface SeguimientoPedido {
    * menos lo transcurrido. Null cuando el pedido ya está entregado o anulado.
    */
   tiempo?: TiempoSeguimiento | null;
+  /** Estado del voucher (aditivo). Solo en obtener() y solo con pago digital; en efectivo no existe. */
+  voucher?: VoucherSeguimiento;
+}
+
+/** Estado del voucher para el invitado: solo el estado y el medio, nunca imagen, operación, montos ni titular. */
+export type EstadoVoucherSeguimiento = 'SIN_VOUCHER' | 'EN_REVISION' | 'VERIFICADO' | 'RECHAZADO';
+
+export interface VoucherSeguimiento {
+  estado: EstadoVoucherSeguimiento;
+  medio: string | null;
+  actualizadoEn: string | null;
+  /** Motivo corto cuando el voucher no se pudo leer (RECHAZADO). */
+  motivo?: string;
 }
 
 export interface TiempoSeguimiento {
@@ -235,7 +248,7 @@ export class SeguimientoService {
   async obtener(codigo: string, token: string | undefined): Promise<SeguimientoPedido> {
     const pedido = await this.prisma.pedido.findUnique({
       where: { codigo },
-      select: { ...SELECCION_SEGUIMIENTO, pago_preferido: true },
+      select: { ...SELECCION_SEGUIMIENTO, pago_preferido: true, pago_estado: true },
     });
 
     if (!pedido || !verificarTokenSeguimiento(pedido.id, token)) {
@@ -245,8 +258,25 @@ export class SeguimientoService {
       });
     }
 
-    const pagoDigital = MEDIOS_DIGITALES.includes(String(pedido.pago_preferido ?? '').toUpperCase());
-    return { ...this.construir(pedido as PedidoSeguimiento, await this.contexto()), pagoDigital };
+    const medioPreferido = String(pedido.pago_preferido ?? '').toUpperCase();
+    const pagoDigital = MEDIOS_DIGITALES.includes(medioPreferido);
+    const base = { ...this.construir(pedido as PedidoSeguimiento, await this.contexto()), pagoDigital };
+    if (!pagoDigital) return base;
+
+    // Vouchers vigentes del pedido (no reemplazados ni retirados), del más nuevo al más viejo
+    const vouchers = await this.prisma.voucherPago.findMany({
+      where: { pedido_id: pedido.id, reemplazado_en: null },
+      orderBy: { creado_en: 'desc' },
+      select: { medio: true, semaforo: true, motivos: true, creado_en: true, revisado_en: true },
+    });
+    return {
+      ...base,
+      voucher: estadoVoucherDe({
+        pagado: pedido.pago_estado === 'PAGADO',
+        medioPreferido,
+        vouchers,
+      }),
+    };
   }
 
   /**
@@ -415,6 +445,49 @@ export class SeguimientoService {
       null;
     return fecha ? obtenerFechaHoraLima(fecha).horaMinutos : null;
   }
+}
+
+/** Fila mínima de voucher_pago que necesita el estado (sin imagen ni datos leídos). */
+export interface FilaVoucherEstado {
+  medio: string | null;
+  semaforo: string;
+  motivos: string[];
+  creado_en: Date;
+  revisado_en: Date | null;
+}
+
+/**
+ * Estado del voucher para el invitado. Reglas de siempre: vigente = no reemplazado (ya filtrado por la consulta);
+ * útil = no ILEGIBLE (un ILEGIBLE no cuenta). Verificado = pedido PAGADO por Caja o voucher útil revisado por el equipo.
+ * Vouchers llegan del más nuevo al más viejo.
+ */
+export function estadoVoucherDe(args: {
+  pagado: boolean;
+  medioPreferido: string | null;
+  vouchers: FilaVoucherEstado[];
+}): VoucherSeguimiento {
+  const { pagado, medioPreferido, vouchers } = args;
+  const utiles = vouchers.filter((v) => v.semaforo !== 'ILEGIBLE');
+  const revisado = utiles.find((v) => v.revisado_en);
+  const iso = (f: Date | null | undefined) => (f ? f.toISOString() : null);
+
+  if (pagado || revisado) {
+    return { estado: 'VERIFICADO', medio: revisado?.medio ?? medioPreferido, actualizadoEn: iso(revisado?.revisado_en) };
+  }
+  if (utiles.length > 0) {
+    return { estado: 'EN_REVISION', medio: utiles[0].medio ?? medioPreferido, actualizadoEn: iso(utiles[0].creado_en) };
+  }
+  if (vouchers.length > 0) {
+    const ultimo = vouchers[0];
+    const motivo = ultimo.motivos[0]?.slice(0, 120);
+    return {
+      estado: 'RECHAZADO',
+      medio: ultimo.medio ?? medioPreferido,
+      actualizadoEn: iso(ultimo.creado_en),
+      ...(motivo ? { motivo } : {}),
+    };
+  }
+  return { estado: 'SIN_VOUCHER', medio: medioPreferido, actualizadoEn: null };
 }
 
 // «2 x Frappe Oreo, 1 x Waffle y 2 más»: hasta 3 productos y el resto como cuenta
