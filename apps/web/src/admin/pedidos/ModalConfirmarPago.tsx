@@ -4,7 +4,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
-import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
+import { digitalesDelPlan, medioDigitalVoucher, mediosQueExigenCodigo, mismoMedio } from './mediosPago';
 import { CapturasPlanDigital, ExcepcionSinVoucher } from './CapturasPlanDigital';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
@@ -27,7 +27,8 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
   const [medio, setMedio] = useState<string>(pedido.pago_metodo || pedido.pago_preferido || 'Yape');
   const [montoPagaCon, setMontoPagaCon] = useState(pedido.paga_con ? String(pedido.paga_con) : '');
-  const [codigoOp, setCodigoOp] = useState('');
+  // Código de operación por medio (MAYÚSCULAS). Sin entrada, el campo muestra el que leyó la IA del voucher.
+  const [codigos, setCodigos] = useState<Record<string, string>>({});
   // Vouchers ya enlazados al pedido (cualquier origen) y la foto que acaba de subir esta ventana
   const [vouchersPedido, setVouchersPedido] = useState<VoucherPagoItem[]>([]);
   const [voucherSubido, setVoucherSubido] = useState<string | number | null>(null);
@@ -53,6 +54,19 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
   const comprobanteListo = multiples
     ? faltanCapturas.length === 0
     : voucherSubido !== null || vouchersPedido.some((v) => v.semaforo !== 'ILEGIBLE');
+  // Medios que piden código: digitales del plan y el medio elegido (el efectivo nunca)
+  const codigosRequeridos = mediosQueExigenCodigo(medio, pedido.planPago);
+  // Lectura de la IA del voucher vigente de ese medio (el más reciente que no sea ilegible)
+  const codigoLeido = (m: string): string => {
+    const candidatos = vouchersPedido
+      .filter((v) => v.semaforo !== 'ILEGIBLE' && (v.medio == null || mismoMedio(v.medio, m)))
+      .filter((v) => (v.operacion || v.extraido?.operacion || '').trim() !== '')
+      .sort((x, y) => String(y.creadoEn).localeCompare(String(x.creadoEn)));
+    return candidatos[0] ? String(candidatos[0].operacion || candidatos[0].extraido?.operacion).trim() : '';
+  };
+  const valorCodigo = (m: string): string => codigos[m] ?? codigoLeido(m);
+  const codigoCorregido = (m: string): boolean => codigos[m] !== undefined && codigoLeido(m) !== '' && codigos[m].trim() !== codigoLeido(m);
+  const codigosFaltan = codigosRequeridos.filter((m) => valorCodigo(m).trim() === '');
   const esDelivery = (pedido.modalidad || '').toUpperCase() === 'DELIVERY';
   const tieneUbicacion =
     (pedido.entrega_lat != null && pedido.entrega_lng != null) || Boolean(pedido.zona);
@@ -83,6 +97,11 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
         return;
       }
     }
+    if (codigosFaltan.length > 0) {
+      setPaso(3);
+      setMsg('Escribe el código de operación que ves en el voucher.');
+      return;
+    }
     setMsg('');
     setConfirmandoSiNo(true);
   };
@@ -102,6 +121,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
         medio.toUpperCase(),
         esDigital ? 'PAGADO' : 'COORDINADO',
         excepcionSinVoucher,
+        codigosRequeridos.length > 0
+          ? codigosRequeridos.map((m) => ({ medio: m, codigo: valorCodigo(m).trim() }))
+          : undefined,
       );
       if (String(pedido.estado).toUpperCase() === 'NUEVO') {
         await pedidosApi.cambiarEstado(
@@ -447,12 +469,45 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
                 </dd>
               </dl>
             </div>
-            {esDigital && (
-              <div style={tarjeta}>
-                <label htmlFor="pc-r" style={{ fontWeight: 700, fontSize: 13 }}>
-                  Código de operación (opcional)
-                </label>
-                <input id="pc-r" type="text" value={codigoOp} onChange={(e) => setCodigoOp(e.target.value)} style={campo} />
+            {codigosRequeridos.length > 0 && (
+              <div style={tarjeta} data-testid="codigos-operacion">
+                <div style={subtitulo}>Código de operación{codigosRequeridos.length > 1 ? 's' : ''}</div>
+                {codigosRequeridos.map((m) => {
+                  const nombre = m.charAt(0) + m.slice(1).toLowerCase();
+                  const valor = valorCodigo(m);
+                  const leido = codigoLeido(m);
+                  const faltaEste = valor.trim() === '';
+                  return (
+                    <div key={m} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <label htmlFor={`pc-r-${m}`} style={{ fontWeight: 700, fontSize: 13 }}>
+                        {codigosRequeridos.length > 1 ? `${nombre}: código de operación` : 'Código de operación'}
+                      </label>
+                      <input
+                        id={`pc-r-${m}`}
+                        data-testid={`input-codigo-operacion-${m}`}
+                        type="text"
+                        value={valor}
+                        onChange={(e) => setCodigos((c) => ({ ...c, [m]: e.target.value }))}
+                        style={campo}
+                      />
+                      {faltaEste && (
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+                          Escribe el código de operación que ves en el voucher
+                        </div>
+                      )}
+                      {!faltaEste && codigoCorregido(m) && (
+                        <div data-testid={`codigo-corregido-${m}`} style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                          Corregido manualmente (leído por la IA: {leido})
+                        </div>
+                      )}
+                      {!faltaEste && !codigoCorregido(m) && leido !== '' && (
+                        <div data-testid={`codigo-leido-${m}`} style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                          Leído del voucher por la IA
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -498,8 +553,8 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
               <button
                 type="button"
                 onClick={handleConfirmar}
-                disabled={enviando}
-                style={{ flex: '2 1 220px', minHeight: 52, border: 0, borderRadius: 12, background: 'var(--cp-orange, #E67929)', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 15, cursor: enviando ? 'not-allowed' : 'pointer' }}
+                disabled={enviando || codigosFaltan.length > 0}
+                style={{ flex: '2 1 220px', minHeight: 52, border: 0, borderRadius: 12, background: 'var(--cp-orange, #E67929)', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 15, cursor: enviando || codigosFaltan.length > 0 ? 'not-allowed' : 'pointer', opacity: codigosFaltan.length > 0 ? 0.6 : 1 }}
               >
                 {enviando ? 'Confirmando...' : 'Confirmar y enviar a cocina'}
               </button>

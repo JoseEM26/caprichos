@@ -57,6 +57,8 @@ export interface VoucherPagoItem {
   medio?: 'YAPE' | 'PLIN' | null;
   subidoPor?: string | number | null;
   hashImagen?: string | null;
+  /** Código de operación vigente (la lectura de la IA o el que confirmó Caja). */
+  operacion?: string | null;
   extraido?: VoucherExtraido | null;
   semaforo: SemaforoVoucher;
   motivos: string[];
