@@ -671,10 +671,13 @@ export const TEXTOS_BOT = {
     return `Aceptamos los siguientes medios de pago: ${lista}. En pedidos por WhatsApp, coordinamos el pago por aquí y una persona del equipo lo valida.`;
   },
 
+  // Sin `pedido_minimo` configurado no se menciona ningún mínimo.
   faqDelivery: (minimo?: number | null, envioGratis?: number | null): string => {
-    const minTexto = minimo ? `s/ ${minimo.toFixed(2)}` : 's/ 14.50';
-    const gratisTexto = envioGratis ? ` Además, ¡el envío es gratis en compras a partir de s/ ${envioGratis.toFixed(2)}!` : '';
-    return `El pedido mínimo para delivery es ${minTexto} en productos.${gratisTexto} La tarifa exacta depende de tu ubicación en nuestras zonas de reparto.`;
+    const minTexto = minimo && minimo > 0
+      ? `El pedido mínimo para delivery es s/ ${minimo.toFixed(2)} en productos (para recoger en el local no hay mínimo). `
+      : '';
+    const gratisTexto = envioGratis ? `¡El envío es gratis en compras a partir de s/ ${envioGratis.toFixed(2)}! ` : '';
+    return `${minTexto}${gratisTexto}La tarifa exacta depende de tu ubicación en nuestras zonas de reparto.`;
   },
 
   // =========================================================================

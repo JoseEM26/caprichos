@@ -2532,10 +2532,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     const subtotal = Number(pedido.items.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
-    const pedidoMin = Number(contexto.datosLocalPublicos?.pedidoMinimo || 14.5);
+    // Sin `pedido_minimo` configurado (0 o null) no hay mínimo
+    const pedidoMin = Number(contexto.datosLocalPublicos?.pedidoMinimo || 0);
 
-    // 1. Pedido mínimo para delivery
-    if (pedido.modalidad === 'DELIVERY' && subtotal < pedidoMin) {
+    // 1. Pedido mínimo solo para delivery
+    if (pedido.modalidad === 'DELIVERY' && pedidoMin > 0 && subtotal < pedidoMin) {
       const faltante = Number((pedidoMin - subtotal).toFixed(2));
       return {
         nuevoEstado: 'PEDIDO_ACCION_CARRITO',

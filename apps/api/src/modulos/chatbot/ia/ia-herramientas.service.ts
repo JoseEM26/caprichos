@@ -383,7 +383,7 @@ export class IaHerramientasService {
       if (match.length > 0) {
         return {
           zonas: match,
-          pedidoMinimo: paramPedidoMin?.valor ?? 15,
+          pedidoMinimo: Number(paramPedidoMin?.valor) > 0 ? Number(paramPedidoMin?.valor) : null,
           envioGratisDesde: paramEnvioGratis?.valor ?? ENVIO_GRATIS_MONTO_POR_DEFECTO,
           mensaje: 'Tarifa para la zona consultada.',
         };
@@ -392,7 +392,7 @@ export class IaHerramientasService {
 
     return {
       zonas: zonasResumen,
-      pedidoMinimo: paramPedidoMin?.valor ?? 15,
+      pedidoMinimo: Number(paramPedidoMin?.valor) > 0 ? Number(paramPedidoMin?.valor) : null,
       envioGratisDesde: paramEnvioGratis?.valor ?? ENVIO_GRATIS_MONTO_POR_DEFECTO,
       mensaje: 'Zonas de cobertura en Campoy y alrededores.',
     };
