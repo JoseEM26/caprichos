@@ -28,6 +28,9 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
   beforeEach(async () => {
     prismaMock = {
       parametro: {
+        findUnique: jest.fn().mockImplementation(({ where }: any) =>
+          Promise.resolve(where.clave === 'stock_control_activo' ? { clave: where.clave, valor: 'si' } : null),
+        ),
         findMany: jest.fn().mockResolvedValue([
           { clave: 'alerta_voucher_min_1', valor: 5 },
           { clave: 'alerta_voucher_min_2', valor: 15 },
@@ -366,6 +369,23 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
         expect.stringContaining('idemp:alerta:pedido:caja:505'),
         { correo: true },
       );
+    });
+
+    it('2.d: con el control de almacén apagado no hay alerta de stock (ni se consultan insumos)', async () => {
+      const ahora = new Date('2026-10-27T12:00:00Z');
+      prismaMock.parametro.findUnique.mockImplementation(({ where }: any) =>
+        Promise.resolve({ clave: where.clave, valor: where.clave === 'stock_control_activo' ? 'no' : 1 }),
+      );
+      prismaMock.insumo.findMany.mockResolvedValueOnce([
+        { id: 606n, nombre: 'Queso Cheddar', minimo: 5, unidad_almacen: 'KG', stocks: [{ cantidad: 0 }] },
+      ]);
+
+      const res = await service.ejecutarCiclo(ahora);
+
+      expect(res.alertasStockEnviadas).toBe(0);
+      expect(prismaMock.insumo.findMany).not.toHaveBeenCalled();
+      const avisos = avisosInternosMock.enviarAvisoAdmin.mock.calls.map((c: any[]) => String(c[0]));
+      expect(avisos.some((t: string) => t.startsWith('Alerta de Stock'))).toBe(false);
     });
 
     it('2.d: alerta de stock bajo una vez al día por insumo y de falla de impresora', async () => {
