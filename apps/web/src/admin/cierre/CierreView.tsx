@@ -30,6 +30,9 @@ type TabCierre = 'turno' | 'historial';
 // Monto en soles: solo dígitos y un punto, máximo dos decimales (sin negativos ni letras)
 const limpiarMonto = (v: string) => v.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d{0,2}).*$/, '$1');
 
+// Monto con signo para el desglose digital: las devoluciones salen en negativo
+const solesConSigno = (n: number) => (n < 0 ? `-S/ ${(-n).toFixed(2)}` : `S/ ${n.toFixed(2)}`);
+
 // Hoy en Lima como AAAA-MM-DD, para comparar con la fecha de la caja
 const hoyLima = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
 
@@ -1693,6 +1696,13 @@ export function CierreView() {
                           <div style={{ fontSize: 10, color: 'var(--cp-soft, #2C4C5D)' }}>
                             Calculado por el sistema (vouchers aprobados)
                           </div>
+                          {info && (
+                            <div data-testid={`desglose-${clave}`} style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              <span>Cobrado: {solesConSigno(info.cobrado)}</span>
+                              <span>Devoluciones: {solesConSigno(info.devuelto)}</span>
+                              <span style={{ fontWeight: 800 }}>Esperado: {solesConSigno(info.sistema)}</span>
+                            </div>
+                          )}
                           <div style={{ fontSize: 10, color: 'var(--cp-soft, #2C4C5D)' }}>
                             {info ? `${info.cobros} ${info.cobros === 1 ? 'cobro' : 'cobros'}` : 'Sin datos'}
                           </div>

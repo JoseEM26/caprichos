@@ -28,10 +28,10 @@ const digitales: DigitalesCaja = {
   cajaId: 10,
   fecha: `${hoy()}T00:00:00.000Z`,
   medios: {
-    yape: { monto: 200, sistema: 200, cobros: 1, corregido: false },
-    plin: { monto: 0, sistema: 0, cobros: 0, corregido: false },
-    transferencia: { monto: 50, sistema: 50, cobros: 1, corregido: false },
-    tarjeta: { monto: 100, sistema: 100, cobros: 2, corregido: false },
+    yape: { monto: 200, sistema: 200, cobrado: 200, devuelto: 0, cobros: 1, corregido: false },
+    plin: { monto: 0, sistema: 0, cobrado: 0, devuelto: 0, cobros: 0, corregido: false },
+    transferencia: { monto: 50, sistema: 50, cobrado: 50, devuelto: 0, cobros: 1, corregido: false },
+    tarjeta: { monto: 100, sistema: 100, cobrado: 100, devuelto: 0, cobros: 2, corregido: false },
   },
 };
 
@@ -90,6 +90,22 @@ describe('cierre: medios digitales calculados por el sistema', () => {
     expect(screen.getAllByText('Calculado por el sistema (vouchers aprobados)')).toHaveLength(4);
     expect(screen.getByText('2 cobros')).toBeInTheDocument();
     expect(screen.getAllByText('1 cobro')).toHaveLength(2);
+  });
+
+  it('el desglose de cada medio muestra cobrado, devoluciones en negativo y esperado', async () => {
+    usarSesion('ADMIN');
+    vi.spyOn(cierreApi, 'obtenerDigitales').mockResolvedValue({
+      ...digitales,
+      medios: { ...digitales.medios, yape: { monto: 150, sistema: 150, cobrado: 200, devuelto: -50, cobros: 1, corregido: false } },
+    });
+    render(<CierreView />);
+    await abrirConteo();
+
+    expect(screen.getByLabelText('Monto en yape')).toHaveValue('150.00');
+    const desglose = await screen.findByTestId('desglose-yape');
+    expect(desglose).toHaveTextContent('Cobrado: S/ 200.00');
+    expect(desglose).toHaveTextContent('Devoluciones: -S/ 50.00');
+    expect(desglose).toHaveTextContent('Esperado: S/ 150.00');
   });
 
   it('el cajero ve los digitales sin pedir el esperado: el efectivo sigue ciego', async () => {
@@ -158,7 +174,7 @@ describe('cierre: medios digitales calculados por el sistema', () => {
     vi.spyOn(cierreApi, 'listarAjustesMedio').mockResolvedValue([ajuste]);
     vi.spyOn(cierreApi, 'obtenerDigitales').mockResolvedValue({
       ...digitales,
-      medios: { ...digitales.medios, yape: { monto: 210, sistema: 200, cobros: 1, corregido: true } },
+      medios: { ...digitales.medios, yape: { monto: 210, sistema: 200, cobrado: 200, devuelto: 0, cobros: 1, corregido: true } },
     });
     render(<CierreView />);
     await abrirConteo();
