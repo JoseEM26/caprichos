@@ -146,7 +146,8 @@ export function NovedadesView() {
   const { valor: e, cambiar, cargar } = b;
 
   const cargarDatos = async () => {
-    setCargando(true);
+    // tras publicar o descartar se recarga sin desmontar el editor (y su pantalla completa)
+    if (!e) setCargando(true);
     setError(null);
     try {
       const [lista, borrador, enc, momentos] = await Promise.all([

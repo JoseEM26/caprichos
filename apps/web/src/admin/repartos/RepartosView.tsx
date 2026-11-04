@@ -120,28 +120,13 @@ function RepartosAdminView() {
     }
   }, [vistaUrl]);
 
-  // Sincronizar Fullscreen API con el estado local
-  useEffect(() => {
-    const alCambiarFullscreen = () => {
-      setPantallaCompleta(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', alCambiarFullscreen);
-    return () => {
-      document.removeEventListener('fullscreenchange', alCambiarFullscreen);
-    };
-  }, []);
-
+  // La pantalla completa es este estado: que el navegador salga de su Fullscreen API no la cierra.
   const alternarPantallaCompleta = () => {
-    if (!document.fullscreenElement) {
-      const el = document.documentElement;
-      if (el.requestFullscreen) {
-        el.requestFullscreen().catch(() => {});
-      }
+    if (!pantallaCompleta) {
+      Promise.resolve(document.documentElement.requestFullscreen?.()).catch(() => {});
       setPantallaCompleta(true);
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      }
+      if (document.fullscreenElement) Promise.resolve(document.exitFullscreen?.()).catch(() => {});
       setPantallaCompleta(false);
     }
   };
