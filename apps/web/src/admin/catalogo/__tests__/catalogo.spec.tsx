@@ -242,6 +242,24 @@ describe('Módulo Catálogo - ProductosView', () => {
     expect(within(enNuevo).getByRole('button', { name: 'Ver cómo se ve en la carta' })).toBeInTheDocument();
   });
 
+  it('Guardar del editor abre la confirmación en body (fuera del modal) y al confirmar llama editarProducto', async () => {
+    const editar = vi.spyOn(catalogoApi, 'editarProducto').mockResolvedValue({ ok: true } as any);
+    render(
+      <MemoryRouter>
+        <ProductosView />
+      </MemoryRouter>,
+    );
+    await screen.findByText('Frappe Oreo');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Editar' })[0]);
+    const enEditar = await screen.findByRole('dialog', { name: /Editar:/ });
+    fireEvent.click(within(enEditar).getByRole('button', { name: 'Guardar' }));
+    const confirmacion = await screen.findByRole('dialog', { name: '¿Guardar los cambios?' });
+    expect(enEditar.contains(confirmacion)).toBe(false);
+    expect(document.body.contains(confirmacion)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /^Sí/ }));
+    await waitFor(() => expect(editar).toHaveBeenCalledTimes(1));
+  });
+
   it('Desactivar: confirma y llama ocultarProducto; el producto desactivado sale de Activos y se ve atenuado en Desactivados', async () => {
     const ocultar = vi.spyOn(catalogoApi, 'ocultarProducto').mockResolvedValue({ ok: true, id: 'prod-1', oculto: true });
     const mostrar = vi.spyOn(catalogoApi, 'mostrarProducto').mockResolvedValue({ ok: true, id: 'prod-1', oculto: false });

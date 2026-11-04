@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Boton } from './Boton';
 
 export interface ConfirmarProps {
@@ -27,11 +29,29 @@ export function Confirmar({
   alCancelar,
   children,
 }: ConfirmarProps) {
-  if (!abierto) return null;
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  const alCancelarRef = useRef(alCancelar);
+  alCancelarRef.current = alCancelar;
+
+  // Foco inicial en el botón principal y cierre con Esc (no mientras carga).
+  // ponytail: sin trampa de foco (Tab puede salir); basta para confirmaciones cortas.
+  useEffect(() => {
+    if (!abierto) return;
+    dialogoRef.current?.querySelector<HTMLButtonElement>('[data-confirmar-principal]')?.focus();
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !cargando) alCancelarRef.current();
+    };
+    document.addEventListener('keydown', alTeclear);
+    return () => document.removeEventListener('keydown', alTeclear);
+  }, [abierto, cargando]);
+
+  if (!abierto || typeof document === 'undefined') return null;
 
   const textoBotonSi = textoConfirmar || textoSi;
 
-  return (
+  // Portal a document.body: sale centrada en la ventana visible aunque se
+  // abra desde un modal con scroll o con transform/filter en un ancestro.
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -43,10 +63,12 @@ export function Confirmar({
         alignItems: 'center',
         justifyContent: 'center',
         padding: '16px',
+        boxSizing: 'border-box',
       }}
       onClick={cargando ? undefined : alCancelar}
     >
       <div
+        ref={dialogoRef}
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
@@ -54,6 +76,9 @@ export function Confirmar({
         style={{
           width: '100%',
           maxWidth: '420px',
+          maxHeight: 'calc(100dvh - 32px)',
+          overflowY: 'auto',
+          boxSizing: 'border-box',
           background: 'var(--cp-white)',
           border: '1px solid var(--cp-line)',
           borderRadius: '20px',
@@ -95,6 +120,7 @@ export function Confirmar({
         <div
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
             gap: '10px',
             justifyContent: 'flex-end',
             marginTop: '8px',
@@ -110,6 +136,7 @@ export function Confirmar({
           </Boton>
           <Boton
             type="button"
+            data-confirmar-principal=""
             variante={peligro ? 'peligro' : 'primario'}
             cargando={cargando}
             onClick={alConfirmar}
@@ -118,6 +145,7 @@ export function Confirmar({
           </Boton>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
