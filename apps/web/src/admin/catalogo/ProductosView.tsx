@@ -1992,7 +1992,20 @@ export function ProductosView() {
               })}
             />
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            {/* Barra de acciones fija abajo: el formulario hace scroll por encima */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                position: 'sticky',
+                bottom: -20,
+                margin: '8px -20px -20px',
+                padding: '12px 20px 20px',
+                background: 'var(--cp-cream)',
+                borderTop: '1px solid var(--cp-line)',
+                zIndex: 1,
+              }}
+            >
               <button
                 onClick={guardarEdicion}
                 disabled={guardandoEdicion}
