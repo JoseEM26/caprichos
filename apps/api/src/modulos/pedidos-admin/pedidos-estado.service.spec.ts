@@ -865,19 +865,15 @@ describe('PedidosEstadoService', () => {
         expect(prismaMock.pedido.update).not.toHaveBeenCalled();
       });
 
-      it('EFECTIVO no pide voucher ni código; TARJETA no pide voucher pero sí su código', async () => {
+      it('EFECTIVO y TARJETA no piden voucher ni código de operación', async () => {
         prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
         await service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth);
-        await service.registrarPago(
-          10n,
-          { metodo: 'tarjeta', estado: 'PAGADO', codigosOperacion: [{ medio: 'TARJETA', codigo: 'POS-889' }] },
-          cajeroAuth,
-        );
+        await service.registrarPago(10n, { metodo: 'tarjeta', estado: 'PAGADO' }, cajeroAuth);
 
         expect(prismaMock.pedido.update).toHaveBeenCalledTimes(2);
-        // Solo la tarjeta busca el voucher para guardar su código (sin voucher, no hay dónde guardarlo)
-        expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledTimes(1);
+        // Sin código no se busca el voucher donde guardarlo
+        expect(prismaMock.voucherPago.findFirst).not.toHaveBeenCalled();
       });
 
       it('digital sin código de operación -> 400 CODIGO_OPERACION_REQUERIDO, no registra', async () => {

@@ -169,7 +169,6 @@ describe('ModalConfirmarPago', () => {
     /** Con la excepción llena en el paso 2, se pasa al 3 y se pulsa Confirmar. */
     const confirmarDesdePaso3 = () => {
       siguiente();
-      escribirCodigo('YAPE', '123456');
       fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
     };
 
@@ -206,7 +205,7 @@ describe('ModalConfirmarPago', () => {
         'YAPE',
         'PAGADO',
         { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
-        [{ medio: 'YAPE', codigo: '123456' }],
+        undefined, // en la excepción sin comprobante no hay código de operación
       );
     });
   });
@@ -303,12 +302,12 @@ describe('ModalConfirmarPago', () => {
       expect(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }).hasAttribute('disabled')).toBe(false);
     });
 
-    it('tarjeta también pide su código de operación', async () => {
+    it('tarjeta no pide código de operación (no lleva voucher en esta pantalla)', async () => {
       abrir(pedidoCarta({ pago_preferido: 'TARJETA' }));
       irAlPaso3();
 
-      expect(screen.getByTestId('input-codigo-operacion-TARJETA')).toBeDefined();
-      expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.queryByTestId('input-codigo-operacion-TARJETA')).toBeNull();
+      expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(false);
     });
 
     it('plan efectivo + Yape pide solo el código de Yape', async () => {

@@ -1141,7 +1141,8 @@ export class PedidosEstadoService {
     });
 
     // Código de operación por cada medio digital (plan mixto: uno por parte digital; efectivo: ninguno)
-    const codigosRequeridos = mediosQueExigenCodigo(metodoUpper, pedido.planPago);
+    // La excepción «confirmar sin comprobante» (motivo + supervisor) no tiene voucher del que sacar el código
+    const codigosRequeridos = dto.sinVoucher ? [] : mediosQueExigenCodigo(metodoUpper, pedido.planPago);
     const codigosEntregados = new Map(
       (dto.codigosOperacion ?? []).map((c) => [String(c.medio).toUpperCase().trim(), String(c.codigo).trim()]),
     );

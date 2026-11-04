@@ -55,7 +55,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
     ? faltanCapturas.length === 0
     : voucherSubido !== null || vouchersPedido.some((v) => v.semaforo !== 'ILEGIBLE');
   // Medios que piden código: digitales del plan y el medio elegido (el efectivo nunca)
-  const codigosRequeridos = mediosQueExigenCodigo(medio, pedido.planPago);
+  // En la excepción «confirmar sin comprobante» no hay voucher del que sacar el código
+  const enExcepcion = (esDigital || multiples) && !comprobanteListo && sinVoucher;
+  const codigosRequeridos = enExcepcion ? [] : mediosQueExigenCodigo(medio, pedido.planPago);
   // Lectura de la IA del voucher vigente de ese medio (el más reciente que no sea ilegible)
   const codigoLeido = (m: string): string => {
     const candidatos = vouchersPedido

@@ -6,7 +6,8 @@ import { MEDIOS_DIGITALES_PLAN } from '../pedidos/pago-plan.service';
 export const MEDIOS_CON_COMPROBANTE = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 
 /** Medios que piden el código de operación al confirmar (Yape, Plin, transferencia y tarjeta, como MEDIOS_CON_VOUCHER_CAJA). */
-export const MEDIOS_CON_CODIGO_OPERACION = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
+// La tarjeta no lleva voucher ni lectura de IA en esta pantalla: no se pide código de operación
+export const MEDIOS_CON_CODIGO_OPERACION = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 
 /**
  * Medios que necesitan código de operación: los digitales del plan (pago dividido) y el medio elegido, si aplica.

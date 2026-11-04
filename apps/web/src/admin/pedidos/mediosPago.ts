@@ -26,7 +26,7 @@ export function digitalesDelPlan(planPago: ReadonlyArray<{ medio: string }> | nu
 }
 
 /** Medios que piden el código de operación al confirmar (igual que el servidor: MEDIOS_CON_CODIGO_OPERACION). */
-export const MEDIOS_CON_CODIGO_OPERACION: readonly string[] = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
+export const MEDIOS_CON_CODIGO_OPERACION: readonly string[] = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 
 /**
  * Medios que necesitan código de operación: los digitales del plan (pago dividido) y el medio elegido, si aplica.
