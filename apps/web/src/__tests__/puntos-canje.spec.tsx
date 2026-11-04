@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import * as cuentaModulo from '../carta/cuenta/CuentaContext';
 import { PuntosCanje } from '../carta/cuenta/PuntosCanje';
 
@@ -88,7 +88,8 @@ describe('PuntosCanje (puntos en números enteros)', () => {
     fireEvent.change(screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i), { target: { value: '31' } });
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
 
-    expect(alAplicar).not.toHaveBeenCalled();
+    expect(alAplicar).not.toHaveBeenCalledWith(31);
+    expect(alAplicar).toHaveBeenLastCalledWith(0);
     expect(screen.getByText('Solo tienes 30.50 puntos.')).toBeInTheDocument();
   });
 
@@ -100,7 +101,8 @@ describe('PuntosCanje (puntos en números enteros)', () => {
     fireEvent.change(screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i), { target: { value: '20' } });
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
 
-    expect(alAplicar).not.toHaveBeenCalled();
+    expect(alAplicar).not.toHaveBeenCalledWith(20);
+    expect(alAplicar).toHaveBeenLastCalledWith(0);
     expect(
       screen.getByText(
         'Solo puedes usar hasta 12 puntos en este pedido: se aplican a productos sin promoción ni descuento.',
@@ -127,5 +129,60 @@ describe('PuntosCanje (puntos en números enteros)', () => {
     fireEvent.change(screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i), { target: { value: '10' } });
 
     expect(texto()).toContain('Te quedan 20.50 puntos.');
+  });
+  it('escribir un valor válido lo aplica solo, tras la pausa corta, sin pulsar Aplicar', () => {
+    vi.useFakeTimers();
+    try {
+      mockCuenta(30);
+      const alAplicar = vi.fn();
+      render(<PuntosCanje totalPedido={25} puntosAplicados={0} alAplicar={alAplicar} />);
+      const input = screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i);
+
+      fireEvent.change(input, { target: { value: '2' } });
+      fireEvent.change(input, { target: { value: '20' } });
+      expect(alAplicar).not.toHaveBeenCalled();
+
+      act(() => vi.advanceTimersByTime(250));
+      expect(alAplicar).toHaveBeenCalledTimes(1);
+      expect(alAplicar).toHaveBeenCalledWith(20);
+      expect(screen.getByText('Se descontarán S/ 20.00 de tu pedido.')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('un valor mayor al saldo no se aplica al instante: vuelve a 0 y muestra el error en vivo', () => {
+    mockCuenta(30.5);
+    const alAplicar = vi.fn();
+    render(<PuntosCanje totalPedido={100} puntosAplicados={10} alAplicar={alAplicar} />);
+
+    fireEvent.change(screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i), { target: { value: '31' } });
+
+    expect(alAplicar).toHaveBeenCalledWith(0);
+    expect(alAplicar).not.toHaveBeenCalledWith(31);
+    expect(screen.getByText('Solo tienes 30.50 puntos.')).toBeInTheDocument();
+  });
+
+  it('borrar el campo quita el canje al instante', () => {
+    mockCuenta(30);
+    const alAplicar = vi.fn();
+    render(<PuntosCanje totalPedido={25} puntosAplicados={20} alAplicar={alAplicar} />);
+
+    fireEvent.change(screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i), { target: { value: '' } });
+
+    expect(alAplicar).toHaveBeenCalledTimes(1);
+    expect(alAplicar).toHaveBeenCalledWith(0);
+  });
+
+  it('el mensaje de «puedes usar hasta» se actualiza mientras se escribe', () => {
+    mockCuenta(30);
+    render(<PuntosCanje totalPedido={12} puntosAplicados={0} alAplicar={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/¿Cuántos puntos deseas usar\?/i), { target: { value: '20' } });
+    expect(
+      screen.getByText(
+        'Solo puedes usar hasta 12 puntos en este pedido: se aplican a productos sin promoción ni descuento.',
+      ),
+    ).toBeInTheDocument();
   });
 });
