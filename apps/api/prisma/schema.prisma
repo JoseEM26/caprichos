@@ -278,6 +278,7 @@ model Archivo {
   foto_local         FotoLocal?
   productos          Producto[]
   incidentes         IncidenteEntrega[]
+  incidenteFotos     IncidenteEntregaFoto[]
   compras            Compra[]
   iniciativas        Iniciativa[]
   novedadesFotos     NovedadFoto[]
@@ -861,11 +862,27 @@ model IncidenteEntrega {
   cerrado_por     BigInt?
   contactos       Json      @default("[]")
   foto_archivo_id BigInt?
+  /// Prueba de entrega fallida (cliente no salió): instante de llegada, minutos de espera exigidos y repartidor
+  llego_en           DateTime? @db.Timestamptz
+  espera_max_min    Int?
+  repartidor_party_id BigInt?
 
   pedido          Pedido    @relation(fields: [pedido_id], references: [id])
   foto_archivo    Archivo?  @relation(fields: [foto_archivo_id], references: [id])
+  fotos           IncidenteEntregaFoto[]
 
   @@map("incidente_entrega")
+}
+
+model IncidenteEntregaFoto {
+  incidente_id BigInt
+  archivo_id   BigInt
+  creado_en    DateTime         @default(now()) @db.Timestamptz
+  incidente    IncidenteEntrega @relation(fields: [incidente_id], references: [id])
+  archivo      Archivo          @relation(fields: [archivo_id], references: [id])
+
+  @@id([incidente_id, archivo_id])
+  @@map("incidente_entrega_foto")
 }
 
 model MensajeReparto {

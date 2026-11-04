@@ -7,6 +7,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { ErrorApi } from '../../comun/api';
 import { Icono } from '../../comun/Icono';
 import { ModalReportarFalla } from './ModalReportarFalla';
+import { BotonCancelarEspera } from './EsperaEntrega';
 import { MapaRepartidor, type PuntoRepartidor, type PosicionMarcador } from './MapaRepartidor';
 import { HojaInferior } from './HojaInferior';
 import { SaltarPedidoModal } from './SaltarPedidoModal';
@@ -178,21 +179,24 @@ export function BotonEtapa({
 
 export function BotonReportar({ pedido, onReportar }: { pedido: PedidoReparto; onReportar: (p: PedidoReparto) => void }) {
   return (
-    <button
-      type="button"
-      data-testid={`btn-reportar-${pedido.id}`}
-      onClick={() => onReportar(pedido)}
-      style={{
-        ...botonBase,
-        width: '100%',
-        background: 'transparent',
-        color: 'var(--cp-rust)',
-        border: '1.5px solid var(--cp-rust)',
-        fontSize: 14,
-      }}
-    >
-      Reportar problema
-    </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <BotonCancelarEspera pedido={pedido} onCancelar={onReportar} />
+      <button
+        type="button"
+        data-testid={`btn-reportar-${pedido.id}`}
+        onClick={() => onReportar(pedido)}
+        style={{
+          ...botonBase,
+          width: '100%',
+          background: 'transparent',
+          color: 'var(--cp-rust)',
+          border: '1.5px solid var(--cp-rust)',
+          fontSize: 14,
+        }}
+      >
+        Reportar problema
+      </button>
+    </div>
   );
 }
 

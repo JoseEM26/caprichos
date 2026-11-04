@@ -3,6 +3,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { repartosApi } from '../repartos/repartosApi';
 import type { DevolucionRegistrada, NoEntregado, PreguntaNoEntregado, RegistroDevolucion, RespuestaNoEntregados } from './pedidosApi';
 import { ModalDevolucion } from './ModalDevolucion';
+import { PruebaEntregaFallida } from './PruebaEntregaFallida';
 
 export interface PanelNoEntregadosProps {
   datos: RespuestaNoEntregados | null;
@@ -145,6 +146,8 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puede
           <div>{p.motivo}</div>
           <div>{horaRetiro(p.retirado_en)}</div>
         </div>
+
+        <PruebaEntregaFallida prueba={p.prueba_entrega} />
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span

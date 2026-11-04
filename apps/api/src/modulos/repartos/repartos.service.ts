@@ -306,6 +306,7 @@ export class RepartosService {
 
     return {
       espera_min: esperaMin,
+      espera_max_min: config.esperaMaxMin,
       espera_agotada: esperaAgotada,
       id: String(p.id),
       codigo: p.codigo,
@@ -1497,6 +1498,58 @@ export class RepartosService {
       }
     }
 
+    // Fotos del lugar: de la lista nueva o del campo de texto anterior (otros motivos)
+    const idsFoto = [
+      ...new Set(
+        (dto.fotoArchivoIds ?? (dto.fotoArchivoId != null && dto.fotoArchivoId !== '' ? [dto.fotoArchivoId] : [])).map(
+          String,
+        ),
+      ),
+    ];
+    if (idsFoto.some((v) => !/^\d+$/.test(v))) {
+      throw new BadRequestException({ codigo: 'FOTO_INVALIDA', mensaje: 'Foto no válida' });
+    }
+    if (idsFoto.length > 3) {
+      throw new BadRequestException({ codigo: 'DEMASIADAS_FOTOS', mensaje: 'Se admiten como máximo 3 fotos' });
+    }
+
+    // Cliente no salió: solo si el repartidor ya marcó «Llegué» y pasó el tiempo de espera; foto obligatoria
+    let esperaMaxMin: number | null = null;
+    if (dto.motivo === 'NO_CONTESTA') {
+      if (pedido.estado !== 'EN_CAMINO' || pedido.llego_en == null) {
+        throw new BadRequestException({
+          codigo: 'SIN_LLEGADA',
+          mensaje: 'Marca «Llegué» al llegar al domicilio antes de reportar que el cliente no salió',
+        });
+      }
+      const config = await this.obtenerParametrosReparto();
+      esperaMaxMin = config.esperaMaxMin;
+      const esperaMs = config.esperaMaxMin * 60000;
+      const transcurridoMs = Date.now() - new Date(pedido.llego_en).getTime();
+      if (transcurridoMs < esperaMs) {
+        const faltan = Math.ceil((esperaMs - transcurridoMs) / 60000);
+        throw new BadRequestException({
+          codigo: 'ESPERA_NO_CUMPLIDA',
+          mensaje: `Aún no pasó el tiempo de espera (faltan ${faltan} min)`,
+        });
+      }
+      if (idsFoto.length < 1) {
+        throw new BadRequestException({
+          codigo: 'FOTO_REQUERIDA',
+          mensaje: 'Sube de 1 a 3 fotos del lugar donde esperaste',
+        });
+      }
+    }
+    if (idsFoto.length > 0) {
+      const archivos = await this.prisma.archivo.findMany({
+        where: { id: { in: idsFoto.map((v) => BigInt(v)) }, privado: true },
+        select: { id: true },
+      });
+      if (archivos.length !== idsFoto.length) {
+        throw new BadRequestException({ codigo: 'FOTO_NO_ENCONTRADA', mensaje: 'Una de las fotos no existe' });
+      }
+    }
+
     const cantidadIncidentes = await this.prisma.incidenteEntrega.count({
       where: { pedido_id: pedidoId },
     });
@@ -1509,7 +1562,11 @@ export class RepartosService {
         motivo: dto.motivo,
         intento,
         contactos: dto.contactos as any,
-        foto_archivo_id: dto.fotoArchivoId ? BigInt(dto.fotoArchivoId) : null,
+        foto_archivo_id: idsFoto.length ? BigInt(idsFoto[0]) : null,
+        llego_en: dto.motivo === 'NO_CONTESTA' ? pedido.llego_en : null,
+        espera_max_min: esperaMaxMin,
+        repartidor_party_id: pedido.repartidor_party_id ?? null,
+        fotos: { create: idsFoto.map((v) => ({ archivo_id: BigInt(v) })) },
         en: ahora,
       },
     });

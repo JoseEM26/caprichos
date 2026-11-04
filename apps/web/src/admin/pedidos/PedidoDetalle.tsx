@@ -14,6 +14,7 @@ import { Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
+import { PruebaEntregaFallida } from './PruebaEntregaFallida';
 import { ModalAnular } from './ModalAnular';
 import { ModalRechazarCobroMozo } from './ModalRechazarCobroMozo';
 import { ModalUbicar } from './ModalUbicar';
@@ -931,6 +932,9 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
             </button>
           </div>
         )}
+
+        {/* Prueba de entrega fallida (cliente no salió): hora de llegada, espera, repartidor y fotos */}
+        <PruebaEntregaFallida prueba={pedido.prueba_entrega} />
 
         {/* Comprobantes del pedido (foto del pago digital, cualquier origen) */}
         <SeccionVouchersPedido

@@ -37,7 +37,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['transacciones de venta: pedidos, cobros, comprobantes y reclamos', [
     'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_estado_historial', 'secuencia_pedido',
     'pedido_mesa', 'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
-    'incidente_entrega', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto',
+    'incidente_entrega', 'incidente_entrega_foto', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto',
   ]],
   ['caja y cierres: dinero real del día', [
     'caja', 'cobro', 'cobro_pago', 'movimiento_caja', 'liquidacion', 'cierre_caja', 'conteo_cierre',

@@ -1,4 +1,5 @@
-import { api } from '../../comun/api';
+import { api, clienteFetch } from '../../comun/api';
+import { reducirImagenVoucher } from '../vouchers/reducirImagenVoucher';
 import { ConfigReparto, CONFIG_REPARTO_DEFECTO } from './calculoRuta';
 import { ZonaGeoItem, ZONAS_GEO_DEFECTO } from './zonasGeo';
 
@@ -47,6 +48,8 @@ export interface PedidoReparto {
   por_rendir_efectivo?: number;
   efectivo_a_rendir?: number;
   espera_min?: number | null;
+  /** Minutos de espera exigidos antes de poder reportar «cliente no salió». */
+  espera_max_min?: number | null;
   espera_agotada?: boolean;
   /** POR_REPROGRAMAR: el cliente dijo SÍ y falta reenviar; REPROGRAMADO: ya volvió a reparto. */
   reprogramacion?: 'POR_REPROGRAMAR' | 'REPROGRAMADO' | null;
@@ -203,6 +206,8 @@ export interface ReportarFallaDto {
   motivo: 'NO_CONTESTA' | 'DIRECCION_NO_ENCONTRADA';
   contactos: ContactoIntento[];
   fotoArchivoId?: number | string;
+  /** Prueba de entrega fallida (cliente no salió): de 1 a 3 fotos privadas del lugar. */
+  fotoArchivoIds?: string[];
 }
 
 export interface ResolverFallaDto {
@@ -333,6 +338,16 @@ export const repartosApi = {
     api.post<PedidoReparto & { por_rendir_efectivo?: number; efectivo_a_rendir?: number }>(
       `/admin/repartos/${id}/entregar`,
     ),
+
+  /** Sube una foto del lugar como archivo privado (reducida antes, para conexiones lentas). Devuelve su id. */
+  subirFotoPrueba: async (foto: File): Promise<string> => {
+    const reducida = await reducirImagenVoucher(foto, 1280, 0.8);
+    const fd = new FormData();
+    fd.append('archivo', reducida, 'prueba-entrega.jpg');
+    fd.append('privado', 'true');
+    const r = await clienteFetch<{ id: string }>('/admin/archivos', { method: 'POST', body: fd });
+    return r.id;
+  },
 
   reportarFalla: (id: string, dto: ReportarFallaDto) =>
     api.post<{ ok: boolean; incidenteId: string; intento: number; pedido: any }>(
