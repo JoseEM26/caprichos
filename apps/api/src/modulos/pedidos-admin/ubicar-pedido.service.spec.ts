@@ -29,6 +29,8 @@ describe('UbicarPedidoService', () => {
     prisma = {
       pedido: { findUnique: jest.fn().mockResolvedValue(pedido()), update: jest.fn().mockResolvedValue({ id: 7n, codigo: 'CP-W007' }) },
       parametro: { findUnique: jest.fn().mockResolvedValue({ valor: 70 }) },
+      oferta: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
     };
     zonas = { detectar: jest.fn().mockResolvedValue({ zonaId: 3n, codigo: 'Z3', tarifa: 6 }) };
     auditoria = { registrar: jest.fn() };

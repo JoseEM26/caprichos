@@ -93,8 +93,8 @@ export class ComboParteDto {
 }
 
 export class CrearOfertaDto {
-  @IsIn(['COMBO', 'LLEVA_PAGA', 'DESCUENTO', 'DESCUENTO_AUTOMATICO'], { message: 'Tipo de oferta no válido' })
-  tipo!: 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'DESCUENTO_AUTOMATICO';
+  @IsIn(['COMBO', 'LLEVA_PAGA', 'DESCUENTO', 'DESCUENTO_AUTOMATICO', 'ENVIO_GRATIS'], { message: 'Tipo de oferta no válido' })
+  tipo!: 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'DESCUENTO_AUTOMATICO' | 'ENVIO_GRATIS';
 
   @IsString({ message: 'El nombre debe ser un texto' })
   @IsNotEmpty({ message: 'El nombre es obligatorio' })

@@ -1,5 +1,6 @@
 import { reglaEnvioGratis } from '@caprichos/compartido';
 import { leerReglaEnvioGratis } from './envio-gratis';
+import { promoEnvioGratisVigente } from '../ofertas/envio-gratis-promo';
 import { ajustarAVecinas, areaSolapeM2, areaM2, recortarSolape, separacionM, SNAP_M_DEFECTO, solapeEntre } from '@caprichos/compartido';
 import type { ResumenAjuste, SolapeZonas } from '@caprichos/compartido';
 import {
@@ -214,8 +215,12 @@ export class ZonasService {
         tarifaZona: null,
         gratisDesde: regla.monto,
         modoGratis: regla.modo,
+        envioGratisPromo: null,
       };
     }
+
+    // Promo ENVIO_GRATIS de la carta web (el pedido usa la misma regla); el monto mínimo lo compara el checkout
+    const promo = await promoEnvioGratisVigente(this.prisma, 'CARTA');
 
     return {
       cubierto: true,
@@ -225,6 +230,9 @@ export class ZonasService {
       tarifaZona: zona.tarifa,
       gratisDesde: regla.monto,
       modoGratis: regla.modo,
+      envioGratisPromo: promo
+        ? { nombre: promo.nombre, hasta: promo.hasta, compraMinima: promo.compraMinima }
+        : null,
     };
   }
 

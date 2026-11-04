@@ -8,6 +8,7 @@ import {
   type ReglaEnvioGratis,
 } from '@caprichos/compartido';
 import { api, ErrorApi } from '../comun/api';
+import { envioGratisPromoAplica, type PromoEnvioGratisCarta } from '../comun/envioGratis';
 import { MapaUbicacion } from '../comun/mapa/MapaUbicacion';
 import { SEDE_DEFECTO } from '../comun/mapa/sedeDefecto';
 import { BuscadorDireccion } from '../comun/mapa/BuscadorDireccion';
@@ -79,6 +80,7 @@ export function FormularioCheckout({
   const [zonaEnvio, setZonaEnvio] = useState<string | null>(null);
   const [tarifaZona, setTarifaZona] = useState<number | null>(null);
   const [reglaEnvio, setReglaEnvio] = useState<ReglaEnvioGratis>(() => reglaEnvioGratis(undefined, undefined));
+  const [promoEnvio, setPromoEnvio] = useState<PromoEnvioGratisCarta | null>(null);
   // El costo sale del subtotal actual del carrito: si cambian los productos no hace falta volver a consultar la zona
   const costoEnvio = zonaEnvio && tarifaZona !== null ? calcularEnvioFinal(subtotal, tarifaZona, reglaEnvio) : null;
   const [cargandoGps, setCargandoGps] = useState(false);
@@ -118,6 +120,7 @@ export function FormularioCheckout({
     descuentoCalculado: number;
     tipo: string;
     valor: number;
+    envioGratis?: boolean;
   } | null>(null);
   const [cargandoCupon, setCargandoCupon] = useState(false);
   const [puntosAplicados, setPuntosAplicados] = useState(0);
@@ -235,10 +238,16 @@ export function FormularioCheckout({
     Boolean(clienteCuenta) && opcionDireccion === null && (direccionesAnteriores === null || direccionesAnteriores.length > 0);
 
   // Cálculo del total
-  const costoEnvioEfectivo = modalidad === 'DELIVERY' ? costoEnvio : 0;
+  // Envío gratis: por cupón de envío (aplicado) o por la promo ENVIO_GRATIS vigente. El servidor decide al crear el pedido.
+  const envioGratisCupon = cuponAplicado?.envioGratis === true;
+  const envioGratisPromo = !envioGratisCupon && !!zonaEnvio && envioGratisPromoAplica(promoEnvio, subtotal);
+  const envioGratisActivo = envioGratisCupon || envioGratisPromo;
+  const costoEnvioEfectivo = modalidad === 'DELIVERY' ? (envioGratisActivo ? 0 : costoEnvio) : 0;
   const resumenEnvio =
     modalidad === 'DELIVERY' && zonaEnvio && tarifaZona !== null
-      ? textoResumenEnvio(zonaEnvio, tarifaZona, subtotal, reglaEnvio)
+      ? envioGratisActivo
+        ? `Zona ${zonaEnvio} · envío gratis`
+        : textoResumenEnvio(zonaEnvio, tarifaZona, subtotal, reglaEnvio)
       : null;
   const descuentoCupon = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
   // Descuentos del servidor (promociones + cupón). El cupón se muestra aparte; lo demás son promociones.
@@ -267,6 +276,7 @@ export function FormularioCheckout({
           descuentoCalculado: Number(res.cupon.descuentoCalculado || 0),
           tipo: res.cupon.tipo,
           valor: Number(res.cupon.valor),
+          envioGratis: res.cupon.envioGratis === true,
         });
         setMensajeCupon(`Cupón aplicado: ${res.cupon.descripcion || ''}.`);
       }
@@ -320,6 +330,7 @@ export function FormularioCheckout({
         setZonaEnvio(res.zona);
         setTarifaZona(res.tarifaZona);
         setReglaEnvio(reglaEnvioGratis(res.gratisDesde, res.modoGratis));
+        setPromoEnvio(res.envioGratisPromo ?? null);
         setMensajeGps(`Ubicación encontrada.${avisoPrecision}`);
       }
     } catch {
@@ -2068,6 +2079,11 @@ export function FormularioCheckout({
                           {mensajeCupon}
                         </div>
                       )}
+                      {cuponAplicado?.envioGratis && modalidad !== 'DELIVERY' && (
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--cp-rust)' }}>
+                          El cupón de envío gratis solo aplica a delivery.
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2127,13 +2143,21 @@ export function FormularioCheckout({
 
                     {modalidad === 'DELIVERY' && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                        <span>Costo de envío</span>
+                        <span>
+                          {envioGratisCupon
+                            ? `Envío gratis (cupón ${cuponAplicado?.codigo})`
+                            : envioGratisPromo && promoEnvio
+                              ? `Envío gratis (promoción): ${promoEnvio.nombre}`
+                              : 'Costo de envío'}
+                        </span>
                         <span style={{ fontWeight: 700 }}>
-                          {costoEnvio !== null
-                            ? costoEnvio === 0
-                              ? 'GRATIS'
-                              : `S/ ${costoEnvio.toFixed(2)}`
-                            : 'Se confirma por WhatsApp'}
+                          {envioGratisActivo
+                            ? 'S/ 0.00'
+                            : costoEnvio !== null
+                              ? costoEnvio === 0
+                                ? 'GRATIS'
+                                : `S/ ${costoEnvio.toFixed(2)}`
+                              : 'Se confirma por WhatsApp'}
                         </span>
                       </div>
                     )}

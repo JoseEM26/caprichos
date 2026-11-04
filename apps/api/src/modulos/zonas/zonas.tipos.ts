@@ -24,6 +24,8 @@ export interface RespuestaConsultaEnvio {
   tarifaZona: number | null;
   gratisDesde: number;
   modoGratis: 'desde' | 'mas_de';
+  /** Promo de envío gratis vigente ahora en la carta (aditivo). compraMinima null = sin mínimo. */
+  envioGratisPromo?: { nombre: string; hasta: string | null; compraMinima: number | null } | null;
 }
 
 export interface ZonaAdminItem {

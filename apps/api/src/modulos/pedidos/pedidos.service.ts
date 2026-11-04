@@ -14,12 +14,11 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { calcularEnvioFinal } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
-import { leerReglaEnvioGratis } from '../zonas/envio-gratis';
+import { calcularEnvioDelivery, PromoEnvioGratis } from '../ofertas/envio-gratis-promo';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto, EntregaDto } from './dto/crear-pedido.dto';
@@ -621,6 +620,14 @@ export class PedidosService {
 
     const descuentoAplicado = desgloseDescuento.descuentoTotal;
 
+    // Cupón de envío gratis: solo delivery (en pickup o mesa el cliente debe quitarlo)
+    if (desgloseDescuento.envioGratisCupon && dto.modalidad !== 'DELIVERY') {
+      throw new BadRequestException({
+        codigo: 'CUPON_SOLO_DELIVERY',
+        mensaje: 'El cupón de envío gratis solo aplica a pedidos de delivery',
+      });
+    }
+
     // 6. Pedido mínimo: solo para DELIVERY, sobre el subtotal de productos (sin envío ni descuentos).
     // Sin parámetro `pedido_minimo` configurado (o 0) no hay mínimo.
     if (dto.modalidad === 'DELIVERY') {
@@ -647,6 +654,7 @@ export class PedidosService {
     // Dirección del pedido: la de la carta, o la del último pedido de ese celular si la pidió reutilizar
     const entrega = direccionReutilizada ?? dto.entrega;
     let envio: number | null = 0;
+    let envioPromo: PromoEnvioGratis | null = null;
     let zonaId: bigint | null = null;
     let entregaOrigen: string | null = null;
 
@@ -671,8 +679,15 @@ export class PedidosService {
 
         zonaId = zonaDetectada.zonaId;
 
-        const reglaEnvio = await leerReglaEnvioGratis(this.prisma);
-        envio = calcularEnvioFinal(subtotalCalculado, zonaDetectada.tarifa, reglaEnvio);
+        // Misma función que la consulta /carta/envio y ubicar: promo ENVIO_GRATIS o envío gratis por monto
+        const calculoEnvio = await calcularEnvioDelivery(this.prisma, {
+          subtotal: subtotalCalculado,
+          tarifaZona: zonaDetectada.tarifa,
+          canal: canalPedido,
+          envioGratisCupon: desgloseDescuento.envioGratisCupon,
+        });
+        envio = calculoEnvio.envio;
+        envioPromo = calculoEnvio.promo;
 
         entregaOrigen = entrega?.origen || 'GPS';
       } else if (
@@ -683,6 +698,8 @@ export class PedidosService {
         envio = null;
         zonaId = null;
         entregaOrigen = 'ESCRITA';
+        // Sin zona aún: si hay cupón de envío gratis, el envío queda en 0 (ubicar no lo vuelve a cobrar)
+        if (desgloseDescuento.envioGratisCupon) envio = 0;
       } else {
         throw new BadRequestException({
           codigo: 'UBICACION_REQUERIDA',
@@ -944,6 +961,13 @@ export class PedidosService {
       if (desgloseDescuento.ofertaId) {
         await tx.oferta.update({
           where: { id: BigInt(desgloseDescuento.ofertaId) },
+          data: { usos_actuales: { increment: 1 } },
+        });
+      }
+      // Envío gratis por promo: cuenta un uso solo si de verdad dejó el envío en 0
+      if (envioPromo) {
+        await tx.oferta.update({
+          where: { id: BigInt(envioPromo.id) },
           data: { usos_actuales: { increment: 1 } },
         });
       }

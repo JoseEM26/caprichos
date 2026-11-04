@@ -40,7 +40,7 @@ export interface LlevaPagaConfig {
 
 export interface OfertaItem {
   id: string;
-  tipo: 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'DESCUENTO_AUTOMATICO';
+  tipo: 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'DESCUENTO_AUTOMATICO' | 'ENVIO_GRATIS';
   nombre: string;
   descripcion?: string | null;
   lleva?: number | null;

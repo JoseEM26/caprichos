@@ -16,8 +16,8 @@ import { ComboParteDto, ComboPrecioDto, EsDescuentoValorValidoConstraint } from 
 
 export class ActualizarOfertaDto {
   @IsOptional()
-  @IsIn(['COMBO', 'LLEVA_PAGA', 'DESCUENTO', 'DESCUENTO_AUTOMATICO'], { message: 'Tipo de oferta no válido' })
-  tipo?: 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'DESCUENTO_AUTOMATICO';
+  @IsIn(['COMBO', 'LLEVA_PAGA', 'DESCUENTO', 'DESCUENTO_AUTOMATICO', 'ENVIO_GRATIS'], { message: 'Tipo de oferta no válido' })
+  tipo?: 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'DESCUENTO_AUTOMATICO' | 'ENVIO_GRATIS';
 
   @IsOptional()
   @IsString({ message: 'El nombre debe ser un texto' })

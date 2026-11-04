@@ -4,6 +4,7 @@ import { CategoriaCarta, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { TextoEd } from './edicion';
 import { useEsMovil } from './useEsMovil';
+import { textoEnvioGratisHasta } from '../comun/envioGratis';
 
 interface TarjetaOfertaProps {
   oferta: OfertaItem;
@@ -53,6 +54,10 @@ export function TarjetaOferta({
         }
       }
       return { textoPrecio: 'Combo especial', textoBadge: 'Combo' };
+    }
+
+    if (oferta.tipo === 'ENVIO_GRATIS') {
+      return { textoPrecio: textoEnvioGratisHasta(oferta.horaHasta), textoBadge: 'Envío gratis' };
     }
 
     if (oferta.tipo === 'LLEVA_PAGA') {

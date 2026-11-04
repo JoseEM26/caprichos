@@ -139,6 +139,7 @@ describe('PedidosService', () => {
       producto: {
         findMany: jest.fn().mockResolvedValue([mockProductoCafe]),
       },
+      oferta: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
       parametro: {
         findUnique: jest.fn().mockImplementation(({ where }) => {
           if (where.clave === 'envio_gratis_monto') {
@@ -370,6 +371,111 @@ describe('PedidosService', () => {
       expect(res.subtotal).toBe(84.0);
       expect(res.envio).toBe(0); // Envío gratis
       expect(res.total).toBe(84.0);
+    });
+
+    describe('promo ENVIO_GRATIS (envío gratis por promoción)', () => {
+      // Subtotal 28 (no llega al envío gratis por monto de 70): sin la promo el envío es la tarifa de zona (5)
+      const promo = {
+        id: 77n,
+        nombre: 'Delivery gratis de 2 a 6 pm',
+        activo: true,
+        tipo: 'ENVIO_GRATIS',
+        orden: 0,
+        dias: [],
+        hora_desde: null,
+        hora_hasta: null,
+        fecha_desde: null,
+        fecha_hasta: null,
+        canales: ['CARTA', 'ADMIN'],
+        limite_usos: null,
+        usos_actuales: 0,
+        compra_minima: null,
+      };
+
+      beforeEach(() => {
+        prismaMock.cupon = { update: jest.fn().mockResolvedValue({}) };
+        prismaMock.cuponCanjeCompartido = { create: jest.fn().mockResolvedValue({}) };
+        prismaMock.pedido.create.mockImplementation(({ data }: any) =>
+          Promise.resolve({ id: 300n, codigo: 'CP-W300', estado: 'COLA', subtotal: 28, envio: Number(data.envio), total: Number(data.total) }),
+        );
+      });
+
+      it('delivery de la carta con promo vigente: envío 0, total = subtotal, cuenta un uso de la promo', async () => {
+        prismaMock.oferta.findMany.mockResolvedValueOnce([promo]);
+
+        const res = await service.crear(pedidoBaseDto, 'idemp-promo-envio', { canal: 'CARTA' });
+
+        expect(res.envio).toBe(0);
+        expect(res.total).toBe(28);
+        expect(prismaMock.oferta.update).toHaveBeenCalledWith({
+          where: { id: 77n },
+          data: { usos_actuales: { increment: 1 } },
+        });
+      });
+
+      it('con compra mínima no alcanzada no aplica: paga la tarifa de zona y no cuenta uso', async () => {
+        prismaMock.oferta.findMany.mockResolvedValueOnce([{ ...promo, compra_minima: 50 }]);
+
+        const res = await service.crear(pedidoBaseDto, 'idemp-promo-minima', { canal: 'CARTA' });
+
+        expect(res.envio).toBe(5);
+        expect(prismaMock.oferta.update).not.toHaveBeenCalledWith(expect.objectContaining({ where: { id: 77n } }));
+      });
+
+      it('bot sin la casilla BOT marcada: paga la tarifa de zona', async () => {
+        prismaMock.oferta.findMany.mockResolvedValueOnce([{ ...promo, canales: ['TODOS'] }]);
+
+        const res = await service.crear(pedidoBaseDto, 'idemp-promo-bot', { canal: 'BOT' });
+
+        expect(res.envio).toBe(5);
+        expect(prismaMock.oferta.update).not.toHaveBeenCalledWith(expect.objectContaining({ where: { id: 77n } }));
+      });
+
+      it('bot con la casilla BOT marcada: envío 0 y cuenta el uso (WhatsApp también)', async () => {
+        prismaMock.oferta.findMany.mockResolvedValueOnce([{ ...promo, canales: ['CARTA', 'BOT'] }]);
+        const res = await service.crear(pedidoBaseDto, 'idemp-promo-bot-ok', { canal: 'BOT' });
+        expect(res.envio).toBe(0);
+        expect(prismaMock.oferta.update).toHaveBeenCalledWith({ where: { id: 77n }, data: { usos_actuales: { increment: 1 } } });
+
+        prismaMock.oferta.findMany.mockResolvedValueOnce([{ ...promo, canales: ['CARTA', 'BOT'] }]);
+        const wa = await service.crear(pedidoBaseDto, 'idemp-promo-wa-ok', { canal: 'WHATSAPP' });
+        expect(wa.envio).toBe(0);
+      });
+
+      it('cupón de envío gratis: delivery queda en envío 0 y el cupón se cuenta (no la promo)', async () => {
+        ofertasServiceMock.calcularDescuentosParaPedido.mockResolvedValueOnce({
+          descuentoTotal: 0, ofertaId: null, cuponId: '5', cuponEmitidoId: null, detalles: [], envioGratisCupon: true,
+        });
+        prismaMock.oferta.findMany.mockResolvedValueOnce([promo]);
+
+        const res = await service.crear(pedidoBaseDto, 'idemp-cupon-envio', { canal: 'CARTA' });
+
+        expect(res.envio).toBe(0);
+        expect(res.total).toBe(28);
+        expect(prismaMock.cupon.update).toHaveBeenCalledWith({ where: { id: 5n }, data: { usos_actuales: { increment: 1 } } });
+        expect(prismaMock.oferta.update).not.toHaveBeenCalledWith(expect.objectContaining({ where: { id: 77n } }));
+      });
+
+      it('cupón de envío gratis en recoger en local: rechaza con CUPON_SOLO_DELIVERY', async () => {
+        ofertasServiceMock.calcularDescuentosParaPedido.mockResolvedValueOnce({
+          descuentoTotal: 0, ofertaId: null, cuponId: '5', cuponEmitidoId: null, detalles: [], envioGratisCupon: true,
+        });
+
+        await expect(
+          service.crear({ ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined }, 'idemp-cupon-recoger', { canal: 'CARTA' }),
+        ).rejects.toMatchObject({ response: { codigo: 'CUPON_SOLO_DELIVERY' } });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('recoger en local no se ve afectado por la promo', async () => {
+        prismaMock.oferta.findMany.mockResolvedValueOnce([promo]);
+
+        const res = await service.crear({ ...pedidoBaseDto, modalidad: 'RECOGER', entrega: undefined }, 'idemp-promo-recoger', { canal: 'CARTA' });
+
+        expect(res.envio).toBe(0);
+        expect(prismaMock.oferta.findMany).not.toHaveBeenCalled();
+        expect(prismaMock.oferta.update).not.toHaveBeenCalledWith(expect.objectContaining({ where: { id: 77n } }));
+      });
     });
 
     it('4. modo desde: el monto exacto ya da envío gratis', async () => {

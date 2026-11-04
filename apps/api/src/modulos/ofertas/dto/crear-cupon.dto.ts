@@ -24,8 +24,8 @@ export class CrearCuponDto {
   @IsString()
   descripcion?: string;
 
-  @IsIn(['PORCENTAJE', 'MONTO'], { message: 'descuentoTipo debe ser PORCENTAJE o MONTO' })
-  descuentoTipo!: 'PORCENTAJE' | 'MONTO';
+  @IsIn(['PORCENTAJE', 'MONTO', 'ENVIO_GRATIS'], { message: 'descuentoTipo debe ser PORCENTAJE, MONTO o ENVIO_GRATIS' })
+  descuentoTipo!: 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS';
 
   @IsNumber({}, { message: 'descuentoValor debe ser un número válido' })
   @Min(0, { message: 'descuentoValor debe ser mayor o igual a 0' })
@@ -45,6 +45,27 @@ export class CrearCuponDto {
   @IsOptional()
   @IsArray()
   canales?: string[];
+
+  @IsOptional()
+  @IsArray({ message: 'dias debe ser un arreglo de números (1..7)' })
+  dias?: number[];
+
+  @IsOptional()
+  @IsString()
+  horaDesde?: string | null;
+
+  @IsOptional()
+  @IsString()
+  horaHasta?: string | null;
+
+  @IsOptional()
+  @IsString()
+  fechaDesde?: string | null;
+
+  @IsOptional()
+  @IsString()
+  fechaHasta?: string | null;
+
 
   @IsOptional()
   @IsBoolean()

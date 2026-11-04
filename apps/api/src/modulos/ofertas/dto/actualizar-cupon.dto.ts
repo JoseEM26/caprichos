@@ -27,8 +27,8 @@ export class ActualizarCuponDto {
   descripcion?: string | null;
 
   @IsOptional()
-  @IsIn(['PORCENTAJE', 'MONTO'], { message: 'descuentoTipo debe ser PORCENTAJE o MONTO' })
-  descuentoTipo?: 'PORCENTAJE' | 'MONTO';
+  @IsIn(['PORCENTAJE', 'MONTO', 'ENVIO_GRATIS'], { message: 'descuentoTipo debe ser PORCENTAJE, MONTO o ENVIO_GRATIS' })
+  descuentoTipo?: 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS';
 
   @IsOptional()
   @IsNumber({}, { message: 'descuentoValor debe ser un número válido' })
@@ -49,6 +49,26 @@ export class ActualizarCuponDto {
   @IsOptional()
   @IsArray()
   canales?: string[] | null;
+
+  @IsOptional()
+  @IsArray({ message: 'dias debe ser un arreglo de números (1..7)' })
+  dias?: number[];
+
+  @IsOptional()
+  @IsString()
+  horaDesde?: string | null;
+
+  @IsOptional()
+  @IsString()
+  horaHasta?: string | null;
+
+  @IsOptional()
+  @IsString()
+  fechaDesde?: string | null;
+
+  @IsOptional()
+  @IsString()
+  fechaHasta?: string | null;
 
   @IsOptional()
   @IsBoolean()

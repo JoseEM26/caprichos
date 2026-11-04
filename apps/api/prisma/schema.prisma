@@ -1371,7 +1371,7 @@ model ContactMechanism {
 
 model Oferta {
   id                   BigInt         @id @default(autoincrement())
-  tipo                 String         // COMBO | LLEVA_PAGA | DESCUENTO
+  tipo                 String         // COMBO | LLEVA_PAGA | DESCUENTO | ENVIO_GRATIS
   nombre               String         @unique
   descripcion          String?
   lleva                Int?
@@ -1468,12 +1468,18 @@ model Cupon {
   modo               String                  // UNICO_COMPROBANTE | COMPARTIDO
   codigo_base        String                  @unique
   descripcion        String?
-  descuento_tipo     String                  // PORCENTAJE | MONTO
+  descuento_tipo     String                  // PORCENTAJE | MONTO | ENVIO_GRATIS
   descuento_valor    Decimal                 @db.Decimal(12, 2)
   compra_minima      Decimal?                @db.Decimal(12, 2)
   categoria_id       BigInt?
   producto_id        BigInt?
   canales            String[]                @default(["CARTA", "CAJA", "BOT"])
+  // Horario opcional (vacío = todo el tiempo): días 1..7, hora desde inclusiva y hasta exclusiva, fechas inclusivas
+  dias               Int[]                   @default([])
+  hora_desde         DateTime?               @db.Time
+  hora_hasta         DateTime?               @db.Time
+  fecha_desde        DateTime?               @db.Date
+  fecha_hasta        DateTime?               @db.Date
   requiere_cuenta    Boolean                 @default(false)
   dias_validez       Int?                    @default(15)
   tope_usos          Int?
