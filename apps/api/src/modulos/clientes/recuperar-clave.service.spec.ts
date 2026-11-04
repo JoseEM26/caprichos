@@ -42,7 +42,11 @@ describe('RecuperarClaveService', () => {
 
   beforeEach(() => {
     redis = redisFalso();
-    prisma = { customerAccount: { update: jest.fn().mockResolvedValue({}) } };
+    // Estos tests son del modo CODIGO_PLANTILLA (código de 6 dígitos); el modo por defecto es WHATSAPP_ENTRANTE
+    prisma = {
+      customerAccount: { update: jest.fn().mockResolvedValue({}) },
+      parametro: { findUnique: jest.fn().mockResolvedValue({ valor: 'CODIGO_PLANTILLA' }) },
+    };
     auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
     outbox = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn() };
     clientes = { cuentaPorCelular: jest.fn().mockResolvedValue({ id: 1n, party_id: 100n, hash: 'x' }) };

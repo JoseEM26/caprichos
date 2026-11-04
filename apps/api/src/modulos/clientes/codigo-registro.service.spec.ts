@@ -40,7 +40,11 @@ describe('CodigoRegistroService', () => {
 
   beforeEach(() => {
     redis = redisFalso();
-    prisma = { customerAccount: { findFirst: jest.fn().mockResolvedValue(null) } };
+    // Estos tests son del modo CODIGO_PLANTILLA (código de 6 dígitos); el modo por defecto es WHATSAPP_ENTRANTE
+    prisma = {
+      customerAccount: { findFirst: jest.fn().mockResolvedValue(null) },
+      parametro: { findUnique: jest.fn().mockResolvedValue({ valor: 'CODIGO_PLANTILLA' }) },
+    };
     outbox = { encolar: jest.fn().mockResolvedValue(undefined), despertar: jest.fn() };
     service = new CodigoRegistroService(
       prisma,
