@@ -216,7 +216,8 @@ export function DisenadorView() {
   const { cargar, cambiar, valor: e } = b;
 
   const cargarDatos = async () => {
-    setCargando(true);
+    // tras publicar o descartar se recarga sin desmontar el editor (y su pantalla completa)
+    if (!e) setCargando(true);
     setError(null);
     try {
       const data = await api.get<any>('/admin/contenido/disenador');
