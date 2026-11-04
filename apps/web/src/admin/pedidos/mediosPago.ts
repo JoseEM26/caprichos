@@ -25,6 +25,18 @@ export function digitalesDelPlan(planPago: ReadonlyArray<{ medio: string }> | nu
   return medios;
 }
 
+/** Medios que piden el código de operación al confirmar (igual que el servidor: MEDIOS_CON_CODIGO_OPERACION). */
+export const MEDIOS_CON_CODIGO_OPERACION: readonly string[] = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
+
+/**
+ * Medios que necesitan código de operación: los digitales del plan (pago dividido) y el medio elegido, si aplica.
+ * El efectivo nunca pide código.
+ */
+export function mediosQueExigenCodigo(medio: string | null | undefined, planPago: ReadonlyArray<{ medio: string }> | null | undefined): string[] {
+  const medios = [...(planPago ?? []).map((f) => f.medio), medio ?? ''].map((m) => m.trim().toUpperCase());
+  return [...new Set(medios.filter((m) => MEDIOS_CON_CODIGO_OPERACION.includes(m)))];
+}
+
 /**
  * Medios del plan sin captura vigente y legible. Un voucher sin medio cubre cualquiera (compatibilidad),
  * igual que el servidor (voucherCubreMedio).

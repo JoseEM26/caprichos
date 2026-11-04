@@ -31,7 +31,7 @@ import {
   SupervisorCodigoService,
   autorizarAdminSinCodigo,
 } from '../supervisor-codigo/supervisor-codigo.service';
-import { exigirComprobanteDigital, voucherCubreMedio } from '../caja/comprobante-pago.util';
+import { exigirComprobanteDigital, mediosQueExigenCodigo, voucherCubreMedio } from '../caja/comprobante-pago.util';
 import { puedeCambiarVoucher, puedeSubirVoucher } from '../vouchers/regla-cambio-voucher';
 import { MEDIOS_CON_VOUCHER_CAJA } from '../vouchers/vouchers.service';
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
@@ -1140,6 +1140,20 @@ export class PedidosEstadoService {
         this.verificarPinSupervisor(pin, usuarioActual.partyId, ip, pedido.id, 'pedidos/registrar_pago_sin_voucher'),
     });
 
+    // Código de operación por cada medio digital (plan mixto: uno por parte digital; efectivo: ninguno)
+    const codigosRequeridos = mediosQueExigenCodigo(metodoUpper, pedido.planPago);
+    const codigosEntregados = new Map(
+      (dto.codigosOperacion ?? []).map((c) => [String(c.medio).toUpperCase().trim(), String(c.codigo).trim()]),
+    );
+    const sinCodigo = codigosRequeridos.filter((m) => !codigosEntregados.get(m));
+    if (sinCodigo.length > 0) {
+      throw new BadRequestException({
+        codigo: 'CODIGO_OPERACION_REQUERIDO',
+        faltan: sinCodigo,
+        mensaje: `Escribe el código de operación que ves en el voucher (${sinCodigo.join(', ')})`,
+      });
+    }
+
     const ahora = new Date();
     const pedidoActualizado = await this.prisma.pedido.update({
       where: { id: pedido.id },
@@ -1150,6 +1164,24 @@ export class PedidosEstadoService {
         pago_coordinado_por: usuarioActual.partyId,
       },
     });
+
+    // El código confirmado por Caja queda en el voucher vigente de ese medio (la lectura de la IA sigue en `extraido`)
+    for (const medio of codigosRequeridos) {
+      const codigo = codigosEntregados.get(medio)!;
+      const voucher = await this.prisma.voucherPago.findFirst({
+        where: {
+          pedido_id: pedido.id,
+          reemplazado_en: null,
+          semaforo: { not: 'ILEGIBLE' },
+          OR: [{ medio: null }, { medio }],
+        },
+        orderBy: { creado_en: 'desc' },
+        select: { id: true, operacion: true },
+      });
+      if (voucher && voucher.operacion !== codigo) {
+        await this.prisma.voucherPago.update({ where: { id: voucher.id }, data: { operacion: codigo } });
+      }
+    }
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -1165,6 +1197,7 @@ export class PedidosEstadoService {
         sin_voucher: sinVoucherAutorizado
           ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId }
           : null,
+        codigos_operacion: codigosRequeridos.map((medio) => ({ medio, codigo: codigosEntregados.get(medio) })),
       },
       partyId: usuarioActual.partyId,
       ...(sinVoucherAutorizado ? { conPinAdmin: true, motivo: sinVoucherAutorizado.motivo } : {}),

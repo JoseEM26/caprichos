@@ -298,11 +298,13 @@ export const pedidosApi = {
     metodo: string,
     estado: 'COORDINADO' | 'PAGADO' = 'PAGADO',
     sinVoucher?: { motivo: string; pinSupervisor?: string },
+    codigosOperacion?: Array<{ medio: string; codigo: string }>,
   ): Promise<Pedido> {
     return api.post<Pedido>(`/admin/pedidos/${id}/pago`, {
       metodo,
       estado,
       ...(sinVoucher ? { sinVoucher } : {}),
+      ...(codigosOperacion?.length ? { codigosOperacion } : {}),
     });
   },
 
