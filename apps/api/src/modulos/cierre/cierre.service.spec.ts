@@ -1225,16 +1225,16 @@ describe('CierreService', () => {
       expect(Object.keys(res.medios).sort()).toEqual(['plin', 'tarjeta', 'transferencia', 'yape']);
       expect(res).not.toHaveProperty('efectivoEsperado');
       expect(JSON.stringify(res)).not.toMatch(/efectivo|esperado|diferencia/i);
-      expect(res.medios.yape).toEqual({ monto: 200, cobros: 1, corregido: false });
-      expect(res.medios.transferencia).toEqual({ monto: 50, cobros: 1, corregido: false });
-      expect(res.medios.tarjeta).toEqual({ monto: 100, cobros: 1, corregido: false });
-      expect(res.medios.plin).toEqual({ monto: 0, cobros: 0, corregido: false });
+      expect(res.medios.yape).toEqual({ monto: 200, sistema: 200, cobros: 1, corregido: false });
+      expect(res.medios.transferencia).toEqual({ monto: 50, sistema: 50, cobros: 1, corregido: false });
+      expect(res.medios.tarjeta).toEqual({ monto: 100, sistema: 100, cobros: 1, corregido: false });
+      expect(res.medios.plin).toEqual({ monto: 0, sistema: 0, cobros: 0, corregido: false });
     });
 
     it('el monto digital que ve el cajero es el corregido, marcado como corregido', async () => {
       prismaMock.cierreAjusteMedio.findMany.mockResolvedValue([ajusteYape]);
       const res = await service.obtenerDigitales();
-      expect(res.medios.yape).toMatchObject({ monto: 210, corregido: true });
+      expect(res.medios.yape).toMatchObject({ monto: 210, sistema: 200, corregido: true });
     });
 
     it('el cajero sin código de supervisor no puede corregir un monto (PIN_REQUERIDO, nada se guarda)', async () => {

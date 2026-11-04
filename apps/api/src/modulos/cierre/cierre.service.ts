@@ -275,6 +275,7 @@ export class CierreService {
     const montos = await calcularMontosCaja(this.prisma, caja);
     const ajustes = await this.ajustesVigentes(this.prisma, caja.id);
     const aceptados = digitalesAceptados(montos, ajustes);
+    const delSistema = digitalesDelSistema(montos);
     const cobros = await this.cobrosPorMedio(caja.id);
     return {
       cajaId: Number(caja.id),
@@ -282,7 +283,10 @@ export class CierreService {
       medios: Object.fromEntries(
         MEDIOS_DIGITALES.map((m) => {
           const clave = CLAVE_DIGITAL[m];
-          return [clave, { monto: aceptados[clave], cobros: cobros[clave], corregido: ajustes.has(m) }];
+          return [
+            clave,
+            { monto: aceptados[clave], sistema: delSistema[clave], cobros: cobros[clave], corregido: ajustes.has(m) },
+          ];
         }),
       ),
     };
