@@ -157,10 +157,24 @@ export interface HistorialRespuesta {
 export type ClaveDigital = 'yape' | 'plin' | 'transferencia' | 'tarjeta';
 export type MedioAjustable = 'YAPE' | 'PLIN' | 'TRANSFERENCIA' | 'TARJETA';
 
+/**
+ * Un medio digital de la caja. `cobrado` es lo que entró por ese medio; `devuelto` son las devoluciones
+ * del día (negativo o 0); `sistema` es el esperado digital = cobrado + devuelto. `monto` es el que vale
+ * en el cierre (el esperado, o la corrección aprobada).
+ */
+export interface DigitalCaja {
+  monto: number;
+  sistema: number;
+  cobrado: number;
+  devuelto: number;
+  cobros: number;
+  corregido: boolean;
+}
+
 export interface DigitalesCaja {
   cajaId: number;
   fecha: string;
-  medios: Record<ClaveDigital, { monto: number; sistema: number; cobros: number; corregido: boolean }>;
+  medios: Record<ClaveDigital, DigitalCaja>;
 }
 
 /** Corrección de un monto digital de la caja, con quién la hizo, quién la aprobó y cuándo. */

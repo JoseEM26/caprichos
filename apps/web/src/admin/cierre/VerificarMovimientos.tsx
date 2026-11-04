@@ -219,8 +219,8 @@ export function VerificarMovimientos(p: Props) {
             </div>
           )}
           <div className="vm-ayuda">
-            Solo para revisar. Las devoluciones en efectivo ya salen como egreso en Movimientos de caja. Las digitales
-            todavía no descuentan del cuadre: compáralas con lo que devolviste por Yape, Plin o transferencia.
+            Solo para revisar. Las devoluciones en efectivo salen como egreso en Movimientos de caja. Las digitales
+            ya se descuentan del esperado de Yape, Plin, transferencia o tarjeta del día de esta caja.
           </div>
         </section>
 

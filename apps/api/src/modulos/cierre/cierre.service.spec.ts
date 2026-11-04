@@ -215,6 +215,9 @@ describe('CierreService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      devolucionPedido: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       party: {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockResolvedValue({
@@ -1225,10 +1228,10 @@ describe('CierreService', () => {
       expect(Object.keys(res.medios).sort()).toEqual(['plin', 'tarjeta', 'transferencia', 'yape']);
       expect(res).not.toHaveProperty('efectivoEsperado');
       expect(JSON.stringify(res)).not.toMatch(/efectivo|esperado|diferencia/i);
-      expect(res.medios.yape).toEqual({ monto: 200, sistema: 200, cobros: 1, corregido: false });
-      expect(res.medios.transferencia).toEqual({ monto: 50, sistema: 50, cobros: 1, corregido: false });
-      expect(res.medios.tarjeta).toEqual({ monto: 100, sistema: 100, cobros: 1, corregido: false });
-      expect(res.medios.plin).toEqual({ monto: 0, sistema: 0, cobros: 0, corregido: false });
+      expect(res.medios.yape).toEqual({ monto: 200, sistema: 200, cobrado: 200, devuelto: 0, cobros: 1, corregido: false });
+      expect(res.medios.transferencia).toEqual({ monto: 50, sistema: 50, cobrado: 50, devuelto: 0, cobros: 1, corregido: false });
+      expect(res.medios.tarjeta).toEqual({ monto: 100, sistema: 100, cobrado: 100, devuelto: 0, cobros: 1, corregido: false });
+      expect(res.medios.plin).toEqual({ monto: 0, sistema: 0, cobrado: 0, devuelto: 0, cobros: 0, corregido: false });
     });
 
     it('el monto digital que ve el cajero es el corregido, marcado como corregido', async () => {
@@ -1394,6 +1397,97 @@ describe('CierreService', () => {
       expect(sql).toMatch(/BEFORE UPDATE OR DELETE ON "cierre_ajuste_medio"/);
       const fuente = fs.readFileSync(path.join(__dirname, 'cierre.service.ts'), 'utf8');
       expect(fuente).not.toMatch(/cierreAjusteMedio\.(update|delete|upsert|updateMany|deleteMany)/);
+    });
+  });
+  // -------------------------------------------------------------------------
+  // 14. Devoluciones digitales descuentan del esperado digital del día
+  // -------------------------------------------------------------------------
+  describe('14. devoluciones digitales descuentan del esperado digital', () => {
+    // Caja del 21/10 (día de Lima): [2026-10-21T05:00Z, 2026-10-22T05:00Z)
+    const devolucion = (medio: string, monto: number, creado: string) => ({
+      medio,
+      monto_devuelto: monto,
+      creado_en: new Date(creado),
+    });
+
+    it('sin devoluciones el esperado digital es lo cobrado y la devolución es 0', async () => {
+      const res = await service.obtenerDigitales();
+      expect(res.medios.yape).toMatchObject({ cobrado: 200, devuelto: 0, sistema: 200 });
+    });
+
+    it('una devolución por Yape del día resta de Yape: cobrado, devuelto (negativo) y esperado', async () => {
+      prismaMock.devolucionPedido.findMany.mockResolvedValue([
+        devolucion('YAPE', 50, '2026-10-21T17:00:00Z'),
+      ]);
+      const res = await service.obtenerDigitales();
+      expect(res.medios.yape).toMatchObject({ cobrado: 200, devuelto: -50, sistema: 150, monto: 150 });
+      // El resto de medios no cambia
+      expect(res.medios.transferencia).toMatchObject({ cobrado: 50, devuelto: 0, sistema: 50 });
+    });
+
+    it('varios medios: cada uno descuenta solo sus devoluciones (Yape, Plin, transferencia, tarjeta)', async () => {
+      prismaMock.devolucionPedido.findMany.mockResolvedValue([
+        devolucion('YAPE', 50, '2026-10-21T17:00:00Z'),
+        devolucion('TARJETA', 30, '2026-10-21T18:00:00Z'),
+        devolucion('TARJETA', 20.5, '2026-10-21T19:00:00Z'),
+        devolucion('TRANSFERENCIA', 10, '2026-10-21T20:00:00Z'),
+      ]);
+      const res = await service.obtenerDigitales();
+      expect(res.medios.yape).toMatchObject({ cobrado: 200, devuelto: -50, sistema: 150 });
+      expect(res.medios.tarjeta).toMatchObject({ cobrado: 100, devuelto: -50.5, sistema: 49.5 });
+      expect(res.medios.transferencia).toMatchObject({ cobrado: 50, devuelto: -10, sistema: 40 });
+      expect(res.medios.plin).toMatchObject({ cobrado: 0, devuelto: 0, sistema: 0 });
+    });
+
+    it('las devoluciones de otro día no cuentan (ni las de antes ni las de después de la caja)', async () => {
+      prismaMock.devolucionPedido.findMany.mockResolvedValue([
+        devolucion('YAPE', 50, '2026-10-20T20:00:00Z'), // ayer, en Lima 15:00
+        devolucion('YAPE', 40, '2026-10-22T05:00:00Z'), // mañana 00:00 Lima: ya es otro día
+        devolucion('YAPE', 10, '2026-10-21T04:59:59Z'), // ayer 23:59:59 Lima
+      ]);
+      const res = await service.obtenerDigitales();
+      expect(res.medios.yape).toMatchObject({ cobrado: 200, devuelto: 0, sistema: 200 });
+    });
+
+    it('la devolución en efectivo no toca el esperado digital (ya sale como egreso de caja)', async () => {
+      prismaMock.devolucionPedido.findMany.mockResolvedValue([
+        devolucion('EFECTIVO', 40, '2026-10-21T17:00:00Z'),
+      ]);
+      const res = await service.obtenerDigitales();
+      expect(res.medios.yape).toMatchObject({ sistema: 200, devuelto: 0 });
+    });
+
+    it('el ADMIN ve el esperado de Yape ya descontada la devolución', async () => {
+      prismaMock.devolucionPedido.findMany.mockResolvedValue([
+        devolucion('YAPE', 50, '2026-10-21T17:00:00Z'),
+      ]);
+      const res = await service.obtenerEsperado(mockUsuarioAdmin);
+      expect(res.medios.yape).toBe(150);
+    });
+
+    it('el arqueo cuadra si el voucher de Yape ya viene con la devolución descontada', async () => {
+      prismaMock.devolucionPedido.findMany.mockResolvedValue([
+        devolucion('YAPE', 50, '2026-10-21T17:00:00Z'),
+      ]);
+      const dto: ArqueoDto = {
+        conteo: { '200': 1, '100': 1, '50': 1, '5': 1 },
+        medios: { yape: 150.0, plin: 0.0, transferencia: 50.0, tarjeta: 100.0 },
+      };
+      const resultado = await service.arqueo(dto, mockUsuarioCajero);
+      expect(resultado).toEqual({ resultado: 'CUADRA', intento: 1 });
+    });
+
+    it('el cierre no acepta el Yape sin devolución (AJUSTE_REQUERIDO): el sistema ya lo descuenta', async () => {
+      prismaMock.devolucionPedido.findMany.mockResolvedValue([
+        devolucion('YAPE', 50, '2026-10-21T17:00:00Z'),
+      ]);
+      await expect(
+        service.cerrar(
+          { conteo: { '200': 1, '100': 1, '50': 1, '5': 1 }, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } } as CerrarCajaDto,
+          mockUsuarioCajero,
+          '654321',
+        ),
+      ).rejects.toMatchObject({ response: { codigo: 'AJUSTE_REQUERIDO' } });
     });
   });
 });

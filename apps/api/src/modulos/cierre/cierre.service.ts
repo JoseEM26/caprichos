@@ -43,8 +43,12 @@ import { AjusteMedioDto } from './dto/ajuste-medio.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { LiquidarRepartidorDto } from './dto/liquidar.dto';
 import { HistorialCierresDto } from './dto/historial.dto';
-import { calcularTotalConteo } from './cierre.util';
-import { inicioDiaLimaDeFecha } from '../cocina/cocina.util';
+import {
+  ClaveDigitalCierre,
+  calcularTotalConteo,
+  rangoDiaCaja,
+  sumarDevolucionesDigitales,
+} from './cierre.util';
 import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-pedido.util';
 
 /**
@@ -118,6 +122,15 @@ function digitalesAceptados(
   return aceptados;
 }
 
+/**
+ * Montos del cierre: el cobrado por el sistema y, en digitales, ya descontadas las devoluciones del día.
+ * `sistemaYape`… son el esperado neto; `digitalesCobrados`/`digitalesDevueltos` son el desglose en pantalla.
+ */
+type MontosCierre = MontosSistema & {
+  digitalesCobrados: Record<ClaveDigitalCierre, number>;
+  digitalesDevueltos: Record<ClaveDigitalCierre, number>;
+};
+
 function exigirAdmin(usuario: UsuarioAutenticado | undefined, mensaje: string) {
   if (usuario?.rol !== 'ADMIN') {
     throw new HttpException({ codigo: 'SOLO_ADMIN', mensaje }, HttpStatus.FORBIDDEN);
@@ -189,16 +202,50 @@ export class CierreService {
   }
 
   /**
+   * Montos del cierre de una caja: lo cobrado por medio (caja.calculo.ts) menos las devoluciones digitales
+   * (Yape, Plin, transferencia, tarjeta) hechas el día de Lima de la caja. Las de efectivo no se tocan:
+   * ya entran como egreso en calcularMontosCaja.
+   */
+  private async montosCierre(
+    cliente: ClienteCaja & Pick<Prisma.TransactionClient, 'devolucionPedido'>,
+    caja: { id: bigint; fecha: Date; apertura: unknown },
+  ): Promise<MontosCierre> {
+    const montos = await calcularMontosCaja(cliente, caja);
+    const { inicio, fin } = rangoDiaCaja(caja.fecha);
+    const filas = await cliente.devolucionPedido.findMany({
+      where: { creado_en: { gte: inicio, lt: fin } },
+      select: { medio: true, monto_devuelto: true, creado_en: true },
+    });
+    const devueltos = sumarDevolucionesDigitales(filas, inicio, fin);
+    const cobrados = {
+      yape: montos.sistemaYape,
+      plin: montos.sistemaPlin,
+      transferencia: montos.sistemaTransferencia,
+      tarjeta: montos.sistemaTarjeta,
+    };
+    const neto = (clave: ClaveDigitalCierre) => enPesos(aCentimos(cobrados[clave]) - aCentimos(devueltos[clave]));
+    return {
+      ...montos,
+      sistemaYape: neto('yape'),
+      sistemaPlin: neto('plin'),
+      sistemaTransferencia: neto('transferencia'),
+      sistemaTarjeta: neto('tarjeta'),
+      digitalesCobrados: cobrados,
+      digitalesDevueltos: devueltos,
+    };
+  }
+
+  /**
    * Calcula los montos esperados por el sistema para una caja dada (ver caja.calculo.ts).
    */
-  async calcularMontosSistema(cajaId: bigint): Promise<MontosSistema> {
+  async calcularMontosSistema(cajaId: bigint): Promise<MontosCierre> {
     const caja = await this.prisma.caja.findUnique({
       where: { id: cajaId },
     });
     if (!caja) {
       throw new NotFoundException('Caja no encontrada');
     }
-    return calcularMontosCaja(this.prisma, caja);
+    return this.montosCierre(this.prisma, caja);
   }
 
   /**
@@ -274,7 +321,7 @@ export class CierreService {
    */
   async obtenerDigitales() {
     const caja = await this.obtenerCajaAbierta();
-    const montos = await calcularMontosCaja(this.prisma, caja);
+    const montos = await this.montosCierre(this.prisma, caja);
     const ajustes = await this.ajustesVigentes(this.prisma, caja.id);
     const aceptados = digitalesAceptados(montos, ajustes);
     const delSistema = digitalesDelSistema(montos);
@@ -285,9 +332,18 @@ export class CierreService {
       medios: Object.fromEntries(
         MEDIOS_DIGITALES.map((m) => {
           const clave = CLAVE_DIGITAL[m];
+          const devuelto = montos.digitalesDevueltos[clave];
           return [
             clave,
-            { monto: aceptados[clave], sistema: delSistema[clave], cobros: cobros[clave], corregido: ajustes.has(m) },
+            {
+              monto: aceptados[clave],
+              // sistema = esperado digital: cobrado menos devoluciones del día (negativo en pantalla)
+              sistema: delSistema[clave],
+              cobrado: montos.digitalesCobrados[clave],
+              devuelto: devuelto === 0 ? 0 : -devuelto,
+              cobros: cobros[clave],
+              corregido: ajustes.has(m),
+            },
           ];
         }),
       ),
@@ -295,13 +351,14 @@ export class CierreService {
   }
 
   /**
-   * Devoluciones de pedidos desde el inicio (día de Lima) de la caja abierta. Solo informativo:
-   * el cuadre no las descuenta (las de efectivo ya salen como egreso de caja).
+   * Devoluciones de pedidos del día de Lima de la caja abierta. Las digitales ya se descuentan del
+   * esperado digital (montosCierre); las de efectivo salen como egreso de caja.
    */
   async listarDevolucionesTurno() {
     const caja = await this.obtenerCajaAbierta();
+    const { inicio, fin } = rangoDiaCaja(caja.fecha);
     const filas = await this.prisma.devolucionPedido.findMany({
-      where: { creado_en: { gte: inicioDiaLimaDeFecha(caja.fecha.toISOString().slice(0, 10)) } },
+      where: { creado_en: { gte: inicio, lt: fin } },
       include: { pedido: { select: { codigo: true } } },
       orderBy: { id: 'asc' },
     });
@@ -394,7 +451,7 @@ export class CierreService {
       );
       const autorizadoPor = supervisor.party_id ?? usuario.partyId;
 
-      const montos = await calcularMontosCaja(tx, caja);
+      const montos = await this.montosCierre(tx, caja);
       const ajustes = await this.ajustesVigentes(tx, caja.id);
       const anterior = digitalesAceptados(montos, ajustes)[clave];
       if (aCentimos(anterior) === aCentimos(dto.montoNuevo)) {
@@ -483,7 +540,7 @@ export class CierreService {
         await this.verificarPinSupervisor(pinSupervisor, usuario.partyId, ip, caja.id, tx);
       }
 
-      const montos = await calcularMontosCaja(tx, caja);
+      const montos = await this.montosCierre(tx, caja);
       const comparacion = compararConSistema(
         {
           efectivo: calcularTotalConteo(dto.conteo),
@@ -603,7 +660,7 @@ export class CierreService {
         medios = medios ?? (conteosCaja[0].medios as any);
       }
 
-      const montos = await calcularMontosCaja(tx, caja);
+      const montos = await this.montosCierre(tx, caja);
       // Digitales: el valor es el del sistema o el del último ajuste aprobado (nunca lo que teclee el navegador).
       // Si el navegador manda un monto distinto de ese, se rechaza: la corrección pasa por «Corregir» con motivo.
       const aceptados = digitalesAceptados(montos, await this.ajustesVigentes(tx, caja.id));
