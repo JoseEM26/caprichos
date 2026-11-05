@@ -18,7 +18,7 @@ import { OfertasAdminView } from './ofertas';
 import { IniciativasView } from './iniciativas';
 import { CreditosView } from './creditos';
 import { ComprasView } from './compras';
-import { AlmacenView } from './almacen';
+import { AlmacenView, AperturaDiaView } from './almacen';
 import { MensajesView } from './mensajes';
 import { NotificacionesView } from './notificaciones';
 import { PantallasView } from './pantallas';
@@ -230,6 +230,15 @@ export const MODULOS: DefinicionModulo[] = [
     ruta: '/admin/almacen',
     permisoMinimo: 'stock/ver',
     componente: AlmacenView,
+    icono: 'almacen',
+  },
+  {
+    clave: 'apertura',
+    nombre: 'Apertura del día',
+    grupo: 'Compras y stock',
+    ruta: '/admin/apertura',
+    permisoMinimo: 'almacen/apertura',
+    componente: AperturaDiaView,
     icono: 'almacen',
   },
   {

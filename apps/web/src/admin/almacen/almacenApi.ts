@@ -118,7 +118,30 @@ export interface ListarMovimientosRespuesta {
   movimientos: MovimientoItem[];
 }
 
+/** Conteo de apertura del día: un producto controlado con su saldo y si ya se contó hoy. */
+export interface AperturaProductoItem {
+  productoId: string;
+  nombre: string;
+  areaNombre: string | null;
+  saldo: number;
+  aperturaHoy: boolean;
+  aperturaCantidad: number | null;
+}
+
+export interface AperturaDiaRespuesta {
+  /** YYYY-MM-DD (día de Lima) */
+  fecha: string;
+  productos: AperturaProductoItem[];
+}
+
 export const almacenApi = {
+  /** Productos con control de stock propio y su conteo de apertura de hoy (permiso almacen/apertura). */
+  obtenerApertura: () => api.get<AperturaDiaRespuesta>('/admin/almacen/apertura'),
+
+  /** Registra el conteo de apertura de hoy; solo los productos enviados. */
+  registrarApertura: (items: Array<{ productoId: string; cantidad: number }>) =>
+    api.post<{ ok: true; registrados: number }>('/admin/almacen/apertura', { items }),
+
   listarMovimientos: async (filtros?: { tipo?: string; insumoId?: string; buscar?: string; desde?: string; hasta?: string }): Promise<ListarMovimientosRespuesta> => {
     const params = new URLSearchParams();
     if (filtros?.tipo && filtros.tipo !== 'Todos') params.append('tipo', filtros.tipo);

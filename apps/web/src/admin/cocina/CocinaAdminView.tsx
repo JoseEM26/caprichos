@@ -37,6 +37,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
+import { AvisoAperturaHoy } from '../almacen/AvisoAperturaHoy';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export type ModoCocina = 'area' | 'hist';
@@ -613,6 +614,9 @@ export function CocinaAdminView() {
         color: 'var(--cp-navy)',
       }}
     >
+      {/* 0. Conteo de apertura del día pendiente (productos con control de stock propio) */}
+      <AvisoAperturaHoy />
+
       {/* 1. Texto de ayuda de los tiempos */}
       <div style={{ fontSize: '13px', color: 'var(--cp-soft)', lineHeight: '1.5' }}>
         Cada área ve solo lo suyo y lo despeja con un toque cuando lo terminó. Los
