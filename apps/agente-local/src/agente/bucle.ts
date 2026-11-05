@@ -1,6 +1,7 @@
 import { rolDeTrabajo } from '@caprichos/compartido';
 import type { EstadoImpresora, ImpresoraReportada, RolImpresora, TrabajoImpresion } from '@caprichos/compartido';
 import type { ConfiguracionAgente } from '../config';
+import { ErrorRespuestaApi } from '../api/clienteApi';
 import type { IClienteApiImpresion } from '../api/clienteApi';
 import type { IDispositivoImpresora } from '../impresora/dispositivo.interface';
 import { ErrorImpresora } from '../impresora/dispositivo.interface';
@@ -26,6 +27,9 @@ export class AgenteLocalServicio {
   private readonly modoPorRol: boolean;
   /** Roles cuya impresora respondió lista en el último latido: solo esos toman trabajos. */
   private rolesListos: RolImpresora[] = [];
+  /** Trabajos ya impresos cuya confirmación (ok=true) aún no llegó al servidor. */
+  // ponytail: en memoria; si el programa se reinicia con alguno sin confirmar, puede salir dos veces (persistir en archivo si pasa)
+  private reportesPendientes: string[] = [];
   private estadosRol: ImpresoraReportada[] = [];
   private readonly logger: (
     nivel: 'info' | 'warn' | 'error' | 'debug',
@@ -122,7 +126,14 @@ export class AgenteLocalServicio {
       }
     }
 
-    // 2. Tomar trabajos pendientes
+    // 2. Confirmar lo impreso antes de tomar nada nuevo (si no, el servidor podría devolver a la cola un trabajo ya impreso)
+    await this.vaciarReportes();
+    if (this.reportesPendientes.length > 0) {
+      this.factorEsperaRed = Math.min(10, this.factorEsperaRed * 1.5);
+      return { trabajosProcesados: 0, errorRed: true };
+    }
+
+    // 3. Tomar trabajos pendientes
     let trabajos: TrabajoImpresion[] = [];
     try {
       // Una máquina que falla o no está lista no toma trabajos: los suyos esperan en la cola del servidor
@@ -149,7 +160,7 @@ export class AgenteLocalServicio {
 
     this.logger('info', `Tomados ${trabajos.length} trabajo(s) de impresión`);
 
-    // 3. Procesar cada trabajo en serie
+    // 4. Procesar cada trabajo en serie
     for (const trabajo of trabajos) {
       await this.procesarTrabajo(trabajo);
     }
@@ -166,8 +177,8 @@ export class AgenteLocalServicio {
       `Imprimiendo trabajo ${trabajo.id} (tipo: ${trabajo.tipo}, copia: ${trabajo.copia})`
     );
 
+    const rol: RolImpresora = rolDeTrabajo(trabajo.tipo);
     try {
-      const rol: RolImpresora = rolDeTrabajo(trabajo.tipo);
       const dispositivo = this.impresoras[rol];
       if (!dispositivo) {
         throw new ErrorImpresora(`La ${rol.toLowerCase()} no está configurada en este equipo`, 'desconectada');
@@ -179,21 +190,11 @@ export class AgenteLocalServicio {
             ? generarComandaSalonEscPos(trabajo.payload as any, this.config.ticketColumnas)
             : generarBytesTrabajo(trabajo.tipo, trabajo.payload as any, trabajo.copia, this.config.etiqueta);
       await dispositivo.escribir(bytes);
-
-      if (rol === 'ETIQUETERA') {
-        this.estadoImpresora = 'lista';
-        this.detalleEstadoImpresora = undefined;
-      }
-
-      // Reportar éxito
-      await this.clienteApi.reportarResultado(trabajo.id, true);
-      this.logger('info', `Trabajo ${trabajo.id} impreso y confirmado con éxito`);
     } catch (err: any) {
       const mensajeError = err.message || 'Error desconocido al imprimir';
 
       // Una máquina que falla deja de tomar trabajos hasta que el próximo latido la vea lista
-      const rolFallido: RolImpresora = rolDeTrabajo(trabajo.tipo);
-      this.rolesListos = this.rolesListos.filter((r) => r !== rolFallido);
+      this.rolesListos = this.rolesListos.filter((r) => r !== rol);
       if (err instanceof ErrorImpresora) {
         this.estadoImpresora = err.estado;
         this.detalleEstadoImpresora = err.message;
@@ -207,7 +208,8 @@ export class AgenteLocalServicio {
         `Fallo al imprimir trabajo ${trabajo.id} (${this.estadoImpresora}): ${mensajeError}`
       );
 
-      // Reportar fallo al servidor para que contabilice el intento sin perder el trabajo
+      // Reportar fallo al servidor para que contabilice el intento sin perder el trabajo.
+      // Se reporta una sola vez: ok=false suma intentos en el servidor, no es idempotente.
       try {
         await this.clienteApi.reportarResultado(trabajo.id, false, mensajeError);
       } catch (errReporte: any) {
@@ -215,6 +217,39 @@ export class AgenteLocalServicio {
           'warn',
           `No se pudo reportar el fallo del trabajo ${trabajo.id} al servidor: ${errReporte.message}`
         );
+      }
+      return;
+    }
+
+    // Ya salió de la impresora: nunca se vuelve a imprimir por un fallo al confirmarlo.
+    if (rol === 'ETIQUETERA') {
+      this.estadoImpresora = 'lista';
+      this.detalleEstadoImpresora = undefined;
+    }
+    this.reportesPendientes.push(trabajo.id);
+    await this.vaciarReportes();
+  }
+
+  /**
+   * Confirma al servidor los trabajos impresos (ok=true, idempotente: reintentarlo es seguro).
+   * Lo que no se confirma se reintenta antes de volver a tomar trabajos, así el servidor no puede
+   * devolver a la cola un trabajo que ya salió. Un 4xx (p. ej. trabajo borrado) se descarta.
+   */
+  private async vaciarReportes(): Promise<void> {
+    while (this.reportesPendientes.length > 0) {
+      const id = this.reportesPendientes[0];
+      try {
+        await this.clienteApi.reportarResultado(id, true);
+        this.reportesPendientes.shift();
+        this.logger('info', `Trabajo ${id} impreso y confirmado con éxito`);
+      } catch (err: any) {
+        if (err instanceof ErrorRespuestaApi && err.status >= 400 && err.status < 500) {
+          this.reportesPendientes.shift();
+          this.logger('warn', `El servidor rechazó la confirmación del trabajo ${id} (${err.status}): se descarta`);
+          continue;
+        }
+        this.logger('warn', `No se pudo confirmar el trabajo ${id}; se reintenta en el próximo ciclo: ${err.message}`);
+        return;
       }
     }
   }
