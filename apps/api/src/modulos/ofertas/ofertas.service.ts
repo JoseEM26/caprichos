@@ -1585,6 +1585,13 @@ export class OfertasService {
     clienteConSesion?: boolean;
   }): Promise<DesgloseDescuentosPedido> {
     const { subtotal, lineas, canal, cuponCodigo, clientePartyId, clienteConSesion } = params;
+
+    // Bot de WhatsApp (decisión del dueño): sin promociones, combos, 2x1 ni cupones. El total es el precio de lista.
+    // Los pedidos de carta, caja y mozo no cambian. El envío y el pedido mínimo de delivery se calculan aparte.
+    if (canal === 'BOT' || canal === 'WHATSAPP') {
+      return { descuentoTotal: 0, ofertaId: null, cuponId: null, cuponEmitidoId: null, detalles: [] };
+    }
+
     const regla = await this.obtenerReglasAcumulacion();
     const ahora = new Date();
 

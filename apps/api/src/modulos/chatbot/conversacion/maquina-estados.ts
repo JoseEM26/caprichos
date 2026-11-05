@@ -1,6 +1,7 @@
-import { accionesPaginaCarrusel, LIMITES_CARRUSEL, ordenarPorVentas, tarjetaProducto, urlPublicaFoto } from '../servicios/carrusel.util';
+import { accionesPaginaCarrusel, LIMITES_CARRUSEL, ordenarPorVentas, tarjetaProducto } from '../servicios/carrusel.util';
 import {
   BOTON_HABLAR_PERSONA,
+  BOTON_HACER_PEDIDO,
   BOTON_LISTA_CATEGORIAS,
   BOTON_LISTA_MENU,
   BOTON_LISTA_PREGUNTAS,
@@ -17,7 +18,6 @@ import {
   TEXTO_ASISTIDO_FRASE_FIJA,
   TEXTOS_BOT,
   TEXTOS_SOLO_MENUS,
-  lineaPromoSaludo,
   TITULO_SECCION_CATEGORIAS,
   TITULO_SECCION_MENU,
   TITULO_SECCION_PREGUNTAS,
@@ -240,7 +240,10 @@ const PALABRAS_DESPEDIDA = [
   'nos vemos',
 ];
 
-/** Bot solo con menús: true = el motor nuevo atiende todo; false = motor anterior (IA, pedidos por chat). */
+/**
+ * Bot con menú (true): menú nuevo, pedido y pago por chat del motor anterior, sin promociones, puntos,
+ * reservas por chat ni IA. false = motor anterior completo (IA, modo asistido, cambios, reservas, puntos).
+ */
 export const MODO_SOLO_MENUS = true;
 
 /** Palabras que sí significan «hablar con una persona» en texto libre (sin «atención», «ayuda», etc.). */
@@ -378,8 +381,7 @@ export function transicionarEstado(
     };
   }
 
-  // 1.b Bot solo con menús (decisión del dueño): el camino normal no usa IA ni toma pedidos por chat.
-  // Con MODO_SOLO_MENUS en false se vuelve al motor anterior (código que queda como respaldo).
+  // 1.b Bot con menú (decisión del dueño): menú + pedido y pago por chat; sin IA. Con MODO_SOLO_MENUS en false, motor anterior.
   if (MODO_SOLO_MENUS) {
     // Chat tomado por una persona: el bot calla (misma regla de antes)
     if (flujo.estado === 'ATENCION_PERSONA' && (contexto.chatTomado || contexto.humanoHabloReciente)) {
@@ -1805,7 +1807,7 @@ export function transicionarEstado(
   };
 }
 
-/** Carrusel de «Ver la carta»: productos destacados (más vendidos primero) y el enlace a la carta web. */
+/** Carrusel de «Ver la carta»: productos destacados (más vendidos primero), con «Pedir este» en cada tarjeta. */
 function accionesCartaSoloMenus(contexto: ContextoConversacion, url: string): any[] {
   const unicos = new Map<string, any>();
   for (const c of contexto.categoriasCarta || []) {
@@ -1817,10 +1819,7 @@ function accionesCartaSoloMenus(contexto: ContextoConversacion, url: string): an
     return [{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.cartaSinProductos(url), botones: [BOTON_VOLVER_MENU] }];
   }
   const destacados = ordenarPorVentas([...unicos.values()], contexto.ventasProductos).slice(0, LIMITES_CARRUSEL.max);
-  const tarjetas = destacados.map((p) => ({
-    ...tarjetaProducto(p, contexto.cartaUrlPublica),
-    boton: { id: `carta_p_${p.id}`, titulo: 'Ver en la carta' },
-  }));
+  const tarjetas = destacados.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica));
   const cuerpo = TEXTOS_SOLO_MENUS.cartaDestacados(url);
   if (tarjetas.length < LIMITES_CARRUSEL.min) {
     return [{ tipo: 'enviarBotones', texto: cuerpo, botones: [BOTON_VOLVER_MENU] }];
@@ -1838,10 +1837,14 @@ function accionesCartaSoloMenus(contexto: ContextoConversacion, url: string): an
   ];
 }
 
-/** Respuesta de una pregunta frecuente (lactosa, bebidas calientes, postres, pagos, delivery, promociones). */
+/** Respuesta de una pregunta frecuente (lactosa, bebidas calientes, postres, pagos, delivery). */
 function respuestaFaqSoloMenus(clave: string, contexto: ContextoConversacion): any {
   const botones = [BOTON_OTRAS_PREGUNTAS, BOTON_VOLVER_MENU];
   const enviar = (texto: string) => ({ tipo: 'enviarBotones', texto, botones });
+
+  if (clave === 'horario') {
+    return enviar(TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal));
+  }
 
   if (clave === 'lactosa') {
     let opcionesLeche: { nombre: string; extra: number; disponible: boolean }[] = [];
@@ -1886,24 +1889,20 @@ function respuestaFaqSoloMenus(clave: string, contexto: ContextoConversacion): a
     return enviar(TEXTOS_BOT.faqPagos(contexto.datosLocalPublicos?.mediosPago || {}));
   }
 
-  if (clave === 'delivery') {
-    return enviar(
-      TEXTOS_BOT.faqDelivery(contexto.datosLocalPublicos?.pedidoMinimo, contexto.datosLocalPublicos?.envioGratisDesde),
-    );
-  }
-
-  return enviar(TEXTOS_BOT.promocionesHoy(contexto.ofertas || []));
+  return enviar(
+    TEXTOS_BOT.faqDelivery(contexto.datosLocalPublicos?.pedidoMinimo, contexto.datosLocalPublicos?.envioGratisDesde),
+  );
 }
 
 /** Clave de la pregunta frecuente pedida (por botón o por palabra clave), o null. */
 function claveFaqSoloMenus(id: string, texto: string): string | null {
   const porBoton: Record<string, string> = {
+    faq_horario: 'horario',
     faq_lactosa: 'lactosa',
     faq_calientes: 'calientes',
     faq_postres: 'postres',
     faq_pagos: 'pagos',
     faq_delivery: 'delivery',
-    faq_promos: 'promos',
   };
   if (porBoton[id]) return porBoton[id];
   const reglas: [string, string[]][] = [
@@ -1912,16 +1911,27 @@ function claveFaqSoloMenus(id: string, texto: string): string | null {
     ['postres', ['postres', 'waffles', 'dulces', 'donas']],
     ['pagos', ['pago', 'pagos', 'yape', 'plin', 'tarjeta', 'efectivo']],
     ['delivery', ['delivery', 'costo envio', 'envio gratis', 'zonas reparto']],
-    ['promos', PALABRAS_PROMOS],
   ];
   const hit = reglas.find(([, palabras]) => coincideAlgunaPalabra(texto, palabras));
   return hit ? hit[0] : null;
 }
 
+/** Flujo de un subflujo modular (pedido o pago) si puede atender la entrada; null si no. */
+function atenderConSubflujo(
+  nombre: 'pedido' | 'pago',
+  flujo: FlujoConversacion,
+  entrada: EntradaNormalizada,
+  contexto: ContextoConversacion,
+): ResultadoTransicion | null {
+  const sub = RegistroSubFlujos.obtenerFlujos().find((f) => f.nombre === nombre);
+  if (!sub || !sub.puedeManejar(flujo, entrada, contexto)) return null;
+  return sub.transicionar(flujo, entrada, contexto);
+}
+
 /**
- * Motor del bot solo con menús. Responde a botones y a texto libre con el menú (un solo mensaje).
- * No toma pedidos, no toca puntos ni reservas, no llama a la IA. El silencio de ATENCION_PERSONA
- * (chat tomado por una persona) se decide antes, en transicionarEstado.
+ * Motor del bot con menú: pedido por chat (flujo de pedido del motor anterior), pago de pedidos y menú.
+ * Sin promociones, descuentos, cupones, puntos ni IA. Un solo mensaje por turno cuando se puede.
+ * El silencio de ATENCION_PERSONA (chat tomado por una persona) se decide antes, en transicionarEstado.
  */
 function transicionarSoloMenus(
   flujo: FlujoConversacion,
@@ -1930,8 +1940,10 @@ function transicionarSoloMenus(
 ): ResultadoTransicion {
   const texto = entrada.texto;
   const id = entrada.id ?? '';
-  const url = contexto.cartaUrlPublica || 'https://caprichos.pe';
+  const url = contexto.cartaUrlPublica || 'https://caprichos.pe/carta';
   const enPersona = flujo.estado === 'ATENCION_PERSONA';
+  const enPedido = String(flujo.estado).startsWith('PEDIDO') || Boolean(flujo.pedido);
+  const enPago = String(flujo.estado).startsWith('PAGO') || flujo.estado === 'VALIDAR_PAGO' || Boolean(flujo.pago?.pedidoCodigo);
   const esId = (...ids: string[]) => ids.includes(id);
   const hay = (palabras: string[]) => coincideAlgunaPalabra(texto, palabras);
 
@@ -1944,48 +1956,33 @@ function transicionarSoloMenus(
   const saludo = () => {
     const cuerpo = [
       TEXTOS_BOT.saludoBienvenida(contexto.nombreCliente, contexto.datosLocal, contexto.textosPersonalizados?.chatbot_texto_bienvenida),
-      lineaPromoSaludo(contexto.promoSaludo),
-      TEXTOS_SOLO_MENUS.lineaPuntosSaludo(url),
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-    return respuesta(
-      [{ tipo: 'enviarLista', texto: cuerpo, botonTexto: BOTON_LISTA_MENU, tituloSeccion: TITULO_SECCION_MENU, filas: FILAS_MENU_PRINCIPAL }],
-    );
+      TEXTOS_SOLO_MENUS.lineaCartaSaludo(url),
+    ].join('\n\n');
+    return respuesta([
+      { tipo: 'enviarLista', texto: cuerpo, botonTexto: BOTON_LISTA_MENU, tituloSeccion: TITULO_SECCION_MENU, filas: FILAS_MENU_PRINCIPAL },
+    ]);
   };
 
-  // 0. Saludo y regreso al menú
-  if (esId('menu', 'btn_menu', 'volver_menu', 'inicio') || esSaludoPuro(texto) || texto === '0') {
+  // 0. Pedido en curso que lleva más de 30 minutos sin respuesta: se descarta el carrito y se vuelve al menú
+  if (contexto.inactividadExpirada && enPedido) {
+    return {
+      nuevoEstado: 'MENU',
+      acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoExpiradoInactividad(), botones: BOTONES_MENU_PRINCIPAL }],
+      nuevoFlujo: { ...flujo, estado: 'MENU', pedido: null, repreguntasFallidas: 0 },
+    };
+  }
+
+  // Saludo y regreso al menú (fuera de un pedido o pago en curso: ahí lo atiende el flujo de pedido)
+  if (!enPedido && !enPago && (esId('menu', 'btn_menu', 'volver_menu', 'inicio') || esSaludoPuro(texto) || texto === '0')) {
     return saludo();
   }
 
-  // Con una persona atendiendo, el texto libre (que no sea saludo) no se contesta salvo modo asistido
-  // Con una persona atendiendo, el texto libre no se contesta salvo modo asistido (regla de siempre)
+  // Con una persona atendiendo, el texto libre no se contesta (regla de siempre)
   if (enPersona && !id && !contexto.modoAsistido) {
     return { nuevoEstado: 'ATENCION_PERSONA', acciones: [], nuevoFlujo: flujo };
   }
 
-  // 1. Producto de la carta (botón del carrusel): el enlace a la carta, sin pedir por chat
-  if (id.startsWith('carta_p_')) {
-    const pid = id.slice('carta_p_'.length);
-    let nombre: string | null = null;
-    for (const c of contexto.categoriasCarta || []) {
-      const p = (c.productos || []).find((x: any) => String(x.id) === pid);
-      if (p) {
-        nombre = String(p.nombre);
-        break;
-      }
-    }
-    return respuesta([
-      {
-        tipo: 'enviarBotones',
-        texto: nombre ? TEXTOS_SOLO_MENUS.productoEnCarta(nombre, url) : TEXTOS_SOLO_MENUS.cartaDestacados(url),
-        botones: [BOTON_VOLVER_MENU],
-      },
-    ]);
-  }
-
-  // 2. Queja escrita: urgente, a una persona (igual que antes)
+  // 1. Queja escrita: urgente, a una persona (también en mitad de un pedido)
   if (hay(PALABRAS_QUEJA)) {
     return {
       nuevoEstado: 'ATENCION_PERSONA',
@@ -2004,7 +2001,7 @@ function transicionarSoloMenus(
     };
   }
 
-  // 3. Hablar con una persona
+  // 2. Hablar con una persona (también en mitad de un pedido)
   if (esId('persona', 'btn_persona', 'btn_asi_persona', 'btn_esp_persona') || hay(PALABRAS_PERSONA_SOLO)) {
     const estaCerrado = contexto.datosLocal && contexto.datosLocal.abierta === false;
     const horaAbre = contexto.datosLocal?.abre || '15:00';
@@ -2028,40 +2025,43 @@ function transicionarSoloMenus(
     };
   }
 
-  // 4. Cambiar dirección o cancelar/cambiar pedido: pasa a una persona
+  // 3. Pedido o pago en curso: el flujo del motor anterior atiende la respuesta (carrito, dirección, medio de pago, voucher)
+  if (enPedido) {
+    const r = atenderConSubflujo('pedido', flujo, entrada, contexto);
+    if (r) return r;
+  }
+  if (enPago) {
+    const r = atenderConSubflujo('pago', flujo, entrada, contexto);
+    if (r) return r;
+  }
+
+  // 4. Hacer pedido: botón «Hacer pedido», «Pedir este» de la carta o texto como «quiero pedir»
+  if (esId('pedir', 'btn_pedido', 'btn_pedir') || id.startsWith('ped_') || hay([...PALABRAS_PEDIDO, 'nuevo pedido'])) {
+    // Desde el menú, el flujo de pedido arranca como si viniera del menú
+    const r = atenderConSubflujo('pedido', { ...flujo, estado: 'MENU', pedido: null }, entrada, contexto);
+    if (r) return r;
+  }
+
+  // 6. Cambiar dirección o anular pedido: pasa a una persona
   const pideCambioDir = esId('c_dir') || hay(PALABRAS_CAMBIO_DIR);
   const pideCambioPed = esId('c_ped') || hay([...PALABRAS_CAMBIO_PED, 'cancelar', 'anular']);
   if (pideCambioDir || pideCambioPed) {
     const enRuta = ['en_camino', 'ruta'].includes(String(contexto.pedidoActivo?.estado || '').toLowerCase());
     const motivo = pideCambioDir ? 'CAMBIO_DIRECCION' : 'CAMBIO_CANCELACION_PEDIDO';
-    const texto = pideCambioDir
+    const textoRespuesta = pideCambioDir
       ? TEXTOS_BOT.miPedidoCambioDireccion(enRuta)
       : TEXTOS_BOT.miPedidoCambioOAnulacion(enRuta);
     return {
       nuevoEstado: 'ATENCION_PERSONA',
       acciones: [
         { tipo: 'pasarAPersona', motivo, mensajeCliente: entrada.textoOriginal },
-        { tipo: 'enviarTexto', texto },
+        { tipo: 'enviarTexto', texto: textoRespuesta },
       ],
       nuevoFlujo: { ...flujo, estado: 'ATENCION_PERSONA', pedido: null, repreguntasFallidas: 0 },
     };
   }
 
-  // 5. Horario y ubicación (antes que «estado», porque «donde estan» contiene «donde esta»)
-  if (
-    esId('horario', 'btn_horario', 'btn_horario_ubicacion', 'btn_ubicacion', 'ubicacion', 'faq_horario', 'faq_ubicacion') ||
-    hay(['horario', 'ubicacion', 'ubicado', 'donde estan', 'mapa', 'como llego', 'abren', 'cierran', 'hasta que hora', 'direccion'])
-  ) {
-    return respuesta([
-      {
-        tipo: 'enviarBotones',
-        texto: TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal),
-        botones: [BOTON_VER_CARTA, BOTON_VOLVER_MENU],
-      },
-    ]);
-  }
-
-  // 6. Estado de mi pedido (el activo de este número)
+  // 7. Estado de mi pedido (el activo de este número)
   if (
     esId('mipedido', 'btn_mipedido', 'btn_asi_pedido', 'c_eta') ||
     id.startsWith('ord_') ||
@@ -2073,30 +2073,25 @@ function transicionarSoloMenus(
     }
     const p = contexto.pedidoActivo;
     if (!p) {
-      return respuesta([
-        { tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.sinPedidoActivo(url), botones: [BOTON_VER_CARTA, BOTON_VOLVER_MENU] },
-      ]);
+      return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.sinPedidoActivo(url), botones: [BOTON_HACER_PEDIDO, BOTON_VOLVER_MENU] }]);
     }
-    // Enlace de seguimiento del propio pedido activo (token firmado por su id); sin origen, el enlace genérico
     const enlaceSeguimiento =
       contexto.cartaUrlPublica && p.id != null ? enlaceSeguimientoCarta(contexto.cartaUrlPublica, String(p.codigo), p.id) : url;
     return respuesta([
       {
         tipo: 'enviarBotones',
-        texto: TEXTOS_SOLO_MENUS.estadoPedido(String(p.codigo), String(p.estado), p.pago_estado, enlaceSeguimiento),
+        texto: `${TEXTOS_SOLO_MENUS.estadoPedido(String(p.codigo), String(p.estado), p.pago_estado)}\nSíguelo aquí: ${enlaceSeguimiento}`,
         botones: [BOTON_VOLVER_MENU, BOTON_HABLAR_PERSONA],
       },
     ]);
   }
 
-  // 7. Quiere pedir: el pedido es la carta virtual web
-  if (esId('pedir', 'btn_pedido', 'btn_pedir', 'delivery', 'recojo') || hay([...PALABRAS_PEDIDO, 'nuevo pedido'])) {
-    return respuesta([
-      { tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.pedidoEnCarta(url), botones: [BOTON_VOLVER_MENU, BOTON_HABLAR_PERSONA] },
-    ]);
+  // 8. Horario y ubicación: ahora es una pregunta frecuente (también por texto)
+  if (hay(['horario', 'ubicacion', 'ubicado', 'donde estan', 'mapa', 'como llego', 'abren', 'cierran', 'hasta que hora', 'direccion'])) {
+    return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_BOT.horarioYUbicacion(contexto.datosLocal), botones: [BOTON_OTRAS_PREGUNTAS, BOTON_VOLVER_MENU] }]);
   }
 
-  // 8. Reservar mesa: por teléfono o con una persona
+  // 9. Reservar mesa: por teléfono o con una persona
   if (esId('reservar', 'btn_reserva') || hay(PALABRAS_RESERVA)) {
     return respuesta([
       {
@@ -2105,12 +2100,6 @@ function transicionarSoloMenus(
         botones: [BOTON_HABLAR_PERSONA, BOTON_VOLVER_MENU],
       },
     ]);
-  }
-
-  // 9. Puntos: se ven y canjean en la carta virtual (abre el panel de puntos)
-  if (esId('mispuntos') || /\bpuntos?\b/.test(texto)) {
-    const enlace = `${url}${url.includes('?') ? '&' : '?'}puntos=1`;
-    return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.puntosEnCarta(enlace), botones: [BOTON_VOLVER_MENU] }]);
   }
 
   // 10. Preguntas frecuentes concretas
@@ -2154,7 +2143,7 @@ function transicionarSoloMenus(
   // 14. Primer contacto sin intención clara: saludo con el menú
   if (flujo.estado === 'INICIO') return saludo();
 
-  // 15. Cualquier otro texto o botón: el menú de botones, en un solo mensaje
+  // 15. Cualquier otro texto o botón: el menú, en un solo mensaje
   return respuesta([
     {
       tipo: 'enviarLista',

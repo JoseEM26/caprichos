@@ -1,7 +1,6 @@
 import { generarTokenSeguimiento } from '../../../pedidos/seguimiento.tokens';
 import { MODO_SOLO_MENUS, transicionarEstado } from '../maquina-estados';
 import { normalizarEntrada } from '../normalizador-entrada.util';
-import { lineaPromoSaludo } from '../textos-bot';
 import { ContextoConversacion } from '../tipos-conversacion';
 
 const URL_CARTA = 'https://carta.test';
@@ -45,70 +44,98 @@ const ejecutar = (entrada: Parameters<typeof normalizarEntrada>[0], contexto = c
 
 const tipos = (r: { acciones: any[] }) => r.acciones.map((a) => a.tipo);
 
-describe('Bot solo con menús (decisión del dueño)', () => {
+describe('Bot con menú (decisión del dueño)', () => {
   it('el motor nuevo está activo', () => {
     expect(MODO_SOLO_MENUS).toBe(true);
   });
 
-  describe('saludo', () => {
-    it('muestra el menú de 5 opciones y agrega la línea de puntos y pedidos con el enlace a la carta', () => {
+  describe('saludo y menú', () => {
+    it('el menú tiene 5 opciones: hacer pedido, carta, estado, preguntas frecuentes y persona', () => {
       const r = ejecutar({ texto: 'Hola' });
       expect(tipos(r)).toEqual(['enviarLista']);
       const accion: any = r.acciones[0];
-      expect(accion.texto).toContain('Soy Capri');
-      expect(accion.texto).toContain(`puedes pedir y ver o canjear tus puntos en nuestra carta virtual: ${URL_CARTA}`);
-      expect(accion.texto.endsWith(URL_CARTA)).toBe(true);
-      expect(accion.filas.map((f: any) => f.id)).toEqual(['horario', 'carta', 'mipedido', 'persona', 'preguntar']);
+      expect(accion.filas.map((f: any) => f.id)).toEqual(['pedir', 'carta', 'mipedido', 'preguntar', 'persona']);
+      expect(accion.filas.map((f: any) => f.titulo)).toEqual([
+        'Hacer pedido',
+        'Ver la carta',
+        'Estado de mi pedido',
+        'Preguntas frecuentes',
+        'Hablar con una persona',
+      ]);
+      expect(accion.filas.every((f: any) => f.titulo.length <= 24)).toBe(true);
       expect(r.nuevoEstado).toBe('MENU');
     });
 
-    it('sin promoción marcada el saludo queda igual (lineaPromoSaludo devuelve null)', () => {
-      expect(lineaPromoSaludo()).toBeNull();
-      expect(lineaPromoSaludo(null)).toBeNull();
-      const conPromoNula = (ejecutar({ texto: 'Hola' }, contextoBase({ promoSaludo: null })).acciones[0] as any).texto;
-      const sinCampo = (ejecutar({ texto: 'Hola' }).acciones[0] as any).texto;
-      expect(conPromoNula).not.toContain('🎁');
-      expect(conPromoNula).toBe(sinCampo);
-    });
-
-    it('con promoción marcada agrega su línea con el enlace a la carta antes de los puntos', () => {
-      const promo = { texto: '25 % de descuento en tu primera compra en nuestra carta online.', enlaceCarta: URL_CARTA };
-      const r = ejecutar({ texto: 'Hola' }, contextoBase({ promoSaludo: promo }));
-      const texto: string = (r.acciones[0] as any).texto;
-      expect(lineaPromoSaludo(promo)).toBe(`🎁 ${promo.texto}\n👉 ${URL_CARTA}`);
-      expect(texto).toContain(`🎁 ${promo.texto}\n👉 ${URL_CARTA}`);
-      expect(texto.indexOf('🎁')).toBeLessThan(texto.indexOf('puntos en nuestra carta virtual'));
+    it('el saludo es corto: una línea que invita a la carta virtual, sin promociones ni puntos', () => {
+      const texto: string = (ejecutar({ texto: 'Hola' }).acciones[0] as any).texto;
+      expect(texto).toContain('Soy Capri');
+      expect(texto.endsWith(`💛 Mira nuestra carta virtual: ${URL_CARTA}`)).toBe(true);
+      expect(texto).not.toMatch(/CAPRICHOS DEL MES|promo|puntos|descuento|🎁/i);
     });
 
     it('el primer contacto (INICIO) con texto sin intención también saluda', () => {
       const r = ejecutar({ texto: 'buenas, qué tal' }, contextoBase(), { estado: 'INICIO', repreguntasFallidas: 0 });
       expect(tipos(r)).toEqual(['enviarLista']);
     });
+
+    it('un texto que no es botón responde con el menú, en un solo mensaje', () => {
+      const r = ejecutar({ texto: 'asdfghjk' }, contextoBase(), { estado: 'MENU', repreguntasFallidas: 0 });
+      expect(tipos(r)).toEqual(['enviarLista']);
+      expect((r.acciones[0] as any).texto).toContain('Elige una opción del menú');
+    });
   });
 
-  describe('pedidos por chat fuera', () => {
-    it('«quiero pedir» responde con el enlace a la carta web y no abre ningún flujo de pedido', () => {
-      const r = ejecutar({ texto: 'quiero pedir' });
+  describe('hacer pedido por chat (flujo de pedido del motor anterior)', () => {
+    it('«Hacer pedido» abre el pedido: primero la modalidad, en un solo mensaje', () => {
+      const r = ejecutar({ listRowId: 'pedir' });
       expect(tipos(r)).toEqual(['enviarBotones']);
-      expect((r.acciones[0] as any).texto).toContain(URL_CARTA);
-      expect(r.nuevoFlujo.pedido ?? null).toBeNull();
-      expect(r.nuevoEstado).toBe('MENU');
+      expect(r.nuevoEstado).toBe('PEDIDO_MODALIDAD');
+      expect(r.nuevoFlujo.pedido?.estadoInterno).toBe('PEDIDO_MODALIDAD');
+      expect((r.acciones[0] as any).botones.map((b: any) => b.id)).toEqual(['ped_mod_delivery', 'ped_mod_recojer']);
     });
 
-    it('el botón «Hacer un pedido» de un mensaje viejo también lleva a la carta', () => {
-      const r = ejecutar({ buttonPayload: 'btn_pedido', texto: 'Hacer un pedido' });
-      expect((r.acciones[0] as any).texto).toContain(URL_CARTA);
+    it('el texto «quiero pedir» también abre el pedido', () => {
+      const r = ejecutar({ texto: 'quiero pedir' });
+      expect(r.nuevoEstado).toBe('PEDIDO_MODALIDAD');
+    });
+
+    it('a mitad de un pedido, la respuesta sigue en el pedido y no vuelve al menú', () => {
+      const flujo: any = {
+        estado: 'PEDIDO_MODALIDAD',
+        repreguntasFallidas: 0,
+        pedido: { estadoInterno: 'PEDIDO_MODALIDAD', items: [] },
+      };
+      const r = ejecutar({ buttonPayload: 'ped_mod_recojer' }, contextoBase(), flujo);
+      expect(r.nuevoEstado).not.toBe('MENU');
+      expect(r.nuevoEstado.startsWith('PEDIDO_')).toBe(true);
+    });
+
+    it('«Pedir este» de la carta abre el pedido de ese producto', () => {
+      const r = ejecutar({ buttonPayload: 'ped_prod_2', texto: 'Pedir este' });
+      expect(r.nuevoEstado.startsWith('PEDIDO_')).toBe(true);
+      expect(JSON.stringify(r.acciones)).not.toMatch(/crearPedido/);
+    });
+
+    it('un pedido en curso no se convierte en la carta ni en el menú por texto de preguntas', () => {
+      const flujo: any = { estado: 'PEDIDO_CATEGORIAS', repreguntasFallidas: 0, pedido: { estadoInterno: 'PEDIDO_CATEGORIAS', items: [] } };
+      const r = ejecutar({ texto: 'ver la carta' }, contextoBase(), flujo);
+      expect(r.nuevoEstado.startsWith('PEDIDO_')).toBe(true);
+    });
+
+    it('nunca menciona promociones, descuentos, cupones ni puntos en el flujo de pedido', () => {
+      const r = ejecutar({ listRowId: 'pedir' }, contextoBase({ ofertas: [{ id: 'o1', nombre: '2x1', tipo: 'LLEVA_PAGA', lleva: 2, paga: 1, activo: true } as any] }));
+      expect(JSON.stringify(r.acciones)).not.toMatch(/promo|descuento|cup[oó]n|ahorr|puntos|oferta/i);
     });
   });
 
   describe('Ver la carta', () => {
-    it('envía un carrusel con los productos más vendidos (sin agotados) y el enlace a la carta', () => {
+    it('envía un carrusel con los productos más vendidos (sin agotados), con «Pedir este» en cada tarjeta', () => {
       const r = ejecutar({ listRowId: 'carta' });
       expect(tipos(r)).toEqual(['enviarCarrusel']);
       const carga = (r.acciones[0] as any).carga;
       expect(carga.cuerpo).toContain(URL_CARTA);
       expect(carga.tarjetas.map((t: any) => t.nombre)).toEqual(['Frappe Fresa', 'Waffle Nutella', 'Frappe Maracuyá']);
-      expect(carga.tarjetas.every((t: any) => t.boton.id.startsWith('carta_p_'))).toBe(true);
+      expect(carga.tarjetas.every((t: any) => t.boton.id.startsWith('ped_prod_') && t.boton.titulo === 'Pedir este')).toBe(true);
       expect(carga.botonComun.id).toBe('btn_menu');
     });
 
@@ -123,45 +150,61 @@ describe('Bot solo con menús (decisión del dueño)', () => {
       expect(tipos(r)).toEqual(['enviarBotones']);
       expect((r.acciones[0] as any).texto).toContain(URL_CARTA);
     });
-
-    it('tocar un producto del carrusel da el enlace a la carta, sin entrar a un pedido', () => {
-      const r = ejecutar({ buttonPayload: 'carta_p_2', texto: 'Ver en la carta' });
-      expect(tipos(r)).toEqual(['enviarBotones']);
-      const texto = (r.acciones[0] as any).texto as string;
-      expect(texto).toContain('Frappe Fresa');
-      expect(texto).toContain(URL_CARTA);
-    });
   });
 
   describe('estado de mi pedido', () => {
-    it('con pedido activo informa el estado y lleva a la carta web', () => {
-      const r = ejecutar({ listRowId: 'mipedido' }, contextoBase({ pedidoActivo: { codigo: 'CP-0110', estado: 'COCINA', pago_estado: 'PAGADO' } }));
+    it('con pedido activo informa el estado con el enlace de seguimiento firmado de ese pedido', () => {
+      const r = ejecutar({ listRowId: 'mipedido' }, contextoBase({ pedidoActivo: { id: 7n, codigo: 'CP-0110', estado: 'COCINA', pago_estado: 'PAGADO' } }));
       expect(tipos(r)).toEqual(['enviarBotones']);
       const texto = (r.acciones[0] as any).texto as string;
       expect(texto).toContain('CP-0110');
       expect(texto).toContain('COCINA');
-      expect(texto).toContain(URL_CARTA);
-    });
-
-    it('el enlace es el seguimiento firmado de ese pedido, no el genérico de la carta', () => {
-      const r = ejecutar({ listRowId: 'mipedido' }, contextoBase({ pedidoActivo: { id: 7n, codigo: 'CP-0110', estado: 'COCINA', pago_estado: null } }));
-      const texto = (r.acciones[0] as any).texto as string;
       expect(texto).toContain(`${URL_CARTA}/?seguimiento=CP-0110&t=${generarTokenSeguimiento(7n)}`);
     });
 
-    it('sin pedido activo lo dice y ofrece la carta', () => {
+    it('sin pedido activo lo dice y ofrece hacer pedido', () => {
       const r = ejecutar({ listRowId: 'mipedido' }, contextoBase({ pedidoActivo: null }));
-      expect((r.acciones[0] as any).texto).toContain('No encontramos un pedido activo');
+      expect((r.acciones[0] as any).texto).toContain('No tienes un pedido activo');
+      expect((r.acciones[0] as any).botones.map((b: any) => b.id)).toContain('pedir');
     });
   });
 
-  describe('horario, reservas, puntos, cambios y personas', () => {
-    it('horario y ubicación con los datos del local', () => {
-      const r = ejecutar({ listRowId: 'horario' });
+  describe('preguntas frecuentes', () => {
+    it('la lista tiene una sola fila de horario y ubicación, sin promociones', () => {
+      const r = ejecutar({ listRowId: 'preguntar' });
+      const ids = (r.acciones[0] as any).filas.map((f: any) => f.id);
+      expect(ids.filter((id: string) => id === 'faq_horario')).toHaveLength(1);
+      expect(ids).not.toEqual(expect.arrayContaining(['faq_ubicacion', 'faq_promos']));
+      expect(ids).toEqual(expect.arrayContaining(['faq_pagos', 'faq_delivery', 'faq_lactosa', 'faq_calientes', 'faq_postres']));
+      expect((r.acciones[0] as any).filas.every((f: any) => f.titulo.length <= 24)).toBe(true);
+    });
+
+    it('horario y ubicación se responden juntos desde la FAQ unificada', () => {
+      const r = ejecutar({ listRowId: 'faq_horario' });
       expect(tipos(r)).toEqual(['enviarBotones']);
+      const texto = (r.acciones[0] as any).texto as string;
+      expect(texto).toContain('Av. Principal 123');
+      expect(texto).toContain('https://maps.test');
+    });
+
+    it('preguntar por el horario por texto da la misma respuesta', () => {
+      const r = ejecutar({ texto: 'a qué hora abren' });
       expect((r.acciones[0] as any).texto).toContain('Av. Principal 123');
     });
 
+    it('medios de pago y delivery responden desde el local', () => {
+      const ctx = contextoBase({ datosLocalPublicos: { mediosPago: {}, pedidoMinimo: 15, envioGratisDesde: 60 } });
+      expect(tipos(ejecutar({ listRowId: 'faq_pagos' }, ctx))).toEqual(['enviarBotones']);
+      expect(tipos(ejecutar({ listRowId: 'faq_delivery' }, ctx))).toEqual(['enviarBotones']);
+    });
+
+    it('«promociones» por texto no tiene respuesta propia: vuelve al menú', () => {
+      const r = ejecutar({ texto: 'hay promociones hoy' });
+      expect(tipos(r)).toEqual(['enviarLista']);
+    });
+  });
+
+  describe('reservas, cambios y personas', () => {
     it('reservar mesa: llama al local o habla con una persona, sin reservar por chat', () => {
       const r = ejecutar({ texto: 'quiero reservar una mesa' });
       const texto = (r.acciones[0] as any).texto as string;
@@ -170,11 +213,10 @@ describe('Bot solo con menús (decisión del dueño)', () => {
       expect(tipos(r)).not.toContain('crearSolicitudReserva');
     });
 
-    it('puntos: mensaje corto con el enlace a la carta en el panel de puntos', () => {
+    it('puntos no se atienden en el bot: cae al menú, sin enlace de puntos', () => {
       const r = ejecutar({ texto: 'cuantos puntos tengo' });
-      const texto = (r.acciones[0] as any).texto as string;
-      expect(texto).toContain('canjear tus puntos en nuestra carta virtual');
-      expect(texto).toContain(`${URL_CARTA}?puntos=1`);
+      expect(tipos(r)).toEqual(['enviarLista']);
+      expect(JSON.stringify(r.acciones)).not.toContain('puntos=1');
     });
 
     it('cambiar la dirección pasa a una persona', () => {
@@ -199,28 +241,7 @@ describe('Bot solo con menús (decisión del dueño)', () => {
     });
   });
 
-  describe('preguntas frecuentes', () => {
-    it('la lista de preguntas tiene las FAQ de siempre', () => {
-      const r = ejecutar({ listRowId: 'preguntar' });
-      const ids = (r.acciones[0] as any).filas.map((f: any) => f.id);
-      expect(ids).toEqual(expect.arrayContaining(['faq_pagos', 'faq_delivery', 'faq_promos', 'faq_lactosa', 'faq_calientes', 'faq_postres']));
-    });
-
-    it('medios de pago, delivery y promociones responden desde el local', () => {
-      const ctx = contextoBase({ datosLocalPublicos: { mediosPago: {}, pedidoMinimo: 15, envioGratisDesde: 60 } });
-      expect(tipos(ejecutar({ listRowId: 'faq_pagos' }, ctx))).toEqual(['enviarBotones']);
-      expect(tipos(ejecutar({ listRowId: 'faq_delivery' }, ctx))).toEqual(['enviarBotones']);
-      expect(tipos(ejecutar({ listRowId: 'faq_promos' }, ctx))).toEqual(['enviarBotones']);
-    });
-  });
-
-  describe('texto libre y la IA', () => {
-    it('un texto que no es botón responde con el menú, un solo mensaje', () => {
-      const r = ejecutar({ texto: 'asdfghjk' }, contextoBase(), { estado: 'MENU', repreguntasFallidas: 0 });
-      expect(tipos(r)).toEqual(['enviarLista']);
-      expect((r.acciones[0] as any).texto).toContain('Elige una opción del menú');
-    });
-
+  describe('IA', () => {
     it('nunca pide a la IA, aunque esté disponible', () => {
       const r = ejecutar({ texto: 'que clima hace hoy en lima' }, contextoBase({ chatbotIaActivo: true }));
       expect(tipos(r)).not.toContain('consultarIa');
@@ -250,6 +271,20 @@ describe('Bot solo con menús (decisión del dueño)', () => {
       const r = ejecutar({ texto: 'hola' }, contextoBase({ modoAsistido: false }), enPersona);
       expect(tipos(r)).toEqual(['enviarLista']);
       expect(r.nuevoEstado).toBe('ATENCION_PERSONA');
+    });
+  });
+
+  describe('mensajes cortos', () => {
+    it('ninguna respuesta del menú repite el enlace de la carta en cada mensaje', () => {
+      const respuestas = [
+        ejecutar({ listRowId: 'mipedido' }, contextoBase({ pedidoActivo: null })),
+        ejecutar({ listRowId: 'preguntar' }),
+        ejecutar({ texto: 'asdfghjk' }, contextoBase(), { estado: 'MENU', repreguntasFallidas: 0 }),
+      ];
+      for (const r of respuestas) {
+        const veces = JSON.stringify(r.acciones).split(URL_CARTA).length - 1;
+        expect(veces).toBeLessThanOrEqual(1);
+      }
     });
   });
 });

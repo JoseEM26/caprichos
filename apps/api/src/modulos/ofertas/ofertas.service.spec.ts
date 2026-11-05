@@ -773,6 +773,56 @@ describe('OfertasService', () => {
     });
   });
 
+  describe('Bot de WhatsApp sin descuentos (decisión del dueño)', () => {
+    const ofertaToda10 = {
+      id: 1n,
+      tipo: 'DESCUENTO',
+      nombre: '10% en toda la carta',
+      descuento_tipo: 'PORCENTAJE',
+      descuento_valor: new Prisma.Decimal(10),
+      alcance_categoria_id: null,
+      alcance_producto_id: null,
+      compra_minima: null,
+      dias: [],
+      hora_desde: null,
+      hora_hasta: null,
+      fecha_desde: null,
+      fecha_hasta: null,
+      canales: ['CARTA', 'WHATSAPP', 'BOT'],
+      limite_usos: null,
+      usos_actuales: 0,
+      activo: true,
+    };
+    const lineas = [{ productoId: 10n, categoriaId: 1n, cantidad: 2, subtotal: 30.0, precioUnitario: 15.0 }];
+
+    beforeEach(() => {
+      prismaMock.reglaAcumulacion.upsert.mockResolvedValue({ id: 1, cupon_con_descuento: false, promo_con_descuento: false });
+    });
+
+    it('pedido por BOT con una oferta de descuento vigente: total sin descuento', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([ofertaToda10]);
+      const res = await service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'BOT' });
+      expect(res.descuentoTotal).toBe(0);
+      expect(res.ofertaId).toBeNull();
+      expect(res.detalles).toEqual([]);
+    });
+
+    it('pedido por WHATSAPP: tampoco aplica descuentos ni cupones', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([ofertaToda10]);
+      const res = await service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'WHATSAPP', cuponCodigo: 'PROMO10' });
+      expect(res.descuentoTotal).toBe(0);
+      expect(res.cuponId).toBeNull();
+      expect(prismaMock.oferta.findMany).not.toHaveBeenCalled();
+    });
+
+    it('el mismo pedido por CARTA sí lleva el descuento', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([ofertaToda10]);
+      const res = await service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'CARTA' });
+      expect(res.descuentoTotal).toBe(3.0);
+      expect(res.ofertaId).toBe('1');
+    });
+  });
+
   describe('visible en la carta (diseñador)', () => {
     const fila = (visible: boolean) => ({
       id: 1n, tipo: 'DESCUENTO', nombre: 'Martes 2x1', descripcion: null, lleva: null, paga: null,

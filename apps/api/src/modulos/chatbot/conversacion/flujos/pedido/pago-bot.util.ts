@@ -3,13 +3,12 @@ import { BotonAccion, FilaLista } from '../../../puerto/whatsapp-mensajeria.puer
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Única función de totales del bot: resumen previo, resumen final, efectivo y DTO usan esta. */
+/** Única función de totales del bot (precio de lista, sin descuentos): resumen previo, final, efectivo y DTO. */
 export function calcularTotales(pedido: EstadoCarritoPedido) {
   const subtotal = r2(pedido.items.reduce((s, i) => s + i.subtotal, 0));
-  const descuento = pedido.descuentoAplicado || 0;
   const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
-  const total = Math.max(0, r2(subtotal - descuento + (envio || 0)));
-  return { subtotal, descuento, envio, total };
+  const total = Math.max(0, r2(subtotal + (envio || 0)));
+  return { subtotal, envio, total };
 }
 
 export const NOMBRE_MEDIO: Record<MedioPagoBot, string> = {
