@@ -5,6 +5,7 @@ import { obtenerConfiguracion, rutaArchivoConfiguracion } from './config';
 import type { ArchivoConfiguracion } from './config';
 import { ImpresoraWindows, listarImpresorasWindows } from './impresora/impresoraWindows';
 import { ImpresoraUsb } from './impresora/impresoraUsb';
+import { ImpresoraRed, esDestinoRed, parsearDestinoRed } from './impresora/impresoraRed';
 import type { IDispositivoImpresora } from './impresora/dispositivo.interface';
 import { ClienteApiImpresion, canjearCodigoVinculo } from './api/clienteApi';
 import { AgenteLocalServicio } from './agente/bucle';
@@ -13,10 +14,13 @@ import {
   generarBytesTrabajo,
   generarBytesDeScript,
 } from './tspl/generadorTspl';
+import { generarTicketEscPos } from './escpos/generadorTicket';
+import type { RolImpresora } from '@caprichos/compartido';
 import {
   muestraEtiquetaGeneral,
   muestraEtiquetaArea,
   muestraEtiquetaBebida,
+  muestraTicketPago,
 } from './datosMuestra';
 
 export async function ejecutarComandoProbar(
@@ -175,11 +179,26 @@ export function describirImpresora(i: ImpresoraDetectada): string {
   return `${i.destino}${i.modelo ? ` — ${i.modelo}` : ''}${det ? ` (${det})` : ''}${i.puedeEscribir ? '' : ' [sin permiso]'}`;
 }
 
-/** Windows: nombre de la impresora instalada. Linux: ruta del dispositivo (empieza con /). */
-export function crearDispositivo(destino: string, identidad?: string): IDispositivoImpresora {
+/** Red: `tcp://IP:PUERTO` o IP[:puerto]. Windows: nombre de la impresora instalada. Linux: ruta del dispositivo (empieza con /). */
+export function crearDispositivo(destino: string, identidad?: string, rol?: RolImpresora): IDispositivoImpresora {
+  if (esDestinoRed(destino)) return new ImpresoraRed(destino, { rol });
   return destino.startsWith('/')
     ? new ImpresoraUsb(destino, identidad, () => listarImpresorasLinux(), (m) => console.log(`[${new Date().toISOString()}] [WARN] ${m}`))
     : new ImpresoraWindows(destino);
+}
+
+/** Página de prueba corta: etiqueta general (etiquetera) o ticket de pago (ticketera). */
+async function imprimirPruebaRed(rol: RolImpresora, destino: string, logger: (m: string) => void): Promise<void> {
+  const config = obtenerConfiguracion(process.env, leerArchivoConfiguracion());
+  const bytes = rol === 'ETIQUETERA'
+    ? generarBytesTrabajo('ETIQUETA_GENERAL', muestraEtiquetaGeneral, false, config.etiqueta)
+    : generarTicketEscPos(muestraTicketPago, config.ticketColumnas);
+  try {
+    await new ImpresoraRed(destino, { rol }).escribir(bytes);
+    logger('✔ Página de prueba enviada a la impresora.');
+  } catch (err: any) {
+    logger(`✖ No se imprimió la prueba: ${err.message}`);
+  }
 }
 
 export function leerArchivoConfiguracion(ruta = rutaArchivoConfiguracion()): ArchivoConfiguracion {
@@ -223,12 +242,50 @@ export async function ejecutarAsistente(
       logger('Impresoras encontradas en este equipo:');
       detectadas.forEach((d, i) => logger(`  ${i + 1}) ${describirImpresora(d)}`));
     }
-    const elegir = async (rol: string, previa?: string, sugerida?: number) => {
+    const opcionRed = detectadas.length + 1;
+    logger(`  ${opcionRed}) Impresora de RED por IP (escribe su IP, ej. 192.168.1.50)`);
+
+    // Pide la IP, comprueba la conexión y, si el usuario quiere, imprime una página de prueba. undefined = volver.
+    const pedirImpresoraRed = async (rol: RolImpresora, inicial?: string): Promise<string | undefined> => {
+      let valor = inicial;
+      for (;;) {
+        if (!valor) {
+          valor = await ask('IP de la impresora de red (ej. 192.168.1.50 o 192.168.1.50:9100; Enter = volver): ');
+          if (!valor) return undefined;
+        }
+        let destino: string;
+        try {
+          const d = parsearDestinoRed(valor);
+          destino = `tcp://${d.host}:${d.puerto}`;
+        } catch (err: any) {
+          logger(`✖ ${err.message}`);
+          valor = undefined;
+          continue;
+        }
+        const estado = await new ImpresoraRed(destino, { rol }).verificarEstado();
+        if (estado.estado === 'desconectada') {
+          logger(`✖ ${estado.detalle}`);
+          valor = undefined;
+          continue;
+        }
+        logger(`✔ Conexión con ${destino} correcta${estado.estado === 'lista' ? '' : ` (${estado.detalle})`}`);
+        const respuesta = (await ask(`¿Imprimir una página de prueba en la ${rol === 'ETIQUETERA' ? 'etiquetera' : 'ticketera'}? (S/n): `)).toLowerCase();
+        if (respuesta !== 'n') await imprimirPruebaRed(rol, destino, logger);
+        return destino;
+      }
+    };
+
+    const elegir = async (rol: RolImpresora, etiqueta: string, previa?: string, sugerida?: number) => {
       const porDefecto = previa ?? (sugerida ? detectadas[sugerida - 1].destino : undefined);
       const nota = porDefecto ? ` [Enter = ${previa ? 'actual' : 'sugerida'}: ${porDefecto}]` : ' (Enter = ninguna)';
       for (;;) {
-        const r = await ask(`Número o ${esWin ? 'nombre' : 'ruta'} de la ${rol}${nota}: `);
+        const r = await ask(`Número, ${esWin ? 'nombre' : 'ruta'} o IP de red de la ${etiqueta}${nota}: `);
         if (!r) return porDefecto;
+        if (r === String(opcionRed) || esDestinoRed(r)) {
+          const red = await pedirImpresoraRed(rol, esDestinoRed(r) ? r : undefined);
+          if (red) return red;
+          continue;
+        }
         if (/^\d+$/.test(r)) {
           if (detectadas[Number(r) - 1]) return detectadas[Number(r) - 1].destino;
         } else if (esWin) {
@@ -237,15 +294,15 @@ export async function ejecutarAsistente(
         } else if (r.startsWith('/') && fs.existsSync(r)) {
           return r;
         }
-        logger(`"${r}" no existe en este equipo. Elige un número de la lista${esWin ? ' o el nombre exacto' : ' o una ruta que exista'}.`);
+        logger(`"${r}" no existe en este equipo. Elige un número de la lista${esWin ? ' o el nombre exacto' : ' o una ruta que exista'}, o escribe la IP de una impresora de red.`);
       }
     };
     const sug = (rol: 'ETIQUETERA' | 'TICKETERA') => {
       const i = detectadas.findIndex((d) => d.sugerido === rol);
       return i >= 0 ? i + 1 : undefined;
     };
-    const etiquetera = await elegir('ETIQUETERA (stickers)', actual.etiquetera, sug('ETIQUETERA'));
-    const ticketera = await elegir('TICKETERA (ticket de pago)', actual.ticketera, sug('TICKETERA'));
+    const etiquetera = await elegir('ETIQUETERA', 'etiquetera (stickers)', actual.etiquetera, sug('ETIQUETERA'));
+    const ticketera = await elegir('TICKETERA', 'ticketera (ticket de pago)', actual.ticketera, sug('TICKETERA'));
     const idDe = (destino?: string, previo?: string, idPrevio?: string) =>
       destino ? detectadas.find((d) => d.destino === destino)?.identidad ?? (destino === previo ? idPrevio : undefined) : undefined;
     const cfg: ArchivoConfiguracion = {
@@ -311,8 +368,8 @@ export async function main(): Promise<void> {
   const clienteApi = new ClienteApiImpresion(config.apiUrl, config.agenteKey);
   const impresoras: Partial<Record<'ETIQUETERA' | 'TICKETERA', IDispositivoImpresora>> = {};
   const etiquetera = config.etiquetera ?? (config.ticketera ? undefined : config.impresoraRuta);
-  if (etiquetera) impresoras.ETIQUETERA = crearDispositivo(etiquetera, archivo.etiqueteraId);
-  if (config.ticketera) impresoras.TICKETERA = crearDispositivo(config.ticketera, archivo.ticketeraId);
+  if (etiquetera) impresoras.ETIQUETERA = crearDispositivo(etiquetera, archivo.etiqueteraId, 'ETIQUETERA');
+  if (config.ticketera) impresoras.TICKETERA = crearDispositivo(config.ticketera, archivo.ticketeraId, 'TICKETERA');
 
   const agente = new AgenteLocalServicio({
     config,
