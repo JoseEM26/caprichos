@@ -27,6 +27,8 @@ export interface EstadoMaquinaImpresion {
   conectada: boolean;
   estado: EstadoImpresora | 'no_configurada' | 'sin_programa';
   motivo: string | null;
+  /** Dato de conexión cuando lo hay (ej. «Red 192.168.1.50:9100»). */
+  detalle?: string;
 }
 
 export interface TicketPagoDatos {

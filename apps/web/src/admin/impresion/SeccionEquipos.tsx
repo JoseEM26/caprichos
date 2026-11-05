@@ -180,6 +180,19 @@ export function SeccionEquipos() {
         </ol>
       </section>
 
+      <section aria-labelledby="equipos-red" style={tarjeta}>
+        <h4 id="equipos-red" style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>
+          Ticketera de red (por IP)
+        </h4>
+        <ol style={{ margin: '4px 0 0', paddingLeft: 20, fontSize: 13, lineHeight: '22px' }}>
+          <li>Ticketera de red: instálala con su IP fija. En el programa elige «Impresora de RED por IP» y escribe su IP.</li>
+          <li>Pide a quien instale que reserve esa IP en el router para que no cambie.</li>
+        </ol>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+          Si se va el internet, la computadora y la impresora de red siguen hablándose por la red local, pero los pedidos nuevos no llegan hasta que vuelva internet. Los trabajos ya en cola se imprimen al reconectar (hasta 3 horas, parámetro impresion_vence_min).
+        </p>
+      </section>
+
       {error && (
         <div role="alert" style={{ background: '#FBE9DF', color: 'var(--cp-rust, #B2500F)', padding: '10px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700 }}>
           {error}
@@ -233,6 +246,9 @@ export function SeccionEquipos() {
               <div style={{ fontWeight: 800, fontSize: 14, color: m?.conectada ? 'var(--cp-green, #2F7A45)' : 'var(--cp-rust, #B2500F)', marginTop: 2 }}>
                 {m?.conectada ? 'Conectada' : 'No conectada'}
               </div>
+              {m?.conectada && m?.detalle && (
+                <div style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>{m.detalle}</div>
+              )}
               {!m?.conectada && m?.motivo && (
                 <div style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>{m.motivo}</div>
               )}
