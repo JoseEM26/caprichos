@@ -568,4 +568,92 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
       );
     });
   });
+
+  describe('aprobar y rechazar compiten por la misma solicitud', () => {
+    const horaFutura = new Date('2099-01-10T20:00:00-05:00');
+    const pendiente = () => ({
+      id: 9n,
+      conversacion_id: null,
+      personas: 2,
+      hora: horaFutura,
+      estado: 'PENDIENTE',
+      origen: 'WHATSAPP',
+      nombre: 'Lucía Ramos',
+      telefono: '912345678',
+      nota: null,
+      motivo_rechazo: null,
+      reserva_id: null,
+      creado_en: new Date(),
+      conversacion: null,
+    });
+
+    // Fila real de solicitud_reserva + transacción que deshace lo escrito si falla.
+    const simularFila = (prisma: any) => {
+      let estadoFila = 'PENDIENTE';
+      let reservas: any[] = [];
+      prisma.solicitudReserva.findUnique.mockImplementation(async () => ({ ...pendiente(), estado: estadoFila }));
+      prisma.solicitudReserva.updateMany.mockImplementation(async ({ where, data }: any) => {
+        if (where.estado !== estadoFila) return { count: 0 };
+        estadoFila = data.estado;
+        return { count: 1 };
+      });
+      prisma.reserva.create.mockImplementation(async ({ data }: any) => {
+        const r = { id: BigInt(500 + reservas.length), nombre: data.nombre, telefono: data.telefono, personas: data.personas, hora: data.hora, tolerancia_min: 15, estado: 'ACTIVA', motivo_cancelacion: null, pedido_id: null, mesas: [] };
+        reservas.push(r);
+        return r;
+      });
+      prisma.$transaction = jest.fn(async (cb: any) => {
+        const antes = reservas.length;
+        try {
+          return await cb(prisma);
+        } catch (err) {
+          reservas = reservas.slice(0, antes);
+          throw err;
+        }
+      });
+      prisma.fechaEspecial.findUnique.mockResolvedValue(null);
+      prisma.horarioDia.findUnique.mockResolvedValue({ dia_semana: 6, cerrado: false, abre: horaToDate('10:00'), cierra: horaToDate('23:00') });
+      prisma.elementoPlano.findMany.mockResolvedValue([{ id: 1n, tipo: 'MESA', activo: true, asientos: 4 }]);
+      prisma.parametro.findUnique.mockResolvedValue({ clave: 'reserva_tolerancia_min', valor: 15 });
+      return { estadoFila: () => estadoFila, reservas: () => reservas };
+    };
+
+    it('rechazo tras aprobación: SOLICITUD_NO_PENDIENTE, la solicitud queda APROBADA y no se encola un rechazo', async () => {
+      const fila = simularFila(prisma);
+      outboxMock.encolar.mockClear();
+
+      await service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1');
+      // Lectura desfasada: el rechazo ve PENDIENTE aunque la aprobación ya se escribió.
+      prisma.solicitudReserva.findUnique.mockResolvedValue(pendiente());
+      await expect(
+        service.rechazarSolicitud(9, { motivo: 'Aforo completo en ese horario' }, mockUsuario, '127.0.0.1'),
+      ).rejects.toMatchObject({ response: { codigo: 'SOLICITUD_NO_PENDIENTE' } });
+
+      expect(fila.estadoFila()).toBe('APROBADA');
+      expect(fila.reservas()).toHaveLength(1);
+      expect(outboxMock.encolar).toHaveBeenCalledTimes(1);
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({ carga: expect.objectContaining({ plantillaClave: 'RESERVA_CONFIRMADA' }) }),
+        expect.anything(),
+      );
+    });
+
+    it('aprobar y rechazar a la vez: gana uno solo y la fila y las reservas quedan coherentes', async () => {
+      const fila = simularFila(prisma);
+
+      const [ap, re] = await Promise.allSettled([
+        service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1'),
+        service.rechazarSolicitud(9, { motivo: 'Aforo completo en ese horario' }, mockUsuario, '127.0.0.1'),
+      ]);
+
+      expect([ap.status, re.status].filter((x) => x === 'fulfilled')).toHaveLength(1);
+      if (ap.status === 'fulfilled') {
+        expect(fila.estadoFila()).toBe('APROBADA');
+        expect(fila.reservas()).toHaveLength(1);
+      } else {
+        expect(fila.estadoFila()).toBe('RECHAZADA');
+        expect(fila.reservas()).toHaveLength(0);
+      }
+    });
+  });
 });

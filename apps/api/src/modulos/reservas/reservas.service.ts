@@ -1178,14 +1178,22 @@ export class ReservasService {
     const nombre = solicitud.nombre || solicitud.conversacion?.nombre_contacto || 'Cliente';
     const telefono = solicitud.telefono || solicitud.conversacion?.telefono || '';
     const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
-      const actualizada = await tx.solicitudReserva.update({
-        where: { id: sId },
-        data: {
-          estado: 'RECHAZADA',
-          motivo_rechazo: dto.motivo.trim(),
-        },
-        include: { conversacion: true },
+      // Solo rechaza si sigue PENDIENTE: un rechazo tardío no pisa una aprobación.
+      const { count } = await tx.solicitudReserva.updateMany({
+        where: { id: sId, estado: 'PENDIENTE' },
+        data: { estado: 'RECHAZADA', motivo_rechazo: dto.motivo.trim() },
       });
+      if (count !== 1) {
+        throw new BadRequestException({
+          codigo: 'SOLICITUD_NO_PENDIENTE',
+          mensaje: 'La solicitud ya fue atendida por otra persona. Actualiza la pantalla.',
+        });
+      }
+      const actualizada = {
+        ...solicitud,
+        estado: 'RECHAZADA',
+        motivo_rechazo: dto.motivo.trim(),
+      };
       const { fechaIso: fechaLima, horaMinutos: horaLima } = solicitud.hora
         ? obtenerFechaHoraLima(solicitud.hora)
         : { fechaIso: '', horaMinutos: '' };
