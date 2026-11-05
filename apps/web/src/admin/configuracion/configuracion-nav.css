@@ -1,5 +1,6 @@
 /* Configuración: buscador, navegación por grupos, resaltado de campo y ayuda por campo. Tokens --cp-*. */
-.cfg-buscador { position: sticky; top: 0; z-index: 30; background: var(--cp-cream); padding: 8px 0; }
+/* El buscador se desplaza con el contenido (no es sticky). z-index solo para que su panel de resultados quede encima. */
+.cfg-buscador { position: relative; z-index: 30; }
 .cfg-buscador-campo { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; background: var(--cp-white); border: 1.5px solid var(--cp-line); border-radius: 12px; color: var(--cp-soft); }
 .cfg-buscador-campo:focus-within { border-color: var(--cp-orange); box-shadow: 0 0 0 3px rgba(230, 121, 41, 0.2); }
 .cfg-buscador-campo input { flex: 1; min-width: 0; min-height: 44px; border: 0; outline: 0; background: transparent; font-size: 15px; color: var(--cp-navy); font-family: inherit; }
