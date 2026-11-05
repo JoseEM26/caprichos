@@ -292,6 +292,23 @@ describe('OutboxWhatsappService (salientes de WhatsApp)', () => {
       expect(r.filas[0].texto).toBe('Tu código de Caprichos es ••••••. Vence en 10 minutos.');
     });
 
+    it('salientes: la causa en español va a todos; el código de Meta y el texto original solo a ADMIN', async () => {
+      const ultimo = '[PLANTILLA_FORMATO_VARIABLE] [132012] Parameter format does not match format in the created template';
+      prisma.salienteWhatsapp.findMany.mockResolvedValueOnce([fila({ estado: 'FALLIDO', ultimo_error: ultimo })]);
+      const noAdmin = await servicio.listar('FALLIDO', 1, 20);
+      expect(noAdmin.filas[0].causa).toContain('formato que Meta no admite');
+      expect(noAdmin.filas[0].ultimoError).toBeNull();
+      expect(noAdmin.filas[0].detalleTecnico).toBeNull();
+
+      prisma.salienteWhatsapp.findMany.mockResolvedValueOnce([fila({ estado: 'FALLIDO', ultimo_error: ultimo })]);
+      const admin = await servicio.listar('FALLIDO', 1, 20, undefined, true);
+      expect(admin.filas[0].ultimoError).toBe(ultimo);
+      expect(admin.filas[0].detalleTecnico).toEqual({
+        codigoMeta: '132012',
+        original: 'Parameter format does not match format in the created template',
+      });
+    });
+
     it('un aviso normal no se enmascara', async () => {
       prisma.salienteWhatsapp.findMany.mockResolvedValueOnce([fila({ estado: 'FALLIDO', carga: { textoLibre: 'Tu pedido 123456 está listo' } })]);
       const r = await servicio.listar('FALLIDO');

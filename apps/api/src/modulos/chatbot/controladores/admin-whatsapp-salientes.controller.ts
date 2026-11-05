@@ -20,11 +20,17 @@ export class AdminWhatsappSalientesController {
 
   @Get('salientes')
   @Permiso('whatsapp_salientes', 'ver')
-  async listar(@Query('estado') estado?: string, @Query('pagina') pagina?: string, @Query('origen') origen?: string) {
+  async listar(
+    @Query('estado') estado?: string,
+    @Query('pagina') pagina?: string,
+    @Query('origen') origen?: string,
+    @Req() req?: any,
+  ) {
     const estadoValido = estado && ESTADOS_VALIDOS.includes(estado) ? estado : undefined;
     const origenValido = origen && /^[A-Z_]{3,40}$/.test(origen) ? origen : undefined;
     const pag = Math.max(1, parseInt(pagina ?? '1', 10) || 1);
-    return this.outbox.listar(estadoValido, pag, undefined, origenValido);
+    const roles = (req?.usuario?.roles ?? [req?.usuario?.rol ?? '']).map((r: unknown) => String(r || '').toUpperCase());
+    return this.outbox.listar(estadoValido, pag, undefined, origenValido, roles.includes('ADMIN'));
   }
 
   @Get('salientes/resumen')

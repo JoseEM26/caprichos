@@ -119,4 +119,17 @@ describe('Pestaña Salientes de WhatsApp', () => {
     fireEvent.click(screen.getByText('Enviados'));
     await waitFor(() => expect(listar).toHaveBeenLastCalledWith('ENVIADO', 1));
   });
+
+  it('muestra la causa en español y, en el detalle técnico, el código de Meta con el texto original', async () => {
+    const conDetalle: api.SalienteAdmin = {
+      ...fallido,
+      causa: 'Una variable tiene un formato que Meta no admite.',
+      detalleTecnico: { codigoMeta: '132012', original: 'Parameter format does not match format in the created template' },
+    };
+    vi.spyOn(api.salientesApi, 'listar').mockResolvedValue({ pagina: 1, limite: 20, total: 1, filas: [conDetalle] });
+    render(<SalientesWhatsApp />);
+    await waitFor(() => expect(screen.getByText(/Una variable tiene un formato/)).toBeTruthy());
+    expect(screen.getByText('Detalle técnico')).toBeTruthy();
+    expect(screen.getByText(/Código de Meta: 132012 · Parameter format does not match/)).toBeTruthy();
+  });
 });

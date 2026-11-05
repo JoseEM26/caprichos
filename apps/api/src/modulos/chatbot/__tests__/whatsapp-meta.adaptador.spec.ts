@@ -163,7 +163,7 @@ describe('WhatsAppMetaAdaptador', () => {
 
     expect(resultado.exito).toBe(false);
     expect(resultado.errorCodigo).toBe('FUERA_DE_VENTANA_24H');
-    expect(resultado.errorDetalle).toContain('24 horas');
+    expect(resultado.errorDetalle).toBe('[131047] Message failed to send because more than 24 hours have passed');
   });
 
   it('clasifica error de plantilla no aprobada o inexistente (132000)', async () => {
@@ -504,9 +504,7 @@ describe('WhatsAppMetaAdaptador', () => {
       const res = await adaptador.enviarTexto('wa-user:PE.123456789', 'Prueba error BSUID');
       expect(res.exito).toBe(false);
       expect(res.errorCodigo).toBe('BSUID_NO_PERMITIDO');
-      expect(res.errorDetalle).toBe(
-        'Meta no permite escribir a este contacto por su identificador. Pidele su numero de celular.',
-      );
+      expect(res.errorDetalle).toBe('[100] Invalid parameter | Invalid recipient format or identifier not allowed');
     });
 
     it('clasifica error 131009 con BSUID como BSUID_NO_PERMITIDO', async () => {
@@ -526,9 +524,7 @@ describe('WhatsAppMetaAdaptador', () => {
       const res = await adaptador.enviarPlantilla('PE.123', 'caprichos_reabrir_conversacion', 'es');
       expect(res.exito).toBe(false);
       expect(res.errorCodigo).toBe('BSUID_NO_PERMITIDO');
-      expect(res.errorDetalle).toBe(
-        'Meta no permite escribir a este contacto por su identificador. Pidele su numero de celular.',
-      );
+      expect(res.errorDetalle).toBe('[131009] Parameter value is not valid');
     });
   });
 
@@ -791,6 +787,110 @@ describe('WhatsAppMetaAdaptador: plantilla con botón copiar código', () => {
           { type: 'text', text: '25' },
         ],
       },
+    ]);
+  });
+});
+
+describe('WhatsAppMetaAdaptador: plantillas de Meta (clasificación, saneo y detalle)', () => {
+  let adaptador: WhatsAppMetaAdaptador;
+  let mockPrisma: any;
+  let originalFetch: typeof global.fetch;
+
+  const errorMeta = (code: number, message: string, details?: string) =>
+    JSON.stringify({ error: { code, message, ...(details ? { error_data: { details } } : {}) } });
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    const config = {
+      get: jest.fn((key: string, def?: any) => {
+        if (key === 'WHATSAPP_TOKEN') return 'EAAB_test_token_super_secreto_12345';
+        if (key === 'WHATSAPP_PHONE_ID') return '109876543210';
+        if (key === 'WHATSAPP_API_VERSION') return 'v20.0';
+        if (key === 'WHATSAPP_TIMEOUT_MS') return 1000;
+        return def;
+      }),
+    };
+    mockPrisma = {
+      whatsappMensaje: {
+        create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: BigInt(7), ...data })),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    adaptador = new WhatsAppMetaAdaptador(config as any, mockPrisma as PrismaService);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.clearAllMocks();
+  });
+
+  it.each([
+    [132000, 'Number of parameters does not match', 'PLANTILLA_VARIABLES_NO_COINCIDEN'],
+    [132001, 'Template name does not exist in the translation', 'PLANTILLA_NO_APROBADA'],
+    [132001, 'Template not approved', 'PLANTILLA_NO_APROBADA'],
+    [132001, 'Language mismatch', 'PLANTILLA_NO_EXISTE_IDIOMA'],
+    [132005, 'Template text is too long', 'PLANTILLA_TEXTO_LARGO'],
+    [132007, 'Template violates policy', 'PLANTILLA_RECHAZADA_POLITICA'],
+    [132012, 'Parameter format does not match format in the created template', 'PLANTILLA_FORMATO_VARIABLE'],
+    [132015, 'Template paused due to low quality', 'PLANTILLA_PAUSADA'],
+    [132016, 'Template disabled', 'PLANTILLA_DESACTIVADA'],
+    [132010, 'Template something else', 'PLANTILLA_RECHAZADA_META'],
+  ])('clasifica %i (%s) como %s y conserva el código y el texto original', (code, texto, esperado) => {
+    const r = adaptador.clasificarErrorMeta(400, errorMeta(code, texto));
+    expect(r.codigo).toBe(esperado);
+    expect(r.reintentable).toBe(false);
+    expect(r.metaCodigo).toBe(code);
+    expect(r.detalleOriginal).toBe(texto);
+  });
+
+  it('un formato de variable enviado a un BSUID sigue siendo PLANTILLA_FORMATO_VARIABLE (no BSUID_NO_PERMITIDO)', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: jest.fn().mockResolvedValue(errorMeta(132012, 'Parameter format does not match format in the created template')),
+    } as any);
+
+    const res = await adaptador.enviarPlantilla('PE.123456', 'caprichos_reserva_confirmada', 'es', ['Ana', '2026-11-05 19:30', '4']);
+    expect(res.errorCodigo).toBe('PLANTILLA_FORMATO_VARIABLE');
+  });
+
+  it('error_detalle guarda el código de Meta y el texto original, sin tokens ni teléfonos, y máximo 500 caracteres', async () => {
+    const largo = 'x'.repeat(800);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: jest.fn().mockResolvedValue(errorMeta(132000, `Mensaje ${largo} EAAB1234567890abcdef 51987654321`)),
+    } as any);
+
+    const res = await adaptador.enviarPlantilla('987654321', 'caprichos_reserva_confirmada', 'es', ['Ana']);
+    const guardado = mockPrisma.whatsappMensaje.create.mock.calls[0][0].data;
+
+    expect(guardado.error_codigo).toBe('PLANTILLA_VARIABLES_NO_COINCIDEN');
+    expect(guardado.error_detalle.startsWith('[132000] Mensaje xxx')).toBe(true);
+    expect(guardado.error_detalle).not.toContain('EAAB1234567890abcdef');
+    expect(guardado.error_detalle).not.toContain('51987654321');
+    expect(guardado.error_detalle.length).toBeLessThanOrEqual(500);
+    expect(res.errorDetalle).toBe(guardado.error_detalle);
+  });
+
+  it('sanea las variables de la plantilla: saltos, tabulaciones, espacios repetidos y vacías pasan a «-» o texto limpio', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: jest.fn().mockResolvedValue(JSON.stringify({ messages: [{ id: 'wamid.ok' }] })),
+    } as any);
+
+    await adaptador.enviarPlantilla('987654321', 'caprichos_reserva_actualizacion', 'es', [
+      'Juan\n  Pérez\t',
+      '   ',
+      'Solicitud no confirmada:\r\nmotivo\tlargo',
+    ]);
+
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body.template.components[0].parameters.map((p: any) => p.text)).toEqual([
+      'Juan Pérez',
+      '-',
+      'Solicitud no confirmada: motivo largo',
     ]);
   });
 });

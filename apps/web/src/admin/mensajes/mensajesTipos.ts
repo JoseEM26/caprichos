@@ -13,8 +13,12 @@ export interface MensajeItem {
   ubicacion?: UbicacionChat | null;
   hora: string;
   estado?: string;
+  /** Solo ADMIN: código de clasificación interno (p. ej. PLANTILLA_FORMATO_VARIABLE). */
   errorCodigo?: string | null;
+  /** Solo ADMIN: texto original de Meta, sin el código. */
   errorDetalle?: string | null;
+  /** Solo ADMIN: código numérico de Meta (p. ej. 132012). */
+  metaCodigo?: string | null;
   motivoFallo?: string | null;
 }
 

@@ -201,8 +201,16 @@ export function SalientesWhatsApp({ controles }: { controles?: ReactNode } = {})
               {f.estado === 'FALLIDO' && (
                 <div style={{ fontSize: 13, marginTop: 6, color: 'var(--cp-rust, #B2500F)' }}>
                   {f.clasificacion ? `${ETIQUETA_CLASIFICACION[f.clasificacion]}. ` : ''}
-                  {f.ultimoError ?? 'Sin detalle'}
+                  {f.causa ?? f.ultimoError ?? 'Sin detalle'}
                 </div>
+              )}
+              {f.detalleTecnico && (
+                <details style={{ fontSize: 12, marginTop: 4, color: '#54656F' }}>
+                  <summary>Detalle técnico</summary>
+                  <div>
+                    Código de Meta: {f.detalleTecnico.codigoMeta ?? 'sin código'} · {f.detalleTecnico.original ?? 'sin texto'}
+                  </div>
+                </details>
               )}
               {f.estado === 'DESCARTADO' && (
                 <div style={{ fontSize: 13, marginTop: 6 }}>Descartado: {f.motivoDescarte}</div>

@@ -19,6 +19,9 @@ import { TEXTOS_RESERVA } from '../chatbot/conversacion/textos-reserva';
 import { generarFranjasPorDefecto } from '../chatbot/conversacion/flujos/reserva/flujo-reserva';
 import { OutboxWhatsappService } from '../chatbot/servicios/outbox-whatsapp.service';
 
+/** 'YYYY-MM-DD' (Lima) a 'DD/MM/YYYY' para el cliente. */
+const fechaDeIso = (iso: string) => iso.split('-').reverse().join('/');
+
 @Injectable()
 export class ReservasService {
   constructor(
@@ -1081,7 +1084,7 @@ export class ReservasService {
       const { fechaIso: fechaLima, horaMinutos: horaLima } = obtenerFechaHoraLima(fechaHora);
       const msgConfirmacion = TEXTOS_RESERVA.reservaConfirmadaCliente({
         personas,
-        fechaTexto: fechaLima,
+        fechaTexto: fechaDeIso(fechaLima),
         hora: horaLima,
         toleranciaMin: reservaCreada.tolerancia_min || 15,
       });
@@ -1095,7 +1098,7 @@ export class ReservasService {
           carga: {
             textoLibre: msgConfirmacion,
             plantillaClave: 'RESERVA_CONFIRMADA',
-            variablesPlantilla: [nombre, `${fechaLima} ${horaLima}`, String(personas)],
+            variablesPlantilla: [nombre, `${fechaDeIso(fechaLima)} ${horaLima}`, String(personas)],
             autor: 'PERSONA',
             nombre,
             etapa: 'SOLICITUD_APROBADA',
@@ -1200,7 +1203,7 @@ export class ReservasService {
 
       const msgRechazo = TEXTOS_RESERVA.reservaRechazadaCliente({
         nombre,
-        fechaTexto: fechaLima,
+        fechaTexto: fechaDeIso(fechaLima),
         hora: horaLima,
         motivo: dto.motivo.trim(),
         alternativas: dto.alternativas,
