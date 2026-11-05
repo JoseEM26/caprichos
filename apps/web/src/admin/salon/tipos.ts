@@ -197,6 +197,21 @@ export interface ProgresoPedido {
   estimadoMin?: number;
 }
 
+/** Línea de un pedido del mozo. Los campos nuevos pueden faltar en respuestas anteriores. */
+export interface MiPedidoLinea {
+  id?: string;
+  nombre: string;
+  cantidad: number;
+  tamano?: string | null;
+  /** Nombres de las opciones elegidas (sin grupo) */
+  opciones?: string[];
+  nota?: string | null;
+  precioUnit?: number;
+  subtotal?: number | null;
+  /** Cocina ya tiene todas las unidades listas */
+  lista?: boolean;
+}
+
 /** Pedido que tomó el mozo (GET /admin/pedidos/mis-pedidos). */
 export interface MiPedido {
   id: string;
@@ -226,7 +241,8 @@ export interface MiPedido {
   puedeCambiarVoucher?: boolean;
   puedeSubirVoucher?: boolean;
   creadoEn: string;
-  lineas: Array<{ nombre: string; cantidad: number }>;
+  /** Lista del pedido, siempre visible en la tarjeta */
+  lineas: MiPedidoLinea[];
   /** Cocina y entrega en vivo. Puede faltar en respuestas anteriores. */
   progreso?: ProgresoPedido;
 }

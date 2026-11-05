@@ -465,6 +465,12 @@ export class PedidosEstadoService {
             listas: true,
             despachadas: true,
             producto_id: true,
+            // Lista del mozo: tamaño, opciones (mismo criterio que constructor-etiquetas.ts), nota y precios
+            tamano: true,
+            nota: true,
+            precio_unit: true,
+            subtotal: true,
+            opcionesElegidas: { select: { opcion_nombre: true }, orderBy: { id: 'asc' } },
             // Solo para contar líneas por área del progreso; no se devuelven
             area_id: true,
             producto: { select: { categoria: { select: { area_id: true } } } },
@@ -531,7 +537,19 @@ export class PedidosEstadoService {
             p.vouchers.find((v) => v.reemplazado_en == null && voucherCubreMedio(v.medio, m.medio))?.id?.toString() ?? null,
         })),
         creadoEn: p.creado_en,
-        lineas: p.lineas.map((l) => ({ nombre: l.nombre, cantidad: l.cantidad })),
+        lineas: p.lineas.map((l) => ({
+          id: String(l.id),
+          nombre: l.nombre,
+          cantidad: l.cantidad,
+          tamano: l.tamano || null,
+          // Nombres de las opciones elegidas, como en las etiquetas de cocina
+          opciones: l.opcionesElegidas.map((o) => o.opcion_nombre).filter(Boolean),
+          nota: l.nota || null,
+          precioUnit: Number(l.precio_unit),
+          subtotal: l.subtotal != null ? Number(l.subtotal) : null,
+          // Cocina ya tiene todas las unidades de la línea listas (listas = cantidad)
+          lista: l.listas >= l.cantidad,
+        })),
         // Estado de cocina y entrega (misma función que el seguimiento de la carta)
         progreso: progresoDelPedido(p, { cfg, ahora, preparacion }),
       })),

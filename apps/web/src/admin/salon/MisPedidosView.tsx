@@ -76,8 +76,6 @@ const horaLima = (iso: string) =>
 
 const lugar = (p: MiPedido) => p.mesaNombre || MODALIDAD[p.modalidad] || p.modalidad;
 
-const resumenLineas = (p: MiPedido) => p.lineas.map((l) => `${l.cantidad} x ${l.nombre}`).join(', ');
-
 const RESUMEN_VACIO = { cantidad: 0, total: 0, enCurso: 0, entregados: 0 };
 
 /** Pedidos que tomó el mozo: resumen del rango, filtro por estado y detalle de solo lectura. */
@@ -316,13 +314,7 @@ export function MisPedidosView() {
             const idDetalle = `mp-detalle-${p.id}`;
             return (
               <li key={p.id} className={faltanVoucher(p) ? 'mp-card mpv-card--falta' : 'mp-card'}>
-                <button
-                  type="button"
-                  className="mp-card-cabeza"
-                  aria-expanded={abierto}
-                  aria-controls={idDetalle}
-                  onClick={() => setExpandido(abierto ? null : p.id)}
-                >
+                <div className="mp-card-cabeza">
                   <span className="mp-card-fila">
                     <strong className="mp-codigo">{p.codigo}</strong>
                     {p.clienteNombre && (
@@ -341,22 +333,51 @@ export function MisPedidosView() {
                     </span>
                     <strong className="mp-total">{soles(p.total)}</strong>
                   </span>
-                  <span className="mp-resumen-lineas">{resumenLineas(p)}</span>
-                  <span className="mp-mas">{abierto ? 'Ocultar detalle' : 'Ver detalle'}</span>
-                </button>
+                </div>
+
+                {/* Lista del pedido siempre visible: cantidad, producto, detalle, nota y subtotal */}
+                <ul className="mp-items" aria-label={`Productos del pedido ${p.codigo}`}>
+                  {p.lineas.map((l, i) => {
+                    const detalle = [l.tamano, l.opciones?.join(', ')].filter(Boolean).join(' · ');
+                    return (
+                      <li key={l.id ?? i} className="mp-item">
+                        <span className="mp-item-cant">{l.cantidad}×</span>
+                        <span className="mp-item-cuerpo">
+                          <span className="mp-item-nombre">
+                            <span>{l.nombre}</span>
+                            {l.lista && <span className="mp-item-listo">✓ Listo</span>}
+                          </span>
+                          {detalle && <span className="mp-item-det">{detalle}</span>}
+                          {l.nota && (
+                            <span className="mp-item-nota">
+                              <svg className="mp-item-icono" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                              </svg>
+                              <span>Nota: {l.nota}</span>
+                            </span>
+                          )}
+                        </span>
+                        {l.subtotal != null && <span className="mp-item-sub">{soles(l.subtotal)}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
 
                 {!abierto && <ProgresoPedido progreso={p.progreso} modalidad={p.modalidad} variante="compacto" />}
+
+                <button
+                  type="button"
+                  className="mp-mas"
+                  aria-expanded={abierto}
+                  aria-controls={idDetalle}
+                  onClick={() => setExpandido(abierto ? null : p.id)}
+                >
+                  {abierto ? 'Ocultar detalle' : 'Ver detalle'}
+                </button>
 
                 {abierto && (
                   <div id={idDetalle} className="mp-detalle">
                     <ProgresoPedido progreso={p.progreso} modalidad={p.modalidad} variante="completo" />
-                    <ul>
-                      {p.lineas.map((l, i) => (
-                        <li key={i}>
-                          {l.cantidad} x {l.nombre}
-                        </li>
-                      ))}
-                    </ul>
                     <dl>
                       <dt>Estado</dt>
                       <dd>{est.texto}</dd>
