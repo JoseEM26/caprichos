@@ -22,8 +22,8 @@ const conPuntos = (puntos: number) =>
 describe('Carta ▸ puntos siempre visibles', () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it('la cabecera muestra «0 pts» con saldo 0 y «12 pts» con saldo', () => {
-    for (const [saldo, texto] of [[0, '0 pts'], [12, '12 pts']] as const) {
+  it('la cabecera muestra «0.00 pts» con saldo 0 y «12.00 pts» con saldo', () => {
+    for (const [saldo, texto] of [[0, '0.00 pts'], [12, '12.00 pts']] as const) {
       conPuntos(saldo);
       const { unmount } = render(
         <CarritoProvider>
