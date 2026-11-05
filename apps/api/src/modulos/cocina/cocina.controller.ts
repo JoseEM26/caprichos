@@ -22,6 +22,8 @@ import { AgotarDto } from './dto/agotar.dto';
 import { AltaDemandaDto } from './dto/alta-demanda.dto';
 import { MarcarListasDto } from './dto/marcar-listas.dto';
 import { DespacharDto } from './dto/despachar.dto';
+import { MisAjustesCocinaDto } from './dto/mis-ajustes-cocina.dto';
+import { AjustesPersonalesCocinaService } from './ajustes-personales.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { areasPermitidasDeUsuario } from '../acceso/roles-usuario';
 
@@ -32,6 +34,7 @@ export class CocinaController {
     private readonly comandasService: ComandasService,
     private readonly agotadosService: AgotadosService,
     private readonly altaDemandaService: AltaDemandaService,
+    private readonly ajustesPersonales: AjustesPersonalesCocinaService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -85,10 +88,19 @@ export class CocinaController {
     return this.comandasService.despejar(pedidoId, areaId, req.usuario, ip);
   }
 
+  /** Ajustes que ve el usuario: su preferencia personal si la tiene, si no el general del local. */
   @Get('ajustes')
   @Permiso('cocina', 'ver')
-  async obtenerAjustes() {
-    return this.comandasService.obtenerAjustes();
+  async obtenerAjustes(@Req() req: any) {
+    return this.ajustesPersonales.obtener(req.usuario.partyId);
+  }
+
+  /** Preferencia personal del cocinero que llama (el party sale del token). null = volver al general. */
+  @Put('mis-ajustes')
+  @Permiso('cocina', 'ver')
+  async guardarMisAjustes(@Body() dto: MisAjustesCocinaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.ajustesPersonales.guardar(req.usuario, dto.confirmarDespejar, ip);
   }
 
   @Get('historial')

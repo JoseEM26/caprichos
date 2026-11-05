@@ -28,6 +28,7 @@ model Party {
   documentos               PartyIdentifier[]
   usuario                  UserAccount?
   sesiones                 Sesion[]
+  preferencias             PreferenciaUsuario[]
   vouchersReemplazadosPor  VoucherPago[]          @relation("VoucherReemplazadoPor")
   pedidos                  Pedido[]               @relation("ClientePedido")
   pedidosRepartidos        Pedido[]               @relation("RepartidorPedido")
@@ -182,6 +183,18 @@ model Sesion {
   party        Party     @relation(fields: [party_id], references: [id])
 
   @@map("sesion")
+}
+
+/// Preferencias personales de un usuario (una fila por party y clave). Solo para quien la fijó.
+model PreferenciaUsuario {
+  party_id       BigInt
+  clave          String
+  valor          Json
+  actualizado_en DateTime @default(now()) @db.Timestamptz
+  party          Party    @relation(fields: [party_id], references: [id])
+
+  @@id([party_id, clave])
+  @@map("preferencia_usuario")
 }
 
 model Parametro {

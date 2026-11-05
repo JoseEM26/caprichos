@@ -95,8 +95,9 @@ export function TarjetaConfirmarDespejarConfiguracion({ esAdmin: esAdminProp }: 
             Confirmar al despejar
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--cp-soft)', marginTop: 2, maxWidth: 560 }}>
-            Encendido, despejar un pedido en cocina pide confirmar con Sí o No. Apagado, un toque despeja el pedido directo
-            (el botón «Deshacer» sigue disponible).
+            Es el valor general del local: encendido, despejar un pedido pide confirmar con Sí o No; apagado, un toque lo
+            despeja directo («Deshacer» sigue disponible). Aplica a quien no lo haya personalizado: cada cocinero puede
+            cambiarlo para sí mismo desde Cocina («Preguntar antes de despejar»).
           </div>
         </div>
         <CampoConfig id="cocina-confirmar-despejar" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
