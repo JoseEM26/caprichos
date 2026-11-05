@@ -152,6 +152,47 @@ export function SeccionEquipos() {
         </div>
       </div>
 
+      <section aria-labelledby="equipos-agregar" style={tarjeta}>
+        <h4 id="equipos-agregar" style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>
+          Agregar un equipo a un área
+        </h4>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>
+          El mismo programa sirve para todas las computadoras: el área se elige aquí, no en el programa.
+        </p>
+        <ol style={{ margin: '4px 0 0', paddingLeft: 20, fontSize: 13, lineHeight: '22px' }}>
+          <li>Genera un código de vinculación con «Instalar o vincular programa».</li>
+          <li>Instala el programa en la computadora de esa área y vincúlala con el código.</li>
+          <li>En el Mapa, elige su área con «+ Asignar equipo» (o con su selector «Imprime lo de»).</li>
+        </ol>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+          Un solo equipo por área y tipo de máquina, y uno en Caja. Si el área ya tiene uno, el Mapa pregunta antes de reemplazarlo.
+        </p>
+      </section>
+
+      <section aria-labelledby="equipos-cambiar" style={tarjeta}>
+        <h4 id="equipos-cambiar" style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>
+          Cambiar la computadora de un área
+        </h4>
+        <ol style={{ margin: '4px 0 0', paddingLeft: 20, fontSize: 13, lineHeight: '22px' }}>
+          <li>Instala el programa en la computadora nueva y vincúlala con un código de vinculación.</li>
+          <li>En el Mapa, pulsa «Reemplazar este equipo» en la máquina del área y elige la nueva.</li>
+          <li>Listo: la vieja se desactiva y sus trabajos pendientes los imprime la nueva.</li>
+        </ol>
+      </section>
+
+      <section aria-labelledby="equipos-red" style={tarjeta}>
+        <h4 id="equipos-red" style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>
+          Ticketera de red (por IP)
+        </h4>
+        <ol style={{ margin: '4px 0 0', paddingLeft: 20, fontSize: 13, lineHeight: '22px' }}>
+          <li>Ticketera de red: instálala con su IP fija. En el programa elige «Impresora de RED por IP» y escribe su IP.</li>
+          <li>Pide a quien instale que reserve esa IP en el router para que no cambie.</li>
+        </ol>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+          Si se va el internet, la computadora y la impresora de red siguen hablándose por la red local, pero los pedidos nuevos no llegan hasta que vuelva internet. Los trabajos ya en cola se imprimen al reconectar (hasta 3 horas, parámetro impresion_vence_min).
+        </p>
+      </section>
+
       {error && (
         <div role="alert" style={{ background: '#FBE9DF', color: 'var(--cp-rust, #B2500F)', padding: '10px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700 }}>
           {error}
@@ -205,6 +246,9 @@ export function SeccionEquipos() {
               <div style={{ fontWeight: 800, fontSize: 14, color: m?.conectada ? 'var(--cp-green, #2F7A45)' : 'var(--cp-rust, #B2500F)', marginTop: 2 }}>
                 {m?.conectada ? 'Conectada' : 'No conectada'}
               </div>
+              {m?.conectada && m?.detalle && (
+                <div style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>{m.detalle}</div>
+              )}
               {!m?.conectada && m?.motivo && (
                 <div style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>{m.motivo}</div>
               )}

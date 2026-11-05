@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { OfertaItem } from './ofertasApi';
+import { SelectorVisibleCarta } from './canalesPromo';
 
 const DIAS = [
   ['lun', 'Lun'],
@@ -266,12 +267,7 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
           </label>
         </div>
 
-        {ofertaAEditar && (
-          <label style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '14px', fontWeight: 700 }}>
-            <input type="checkbox" checked={visibleCarta} onChange={(e) => setVisibleCarta(e.target.checked)} />
-            Mostrar en la carta virtual
-          </label>
-        )}
+        {ofertaAEditar && <SelectorVisibleCarta id="envio-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
 
         {mensajeError && (
           <div role="alert" style={{ fontSize: '13px', color: 'var(--cp-rust)' }}>

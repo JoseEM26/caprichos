@@ -6,10 +6,11 @@ import { Cargando } from '../../../comun/Cargando';
 import { EstadoError } from '../../../comun/EstadoError';
 import { EstadoVacio } from '../../../comun/EstadoVacio';
 import { Confirmar } from '../../../comun/Confirmar';
+import { ErrorApi } from '../../../comun/api';
 import { impresionApi, type MapaImpresionDatos, type ReglasMapa } from '../impresionApi';
 import { derivarFlujo, type Escenario } from './flujo';
-import { LienzoMapa } from './LienzoMapa';
-import { SimuladorPedido } from './SimuladorPedido';
+import { LeyendaMapa, LienzoMapa } from './LienzoMapa';
+import { SimuladorPedido, TiraSaldria } from './SimuladorPedido';
 import './mapa-impresion.css';
 
 interface Pendiente {
@@ -17,6 +18,14 @@ interface Pendiente {
   areaId: string | null;
   nombre: string;
   pendientes: number;
+}
+
+/** Diálogo de confirmación de un cambio que desplaza a otro equipo (reemplazo o dejar solo uno). */
+interface Confirmacion {
+  titulo: string;
+  mensaje: string;
+  textoSi: string;
+  alConfirmar: () => void;
 }
 
 const hora = () => new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
@@ -33,6 +42,7 @@ export function ModuloMapaImpresion() {
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [pendiente, setPendiente] = useState<Pendiente | null>(null);
+  const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null);
   const [escenario, setEscenario] = useState<Escenario>({ modalidad: 'LLEVAR', conBebidas: true });
   const [actualizado, setActualizado] = useState('');
   const [enfocar, setEnfocar] = useState<string | null>(null);
@@ -68,7 +78,17 @@ export function ModuloMapaImpresion() {
 
   const flujo = useMemo(() => (mapa ? derivarFlujo(mapa, escenario) : []), [mapa, escenario]);
 
-  const ejecutarMover = async (equipoId: string, areaId: string | null) => {
+  /** Pregunta antes de reemplazar: «Bebidas ya la atiende «Barra». ¿Reemplazarla por «Barra 2»? «Barra» dejará de imprimir.» */
+  const confirmarReemplazo = (nombreArea: string, viejo: string, nuevo: string, alSi: () => void) => {
+    setConfirmacion({
+      titulo: 'Reemplazar el equipo de esta área',
+      mensaje: `${nombreArea} ya la atiende «${viejo}». ¿Reemplazarla por «${nuevo}»? «${viejo}» dejará de imprimir.`,
+      textoSi: 'Sí, reemplazar',
+      alConfirmar: alSi,
+    });
+  };
+
+  const ejecutarMover = async (equipoId: string, areaId: string | null, reemplazar = false) => {
     if (!mapa) return;
     const anterior = mapa;
     const eq = mapa.equipos.find((e) => e.deviceKeyId === equipoId);
@@ -77,12 +97,67 @@ export function ModuloMapaImpresion() {
     setOcupado(equipoId);
     setEnfocar(equipoId);
     try {
-      const r = await impresionApi.asignarAreaEquipo(equipoId, areaId);
+      const r = reemplazar
+        ? await impresionApi.asignarAreaEquipo(equipoId, areaId, true)
+        : await impresionApi.asignarAreaEquipo(equipoId, areaId);
       setAviso({ tipo: 'ok', texto: [`${eq?.nombre ?? 'El equipo'} ahora imprime lo de ${nombreArea}.`, ...r.avisos].join(' ') });
       await cargar(); // el ruteo lo calcula el servidor: se vuelve a leer
     } catch (e: any) {
       setMapa(anterior);
+      const ocupado409 = e instanceof ErrorApi && e.codigo === 'AREA_OCUPADA' ? (e.detalles as any)?.ocupadoPor : null;
+      if (ocupado409 && eq) {
+        // Un solo equipo por área: se pide confirmación para reemplazar al que está
+        confirmarReemplazo(nombreArea, ocupado409.nombre, eq.nombre, () => void ejecutarMover(equipoId, areaId, true));
+        return;
+      }
       setAviso({ tipo: 'error', texto: `No se guardó el cambio. ${e?.message ?? ''}`.trim() });
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  /** «Reemplazar este equipo» de una sub-ranura: el nuevo ocupa el área del viejo y el viejo se desactiva. */
+  const pedirReemplazo = (viejoId: string, nuevoId: string) => {
+    if (!mapa || !puedeEditar) return;
+    const viejo = mapa.equipos.find((e) => e.deviceKeyId === viejoId);
+    const nuevo = mapa.equipos.find((e) => e.deviceKeyId === nuevoId);
+    if (!viejo || !nuevo) return;
+    const nombreArea = viejo.areaId === null ? 'Caja' : mapa.areas.find((a) => a.id === viejo.areaId)?.nombre ?? 'el área';
+    confirmarReemplazo(nombreArea, viejo.nombre, nuevo.nombre, () => void ejecutarReemplazo(viejoId, nuevoId));
+  };
+
+  const ejecutarReemplazo = async (viejoId: string, nuevoId: string) => {
+    setOcupado(nuevoId);
+    try {
+      await impresionApi.reemplazarEquipo(viejoId, nuevoId);
+      setAviso({ tipo: 'ok', texto: 'Equipo reemplazado. El anterior quedó desactivado y puede volver a vincularse.' });
+      await cargar();
+    } catch (e: any) {
+      setAviso({ tipo: 'error', texto: `No se reemplazó el equipo. ${e?.message ?? ''}`.trim() });
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  /** Dejar solo uno en un grupo de duplicados: el otro se desactiva (con confirmación). */
+  const pedirQuedarse = (grupoNombre: string, quedaId: string, otros: string[]) => {
+    const quedaNombre = mapa?.duplicados.flatMap((g) => g.equipos).find((e) => e.deviceKeyId === quedaId)?.nombre ?? 'este equipo';
+    setConfirmacion({
+      titulo: `Dejar solo un equipo en ${grupoNombre}`,
+      mensaje: `«${quedaNombre}» se queda en ${grupoNombre}. ${otros.length === 1 ? 'El otro equipo' : 'Los otros equipos'} se desactivan y dejan de imprimir. Pueden volver a vincularse.`,
+      textoSi: 'Sí, dejar solo este',
+      alConfirmar: () => void ejecutarQuedarse(quedaId),
+    });
+  };
+
+  const ejecutarQuedarse = async (quedaId: string) => {
+    setOcupado(quedaId);
+    try {
+      await impresionApi.quedarseCon(quedaId);
+      setAviso({ tipo: 'ok', texto: 'Quedó un solo equipo en esa área.' });
+      await cargar();
+    } catch (e: any) {
+      setAviso({ tipo: 'error', texto: `No se pudo dejar un solo equipo. ${e?.message ?? ''}`.trim() });
     } finally {
       setOcupado(null);
     }
@@ -137,14 +212,13 @@ export function ModuloMapaImpresion() {
       <header className="mapa-cabecera">
         <div>
           <h3 id="mapa-impresion-titulo" className="mapa-titulo">Mapa de impresión</h3>
-          <p className="mapa-intro">
-            Mira qué se imprime, con qué regla y en qué equipo. Cambia las reglas y lleva cada equipo al área que atiende.
-          </p>
+          <p className="mapa-intro">Qué sale de cada pedido, cuándo sale y en qué impresora.</p>
         </div>
         <div className="mapa-vivo">
           En vivo · actualizado {actualizado}
           {error && <span className="mapa-vivo-error"> (sin conexión al actualizar)</span>}
         </div>
+        <LeyendaMapa />
       </header>
 
       <p className="mapa-enlaces">
@@ -163,6 +237,36 @@ export function ModuloMapaImpresion() {
           {aviso.texto}
         </div>
       )}
+      <p className="mapa-regla-unica">Un solo equipo por área y tipo de máquina, y uno en Caja.</p>
+      {mapa.duplicados.map((g) => (
+        <section key={g.areaId ?? 'caja'} className="mapa-duplicados" aria-label={`Equipos duplicados en ${g.nombre}`}>
+          <p>
+            <strong>Hay {g.equipos.length} equipos para {g.areaId === null ? 'Caja' : 'esta área'}: deja solo uno.</strong>
+          </p>
+          {g.equipos.map((e) => (
+            <div key={e.deviceKeyId} className="mapa-duplicados-fila">
+              <span>{e.nombre}</span>
+              {puedeEditar && (
+                <button
+                  type="button"
+                  className="mapa-asignar mapa-asignar--secundario"
+                  aria-label={`Quedarme con este equipo: ${e.nombre}`}
+                  disabled={ocupado !== null}
+                  onClick={() =>
+                    pedirQuedarse(
+                      g.areaId === null ? 'Caja' : g.nombre,
+                      e.deviceKeyId,
+                      g.equipos.filter((o) => o.deviceKeyId !== e.deviceKeyId).map((o) => o.nombre),
+                    )
+                  }
+                >
+                  Quedarme con este
+                </button>
+              )}
+            </div>
+          ))}
+        </section>
+      ))}
       {mapa.equipos.length === 0 && (
         <EstadoVacio
           titulo="Aún no hay equipos de impresión"
@@ -171,9 +275,8 @@ export function ModuloMapaImpresion() {
         />
       )}
 
-      <SimuladorPedido escenario={escenario} flujo={flujo} onCambiar={setEscenario} />
+      <SimuladorPedido escenario={escenario} onCambiar={setEscenario} />
 
-      <h3 className="mapa-subtitulo">Mapa</h3>
       <LienzoMapa
         mapa={mapa}
         flujo={flujo}
@@ -182,6 +285,22 @@ export function ModuloMapaImpresion() {
         enfocar={enfocar}
         onCambiarRegla={cambiarRegla}
         onMover={pedirMover}
+        onReemplazar={pedirReemplazo}
+      />
+
+      <TiraSaldria flujo={flujo} />
+
+      <Confirmar
+        abierto={confirmacion !== null}
+        titulo={confirmacion?.titulo ?? ''}
+        mensaje={confirmacion?.mensaje}
+        textoSi={confirmacion?.textoSi ?? 'Sí'}
+        alCancelar={() => setConfirmacion(null)}
+        alConfirmar={() => {
+          const c = confirmacion;
+          setConfirmacion(null);
+          c?.alConfirmar();
+        }}
       />
 
       <Confirmar

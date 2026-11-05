@@ -1,7 +1,7 @@
 export type TipoEtiqueta = 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA';
 
-/** Comanda completa de un pedido de salón para la ticketera de Caja (se imprime al aceptarse). */
-export type TipoTicketComanda = 'TICKET_COMANDA_SALON';
+/** Comandas por pedido para la ticketera: la de salón (Caja, al aceptarse) y la de cada área (su ticketera, o Caja). */
+export type TipoTicketComanda = 'TICKET_COMANDA_SALON' | 'TICKET_COMANDA_AREA';
 
 /** Tipo de trabajo de impresión: etiquetas (etiquetera), ticket de pago o comanda de salón (ticketera de Caja). */
 export type TipoTrabajoImpresion = TipoEtiqueta | 'TICKET_PAGO' | TipoTicketComanda;
@@ -12,7 +12,7 @@ export type RolImpresora = 'ETIQUETERA' | 'TICKETERA';
 export const ROLES_IMPRESORA: RolImpresora[] = ['ETIQUETERA', 'TICKETERA'];
 
 export function rolDeTrabajo(tipo: string): RolImpresora {
-  return tipo === 'TICKET_PAGO' || tipo === 'TICKET_COMANDA_SALON' ? 'TICKETERA' : 'ETIQUETERA';
+  return tipo === 'TICKET_PAGO' || tipo === 'TICKET_COMANDA_SALON' || tipo === 'TICKET_COMANDA_AREA' ? 'TICKETERA' : 'ETIQUETERA';
 }
 
 /** Estado de una máquina reportado por el agente local en su latido. */
@@ -27,6 +27,8 @@ export interface EstadoMaquinaImpresion {
   conectada: boolean;
   estado: EstadoImpresora | 'no_configurada' | 'sin_programa';
   motivo: string | null;
+  /** Dato de conexión cuando lo hay (ej. «Red 192.168.1.50:9100»). */
+  detalle?: string;
 }
 
 export interface TicketPagoDatos {
@@ -131,6 +133,8 @@ export interface TicketComandaSalonDatos {
   codigo: string;
   /** Nombre de la mesa (salón); null si no hay. */
   mesa: string | null;
+  /** Solo en la comanda de área: nombre del área cuyas líneas trae la hoja. */
+  area?: string | null;
   cliente: string;
   canal: string;
   hora: string;

@@ -18,12 +18,22 @@ import {
   hashTelefono,
   normalizarTelefono,
 } from '../utilidades/enmascarar.util';
+import {
+  causaPlantillaMeta,
+  detalleDeErrorMeta,
+  sanearDetalleMeta,
+  sanearVariablePlantilla,
+} from '../utilidades/meta-errores.util';
 
 export interface MetaErrorParsed {
   codigo: string;
   mensaje: string;
   reintentable: boolean;
   httpStatus?: number;
+  /** Código numérico de Meta (p. ej. 132012), si Meta lo mandó. */
+  metaCodigo?: number;
+  /** Texto original de Meta (mensaje y detalles), saneado y máximo 500 caracteres. */
+  detalleOriginal?: string;
 }
 
 export interface DestinatarioMeta {
@@ -118,9 +128,30 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
 
     const errorObj = parsed?.error || {};
     const code = errorObj.code;
-    const msg = errorObj.message || bodyText;
-    const details = errorObj.error_data?.details || '';
+    const msg = String(errorObj.message || bodyText);
+    const details = String(errorObj.error_data?.details || '');
+    const original = [msg, details].filter(Boolean).join(' | ');
+    const metaCodigo = typeof code === 'number' ? code : undefined;
+
+    const resultado = this.clasificarCausa(status, code, msg, details, esBsuid);
+    return { ...resultado, metaCodigo, detalleOriginal: sanearDetalleMeta(original) };
+  }
+
+  private clasificarCausa(
+    status: number,
+    code: any,
+    msg: string,
+    details: string,
+    esBsuid?: boolean,
+  ): Omit<MetaErrorParsed, 'metaCodigo' | 'detalleOriginal'> {
     const fullLower = `${msg} ${details}`.toLowerCase();
+
+    // 00. Plantillas (132000-132016): antes que la regla de BSUID, para que un error de formato de variable
+    // no se confunda con un identificador rechazado
+    const causaPlantilla = typeof code === 'number' ? causaPlantillaMeta(code, fullLower) : null;
+    if (causaPlantilla) {
+      return { codigo: causaPlantilla.codigo, mensaje: causaPlantilla.mensaje, reintentable: false, httpStatus: status };
+    }
 
     // 0. BSUID no permitido o rechazado por Meta (código 100, 131009 o detalles de recipient/formato)
     if (
@@ -206,20 +237,6 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       return {
         codigo: 'NUMERO_INVALIDO',
         mensaje: 'El número de teléfono no está activo en WhatsApp o tiene formato inválido.',
-        reintentable: false,
-        httpStatus: status,
-      };
-    }
-
-    // 3. Plantilla no aprobada o inexistente (132000..132015)
-    if (
-      (code >= 132000 && code <= 132015) ||
-      fullLower.includes('template') ||
-      fullLower.includes('does not exist')
-    ) {
-      return {
-        codigo: 'PLANTILLA_NO_APROBADA',
-        mensaje: `La plantilla de WhatsApp no existe o no ha sido aprobada por Meta: ${msg}`,
         reintentable: false,
         httpStatus: status,
       };
@@ -390,7 +407,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         plantilla: null,
         estado,
         error_codigo: resultado.error?.codigo || null,
-        error_detalle: resultado.error?.mensaje || null,
+        error_detalle: detalleDeErrorMeta(resultado.error) || null,
         pedido_id: this.parsearId(opciones?.pedidoId),
         conversacion_id: this.parsearId(opciones?.conversacionId),
       },
@@ -402,7 +419,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       waMessageId,
       estado,
       errorCodigo: resultado.error?.codigo,
-      errorDetalle: resultado.error?.mensaje,
+      errorDetalle: detalleDeErrorMeta(resultado.error),
       reintentos: resultado.intentos,
     };
   }
@@ -434,9 +451,9 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     if (variables) {
       let params: Array<{ type: 'text'; text: string }> = [];
       if (Array.isArray(variables)) {
-        params = variables.map((v) => ({ type: 'text', text: String(v) }));
+        params = variables.map((v) => ({ type: 'text', text: sanearVariablePlantilla(v) }));
       } else {
-        params = Object.values(variables).map((v) => ({ type: 'text', text: String(v) }));
+        params = Object.values(variables).map((v) => ({ type: 'text', text: sanearVariablePlantilla(v) }));
       }
       if (params.length > 0) {
         components.push({
@@ -451,7 +468,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         type: 'button',
         sub_type: 'url',
         index: '0',
-        parameters: [{ type: 'text', text: opciones.botonCodigo }],
+        parameters: [{ type: 'text', text: sanearVariablePlantilla(opciones.botonCodigo) }],
       });
     }
 
@@ -480,7 +497,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         plantilla: nombre,
         estado,
         error_codigo: resultado.error?.codigo || null,
-        error_detalle: resultado.error?.mensaje || null,
+        error_detalle: detalleDeErrorMeta(resultado.error) || null,
         pedido_id: this.parsearId(opciones?.pedidoId),
         conversacion_id: this.parsearId(opciones?.conversacionId),
       },
@@ -492,7 +509,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       waMessageId,
       estado,
       errorCodigo: resultado.error?.codigo,
-      errorDetalle: resultado.error?.mensaje,
+      errorDetalle: detalleDeErrorMeta(resultado.error),
       reintentos: resultado.intentos,
     };
   }
@@ -556,7 +573,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         plantilla: null,
         estado,
         error_codigo: resultado.error?.codigo || null,
-        error_detalle: resultado.error?.mensaje || null,
+        error_detalle: detalleDeErrorMeta(resultado.error) || null,
         pedido_id: this.parsearId(opciones?.pedidoId),
         conversacion_id: this.parsearId(opciones?.conversacionId),
       },
@@ -568,7 +585,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       waMessageId,
       estado,
       errorCodigo: resultado.error?.codigo,
-      errorDetalle: resultado.error?.mensaje,
+      errorDetalle: detalleDeErrorMeta(resultado.error),
       reintentos: resultado.intentos,
     };
   }
@@ -639,7 +656,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         plantilla: null,
         estado,
         error_codigo: resultado.error?.codigo || null,
-        error_detalle: resultado.error?.mensaje || null,
+        error_detalle: detalleDeErrorMeta(resultado.error) || null,
         pedido_id: this.parsearId(opciones?.pedidoId),
         conversacion_id: this.parsearId(opciones?.conversacionId),
       },
@@ -651,7 +668,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       waMessageId,
       estado,
       errorCodigo: resultado.error?.codigo,
-      errorDetalle: resultado.error?.mensaje,
+      errorDetalle: detalleDeErrorMeta(resultado.error),
       reintentos: resultado.intentos,
     };
   }
@@ -784,7 +801,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         plantilla: null,
         estado,
         error_codigo: resultado.error?.codigo || null,
-        error_detalle: resultado.error?.mensaje || null,
+        error_detalle: detalleDeErrorMeta(resultado.error) || null,
         pedido_id: this.parsearId(opciones?.pedidoId),
         conversacion_id: this.parsearId(opciones?.conversacionId),
       },
@@ -796,7 +813,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       waMessageId,
       estado,
       errorCodigo: resultado.error?.codigo,
-      errorDetalle: resultado.error?.mensaje,
+      errorDetalle: detalleDeErrorMeta(resultado.error),
       reintentos: resultado.intentos,
     };
   }
@@ -851,7 +868,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         plantilla: null,
         estado,
         error_codigo: resultado.error?.codigo || null,
-        error_detalle: resultado.error?.mensaje || null,
+        error_detalle: detalleDeErrorMeta(resultado.error) || null,
         pedido_id: this.parsearId(opciones?.pedidoId),
         conversacion_id: this.parsearId(opciones?.conversacionId),
       },
@@ -863,7 +880,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       waMessageId,
       estado,
       errorCodigo: resultado.error?.codigo,
-      errorDetalle: resultado.error?.mensaje,
+      errorDetalle: detalleDeErrorMeta(resultado.error),
       reintentos: resultado.intentos,
     };
   }

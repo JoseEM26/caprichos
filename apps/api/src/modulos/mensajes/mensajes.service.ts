@@ -16,6 +16,7 @@ import {
 import { flujoLiberadoParaBot } from '../chatbot/conversacion/flujo-liberado.util';
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
+import { separarDetalleTecnico } from '../chatbot/utilidades/meta-errores.util';
 import { EditarNombreContactoDto } from './dto/mensajes.dto';
 import { MATRIZ } from '../acceso/permisos';
 import { BOTONES_PAGO_RECHAZADO, TEXTOS_PAGO } from '../chatbot/conversacion/flujos/pago/textos-pago';
@@ -310,8 +311,9 @@ export class MensajesService {
     let voucherDetalle: any = null;
     // Cualquiera de sus roles (principal o extra) con permiso; ADMIN solo como principal
     const rolesUsuario = (usuario?.roles ?? [usuario?.rol ?? '']).map((r) => String(r || '').toUpperCase());
+    const esAdmin = rolesUsuario.includes('ADMIN');
     const tienePermisoVerVouchers =
-      rolesUsuario.includes('ADMIN') ||
+      esAdmin ||
       rolesUsuario.some((r) => Boolean(MATRIZ[r]) && MATRIZ[r].includes('vouchers/ver'));
 
     if (tienePermisoVerVouchers && pedido?.id) {
@@ -361,6 +363,8 @@ export class MensajesService {
         const errorDetalle = wa?.error_detalle || contenido.errorDetalle || null;
         const motivoFallo =
           estadoMsg === 'FALLIDO' ? mapearErrorWhatsApp(errorCodigo, errorDetalle) : null;
+        // Detalle técnico (código de Meta y texto original): solo ADMIN
+        const tecnico = esAdmin && estadoMsg === 'FALLIDO' ? separarDetalleTecnico(errorCodigo, errorDetalle) : null;
 
         return {
           id: m.id.toString(),
@@ -375,8 +379,9 @@ export class MensajesService {
           ubicacion: contenido.ubicacion ?? null,
           hora: hora(m.en),
           estado: estadoMsg,
-          errorCodigo,
-          errorDetalle,
+          errorCodigo: esAdmin ? errorCodigo : null,
+          errorDetalle: esAdmin ? tecnico?.original ?? null : null,
+          metaCodigo: esAdmin ? tecnico?.codigoMeta ?? null : null,
           motivoFallo,
         };
       }),

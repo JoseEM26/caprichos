@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { derivarFlujo, alternarGrupo, luzDeEquipo, type PiezaFlujo, type Escenario } from '../flujo';
+import { derivarFlujo, alternarGrupo, luzDeEquipo, luzDeMaquina, motivoSalida, ordenarPiezas, subRanura, type PiezaFlujo, type Escenario } from '../flujo';
 import type { MapaImpresionDatos } from '../../impresionApi';
 
 const CAJA = '10';
@@ -8,16 +8,17 @@ const DELIVERY: Escenario = { modalidad: 'DELIVERY', conBebidas: true };
 /** Mapa como lo devuelve el servidor: Caja con etiquetera y ticketera; un equipo en Bebidas; áreas apagadas. */
 function mapaBase(over: Partial<MapaImpresionDatos> = {}): MapaImpresionDatos {
   return {
+    duplicados: [],
     areas: [
-      { id: '1', nombre: 'Bebidas' },
-      { id: '2', nombre: 'Salados' },
-      { id: '3', nombre: 'Postres' },
+      { id: '1', nombre: 'Bebidas', equiposPorRol: { ETIQUETERA: '11', TICKETERA: null } },
+      { id: '2', nombre: 'Salados', equiposPorRol: { ETIQUETERA: null, TICKETERA: null } },
+      { id: '3', nombre: 'Postres', equiposPorRol: { ETIQUETERA: null, TICKETERA: null } },
     ],
     equipos: [
-      { deviceKeyId: CAJA, nombre: 'PC Caja', areaId: null, roles: [{ rol: 'ETIQUETERA', estado: 'lista' }, { rol: 'TICKETERA', estado: 'lista' }], ultimoLatido: null, conectado: true },
-      { deviceKeyId: '11', nombre: 'Etiquetera bar', areaId: '1', roles: [{ rol: 'ETIQUETERA', estado: 'lista' }], ultimoLatido: null, conectado: true },
+      { deviceKeyId: CAJA, nombre: 'PC Caja', areaId: null, maquinas: ['ETIQUETERA', 'TICKETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }, { rol: 'TICKETERA', estado: 'lista' }], ultimoLatido: null, conectado: true },
+      { deviceKeyId: '11', nombre: 'Etiquetera bar', areaId: '1', maquinas: ['ETIQUETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }, { rol: 'TICKETERA', estado: 'no_configurada' }], ultimoLatido: null, conectado: true },
     ],
-    reglas: { generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true },
+    reglas: { generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true, comandaAreaActivo: false },
     ruteo: [
       { tipo: 'ETIQUETA_GENERAL', areaId: null, destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: true },
       { tipo: 'ETIQUETA_BEBIDA', areaId: '1', destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Etiquetera bar', activo: true },
@@ -25,6 +26,9 @@ function mapaBase(over: Partial<MapaImpresionDatos> = {}): MapaImpresionDatos {
       { tipo: 'ETIQUETA_AREA', areaId: '2', destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: false },
       { tipo: 'ETIQUETA_AREA', areaId: '3', destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: false },
       { tipo: 'TICKET_COMANDA_SALON', areaId: null, destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: true },
+      { tipo: 'TICKET_COMANDA_AREA', areaId: '1', destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: false },
+      { tipo: 'TICKET_COMANDA_AREA', areaId: '2', destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: false },
+      { tipo: 'TICKET_COMANDA_AREA', areaId: '3', destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: false },
       { tipo: 'TICKET_PAGO', areaId: null, destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: true },
     ],
     colaPendientePorEquipo: [],
@@ -65,7 +69,7 @@ describe('derivarFlujo', () => {
   it('área con equipo: el sticker va a su equipo, sin espera', () => {
     const mapa = mapaBase({
       reglas: { ...mapaBase().reglas, areaActivo: true },
-      equipos: [...mapaBase().equipos, { deviceKeyId: '12', nombre: 'Etiquetera cocina', areaId: '2', roles: [{ rol: 'ETIQUETERA', estado: 'lista' }], ultimoLatido: null, conectado: true }],
+      equipos: [...mapaBase().equipos, { deviceKeyId: '12', nombre: 'Etiquetera cocina', areaId: '2', maquinas: ['ETIQUETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }], ultimoLatido: null, conectado: true }],
       ruteo: mapaBase().ruteo.map((x) => (x.tipo === 'ETIQUETA_AREA' && x.areaId === '2' ? { ...x, destinoAreaId: '2', destinoEquipoId: '12', destinoNombre: 'Etiquetera cocina' } : x)),
     });
     const s = pieza(derivarFlujo(mapa, DELIVERY), 'AREA').salidas.find((x) => x.slot === '2')!;
@@ -76,7 +80,7 @@ describe('derivarFlujo', () => {
 
   it('área con equipo caído: el trabajo espera en su cola, no vuelve a Caja', () => {
     const mapa = mapaBase({
-      equipos: [...mapaBase().equipos, { deviceKeyId: '12', nombre: 'Etiquetera cocina', areaId: '2', roles: [{ rol: 'ETIQUETERA', estado: 'desconectada' }], ultimoLatido: null, conectado: false }],
+      equipos: [...mapaBase().equipos, { deviceKeyId: '12', nombre: 'Etiquetera cocina', areaId: '2', maquinas: ['ETIQUETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'desconectada' }], ultimoLatido: null, conectado: false }],
       ruteo: mapaBase().ruteo.map((x) => (x.tipo === 'ETIQUETA_AREA' && x.areaId === '2' ? { ...x, destinoAreaId: '2', destinoEquipoId: '12', destinoNombre: 'Etiquetera cocina' } : x)),
       reglas: { ...mapaBase().reglas, areaActivo: true },
     });
@@ -122,3 +126,68 @@ describe('ayudas de flujo y luces', () => {
     expect(luzDeEquipo({ ...base, conectado: false })).toBe('rojo');
   });
 });
+
+describe('motivo y orden para el detalle', () => {
+  it('cada salida explica por qué cae ahí', () => {
+    const base = { slot: null, equipoId: CAJA, nombreDestino: 'PC Caja', espera: false, cae: false, sinEquipo: false };
+    expect(motivoSalida({ ...base, slot: '1', equipoId: '11', nombreDestino: 'Etiquetera bar' })).toBe('Su equipo está asignado a esa área.');
+    expect(motivoSalida({ ...base, cae: true })).toContain('cae en Caja');
+    expect(motivoSalida({ ...base, slot: '1', espera: true })).toContain('en espera');
+    expect(motivoSalida({ ...base, sinEquipo: true, equipoId: null })).toContain('no sale');
+    expect(motivoSalida(base)).toBe('Caja imprime esta pieza.');
+  });
+
+  it('las piezas de Caja van primero, luego las de cada área (menos cruces)', () => {
+    const f = derivarFlujo(mapaBase(), DELIVERY);
+    const orden = ordenarPiezas(f, [null, '1', '2', '3']).map((p) => p.clave);
+    expect(orden.indexOf('BEBIDA')).toBeGreaterThan(orden.indexOf('RESUMEN'));
+    expect(orden.indexOf('BEBIDA')).toBeGreaterThan(orden.indexOf('PAGO'));
+    expect(orden).toHaveLength(6);
+  });
+});
+
+describe('comanda por área en el flujo', () => {
+  it('viene apagada por defecto y no sale con ningún pedido', () => {
+    const pieza1 = pieza(derivarFlujo(mapaBase(), DELIVERY), 'COMANDA_AREA');
+    expect(pieza1.reglaActiva).toBe(false);
+    expect(pieza1.sale).toBe(false);
+    expect(pieza1.motivo).toBe('Apagada en las reglas');
+  });
+
+  it('encendida sale en cualquier modalidad, con una hoja por área a su ticketera o a Caja', () => {
+    const mapa = mapaBase({
+      reglas: { ...mapaBase().reglas, comandaAreaActivo: true },
+      equipos: [...mapaBase().equipos, { deviceKeyId: '12', nombre: 'Ticketera salados', areaId: '2', maquinas: ['TICKETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'no_configurada' }, { rol: 'TICKETERA', estado: 'lista' }], ultimoLatido: null, conectado: true }],
+      ruteo: mapaBase().ruteo.map((x) => (x.tipo === 'TICKET_COMANDA_AREA' && x.areaId === '2' ? { ...x, destinoAreaId: '2', destinoEquipoId: '12', destinoNombre: 'Ticketera salados' } : x)),
+    });
+    for (const modalidad of ['MESA', 'LLEVAR', 'DELIVERY'] as const) {
+      const p = pieza(derivarFlujo(mapa, { modalidad, conBebidas: false }), 'COMANDA_AREA');
+      expect(p.sale).toBe(true);
+    }
+    const salidas = pieza(derivarFlujo(mapa, DELIVERY), 'COMANDA_AREA').salidas;
+    expect(salidas.find((s) => s.slot === '2')).toMatchObject({ equipoId: '12', cae: false });
+    expect(salidas.find((s) => s.slot === null && s.cae)).toBeDefined();
+  });
+});
+
+describe('máquinas de un equipo y sub-ranuras de área', () => {
+  it('un equipo con solo etiquetera no se ve «en ámbar» por la ticketera que no tiene', () => {
+    const eq = mapaBase().equipos[1];
+    expect(luzDeEquipo(eq)).toBe('verde');
+    expect(luzDeMaquina(eq, 'ETIQUETERA')).toBe('verde');
+  });
+
+  it('subRanura distingue equipo con la máquina, equipo sin esa máquina y área sin equipo', () => {
+    const mapa = mapaBase();
+    expect(subRanura(mapa, '1', 'ETIQUETERA')).toMatchObject({ tipo: 'equipo', equipo: { deviceKeyId: '11' }, estado: 'lista' });
+    expect(subRanura(mapa, '1', 'TICKETERA')).toMatchObject({ tipo: 'sin_maquina', equipo: { deviceKeyId: '11' } });
+    expect(subRanura(mapa, '2', 'ETIQUETERA')).toEqual({ tipo: 'sin_equipo' });
+  });
+
+  it('luz de una máquina: sin conexión o con error es roja; sin papel, ámbar', () => {
+    const eq = mapaBase().equipos[1];
+    expect(luzDeMaquina({ ...eq, conectado: false }, 'ETIQUETERA')).toBe('rojo');
+    expect(luzDeMaquina({ ...eq, roles: [{ rol: 'ETIQUETERA', estado: 'sin_papel' }, { rol: 'TICKETERA', estado: 'no_configurada' }] }, 'ETIQUETERA')).toBe('ambar');
+  });
+});
+

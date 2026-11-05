@@ -7,6 +7,9 @@ import { rutaArchivoConfiguracion, obtenerConfiguracion } from '../config';
 import { ImpresoraMemoria } from '../impresora/impresoraMemoria';
 import { ImpresoraUsb } from '../impresora/impresoraUsb';
 import { ErrorImpresora } from '../impresora/dispositivo.interface';
+import { ImpresoraRed } from '../impresora/impresoraRed';
+import { ImpresoraWindows } from '../impresora/impresoraWindows';
+import * as net from 'net';
 
 // Que los comandos no lean la configuracion real del equipo
 process.env.AGENTE_CONFIG = path.join(os.tmpdir(), 'caprichos-sin-config.json');
@@ -143,5 +146,85 @@ describe('Linux: dos impresoras por rol', () => {
     expect(vieja.obtenerRuta()).toBe(`${d}/lp0`); // config solo con ruta: se mantiene
     fs.rmSync(d, { recursive: true, force: true });
     fs.rmSync(sys, { recursive: true, force: true });
+  });
+});
+
+describe('Impresora de RED por IP', () => {
+  /** Servidor local que hace de impresora de red y guarda lo que recibe. */
+  function impresoraDeRed(): Promise<{ puerto: number; recibido: () => Buffer; cerrar: () => Promise<void> }> {
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = [];
+      const conexiones: net.Socket[] = [];
+      const srv = net.createServer((c) => {
+        conexiones.push(c);
+        c.on('data', (d) => chunks.push(d));
+        c.on('error', () => undefined);
+      });
+      srv.listen(0, '127.0.0.1', () => {
+        resolve({
+          puerto: (srv.address() as net.AddressInfo).port,
+          recibido: () => Buffer.concat(chunks),
+          cerrar: () => new Promise((r) => { conexiones.forEach((c) => c.destroy()); srv.close(() => r()); }),
+        });
+      });
+    });
+  }
+
+  /** Config con llave (así el asistente no pide vincular) en un archivo temporal propio. */
+  function configTemporal(): { ruta: string; limpiar: () => void } {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'red-cfg-'));
+    const ruta = path.join(dir, 'config.json');
+    fs.writeFileSync(ruta, JSON.stringify({ apiUrl: 'http://x', agenteKey: 'k' }));
+    const prev = process.env.AGENTE_CONFIG;
+    process.env.AGENTE_CONFIG = ruta;
+    return { ruta, limpiar: () => { process.env.AGENTE_CONFIG = prev; fs.rmSync(dir, { recursive: true, force: true }); } };
+  }
+
+  it('crearDispositivo elige red (tcp:// o IP), USB o Windows según el destino', () => {
+    expect(crearDispositivo('tcp://192.168.1.50:9100', undefined, 'TICKETERA')).toBeInstanceOf(ImpresoraRed);
+    expect(crearDispositivo('192.168.1.50').obtenerRuta()).toBe('tcp://192.168.1.50:9100');
+    expect(crearDispositivo('/dev/usb/lp0')).toBeInstanceOf(ImpresoraUsb);
+    expect(crearDispositivo('POS80')).toBeInstanceOf(ImpresoraWindows);
+  });
+
+  it('asistente: IP inválida y puerto cerrado vuelven a preguntar; IP buena se prueba, se guarda y se imprime la prueba si se acepta', async () => {
+    const red = await impresoraDeRed();
+    const cerrado = await impresoraDeRed();
+    const puertoCerrado = cerrado.puerto;
+    await cerrado.cerrar();
+    const cfg = configTemporal();
+    const resp = ['192.168.1.300', `127.0.0.1:${puertoCerrado}`, `127.0.0.1:${red.puerto}`, 'S', ''];
+    const logs: string[] = [];
+    try {
+      const r = await ejecutarAsistente(async () => resp.shift() ?? '', (m) => logs.push(m));
+      expect(r.etiquetera).toBe(`tcp://127.0.0.1:${red.puerto}`);
+      expect(r.ticketera).toBeUndefined();
+      expect(logs.some((m) => m.includes('IP no válida'))).toBe(true);
+      expect(logs.some((m) => m.includes('No se pudo conectar con la impresora 127.0.0.1:'))).toBe(true);
+      expect(logs.some((m) => m.startsWith('✔ Conexión con tcp://127.0.0.1:'))).toBe(true);
+      await new Promise((res) => setTimeout(res, 50));
+      expect(red.recibido().length).toBeGreaterThan(0); // la página de prueba de la etiquetera
+      const guardado = JSON.parse(fs.readFileSync(cfg.ruta, 'utf-8'));
+      expect(guardado.etiquetera).toBe(`tcp://127.0.0.1:${red.puerto}`);
+    } finally {
+      cfg.limpiar();
+      await red.cerrar();
+    }
+  });
+
+  it('asistente: con «n» en la prueba solo guarda (sin ticket, solo la consulta de estado)', async () => {
+    const red = await impresoraDeRed();
+    const cfg = configTemporal();
+    const resp = ['', `127.0.0.1:${red.puerto}`, 'n'];
+    try {
+      const r = await ejecutarAsistente(async () => resp.shift() ?? '', () => undefined);
+      expect(r.ticketera).toBe(`tcp://127.0.0.1:${red.puerto}`);
+      await new Promise((res) => setTimeout(res, 50));
+      // Solo la consulta de estado DLE EOT de la verificación: ningún ticket salió
+      expect(red.recibido()).toEqual(Buffer.from([0x10, 0x04, 0x04, 0x10, 0x04, 0x02]));
+    } finally {
+      cfg.limpiar();
+      await red.cerrar();
+    }
   });
 });

@@ -23,6 +23,10 @@ export function reglasDesdeValores(valores: Record<string, unknown>): ReglasImpr
       valores[CLAVES_CONFIG_IMPRESION.TICKET_COMANDA_SALON_ACTIVO],
       REGLAS_IMPRESION_DEFECTO.comandaSalonActivo,
     ),
+    comandaAreaActivo: bool(
+      valores[CLAVES_CONFIG_IMPRESION.TICKET_COMANDA_AREA_ACTIVO],
+      REGLAS_IMPRESION_DEFECTO.comandaAreaActivo,
+    ),
   };
 }
 
@@ -42,6 +46,7 @@ export function valoresDesdeCambio(cambio: Partial<{
   bebidaActivo: boolean;
   areaActivo: boolean;
   comandaSalonActivo: boolean;
+  comandaAreaActivo: boolean;
 }>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (cambio.generalModalidades !== undefined) {
@@ -59,6 +64,7 @@ export function valoresDesdeCambio(cambio: Partial<{
     ['bebidaActivo', CLAVES_CONFIG_IMPRESION.ETIQUETA_BEBIDA_ACTIVO],
     ['areaActivo', CLAVES_CONFIG_IMPRESION.ETIQUETA_AREA_ACTIVO],
     ['comandaSalonActivo', CLAVES_CONFIG_IMPRESION.TICKET_COMANDA_SALON_ACTIVO],
+    ['comandaAreaActivo', CLAVES_CONFIG_IMPRESION.TICKET_COMANDA_AREA_ACTIVO],
   ];
   for (const [campo, clave] of booleanos) {
     if (cambio[campo] === undefined) continue;

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { lineasTicketComandaSalon } from '../etiquetas/ticketComanda.js';
+import { rolDeTrabajo } from '../tipos/etiquetas.js';
 import { maquetarGeneral } from '../etiquetas/maquetaEtiquetas.js';
 import type { TicketComandaSalonDatos, EtiquetaGeneralDatos } from '../tipos/etiquetas.js';
 
@@ -61,3 +62,21 @@ describe('sticker general con monto total', () => {
     expect(textos.some((t) => t.startsWith('TOTAL'))).toBe(false);
   });
 });
+
+describe('comanda por área (TICKET_COMANDA_AREA)', () => {
+  it('su cabecera lleva el nombre del área y sus líneas', () => {
+    const textos = lineasTicketComandaSalon({ ...comanda, tipo: 'TICKET_COMANDA_AREA', area: 'SALADOS' }, 32).map((l) => l.texto);
+    expect(textos[0]).toBe('COMANDA · SALADOS');
+    expect(textos.some((t) => t.includes('Frappe Mocha'))).toBe(true);
+  });
+
+  it('sin área la cabecera de la comanda de salón no cambia', () => {
+    expect(lineasTicketComandaSalon(comanda, 32)[0].texto).toBe('COMANDA');
+  });
+
+  it('se imprime en la ticketera, como la comanda de salón', () => {
+    expect(rolDeTrabajo('TICKET_COMANDA_AREA')).toBe('TICKETERA');
+    expect(rolDeTrabajo('ETIQUETA_AREA')).toBe('ETIQUETERA');
+  });
+});
+

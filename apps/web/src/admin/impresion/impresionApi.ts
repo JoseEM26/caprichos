@@ -111,6 +111,8 @@ export interface EquipoMapa {
   nombre: string;
   /** null = Caja */
   areaId: string | null;
+  /** Máquinas que declara el programa (las que usa el ruteo), aunque el programa esté caído. */
+  maquinas: RolEquipoMapa[];
   roles: Array<{ rol: RolEquipoMapa; estado: EstadoRolMapa }>;
   ultimoLatido: string | null;
   conectado: boolean;
@@ -121,9 +123,16 @@ export interface ReglasMapa {
   bebidaActivo: boolean;
   areaActivo: boolean;
   comandaSalonActivo: boolean;
+  comandaAreaActivo: boolean;
 }
 
-export type TipoRuteoMapa = 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA' | 'TICKET_COMANDA_SALON' | 'TICKET_PAGO';
+export type TipoRuteoMapa =
+  | 'ETIQUETA_GENERAL'
+  | 'ETIQUETA_AREA'
+  | 'ETIQUETA_BEBIDA'
+  | 'TICKET_COMANDA_SALON'
+  | 'TICKET_COMANDA_AREA'
+  | 'TICKET_PAGO';
 
 export interface RuteoMapa {
   tipo: TipoRuteoMapa;
@@ -136,8 +145,24 @@ export interface RuteoMapa {
   activo: boolean;
 }
 
+export interface AreaMapa {
+  id: string;
+  nombre: string;
+  /** Equipo que declara cada máquina dentro de esta área (deviceKeyId), o null si ninguno. */
+  equiposPorRol: Record<RolEquipoMapa, string | null>;
+}
+
+/** Grupo de equipos que chocan (más de uno para la misma área y máquina, o en Caja): hay que dejar uno. */
+export interface GrupoDuplicadoMapa {
+  /** null = Caja */
+  areaId: string | null;
+  nombre: string;
+  equipos: Array<{ deviceKeyId: string; nombre: string }>;
+}
+
 export interface MapaImpresionDatos {
-  areas: Array<{ id: string; nombre: string }>;
+  duplicados: GrupoDuplicadoMapa[];
+  areas: AreaMapa[];
   equipos: EquipoMapa[];
   reglas: ReglasMapa;
   ruteo: RuteoMapa[];
@@ -155,9 +180,23 @@ export const impresionApi = {
     return api.get<MapaImpresionDatos>('/admin/impresion/mapa');
   },
 
-  /** areaId null = Caja. */
-  asignarAreaEquipo: async (equipoId: string, areaId: string | null): Promise<RespuestaAsignarArea> => {
-    return api.put<RespuestaAsignarArea>(`/admin/impresion/equipos/${equipoId}/area`, { areaId });
+  /**
+   * areaId null = Caja. Si el destino ya tiene equipo con esa máquina, responde 409 AREA_OCUPADA
+   * (err.codigo) con err.detalles.ocupadoPor; con reemplazar: true lo desactiva y asigna este.
+   */
+  asignarAreaEquipo: async (equipoId: string, areaId: string | null, reemplazar = false): Promise<RespuestaAsignarArea> => {
+    const cuerpo = reemplazar ? { areaId, reemplazar: true } : { areaId };
+    return api.put<RespuestaAsignarArea>(`/admin/impresion/equipos/${equipoId}/area`, cuerpo);
+  },
+
+  /** El equipo viejo cede su área al nuevo, y el viejo se desactiva. */
+  reemplazarEquipo: async (viejoId: string, porEquipoId: string): Promise<{ ok: boolean; reemplazados: string[] }> => {
+    return api.post(`/admin/impresion/equipos/${viejoId}/reemplazar`, { porEquipoId });
+  },
+
+  /** Deja solo este equipo en su área (o en Caja): desactiva los duplicados. */
+  quedarseCon: async (equipoId: string): Promise<{ ok: boolean; desactivados: string[] }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/quedarse`, {});
   },
 
   guardarReglasImpresion: async (cambio: Partial<ReglasMapa>): Promise<{ ok: boolean; reglas: ReglasMapa }> => {

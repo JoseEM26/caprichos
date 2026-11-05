@@ -2,6 +2,7 @@ import type {
   EtiquetaGeneralDatos,
   EtiquetaAreaDatos,
   EtiquetaBebidaDatos,
+  TicketPagoDatos,
 } from '@caprichos/compartido';
 
 export const muestraEtiquetaGeneral: EtiquetaGeneralDatos = {
@@ -60,4 +61,17 @@ export const muestraEtiquetaBebida: EtiquetaBebidaDatos = {
   contiene: 'Avena, canela, espresso doble',
   who: 'Para: Juan Pérez',
   hora: '15:30',
+};
+
+/** Ticket de prueba de la ticketera (asistente de vinculación por red). */
+export const muestraTicketPago: TicketPagoDatos = {
+  local: { nombre: 'CAPRICHOS' },
+  codigo: 'PRUEBA',
+  fecha: '05/11/2026',
+  hora: '12:00',
+  who: 'Prueba de impresión',
+  modalidad: 'PRUEBA',
+  lineas: [{ cantidad: 1, nombre: 'Página de prueba', subtotal: 0 }],
+  total: 0,
+  pagos: [{ medio: 'EFECTIVO', monto: 0 }],
 };

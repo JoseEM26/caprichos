@@ -40,6 +40,14 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
                 >
                   Reintentar
                 </button>
+                {m.errorDetalle && (
+                  <details style={{ flexBasis: '100%', fontWeight: 400, fontSize: 12, color: '#54656F' }}>
+                    <summary>Detalle técnico</summary>
+                    <div>
+                      Código de Meta: {m.metaCodigo ?? 'sin código'} · {m.errorDetalle}
+                    </div>
+                  </details>
+                )}
               </span>
             ) : m.estado === 'SIMULADO' ? (
               <span>Modo simulado: no se envia a WhatsApp</span>

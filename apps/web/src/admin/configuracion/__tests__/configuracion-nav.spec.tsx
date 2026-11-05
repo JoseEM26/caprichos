@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { api } from '../../../comun/api';
@@ -120,5 +122,67 @@ describe('Configuración: buscador, grupos y salto al ajuste', () => {
     fireEvent.click(screen.getByRole('button', { name: /‹ Configuración/ }));
     expect(screen.getByRole('tablist')).toBeInTheDocument();
     expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
+  });
+});
+
+describe('Configuración: menú de secciones con alto máximo y scroll', () => {
+  const css = readFileSync(resolve(__dirname, '../configuracion-nav.css'), 'utf8');
+  const regla = (sel: string) => css.match(new RegExp(`${sel.replace(/[.[\]]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+    ancho(1024);
+    vi.spyOn(api, 'get').mockResolvedValue({} as any);
+    usarSesion(['configuracion/ver', 'configuracion/editar', 'local/ver', 'local/editar']);
+  });
+  afterEach(() => { ancho(1024); delete (Element.prototype as any).scrollIntoView; });
+
+  it('el contenedor tiene alto máximo y desplazamiento vertical propio (escritorio y celular)', () => {
+    const base = regla('.cfg-nav');
+    expect(base).toMatch(/max-height:\s*min\(60vh,\s*520px\)/);
+    expect(base).toMatch(/overflow-y:\s*auto/);
+    expect(base).toMatch(/scroll-behavior:\s*smooth/);
+    expect(css).toMatch(/@media \(max-width: 719px\)[^@]*\.cfg-nav\s*\{\s*max-height:\s*50vh/);
+  });
+
+  it('el contenedor es enfocable, se anuncia como secciones y el foco es visible', () => {
+    montar();
+    const nav = screen.getByRole('tablist', { name: 'Secciones de configuración' });
+    expect(nav).toHaveAttribute('tabIndex', '0');
+    expect(nav).toHaveClass('cfg-nav');
+    expect(regla('.cfg-nav:focus-visible')).toMatch(/outline:\s*3px/);
+  });
+
+  it('el ajuste activo se desplaza a la vista con scrollIntoView({block:"nearest"})', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    montar('/admin/configuracion?tab=pagos');
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Pagos/i })).toHaveAttribute('aria-selected', 'true'));
+    expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+    expect(scroll.mock.contexts[scroll.mock.calls.length - 1]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('sin scrollIntoView (jsdom) no falla al cambiar de pestaña', () => {
+    montar();
+    expect(() => fireEvent.click(screen.getByRole('tab', { name: /Datos del local/i }))).not.toThrow();
+  });
+
+  it('marca los indicadores de desplazamiento cuando hay contenido arriba o abajo', () => {
+    montar();
+    const nav = screen.getByRole('tablist', { name: 'Secciones de configuración' });
+    Object.defineProperty(nav, 'scrollHeight', { configurable: true, value: 900 });
+    Object.defineProperty(nav, 'clientHeight', { configurable: true, value: 400 });
+    nav.scrollTop = 0;
+    fireEvent.scroll(nav);
+    expect(nav.dataset.arriba).toBe('false');
+    expect(nav.dataset.abajo).toBe('true');
+    nav.scrollTop = 300;
+    fireEvent.scroll(nav);
+    expect(nav.dataset.arriba).toBe('true');
+    expect(nav.dataset.abajo).toBe('true');
+    nav.scrollTop = 500;
+    fireEvent.scroll(nav);
+    expect(nav.dataset.abajo).toBe('false');
   });
 });

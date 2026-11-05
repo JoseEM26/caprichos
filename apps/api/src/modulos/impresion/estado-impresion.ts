@@ -111,7 +111,7 @@ export function estadoPorRol(
     if (!r) {
       return { conectada: false, estado: 'no_configurada', motivo: 'No está configurada en el programa del local' };
     }
-    if (r.estado === 'lista') return { conectada: true, estado: 'lista', motivo: null };
+    if (r.estado === 'lista') return { conectada: true, estado: 'lista', motivo: null, ...(r.detalle ? { detalle: r.detalle } : {}) };
     const base = MOTIVO_ESTADO[r.estado] || 'Impresora con problema';
     return { conectada: false, estado: r.estado, motivo: r.detalle && (r.estado === 'sin_permiso' || r.estado === 'desconectada') ? r.detalle : r.detalle && r.estado === 'error' ? `${base}: ${r.detalle}` : base };
   };

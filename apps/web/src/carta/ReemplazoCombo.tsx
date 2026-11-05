@@ -9,7 +9,9 @@ export interface ParteConReemplazo {
 /** Combo activo vinculado a un producto de la carta (el producto «Combo Dúo...» abre su ventana de armado). */
 export function comboDeProducto(ofertas: OfertaItem[] | undefined, productoId: string): OfertaItem | null {
   return (
-    (ofertas ?? []).find((o) => o.tipo === 'COMBO' && String(o.alcanceProductoId ?? '') === String(productoId)) ?? null
+    (ofertas ?? []).find(
+      (o) => o.tipo === 'COMBO' && o.activo !== false && String(o.alcanceProductoId ?? '') === String(productoId),
+    ) ?? null
   );
 }
 

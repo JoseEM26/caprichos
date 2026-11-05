@@ -1,6 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
-import { CasillaBot, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
+import { CasillaBot, SelectorVisibleCarta, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -78,6 +78,7 @@ export function ModalLlevaPaga({
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
   const [valeBot, setValeBot] = useState(false);
+  const [visibleCarta, setVisibleCarta] = useState(true);
 
   // Paso 3: Beneficio
   const [qLleva, setQLleva] = useState(2);
@@ -132,6 +133,7 @@ export function ModalLlevaPaga({
       setFechaDesde(ofertaAEditar.fechaInicio ? ofertaAEditar.fechaInicio.slice(0, 10) : ofertaAEditar.fechaDesde ? ofertaAEditar.fechaDesde.slice(0, 10) : '');
       setFechaHasta(ofertaAEditar.fechaFin ? ofertaAEditar.fechaFin.slice(0, 10) : ofertaAEditar.fechaHasta ? ofertaAEditar.fechaHasta.slice(0, 10) : '');
       { const sel = selectorDesdeCanales(ofertaAEditar.canales); setCanal(sel.canal); setValeBot(sel.valeBot); }
+      setVisibleCarta(ofertaAEditar.visibleCarta !== false);
       setPaso(1);
       setMensajeError('');
     } else {
@@ -377,6 +379,7 @@ export function ModalLlevaPaga({
             cantidad: c.cantidad,
           })),
         },
+        ...(ofertaAEditar ? { visibleCarta } : {}),
       };
 
       await onGuardar(payload);
@@ -898,6 +901,7 @@ export function ModalLlevaPaga({
                   ))}
                 </select>
                   <CasillaBot id="lp-canal-bot" checked={valeBot} onChange={setValeBot} bloqueada={canal === 'solo-bot'} />
+                  {ofertaAEditar && <SelectorVisibleCarta id="lp-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
               </div>
               <div style={{ flex: 1, minWidth: '130px' }}>
                 <label htmlFor="lp-f-desde" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>

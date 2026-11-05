@@ -22,9 +22,9 @@ function equipoConRol(ctx: ContextoRuteo, areaId: bigint, rol: RolImpresora): bo
 
 /**
  * Destino de un trabajo: el id del área cuyo equipo lo imprime, o NULL (Caja).
- * Solo los stickers se rutean: el sticker por área va a su área si esa área tiene etiquetera asignada, y el
- * sticker por vaso va a Bebidas si tiene etiquetera. Todo lo demás (general, ticketera) es de Caja.
- * Con el equipo asignado pero caído, el trabajo espera en su cola: no vuelve solo a Caja.
+ * Stickers: el sticker por área va a su área si esa área tiene etiquetera asignada, y el sticker por vaso va a
+ * Bebidas si tiene etiquetera. Comanda por área: a la ticketera de su área si la tiene. Lo demás (general,
+ * comanda de salón, pago) es de Caja. Con el equipo asignado pero caído, el trabajo espera en su cola.
  */
 export function destinoDeTrabajo(
   tipo: TipoTrabajoImpresion | string,
@@ -38,6 +38,9 @@ export function destinoDeTrabajo(
     const bebidas = ctx.areaBebidasId;
     return bebidas !== null && equipoConRol(ctx, bebidas, 'ETIQUETERA') ? bebidas : null;
   }
+  if (tipo === 'TICKET_COMANDA_AREA') {
+    return areaId !== null && equipoConRol(ctx, areaId, 'TICKETERA') ? areaId : null;
+  }
   return null;
 }
 
@@ -45,7 +48,7 @@ export function destinoDeTrabajo(
 export function tiposDeRoles(roles: RolImpresora[]): string[] {
   return [
     ...(roles.includes('ETIQUETERA') ? ['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'] : []),
-    ...(roles.includes('TICKETERA') ? ['TICKET_PAGO', 'TICKET_COMANDA_SALON'] : []),
+    ...(roles.includes('TICKETERA') ? ['TICKET_PAGO', 'TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA'] : []),
   ];
 }
 
@@ -60,6 +63,9 @@ export function aplicaSegunReglas(tipo: string, modalidad: string, reglas: Regla
       return reglas.areaActivo;
     case 'TICKET_COMANDA_SALON':
       return reglas.comandaSalonActivo && (MODALIDADES_SALON as readonly string[]).includes(modalidad);
+    // Comanda por área: en cualquier modalidad (la cocina de cada área prepara también llevar y delivery).
+    case 'TICKET_COMANDA_AREA':
+      return reglas.comandaAreaActivo;
     default:
       return true;
   }

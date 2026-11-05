@@ -1,6 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
-import { CasillaBot, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
+import { CasillaBot, SelectorVisibleCarta, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ComboPrecioItem, ComboParteItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -141,6 +141,7 @@ export function ModalCombo({
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
   const [valeBot, setValeBot] = useState(false);
+  const [visibleCarta, setVisibleCarta] = useState(true);
 
   // Estados de control
   const [mensajeError, setMensajeError] = useState('');
@@ -207,6 +208,7 @@ export function ModalCombo({
       setFechaDesde(fDesde ? fDesde.slice(0, 10) : '');
       setFechaHasta(fHasta ? fHasta.slice(0, 10) : '');
       { const sel = selectorDesdeCanales(comboAEditar.canales); setCanal(sel.canal); setValeBot(sel.valeBot); }
+      setVisibleCarta(comboAEditar.visibleCarta !== false);
       setPaso(1);
       setMensajeError('');
       setParteAbiertaIndex(0);
@@ -469,6 +471,7 @@ export function ModalCombo({
         fechaFin: fechaHasta || undefined,
         canales: canalesDesdeSelector(canal, valeBot),
         activo: comboAEditar ? comboAEditar.activo : true,
+        ...(comboAEditar ? { visibleCarta } : {}),
         imagenArchivoId: fotoArchivoId,
         tamanos: tamanos.map((t) => ({
           tamanoNombre: t.tamanoNombre.trim(),
@@ -1618,6 +1621,7 @@ export function ModalCombo({
                     ))}
                   </select>
                   <CasillaBot id="canal-combo-bot" checked={valeBot} onChange={setValeBot} bloqueada={canal === 'solo-bot'} />
+                  {comboAEditar && <SelectorVisibleCarta id="combo-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
                 </div>
               </div>
             </div>

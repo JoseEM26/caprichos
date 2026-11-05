@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OfertasAdminView } from '../OfertasAdminView';
 import { api } from '../../../comun/api';
@@ -178,5 +178,39 @@ describe('OfertasAdminView', () => {
 
     expect(await screen.findByText('Frappé Normal')).toBeInTheDocument();
     expect(screen.queryByText('Frappé Combo Base')).not.toBeInTheDocument();
+  });
+  it('desactivar pregunta cómo se ve en la carta y manda la elección junto con activo', async () => {
+    (api.patch as any).mockResolvedValue({});
+    render(<OfertasAdminView />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Desactivar' }));
+    const dialogo = await screen.findByRole('dialog');
+    expect(within(dialogo).getByText('¿Cómo quieres que se vea en la carta mientras esté desactivada?')).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText('Ocultar de la carta (recomendado)')).toBeChecked();
+
+    fireEvent.click(within(dialogo).getByLabelText('Mostrar como No disponible'));
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Desactivar' }));
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith('/admin/ofertas/1/estado', { activo: false, visibleCarta: true }),
+    );
+  });
+
+  it('la tarjeta dice dónde se ve cada desactivada y cambia la visibilidad con el interruptor', async () => {
+    const lista = [
+      { ...mockOfertas[0], id: '1', activo: false, visibleCarta: false },
+      { ...mockOfertas[0], id: '3', nombre: 'Combo Frappé Dúo', activo: false, visibleCarta: true },
+    ];
+    (api.get as any).mockImplementation((url: string) => (url === '/admin/ofertas' ? Promise.resolve(lista) : Promise.resolve([])));
+    (api.patch as any).mockResolvedValue({});
+    render(<OfertasAdminView />);
+
+    expect(await screen.findByText('Desactivada · oculta en la carta')).toBeInTheDocument();
+    expect(screen.getByText('Desactivada · se ve como No disponible')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar como No disponible' }));
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith('/admin/ofertas/1/estado', { activo: false, visibleCarta: true }),
+    );
   });
 });

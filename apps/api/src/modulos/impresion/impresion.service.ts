@@ -44,6 +44,8 @@ import {
   construirTicketPrueba,
   construirTicketNotaMozo,
   construirTicketComandaSalon,
+  construirTicketComandaArea,
+  areasDeLineas,
 } from './constructor-etiquetas';
 import {
   consultarEstadoAgente,
@@ -716,6 +718,18 @@ export class ImpresionService {
       // Comanda completa de salón: a la ticketera de Caja (solo mesa/local, con la regla activa)
       if (aplicaSegunReglas('TICKET_COMANDA_SALON', pedido.modalidad, reglas)) {
         await encolar('TICKET_COMANDA_SALON', `${pedido.id}-TICKET_COMANDA_SALON`, construirTicketComandaSalon(pedido), null);
+      }
+
+      // Comanda por área (apagada por defecto): una hoja por área a su ticketera, o a Caja si no tiene
+      if (aplicaSegunReglas('TICKET_COMANDA_AREA', pedido.modalidad, reglas)) {
+        for (const areaId of areasDeLineas(pedido)) {
+          await encolar(
+            'TICKET_COMANDA_AREA',
+            `${pedido.id}-TICKET_COMANDA_AREA-${areaId ?? 'SIN_AREA'}`,
+            construirTicketComandaArea(pedido, areaId),
+            areaId,
+          );
+        }
       }
 
       this.logger.log(`Encoladas etiquetas automáticas para pedido ${pedido.codigo} (id: ${pedido.id})`);

@@ -206,7 +206,7 @@ export function FormularioCheckout({
     api
       .get<OfertaItem[]>('/carta/ofertas')
       .then((r) => {
-        const oferta = (Array.isArray(r) ? r : []).find((o) => o.soloPrimeraCompra && o.vigenteAhora);
+        const oferta = (Array.isArray(r) ? r : []).find((o) => o.activo !== false && o.soloPrimeraCompra && o.vigenteAhora);
         if (vigente) {
           setPrimeraCompra(oferta ? { nombre: oferta.nombre, descuento: oferta.descuentoTipo === 'MONTO' ? `S/ ${oferta.descuentoValor ?? 0}` : `${oferta.descuentoValor ?? 0} %` } : null);
         }

@@ -98,7 +98,11 @@ export class OfertasService {
   // OFERTAS Y COMBOS
   // ==========================================
 
-  async listarOfertas(tipo?: string, soloActivas = false, canal?: string): Promise<OfertaItem[]> {
+  /**
+   * `paraCarta`: lo que pinta la carta virtual. Activas, y las desactivadas que el dueño dejó
+   * «Mostrar como No disponible» (visible_carta). Las desactivadas con visible_carta=false no salen.
+   */
+  async listarOfertas(tipo?: string, soloActivas = false, canal?: string, paraCarta = false): Promise<OfertaItem[]> {
     const where: Prisma.OfertaWhereInput = {};
 
     if (tipo) {
@@ -106,6 +110,9 @@ export class OfertasService {
     }
     if (soloActivas) {
       where.activo = true;
+    }
+    if (paraCarta) {
+      where.OR = [{ activo: true }, { visible_carta: true }];
     }
 
     const ofertasDb = await this.prisma.oferta.findMany({
@@ -626,10 +633,19 @@ export class OfertasService {
     return (await this.conDisponibilidad([this.mapearOferta(actualizada!)]))[0];
   }
 
-  async cambiarEstadoOferta(id: bigint | string | number, activo: boolean, usuario?: any): Promise<OfertaItem> {
+  /**
+   * Activa o desactiva. Si llega `visibleCarta`, se guarda junto (al desactivar: true = la carta la
+   * muestra como «No disponible»; false = la oculta). Si no llega, no se toca.
+   */
+  async cambiarEstadoOferta(
+    id: bigint | string | number,
+    activo: boolean,
+    usuario?: any,
+    visibleCarta?: boolean,
+  ): Promise<OfertaItem> {
     const actualizada = await this.prisma.oferta.update({
       where: { id: BigInt(id) },
-      data: { activo },
+      data: { activo, ...(visibleCarta !== undefined ? { visible_carta: visibleCarta } : {}) },
       include: {
         categoria: true,
         producto: true,
@@ -645,7 +661,7 @@ export class OfertasService {
       accion: activo ? 'activar' : 'desactivar',
       entidad: 'oferta',
       entidadId: BigInt(id),
-      despues: { activo },
+      despues: { activo, ...(visibleCarta !== undefined ? { visibleCarta } : {}) },
       partyId: usuario?.partyId,
     });
 

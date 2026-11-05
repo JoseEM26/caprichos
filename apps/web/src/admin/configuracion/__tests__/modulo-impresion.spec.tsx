@@ -36,9 +36,10 @@ const estadoConectado = {
 };
 
 const mapaMock = {
-  areas: [{ id: '1', nombre: 'Bebidas' }],
-  equipos: [{ deviceKeyId: '10', nombre: 'PC Caja', areaId: null, roles: [{ rol: 'ETIQUETERA', estado: 'lista' }], ultimoLatido: null, conectado: true }],
-  reglas: { generalModalidades: ['LLEVAR'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true },
+  duplicados: [],
+  areas: [{ id: '1', nombre: 'Bebidas', equiposPorRol: { ETIQUETERA: null, TICKETERA: null } }],
+  equipos: [{ deviceKeyId: '10', nombre: 'PC Caja', areaId: null, maquinas: ['ETIQUETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }], ultimoLatido: null, conectado: true }],
+  reglas: { generalModalidades: ['LLEVAR'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true, comandaAreaActivo: false },
   ruteo: [],
   colaPendientePorEquipo: [{ deviceKeyId: '10', pendientes: 0 }],
 };
@@ -68,7 +69,7 @@ const montar = (url = '/admin/configuracion') =>
   );
 
 const ubicacion = () => screen.getByTestId('ubicacion').textContent ?? '';
-const navegacion = () => screen.getByRole('tablist', { name: 'Categorías de configuración' });
+const navegacion = () => screen.getByRole('tablist', { name: 'Secciones de configuración' });
 const seccion = (nombre: RegExp) => screen.getByRole('tab', { name: nombre });
 const ancho = (n: number) => {
   (window as any).innerWidth = n;

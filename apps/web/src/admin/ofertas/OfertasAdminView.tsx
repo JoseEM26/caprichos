@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type CSSProperties } from 'react';
 import {
   ofertasApi,
   OfertaItem,
@@ -14,6 +14,7 @@ import { ModalEnvioGratis } from './ModalEnvioGratis';
 import { ModalCupon } from './ModalCupon';
 import { ModalHistorialCupones, HistorialMovimiento } from './ModalHistorialCupones';
 import { ModalConfirmacion } from './ModalConfirmacion';
+import { Confirmar } from '../../comun/Confirmar';
 import { ModalPrevisualizacionCarta } from './ModalPrevisualizacionCarta';
 import { api } from '../../comun/api';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
@@ -120,6 +121,23 @@ function calcularVigenciaOferta(
   }
 
   return { texto: 'Vigente ahora', ok: true };
+}
+
+const botonVisibilidadCarta: CSSProperties = {
+  width: '100%',
+  minHeight: '34px',
+  border: '1.5px dashed var(--cp-navy)',
+  borderRadius: '10px',
+  backgroundColor: 'transparent',
+  color: 'var(--cp-navy)',
+  fontWeight: 700,
+  fontSize: '12px',
+  cursor: 'pointer',
+};
+
+/** Qué se ve en la carta de una oferta desactivada (visible_carta). */
+function etiquetaDesactivada(o: OfertaItem): string {
+  return o.visibleCarta === false ? 'Desactivada · oculta en la carta' : 'Desactivada · se ve como No disponible';
 }
 
 function formatearHora12(hStr?: string | null): string {
@@ -310,6 +328,9 @@ export function OfertasAdminView() {
   const [modalPreviewAbierto, setModalPreviewAbierto] = useState(false);
   const [ofertaParaPreview, setOfertaParaPreview] = useState<OfertaItem | null>(null);
 
+  // Desactivar una promo/descuento: pregunta cómo se ve en la carta mientras esté desactivada
+  const [desactivarOferta, setDesactivarOferta] = useState<{ oferta: OfertaItem; visibleCarta: boolean } | null>(null);
+
   // Modal confirmación
   const [confirmacion, setConfirmacion] = useState<{
     abierto: boolean;
@@ -441,26 +462,46 @@ export function OfertasAdminView() {
     });
   };
 
-  // Alternar estado de oferta
+  // Alternar estado de oferta. Al desactivar se pregunta cómo se ve en la carta (ver Desactivar abajo).
   const pedirCambioEstadoOferta = (oferta: OfertaItem) => {
-    const nuevoEstado = !oferta.activo;
+    if (oferta.activo) {
+      setDesactivarOferta({ oferta, visibleCarta: false });
+      return;
+    }
     setConfirmacion({
       abierto: true,
-      titulo: `¿${nuevoEstado ? 'Activar' : 'Desactivar'} "${oferta.nombre}"?`,
-      mensaje: nuevoEstado
-        ? 'Volverá a ofrecerse en la carta cuando le toque.'
-        : 'Deja de aplicarse en la carta. No se elimina.',
+      titulo: `¿Activar "${oferta.nombre}"?`,
+      mensaje:
+        oferta.visibleCarta === false
+          ? 'Volverá a ofrecerse, pero seguirá oculta en la carta porque la dejaste oculta. Para mostrarla, cámbialo en el Diseñador de la carta.'
+          : 'Volverá a ofrecerse en la carta cuando le toque.',
       onConfirmar: async () => {
         try {
-          await ofertasApi.cambiarEstadoOferta(oferta.id, nuevoEstado);
-          setOfertas((prev) =>
-            prev.map((o) => (o.id === oferta.id ? { ...o, activo: nuevoEstado } : o)),
-          );
+          await ofertasApi.cambiarEstadoOferta(oferta.id, true);
+          setOfertas((prev) => prev.map((o) => (o.id === oferta.id ? { ...o, activo: true } : o)));
         } finally {
           setConfirmacion((prev) => ({ ...prev, abierto: false }));
         }
       },
     });
+  };
+
+  const confirmarDesactivarOferta = async () => {
+    if (!desactivarOferta) return;
+    const { oferta, visibleCarta } = desactivarOferta;
+    try {
+      await ofertasApi.cambiarEstadoOferta(oferta.id, false, visibleCarta);
+      setOfertas((prev) => prev.map((o) => (o.id === oferta.id ? { ...o, activo: false, visibleCarta } : o)));
+    } finally {
+      setDesactivarOferta(null);
+    }
+  };
+
+  // Interruptor de una oferta ya desactivada: oculta <-> «No disponible» sin editarla entera
+  const cambiarVisibilidadDesactivada = async (oferta: OfertaItem) => {
+    const visibleCarta = oferta.visibleCarta === false;
+    await ofertasApi.cambiarEstadoOferta(oferta.id, false, visibleCarta);
+    setOfertas((prev) => prev.map((o) => (o.id === oferta.id ? { ...o, visibleCarta } : o)));
   };
 
   // Alternar estado de cupón
@@ -865,7 +906,7 @@ export function OfertasAdminView() {
                         color: 'var(--cp-navy)',
                       }}
                     >
-                      {pr.activo ? 'Activa' : 'Desactivada'}
+                      {pr.activo ? 'Activa' : etiquetaDesactivada(pr)}
                     </span>
                   </div>
                   {pr.tipo === 'COMBO' && pr.disponible === false && (
@@ -934,6 +975,11 @@ export function OfertasAdminView() {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
+                    {!pr.activo && (
+                      <button type="button" onClick={() => cambiarVisibilidadDesactivada(pr)} style={botonVisibilidadCarta}>
+                        {pr.visibleCarta === false ? 'Mostrar como No disponible' : 'Ocultar de la carta'}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -1165,7 +1211,7 @@ export function OfertasAdminView() {
                         color: 'var(--cp-navy)',
                       }}
                     >
-                      {d.activo ? 'Activo' : 'Desactivado'}
+                      {d.activo ? 'Activo' : etiquetaDesactivada(d)}
                     </span>
                   </div>
 
@@ -1202,6 +1248,11 @@ export function OfertasAdminView() {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
+                    {!d.activo && (
+                      <button type="button" onClick={() => cambiarVisibilidadDesactivada(d)} style={botonVisibilidadCarta}>
+                        {d.visibleCarta === false ? 'Mostrar como No disponible' : 'Ocultar de la carta'}
+                      </button>
+                    )}
                     {!esEnvio && (
                     <button
                       type="button"
@@ -2242,6 +2293,35 @@ export function OfertasAdminView() {
         productosDisponibles={productos}
         categoriasDisponibles={categorias}
       />
+
+      <Confirmar
+        abierto={desactivarOferta !== null}
+        titulo={`¿Desactivar "${desactivarOferta?.oferta.nombre ?? ''}"?`}
+        mensaje="Deja de aplicarse en la carta. No se elimina."
+        textoConfirmar="Desactivar"
+        alConfirmar={confirmarDesactivarOferta}
+        alCancelar={() => setDesactivarOferta(null)}
+      >
+        <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <legend style={{ fontSize: '14px', fontWeight: 700, marginBottom: '6px' }}>
+            ¿Cómo quieres que se vea en la carta mientras esté desactivada?
+          </legend>
+          {[
+            { valor: false, texto: 'Ocultar de la carta (recomendado)' },
+            { valor: true, texto: 'Mostrar como No disponible' },
+          ].map((op) => (
+            <label key={String(op.valor)} style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '14px', fontWeight: 600 }}>
+              <input
+                type="radio"
+                name="desactivar-visible-carta"
+                checked={desactivarOferta?.visibleCarta === op.valor}
+                onChange={() => setDesactivarOferta((prev) => (prev ? { ...prev, visibleCarta: op.valor } : prev))}
+              />
+              {op.texto}
+            </label>
+          ))}
+        </fieldset>
+      </Confirmar>
 
       <ModalConfirmacion
         abierto={confirmacion.abierto}

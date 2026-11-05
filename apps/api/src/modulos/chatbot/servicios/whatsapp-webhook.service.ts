@@ -27,6 +27,7 @@ import {
   hashTelefono,
   normalizarTelefono,
 } from '../utilidades/enmascarar.util';
+import { sanearDetalleMeta } from '../utilidades/meta-errores.util';
 import {
   limpiarNombrePerfil,
   obtenerNombreMostrar,
@@ -174,10 +175,9 @@ export class WhatsappWebhookService {
       const err = status.errors[0];
       errorCodigo = String(err.code || 'ERROR_META');
       // code + title + message + error_data.details: lo que Meta dio, para ver por qué falló
-      errorDetalle = [err.title, err.message, err.error_data?.details]
-        .filter((t, i, a) => t && a.indexOf(t) === i)
-        .join(' | ')
-        .slice(0, 500);
+      errorDetalle = sanearDetalleMeta(
+        [err.title, err.message, err.error_data?.details].filter((t, i, a) => t && a.indexOf(t) === i).join(' | '),
+      );
     }
 
     try {

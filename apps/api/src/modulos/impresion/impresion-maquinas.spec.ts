@@ -35,6 +35,11 @@ describe('estadoPorRol', () => {
     expect(e.TICKETERA).toMatchObject({ conectada: false, motivo: 'Impresora no encontrada' });
   });
 
+  it('una ticketera de red lista muestra su dirección como detalle', () => {
+    const e = estadoPorRol(latido([{ rol: 'TICKETERA', estado: 'lista', detalle: 'Red 192.168.1.50:9100' }]));
+    expect(e.TICKETERA).toEqual({ conectada: true, estado: 'lista', motivo: null, detalle: 'Red 192.168.1.50:9100' });
+  });
+
   it('sin permiso y no encontrada traen el detalle del agente', () => {
     const e = estadoPorRol(
       latido([

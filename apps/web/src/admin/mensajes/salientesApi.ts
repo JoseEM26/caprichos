@@ -10,6 +10,11 @@ export interface SalienteAdmin {
   estado: EstadoSaliente;
   intentos: number;
   maxIntentos: number;
+  /** Motivo en español para todos los roles. */
+  causa?: string | null;
+  /** Solo ADMIN: código de Meta y texto original; null para el resto. */
+  detalleTecnico?: { codigoMeta: string | null; original: string | null } | null;
+  /** Solo ADMIN: «[CLASIFICACION] detalle»; null para el resto. */
   ultimoError: string | null;
   clasificacion: 'PERMANENTE' | 'AGOTADO' | 'TEMPORAL' | null;
   /** Solo códigos de cuenta: si el envío era de registro o de recuperar contraseña. */
