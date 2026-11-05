@@ -413,6 +413,8 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
   whatsapp_aviso_encuesta_activo: {
     grupo: 'avisos', titulo: 'Aviso: encuesta de satisfacción',
     ...aviso('Pide una calificación del 1 al 5 con botones.', 'unos minutos después de recibir su pedido', 'En «Sí», 30 minutos tras la entrega el cliente recibe la encuesta.', ['encuesta', 'calificacion', 'posventa', 'satisfaccion', 'estrellas']),
+    descripcion: 'Encendido: se envía una encuesta de satisfacción por plantilla a todo pedido con teléfono, 30 min después de entregado (según «Espera antes de enviar la encuesta»). Pide una calificación del 1 al 5 con 3 botones: 1 Malo, 3 Regular y 5 Excelente.',
+    efecto: 'En «No» no se envía ninguna encuesta. Requiere que la plantilla caprichos_encuesta_posventa esté aprobada en Meta.',
   },
   chatbot_pago_recordatorio_activo: {
     grupo: 'pago', titulo: 'Recordatorio de comprobante de pago pendiente',

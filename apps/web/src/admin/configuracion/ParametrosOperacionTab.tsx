@@ -375,7 +375,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   },
   whatsapp_aviso_encuesta_activo: {
     nombre: 'Aviso WhatsApp: Encuesta de satisfacción posventa',
-    descripcion: 'Envía encuesta interactiva de calificación del 1 al 5 al cliente tras la entrega de su pedido.',
+    descripcion: 'Encendido: se envía una encuesta de satisfacción por plantilla a todo pedido con teléfono, 30 min después de entregado (según «Espera antes de enviar la encuesta»). Requiere la plantilla caprichos_encuesta_posventa aprobada en Meta.',
     tipo: 'sino',
   },
   chatbot_pago_recordatorio_activo: {
