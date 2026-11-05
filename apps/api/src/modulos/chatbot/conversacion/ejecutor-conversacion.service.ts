@@ -13,6 +13,7 @@ import { SeguimientoService } from '../../pedidos/seguimiento.service';
 import { PedidosService } from '../../pedidos/pedidos.service';
 import { ZonasService } from '../../zonas/zonas.service';
 import { ReservasService } from '../../reservas/reservas.service';
+import { textosNotificacionSolicitud } from '../../reservas/notificacion-solicitud';
 import { ChatbotIaService } from '../ia/chatbot-ia.service';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
 import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
@@ -2016,13 +2017,16 @@ export class EjecutorConversacionService {
             },
           });
 
-          // Notificación campana para Caja y Salón (ADMIN, CAJA, MOZO)
-          // Título con lo esencial para decidir de un vistazo: cuántos y cuándo (día corto en hora de Lima)
-          const diaCorto = new Intl.DateTimeFormat('es-PE', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Lima' })
-            .format(fechaHora)
-            .replace(/\./g, '');
-          const tituloNotif = `Reserva nueva para ${accion.personas} personas, ${diaCorto} ${accion.hora}`;
-          const mensajeNotif = `${accion.nombre}. Solicitud para ${accion.personas} personas el ${accion.fechaTexto} a las ${accion.hora}. Tel: ${accion.telefono}${accion.nota ? ' · Nota: ' + accion.nota : ''}`;
+          // Notificación campana para Caja y Salón (texto compartido con la carta web)
+          const { titulo: tituloNotif, mensaje: mensajeNotif } = textosNotificacionSolicitud({
+            personas: accion.personas,
+            fechaHora,
+            fechaTexto: accion.fechaTexto,
+            hora: accion.hora,
+            nombre: accion.nombre,
+            telefono: accion.telefono,
+            nota: accion.nota,
+          });
 
           const notif = await this.prisma.notificacion.create({
             data: {
