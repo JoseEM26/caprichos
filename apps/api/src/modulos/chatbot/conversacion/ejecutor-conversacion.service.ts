@@ -17,7 +17,7 @@ import { textosNotificacionSolicitud } from '../../reservas/notificacion-solicit
 import { ChatbotIaService } from '../ia/chatbot-ia.service';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
 import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
-import { vistaPreviaPedidoBot } from './vista-previa-pedido.util';
+import { vistaPreviaPedidoBot, vistaPreviaUbicacionBot } from './vista-previa-pedido.util';
 import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
@@ -100,6 +100,30 @@ export class EjecutorConversacionService {
     telefonoPuntos: string;
   } {
     return { canal: 'WHATSAPP', telefonoRemitente: conversacion.telefono, telefonoPuntos: conversacion.telefono };
+  }
+
+  /**
+   * Delivery con ubicación y sin dirección escrita: la calle aproximada es la que el webhook ya sacó de esa
+   * ubicación del chat (direccionAprox, Nominatim). Así el pedido y el reparto la muestran. Nunca lanza.
+   */
+  private async conCalleDeLaUbicacion<T extends { modalidad?: string; entrega?: any }>(dto: T, conversacionId: bigint): Promise<T> {
+    const entrega = dto?.entrega;
+    if (dto?.modalidad !== 'DELIVERY' || entrega?.lat == null || entrega?.lng == null || entrega?.direccion) return dto;
+    try {
+      const recientes = await this.prisma.mensajeChat.findMany({
+        where: { conversacion_id: conversacionId, direccion: 'ENTRA' },
+        orderBy: { id: 'desc' },
+        take: 10,
+        select: { contenido: true },
+      });
+      const punto = recientes
+        .map((m) => (m.contenido as any)?.ubicacion)
+        .find((u) => u && Number(u.lat) === Number(entrega.lat) && Number(u.lng) === Number(entrega.lng));
+      return punto?.direccionAprox ? { ...dto, entrega: { ...entrega, direccion: punto.direccionAprox } } : dto;
+    } catch (err: any) {
+      this.logger.warn(`No se pudo leer la calle de la ubicación: ${err.message}`);
+      return dto;
+    }
   }
 
   /**
@@ -941,29 +965,6 @@ export class EjecutorConversacionService {
       }
     }
 
-    // Libreta del cliente con cuenta (party por el teléfono de quien escribe): solo en el paso de delivery
-    // y cuando elige una dirección anterior. Sin cuenta o sin direcciones queda null.
-    let direccionesCliente: Array<{
-      id: string;
-      direccion: string;
-      referencia: string | null;
-      lat: number | null;
-      lng: number | null;
-      alias: string | null;
-    }> | null = null;
-    const estadoPedidoPrevio = String(flujoPrevio?.estado ?? '');
-    if (
-      this.direccionesService &&
-      (estadoPedidoPrevio === 'PEDIDO_MODALIDAD' || estadoPedidoPrevio === 'PEDIDO_DIRECCION_ELEGIR')
-    ) {
-      try {
-        const partyId = await this.direccionesService.resolverPartyPorTelefono(conversacion.telefono);
-        if (partyId) direccionesCliente = await this.direccionesService.listar(partyId, { limite: 5 });
-      } catch (err: any) {
-        this.logger.warn(`Error consultando direcciones del cliente: ${err.message}`);
-      }
-    }
-
     // Puntos: la cuenta del propio número de quien escribe (con saldo). El bot no acepta otro número para puntos
     let puntosCtx: ContextoConversacion['puntos'] = undefined;
     const estadoPrevio = String(flujoPrevio?.estado ?? '');
@@ -988,21 +989,6 @@ export class EjecutorConversacionService {
       } catch (err: any) {
         this.logger.warn(`Error consultando puntos del cliente: ${err.message}`);
         puntosCtx = undefined;
-      }
-    }
-
-    // Cobertura de la dirección anterior elegida: misma consulta que una ubicación compartida
-    if (!resultadoEnvio && estadoPedidoPrevio === 'PEDIDO_DIRECCION_ELEGIR' && this.zonasService) {
-      const idElegido = normalizarEntrada(entradaRaw).id ?? '';
-      const dirElegida = idElegido.startsWith('ped_dir_')
-        ? direccionesCliente?.find((d) => `ped_dir_${d.id}` === idElegido)
-        : undefined;
-      if (dirElegida && dirElegida.lat != null && dirElegida.lng != null) {
-        try {
-          resultadoEnvio = await this.zonasService.consultarEnvio(dirElegida.lat, dirElegida.lng);
-        } catch (err: any) {
-          this.logger.warn(`Error consultando cobertura de dirección anterior: ${err.message}`);
-        }
       }
     }
 
@@ -1126,6 +1112,13 @@ export class EjecutorConversacionService {
       } catch (err: any) {
         this.logger.warn(`Sin vista previa del pedido (se cobra el precio de lista del servidor): ${err.message}`);
       }
+    } else if (resultadoEnvio && pedidoEnCurso?.modalidad === 'DELIVERY') {
+      // Ubicación antes del carrito: el envío de la zona (y la promo de envío) sale ya del servidor
+      try {
+        vistaPreviaPedido = await vistaPreviaUbicacionBot(this.prisma, resultadoEnvio.tarifa);
+      } catch (err: any) {
+        this.logger.warn(`Sin envío para la ubicación (queda por calcular): ${err.message}`);
+      }
     }
 
     const contexto: ContextoConversacion = {
@@ -1146,7 +1139,6 @@ export class EjecutorConversacionService {
       minutosInactividad,
       inactividadExpirada,
       resultadoEnvio,
-      direccionesCliente,
       puntos: puntosCtx,
       franjasDisponiblesReserva,
       solicitudesPendientesTelefono,
@@ -1913,7 +1905,7 @@ export class EjecutorConversacionService {
         try {
           if (this.pedidosService) {
             const pedidoCreado = await this.pedidosService.crear(
-              accion.dto,
+              await this.conCalleDeLaUbicacion(accion.dto, conversacion.id),
               accion.claveIdempotencia,
               this.origenPedidoWhatsapp(conversacion),
             );

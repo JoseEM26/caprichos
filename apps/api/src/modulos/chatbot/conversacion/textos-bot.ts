@@ -84,14 +84,11 @@ export const BOTONES_PEDIDO_MODALIDAD: BotonAccion[] = [
   { id: 'ped_mod_recojer', titulo: 'Para recoger' },
 ];
 
-export const BOTONES_PEDIDO_UBICACION: BotonAccion[] = [
-  { id: 'ped_loc_share', titulo: 'Mi ubicación actual' },
-  { id: 'ped_loc_escribir', titulo: 'Escribir dirección' },
-];
+/** Delivery: solo se pide la ubicación actual; el único botón deja salir al menú. */
+export const BOTONES_PEDIDO_UBICACION: BotonAccion[] = [BOTON_VOLVER_MENU];
 
 export const BOTONES_PEDIDO_UBICACION_FALLIDA: BotonAccion[] = [
   { id: 'ped_mod_recojer', titulo: 'Para recoger' },
-  { id: 'ped_loc_escribir', titulo: 'Escribir dirección' },
   BOTON_VOLVER_MENU,
 ];
 
@@ -636,53 +633,21 @@ export const TEXTOS_BOT = {
   },
 
   pedidoPedirUbicacion: (): string => {
-    return '¿Dónde te lo llevamos? 📍\nEnvíanos tu ubicación actual o escribe tu dirección.';
-  },
-
-  /** Respuesta corta al tocar «Mi ubicación actual»: cómo mandar el punto desde WhatsApp. */
-  pedidoUbicacionClipAyuda: (): string => {
-    return 'Toca el clip 📎 > Ubicación > Enviar mi ubicación actual.';
+    return '¿Dónde te lo llevamos? 📍 Envíanos tu ubicación actual: toca el clip 📎 > Ubicación > Enviar mi ubicación actual.';
   },
 
   pedidoFueraDeCobertura: (): string => {
-    return 'Tu ubicación está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local.';
+    return 'Tu ubicación está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local o enviarnos otra ubicación.';
   },
 
-  /** Ubicación recibida: una sola respuesta con el envío y la pregunta de referencia (antes eran dos mensajes). */
+  /** Ubicación recibida: el envío y, en el mismo mensaje, las categorías. */
   pedidoUbicacionExitosa: (envio: number | null, esGratis: boolean): string => {
     const txtEnvio = esGratis
       ? 'El envío a tu ubicación es gratis.'
       : envio === null
         ? 'El costo del envío lo confirma un asesor.'
         : `El envío a tu ubicación cuesta S/ ${envio.toFixed(2)}.`;
-    return `¡Listo, te encontramos! ${txtEnvio} Indícanos una referencia para el repartidor (por ejemplo: frente al parque, portón blanco, timbre 2).`;
-  },
-
-  /** «Escribir dirección» y «Otra dirección»: una sola pregunta para dirección y referencia. */
-  pedidoEscribirDireccion: (): string => {
-    return 'Escríbenos tu dirección en un solo mensaje: distrito, calle, número o manzana y lote, y una referencia para el repartidor.';
-  },
-
-  /** Cliente con cuenta y direcciones guardadas: elegir una anterior o escribir otra. */
-  pedidoDireccionesAnteriores: (): string => {
-    return '¿Dónde te lo llevamos? 📍 Elige una dirección anterior o «Otra dirección».';
-  },
-
-  pedidoDireccionAnteriorElegida: (direccion: string, envio: number | null, esGratis: boolean): string => {
-    const txtEnvio = esGratis
-      ? 'El envío es gratis.'
-      : envio === null
-        ? 'El costo del envío lo confirma un asesor.'
-        : `El envío cuesta S/ ${envio.toFixed(2)}.`;
-    return `Perfecto, lo enviamos a ${direccion}. ${txtEnvio} Elige una categoría:`;
-  },
-
-  pedidoDireccionAnteriorSinCoordenadas: (direccion: string): string => {
-    return `Anotado: lo enviamos a ${direccion}. Un asesor te confirmará el costo del envío. Elige una categoría:`;
-  },
-
-  pedidoDireccionAnteriorFueraCobertura: (): string => {
-    return 'Esa dirección quedó fuera de nuestra zona de reparto. Comparte una nueva ubicación o escribe otra dirección.';
+    return `¡Listo, te encontramos! ${txtEnvio} Elige una categoría:`;
   },
 
   pedidoRecojoConfirmado: (): string => {

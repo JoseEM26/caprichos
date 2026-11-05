@@ -237,12 +237,7 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoConEnvio);
 
-      // Pide referencia de entrega
-      expect(resultado.nuevoEstado).toBe('PEDIDO_REFERENCIA');
-      entrada = normalizarEntrada({ texto: 'Frente al parque, portón blanco' });
-      resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoConEnvio);
-
-      // Pasa a categorías para armar su pedido
+      // La ubicación pasa directo a categorías (sin paso de referencia)
       expect(resultado.nuevoEstado).toBe('PEDIDO_CATEGORIAS');
       expect(resultado.nuevoFlujo.pedido?.entrega?.modalidad).toBe('DELIVERY');
       expect(resultado.nuevoFlujo.pedido?.entrega?.tarifaEnvio).toBe(5.0);
@@ -352,12 +347,12 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
       expect(resultado.nuevoEstado).toBe('PEDIDO_UBICACION');
 
-      // Ingresar dirección fuera de rango
+      // Ubicación fuera de rango (solo la ubicación actual cuenta; el texto libre repite la instrucción)
       const contextoFueraCobertura: ContextoConversacion = {
         ...contextoBase,
         resultadoEnvio: { cubierto: false, tarifa: null },
       };
-      entrada = normalizarEntrada({ texto: 'Chosica Km 35' });
+      entrada = normalizarEntrada({ tipo: 'location', ubicacion: { latitud: -11.9, longitud: -76.7 } });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoFueraCobertura);
 
       expect(resultado.nuevoEstado).toBe('PEDIDO_UBICACION');

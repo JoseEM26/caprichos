@@ -67,6 +67,16 @@ const PALABRAS_CANCELAR = [
   'descartar',
 ];
 
+/**
+ * Estados de dirección que ya no existen (conversaciones abiertas antes de quitar las direcciones anteriores
+ * y la referencia aparte): siguen por la ubicación, para que nadie quede atascado.
+ */
+const ESTADOS_UBICACION_LEGADOS: string[] = ['PEDIDO_DIRECCION_ELEGIR', 'PEDIDO_DIRECCION_TEXTO', 'PEDIDO_REFERENCIA'];
+
+function normalizarEstadoUbicacion(estado: EstadoPedidoFlujo): EstadoPedidoFlujo {
+  return ESTADOS_UBICACION_LEGADOS.includes(estado) ? 'PEDIDO_UBICACION' : estado;
+}
+
 export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   readonly nombre = 'pedido';
 
@@ -349,21 +359,13 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion | null {
+    estado = normalizarEstadoUbicacion(estado);
     switch (estado) {
       case 'PEDIDO_MODALIDAD':
         return this.pasoModalidad(flujo, pedido, entrada, contexto);
 
-      case 'PEDIDO_DIRECCION_ELEGIR':
-        return this.pasoDireccionElegir(flujo, pedido, entrada, contexto);
-
       case 'PEDIDO_UBICACION':
         return this.pasoUbicacion(flujo, pedido, entrada, contexto);
-
-      case 'PEDIDO_DIRECCION_TEXTO':
-        return this.pasoDireccionTexto(flujo, pedido, entrada, contexto);
-
-      case 'PEDIDO_REFERENCIA':
-        return this.pasoReferencia(flujo, pedido, entrada, contexto);
 
       case 'PEDIDO_CATEGORIAS':
         return this.pasoCategorias(flujo, pedido, entrada, contexto);
@@ -463,29 +465,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       entrada.texto.includes('retiro');
 
     if (esDelivery) {
-      if (contexto.direccionesCliente?.length) {
-        return this.mostrarDireccionesAnteriores(flujo, { ...pedido, modalidad: 'DELIVERY' }, contexto);
-      }
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        modalidad: 'DELIVERY',
-        estadoInterno: 'PEDIDO_UBICACION',
-      };
-      return {
-        nuevoEstado: 'PEDIDO_UBICACION',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoPedirUbicacion(),
-            botones: BOTONES_PEDIDO_UBICACION,
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_UBICACION',
-          pedido: nuevoPedido,
-        },
-      };
+      return this.pedirUbicacion(flujo, { ...pedido, modalidad: 'DELIVERY' });
     }
 
     if (esRecoger) {
@@ -513,8 +493,21 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   }
 
   // -------------------------------------------------------------------------
-  // PASO 2: Ubicación / Entrega
+  // PASO 2: Ubicación (delivery): solo la ubicación actual que manda WhatsApp
   // -------------------------------------------------------------------------
+  /** Pide la ubicación en un solo mensaje, con la instrucción del clip (sin otras opciones). */
+  private pedirUbicacion(flujo: FlujoConversacion, pedido: EstadoCarritoPedido): ResultadoTransicion {
+    return {
+      nuevoEstado: 'PEDIDO_UBICACION',
+      acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoPedirUbicacion(), botones: BOTONES_PEDIDO_UBICACION }],
+      nuevoFlujo: {
+        ...flujo,
+        estado: 'PEDIDO_UBICACION',
+        pedido: { ...pedido, estadoInterno: 'PEDIDO_UBICACION' },
+      },
+    };
+  }
+
   private pasoUbicacion(
     flujo: FlujoConversacion,
     pedido: EstadoCarritoPedido,
@@ -531,122 +524,36 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       return this.mostrarCategorias(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoRecojoConfirmado());
     }
 
-    if (entrada.id === 'ped_loc_share') {
-      return {
-        nuevoEstado: 'PEDIDO_UBICACION',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoUbicacionClipAyuda(),
-            botones: [
-              { id: 'ped_loc_escribir', titulo: 'Escribir dirección' },
-              BOTON_VOLVER_MENU,
-            ],
-          },
-        ],
-        nuevoFlujo: flujo,
-      };
+    const ubicacion = entrada.ubicacion;
+    // Cualquier cosa que no sea una ubicación (texto, botón viejo) repite la misma instrucción
+    if (!ubicacion || !Number.isFinite(ubicacion.latitud) || !Number.isFinite(ubicacion.longitud)) {
+      return this.pedirUbicacion(flujo, pedido);
     }
 
-    if (entrada.id === 'ped_loc_escribir' || entrada.texto.includes('escribir')) {
-      return this.pedirDireccionEscrita(flujo, pedido);
-    }
-
-    // Verificación de cobertura si se resolvió el envío
+    // El servidor ya consultó la zona de ese punto (ejecutor): fuera de cobertura se avisa y se ofrece recoger
     if (contexto.resultadoEnvio && !contexto.resultadoEnvio.cubierto) {
       return {
         nuevoEstado: 'PEDIDO_UBICACION',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoFueraDeCobertura(),
-            botones: BOTONES_PEDIDO_UBICACION_FALLIDA,
-          },
-        ],
-        nuevoFlujo: flujo,
+        acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoFueraDeCobertura(), botones: BOTONES_PEDIDO_UBICACION_FALLIDA }],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_UBICACION', pedido: { ...pedido, estadoInterno: 'PEDIDO_UBICACION' } },
       };
     }
 
-    // Si viene payload de ubicación (GPS) o coordenadas escritas
-    const tieneUbicacionGps =
-      entrada.tipo === 'ubicacion' ||
-      (entrada.ubicacion && Number.isFinite(entrada.ubicacion.latitud));
-
-    if (tieneUbicacionGps) {
-      const { entrega, envio, esGratis } = this.entregaDesdePunto(pedido, contexto, {
-        lat: entrada.ubicacion!.latitud,
-        lng: entrada.ubicacion!.longitud,
-        direccion: entrada.ubicacion?.direccion || entrada.ubicacion?.nombre,
-      });
-
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        entrega,
-        estadoInterno: 'PEDIDO_REFERENCIA',
-      };
-
-      return {
-        nuevoEstado: 'PEDIDO_REFERENCIA',
-        acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.pedidoUbicacionExitosa(envio, esGratis) }],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_REFERENCIA',
-          pedido: nuevoPedido,
-        },
-      };
-    }
-
-    // Si escribió la dirección directamente en este paso
-    if (entrada.textoOriginal.trim().length >= 5) {
-      return this.direccionEscrita(flujo, pedido, contexto, entrada.textoOriginal.trim());
-    }
-
-    return {
-      nuevoEstado: 'PEDIDO_UBICACION',
-      acciones: [
-        {
-          tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPedirUbicacion(),
-          botones: BOTONES_PEDIDO_UBICACION,
-        },
-      ],
-      nuevoFlujo: flujo,
-    };
-  }
-
-  /** Pide la dirección escrita en un solo mensaje (dirección y referencia juntas). */
-  private pedirDireccionEscrita(flujo: FlujoConversacion, pedido: EstadoCarritoPedido): ResultadoTransicion {
-    return {
-      nuevoEstado: 'PEDIDO_DIRECCION_TEXTO',
-      acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.pedidoEscribirDireccion() }],
-      nuevoFlujo: {
-        ...flujo,
-        estado: 'PEDIDO_DIRECCION_TEXTO',
-        pedido: { ...pedido, estadoInterno: 'PEDIDO_DIRECCION_TEXTO' },
-      },
-    };
-  }
-
-  /** Dirección escrita (la referencia va dentro del texto): sin coordenadas, un asesor confirma el envío. */
-  private direccionEscrita(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    contexto: ContextoConversacion,
-    direccion: string,
-  ): ResultadoTransicion {
-    const nuevoPedido: EstadoCarritoPedido = {
-      ...pedido,
-      entrega: { modalidad: 'DELIVERY', direccion, origen: 'ESCRITA', tarifaEnvio: null },
-      estadoInterno: 'PEDIDO_CATEGORIAS',
-    };
-    return this.mostrarCategorias(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoDireccionAnteriorSinCoordenadas(direccion));
+    // Ubicación recibida: zona, tarifa y coordenadas en el pedido; categorías en el mismo mensaje
+    const { entrega, envio, esGratis } = this.entregaDesdePunto(pedido, contexto, {
+      lat: ubicacion.latitud,
+      lng: ubicacion.longitud,
+      direccion: ubicacion.direccion || ubicacion.nombre,
+    });
+    const nuevoPedido: EstadoCarritoPedido = { ...pedido, modalidad: 'DELIVERY', entrega, estadoInterno: 'PEDIDO_CATEGORIAS' };
+    return this.mostrarCategorias(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoUbicacionExitosa(envio, esGratis));
   }
 
   /** Entrega DELIVERY con zona, tarifa y envío gratis según la cobertura resuelta para el punto. */
   private entregaDesdePunto(
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
-    punto: { lat: number; lng: number; direccion?: string; referencia?: string },
+    punto: { lat: number; lng: number; direccion?: string },
   ): { entrega: NonNullable<EstadoCarritoPedido['entrega']>; envio: number | null; esGratis: boolean } {
     const resEnvio = contexto.resultadoEnvio;
     // Envío con las reglas del servidor (zona + promo de envío gratis por horario con casilla BOT). Sin tarifa, por calcular.
@@ -664,182 +571,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       tarifaEnvio: envio,
       tarifaZona,
       direccion: punto.direccion,
-      referencia: punto.referencia,
     };
     return { entrega, envio, esGratis };
-  }
-
-  /** Lista de direcciones anteriores del cliente con cuenta, más «Otra dirección». */
-  private mostrarDireccionesAnteriores(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    const direcciones = contexto.direccionesCliente || [];
-    if (!direcciones.length) {
-      return this.renderizarEstado('PEDIDO_UBICACION', flujo, pedido, contexto);
-    }
-
-    // Siempre en letras: la dirección (o el alias) y, debajo, la referencia si no está ya en el texto
-    const filas: FilaLista[] = direcciones.map((d) => {
-      const detalle = d.referencia && !d.direccion.includes(d.referencia) ? `${d.direccion} · Ref: ${d.referencia}` : d.direccion;
-      return {
-        id: `ped_dir_${d.id}`,
-        titulo: recortarEnPalabra(d.alias?.trim() || d.direccion, 24),
-        descripcion: recortarEnPalabra(detalle, 72),
-      };
-    });
-    filas.push({
-      id: 'ped_dir_nueva',
-      titulo: 'Otra dirección',
-      descripcion: 'Escríbela aquí',
-    });
-
-    return {
-      nuevoEstado: 'PEDIDO_DIRECCION_ELEGIR',
-      acciones: [
-        {
-          tipo: 'enviarLista',
-          texto: TEXTOS_BOT.pedidoDireccionesAnteriores(),
-          botonTexto: 'Ver direcciones',
-          filas: filas.slice(0, 10),
-        },
-      ],
-      nuevoFlujo: {
-        ...flujo,
-        estado: 'PEDIDO_DIRECCION_ELEGIR',
-        pedido: { ...pedido, modalidad: 'DELIVERY', estadoInterno: 'PEDIDO_DIRECCION_ELEGIR' },
-      },
-    };
-  }
-
-  // -------------------------------------------------------------------------
-  // PASO 2.0: Elegir una dirección anterior o pedir una nueva (cliente con cuenta)
-  // -------------------------------------------------------------------------
-  private pasoDireccionElegir(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    entrada: EntradaNormalizada,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    if (entrada.id === 'ped_dir_nueva') {
-      return this.pedirDireccionEscrita(flujo, pedido);
-    }
-
-    const dir = entrada.id?.startsWith('ped_dir_')
-      ? contexto.direccionesCliente?.find((d) => `ped_dir_${d.id}` === entrada.id)
-      : undefined;
-    if (!dir) {
-      return this.mostrarDireccionesAnteriores(flujo, pedido, contexto);
-    }
-
-    const referencia = dir.referencia ?? undefined;
-
-    // Sin coordenadas no hay zona que calcular: igual que una dirección escrita
-    if (dir.lat == null || dir.lng == null) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        entrega: {
-          modalidad: 'DELIVERY',
-          direccion: dir.direccion,
-          referencia,
-          origen: 'ESCRITA',
-          tarifaEnvio: null,
-        },
-        estadoInterno: 'PEDIDO_CATEGORIAS',
-      };
-      return this.mostrarCategorias(
-        flujo,
-        nuevoPedido,
-        contexto,
-        TEXTOS_BOT.pedidoDireccionAnteriorSinCoordenadas(dir.direccion),
-      );
-    }
-
-    if (contexto.resultadoEnvio && !contexto.resultadoEnvio.cubierto) {
-      return {
-        nuevoEstado: 'PEDIDO_UBICACION',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoDireccionAnteriorFueraCobertura(),
-            botones: BOTONES_PEDIDO_UBICACION_FALLIDA,
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_UBICACION',
-          pedido: { ...pedido, estadoInterno: 'PEDIDO_UBICACION' },
-        },
-      };
-    }
-
-    const { entrega, envio, esGratis } = this.entregaDesdePunto(pedido, contexto, {
-      lat: dir.lat,
-      lng: dir.lng,
-      direccion: dir.direccion,
-      referencia,
-    });
-    const nuevoPedido: EstadoCarritoPedido = { ...pedido, entrega, estadoInterno: 'PEDIDO_CATEGORIAS' };
-    return this.mostrarCategorias(
-      flujo,
-      nuevoPedido,
-      contexto,
-      TEXTOS_BOT.pedidoDireccionAnteriorElegida(dir.direccion, envio, esGratis),
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // PASO 2.1: Dirección por Texto
-  // -------------------------------------------------------------------------
-  private pasoDireccionTexto(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    entrada: EntradaNormalizada,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    const direccion = entrada.textoOriginal.trim();
-    if (direccion.length < 5) {
-      return {
-        nuevoEstado: 'PEDIDO_DIRECCION_TEXTO',
-        acciones: [
-          {
-            tipo: 'enviarTexto',
-            texto: 'Escribe una dirección más detallada (distrito, calle y número, o manzana y lote):',
-          },
-        ],
-        nuevoFlujo: flujo,
-      };
-    }
-
-    return this.direccionEscrita(flujo, pedido, contexto, direccion);
-  }
-
-  // -------------------------------------------------------------------------
-  // PASO 2.2: Referencia
-  // -------------------------------------------------------------------------
-  private pasoReferencia(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    entrada: EntradaNormalizada,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    const referencia = entrada.textoOriginal.trim();
-    const nuevoPedido: EstadoCarritoPedido = {
-      ...pedido,
-      entrega: {
-        ...(pedido.entrega || { modalidad: 'DELIVERY' }),
-        referencia: referencia !== 'omitir' ? referencia : undefined,
-      },
-      estadoInterno: 'PEDIDO_CATEGORIAS',
-    };
-
-    return this.mostrarCategorias(
-      flujo,
-      nuevoPedido,
-      contexto,
-      'Anotado. Ahora elige una categoría para comenzar a agregar productos:',
-    );
   }
 
   // -------------------------------------------------------------------------
@@ -2937,10 +2670,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
+    estado = normalizarEstadoUbicacion(estado);
     pedido.estadoInterno = estado;
     switch (estado) {
-      case 'PEDIDO_DIRECCION_ELEGIR':
-        return this.mostrarDireccionesAnteriores(flujo, pedido, contexto);
       case 'PEDIDO_MODALIDAD':
         return {
           nuevoEstado: 'PEDIDO_MODALIDAD',
@@ -2954,17 +2686,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           nuevoFlujo: { ...flujo, estado: 'PEDIDO_MODALIDAD', pedido },
         };
       case 'PEDIDO_UBICACION':
-        return {
-          nuevoEstado: 'PEDIDO_UBICACION',
-          acciones: [
-            {
-              tipo: 'enviarBotones',
-              texto: TEXTOS_BOT.pedidoPedirUbicacion(),
-              botones: BOTONES_PEDIDO_UBICACION,
-            },
-          ],
-          nuevoFlujo: { ...flujo, estado: 'PEDIDO_UBICACION', pedido },
-        };
+        return this.pedirUbicacion(flujo, pedido);
       case 'PEDIDO_CATEGORIAS':
         return this.mostrarCategorias(flujo, pedido, contexto);
       case 'PEDIDO_VER_CARRITO':
@@ -2989,13 +2711,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         return this.mostrarCategorias(flujo, pedido, contexto);
     }
   }
-}
-
-/** Recorta a `max` caracteres sin partir palabras (la lista de WhatsApp corta a 24 y 72). */
-function recortarEnPalabra(texto: string, max: number): string {
-  if (texto.length <= max) return texto;
-  const corte = texto.slice(0, max + 1);
-  return corte.slice(0, corte.lastIndexOf(' ') > 0 ? corte.lastIndexOf(' ') : max);
 }
 
 // Función auxiliar para coincidencia de palabras
