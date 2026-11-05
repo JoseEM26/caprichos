@@ -328,6 +328,18 @@ export interface DatosHorarioLocal {
 /**
  * Contexto complementario inyectado a las transiciones puras.
  */
+/** Vista previa del pedido del bot calculada con las funciones del servidor (ver vista-previa-pedido.util.ts). */
+export interface VistaPreviaPedidoBot {
+  subtotal: number;
+  /** Descuento automático del servidor (promociones con la casilla «Vale también por WhatsApp»). Nunca cupones. */
+  descuento: number;
+  descuentoNombre: string | null;
+  /** Envío a pagar; null = por calcular (zona sin tarifa conocida). */
+  envio: number | null;
+  /** Delivery con envío 0 (promo de envío gratis por horario o por monto). */
+  envioGratis: boolean;
+}
+
 export interface ContextoConversacion {
   conversacionId?: string | bigint;
   nombreCliente?: string | null;
@@ -345,6 +357,8 @@ export interface ContextoConversacion {
   pedidosHoyTelefono?: number;
   minutosInactividad?: number;
   inactividadExpirada?: boolean;
+  /** Total del pedido en curso con las reglas del servidor (descuento de promo con casilla BOT y envío). Null sin pedido. */
+  vistaPreviaPedido?: VistaPreviaPedidoBot | null;
   resultadoEnvio?: {
     cubierto: boolean;
     zona?: any;

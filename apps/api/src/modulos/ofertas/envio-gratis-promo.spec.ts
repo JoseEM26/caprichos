@@ -80,6 +80,7 @@ describe('promo ENVIO_GRATIS: vigencia por horario, días, fechas, canal y lími
   it('en el bot (y WhatsApp) solo aplica si la promo tiene BOT marcado; TODOS no alcanza', async () => {
     expect(await promoEnvioGratisVigente(prismaCon([oferta({ canales: ['CARTA', 'ADMIN'] })]), 'BOT', MIERCOLES_14H)).toBeNull();
     expect(await promoEnvioGratisVigente(prismaCon([oferta({ canales: ['TODOS'] })]), 'BOT', MIERCOLES_14H)).toBeNull();
+    expect(await promoEnvioGratisVigente(prismaCon([oferta({ canales: [] })]), 'BOT', MIERCOLES_14H)).toBeNull();
     expect(await promoEnvioGratisVigente(prismaCon([oferta({ canales: ['CARTA', 'BOT'] })]), 'BOT', MIERCOLES_14H)).not.toBeNull();
     expect(await promoEnvioGratisVigente(prismaCon([oferta({ canales: ['CARTA', 'BOT'] })]), 'WHATSAPP', MIERCOLES_14H)).not.toBeNull();
   });

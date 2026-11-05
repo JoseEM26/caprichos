@@ -589,7 +589,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       (entrada.ubicacion && Number.isFinite(entrada.ubicacion.latitud));
 
     if (tieneUbicacionGps) {
-      const { entrega, tarifa, esGratis, gratisDesde } = this.entregaDesdePunto(pedido, contexto, {
+      const { entrega, envio, esGratis } = this.entregaDesdePunto(pedido, contexto, {
         lat: entrada.ubicacion!.latitud,
         lng: entrada.ubicacion!.longitud,
         direccion: entrada.ubicacion?.direccion || entrada.ubicacion?.nombre,
@@ -606,7 +606,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         acciones: [
           {
             tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoUbicacionExitosa(tarifa, esGratis, gratisDesde),
+            texto: TEXTOS_BOT.pedidoUbicacionExitosa(envio, esGratis),
           },
           {
             tipo: 'enviarTexto',
@@ -671,12 +671,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
     punto: { lat: number; lng: number; direccion?: string; referencia?: string },
-  ): { entrega: NonNullable<EstadoCarritoPedido['entrega']>; tarifa: number; esGratis: boolean; gratisDesde: number } {
+  ): { entrega: NonNullable<EstadoCarritoPedido['entrega']>; envio: number | null; esGratis: boolean } {
     const resEnvio = contexto.resultadoEnvio;
-    const tarifa = Number(resEnvio?.tarifa ?? 5);
-    const gratisDesde = Number(resEnvio?.gratisDesde ?? 70);
-    const subtotalActual = pedido.items.reduce((s, i) => s + i.subtotal, 0);
-    const esGratis = subtotalActual > gratisDesde;
+    // Envío con las reglas del servidor (zona + promo de envío gratis por horario con casilla BOT). Sin tarifa, por calcular.
+    const tarifaZona = resEnvio?.tarifa ?? null;
+    const envio = contexto.vistaPreviaPedido?.envio ?? null;
+    const esGratis = envio === 0;
 
     const entrega: NonNullable<EstadoCarritoPedido['entrega']> = {
       modalidad: 'DELIVERY',
@@ -685,11 +685,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       origen: 'WHATSAPP',
       zonaId: resEnvio?.zona?.id ? String(resEnvio.zona.id) : undefined,
       zonaNombre: resEnvio?.zona?.nombre,
-      tarifaEnvio: esGratis ? 0 : tarifa,
+      tarifaEnvio: envio,
+      tarifaZona,
       direccion: punto.direccion,
       referencia: punto.referencia,
     };
-    return { entrega, tarifa, esGratis, gratisDesde };
+    return { entrega, envio, esGratis };
   }
 
   /** Lista de direcciones anteriores del cliente con cuenta, más «Otra dirección». */
@@ -793,7 +794,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    const { entrega, tarifa, esGratis, gratisDesde } = this.entregaDesdePunto(pedido, contexto, {
+    const { entrega, envio, esGratis } = this.entregaDesdePunto(pedido, contexto, {
       lat: dir.lat,
       lng: dir.lng,
       direccion: dir.direccion,
@@ -804,7 +805,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       flujo,
       nuevoPedido,
       contexto,
-      TEXTOS_BOT.pedidoDireccionAnteriorElegida(dir.direccion, tarifa, esGratis, gratisDesde),
+      TEXTOS_BOT.pedidoDireccionAnteriorElegida(dir.direccion, envio, esGratis),
     );
   }
 
@@ -1819,7 +1820,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     if (metodo === 'EFECTIVO') {
-      return this.pedirMontoEfectivo(flujo, { ...pedido, pago: { metodo: 'EFECTIVO' } }, calcularTotales(pedido).total);
+      return this.pedirMontoEfectivo(flujo, { ...pedido, pago: { metodo: 'EFECTIVO' } }, calcularTotales(pedido, contexto.vistaPreviaPedido).total);
     }
     const nuevoPedido: EstadoCarritoPedido = { ...pedido, pago: { metodo } };
     const res = this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
@@ -1860,7 +1861,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const totalPedido = calcularTotales(pedido).total;
+    const totalPedido = calcularTotales(pedido, contexto.vistaPreviaPedido).total;
     const plan = pedido.pago?.plan;
     // Con pago dividido el efectivo cubre solo su parte
     const parte = plan?.find((f) => f.medio === 'EFECTIVO')?.monto ?? totalPedido;
@@ -1906,7 +1907,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     const primero = pedido.pagoDiv?.medio1;
-    const { total } = calcularTotales(pedido);
+    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const resto = Number((total - (pedido.pagoDiv?.monto1 ?? 0)).toFixed(2));
     const medios = mediosActivos(contexto.datosLocalPublicos)
       .filter((m) => m !== primero)
@@ -1940,7 +1941,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (!medio || !activos.includes(medio) || (estado === 'PEDIDO_PAGO_DIV_MEDIO2' && medio === pedido.pagoDiv?.medio1)) {
       return this.mostrarMediosDivididos(estado, flujo, pedido, contexto);
     }
-    const { total } = calcularTotales(pedido);
+    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     if (estado === 'PEDIDO_PAGO_DIV_MEDIO1') {
       const nuevoPedido: EstadoCarritoPedido = {
@@ -1993,7 +1994,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const { total } = calcularTotales(pedido);
+    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const medio1 = pedido.pagoDiv?.medio1;
     if (!medio1) return this.mostrarMediosDivididos('PEDIDO_PAGO_DIV_MEDIO1', flujo, pedido, contexto);
     const monto =
@@ -2205,9 +2206,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     // 11.2. Construir DTO de PedidosService.crear
-    const subtotal = Number(pedido.items.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
-    const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
-    const total = Math.max(0, subtotal + (envio || 0));
+    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     const clienteNombre =
       pedido.cliente?.nombre ||
@@ -2455,12 +2454,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const subtotal = Number(pedido.items.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
-    const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
-    const total = Math.max(0, subtotal + (envio || 0));
+    const { envio, descuento, descuentoNombre, total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     const lineasTexto = this.lineasResumen(pedido);
 
+
+    const descuentoTexto = descuento > 0 ? TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento) : undefined;
 
     let envioTexto = 'gratis';
     if (pedido.modalidad === 'DELIVERY') {
@@ -2507,6 +2506,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           tipo: 'enviarBotones',
           texto: TEXTOS_BOT.pedidoResumenFinal({
             lineasTexto,
+            descuentoTexto,
             envioTexto,
             total,
             modalidad: pedido.modalidad === 'DELIVERY' ? 'Delivery' : 'Para recoger',
@@ -2551,7 +2551,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     };
     const pregunta = TEXTOS_BOT.pedidoMedioPago();
     // Un solo mensaje (resumen + pregunta) mientras cabe en el cuerpo de WhatsApp (1024 caracteres)
-    const resumen = conResumen ? this.resumenAntesDePagar(pedido) : '';
+    const resumen = conResumen ? this.resumenAntesDePagar(pedido, contexto) : '';
     const unido = resumen ? `${resumen}\n\n${pregunta}` : pregunta;
     const cabe = unido.length <= 1000;
     const texto = cabe ? unido : pregunta;
@@ -2575,9 +2575,10 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   }
 
   /** Resumen con total justo antes de «¿Cómo pagarás?». Usa las mismas líneas y totales que el resumen final. */
-  private resumenAntesDePagar(pedido: EstadoCarritoPedido): string {
-    const { subtotal, envio, total } = calcularTotales(pedido);
+  private resumenAntesDePagar(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
+    const { subtotal, envio, total, descuento, descuentoNombre } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const lineas = this.lineasResumen(pedido);
+    const descuentoTxt = descuento > 0 ? `${TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento)}\n` : '';
     const envioTxt =
       pedido.modalidad !== 'DELIVERY'
         ? 'Recojo en tienda'
@@ -2589,6 +2590,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     return (
       `🧾 *Resumen de tu pedido*\n${lineas}\n\n` +
       `Subtotal: S/ ${subtotal.toFixed(2)}\n` +
+      descuentoTxt +
       `${envioTxt}\n` +
       `*TOTAL: S/ ${total.toFixed(2)}*`
     );

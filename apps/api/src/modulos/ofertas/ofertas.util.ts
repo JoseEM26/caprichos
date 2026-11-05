@@ -155,6 +155,9 @@ export function estaVigente(
         return false;
       }
     }
+  } else if (canalBot) {
+    // Bot: sin canales marcados la promoción no vale por WhatsApp (solo cuenta la casilla explícita)
+    return false;
   }
 
   // Validar días de la semana

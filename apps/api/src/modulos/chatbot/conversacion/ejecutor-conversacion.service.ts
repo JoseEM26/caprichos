@@ -16,6 +16,8 @@ import { ReservasService } from '../../reservas/reservas.service';
 import { ChatbotIaService } from '../ia/chatbot-ia.service';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
 import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
+import { vistaPreviaPedidoBot } from './vista-previa-pedido.util';
+import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
 import {
@@ -43,6 +45,7 @@ import { EntradaRawInput, normalizarEntrada, esSaludo } from './normalizador-ent
 import { transicionarEstado, MODO_SOLO_MENUS } from './maquina-estados';
 import {
   ContextoConversacion,
+  VistaPreviaPedidoBot,
   DatosHorarioLocal,
   FlujoConversacion,
 } from './tipos-conversacion';
@@ -1104,11 +1107,27 @@ export class EjecutorConversacionService {
       }
     }
 
+    // Vista previa del pedido en curso con las reglas del servidor (promo BOT y envío): el total del bot sale de aquí
+    let vistaPreviaPedido: VistaPreviaPedidoBot | null = null;
+    const pedidoEnCurso = flujoPrevio?.pedido as EstadoCarritoPedido | undefined;
+    if (pedidoEnCurso?.items?.length) {
+      try {
+        vistaPreviaPedido = await vistaPreviaPedidoBot(
+          { prisma: this.prisma, ofertasService: this.ofertasService },
+          pedidoEnCurso,
+          resultadoEnvio?.tarifa ?? pedidoEnCurso.entrega?.tarifaZona ?? null,
+        );
+      } catch (err: any) {
+        this.logger.warn(`Sin vista previa del pedido (se cobra el precio de lista del servidor): ${err.message}`);
+      }
+    }
+
     const contexto: ContextoConversacion = {
       conversacionId: conversacion.id.toString(),
       nombreCliente: nombreMostrar,
       telefonoCliente,
       cartaUrlPublica,
+      vistaPreviaPedido,
       datosLocal,
       datosLocalPublicos,
       categoriasCarta,

@@ -647,12 +647,10 @@ export const TEXTOS_BOT = {
     return 'Tu ubicación está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local.';
   },
 
-  pedidoUbicacionExitosa: (tarifa: number, esGratis: boolean, gratisDesde?: number): string => {
-    if (esGratis) {
-      const gTexto = gratisDesde ? ` por compras mayores a S/ ${gratisDesde.toFixed(2)}` : '';
-      return `Tu ubicación fue localizada correctamente. El envío a tu ubicación es gratis${gTexto}. Elige una categoría:`;
-    }
-    return `Tu ubicación fue localizada correctamente. El envío a tu ubicación cuesta S/ ${tarifa.toFixed(2)}. Elige una categoría:`;
+  pedidoUbicacionExitosa: (envio: number | null, esGratis: boolean): string => {
+    if (esGratis) return 'Tu ubicación fue localizada correctamente. El envío a tu ubicación es gratis. Elige una categoría:';
+    if (envio === null) return 'Tu ubicación fue localizada correctamente. El costo del envío lo confirma un asesor. Elige una categoría:';
+    return `Tu ubicación fue localizada correctamente. El envío a tu ubicación cuesta S/ ${envio.toFixed(2)}. Elige una categoría:`;
   },
 
   pedidoEscribirDireccionPrompt: (): string => {
@@ -668,16 +666,13 @@ export const TEXTOS_BOT = {
     return '¡Qué gusto verte de nuevo! 😊 ¿Lo enviamos a una dirección anterior o a una nueva?';
   },
 
-  pedidoDireccionAnteriorElegida: (
-    direccion: string,
-    tarifa: number,
-    esGratis: boolean,
-    gratisDesde?: number,
-  ): string => {
-    const envio = esGratis
-      ? `El envío es gratis${gratisDesde ? ` por compras mayores a S/ ${gratisDesde.toFixed(2)}` : ''}.`
-      : `El envío cuesta S/ ${tarifa.toFixed(2)}.`;
-    return `Perfecto, lo enviamos a ${direccion}. ${envio} Elige una categoría:`;
+  pedidoDireccionAnteriorElegida: (direccion: string, envio: number | null, esGratis: boolean): string => {
+    const txtEnvio = esGratis
+      ? 'El envío es gratis.'
+      : envio === null
+        ? 'El costo del envío lo confirma un asesor.'
+        : `El envío cuesta S/ ${envio.toFixed(2)}.`;
+    return `Perfecto, lo enviamos a ${direccion}. ${txtEnvio} Elige una categoría:`;
   },
 
   pedidoDireccionAnteriorSinCoordenadas: (direccion: string): string => {
@@ -834,8 +829,16 @@ export const TEXTOS_BOT = {
     `No encontré una cuenta con este número de WhatsApp.\nCrea la tuya con tu celular en ${urlCarta}, usando este mismo número, y empieza a sumar puntos.`,
   puntosNoDisponible: (): string => `Ahora no puedo consultar tus puntos. Inténtalo en unos minutos.`,
 
+  /** Línea de descuento del resumen: «Descuento <promo> −S/ x», con el nombre de la promoción en pocas palabras. */
+  lineaDescuentoBot: (nombre: string | null, monto: number): string => {
+    const corto = (nombre || 'promoción').trim().slice(0, 30);
+    return `Descuento ${corto} −S/ ${monto.toFixed(2)}`;
+  },
+
   pedidoResumenFinal: (params: {
     lineasTexto: string;
+    /** Una línea corta: «Descuento <promo> −S/ x» (solo si la promoción con casilla BOT aplica) */
+    descuentoTexto?: string;
     envioTexto: string;
     total: number;
     modalidad: string;
@@ -847,6 +850,7 @@ export const TEXTOS_BOT = {
   }): string => {
     const {
       lineasTexto,
+      descuentoTexto,
       envioTexto,
       total,
       modalidad,
@@ -857,12 +861,13 @@ export const TEXTOS_BOT = {
       avisoDemanda,
     } = params;
 
+    const descBloque = descuentoTexto ? `\n${descuentoTexto}` : '';
     const dirBloque = direccionTexto ? `\n${direccionTexto}` : '';
     const demandaBloque = avisoDemanda ? `\n\n${avisoDemanda}` : '';
 
     return (
       `Este es tu resumen:\n` +
-      `${lineasTexto}\n` +
+      `${lineasTexto}${descBloque}\n` +
       `Envío: ${envioTexto}\n` +
       `*Total: S/ ${total.toFixed(2)}*\n\n` +
       `Modalidad: ${modalidad}${dirBloque}\n` +

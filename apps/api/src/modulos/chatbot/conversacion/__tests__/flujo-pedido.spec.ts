@@ -215,6 +215,7 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       expect(resultado.nuevoEstado).toBe('PEDIDO_UBICACION');
 
       // 2. Cliente comparte ubicación por WhatsApp
+      // La vista previa del servidor (zona + promo de envío con casilla BOT) fija el envío: 5.00 sin promo
       const contextoConEnvio: ContextoConversacion = {
         ...contextoBase,
         resultadoEnvio: {
@@ -222,6 +223,7 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
           tarifa: 5.0,
           gratisDesde: 70.0,
         },
+        vistaPreviaPedido: { subtotal: 40, descuento: 0, descuentoNombre: null, envio: 5.0, envioGratis: false },
       };
 
       entrada = normalizarEntrada({

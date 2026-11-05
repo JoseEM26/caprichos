@@ -69,6 +69,7 @@ describe('Flujo de Pedido: direcciones anteriores del cliente con cuenta', () =>
     it('elegir una dirección con cobertura carga dirección, referencia y coordenadas y avanza a categorías', () => {
       const contextoEnvio = conDirecciones({
         resultadoEnvio: { cubierto: true, tarifa: 5, gratisDesde: 70, zona: { id: 3, nombre: 'San Juan' } },
+        vistaPreviaPedido: { subtotal: 20, descuento: 0, descuentoNombre: null, envio: 5, envioGratis: false },
       });
       const flujo = llegarAlPasoDelivery(contextoEnvio);
       const lista = transicionarEstado(flujo, normalizarEntrada({ buttonPayload: 'ped_mod_delivery' }), contextoEnvio);

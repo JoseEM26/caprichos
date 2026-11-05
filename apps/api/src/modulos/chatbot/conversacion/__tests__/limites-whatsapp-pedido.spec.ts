@@ -154,7 +154,7 @@ describe('Límites estrictos de WhatsApp en catálogo de textos y botones (FT-BO
       expect(TEXTOS_BOT.pedidoPedirUbicacion().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoUbicacionClipAyuda().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoFueraDeCobertura().length).toBeLessThanOrEqual(LIMITE_CUERPO);
-      expect(TEXTOS_BOT.pedidoUbicacionExitosa(5.0, false, 70).length).toBeLessThanOrEqual(LIMITE_CUERPO);
+      expect(TEXTOS_BOT.pedidoUbicacionExitosa(5.0, false).length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoUbicacionExitosa(0, true).length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoEscribirDireccionPrompt().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoPedirReferencia().length).toBeLessThanOrEqual(LIMITE_CUERPO);

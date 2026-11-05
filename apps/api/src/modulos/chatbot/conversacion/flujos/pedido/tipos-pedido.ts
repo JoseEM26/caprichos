@@ -95,6 +95,8 @@ export interface DatosEntregaBot {
   zonaId?: string;
   zonaNombre?: string;
   tarifaEnvio?: number | null;
+  /** Tarifa de la zona (sin promociones), para recalcular el envio con la vista previa en los pasos siguientes */
+  tarifaZona?: number | null;
 }
 
 export interface DatosClienteBot {

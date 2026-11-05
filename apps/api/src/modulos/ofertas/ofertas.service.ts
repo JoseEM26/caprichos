@@ -1584,13 +1584,18 @@ export class OfertasService {
     /** true solo si el cliente tiene sesión iniciada en la carta (cuenta con celular verificado) */
     clienteConSesion?: boolean;
   }): Promise<DesgloseDescuentosPedido> {
-    const { subtotal, lineas, canal, cuponCodigo, clientePartyId, clienteConSesion } = params;
+    const { subtotal, lineas, canal, clientePartyId, clienteConSesion } = params;
 
-    // Bot de WhatsApp (decisión del dueño): sin promociones, combos, 2x1 ni cupones. El total es el precio de lista.
-    // Los pedidos de carta, caja y mozo no cambian. El envío y el pedido mínimo de delivery se calculan aparte.
-    if (canal === 'BOT' || canal === 'WHATSAPP') {
-      return { descuentoTotal: 0, ofertaId: null, cuponId: null, cuponEmitidoId: null, detalles: [] };
+    // Bot de WhatsApp: solo promociones automáticas con la casilla «Vale también por WhatsApp» (canal BOT,
+    // que estaVigente exige explícito). Nunca cupones: el bot no pide códigos y el servidor los rechaza.
+    const esBot = canal === 'BOT' || canal === 'WHATSAPP';
+    if (esBot && params.cuponCodigo?.trim()) {
+      throw new BadRequestException({
+        codigo: 'CUPON_NO_APLICA_CANAL',
+        mensaje: 'Los cupones no se aceptan por WhatsApp',
+      });
     }
+    const cuponCodigo = params.cuponCodigo;
 
     const regla = await this.obtenerReglasAcumulacion();
     const ahora = new Date();
