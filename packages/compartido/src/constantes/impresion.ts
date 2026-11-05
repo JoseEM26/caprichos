@@ -1,0 +1,37 @@
+/**
+ * Configuración de impresión: UN solo lugar con las claves de la tabla `parametro` (prefijo impresion_)
+ * y sus valores por defecto. Sin configurar, todo sale como antes, salvo el sticker general (solo
+ * llevar/recoger/delivery, decisión del dueño).
+ */
+export const CLAVES_CONFIG_IMPRESION = {
+  /** Modalidades en las que sale el sticker general (resumen con total). */
+  ETIQUETA_GENERAL_MODALIDADES: 'impresion_etiqueta_general_modalidades',
+  /** Sticker por vaso de bebida: todos los pedidos con bebidas (salón, llevar, delivery). */
+  ETIQUETA_BEBIDA_ACTIVO: 'impresion_etiqueta_bebida_activo',
+  /** Sticker por área (futuro). Apagado por defecto hasta que el dueño lo confirme. */
+  ETIQUETA_AREA_ACTIVO: 'impresion_etiqueta_area_activo',
+  /** Comanda completa de salón para la ticketera de Caja al aceptar el pedido. */
+  TICKET_COMANDA_SALON_ACTIVO: 'impresion_ticket_comanda_salon_activo',
+  /** Minutos tras los que un trabajo automático pendiente pasa a VENCIDO (ya existía). */
+  VENCE_MIN: 'impresion_vence_min',
+} as const;
+
+/** Modalidades reales del pedido: DELIVERY, RECOGER y MESA las escribe la API; LLEVAR existe en datos antiguos; LOCAL es el valor de respaldo de informes. */
+export const MODALIDADES_PEDIDO = ['MESA', 'LOCAL', 'LLEVAR', 'RECOGER', 'DELIVERY'] as const;
+
+/** Modalidades de salón (pedido en mesa o en el local): reciben la comanda de salón. */
+export const MODALIDADES_SALON = ['MESA', 'LOCAL'] as const;
+
+export interface ReglasImpresion {
+  generalModalidades: string[];
+  bebidaActivo: boolean;
+  areaActivo: boolean;
+  comandaSalonActivo: boolean;
+}
+
+export const REGLAS_IMPRESION_DEFECTO: ReglasImpresion = {
+  generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
+  bebidaActivo: true,
+  areaActivo: false,
+  comandaSalonActivo: true,
+};

@@ -4,7 +4,14 @@ export {
   TIPOS_ETIQUETA,
   ESTADOS_PRINT_JOB,
   ESTADOS_IMPRESORA,
+  CLAVES_CONFIG_IMPRESION,
+  MODALIDADES_PEDIDO,
+  MODALIDADES_SALON,
+  REGLAS_IMPRESION_DEFECTO,
+  ROLES_COCINA_AREA,
+  AREA_BEBIDAS,
 } from './constantes/index.js';
+export type { ReglasImpresion } from './constantes/index.js';
 export type { RolSistema } from './constantes/index.js';
 export * from './tipos/index.js';
 export {
@@ -52,5 +59,7 @@ export {
 } from './etiquetas/maquetaEtiquetas.js';
 export type { FuenteTspl, Primitiva, Maqueta, FormatoMaqueta } from './etiquetas/maquetaEtiquetas.js';
 export { lineasTicketPago } from './etiquetas/ticketPago.js';
+export { lineasTicketComandaSalon } from './etiquetas/ticketComanda.js';
+export type { LineaComanda } from './etiquetas/ticketComanda.js';
 export type { LineaTicket } from './etiquetas/ticketPago.js';
 export { LOGO_BASE64, LOGO_BASE64_90, LOGO_BASE64_270, LOGO_LADO } from './etiquetas/logoBitmap.js';
