@@ -119,7 +119,7 @@ export function EtiquetaBebida({ datos }: { datos: EtiquetaBebidaDatos }) {
 }
 
 /** Ticket de pago tal como lo imprime la ticketera: bloque monoespaciado del ancho del papel (80 mm = 48 col, 58 mm = 32). */
-export function TicketPagoPrevia({ datos }: { datos: TicketPagoDatos }) {
+export function TicketPagoPrevia({ datos, sinCabecera = false }: { datos: TicketPagoDatos; sinCabecera?: boolean }) {
   const [columnas, setColumnas] = useState<48 | 32>(48);
   const lineas = lineasTicketPago(datos, columnas);
   const boton = (c: 48 | 32, texto: string) => (
@@ -144,10 +144,14 @@ export function TicketPagoPrevia({ datos }: { datos: TicketPagoDatos }) {
   );
   return (
     <section aria-label="Ticket de pago" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>4. Ticket de pago</div>
-      <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
-        Sale en la ticketera al cobrar. Así se imprime, línea por línea.
-      </div>
+      {!sinCabecera && (
+        <>
+          <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14 }}>4. Ticket de pago</div>
+          <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+            Sale en la ticketera al cobrar. Así se imprime, línea por línea.
+          </div>
+        </>
+      )}
       <div style={{ display: 'flex', gap: 8 }}>
         {boton(48, 'Papel 80 mm')}
         {boton(32, 'Papel 58 mm')}

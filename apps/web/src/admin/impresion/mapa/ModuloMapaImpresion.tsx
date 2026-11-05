@@ -8,8 +8,8 @@ import { EstadoVacio } from '../../../comun/EstadoVacio';
 import { Confirmar } from '../../../comun/Confirmar';
 import { impresionApi, type MapaImpresionDatos, type ReglasMapa } from '../impresionApi';
 import { derivarFlujo, type Escenario } from './flujo';
-import { LienzoMapa } from './LienzoMapa';
-import { SimuladorPedido } from './SimuladorPedido';
+import { LeyendaMapa, LienzoMapa } from './LienzoMapa';
+import { SimuladorPedido, TiraSaldria } from './SimuladorPedido';
 import './mapa-impresion.css';
 
 interface Pendiente {
@@ -137,14 +137,13 @@ export function ModuloMapaImpresion() {
       <header className="mapa-cabecera">
         <div>
           <h3 id="mapa-impresion-titulo" className="mapa-titulo">Mapa de impresión</h3>
-          <p className="mapa-intro">
-            Mira qué se imprime, con qué regla y en qué equipo. Cambia las reglas y lleva cada equipo al área que atiende.
-          </p>
+          <p className="mapa-intro">Qué sale de cada pedido, cuándo sale y en qué impresora.</p>
         </div>
         <div className="mapa-vivo">
           En vivo · actualizado {actualizado}
           {error && <span className="mapa-vivo-error"> (sin conexión al actualizar)</span>}
         </div>
+        <LeyendaMapa />
       </header>
 
       <p className="mapa-enlaces">
@@ -171,9 +170,8 @@ export function ModuloMapaImpresion() {
         />
       )}
 
-      <SimuladorPedido escenario={escenario} flujo={flujo} onCambiar={setEscenario} />
+      <SimuladorPedido escenario={escenario} onCambiar={setEscenario} />
 
-      <h3 className="mapa-subtitulo">Mapa</h3>
       <LienzoMapa
         mapa={mapa}
         flujo={flujo}
@@ -183,6 +181,8 @@ export function ModuloMapaImpresion() {
         onCambiarRegla={cambiarRegla}
         onMover={pedirMover}
       />
+
+      <TiraSaldria flujo={flujo} />
 
       <Confirmar
         abierto={pendiente !== null}

@@ -8,13 +8,35 @@ export interface Escenario {
 }
 export type ClavePieza = 'BEBIDA' | 'RESUMEN' | 'AREA' | 'COMANDA' | 'PAGO';
 
-export const PIEZAS: Record<ClavePieza, { titulo: string; que: string }> = {
-  BEBIDA: { titulo: 'Sticker de bebida', que: 'Un sticker por cada vaso con bebida' },
-  RESUMEN: { titulo: 'Sticker de resumen', que: 'Un sticker con el monto total del pedido' },
-  AREA: { titulo: 'Sticker por área', que: 'Un sticker por cada área del pedido' },
-  COMANDA: { titulo: 'Comanda de salón', que: 'Hoja con cada línea para la cocina de salón' },
-  PAGO: { titulo: 'Ticket de pago', que: 'Lo que se entrega al cobrar' },
+export const PIEZAS: Record<ClavePieza, { titulo: string; que: string; paraQue: string }> = {
+  BEBIDA: { titulo: 'Sticker de bebida', que: 'Sale uno por cada bebida', paraQue: 'Un vaso marcado para cada bebida, para no confundirlas en la barra.' },
+  RESUMEN: { titulo: 'Sticker de resumen', que: 'Sale uno con el total del pedido', paraQue: 'Muestra el monto y la modalidad para cobrar y entregar.' },
+  AREA: { titulo: 'Sticker por área', que: 'Sale uno por cada área del pedido', paraQue: 'Para que cada área (salados, postres…) sepa qué le toca preparar.' },
+  COMANDA: { titulo: 'Comanda de salón', que: 'Hoja con cada línea para la cocina', paraQue: 'Lo que la cocina y el mozo leen en mesa o local.' },
+  PAGO: { titulo: 'Ticket de pago', que: 'Lo que se entrega al cobrar', paraQue: 'El comprobante de la venta. Siempre sale en Caja.' },
 };
+
+/** Color de cada tipo de pieza: sus líneas y su borde. Las piezas apagadas usan gris (GRIS_APAGADO). */
+export const COLOR_PIEZA: Record<ClavePieza, string> = {
+  BEBIDA: '#2a9d8f',
+  RESUMEN: '#e07a2d',
+  AREA: '#3d6fb6',
+  COMANDA: '#8a4fb0',
+  PAGO: '#0b2c3e',
+};
+export const GRIS_APAGADO = '#9a9a9a';
+
+/** Texto llano de cada estado de impresora (lo que ve el dueño, no el código del agente). */
+export const TEXTO_ESTADO: Record<string, string> = {
+  lista: 'lista',
+  sin_papel: 'sin papel',
+  desconectada: 'desconectada',
+  sin_permiso: 'sin permiso',
+  error: 'con error',
+  no_configurada: 'sin configurar',
+  sin_programa: 'programa apagado',
+};
+export const NOMBRE_ROL: Record<string, string> = { ETIQUETERA: 'Etiquetera', TICKETERA: 'Ticketera' };
 
 /** Botones de modalidad del resumen: cada uno agrupa las modalidades que representa. */
 export const GRUPOS_MODALIDAD: Array<{ id: string; titulo: string; mods: Modalidad[] }> = [
@@ -48,6 +70,7 @@ export interface PiezaFlujo {
   clave: ClavePieza;
   titulo: string;
   que: string;
+  paraQue: string;
   /** La regla de esta pieza está encendida. */
   reglaActiva: boolean;
   /** Sale con el pedido del escenario. */
@@ -69,6 +92,37 @@ export function luzDeEquipo(e: EquipoMapa): NivelLuz {
   if (estados.some((s) => s === 'desconectada' || s === 'error' || s === 'sin_permiso' || s === 'sin_programa')) return 'rojo';
   if (estados.some((s) => s === 'sin_papel' || s === 'no_configurada')) return 'ambar';
   return 'verde';
+}
+
+/** Texto de la luz de un equipo: lo que se entiende de un vistazo. */
+export function textoLuz(e: EquipoMapa): string {
+  if (!e.conectado) return 'Sin conexión';
+  const luz = luzDeEquipo(e);
+  return luz === 'verde' ? 'Lista' : luz === 'ambar' ? 'Atención' : 'Revisar';
+}
+
+/** Por qué un trabajo de esta pieza acaba en ese destino (o no sale). Para el detalle. */
+export function motivoSalida(s: Salida): string {
+  if (s.sinEquipo) return 'Ningún equipo tiene asignada esta área: no sale.';
+  if (s.cae) return 'El área no tiene equipo propio: cae en Caja.';
+  if (s.espera) return 'Su equipo no está listo: el trabajo queda en espera.';
+  if (s.slot === null) return 'Caja imprime esta pieza.';
+  return 'Su equipo está asignado a esa área.';
+}
+
+/**
+ * Orden de las piezas para que las líneas se crucen lo menos posible: primero las que van a la
+ * columna de Caja (la de arriba), luego las de cada área en el orden de la columna de destinos.
+ */
+export function ordenarPiezas(flujo: PiezaFlujo[], columnas: Array<string | null>): PiezaFlujo[] {
+  const puesto = (p: PiezaFlujo) => {
+    const idx = p.salidas.map((s) => {
+      const i = columnas.indexOf(s.slot ?? null);
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    });
+    return idx.length ? Math.min(...idx) : Number.MAX_SAFE_INTEGER;
+  };
+  return [...flujo].sort((a, b) => puesto(a) - puesto(b));
 }
 
 /** Alterna un grupo de modalidades: si todas están, las quita; si no, añade las que falten. */

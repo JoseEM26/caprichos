@@ -1,10 +1,12 @@
-/* Mapa de impresión: lienzo de tres columnas con líneas medidas desde el DOM. Colores: tokens --cp-*. */
+/* Mapa de impresión: leyenda, tres columnas (qué · cuándo · dónde) con líneas medidas desde el DOM,
+   hoja de detalle y simulador. Colores: tokens --cp-*; cada tipo de pieza usa su --pieza (ver flujo.ts). */
 
 .mapa-impresion {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   min-width: 0;
+  max-width: 100%;
   color: var(--cp-navy);
   font-family: var(--fuente-cuerpo, inherit);
 }
@@ -26,9 +28,8 @@
 
 .mapa-intro {
   margin: 4px 0 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--cp-soft);
-  max-width: 62ch;
 }
 
 .mapa-vivo {
@@ -43,7 +44,7 @@
 
 .mapa-subtitulo {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
 }
 
@@ -77,8 +78,63 @@
   color: var(--cp-rust);
 }
 
-/* Simulador */
-.mapa-simulador {
+/* Leyenda */
+.mapa-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--cp-white);
+  border: 1.5px solid var(--cp-line);
+  font-size: 14px;
+}
+
+.mapa-leyenda li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mapa-leyenda-linea {
+  width: 44px;
+  height: 10px;
+  flex: none;
+}
+
+.mapa-leyenda-pista {
+  width: 100%;
+  font-size: 13px;
+  color: var(--cp-soft);
+  font-style: italic;
+}
+
+.mapa-luz {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
+.mapa-luz--verde {
+  background: var(--cp-ok);
+}
+
+.mapa-luz--ambar {
+  background: var(--cp-gold);
+}
+
+.mapa-luz--rojo {
+  background: var(--cp-rust);
+}
+
+/* Simulador (arriba) */
+.mapa-simulador,
+.mapa-saldria {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -152,6 +208,7 @@
   background: var(--cp-greenbg);
 }
 
+/* Tira «Lo que saldría» (debajo del mapa) */
 .sim-tira {
   list-style: none;
   margin: 0;
@@ -183,13 +240,14 @@
   color: var(--cp-soft);
 }
 
-/* Lienzo */
+/* Lienzo: escritorio = cuadrícula de 3 columnas con cada pieza en la misma fila que su regla */
 .mapa-lienzo {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 28px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
+  column-gap: 32px;
+  row-gap: 14px;
+  align-items: stretch;
   min-width: 0;
 }
 
@@ -204,13 +262,14 @@
 
 .mapa-linea {
   fill: none;
-  stroke-width: 3;
+  stroke-width: 2;
   stroke-linecap: round;
 }
 
 .mapa-linea--activa {
-  stroke: var(--cp-green);
-  stroke-dasharray: 8 10;
+  stroke: var(--pieza, var(--cp-green));
+  stroke-dasharray: 8 8;
+  stroke-width: 2.5;
   animation: mapa-fluir 1.4s linear infinite;
 }
 
@@ -221,19 +280,19 @@
 
 .mapa-linea--fuera {
   stroke: #9c9184;
-  stroke-width: 2;
+  stroke-dasharray: 6 6;
+  stroke-width: 1.5;
 }
 
 .mapa-linea--apagada {
-  stroke: #8a8a8a;
-  stroke-width: 2;
-  stroke-dasharray: 2 8;
-  opacity: 0.7;
+  stroke: #b0b0b0;
+  stroke-dasharray: 2 6;
+  stroke-width: 1.5;
 }
 
 @keyframes mapa-fluir {
   to {
-    stroke-dashoffset: -18px;
+    stroke-dashoffset: -16px;
   }
 }
 
@@ -241,49 +300,87 @@
   .mapa-linea--activa {
     animation: none;
   }
+  .mapa-anillo-marca {
+    transition: none;
+  }
 }
 
-.mapa-col {
+.mapa-col-titulo {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 2px;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--cp-navy);
+  min-width: 0;
+}
+
+.mapa-icono {
+  display: inline-flex;
+  color: var(--pieza, var(--cp-soft));
+  flex: none;
+}
+
+.mapa-icono-svg {
+  display: block;
+}
+
+/* Nodos de «qué se imprime»: misma altura y estructura para que queden alineados */
+.mapa-pieza {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-.mapa-col-titulo {
-  margin: 0;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--cp-soft);
-}
-
-/* Nodos de la izquierda: qué se imprime */
-.mapa-pieza {
+  gap: 6px;
+  min-height: 150px;
+  padding: 14px 16px;
   background: var(--cp-white);
   border: 2px solid var(--cp-line);
-  border-radius: 18px;
-  padding: 12px 14px;
+  border-left: 6px solid var(--pieza, var(--cp-line));
+  border-radius: 16px;
   min-width: 0;
-  transition: opacity 0.2s;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: opacity 0.2s, box-shadow 0.2s;
+}
+
+.mapa-nodo-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-right: 32px;
 }
 
 .mapa-pieza h4 {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
-}
-
-.mapa-pieza p {
-  margin: 2px 0 0;
-  font-size: 13px;
   overflow-wrap: anywhere;
 }
 
+.mapa-nodo-desc {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.mapa-pieza-estado {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-navy);
+  overflow-wrap: anywhere;
+}
+
+.mapa-nodo-pie {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
 .mapa-pieza--sale {
-  border-color: var(--cp-green);
+  border-color: var(--pieza);
+  border-left-color: var(--pieza);
 }
 
 .mapa-pieza--fuera {
@@ -291,21 +388,79 @@
 }
 
 .mapa-pieza--apagada {
-  opacity: 0.5;
+  opacity: 0.55;
   border-style: dashed;
+  border-color: #b8b8b8;
+  border-left-color: #b8b8b8;
 }
 
-.mapa-pieza-estado {
+/* Botón «i Ver detalle» (objetivo de 44 px) */
+.mapa-ver {
+  min-height: 44px;
+  padding: 0 14px 0 8px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
   font-weight: 700;
-  color: var(--cp-soft);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }
 
-.mapa-pieza--sale .mapa-pieza-estado {
-  color: var(--cp-green);
+.mapa-ver-i {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cp-navy);
+  color: var(--cp-white);
+  font-size: 13px;
+  font-weight: 800;
+  font-style: italic;
 }
 
-/* Reglas del centro */
+/* Anillo de la presión larga */
+.mapa-anillo {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+}
+
+.mapa-anillo-base {
+  fill: none;
+  stroke: var(--cp-line);
+  stroke-width: 3;
+}
+
+.mapa-anillo-marca {
+  fill: none;
+  stroke: var(--cp-orange);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.1s linear;
+}
+
+.mapa-nodo--presion {
+  box-shadow: 0 0 0 3px rgba(230, 121, 41, 0.35);
+}
+
+/* Reglas (columna 2): cada una junto a su pieza y encima de su línea */
+.mapa-celda-regla {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+}
+
 .mapa-regla {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -313,7 +468,7 @@
   flex-wrap: wrap;
   background: var(--cp-cream);
   border-radius: 14px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1.5px solid var(--cp-line);
   min-width: 0;
 }
@@ -327,17 +482,35 @@
 
 .mapa-regla-titulo {
   font-weight: 800;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .mapa-regla small {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--cp-soft);
 }
 
 .mapa-regla--fija {
   background: var(--cp-sand);
   border-style: dashed;
+}
+
+.mapa-regla--modos {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.mapa-sale-en {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.mapa-sale-en-etiqueta {
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .mapa-switch {
@@ -368,18 +541,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  width: 100%;
 }
 
 .mapa-pildora {
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 14px;
   border-radius: 9999px;
   border: 2px solid var(--cp-line);
   background: var(--cp-white);
   color: var(--cp-soft);
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
 }
 
@@ -389,15 +561,22 @@
   color: var(--cp-navy);
 }
 
-/* Destinos de la derecha: ranuras de área con equipos */
+/* Destinos (columna 3): ranuras de Caja y de cada área */
+.mapa-destinos {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
 .mapa-ranura {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 72px;
   padding: 12px;
-  border-radius: 18px;
-  border: 2px dashed var(--cp-line);
+  border-radius: 16px;
+  border: 1.5px solid var(--cp-line);
   background: var(--cp-white);
   transition: border-color 0.15s, background 0.15s;
   min-width: 0;
@@ -410,7 +589,7 @@
 
 .mapa-ranura-titulo {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
 }
 
@@ -422,14 +601,17 @@
 }
 
 .mapa-equipo {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 12px 14px;
   border-radius: 14px;
   background: var(--cp-cream);
   border: 1.5px solid var(--cp-line);
   min-width: 0;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .mapa-equipo[draggable='true'] {
@@ -446,6 +628,7 @@
   gap: 8px;
   flex-wrap: wrap;
   min-width: 0;
+  padding-right: 32px;
 }
 
 .mapa-equipo-cab strong {
@@ -461,28 +644,9 @@
 .mapa-equipo-detalle,
 .mapa-equipo-pie {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--cp-soft);
   overflow-wrap: anywhere;
-}
-
-.mapa-luz {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-}
-
-.mapa-luz--verde {
-  background: var(--cp-ok);
-}
-
-.mapa-luz--ambar {
-  background: var(--cp-gold);
-}
-
-.mapa-luz--rojo {
-  background: var(--cp-rust);
 }
 
 .mapa-equipo-select {
@@ -505,6 +669,125 @@
   max-width: 100%;
 }
 
+/* Hoja de detalle: en escritorio va encima del mapa; en celular, abajo. No bloquea nada. */
+.mapa-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--cp-white);
+  border: 2px solid var(--cp-navy);
+  box-shadow: 0 10px 30px rgba(11, 44, 62, 0.14);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mapa-detalle-cab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mapa-detalle-titulo {
+  margin: 0;
+  flex: 1;
+  font-size: 20px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.mapa-detalle-titulo:focus {
+  outline: 3px solid var(--cp-orange);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.mapa-detalle-cerrar {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1.5px solid var(--cp-navy);
+  background: transparent;
+  color: var(--cp-navy);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mapa-detalle-para {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mapa-detalle-h {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cp-soft);
+}
+
+.mapa-detalle-linea {
+  margin: 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mapa-detalle-lista {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+.mapa-detalle-sub {
+  color: var(--cp-soft);
+}
+
+.mapa-detalle--hoja {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 60;
+  max-height: 78vh;
+  overflow-y: auto;
+  border-radius: 20px;
+}
+
+/* Vista previa de la pieza (EJEMPLO) */
+.mapa-vista {
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.mapa-vista > svg {
+  max-width: 260px;
+}
+
+.mapa-vista-etiqueta {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  background: var(--cp-gold);
+  color: var(--cp-navy);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -517,13 +800,23 @@
   border: 0;
 }
 
-/* Celular: las columnas se apilan en el orden qué · reglas · dónde */
-@media (max-width: 719px) {
-  .mapa-lienzo {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
-  }
+/* Celular: las tres columnas se apilan en el orden ① ② ③, sin scroll horizontal */
+.mapa-lienzo--pila {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
+.mapa-lienzo--pila .mapa-col-titulo {
+  margin-top: 10px;
+  font-size: 18px;
+}
+
+.mapa-lienzo--pila .mapa-pieza {
+  min-height: 0;
+}
+
+@media (max-width: 719px) {
   .sim-opciones {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -537,5 +830,9 @@
 
   .sim-opcion-ayuda {
     text-align: right;
+  }
+
+  .mapa-leyenda {
+    gap: 8px 14px;
   }
 }

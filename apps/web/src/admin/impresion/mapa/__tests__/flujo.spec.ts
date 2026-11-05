@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { derivarFlujo, alternarGrupo, luzDeEquipo, type PiezaFlujo, type Escenario } from '../flujo';
+import { derivarFlujo, alternarGrupo, luzDeEquipo, motivoSalida, ordenarPiezas, type PiezaFlujo, type Escenario } from '../flujo';
 import type { MapaImpresionDatos } from '../../impresionApi';
 
 const CAJA = '10';
@@ -120,5 +120,24 @@ describe('ayudas de flujo y luces', () => {
     expect(luzDeEquipo({ ...base, roles: [{ rol: 'ETIQUETERA', estado: 'sin_papel' }] })).toBe('ambar');
     expect(luzDeEquipo({ ...base, roles: [{ rol: 'ETIQUETERA', estado: 'error' }] })).toBe('rojo');
     expect(luzDeEquipo({ ...base, conectado: false })).toBe('rojo');
+  });
+});
+
+describe('motivo y orden para el detalle', () => {
+  it('cada salida explica por qué cae ahí', () => {
+    const base = { slot: null, equipoId: CAJA, nombreDestino: 'PC Caja', espera: false, cae: false, sinEquipo: false };
+    expect(motivoSalida({ ...base, slot: '1', equipoId: '11', nombreDestino: 'Etiquetera bar' })).toBe('Su equipo está asignado a esa área.');
+    expect(motivoSalida({ ...base, cae: true })).toContain('cae en Caja');
+    expect(motivoSalida({ ...base, slot: '1', espera: true })).toContain('en espera');
+    expect(motivoSalida({ ...base, sinEquipo: true, equipoId: null })).toContain('no sale');
+    expect(motivoSalida(base)).toBe('Caja imprime esta pieza.');
+  });
+
+  it('las piezas de Caja van primero, luego las de cada área (menos cruces)', () => {
+    const f = derivarFlujo(mapaBase(), DELIVERY);
+    const orden = ordenarPiezas(f, [null, '1', '2', '3']).map((p) => p.clave);
+    expect(orden.indexOf('BEBIDA')).toBeGreaterThan(orden.indexOf('RESUMEN'));
+    expect(orden.indexOf('BEBIDA')).toBeGreaterThan(orden.indexOf('PAGO'));
+    expect(orden).toHaveLength(5);
   });
 });
