@@ -421,7 +421,6 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
         estadoInterno: 'PEDIDO_INGRESAR_TELEFONO',
         modalidad: 'RECOGER',
         cliente: { nombre: 'Cliente Meta' },
-        cuponPreguntado: true,
         items: [
           {
             lineaId: 'lin_1',
@@ -740,7 +739,8 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       const textos = resultado.acciones
         .map((a: any) => `${a.texto ?? ''} ${a.botones?.map((b: any) => b.titulo).join(' ') ?? ''}`)
         .join(' ');
-      expect(textos).not.toMatch(/promo|oferta|descuento|cup[oó]n|ahorr|puntos/i);
+      // La línea de puntos (solo acumular, con el celular de quien escribe) sí va en este mensaje; las promos no
+      expect(textos).not.toMatch(/promo|oferta|descuento|cup[oó]n|ahorr/i);
     });
   });
 

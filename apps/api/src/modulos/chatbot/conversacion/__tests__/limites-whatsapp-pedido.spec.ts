@@ -174,7 +174,8 @@ describe('Límites estrictos de WhatsApp en catálogo de textos y botones (FT-BO
       expect(TEXTOS_BOT.pedidoProductoEliminado('Hamburguesa Clásica').length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoCarritoVacio().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoMinimoNoAlcanzado(20, 5).length).toBeLessThanOrEqual(LIMITE_CUERPO);
-      expect(TEXTOS_BOT.pedidoConfirmarNombre('Carlos').length).toBeLessThanOrEqual(LIMITE_CUERPO);
+      // Peor caso: nombre de 80 caracteres, celular enmascarado y saldo con decimales
+      expect(TEXTOS_BOT.pedidoConfirmarNombre('C'.repeat(80), { celular: '9•• ••• 123', saldo: 1234.5 }).length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoIngresarNombre().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoIngresarTelefono().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoTelefonoInvalido().length).toBeLessThanOrEqual(LIMITE_CUERPO);
