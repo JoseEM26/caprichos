@@ -93,6 +93,13 @@ function AvisoPromocion({ p }: { p: ProductoAdmin }) {
   );
 }
 
+/**
+ * Qué hizo el admin con la foto en el modal Editar. Solo `NUEVA` y `QUITADA`
+ * viajan al servidor: `SIN_CAMBIO` omite `fotoArchivoId` del payload, así la
+ * foto actual se conserva (el PATCH solo la toca si la clave viene).
+ */
+type CambioFotoEdicion = 'SIN_CAMBIO' | 'NUEVA' | 'QUITADA';
+
 export function ProductosView() {
   const navigate = useNavigate();
   const { usuario, tiene } = useSesion();
@@ -159,6 +166,7 @@ export function ProductosView() {
   const [edControlaStock, setEdControlaStock] = useState(false);
   const [edFotoUrl, setEdFotoUrl] = useState<string | null>(null);
   const [edFotoArchivoId, setEdFotoArchivoId] = useState<string | null>(null);
+  const [edFotoCambio, setEdFotoCambio] = useState<CambioFotoEdicion>('SIN_CAMBIO');
   const subidaEdFoto = useSubidaArchivo();
   const [edSabores, setEdSabores] = useState<Array<{ id?: string; nombre: string; activo?: boolean }>>([]);
   const [edNuevoSabor, setEdNuevoSabor] = useState('');
@@ -389,6 +397,7 @@ export function ProductosView() {
     setEdControlaStock(p.controlaStock === true);
     setEdFotoUrl(p.fotoUrl || null);
     setEdFotoArchivoId(null);
+    setEdFotoCambio('SIN_CAMBIO');
     setEdSabores(p.sabores.map((s) => ({ ...s })));
     setEdNuevoSabor('');
     setEdError('');
@@ -415,7 +424,10 @@ export function ProductosView() {
             precio: precioNum,
             oculto: edOculto,
             controlaStock: edControlaStock,
-            fotoArchivoId: edFotoArchivoId,
+            // Sin cambio: no viaja la clave, y el servidor conserva la foto.
+            ...(edFotoCambio === 'SIN_CAMBIO'
+              ? {}
+              : { fotoArchivoId: edFotoCambio === 'NUEVA' ? edFotoArchivoId : null }),
             sabores: edSabores.map((s) => ({
               id: s.id,
               nombre: s.nombre,
@@ -442,6 +454,7 @@ export function ProductosView() {
       const res = await catalogoApi.subirFoto(file);
       setEdFotoUrl(res.url);
       setEdFotoArchivoId(res.id);
+      setEdFotoCambio('NUEVA');
     });
   };
 
@@ -464,6 +477,7 @@ export function ProductosView() {
       accion: () => {
         setEdFotoUrl(null);
         setEdFotoArchivoId(null);
+        setEdFotoCambio('QUITADA');
       },
     });
   };

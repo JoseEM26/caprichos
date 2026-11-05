@@ -686,6 +686,9 @@ export class CatalogoService implements OnApplicationBootstrap {
       }
     }
 
+    // Foto: solo se toca si el cliente manda la clave. Clave ausente = conservar
+    // la foto actual; `null` explícito = quitarla. El front omite la clave si el
+    // admin no cambió la foto (no mandar null por defecto: borraría la imagen).
     const fotoArchivoId =
       dto.fotoArchivoId !== undefined
         ? dto.fotoArchivoId
