@@ -12,6 +12,8 @@ import {
 } from '../puerto/whatsapp-mensajeria.puerto';
 import { botonCodigoDe, CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { enmascararTelefono, ORIGEN_CODIGO_CUENTA, textoParaPersonal } from '../utilidades/enmascarar.util';
+import { CODIGOS_PLANTILLA_PERMANENTES, separarDetalleTecnico } from '../utilidades/meta-errores.util';
+import { mapearErrorWhatsApp } from '../../mensajes/utilidades/error-whatsapp.util';
 import { PayloadMensajeNegocio, Ventana24hService } from './ventana-24h.service';
 import { enviarCarruselConRespaldo, resumenCarrusel } from './carrusel.util';
 import { CargaInteractivo, normalizarInteractivo, textoConVinetas } from './interactivo.util';
@@ -60,13 +62,13 @@ const LOTES_POR_CORRIDA = 10;
 /** Errores que no mejoran reintentando: el número, la plantilla o la BAJA del cliente. */
 const CODIGOS_PERMANENTES = new Set([
   'NUMERO_INVALIDO',
-  'PLANTILLA_NO_APROBADA',
   'PLANTILLA_NO_CONFIGURADA',
   'CLIENTE_BAJA',
   'DESTINATARIO_NO_VERIFICADO',
   'FUERA_DE_VENTANA_24H',
   'BSUID_NO_PERMITIDO',
   'ERROR_META',
+  ...CODIGOS_PLANTILLA_PERMANENTES,
 ]);
 
 /** Lo que no está en la lista permanente se trata como temporal: se reintenta hasta agotar intentos. */
@@ -76,6 +78,20 @@ export const esErrorPermanente = (codigo?: string | null): boolean => !!codigo &
 export const clasificarFallo = (codigo: string | null | undefined, agotado: boolean): 'PERMANENTE' | 'AGOTADO' | 'TEMPORAL' => {
   if (esErrorPermanente(codigo)) return 'PERMANENTE';
   return agotado ? 'AGOTADO' : 'TEMPORAL';
+};
+
+/** ultimo_error se guarda como «[CLASIFICACION] detalle»: de ahí salen la causa en español y el detalle técnico. */
+const causaDeUltimoError = (ultimo: string | null): string | null => {
+  if (!ultimo) return null;
+  const codigo = ultimo.match(/^\[([A-Z_]+)\]/)?.[1] ?? null;
+  return mapearErrorWhatsApp(codigo, ultimo.replace(/^\[[A-Z_]+\]\s*/, ''));
+};
+
+const detalleTecnicoDeUltimoError = (ultimo: string | null) => {
+  if (!ultimo) return null;
+  const sinClasificacion = ultimo.replace(/^\[[A-Z_]+\]\s*/, '');
+  const detalle = separarDetalleTecnico(null, sinClasificacion);
+  return detalle ? { codigoMeta: detalle.codigoMeta, original: detalle.original } : null;
 };
 
 const esParametroActivo = (valor: unknown) => valor === true || String(valor).toLowerCase() === 'si';
@@ -608,8 +624,10 @@ export class OutboxWhatsappService {
    * Lista para la pestaña Salientes: por estado y/o origen, con teléfono enmascarado y paginado.
    * Canal: lo que Meta aceptó (texto libre o plantilla) se toma de whatsapp_mensaje por wa_message_id;
    * si no hay ese id (fallido, o simulado) queda null. Los códigos de cuenta salen con los dígitos enmascarados.
+   * `causa` (todos) es el motivo en español; `ultimoError` y `detalleTecnico` (código de Meta y texto original)
+   * solo salen para ADMIN.
    */
-  async listar(estado?: string, pagina = 1, limite = 20, origen?: string) {
+  async listar(estado?: string, pagina = 1, limite = 20, origen?: string, esAdmin = false) {
     const where: Prisma.SalienteWhatsappWhereInput = {
       ...(estado ? { estado } : {}),
       ...(origen ? { origen } : {}),
@@ -650,7 +668,9 @@ export class OutboxWhatsappService {
           canal: canal ? { tipo: canal.tipo, plantilla: canal.plantilla } : null,
           intentos: f.intentos,
           maxIntentos: f.max_intentos,
-          ultimoError: f.ultimo_error,
+          ultimoError: esAdmin ? f.ultimo_error : null,
+          causa: f.estado === 'FALLIDO' ? causaDeUltimoError(f.ultimo_error) : null,
+          detalleTecnico: esAdmin && f.estado === 'FALLIDO' ? detalleTecnicoDeUltimoError(f.ultimo_error) : null,
           clasificacion: f.estado === 'FALLIDO' ? clasificarFallo(f.ultimo_error?.match(/^\[([A-Z_]+)\]/)?.[1], f.intentos >= f.max_intentos) : null,
           texto: textoParaPersonal(f.origen, carga.textoLibre),
           pedidoCodigo: f.pedido?.codigo ?? null,

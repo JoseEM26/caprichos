@@ -1,10 +1,17 @@
+import { causaPlantillaMeta, causaPorCodigoPlantilla } from '../../chatbot/utilidades/meta-errores.util';
+
 /**
  * Mapeo de códigos de error de WhatsApp / Meta a mensajes en español accesibles y claros.
- * Regla: sin exponer detalles técnicos, contraseñas, tokens ni teléfonos completos.
+ * Regla: sin exponer detalles técnicos, contraseñas, tokens ni teléfonos completos. El detalle técnico
+ * (código de Meta y texto original) se muestra aparte y solo a ADMIN.
  */
 export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | null): string {
   const c = String(codigo || '').toUpperCase();
   const d = String(detalle || '').toLowerCase();
+
+  // Plantillas de Meta: por código exacto (132000-132016), el código de clasificación o el numérico del webhook
+  const causaPlantilla = causaPorCodigoPlantilla(c) ?? (/^\d{6}$/.test(c) ? causaPlantillaMeta(Number(c), d) : null);
+  if (causaPlantilla) return causaPlantilla.mensaje;
 
   // Destinatario no verificado en número de prueba de Meta (sandbox)
   if (
@@ -62,17 +69,6 @@ export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | n
     return 'El numero de telefono no es valido o no tiene WhatsApp';
   }
 
-  // Plantilla no aprobada
-  if (
-    c === 'PLANTILLA_NO_APROBADA' ||
-    d.includes('template') ||
-    d.includes('does not exist') ||
-    d.includes('132000') ||
-    d.includes('132001')
-  ) {
-    return 'La plantilla no esta aprobada por Meta';
-  }
-
   // Límite de envío / tasa excedida
   if (
     c === 'LIMITE_ENVIO' ||
@@ -94,6 +90,10 @@ export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | n
     return 'Superaste el limite de 20 mensajes por minuto. Espera un momento';
   }
 
+  // Cliente que pidió no recibir mensajes, o aviso sin plantilla configurada
+  if (c === 'CLIENTE_BAJA') return 'El cliente pidió no recibir mensajes (BAJA)';
+  if (c === 'PLANTILLA_NO_CONFIGURADA') return 'No hay una plantilla configurada para este aviso';
+
   // Faltan credenciales
   if (c === 'SIN_CREDENCIALES_META') {
     return 'Faltan credenciales de Meta en el servidor';
@@ -104,5 +104,7 @@ export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | n
     return 'No se pudo conectar con el servicio de WhatsApp. Intenta nuevamente';
   }
 
-  return detalle ? String(detalle) : 'No se pudo enviar el mensaje';
+  // Meta rechazó el mensaje por un motivo sin causa conocida: el detalle técnico queda para ADMIN
+  if (c === 'ERROR_META' || /^\d+$/.test(c)) return 'Meta rechazó el mensaje. Pide a un administrador revisar el detalle técnico.';
+  return 'No se pudo enviar el mensaje';
 }

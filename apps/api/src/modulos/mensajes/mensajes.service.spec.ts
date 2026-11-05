@@ -796,5 +796,56 @@ describe('MensajesService', () => {
         'Meta no permite escribir a este contacto por su identificador. Pidele su numero de celular.',
       );
     });
+
+    it('mapea los códigos de plantilla de Meta a su causa y acción, sin el genérico «no esta aprobada»', async () => {
+      gateway.enviarTexto.mockResolvedValue({
+        id: 'msg-plantilla',
+        autor: 'PERSONA',
+        texto: 'Hola',
+        metaId: null,
+        estado: 'FALLIDO',
+        errorCodigo: 'PLANTILLA_FORMATO_VARIABLE',
+        errorDetalle: '[132012] Parameter format does not match format in the created template',
+      });
+
+      let errorCapturado: any;
+      try {
+        await service.enviar('1', 'Hola', usuarioAdmin);
+      } catch (e) {
+        errorCapturado = e;
+      }
+
+      expect(errorCapturado.getResponse().codigo).toBe('PLANTILLA_FORMATO_VARIABLE');
+      expect(errorCapturado.getResponse().mensaje).toContain('formato que Meta no admite');
+      expect(errorCapturado.getResponse().mensaje).not.toContain('no esta aprobada');
+    });
+  });
+
+  describe('Detalle técnico de un envío fallido (solo ADMIN)', () => {
+    const fallido = {
+      id: 40n,
+      autor: 'PERSONA',
+      direccion: 'SALE',
+      tipo: 'TEXTO',
+      contenido: { estado: 'FALLIDO', errorCodigo: 'PLANTILLA_FORMATO_VARIABLE', errorDetalle: '[132012] Parameter format does not match' },
+      en: new Date(),
+    };
+
+    it('ADMIN ve el código de Meta y el texto original; el resto solo la causa amigable', async () => {
+      prisma.mensajeChat.findMany.mockResolvedValueOnce([fallido]);
+      const admin = await service.detalle('1', usuarioAdmin);
+      expect(admin.mensajes[0]).toMatchObject({
+        estado: 'FALLIDO',
+        errorCodigo: 'PLANTILLA_FORMATO_VARIABLE',
+        metaCodigo: '132012',
+        errorDetalle: 'Parameter format does not match',
+      });
+      expect(admin.mensajes[0].motivoFallo).toContain('formato que Meta no admite');
+
+      prisma.mensajeChat.findMany.mockResolvedValueOnce([fallido]);
+      const cocina = await service.detalle('1', { partyId: 30n, rol: 'COCINA', debeCambiar: false });
+      expect(cocina.mensajes[0]).toMatchObject({ errorCodigo: null, errorDetalle: null, metaCodigo: null });
+      expect(cocina.mensajes[0].motivoFallo).toContain('formato que Meta no admite');
+    });
   });
 });
