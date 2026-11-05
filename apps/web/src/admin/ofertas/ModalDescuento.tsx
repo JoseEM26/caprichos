@@ -55,6 +55,10 @@ export function ModalDescuento({
 
   // Paso 1: Nombre, foto y a qué aplica
   const [nombre, setNombre] = useState('');
+  // Sin tildes ni mayúsculas: "Envío", "envio", "DELIVERY" cuentan igual
+  const pareceDelivery = /delivery|envio|reparto/.test(
+    nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(),
+  );
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [fotoArchivoId, setFotoArchivoId] = useState<string | null>(null);
   const subidaFoto = useSubidaArchivo();
@@ -679,6 +683,24 @@ export function ModalDescuento({
           })}
         </nav>
 
+        {/* Aviso fijo: este formulario rebaja productos, no el envío */}
+        <div
+          role="note"
+          data-testid="aviso-descuento-productos"
+          style={{
+            backgroundColor: 'var(--cp-sand)',
+            border: '1.5px solid var(--cp-navy)',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            color: 'var(--cp-navy)',
+            fontWeight: 700,
+            fontSize: '13px',
+            lineHeight: '18px',
+          }}
+        >
+          Este descuento rebaja el precio de los productos. Si quieres delivery gratis, no uses este formulario: usa «+ Envío gratis».
+        </div>
+
         {/* Error de validación */}
         {mensajeError && (
           <div
@@ -740,6 +762,15 @@ export function ModalDescuento({
                   fontSize: '14px',
                 }}
               />
+              {pareceDelivery && (
+                <div
+                  role="note"
+                  data-testid="advertencia-delivery"
+                  style={{ marginTop: '6px', color: 'var(--cp-rust)', fontWeight: 700, fontSize: '13px', lineHeight: '18px' }}
+                >
+                  Parece una promoción de delivery. Este formulario descuenta productos; para envío gratis usa «+ Envío gratis».
+                </div>
+              )}
             </div>
 
             {/* Foto opcional */}
