@@ -11,8 +11,13 @@ import { SeccionAltaDemanda } from './SeccionAltaDemanda';
 import { SeccionRepartoConfig } from './SeccionRepartoConfig';
 import { ParametrosOperacionTab } from './ParametrosOperacionTab';
 import { ChatbotConfiguracionTab } from './ChatbotConfiguracionTab';
-import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiquetas';
-import { ModuloMapaImpresion } from '../impresion/mapa/ModuloMapaImpresion';
+import { ModuloImpresion, SaludImpresion } from '../impresion/ModuloImpresion';
+import {
+  guardarSeccionRecordada,
+  leerSeccionRecordada,
+  seccionDesdeUrl,
+  type SeccionImpresion,
+} from '../impresion/seccionesImpresion';
 import { TarjetaAyudaIaConfiguracion } from './TarjetaAyudaIaConfiguracion';
 import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion';
 import { TarjetaControlAlmacenConfiguracion } from './TarjetaControlAlmacenConfiguracion';
@@ -239,15 +244,9 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     fields: [],
   },
   {
-    id: 'mapa-impresion',
-    n: 'Mapa de impresión',
-    d: 'Qué se imprime, con qué regla y en qué equipo',
-    fields: [],
-  },
-  {
     id: 'impresion',
-    n: 'Impresión de etiquetas',
-    d: 'Estado del agente de caja, trabajos y llaves',
+    n: 'Impresión',
+    d: 'Qué se imprime, en qué equipo y el estado de las impresoras',
     fields: [],
   },
   {
@@ -281,7 +280,7 @@ const CLAVES_DATOS_LOCAL: Array<keyof InfoLocalState> = [
 const RUC_VALIDO = /^(10|15|17|20)\d{9}$/;
 
 /** Pestañas con componente propio: no usan el formulario genérico. */
-const TABS_PROPIAS = ['horario', 'pagos', 'zonas', 'demanda', 'cocina', 'reparto', 'parametros', 'chatbot', 'mapa-impresion', 'impresion', 'ayuda', 'vouchers', 'ingreso'];
+const TABS_PROPIAS = ['horario', 'pagos', 'zonas', 'demanda', 'cocina', 'reparto', 'parametros', 'chatbot', 'impresion', 'ayuda', 'vouchers', 'ingreso'];
 
 const estiloInputCoord = {
   width: '100%',
@@ -330,9 +329,28 @@ export function ConfiguracionLocalView() {
 
   const location = useLocation();
   const [, setSearchParams] = useSearchParams();
-  const tabParam = useMemo(() => {
-    return new URLSearchParams(location.search).get('tab');
-  }, [location.search]);
+  const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const rawTab = params.get('tab');
+  // «mapa-impresion» fue la pestaña de Mapa de impresión: ahora es una sección de Impresión.
+  const tabParam = rawTab === 'mapa-impresion' ? 'impresion' : rawTab;
+  const seccionParam = params.get('seccion');
+  const [seccionRecordada, setSeccionRecordada] = useState<SeccionImpresion | null>(leerSeccionRecordada);
+  const seccionImpresion = seccionDesdeUrl(rawTab, seccionParam, seccionRecordada);
+
+  // Enlaces viejos (?tab=mapa-impresion o ?tab=impresion sin sección) se reescriben a la sección que les toca.
+  useEffect(() => {
+    const viejo = rawTab === 'mapa-impresion' || (rawTab === 'impresion' && seccionParam !== seccionImpresion);
+    if (!viejo) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', 'impresion');
+        next.set('seccion', seccionImpresion);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [rawTab, seccionParam, seccionImpresion, setSearchParams]);
 
   const [tabId, setTabId] = useState<string>(() => tabParam || 'local');
   const esMovil = useEsMovil();
@@ -415,13 +433,15 @@ export function ConfiguracionLocalView() {
     return CATEGORIAS_CONFIG.find((c) => c.id === tabId) || CATEGORIAS_CONFIG[0];
   }, [tabId]);
 
-  const irACategoria = (id: string, campo?: string) => {
+  /** Abre una pestaña. En Impresión, `apartado` elige la sección; sin él se abre la última que vio el dueño. */
+  const irACategoria = (id: string, campo?: string, apartado?: string) => {
     setTabId(id);
     setVerDetalle(true);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
         next.set('tab', id);
+        if (id === 'impresion') next.set('seccion', (apartado as SeccionImpresion) || seccionRecordada || 'mapa');
         if (campo) next.set('campo', campo);
         else next.delete('campo');
         return next;
@@ -429,6 +449,22 @@ export function ConfiguracionLocalView() {
       { replace: true },
     );
     setMensaje('');
+  };
+
+  /** Cambio de sección dentro de Impresión: queda en la URL y se recuerda para la próxima vez. */
+  const elegirSeccionImpresion = (s: SeccionImpresion) => {
+    guardarSeccionRecordada(s);
+    setSeccionRecordada(s);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', 'impresion');
+        next.set('seccion', s);
+        next.delete('campo');
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   const categoriasVisibles = CATEGORIAS_CONFIG.filter((c) => c.id !== 'ingreso' || puedeEditarIngreso);
@@ -695,7 +731,7 @@ export function ConfiguracionLocalView() {
 
       <BuscadorConfiguracion
         categorias={categoriasVisibles}
-        onElegir={(e: EntradaConfig) => irACategoria(e.tab, e.id)}
+        onElegir={(e: EntradaConfig) => irACategoria(e.tab, e.id, e.apartado)}
       />
 
       {/* Contenedor: navegación por grupos (PC) o lista a pantalla completa (celular) + panel de edición */}
@@ -734,8 +770,11 @@ export function ConfiguracionLocalView() {
               </button>
             )}
             <div className="cfg-migas">Configuración › {grupoDe(categoriaActual.id)}</div>
-            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '18px' }}>
-              {categoriaActual.n}
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '18px' }}>
+                {categoriaActual.n}
+              </div>
+              {categoriaActual.id === 'impresion' && <SaludImpresion />}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
               {categoriaActual.d}
@@ -899,14 +938,9 @@ export function ConfiguracionLocalView() {
             <ChatbotConfiguracionTab puedeVer={puedeVer} puedeEditar={puedeEditar} />
           )}
 
-          {/* Subcaso: MAPA DE IMPRESIÓN (qué sale dónde) */}
-          {tabId === 'mapa-impresion' && (
-            <ModuloMapaImpresion />
-          )}
-
-          {/* Subcaso: IMPRESIÓN DE ETIQUETAS */}
+          {/* Subcaso: IMPRESIÓN (mapa, equipos y estado, cola y pruebas) */}
           {tabId === 'impresion' && (
-            <TarjetaImpresionEtiquetas />
+            <ModuloImpresion seccion={seccionImpresion} alCambiarSeccion={elegirSeccionImpresion} />
           )}
 
           {/* Subcaso: ASISTENTE DE AYUDA CON IA */}

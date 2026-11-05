@@ -9,7 +9,6 @@ import { REPARTO } from './reparto';
 import { PARAMETROS } from './parametros';
 import { CHATBOT } from './chatbot';
 import { IMPRESION } from './impresion';
-import { MAPA_IMPRESION } from './mapa-impresion';
 import { AYUDA } from './ayuda';
 import { VOUCHERS } from './vouchers';
 import { INGRESO } from './ingreso';
@@ -20,7 +19,7 @@ export type { EntradaConfig, PeligroConfig } from './tipos';
 
 export const CATALOGO: EntradaConfig[] = [
   ...LOCAL, ...HORARIO, ...FECHAS, ...PAGOS, ...ZONAS, ...DEMANDA, ...REPARTO, ...PARAMETROS,
-  ...CHATBOT, ...MAPA_IMPRESION, ...IMPRESION, ...AYUDA, ...VOUCHERS, ...INGRESO, ...OPERACION, ...COCINA,
+  ...CHATBOT, ...IMPRESION, ...AYUDA, ...VOUCHERS, ...INGRESO, ...OPERACION, ...COCINA,
 ];
 
 /** Ids repetidos o mal formados (lo valida el test del catálogo). */
