@@ -160,6 +160,8 @@ export interface AccionCrearPedido {
   tiempoEstimadoMax: number;
   esPagoDigital: boolean;
   datosPagoTexto?: string;
+  /** Carrito tal como estaba al confirmar: si el servidor rechaza por stock, el bot vuelve a él sin perderlo. */
+  carrito?: EstadoCarritoPedido;
   /** A qué cuenta suma el pedido; NINGUNO = invitado de verdad (no se resuelve por teléfono) */
   puntos?: { modo: 'TELEFONO_PROPIO' | 'TELEFONO_DICTADO' | 'NINGUNO'; partyId?: string; telefono?: string };
 }

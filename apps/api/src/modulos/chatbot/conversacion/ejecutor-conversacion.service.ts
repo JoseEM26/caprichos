@@ -323,6 +323,47 @@ export class EjecutorConversacionService {
    * (pagado/rechazado, anulado, entregado, cancelado, inexistente o vencido) la conversación vuelve a MENU.
    * Devuelve el flujo vigente. Sin pedidoId en el flujo no se puede saber: se deja como está.
    */
+  /** Pedido rechazado por stock: el carrito vuelve tal cual (estado PEDIDO_ACCION_CARRITO) y se avisa en un mensaje. */
+  private async volverAlCarritoSinStock(
+    conversacionId: bigint,
+    carrito: any,
+    mensaje: string,
+    destinoEnvio: string | null | undefined,
+    entradaRaw: any,
+  ): Promise<void> {
+    const actual = await this.prisma.conversacion.findUnique({ where: { id: conversacionId }, select: { flujo: true } });
+    const flujoVuelta = {
+      ...((actual?.flujo as any) || {}),
+      estado: 'PEDIDO_ACCION_CARRITO',
+      pedido: { ...carrito, estadoInterno: 'PEDIDO_ACCION_CARRITO' },
+    };
+    await this.prisma.conversacion.update({ where: { id: conversacionId }, data: { flujo: flujoVuelta as any } });
+    const texto = `${mensaje} 😅 ¿Quieres ajustar tu pedido?`;
+    const botones = [
+      { id: 'ped_ver_carrito', titulo: 'Ajustar cantidad' },
+      { id: 'ped_quitar', titulo: 'Quitar' },
+      { id: 'btn_persona', titulo: 'Hablar con persona' },
+    ];
+    let metaId: string | null = null;
+    if (destinoEnvio) {
+      const res = await this.mensajeria.enviarBotones(destinoEnvio, texto, botones, {
+        conversacionId,
+        replyToWaMessageId: entradaRaw?.waMessageId,
+      });
+      metaId = res.waMessageId || null;
+    }
+    await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: conversacionId,
+        direccion: 'SALE',
+        autor: 'BOT',
+        tipo: 'BOTON',
+        contenido: { texto, botones } as any,
+        meta_id: metaId,
+      },
+    });
+  }
+
   private async salirDeValidarPagoSiVencido(conversacion: any, flujo: FlujoConversacion | null): Promise<FlujoConversacion | null> {
     const pago = (flujo as any)?.pago;
     const pedidoId = pago?.pedidoId;
@@ -1917,6 +1958,11 @@ export class EjecutorConversacionService {
             // La campana del pedido nuevo la crea PedidosService.crear (igual para carta, mozo y WhatsApp)
           }
         } catch (err: any) {
+          // Sin stock de un producto que controla stock: se vuelve al carrito, en un solo mensaje y sin escalar
+          if (err?.response?.codigo === 'STOCK_INSUFICIENTE' && accion.carrito) {
+            await this.volverAlCarritoSinStock(conversacion.id, accion.carrito, err.response.mensaje, destinoEnvio, entradaRaw);
+            continue;
+          }
           this.logger.error(`Error creando pedido desde chatbot: ${err.message}`, err.stack);
           await this.prisma.conversacion.update({
             where: { id: conversacion.id },

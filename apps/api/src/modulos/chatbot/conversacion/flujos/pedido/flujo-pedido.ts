@@ -1235,7 +1235,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         {
           tipo: 'enviarBotones',
           texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
-          botones: BOTONES_PEDIDO_CANTIDADES,
+          botones: this.botonesCantidad(config.productoId, contexto),
         },
       ],
       nuevoFlujo: {
@@ -1274,7 +1274,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         {
           tipo: 'enviarBotones',
           texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
-          botones: BOTONES_PEDIDO_CANTIDADES,
+          botones: this.botonesCantidad(config.productoId, contexto),
         },
       ],
       nuevoFlujo: {
@@ -1308,6 +1308,22 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       }
     }
 
+    // Productos que controlan stock: no se ofrece ni acepta más que lo que queda (carta con «quedan»)
+    const quedan = this.quedanProducto(config.productoId, contexto);
+    if (quedan !== null && cantidad > quedan) {
+      return {
+        nuevoEstado: 'PEDIDO_CANTIDAD',
+        acciones: [
+          {
+            tipo: 'enviarBotones',
+            texto: `Solo quedan ${quedan} de ${config.productoNombre} 😅 ¿Cuántas quieres?`,
+            botones: this.botonesCantidad(config.productoId, contexto),
+          },
+        ],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_CANTIDAD', pedido },
+      };
+    }
+
     config.cantidad = cantidad;
 
     // Bebidas: cada envase lleva un nombre distinto en su etiqueta; se piden uno por uno
@@ -1317,6 +1333,22 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     return this.agregarLineaConfigurada(flujo, pedido, contexto);
+  }
+
+  /** Unidades que quedan de un producto con apertura de hoy (null si no controla stock o no hay apertura). */
+  private quedanProducto(productoId: string, contexto: ContextoConversacion): number | null {
+    for (const cat of contexto.categoriasCarta || []) {
+      const p = (cat.productos || []).find((x: any) => String(x.id) === String(productoId));
+      if (p) return typeof p.quedan === 'number' ? p.quedan : null;
+    }
+    return null;
+  }
+
+  /** Botones 1/2/3 unidades, sin ofrecer más de lo que queda. */
+  private botonesCantidad(productoId: string, contexto: ContextoConversacion): BotonAccion[] {
+    const quedan = this.quedanProducto(productoId, contexto);
+    if (quedan === null) return BOTONES_PEDIDO_CANTIDADES;
+    return BOTONES_PEDIDO_CANTIDADES.filter((b) => Number(b.id.replace('ped_cant_', '')) <= Math.max(1, quedan));
   }
 
   private esBebidaConNombres(categoriaNombre: string): boolean {
@@ -2282,6 +2314,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         {
           tipo: 'crearPedido',
           dto,
+          carrito: pedido,
           claveIdempotencia,
           tiempoEstimadoMin: tiempoMin,
           tiempoEstimadoMax: tiempoMax,
@@ -2683,7 +2716,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         {
           tipo: 'enviarBotones',
           texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
-          botones: BOTONES_PEDIDO_CANTIDADES,
+          botones: this.botonesCantidad(config.productoId, contexto),
         },
       ],
       nuevoFlujo: {

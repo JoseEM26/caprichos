@@ -828,4 +828,33 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       expect(accionCrear.dto.lineas[0].productoId).toBe('prod_clasica');
     });
   });
+
+  describe('11. Productos que controlan stock: no se ofrece más de lo que queda', () => {
+    it('la pregunta de cantidad solo ofrece 1 unidad si quedan 1, y pedir 2 repreguntan con el saldo', () => {
+      const contextoQuedan: ContextoConversacion = {
+        ...contextoBase,
+        categoriasCarta: [
+          {
+            ...categoriaHamburguesas,
+            productos: categoriaHamburguesas.productos.map((p) => (p.id === 'prod_clasica' ? { ...p, quedan: 1 } : p)),
+          },
+        ],
+      };
+      let resultado = transicionarEstado(null, normalizarEntrada({ listRowId: 'pedir' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_mod_recojer' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_cat_cat_hamb' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_prod_prod_clasica' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_tam_tam_simple' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_op_op_tartara' }), contextoQuedan);
+
+      expect(resultado.nuevoEstado).toBe('PEDIDO_CANTIDAD');
+      const botones = (resultado.acciones[0] as any).botones.map((b: any) => b.id);
+      expect(botones).toEqual(['ped_cant_1']);
+
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_cant_2' }), contextoQuedan);
+      expect(resultado.nuevoEstado).toBe('PEDIDO_CANTIDAD');
+      expect((resultado.acciones[0] as any).texto).toBe('Solo quedan 1 de Hamburguesa Clásica 😅 ¿Cuántas quieres?');
+      expect(resultado.nuevoFlujo.pedido?.items?.length ?? 0).toBe(0);
+    });
+  });
 });

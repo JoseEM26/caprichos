@@ -554,4 +554,35 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       );
     });
   });
+
+  describe('6. Pedido rechazado por stock vuelve al carrito en un solo mensaje', () => {
+    it('restaura el carrito (PEDIDO_ACCION_CARRITO), manda un mensaje con Ajustar/Quitar/Persona y no escala', async () => {
+      const carrito: any = {
+        estadoInterno: 'PEDIDO_CANTIDAD',
+        modalidad: 'RECOGER',
+        items: [{ lineaId: 'l1', productoId: 'p1', productoNombre: 'Frappe Oreo', cantidad: 2, subtotal: 29 }],
+      };
+      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({ flujo: { version: 2, estado: 'MENU', pedido: null } });
+      mockMensajeria.enviarBotones = jest.fn().mockResolvedValue({ exito: true, waMessageId: 'wamid.stock' });
+
+      await (service as any).volverAlCarritoSinStock(
+        10n,
+        carrito,
+        'Solo quedan 1 de Frappe Oreo',
+        '51999999999',
+        { waMessageId: 'wamid.entrada' },
+      );
+
+      const update = mockPrisma.conversacion.update.mock.calls.at(-1)[0];
+      expect(update.data.flujo).toMatchObject({
+        estado: 'PEDIDO_ACCION_CARRITO',
+        pedido: { estadoInterno: 'PEDIDO_ACCION_CARRITO', items: carrito.items, modalidad: 'RECOGER' },
+      });
+      expect(mockMensajeria.enviarBotones).toHaveBeenCalledTimes(1);
+      const [, texto, botones] = mockMensajeria.enviarBotones.mock.calls[0];
+      expect(texto).toBe('Solo quedan 1 de Frappe Oreo 😅 ¿Quieres ajustar tu pedido?');
+      expect(botones.map((b: any) => b.id)).toEqual(['ped_ver_carrito', 'ped_quitar', 'btn_persona']);
+      expect(mockPrisma.notificacion.create).not.toHaveBeenCalled();
+    });
+  });
 });
