@@ -859,6 +859,40 @@ describe('OfertasService', () => {
       expect(prismaMock.oferta.update).toHaveBeenCalledWith({ where: { id: 1n }, data: { visible_carta: false } });
     });
 
+    it('la carta pública trae activas y desactivadas con visible_carta; las desactivadas ocultas no salen', async () => {
+      const filas = [
+        { ...fila(false), id: 1n, activo: true },
+        { ...fila(true), id: 2n, activo: false },
+        { ...fila(false), id: 3n, activo: false },
+      ];
+      // Evalúa el OR del where igual que Prisma: basta para comprobar la condición que se envía
+      prismaMock.oferta.findMany.mockImplementationOnce(({ where }: any) =>
+        Promise.resolve(filas.filter((f) => !where.OR || where.OR.some((c: any) => Object.entries(c).every(([k, v]) => (f as any)[k] === v)))),
+      );
+      const lista = await service.listarOfertas(undefined, false, 'CARTA', true);
+      expect(lista.map((o) => [o.id, o.activo, o.visibleCarta])).toEqual([
+        ['1', true, false],
+        ['2', false, true],
+      ]);
+    });
+
+    it('desactivar con visibleCarta guarda visible_carta junto con activo y lo audita', async () => {
+      prismaMock.oferta.update.mockResolvedValueOnce({ ...fila(true), activo: false });
+      await service.cambiarEstadoOferta('1', false, { partyId: 1n }, true);
+      expect(prismaMock.oferta.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { activo: false, visible_carta: true } }),
+      );
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'desactivar', despues: { activo: false, visibleCarta: true } }),
+      );
+    });
+
+    it('activar sin visibleCarta no toca visible_carta', async () => {
+      prismaMock.oferta.update.mockResolvedValueOnce(fila(false));
+      await service.cambiarEstadoOferta('1', true, { partyId: 1n });
+      expect(prismaMock.oferta.update).toHaveBeenCalledWith(expect.objectContaining({ data: { activo: true } }));
+    });
+
     it('el saludo del bot no usa una promoción oculta en la carta', async () => {
       prismaMock.oferta.findMany.mockResolvedValueOnce([]);
       await service.promoParaSaludo(new Date('2026-12-12T15:00:00Z'));

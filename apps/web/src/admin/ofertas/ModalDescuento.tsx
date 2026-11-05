@@ -1,6 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
-import { CasillaBot, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
+import { CasillaBot, SelectorVisibleCarta, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -77,6 +77,7 @@ export function ModalDescuento({
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
   const [valeBot, setValeBot] = useState(false);
+  const [visibleCarta, setVisibleCarta] = useState(true);
   const [mostrarEnSaludo, setMostrarEnSaludo] = useState(false);
   const [soloPrimeraCompra, setSoloPrimeraCompra] = useState(false);
   const [minima, setMinima] = useState('');
@@ -134,6 +135,7 @@ export function ModalDescuento({
       setFechaDesde(fDesde ? fDesde.slice(0, 10) : '');
       setFechaHasta(fHasta ? fHasta.slice(0, 10) : '');
       { const sel = selectorDesdeCanales(descuentoAEditar.canales); setCanal(sel.canal); setValeBot(sel.valeBot); }
+      setVisibleCarta(descuentoAEditar.visibleCarta !== false);
       setMostrarEnSaludo(Boolean(descuentoAEditar.mostrarEnSaludoBot));
       setSoloPrimeraCompra(Boolean(descuentoAEditar.soloPrimeraCompra));
       setPaso(1);
@@ -494,6 +496,7 @@ export function ModalDescuento({
         mostrarEnSaludoBot: mostrarEnSaludo,
         soloPrimeraCompra,
         imagenArchivoId: fotoArchivoId,
+        ...(descuentoAEditar ? { visibleCarta } : {}),
       };
 
       await onGuardar(payload);
@@ -1148,6 +1151,7 @@ export function ModalDescuento({
                   ))}
                 </select>
                   <CasillaBot id="desc-canal-bot" checked={valeBot} onChange={setValeBot} bloqueada={canal === 'solo-bot'} />
+                  {descuentoAEditar && <SelectorVisibleCarta id="desc-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
               </div>
               <div style={{ flex: 1, minWidth: '180px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>

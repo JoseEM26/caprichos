@@ -75,9 +75,11 @@ export class OfertasController {
   async cambiarEstadoOferta(
     @Param('id') id: string,
     @Body('activo') activo: boolean,
+    @Body('visibleCarta') visibleCarta: boolean | undefined,
     @Req() req: any,
   ) {
-    return this.ofertasService.cambiarEstadoOferta(id, Boolean(activo), req.usuario);
+    const visible = typeof visibleCarta === 'boolean' ? visibleCarta : undefined;
+    return this.ofertasService.cambiarEstadoOferta(id, Boolean(activo), req.usuario, visible);
   }
 }
 

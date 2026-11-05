@@ -12,7 +12,7 @@ export class OfertasPublicoController {
 
   @Get('ofertas')
   async listarOfertasCarta() {
-    return this.ofertasService.listarOfertas(undefined, true, 'CARTA');
+    return this.ofertasService.listarOfertas(undefined, false, 'CARTA', true);
   }
 
   /** Vista previa de lo que descontará el servidor al crear el pedido (promociones automáticas y cupón) */

@@ -96,6 +96,9 @@ export function TarjetaOferta({
   const aplicaHoy = oferta.vigenteAhora !== false;
   // Combo sin con qué armarse (principal y reemplazos agotados): se ve agotado y no se puede agregar
   const agotado = oferta.tipo === 'COMBO' && oferta.disponible === false;
+  // Desactivada (visible_carta = «Mostrar como No disponible»): se ve, pero no se puede pedir
+  const noDisponible = oferta.activo === false;
+  const sinPedir = agotado || noDisponible;
 
   const cardDir = movil ? 'row' : 'column';
   const imgW = movil ? '100px' : '100%';
@@ -157,13 +160,13 @@ export function TarjetaOferta({
         overflow: 'hidden',
         display: 'flex',
         flexDirection: cardDir,
-        opacity: aplicaHoy && !agotado ? 1 : 0.75,
+        opacity: aplicaHoy && !sinPedir ? 1 : 0.75,
       }}
     >
       {/* Zona de imagen / letra inicial */}
       <button
         type="button"
-        onClick={agotado ? undefined : handleAccion}
+        onClick={sinPedir ? undefined : handleAccion}
         aria-label={`Ver oferta ${oferta.nombre}`}
         style={{
           border: 0,
@@ -304,7 +307,21 @@ export function TarjetaOferta({
           >
             {textoBadge}
           </span>
-          {agotado ? (
+          {noDisponible ? (
+            <span
+              data-testid="insignia-no-disponible"
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: 'var(--cp-sand)',
+                color: 'var(--cp-soft)',
+                borderRadius: '9999px',
+                padding: '2px 8px',
+              }}
+            >
+              No disponible
+            </span>
+          ) : agotado ? (
             <span
               style={{
                 fontSize: '11px',
@@ -399,7 +416,7 @@ export function TarjetaOferta({
             {textoPrecio}
           </span>
 
-          {!agotado && (
+          {!sinPedir && (
           <button
             type="button"
             onClick={handleAccion}

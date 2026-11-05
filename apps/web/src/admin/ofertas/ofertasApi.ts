@@ -180,8 +180,9 @@ export const ofertasApi = {
     return api.put<OfertaItem>(`/admin/ofertas/${id}`, payload);
   },
 
-  async cambiarEstadoOferta(id: string, activo: boolean): Promise<OfertaItem> {
-    return api.patch<OfertaItem>(`/admin/ofertas/${id}/estado`, { activo });
+  /** Al desactivar, `visibleCarta` dice si la carta la oculta (false) o la muestra como «No disponible» (true). */
+  async cambiarEstadoOferta(id: string, activo: boolean, visibleCarta?: boolean): Promise<OfertaItem> {
+    return api.patch<OfertaItem>(`/admin/ofertas/${id}/estado`, { activo, ...(visibleCarta !== undefined ? { visibleCarta } : {}) });
   },
 
   // Reglas
