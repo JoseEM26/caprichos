@@ -10,7 +10,7 @@ import type { VistaPreviaCarta } from '../CartaPublica';
 const mockAbrirModal = vi.fn();
 vi.mock('../CarritoContext', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../CarritoContext')>()),
-  useCarrito: () => ({ abrirModalProducto: mockAbrirModal, cantidadTotal: 0, subtotal: 0 }),
+  useCarrito: () => ({ abrirModalProducto: mockAbrirModal, cantidadTotal: 0, subtotal: 0, lineas: [], inventario: {}, aplicarCarta: () => {} }),
 }));
 
 const combo = (over: Partial<OfertaItem>): OfertaItem =>

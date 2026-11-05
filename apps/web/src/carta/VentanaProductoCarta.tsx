@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { calcularPrecioLinea } from '@caprichos/compartido';
 import { GrupoOpcionesCarta, OpcionElegida, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
 import { alternarEleccion } from './eleccionGrupo';
+import { etiquetaQuedan, infoStockDe, topeAgregable, unidadesEnCarrito } from './stock';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import {
   AvisoReemplazoCombo,
@@ -42,7 +43,7 @@ const nombreCorto = (g: GrupoOpcionesCarta): string => (g.nombre.includes(' · '
  * unidad, DT-62, es del pedido de caja y mozo: VentanaProducto.)
  */
 export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura = false, esMovilPreview, oferta = null }: Props) {
-  const { agregarLinea } = useCarrito();
+  const { agregarLinea, inventario, lineas } = useCarrito();
   const esMovilDetectado = useEsMovil();
   const movil = esMovilPreview !== undefined ? esMovilPreview : esMovilDetectado;
 
@@ -98,6 +99,25 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const valido =
     !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && producto.grupos.every((g) => (sel[g.id] ?? []).length >= g.minimo);
 
+  // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
+  const info = inventario[String(producto.id)] ?? infoStockDe(producto);
+  const enCarrito = unidadesEnCarrito(lineas, producto.id);
+  const tope = topeAgregable(info, enCarrito);
+  const sinStock = !info.disponible || (info.controlaStock && info.quedan === 0);
+  const sinSaldo = tope !== null && tope <= 0;
+  const puedeAgregar = valido && !sinStock && !sinSaldo;
+  const enTope = tope !== null && cantidad >= tope;
+  const etiquetaStock = etiquetaQuedan(info);
+  const ayudaStock =
+    sinStock || info.quedan === null
+      ? null
+      : enTope
+        ? `Solo quedan ${info.quedan}${enCarrito > 0 ? ` · ya tienes ${enCarrito} en tu pedido` : ''}`
+        : etiquetaStock;
+  useEffect(() => {
+    if (tope !== null && cantidad > Math.max(1, tope)) setCantidad(Math.max(1, tope));
+  }, [tope, cantidad]);
+
   const alternar = (g: GrupoOpcionesCarta, oid: string) => {
     setSel((prev) => ({ ...prev, [g.id]: alternarEleccion(g, prev[g.id] ?? [], oid) }));
   };
@@ -109,7 +129,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       : '';
 
   const agregar = () => {
-    if (!valido) return;
+    if (!puedeAgregar) return;
     // en las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
     if (esBebida && !esCombo) {
       const faltan = Array.from({ length: cantidad }, (_, i) => i).filter((i) => !(nombres[i] ?? '').trim());
@@ -493,26 +513,36 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
             </div>
 
             <div style={{ position: 'sticky', bottom: 0, zIndex: 1, margin: '0 -24px -24px', padding: '12px 24px 16px', background: 'var(--cp-cream)', borderTop: '1px solid var(--cp-line)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              {ayudaStock && (
+                <div role="status" style={{ flexBasis: '100%', fontSize: 12, fontWeight: 700, lineHeight: '17px', color: enTope ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>
+                  {ayudaStock}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--cp-navy)', borderRadius: 12 }}>
                 <button onClick={() => setCantidad((c) => Math.max(1, c - 1))} aria-label="Menos" style={{ width: 44, height: 48, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontSize: 22, fontWeight: 800 }}>
                   −
                 </button>
                 <span style={{ minWidth: 28, textAlign: 'center', fontWeight: 700 }}>{cantidad}</span>
-                <button onClick={() => setCantidad((c) => c + 1)} aria-label="Más" style={{ width: 44, height: 48, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontSize: 22, fontWeight: 800 }}>
+                <button
+                  onClick={() => setCantidad((c) => (tope !== null && c >= tope ? c : c + 1))}
+                  disabled={enTope}
+                  aria-label="Más"
+                  style={{ width: 44, height: 48, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontSize: 22, fontWeight: 800, opacity: enTope ? 0.35 : 1, cursor: enTope ? 'not-allowed' : 'pointer' }}
+                >
                   +
                 </button>
               </div>
               <button
                 onClick={soloLectura ? undefined : agregar}
-                disabled={soloLectura ? true : !valido}
+                disabled={soloLectura ? true : !puedeAgregar}
                 aria-label={soloLectura ? 'Vista previa deshabilitada' : undefined}
                 style={{
                   flex: '1 1 200px',
                   minHeight: 52,
                   border: 0,
                   borderRadius: 12,
-                  background: soloLectura ? 'var(--cp-sand)' : valido ? 'var(--cp-orange)' : 'var(--cp-line)',
-                  color: soloLectura ? 'var(--cp-navy)' : valido ? '#fff' : 'var(--cp-soft)',
+                  background: soloLectura ? 'var(--cp-sand)' : puedeAgregar ? 'var(--cp-orange)' : 'var(--cp-line)',
+                  color: soloLectura ? 'var(--cp-navy)' : puedeAgregar ? '#fff' : 'var(--cp-soft)',
                   ...titulo,
                   fontWeight: 800,
                   fontSize: 14,
@@ -524,7 +554,17 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   opacity: soloLectura ? 0.9 : 1,
                 }}
               >
-                <span>{soloLectura ? 'Vista previa' : comboAgotado ? 'Agotado' : valido ? 'Agregar al pedido' : 'Elige las opciones obligatorias'}</span>
+                <span>
+                  {soloLectura
+                    ? 'Vista previa'
+                    : comboAgotado || sinStock
+                      ? 'Agotado'
+                      : sinSaldo && valido
+                        ? 'Sin más unidades'
+                        : valido
+                          ? 'Agregar al pedido'
+                          : 'Elige las opciones obligatorias'}
+                </span>
                 <span>{fmt(unitario * cantidad)}</span>
               </button>
             </div>

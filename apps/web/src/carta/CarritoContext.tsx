@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { calcularSubtotalPedido } from '@caprichos/compartido';
-import { LineaCarrito, PedidoConfirmado, ProductoCarta } from './tipos';
+import { api } from '../comun/api';
+import { CategoriaCarta, LineaCarrito, PedidoConfirmado, ProductoCarta } from './tipos';
 import type { PedidoGuardado } from './seguimiento';
+import { INTERVALO_REFRESCO_STOCK_MS, InfoStock, InventarioCarta, infoStockDe, recortarLineasProducto } from './stock';
 
 const CLAVE_SESSION_STORAGE = 'caprichos_carrito';
 
@@ -36,6 +38,15 @@ interface CarritoContextoValor {
   setSeguimientoAbierto: (p: PedidoGuardado | null) => void;
   listaPedidosAbierta: boolean;
   setListaPedidosAbierta: (abierta: boolean) => void;
+  inventario: InventarioCarta;
+  /** Guarda el stock de la carta que se acaba de cargar. */
+  aplicarCarta: (productos: ProductoCarta[]) => void;
+  /** Vuelve a pedir la carta (como mucho cada 20 s) para tener quedan al día. */
+  refrescarStock: () => Promise<void>;
+  /** Fija quedan de un producto tras un 409 STOCK_INSUFICIENTE. */
+  marcarQuedan: (productoId: string, quedan: number) => void;
+  /** Recorta las líneas del producto para que sumen como mucho `maximo`. */
+  ajustarCantidadProducto: (productoId: string, maximo: number) => void;
 }
 
 const CarritoContext = createContext<CarritoContextoValor | undefined>(undefined);
@@ -63,6 +74,8 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
   const [pedidoConfirmado, setPedidoConfirmado] = useState<PedidoConfirmado | null>(null);
   const [seguimientoAbierto, setSeguimientoAbierto] = useState<PedidoGuardado | null>(null);
   const [listaPedidosAbierta, setListaPedidosAbierta] = useState(false);
+  const [inventario, setInventario] = useState<InventarioCarta>({});
+  const ultimoRefrescoStock = useRef(0);
 
   // Guardar en sessionStorage ante cada cambio
   useEffect(() => {
@@ -123,12 +136,42 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const aplicarCarta = (productos: ProductoCarta[]) => {
+    const nuevo: InventarioCarta = {};
+    for (const p of productos) nuevo[String(p.id)] = infoStockDe(p);
+    setInventario(nuevo);
+  };
+
+  const refrescarStock = async () => {
+    const ahora = Date.now();
+    if (ahora - ultimoRefrescoStock.current < INTERVALO_REFRESCO_STOCK_MS) return;
+    ultimoRefrescoStock.current = ahora;
+    try {
+      const categorias = await api.get<CategoriaCarta[]>('/carta');
+      if (Array.isArray(categorias)) aplicarCarta(categorias.flatMap((c) => c.productos));
+    } catch {
+      // Sin red: se queda el último stock conocido y el servidor valida al enviar
+    }
+  };
+
+  const marcarQuedan = (productoId: string, quedan: number) => {
+    setInventario((prev) => {
+      const actual: InfoStock = prev[productoId] ?? { controlaStock: true, quedan, disponible: quedan > 0 };
+      return { ...prev, [productoId]: { ...actual, controlaStock: true, quedan, disponible: quedan > 0 } };
+    });
+  };
+
+  const ajustarCantidadProducto = (productoId: string, maximo: number) => {
+    setLineas((prev) => recortarLineasProducto(prev, productoId, maximo));
+  };
+
   const cantidadTotal = lineas.reduce((acc, l) => acc + l.cantidad, 0);
   const subtotal = calcularSubtotalPedido(lineas);
 
   const abrirCajon = () => {
     setNotificacion(null);
     setCajonAbierto(true);
+    void refrescarStock();
   };
 
   const cerrarCajon = () => setCajonAbierto(false);
@@ -136,6 +179,7 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
   const abrirCheckout = () => {
     setCajonAbierto(false);
     setCheckoutAbierto(true);
+    void refrescarStock();
   };
 
   const cerrarCheckout = () => setCheckoutAbierto(false);
@@ -172,6 +216,11 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
         setSeguimientoAbierto,
         listaPedidosAbierta,
         setListaPedidosAbierta,
+        inventario,
+        aplicarCarta,
+        refrescarStock,
+        marcarQuedan,
+        ajustarCantidadProducto,
       }}
     >
       {children}

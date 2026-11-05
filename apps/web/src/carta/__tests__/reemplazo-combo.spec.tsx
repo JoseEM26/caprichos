@@ -7,7 +7,7 @@ import { ProductoCarta } from '../tipos';
 
 const agregarLinea = vi.fn();
 vi.mock('../CarritoContext', () => ({
-  useCarrito: () => ({ abrirModalProducto: vi.fn(), agregarLinea, cantidadTotal: 0, subtotal: 0 }),
+  useCarrito: () => ({ abrirModalProducto: vi.fn(), agregarLinea, cantidadTotal: 0, subtotal: 0, lineas: [], inventario: {} }),
 }));
 
 const producto: ProductoCarta = {

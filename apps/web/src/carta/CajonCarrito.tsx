@@ -4,6 +4,7 @@ import { CategoriaCarta, DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { api } from '../comun/api';
 import { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { AvisoTeFaltaPoco } from './AvisoTeFaltaPoco';
+import { excesosDeStock, topeAgregable, unidadesEnCarrito } from './stock';
 
 export interface CajonCarritoProps {
   estadoLocal: EstadoLocalCarta | null;
@@ -26,7 +27,9 @@ export function CajonCarrito({
     actualizarCantidad,
     eliminarLinea,
     abrirCheckout,
+    inventario,
   } = useCarrito();
+  const excesos = excesosDeStock(lineas, inventario);
 
   const [cuponCodigo, setCuponCodigo] = useState('');
   const [cuponAplicado, setCuponAplicado] = useState<{
@@ -81,6 +84,7 @@ export function CajonCarrito({
   const localBloqueado = Boolean(
     estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda),
   );
+  const stockBloqueado = excesos.length > 0;
 
   return (
     <div
@@ -216,6 +220,15 @@ export function CajonCarrito({
             </div>
           ) : (
             lineas.map((linea) => {
+              const info = inventario[String(linea.productoId)];
+              const tope = topeAgregable(info, unidadesEnCarrito(lineas, linea.productoId));
+              const topeMas = tope !== null && tope <= 0;
+              const exceso = excesos.find((e) => e.productoId === String(linea.productoId));
+              const mensajeStock = exceso
+                ? `Solo quedan ${exceso.quedan}: quita unidades de este producto`
+                : topeMas && info?.quedan != null
+                  ? `Solo quedan ${info.quedan}`
+                  : null;
               const iniciales = linea.nombre
                 .split(' ')
                 .filter(Boolean)
@@ -324,6 +337,21 @@ export function CajonCarrito({
                     >
                       S/ {linea.subtotal.toFixed(2)}
                     </div>
+
+                    {mensajeStock && (
+                      <div
+                        role="status"
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          lineHeight: '16px',
+                          marginTop: '4px',
+                          color: exceso ? 'var(--cp-rust)' : 'var(--cp-soft)',
+                        }}
+                      >
+                        {mensajeStock}
+                      </div>
+                    )}
                   </div>
 
                   {/* Controles cantidad y eliminar */}
@@ -372,6 +400,7 @@ export function CajonCarrito({
                       </span>
                       <button
                         onClick={() => actualizarCantidad(linea.id, 1)}
+                        disabled={topeMas}
                         aria-label={`Agregar uno más a ${linea.nombre}`}
                         style={{
                           width: '32px',
@@ -381,6 +410,8 @@ export function CajonCarrito({
                           color: 'var(--cp-navy)',
                           fontSize: '18px',
                           fontWeight: 800,
+                          opacity: topeMas ? 0.35 : 1,
+                          cursor: topeMas ? 'not-allowed' : 'pointer',
                         }}
                       >
                         +
@@ -593,23 +624,25 @@ export function CajonCarrito({
 
             <button
               onClick={abrirCheckout}
-              disabled={localBloqueado}
+              disabled={localBloqueado || stockBloqueado}
               style={{
                 width: '100%',
                 minHeight: '50px',
                 borderRadius: '12px',
                 border: 0,
-                backgroundColor: localBloqueado ? 'var(--cp-line)' : 'var(--cp-orange)',
-                color: localBloqueado ? 'var(--cp-soft)' : '#FFFFFF',
+                backgroundColor: localBloqueado || stockBloqueado ? 'var(--cp-line)' : 'var(--cp-orange)',
+                color: localBloqueado || stockBloqueado ? 'var(--cp-soft)' : '#FFFFFF',
                 fontFamily: 'var(--fuente-titulos)',
                 fontWeight: 800,
                 fontSize: '15px',
-                cursor: localBloqueado ? 'not-allowed' : 'pointer',
+                cursor: localBloqueado || stockBloqueado ? 'not-allowed' : 'pointer',
               }}
             >
               {localBloqueado
                 ? 'Carta cerrada para pedidos'
-                : `Continuar · S/ ${subtotal.toFixed(2)}`}
+                : stockBloqueado
+                  ? 'Ajusta las cantidades para continuar'
+                  : `Continuar · S/ ${subtotal.toFixed(2)}`}
             </button>
           </div>
         )}

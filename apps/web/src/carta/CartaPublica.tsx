@@ -121,7 +121,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   // En la carta pública las promociones ocultas no existen; en el diseñador se ven atenuadas para poder mostrarlas.
   const ofertas = useMemo(() => (ed ? ofertasBase : ofertasBase.filter((o) => o.visibleCarta !== false)), [ofertasBase, ed]);
 
-  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto } =
+  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto, aplicarCarta } =
     useCarrito();
 
   // Enlace del bot o del aviso «pedido recibido»: abre directo el seguimiento de ese pedido (si el token no coincide, no pasa nada)
@@ -183,6 +183,11 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
     () => categorias.flatMap((c) => c.productos),
     [categorias],
   );
+
+  // Quedan de cada producto: el carrito y el checkout los leen del mismo inventario
+  useEffect(() => {
+    aplicarCarta(todosLosProductos);
+  }, [todosLosProductos]);
 
   // Filtrado reactivo de ofertas por búsqueda
   const ofertasFiltradas = useMemo(() => {

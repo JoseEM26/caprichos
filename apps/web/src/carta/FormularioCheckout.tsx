@@ -17,6 +17,7 @@ import { useCarrito } from './CarritoContext';
 import { PuntosCanje, estimarPuntos } from './cuenta/PuntosCanje';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { guardarPedido } from './seguimiento';
+import { excesosDeStock, stockInsuficienteDe } from './stock';
 import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
 import {
   ConsultaEnvioRespuesta,
@@ -53,7 +54,18 @@ export function FormularioCheckout({
     abrirCajon,
     limpiarCarrito,
     setPedidoConfirmado,
+    inventario,
+    marcarQuedan,
+    ajustarCantidadProducto,
   } = useCarrito();
+
+  // Productos que superan lo que queda (el saldo cambió) y el 409 del último envío
+  const excesos = excesosDeStock(lineas, inventario);
+  const enviarBloqueadoPorStock = excesos.length > 0;
+  const [stockRechazado, setStockRechazado] = useState<{ productoId: string | null; quedan: number; mensaje: string } | null>(null);
+  useEffect(() => {
+    if (!checkoutAbierto) setStockRechazado(null);
+  }, [checkoutAbierto]);
 
   // Control de apartados (pasos 1, 2, 3)
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
@@ -558,6 +570,14 @@ export function FormularioCheckout({
     hacerScrollArriba();
   };
 
+  // Deja cada producto con lo que queda (o lo quita si no queda nada); los datos del cliente no se tocan
+  const ajustarPedidoAStock = () => {
+    for (const e of excesos) ajustarCantidadProducto(e.productoId, e.quedan);
+    if (stockRechazado?.productoId) ajustarCantidadProducto(stockRechazado.productoId, stockRechazado.quedan);
+    setStockRechazado(null);
+    setErrorEnvio(null);
+  };
+
   // Enviar pedido a la API
   const enviarPedido = async (e?: FormEvent) => {
     if (e) e.preventDefault();
@@ -568,6 +588,11 @@ export function FormularioCheckout({
 
     if (estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda)) {
       setErrorEnvio('La carta se encuentra cerrada o en pausa: no se pueden enviar pedidos.');
+      return;
+    }
+
+    if (enviarBloqueadoPorStock) {
+      setErrorEnvio('Hay productos por encima de lo que queda. Ajusta tu pedido antes de enviar.');
       return;
     }
 
@@ -690,7 +715,12 @@ export function FormularioCheckout({
       });
     } catch (err) {
       if (err instanceof ErrorApi) {
-        if (err.codigo === 'PRODUCTO_AGOTADO') {
+        const stock = stockInsuficienteDe(err);
+        if (stock) {
+          setStockRechazado(stock);
+          if (stock.productoId) marcarQuedan(stock.productoId, stock.quedan);
+          setErrorEnvio(null);
+        } else if (err.codigo === 'PRODUCTO_AGOTADO') {
           setErrorEnvio(err.message || 'Uno de los productos seleccionados se encuentra agotado.');
         } else if (err.codigo === 'COMBO_PARTE_NO_DISPONIBLE') {
           setErrorEnvio(`${err.message} Tu carrito sigue igual: quita el combo y vuelve a agregarlo para elegir otro reemplazo.`);
@@ -2266,6 +2296,40 @@ export function FormularioCheckout({
                 </div>
               )}
 
+              {/* Stock: productos por encima de lo que queda, con el ajuste del pedido */}
+              {(enviarBloqueadoPorStock || stockRechazado) && (
+                <div
+                  role="alert"
+                  style={{
+                    backgroundColor: '#FDECEA',
+                    color: 'var(--cp-rust)',
+                    border: '1.5px solid var(--cp-rust)',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    lineHeight: '17px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  {excesos.map((e) => (
+                    <span key={e.productoId}>{`Solo quedan ${e.quedan} de ${e.nombre}`}</span>
+                  ))}
+                  {stockRechazado && !excesos.some((e) => e.productoId === stockRechazado.productoId) && (
+                    <span>{stockRechazado.mensaje}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={ajustarPedidoAStock}
+                    style={{ alignSelf: 'flex-start', border: 0, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                  >
+                    Ajustar mi pedido
+                  </button>
+                </div>
+              )}
+
               {/* Mensaje de error del apartado o de la API */}
               {(errorPaso || errorEnvio) && (
                 <div
@@ -2330,22 +2394,26 @@ export function FormularioCheckout({
                 ) : (
                   <button
                     type="button"
-                    disabled={enviando}
+                    disabled={enviando || enviarBloqueadoPorStock}
                     onClick={() => void enviarPedido()}
                     style={{
                       flex: 1,
                       minHeight: '48px',
                       borderRadius: '12px',
                       border: 0,
-                      backgroundColor: enviando ? 'var(--cp-line)' : 'var(--cp-orange)',
-                      color: enviando ? 'var(--cp-soft)' : '#FFFFFF',
+                      backgroundColor: enviando || enviarBloqueadoPorStock ? 'var(--cp-line)' : 'var(--cp-orange)',
+                      color: enviando || enviarBloqueadoPorStock ? 'var(--cp-soft)' : '#FFFFFF',
                       fontFamily: 'var(--fuente-titulos)',
                       fontWeight: 800,
                       fontSize: '15px',
-                      cursor: enviando ? 'not-allowed' : 'pointer',
+                      cursor: enviando || enviarBloqueadoPorStock ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {enviando ? 'Enviando pedido...' : `Enviar pedido · S/ ${totalCalculado.toFixed(2)}`}
+                    {enviando
+                      ? 'Enviando pedido...'
+                      : enviarBloqueadoPorStock
+                        ? 'Ajusta tu pedido para enviar'
+                        : `Enviar pedido · S/ ${totalCalculado.toFixed(2)}`}
                   </button>
                 )}
               </div>
