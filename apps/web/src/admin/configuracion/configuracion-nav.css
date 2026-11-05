@@ -25,7 +25,23 @@
 .cfg-ver-todos { width: 100%; margin-top: 4px; border-color: var(--cp-line); }
 
 /* Navegación */
-.cfg-nav { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* Alto máximo: el menú no empuja el contenido; si no cabe, se desplaza dentro de su propio marco. */
+.cfg-nav {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  max-height: min(60vh, 520px); overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth;
+  scrollbar-width: thin; scrollbar-color: var(--cp-soft) transparent;
+  padding-right: 4px; border-radius: 12px;
+  --cfg-fade-arriba: 0px; --cfg-fade-abajo: 0px;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--cfg-fade-arriba), #000 calc(100% - var(--cfg-fade-abajo)), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--cfg-fade-arriba), #000 calc(100% - var(--cfg-fade-abajo)), transparent 100%);
+}
+.cfg-nav[data-arriba='true'] { --cfg-fade-arriba: 24px; }
+.cfg-nav[data-abajo='true'] { --cfg-fade-abajo: 24px; }
+.cfg-nav > * { flex: none; }
+.cfg-nav::-webkit-scrollbar { width: 8px; }
+.cfg-nav::-webkit-scrollbar-track { background: transparent; }
+.cfg-nav::-webkit-scrollbar-thumb { background: var(--cp-soft); border-radius: 9999px; }
+.cfg-nav:focus-visible { outline: 3px solid var(--cp-orange); outline-offset: -3px; }
 .cfg-grupo { display: flex; flex-direction: column; gap: 6px; }
 .cfg-grupo-titulo { font-family: Montserrat, sans-serif; font-weight: 800; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--cp-soft); padding: 4px 4px 0; }
 .cfg-grupo-boton { display: flex; align-items: center; justify-content: space-between; min-height: 44px; background: transparent; border: 0; cursor: pointer; width: 100%; text-align: left; }
@@ -54,6 +70,7 @@
 @media (prefers-reduced-motion: reduce) {
   .cfg-resaltado { animation: none; box-shadow: 0 0 0 4px rgba(230, 121, 41, 0.55); background: rgba(230, 121, 41, 0.14); }
   .cfg-grupo-boton svg { transition: none; }
+  .cfg-nav { scroll-behavior: auto; }
 }
 
 /* Ayuda por campo */
@@ -73,6 +90,7 @@
 .cfg-panel { flex: 1 1 0; min-width: 0; }
 @media (max-width: 719px) {
   .cfg-contenedor { flex-direction: column; align-items: stretch; }
+  .cfg-nav { max-height: 50vh; }
   .cfg-lateral, .cfg-panel { flex: none; width: 100%; }
   .cfg-kbd { display: none; }
 }

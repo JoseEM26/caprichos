@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './configuracion-nav.css';
 
 export interface CategoriaNav { id: string; n: string; d: string; }
@@ -64,12 +64,39 @@ export function NavegacionConfiguracion({ categorias, activo, onElegir, movil }:
   movil: boolean;
 }) {
   const [cerrados, setCerrados] = useState<string[]>(leerCerrados);
+  const refNav = useRef<HTMLDivElement>(null);
   const grupoActivo = GRUPOS_CONFIG.find((g) => g.tabs.includes(activo))?.id;
+  const activoVisible = !grupoActivo || movil || !cerrados.includes(grupoActivo);
 
   // al saltar a un ajuste de un grupo plegado (buscador), se abre
   useEffect(() => {
     if (grupoActivo) setCerrados((c) => (c.includes(grupoActivo) ? c.filter((x) => x !== grupoActivo) : c));
   }, [grupoActivo, activo]);
+
+  // Indicadores de desplazamiento: solo marcan si hay contenido arriba/abajo (la máscara CSS difumina los bordes).
+  const actualizarIndicadores = useCallback(() => {
+    const el = refNav.current;
+    if (!el) return;
+    el.dataset.arriba = String(el.scrollTop > 2);
+    el.dataset.abajo = String(el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+  }, []);
+  useEffect(() => {
+    const el = refNav.current;
+    if (!el) return;
+    el.addEventListener('scroll', actualizarIndicadores, { passive: true });
+    window.addEventListener('resize', actualizarIndicadores);
+    return () => {
+      el.removeEventListener('scroll', actualizarIndicadores);
+      window.removeEventListener('resize', actualizarIndicadores);
+    };
+  }, [actualizarIndicadores]);
+  useEffect(() => actualizarIndicadores(), [actualizarIndicadores, cerrados, movil, categorias]);
+
+  // el ajuste activo queda visible dentro del contenedor con scroll (sin mover la página si ya se ve)
+  useEffect(() => {
+    const el = refNav.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
+  }, [activo, activoVisible, movil]);
 
   const alternar = (id: string) =>
     setCerrados((c) => {
@@ -85,7 +112,14 @@ export function NavegacionConfiguracion({ categorias, activo, onElegir, movil }:
   ];
 
   return (
-    <div role="tablist" aria-label="Categorías de configuración" aria-orientation="vertical" className={`cfg-nav ${movil ? 'cfg-nav-movil' : ''}`}>
+    <div
+      ref={refNav}
+      role="tablist"
+      aria-label="Secciones de configuración"
+      aria-orientation="vertical"
+      tabIndex={0}
+      className={`cfg-nav ${movil ? 'cfg-nav-movil' : ''}`}
+    >
       {grupos.map((g) => {
         const cats = g.tabs.map((t) => categorias.find((c) => c.id === t)).filter(Boolean) as CategoriaNav[];
         if (!cats.length) return null;

@@ -69,7 +69,7 @@ const montar = (url = '/admin/configuracion') =>
   );
 
 const ubicacion = () => screen.getByTestId('ubicacion').textContent ?? '';
-const navegacion = () => screen.getByRole('tablist', { name: 'Categorías de configuración' });
+const navegacion = () => screen.getByRole('tablist', { name: 'Secciones de configuración' });
 const seccion = (nombre: RegExp) => screen.getByRole('tab', { name: nombre });
 const ancho = (n: number) => {
   (window as any).innerWidth = n;
