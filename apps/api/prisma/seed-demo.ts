@@ -98,7 +98,7 @@ async function configurarParametrosDemo() {
     { clave: 'whatsapp_aviso_listo_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_recibido_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_entregado_activo', valor: 'no' },
-    { clave: 'whatsapp_aviso_encuesta_activo', valor: 'no' },
+    { clave: 'whatsapp_aviso_encuesta_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_voucher_recordatorio_activo', valor: 'no' },
     { clave: 'whatsapp_plantilla_recibido_seguimiento_activa', valor: 'no' },
     { clave: 'chatbot_pago_recordatorio_activo', valor: 'no' },

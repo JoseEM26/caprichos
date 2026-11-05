@@ -1254,6 +1254,9 @@ export function FormularioCheckout({
                             ? 'Opcional. Con tu celular sumas puntos.'
                             : 'Tu celular: sumas puntos con tu número, sin contraseña.'}
                         </div>
+                        <div style={{ fontSize: '11px', color: 'var(--cp-soft)', marginTop: '2px' }}>
+                          Te enviaremos una breve encuesta de satisfacción por WhatsApp
+                        </div>
                       </div>
                           {clienteCuenta && otroTelefono && clienteCuenta.telefono && (
                             <button

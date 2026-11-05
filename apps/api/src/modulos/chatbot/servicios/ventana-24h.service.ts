@@ -189,12 +189,16 @@ export class Ventana24hService {
     }
 
     const botonCodigo = botonCodigoDe(definicion, payload.variablesPlantilla);
+    // Plantilla con botones de respuesta rápida (encuesta): el payload de cada botón viaja con el envío
+    const botonesRespuesta = definicion.botones?.length && payload.botones?.length ? payload.botones.map((b) => b.id) : undefined;
+    let opcionesPlantilla = botonCodigo ? { ...opciones, botonCodigo } : opciones;
+    if (botonesRespuesta) opcionesPlantilla = { ...opcionesPlantilla, botonesRespuesta };
     const resultadoPlantilla = await this.mensajeria.enviarPlantilla(
       telefono,
       definicion.nombre,
       definicion.idioma,
       payload.variablesPlantilla,
-      botonCodigo ? { ...opciones, botonCodigo } : opciones,
+      opcionesPlantilla,
     );
 
     if (!resultadoPlantilla.exito) {

@@ -7,6 +7,11 @@ export interface DefinicionPlantilla {
   descripcion: string;
   /** Plantilla con botón «copiar código»: la primera variable se manda también en el botón. */
   botonCodigo?: boolean;
+  /**
+   * Botones de respuesta rápida fijos en Meta (título exacto, máx. 20 caracteres, en el orden del componente
+   * button index 0, 1, 2). Al enviar, el payload de cada botón lo pone el emisor (`botones[].id`).
+   */
+  botones?: string[];
 }
 
 /** Código del botón «copiar código» (la primera variable), si la plantilla lo lleva. */
@@ -213,7 +218,8 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     idioma: 'es',
     variables: ['nombre_cliente', 'codigo_pedido'],
     texto: 'Hola {{1}}, gracias por tu compra en Caprichos (pedido {{2}}). ¿Como calificarias tu atencion del 1 al 5?',
-    descripcion: 'Plantilla de encuesta posventa enviada tras la entrega del pedido.',
+    botones: ['1 Malo', '3 Regular', '5 Excelente'],
+    descripcion: 'Plantilla de encuesta posventa enviada tras la entrega del pedido. Lleva 3 botones de respuesta rápida (1 Malo, 3 Regular, 5 Excelente); en Meta, categoría Utilidad, español.',
   },
   ENCUESTA_GRACIAS: {
     nombre: 'caprichos_encuesta_gracias',
