@@ -10,6 +10,7 @@ import { useSocketConectado } from '../comun/socket';
 import { useNotificaciones } from './useNotificaciones';
 import { marcarTodasNotificacionesLeidas } from './notificaciones/notificacionesApi';
 import { CampanaNotificaciones } from './notificaciones/CampanaNotificaciones';
+import { BannerInstalarApp } from '../pwa/BannerInstalarApp';
 import { AvisosEmergentes, useTituloContador } from './notificaciones/AvisosNotificaciones';
 import { hayQueSonar, useSonidoAvisos } from './notificaciones/sonidoAviso';
 import { AJUSTES_NOTIFICACIONES_DEFECTO } from './notificaciones/notificacionesTipos';
@@ -419,6 +420,7 @@ export function AdminShell() {
         {!enLinea ? 'Sin internet' : socketConectado ? 'En línea' : 'Reconectando…'}
       </span>
       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-soft)', fontVariantNumeric: 'tabular-nums' }}>{horaLima(ahora)}</span>
+      <BannerInstalarApp compacto />
       <CampanaNotificaciones
         notificaciones={resumen.notificaciones}
         sonidoSoportado={sonido.soportado}
@@ -510,6 +512,9 @@ export function AdminShell() {
             </div>
 
             <hr style={{ border: 'none', borderTop: '1px solid var(--cp-line)', margin: '4px 0' }} />
+
+            {/* El repartidor en celular no ve la barra de estado: el botón de instalar va aquí */}
+            <BannerInstalarApp compacto />
 
             <button
               type="button"
