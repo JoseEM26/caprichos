@@ -5,6 +5,7 @@ import { useCuenta } from './cuenta/CuentaContext';
 import { useEsMovil } from './useEsMovil';
 import { usePedidosGuardados } from './seguimiento';
 import { BotonInstalarApp } from '../pwa/BotonInstalarApp';
+import { BotonReservar } from './reservas/BotonReservar';
 
 export type PaginaCarta = 'carta' | 'novedades' | 'conocenos';
 
@@ -20,6 +21,8 @@ interface CabeceraCartaProps {
   onCategoria: (id: string) => void;
   /** Botón «Instalar app» (false en la vista previa del diseñador) */
   mostrarInstalar?: boolean;
+  /** Botón «Reservar mesa» (false en la vista previa del diseñador) */
+  mostrarReservar?: boolean;
 }
 
 const PAGINAS: [PaginaCarta, string][] = [
@@ -64,6 +67,7 @@ export function CabeceraCarta({
   categoriaActivaId,
   onCategoria,
   mostrarInstalar = true,
+  mostrarReservar = true,
 }: CabeceraCartaProps) {
   const { cantidadTotal, subtotal, abrirCajon, setListaPedidosAbierta } = useCarrito();
   const { cliente, abrirPanel } = useCuenta();
@@ -230,6 +234,7 @@ export function CabeceraCarta({
               gap: movil ? 8 : 12,
             }}
           >
+            {mostrarReservar && <BotonReservar />}
             {mostrarInstalar && <BotonInstalarApp />}
 
             {mostrarPedidos && (

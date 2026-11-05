@@ -157,6 +157,29 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  reserva_web_activa: {
+    nombre: 'Reservar mesa desde la carta',
+    descripcion: 'Muestra el botón «Reservar» en la carta virtual. En «No» el cliente no puede pedir reserva desde la carta.',
+    tipo: 'sino',
+  },
+  reserva_web_max_pendientes: {
+    nombre: 'Solicitudes pendientes por celular',
+    descripcion: 'Cuántas reservas pedidas desde la carta puede tener esperando respuesta un mismo celular.',
+    tipo: 'numero',
+    sufijo: 'solicitudes',
+  },
+  reserva_web_dias_max: {
+    nombre: 'Días de anticipación para reservar desde la carta',
+    descripcion: 'Hasta cuántos días antes puede pedir reserva el cliente desde la carta.',
+    tipo: 'numero',
+    sufijo: 'días',
+  },
+  reserva_web_max_personas: {
+    nombre: 'Personas máximas por reserva desde la carta',
+    descripcion: 'Tope de personas que acepta la carta. Si lo dejas vacío, el tope es la suma de asientos de las mesas activas.',
+    tipo: 'numero',
+    sufijo: 'personas',
+  },
   puntos_porcentaje: {
     nombre: 'Porcentaje de puntos',
     descripcion: 'Porcentaje del monto consumido que el cliente acumula en puntos fidelidad.',
