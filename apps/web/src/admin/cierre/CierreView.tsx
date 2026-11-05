@@ -5,7 +5,18 @@ import { usePideCodigo } from '../../comun/usePideCodigo';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { HistorialCierres } from './HistorialCierres';
-import { cierreApi, calcularTotalEfectivo, PendienteCobro, RepartidorPorLiquidar } from './cierreApi';
+import {
+  cierreApi,
+  calcularTotalEfectivo,
+  AjusteMedio,
+  ClaveDigital,
+  DevolucionTurno,
+  DigitalesCaja,
+  MedioAjustable,
+  PendienteCobro,
+  RepartidorPorLiquidar,
+} from './cierreApi';
+import { DialogoCorregirMedio, ETIQUETA_MEDIO, ListaCorrecciones } from './CorreccionesMedios';
 import { VerificarMovimientos } from './VerificarMovimientos';
 import { PendientesCobroCierre, AvisoBloqueoCierre, FocoPendientes, GrupoFoco } from './PendientesCobroCierre';
 import { pedidosApi, MovimientoCaja, CobroTurno } from '../pedidos/pedidosApi';
@@ -18,6 +29,9 @@ type TabCierre = 'turno' | 'historial';
 
 // Monto en soles: solo dígitos y un punto, máximo dos decimales (sin negativos ni letras)
 const limpiarMonto = (v: string) => v.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d{0,2}).*$/, '$1');
+
+// Monto con signo para el desglose digital: las devoluciones salen en negativo
+const solesConSigno = (n: number) => (n < 0 ? `-S/ ${(-n).toFixed(2)}` : `S/ ${n.toFixed(2)}`);
 
 // Hoy en Lima como AAAA-MM-DD, para comparar con la fecha de la caja
 const hoyLima = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
@@ -92,13 +106,12 @@ export function CierreView() {
     '0.2': '',
     '0.1': '',
   });
-  const [mediosDigitales, setMediosDigitales] = useState({
-    yape: '',
-    plin: '',
-    transferencia: '',
-    tarjeta: '',
-    otros: '',
-  });
+  // Medios digitales: los calcula el sistema (vouchers aprobados). El cajero no los teclea;
+  // solo los corrige por excepción, con motivo y autorización (ver DialogoCorregirMedio).
+  const [digitales, setDigitales] = useState<DigitalesCaja | null>(null);
+  const [ajustesMedio, setAjustesMedio] = useState<AjusteMedio[]>([]);
+  const [devolucionesTurno, setDevolucionesTurno] = useState<DevolucionTurno[]>([]);
+  const [correccion, setCorreccion] = useState<{ medio: MedioAjustable; clave: ClaveDigital } | null>(null);
   const [obsCierre, setObsCierre] = useState('');
   const [pinSupervisora, setPinSupervisora] = useState('');
   const [revisadoCuadra, setRevisadoCuadra] = useState<boolean | null>(null);
@@ -107,6 +120,23 @@ export function CierreView() {
   const [pinVerificado, setPinVerificado] = useState(false);
   const [msgCierreError, setMsgCierreError] = useState('');
   const [cerrandoCaja, setCerrandoCaja] = useState(false);
+
+  // Montos digitales del sistema y sus correcciones de la caja abierta
+  const cargarDigitales = useCallback(async () => {
+    try {
+      const [d, a, dev] = await Promise.all([
+        cierreApi.obtenerDigitales(),
+        cierreApi.listarAjustesMedio(),
+        cierreApi.listarDevolucionesTurno().catch(() => [] as DevolucionTurno[]),
+      ]);
+      setDigitales(d);
+      setAjustesMedio(a);
+      setDevolucionesTurno(dev);
+    } catch {
+      setDigitales(null);
+      setAjustesMedio([]);
+    }
+  }, []);
 
   // Cargar datos del turno
   const cargarTurno = useCallback(async () => {
@@ -178,6 +208,9 @@ export function CierreView() {
         setRepartidores([]);
       }
 
+      // 4b. Medios digitales calculados por el sistema (sin efectivo ni esperado)
+      await cargarDigitales();
+
       // 5. Pedidos sin cobrar de cualquier día (los que bloquean el cierre; el admin y el supervisor los ven de entrada,
       // el cajero los ve con el PIN de supervisor)
       if (sinCodigo) {
@@ -194,7 +227,7 @@ export function CierreView() {
     } finally {
       setCargando(false);
     }
-  }, [sinCodigo]);
+  }, [sinCodigo, cargarDigitales]);
 
   useEffect(() => {
     cargarTurno();
@@ -227,6 +260,8 @@ export function CierreView() {
     return aperturaMonto + ventasEfectivo + ingresosExtra - egresosGasto;
   }, [esperado, aperturaMonto, ventasEfectivo, ingresosExtra, egresosGasto]);
 
+  const montoDigital = (clave: ClaveDigital) => digitales?.medios[clave]?.monto ?? 0;
+
   // Pedidos cobrados por medio (solo para el número de pedidos de cada tarjeta)
   // Cuenta los pedidos que tienen un pago en ese medio (un pedido mixto cuenta en cada medio)
   const pedidosPorMedio = (medio: string) => pedidosCobrados.filter((p) => p.medios.includes(medio)).length;
@@ -241,10 +276,10 @@ export function CierreView() {
   const filasCuadre = esperado
     ? [
         { medio: 'Efectivo', sistema: efectivoEsperado, contado: totalEfectivoContado },
-        { medio: 'Yape', sistema: esperado.medios?.yape ?? 0, contado: Number(limpiarMonto(mediosDigitales.yape)) || 0 },
-        { medio: 'Plin', sistema: esperado.medios?.plin ?? 0, contado: Number(limpiarMonto(mediosDigitales.plin)) || 0 },
-        { medio: 'Transferencia', sistema: esperado.medios?.transferencia ?? 0, contado: Number(limpiarMonto(mediosDigitales.transferencia)) || 0 },
-        { medio: 'Tarjeta', sistema: esperado.medios?.tarjeta ?? 0, contado: Number(limpiarMonto(mediosDigitales.tarjeta)) || 0 },
+        { medio: 'Yape', sistema: esperado.medios?.yape ?? 0, contado: montoDigital('yape') },
+        { medio: 'Plin', sistema: esperado.medios?.plin ?? 0, contado: montoDigital('plin') },
+        { medio: 'Transferencia', sistema: esperado.medios?.transferencia ?? 0, contado: montoDigital('transferencia') },
+        { medio: 'Tarjeta', sistema: esperado.medios?.tarjeta ?? 0, contado: montoDigital('tarjeta') },
       ].map((f) => ({ ...f, dif: Math.round((f.contado - f.sistema) * 100) / 100 }))
     : [];
   const cuadraEnSistema = filasCuadre.length > 0 && filasCuadre.every((f) => Math.abs(f.dif) < 0.005);
@@ -262,12 +297,24 @@ export function CierreView() {
     return conteo;
   };
 
+  // Los digitales van como los vale hoy el sistema (con su corrección, si la hay); el servidor los vuelve a comprobar
   const armarMedios = () => ({
-    yape: Number(limpiarMonto(mediosDigitales.yape)) || 0,
-    plin: Number(limpiarMonto(mediosDigitales.plin)) || 0,
-    transferencia: Number(limpiarMonto(mediosDigitales.transferencia)) || 0,
-    tarjeta: Number(limpiarMonto(mediosDigitales.tarjeta)) || 0,
+    yape: montoDigital('yape'),
+    plin: montoDigital('plin'),
+    transferencia: montoDigital('transferencia'),
+    tarjeta: montoDigital('tarjeta'),
   });
+
+  // Tras corregir un monto, el cuadre anterior ya no vale: hay que revisar otra vez
+  const alCorregirMedio = async (ajuste: AjusteMedio) => {
+    setCorreccion(null);
+    setRevisadoCuadra(null);
+    setRequierePin(false);
+    setPinVerificado(false);
+    setMsgCierreError('');
+    setCjMsg(`Corrección guardada: ${ETIQUETA_MEDIO[ajuste.medio] ?? ajuste.medio} ahora vale s/ ${ajuste.montoNuevo.toFixed(2)}.`);
+    await cargarDigitales();
+  };
 
   const errorDeServidor = (err: unknown, respaldo: string) => (err instanceof ErrorApi ? err.message : respaldo);
 
@@ -1469,6 +1516,7 @@ export function CierreView() {
             {/* FASE 1: VERIFICAR MOVIMIENTOS */}
             {faseCierre === 'verificar' && (
               <VerificarMovimientos
+                devoluciones={devolucionesTurno}
                 fecha={fechaTurno}
                 diaAnterior={fechaTurno < hoyLima()}
                 cajero={cajeroNombre}
@@ -1595,7 +1643,7 @@ export function CierreView() {
                   </div>
                 </div>
 
-                {/* 2. Medios digitales */}
+                {/* 2. Medios digitales: los calcula el sistema; corregir es excepción (motivo y autorización) */}
                 <div
                   style={{
                     background: 'var(--cp-white, #FFFFFF)',
@@ -1607,33 +1655,71 @@ export function CierreView() {
                     gap: 6,
                   }}
                 >
-                  <div style={{ fontWeight: 800, fontSize: 14 }}>2. Medios digitales (lo que ves en la app o voucher)</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8 }}>
-                    {(['yape', 'plin', 'transferencia', 'tarjeta'] as const).map((m) => (
-                      <div key={m}>
-                        <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'capitalize', color: 'var(--cp-soft, #2C4C5D)' }}>
-                          {m}
-                        </label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          aria-label={`Monto en ${m}`}
-                          placeholder="0.00"
-                          value={mediosDigitales[m]}
-                          onChange={(e) => setMediosDigitales({ ...mediosDigitales, [m]: limpiarMonto(e.target.value) })}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            minHeight: 38,
-                            borderRadius: 8,
-                            border: '1px solid var(--cp-line, #E3D6C6)',
-                            padding: '0 8px',
-                            fontSize: 13,
-                          }}
-                        />
-                      </div>
-                    ))}
+                  <div style={{ fontWeight: 800, fontSize: 14 }}>2. Medios digitales (calculados por el sistema)</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+                    {(
+                      [
+                        { clave: 'yape', medio: 'YAPE', etiqueta: 'Yape' },
+                        { clave: 'plin', medio: 'PLIN', etiqueta: 'Plin' },
+                        { clave: 'transferencia', medio: 'TRANSFERENCIA', etiqueta: 'Transferencia' },
+                        { clave: 'tarjeta', medio: 'TARJETA', etiqueta: 'Tarjeta' },
+                      ] as const
+                    ).map(({ clave, medio, etiqueta }) => {
+                      const info = digitales?.medios[clave];
+                      return (
+                        <div key={clave} data-testid={`digital-${clave}`} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+                            <label htmlFor={`digital-${clave}-monto`} style={{ fontSize: 11, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>
+                              {etiqueta}
+                            </label>
+                            {info?.corregido && (
+                              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--cp-rust, #B2500F)' }}>Corregido</span>
+                            )}
+                          </div>
+                          <input
+                            id={`digital-${clave}-monto`}
+                            type="text"
+                            readOnly
+                            aria-label={`Monto en ${clave}`}
+                            value={(info?.monto ?? 0).toFixed(2)}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              minHeight: 38,
+                              borderRadius: 8,
+                              border: '1px solid var(--cp-line, #E3D6C6)',
+                              padding: '0 8px',
+                              fontSize: 13,
+                              background: 'var(--cp-sand, #EDE1D1)',
+                            }}
+                          />
+                          <div style={{ fontSize: 10, color: 'var(--cp-soft, #2C4C5D)' }}>
+                            Calculado por el sistema (vouchers aprobados)
+                          </div>
+                          {info && (
+                            <div data-testid={`desglose-${clave}`} style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              <span>Cobrado: {solesConSigno(info.cobrado)}</span>
+                              <span>Devoluciones: {solesConSigno(info.devuelto)}</span>
+                              <span style={{ fontWeight: 800 }}>Esperado: {solesConSigno(info.sistema)}</span>
+                            </div>
+                          )}
+                          <div style={{ fontSize: 10, color: 'var(--cp-soft, #2C4C5D)' }}>
+                            {info ? `${info.cobros} ${info.cobros === 1 ? 'cobro' : 'cobros'}` : 'Sin datos'}
+                          </div>
+                          <button
+                            type="button"
+                            aria-label={`Corregir ${etiqueta}`}
+                            disabled={!info}
+                            onClick={() => setCorreccion({ medio, clave })}
+                            style={{ minHeight: 30, borderRadius: 8, border: '1px solid var(--cp-navy, #0B2C3E)', background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                          >
+                            Corregir
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
+                  {ajustesMedio.length > 0 && <ListaCorrecciones ajustes={ajustesMedio} />}
                 </div>
 
                 {/* Botón Revisar si cuadra: solo para el cajero (ADMIN y SUPERVISOR no lo necesitan) */}
@@ -1812,6 +1898,16 @@ export function CierreView() {
               </div>
             )}
           </div>
+          {correccion && digitales && (
+            <DialogoCorregirMedio
+              medio={correccion.medio}
+              montoSistema={digitales.medios[correccion.clave].sistema}
+              montoActual={digitales.medios[correccion.clave].monto}
+              pideCodigo={pideCodigo}
+              alCerrar={() => setCorreccion(null)}
+              alGuardado={alCorregirMedio}
+            />
+          )}
         </>
       )}
     </div>

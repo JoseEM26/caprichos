@@ -37,11 +37,11 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['transacciones de venta: pedidos, cobros, comprobantes y reclamos', [
     'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_estado_historial', 'secuencia_pedido',
     'pedido_mesa', 'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
-    'incidente_entrega', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto',
+    'incidente_entrega', 'incidente_entrega_foto', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto',
   ]],
   ['caja y cierres: dinero real del día', [
     'caja', 'cobro', 'cobro_pago', 'movimiento_caja', 'liquidacion', 'cierre_caja', 'conteo_cierre',
-    'cierre_medio', 'cierre_dia', 'consumo_personal',
+    'cierre_medio', 'cierre_dia', 'consumo_personal', 'cierre_ajuste_medio', 'devolucion_pedido',
   ]],
   ['clientes: cuentas, puntos, direcciones y consentimientos', [
     'customer_account', 'customer_detail', 'consent', 'contact_mechanism', 'cliente_direccion',
@@ -66,7 +66,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
     'notificacion_lectura',
   ]],
   ['roles extra de cada cuenta: se asignan de nuevo en la base destino tras migrar el personal', [
-    'user_account_rol',
+    'user_account_rol', 'user_account_area',
   ]],
   ['trazas y control técnico', [
     'auditoria', 'sys_control', 'iniciativa', 'iniciativa_comentario',
@@ -82,7 +82,7 @@ export const TABLAS_SENSIBLES: string[] = [
   'sesion', 'supervisor_secreto', 'device_key', 'print_job', 'auditoria', 'voucher_pago',
   'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
   'contact_mechanism', 'cliente_direccion', 'conversacion', 'mensaje_chat', 'whatsapp_mensaje',
-  'saliente_whatsapp', 'notificacion', 'cobro', 'caja', 'cierre_caja', 'pedido', 'reserva',
+  'saliente_whatsapp', 'notificacion', 'cobro', 'caja', 'cierre_caja', 'cierre_ajuste_medio', 'devolucion_pedido', 'pedido', 'reserva',
   'reclamo', 'encuesta', 'stock', 'movimiento_stock', 'ia_consumo', 'data_request',
 ];
 

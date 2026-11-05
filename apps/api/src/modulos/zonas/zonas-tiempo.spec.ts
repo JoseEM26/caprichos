@@ -23,6 +23,7 @@ function construir(zonas: any[] = []) {
       }),
     },
     parametro: { findUnique: jest.fn(async () => null) },
+    oferta: { findMany: jest.fn(async () => []) },
   };
   const auditoria: any = { registrar: jest.fn(async () => undefined) };
   return { servicio: new ZonasService(prisma, auditoria), prisma, auditoria };

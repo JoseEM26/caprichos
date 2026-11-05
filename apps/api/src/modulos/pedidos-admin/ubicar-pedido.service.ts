@@ -11,8 +11,7 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { ZonasService } from '../zonas/zonas.service';
-import { leerReglaEnvioGratis } from '../zonas/envio-gratis';
-import { calcularEnvioFinal } from '@caprichos/compartido';
+import { calcularEnvioDelivery } from '../ofertas/envio-gratis-promo';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 
 const ESTADOS_CERRADOS = ['ENTREGADO', 'ANULADO'];
@@ -29,6 +28,19 @@ export class UbicarPedidoService {
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
   ) {}
+
+  /** El pedido canjeó un cupón de envío gratis (de campaña o emitido). */
+  private async pedidoTieneCuponEnvio(pedido: { cupon_id: bigint | null; cupon_emitido_id: bigint | null }): Promise<boolean> {
+    if (pedido.cupon_emitido_id) {
+      const emitido = await this.prisma.cuponEmitido.findUnique({ where: { id: pedido.cupon_emitido_id }, include: { cupon: true } });
+      return emitido?.cupon.descuento_tipo === 'ENVIO_GRATIS';
+    }
+    if (pedido.cupon_id) {
+      const cupon = await this.prisma.cupon.findUnique({ where: { id: pedido.cupon_id } });
+      return cupon?.descuento_tipo === 'ENVIO_GRATIS';
+    }
+    return false;
+  }
 
   async ubicar(id: string, dto: UbicarPedidoDto, usuario: UsuarioAutenticado, ip?: string) {
     let pedidoId: bigint;
@@ -60,9 +72,16 @@ export class UbicarPedidoService {
       });
     }
 
-    const regla = await leerReglaEnvioGratis(this.prisma);
+    // Con la hora de creación del pedido (no la de ahora): la promo ENVIO_GRATIS rige como si se hubiera pedido entonces
     const subtotal = Number(pedido.subtotal);
-    const envio = calcularEnvioFinal(subtotal, Number(zona.tarifa), regla);
+    const envioGratisCupon = await this.pedidoTieneCuponEnvio(pedido);
+    const { envio, promo } = await calcularEnvioDelivery(this.prisma, {
+      subtotal,
+      tarifaZona: Number(zona.tarifa),
+      canal: pedido.canal,
+      ahora: pedido.creado_en,
+      envioGratisCupon,
+    });
     const total = Number((subtotal - Number(pedido.descuento) + envio).toFixed(2));
 
     // Con el pago ya cobrado el total no puede moverse: hay que anular y rehacer
@@ -73,18 +92,24 @@ export class UbicarPedidoService {
       });
     }
 
-    const actualizado = await this.prisma.pedido.update({
-      where: { id: pedido.id },
-      data: {
-        entrega_lat: new Prisma.Decimal(dto.lat),
-        entrega_lng: new Prisma.Decimal(dto.lng),
-        entrega_origen: 'MAPA',
-        zona_id: zona.zonaId,
-        envio: new Prisma.Decimal(envio),
-        total: new Prisma.Decimal(total),
-        ...(dto.direccion?.trim() ? { entrega_direccion: dto.direccion.trim() } : {}),
-        ...(dto.referencia?.trim() ? { entrega_referencia: dto.referencia.trim() } : {}),
-      },
+    const actualizado = await this.prisma.$transaction(async (tx) => {
+      const pedidoActualizado = await tx.pedido.update({
+        where: { id: pedido.id },
+        data: {
+          entrega_lat: new Prisma.Decimal(dto.lat),
+          entrega_lng: new Prisma.Decimal(dto.lng),
+          entrega_origen: 'MAPA',
+          zona_id: zona.zonaId,
+          envio: new Prisma.Decimal(envio),
+          total: new Prisma.Decimal(total),
+          ...(dto.direccion?.trim() ? { entrega_direccion: dto.direccion.trim() } : {}),
+          ...(dto.referencia?.trim() ? { entrega_referencia: dto.referencia.trim() } : {}),
+        },
+      });
+      if (promo) {
+        await tx.oferta.update({ where: { id: BigInt(promo.id) }, data: { usos_actuales: { increment: 1 } } });
+      }
+      return pedidoActualizado;
     });
 
     await this.auditoria.registrar({

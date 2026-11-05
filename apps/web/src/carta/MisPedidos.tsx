@@ -19,6 +19,7 @@ import {
 } from './seguimiento';
 import { useEsMovil } from './useEsMovil';
 import type { ModalidadEntrega } from './tipos';
+import { BannerInstalarApp } from '../pwa/BannerInstalarApp';
 
 interface PedidoCuenta extends EstadoSeguimiento {
   creadoEn: string;
@@ -171,6 +172,8 @@ function ContenidoMisPedidos({ alCerrar }: { alCerrar: () => void }) {
                   {historial.cargando ? 'Cargando...' : 'Ver más'}
                 </Boton>
               )}
+              {/* Ya tiene pedidos: aquí se ofrece instalar la app (nunca con la lista vacía) */}
+              <BannerInstalarApp />
             </>
           )}
         </div>

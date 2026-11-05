@@ -32,6 +32,16 @@ export interface PasoSeguimiento {
   hora: string | null;
 }
 
+/** Estado del voucher del pago digital (solo estado y medio; sin imagen ni datos leídos). */
+export interface VoucherSeguimiento {
+  estado: 'SIN_VOUCHER' | 'EN_REVISION' | 'VERIFICADO' | 'RECHAZADO';
+  medio: string | null;
+  actualizadoEn: string | null;
+  motivo?: string;
+}
+
+export type EstadoVoucherSeguimiento = VoucherSeguimiento['estado'];
+
 export interface EstadoSeguimiento {
   codigo: string;
   estado: string;
@@ -45,6 +55,8 @@ export interface EstadoSeguimiento {
   progreso?: ProgresoPedido;
   /** Yape, Plin o transferencia: la pantalla pide la captura del pago. */
   pagoDigital?: boolean;
+  /** Estado del voucher: solo con pago digital (en efectivo no viene). */
+  voucher?: VoucherSeguimiento;
 }
 
 export type ResultadoLote = EstadoSeguimiento | { codigo: string; noEncontrado: true };

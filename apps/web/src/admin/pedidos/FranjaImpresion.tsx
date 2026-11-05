@@ -90,7 +90,7 @@ export function FranjaImpresion() {
           Gestionar cola
         </button>
         <Link
-          to="/admin/configuracion?tab=impresion"
+          to="/admin/configuracion?tab=impresion&seccion=equipos"
           style={{ ...estiloBoton, background: 'var(--cp-navy, #0B2C3E)', color: 'var(--cp-cream, #FBF4EC)', textDecoration: 'none' }}
         >
           Ver impresión

@@ -773,6 +773,99 @@ describe('OfertasService', () => {
     });
   });
 
+  describe('Bot de WhatsApp: solo promociones con la casilla «Vale también por WhatsApp»', () => {
+    const oferta = (canales: string[], extra: Record<string, unknown> = {}) => ({
+      id: 1n,
+      tipo: 'DESCUENTO',
+      nombre: '10% en toda la carta',
+      descuento_tipo: 'PORCENTAJE',
+      descuento_valor: new Prisma.Decimal(10),
+      alcance_categoria_id: null,
+      alcance_producto_id: null,
+      compra_minima: null,
+      dias: [],
+      hora_desde: null,
+      hora_hasta: null,
+      fecha_desde: null,
+      fecha_hasta: null,
+      canales,
+      limite_usos: null,
+      usos_actuales: 0,
+      activo: true,
+      solo_primera_compra: false,
+      ...extra,
+    });
+    const lineas = [{ productoId: 10n, categoriaId: 1n, cantidad: 2, subtotal: 30.0, precioUnitario: 15.0 }];
+
+    beforeEach(() => {
+      prismaMock.reglaAcumulacion.upsert.mockResolvedValue({ id: 1, cupon_con_descuento: false, promo_con_descuento: false });
+    });
+
+    it('promoción sin la casilla de WhatsApp: el bot no aplica descuento', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([oferta(['CARTA'])]);
+      const res = await service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'BOT' });
+      expect(res.descuentoTotal).toBe(0);
+      expect(res.ofertaId).toBeNull();
+      expect(res.detalles).toEqual([]);
+    });
+
+    it('promoción sin canales marcados no vale por WhatsApp', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([oferta([])]);
+      const res = await service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'WHATSAPP' });
+      expect(res.descuentoTotal).toBe(0);
+    });
+
+    it('promoción con la casilla de WhatsApp: el bot aplica el descuento del servidor', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([oferta(['BOT'])]);
+      const res = await service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'BOT' });
+      expect(res.descuentoTotal).toBe(3.0);
+      expect(res.ofertaId).toBe('1');
+      expect(res.detalles[0].nombre).toBe('10% en toda la carta');
+    });
+
+    it('el valor WHATSAPP del editor viejo también cuenta como casilla de bot', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([oferta(['WHATSAPP'])]);
+      const res = await service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'WHATSAPP' });
+      expect(res.descuentoTotal).toBe(3.0);
+    });
+
+    it('el mismo pedido por CARTA lleva el descuento de la promoción de carta', async () => {
+      prismaMock.oferta.findMany.mockResolvedValue([oferta(['CARTA'])]);
+      const res = await service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'CARTA' });
+      expect(res.descuentoTotal).toBe(3.0);
+    });
+
+    it('los cupones nunca se aplican por el bot', async () => {
+      await expect(
+        service.calcularDescuentosParaPedido({ subtotal: 30, lineas, canal: 'BOT', cuponCodigo: 'PROMO10' }),
+      ).rejects.toMatchObject({ response: { codigo: 'CUPON_NO_APLICA_CANAL' } });
+      expect(prismaMock.cupon.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('visible en la carta (diseñador)', () => {
+    const fila = (visible: boolean) => ({
+      id: 1n, tipo: 'DESCUENTO', nombre: 'Martes 2x1', descripcion: null, lleva: null, paga: null,
+      alcance_categoria_id: null, alcance_producto_id: null, descuento_tipo: 'PORCENTAJE', descuento_valor: 10,
+      compra_minima: null, dias: [], hora_desde: null, hora_hasta: null, fecha_desde: null, fecha_hasta: null,
+      canales: ['CARTA'], limite_usos: null, usos_actuales: 0, no_suma_beneficios: false, orden: 2, activo: true,
+      creado_en: new Date(), categoria: null, producto: null, imagen_archivo_id: null, imagen_archivo: null,
+      combosPrecio: [], combosParte: [], mostrar_en_saludo_bot: false, solo_primera_compra: false, visible_carta: visible,
+    });
+
+    it('ocultar en la carta cambia solo visible_carta: el descuento y activo no se tocan', async () => {
+      prismaMock.oferta.findUnique.mockResolvedValue(fila(false));
+      await service.actualizarOferta('1', { visibleCarta: false }, { partyId: 1n });
+      expect(prismaMock.oferta.update).toHaveBeenCalledWith({ where: { id: 1n }, data: { visible_carta: false } });
+    });
+
+    it('el saludo del bot no usa una promoción oculta en la carta', async () => {
+      prismaMock.oferta.findMany.mockResolvedValueOnce([]);
+      await service.promoParaSaludo(new Date('2026-12-12T15:00:00Z'));
+      expect(prismaMock.oferta.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ visible_carta: true }) }));
+    });
+  });
+
   describe('soporte de imagen en oferta', () => {
     it('mapea correctamente imagenArchivoId e imagenUrl si la oferta tiene archivo', async () => {
       prismaMock.oferta.findUnique.mockResolvedValueOnce({

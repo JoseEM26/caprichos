@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { repartosApi } from '../repartos/repartosApi';
-import type { NoEntregado, PreguntaNoEntregado, RespuestaNoEntregados } from './pedidosApi';
+import type { DevolucionRegistrada, NoEntregado, PreguntaNoEntregado, RegistroDevolucion, RespuestaNoEntregados } from './pedidosApi';
+import { ModalDevolucion } from './ModalDevolucion';
+import { PruebaEntregaFallida } from './PruebaEntregaFallida';
 
 export interface PanelNoEntregadosProps {
   datos: RespuestaNoEntregados | null;
@@ -9,7 +11,30 @@ export interface PanelNoEntregadosProps {
   error: string;
   /** Mismo permiso que la tarjeta de Repartos (repartos/liquidar): sin él no hay botón de reenvío. */
   puedeLiquidar: boolean;
+  /** Permiso de cambiar pedidos (pedidos/cambiar_estado): sin él no hay botón de devolución. */
+  puedeDevolver?: boolean;
   alActualizar: () => void;
+}
+
+const MEDIO_TEXTO: Record<string, string> = {
+  EFECTIVO: 'Efectivo',
+  YAPE: 'Yape',
+  PLIN: 'Plin',
+  TRANSFERENCIA: 'Transferencia',
+  TARJETA: 'Tarjeta',
+};
+
+function cuandoDevolvio(iso: string) {
+  const f = new Date(iso);
+  if (Number.isNaN(f.getTime())) return '';
+  return f.toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+/** «Devuelto S/ 25.00 · Yape · Marta · 04/11 15:00» (y quién autorizó, si fue otra persona). */
+function textoDevuelto(d: DevolucionRegistrada) {
+  const quien = d.porNombre ?? 'Sin nombre';
+  const autorizo = d.autorizadoPorNombre && d.autorizadoPorNombre !== d.porNombre ? `, autorizó ${d.autorizadoPorNombre}` : '';
+  return `Devuelto S/ ${d.montoDevuelto.toFixed(2)} · ${MEDIO_TEXTO[d.medio] ?? d.medio} · ${quien}${autorizo} · ${cuandoDevolvio(d.creadoEn)}`;
 }
 
 const TEXTO_PREGUNTA: Record<PreguntaNoEntregado, string> = {
@@ -50,10 +75,18 @@ const estiloBoton = {
   alignSelf: 'flex-start' as const,
 };
 
-export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, alActualizar }: PanelNoEntregadosProps) {
+export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, puedeDevolver = false, alActualizar }: PanelNoEntregadosProps) {
   const [confirmar, setConfirmar] = useState<NoEntregado | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
+  const [devolviendo, setDevolviendo] = useState<NoEntregado | null>(null);
+  const [avisoDevolucion, setAvisoDevolucion] = useState<string | null>(null);
+
+  const alDevolver = (resultado: RegistroDevolucion) => {
+    setDevolviendo(null);
+    setAvisoDevolucion(resultado.avisoComprobante);
+    alActualizar();
+  };
 
   const reenviar = async () => {
     if (!confirmar) return;
@@ -114,6 +147,8 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, alAct
           <div>{horaRetiro(p.retirado_en)}</div>
         </div>
 
+        <PruebaEntregaFallida prueba={p.prueba_entrega} />
+
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span
             data-testid={`pregunta-${p.codigo}`}
@@ -128,7 +163,22 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, alAct
           >
             {TEXTO_PREGUNTA[p.pregunta]}
           </span>
-          {p.revisar_devolucion && (
+          {p.devolucion && (
+            <span
+              data-testid={`devuelto-${p.codigo}`}
+              style={{
+                fontSize: 12,
+                fontWeight: 800,
+                borderRadius: 9999,
+                padding: '4px 12px',
+                background: 'var(--cp-greenbg, #DFF3E3)',
+                color: '#1F5C33',
+              }}
+            >
+              {textoDevuelto(p.devolucion)}
+            </span>
+          )}
+          {p.revisar_devolucion && !p.devolucion && (
             <span
               data-testid={`revisar-devolucion-${p.codigo}`}
               style={{
@@ -149,6 +199,17 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, alAct
           <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
             Aún no responde. Si dice que sí, aparece aquí el botón para reenviarlo.
           </div>
+        )}
+
+        {grupo === 'cancelados' && p.revisar_devolucion && !p.devolucion && puedeDevolver && (
+          <button
+            type="button"
+            data-testid={`devolver-${p.codigo}`}
+            style={estiloBoton}
+            onClick={() => setDevolviendo(p)}
+          >
+            Gestionar devolución
+          </button>
         )}
 
         {puedeReenviar && (
@@ -208,6 +269,11 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, alAct
           {errorAccion}
         </div>
       )}
+      {avisoDevolucion && (
+        <div role="status" data-testid="aviso-devolucion" style={{ fontSize: 14, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+          Devolución registrada. {avisoDevolucion}.
+        </div>
+      )}
       <div className="cj-ne-grupos">
         {grupo(
           'Por reprogramar',
@@ -224,6 +290,10 @@ export function PanelNoEntregados({ datos, cargando, error, puedeLiquidar, alAct
           'No hay cancelados por no recibir.',
         )}
       </div>
+
+      {devolviendo && (
+        <ModalDevolucion pedido={devolviendo} alCerrar={() => setDevolviendo(null)} alRegistrar={alDevolver} />
+      )}
 
       <Confirmar
         abierto={confirmar !== null}

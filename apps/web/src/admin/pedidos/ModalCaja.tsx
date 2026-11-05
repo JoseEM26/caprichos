@@ -11,7 +11,8 @@ import {
   PedidoPorCobrar,
 } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
-import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiquetas';
+import { SeccionEquipos } from '../impresion/SeccionEquipos';
+import { SeccionColaPruebas } from '../impresion/SeccionColaPruebas';
 import { ModalCoordinarPago } from './ModalCoordinarPago';
 
 export interface ModalCajaProps {
@@ -344,7 +345,7 @@ export function ModalCaja({
               fontSize: 13,
             }}
           >
-            Impresión de etiquetas
+            Impresión
           </button>
         </div>
 
@@ -794,10 +795,11 @@ export function ModalCaja({
           </div>
         )}
 
-        {/* PESTAÑA: IMPRESIÓN DE ETIQUETAS */}
+        {/* PESTAÑA: IMPRESIÓN (mismas secciones que Configuración > Impresión, para quien no ve Configuración) */}
         {pestana === 'impresion' && (
-          <div style={{ marginTop: 8 }}>
-            <TarjetaImpresionEtiquetas />
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <SeccionEquipos />
+            <SeccionColaPruebas />
           </div>
         )}
       </div>

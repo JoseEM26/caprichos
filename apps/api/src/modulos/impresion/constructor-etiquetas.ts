@@ -6,6 +6,7 @@ import {
   EtiquetaAreaLinea,
   EtiquetaBebidaDatos,
   TicketPagoDatos,
+  TicketComandaSalonDatos,
 } from '@caprichos/compartido';
 
 export const CRITERIO_BEBIDA_AREAS = ['BARRA', 'BEBIDAS', 'CAFETERIA', 'BAR'];
@@ -147,6 +148,7 @@ export function construirEtiquetaGeneral(pedido: any): EtiquetaGeneralDatos {
     cantidadProductos,
     productos: productosGeneral,
     nota: pedido.nota || null,
+    total: pedido.total != null ? Number(pedido.total) : null,
     printer: 'Etiquetera de caja',
   };
 }
@@ -282,6 +284,32 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
   });
 
   return bebidas;
+}
+
+/**
+ * Comanda de salón: TODAS las líneas del pedido (tamaño, opciones y notas), con mesa o cliente, hora y código.
+ * La imprime la ticketera de Caja al aceptarse el pedido; no se usa para llevar ni delivery (lo filtra la regla).
+ */
+export function construirTicketComandaSalon(pedido: any): TicketComandaSalonDatos {
+  const lineas: any[] = pedido.lineas || [];
+  const mesa = pedido.mesa_nombre ? String(pedido.mesa_nombre).trim() : null;
+  return {
+    tipo: 'TICKET_COMANDA_SALON',
+    codigo: pedido.codigo,
+    mesa: mesa || null,
+    cliente: (pedido.cliente_nombre || '').trim(),
+    canal: canalLabel(pedido.canal),
+    hora: formatearHora(pedido.creado_en),
+    fecha: formatearFecha(pedido.creado_en),
+    lineas: lineas.map((l) => ({
+      cantidad: Number(l.cantidad) || 1,
+      nombre: l.nombre,
+      tamano: l.tamano || null,
+      opciones: (l.opcionesElegidas || l.opciones || []).map((o: any) => o.opcion_nombre || o.nombre || '').filter(Boolean),
+      nota: l.nota || null,
+    })),
+    nota: pedido.nota || null,
+  };
 }
 
 export function construirTodasLasEtiquetas(pedido: any) {

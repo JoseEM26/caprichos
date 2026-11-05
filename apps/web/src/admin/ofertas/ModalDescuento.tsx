@@ -1,5 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
+import { CasillaBot, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -15,12 +16,6 @@ const DIAS = [
   ['dom', 'Domingo', 'Dom'],
 ];
 
-const CANALES = [
-  { clave: 'todos', nombre: 'Todos los canales' },
-  { clave: 'carta', nombre: 'Solo carta web' },
-  { clave: 'local', nombre: 'Solo en el local' },
-  { clave: 'whatsapp', nombre: 'Solo WhatsApp' },
-];
 
 const CATEGORIAS_DEF = [
   'Combos',
@@ -60,6 +55,10 @@ export function ModalDescuento({
 
   // Paso 1: Nombre, foto y a qué aplica
   const [nombre, setNombre] = useState('');
+  // Sin tildes ni mayúsculas: "Envío", "envio", "DELIVERY" cuentan igual
+  const pareceDelivery = /delivery|envio|reparto/.test(
+    nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(),
+  );
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [fotoArchivoId, setFotoArchivoId] = useState<string | null>(null);
   const subidaFoto = useSubidaArchivo();
@@ -77,6 +76,7 @@ export function ModalDescuento({
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
+  const [valeBot, setValeBot] = useState(false);
   const [mostrarEnSaludo, setMostrarEnSaludo] = useState(false);
   const [soloPrimeraCompra, setSoloPrimeraCompra] = useState(false);
   const [minima, setMinima] = useState('');
@@ -133,7 +133,7 @@ export function ModalDescuento({
       const fHasta = descuentoAEditar.fechaHasta || descuentoAEditar.fechaFin;
       setFechaDesde(fDesde ? fDesde.slice(0, 10) : '');
       setFechaHasta(fHasta ? fHasta.slice(0, 10) : '');
-      setCanal(descuentoAEditar.canales && descuentoAEditar.canales[0] ? descuentoAEditar.canales[0].toLowerCase() : 'todos');
+      { const sel = selectorDesdeCanales(descuentoAEditar.canales); setCanal(sel.canal); setValeBot(sel.valeBot); }
       setMostrarEnSaludo(Boolean(descuentoAEditar.mostrarEnSaludoBot));
       setSoloPrimeraCompra(Boolean(descuentoAEditar.soloPrimeraCompra));
       setPaso(1);
@@ -156,6 +156,7 @@ export function ModalDescuento({
       setFechaDesde('');
       setFechaHasta('');
       setCanal('todos');
+      setValeBot(false);
       setMostrarEnSaludo(false);
       setSoloPrimeraCompra(false);
       setPaso(1);
@@ -489,7 +490,7 @@ export function ModalDescuento({
         fechaHasta: fechaHasta || undefined,
         fechaFin: fechaHasta || undefined,
         // La primera compra solo se canjea en la carta web
-        canales: soloPrimeraCompra ? ['CARTA'] : canal === 'todos' ? ['CARTA', 'ADMIN', 'BOT'] : [canal.toUpperCase()],
+        canales: soloPrimeraCompra ? ['CARTA'] : canalesDesdeSelector(canal, valeBot),
         mostrarEnSaludoBot: mostrarEnSaludo,
         soloPrimeraCompra,
         imagenArchivoId: fotoArchivoId,
@@ -523,7 +524,7 @@ export function ModalDescuento({
     horaHasta: horaHasta || null,
     fechaDesde: fechaDesde || null,
     fechaHasta: fechaHasta || null,
-    canales: canal === 'todos' ? ['CARTA', 'ADMIN', 'BOT'] : [canal.toUpperCase()],
+    canales: canalesDesdeSelector(canal, valeBot),
     activo: true,
   };
 
@@ -682,6 +683,24 @@ export function ModalDescuento({
           })}
         </nav>
 
+        {/* Aviso fijo: este formulario rebaja productos, no el envío */}
+        <div
+          role="note"
+          data-testid="aviso-descuento-productos"
+          style={{
+            backgroundColor: 'var(--cp-sand)',
+            border: '1.5px solid var(--cp-navy)',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            color: 'var(--cp-navy)',
+            fontWeight: 700,
+            fontSize: '13px',
+            lineHeight: '18px',
+          }}
+        >
+          Este descuento rebaja el precio de los productos. Si quieres delivery gratis, no uses este formulario: usa «+ Envío gratis».
+        </div>
+
         {/* Error de validación */}
         {mensajeError && (
           <div
@@ -743,6 +762,15 @@ export function ModalDescuento({
                   fontSize: '14px',
                 }}
               />
+              {pareceDelivery && (
+                <div
+                  role="note"
+                  data-testid="advertencia-delivery"
+                  style={{ marginTop: '6px', color: 'var(--cp-rust)', fontWeight: 700, fontSize: '13px', lineHeight: '18px' }}
+                >
+                  Parece una promoción de delivery. Este formulario descuenta productos; para envío gratis usa «+ Envío gratis».
+                </div>
+              )}
             </div>
 
             {/* Foto opcional */}
@@ -1113,12 +1141,13 @@ export function ModalDescuento({
                   onChange={(e) => setCanal(e.target.value)}
                   style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
                 >
-                  {CANALES.map((c) => (
+                  {opcionesCanal(canal).map((c) => (
                     <option key={c.clave} value={c.clave}>
                       {c.nombre}
                     </option>
                   ))}
                 </select>
+                  <CasillaBot id="desc-canal-bot" checked={valeBot} onChange={setValeBot} bloqueada={canal === 'solo-bot'} />
               </div>
               <div style={{ flex: 1, minWidth: '180px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>

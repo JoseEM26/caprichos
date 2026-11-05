@@ -39,10 +39,17 @@ import {
   pedidosRepartoDelDia,
 } from '../caja/caja.calculo';
 import { ArqueoDto } from './dto/arqueo.dto';
+import { AjusteMedioDto } from './dto/ajuste-medio.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { LiquidarRepartidorDto } from './dto/liquidar.dto';
 import { HistorialCierresDto } from './dto/historial.dto';
-import { calcularTotalConteo } from './cierre.util';
+import {
+  ClaveDigitalCierre,
+  calcularTotalConteo,
+  rangoDiaCaja,
+  sumarDevolucionesDigitales,
+} from './cierre.util';
+import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-pedido.util';
 
 /**
  * Arqueos que NO cuadraron antes de exigir PIN de supervisor. Un arqueo que cuadra no suma.
@@ -73,6 +80,56 @@ function compararConSistema(
     difTarjeta: enPesos(difTarjeta),
   };
 }
+
+/** Medios digitales: el cajero no los teclea; su monto sale del sistema o del último ajuste aprobado. */
+const CLAVE_DIGITAL = { YAPE: 'yape', PLIN: 'plin', TRANSFERENCIA: 'transferencia', TARJETA: 'tarjeta' } as const;
+type ClaveDigital = (typeof CLAVE_DIGITAL)[keyof typeof CLAVE_DIGITAL];
+type MedioDigital = keyof typeof CLAVE_DIGITAL;
+const MEDIOS_DIGITALES = Object.keys(CLAVE_DIGITAL) as MedioDigital[];
+
+type AjusteMedioFila = {
+  id: bigint;
+  medio: string;
+  monto_sistema: unknown;
+  monto_anterior: unknown;
+  monto_nuevo: unknown;
+  motivo: string;
+  por_party_id: bigint;
+  autorizado_por_party_id: bigint;
+  creado_en: Date;
+};
+
+/** Lo que suma el sistema para cada medio digital, en la forma del DTO. */
+function digitalesDelSistema(montos: MontosSistema): Record<ClaveDigital, number> {
+  return {
+    yape: montos.sistemaYape,
+    plin: montos.sistemaPlin,
+    transferencia: montos.sistemaTransferencia,
+    tarjeta: montos.sistemaTarjeta,
+  };
+}
+
+/** Monto que vale cada medio digital: el del sistema, o el del último ajuste aprobado de ese medio. */
+function digitalesAceptados(
+  montos: MontosSistema,
+  ajustes: Map<string, AjusteMedioFila>,
+): Record<ClaveDigital, number> {
+  const aceptados = digitalesDelSistema(montos);
+  for (const medio of MEDIOS_DIGITALES) {
+    const ajuste = ajustes.get(medio);
+    if (ajuste) aceptados[CLAVE_DIGITAL[medio]] = Number(ajuste.monto_nuevo);
+  }
+  return aceptados;
+}
+
+/**
+ * Montos del cierre: el cobrado por el sistema y, en digitales, ya descontadas las devoluciones del día.
+ * `sistemaYape`… son el esperado neto; `digitalesCobrados`/`digitalesDevueltos` son el desglose en pantalla.
+ */
+type MontosCierre = MontosSistema & {
+  digitalesCobrados: Record<ClaveDigitalCierre, number>;
+  digitalesDevueltos: Record<ClaveDigitalCierre, number>;
+};
 
 function exigirAdmin(usuario: UsuarioAutenticado | undefined, mensaje: string) {
   if (usuario?.rol !== 'ADMIN') {
@@ -145,16 +202,50 @@ export class CierreService {
   }
 
   /**
+   * Montos del cierre de una caja: lo cobrado por medio (caja.calculo.ts) menos las devoluciones digitales
+   * (Yape, Plin, transferencia, tarjeta) hechas el día de Lima de la caja. Las de efectivo no se tocan:
+   * ya entran como egreso en calcularMontosCaja.
+   */
+  private async montosCierre(
+    cliente: ClienteCaja & Pick<Prisma.TransactionClient, 'devolucionPedido'>,
+    caja: { id: bigint; fecha: Date; apertura: unknown },
+  ): Promise<MontosCierre> {
+    const montos = await calcularMontosCaja(cliente, caja);
+    const { inicio, fin } = rangoDiaCaja(caja.fecha);
+    const filas = await cliente.devolucionPedido.findMany({
+      where: { creado_en: { gte: inicio, lt: fin } },
+      select: { medio: true, monto_devuelto: true, creado_en: true },
+    });
+    const devueltos = sumarDevolucionesDigitales(filas, inicio, fin);
+    const cobrados = {
+      yape: montos.sistemaYape,
+      plin: montos.sistemaPlin,
+      transferencia: montos.sistemaTransferencia,
+      tarjeta: montos.sistemaTarjeta,
+    };
+    const neto = (clave: ClaveDigitalCierre) => enPesos(aCentimos(cobrados[clave]) - aCentimos(devueltos[clave]));
+    return {
+      ...montos,
+      sistemaYape: neto('yape'),
+      sistemaPlin: neto('plin'),
+      sistemaTransferencia: neto('transferencia'),
+      sistemaTarjeta: neto('tarjeta'),
+      digitalesCobrados: cobrados,
+      digitalesDevueltos: devueltos,
+    };
+  }
+
+  /**
    * Calcula los montos esperados por el sistema para una caja dada (ver caja.calculo.ts).
    */
-  async calcularMontosSistema(cajaId: bigint): Promise<MontosSistema> {
+  async calcularMontosSistema(cajaId: bigint): Promise<MontosCierre> {
     const caja = await this.prisma.caja.findUnique({
       where: { id: cajaId },
     });
     if (!caja) {
       throw new NotFoundException('Caja no encontrada');
     }
-    return calcularMontosCaja(this.prisma, caja);
+    return this.montosCierre(this.prisma, caja);
   }
 
   /**
@@ -197,6 +288,218 @@ export class CierreService {
     );
   }
 
+  /** Último ajuste aprobado de cada medio en la caja (el que vale). */
+  private async ajustesVigentes(cliente: Pick<Prisma.TransactionClient, 'cierreAjusteMedio'>, cajaId: bigint) {
+    const filas: AjusteMedioFila[] = await cliente.cierreAjusteMedio.findMany({
+      where: { caja_id: cajaId },
+      orderBy: { id: 'asc' },
+    });
+    const ultimo = new Map<string, AjusteMedioFila>();
+    for (const f of filas) ultimo.set(f.medio, f);
+    return ultimo;
+  }
+
+  /** Cuántos cobros vigentes de la caja llevan un pago en cada medio digital. */
+  private async cobrosPorMedio(cajaId: bigint): Promise<Record<ClaveDigital, number>> {
+    const cobros = await this.prisma.cobro.findMany({
+      where: { caja_id: cajaId, anulado_en: null },
+      include: { pagos: true },
+    });
+    const cuenta: Record<ClaveDigital, number> = { yape: 0, plin: 0, transferencia: 0, tarjeta: 0 };
+    for (const c of cobros) {
+      const medios = new Set(c.pagos.map((p) => (p.medio || '').trim().toUpperCase()));
+      for (const m of MEDIOS_DIGITALES) {
+        if (medios.has(m)) cuenta[CLAVE_DIGITAL[m]] += 1;
+      }
+    }
+    return cuenta;
+  }
+
+  /**
+   * Los 4 montos digitales de la caja abierta (de cualquier día) para el cajero. NUNCA efectivo,
+   * esperado ni diferencias: el cierre ciego del efectivo se mantiene (DT-61).
+   */
+  async obtenerDigitales() {
+    const caja = await this.obtenerCajaAbierta();
+    const montos = await this.montosCierre(this.prisma, caja);
+    const ajustes = await this.ajustesVigentes(this.prisma, caja.id);
+    const aceptados = digitalesAceptados(montos, ajustes);
+    const delSistema = digitalesDelSistema(montos);
+    const cobros = await this.cobrosPorMedio(caja.id);
+    return {
+      cajaId: Number(caja.id),
+      fecha: caja.fecha,
+      medios: Object.fromEntries(
+        MEDIOS_DIGITALES.map((m) => {
+          const clave = CLAVE_DIGITAL[m];
+          const devuelto = montos.digitalesDevueltos[clave];
+          return [
+            clave,
+            {
+              monto: aceptados[clave],
+              // sistema = esperado digital: cobrado menos devoluciones del día (negativo en pantalla)
+              sistema: delSistema[clave],
+              cobrado: montos.digitalesCobrados[clave],
+              devuelto: devuelto === 0 ? 0 : -devuelto,
+              cobros: cobros[clave],
+              corregido: ajustes.has(m),
+            },
+          ];
+        }),
+      ),
+    };
+  }
+
+  /**
+   * Devoluciones de pedidos del día de Lima de la caja abierta. Las digitales ya se descuentan del
+   * esperado digital (montosCierre); las de efectivo salen como egreso de caja.
+   */
+  async listarDevolucionesTurno() {
+    const caja = await this.obtenerCajaAbierta();
+    const { inicio, fin } = rangoDiaCaja(caja.fecha);
+    const filas = await this.prisma.devolucionPedido.findMany({
+      where: { creado_en: { gte: inicio, lt: fin } },
+      include: { pedido: { select: { codigo: true } } },
+      orderBy: { id: 'asc' },
+    });
+    const nombres = await nombresDePartes(
+      this.prisma,
+      filas.flatMap((f) => [f.por_party_id, f.autorizado_por_party_id]),
+    );
+    return filas.map((f) => ({
+      ...salidaDevolucion(f, nombres),
+      pedidoCodigo: f.pedido.codigo,
+      codigoOperacion: f.codigo_operacion,
+    }));
+  }
+
+  /** Correcciones de montos digitales de la caja abierta, en orden de registro. */
+  async listarAjustesMedio() {
+    const caja = await this.obtenerCajaAbierta();
+    const filas = await this.prisma.cierreAjusteMedio.findMany({
+      where: { caja_id: caja.id },
+      orderBy: { id: 'asc' },
+    });
+    return this.mapearAjustes(filas);
+  }
+
+  /** Forma de salida de los ajustes: nombres de quien lo hizo y de quien lo autorizó, no IDs. */
+  private async mapearAjustes(filas: AjusteMedioFila[]) {
+    const nombres = await this.nombresDePartes(
+      filas.flatMap((f) => [f.por_party_id, f.autorizado_por_party_id]),
+    );
+    return filas.map((f) => ({
+      id: Number(f.id),
+      medio: f.medio,
+      montoSistema: Number(f.monto_sistema),
+      montoAnterior: Number(f.monto_anterior),
+      montoNuevo: Number(f.monto_nuevo),
+      motivo: f.motivo,
+      porNombre: nombres.get(String(f.por_party_id)) ?? null,
+      autorizadoPorNombre: nombres.get(String(f.autorizado_por_party_id)) ?? null,
+      creadoEn: f.creado_en,
+    }));
+  }
+
+  /**
+   * Corrige el monto de un medio digital de la caja abierta. Excepción, no camino normal: lo hace el
+   * ADMIN o el SUPERVISOR sin código (queda auditado a su nombre); el cajero necesita el código de supervisor.
+   * Solo se inserta un registro; el valor corregido es el que usa el arqueo y el cierre.
+   */
+  async registrarAjusteMedio(
+    dto: AjusteMedioDto,
+    usuario: UsuarioAutenticado,
+    pinSupervisor?: string,
+    ip?: string,
+  ) {
+    const motivo = (dto.motivo ?? '').trim();
+    if (motivo.length < 10) {
+      throw new HttpException(
+        { codigo: 'MOTIVO_REQUERIDO', mensaje: 'Escribe el motivo del cambio (al menos 10 caracteres).' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (!esCentimosValidos(dto.montoNuevo)) {
+      throw new HttpException(
+        { codigo: 'MONTO_INVALIDO', mensaje: 'El monto admite como máximo dos decimales.' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const cajaAbierta = await this.obtenerCajaAbierta();
+    const clave = CLAVE_DIGITAL[dto.medio];
+
+    const { fila, supervisorPartyId } = await this.prisma.$transaction(async (tx) => {
+      const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
+
+      if (!pinSupervisor && !(await esOperadorSinCodigo(this.prisma, usuario.partyId))) {
+        throw new HttpException(
+          {
+            codigo: 'PIN_REQUERIDO',
+            mensaje: 'Corregir un monto digital requiere el código de supervisor.',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
+      const supervisor = await this.verificarPinSupervisor(
+        pinSupervisor,
+        usuario.partyId,
+        ip,
+        caja.id,
+        tx,
+        'cierre/ajustar_medio',
+      );
+      const autorizadoPor = supervisor.party_id ?? usuario.partyId;
+
+      const montos = await this.montosCierre(tx, caja);
+      const ajustes = await this.ajustesVigentes(tx, caja.id);
+      const anterior = digitalesAceptados(montos, ajustes)[clave];
+      if (aCentimos(anterior) === aCentimos(dto.montoNuevo)) {
+        throw new HttpException(
+          { codigo: 'AJUSTE_SIN_CAMBIO', mensaje: 'El monto nuevo es igual al que ya vale en el cierre.' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const creada = await tx.cierreAjusteMedio.create({
+        data: {
+          caja_id: caja.id,
+          medio: dto.medio,
+          monto_sistema: digitalesDelSistema(montos)[clave],
+          monto_anterior: anterior,
+          monto_nuevo: enPesos(aCentimos(dto.montoNuevo)),
+          motivo,
+          por_party_id: usuario.partyId,
+          autorizado_por_party_id: autorizadoPor,
+        },
+      });
+      return { fila: creada, supervisorPartyId: autorizadoPor };
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'cierre',
+      accion: 'AJUSTE_MEDIO_DIGITAL',
+      resultado: 'OK',
+      entidad: 'cierre_ajuste_medio',
+      entidadId: fila.id,
+      antes: { medio: dto.medio, monto: Number(fila.monto_anterior) },
+      despues: {
+        medio: dto.medio,
+        montoSistema: Number(fila.monto_sistema),
+        montoNuevo: Number(fila.monto_nuevo),
+        motivo,
+        autorizadoPor: String(supervisorPartyId),
+      },
+      motivo,
+      partyId: usuario.partyId,
+      ip,
+    });
+
+    const [salida] = await this.mapearAjustes([fila]);
+    return salida;
+  }
+
   /**
    * Arqueo ciego: registra el conteo físico por denominación y medios digitales.
    * La respuesta NUNCA entrega los montos esperados ni las diferencias (DT-61).
@@ -237,7 +540,7 @@ export class CierreService {
         await this.verificarPinSupervisor(pinSupervisor, usuario.partyId, ip, caja.id, tx);
       }
 
-      const montos = await calcularMontosCaja(tx, caja);
+      const montos = await this.montosCierre(tx, caja);
       const comparacion = compararConSistema(
         {
           efectivo: calcularTotalConteo(dto.conteo),
@@ -357,13 +660,29 @@ export class CierreService {
         medios = medios ?? (conteosCaja[0].medios as any);
       }
 
-      const montos = await calcularMontosCaja(tx, caja);
+      const montos = await this.montosCierre(tx, caja);
+      // Digitales: el valor es el del sistema o el del último ajuste aprobado (nunca lo que teclee el navegador).
+      // Si el navegador manda un monto distinto de ese, se rechaza: la corrección pasa por «Corregir» con motivo.
+      const aceptados = digitalesAceptados(montos, await this.ajustesVigentes(tx, caja.id));
+      for (const m of MEDIOS_DIGITALES) {
+        const clave = CLAVE_DIGITAL[m];
+        const enviado = dto.medios?.[clave];
+        if (enviado !== undefined && enviado !== null && aCentimos(enviado) !== aCentimos(aceptados[clave])) {
+          throw new HttpException(
+            {
+              codigo: 'AJUSTE_REQUERIDO',
+              mensaje: `El monto de ${m.charAt(0)}${m.slice(1).toLowerCase()} no coincide con el sistema ni con una corrección aprobada. Corrígelo con «Corregir» (con motivo) antes de cerrar.`,
+            },
+            HttpStatus.CONFLICT,
+          );
+        }
+      }
       const vistos = {
         efectivo: calcularTotalConteo(conteo),
-        yape: Number(medios?.yape ?? 0),
-        plin: Number(medios?.plin ?? 0),
-        transferencia: Number(medios?.transferencia ?? 0),
-        tarjeta: Number(medios?.tarjeta ?? 0),
+        yape: aceptados.yape,
+        plin: aceptados.plin,
+        transferencia: aceptados.transferencia,
+        tarjeta: aceptados.tarjeta,
       };
       const comparacion = compararConSistema(vistos, montos);
       const { resultado, cuadra } = comparacion;
@@ -644,6 +963,11 @@ export class CierreService {
       );
     }
 
+    const ajustes = await this.prisma.cierreAjusteMedio.findMany({
+      where: { caja_id: cierre.caja_id },
+      orderBy: { id: 'asc' },
+    });
+
     return {
       cajaId: Number(cierre.caja_id),
       fecha: cierre.caja.fecha,
@@ -663,6 +987,7 @@ export class CierreService {
         visto: Number(m.visto),
         diferencia: m.diferencia !== null ? Number(m.diferencia) : null,
       })),
+      ajustesMedio: await this.mapearAjustes(ajustes),
     };
   }
 

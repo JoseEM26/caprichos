@@ -1,10 +1,11 @@
+import { rolDeTrabajo } from '@caprichos/compartido';
 import type { EstadoImpresora, ImpresoraReportada, RolImpresora, TrabajoImpresion } from '@caprichos/compartido';
 import type { ConfiguracionAgente } from '../config';
 import type { IClienteApiImpresion } from '../api/clienteApi';
 import type { IDispositivoImpresora } from '../impresora/dispositivo.interface';
 import { ErrorImpresora } from '../impresora/dispositivo.interface';
 import { generarBytesTrabajo } from '../tspl/generadorTspl';
-import { generarTicketEscPos } from '../escpos/generadorTicket';
+import { generarTicketEscPos, generarComandaSalonEscPos } from '../escpos/generadorTicket';
 
 export interface OpcionesAgenteLocalServicio {
   config: ConfiguracionAgente;
@@ -166,7 +167,7 @@ export class AgenteLocalServicio {
     );
 
     try {
-      const rol: RolImpresora = trabajo.tipo === 'TICKET_PAGO' ? 'TICKETERA' : 'ETIQUETERA';
+      const rol: RolImpresora = rolDeTrabajo(trabajo.tipo);
       const dispositivo = this.impresoras[rol];
       if (!dispositivo) {
         throw new ErrorImpresora(`La ${rol.toLowerCase()} no está configurada en este equipo`, 'desconectada');
@@ -174,7 +175,9 @@ export class AgenteLocalServicio {
       const bytes =
         trabajo.tipo === 'TICKET_PAGO'
           ? generarTicketEscPos(trabajo.payload as any, this.config.ticketColumnas)
-          : generarBytesTrabajo(trabajo.tipo, trabajo.payload as any, trabajo.copia, this.config.etiqueta);
+          : trabajo.tipo === 'TICKET_COMANDA_SALON'
+            ? generarComandaSalonEscPos(trabajo.payload as any, this.config.ticketColumnas)
+            : generarBytesTrabajo(trabajo.tipo, trabajo.payload as any, trabajo.copia, this.config.etiqueta);
       await dispositivo.escribir(bytes);
 
       if (rol === 'ETIQUETERA') {
@@ -189,7 +192,7 @@ export class AgenteLocalServicio {
       const mensajeError = err.message || 'Error desconocido al imprimir';
 
       // Una máquina que falla deja de tomar trabajos hasta que el próximo latido la vea lista
-      const rolFallido: RolImpresora = trabajo.tipo === 'TICKET_PAGO' ? 'TICKETERA' : 'ETIQUETERA';
+      const rolFallido: RolImpresora = rolDeTrabajo(trabajo.tipo);
       this.rolesListos = this.rolesListos.filter((r) => r !== rolFallido);
       if (err instanceof ErrorImpresora) {
         this.estadoImpresora = err.estado;

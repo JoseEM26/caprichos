@@ -130,6 +130,9 @@ export function estaVigente(
 ): boolean {
   if (!oferta.activo) return false;
 
+  // El bot de WhatsApp es el canal BOT (o WHATSAPP); «TODOS» no lo incluye: solo cuenta la casilla explícita
+  const canalBot = canal && ['BOT', 'WHATSAPP'].includes(canal.toUpperCase());
+
   if (
     oferta.limite_usos !== null &&
     oferta.limite_usos !== undefined &&
@@ -142,11 +145,19 @@ export function estaVigente(
 
   // Validar canal
   if (canal && oferta.canales && oferta.canales.length > 0) {
-    const canalNorm = canal.toUpperCase();
     const canalesNorm = oferta.canales.map((c) => c.toUpperCase());
-    if (!canalesNorm.includes(canalNorm) && !canalesNorm.includes('TODOS')) {
-      return false;
+    if (canalBot) {
+      // «WHATSAPP» es el valor que guardaba el editor viejo para «Solo WhatsApp»: sigue valiendo como BOT
+      if (!canalesNorm.includes('BOT') && !canalesNorm.includes('WHATSAPP')) return false;
+    } else {
+      const canalNorm = canal.toUpperCase();
+      if (!canalesNorm.includes(canalNorm) && !canalesNorm.includes('TODOS')) {
+        return false;
+      }
     }
+  } else if (canalBot) {
+    // Bot: sin canales marcados la promoción no vale por WhatsApp (solo cuenta la casilla explícita)
+    return false;
   }
 
   // Validar días de la semana

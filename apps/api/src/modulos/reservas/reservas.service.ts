@@ -229,13 +229,7 @@ export class ReservasService {
     ip?: string,
     ahora: Date = new Date(),
   ) {
-    const fechaHora = new Date(dto.hora);
-    if (isNaN(fechaHora.getTime())) {
-      throw new BadRequestException({
-        codigo: 'FORMATO_INVALIDO',
-        mensaje: 'La hora de la reserva no es válida',
-      });
-    }
+    const fechaHora = this.parsearHora(dto.hora);
 
     if (fechaHora.getTime() <= ahora.getTime()) {
       throw new BadRequestException({
@@ -244,23 +238,62 @@ export class ReservasService {
       });
     }
 
-    await this.validarHorarioAtencion(fechaHora);
-
     const mesaIds = dto.mesas.map((id) => BigInt(id));
-    await this.validarMesasYAsientos(mesaIds, dto.personas);
+    await this.validarNuevaReserva(fechaHora, mesaIds, dto.personas);
 
-    const toleranciaMin = await this.obtenerToleranciaMin();
+    const reserva = await this.insertarReserva(this.prisma, {
+      nombre: dto.nombre,
+      telefono: dto.telefono,
+      personas: dto.personas,
+      fechaHora,
+      mesaIds,
+      toleranciaMin: await this.obtenerToleranciaMin(),
+    });
 
-    const reserva = await this.prisma.reserva.create({
+    await this.registrarReservaCreada(reserva, mesaIds, usuario, ip);
+
+    return this.serializarReserva(reserva);
+  }
+
+  private parsearHora(hora: string): Date {
+    const fechaHora = new Date(hora);
+    if (isNaN(fechaHora.getTime())) {
+      throw new BadRequestException({
+        codigo: 'FORMATO_INVALIDO',
+        mensaje: 'La hora de la reserva no es válida',
+      });
+    }
+    return fechaHora;
+  }
+
+  /** Horario de atención y mesas/asientos de una reserva nueva. No escribe nada. */
+  private async validarNuevaReserva(fechaHora: Date, mesaIds: bigint[], personas: number) {
+    await this.validarHorarioAtencion(fechaHora);
+    await this.validarMesasYAsientos(mesaIds, personas);
+  }
+
+  /** Inserta la reserva con sus mesas. Recibe el cliente para correr dentro de una transacción. */
+  private insertarReserva(
+    cliente: Pick<PrismaService, 'reserva'>,
+    datos: {
+      nombre: string;
+      telefono: string;
+      personas: number;
+      fechaHora: Date;
+      mesaIds: bigint[];
+      toleranciaMin: number;
+    },
+  ) {
+    return cliente.reserva.create({
       data: {
-        nombre: dto.nombre.trim(),
-        telefono: dto.telefono.trim(),
-        personas: dto.personas,
-        hora: fechaHora,
-        tolerancia_min: toleranciaMin,
+        nombre: datos.nombre.trim(),
+        telefono: datos.telefono.trim(),
+        personas: datos.personas,
+        hora: datos.fechaHora,
+        tolerancia_min: datos.toleranciaMin,
         estado: 'ACTIVA',
         mesas: {
-          create: mesaIds.map((mesaId) => ({
+          create: datos.mesaIds.map((mesaId) => ({
             mesa_id: mesaId,
           })),
         },
@@ -273,7 +306,14 @@ export class ReservasService {
         },
       },
     });
+  }
 
+  private async registrarReservaCreada(
+    reserva: { id: bigint; nombre: string; telefono: string; personas: number; hora: Date; tolerancia_min: number; estado: string },
+    mesaIds: bigint[],
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'reservas',
@@ -299,8 +339,6 @@ export class ReservasService {
       tipo: 'CREADA',
       reserva: this.serializarReserva(reserva),
     });
-
-    return this.serializarReserva(reserva);
   }
 
   /**
@@ -1000,38 +1038,52 @@ export class ReservasService {
     const nombre = dto.nombre?.trim() || solicitud.nombre?.trim() || solicitud.conversacion?.nombre_contacto?.trim() || 'Cliente';
     const telefono = dto.telefono?.trim() || solicitud.telefono?.trim() || solicitud.conversacion?.telefono?.trim() || '';
     const personas = dto.personas ?? solicitud.personas ?? 2;
-    const horaIso = dto.hora || (solicitud.hora ? solicitud.hora.toISOString() : new Date().toISOString());
+    const horaEfectiva = dto.hora || (solicitud.hora ? solicitud.hora.toISOString() : new Date().toISOString());
+    const fechaHora = this.parsearHora(horaEfectiva);
 
-    // 1. Reutiliza ReservasService.crear
-    const reserva = await this.crear(
-      {
+    if (fechaHora.getTime() <= Date.now()) {
+      throw new BadRequestException({
+        codigo: 'HORA_PASADA',
+        mensaje: 'La hora solicitada ya pasó. Elige una hora nueva para aprobar la reserva.',
+      });
+    }
+
+    // Todas las validaciones antes de escribir: si fallan, la solicitud sigue PENDIENTE.
+    const mesaIds = dto.mesas.map((id) => BigInt(id));
+    await this.validarNuevaReserva(fechaHora, mesaIds, personas);
+    const toleranciaMin = await this.obtenerToleranciaMin();
+
+    // Reserva, solicitud y aviso al cliente en una sola transacción: no queda reserva huérfana
+    // si algo falla, y reintentar no crea una segunda reserva.
+    const { solicitudActualizada, reserva } = await this.prisma.$transaction(async (tx) => {
+      const reservaCreada = await this.insertarReserva(tx, {
         nombre,
         telefono,
         personas,
-        hora: horaIso,
-        mesas: dto.mesas,
-      },
-      usuario,
-      ip,
-    );
-
-    // 2. Actualizar solicitud
-    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
-      const actualizada = await tx.solicitudReserva.update({
-        where: { id: sId },
-        data: {
-          estado: 'APROBADA',
-          reserva_id: BigInt(reserva.id),
-        },
-        include: { conversacion: true },
+        fechaHora,
+        mesaIds,
+        toleranciaMin,
       });
+      // Solo transiciona si sigue PENDIENTE: dos aprobaciones seguidas no crean dos reservas.
+      // Si no es 1, el throw deshace también la reserva creada arriba.
+      const { count } = await tx.solicitudReserva.updateMany({
+        where: { id: sId, estado: 'PENDIENTE' },
+        data: { estado: 'APROBADA', reserva_id: reservaCreada.id },
+      });
+      if (count !== 1) {
+        throw new BadRequestException({
+          codigo: 'SOLICITUD_NO_PENDIENTE',
+          mensaje: 'La solicitud ya fue atendida por otra persona. Actualiza la pantalla.',
+        });
+      }
+      const actualizada = { ...solicitud, estado: 'APROBADA', reserva_id: reservaCreada.id };
       // Mensaje al cliente: se encola en la misma transacción que la solicitud (outbox)
-      const { fechaIso: fechaLima, horaMinutos: horaLima } = obtenerFechaHoraLima(new Date(horaIso));
+      const { fechaIso: fechaLima, horaMinutos: horaLima } = obtenerFechaHoraLima(fechaHora);
       const msgConfirmacion = TEXTOS_RESERVA.reservaConfirmadaCliente({
         personas,
         fechaTexto: fechaLima,
         hora: horaLima,
-        toleranciaMin: reserva.tolerancia_min || 15,
+        toleranciaMin: reservaCreada.tolerancia_min || 15,
       });
 
       if (this.outbox && telefono) {
@@ -1050,11 +1102,13 @@ export class ReservasService {
           },
         }, tx);
       }
-      return actualizada;
+      return { solicitudActualizada: actualizada, reserva: reservaCreada };
     });
     this.outbox?.despertar();
 
-    // 3. Auditoría
+    await this.registrarReservaCreada(reserva, mesaIds, usuario, ip);
+
+    // Auditoría
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'reservas',
@@ -1064,24 +1118,23 @@ export class ReservasService {
       entidadId: sId,
       despues: {
         solicitudId: sId.toString(),
-        reservaId: reserva.id,
+        reservaId: reserva.id.toString(),
         mesas: dto.mesas,
       },
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
     });
 
-    // 4. Socket
+    // Socket
     this.eventosGateway?.emitirAdmin?.('reserva:solicitud_cambio', {
       tipo: 'APROBADA',
       solicitudId: sId.toString(),
-      reservaId: reserva.id,
+      reservaId: reserva.id.toString(),
     });
-
 
     return {
       solicitud: this.serializarSolicitud(solicitudActualizada),
-      reserva,
+      reserva: this.serializarReserva(reserva),
     };
   }
 
@@ -1125,14 +1178,22 @@ export class ReservasService {
     const nombre = solicitud.nombre || solicitud.conversacion?.nombre_contacto || 'Cliente';
     const telefono = solicitud.telefono || solicitud.conversacion?.telefono || '';
     const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
-      const actualizada = await tx.solicitudReserva.update({
-        where: { id: sId },
-        data: {
-          estado: 'RECHAZADA',
-          motivo_rechazo: dto.motivo.trim(),
-        },
-        include: { conversacion: true },
+      // Solo rechaza si sigue PENDIENTE: un rechazo tardío no pisa una aprobación.
+      const { count } = await tx.solicitudReserva.updateMany({
+        where: { id: sId, estado: 'PENDIENTE' },
+        data: { estado: 'RECHAZADA', motivo_rechazo: dto.motivo.trim() },
       });
+      if (count !== 1) {
+        throw new BadRequestException({
+          codigo: 'SOLICITUD_NO_PENDIENTE',
+          mensaje: 'La solicitud ya fue atendida por otra persona. Actualiza la pantalla.',
+        });
+      }
+      const actualizada = {
+        ...solicitud,
+        estado: 'RECHAZADA',
+        motivo_rechazo: dto.motivo.trim(),
+      };
       const { fechaIso: fechaLima, horaMinutos: horaLima } = solicitud.hora
         ? obtenerFechaHoraLima(solicitud.hora)
         : { fechaIso: '', horaMinutos: '' };

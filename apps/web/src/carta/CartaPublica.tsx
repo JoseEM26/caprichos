@@ -105,7 +105,7 @@ export interface VistaPreviaCarta {
 
 function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: VistaPreviaCarta; paginaInicial?: PaginaCarta }) {
   const [categorias, setCategorias] = useState<CategoriaCarta[]>([]);
-  const [ofertas, setOfertas] = useState<OfertaItem[]>([]);
+  const [ofertasBase, setOfertas] = useState<OfertaItem[]>([]);
   const [estadoLocal, setEstadoLocal] = useState<EstadoLocalCarta | null>(null);
   const [datosLocal, setDatosLocal] = useState<DatosLocalCarta | null>(null);
   const [contenido, setContenido] = useState<ContenidoCarta | null>(null);
@@ -118,8 +118,11 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   const [pagina, setPagina] = useState<PaginaCarta>(paginaInicial ?? 'carta');
   const movil = useEsMovil();
   const ed = useEdicion();
+  // En la carta pública las promociones ocultas no existen; en el diseñador se ven atenuadas para poder mostrarlas.
+  const ofertas = useMemo(() => (ed ? ofertasBase : ofertasBase.filter((o) => o.visibleCarta !== false)), [ofertasBase, ed]);
 
-  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto } = useCarrito();
+  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto } =
+    useCarrito();
 
   // Enlace del bot o del aviso «pedido recibido»: abre directo el seguimiento de ese pedido (si el token no coincide, no pasa nada)
   useEffect(() => {
@@ -549,18 +552,21 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
                     gap: '16px',
                   }}
                 >
-                  {ofertasFiltradas.map((ofe) => (
-                    <TarjetaOferta
-                      key={ofe.id}
-                      oferta={ofe}
-                      productos={todosLosProductos}
-                      categorias={categorias}
-                      onSeleccionarCategoria={(catId) => {
-                        setCategoriaActivaId(catId);
-                        setBusqueda('');
-                      }}
-                    />
-                  ))}
+                  {ofertasFiltradas.map((ofe) => {
+                    const tarjeta = (
+                      <TarjetaOferta
+                        key={ofe.id}
+                        oferta={ofe}
+                        productos={todosLosProductos}
+                        categorias={categorias}
+                        onSeleccionarCategoria={(catId) => {
+                          setCategoriaActivaId(catId);
+                          setBusqueda('');
+                        }}
+                      />
+                    );
+                    return ed ? ed.bloque(`promo:${ofe.id}`, tarjeta) : tarjeta;
+                  })}
                 </div>
               </section>
             )}
@@ -709,9 +715,10 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   const waNum = String(datosLocal?.whatsapp || '51900000000').replace(/\D/g, '');
   const waUrl = `https://wa.me/${waNum || '51900000000'}`;
   const envioGratis = datosLocal?.envioGratisDesde ?? 70;
-  const pedidoMin = datosLocal?.pedidoMinimo ?? 14.5;
+  // Sin parámetro `pedido_minimo` configurado no se menciona ningún mínimo
+  const pedidoMin = datosLocal?.pedidoMinimo ?? 0;
   const fmtMonto = (m: number) => `s/ ${Number.isInteger(m) ? m : m.toFixed(2)}`;
-  const lineaPie = `Horario: ${horarioTexto} · Delivery gratis por compras de más de ${fmtMonto(envioGratis)} · Pedido mínimo de delivery ${fmtMonto(pedidoMin)}`;
+  const lineaPie = `Horario: ${horarioTexto} · Delivery gratis por compras de más de ${fmtMonto(envioGratis)}${pedidoMin > 0 ? ` · Pedido mínimo de delivery ${fmtMonto(pedidoMin)}` : ''}`;
   const redes = [
     { n: datosLocal?.redes?.instagramNombre || '@caprichos (ejemplo)', url: datosLocal?.redes?.instagram || 'https://www.instagram.com/' },
     { n: 'Facebook', url: datosLocal?.redes?.facebook || 'https://www.facebook.com/' },
@@ -746,6 +753,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
           setCategoriaActivaId(id);
           setBusqueda('');
         }}
+        mostrarInstalar={!vistaPrevia}
       />
 
       {/* Franja de aviso de promociones de hoy */}

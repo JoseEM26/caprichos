@@ -15,7 +15,9 @@ import { ZonasService } from '../../zonas/zonas.service';
 import { ReservasService } from '../../reservas/reservas.service';
 import { ChatbotIaService } from '../ia/chatbot-ia.service';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
-import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
+import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
+import { vistaPreviaPedidoBot } from './vista-previa-pedido.util';
+import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
 import {
@@ -43,6 +45,7 @@ import { EntradaRawInput, normalizarEntrada, esSaludo } from './normalizador-ent
 import { transicionarEstado, MODO_SOLO_MENUS } from './maquina-estados';
 import {
   ContextoConversacion,
+  VistaPreviaPedidoBot,
   DatosHorarioLocal,
   FlujoConversacion,
 } from './tipos-conversacion';
@@ -1104,12 +1107,19 @@ export class EjecutorConversacionService {
       }
     }
 
-    // Promoción del saludo: si falla, el saludo sale sin ella
-    let promoSaludo: { titulo: string; texto: string; enlaceCarta: string } | null = null;
-    try {
-      promoSaludo = (await this.ofertasService?.promoParaSaludo()) ?? null;
-    } catch (err: any) {
-      this.logger.warn(`Sin promoción para el saludo: ${err.message}`);
+    // Vista previa del pedido en curso con las reglas del servidor (promo BOT y envío): el total del bot sale de aquí
+    let vistaPreviaPedido: VistaPreviaPedidoBot | null = null;
+    const pedidoEnCurso = flujoPrevio?.pedido as EstadoCarritoPedido | undefined;
+    if (pedidoEnCurso?.items?.length) {
+      try {
+        vistaPreviaPedido = await vistaPreviaPedidoBot(
+          { prisma: this.prisma, ofertasService: this.ofertasService },
+          pedidoEnCurso,
+          resultadoEnvio?.tarifa ?? pedidoEnCurso.entrega?.tarifaZona ?? null,
+        );
+      } catch (err: any) {
+        this.logger.warn(`Sin vista previa del pedido (se cobra el precio de lista del servidor): ${err.message}`);
+      }
     }
 
     const contexto: ContextoConversacion = {
@@ -1117,7 +1127,7 @@ export class EjecutorConversacionService {
       nombreCliente: nombreMostrar,
       telefonoCliente,
       cartaUrlPublica,
-      promoSaludo,
+      vistaPreviaPedido,
       datosLocal,
       datosLocalPublicos,
       categoriasCarta,
@@ -1950,17 +1960,19 @@ export class EjecutorConversacionService {
 
         // Con qué celular suma el pedido: el elegido en el chat, o el de quien escribe si eligió su propia cuenta
         const celularPuntos = accion.puntos?.telefono ?? (accion.puntos?.modo === 'TELEFONO_PROPIO' ? conversacion.telefono : undefined);
-        const textoConfirmacion = TEXTOS_BOT.pedidoConfirmadoExito({
-          codigo: codigoFinal,
-          tiempoMin: accion.tiempoEstimadoMin,
-          tiempoMax: accion.tiempoEstimadoMax,
-          esPagoDigital: accion.esPagoDigital,
-          capturas: ((accion.dto?.pago?.plan ?? []) as Array<{ medio: string; monto: number }>).filter((f) =>
-            ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio),
-          ),
-          datosPago: accion.datosPagoTexto,
-          puntosTerminacion: celularPuntos ? celularPuntos.slice(-3) : undefined,
-        });
+        // Una línea con la carta virtual al confirmar (sin repetirla en cada mensaje)
+        const textoConfirmacion =
+          TEXTOS_BOT.pedidoConfirmadoExito({
+            codigo: codigoFinal,
+            tiempoMin: accion.tiempoEstimadoMin,
+            tiempoMax: accion.tiempoEstimadoMax,
+            esPagoDigital: accion.esPagoDigital,
+            capturas: ((accion.dto?.pago?.plan ?? []) as Array<{ medio: string; monto: number }>).filter((f) =>
+              ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio),
+            ),
+            datosPago: accion.datosPagoTexto,
+            puntosTerminacion: celularPuntos ? celularPuntos.slice(-3) : undefined,
+          }) + `\n\n${TEXTOS_SOLO_MENUS.lineaCartaConfirmacion(cartaUrlPublica)}`;
 
         let metaId: string | null = null;
         if (destinoEnvio) {

@@ -35,6 +35,7 @@ import { puedeRecibirAlertasWhatsApp } from './alertasWhatsappApi';
 import { AUTOCOMPLETAR_CLAVE, AVISO_REINGRESO, FORMATO_CORREO_ADMIN } from './claves';
 import { CambiarClaveModal } from './CambiarClaveModal';
 import { FotoUsuarioAdmin } from './FotoUsuarioAdmin';
+import { SeccionAreasCocina, type AreaCocinaOpcion } from './SeccionAreasCocina';
 
 export interface EditarUsuarioModalProps {
   usuario: UsuarioItem | null;
@@ -78,6 +79,11 @@ export function EditarUsuarioModal({
   const [avisosCorreo, setAvisosCorreo] = useState(false);
   const [horario247, setHorario247] = useState(false);
   const [cambiarClaveAbierto, setCambiarClaveAbierto] = useState(false);
+  // Áreas de cocina del usuario (solo se muestran si tiene rol Cocina). Se guardan con el PUT tras el PATCH.
+  const [areasCocina, setAreasCocina] = useState<string[]>([]);
+  const [areasOriginales, setAreasOriginales] = useState<string[]>([]);
+  const [areasDisponibles, setAreasDisponibles] = useState<AreaCocinaOpcion[]>([]);
+  const rolEsCocina = rol === 'COCINA' || otrosRoles.includes('COCINA');
 
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -124,6 +130,25 @@ export function EditarUsuarioModal({
     if (m) return setErrorServidor(m);
     setConfirmarHorario(true);
   }
+
+  useEffect(() => {
+    if (!usuario || !abierto) return;
+    let vigente = true;
+    api
+      .get<{ areaIds?: string[]; disponibles?: AreaCocinaOpcion[] }>(`/admin/usuarios/${usuario.id}/areas`)
+      .then((r) => {
+        if (!vigente) return;
+        setAreasCocina(r.areaIds ?? []);
+        setAreasOriginales(r.areaIds ?? []);
+        setAreasDisponibles(r.disponibles ?? []);
+      })
+      .catch(() => {
+        if (vigente) setAreasDisponibles([]);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [usuario, abierto]);
 
   useEffect(() => {
     if (usuario) {
@@ -217,6 +242,11 @@ export function EditarUsuarioModal({
       }
 
       const resp = await api.patch<UsuarioItem & { reingresar?: boolean }>(`/admin/usuarios/${usuario.id}`, cuerpo);
+
+      // Áreas de cocina: solo si cambiaron y el usuario tiene rol Cocina (la regla vive en el servidor)
+      if (esAdmin && rolEsCocina && !iguales(areasCocina, areasOriginales)) {
+        await api.put(`/admin/usuarios/${usuario.id}/areas`, { areaIds: areasCocina });
+      }
 
       setConfirmarAbierto(false);
       if (resp.reingresar) {
@@ -549,6 +579,15 @@ export function EditarUsuarioModal({
               error={errores.otrosRoles}
               deshabilitado={guardando || !esAdmin}
             />
+
+            {rolEsCocina && areasDisponibles.length > 0 && (
+              <SeccionAreasCocina
+                disponibles={areasDisponibles}
+                valor={areasCocina}
+                alCambiar={setAreasCocina}
+                deshabilitado={guardando || !esAdmin}
+              />
+            )}
 
             {esAdmin && (
               <>

@@ -4,7 +4,7 @@ Sirven para comprobar que la etiquetera y la ticketera están bien conectadas, s
 
 ## Dónde están
 
-- **Configuración › Impresión de etiquetas** (y dentro de la caja): la fila **Pruebas de impresión** tiene un botón por máquina.
+- **Configuración › Impresión › Cola y pruebas** (y dentro de la caja, pestaña Impresión): la sección **Pruebas de impresión** tiene un botón por máquina.
   - **Imprimir etiqueta de prueba**: sale por la etiquetera.
   - **Imprimir ticket de prueba**: sale por la ticketera.
 - **Indicadores Etiquetera / Ticketera** (cocina y caja): al abrir el detalle de una máquina aparece su botón de prueba.

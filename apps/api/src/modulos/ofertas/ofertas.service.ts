@@ -41,6 +41,7 @@ import {
   obtenerAhoraLima,
 } from './ofertas.util';
 import { urlPublicaCarta } from '../chatbot/servicios/carrusel.util';
+import { canalOfertaParaEnvio, CAMPOS_BENEFICIO_ENVIO } from './envio-gratis-promo';
 
 /** Si la promoción (DESCUENTO o LLEVA_PAGA) alcanza a esta línea según su alcance: categoría, producto o toda la carta. */
 function alcanceCubreLinea(
@@ -50,6 +51,32 @@ function alcanceCubreLinea(
   if (d.alcance_categoria_id) return !!l.categoriaId && l.categoriaId === d.alcance_categoria_id;
   if (d.alcance_producto_id) return l.productoId === d.alcance_producto_id;
   return true;
+}
+
+/** Horario del cupón con la misma regla de vigencia que las ofertas. Sin horario vale siempre. */
+function cuponEnHorario(cupon: any, ahora: Date): boolean {
+  return estaVigente(
+    {
+      activo: true,
+      dias: cupon.dias,
+      hora_desde: cupon.hora_desde,
+      hora_hasta: cupon.hora_hasta,
+      fecha_desde: cupon.fecha_desde,
+      fecha_hasta: cupon.fecha_hasta,
+    },
+    undefined,
+    ahora,
+  );
+}
+
+/** «HH:mm» a Date para columnas @db.Time (igual que las ofertas). */
+function horaCupon(v?: string | null): Date | null {
+  return v ? new Date(`1970-01-01T${v}:00.000Z`) : null;
+}
+
+/** «YYYY-MM-DD» a Date para columnas @db.Date. */
+function fechaCupon(v?: string | null): Date | null {
+  return v ? new Date(`${v.slice(0, 10)}T00:00:00.000Z`) : null;
 }
 
 const INCLUDE_PARTES = {
@@ -153,10 +180,11 @@ export class OfertasService {
     }
 
     const tipoFinal = dto.tipo === 'DESCUENTO_AUTOMATICO' ? 'DESCUENTO' : dto.tipo;
+    const esEnvio = tipoFinal === 'ENVIO_GRATIS';
     const descTipoFinal = dto.descuentoTipo === 'MONTO_FIJO' ? 'MONTO' : dto.descuentoTipo;
 
-    // Validación de límites de descuento y compra mínima
-    if (dto.descuentoValor !== undefined && dto.descuentoValor !== null) {
+    // Validación de límites de descuento y compra mínima (el envío gratis no lleva descuento)
+    if (!esEnvio && dto.descuentoValor !== undefined && dto.descuentoValor !== null) {
       if (descTipoFinal === 'PORCENTAJE') {
         if (dto.descuentoValor < 1 || dto.descuentoValor > 100) {
           throw new BadRequestException({
@@ -198,12 +226,16 @@ export class OfertasService {
           tipo: tipoFinal,
           nombre: nombreLimpio,
           descripcion: dto.descripcion?.trim() || null,
-          lleva: dto.lleva ?? null,
-          paga: dto.paga ?? null,
-          alcance_categoria_id: dto.alcanceCategoriaId ? BigInt(dto.alcanceCategoriaId) : null,
-          alcance_producto_id: dto.alcanceProductoId ? BigInt(dto.alcanceProductoId) : null,
-          descuento_tipo: descTipoFinal ?? null,
-          descuento_valor: dto.descuentoValor !== undefined && dto.descuentoValor !== null ? new Prisma.Decimal(dto.descuentoValor) : null,
+          ...(esEnvio
+            ? CAMPOS_BENEFICIO_ENVIO
+            : {
+                lleva: dto.lleva ?? null,
+                paga: dto.paga ?? null,
+                alcance_categoria_id: dto.alcanceCategoriaId ? BigInt(dto.alcanceCategoriaId) : null,
+                alcance_producto_id: dto.alcanceProductoId ? BigInt(dto.alcanceProductoId) : null,
+                descuento_tipo: descTipoFinal ?? null,
+                descuento_valor: dto.descuentoValor !== undefined && dto.descuentoValor !== null ? new Prisma.Decimal(dto.descuentoValor) : null,
+              }),
           compra_minima: dto.compraMinima !== undefined && dto.compraMinima !== null ? new Prisma.Decimal(dto.compraMinima) : null,
           dias: diasFinal,
           hora_desde: horaDesdeDate,
@@ -211,7 +243,8 @@ export class OfertasService {
           fecha_desde: fechaDesdeDate,
           fecha_hasta: fechaHastaDate,
           // La primera compra solo se canjea en la carta web
-          canales: soloPrimeraCompra ? ['CARTA'] : dto.canales ?? ['CARTA', 'ADMIN', 'BOT'],
+          // Por defecto no vale por WhatsApp (casilla desmarcada); el envío gratis sí sale marcado
+          canales: soloPrimeraCompra ? ['CARTA'] : dto.canales ?? (esEnvio ? ['CARTA', 'ADMIN', 'BOT'] : ['CARTA', 'ADMIN']),
           limite_usos: dto.limiteUsos ?? null,
           no_suma_beneficios: dto.noSumaBeneficios ?? false,
           mostrar_en_saludo_bot: dto.mostrarEnSaludoBot ?? false,
@@ -370,10 +403,11 @@ export class OfertasService {
       }
     }
 
+    const esEnvioActualizado = (dto.tipo === 'DESCUENTO_AUTOMATICO' ? 'DESCUENTO' : (dto.tipo ?? ofertaExistente.tipo)) === 'ENVIO_GRATIS';
     const descTipoCheck = dto.descuentoTipo !== undefined
       ? (dto.descuentoTipo === 'MONTO_FIJO' ? 'MONTO' : dto.descuentoTipo)
       : ofertaExistente.descuento_tipo;
-    if (dto.descuentoValor !== undefined && dto.descuentoValor !== null) {
+    if (!esEnvioActualizado && dto.descuentoValor !== undefined && dto.descuentoValor !== null) {
       if (descTipoCheck === 'PORCENTAJE') {
         if (dto.descuentoValor < 1 || dto.descuentoValor > 100) {
           throw new BadRequestException({
@@ -452,10 +486,23 @@ export class OfertasService {
     }
     if (dto.orden !== undefined) data.orden = dto.orden;
     if (dto.activo !== undefined) data.activo = dto.activo;
+    if (dto.visibleCarta !== undefined) data.visible_carta = dto.visibleCarta;
     if (dto.imagenArchivoId !== undefined) {
       data.imagen_archivo = dto.imagenArchivoId
         ? { connect: { id: BigInt(dto.imagenArchivoId) } }
         : { disconnect: true };
+    }
+
+    if (esEnvioActualizado) {
+      // El envío gratis no lleva descuento, lleva/paga ni productos: se vacían al pasar a este tipo
+      Object.assign(data, {
+        lleva: null,
+        paga: null,
+        descuento_tipo: null,
+        descuento_valor: null,
+        categoria: { disconnect: true },
+        producto: { disconnect: true },
+      });
     }
 
     const actualizada = await this.prisma.$transaction(async (tx) => {
@@ -738,11 +785,16 @@ export class OfertasService {
         codigo_base: codigoBaseLimpio,
         descripcion: dto.descripcion?.trim() || null,
         descuento_tipo: dto.descuentoTipo,
-        descuento_valor: new Prisma.Decimal(dto.descuentoValor),
+        descuento_valor: new Prisma.Decimal(dto.descuentoTipo === 'ENVIO_GRATIS' ? 0 : dto.descuentoValor),
         compra_minima: dto.compraMinima !== undefined && dto.compraMinima !== null ? new Prisma.Decimal(dto.compraMinima) : null,
         categoria_id: dto.categoriaId ? BigInt(dto.categoriaId) : null,
         producto_id: dto.productoId ? BigInt(dto.productoId) : null,
-        canales: dto.canales ?? ['CARTA', 'CAJA', 'BOT'],
+        canales: dto.canales ?? ['CARTA', 'CAJA'],
+        dias: dto.dias ?? [],
+        hora_desde: horaCupon(dto.horaDesde),
+        hora_hasta: horaCupon(dto.horaHasta),
+        fecha_desde: fechaCupon(dto.fechaDesde),
+        fecha_hasta: fechaCupon(dto.fechaHasta),
         requiere_cuenta: dto.requiereCuenta ?? false,
         dias_validez: dto.diasValidez ?? 15,
         tope_usos: dto.modo === 'COMPARTIDO' ? dto.topeUsos : null,
@@ -815,6 +867,12 @@ export class OfertasService {
     if (dto.descripcion !== undefined) data.descripcion = dto.descripcion?.trim() || null;
     if (dto.descuentoTipo !== undefined) data.descuento_tipo = dto.descuentoTipo;
     if (dto.descuentoValor !== undefined) data.descuento_valor = new Prisma.Decimal(dto.descuentoValor);
+    if ((dto.descuentoTipo ?? cuponExistente.descuento_tipo) === 'ENVIO_GRATIS') data.descuento_valor = new Prisma.Decimal(0);
+    if (dto.dias !== undefined) data.dias = dto.dias ?? [];
+    if (dto.horaDesde !== undefined) data.hora_desde = horaCupon(dto.horaDesde);
+    if (dto.horaHasta !== undefined) data.hora_hasta = horaCupon(dto.horaHasta);
+    if (dto.fechaDesde !== undefined) data.fecha_desde = fechaCupon(dto.fechaDesde);
+    if (dto.fechaHasta !== undefined) data.fecha_hasta = fechaCupon(dto.fechaHasta);
     if (dto.compraMinima !== undefined) {
       data.compra_minima = dto.compraMinima !== null ? new Prisma.Decimal(dto.compraMinima) : null;
     }
@@ -1118,6 +1176,12 @@ export class OfertasService {
           mensaje: 'La campaña de este cupón ya no se encuentra activa',
         });
       }
+      if (!cuponEnHorario(cuponEmitido.cupon, ahora)) {
+        throw new BadRequestException({
+          codigo: 'CUPON_FUERA_DE_HORARIO',
+          mensaje: 'Este cupón no se puede usar en este día u horario',
+        });
+      }
 
       const cuponPadre = cuponEmitido.cupon;
       return this.calcularDescuentoCupon(cuponPadre, dto, cuponEmitido.id);
@@ -1147,6 +1211,13 @@ export class OfertasService {
       throw new BadRequestException({
         codigo: 'CUPON_INACTIVO',
         mensaje: 'Este cupón no se encuentra activo',
+      });
+    }
+
+    if (!cuponEnHorario(cuponCompartido, ahora)) {
+      throw new BadRequestException({
+        codigo: 'CUPON_FUERA_DE_HORARIO',
+        mensaje: 'Este cupón no se puede usar en este día u horario',
       });
     }
 
@@ -1192,6 +1263,25 @@ export class OfertasService {
       });
     }
 
+    // Envío gratis: no descuenta productos; el pedido lo aplica (solo delivery) con la misma función de envío
+    if (cupon.descuento_tipo === 'ENVIO_GRATIS') {
+      return {
+        valido: true,
+        mensaje: `Cupón ${cupon.codigo_base}: envío gratis`,
+        cupon: {
+          id: cupon.id.toString(),
+          emitidoId: cuponEmitidoId ? cuponEmitidoId.toString() : null,
+          codigoBase: cupon.codigo_base,
+          descripcion: cupon.descripcion,
+          tipo: 'ENVIO_GRATIS' as const,
+          valor: 0,
+          descuentoCalculado: 0,
+          envioGratis: true,
+          canales: (cupon.canales ?? []) as string[],
+        },
+      };
+    }
+
     // Base imponible del descuento según alcance (toda la carta, categoría o producto)
     let baseCalculo = dto.subtotal;
     if (cupon.categoria_id && Array.isArray(dto.lineas)) {
@@ -1235,6 +1325,8 @@ export class OfertasService {
         tipo: cupon.descuento_tipo,
         valor,
         descuentoCalculado: Number(descuentoMonto.toFixed(2)),
+        envioGratis: false,
+        canales: (cupon.canales ?? []) as string[],
       },
     };
   }
@@ -1433,11 +1525,11 @@ export class OfertasService {
     lineas: { productoId: string; cantidad: number; subtotal: number; precioUnitario: number }[],
     cuponCodigo?: string,
     clientePartyId?: string | null,
-  ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[] }> {
+  ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean }> {
     const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
     const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
     const validas = (lineas || []).filter((l) => /^\d+$/.test(String(l.productoId)) && Number(l.cantidad) > 0);
-    if (validas.length === 0) return { descuentoTotal: 0, montoCanjeable: 0, puntosEstimados: 0, puntosPorcentaje, detalles: [] };
+    if (validas.length === 0) return { descuentoTotal: 0, montoCanjeable: 0, puntosEstimados: 0, puntosPorcentaje, detalles: [], envioGratisCupon: false };
     const productos = await this.prisma.producto.findMany({
       where: { id: { in: validas.map((l) => BigInt(l.productoId)) } },
       select: { id: true, categoria_id: true, no_suma_beneficios: true },
@@ -1466,6 +1558,7 @@ export class OfertasService {
     const conCupon = !!(desglose.cuponId || desglose.cuponEmitidoId);
     const montoCanjeable = montoElegiblePuntos(lineasCalc, conCupon ? [] : desglose.detalles);
     return {
+      envioGratisCupon: desglose.envioGratisCupon ?? false,
       descuentoTotal: desglose.descuentoTotal,
       montoCanjeable,
       // con cupón no se suman puntos (DT-56); misma base y porcentaje que PuntosService.acumularPorPedido
@@ -1491,7 +1584,19 @@ export class OfertasService {
     /** true solo si el cliente tiene sesión iniciada en la carta (cuenta con celular verificado) */
     clienteConSesion?: boolean;
   }): Promise<DesgloseDescuentosPedido> {
-    const { subtotal, lineas, canal, cuponCodigo, clientePartyId, clienteConSesion } = params;
+    const { subtotal, lineas, canal, clientePartyId, clienteConSesion } = params;
+
+    // Bot de WhatsApp: solo promociones automáticas con la casilla «Vale también por WhatsApp» (canal BOT,
+    // que estaVigente exige explícito). Nunca cupones: el bot no pide códigos y el servidor los rechaza.
+    const esBot = canal === 'BOT' || canal === 'WHATSAPP';
+    if (esBot && params.cuponCodigo?.trim()) {
+      throw new BadRequestException({
+        codigo: 'CUPON_NO_APLICA_CANAL',
+        mensaje: 'Los cupones no se aceptan por WhatsApp',
+      });
+    }
+    const cuponCodigo = params.cuponCodigo;
+
     const regla = await this.obtenerReglasAcumulacion();
     const ahora = new Date();
 
@@ -1659,6 +1764,8 @@ export class OfertasService {
       monto: number;
       detalles: DetalleDescuentoAplicado;
     } | null = null;
+    // Cupón de envío gratis: va aparte, no compite con los descuentos automáticos
+    let cuponEnvio: { cuponId: string; cuponEmitidoId: string | null; detalles: DetalleDescuentoAplicado } | null = null;
 
     if (cuponCodigo && cuponCodigo.trim().length > 0) {
       try {
@@ -1688,6 +1795,24 @@ export class OfertasService {
             montoDescontado: val.cupon.descuentoCalculado,
           },
         };
+
+        if (val.cupon.envioGratis) {
+          // Solo carta web y local (nunca WhatsApp/bot) y dentro de los canales del cupón
+          const canalEnvio = canalOfertaParaEnvio(canal);
+          // Los cupones no se piden por chat: el bot nunca aplica el cupón de envío
+          if (canalEnvio === 'BOT' || !estaVigente({ activo: true, canales: val.cupon.canales }, canalEnvio, new Date())) {
+            throw new BadRequestException({
+              codigo: 'CUPON_NO_APLICA_CANAL',
+              mensaje: 'Este cupón de envío gratis no aplica en este canal',
+            });
+          }
+          cuponEnvio = {
+            cuponId: cuponEvaluado.cuponId,
+            cuponEmitidoId: cuponEvaluado.cuponEmitidoId,
+            detalles: { ...cuponEvaluado.detalles, descuentoTipo: 'ENVIO_GRATIS', descuentoValor: 0, montoDescontado: 0 },
+          };
+          cuponEvaluado = null;
+        }
       } catch (err: any) {
         this.logger.warn(`Cupón ${cuponCodigo} no aplicó: ${err.message}`);
         throw err;
@@ -1736,12 +1861,19 @@ export class OfertasService {
       descuentoTotal = mejorDescuentoAutomatico.monto;
     }
 
+    if (cuponEnvio) {
+      detallesFinales.push(cuponEnvio.detalles);
+      cuponIdFinal = cuponEnvio.cuponId;
+      cuponEmitidoIdFinal = cuponEnvio.cuponEmitidoId;
+    }
+
     return {
       descuentoTotal: Number(descuentoTotal.toFixed(2)),
       ofertaId: ofertaIdFinal,
       cuponId: cuponIdFinal,
       cuponEmitidoId: cuponEmitidoIdFinal,
       detalles: detallesFinales,
+      envioGratisCupon: cuponEnvio !== null,
     };
   }
 
@@ -1909,7 +2041,7 @@ export class OfertasService {
    */
   async promoParaSaludo(ahora: Date = new Date()): Promise<{ titulo: string; texto: string; enlaceCarta: string } | null> {
     const candidatas = await this.prisma.oferta.findMany({
-      where: { mostrar_en_saludo_bot: true, activo: true, tipo: 'DESCUENTO' },
+      where: { mostrar_en_saludo_bot: true, activo: true, visible_carta: true, tipo: 'DESCUENTO' },
       orderBy: [{ orden: 'asc' }, { id: 'asc' }],
     });
     const oferta = candidatas.find((o) => estaVigente(o, 'CARTA', ahora));
@@ -1948,6 +2080,7 @@ export class OfertasService {
       soloPrimeraCompra: o.solo_primera_compra ?? false,
       orden: o.orden,
       activo: o.activo,
+      visibleCarta: o.visible_carta ?? true,
       creadoEn: o.creado_en.toISOString(),
       categoriaNombre: o.categoria?.nombre || null,
       productoNombre: o.producto?.nombre || null,
@@ -2004,6 +2137,11 @@ export class OfertasService {
       creadoEn: c.creado_en.toISOString(),
       categoriaNombre: c.categoria?.nombre || null,
       productoNombre: c.producto?.nombre || null,
+      dias: c.dias || [],
+      horaDesde: formatearHora(c.hora_desde),
+      horaHasta: formatearHora(c.hora_hasta),
+      fechaDesde: formatearFecha(c.fecha_desde),
+      fechaHasta: formatearFecha(c.fecha_hasta),
     };
   }
 }

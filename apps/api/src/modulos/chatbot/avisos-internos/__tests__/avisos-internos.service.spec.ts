@@ -110,6 +110,10 @@ describe('AvisosInternosService (Ola 4, Agente H: Avisos Internos al Equipo)', (
           ],
         }),
       },
+      parametro: {
+        // «Control de almacén» encendido por defecto; cada prueba puede cambiarlo
+        findUnique: jest.fn().mockResolvedValue({ clave: 'stock_control_activo', valor: 'si' }),
+      },
       insumo: {
         findUnique: jest.fn().mockResolvedValue({
           id: 55n,
@@ -242,6 +246,33 @@ describe('AvisosInternosService (Ola 4, Agente H: Avisos Internos al Equipo)', (
   });
 
   describe('Avisos de Almacén (Insumos Agotados y Por Pedir)', () => {
+    it('con el control de almacén apagado no crea aviso de insumo agotado ni de bajo stock', async () => {
+      outboxMock.encolar.mockClear();
+      auditoriaServiceMock.registrar.mockClear();
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'stock_control_activo', valor: 'no' });
+
+      const agotado = await service.notificarInsumoAgotado(55n);
+      const bajo = await service.notificarInsumoBajoStock(55n);
+
+      expect(agotado).toMatchObject({ omitido: true, motivo: 'DESACTIVADO', enviosExitosos: 0 });
+      expect(bajo).toMatchObject({ omitido: true, motivo: 'DESACTIVADO', enviosExitosos: 0 });
+      expect(prismaMock.insumo.findUnique).not.toHaveBeenCalled();
+      expect(outboxMock.encolar).not.toHaveBeenCalled();
+      expect(auditoriaServiceMock.registrar).not.toHaveBeenCalled();
+
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'stock_control_activo', valor: 'si' });
+    });
+
+    it('con el control de almacén encendido sí crea el aviso de insumo agotado', async () => {
+      outboxMock.encolar.mockClear();
+      prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'stock_control_activo', valor: 'si' });
+
+      const resultado = await service.notificarInsumoAgotado(55n);
+
+      expect(resultado.omitido).toBe(false);
+      expect(outboxMock.encolar).toHaveBeenCalled();
+    });
+
     it('encola la alerta de insumo agotado con botones para cada número del equipo', async () => {
       outboxMock.encolar.mockClear();
       const resultado = await service.notificarInsumoAgotado(55n);

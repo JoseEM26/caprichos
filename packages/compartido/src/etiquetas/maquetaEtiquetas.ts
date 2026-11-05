@@ -265,6 +265,11 @@ export function maquetarGeneral(d: EtiquetaGeneralDatos, f: FormatoMaqueta = {})
   const cant = `${d.cantidadProductos} PRODUCTO${d.cantidadProductos === 1 ? '' : 'S'}`;
   texto(C, centrar(X0, C.w, cant, '3'), y, '3', 1, cant);
   y += 34;
+  if (d.total != null) {
+    const tot = `TOTAL S/ ${Number(d.total).toFixed(2)}`;
+    texto(C, centrar(X0, C.w, tot, '3'), y, '3', 1, tot);
+    y += 34;
+  }
 
   const top = d.nota ? recuadroAbajo(C, `NOTA: ${d.nota}`, 3) : null;
   const bloques = (d.productos || []).map((p) =>

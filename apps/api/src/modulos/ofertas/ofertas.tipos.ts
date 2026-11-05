@@ -1,5 +1,5 @@
-export type TipoOferta = 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO';
-export type TipoDescuento = 'PORCENTAJE' | 'MONTO';
+export type TipoOferta = 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'ENVIO_GRATIS';
+export type TipoDescuento = 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS';
 export type TipoComboParte = 'A_ELECCION' | 'UNA_DE' | 'FIJO';
 export type ModoCupon = 'UNICO_COMPROBANTE' | 'COMPARTIDO';
 export type EstadoCuponEmitido = 'VIGENTE' | 'CANJEADO' | 'VENCIDO' | 'ANULADO';
@@ -52,6 +52,8 @@ export interface OfertaItem {
   soloPrimeraCompra: boolean;
   orden: number;
   activo: boolean;
+  /** Se muestra en la carta virtual (el descuento sigue vigente aunque esté oculta) */
+  visibleCarta: boolean;
   creadoEn: string;
   combosPrecio?: ComboPrecioItem[];
   combosParte?: ComboParteItem[];
@@ -94,6 +96,12 @@ export interface CuponItem {
   creadoEn: string;
   categoriaNombre?: string | null;
   productoNombre?: string | null;
+  /** Horario del cupón (vacío = siempre): días 1..7, hora desde inclusiva, hasta exclusiva, fechas inclusivas. */
+  dias?: number[];
+  horaDesde?: string | null;
+  horaHasta?: string | null;
+  fechaDesde?: string | null;
+  fechaHasta?: string | null;
 }
 
 export interface CuponEmitidoItem {
@@ -139,4 +147,6 @@ export interface DesgloseDescuentosPedido {
   cuponId: string | null;
   cuponEmitidoId: string | null;
   detalles: DetalleDescuentoAplicado[];
+  /** El cupón canjeado da envío gratis (no descuenta productos). Solo delivery; lo aplica el pedido. */
+  envioGratisCupon?: boolean;
 }

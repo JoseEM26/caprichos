@@ -26,41 +26,26 @@ export const TITULO_SECCION_MENU = 'Menú';
 export const TITULO_SECCION_CATEGORIAS = 'Categorías';
 export const TITULO_SECCION_PREGUNTAS = 'Preguntas';
 
-// Filas del Menú Principal (bot solo con menús: el pedido se hace en la carta virtual web)
+// Filas del Menú Principal (5 opciones; el pedido se toma por chat, con el flujo de pedido)
 export const FILAS_MENU_PRINCIPAL: FilaLista[] = [
-  {
-    id: 'horario',
-    titulo: '🕒 Horario y ubicación',
-    descripcion: 'Horario, dirección y cómo llegar',
-  },
-  {
-    id: 'carta',
-    titulo: '🧁 Ver la carta',
-    descripcion: 'Productos destacados y el enlace a la carta',
-  },
-  {
-    id: 'mipedido',
-    titulo: '📦 Estado de mi pedido',
-    descripcion: 'Cómo va tu pedido de hoy',
-  },
-  {
-    id: 'persona',
-    titulo: '🙋 Hablar con persona',
-    descripcion: 'Te atiende alguien del equipo',
-  },
-  {
-    id: 'preguntar',
-    titulo: '💬 Preguntas frecuentes',
-    descripcion: 'Pagos, delivery, promociones y más',
-  },
+  { id: 'pedir', titulo: 'Hacer pedido', descripcion: 'Pide aquí mismo por WhatsApp' },
+  { id: 'carta', titulo: 'Ver la carta', descripcion: 'Productos destacados y la carta' },
+  { id: 'mipedido', titulo: 'Estado de mi pedido', descripcion: 'Cómo va tu pedido de hoy' },
+  { id: 'preguntar', titulo: 'Preguntas frecuentes', descripcion: 'Horario, ubicación, pagos y más' },
+  { id: 'persona', titulo: 'Hablar con una persona', descripcion: 'Te atiende alguien del equipo' },
 ];
 
 // Botones de respuesta rápida comunes
 export const BOTONES_MENU_PRINCIPAL: BotonAccion[] = [
-  { id: 'btn_horario_ubicacion', titulo: 'Horario y ubicación' },
+  { id: 'pedir', titulo: 'Hacer pedido' },
   { id: 'btn_carta', titulo: 'Ver la carta' },
   { id: 'btn_persona', titulo: 'Hablar con persona' },
 ];
+
+export const BOTON_HACER_PEDIDO: BotonAccion = {
+  id: 'pedir',
+  titulo: 'Hacer pedido',
+};
 
 export const BOTON_VOLVER_MENU: BotonAccion = {
   id: 'btn_menu',
@@ -132,21 +117,6 @@ export const BOTONES_PEDIDO_VER_CARRITO: BotonAccion[] = [
   { id: 'ped_quitar', titulo: 'Quitar producto' },
 ];
 
-export const BOTONES_PEDIDO_OFERTA_CALIFICA: BotonAccion[] = [
-  { id: 'ped_promo_si', titulo: 'Sí, aplicar promo' },
-  { id: 'ped_promo_no', titulo: 'No, gracias' },
-];
-
-export const BOTONES_PEDIDO_OFERTA_FALTA: BotonAccion[] = [
-  { id: 'ped_otro', titulo: 'Agregar producto' },
-  { id: 'ped_promo_seguir', titulo: 'Seguir sin promo' },
-];
-
-export const BOTONES_PEDIDO_PREGUNTA_CUPON: BotonAccion[] = [
-  { id: 'ped_cupon_si', titulo: 'Tengo un cupón' },
-  { id: 'ped_cupon_no', titulo: 'No tengo cupón' },
-];
-
 export const BOTONES_PEDIDO_NOMBRE_CONFIRMAR: BotonAccion[] = [
   { id: 'ped_nombre_ok', titulo: 'Sí, es correcto' },
   { id: 'ped_nombre_otro', titulo: 'Escribir mi nombre' },
@@ -156,19 +126,6 @@ export const BOTONES_PEDIDO_COMPROBANTE: BotonAccion[] = [
   { id: 'ped_comp_boleta', titulo: 'Boleta' },
   { id: 'ped_comp_factura', titulo: 'Factura' },
 ];
-
-// Pregunta de puntos (sin cuenta identificada): sumar con el número de WhatsApp, con otro celular o no sumar
-export const BOTONES_PUNTOS_PREGUNTA: BotonAccion[] = [
-  { id: 'puntos_este', titulo: 'Este número' },
-  { id: 'puntos_otro', titulo: 'Otro número' },
-  { id: 'puntos_no', titulo: 'No, gracias' },
-];
-export const BOTONES_PUNTOS_RECORDATORIO: BotonAccion[] = [
-  { id: 'puntos_si', titulo: 'Sí' },
-  { id: 'puntos_otro', titulo: 'Cambiar' },
-  { id: 'puntos_sin', titulo: 'Sin puntos' },
-];
-export const BOTONES_PUNTOS_NUMERO: BotonAccion[] = [{ id: 'puntos_no', titulo: 'No, gracias' }];
 
 export const BOTONES_PEDIDO_CONFIRMAR_FINAL: BotonAccion[] = [
   { id: 'ped_confirmar', titulo: 'Confirmar pedido' },
@@ -209,14 +166,9 @@ export const FILAS_PREGUNTAS_FRECUENTES: FilaLista[] = [
     descripcion: 'Waffles y postres disponibles hoy',
   },
   {
-    id: 'faq_ubicacion',
-    titulo: '¿Dónde están ubicados?',
-    descripcion: 'Dirección, referencia y cómo llegar',
-  },
-  {
     id: 'faq_horario',
-    titulo: 'Horario de atención', // ¿Hasta qué hora atienden? excede 24 caracteres (25). Se coloca en descripción.
-    descripcion: '¿Hasta qué hora atienden y días abiertos?',
+    titulo: 'Horario y ubicación', // un solo botón: horario, dirección y cómo llegar
+    descripcion: 'Horario de hoy, dirección y mapa',
   },
   {
     id: 'faq_pagos',
@@ -227,11 +179,6 @@ export const FILAS_PREGUNTAS_FRECUENTES: FilaLista[] = [
     id: 'faq_delivery',
     titulo: 'Costo de delivery',
     descripcion: 'Tarifas de envío y envío gratis',
-  },
-  {
-    id: 'faq_promos',
-    titulo: 'Promociones de hoy',
-    descripcion: 'Ofertas vigentes y combos de hoy',
   },
   {
     id: 'btn_persona',
@@ -311,8 +258,8 @@ export const TEXTOS_BOT = {
 
     if (!saludoBase) {
       saludoBase = nombreLimpio
-        ? `CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola, ${nombreLimpio}! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te podemos ayudar hoy? 🧁`
-        : 'CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te podemos ayudar hoy? 🧁';
+        ? `¡Hola, ${nombreLimpio}! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te ayudo?`
+        : '¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te ayudo?';
     } else if (saludoBase.includes('{nombre}')) {
       saludoBase = saludoBase.replace('{nombre}', nombreLimpio || 'cliente');
     }
@@ -671,10 +618,13 @@ export const TEXTOS_BOT = {
     return `Aceptamos los siguientes medios de pago: ${lista}. En pedidos por WhatsApp, coordinamos el pago por aquí y una persona del equipo lo valida.`;
   },
 
+  // Sin `pedido_minimo` configurado no se menciona ningún mínimo.
   faqDelivery: (minimo?: number | null, envioGratis?: number | null): string => {
-    const minTexto = minimo ? `s/ ${minimo.toFixed(2)}` : 's/ 14.50';
-    const gratisTexto = envioGratis ? ` Además, ¡el envío es gratis en compras a partir de s/ ${envioGratis.toFixed(2)}!` : '';
-    return `El pedido mínimo para delivery es ${minTexto} en productos.${gratisTexto} La tarifa exacta depende de tu ubicación en nuestras zonas de reparto.`;
+    const minTexto = minimo && minimo > 0
+      ? `El pedido mínimo para delivery es s/ ${minimo.toFixed(2)} en productos (para recoger en el local no hay mínimo). `
+      : '';
+    const gratisTexto = envioGratis ? `¡El envío es gratis en compras a partir de s/ ${envioGratis.toFixed(2)}! ` : '';
+    return `${minTexto}${gratisTexto}La tarifa exacta depende de tu ubicación en nuestras zonas de reparto.`;
   },
 
   // =========================================================================
@@ -697,12 +647,10 @@ export const TEXTOS_BOT = {
     return 'Tu ubicación está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local.';
   },
 
-  pedidoUbicacionExitosa: (tarifa: number, esGratis: boolean, gratisDesde?: number): string => {
-    if (esGratis) {
-      const gTexto = gratisDesde ? ` por compras mayores a S/ ${gratisDesde.toFixed(2)}` : '';
-      return `Tu ubicación fue localizada correctamente. El envío a tu ubicación es gratis${gTexto}. Elige una categoría:`;
-    }
-    return `Tu ubicación fue localizada correctamente. El envío a tu ubicación cuesta S/ ${tarifa.toFixed(2)}. Elige una categoría:`;
+  pedidoUbicacionExitosa: (envio: number | null, esGratis: boolean): string => {
+    if (esGratis) return 'Tu ubicación fue localizada correctamente. El envío a tu ubicación es gratis. Elige una categoría:';
+    if (envio === null) return 'Tu ubicación fue localizada correctamente. El costo del envío lo confirma un asesor. Elige una categoría:';
+    return `Tu ubicación fue localizada correctamente. El envío a tu ubicación cuesta S/ ${envio.toFixed(2)}. Elige una categoría:`;
   },
 
   pedidoEscribirDireccionPrompt: (): string => {
@@ -718,16 +666,13 @@ export const TEXTOS_BOT = {
     return '¡Qué gusto verte de nuevo! 😊 ¿Lo enviamos a una dirección anterior o a una nueva?';
   },
 
-  pedidoDireccionAnteriorElegida: (
-    direccion: string,
-    tarifa: number,
-    esGratis: boolean,
-    gratisDesde?: number,
-  ): string => {
-    const envio = esGratis
-      ? `El envío es gratis${gratisDesde ? ` por compras mayores a S/ ${gratisDesde.toFixed(2)}` : ''}.`
-      : `El envío cuesta S/ ${tarifa.toFixed(2)}.`;
-    return `Perfecto, lo enviamos a ${direccion}. ${envio} Elige una categoría:`;
+  pedidoDireccionAnteriorElegida: (direccion: string, envio: number | null, esGratis: boolean): string => {
+    const txtEnvio = esGratis
+      ? 'El envío es gratis.'
+      : envio === null
+        ? 'El costo del envío lo confirma un asesor.'
+        : `El envío cuesta S/ ${envio.toFixed(2)}.`;
+    return `Perfecto, lo enviamos a ${direccion}. ${txtEnvio} Elige una categoría:`;
   },
 
   pedidoDireccionAnteriorSinCoordenadas: (direccion: string): string => {
@@ -797,9 +742,8 @@ export const TEXTOS_BOT = {
     return `¿Cuántas unidades deseas de ${nombreProd}? Elige una opción o escribe el número:`;
   },
 
-  pedidoProductoAgregado: (nombreProd: string, subtotalLinea: number, hintOferta?: string): string => {
-    const hint = hintOferta ? `\n\n${hintOferta}` : '';
-    return `Agregué ${nombreProd} (S/ ${subtotalLinea.toFixed(2)}) a tu pedido. ¿Quieres algo más?${hint}`;
+  pedidoProductoAgregado: (nombreProd: string, subtotalLinea: number): string => {
+    return `Agregué ${nombreProd} (S/ ${subtotalLinea.toFixed(2)}) a tu pedido. ¿Quieres algo más?`;
   },
 
   pedidoVerCarrito: (itemsTexto: string, subtotal: number): string => {
@@ -812,30 +756,6 @@ export const TEXTOS_BOT = {
 
   pedidoCarritoVacio: (): string => {
     return 'Tu carrito está vacío. Elige una categoría para empezar a agregar productos:';
-  },
-
-  pedidoOfertaCalifica: (nombreOferta: string, ahorro: number): string => {
-    return `🏷 Tu pedido califica para «${nombreOferta}»: te ahorras S/ ${ahorro.toFixed(2)} (los adicionales se cobran aparte). ¿La aplico?`;
-  },
-
-  pedidoOfertaFaltaPoco: (faltan: number, miss: string[], nombreOferta: string, precio: number): string => {
-    return `🏷 Con ${faltan} más (${miss.join(' + ')}) se aplica «${nombreOferta}»: pagas S/ ${precio.toFixed(2)} por los productos. ¿Quieres agregarlo?`;
-  },
-
-  pedidoPreguntaCupon: (): string => {
-    return '¿Cuentas con un cupón de descuento?';
-  },
-
-  pedidoIngresarCuponPrompt: (): string => {
-    return 'Por favor escribe el código de tu cupón:';
-  },
-
-  pedidoCuponAplicado: (codigo: string, descuento: number): string => {
-    return `Listo, apliqué el cupón «${codigo}»: ahorras S/ ${descuento.toFixed(2)}.`;
-  },
-
-  pedidoCuponInvalido: (mensaje?: string): string => {
-    return mensaje || 'El código de cupón ingresado no es válido o ya expiró.';
   },
 
   pedidoMinimoNoAlcanzado: (minimo: number, faltante: number): string => {
@@ -899,34 +819,25 @@ export const TEXTOS_BOT = {
     return 'Por favor escribe la Razón Social de tu empresa:';
   },
 
-  // --- Puntos (cliente con cuenta, sin clave: se reconoce por el número de WhatsApp) ---
-  puntosPregunta: (): string =>
-    `¿Quieres sumar puntos en este pedido? ⭐ Solo necesitas un celular, sin cuenta ni contraseña. ¿A qué número los sumo?`,
-  puntosPedirNumero: (): string =>
-    `Escríbeme tu celular (9 dígitos, empieza con 9) y sumo tus puntos a ese número. Si no quieres sumar, toca "No, gracias".`,
-  puntosListo: (terminacion: string): string => `Listo, sumarás puntos con el ***${terminacion}. ⭐`,
   cuentaCreada: (nombre: string): string =>
     `¡Listo, ${nombre}! Tu cuenta quedó creada con este número. Para entrar en caprichos.pe define tu contraseña con “¿Olvidaste tu contraseña?”; te llegará un código por aquí.`,
   cuentaNoCreada: (): string =>
     `No pude crear tu cuenta ahora, pero tu pedido sigue en marcha. Puedes crearla después en la carta con este mismo número. 😊`,
-  puntosNumeroInvalido: (): string =>
-    `Ese número no es válido. Necesito un celular de 9 dígitos que empiece con 9 (por ejemplo 987654321). Si no quieres sumar, toca "No, gracias".`,
-  puntosRecordatorio: (destino: string): string => `Sumo tus puntos a ${destino} como antes, ¿ok?`,
-  puntosLineaResumen: (p: { estimado: number | null; saldo?: number | null; sinPuntos?: boolean }): string => {
-    if (p.sinPuntos) return `⭐ Este pedido no suma puntos.`;
-    const saldo = p.saldo != null ? ` (tienes ${p.saldo.toFixed(2)})` : '';
-    return p.estimado != null
-      ? `⭐ Este pedido sumará ~${p.estimado.toFixed(2)} puntos cuando Caja lo cobre${saldo}.`
-      : `⭐ Sumarás puntos por los productos sin promoción cuando Caja cobre el pedido${saldo}.`;
-  },
   puntosMiSaldo: (primerNombre: string, saldo: number, porcentaje: number): string =>
     `⭐ ${primerNombre}, tienes ${saldo.toFixed(2)} puntos.\nGanas ${porcentaje} % de lo que pagas en productos sin promoción.`,
   puntosSinCuenta: (urlCarta: string): string =>
     `No encontré una cuenta con este número de WhatsApp.\nCrea la tuya con tu celular en ${urlCarta}, usando este mismo número, y empieza a sumar puntos.`,
   puntosNoDisponible: (): string => `Ahora no puedo consultar tus puntos. Inténtalo en unos minutos.`,
 
+  /** Línea de descuento del resumen: «Descuento <promo> −S/ x», con el nombre de la promoción en pocas palabras. */
+  lineaDescuentoBot: (nombre: string | null, monto: number): string => {
+    const corto = (nombre || 'promoción').trim().slice(0, 30);
+    return `Descuento ${corto} −S/ ${monto.toFixed(2)}`;
+  },
+
   pedidoResumenFinal: (params: {
     lineasTexto: string;
+    /** Una línea corta: «Descuento <promo> −S/ x» (solo si la promoción con casilla BOT aplica) */
     descuentoTexto?: string;
     envioTexto: string;
     total: number;
@@ -936,7 +847,6 @@ export const TEXTOS_BOT = {
     tiempoMin: number;
     tiempoMax: number;
     avisoDemanda?: string;
-    puntosTexto?: string;
   }): string => {
     const {
       lineasTexto,
@@ -949,7 +859,6 @@ export const TEXTOS_BOT = {
       tiempoMin,
       tiempoMax,
       avisoDemanda,
-      puntosTexto,
     } = params;
 
     const descBloque = descuentoTexto ? `\n${descuentoTexto}` : '';
@@ -964,7 +873,6 @@ export const TEXTOS_BOT = {
       `Modalidad: ${modalidad}${dirBloque}\n` +
       `Pago: ${pagoTexto}\n` +
       `Tiempo estimado: ${tiempoMin} a ${tiempoMax} minutos${demandaBloque}\n\n` +
-      (puntosTexto ? `${puntosTexto}\n\n` : '') +
       `¿Confirmo tu pedido?`
     );
   },
@@ -1027,18 +935,15 @@ export const TEXTOS_BOT = {
 };
 
 /**
- * Bot solo con menús (decisión del dueño): el pedido, los puntos y la reserva no se toman por chat.
- * Se responde con la carta virtual web o con una persona del equipo.
+ * Textos cortos del bot con el menú (decisión del dueño: mensajes breves y pocos).
+ * Sin promociones, descuentos, cupones ni puntos. La carta virtual se menciona en el saludo y al confirmar un pedido.
  */
 export const TEXTOS_SOLO_MENUS = {
-  pedidoEnCarta: (url: string): string =>
-    `Para pedir, entra a nuestra carta virtual, elige lo que quieres y confirma tu pedido ahí: ${url}`,
+  /** Línea breve del saludo que invita a la carta virtual. */
+  lineaCartaSaludo: (url: string): string => `💛 Mira nuestra carta virtual: ${url}`,
 
-  puntosEnCarta: (url: string): string =>
-    `Puedes ver y canjear tus puntos en nuestra carta virtual 💛\n👉 ${url}`,
-
-  lineaPuntosSaludo: (url: string): string =>
-    `💛 También puedes pedir y ver o canjear tus puntos en nuestra carta virtual: ${url}`,
+  /** Línea breve al confirmar un pedido: seguimiento y carta. */
+  lineaCartaConfirmacion: (url: string): string => `Sigue tu pedido y mira la carta en: ${url}`,
 
   reservaPorPersona: (telefono?: string | null): string => {
     const tel = String(telefono || '').trim();
@@ -1047,33 +952,18 @@ export const TEXTOS_SOLO_MENUS = {
       : 'Para reservar una mesa, habla con una persona de nuestro equipo.';
   },
 
-  cartaDestacados: (url: string): string =>
-    `Estos son nuestros favoritos 💛\nVe toda la carta y pide en: ${url}`,
+  cartaDestacados: (url: string): string => `Nuestros favoritos 💛 Toca «Pedir este» para pedirlo. Carta completa: ${url}`,
 
-  cartaSinProductos: (url: string): string =>
-    `Nuestra carta está en actualización. Revísala aquí: ${url}`,
+  cartaSinProductos: (url: string): string => `Nuestra carta está en actualización: ${url}`,
 
-  productoEnCarta: (nombre: string, url: string): string =>
-    `*${nombre}* lo encuentras en nuestra carta virtual, donde también lo puedes pedir: ${url}`,
+  estadoPedido: (codigo: string, estado: string, pagoEstado: string | null | undefined): string =>
+    `Tu pedido *${codigo}* está en estado: *${estado}*${pagoEstado ? ` (Pago: *${pagoEstado}*)` : ''}.`,
 
-  estadoPedido: (codigo: string, estado: string, pagoEstado: string | null | undefined, url: string): string =>
-    `Tu pedido *${codigo}* está en estado: *${estado}*${pagoEstado ? ` (Pago: *${pagoEstado}*)` : ''}.\nPuedes seguirlo en nuestra carta virtual: ${url}`,
-
-  sinPedidoActivo: (url: string): string =>
-    `No encontramos un pedido activo a tu número. Puedes revisar tu pedido o hacer uno nuevo en nuestra carta virtual: ${url}`,
+  sinPedidoActivo: (url: string): string => `No tienes un pedido activo con este número. Carta: ${url}`,
 
   menuNoEntiendo: (textoPersonalizado?: string | null): string =>
-    textoPersonalizado?.trim() ||
-    'Elige una opción del menú y te ayudo. Si necesitas algo más, toca «Hablar con una persona».',
+    textoPersonalizado?.trim() || 'Elige una opción del menú.',
 };
-
-/**
- * Línea de promoción del saludo (la promo la marca el local en Ofertas). Null cuando no hay promoción.
- */
-export function lineaPromoSaludo(promo?: { texto: string; enlaceCarta: string } | null): string | null {
-  if (!promo) return null;
-  return `🎁 ${promo.texto}\n👉 ${promo.enlaceCarta}`;
-}
 
 export * from './textos-reserva';
 export * from './flujos/pago/textos-pago';

@@ -4,6 +4,7 @@ import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-pl
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
+import { FILTRO_CANCELADO_NO_RECIBIR, PAGOS_DEVOLVIBLES, nombresDePartes, salidaDevolucion } from './devolucion-pedido.util';
 import { StockService } from '../stock/stock.service';
 import { ImpresionService } from '../impresion/impresion.service';
 import { SalonService } from '../salon/salon.service';
@@ -31,12 +32,13 @@ import {
   SupervisorCodigoService,
   autorizarAdminSinCodigo,
 } from '../supervisor-codigo/supervisor-codigo.service';
-import { exigirComprobanteDigital, voucherCubreMedio } from '../caja/comprobante-pago.util';
+import { exigirComprobanteDigital, mediosQueExigenCodigo, voucherCubreMedio } from '../caja/comprobante-pago.util';
 import { puedeCambiarVoucher, puedeSubirVoucher } from '../vouchers/regla-cambio-voucher';
 import { MEDIOS_CON_VOUCHER_CAJA } from '../vouchers/vouchers.service';
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
+import { SELECT_PRUEBA_INCIDENTE, construirPruebaEntrega } from '../repartos/prueba-entrega';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { RangoMisPedidos } from './dto/mis-pedidos-query.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
@@ -340,8 +342,8 @@ export class PedidosEstadoService {
       incidentes: {
         where: { motivo: MOTIVO_RETIRO },
         orderBy: { en: 'desc' as const },
-        take: 1,
-        select: { en: true },
+        take: 5,
+        select: { ...SELECT_PRUEBA_INCIDENTE, id: true },
       },
       mensajesReparto: {
         where: { numero: NUMERO_PREGUNTA_REPROG },
@@ -366,26 +368,23 @@ export class PedidosEstadoService {
         take: 200,
       }),
       this.prisma.pedido.findMany({
-        where: {
-          estado: 'ANULADO',
-          mensajesReparto: {
-            some: {
-              numero: NUMERO_PREGUNTA_REPROG,
-              estado: {
-                in: [ESTADO_REPROG.NO_REPROGRAMAR, ESTADO_REPROG.SIN_RESPUESTA, ESTADO_REPROG.TOPE_ALCANZADO],
-              },
-            },
-          },
-        },
-        include: incluir,
+        where: FILTRO_CANCELADO_NO_RECIBIR,
+        include: { ...incluir, devolucion: true },
         orderBy: { anulado_en: 'desc' },
         take: 200,
       }),
     ]);
 
+    const devoluciones = cancelados.flatMap((p) => (p.devolucion ? [p.devolucion] : []));
+    const nombres = await nombresDePartes(
+      this.prisma,
+      devoluciones.flatMap((d) => [d.por_party_id, d.autorizado_por_party_id]),
+    );
+
     const filas = (p: any, enLista: boolean) => {
       const pago = String(p.pago_estado || '').toUpperCase();
       const pregunta = p.mensajesReparto?.[0]?.estado as string | undefined;
+      const devolucion = p.devolucion ? salidaDevolucion(p.devolucion, nombres) : null;
       return {
         id: String(p.id),
         codigo: p.codigo,
@@ -398,12 +397,24 @@ export class PedidosEstadoService {
         retirado_en: p.incidentes?.[0]?.en ?? null,
         pregunta: PREGUNTA_REPROG_VISTA[pregunta ?? ''] ?? 'SIN_PREGUNTA',
         pago_estado: p.pago_estado ?? null,
-        revisar_devolucion: !enLista && (pago === 'PAGADO' || pago === 'COORDINADO'),
+        revisar_devolucion: !enLista && PAGOS_DEVOLVIBLES.includes(pago) && !devolucion,
+        devolucion,
       };
     };
 
-    const reprogramar = porReprogramar.map((p) => filas(p, true));
-    const cancelacion = cancelados.map((p) => filas(p, false));
+    // Prueba de entrega fallida: la última fila de NO_CONTESTA con llegada registrada (si la hay)
+    const conPrueba = async (lista: any[]) =>
+      Promise.all(
+        lista.map(async (p) => ({
+          ...filas(p, lista === porReprogramar),
+          prueba_entrega: await construirPruebaEntrega(
+            this.prisma,
+            (p.incidentes ?? []).find((i: any) => i.llego_en),
+          ),
+        })),
+      );
+    const reprogramar = await conPrueba(porReprogramar);
+    const cancelacion = await conPrueba(cancelados);
     return {
       reprogramar,
       cancelados: cancelacion,
@@ -454,6 +465,12 @@ export class PedidosEstadoService {
             listas: true,
             despachadas: true,
             producto_id: true,
+            // Lista del mozo: tamaño, opciones (mismo criterio que constructor-etiquetas.ts), nota y precios
+            tamano: true,
+            nota: true,
+            precio_unit: true,
+            subtotal: true,
+            opcionesElegidas: { select: { opcion_nombre: true }, orderBy: { id: 'asc' } },
             // Solo para contar líneas por área del progreso; no se devuelven
             area_id: true,
             producto: { select: { categoria: { select: { area_id: true } } } },
@@ -520,7 +537,19 @@ export class PedidosEstadoService {
             p.vouchers.find((v) => v.reemplazado_en == null && voucherCubreMedio(v.medio, m.medio))?.id?.toString() ?? null,
         })),
         creadoEn: p.creado_en,
-        lineas: p.lineas.map((l) => ({ nombre: l.nombre, cantidad: l.cantidad })),
+        lineas: p.lineas.map((l) => ({
+          id: String(l.id),
+          nombre: l.nombre,
+          cantidad: l.cantidad,
+          tamano: l.tamano || null,
+          // Nombres de las opciones elegidas, como en las etiquetas de cocina
+          opciones: l.opcionesElegidas.map((o) => o.opcion_nombre).filter(Boolean),
+          nota: l.nota || null,
+          precioUnit: Number(l.precio_unit),
+          subtotal: l.subtotal != null ? Number(l.subtotal) : null,
+          // Cocina ya tiene todas las unidades de la línea listas (listas = cantidad)
+          lista: l.listas >= l.cantidad,
+        })),
         // Estado de cocina y entrega (misma función que el seguimiento de la carta)
         progreso: progresoDelPedido(p, { cfg, ahora, preparacion }),
       })),
@@ -724,6 +753,13 @@ export class PedidosEstadoService {
           select: { id: true },
           take: 1,
         },
+        // Última prueba de entrega fallida (cliente no salió con llegada registrada)
+        incidentes: {
+          where: { motivo: 'NO_CONTESTA', llego_en: { not: null } },
+          orderBy: { en: 'desc' },
+          take: 1,
+          select: SELECT_PRUEBA_INCIDENTE,
+        },
       },
     });
 
@@ -772,8 +808,10 @@ export class PedidosEstadoService {
 
     const cobroMozo = (await this.cobrosMozoDe([pedido])).get(String(pedido.id)) ?? null;
 
+    const { incidentes, ...pedidoSinIncidentes } = pedido;
     return {
-      ...pedido,
+      ...pedidoSinIncidentes,
+      prueba_entrega: await construirPruebaEntrega(this.prisma, incidentes?.[0]),
       puntos,
       cobro_vigente_id: cobroVigenteId,
       cobroMozo,
@@ -1140,6 +1178,21 @@ export class PedidosEstadoService {
         this.verificarPinSupervisor(pin, usuarioActual.partyId, ip, pedido.id, 'pedidos/registrar_pago_sin_voucher'),
     });
 
+    // Código de operación por cada medio digital (plan mixto: uno por parte digital; efectivo: ninguno)
+    // La excepción «confirmar sin comprobante» (motivo + supervisor) no tiene voucher del que sacar el código
+    const codigosRequeridos = dto.sinVoucher ? [] : mediosQueExigenCodigo(metodoUpper, pedido.planPago);
+    const codigosEntregados = new Map(
+      (dto.codigosOperacion ?? []).map((c) => [String(c.medio).toUpperCase().trim(), String(c.codigo).trim()]),
+    );
+    const sinCodigo = codigosRequeridos.filter((m) => !codigosEntregados.get(m));
+    if (sinCodigo.length > 0) {
+      throw new BadRequestException({
+        codigo: 'CODIGO_OPERACION_REQUERIDO',
+        faltan: sinCodigo,
+        mensaje: `Escribe el código de operación que ves en el voucher (${sinCodigo.join(', ')})`,
+      });
+    }
+
     const ahora = new Date();
     const pedidoActualizado = await this.prisma.pedido.update({
       where: { id: pedido.id },
@@ -1150,6 +1203,24 @@ export class PedidosEstadoService {
         pago_coordinado_por: usuarioActual.partyId,
       },
     });
+
+    // El código confirmado por Caja queda en el voucher vigente de ese medio (la lectura de la IA sigue en `extraido`)
+    for (const medio of codigosRequeridos) {
+      const codigo = codigosEntregados.get(medio)!;
+      const voucher = await this.prisma.voucherPago.findFirst({
+        where: {
+          pedido_id: pedido.id,
+          reemplazado_en: null,
+          semaforo: { not: 'ILEGIBLE' },
+          OR: [{ medio: null }, { medio }],
+        },
+        orderBy: { creado_en: 'desc' },
+        select: { id: true, operacion: true },
+      });
+      if (voucher && voucher.operacion !== codigo) {
+        await this.prisma.voucherPago.update({ where: { id: voucher.id }, data: { operacion: codigo } });
+      }
+    }
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -1165,6 +1236,7 @@ export class PedidosEstadoService {
         sin_voucher: sinVoucherAutorizado
           ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId }
           : null,
+        codigos_operacion: codigosRequeridos.map((medio) => ({ medio, codigo: codigosEntregados.get(medio) })),
       },
       partyId: usuarioActual.partyId,
       ...(sinVoucherAutorizado ? { conPinAdmin: true, motivo: sinVoucherAutorizado.motivo } : {}),

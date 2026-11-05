@@ -18,9 +18,6 @@ import {
   BOTONES_PEDIDO_MODALIDAD,
   BOTONES_PEDIDO_NOMBRE_CONFIRMAR,
   BOTONES_PEDIDO_NOTAS,
-  BOTONES_PEDIDO_OFERTA_CALIFICA,
-  BOTONES_PEDIDO_OFERTA_FALTA,
-  BOTONES_PEDIDO_PREGUNTA_CUPON,
   BOTONES_PEDIDO_UBICACION,
   BOTONES_PEDIDO_UBICACION_FALLIDA,
   BOTONES_PEDIDO_VER_CARRITO,
@@ -54,9 +51,6 @@ describe('Límites estrictos de WhatsApp en catálogo de textos y botones (FT-BO
       ...BOTONES_PEDIDO_UBICACION_FALLIDA,
       ...BOTONES_PEDIDO_ACCION_CARRITO,
       ...BOTONES_PEDIDO_VER_CARRITO,
-      ...BOTONES_PEDIDO_OFERTA_CALIFICA,
-      ...BOTONES_PEDIDO_OFERTA_FALTA,
-      ...BOTONES_PEDIDO_PREGUNTA_CUPON,
       ...BOTONES_PEDIDO_NOMBRE_CONFIRMAR,
       ...BOTONES_PEDIDO_COMPROBANTE,
       ...BOTONES_PEDIDO_CONFIRMAR_FINAL,
@@ -132,9 +126,6 @@ describe('Límites estrictos de WhatsApp en catálogo de textos y botones (FT-BO
       BOTONES_PEDIDO_UBICACION_FALLIDA,
       BOTONES_PEDIDO_ACCION_CARRITO,
       BOTONES_PEDIDO_VER_CARRITO,
-      BOTONES_PEDIDO_OFERTA_CALIFICA,
-      BOTONES_PEDIDO_OFERTA_FALTA,
-      BOTONES_PEDIDO_PREGUNTA_CUPON,
       BOTONES_PEDIDO_NOMBRE_CONFIRMAR,
       BOTONES_PEDIDO_COMPROBANTE,
       BOTONES_PEDIDO_CONFIRMAR_FINAL,
@@ -163,7 +154,7 @@ describe('Límites estrictos de WhatsApp en catálogo de textos y botones (FT-BO
       expect(TEXTOS_BOT.pedidoPedirUbicacion().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoUbicacionClipAyuda().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoFueraDeCobertura().length).toBeLessThanOrEqual(LIMITE_CUERPO);
-      expect(TEXTOS_BOT.pedidoUbicacionExitosa(5.0, false, 70).length).toBeLessThanOrEqual(LIMITE_CUERPO);
+      expect(TEXTOS_BOT.pedidoUbicacionExitosa(5.0, false).length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoUbicacionExitosa(0, true).length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoEscribirDireccionPrompt().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoPedirReferencia().length).toBeLessThanOrEqual(LIMITE_CUERPO);
@@ -183,12 +174,6 @@ describe('Límites estrictos de WhatsApp en catálogo de textos y botones (FT-BO
       expect(TEXTOS_BOT.pedidoVerCarrito('1x Hamburguesa S/ 25.00', 25.0).length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoProductoEliminado('Hamburguesa Clásica').length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoCarritoVacio().length).toBeLessThanOrEqual(LIMITE_CUERPO);
-      expect(TEXTOS_BOT.pedidoOfertaCalifica('2x1 Hamburguesas', 15.0).length).toBeLessThanOrEqual(LIMITE_CUERPO);
-      expect(TEXTOS_BOT.pedidoOfertaFaltaPoco(1, ['1x Hamburguesa'], 'Combo Dúo', 35.0).length).toBeLessThanOrEqual(LIMITE_CUERPO);
-      expect(TEXTOS_BOT.pedidoPreguntaCupon().length).toBeLessThanOrEqual(LIMITE_CUERPO);
-      expect(TEXTOS_BOT.pedidoIngresarCuponPrompt().length).toBeLessThanOrEqual(LIMITE_CUERPO);
-      expect(TEXTOS_BOT.pedidoCuponAplicado('DESCUENTO10', 5.0).length).toBeLessThanOrEqual(LIMITE_CUERPO);
-      expect(TEXTOS_BOT.pedidoCuponInvalido().length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoMinimoNoAlcanzado(20, 5).length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoConfirmarNombre('Carlos').length).toBeLessThanOrEqual(LIMITE_CUERPO);
       expect(TEXTOS_BOT.pedidoIngresarNombre().length).toBeLessThanOrEqual(LIMITE_CUERPO);
@@ -212,7 +197,6 @@ describe('Límites estrictos de WhatsApp en catálogo de textos y botones (FT-BO
         modalidad: 'DELIVERY',
         direccionTexto: 'Av. Las Flores 123 (Ref: Portón azul)',
         lineasTexto: '• 2x Hamburguesa Clásica S/ 50.00\n  - Papas nativas (S/ 0.00)\n• 1x Chicha Morada 500ml S/ 8.00',
-        descuentoTexto: 'Cupón DESCUENTO10 (-S/ 5.00)',
         envioTexto: 'S/ 6.00',
         total: 59.0,
         pagoTexto: 'Yape / Plin',

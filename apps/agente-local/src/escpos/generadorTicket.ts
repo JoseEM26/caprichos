@@ -1,5 +1,5 @@
-import { lineasTicketPago } from '@caprichos/compartido';
-import type { TicketPagoDatos } from '@caprichos/compartido';
+import { lineasTicketPago, lineasTicketComandaSalon } from '@caprichos/compartido';
+import type { TicketPagoDatos, TicketComandaSalonDatos } from '@caprichos/compartido';
 import { aWindows1252 } from '../tspl/codepage1252';
 
 const ESC = '\x1b';
@@ -60,4 +60,17 @@ export function generarTicketEscPos(t: TicketPagoDatos, columnas: number = 48): 
   texto.push(`\n\n\n${GS}V\x42\x00`);
   volcar();
   return Buffer.concat(partes);
+}
+
+/**
+ * Comanda de salón en ESC/POS para la ticketera de Caja: texto plano en negrita donde toca, sin QR.
+ * Mismo ancho de papel y corte que el ticket de pago.
+ */
+export function generarComandaSalonEscPos(c: TicketComandaSalonDatos, columnas: number = 48): Buffer {
+  const partes: string[] = [`${ESC}@${ESC}t\x10`];
+  for (const l of lineasTicketComandaSalon(c, columnas)) {
+    partes.push(l.negrita ? `${ESC}E\x01${l.texto}\n${ESC}E\x00` : `${l.texto}\n`);
+  }
+  partes.push(`\n\n\n${GS}V\x42\x00`);
+  return aWindows1252(partes.join(''));
 }

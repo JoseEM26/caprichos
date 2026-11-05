@@ -4,7 +4,9 @@ import { leerPedidosGuardados, useSeguimientoPedido } from './seguimiento';
 import type { PasoSeguimiento, PedidoGuardado } from './seguimiento';
 import { ProgresoPedido } from '../admin/salon/ProgresoPedido';
 import { AdjuntarCapturaPago } from './AdjuntarCapturaPago';
+import { EstadoVoucherPedido } from './EstadoVoucherPedido';
 import type { PedidoConfirmado } from './tipos';
+import { BannerInstalarApp } from '../pwa/BannerInstalarApp';
 
 export function PantallaConfirmacion() {
   const { pedidoConfirmado, setPedidoConfirmado, seguimientoAbierto, setSeguimientoAbierto } = useCarrito();
@@ -222,6 +224,9 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
         )}
       </div>
 
+      {/* Estado del voucher (pago digital), arriba del progreso */}
+      {estado && !anulado && <EstadoVoucherPedido voucher={estado.voucher} />}
+
       {/* Pasos reales del pedido, según la API */}
       {estado && !anulado && (
         <div
@@ -255,6 +260,9 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
           ))}
         </div>
       )}
+
+      {/* Ya hizo un pedido: aquí (y en Mis pedidos con pedidos) se ofrece instalar la app */}
+      <BannerInstalarApp />
 
       <button
         onClick={onCerrar}

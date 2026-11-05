@@ -37,6 +37,7 @@ describe('ZonasService', () => {
       parametro: {
         findUnique: jest.fn(),
       },
+      oferta: { findMany: jest.fn().mockResolvedValue([]) },
     };
 
     auditoria = {
@@ -312,7 +313,29 @@ describe('ZonasService', () => {
         tarifaZona: 4.0,
         gratisDesde: 80,
         modoGratis: 'mas_de',
+        envioGratisPromo: null,
       });
+    });
+
+    it('GET /carta/envio con promo ENVIO_GRATIS vigente en la carta devuelve envioGratisPromo (14:00 Lima)', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-11-04T19:00:00.000Z'));
+      try {
+        prisma.zonaReparto.findMany.mockResolvedValue([{ id: BigInt(4), codigo: 'Z4', tarifa: 4.0, activa: true, poligono: poligonoZ4 }]);
+        prisma.oferta.findMany.mockResolvedValueOnce([
+          {
+            id: 77n, nombre: 'Delivery gratis de 2 a 6 pm', tipo: 'ENVIO_GRATIS', activo: true, orden: 0, dias: [],
+            hora_desde: new Date('1970-01-01T14:00:00.000Z'), hora_hasta: new Date('1970-01-01T18:00:00.000Z'),
+            fecha_desde: null, fecha_hasta: null, canales: ['CARTA', 'ADMIN'], limite_usos: null, usos_actuales: 0, compra_minima: null,
+          },
+        ]);
+
+        const res = await service.consultarEnvio(-12.05, -77.0);
+
+        expect(res.tarifa).toBe(4);
+        expect(res.envioGratisPromo).toEqual({ nombre: 'Delivery gratis de 2 a 6 pm', hasta: '18:00', compraMinima: null });
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('GET /carta/envio lee envio_gratis_modo "desde" y acepta el monto como texto', async () => {
@@ -346,6 +369,7 @@ describe('ZonasService', () => {
         tarifaZona: null,
         modoGratis: 'mas_de',
         gratisDesde: 70,
+        envioGratisPromo: null,
       });
     });
   });

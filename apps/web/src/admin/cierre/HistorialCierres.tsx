@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Cargando } from '../../comun/Cargando';
+import { ListaCorrecciones } from './CorreccionesMedios';
 import { EstadoError } from '../../comun/EstadoError';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { Paginacion } from '../../comun/Paginacion';
@@ -410,6 +411,9 @@ export function HistorialCierres() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                     <span>{detalle.resultado === 'CUADRA' ? 'Cuadrado' : 'Diferencia'}</span>
                     <span>{detalle.resultado === 'CUADRA' ? '+s/ 0.00' : `${(detalle.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.diferencia ?? 0).toFixed(2)}`}</span>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <ListaCorrecciones ajustes={detalle.ajustesMedio ?? []} titulo="Correcciones de medios digitales" />
                   </div>
                   {detalle.nota && (
                     <div style={{ marginTop: 6, fontStyle: 'italic' }}>

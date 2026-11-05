@@ -6,6 +6,8 @@ import { Confirmar } from '../../comun/Confirmar';
 import { PisoSalon, Reserva } from './tipos';
 import { ModalFormularioReserva } from './componentes/ModalFormularioReserva';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
+import { ConfirmarAprobacionSolicitud } from './componentes/ConfirmarAprobacionSolicitud';
+import { hoyLima, partesLima } from './fechaLima';
 import { useSalonSocket } from './useSalonSocket';
 import { salonApi } from './api';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
@@ -15,10 +17,19 @@ export interface SolicitudWhatsApp {
   nombre: string;
   tel: string;
   personas: number;
+  /** Hora de la solicitud en Lima (HH:mm). */
   hora: string;
+  /** Fecha de la solicitud en Lima (YYYY-MM-DD). */
+  fecha: string;
+  /** Instante original de la solicitud (ISO). */
+  horaIso: string;
   estado: 'pendiente' | 'aprobada' | 'rechazada';
   mesa?: string;
   mesasIds?: string[];
+}
+
+function partesSolicitud(horaIso: string | null | undefined) {
+  return { horaIso: horaIso || '', ...partesLima(horaIso) };
 }
 
 export function ReservasView() {
@@ -41,12 +52,12 @@ export function ReservasView() {
   const [solicitudes, setSolicitudes] = useState<SolicitudWhatsApp[]>([]);
 
   // Selección de fecha en calendario (por defecto hoy)
-  const hoyRef = new Date();
+  const [hoyY, hoyM, hoyD] = hoyLima().split('-').map(Number);
   const [mesActual, setMesActual] = useState<{ y: number; m: number }>({
-    y: hoyRef.getFullYear(),
-    m: hoyRef.getMonth(),
+    y: hoyY,
+    m: hoyM - 1,
   });
-  const [diaSeleccionado, setDiaSeleccionado] = useState<number>(hoyRef.getDate());
+  const [diaSeleccionado, setDiaSeleccionado] = useState<number>(hoyD);
 
   // Búsqueda y filtros de tabla
   const [busquedaTabla, setBusquedaTabla] = useState('');
@@ -69,6 +80,7 @@ export function ReservasView() {
   // Confirmaciones Sí/No
   const [confirmarAprobarSol, setConfirmarAprobarSol] = useState<SolicitudWhatsApp | null>(null);
   const [confirmarRechazarSol, setConfirmarRechazarSol] = useState<SolicitudWhatsApp | null>(null);
+  const [errorRechazo, setErrorRechazo] = useState<string | null>(null);
   const [confirmarCancelarReserva, setConfirmarCancelarReserva] = useState<Reserva | null>(null);
   const [confirmarSentarReserva, setConfirmarSentarReserva] = useState<Reserva | null>(null);
 
@@ -97,7 +109,7 @@ export function ReservasView() {
             nombre: s.nombre || 'Cliente',
             tel: s.telefono || '',
             personas: s.personas || 2,
-            hora: s.hora ? s.hora.slice(11, 16) : '',
+            ...partesSolicitud(s.hora),
             estado: s.estado || 'pendiente',
             mesa: s.mesa || undefined,
             mesasIds: s.mesasIds || [],
@@ -182,10 +194,7 @@ export function ReservasView() {
   const listaTodasReservas = reservas;
 
   // Fecha actual formateada (YYYY-MM-DD)
-  const hoyIso = useMemo(() => {
-    const h = new Date();
-    return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`;
-  }, []);
+  const hoyIso = useMemo(() => hoyLima(), []);
 
   // Fecha seleccionada formateada (YYYY-MM-DD)
   const diaIso = useMemo(() => {
@@ -198,7 +207,7 @@ export function ReservasView() {
       return agendaReservas;
     }
     return listaTodasReservas.filter((r) => {
-      const f = r.hora ? r.hora.slice(0, 10) : '';
+      const f = partesLima(r.hora).fecha;
       return f === diaIso;
     });
   }, [agendaReservas, listaTodasReservas, diaIso]);
@@ -206,7 +215,7 @@ export function ReservasView() {
   // Conteo de hoy calculado desde las reservas reales
   const reservasHoyCount = useMemo(() => {
     return listaTodasReservas.filter((r) => {
-      const f = r.hora ? r.hora.slice(0, 10) : '';
+      const f = partesLima(r.hora).fecha;
       return f === hoyIso && r.estado !== 'CANCELADA';
     }).length;
   }, [listaTodasReservas, hoyIso]);
@@ -742,7 +751,10 @@ export function ReservasView() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setConfirmarRechazarSol(r)}
+                      onClick={() => {
+                        setErrorRechazo(null);
+                        setConfirmarRechazarSol(r);
+                      }}
                       style={{
                         flex: '1 1 100px',
                         minHeight: '48px',
@@ -886,9 +898,9 @@ export function ReservasView() {
             <button
               type="button"
               onClick={() => {
-                const h = new Date();
-                setMesActual({ y: h.getFullYear(), m: h.getMonth() });
-                setDiaSeleccionado(h.getDate());
+                const [y, m, d] = hoyLima().split('-').map(Number);
+                setMesActual({ y, m: m - 1 });
+                setDiaSeleccionado(d);
               }}
               style={{
                 minHeight: '44px',
@@ -927,8 +939,7 @@ export function ReservasView() {
             const esSeleccionado = diaSeleccionado === d;
             const dtIso = `${mesActual.y}-${String(mesActual.m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const reservasDia = listaTodasReservas.filter((r) => {
-              const f = r.hora ? r.hora.slice(0, 10) : '';
-              return f === dtIso;
+              return partesLima(r.hora).fecha === dtIso;
             });
             const nConf = reservasDia.filter((r) => r.estado !== 'CANCELADA').length;
 
@@ -1050,10 +1061,7 @@ export function ReservasView() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {reservasDelDia.map((r) => {
-              const d = new Date(r.hora);
-              const horaTexto = !isNaN(d.getTime())
-                ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : '19:00';
+              const horaTexto = partesLima(r.hora).hora || '19:00';
               const mesaNom = (r.mesas || []).map((m) => m.nombre || `M0${m.numero}`).join(' + ');
 
               return (
@@ -1298,13 +1306,9 @@ export function ReservasView() {
           }}
         >
           {reservasFiltradas.map((r) => {
-            const d = new Date(r.hora);
-            const fechaStr = !isNaN(d.getTime())
-              ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
-              : '15/10';
-            const horaStr = !isNaN(d.getTime())
-              ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : '19:00';
+            const lima = partesLima(r.hora);
+            const fechaStr = lima.fecha ? `${lima.fecha.slice(8, 10)}/${lima.fecha.slice(5, 7)}` : '15/10';
+            const horaStr = lima.hora || '19:00';
             const mesaNom = (r.mesas || []).map((m) => m.nombre || `M0${m.numero}`).join(' + ');
 
             const badgeBg =
@@ -1472,38 +1476,18 @@ export function ReservasView() {
 
       {/* DIÁLOGOS DE CONFIRMACIÓN OBLIGATORIA SÍ/NO */}
       {confirmarAprobarSol && (
-        <Confirmar
-          abierto={true}
-          titulo={`¿Aprobar la reserva de ${confirmarAprobarSol.nombre}?`}
-          mensaje={`Se guarda la mesa ${
-            confirmarAprobarSol.mesa || 'asignada'
-          } a las ${confirmarAprobarSol.hora} y se le avisa al cliente por WhatsApp.`}
-          textoConfirmar="Sí, aprobar"
-          textoNo="No, cancelar"
-          alConfirmar={async () => {
-            try {
-              if (salonApi.aprobarSolicitud) {
-                const mesasParaAsignar =
-                  confirmarAprobarSol.mesasIds && confirmarAprobarSol.mesasIds.length > 0
-                    ? confirmarAprobarSol.mesasIds
-                    : todasLasMesas.slice(0, 1).map((m) => m.id);
-                await salonApi.aprobarSolicitud(confirmarAprobarSol.id, {
-                  mesas: mesasParaAsignar,
-                });
-              }
-              setSolicitudes((prev) =>
-                prev.map((s) =>
-                  s.id === confirmarAprobarSol.id
-                    ? { ...s, estado: 'aprobada' as const }
-                    : s,
-                ),
-              );
-              setConfirmarAprobarSol(null);
-              cargarDatos();
-            } catch (err: any) {
-              setErrorGlobal(err?.message || 'Error al aprobar solicitud de reserva.');
-              setConfirmarAprobarSol(null);
-            }
+        <ConfirmarAprobacionSolicitud
+          solicitud={confirmarAprobarSol}
+          mesas={todasLasMesas}
+          alAprobar={async ({ mesas, hora }) => {
+            await salonApi.aprobarSolicitud(confirmarAprobarSol.id, { mesas, hora });
+            setSolicitudes((prev) =>
+              prev.map((s) =>
+                s.id === confirmarAprobarSol.id ? { ...s, estado: 'aprobada' as const } : s,
+              ),
+            );
+            setConfirmarAprobarSol(null);
+            cargarDatos();
           }}
           alCancelar={() => setConfirmarAprobarSol(null)}
         />
@@ -1517,28 +1501,34 @@ export function ReservasView() {
           textoConfirmar="Sí, rechazar"
           textoNo="No, cancelar"
           alConfirmar={async () => {
+            setErrorRechazo(null);
             try {
-              if (salonApi.rechazarSolicitud) {
-                await salonApi.rechazarSolicitud(confirmarRechazarSol.id, {
-                  motivo: 'No hay mesa disponible en el horario solicitado',
-                });
-              }
+              await salonApi.rechazarSolicitud(confirmarRechazarSol.id, {
+                motivo: 'No hay mesa disponible en el horario solicitado',
+              });
               setSolicitudes((prev) =>
                 prev.map((s) =>
-                  s.id === confirmarRechazarSol.id
-                    ? { ...s, estado: 'rechazada' as const }
-                    : s,
+                  s.id === confirmarRechazarSol.id ? { ...s, estado: 'rechazada' as const } : s,
                 ),
               );
               setConfirmarRechazarSol(null);
               cargarDatos();
             } catch (err: any) {
-              setErrorGlobal(err?.message || 'Error al rechazar solicitud de reserva.');
-              setConfirmarRechazarSol(null);
+              // El diálogo se queda abierto con el motivo; la pantalla sigue visible.
+              setErrorRechazo(err?.message || 'No fue posible rechazar la solicitud.');
             }
           }}
-          alCancelar={() => setConfirmarRechazarSol(null)}
-        />
+          alCancelar={() => {
+            setErrorRechazo(null);
+            setConfirmarRechazarSol(null);
+          }}
+        >
+          {errorRechazo && (
+            <div role="alert" style={{ fontSize: '13px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+              {errorRechazo}
+            </div>
+          )}
+        </Confirmar>
       )}
 
       {confirmarCancelarReserva && (

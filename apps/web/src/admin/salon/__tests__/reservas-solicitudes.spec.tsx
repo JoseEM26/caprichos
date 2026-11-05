@@ -36,6 +36,34 @@ vi.mock('../audioAlerta', () => ({
   reproducirAvisoListo: vi.fn(),
 }));
 
+/** Respuesta de /admin/salon/mesas: dos mesas activas en un piso. */
+function pisosConMesas() {
+  const mesa = (id: string, numero: number, asientos: number) => ({
+    id,
+    pisoId: 'p1',
+    tipo: 'MESA',
+    numero,
+    nombre: `Mesa ${numero}`,
+    asientos,
+    x: 0,
+    y: 0,
+    ancho: 1,
+    alto: 1,
+    activo: true,
+    estado: 'LIBRE',
+  });
+  return {
+    pisos: [
+      {
+        id: 'p1',
+        nombre: 'Piso 1',
+        activo: true,
+        mesas: [mesa('1', 1, 4), mesa('2', 2, 2)],
+      },
+    ],
+  };
+}
+
 function simularSesionAdmin() {
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
     usuario: {
@@ -60,10 +88,7 @@ describe('Gestión de Solicitudes de Reserva por WhatsApp (Admin Salon)', () => 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    (salonApi.obtenerMesas as any).mockResolvedValue([
-      { id: '1', numero: 1, nombre: 'Mesa 1', asientos: 4, activo: true, estado: 'LIBRE' },
-      { id: '2', numero: 2, nombre: 'Mesa 2', asientos: 2, activo: true, estado: 'LIBRE' },
-    ]);
+    (salonApi.obtenerMesas as any).mockResolvedValue(pisosConMesas());
 
     (salonApi.calendario as any).mockResolvedValue({
       dias: {},
@@ -104,8 +129,7 @@ describe('Gestión de Solicitudes de Reserva por WhatsApp (Admin Salon)', () => 
         nombre: 'Renzo Palacios',
         telefono: '912345678',
         personas: 2,
-        hora: '19:30',
-        fechaTexto: '2026-10-30',
+        hora: '2099-12-20T19:30:00-05:00',
         estado: 'pendiente',
         mesa: 'Mesa 2 (Piso 1)',
         mesasIds: ['2'],
@@ -137,7 +161,10 @@ describe('Gestión de Solicitudes de Reserva por WhatsApp (Admin Salon)', () => 
     fireEvent.click(btnSi);
 
     await waitFor(() => {
-      expect(salonApi.aprobarSolicitud).toHaveBeenCalledWith('15', { mesas: ['2'] });
+      expect(salonApi.aprobarSolicitud).toHaveBeenCalledWith('15', {
+        mesas: ['2'],
+        hora: '2099-12-20T19:30:00-05:00',
+      });
     });
   });
 
@@ -205,6 +232,115 @@ describe('Gestión de Solicitudes de Reserva por WhatsApp (Admin Salon)', () => 
     await waitFor(() => {
       expect(salonApi.rechazarSolicitud).toHaveBeenCalledWith('25', {
         motivo: 'No hay mesa disponible en el horario solicitado',
+      });
+    });
+  });
+
+  describe('aprobar o rechazar con error: la pantalla no se reemplaza', () => {
+    const solicitudFutura = (extra: Record<string, unknown> = {}) => ({
+      id: '40',
+      nombre: 'Marta Quispe',
+      telefono: '955443322',
+      personas: 2,
+      hora: '2099-12-20T19:00:00-05:00',
+      estado: 'pendiente',
+      ...extra,
+    });
+
+    it('si el API rechaza la aprobación, el error va dentro del diálogo y no aparece «Error al cargar reservas»', async () => {
+      (salonApi.listarSolicitudes as any).mockResolvedValue([solicitudFutura({ mesasIds: ['1'] })]);
+      (salonApi.aprobarSolicitud as any).mockRejectedValue(
+        new Error('La hora solicitada ya pasó. Elige una hora nueva para aprobar la reserva.'),
+      );
+
+      simularSesionAdmin();
+      render(<ReservasView />);
+      await waitFor(() => expect(screen.getByText('Marta Quispe')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /Aprobar y guardar la mesa/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Sí, aprobar/i }));
+
+      const alerta = await screen.findByRole('alert');
+      expect(alerta).toHaveTextContent('La hora solicitada ya pasó. Elige una hora nueva para aprobar la reserva.');
+      expect(screen.queryByText('Error al cargar reservas')).not.toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /¿Aprobar la reserva de Marta Quispe\?/i })).toBeInTheDocument();
+      expect(screen.getByText(/Solicitudes por WhatsApp/i)).toBeInTheDocument();
+    });
+
+    it('si el API rechaza el rechazo, el error queda dentro del diálogo y la pantalla sigue', async () => {
+      (salonApi.listarSolicitudes as any).mockResolvedValue([solicitudFutura()]);
+      (salonApi.rechazarSolicitud as any).mockRejectedValue(new Error('Motivo no válido'));
+
+      simularSesionAdmin();
+      render(<ReservasView />);
+      await waitFor(() => expect(screen.getByText('Marta Quispe')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /^Rechazar$/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Sí, rechazar/i }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Motivo no válido');
+      expect(screen.queryByText('Error al cargar reservas')).not.toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /¿Rechazar la solicitud de Marta Quispe\?/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('modal de aprobación: mesa y hora', () => {
+    it('sin mesa elegida el botón está deshabilitado y dice «Elige una mesa»', async () => {
+      (salonApi.listarSolicitudes as any).mockResolvedValue([
+        { id: '41', nombre: 'Tomás Ríos', telefono: '966554433', personas: 2, hora: '2099-12-20T20:00:00-05:00', estado: 'pendiente' },
+      ]);
+
+      simularSesionAdmin();
+      render(<ReservasView />);
+      await waitFor(() => expect(screen.getByText('Tomás Ríos')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /Aprobar y guardar la mesa/i }));
+
+      const btnElegir = screen.getByRole('button', { name: 'Elige una mesa' });
+      expect(btnElegir).toBeDisabled();
+
+      fireEvent.click(screen.getByRole('button', { name: /Mesa 1/ }));
+      const btnSi = screen.getByRole('button', { name: 'Sí, aprobar' });
+      expect(btnSi).toBeEnabled();
+      fireEvent.click(btnSi);
+
+      await waitFor(() => {
+        expect(salonApi.aprobarSolicitud).toHaveBeenCalledWith('41', {
+          mesas: ['1'],
+          hora: '2099-12-20T20:00:00-05:00',
+        });
+      });
+    });
+
+    it('si la hora solicitada ya pasó, lo avisa, exige una hora futura y envía la nueva', async () => {
+      (salonApi.listarSolicitudes as any).mockResolvedValue([
+        { id: '42', nombre: 'Elena Vidal', telefono: '977665544', personas: 2, hora: '2020-01-01T01:00:00.000Z', estado: 'pendiente', mesasIds: ['2'] },
+      ]);
+      (salonApi.aprobarSolicitud as any).mockResolvedValue({ solicitud: { id: '42' }, reserva: { id: '9' } });
+
+      simularSesionAdmin();
+      render(<ReservasView />);
+      await waitFor(() => expect(screen.getByText('Elena Vidal')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /Aprobar y guardar la mesa/i }));
+
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'La hora solicitada ya pasó. Elige una hora nueva para aprobar o rechaza la solicitud.',
+      );
+      expect(screen.getByRole('button', { name: 'Elige una hora futura' })).toBeDisabled();
+
+      fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2099-12-21' } });
+      fireEvent.change(screen.getByLabelText('Hora (Lima)'), { target: { value: '18:30' } });
+
+      const btnSi = screen.getByRole('button', { name: 'Sí, aprobar' });
+      expect(btnSi).toBeEnabled();
+      fireEvent.click(btnSi);
+
+      await waitFor(() => {
+        expect(salonApi.aprobarSolicitud).toHaveBeenCalledWith('42', {
+          mesas: ['2'],
+          hora: '2099-12-21T18:30:00-05:00',
+        });
       });
     });
   });

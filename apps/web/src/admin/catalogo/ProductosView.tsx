@@ -1815,7 +1815,15 @@ export function ProductosView() {
 
             {/* Sabores gestionables (Donas, Galletas, Pizzas, etc.) */}
             <div>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>Sabores o variantes</div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                Sabores o variantes (opciones que el cliente elige, como relleno o sabor)
+              </div>
+              <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)', marginBottom: 6 }}>
+                Son las opciones que el cliente elige al pedir este producto (p. ej. el relleno o
+                sabor de una dona). El bot de WhatsApp las ofrece al pedir, cocina las usa para
+                marcar agotados y los avisos de agotados también las usan. Toca una opción para
+                marcarla como agotada.
+              </div>
               <div
                 style={{
                   background: 'var(--cp-white)',

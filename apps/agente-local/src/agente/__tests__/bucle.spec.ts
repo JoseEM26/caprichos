@@ -167,4 +167,37 @@ describe('AgenteLocalServicio (Bucle de impresion)', () => {
     await agente.ejecutarCiclo();
     expect(mockCliente.enviarLatido).toHaveBeenCalledWith('0.1.0', 'lista', undefined);
   });
+
+  it('la comanda de salón sale por la ticketera (no por la etiquetera) con su generador ESC/POS', async () => {
+    const etiquetera = new ImpresoraMemoria();
+    const ticketera = new ImpresoraMemoria();
+    const comanda: TrabajoImpresion = {
+      id: 'job-comanda',
+      tipo: 'TICKET_COMANDA_SALON',
+      payload: {
+        codigo: 'CP-9', mesa: 'Mesa 3', cliente: 'Ana', canal: 'Mozo', fecha: '05/11/2026', hora: '13:00',
+        lineas: [{ cantidad: 1, nombre: 'Frappe Mocha', tamano: 'Grande', opciones: ['Sin azúcar'], nota: null }],
+      } as any,
+      copia: false,
+      intentos: 0,
+    };
+    (mockCliente.tomarTrabajos as any).mockResolvedValueOnce([comanda]);
+
+    const agente = new AgenteLocalServicio({
+      config: {
+        apiUrl: 'http://localhost:3000', agenteKey: 'k', impresoraRuta: 'memoria://',
+        intervaloConsultaMs: 1000, intervaloLatidoMs: 20000, maxTrabajosPorLote: 10, version: '0.1.0',
+      },
+      clienteApi: mockCliente,
+      impresoras: { ETIQUETERA: etiquetera, TICKETERA: ticketera },
+      logger: (_n, msg) => logs.push(msg),
+    });
+
+    await agente.ejecutarCiclo();
+    expect(etiquetera.obtenerTrabajosEscritos()).toHaveLength(0);
+    const salida = ticketera.obtenerTrabajosEscritos().map((b) => b.toString('latin1')).join('');
+    expect(salida).toContain('Pedido CP-9');
+    expect(salida).toContain('Frappe Mocha');
+    expect(mockCliente.reportarResultado).toHaveBeenCalledWith('job-comanda', true);
+  });
 });

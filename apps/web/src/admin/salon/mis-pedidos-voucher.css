@@ -1,18 +1,20 @@
 /* Voucher de pedidos digitales en Mis pedidos (fila de la tarjeta y ventana). Clases propias: mpv-. */
 
+/* Una fila por medio digital: badge y botones en línea, con salto si no caben */
 .mpv-fila {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 14px 12px;
+  gap: 6px 8px;
+  padding: 0;
 }
 
 .mpv-badge {
   font-size: 12px;
   font-weight: 700;
-  padding: 4px 10px;
+  line-height: 1.4;
+  padding: 2px 9px;
   border-radius: 999px;
 }
 

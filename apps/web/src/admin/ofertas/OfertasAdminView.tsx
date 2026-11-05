@@ -10,6 +10,7 @@ import { ModalArmarOferta } from './ModalArmarOferta';
 import { ModalCombo } from './ModalCombo';
 import { ModalLlevaPaga } from './ModalLlevaPaga';
 import { ModalDescuento } from './ModalDescuento';
+import { ModalEnvioGratis } from './ModalEnvioGratis';
 import { ModalCupon } from './ModalCupon';
 import { ModalHistorialCupones, HistorialMovimiento } from './ModalHistorialCupones';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -292,6 +293,8 @@ export function OfertasAdminView() {
   const [llevaPagaAEditar, setLlevaPagaAEditar] = useState<OfertaItem | null>(null);
 
   const [modalDescuentoAbierto, setModalDescuentoAbierto] = useState(false);
+  const [modalEnvioAbierto, setModalEnvioAbierto] = useState(false);
+  const [envioAEditar, setEnvioAEditar] = useState<OfertaItem | null>(null);
   const [descuentoAEditar, setDescuentoAEditar] = useState<OfertaItem | null>(null);
 
   const [modalCuponAbierto, setModalCuponAbierto] = useState(false);
@@ -391,8 +394,9 @@ export function OfertasAdminView() {
     return productos.filter((p) => !p.noSumaBeneficios && !deCombo.has(p.id));
   }, [productos, ofertas]);
 
+  // Las promos de envío gratis viven en esta pestaña: se aplican solas, sin código, como los descuentos
   const descuentos = useMemo(
-    () => ofertas.filter((o) => o.tipo === 'DESCUENTO' || o.tipo === 'DESCUENTO_AUTOMATICO'),
+    () => ofertas.filter((o) => o.tipo === 'DESCUENTO' || o.tipo === 'DESCUENTO_AUTOMATICO' || o.tipo === 'ENVIO_GRATIS'),
     [ofertas],
   );
 
@@ -508,12 +512,15 @@ export function OfertasAdminView() {
       await ofertasApi.actualizarOferta(llevaPagaAEditar.id, datos);
     } else if (descuentoAEditar) {
       await ofertasApi.actualizarOferta(descuentoAEditar.id, datos);
+    } else if (envioAEditar) {
+      await ofertasApi.actualizarOferta(envioAEditar.id, datos);
     } else {
       await ofertasApi.crearOferta(datos);
     }
     setComboAEditar(null);
     setLlevaPagaAEditar(null);
     setDescuentoAEditar(null);
+    setEnvioAEditar(null);
     await cargarDatos();
   };
 
@@ -1019,25 +1026,46 @@ export function OfertasAdminView() {
             <span style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
               Se aplican solos, sin código, en la carta, en Nuevo pedido y en el chatbot, cuando les toca el día y la hora.
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                setDescuentoAEditar(null);
-                setModalDescuentoAbierto(true);
-              }}
-              style={{
-                minHeight: '44px',
-                padding: '0 18px',
-                border: 0,
-                borderRadius: '12px',
-                backgroundColor: 'var(--cp-orange)',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                cursor: 'pointer',
-              }}
-            >
-              + Nuevo descuento
-            </button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setEnvioAEditar(null);
+                  setModalEnvioAbierto(true);
+                }}
+                style={{
+                  minHeight: '44px',
+                  padding: '0 18px',
+                  borderRadius: '12px',
+                  border: '1.5px solid var(--cp-navy)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                + Envío gratis
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDescuentoAEditar(null);
+                  setModalDescuentoAbierto(true);
+                }}
+                style={{
+                  minHeight: '44px',
+                  padding: '0 18px',
+                  border: 0,
+                  borderRadius: '12px',
+                  backgroundColor: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                + Nuevo descuento
+              </button>
+            </div>
           </div>
 
           {descuentos.length === 0 && (
@@ -1048,10 +1076,13 @@ export function OfertasAdminView() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
             {descuentos.map((d) => {
-              const valorBig =
-                d.descuentoTipo === 'PORCENTAJE' ? `${d.descuentoValor} %` : `s/ ${d.descuentoValor}`;
-              const aplicaTxt =
-                d.alcanceCategoriaId || d.categoriaNombre
+              const esEnvio = d.tipo === 'ENVIO_GRATIS';
+              const valorBig = esEnvio
+                ? 'Envío gratis'
+                : d.descuentoTipo === 'PORCENTAJE' ? `${d.descuentoValor} %` : `s/ ${d.descuentoValor}`;
+              const aplicaTxt = esEnvio
+                ? 'en el delivery, todas las zonas'
+                : d.alcanceCategoriaId || d.categoriaNombre
                   ? `en ${d.categoriaNombre || 'Categoría'}`
                   : d.alcanceProductoId || d.productoNombre
                   ? `en ${d.productoNombre || 'Producto'}`
@@ -1171,6 +1202,7 @@ export function OfertasAdminView() {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
+                    {!esEnvio && (
                     <button
                       type="button"
                       onClick={() => {
@@ -1195,11 +1227,17 @@ export function OfertasAdminView() {
                     >
                       Ver como se ve en la carta
                     </button>
+                    )}
 
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
                         type="button"
                         onClick={() => {
+                          if (esEnvio) {
+                            setEnvioAEditar(d);
+                            setModalEnvioAbierto(true);
+                            return;
+                          }
                           setDescuentoAEditar(d);
                           setModalDescuentoAbierto(true);
                         }}
@@ -2153,6 +2191,16 @@ export function OfertasAdminView() {
         categorias={categorias}
       />
 
+      <ModalEnvioGratis
+        abierto={modalEnvioAbierto}
+        ofertaAEditar={envioAEditar}
+        onCerrar={() => {
+          setModalEnvioAbierto(false);
+          setEnvioAEditar(null);
+        }}
+        onGuardar={guardarOfertaHandler}
+      />
+
       <ModalDescuento
         abierto={modalDescuentoAbierto}
         descuentoAEditar={descuentoAEditar}
@@ -2175,6 +2223,7 @@ export function OfertasAdminView() {
         }}
         onGuardar={guardarCuponHandler}
         productosDisponibles={productosConDescuento}
+              categorias={categorias}
       />
 
       <ModalHistorialCupones

@@ -1,7 +1,10 @@
 export type TipoEtiqueta = 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA';
 
-/** Tipo de trabajo de impresión: etiquetas (etiquetera) o ticket de pago (ticketera térmica). */
-export type TipoTrabajoImpresion = TipoEtiqueta | 'TICKET_PAGO';
+/** Comanda completa de un pedido de salón para la ticketera de Caja (se imprime al aceptarse). */
+export type TipoTicketComanda = 'TICKET_COMANDA_SALON';
+
+/** Tipo de trabajo de impresión: etiquetas (etiquetera), ticket de pago o comanda de salón (ticketera de Caja). */
+export type TipoTrabajoImpresion = TipoEtiqueta | 'TICKET_PAGO' | TipoTicketComanda;
 
 /** Máquina que imprime el trabajo: la etiquetera (stickers) o la ticketera (voucher/ticket de pago). */
 export type RolImpresora = 'ETIQUETERA' | 'TICKETERA';
@@ -9,7 +12,7 @@ export type RolImpresora = 'ETIQUETERA' | 'TICKETERA';
 export const ROLES_IMPRESORA: RolImpresora[] = ['ETIQUETERA', 'TICKETERA'];
 
 export function rolDeTrabajo(tipo: string): RolImpresora {
-  return tipo === 'TICKET_PAGO' ? 'TICKETERA' : 'ETIQUETERA';
+  return tipo === 'TICKET_PAGO' || tipo === 'TICKET_COMANDA_SALON' ? 'TICKETERA' : 'ETIQUETERA';
 }
 
 /** Estado de una máquina reportado por el agente local en su latido. */
@@ -78,6 +81,8 @@ export interface EtiquetaGeneralDatos {
   cantidadProductos: number;
   productos: EtiquetaGeneralProducto[];
   nota?: string | null;
+  /** Monto total del pedido (sticker de resumen para llevar/recoger y delivery). Ausente en trabajos viejos. */
+  total?: number | null;
   printer: string;
 }
 
@@ -120,11 +125,26 @@ export interface EtiquetaBebidaDatos {
   hora: string;
 }
 
+/** Comanda de salón: todas las líneas del pedido con tamaño, opciones y notas, para la cocina y el mozo. */
+export interface TicketComandaSalonDatos {
+  tipo?: TipoTicketComanda;
+  codigo: string;
+  /** Nombre de la mesa (salón); null si no hay. */
+  mesa: string | null;
+  cliente: string;
+  canal: string;
+  hora: string;
+  fecha: string;
+  lineas: { cantidad: number; nombre: string; tamano?: string | null; opciones: string[]; nota?: string | null }[];
+  nota?: string | null;
+}
+
 export type PayloadEtiqueta =
   | EtiquetaGeneralDatos
   | EtiquetaAreaDatos
   | EtiquetaBebidaDatos
-  | TicketPagoDatos;
+  | TicketPagoDatos
+  | TicketComandaSalonDatos;
 
 export interface TrabajoImpresion {
   id: string;

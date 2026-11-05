@@ -78,12 +78,12 @@ export const ANONIMIZAR: Record<string, ReglaAnonimizar[]> = {
 
 export const CONSERVAR: string[] = [
   'agotado', 'ajuste_opcion', 'alta_demanda', 'archivo', 'area_cocina', 'auditoria', 'caja',
-  'categoria', 'cierre_caja', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
+  'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'devolucion_pedido', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
   'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio',
   'compra', 'compra_linea', 'consumo_personal', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta',
   'encuesta_posventa', 'fecha_especial', 'foto_local', 'grupo_opciones', 'horario_dia',
-  'horario_trabajo', 'ia_consumo', 'incidente_entrega', 'iniciativa', 'iniciativa_comentario',
+  'horario_trabajo', 'ia_consumo', 'incidente_entrega', 'incidente_entrega_foto', 'iniciativa', 'iniciativa_comentario',
   'insumo', 'liquidacion', 'lista', 'lista_valor', 'lugar_stock', 'mensaje_carta', 'mensaje_chat',
   'mensaje_reparto', 'movimiento_caja', 'movimiento_stock', 'notificacion_lectura', 'novedad', 'novedad_foto', 'oferta',
   'opcion', 'organization', 'parametro', 'pedido_estado_historial', 'pedido_interno',
@@ -93,7 +93,7 @@ export const CONSERVAR: string[] = [
   'regla_acumulacion', 'reemplazo_dia', 'resena_google', 'reserva', 'reserva_mesa', 'ruta_reparto', 'respuesta_rapida', 'rol', 'rol_permiso',
   'sabor', 'saliente_whatsapp', 'secuencia_comprobante', 'secuencia_pedido', 'solicitud_cambio', 'comprobante_archivo', 'sunat_resumen',
   'solicitud_reserva', 'stock', 'supervisor_secreto', 'supplier_detail', 'sys_control', 'traslado',
-  'user_account', 'user_account_rol', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje', 'correo_envio',
+  'user_account', 'user_account_rol', 'user_account_area', 'uso_externo', 'version_carta', 'voucher_pago', 'whatsapp_mensaje', 'correo_envio',
   'zona_reparto',
 ];
 
@@ -111,6 +111,8 @@ export const FK_PARTY_PERSONAL = [
   'reclamo.respondido_por', 'voucher_pago.reemplazado_por', 'pedido_proveedor.proveedor_party_id',
   'compra.proveedor_party_id', 'pedido_interno.avisado_party_id', 'consumo_personal.party_id',
   'reemplazo_dia.party_id', 'reemplazo_dia.reemplaza_party_id',
+  'cierre_ajuste_medio.por_party_id', 'cierre_ajuste_medio.autorizado_por_party_id',
+  'devolucion_pedido.por_party_id', 'devolucion_pedido.autorizado_por_party_id',
 ];
 
 /**

@@ -8,6 +8,7 @@ import {
   type ReglaEnvioGratis,
 } from '@caprichos/compartido';
 import { api, ErrorApi } from '../comun/api';
+import { envioGratisPromoAplica, type PromoEnvioGratisCarta } from '../comun/envioGratis';
 import { MapaUbicacion } from '../comun/mapa/MapaUbicacion';
 import { SEDE_DEFECTO } from '../comun/mapa/sedeDefecto';
 import { BuscadorDireccion } from '../comun/mapa/BuscadorDireccion';
@@ -79,6 +80,7 @@ export function FormularioCheckout({
   const [zonaEnvio, setZonaEnvio] = useState<string | null>(null);
   const [tarifaZona, setTarifaZona] = useState<number | null>(null);
   const [reglaEnvio, setReglaEnvio] = useState<ReglaEnvioGratis>(() => reglaEnvioGratis(undefined, undefined));
+  const [promoEnvio, setPromoEnvio] = useState<PromoEnvioGratisCarta | null>(null);
   // El costo sale del subtotal actual del carrito: si cambian los productos no hace falta volver a consultar la zona
   const costoEnvio = zonaEnvio && tarifaZona !== null ? calcularEnvioFinal(subtotal, tarifaZona, reglaEnvio) : null;
   const [cargandoGps, setCargandoGps] = useState(false);
@@ -118,10 +120,11 @@ export function FormularioCheckout({
     descuentoCalculado: number;
     tipo: string;
     valor: number;
+    envioGratis?: boolean;
   } | null>(null);
   const [cargandoCupon, setCargandoCupon] = useState(false);
   const [puntosAplicados, setPuntosAplicados] = useState(0);
-  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
+  const [promos, setPromos] = useState<{ total: number; canjeable: number | null; puntosEstimados: number | null; porcentaje: number | null; detalles: { tipo?: string; nombre: string; monto: number }[] }>({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] });
   const cuentaCtx = useCuentaOpcional();
   const clienteCuenta = cuentaCtx?.cliente ?? null;
   const cumpleFaltaCuenta = !!clienteCuenta && (!clienteCuenta.cumpleanos || clienteCuenta.cumpleanos === '—');
@@ -185,7 +188,7 @@ export function FormularioCheckout({
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
     api
-      .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
+      .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { tipo?: string; nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
         lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, subtotal: l.subtotal, precioUnitario: l.precioUnitario })),
         cuponCodigo: cuponAplicado?.codigo,
       })
@@ -235,22 +238,25 @@ export function FormularioCheckout({
     Boolean(clienteCuenta) && opcionDireccion === null && (direccionesAnteriores === null || direccionesAnteriores.length > 0);
 
   // Cálculo del total
-  const costoEnvioEfectivo = modalidad === 'DELIVERY' ? costoEnvio : 0;
+  // Envío gratis: por cupón de envío (aplicado) o por la promo ENVIO_GRATIS vigente. El servidor decide al crear el pedido.
+  const envioGratisCupon = cuponAplicado?.envioGratis === true;
+  const envioGratisPromo = !envioGratisCupon && !!zonaEnvio && envioGratisPromoAplica(promoEnvio, subtotal);
+  const envioGratisActivo = envioGratisCupon || envioGratisPromo;
+  const costoEnvioEfectivo = modalidad === 'DELIVERY' ? (envioGratisActivo ? 0 : costoEnvio) : 0;
   const resumenEnvio =
     modalidad === 'DELIVERY' && zonaEnvio && tarifaZona !== null
-      ? textoResumenEnvio(zonaEnvio, tarifaZona, subtotal, reglaEnvio)
+      ? envioGratisActivo
+        ? `Zona ${zonaEnvio} · envío gratis`
+        : textoResumenEnvio(zonaEnvio, tarifaZona, subtotal, reglaEnvio)
       : null;
   const descuentoCupon = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
+  // Descuentos del servidor (promociones + cupón). El cupón se muestra aparte; lo demás son promociones.
+  const descuentosServidor = promos.total > 0 ? promos.total : descuentoCupon;
+  const promoMonto = Math.max(0, Math.round((descuentosServidor - descuentoCupon) * 100) / 100);
+  const puntosMonto = cuponAplicado ? 0 : puntosAplicados;
   const totalCalculado = Math.max(
     0,
-    Number(
-      (
-        calcularTotalPedido({
-          subtotal,
-          envio: costoEnvioEfectivo,
-        }) - (promos.total > 0 ? promos.total : descuentoCupon) - (cuponAplicado ? 0 : puntosAplicados)
-      ).toFixed(2),
-    ),
+    Number((calcularTotalPedido({ subtotal, envio: costoEnvioEfectivo }) - promoMonto - descuentoCupon - puntosMonto).toFixed(2)),
   );
 
   const aplicarCupon = async () => {
@@ -270,6 +276,7 @@ export function FormularioCheckout({
           descuentoCalculado: Number(res.cupon.descuentoCalculado || 0),
           tipo: res.cupon.tipo,
           valor: Number(res.cupon.valor),
+          envioGratis: res.cupon.envioGratis === true,
         });
         setMensajeCupon(`Cupón aplicado: ${res.cupon.descripcion || ''}.`);
       }
@@ -323,6 +330,7 @@ export function FormularioCheckout({
         setZonaEnvio(res.zona);
         setTarifaZona(res.tarifaZona);
         setReglaEnvio(reglaEnvioGratis(res.gratisDesde, res.modoGratis));
+        setPromoEnvio(res.envioGratisPromo ?? null);
         setMensajeGps(`Ubicación encontrada.${avisoPrecision}`);
       }
     } catch {
@@ -413,6 +421,14 @@ export function FormularioCheckout({
     setTarifaZona(null);
   };
 
+  // Pedido mínimo: solo para DELIVERY, sobre el subtotal de productos. Sin parámetro configurado no hay mínimo.
+  const minimoDelivery = datosLocal?.pedidoMinimo && datosLocal.pedidoMinimo > 0 ? datosLocal.pedidoMinimo : 0;
+  const faltanteMinimo =
+    modalidad === 'DELIVERY' && minimoDelivery > 0 && subtotal < minimoDelivery
+      ? Number((minimoDelivery - subtotal).toFixed(2))
+      : 0;
+  const mensajeMinimo = `Pedido mínimo de delivery S/ ${minimoDelivery.toFixed(2)}. Te faltan S/ ${faltanteMinimo.toFixed(2)}`;
+
   // Validaciones del formulario separadas por apartado
   const validarPaso1 = (): string | null => {
     if (!clienteCuenta && !comoInvitado && invitadoPermitido) {
@@ -436,6 +452,7 @@ export function FormularioCheckout({
 
   const validarPaso2 = (): string | null => {
     if (modalidad === 'DELIVERY') {
+      if (faltanteMinimo > 0) return mensajeMinimo;
       if (usarUltimaDireccion) return null;
       if (pideEleccionDireccion) {
         return 'Elige a dónde lo enviamos: una de tus direcciones anteriores o una nueva';
@@ -684,6 +701,10 @@ export function FormularioCheckout({
         } else if (err.codigo === 'CELULAR_REQUERIDO') {
           setPaso(1);
           setErrorEnvio('Escribe tu celular para hacer tu pedido y sumar puntos.');
+        } else if (err.codigo === 'PEDIDO_MINIMO') {
+          // El servidor manda el mensaje con el faltante; se muestra tal cual y se vuelve a los datos de entrega
+          setPaso(2);
+          setErrorEnvio(err.message);
         } else if (err.codigo === 'FACTURA_DATOS_INCOMPLETOS') {
           setErrorEnvio('La factura exige un RUC de 11 dígitos y razón social válida.');
         } else {
@@ -2058,6 +2079,11 @@ export function FormularioCheckout({
                           {mensajeCupon}
                         </div>
                       )}
+                      {cuponAplicado?.envioGratis && modalidad !== 'DELIVERY' && (
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--cp-rust)' }}>
+                          El cupón de envío gratis solo aplica a delivery.
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2078,10 +2104,34 @@ export function FormularioCheckout({
                       <span style={{ fontWeight: 700 }}>S/ {subtotal.toFixed(2)}</span>
                     </div>
 
-                    {puntosAplicados > 0 && !cuponAplicado && (
+                    {promoMonto > 0 && (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                          <span>Promociones y descuentos</span>
+                          <span style={{ fontWeight: 700 }}>−S/ {promoMonto.toFixed(2)}</span>
+                        </div>
+                        {promos.detalles
+                          .filter((d) => d.tipo !== 'CUPON' && d.monto > 0)
+                          .map((d, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--cp-soft)', paddingLeft: '10px' }}>
+                              <span>{d.nombre}</span>
+                              <span>−S/ {d.monto.toFixed(2)}</span>
+                            </div>
+                          ))}
+                      </>
+                    )}
+
+                    {cuponAplicado && descuentoCupon > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                        <span>Puntos canjeados</span>
-                        <span style={{ fontWeight: 700 }}>−S/ {puntosAplicados.toFixed(2)}</span>
+                        <span>Cupón {cuponAplicado.codigo}</span>
+                        <span style={{ fontWeight: 700 }}>−S/ {descuentoCupon.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    {puntosMonto > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
+                        <span>Puntos usados</span>
+                        <span style={{ fontWeight: 700 }}>−S/ {puntosMonto.toFixed(2)}</span>
                       </div>
                     )}
 
@@ -2091,29 +2141,23 @@ export function FormularioCheckout({
                       </div>
                     )}
 
-                    {promos.detalles.length > 0
-                      ? promos.detalles.map((d, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                            <span>{d.nombre}</span>
-                            <span style={{ fontWeight: 700 }}>−S/ {d.monto.toFixed(2)}</span>
-                          </div>
-                        ))
-                      : cuponAplicado && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--cp-rust)' }}>
-                            <span>Cupón {cuponAplicado.codigo}</span>
-                            <span style={{ fontWeight: 700 }}>−S/ {cuponAplicado.descuentoCalculado.toFixed(2)}</span>
-                          </div>
-                        )}
-
                     {modalidad === 'DELIVERY' && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                        <span>Costo de envío</span>
+                        <span>
+                          {envioGratisCupon
+                            ? `Envío gratis (cupón ${cuponAplicado?.codigo})`
+                            : envioGratisPromo && promoEnvio
+                              ? `Envío gratis (promoción): ${promoEnvio.nombre}`
+                              : 'Costo de envío'}
+                        </span>
                         <span style={{ fontWeight: 700 }}>
-                          {costoEnvio !== null
-                            ? costoEnvio === 0
-                              ? 'GRATIS'
-                              : `S/ ${costoEnvio.toFixed(2)}`
-                            : 'Se confirma por WhatsApp'}
+                          {envioGratisActivo
+                            ? 'S/ 0.00'
+                            : costoEnvio !== null
+                              ? costoEnvio === 0
+                                ? 'GRATIS'
+                                : `S/ ${costoEnvio.toFixed(2)}`
+                              : 'Se confirma por WhatsApp'}
                         </span>
                       </div>
                     )}
@@ -2171,6 +2215,56 @@ export function FormularioCheckout({
                   S/ {totalCalculado.toFixed(2)}
                 </span>
               </div>
+
+              {/* Aviso de pedido mínimo (solo delivery): no deja enviar hasta cubrirlo */}
+              {faltanteMinimo > 0 && (
+                <div
+                  role="status"
+                  style={{
+                    backgroundColor: 'var(--cp-sand)',
+                    border: '1.5px solid var(--cp-orange)',
+                    borderRadius: '10px',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    fontSize: '13px',
+                    color: 'var(--cp-navy)',
+                    fontWeight: 700,
+                  }}
+                >
+                  <span>{mensajeMinimo}</span>
+                  <div style={{ height: '6px', borderRadius: '3px', backgroundColor: 'var(--cp-line)', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${Math.min(100, (subtotal / minimoDelivery) * 100).toFixed(0)}%`,
+                        backgroundColor: 'var(--cp-orange)',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => cerrarCheckout()}
+                      style={{ border: 0, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                    >
+                      Seguir agregando productos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalidad('RECOGER');
+                        setErrorPaso(null);
+                        setErrorEnvio(null);
+                      }}
+                      style={{ border: 0, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                    >
+                      Cambiar a Recoger
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Mensaje de error del apartado o de la API */}
               {(errorPaso || errorEnvio) && (

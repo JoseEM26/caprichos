@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useCuenta } from './CuentaContext';
 
@@ -69,13 +69,36 @@ export function estimarPuntos(p: { canjeable: number | null; porcentaje: number;
   return Math.round(Math.max(0, (p.canjeable ?? 0) - p.puntosAplicados) * (p.porcentaje / 100) * 100) / 100;
 }
 
+const PAUSA_CANJE_MS = 250;
+
+/** Valida lo escrito: 0 si está vacío, y un error si pasa del saldo o del tope usable. */
+function evaluarPuntos(texto: string, saldo: number, maximo: number): { puntos: number; error: string | null } {
+  const n = parseInt(texto, 10) || 0;
+  if (n <= 0) return { puntos: 0, error: null };
+  if (n > saldo) return { puntos: 0, error: `Solo tienes ${saldo.toFixed(2)} puntos.` };
+  if (n > maximo) {
+    return {
+      puntos: 0,
+      error: `Solo puedes usar hasta ${maximo} ${maximo === 1 ? 'punto' : 'puntos'} en este pedido: se aplican a productos sin promoción ni descuento.`,
+    };
+  }
+  return { puntos: n, error: null };
+}
+
 /**
  * Componente de canje de puntos en el paso de pago (DT-55, RQ-CLI-02-11, mockup Main.dc.html).
  */
 export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaje = 5 }: PropsPuntosCanje) {
   const { cliente, abrirPanel } = useCuenta();
   const [valorInput, setValorInput] = useState(puntosAplicados > 0 ? String(puntosAplicados) : '');
-  const [mensaje, setMensaje] = useState<{ texto: string; tipo: 'error' | 'ok' } | null>(null);
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (temporizador.current) clearTimeout(temporizador.current);
+    },
+    [],
+  );
 
   if (!cliente) {
     return (
@@ -94,8 +117,34 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaj
   // Los puntos se ganan con decimales (5 % del total) pero se usan en números enteros, para que el cliente
   // sepa exactamente cuánto descuenta; la fracción que sobra se queda en su saldo.
   const maximoUsable = Math.floor(Math.min(saldoDisponible, totalPedido) + 1e-9);
+  const { puntos: puntosEscritos, error: errorEscritos } = evaluarPuntos(valorInput, saldoDisponible, maximoUsable);
   const numInput = parseInt(valorInput, 10) || 0;
   const saldoRestante = Math.max(0, Math.round((saldoDisponible - numInput) * 100) / 100);
+  const mensaje: { texto: string; tipo: 'error' | 'ok' } | null = errorEscritos
+    ? { texto: errorEscritos, tipo: 'error' }
+    : puntosEscritos > 0
+      ? { texto: `Se descontarán S/ ${puntosEscritos.toFixed(2)} de tu pedido.`, tipo: 'ok' }
+      : null;
+
+  // Aplica al instante lo que se escribe (si es válido), con una pausa corta para no recalcular en cada tecla.
+  const cancelarPendiente = () => {
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = null;
+  };
+  const alEscribir = (texto: string) => {
+    setValorInput(texto);
+    cancelarPendiente();
+    const { puntos, error } = evaluarPuntos(texto, saldoDisponible, maximoUsable);
+    // inválido o vacío: vuelve a 0 de inmediato, sin estado intermedio
+    if (error || puntos === 0) {
+      alAplicar(0);
+      return;
+    }
+    temporizador.current = setTimeout(() => {
+      temporizador.current = null;
+      alAplicar(puntos);
+    }, PAUSA_CANJE_MS);
+  };
 
   // sin puntos no hay nada que canjear, pero se explica cómo ganarlos
   if (saldoDisponible <= 0 && puntosAplicados <= 0) {
@@ -118,42 +167,16 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaj
     );
   }
 
+  // «Aplicar» confirma al instante (sin esperar la pausa); los errores ya se ven mientras escribe
   const aplicar = () => {
-    setMensaje(null);
-    if (numInput <= 0) {
-      alAplicar(0);
-      setValorInput('');
-      setMensaje({ texto: 'Se quitaron los puntos del pedido.', tipo: 'ok' });
-      return;
-    }
-
-    if (numInput > saldoDisponible) {
-      setMensaje({
-        texto: `Solo tienes ${saldoDisponible.toFixed(2)} puntos.`,
-        tipo: 'error',
-      });
-      return;
-    }
-
-    if (numInput > maximoUsable) {
-      setMensaje({
-        texto: `Solo puedes usar hasta ${maximoUsable} ${maximoUsable === 1 ? 'punto' : 'puntos'} en este pedido: se aplican a productos sin promoción ni descuento.`,
-        tipo: 'error',
-      });
-      return;
-    }
-
-    alAplicar(numInput);
-    setMensaje({
-      texto: `¡Aplicado! Se descontaron S/ ${numInput.toFixed(2)} de tu pedido.`,
-      tipo: 'ok',
-    });
+    cancelarPendiente();
+    alAplicar(puntosEscritos);
   };
 
   const quitar = () => {
+    cancelarPendiente();
     alAplicar(0);
     setValorInput('');
-    setMensaje({ texto: 'Se retiró el canje de puntos.', tipo: 'ok' });
   };
 
   return (
@@ -172,10 +195,7 @@ export function PuntosCanje({ totalPedido, puntosAplicados, alAplicar, porcentaj
             type="text"
             inputMode="numeric"
             value={valorInput}
-            onChange={(e) => {
-              setValorInput(e.target.value.replace(/\D/g, '').slice(0, 5));
-              setMensaje(null);
-            }}
+            onChange={(e) => alEscribir(e.target.value.replace(/\D/g, '').slice(0, 5))}
             placeholder="0"
             style={campo}
           />

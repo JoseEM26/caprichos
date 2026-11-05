@@ -117,3 +117,12 @@ export function estadoPorRol(
   };
   return { ETIQUETERA: una('ETIQUETERA'), TICKETERA: una('TICKETERA') };
 }
+
+/** Roles que el agente declara en su último latido (configurados aunque hoy no estén conectados). */
+export function rolesDeclarados(
+  agente: { latido_impresora?: string | null; latido_detalle?: string | null } | null | undefined,
+): RolImpresora[] {
+  const lista = leerImpresorasLatido(agente?.latido_detalle);
+  if (lista) return lista.map((r) => r.rol);
+  return agente?.latido_impresora ? ['ETIQUETERA'] : [];
+}

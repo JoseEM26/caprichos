@@ -105,6 +105,8 @@ export interface ConsultaEnvioRespuesta {
   tarifaZona: number | null;
   gratisDesde: number;
   modoGratis: 'desde' | 'mas_de';
+  /** Promo ENVIO_GRATIS vigente en la carta (aditivo). */
+  envioGratisPromo?: { nombre: string; hasta: string | null; compraMinima: number | null } | null;
 }
 
 /** Dirección de la libreta del cliente con cuenta (GET /carta/cuenta/direcciones). */

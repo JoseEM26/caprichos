@@ -39,6 +39,7 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       reserva: {
         create: jest.fn(),
@@ -304,6 +305,184 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
     });
   });
 
+  describe('aprobarSolicitud: hora y validaciones', () => {
+    const horaVencida = new Date('2020-01-01T01:00:00.000Z');
+    const horaFutura = '2099-01-10T20:00:00-05:00';
+
+    const solicitudPendiente = (hora: Date, personas = 2) => ({
+      id: 9n,
+      conversacion_id: null,
+      personas,
+      hora,
+      estado: 'PENDIENTE',
+      origen: 'WHATSAPP',
+      nombre: 'Lucía Ramos',
+      telefono: '912345678',
+      nota: null,
+      motivo_rechazo: null,
+      reserva_id: null,
+      creado_en: new Date(),
+      conversacion: null,
+    });
+
+    beforeEach(() => {
+      outboxMock.encolar.mockClear();
+      prisma.fechaEspecial.findUnique.mockResolvedValue(null);
+      prisma.horarioDia.findUnique.mockResolvedValue({
+        dia_semana: 6,
+        cerrado: false,
+        abre: horaToDate('10:00'),
+        cierra: horaToDate('23:00'),
+      });
+      prisma.elementoPlano.findMany.mockResolvedValue([
+        { id: 1n, tipo: 'MESA', activo: true, asientos: 4 },
+      ]);
+      prisma.parametro.findUnique.mockResolvedValue({ clave: 'reserva_tolerancia_min', valor: 15 });
+      prisma.reserva.create.mockImplementation(async ({ data }: any) => ({
+        id: 88n,
+        nombre: data.nombre,
+        telefono: data.telefono,
+        personas: data.personas,
+        hora: data.hora,
+        tolerancia_min: 15,
+        estado: 'ACTIVA',
+        motivo_cancelacion: null,
+        pedido_id: null,
+        mesas: [],
+      }));
+    });
+
+    it('hora de la solicitud ya pasada -> HORA_PASADA accionable y la solicitud sigue PENDIENTE', async () => {
+      prisma.solicitudReserva.findUnique.mockResolvedValue(solicitudPendiente(horaVencida));
+
+      await expect(
+        service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1'),
+      ).rejects.toMatchObject({
+        response: {
+          codigo: 'HORA_PASADA',
+          mensaje: 'La hora solicitada ya pasó. Elige una hora nueva para aprobar la reserva.',
+        },
+      });
+
+      expect(prisma.reserva.create).not.toHaveBeenCalled();
+      expect(prisma.solicitudReserva.update).not.toHaveBeenCalled();
+      expect(outboxMock.encolar).not.toHaveBeenCalled();
+    });
+
+    it('dto.hora futura reemplaza la hora vencida: aprueba con esa hora y encola el aviso', async () => {
+      prisma.solicitudReserva.findUnique.mockResolvedValue(solicitudPendiente(horaVencida));
+
+      const res = await service.aprobarSolicitud(
+        9,
+        { mesas: ['1'], hora: horaFutura },
+        mockUsuario,
+        '127.0.0.1',
+      );
+
+      expect(prisma.reserva.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ hora: new Date(horaFutura) }),
+        }),
+      );
+      expect(res.reserva.hora).toBe(new Date(horaFutura).toISOString());
+      expect(res.solicitud.estado).toBe('aprobada');
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({ telefono: '912345678' }),
+        expect.anything(),
+      );
+    });
+
+    it('mesas sin asientos suficientes -> ASIENTOS_INSUFICIENTES, no escribe y la solicitud sigue PENDIENTE', async () => {
+      prisma.elementoPlano.findMany.mockResolvedValue([
+        { id: 1n, tipo: 'MESA', activo: true, asientos: 2 },
+      ]);
+      prisma.solicitudReserva.findUnique.mockResolvedValue(
+        solicitudPendiente(new Date(horaFutura), 4),
+      );
+
+      await expect(
+        service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1'),
+      ).rejects.toMatchObject({
+        response: { codigo: 'ASIENTOS_INSUFICIENTES', mensaje: 'Faltan 2 asientos' },
+      });
+
+      expect(prisma.reserva.create).not.toHaveBeenCalled();
+      expect(prisma.solicitudReserva.update).not.toHaveBeenCalled();
+      expect(outboxMock.encolar).not.toHaveBeenCalled();
+    });
+
+    // Simula la fila real de solicitud_reserva y una transacción que deshace lo escrito si falla.
+    const simularBdConFila = () => {
+      let estadoFila = 'PENDIENTE';
+      let reservasEnBd: any[] = [];
+      prisma.solicitudReserva.findUnique.mockImplementation(async () => ({
+        ...solicitudPendiente(new Date(horaFutura)),
+        estado: estadoFila,
+      }));
+      prisma.solicitudReserva.updateMany.mockImplementation(async ({ where, data }: any) => {
+        if (where.estado !== estadoFila) return { count: 0 };
+        estadoFila = data.estado;
+        return { count: 1 };
+      });
+      prisma.reserva.create.mockImplementation(async ({ data }: any) => {
+        const r = {
+          id: BigInt(100 + reservasEnBd.length),
+          nombre: data.nombre,
+          telefono: data.telefono,
+          personas: data.personas,
+          hora: data.hora,
+          tolerancia_min: 15,
+          estado: 'ACTIVA',
+          motivo_cancelacion: null,
+          pedido_id: null,
+          mesas: [],
+        };
+        reservasEnBd.push(r);
+        return r;
+      });
+      prisma.$transaction = jest.fn(async (cb: any) => {
+        const antes = reservasEnBd.length;
+        try {
+          return await cb(prisma);
+        } catch (err) {
+          reservasEnBd = reservasEnBd.slice(0, antes);
+          throw err;
+        }
+      });
+      return { reservasEnBd: () => reservasEnBd, estadoFila: () => estadoFila };
+    };
+
+    it('dos aprobaciones seguidas de la misma solicitud: una gana, la otra SOLICITUD_NO_PENDIENTE y no queda reserva extra', async () => {
+      const bd = simularBdConFila();
+
+      const [primera, segunda] = await Promise.allSettled([
+        service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1'),
+        service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1'),
+      ]);
+
+      expect(primera.status).toBe('fulfilled');
+      expect(segunda.status).toBe('rejected');
+      expect((segunda as PromiseRejectedResult).reason).toMatchObject({
+        response: { codigo: 'SOLICITUD_NO_PENDIENTE' },
+      });
+      expect(bd.reservasEnBd()).toHaveLength(1);
+      expect(bd.estadoFila()).toBe('APROBADA');
+      expect(outboxMock.encolar).toHaveBeenCalledTimes(1);
+    });
+
+    it('segunda aprobación después de la primera: SOLICITUD_NO_PENDIENTE sin crear otra reserva', async () => {
+      const bd = simularBdConFila();
+
+      await service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1');
+      await expect(
+        service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1'),
+      ).rejects.toMatchObject({ response: { codigo: 'SOLICITUD_NO_PENDIENTE' } });
+
+      expect(bd.reservasEnBd()).toHaveLength(1);
+      expect(outboxMock.encolar).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('rechazarSolicitud', () => {
     it('lanza BadRequestException si no se envía motivo o tiene menos de 5 caracteres', async () => {
       await expect(
@@ -387,6 +566,94 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
           carga: expect.objectContaining({ plantillaClave: 'RESERVA_ACTUALIZACION' }),
         }), expect.anything(),
       );
+    });
+  });
+
+  describe('aprobar y rechazar compiten por la misma solicitud', () => {
+    const horaFutura = new Date('2099-01-10T20:00:00-05:00');
+    const pendiente = () => ({
+      id: 9n,
+      conversacion_id: null,
+      personas: 2,
+      hora: horaFutura,
+      estado: 'PENDIENTE',
+      origen: 'WHATSAPP',
+      nombre: 'Lucía Ramos',
+      telefono: '912345678',
+      nota: null,
+      motivo_rechazo: null,
+      reserva_id: null,
+      creado_en: new Date(),
+      conversacion: null,
+    });
+
+    // Fila real de solicitud_reserva + transacción que deshace lo escrito si falla.
+    const simularFila = (prisma: any) => {
+      let estadoFila = 'PENDIENTE';
+      let reservas: any[] = [];
+      prisma.solicitudReserva.findUnique.mockImplementation(async () => ({ ...pendiente(), estado: estadoFila }));
+      prisma.solicitudReserva.updateMany.mockImplementation(async ({ where, data }: any) => {
+        if (where.estado !== estadoFila) return { count: 0 };
+        estadoFila = data.estado;
+        return { count: 1 };
+      });
+      prisma.reserva.create.mockImplementation(async ({ data }: any) => {
+        const r = { id: BigInt(500 + reservas.length), nombre: data.nombre, telefono: data.telefono, personas: data.personas, hora: data.hora, tolerancia_min: 15, estado: 'ACTIVA', motivo_cancelacion: null, pedido_id: null, mesas: [] };
+        reservas.push(r);
+        return r;
+      });
+      prisma.$transaction = jest.fn(async (cb: any) => {
+        const antes = reservas.length;
+        try {
+          return await cb(prisma);
+        } catch (err) {
+          reservas = reservas.slice(0, antes);
+          throw err;
+        }
+      });
+      prisma.fechaEspecial.findUnique.mockResolvedValue(null);
+      prisma.horarioDia.findUnique.mockResolvedValue({ dia_semana: 6, cerrado: false, abre: horaToDate('10:00'), cierra: horaToDate('23:00') });
+      prisma.elementoPlano.findMany.mockResolvedValue([{ id: 1n, tipo: 'MESA', activo: true, asientos: 4 }]);
+      prisma.parametro.findUnique.mockResolvedValue({ clave: 'reserva_tolerancia_min', valor: 15 });
+      return { estadoFila: () => estadoFila, reservas: () => reservas };
+    };
+
+    it('rechazo tras aprobación: SOLICITUD_NO_PENDIENTE, la solicitud queda APROBADA y no se encola un rechazo', async () => {
+      const fila = simularFila(prisma);
+      outboxMock.encolar.mockClear();
+
+      await service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1');
+      // Lectura desfasada: el rechazo ve PENDIENTE aunque la aprobación ya se escribió.
+      prisma.solicitudReserva.findUnique.mockResolvedValue(pendiente());
+      await expect(
+        service.rechazarSolicitud(9, { motivo: 'Aforo completo en ese horario' }, mockUsuario, '127.0.0.1'),
+      ).rejects.toMatchObject({ response: { codigo: 'SOLICITUD_NO_PENDIENTE' } });
+
+      expect(fila.estadoFila()).toBe('APROBADA');
+      expect(fila.reservas()).toHaveLength(1);
+      expect(outboxMock.encolar).toHaveBeenCalledTimes(1);
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({ carga: expect.objectContaining({ plantillaClave: 'RESERVA_CONFIRMADA' }) }),
+        expect.anything(),
+      );
+    });
+
+    it('aprobar y rechazar a la vez: gana uno solo y la fila y las reservas quedan coherentes', async () => {
+      const fila = simularFila(prisma);
+
+      const [ap, re] = await Promise.allSettled([
+        service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1'),
+        service.rechazarSolicitud(9, { motivo: 'Aforo completo en ese horario' }, mockUsuario, '127.0.0.1'),
+      ]);
+
+      expect([ap.status, re.status].filter((x) => x === 'fulfilled')).toHaveLength(1);
+      if (ap.status === 'fulfilled') {
+        expect(fila.estadoFila()).toBe('APROBADA');
+        expect(fila.reservas()).toHaveLength(1);
+      } else {
+        expect(fila.estadoFila()).toBe('RECHAZADA');
+        expect(fila.reservas()).toHaveLength(0);
+      }
     });
   });
 });

@@ -13,3 +13,6 @@ export type RolSistema = (typeof ROLES_SISTEMA)[keyof typeof ROLES_SISTEMA];
 
 export * from './etiquetas.js';
 
+
+export * from './impresion.js';
+export * from './cocina.js';

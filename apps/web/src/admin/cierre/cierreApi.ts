@@ -153,6 +153,57 @@ export interface HistorialRespuesta {
   totalPaginas: number;
 }
 
+/** Medios digitales que calcula el sistema: el cajero no los teclea. */
+export type ClaveDigital = 'yape' | 'plin' | 'transferencia' | 'tarjeta';
+export type MedioAjustable = 'YAPE' | 'PLIN' | 'TRANSFERENCIA' | 'TARJETA';
+
+/**
+ * Un medio digital de la caja. `cobrado` es lo que entró por ese medio; `devuelto` son las devoluciones
+ * del día (negativo o 0); `sistema` es el esperado digital = cobrado + devuelto. `monto` es el que vale
+ * en el cierre (el esperado, o la corrección aprobada).
+ */
+export interface DigitalCaja {
+  monto: number;
+  sistema: number;
+  cobrado: number;
+  devuelto: number;
+  cobros: number;
+  corregido: boolean;
+}
+
+export interface DigitalesCaja {
+  cajaId: number;
+  fecha: string;
+  medios: Record<ClaveDigital, DigitalCaja>;
+}
+
+/** Corrección de un monto digital de la caja, con quién la hizo, quién la aprobó y cuándo. */
+/** Devolución de un pedido en la caja abierta (informativa para el cuadre). */
+export interface DevolucionTurno {
+  id: string;
+  pedidoCodigo: string;
+  montoDevuelto: number;
+  medio: string;
+  codigoOperacion: string | null;
+  motivo: string | null;
+  porNombre: string | null;
+  autorizadoPorNombre: string | null;
+  comprobanteBajaEstado: string | null;
+  creadoEn: string;
+}
+
+export interface AjusteMedio {
+  id: number;
+  medio: string;
+  montoSistema: number;
+  montoAnterior: number;
+  montoNuevo: number;
+  motivo: string;
+  porNombre: string | null;
+  autorizadoPorNombre: string | null;
+  creadoEn: string;
+}
+
 export interface DetalleCierreCompleto {
   cajaId: number;
   fecha: string;
@@ -165,6 +216,7 @@ export interface DetalleCierreCompleto {
   cerradaEn: string | null;
   conteo: Record<string, number> | null;
   medios: CierreMedioDetalle[];
+  ajustesMedio?: AjusteMedio[];
 }
 
 export const DENOMINACIONES_LISTA: Array<{ valor: number; clave: string; tipo: 'billete' | 'moneda'; etiqueta: string }> = [
@@ -235,6 +287,22 @@ export const cierreApi = {
       headers['x-pin-supervisor'] = pinSupervisor.trim();
     }
     return conAutorizacion(api.get<PendienteCobro[]>('/admin/cierre/pendientes', { headers }), pinSupervisor);
+  },
+
+  obtenerDigitales: () => api.get<DigitalesCaja>('/admin/cierre/digitales'),
+
+  listarAjustesMedio: () => api.get<AjusteMedio[]>('/admin/cierre/ajustes-medio'),
+
+  listarDevolucionesTurno: () => api.get<DevolucionTurno[]>('/admin/cierre/devoluciones'),
+
+  // ADMIN y SUPERVISOR sin código; el cajero con el código de supervisor (lo valida el servidor)
+  registrarAjusteMedio: (dto: { medio: MedioAjustable; montoNuevo: number; motivo: string }, pinSupervisor?: string) => {
+    const headers: Record<string, string> = {};
+    if (pinSupervisor?.trim()) {
+      headers['x-codigo-supervisor'] = pinSupervisor.trim();
+      headers['x-pin-supervisor'] = pinSupervisor.trim();
+    }
+    return conAutorizacion(api.post<AjusteMedio>('/admin/cierre/ajustes-medio', dto, { headers }), pinSupervisor);
   },
 
   cobrarPendiente: (id: string | number, dto: CobrarDto) =>

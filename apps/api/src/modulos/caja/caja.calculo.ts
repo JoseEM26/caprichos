@@ -136,6 +136,30 @@ export async function exigirCajaAbiertaHoy(db: Prisma.TransactionClient): Promis
 }
 
 /**
+ * Egreso de la caja de hoy por una devolución en efectivo (dentro de la transacción de la devolución).
+ * Bloquea la caja; si no está abierta hoy, lanza un 409 con el mensaje para el cajero.
+ */
+export async function registrarEgresoDevolucionCajaHoy(
+  tx: Prisma.TransactionClient,
+  monto: number,
+  motivo: string,
+): Promise<{ id: bigint }> {
+  const { fechaIso } = obtenerFechaHoraLima();
+  const caja = await tx.caja.findUnique({ where: { fecha: new Date(`${fechaIso}T00:00:00.000Z`) } });
+  const bloqueada = caja ? await bloquearCaja(tx, caja.id) : null;
+  if (!bloqueada || bloqueada.estado !== 'ABIERTA') {
+    throw new HttpException(
+      { codigo: 'CAJA_CERRADA', mensaje: 'Abre la caja para devolver en efectivo' },
+      HttpStatus.CONFLICT,
+    );
+  }
+  return tx.movimientoCaja.create({
+    data: { caja_id: bloqueada.id, tipo: 'EGRESO', monto: new Prisma.Decimal(monto), motivo },
+    select: { id: true },
+  });
+}
+
+/**
  * Pedidos delivery entregados el día de la caja (hora de Lima). Son los que el repartidor
  * cobró en efectivo y entrega en la liquidación (RN-CAP-088).
  */

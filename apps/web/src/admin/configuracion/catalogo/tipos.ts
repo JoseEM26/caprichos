@@ -6,6 +6,8 @@ export interface EntradaConfig {
   id: string;
   /** Id de la pestaña (categoría) donde vive: 'chatbot', 'local', 'parametros'... */
   tab: string;
+  /** Sección interna de la pestaña, si tiene varias (Impresión: 'mapa' | 'equipos' | 'cola'). Va en ?seccion=. */
+  apartado?: string;
   /** Título de la tarjeta o sección donde está. */
   seccion: string;
   /** Nombre del ajuste, como lo diría el dueño. */

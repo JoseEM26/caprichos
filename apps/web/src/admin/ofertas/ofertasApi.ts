@@ -40,7 +40,7 @@ export interface LlevaPagaConfig {
 
 export interface OfertaItem {
   id: string;
-  tipo: 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'DESCUENTO_AUTOMATICO';
+  tipo: 'COMBO' | 'LLEVA_PAGA' | 'DESCUENTO' | 'DESCUENTO_AUTOMATICO' | 'ENVIO_GRATIS';
   nombre: string;
   descripcion?: string | null;
   lleva?: number | null;
@@ -74,6 +74,8 @@ export interface OfertaItem {
   soloPrimeraCompra?: boolean;
   orden?: number;
   activo: boolean;
+  /** Se muestra en la carta virtual (el diseñador la oculta sin apagar el descuento) */
+  visibleCarta?: boolean;
   creadoEn: string;
   vigenteAhora?: boolean;
   imagenArchivoId?: string | null;
@@ -94,10 +96,14 @@ export interface CuponItem {
   descripcion: string;
   modo: 'UNICO_COMPROBANTE' | 'COMPARTIDO';
   tipo?: 'PORCENTAJE' | 'MONTO_FIJO';
-  descuentoTipo?: 'PORCENTAJE' | 'MONTO';
+  descuentoTipo?: 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS';
   valor?: number;
   descuentoValor?: number;
   compraMinima?: number | null;
+  /** Horario del cupón (vacío = siempre) */
+  dias?: number[];
+  horaDesde?: string | null;
+  horaHasta?: string | null;
   fechaDesde?: string | null;
   fechaHasta?: string | null;
   maxUsos?: number | null;

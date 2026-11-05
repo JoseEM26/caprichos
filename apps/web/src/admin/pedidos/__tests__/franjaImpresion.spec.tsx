@@ -30,7 +30,7 @@ describe('FranjaImpresion', () => {
     montar();
 
     expect(await screen.findByTestId('franja-impresion')).toHaveTextContent('Impresora sin conexión: 4 etiqueta(s) en cola');
-    expect(screen.getByRole('link', { name: 'Ver impresión' })).toHaveAttribute('href', '/admin/configuracion?tab=impresion');
+    expect(screen.getByRole('link', { name: 'Ver impresión' })).toHaveAttribute('href', '/admin/configuracion?tab=impresion&seccion=equipos');
     expect(screen.getByRole('button', { name: 'Gestionar cola' })).toBeInTheDocument();
   });
 

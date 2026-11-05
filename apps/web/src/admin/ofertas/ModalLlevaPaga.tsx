@@ -1,5 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
+import { CasillaBot, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -15,12 +16,6 @@ const DIAS = [
   ['dom', 'Domingo', 'Dom'],
 ];
 
-const CANALES = [
-  { clave: 'todos', nombre: 'Todos los canales' },
-  { clave: 'carta', nombre: 'Solo carta web' },
-  { clave: 'local', nombre: 'Solo en el local' },
-  { clave: 'whatsapp', nombre: 'Solo WhatsApp' },
-];
 
 const CATEGORIAS_DEF = [
   'Combos',
@@ -82,6 +77,7 @@ export function ModalLlevaPaga({
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
+  const [valeBot, setValeBot] = useState(false);
 
   // Paso 3: Beneficio
   const [qLleva, setQLleva] = useState(2);
@@ -135,7 +131,7 @@ export function ModalLlevaPaga({
       setHoraHasta(ofertaAEditar.horaFin || ofertaAEditar.horaHasta || '');
       setFechaDesde(ofertaAEditar.fechaInicio ? ofertaAEditar.fechaInicio.slice(0, 10) : ofertaAEditar.fechaDesde ? ofertaAEditar.fechaDesde.slice(0, 10) : '');
       setFechaHasta(ofertaAEditar.fechaFin ? ofertaAEditar.fechaFin.slice(0, 10) : ofertaAEditar.fechaHasta ? ofertaAEditar.fechaHasta.slice(0, 10) : '');
-      setCanal(ofertaAEditar.canales && ofertaAEditar.canales[0] ? ofertaAEditar.canales[0].toLowerCase() : 'todos');
+      { const sel = selectorDesdeCanales(ofertaAEditar.canales); setCanal(sel.canal); setValeBot(sel.valeBot); }
       setPaso(1);
       setMensajeError('');
     } else {
@@ -152,6 +148,7 @@ export function ModalLlevaPaga({
       setFechaDesde('');
       setFechaHasta('');
       setCanal('todos');
+      setValeBot(false);
       setPaso(1);
       setMensajeError('');
     }
@@ -368,7 +365,7 @@ export function ModalLlevaPaga({
         fechaDesde: fechaDesde || undefined,
         fechaFin: fechaHasta || undefined,
         fechaHasta: fechaHasta || undefined,
-        canales: canal === 'todos' ? ['TODOS'] : [canal.toUpperCase()],
+        canales: canalesDesdeSelector(canal, valeBot),
         imagenArchivoId: fotoArchivoId,
         llevaPaga: {
           lleva: qLleva,
@@ -406,7 +403,7 @@ export function ModalLlevaPaga({
     horaHasta: horaHasta || null,
     fechaDesde: fechaDesde || null,
     fechaHasta: fechaHasta || null,
-    canales: canal === 'todos' ? ['TODOS'] : [canal.toUpperCase()],
+    canales: canalesDesdeSelector(canal, valeBot),
     activo: true,
   };
 
@@ -894,12 +891,13 @@ export function ModalLlevaPaga({
                   onChange={(e) => setCanal(e.target.value)}
                   style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
                 >
-                  {CANALES.map((c) => (
+                  {opcionesCanal(canal).map((c) => (
                     <option key={c.clave} value={c.clave}>
                       {c.nombre}
                     </option>
                   ))}
                 </select>
+                  <CasillaBot id="lp-canal-bot" checked={valeBot} onChange={setValeBot} bloqueada={canal === 'solo-bot'} />
               </div>
               <div style={{ flex: 1, minWidth: '130px' }}>
                 <label htmlFor="lp-f-desde" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>

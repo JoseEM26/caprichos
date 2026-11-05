@@ -12,6 +12,7 @@ import {
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { CierreService } from './cierre.service';
+import { AjusteMedioDto } from './dto/ajuste-medio.dto';
 import { ArqueoDto } from './dto/arqueo.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { LiquidarRepartidorDto } from './dto/liquidar.dto';
@@ -63,6 +64,50 @@ export class CierreController {
       req.headers?.['x-codigo-supervisor'] ||
       req.headers?.['x-pin-supervisor'];
     return this.cierreService.cerrar(dto, req.usuario, pin, ip);
+  }
+
+  /**
+   * Montos digitales de la caja abierta (Yape, Plin, transferencia, tarjeta), ya calculados por el sistema.
+   * Sin efectivo, esperado ni diferencias: el cierre ciego del efectivo se mantiene.
+   */
+  @Get('digitales')
+  @Permiso('caja', 'cerrar')
+  async obtenerDigitales() {
+    return this.cierreService.obtenerDigitales();
+  }
+
+  /** Devoluciones de pedidos de la caja abierta (informativo, para reconciliar Yape/Plin devueltos). */
+  @Get('devoluciones')
+  @Permiso('caja', 'cerrar')
+  async listarDevolucionesTurno() {
+    return this.cierreService.listarDevolucionesTurno();
+  }
+
+  /** Correcciones de montos digitales de la caja abierta. */
+  @Get('ajustes-medio')
+  @Permiso('caja', 'cerrar')
+  async listarAjustesMedio() {
+    return this.cierreService.listarAjustesMedio();
+  }
+
+  /**
+   * Corrige un monto digital con motivo. ADMIN y SUPERVISOR sin código; el cajero con código de supervisor.
+   */
+  @Post('ajustes-medio')
+  @Permiso('caja', 'cerrar')
+  async registrarAjusteMedio(
+    @Body() dto: AjusteMedioDto,
+    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
+    @Req() req: any,
+    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const pin =
+      codigoSupervisor ||
+      pinSupervisor ||
+      req.headers?.['x-codigo-supervisor'] ||
+      req.headers?.['x-pin-supervisor'];
+    return this.cierreService.registrarAjusteMedio(dto, req.usuario, pin, ip);
   }
 
   /**

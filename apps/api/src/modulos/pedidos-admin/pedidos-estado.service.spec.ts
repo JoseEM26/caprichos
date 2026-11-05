@@ -66,6 +66,7 @@ describe('PedidosEstadoService', () => {
       // Por defecto el pedido ya tiene un voucher útil; las pruebas del pago digital lo quitan
       voucherPago: {
         findFirst: jest.fn().mockResolvedValue({ id: 9n }),
+        update: jest.fn().mockResolvedValue({}),
       },
       userAccount: {
         findMany: jest.fn(),
@@ -758,7 +759,11 @@ describe('PedidosEstadoService', () => {
         pago_estado: 'COORDINADO',
       });
 
-      const res = await service.registrarPago(10n, { metodo: 'YAPE', estado: 'COORDINADO' }, cajeroAuth);
+      const res = await service.registrarPago(
+        10n,
+        { metodo: 'YAPE', estado: 'COORDINADO', codigosOperacion: [{ medio: 'YAPE', codigo: '123456' }] },
+        cajeroAuth,
+      );
 
       expect(res.pago_metodo).toBe('YAPE');
       expect(res.pago_estado).toBe('COORDINADO');
@@ -840,7 +845,11 @@ describe('PedidosEstadoService', () => {
       });
 
       it('con un voucher útil enlazado -> registra el pago normal', async () => {
-        const res = await service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO' }, cajeroAuth);
+        const res = await service.registrarPago(
+          10n,
+          { metodo: 'YAPE', estado: 'PAGADO', codigosOperacion: [{ medio: 'YAPE', codigo: '123456' }] },
+          cajeroAuth,
+        );
 
         expect(res.pago_estado).toBe('PAGADO');
         expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'REGISTRAR_PAGO' }));
@@ -856,14 +865,61 @@ describe('PedidosEstadoService', () => {
         expect(prismaMock.pedido.update).not.toHaveBeenCalled();
       });
 
-      it('EFECTIVO y TARJETA no piden voucher', async () => {
+      it('EFECTIVO y TARJETA no piden voucher ni código de operación', async () => {
         prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
         await service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth);
         await service.registrarPago(10n, { metodo: 'tarjeta', estado: 'PAGADO' }, cajeroAuth);
 
         expect(prismaMock.pedido.update).toHaveBeenCalledTimes(2);
+        // Sin código no se busca el voucher donde guardarlo
         expect(prismaMock.voucherPago.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('digital sin código de operación -> 400 CODIGO_OPERACION_REQUERIDO, no registra', async () => {
+        await expect(
+          service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO' }, cajeroAuth),
+        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_OPERACION_REQUERIDO', faltan: ['YAPE'] } });
+        await expect(
+          service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO', codigosOperacion: [{ medio: 'YAPE', codigo: '   ' }] }, cajeroAuth),
+        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_OPERACION_REQUERIDO' } });
+        expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+        expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+      });
+
+      it('plan mixto efectivo + Yape: pide solo el código de Yape', async () => {
+        prismaMock.pedido.findUnique.mockResolvedValue({
+          ...pedidoSinPagar,
+          planPago: [{ medio: 'EFECTIVO', monto: 10 }, { medio: 'YAPE', monto: 25 }],
+        });
+
+        await expect(
+          service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth),
+        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_OPERACION_REQUERIDO', faltan: ['YAPE'] } });
+
+        const res = await service.registrarPago(
+          10n,
+          { metodo: 'EFECTIVO', estado: 'COORDINADO', codigosOperacion: [{ medio: 'yape', codigo: '998877' }] },
+          cajeroAuth,
+        );
+        expect(res.pago_estado).toBe('PAGADO');
+      });
+
+      it('guarda el código confirmado en el voucher vigente (si difiere de la lectura) y lo audita', async () => {
+        prismaMock.voucherPago.findFirst.mockResolvedValue({ id: 9n, operacion: '111' });
+
+        await service.registrarPago(
+          10n,
+          { metodo: 'YAPE', estado: 'PAGADO', codigosOperacion: [{ medio: 'YAPE', codigo: '222' }] },
+          cajeroAuth,
+        );
+
+        expect(prismaMock.voucherPago.update).toHaveBeenCalledWith({ where: { id: 9n }, data: { operacion: '222' } });
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+          expect.objectContaining({
+            despues: expect.objectContaining({ codigos_operacion: [{ medio: 'YAPE', codigo: '222' }] }),
+          }),
+        );
       });
 
       it('excepción con código de supervisor válido -> registra y audita con el motivo', async () => {
@@ -871,7 +927,12 @@ describe('PedidosEstadoService', () => {
 
         const res = await service.registrarPago(
           10n,
-          { metodo: 'YAPE', estado: 'PAGADO', sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '654321' } },
+          {
+            metodo: 'YAPE',
+            estado: 'PAGADO',
+            sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '654321' },
+            codigosOperacion: [{ medio: 'YAPE', codigo: '777001' }],
+          },
           cajeroAuth,
         );
 
@@ -894,7 +955,12 @@ describe('PedidosEstadoService', () => {
         await expect(
           service.registrarPago(
             10n,
-            { metodo: 'YAPE', estado: 'PAGADO', sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' } },
+            {
+              metodo: 'YAPE',
+              estado: 'PAGADO',
+              sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' },
+              codigosOperacion: [{ medio: 'YAPE', codigo: '777001' }],
+            },
             cajeroAuth,
           ),
         ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });

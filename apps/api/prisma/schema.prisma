@@ -56,6 +56,10 @@ model Party {
   dataRequests             DataRequest[]
   pedidosComoCliente       Pedido[]              @relation("ClienteIdentificadoPedido")
   direccionesCliente       ClienteDireccion[]
+  ajustesMedioPor          CierreAjusteMedio[]   @relation("AjusteMedioPor")
+  ajustesMedioAutorizados  CierreAjusteMedio[]   @relation("AjusteMedioAutorizado")
+  devolucionesPor          DevolucionPedido[]    @relation("DevolucionPor")
+  devolucionesAutorizadas  DevolucionPedido[]    @relation("DevolucionAutorizada")
 
   @@map("party")
 }
@@ -109,6 +113,19 @@ model UserAccountRol {
   @@map("user_account_rol")
 }
 
+/// Áreas de cocina que atiende un usuario con rol COCINA. Sin filas = ve todas las áreas.
+model UserAccountArea {
+  user_account_id BigInt
+  area_id         BigInt
+  creado_en       DateTime   @default(now()) @db.Timestamptz
+  cuenta          UserAccount @relation(fields: [user_account_id], references: [id])
+  area            AreaCocina @relation(fields: [area_id], references: [id])
+
+  @@id([user_account_id, area_id])
+  @@index([area_id])
+  @@map("user_account_area")
+}
+
 model Permiso {
   id     BigInt       @id @default(autoincrement())
   modulo String
@@ -145,6 +162,7 @@ model UserAccount {
   party                 Party                  @relation(fields: [party_id], references: [id])
   r                     Rol                    @relation(fields: [rol], references: [codigo])
   rolesExtra            UserAccountRol[]
+  areasCocina           UserAccountArea[]
   iniciativasCreadas    Iniciativa[]           @relation("IniciativasCreadas")
   iniciativasCambiadas  Iniciativa[]           @relation("IniciativasCambiadas")
   iniciativaComentarios IniciativaComentario[]
@@ -274,6 +292,7 @@ model Archivo {
   foto_local         FotoLocal?
   productos          Producto[]
   incidentes         IncidenteEntrega[]
+  incidenteFotos     IncidenteEntregaFoto[]
   compras            Compra[]
   iniciativas        Iniciativa[]
   novedadesFotos     NovedadFoto[]
@@ -310,6 +329,8 @@ model AreaCocina {
   pedidosInternos PedidoInterno[]
   deviceKeys      DeviceKey[]
   printJobs       PrintJob[]
+  printJobsDestino PrintJob[] @relation("DestinoImpresion")
+  usuariosAreas   UserAccountArea[]
 
   @@map("area_cocina")
 }
@@ -557,6 +578,7 @@ model Pedido {
   quejasWhatsapp         QuejaWhatsapp[]
   vouchers               VoucherPago[]
   planPago               PedidoPagoPlan[]
+  devolucion             DevolucionPedido?
   clienteIdentificado    Party?                 @relation("ClienteIdentificadoPedido", fields: [cliente_party_id], references: [id])
 
   @@index([cliente_party_id], map: "pedido_cliente_party_id_idx")
@@ -688,6 +710,7 @@ model Caja {
   liquidaciones Liquidacion[]
   cierre        CierreCaja?
   conteos       ConteoCierre[]
+  ajustesMedio  CierreAjusteMedio[]
 
   @@map("caja")
 }
@@ -736,6 +759,7 @@ model MovimientoCaja {
   motivo_anulacion String?
 
   caja             Caja      @relation(fields: [caja_id], references: [id])
+  devolucion       DevolucionPedido[]
 
   @@map("movimiento_caja")
 }
@@ -795,6 +819,54 @@ model CierreMedio {
   @@map("cierre_medio")
 }
 
+/// Corrección de un monto digital (Yape, Plin, transferencia o tarjeta) de una caja. Solo se inserta:
+/// el trigger de la migración impide UPDATE y DELETE (historial append-only).
+/// Devolución de un pedido cancelado por no recibir que ya estaba pagado. Manual, una por pedido. Solo se inserta.
+model DevolucionPedido {
+  id                      BigInt         @id @default(autoincrement())
+  pedido_id               BigInt         @unique
+  monto_pagado            Decimal        @db.Decimal(12, 2)
+  monto_envio             Decimal        @db.Decimal(12, 2)
+  monto_sugerido          Decimal        @db.Decimal(12, 2)
+  monto_devuelto          Decimal        @db.Decimal(12, 2)
+  medio                   String
+  codigo_operacion        String?
+  motivo                  String?
+  por_party_id            BigInt
+  autorizado_por_party_id BigInt
+  // Resultado de la comunicación de baja de la boleta/factura (null si no tenía comprobante electrónico)
+  comprobante_baja_estado String?
+  movimiento_caja_id      BigInt?
+  creado_en               DateTime       @default(now()) @db.Timestamptz
+
+  pedido         Pedido          @relation(fields: [pedido_id], references: [id])
+  por            Party           @relation("DevolucionPor", fields: [por_party_id], references: [id])
+  autorizadoPor  Party           @relation("DevolucionAutorizada", fields: [autorizado_por_party_id], references: [id])
+  movimientoCaja MovimientoCaja? @relation(fields: [movimiento_caja_id], references: [id])
+
+  @@map("devolucion_pedido")
+}
+
+model CierreAjusteMedio {
+  id                      BigInt   @id @default(autoincrement())
+  caja_id                 BigInt
+  medio                   String
+  monto_sistema           Decimal  @db.Decimal(12, 2)
+  monto_anterior          Decimal  @db.Decimal(12, 2)
+  monto_nuevo             Decimal  @db.Decimal(12, 2)
+  motivo                  String
+  por_party_id            BigInt
+  autorizado_por_party_id BigInt
+  creado_en               DateTime @default(now()) @db.Timestamptz
+
+  caja           Caja  @relation(fields: [caja_id], references: [id])
+  por            Party @relation("AjusteMedioPor", fields: [por_party_id], references: [id])
+  autorizado_por Party @relation("AjusteMedioAutorizado", fields: [autorizado_por_party_id], references: [id])
+
+  @@index([caja_id])
+  @@map("cierre_ajuste_medio")
+}
+
 model IncidenteEntrega {
   id              BigInt    @id @default(autoincrement())
   pedido_id       BigInt
@@ -806,11 +878,27 @@ model IncidenteEntrega {
   cerrado_por     BigInt?
   contactos       Json      @default("[]")
   foto_archivo_id BigInt?
+  /// Prueba de entrega fallida (cliente no salió): instante de llegada, minutos de espera exigidos y repartidor
+  llego_en           DateTime? @db.Timestamptz
+  espera_max_min    Int?
+  repartidor_party_id BigInt?
 
   pedido          Pedido    @relation(fields: [pedido_id], references: [id])
   foto_archivo    Archivo?  @relation(fields: [foto_archivo_id], references: [id])
+  fotos           IncidenteEntregaFoto[]
 
   @@map("incidente_entrega")
+}
+
+model IncidenteEntregaFoto {
+  incidente_id BigInt
+  archivo_id   BigInt
+  creado_en    DateTime         @default(now()) @db.Timestamptz
+  incidente    IncidenteEntrega @relation(fields: [incidente_id], references: [id])
+  archivo      Archivo          @relation(fields: [archivo_id], references: [id])
+
+  @@id([incidente_id, archivo_id])
+  @@map("incidente_entrega_foto")
 }
 
 model MensajeReparto {
@@ -1299,7 +1387,7 @@ model ContactMechanism {
 
 model Oferta {
   id                   BigInt         @id @default(autoincrement())
-  tipo                 String         // COMBO | LLEVA_PAGA | DESCUENTO
+  tipo                 String         // COMBO | LLEVA_PAGA | DESCUENTO | ENVIO_GRATIS
   nombre               String         @unique
   descripcion          String?
   lleva                Int?
@@ -1326,6 +1414,8 @@ model Oferta {
   mostrar_en_saludo_bot Boolean       @default(false)
   // Solo clientes con sesión iniciada en la carta cuyo celular nunca tuvo un pedido válido (no anulado)
   solo_primera_compra  Boolean        @default(false)
+  // Se muestra en la carta virtual (no apaga el descuento: solo la vista de la promoción)
+  visible_carta        Boolean        @default(true)
 
   categoria            Categoria?     @relation(fields: [alcance_categoria_id], references: [id])
   producto             Producto?      @relation(fields: [alcance_producto_id], references: [id])
@@ -1394,12 +1484,18 @@ model Cupon {
   modo               String                  // UNICO_COMPROBANTE | COMPARTIDO
   codigo_base        String                  @unique
   descripcion        String?
-  descuento_tipo     String                  // PORCENTAJE | MONTO
+  descuento_tipo     String                  // PORCENTAJE | MONTO | ENVIO_GRATIS
   descuento_valor    Decimal                 @db.Decimal(12, 2)
   compra_minima      Decimal?                @db.Decimal(12, 2)
   categoria_id       BigInt?
   producto_id        BigInt?
   canales            String[]                @default(["CARTA", "CAJA", "BOT"])
+  // Horario opcional (vacío = todo el tiempo): días 1..7, hora desde inclusiva y hasta exclusiva, fechas inclusivas
+  dias               Int[]                   @default([])
+  hora_desde         DateTime?               @db.Time
+  hora_hasta         DateTime?               @db.Time
+  fecha_desde        DateTime?               @db.Date
+  fecha_hasta        DateTime?               @db.Date
   requiere_cuenta    Boolean                 @default(false)
   dias_validez       Int?                    @default(15)
   tope_usos          Int?
@@ -2013,11 +2109,15 @@ model PrintJob {
   tomado_en           DateTime?   @db.Timestamptz
   impreso_en          DateTime?   @db.Timestamptz
   device_key_id       BigInt?
+  /// Área del equipo que imprime (sticker por área). NULL = Caja (la etiquetera y ticketera de Caja).
+  destino_area_id     BigInt?
 
   pedido              Pedido?     @relation(fields: [pedido_id], references: [id])
   area                AreaCocina? @relation(fields: [area_id], references: [id])
+  destinoArea         AreaCocina? @relation("DestinoImpresion", fields: [destino_area_id], references: [id])
   deviceKey           DeviceKey?  @relation(fields: [device_key_id], references: [id])
 
+  @@index([destino_area_id, estado])
   @@map("print_job")
 }
 

@@ -6,7 +6,6 @@ import {
   AccionMensaje,
   BotonAccion,
   FilaLista,
-  MemoriaPuntosBot,
 } from '../../tipos-conversacion';
 import { SubFlujoConversacion, RegistroSubFlujos } from '../registro-flujos';
 import {
@@ -21,16 +20,10 @@ import {
   BOTON_VOLVER_MENU,
   BOTON_HABLAR_PERSONA,
   BOTONES_PEDIDO_MODALIDAD,
-  BOTONES_PUNTOS_PREGUNTA,
-  BOTONES_PUNTOS_RECORDATORIO,
-  BOTONES_PUNTOS_NUMERO,
   BOTONES_PEDIDO_UBICACION,
   BOTONES_PEDIDO_UBICACION_FALLIDA,
   BOTONES_PEDIDO_ACCION_CARRITO,
   BOTONES_PEDIDO_VER_CARRITO,
-  BOTONES_PEDIDO_OFERTA_CALIFICA,
-  BOTONES_PEDIDO_OFERTA_FALTA,
-  BOTONES_PEDIDO_PREGUNTA_CUPON,
   BOTONES_PEDIDO_NOMBRE_CONFIRMAR,
   BOTONES_PEDIDO_COMPROBANTE,
   BOTONES_PEDIDO_CONFIRMAR_FINAL,
@@ -40,7 +33,6 @@ import {
   BOTONES_PEDIDO_NOMBRES_ENVASE,
   BOTONES_PEDIDO_TELEFONO,
 } from '../../textos-bot';
-import { evaluarOfertasParaCarrito } from './aviso-te-falta-poco.util';
 import {
   NOMBRE_MEDIO,
   botonesEfectivo,
@@ -73,15 +65,6 @@ const PALABRAS_CANCELAR = [
   'cancelar pedido',
   'descartar',
 ];
-
-const VIGENCIA_PUNTOS_MS = 30 * 24 * 60 * 60 * 1000;
-
-/** Celular peruano de 9 dígitos (empieza con 9) de un texto o del número con prefijo 51; null si no es válido. */
-function celularPeruano(texto: string | null | undefined): string | null {
-  const dig = String(texto ?? '').replace(/\D/g, '');
-  const celular = dig.length === 11 && dig.startsWith('51') ? dig.slice(2) : dig;
-  return /^9\d{8}$/.test(celular) ? celular : null;
-}
 
 export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   readonly nombre = 'pedido';
@@ -415,18 +398,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       case 'PEDIDO_QUITAR_ITEM':
         return this.pasoQuitarItem(flujo, pedido, entrada, contexto);
 
-      case 'PEDIDO_OFERTA_APLICAR':
-        return this.pasoOfertaAplicar(flujo, pedido, entrada, contexto);
-
-      case 'PEDIDO_OFERTA_FALTA':
-        return this.pasoOfertaFalta(flujo, pedido, entrada, contexto);
-
-      case 'PEDIDO_PREGUNTA_CUPON':
-        return this.pasoPreguntaCupon(flujo, pedido, entrada, contexto);
-
-      case 'PEDIDO_INGRESAR_CUPON':
-        return this.pasoIngresarCupon(flujo, pedido, entrada, contexto);
-
       case 'PEDIDO_CONFIRMAR_NOMBRE':
         return this.pasoConfirmarNombre(flujo, pedido, entrada, contexto);
 
@@ -460,12 +431,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
       case 'PEDIDO_COMPROBANTE_RAZON':
         return this.pasoComprobanteRazon(flujo, pedido, entrada, contexto);
-
-      case 'PEDIDO_PUNTOS_PREGUNTA':
-        return this.pasoPuntosPregunta(flujo, pedido, entrada, contexto);
-
-      case 'PEDIDO_PUNTOS_NUMERO':
-        return this.pasoPuntosNumero(flujo, pedido, entrada, contexto);
 
       case 'PEDIDO_RESUMEN_CONFIRMAR':
         return this.pasoResumenConfirmar(flujo, pedido, entrada, contexto);
@@ -624,7 +589,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       (entrada.ubicacion && Number.isFinite(entrada.ubicacion.latitud));
 
     if (tieneUbicacionGps) {
-      const { entrega, tarifa, esGratis, gratisDesde } = this.entregaDesdePunto(pedido, contexto, {
+      const { entrega, envio, esGratis } = this.entregaDesdePunto(pedido, contexto, {
         lat: entrada.ubicacion!.latitud,
         lng: entrada.ubicacion!.longitud,
         direccion: entrada.ubicacion?.direccion || entrada.ubicacion?.nombre,
@@ -641,7 +606,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         acciones: [
           {
             tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoUbicacionExitosa(tarifa, esGratis, gratisDesde),
+            texto: TEXTOS_BOT.pedidoUbicacionExitosa(envio, esGratis),
           },
           {
             tipo: 'enviarTexto',
@@ -706,12 +671,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
     punto: { lat: number; lng: number; direccion?: string; referencia?: string },
-  ): { entrega: NonNullable<EstadoCarritoPedido['entrega']>; tarifa: number; esGratis: boolean; gratisDesde: number } {
+  ): { entrega: NonNullable<EstadoCarritoPedido['entrega']>; envio: number | null; esGratis: boolean } {
     const resEnvio = contexto.resultadoEnvio;
-    const tarifa = Number(resEnvio?.tarifa ?? 5);
-    const gratisDesde = Number(resEnvio?.gratisDesde ?? 70);
-    const subtotalActual = pedido.items.reduce((s, i) => s + i.subtotal, 0);
-    const esGratis = subtotalActual > gratisDesde;
+    // Envío con las reglas del servidor (zona + promo de envío gratis por horario con casilla BOT). Sin tarifa, por calcular.
+    const tarifaZona = resEnvio?.tarifa ?? null;
+    const envio = contexto.vistaPreviaPedido?.envio ?? null;
+    const esGratis = envio === 0;
 
     const entrega: NonNullable<EstadoCarritoPedido['entrega']> = {
       modalidad: 'DELIVERY',
@@ -720,11 +685,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       origen: 'WHATSAPP',
       zonaId: resEnvio?.zona?.id ? String(resEnvio.zona.id) : undefined,
       zonaNombre: resEnvio?.zona?.nombre,
-      tarifaEnvio: esGratis ? 0 : tarifa,
+      tarifaEnvio: envio,
+      tarifaZona,
       direccion: punto.direccion,
       referencia: punto.referencia,
     };
-    return { entrega, tarifa, esGratis, gratisDesde };
+    return { entrega, envio, esGratis };
   }
 
   /** Lista de direcciones anteriores del cliente con cuenta, más «Otra dirección». */
@@ -828,7 +794,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    const { entrega, tarifa, esGratis, gratisDesde } = this.entregaDesdePunto(pedido, contexto, {
+    const { entrega, envio, esGratis } = this.entregaDesdePunto(pedido, contexto, {
       lat: dir.lat,
       lng: dir.lng,
       direccion: dir.direccion,
@@ -839,7 +805,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       flujo,
       nuevoPedido,
       contexto,
-      TEXTOS_BOT.pedidoDireccionAnteriorElegida(dir.direccion, tarifa, esGratis, gratisDesde),
+      TEXTOS_BOT.pedidoDireccionAnteriorElegida(dir.direccion, envio, esGratis),
     );
   }
 
@@ -1514,18 +1480,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     };
 
     const nuevosItems = [...pedido.items, nuevaLinea];
-    const subtotalTotal = Number(nuevosItems.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
-
-    // Evaluar ofertas y aviso de "te falta poco"
-    const evalOfertas = evaluarOfertasParaCarrito({
-      items: nuevosItems,
-      subtotal: subtotalTotal,
-      ofertas: contexto.ofertas,
-      ofertasRechazadas: pedido.ofertasRechazadas,
-      envioGratisMonto: contexto.datosLocalPublicos?.envioGratis || 70,
-    });
-
-    const hintTexto = evalOfertas.faltaPoco?.texto;
 
     const nuevoPedido: EstadoCarritoPedido = {
       ...pedido,
@@ -1539,7 +1493,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoProductoAgregado(config.productoNombre, subtotalLinea, hintTexto),
+          texto: TEXTOS_BOT.pedidoProductoAgregado(config.productoNombre, subtotalLinea),
           botones: BOTONES_PEDIDO_ACCION_CARRITO,
         },
       ],
@@ -1688,181 +1642,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         pedido: nuevoPedido,
       },
     };
-  }
-
-  // -------------------------------------------------------------------------
-  // PASO 6: Ofertas y "Te falta poco"
-  // -------------------------------------------------------------------------
-  private pasoOfertaAplicar(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    entrada: EntradaNormalizada,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    const oferta = pedido.ofertaPendiente;
-    const rechaza = entrada.id === 'ped_promo_no' || entrada.texto.includes('no');
-
-    if (rechaza && oferta) {
-      const rechazadas = [...(pedido.ofertasRechazadas || []), oferta.id];
-      const nuevoPedido = { ...pedido, ofertaPendiente: undefined, ofertasRechazadas: rechazadas };
-      return this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
-    }
-
-    if (oferta) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        descuentoAplicado: oferta.ahorro,
-        descuentoNombre: oferta.nombre,
-        ofertaPendiente: undefined,
-      };
-      return this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
-    }
-
-    return this.avanzarHaciaCheckout(flujo, pedido, contexto);
-  }
-
-  private pasoOfertaFalta(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    entrada: EntradaNormalizada,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    if (entrada.id === 'ped_otro' || entrada.texto.includes('agregar')) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        ofertaFaltaPoco: undefined,
-        estadoInterno: 'PEDIDO_CATEGORIAS',
-      };
-      return this.mostrarCategorias(flujo, nuevoPedido, contexto);
-    }
-
-    // Seguir sin la oferta
-    const nuevoPedido: EstadoCarritoPedido = {
-      ...pedido,
-      ofertaFaltaPoco: undefined,
-      ofertasRechazadas: [
-        ...(pedido.ofertasRechazadas || []),
-        pedido.ofertaFaltaPoco?.id || 'oferta_omitida',
-      ],
-    };
-    return this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
-  }
-
-  // -------------------------------------------------------------------------
-  // PASO 7: Cupón Opcional
-  // -------------------------------------------------------------------------
-  private pasoPreguntaCupon(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    entrada: EntradaNormalizada,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    if (entrada.id === 'ped_cupon_si' || entrada.texto.includes('tengo') || entrada.texto.includes('si')) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        estadoInterno: 'PEDIDO_INGRESAR_CUPON',
-      };
-      return {
-        nuevoEstado: 'PEDIDO_INGRESAR_CUPON',
-        acciones: [
-          {
-            tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoIngresarCuponPrompt(),
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_INGRESAR_CUPON',
-          pedido: nuevoPedido,
-        },
-      };
-    }
-
-    // No tiene cupón -> continuar
-    return this.avanzarHaciaCheckout(flujo, pedido, contexto);
-  }
-
-  private pasoIngresarCupon(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    entrada: EntradaNormalizada,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    const codigo = entrada.textoOriginal.trim().toUpperCase();
-
-    // Si contexto trajo resultado del cupón
-    if (contexto.resultadoCupon && contexto.resultadoCupon.valido) {
-      const desc = Number(contexto.resultadoCupon.descuento || 0);
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        cuponCodigo: codigo,
-        cuponDescuento: desc,
-        descuentoAplicado: Number(((pedido.descuentoAplicado || 0) + desc).toFixed(2)),
-        descuentoNombre: `Cupón ${codigo}`,
-      };
-
-      return {
-        nuevoEstado: 'PEDIDO_CONFIRMAR_NOMBRE',
-        acciones: [
-          {
-            tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoCuponAplicado(codigo, desc),
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_CONFIRMAR_NOMBRE',
-          pedido: nuevoPedido,
-        },
-      };
-    }
-
-    if (contexto.resultadoCupon && !contexto.resultadoCupon.valido) {
-      return {
-        nuevoEstado: 'PEDIDO_PREGUNTA_CUPON',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoCuponInvalido(contexto.resultadoCupon.mensaje),
-            botones: BOTONES_PEDIDO_PREGUNTA_CUPON,
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_PREGUNTA_CUPON',
-          pedido,
-        },
-      };
-    }
-
-    // Validación defensiva básica si se prueba en modo unitario
-    if (codigo.length >= 3 && codigo !== 'OMITIR') {
-      const desc = 5.0; // Descuento de ejemplo para pruebas de cupón
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        cuponCodigo: codigo,
-        cuponDescuento: desc,
-        descuentoAplicado: Number(((pedido.descuentoAplicado || 0) + desc).toFixed(2)),
-        descuentoNombre: `Cupón ${codigo}`,
-      };
-
-      return {
-        nuevoEstado: 'PEDIDO_CONFIRMAR_NOMBRE',
-        acciones: [
-          {
-            tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoCuponAplicado(codigo, desc),
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_CONFIRMAR_NOMBRE',
-          pedido: nuevoPedido,
-        },
-      };
-    }
-
-    return this.avanzarHaciaCheckout(flujo, pedido, contexto);
   }
 
   // -------------------------------------------------------------------------
@@ -2041,7 +1820,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     if (metodo === 'EFECTIVO') {
-      return this.pedirMontoEfectivo(flujo, { ...pedido, pago: { metodo: 'EFECTIVO' } }, calcularTotales(pedido).total);
+      return this.pedirMontoEfectivo(flujo, { ...pedido, pago: { metodo: 'EFECTIVO' } }, calcularTotales(pedido, contexto.vistaPreviaPedido).total);
     }
     const nuevoPedido: EstadoCarritoPedido = { ...pedido, pago: { metodo } };
     const res = this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
@@ -2082,7 +1861,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const totalPedido = calcularTotales(pedido).total;
+    const totalPedido = calcularTotales(pedido, contexto.vistaPreviaPedido).total;
     const plan = pedido.pago?.plan;
     // Con pago dividido el efectivo cubre solo su parte
     const parte = plan?.find((f) => f.medio === 'EFECTIVO')?.monto ?? totalPedido;
@@ -2128,7 +1907,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     const primero = pedido.pagoDiv?.medio1;
-    const { total } = calcularTotales(pedido);
+    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const resto = Number((total - (pedido.pagoDiv?.monto1 ?? 0)).toFixed(2));
     const medios = mediosActivos(contexto.datosLocalPublicos)
       .filter((m) => m !== primero)
@@ -2162,7 +1941,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (!medio || !activos.includes(medio) || (estado === 'PEDIDO_PAGO_DIV_MEDIO2' && medio === pedido.pagoDiv?.medio1)) {
       return this.mostrarMediosDivididos(estado, flujo, pedido, contexto);
     }
-    const { total } = calcularTotales(pedido);
+    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     if (estado === 'PEDIDO_PAGO_DIV_MEDIO1') {
       const nuevoPedido: EstadoCarritoPedido = {
@@ -2215,7 +1994,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const { total } = calcularTotales(pedido);
+    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const medio1 = pedido.pagoDiv?.medio1;
     if (!medio1) return this.mostrarMediosDivididos('PEDIDO_PAGO_DIV_MEDIO1', flujo, pedido, contexto);
     const monto =
@@ -2427,10 +2206,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     // 11.2. Construir DTO de PedidosService.crear
-    const subtotal = Number(pedido.items.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
-    const desc = pedido.descuentoAplicado || 0;
-    const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
-    const total = Math.max(0, subtotal - desc + (envio || 0));
+    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     const clienteNombre =
       pedido.cliente?.nombre ||
@@ -2482,7 +2258,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
               razonSocial: pedido.comprobante.razonSocial,
             }
           : undefined,
-      cuponCodigo: pedido.cuponCodigo,
     };
 
     // Clave estable de idempotencia para evitar duplicados ante reenvíos de Meta
@@ -2511,7 +2286,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           tiempoEstimadoMin: tiempoMin,
           tiempoEstimadoMax: tiempoMax,
           esPagoDigital,
-          puntos: this.puntosParaPedido(flujo, contexto),
           datosPagoTexto: this.formatearDatosPago(contexto.datosLocalPublicos?.mediosPagoVisibles, total),
         },
       ],
@@ -2532,10 +2306,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     const subtotal = Number(pedido.items.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
-    const pedidoMin = Number(contexto.datosLocalPublicos?.pedidoMinimo || 14.5);
+    // Sin `pedido_minimo` configurado (0 o null) no hay mínimo
+    const pedidoMin = Number(contexto.datosLocalPublicos?.pedidoMinimo || 0);
 
-    // 1. Pedido mínimo para delivery
-    if (pedido.modalidad === 'DELIVERY' && subtotal < pedidoMin) {
+    // 1. Pedido mínimo solo para delivery
+    if (pedido.modalidad === 'DELIVERY' && pedidoMin > 0 && subtotal < pedidoMin) {
       const faltante = Number((pedidoMin - subtotal).toFixed(2));
       return {
         nuevoEstado: 'PEDIDO_ACCION_CARRITO',
@@ -2558,103 +2333,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // 2. Oferta calificada
-    const evalOfertas = evaluarOfertasParaCarrito({
-      items: pedido.items,
-      subtotal,
-      ofertas: contexto.ofertas,
-      ofertasRechazadas: pedido.ofertasRechazadas,
-      envioGratisMonto: contexto.datosLocalPublicos?.envioGratis || 70,
-    });
-
-    if (
-      evalOfertas.califica &&
-      !pedido.descuentoAplicado &&
-      !pedido.ofertasRechazadas?.includes(evalOfertas.califica.id)
-    ) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        ofertaPendiente: evalOfertas.califica,
-        estadoInterno: 'PEDIDO_OFERTA_APLICAR',
-      };
-      return {
-        nuevoEstado: 'PEDIDO_OFERTA_APLICAR',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoOfertaCalifica(
-              evalOfertas.califica.nombre,
-              evalOfertas.califica.ahorro,
-            ),
-            botones: BOTONES_PEDIDO_OFERTA_CALIFICA,
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_OFERTA_APLICAR',
-          pedido: nuevoPedido,
-        },
-      };
-    }
-
-    // 3. Oferta te falta poco
-    if (
-      evalOfertas.faltaPoco &&
-      !pedido.descuentoAplicado &&
-      !pedido.ofertasRechazadas?.includes(evalOfertas.faltaPoco.id)
-    ) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        ofertaFaltaPoco: evalOfertas.faltaPoco,
-        estadoInterno: 'PEDIDO_OFERTA_FALTA',
-      };
-      return {
-        nuevoEstado: 'PEDIDO_OFERTA_FALTA',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoOfertaFaltaPoco(
-              evalOfertas.faltaPoco.faltan,
-              evalOfertas.faltaPoco.miss,
-              evalOfertas.faltaPoco.nombre,
-              evalOfertas.faltaPoco.precio,
-            ),
-            botones: BOTONES_PEDIDO_OFERTA_FALTA,
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_OFERTA_FALTA',
-          pedido: nuevoPedido,
-        },
-      };
-    }
-
-    // 4. Pregunta de Cupón
-    if (pedido.cuponCodigo === undefined && (pedido as any).cuponPreguntado !== true) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        estadoInterno: 'PEDIDO_PREGUNTA_CUPON',
-      };
-      (nuevoPedido as any).cuponPreguntado = true;
-      return {
-        nuevoEstado: 'PEDIDO_PREGUNTA_CUPON',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoPreguntaCupon(),
-            botones: BOTONES_PEDIDO_PREGUNTA_CUPON,
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_PREGUNTA_CUPON',
-          pedido: nuevoPedido,
-        },
-      };
-    }
-
-    // 5. Nombre del cliente
+    // 2. Nombre del cliente
     if (!pedido.cliente?.nombre) {
       const nombreSugerido = flujo.nombre_perfil_wa || contexto.nombreCliente;
       if (nombreSugerido) {
@@ -2699,7 +2378,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // 6. Teléfono del cliente: el número del chat llega como 51XXXXXXXXX; se ofrece usarlo o escribir otro
+    // 3. Teléfono del cliente: el número del chat llega como 51XXXXXXXXX; se ofrece usarlo o escribir otro
     const telDigitos = String(contexto.telefonoCliente || '').replace(/\D/g, '');
     const telExistente = /^51(9\d{8})$/.test(telDigitos)
       ? telDigitos.slice(2)
@@ -2735,12 +2414,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // 7. Medio de pago
+    // 4. Medio de pago
     if (!pedido.pago?.metodo) {
       return this.mostrarOpcionesPago(flujo, pedido, contexto);
     }
 
-    // 8. Comprobante
+    // 5. Comprobante
     if (!pedido.comprobante) {
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
@@ -2763,153 +2442,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
-    // 8.b A qué celular suman los puntos (solo si el servidor los puede consultar)
-    if (!pedido.puntosResuelto && contexto.puntos) {
-      // Con cuenta identificada por su celular no se pregunta: suma a esa cuenta
-      const propia = contexto.puntos.cuentaTelefono;
-      if (propia) {
-        const f = this.resolverPuntos(flujo, pedido, { modo: 'TELEFONO_PROPIO', partyId: propia.partyId, primerNombre: propia.primerNombre, en: Date.now() });
-        return this.avanzarHaciaCheckout(f, f.pedido as EstadoCarritoPedido, contexto);
-      }
-      const paso = this.preguntarPuntos(flujo, pedido, contexto);
-      if (paso) return paso;
-    }
-
-    // 9. Resumen final completo
+    // 6. Resumen final completo
     return this.mostrarResumenFinal(flujo, pedido, contexto);
-  }
-
-  // -------------------------------------------------------------------------
-  // Puntos: sin clave ni login; el cliente elige a qué celular suman (RQ-CLI-02). Sin cuenta, sin nombre ni contraseña.
-  private memoriaPuntosVigente(flujo: FlujoConversacion): MemoriaPuntosBot | null {
-    const m = flujo.puntos;
-    return m && Date.now() - m.en < VIGENCIA_PUNTOS_MS ? m : null;
-  }
-
-  private resolverPuntos(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    memoria: MemoriaPuntosBot,
-  ): FlujoConversacion {
-    return {
-      ...flujo,
-      puntos: memoria,
-      pedido: { ...pedido, puntosResuelto: true, puntosModo: undefined },
-    };
-  }
-
-  /** Continúa al checkout con los puntos ya resueltos. */
-  private continuarPuntos(f: FlujoConversacion, contexto: ContextoConversacion): ResultadoTransicion {
-    return this.avanzarHaciaCheckout({ ...f, estado: 'PEDIDO_RESUMEN_CONFIRMAR' as any }, f.pedido as EstadoCarritoPedido, contexto);
-  }
-
-  /** Suma al celular elegido y sigue al checkout, con «Listo, sumarás puntos con el ***XXX». */
-  private sumarAlNumero(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, celular: string, contexto: ContextoConversacion): ResultadoTransicion {
-    const f = this.resolverPuntos(flujo, pedido, { modo: 'TELEFONO_DICTADO', telefono: celular, terminacion: celular.slice(-3), en: Date.now() });
-    const r = this.continuarPuntos(f, contexto);
-    return { ...r, acciones: [{ tipo: 'enviarTexto' as const, texto: TEXTOS_BOT.puntosListo(celular.slice(-3)) }, ...r.acciones] };
-  }
-
-  /** Devuelve la pregunta de puntos que toca, o null si no hay nada que preguntar (decisión NINGUNO vigente). */
-  private preguntarPuntos(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, contexto: ContextoConversacion): ResultadoTransicion | null {
-    const memoria = this.memoriaPuntosVigente(flujo);
-    if (memoria?.modo === 'NINGUNO') return null;
-
-    const preguntar = (modo: EstadoCarritoPedido['puntosModo'], texto: string, botones: BotonAccion[]): ResultadoTransicion => ({
-      nuevoEstado: 'PEDIDO_PUNTOS_PREGUNTA',
-      acciones: [{ tipo: 'enviarBotones', texto, botones }],
-      nuevoFlujo: { ...flujo, estado: 'PEDIDO_PUNTOS_PREGUNTA', pedido: { ...pedido, estadoInterno: 'PEDIDO_PUNTOS_PREGUNTA', puntosModo: modo } },
-    });
-
-    if (memoria && (memoria.partyId || memoria.telefono)) {
-      const terminacion = memoria.terminacion ?? '***';
-      const destino =
-        memoria.modo === 'TELEFONO_PROPIO'
-          ? `la cuenta de ${memoria.primerNombre ?? 'tu cuenta'}`
-          : memoria.telefono
-            ? `tu número que termina en ***${terminacion}`
-            : `la cuenta que termina en ***${terminacion}`;
-      return preguntar('RECORDATORIO', TEXTOS_BOT.puntosRecordatorio(destino), BOTONES_PUNTOS_RECORDATORIO);
-    }
-    // «Este número» solo si quien escribe tiene un celular de 9 dígitos (no un identificador de WhatsApp)
-    const botones = celularPeruano(contexto.telefonoCliente) ? BOTONES_PUNTOS_PREGUNTA : BOTONES_PUNTOS_PREGUNTA.filter((b) => b.id !== 'puntos_este');
-    return preguntar('SIN_CUENTA', TEXTOS_BOT.puntosPregunta(), botones);
-  }
-
-  private pasoPuntosPregunta(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    entrada: EntradaNormalizada,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    const ahora = Date.now();
-    if (entrada.id === 'puntos_no' || entrada.id === 'puntos_sin') {
-      return this.continuarPuntos(this.resolverPuntos(flujo, pedido, { modo: 'NINGUNO', en: ahora }), contexto);
-    }
-    if (entrada.id === 'puntos_este' && pedido.puntosModo === 'SIN_CUENTA') {
-      const celular = celularPeruano(contexto.telefonoCliente);
-      if (celular) return this.sumarAlNumero(flujo, pedido, celular, contexto);
-    }
-    if (entrada.id === 'puntos_otro') {
-      return {
-        nuevoEstado: 'PEDIDO_PUNTOS_NUMERO',
-        acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.puntosPedirNumero(), botones: BOTONES_PUNTOS_NUMERO }],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_PUNTOS_NUMERO',
-          puntos: undefined,
-          pedido: { ...pedido, estadoInterno: 'PEDIDO_PUNTOS_NUMERO', puntosModo: undefined },
-        },
-      };
-    }
-    if (entrada.id === 'puntos_si' && pedido.puntosModo === 'RECORDATORIO') {
-      const mem = this.memoriaPuntosVigente(flujo);
-      if (mem) return this.continuarPuntos(this.resolverPuntos(flujo, pedido, mem), contexto);
-    }
-    // Cualquier otra cosa: se repite la pregunta
-    const pregunta = this.preguntarPuntos(flujo, { ...pedido, puntosResuelto: false }, contexto);
-    return pregunta ?? this.continuarPuntos(this.resolverPuntos(flujo, pedido, { modo: 'NINGUNO', en: ahora }), contexto);
-  }
-
-  private pasoPuntosNumero(
-    flujo: FlujoConversacion,
-    pedido: EstadoCarritoPedido,
-    entrada: EntradaNormalizada,
-    contexto: ContextoConversacion,
-  ): ResultadoTransicion {
-    if (entrada.id === 'puntos_sin' || entrada.id === 'puntos_no') {
-      return this.continuarPuntos(this.resolverPuntos(flujo, pedido, { modo: 'NINGUNO', en: Date.now() }), contexto);
-    }
-    const celular = celularPeruano(entrada.textoOriginal);
-    if (!celular) return this.reintentoNumero(flujo, pedido, TEXTOS_BOT.puntosNumeroInvalido());
-    return this.sumarAlNumero(flujo, pedido, celular, contexto);
-  }
-
-  private reintentoNumero(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, texto: string): ResultadoTransicion {
-    return {
-      nuevoEstado: 'PEDIDO_PUNTOS_NUMERO',
-      acciones: [{ tipo: 'enviarBotones', texto, botones: BOTONES_PUNTOS_NUMERO }],
-      nuevoFlujo: { ...flujo, estado: 'PEDIDO_PUNTOS_NUMERO', pedido: { ...pedido, estadoInterno: 'PEDIDO_PUNTOS_NUMERO' } },
-    };
-  }
-
-  private puntosParaPedido(flujo: FlujoConversacion, contexto: ContextoConversacion): { modo: 'TELEFONO_PROPIO' | 'TELEFONO_DICTADO' | 'NINGUNO'; partyId?: string; telefono?: string } | undefined {
-    if (!contexto.puntos) return undefined; // sin consulta de puntos: rige la resolución automática por teléfono
-    const mem = this.memoriaPuntosVigente(flujo);
-    return mem ? { modo: mem.modo, partyId: mem.partyId, telefono: mem.telefono } : { modo: 'NINGUNO' };
-  }
-
-  /** Línea del resumen: lo que sumará el pedido y, solo con el teléfono propio, el saldo. Misma base que el servidor. */
-  private lineaPuntosResumen(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string | undefined {
-    if (!contexto.puntos) return undefined;
-    const mem = this.memoriaPuntosVigente(flujo);
-    if (!mem || mem.modo === 'NINGUNO') return undefined;
-    if (pedido.cuponCodigo) return TEXTOS_BOT.puntosLineaResumen({ estimado: null, sinPuntos: true });
-    const elegible = pedido.items.filter((i) => !i.noSumaBeneficios).reduce((a, i) => a + i.subtotal, 0);
-    const estimado = pedido.descuentoAplicado ? null : Math.round(elegible * ((contexto.puntos.porcentaje ?? 5) / 100) * 100) / 100;
-    if (estimado === 0) return TEXTOS_BOT.puntosLineaResumen({ estimado: null, sinPuntos: true });
-    const saldo = mem.modo === 'TELEFONO_PROPIO' ? contexto.puntos.cuentaTelefono?.saldo ?? null : null;
-    return TEXTOS_BOT.puntosLineaResumen({ estimado, saldo });
   }
 
   // -------------------------------------------------------------------------
@@ -2920,14 +2454,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const subtotal = Number(pedido.items.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
-    const desc = pedido.descuentoAplicado || 0;
-    const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
-    const total = Math.max(0, subtotal - desc + (envio || 0));
+    const { envio, descuento, descuentoNombre, total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     const lineasTexto = this.lineasResumen(pedido);
 
-    const descTexto = desc > 0 ? `Descuento ${pedido.descuentoNombre || 'aplicado'} — −S/ ${desc.toFixed(2)}` : undefined;
+
+    const descuentoTexto = descuento > 0 ? TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento) : undefined;
 
     let envioTexto = 'gratis';
     if (pedido.modalidad === 'DELIVERY') {
@@ -2974,7 +2506,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           tipo: 'enviarBotones',
           texto: TEXTOS_BOT.pedidoResumenFinal({
             lineasTexto,
-            descuentoTexto: descTexto,
+            descuentoTexto,
             envioTexto,
             total,
             modalidad: pedido.modalidad === 'DELIVERY' ? 'Delivery' : 'Para recoger',
@@ -2983,7 +2515,6 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
             tiempoMin,
             tiempoMax,
             avisoDemanda,
-            puntosTexto: this.lineaPuntosResumen(flujo, pedido, contexto),
           }),
           botones: BOTONES_PEDIDO_CONFIRMAR_FINAL,
         },
@@ -3018,9 +2549,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       ...pedido,
       estadoInterno: 'PEDIDO_MEDIO_PAGO',
     };
-    const texto = TEXTOS_BOT.pedidoMedioPago();
+    const pregunta = TEXTOS_BOT.pedidoMedioPago();
+    // Un solo mensaje (resumen + pregunta) mientras cabe en el cuerpo de WhatsApp (1024 caracteres)
+    const resumen = conResumen ? this.resumenAntesDePagar(pedido, contexto) : '';
+    const unido = resumen ? `${resumen}\n\n${pregunta}` : pregunta;
+    const cabe = unido.length <= 1000;
+    const texto = cabe ? unido : pregunta;
     const acciones: AccionMensaje[] = [];
-    if (conResumen) acciones.push({ tipo: 'enviarTexto', texto: this.resumenAntesDePagar(pedido) });
+    if (resumen && !cabe) acciones.push({ tipo: 'enviarTexto', texto: resumen });
     acciones.push(
       op.filas
         ? { tipo: 'enviarLista', texto, botonTexto: 'Elegir medio de pago', filas: op.filas }
@@ -3039,9 +2575,10 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   }
 
   /** Resumen con total justo antes de «¿Cómo pagarás?». Usa las mismas líneas y totales que el resumen final. */
-  private resumenAntesDePagar(pedido: EstadoCarritoPedido): string {
-    const { subtotal, descuento, envio, total } = calcularTotales(pedido);
+  private resumenAntesDePagar(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
+    const { subtotal, envio, total, descuento, descuentoNombre } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const lineas = this.lineasResumen(pedido);
+    const descuentoTxt = descuento > 0 ? `${TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento)}\n` : '';
     const envioTxt =
       pedido.modalidad !== 'DELIVERY'
         ? 'Recojo en tienda'
@@ -3053,7 +2590,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     return (
       `🧾 *Resumen de tu pedido*\n${lineas}\n\n` +
       `Subtotal: S/ ${subtotal.toFixed(2)}\n` +
-      (descuento > 0 ? `${pedido.descuentoNombre || 'Descuento'}: −S/ ${descuento.toFixed(2)}\n` : '') +
+      descuentoTxt +
       `${envioTxt}\n` +
       `*TOTAL: S/ ${total.toFixed(2)}*`
     );

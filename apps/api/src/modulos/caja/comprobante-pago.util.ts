@@ -5,6 +5,19 @@ import { MEDIOS_DIGITALES_PLAN } from '../pedidos/pago-plan.service';
 /** Medios digitales: siempre llevan la foto del comprobante (la IA solo informa, nunca aprueba). */
 export const MEDIOS_CON_COMPROBANTE = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 
+/** Medios que piden el código de operación al confirmar (Yape, Plin, transferencia y tarjeta, como MEDIOS_CON_VOUCHER_CAJA). */
+// La tarjeta no lleva voucher ni lectura de IA en esta pantalla: no se pide código de operación
+export const MEDIOS_CON_CODIGO_OPERACION = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
+
+/**
+ * Medios que necesitan código de operación: los digitales del plan (pago dividido) y el medio elegido, si aplica.
+ * El efectivo nunca pide código. Igual que la web (mediosQueExigenCodigo en mediosPago.ts).
+ */
+export function mediosQueExigenCodigo(metodo: string | null | undefined, planPago?: ReadonlyArray<{ medio: string }> | null): string[] {
+  const medios = [...(planPago ?? []).map((f) => f.medio), metodo ?? ''].map((m) => String(m).toUpperCase().trim());
+  return [...new Set(medios.filter((m) => MEDIOS_CON_CODIGO_OPERACION.includes(m)))];
+}
+
 const NOMBRE_MEDIO_DIGITAL: Record<string, string> = {
   YAPE: 'Yape',
   PLIN: 'Plin',

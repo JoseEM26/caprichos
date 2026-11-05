@@ -14,12 +14,11 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { calcularEnvioFinal } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
-import { leerReglaEnvioGratis } from '../zonas/envio-gratis';
+import { calcularEnvioDelivery, PromoEnvioGratis } from '../ofertas/envio-gratis-promo';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto, EntregaDto } from './dto/crear-pedido.dto';
@@ -621,26 +620,41 @@ export class PedidosService {
 
     const descuentoAplicado = desgloseDescuento.descuentoTotal;
 
-    // 6. Validar pedido mínimo si está configurado
-    const paramPedidoMinimo = await this.prisma.parametro.findUnique({
-      where: { clave: 'pedido_minimo' },
-    });
-    const pedidoMinimoVal =
-      typeof paramPedidoMinimo?.valor === 'number'
-        ? paramPedidoMinimo.valor
-        : Number(paramPedidoMinimo?.valor) || 0;
-
-    if (pedidoMinimoVal > 0 && subtotalCalculado < pedidoMinimoVal) {
+    // Cupón de envío gratis: solo delivery (en pickup o mesa el cliente debe quitarlo)
+    if (desgloseDescuento.envioGratisCupon && dto.modalidad !== 'DELIVERY') {
       throw new BadRequestException({
-        codigo: 'PEDIDO_MINIMO',
-        mensaje: `El pedido no alcanza el monto mínimo de S/ ${pedidoMinimoVal.toFixed(2)}`,
+        codigo: 'CUPON_SOLO_DELIVERY',
+        mensaje: 'El cupón de envío gratis solo aplica a pedidos de delivery',
       });
+    }
+
+    // 6. Pedido mínimo: solo para DELIVERY, sobre el subtotal de productos (sin envío ni descuentos).
+    // Sin parámetro `pedido_minimo` configurado (o 0) no hay mínimo.
+    if (dto.modalidad === 'DELIVERY') {
+      const paramPedidoMinimo = await this.prisma.parametro.findUnique({
+        where: { clave: 'pedido_minimo' },
+      });
+      const pedidoMinimoVal =
+        typeof paramPedidoMinimo?.valor === 'number'
+          ? paramPedidoMinimo.valor
+          : Number(paramPedidoMinimo?.valor) || 0;
+
+      if (pedidoMinimoVal > 0 && subtotalCalculado < pedidoMinimoVal) {
+        const faltante = Number((pedidoMinimoVal - subtotalCalculado).toFixed(2));
+        throw new BadRequestException({
+          codigo: 'PEDIDO_MINIMO',
+          mensaje: `El pedido mínimo para delivery es S/ ${pedidoMinimoVal.toFixed(2)}; te faltan S/ ${faltante.toFixed(2)}`,
+          minimo: pedidoMinimoVal,
+          faltante,
+        });
+      }
     }
 
     // 7. Cálculo de envío (solo DELIVERY)
     // Dirección del pedido: la de la carta, o la del último pedido de ese celular si la pidió reutilizar
     const entrega = direccionReutilizada ?? dto.entrega;
     let envio: number | null = 0;
+    let envioPromo: PromoEnvioGratis | null = null;
     let zonaId: bigint | null = null;
     let entregaOrigen: string | null = null;
 
@@ -665,8 +679,15 @@ export class PedidosService {
 
         zonaId = zonaDetectada.zonaId;
 
-        const reglaEnvio = await leerReglaEnvioGratis(this.prisma);
-        envio = calcularEnvioFinal(subtotalCalculado, zonaDetectada.tarifa, reglaEnvio);
+        // Misma función que la consulta /carta/envio y ubicar: promo ENVIO_GRATIS o envío gratis por monto
+        const calculoEnvio = await calcularEnvioDelivery(this.prisma, {
+          subtotal: subtotalCalculado,
+          tarifaZona: zonaDetectada.tarifa,
+          canal: canalPedido,
+          envioGratisCupon: desgloseDescuento.envioGratisCupon,
+        });
+        envio = calculoEnvio.envio;
+        envioPromo = calculoEnvio.promo;
 
         entregaOrigen = entrega?.origen || 'GPS';
       } else if (
@@ -677,6 +698,8 @@ export class PedidosService {
         envio = null;
         zonaId = null;
         entregaOrigen = 'ESCRITA';
+        // Sin zona aún: si hay cupón de envío gratis, el envío queda en 0 (ubicar no lo vuelve a cobrar)
+        if (desgloseDescuento.envioGratisCupon) envio = 0;
       } else {
         throw new BadRequestException({
           codigo: 'UBICACION_REQUERIDA',
@@ -938,6 +961,13 @@ export class PedidosService {
       if (desgloseDescuento.ofertaId) {
         await tx.oferta.update({
           where: { id: BigInt(desgloseDescuento.ofertaId) },
+          data: { usos_actuales: { increment: 1 } },
+        });
+      }
+      // Envío gratis por promo: cuenta un uso solo si de verdad dejó el envío en 0
+      if (envioPromo) {
+        await tx.oferta.update({
+          where: { id: BigInt(envioPromo.id) },
           data: { usos_actuales: { increment: 1 } },
         });
       }

@@ -26,7 +26,7 @@ const pedidoCarta = (extra: Partial<Pedido> = {}): Pedido => ({
   ...extra,
 });
 
-const voucher = (semaforo: 'CONFIABLE' | 'ILEGIBLE', id = '21') => ({
+const voucher = (semaforo: 'CONFIABLE' | 'ILEGIBLE', id = '21', operacion: string | null = '4455') => ({
   id,
   pedidoId: '77',
   archivoId: '900',
@@ -34,7 +34,8 @@ const voucher = (semaforo: 'CONFIABLE' | 'ILEGIBLE', id = '21') => ({
   medio: 'YAPE' as const,
   semaforo,
   motivos: semaforo === 'CONFIABLE' ? [] : ['El monto no se distingue'],
-  extraido: null,
+  operacion,
+  extraido: operacion ? { legible: true, monto: 35, operacion, fecha: null, hora: null, titular: null, destinoNumero: null, medioDetectado: 'YAPE' as const, confianza: 0.9 } : null,
   creadoEn: '2026-10-27T18:00:00Z',
 });
 
@@ -71,6 +72,10 @@ describe('ModalConfirmarPago', () => {
     siguiente();
   };
 
+  /** Escribe el código de operación en el paso 3 (el campo vive ahí). */
+  const escribirCodigo = (medio: string, valor: string) =>
+    fireEvent.change(screen.getByTestId(`input-codigo-operacion-${medio}`), { target: { value: valor } });
+
   const confirmar = async () => {
     irAlPaso3();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
@@ -90,6 +95,7 @@ describe('ModalConfirmarPago', () => {
   it('digital sin voucher bloquea la confirmación y no registra el pago', async () => {
     abrir(pedidoCarta());
     irAlPaso3();
+    escribirCodigo('YAPE', '123456');
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
 
     expect(screen.getByRole('alert').textContent).toMatch(/Sube el comprobante del pago/);
@@ -140,7 +146,9 @@ describe('ModalConfirmarPago', () => {
 
     await confirmar();
     await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
-    expect(pedidosApi.registrarPago).toHaveBeenCalledWith('77', 'YAPE', 'PAGADO', undefined);
+    expect(pedidosApi.registrarPago).toHaveBeenCalledWith('77', 'YAPE', 'PAGADO', undefined, [
+      { medio: 'YAPE', codigo: '4455' },
+    ]);
     expect(pedidosApi.cambiarEstado).toHaveBeenCalledWith('77', 'COLA', expect.any(String));
   });
 
@@ -192,10 +200,13 @@ describe('ModalConfirmarPago', () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar' }));
 
       await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
-      expect(pedidosApi.registrarPago).toHaveBeenCalledWith('77', 'YAPE', 'PAGADO', {
-        motivo: 'El cliente no tenía señal',
-        pinSupervisor: '123456',
-      });
+      expect(pedidosApi.registrarPago).toHaveBeenCalledWith(
+        '77',
+        'YAPE',
+        'PAGADO',
+        { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
+        undefined, // en la excepción sin comprobante no hay código de operación
+      );
     });
   });
 
@@ -236,6 +247,84 @@ describe('ModalConfirmarPago', () => {
     expect(screen.queryByTestId('input-voucher-archivo')).toBeNull();
     await confirmar();
     await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
-    expect(pedidosApi.registrarPago).toHaveBeenCalledWith('77', 'EFECTIVO', 'COORDINADO', undefined);
+    expect(pedidosApi.registrarPago).toHaveBeenCalledWith('77', 'EFECTIVO', 'COORDINADO', undefined, undefined);
+  });
+
+  describe('código de operación', () => {
+    it('llega prellenado con la lectura de la IA, con la etiqueta y sin «(opcional)»', async () => {
+      vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([voucher('CONFIABLE', '21', '98765')]);
+      abrir(pedidoCarta());
+      irAlPaso3();
+
+      const campo = await screen.findByTestId('input-codigo-operacion-YAPE');
+      await waitFor(() => expect((campo as HTMLInputElement).value).toBe('98765'));
+      expect(screen.getByTestId('codigo-leido-YAPE').textContent).toMatch(/Leído del voucher por la IA/);
+      expect(screen.queryByText(/opcional/)).toBeNull();
+    });
+
+    it('sin lectura de la IA el campo va vacío, bloquea Confirmar y pide escribirlo', async () => {
+      vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([voucher('ILEGIBLE', '21', null)]);
+      abrir(pedidoCarta());
+      irAlPaso3();
+
+      expect((await screen.findByTestId('input-codigo-operacion-YAPE') as HTMLInputElement).value).toBe('');
+      expect(screen.getByText('Escribe el código de operación que ves en el voucher')).toBeDefined();
+      const boton = screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement;
+      expect(boton.disabled).toBe(true);
+      fireEvent.click(boton);
+      expect(pedidosApi.registrarPago).not.toHaveBeenCalled();
+
+      escribirCodigo('YAPE', '555111');
+      expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('si Caja corrige lo leído, queda la nota «Corregido manualmente» y se envía lo corregido', async () => {
+      vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([voucher('CONFIABLE', '21', '98765')]);
+      abrir(pedidoCarta());
+      irAlPaso3();
+      await waitFor(() => expect((screen.getByTestId('input-codigo-operacion-YAPE') as HTMLInputElement).value).toBe('98765'));
+
+      escribirCodigo('YAPE', '98766');
+      expect(screen.getByTestId('codigo-corregido-YAPE').textContent).toMatch(/Corregido manualmente/);
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar' }));
+      await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
+      expect(pedidosApi.registrarPago).toHaveBeenCalledWith('77', 'YAPE', 'PAGADO', undefined, [
+        { medio: 'YAPE', codigo: '98766' },
+      ]);
+    });
+
+    it('efectivo no muestra el campo ni lo pide', async () => {
+      abrir(pedidoCarta({ pago_preferido: 'EFECTIVO' }));
+      irAlPaso3();
+
+      expect(screen.queryByTestId('codigos-operacion')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }).hasAttribute('disabled')).toBe(false);
+    });
+
+    it('tarjeta no pide código de operación (no lleva voucher en esta pantalla)', async () => {
+      abrir(pedidoCarta({ pago_preferido: 'TARJETA' }));
+      irAlPaso3();
+
+      expect(screen.queryByTestId('input-codigo-operacion-TARJETA')).toBeNull();
+      expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('plan efectivo + Yape pide solo el código de Yape', async () => {
+      abrir(
+        pedidoCarta({
+          pago_preferido: 'EFECTIVO',
+          planPago: [
+            { medio: 'EFECTIVO', monto: 10 },
+            { medio: 'YAPE', monto: 25 },
+          ],
+        } as Partial<Pedido>),
+      );
+      irAlPaso3();
+
+      expect(screen.getByTestId('input-codigo-operacion-YAPE')).toBeDefined();
+      expect(screen.queryByTestId('input-codigo-operacion-EFECTIVO')).toBeNull();
+      expect(screen.getAllByTestId(/^input-codigo-operacion-/)).toHaveLength(1);
+    });
   });
 });

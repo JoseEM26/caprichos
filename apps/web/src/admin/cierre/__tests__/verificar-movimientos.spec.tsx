@@ -150,3 +150,27 @@ describe('Verificar movimientos del turno', () => {
     expect(within(dlg).queryByText('Sin pedidos cobrados aún.')).not.toBeInTheDocument();
   });
 });
+
+describe('Verificar movimientos: devoluciones del turno (informativo)', () => {
+  const devoluciones = [
+    { id: '1', pedidoCodigo: 'CP-7', montoDevuelto: 25, medio: 'YAPE', codigoOperacion: 'YP-881', motivo: null, porNombre: 'Ana', autorizadoPorNombre: 'Ana', comprobanteBajaEstado: null, creadoEn: '2026-11-04T15:00:00Z' },
+    { id: '2', pedidoCodigo: 'CP-8', montoDevuelto: 10, medio: 'EFECTIVO', codigoOperacion: null, motivo: null, porNombre: 'Ana', autorizadoPorNombre: 'Ana', comprobanteBajaEstado: null, creadoEn: '2026-11-04T16:00:00Z' },
+  ];
+
+  it('lista las devoluciones con su medio, código y el total digital', () => {
+    render(<VerificarMovimientos {...base} resumen={resumen} devoluciones={devoluciones} />);
+
+    const tabla = screen.getByRole('table', { name: 'Devoluciones del turno' });
+    expect(within(tabla).getByText('CP-7')).toBeInTheDocument();
+    expect(within(tabla).getByText('YP-881')).toBeInTheDocument();
+    expect(within(tabla).getByText('Devuelto por Yape, Plin, transferencia y tarjeta')).toBeInTheDocument();
+    // fila de la devolución y total digital: ambas dicen S/ 25.00
+    expect(within(tabla).getAllByText('S/ 25.00')).toHaveLength(2);
+  });
+
+  it('sin devoluciones dice que no hay', () => {
+    render(<VerificarMovimientos {...base} resumen={resumen} devoluciones={[]} />);
+    expect(screen.getByRole('heading', { name: 'Devoluciones del turno' })).toBeInTheDocument();
+    expect(screen.getByText('Sin devoluciones en este turno.')).toBeInTheDocument();
+  });
+});

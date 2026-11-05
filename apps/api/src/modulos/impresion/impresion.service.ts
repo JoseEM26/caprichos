@@ -13,6 +13,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import {
+  AREA_BEBIDAS,
   EstadoAdminImpresion,
   EstadoImpresora,
   RespuestaTomarTrabajos,
@@ -42,21 +43,27 @@ import {
   construirTicketPago,
   construirTicketPrueba,
   construirTicketNotaMozo,
+  construirTicketComandaSalon,
 } from './constructor-etiquetas';
 import {
   consultarEstadoAgente,
   empaquetarDetalleLatido,
   estadoPorRol,
   leerParametroNumerico,
+  rolesDeclarados,
 } from './estado-impresion';
+import {
+  CONTEXTO_RUTEO_VACIO,
+  ContextoRuteo,
+  aplicaSegunReglas,
+  destinoDeTrabajo,
+  tiposDeRoles,
+} from './ruteo-impresion';
+import { leerReglasImpresion } from './reglas-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 
 /** Estados de print_job que cuentan como "en cola" para el admin y para no reencolar dos veces. */
 const TIPOS_ETIQUETA = ['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'];
-const tiposDeRoles = (roles: RolImpresora[]): string[] => [
-  ...(roles.includes('ETIQUETERA') ? TIPOS_ETIQUETA : []),
-  ...(roles.includes('TICKETERA') ? ['TICKET_PAGO'] : []),
-];
 
 const ESTADOS_EN_COLA = ['PENDIENTE', 'IMPRIMIENDO'];
 
@@ -118,8 +125,10 @@ export class ImpresionService {
     max = 10,
     deviceKeyId?: bigint,
     roles?: RolImpresora[],
+    areaId: bigint | null = null,
   ): Promise<RespuestaTomarTrabajos> {
-    // Con roles, solo los trabajos de las máquinas que el agente puede imprimir ahora; el resto espera en cola
+    // Con roles, solo los trabajos de las máquinas que el agente puede imprimir ahora; el resto espera en cola.
+    // Por área: un equipo de área solo toma lo suyo (destino_area_id); Caja (areaId null) toma lo de destino NULL.
     const tipos = roles ? tiposDeRoles(roles) : null;
     const limite = Math.min(Math.max(1, max || 10), 10);
 
@@ -151,7 +160,9 @@ export class ImpresionService {
         const filas: Array<{ id: bigint }> = tipos
           ? await tx.$queryRaw`
           SELECT id FROM "print_job"
-          WHERE estado = 'PENDIENTE' AND tipo = ANY(${tipos}::text[])
+          WHERE estado = 'PENDIENTE'
+            AND destino_area_id IS NOT DISTINCT FROM ${areaId}::bigint
+            AND tipo = ANY(${tipos}::text[])
           ORDER BY id ASC
           LIMIT ${limite}
           FOR UPDATE SKIP LOCKED
@@ -159,6 +170,7 @@ export class ImpresionService {
           : await tx.$queryRaw`
           SELECT id FROM "print_job"
           WHERE estado = 'PENDIENTE'
+            AND destino_area_id IS NOT DISTINCT FROM ${areaId}::bigint
           ORDER BY id ASC
           LIMIT ${limite}
           FOR UPDATE SKIP LOCKED
@@ -168,7 +180,7 @@ export class ImpresionService {
         // Fallback para entornos donde raw SQL no soporte FOR UPDATE SKIP LOCKED (ej: SQLite mock)
         this.logger.warn(`Fallo $queryRaw SKIP LOCKED, usando findMany: ${err.message}`);
         const filas = await tx.printJob.findMany({
-          where: { estado: 'PENDIENTE', ...(tipos ? { tipo: { in: tipos } } : {}) },
+          where: { estado: 'PENDIENTE', destino_area_id: areaId, ...(tipos ? { tipo: { in: tipos } } : {}) },
           orderBy: { id: 'asc' },
           take: limite,
           select: { id: true },
@@ -384,6 +396,7 @@ export class ImpresionService {
       items: items.map((t) => ({
         id: t.id.toString(),
         pedidoId: t.pedido_id?.toString() ?? null,
+        destinoAreaId: t.destino_area_id?.toString() ?? null,
         pedidoCodigo: t.pedido?.codigo || '',
         clienteNombre: t.pedido?.cliente_nombre || '',
         tipo: t.tipo,
@@ -655,67 +668,60 @@ export class ImpresionService {
       }
 
       const { general, areas, bebidas } = construirTodasLasEtiquetas(pedido);
+      const reglas = await leerReglasImpresion(this.prisma);
+      const ctx = await this.contextoRuteo();
       // Solo el primer encolado del pedido avisa a Caja (los reintentos de la misma aceptación no repiten el aviso)
       const yaTenia = (await this.prisma.printJob.count({ where: { pedido_id: pedido.id, tipo: { in: TIPOS_ETIQUETA } } })) > 0;
 
-      // 1. Encolar General
-      const claveGeneral = `${pedido.id}-ETIQUETA_GENERAL`;
-      await this.prisma.printJob.upsert({
-        where: { clave_idempotencia: claveGeneral },
-        create: {
-          pedido_id: pedido.id,
-          tipo: 'ETIQUETA_GENERAL',
-          clave_idempotencia: claveGeneral,
-          payload: general as any,
-          copia: false,
-          estado: 'PENDIENTE',
-        },
-        update: {}, // No sobreescribir si ya existe
-      }).catch((e) => this.logger.debug(`General ya existe: ${e.message}`));
-
-      // 2. Encolar Áreas
-      for (const a of areas) {
-        const areaIdVal = pedido.lineas.find(
-          (l: any) => (l.area?.nombre || '').toUpperCase() === a.areaNombre,
-        )?.area_id;
-
-        const claveArea = `${pedido.id}-ETIQUETA_AREA-${areaIdVal || a.areaNombre}`;
+      // Cada trabajo se encola si la regla de su tipo y modalidad lo pide; su destino sale del ruteo (NULL = Caja)
+      let cajas = 0;
+      const encolar = async (tipo: string, clave: string, payload: any, areaId: bigint | null) => {
+        const destino = destinoDeTrabajo(tipo, areaId, ctx);
         await this.prisma.printJob.upsert({
-          where: { clave_idempotencia: claveArea },
+          where: { clave_idempotencia: clave },
           create: {
             pedido_id: pedido.id,
-            area_id: areaIdVal || null,
-            tipo: 'ETIQUETA_AREA',
-            clave_idempotencia: claveArea,
-            payload: a as any,
+            area_id: areaId,
+            destino_area_id: destino,
+            tipo,
+            clave_idempotencia: clave,
+            payload: payload as any,
             copia: false,
             estado: 'PENDIENTE',
           },
-          update: {},
-        }).catch((e) => this.logger.debug(`Área ya existe: ${e.message}`));
+          update: {}, // No sobreescribir si ya existe
+        }).catch((e) => this.logger.debug(`${tipo} ya existe: ${e.message}`));
+        if (destino === null) cajas += 1;
+      };
+
+      if (aplicaSegunReglas('ETIQUETA_GENERAL', pedido.modalidad, reglas)) {
+        await encolar('ETIQUETA_GENERAL', `${pedido.id}-ETIQUETA_GENERAL`, general, null);
       }
 
-      // 3. Encolar Bebidas
-      for (const b of bebidas) {
-        const claveBebida = `${pedido.id}-ETIQUETA_BEBIDA-${b.bebidaIndex}`;
-        await this.prisma.printJob.upsert({
-          where: { clave_idempotencia: claveBebida },
-          create: {
-            pedido_id: pedido.id,
-            tipo: 'ETIQUETA_BEBIDA',
-            clave_idempotencia: claveBebida,
-            payload: b as any,
-            copia: false,
-            estado: 'PENDIENTE',
-          },
-          update: {},
-        }).catch((e) => this.logger.debug(`Bebida ya existe: ${e.message}`));
+      if (aplicaSegunReglas('ETIQUETA_AREA', pedido.modalidad, reglas)) {
+        for (const a of areas) {
+          const areaIdVal = pedido.lineas.find(
+            (l: any) => (l.area?.nombre || '').toUpperCase() === a.areaNombre,
+          )?.area_id ?? null;
+          await encolar('ETIQUETA_AREA', `${pedido.id}-ETIQUETA_AREA-${areaIdVal || a.areaNombre}`, a, areaIdVal);
+        }
+      }
+
+      if (aplicaSegunReglas('ETIQUETA_BEBIDA', pedido.modalidad, reglas)) {
+        for (const b of bebidas) {
+          await encolar('ETIQUETA_BEBIDA', `${pedido.id}-ETIQUETA_BEBIDA-${b.bebidaIndex}`, b, null);
+        }
+      }
+
+      // Comanda completa de salón: a la ticketera de Caja (solo mesa/local, con la regla activa)
+      if (aplicaSegunReglas('TICKET_COMANDA_SALON', pedido.modalidad, reglas)) {
+        await encolar('TICKET_COMANDA_SALON', `${pedido.id}-TICKET_COMANDA_SALON`, construirTicketComandaSalon(pedido), null);
       }
 
       this.logger.log(`Encoladas etiquetas automáticas para pedido ${pedido.codigo} (id: ${pedido.id})`);
 
-      if (!yaTenia) {
-        await this.avisarSiNoHayImpresora(pedido, 1 + areas.length + bebidas.length);
+      if (!yaTenia && cajas > 0) {
+        await this.avisarSiNoHayImpresora(pedido, cajas);
       }
     } catch (err: any) {
       // El encolado NUNCA bloquea ni hace fallar la aceptación del pedido
@@ -963,6 +969,11 @@ export class ImpresionService {
       }
     }
     const pedidas = dto.clave ? seleccion.filter((s) => s.clave === dto.clave) : seleccion;
+    // Por defecto se respetan las reglas (modalidad y activos); solo `forzar` las salta, a propósito
+    const reglas = await leerReglasImpresion(this.prisma);
+    const ctx = await this.contextoRuteo();
+    const aplicables = dto.forzar ? pedidas : pedidas.filter((s) => aplicaSegunReglas(s.tipo, pedido.modalidad, reglas));
+    const noAplican = pedidas.length - aplicables.length;
 
     // Una etiqueta que ya está en cola no se duplica: el cajero no imprime dos veces lo mismo
     const enCola = await this.prisma.printJob.findMany({
@@ -970,7 +981,7 @@ export class ImpresionService {
       select: { tipo: true, payload: true },
     });
     const claveEnCola = new Set(enCola.map((j) => claveDeTrabajo(j)));
-    const nuevas = pedidas.filter((s) => !claveEnCola.has(s.clave));
+    const nuevas = aplicables.filter((s) => !claveEnCola.has(s.clave));
 
     const trabajosCreados: any[] = [];
     for (const s of nuevas) {
@@ -979,6 +990,7 @@ export class ImpresionService {
           data: {
             pedido_id: pedido.id,
             area_id: s.areaId,
+            destino_area_id: destinoDeTrabajo(s.tipo, s.areaId, ctx),
             tipo: s.tipo,
             payload: s.payload as any,
             copia: true,
@@ -988,14 +1000,17 @@ export class ImpresionService {
       );
     }
 
-    const omitidas = pedidas.length - nuevas.length;
+    const omitidas = aplicables.length - nuevas.length;
     return {
       ok: true,
       mensaje: nuevas.length > 0
         ? `Se encolaron ${trabajosCreados.length} etiqueta(s) para reimpresión`
-        : 'Esas etiquetas ya están en cola de impresión',
+        : noAplican > 0 && omitidas === 0
+          ? 'Esas etiquetas no aplican a este pedido según la configuración de impresión'
+          : 'Esas etiquetas ya están en cola de impresión',
       cantidad: trabajosCreados.length,
       omitidas,
+      noAplican,
       trabajoIds: trabajosCreados.map((t) => t.id.toString()),
     };
   }
@@ -1122,16 +1137,19 @@ export class ImpresionService {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
     }
 
-    const { general, areas, bebidas } = construirTodasLasEtiquetas(pedido);
+    const { areas, bebidas } = construirTodasLasEtiquetas(pedido);
+    const reglas = await leerReglasImpresion(this.prisma);
     const esperadas = [
-      { clave: CLAVE_GENERAL, tipo: 'ETIQUETA_GENERAL', titulo: 'General del pedido', detalle: 'Bolsa o bandeja, etiquetera de caja' },
-      ...areas.map((a) => ({
+      ...(aplicaSegunReglas('ETIQUETA_GENERAL', pedido.modalidad, reglas)
+        ? [{ clave: CLAVE_GENERAL, tipo: 'ETIQUETA_GENERAL', titulo: 'General del pedido', detalle: 'Resumen con total, etiquetera de caja' }]
+        : []),
+      ...(aplicaSegunReglas('ETIQUETA_AREA', pedido.modalidad, reglas) ? areas : []).map((a) => ({
         clave: claveEtiquetaArea(a.areaNombre),
         tipo: 'ETIQUETA_AREA',
         titulo: `Área ${a.areaNombre}`,
         detalle: 'Etiqueta de la cocina de esta área',
       })),
-      ...bebidas.map((b) => ({
+      ...(aplicaSegunReglas('ETIQUETA_BEBIDA', pedido.modalidad, reglas) ? bebidas : []).map((b) => ({
         clave: claveEtiquetaBebida(b.bebidaIndex),
         tipo: 'ETIQUETA_BEBIDA',
         titulo: `Bebida ${b.bebidaIndex} de ${b.totalBebidas}`,
@@ -1182,6 +1200,28 @@ export class ImpresionService {
         sinTrabajo: contar(['SIN_TRABAJO']),
       },
     };
+  }
+
+  /** Equipos de área activos con sus roles declarados y el id del área de bebidas (por nombre). Sin datos: todo a Caja. */
+  private async contextoRuteo(): Promise<ContextoRuteo> {
+    try {
+      const [equipos, bebidas] = await Promise.all([
+        this.prisma.deviceKey.findMany({
+          where: { tipo: 'AGENTE', activo: true, area_id: { not: null } },
+          select: { area_id: true, latido_impresora: true, latido_detalle: true },
+        }),
+        this.prisma.areaCocina.findMany({ where: { nombre: AREA_BEBIDAS, activo: true }, select: { id: true } }),
+      ]);
+      return {
+        equipos: (equipos ?? [])
+          .filter((e) => e.area_id !== null)
+          .map((e) => ({ areaId: e.area_id as bigint, roles: rolesDeclarados(e) })),
+        areaBebidasId: bebidas?.[0]?.id ?? null,
+      };
+    } catch (err: any) {
+      this.logger.warn(`No se pudo leer el ruteo de impresión, todo sale en Caja: ${err.message}`);
+      return CONTEXTO_RUTEO_VACIO;
+    }
   }
 
   /**
