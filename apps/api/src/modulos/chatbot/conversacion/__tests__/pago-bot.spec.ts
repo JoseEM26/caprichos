@@ -25,7 +25,7 @@ function flujoPago(extra: any = {}, estado = 'PEDIDO_MEDIO_PAGO'): FlujoConversa
   return {
     version: 2, repreguntasFallidas: 0, estado: estado as any,
     pedido: {
-      estadoInterno: estado, modalidad: 'RECOGER', cuponPreguntado: true,
+      estadoInterno: estado, modalidad: 'RECOGER',
       items: [item('Hamburguesa', 2, 26, 'Doble'), item('Frappe', 1, 10.5)],
       cliente: { nombre: 'Kevin Rosales', telefono: '987654321' }, telefonoSugerido: '987654321',
       comprobante: { tipo: 'NINGUNO' },

@@ -762,8 +762,15 @@ export const TEXTOS_BOT = {
     return `El pedido mínimo para delivery es S/ ${minimo.toFixed(2)} en productos. Te faltan S/ ${faltante.toFixed(2)}; agrega algo más.`;
   },
 
-  pedidoConfirmarNombre: (nombrePerfil: string): string => {
-    return `¿Confirmas que tu nombre es ${nombrePerfil}? 👤`;
+  /** Mismo mensaje de siempre: se agrega la línea de puntos (solo acumulan, con el celular de quien escribe). */
+  pedidoConfirmarNombre: (nombrePerfil: string, puntos: { celular: string | null; saldo: number | null }): string => {
+    const donde = puntos.celular ? `tu número ${puntos.celular}` : 'tu número de WhatsApp';
+    const saldo = puntos.saldo !== null ? `\nTu saldo: ${Number(puntos.saldo).toFixed(2)} puntos.` : '';
+    return (
+      `¿Confirmas que tu nombre es ${nombrePerfil}? 👤\n\n` +
+      `⭐ Con este pedido sumas puntos en ${donde}. Aquí solo se acumulan; los canjeas en nuestra carta virtual.` +
+      saldo
+    );
   },
 
   pedidoIngresarNombre: (): string => {
@@ -885,11 +892,10 @@ export const TEXTOS_BOT = {
     datosPago?: string;
     /** Pago dividido: una captura por medio digital, con su monto */
     capturas?: Array<{ medio: string; monto: number }>;
-    /** Últimos 3 dígitos del celular al que suma puntos el pedido (si suma) */
-    puntosTerminacion?: string;
   }): string => {
-    const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago, capturas, puntosTerminacion } = params;
-    const puntosBloque = puntosTerminacion ? `\n\n⭐ Sumas puntos con el ***${puntosTerminacion}.` : '';
+    const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago, capturas } = params;
+    // Todo pedido del bot suma al celular de quien escribe (no se promete una cantidad: depende del cobro)
+    const puntosBloque = '\n\n⭐ Sumaste puntos en este pedido; los usas en la carta virtual.';
     const datosBloque = `${puntosBloque}${datosPago ? `\n\n${datosPago}` : ''}`;
 
     if (esPagoDigital && capturas && capturas.length >= 1) {

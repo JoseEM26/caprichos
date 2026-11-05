@@ -21,8 +21,6 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_QUITAR_ITEM'
   | 'PEDIDO_OFERTA_APLICAR'
   | 'PEDIDO_OFERTA_FALTA'
-  | 'PEDIDO_PREGUNTA_CUPON'
-  | 'PEDIDO_INGRESAR_CUPON'
   | 'PEDIDO_CONFIRMAR_NOMBRE'
   | 'PEDIDO_INGRESAR_NOMBRE'
   | 'PEDIDO_INGRESAR_TELEFONO'
@@ -35,8 +33,6 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_COMPROBANTE_DNI'
   | 'PEDIDO_COMPROBANTE_RUC'
   | 'PEDIDO_COMPROBANTE_RAZON'
-  | 'PEDIDO_PUNTOS_PREGUNTA'
-  | 'PEDIDO_PUNTOS_NUMERO'
   | 'PEDIDO_RESUMEN_CONFIRMAR'
   | 'PEDIDO_CANCELAR_CONFIRMAR';
 
@@ -152,16 +148,9 @@ export interface EstadoCarritoPedido {
     precio: number;
   };
   ofertasRechazadas?: string[];
-  cuponCodigo?: string;
-  cuponDescuento?: number;
-  cuponPreguntado?: boolean;
   pago?: DatosPagoBot;
   comprobante?: DatosComprobanteBot;
   idempotenciaPaso?: string;
   timestampUltimaAccion?: number;
   estadoPrevioCancelacion?: EstadoPedidoFlujo;
-  /** Ya se resolvió a qué cuenta suman los puntos de este pedido */
-  puntosResuelto?: boolean;
-  /** Qué se le está preguntando al cliente en PEDIDO_PUNTOS_PREGUNTA */
-  puntosModo?: 'SIN_CUENTA' | 'RECORDATORIO';
 }

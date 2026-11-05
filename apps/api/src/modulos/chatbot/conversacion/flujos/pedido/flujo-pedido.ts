@@ -44,6 +44,7 @@ import {
   textoPago,
 } from './pago-bot.util';
 import { MedioPagoBot } from './tipos-pedido';
+import { celularPuntosEnmascarado } from '../../../utilidades/enmascarar.util';
 
 const PALABRAS_PEDIDO = [
   'pedir',
@@ -2346,7 +2347,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           acciones: [
             {
               tipo: 'enviarBotones',
-              texto: TEXTOS_BOT.pedidoConfirmarNombre(nombreSugerido),
+              // Puntos: siempre al celular de quien escribe (contexto.telefonoCliente); el saldo solo si ya vino en el contexto
+              texto: TEXTOS_BOT.pedidoConfirmarNombre(nombreSugerido, {
+                celular: celularPuntosEnmascarado(contexto.telefonoCliente),
+                saldo: contexto.puntos?.cuentaTelefono?.saldo ?? null,
+              }),
               botones: BOTONES_PEDIDO_NOMBRE_CONFIRMAR,
             },
           ],

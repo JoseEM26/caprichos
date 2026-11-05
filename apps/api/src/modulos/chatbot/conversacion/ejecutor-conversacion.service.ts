@@ -91,51 +91,15 @@ export class EjecutorConversacionService {
   ) {}
 
   /**
-   * Origen del pedido de WhatsApp. TELEFONO_PROPIO se vuelve a resolver aquí por el número de quien escribe (no se
-   * confía en lo guardado); TELEFONO_DICTADO lleva la cuenta elegida, que el servidor valida; NINGUNO = invitado de verdad.
+   * Origen del pedido de WhatsApp: los puntos van SIEMPRE al celular de quien escribe. El bot no acepta otro número
+   * (el de contacto para la entrega nunca suma puntos) ni ofrece canjear.
    */
-  private async origenPedidoWhatsapp(
-    puntos: { modo: string; partyId?: string; telefono?: string } | undefined,
-    conversacion: { telefono: string },
-  ): Promise<any> {
-    const base = { canal: 'WHATSAPP' as const, telefonoRemitente: conversacion.telefono };
-    if (!puntos) return base;
-    if (puntos.modo === 'NINGUNO') return { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
-    if (puntos.modo === 'TELEFONO_PROPIO') {
-      const propia = await this.direccionesService?.cuentaPorTelefono(conversacion.telefono);
-      return propia ? { ...base, clientePartyId: propia.partyId } : { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
-    }
-    // Celular elegido en el chat (sin cuenta previa): el party de puntos de ese celular, no el de quien escribe
-    if (puntos.telefono) return { ...base, telefonoPuntos: puntos.telefono };
-    return puntos.partyId ? { ...base, telefonoRemitente: undefined, clientePartyId: puntos.partyId } : { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
-  }
-
-  /** Deja en el chat qué cuenta se eligió y cómo (TELEFONO_PROPIO | TELEFONO_DICTADO | invitado). */
-  private async registrarEleccionPuntos(
-    conversacionId: bigint | string,
-    puntos: { modo: string; partyId?: string; telefono?: string } | undefined,
-    codigoPedido: string,
-  ): Promise<void> {
-    if (!puntos) return;
-    try {
-      await this.prisma.mensajeChat.create({
-        data: {
-          conversacion_id: BigInt(conversacionId),
-          direccion: 'SALE',
-          autor: 'BOT',
-          tipo: 'SISTEMA',
-          contenido: {
-            texto:
-              puntos.modo === 'NINGUNO'
-                ? `Pedido ${codigoPedido}: el cliente eligió no sumar puntos (invitado).`
-                : `Pedido ${codigoPedido}: puntos a la cuenta #${puntos.partyId ?? 'del teléfono'} elegida por ${puntos.modo}.`,
-            puntos: { modo: puntos.modo, partyId: puntos.partyId ?? null, pedido: codigoPedido },
-          } as any,
-        },
-      });
-    } catch (err: any) {
-      this.logger.warn(`No se pudo registrar la elección de puntos: ${err.message}`);
-    }
+  private origenPedidoWhatsapp(conversacion: { telefono: string }): {
+    canal: 'WHATSAPP';
+    telefonoRemitente: string;
+    telefonoPuntos: string;
+  } {
+    return { canal: 'WHATSAPP', telefonoRemitente: conversacion.telefono, telefonoPuntos: conversacion.telefono };
   }
 
   /**
@@ -959,7 +923,7 @@ export class EjecutorConversacionService {
       }
     }
 
-    // Puntos: la cuenta del propio número (con saldo). El celular que elige el cliente se guarda en el flujo, sin consultarlo
+    // Puntos: la cuenta del propio número de quien escribe (con saldo). El bot no acepta otro número para puntos
     let puntosCtx: ContextoConversacion['puntos'] = undefined;
     const estadoPrevio = String(flujoPrevio?.estado ?? '');
     const textoEntradaPuntos = normalizarEntrada(entradaRaw);
@@ -1910,10 +1874,9 @@ export class EjecutorConversacionService {
             const pedidoCreado = await this.pedidosService.crear(
               accion.dto,
               accion.claveIdempotencia,
-              await this.origenPedidoWhatsapp(accion.puntos, conversacion),
+              this.origenPedidoWhatsapp(conversacion),
             );
             codigoFinal = pedidoCreado.codigo;
-            await this.registrarEleccionPuntos(conversacion.id, accion.puntos, pedidoCreado.codigo);
             // La campana del pedido nuevo la crea PedidosService.crear (igual para carta, mozo y WhatsApp)
           }
         } catch (err: any) {
@@ -1959,8 +1922,6 @@ export class EjecutorConversacionService {
           continue;
         }
 
-        // Con qué celular suma el pedido: el elegido en el chat, o el de quien escribe si eligió su propia cuenta
-        const celularPuntos = accion.puntos?.telefono ?? (accion.puntos?.modo === 'TELEFONO_PROPIO' ? conversacion.telefono : undefined);
         // Una línea con la carta virtual al confirmar (sin repetirla en cada mensaje)
         const textoConfirmacion =
           TEXTOS_BOT.pedidoConfirmadoExito({
@@ -1972,7 +1933,6 @@ export class EjecutorConversacionService {
               ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio),
             ),
             datosPago: accion.datosPagoTexto,
-            puntosTerminacion: celularPuntos ? celularPuntos.slice(-3) : undefined,
           }) + `\n\n${TEXTOS_SOLO_MENUS.lineaCartaConfirmacion(cartaUrlPublica)}`;
 
         let metaId: string | null = null;

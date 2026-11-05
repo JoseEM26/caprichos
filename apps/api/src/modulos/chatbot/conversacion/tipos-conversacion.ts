@@ -160,8 +160,6 @@ export interface AccionCrearPedido {
   tiempoEstimadoMax: number;
   esPagoDigital: boolean;
   datosPagoTexto?: string;
-  /** A qué cuenta suma el pedido; NINGUNO = invitado de verdad (no se resuelve por teléfono) */
-  puntos?: { modo: 'TELEFONO_PROPIO' | 'TELEFONO_DICTADO' | 'NINGUNO'; partyId?: string; telefono?: string };
 }
 
 /**
@@ -282,23 +280,7 @@ export interface FlujoConversacion {
   duda_ia?: {
     historial?: any[];
   } | null;
-  /** Cuenta a la que suman los puntos de los pedidos de esta conversación (se recuerda 30 días) */
-  puntos?: MemoriaPuntosBot | null;
   [key: string]: any;
-}
-
-/** Decisión del cliente sobre sus puntos; el nombre completo, el DNI y el saldo nunca se guardan aquí. */
-export interface MemoriaPuntosBot {
-  modo: 'TELEFONO_PROPIO' | 'TELEFONO_DICTADO' | 'NINGUNO';
-  partyId?: string;
-  /** Solo con TELEFONO_PROPIO: el nombre coincide con el número de quien escribe */
-  primerNombre?: string;
-  /** Celular de 9 dígitos elegido para sumar (el de quien escribe o uno que dictó) */
-  telefono?: string;
-  /** Últimos 3 dígitos del celular elegido */
-  terminacion?: string;
-  /** Epoch ms de la decisión */
-  en: number;
 }
 
 /** Lo que el servidor averiguó sobre puntos para este mensaje (sin él, el bot no pregunta nada de puntos). */
