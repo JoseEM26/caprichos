@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { AREA_BEBIDAS, ReglasImpresion, RolImpresora, rolDeTrabajo } from '@caprichos/compartido';
+import { AREA_BEBIDAS, ReglasImpresion, RolImpresora, esAreaBebidas, rolDeTrabajo } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -110,7 +110,9 @@ export class ImpresionConfigService {
       };
     };
     const ruteo = TIPOS_RUTEO.flatMap((tipo) => {
-      if (tipo === 'ETIQUETA_AREA' || tipo === 'TICKET_COMANDA_AREA') return areas.map((a) => ruteoDe(tipo, a.id));
+      // Bebidas no tiene sticker por área (sí comanda por área y sticker por vaso)
+      if (tipo === 'ETIQUETA_AREA') return areas.filter((a) => !esAreaBebidas(a.nombre)).map((a) => ruteoDe(tipo, a.id));
+      if (tipo === 'TICKET_COMANDA_AREA') return areas.map((a) => ruteoDe(tipo, a.id));
       if (tipo === 'ETIQUETA_BEBIDA') return [ruteoDe(tipo, areas.find((a) => a.nombre === AREA_BEBIDAS)?.id ?? null)];
       return [ruteoDe(tipo, null)];
     });

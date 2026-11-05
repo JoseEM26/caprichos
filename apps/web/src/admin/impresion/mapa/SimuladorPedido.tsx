@@ -102,7 +102,7 @@ export function TiraSaldria({ flujo }: { flujo: PiezaFlujo[] }) {
           No sale: {no.map((p) => `${p.titulo.toLowerCase()} (${p.motivo.toLowerCase()})`).join('; ')}.
         </p>
       )}
-      <p className="sim-nota">Supone que el pedido tiene productos de cada área y las bebidas que indicas. Los textos de las miniaturas son de ejemplo.</p>
+      <p className="sim-nota">Supone que el pedido tiene productos de cada área y las bebidas que indicas. Bebidas no lleva sticker por área. Los textos de las miniaturas son de ejemplo.</p>
     </section>
   );
 }

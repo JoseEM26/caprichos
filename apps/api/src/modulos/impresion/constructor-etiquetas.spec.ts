@@ -101,6 +101,31 @@ describe('Constructor server-side de etiquetas', () => {
     expect(resumen.bebidas).toHaveLength(2);
   });
 
+  it('Bebidas no tiene sticker por área: solo Salados y Postres, y los vasos siguen igual', () => {
+    const pedido: any = {
+      ...pedidoMock,
+      lineas: [
+        { id: 1n, cantidad: 1, nombre: 'Limonada', area: { id: 1n, nombre: 'Bebidas' }, categoria: { nombre: 'Bebidas' }, opciones: [] },
+        { id: 2n, cantidad: 1, nombre: 'Empanada', area: { id: 2n, nombre: 'Salados' }, opciones: [] },
+        { id: 3n, cantidad: 1, nombre: 'Brownie', area: { id: 3n, nombre: 'Postres' }, opciones: [] },
+      ],
+    };
+    const areas = construirEtiquetasArea(pedido);
+    expect(areas.map((a) => a.areaNombre)).toEqual(['SALADOS', 'POSTRES']);
+    expect(areas.every((a) => a.totalAreas === 2)).toBe(true);
+    expect(construirEtiquetasBebida(pedido)).toHaveLength(1);
+  });
+
+  it('un pedido solo de bebidas no genera ninguna etiqueta por área', () => {
+    const pedido: any = {
+      ...pedidoMock,
+      lineas: [{ id: 1n, cantidad: 2, nombre: 'Limonada', area: { id: 1n, nombre: 'Bebidas' }, opciones: [] }],
+    };
+    const resumen = construirTodasLasEtiquetas(pedido);
+    expect(resumen.areas).toEqual([]);
+    expect(resumen.bebidas).toHaveLength(2);
+  });
+
   const comboBase = (extra: any): any => ({
     codigo: 'CP-7',
     modalidad: 'RECOGER',

@@ -73,6 +73,8 @@ describe('ImpresionConfigService', () => {
       expect(vaso).toMatchObject({ destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Barra' });
       const area = m.ruteo.filter((r) => r.tipo === 'ETIQUETA_AREA');
       expect(area.every((r) => r.activo === false)).toBe(true);
+      // Bebidas no lleva sticker por área (ya tiene uno por vaso): el ruteo solo lista las demás áreas
+      expect(area.map((r) => r.areaId)).toEqual(['2']);
       const comanda = m.ruteo.find((r) => r.tipo === 'TICKET_COMANDA_SALON')!;
       expect(comanda).toMatchObject({ destinoAreaId: null, destinoNombre: 'Caja' });
     });

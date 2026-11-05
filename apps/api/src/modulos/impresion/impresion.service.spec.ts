@@ -640,6 +640,86 @@ describe('ImpresionService', () => {
     });
   });
 
+  describe('sticker por área sin Bebidas', () => {
+    const pedidoMixto = {
+      id: 90n,
+      codigo: 'CP-090',
+      modalidad: 'LLEVAR',
+      cliente_nombre: 'Rosa',
+      canal: 'CAJA',
+      creado_en: new Date(),
+      lineas: [
+        { id: 1n, cantidad: 1, nombre: 'Limonada', area_id: 1n, area: { nombre: 'Bebidas' }, opciones: [] },
+        { id: 2n, cantidad: 1, nombre: 'Empanada', area_id: 2n, area: { nombre: 'Salados' }, opciones: [] },
+        { id: 3n, cantidad: 1, nombre: 'Brownie', area_id: 3n, area: { nombre: 'Postres' }, opciones: [] },
+      ],
+    };
+    const reglaArea = (valor: boolean) => ({ findMany: jest.fn().mockResolvedValue([{ clave: 'impresion_etiqueta_area_activo', valor }]) });
+    const clavesEncoladas = (): string[] => prismaMock.printJob.upsert.mock.calls.map((c: any) => c[0].where.clave_idempotencia as string);
+
+    beforeEach(() => {
+      prismaMock.printJob.count.mockResolvedValue(0);
+      prismaMock.printJob.upsert.mockResolvedValue({});
+      prismaMock.printJob.create.mockResolvedValue({ id: 900n });
+      prismaMock.printJob.findMany.mockResolvedValue([]);
+      prismaMock.deviceKey.findFirst.mockResolvedValue({ ultimo_latido: new Date(), latido_impresora: 'lista' });
+      service = new ImpresionService(prismaMock, auditoriaMock, { emitirAdmin: jest.fn() } as any);
+    });
+
+    it('regla encendida: sticker por área solo para Salados y Postres; Bebidas sale por vaso', async () => {
+      prismaMock.parametro = reglaArea(true);
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMixto);
+
+      await service.encolarEtiquetasPedido(90n);
+
+      expect(clavesEncoladas().filter((c) => c.includes('ETIQUETA_AREA'))).toEqual(['90-ETIQUETA_AREA-2', '90-ETIQUETA_AREA-3']);
+      expect(clavesEncoladas()).toContain('90-ETIQUETA_BEBIDA-1');
+    });
+
+    it('pedido solo de bebidas con la regla encendida: no genera ETIQUETA_AREA', async () => {
+      prismaMock.parametro = reglaArea(true);
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMixto, lineas: [pedidoMixto.lineas[0]] });
+
+      await service.encolarEtiquetasPedido(90n);
+
+      expect(clavesEncoladas().some((c) => c.includes('ETIQUETA_AREA'))).toBe(false);
+      expect(clavesEncoladas()).toContain('90-ETIQUETA_BEBIDA-1');
+    });
+
+    it('regla apagada (defecto): no genera ninguna ETIQUETA_AREA', async () => {
+      prismaMock.parametro = reglaArea(false);
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMixto);
+
+      await service.encolarEtiquetasPedido(90n);
+
+      expect(clavesEncoladas().some((c) => c.includes('ETIQUETA_AREA'))).toBe(false);
+    });
+
+    it('reimprimir por área excluye Bebidas y deja los vasos intactos', async () => {
+      prismaMock.parametro = reglaArea(true);
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMixto);
+
+      await service.reimprimirEtiqueta('90', { tipo: 'AREA' });
+
+      const creadas = prismaMock.printJob.create.mock.calls.map((c: any) => c[0].data);
+      expect(creadas.map((d: any) => [d.tipo, d.payload.areaNombre])).toEqual([
+        ['ETIQUETA_AREA', 'SALADOS'],
+        ['ETIQUETA_AREA', 'POSTRES'],
+      ]);
+    });
+
+    it('el estado del pedido no espera sticker de área para Bebidas', async () => {
+      prismaMock.parametro = reglaArea(true);
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMixto);
+
+      const res = await service.estadoEtiquetasPedido('90');
+
+      const claves = res.etiquetas.map((e) => e.clave);
+      expect(claves).toEqual(expect.arrayContaining(['AREA:SALADOS', 'AREA:POSTRES', 'BEBIDA:1']));
+      expect(claves).not.toContain('AREA:BEBIDAS');
+    });
+  });
+
   describe('comanda por área (TICKET_COMANDA_AREA)', () => {
     const pedido = {
       id: 60n,

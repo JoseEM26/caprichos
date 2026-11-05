@@ -7,6 +7,7 @@ import {
   EtiquetaBebidaDatos,
   TicketPagoDatos,
   TicketComandaSalonDatos,
+  esAreaBebidas,
 } from '@caprichos/compartido';
 
 export const CRITERIO_BEBIDA_AREAS = ['BARRA', 'BEBIDAS', 'CAFETERIA', 'BAR'];
@@ -164,6 +165,8 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
   const areaMap = new Map<string, any[]>();
   lineas.forEach((l) => {
     const areaRaw = l.area?.nombre?.trim();
+    // Bebidas no tiene sticker por área: sus vasos ya salen en construirEtiquetasBebida
+    if (esAreaBebidas(areaRaw)) return;
     const areaNombre = (areaRaw || 'SALADOS').toUpperCase();
     if (!areaMap.has(areaNombre)) {
       areaMap.set(areaNombre, []);
