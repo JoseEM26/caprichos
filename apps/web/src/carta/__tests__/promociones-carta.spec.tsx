@@ -11,6 +11,8 @@ vi.mock('../CarritoContext', () => ({
     abrirModalProducto: mockAbrirModal,
     cantidadTotal: 0,
     subtotal: 0,
+    lineas: [],
+    inventario: {},
   }),
 }));
 

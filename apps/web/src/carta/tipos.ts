@@ -38,6 +38,10 @@ export interface ProductoCarta {
   noSumaBeneficios: boolean;
   disponible: boolean;
   agotadoHasta: string | null;
+  /** Producto terminado con conteo (donas, galletas). Ausente o false = sin control de stock. */
+  controlaStock?: boolean;
+  /** Unidades que quedan hoy; null si no controla stock o no hay conteo de apertura del día. */
+  quedan?: number | null;
 }
 
 export interface CategoriaCarta {
