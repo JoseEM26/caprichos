@@ -12,6 +12,8 @@ export const CLAVES_CONFIG_IMPRESION = {
   ETIQUETA_AREA_ACTIVO: 'impresion_etiqueta_area_activo',
   /** Comanda completa de salón para la ticketera de Caja al aceptar el pedido. */
   TICKET_COMANDA_SALON_ACTIVO: 'impresion_ticket_comanda_salon_activo',
+  /** Una hoja por área (su cocina) para la ticketera de esa área, o de Caja si no tiene. Apagada hasta que se encienda. */
+  TICKET_COMANDA_AREA_ACTIVO: 'impresion_ticket_comanda_area_activo',
   /** Minutos tras los que un trabajo automático pendiente pasa a VENCIDO (ya existía). */
   VENCE_MIN: 'impresion_vence_min',
 } as const;
@@ -27,6 +29,7 @@ export interface ReglasImpresion {
   bebidaActivo: boolean;
   areaActivo: boolean;
   comandaSalonActivo: boolean;
+  comandaAreaActivo: boolean;
 }
 
 export const REGLAS_IMPRESION_DEFECTO: ReglasImpresion = {
@@ -34,4 +37,5 @@ export const REGLAS_IMPRESION_DEFECTO: ReglasImpresion = {
   bebidaActivo: true,
   areaActivo: false,
   comandaSalonActivo: true,
+  comandaAreaActivo: false,
 };

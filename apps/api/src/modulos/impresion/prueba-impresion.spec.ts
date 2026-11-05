@@ -63,7 +63,7 @@ describe('pruebas de impresión', () => {
     expect(prisma.printJob.create).not.toHaveBeenCalled();
     const filtro = prisma.printJob.findFirst.mock.calls[0][0].where;
     expect(filtro.pedido_id).toBeNull();
-    expect(filtro.tipo).toEqual({ in: ['TICKET_PAGO', 'TICKET_COMANDA_SALON'] });
+    expect(filtro.tipo).toEqual({ in: ['TICKET_PAGO', 'TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA'] });
     expect(filtro.en.gt).toBeInstanceOf(Date);
   });
 

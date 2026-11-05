@@ -43,6 +43,13 @@ describe('destinoDeTrabajo', () => {
     expect(destinoDeTrabajo('TICKET_COMANDA_SALON', null, ctxCompleto)).toBeNull();
   });
 
+  it('TICKET_COMANDA_AREA va a su área solo si esa área tiene ticketera; si no, a Caja', () => {
+    expect(destinoDeTrabajo('TICKET_COMANDA_AREA', SALADOS, ctxCompleto)).toBe(SALADOS);
+    expect(destinoDeTrabajo('TICKET_COMANDA_AREA', BEBIDAS, ctxCompleto)).toBeNull();
+    expect(destinoDeTrabajo('TICKET_COMANDA_AREA', null, ctxCompleto)).toBeNull();
+    expect(destinoDeTrabajo('TICKET_COMANDA_AREA', POSTRES, { ...ctxCompleto, equipos: [] })).toBeNull();
+  });
+
   it('un área con equipo solo ticketera no recibe stickers de área', () => {
     expect(destinoDeTrabajo('ETIQUETA_AREA', SALADOS, { ...ctxCompleto, equipos: [{ areaId: SALADOS, roles: ['TICKETERA'] }] })).toBeNull();
   });
@@ -50,7 +57,7 @@ describe('destinoDeTrabajo', () => {
 
 describe('tiposDeRoles', () => {
   it('la ticketera toma pago y comanda de salón; la etiquetera, los stickers', () => {
-    expect(tiposDeRoles(['TICKETERA'])).toEqual(['TICKET_PAGO', 'TICKET_COMANDA_SALON']);
+    expect(tiposDeRoles(['TICKETERA'])).toEqual(['TICKET_PAGO', 'TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA']);
     expect(tiposDeRoles(['ETIQUETERA'])).toEqual(['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA']);
     expect(tiposDeRoles([])).toEqual([]);
   });
@@ -121,3 +128,24 @@ describe('equipos: roles declarados y estado por rol', () => {
     expect(estadoPorRol(null).ETIQUETERA.estado).toBe('sin_programa');
   });
 });
+
+describe('comanda por área: regla y modalidad', () => {
+  it('apagada por defecto y sin modalidad: se encola en cualquier pedido solo si la regla está encendida', () => {
+    expect(REGLAS_IMPRESION_DEFECTO.comandaAreaActivo).toBe(false);
+    const apagada = { ...REGLAS_IMPRESION_DEFECTO };
+    expect(aplicaSegunReglas('TICKET_COMANDA_AREA', 'MESA', apagada)).toBe(false);
+    expect(aplicaSegunReglas('TICKET_COMANDA_AREA', 'DELIVERY', apagada)).toBe(false);
+    const encendida = { ...REGLAS_IMPRESION_DEFECTO, comandaAreaActivo: true };
+    expect(aplicaSegunReglas('TICKET_COMANDA_AREA', 'MESA', encendida)).toBe(true);
+    expect(aplicaSegunReglas('TICKET_COMANDA_AREA', 'DELIVERY', encendida)).toBe(true);
+  });
+
+  it('la clave de la regla se lee y se guarda como impresion_ticket_comanda_area_activo', () => {
+    expect(CLAVES_CONFIG_IMPRESION.TICKET_COMANDA_AREA_ACTIVO).toBe('impresion_ticket_comanda_area_activo');
+    expect(reglasDesdeValores({ impresion_ticket_comanda_area_activo: true }).comandaAreaActivo).toBe(true);
+    expect(reglasDesdeValores({}).comandaAreaActivo).toBe(false);
+    expect(valoresDesdeCambio({ comandaAreaActivo: true })).toEqual({ impresion_ticket_comanda_area_activo: true });
+    expect(() => valoresDesdeCambio({ comandaAreaActivo: 'si' as any })).toThrow();
+  });
+});
+

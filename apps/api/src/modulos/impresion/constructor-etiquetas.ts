@@ -312,6 +312,30 @@ export function construirTicketComandaSalon(pedido: any): TicketComandaSalonDato
   };
 }
 
+/**
+ * Comanda de un área: la misma hoja de salón con solo las líneas de esa área (areaId null = líneas sin área).
+ * Reutiliza construirTicketComandaSalon; cambia el tipo y lleva el nombre del área en la cabecera.
+ */
+export function construirTicketComandaArea(pedido: any, areaId: bigint | null): TicketComandaSalonDatos {
+  const lineas: any[] = (pedido.lineas || []).filter((l: any) => String(l.area_id ?? null) === String(areaId));
+  const nombre: string | null = lineas.find((l) => l.area?.nombre)?.area.nombre ?? null;
+  return {
+    ...construirTicketComandaSalon({ ...pedido, lineas }),
+    tipo: 'TICKET_COMANDA_AREA',
+    area: nombre ? String(nombre).toUpperCase() : null,
+  };
+}
+
+/** Áreas distintas de las líneas del pedido (null = líneas sin área), en orden de aparición. */
+export function areasDeLineas(pedido: any): Array<bigint | null> {
+  const vistas: Array<bigint | null> = [];
+  for (const l of pedido.lineas || []) {
+    const id: bigint | null = l.area_id ?? null;
+    if (!vistas.some((v) => String(v) === String(id))) vistas.push(id);
+  }
+  return vistas;
+}
+
 export function construirTodasLasEtiquetas(pedido: any) {
   return {
     general: construirEtiquetaGeneral(pedido),

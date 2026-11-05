@@ -93,3 +93,51 @@ describe('vinculación', () => {
     await expect(canjearCodigoVinculo('http://x', 'A', f)).rejects.toThrow('ya venció');
   });
 });
+
+describe('el mismo programa para todas las computadoras', () => {
+  const comandaArea = {
+    id: 'job-area', tipo: 'TICKET_COMANDA_AREA', copia: false, intentos: 0,
+    payload: { codigo: 'CP-7', mesa: 'Mesa 1', area: 'SALADOS', cliente: 'Ana', canal: 'Mozo', fecha: '05/11/2026', hora: '13:00', lineas: [{ cantidad: 1, nombre: 'Empanada', opciones: [], nota: null }] },
+  } as any;
+
+  it('la comanda de área sale por la ticketera, con el mismo generador que la comanda de salón', async () => {
+    const tk = new ImpresoraMemoria();
+    const et = new ImpresoraMemoria();
+    const { cliente, agente } = montar(tk, et);
+    cliente.tomarTrabajos.mockResolvedValueOnce([comandaArea]);
+    await agente.ejecutarCiclo();
+    expect(et.obtenerTrabajosEscritos()).toHaveLength(0);
+    const salida = tk.obtenerTrabajosEscritos().map((b) => b.toString('latin1')).join('');
+    expect(salida).toContain('COMANDA · SALADOS');
+    expect(salida).toContain('Empanada');
+    expect(cliente.reportarResultado).toHaveBeenCalledWith('job-area', true);
+  });
+
+  function soloCon(rol: 'ETIQUETERA' | 'TICKETERA') {
+    const cliente: any = {
+      tomarTrabajos: vi.fn().mockResolvedValue([]),
+      reportarResultado: vi.fn().mockResolvedValue(undefined),
+      enviarLatido: vi.fn().mockResolvedValue(undefined),
+    };
+    const agente = new AgenteLocalServicio({
+      config: { ...obtenerConfiguracion({}), intervaloLatidoMs: 0 },
+      clienteApi: cliente,
+      impresoras: { [rol]: new ImpresoraMemoria() },
+      logger: () => undefined,
+    });
+    return { cliente, agente };
+  }
+
+  it('un equipo solo con ticketera toma solo trabajos de ticketera; no pide stickers', async () => {
+    const { cliente, agente } = soloCon('TICKETERA');
+    await agente.ejecutarCiclo();
+    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(10, ['TICKETERA']);
+  });
+
+  it('un equipo solo con etiquetera toma solo stickers; no pide comandas ni tickets', async () => {
+    const { cliente, agente } = soloCon('ETIQUETERA');
+    await agente.ejecutarCiclo();
+    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(10, ['ETIQUETERA']);
+  });
+});
+
