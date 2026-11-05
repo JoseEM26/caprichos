@@ -57,6 +57,43 @@ function idMockupDeArea(nombre: string): string {
   return 'todas';
 }
 
+/** Clave de localStorage con el área que cada usuario dejó elegida en esta pantalla. */
+const claveAreaRecordada = (partyId: string) => `caprichos.cocina.area.${partyId}`;
+
+function leerAreaRecordada(partyId: string): string | null {
+  try {
+    return window.localStorage.getItem(claveAreaRecordada(partyId));
+  } catch {
+    return null; // sin almacenamiento: no hay recuerdo
+  }
+}
+
+function guardarAreaRecordada(partyId: string, areaId: string): void {
+  try {
+    window.localStorage.setItem(claveAreaRecordada(partyId), areaId);
+  } catch {
+    // sin almacenamiento: la pantalla funciona igual
+  }
+}
+
+/**
+ * Área con la que abre la pantalla: la recordada si sigue en la lista; si no, la primera.
+ * Con `areasPermitidasIds` no vacía, solo cuentan esas áreas. Devuelve '' si no hay ninguna.
+ */
+export function elegirAreaInicial(
+  listaAreas: AreaCocina[],
+  areaRecordadaId: string | null,
+  areasPermitidasIds?: string[],
+): string {
+  const candidatas =
+    areasPermitidasIds && areasPermitidasIds.length > 0
+      ? listaAreas.filter((a) => areasPermitidasIds.includes(a.id))
+      : listaAreas;
+  if (candidatas.length === 0) return '';
+  const recordada = candidatas.find((a) => a.id === areaRecordadaId);
+  return (recordada ?? candidatas[0]).id;
+}
+
 /**
  * Ordena las comandas por hora de llegada ascendente (FIFO estricto).
  * Primero las pendientes de la propia área; después las de solo seguimiento (ya despejadas).
@@ -99,7 +136,8 @@ export function agruparPorPedido(lista: Comanda[]): Comanda[] {
 }
 
 export function CocinaAdminView() {
-  const { tiene } = useSesion();
+  const { tiene, usuario } = useSesion();
+  const usuarioId = usuario?.partyId ?? null;
 
   const puedeVer = tiene('cocina/ver');
   const puedeDespejar = tiene('cocina/despejar');
@@ -227,10 +265,13 @@ export function CocinaAdminView() {
         setCargandoInicial(true);
         const listaAreas = await listarAreasCocina();
         setAreasApi(listaAreas);
-        const areaDefault = listaAreas.length > 0 ? listaAreas[0].id : '';
-        setAreaSeleccionada(areaDefault);
+        const areaInicial = elegirAreaInicial(
+          listaAreas,
+          usuarioId ? leerAreaRecordada(usuarioId) : null,
+        );
+        setAreaSeleccionada(areaInicial);
         // El botón marcado debe ser el de los datos que se muestran (antes quedaba «Todas» con el área cargada)
-        setAreaActiva(idMockupDeArea(listaAreas[0]?.nombre ?? ''));
+        setAreaActiva(idMockupDeArea(listaAreas.find((a) => a.id === areaInicial)?.nombre ?? ''));
         await cargarAltaDemanda();
       } catch (err: any) {
         setError(err?.message || 'Error al iniciar módulo de cocina');
@@ -240,7 +281,7 @@ export function CocinaAdminView() {
     };
 
     inicializar();
-  }, [puedeVer, cargarAltaDemanda]);
+  }, [puedeVer, cargarAltaDemanda, usuarioId]);
 
   // Recarga al cambiar modo o área activa
   useEffect(() => {
@@ -316,6 +357,7 @@ export function CocinaAdminView() {
       return false;
     });
     setAreaSeleccionada(match ? match.id : areaId);
+    if (match && usuarioId) guardarAreaRecordada(usuarioId, match.id);
   };
 
   // Despejar comanda. Con «Confirmar al despejar» apagado, el toque despeja directo (sin Sí/No).
