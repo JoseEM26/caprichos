@@ -321,12 +321,22 @@ describe('ImpresionService', () => {
       ],
     };
 
-    it('crea trabajo con copia=true para reimpresión general', async () => {
+    it('reimprimir general a un pedido de mesa no aplica por regla, salvo que se fuerce', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
       prismaMock.printJob.create.mockResolvedValue({ id: 100n });
       prismaMock.printJob.findMany.mockResolvedValue([]);
 
-      const res = await service.reimprimirEtiqueta('70', { tipo: 'general' });
+      const sinForzar = await service.reimprimirEtiqueta('70', { tipo: 'general' });
+      expect(prismaMock.printJob.create).not.toHaveBeenCalled();
+      expect(sinForzar).toMatchObject({ cantidad: 0, noAplican: 1 });
+    });
+
+    it('crea trabajo con copia=true para reimpresión general (forzada)', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
+      prismaMock.printJob.create.mockResolvedValue({ id: 100n });
+      prismaMock.printJob.findMany.mockResolvedValue([]);
+
+      const res = await service.reimprimirEtiqueta('70', { tipo: 'general', forzar: true });
 
       expect(res.ok).toBe(true);
       expect(prismaMock.printJob.create).toHaveBeenCalledWith({
@@ -462,10 +472,24 @@ describe('ImpresionService', () => {
 
       const res = await service.reimprimirEtiqueta('80', { tipo: 'TODAS' });
 
+      // El sticker por área está apagado por defecto: solo sale el de vaso, y la general ya está en cola
       const tipos = prismaMock.printJob.create.mock.calls.map((c: any) => c[0].data.tipo);
-      expect(tipos).toEqual(['ETIQUETA_AREA', 'ETIQUETA_BEBIDA']);
-      expect(res.cantidad).toBe(2);
+      expect(tipos).toEqual(['ETIQUETA_BEBIDA']);
+      expect(res.cantidad).toBe(1);
       expect(res.omitidas).toBe(1);
+      expect(res.noAplican).toBe(1);
+    });
+
+    it('reimprimir TODAS con el sticker por área activado lo incluye (con su destino)', async () => {
+      prismaMock.parametro = { findMany: jest.fn().mockResolvedValue([{ clave: 'impresion_etiqueta_area_activo', valor: true }]) };
+      prismaMock.printJob.findMany.mockResolvedValue([]);
+      prismaMock.printJob.create.mockResolvedValue({ id: 900n });
+
+      await service.reimprimirEtiqueta('80', { tipo: 'AREA', forzar: false });
+
+      const tipos = prismaMock.printJob.create.mock.calls.map((c: any) => c[0].data.tipo);
+      expect(tipos).toEqual(['ETIQUETA_AREA']);
+      expect(prismaMock.printJob.create.mock.calls[0][0].data).toHaveProperty('destino_area_id', null);
     });
 
     it('reimprimir una sola etiqueta por clave solo encola esa', async () => {
@@ -489,6 +513,7 @@ describe('ImpresionService', () => {
     });
 
     it('estadoEtiquetasPedido muestra el estado real de cada etiqueta y el resumen', async () => {
+      prismaMock.parametro = { findMany: jest.fn().mockResolvedValue([{ clave: 'impresion_etiqueta_area_activo', valor: true }]) };
       prismaMock.printJob.findMany.mockResolvedValue([
         {
           id: 12n, tipo: 'ETIQUETA_AREA', payload: { areaNombre: 'BARRA' }, estado: 'PENDIENTE',

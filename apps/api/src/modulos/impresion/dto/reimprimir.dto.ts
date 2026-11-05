@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class ReimprimirDto {
   @IsNotEmpty({ message: 'El tipo de etiqueta es obligatorio' })
@@ -20,4 +20,9 @@ export class ReimprimirDto {
   @IsOptional()
   @IsString()
   clave?: string;
+
+  /** Salta las reglas de modalidad y activos (decisión explícita; por defecto la reimpresión las respeta). */
+  @IsOptional()
+  @IsBoolean({ message: 'forzar debe ser verdadero o falso' })
+  forzar?: boolean;
 }

@@ -46,7 +46,7 @@ export function lineasTicketComandaSalon(t: TicketComandaSalonDatos, columnas: n
   p(`Pedido ${t.codigo}`, { centrado: true, negrita: true });
   p('-'.repeat(c));
   if (t.mesa) p(`Mesa: ${t.mesa}`, { negrita: true });
-  bloque(`Cliente: ${t.cliente}`, c);
+  if (t.cliente) bloque(`Cliente: ${t.cliente}`, c);
   p(`${t.canal} - ${t.fecha} ${t.hora}`);
   if (t.nota) bloque(`NOTA: ${t.nota}`, c, { negrita: true });
   p('-'.repeat(c));

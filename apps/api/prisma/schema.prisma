@@ -315,6 +315,7 @@ model AreaCocina {
   pedidosInternos PedidoInterno[]
   deviceKeys      DeviceKey[]
   printJobs       PrintJob[]
+  printJobsDestino PrintJob[] @relation("DestinoImpresion")
 
   @@map("area_cocina")
 }
@@ -2093,11 +2094,15 @@ model PrintJob {
   tomado_en           DateTime?   @db.Timestamptz
   impreso_en          DateTime?   @db.Timestamptz
   device_key_id       BigInt?
+  /// Área del equipo que imprime (sticker por área). NULL = Caja (la etiquetera y ticketera de Caja).
+  destino_area_id     BigInt?
 
   pedido              Pedido?     @relation(fields: [pedido_id], references: [id])
   area                AreaCocina? @relation(fields: [area_id], references: [id])
+  destinoArea         AreaCocina? @relation("DestinoImpresion", fields: [destino_area_id], references: [id])
   deviceKey           DeviceKey?  @relation(fields: [device_key_id], references: [id])
 
+  @@index([destino_area_id, estado])
   @@map("print_job")
 }
 
