@@ -585,4 +585,48 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       expect(mockPrisma.notificacion.create).not.toHaveBeenCalled();
     });
   });
+
+  describe('7. La calle de la ubicación del chat llega al pedido delivery', () => {
+    const dtoDelivery = (extra: any = {}) => ({
+      modalidad: 'DELIVERY',
+      entrega: { lat: -12.018591, lng: -76.957939, origen: 'WHATSAPP', ...extra },
+    });
+
+    it('usa la dirección aproximada de la ubicación del mismo punto', async () => {
+      mockPrisma.mensajeChat.findMany = jest.fn().mockResolvedValue([
+        { contenido: { texto: 'hola' } },
+        { contenido: { ubicacion: { lat: -12.5, lng: -77.1, direccionAprox: 'Otra calle' } } },
+        { contenido: { ubicacion: { lat: -12.018591, lng: -76.957939, direccionAprox: 'Calle Los Alamos, Campoy' } } },
+      ]);
+
+      const dto = await (service as any).conCalleDeLaUbicacion(dtoDelivery(), 10n);
+
+      expect(dto.entrega.direccion).toBe('Calle Los Alamos, Campoy');
+      expect(dto.entrega.lat).toBe(-12.018591);
+    });
+
+    it('no cambia el pedido si ya trae dirección o si ningún punto coincide', async () => {
+      mockPrisma.mensajeChat.findMany = jest.fn().mockResolvedValue([
+        { contenido: { ubicacion: { lat: -12.018591, lng: -76.957939, direccionAprox: 'Calle X' } } },
+      ]);
+      const conDireccion = dtoDelivery({ direccion: 'Av. Gran Chimú 500' });
+      expect(await (service as any).conCalleDeLaUbicacion(conDireccion, 10n)).toBe(conDireccion);
+
+      const sinCoincidir = dtoDelivery({ lat: -11, lng: -76 });
+      expect(await (service as any).conCalleDeLaUbicacion(sinCoincidir, 10n)).toBe(sinCoincidir);
+    });
+
+    it('si leer el chat falla, el pedido sigue igual (nunca bloquea la venta)', async () => {
+      mockPrisma.mensajeChat.findMany = jest.fn().mockRejectedValue(new Error('db caída'));
+      const dto = dtoDelivery();
+      expect(await (service as any).conCalleDeLaUbicacion(dto, 10n)).toBe(dto);
+    });
+
+    it('para recoger no busca nada', async () => {
+      mockPrisma.mensajeChat.findMany = jest.fn();
+      const dto = { modalidad: 'RECOGER', entrega: undefined };
+      expect(await (service as any).conCalleDeLaUbicacion(dto, 10n)).toBe(dto);
+      expect(mockPrisma.mensajeChat.findMany).not.toHaveBeenCalled();
+    });
+  });
 });
