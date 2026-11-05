@@ -22,7 +22,9 @@ describe('rol SUPERVISOR: matriz de permisos', () => {
   });
 
   it('es exactamente la unión de CAJERO y MOZO, más supervisor/ver_codigo y su escritorio operativo', () => {
-    expect([...supervisor].sort()).toEqual([...uniones('CAJERO', 'MOZO'), 'supervisor/ver_codigo', 'escritorio/operativo'].sort());
+    // Excepción: almacen/apertura (conteo de apertura de productos) es de CAJERO pero no del supervisor
+    const esperado = uniones('CAJERO', 'MOZO').filter((p) => p !== 'almacen/apertura');
+    expect([...supervisor].sort()).toEqual([...esperado, 'supervisor/ver_codigo', 'escritorio/operativo'].sort());
   });
 
   it('ve el código rotativo pero NO puede gestionarlo (generar, rotar, desbloquear)', () => {

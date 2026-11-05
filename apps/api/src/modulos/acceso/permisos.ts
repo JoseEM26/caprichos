@@ -115,6 +115,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'almacen', accion: 'traslados' },
   { modulo: 'almacen', accion: 'pedidos_internos' },
   { modulo: 'almacen', accion: 'cierre' },
+  // Conteo de apertura del día de los productos que controlan stock (donas, galletas)
+  { modulo: 'almacen', accion: 'apertura' },
   { modulo: 'produccion', accion: 'ver' },
   { modulo: 'produccion', accion: 'crear' },
   { modulo: 'produccion', accion: 'anular' },
@@ -179,6 +181,7 @@ export const MATRIZ: Record<string, string[]> = {
   // Caja y cobro, pedidos sin anular (la anulación de un entregado sin cobro la autoriza el PIN
   // de supervisor), cocina y carta en solo lectura. Escritorio no tiene permiso propio.
   CAJERO: [
+    'almacen/apertura',
     'pedidos/ver',
     'pedidos/crear',
     'pedidos/cambiar_estado',
@@ -200,6 +203,7 @@ export const MATRIZ: Record<string, string[]> = {
     'vouchers/ver',
   ],
   COCINA: [
+    'almacen/apertura',
     'pedidos/ver',
     'pedidos/cambiar_estado',
     'cocina/ver',
@@ -270,6 +274,7 @@ export const MATRIZ: Record<string, string[]> = {
     'almacen/traslados',
     'almacen/pedidos_internos',
     'almacen/cierre',
+    'almacen/apertura',
     'compras/ver',
     'compras/crear',
     'proveedores/ver',
@@ -303,5 +308,8 @@ export const MATRIZ: Record<string, string[]> = {
 // Supervisor: la unión de lo que tienen CAJERO y MOZO, más ver el código rotativo de 6 dígitos.
 // No recibe diseño de carta, Novedades, informes, usuarios, configuración ni compras (ver la tabla del informe).
 // Y su escritorio operativo (conteos, sin montos).
-MATRIZ.SUPERVISOR = [...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo'])];
+// El conteo de apertura (almacen/apertura) no lo tiene el supervisor: sin administración de stock.
+MATRIZ.SUPERVISOR = [...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo'])].filter(
+  (p) => p !== 'almacen/apertura',
+);
 

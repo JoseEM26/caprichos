@@ -365,6 +365,8 @@ model Producto {
   no_suma_beneficios Boolean          @default(false)
   // Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto
   resaltar_opcion_menos_pedida Boolean @default(false)
+  // Stock de producto terminado (donas, galletas): se controla aunque «Control de almacén» (insumos) esté apagado
+  controla_stock     Boolean          @default(false)
   categoria          Categoria        @relation(fields: [categoria_id], references: [id])
   foto_archivo       Archivo?         @relation(fields: [foto_archivo_id], references: [id])
   tamanos            ProductoTamano[]
@@ -374,6 +376,7 @@ model Producto {
   agotados           Agotado[]
   stocks             Stock[]
   movimientosStock   MovimientoStock[]
+  conteosApertura    ConteoApertura[]
   recetas            Receta[]
   ofertasAlcance     Oferta[]
   comboReemplazos    ComboParteReemplazo[]
@@ -987,6 +990,7 @@ model LugarStock {
   movimientos      MovimientoStock[]
   trasladosDestino Traslado[]
   cierresDia       CierreDia[]
+  conteosApertura  ConteoApertura[]
 
   @@map("lugar_stock")
 }
@@ -1064,6 +1068,23 @@ model MovimientoStock {
   movimientosRevertidos MovimientoStock[] @relation("MovimientosAnulados")
 
   @@map("movimiento_stock")
+}
+
+/// Conteo de apertura del día (fecha en hora de Lima) de un producto que controla stock. Una fila por día y producto.
+model ConteoApertura {
+  id          BigInt     @id @default(autoincrement())
+  fecha       DateTime   @db.Date
+  producto_id BigInt
+  lugar_id    BigInt
+  cantidad    Decimal    @db.Decimal(14, 3)
+  por         BigInt
+  en          DateTime   @default(now()) @db.Timestamptz
+
+  producto    Producto   @relation(fields: [producto_id], references: [id])
+  lugar       LugarStock @relation(fields: [lugar_id], references: [id])
+
+  @@unique([fecha, producto_id])
+  @@map("conteo_apertura")
 }
 
 model Receta {
