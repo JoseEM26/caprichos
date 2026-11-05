@@ -34,6 +34,7 @@ import {
   CrearListaDto,
 } from './dto/lista.dto';
 import { invalidarOpcionesMenosPedida } from '../cocina/opcion-menos-pedida';
+import { quedanProductos } from '../stock/producto-controlado';
 
 export function normalizarTexto(texto: string): string {
   if (!texto) return '';
@@ -189,6 +190,11 @@ export class CatalogoService implements OnApplicationBootstrap {
       },
     });
 
+    const quedanPorProducto = await quedanProductos(
+      this.prisma,
+      categorias.flatMap((c) => c.productos.map((p) => p.id)),
+    );
+
     const terminosBusqueda = q && q.trim() ? normalizarTexto(q).split(/\s+/).filter(Boolean) : [];
 
     const resultado: CategoriaCarta[] = [];
@@ -206,7 +212,9 @@ export class CatalogoService implements OnApplicationBootstrap {
           }
         }
 
-        const disponible = estaDisponible(p.agotado_hasta);
+        const quedan = quedanPorProducto.get(p.id.toString()) ?? null;
+        // Con apertura de hoy, sin saldo no se vende (aunque no esté marcado como agotado)
+        const disponible = estaDisponible(p.agotado_hasta) && !(quedan !== null && quedan <= 0);
         const agotadoHasta =
           p.agotado_hasta && !disponible
             ? p.agotado_hasta.toISOString()
@@ -256,6 +264,8 @@ export class CatalogoService implements OnApplicationBootstrap {
           noSumaBeneficios: p.no_suma_beneficios,
           disponible,
           agotadoHasta,
+          controlaStock: p.controla_stock,
+          quedan,
         });
       }
 
@@ -378,6 +388,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
+      controlaStock: p.controla_stock,
       promociones: ofertas
         .filter((o) => o.alcance_producto_id === p.id || (!o.alcance_producto_id && o.alcance_categoria_id === p.categoria_id))
         .map(aItem),
@@ -463,6 +474,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
+      controlaStock: p.controla_stock,
       fotoUrl: obtenerFotoUrl(p.foto_archivo),
       tamanos: (p.tamanos || []).map((t) => ({
         id: t.id.toString(),
@@ -550,6 +562,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           orden: dto.orden ?? 0,
           no_suma_beneficios: dto.noSumaBeneficios ?? false,
           resaltar_opcion_menos_pedida: dto.resaltarOpcionMenosPedida ?? false,
+          controla_stock: dto.controlaStock ?? false,
           oculto: false,
         },
       });
@@ -694,6 +707,7 @@ export class CatalogoService implements OnApplicationBootstrap {
             dto.noSumaBeneficios !== undefined ? dto.noSumaBeneficios : undefined,
           resaltar_opcion_menos_pedida:
             dto.resaltarOpcionMenosPedida !== undefined ? dto.resaltarOpcionMenosPedida : undefined,
+          controla_stock: dto.controlaStock !== undefined ? dto.controlaStock : undefined,
           foto_archivo_id: fotoArchivoId,
         },
       });

@@ -13,6 +13,8 @@ describe('CatalogoService', () => {
 
   beforeEach(async () => {
     prisma = {
+      // Conteo de apertura del día (productos que controlan stock): sin aperturas en estos casos
+      conteoApertura: { findMany: jest.fn().mockResolvedValue([]) },
       categoria: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
@@ -704,6 +706,52 @@ describe('CatalogoService', () => {
       expect(prisma.productoGrupo.deleteMany).toHaveBeenCalledWith({
         where: { producto_id: BigInt(1), grupo_id: { notIn: [BigInt(4)] } },
       });
+    });
+  });
+
+  describe('7. Productos que controlan stock (quedan)', () => {
+    const producto = (id: number, controla: boolean) => ({
+      id: BigInt(id),
+      nombre: `Dona ${id}`,
+      descripcion: null,
+      precio: 5.0,
+      oculto: false,
+      agotado_hasta: null,
+      no_suma_beneficios: false,
+      controla_stock: controla,
+      foto_archivo: null,
+      tamanos: [],
+      grupos: [],
+      sabores: [],
+    });
+
+    beforeEach(() => {
+      prisma.categoria.findMany.mockResolvedValue([
+        { id: BigInt(3), nombre: 'Donas', orden: 1, oculta: false, productos: [producto(30, true), producto(31, true), producto(32, false)] },
+      ]);
+      prisma.conteoApertura = {
+        findMany: jest.fn().mockResolvedValue([{ producto_id: BigInt(30) }, { producto_id: BigInt(31) }]),
+      };
+      prisma.stock = {
+        findMany: jest.fn().mockResolvedValue([
+          { producto_id: BigInt(30), cantidad: 3.7 },
+          { producto_id: BigInt(31), cantidad: 0 },
+        ]),
+      };
+    });
+
+    it('con apertura hoy muestra quedan (entero hacia abajo) y se agota en 0 aunque no esté marcado', async () => {
+      const carta = await (service as any).obtenerCarta();
+      const [a, b, sinControl] = carta[0].productos;
+      expect(a).toMatchObject({ controlaStock: true, quedan: 3, disponible: true });
+      expect(b).toMatchObject({ controlaStock: true, quedan: 0, disponible: false });
+      expect(sinControl).toMatchObject({ controlaStock: false, quedan: null, disponible: true });
+    });
+
+    it('sin apertura hoy no limita ni apaga el producto (quedan null)', async () => {
+      prisma.conteoApertura.findMany.mockResolvedValue([]);
+      const carta = await (service as any).obtenerCarta();
+      expect(carta[0].productos[1]).toMatchObject({ controlaStock: true, quedan: null, disponible: true });
     });
   });
 });

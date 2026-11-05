@@ -38,6 +38,10 @@ export interface ProductoCarta {
   noSumaBeneficios: boolean;
   disponible: boolean;
   agotadoHasta: string | null;
+  /** Controla su stock (conteo de apertura). */
+  controlaStock: boolean;
+  /** Quedan con apertura de hoy (entero, nunca negativo); null si no controla stock o no hay apertura hoy. */
+  quedan: number | null;
 }
 
 export interface CategoriaCarta {

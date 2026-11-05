@@ -33,6 +33,7 @@ import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
+import { descontarVentaProductos } from '../stock/producto-controlado';
 
 /** Pista pública de la dirección anterior: nunca la dirección completa (ver enmascararDireccion). */
 export type PistaDireccion = { existe: false } | { existe: true; zona: string | null; direccion: string | null };
@@ -779,6 +780,7 @@ export class PedidosService {
 
     // Nunca se rechaza una venta por el DNI: una boleta mayor a S/ 700 sin DNI se crea y el cobro la exige.
 
+    let agotadosPorVenta: bigint[] = [];
     const pedidoCreado = await this.prisma.$transaction(async (tx) => {
       // Generación del código correlativo CP-W###
       let codigo: string;
@@ -901,6 +903,15 @@ export class PedidosService {
         }
       }
 
+      // Productos que controlan stock: se descuentan ya (todos los canales) y el tope corta el pedido entero
+      const ventaProductos = await descontarVentaProductos(
+        tx,
+        pedido.id,
+        lineasCalculadas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, areaId: l.areaId })),
+        pedido.party_id ?? BigInt(1),
+      );
+      agotadosPorVenta = ventaProductos.agotados;
+
       // Historial de estado inicial
       await tx.pedidoEstadoHistorial.create({
         data: {
@@ -983,6 +994,26 @@ export class PedidosService {
 
       return pedido;
     });
+
+    // Productos que esta venta dejó agotados: aviso al equipo y carta al día (fuera de la transacción)
+    if (agotadosPorVenta.length > 0) {
+      for (const pid of agotadosPorVenta) {
+        this.avisosInternosService?.notificarElementoAgotado('PRODUCTO', pid).catch(() => {});
+      }
+      const agotadosAhora = await this.prisma.producto.findMany({
+        where: { agotado_hasta: { gt: new Date() } },
+        select: { id: true },
+      });
+      this.eventosGateway.emitirAdmin('stock:cambio', {});
+      this.eventosGateway.emitirAdmin('carta:disponibilidad', {
+        productos: agotadosAhora.map((p) => p.id.toString()),
+        sabores: [],
+        opciones: [],
+        productoIds: agotadosAhora.map((p) => p.id.toString()),
+        saborIds: [],
+        opcionIds: [],
+      });
+    }
 
     // 9.5. Canje de puntos: se descuenta del saldo y del total del pedido
     let totalFinal = Number(pedidoCreado.total);

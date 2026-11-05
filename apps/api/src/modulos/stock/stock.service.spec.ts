@@ -79,6 +79,7 @@ describe('StockService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         update: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
       },
       sabor: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -259,6 +260,7 @@ describe('StockService', () => {
         insumosConReceta: 2,
         insumosSinStock: 1,
         productosEnRiesgo: 2,
+        productosControlados: 0,
       });
     });
   });
@@ -432,15 +434,14 @@ describe('StockService', () => {
       });
     });
 
-    it('es idempotente: si ya fue anulado previamente no duplica', async () => {
-      prisma.movimientoStock.findFirst.mockResolvedValueOnce({
-        id: 999n,
-        tipo: 'ANULACION',
-      });
+    it('es idempotente: las ventas ya revertidas no se vuelven a reponer', async () => {
+      // Antes la marca era «hay alguna ANULACION del pedido»; ahora se mira movimiento a movimiento
+      // (un cobro anulado revierte solo insumos y la anulación del pedido repone después los productos).
+      prisma.movimientoStock.findMany.mockResolvedValueOnce([]);
 
       const res = await service.revertirPorPedido('100');
-      expect(res).toEqual({ ok: true, yaRevertido: true });
-      expect(prisma.movimientoStock.findMany).not.toHaveBeenCalled();
+      expect(res).toEqual({ ok: true, movimientosRevertidos: 0 });
+      expect(prisma.stock.update).not.toHaveBeenCalled();
     });
 
     it('revierte producto terminado por tanda con producto_id (DT-58)', async () => {
@@ -688,6 +689,51 @@ describe('StockService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('productos que controlan stock frente a insumos (Control de almacén)', () => {
+    it('cobrar con el control encendido no vuelve a descontar un producto que controla stock (ya se descontó al crear)', async () => {
+      prisma.parametro.findUnique.mockResolvedValue({ valor: 'si' });
+      prisma.movimientoStock.findFirst.mockResolvedValueOnce(null);
+      prisma.producto.findMany.mockResolvedValueOnce([{ id: 1n, controla_stock: true }]);
+      prisma.pedido.findUnique.mockResolvedValueOnce({
+        id: 88n,
+        estado: 'CONFIRMADO',
+        party_id: null,
+        lineas: [{ id: 111n, producto_id: 1n, cantidad: 2, tamano: null, area_id: null, opcionesElegidas: [] }],
+      });
+      prisma.receta.findMany.mockResolvedValueOnce([]);
+
+      await service.descontarPorPedido('88');
+
+      expect(prisma.stock.update).not.toHaveBeenCalled();
+      expect(prisma.stock.create).not.toHaveBeenCalled();
+      expect(prisma.movimientoStock.create).not.toHaveBeenCalled();
+    });
+
+    it('la idempotencia del cobro mira solo insumos o productos sin casilla (no las ventas de productos controlados)', async () => {
+      prisma.parametro.findUnique.mockResolvedValue({ valor: 'si' });
+      await service.descontarPorPedido('77');
+      const where = prisma.movimientoStock.findFirst.mock.calls[0][0].where;
+      expect(where).toMatchObject({ pedido_id: 77n, tipo: 'VENTA' });
+      expect(where.OR).toEqual([{ insumo_id: { not: null } }, { producto: { controla_stock: false } }]);
+    });
+
+    it('anular el pedido repone solo las ventas que aún no se revirtieron', async () => {
+      prisma.movimientoStock.findMany.mockResolvedValueOnce([]);
+      await service.revertirPorPedido('100');
+      expect(prisma.movimientoStock.findMany).toHaveBeenCalledWith({
+        where: { pedido_id: 100n, tipo: 'VENTA', movimientosRevertidos: { none: {} } },
+      });
+    });
+
+    it('anular solo el cobro (soloInsumos) no repone los productos que controlan stock', async () => {
+      prisma.movimientoStock.findMany.mockResolvedValueOnce([]);
+      await service.revertirPorPedido('100', undefined, undefined, { soloInsumos: true });
+      expect(prisma.movimientoStock.findMany).toHaveBeenCalledWith({
+        where: { pedido_id: 100n, tipo: 'VENTA', movimientosRevertidos: { none: {} }, insumo_id: { not: null } },
+      });
     });
   });
 });

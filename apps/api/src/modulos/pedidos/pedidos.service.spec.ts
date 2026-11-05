@@ -137,7 +137,10 @@ describe('PedidosService', () => {
         create: jest.fn(),
       },
       producto: {
-        findMany: jest.fn().mockResolvedValue([mockProductoCafe]),
+        // La consulta de productos que controlan stock (descuento al crear) no devuelve nada en estos casos
+        findMany: jest.fn().mockImplementation(({ where }) =>
+          Promise.resolve(where?.controla_stock ? [] : [mockProductoCafe]),
+        ),
       },
       oferta: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
       parametro: {
@@ -1547,6 +1550,70 @@ describe('PedidosService', () => {
       const capturado = crearCapturado();
       await service.crear(pedidoBaseDto, 'idemp-celular-ok', { canal: 'CARTA' });
       expect(capturado.data.cliente_party_id).toBe(300n);
+    });
+  });
+
+  describe('productos que controlan stock al crear el pedido (todos los canales)', () => {
+    const soloMesa = { ...pedidoBaseDto, modalidad: 'MESA' as const, entrega: undefined };
+
+    beforeEach(() => {
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(where?.controla_stock ? [{ id: 1n, nombre: 'Americano', controla_stock: true }] : [mockProductoCafe]),
+      );
+      prismaMock.pedido.create.mockResolvedValue({ id: 100n, codigo: 'CP-W001', estado: 'COLA', subtotal: 28, envio: null, total: 28 });
+      prismaMock.lugarStock = { findFirst: jest.fn().mockResolvedValue({ id: 7n }) };
+      prismaMock.stock = {
+        findFirst: jest.fn().mockResolvedValue({ id: 9n, lugar_id: 7n }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findMany: jest.fn().mockResolvedValue([{ cantidad: 1 }]),
+        create: jest.fn(),
+      };
+      prismaMock.conteoApertura = { findUnique: jest.fn().mockResolvedValue(null) };
+      prismaMock.movimientoStock = { create: jest.fn().mockResolvedValue({}) };
+      prismaMock.agotado = { create: jest.fn() };
+      prismaMock.producto.findUnique = jest.fn().mockResolvedValue({ agotado_hasta: null });
+    });
+
+    it.each([
+      ['CARTA', undefined, pedidoBaseDto],
+      ['MOZO', { canal: 'MOZO' }, soloMesa],
+      ['CAJA', { canal: 'CAJA' }, soloMesa],
+      ['WHATSAPP', { canal: 'WHATSAPP' }, pedidoBaseDto],
+    ])('canal %s: descuenta el producto al crear con movimiento VENTA ligado al pedido', async (_canal, origen, dto) => {
+      await service.crear(dto as any, `key-${_canal}`, origen as any);
+      expect(prismaMock.movimientoStock.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'VENTA', producto_id: 1n, pedido_id: 100n }),
+      });
+    });
+
+    it('sin conteo de apertura hoy resta sin tope y no hace la comprobación de saldo', async () => {
+      await service.crear(pedidoBaseDto, 'key-sin-apertura', { canal: 'WHATSAPP' });
+      expect(prismaMock.stock.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ producto_id: 1n }) }),
+      );
+      expect(prismaMock.stock.updateMany.mock.calls[0][0].where.cantidad).toBeUndefined();
+    });
+
+    it('con apertura hoy y saldo insuficiente responde 409 STOCK_INSUFICIENTE con productoId y quedan', async () => {
+      prismaMock.conteoApertura.findUnique.mockResolvedValue({ cantidad: 5 });
+      prismaMock.stock.updateMany.mockResolvedValue({ count: 0 });
+      prismaMock.stock.findMany.mockResolvedValue([{ cantidad: 1 }]);
+      const err: any = await service.crear(pedidoBaseDto, 'key-tope', { canal: 'CARTA' }).catch((e) => e);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toEqual({
+        codigo: 'STOCK_INSUFICIENTE',
+        mensaje: 'Solo quedan 1 de Americano',
+        productoId: '1',
+        quedan: 1,
+      });
+    });
+
+    it('suma las líneas repetidas del mismo producto en un solo descuento (2 + 3 = 5)', async () => {
+      prismaMock.conteoApertura.findUnique.mockResolvedValue({ cantidad: 10 });
+      const linea = pedidoBaseDto.lineas[0];
+      await service.crear({ ...pedidoBaseDto, lineas: [linea, { ...linea, cantidad: 3 }] } as any, 'key-repetidas', { canal: 'CARTA' });
+      expect(prismaMock.stock.updateMany).toHaveBeenCalledTimes(1);
+      expect(Number(prismaMock.stock.updateMany.mock.calls[0][0].data.cantidad.decrement)).toBe(5);
     });
   });
 });

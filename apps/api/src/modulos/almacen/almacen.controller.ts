@@ -19,6 +19,7 @@ import { ProduccionTandasDto } from './dto/produccion-tandas.dto';
 import { CierreDiaDto } from './dto/cierre-dia.dto';
 import { AlmacenQueryDto } from './dto/almacen-query.dto';
 import { CrearPedidoInternoDto } from './dto/crear-pedido-interno.dto';
+import { RegistrarAperturaDto } from './dto/registrar-apertura.dto';
 
 export const UMBRAL_MERMA_GRANDE = 10;
 
@@ -80,6 +81,19 @@ export class AlmacenController {
       req.usuario,
       req.ip,
     );
+  }
+
+  // --- Conteo de apertura (productos que controlan stock) ---
+  @Get('apertura')
+  @Permiso('almacen', 'apertura')
+  async obtenerApertura() {
+    return this.almacenService.obtenerApertura();
+  }
+
+  @Post('apertura')
+  @Permiso('almacen', 'apertura')
+  async registrarApertura(@Body() dto: RegistrarAperturaDto, @Req() req: any) {
+    return this.almacenService.registrarApertura(dto, req.usuario, req.ip);
   }
 
   // --- Producción del día ---

@@ -16,6 +16,8 @@ import { ProduccionTandasDto } from './dto/produccion-tandas.dto';
 import { CierreDiaDto } from './dto/cierre-dia.dto';
 import { AlmacenQueryDto } from './dto/almacen-query.dto';
 import { CrearPedidoInternoDto } from './dto/crear-pedido-interno.dto';
+import { RegistrarAperturaDto } from './dto/registrar-apertura.dto';
+import { fechaLimaHoy, fijarAperturaProducto } from '../stock/producto-controlado';
 import { StockService } from '../stock/stock.service';
 import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 
@@ -53,6 +55,90 @@ export class AlmacenService {
       });
     }
     return lugar;
+  }
+
+  // ==========================================
+  // CONTEO DE APERTURA (productos que controlan stock)
+  // ==========================================
+  async obtenerApertura() {
+    const fecha = fechaLimaHoy();
+    const productos = await this.prisma.producto.findMany({
+      where: { controla_stock: true },
+      select: { id: true, nombre: true, categoria: { select: { area: { select: { nombre: true } } } } },
+      orderBy: { nombre: 'asc' },
+    });
+    const ids = productos.map((p) => p.id);
+    const [aperturas, filas] = await Promise.all([
+      this.prisma.conteoApertura.findMany({ where: { fecha: new Date(`${fecha}T00:00:00.000Z`), producto_id: { in: ids } } }),
+      this.prisma.stock.findMany({ where: { producto_id: { in: ids } }, select: { producto_id: true, cantidad: true } }),
+    ]);
+    const apertura = new Map(aperturas.map((a) => [a.producto_id.toString(), Number(a.cantidad)]));
+    const saldo = new Map<string, number>();
+    for (const f of filas) {
+      const k = f.producto_id!.toString();
+      saldo.set(k, (saldo.get(k) ?? 0) + Number(f.cantidad));
+    }
+    return {
+      fecha,
+      productos: productos.map((p) => {
+        const k = p.id.toString();
+        const ap = apertura.get(k);
+        return {
+          productoId: k,
+          nombre: p.nombre,
+          areaNombre: p.categoria?.area?.nombre ?? null,
+          saldo: saldo.get(k) ?? 0,
+          aperturaHoy: ap !== undefined,
+          aperturaCantidad: ap ?? null,
+        };
+      }),
+    };
+  }
+
+  async registrarApertura(dto: RegistrarAperturaDto, usuario: UsuarioAutenticado, ip?: string) {
+    const fecha = fechaLimaHoy();
+    const ids = dto.items.map((i) => this.parsearId(i.productoId, 'producto'));
+    const productos = await this.prisma.producto.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, controla_stock: true, categoria: { select: { area_id: true } } },
+    });
+    for (const item of dto.items) {
+      const prod = productos.find((p) => p.id === this.parsearId(item.productoId, 'producto'));
+      if (!prod) {
+        throw new NotFoundException({ codigo: 'PRODUCTO_NO_ENCONTRADO', mensaje: `Producto ${item.productoId} no encontrado` });
+      }
+      if (!prod.controla_stock) {
+        throw new BadRequestException({
+          codigo: 'PRODUCTO_SIN_CONTROL',
+          mensaje: 'Ese producto no controla stock: no lleva conteo de apertura',
+        });
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of dto.items) {
+        const prod = productos.find((p) => p.id === this.parsearId(item.productoId, 'producto'))!;
+        await fijarAperturaProducto(tx, prod.id, item.cantidad, prod.categoria?.area_id ?? null, usuario.partyId, new Date(), fecha);
+      }
+      await this.auditoria.registrar(
+        {
+          categoria: 'CAMBIO',
+          modulo: 'almacen',
+          accion: 'REGISTRAR_APERTURA',
+          entidad: 'conteo_apertura',
+          partyId: usuario.partyId,
+          despues: { fecha, productos: dto.items.length },
+          ip,
+        },
+        tx,
+      );
+    });
+
+    this.eventosGateway?.emitirAdmin('stock:cambio', {});
+    if (typeof this.stockService?.verificarYReactivarAgotados === 'function') {
+      await this.stockService.verificarYReactivarAgotados([], ids);
+    }
+    return { ok: true, registrados: dto.items.length };
   }
 
   // ==========================================
