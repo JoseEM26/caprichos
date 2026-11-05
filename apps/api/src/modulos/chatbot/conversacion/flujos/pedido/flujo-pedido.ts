@@ -548,24 +548,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     if (entrada.id === 'ped_loc_escribir' || entrada.texto.includes('escribir')) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        estadoInterno: 'PEDIDO_DIRECCION_TEXTO',
-      };
-      return {
-        nuevoEstado: 'PEDIDO_DIRECCION_TEXTO',
-        acciones: [
-          {
-            tipo: 'enviarTexto',
-            texto: 'Por favor escribe tu dirección (distrito, calle, número o manzana y lote):',
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_DIRECCION_TEXTO',
-          pedido: nuevoPedido,
-        },
-      };
+      return this.pedirDireccionEscrita(flujo, pedido);
     }
 
     // Verificación de cobertura si se resolvió el envío
@@ -603,16 +586,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
       return {
         nuevoEstado: 'PEDIDO_REFERENCIA',
-        acciones: [
-          {
-            tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoUbicacionExitosa(envio, esGratis),
-          },
-          {
-            tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoPedirReferencia(),
-          },
-        ],
+        acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.pedidoUbicacionExitosa(envio, esGratis) }],
         nuevoFlujo: {
           ...flujo,
           estado: 'PEDIDO_REFERENCIA',
@@ -622,35 +596,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     // Si escribió la dirección directamente en este paso
-    if (entrada.textoOriginal.length >= 5) {
-      const nuevoPedido: EstadoCarritoPedido = {
-        ...pedido,
-        entrega: {
-          modalidad: 'DELIVERY',
-          direccion: entrada.textoOriginal,
-          origen: 'ESCRITA',
-          tarifaEnvio: null,
-        },
-        estadoInterno: 'PEDIDO_REFERENCIA',
-      };
-      return {
-        nuevoEstado: 'PEDIDO_REFERENCIA',
-        acciones: [
-          {
-            tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoEscribirDireccionPrompt(),
-          },
-          {
-            tipo: 'enviarTexto',
-            texto: TEXTOS_BOT.pedidoPedirReferencia(),
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_REFERENCIA',
-          pedido: nuevoPedido,
-        },
-      };
+    if (entrada.textoOriginal.trim().length >= 5) {
+      return this.direccionEscrita(flujo, pedido, contexto, entrada.textoOriginal.trim());
     }
 
     return {
@@ -664,6 +611,34 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       ],
       nuevoFlujo: flujo,
     };
+  }
+
+  /** Pide la dirección escrita en un solo mensaje (dirección y referencia juntas). */
+  private pedirDireccionEscrita(flujo: FlujoConversacion, pedido: EstadoCarritoPedido): ResultadoTransicion {
+    return {
+      nuevoEstado: 'PEDIDO_DIRECCION_TEXTO',
+      acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.pedidoEscribirDireccion() }],
+      nuevoFlujo: {
+        ...flujo,
+        estado: 'PEDIDO_DIRECCION_TEXTO',
+        pedido: { ...pedido, estadoInterno: 'PEDIDO_DIRECCION_TEXTO' },
+      },
+    };
+  }
+
+  /** Dirección escrita (la referencia va dentro del texto): sin coordenadas, un asesor confirma el envío. */
+  private direccionEscrita(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    contexto: ContextoConversacion,
+    direccion: string,
+  ): ResultadoTransicion {
+    const nuevoPedido: EstadoCarritoPedido = {
+      ...pedido,
+      entrega: { modalidad: 'DELIVERY', direccion, origen: 'ESCRITA', tarifaEnvio: null },
+      estadoInterno: 'PEDIDO_CATEGORIAS',
+    };
+    return this.mostrarCategorias(flujo, nuevoPedido, contexto, TEXTOS_BOT.pedidoDireccionAnteriorSinCoordenadas(direccion));
   }
 
   /** Entrega DELIVERY con zona, tarifa y envío gratis según la cobertura resuelta para el punto. */
@@ -704,15 +679,19 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       return this.renderizarEstado('PEDIDO_UBICACION', flujo, pedido, contexto);
     }
 
-    const filas: FilaLista[] = direcciones.map((d) => ({
-      id: `ped_dir_${d.id}`,
-      titulo: (d.alias || d.direccion).slice(0, 24),
-      descripcion: (d.referencia ? `${d.direccion} (ref: ${d.referencia})` : d.direccion).slice(0, 72),
-    }));
+    // Siempre en letras: la dirección (o el alias) y, debajo, la referencia si no está ya en el texto
+    const filas: FilaLista[] = direcciones.map((d) => {
+      const detalle = d.referencia && !d.direccion.includes(d.referencia) ? `${d.direccion} · Ref: ${d.referencia}` : d.direccion;
+      return {
+        id: `ped_dir_${d.id}`,
+        titulo: recortarEnPalabra(d.alias?.trim() || d.direccion, 24),
+        descripcion: recortarEnPalabra(detalle, 72),
+      };
+    });
     filas.push({
       id: 'ped_dir_nueva',
       titulo: 'Otra dirección',
-      descripcion: 'Comparte una ubicación nueva o escríbela',
+      descripcion: 'Escríbela aquí',
     });
 
     return {
@@ -743,7 +722,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     if (entrada.id === 'ped_dir_nueva') {
-      return this.renderizarEstado('PEDIDO_UBICACION', flujo, pedido, contexto);
+      return this.pedirDireccionEscrita(flujo, pedido);
     }
 
     const dir = entrada.id?.startsWith('ped_dir_')
@@ -816,7 +795,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     flujo: FlujoConversacion,
     pedido: EstadoCarritoPedido,
     entrada: EntradaNormalizada,
-    _contexto: ContextoConversacion,
+    contexto: ContextoConversacion,
   ): ResultadoTransicion {
     const direccion = entrada.textoOriginal.trim();
     if (direccion.length < 5) {
@@ -825,39 +804,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         acciones: [
           {
             tipo: 'enviarTexto',
-            texto:
-              'Por favor escribe una dirección más detallada (al menos calle y número o manzana/lote y distrito):',
+            texto: 'Escribe una dirección más detallada (distrito, calle y número, o manzana y lote):',
           },
         ],
         nuevoFlujo: flujo,
       };
     }
 
-    const nuevoPedido: EstadoCarritoPedido = {
-      ...pedido,
-      entrega: {
-        modalidad: 'DELIVERY',
-        direccion,
-        origen: 'ESCRITA',
-        tarifaEnvio: null,
-      },
-      estadoInterno: 'PEDIDO_REFERENCIA',
-    };
-
-    return {
-      nuevoEstado: 'PEDIDO_REFERENCIA',
-      acciones: [
-        {
-          tipo: 'enviarTexto',
-          texto: TEXTOS_BOT.pedidoPedirReferencia(),
-        },
-      ],
-      nuevoFlujo: {
-        ...flujo,
-        estado: 'PEDIDO_REFERENCIA',
-        pedido: nuevoPedido,
-      },
-    };
+    return this.direccionEscrita(flujo, pedido, contexto, direccion);
   }
 
   // -------------------------------------------------------------------------
@@ -2801,17 +2755,15 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       });
     }
 
-    const acciones: AccionMensaje[] = [];
-    if (mensajeEncabezado) {
-      acciones.push({ tipo: 'enviarTexto', texto: mensajeEncabezado });
-    }
-
-    acciones.push({
-      tipo: 'enviarLista',
-      texto: TEXTOS_BOT.pedidoCategoriasPrompt(),
-      botonTexto: 'Ver categorías',
-      filas: filas.slice(0, 10),
-    });
+    // El encabezado va como cuerpo de la lista: un solo mensaje en vez de texto + lista
+    const acciones: AccionMensaje[] = [
+      {
+        tipo: 'enviarLista',
+        texto: mensajeEncabezado ?? TEXTOS_BOT.pedidoCategoriasPrompt(),
+        botonTexto: 'Ver categorías',
+        filas: filas.slice(0, 10),
+      },
+    ];
 
     return {
       nuevoEstado: 'PEDIDO_CATEGORIAS',
@@ -3032,6 +2984,13 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         return this.mostrarCategorias(flujo, pedido, contexto);
     }
   }
+}
+
+/** Recorta a `max` caracteres sin partir palabras (la lista de WhatsApp corta a 24 y 72). */
+function recortarEnPalabra(texto: string, max: number): string {
+  if (texto.length <= max) return texto;
+  const corte = texto.slice(0, max + 1);
+  return corte.slice(0, corte.lastIndexOf(' ') > 0 ? corte.lastIndexOf(' ') : max);
 }
 
 // Función auxiliar para coincidencia de palabras

@@ -23,6 +23,8 @@ export interface DireccionClienteDto {
   usos: number;
   ultimoUsoEn: string;
   origen: string;
+  /** Código de zona de reparto: solo para el personal (admin). El bot no lo muestra al cliente. */
+  zona: string | null;
 }
 
 /** Búsquedas por teléfono permitidas por usuario y minuto (anti-enumeración). */
@@ -38,10 +40,35 @@ export function textoParecePunto(texto: string | null | undefined): boolean {
   return /^\s*(punto en el mapa|ubicaci[oó]n compartida)?\s*:?\s*-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?\s*$/i.test(texto ?? '');
 }
 
-/** Texto legible para una dirección que solo tiene coordenadas. */
-export function textoAlternativo(origen: string, zona?: string | null): string {
-  if (origen === 'WHATSAPP') return 'Ubicación compartida por WhatsApp';
-  return zona ? `Punto marcado en el mapa (zona ${zona})` : 'Punto marcado en el mapa';
+/** Marcadores que se guardan cuando la dirección es solo un punto (sin texto que el cliente pueda leer). */
+const MARCADOR_PUNTO_MAPA = 'Punto marcado en el mapa';
+const MARCADOR_PUNTO_WHATSAPP = 'Ubicación compartida por WhatsApp';
+
+/** Texto que se guarda para una dirección sin texto (solo coordenadas). */
+function marcadorSinTexto(origen: string): string {
+  return origen === 'WHATSAPP' ? MARCADOR_PUNTO_WHATSAPP : MARCADOR_PUNTO_MAPA;
+}
+
+/** ¿La dirección guardada no tiene texto legible (vacía, coordenadas o solo un marcador de punto)? */
+export function esSinTextoLegible(texto: string | null | undefined): boolean {
+  const t = (texto ?? '').trim();
+  return !t || textoParecePunto(t) || t === MARCADOR_PUNTO_MAPA || t === MARCADOR_PUNTO_WHATSAPP;
+}
+
+/** «3 nov» en hora de Lima. */
+function diaMesLima(fecha: Date): string {
+  return new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', timeZone: 'America/Lima' }).format(fecha).replace('.', '');
+}
+
+/**
+ * Texto para el cliente de una dirección que solo tiene coordenadas, en letras: la referencia si hay;
+ * si no, «Ubicación que enviaste el 3 nov» (WhatsApp) o «Ubicación guardada el 3 nov». Nunca zona ni coordenadas.
+ */
+export function textoAlternativo(origen: string, referencia?: string | null, ultimoUsoEn?: Date | null): string {
+  const ref = referencia?.trim();
+  if (ref) return `Cerca de: ${ref}`;
+  const cuando = ultimoUsoEn ? ` el ${diaMesLima(ultimoUsoEn)}` : '';
+  return origen === 'WHATSAPP' ? `Ubicación que enviaste${cuando}` : `Ubicación guardada${cuando}`;
 }
 
 function aDto(fila: {
@@ -58,7 +85,9 @@ function aDto(fila: {
 }): DireccionClienteDto {
   return {
     id: fila.id.toString(),
-    direccion: textoParecePunto(fila.direccion) ? textoAlternativo(fila.origen, fila.zona?.codigo) : fila.direccion,
+    direccion: esSinTextoLegible(fila.direccion)
+      ? textoAlternativo(fila.origen, fila.referencia, fila.ultimo_uso_en)
+      : fila.direccion,
     referencia: fila.referencia,
     lat: fila.lat != null ? Number(fila.lat) : null,
     lng: fila.lng != null ? Number(fila.lng) : null,
@@ -66,6 +95,7 @@ function aDto(fila: {
     usos: fila.usos,
     ultimoUsoEn: fila.ultimo_uso_en.toISOString(),
     origen: fila.origen,
+    zona: fila.zona?.codigo ?? null,
   };
 }
 
@@ -109,9 +139,9 @@ export class DireccionesClienteService {
     const lng = typeof entrega.lng === 'number' && Number.isFinite(entrega.lng) ? entrega.lng : null;
     const coordenadas = lat !== null && lng !== null;
     const escrito = entrega.direccion?.trim() || '';
-    const sinTexto = !escrito || textoParecePunto(escrito);
+    const sinTexto = esSinTextoLegible(escrito);
     if (sinTexto && !coordenadas) return null;
-    const texto = sinTexto ? textoAlternativo(origen) : escrito;
+    const texto = sinTexto ? marcadorSinTexto(origen) : escrito;
 
     const referencia = entrega.referencia?.trim() || null;
     const ahora = new Date();
