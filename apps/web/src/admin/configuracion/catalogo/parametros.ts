@@ -31,7 +31,7 @@ export interface GrupoParametros {
 export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'entrega', titulo: 'Tiempo prometido de entrega', claves: ['tiempo_prometido_min', 'tiempo_max_min', 'eta_factor_urbano', 'eta_productos_desde', 'eta_extra_por_producto_min', 'eta_parada_min', 'eta_margen_min', 'eta_paso_min', 'eta_base_sin_zona_min'] },
   { id: 'envio', titulo: 'Envío gratis y pedido mínimo', claves: ['envio_gratis_monto', 'envio_gratis_modo', 'pedido_minimo'] },
-  { id: 'clientes', titulo: 'Puntos, personal y reservas', claves: ['puntos_porcentaje', 'descuento_personal_pct', 'reserva_tolerancia_min', 'carta_aviso_entrada', 'verificacion_celular_modo', 'verificacion_whatsapp_numero'] },
+  { id: 'clientes', titulo: 'Puntos, personal y reservas', claves: ['puntos_porcentaje', 'descuento_personal_pct', 'reserva_tolerancia_min', 'reserva_web_activa', 'reserva_web_max_pendientes', 'reserva_web_dias_max', 'reserva_web_max_personas', 'carta_aviso_entrada', 'verificacion_celular_modo', 'verificacion_whatsapp_numero'] },
   { id: 'colores', titulo: 'Colores de espera en cocina y en el mapa de reparto', claves: ['rep_naranja_min', 'rep_rojo_min', 'reparto_retrasado_min', 'reparto_tarde_min', 'reparto_muy_tarde_min', 'reparto_velocidad_kmh', 'rep_max_pedidos', 'reparto_max_pedidos'] },
   { id: 'demanda', titulo: 'Alta demanda', claves: ['pausa_alta_demanda', 'alta_demanda_min_base'] },
   { id: 'puerta', titulo: 'Entrega fallida y reprogramación', claves: ['reparto_insistencia_min', 'reparto_espera_max_min', 'reprog_recargo_modo', 'reparto_recargo_reprogramacion', 'reprog_respuesta_min', 'reprog_max_intentos'] },
@@ -160,6 +160,34 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con 15: una reserva de las 8:00 se libera a las 8:15 si nadie llegó.',
     efecto: 'Subirlo da más tiempo al cliente pero mantiene la mesa ocupada más rato.',
     porDefecto: '15', unidad: 'minutos', rango: 'entero de 1 a 180', palabras: ['reserva', 'mesa', 'tolerancia', 'no llega', 'liberar mesa', 'cortesia'], peligro: 'medio',
+  },
+  reserva_web_activa: {
+    grupo: 'clientes', titulo: 'Reservar mesa desde la carta encendido',
+    descripcion: 'Muestra el botón «Reservar» en la carta virtual para que el cliente pida mesa. Cada pedido llega como solicitud pendiente que el local aprueba o rechaza en Reservas › Solicitudes.',
+    ejemplo: 'En «No», la carta no muestra el botón de reservar y nadie puede enviar una solicitud desde ahí.',
+    efecto: 'Apagarlo no cambia las reservas ya pedidas; solo quita el botón de la carta.',
+    porDefecto: 'Sí (encendido si no existe)', rango: SI_NO, palabras: ['reservar', 'reserva', 'carta', 'mesa', 'solicitud', 'boton reservar', 'apagar reservas'], peligro: 'medio',
+  },
+  reserva_web_max_pendientes: {
+    grupo: 'clientes', titulo: 'Reservas pendientes por celular desde la carta',
+    descripcion: 'Cuántas solicitudes de reserva pedidas desde la carta puede tener esperando respuesta un mismo celular. Frena que una persona llene la lista de pendientes.',
+    ejemplo: 'Con 2: si Ana ya tiene dos pedidos sin confirmar, la carta le pide esperar antes de un tercero.',
+    efecto: 'Subirlo permite más pedidos en espera por celular; bajarlo a 1 exige que el cliente espere una respuesta antes de pedir otra.',
+    porDefecto: '2', unidad: 'solicitudes', rango: 'entero de 1 a 10', palabras: ['reserva', 'pendientes', 'spam', 'limite', 'celular', 'solicitudes'], peligro: 'bajo',
+  },
+  reserva_web_dias_max: {
+    grupo: 'clientes', titulo: 'Días de anticipación para reservar desde la carta',
+    descripcion: 'Hasta cuántos días antes de la fecha puede pedir mesa el cliente desde la carta virtual.',
+    ejemplo: 'Con 30: el cliente puede pedir mesa para hoy o hasta dentro de 30 días.',
+    efecto: 'Subirlo deja reservar con más meses de anticipación; bajarlo acorta las fechas que se ofrecen en la carta.',
+    porDefecto: '30', unidad: 'días', rango: 'entero de 1 a 365', palabras: ['reserva', 'anticipacion', 'dias', 'fecha', 'futuro'], peligro: 'bajo',
+  },
+  reserva_web_max_personas: {
+    grupo: 'clientes', titulo: 'Personas máximas por reserva desde la carta',
+    descripcion: 'Tope de personas que acepta una reserva pedida desde la carta. Si está vacío, el tope es la suma de asientos de las mesas activas del salón.',
+    ejemplo: 'Con 8: un pedido para 9 personas se rechaza en la carta y el cliente recibe la indicación de escribir o llamar al local.',
+    efecto: 'Cambia solo las reservas que se pidan desde la carta a partir de ese momento; las ya pedidas no cambian.',
+    porDefecto: 'suma de asientos de las mesas activas', unidad: 'personas', rango: 'entero de 1 a 200', palabras: ['reserva', 'personas', 'grupo', 'asientos', 'maximo', 'mesa'], peligro: 'bajo',
   },
   // Verificación del celular al crear cuenta o recuperar contraseña. Ver apps/api/src/modulos/clientes/verificacion-whatsapp.util.ts
   verificacion_celular_modo: {

@@ -754,6 +754,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
           setBusqueda('');
         }}
         mostrarInstalar={!vistaPrevia}
+        mostrarReservar={!vistaPrevia}
       />
 
       {/* Franja de aviso de promociones de hoy */}
