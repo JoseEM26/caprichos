@@ -61,3 +61,26 @@ export function rolEfectivoMozo(usuario: { rol: string; roles?: string[] }): str
   const roles = usuario.roles ?? [usuario.rol];
   return roles.find((r) => (ROLES_ALCANCE_AMPLIO as readonly string[]).includes(r)) ?? usuario.rol;
 }
+
+/** Roles del usuario (principal y extra). */
+export function rolesDelUsuario(usuario: { rol: string; roles?: string[] } | undefined): string[] {
+  return usuario?.roles ?? (usuario?.rol ? [usuario.rol] : []);
+}
+
+/**
+ * Áreas de cocina que ve un usuario en las pantallas de cocina. null = todas (sin restricción).
+ * Solo afecta a quien tiene rol COCINA: sin áreas marcadas ve todas (como hoy); con áreas marcadas, la unión.
+ * El resto de roles no se restringe. Única función de esta regla: cocina y comandas la usan.
+ */
+export async function areasPermitidasDeUsuario(
+  prisma: PrismaService,
+  usuario: { partyId?: bigint; rol: string; roles?: string[] } | undefined,
+): Promise<bigint[] | null> {
+  if (!rolesDelUsuario(usuario).includes('COCINA') || usuario?.partyId === undefined) return null;
+  const cuenta = await prisma.userAccount.findUnique({
+    where: { party_id: usuario.partyId },
+    select: { id: true, areasCocina: { select: { area_id: true } } },
+  });
+  const areas = (cuenta?.areasCocina ?? []).map((a) => a.area_id);
+  return areas.length > 0 ? [...new Set(areas)] : null;
+}

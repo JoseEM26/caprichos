@@ -66,7 +66,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
     'notificacion_lectura',
   ]],
   ['roles extra de cada cuenta: se asignan de nuevo en la base destino tras migrar el personal', [
-    'user_account_rol',
+    'user_account_rol', 'user_account_area',
   ]],
   ['trazas y control técnico', [
     'auditoria', 'sys_control', 'iniciativa', 'iniciativa_comentario',

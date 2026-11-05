@@ -11,7 +11,7 @@ export interface DefinicionPermiso {
 export const ROLES: readonly DefinicionRol[] = [
   { codigo: 'ADMIN', nombre: 'Administrador' },
   { codigo: 'CAJERO', nombre: 'Cajero' },
-  { codigo: 'COCINA', nombre: 'Cocina' },
+  { codigo: 'COCINA', nombre: 'Cocina (todas las áreas)' },
   { codigo: 'MOZO', nombre: 'Mozo' },
   { codigo: 'CALLCENTER', nombre: 'Call Center' },
   { codigo: 'ALMACEN', nombre: 'Almacén' },

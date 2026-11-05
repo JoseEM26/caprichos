@@ -113,6 +113,19 @@ model UserAccountRol {
   @@map("user_account_rol")
 }
 
+/// Áreas de cocina que atiende un usuario con rol COCINA. Sin filas = ve todas las áreas.
+model UserAccountArea {
+  user_account_id BigInt
+  area_id         BigInt
+  creado_en       DateTime   @default(now()) @db.Timestamptz
+  cuenta          UserAccount @relation(fields: [user_account_id], references: [id])
+  area            AreaCocina @relation(fields: [area_id], references: [id])
+
+  @@id([user_account_id, area_id])
+  @@index([area_id])
+  @@map("user_account_area")
+}
+
 model Permiso {
   id     BigInt       @id @default(autoincrement())
   modulo String
@@ -149,6 +162,7 @@ model UserAccount {
   party                 Party                  @relation(fields: [party_id], references: [id])
   r                     Rol                    @relation(fields: [rol], references: [codigo])
   rolesExtra            UserAccountRol[]
+  areasCocina           UserAccountArea[]
   iniciativasCreadas    Iniciativa[]           @relation("IniciativasCreadas")
   iniciativasCambiadas  Iniciativa[]           @relation("IniciativasCambiadas")
   iniciativaComentarios IniciativaComentario[]
@@ -316,6 +330,7 @@ model AreaCocina {
   deviceKeys      DeviceKey[]
   printJobs       PrintJob[]
   printJobsDestino PrintJob[] @relation("DestinoImpresion")
+  usuariosAreas   UserAccountArea[]
 
   @@map("area_cocina")
 }

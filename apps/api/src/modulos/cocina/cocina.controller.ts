@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -21,6 +22,8 @@ import { AgotarDto } from './dto/agotar.dto';
 import { AltaDemandaDto } from './dto/alta-demanda.dto';
 import { MarcarListasDto } from './dto/marcar-listas.dto';
 import { DespacharDto } from './dto/despachar.dto';
+import { PrismaService } from '../../comun/prisma/prisma.service';
+import { areasPermitidasDeUsuario } from '../acceso/roles-usuario';
 
 @Controller('admin/cocina')
 @UseGuards(AccesoGuard)
@@ -29,18 +32,45 @@ export class CocinaController {
     private readonly comandasService: ComandasService,
     private readonly agotadosService: AgotadosService,
     private readonly altaDemandaService: AltaDemandaService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /** Áreas que ve el usuario en cocina (null = todas). Regla única en areasPermitidasDeUsuario. */
+  private async areasVisibles(req: any): Promise<string[] | null> {
+    const ids = await areasPermitidasDeUsuario(this.prisma, req.usuario);
+    return ids ? ids.map(String) : null;
+  }
+
+  private exigirAreaVisible(visibles: string[] | null, areaId: string | number) {
+    if (visibles && !visibles.includes(String(areaId))) {
+      throw new ForbiddenException({ codigo: 'AREA_NO_PERMITIDA', mensaje: 'Tu rol de cocina no ve esta área' });
+    }
+  }
 
   @Get('areas')
   @Permiso('cocina', 'ver')
-  async listarAreas() {
-    return this.comandasService.listarAreas();
+  async listarAreas(@Req() req: any) {
+    const areas = await this.comandasService.listarAreas();
+    const visibles = await this.areasVisibles(req);
+    if (!visibles) return areas;
+    return (areas as any[]).filter((a) => visibles.includes(String(a.id)));
   }
 
   @Get('comandas')
   @Permiso('cocina', 'ver')
-  async listarComandas(@Query() query: ComandasQueryDto) {
-    return this.comandasService.listarComandas(query.area);
+  async listarComandas(@Query() query: ComandasQueryDto, @Req() req: any) {
+    const visibles = await this.areasVisibles(req);
+    if (!visibles) return this.comandasService.listarComandas(query.area);
+    if (query.area) {
+      this.exigirAreaVisible(visibles, query.area);
+      return this.comandasService.listarComandas(query.area);
+    }
+    // Vista general de un rol por área: las comandas de sus áreas, en orden de llegada
+    const listas = await Promise.all(visibles.map((id) => this.comandasService.listarComandas(id)));
+    return listas.flat().sort((x: any, y: any) => {
+      if (x.despejada !== y.despejada) return x.despejada ? 1 : -1;
+      return new Date(x.creado_en || x.llego_en).getTime() - new Date(y.creado_en || y.llego_en).getTime();
+    });
   }
 
   @Post('comandas/:pedidoId/:areaId/despejar')
@@ -50,6 +80,7 @@ export class CocinaController {
     @Param('areaId') areaId: string,
     @Req() req: any,
   ) {
+    this.exigirAreaVisible(await this.areasVisibles(req), areaId);
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.comandasService.despejar(pedidoId, areaId, req.usuario, ip);
   }
@@ -62,8 +93,15 @@ export class CocinaController {
 
   @Get('historial')
   @Permiso('cocina', 'ver')
-  async historial(@Query() query: HistorialQueryDto) {
-    return this.comandasService.historial(query.area);
+  async historial(@Query() query: HistorialQueryDto, @Req() req: any) {
+    const visibles = await this.areasVisibles(req);
+    if (!visibles) return this.comandasService.historial(query.area);
+    if (query.area) {
+      this.exigirAreaVisible(visibles, query.area);
+      return this.comandasService.historial(query.area);
+    }
+    const listas = await Promise.all(visibles.map((id) => this.comandasService.historial(id)));
+    return listas.flat();
   }
 
   @Post('lineas/:lineaId/listas')
@@ -87,6 +125,7 @@ export class CocinaController {
     @Param('areaId') areaId: string,
     @Req() req: any,
   ) {
+    this.exigirAreaVisible(await this.areasVisibles(req), areaId);
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.comandasService.devolver(pedidoId, areaId, req.usuario, ip);
   }
