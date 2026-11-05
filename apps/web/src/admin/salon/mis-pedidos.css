@@ -50,8 +50,7 @@
 }
 
 .mp-nuevo:focus-visible,
-.mp-chip:focus-visible,
-.mp-card-cabeza:focus-visible {
+.mp-chip:focus-visible {
   outline: 3px solid var(--cp-gold);
   outline-offset: 2px;
 }
@@ -179,15 +178,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 100%;
-  min-height: 44px;
-  padding: 14px 16px 12px 14px;
-  border: 0;
-  background: none;
+  padding: 14px 16px 10px 14px;
   color: var(--cp-navy);
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
   min-width: 0;
 }
 
@@ -235,15 +227,82 @@
   font-variant-numeric: tabular-nums;
 }
 
-.mp-resumen-lineas {
+/* Lista de productos del pedido: siempre visible, sin clamp; filas compactas y separadas por línea */
+.mp-items {
+  list-style: none;
+  margin: 0;
+  padding: 10px 16px 6px 14px;
+  border-top: 1px dashed var(--cp-line);
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mp-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: start;
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--cp-navy);
+  min-width: 0;
+}
+
+.mp-item-cant {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.2em;
+}
+
+.mp-item-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
   overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+}
+
+.mp-item-nombre {
+  font-weight: 700;
+}
+
+.mp-item-listo {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--cp-greenbg);
+  color: var(--cp-green);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Detalle y nota en gris (contraste con --cp-soft sobre blanco y crema) */
+.mp-item-det,
+.mp-item-nota {
+  font-size: 13px;
+  color: var(--cp-soft);
+}
+
+.mp-item-nota {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.mp-item-icono {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+}
+
+.mp-item-sub {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* "Ver detalle" con chevron que gira al abrir */
@@ -268,12 +327,12 @@
   transition: transform 0.25s ease;
 }
 
-.mp-card-cabeza[aria-expanded='true'] .mp-mas::after {
+.mp-mas[aria-expanded='true']::after {
   transform: translateY(2px) rotate(-135deg);
 }
 
 /* Zona de acciones extra (p. ej. voucher): botones táctiles de 44 px */
-.mp-card > :not(.mp-card-cabeza):not(.mp-detalle) {
+.mp-card > :not(.mp-card-cabeza):not(.mp-detalle):not(.mp-items) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -312,16 +371,6 @@
   border-top: 1px dashed var(--cp-line);
   background: var(--cp-cream);
   animation: mp-abrir 0.25s ease both;
-}
-
-.mp-detalle ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-  font-size: 14px;
-  overflow-wrap: anywhere;
 }
 
 .mp-detalle dl {
@@ -426,7 +475,21 @@
 
   .mp-card-cabeza {
     gap: 10px;
-    padding: 20px 22px 18px 20px;
+    padding: 20px 22px 14px 20px;
+  }
+
+  .mp-items {
+    padding: 12px 22px 8px 20px;
+    gap: 10px;
+  }
+
+  .mp-item {
+    font-size: 15px;
+  }
+
+  .mp-item-det,
+  .mp-item-nota {
+    font-size: 14px;
   }
 
   .mp-codigo {
@@ -441,15 +504,11 @@
     font-size: 19px;
   }
 
-  .mp-resumen-lineas {
-    font-size: 15px;
-  }
-
   .mp-detalle {
     padding: 18px 22px 22px 20px;
   }
 
-  .mp-card > :not(.mp-card-cabeza):not(.mp-detalle) {
+  .mp-card > :not(.mp-card-cabeza):not(.mp-detalle):not(.mp-items) {
     padding: 0 22px 18px 20px;
   }
 }

@@ -18,7 +18,7 @@ describe('PedidosEstadoService.misPedidos', () => {
     pago_estado: 'PENDIENTE',
     pago_metodo: null,
     creado_en: new Date('2026-10-29T14:00:00Z'),
-    lineas: [{ nombre: 'Café', cantidad: 2 }],
+    lineas: [{ id: 11n, nombre: 'Café', cantidad: 2, tamano: null, nota: null, precio_unit: '5', subtotal: '10', listas: 0, opcionesElegidas: [] }],
     vouchers: [],
     planPago: [],
     cliente_nombre: null,
@@ -108,7 +108,7 @@ describe('PedidosEstadoService.misPedidos', () => {
       puedeSubirVoucher: true,
       vouchersPorMedio: [],
       creadoEn: new Date('2026-10-29T14:00:00Z'),
-      lineas: [{ nombre: 'Café', cantidad: 2 }],
+      lineas: [{ id: '11', nombre: 'Café', cantidad: 2, tamano: null, opciones: [], nota: null, precioUnit: 5, subtotal: 10, lista: false }],
       progreso: {
         etapa: 'EN_CAMINO',
         etiqueta: 'En camino',
@@ -128,8 +128,8 @@ describe('PedidosEstadoService.misPedidos', () => {
         estado: 'PREPARANDO',
         modalidad: 'MESA',
         lineas: [
-          { nombre: 'Limonada', cantidad: 1, area_id: 1n, producto: null },
-          { nombre: 'Lomo', cantidad: 1, area_id: null, producto: { categoria: { area_id: 2n } } },
+          { nombre: 'Limonada', cantidad: 1, area_id: 1n, producto: null, opcionesElegidas: [] },
+          { nombre: 'Lomo', cantidad: 1, area_id: null, producto: { categoria: { area_id: 2n } }, opcionesElegidas: [] },
         ],
         comandas: [
           { area_id: 1n, estado: 'DESPEJADA', llego_en: new Date(), despejada_en: new Date(), area: { nombre: 'Bebidas' } },
@@ -165,6 +165,48 @@ describe('PedidosEstadoService.misPedidos', () => {
     const select = prisma.pedido.findMany.mock.calls[0][0].select;
     expect(select.comandas).toEqual({ select: { area_id: true, estado: true, area: { select: { nombre: true } } } });
     expect(select.lineas.select.producto).toEqual({ select: { categoria: { select: { area_id: true } } } });
+    expect(prisma.pedido.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('lineas: tamaño, nota, opciones por nombre (como las etiquetas), subtotal y lista; sin consultas extra', async () => {
+    prisma.pedido.findMany.mockResolvedValueOnce([
+      pedido({
+        lineas: [
+          {
+            id: 21n,
+            nombre: 'Cheesecake',
+            cantidad: 3,
+            tamano: 'Grande',
+            nota: 'Sin nueces',
+            precio_unit: '12.50',
+            subtotal: '37.50',
+            listas: 3,
+            opcionesElegidas: [{ opcion_nombre: 'Oreo' }, { opcion_nombre: 'Crema' }],
+          },
+          {
+            id: 22n,
+            nombre: 'Limonada',
+            cantidad: 2,
+            tamano: null,
+            nota: null,
+            precio_unit: '8',
+            subtotal: null,
+            listas: 1,
+            opcionesElegidas: [],
+          },
+        ],
+      }),
+    ]);
+
+    const res = await service.misPedidos(mozo);
+
+    expect(res.pedidos[0].lineas).toEqual([
+      { id: '21', nombre: 'Cheesecake', cantidad: 3, tamano: 'Grande', opciones: ['Oreo', 'Crema'], nota: 'Sin nueces', precioUnit: 12.5, subtotal: 37.5, lista: true },
+      { id: '22', nombre: 'Limonada', cantidad: 2, tamano: null, opciones: [], nota: null, precioUnit: 8, subtotal: null, lista: false },
+    ]);
+    const select = prisma.pedido.findMany.mock.calls[0][0].select;
+    expect(select.lineas.select.opcionesElegidas).toEqual({ select: { opcion_nombre: true }, orderBy: { id: 'asc' } });
+    expect(select.lineas.select).toMatchObject({ tamano: true, nota: true, precio_unit: true, subtotal: true, listas: true });
     expect(prisma.pedido.findMany).toHaveBeenCalledTimes(1);
   });
 

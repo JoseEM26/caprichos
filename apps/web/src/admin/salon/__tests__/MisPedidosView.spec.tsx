@@ -31,8 +31,8 @@ const respuesta = {
       pagoEstado: 'PAGADO',
       creadoEn: '2026-10-29T15:10:00Z',
       lineas: [
-        { nombre: 'Café', cantidad: 2 },
-        { nombre: 'Torta', cantidad: 1 },
+        { id: '1', nombre: 'Café', cantidad: 2, tamano: 'Grande', opciones: ['Oreo', 'Crema'], nota: 'Sin azúcar', precioUnit: 5, subtotal: 10, lista: true },
+        { id: '2', nombre: 'Torta', cantidad: 1, tamano: null, opciones: [], nota: null, precioUnit: 14.5, subtotal: 14.5, lista: false },
       ],
     },
     {
@@ -44,7 +44,7 @@ const respuesta = {
       total: 8,
       pagoEstado: 'PENDIENTE',
       creadoEn: '2026-10-29T15:00:00Z',
-      lineas: [{ nombre: 'Limonada', cantidad: 1 }],
+      lineas: [{ id: '3', nombre: 'Limonada', cantidad: 1, tamano: null, opciones: [], nota: null, precioUnit: 8, subtotal: 8, lista: false }],
     },
   ],
   resumen: { cantidad: 2, total: 32.5, enCurso: 1, entregados: 1 },
@@ -65,7 +65,10 @@ describe('MisPedidosView', () => {
     expect(within(resumen).getByText('S/ 32.50')).toBeInTheDocument();
     expect(within(resumen).getByText('Total vendido')).toBeInTheDocument();
     expect(screen.getByText('CP-M011')).toBeInTheDocument();
-    expect(screen.getByText('2 x Café, 1 x Torta')).toBeInTheDocument();
+    // La lista de productos se ve sin abrir la tarjeta
+    const lista = screen.getByRole('list', { name: 'Productos del pedido CP-M012' });
+    expect(within(lista).getByText('2×')).toBeInTheDocument();
+    expect(within(lista).getByText('Torta')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Nuevo pedido' })).toBeInTheDocument();
     expect(salonApi.misPedidos).toHaveBeenCalledWith('hoy');
   });
@@ -96,18 +99,38 @@ describe('MisPedidosView', () => {
     expect(await screen.findByText('Aún no tomaste pedidos en este rango')).toBeInTheDocument();
   });
 
-  it('al tocar una tarjeta se expande el detalle de solo lectura', async () => {
+  it('la lista muestra tamaño, opciones, nota, subtotal y Listo sin abrir la tarjeta', async () => {
     render(<MisPedidosView />);
-    const tarjeta = (await screen.findByText('CP-M012')).closest('button')!;
-    expect(tarjeta).toHaveAttribute('aria-expanded', 'false');
+    const tarjeta = (await screen.findByText('CP-M012')).closest('li')!;
+    const lista = within(tarjeta).getByRole('list', { name: 'Productos del pedido CP-M012' });
+    const cafe = within(lista).getAllByRole('listitem')[0];
 
-    fireEvent.click(tarjeta);
+    expect(within(cafe).getByText('Café')).toBeInTheDocument();
+    expect(within(cafe).getByText('Grande · Oreo, Crema')).toBeInTheDocument();
+    expect(within(cafe).getByText('Nota: Sin azúcar')).toBeInTheDocument();
+    expect(within(cafe).getByText('S/ 10.00')).toBeInTheDocument();
+    expect(within(cafe).getByText('✓ Listo')).toBeInTheDocument();
 
-    expect(tarjeta).toHaveAttribute('aria-expanded', 'true');
-    const detalle = document.getElementById(tarjeta.getAttribute('aria-controls')!)!;
-    expect(within(detalle).getByText('2 x Café')).toBeInTheDocument();
-    expect(within(detalle).getByText('1 x Torta')).toBeInTheDocument();
+    const torta = within(lista).getAllByRole('listitem')[1];
+    expect(within(torta).queryByText('✓ Listo')).not.toBeInTheDocument();
+    expect(within(torta).getByText('S/ 14.50')).toBeInTheDocument();
+  });
+
+  it('al abrir el detalle solo aparecen pago, progreso e historial; los productos no se repiten', async () => {
+    render(<MisPedidosView />);
+    const tarjeta = (await screen.findByText('CP-M012')).closest('li')!;
+    const boton = within(tarjeta).getByRole('button', { name: 'Ver detalle' });
+    expect(boton).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(boton);
+
+    expect(within(tarjeta).getByRole('button', { name: 'Ocultar detalle' })).toHaveAttribute('aria-expanded', 'true');
+    const detalle = document.getElementById(boton.getAttribute('aria-controls')!)!;
     expect(within(detalle).getByText('Pagado')).toBeInTheDocument();
+    expect(within(detalle).queryByRole('list')).not.toBeInTheDocument();
+    expect(within(detalle).queryByText('Café')).not.toBeInTheDocument();
+    // Los productos siguen en la lista de la tarjeta, una sola vez
+    expect(within(tarjeta).getAllByRole('list', { name: 'Productos del pedido CP-M012' })).toHaveLength(1);
   });
 
   it('error con Reintentar que vuelve a pedir los datos', async () => {
