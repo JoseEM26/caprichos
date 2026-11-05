@@ -28,6 +28,7 @@ import {
   autorizarAdminSinCodigo,
 } from '../supervisor-codigo/supervisor-codigo.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
+import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import {
   MEDIOS_COBRO,
@@ -449,6 +450,9 @@ export class CobrosService {
         sinVoucherAutorizado,
       };
     });
+
+    // Caja cobró: las conversaciones de Validar pago de este pedido salen de la espera sin avisar al cliente (idempotente)
+    await cerrarValidarPagoDePedido(this.prisma, cobro.pedido_id, 'Caja registró el cobro', this.eventosGateway);
 
     // Si el mozo ya emitió la nota de venta al enviar a Caja, su ticket salió ya en la ticketera: no se repite.
     // Se mira antes de emitir (el cobro podría emitir otra nota si el comprobante cambió).
@@ -941,6 +945,7 @@ export class CobrosService {
         pago_coordinado_por: BigInt(usuario.partyId),
       },
     });
+    await cerrarValidarPagoDePedido(this.prisma, pedido.id, 'Caja coordinó el pago', this.eventosGateway);
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',

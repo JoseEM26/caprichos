@@ -6,6 +6,12 @@ import {
   Optional,
 } from '@nestjs/common';
 import { flujoLiberadoParaBot } from '../conversacion/flujo-liberado.util';
+import {
+  leerExpiraPagoMin,
+  motivoSalidaValidarPago,
+  pedidoIdDePago,
+  sacarDeValidarPago,
+} from '../conversacion/validar-pago-salida.util';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
@@ -214,6 +220,9 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
 
       for (const conv of conversacionesVoucher) {
         const flujo = (conv.flujo as any) || {};
+        // Si el pedido ya no espera pago (Caja lo cobró o coordinó, o se anuló/entregó), no se avisa nada: sale de Validar pago
+        if (await this.salirSiPedidoResuelto(conv, flujo, ahora)) continue;
+
         const pago = flujo.pago || {};
         const capturasEnviadas = pago.capturasEnviadas || 1;
         const timestampCaptura =
@@ -512,6 +521,28 @@ export class AlertasEsperaService implements OnModuleInit, OnModuleDestroy {
         await liberarCandado(redis, lockKey, lockToken).catch(() => {});
       }
       this.ejecutando = false;
+    }
+  }
+
+  /**
+   * Conversación de VALIDAR_PAGO cuyo pedido ya no espera pago: la saca de la espera.
+   * true = no avisar en este ciclo (salió de la espera, o no se pudo revisar el pedido). false = sigue pendiente.
+   */
+  private async salirSiPedidoResuelto(conv: any, flujo: any, ahora: Date): Promise<boolean> {
+    const pedidoId = pedidoIdDePago(flujo);
+    if (!pedidoId) return false;
+    try {
+      const pedido = await this.prisma.pedido.findUnique({ where: { id: pedidoId } });
+      const motivo = motivoSalidaValidarPago(pedido, flujo.pago, ahora, await leerExpiraPagoMin(this.prisma));
+      if (!motivo) return false;
+      await sacarDeValidarPago(this.prisma, conv, flujo, motivo);
+      this.eventosGateway?.emitirAdmin('mensajes:actualizado', { id: conv.id.toString() });
+      this.logger.log(`Conversación ${conv.id} salió de Validar pago: ${motivo}.`);
+      return true;
+    } catch (err: any) {
+      // Sin revisar el pedido no se avisa a nadie por esta conversación en este ciclo: se reintenta en el siguiente
+      this.logger.warn(`No se pudo revisar el pedido de Validar pago de la conversación ${conv.id}: ${err.message}`);
+      return true;
     }
   }
 

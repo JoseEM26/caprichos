@@ -50,6 +50,7 @@ import {
   sumarDevolucionesDigitales,
 } from './cierre.util';
 import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-pedido.util';
+import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
 
 /**
  * Arqueos que NO cuadraron antes de exigir PIN de supervisor. Un arqueo que cuadra no suma.
@@ -1098,6 +1099,7 @@ export class CierreService {
     // el contra entrega se cobra aquí y no pasa por Caja → cobrar: suma los puntos del cliente
     // (idempotente; si falla no deshace la liquidación)
     for (const id of pedidosIds) {
+      await cerrarValidarPagoDePedido(this.prisma, id, 'el repartidor cobró el pedido', this.eventosGateway);
       try {
         await this.puntosService?.acumularPorPedido(id);
       } catch {
