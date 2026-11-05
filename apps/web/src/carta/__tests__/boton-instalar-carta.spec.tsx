@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-// El aviso de instalar sale en la carta en cada visita (sin pedido previo). Se oculta mientras
-// «Mis pedidos» o la confirmación están abiertos, para que nunca haya dos a la vez.
+// El botón «Instalar app» está en la cabecera de la carta, siempre que la app no esté instalada.
 const { pedidosGuardados, forzado } = vi.hoisted(() => ({
   pedidosGuardados: { lista: [] as Array<Record<string, unknown>> },
   forzado: { valores: {} as Record<string, unknown> },
@@ -49,19 +48,7 @@ import { CartaPublica } from '../CartaPublica';
 const enCarta = () => <MemoryRouter><CartaPublica /></MemoryRouter>;
 import { iniciarCapturaInstalar } from '../../pwa/instalar';
 
-const NOMBRE_AVISO = 'Instalar Caprichos en tu celular';
-const CLAVE = 'caprichos.pwa.instalar.descartado';
-
-const pedidoPrevio = {
-  codigo: 'A1B2',
-  token: 'tok',
-  modalidad: 'RECOGER',
-  nombre: 'Ana',
-  creadoEn: new Date().toISOString(),
-  estado: 'COLA',
-  estadoEtiqueta: 'En cola',
-  terminado: false,
-};
+const NOMBRE_BOTON = 'Instalar app';
 
 function dispararInstalable() {
   act(() => {
@@ -69,7 +56,7 @@ function dispararInstalable() {
   });
 }
 
-describe('Aviso «Instalar app» en la carta', () => {
+describe('Botón «Instalar app» en la cabecera de la carta', () => {
   beforeEach(() => {
     iniciarCapturaInstalar();
     pedidosGuardados.lista = [];
@@ -79,49 +66,22 @@ describe('Aviso «Instalar app» en la carta', () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia;
   });
 
-  it('la carta lo muestra en cada visita, sin pedido previo', async () => {
+  it('está en la cabecera sin pedido previo y sin que el navegador haya dado el aviso', async () => {
     render(enCarta());
-    dispararInstalable();
-    expect(await screen.findByRole('region', { name: NOMBRE_AVISO })).toBeDefined();
+    expect(await screen.findByRole('button', { name: NOMBRE_BOTON })).toBeDefined();
   });
 
-  it('la × lo oculta solo en esta sesión: con una sesión nueva vuelve a salir', async () => {
-    const { unmount } = render(enCarta());
-    dispararInstalable();
-    fireEvent.click(await screen.findByRole('button', { name: 'Cerrar aviso de instalación' }));
-    expect(screen.queryByRole('region', { name: NOMBRE_AVISO })).toBeNull();
-    expect(window.sessionStorage.getItem(CLAVE)).toBe('1');
-    expect(window.localStorage.getItem(CLAVE)).toBeNull();
-    unmount();
-
-    window.sessionStorage.clear();
+  it('ya no hay barra de instalar bajo la cabecera: el aviso vive en el botón', async () => {
     render(enCarta());
     dispararInstalable();
-    expect(await screen.findByRole('region', { name: NOMBRE_AVISO })).toBeDefined();
+    await act(async () => {});
+    expect(screen.queryByRole('region', { name: 'Instalar Caprichos en tu celular' })).toBeNull();
   });
 
   it('en standalone (ya instalada) no se muestra', async () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
     render(enCarta());
-    dispararInstalable();
     await act(async () => {});
-    expect(screen.queryByRole('region', { name: NOMBRE_AVISO })).toBeNull();
-  });
-
-  it('en la confirmación del pedido hay un solo aviso, no dos', async () => {
-    forzado.valores = {
-      pedidoConfirmado: { codigo: 'A1B2', seguimientoToken: 'tok', modalidad: 'RECOGER', clienteNombre: 'Ana' },
-    };
-    render(enCarta());
-    dispararInstalable();
-    expect(await screen.findAllByRole('region', { name: NOMBRE_AVISO })).toHaveLength(1);
-  });
-
-  it('con «Mis pedidos» abierto hay un solo aviso, no dos', async () => {
-    pedidosGuardados.lista = [pedidoPrevio];
-    forzado.valores = { listaPedidosAbierta: true };
-    render(enCarta());
-    dispararInstalable();
-    expect(await screen.findAllByRole('region', { name: NOMBRE_AVISO })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: NOMBRE_BOTON })).toBeNull();
   });
 });

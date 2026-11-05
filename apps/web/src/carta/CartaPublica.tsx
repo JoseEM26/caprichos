@@ -15,7 +15,6 @@ import {
 import { CarritoProvider, useCarrito } from './CarritoContext';
 import { abrirSeguimientoDesdeEnlace, leerEnlaceSeguimiento } from './seguimiento';
 import { CabeceraCarta } from './CabeceraCarta';
-import { BannerInstalarApp } from '../pwa/BannerInstalarApp';
 import type { PaginaCarta } from './CabeceraCarta';
 import { BannerMesCarta, FranjaDatosCarta } from './PortadaCarta';
 import { PaginaConocenos } from './PaginaConocenos';
@@ -122,10 +121,8 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   // En la carta pública las promociones ocultas no existen; en el diseñador se ven atenuadas para poder mostrarlas.
   const ofertas = useMemo(() => (ed ? ofertasBase : ofertasBase.filter((o) => o.visibleCarta !== false)), [ofertasBase, ed]);
 
-  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto, pedidoConfirmado, seguimientoAbierto, listaPedidosAbierta } =
+  const { productoEnModal, cerrarModalProducto, abrirModalProducto, setListaPedidosAbierta, setSeguimientoAbierto } =
     useCarrito();
-  // Con confirmación o «Mis pedidos» abiertos, el aviso de instalar de la carta se oculta: nunca hay dos a la vez
-  const overlayPedidoAbierto = pedidoConfirmado !== null || seguimientoAbierto !== null || listaPedidosAbierta;
 
   // Enlace del bot o del aviso «pedido recibido»: abre directo el seguimiento de ese pedido (si el token no coincide, no pasa nada)
   useEffect(() => {
@@ -756,14 +753,8 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
           setCategoriaActivaId(id);
           setBusqueda('');
         }}
+        mostrarInstalar={!vistaPrevia}
       />
-
-      {/* Aviso de instalar la app: en cada visita (en flujo, no fijo), nunca en la vista previa del admin */}
-      {!vistaPrevia && !overlayPedidoAbierto && (
-        <div style={{ padding: movil ? '6px 12px 0' : '8px 24px 0' }}>
-          <BannerInstalarApp />
-        </div>
-      )}
 
       {/* Franja de aviso de promociones de hoy */}
       <FranjaAvisoCarta

@@ -135,3 +135,40 @@ describe('Cabecera de la carta ▸ nombre largo', () => {
     expect(nombre.style.textOverflow).toBe('ellipsis');
   });
 });
+
+describe('Cabecera de la carta ▸ instalar app', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    sessionStorage.clear();
+    vi.spyOn(cuentaModulo, 'useCuenta').mockReturnValue({ ...cuentaBase, cliente: null } as any);
+  });
+
+  it('muestra «Instalar app» en el mismo grupo que el carrito, sin pedido y sin prompt', () => {
+    render(cabecera(0));
+    const instalar = screen.getByRole('button', { name: 'Instalar app' });
+    const carrito = screen.getByRole('button', { name: /Abrir el carrito/ });
+    expect(instalar.parentElement).toBe(carrito.parentElement);
+    expect(instalar.style.minHeight).toBe('44px');
+  });
+
+  it('en la vista previa del diseñador (mostrarInstalar=false) no aparece', () => {
+    render(
+      <CarritoProvider>
+        <CabeceraCarta
+          busqueda=""
+          onCambioBusqueda={() => {}}
+          estadoLocal={{ abierta: true } as any}
+          datosLocal={{ nombre: 'Caprichos' } as any}
+          pagina="carta"
+          onPagina={() => {}}
+          categorias={[]}
+          categoriaActivaId="todo"
+          onCategoria={() => {}}
+          mostrarInstalar={false}
+        />
+      </CarritoProvider>,
+    );
+    expect(screen.queryByRole('button', { name: /Instalar app/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Abrir el carrito/ })).toBeInTheDocument();
+  });
+});

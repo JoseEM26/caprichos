@@ -4,6 +4,7 @@ import { useCarrito } from './CarritoContext';
 import { useCuenta } from './cuenta/CuentaContext';
 import { useEsMovil } from './useEsMovil';
 import { usePedidosGuardados } from './seguimiento';
+import { BotonInstalarApp } from '../pwa/BotonInstalarApp';
 
 export type PaginaCarta = 'carta' | 'novedades' | 'conocenos';
 
@@ -17,6 +18,8 @@ interface CabeceraCartaProps {
   categorias: { id: string; nombre: string }[];
   categoriaActivaId: string;
   onCategoria: (id: string) => void;
+  /** Botón «Instalar app» (false en la vista previa del diseñador) */
+  mostrarInstalar?: boolean;
 }
 
 const PAGINAS: [PaginaCarta, string][] = [
@@ -47,7 +50,7 @@ const flecha = {
  * Cabecera fija de la carta (mockup Main ▸ CABECERA FIJA): marca, páginas, buscador, cuenta y carrito,
  * con la franja de categorías dentro del mismo bloque pegado arriba para que no se descuadre al desplazar.
  *
- * Los botones de la derecha («Mis pedidos», puntos y carrito) van juntos en un grupo: así saltan de línea
+ * Los botones de la derecha («Instalar app», «Mis pedidos», puntos y carrito) van juntos en un grupo: así saltan de línea
  * como una sola pieza y nunca se separa el carrito del resto.
  */
 export function CabeceraCarta({
@@ -60,6 +63,7 @@ export function CabeceraCarta({
   categorias,
   categoriaActivaId,
   onCategoria,
+  mostrarInstalar = true,
 }: CabeceraCartaProps) {
   const { cantidadTotal, subtotal, abrirCajon, setListaPedidosAbierta } = useCarrito();
   const { cliente, abrirPanel } = useCuenta();
@@ -226,6 +230,8 @@ export function CabeceraCarta({
               gap: movil ? 8 : 12,
             }}
           >
+            {mostrarInstalar && <BotonInstalarApp />}
+
             {mostrarPedidos && (
               <button
                 onClick={() => setListaPedidosAbierta(true)}
