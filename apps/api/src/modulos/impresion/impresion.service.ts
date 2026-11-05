@@ -1137,7 +1137,7 @@ export class ImpresionService {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
     }
 
-    const { general, areas, bebidas } = construirTodasLasEtiquetas(pedido);
+    const { areas, bebidas } = construirTodasLasEtiquetas(pedido);
     const reglas = await leerReglasImpresion(this.prisma);
     const esperadas = [
       ...(aplicaSegunReglas('ETIQUETA_GENERAL', pedido.modalidad, reglas)
