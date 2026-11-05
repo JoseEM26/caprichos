@@ -1,0 +1,81 @@
+/* Módulo Impresión de Configuración: segmentos de sección y luz de salud. Colores: tokens --cp-*. */
+
+.imp-modulo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  color: var(--cp-navy);
+}
+
+/* Móvil: fila desplazable; desde 720 px, tres columnas iguales. */
+.imp-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px;
+}
+.imp-tabs::-webkit-scrollbar { display: none; }
+
+.imp-tab {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.imp-tab:hover { border-color: var(--cp-navy); }
+.imp-tab:focus-visible { outline: 3px solid var(--cp-orange); outline-offset: 2px; }
+.imp-tab--activa {
+  background: var(--cp-navy);
+  border-color: var(--cp-navy);
+  color: var(--cp-cream);
+}
+
+.imp-tab-icono { flex: 0 0 auto; }
+.imp-tab-texto { display: flex; flex-direction: column; min-width: 0; }
+.imp-tab-nombre { font-family: Montserrat, sans-serif; font-weight: 800; font-size: 14px; line-height: 18px; white-space: nowrap; }
+.imp-tab-ayuda { display: none; font-size: 12px; line-height: 16px; opacity: 0.85; }
+
+@media (min-width: 720px) {
+  .imp-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
+  .imp-tab { min-height: 64px; }
+  .imp-tab-ayuda { display: block; }
+}
+
+.imp-panel { min-width: 0; }
+.imp-panel:focus-visible { outline: 3px solid var(--cp-orange); outline-offset: 4px; border-radius: 12px; }
+
+/* Luz de salud junto al título */
+.imp-salud {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  border: 1px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-size: 13px;
+  font-weight: 700;
+}
+.imp-salud-luz {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--cp-line);
+  flex: 0 0 auto;
+}
+.imp-salud--ok .imp-salud-luz { background: var(--cp-green, #2F7A45); }
+.imp-salud--aviso .imp-salud-luz { background: var(--cp-amber, #C98A00); }
+.imp-salud--falla .imp-salud-luz { background: var(--cp-rust, #B2500F); }

@@ -8,7 +8,8 @@ const FUENTES: Record<string, string[]> = {
   vouchers: [resolve(dir, 'TarjetaVouchersIaConfiguracion.tsx')],
   ayuda: [resolve(dir, 'TarjetaAyudaIaConfiguracion.tsx')],
   ingreso: [resolve(dir, 'TarjetaPantallaIngresoConfiguracion.tsx')],
-  impresion: [resolve(dir, '../impresion/TarjetaImpresionEtiquetas.tsx')],
+  // Impresión: equipos y cola están literales en sus secciones; los del mapa van por data-cfg-id={id} (ver test abajo).
+  impresion: [resolve(dir, '../impresion/SeccionEquipos.tsx'), resolve(dir, '../impresion/SeccionColaPruebas.tsx')],
 };
 const re = /(?:data-cfg-id=|<CampoConfig\s+id=|cfgId=)"([a-z0-9-]+)"/g;
 
@@ -17,9 +18,16 @@ describe('Catálogo de tarjetas Vouchers, Ayuda, Ingreso e Impresión', () => {
     it(`cada ajuste de ${tab} tiene destino en su tarjeta y cada destino está en el catálogo`, () => {
       const enCodigo = new Set<string>();
       for (const f of archivos) for (const m of readFileSync(f, 'utf8').matchAll(re)) enCodigo.add(m[1]);
-      const enCatalogo = CATALOGO.filter((e) => e.tab === tab).map((e) => e.id);
+      const enCatalogo = CATALOGO.filter((e) => e.tab === tab && e.apartado !== 'mapa').map((e) => e.id);
       for (const id of enCatalogo) expect(enCodigo.has(id), `falta destino: ${id}`).toBe(true);
       for (const id of enCodigo) expect(enCatalogo.includes(id), `sin catálogo: ${id}`).toBe(true);
     });
   }
+
+  it('cada ajuste del mapa de impresión tiene destino en el lienzo', () => {
+    const lienzo = readFileSync(resolve(dir, '../impresion/mapa/LienzoMapa.tsx'), 'utf8');
+    const delMapa = CATALOGO.filter((e) => e.tab === 'impresion' && e.apartado === 'mapa');
+    expect(delMapa.length).toBeGreaterThan(0);
+    for (const e of delMapa) expect(lienzo.includes(`id="${e.id}"`), `falta destino: ${e.id}`).toBe(true);
+  });
 });

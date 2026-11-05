@@ -21,7 +21,7 @@ interface Pendiente {
 
 const hora = () => new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
 
-/** Pantalla «Mapa de impresión» dentro de Configuración: ver, simular y cambiar qué sale dónde. */
+/** Sección «Mapa» del módulo Impresión de Configuración: ver, simular y cambiar qué sale dónde. */
 export function ModuloMapaImpresion() {
   const { tiene, usuario } = useSesion();
   const esAdmin = (usuario?.rol || '').toUpperCase() === 'ADMIN';
@@ -136,7 +136,7 @@ export function ModuloMapaImpresion() {
     <section className="mapa-impresion" aria-labelledby="mapa-impresion-titulo">
       <header className="mapa-cabecera">
         <div>
-          <h2 id="mapa-impresion-titulo" className="mapa-titulo">Mapa de impresión</h2>
+          <h3 id="mapa-impresion-titulo" className="mapa-titulo">Mapa de impresión</h3>
           <p className="mapa-intro">
             Mira qué se imprime, con qué regla y en qué equipo. Cambia las reglas y lleva cada equipo al área que atiende.
           </p>
@@ -148,7 +148,9 @@ export function ModuloMapaImpresion() {
       </header>
 
       <p className="mapa-enlaces">
-        <Link to="?tab=impresion">Cola de impresión, prueba e instalar programa</Link>
+        <Link to="?tab=impresion&seccion=cola">Cola de impresión y pruebas</Link>
+        {' · '}
+        <Link to="?tab=impresion&seccion=equipos">Equipos y estado</Link>
       </p>
 
       {!puedeEditar && (
@@ -165,7 +167,7 @@ export function ModuloMapaImpresion() {
         <EstadoVacio
           titulo="Aún no hay equipos de impresión"
           descripcion="Instala el programa en la PC de Caja y vincúlalo. Después aparecerá aquí."
-          accion={<Link to="?tab=impresion">Ir a instalar el programa</Link>}
+          accion={<Link to="?tab=impresion&seccion=equipos">Ir a instalar el programa</Link>}
         />
       )}
 
