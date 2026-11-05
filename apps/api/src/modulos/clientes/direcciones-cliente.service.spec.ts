@@ -156,8 +156,27 @@ describe('DireccionesClienteService', () => {
           usos: 1,
           ultimoUsoEn: '2026-10-01T10:00:00.000Z',
           origen: 'CARTA',
+          zona: null,
         },
       ]);
+    });
+
+    it('una dirección que solo tiene coordenadas se lee en letras, sin zona ni coordenadas', async () => {
+      prismaMock.clienteDireccion.findMany.mockResolvedValue([
+        fila({ id: 2n, direccion: '-12.0186, -76.958', origen: 'CARTA', referencia: null, lat: -12.0186, lng: -76.958, zona: { codigo: '02' } }),
+        fila({ id: 3n, direccion: 'Punto marcado en el mapa', origen: 'CARTA', referencia: 'Portón azul' }),
+        fila({ id: 4n, direccion: 'Ubicación compartida por WhatsApp', origen: 'WHATSAPP', referencia: null, ultimo_uso_en: new Date('2026-11-03T15:00:00Z') }),
+      ]);
+
+      const r = await service.listar('77');
+
+      expect(r.map((d) => d.direccion)).toEqual([
+        'Ubicación guardada el 1 oct',
+        'Cerca de: Portón azul',
+        'Ubicación que enviaste el 3 nov',
+      ]);
+      expect(r[0].zona).toBe('02');
+      expect(r.map((d) => d.direccion).join(' ')).not.toMatch(/zona|Punto marcado|-12\.0186/);
     });
   });
 
@@ -261,9 +280,13 @@ describe('texto legible de direcciones', () => {
       expect(textoParecePunto(t)).toBe(true);
     expect(textoParecePunto('Av. Las Palmeras 123')).toBe(false);
   });
-  it('el texto alternativo nunca lleva coordenadas', () => {
-    expect(textoAlternativo('WHATSAPP')).toBe('Ubicación compartida por WhatsApp');
-    expect(textoAlternativo('CARTA', 'Z1')).toBe('Punto marcado en el mapa (zona Z1)');
+  it('el texto alternativo se lee en letras: referencia, o fecha de último uso (hora de Lima)', () => {
+    const ultimo = new Date('2026-11-03T15:00:00Z');
+    expect(textoAlternativo('CARTA', 'Portón azul', ultimo)).toBe('Cerca de: Portón azul');
+    expect(textoAlternativo('CARTA', null, ultimo)).toBe('Ubicación guardada el 3 nov');
+    expect(textoAlternativo('WHATSAPP', '  ', ultimo)).toBe('Ubicación que enviaste el 3 nov');
+    expect(textoAlternativo('CARTA')).toBe('Ubicación guardada');
+    expect(textoAlternativo('WHATSAPP', null, ultimo)).not.toMatch(/zona|\d+\.\d+/);
   });
 });
 
