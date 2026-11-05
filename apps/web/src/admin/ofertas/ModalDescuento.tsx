@@ -1,5 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
+import { CasillaBot, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -15,12 +16,6 @@ const DIAS = [
   ['dom', 'Domingo', 'Dom'],
 ];
 
-const CANALES = [
-  { clave: 'todos', nombre: 'Todos los canales' },
-  { clave: 'carta', nombre: 'Solo carta web' },
-  { clave: 'local', nombre: 'Solo en el local' },
-  { clave: 'whatsapp', nombre: 'Solo WhatsApp' },
-];
 
 const CATEGORIAS_DEF = [
   'Combos',
@@ -77,6 +72,7 @@ export function ModalDescuento({
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
+  const [valeBot, setValeBot] = useState(false);
   const [mostrarEnSaludo, setMostrarEnSaludo] = useState(false);
   const [soloPrimeraCompra, setSoloPrimeraCompra] = useState(false);
   const [minima, setMinima] = useState('');
@@ -133,7 +129,7 @@ export function ModalDescuento({
       const fHasta = descuentoAEditar.fechaHasta || descuentoAEditar.fechaFin;
       setFechaDesde(fDesde ? fDesde.slice(0, 10) : '');
       setFechaHasta(fHasta ? fHasta.slice(0, 10) : '');
-      setCanal(descuentoAEditar.canales && descuentoAEditar.canales[0] ? descuentoAEditar.canales[0].toLowerCase() : 'todos');
+      { const sel = selectorDesdeCanales(descuentoAEditar.canales); setCanal(sel.canal); setValeBot(sel.valeBot); }
       setMostrarEnSaludo(Boolean(descuentoAEditar.mostrarEnSaludoBot));
       setSoloPrimeraCompra(Boolean(descuentoAEditar.soloPrimeraCompra));
       setPaso(1);
@@ -156,6 +152,7 @@ export function ModalDescuento({
       setFechaDesde('');
       setFechaHasta('');
       setCanal('todos');
+      setValeBot(false);
       setMostrarEnSaludo(false);
       setSoloPrimeraCompra(false);
       setPaso(1);
@@ -489,7 +486,7 @@ export function ModalDescuento({
         fechaHasta: fechaHasta || undefined,
         fechaFin: fechaHasta || undefined,
         // La primera compra solo se canjea en la carta web
-        canales: soloPrimeraCompra ? ['CARTA'] : canal === 'todos' ? ['CARTA', 'ADMIN', 'BOT'] : [canal.toUpperCase()],
+        canales: soloPrimeraCompra ? ['CARTA'] : canalesDesdeSelector(canal, valeBot),
         mostrarEnSaludoBot: mostrarEnSaludo,
         soloPrimeraCompra,
         imagenArchivoId: fotoArchivoId,
@@ -523,7 +520,7 @@ export function ModalDescuento({
     horaHasta: horaHasta || null,
     fechaDesde: fechaDesde || null,
     fechaHasta: fechaHasta || null,
-    canales: canal === 'todos' ? ['CARTA', 'ADMIN', 'BOT'] : [canal.toUpperCase()],
+    canales: canalesDesdeSelector(canal, valeBot),
     activo: true,
   };
 
@@ -1113,12 +1110,13 @@ export function ModalDescuento({
                   onChange={(e) => setCanal(e.target.value)}
                   style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
                 >
-                  {CANALES.map((c) => (
+                  {opcionesCanal(canal).map((c) => (
                     <option key={c.clave} value={c.clave}>
                       {c.nombre}
                     </option>
                   ))}
                 </select>
+                  <CasillaBot id="desc-canal-bot" checked={valeBot} onChange={setValeBot} bloqueada={canal === 'solo-bot'} />
               </div>
               <div style={{ flex: 1, minWidth: '180px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>

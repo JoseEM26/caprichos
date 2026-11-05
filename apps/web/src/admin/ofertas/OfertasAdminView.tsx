@@ -2223,6 +2223,7 @@ export function OfertasAdminView() {
         }}
         onGuardar={guardarCuponHandler}
         productosDisponibles={productosConDescuento}
+              categorias={categorias}
       />
 
       <ModalHistorialCupones

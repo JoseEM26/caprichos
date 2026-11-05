@@ -17,8 +17,33 @@ const CANALES = [
   { clave: 'TODOS', nombre: 'Todos los canales' },
   { clave: 'CARTA', nombre: 'Solo carta web' },
   { clave: 'LOCAL', nombre: 'Solo en el local' },
-  { clave: 'WHATSAPP', nombre: 'Solo WhatsApp' },
 ];
+
+const DIAS = [
+  ['lun', 'Lun', 1],
+  ['mar', 'Mar', 2],
+  ['mie', 'Mié', 3],
+  ['jue', 'Jue', 4],
+  ['vie', 'Vie', 5],
+  ['sab', 'Sáb', 6],
+  ['dom', 'Dom', 7],
+] as const;
+
+/** Canales guardados del cupón -> opción del selector. */
+function canalDeCupon(canales: string[] | null | undefined): string {
+  const c = (canales || []).map((x) => x.toUpperCase());
+  if (c.includes('CARTA') && c.includes('CAJA')) return 'TODOS';
+  if (c.includes('CARTA')) return 'CARTA';
+  if (c.includes('CAJA')) return 'LOCAL';
+  return 'TODOS';
+}
+
+/** Canales del cupón en la API: se canjea en la carta (CARTA) y en caja (CAJA). Nunca por chat. */
+function canalesDeCupon(canal: string): string[] {
+  if (canal === 'CARTA') return ['CARTA'];
+  if (canal === 'LOCAL') return ['CAJA'];
+  return ['CARTA', 'CAJA'];
+}
 
 interface ModalCuponProps {
   abierto: boolean;
@@ -28,6 +53,8 @@ interface ModalCuponProps {
   onGuardar: (datos: any) => Promise<void>;
   productosDisponibles?: Array<{ id: string; nombre: string; categoria?: string }>;
   categoriasDisponibles?: string[];
+  /** Categorías con id (la API guarda el id del alcance). */
+  categorias?: Array<{ id: string; nombre: string }>;
 }
 
 export function ModalCupon({
@@ -38,11 +65,15 @@ export function ModalCupon({
   onGuardar,
   productosDisponibles = [],
   categoriasDisponibles = CATEGORIAS_DEF,
+  categorias = [],
 }: ModalCuponProps) {
   const [modo, setModo] = useState<'UNICO_COMPROBANTE' | 'COMPARTIDO'>('UNICO_COMPROBANTE');
   const [codigoBase, setCodigoBase] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [tipo, setTipo] = useState<'pct' | 'monto'>('pct');
+  const [tipo, setTipo] = useState<'pct' | 'monto' | 'envio'>('pct');
+  const [dias, setDias] = useState<string[]>([]);
+  const [horaDesde, setHoraDesde] = useState('');
+  const [horaHasta, setHoraHasta] = useState('');
   const [valor, setValor] = useState('');
   const [minima, setMinima] = useState('0');
   const [fechaDesde, setFechaDesde] = useState('');
@@ -66,8 +97,12 @@ export function ModalCupon({
       setModo(cuponAEditar.modo || 'UNICO_COMPROBANTE');
       setCodigoBase(cuponAEditar.codigoBase || '');
       setDescripcion(cuponAEditar.descripcion || '');
-      setTipo(cuponAEditar.tipo === 'MONTO_FIJO' ? 'monto' : 'pct');
-      setValor(cuponAEditar.valor !== undefined && cuponAEditar.valor !== null ? String(cuponAEditar.valor) : '');
+      setTipo(cuponAEditar.descuentoTipo === 'ENVIO_GRATIS' ? 'envio' : cuponAEditar.descuentoTipo === 'MONTO' || cuponAEditar.tipo === 'MONTO_FIJO' ? 'monto' : 'pct');
+      const valorActual = cuponAEditar.descuentoValor ?? cuponAEditar.valor;
+      setValor(valorActual !== undefined && valorActual !== null ? String(valorActual) : '');
+      setDias((cuponAEditar.dias || []).map((d) => DIAS[d - 1]?.[0] || 'lun'));
+      setHoraDesde(cuponAEditar.horaDesde || '');
+      setHoraHasta(cuponAEditar.horaHasta || '');
       setMinima(cuponAEditar.compraMinima !== undefined && cuponAEditar.compraMinima !== null ? String(cuponAEditar.compraMinima) : '0');
       setFechaDesde(cuponAEditar.fechaDesde ? cuponAEditar.fechaDesde.slice(0, 10) : '');
       setFechaHasta(cuponAEditar.fechaHasta ? cuponAEditar.fechaHasta.slice(0, 10) : '');
@@ -83,8 +118,8 @@ export function ModalCupon({
         setAplica('toda');
       }
       setTituloImpreso(cuponAEditar.tituloImpreso || 'En tu siguiente compra');
-      setValidezDias(cuponAEditar.diasValidezImpreso ? String(cuponAEditar.diasValidezImpreso) : String(validezReglasDefecto));
-      setCanal(cuponAEditar.canal || 'TODOS');
+      setValidezDias(cuponAEditar.diasValidez || cuponAEditar.diasValidezImpreso ? String(cuponAEditar.diasValidez || cuponAEditar.diasValidezImpreso) : String(validezReglasDefecto));
+      setCanal(canalDeCupon(cuponAEditar.canales));
       setRequiereCuenta(Boolean(cuponAEditar.requiereCuenta));
       setMensajeError('');
     } else {
@@ -92,6 +127,9 @@ export function ModalCupon({
       setCodigoBase('');
       setDescripcion('');
       setTipo('pct');
+      setDias([]);
+      setHoraDesde('');
+      setHoraHasta('');
       setValor('');
       setMinima('0');
       setFechaDesde('');
@@ -120,8 +158,9 @@ export function ModalCupon({
       setMensajeError('Escribe una descripción.');
       return;
     }
-    const valNum = parseFloat(valor.replace(',', '.'));
-    if (isNaN(valNum) || !(valNum > 0)) {
+    const esEnvio = tipo === 'envio';
+    const valNum = esEnvio ? 0 : parseFloat(valor.replace(',', '.'));
+    if (!esEnvio && (isNaN(valNum) || !(valNum > 0))) {
       setMensajeError('Escribe el valor del descuento.');
       return;
     }
@@ -137,6 +176,10 @@ export function ModalCupon({
       setMensajeError('Elige el producto.');
       return;
     }
+    if (horaDesde && horaHasta && horaDesde >= horaHasta) {
+      setMensajeError('La hora de fin debe ser después de la hora de inicio.');
+      return;
+    }
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
       setMensajeError('La fecha de inicio no puede ser después de la final.');
       return;
@@ -147,26 +190,31 @@ export function ModalCupon({
     try {
       const prodObj = productosDisponibles.find((p) => p.nombre === producto);
 
+      const categoriaObj = (categorias || []).find((c) => c.nombre === categoria);
+      if (aplica === 'cat' && !categoriaObj) {
+        throw new Error('Esa categoría ya no existe. Elige otra.');
+      }
+      // Nombres y campos de la API (CrearCuponDto / ActualizarCuponDto)
       const payload = {
         codigoBase: codigoBase.trim().toUpperCase(),
         descripcion: descripcion.trim(),
         modo,
-        tipo: tipo === 'pct' ? 'PORCENTAJE' : 'MONTO_FIJO',
-        valor: valNum,
+        descuentoTipo: esEnvio ? 'ENVIO_GRATIS' : tipo === 'pct' ? 'PORCENTAJE' : 'MONTO',
+        descuentoValor: valNum,
         compraMinima: parseFloat(minima) || 0,
-        fechaDesde: fechaDesde || undefined,
-        fechaHasta: fechaHasta || undefined,
-        maxUsos: modo === 'COMPARTIDO' ? (parseInt(maxUsos, 10) || 5000) : undefined,
-        maxPorCliente: modo === 'COMPARTIDO' ? (parseInt(porCliente, 10) || 1) : undefined,
-        aplicaA: aplica === 'toda' ? 'TODA_LA_CARTA' : aplica === 'cat' ? 'CATEGORIA' : 'PRODUCTO',
-        categoriaNombre: aplica === 'cat' ? categoria : undefined,
+        categoriaId: aplica === 'cat' && categoriaObj ? categoriaObj.id : undefined,
         productoId: aplica === 'prod' && prodObj ? prodObj.id : undefined,
-        productoNombre: aplica === 'prod' ? producto : undefined,
-        imprimirEnComprobante: modo === 'UNICO_COMPROBANTE',
-        tituloImpreso: modo === 'UNICO_COMPROBANTE' ? tituloImpreso : undefined,
-        diasValidezImpreso: modo === 'UNICO_COMPROBANTE' ? (parseInt(validezDias, 10) || 15) : undefined,
-        canal,
+        canales: canalesDeCupon(canal),
         requiereCuenta,
+        diasValidez: modo === 'UNICO_COMPROBANTE' ? (parseInt(validezDias, 10) || 15) : undefined,
+        topeUsos: modo === 'COMPARTIDO' ? (parseInt(maxUsos, 10) || 5000) : undefined,
+        maxPorCliente: modo === 'COMPARTIDO' ? (parseInt(porCliente, 10) || 1) : undefined,
+        // Horario opcional: vacío = el cupón vale todo el tiempo
+        dias: dias.map((code) => DIAS.findIndex((x) => x[0] === code) + 1),
+        horaDesde: horaDesde || null,
+        horaHasta: horaHasta || null,
+        fechaDesde: fechaDesde || null,
+        fechaHasta: fechaHasta || null,
       };
 
       await onGuardar(payload);
@@ -419,9 +467,30 @@ export function ModalCupon({
               >
                 Monto fijo (s/)
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTipo('envio');
+                  setMensajeError('');
+                }}
+                style={{
+                  minHeight: '44px',
+                  padding: '0 12px',
+                  borderRadius: '9999px',
+                  border: '1.5px solid var(--cp-navy)',
+                  backgroundColor: tipo === 'envio' ? 'var(--cp-navy)' : 'transparent',
+                  color: tipo === 'envio' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Envío gratis
+              </button>
             </div>
           </div>
 
+          {tipo !== 'envio' && (
           <div style={{ flex: '1 1 100px' }}>
             <label htmlFor="cp-v" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
               Valor
@@ -446,6 +515,7 @@ export function ModalCupon({
               }}
             />
           </div>
+          )}
 
           <div style={{ flex: '1 1 100px' }}>
             <label htmlFor="cp-m" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
@@ -467,6 +537,46 @@ export function ModalCupon({
                 fontSize: '14px',
               }}
             />
+          </div>
+        </div>
+
+        {/* Horario opcional del cupón (vacío = todo el tiempo) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ fontWeight: 700 }}>Días (si no eliges ninguno, todos los días)</div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {DIAS.map(([codigo, etiqueta]) => {
+              const on = dias.includes(codigo);
+              return (
+                <button
+                  key={codigo}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setDias((prev) => (on ? prev.filter((d) => d !== codigo) : [...prev, codigo]))}
+                  style={{
+                    minHeight: '44px',
+                    minWidth: '52px',
+                    borderRadius: '9999px',
+                    border: '1.5px solid var(--cp-navy)',
+                    backgroundColor: on ? 'var(--cp-navy)' : 'transparent',
+                    color: on ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {etiqueta}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <label style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: 700 }}>
+              Desde las (vacío = todo el día)
+              <input type="time" value={horaDesde} onChange={(e) => setHoraDesde(e.target.value)} style={{ minHeight: '44px', borderRadius: '12px', border: '1.5px solid var(--cp-line)', padding: '0 12px' }} />
+            </label>
+            <label style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: 700 }}>
+              Hasta las (no incluye esa hora)
+              <input type="time" value={horaHasta} onChange={(e) => setHoraHasta(e.target.value)} style={{ minHeight: '44px', borderRadius: '12px', border: '1.5px solid var(--cp-line)', padding: '0 12px' }} />
+            </label>
           </div>
         </div>
 

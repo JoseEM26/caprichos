@@ -1,5 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
+import { CasillaBot, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ComboPrecioItem, ComboParteItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -16,12 +17,6 @@ const DIAS = [
   ['dom', 'Domingo', 'Dom'],
 ];
 
-const CANALES = [
-  { clave: 'todos', nombre: 'Todos los canales' },
-  { clave: 'carta', nombre: 'Solo carta web' },
-  { clave: 'local', nombre: 'Solo en el local' },
-  { clave: 'whatsapp', nombre: 'Solo WhatsApp' },
-];
 
 const CATEGORIAS_DEF = [
   'Combos',
@@ -145,6 +140,7 @@ export function ModalCombo({
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [canal, setCanal] = useState('todos');
+  const [valeBot, setValeBot] = useState(false);
 
   // Estados de control
   const [mensajeError, setMensajeError] = useState('');
@@ -210,7 +206,7 @@ export function ModalCombo({
       const fHasta = comboAEditar.fechaHasta || comboAEditar.fechaFin;
       setFechaDesde(fDesde ? fDesde.slice(0, 10) : '');
       setFechaHasta(fHasta ? fHasta.slice(0, 10) : '');
-      setCanal(comboAEditar.canales && comboAEditar.canales[0] ? comboAEditar.canales[0].toLowerCase() : 'todos');
+      { const sel = selectorDesdeCanales(comboAEditar.canales); setCanal(sel.canal); setValeBot(sel.valeBot); }
       setPaso(1);
       setMensajeError('');
       setParteAbiertaIndex(0);
@@ -231,6 +227,7 @@ export function ModalCombo({
       setFechaDesde('');
       setFechaHasta('');
       setCanal('todos');
+      setValeBot(false);
       setPaso(1);
       setMensajeError('');
       setParteAbiertaIndex(0);
@@ -470,7 +467,7 @@ export function ModalCombo({
         fechaInicio: fechaDesde || undefined,
         fechaHasta: fechaHasta || undefined,
         fechaFin: fechaHasta || undefined,
-        canales: canal === 'todos' ? ['CARTA', 'ADMIN', 'BOT'] : [canal.toUpperCase()],
+        canales: canalesDesdeSelector(canal, valeBot),
         activo: comboAEditar ? comboAEditar.activo : true,
         imagenArchivoId: fotoArchivoId,
         tamanos: tamanos.map((t) => ({
@@ -531,7 +528,7 @@ export function ModalCombo({
     horaHasta: horaHasta || null,
     fechaDesde: fechaDesde || null,
     fechaHasta: fechaHasta || null,
-    canales: canal === 'todos' ? ['CARTA', 'ADMIN', 'BOT'] : [canal.toUpperCase()],
+    canales: canalesDesdeSelector(canal, valeBot),
     activo: true,
   };
 
@@ -1614,12 +1611,13 @@ export function ModalCombo({
                     onChange={(e) => setCanal(e.target.value)}
                     style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
                   >
-                    {CANALES.map((c) => (
+                    {opcionesCanal(canal).map((c) => (
                       <option key={c.clave} value={c.clave}>
                         {c.nombre}
                       </option>
                     ))}
                   </select>
+                  <CasillaBot id="canal-combo-bot" checked={valeBot} onChange={setValeBot} bloqueada={canal === 'solo-bot'} />
                 </div>
               </div>
             </div>

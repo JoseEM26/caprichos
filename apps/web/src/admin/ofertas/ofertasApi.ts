@@ -96,10 +96,14 @@ export interface CuponItem {
   descripcion: string;
   modo: 'UNICO_COMPROBANTE' | 'COMPARTIDO';
   tipo?: 'PORCENTAJE' | 'MONTO_FIJO';
-  descuentoTipo?: 'PORCENTAJE' | 'MONTO';
+  descuentoTipo?: 'PORCENTAJE' | 'MONTO' | 'ENVIO_GRATIS';
   valor?: number;
   descuentoValor?: number;
   compraMinima?: number | null;
+  /** Horario del cupón (vacío = siempre) */
+  dias?: number[];
+  horaDesde?: string | null;
+  horaHasta?: string | null;
   fechaDesde?: string | null;
   fechaHasta?: string | null;
   maxUsos?: number | null;
