@@ -304,4 +304,107 @@ describe('ChatbotPlanificadorService (avisos por tiempo)', () => {
       expect(mockOutbox.encolar).not.toHaveBeenCalled();
     });
   });
+  describe('encuesta posventa por todos los canales (carta, bot, mozo y caja)', () => {
+    const base = (extra: Record<string, unknown> = {}) => ({
+      id: BigInt(70),
+      codigo: 'CP-E070',
+      modalidad: 'DELIVERY',
+      estado: 'ENTREGADO',
+      cliente_nombre: 'Ana',
+      cliente_telefono: '987654321',
+      entregado_en: new Date(Date.now() - 40 * 60000),
+      entregado_mesa_en: null,
+      ...extra,
+    });
+    const encuestas = () => mockPrisma.pedido.findMany.mock.calls.find((c: any[]) => c[0]?.where?.OR)?.[0];
+    const conEncuestas = (filas: unknown[]) => {
+      mockPrisma.pedido.findMany.mockImplementation(async (args: any) => (args?.where?.OR ? filas : []));
+    };
+
+    it('la consulta cubre entregado (delivery y recojo), mesa (entregado o cobro) y para llevar/recoger cobrado LISTO o ENTREGADO', async () => {
+      conEncuestas([]);
+      await planificador.ejecutarCiclo();
+
+      const where = encuestas().where;
+      expect(where.estado).toEqual({ notIn: ['ANULADO'] });
+      expect(where.cliente_telefono).toEqual({ not: null });
+      expect(where.encuestaPosventa).toBeNull();
+      expect(where.OR).toHaveLength(4);
+      expect(where.OR[0]).toEqual({ entregado_en: expect.any(Object) });
+      expect(where.OR[1]).toEqual({ modalidad: 'MESA', entregado_mesa_en: expect.any(Object) });
+      expect(where.OR[2]).toEqual({ modalidad: 'MESA', cobros: { some: expect.objectContaining({ anulado_en: null }) } });
+      expect(where.OR[3]).toEqual({
+        modalidad: { notIn: ['DELIVERY', 'MESA'] },
+        estado: { in: ['LISTO', 'ENTREGADO'] },
+        cobros: { some: expect.objectContaining({ anulado_en: null }) },
+      });
+    });
+
+    it('envía a cada canal con teléfono real: carta delivery, recojo, bot, mozo en mesa y caja para llevar', async () => {
+      conEncuestas([
+        base({ id: BigInt(71), codigo: 'CP-D071' }), // carta o bot a domicilio
+        base({ id: BigInt(72), codigo: 'CP-R072', modalidad: 'RECOGER', estado: 'ENTREGADO' }), // recojo entregado
+        base({ id: BigInt(73), codigo: 'CP-M073', modalidad: 'MESA', estado: 'LISTO', entregado_en: null, entregado_mesa_en: new Date(Date.now() - 40 * 60000) }),
+        base({ id: BigInt(74), codigo: 'CP-L074', modalidad: 'RECOGER', estado: 'LISTO', entregado_en: null }), // caja cobró sin cocina
+      ]);
+
+      const res = await planificador.ejecutarCiclo();
+
+      expect(res.avisosEncuesta).toBe(4);
+      const claves = mockOutbox.encolar.mock.calls.map((c: any[]) => c[0].clave).sort();
+      expect(claves).toEqual(['encuesta-71', 'encuesta-72', 'encuesta-73', 'encuesta-74']);
+    });
+
+    it('un solo envío por pedido: tras crear la encuesta, el siguiente ciclo ya no la vuelve a traer (encuestaPosventa null)', async () => {
+      // Simula la base: la fila creada deja de cumplir encuestaPosventa: null
+      const creadas = new Set<bigint>();
+      const fila = base({ id: BigInt(75) });
+      mockPrisma.pedido.findMany.mockImplementation(async (args: any) =>
+        args?.where?.OR && !creadas.has(fila.id) ? [fila] : [],
+      );
+      mockPrisma.encuestaPosventa.create.mockImplementation(async ({ data }: any) => {
+        creadas.add(data.pedido_id);
+        return { id: BigInt(1) };
+      });
+
+      const primero = await planificador.ejecutarCiclo();
+      const segundo = await planificador.ejecutarCiclo();
+
+      expect(primero.avisosEncuesta).toBe(1);
+      expect(segundo.avisosEncuesta).toBe(0);
+      expect(mockOutbox.encolar).toHaveBeenCalledTimes(1);
+      expect(mockOutbox.encolar.mock.calls[0][0].clave).toBe('encuesta-75');
+    });
+
+    it('sin consentimiento (BAJA) no se encola nada', async () => {
+      mockVentana24h.tieneConsentimiento.mockResolvedValue(false);
+      conEncuestas([base({ id: BigInt(76) })]);
+
+      const res = await planificador.ejecutarCiclo();
+
+      expect(res.avisosEncuesta).toBe(0);
+      expect(mockOutbox.encolar).not.toHaveBeenCalled();
+      expect(mockPrisma.encuestaPosventa.create).not.toHaveBeenCalled();
+    });
+
+    it('teléfono relleno 999999999 o vacío no se encuesta aunque la consulta lo traiga', async () => {
+      conEncuestas([base({ id: BigInt(77), cliente_telefono: '999999999' }), base({ id: BigInt(78), cliente_telefono: '  ' })]);
+
+      const res = await planificador.ejecutarCiclo();
+
+      expect(res.avisosEncuesta).toBe(0);
+      expect(mockOutbox.encolar).not.toHaveBeenCalled();
+    });
+
+    it('la encuesta se encola con botones 1/3/5 y la plantilla ENCUESTA_POSVENTA', async () => {
+      conEncuestas([base({ id: BigInt(79) })]);
+
+      await planificador.ejecutarCiclo();
+
+      const carga = mockOutbox.encolar.mock.calls[0][0].carga;
+      expect(carga.plantillaClave).toBe('ENCUESTA_POSVENTA');
+      expect(carga.variablesPlantilla).toEqual(['Ana', 'CP-E070']);
+      expect(carga.botones.map((b: any) => b.id)).toEqual(['encuesta:1', 'encuesta:3', 'encuesta:5']);
+    });
+  });
 });

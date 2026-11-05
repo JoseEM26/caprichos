@@ -1,5 +1,6 @@
 jest.mock('../../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { Ventana24hService } from '../servicios/ventana-24h.service';
+import { CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { WhatsAppMensajeriaPuerto } from '../puerto/whatsapp-mensajeria.puerto';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
@@ -100,6 +101,52 @@ describe('Ventana24hService', () => {
       undefined,
     );
     expect(mockMensajeria.enviarTexto).not.toHaveBeenCalled();
+  });
+
+  it('ENCUESTA_POSVENTA fuera de la ventana: la plantilla lleva los payloads de sus 3 botones 1/3/5', async () => {
+    mockPrisma.whatsappMensaje.findFirst.mockResolvedValue(null); // Ventana cerrada
+    mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue({ acepta: true });
+
+    await servicio.enviarMensajeNegocio('987654321', {
+      textoLibre: 'Hola Ana, gracias por tu compra',
+      plantillaClave: 'ENCUESTA_POSVENTA',
+      variablesPlantilla: ['Ana', 'CP-1'],
+      botones: [
+        { id: 'encuesta:1', titulo: '1 Malo' },
+        { id: 'encuesta:3', titulo: '3 Regular' },
+        { id: 'encuesta:5', titulo: '5 Excelente' },
+      ],
+    });
+
+    expect(mockMensajeria.enviarPlantilla).toHaveBeenCalledWith(
+      '987654321',
+      'caprichos_encuesta_posventa',
+      'es',
+      ['Ana', 'CP-1'],
+      { botonesRespuesta: ['encuesta:1', 'encuesta:3', 'encuesta:5'] },
+    );
+  });
+
+  it('plantilla sin botones en el catálogo (DELIVERY_SALIDA): no se mandan payloads aunque llegue botones', async () => {
+    mockPrisma.whatsappMensaje.findFirst.mockResolvedValue(null);
+    mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue({ acepta: true });
+
+    await servicio.enviarMensajeNegocio('987654321', {
+      textoLibre: 'x',
+      plantillaClave: 'DELIVERY_SALIDA',
+      variablesPlantilla: ['Ana', 'CP-1', '25'],
+      botones: [{ id: 'a', titulo: 'A' }],
+    });
+
+    expect(mockMensajeria.enviarPlantilla.mock.calls[0][4]).toBeUndefined();
+  });
+
+  it('botones de la encuesta en el catálogo: 3 botones, títulos ≤ 20 caracteres y los de la conversación', () => {
+    const def = CATALOGO_PLANTILLAS.ENCUESTA_POSVENTA;
+    expect(def.botones).toEqual(['1 Malo', '3 Regular', '5 Excelente']);
+    for (const titulo of def.botones!) expect(titulo.length).toBeLessThanOrEqual(20);
+    expect(def.nombre).toBe('caprichos_encuesta_posventa');
+    expect(def.categoria).toBe('UTILITY');
   });
 
   it('CODIGO_CUENTA fuera de la ventana: pasa el código también como botonCodigo', async () => {

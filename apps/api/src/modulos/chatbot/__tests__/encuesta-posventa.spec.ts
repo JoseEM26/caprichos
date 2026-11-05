@@ -58,6 +58,30 @@ const payloadBoton = (payload: string, titulo: string, from = TEL) => ({
   ],
 });
 
+// Botón de una plantilla de Meta (quick reply): type 'button'. Con payload (el que mandamos) o solo con el texto.
+const payloadBotonPlantilla = (titulo: string, payload: string | null, from = TEL) => ({
+  object: 'whatsapp_business_account',
+  entry: [
+    {
+      changes: [
+        {
+          value: {
+            contacts: [{ wa_id: from, profile: { name: 'José Ángel' } }],
+            messages: [
+              {
+                id: `wamid.${Math.random().toString(36).slice(2)}`,
+                from,
+                type: 'button',
+                button: payload === null ? { text: titulo } : { payload, text: titulo },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+});
+
 const flush = () => new Promise((r) => setTimeout(r, 10));
 
 describe('Calificación de la encuesta posventa por WhatsApp', () => {
@@ -286,6 +310,29 @@ describe('Calificación de la encuesta posventa por WhatsApp', () => {
 
     expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 1 });
     expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+  });
+
+  it('botón de plantilla con payload "encuesta:1" cuenta 1 y abre queja', async () => {
+    await recibir(payloadBotonPlantilla('1 Malo', 'encuesta:1'));
+
+    expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 1 });
+    expect(quejas).toHaveLength(1);
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+  });
+
+  it('botón de plantilla sin payload: el texto "3 Regular" cuenta 3 (sin queja)', async () => {
+    await recibir(payloadBotonPlantilla('3 Regular', null));
+
+    expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 3 });
+    expect(quejas).toHaveLength(0);
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+  });
+
+  it('botón de plantilla con payload "encuesta:5" y texto "5 Excelente" cuenta 5', async () => {
+    await recibir(payloadBotonPlantilla('5 Excelente', 'encuesta:5'));
+
+    expect(encuestas[0]).toMatchObject({ estado: 'RESPONDIDA', puntaje: 5 });
+    expect(outbox.encolar.mock.calls[0][0].clave).toBe('encuesta-1-GRACIAS');
   });
 
   it('"5 Excelente" es calificación 5: agradecimiento sin queja ni alerta a administradores', async () => {

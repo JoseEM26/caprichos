@@ -19,6 +19,8 @@ export interface OpcionesEnvio {
   tituloSeccion?: string;
   /** Código para el botón «copiar código» de una plantilla AUTHENTICATION. Solo lo usa Meta. */
   botonCodigo?: string;
+  /** Payloads de los botones de respuesta rápida de la plantilla, en orden (index 0, 1, 2). Solo plantillas con botones. */
+  botonesRespuesta?: string[];
 }
 
 export interface ResultadoEnvioWhatsApp {
