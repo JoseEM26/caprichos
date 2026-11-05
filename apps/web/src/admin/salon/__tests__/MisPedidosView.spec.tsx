@@ -153,4 +153,49 @@ describe('MisPedidosView', () => {
 
     await waitFor(() => expect(salonApi.misPedidos).toHaveBeenLastCalledWith('ayer'));
   });
+
+  describe('lista de productos recortada', () => {
+    const pedidoCon = (lineas: number) => ({
+      ...respuesta.pedidos[0],
+      id: '30',
+      codigo: 'CP-M030',
+      lineas: Array.from({ length: lineas }, (_, i) => ({
+        id: `l${i}`,
+        nombre: `Producto ${i + 1}`,
+        cantidad: 1,
+        tamano: null,
+        opciones: [],
+        nota: null,
+        precioUnit: 1,
+        subtotal: 1,
+        lista: false,
+      })),
+    });
+
+    it('con 7 productos muestra 5 y «Ver 2 más» expande y colapsa dentro de la tarjeta', async () => {
+      vi.mocked(salonApi.misPedidos).mockResolvedValue({ pedidos: [pedidoCon(7)], resumen: respuesta.resumen } as any);
+      render(<MisPedidosView />);
+      const tarjeta = (await screen.findByText('CP-M030')).closest('li')!;
+      const lista = within(tarjeta).getByRole('list', { name: 'Productos del pedido CP-M030' });
+      expect(within(lista).getAllByRole('listitem')).toHaveLength(5);
+
+      const boton = within(tarjeta).getByRole('button', { name: 'Ver 2 más' });
+      expect(boton).toHaveAttribute('aria-expanded', 'false');
+      fireEvent.click(boton);
+
+      expect(within(lista).getAllByRole('listitem')).toHaveLength(7);
+      expect(within(tarjeta).getByRole('button', { name: 'Ver menos' })).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(within(tarjeta).getByRole('button', { name: 'Ver menos' }));
+      expect(within(lista).getAllByRole('listitem')).toHaveLength(5);
+      expect(within(tarjeta).getByRole('button', { name: 'Ver 2 más' })).toBeInTheDocument();
+    });
+
+    it('con 6 productos o menos se ven todos y no aparece el botón', async () => {
+      vi.mocked(salonApi.misPedidos).mockResolvedValue({ pedidos: [pedidoCon(6)], resumen: respuesta.resumen } as any);
+      render(<MisPedidosView />);
+      const tarjeta = (await screen.findByText('CP-M030')).closest('li')!;
+      expect(within(tarjeta).getAllByRole('listitem')).toHaveLength(6);
+      expect(within(tarjeta).queryByRole('button', { name: /Ver \d+ más|Ver menos/ })).not.toBeInTheDocument();
+    });
+  });
 });

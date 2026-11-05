@@ -5,11 +5,11 @@
 .mp {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 16px 16px 32px;
+  padding: 12px 14px 28px;
   box-sizing: border-box;
   min-width: 0;
   color: var(--cp-navy);
@@ -59,27 +59,27 @@
 .mp-resumen {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .mp-stat {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
-  padding: 14px 14px 13px;
+  padding: 10px 12px;
   background: var(--cp-white);
   border: 1px solid var(--cp-line);
-  border-radius: 18px;
+  border-radius: 14px;
   box-shadow: 0 1px 2px rgba(11, 44, 62, 0.05);
 }
 
 .mp-stat-valor {
   font-family: var(--fuente-titulos);
   font-weight: 800;
-  font-size: 22px;
-  line-height: 1.15;
+  font-size: 20px;
+  line-height: 1.2;
   color: var(--cp-navy);
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
@@ -139,24 +139,27 @@
   color: var(--cp-cream);
 }
 
-/* Lista de pedidos: una columna en celular, dos desde 600 px */
+/* Lista de pedidos: una columna en celular, dos desde 600 px (tres desde 1400 px, ver abajo).
+   align-items: start: cada tarjeta mide su contenido; nunca se estira hasta la altura de su vecina. */
 .mp-lista {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  align-items: start;
+  gap: 10px;
 }
 
-/* Tarjeta: el color del borde izquierdo sale del estado (naranja por defecto = en curso) */
+/* Tarjeta: el color del borde izquierdo sale del estado (naranja por defecto = en curso).
+   Sin min-height ni flex: su alto es el de su contenido. */
 .mp-card {
   --estado: var(--cp-orange);
   min-width: 0;
   background: var(--cp-white);
   border: 1px solid var(--cp-line);
   border-left: 6px solid var(--estado);
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(11, 44, 62, 0.05), 0 6px 14px rgba(11, 44, 62, 0.04);
   transition: box-shadow 0.2s ease;
@@ -177,34 +180,37 @@
 .mp-card-cabeza {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px 10px 14px;
+  gap: 6px;
+  padding: 12px 14px 8px 14px;
   color: var(--cp-navy);
   min-width: 0;
 }
 
+/* Fila 1: código · cliente · insignias de estado. Fila 2: mesa/hora a la izquierda, total a la derecha */
 .mp-card-fila {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   min-width: 0;
 }
 
 .mp-codigo {
   font-family: var(--fuente-titulos);
   font-weight: 800;
-  font-size: 17px;
+  font-size: 15px;
+  line-height: 1.25;
   letter-spacing: 0.02em;
   overflow-wrap: anywhere;
 }
 
-/* Insignia de estado: píldora con el color que pone el TSX */
+/* Insignia de estado: píldora pequeña con el color que pone el TSX */
 .mp-estado {
-  padding: 5px 12px;
+  padding: 2px 9px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
   font-weight: 800;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -213,6 +219,7 @@
 .mp-card-sub {
   width: 100%;
   font-size: 13px;
+  line-height: 1.3;
   color: var(--cp-soft);
   overflow-wrap: anywhere;
 }
@@ -220,31 +227,32 @@
 .mp-total {
   font-family: var(--fuente-titulos);
   font-weight: 800;
-  font-size: 17px;
+  font-size: 16px;
+  line-height: 1.25;
   color: var(--cp-navy);
   white-space: nowrap;
   margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
 
-/* Lista de productos del pedido: siempre visible, sin clamp; filas compactas y separadas por línea */
+/* Lista de productos del pedido: siempre visible; cada producto en una fila (cantidad · nombre · detalle · subtotal) */
 .mp-items {
   list-style: none;
   margin: 0;
-  padding: 10px 16px 6px 14px;
+  padding: 8px 14px 6px 14px;
   border-top: 1px dashed var(--cp-line);
   display: grid;
-  gap: 8px;
+  gap: 5px;
   min-width: 0;
 }
 
 .mp-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 4px 10px;
+  gap: 0 8px;
   align-items: start;
   font-size: 14px;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--cp-navy);
   min-width: 0;
 }
@@ -255,26 +263,43 @@
   min-width: 2.2em;
 }
 
+/* Nombre y detalle en la misma línea (flex con salto): si no caben, el detalle baja a otra línea */
 .mp-item-cuerpo {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
+/* Nombre con elipsis en una línea; la insignia «Listo» no se corta */
 .mp-item-nombre {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
   font-weight: 700;
 }
 
+.mp-item-texto,
+.mp-item-det {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mp-item-listo {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 8px;
+  flex: none;
+  padding: 0 7px;
   border-radius: 999px;
   background: var(--cp-greenbg);
   color: var(--cp-green);
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -286,16 +311,19 @@
   color: var(--cp-soft);
 }
 
+/* La nota ocupa su propia línea, solo si existe */
 .mp-item-nota {
-  display: inline-flex;
+  flex: 1 1 100%;
+  display: flex;
   align-items: flex-start;
   gap: 4px;
+  min-width: 0;
 }
 
 .mp-item-icono {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   margin-top: 2px;
 }
 
@@ -305,42 +333,8 @@
   white-space: nowrap;
 }
 
-/* "Ver detalle" con chevron que gira al abrir */
-.mp-mas {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  margin-top: 2px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--cp-rust);
-}
-
-.mp-mas::after {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: translateY(-2px) rotate(45deg);
-  transition: transform 0.25s ease;
-}
-
-.mp-mas[aria-expanded='true']::after {
-  transform: translateY(2px) rotate(-135deg);
-}
-
-/* Zona de acciones extra (p. ej. voucher): botones táctiles de 44 px */
-.mp-card > :not(.mp-card-cabeza):not(.mp-detalle):not(.mp-items) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px 14px 14px;
-  min-width: 0;
-}
-
+/* Botones de la tarjeta (voucher, historial): altura táctil de 44 px en celular.
+   Va antes de «Ver detalle» y «Ver N más», que la sobrescriben (misma especificidad, gana el último). */
 .mp-card button:not(.mp-card-cabeza) {
   min-height: 44px;
   padding: 0 16px;
@@ -363,11 +357,72 @@
   outline-offset: 2px;
 }
 
+/* "Ver detalle" con chevron que gira al abrir (y «Ver N más», sin chevron): enlace de texto, no botón lleno */
+.mp-card button.mp-mas,
+.mp-card button.mp-items-mas {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cp-rust);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mp-mas::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.25s ease;
+}
+
+.mp-mas[aria-expanded='true']::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+
+/* Filas de la tarjeta fuera de la cabecera y de la lista: progreso, acciones de voucher y aviso.
+   Cada una con solo el relleno que necesita (antes un selector genérico sumaba 14-22 px a cada bloque). */
+.mp-card > .pp {
+  gap: 4px;
+  padding: 0 14px 10px 14px;
+}
+
+.mp-card > .mpv-ayuda {
+  margin: 0;
+  padding: 0 14px 10px 14px;
+}
+
+.mp-card > .mpv-medios {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 14px 10px 14px;
+  min-width: 0;
+}
+
+.mp-card .mpv-medios .mpv-ayuda {
+  margin: 0;
+}
+
+.mp-card > .mp-mas,
+.mp-card > .mp-items-mas {
+  margin-left: 10px;
+}
+
 /* Detalle expandible: aparece con una transición suave */
 .mp-detalle {
   display: grid;
-  gap: 12px;
-  padding: 14px 16px 16px 14px;
+  gap: 10px;
+  padding: 12px 14px 14px 14px;
   border-top: 1px dashed var(--cp-line);
   background: var(--cp-cream);
   animation: mp-abrir 0.25s ease both;
@@ -415,51 +470,52 @@
 /* Tablet: 600 px en adelante */
 @media (min-width: 600px) {
   .mp {
-    padding: 20px 20px 36px;
+    padding: 16px 20px 32px;
   }
 
   .mp-resumen {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: 10px;
   }
 
   .mp-stat-valor {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   .mp-lista {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 }
 
-/* PC: 900 px en adelante */
+/* PC: 900 px en adelante. Tarjetas en dos columnas; tres desde 1400 px */
 @media (min-width: 900px) {
   .mp {
-    gap: 20px;
-    padding: 28px 32px 48px;
+    gap: 16px;
+    padding: 24px 28px 40px;
   }
 
   .mp-nuevo {
     position: static;
     align-self: flex-end;
     width: auto;
-    min-width: 240px;
-    min-height: 52px;
-    padding: 0 28px;
-    font-size: 17px;
+    min-width: 220px;
+    min-height: 46px;
+    padding: 0 24px;
+    font-size: 16px;
   }
 
   .mp-stat {
-    padding: 20px 22px;
-    gap: 6px;
+    padding: 12px 16px;
+    gap: 2px;
   }
 
   .mp-stat-valor {
-    font-size: 30px;
+    font-size: 24px;
   }
 
   .mp-stat-etiq {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .mp-chips {
@@ -469,47 +525,97 @@
     padding: 0;
   }
 
+  .mp-chip {
+    min-height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .mp .mpv-buscar-caja {
+    min-height: 38px;
+    font-size: 14px;
+  }
+
   .mp-lista {
-    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .mp-card-cabeza {
-    gap: 10px;
-    padding: 20px 22px 14px 20px;
+    gap: 5px;
+    padding: 12px 16px 8px 16px;
   }
 
   .mp-items {
-    padding: 12px 22px 8px 20px;
-    gap: 10px;
+    padding: 8px 16px 6px 16px;
+    gap: 4px;
   }
 
   .mp-item {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .mp-item-det,
   .mp-item-nota {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .mp-codigo {
-    font-size: 18px;
+    font-size: 15px;
   }
 
   .mp-card-sub {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .mp-total {
-    font-size: 19px;
+    font-size: 16px;
   }
 
   .mp-detalle {
-    padding: 18px 22px 22px 20px;
+    padding: 12px 16px 14px 16px;
   }
 
-  .mp-card > :not(.mp-card-cabeza):not(.mp-detalle):not(.mp-items) {
-    padding: 0 22px 18px 20px;
+  .mp-card > .pp {
+    padding: 0 16px 10px 16px;
+  }
+
+  .mp-card > .mpv-ayuda {
+    padding: 0 16px 10px 16px;
+  }
+
+  .mp-card > .mpv-medios {
+    padding: 0 16px 10px 16px;
+  }
+
+  .mp-card > .mp-mas,
+  .mp-card > .mp-items-mas {
+    margin-left: 12px;
+  }
+
+  /* Escritorio: acciones de voucher y «Ver detalle» más bajos, con texto de 13 px */
+  .mp-card button:not(.mp-card-cabeza):not(.mp-mas):not(.mp-items-mas) {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+
+  .mp-card button.mp-mas,
+  .mp-card button.mp-items-mas {
+    min-height: 34px;
+  }
+
+  .mp-mas::after {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+/* Escritorio ancho: tres tarjetas por fila */
+@media (min-width: 1400px) {
+  .mp-lista {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

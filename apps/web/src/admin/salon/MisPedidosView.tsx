@@ -46,6 +46,10 @@ const FILTROS: Array<{ valor: FiltroEstado; etiqueta: string }> = [
 
 const ESTADOS_EN_CURSO = ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
 
+/** Con más de 6 productos se ven 5 y un «Ver N más» expande la tarjeta; con 6 o menos, todos. */
+const LINEAS_SIN_RECORTE = 6;
+const LINEAS_VISIBLES = 5;
+
 const ESTADO_VISTO: Record<string, { texto: string; bg: string; fg: string }> = {
   COLA: { texto: 'En cocina', bg: 'var(--cp-gold)', fg: 'var(--cp-navy)' },
   PREPARANDO: { texto: 'Preparando', bg: 'var(--cp-gold)', fg: 'var(--cp-navy)' },
@@ -128,7 +132,16 @@ export function MisPedidosView() {
   const [voucherPedido, setVoucherPedido] = useState<{ pedido: MiPedido; medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number } | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
   const [pestana, setPestanaState] = useState<Pestana>(pestanaGuardada);
+  const [itemsAbiertos, setItemsAbiertos] = useState<Set<string>>(() => new Set());
   const ultimaSolicitud = useRef(0);
+
+  const alternarItems = (id: string) =>
+    setItemsAbiertos((previo) => {
+      const siguiente = new Set(previo);
+      if (siguiente.has(id)) siguiente.delete(id);
+      else siguiente.add(id);
+      return siguiente;
+    });
 
   const setPestana = (p: Pestana) => {
     setPestanaState(p);
@@ -312,6 +325,9 @@ export function MisPedidosView() {
             const abierto = expandido === p.id;
             const est = ESTADO_VISTO[p.estado] ?? { texto: p.estado, bg: 'var(--cp-sand)', fg: 'var(--cp-navy)' };
             const idDetalle = `mp-detalle-${p.id}`;
+            const idItems = `mp-items-${p.id}`;
+            const recortar = p.lineas.length > LINEAS_SIN_RECORTE && !itemsAbiertos.has(p.id);
+            const lineasVisibles = recortar ? p.lineas.slice(0, LINEAS_VISIBLES) : p.lineas;
             return (
               <li key={p.id} className={faltanVoucher(p) ? 'mp-card mpv-card--falta' : 'mp-card'}>
                 <div className="mp-card-cabeza">
@@ -336,15 +352,15 @@ export function MisPedidosView() {
                 </div>
 
                 {/* Lista del pedido siempre visible: cantidad, producto, detalle, nota y subtotal */}
-                <ul className="mp-items" aria-label={`Productos del pedido ${p.codigo}`}>
-                  {p.lineas.map((l, i) => {
+                <ul className="mp-items" id={idItems} aria-label={`Productos del pedido ${p.codigo}`}>
+                  {lineasVisibles.map((l, i) => {
                     const detalle = [l.tamano, l.opciones?.join(', ')].filter(Boolean).join(' · ');
                     return (
                       <li key={l.id ?? i} className="mp-item">
                         <span className="mp-item-cant">{l.cantidad}×</span>
                         <span className="mp-item-cuerpo">
                           <span className="mp-item-nombre">
-                            <span>{l.nombre}</span>
+                            <span className="mp-item-texto">{l.nombre}</span>
                             {l.lista && <span className="mp-item-listo">✓ Listo</span>}
                           </span>
                           {detalle && <span className="mp-item-det">{detalle}</span>}
@@ -362,6 +378,17 @@ export function MisPedidosView() {
                     );
                   })}
                 </ul>
+                {p.lineas.length > LINEAS_SIN_RECORTE && (
+                  <button
+                    type="button"
+                    className="mp-items-mas"
+                    aria-expanded={!recortar}
+                    aria-controls={idItems}
+                    onClick={() => alternarItems(p.id)}
+                  >
+                    {recortar ? `Ver ${p.lineas.length - LINEAS_VISIBLES} más` : 'Ver menos'}
+                  </button>
+                )}
 
                 {!abierto && <ProgresoPedido progreso={p.progreso} modalidad={p.modalidad} variante="compacto" />}
 
