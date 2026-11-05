@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type ReactNode,
+} from 'react';
 import type { EquipoMapa, MapaImpresionDatos, ReglasMapa } from '../impresionApi';
 import { useEsMovil } from '../../configuracion/NavegacionConfiguracion';
 import {
@@ -17,6 +27,7 @@ import {
 } from './flujo';
 import { IconoPieza } from './IconosMapa';
 import { PanelDetalle, idDisparador, type DetalleAbierto } from './PanelDetalle';
+import { RanuraArea } from './RanuraArea';
 import { useMantenerPresionado } from './useMantenerPresionado';
 import './mapa-impresion.css';
 
@@ -259,6 +270,7 @@ export function LienzoMapa({
   enfocar,
   onCambiarRegla,
   onMover,
+  onReemplazar,
 }: {
   mapa: MapaImpresionDatos;
   flujo: PiezaFlujo[];
@@ -269,6 +281,7 @@ export function LienzoMapa({
   enfocar: string | null;
   onCambiarRegla: (cambio: Partial<ReglasMapa>, clave: string) => void;
   onMover: (equipoId: string, areaId: string | null) => void;
+  onReemplazar: (viejoId: string, nuevoId: string) => void;
 }) {
   const vertical = useEsMovil();
   const raiz = useRef<HTMLDivElement>(null);
@@ -430,6 +443,18 @@ export function LienzoMapa({
         />,
       );
     }
+    if (p.clave === 'COMANDA_AREA') {
+      return celda(
+        <Interruptor
+          id="mapa-impresion-comanda-area"
+          titulo="Comanda por área"
+          ayuda="Una hoja por área para su cocina"
+          activo={r.comandaAreaActivo}
+          deshabilitado={bloqueado}
+          onCambiar={(v) => onCambiarRegla({ comandaAreaActivo: v }, 'reglas')}
+        />,
+      );
+    }
     return celda(
       <Interruptor
         id="mapa-impresion-comanda"
@@ -442,50 +467,71 @@ export function LienzoMapa({
     );
   };
 
+  const renderEquipo = (eq: EquipoMapa) => (
+    <EquipoNodo
+      key={eq.deviceKeyId}
+      eq={eq}
+      cola={cola(eq.deviceKeyId)}
+      areas={mapa.areas}
+      puedeEditar={puedeEditar}
+      ocupado={ocupado === eq.deviceKeyId}
+      enfocar={enfocar === eq.deviceKeyId}
+      onMover={onMover}
+      onAbrir={() => abrirEquipo(eq.deviceKeyId)}
+    />
+  );
+
+  /** Arrastrar un equipo sobre una ranura lo asigna a esa área (o a Caja). */
+  const arrastreDe = (clave: string, areaId: string | null) => ({
+    onDragOver: (e: DragEvent<HTMLElement>) => {
+      if (!puedeEditar) return;
+      e.preventDefault();
+      setSobre(clave);
+    },
+    onDragLeave: () => setSobre((s) => (s === clave ? null : s)),
+    onDrop: (e: DragEvent<HTMLElement>) => {
+      e.preventDefault();
+      setSobre(null);
+      const id = e.dataTransfer.getData('text/plain');
+      if (id && puedeEditar) onMover(id, areaId);
+    },
+  });
+
   const destinosEl = (estilo?: CSSProperties) => (
     <div className="mapa-destinos" style={estilo}>
       {slots.map((slot) => {
         const clave = slot.id ?? CAJA;
-        const equipos = mapa.equipos.filter((e) => (e.areaId ?? null) === slot.id);
+        if (slot.id !== null) {
+          const area = mapa.areas.find((a) => a.id === slot.id);
+          if (!area) return null;
+          return (
+            <RanuraArea
+              key={clave}
+              area={area}
+              mapa={mapa}
+              puedeEditar={puedeEditar}
+              sobre={sobre === clave}
+              refNodo={ref(`slot-${clave}`)}
+              arrastre={arrastreDe(clave, area.id)}
+              onMover={onMover}
+              onReemplazar={onReemplazar}
+              renderEquipo={renderEquipo}
+            />
+          );
+        }
+        const equipos = mapa.equipos.filter((e) => e.areaId === null);
         return (
           <section
             key={clave}
             ref={ref(`slot-${clave}`)}
             aria-label={`Ranura ${slot.nombre}`}
             className={`mapa-ranura ${sobre === clave ? 'mapa-ranura--sobre' : ''}`}
-            onDragOver={(e) => {
-              if (!puedeEditar) return;
-              e.preventDefault();
-              setSobre(clave);
-            }}
-            onDragLeave={() => setSobre((s) => (s === clave ? null : s))}
-            onDrop={(e) => {
-              e.preventDefault();
-              setSobre(null);
-              const id = e.dataTransfer.getData('text/plain');
-              if (id && puedeEditar) onMover(id, slot.id);
-            }}
+            {...arrastreDe(clave, null)}
           >
             <h4 className="mapa-ranura-titulo">{slot.nombre}</h4>
-            {equipos.map((eq) => (
-              <EquipoNodo
-                key={eq.deviceKeyId}
-                eq={eq}
-                cola={cola(eq.deviceKeyId)}
-                areas={mapa.areas}
-                puedeEditar={puedeEditar}
-                ocupado={ocupado === eq.deviceKeyId}
-                enfocar={enfocar === eq.deviceKeyId}
-                onMover={onMover}
-                onAbrir={() => abrirEquipo(eq.deviceKeyId)}
-              />
-            ))}
-            {equipos.length === 0 && (
-              <p className="mapa-ranura-vacia">
-                {slot.id === null ? 'Ningún equipo en Caja.' : `Sin equipo: lo de ${slot.nombre} sale en Caja.`}
-              </p>
-            )}
-            {slot.id === null && <p className="mapa-ranura-nota">Los tickets de pago y las comandas de salón siempre salen aquí.</p>}
+            {equipos.map((eq) => renderEquipo(eq))}
+            {equipos.length === 0 && <p className="mapa-ranura-vacia">Ningún equipo en Caja.</p>}
+            <p className="mapa-ranura-nota">Los tickets de pago y las comandas de salón siempre salen aquí.</p>
           </section>
         );
       })}

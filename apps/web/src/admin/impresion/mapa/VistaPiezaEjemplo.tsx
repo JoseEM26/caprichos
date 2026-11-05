@@ -59,6 +59,18 @@ const BEBIDA: EtiquetaBebidaDatos = {
   who: 'CLIENTE EJEMPLO',
   hora: '12:40',
 };
+const COMANDA_AREA: TicketComandaSalonDatos = {
+  tipo: 'TICKET_COMANDA_AREA',
+  codigo: 'A-1024',
+  mesa: 'Mesa 4',
+  area: 'SALADOS',
+  cliente: 'CLIENTE EJEMPLO',
+  canal: 'MESA',
+  hora: '12:40',
+  fecha: FECHA,
+  lineas: [{ cantidad: 1, nombre: 'Sándwich de pollo', tamano: null, opciones: ['Sin cebolla'], nota: null }],
+  nota: null,
+};
 const COMANDA: TicketComandaSalonDatos = {
   codigo: 'A-1024',
   mesa: 'Mesa 4',
@@ -85,8 +97,8 @@ const PAGO: TicketPagoDatos = {
 };
 
 /** Comanda de salón en texto monoespaciado (58 mm = 32 columnas), como la imprime la ticketera. */
-function ComandaEjemplo() {
-  const lineas = useMemo(() => lineasTicketComandaSalon(COMANDA, 32), []);
+function ComandaEjemplo({ datos }: { datos: TicketComandaSalonDatos }) {
+  const lineas = useMemo(() => lineasTicketComandaSalon(datos, 32), [datos]);
   return (
     <pre
       data-testid="comanda-ejemplo"
@@ -126,7 +138,8 @@ export function VistaPieza({ clave }: { clave: ClavePieza }) {
       {clave === 'BEBIDA' && <EtiquetaBebida datos={BEBIDA} />}
       {clave === 'RESUMEN' && <EtiquetaGeneral datos={GENERAL} />}
       {clave === 'AREA' && <EtiquetaArea datos={AREA} />}
-      {clave === 'COMANDA' && <ComandaEjemplo />}
+      {clave === 'COMANDA' && <ComandaEjemplo datos={COMANDA} />}
+      {clave === 'COMANDA_AREA' && <ComandaEjemplo datos={COMANDA_AREA} />}
       {clave === 'PAGO' && <TicketPagoPrevia datos={PAGO} sinCabecera />}
     </figure>
   );

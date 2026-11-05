@@ -36,9 +36,10 @@ const estadoConectado = {
 };
 
 const mapaMock = {
-  areas: [{ id: '1', nombre: 'Bebidas' }],
-  equipos: [{ deviceKeyId: '10', nombre: 'PC Caja', areaId: null, roles: [{ rol: 'ETIQUETERA', estado: 'lista' }], ultimoLatido: null, conectado: true }],
-  reglas: { generalModalidades: ['LLEVAR'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true },
+  duplicados: [],
+  areas: [{ id: '1', nombre: 'Bebidas', equiposPorRol: { ETIQUETERA: null, TICKETERA: null } }],
+  equipos: [{ deviceKeyId: '10', nombre: 'PC Caja', areaId: null, maquinas: ['ETIQUETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }], ultimoLatido: null, conectado: true }],
+  reglas: { generalModalidades: ['LLEVAR'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true, comandaAreaActivo: false },
   ruteo: [],
   colaPendientePorEquipo: [{ deviceKeyId: '10', pendientes: 0 }],
 };

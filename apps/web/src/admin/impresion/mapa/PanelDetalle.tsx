@@ -18,6 +18,7 @@ function reglaDe(p: PiezaFlujo, mapa: MapaImpresionDatos): string {
   }
   if (p.clave === 'AREA') return p.reglaActiva ? 'Regla encendida: un sticker por cada área del pedido.' : 'Regla apagada: actívala cuando lo confirmes.';
   if (p.clave === 'COMANDA') return p.reglaActiva ? 'Regla encendida: solo en pedidos de salón (mesa o local).' : 'Regla apagada.';
+  if (p.clave === 'COMANDA_AREA') return p.reglaActiva ? 'Regla encendida: una hoja por cada área del pedido, en cualquier modalidad.' : 'Regla apagada: no sale en ningún pedido.';
   return 'Regla fija: siempre sale en Caja.';
 }
 

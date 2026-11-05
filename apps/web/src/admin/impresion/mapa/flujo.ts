@@ -6,13 +6,14 @@ export interface Escenario {
   modalidad: Modalidad;
   conBebidas: boolean;
 }
-export type ClavePieza = 'BEBIDA' | 'RESUMEN' | 'AREA' | 'COMANDA' | 'PAGO';
+export type ClavePieza = 'BEBIDA' | 'RESUMEN' | 'AREA' | 'COMANDA' | 'COMANDA_AREA' | 'PAGO';
 
 export const PIEZAS: Record<ClavePieza, { titulo: string; que: string; paraQue: string }> = {
   BEBIDA: { titulo: 'Sticker de bebida', que: 'Sale uno por cada bebida', paraQue: 'Un vaso marcado para cada bebida, para no confundirlas en la barra.' },
   RESUMEN: { titulo: 'Sticker de resumen', que: 'Sale uno con el total del pedido', paraQue: 'Muestra el monto y la modalidad para cobrar y entregar.' },
   AREA: { titulo: 'Sticker por área', que: 'Sale uno por cada área del pedido', paraQue: 'Para que cada área (salados, postres…) sepa qué le toca preparar.' },
   COMANDA: { titulo: 'Comanda de salón', que: 'Hoja con cada línea para la cocina', paraQue: 'Lo que la cocina y el mozo leen en mesa o local.' },
+  COMANDA_AREA: { titulo: 'Comanda por área', que: 'Una hoja por área para su cocina', paraQue: 'Cada cocina recibe solo las líneas de su área, en su ticketera (o en la de Caja si no tiene).' },
   PAGO: { titulo: 'Ticket de pago', que: 'Lo que se entrega al cobrar', paraQue: 'El comprobante de la venta. Siempre sale en Caja.' },
 };
 
@@ -22,6 +23,7 @@ export const COLOR_PIEZA: Record<ClavePieza, string> = {
   RESUMEN: '#e07a2d',
   AREA: '#3d6fb6',
   COMANDA: '#8a4fb0',
+  COMANDA_AREA: '#b5537a',
   PAGO: '#0b2c3e',
 };
 export const GRIS_APAGADO = '#9a9a9a';
@@ -85,12 +87,44 @@ export function estadoRol(e: EquipoMapa, rol: RolEquipoMapa): EstadoRolMapa | 'n
   return e.roles.find((r) => r.rol === rol)?.estado ?? 'no_configurada';
 }
 
-/** Luz del equipo: verde lista; ámbar pide atención (sin papel, sin configurar); rojo no imprime. */
+/** ¿El equipo declara esa máquina? (una etiquetera o ticketera que no tiene no cuenta como problema). */
+export function tieneMaquina(e: EquipoMapa, rol: RolEquipoMapa): boolean {
+  return e.maquinas.includes(rol);
+}
+
+/**
+ * Qué hay en la sub-ranura de una máquina de un área: el equipo del área que la declara, un equipo del área
+ * que no la tiene, o ningún equipo (sale en Caja).
+ */
+export type SubRanura =
+  | { tipo: 'equipo'; equipo: EquipoMapa; estado: EstadoRolMapa }
+  | { tipo: 'sin_maquina'; equipo: EquipoMapa }
+  | { tipo: 'sin_equipo' };
+
+export function subRanura(mapa: MapaImpresionDatos, areaId: string, rol: RolEquipoMapa): SubRanura {
+  const delArea = mapa.equipos.filter((e) => e.areaId === areaId);
+  const con = delArea.find((e) => tieneMaquina(e, rol));
+  if (con) return { tipo: 'equipo', equipo: con, estado: estadoRol(con, rol) as EstadoRolMapa };
+  if (delArea.length > 0) return { tipo: 'sin_maquina', equipo: delArea[0] };
+  return { tipo: 'sin_equipo' };
+}
+
+/** Luz de una sola máquina: verde lista, ámbar sin papel, roja cualquier otro problema o sin conexión. */
+export function luzDeMaquina(e: EquipoMapa, rol: RolEquipoMapa): NivelLuz {
+  if (!e.conectado) return 'rojo';
+  const estado = estadoRol(e, rol);
+  if (estado === 'lista') return 'verde';
+  if (estado === 'sin_papel') return 'ambar';
+  return 'rojo';
+}
+
+/** Luz del equipo: verde lista; ámbar pide atención (sin papel, sin máquinas); rojo no imprime. Solo cuentan sus máquinas. */
 export function luzDeEquipo(e: EquipoMapa): NivelLuz {
   if (!e.conectado) return 'rojo';
-  const estados = e.roles.map((r) => r.estado);
+  const estados = e.roles.filter((r) => tieneMaquina(e, r.rol)).map((r) => r.estado);
+  if (estados.length === 0) return 'ambar';
   if (estados.some((s) => s === 'desconectada' || s === 'error' || s === 'sin_permiso' || s === 'sin_programa')) return 'rojo';
-  if (estados.some((s) => s === 'sin_papel' || s === 'no_configurada')) return 'ambar';
+  if (estados.some((s) => s === 'sin_papel')) return 'ambar';
   return 'verde';
 }
 
@@ -186,6 +220,15 @@ export function derivarFlujo(mapa: MapaImpresionDatos, esc: Escenario): PiezaFlu
     salidas: salidas('ETIQUETA_AREA', 'ETIQUETERA'),
   };
 
+  const comandaArea: PiezaFlujo = {
+    clave: 'COMANDA_AREA',
+    ...PIEZAS.COMANDA_AREA,
+    reglaActiva: r.comandaAreaActivo,
+    sale: r.comandaAreaActivo,
+    motivo: r.comandaAreaActivo ? 'Una hoja por cada área del pedido' : 'Apagada en las reglas',
+    salidas: salidas('TICKET_COMANDA_AREA', 'TICKETERA'),
+  };
+
   const comanda: PiezaFlujo = {
     clave: 'COMANDA',
     ...PIEZAS.COMANDA,
@@ -208,5 +251,5 @@ export function derivarFlujo(mapa: MapaImpresionDatos, esc: Escenario): PiezaFlu
     salidas: salidas('TICKET_PAGO', 'TICKETERA'),
   };
 
-  return [bebida, resumen, area, comanda, pago];
+  return [bebida, resumen, area, comanda, comandaArea, pago];
 }

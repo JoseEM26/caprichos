@@ -669,6 +669,144 @@
   max-width: 100%;
 }
 
+/* Ranura de área: una sub-ranura por máquina (etiquetera y ticketera) */
+.mapa-maquina {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px dashed var(--cp-line);
+  min-width: 0;
+}
+
+.mapa-maquina-titulo {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--cp-navy);
+}
+
+.mapa-maquina-linea {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.mapa-maquina-linea--aviso {
+  color: var(--cp-soft);
+}
+
+.mapa-asignar,
+.mapa-vincular,
+.mapa-asignar-no,
+.mapa-asignar-ok {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.mapa-asignar {
+  border: 0;
+  background: var(--cp-navy);
+  color: var(--cp-cream);
+  align-self: flex-start;
+}
+
+.mapa-vincular {
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  align-self: flex-start;
+}
+
+.mapa-asignar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--cp-cream);
+}
+
+.mapa-asignar-etiqueta {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mapa-asignar-select {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  padding: 0 10px;
+  font-size: 14px;
+  max-width: 100%;
+}
+
+.mapa-asignar-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mapa-asignar--secundario {
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+}
+
+.mapa-regla-unica,
+.mapa-duplicados {
+  margin: 0;
+  font-size: 13px;
+}
+
+.mapa-duplicados {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cp-gold);
+  background: var(--cp-cream);
+}
+
+.mapa-duplicados-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mapa-asignar-ok {
+  border: 0;
+  background: var(--cp-navy);
+  color: var(--cp-cream);
+}
+
+.mapa-asignar-ok:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mapa-asignar-no {
+  border: 1.5px solid var(--cp-line);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+}
+
 /* Hoja de detalle: en escritorio va encima del mapa; en celular, abajo. No bloquea nada. */
 .mapa-detalle {
   display: flex;

@@ -12,6 +12,7 @@ const EJEMPLO: Record<ClavePieza, [string, string]> = {
   RESUMEN: ['TOTAL S/ 38.50', 'Para llevar'],
   AREA: ['SALADOS', '1 × Sándwich de pollo'],
   COMANDA: ['COMANDA · Mesa 4', '2 × Café latte'],
+  COMANDA_AREA: ['COMANDA · SALADOS', '1 × Sándwich de pollo'],
   PAGO: ['TICKET DE PAGO', 'Total S/ 38.50'],
 };
 

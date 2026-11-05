@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import * as sesionModulo from '../../../../comun/sesion';
 import { impresionApi, type MapaImpresionDatos } from '../../impresionApi';
 import { ModuloMapaImpresion } from '../ModuloMapaImpresion';
+import { ErrorApi } from '../../../../comun/api';
 
 vi.mock('../../../../comun/socket', () => ({ useEventos: () => undefined }));
 
@@ -21,15 +22,16 @@ if (typeof window.PointerEvent === 'undefined') {
 
 function mapa(over: Partial<MapaImpresionDatos> = {}): MapaImpresionDatos {
   return {
+    duplicados: [],
     areas: [
-      { id: '1', nombre: 'Bebidas' },
-      { id: '2', nombre: 'Salados' },
+      { id: '1', nombre: 'Bebidas', equiposPorRol: { ETIQUETERA: '11', TICKETERA: null } },
+      { id: '2', nombre: 'Salados', equiposPorRol: { ETIQUETERA: null, TICKETERA: null } },
     ],
     equipos: [
-      { deviceKeyId: '10', nombre: 'PC Caja', areaId: null, roles: [{ rol: 'ETIQUETERA', estado: 'lista' }, { rol: 'TICKETERA', estado: 'lista' }], ultimoLatido: null, conectado: true },
-      { deviceKeyId: '11', nombre: 'Etiquetera bar', areaId: '1', roles: [{ rol: 'ETIQUETERA', estado: 'sin_papel' }], ultimoLatido: null, conectado: true },
+      { deviceKeyId: '10', nombre: 'PC Caja', areaId: null, maquinas: ['ETIQUETERA', 'TICKETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }, { rol: 'TICKETERA', estado: 'lista' }], ultimoLatido: null, conectado: true },
+      { deviceKeyId: '11', nombre: 'Etiquetera bar', areaId: '1', maquinas: ['ETIQUETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'sin_papel' }, { rol: 'TICKETERA', estado: 'no_configurada' }], ultimoLatido: null, conectado: true },
     ],
-    reglas: { generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true },
+    reglas: { generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true, comandaAreaActivo: false },
     ruteo: [
       { tipo: 'ETIQUETA_GENERAL', areaId: null, destinoAreaId: null, destinoEquipoId: '10', destinoNombre: 'PC Caja', activo: true },
       { tipo: 'ETIQUETA_BEBIDA', areaId: '1', destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Etiquetera bar', activo: true },
@@ -287,5 +289,89 @@ describe('Mapa de impresión: leyenda, detalle y presión larga', () => {
     const panel = await screen.findByRole('dialog', { name: 'Detalle: Sticker de resumen' });
     expect(within(panel).getByRole('img', { name: /Vista previa de la etiqueta general/ })).toBeInTheDocument();
     expect(within(panel).getByText(/Sale en: Para llevar · Delivery/)).toBeInTheDocument();
+  });
+
+  it('cada área tiene dos sub-ranuras: la etiquetera con su equipo, y la ticketera sin equipo sale en Caja', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    montar({ editar: true });
+    const bebidas = await screen.findByRole('region', { name: 'Ranura Bebidas' });
+    const etiq = within(bebidas).getByText('Etiquetera de stickers').closest('[data-maquina]') as HTMLElement;
+    expect(within(etiq).getByText('Etiquetera bar · sin papel')).toBeInTheDocument();
+    const tick = within(bebidas).getByText('Ticketera de tickets').closest('[data-maquina]') as HTMLElement;
+    expect(within(tick).getByText('Este equipo no tiene ticketera: sale en Caja.')).toBeInTheDocument();
+    const salados = screen.getByRole('region', { name: 'Ranura Salados' });
+    expect(within(salados).getAllByText('Sin impresora propia: sale en la de Caja')).toHaveLength(2);
+    expect(within(salados).getAllByRole('button', { name: '+ Asignar equipo' })).toHaveLength(2);
+    const enlaces = within(salados).getAllByRole('link', { name: 'Vincular un equipo nuevo' });
+    expect(enlaces[0].getAttribute('href')).toContain('seccion=equipos');
+  });
+
+  it('+ Asignar equipo abre el selector con los equipos vinculados y envía {areaId} al confirmar', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    const asignar = vi.spyOn(impresionApi, 'asignarAreaEquipo').mockResolvedValue({ ok: true, areaId: '2', avisos: [] });
+    montar({ editar: true });
+    const salados = await screen.findByRole('region', { name: 'Ranura Salados' });
+    fireEvent.click(within(salados).getAllByRole('button', { name: '+ Asignar equipo' })[0]);
+    const select = within(salados).getByRole('combobox', { name: /Equipo que atiende la etiquetera de Salados/ });
+    expect(within(select).getByText(/PC Caja/)).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: '10' } });
+    fireEvent.click(within(salados).getByRole('button', { name: 'Asignar a Salados' }));
+    await waitFor(() => expect(asignar).toHaveBeenCalledWith('10', '2'));
+  });
+
+  it('si el área ya tiene equipo para esa máquina, confirma el reemplazo y envía reemplazar:true', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    const asignar = vi.spyOn(impresionApi, 'asignarAreaEquipo')
+      .mockRejectedValueOnce(new ErrorApi('AREA_OCUPADA', 'ocupada', 409, { ocupadoPor: { deviceKeyId: '11', nombre: 'Etiquetera bar' } }))
+      .mockResolvedValueOnce({ ok: true, areaId: '1', avisos: [], reemplazados: ['11'] } as any);
+    montar({ editar: true });
+    const caja = await equipo('10');
+    fireEvent.change(within(caja).getByRole('combobox'), { target: { value: '1' } });
+    expect(await screen.findByText('Bebidas ya la atiende «Etiquetera bar». ¿Reemplazarla por «PC Caja»? «Etiquetera bar» dejará de imprimir.')).toBeInTheDocument();
+    expect(asignar).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, reemplazar' }));
+    await waitFor(() => expect(asignar).toHaveBeenLastCalledWith('10', '1', true));
+  });
+
+  it('«Reemplazar este equipo» en una sub-ranura elige el nuevo, confirma y llama al atajo de reemplazo', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    const reemplazar = vi.spyOn(impresionApi, 'reemplazarEquipo').mockResolvedValue({ ok: true, reemplazados: ['11'] });
+    montar({ editar: true });
+    const bebidas = await screen.findByRole('region', { name: 'Ranura Bebidas' });
+    fireEvent.click(within(bebidas).getByRole('button', { name: 'Reemplazar este equipo' }));
+    fireEvent.change(within(bebidas).getByRole('combobox', { name: /ocupará el lugar de «Etiquetera bar»/ }), { target: { value: '10' } });
+    fireEvent.click(within(bebidas).getByRole('button', { name: 'Reemplazar' }));
+    expect(await screen.findByText('Bebidas ya la atiende «Etiquetera bar». ¿Reemplazarla por «PC Caja»? «Etiquetera bar» dejará de imprimir.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, reemplazar' }));
+    await waitFor(() => expect(reemplazar).toHaveBeenCalledWith('11', '10'));
+  });
+
+  it('avisa de equipos duplicados y «Quedarme con este» desactiva el otro, con confirmación', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa({
+      duplicados: [{ areaId: '1', nombre: 'Bebidas', equipos: [{ deviceKeyId: '11', nombre: 'Etiquetera bar' }, { deviceKeyId: '12', nombre: 'Barra 2' }] }],
+    }));
+    const quedarse = vi.spyOn(impresionApi, 'quedarseCon').mockResolvedValue({ ok: true, desactivados: ['12'] });
+    montar({ editar: true });
+    expect(await screen.findByText('Hay 2 equipos para esta área: deja solo uno.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Quedarme con este equipo: Etiquetera bar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, dejar solo este' }));
+    await waitFor(() => expect(quedarse).toHaveBeenCalledWith('11'));
+  });
+
+  it('la pieza «Comanda por área» viene apagada y su interruptor guarda comandaAreaActivo', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    const guardar = vi.spyOn(impresionApi, 'guardarReglasImpresion').mockResolvedValue({ ok: true, reglas: { ...mapa().reglas, comandaAreaActivo: true } });
+    montar({ editar: true });
+    const interruptor = await screen.findByRole('switch', { name: 'Comanda por área' });
+    expect(interruptor).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getAllByText('Una hoja por área para su cocina').length).toBeGreaterThan(0);
+    fireEvent.click(interruptor);
+    await waitFor(() => expect(guardar).toHaveBeenCalledWith({ comandaAreaActivo: true }));
+  });
+
+  it('el mapa recuerda la regla de un solo equipo por área y en Caja', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    montar({ editar: true });
+    expect(await screen.findByText('Un solo equipo por área y tipo de máquina, y uno en Caja.')).toBeInTheDocument();
   });
 });
