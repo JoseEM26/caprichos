@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { TicketPagoDatos } from '@caprichos/compartido';
-import { bloqueQrEscPos, generarTicketEscPos } from '../generadorTicket';
+import { bloqueQrEscPos, generarTicketEscPos, generarComandaSalonEscPos } from '../generadorTicket';
 
 const CADENA = '20600000001|03|B002|1|1.80|11.80|2026-11-02|1|00000000|';
 const GS_K = Buffer.from([0x1d, 0x28, 0x6b]);
@@ -74,5 +74,20 @@ describe('generarTicketEscPos con cadena QR', () => {
     const t = generarTicketEscPos(base, 48);
     expect(t.includes(GS_K)).toBe(false);
     expect(t.toString('latin1').endsWith('\x1dV\x42\x00')).toBe(true);
+  });
+});
+
+describe('generarComandaSalonEscPos', () => {
+  it('imprime la comanda en texto, sin QR, y corta el papel al final', () => {
+    const b = generarComandaSalonEscPos({
+      codigo: 'CP-7', mesa: 'Mesa 2', cliente: 'Luis', canal: 'Mozo', fecha: '05/11/2026', hora: '12:30',
+      lineas: [{ cantidad: 2, nombre: 'Croissant', opciones: [], nota: 'Sin mantequilla' }],
+    }, 32);
+    const texto = b.toString('latin1');
+    expect(texto).toContain('Pedido CP-7');
+    expect(texto).toContain('2 x Croissant');
+    expect(texto).toContain('Sin mantequilla');
+    expect(b.includes(GS_K)).toBe(false);
+    expect(b.subarray(b.length - 4)).toEqual(Buffer.from([0x1d, 0x56, 0x42, 0x00]));
   });
 });
