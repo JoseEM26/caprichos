@@ -57,3 +57,28 @@ export function CasillaBot({ id, checked, onChange, bloqueada }: CasillaBotProps
     </label>
   );
 }
+
+interface SelectorVisibleCartaProps {
+  id: string;
+  /** true = la carta la muestra como «No disponible»; false = se oculta. */
+  visibleCarta: boolean;
+  onChange: (visibleCarta: boolean) => void;
+}
+
+/** Solo aplica mientras la oferta está desactivada. Se guarda en visible_carta. */
+export function SelectorVisibleCarta({ id, visibleCarta, onChange }: SelectorVisibleCartaProps) {
+  const opcion = { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', fontWeight: 600 } as const;
+  return (
+    <fieldset style={{ border: 0, padding: 0, margin: '8px 0 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <legend style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>Si está desactivada:</legend>
+      <label htmlFor={`${id}-ocultar`} style={opcion}>
+        <input id={`${id}-ocultar`} type="radio" name={id} checked={!visibleCarta} onChange={() => onChange(false)} />
+        Ocultar de la carta
+      </label>
+      <label htmlFor={`${id}-no-disponible`} style={opcion}>
+        <input id={`${id}-no-disponible`} type="radio" name={id} checked={visibleCarta} onChange={() => onChange(true)} />
+        Mostrar como No disponible
+      </label>
+    </fieldset>
+  );
+}
