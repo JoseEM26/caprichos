@@ -24,8 +24,9 @@ const botonInstalar: CSSProperties = {
 };
 
 /**
- * Aviso «Instalar app». Por defecto es una barra discreta con cierre que, una vez cerrada, no vuelve en ese dispositivo.
- * Con `compacto` es solo un botón que no se descarta (panel del local): aparece mientras la app no esté instalada.
+ * Aviso «Instalar app». Por defecto es una barra discreta (carta) con cierre que solo dura la sesión de navegación:
+ * en la siguiente visita vuelve. Con `compacto` es solo un botón que no se descarta (panel del local).
+ * Nunca aparece si la app ya está instalada.
  */
 export function BannerInstalarApp({ compacto = false }: { compacto?: boolean }) {
   const [, actualizar] = useReducer((n: number) => n + 1, 0);
@@ -91,7 +92,10 @@ export function BannerInstalarApp({ compacto = false }: { compacto?: boolean }) 
       )}
       <button
         type="button"
-        onClick={descartarInstalar}
+        onClick={() => {
+          descartarInstalar();
+          actualizar(); // se oculta ya, sin esperar a la suscripción
+        }}
         aria-label="Cerrar aviso de instalación"
         style={{ width: 44, height: 44, padding: 0, border: 0, background: 'transparent', color: 'var(--cp-soft)', fontSize: 24, lineHeight: 1 }}
       >

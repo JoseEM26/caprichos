@@ -27,7 +27,7 @@ function dispararInstalable(outcome: 'accepted' | 'dismissed' = 'accepted') {
 
 describe('instalar (PWA)', () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    window.sessionStorage.clear();
     ponerUserAgent(UA_ESCRITORIO);
     vi.restoreAllMocks();
     // jsdom no trae matchMedia: sin modo standalone por defecto
@@ -70,19 +70,25 @@ describe('instalar (PWA)', () => {
     expect(llamadas).toHaveLength(1);
   });
 
-  it('el descarte queda guardado en localStorage y oculta el aviso', async () => {
+  it('el descarte queda en sessionStorage: oculta el aviso en esta sesión y no en la siguiente', async () => {
     const m = await cargar();
     m.iniciarCapturaInstalar();
     dispararInstalable();
     expect(m.estaDescartado()).toBe(false);
 
     m.descartarInstalar();
-    expect(window.localStorage.getItem(CLAVE)).toBe('1');
+    expect(window.sessionStorage.getItem(CLAVE)).toBe('1');
+    expect(window.localStorage.getItem(CLAVE)).toBeNull();
     expect(m.estaDescartado()).toBe(true);
 
-    // otra carga de la app en el mismo dispositivo sigue descartado
+    // otra carga de la app en la misma sesión de navegación sigue descartado
     const otro = await cargar();
     expect(otro.estaDescartado()).toBe(true);
+
+    // sesión nueva (pestaña o navegador cerrado): vuelve a salir
+    window.sessionStorage.clear();
+    const nueva = await cargar();
+    expect(nueva.estaDescartado()).toBe(false);
   });
 
   it('en modo standalone (ya instalada) no ofrece nada', async () => {
@@ -113,7 +119,7 @@ describe('instalar (PWA)', () => {
     await expect(m.instalar()).resolves.toBe('no-disponible');
   });
 
-  it('si localStorage lanza, no rompe: el descarte no se persiste y no hay error', async () => {
+  it('si sessionStorage lanza, no rompe: el descarte no se persiste y no hay error', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('denegado');
     });

@@ -30,6 +30,7 @@ async function cargarBanner() {
 
 describe('BannerInstalarApp', () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     window.localStorage.clear();
     ponerUserAgent(UA_ESCRITORIO);
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia;
@@ -55,22 +56,33 @@ describe('BannerInstalarApp', () => {
     expect(evento.prompt).toHaveBeenCalledTimes(1);
   });
 
-  it('al cerrarlo desaparece y no vuelve en ese dispositivo', async () => {
+  it('la × lo oculta solo en esta sesión y reaparece con una sesión nueva', async () => {
     const { BannerInstalarApp } = await cargarBanner();
     const { unmount } = render(<BannerInstalarApp />);
     dispararInstalable();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar aviso de instalación' }));
     expect(screen.queryByRole('region')).toBeNull();
-    expect(window.localStorage.getItem(CLAVE)).toBe('1');
+    expect(window.sessionStorage.getItem(CLAVE)).toBe('1');
+    expect(window.localStorage.getItem(CLAVE)).toBeNull();
 
+    // misma sesión de navegación: sigue oculto
     unmount();
-    render(<BannerInstalarApp />);
+    const { unmount: otraCarga } = render(<BannerInstalarApp />);
+    dispararInstalable();
     expect(screen.queryByRole('region')).toBeNull();
+    otraCarga();
+
+    // sesión nueva (pestaña cerrada): vuelve a salir
+    window.sessionStorage.clear();
+    const { BannerInstalarApp: Nueva } = await cargarBanner();
+    render(<Nueva />);
+    dispararInstalable();
+    expect(screen.getByRole('region', { name: 'Instalar Caprichos en tu celular' })).toBeDefined();
   });
 
-  it('no aparece si ya se cerró antes en este dispositivo', async () => {
-    window.localStorage.setItem(CLAVE, '1');
+  it('no aparece si ya se cerró en esta sesión de navegación', async () => {
+    window.sessionStorage.setItem(CLAVE, '1');
     const { BannerInstalarApp } = await cargarBanner();
     render(<BannerInstalarApp />);
     dispararInstalable();
@@ -98,7 +110,7 @@ describe('BannerInstalarApp', () => {
   });
 
   it('compacto (panel del local) ignora el descarte de la carta', async () => {
-    window.localStorage.setItem(CLAVE, '1');
+    window.sessionStorage.setItem(CLAVE, '1');
     const { BannerInstalarApp } = await cargarBanner();
     render(<BannerInstalarApp compacto />);
     dispararInstalable();
@@ -116,7 +128,7 @@ describe('BannerInstalarApp', () => {
     expect(screen.getByText(/Añadir a pantalla de inicio/)).toBeDefined();
   });
 
-  it('si localStorage lanza, el aviso igual aparece y el cierre no rompe', async () => {
+  it('si sessionStorage lanza, el aviso igual aparece y el cierre no rompe', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('denegado');
     });

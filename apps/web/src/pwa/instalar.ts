@@ -44,9 +44,10 @@ export function estaInstalada(): boolean {
   );
 }
 
+/** Descarte solo para esta sesión de navegación: en la siguiente visita el aviso vuelve. */
 export function estaDescartado(): boolean {
   try {
-    return window.localStorage.getItem(CLAVE_DESCARTE) === '1';
+    return window.sessionStorage.getItem(CLAVE_DESCARTE) === '1';
   } catch {
     return false; // sin almacenamiento (modo privado): el aviso reaparece, no rompe nada
   }
@@ -54,7 +55,7 @@ export function estaDescartado(): boolean {
 
 export function descartarInstalar(): void {
   try {
-    window.localStorage.setItem(CLAVE_DESCARTE, '1');
+    window.sessionStorage.setItem(CLAVE_DESCARTE, '1');
   } catch {
     // sin almacenamiento: se queda solo en esta sesión
   }
