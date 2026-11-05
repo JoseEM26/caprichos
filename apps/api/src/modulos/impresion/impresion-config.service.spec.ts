@@ -170,6 +170,21 @@ describe('ImpresionConfigService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
+    it('el reemplazo no toca los trabajos pendientes: siguen con su área de destino y los toma el nuevo', async () => {
+      prisma.printJob = { updateMany: jest.fn(), update: jest.fn() };
+      prisma.deviceKey.findUnique
+        .mockResolvedValueOnce({ id: 11n, tipo: 'AGENTE', nombre: 'Barra', activo: true, area_id: 1n, ...latidoOk(['ETIQUETERA']) })
+        .mockResolvedValueOnce({ id: 12n, tipo: 'AGENTE', nombre: 'Barra 2', activo: true, area_id: null, ...latidoOk(['ETIQUETERA']) });
+      prisma.deviceKey.findMany.mockResolvedValue([
+        { id: 11n, tipo: 'AGENTE', nombre: 'Barra', activo: true, area_id: 1n, ...latidoOk(['ETIQUETERA']) },
+      ]);
+      await service.reemplazarEquipo('11', '12', undefined);
+      // Ningún trabajo se reescribe: el área de destino de cada trabajo sigue igual y el nuevo equipo la hereda
+      expect(prisma.printJob.updateMany).not.toHaveBeenCalled();
+      expect(prisma.printJob.update).not.toHaveBeenCalled();
+      expect(prisma.deviceKey.update).toHaveBeenCalledWith({ where: { id: 12n }, data: { area_id: 1n } });
+    });
+
     it('quedarse con un equipo desactiva los duplicados que chocan con él', async () => {
       prisma.deviceKey.findUnique.mockResolvedValue({ id: 11n, tipo: 'AGENTE', nombre: 'Barra', activo: true, area_id: 1n, ...latidoOk(['ETIQUETERA']) });
       prisma.deviceKey.findMany.mockResolvedValue([
