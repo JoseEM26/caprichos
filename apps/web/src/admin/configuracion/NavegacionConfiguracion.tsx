@@ -7,7 +7,7 @@ export const GRUPOS_CONFIG: Array<{ id: string; titulo: string; tabs: string[] }
   { id: 'local', titulo: 'Mi local', tabs: ['local', 'ubicacion', 'contacto', 'horario', 'redes', 'empresa'] },
   { id: 'ventas', titulo: 'Ventas y reparto', tabs: ['pagos', 'entrega', 'zonas', 'reparto', 'fallas', 'demanda', 'cocina', 'operacion'] },
   { id: 'clientes', titulo: 'Comunicación con clientes', tabs: ['textos', 'chatbot', 'vouchers', 'ayuda'] },
-  { id: 'equipos', titulo: 'Equipos y dispositivos', tabs: ['impresion', 'ingreso'] },
+  { id: 'equipos', titulo: 'Equipos y dispositivos', tabs: ['mapa-impresion', 'impresion', 'ingreso'] },
   { id: 'sistema', titulo: 'Sistema', tabs: ['parametros'] },
 ];
 
@@ -39,6 +39,7 @@ const D: Record<string, string> = {
   vouchers: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6',
   ayuda: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17v.01',
   impresion: 'M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z',
+  'mapa-impresion': 'M4 5h5v5H4zM15 5h5v5h-5zM9.5 16.5h5M6.5 10v3.5h11V10',
   ingreso: 'M10 4H5v16h5M14 8l4 4-4 4M18 12H9',
   parametros: 'M4 6h8M16 6h4M4 12h4M12 12h8M4 18h10M18 18h2M14 4v4M8 10v4M16 16v4',
 };

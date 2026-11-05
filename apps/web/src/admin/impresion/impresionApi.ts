@@ -102,7 +102,68 @@ export interface RespuestaCrearLlave {
   mensaje: string;
 }
 
+/** Contrato de GET /admin/impresion/mapa (ver apps/api/src/modulos/impresion/impresion-config.service.ts). */
+export type RolEquipoMapa = 'ETIQUETERA' | 'TICKETERA';
+export type EstadoRolMapa = 'lista' | 'sin_papel' | 'desconectada' | 'sin_permiso' | 'error' | 'no_configurada' | 'sin_programa';
+
+export interface EquipoMapa {
+  deviceKeyId: string;
+  nombre: string;
+  /** null = Caja */
+  areaId: string | null;
+  roles: Array<{ rol: RolEquipoMapa; estado: EstadoRolMapa }>;
+  ultimoLatido: string | null;
+  conectado: boolean;
+}
+
+export interface ReglasMapa {
+  generalModalidades: string[];
+  bebidaActivo: boolean;
+  areaActivo: boolean;
+  comandaSalonActivo: boolean;
+}
+
+export type TipoRuteoMapa = 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA' | 'TICKET_COMANDA_SALON' | 'TICKET_PAGO';
+
+export interface RuteoMapa {
+  tipo: TipoRuteoMapa;
+  /** Área del trabajo (sticker por área o de bebida); null en general, comanda y pago. */
+  areaId: string | null;
+  /** Área cuyo equipo lo imprime; null = Caja. */
+  destinoAreaId: string | null;
+  destinoEquipoId: string | null;
+  destinoNombre: string;
+  activo: boolean;
+}
+
+export interface MapaImpresionDatos {
+  areas: Array<{ id: string; nombre: string }>;
+  equipos: EquipoMapa[];
+  reglas: ReglasMapa;
+  ruteo: RuteoMapa[];
+  colaPendientePorEquipo: Array<{ deviceKeyId: string; pendientes: number }>;
+}
+
+export interface RespuestaAsignarArea {
+  ok: boolean;
+  areaId: string | null;
+  avisos: string[];
+}
+
 export const impresionApi = {
+  obtenerMapa: async (): Promise<MapaImpresionDatos> => {
+    return api.get<MapaImpresionDatos>('/admin/impresion/mapa');
+  },
+
+  /** areaId null = Caja. */
+  asignarAreaEquipo: async (equipoId: string, areaId: string | null): Promise<RespuestaAsignarArea> => {
+    return api.put<RespuestaAsignarArea>(`/admin/impresion/equipos/${equipoId}/area`, { areaId });
+  },
+
+  guardarReglasImpresion: async (cambio: Partial<ReglasMapa>): Promise<{ ok: boolean; reglas: ReglasMapa }> => {
+    return api.put<{ ok: boolean; reglas: ReglasMapa }>('/admin/impresion/reglas', cambio);
+  },
+
   /** Código de un solo uso (15 min) para vincular el programa del local; solo ADMIN. */
   generarCodigoVinculo: async (): Promise<{ codigo: string; expiraEn: string }> => {
     return api.post('/admin/impresion/codigo-vinculo', {});

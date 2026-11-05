@@ -12,6 +12,7 @@ import { SeccionRepartoConfig } from './SeccionRepartoConfig';
 import { ParametrosOperacionTab } from './ParametrosOperacionTab';
 import { ChatbotConfiguracionTab } from './ChatbotConfiguracionTab';
 import { TarjetaImpresionEtiquetas } from '../impresion/TarjetaImpresionEtiquetas';
+import { ModuloMapaImpresion } from '../impresion/mapa/ModuloMapaImpresion';
 import { TarjetaAyudaIaConfiguracion } from './TarjetaAyudaIaConfiguracion';
 import { TarjetaVouchersIaConfiguracion } from './TarjetaVouchersIaConfiguracion';
 import { TarjetaControlAlmacenConfiguracion } from './TarjetaControlAlmacenConfiguracion';
@@ -238,6 +239,12 @@ export const CATEGORIAS_CONFIG: CategoriaConfig[] = [
     fields: [],
   },
   {
+    id: 'mapa-impresion',
+    n: 'Mapa de impresión',
+    d: 'Qué se imprime, con qué regla y en qué equipo',
+    fields: [],
+  },
+  {
     id: 'impresion',
     n: 'Impresión de etiquetas',
     d: 'Estado del agente de caja, trabajos y llaves',
@@ -274,7 +281,7 @@ const CLAVES_DATOS_LOCAL: Array<keyof InfoLocalState> = [
 const RUC_VALIDO = /^(10|15|17|20)\d{9}$/;
 
 /** Pestañas con componente propio: no usan el formulario genérico. */
-const TABS_PROPIAS = ['horario', 'pagos', 'zonas', 'demanda', 'cocina', 'reparto', 'parametros', 'chatbot', 'impresion', 'ayuda', 'vouchers', 'ingreso'];
+const TABS_PROPIAS = ['horario', 'pagos', 'zonas', 'demanda', 'cocina', 'reparto', 'parametros', 'chatbot', 'mapa-impresion', 'impresion', 'ayuda', 'vouchers', 'ingreso'];
 
 const estiloInputCoord = {
   width: '100%',
@@ -890,6 +897,11 @@ export function ConfiguracionLocalView() {
           {/* Subcaso: CONFIGURACIÓN Y SEGURIDAD DEL CHATBOT */}
           {tabId === 'chatbot' && (
             <ChatbotConfiguracionTab puedeVer={puedeVer} puedeEditar={puedeEditar} />
+          )}
+
+          {/* Subcaso: MAPA DE IMPRESIÓN (qué sale dónde) */}
+          {tabId === 'mapa-impresion' && (
+            <ModuloMapaImpresion />
           )}
 
           {/* Subcaso: IMPRESIÓN DE ETIQUETAS */}
