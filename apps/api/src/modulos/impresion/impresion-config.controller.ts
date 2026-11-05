@@ -44,4 +44,12 @@ export class ImpresionConfigController {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.config.guardarReglas(dto, req.usuario, ip);
   }
+
+  /** Vuelve las reglas a lo recomendado (defectos del código). */
+  @Post('reglas/restablecer')
+  @Permiso('configuracion', 'editar')
+  async restablecerReglas(@Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.config.restablecerReglas(req.usuario, ip);
+  }
 }

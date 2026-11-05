@@ -203,6 +203,11 @@ export const impresionApi = {
     return api.put<{ ok: boolean; reglas: ReglasMapa }>('/admin/impresion/reglas', cambio);
   },
 
+  /** Vuelve las reglas a lo recomendado (defectos del servidor); solo con permiso de editar. */
+  restablecerReglasImpresion: async (): Promise<{ ok: boolean; reglas: ReglasMapa }> => {
+    return api.post<{ ok: boolean; reglas: ReglasMapa }>('/admin/impresion/reglas/restablecer', {});
+  },
+
   /** Código de un solo uso (15 min) para vincular el programa del local; solo ADMIN. */
   generarCodigoVinculo: async (): Promise<{ codigo: string; expiraEn: string }> => {
     return api.post('/admin/impresion/codigo-vinculo', {});

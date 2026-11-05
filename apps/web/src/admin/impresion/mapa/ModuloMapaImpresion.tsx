@@ -6,6 +6,7 @@ import { Cargando } from '../../../comun/Cargando';
 import { EstadoError } from '../../../comun/EstadoError';
 import { EstadoVacio } from '../../../comun/EstadoVacio';
 import { Confirmar } from '../../../comun/Confirmar';
+import { Boton } from '../../../comun/Boton';
 import { ErrorApi } from '../../../comun/api';
 import { impresionApi, type MapaImpresionDatos, type ReglasMapa } from '../impresionApi';
 import { derivarFlujo, type Escenario } from './flujo';
@@ -176,6 +177,29 @@ export function ModuloMapaImpresion() {
     void ejecutarMover(equipoId, areaId);
   };
 
+  /** Pide confirmación y vuelve las reglas a lo recomendado; luego vuelve a leer el mapa. */
+  const pedirRestablecerReglas = () => {
+    setConfirmacion({
+      titulo: 'Restablecer las reglas recomendadas',
+      mensaje: 'Se volverán a las reglas recomendadas: sticker de bebida en todos los pedidos, sticker de resumen solo en llevar y delivery, comanda de salón encendida, sticker por área y comanda por área apagados. No cambia a qué área atiende cada equipo.',
+      textoSi: 'Sí, restablecer',
+      alConfirmar: () => void ejecutarRestablecerReglas(),
+    });
+  };
+
+  const ejecutarRestablecerReglas = async () => {
+    setOcupado('restablecer');
+    try {
+      await impresionApi.restablecerReglasImpresion();
+      setAviso({ tipo: 'ok', texto: 'Reglas restablecidas' });
+      await cargar();
+    } catch (e: any) {
+      setAviso({ tipo: 'error', texto: `No se restablecieron las reglas. ${e?.message ?? ''}`.trim() });
+    } finally {
+      setOcupado(null);
+    }
+  };
+
   const cambiarRegla = async (cambio: Partial<ReglasMapa>, clave: string) => {
     if (!mapa || !puedeEditar) return;
     const anterior = mapa;
@@ -238,6 +262,22 @@ export function ModuloMapaImpresion() {
         </div>
       )}
       <p className="mapa-regla-unica">Un solo equipo por área y tipo de máquina, y uno en Caja.</p>
+      <div className="mapa-recomendado">
+        <p className="mapa-recomendado-ayuda">
+          <strong>Lo recomendado:</strong> sticker de bebida en todos los pedidos; sticker de resumen solo en llevar y delivery;
+          comanda de salón encendida; sticker por área y comanda por área apagados.
+        </p>
+        {puedeEditar && (
+          <Boton
+            variante="secundario"
+            tamano="pequeno"
+            disabled={ocupado !== null}
+            onClick={pedirRestablecerReglas}
+          >
+            Restablecer a lo recomendado
+          </Boton>
+        )}
+      </div>
       {mapa.duplicados.map((g) => (
         <section key={g.areaId ?? 'caja'} className="mapa-duplicados" aria-label={`Equipos duplicados en ${g.nombre}`}>
           <p>
