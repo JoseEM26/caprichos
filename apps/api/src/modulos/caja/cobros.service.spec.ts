@@ -102,6 +102,14 @@ describe('CobrosService', () => {
       parametro: {
         findUnique: jest.fn().mockResolvedValue(null),
       },
+      // El cierre silencioso de Validar pago consulta conversaciones en espera (sin ninguna por defecto)
+      conversacion: {
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      mensajeChat: {
+        create: jest.fn().mockResolvedValue({}),
+      },
       $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn().mockImplementation(async (cb) => {
         return cb(prismaMock);
@@ -1452,6 +1460,87 @@ describe('CobrosService', () => {
       await cobrarEfectivo();
 
       expect(impresionMock.encolarTicketPedido).toHaveBeenCalledWith(100n);
+    });
+  });
+
+  describe('cierre silencioso de Validar pago al cobrar o coordinar', () => {
+    const cajaAbiertaMock = { id: 10n, fecha: new Date('2026-10-21T00:00:00.000Z'), estado: 'ABIERTA' };
+    const pedidoMock = {
+      id: 100n,
+      codigo: 'CP-0100',
+      total: new Prisma.Decimal(50.0),
+      estado: 'ENTREGADO',
+      pago_estado: 'PENDIENTE',
+      comprobante_tipo: 'BOLETA',
+      pago_metodo: null,
+      es_personal: false,
+      cobros: [],
+    };
+    const conversacionEnEspera = (id: bigint, pedidoId: string) => ({
+      id,
+      flujo: { estado: 'VALIDAR_PAGO', pago: { pedidoId } },
+      tomado_por: null,
+      motivo_derivacion: null,
+    });
+
+    beforeEach(() => {
+      prismaMock.conversacion = {
+        findMany: jest.fn().mockResolvedValue([conversacionEnEspera(5n, '100'), conversacionEnEspera(6n, '999')]),
+        update: jest.fn().mockResolvedValue({}),
+      };
+      prismaMock.mensajeChat = { create: jest.fn().mockResolvedValue({}) };
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
+      prismaMock.cobro.create.mockResolvedValue({
+        id: 77n,
+        pedido_id: 100n,
+        caja_id: 10n,
+        total: new Prisma.Decimal(50.0),
+        credito_personal: false,
+        cobrado_por: 2n,
+        en: new Date(),
+        pagos: [{ id: 1n, medio: 'EFECTIVO', monto: new Prisma.Decimal(50.0), recibido: null, vuelto: null }],
+      });
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'EFECTIVO' });
+    });
+
+    it('al cobrar sale de Validar pago solo la conversación de ese pedido, sin mensaje al cliente', async () => {
+      const res = await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 50 }] }, cajeroUsuario);
+
+      expect(res.id).toBe('77');
+      expect(prismaMock.conversacion.update).toHaveBeenCalledTimes(1);
+      expect(prismaMock.conversacion.update).toHaveBeenCalledWith({
+        where: { id: 5n },
+        data: expect.objectContaining({ estado: 'MENU', duenio: 'BOT', urgente: false }),
+      });
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('mensajes:actualizado', { id: '5' });
+    });
+
+    it('si el cierre de la espera falla, el cobro queda registrado igual', async () => {
+      prismaMock.conversacion.findMany.mockRejectedValueOnce(new Error('BD caída'));
+
+      const res = await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 50 }] }, cajeroUsuario);
+
+      expect(res.id).toBe('77');
+      expect(prismaMock.cobro.create).toHaveBeenCalled();
+    });
+
+    it('al coordinar el pago (Caja aprueba el digital) también sale de Validar pago en silencio', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock, estado: 'COLA', pago_preferido: null });
+      prismaMock.pedido.update.mockResolvedValue({
+        id: 100n,
+        codigo: 'CP-0100',
+        pago_estado: 'COORDINADO',
+        pago_coordinado_en: new Date(),
+        pago_coordinado_por: 2n,
+      });
+
+      await service.marcarCoordinado('100', cajeroUsuario);
+
+      expect(prismaMock.conversacion.update).toHaveBeenCalledWith({
+        where: { id: 5n },
+        data: expect.objectContaining({ estado: 'MENU' }),
+      });
     });
   });
 });

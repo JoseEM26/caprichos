@@ -232,6 +232,120 @@ describe('AlertasEsperaService (Contrato Secciones 2, 3 y 4)', () => {
     });
   });
 
+  describe('VALIDAR_PAGO con pedido ya resuelto (no avisar a nadie y salir de la espera)', () => {
+    const ahora = new Date('2026-11-05T18:30:00Z');
+    const minAtras = (min: number) => ahora.getTime() - min * 60 * 1000;
+
+    /** Conversación en VALIDAR_PAGO ligada al pedido 500, con voucher enviado hace `min` minutos. */
+    const conversacionEnEspera = (min: number) => ({
+      id: 101n,
+      telefono: '51987654321',
+      nombre_contacto: 'Ana Cliente',
+      estado: 'VALIDAR_PAGO',
+      urgente: true,
+      duenio: 'PERSONA',
+      tomado_por: null,
+      motivo_derivacion: null,
+      ultima_actividad: ahora,
+      flujo: { estado: 'VALIDAR_PAGO', pago: { pedidoId: '500', capturasEnviadas: 1, timestampUltimoVoucher: minAtras(min) } },
+      mensajes: [],
+    });
+
+    const pedidoEn = (extra: Record<string, unknown>) => ({
+      id: 500n,
+      estado: 'COLA',
+      pago_estado: 'PENDIENTE',
+      creado_en: new Date(minAtras(40)),
+      ...extra,
+    });
+
+    beforeEach(() => {
+      prismaMock.pedido.findUnique = jest.fn();
+    });
+
+    function conConversacion(conv: any, pedido: any) {
+      prismaMock.conversacion.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(where?.estado === 'VALIDAR_PAGO' ? [conv] : []),
+      );
+      prismaMock.pedido.findUnique.mockResolvedValue(pedido);
+    }
+
+    it.each([
+      ['PAGADO', pedidoEn({ pago_estado: 'PAGADO', estado: 'PREPARANDO' })],
+      ['COORDINADO', pedidoEn({ pago_estado: 'COORDINADO', estado: 'PREPARANDO' })],
+      ['ENTREGADO', pedidoEn({ estado: 'ENTREGADO', pago_estado: 'PAGADO' })],
+      ['ANULADO', pedidoEn({ estado: 'ANULADO' })],
+      ['CANCELADO', pedidoEn({ estado: 'CANCELADO' })],
+      ['inexistente', null],
+    ])('pedido %s: no encola espera ni correo, y sale de VALIDAR_PAGO', async (_nombre, pedido) => {
+      conConversacion(conversacionEnEspera(35), pedido);
+
+      const res = await service.ejecutarCiclo(ahora);
+
+      expect(res.avisosEsperaClienteEnviados).toBe(0);
+      expect(res.alertasVoucherEnviadas).toBe(0);
+      expect(outboxMock.encolar).not.toHaveBeenCalled();
+      expect(avisosInternosMock.enviarAvisoAdmin).not.toHaveBeenCalled();
+      expect(prismaMock.conversacion.update).toHaveBeenCalledWith({
+        where: { id: 101n },
+        data: expect.objectContaining({ estado: 'MENU', duenio: 'BOT', urgente: false, motivo_derivacion: null }),
+      });
+      expect(prismaMock.mensajeChat.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'SISTEMA', conversacion_id: 101n }),
+      });
+    });
+
+    it('pedido PAGADO con la conversación tomada por una persona: sale de VALIDAR_PAGO sin tocar su dueño', async () => {
+      conConversacion({ ...conversacionEnEspera(35), tomado_por: 9n }, pedidoEn({ pago_estado: 'PAGADO', estado: 'PREPARANDO' }));
+
+      await service.ejecutarCiclo(ahora);
+
+      const data = prismaMock.conversacion.update.mock.calls[0][0].data;
+      expect(data.estado).toBe('MENU');
+      expect(data).not.toHaveProperty('duenio');
+      expect(data).not.toHaveProperty('urgente');
+    });
+
+    it('pedido PENDIENTE con voucher de 11 min: envía la espera una sola vez (idempotencia)', async () => {
+      conConversacion(conversacionEnEspera(11), pedidoEn({}));
+      const redisCliente = redisMock.obtenerCliente();
+      redisCliente.set.mockResolvedValueOnce('OK').mockResolvedValueOnce(null);
+
+      await service.ejecutarCiclo(ahora);
+      await service.ejecutarCiclo(ahora);
+
+      expect(outboxMock.encolar).toHaveBeenCalledTimes(1);
+      expect(prismaMock.conversacion.update).not.toHaveBeenCalled();
+    });
+
+    it('pedido PENDIENTE con voucher de 31 min: aviso interno por correo solo si sigue pendiente', async () => {
+      conConversacion(conversacionEnEspera(31), pedidoEn({}));
+      await service.ejecutarCiclo(ahora);
+      expect(avisosInternosMock.enviarAvisoAdmin).toHaveBeenCalledWith(
+        'Voucher sin revisar (30 min)',
+        expect.any(String),
+        '/admin/mensajes',
+        expect.any(Array),
+        expect.stringContaining('idemp:alerta:voucher:30m:101:1'),
+        { correo: true },
+      );
+    });
+
+    it('pedido PAGADO con voucher de 31 min: no hay aviso interno ni correo', async () => {
+      conConversacion(conversacionEnEspera(31), pedidoEn({ pago_estado: 'PAGADO', estado: 'PREPARANDO' }));
+      await service.ejecutarCiclo(ahora);
+      expect(avisosInternosMock.enviarAvisoAdmin).not.toHaveBeenCalled();
+    });
+
+    it('sin pedido marcado en el flujo conserva el comportamiento de siempre (no consulta pedidos)', async () => {
+      const conv = { ...conversacionEnEspera(11), flujo: { estado: 'VALIDAR_PAGO', pago: { timestampUltimoVoucher: minAtras(11) } } };
+      conConversacion(conv, null);
+      await service.ejecutarCiclo(ahora);
+      expect(prismaMock.pedido.findUnique).not.toHaveBeenCalled();
+      expect(outboxMock.encolar).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('3) Chat tomado y abandonado vs EXCEPCIÓN VALIDAR_PAGO', () => {
     it('libera chat normal al bot tras 10 min sin respuesta humana y avisa por campana', async () => {
       const ahora = new Date('2026-10-27T12:15:00Z');

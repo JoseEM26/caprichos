@@ -54,6 +54,12 @@ import { obtenerFechaHoraLima } from '../../local/local.util';
 import { DireccionesClienteService } from '../../clientes/direcciones-cliente.service';
 import { OutboxWhatsappService } from '../servicios/outbox-whatsapp.service';
 import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servicios/tope-pedidos-sin-pagar.util';
+import {
+  leerExpiraPagoMin,
+  motivoSalidaValidarPago,
+  pedidoIdDePago,
+  sacarDeValidarPago,
+} from './validar-pago-salida.util';
 
 export interface EntradaProcesarMensaje extends EntradaRawInput {
   waMessageId?: string;
@@ -353,43 +359,20 @@ export class EjecutorConversacionService {
   }
 
   private async salirDeValidarPagoSiVencido(conversacion: any, flujo: FlujoConversacion | null): Promise<FlujoConversacion | null> {
-    const pago = (flujo as any)?.pago;
-    const pedidoId = pago?.pedidoId;
-    if (!pedidoId || !/^\d+$/.test(String(pedidoId)) || typeof this.prisma.pedido?.findUnique !== 'function') return flujo;
+    const pedidoId = pedidoIdDePago(flujo);
+    if (!pedidoId || typeof this.prisma.pedido?.findUnique !== 'function') return flujo;
     try {
-      const pedido: any = await this.prisma.pedido.findUnique({ where: { id: BigInt(pedidoId) } });
-      let motivo: string | null = null;
-      if (!pedido) motivo = 'el pedido ya no existe';
-      else if (['ANULADO', 'ENTREGADO', 'CANCELADO'].includes(String(pedido.estado))) motivo = `el pedido está ${pedido.estado}`;
-      else if (pedido.pago_estado && pedido.pago_estado !== 'PENDIENTE') motivo = `el pago está ${pedido.pago_estado}`;
-      else if (!Number(pago.timestampUltimoVoucher)) {
-        // Con un comprobante enviado el chat sigue en Validar pago hasta que Caja decida (nunca se oculta un voucher sin revisar);
-        // solo vence la espera de un comprobante que nunca llegó.
-        const expiraMin = await this.leerParametroNumero('chatbot_pago_expira_min', 30);
-        const ref = pedido.creado_en ? new Date(pedido.creado_en).getTime() : 0;
-        if (expiraMin > 0 && ref && Date.now() - ref > expiraMin * 60000) motivo = `venció la espera de pago (${expiraMin} min)`;
-      }
+      const pedido: any = await this.prisma.pedido.findUnique({ where: { id: pedidoId } });
+      const motivo = motivoSalidaValidarPago(
+        pedido,
+        (flujo as any)?.pago,
+        new Date(),
+        await leerExpiraPagoMin(this.prisma),
+      );
       if (!motivo) return flujo;
 
-      const nuevoFlujo: any = { ...(flujo as any) };
-      if (nuevoFlujo.estado === 'VALIDAR_PAGO') nuevoFlujo.estado = 'MENU';
-      const data: any = { estado: 'MENU', flujo: nuevoFlujo };
-      if (conversacion.tomado_por == null && conversacion.motivo_derivacion !== 'CALIFICACION_BAJA') {
-        data.duenio = 'BOT';
-        data.urgente = false;
-        data.motivo_derivacion = null;
-      }
-      await this.prisma.conversacion.update({ where: { id: conversacion.id }, data });
+      const { flujo: nuevoFlujo, data } = await sacarDeValidarPago(this.prisma, conversacion, flujo, motivo);
       Object.assign(conversacion, data);
-      await this.prisma.mensajeChat.create({
-        data: {
-          conversacion_id: conversacion.id,
-          direccion: 'SALE',
-          autor: 'BOT',
-          tipo: 'SISTEMA',
-          contenido: { texto: `La conversación salió de «Validar pago»: ${motivo}.` } as any,
-        },
-      });
       this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
       return nuevoFlujo;
     } catch (err: any) {
