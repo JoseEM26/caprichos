@@ -11,6 +11,8 @@ export interface ConfirmarProps {
   textoNo?: string;
   peligro?: boolean;
   cargando?: boolean;
+  /** Deshabilita solo el botón de confirmar (p. ej. falta elegir mesa). */
+  deshabilitarConfirmar?: boolean;
   alConfirmar: () => void | Promise<void>;
   alCancelar: () => void;
   children?: React.ReactNode;
@@ -25,6 +27,7 @@ export function Confirmar({
   textoNo = 'No, cancelar',
   peligro = false,
   cargando = false,
+  deshabilitarConfirmar = false,
   alConfirmar,
   alCancelar,
   children,
@@ -139,6 +142,7 @@ export function Confirmar({
             data-confirmar-principal=""
             variante={peligro ? 'peligro' : 'primario'}
             cargando={cargando}
+            disabled={deshabilitarConfirmar}
             onClick={alConfirmar}
           >
             {textoBotonSi}

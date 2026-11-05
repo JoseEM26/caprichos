@@ -6,6 +6,10 @@ import { Confirmar } from '../../comun/Confirmar';
 import { PisoSalon, Reserva } from './tipos';
 import { ModalFormularioReserva } from './componentes/ModalFormularioReserva';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
+import {
+  ConfirmarAprobacionSolicitud,
+  partesLima,
+} from './componentes/ConfirmarAprobacionSolicitud';
 import { useSalonSocket } from './useSalonSocket';
 import { salonApi } from './api';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
@@ -15,10 +19,19 @@ export interface SolicitudWhatsApp {
   nombre: string;
   tel: string;
   personas: number;
+  /** Hora de la solicitud en Lima (HH:mm). */
   hora: string;
+  /** Fecha de la solicitud en Lima (YYYY-MM-DD). */
+  fecha: string;
+  /** Instante original de la solicitud (ISO). */
+  horaIso: string;
   estado: 'pendiente' | 'aprobada' | 'rechazada';
   mesa?: string;
   mesasIds?: string[];
+}
+
+function partesSolicitud(horaIso: string | null | undefined) {
+  return { horaIso: horaIso || '', ...partesLima(horaIso) };
 }
 
 export function ReservasView() {
@@ -69,6 +82,7 @@ export function ReservasView() {
   // Confirmaciones Sí/No
   const [confirmarAprobarSol, setConfirmarAprobarSol] = useState<SolicitudWhatsApp | null>(null);
   const [confirmarRechazarSol, setConfirmarRechazarSol] = useState<SolicitudWhatsApp | null>(null);
+  const [errorRechazo, setErrorRechazo] = useState<string | null>(null);
   const [confirmarCancelarReserva, setConfirmarCancelarReserva] = useState<Reserva | null>(null);
   const [confirmarSentarReserva, setConfirmarSentarReserva] = useState<Reserva | null>(null);
 
@@ -97,7 +111,7 @@ export function ReservasView() {
             nombre: s.nombre || 'Cliente',
             tel: s.telefono || '',
             personas: s.personas || 2,
-            hora: s.hora ? s.hora.slice(11, 16) : '',
+            ...partesSolicitud(s.hora),
             estado: s.estado || 'pendiente',
             mesa: s.mesa || undefined,
             mesasIds: s.mesasIds || [],
@@ -742,7 +756,10 @@ export function ReservasView() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setConfirmarRechazarSol(r)}
+                      onClick={() => {
+                        setErrorRechazo(null);
+                        setConfirmarRechazarSol(r);
+                      }}
                       style={{
                         flex: '1 1 100px',
                         minHeight: '48px',
@@ -1472,38 +1489,18 @@ export function ReservasView() {
 
       {/* DIÁLOGOS DE CONFIRMACIÓN OBLIGATORIA SÍ/NO */}
       {confirmarAprobarSol && (
-        <Confirmar
-          abierto={true}
-          titulo={`¿Aprobar la reserva de ${confirmarAprobarSol.nombre}?`}
-          mensaje={`Se guarda la mesa ${
-            confirmarAprobarSol.mesa || 'asignada'
-          } a las ${confirmarAprobarSol.hora} y se le avisa al cliente por WhatsApp.`}
-          textoConfirmar="Sí, aprobar"
-          textoNo="No, cancelar"
-          alConfirmar={async () => {
-            try {
-              if (salonApi.aprobarSolicitud) {
-                const mesasParaAsignar =
-                  confirmarAprobarSol.mesasIds && confirmarAprobarSol.mesasIds.length > 0
-                    ? confirmarAprobarSol.mesasIds
-                    : todasLasMesas.slice(0, 1).map((m) => m.id);
-                await salonApi.aprobarSolicitud(confirmarAprobarSol.id, {
-                  mesas: mesasParaAsignar,
-                });
-              }
-              setSolicitudes((prev) =>
-                prev.map((s) =>
-                  s.id === confirmarAprobarSol.id
-                    ? { ...s, estado: 'aprobada' as const }
-                    : s,
-                ),
-              );
-              setConfirmarAprobarSol(null);
-              cargarDatos();
-            } catch (err: any) {
-              setErrorGlobal(err?.message || 'Error al aprobar solicitud de reserva.');
-              setConfirmarAprobarSol(null);
-            }
+        <ConfirmarAprobacionSolicitud
+          solicitud={confirmarAprobarSol}
+          mesas={todasLasMesas}
+          alAprobar={async ({ mesas, hora }) => {
+            await salonApi.aprobarSolicitud(confirmarAprobarSol.id, { mesas, hora });
+            setSolicitudes((prev) =>
+              prev.map((s) =>
+                s.id === confirmarAprobarSol.id ? { ...s, estado: 'aprobada' as const } : s,
+              ),
+            );
+            setConfirmarAprobarSol(null);
+            cargarDatos();
           }}
           alCancelar={() => setConfirmarAprobarSol(null)}
         />
@@ -1517,28 +1514,34 @@ export function ReservasView() {
           textoConfirmar="Sí, rechazar"
           textoNo="No, cancelar"
           alConfirmar={async () => {
+            setErrorRechazo(null);
             try {
-              if (salonApi.rechazarSolicitud) {
-                await salonApi.rechazarSolicitud(confirmarRechazarSol.id, {
-                  motivo: 'No hay mesa disponible en el horario solicitado',
-                });
-              }
+              await salonApi.rechazarSolicitud(confirmarRechazarSol.id, {
+                motivo: 'No hay mesa disponible en el horario solicitado',
+              });
               setSolicitudes((prev) =>
                 prev.map((s) =>
-                  s.id === confirmarRechazarSol.id
-                    ? { ...s, estado: 'rechazada' as const }
-                    : s,
+                  s.id === confirmarRechazarSol.id ? { ...s, estado: 'rechazada' as const } : s,
                 ),
               );
               setConfirmarRechazarSol(null);
               cargarDatos();
             } catch (err: any) {
-              setErrorGlobal(err?.message || 'Error al rechazar solicitud de reserva.');
-              setConfirmarRechazarSol(null);
+              // El diálogo se queda abierto con el motivo; la pantalla sigue visible.
+              setErrorRechazo(err?.message || 'No fue posible rechazar la solicitud.');
             }
           }}
-          alCancelar={() => setConfirmarRechazarSol(null)}
-        />
+          alCancelar={() => {
+            setErrorRechazo(null);
+            setConfirmarRechazarSol(null);
+          }}
+        >
+          {errorRechazo && (
+            <div role="alert" style={{ fontSize: '13px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+              {errorRechazo}
+            </div>
+          )}
+        </Confirmar>
       )}
 
       {confirmarCancelarReserva && (

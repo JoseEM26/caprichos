@@ -304,6 +304,118 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
     });
   });
 
+  describe('aprobarSolicitud: hora y validaciones', () => {
+    const horaVencida = new Date('2020-01-01T01:00:00.000Z');
+    const horaFutura = '2099-01-10T20:00:00-05:00';
+
+    const solicitudPendiente = (hora: Date, personas = 2) => ({
+      id: 9n,
+      conversacion_id: null,
+      personas,
+      hora,
+      estado: 'PENDIENTE',
+      origen: 'WHATSAPP',
+      nombre: 'Lucía Ramos',
+      telefono: '912345678',
+      nota: null,
+      motivo_rechazo: null,
+      reserva_id: null,
+      creado_en: new Date(),
+      conversacion: null,
+    });
+
+    beforeEach(() => {
+      outboxMock.encolar.mockClear();
+      prisma.fechaEspecial.findUnique.mockResolvedValue(null);
+      prisma.horarioDia.findUnique.mockResolvedValue({
+        dia_semana: 6,
+        cerrado: false,
+        abre: horaToDate('10:00'),
+        cierra: horaToDate('23:00'),
+      });
+      prisma.elementoPlano.findMany.mockResolvedValue([
+        { id: 1n, tipo: 'MESA', activo: true, asientos: 4 },
+      ]);
+      prisma.parametro.findUnique.mockResolvedValue({ clave: 'reserva_tolerancia_min', valor: 15 });
+      prisma.reserva.create.mockImplementation(async ({ data }: any) => ({
+        id: 88n,
+        nombre: data.nombre,
+        telefono: data.telefono,
+        personas: data.personas,
+        hora: data.hora,
+        tolerancia_min: 15,
+        estado: 'ACTIVA',
+        motivo_cancelacion: null,
+        pedido_id: null,
+        mesas: [],
+      }));
+      prisma.solicitudReserva.update.mockImplementation(async ({ data }: any) => ({
+        ...solicitudPendiente(horaVencida),
+        estado: data.estado,
+        reserva_id: data.reserva_id,
+      }));
+    });
+
+    it('hora de la solicitud ya pasada -> HORA_PASADA accionable y la solicitud sigue PENDIENTE', async () => {
+      prisma.solicitudReserva.findUnique.mockResolvedValue(solicitudPendiente(horaVencida));
+
+      await expect(
+        service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1'),
+      ).rejects.toMatchObject({
+        response: {
+          codigo: 'HORA_PASADA',
+          mensaje: 'La hora solicitada ya pasó. Elige una hora nueva para aprobar la reserva.',
+        },
+      });
+
+      expect(prisma.reserva.create).not.toHaveBeenCalled();
+      expect(prisma.solicitudReserva.update).not.toHaveBeenCalled();
+      expect(outboxMock.encolar).not.toHaveBeenCalled();
+    });
+
+    it('dto.hora futura reemplaza la hora vencida: aprueba con esa hora y encola el aviso', async () => {
+      prisma.solicitudReserva.findUnique.mockResolvedValue(solicitudPendiente(horaVencida));
+
+      const res = await service.aprobarSolicitud(
+        9,
+        { mesas: ['1'], hora: horaFutura },
+        mockUsuario,
+        '127.0.0.1',
+      );
+
+      expect(prisma.reserva.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ hora: new Date(horaFutura) }),
+        }),
+      );
+      expect(res.reserva.hora).toBe(new Date(horaFutura).toISOString());
+      expect(res.solicitud.estado).toBe('aprobada');
+      expect(outboxMock.encolar).toHaveBeenCalledWith(
+        expect.objectContaining({ telefono: '912345678' }),
+        expect.anything(),
+      );
+    });
+
+    it('mesas sin asientos suficientes -> ASIENTOS_INSUFICIENTES, no escribe y la solicitud sigue PENDIENTE', async () => {
+      prisma.elementoPlano.findMany.mockResolvedValue([
+        { id: 1n, tipo: 'MESA', activo: true, asientos: 2 },
+      ]);
+      prisma.solicitudReserva.findUnique.mockResolvedValue(
+        solicitudPendiente(new Date(horaFutura), 4),
+      );
+
+      await expect(
+        service.aprobarSolicitud(9, { mesas: ['1'] }, mockUsuario, '127.0.0.1'),
+      ).rejects.toMatchObject({
+        response: { codigo: 'ASIENTOS_INSUFICIENTES', mensaje: 'Faltan 2 asientos' },
+      });
+
+      expect(prisma.reserva.create).not.toHaveBeenCalled();
+      expect(prisma.solicitudReserva.update).not.toHaveBeenCalled();
+      expect(outboxMock.encolar).not.toHaveBeenCalled();
+    });
+  });
+
   describe('rechazarSolicitud', () => {
     it('lanza BadRequestException si no se envía motivo o tiene menos de 5 caracteres', async () => {
       await expect(
