@@ -6,10 +6,8 @@ import { Confirmar } from '../../comun/Confirmar';
 import { PisoSalon, Reserva } from './tipos';
 import { ModalFormularioReserva } from './componentes/ModalFormularioReserva';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
-import {
-  ConfirmarAprobacionSolicitud,
-  partesLima,
-} from './componentes/ConfirmarAprobacionSolicitud';
+import { ConfirmarAprobacionSolicitud } from './componentes/ConfirmarAprobacionSolicitud';
+import { hoyLima, partesLima } from './fechaLima';
 import { useSalonSocket } from './useSalonSocket';
 import { salonApi } from './api';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
@@ -54,12 +52,12 @@ export function ReservasView() {
   const [solicitudes, setSolicitudes] = useState<SolicitudWhatsApp[]>([]);
 
   // Selección de fecha en calendario (por defecto hoy)
-  const hoyRef = new Date();
+  const [hoyY, hoyM, hoyD] = hoyLima().split('-').map(Number);
   const [mesActual, setMesActual] = useState<{ y: number; m: number }>({
-    y: hoyRef.getFullYear(),
-    m: hoyRef.getMonth(),
+    y: hoyY,
+    m: hoyM - 1,
   });
-  const [diaSeleccionado, setDiaSeleccionado] = useState<number>(hoyRef.getDate());
+  const [diaSeleccionado, setDiaSeleccionado] = useState<number>(hoyD);
 
   // Búsqueda y filtros de tabla
   const [busquedaTabla, setBusquedaTabla] = useState('');
@@ -196,10 +194,7 @@ export function ReservasView() {
   const listaTodasReservas = reservas;
 
   // Fecha actual formateada (YYYY-MM-DD)
-  const hoyIso = useMemo(() => {
-    const h = new Date();
-    return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`;
-  }, []);
+  const hoyIso = useMemo(() => hoyLima(), []);
 
   // Fecha seleccionada formateada (YYYY-MM-DD)
   const diaIso = useMemo(() => {
@@ -212,7 +207,7 @@ export function ReservasView() {
       return agendaReservas;
     }
     return listaTodasReservas.filter((r) => {
-      const f = r.hora ? r.hora.slice(0, 10) : '';
+      const f = partesLima(r.hora).fecha;
       return f === diaIso;
     });
   }, [agendaReservas, listaTodasReservas, diaIso]);
@@ -220,7 +215,7 @@ export function ReservasView() {
   // Conteo de hoy calculado desde las reservas reales
   const reservasHoyCount = useMemo(() => {
     return listaTodasReservas.filter((r) => {
-      const f = r.hora ? r.hora.slice(0, 10) : '';
+      const f = partesLima(r.hora).fecha;
       return f === hoyIso && r.estado !== 'CANCELADA';
     }).length;
   }, [listaTodasReservas, hoyIso]);
@@ -903,9 +898,9 @@ export function ReservasView() {
             <button
               type="button"
               onClick={() => {
-                const h = new Date();
-                setMesActual({ y: h.getFullYear(), m: h.getMonth() });
-                setDiaSeleccionado(h.getDate());
+                const [y, m, d] = hoyLima().split('-').map(Number);
+                setMesActual({ y, m: m - 1 });
+                setDiaSeleccionado(d);
               }}
               style={{
                 minHeight: '44px',
@@ -944,8 +939,7 @@ export function ReservasView() {
             const esSeleccionado = diaSeleccionado === d;
             const dtIso = `${mesActual.y}-${String(mesActual.m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const reservasDia = listaTodasReservas.filter((r) => {
-              const f = r.hora ? r.hora.slice(0, 10) : '';
-              return f === dtIso;
+              return partesLima(r.hora).fecha === dtIso;
             });
             const nConf = reservasDia.filter((r) => r.estado !== 'CANCELADA').length;
 
@@ -1067,10 +1061,7 @@ export function ReservasView() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {reservasDelDia.map((r) => {
-              const d = new Date(r.hora);
-              const horaTexto = !isNaN(d.getTime())
-                ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : '19:00';
+              const horaTexto = partesLima(r.hora).hora || '19:00';
               const mesaNom = (r.mesas || []).map((m) => m.nombre || `M0${m.numero}`).join(' + ');
 
               return (
@@ -1315,13 +1306,9 @@ export function ReservasView() {
           }}
         >
           {reservasFiltradas.map((r) => {
-            const d = new Date(r.hora);
-            const fechaStr = !isNaN(d.getTime())
-              ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
-              : '15/10';
-            const horaStr = !isNaN(d.getTime())
-              ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : '19:00';
+            const lima = partesLima(r.hora);
+            const fechaStr = lima.fecha ? `${lima.fecha.slice(8, 10)}/${lima.fecha.slice(5, 7)}` : '15/10';
+            const horaStr = lima.hora || '19:00';
             const mesaNom = (r.mesas || []).map((m) => m.nombre || `M0${m.numero}`).join(' + ');
 
             const badgeBg =

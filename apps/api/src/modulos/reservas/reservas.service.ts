@@ -1064,14 +1064,19 @@ export class ReservasService {
         mesaIds,
         toleranciaMin,
       });
-      const actualizada = await tx.solicitudReserva.update({
-        where: { id: sId },
-        data: {
-          estado: 'APROBADA',
-          reserva_id: reservaCreada.id,
-        },
-        include: { conversacion: true },
+      // Solo transiciona si sigue PENDIENTE: dos aprobaciones seguidas no crean dos reservas.
+      // Si no es 1, el throw deshace también la reserva creada arriba.
+      const { count } = await tx.solicitudReserva.updateMany({
+        where: { id: sId, estado: 'PENDIENTE' },
+        data: { estado: 'APROBADA', reserva_id: reservaCreada.id },
       });
+      if (count !== 1) {
+        throw new BadRequestException({
+          codigo: 'SOLICITUD_NO_PENDIENTE',
+          mensaje: 'La solicitud ya fue atendida por otra persona. Actualiza la pantalla.',
+        });
+      }
+      const actualizada = { ...solicitud, estado: 'APROBADA', reserva_id: reservaCreada.id };
       // Mensaje al cliente: se encola en la misma transacción que la solicitud (outbox)
       const { fechaIso: fechaLima, horaMinutos: horaLima } = obtenerFechaHoraLima(fechaHora);
       const msgConfirmacion = TEXTOS_RESERVA.reservaConfirmadaCliente({

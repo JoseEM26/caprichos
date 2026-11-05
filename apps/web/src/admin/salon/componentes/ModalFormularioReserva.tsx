@@ -3,6 +3,7 @@ import { Boton } from '../../../comun/Boton';
 import { Confirmar } from '../../../comun/Confirmar';
 import { Campo } from '../../../comun/Campo';
 import { MesaSalon, Reserva } from '../tipos';
+import { hoyLima, partesLima } from '../fechaLima';
 
 export interface ModalFormularioReservaProps {
   abierto: boolean;
@@ -32,7 +33,7 @@ export function ModalFormularioReserva({
   errorServidor,
   alLimpiarError,
 }: ModalFormularioReservaProps) {
-  const hoyIso = new Date().toISOString().split('T')[0];
+  const hoyIso = hoyLima();
 
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -51,15 +52,10 @@ export function ModalFormularioReserva({
       setTelefono(reservaParaEditar.telefono || '');
       setPersonas(reservaParaEditar.personas || 2);
 
-      const d = new Date(reservaParaEditar.hora);
-      if (!isNaN(d.getTime())) {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        setFecha(`${year}-${month}-${day}`);
-        setHora(`${hours}:${minutes}`);
+      const lima = partesLima(reservaParaEditar.hora);
+      if (lima.fecha) {
+        setFecha(lima.fecha);
+        setHora(lima.hora);
       }
 
       const mIds = (reservaParaEditar.mesas || [])

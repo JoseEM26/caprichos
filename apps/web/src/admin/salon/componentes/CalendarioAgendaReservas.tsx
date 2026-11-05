@@ -6,6 +6,7 @@ import { EstadoVacio } from '../../../comun/EstadoVacio';
 import { Confirmar } from '../../../comun/Confirmar';
 import { DiaCalendarioReserva, Reserva } from '../tipos';
 import { salonApi } from '../api';
+import { hoyLima, partesLima } from '../fechaLima';
 
 export interface CalendarioAgendaReservasProps {
   onSentarReserva: (datos: {
@@ -42,13 +43,8 @@ export function CalendarioAgendaReservas({
   onCancelarReserva,
   recargarKey = 0,
 }: CalendarioAgendaReservasProps) {
-  const hoy = new Date();
-  const hoyAno = hoy.getFullYear();
-  const hoyMesNum = hoy.getMonth() + 1;
-  const hoyDia = hoy.getDate();
-  const hoyFechaIso = `${hoyAno}-${String(hoyMesNum).padStart(2, '0')}-${String(
-    hoyDia,
-  ).padStart(2, '0')}`;
+  const hoyFechaIso = hoyLima();
+  const [hoyAno, hoyMesNum] = hoyFechaIso.split('-').map(Number);
 
   const [ano, setAno] = useState(hoyAno);
   const [mes, setMes] = useState(hoyMesNum); // 1-12
@@ -217,17 +213,7 @@ export function CalendarioAgendaReservas({
     }
   };
 
-  const formatearHoraLima = (iso: string) => {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleTimeString('es-PE', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return iso;
-    }
-  };
+  const formatearHoraLima = (iso: string) => partesLima(iso).hora || iso;
 
   const getVarianteInsignia = (estado: string): VarianteInsignia => {
     switch (estado) {
