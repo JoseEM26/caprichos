@@ -24,6 +24,31 @@ import { esSoloMozoUsuario, tieneRolUsuario } from '../../comun/rolesUsuario';
 const PPAGE = 24;
 
 
+/** Casilla «Controlar stock»: stock propio del producto (donas, galletas), aparte del control de insumos. */
+function CasillaControlaStock({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minHeight: 44, fontWeight: 700 }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-describedby="ayuda-controla-stock"
+        style={{ width: 22, height: 22, marginTop: 2, flexShrink: 0 }}
+      />
+      <span>
+        Controlar stock de este producto
+        <span
+          id="ayuda-controla-stock"
+          style={{ display: 'block', fontWeight: 400, fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)', marginTop: 2 }}
+        >
+          Para productos que se acaban, como donas o galletas: se descuenta al vender, se marca Agotado al llegar a 0
+          y la carta muestra cuántos quedan. Necesita el conteo de apertura de cada día.
+        </span>
+      </span>
+    </label>
+  );
+}
+
 /** Aviso de producto en promoción: reemplaza al botón «no suma puntos». */
 function AvisoPromocion({ p }: { p: ProductoAdmin }) {
   const promos = p.promociones ?? [];
@@ -110,6 +135,7 @@ export function ProductosView() {
   const [npCategoriaId, setNpCategoriaId] = useState<string>('');
   const [npPrecio, setNpPrecio] = useState('');
   const [npDesc, setNpDesc] = useState('');
+  const [npControlaStock, setNpControlaStock] = useState(false);
   // «¿Cómo se vende?»: null = lo decide la categoría (llevaOpciones); al tocar una tarjeta queda la elección
   const [npModoElegido, setNpModoElegido] = useState<'unico' | 'opciones' | null>(null);
   const [npOpc, setNpOpc] = useState<EstadoOpciones>(ESTADO_VACIO);
@@ -130,6 +156,7 @@ export function ProductosView() {
   const [edCategoriaId, setEdCategoriaId] = useState('');
   const [edPrecio, setEdPrecio] = useState('');
   const [edOculto, setEdOculto] = useState(false);
+  const [edControlaStock, setEdControlaStock] = useState(false);
   const [edFotoUrl, setEdFotoUrl] = useState<string | null>(null);
   const [edFotoArchivoId, setEdFotoArchivoId] = useState<string | null>(null);
   const subidaEdFoto = useSubidaArchivo();
@@ -359,6 +386,7 @@ export function ProductosView() {
     setEdCategoriaId(p.categoriaId);
     setEdPrecio(p.precio.toFixed(2));
     setEdOculto(p.oculto === true);
+    setEdControlaStock(p.controlaStock === true);
     setEdFotoUrl(p.fotoUrl || null);
     setEdFotoArchivoId(null);
     setEdSabores(p.sabores.map((s) => ({ ...s })));
@@ -386,6 +414,7 @@ export function ProductosView() {
             categoriaId: edCategoriaId,
             precio: precioNum,
             oculto: edOculto,
+            controlaStock: edControlaStock,
             fotoArchivoId: edFotoArchivoId,
             sabores: edSabores.map((s) => ({
               id: s.id,
@@ -496,6 +525,7 @@ export function ProductosView() {
             categoriaId: npCategoriaId,
             precio: precioNum,
             descripcion: npDesc.trim() || undefined,
+            controlaStock: npControlaStock,
             ...(npFotoArchivoId ? { fotoArchivoId: npFotoArchivoId } : {}),
             ...(conOpciones
               ? {
@@ -509,6 +539,7 @@ export function ProductosView() {
           setNpNombre('');
           setNpPrecio('');
           setNpDesc('');
+          setNpControlaStock(false);
           setNpModoElegido(null);
           setNpOpc(ESTADO_VACIO);
           elegirNpFoto(null);
@@ -970,6 +1001,7 @@ export function ProductosView() {
                 {p.promociones && p.promociones.length > 0 && (
                   <span className="pt-ins pt-ins--promo">En promoción</span>
                 )}
+                {p.controlaStock && <span className="pt-ins pt-ins--stock">Con stock</span>}
               </div>
               {p.fotoUrl && (
                 <img
@@ -1528,6 +1560,8 @@ export function ProductosView() {
             </div>
 
 
+            <CasillaControlaStock checked={npControlaStock} onChange={setNpControlaStock} />
+
             {/* Foto */}
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <div
@@ -1812,6 +1846,8 @@ export function ProductosView() {
               />
               Mostrar en la carta
             </label>
+
+            <CasillaControlaStock checked={edControlaStock} onChange={setEdControlaStock} />
 
             {/* Sabores gestionables (Donas, Galletas, Pizzas, etc.) */}
             <div>

@@ -38,6 +38,7 @@ const PRODUCTOS_MOCK = [
     disponible: true,
     agotadoHasta: null,
     noSumaBeneficios: false,
+    controlaStock: false,
     fotoUrl: '/uploads/frappe.jpg',
     tamanos: [
       { id: 'tam-1', tamanoValorId: 'val-tam-1', nombre: '12 oz', precio: 14.5, activo: true },
@@ -67,6 +68,7 @@ const PRODUCTOS_MOCK = [
     disponible: false,
     agotadoHasta: null,
     noSumaBeneficios: false,
+    controlaStock: false,
     fotoUrl: null,
     tamanos: [],
     grupos: [],

@@ -16,7 +16,10 @@ function useSesionSegura() {
   }
 }
 
-/** Interruptor «Control de almacén»: apagado, vender no descuenta stock ni agota productos solos. Solo el administrador. */
+/**
+ * Interruptor «Control de almacén»: gobierna SOLO insumos y recetas. El stock de productos terminados
+ * (casilla «Controlar stock de este producto» en Catálogo) funciona aparte. Solo el administrador.
+ */
 export function TarjetaControlAlmacenConfiguracion({ esAdmin: esAdminProp }: { esAdmin?: boolean } = {}) {
   const sesion = useSesionSegura();
   const esAdmin = esAdminProp !== undefined ? esAdminProp : (sesion?.usuario?.rol || '').toUpperCase() === 'ADMIN';
@@ -93,9 +96,26 @@ export function TarjetaControlAlmacenConfiguracion({ esAdmin: esAdminProp }: { e
             Control de almacén
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--cp-soft)', marginTop: 2, maxWidth: 560 }}>
-            Encendido, cada cobro descuenta insumos por receta, agota solos los productos sin insumos y avisa de lo que
-            falta. Apagado, vender no toca el stock: puedes cargar insumos, compras y proveedores con calma y encenderlo
-            cuando el almacén esté listo.
+            Este interruptor gobierna solo los insumos y las recetas. Encendido, cada cobro descuenta insumos por receta,
+            agota solos los productos que dependen de insumos sin stock y avisa de lo que falta. Apagado, vender no toca
+            el stock de insumos: puedes cargar insumos, compras y proveedores con calma.
+          </div>
+          <div
+            data-testid="control-almacen-productos"
+            style={{ fontSize: 12.5, color: 'var(--cp-navy)', marginTop: 6, maxWidth: 560 }}
+          >
+            {(estado?.productosControlados ?? 0) > 0 ? (
+              <>
+                El stock de productos terminados (donas, galletas) funciona aparte: <b>{estado?.productosControlados}</b>{' '}
+                {estado?.productosControlados === 1 ? 'producto controla' : 'productos controlan'} su stock con la casilla
+                «Controlar stock de este producto» del Catálogo, con o sin este interruptor.
+              </>
+            ) : (
+              <>
+                El stock de productos terminados (donas, galletas) funciona aparte, con la casilla «Controlar stock de
+                este producto» del Catálogo. Ningún producto la tiene marcada todavía.
+              </>
+            )}
           </div>
         </div>
         <CampoConfig id="operacion-control-almacen" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -133,10 +153,10 @@ export function TarjetaControlAlmacenConfiguracion({ esAdmin: esAdminProp }: { e
         titulo={activo ? 'Apagar el control de almacén' : 'Encender el control de almacén'}
         mensaje={
           activo
-            ? 'Desde ahora vender no descontará stock ni agotará productos solos. Los registros manuales siguen guardándose.'
+            ? 'Desde ahora vender no descontará insumos ni agotará productos por falta de insumos. El stock de los productos con casilla (donas, galletas) sigue igual. Los registros manuales siguen guardándose.'
             : riesgo
               ? `${estado?.insumosSinStock} insumos de recetas no tienen stock cargado. Si lo enciendes, ${estado?.productosEnRiesgo} productos se agotarán al primer cobro. ¿Encender igual?`
-              : 'Desde ahora cada cobro descontará stock por receta y agotará los productos que se queden sin insumos.'
+              : 'Desde ahora cada cobro descontará insumos por receta y agotará los productos que se queden sin insumos. El stock de los productos con casilla (donas, galletas) no cambia.'
         }
         textoSi="Sí, confirmar"
         textoNo="No, cancelar"

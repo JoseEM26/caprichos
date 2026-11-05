@@ -21,6 +21,7 @@ import { salonApi } from '../api';
 import '../salon.css';
 import '../nuevo-pedido-mozo.css';
 import { pedidosApi } from '../../pedidos/pedidosApi';
+import { leerStockInsuficiente, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
 import { comprobantesApi } from '../../comprobantes/comprobantesApi';
 import { ModalVoucherPedido } from '../ModalVoucherPedido';
 import { PlanPagoEditor } from './PlanPagoEditor';
@@ -1014,6 +1015,12 @@ export function ModalNuevoPedidoMesa({
         } catch {
           /* se mantiene la lista anterior */
         }
+      } else if (err?.codigo === 'STOCK_INSUFICIENTE') {
+        // Sin cerrar el modal: se vuelve a los productos para bajar la cantidad o cambiar el producto
+        const datos = leerStockInsuficiente(err);
+        const linea = lineas.find((l) => String(l.productoId) === datos?.productoId);
+        setErrorEnvio(datos ? mensajeStockInsuficiente(datos, linea?.nombre) : 'No hay stock suficiente para este pedido.');
+        setPaso('items');
       } else if (err?.codigo === 'MESA_OCUPADA') {
         setErrorEnvio(
           err.message ||

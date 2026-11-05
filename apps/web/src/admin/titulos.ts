@@ -15,6 +15,7 @@ export const TITULOS_VISTA: Record<string, { titulo: string; subtitulo: string }
   ofertas: { titulo: "Ofertas y descuentos", subtitulo: "Combos, promociones por cantidad, descuentos, cupones, vales y sorteos." },
   compras: { titulo: "Compras", subtitulo: "Pedidos a proveedores, compras rápidas, recepción de insumos y lista por pedir." },
   almacen: { titulo: "Almacén", subtitulo: "Guardar, traslados a cocina, mermas, devoluciones, ajustes por conteo y cierre del día." },
+  apertura: { titulo: "Apertura del día", subtitulo: "Cuántos hay de cada producto que se acaba (donas, galletas) al empezar el día. Con eso la carta muestra cuántos quedan." },
   stock: { titulo: "Stock y recetas", subtitulo: "Insumos, recetas y margen por plato." },
   recetas: { titulo: "Recetas", subtitulo: "Qué lleva cada producto, qué insumos descuenta al vender o al preparar por tanda." },
   informes: { titulo: "Informes", subtitulo: "Reportes con los datos del sistema: abre uno para ver sus cifras y descargarlo." },

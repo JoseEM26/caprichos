@@ -64,6 +64,8 @@ export interface ProductoAdmin {
   noSumaBeneficios: boolean;
   /** Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto. */
   resaltarOpcionMenosPedida?: boolean;
+  /** Stock propio del producto (donas, galletas): se descuenta al vender y se marca agotado en 0. Necesita conteo de apertura. */
+  controlaStock: boolean;
   /** Promociones activas (descuento / lleva-paga) que alcanzan al producto; los combos no cuentan. */
   promociones?: PromocionProducto[];
   /** Promociones activas de toda la carta (no esconden el botón). */
@@ -131,6 +133,7 @@ export const catalogoApi = {
     orden?: number;
     noSumaBeneficios?: boolean;
     resaltarOpcionMenosPedida?: boolean;
+    controlaStock?: boolean;
     tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean }>;
     grupos?: Array<{ grupoId: string | number; orden?: number }>;
     sabores?: string[];
@@ -150,6 +153,7 @@ export const catalogoApi = {
       oculto?: boolean;
       noSumaBeneficios?: boolean;
       resaltarOpcionMenosPedida?: boolean;
+      controlaStock?: boolean;
       tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean }>;
       grupos?: Array<{ grupoId: string | number; orden?: number }>;
       sabores?: Array<{ id?: string | number; nombre: string; activo?: boolean }>;

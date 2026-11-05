@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react';
 import { stockApi } from './stockApi';
 
-/** Franja que se muestra arriba de Almacén, Stock y Compras cuando el control de almacén está apagado. */
+/**
+ * Franja que se muestra arriba de Almacén, Stock y Compras cuando el control de insumos está apagado.
+ * El interruptor gobierna solo insumos y recetas; el stock de productos con casilla sigue aparte.
+ */
 export function AvisoControlAlmacen() {
   const [apagado, setApagado] = useState(false);
+  const [controlados, setControlados] = useState(0);
 
   useEffect(() => {
     let vivo = true;
     stockApi
       .estadoControl()
       .then((e) => {
-        if (vivo) setApagado(!e.activo);
+        if (!vivo) return;
+        setApagado(!e.activo);
+        setControlados(e.productosControlados ?? 0);
       })
       .catch(() => {});
     return () => {
@@ -33,9 +39,18 @@ export function AvisoControlAlmacen() {
         color: 'var(--cp-navy)',
       }}
     >
-      <b>Control de almacén apagado.</b> Aquí puedes cargar insumos, stock, compras y proveedores, pero al cobrar un
-      pedido no se descuenta stock, no se agotan productos solos y no hay avisos de insumos. El administrador lo
-      enciende en Configuración › Operación.
+      <b>Control de insumos apagado.</b> Aquí puedes cargar insumos, compras y proveedores, pero al cobrar un pedido
+      no se descuentan insumos por receta y no hay avisos de insumos. El administrador lo enciende en Configuración ›
+      Operación.
+      {controlados > 0 ? (
+        <>
+          {' '}
+          {controlados === 1
+            ? <>El producto con stock propio (donas, galletas) sigue controlándose</>
+            : <><b>{controlados}</b> productos con stock propio (donas, galletas) siguen controlándose</>}
+          : se descuenta al vender y se agota en 0.
+        </>
+      ) : null}
     </div>
   );
 }
