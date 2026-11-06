@@ -2154,95 +2154,18 @@ export function ProductosView() {
       {/* MODAL: OPCIONES Y TAMAÑOS                                          */}
       {/* =================================================================== */}
       {productoEnOpciones && (
-        <>
-          <div
-            onClick={() => setProductoEnOpciones(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 50,
-              background: 'rgba(11,44,62,0.55)',
-            }}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Tamaños y opciones"
-            style={{
-              position: 'fixed',
-              zIndex: 60,
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%,-50%)',
-              width: 'min(1120px, calc(100% - 24px))',
-              maxHeight: 'calc(100% - 24px)',
-              overflowY: 'auto',
-              background: 'var(--cp-cream)',
-              borderRadius: 20,
-              boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
-              padding: 20,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: 8,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: 22,
-                    lineHeight: '27px',
-                  }}
-                >
-                  Tamaños y opciones: {productoEnOpciones.nombre}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-                  Tamaños y opciones de este producto.
-                </div>
-              </div>
-              <button
-                onClick={() => setProductoEnOpciones(null)}
-                aria-label="Cerrar"
-                style={{
-                  flex: 'none',
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  border: '1.5px solid var(--cp-navy)',
-                  background: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontSize: 20,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <EditorOpcionesTamanos
-              key={productoEnOpciones.id}
-              modo="guardado"
-              producto={productoEnOpciones}
-              precioBase={productoEnOpciones.precio}
-              puedeEditar={puedeEditar}
-              alGuardar={async () => {
-                setProductoEnOpciones(null);
-                await cargarDatos();
-              }}
-              alCancelar={() => setProductoEnOpciones(null)}
-            />
-          </div>
-        </>
+        <EditorOpcionesTamanos
+          key={productoEnOpciones.id}
+          modo="guardado"
+          producto={productoEnOpciones}
+          precioBase={productoEnOpciones.precio}
+          puedeEditar={puedeEditar}
+          alGuardar={async () => {
+            setProductoEnOpciones(null);
+            await cargarDatos();
+          }}
+          alCancelar={() => setProductoEnOpciones(null)}
+        />
       )}
 
       {/* =================================================================== */}

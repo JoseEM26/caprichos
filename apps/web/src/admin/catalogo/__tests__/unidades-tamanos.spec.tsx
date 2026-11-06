@@ -5,7 +5,6 @@ import { EditorOpcionesTamanos } from '../EditorOpcionesTamanos';
 import { EstadoOpciones } from '../editorOpcionesTipos';
 import { catalogoApi } from '../catalogoApi';
 
-const AYUDA_UNIDADES = 'Sirve para descontar el stock: una 1/2 docena descuenta 6 unidades.';
 
 const LISTAS = [
   {
@@ -38,11 +37,12 @@ describe('Tamaños: campo «Unidades» (stock por sabor)', () => {
     vi.spyOn(catalogoApi, 'listarGrupos').mockResolvedValue([] as any);
   });
 
-  it('cada tamaño muestra Unidades con 1 por defecto y la ayuda corta', () => {
+  it('cada tamaño muestra Unidades con 1 por defecto y la ayuda en el «?»', () => {
     render(<Borrador onEmitir={() => {}} />);
     expect(screen.getByLabelText('Unidades de Regular 12 oz')).toHaveValue(1);
     expect(screen.getByLabelText('Unidades de Grande 16 oz')).toHaveValue(1);
-    expect(screen.getAllByText(AYUDA_UNIDADES)).toHaveLength(2);
+    fireEvent.click(screen.getByLabelText('Ayuda: Unidades'));
+    expect(screen.getByRole('note')).toHaveTextContent(/descuenta esa cantidad del stock/);
   });
 
   it('en borrador, cambiar las unidades emite el nuevo valor', () => {
@@ -100,7 +100,7 @@ describe('Tamaños: campo «Unidades» (stock por sabor)', () => {
     const emitir = vi.fn();
     const agregar = vi.spyOn(catalogoApi, 'agregarValor').mockResolvedValue({ id: 'v9', nombre: 'Docena', orden: 3, activo: true });
     render(<Borrador onEmitir={emitir} />);
-    fireEvent.click(screen.getByText('Agregar tamaño'));
+    fireEvent.click(screen.getByText('+ Agregar tamaño'));
     await waitFor(() => screen.getByRole('option', { name: 'Extra 21 oz' }));
     fireEvent.change(screen.getByLabelText('O crear uno nuevo'), { target: { value: 'Docena' } });
     fireEvent.click(screen.getByText('+ Crear'));

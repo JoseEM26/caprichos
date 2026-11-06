@@ -18,3 +18,5 @@ export * from './mapa/MapaUbicacion';
 export * from './mapa/MapaPedidos';
 export * from './mapa/BuscadorDireccion';
 export { enlaceGoogleMaps } from './mapa/leaflet';
+export * from './ModalConPestanas';
+export * from './ModalPorPasos';

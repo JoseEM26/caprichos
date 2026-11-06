@@ -1,0 +1,17 @@
+/* Asistente por pasos (comun/ModalPorPasos.tsx); base visual en .ad-* de pendientes-cierre.css. */
+.mpp-fondo { position: fixed; inset: 0; z-index: 50; background: rgba(11, 44, 62, 0.55); }
+.mpp-dialogo { width: min(620px, calc(100% - 24px)); height: min(90dvh, 720px); font-family: 'Open Sans', sans-serif; color: var(--cp-navy, #0B2C3E); }
+.mpp-dialogo:focus { outline: none; }
+.mpp-progreso { flex: 0 0 auto; padding: 0 16px 8px; display: flex; flex-direction: column; gap: 6px; }
+.mpp-texto { font-family: Montserrat, sans-serif; font-weight: 800; font-size: 13px; color: var(--cp-soft, #2C4C5D); }
+.mpp-pasos { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.mpp-paso { flex: 1 1 0; height: 6px; border-radius: 3px; background: var(--cp-sand, #EDE1D1); }
+.mpp-paso span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.mpp-hecho { background: var(--cp-rust, #B2500F); }
+.mpp-actual { background: var(--cp-navy, #0B2C3E); }
+.mpp-cuerpo { padding-bottom: 12px; }
+.mpp-h { margin: 0; font-family: Montserrat, sans-serif; font-size: 16px; }
+.mpp-error { color: var(--cp-rust, #B2500F); font-weight: 700; font-size: 14px; }
+.mpp-pie { justify-content: flex-end; }
+.mpp-pie > * { flex: 0 1 auto; min-width: 120px; }
+@media (max-width: 480px) { .mpp-dialogo { width: calc(100% - 12px); height: 94dvh; } .mpp-pie { flex-direction: row; } .mpp-pie > * { flex: 1 1 0; } }
