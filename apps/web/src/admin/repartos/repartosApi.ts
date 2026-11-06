@@ -8,6 +8,8 @@ export type ColorEspera = 'verde' | 'amarillo' | 'naranja' | 'rojo';
 export interface PedidoReparto {
   id: string;
   codigo: string;
+  /** Último cambio de ubicación (ISO); null si la dirección es la original */
+  ubicacion_editada_en?: string | null;
   modalidad: string;
   estado: string;
   cliente_nombre: string;

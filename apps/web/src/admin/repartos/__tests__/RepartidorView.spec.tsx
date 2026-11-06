@@ -390,6 +390,14 @@ describe('RepartidorView: pantalla toda mapa del repartidor', () => {
       expect(screen.queryByTestId('hoja-inferior')).toBeNull();
     });
 
+    it('12c. el enlace viejo wa.me ya no sale: queda «Llamar» y el chat de WhatsApp de la app', async () => {
+      await abrirDetalleMio();
+      const detalle = screen.getByTestId('detalle-pedido');
+      expect(within(detalle).getByRole('link', { name: 'Llamar' })).toBeInTheDocument();
+      expect(detalle.querySelector('a[href*="wa.me"]')).toBeNull();
+      expect(screen.getByTestId('btn-chatear-101')).toBeInTheDocument();
+    });
+
     it('13. se cierra deslizando el asa hacia abajo; un deslizamiento corto no la cierra', async () => {
       await abrirDetalleMio();
       const asa = screen.getByTestId('hoja-asa');

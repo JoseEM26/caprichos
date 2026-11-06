@@ -371,6 +371,15 @@ export function ModalCobrar({
           </div>
         )}
 
+        {/* Cambio de dirección con ajuste sin resolver: saldo por cobrar o devolución pendiente (solo si aplica) */}
+        {pedido.ajusteUbicacionPendiente && (
+          <div data-testid="cobro-ajuste-ubicacion" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)', marginTop: -6, marginBottom: 6 }}>
+            {pedido.ajusteUbicacionPendiente.tipo === 'SALDO'
+              ? `Ajuste por cambio de dirección: +S/ ${pedido.ajusteUbicacionPendiente.monto.toFixed(2)}`
+              : `Devolución pendiente S/ ${pedido.ajusteUbicacionPendiente.monto.toFixed(2)}`}
+          </div>
+        )}
+
         {/* Filas de pagos */}
         {pagos.map((fila, idx) => {
           const esEfectivo = mismoMedio(fila.medio, 'Efectivo');

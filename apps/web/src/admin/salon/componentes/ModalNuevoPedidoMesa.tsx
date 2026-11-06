@@ -11,6 +11,7 @@ import { SEDE_DEFECTO, cargarSede } from '../../../comun/mapa/sedeDefecto';
 import { CategoriaCarta, ProductoCarta, OpcionCarta as OpcionProducto } from '../../../carta/tipos';
 import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from '../tipos';
 import { CuadriculaPlano } from './CuadriculaPlano';
+import { SelectorMesasCroquis } from './SelectorMesasCroquis';
 import { comboDeProducto } from '../../../carta/ReemplazoCombo';
 import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
@@ -638,6 +639,12 @@ export function ModalNuevoPedidoMesa({
   // Aviso al tocar una mesa que no se puede elegir
   const [avisoMesa, setAvisoMesa] = useState<string | null>(null);
 
+  // Personas de la mesa (opcional). Si los asientos no alcanzan, se avisa y el local confirma antes de enviar.
+  const [personasTxt, setPersonasTxt] = useState('');
+  const [capacidadAceptada, setCapacidadAceptada] = useState(false);
+  const [avisoCapacidad, setAvisoCapacidad] = useState(false);
+  const personasNum = /^\d+$/.test(personasTxt.trim()) && Number(personasTxt) > 0 ? Number(personasTxt) : undefined;
+
   // Cargar carta al montar
   useEffect(() => {
     let cancel = false;
@@ -704,6 +711,46 @@ export function ModalNuevoPedidoMesa({
       .filter((m) => mesasSeleccionadas.includes(m.id))
       .reduce((acc, m) => acc + (Number(m.asientos) || 4), 0);
   }, [mesasSeleccionadas, todasLasMesas]);
+
+  // Capacidad real de las mesas elegidas (asientos, como en el servidor) frente a las personas
+  const capacidadElegida = useMemo(
+    () => todasLasMesas.filter((m) => mesasSeleccionadas.includes(m.id)).reduce((acc, m) => acc + (m.asientos ?? 0), 0),
+    [mesasSeleccionadas, todasLasMesas],
+  );
+  const asientosFaltan = personasNum !== undefined && mesasSeleccionadas.length > 0 ? Math.max(0, personasNum - capacidadElegida) : 0;
+
+  // Croquis: mesas ocupadas (no elegibles) y reservadas (se ven, pero se pueden elegir)
+  const ocupadasCroquis = useMemo(
+    () =>
+      Object.fromEntries(
+        todasLasMesas.filter((m) => m.estado === 'OCUPADA').map((m) => [m.id, { nombre: m.pedido?.codigo ?? null }]),
+      ),
+    [todasLasMesas],
+  );
+  const reservadasCroquis = useMemo(
+    () =>
+      Object.fromEntries(
+        todasLasMesas
+          .filter((m) => m.estado !== 'OCUPADA' && m.reserva)
+          .map((m) => [m.id, { reservaId: m.reserva?.id, nombre: m.reserva?.nombre ?? null, hora: m.reserva?.hora ?? null }]),
+      ),
+    [todasLasMesas],
+  );
+
+  // Croquis nuevo (elegir una o varias mesas): tocar una libre la elige; en «Tomar pedido», la primera abre la carta
+  const alCambiarSeleccionCroquis = (ids: string[]) => {
+    setAvisoMesa(null);
+    setCapacidadAceptada(false);
+    if (modoPlano === 'one') {
+      const nueva = ids.find((id) => !mesasSeleccionadas.includes(id));
+      if (nueva) {
+        setMesasSeleccionadas([nueva]);
+        setPaso('items');
+      }
+      return;
+    }
+    setMesasSeleccionadas(ids);
+  };
 
   // Manejar clic en mesa en el plano
   const handleClicMesa = (mesa: MesaSalon) => {
@@ -922,6 +969,11 @@ export function ModalNuevoPedidoMesa({
       enfocarCampo(primero.foco);
       return;
     }
+    // Personas de más frente a los asientos: se avisa y el local lo confirma (el servidor lo exige igual)
+    if (modalidad === 'local' && asientosFaltan > 0 && !capacidadAceptada) {
+      setAvisoCapacidad(true);
+      return;
+    }
     setConfirmarEnviar(true);
   };
   const intentarContinuarCli = () => {
@@ -984,6 +1036,9 @@ export function ModalNuevoPedidoMesa({
             reservaId: reservaIdPreseleccionada,
             cuponCodigo: cuponAplicado?.codigo,
             canal: canalEnvio,
+            // Personas (opcional): el servidor valida los asientos; confirmarCapacidad la deja pasar si el local lo aceptó
+            personas: personasNum,
+            ...(capacidadAceptada ? { confirmarCapacidad: true } : {}),
             esPersonal: pideMode === 'personal',
             colaboradorPartyId: staffElegido?.partyId,
             clientePartyId: clientePideId,
@@ -1667,8 +1722,8 @@ export function ModalNuevoPedidoMesa({
                 })}
               </div>
 
-              {/* Selector de piso si hay más de 1 */}
-              {pisosActivos.length > 1 && (
+              {/* Selector de piso si hay más de 1 (en el croquis de elegir mesas, sus propias pestañas) */}
+              {modoPlano === 'free' && pisosActivos.length > 1 && (
                 <div className="salon-pisos" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {pisosActivos.map((f) => (
                     <button
@@ -1782,19 +1837,53 @@ export function ModalNuevoPedidoMesa({
                 </div>
               )}
 
-              {/* El plano del local, con sus paredes, cocina, barra y mesas */}
-              <div style={{ maxWidth: '100%', overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
-                <CuadriculaPlano
-                  columnas={planoActual?.cuadriculaAncho ?? planoActual?.cuadricula_ancho ?? pisoActual?.cuadricula_ancho ?? 20}
-                  filas={planoActual?.cuadriculaAlto ?? planoActual?.cuadricula_alto ?? pisoActual?.cuadricula_alto ?? 12}
-                  elementos={elementosPlano}
-                  modoSalon
-                  mesasSalon={mesasPiso}
-                  mesasSeleccionadasIds={mesasSeleccionadas}
-                  onSeleccionarMesaSalon={handleClicMesa}
-                  alMantenerMesaSalon={(m) => setVistaPreviaId(String(m.id))}
-                />
-              </div>
+              {/* Liberar o marcar: el plano de siempre (tocar una ocupada la libera) */}
+              {modoPlano === 'free' && (
+                <div style={{ maxWidth: '100%', overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
+                  <CuadriculaPlano
+                    columnas={planoActual?.cuadriculaAncho ?? planoActual?.cuadricula_ancho ?? pisoActual?.cuadricula_ancho ?? 20}
+                    filas={planoActual?.cuadriculaAlto ?? planoActual?.cuadricula_alto ?? pisoActual?.cuadricula_alto ?? 12}
+                    elementos={elementosPlano}
+                    modoSalon
+                    mesasSalon={mesasPiso}
+                    mesasSeleccionadasIds={mesasSeleccionadas}
+                    onSeleccionarMesaSalon={handleClicMesa}
+                    alMantenerMesaSalon={(m) => setVistaPreviaId(String(m.id))}
+                  />
+                </div>
+              )}
+
+              {/* Tomar pedido o juntar varias: el croquis nuevo (con paredes, cocina y barra del plano) */}
+              {modoPlano !== 'free' && (
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>
+                    Personas (opcional)
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={personasTxt}
+                      onChange={(e) => {
+                        setPersonasTxt(e.target.value);
+                        setCapacidadAceptada(false);
+                      }}
+                      aria-label="Personas"
+                      style={{ width: 90, minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', padding: '0 10px', fontSize: 16 }}
+                    />
+                  </label>
+                  <SelectorMesasCroquis
+                    pisos={pisosActivos}
+                    planos={planoPisos}
+                    seleccionadas={mesasSeleccionadas}
+                    onCambio={alCambiarSeleccionCroquis}
+                    personas={personasNum}
+                    ocupadas={ocupadasCroquis}
+                    reservadas={reservadasCroquis}
+                    alMantenerMesa={(m) => setVistaPreviaId(String(m.id))}
+                    alTocarOcupada={(m) => setAvisoMesa(`${m.nombre || `Mesa ${m.numero}`} está ocupada. Elige una mesa libre.`)}
+                  />
+                </>
+              )}
               {avisoMesa && (
                 <div
                   role="alert"
@@ -3208,6 +3297,21 @@ export function ModalNuevoPedidoMesa({
         cargando={enviando}
         alConfirmar={handleEnviarPedido}
         alCancelar={() => setConfirmarEnviar(false)}
+      />
+
+      {/* Aviso de capacidad: las mesas no alcanzan para las personas (el local decide) */}
+      <Confirmar
+        abierto={avisoCapacidad}
+        titulo="¿Enviar con menos asientos que personas?"
+        mensaje={`Las mesas elegidas suman ${capacidadElegida} asientos y son ${personasNum ?? 0} personas: faltan ${asientosFaltan}. Si el local lo confirma, el pedido se abre igual.`}
+        textoConfirmar="Sí, enviar igual"
+        textoNo="No, revisar"
+        alConfirmar={() => {
+          setAvisoCapacidad(false);
+          setCapacidadAceptada(true);
+          setConfirmarEnviar(true);
+        }}
+        alCancelar={() => setAvisoCapacidad(false)}
       />
 
       {/* Voucher del pedido digital recién creado */}

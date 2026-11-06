@@ -19,6 +19,7 @@ import './pedidos.css';
 import { FiltroDiasPedidos } from './FiltroDiasPedidos';
 import { RangoPedidos, parametrosDeRango, rangoHoy } from './filtroDias';
 import { nombreMedio } from './planPago';
+import { InsigniaDireccionEditada } from './InsigniaDireccionEditada';
 
 export function canalLabel(c?: string | null) {
   if (!c) return 'Web';
@@ -817,6 +818,7 @@ export function PedidosAdminView() {
                     {canalLabel(o.canal)} · {modLabel(o.modalidad)} · {o.cliente_nombre || 'Cliente'}
                   </div>
                   <ChipCobroMozo cobro={o.cobroMozo} />
+                  {o.ubicacion_editada_en && <InsigniaDireccionEditada />}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
                       {itemsTexto || '1 producto'}

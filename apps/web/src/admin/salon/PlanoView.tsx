@@ -9,7 +9,7 @@ import { ModalPrecuenta } from './componentes/ModalPrecuenta';
 import { useSalonSocket } from './useSalonSocket';
 import { useMantenerPresionado } from './useMantenerPresionado';
 import { VistaPreviaMesa } from './componentes/VistaPreviaMesa';
-import { useCambioDeMesa } from './componentes/CambioDeMesa';
+import { useCambioDeMesa, useSumarMesas } from './componentes/CambioDeMesa';
 import { salonApi } from './api';
 import './salon.css';
 
@@ -60,6 +60,10 @@ export function PlanoView() {
   const [vistaPreviaId, setVistaPreviaId] = useState<string | null>(null);
   const mantenerMesa = useMantenerPresionado<MesaSalon>((mesa) => setVistaPreviaId(String(mesa.id)), 2000);
   const cambio = useCambioDeMesa(() => void cargarDatos());
+  const sumar = useSumarMesas(() => void cargarDatos());
+  // Mesas del mismo pedido que esta (la vista previa y «Quitar mesa» las necesitan)
+  const mesasDelPedidoDe = (m: MesaSalon): MesaSalon[] =>
+    m.pedido ? pisosSalon.flatMap((p) => p.mesas || []).filter((x) => x.pedido?.id === m.pedido?.id) : [];
   const [mesasParaPedido, setMesasParaPedido] = useState<string[]>([]);
 
   // Confirmaciones obligatorias Sí/No
@@ -840,6 +844,7 @@ export function PlanoView() {
           </div>
 
           {cambio.ui}
+          {sumar.ui}
           {/* Contenedor del plano con aspecto exacto del mockup */}
           <div
             className="salon-lienzo"
@@ -875,6 +880,8 @@ export function PlanoView() {
                 const t = EL_CONFIG[e.tipo.toLowerCase()] || EL_CONFIG.mesa;
                 const sel = e.id === elementoSeleccionadoId;
                 const esMesa = e.tipo.toLowerCase() === 'mesa';
+                // Mesa elegida para sumar a un pedido (modo «Agregar mesa»)
+                const elegidaParaSumar = sumar.seleccionadas.includes(String(e.id));
                 const numMesa = parseInt(String(e.nombre || '').replace(/\D/g, ''), 10) || e.numero || 0;
                 const mesaSalonElem = esMesa ? mesasSalonPorId.get(String(e.id)) : undefined;
                 // Estado real del servidor (LIBRE / OCUPADA) para pintar la mesa
@@ -894,8 +901,8 @@ export function PlanoView() {
                     onClick={(ev) => {
                       ev.stopPropagation();
                       // Eligiendo destino de un cambio de mesa, tocar una libre es la elección
-                      if (cambio.modoDestino) {
-                        if (mesaSalonElem) cambio.tocarMesa(mesaSalonElem);
+                      if (cambio.modoDestino || sumar.modoDestino) {
+                        if (mesaSalonElem && !sumar.tocarMesa(mesaSalonElem)) cambio.tocarMesa(mesaSalonElem);
                         return;
                       }
                       setElementoSeleccionadoId(e.id);
@@ -920,9 +927,9 @@ export function PlanoView() {
                       borderRadius: esMesa ? '10px' : '3px',
                       background: ocupadaSalon ? '#F6C9A5' : libreSalon ? 'var(--cp-greenbg)' : t.bg,
                       color: t.fg,
-                      border: sel
+                      border: sel || elegidaParaSumar
                         ? '3px solid var(--cp-orange)'
-                        : cambio.modoDestino && libreSalon
+                        : (cambio.modoDestino || sumar.modoDestino) && libreSalon
                         ? '2.5px solid var(--cp-orange)'
                         : e.activo
                         ? `1.5px solid ${ocupadaSalon ? 'var(--cp-orange)' : libreSalon ? 'var(--cp-ok)' : t.bd}`
@@ -1932,6 +1939,12 @@ export function PlanoView() {
           alCambiarMesa={(m) => {
             setVistaPreviaId(null);
             if (m.pedido) cambio.iniciar({ pedidoId: m.pedido.id, codigo: m.pedido.codigo, mesa: m });
+          }}
+          puedeAbrirMesas={tiene('mesas/abrir')}
+          mesasDelPedido={mesasDelPedidoDe(mesasSalonPorId.get(vistaPreviaId) as MesaSalon)}
+          alAgregarMesa={(m) => {
+            setVistaPreviaId(null);
+            if (m.pedido) sumar.iniciar({ pedidoId: m.pedido.id, codigo: m.pedido.codigo, mesa: m, mesasEnPedido: mesasDelPedidoDe(m).length });
           }}
           alCambiar={() => void cargarDatos()}
         />

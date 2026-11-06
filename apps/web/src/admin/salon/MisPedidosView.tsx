@@ -15,6 +15,7 @@ import { ProgresoPedido } from './ProgresoPedido';
 import { SalonMozo } from './componentes/SalonMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
 import type { MiPedido, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
+import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
 import './mis-pedidos.css';
 import './mis-pedidos-voucher.css';
 
@@ -333,6 +334,7 @@ export function MisPedidosView() {
                 <div className="mp-card-cabeza">
                   <span className="mp-card-fila">
                     <strong className="mp-codigo">{p.codigo}</strong>
+                    {p.ubicacionEditadaEn && <InsigniaDireccionEditada />}
                     {p.clienteNombre && (
                       <span className="mpv-cliente" title={p.clienteNombre}>
                         · {p.clienteNombre}
