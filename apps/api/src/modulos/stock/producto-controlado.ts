@@ -473,6 +473,16 @@ export async function fijarAperturaProducto(
   await sincronizarAgotadoProducto(db, productoId, cantidad, ahora);
 }
 
+/** Ids de productos (sin sabor) que ya tienen conteo de apertura hoy. El saldo arrastra del día anterior, pero el admin necesita saber si falta contar hoy. */
+export async function aperturaHoyProductos(db: any, ids: bigint[], fecha: string = fechaLimaHoy()): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const filas = await db.conteoApertura.findMany({
+    where: { fecha: fechaColumna(fecha), producto_id: { in: ids }, sabor_id: null },
+    select: { producto_id: true },
+  });
+  return new Set(filas.map((f: any) => f.producto_id.toString()));
+}
+
 /** Quedan de cada producto que controla stock (saldo entero, mínimo 0). Los demás productos no aparecen en el mapa. */
 export async function quedanProductos(db: any, ids: bigint[]): Promise<Map<string, number>> {
   const mapa = new Map<string, number>();
