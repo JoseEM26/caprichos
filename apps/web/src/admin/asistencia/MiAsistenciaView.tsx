@@ -14,6 +14,7 @@ import {
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
+import { leerQrDeVideo, mensajeErrorCamara, pedirCamara } from './escanerQr';
 import './asistencia.css';
 
 const VARIANTE_ESTADO: Record<string, VarianteInsignia> = {
@@ -78,6 +79,9 @@ export function MiAsistenciaView() {
   const [mensajeOk, setMensajeOk] = useState<string | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
   const flujo = useRef<MediaStream | null>(null);
+  const [modoCamara, setModoCamara] = useState<'environment' | 'user'>('environment');
+  const [variasCamaras, setVariasCamaras] = useState(false);
+  const [errorCamara, setErrorCamara] = useState<string | null>(null);
 
   const recargar = async () => {
     try {
@@ -106,7 +110,7 @@ export function MiAsistenciaView() {
 
   async function abrirCamara(modo: 'environment' | 'user') {
     detenerCamara();
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: modo }, audio: false });
+    const stream = await pedirCamara(modo);
     flujo.current = stream;
     if (video.current) {
       video.current.srcObject = stream;
@@ -120,40 +124,40 @@ export function MiAsistenciaView() {
     setError(null);
     setCodigo('');
     setQrTexto(null);
+    setModoCamara('environment');
     setUbicacion(null);
     setSelfie(null);
     setPaso('escanear');
   };
 
-  // Escaneo con BarcodeDetector cuando el navegador lo trae; si no, código manual.
+  // Escaneo del QR: BarcodeDetector si existe; si no, jsQR. El código manual siempre queda a la vista.
   useEffect(() => {
     if (paso !== 'escanear') return;
-    const Detector = (window as any).BarcodeDetector;
     let activo = true;
-    let intervalo: ReturnType<typeof setInterval> | undefined;
+    let parar: (() => void) | undefined;
+    setErrorCamara(null);
     (async () => {
       try {
-        await abrirCamara('environment');
-        if (!Detector || !video.current) return;
-        const det = new Detector({ formats: ['qr_code'] });
-        intervalo = setInterval(async () => {
-          if (!activo || !video.current) return;
-          const codigos = await det.detect(video.current).catch(() => []);
-          if (codigos.length && activo) {
-            setQrTexto(codigos[0].rawValue);
-            setPaso('ubicacion');
-          }
-        }, 400);
-      } catch {
-        // Sin cámara: queda el código manual
+        await abrirCamara(modoCamara);
+        if (!activo) return;
+        navigator.mediaDevices.enumerateDevices?.()
+          .then((d) => activo && setVariasCamaras(d.filter((x) => x.kind === 'videoinput').length > 1))
+          .catch(() => undefined);
+        if (!video.current) return;
+        parar = leerQrDeVideo(video.current, (texto) => {
+          setQrTexto(texto);
+          setPaso('ubicacion');
+        });
+      } catch (e) {
+        if (activo) setErrorCamara(mensajeErrorCamara(e));
       }
     })();
     return () => {
       activo = false;
-      if (intervalo) clearInterval(intervalo);
+      parar?.();
       detenerCamara();
     };
-  }, [paso]);
+  }, [paso, modoCamara]);
 
   // Ubicación al entrar a su paso
   useEffect(() => {
@@ -176,7 +180,7 @@ export function MiAsistenciaView() {
   // Cámara frontal para la selfie
   useEffect(() => {
     if (paso !== 'selfie') return;
-    abrirCamara('user').catch(() => setError('No pudimos abrir la cámara. Revisa el permiso del navegador.'));
+    abrirCamara('user').catch((e) => setError(mensajeErrorCamara(e)));
     return () => detenerCamara();
   }, [paso]);
 
@@ -299,7 +303,13 @@ export function MiAsistenciaView() {
         <section className="ma-card">
           <h3>1. Escanea el QR</h3>
           <div className="as-ayuda">Apunta la cámara al QR de la pantalla del local.</div>
-          <video ref={video} muted playsInline className="ma-video" />
+          <video ref={video} muted playsInline autoPlay className="ma-video" />
+          {errorCamara && <div role="alert" className="as-aviso as-aviso--alerta" data-testid="error-camara">{errorCamara}</div>}
+          {variasCamaras && !errorCamara && (
+            <Boton type="button" variante="secundario" onClick={() => setModoCamara((m) => (m === 'environment' ? 'user' : 'environment'))}>
+              Cambiar cámara
+            </Boton>
+          )}
           <label className="as-campo">
             O escribe el código de 6 dígitos de la pantalla
             <input
