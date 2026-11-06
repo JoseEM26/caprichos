@@ -77,6 +77,15 @@ describe('lógica de stock (stock.ts)', () => {
     expect(topeAgregable(infoStockDe(base), 3)).toBeNull();
   });
 
+  it('galleta por tamaño: 1/2 docena cuenta 6 unidades del saldo, no 1', () => {
+    const media = { ...linea('a', '1', 1), unidadesTamano: 6 };
+    expect(unidadesEnCarrito([media], '1')).toBe(6);
+    expect(topeAgregable(infoStockDe(conStock(12)), 6, 6)).toBe(1);
+    expect(topeAgregable(infoStockDe(conStock(5)), 0, 6)).toBe(0);
+    const recortado = recortarLineasProducto([{ ...linea('a', '1', 2), unidadesTamano: 6 }], '1', 7);
+    expect(recortado[0].cantidad).toBe(1);
+  });
+
   it('excesos: marca el producto cuya suma supera quedan y no toca los demás', () => {
     const inv = { '1': infoStockDe(conStock(4)), '2': infoStockDe(conStock(null)) };
     const lineas = [linea('a', '1', 3), linea('b', '1', 2), linea('c', '2', 9)];

@@ -123,6 +123,17 @@ describe('Apertura del día por sabor', () => {
     expect(registrar).not.toHaveBeenCalled();
   });
 
+  it('galleta sin sabores: una sola fila con su nombre como título, separada de las donas', async () => {
+    cargarCon([DONA, { ...GALLETA, nombre: 'GALLETA CHOCO CHIPS', sabores: [] }]);
+    render(<AperturaDiaView />);
+    expect(await screen.findByText('GALLETA CHOCO CHIPS')).toBeInTheDocument();
+    expect(screen.getAllByTestId('apertura-fila')).toHaveLength(2);
+    expect(screen.getAllByTestId('apertura-sabor')).toHaveLength(2);
+    expect(screen.getByLabelText('Quedaron de ayer GALLETA CHOCO CHIPS')).toHaveValue(6);
+    // solo la dona se cuenta por sabor; la galleta no lleva esa etiqueta
+    expect(screen.getAllByText('Se cuenta por sabor')).toHaveLength(1);
+  });
+
   it('un producto con la lista de sabores vacía se cuenta como producto normal', async () => {
     cargarCon([{ ...TORTA, sabores: [] }]);
     render(<AperturaDiaView />);

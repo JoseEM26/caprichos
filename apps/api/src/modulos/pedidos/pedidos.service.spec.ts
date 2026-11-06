@@ -1665,6 +1665,28 @@ describe('PedidosService', () => {
       expect(prismaMock.stock.updateMany).toHaveBeenCalledTimes(1);
       expect(Number(prismaMock.stock.updateMany.mock.calls[0][0].data.cantidad.decrement)).toBe(5);
     });
+
+    it('galleta sin sabores: 2 × 1/2 docena descuenta 12 unidades del stock del producto (no 2)', async () => {
+      const galleta = {
+        ...mockProductoCafe,
+        nombre: 'GALLETA CHOCO CHIPS',
+        controla_stock: true,
+        sabores: [],
+        grupos: [],
+        tamanos: [{ id: 5n, producto_id: 1n, tamano_valor_id: 100n, precio: 18, unidades: 6, tamano_valor: { id: 100n, nombre: '1/2 docena' } }],
+      };
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(where?.controla_stock ? [{ id: 1n, nombre: 'GALLETA CHOCO CHIPS', controla_stock: true, sabores: [] }] : [galleta]),
+      );
+      prismaMock.conteoApertura.findFirst.mockResolvedValue({ cantidad: 20 });
+      prismaMock.stock.findMany.mockResolvedValue([{ cantidad: 8 }]);
+      await service.crear({ ...pedidoBaseDto, lineas: [{ productoId: 1, tamanoId: 5, cantidad: 2 }] } as any, 'key-galleta-media', { canal: 'CARTA' });
+      expect(prismaMock.stock.updateMany).toHaveBeenCalledTimes(1);
+      expect(Number(prismaMock.stock.updateMany.mock.calls[0][0].data.cantidad.decrement)).toBe(12);
+      expect(prismaMock.movimientoStock.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'VENTA', producto_id: 1n, pedido_id: 100n, cantidad: expect.anything() }),
+      });
+    });
   });
   describe('productos por sabor al crear el pedido (stock por sabor)', () => {
     const donaSabor = {

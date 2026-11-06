@@ -105,15 +105,18 @@ export function etiquetaQuedan(info: InfoStock): string | null {
   return info.quedan === 1 ? '¡Última unidad!' : `Quedan ${info.quedan}`;
 }
 
-/** Unidades del producto en todas sus líneas del carrito (varias líneas comparten el saldo). */
+/** Unidades del producto en todas sus líneas del carrito (varias líneas comparten el saldo; 1/2 docena = 6). */
 export function unidadesEnCarrito(lineas: LineaCarrito[], productoId: string): number {
-  return lineas.reduce((acc, l) => (String(l.productoId) === String(productoId) ? acc + l.cantidad : acc), 0);
+  return lineas.reduce(
+    (acc, l) => (String(l.productoId) === String(productoId) ? acc + l.cantidad * (l.unidadesTamano ?? 1) : acc),
+    0,
+  );
 }
 
-/** Cuántas unidades más se pueden agregar; null si el producto no tiene límite. */
-export function topeAgregable(info: InfoStock | undefined, enCarrito: number): number | null {
+/** Cuántas veces (de `unidadesPorCantidad` unidades cada una) se pueden agregar; null si el producto no tiene límite. */
+export function topeAgregable(info: InfoStock | undefined, enCarrito: number, unidadesPorCantidad = 1): number | null {
   if (!info || !info.controlaStock || info.quedan === null) return null;
-  return Math.max(0, info.quedan - enCarrito);
+  return Math.floor(Math.max(0, info.quedan - enCarrito) / Math.max(1, unidadesPorCantidad));
 }
 
 /** Productos del carrito cuya suma supera lo que queda (el saldo cambió desde que se agregaron). */
@@ -145,6 +148,7 @@ export function excesosDeStock(lineas: LineaCarrito[], inventario: InventarioCar
 
 /** Recorta las líneas de un producto para que sumen como mucho `maximo`, quitando desde la última; las de 0 salen. */
 export function recortarLineasProducto(lineas: LineaCarrito[], productoId: string, maximo: number): LineaCarrito[] {
+  // `maximo` son unidades (no tamaños): cada cantidad de la línea ocupa unidadesTamano unidades
   let restan = Math.max(0, maximo);
   const nuevas: LineaCarrito[] = [];
   for (const l of lineas) {
@@ -152,8 +156,9 @@ export function recortarLineasProducto(lineas: LineaCarrito[], productoId: strin
       nuevas.push(l);
       continue;
     }
-    const cantidad = Math.min(l.cantidad, restan);
-    restan -= cantidad;
+    const u = Math.max(1, l.unidadesTamano ?? 1);
+    const cantidad = Math.min(l.cantidad, Math.floor(restan / u));
+    restan -= cantidad * u;
     if (cantidad === 0) continue;
     if (cantidad === l.cantidad) {
       nuevas.push(l);

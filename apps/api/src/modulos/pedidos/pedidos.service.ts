@@ -589,6 +589,8 @@ export class PedidosService {
         nombre: prodDb.nombre,
         tamano: tamanoNombre,
         cantidad,
+        // Unidades que lleva cada cantidad del tamaño (Unidad=1, 1/2 docena=6): el stock se descuenta en unidades
+        unidades: unidadesTamano,
         precioUnitario,
         subtotal: lineaSubtotal,
         // Línea madre de combo: sin producto ni área propios; la cocina ve solo sus hijas
@@ -966,7 +968,7 @@ export class PedidosService {
         [
           ...lineasCalculadas
             .filter((l) => !l.contenedora)
-            .map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, areaId: l.areaId, sabores: l.sabores })),
+            .map((l) => ({ productoId: l.productoId, cantidad: l.cantidad * (l.unidades ?? 1), areaId: l.areaId, sabores: l.sabores })),
           ...lineasCalculadas.flatMap((l) =>
             l.partesCombo.map((p: ParteResueltaCombo) => ({ productoId: p.productoId, cantidad: p.cantidad, areaId: p.areaId })),
           ),

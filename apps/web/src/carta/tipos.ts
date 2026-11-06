@@ -172,6 +172,8 @@ export interface LineaCarrito {
   unidades?: UnidadPersonalizada[];
   /** Mezcla de sabores: unidades que reparte cada media docena o docena (del tamaño elegido). */
   unidadesPorMezcla?: number;
+  /** Unidades que lleva cada cantidad del tamaño (Unidad=1, 1/2 docena=6): el stock del producto se cuenta en unidades. */
+  unidadesTamano?: number;
   sabores?: SaborLinea[];
   precioUnitario: number;
   subtotal: number;

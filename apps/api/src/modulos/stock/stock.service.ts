@@ -554,7 +554,7 @@ export class StockService {
     const productosEnRiesgo = new Set<string>(
       (lineas as any[]).filter((l) => sinStock.has(l.insumo_id.toString())).map((l) => l.receta.producto_id.toString()),
     );
-    const productosControlados = await this.prisma.producto.count({ where: { controla_stock: true } });
+    const productosControlados = await this.prisma.producto.count({ where: { controla_stock: true, oculto: false } });
     return {
       activo,
       insumosConReceta: insumosConReceta.size,

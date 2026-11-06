@@ -597,6 +597,13 @@ describe('AlmacenService', () => {
       expect(p).toMatchObject({ saldo: 4, aperturaHoy: true });
     });
 
+    it('GET: un producto oculto no entra a la apertura (la consulta excluye oculto)', async () => {
+      await service.obtenerApertura();
+      expect(prisma.producto.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { controla_stock: true, oculto: false } }),
+      );
+    });
+
     it('POST: producto por sabor sin saborId: 400 SABOR_REQUERIDO; con saborId fija el saldo de ese sabor', async () => {
       await expect(
         service.registrarApertura({ items: [{ productoId: '50', cantidad: 6 }] } as any, mockUsuario),

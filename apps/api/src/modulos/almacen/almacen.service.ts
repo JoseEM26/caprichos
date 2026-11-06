@@ -70,8 +70,9 @@ export class AlmacenService {
   // ==========================================
   async obtenerApertura() {
     const fecha = fechaLimaHoy();
+    // Un producto oculto no se cuenta ni aparece en la apertura (aunque tenga la casilla de control)
     const productos = await this.prisma.producto.findMany({
-      where: { controla_stock: true },
+      where: { controla_stock: true, oculto: false },
       select: {
         id: true,
         nombre: true,
@@ -1352,7 +1353,7 @@ export class AlmacenService {
   async obtenerProductosDelDia() {
     // Productos por sabor: su saldo vive en stock_sabor. Se listan con el desglose por sabor (su merma va por registrarMermaProducto).
     const porSabor = await this.prisma.producto.findMany({
-      where: { controla_stock: true, sabores: { some: { activo: true } } },
+      where: { controla_stock: true, oculto: false, sabores: { some: { activo: true } } },
       orderBy: { nombre: 'asc' },
       select: {
         id: true,
@@ -1405,7 +1406,7 @@ export class AlmacenService {
     }
 
     for (const r of recetas) {
-      if (r.producto && !idsPorSabor.has(r.producto.id.toString())) {
+      if (r.producto && !r.producto.oculto && !idsPorSabor.has(r.producto.id.toString())) {
         const stockTotal = r.producto.stocks.reduce(
           (acc, s) => acc + Number(s.cantidad),
           0,

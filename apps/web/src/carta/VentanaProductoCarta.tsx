@@ -129,7 +129,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const saboresListos = !saborMode || repartoValido(valorSaboresOk, total, saboresDisp);
   const faltanSabores = faltanUnidades(valorSaboresOk, total);
 
-  const tope = saborMode ? mezclasDisponibles(info, lineas, String(producto.id), unidadesMezcla) : topeAgregable(info, enCarrito);
+  const tope = saborMode ? mezclasDisponibles(info, lineas, String(producto.id), unidadesMezcla) : topeAgregable(info, enCarrito, unidadesMezcla);
   const sinStock = !info.disponible || (info.controlaStock && info.quedan === 0);
   const sinSaldo = tope !== null && tope <= 0;
   const puedeAgregar = valido && saboresListos && !sinStock && !sinSaldo;
@@ -180,6 +180,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       fotoUrl: producto.fotoUrl,
       tamanoId: tamano?.id,
       tamanoNombre: tamano?.nombre,
+      unidadesTamano: unidadesMezcla,
       precioBase,
       cantidad,
       opciones: elegidas,
