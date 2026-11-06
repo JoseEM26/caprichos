@@ -44,6 +44,14 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     texto: '{{1}} es tu código de recuperación de contraseña.',
     descripcion: 'Código de 6 dígitos para recuperar la contraseña de la cuenta del cliente. Se crea en Meta desde la biblioteca de plantillas (verify_password_recovery), en español y con el botón «copiar código»; debe quedar APROBADA antes de usarla. Si Meta la entrega sin botón, poner botonCodigo en false.',
   },
+  DELIVERY_ASIGNADO: {
+    nombre: 'caprichos_delivery_asignado',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente', 'codigo_pedido', 'nombre_repartidor'],
+    texto: '¡Hola {{1}}! 🛵 Para tu pedido {{2}} ya asignamos a tu delivery {{3}}. Te avisaremos cuando salga hacia tu dirección. 😊',
+    descripcion: 'Aviso al cliente cuando un repartidor toma su pedido (o cuando caja lo reasigna). {{3}} es el nombre de pila del repartidor. Pendiente de aprobar en Meta (UTILITY).',
+  },
   DELIVERY_SALIDA: {
     nombre: 'caprichos_delivery_en_camino',
     categoria: 'UTILITY',

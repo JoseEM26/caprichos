@@ -7,6 +7,7 @@
 export type EtapaAvisoReparto =
   | 'ACEPTADO'
   | 'LISTO'
+  | 'ASIGNADO'
   | 'SALIDA'
   | 'LLEGADA'
   | 'INSISTENCIA'
@@ -43,6 +44,13 @@ export const TEXTOS_REPARTO = {
     textoLibre: `¡Hola ${nombre}! 🎉 Tu pedido ${codigo} ya está listo. Pronto sale con nuestro repartidor. 🛵`,
     plantillaClave: 'DELIVERY_LISTO',
     variablesPlantilla: [nombre, codigo],
+  }),
+
+  /** Un repartidor tomó el pedido (o se reasignó a otro). `repartidor` es solo su nombre de pila. */
+  asignado: (nombre: string, codigo: string, repartidor: string): PayloadAvisoReparto => ({
+    textoLibre: `¡Hola ${nombre}! 🛵 Para tu pedido ${codigo} ya asignamos a tu delivery ${repartidor}. Te avisaremos cuando salga hacia tu dirección. 😊`,
+    plantillaClave: 'DELIVERY_ASIGNADO',
+    variablesPlantilla: [nombre, codigo, repartidor],
   }),
 
   /** `minutos` es el rango ya formateado: «25 a 30» (o un número si cae al respaldo). */

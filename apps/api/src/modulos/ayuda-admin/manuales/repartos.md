@@ -107,6 +107,14 @@ Ver tambien: [[caja]]
 5. Pulsar Reportar entrega fallida. El incidente se notificara a la central y a caja para coordinar la solucion.
 Ver tambien: [[mensajes]]
 
+## Como se hace: saber que avisos de WhatsApp recibe el cliente del delivery
+1. Cuando un repartidor toma el pedido: "Ya asignamos a tu delivery (nombre de pila)". Si Caja o el Administrador reasigna el pedido, el cliente recibe el aviso otra vez con el nombre nuevo.
+2. Cuando el repartidor sale (En camino): "Tu pedido salio y llega en unos N minutos", con el rango calculado para ese pedido.
+3. Cuando el repartidor llega (Llegue a destino): "Tu repartidor llego a tu puerta". Si espera mucho, sigue el aviso de insistencia y, si se agota la espera, el de reprogramacion.
+4. Cuando se entrega: "Entregado, gracias" (con los puntos ganados si el pedido sumo puntos). La encuesta de posventa va aparte y tiene su propio interruptor.
+5. Cada aviso sale una sola vez por pedido y etapa, aunque el repartidor toque el boton dos veces. Cada uno se enciende o apaga en Parametros de operacion > Avisos automaticos por WhatsApp (asignado, en camino, en la puerta, entregado); por defecto los cuatro estan en Si.
+6. Si el cliente no escribio en las ultimas 24 horas, el aviso sale como plantilla aprobada por Meta; si Meta aun no aprobo esa plantilla, el aviso queda como Fallido y se ve en [[mensajes]] (estado del envio) para que soporte lo revise.
+
 ## Como se hace: entender el tiempo estimado que se le dice al cliente
 - Al salir con el pedido, el cliente recibe un rango calculado para ese pedido (no un número fijo). Ese rango queda guardado.
 - En la carta, el seguimiento cuenta desde la salida: lo que falta es el rango guardado menos lo transcurrido, y nunca baja de 5 minutos.
