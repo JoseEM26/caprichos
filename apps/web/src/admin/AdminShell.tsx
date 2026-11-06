@@ -516,6 +516,37 @@ export function AdminShell() {
             {/* El repartidor en celular no ve la barra de estado: el botón de instalar va aquí */}
             <BannerInstalarApp compacto />
 
+            {tiene('asistencia/marcar') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMasRepartidorAbierto(false);
+                  navigate('/admin/mi-asistencia');
+                }}
+                style={{
+                  minHeight: '56px',
+                  border: 'none',
+                  borderRadius: '12px',
+                  background: 'var(--cp-orange)',
+                  color: 'var(--cp-navy)',
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 800,
+                  fontSize: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                Marcar asistencia
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -812,12 +843,31 @@ export function AdminShell() {
               </div>
             </div>
           )}
+          {esRepartidorMovil && location.pathname === '/admin/mi-asistencia' && (
+            <button
+              type="button"
+              onClick={() => navigate('/admin/repartos')}
+              style={{ alignSelf: 'flex-start', minHeight: '44px', padding: '0 16px', margin: '12px', borderRadius: '12px', border: '1.5px solid var(--cp-line)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}
+            >
+              ← Volver a mis pedidos
+            </button>
+          )}
           <Outlet />
         </main>
       </div>
 
       {/* Barra inferior del repartidor en celular (Decisión 6 del dueño) */}
       {/* En /admin/repartos la pantalla del repartidor trae su propia barra (Pedidos, Mis pedidos, Más) */}
+      {/* Acceso pequeño a Mi asistencia desde la pantalla de repartos (el repartidor en celular no tiene menú) */}
+      {esRepartidorMovil && location.pathname === '/admin/repartos' && tiene('asistencia/marcar') && (
+        <button
+          type="button"
+          onClick={() => navigate('/admin/mi-asistencia')}
+          style={{ position: 'fixed', top: '8px', right: '8px', zIndex: 1000, minHeight: '32px', padding: '0 10px', borderRadius: '10px', border: '1px solid var(--cp-line)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+        >
+          Asistencia
+        </button>
+      )}
       {esRepartidorMovil && location.pathname !== '/admin/repartos' && barraInferiorRepartidor}
 
       <Confirmar

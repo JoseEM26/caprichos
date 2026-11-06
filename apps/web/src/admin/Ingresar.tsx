@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
 import { ErrorApi } from '../comun/api';
+import { destinoTrasIngresar } from '../comun/destinoTrasIngresar';
 import {
   FRASE_INGRESO_DEFECTO,
   IMAGEN_INGRESO_DEFECTO,
@@ -165,7 +166,7 @@ export function Ingresar() {
       if (debeCambiar) {
         navigate('/admin/cambiar-clave', { replace: true });
       } else {
-        const destino = (location.state as any)?.desde || '/admin';
+        const destino = destinoTrasIngresar((location.state as any)?.desde);
         navigate(destino, { replace: true });
       }
     }
@@ -207,7 +208,7 @@ export function Ingresar() {
       if (resultado.debeCambiar) {
         navigate('/admin/cambiar-clave', { replace: true });
       } else {
-        const destino = (location.state as any)?.desde || '/admin';
+        const destino = destinoTrasIngresar((location.state as any)?.desde);
         navigate(destino, { replace: true });
       }
     } catch (err: any) {

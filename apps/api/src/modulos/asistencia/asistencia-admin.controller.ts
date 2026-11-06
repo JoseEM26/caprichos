@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
@@ -20,6 +20,26 @@ export class AsistenciaAdminController {
   @Permiso('asistencia', 'pantalla')
   qrPantalla() {
     return this.asistencia.qrPantalla();
+  }
+
+  /** Enlace público de la pantalla del local: solo dice si está activo (el token nunca se vuelve a mostrar). */
+  @Get('pantalla/enlace')
+  @Permiso('asistencia', 'administrar')
+  estadoEnlace() {
+    return this.asistencia.estadoEnlacePantalla();
+  }
+
+  @Post('pantalla/enlace')
+  @Permiso('asistencia', 'administrar')
+  @Header('Cache-Control', 'no-store')
+  generarEnlace(@Req() req: any) {
+    return this.asistencia.generarEnlacePantalla(req.usuario, ipDe(req));
+  }
+
+  @Delete('pantalla/enlace')
+  @Permiso('asistencia', 'administrar')
+  desactivarEnlace(@Req() req: any) {
+    return this.asistencia.desactivarEnlacePantalla(req.usuario, ipDe(req));
   }
 
   @Get('hoy')

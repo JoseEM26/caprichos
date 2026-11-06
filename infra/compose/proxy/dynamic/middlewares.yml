@@ -15,7 +15,7 @@ http:
         frameDeny: false
         customFrameOptionsValue: "SAMEORIGIN"
         referrerPolicy: "strict-origin-when-cross-origin"
-        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        permissionsPolicy: "camera=(self), microphone=(), geolocation=(self)"
 
     # Cabeceras de seguridad para Demo y Staging (bloquea indexación de buscadores)
     sec-headers-demo:

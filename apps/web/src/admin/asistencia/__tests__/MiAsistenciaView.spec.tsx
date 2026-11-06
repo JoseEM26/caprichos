@@ -60,7 +60,7 @@ describe('MiAsistenciaView (celular)', () => {
     miHoy.mockResolvedValue(base);
     render(<MiAsistenciaView />);
     expect(await screen.findByTestId('estado-hoy')).toHaveTextContent('Te falta marcar: Entrada');
-    expect(screen.getByRole('button', { name: 'Marcar Entrada' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeEnabled();
   });
 
   it('pide aceptar el aviso de datos personales la primera vez y bloquea marcar hasta aceptarlo', async () => {
@@ -71,10 +71,10 @@ describe('MiAsistenciaView (celular)', () => {
     });
     render(<MiAsistenciaView />);
     expect(await screen.findByText('Aviso de datos')).toBeInTheDocument();
-    const boton = screen.getByRole('button', { name: 'Marcar Entrada' });
+    const boton = screen.getByRole('button', { name: 'Escanear QR' });
     expect(boton).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Marcar Entrada' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeEnabled());
   });
 
   it('sin turno hoy lo dice y no ofrece marcar', async () => {
