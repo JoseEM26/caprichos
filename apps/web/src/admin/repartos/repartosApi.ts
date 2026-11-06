@@ -170,6 +170,25 @@ export interface ResumenRepartos {
   [key: string]: any;
 }
 
+export type EtapaReparto = 'TOMADO' | 'EN_CAMINO' | 'LLEGADO';
+
+export interface RepartidorPanel {
+  party_id: string;
+  nombre: string;
+  libre: boolean;
+  pedidos: Array<PedidoReparto & { etapa: EtapaReparto }>;
+  efectivo_por_rendir: number;
+}
+
+/** GET /admin/repartos/panel: quién lleva qué, quién está libre y qué falta por tomar. */
+export interface PanelRepartidores {
+  generado_en: string;
+  max_pedidos: number;
+  resumen: { repartidores_libres: number; repartidores_ocupados: number; pedidos_sin_tomar: number };
+  repartidores: RepartidorPanel[];
+  sin_tomar: PedidoReparto[];
+}
+
 export interface PedidoPerdido {
   pedidoId: string;
   codigo: string;
@@ -314,6 +333,8 @@ export const repartosApi = {
 
   obtenerResumen: () =>
     api.get<ResumenRepartos>('/admin/repartos/resumen'),
+
+  obtenerPanel: () => api.get<PanelRepartidores>('/admin/repartos/panel'),
 
   obtenerChat: (pedidoId: string) =>
     api.get<ChatRepartidor>(`/admin/repartos/${pedidoId}/chat/mensajes`),

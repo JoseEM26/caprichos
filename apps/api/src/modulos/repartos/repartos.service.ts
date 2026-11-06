@@ -961,6 +961,88 @@ export class RepartosService {
   }
 
   /**
+   * GET /admin/repartos/panel (repartos/ver, nunca REPARTIDOR):
+   * Repartidores activos con los pedidos que llevan (etapa, horas, espera y efectivo por rendir)
+   * y los pedidos sin tomar, más el resumen de libres y ocupados. Reutiliza listarTodos.
+   */
+  async obtenerPanelRepartidores(usuario: UsuarioAutenticado) {
+    if (usuario.rol === 'REPARTIDOR') {
+      throw new ForbiddenException({
+        codigo: 'SOLO_CAJA_ADMIN',
+        mensaje: 'El panel de repartidores es solo para caja y administración',
+      });
+    }
+
+    const config = await this.obtenerParametrosReparto();
+    const [cuentas, activos] = await Promise.all([
+      this.prisma.userAccount.findMany({
+        where: { rol: 'REPARTIDOR', activo: true },
+        include: { party: { include: { persona: true } } },
+        orderBy: { id: 'asc' },
+      }),
+      this.listarTodos({}, usuario),
+    ]);
+
+    const etapaDe = (p: any) => (p.llego_en ? 'LLEGADO' : p.salio_en ? 'EN_CAMINO' : 'TOMADO');
+    const porRepartidor = new Map<string, any[]>();
+    const sinTomar: any[] = [];
+    for (const p of activos) {
+      if (p.repartidor_party_id == null) {
+        if (p.estado === 'LISTO' && p.motivo_falla == null) sinTomar.push(p);
+        continue;
+      }
+      const lista = porRepartidor.get(p.repartidor_party_id) ?? [];
+      lista.push({ ...p, etapa: etapaDe(p) });
+      porRepartidor.set(p.repartidor_party_id, lista);
+    }
+
+    const nombreCuenta = (c: any) =>
+      c.party?.persona
+        ? `${c.party.persona.nombres} ${c.party.persona.apellidos || ''}`.trim()
+        : `Repartidor #${c.party_id}`;
+    const cuentaPorParty = new Map(cuentas.map((c) => [String(c.party_id), c]));
+    // Repartidores con pedidos vivos aunque ya no estén activos: se muestran para no perderlos de vista
+    const partyIds = new Set([...cuentaPorParty.keys(), ...porRepartidor.keys()]);
+
+    const repartidores = [...partyIds].map((partyId) => {
+      const cuenta = cuentaPorParty.get(partyId);
+      const pedidos = (porRepartidor.get(partyId) ?? []).sort(
+        (a, b) => new Date(a.creado_en).getTime() - new Date(b.creado_en).getTime(),
+      );
+      const efectivoPorRendir = pedidos.reduce(
+        (acc, p) => acc + (p.cobro_pendiente_efectivo ? p.total : 0),
+        0,
+      );
+      const nombre =
+        cuenta != null
+          ? nombreCuenta(cuenta)
+          : pedidos[0]?.repartidor?.nombre ?? `Repartidor #${partyId}`;
+      return {
+        party_id: partyId,
+        nombre,
+        libre: pedidos.length === 0,
+        pedidos,
+        efectivo_por_rendir: Number(efectivoPorRendir.toFixed(2)),
+      };
+    });
+    repartidores.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+    return {
+      generado_en: new Date().toISOString(),
+      max_pedidos: config.maxPedidos,
+      resumen: {
+        repartidores_libres: repartidores.filter((r) => r.libre).length,
+        repartidores_ocupados: repartidores.filter((r) => !r.libre).length,
+        pedidos_sin_tomar: sinTomar.length,
+      },
+      repartidores,
+      sin_tomar: sinTomar.sort(
+        (a, b) => new Date(a.creado_en).getTime() - new Date(b.creado_en).getTime(),
+      ),
+    };
+  }
+
+  /**
    * 2) POST /admin/repartos/:id/tomar (repartos/tomar):
    * Asigna repartidor_party_id = usuario, tomado_en = ahora.
    * Límite rep_max_pedidos (3): 409 LIMITE_PEDIDOS «Ya llevas 3 pedidos: entrega alguno antes de tomar otro».
