@@ -859,7 +859,12 @@ export function TarjetaReparto({
             <BotonReportar pedido={pedido} onReportar={() => setModalFallaAbierto(true)} />
 
             {/* Propuesta de la ubicación real (caja la aprueba antes de cambiar nada) */}
-            <BotonProponerUbicacion pedidoId={pedido.id} codigo={pedido.codigo} estado={pedido.estado} />
+            <BotonProponerUbicacion
+              pedidoId={pedido.id}
+              codigo={pedido.codigo}
+              estado={pedido.estado}
+              puntoActual={pedido.lat != null && pedido.lng != null ? { lat: pedido.lat, lng: pedido.lng } : null}
+            />
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { SalonService } from '../salon/salon.service';
+import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import {
   BadRequestException,
@@ -249,6 +250,8 @@ export class ComandasService {
       where: {
         estado: { in: ['COLA', 'PREPARANDO'] },
         comandas: { none: {} },
+        // Delivery sin ubicación (punto o zona): no llega a cocina
+        NOT: { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
       },
       select: { id: true },
     });
@@ -385,6 +388,7 @@ export class ComandasService {
         area_id: area.id,
         pedido: {
           estado: { notIn: ESTADOS_FUERA_DE_COCINA },
+          NOT: { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
         },
         OR: [
           { estado: 'EN_COCINA' },
@@ -538,6 +542,7 @@ export class ComandasService {
         mensaje: `No se puede despejar un pedido en estado ${pedido.estado}`,
       });
     }
+    exigirDeliveryUbicado(pedido);
 
     const comanda = await this.prisma.comandaArea.findUnique({
       where: {

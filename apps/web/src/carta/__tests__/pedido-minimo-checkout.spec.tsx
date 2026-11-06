@@ -151,6 +151,7 @@ describe('Checkout ▸ pedido mínimo solo para delivery', () => {
     fireEvent.change(document.getElementById('f-direccion') as HTMLInputElement, {
       target: { value: 'Av. Los Olivos 123' },
     });
+    fireEvent.change(document.getElementById('f-referencia') as HTMLInputElement, { target: { value: 'Frente al parque' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     fireEvent.click(await screen.findByRole('button', { name: /Enviar pedido/i }));
 

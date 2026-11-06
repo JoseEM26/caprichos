@@ -4,7 +4,10 @@ import { ErrorApi } from '../../comun/api';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import type { Punto } from '../../comun/mapa/MapaUbicacion';
 import { SEDE_DEFECTO, cargarSede } from '../../comun/mapa/sedeDefecto';
-import { CambioUbicacion, propuestaUbicacionApi } from '../pedidos/cambioUbicacionApi';
+import { CambioUbicacion, distanciaMetros, propuestaUbicacionApi } from '../pedidos/cambioUbicacionApi';
+
+/** Precisión del GPS (metros) a partir de la cual se avisa que puede no ser exacta. */
+export const PRECISION_MALA_M = 50;
 
 const ESTADOS_EN_CURSO = ['LISTO', 'EN_CAMINO'];
 
@@ -19,7 +22,21 @@ const TEXTO_ESTADO: Record<CambioUbicacion['estado'], string> = {
  * El repartidor propone la ubicación real del cliente en su pedido en curso: con su GPS («Estoy en la ubicación
  * real») o con el pin en el mapa. Nada cambia hasta que Caja la aprueba; aquí ve el resultado.
  */
-export function BotonProponerUbicacion({ pedidoId, codigo, estado }: { pedidoId: string; codigo: string; estado: string }) {
+export function BotonProponerUbicacion({
+  pedidoId,
+  codigo,
+  estado,
+  puntoActual = null,
+  alChatear,
+}: {
+  pedidoId: string;
+  codigo: string;
+  estado: string;
+  /** Punto que hoy tiene el pedido (null si el pedido no tenía ubicación) */
+  puntoActual?: Punto | null;
+  /** Abre el chat de WhatsApp del pedido para hablar con el cliente antes de proponer */
+  alChatear?: () => void;
+}) {
   const [abierto, setAbierto] = useState(false);
   const [punto, setPunto] = useState<Punto | null>(null);
   const [nota, setNota] = useState('');
@@ -51,10 +68,16 @@ export function BotonProponerUbicacion({ pedidoId, codigo, estado }: { pedidoId:
       setGpsMensaje('Este dispositivo no permite leer tu ubicación: marca el punto en el mapa.');
       return;
     }
+    setGpsMensaje('Buscando tu ubicación...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setPunto({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setGpsMensaje('Usamos tu ubicación actual. Puedes mover el pin si hace falta.');
+        const m = Math.round(pos.coords.accuracy ?? 0);
+        setGpsMensaje(
+          m > PRECISION_MALA_M
+            ? `Precisión baja (±${m} m): puede no ser la puerta exacta. Sal a cielo abierto o mueve el pin hasta donde realmente es.`
+            : 'Usamos tu ubicación actual. Puedes mover el pin si hace falta.',
+        );
       },
       () => setGpsMensaje('No pudimos leer tu ubicación. Da permiso de ubicación o marca el punto en el mapa.'),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
@@ -95,7 +118,7 @@ export function BotonProponerUbicacion({ pedidoId, codigo, estado }: { pedidoId:
 
   return (
     <>
-      <Boton variante="secundario" onClick={() => setAbierto(true)} aria-label={`Proponer ubicación real del pedido ${codigo}`}>
+      <Boton variante="secundario" onClick={() => setAbierto(true)} aria-label={`Proponer ubicación real del pedido ${codigo}`} style={{ minHeight: 52, width: '100%' }}>
         Proponer ubicación real
       </Boton>
 
@@ -112,8 +135,8 @@ export function BotonProponerUbicacion({ pedidoId, codigo, estado }: { pedidoId:
               left: '50%',
               top: '50%',
               transform: 'translate(-50%, -50%)',
-              width: 'min(560px, calc(100% - 24px))',
-              maxHeight: 'calc(100% - 24px)',
+              width: 'min(560px, calc(100% - 12px))',
+              maxHeight: 'calc(100% - 12px)',
               overflowY: 'auto',
               background: 'var(--cp-cream, #FBF4EC)',
               borderRadius: 20,
@@ -138,12 +161,44 @@ export function BotonProponerUbicacion({ pedidoId, codigo, estado }: { pedidoId:
               </div>
             )}
 
-            <Boton variante="secundario" onClick={usarGps} disabled={ocupado}>
-              Estoy en la ubicación real
-            </Boton>
-            {gpsMensaje && <div style={{ fontSize: 12 }}>{gpsMensaje}</div>}
+            {alChatear && (
+              <Boton
+                variante="secundario"
+                onClick={() => {
+                  setAbierto(false);
+                  alChatear();
+                }}
+                style={{ minHeight: 52 }}
+              >
+                Hablar con el cliente por WhatsApp
+              </Boton>
+            )}
 
-            <MapaUbicacion punto={punto} onCambiar={setPunto} altura={260} local={sedeLocal} ajustarA={punto ? 'ambos' : 'local'} />
+            <Boton variante="secundario" onClick={usarGps} disabled={ocupado} style={{ minHeight: 52 }}>
+              Mi ubicación actual
+            </Boton>
+            {gpsMensaje && (
+              <div role="status" style={{ fontSize: 13, fontWeight: 700 }}>
+                {gpsMensaje}
+              </div>
+            )}
+
+            <div style={{ fontSize: 12 }}>Toca el mapa o arrastra el pin hasta el punto donde realmente es.</div>
+            <MapaUbicacion
+              punto={punto}
+              onCambiar={setPunto}
+              altura="min(52vh, 420px)"
+              local={sedeLocal}
+              ajustarA={punto ? 'ambos' : 'local'}
+              etiqueta="Mapa para colocar o arrastrar el punto real de la entrega"
+            />
+            {punto && (
+              <div data-testid="distancia-propuesta" style={{ fontSize: 13, fontWeight: 700 }}>
+                {puntoActual
+                  ? `A ${Math.round(distanciaMetros(puntoActual, punto))} m del punto actual del pedido`
+                  : 'El pedido todavía no tiene punto: este será el primero.'}
+              </div>
+            )}
 
             <label style={{ fontSize: 12, fontWeight: 700 }}>
               Nota (opcional)
@@ -169,11 +224,11 @@ export function BotonProponerUbicacion({ pedidoId, codigo, estado }: { pedidoId:
 
             <div style={{ display: 'flex', gap: 8 }}>
               {pendiente && (
-                <Boton variante="secundario" onClick={cancelar} cargando={ocupado} style={{ flex: 1 }}>
+                <Boton variante="secundario" onClick={cancelar} cargando={ocupado} style={{ flex: 1, minHeight: 52 }}>
                   Cancelar mi propuesta
                 </Boton>
               )}
-              <Boton onClick={enviar} deshabilitado={!punto || ocupado || pendiente} style={{ flex: 1 }}>
+              <Boton onClick={enviar} deshabilitado={!punto || ocupado || pendiente} style={{ flex: 1, minHeight: 52 }}>
                 Enviar propuesta
               </Boton>
             </div>

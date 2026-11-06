@@ -412,6 +412,14 @@ describe('MensajesService', () => {
     expect(prisma.pedido.update).not.toHaveBeenCalled();
   });
 
+  it('aprobar pago de un delivery sin ubicación -> 409 DELIVERY_SIN_UBICACION y no cambia el pedido', async () => {
+    prisma.pedido.findUnique = jest.fn().mockResolvedValue({ modalidad: 'DELIVERY', entrega_lat: null, entrega_lng: null, zona_id: null });
+    await expect(service.aprobarPago('2', usuarioAdmin)).rejects.toMatchObject({
+      response: { codigo: 'DELIVERY_SIN_UBICACION' },
+    });
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
+  });
+
   it('aprobar pago cambia pedido a COORDINADO y avisa por WhatsAppGateway', async () => {
     await service.aprobarPago('2', usuarioAdmin);
     expect(prisma.pedido.update).toHaveBeenCalledWith(

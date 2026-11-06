@@ -76,14 +76,14 @@ Ver tambien: [[mensajes]]
 
 ## Como se hace: Corregir la ubicacion real de un pedido (repartidor propone)
 1. En el pedido, pulsa Proponer ubicacion real (solo en pedidos en curso, Listo o En camino).
-2. Si estas en el lugar, pulsa "Estoy en la ubicacion real" para usar tu GPS ("Usamos tu ubicacion actual. Puedes mover el pin si hace falta."), o toca el mapa para mover el pin. Escribe una Nota (opcional).
+2. Si quieres confirmar antes con el cliente, pulsa Hablar con el cliente por WhatsApp. Si estas en el lugar, pulsa "Mi ubicacion actual" para usar tu GPS (si la precision es mala, ±50 m o mas, te avisa "Precision baja"; sal a cielo abierto o mueve el pin), o toca el mapa o arrastra el pin hasta donde realmente es. Debajo ves a cuantos metros queda del punto actual del pedido. Escribe una Nota (opcional). Funciona tambien si el pedido no tenia ubicacion.
 3. Pulsa Enviar propuesta. Aparece "Propuesta enviada. Caja la revisara; el pedido no cambia hasta que la aprueben."
 4. El estado se ve en el mismo boton: "Pendiente de revision en caja", "Aprobada: caja cambio la ubicacion" o "Rechazada por caja" (con el motivo). Puedes usar Cancelar mi propuesta mientras este pendiente. Solo puede haber una propuesta pendiente por pedido ("Ya hay una propuesta pendiente...").
 Ver tambien: [[caja]]
 
 ## Como se hace: Cambiar la ubicacion de un pedido de delivery (Caja o Administrador)
 1. En Pedidos y caja abre el pedido de delivery: la seccion de ubicacion muestra el mapa, la direccion y, si ya se cambio, la insignia Dirección editada (revisa el historial de ubicacion).
-2. Pulsa Cambiar ubicacion (Caja o Administrador; el Supervisor no). Busca la direccion o mueve el pin en el mapa. En un pedido de delivery de Caja o del mozo tambien existe el boton Usar ubicacion de WhatsApp, que toma la ultima ubicacion que el cliente mando en las ultimas 24 horas.
+2. Pulsa Cambiar ubicacion (Caja o Administrador; el Supervisor no). Si el delivery llego sin ubicacion tambien puedes pulsar Pedir ubicacion por WhatsApp: el cliente la envia con un toque (clip, Ubicacion) y el pedido se ubica solo. Busca la direccion o mueve el pin en el mapa. En un pedido de delivery de Caja o del mozo tambien existe el boton Usar ubicacion de WhatsApp, que toma la ultima ubicacion que el cliente mando en las ultimas 24 horas.
 3. La ventana "Cambiar ubicacion de CP-xxxx" calcula en vivo la comparacion Antes y Despues: zona, Envio, Diferencia y Total. Si el punto queda fuera de cobertura: "Ese punto esta fuera de la zona de reparto. Mueve el pin o busca otra direccion."
 4. Pulsa Cambiar y confirma "Si, cambiar" en "Cambiar la ubicacion del pedido?". Aparece "Ubicacion cambiada." El envio y el total se recalculan solos, y el cliente recibe un aviso si cambia el costo de envio.
 5. Si el pedido ya estaba pagado y el envio cambia, queda un ajuste: Saldo por cobrar (envio mayor: hay que cobrar mas) o Devolucion pendiente (envio menor: hay que devolver). Se resuelve con el boton Cobrar saldo o Marcar como devuelta: eliges el medio (Efectivo, Yape, Plin, Transferencia o Tarjeta; si no es efectivo escribes el Codigo de operacion). En efectivo mueve la caja de hoy; en digital queda en el cierre del dia. Si no esta pagado el total solo cambia y se cobra asi.

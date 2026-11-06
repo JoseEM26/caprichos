@@ -390,6 +390,11 @@ describe('RepartidorView: pantalla toda mapa del repartidor', () => {
       expect(screen.queryByTestId('hoja-inferior')).toBeNull();
     });
 
+    it('12d. mi pedido en curso trae «Proponer ubicación real» (la pantalla del repartidor llega a la propuesta)', async () => {
+      await abrirDetalleMio();
+      expect(within(screen.getByTestId('detalle-pedido')).getByRole('button', { name: /Proponer ubicación real del pedido CP-0101/ })).toBeInTheDocument();
+    });
+
     it('12c. el enlace viejo wa.me ya no sale: queda «Llamar» y el chat de WhatsApp de la app', async () => {
       await abrirDetalleMio();
       const detalle = screen.getByTestId('detalle-pedido');

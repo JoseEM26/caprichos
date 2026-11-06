@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { enmascararTelefono, telefonoEnviable } from '../utilidades/enmascarar.util';
 import { CargaSaliente, OutboxWhatsappService } from './outbox-whatsapp.service';
-import { EtapaAvisoReparto, TEXTOS_REPARTO, PayloadAvisoReparto, conBienvenidaPuntos, conPuntosEntregado } from '../conversacion/textos-reparto';
+import { EtapaAvisoReparto, ResumenRecibido, TEXTOS_REPARTO, PayloadAvisoReparto, conBienvenidaPuntos, conPuntosEntregado } from '../conversacion/textos-reparto';
 import { partyClienteDelPedido } from '../../clientes/cliente-del-pedido';
 import { urlPublicaCarta } from './carrusel.util';
 import { parametroActivoConDefecto, whatsappSimulado } from '../utilidades/modo-whatsapp.util';
@@ -81,6 +81,8 @@ export interface DatosAviso {
   enlaceSeguimiento?: string | null;
   /** RECIBIDO efectivo: usar la plantilla con enlace (solo si Meta ya la aprobó y el parámetro está en «Sí»). */
   plantillaSeguimiento?: boolean;
+  /** RECIBIDO: productos, total, medio y estado del envío (se arma al avisar). */
+  resumen?: ResumenRecibido | null;
 }
 
 /**
@@ -191,6 +193,7 @@ export class AvisosPedidoService {
         ...datos,
         enlaceSeguimiento: this.enlaceSeguimiento(pedidoId, pedido.codigo),
         plantillaSeguimiento: esParametroActivo(flagPlantilla?.valor),
+        resumen: await this.resumenRecibido(db, pedidoId),
       };
     }
     // Línea de puntos (bienvenida o puntos ganados): se decide aquí y el marcador «una sola vez» se escribe en encolar
@@ -245,6 +248,30 @@ export class AvisosPedidoService {
     if (!tx) this.outbox.despertar();
     this.logger.log(`Aviso ${etapa} del pedido ${pedido.codigo} encolado a ${enmascararTelefono(telefono)}`);
     return { estado: 'ENCOLADO' };
+  }
+
+  /** Productos (sin las partes de un combo), total, medio de pago y estado del envío para el aviso de pedido recibido. */
+  private async resumenRecibido(db: Prisma.TransactionClient | PrismaService, pedidoId: bigint): Promise<ResumenRecibido | null> {
+    const p = await db.pedido.findUnique({
+      where: { id: pedidoId },
+      select: {
+        modalidad: true, total: true, envio: true, entrega_lat: true, entrega_lng: true, zona_id: true,
+        pago_metodo: true, pago_preferido: true,
+        lineas: { where: { linea_combo_id: null }, orderBy: { id: 'asc' }, select: { nombre: true, cantidad: true } },
+      },
+    });
+    if (!p || !Array.isArray(p.lineas) || p.lineas.length === 0) return null;
+    const metodo = String(p.pago_preferido || p.pago_metodo || '').toUpperCase();
+    const nombresMedio: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'transferencia', EFECTIVO: 'efectivo', TARJETA: 'tarjeta' };
+    const delivery = p.modalidad === 'DELIVERY';
+    const sinUbicar = delivery && (p.entrega_lat == null || p.entrega_lng == null || p.zona_id == null);
+    return {
+      lineas: p.lineas.map((l) => `${l.cantidad} x ${l.nombre}`),
+      total: Number(p.total),
+      medioPago: nombresMedio[metodo] ?? (metodo ? metodo.toLowerCase() : 'por coordinar'),
+      envioPorConfirmar: sinUbicar,
+      envio: delivery && !sinUbicar && p.envio != null ? Number(p.envio) : null,
+    };
   }
 
   /** Enlace a la carta con el seguimiento del pedido (código y token firmado). Null sin origen público. */
@@ -375,8 +402,8 @@ export class AvisosPedidoService {
     switch (etapa) {
       case 'RECIBIDO':
         return medioDigital
-          ? TEXTOS_REPARTO.recibidoDigital(nombre, codigo, medioDigital, datos.enlaceSeguimiento)
-          : TEXTOS_REPARTO.recibidoEfectivo(nombre, codigo, datos.enlaceSeguimiento, datos.plantillaSeguimiento);
+          ? TEXTOS_REPARTO.recibidoDigital(nombre, codigo, medioDigital, datos.enlaceSeguimiento, datos.resumen)
+          : TEXTOS_REPARTO.recibidoEfectivo(nombre, codigo, datos.enlaceSeguimiento, datos.plantillaSeguimiento, datos.resumen);
       case 'ACEPTADO':
         return TEXTOS_REPARTO.aceptado(nombre, codigo);
       case 'LISTO':

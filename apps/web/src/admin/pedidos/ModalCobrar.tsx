@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
+import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
+import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
@@ -31,6 +33,8 @@ export interface ModalCobrarProps {
   alCobrarExitoso: () => void;
   /** Cobro por otro endpoint (p. ej. un pedido de otro día desde el cierre). Por defecto, la caja de hoy. */
   cobrar?: (dto: CobrarDto) => Promise<unknown>;
+  /** Se ubicó el pedido desde el aviso (por defecto solo cierra) */
+  alActualizarPedido?: () => void;
 }
 
 interface FilaPago {
@@ -44,7 +48,9 @@ export function ModalCobrar({
   alCerrar,
   alCobrarExitoso,
   cobrar = pedidosApi.cobrar,
+  alActualizarPedido,
 }: ModalCobrarProps) {
+  const sinUbicar = deliverySinUbicacion(pedido);
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   // Lo que se cobra: la venta más la propina (la propina va aparte: no es venta ni comprobante)
   const propinaPedido = Number(pedido.propina) || 0;
@@ -770,12 +776,22 @@ export function ModalCobrar({
           </div>
         )}
 
+        {sinUbicar && (
+          <AvisoDeliverySinUbicacion
+            pedidoId={String(pedido.id)}
+            codigo={pedido.codigo}
+            direccion={pedido.entrega_direccion}
+            alActualizar={alActualizarPedido ?? alCerrar}
+          />
+        )}
+
         {/* Acciones */}
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <Boton
             variante="primario"
             cargando={enviando}
-            disabled={!cuadra || enviando || !comprobanteListo}
+            disabled={!cuadra || enviando || !comprobanteListo || sinUbicar}
+            title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
             onClick={iniciarCobro}
             style={{
               flex: 1,

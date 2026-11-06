@@ -65,12 +65,36 @@ describe('cambio de ubicación', () => {
     propuestas.proponer.mockResolvedValue({ id: '3', estado: 'PROPUESTA' });
     render(<BotonProponerUbicacion pedidoId="7" codigo="CP-W007" estado="EN_CAMINO" />);
     fireEvent.click(screen.getByRole('button', { name: /Proponer ubicación real del pedido/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Estoy en la ubicación real' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Mi ubicación actual' }));
     fireEvent.change(screen.getByPlaceholderText(/portón verde/), { target: { value: 'Casa azul' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar propuesta' }));
     await waitFor(() =>
       expect(propuestas.proponer).toHaveBeenCalledWith('7', { lat: -12.06, lng: -76.98, nota: 'Casa azul' }),
     );
+  });
+
+  it('repartidor: avisa si la precisión del GPS es mala, muestra el mapa y la distancia al punto actual', async () => {
+    const geo = { getCurrentPosition: vi.fn((ok: any) => ok({ coords: { latitude: -12.06, longitude: -76.98, accuracy: 180 } })) };
+    Object.defineProperty(globalThis.navigator, 'geolocation', { value: geo, configurable: true });
+    render(<BotonProponerUbicacion pedidoId="7" codigo="CP-W007" estado="LISTO" puntoActual={{ lat: -12.05, lng: -76.98 }} />);
+    fireEvent.click(screen.getByRole('button', { name: /Proponer ubicación real del pedido/ }));
+    expect(await screen.findByTestId('mapa')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Mi ubicación actual' }));
+    expect(await screen.findByText(/Precisión baja \(±180 m\)/)).toBeTruthy();
+    expect(screen.getByTestId('distancia-propuesta').textContent).toMatch(/A \d+ m del punto actual del pedido/);
+  });
+
+  it('repartidor: puede proponer aunque el pedido no tuviera ubicación y hablar con el cliente antes', async () => {
+    const alChatear = vi.fn();
+    propuestas.proponer.mockResolvedValue({ id: '4', estado: 'PROPUESTA' });
+    render(<BotonProponerUbicacion pedidoId="7" codigo="CP-W007" estado="LISTO" puntoActual={null} alChatear={alChatear} />);
+    fireEvent.click(screen.getByRole('button', { name: /Proponer ubicación real del pedido/ }));
+    fireEvent.click(await screen.findByTestId('mapa'));
+    expect(screen.getByTestId('distancia-propuesta').textContent).toMatch(/todavía no tiene punto/);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar propuesta' }));
+    await waitFor(() => expect(propuestas.proponer).toHaveBeenCalledWith('7', { lat: -12.05, lng: -76.97, nota: undefined }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hablar con el cliente por WhatsApp' }));
+    expect(alChatear).toHaveBeenCalled();
   });
 
   it('no muestra el botón de propuesta si el pedido ya no está en curso', () => {

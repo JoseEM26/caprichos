@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { BotonProponerUbicacion } from './BotonProponerUbicacion';
 import type { CSSProperties, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
@@ -576,6 +577,14 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
             </button>
           )}
           <BotonReportar pedido={mio} onReportar={alReportar} />
+          {/* El repartidor propone el punto real del cliente (Caja lo aprueba antes de recalcular el pago) */}
+          <BotonProponerUbicacion
+            pedidoId={mio.id}
+            codigo={mio.codigo}
+            estado={mio.estado}
+            puntoActual={mio.lat != null && mio.lng != null ? { lat: mio.lat, lng: mio.lng } : null}
+            alChatear={alChatear && chatVigente(mio.estado, mio.entregado_en) ? () => alChatear(mio) : undefined}
+          />
         </>
       ) : disponible ? (
         <>

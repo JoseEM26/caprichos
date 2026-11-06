@@ -332,10 +332,25 @@ describe('ComandasService', () => {
     });
   });
 
+  describe('delivery sin ubicación', () => {
+    it('despejar un delivery sin ubicación: 409 DELIVERY_SIN_UBICACION', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({ id: 9n, codigo: 'CP-0009', estado: 'COLA', modalidad: 'DELIVERY', entrega_lat: null, entrega_lng: null, zona_id: null, comandas: [] });
+      await expect(service.despejar(9n, 1n, mockUsuario)).rejects.toMatchObject({ response: { codigo: 'DELIVERY_SIN_UBICACION' } });
+    });
+
+    it('sincronizar pendientes excluye los delivery sin ubicación', async () => {
+      prisma.pedido.findMany.mockResolvedValue([]);
+      await service.sincronizarPendientes();
+      expect(prisma.pedido.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ NOT: expect.objectContaining({ modalidad: 'DELIVERY' }) }) }),
+      );
+    });
+  });
+
   describe('pedido de dos áreas: una despeja (sigue en COLA), la segunda lo deja LISTO', () => {
     it('al completarse un pedido de MESA avisa al mozo; uno de DELIVERY no', async () => {
       const probar = async (modalidad: string) => {
-        const pedido = { id: 8n, codigo: 'CP-0008', estado: 'COLA', modalidad, pasa_cocina_en: new Date() };
+        const pedido = { id: 8n, codigo: 'CP-0008', estado: 'COLA', modalidad, pasa_cocina_en: new Date(), entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n };
         prisma.pedido.findUnique.mockResolvedValue(pedido);
         prisma.comandaArea.findUnique.mockResolvedValue({ pedido_id: 8n, area_id: 1n, estado: 'EN_COCINA' });
         prisma.comandaArea.findMany.mockResolvedValue([{ pedido_id: 8n, area_id: 1n, estado: 'DESPEJADA' }]);

@@ -16,6 +16,8 @@ import { DevolucionPedidoService } from './devolucion-pedido.service';
 import { CambioUbicacionService } from './cambio-ubicacion.service';
 import { PropuestaUbicacionService } from './propuesta-ubicacion.service';
 import { CambioUbicacionController } from './cambio-ubicacion.controller';
+import { UbicacionWhatsappPedidoService } from './ubicacion-whatsapp-pedido.service';
+import { UBICACION_PEDIDO_PUERTO } from '../chatbot/puerto/ubicacion-pedido.puerto';
 import { PropuestaUbicacionController } from './propuesta-ubicacion.controller';
 import { CambioCobroService } from './cambio-cobro.service';
 import { CambioCobroController } from './cambio-cobro.controller';
@@ -34,7 +36,9 @@ import { PagoPlanService } from '../pedidos/pago-plan.service';
     CambioCobroService,
     // Sin estado ni dependencias; PedidosModule no lo exporta
     PagoPlanService,
+    UbicacionWhatsappPedidoService,
+    { provide: UBICACION_PEDIDO_PUERTO, useExisting: UbicacionWhatsappPedidoService },
   ],
-  exports: [PedidosEstadoService],
+  exports: [PedidosEstadoService, UBICACION_PEDIDO_PUERTO],
 })
 export class PedidosAdminModule {}

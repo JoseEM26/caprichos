@@ -125,10 +125,10 @@ Una cortesia es una venta a costo 0: no suma ingresos, no sale en comprobantes (
 Ver tambien: [[informes]]
 
 ## Como se hace: Cambiar la ubicacion de un pedido de delivery
-1. Abre el pedido de delivery. En la seccion de ubicacion pulsa Cambiar ubicacion, mueve el pin o busca la direccion (o usa Usar ubicacion de WhatsApp si el cliente la envio en las ultimas 24 h).
+1. Abre el pedido de delivery. En la seccion de ubicacion pulsa Cambiar ubicacion, mueve el pin o busca la direccion (o usa Usar ubicacion de WhatsApp si el cliente la envio en las ultimas 24 h). Funciona igual en un pedido que llego sin ubicacion.
 2. Revisa la comparacion Antes y Despues: zona, Envio, Diferencia y Total. Pulsa Cambiar y confirma "Si, cambiar".
 3. Si el pedido ya estaba pagado y el envio cambio, queda un Saldo por cobrar (cobrar mas) o una Devolucion pendiente (devolver). Pulsa Cobrar saldo o Marcar como devuelta, elige el medio (si no es efectivo, el Codigo de operacion). En efectivo necesitas la caja abierta ("Abre la caja para mover efectivo").
-4. El repartidor tambien puede proponer la ubicacion real: veras la propuesta con mapas y los botones Aprobar o Rechazar.
+4. El repartidor tambien puede proponer la ubicacion real: veras la propuesta con mapas, la distancia al punto actual, la diferencia de envio y los botones Aprobar o Rechazar. Si es el cliente quien envio otra ubicacion por WhatsApp, la tarjeta dice "El cliente envio otra ubicacion: usarla?" con los botones Usar o Descartar.
 5. Una devolucion pendiente por cambio de ubicacion no afecta el cierre mientras no se marque como devuelta.
 6. La insignia Direccion editada aparece en Caja, Repartos y Mis pedidos cuando el punto se cambio; el historial muestra quien lo cambio. No se cambia en pedidos Entregados ni Anulados.
 Ver tambien: [[repartos]]
@@ -144,6 +144,14 @@ Ver tambien: [[repartos]]
 8. El historial de solicitudes no se edita ni se borra.
 Ver tambien: [[repartos]]
 
+## Como se hace: Atender un delivery que espera la ubicacion del cliente
+1. Desde la carta el cliente ya no marca el punto en el mapa: escribe su direccion y su referencia. El pedido queda Por confirmar con el aviso "Falta la ubicacion: el cliente debe enviarla por WhatsApp" y el envio como "Envio por confirmar".
+2. El mensaje de WhatsApp al cliente ya le pide la ubicacion (clip, Ubicacion, Enviar tu ubicacion actual). Cuando la envia, el pedido se ubica solo: se calcula la zona y el envio, la pantalla se actualiza en vivo y el cliente recibe su confirmacion. No hay que copiar ni pegar nada.
+3. Si el cliente no la envia, pulsa Pedir ubicacion por WhatsApp para reenviarle el pedido. Solo funciona dentro de las 24 horas desde su ultimo mensaje; si ya paso ese tiempo el sistema lo dice ("Pasaron mas de 24 h...") y debes llamarlo o esperar que escriba. Tambien puedes pulsar Ubicar en el mapa.
+4. Mientras falte la ubicacion no se puede confirmar el pedido y el pago, cobrar ni pasar a cocina: el sistema responde "Para delivery primero ubica la direccion en el mapa (calcula la zona y el envio)." y los botones quedan deshabilitados.
+5. Si la ubicacion del cliente cae fuera de la zona de reparto, el pedido queda marcado Fuera de zona, el cliente recibe un aviso y ves la ubicacion como propuesta que solo puedes Descartar; ubica el pedido a mano o habla con el cliente.
+Ver tambien: [[repartos]], [[mensajes]]
+
 ## Como se hace: Leer las insignias #N del dia y las propinas
 1. "#N del dia" en el detalle del pedido es el orden de llegada a cocina de hoy (referencial; reinicia a medianoche de Lima). El codigo CP-xxxx es el que vale. Un pedido sin numero (anterior a esta funcion) muestra un guion.
 2. Si el pedido trae propina (la dejo el cliente en la carta o el bot), el cobro muestra "Venta S/ X + propina S/ Y (va aparte, no es venta)". Se cobra la suma; la propina no es ingreso ni sale en comprobantes y se ve en [[propinas]] y en el bloque de propinas del [[cierre]].
@@ -156,8 +164,8 @@ Ver tambien: [[repartos]]
 - Si un cliente escribe por WhatsApp con una imagen y no ves el comprobante en la ficha, revisa el chat en Mensajes: la foto queda guardada aunque aun no exista la cuenta.
 - No se puede cerrar la caja al finalizar el dia si existen pedidos pendientes de cobro; deben cobrarse o anularse primero.
 - Si no puedes cobrar o aprobar un pago y aparece "La caja está cerrada", abre la caja del dia en Caja y cierres.
-- Si un pedido por delivery no tiene ubicacion GPS o referencia clara, debe ubicarse en el mapa antes de enviarse a despacho.
 - "La solicitud ya fue resuelta" (SOLICITUD_NO_VIGENTE): otra persona de Caja ya la aprobo, rechazo o autorizo; recarga la lista. "Escribe el motivo para autorizar la entrega sin validar": falta el motivo (minimo 5 caracteres). "El pedido ya esta anulado o pagado: no se puede cambiar el cobro": ya no admite el cambio.
+- Si un pedido por delivery no tiene ubicacion en el mapa, no se confirma, no se cobra y no pasa a cocina (409 DELIVERY_SIN_UBICACION): usa Pedir ubicacion por WhatsApp o Ubicar en el mapa.
 - Si la impresora de caja no responde, las etiquetas quedan en cola y no se pierden: la franja de Pedidos y caja lo indica. Al reconectar salen solas.
 
 ## Quien puede hacerlo

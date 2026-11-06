@@ -5,6 +5,8 @@ import { usePideCodigo } from '../../comun/usePideCodigo';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { pedidosApi, PedidoPorCobrar } from './pedidosApi';
 import { medioDigitalVoucher } from './mediosPago';
+import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
+import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 
 const MOTIVO_MINIMO = 5;
 
@@ -12,13 +14,16 @@ export interface ModalCoordinarPagoProps {
   pedido: PedidoPorCobrar;
   alCerrar: () => void;
   alCoordinado: () => void;
+  /** Se ubicó el pedido desde el aviso (por defecto solo cierra) */
+  alActualizarPedido?: () => void;
 }
 
 /**
  * Marca el pago como coordinado. En un medio digital (Yape, Plin, transferencia) hace falta la foto
  * legible del comprobante o, en su defecto, el motivo y el código del supervisor.
  */
-export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado }: ModalCoordinarPagoProps) {
+export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualizarPedido }: ModalCoordinarPagoProps) {
+  const sinUbicar = deliverySinUbicacion(pedido);
   const medio = pedido.pago_preferido || pedido.pago_metodo || '';
   const medioVoucher = medioDigitalVoucher(medio);
 
@@ -35,7 +40,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado }: ModalCoor
   const excepcionLista =
     sinVoucher && motivo.trim().length >= MOTIVO_MINIMO && (!pideCodigo || pinSupervisor.length === 6);
   const usaExcepcion = Boolean(medioVoucher) && !voucherListo && sinVoucher;
-  const listo = !medioVoucher || voucherListo || excepcionLista;
+  const listo = !sinUbicar && (!medioVoucher || voucherListo || excepcionLista);
 
   const ejecutar = async () => {
     setConfirmando(false);
@@ -89,6 +94,15 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado }: ModalCoor
         <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
           Medio: <b>{medio || 'sin medio'}</b> · Total S/ {Number(pedido.total).toFixed(2)}
         </div>
+
+        {sinUbicar && (
+          <AvisoDeliverySinUbicacion
+            pedidoId={String(pedido.id)}
+            codigo={pedido.codigo}
+            direccion={pedido.entrega_direccion}
+            alActualizar={alActualizarPedido ?? alCerrar}
+          />
+        )}
 
         {medioVoucher ? (
           <div
@@ -203,6 +217,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado }: ModalCoor
           <button
             type="button"
             disabled={!listo || enviando}
+            title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
             onClick={() => setConfirmando(true)}
             style={{
               flex: 1,

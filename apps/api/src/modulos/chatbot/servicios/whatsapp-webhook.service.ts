@@ -41,6 +41,8 @@ import { pedidoEsperandoVoucher } from './pedido-esperando-voucher.util';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { interpretarPuntajeEncuesta } from './encuesta-posventa.util';
 import { ubicacionValida, UbicacionCliente } from './ubicacion-cliente.util';
+import { ModuleRef } from '@nestjs/core';
+import { UBICACION_PEDIDO_PUERTO, UbicacionPedidoPuerto } from '../puerto/ubicacion-pedido.puerto';
 import { DireccionesService } from '../../direcciones/direcciones.service';
 import { atenderMensajeVerificacion, secretoVerificacion } from '../../clientes/verificacion-whatsapp.util';
 import { textoGraciasEncuesta } from '../conversacion/textos-encuesta';
@@ -93,6 +95,7 @@ export class WhatsappWebhookService {
     @Optional() private readonly outbox?: OutboxWhatsappService,
     @Optional() private readonly redis?: RedisService,
     @Optional() private readonly direcciones?: DireccionesService,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -750,6 +753,9 @@ export class WhatsappWebhookService {
       }
     }
 
+    // 5.8. Ubicación (pin) de un cliente con delivery activo: se asigna a su pedido (o queda como propuesta para Caja)
+    const ubicacionAtendida = await this.atenderUbicacionDePedido(conversacion, ubicacionGuardada, telefonoNorm);
+
     // 6. Invocación segura del motor de conversación (Ola 1 Agente B)
     // El bot responde únicamente si la conversación le pertenece y el cliente no solicitó baja/alta
     const esComandoBajaOAlta =
@@ -778,6 +784,7 @@ export class WhatsappWebhookService {
       !esComandoBajaOAlta &&
       puedeProcesarMotor &&
       !reprogramacionAtendida &&
+      !ubicacionAtendida &&
       !encuestaAtendida &&
       !voucherAtendido
     ) {
@@ -807,6 +814,28 @@ export class WhatsappWebhookService {
     }
 
     return true;
+  }
+
+  /**
+   * Ubicación de WhatsApp de un cliente con pedido delivery activo. No interviene si el cliente está armando un pedido
+   * en el bot (el paso del flujo ya la usa). Nunca lanza: si falla, el motor sigue como siempre.
+   */
+  private async atenderUbicacionDePedido(
+    conversacion: { flujo?: unknown },
+    ubicacion: UbicacionCliente | null,
+    telefonoNorm?: string | null,
+  ): Promise<boolean> {
+    if (!ubicacion || !telefonoNorm || !this.moduleRef) return false;
+    const estado = String(((conversacion.flujo as Record<string, any>) ?? {}).estado ?? '');
+    if (estado.startsWith('PEDIDO_')) return false;
+    try {
+      const puerto = this.moduleRef.get<UbicacionPedidoPuerto>(UBICACION_PEDIDO_PUERTO, { strict: false });
+      const r = await puerto.recibir({ telefono: telefonoNorm, lat: ubicacion.lat, lng: ubicacion.lng, direccion: ubicacion.direccion });
+      return r.atendida;
+    } catch (err: any) {
+      this.logger.error(`No se pudo asignar la ubicación a un pedido: ${err?.message}`, err?.stack);
+      return false;
+    }
   }
 
   /** Pone la dirección aproximada en la ubicación del chat. No bloquea al bot: si falla, la ubicación queda sin dirección. */
