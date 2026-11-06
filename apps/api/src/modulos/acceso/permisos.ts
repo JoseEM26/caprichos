@@ -178,6 +178,11 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Vouchers y lectura IA (vch-api)
   { modulo: 'vouchers', accion: 'subir' },
   { modulo: 'vouchers', accion: 'ver' },
+  // Control de asistencia: marcar (todo el personal con horario), reportes y correcciones (solo ADMIN),
+  // pantalla del QR del local (solo ADMIN por defecto)
+  { modulo: 'asistencia', accion: 'marcar' },
+  { modulo: 'asistencia', accion: 'administrar' },
+  { modulo: 'asistencia', accion: 'pantalla' },
   // Mascota Capri (mas-api)
   { modulo: 'mascota', accion: 'ver' },
   { modulo: 'mascota', accion: 'editar' },
@@ -315,6 +320,11 @@ export const MATRIZ: Record<string, string[]> = {
     'notificaciones/marcar',
   ],
 };
+
+// Marcar asistencia desde el celular: todo el personal que puede tener horario (no el ADMIN, que ya lo tiene todo)
+for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR']) {
+  MATRIZ[rol] = [...MATRIZ[rol], 'asistencia/marcar'];
+}
 
 // Supervisor: la unión de lo que tienen CAJERO y MOZO, más ver el código rotativo de 6 dígitos.
 // No recibe diseño de carta, Novedades, informes, usuarios, configuración ni compras (ver la tabla del informe).

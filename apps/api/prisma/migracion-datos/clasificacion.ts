@@ -62,6 +62,9 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['seguridad y llaves: secretos, llaves de dispositivos y colas de impresión', [
     'supervisor_secreto', 'device_key', 'print_job', 'sesion',
   ]],
+  ['asistencia del personal: marcas, selfies, dispositivos y consentimientos (datos personales e historial de la base de origen)', [
+    'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
+  ]],
   ['lectura de notificaciones por persona: cada usuario tiene su propio estado, no se migra', [
     'notificacion_lectura',
   ]],

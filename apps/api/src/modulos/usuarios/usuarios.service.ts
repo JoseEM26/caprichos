@@ -735,7 +735,13 @@ export class UsuariosService {
       partyId: partyId.toString(),
       horarios: horarios
         .filter((h) => h.party_id === partyId)
-        .map((h) => ({ dia: h.dia_semana, entrada: deHora(h.entrada), salida: deHora(h.salida) }))
+        .map((h) => ({
+          dia: h.dia_semana,
+          entrada: deHora(h.entrada),
+          salida: deHora(h.salida),
+          almuerzoInicio: h.almuerzo_inicio ? deHora(h.almuerzo_inicio) : null,
+          almuerzoFin: h.almuerzo_fin ? deHora(h.almuerzo_fin) : null,
+        }))
         .sort((a, b) => a.dia - b.dia),
       reemplazos: reemplazos
         .filter((r) => r.party_id === partyId)
