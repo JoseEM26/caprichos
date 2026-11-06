@@ -127,7 +127,7 @@ export function unidadesEnCarrito(lineas: LineaCarrito[], productoId: string): n
 /** Cuántas unidades más se pueden agregar (saldo menos lo que ya va en el carrito); null si no tiene límite. */
 export function topeAgregable(info: InfoStock | undefined, enCarrito: number): number | null {
   if (!info || !info.controlaStock || info.quedan === null) return null;
-  return Math.floor(Math.max(0, info.quedan - enCarrito) / Math.max(1, unidadesPorCantidad));
+  return Math.max(0, info.quedan - enCarrito);
 }
 
 /** Cuántas veces cabe un tamaño de `unidades` en lo que queda; null si no tiene límite. 0 = ese tamaño no cabe. */

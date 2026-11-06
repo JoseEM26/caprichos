@@ -236,7 +236,7 @@ export function CajonCarrito({
             lineas.map((linea) => {
               const info = inventario[String(linea.productoId)];
               const esMezcla = linea.unidadesPorMezcla !== undefined;
-              const tope = esMezcla ? null : topeAgregable(info, unidadesEnCarrito(lineas, linea.productoId), linea.unidadesTamano ?? 1);
+              const tope = esMezcla ? null : topeAgregable(info, unidadesEnCarrito(lineas, linea.productoId));
               // en mezclas, el + llega hasta lo que queda de los sabores que no usan otras líneas
               const maxMezclas = esMezcla && info ? mezclasDisponibles(info, lineas, String(linea.productoId), linea.unidadesPorMezcla ?? 1, linea.id) : null;
               // sin sabores, el + suma las unidades del tamaño (1/2 docena = 6): se bloquea si ya no caben

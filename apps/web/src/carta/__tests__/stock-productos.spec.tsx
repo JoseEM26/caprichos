@@ -16,6 +16,7 @@ import {
   recortarLineasProducto,
   stockInsuficienteDe,
   topeAgregable,
+  topeTamano,
   unidadesEnCarrito,
 } from '../stock';
 
@@ -97,8 +98,8 @@ describe('lógica de stock (stock.ts)', () => {
   it('galleta por tamaño: 1/2 docena cuenta 6 unidades del saldo, no 1', () => {
     const media = { ...linea('a', '1', 1), unidadesTamano: 6 };
     expect(unidadesEnCarrito([media], '1')).toBe(6);
-    expect(topeAgregable(infoStockDe(conStock(12)), 6, 6)).toBe(1);
-    expect(topeAgregable(infoStockDe(conStock(5)), 0, 6)).toBe(0);
+    expect(topeTamano(infoStockDe(conStock(12)), 6, 6)).toBe(1);
+    expect(topeTamano(infoStockDe(conStock(5)), 0, 6)).toBe(0);
     const recortado = recortarLineasProducto([{ ...linea('a', '1', 2), unidadesTamano: 6 }], '1', 7);
     expect(recortado[0].cantidad).toBe(1);
   });
