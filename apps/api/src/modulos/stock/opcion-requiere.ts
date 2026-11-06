@@ -1,3 +1,6 @@
+import { ConflictException } from '@nestjs/common';
+import { controlaPorSabor, LineaVentaProducto } from './producto-controlado';
+
 /**
  * Opciones de grupo ligadas al stock real (tabla opcion_requiere): «2 Donas» consume 2 de DONAS ARTESANALES;
  * un sabor de dona consume 1 de ese sabor. Una opción sin requisitos sigue como antes (solo agotado_hasta).
@@ -143,4 +146,108 @@ export async function opcionesSinStock(db: any, opcionIds: bigint[], ahora = new
     if (requisitosFaltantes(reqs, saldos, ahora).length > 0) sinStock.add(id);
   }
   return sinStock;
+}
+
+/**
+ * Líneas de venta que descuentan los requisitos de las opciones de un pedido (se llama dentro de su transacción).
+ * Requisito con sabor: descuenta ese sabor. Requisito sin sabor en un producto por sabor (p. ej. «2 Donas»):
+ * se reparte entre sus sabores con saldo, primero los de id menor, DESPUÉS de restar lo que piden los requisitos
+ * de sabor. Sin saldo suficiente: 409 STOCK_INSUFICIENTE (la transacción del pedido se deshace).
+ * Productos que no controlan stock no descuentan. Los requisitos del mismo sabor se acumulan (Dona 1 + Dona 2).
+ */
+export async function lineasDeRequisitosOpcion(db: any, requisitos: RequisitoOpcion[]): Promise<LineaVentaProducto[]> {
+  if (requisitos.length === 0) return [];
+  const productos = await db.producto.findMany({
+    where: { id: { in: [...new Set(requisitos.map((r) => BigInt(r.productoId)))] }, controla_stock: true },
+    select: {
+      id: true,
+      nombre: true,
+      controla_stock: true,
+      sabores: { where: { activo: true }, orderBy: { id: 'asc' }, select: { id: true, nombre: true } },
+      ofertasAlcance: { where: { tipo: 'COMBO' }, select: { id: true }, take: 1 },
+    },
+  });
+  const porId = new Map<string, any>(productos.map((p: any) => [p.id.toString(), p]));
+
+  // Demanda agregada por producto (sin sabor) y por sabor
+  const demandaProducto = new Map<string, number>();
+  const demandaSabor = new Map<string, { productoId: string; cantidad: number }>();
+  for (const r of requisitos) {
+    if (!porId.has(r.productoId)) continue;
+    if (r.saborId) {
+      const previo = demandaSabor.get(r.saborId);
+      demandaSabor.set(r.saborId, { productoId: r.productoId, cantidad: (previo?.cantidad ?? 0) + r.cantidad });
+    } else {
+      demandaProducto.set(r.productoId, (demandaProducto.get(r.productoId) ?? 0) + r.cantidad);
+    }
+  }
+
+  const lineas: LineaVentaProducto[] = [];
+  // Producto sin sabores: una sola línea con el total (sabor pedido en un producto así no aplica: se suma al producto)
+  const productosIds = new Set<string>([...demandaProducto.keys(), ...[...demandaSabor.values()].map((d) => d.productoId)]);
+  for (const pid of productosIds) {
+    const p = porId.get(pid);
+    const sabDemanda = [...demandaSabor.entries()].filter(([, d]) => d.productoId === pid);
+    const prodDemanda = demandaProducto.get(pid) ?? 0;
+    if (!controlaPorSabor({ controla_stock: p.controla_stock, sabores: p.sabores, ofertasAlcance: p.ofertasAlcance })) {
+      const total = prodDemanda + sabDemanda.reduce((acc, [, d]) => acc + d.cantidad, 0);
+      if (total > 0) lineas.push({ productoId: p.id, cantidad: total });
+      continue;
+    }
+    // Producto por sabor: saldo de cada sabor pedido y de sus sabores activos
+    const saborIds = [...new Set<string>([...p.sabores.map((s: any) => s.id.toString()), ...sabDemanda.map(([k]) => k)])];
+    const filasSaldo = await db.stockSabor.findMany({ where: { sabor_id: { in: saborIds.map((x) => BigInt(x)) } }, select: { sabor_id: true, cantidad: true } });
+    const disponible = new Map<string, number>(filasSaldo.map((f: any) => [f.sabor_id.toString(), Math.floor(Number(f.cantidad))]));
+    const nombres = new Map<string, string>(p.sabores.map((s: any) => [s.id.toString(), s.nombre]));
+    const nombreDe = async (sid: string) => {
+      if (!nombres.has(sid)) {
+        const sab = await db.sabor.findUnique({ where: { id: BigInt(sid) }, select: { nombre: true } });
+        nombres.set(sid, sab?.nombre ?? `Sabor ${sid}`);
+      }
+      return nombres.get(sid)!;
+    };
+    const sabores: Array<{ saborId: bigint; nombre: string; cantidad: number }> = [];
+    // 1) Requisitos con sabor: su sabor debe tener saldo
+    for (const [sid, d] of sabDemanda) {
+      const saldo = disponible.get(sid) ?? 0;
+      if (saldo < d.cantidad) {
+        throw new ConflictException({
+          codigo: 'STOCK_INSUFICIENTE',
+          mensaje: `Solo quedan ${Math.max(0, saldo)} de ${await nombreDe(sid)}`,
+          productoId: pid,
+          saborId: sid,
+          quedan: Math.max(0, saldo),
+        });
+      }
+      disponible.set(sid, saldo - d.cantidad);
+      sabores.push({ saborId: BigInt(sid), nombre: await nombreDe(sid), cantidad: d.cantidad });
+    }
+    // 2) Requisitos de producto: se reparten entre los sabores que quedan con saldo
+    let pendiente = prodDemanda;
+    const libres = [...disponible.values()].reduce((acc, v) => acc + Math.max(0, v), 0);
+    for (const sid of p.sabores.map((s: any) => s.id.toString())) {
+      if (pendiente <= 0) break;
+      const saldo = disponible.get(sid) ?? 0;
+      const tomo = Math.min(Math.max(0, saldo), pendiente);
+      if (tomo > 0) {
+        disponible.set(sid, saldo - tomo);
+        pendiente -= tomo;
+        const existente = sabores.find((x) => x.saborId.toString() === sid);
+        if (existente) existente.cantidad += tomo;
+        else sabores.push({ saborId: BigInt(sid), nombre: await nombreDe(sid), cantidad: tomo });
+      }
+    }
+    if (pendiente > 0) {
+      throw new ConflictException({
+        codigo: 'STOCK_INSUFICIENTE',
+        mensaje: `Solo quedan ${libres} de ${p.nombre}`,
+        productoId: pid,
+        quedan: libres,
+      });
+    }
+    if (sabores.length > 0) {
+      lineas.push({ productoId: p.id, cantidad: sabores.reduce((acc, x) => acc + x.cantidad, 0), sabores });
+    }
+  }
+  return lineas;
 }
