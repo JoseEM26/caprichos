@@ -101,4 +101,91 @@ describe('PantallaAsistenciaView (QR de asistencia)', () => {
       expect(pantallaQrPublica).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('instalar app QR Asistencia', () => {
+    const ok = () => {
+      const slot = Math.floor(Date.parse('2026-11-06T13:00:10Z') / 30_000);
+      pantallaQrPublica.mockResolvedValue(respuesta(Date.parse('2026-11-06T13:00:10Z'), slot, '123 456'));
+    };
+    const media = (match: boolean) =>
+      (window.matchMedia = vi.fn().mockReturnValue({ matches: match, addEventListener() {}, removeEventListener() {} }) as any);
+    beforeEach(() => {
+      media(false);
+      document.head.innerHTML = '<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#111111">';
+      document.title = 'Caprichos';
+    });
+
+    it('con beforeinstallprompt muestra el botón y llama prompt()', async () => {
+      ok();
+      await act(async () => {
+        render(<PantallaAsistenciaView token="tok" />);
+      });
+      const ev: any = new Event('beforeinstallprompt', { cancelable: true });
+      ev.prompt = vi.fn().mockResolvedValue(undefined);
+      await act(async () => {
+        window.dispatchEvent(ev);
+      });
+      await act(async () => {
+        screen.getByRole('button', { name: 'Instalar app QR Asistencia' }).click();
+      });
+      expect(ev.prompt).toHaveBeenCalled();
+    });
+
+    it('sin el evento muestra ayuda de pasos', async () => {
+      ok();
+      await act(async () => {
+        render(<PantallaAsistenciaView token="tok" />);
+      });
+      await act(async () => {
+        screen.getByRole('button', { name: 'Instalar app QR Asistencia' }).click();
+      });
+      expect(screen.getByRole('note')).toHaveTextContent('menú del navegador');
+    });
+
+    it('en iOS la ayuda dice Compartir y Añadir a pantalla de inicio', async () => {
+      ok();
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)');
+      await act(async () => {
+        render(<PantallaAsistenciaView token="tok" />);
+      });
+      await act(async () => {
+        screen.getByRole('button', { name: 'Instalar app QR Asistencia' }).click();
+      });
+      expect(screen.getByRole('note')).toHaveTextContent('Toca Compartir y luego Añadir a pantalla de inicio.');
+      vi.restoreAllMocks();
+    });
+
+    it('oculto cuando ya corre instalada y en la variante admin', async () => {
+      ok();
+      media(true);
+      await act(async () => {
+        render(<PantallaAsistenciaView token="tok" />);
+      });
+      expect(screen.queryByRole('button', { name: /Instalar app/ })).toBeNull();
+    });
+
+    it('la variante admin no muestra el botón ni toca el manifest', async () => {
+      pantallaQr.mockResolvedValue(respuesta(Date.parse('2026-11-06T13:00:10Z'), 1, '1'));
+      await act(async () => {
+        render(<PantallaAsistenciaView />);
+      });
+      expect(screen.queryByRole('button', { name: /Instalar app/ })).toBeNull();
+      expect(document.querySelector('link[rel="manifest"]')!.getAttribute('href')).toBe('/manifest.webmanifest');
+    });
+
+    it('cambia el manifest, el tema y el título, y los restaura al desmontar', async () => {
+      ok();
+      let r: any;
+      await act(async () => {
+        r = render(<PantallaAsistenciaView token="tok" />);
+      });
+      expect(document.querySelector('link[rel="manifest"]')!.getAttribute('href')).toBe('/carta/asistencia-pantalla/tok/manifest.webmanifest');
+      expect(document.querySelector('meta[name="theme-color"]')!.getAttribute('content')).toBe('#0B2C3E');
+      expect(document.title).toBe('QR Asistencia');
+      r.unmount();
+      expect(document.querySelector('link[rel="manifest"]')!.getAttribute('href')).toBe('/manifest.webmanifest');
+      expect(document.querySelector('meta[name="theme-color"]')!.getAttribute('content')).toBe('#111111');
+      expect(document.title).toBe('Caprichos');
+    });
+  });
 });
