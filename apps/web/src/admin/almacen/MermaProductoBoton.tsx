@@ -1,7 +1,9 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { almacenApi, type MotivoMermaProducto } from './almacenApi';
 import { Boton } from '../../comun/Boton';
+import { Icono } from '../../comun/Icono';
 import { ErrorApi } from '../../comun/api';
+import './apertura-dia.css';
 
 export const MOTIVOS_MERMA: Array<{ valor: MotivoMermaProducto; etiqueta: string }> = [
   { valor: 'VENCIDO', etiqueta: 'Vencido' },
@@ -27,14 +29,17 @@ interface Props {
   saldo: number;
   /** Se llama tras una merma registrada (para recargar la pantalla). */
   alRegistrar: () => void;
+  /** Para la tabla de apertura: un icono que abre el formulario en un diálogo, en vez de desplegarlo en la fila. */
+  compacto?: boolean;
 }
 
 /**
  * «Botar a merma» de un producto o de un sabor: cantidad, motivo y nota (obligatoria si es Otro).
  * Sin código de supervisor: Cocina la registra y queda auditada (quién y cuándo).
  */
-export function MermaProductoBoton({ productoId, saborId, nombre, saldo, alRegistrar }: Props) {
+export function MermaProductoBoton({ productoId, saborId, nombre, saldo, alRegistrar, compacto = false }: Props) {
   const [abierto, setAbierto] = useState(false);
+  const cantidadRef = useRef<HTMLInputElement>(null);
   const [cantidad, setCantidad] = useState('');
   const [motivo, setMotivo] = useState<MotivoMermaProducto>('VENCIDO');
   const [nota, setNota] = useState('');
@@ -76,21 +81,36 @@ export function MermaProductoBoton({ productoId, saborId, nombre, saldo, alRegis
     }
   };
 
+  useEffect(() => {
+    if (abierto && compacto) cantidadRef.current?.focus();
+  }, [abierto, compacto]);
+
+  const abrir = () => {
+    setExito(null);
+    setAbierto(true);
+  };
+
+  const disparador = compacto ? (
+    <button
+      type="button"
+      aria-label={`Botar a merma ${nombre}`}
+      title="Botar a merma"
+      onClick={abrir}
+      disabled={saldo <= 0}
+      className="ap-merma-icono"
+    >
+      <Icono nombre="alerta" tamano={18} aria-hidden="true" />
+    </button>
+  ) : (
+    <button type="button" aria-label={`Botar a merma ${nombre}`} onClick={abrir} disabled={saldo <= 0} style={botonSecundario}>
+      Botar a merma
+    </button>
+  );
+
   if (!abierto) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <button
-          type="button"
-          aria-label={`Botar a merma ${nombre}`}
-          onClick={() => {
-            setExito(null);
-            setAbierto(true);
-          }}
-          disabled={saldo <= 0}
-          style={botonSecundario}
-        >
-          Botar a merma
-        </button>
+        {disparador}
         {exito && (
           <span role="status" style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-navy)' }}>
             {exito}
@@ -101,15 +121,23 @@ export function MermaProductoBoton({ productoId, saborId, nombre, saldo, alRegis
   }
 
   const esOtro = motivo === 'OTRO';
-  return (
+  const formulario = (
     <div
       role="group"
       aria-label={`Botar a merma ${nombre}`}
-      style={{ display: 'flex', flexDirection: 'column', gap: 8, border: '1px dashed var(--cp-rust)', borderRadius: 10, padding: 10 }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        border: compacto ? 'none' : '1px dashed var(--cp-rust)',
+        borderRadius: 10,
+        padding: compacto ? 0 : 10,
+      }}
     >
       <label style={etiqueta}>
         Cantidad a botar
         <input
+          ref={cantidadRef}
           type="number"
           inputMode="numeric"
           min={1}
@@ -150,6 +178,25 @@ export function MermaProductoBoton({ productoId, saborId, nombre, saldo, alRegis
         </button>
       </div>
     </div>
+  );
+
+  if (!compacto) return formulario;
+  return (
+    <>
+      {disparador}
+      <div className="ap-modal-fondo" aria-hidden="true" onClick={cerrar} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Botar a merma ${nombre}`}
+        className="ap-modal"
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') cerrar();
+        }}
+      >
+        {formulario}
+      </div>
+    </>
   );
 }
 
