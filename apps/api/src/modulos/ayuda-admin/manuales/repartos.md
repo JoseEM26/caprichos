@@ -3,26 +3,26 @@ modulo: repartos
 titulo: Repartos
 ruta: /admin/repartos
 permiso: repartos/ver
-roles: [ADMIN, CAJERO, REPARTIDOR, SUPERVISOR]
+roles: [ADMIN, CAJERO, REPARTIDOR, SUPERVISOR, MOZO]
 relacionados: [caja, cocina, cierre, zonas, mensajes, mapa, usuarios, asistencia]
 sugerencias:
   - Como tomo un pedido o una ruta para repartir
-  - Como cambio el estado a En camino y Entregado
-  - Que hago si llego y el cliente no contesta
   - Como le escribo por WhatsApp al cliente de mi pedido
   - La ubicacion del cliente esta mal, como la corrijo
   - Como veo que repartidores estan libres u ocupados
   - Como cambio la ubicacion de un pedido de delivery
-  - Por que no puedo tomar mas pedidos
+  - Como veo todos los pedidos de delivery y en que etapa estan
+  - Como suelto o reasigno un pedido
+  - Como tomo un pedido yo mismo como administrador
 ---
 # Repartos
 
 ## Para que sirve
 Modulo de asignacion, ruta y seguimiento de los pedidos a domicilio. Muestra los pedidos que [[cocina]] ya dejo listos, los reparte entre los repartidores, dibuja la ruta en el mapa (limitado por las [[zonas]]) y controla el efectivo que hay que rendir en [[caja]] y [[cierre]].
 
-Segun el rol la pantalla es distinta: el Repartidor ve una pantalla todo-mapa pensada para celular y solo sus pedidos; Caja y Administrador ven el panel de despacho con mapa, lista y el panel Repartidores.
+Segun el rol la pantalla es distinta: el Repartidor conserva su pantalla todo-mapa para celular con solo sus pedidos; los demas roles ven la vista de seguimiento.
 
-Aviso: la vista de seguimiento por rol (una sola pantalla de seguimiento con filtros por rol, la lista Todos los pedidos y la opcion del administrador de tomar un pedido como repartidor) esta llegando en una proxima version y todavia no esta en esta pantalla. Este manual describe lo que se ve hoy.
+Para Administrador, Supervisor, Cajero y Mozo la pantalla es de seguimiento: muestra que lleva y entrega cada repartidor y todos los pedidos de delivery.
 
 ## Reglas de seguridad y aislamiento
 1. Cada repartidor ve y toca solo sus pedidos; si intenta con uno ajeno el sistema responde 403 NO_ASIGNADO ("Solo puedes tomar rutas para ti" / "Este pedido no esta asignado a ti").
@@ -75,12 +75,28 @@ Ver tambien: [[caja]]
 7. El historial de cambios muestra quien lo hizo (Caja o Repartidor), el estado, zona anterior y nueva, y el envio anterior y nuevo con su diferencia.
 Ver tambien: [[caja]]
 
-## Vista de Administrador y Cajero (panel de despacho)
-- Mapa y lista con los pedidos de la jornada; filtros de Espera (Retrasado desde 20 min, Tarde desde 30, Muy tarde desde 45: los minutos se editan) y por zona (Todas las zonas). Pantalla completa para el mapa.
-- Boton Repartidores: panel con cada repartidor LIBRE u OCUPADO (N pedidos), los pedidos que lleva por etapa (Tomado, En camino, Llegado) y los pedidos Sin tomar. Solo Caja y Administrador lo ven; el Repartidor no (403).
-- Ruta sugerida: arma la ruta de los pedidos listos y permite Iniciar ruta; para devolver un pedido a disponibles por averia o demora usa Liberar pedido (caja) o Liberar a disponibles en el detalle del pedido. La pestana Rutas lista las rutas con filtros de Dia y Repartidor.
-- Caja resuelve incidentes (reprogramar, retornar al local o cobrar con recargo) y liquida el efectivo que rinde cada repartidor. En esta version la asignacion se hace cuando el repartidor toma el pedido o una ruta; la reasignacion manual es parte de la vista de seguimiento que esta llegando.
-- Reenvio tras el retiro (Por reprogramar): si el cliente dijo SI, el pedido aparece como Por reprogramar con el boton «Reprogramar / Reenviar a reparto: S/ x». Ese monto es el que el cliente vio antes de responder y se suma una vez al total y al envio. Si el pedido ya estaba pagado, el recargo se cobra aparte en Caja. El costo se configura en Configuracion, Parametros de operacion, «Costo de volver a enviar un pedido».
+## Vista de seguimiento (Administrador, Supervisor, Cajero y Mozo)
+Tiene cuatro pestanas: Repartidores, Todos los pedidos, Mapa y Rutas. Ver el seguimiento requiere el permiso repartos/seguir (Administrador, Supervisor, Cajero y Mozo). Mozo y Supervisor ven en modo solo lectura; el Mozo no ve telefonos de clientes. Ya no se asigna pedidos a "Repartidor 1/2/3" ni Caja asigna pedidos: cada repartidor toma los suyos desde su celular.
+- Repartidores: una tarjeta por repartidor con su estado, Libre · Sin pedidos u OCUPADO (N), y los pedidos que lleva por etapa (Tomado, En camino, Llegado), mas los pedidos Sin tomar. Hay un filtro para ver Todos los repartidores o uno solo.
+- Todos los pedidos: lista de todo el delivery agrupada en secciones: Esperando repartidor (listo, sin tomar), En preparacion / en espera (En cola, En cocina, En preparacion o Por confirmar), Tomados · en camino (Tomado, En camino o Llego, con la hora), Entregados hoy y No entregados / con incidente (Anulado o "Incidente: motivo"). Arriba hay chips para ver una seccion o Todas, y un buscador "Buscar por codigo o cliente". Cada fila dice zona, repartidor ("Sin repartidor" si no tiene) y etapa.
+- Mapa: pedidos activos en el mapa con filtros de Espera (Retrasado desde 20 min, Tarde desde 30, Muy tarde desde 45) y por zona, pantalla completa y ruta sugerida.
+- Rutas: rutas de los repartidores con filtros de Dia y Repartidor.
+- Si el Administrador toma pedidos como repartidor aparece en el panel con su nombre y "(admin)" mientras los lleve.
+
+## Como se hace: Tomar un pedido como repartidor (solo Administrador)
+1. En Todos los pedidos, Mapa o el detalle de un pedido que esta Esperando repartidor, pulsa Tomar como repartidor.
+2. El pedido queda a tu nombre y apareces como "Tu nombre (admin)" en Repartidores. Lo entregas con los mismos pasos de la pantalla de reparto (Salir, Llegue, Entregar).
+Ver tambien: [[caja]]
+
+## Como se hace: Soltar o reasignar un pedido (Administrador y Cajero)
+1. Abre un pedido que ya tiene repartidor y no esta entregado y pulsa Soltar / reasignar.
+2. Escribe el Motivo (obligatorio; si no, "Escribe el motivo").
+3. Elige un repartidor destino para Reasignar, o deja "Dejarlo sin repartidor (vuelve a esperando)" y pulsa Soltar pedido. El cambio queda auditado.
+4. El Mozo y el Supervisor no ven este boton. Un pedido con alerta de "tomado sin salir" tiene su propio aviso.
+
+## Otras funciones del Cajero y el Administrador
+- Resolver incidentes (Resolver incidente (caja/admin)): reprogramar, retornar al local o cobrar con recargo, y liquidar el efectivo que rinde cada repartidor.
+- Reenvio tras el retiro (Por reprogramar): si el cliente dijo SI, el pedido aparece como Por reprogramar con el boton «Reprogramar / Reenviar a reparto: S/ x». Ese monto es el que el cliente vio antes de responder y se suma una vez al total y al envio. Si ya estaba pagado, el recargo se cobra aparte en Caja. El costo se configura en Configuracion, Parametros de operacion, «Costo de volver a enviar un pedido».
 - La liquidacion de un repartidor ya no bloquea el cierre ni duplica el efectivo.
 
 ## Como se hace: Reportar una falla en la entrega (no contesta o direccion erronea)
@@ -112,7 +128,7 @@ Ver tambien: [[mensajes]]
 - La devolucion pendiente por cambio de ubicacion no afecta el cierre de caja mientras no se resuelva: al marcarla como devuelta, en efectivo sale como egreso de la caja de hoy y en digital se descuenta del medio en el cierre.
 
 ## Quien puede hacerlo
-- Repartidor: ver y tomar sus pedidos y rutas, salir, llegar, entregar, reportar fallas, chatear con el cliente de su pedido y proponer la ubicacion real (permisos repartos/tomar, entregar, reportar, chat y proponer_ubicacion).
-- Cajero: ver el panel de despacho, asignar o liberar, liquidar, resolver incidentes y cambiar o aprobar la ubicacion (pedidos/cambiar_ubicacion).
-- Administrador: todo lo anterior.
-- Supervisor: ve Repartos pero no cambia ubicaciones.
+- Repartidor: ver y tomar sus pedidos y rutas, salir, llegar, entregar, reportar fallas, chatear con el cliente de su pedido y proponer la ubicacion real.
+- Administrador: seguimiento completo, Tomar como repartidor, Soltar / reasignar, resolver incidentes, cambiar ubicaciones y liquidar.
+- Cajero: seguimiento, Soltar / reasignar, resolver incidentes, liquidar y cambiar o aprobar ubicaciones (pedidos/cambiar_ubicacion).
+- Supervisor y Mozo: seguimiento en solo lectura (repartos/seguir); el Mozo no ve telefonos y ninguno de los dos suelta ni cambia ubicaciones.
