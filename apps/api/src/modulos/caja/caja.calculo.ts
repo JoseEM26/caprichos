@@ -180,6 +180,7 @@ export function pedidosRepartoDelDia(cliente: ClienteCaja, fechaIso: string) {
     include: {
       repartidor: { include: { persona: true } },
       cobros: { include: { pagos: true } },
+      planPago: true,
     },
   });
 }
@@ -202,8 +203,13 @@ export function efectivoDelRepartidor(p: {
   total: unknown;
   pago_metodo: string | null;
   cobros: { anulado_en: Date | null }[];
+  /** Plan de pago (pago dividido o cambio de cobro aprobado en la puerta): cuenta solo su renglón EFECTIVO */
+  planPago?: { medio: string; monto: unknown }[] | null;
 }): number {
   if (cobroVigente(p.cobros)) return 0;
+  if (p.planPago && p.planPago.length > 0) {
+    return p.planPago.filter((f) => f.medio === 'EFECTIVO').reduce((acc, f) => acc + aCentimos(f.monto), 0);
+  }
   return p.pago_metodo === 'EFECTIVO' ? aCentimos(p.total) : 0;
 }
 

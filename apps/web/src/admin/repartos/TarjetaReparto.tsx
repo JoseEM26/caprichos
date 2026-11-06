@@ -8,6 +8,7 @@ import { PedidoReparto, repartosApi, MensajeReparto } from './repartosApi';
 import { ModalReportarFalla } from './ModalReportarFalla';
 import { BotonProponerUbicacion } from './BotonProponerUbicacion';
 import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
+import { InsigniaCambioCobro } from '../pedidos/PanelCambioCobro';
 import { ModalResolverFalla } from './ModalResolverFalla';
 import { ErrorApi } from '../../comun/api';
 import { clasificarEspera } from './calculoRuta';
@@ -312,6 +313,7 @@ export function TarjetaReparto({
                 {pedido.codigo}
               </span>
               {pedido.ubicacion_editada_en && <InsigniaDireccionEditada />}
+              {pedido.cambio_cobro_pendiente && <InsigniaCambioCobro />}
               {pedido.zona && (
                 <span
                   style={{

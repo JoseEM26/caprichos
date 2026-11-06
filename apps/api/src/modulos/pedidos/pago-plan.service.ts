@@ -54,6 +54,21 @@ export function mediosDigitalesDelPedido(
 }
 
 /**
+ * Efectivo que el repartidor debe cobrar en la puerta: el renglón EFECTIVO del plan si el pedido tiene plan;
+ * sin plan, el total cuando el medio del pedido es efectivo. Función pura.
+ */
+export function efectivoDelPedido(
+  planPago: PlanPagoItem[] | null | undefined,
+  pagoMetodo: string | null | undefined,
+  total: number,
+): number {
+  if (planPago && planPago.length > 0) {
+    return Math.round(planPago.filter((f) => f.medio === 'EFECTIVO').reduce((acc, f) => acc + Number(f.monto), 0) * 100) / 100;
+  }
+  return String(pagoMetodo ?? '').toUpperCase() === 'EFECTIVO' ? total : 0;
+}
+
+/**
  * Pago dividido: plan de pago declarado al hacer el pedido (un renglón por medio).
  * Reutilizable por carta virtual, WhatsApp y el mozo. Sin dependencias.
  */

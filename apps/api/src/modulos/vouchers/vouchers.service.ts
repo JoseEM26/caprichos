@@ -41,7 +41,9 @@ import {
 export interface SubirVoucherOpciones {
   pedidoId?: string | number | bigint;
   medio?: 'YAPE' | 'PLIN' | 'TRANSFERENCIA' | 'TARJETA';
-  origen?: 'MOZO' | 'WHATSAPP' | 'CAJA' | 'CARTA';
+  origen?: 'MOZO' | 'WHATSAPP' | 'CAJA' | 'CARTA' | 'REPARTIDOR';
+  /** Plan que se espera en vez del guardado en el pedido (cambio de cobro en la puerta: aún no está aprobado). */
+  planEsperado?: PlanPagoItem[];
   /** Obligatorio (≥5 caracteres) para CAJERO/ADMIN cuando reemplaza un voucher vigente. */
   motivoCambio?: string;
 }
@@ -266,12 +268,13 @@ export class VouchersService {
     }
 
     // 7. Evaluar semáforo con función pura
+    const planDelPedido = opciones.planEsperado ?? pedido?.planPago;
     const contexto: ContextoSemaforo = {
       // Con medio: se compara contra el renglón de ESE medio del plan; sin medio, contra la parte digital total
       pedidoTotal: pedido
-        ? opciones.medio && pedido.planPago?.length
-          ? montoDeMedioDigital(pedido.planPago, opciones.medio) || null
-          : montoEsperadoVoucher(pedido.planPago, pedido.total != null ? totalCobrable(pedido) : null)
+        ? opciones.medio && planDelPedido?.length
+          ? montoDeMedioDigital(planDelPedido, opciones.medio) || null
+          : montoEsperadoVoucher(planDelPedido, pedido.total != null ? totalCobrable(pedido) : null)
         : null,
       medioEsperado: opciones.medio || (pedido?.pago_preferido as any) || (pedido?.pago_metodo as any) || null,
       titularEsperado: config.titularEsperado,

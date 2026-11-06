@@ -17,6 +17,7 @@ import { JwtService } from '@nestjs/jwt';
  *  vouchers:actualizado {pedidoIds,codigo,motivo,origen}
  *      motivo: subido | reemplazado | quitado | reasignado | revisado | plan | enviado_caja -> Caja (lista y modal)
  *  cocina:comanda / cocina:comanda-actualizada / pedido:progreso / carta:disponibilidad      -> Cocina
+ *  cambio-cobro:solicitud {pedidoId,codigo,solicitudId,estado,repartidorPartyId}   cambio de forma de pago en la puerta (PENDIENTE y su resultado) -> Caja, Repartidor
  *  reparto:rutas / reparto:incidente                                                         -> Repartos, Caja
  */
 @WebSocketGateway({

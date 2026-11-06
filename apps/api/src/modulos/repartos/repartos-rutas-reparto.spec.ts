@@ -35,6 +35,7 @@ function montar(pedidos: any[]) {
     });
   const db: any = {
     parametro: { findMany: jest.fn().mockResolvedValue([]) },
+    solicitudCambioCobro: { findFirst: jest.fn().mockResolvedValue(null) },
     pedidoEstadoHistorial: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     incidenteEntrega: { count: jest.fn(async () => 0), create: jest.fn(async ({ data }: any) => { incidentes.push(data); return { id: 1n }; }) },
     pedido: {
