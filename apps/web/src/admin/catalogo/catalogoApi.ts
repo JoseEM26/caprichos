@@ -56,6 +56,8 @@ export interface SaborItem {
   disponible?: boolean;
   /** Stock de hoy de este sabor (de la apertura del día). null = sin apertura hoy. */
   quedan?: number | null;
+  /** Hay conteo de apertura de este sabor hoy (el saldo arrastra del día anterior, pero conviene contar). */
+  aperturaHoy?: boolean;
 }
 
 export interface PromocionProducto {
@@ -85,6 +87,12 @@ export interface ProductoAdmin {
   resaltarOpcionMenosPedida?: boolean;
   /** Stock propio del producto (donas, galletas): se descuenta al vender y se marca agotado en 0. Necesita conteo de apertura. */
   controlaStock: boolean;
+  /** Anfitrión de un combo (Dúo, Cajita): su disponibilidad sale de lo que lo compone; no usa stock ni sabores propios. */
+  esAnfitrionCombo?: boolean;
+  /** Saldo de hoy (solo si controla stock; null si no). Sin sabores es el del producto. */
+  quedan?: number | null;
+  /** Si ya se contó la apertura de hoy del producto (null si no controla stock). */
+  aperturaHoy?: boolean | null;
   /** Promociones activas (descuento / lleva-paga) que alcanzan al producto; los combos no cuentan. */
   promociones?: PromocionProducto[];
   /** Promociones activas de toda la carta (no esconden el botón). */

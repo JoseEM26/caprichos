@@ -1,0 +1,32 @@
+/* Editar producto (EditarProductoModal.tsx): secciones con título, rejilla 3 columnas en PC y 1 en celular. */
+.ep-pagina { display: flex; flex-direction: column; gap: 12px; color: var(--cp-navy); min-width: 0; }
+.ep-sec { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ep-h { margin: 0; display: flex; align-items: center; gap: 6px; font-family: Montserrat, sans-serif; font-size: 14px; font-weight: 800; }
+.ep-fila3 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1fr); gap: 10px; }
+.ep-campo { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; min-width: 0; }
+.ep-imagen { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.ep-miniatura { width: 120px; height: 120px; border-radius: 12px; object-fit: contain; background: var(--cp-sand); border: 1.5px dashed var(--cp-soft); flex: 0 0 auto; }
+.ep-imagen-acciones { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 160px; }
+.ep-botones { display: flex; gap: 8px; flex-wrap: wrap; }
+.ep-subir { display: inline-flex; align-items: center; justify-content: center; position: relative; }
+.ep-quitar { border-color: var(--cp-rust); color: var(--cp-rust); }
+.ep-oculto { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.ep-enlace { width: 100%; text-align: left; border-radius: 12px; font-weight: 800; }
+.ep-ajuste { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ep-estado { font-size: 13px; font-weight: 700; padding: 6px 10px; border-radius: 8px; background: var(--cp-sand); }
+.ep-estado a { color: var(--cp-rust); font-weight: 800; }
+.ep-sabores { display: flex; flex-direction: column; border: 1px solid var(--cp-line); border-radius: 10px; }
+.ep-sabores:empty { display: none; }
+.ep-sabor { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--cp-line); }
+.ep-sabor:last-child { border-bottom: 0; }
+.ep-sabor-nombre { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.ep-sabor-titulo { font-weight: 800; font-size: 13px; }
+.ep-sabor-estado { font-size: 12px; font-weight: 700; }
+.ep-sin { color: var(--cp-rust); }
+.ep-nuevo { display: flex; gap: 8px; }
+.ep-nuevo .eo-input { flex: 1 1 auto; min-height: 40px; }
+.ep-nuevo .eo-btn { min-height: 40px; flex: 0 0 auto; }
+.ep-nota-combo { padding: 14px; border-radius: 12px; background: var(--cp-sand); font-size: 14px; font-weight: 700; line-height: 20px; }
+.ep-error { flex: 1 1 100%; }
+.eo-pendiente { margin-right: auto; font-size: 13px; font-weight: 700; color: var(--cp-rust); }
+@media (max-width: 640px) { .ep-fila3 { grid-template-columns: 1fr; } .ep-miniatura { width: 96px; height: 96px; } }

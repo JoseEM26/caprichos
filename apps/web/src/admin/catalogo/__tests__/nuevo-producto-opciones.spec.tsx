@@ -37,10 +37,10 @@ describe('Nuevo producto: ¿Cómo se vende?', () => {
     expect(within(d).getByRole('button', { name: /Con tamaños y opciones/ })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(within(d).getByRole('button', { name: 'Postres' }));
     expect(within(d).getByRole('button', { name: /Un solo precio/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(d).queryByText('Agregar tamaño')).not.toBeInTheDocument();
+    expect(within(d).queryByText('+ Agregar tamaño')).not.toBeInTheDocument();
     expect(within(d).getByPlaceholderText('0.00')).toBeInTheDocument();
     fireEvent.click(within(d).getByRole('button', { name: /Con tamaños y opciones/ }));
-    expect(await within(d).findByText('Agregar tamaño')).toBeInTheDocument();
+    expect(await within(d).findByText('+ Agregar tamaño')).toBeInTheDocument();
   });
 
   it('con tamaños exige al menos uno activo', async () => {
@@ -54,7 +54,7 @@ describe('Nuevo producto: ¿Cómo se vende?', () => {
     const crear = vi.spyOn(catalogoApi, 'crearProducto').mockResolvedValue({} as any);
     const d = await abrirNuevo();
     fireEvent.change(within(d).getByPlaceholderText(/BROWNIE/), { target: { value: 'cafe' } });
-    fireEvent.click(await within(d).findByText('Agregar tamaño'));
+    fireEvent.click(await within(d).findByText('+ Agregar tamaño'));
     const sel = await waitFor(() => {
       const s = d.querySelector('select.eo-input') as HTMLSelectElement;
       expect(s.options.length).toBeGreaterThan(1);

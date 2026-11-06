@@ -81,9 +81,12 @@ describe('Productos: stock por sabor (tarjeta y modal de sabores)', () => {
     render(<MemoryRouter><ProductosView /></MemoryRouter>);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Editar' }))[0]);
     const d = await screen.findByRole('dialog', { name: /Editar: DONA DE CHOCOLATE/ });
+    fireEvent.click(within(d).getByRole('tab', { name: /Stock y sabores/ }));
 
     expect(within(d).getByText('Quedan 4')).toBeInTheDocument();
     expect(within(d).getByText('Sin apertura hoy')).toBeInTheDocument();
+    expect(within(d).getByRole('status')).toHaveTextContent('Sin apertura de hoy: cárgala en Apertura del día');
+    expect(within(d).getByRole('link', { name: 'Apertura del día' })).toHaveAttribute('href', '/admin/apertura');
     expect(within(d).getByRole('button', { name: /Chocolate: disponible/ })).toHaveTextContent('Disponible');
     expect(within(d).getByRole('button', { name: /Vainilla: agotado/ })).toHaveTextContent('Agotado');
     expect(within(d).getByText(NOTA_APERTURA)).toBeInTheDocument();
@@ -96,6 +99,7 @@ describe('Productos: stock por sabor (tarjeta y modal de sabores)', () => {
     render(<MemoryRouter><ProductosView /></MemoryRouter>);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Editar' }))[0]);
     const d = await screen.findByRole('dialog', { name: /Editar: DONA DE CHOCOLATE/ });
+    fireEvent.click(within(d).getByRole('tab', { name: /Stock y sabores/ }));
     expect(within(d).getByText('Chocolate')).toBeInTheDocument();
     expect(within(d).queryByText(/Quedan \d+/)).toBeNull();
     expect(within(d).queryByText('Sin apertura hoy')).toBeNull();
@@ -110,6 +114,7 @@ describe('Productos: stock por sabor (tarjeta y modal de sabores)', () => {
     render(<MemoryRouter><ProductosView /></MemoryRouter>);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Editar' }))[0]);
     const d = await screen.findByRole('dialog', { name: /Editar: DONA DE CHOCOLATE/ });
+    fireEvent.click(within(d).getByRole('tab', { name: /Stock y sabores/ }));
 
     fireEvent.click(within(d).getByRole('button', { name: /Vainilla: agotado/ }));
     expect(within(d).getByRole('button', { name: /Vainilla: disponible/ })).toHaveTextContent('Disponible');

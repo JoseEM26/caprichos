@@ -74,6 +74,7 @@ describe('Editar producto: la foto solo viaja si el admin la cambia', () => {
     render(<MemoryRouter><ProductosView /></MemoryRouter>);
     const d = await abrirEditarConFoto();
 
+    fireEvent.click(within(d).getByRole('tab', { name: /Stock y sabores/ }));
     fireEvent.click(within(d).getByRole('checkbox', { name: CHECK }));
     await guardarYConfirmar(d);
 
@@ -123,6 +124,7 @@ describe('Editar producto: la foto solo viaja si el admin la cambia', () => {
     await waitFor(() => expect(catalogoApi.subirFoto).toHaveBeenCalled());
 
     fireEvent.click(within(d).getByRole('button', { name: 'Cancelar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, salir' })); // hay cambios sin guardar
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /Editar: DONA/ })).not.toBeInTheDocument());
 
     d = await abrirEditarConFoto();
