@@ -12,6 +12,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { ErrorApi } from '../../comun/api';
+import { MermaProductoBoton } from './MermaProductoBoton';
 
 /** Un cambio de más de la mitad del saldo (o cualquier cantidad si el saldo es 0) pide confirmación. */
 const UMBRAL_DIFERENCIA = 0.5;
@@ -45,6 +46,10 @@ interface Casilla {
   saldo: number;
   aperturaHoy: boolean;
   aperturaCantidad: number | null;
+  /** Lo que quedó de ayer (propuesto en «Quedaron de ayer»). */
+  quedaronAyer: number;
+  /** Lo que ya se produjo hoy (ya está en el saldo). */
+  producidoHoy: number;
 }
 
 const claveCasilla = (productoId: string, saborId?: string) => (saborId ? `${productoId}#${saborId}` : productoId);
@@ -61,6 +66,8 @@ function casillasDe(productos: AperturaProductoItem[]): Casilla[] {
           saldo: s.saldo,
           aperturaHoy: s.aperturaHoy,
           aperturaCantidad: s.aperturaCantidad,
+          quedaronAyer: s.quedaronAyer,
+          producidoHoy: s.producidoHoy,
         }))
       : [
           {
@@ -71,21 +78,24 @@ function casillasDe(productos: AperturaProductoItem[]): Casilla[] {
             saldo: p.saldo,
             aperturaHoy: p.aperturaHoy,
             aperturaCantidad: p.aperturaCantidad,
+            quedaronAyer: p.quedaronAyer,
+            producidoHoy: p.producidoHoy,
           },
         ],
   );
 }
 
 /**
- * Conteo de apertura del día: cuántos hay de cada producto controlado al empezar.
- * Los productos con sabores se cuentan sabor por sabor. Se guardan los que el usuario cambió
- * y los que todavía no tienen apertura hoy.
+ * Conteo de apertura del día con arrastre: el stock no se reinicia. «Quedaron de ayer» viene ya cargado
+ * (editable si se contó distinto) y «Produje hoy» se suma. Los productos con sabores se cuentan sabor por sabor.
+ * Se guardan los que cambiaron y los que todavía no tienen apertura hoy.
  */
 export function AperturaDiaView() {
   const [datos, setDatos] = useState<AperturaDiaRespuesta | null>(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [valores, setValores] = useState<Record<string, string>>({});
+  const [produccion, setProduccion] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
   const [exito, setExito] = useState<string | null>(null);
@@ -97,7 +107,9 @@ export function AperturaDiaView() {
     try {
       const res = await almacenApi.obtenerApertura();
       setDatos(res);
-      setValores(Object.fromEntries(casillasDe(res.productos).map((c) => [c.clave, String(c.saldo)])));
+      const cs = casillasDe(res.productos);
+      setValores(Object.fromEntries(cs.map((c) => [c.clave, String(c.quedaronAyer)])));
+      setProduccion(Object.fromEntries(cs.map((c) => [c.clave, '0'])));
     } catch (err) {
       setErrorCarga(err instanceof ErrorApi ? err.message : 'No se pudo cargar la apertura del día.');
     } finally {
@@ -112,20 +124,28 @@ export function AperturaDiaView() {
   const productos = datos?.productos ?? [];
   const casillas = casillasDe(productos);
   const valorDe = (clave: string) => valores[clave] ?? '';
+  const produccionDe = (clave: string) => produccion[clave] ?? '0';
 
-  const aEnviar: Array<{ c: Casilla; cantidad: number }> = [];
+  const aEnviar: Array<{ c: Casilla; cantidad: number; produccionHoy: number }> = [];
   const invalidos: string[] = [];
   for (const c of casillas) {
     const cantidad = leerCantidad(valorDe(c.clave));
-    if (cantidad === null) invalidos.push(c.clave);
-    else if (!c.aperturaHoy || cantidad !== c.saldo) aEnviar.push({ c, cantidad });
+    const produccionHoy = leerCantidad(produccionDe(c.clave));
+    if (cantidad === null || produccionHoy === null) invalidos.push(c.clave);
+    else if (!c.aperturaHoy || cantidad !== c.quedaronAyer || produccionHoy > 0) aEnviar.push({ c, cantidad, produccionHoy });
   }
-  const grandes = aEnviar.filter((x) => esGrande(x.c.saldo, x.cantidad));
+  const grandes = aEnviar.filter((x) => x.cantidad !== x.c.quedaronAyer && esGrande(x.c.quedaronAyer, x.cantidad));
 
   const cambiarValor = (clave: string, texto: string) => {
     setExito(null);
     setError(null);
     setValores((v) => ({ ...v, [clave]: texto }));
+  };
+
+  const cambiarProduccion = (clave: string, texto: string) => {
+    setExito(null);
+    setError(null);
+    setProduccion((v) => ({ ...v, [clave]: texto }));
   };
 
   const ajustar = (c: Casilla, delta: number) => {
@@ -143,10 +163,10 @@ export function AperturaDiaView() {
     setGuardando(true);
     setError(null);
     try {
-      const items: ItemApertura[] = aEnviar.map(({ c, cantidad }) =>
+      const items: ItemApertura[] = aEnviar.map(({ c, cantidad, produccionHoy }) =>
         c.saborId
-          ? { productoId: c.productoId, saborId: c.saborId, cantidad }
-          : { productoId: c.productoId, cantidad },
+          ? { productoId: c.productoId, saborId: c.saborId, cantidad, produccion: produccionHoy }
+          : { productoId: c.productoId, cantidad, produccion: produccionHoy },
       );
       const res = await almacenApi.registrarApertura(items);
       setExito(`Apertura guardada: ${res.registrados} ${res.registrados === 1 ? 'producto' : 'productos'}.`);
@@ -176,59 +196,71 @@ export function AperturaDiaView() {
     void enviar();
   };
 
-  /** Campo «¿Cuántos hay ahora?» con − y + de 44 px, para un producto o un sabor. */
+  /** «Quedaron de ayer» (− y + de 44 px) y «Produje hoy» (+M), para un producto o un sabor. */
   const controles = (c: Casilla) => {
     const id = `apertura-${c.clave}`;
+    const idProd = `produccion-${c.clave}`;
     const invalido = invalidos.includes(c.clave);
-    const cantidad = leerCantidad(valorDe(c.clave)) ?? 0;
+    const quedaron = leerCantidad(valorDe(c.clave)) ?? 0;
+    const producido = leerCantidad(produccionDe(c.clave)) ?? 0;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label htmlFor={id} style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-navy)' }}>
-          ¿Cuántos hay ahora?
-        </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            aria-label={`Quitar uno de ${c.nombre}`}
-            onClick={() => ajustar(c, -1)}
-            disabled={cantidad <= 0}
-            style={botonCantidad}
-          >
-            −
-          </button>
-          <input
-            id={id}
-            type="number"
-            inputMode="numeric"
-            min={0}
-            step={1}
-            aria-label={`¿Cuántos hay ahora? ${c.nombre}`}
-            aria-invalid={invalido || undefined}
-            value={valorDe(c.clave)}
-            onChange={(e) => cambiarValor(c.clave, e.target.value)}
-            style={{
-              width: 110,
-              minHeight: 44,
-              boxSizing: 'border-box',
-              borderRadius: 10,
-              border: `1.5px solid ${invalido ? 'var(--cp-rust)' : 'var(--cp-navy)'}`,
-              background: 'var(--cp-white)',
-              color: 'var(--cp-navy)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: 18,
-              textAlign: 'center',
-              padding: '0 8px',
-            }}
-          />
-          <button
-            type="button"
-            aria-label={`Sumar uno a ${c.nombre}`}
-            onClick={() => ajustar(c, 1)}
-            style={botonCantidad}
-          >
-            +
-          </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label htmlFor={id} style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-navy)' }}>
+              Quedaron de ayer
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                aria-label={`Quitar uno de ${c.nombre}`}
+                onClick={() => ajustar(c, -1)}
+                disabled={quedaron <= 0}
+                style={botonCantidad}
+              >
+                −
+              </button>
+              <input
+                id={id}
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                aria-label={`Quedaron de ayer ${c.nombre}`}
+                aria-invalid={invalido || undefined}
+                value={valorDe(c.clave)}
+                onChange={(e) => cambiarValor(c.clave, e.target.value)}
+                style={campoNumero(invalido)}
+              />
+              <button
+                type="button"
+                aria-label={`Sumar uno a ${c.nombre}`}
+                onClick={() => ajustar(c, 1)}
+                style={botonCantidad}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label htmlFor={idProd} style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-navy)' }}>
+              Produje hoy (+)
+            </label>
+            <input
+              id={idProd}
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              aria-label={`Produje hoy ${c.nombre}`}
+              value={produccionDe(c.clave)}
+              onChange={(e) => cambiarProduccion(c.clave, e.target.value)}
+              style={campoNumero(false)}
+            />
+          </div>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>
+          {`Total: ${quedaron} + ${producido} = ${quedaron + producido}`}
         </div>
         {invalido && (
           <span role="alert" style={{ fontSize: 12, color: 'var(--cp-rust)', fontWeight: 700 }}>
@@ -284,7 +316,10 @@ export function AperturaDiaView() {
           const delProducto = casillas.filter((c) => c.productoId === p.productoId);
           const conSabores = !!p.sabores && p.sabores.length > 0;
           const conError = delProducto.some((c) => invalidos.includes(c.clave));
-          const total = delProducto.reduce((suma, c) => suma + (leerCantidad(valorDe(c.clave)) ?? 0), 0);
+          const total = delProducto.reduce(
+            (suma, c) => suma + (leerCantidad(valorDe(c.clave)) ?? 0) + (leerCantidad(produccionDe(c.clave)) ?? 0),
+            0,
+          );
           return (
             <li
               key={p.productoId}
@@ -331,12 +366,25 @@ export function AperturaDiaView() {
                     </div>
                     {estado(c)}
                     {controles(c)}
+                    <MermaProductoBoton
+                      productoId={c.productoId}
+                      saborId={c.saborId}
+                      nombre={c.nombre}
+                      saldo={c.saldo}
+                      alRegistrar={() => void cargar()}
+                    />
                   </div>
                 ))
               ) : (
                 <>
                   {estado(delProducto[0])}
                   {controles(delProducto[0])}
+                  <MermaProductoBoton
+                    productoId={delProducto[0].productoId}
+                    nombre={delProducto[0].nombre}
+                    saldo={delProducto[0].saldo}
+                    alRegistrar={() => void cargar()}
+                  />
                 </>
               )}
             </li>
@@ -384,6 +432,21 @@ export function AperturaDiaView() {
     </div>
   );
 }
+
+const campoNumero = (invalido: boolean): CSSProperties => ({
+  width: 110,
+  minHeight: 44,
+  boxSizing: 'border-box',
+  borderRadius: 10,
+  border: `1.5px solid ${invalido ? 'var(--cp-rust)' : 'var(--cp-navy)'}`,
+  background: 'var(--cp-white)',
+  color: 'var(--cp-navy)',
+  fontFamily: 'Montserrat, sans-serif',
+  fontWeight: 800,
+  fontSize: 18,
+  textAlign: 'center',
+  padding: '0 8px',
+});
 
 const botonCantidad: CSSProperties = {
   minWidth: 44,

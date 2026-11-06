@@ -17,13 +17,14 @@ import { CierreDiaDto } from './dto/cierre-dia.dto';
 import { AlmacenQueryDto } from './dto/almacen-query.dto';
 import { CrearPedidoInternoDto } from './dto/crear-pedido-interno.dto';
 import { RegistrarAperturaDto } from './dto/registrar-apertura.dto';
+import { MermaProductoDto } from './dto/merma-producto.dto';
 import {
   controlaPorSabor,
   fechaLimaHoy,
-  fijarAperturaProducto,
-  fijarAperturaSabor,
-  saldoSabor,
+  mermarProductoControlado,
+  registrarAperturaArrastre,
   sincronizarAgotadoSabor,
+  saldoSabor,
 } from '../stock/producto-controlado';
 import { StockService } from '../stock/stock.service';
 import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
@@ -100,6 +101,9 @@ export class AlmacenService {
     }
     const aperturaSabor = new Map(aperturasSabor.map((a) => [a.sabor_id!.toString(), Number(a.cantidad)]));
     const saldoSabor = new Map(filasSabor.map((f) => [f.sabor_id.toString(), Number(f.cantidad)]));
+    // Arrastre: lo producido hoy (ya sumado) se separa del saldo para sugerir «Quedaron de ayer»
+    const producidoHoyPorSabor = await this.producidoHoyMapa(ids, idsSabores, fecha);
+    const quedaron = (saldoActual: number, producido: number) => Math.max(0, saldoActual - producido);
     return {
       fecha,
       productos: productos.map((p) => {
@@ -110,12 +114,16 @@ export class AlmacenService {
           const sabores = p.sabores.map((sb) => {
             const sk = sb.id.toString();
             const apSab = aperturaSabor.get(sk);
+            const saldoSab = saldoSabor.get(sk) ?? 0;
+            const producido = producidoHoyPorSabor.sabor.get(sk) ?? 0;
             return {
               saborId: sk,
               nombre: sb.nombre,
-              saldo: saldoSabor.get(sk) ?? 0,
+              saldo: saldoSab,
               aperturaHoy: apSab !== undefined,
               aperturaCantidad: apSab ?? null,
+              producidoHoy: producido,
+              quedaronAyer: quedaron(saldoSab, producido),
             };
           });
           return {
@@ -125,20 +133,48 @@ export class AlmacenService {
             saldo: sabores.reduce((acc, sb) => acc + sb.saldo, 0),
             aperturaHoy: sabores.some((sb) => sb.aperturaHoy),
             aperturaCantidad: null,
+            producidoHoy: sabores.reduce((acc, sb) => acc + sb.producidoHoy, 0),
+            quedaronAyer: sabores.reduce((acc, sb) => acc + sb.quedaronAyer, 0),
             sabores,
           };
         }
+        const saldoProd = saldo.get(k) ?? 0;
+        const producido = producidoHoyPorSabor.producto.get(k) ?? 0;
         return {
           productoId: k,
           nombre: p.nombre,
           areaNombre: p.categoria?.area?.nombre ?? null,
-          saldo: saldo.get(k) ?? 0,
+          saldo: saldoProd,
           aperturaHoy: ap !== undefined,
           aperturaCantidad: ap ?? null,
+          producidoHoy: producido,
+          quedaronAyer: quedaron(saldoProd, producido),
           sabores: [],
         };
       }),
     };
+  }
+
+  /** Lo producido hoy por producto (sin sabor) y por sabor, para la apertura con arrastre. */
+  private async producidoHoyMapa(ids: bigint[], idsSabores: bigint[], fecha: string) {
+    const producto = new Map<string, number>();
+    const sabor = new Map<string, number>();
+    if (ids.length === 0 && idsSabores.length === 0) return { producto, sabor };
+    const movs = await this.prisma.movimientoStock.findMany({
+      where: {
+        tipo: 'ENTRADA',
+        nota: 'Produje hoy',
+        en: { gte: new Date(`${fecha}T05:00:00.000Z`) },
+        OR: [{ producto_id: { in: ids } }, { sabor_id: { in: idsSabores } }],
+      },
+      select: { producto_id: true, sabor_id: true, cantidad: true },
+    });
+    for (const m of movs) {
+      const c = Number(m.cantidad);
+      if (m.sabor_id) sabor.set(m.sabor_id.toString(), (sabor.get(m.sabor_id.toString()) ?? 0) + c);
+      else if (m.producto_id) producto.set(m.producto_id.toString(), (producto.get(m.producto_id.toString()) ?? 0) + c);
+    }
+    return { producto, sabor };
   }
 
   async registrarApertura(dto: RegistrarAperturaDto, usuario: UsuarioAutenticado, ip?: string) {
@@ -189,20 +225,16 @@ export class AlmacenService {
     await this.prisma.$transaction(async (tx) => {
       for (const item of dto.items) {
         const prod = productos.find((p) => p.id === this.parsearId(item.productoId, 'producto'))!;
-        if (item.saborId) {
-          await fijarAperturaSabor(
-            tx,
-            prod.id,
-            this.parsearId(item.saborId, 'sabor'),
-            item.cantidad,
-            prod.categoria?.area_id ?? null,
-            usuario.partyId,
-            new Date(),
-            fecha,
-          );
-          continue;
-        }
-        await fijarAperturaProducto(tx, prod.id, item.cantidad, prod.categoria?.area_id ?? null, usuario.partyId, new Date(), fecha);
+        await registrarAperturaArrastre(tx, {
+          productoId: prod.id,
+          saborId: item.saborId ? this.parsearId(item.saborId, 'sabor') : null,
+          quedaron: item.cantidad,
+          produccion: item.produccion ?? 0,
+          areaId: prod.categoria?.area_id ?? null,
+          por: usuario.partyId,
+          ahora: new Date(),
+          fecha,
+        });
       }
       await this.auditoria.registrar(
         {
@@ -223,6 +255,84 @@ export class AlmacenService {
       await this.stockService.verificarYReactivarAgotados([], ids);
     }
     return { ok: true, registrados: dto.items.length };
+  }
+
+  // ==========================================
+  // MERMA DE PRODUCTO TERMINADO (sabor o producto)
+  // ==========================================
+  /** Sin código de supervisor y sin mirar «Control de almacén»: la audita movimiento_stock (por y en) y auditoria. */
+  async registrarMermaProducto(dto: MermaProductoDto, usuario: UsuarioAutenticado, ip?: string) {
+    const productoId = this.parsearId(dto.productoId, 'producto');
+    const prod = await this.prisma.producto.findUnique({
+      where: { id: productoId },
+      select: {
+        id: true,
+        nombre: true,
+        controla_stock: true,
+        categoria: { select: { area_id: true } },
+        sabores: { where: { activo: true }, select: { id: true, nombre: true, activo: true } },
+      },
+    });
+    if (!prod) {
+      throw new NotFoundException({ codigo: 'PRODUCTO_NO_ENCONTRADO', mensaje: `Producto ${dto.productoId} no encontrado` });
+    }
+    if (!prod.controla_stock) {
+      throw new BadRequestException({ codigo: 'PRODUCTO_SIN_CONTROL', mensaje: 'Ese producto no controla stock' });
+    }
+    const porSabor = controlaPorSabor(prod);
+    if (porSabor && !dto.saborId) {
+      throw new BadRequestException({ codigo: 'SABOR_REQUERIDO', mensaje: `${prod.nombre} lleva stock por sabor: indica el sabor` });
+    }
+    if (!porSabor && dto.saborId) {
+      throw new BadRequestException({ codigo: 'PRODUCTO_SIN_SABORES', mensaje: `${prod.nombre} no lleva stock por sabor` });
+    }
+    const sabor = dto.saborId ? prod.sabores.find((sb) => sb.id === this.parsearId(dto.saborId!, 'sabor')) : undefined;
+    if (dto.saborId && !sabor) {
+      throw new BadRequestException({ codigo: 'SABORES_INVALIDOS', mensaje: `El sabor no pertenece a ${prod.nombre} o no está activo` });
+    }
+    if (dto.motivo === 'OTRO' && !dto.nota?.trim()) {
+      throw new BadRequestException({ codigo: 'NOTA_OBLIGATORIA', mensaje: 'Si el motivo es Otro, escribe una nota' });
+    }
+
+    const fecha = fechaLimaHoy();
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const r = await mermarProductoControlado(tx, {
+        productoId: prod.id,
+        nombre: prod.nombre,
+        saborId: sabor?.id ?? null,
+        saborNombre: sabor?.nombre ?? null,
+        cantidad: dto.cantidad,
+        motivo: dto.motivo,
+        nota: dto.nota,
+        areaId: prod.categoria?.area_id ?? null,
+        por: usuario.partyId,
+        ahora: new Date(),
+        fecha,
+      });
+      await this.auditoria.registrar(
+        {
+          categoria: 'CAMBIO',
+          modulo: 'almacen',
+          accion: 'MERMA_PRODUCTO',
+          entidad: 'movimiento_stock',
+          entidadId: r.movimientoId,
+          partyId: usuario.partyId,
+          despues: {
+            productoId: prod.id.toString(),
+            saborId: sabor?.id.toString() ?? null,
+            cantidad: dto.cantidad,
+            motivo: dto.motivo,
+            saldo: r.saldo,
+          },
+          ip,
+        },
+        tx,
+      );
+      return r;
+    });
+
+    this.eventosGateway?.emitirAdmin('stock:cambio', {});
+    return { ok: true, id: resultado.movimientoId.toString(), saldo: resultado.saldo };
   }
 
   // ==========================================
@@ -1240,6 +1350,22 @@ export class AlmacenService {
   // CIERRE DEL DÍA CON CONTEO Y MERMA
   // ==========================================
   async obtenerProductosDelDia() {
+    // Productos por sabor: su saldo vive en stock_sabor. Se listan con el desglose por sabor (su merma va por registrarMermaProducto).
+    const porSabor = await this.prisma.producto.findMany({
+      where: { controla_stock: true, sabores: { some: { activo: true } } },
+      orderBy: { nombre: 'asc' },
+      select: {
+        id: true,
+        nombre: true,
+        sabores: {
+          where: { activo: true },
+          orderBy: { nombre: 'asc' },
+          select: { id: true, nombre: true, stockSabor: { select: { cantidad: true } } },
+        },
+      },
+    });
+    const idsPorSabor = new Set(porSabor.map((p) => p.id.toString()));
+
     const recetas = await this.prisma.receta.findMany({
       where: { es_produccion: true },
       include: {
@@ -1263,8 +1389,23 @@ export class AlmacenService {
 
     const resultado: any[] = [];
 
+    for (const p of porSabor) {
+      const sabores = p.sabores.map((sb) => ({
+        saborId: sb.id.toString(),
+        nombre: sb.nombre,
+        sistema: Number(sb.stockSabor?.cantidad ?? 0),
+      }));
+      resultado.push({
+        productoId: p.id.toString(),
+        nombre: p.nombre,
+        sistema: sabores.reduce((acc, sb) => acc + sb.sistema, 0),
+        unidad: 'unidades',
+        sabores,
+      });
+    }
+
     for (const r of recetas) {
-      if (r.producto) {
+      if (r.producto && !idsPorSabor.has(r.producto.id.toString())) {
         const stockTotal = r.producto.stocks.reduce(
           (acc, s) => acc + Number(s.cantidad),
           0,
@@ -1306,6 +1447,10 @@ export class AlmacenService {
 
     const resultado = await this.prisma.$transaction(async (tx) => {
       for (const fila of dto.filas) {
+        // Producto por sabor: no se cierra por fila (su saldo está por sabor); se botan sabores con registrarMermaProducto
+        if (fila.productoId && (await tx.sabor.count({ where: { producto_id: this.parsearId(fila.productoId, 'producto'), activo: true } })) > 0) {
+          continue;
+        }
         const cont = Number(fila.contado);
         const bot = Number(fila.botar);
         const sis = Number(fila.sistema);
