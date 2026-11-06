@@ -5,10 +5,26 @@ import {
   listarComandasArea,
 } from '../admin/cocina/cocinaApi';
 import { conectarSocket, useEventos } from '../comun/socket';
+import type { UmbralesCocina } from '../admin/cocina/cocinaTipos';
+import { colorPorMinutos, useTiempoEnVivo } from '../admin/cocina/tiempoEnVivo';
+import { COLOR_TV, NumeroDia, TiempoEspera } from '../admin/cocina/TiempoEspera';
 
 export type ModoTV = 'orders' | 'pair' | 'off' | 'out';
 
-const TIMEC = (m: number) => (m >= 13 ? '#C73E2A' : m >= 10 ? '#C98A1B' : '#2C7FA3');
+/** Datos de una tarjeta de la TV (ya filtrados por área). */
+interface DatosTarjetaTV {
+  code: string;
+  modal: string;
+  who: string;
+  mins: number;
+  creado?: string;
+  umbrales?: UmbralesCocina;
+  numero?: number | null;
+  items: Array<{ a: string; t: string; d: string; combo: boolean; comboNombre: string }>;
+  hasNote: boolean;
+  note: string;
+}
+
 
 const CARDH = (c: {
   items: Array<{ t: string; d: string; combo?: boolean }>;
@@ -59,6 +75,106 @@ const NOMBRE_AREA_MAP: Record<string, string> = {
   postres: 'Postres',
   salados: 'Salados',
 };
+
+/** Tarjeta de un pedido en la TV: el tiempo y el color se actualizan solos con el temporizador compartido. */
+function TarjetaCocinaTV({ k }: { k: DatosTarjetaTV }) {
+  const t = useTiempoEnVivo(k.creado, k.mins, k.umbrales);
+  const tc = COLOR_TV[t.color];
+  return (
+          <div
+            style={{
+              background: '#FBF4EC',
+              color: '#0B2C3E',
+              borderRadius: '14px',
+              borderLeft: `10px solid ${tc}`,
+              padding: '10px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span style={{ fontWeight: 800, fontSize: '22px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <NumeroDia numero={k.numero} />
+                {k.code}{' '}
+                <span
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    borderRadius: '9999px',
+                    padding: '2px 10px',
+                    background: '#0B2C3E',
+                    color: '#FBF4EC',
+                    verticalAlign: 'middle',
+                  }}
+                >
+                  {k.modal}
+                </span>
+              </span>
+              <TiempoEspera
+                variante="tv"
+                desde={k.creado}
+                minutosRespaldo={k.mins}
+                umbrales={k.umbrales}
+              />
+            </div>
+
+            <div
+              style={{
+                fontSize: '14px',
+                fontWeight: 700,
+                color: '#2C4C5D',
+              }}
+            >
+              {k.who}
+            </div>
+
+            {k.items.map((it, idx) => (
+              <div
+                key={idx}
+                style={{ fontSize: '17px', lineHeight: '21px' }}
+              >
+                <b>{it.t}</b>
+                {it.d && <span>{it.d}</span>}
+                {it.combo && (
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#B2500F',
+                      lineHeight: '16px',
+                    }}
+                  >
+                    parte del combo {it.comboNombre}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {k.hasNote && (
+              <div
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 800,
+                  color: '#0B2C3E',
+                  background: '#FFF3C4',
+                  border: '2px solid #D99E39',
+                  borderRadius: '8px',
+                  padding: '2px 8px',
+                }}
+              >
+                NOTA: {k.note}
+              </div>
+            )}
+          </div>
+  );
+}
 
 export function PantallaCocinaView() {
   const searchParams =
@@ -274,6 +390,9 @@ export function PantallaCocinaView() {
       modal: modalText,
       who: whoText,
       mins: c.minutos ?? c.minutosEspera ?? 0,
+      creado: c.creado_en,
+      umbrales: c.umbrales,
+      numero: c.numeroDia ?? null,
       items: (c.lineas || []).map((l) => {
         const itemAreaLower = (l.area || '').toLowerCase();
         const itemArea = itemAreaLower.includes('bebida') || itemAreaLower.includes('barra')
@@ -356,7 +475,7 @@ export function PantallaCocinaView() {
 
   const porPrepararCount = cols[0].count;
   const enPrepCount = cols[1].count;
-  const atrasadosCount = vis.filter((o) => o.mins >= 13 && o.st < 2).length;
+  const atrasadosCount = vis.filter((o) => colorPorMinutos(o.mins, o.umbrales) === 'ROJO' && o.st < 2).length;
 
   return (
     <div
@@ -577,106 +696,9 @@ export function PantallaCocinaView() {
                   </div>
                 )}
 
-                {c.cards.map((k) => {
-                  const tc = TIMEC(k.mins);
-                  return (
-                    <div
-                      key={k.code}
-                      style={{
-                        background: '#FBF4EC',
-                        color: '#0B2C3E',
-                        borderRadius: '14px',
-                        borderLeft: `10px solid ${tc}`,
-                        padding: '10px 14px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <span style={{ fontWeight: 800, fontSize: '22px' }}>
-                          {k.code}{' '}
-                          <span
-                            style={{
-                              fontSize: '13px',
-                              fontWeight: 700,
-                              borderRadius: '9999px',
-                              padding: '2px 10px',
-                              background: '#0B2C3E',
-                              color: '#FBF4EC',
-                              verticalAlign: 'middle',
-                            }}
-                          >
-                            {k.modal}
-                          </span>
-                        </span>
-                        <span
-                          style={{
-                            fontWeight: 800,
-                            fontSize: '26px',
-                            color: tc,
-                          }}
-                        >
-                          {k.mins} min
-                        </span>
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 700,
-                          color: '#2C4C5D',
-                        }}
-                      >
-                        {k.who}
-                      </div>
-
-                      {k.items.map((it, idx) => (
-                        <div
-                          key={idx}
-                          style={{ fontSize: '17px', lineHeight: '21px' }}
-                        >
-                          <b>{it.t}</b>
-                          {it.d && <span>{it.d}</span>}
-                          {it.combo && (
-                            <div
-                              style={{
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                color: '#B2500F',
-                                lineHeight: '16px',
-                              }}
-                            >
-                              parte del combo {it.comboNombre}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-
-                      {k.hasNote && (
-                        <div
-                          style={{
-                            fontSize: '16px',
-                            fontWeight: 800,
-                            color: '#0B2C3E',
-                            background: '#FFF3C4',
-                            border: '2px solid #D99E39',
-                            borderRadius: '8px',
-                            padding: '2px 8px',
-                          }}
-                        >
-                          NOTA: {k.note}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {c.cards.map((k) => (
+                  <TarjetaCocinaTV key={k.code} k={k} />
+                ))}
 
                 {c.hasMore && (
                   <div

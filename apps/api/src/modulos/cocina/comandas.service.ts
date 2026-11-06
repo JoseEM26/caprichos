@@ -22,6 +22,7 @@ import {
   obtenerInicioDiaLima,
 } from './cocina.util';
 import { opcionesMenosPedidasPorProducto } from './opcion-menos-pedida';
+import { asignarNumeroDia } from './numero-dia';
 
 export interface DescuentoPedidoHook {
   descontarPedido(pedidoId: bigint | string | number): Promise<any> | any;
@@ -211,16 +212,22 @@ export class ComandasService {
     const ahora = new Date();
     const llegoEn = pedido.pasa_cocina_en ?? pedido.creado_en ?? ahora;
 
-    for (const areaId of areasACrear) {
-      await this.prisma.comandaArea.create({
-        data: {
-          pedido_id: pId,
-          area_id: areaId,
-          estado: 'EN_COCINA',
-          llego_en: llegoEn,
-        },
-      });
-    }
+    // Primera llegada a cocina: comandas y número del día en una misma transacción
+    await this.prisma.$transaction(async (tx) => {
+      for (const areaId of areasACrear) {
+        await tx.comandaArea.create({
+          data: {
+            pedido_id: pId,
+            area_id: areaId,
+            estado: 'EN_COCINA',
+            llego_en: llegoEn,
+          },
+        });
+      }
+      if (esPrimeraVez && pedido.numero_dia == null) {
+        await asignarNumeroDia(tx, pId, ahora);
+      }
+    });
 
     // Gancho de descuento: sólo si se crearon comandas por primera vez y el servicio existe
     if (esPrimeraVez && this.descuentoService?.descontarPedido) {
@@ -462,6 +469,11 @@ export class ComandasService {
         minutosEspera: minutos,
         color,
         colorEspera: color,
+        // Referencial: número del día en cocina (null si el pedido es anterior a la función)
+        numeroDia: p.numero_dia ?? null,
+        // Hora del servidor y umbrales: el navegador cuenta el tiempo en vivo con ellos
+        ahoraServidor: ahora.toISOString(),
+        umbrales,
         llego_en: c.llego_en,
         creado_en: p.creado_en,
         lineas: lineasDeArea(p.lineas, area.id, marcadas),
@@ -1271,6 +1283,7 @@ export class ComandasService {
         modalidad: p.modalidad,
         cliente: p.cliente_nombre ?? null,
         mesa,
+        numeroDia: p.numero_dia ?? null,
         llego_en: llegoEn,
         despejada_en: despejadaEn,
         despejada_por: c.despejada_por?.toString() ?? null,

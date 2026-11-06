@@ -38,10 +38,13 @@ describe('ComandasService', () => {
           { clave: 'rep_rojo_min', valor: 50 },
         ]),
       },
+      // Número del día al llegar a cocina (numero-dia.ts): contador y pedido atómicos
+      $queryRaw: jest.fn().mockResolvedValue([{ ultimo: 1 }]),
       pedido: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       comandaArea: {
         findUnique: jest.fn(),
@@ -114,6 +117,37 @@ describe('ComandasService', () => {
       expect(creadas).toBe(2);
       const areas = prisma.comandaArea.create.mock.calls.map((c: any) => c[0].data.area_id);
       expect(areas).toEqual([1n, 2n]);
+    });
+
+    it('la primera llegada a cocina asigna el número del día; una segunda sincronización no lo cambia', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 4n,
+        codigo: 'CP-0104',
+        estado: 'COLA',
+        numero_dia: null,
+        lineas: [{ id: 40n, nombre: 'Americano', area_id: 1n, producto: null }],
+        comandas: [],
+      });
+      prisma.comandaArea.create.mockResolvedValue({ id: 1 });
+
+      await service.sincronizarPedido(4n);
+      expect(prisma.pedido.updateMany).toHaveBeenCalledWith({
+        where: { id: 4n, numero_dia: null },
+        data: expect.objectContaining({ numero_dia: 1 }),
+      });
+
+      // Ya tiene comandas: no vuelve a numerar
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 4n,
+        codigo: 'CP-0104',
+        estado: 'COLA',
+        numero_dia: 1,
+        lineas: [{ id: 40n, nombre: 'Americano', area_id: 1n, producto: null }],
+        comandas: [{ area_id: 1n }],
+      });
+      prisma.pedido.updateMany.mockClear();
+      await service.sincronizarPedido(4n);
+      expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
     });
 
     it('crea filas de comanda_area por cada área involucrada y llama a descuentoService por primera vez', async () => {

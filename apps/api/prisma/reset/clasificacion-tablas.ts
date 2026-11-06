@@ -80,7 +80,7 @@ export const CONSERVAR: string[] = [
   'agotado', 'ajuste_opcion', 'alta_demanda', 'archivo', 'area_cocina', 'auditoria', 'caja',
   'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'cortesia', 'devolucion_pedido', 'pedido_cambio_ubicacion', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
   'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio',
-  'compra', 'compra_linea', 'consumo_personal', 'conteo_apertura', 'conteo_cierre', 'cupon', 'cupon_emitido',
+  'compra', 'compra_linea', 'consumo_personal', 'contador_diario', 'conteo_apertura', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta',
   'encuesta_posventa', 'fecha_especial', 'foto_local', 'grupo_opciones', 'horario_dia',
   'horario_trabajo', 'ia_consumo', 'incidente_entrega', 'incidente_entrega_foto', 'iniciativa', 'iniciativa_comentario',

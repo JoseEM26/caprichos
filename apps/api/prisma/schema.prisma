@@ -604,6 +604,9 @@ model Pedido {
   cobro_mozo_recibido    Decimal?                @db.Decimal(12, 2)
   // Cambio de ubicación (RN cambio de punto): cuándo se aplicó el último cambio; null = dirección original
   ubicacion_editada_en   DateTime?               @db.Timestamptz
+  // Número correlativo del día (referencial, solo cocina): se asigna al llegar a cocina (día Lima de esa hora)
+  numero_dia             Int?
+  fecha_dia              DateTime?               @db.Date
 
   party                 Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
@@ -643,7 +646,16 @@ model Pedido {
 
   @@index([cliente_party_id], map: "pedido_cliente_party_id_idx")
   @@index([ruta_reparto_id], map: "pedido_ruta_reparto_id_idx")
+  @@unique([fecha_dia, numero_dia], map: "pedido_fecha_dia_numero_dia_key")
   @@map("pedido")
+}
+
+// Contador del número del día en cocina: una fila por fecha Lima; ultimo = último número entregado
+model ContadorDiario {
+  fecha  DateTime @id @db.Date
+  ultimo Int      @default(0)
+
+  @@map("contador_diario")
 }
 
 // Una salida del repartidor con sus pedidos: se cierra sola cuando todos llegan a un estado final
