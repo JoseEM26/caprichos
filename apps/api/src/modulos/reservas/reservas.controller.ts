@@ -119,6 +119,17 @@ export class ReservasController {
   }
 
   /**
+   * POST /admin/reservas/:id/reactivar (reservas/editar)
+   * Vuelve a ACTIVA una reserva «No llegó» de hoy cuando el cliente llega tarde. Auditada.
+   */
+  @Post(':id/reactivar')
+  @Permiso('reservas', 'editar')
+  async reactivar(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.reservasService.reactivar(id, req.usuario, ip);
+  }
+
+  /**
    * GET /admin/reservas/mesas-ocupadas (reservas/ver)
    * Mesas que otras reservas activas ocupan a esa fecha y hora (hora Lima). Lo usa el croquis
    * al aprobar o editar: `excluir` deja fuera la reserva que se está editando.
@@ -130,12 +141,38 @@ export class ReservasController {
     @Query('hora') hora: string,
     @Query('excluir') excluir?: string,
   ) {
+    const instante = this.instanteDeConsulta(fecha, hora);
+    const excluirId = excluir && /^\d+$/.test(excluir) ? BigInt(excluir) : null;
+    return this.reservasService.mesasOcupadasEn(instante, excluirId);
+  }
+
+  /**
+   * GET /admin/reservas/avisos-mesas (reservas/ver)
+   * Avisos suaves para las mesas elegidas (no bloquean): otra reserva de esa mesa a menos de 2 horas antes.
+   */
+  @Get('avisos-mesas')
+  @Permiso('reservas', 'ver')
+  async avisosMesas(
+    @Query('fecha') fecha: string,
+    @Query('hora') hora: string,
+    @Query('mesas') mesas: string,
+    @Query('excluir') excluir?: string,
+  ) {
+    const instante = this.instanteDeConsulta(fecha, hora);
+    const mesaIds = (mesas ?? '')
+      .split(',')
+      .filter((m) => /^\d+$/.test(m))
+      .map((m) => BigInt(m));
+    const excluirId = excluir && /^\d+$/.test(excluir) ? BigInt(excluir) : null;
+    return { avisos: await this.reservasService.avisosMesasReserva(instante, mesaIds, excluirId) };
+  }
+
+  private instanteDeConsulta(fecha: string, hora: string): Date {
     const instante = new Date(`${fecha}T${hora}:00-05:00`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha ?? '') || !/^\d{2}:\d{2}$/.test(hora ?? '') || isNaN(instante.getTime())) {
       throw new BadRequestException({ codigo: 'FORMATO_INVALIDO', mensaje: 'Indica la fecha y la hora de la reserva' });
     }
-    const excluirId = excluir && /^\d+$/.test(excluir) ? BigInt(excluir) : null;
-    return this.reservasService.mesasOcupadasEn(instante, excluirId);
+    return instante;
   }
 
   /**

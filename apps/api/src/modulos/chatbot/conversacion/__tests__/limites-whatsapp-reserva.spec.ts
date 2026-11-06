@@ -164,8 +164,12 @@ describe('Límites estrictos de WhatsApp Cloud API — Textos y Botones de Reser
         nombre: 'Lucía',
         personas: 2,
         hora: '19:00',
+        mesas: 'Mesa 3, Mesa 4',
+        minutos: 30,
         toleranciaMin: 15,
       });
+      expect(rec).toContain('en 30 min');
+      expect(rec).toContain('Mesa 3, Mesa 4');
       expect(rec.length).toBeLessThanOrEqual(LIMITE_CUERPO_MENSAJE);
 
       const venc = TEXTOS_RESERVA.toleranciaVencidaCliente({

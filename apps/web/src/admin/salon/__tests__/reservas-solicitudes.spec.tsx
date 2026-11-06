@@ -25,6 +25,8 @@ vi.mock('../api', () => ({
     actualizarReserva: vi.fn(),
     cancelarReserva: vi.fn(),
     sentarReserva: vi.fn(),
+    reactivarReserva: vi.fn(),
+    avisosMesas: vi.fn().mockResolvedValue([]),
     obtenerCarta: vi.fn(),
     listarSolicitudes: vi.fn(),
     aprobarSolicitud: vi.fn(),

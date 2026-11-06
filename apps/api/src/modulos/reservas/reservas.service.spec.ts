@@ -32,6 +32,10 @@ describe('ReservasService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      pedidoMesa: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       reservaMesa: {
         createMany: jest.fn(),
@@ -335,17 +339,20 @@ describe('ReservasService', () => {
       const vencidas1914 = await service.pasarNoAsistioVencidas(tiempo1914);
 
       expect(vencidas1914).toBe(0);
-      expect(prisma.reserva.update).not.toHaveBeenCalled();
+      expect(prisma.reserva.updateMany).not.toHaveBeenCalled();
 
       // 2) A las 19:15 Lima (2026-10-20T19:15:00-05:00): pasa a NO_ASISTIO
       const tiempo1915 = new Date('2026-10-20T19:15:00-05:00');
       const vencidas1915 = await service.pasarNoAsistioVencidas(tiempo1915);
 
       expect(vencidas1915).toBe(1);
-      expect(prisma.reserva.update).toHaveBeenCalledWith({
-        where: { id: 303n },
+      expect(prisma.reserva.updateMany).toHaveBeenCalledWith({
+        where: { id: 303n, estado: 'ACTIVA' },
         data: { estado: 'NO_ASISTIO' },
       });
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ motivo: 'Sin llegada: pasaron 15 min de tolerancia' }),
+      );
       // Verifica auditoría con actor «sistema»
       expect(auditoria.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -617,6 +624,119 @@ describe('ReservasService', () => {
         reservaId: '707',
         pedidoId: '888',
       });
+    });
+  });
+
+  describe('ventana de tolerancia, choques, aviso suave y reactivar', () => {
+    const hoy = new Date('2026-10-20T12:00:00-05:00');
+    const reservaA = (hora: string, id = 1n, estado = 'ACTIVA', mesaId = 1n) => ({
+      id,
+      nombre: 'Otra',
+      telefono: '999',
+      personas: 2,
+      hora: new Date(`2026-10-20T${hora}:00-05:00`),
+      tolerancia_min: 15,
+      estado,
+      mesas: [{ mesa_id: mesaId, mesa: { nombre: null, numero: 1 } }],
+    });
+
+    it('mesa ocupada solo dentro de la ventana [hora, hora + 15 min] (sin duración fija de 60)', async () => {
+      prisma.reserva.findMany.mockResolvedValue([reservaA('19:00')]);
+
+      const ocupada = async (h: string) =>
+        (await service.mesasOcupadasEn(new Date(`2026-10-20T${h}:00-05:00`), null, hoy)).length > 0;
+
+      expect(await ocupada('18:50')).toBe(true); // [18:50, 19:05) se cruza con [19:00, 19:15)
+      expect(await ocupada('19:10')).toBe(true);
+      expect(await ocupada('19:15')).toBe(false); // la ventana termina justo al empezar la otra
+      expect(await ocupada('18:45')).toBe(false);
+      expect(await ocupada('20:00')).toBe(false); // antes la duración de 60 min bloqueaba esto
+    });
+
+    it('la consulta de reservas solo mira ACTIVA: SENTADA y NO_ASISTIO no bloquean por reserva', async () => {
+      await service.mesasOcupadasEn(new Date('2026-10-20T19:10:00-05:00'), null, hoy);
+      expect(prisma.reserva.findMany.mock.calls[0][0].where.estado).toBe('ACTIVA');
+    });
+
+    it('pedido abierto en la mesa bloquea reservas de hoy, no las de otro día', async () => {
+      prisma.reserva.findMany.mockResolvedValue([]);
+      prisma.pedidoMesa.findMany.mockResolvedValue([{ mesa_id: 1n, mesa: { nombre: null, numero: 1 } }]);
+
+      const deHoy = await service.mesasOcupadasEn(new Date('2026-10-20T21:00:00-05:00'), null, hoy);
+      expect(deHoy).toEqual([expect.objectContaining({ mesa_id: '1', motivo: 'PEDIDO_ABIERTO' })]);
+
+      prisma.pedidoMesa.findMany.mockClear();
+      const otroDia = await service.mesasOcupadasEn(new Date('2026-10-21T21:00:00-05:00'), null, hoy);
+      expect(otroDia).toEqual([]);
+      expect(prisma.pedidoMesa.findMany).not.toHaveBeenCalled();
+    });
+
+    it('validarMesasLibres rechaza con MESA_OCUPADA y mensaje de pedido abierto', async () => {
+      prisma.reserva.findMany.mockResolvedValue([]);
+      prisma.pedidoMesa.findMany.mockResolvedValue([{ mesa_id: 1n, mesa: { nombre: 'Mesa 1', numero: 1 } }]);
+
+      await expect(
+        service.validarMesasLibres(new Date('2026-10-20T21:00:00-05:00'), [1n], null, hoy),
+      ).rejects.toMatchObject({ response: { codigo: 'MESA_OCUPADA', mensaje: 'Mesa 1 tiene un pedido abierto. Elige otra mesa.' } });
+    });
+
+    it('aviso suave: otra reserva de la mesa menos de 2 horas antes, sin bloquear', async () => {
+      prisma.reserva.findMany.mockResolvedValue([reservaA('18:30')]);
+
+      const avisos = await service.avisosMesasReserva(new Date('2026-10-20T19:30:00-05:00'), [1n], null, hoy);
+      expect(avisos).toEqual(['Esa mesa tiene otra reserva a las 18:30; puede seguir ocupada.']);
+
+      // 2 horas o más antes: no hay aviso
+      prisma.reserva.findMany.mockResolvedValue([reservaA('17:00')]);
+      expect(await service.avisosMesasReserva(new Date('2026-10-20T19:30:00-05:00'), [1n], null, hoy)).toEqual([]);
+    });
+
+    it('reactivar: NO_ASISTIO de hoy vuelve a ACTIVA y extiende la tolerancia desde la llegada; queda auditada', async () => {
+      const ahora = new Date('2026-10-20T19:30:00-05:00');
+      prisma.reserva.findUnique.mockResolvedValue({ ...reservaA('19:00', 9n, 'NO_ASISTIO'), mesas: [{ mesa_id: 1n, mesa: null }] });
+      prisma.reserva.findMany.mockResolvedValue([]);
+      prisma.reserva.update.mockResolvedValue({
+        ...reservaA('19:00', 9n, 'ACTIVA'),
+        tolerancia_min: 45,
+        mesas: [],
+      });
+
+      const res = await service.reactivar('9', mockUsuario, '127.0.0.1', ahora);
+
+      // 30 min tarde + 15 de tolerancia = 45
+      expect(prisma.reserva.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 9n }, data: { estado: 'ACTIVA', tolerancia_min: 45 } }),
+      );
+      expect(res.estado).toBe('ACTIVA');
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'REACTIVAR_RESERVA', entidadId: 9n, antes: { estado: 'NO_ASISTIO', tolerancia_min: 15 } }),
+      );
+    });
+
+    it('reactivar: rechaza una reserva que no está en No llegó, o que no es de hoy', async () => {
+      const ahora = new Date('2026-10-20T19:30:00-05:00');
+      prisma.reserva.findUnique.mockResolvedValue(reservaA('19:00', 9n, 'ACTIVA'));
+      await expect(service.reactivar('9', mockUsuario, undefined, ahora)).rejects.toMatchObject({
+        response: { codigo: 'RESERVA_NO_REACTIVABLE' },
+      });
+
+      prisma.reserva.findUnique.mockResolvedValue(reservaA('19:00', 9n, 'NO_ASISTIO'));
+      await expect(
+        service.reactivar('9', mockUsuario, undefined, new Date('2026-10-21T19:30:00-05:00')),
+      ).rejects.toMatchObject({ response: { codigo: 'RESERVA_NO_REACTIVABLE' } });
+      expect(prisma.reserva.update).not.toHaveBeenCalled();
+    });
+
+    it('reactivar: no se reactiva si otra reserva o un pedido abierto ya tomó la mesa', async () => {
+      const ahora = new Date('2026-10-20T19:30:00-05:00');
+      prisma.reserva.findUnique.mockResolvedValue({ ...reservaA('19:00', 9n, 'NO_ASISTIO'), mesas: [{ mesa_id: 1n, mesa: null }] });
+      prisma.reserva.findMany.mockResolvedValue([]);
+      prisma.pedidoMesa.findMany.mockResolvedValue([{ mesa_id: 1n, mesa: { nombre: null, numero: 1 } }]);
+
+      await expect(service.reactivar('9', mockUsuario, undefined, ahora)).rejects.toMatchObject({
+        response: { codigo: 'MESA_OCUPADA' },
+      });
+      expect(prisma.reserva.update).not.toHaveBeenCalled();
     });
   });
 });

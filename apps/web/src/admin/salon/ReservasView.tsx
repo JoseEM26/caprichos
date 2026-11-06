@@ -33,6 +33,14 @@ function partesSolicitud(horaIso: string | null | undefined) {
   return { horaIso: horaIso || '', ...partesLima(horaIso) };
 }
 
+/** Texto de la insignia de una reserva. NO_ASISTIO es «No llegó» (la mesa ya no está retenida). */
+function etiquetaEstadoReserva(estado: string): string {
+  if (estado === 'SENTADA') return 'Atendida';
+  if (estado === 'CANCELADA') return 'Cancelada';
+  if (estado === 'NO_ASISTIO') return 'No llegó';
+  return 'Confirmada';
+}
+
 export function ReservasView() {
   const { tiene } = useSesion();
   const puedeVer = tiene('reservas/ver');
@@ -194,6 +202,17 @@ export function ReservasView() {
   // Fecha actual formateada (YYYY-MM-DD)
   const hoyIso = useMemo(() => hoyLima(), []);
 
+  /** Reactiva una reserva «No llegó» de hoy (el cliente llegó tarde). El servidor valida y audita. */
+  const reactivarReserva = async (r: Reserva) => {
+    setErrorGlobal(null);
+    try {
+      const actualizada = await salonApi.reactivarReserva(r.id);
+      setReservas((prev) => prev.map((x) => (x.id === actualizada.id ? actualizada : x)));
+    } catch (err: any) {
+      setErrorGlobal(err?.message || 'No fue posible reactivar la reserva.');
+    }
+  };
+
   // Fecha seleccionada formateada (YYYY-MM-DD)
   const diaIso = useMemo(() => {
     return `${mesActual.y}-${String(mesActual.m + 1).padStart(2, '0')}-${String(diaSeleccionado).padStart(2, '0')}`;
@@ -244,6 +263,7 @@ export function ReservasView() {
         if (filtroEstado === 'Atendida' && r.estado !== 'SENTADA') return false;
         if (filtroEstado === 'Cancelada' && r.estado !== 'CANCELADA') return false;
         if (filtroEstado === 'Pendiente' && r.estado !== 'ACTIVA') return false;
+        if (filtroEstado === 'No llegó' && r.estado !== 'NO_ASISTIO') return false;
       }
       if (filtroPersonas !== 'todos') {
         if (String(r.personas) !== filtroPersonas) return false;
@@ -1123,20 +1143,16 @@ export function ReservasView() {
                             ? '#DDF1E3'
                             : r.estado === 'CANCELADA'
                             ? '#FDECE8'
-                            : '#FFF1C9',
+                            : r.estado === 'NO_ASISTIO' ? '#E9ECF2' : '#FFF1C9',
                         color:
                           r.estado === 'SENTADA'
                             ? '#14502B'
                             : r.estado === 'CANCELADA'
                             ? 'var(--cp-rust)'
-                            : '#7A5C00',
+                            : r.estado === 'NO_ASISTIO' ? '#4A5468' : '#7A5C00',
                       }}
                     >
-                      {r.estado === 'SENTADA'
-                        ? 'Atendida'
-                        : r.estado === 'CANCELADA'
-                        ? 'Cancelada'
-                        : 'Confirmada'}
+                      {etiquetaEstadoReserva(r.estado)}
                     </span>
 
                     {r.estado === 'ACTIVA' && (
@@ -1156,6 +1172,26 @@ export function ReservasView() {
                         }}
                       >
                         Sentar
+                      </button>
+                    )}
+
+                    {r.estado === 'NO_ASISTIO' && partesLima(r.hora).fecha === hoyIso && (
+                      <button
+                        type="button"
+                        onClick={() => reactivarReserva(r)}
+                        style={{
+                          minHeight: '34px',
+                          padding: '0 12px',
+                          borderRadius: '8px',
+                          border: 0,
+                          background: 'var(--cp-orange)',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 800,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Reactivar
                       </button>
                     )}
                   </div>
@@ -1277,7 +1313,7 @@ export function ReservasView() {
               valorPorDefecto="todos"
               opciones={[
                 { valor: 'todos', etiqueta: 'Todos' },
-                ...['Confirmada', 'Pendiente', 'Cancelada', 'Atendida'].map((e) => ({ valor: e, etiqueta: e })),
+                ...['Confirmada', 'Pendiente', 'Cancelada', 'Atendida', 'No llegó'].map((e) => ({ valor: e, etiqueta: e })),
               ]}
               alCambiar={setFiltroEstado}
             />
@@ -1316,15 +1352,12 @@ export function ReservasView() {
                 ? 'var(--cp-rust)'
                 : r.estado === 'ACTIVA'
                 ? 'var(--cp-navy)'
+                : r.estado === 'NO_ASISTIO'
+                ? 'var(--cp-soft)'
                 : 'var(--cp-gold)';
             const badgeFg =
               r.estado === 'CANCELADA' ? 'var(--cp-white)' : 'var(--cp-cream)';
-            const badgeTexto =
-              r.estado === 'SENTADA'
-                ? 'Atendida'
-                : r.estado === 'CANCELADA'
-                ? 'Cancelada'
-                : 'Confirmada';
+            const badgeTexto = etiquetaEstadoReserva(r.estado);
 
             return (
               <div
@@ -1415,6 +1448,24 @@ export function ReservasView() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                  {r.estado === 'NO_ASISTIO' && partesLima(r.hora).fecha === hoyIso && (
+                    <button
+                      type="button"
+                      onClick={() => reactivarReserva(r)}
+                      style={{
+                        flex: 1,
+                        minHeight: '44px',
+                        border: 0,
+                        borderRadius: '12px',
+                        background: 'var(--cp-orange)',
+                        color: 'var(--cp-navy)',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Reactivar
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -1478,6 +1529,7 @@ export function ReservasView() {
           solicitud={confirmarAprobarSol}
           pisos={pisosSalon}
           obtenerOcupadas={(fecha, hora) => salonApi.mesasOcupadas(fecha, hora)}
+          obtenerAvisos={(fecha, hora, mesaIds) => salonApi.avisosMesas(fecha, hora, mesaIds)}
           alAprobar={async ({ mesas, hora, confirmarCapacidad }) => {
             await salonApi.aprobarSolicitud(confirmarAprobarSol.id, { mesas, hora, confirmarCapacidad });
             setSolicitudes((prev) =>

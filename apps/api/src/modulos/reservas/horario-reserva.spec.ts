@@ -2,8 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import {
   franjasReserva,
   horaEnVentanaReserva,
-  reservasSeCruzan,
   ultimoInicioReserva,
+  ventanasSeSolapan,
 } from './horario-reserva';
 
 describe('horario-reserva (reglas compartidas)', () => {
@@ -31,11 +31,14 @@ describe('horario-reserva (reglas compartidas)', () => {
     expect(horaEnVentanaReserva('19:00', '18:00', '02:00')).toBe(false);
   });
 
-  it('dos reservas en la misma mesa se cruzan si empiezan a menos de una hora una de otra', () => {
-    const a = Date.parse('2026-10-27T19:00:00-05:00');
-    expect(reservasSeCruzan(a, Date.parse('2026-10-27T19:59:00-05:00'))).toBe(true);
-    expect(reservasSeCruzan(a, Date.parse('2026-10-27T20:00:00-05:00'))).toBe(false);
-    expect(reservasSeCruzan(a, Date.parse('2026-10-27T18:00:00-05:00'))).toBe(false);
+  it('las ventanas de dos reservas se solapan solo si se cruzan (un fin igual al inicio no choca)', () => {
+    const m = (h: string) => Date.parse(`2026-10-27T${h}:00-05:00`);
+    // Ventana de cada reserva: [hora, hora + 15 min]
+    expect(ventanasSeSolapan(m('19:00'), m('19:15'), m('19:10'), m('19:25'))).toBe(true);
+    expect(ventanasSeSolapan(m('19:00'), m('19:15'), m('19:15'), m('19:30'))).toBe(false);
+    expect(ventanasSeSolapan(m('19:00'), m('19:15'), m('18:30'), m('18:45'))).toBe(false);
+    // Dos reservas de 1 h antes ya no chocan si sus ventanas no se tocan
+    expect(ventanasSeSolapan(m('19:00'), m('19:15'), m('20:00'), m('20:15'))).toBe(false);
   });
 });
 
@@ -96,6 +99,7 @@ describe('ReservasService: horario de atención y mesas', () => {
         update: jest.fn(),
       },
       reservaMesa: { createMany: jest.fn(), deleteMany: jest.fn() },
+      pedidoMesa: { findMany: jest.fn(async () => []) },
       elementoPlano: {
         findMany: jest.fn(async ({ where }: any) => {
           const ids: bigint[] | undefined = where?.id?.in;
@@ -217,18 +221,25 @@ describe('ReservasService: horario de atención y mesas', () => {
       expect(r.codigo).toBe('MESA_REPETIDA');
     });
 
-    it('choque: la mesa 2 ya tiene otra reserva a las 19:30 y la nueva es a las 20:00', async () => {
+    it('choque: la mesa 2 ya tiene una reserva a las 19:30 (ventana 19:30-19:45) y la nueva es a las 19:40', async () => {
       reservasOcupando = [
-        { id: 9n, hora: new Date('2026-10-27T19:30:00-05:00'), estado: 'ACTIVA', mesas: [{ mesa_id: 2n, mesa: mesas[1] }] },
+        { id: 9n, hora: new Date('2026-10-27T19:30:00-05:00'), tolerancia_min: 15, estado: 'ACTIVA', mesas: [{ mesa_id: 2n, mesa: mesas[1] }] },
       ];
-      const r = await errorDe(crear('2026-10-27T20:00:00-05:00', [1, 2]));
+      const r = await errorDe(crear('2026-10-27T19:40:00-05:00', [1, 2]));
       expect(r.codigo).toBe('MESA_OCUPADA');
       expect(r.mensaje).toContain('Mesa 2 ya tiene otra reserva a las 19:30');
     });
 
+    it('sin choque: la ventana de 15 min termina antes de la siguiente reserva aunque sea a 30 min', async () => {
+      reservasOcupando = [
+        { id: 9n, hora: new Date('2026-10-27T19:30:00-05:00'), tolerancia_min: 15, estado: 'ACTIVA', mesas: [{ mesa_id: 2n, mesa: mesas[1] }] },
+      ];
+      await expect(crear('2026-10-27T19:45:00-05:00', [2])).resolves.toBeDefined();
+    });
+
     it('sin choque: otra reserva a las 18:00 en la misma mesa no impide reservar a las 20:00', async () => {
       reservasOcupando = [
-        { id: 9n, hora: new Date('2026-10-27T18:00:00-05:00'), estado: 'ACTIVA', mesas: [{ mesa_id: 2n, mesa: mesas[1] }] },
+        { id: 9n, hora: new Date('2026-10-27T18:00:00-05:00'), tolerancia_min: 15, estado: 'ACTIVA', mesas: [{ mesa_id: 2n, mesa: mesas[1] }] },
       ];
       await expect(crear('2026-10-27T20:00:00-05:00', [2])).resolves.toBeDefined();
     });
@@ -244,9 +255,11 @@ describe('ReservasService: horario de atención y mesas', () => {
     });
 
     it('la consulta de mesas ocupadas excluye la reserva que se edita', async () => {
-      await service.mesasOcupadasEn(new Date('2026-10-27T20:00:00-05:00'), 77n);
-      const args = prisma.reserva.findMany.mock.calls.at(-1)[0];
-      expect(args.where.id).toEqual({ not: 77n });
+      reservasOcupando = [
+        { id: 77n, hora: new Date('2026-10-27T20:00:00-05:00'), tolerancia_min: 15, estado: 'ACTIVA', mesas: [{ mesa_id: 2n, mesa: mesas[1] }] },
+      ];
+      await expect(service.mesasOcupadasEn(new Date('2026-10-27T20:00:00-05:00'), 77n, AHORA)).resolves.toEqual([]);
+      await expect(service.mesasOcupadasEn(new Date('2026-10-27T20:00:00-05:00'), null, AHORA)).resolves.toHaveLength(1);
     });
   });
 });

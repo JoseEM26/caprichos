@@ -3,14 +3,16 @@
  * aprobar o editar, las franjas que ven la carta y el bot, y el cruce de mesas.
  *
  * Reglas (hora de Lima, 'HH:mm'):
- * - Una reserva puede empezar desde la apertura hasta `cierra - DURACION_RESERVA_MIN` (incluido).
- *   Así la reserva termina antes del cierre. Con cierre 22:00 la última reserva empieza 21:00.
- * - Dos reservas en la misma mesa se cruzan si empiezan a menos de DURACION_RESERVA_MIN una de otra.
+ * - Una reserva puede empezar desde la apertura hasta `cierra - MARGEN_CIERRE_MIN` (incluido).
+ *   Con cierre 22:00 la última reserva empieza 21:00. Es un margen de cierre, no una duración:
+ *   la reserva no tiene duración, dura lo que dure el pedido que hagan.
+ * - La mesa de una reserva está reservada solo en su ventana [hora, hora + tolerancia]
+ *   (ver ventanasSeSolapan en reservas.service). Después, si no llegaron, se libera.
  * - El horario no cruza la medianoche (el admin ya lo rechaza al guardar: abre < cierra).
  */
 
-/** Duración fija de una reserva. No hay parámetro configurable: es la misma que usaban las franjas. */
-export const DURACION_RESERVA_MIN = 60;
+/** Último inicio de reserva: minutos antes del cierre del local. No es duración de la reserva. */
+export const MARGEN_CIERRE_MIN = 60;
 
 /** Paso entre franjas sugeridas. */
 export const PASO_FRANJA_MIN = 30;
@@ -37,7 +39,7 @@ export function ultimoInicioReserva(abre: string | null, cierra: string | null):
   const ini = aMinutos(abre);
   const fin = aMinutos(cierra);
   if (fin <= ini) return null;
-  const ultimo = fin - DURACION_RESERVA_MIN;
+  const ultimo = fin - MARGEN_CIERRE_MIN;
   return ultimo >= ini ? ultimo : null;
 }
 
@@ -69,7 +71,7 @@ export function franjasReserva(abre: string | null, cierra: string | null): stri
   return franjas;
 }
 
-/** Dos inicios (ms) se cruzan en la misma mesa si están a menos de la duración de una reserva. */
-export function reservasSeCruzan(inicioA: number, inicioB: number): boolean {
-  return Math.abs(inicioA - inicioB) < DURACION_RESERVA_MIN * 60 * 1000;
+/** Dos ventanas [inicio, fin) en ms se solapan. Un fin igual al inicio de la otra no es solape. */
+export function ventanasSeSolapan(iniA: number, finA: number, iniB: number, finB: number): boolean {
+  return iniA < finB && iniB < finA;
 }

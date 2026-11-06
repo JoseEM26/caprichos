@@ -157,6 +157,12 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  reserva_recordatorio_min: {
+    nombre: 'Recordatorio de reserva',
+    descripcion: 'Minutos antes de la hora en que se envía el único recordatorio por WhatsApp (si el recordatorio está encendido).',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
   reserva_web_activa: {
     nombre: 'Reservar mesa desde la carta',
     descripcion: 'Muestra el botón «Reservar» en la carta virtual. En «No» el cliente no puede pedir reserva desde la carta.',

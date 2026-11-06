@@ -23,7 +23,9 @@ export interface ConfirmarAprobacionSolicitudProps {
   obtenerOcupadas?: (
     fecha: string,
     hora: string,
-  ) => Promise<Array<{ mesa_id: string; reserva_id: string; nombre: string; hora: string }>>;
+  ) => Promise<Array<{ mesa_id: string; reserva_id: string; nombre: string; hora: string; motivo?: string }>>;
+  /** Avisos suaves de las mesas elegidas (no bloquean): otra reserva de la mesa menos de 2 horas antes. */
+  obtenerAvisos?: (fecha: string, hora: string, mesaIds: string[]) => Promise<string[]>;
   /** Debe lanzar el error del API para que se muestre dentro del diálogo. */
   alAprobar: (datos: { mesas: string[]; hora: string; confirmarCapacidad: boolean }) => Promise<void>;
   alCancelar: () => void;
@@ -48,6 +50,7 @@ export function ConfirmarAprobacionSolicitud({
   solicitud,
   pisos,
   obtenerOcupadas,
+  obtenerAvisos,
   alAprobar,
   alCancelar,
 }: ConfirmarAprobacionSolicitudProps) {
@@ -59,6 +62,7 @@ export function ConfirmarAprobacionSolicitud({
   const [hora, setHora] = useState(solicitud.hora);
   const [confirmarCapacidad, setConfirmarCapacidad] = useState(false);
   const [ocupadas, setOcupadas] = useState<Record<string, OcupacionMesa>>({});
+  const [avisos, setAvisos] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
@@ -88,6 +92,26 @@ export function ConfirmarAprobacionSolicitud({
       vigente = false;
     };
   }, [obtenerOcupadas, fecha, hora]);
+
+  // Aviso suave (no bloquea): otra reserva de alguna mesa elegida a menos de 2 horas antes
+  const mesasKey = mesasIds.join(',');
+  useEffect(() => {
+    if (!obtenerAvisos || !fecha || !hora || !mesasKey) {
+      setAvisos([]);
+      return;
+    }
+    let vigente = true;
+    obtenerAvisos(fecha, hora, mesasKey.split(','))
+      .then((lista) => {
+        if (vigente) setAvisos(lista);
+      })
+      .catch(() => {
+        if (vigente) setAvisos([]);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [obtenerAvisos, fecha, hora, mesasKey]);
 
   const elegidas = todasLasMesas.filter((m) => mesasIds.includes(m.id));
   const { faltan } = resumenMesas(elegidas, solicitud.personas);
@@ -182,6 +206,12 @@ export function ConfirmarAprobacionSolicitud({
           />
         )}
       </div>
+
+      {avisos.map((aviso) => (
+        <div key={aviso} role="status" style={{ fontSize: '13px', color: 'var(--cp-navy)', fontWeight: 600 }}>
+          {aviso}
+        </div>
+      ))}
 
       {faltan > 0 && (
         <label style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>

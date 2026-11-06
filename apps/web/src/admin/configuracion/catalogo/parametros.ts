@@ -31,7 +31,7 @@ export interface GrupoParametros {
 export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'entrega', titulo: 'Tiempo prometido de entrega', claves: ['tiempo_prometido_min', 'tiempo_max_min', 'eta_factor_urbano', 'eta_productos_desde', 'eta_extra_por_producto_min', 'eta_parada_min', 'eta_margen_min', 'eta_paso_min', 'eta_base_sin_zona_min'] },
   { id: 'envio', titulo: 'Envío gratis y pedido mínimo', claves: ['envio_gratis_monto', 'envio_gratis_modo', 'pedido_minimo'] },
-  { id: 'clientes', titulo: 'Puntos, personal y reservas', claves: ['puntos_porcentaje', 'descuento_personal_pct', 'reserva_tolerancia_min', 'reserva_web_activa', 'reserva_web_max_pendientes', 'reserva_web_dias_max', 'reserva_web_max_personas', 'carta_aviso_entrada', 'verificacion_celular_modo', 'verificacion_whatsapp_numero'] },
+  { id: 'clientes', titulo: 'Puntos, personal y reservas', claves: ['puntos_porcentaje', 'descuento_personal_pct', 'reserva_tolerancia_min', 'reserva_recordatorio_min', 'reserva_web_activa', 'reserva_web_max_pendientes', 'reserva_web_dias_max', 'reserva_web_max_personas', 'carta_aviso_entrada', 'verificacion_celular_modo', 'verificacion_whatsapp_numero'] },
   { id: 'colores', titulo: 'Colores de espera en cocina y en el mapa de reparto', claves: ['rep_naranja_min', 'rep_rojo_min', 'reparto_retrasado_min', 'reparto_tarde_min', 'reparto_muy_tarde_min', 'reparto_velocidad_kmh', 'rep_max_pedidos', 'reparto_max_pedidos'] },
   { id: 'demanda', titulo: 'Alta demanda', claves: ['pausa_alta_demanda', 'alta_demanda_min_base'] },
   { id: 'puerta', titulo: 'Entrega fallida y reprogramación', claves: ['reparto_insistencia_min', 'reparto_espera_max_min', 'reprog_recargo_modo', 'reparto_recargo_reprogramacion', 'reprog_respuesta_min', 'reprog_max_intentos'] },
@@ -160,6 +160,13 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con 15: una reserva de las 8:00 se libera a las 8:15 si nadie llegó.',
     efecto: 'Subirlo da más tiempo al cliente pero mantiene la mesa ocupada más rato.',
     porDefecto: '15', unidad: 'minutos', rango: 'entero de 1 a 180', palabras: ['reserva', 'mesa', 'tolerancia', 'no llega', 'liberar mesa', 'cortesia'], peligro: 'medio',
+  },
+  reserva_recordatorio_min: {
+    grupo: 'clientes', titulo: 'Recordatorio de reserva (minutos antes)',
+    descripcion: 'Cuántos minutos antes de la hora se manda el único recordatorio por WhatsApp al cliente. Sólo sale si el recordatorio está encendido.',
+    ejemplo: 'Con 30: la reserva de las 8:00 recibe el mensaje a las 7:30.',
+    efecto: 'Un solo mensaje por reserva; no se repite aunque la tarea reinicie.',
+    porDefecto: '30', unidad: 'minutos', rango: 'entero de 5 a 240', palabras: ['reserva', 'recordatorio', 'whatsapp', 'aviso', 'antes'], peligro: 'bajo',
   },
   reserva_web_activa: {
     grupo: 'clientes', titulo: 'Reservar mesa desde la carta encendido',

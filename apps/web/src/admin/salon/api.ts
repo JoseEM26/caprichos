@@ -196,6 +196,15 @@ export const salonApi = {
       `/admin/reservas/${id}/sentar`,
     ),
 
+  /** Vuelve a ACTIVA una reserva «No llegó» de hoy (el cliente llegó tarde). Auditada en el servidor. */
+  reactivarReserva: (id: string) => api.post<Reserva>(`/admin/reservas/${id}/reactivar`, {}),
+
+  /** Avisos suaves (no bloquean) para las mesas elegidas a esa fecha y hora (YYYY-MM-DD, HH:mm). */
+  avisosMesas: (fecha: string, hora: string, mesaIds: string[]) =>
+    api.get<{ avisos: string[] }>(
+      `/admin/reservas/avisos-mesas?fecha=${encodeURIComponent(fecha)}&hora=${encodeURIComponent(hora)}&mesas=${mesaIds.join(',')}`,
+    ).then((r) => r.avisos),
+
   listarSolicitudes: (estado?: string) => {
     const qs = estado ? `?estado=${estado}` : '';
     return api.get<any[]>(`/admin/reservas/solicitudes${qs}`);

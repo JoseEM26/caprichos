@@ -70,6 +70,7 @@ export const CLAVES_NUMERICAS = [
   'eta_paso_min',
   'eta_base_sin_zona_min',
   'reserva_tolerancia_min',
+  'reserva_recordatorio_min',
   // Reservas desde la carta web: cuántas pendientes por celular, días de anticipación y personas máximas
   'reserva_web_max_pendientes',
   'reserva_web_dias_max',
@@ -88,6 +89,7 @@ export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]>
   eta_paso_min: [1, 30, true, 'El redondeo debe ser un entero entre 1 y 30 minutos'],
   eta_base_sin_zona_min: [0.5, 60, false, 'Los minutos de puerta sin zona deben estar entre 0.5 y 60'],
   reserva_tolerancia_min: [1, 180, true, 'La tolerancia de reserva debe ser un entero entre 1 y 180 minutos'],
+  reserva_recordatorio_min: [5, 240, true, 'El recordatorio de reserva debe ser un entero entre 5 y 240 minutos antes'],
   reserva_web_max_pendientes: [1, 10, true, 'Las solicitudes pendientes por celular deben ser un entero entre 1 y 10'],
   reserva_web_dias_max: [1, 365, true, 'Los días de anticipación deben ser un entero entre 1 y 365'],
   reserva_web_max_personas: [1, 200, true, 'Las personas máximas por reserva web deben ser un entero entre 1 y 200'],
