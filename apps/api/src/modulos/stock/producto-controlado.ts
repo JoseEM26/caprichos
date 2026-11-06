@@ -6,7 +6,10 @@ import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
  * Stock de productos terminados que controlan su stock (`producto.controla_stock`).
  * Independiente del interruptor «Control de almacén» (insumos): se descuenta al CREAR el pedido,
  * en la misma transacción, para todos los canales (carta, mozo, caja, WhatsApp).
- * Con conteo de apertura del día hay tope y agotado automático; sin apertura resta pero no limita ni agota.
+ * El SALDO es siempre el tope: haya o no conteo de apertura de hoy. Una venta que no alcanza responde 409 y no
+ * descuenta; al llegar a 0 el producto (o sabor) queda agotado solo. El stock no se reinicia cada día: lo que sobra
+ * pasa al día siguiente y la apertura solo SUMA («Quedaron de ayer» + «Produje hoy»). El conteo de apertura es
+ * informativo (pantalla de apertura: «Falta la apertura de hoy»).
  *
  * Producto POR SABOR (controla_stock y al menos un sabor activo): el saldo vive en `stock_sabor`, uno por sabor.
  * Cada línea reparte sus unidades (tamaño.unidades × cantidad) entre sabores (`sabores: [{saborId, cantidad}]`).
@@ -51,20 +54,6 @@ export async function lugarDelProducto(db: any, productoId: bigint, areaId?: big
 export async function saldoProducto(db: any, productoId: bigint): Promise<number> {
   const filas = await db.stock.findMany({ where: { producto_id: productoId }, select: { cantidad: true } });
   return filas.reduce((acc: number, f: any) => acc + Number(f.cantidad), 0);
-}
-
-/** Conteo de apertura del día de un producto entero (sin sabor), o null si no hay. */
-export async function aperturaDeHoy(db: any, productoId: bigint, fecha: string = fechaLimaHoy()) {
-  return db.conteoApertura.findFirst({
-    where: { fecha: fechaColumna(fecha), producto_id: productoId, sabor_id: null },
-  });
-}
-
-/** Conteo de apertura del día de un sabor, o null si no hay. */
-export async function aperturaDeSaborHoy(db: any, saborId: bigint, fecha: string = fechaLimaHoy()) {
-  return db.conteoApertura.findFirst({
-    where: { fecha: fechaColumna(fecha), sabor_id: saborId },
-  });
 }
 
 /** Guarda el conteo de apertura del día (producto entero o sabor): una fila por día y producto/sabor. */
@@ -135,9 +124,10 @@ export interface LineaVentaProducto {
 
 /**
  * Descuenta del saldo los productos que controlan stock de un pedido recién creado (dentro de su transacción).
- * Suma las líneas repetidas del mismo producto (y del mismo sabor). Con apertura de hoy el descuento es condicional
- * (atómico): si no alcanza, lanza 409 STOCK_INSUFICIENTE y la transacción del pedido se deshace.
- * Devuelve los productos y sabores que quedaron agotados por esta venta. Las líneas de productos sin casilla se ignoran.
+ * Suma las líneas repetidas del mismo producto (y del mismo sabor). El descuento es condicional (atómico) contra el
+ * saldo, haya o no apertura de hoy: si no alcanza (saldo 0 incluido), lanza 409 STOCK_INSUFICIENTE y la transacción
+ * del pedido se deshace. Devuelve los productos y sabores que quedaron agotados por esta venta. Las líneas de
+ * productos sin casilla se ignoran.
  */
 export async function descontarVentaProductos(
   db: any,
@@ -178,7 +168,6 @@ export async function descontarVentaProductos(
 
   for (const a of ordenados) {
     const prod = porId.get(a.productoId.toString());
-    const fecha = fechaLimaHoy(ahora);
     const lugarId = await lugarDelProducto(db, a.productoId, a.areaId);
     if (!lugarId) continue;
 
@@ -191,39 +180,25 @@ export async function descontarVentaProductos(
       }
       const sabores = [...a.sabores.values()].sort((x, y) => (x.saborId < y.saborId ? -1 : x.saborId > y.saborId ? 1 : 0));
       for (const s of sabores) {
-        const r = await descontarSabor(db, { pedidoId, productoId: a.productoId, lugarId, sabor: s, por, fecha, ahora });
+        const r = await descontarSabor(db, { pedidoId, productoId: a.productoId, lugarId, sabor: s, por, ahora });
         if (r === 'AGOTADO') saboresAgotados.push(s.saborId);
       }
       continue;
     }
 
-    const apertura = await aperturaDeHoy(db, a.productoId, fecha);
     const cantidad = new Prisma.Decimal(a.cantidad);
-
-    if (apertura) {
-      const r = await db.stock.updateMany({
-        where: { producto_id: a.productoId, lugar_id: lugarId, cantidad: { gte: cantidad } },
-        data: { cantidad: { decrement: cantidad } },
+    const r = await db.stock.updateMany({
+      where: { producto_id: a.productoId, lugar_id: lugarId, cantidad: { gte: cantidad } },
+      data: { cantidad: { decrement: cantidad } },
+    });
+    if (r.count === 0) {
+      const quedan = Math.max(0, Math.floor(await saldoProducto(db, a.productoId)));
+      throw new ConflictException({
+        codigo: 'STOCK_INSUFICIENTE',
+        mensaje: `Solo quedan ${quedan} de ${prod.nombre}`,
+        productoId: a.productoId.toString(),
+        quedan,
       });
-      if (r.count === 0) {
-        const quedan = Math.max(0, Math.floor(await saldoProducto(db, a.productoId)));
-        const nombre = prod.nombre;
-        throw new ConflictException({
-          codigo: 'STOCK_INSUFICIENTE',
-          mensaje: `Solo quedan ${quedan} de ${nombre}`,
-          productoId: a.productoId.toString(),
-          quedan,
-        });
-      }
-    } else {
-      // Sin apertura de hoy: resta sin límite ni agotado (no se pierden ventas)
-      const r = await db.stock.updateMany({
-        where: { producto_id: a.productoId, lugar_id: lugarId },
-        data: { cantidad: { decrement: cantidad } },
-      });
-      if (r.count === 0) {
-        await db.stock.create({ data: { producto_id: a.productoId, lugar_id: lugarId, cantidad: cantidad.negated() } });
-      }
     }
 
     await db.movimientoStock.create({
@@ -238,47 +213,36 @@ export async function descontarVentaProductos(
       },
     });
 
-    if (apertura) {
-      const saldo = await saldoProducto(db, a.productoId);
-      if ((await sincronizarAgotadoProducto(db, a.productoId, saldo, ahora)) === 'AGOTADO') agotados.push(a.productoId);
-    }
+    const saldo = await saldoProducto(db, a.productoId);
+    if (saldo <= 0 && (await sincronizarAgotadoProducto(db, a.productoId, saldo, ahora)) === 'AGOTADO') agotados.push(a.productoId);
   }
   return { agotados, saboresAgotados };
 }
 
 /**
- * Descuenta de un sabor (producto por sabor). Con apertura de hoy del sabor hay tope (409 STOCK_INSUFICIENTE)
- * y agotado automático de ese sabor; sin apertura resta sin límite. Devuelve 'AGOTADO' si esta venta lo dejó agotado.
+ * Descuenta de un sabor (producto por sabor). Tope = saldo del sabor, haya o no apertura de hoy: si no alcanza
+ * (0 incluido) responde 409 STOCK_INSUFICIENTE y no descuenta. Al llegar a 0 se agota ese sabor solo.
+ * Devuelve 'AGOTADO' si esta venta lo dejó agotado.
  */
 async function descontarSabor(
   db: any,
-  c: { pedidoId: bigint; productoId: bigint; lugarId: bigint; sabor: SaborVenta; por: bigint; fecha: string; ahora: Date },
+  c: { pedidoId: bigint; productoId: bigint; lugarId: bigint; sabor: SaborVenta; por: bigint; ahora: Date },
 ): Promise<'AGOTADO' | null> {
   const { sabor } = c;
   const cantidad = new Prisma.Decimal(sabor.cantidad);
-  const apertura = await aperturaDeSaborHoy(db, sabor.saborId, c.fecha);
-
-  if (apertura) {
-    const r = await db.stockSabor.updateMany({
-      where: { sabor_id: sabor.saborId, cantidad: { gte: cantidad } },
-      data: { cantidad: { decrement: cantidad } },
-    });
-    if (r.count === 0) {
-      const quedan = Math.max(0, Math.floor(await saldoSabor(db, sabor.saborId)));
-      throw new ConflictException({
-        codigo: 'STOCK_INSUFICIENTE',
-        mensaje: `Solo quedan ${quedan} de ${sabor.nombre}`,
-        productoId: c.productoId.toString(),
-        saborId: sabor.saborId.toString(),
-        saborNombre: sabor.nombre,
-        quedan,
-      });
-    }
-  } else {
-    await db.stockSabor.upsert({
-      where: { sabor_id: sabor.saborId },
-      update: { cantidad: { decrement: cantidad } },
-      create: { sabor_id: sabor.saborId, cantidad: cantidad.negated() },
+  const r = await db.stockSabor.updateMany({
+    where: { sabor_id: sabor.saborId, cantidad: { gte: cantidad } },
+    data: { cantidad: { decrement: cantidad } },
+  });
+  if (r.count === 0) {
+    const quedan = Math.max(0, Math.floor(await saldoSabor(db, sabor.saborId)));
+    throw new ConflictException({
+      codigo: 'STOCK_INSUFICIENTE',
+      mensaje: `Solo quedan ${quedan} de ${sabor.nombre}`,
+      productoId: c.productoId.toString(),
+      saborId: sabor.saborId.toString(),
+      saborNombre: sabor.nombre,
+      quedan,
     });
   }
 
@@ -295,10 +259,8 @@ async function descontarSabor(
     },
   });
 
-  if (apertura) {
-    const saldo = await saldoSabor(db, sabor.saborId);
-    if ((await sincronizarAgotadoSabor(db, sabor.saborId, saldo, c.ahora, c.por)) === 'AGOTADO') return 'AGOTADO';
-  }
+  const saldo = await saldoSabor(db, sabor.saborId);
+  if (saldo <= 0 && (await sincronizarAgotadoSabor(db, sabor.saborId, saldo, c.ahora, c.por)) === 'AGOTADO') return 'AGOTADO';
   return null;
 }
 
@@ -309,8 +271,8 @@ export async function saldoSabor(db: any, saborId: bigint): Promise<number> {
 }
 
 /**
- * Agotado automático de un sabor: saldo 0 o menos (con apertura de hoy) → agotado hasta reactivar;
- * saldo > 0 → se reactiva si estaba agotado. Reutiliza sabor.agotado_hasta y la tabla agotado (tipo SABOR).
+ * Agotado automático de un sabor: saldo 0 o menos → agotado hasta reactivar; saldo > 0 → se reactiva si estaba
+ * agotado. Reutiliza sabor.agotado_hasta y la tabla agotado (tipo SABOR). Las ventas y mermas solo lo llaman con saldo 0.
  */
 export async function sincronizarAgotadoSabor(db: any, saborId: bigint, saldo: number, ahora = new Date(), por: bigint = BigInt(1)) {
   const sab = await db.sabor.findUnique({ where: { id: saborId }, select: { agotado_hasta: true, producto_id: true } });
@@ -494,18 +456,18 @@ export async function fijarAperturaProducto(
   await sincronizarAgotadoProducto(db, productoId, cantidad, ahora);
 }
 
-/** Quedan de cada producto con apertura de hoy (entero, mínimo 0). Los demás productos no aparecen en el mapa. */
+/** Quedan de cada producto que controla stock (saldo entero, mínimo 0). Los demás productos no aparecen en el mapa. */
 export async function quedanProductos(db: any, ids: bigint[]): Promise<Map<string, number>> {
   const mapa = new Map<string, number>();
   if (ids.length === 0) return mapa;
-  const aperturas = await db.conteoApertura.findMany({
-    where: { fecha: fechaColumna(fechaLimaHoy()), producto_id: { in: ids }, sabor_id: null },
-    select: { producto_id: true },
+  const controlados = await db.producto.findMany({
+    where: { id: { in: ids }, controla_stock: true },
+    select: { id: true },
   });
-  const conApertura = aperturas.map((a: any) => a.producto_id as bigint);
-  if (conApertura.length === 0) return mapa;
+  const idsControlados = controlados.map((p: any) => p.id as bigint);
+  if (idsControlados.length === 0) return mapa;
   const filas = await db.stock.findMany({
-    where: { producto_id: { in: conApertura } },
+    where: { producto_id: { in: idsControlados } },
     select: { producto_id: true, cantidad: true },
   });
   const suma = new Map<string, number>();
@@ -513,19 +475,23 @@ export async function quedanProductos(db: any, ids: bigint[]): Promise<Map<strin
     const k = f.producto_id.toString();
     suma.set(k, (suma.get(k) ?? 0) + Number(f.cantidad));
   }
-  for (const id of conApertura) {
+  for (const id of idsControlados) {
     mapa.set(id.toString(), Math.max(0, Math.floor(suma.get(id.toString()) ?? 0)));
   }
   return mapa;
 }
 
-/** Sabor tal como lo ve la carta y el admin: disponible (activo, no agotado y con saldo si hay apertura hoy) y quedan. */
+/**
+ * Sabor tal como lo ve la carta y el admin. Si el producto controla stock, quedan = saldo del sabor (mínimo 0) y
+ * disponible exige saldo > 0; si no, no hay tope (quedan null).
+ */
 export function estadoSaborCarta(
   s: { id: bigint; nombre: string; activo: boolean; agotado_hasta: Date | null },
-  e: { saldo: number; aperturaHoy: boolean } | undefined,
+  e: { saldo: number } | undefined,
+  controlaStock: boolean,
   ahora = new Date(),
 ) {
-  const quedan = e?.aperturaHoy ? Math.max(0, Math.floor(e.saldo)) : null;
+  const quedan = controlaStock ? Math.max(0, Math.floor(e?.saldo ?? 0)) : null;
   const agotado = !!s.agotado_hasta && new Date(s.agotado_hasta) > ahora;
   return {
     id: s.id.toString(),
@@ -683,13 +649,9 @@ export async function mermarProductoControlado(
   });
 
   const saldo = c.saborId ? await saldoSabor(db, c.saborId) : await saldoProducto(db, c.productoId);
-  if (await aperturaDeSaborOProductoHoy(db, c)) {
+  if (saldo <= 0) {
     if (c.saborId) await sincronizarAgotadoSabor(db, c.saborId, saldo, c.ahora, c.por);
     else await sincronizarAgotadoProducto(db, c.productoId, saldo, c.ahora);
   }
   return { movimientoId: mov.id, saldo };
-}
-
-async function aperturaDeSaborOProductoHoy(db: any, c: { productoId: bigint; saborId: bigint | null; fecha: string }) {
-  return c.saborId ? aperturaDeSaborHoy(db, c.saborId, c.fecha) : aperturaDeHoy(db, c.productoId, c.fecha);
 }

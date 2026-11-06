@@ -68,7 +68,7 @@ describe('Flujo de Pedido: productos con stock por sabor', () => {
 
   describe('1. Lista de sabores: solo los disponibles, en un solo mensaje', () => {
     it('tras tamaño y cantidad muestra una lista con los sabores disponibles (sin los agotados ni los no disponibles)', () => {
-      const r = llegarASabores('tam_media', '1');
+      const r = llegarASabores('tam_u', '1');
 
       expect(r.nuevoEstado).toBe('PEDIDO_SABOR');
       expect(r.acciones).toHaveLength(1);
@@ -77,8 +77,13 @@ describe('Flujo de Pedido: productos con stock por sabor', () => {
       expect(lista.filas.map((f: any) => f.id)).toEqual(['ped_sab_sab_fresa', 'ped_sab_sab_choco', 'ped_sab_sab_coco']);
     });
 
-    it('la descripción dice «Quedan N» solo cuando quedan 5 o menos; títulos de 24 caracteres como máximo', () => {
+    it('un sabor con menos unidades que la línea (Chocolate 4 para 1/2 docena) no se ofrece', () => {
       const r = llegarASabores('tam_media', '1');
+      expect((r.acciones[0] as any).filas.map((f: any) => f.id)).toEqual(['ped_sab_sab_fresa', 'ped_sab_sab_coco']);
+    });
+
+    it('la descripción dice «Quedan N» solo cuando quedan 5 o menos; títulos de 24 caracteres como máximo', () => {
+      const r = llegarASabores('tam_u', '1');
       const filas = (r.acciones[0] as any).filas;
 
       expect(filas[0].descripcion).toBeUndefined(); // Fresa: 20
@@ -170,7 +175,8 @@ describe('Flujo de Pedido: productos con stock por sabor', () => {
       expect(msg.tipo).toBe('enviarLista');
       expect(msg.texto).toBe('Solo quedan 4 de Chocolate 😅 Elige otro sabor:');
       expect(r.nuevoFlujo.pedido?.items ?? []).toHaveLength(0);
-      expect(msg.filas.map((f: any) => f.id)).toContain('ped_sab_sab_choco');
+      // Chocolate (4) no alcanza para una docena: ya no se ofrece en la lista
+      expect(msg.filas.map((f: any) => f.id)).toEqual(['ped_sab_sab_fresa', 'ped_sab_sab_coco']);
     });
 
     it('Unidad × 4 de Chocolate (4 unidades, quedan 4) sí alcanza: se compara unidades totales', () => {
@@ -263,7 +269,8 @@ describe('Flujo de Pedido: productos con stock por sabor', () => {
       expect(vuelta!.pedido.estadoInterno).toBe('PEDIDO_SABOR');
       expect(vuelta!.pedido.itemEnConfiguracion).toMatchObject({ productoId: 'prod_dona', tamanoId: 'tam_media', cantidad: 1, precioBase: 18 });
       expect(vuelta!.lista.texto).toBe('Ya no quedan Fresa… ¿elegimos otro?');
-      expect(vuelta!.lista.filas.map((f) => f.id)).toEqual(['ped_sab_sab_fresa', 'ped_sab_sab_choco', 'ped_sab_sab_coco']);
+      // Chocolate (4) no alcanza para 1/2 docena (6): solo se ofrecen los sabores que sí tienen las unidades
+      expect(vuelta!.lista.filas.map((f) => f.id)).toEqual(['ped_sab_sab_fresa', 'ped_sab_sab_coco']);
     });
 
     it('el cliente elige otro sabor y la línea vuelve al carrito con ese sabor', () => {
@@ -325,6 +332,72 @@ describe('Flujo de Pedido: productos con stock por sabor', () => {
       r = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_prod_prod_cafe' }), ctx);
       expect(r.nuevoEstado).toBe('PEDIDO_CANTIDAD');
       expect(r.acciones).toHaveLength(1);
+    });
+  });
+
+  describe('7. Lo que no cabe en lo que queda no se ofrece (tamaños, cantidades y sabores)', () => {
+    /** Dona por sabor con el saldo total del producto (la carta da quedan = suma de sus sabores). */
+    const donaCon = (quedan: number, sabores: any[] = dona.sabores) => ({ ...dona, quedan, sabores });
+
+    /** Hasta la pregunta de cantidad con el tamaño elegido (sin pasar por sabores). */
+    function hastaCantidad(tamano: string, producto: any) {
+      const ctx = contexto([{ ...categoriaDonas, productos: [producto] }]);
+      return { ctx, r: llegarACantidad(tamano, ctx) };
+    }
+
+    it('la docena no se ofrece si quedan 8: solo 1 unidad y 1/2 docena', () => {
+      let r = transicionarEstado(null, normalizarEntrada({ listRowId: 'pedir' }), contexto([{ ...categoriaDonas, productos: [donaCon(8)] }]));
+      const ctx = contexto([{ ...categoriaDonas, productos: [donaCon(8)] }]);
+      r = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_mod_recojer' }), ctx);
+      r = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_cat_cat_donas' }), ctx);
+      r = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_prod_prod_dona' }), ctx);
+
+      expect(r.nuevoEstado).toBe('PEDIDO_TAMANO');
+      expect((r.acciones[0] as any).botones.map((b: any) => b.id)).toEqual(['ped_tam_tam_u', 'ped_tam_tam_media']);
+    });
+
+    it('con 1/2 docena de Chocolate y quedan 8 de saldo total: solo se ofrece 1 vez (6 unidades)', () => {
+      const { ctx, r } = hastaCantidad('tam_media', donaCon(8));
+      expect(r.nuevoEstado).toBe('PEDIDO_CANTIDAD');
+      expect((r.acciones[0] as any).botones.map((b: any) => b.id)).toEqual(['ped_cant_1']);
+
+      const pide2 = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_cant_2' }), ctx);
+      expect(pide2.nuevoEstado).toBe('PEDIDO_CANTIDAD');
+      expect((pide2.acciones[0] as any).texto).toBe('Solo quedan 8 de Dona 😅 ¿Cuántas quieres?');
+      expect(pide2.nuevoFlujo.pedido?.items ?? []).toHaveLength(0);
+    });
+
+    it('cantidad × unidades del tamaño: en un producto sin sabores, 2 de 1/2 docena con 8 de saldo se repregunta', () => {
+      const galleta = { ...dona, nombre: 'Galleta', saboresConStock: false, sabores: [], quedan: 8 };
+      const { ctx, r } = hastaCantidad('tam_media', galleta);
+      expect(r.nuevoEstado).toBe('PEDIDO_CANTIDAD');
+      expect((r.acciones[0] as any).botones.map((b: any) => b.id)).toEqual(['ped_cant_1']);
+
+      const pide2 = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_cant_2' }), ctx);
+      expect((pide2.acciones[0] as any).texto).toBe('Solo quedan 8 de Galleta 😅 ¿Cuántas quieres?');
+    });
+
+    it('un sabor no se ofrece si no tiene las unidades de la línea (Chocolate 4 no entra en 1/2 docena)', () => {
+      const { r } = hastaCantidad('tam_media', donaCon(20));
+      const sab = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_cant_1' }), contexto([{ ...categoriaDonas, productos: [donaCon(20)] }]));
+      expect((sab.acciones[0] as any).filas.map((f: any) => f.id)).toEqual(['ped_sab_sab_fresa', 'ped_sab_sab_coco']);
+    });
+
+    it('si ningún sabor tiene las unidades de la cantidad, pide una cantidad menor sin ofrecer sabores', () => {
+      // Fresa 6 y Chocolate 8: el saldo total (14) alcanza para 2 de 1/2 docena (12), pero ningún sabor solo llega a 12
+      const sabores = [
+        { id: 'sab_fresa', nombre: 'Fresa', disponible: true, quedan: 6 },
+        { id: 'sab_choco', nombre: 'Chocolate', disponible: true, quedan: 8 },
+      ];
+      const producto = donaCon(14, sabores);
+      const ctx = contexto([{ ...categoriaDonas, productos: [producto] }]);
+      const r = llegarACantidad('tam_media', ctx);
+      const pide2 = transicionarEstado(r.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_cant_2' }), ctx);
+
+      expect(pide2.nuevoEstado).toBe('PEDIDO_CANTIDAD');
+      expect((pide2.acciones[0] as any).texto).toBe('Ningún sabor de Dona tiene 12 unidades. ¿Cuántas quieres?');
+      expect((pide2.acciones[0] as any).botones.map((b: any) => b.id)).toEqual(['ped_cant_1']);
+      expect(pide2.nuevoFlujo.pedido?.items ?? []).toHaveLength(0);
     });
   });
 });

@@ -142,9 +142,9 @@ describe('Checkout ▸ mezcla de sabores y 409 de stock por sabor', () => {
     expect(await screen.findByText('Ya no quedan Fresa')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ajustar mi pedido' }));
 
-    // se abre la ventana de la línea: Fresa ya no aparece y el total sigue en 6
+    // se abre la ventana de la línea: Fresa sale bloqueada (sin saldo) y el total sigue en 6
     expect(await screen.findByRole('dialog', { name: 'Elegir sabores de Dona' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Cantidad de Fresa')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Agregar una de Fresa' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Elegidas 3 de 6')).toBeInTheDocument();
     // el carrito sigue con su línea
     expect(JSON.parse(sessionStorage.getItem('caprichos_carrito') ?? '[]')).toHaveLength(1);

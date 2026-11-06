@@ -248,12 +248,31 @@ describe('productos por sabor (stock de donas y galletas con sabores)', () => {
       expect(db.st.movimientos.every((m: any) => m.pedido_id === 100n)).toBe(true);
     });
 
-    it('sin apertura de hoy del sabor: resta sin tope y no agota', async () => {
+    it('sin apertura de hoy del sabor: el saldo sigue siendo el tope; con 1 y pedido de 4 responde 409 y no descuenta', async () => {
       const db = fakeDb({ stockSabor: { 11: 1 } });
-      const res = await descontarVentaProductos(db, 100n, [linea([[FRESA, 'Fresa', 4]], 4)], 1n, AHORA);
-      expect(saldoSabor(db, FRESA)).toBe(-3);
-      expect(res.saboresAgotados).toEqual([]);
-      expect(db.st.agotados).toHaveLength(0);
+      const err: any = await descontarVentaProductos(db, 100n, [linea([[FRESA, 'Fresa', 4]], 4)], 1n, AHORA).catch((e) => e);
+      expect(err).toBeInstanceOf(ConflictException);
+      expect(err.getResponse()).toMatchObject({ codigo: 'STOCK_INSUFICIENTE', saborId: '11', quedan: 1 });
+      expect(saldoSabor(db, FRESA)).toBe(1);
+      expect(db.st.movimientos).toHaveLength(0);
+    });
+
+    it('sabor a 0 sin apertura de hoy: 409 STOCK_INSUFICIENTE con quedan 0 y sin descontar', async () => {
+      const db = fakeDb({ stockSabor: { 11: 0 } });
+      const err: any = await descontarVentaProductos(db, 100n, [linea([[FRESA, 'Fresa', 1]])], 1n, AHORA).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'STOCK_INSUFICIENTE', saborId: '11', quedan: 0 });
+      expect(saldoSabor(db, FRESA)).toBe(0);
+    });
+
+    it('sin apertura de hoy: saldo 3 del sabor vende 3 y la 4.ª falla; al llegar a 0 se agota ese sabor', async () => {
+      const db = fakeDb({ stockSabor: { 11: 3, 12: 5 } });
+      const res = await descontarVentaProductos(db, 100n, [linea([[FRESA, 'Fresa', 3]], 3)], 1n, AHORA);
+      expect(saldoSabor(db, FRESA)).toBe(0);
+      expect(res.saboresAgotados).toEqual([FRESA]);
+      expect(db.st.sabores.find((s: Sabor) => s.id === FRESA)!.agotado_hasta).toEqual(FECHA_HASTA_REACTIVAR);
+      const err: any = await descontarVentaProductos(db, 101n, [linea([[FRESA, 'Fresa', 1]])], 1n, AHORA).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'STOCK_INSUFICIENTE', quedan: 0 });
+      expect(saldoSabor(db, OREO)).toBe(5);
     });
 
     it('con apertura de hoy: pedir más que el saldo del sabor responde 409 STOCK_INSUFICIENTE y no descuenta', async () => {
@@ -343,13 +362,13 @@ describe('productos por sabor (stock de donas y galletas con sabores)', () => {
   });
 
   describe('lectura para la carta y el admin', () => {
-    it('quedan del sabor solo con apertura de hoy; sin apertura es null (sin tope)', async () => {
+    it('con control de stock, quedan del sabor es su saldo aunque no haya apertura hoy; sin control es null', async () => {
       const db = fakeDb({ stockSabor: { 11: 3.8, 12: 9 }, aperturaSabor: { 11: 10 } });
       const mapa = await estadoSaboresHoy(db, [FRESA, OREO], HOY);
       expect(mapa.get('11')).toMatchObject({ saldo: 3.8, aperturaHoy: true });
       expect(mapa.get('12')).toMatchObject({ saldo: 9, aperturaHoy: false });
       const sab = db.st.sabores.find((s: Sabor) => s.id === FRESA)!;
-      expect(estadoSaborCarta(sab, mapa.get('11'), AHORA)).toEqual({
+      expect(estadoSaborCarta(sab, mapa.get('11'), true, AHORA)).toEqual({
         id: '11',
         nombre: 'Fresa',
         activo: true,
@@ -357,13 +376,14 @@ describe('productos por sabor (stock de donas y galletas con sabores)', () => {
         quedan: 3,
       });
       const oreo = db.st.sabores.find((s: Sabor) => s.id === OREO)!;
-      expect(estadoSaborCarta(oreo, mapa.get('12'), AHORA)).toMatchObject({ disponible: true, quedan: null });
+      expect(estadoSaborCarta(oreo, mapa.get('12'), true, AHORA)).toMatchObject({ disponible: true, quedan: 9 });
+      expect(estadoSaborCarta(oreo, mapa.get('12'), false, AHORA)).toMatchObject({ disponible: true, quedan: null });
     });
 
-    it('un sabor agotado, o a 0 con apertura de hoy, no está disponible', () => {
+    it('un sabor agotado, o a 0 con control de stock, no está disponible (aunque no haya apertura)', () => {
       const base = { id: FRESA, nombre: 'Fresa', activo: true, agotado_hasta: null };
-      expect(estadoSaborCarta({ ...base, agotado_hasta: FECHA_HASTA_REACTIVAR }, undefined, AHORA).disponible).toBe(false);
-      expect(estadoSaborCarta(base, { saldo: 0, aperturaHoy: true }, AHORA)).toMatchObject({ disponible: false, quedan: 0 });
+      expect(estadoSaborCarta({ ...base, agotado_hasta: FECHA_HASTA_REACTIVAR }, undefined, false, AHORA).disponible).toBe(false);
+      expect(estadoSaborCarta(base, { saldo: 0 }, true, AHORA)).toMatchObject({ disponible: false, quedan: 0 });
     });
   });
 });

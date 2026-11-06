@@ -219,7 +219,7 @@ export class CatalogoService implements OnApplicationBootstrap {
 
         const sabores: SaborCarta[] = (p.sabores || [])
           .filter((s) => s.activo)
-          .map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString())));
+          .map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock));
         const saboresConStock = sabores.some((s) => s.disponible);
         // Producto por sabor: su stock y su disponibilidad salen de los sabores (quedan = suma de los disponibles)
         const porSabor = p.controla_stock && sabores.length > 0;
@@ -232,7 +232,7 @@ export class CatalogoService implements OnApplicationBootstrap {
               ? disponibles.reduce((acc, s) => acc + (s.quedan ?? 0), 0)
               : null
           : quedanProducto;
-        // Con apertura de hoy, sin saldo no se vende (aunque no esté marcado como agotado)
+        // Producto que controla stock: sin saldo no se vende (aunque no esté marcado como agotado)
         const disponible = porSabor
           ? estaDisponible(p.agotado_hasta) && saboresConStock
           : estaDisponible(p.agotado_hasta) && !(quedan !== null && quedan <= 0);
@@ -437,7 +437,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           disponible: estaDisponible(o.agotado_hasta),
         })),
       })),
-      sabores: (p.sabores || []).map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()))),
+      sabores: (p.sabores || []).map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock)),
     }));
   }
 
@@ -515,7 +515,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           disponible: estaDisponible(o.agotado_hasta),
         })),
       })),
-      sabores: (p.sabores || []).map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()))),
+      sabores: (p.sabores || []).map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock)),
     };
   }
 

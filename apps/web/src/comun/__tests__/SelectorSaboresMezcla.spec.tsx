@@ -12,14 +12,16 @@ const sabores: SaborMezcla[] = [
 ];
 
 describe('SelectorSaboresMezcla', () => {
-  it('muestra solo los sabores disponibles y con stock, no los agotados', () => {
+  it('muestra los sabores disponibles; el que no tiene saldo sale bloqueado con «No hay stock»; los inactivos no salen', () => {
     render(<SelectorSaboresMezcla sabores={sabores} total={6} valor={{}} onCambio={() => {}} />);
     expect(screen.getByLabelText('Cantidad de Fresa')).toBeTruthy();
     expect(screen.getByLabelText('Cantidad de Oreo')).toBeTruthy();
     expect(screen.getByLabelText('Cantidad de Manjar')).toBeTruthy();
-    expect(screen.queryByLabelText('Cantidad de Agotada')).toBeNull();
-    expect(screen.queryByText('Agotada', { exact: false })).toBeNull();
-    expect(screen.queryByText('Inactiva', { exact: false })).toBeNull();
+    expect(screen.getByLabelText('Cantidad de Agotada')).toBeTruthy();
+    expect(screen.getByText('No hay stock')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Agregar una de Agotada' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Todas del mismo sabor: Agotada' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByLabelText('Cantidad de Inactiva')).toBeNull();
   });
 
   it('cuenta lo elegido y lo que falta, y dice cuando está completo', () => {

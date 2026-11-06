@@ -22,6 +22,7 @@ import {
 } from '../../../carta/ReemplazoCombo';
 import { SelectorEleccionCombo } from '../../../carta/SelectorEleccionCombo';
 import { etiquetaUltimos, infoStockDe, topeAgregable, topeTamano } from '../../../carta/stock';
+import { maximoMezclas } from '../../../comun/saboresMezcla';
 
 export interface ConfiguracionUnidad {
   opciones: OpcionProducto[];
@@ -122,8 +123,9 @@ export function VentanaOpcionesProducto({
   // Stock sin sabores: cada tamaño consume sus unidades (1/2 docena = 6); el tope son las que quedan menos el pedido
   const infoStock = infoStockDe(producto);
   const libres = topeAgregable(infoStock, enCarrito);
-  const tamanoSinStock = (unidades: number) => !saborMode && libres !== null && unidades > libres;
-  const tope = saborMode ? null : topeTamano(infoStock, enCarrito, unidadesMezcla);
+  // Con sabores, el tope son las mezclas que caben en lo que queda de cada sabor (ya descontado lo de otras líneas)
+  const tamanoSinStock = (unidades: number) => (saborMode ? maximoMezclas(saboresDisp, unidades) === 0 : libres !== null && unidades > libres);
+  const tope = saborMode ? maximoMezclas(saboresDisp, unidadesMezcla) : topeTamano(infoStock, enCarrito, unidadesMezcla);
   const tamanoNoCabe = tamanos.length > 0 && tope === 0;
   const enTopeStock = tope !== null && cantidad >= tope;
   const franjaUltimos = infoStock.quedan !== 0 ? etiquetaUltimos(infoStock) : null;

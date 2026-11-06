@@ -50,7 +50,8 @@ const chip: CSSProperties = {
 export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabilitar = false }: Props) {
   if (total <= 0) return null;
 
-  const visibles = sabores.filter((s) => s.disponible && (s.quedan === null || s.quedan > 0));
+  // Sabor sin saldo (quedan 0) sigue en la lista, bloqueado con «No hay stock»; no se puede subir su cantidad
+  const visibles = sabores.filter((s) => s.disponible || s.quedan === 0);
   const elegidas = totalElegido(valor);
   const faltan = faltanUnidades(valor, total);
   const sobran = Math.max(0, elegidas - total);
@@ -113,7 +114,7 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
                   onClick={() => onCambio(todasDeUn(s.id, total))}
                   disabled={deshabilitar || !cabe}
                   aria-label={`Todas del mismo sabor: ${s.nombre}`}
-                  title={cabe ? undefined : `Solo quedan ${s.quedan} de ${s.nombre}`}
+                  title={cabe ? undefined : s.quedan === 0 ? `No hay stock de ${s.nombre}` : `Solo quedan ${s.quedan} de ${s.nombre}`}
                   style={{ ...chip, opacity: cabe ? 1 : 0.45 }}
                 >
                   {s.nombre}
@@ -145,8 +146,12 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
                 >
                   <div style={{ flex: '1 1 120px', minWidth: 0, overflowWrap: 'anywhere' }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--cp-navy)' }}>{s.nombre}</span>
-                    {s.quedan !== null && s.quedan <= UMBRAL_QUEDAN_SABOR && (
-                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: 'var(--cp-soft)' }}>{`Quedan ${s.quedan}`}</span>
+                    {s.quedan === 0 ? (
+                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: 'var(--cp-rust)' }}>No hay stock</span>
+                    ) : (
+                      s.quedan !== null && s.quedan <= UMBRAL_QUEDAN_SABOR && (
+                        <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: 'var(--cp-soft)' }}>{`Quedan ${s.quedan}`}</span>
+                      )
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>

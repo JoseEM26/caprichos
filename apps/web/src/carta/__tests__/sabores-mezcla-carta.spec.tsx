@@ -69,6 +69,38 @@ const renderVentana = (p: ProductoCarta, onCerrar = () => {}) =>
 const boton = (nombre: string) => screen.getByRole('button', { name: new RegExp(`^${nombre}`) }) as HTMLButtonElement;
 
 describe('ventana de producto con sabores', () => {
+  it('con pocas unidades en total, la docena y la media docena salen bloqueadas («No hay stock suficiente»)', () => {
+    // 3 unidades en total (2 Fresa + 1 Manjar): ni una media docena (6) cabe en ningún sabor
+    const poco: ProductoCarta = {
+      ...dona,
+      quedan: 3,
+      sabores: [
+        { id: 'f', nombre: 'Fresa', disponible: true, quedan: 2 },
+        { id: 'm', nombre: 'Manjar', disponible: true, quedan: 1 },
+      ],
+    };
+    renderVentana(poco);
+    expect((screen.getByRole('button', { name: /^Media docena/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /^Docena/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getAllByText('No hay stock suficiente').length).toBeGreaterThan(0);
+    expect(boton('No hay stock suficiente').disabled).toBe(true);
+  });
+
+  it('un sabor sin saldo sale bloqueado con «No hay stock» y su + no permite aumentar', () => {
+    const conCero: ProductoCarta = {
+      ...dona,
+      quedan: 9,
+      sabores: [
+        { id: 'f', nombre: 'Fresa', disponible: true, quedan: 0 },
+        { id: 'm', nombre: 'Manjar', disponible: true, quedan: 9 },
+      ],
+    };
+    renderVentana(conCero);
+    expect(screen.getByText('No hay stock')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Agregar una de Fresa' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Agregar una de Manjar' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('muestra el selector bajo el tamaño y no deja agregar hasta completar el reparto', () => {
     renderVentana(dona);
     expect(screen.getByRole('group', { name: 'Sabores de la mezcla' })).toBeTruthy();
@@ -226,8 +258,9 @@ describe('ajuste de sabores y 409', () => {
       </CarritoProvider>,
     );
     expect(screen.getByRole('dialog', { name: 'Elegir sabores de Dona' })).toBeTruthy();
-    // Fresa ya no aparece: el reparto actual (3 Fresa) se recorta y hay que completar con Oreo o Manjar
-    expect(screen.queryByLabelText('Cantidad de Fresa')).toBeNull();
+    // Fresa sin saldo sale bloqueada (0, «No hay stock»): el reparto actual (3 Fresa) se recorta y hay que completar con Oreo o Manjar
+    expect(screen.getByLabelText('Cantidad de Fresa').textContent).toBe('0');
+    expect((screen.getByRole('button', { name: 'Agregar una de Fresa' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Elegidas 3 de 6')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Elige todos los sabores' }) as HTMLButtonElement).disabled).toBe(true);
     for (let i = 0; i < 3; i++) fireEvent.click(screen.getByRole('button', { name: 'Agregar una de Oreo' }));

@@ -6,6 +6,7 @@ import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
 import { alternarEleccion } from './eleccionGrupo';
 import { etiquetaQuedan, etiquetaUltimos, infoStockDe, mezclasDisponibles, saboresParaLinea, topeAgregable, topeTamano, unidadesEnCarrito } from './stock';
+import { maximoMezclas } from '../comun/saboresMezcla';
 import { SelectorSaboresMezcla } from '../comun/SelectorSaboresMezcla';
 import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../comun/saboresMezcla';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
@@ -132,11 +133,13 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   // Sin sabores: cada cantidad consume las unidades del tamaño (1/2 docena = 6); con sabores, el tope son las mezclas
   const libres = topeAgregable(info, enCarrito);
   const tope = saborMode ? mezclasDisponibles(info, lineas, String(producto.id), unidadesMezcla) : topeTamano(info, enCarrito, unidadesMezcla);
-  const tamanoSinStock = (unidades: number) => !saborMode && libres !== null && unidades > libres;
+  // Sin sabores, un tamaño no cabe si pasa de lo libre; con sabores, si no cabe ni una mezcla de ese tamaño
+  const tamanoSinStock = (unidades: number) =>
+    saborMode ? maximoMezclas(saboresParaLinea(info, lineas, String(producto.id)), unidades) === 0 : libres !== null && unidades > libres;
   const sinStock = !info.disponible || (info.controlaStock && info.quedan === 0);
   const sinSaldo = tope !== null && tope <= 0;
-  // tamaño que no cabe en lo que queda (tope 0 sin sabores): no se puede agregar
-  const tamanoNoCabe = !saborMode && producto.tamanos.length > 0 && tope === 0;
+  // tamaño que no cabe en lo que queda (tope 0, con o sin sabores): no se puede agregar
+  const tamanoNoCabe = producto.tamanos.length > 0 && tope === 0;
   const puedeAgregar = valido && saboresListos && !sinStock && !sinSaldo;
   const enTope = tope !== null && cantidad >= tope;
   const etiquetaStock = etiquetaQuedan(info);

@@ -111,13 +111,53 @@ describe('producto que controla stock (independiente de Control de almacén)', (
   });
 
   describe('descontarVentaProductos', () => {
-    it('sin conteo de apertura hoy: resta, pero no limita ni agota (no se pierden ventas)', async () => {
+    it('sin apertura de hoy: el saldo sigue siendo el tope; con 2 y pedido de 5 responde 409 y no descuenta', async () => {
       const db = fakeDb({ stock: 2 });
+      const err = await descontarVentaProductos(db, 100n, [venta(5)], 1n, AHORA).catch((e) => e);
+      expect(err).toBeInstanceOf(ConflictException);
+      expect(err.getResponse()).toMatchObject({ codigo: 'STOCK_INSUFICIENTE', quedan: 2 });
+      expect(saldo(db)).toBe(2);
+      expect(db.st.movimientos).toHaveLength(0);
+    });
+
+    it('saldo 0 sin apertura de hoy: la venta responde 409 STOCK_INSUFICIENTE con quedan 0', async () => {
+      const db = fakeDb({ stock: 0 });
+      const err = await descontarVentaProductos(db, 100n, [venta(1)], 1n, AHORA).catch((e) => e);
+      expect(err.getResponse()).toEqual({
+        codigo: 'STOCK_INSUFICIENTE',
+        mensaje: 'Solo quedan 0 de Dona',
+        productoId: '1',
+        quedan: 0,
+      });
+      expect(saldo(db)).toBe(0);
+      expect(db.st.movimientos).toHaveLength(0);
+    });
+
+    it('saldo 5 sin apertura de hoy: vende 5 y la 6.ª unidad falla; al llegar a 0 se agota solo', async () => {
+      const db = fakeDb({ stock: 5 });
       const res = await descontarVentaProductos(db, 100n, [venta(5)], 1n, AHORA);
-      expect(saldo(db)).toBe(-3);
-      expect(res.agotados).toEqual([]);
-      expect(db.st.producto.agotado_hasta).toBeNull();
-      expect(db.st.movimientos[0]).toMatchObject({ tipo: 'VENTA', producto_id: DONA, pedido_id: 100n });
+      expect(saldo(db)).toBe(0);
+      expect(res.agotados).toEqual([DONA]);
+      expect(db.st.producto.agotado_hasta).toEqual(FECHA_HASTA_REACTIVAR);
+      expect(db.st.agotados[0]).toMatchObject({ producto_id: DONA, alcance: 'HASTA_REACTIVAR' });
+      const err = await descontarVentaProductos(db, 101n, [venta(1)], 1n, AHORA).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'STOCK_INSUFICIENTE', quedan: 0 });
+      expect(db.st.movimientos).toHaveLength(1);
+    });
+
+    it('sin apertura de hoy: la venta que deja en 0 agota el producto (sin requerir conteo)', async () => {
+      const db = fakeDb({ stock: 2 });
+      const res = await descontarVentaProductos(db, 100n, [venta(2)], 1n, AHORA);
+      expect(res.agotados).toEqual([DONA]);
+      expect(db.st.producto.agotado_hasta).toEqual(FECHA_HASTA_REACTIVAR);
+    });
+
+    it('una venta que deja saldo > 0 no reactiva un producto agotado a mano por Cocina', async () => {
+      const db = fakeDb({ stock: 5 });
+      db.st.producto.agotado_hasta = FECHA_HASTA_REACTIVAR;
+      await descontarVentaProductos(db, 100n, [venta(2)], 1n, AHORA);
+      expect(db.st.producto.agotado_hasta).toEqual(FECHA_HASTA_REACTIVAR);
+      expect(db.agotado.updateMany).not.toHaveBeenCalled();
     });
 
     it('con apertura hoy: si no alcanza responde 409 STOCK_INSUFICIENTE y no descuenta', async () => {
@@ -197,15 +237,25 @@ describe('producto que controla stock (independiente de Control de almacén)', (
   });
 
   describe('quedanProductos (carta)', () => {
-    it('con apertura hoy da el saldo entero hacia abajo, sin negativos', async () => {
+    it('da el saldo entero hacia abajo, sin negativos', async () => {
       const db = fakeDb({ stock: 3.7, apertura: 10 });
       expect((await quedanProductos(db, [DONA])).get('1')).toBe(3);
       db.st.stock[0].cantidad = -2;
       expect((await quedanProductos(db, [DONA])).get('1')).toBe(0);
     });
 
-    it('sin apertura hoy el producto no aparece (quedan null en la carta)', async () => {
+    it('sin apertura hoy también da el saldo: 3 de saldo es quedan 3 (el saldo es el tope)', async () => {
       const db = fakeDb({ stock: 3 });
+      expect((await quedanProductos(db, [DONA])).get('1')).toBe(3);
+    });
+
+    it('saldo 0 sin apertura da quedan 0 (la carta no lo deja vender)', async () => {
+      const db = fakeDb({ stock: 0 });
+      expect((await quedanProductos(db, [DONA])).get('1')).toBe(0);
+    });
+
+    it('un producto que no controla stock no aparece (sin tope)', async () => {
+      const db = fakeDb({ stock: 3, controla: false });
       expect((await quedanProductos(db, [DONA])).has('1')).toBe(false);
     });
   });

@@ -78,14 +78,54 @@ function normalizarEstadoUbicacion(estado: EstadoPedidoFlujo): EstadoPedidoFlujo
   return ESTADOS_UBICACION_LEGADOS.includes(estado) ? 'PEDIDO_UBICACION' : estado;
 }
 
-/** Sabores que se pueden pedir ahora: disponibles y sin agotar (quedan null = sin apertura hoy, no bloquea). */
+/** Sabores que se pueden pedir ahora: disponibles y sin agotar (quedan null = producto sin control de stock, no bloquea). */
 function saboresPedibles(prod: any): any[] {
   return (prod?.sabores || []).filter((s: any) => s.disponible === true && s.quedan !== 0);
 }
 
-/** No se puede pedir: agotado, o con stock por sabor y ningún sabor disponible. */
+/** Unidades que quedan de un producto que controla stock (null: sin límite). Por sabor, la suma de sus sabores. */
+function quedanDeProducto(prod: any): number | null {
+  return typeof prod?.quedan === 'number' ? prod.quedan : null;
+}
+
+/**
+ * Tamaños que caben en lo que queda (1/2 docena = 6, docena = 12). Con stock por sabor, una línea lleva un solo sabor:
+ * el tamaño cabe si algún sabor pedible tiene esas unidades. Sin límite, todos.
+ */
+function tamanosQueCaben(prod: any): any[] {
+  const tamanos = prod?.tamanos || [];
+  const quedan = quedanDeProducto(prod);
+  return tamanos.filter((t: any) => {
+    const unidades = unidadesDeTamano(prod, String(t.id));
+    if (quedan !== null && unidades > quedan) return false;
+    return prod?.saboresConStock !== true || saboresQueCaben(prod, unidades).length > 0;
+  });
+}
+
+/** Sabores pedibles que tienen las unidades de la línea (el saldo de cada sabor es su tope). */
+function saboresQueCaben(prod: any, unidades: number): any[] {
+  return saboresPedibles(prod).filter((s: any) => typeof s.quedan !== 'number' || s.quedan >= unidades);
+}
+
+/** Botones 1/2/3 sin pasar de `maximo` unidades de cantidad. */
+function botonesHasta(maximo: number): BotonAccion[] {
+  return BOTONES_PEDIDO_CANTIDADES.filter((b) => Number(b.id.replace('ped_cant_', '')) <= Math.max(1, maximo));
+}
+
+/** Botones de cantidad para un producto: con stock, no más de lo que cabe en su tamaño. */
+function botonesCantidadDe(prod: any, tamanoId?: string): BotonAccion[] {
+  const quedan = quedanDeProducto(prod);
+  if (quedan === null) return BOTONES_PEDIDO_CANTIDADES;
+  return botonesHasta(Math.floor(quedan / unidadesDeTamano(prod, tamanoId)));
+}
+
+/** No se puede pedir: agotado, con stock por sabor sin ningún sabor pedible, o sin tamaño que quepa. */
 function productoAgotado(p: any): boolean {
-  return p.disponible === false || (p.saboresConStock === true && saboresPedibles(p).length === 0);
+  return (
+    p.disponible === false ||
+    (p.saboresConStock === true && saboresPedibles(p).length === 0) ||
+    ((p.tamanos || []).length > 0 && tamanosQueCaben(p).length === 0)
+  );
 }
 
 /**
@@ -111,13 +151,13 @@ function productoDeCarta(categorias: any[], productoId: string): any | null {
   return null;
 }
 
-/** Lista de sabores que se pueden pedir (máx 10 filas; «Quedan N» cuando quedan 5 o menos). */
-function listaSaboresStock(prod: any, texto: string): AccionEnviarLista {
+/** Lista de sabores que se pueden pedir con esas unidades (máx 10 filas; «Quedan N» cuando quedan 5 o menos). */
+function listaSaboresStock(prod: any, texto: string, unidades = 1): AccionEnviarLista {
   return {
     tipo: 'enviarLista',
     texto,
     botonTexto: 'Elegir sabor',
-    filas: saboresPedibles(prod)
+    filas: saboresQueCaben(prod, unidades)
       .slice(0, 10)
       .map((s: any) => ({
         id: `ped_sab_${s.id}`,
@@ -154,6 +194,8 @@ export function carritoTrasSaborAgotado(
   if (idx < 0 || !prod?.saboresConStock || saboresPedibles(prod).length === 0) return null;
 
   const linea = carrito.items[idx];
+  const unidadesLinea = unidadesDeTamano(prod, linea.tamanoId) * linea.cantidad;
+  if (saboresQueCaben(prod, unidadesLinea).length === 0) return null;
   const extras = linea.opciones.reduce((s, o) => s + o.precioExtra, 0);
   const config: ItemEnConfiguracionBot = {
     productoId: linea.productoId,
@@ -177,7 +219,7 @@ export function carritoTrasSaborAgotado(
       items: carrito.items.filter((_, k) => k !== idx),
       itemEnConfiguracion: config,
     },
-    lista: listaSaboresStock(prod, TEXTOS_BOT.pedidoSaborAgotado(nombre)),
+    lista: listaSaboresStock(prod, TEXTOS_BOT.pedidoSaborAgotado(nombre), unidadesLinea),
   };
 }
 
@@ -843,36 +885,17 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       itemEnConfiguracion: configInicial,
     };
 
-    // A. ¿Tiene tamaños / variantes?
-    if (producto.tamanos && producto.tamanos.length > 1) {
-      nuevoPedido.estadoInterno = 'PEDIDO_TAMANO';
-      const botonesTam: BotonAccion[] = producto.tamanos.slice(0, 3).map((t: any) => ({
-        id: `ped_tam_${t.id}`,
-        titulo: `${t.nombre} S/${Number(t.precio).toFixed(0)}`.slice(0, 20),
-      }));
-
-      return {
-        nuevoEstado: 'PEDIDO_TAMANO',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoPreguntarTamano(producto.nombre),
-            botones: botonesTam,
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'PEDIDO_TAMANO',
-          pedido: nuevoPedido,
-        },
-      };
+    // A. ¿Tiene tamaños / variantes? Solo se ofrecen los que caben en lo que queda (docena no cabe en 3)
+    const tamanosOfrecidos = tamanosQueCaben(producto);
+    if (tamanosOfrecidos.length > 1) {
+      return this.preguntarTamano(flujo, nuevoPedido, producto, TEXTOS_BOT.pedidoPreguntarTamano(producto.nombre));
     }
 
-    // Si tiene un solo tamaño, asignar su precio base
-    if (producto.tamanos && producto.tamanos.length === 1) {
-      configInicial.tamanoId = String(producto.tamanos[0].id);
-      configInicial.tamanoNombre = producto.tamanos[0].nombre;
-      configInicial.precioBase = Number(producto.tamanos[0].precio);
+    // Si solo cabe un tamaño, asignar su precio base
+    if (tamanosOfrecidos.length === 1) {
+      configInicial.tamanoId = String(tamanosOfrecidos[0].id);
+      configInicial.tamanoNombre = tamanosOfrecidos[0].nombre;
+      configInicial.precioBase = Number(tamanosOfrecidos[0].precio);
     }
 
     // B. Pasar a grupos de opciones o cantidad
@@ -899,14 +922,19 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       ? entrada.id.replace('ped_tam_', '')
       : null;
 
+    const caben = tamanosQueCaben(prod);
     let tamano = (prod?.tamanos || []).find((t: any) => String(t.id) === tamIdMatch);
     if (!tamano) {
       tamano = (prod?.tamanos || []).find((t: any) => normalizarTexto(t.nombre) === entrada.texto);
     }
 
-    if (!tamano && prod?.tamanos && prod.tamanos.length > 0) {
-      // Tomar primer tamaño defensivamente si el botón no coincidió
-      tamano = prod.tamanos[0];
+    // Tamaño que ya no cabe (el stock bajó desde que se mostró la lista): se vuelve a preguntar
+    if (tamano && !caben.includes(tamano)) {
+      return this.preguntarTamano(flujo, pedido, prod, `Solo quedan ${quedanDeProducto(prod)} de ${prod.nombre} 😅 Elige otro tamaño:`);
+    }
+    if (!tamano && caben.length > 0) {
+      // Tomar primer tamaño que cabe defensivamente si el botón no coincidió
+      tamano = caben[0];
     }
 
     if (tamano) {
@@ -916,6 +944,19 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     return this.avanzarConfiguracionProducto(flujo, pedido, prod, contexto);
+  }
+
+  /** Pregunta el tamaño con los que caben en lo que queda (la docena puede no caber aunque la media quepa). */
+  private preguntarTamano(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, prod: any, texto: string): ResultadoTransicion {
+    pedido.estadoInterno = 'PEDIDO_TAMANO';
+    const botones: BotonAccion[] = tamanosQueCaben(prod)
+      .slice(0, 3)
+      .map((t: any) => ({ id: `ped_tam_${t.id}`, titulo: `${t.nombre} S/${Number(t.precio).toFixed(0)}`.slice(0, 20) }));
+    return {
+      nuevoEstado: 'PEDIDO_TAMANO',
+      acciones: [{ tipo: 'enviarBotones', texto, botones }],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_TAMANO', pedido },
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -1030,7 +1071,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         {
           tipo: 'enviarBotones',
           texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
-          botones: this.botonesCantidad(config.productoId, contexto),
+          botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
       nuevoFlujo: {
@@ -1075,7 +1116,13 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     prod: any,
     texto: string,
   ): ResultadoTransicion {
-    if (saboresPedibles(prod).length === 0) {
+    const config = pedido.itemEnConfiguracion;
+    const unidadesTam = unidadesDeTamano(prod, config?.tamanoId);
+    const unidades = unidadesTam * (config?.cantidad ?? 1);
+    const pedibles = saboresPedibles(prod);
+    // Lo que cabe de un solo sabor: el saldo de cada sabor es su tope (no se mezcla en la línea)
+    const maxPorSabor = Math.floor(Math.max(0, ...pedibles.map((s: any) => (typeof s.quedan === 'number' ? s.quedan : Infinity))) / unidadesTam);
+    if (pedibles.length === 0 || maxPorSabor < 1) {
       return {
         nuevoEstado: 'PEDIDO_CATEGORIAS',
         acciones: [
@@ -1092,10 +1139,25 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         },
       };
     }
+    // Ningún sabor tiene las unidades de esta cantidad: se pide menos, sin ofrecer sabores que no alcanzan
+    if (saboresQueCaben(prod, unidades).length === 0) {
+      pedido.estadoInterno = 'PEDIDO_CANTIDAD';
+      return {
+        nuevoEstado: 'PEDIDO_CANTIDAD',
+        acciones: [
+          {
+            tipo: 'enviarBotones',
+            texto: `Ningún sabor de ${prod.nombre} tiene ${unidades} unidades. ¿Cuántas quieres?`,
+            botones: botonesHasta(maxPorSabor),
+          },
+        ],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_CANTIDAD', pedido },
+      };
+    }
     pedido.estadoInterno = 'PEDIDO_SABOR';
     return {
       nuevoEstado: 'PEDIDO_SABOR',
-      acciones: [listaSaboresStock(prod, texto)],
+      acciones: [listaSaboresStock(prod, texto, unidades)],
       nuevoFlujo: { ...flujo, estado: 'PEDIDO_SABOR', pedido },
     };
   }
@@ -1128,7 +1190,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         {
           tipo: 'enviarBotones',
           texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
-          botones: this.botonesCantidad(config.productoId, contexto),
+          botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
       nuevoFlujo: {
@@ -1162,16 +1224,17 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       }
     }
 
-    // Productos que controlan stock: no se ofrece ni acepta más que lo que queda (carta con «quedan»)
+    // Productos que controlan stock: no se acepta más que lo que queda (cantidad × unidades del tamaño)
     const quedan = this.quedanProducto(config.productoId, contexto);
-    if (quedan !== null && cantidad > quedan) {
+    const prodCarta = productoDeCarta(contexto.categoriasCarta || [], config.productoId);
+    if (quedan !== null && cantidad * unidadesDeTamano(prodCarta, config.tamanoId) > quedan) {
       return {
         nuevoEstado: 'PEDIDO_CANTIDAD',
         acciones: [
           {
             tipo: 'enviarBotones',
             texto: `Solo quedan ${quedan} de ${config.productoNombre} 😅 ¿Cuántas quieres?`,
-            botones: this.botonesCantidad(config.productoId, contexto),
+            botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
           },
         ],
         nuevoFlujo: { ...flujo, estado: 'PEDIDO_CANTIDAD', pedido },
@@ -1195,7 +1258,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     return this.agregarLineaConfigurada(flujo, pedido, contexto);
   }
 
-  /** Unidades que quedan de un producto con apertura de hoy (null si no controla stock o no hay apertura). */
+  /** Unidades que quedan de un producto que controla stock (null si no lo controla). */
   private quedanProducto(productoId: string, contexto: ContextoConversacion): number | null {
     for (const cat of contexto.categoriasCarta || []) {
       const p = (cat.productos || []).find((x: any) => String(x.id) === String(productoId));
@@ -1204,11 +1267,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     return null;
   }
 
-  /** Botones 1/2/3 unidades, sin ofrecer más de lo que queda. */
-  private botonesCantidad(productoId: string, contexto: ContextoConversacion): BotonAccion[] {
-    const quedan = this.quedanProducto(productoId, contexto);
-    if (quedan === null) return BOTONES_PEDIDO_CANTIDADES;
-    return BOTONES_PEDIDO_CANTIDADES.filter((b) => Number(b.id.replace('ped_cant_', '')) <= Math.max(1, quedan));
+  /** Botones 1/2/3 cantidades, sin ofrecer más de lo que cabe (unidades del tamaño × cantidad <= lo que queda). */
+  private botonesCantidad(productoId: string, contexto: ContextoConversacion, tamanoId?: string): BotonAccion[] {
+    return botonesCantidadDe(productoDeCarta(contexto.categoriasCarta || [], productoId), tamanoId);
   }
 
   private esBebidaConNombres(categoriaNombre: string): boolean {
@@ -2579,7 +2640,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         {
           tipo: 'enviarBotones',
           texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
-          botones: this.botonesCantidad(config.productoId, contexto),
+          botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
       nuevoFlujo: {

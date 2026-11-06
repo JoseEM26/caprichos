@@ -1636,12 +1636,21 @@ describe('PedidosService', () => {
       });
     });
 
-    it('sin conteo de apertura hoy resta sin tope y no hace la comprobación de saldo', async () => {
+    it('sin conteo de apertura hoy también limita por el saldo: descuento condicional contra el saldo', async () => {
       await service.crear(pedidoBaseDto, 'key-sin-apertura', { canal: 'WHATSAPP' });
       expect(prismaMock.stock.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ producto_id: 1n }) }),
       );
-      expect(prismaMock.stock.updateMany.mock.calls[0][0].where.cantidad).toBeUndefined();
+      expect(prismaMock.stock.updateMany.mock.calls[0][0].where.cantidad).toEqual({ gte: expect.anything() });
+    });
+
+    it('sin apertura hoy y saldo 0: responde 409 STOCK_INSUFICIENTE con quedan 0 y no descuenta', async () => {
+      prismaMock.stock.updateMany.mockResolvedValue({ count: 0 });
+      prismaMock.stock.findMany.mockResolvedValue([{ cantidad: 0 }]);
+      const err: any = await service.crear(pedidoBaseDto, 'key-saldo-cero', { canal: 'CARTA' }).catch((e) => e);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toMatchObject({ codigo: 'STOCK_INSUFICIENTE', productoId: '1', quedan: 0 });
+      expect(prismaMock.movimientoStock.create).not.toHaveBeenCalled();
     });
 
     it('con apertura hoy y saldo insuficiente responde 409 STOCK_INSUFICIENTE con productoId y quedan', async () => {

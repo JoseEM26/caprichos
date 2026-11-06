@@ -105,6 +105,23 @@ interface ClienteBuscado {
   partyId: string;
 }
 
+/** Producto para la ventana de opciones: el saldo de cada sabor menos lo que ya llevan las líneas del pedido. */
+function productoConSaldoLibre(producto: ProductoCarta, lineas: LineaPedidoMesa[]): ProductoCarta {
+  if (!producto.sabores) return producto;
+  const usados: Record<string, number> = {};
+  for (const l of lineas) {
+    if (String(l.productoId) !== String(producto.id)) continue;
+    for (const s of l.sabores ?? []) usados[s.saborId] = (usados[s.saborId] ?? 0) + s.cantidad;
+  }
+  return {
+    ...producto,
+    sabores: producto.sabores.map((s) => ({
+      ...s,
+      quedan: typeof s.quedan === 'number' ? Math.max(0, s.quedan - (usados[String(s.id)] ?? 0)) : null,
+    })),
+  };
+}
+
 /** Marca la primera coincidencia de `q` (ya en minúsculas) dentro de `texto` */
 function resaltarCoincidencia(texto: string, q: string) {
   const i = q ? texto.toLowerCase().indexOf(q) : -1;
@@ -3159,7 +3176,7 @@ export function ModalNuevoPedidoMesa({
       {/* Ventana de Opciones de Producto */}
       {productoSeleccionado && (
         <VentanaOpcionesProducto
-          producto={productoSeleccionado}
+          producto={productoConSaldoLibre(productoSeleccionado, lineas)}
           alCerrar={() => setProductoSeleccionado(null)}
           alAgregar={handleAgregarProductoConfigurado}
           oferta={comboDeProducto(ofertasCombo, productoSeleccionado.id)}
