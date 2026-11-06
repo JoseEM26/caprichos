@@ -30,4 +30,12 @@ export class AsistenciaPantallaPublicaController {
     limitar((req.ip || req.headers?.['x-forwarded-for'] || 'desconocida') as string);
     return this.asistencia.qrPantallaPublica(token);
   }
+
+  @Get(':token/manifest.webmanifest')
+  @Header('Content-Type', 'application/manifest+json; charset=utf-8')
+  @Header('Cache-Control', 'no-store')
+  manifest(@Param('token') token: string, @Req() req: any) {
+    limitar((req.ip || req.headers?.['x-forwarded-for'] || 'desconocida') as string);
+    return this.asistencia.manifestPantallaPublica(token);
+  }
 }

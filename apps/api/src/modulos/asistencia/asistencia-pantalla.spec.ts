@@ -101,3 +101,30 @@ describe('rutas de asistencia que llegan a la API', () => {
     expect(Reflect.getMetadata(PATH_METADATA, AsistenciaPantallaPublicaController)).toBe('carta/asistencia-pantalla');
   });
 });
+
+describe('manifest de la app «QR Asistencia»', () => {
+  it('token válido: nombre, start_url y scope del propio enlace, sin datos del local', async () => {
+    const { svc } = servicio();
+    const token = tokenDe((await svc.generarEnlacePantalla()).ruta);
+    const m = await svc.manifestPantallaPublica(token);
+    expect(m.name).toBe('QR Asistencia');
+    expect(m.short_name).toBe('QR Asistencia');
+    expect(m.start_url).toBe(`/asistencia/pantalla/${token}`);
+    expect(m.id).toBe(m.start_url);
+    expect(m.scope).toBe(m.start_url);
+    expect(m.display).toBe('fullscreen');
+    expect(m.icons.length).toBeGreaterThanOrEqual(2);
+    const texto = JSON.stringify(m);
+    expect(texto).not.toMatch(/Caprichos|local|persona|dni/i);
+  });
+
+  it('inválido, regenerado o desactivado responde 404', async () => {
+    const { svc } = servicio();
+    await expect(svc.manifestPantallaPublica('x')).rejects.toBeInstanceOf(NotFoundException);
+    const viejo = tokenDe((await svc.generarEnlacePantalla()).ruta);
+    const nuevo = tokenDe((await svc.generarEnlacePantalla()).ruta);
+    await expect(svc.manifestPantallaPublica(viejo)).rejects.toBeInstanceOf(NotFoundException);
+    await svc.desactivarEnlacePantalla();
+    await expect(svc.manifestPantallaPublica(nuevo)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});

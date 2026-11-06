@@ -196,6 +196,31 @@ export class AsistenciaService {
     return this.qrPantalla(ahora);
   }
 
+  /** Manifest de la PWA «QR Asistencia» para ese enlace. Solo lleva la ruta del propio token: ningún dato del local. */
+  async manifestPantallaPublica(token: string) {
+    const e = await this.enlacePantalla();
+    if (!e || !tokenCoincide(e.tokenHash, token)) throw new NotFoundException();
+    const ruta = `/asistencia/pantalla/${token}`;
+    return {
+      name: 'QR Asistencia',
+      short_name: 'QR Asistencia',
+      lang: 'es',
+      id: ruta,
+      start_url: ruta,
+      scope: ruta,
+      display: 'fullscreen',
+      display_override: ['fullscreen', 'standalone'],
+      orientation: 'any',
+      theme_color: '#0B2C3E',
+      background_color: '#FBF4EC',
+      icons: [
+        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Pantalla del local
   // ---------------------------------------------------------------------------
