@@ -57,7 +57,10 @@ describe('SalonService', () => {
       registrar: jest.fn().mockResolvedValue(undefined),
     };
 
-    reservasMock = { marcarPedidoDeReserva: jest.fn().mockResolvedValue(undefined) };
+    reservasMock = {
+      marcarPedidoDeReserva: jest.fn().mockResolvedValue(undefined),
+      validarMesasYAsientos: jest.fn().mockResolvedValue(undefined),
+    };
     impresionMock = { encolarEtiquetasPedido: jest.fn().mockResolvedValue(undefined) };
     eventosGatewayMock = {
       emitirAdmin: jest.fn(),
@@ -923,7 +926,7 @@ describe('SalonService', () => {
         data: { abierta: false },
       });
       expect(prismaMock.pedidoMesa.create).toHaveBeenCalledWith({
-        data: { pedido_id: 300n, mesa_id: 9n, mesa_nombre: 'Mesa 5', abierta: true },
+        data: { pedido_id: 300n, mesa_id: 9n, mesa_nombre: 'Mesa 5', abierta: true, principal: true, orden: 1 },
       });
       expect(prismaMock.pedido.update).toHaveBeenCalledWith({ where: { id: 300n }, data: { mesa_nombre: 'Mesa 5' } });
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
@@ -999,6 +1002,230 @@ describe('SalonService', () => {
 
       await expect(service.cambiarMesaPedido('300', '9')).rejects.toMatchObject({
         response: { codigo: 'MODALIDAD_INVALIDA' },
+      });
+    });
+  });
+  describe('8. Pedido con varias mesas (abrir, sumar, quitar, mover y liberar)', () => {
+    const mesaActiva = (id: bigint, numero: number, asientos = 4) => ({ id, tipo: 'MESA', numero, nombre: null, activo: true, asientos });
+    const filaMesa = (id: bigint, pedidoMesaId: bigint, numero: number, extra: any = {}) => ({
+      id: pedidoMesaId,
+      pedido_id: 300n,
+      mesa_id: id,
+      mesa_nombre: `Mesa ${numero}`,
+      abierta: true,
+      principal: false,
+      orden: 1,
+      mesa: { numero, nombre: null },
+      ...extra,
+    });
+
+    it('abrir con 3 mesas: la primera es la principal, el pedido se llama «Mesas 3, 4 y 5» y se crean 3 filas', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([mesaActiva(3n, 3), mesaActiva(4n, 4), mesaActiva(5n, 5)]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockImplementation(async (_dto: any, _k: any, origen: any) => {
+        await origen.enTransaccion(prismaMock, { id: 900n, codigo: 'CP-W900' });
+        return { id: '900', codigo: 'CP-W900', estado: 'COLA' };
+      });
+
+      await service.abrirPedido({ mesas: [3, 4, 5], lineas: [{ productoId: 1, cantidad: 1 }], cliente: { nombre: 'Lucía Pérez' } });
+
+      expect(pedidosServiceMock.crear.mock.calls[0][2].mesaNombre).toBe('Mesas 3, 4 y 5');
+      const filas = prismaMock.pedidoMesa.create.mock.calls.map((c: any[]) => c[0].data);
+      expect(filas).toEqual([
+        expect.objectContaining({ mesa_id: 3n, principal: true, orden: 1 }),
+        expect.objectContaining({ mesa_id: 4n, principal: false, orden: 2 }),
+        expect.objectContaining({ mesa_id: 5n, principal: false, orden: 3 }),
+      ]);
+    });
+
+    it('abrir con 2 mesas el nombre del pedido es «Mesas 3 y 4»', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([mesaActiva(3n, 3), mesaActiva(4n, 4)]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '901', codigo: 'CP-W901' });
+
+      await service.abrirPedido({ mesas: ['3', '4'], lineas: [{ productoId: 1, cantidad: 1 }], cliente: { nombre: 'Lucía Pérez' } });
+
+      expect(pedidosServiceMock.crear.mock.calls[0][2].mesaNombre).toBe('Mesas 3 y 4');
+    });
+
+    it('más de 6 mesas -> 400 MESAS_LIMITE sin tocar la base', async () => {
+      await expect(
+        service.abrirPedido({ mesas: [1, 2, 3, 4, 5, 6, 7], lineas: [], cliente: { nombre: 'Lucía' } }),
+      ).rejects.toMatchObject({ response: { codigo: 'MESAS_LIMITE' } });
+      expect(prismaMock.elementoPlano.findMany).not.toHaveBeenCalled();
+    });
+
+    it('la misma mesa dos veces -> 400 MESA_REPETIDA', async () => {
+      await expect(
+        service.abrirPedido({ mesas: [4, 4], lineas: [], cliente: { nombre: 'Lucía' } }),
+      ).rejects.toMatchObject({ response: { codigo: 'MESA_REPETIDA' } });
+      expect(prismaMock.elementoPlano.findMany).not.toHaveBeenCalled();
+    });
+
+    it('una de las varias mesas ocupada -> 409 MESA_OCUPADA con el nombre de esa mesa', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([mesaActiva(3n, 3), mesaActiva(4n, 4)]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([{ mesa_id: 4n, abierta: true, mesa: { numero: 4 } }]);
+
+      await expect(
+        service.abrirPedido({ mesas: [3, 4], lineas: [], cliente: { nombre: 'Lucía' } }),
+      ).rejects.toMatchObject({ response: { codigo: 'MESA_OCUPADA', mensaje: 'La mesa 4 ya está ocupada' } });
+      expect(pedidosServiceMock.crear).not.toHaveBeenCalled();
+    });
+
+    it('con personas, la capacidad se valida como en reservas (y confirmarCapacidad la deja pasar)', async () => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([mesaActiva(3n, 3), mesaActiva(4n, 4)]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '902', codigo: 'CP-W902' });
+      reservasMock.validarMesasYAsientos.mockRejectedValueOnce({ response: { codigo: 'ASIENTOS_INSUFICIENTES' } });
+
+      await expect(
+        service.abrirPedido({ mesas: [3, 4], personas: 10, lineas: [], cliente: { nombre: 'Lucía' } }),
+      ).rejects.toMatchObject({ response: { codigo: 'ASIENTOS_INSUFICIENTES' } });
+      expect(reservasMock.validarMesasYAsientos).toHaveBeenCalledWith([3n, 4n], 10, false);
+
+      await service.abrirPedido({ mesas: [3, 4], personas: 10, confirmarCapacidad: true, lineas: [], cliente: { nombre: 'Lucía' } });
+      expect(reservasMock.validarMesasYAsientos).toHaveBeenLastCalledWith([3n, 4n], 10, true);
+    });
+
+    it('sumar mesas a un pedido abierto: crea las filas al final, reordena y pone el nombre con todas las mesas', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [{ mesa_id: 8n, abierta: true, principal: true, orden: 1, mesa: { numero: 8 }, mesa_nombre: 'Mesa 8' }],
+      });
+      prismaMock.elementoPlano.findMany.mockResolvedValue([mesaActiva(9n, 9), mesaActiva(10n, 10)]);
+      prismaMock.pedidoMesa.findFirst.mockResolvedValue(null);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([
+        filaMesa(8n, 1n, 8, { principal: true, orden: 1 }),
+        filaMesa(9n, 2n, 9, { orden: 2 }),
+        filaMesa(10n, 3n, 10, { orden: 3 }),
+      ]);
+
+      const res = await service.agregarMesasPedido('300', ['9', '10'], { partyId: '7' } as any, '10.0.0.1');
+
+      expect(prismaMock.pedidoMesa.create).toHaveBeenCalledTimes(2);
+      expect(prismaMock.pedidoMesa.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ pedido_id: 300n, mesa_id: 9n, abierta: true, principal: false, orden: 2 }),
+      });
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith({
+        where: { id: 300n },
+        data: { mesa_nombre: 'Mesas 8, 9 y 10' },
+      });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'AGREGAR_MESA', entidadId: 300n }));
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('salon:mesa', { mesaId: '9', estado: 'OCUPADA' });
+      expect(res).toMatchObject({ ok: true, pedidoId: '300', mesa: 'Mesas 8, 9 y 10' });
+    });
+
+    it('sumar una mesa que ya es del pedido -> 409 MESA_REPETIDA', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [{ mesa_id: 8n, abierta: true, principal: true, orden: 1, mesa: { numero: 8 } }],
+      });
+
+      await expect(service.agregarMesasPedido('300', ['8'])).rejects.toMatchObject({ response: { codigo: 'MESA_REPETIDA' } });
+      expect(prismaMock.pedidoMesa.create).not.toHaveBeenCalled();
+    });
+
+    it('sumar hasta pasar de 6 mesas -> 400 MESAS_LIMITE', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [1, 2, 3, 4, 5].map((n, i) => ({ mesa_id: BigInt(n), abierta: true, principal: i === 0, orden: i + 1, mesa: { numero: n } })),
+      });
+
+      await expect(service.agregarMesasPedido('300', ['9', '10'])).rejects.toMatchObject({ response: { codigo: 'MESAS_LIMITE' } });
+    });
+
+    it('sumar una mesa ocupada por otro pedido -> 409 MESA_OCUPADA', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [{ mesa_id: 8n, abierta: true, principal: true, orden: 1, mesa: { numero: 8 } }],
+      });
+      prismaMock.elementoPlano.findMany.mockResolvedValue([mesaActiva(9n, 9)]);
+      prismaMock.pedidoMesa.findFirst.mockResolvedValue({ mesa_id: 9n, abierta: true, mesa: { numero: 9 } });
+
+      await expect(service.agregarMesasPedido('300', ['9'])).rejects.toMatchObject({
+        response: { codigo: 'MESA_OCUPADA', mensaje: 'La mesa 9 ya está ocupada' },
+      });
+    });
+
+    it('quitar una mesa libera solo esa y, si era la principal, la siguiente pasa a serlo', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [
+          { id: 1n, mesa_id: 8n, abierta: true, principal: true, orden: 1, mesa: { numero: 8 } },
+          { id: 2n, mesa_id: 9n, abierta: true, principal: false, orden: 2, mesa: { numero: 9 } },
+        ],
+      });
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([filaMesa(9n, 2n, 9, { principal: false, orden: 2 })]);
+
+      const res = await service.quitarMesaPedido('300', '8', { partyId: '7' } as any);
+
+      expect(prismaMock.pedidoMesa.update).toHaveBeenCalledWith({ where: { id: 1n }, data: { abierta: false } });
+      expect(prismaMock.pedidoMesa.update).toHaveBeenCalledWith({ where: { id: 2n }, data: { principal: true, orden: 1 } });
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith({ where: { id: 300n }, data: { mesa_nombre: 'Mesa 9' } });
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('salon:mesa', { mesaId: '8', estado: 'LIBRE' });
+      expect(eventosGatewayMock.emitirAdmin).not.toHaveBeenCalledWith('salon:mesa', { mesaId: '9', estado: 'LIBRE' });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'QUITAR_MESA' }));
+      expect(res).toMatchObject({ ok: true, mesa: 'Mesa 9' });
+    });
+
+    it('no se puede quitar la única mesa -> 409 ULTIMA_MESA; una mesa que no es del pedido -> 404', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [{ id: 1n, mesa_id: 8n, abierta: true, principal: true, orden: 1, mesa: { numero: 8 } }],
+      });
+      await expect(service.quitarMesaPedido('300', '8')).rejects.toMatchObject({ response: { codigo: 'ULTIMA_MESA' } });
+
+      await expect(service.quitarMesaPedido('300', '9')).rejects.toMatchObject({ response: { codigo: 'MESA_NO_EN_PEDIDO' } });
+      expect(prismaMock.pedidoMesa.update).not.toHaveBeenCalled();
+    });
+
+    it('pedido anulado no admite sumar ni quitar mesas', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'ANULADO',
+        mesas: [{ mesa_id: 8n, abierta: true, mesa: { numero: 8 } }],
+      });
+      await expect(service.agregarMesasPedido('300', ['9'])).rejects.toMatchObject({ response: { codigo: 'ESTADO_INVALIDO' } });
+      await expect(service.quitarMesaPedido('300', '8')).rejects.toMatchObject({ response: { codigo: 'ESTADO_INVALIDO' } });
+    });
+
+    it('cambiar una sola mesa del pedido (desdeMesaId) conserva su posición y no toca las demás', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [
+          { id: 1n, mesa_id: 8n, abierta: true, principal: true, orden: 1, mesa: { numero: 8 } },
+          { id: 2n, mesa_id: 6n, abierta: true, principal: false, orden: 2, mesa: { numero: 6 } },
+        ],
+      });
+      prismaMock.elementoPlano.findUnique.mockResolvedValue(mesaActiva(9n, 9));
+      prismaMock.pedidoMesa.findFirst.mockResolvedValue(null);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([
+        filaMesa(8n, 1n, 8, { principal: true, orden: 1 }),
+        filaMesa(9n, 3n, 9, { orden: 2 }),
+      ]);
+
+      await service.cambiarMesaPedido('300', '9', undefined, undefined, '6');
+
+      expect(prismaMock.pedidoMesa.update).toHaveBeenCalledWith({ where: { id: 2n }, data: { abierta: false } });
+      expect(prismaMock.pedidoMesa.create).toHaveBeenCalledWith({
+        data: { pedido_id: 300n, mesa_id: 9n, mesa_nombre: 'Mesa 9', abierta: true, principal: false, orden: 2 },
+      });
+      expect(prismaMock.pedidoMesa.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: { abierta: false } }));
+      const libres = eventosGatewayMock.emitirAdmin.mock.calls.filter((c: any[]) => c[0] === 'salon:mesa' && c[1].estado === 'LIBRE');
+      expect(libres).toEqual([['salon:mesa', { mesaId: '6', estado: 'LIBRE' }]]);
+    });
+
+    it('cambiar desde una mesa que no es del pedido -> 404 MESA_NO_EN_PEDIDO', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 300n, codigo: 'P-0300', modalidad: 'MESA', estado: 'COLA',
+        mesas: [{ id: 1n, mesa_id: 8n, abierta: true, principal: true, orden: 1, mesa: { numero: 8 } }],
+      });
+      prismaMock.elementoPlano.findUnique.mockResolvedValue(mesaActiva(9n, 9));
+
+      await expect(service.cambiarMesaPedido('300', '9', undefined, undefined, '7')).rejects.toMatchObject({
+        response: { codigo: 'MESA_NO_EN_PEDIDO' },
       });
     });
   });

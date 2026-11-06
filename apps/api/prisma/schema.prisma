@@ -1289,6 +1289,10 @@ model PedidoMesa {
   mesa_id     BigInt?
   mesa_nombre String?
   abierta     Boolean        @default(true)
+  /// Posición de la mesa en el pedido (1 = principal). Un pedido puede tener varias mesas abiertas.
+  orden       Int            @default(1)
+  /// Mesa que da nombre al pedido. Unicidad parcial (solo abiertas) en la migración 20261231400000.
+  principal   Boolean        @default(false)
 
   pedido      Pedido         @relation(fields: [pedido_id], references: [id], onDelete: Cascade)
   mesa        ElementoPlano? @relation(fields: [mesa_id], references: [id], onDelete: SetNull)

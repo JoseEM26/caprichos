@@ -3,10 +3,12 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsInt,
   IsOptional,
   IsString,
-  MaxLength,
   Matches,
+  Min,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -56,6 +58,16 @@ export class AbrirPedidoMesaDto {
   @IsOptional()
   @IsBoolean()
   esPersonal?: boolean;
+
+  /** Personas de la mesa: si viene, la capacidad de las mesas se valida como en reservas (confirmarCapacidad la permite). */
+  @IsOptional()
+  @IsInt({ message: 'personas debe ser un número entero' })
+  @Min(1, { message: 'personas debe ser al menos 1' })
+  personas?: number;
+
+  @IsOptional()
+  @IsBoolean({ message: 'confirmarCapacidad debe ser verdadero o falso' })
+  confirmarCapacidad?: boolean;
 
   @IsOptional()
   colaboradorPartyId?: number | string;
