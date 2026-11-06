@@ -277,6 +277,60 @@ describe('Cuenta ▸ Mis direcciones', () => {
     expect(screen.getByText('Jr. Los Olivos 45')).toBeInTheDocument();
   });
 
+  it('muestra como máximo 2; «Ver todas» despliega el resto y «Ver menos» lo pliega', async () => {
+    const tres = [
+      ...direccionesGuardadas,
+      { id: '10', direccion: 'Calle Las Flores 9', referencia: null, lat: null, lng: null, alias: null, usos: 1, ultimoUsoEn: '2026-09-01T10:00:00.000Z', origen: 'WHATSAPP' },
+    ];
+    mockApi({ direcciones: tres });
+    abrirCuenta();
+
+    expect(await screen.findByText('Av. Las Palmeras 123')).toBeInTheDocument();
+    expect(screen.queryByText('Calle Las Flores 9')).not.toBeInTheDocument();
+    const ver = screen.getByRole('button', { name: 'Ver todas (3)' });
+    expect(ver).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(ver);
+    expect(screen.getByText('Calle Las Flores 9')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver menos' })).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver menos' }));
+    expect(screen.queryByText('Calle Las Flores 9')).not.toBeInTheDocument();
+  });
+
+  it('quita una dirección que estaba oculta tras «Ver todas»', async () => {
+    const tres = [
+      ...direccionesGuardadas,
+      { id: '10', direccion: 'Calle Las Flores 9', referencia: null, lat: null, lng: null, alias: null, usos: 1, ultimoUsoEn: '2026-09-01T10:00:00.000Z', origen: 'WHATSAPP' },
+    ];
+    mockApi({ direcciones: tres });
+    vi.mocked(api.delete).mockResolvedValue({ ok: true });
+    abrirCuenta();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver todas (3)' }));
+    fireEvent.click(screen.getByRole('button', { name: /Quitar dirección Calle Las Flores 9/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, quitar' }));
+    await waitFor(() => expect(screen.queryByText('Calle Las Flores 9')).not.toBeInTheDocument());
+    expect(api.delete).toHaveBeenCalledWith('/carta/cuenta/direcciones/10');
+    expect(screen.queryByRole('button', { name: /Ver todas/ })).not.toBeInTheDocument();
+  });
+
+  it('muestra la etiqueta de origen y el texto que manda el servidor (solo coordenadas)', async () => {
+    mockApi({
+      direcciones: [
+        { id: '20', direccion: 'Ubicación que enviaste el 5 nov', referencia: null, lat: -12.01, lng: -76.95, alias: null, usos: 1, ultimoUsoEn: '2026-11-05T15:00:00.000Z', origen: 'WHATSAPP' },
+        { id: '21', direccion: 'Ubicación guardada el 6 nov', referencia: null, lat: -12.02, lng: -76.96, alias: null, usos: 1, ultimoUsoEn: '2026-11-06T15:00:00.000Z', origen: 'CARTA' },
+      ],
+    });
+    abrirCuenta();
+
+    expect(await screen.findByText('Ubicación que enviaste el 5 nov')).toBeInTheDocument();
+    expect(screen.getByText('Enviada por WhatsApp')).toBeInTheDocument();
+    expect(screen.getByText('Ubicación guardada el 6 nov')).toBeInTheDocument();
+    expect(screen.getByText('Guardada en la carta')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ver todas/ })).not.toBeInTheDocument();
+  });
+
   it('sin direcciones muestra el estado vacío', async () => {
     mockApi({ direcciones: [] });
     abrirCuenta();
