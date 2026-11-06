@@ -27,6 +27,16 @@ const DICCIONARIO_SINONIMOS: Record<string, string[]> = {
   supervisor: ['codigo', 'totp', 'autorizacion', 'pin'],
 };
 
+/** Palabras que no distinguen un ajuste de otro al buscar «¿dónde cambio…?». */
+const TOKENS_GENERICOS = new Set([
+  'donde', 'dónde', 'cambio', 'cambiar', 'configuro', 'configurar', 'configuracion', 'configura', 'como', 'puedo',
+  'quiero', 'local', 'sistema', 'ajuste', 'ajustes', 'seccion', 'pantalla', 'hago', 'pongo', 'poner', 'activo',
+  'activar', 'apago', 'apagar', 'para', 'que', 'los', 'las', 'del', 'una', 'por', 'con',
+  // palabras de todo el sistema: por sí solas no señalan un ajuste concreto
+  'pedido', 'pedidos', 'cliente', 'clientes', 'carta', 'anulo', 'anular', 'anula', 'cancelar', 'cancela',
+  'mensaje', 'mensajes', 'minutos', 'minuto', 'valor', 'cuantos', 'cuanto',
+]);
+
 @Injectable()
 export class AyudaGrafoService {
   private readonly logger = new Logger(AyudaGrafoService.name);
@@ -154,6 +164,32 @@ export class AyudaGrafoService {
       }
     }
 
+    // 4. Manuales de sección y temáticos: sus tareas cuelgan del módulo y mantienen su sección
+    for (const sec of this.manualesCargador.obtenerSecciones()) {
+      if (!this.nodos.has(sec.modulo)) continue;
+      for (const tarea of sec.seccionesComoSeHace) {
+        const idTarea = `${sec.modulo}#${sec.seccion}#${tarea.slug}`;
+        this.nodos.set(idTarea, {
+          id: idTarea,
+          tipo: 'tarea',
+          modulo: sec.modulo,
+          seccion: sec.seccion,
+          titulo: tarea.titulo,
+          pasos: tarea.pasos,
+          texto: `## Como se hace: ${tarea.titulo}\n${tarea.pasos}`,
+        } as NodoTarea);
+        agregarArista('pertenece_a', idTarea, sec.modulo);
+        for (const rel of tarea.relaciones) {
+          const dest = rel.destinoModulo.trim().toLowerCase();
+          if (dest) agregarArista(rel.tipo, idTarea, dest);
+        }
+      }
+      for (const men of sec.mencionesDoblesCorchetes || []) {
+        const dest = men.trim().toLowerCase();
+        if (dest && dest !== sec.modulo) agregarArista('relacionado_con', sec.modulo, dest);
+      }
+    }
+
     this.inicializado = true;
     this.logger.log(`Grafo de documentación construido: ${this.nodos.size} nodos, ${this.aristas.length} aristas`);
   }
@@ -273,14 +309,23 @@ export class AyudaGrafoService {
     const manualesAccesibles = this.manualesCargador.obtenerManualesAccesibles(rolNorm);
     const modulosAccesiblesSet = new Set(manualesAccesibles.map((m) => m.modulo));
 
-    // Determinar módulo de la ruta actual si es accesible
+    // Determinar módulo de la ruta actual si es accesible, y la sección (pestaña) si la URL la lleva
     let moduloActualClave: string | undefined;
+    let manualSeccionActual: ManualAyuda | undefined;
     if (rutaActual) {
-      const manualRuta = this.manualesCargador.obtenerPorRuta(rutaActual);
+      const { manual: manualRuta, seccion } = this.manualesCargador.resolverRuta(rutaActual);
       if (manualRuta && modulosAccesiblesSet.has(manualRuta.modulo)) {
         moduloActualClave = manualRuta.modulo;
+        if (seccion && this.manualesCargador.esManualAccesibleParaRol(seccion, rolNorm)) {
+          manualSeccionActual = seccion;
+        }
       }
     }
+    const seccionesAccesibles = this.manualesCargador
+      .obtenerSecciones()
+      .filter((m) => this.manualesCargador.esManualAccesibleParaRol(m, rolNorm));
+    const clavesSeccionesAccesibles = new Set(seccionesAccesibles.map((m) => `${m.modulo}#${m.seccion}`));
+    presupuestoMax = manualSeccionActual ? presupuestoMax + 4500 : presupuestoMax;
 
     // 2. Tokenizar pregunta y expandir con sinónimos
     const tokensOriginales = this.tokenizar(pregunta);
@@ -302,7 +347,10 @@ export class AyudaGrafoService {
     }> = [];
 
     const todasTareas = Array.from(this.nodos.values()).filter(
-      (n): n is NodoTarea => n.tipo === 'tarea' && modulosAccesiblesSet.has(n.modulo),
+      (n): n is NodoTarea =>
+        n.tipo === 'tarea' &&
+        modulosAccesiblesSet.has(n.modulo) &&
+        (!n.seccion || clavesSeccionesAccesibles.has(`${n.modulo}#${n.seccion}`)),
     );
 
     for (const tarea of todasTareas) {
@@ -315,9 +363,10 @@ export class AyudaGrafoService {
         if (pasosTokens.includes(t)) score += 3;
       }
 
-      // Bonus si la tarea pertenece al módulo actual de la ruta
+      // Bonus si la tarea pertenece al módulo actual de la ruta, y más si es de la sección abierta
       if (moduloActualClave && tarea.modulo === moduloActualClave) {
         score += 6;
+        if (score > 6 && manualSeccionActual && tarea.seccion === manualSeccionActual.seccion) score += 10;
       }
 
       // Coincidencia con el nombre del módulo
@@ -390,6 +439,33 @@ export class AyudaGrafoService {
     const partes: string[] = [];
     let caracteresAcumulados = 0;
 
+    // Ajustes con enlace directo que coinciden con la pregunta (de cualquier manual que el rol pueda ver)
+    const ajustesCoincidentes = this.buscarAjustes(
+      tokensArr,
+      tokensOriginales,
+      [...manualesAccesibles, ...seccionesAccesibles],
+      rolNorm,
+    );
+
+    // Prioridad 0: la sección abierta en pantalla (p. ej. la pestaña de Configuración), con sus ajustes
+    if (manualSeccionActual) {
+      const ajustesSeccion = [...manualSeccionActual.ajustes].sort(
+        (a, b) => this.puntuarLinea(b, tokensArr) - this.puntuarLinea(a, tokensArr),
+      );
+      const lineas = [
+        `### SECCIÓN ABIERTA EN PANTALLA: ${manualSeccionActual.titulo} (${this.manualesCargador.rutaDeSeccion(manualSeccionActual)})`,
+        manualSeccionActual.paraQueSirve || '',
+        ajustesSeccion.length ? 'Ajustes de esta sección (con su enlace directo):' : '',
+      ];
+      let bloqueSeccion = lineas.filter(Boolean).join('\n');
+      for (const aj of ajustesSeccion) {
+        if (bloqueSeccion.length + aj.length + 3 > 4500) break;
+        bloqueSeccion += `\n- ${aj}`;
+      }
+      partes.push(bloqueSeccion);
+      caracteresAcumulados += bloqueSeccion.length;
+    }
+
     // Prioridad 1: Mejor tarea completa
     if (mejorCandidata && moduloPrincipal) {
       const bloqueTarea = [
@@ -434,13 +510,41 @@ export class AyudaGrafoService {
       }
     }
 
-    // Enlaces sugeridos (módulo principal + vecinos hasta 3)
+    // Ajustes encontrados: el cliente puede pedir «¿dónde cambio…?» desde cualquier pantalla
+    const ajustesFuera = ajustesCoincidentes.filter((a) => !manualSeccionActual?.ajustes.includes(a));
+    if (ajustesFuera.length > 0) {
+      const bloqueAjustes = `\n### AJUSTES QUE COINCIDEN CON LA PREGUNTA (con enlace directo):\n${ajustesFuera.map((a) => `- ${a}`).join('\n')}`;
+      if (caracteresAcumulados + bloqueAjustes.length < presupuestoMax) {
+        partes.push(bloqueAjustes);
+        caracteresAcumulados += bloqueAjustes.length;
+      }
+    }
+
+    // Enlaces sugeridos: sección/ajuste concreto primero, luego módulo principal y vecinos (hasta 3)
     const enlacesSugeridos: Array<{ texto: string; ruta: string }> = [];
-    if (moduloPrincipal && modulosAccesiblesSet.has(moduloPrincipal.clave)) {
-      enlacesSugeridos.push({
-        texto: `Ir a ${moduloPrincipal.titulo}`,
-        ruta: moduloPrincipal.ruta,
-      });
+    const empujar = (e: { texto: string; ruta: string }) => {
+      if (enlacesSugeridos.length < 3 && !enlacesSugeridos.some((x) => x.ruta === e.ruta)) enlacesSugeridos.push(e);
+    };
+    for (const aj of ajustesCoincidentes.slice(0, 2)) {
+      for (const e of this.manualesCargador.extraerEnlacesProfundos(aj)) {
+        if (this.manualesCargador.esEnlacePermitido(e.ruta, rolNorm)) empujar(e);
+      }
+    }
+    if (mejorCandidata?.seccion) {
+      const secMejor = seccionesAccesibles.find(
+        (m) => m.modulo === mejorCandidata.modulo && m.seccion === mejorCandidata.seccion,
+      );
+      if (secMejor?.activaCon?.length) {
+        empujar({ texto: `Ir a ${secMejor.titulo}`, ruta: this.manualesCargador.rutaDeSeccion(secMejor) });
+      }
+    }
+    const baseDe = (r: string) => r.split('?')[0];
+    if (
+      moduloPrincipal &&
+      modulosAccesiblesSet.has(moduloPrincipal.clave) &&
+      !enlacesSugeridos.some((e) => baseDe(e.ruta) === moduloPrincipal.ruta)
+    ) {
+      empujar({ texto: `Ir a ${moduloPrincipal.titulo}`, ruta: moduloPrincipal.ruta });
     }
 
     for (const v of vecinos) {
@@ -458,9 +562,40 @@ export class AyudaGrafoService {
       mejorTarea: mejorCandidata,
       moduloPrincipal,
       vecinos,
+      seccionActual: manualSeccionActual
+        ? { modulo: manualSeccionActual.modulo, seccion: manualSeccionActual.seccion ?? '', titulo: manualSeccionActual.titulo }
+        : undefined,
+      ajustesCoincidentes,
       relacionesFormateadas: relacionesUnicas,
       enlacesSugeridos,
     };
+  }
+
+  private puntuarLinea(linea: string, tokens: string[]): number {
+    const t = new Set(this.tokenizar(linea));
+    return tokens.reduce((n, tok) => n + (!TOKENS_GENERICOS.has(tok) && t.has(tok) ? 1 : 0), 0);
+  }
+
+  /** Líneas de «Ajustes» / «Donde se configura» que mejor coinciden con la pregunta (máx. 4). */
+  private buscarAjustes(tokens: string[], originales: string[], manuales: ManualAyuda[], rol: string): string[] {
+    // con preguntas largas se exige más de una palabra en común para no mezclar ajustes ajenos
+    const significativas = originales.filter((t) => !TOKENS_GENERICOS.has(t)).length;
+    const minimo = significativas >= 3 ? 2 : 1;
+    const puntuadas: Array<{ linea: string; score: number }> = [];
+    const vistas = new Set<string>();
+    for (const m of manuales) {
+      for (const linea of m.ajustes) {
+        if (vistas.has(linea)) continue;
+        vistas.add(linea);
+        const score = this.puntuarLinea(linea, tokens);
+        if (score < minimo) continue;
+        // un enlace profundo que el rol no puede abrir no se ofrece
+        const enlaces = this.manualesCargador.extraerEnlacesProfundos(linea);
+        if (enlaces.length && !enlaces.some((e) => this.manualesCargador.esEnlacePermitido(e.ruta, rol))) continue;
+        puntuadas.push({ linea, score });
+      }
+    }
+    return puntuadas.sort((a, b) => b.score - a.score).slice(0, 4).map((p) => p.linea);
   }
 
   private tokenizar(texto: string): string[] {

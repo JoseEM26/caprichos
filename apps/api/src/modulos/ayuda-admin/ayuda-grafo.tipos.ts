@@ -26,6 +26,8 @@ export interface NodoTarea {
   id: string; // e.g. 'caja#anular-un-pedido'
   tipo: 'tarea';
   modulo: string;
+  /** Si la tarea viene de un manual de sección, su id (p. ej. `horario`). */
+  seccion?: string;
   titulo: string;
   pasos: string;
   texto: string;
@@ -86,6 +88,10 @@ export interface ResultadoRecuperacionGrafo {
   mejorTarea?: NodoTarea;
   moduloPrincipal?: NodoModulo;
   vecinos: NodoModulo[];
+  /** Manual de la sección de la pantalla actual (si la URL lleva una y el rol puede verla). */
+  seccionActual?: { modulo: string; seccion: string; titulo: string };
+  /** Líneas de ajustes («- Texto … [enlace](/admin/…)») que coinciden con la pregunta. */
+  ajustesCoincidentes: string[];
   relacionesFormateadas: string[];
   enlacesSugeridos: Array<{ texto: string; ruta: string }>;
 }

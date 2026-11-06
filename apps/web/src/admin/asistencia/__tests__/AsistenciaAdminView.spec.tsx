@@ -6,6 +6,7 @@ vi.mock('../../../comun/mapa/MapaUbicacion', () => ({
 }));
 vi.mock('../../../comun/mapa/BuscadorDireccion', () => ({ BuscadorDireccion: () => null }));
 import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 const reporteHoy = vi.fn();
 vi.mock('../asistenciaApi', async (orig) => ({
@@ -26,7 +27,7 @@ describe('AsistenciaAdminView (solo administrador)', () => {
         { partyId: 7, nombre: 'Luis Pérez', turno: { entrada: '09:00', salida: '18:00', almuerzo: null }, estado: 'TARDANZA', alertas: [], entrada: '09:15', salida: null, trabajadaMin: 0, tardanzaMin: 15 },
       ],
     });
-    render(<AsistenciaAdminView />);
+    render(<MemoryRouter><AsistenciaAdminView /></MemoryRouter>);
     expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
     expect(within(screen.getByRole('table')).getByText('Tardanza')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reiniciar celular' })).toBeInTheDocument();
@@ -37,7 +38,7 @@ describe('AsistenciaAdminView (solo administrador)', () => {
     (navigator as any).geolocation = {
       getCurrentPosition: (ok: any) => ok({ coords: { latitude: -12.1, longitude: -77.02, accuracy: 45 } }),
     };
-    render(<AsistenciaAdminView />);
+    render(<MemoryRouter><AsistenciaAdminView /></MemoryRouter>);
     expect(await screen.findByTestId('aviso-sin-ubicacion')).toHaveTextContent('nadie podrá marcar');
     fireEvent.click(screen.getByRole('tab', { name: 'Configuración' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Usar mi ubicación actual' }));
@@ -50,7 +51,7 @@ describe('AsistenciaAdminView (solo administrador)', () => {
     (navigator as any).geolocation = {
       getCurrentPosition: (ok: any) => ok({ coords: { latitude: -1, longitude: -2, accuracy: 809655 } }),
     };
-    render(<AsistenciaAdminView />);
+    render(<MemoryRouter><AsistenciaAdminView /></MemoryRouter>);
     fireEvent.click(await screen.findByRole('tab', { name: 'Configuración' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Usar mi ubicación actual' }));
     expect(await screen.findByText(/no tiene GPS preciso \(precisión 809[.,]7 km/)).toBeInTheDocument();
@@ -59,12 +60,25 @@ describe('AsistenciaAdminView (solo administrador)', () => {
 
   it('tocar el mapa fija el punto y el texto explica radio y precisión', async () => {
     reporteHoy.mockResolvedValue({ jornada: '2026-11-06', filas: [] });
-    render(<AsistenciaAdminView />);
+    render(<MemoryRouter><AsistenciaAdminView /></MemoryRouter>);
     fireEvent.click(await screen.findByRole('tab', { name: 'Configuración' }));
     fireEvent.click(await screen.findByTestId('mapa'));
     expect(screen.getByTestId('mapa').dataset.punto).toBe('-12.5,-77.5');
     expect(screen.getByTestId('mapa').dataset.radio).toBe('10');
     expect(screen.getByTestId('texto-regla')).toHaveTextContent('a 10 m o menos (radio) y con el GPS del celular con precisión mejor que 25 m');
+  });
+
+  it('un enlace directo ?pestana=config abre la pestaña de Configuración', async () => {
+    reporteHoy.mockResolvedValue({ jornada: '2026-11-06', filas: [] });
+    render(<MemoryRouter initialEntries={['/admin/asistencia?pestana=config']}><AsistenciaAdminView /></MemoryRouter>);
+    expect(await screen.findByRole('tab', { name: 'Configuración', selected: true })).toBeInTheDocument();
+    expect(await screen.findByText('Radio del local (m)')).toBeInTheDocument();
+  });
+
+  it('una pestaña desconocida en la URL se ignora y se abre «Hoy»', async () => {
+    reporteHoy.mockResolvedValue({ jornada: '2026-11-06', filas: [] });
+    render(<MemoryRouter initialEntries={['/admin/asistencia?pestana=nada']}><AsistenciaAdminView /></MemoryRouter>);
+    expect(await screen.findByRole('tab', { name: 'Hoy', selected: true })).toBeInTheDocument();
   });
 
   it('el CSV del mes escapa comas y comillas', () => {
