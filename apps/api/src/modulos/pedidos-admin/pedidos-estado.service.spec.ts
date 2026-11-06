@@ -1094,6 +1094,19 @@ describe('PedidosEstadoService', () => {
       prismaMock.pedidoPagoPlan = { findMany: jest.fn().mockResolvedValue([]) };
     });
 
+    it('lista: buscar filtra por código, cliente o mesa', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+      prismaMock.pedido.count = jest.fn().mockResolvedValue(0);
+
+      await service.listar({ buscar: ' Mesa 4 ' }, cajeroAuth);
+
+      expect(prismaMock.pedido.findMany.mock.calls[0][0].where.OR).toEqual([
+        { codigo: { contains: 'Mesa 4', mode: 'insensitive' } },
+        { cliente_nombre: { contains: 'Mesa 4', mode: 'insensitive' } },
+        { mesa_nombre: { contains: 'Mesa 4', mode: 'insensitive' } },
+      ]);
+    });
+
     it('lista: digital sin voucher legible lleva faltaVoucher, mozo y hora', async () => {
       prismaMock.pedido.findMany.mockResolvedValue([pedidoBase]);
 

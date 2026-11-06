@@ -1,0 +1,40 @@
+/* Cortesía por separado en pasos (reusa .ad-dialogo de pendientes-cierre.css). */
+.cpx-pasos { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0 16px 8px; font-family: Montserrat, sans-serif; font-size: 13px; font-weight: 800; align-items: center; }
+.cpx-paso { display: flex; align-items: center; gap: 6px; color: var(--cp-soft, #2C4C5D); }
+.cpx-paso span { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--cp-sand, #EDE1D1); color: var(--cp-navy, #0B2C3E); flex: 0 0 auto; }
+.cpx-paso-actual { color: var(--cp-navy, #0B2C3E); }
+.cpx-paso-actual span { background: var(--cp-navy, #0B2C3E); color: #fff; }
+.cpx-paso-hecho span { background: var(--cp-rust, #B2500F); color: #fff; }
+.cpx-cuerpo { display: flex; flex-direction: column; gap: 10px; font-family: 'Open Sans', sans-serif; }
+.cpx-h { margin: 0; font-family: Montserrat, sans-serif; font-size: 16px; color: var(--cp-navy, #0B2C3E); }
+.cpx-campo { display: flex; flex-direction: column; gap: 4px; font-weight: 800; font-size: 14px; }
+.cpx-input { min-height: 44px; border-radius: 10px; padding: 0 10px; font-size: 15px; border: 1.5px solid var(--cp-sand, #EDE1D1); background: #fff; box-sizing: border-box; width: 100%; }
+.cpx-selector { display: flex; flex-direction: column; gap: 8px; }
+.cpx-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.cpx-chip { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: #fff; color: var(--cp-navy, #0B2C3E); font-weight: 700; font-size: 13px; cursor: pointer; }
+.cpx-chip[aria-pressed='true'] { background: var(--cp-navy, #0B2C3E); color: #fff; }
+.cpx-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+.cpx-lista { max-height: min(200px, 28dvh); overflow-y: auto; border: 1.5px solid var(--cp-sand, #EDE1D1); border-radius: 10px; background: #fff; }
+.cpx-grupo { position: sticky; top: 0; background: var(--cp-cream, #FBF4EC); padding: 4px 10px; font-size: 12px; font-weight: 800; color: var(--cp-soft, #2C4C5D); }
+.cpx-fila { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 6px 10px; border: 0; border-bottom: 1px solid var(--cp-sand, #EDE1D1); background: #fff; text-align: left; font: inherit; font-size: 14px; cursor: pointer; box-sizing: border-box; }
+.cpx-fila:disabled { opacity: 0.55; cursor: not-allowed; }
+.cpx-fila:hover:not(:disabled), .cpx-activa { background: var(--cp-cream, #FBF4EC); }
+.cpx-agotado { color: var(--cp-rust, #B2500F); font-size: 12px; }
+.cpx-pedido { flex-wrap: wrap; }
+.cpx-pedido small { flex-basis: 100%; color: var(--cp-soft, #2C4C5D); }
+.cpx-par { display: flex; align-items: stretch; }
+.cpx-par .cpx-fila { flex: 1; min-width: 0; }
+.cpx-ojo { min-width: 44px; border: 0; border-bottom: 1px solid var(--cp-sand, #EDE1D1); background: #fff; cursor: pointer; font-size: 16px; }
+.cpx-detalle { padding: 8px 10px; background: var(--cp-cream, #FBF4EC); font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.cpx-detalle ul { margin: 0; padding-left: 18px; }
+.cpx-nota, .cpx-vacio { margin: 0; padding: 6px 10px; font-size: 12px; color: var(--cp-soft, #2C4C5D); }
+.cpx-elegido { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: #fff; border: 1.5px solid var(--cp-navy, #0B2C3E); font-size: 14px; }
+.cpx-link { background: none; border: 0; text-decoration: underline; font-weight: 700; cursor: pointer; min-height: 44px; }
+.cpx-motivos { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; }
+.cpx-motivos legend { font-weight: 800; margin-bottom: 2px; }
+.cpx-motivos label { display: flex; gap: 8px; align-items: center; min-height: 38px; font-size: 14px; }
+.cpx-resumen { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; padding: 10px; background: #fff; border-radius: 10px; font-size: 14px; }
+.cpx-resumen dt { font-weight: 800; }
+.cpx-resumen dd { margin: 0; overflow-wrap: anywhere; }
+.cpx-error { color: var(--cp-rust, #B2500F); font-weight: 700; font-size: 14px; }
+@media (max-width: 480px) { .cpx-paso-actual { font-size: 12px; } }
