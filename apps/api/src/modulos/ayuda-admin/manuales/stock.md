@@ -4,7 +4,7 @@ titulo: Stock y recetas
 ruta: /admin/stock
 permiso: stock/ver
 roles: [ADMIN, ALMACEN, COCINA]
-relacionados: [almacen, compras, recetas, cocina, productos]
+relacionados: [almacen, compras, recetas, cocina, productos, apertura]
 sugerencias:
   - ¿Qué significan los colores del semáforo en los insumos?
   - ¿Cómo doy de alta un nuevo insumo con su stock mínimo?
@@ -50,6 +50,8 @@ Ver tambien: [[supervisor-codigo]]
 - Que indica cada color del semaforo: el verde senala existencias suficientes por encima del umbral de seguridad; el amarillo alerta que el producto esta cerca de agotarse; el rojo indica que las existencias cayeron por debajo del minimo requerido o llegaron a cero.
 - Por que aparece un insumo con saldo negativo: ocurre si se confirmaron ventas de platos en caja antes de ingresar la compra o traslado de los insumos que componen la receta. Se soluciona registrando la compra o haciendo un ajuste de saldo.
 - Para que sirve la pestana Produccion y almacen: permite enlazar directamente con las ordenes de preparacion de productos por tanda y registrar consumos vinculados.
+
+- Y las donas y galletas: no estan aqui. El stock de productos terminados (donas, galletas, postres con la casilla "Controlar stock de este producto") se cuenta cada dia en [[apertura]] y se configura en [[productos]]; el control de almacen no los gobierna.
 
 ## Quien puede hacerlo
 - Administrador: tiene acceso completo para crear insumos, modificar umbrales, realizar ajustes de inventario y editar recetas asociadas.

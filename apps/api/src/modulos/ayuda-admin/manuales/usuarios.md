@@ -4,12 +4,16 @@ titulo: Usuarios
 ruta: /admin/usuarios
 permiso: usuarios/ver
 roles: [ADMIN]
-relacionados: [supervisor-codigo, historial, creditos]
+relacionados: [supervisor-codigo, historial, creditos, asistencia, cocina, propinas, iniciativas]
 sugerencias:
   - ¿Cómo registro un nuevo empleado en el sistema?
   - ¿Cómo cambio el rol o cargo de un usuario?
   - ¿Por qué me pide el código del supervisor al cambiar un rol o desactivar a alguien?
   - ¿Cómo restablezco la contraseña de un usuario que no puede entrar?
+  - ¿Cómo dejo a un suplente de supervisor por unos días?
+  - ¿Dónde veo lo que hizo un usuario?
+  - ¿Cómo corrijo la fecha de ingreso o salida de un trabajador?
+  - ¿Cómo asigno las áreas de cocina de un cocinero?
 ---
 # Usuarios
 
@@ -53,7 +57,40 @@ Ver tambien: [[mensajes]], [[reclamos]]
 2. Si el cajero o mozo requiere un PIN numérico rápido para autorizaciones en salón o caja, pulsa "Asignar PIN", escribe el código de 4 o 6 dígitos y confirma el guardado.
 Ver tambien: [[usuarios]]
 
+## Como se hace: Dar un rol temporal (por ejemplo supervisor suplente)
+1. Abre Usuarios, pestana Personal, y pulsa Editar en la fila de la persona que reemplaza. En el editor busca la seccion Roles temporales ("Un rol extra con fecha de fin... Al vencer deja de valer solo"). Si no tiene, dice Ninguno.
+2. Pulsa Dar rol temporal. En la ventana elige el rol ("Elige un rol..."), escribe el motivo (por ejemplo "el supervisor titular no viene hoy") y, en "Hasta cuando (opcional)", la fecha y hora de fin. Pulsa Dar rol.
+3. Aparece "Rol X dado hasta la fecha indicada." (o "...sin fecha de fin."). En la lista se ve la insignia "Temporal · hasta dd/mm" o "sin fecha de fin".
+4. Un supervisor suplente vigente puede aprobar con el codigo de supervisor como el titular; al vencer deja de valer solo y ya no puede autorizar ni ver el codigo. Ver [[supervisor-codigo]].
+5. Para retirarlo antes, pulsa Quitar junto al rol temporal y confirma.
+6. El historial de roles (Otorgado, Retirado, Vencido) no se puede borrar ni alterar: queda para auditar quien tuvo que permiso y cuando.
+Requiere: [[supervisor-codigo]]
+
+## Como se hace: Dar varios roles permanentes a una persona
+1. En el editor (o al crear), en Otros roles (opcional), marca los roles adicionales. Los permisos de todos sus roles se unen.
+2. Reglas: Administrador y Repartidor no se combinan; nadie puede darse roles a si mismo ("Nadie puede darse roles a si mismo"); un usuario desactivado primero se reactiva ("Reactiva al usuario antes de darle un rol"); si ya lo tiene dice "La persona ya tiene ese rol".
+3. Solo el Administrador da o quita roles.
+
+## Como se hace: Registrar un usuario por pasos y con otros documentos
+1. En Personal pulsa + Nuevo usuario. El formulario va por pasos: Datos personales, Puesto, Horario y Reemplazos, y termina con un Resumen final.
+2. En Tipo de documento puedes elegir DNI (8 digitos) u otro documento (carne de extranjeria, cedula, pasaporte, de 7 a 12 letras y numeros). Un documento repetido da DNI_DUPLICADO.
+3. Si el rol es Cocina, marca las Areas que atiende (sin ninguna marcada ve todas). Ver [[cocina]].
+4. Las pestanas de la pantalla son: Personal, Clientes, Horarios y turnos y Que ve cada rol. En Horarios y turnos se cargan los turnos que usa la [[asistencia]] para calcular tardanzas.
+5. Reemplazos: se indica quien cubre a quien en los dias de descanso o falta.
+
+## Como se hace: Ver la actividad y el historial laboral de una persona
+1. En el editor del usuario, la seccion Actividad lista lo que hizo y lo que le hicieron (cambios de rol, accesos, acciones), con filtros por Tipo y por fechas Desde y Hasta, y paginacion. Solo el Administrador la ve.
+2. La seccion Historial laboral muestra los periodos trabajados ("Ingreso dd/mm" / "Reingreso", "Salio dd/mm" o "Sigue"), el Tiempo total trabajado, las Veces que salio y la marca "En licencia".
+3. Para corregir las fechas de un periodo pulsa Corregir periodo, cambia desde y hasta, guarda y confirma. Solo el Administrador.
+Ver tambien: [[historial]]
+
 ## Errores y dudas comunes
+- "La fecha de fin ya paso" (FECHA_PASADA) / "La fecha de fin no es valida": elige una fecha futura para el rol temporal.
+- "Solo un administrador puede dar o quitar roles": inicia sesion como Administrador.
+- "La persona no tiene ese rol extra": ya se retiro o vencio.
+- "No se puede quitar el rol al ultimo administrador activo": debe quedar siempre un administrador.
+- El personal puede ver y crear Iniciativas: desde esta version todo el personal las ve, crea y comenta; cambiar estado es del Administrador y del Supervisor. Ver [[iniciativas]].
+- Para la participacion en el reparto de [[propinas]]: el Administrador no participa salvo excepcion fijada en Propinas.
 - ¿Por qué el sistema me pide código de supervisor al cambiar de rol o desactivar?: si entras como administrador no lo pide, porque tú eres quien autoriza. Para los demás roles, cambiar privilegios o revocar el acceso a un empleado son operaciones críticas y se exige el código rotativo TOTP para prevenir accesos no autorizados.
 - Ver DNI completo: los números de documento se muestran enmascarados por privacidad. Al pulsar "Ver DNI", el sistema registra una entrada de auditoría con la fecha, hora y usuario que consultó el dato personal.
 - No puedo iniciar sesión con la contraseña temporal: asegúrate de no copiar espacios en blanco antes o después de los caracteres generados.

@@ -4,12 +4,14 @@ titulo: Mensajes de WhatsApp
 ruta: /admin/mensajes
 permiso: mensajes/ver
 roles: [ADMIN, CALLCENTER]
-relacionados: [caja, reclamos, clientes, cocina]
+relacionados: [caja, reclamos, clientes, cocina, repartos, reservas]
 sugerencias:
   - Como respondo cuando un cliente pide hablar con una persona
   - Como valido un voucher de Yape o Plin con la lectura de IA
   - Que hago si expiro la ventana de 24 horas del chat
   - Como utilizo la funcion de pulir mensaje con IA
+  - Como veo la ubicacion que me mando el cliente
+  - Que pasa con el chat que el repartidor tiene abierto
 ---
 # Mensajes de WhatsApp
 
@@ -53,6 +55,15 @@ En el panel de validar pago, debajo de la lectura del comprobante, pulsa "Reasig
 3. El sistema sugerira una redaccion mas amable y profesional sin perder el sentido original.
 4. Revisar la propuesta y pulsar Usar texto sugerido para colocarlo en la caja de envio.
 Ver tambien: [[mensajes]]
+
+## Como se hace: Ver la ubicacion que mando el cliente
+1. Cuando el cliente comparte su ubicacion por WhatsApp, el mensaje se ve como una tarjeta con mapa, direccion aproximada y los botones Abrir en Google Maps y Copiar coordenadas.
+2. En un pedido de delivery de Caja o del mozo, el boton Usar ubicacion de WhatsApp toma la ultima ubicacion enviada en las ultimas 24 horas como punto de entrega. Ver [[repartos]].
+
+## Como se hace: Cuando el repartidor chatea con el cliente de su pedido
+1. El repartidor puede escribir al cliente de su pedido desde la app de reparto (mientras el pedido esta Listo o En camino y hasta 2 horas despues de entregado). Los mensajes aparecen aqui en la misma conversacion como "Local".
+2. Si tu tienes tomado el chat, el repartidor ve "El local esta atendiendo este chat ahora. Podras escribir cuando lo suelte."; sueltalo para que pueda escribir. Si pasaron 24 horas sin respuesta del cliente, solo se puede reabrir con plantilla (ver abajo).
+Ver tambien: [[repartos]]
 
 ## Como se hace: Reabrir una conversacion fuera de la ventana de 24 horas
 1. Si han pasado mas de 24 horas desde el ultimo mensaje del cliente, WhatsApp bloquea el envio de texto libre.

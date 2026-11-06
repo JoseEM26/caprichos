@@ -3,13 +3,16 @@ modulo: cierre
 titulo: Caja y cierres
 ruta: /admin/cierre
 permiso: caja/ver
-roles: [ADMIN, CAJERO]
-relacionados: [caja, repartos, supervisor-codigo, comprobantes, mensajes]
+roles: [ADMIN, CAJERO, SUPERVISOR]
+relacionados: [caja, repartos, supervisor-codigo, comprobantes, mensajes, propinas, informes]
 sugerencias:
   - Como realizo el arqueo ciego al terminar el turno
   - Como audito los vouchers digitales de Yape y Plin antes del cierre
   - Que hago si el sistema me dice que la caja no cuadra
   - Como liquido el dinero que trajeron los repartidores
+  - Donde veo las propinas del dia en el cierre
+  - Las cortesias suman en el cierre
+  - Una devolucion pendiente por cambio de ubicacion afecta el cierre
 ---
 # Caja y cierres
 
@@ -57,6 +60,13 @@ Ver tambien: [[comprobantes]]
 Requiere: [[supervisor-codigo]]
 Ver tambien: [[supervisor-codigo]]
 
+## Como se hace: Entender las propinas, cortesias y ajustes en el cierre
+1. Propinas del dia: si hubo propinas, el cierre muestra el bloque Propinas del dia con el total, el efectivo y lo digital. Van aparte de la venta: no son ingreso ni salen en comprobantes. En el efectivo esperado aparece la linea "+ Propinas en efectivo (van aparte de la venta)". Los medios digitales (Yape, Plin, transferencia, tarjeta) ya incluyen la parte de propina digital, pero no se suman al total vendido: el cierre lo aclara. Las devoluciones del dia ya estan descontadas. Ver [[propinas]].
+2. Cortesias: una cortesia es una venta a S/ 0 (por su valor de lista), asi que no suma dinero al cierre ni al total vendido. Se audita aparte en el reporte Cortesias de [[informes]]. Ver [[caja]].
+3. Cambio de ubicacion de un delivery pagado: si el envio cambio, queda un saldo por cobrar o una devolucion pendiente. Mientras la devolucion este pendiente no afecta el cierre (ni lo bloquea). Cuando Caja la marca como devuelta, en efectivo sale como egreso de la caja de hoy y en digital se descuenta del medio correspondiente en el cierre del dia. Un saldo cobrado entra como ingreso en efectivo o suma al medio digital. Ver [[repartos]].
+4. Liquidacion de repartidores: ya no bloquea el cierre ni duplica el efectivo.
+Ver tambien: [[propinas]]
+
 ## Errores y dudas comunes
 - La clasificacion del semaforo de IA en los vouchers es un apoyo para agilizar la deteccion de anomalias o duplicados, pero no reemplaza la auditoria del cajero o administrador al cerrar turno.
 - Los comprobantes en estado Ilegible o Raro exigen verificacion manual obligatoria contra los movimientos de la cuenta receptora antes de autorizar el cierre.
@@ -65,5 +75,5 @@ Ver tambien: [[supervisor-codigo]]
 - No se puede omitir el arqueo de monedas pequenas; cada denominacion debe contarse fielmente.
 
 ## Quien puede hacerlo
-- Administrador y Cajero tienen acceso al modulo de cierres y a la auditoria de vouchers digitales con el permiso vouchers/ver.
+- Administrador, Cajero y Supervisor (permiso caja/ver) tienen acceso al modulo de cierres y a la auditoria de vouchers digitales con el permiso vouchers/ver.
 - Cerrar una caja con descuadre o diferencia requiere la intervencion de un supervisor con su codigo rotativo de 6 digitos. El administrador cierra sin codigo (solo escribe la nota).

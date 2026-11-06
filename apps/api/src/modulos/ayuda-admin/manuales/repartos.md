@@ -3,58 +3,85 @@ modulo: repartos
 titulo: Repartos
 ruta: /admin/repartos
 permiso: repartos/ver
-roles: [ADMIN, CAJERO, REPARTIDOR]
-relacionados: [caja, cocina, cierre, zonas]
+roles: [ADMIN, CAJERO, REPARTIDOR, SUPERVISOR]
+relacionados: [caja, cocina, cierre, zonas, mensajes, mapa, usuarios, asistencia]
 sugerencias:
-  - Como tomo un pedido disponible para reparto
+  - Como tomo un pedido o una ruta para repartir
   - Como cambio el estado a En camino y Entregado
-  - Que hago si llego a la direccion y el cliente no contesta
-  - Como inicio una ruta sugerida con varios pedidos
-  - Como rindo el dinero en efectivo de las entregas
+  - Que hago si llego y el cliente no contesta
+  - Como le escribo por WhatsApp al cliente de mi pedido
+  - La ubicacion del cliente esta mal, como la corrijo
+  - Como veo que repartidores estan libres u ocupados
+  - Como cambio la ubicacion de un pedido de delivery
+  - Por que no puedo tomar mas pedidos
 ---
 # Repartos
 
 ## Para que sirve
-Modulo de asignacion, enrutamiento y seguimiento de pedidos a domicilio. Cuenta con mapa en tiempo real delimitado por [[zonas]], optimizador de rutas con pedidos preparados en [[cocina]], control de cobranzas para [[caja]] y rendicion en [[cierre]].
+Modulo de asignacion, ruta y seguimiento de los pedidos a domicilio. Muestra los pedidos que [[cocina]] ya dejo listos, los reparte entre los repartidores, dibuja la ruta en el mapa (limitado por las [[zonas]]) y controla el efectivo que hay que rendir en [[caja]] y [[cierre]].
 
-Para el rol **REPARTIDOR**, el sistema activa automaticamente una interfaz **mobile-first** adaptada a celulares con aislamiento estricto de informacion y proteccion de datos personales. Para Administradores y Cajeros, mantiene el panel global de despacho y mapa integral.
+Segun el rol la pantalla es distinta: el Repartidor ve una pantalla todo-mapa pensada para celular y solo sus pedidos; Caja y Administrador ven el panel de despacho con mapa, lista y el panel Repartidores.
 
-## Reglas de aislamiento y seguridad para REPARTIDOR
-1. **Aislamiento en servidor**: Cada repartidor cuenta con su propio usuario y ve exclusivamente sus propios pedidos asignados (`repartidor_party_id = su party`). Consultar o intentar modificar pedidos ajenos es rechazado con error 403 NO_ASIGNADO.
-2. **Proteccion del telefono**: En los pedidos disponibles para elegir, el telefono completo del cliente permanece oculto (`null`). Solo se revela tras tomar el pedido formalmente.
-3. **Tope de pedidos activos**: Un repartidor no puede superar el maximo configurable de pedidos simultaneos (parametro `rep_max_pedidos`, por defecto 5).
+Aviso: la vista de seguimiento por rol (una sola pantalla de seguimiento con filtros por rol, la lista Todos los pedidos y la opcion del administrador de tomar un pedido como repartidor) esta llegando en una proxima version y todavia no esta en esta pantalla. Este manual describe lo que se ve hoy.
 
-## Vista de Repartidor (Mobile-First)
+## Reglas de seguridad y aislamiento
+1. Cada repartidor ve y toca solo sus pedidos; si intenta con uno ajeno el sistema responde 403 NO_ASIGNADO ("Solo puedes tomar rutas para ti" / "Este pedido no esta asignado a ti").
+2. El telefono completo, la direccion exacta y el chat del cliente solo se ven despues de tomar el pedido; antes se ve la zona y una direccion aproximada.
+3. Tope de pedidos: un repartidor no puede llevar mas del maximo (por defecto 5, parametro rep_max_pedidos, entre 1 y 20). Mensajes: "Ya llevas el maximo de N pedidos: entrega alguno antes de tomar otro" y "Tu ruta supera el maximo de N pedidos: entrega alguno antes de tomar otro".
+4. Un delivery no se entrega sin repartidor asignado, y un pedido sin ubicacion en el mapa muestra "Falta ubicar" en vez de Tomar pedido.
 
-### 1. Pestana "Mi ruta"
-- Lista los pedidos asignados al repartidor ordenados por la ruta optima calculada.
-- Muestra datos de entrega: codigo, direccion exacta, referencia, zona, cantidad de productos, monto a cobrar y metodo de pago.
-- Canales de comunicacion directa: botones para llamada telefonica directa y enlace a WhatsApp (telefono visible tras la asignacion).
-- Enlaces de navegacion directa en Google Maps y Waze con las coordenadas del cliente.
-- Botones de accion grandes (minimo 48 px de alto) con confirmacion obligatoria Si/No (nunca alert o confirm nativos del navegador):
-  - **Salir a reparto**: cambia el pedido a "En camino" y registra la hora de salida.
-  - **Llegue a destino**: registra el arribo al domicilio del cliente.
-  - **Entregar pedido**: marca el pedido como ENTREGADO y registra la hora de entrega. Recuerda si hay cobro en efectivo pendiente.
-  - **Reportar problema**: abre el modal de registro de incidencias con motivo y evidencias.
+## Vista del Repartidor (celular, todo mapa)
+- Barra inferior con tres botones: Pedidos (mapa con los pedidos disponibles y proximos), Mis pedidos (los que ya tomaste, con sus pasos) y Mas.
+- El menu Mas tiene: Mi perfil, Notificaciones, Hechos hoy (N), Mis rutas, Reportar falla (si tienes pedidos activos), Rutas sugeridas y Cerrar sesion. Si tienes permiso de asistencia, un boton pequeno Asistencia te lleva a [[mi-asistencia]].
+- En el mapa cada pedido es un marcador numerado con el nombre del cliente y el codigo, coloreado por tiempo de espera. Toca un marcador para elegirlo; manten presionado (presion larga) y pulsa Ver detalles para abrir la hoja inferior con zona, direccion, telefono (solo si es tuyo), forma de pago, nota y total.
+- Hechos hoy muestra las entregas completadas y la tarjeta "Efectivo para liquidar" que se rinde en [[caja]].
 
-### 2. Pestana "Para elegir" (Ruta sugerida y seleccion parcial)
-- Muestra los pedidos listos preparados por [[cocina]] que aun no tienen repartidor asignado.
-- Presenta una ruta sugerida con hasta el tope configurable de pedidos (por defecto 5).
-- Muestra informacion esencial: codigo, zona, direccion aproximada, referencia, productos, metodo de pago y minutos de espera. El telefono del cliente se mantiene oculto.
-- **Seleccion parcial**: El repartidor puede elegir libremente la cantidad de pedidos que desea tomar (1, 2, 3 hasta su cupo disponible).
-- **Recalculo dinamico**: Al marcar o desmarcar pedidos, el sistema recalcula en tiempo real el orden optimo de paradas, la distancia estimada en kilometros y la duracion aproximada en minutos.
-- **Toma atomica**: Al pulsar "Tomar seleccionados e Iniciar Ruta" y confirmar con Si/No, el servidor reserva las ordenes en una transaccion con bloqueo pesimista. Si otro repartidor gana un pedido simultaneamente, el sistema notifica claramente cual orden se perdio sin interrumpir las ordenes tomadas exitosamente.
+## Como se hace: Tomar pedidos y empezar una ruta
+1. En Pedidos, toca uno o varios marcadores o usa Agregar a mi ruta en el menu del pedido. Se arma tu ruta con linea y numeros de parada.
+2. Pulsa Tomar ruta: el sistema pregunta "Tomar esta ruta?" con la lista de pedidos en orden. Confirma con Si, confirmar. Aparece "Ruta tomada". Si prefieres uno solo, usa Tomar solo este pedido.
+3. Tambien puedes abrir Rutas sugeridas (en el menu Mas): hasta 5 rutas agrupadas por sector, incluida la mas cercana y la mas urgente. Eliges una y pulsas Iniciar ruta; se abre tu aplicacion de mapas favorita (Google Maps, Waze, Apple Maps u otra).
+4. Es todo o nada: si otro repartidor gana un pedido antes que tu, el sistema avisa cual se perdio y no toma la ruta incompleta sin decirtelo.
+5. Orden: tu eliges con cual empezar (Empezar por este) y el resto queda por cercania; es obligatorio respetar el orden. El numero de parada no cambia hasta cerrar la ruta. Saltar este pedido esta permitido con motivo, maximo 2 veces por pedido ("Ya saltaste este pedido 2 veces: reporta la falla"), y queda auditado; el sistema avisa cual sigue ("Saltaste el #2; sigue el #3").
+Antes: [[cocina]]
 
-### 3. Pestana "Hechos hoy" (Liquidacion y control)
-- Muestra el historial de entregas completadas por el repartidor durante la jornada actual.
-- **Tarjeta de liquidacion**: Consolida el total de entregas efectuadas y suma el **Total cobrado en efectivo para liquidar**, facilitando la rendicion de cuentas en [[caja]] al finalizar el turno.
+## Como se hace: Entregar un pedido paso a paso
+1. En Mis pedidos, el boton grande cambia segun la etapa: Salir a reparto (pasa a En camino y registra la hora; el cliente recibe aviso por WhatsApp), Llegue a destino (registra el arribo) y Entregar pedido (marca Entregado). Cada accion pide Si, confirmar.
+2. Si el pedido es en efectivo, aparece "Efectivo a rendir: S/ N (se liquida en caja, no se cobra aqui)": entregas y rindes el dinero en caja al terminar.
+3. Para llamar usa Llamar; para escribir usa Chatear por WhatsApp. Hay enlaces a Google Maps y Waze.
+4. Cuando entregas o falla el ultimo pedido, la ruta se cierra con el aviso "Ruta terminada". Mis rutas lista las rutas pasadas; los pedidos entregados quedan en gris con un check hasta cerrar la ruta.
+Despues: [[caja]]
 
-## Vista de Administrador y Cajero (Panel de Despacho)
-- Permite visualizar en el mapa todos los pedidos de la jornada, su ubicacion geoespacial por [[zonas]] y su estado de espera.
-- Permite asignar o reasignar manualmente pedidos a cualquier repartidor activo.
-- Permite liberar pedidos asignados en caso de averia o demora del motorizado.
-- Permite resolver incidentes reportados (reprogramar, retornar al local o cobrar con recargo) y liquidar cuentas.
-- **Reenvío tras el retiro (Por reprogramar)**: si el cliente dijo SÍ, el pedido aparece como Por reprogramar con el botón «Reprogramar / Reenviar a reparto: S/ x». Ese monto es el mismo que el cliente vio antes de responder y se suma una vez al total y al envío. Si el pedido ya estaba pagado, el recargo se cobra aparte en Caja (Caja recibe un aviso). El costo se configura en Configuración > Parámetros de operación, en «Costo de volver a enviar un pedido».
+## Como se hace: Chatear por WhatsApp con el cliente de mi pedido
+1. En un pedido que ya tomaste pulsa Chatear por WhatsApp (el boton aparece solo si el cliente tiene numero).
+2. Se abre el chat dentro de la pantalla ("Chat de WhatsApp del pedido ..."). Veras los mensajes desde que se creo el pedido, marcados Local o Cliente con su hora. Escribe en "Escribe un mensaje" y pulsa Enviar.
+3. El chat esta disponible mientras el pedido esta Listo o En camino y hasta 2 horas despues de entregado.
+4. Avisos: "El local esta atendiendo este chat ahora. Podras escribir cuando lo suelte." (Caja o Mensajes tiene tomada la conversacion), "Pasaron 24 h sin respuesta del cliente; el local debe escribirle." (la ventana de 24 horas de WhatsApp esta cerrada; ver [[mensajes]]) y "No puedes escribir ahora".
+Ver tambien: [[mensajes]]
+
+## Como se hace: Corregir la ubicacion real de un pedido (repartidor propone)
+1. En el pedido, pulsa Proponer ubicacion real (solo en pedidos en curso, Listo o En camino).
+2. Si estas en el lugar, pulsa "Estoy en la ubicacion real" para usar tu GPS ("Usamos tu ubicacion actual. Puedes mover el pin si hace falta."), o toca el mapa para mover el pin. Escribe una Nota (opcional).
+3. Pulsa Enviar propuesta. Aparece "Propuesta enviada. Caja la revisara; el pedido no cambia hasta que la aprueben."
+4. El estado se ve en el mismo boton: "Pendiente de revision en caja", "Aprobada: caja cambio la ubicacion" o "Rechazada por caja" (con el motivo). Puedes usar Cancelar mi propuesta mientras este pendiente. Solo puede haber una propuesta pendiente por pedido ("Ya hay una propuesta pendiente...").
+Ver tambien: [[caja]]
+
+## Como se hace: Cambiar la ubicacion de un pedido de delivery (Caja o Administrador)
+1. En Pedidos y caja abre el pedido de delivery: la seccion de ubicacion muestra el mapa, la direccion y, si ya se cambio, la insignia Dirección editada (revisa el historial de ubicacion).
+2. Pulsa Cambiar ubicacion (Caja o Administrador; el Supervisor no). Busca la direccion o mueve el pin en el mapa. En un pedido de delivery de Caja o del mozo tambien existe el boton Usar ubicacion de WhatsApp, que toma la ultima ubicacion que el cliente mando en las ultimas 24 horas.
+3. La ventana "Cambiar ubicacion de CP-xxxx" calcula en vivo la comparacion Antes y Despues: zona, Envio, Diferencia y Total. Si el punto queda fuera de cobertura: "Ese punto esta fuera de la zona de reparto. Mueve el pin o busca otra direccion."
+4. Pulsa Cambiar y confirma "Si, cambiar" en "Cambiar la ubicacion del pedido?". Aparece "Ubicacion cambiada." El envio y el total se recalculan solos, y el cliente recibe un aviso si cambia el costo de envio.
+5. Si el pedido ya estaba pagado y el envio cambia, queda un ajuste: Saldo por cobrar (envio mayor: hay que cobrar mas) o Devolucion pendiente (envio menor: hay que devolver). Se resuelve con el boton Cobrar saldo o Marcar como devuelta: eliges el medio (Efectivo, Yape, Plin, Transferencia o Tarjeta; si no es efectivo escribes el Codigo de operacion). En efectivo mueve la caja de hoy; en digital queda en el cierre del dia. Si no esta pagado el total solo cambia y se cobra asi.
+6. Si hay una propuesta del repartidor, la seccion la muestra con mapas Antes y Despues y los botones Aprobar o Rechazar (con motivo opcional). Si Caja cambia el punto directo mientras hay una propuesta, esa propuesta se cancela sola.
+7. El historial de cambios muestra quien lo hizo (Caja o Repartidor), el estado, zona anterior y nueva, y el envio anterior y nuevo con su diferencia.
+Ver tambien: [[caja]]
+
+## Vista de Administrador y Cajero (panel de despacho)
+- Mapa y lista con los pedidos de la jornada; filtros de Espera (Retrasado desde 20 min, Tarde desde 30, Muy tarde desde 45: los minutos se editan) y por zona (Todas las zonas). Pantalla completa para el mapa.
+- Boton Repartidores: panel con cada repartidor LIBRE u OCUPADO (N pedidos), los pedidos que lleva por etapa (Tomado, En camino, Llegado) y los pedidos Sin tomar. Solo Caja y Administrador lo ven; el Repartidor no (403).
+- Ruta sugerida: arma la ruta de los pedidos listos y permite Iniciar ruta; para devolver un pedido a disponibles por averia o demora usa Liberar pedido (caja) o Liberar a disponibles en el detalle del pedido. La pestana Rutas lista las rutas con filtros de Dia y Repartidor.
+- Caja resuelve incidentes (reprogramar, retornar al local o cobrar con recargo) y liquida el efectivo que rinde cada repartidor. En esta version la asignacion se hace cuando el repartidor toma el pedido o una ruta; la reasignacion manual es parte de la vista de seguimiento que esta llegando.
+- Reenvio tras el retiro (Por reprogramar): si el cliente dijo SI, el pedido aparece como Por reprogramar con el boton «Reprogramar / Reenviar a reparto: S/ x». Ese monto es el que el cliente vio antes de responder y se suma una vez al total y al envio. Si el pedido ya estaba pagado, el recargo se cobra aparte en Caja. El costo se configura en Configuracion, Parametros de operacion, «Costo de volver a enviar un pedido».
+- La liquidacion de un repartidor ya no bloquea el cierre ni duplica el efectivo.
 
 ## Como se hace: Reportar una falla en la entrega (no contesta o direccion erronea)
 1. Si transcurren varios minutos sin poder contactar al cliente, pulsar el boton Reportar problema.
@@ -71,10 +98,21 @@ Ver tambien: [[mensajes]]
 - Para cambiar los minutos de una zona, ve a Zonas de reparto; para cambiar la forma de calcular, ve a Parámetros de operación (eta_*).
 
 ## Errores y dudas comunes
-- Si otro repartidor tomo antes un pedido de la ruta sugerida, el sistema avisa cual se perdio y conserva los demas que elegiste.
-- Si llegas al tope de pedidos simultaneos (5 por defecto, se cambia en Configuracion), debes entregar alguno antes de tomar otro.
-- Un repartidor solo ve sus propios pedidos; el telefono completo del cliente aparece despues de tomar el pedido.
+- 403 NO_ASIGNADO: el pedido es de otro repartidor. Pide a Caja que lo reasigne.
+- 409 ESTADO_INVALIDO "Solo puedes proponer ubicacion en un pedido en curso": el pedido ya se entrego o anulo.
+- 409 FUERA_DE_COBERTURA / "La ubicacion indicada esta fuera de la zona de cobertura": el punto no esta en ninguna zona de reparto activa; ver [[zonas]].
+- "Hay un saldo o una devolucion sin resolver en este pedido: resuelvelo antes de cambiar la ubicacion": primero cobra el saldo o marca la devolucion del cambio anterior.
+- "No se puede cambiar la ubicacion de un pedido en estado ENTREGADO o ANULADO": ya no admite cambio. Solo se cambia en pedidos de delivery.
+- "Abre la caja para mover efectivo" (CAJA_CERRADA): para cobrar o devolver en efectivo la caja de hoy debe estar abierta; en digital no hace falta.
+- "La propuesta ya no esta pendiente": otra persona ya la aprobo, rechazo o se cancelo; recarga.
+- "Falta ubicar": el pedido no tiene punto en el mapa; Caja le pone la ubicacion con Cambiar ubicacion.
+- Si otro repartidor tomo antes un pedido de la ruta sugerida, el sistema avisa cual se perdio.
+- Si llegas al tope de pedidos simultaneos debes entregar alguno antes de tomar otro.
+- Un repartidor solo ve sus pedidos y el telefono aparece despues de tomar el pedido.
+- La devolucion pendiente por cambio de ubicacion no afecta el cierre de caja mientras no se resuelva: al marcarla como devuelta, en efectivo sale como egreso de la caja de hoy y en digital se descuenta del medio en el cierre.
 
 ## Quien puede hacerlo
-- **Repartidores**: acceder a la vista mobile-first, elegir pedidos de la ruta sugerida, gestionar sus viajes (Salir, Llegue, Entregar), consultar telefonos de pedidos propios asignados y reportar incidentes de entrega.
-- **Administrador y Cajero**: supervisar el mapa global de despacho, asignar/reasignar pedidos, resolver incidentes reportados y liquidar cuentas.
+- Repartidor: ver y tomar sus pedidos y rutas, salir, llegar, entregar, reportar fallas, chatear con el cliente de su pedido y proponer la ubicacion real (permisos repartos/tomar, entregar, reportar, chat y proponer_ubicacion).
+- Cajero: ver el panel de despacho, asignar o liberar, liquidar, resolver incidentes y cambiar o aprobar la ubicacion (pedidos/cambiar_ubicacion).
+- Administrador: todo lo anterior.
+- Supervisor: ve Repartos pero no cambia ubicaciones.

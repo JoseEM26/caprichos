@@ -4,12 +4,15 @@ titulo: Clientes
 ruta: /admin/clientes
 permiso: clientes/ver
 roles: [ADMIN, CALLCENTER]
-relacionados: [caja, ofertas, mensajes]
+relacionados: [caja, ofertas, mensajes, zonas, usuarios]
 sugerencias:
   - Como registro a un nuevo cliente en el sistema
   - Como busco el historial de compras de un cliente
   - Como ajusto o agrego puntos de fidelidad a un cliente
   - Como edito el telefono o direccion de un cliente
+  - Como verifica el cliente su celular al crear su cuenta
+  - Por que el cliente escribe primero al WhatsApp del negocio
+  - El cliente dice que no avanza la verificacion del celular
 ---
 # Clientes
 
@@ -46,6 +49,15 @@ Ver tambien: [[ofertas]]
 3. Si corresponde, configurar un Costo de envio fijo o Descuento de envio especial aplicable a las [[zonas]] de delivery.
 4. Pulsar Guardar cambios.
 Ver tambien: [[zonas]]
+
+## Como se hace: Entender la verificacion del celular del cliente
+La cuenta del cliente es celular + contrasena (sin DNI). Para crear la cuenta o recuperar la contrasena en la carta virtual, el celular se verifica por WhatsApp. Hay dos modos, que el Administrador elige en Configuracion, Parametros de operacion, "Como verifica el cliente su celular" (parametro verificacion_celular_modo):
+1. WHATSAPP_ENTRANTE (el modo normal hoy): el cliente escribe primero al WhatsApp del negocio. En la carta toca el boton Abrir WhatsApp y enviar mensaje; WhatsApp abre un mensaje ya escrito con una clave de un solo uso (no hay que cambiar el texto) y el cliente solo pulsa enviar. Como WhatsApp informa de que numero viene, la llegada prueba que el celular es suyo. La carta lo detecta sola y pasa al siguiente paso con "Celular verificado. Seguimos con el siguiente paso...". No hace falta plantilla de Meta. La clave vence a los 10 minutos.
+2. CODIGO_PLANTILLA (modo anterior, conservado): se envia un codigo de 6 digitos por una plantilla de Meta y el cliente lo escribe en la carta. Solo sirve si las plantillas caprichos_codigo_cuenta y caprichos_codigo_recuperar estan aprobadas por Meta. El codigo vence en 10 minutos y se permite maximo 3 solicitudes por hora por celular.
+3. Numero por ambiente: "Numero que recibe la verificacion" (verificacion_whatsapp_numero) lleva el celular del negocio con codigo de pais (por ejemplo 51914244077). Si esta vacio se usa el numero configurado para el ambiente en el servidor y, si tampoco existe, el WhatsApp de contacto del local. En la demo y en preproduccion se usa un numero de prueba propio para no escribir al numero real de produccion; si el cliente escribe al numero equivocado la verificacion no avanza.
+4. Si el cliente dice que no avanza: pidele revisar que mando el mensaje desde su propio WhatsApp al numero de Caprichos, sin cambiar el texto. A los 60 segundos la carta le dice que revisar. Si sigue igual, que pulse Pedir un enlace nuevo (o "El enlace vencio. Pide uno nuevo.") o avisa al local. Tras 5 mensajes desde otro celular la clave se invalida.
+5. Registro y recuperar: en ambos modos termina igual, el cliente ya puede registrarse o crear una contrasena nueva. Si el celular ya tiene cuenta con contrasena el registro dice que ingrese o recupere.
+Ver tambien: [[mensajes]]
 
 ## Errores y dudas comunes
 - No es posible restar una cantidad de puntos superior al saldo actual que posee el cliente.
