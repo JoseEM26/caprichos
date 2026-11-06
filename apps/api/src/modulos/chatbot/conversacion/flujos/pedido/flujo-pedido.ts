@@ -88,6 +88,15 @@ function productoAgotado(p: any): boolean {
   return p.disponible === false || (p.saboresConStock === true && saboresPedibles(p).length === 0);
 }
 
+/**
+ * Grupos de opciones que el bot pregunta. Con stock por sabor se omiten los obligatorios heredados
+ * («Sabor» de empanadas): no se preguntan ni se exigen.
+ */
+function gruposDePregunta(prod: any): any[] {
+  const grupos = prod?.grupos || [];
+  return prod?.saboresConStock === true ? grupos.filter((g: any) => !(g.obligatorio || g.minimo > 0)) : grupos;
+}
+
 /** Unidades de un tamaño (Unidad=1, 1/2 docena=6, Docena=12). Sin tamaño o sin dato: 1. */
 function unidadesDeTamano(prod: any, tamanoId?: string): number {
   const tamano = (prod?.tamanos || []).find((t: any) => String(t.id) === String(tamanoId));
@@ -924,7 +933,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const categorias = contexto.categoriasCarta || [];
     const cat = categorias.find((c) => String(c.id) === config.categoriaId);
     const prod = (cat?.productos || []).find((p: any) => String(p.id) === config.productoId);
-    const grupos = prod?.grupos || [];
+    const grupos = gruposDePregunta(prod);
     const grupoActual = grupos[config.grupoIndexActual];
 
     if (!grupoActual) {
@@ -2507,7 +2516,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const config = pedido.itemEnConfiguracion;
     if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
 
-    const grupos = prod?.grupos || [];
+    const grupos = gruposDePregunta(prod);
 
     // Si aún quedan grupos de opciones por responder
     if (config.grupoIndexActual < grupos.length) {

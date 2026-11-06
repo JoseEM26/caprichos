@@ -77,6 +77,32 @@ describe('ventana de producto con sabores', () => {
     expect(boton('Elige los sabores').disabled).toBe(true);
   });
 
+  it('no muestra ni exige el grupo obligatorio heredado «Sabor» (empanadas) y no manda sus opciones', () => {
+    const conGrupoHeredado: ProductoCarta = {
+      ...dona,
+      grupos: [
+        {
+          id: 'g-sabor',
+          nombre: 'Sabor',
+          obligatorio: true,
+          minimo: 1,
+          maximo: 1,
+          opciones: [{ id: 'emp', nombre: 'Empanada de pollo', precioExtra: 0, disponible: true }],
+        },
+      ],
+    };
+    const onCerrar = vi.fn();
+    renderVentana(conGrupoHeredado, onCerrar);
+    expect(screen.queryByText('Sabor')).toBeNull();
+    expect(screen.queryByText('Empanada de pollo')).toBeNull();
+    for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole('button', { name: 'Agregar una de Fresa' }));
+    expect(boton('Agregar al pedido').disabled).toBe(false);
+    fireEvent.click(boton('Agregar al pedido'));
+    expect(onCerrar).toHaveBeenCalled();
+    const [l] = carritoGuardado();
+    expect(l.opciones).toEqual([]);
+  });
+
   it('el total es unidades del tamaño × cantidad, y el payload guarda sabores y unidades por mezcla', () => {
     const onCerrar = vi.fn();
     renderVentana(dona, onCerrar);

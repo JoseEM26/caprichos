@@ -49,10 +49,14 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const esMovilDetectado = useEsMovil();
   const movil = esMovilPreview !== undefined ? esMovilPreview : esMovilDetectado;
 
+  // Con stock por sabor (donas, galletas) los grupos obligatorios heredados («Sabor» de empanadas) no aplican:
+  // no se muestran, no se exigen y sus opciones no viajan con la línea.
+  const gruposCarta = producto.saboresConStock === true ? producto.grupos.filter((g) => !(g.obligatorio || g.minimo >= 1)) : producto.grupos;
+
   const [tamanoId, setTamanoId] = useState<string | null>(producto.tamanos[0]?.id ?? null);
   const [sel, setSel] = useState<Record<string, string[]>>(() => {
     const inicial: Record<string, string[]> = {};
-    for (const g of producto.grupos) {
+    for (const g of gruposCarta) {
       // elección única y obligatoria: parte con la primera opción marcada
       inicial[g.id] = g.maximo === 1 && g.minimo >= 1 && g.opciones[0] ? [g.opciones[0].id] : [];
     }
@@ -77,7 +81,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const secciones = useMemo(() => {
     const claves: string[] = [];
     const mapa: Record<string, GrupoOpcionesCarta[]> = {};
-    for (const g of producto.grupos) {
+    for (const g of gruposCarta) {
       const k = claveSeccion(g);
       if (!mapa[k]) {
         mapa[k] = [];
@@ -86,13 +90,13 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       mapa[k].push(g);
     }
     return { claves, mapa };
-  }, [producto.grupos]);
+  }, [gruposCarta]);
   const [abierta, setAbierta] = useState<string>(secciones.claves[0] ?? '');
 
   const tamano = producto.tamanos.find((t) => t.id === tamanoId) ?? null;
   const precioBase = tamano ? tamano.precio : producto.precio;
 
-  const elegidas: OpcionElegida[] = producto.grupos.flatMap((g) =>
+  const elegidas: OpcionElegida[] = gruposCarta.flatMap((g) =>
     (sel[g.id] ?? []).flatMap((oid) => {
       const o = g.opciones.find((x) => x.id === oid);
       return o ? [{ id: o.id, nombre: o.nombre, precioExtra: o.precioExtra, grupoId: g.id, grupoNombre: g.nombre }] : [];
@@ -100,7 +104,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   );
   const unitario = calcularPrecioLinea({ precioBase, opciones: elegidas, cantidad: 1 }).precioUnitario;
   const valido =
-    !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && producto.grupos.every((g) => (sel[g.id] ?? []).length >= g.minimo);
+    !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && gruposCarta.every((g) => (sel[g.id] ?? []).length >= g.minimo);
 
   // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
   const info = inventario[String(producto.id)] ?? infoStockDe(producto);
@@ -414,7 +418,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 })}
               </div>
             ) : (
-              producto.grupos.map((g) => {
+              gruposCarta.map((g) => {
                 const f = filtrar(g);
                 const obligatorio = g.minimo >= 1;
                 return (

@@ -96,6 +96,11 @@ export function VentanaOpcionesProducto({
   // Mezcla de sabores (donas y galletas): el reparto se recorta al total y al stock de cada sabor
   const [valorSabores, setValorSabores] = useState<Reparto>({});
   const saborMode = producto.saboresConStock === true;
+  // Con stock por sabor, los grupos obligatorios heredados («Sabor» de empanadas) no se muestran ni se exigen
+  const gruposVisibles = useMemo(
+    () => (saborMode ? (producto.grupos || []).filter((g) => !(g.obligatorio || (g.minimo && g.minimo > 0))) : producto.grupos || []),
+    [producto, saborMode],
+  );
   const unidadesMezcla = tamanoSeleccionado?.unidades ?? 1;
   const total = unidadesMezcla * cantidad;
   const saboresDisp = (producto.sabores ?? []).map((s) => ({ id: s.id, nombre: s.nombre, disponible: s.disponible, quedan: s.quedan ?? null }));
@@ -191,8 +196,7 @@ export function VentanaOpcionesProducto({
   // Validar selecciones obligatorias
   const gruposFaltantes = useMemo(() => {
     const faltantes: string[] = [];
-    const grupos = producto.grupos || [];
-    for (const g of grupos) {
+    for (const g of gruposVisibles) {
       if (g.obligatorio || (g.minimo && g.minimo > 0)) {
         const minReq = g.minimo || 1;
         const seleccionadas = opcionesActuales.filter((o) =>
@@ -204,7 +208,7 @@ export function VentanaOpcionesProducto({
       }
     }
     return faltantes;
-  }, [producto, opcionesActuales]);
+  }, [gruposVisibles, opcionesActuales]);
 
   const puedeAgregar = gruposFaltantes.length === 0 && !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && saboresListos;
 
@@ -400,7 +404,7 @@ export function VentanaOpcionesProducto({
         )}
 
         {/* Grupos de opciones */}
-        {(producto.grupos || []).map((g) => {
+        {gruposVisibles.map((g) => {
           const qBuscada = (busquedaGrupo[g.id] || '').toLowerCase().trim();
           const opcionesVisibles = qBuscada
             ? g.opciones.filter((o) => o.nombre.toLowerCase().includes(qBuscada))

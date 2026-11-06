@@ -455,10 +455,11 @@ export class PedidosService {
         ? validarSaboresLinea(prodDb, unidadesTamano, cantidad, l.sabores, ahora)
         : [];
 
-      // Validar grupos y opciones del producto
+      // Validar grupos y opciones del producto. Por sabor, sus grupos obligatorios heredados (p. ej. «Sabor»
+      // de donas) no aplican: no se exigen ni se aceptan sus opciones.
       const gruposActivos = prodDb.grupos
         .map((pg) => pg.grupo)
-        .filter((g) => g.activo);
+        .filter((g) => g.activo && !(porSabor && (g.obligatorio || g.minimo > 0)));
 
       const todasLasOpcionesDelProducto = gruposActivos.flatMap((g) => g.opciones);
 

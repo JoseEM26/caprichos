@@ -1672,6 +1672,32 @@ describe('PedidosService', () => {
       expect(prismaMock.stock.updateMany).not.toHaveBeenCalled();
     });
 
+    it('ignora el grupo obligatorio heredado «Sabor» (opciones de empanada): sin opciones el pedido pasa', async () => {
+      const grupoHeredado = {
+        id: 30n,
+        nombre: 'Sabor',
+        obligatorio: true,
+        minimo: 1,
+        maximo: 1,
+        activo: true,
+        opciones: [
+          { id: 300n, grupo_id: 30n, valor_id: 310n, precio_extra: 0, activo: true, agotado_hasta: null, valor: { id: 310n, nombre: 'Empanada de pollo' } },
+        ],
+      };
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where?.controla_stock
+            ? [{ id: 1n, nombre: 'Dona', controla_stock: true, sabores: donaSabor.sabores }]
+            : [{ ...donaSabor, grupos: [{ grupo_id: 30n, grupo: grupoHeredado }] }],
+        ),
+      );
+      await service.crear(lineaMedia([{ saborId: 11, cantidad: 6 }]) as any, 'key-sab-grupo-heredado', { canal: 'CARTA' });
+      expect(prismaMock.pedido.create).toHaveBeenCalled();
+      expect(prismaMock.pedidoLineaSabor.create).toHaveBeenCalledWith({
+        data: { pedido_linea_id: 50n, sabor_id: 11n, sabor_nombre: 'Fresa', cantidad: 6 },
+      });
+    });
+
     it('suma inválida (5 de 6): 400 SABORES_INVALIDOS y no crea el pedido', async () => {
       const err: any = await service.crear(lineaMedia([{ saborId: 11, cantidad: 2 }, { saborId: 12, cantidad: 3 }]) as any, 'key-sab-suma', { canal: 'CARTA' }).catch((e) => e);
       expect(err.getResponse()).toMatchObject({ codigo: 'SABORES_INVALIDOS' });
