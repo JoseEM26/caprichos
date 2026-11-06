@@ -14,7 +14,6 @@ sugerencias:
   - Como doy una cortesia a un cliente
   - Como cambio la ubicacion de un pedido de delivery
   - Que significa Direccion editada o #7 del dia
-  - Como cobro un pedido que trae propina
 ---
 # Pedidos y caja
 

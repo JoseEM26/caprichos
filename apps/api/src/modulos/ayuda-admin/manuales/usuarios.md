@@ -11,7 +11,6 @@ sugerencias:
   - ¿Por qué me pide el código del supervisor al cambiar un rol o desactivar a alguien?
   - ¿Cómo restablezco la contraseña de un usuario que no puede entrar?
   - ¿Cómo dejo a un suplente de supervisor por unos días?
-  - ¿Cómo asigno a una persona más de un rol?
   - ¿Dónde veo lo que hizo un usuario?
   - ¿Cómo corrijo la fecha de ingreso o salida de un trabajador?
   - ¿Cómo asigno las áreas de cocina de un cocinero?

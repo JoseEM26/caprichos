@@ -3,13 +3,17 @@ modulo: productos
 titulo: Productos
 ruta: /admin/productos
 permiso: catalogo/ver
-roles: [ADMIN, CAJERO]
-relacionados: [listas, stock, recetas, ofertas, destacadas]
+roles: [ADMIN, CAJERO, SUPERVISOR]
+relacionados: [listas, stock, recetas, ofertas, destacadas, apertura, almacen, cocina]
 sugerencias:
   - ¿Cómo creo un producto nuevo en la carta?
   - ¿Cómo marco un producto como agotado para que no se venda?
   - ¿Dónde le cambio el precio o la foto a un producto?
   - ¿Cómo agrego tamaños o grupos de opciones a un plato?
+  - ¿Cómo hago que las donas o galletas descuenten stock al venderse?
+  - ¿Cómo configuro los sabores de las donas y cuántas unidades trae cada tamaño?
+  - ¿Cómo enlazo una opción como '2 Donas' con el stock?
+  - ¿Por qué la carta dice Quedan 4 o Últimos 2?
 ---
 # Productos
 
@@ -50,7 +54,40 @@ Ver tambien: [[disenador]]
 Antes: [[listas]]
 Despues: [[recetas]]
 
+## Como se hace: Controlar el stock de un producto terminado (donas, galletas, postres)
+Para productos que se acaban en el dia. Los insumos (leche, harina) se siguen controlando en [[stock]] y [[almacen]]; el interruptor Control de almacen solo gobierna insumos y recetas.
+1. Abre el producto (Nuevo producto o Editar) y marca la casilla "Controlar stock de este producto" ("se descuenta al vender, se marca Agotado al llegar a 0 y la carta muestra cuantos quedan. Necesita el conteo de apertura de cada dia"). Guarda. En la tarjeta aparece la insignia Con stock (o Stock por sabor si tiene sabores).
+2. Cada dia se cuenta en [[apertura]]. Los productos de la categoria Postres ya vienen con el control activado.
+3. Un producto oculto no entra al conteo.
+4. El saldo siempre es el tope de venta, haya o no apertura de hoy: no se puede vender mas de lo que hay.
+Despues: [[apertura]]
+
+## Como se hace: Configurar sabores y unidades por tamano (donas y galletas)
+1. En el editor del producto, en "Sabores o variantes" agrega cada sabor en "Nuevo sabor (ej.: Pistacho, Nutella, Americana)". Cada sabor se marca Disponible o Agotado tocandolo, y muestra "Quedan N" o "Sin apertura hoy". Los sabores son las opciones que el cliente elige (relleno, sabor) y tambien las usa el bot de WhatsApp.
+2. El stock de cada sabor no se escribe aqui: se registra en Apertura del dia (Almacen).
+3. En Tamanos y precios, en la columna Unidades escribe cuantas unidades incluye cada tamano: Unidad 1, 1/2 docena 6, Docena 12. Asi, vender una media docena descuenta 6 del stock, y el tope en la carta se calcula en unidades.
+4. El cliente reparte las unidades de la media docena o docena entre sabores (selector con "Completo" cuando termina de repartir, atajo "Todas del mismo sabor"). En cocina, mis pedidos y etiquetas se ve el reparto, por ejemplo "2 Fresa · 3 Oreo".
+5. Los sabores sin stock salen bloqueados ("No hay stock" o "Solo quedan N de X"); al llegar a 0 ese sabor se marca Agotado solo.
+6. Galletas sin sabores: la galleta (por ejemplo choco chips) lleva un stock unico por producto, en unidades, sin sabores; la media docena descuenta 6.
+
+## Como se hace: Enlazar una opcion con el stock (Stock de cada opcion / Enlaces de stock)
+1. En el editor de opciones y tamanos del producto, baja a la seccion "Stock de cada opcion": "Si una opcion consume stock (p. ej. '2 Donas'), indica que producto y cuantas unidades. Si no hay saldo, la opcion queda agotada en la carta y en WhatsApp."
+2. Elige la Opcion, pulsa Agregar stock, escoge el Producto, el Sabor (o "Todo el producto") y la Cantidad (1 a 99). Pulsa Guardar stock de la opcion; veras "Enlace de stock guardado.". Quitar borra una fila.
+3. Ejemplo: "2 Donas" consume 2 de DONAS ARTESANALES; "Crema pastelera" consume 1 del sabor Crema pastelera de las donas.
+4. Sin filas, la opcion solo depende del boton Agotado, como antes.
+5. Si no alcanza el saldo, la carta muestra la opcion agotada y el pedido responde 409 OPCION_AGOTADA ("No hay stock suficiente para elegir X").
+Ver tambien: [[ofertas]]
+
+## Que ve el cliente cuando hay poco stock
+- 4 o 5 unidades: "Quedan N". 1 a 3 unidades: franja "!Ultimos N!". Sin saldo: Agotado.
+- Si el cliente pide mas de lo que queda: "Solo quedan N de X" y el boton Ajustar mi pedido recorta el pedido sin vaciar el carrito.
+- Plan B en las opciones: si algunas opciones estan agotadas por stock y otras no, la carta avisa "Se acabaron: X. Elige entre: Y".
+
 ## Errores y dudas comunes
+- 409 STOCK_INSUFICIENTE "Solo quedan N de X": no alcanza el saldo; ajusta la cantidad o cuenta la apertura si el saldo esta mal.
+- 409 SABOR_AGOTADO "El sabor X esta agotado": elige otro sabor.
+- 409 OPCION_AGOTADA "La opcion X esta agotada" / "No hay stock suficiente para elegir X": la opcion no se puede elegir hoy.
+- "Falta contar" en Apertura: el producto controla stock pero aun no se conto hoy.
 - No encuentro el boton para eliminar un producto: los productos no se borran del sistema para proteger el historial de ventas y reportes anteriores. Si ya no se va a vender, marcalo como agotado o utiliza la opcion de ocultar.
 - Que significa la opcion "No suma puntos ni aplica cupones": sirve para promociones con margen ajustado. Cuando esta activada, el producto no genera puntos de recompensa, no se puede canjear con puntos y no admite cupones de descuento.
 - La foto subida no aparece: confirma que la imagen este en formato JPG o PNG y espera a que termine de cargar antes de pulsar guardar cambios.

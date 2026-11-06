@@ -4,28 +4,53 @@ titulo: Ofertas y descuentos
 ruta: /admin/ofertas
 permiso: ofertas/ver
 roles: [ADMIN]
-relacionados: [productos, caja, comprobantes, novedades]
+relacionados: [productos, caja, comprobantes, novedades, cocina]
 sugerencias:
   - ¿Cómo armo una promoción 2x1 o un combo?
   - ¿Cómo creo un descuento en porcentaje para una categoría?
   - ¿Cómo genero un cupón de descuento con código?
   - ¿Dónde reviso si un cliente ya usó un cupón?
+  - ¿Cómo armo un combo con alternativas si se acaba un producto?
+  - ¿Qué pasa con el stock cuando se vende un combo?
+  - ¿Por qué un combo sale No disponible en la carta?
+  - ¿Cómo funciona la Cajita Caprikids?
 ---
 # Ofertas y descuentos
 
 ## Para que sirve
 Permite gestionar la estrategia de promociones y descuentos comerciales del negocio. Desde este modulo se configuran combos especiales sobre [[productos]], promociones de tipo lleva y paga (como 2x1 o 3x2), rebajas porcentuales o fijas sobre articulos o categorias completas, y cupones de descuento canjeables por codigo al cobrar en [[caja]].
 
-## Como se hace: Armar un combo o promocion 2x1
-1. Haz clic en la pestana "Combos y 2x1".
-2. Pulsa el boton "+ Armar oferta".
-3. En la ventana emergente, elige entre "Combo" o "Lleva y paga (2x1, 3x2)".
-4. Escribe el nombre publico de la promocion y selecciona los productos que formaran parte de la misma.
-5. Configura el precio especial o la cantidad de unidades que el cliente lleva frente a las que paga, los canales donde estara activa (carta web, salon o todos) y el periodo de vigencia.
-6. Pulsa "Guardar oferta". En la ventana de confirmacion, pulsa "Si, continuar".
+## Como se hace: Armar un combo (constructor por pasos)
+Un combo es un paquete con precio propio que el cliente arma eligiendo por partes; aparece en la carta como un producto mas (categoria COMBOS por defecto) y se descuenta producto por producto del stock al vender. Un combo no recibe descuentos ni 2x1.
+1. Abre la pestana Promociones y pulsa + Armar oferta. En "Que oferta quieres armar?" elige Combo ("Varios productos por un precio. El cliente elige dentro de cada parte.") o "Llevas mas, pagas menos" (precio especial por llevar varias unidades del mismo producto, como 2x1 o 3x2).
+2. Paso 1 de 4, Nombre y categoria de la carta: escribe el nombre, elige la categoria de la carta y, si quieres, sube la Foto de la oferta (si no, la carta muestra la letra inicial sobre fondo dorado).
+3. Paso 2 de 4, Que lleva el combo: agrega las partes. Hay tres tipos: "2 bebidas a eleccion" (el cliente escoge entre las categorias que marques, por ejemplo Frappes, Iced o Calientes; se indica la cantidad), "1 complemento fijo" (un producto especifico e invariable, con su Tamano si lo necesita, por ejemplo "Regular 12 oz") y "Una de estas opciones" (el cliente escoge una alternativa armada, por ejemplo una porcion de torta o una dona artesanal). Puedes reordenar y quitar partes. Hace falta al menos una ("Agrega al menos una parte al combo.").
+4. En una parte fija puedes definir Alternativas: "Si no hay stock, el cliente podra elegir:". Buscas un producto en "Buscar un producto para agregar como opcion...", le pones Cantidad (cuantas unidades consume) y las ordenas con Subir y Bajar o las quitas con Quitar. Se ofrecen solo cuando el complemento no alcanza, al mismo precio del combo; las agotadas salen bloqueadas.
+5. Paso 3 de 4, Cuanto vale el combo y cuando aplica: pon los Precios del combo por tamano (cada tamano con nombre y precio mayor a 0; "+ Agregar otro tamano"), mira la comparacion con la "Suma estimada de productos por separado" y el aviso "Combo mas caro que compras sueltas" si el precio supera la suma. Define los Dias de la semana y el horario (las dos horas o ninguna), y la vigencia por fechas.
+6. Paso 4 de 4: revisa la Previsualizacion en la carta virtual y guarda con confirmacion "Guardar nuevo combo?" / "Guardar cambios del combo?".
+7. Al editar un combo puedes elegir como se ve cuando esta desactivado ("Mostrar como No disponible" u ocultarlo).
 Antes: [[productos]]
 Despues: [[caja]]
 Ver tambien: [[novedades]]
+
+## Como se hace: Entender el stock, el plan B y los avisos de un combo
+1. El stock se hereda: cada eleccion del cliente descuenta el stock de su propio producto (y sabor) al vender, y las lineas se mandan a [[cocina]] por area.
+2. Si un producto del combo se acaba, la carta ofrece las Alternativas de esa parte (plan B). Si ninguna tiene stock, o si el unico paso obligatorio sin opciones se acabo, el combo se muestra "No disponible" (en vez de Agotado). Si es una opcion enlazada a stock y esta agotada, la carta avisa "Se acabaron: X. Elige entre: Y" (ver [[productos]], Enlazar una opcion con el stock).
+3. En el bot de WhatsApp: un combo agotado avisa que se acabo y sugiere otra cosa; el bot arma el pedido por botones con las reglas de la carta. Una promocion solo vale por WhatsApp si tiene marcada la casilla "Vale tambien por WhatsApp (bot)" (en el editor de la oferta, junto al canal).
+4. Errores: 409 STOCK_INSUFICIENTE "Solo quedan N de X" y 409 SABOR_AGOTADO "El sabor X esta agotado": la eleccion no se puede vender; el cliente cambia de eleccion.
+
+## Como se hace: El combo Cajita Caprikids (partes que salen a cocina como lineas hijas)
+1. La Cajita Caprikids es un combo con producto propio (no se repite en Promociones): lleva nuggets, papas mini, un frappe en tamano fijo (Regular 12 oz) y dos juguetes a eleccion.
+2. En la carta, en mozo y en Caja el cliente elige dos juguetes (cantidad exacta; los agotados no se pueden elegir). Se muestra "Incluye: producto · tamano".
+3. En cocina el combo sale desglosado: la linea madre es solo el contenedor (lleva el precio del combo y no tiene comanda) y cada parte va en su linea hija a su area, con su cantidad y tamano, sin cobro. Comprobantes, ticket y cuenta muestran solo la linea madre. Al anular el pedido el stock de cada hija se devuelve.
+4. El tamano de una parte fija se elige en el constructor (Paso 2) para que la etiqueta de la bebida y la comanda salgan con ese tamano y se descuente cantidad × unidades del tamano.
+Ver tambien: [[cocina]]
+
+## Como se hace: Armar una promocion "Llevas mas, pagas menos" (2x1, 3x2)
+1. En Promociones pulsa + Armar oferta y elige Llevas mas, pagas menos.
+2. Elige los productos, la cantidad que lleva y paga, los canales (carta, salon, y la casilla Vale tambien por WhatsApp (bot)), los dias y la vigencia.
+3. Pulsa guardar y confirma con "Si, continuar".
+Antes: [[productos]]
 
 ## Como se hace: Crear un descuento directo
 1. Dirigete a la pestana "Descuentos".
@@ -54,7 +79,7 @@ Ver tambien: [[clientes]]
 Ver tambien: [[indicadores]]
 
 ## Errores y dudas comunes
-- Como se prevé la apariencia de una oferta en la carta: en la pestana de promociones puedes pulsar el boton "Ver en carta" para abrir una previsualizacion exacta de como vera el cliente la oferta en la carta web.
+- Como se prevé la apariencia de una oferta en la carta: en la pestana de promociones puedes pulsar el boton "Ver como se ve en la carta" para abrir una previsualizacion exacta de como vera el cliente la oferta en la carta web.
 - Se pueden acumular cupones con ofertas automaticas: las condiciones de acumulacion se configuran en la pestana "Reglas". Por defecto, el sistema restringe combinaciones que afecten el margen minimo del negocio.
 - Donde revisar canjes de cupones: dentro de la pestana "Cupones", pulsa el boton "Historial de cupones" para auditar que pedidos y clientes utilizaron cada codigo.
 
