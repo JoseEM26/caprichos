@@ -12,6 +12,7 @@ import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { OfertasService } from '../../ofertas/ofertas.service';
+import { BOTONES_BANNER_DEFECTO } from '../banner-botones';
 import { DISPOSICION_CARTA_DEFECTO } from '../disposicion-carta';
 
 describe('Diseño de la carta: disposición en borrador y carta pública', () => {
@@ -49,7 +50,7 @@ describe('Diseño de la carta: disposición en borrador y carta pública', () =>
     const data = prisma.versionCarta.create.mock.calls[0][0].data;
     expect(data.contenido.disposicion.banner.tamanoPc).toBe('grande');
     expect(data.contenido.disposicion.carta.columnasPc).toBe('3');
-    expect(data.contenido.banner).toEqual({ activo: true });
+    expect(data.contenido.banner).toEqual({ activo: true, ...BOTONES_BANNER_DEFECTO, modo: 'MES', intervaloSeg: 5, imagenes: [] });
   });
 
   it('rechaza con 400 un valor fuera de catálogo y no guarda nada', async () => {
@@ -72,7 +73,7 @@ describe('Diseño de la carta: disposición en borrador y carta pública', () =>
     prisma.versionCarta.findFirst.mockResolvedValue({ id: BigInt(2), decoracion: 'NINGUNO', organizacion: 'SECCIONES', contenido: { banner: { activo: true } }, publicada_en: null });
     const res: any = await service.obtenerContenidoPublicoCarta();
     expect(res.disposicion).toEqual(DISPOSICION_CARTA_DEFECTO);
-    expect(res.banner).toEqual({ activo: true });
+    expect(res.banner).toEqual({ activo: true, ...BOTONES_BANNER_DEFECTO, modo: 'MES', intervaloSeg: 5, imagenes: [] });
   });
 
   it('la carta pública usa la disposición publicada aunque tenga datos viejos', async () => {

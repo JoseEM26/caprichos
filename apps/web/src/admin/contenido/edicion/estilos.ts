@@ -19,6 +19,7 @@ export const ESTILOS_EDICION = `
 .ed-btn--mover { cursor: grab; }
 .ed-btn--peligro { border-color: #ffb4a8; color: #ffb4a8; }
 .ed-pop { background: var(--cp-white); color: var(--cp-navy); border: 1px solid var(--cp-line); border-radius: 12px; padding: 12px; box-shadow: 0 10px 28px rgba(11,44,62,.3); display: flex; flex-direction: column; gap: 8px; min-width: 240px; max-width: 340px; font-size: 13px; }
+.ed-pop:has([data-editor-banners]) { max-width: min(560px, 92vw); max-height: 80vh; overflow-y: auto; }
 .ed-pop label { display: flex; flex-direction: column; gap: 4px; font-weight: 700; font-size: 12px; }
 .ed-pop input, .ed-pop select { min-height: 44px; box-sizing: border-box; border-radius: 10px; border: 1.5px solid var(--cp-line); padding: 0 10px; font-size: 14px; font-family: inherit; background: var(--cp-white); color: var(--cp-navy); }
 .ed-pop-lista { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
