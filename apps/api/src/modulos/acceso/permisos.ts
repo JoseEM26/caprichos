@@ -56,6 +56,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'repartos', accion: 'tomar' },
   { modulo: 'repartos', accion: 'entregar' },
   { modulo: 'repartos', accion: 'reportar' },
+  // Chat de WhatsApp de un pedido propio (solo texto, solo mientras el pedido siga vigente)
+  { modulo: 'repartos', accion: 'chat' },
   { modulo: 'repartos', accion: 'liquidar' },
   // Cocina, Stock y Recetas (Ola 5)
   { modulo: 'cocina', accion: 'ver' },
@@ -300,6 +302,7 @@ export const MATRIZ: Record<string, string[]> = {
     'repartos/tomar',
     'repartos/entregar',
     'repartos/reportar',
+    'repartos/chat',
     'iniciativas/ver',
     'iniciativas/crear',
     'iniciativas/comentar',
