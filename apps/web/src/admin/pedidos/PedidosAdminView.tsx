@@ -5,6 +5,7 @@ import { FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { pedidosApi, Pedido, RespuestaNoEntregados } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
+import { BandejaPropuestasUbicacion } from './BandejaPropuestasUbicacion';
 import { PanelNoEntregados } from './PanelNoEntregados';
 import { useSesion } from '../../comun/sesion';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
@@ -531,6 +532,7 @@ export function PedidosAdminView() {
       <BannerCajaCerrada compacto />
       <FranjaImpresion />
     </div>
+    {tiene('pedidos/cambiar_ubicacion') && <BandejaPropuestasUbicacion alAplicar={cargarDatos} />}
     <div className="cj-grid">
       {/* PANEL IZQUIERDO */}
       <div className="cj-left">

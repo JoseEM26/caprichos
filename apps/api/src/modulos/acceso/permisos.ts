@@ -57,6 +57,9 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'repartos', accion: 'entregar' },
   { modulo: 'repartos', accion: 'reportar' },
   { modulo: 'repartos', accion: 'liquidar' },
+  // Cambio de ubicación de un delivery: Caja aprueba/cambia (con dinero: sin supervisor); el repartidor propone
+  { modulo: 'pedidos', accion: 'cambiar_ubicacion' },
+  { modulo: 'repartos', accion: 'proponer_ubicacion' },
   // Cocina, Stock y Recetas (Ola 5)
   { modulo: 'cocina', accion: 'ver' },
   { modulo: 'cocina', accion: 'despejar' },
@@ -187,6 +190,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/ver',
     'pedidos/crear',
     'pedidos/cambiar_estado',
+    'pedidos/cambiar_ubicacion',
     'caja/abrir',
     'caja/cobrar',
     'caja/movimientos',
@@ -300,6 +304,7 @@ export const MATRIZ: Record<string, string[]> = {
     'repartos/tomar',
     'repartos/entregar',
     'repartos/reportar',
+    'repartos/proponer_ubicacion',
     'iniciativas/ver',
     'iniciativas/crear',
     'iniciativas/comentar',
@@ -313,6 +318,7 @@ export const MATRIZ: Record<string, string[]> = {
 // Y su escritorio operativo (conteos, sin montos).
 // El conteo de apertura (almacen/apertura) no lo tiene el supervisor: sin administración de stock.
 MATRIZ.SUPERVISOR = [...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo'])].filter(
-  (p) => p !== 'almacen/apertura',
+  // Sin dinero: el supervisor no cambia ubicación con cobro (ni el conteo de apertura)
+  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion',
 );
 

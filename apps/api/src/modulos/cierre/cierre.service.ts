@@ -50,6 +50,7 @@ import {
   sumarDevolucionesDigitales,
 } from './cierre.util';
 import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-pedido.util';
+import { sumarAjustesCambioDigitales } from '../pedidos-admin/cambio-ubicacion.util';
 import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
 
 /**
@@ -208,7 +209,7 @@ export class CierreService {
    * ya entran como egreso en calcularMontosCaja.
    */
   private async montosCierre(
-    cliente: ClienteCaja & Pick<Prisma.TransactionClient, 'devolucionPedido'>,
+    cliente: ClienteCaja & Pick<Prisma.TransactionClient, 'devolucionPedido' | 'pedidoCambioUbicacion'>,
     caja: { id: bigint; fecha: Date; apertura: unknown },
   ): Promise<MontosCierre> {
     const montos = await calcularMontosCaja(cliente, caja);
@@ -218,12 +219,21 @@ export class CierreService {
       select: { medio: true, monto_devuelto: true, creado_en: true },
     });
     const devueltos = sumarDevolucionesDigitales(filas, inicio, fin);
+    // Saldos cobrados y devoluciones de cambio de ubicación resueltos hoy (digital; el efectivo ya es movimiento de caja)
+    const ajustes = await cliente.pedidoCambioUbicacion.findMany({
+      where: { ajuste_en: { gte: inicio, lt: fin }, ajuste_estado: { in: ['COBRADO', 'DEVUELTO'] } },
+      select: { ajuste_tipo: true, ajuste_estado: true, ajuste_medio: true, ajuste_monto: true, ajuste_en: true },
+    });
+    const ajustesDig = sumarAjustesCambioDigitales(ajustes, inicio, fin);
     const cobrados = {
-      yape: montos.sistemaYape,
-      plin: montos.sistemaPlin,
-      transferencia: montos.sistemaTransferencia,
-      tarjeta: montos.sistemaTarjeta,
+      yape: montos.sistemaYape + ajustesDig.cobrados.yape,
+      plin: montos.sistemaPlin + ajustesDig.cobrados.plin,
+      transferencia: montos.sistemaTransferencia + ajustesDig.cobrados.transferencia,
+      tarjeta: montos.sistemaTarjeta + ajustesDig.cobrados.tarjeta,
     };
+    for (const k of ['yape', 'plin', 'transferencia', 'tarjeta'] as const) {
+      devueltos[k] = enPesos(aCentimos(devueltos[k]) + aCentimos(ajustesDig.devueltos[k]));
+    }
     const neto = (clave: ClaveDigitalCierre) => enPesos(aCentimos(cobrados[clave]) - aCentimos(devueltos[clave]));
     return {
       ...montos,
