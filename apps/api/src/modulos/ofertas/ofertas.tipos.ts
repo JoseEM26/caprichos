@@ -20,16 +20,22 @@ export interface OpcionDetalleCombo {
   sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
 }
 
+/** Alternativa de una parte: producto y cantidad («si no hay stock, el cliente podrá elegir»). Mismo precio del combo. */
+export interface AlternativaParteItem extends OpcionDetalleCombo {
+  cantidad: number;
+}
+
 export interface ComboParteItem {
   id?: string;
   tipo: TipoComboParte;
   cantidad: number;
   categorias: string[];
   productos: string[];
-  /** Plan B, plan C...: ids de producto en orden (solo FIJO). */
-  reemplazos?: string[];
-  reemplazosDetalle?: { id: string; nombre: string }[];
-  /** Calculado en tiempo real. FIJO: principal si está, si no los reemplazos disponibles en orden. */
+  /** Alternativas en orden. Entrada: producto y cantidad; salida: además su disponibilidad ahora. */
+  alternativas?: AlternativaParteItem[];
+  /** Calculado en tiempo real: el original no alcanza y hay alguna alternativa con stock. */
+  alternativasActivas?: boolean;
+  /** Calculado en tiempo real. FIJO: principal si está, si no las alternativas disponibles en orden. */
   disponible?: boolean;
   opcionesDisponibles?: string[];
   principalNombre?: string;
