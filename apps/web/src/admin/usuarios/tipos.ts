@@ -69,6 +69,9 @@ export interface HorarioDiaApi {
   dia: number; // 0 = Domingo
   entrada: string;
   salida: string;
+  /** Almuerzo programado (opcional, ambos o ninguno) */
+  almuerzoInicio?: string | null;
+  almuerzoFin?: string | null;
 }
 
 export interface ReemplazoDiaApi {
