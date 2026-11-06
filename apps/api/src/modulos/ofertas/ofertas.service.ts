@@ -44,6 +44,7 @@ import {
   saborDisponible,
 } from './combo-disponibilidad.util';
 import { estaDisponible } from '../catalogo/catalogo.service';
+import { anfitrionBloqueadoPorPaso, opcionesSinStock } from '../stock/opcion-requiere';
 import {
   estaVigente,
   formatearFecha,
@@ -2304,6 +2305,54 @@ export class OfertasService {
     });
   }
 
+  /**
+   * Anfitriones de combo que no se venden por un paso obligatorio sin opciones por stock y sin alternativas en el combo.
+   * Misma regla que la carta (opcion-requiere.ts), con los grupos y las opciones del producto anfitrión.
+   */
+  private async anfitrionesBloqueadosPorPaso(combos: OfertaItem[]): Promise<Set<string>> {
+    const bloqueados = new Set<string>();
+    const hosts = combos.filter((c) => c.alcanceProductoId);
+    if (hosts.length === 0) return bloqueados;
+    const filas = await this.prisma.producto.findMany({
+      where: { id: { in: hosts.map((c) => BigInt(c.alcanceProductoId!)) } },
+      select: {
+        id: true,
+        grupos: {
+          select: {
+            grupo: {
+              select: {
+                activo: true,
+                obligatorio: true,
+                minimo: true,
+                opciones: { where: { activo: true }, select: { id: true, agotado_hasta: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    const sinStock = await opcionesSinStock(
+      this.prisma,
+      filas.flatMap((f: any) => f.grupos.flatMap((pg: any) => pg.grupo.opciones.map((o: any) => o.id))),
+    );
+    for (const f of filas as any[]) {
+      const pasos = f.grupos
+        .filter((pg: any) => pg.grupo.activo)
+        .map((pg: any) => ({
+          obligatorio: pg.grupo.obligatorio,
+          minimo: pg.grupo.minimo,
+          opciones: pg.grupo.opciones.map((o: any) => ({
+            disponible: estaDisponible(o.agotado_hasta) && !sinStock.has(o.id.toString()),
+            bloqueadaPorStock: sinStock.has(o.id.toString()),
+          })),
+        }));
+      const combo = hosts.find((c) => c.alcanceProductoId === f.id.toString());
+      const conAlternativas = (combo?.combosParte ?? []).some((p) => (p.alternativas ?? []).length > 0);
+      if (anfitrionBloqueadoPorPaso(pasos, conAlternativas)) bloqueados.add(f.id.toString());
+    }
+    return bloqueados;
+  }
+
   /** Agrega `disponible`, `motivoAgotado` y por parte `opcionesDisponibles` a los combos (tiempo real, no toca `activo`). */
   private async conDisponibilidad(items: OfertaItem[]): Promise<OfertaItem[]> {
     const combos = items.filter((i) => i.tipo === 'COMBO' && i.combosParte?.length);
@@ -2327,6 +2376,7 @@ export class OfertasService {
       agotadoHasta: f.agotado_hasta,
       ...stockDeProducto(f),
     }));
+    const hostsBloqueados = await this.anfitrionesBloqueadosPorPaso(combos);
     for (const c of combos) {
       const r = calcularDisponibilidadCombo(
         c.combosParte!.map((p) => ({ ...p, alternativas: p.alternativas ?? [] })),
@@ -2339,6 +2389,12 @@ export class OfertasService {
         (x) => c.combosParte!.some((p) => [...p.productos, ...(p.alternativas ?? []).map((a) => a.id)].includes(x.id) || p.categorias.includes(x.categoriaId)),
       );
       c.sinStock = !r.disponible && delCombo.some((x) => x.controlaStock && !x.oculto && estaDisponible(x.agotadoHasta) && !productoDisponible(x));
+      // El producto anfitrión (Dúo) no se vende si un paso obligatorio se quedó sin opciones por stock (misma regla que la carta)
+      if (c.alcanceProductoId && hostsBloqueados.has(c.alcanceProductoId)) {
+        c.disponible = false;
+        c.motivoAgotado = 'Sin stock de un paso obligatorio del combo';
+        c.sinStock = true;
+      }
       c.combosParte!.forEach((p, i) => {
         const rp = r.partes[i];
         p.disponible = rp.disponible;

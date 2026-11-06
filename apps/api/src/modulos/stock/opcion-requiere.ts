@@ -251,3 +251,25 @@ export async function lineasDeRequisitosOpcion(db: any, requisitos: RequisitoOpc
   }
   return lineas;
 }
+
+/** Un paso (grupo de opciones) tal como lo ve la carta: si sus opciones están bloqueadas por stock. */
+export interface PasoStock {
+  obligatorio: boolean;
+  minimo: number;
+  opciones: Array<{ disponible: boolean; bloqueadaPorStock: boolean }>;
+}
+
+/** Paso obligatorio sin ninguna opción pedible, y al menos una bloqueada por stock. */
+export function pasoObligatorioSinStock(g: PasoStock): boolean {
+  return (g.obligatorio || g.minimo > 0) && g.opciones.length > 0 && g.opciones.every((o) => !o.disponible) && g.opciones.some((o) => o.bloqueadaPorStock);
+}
+
+/** Paso opcional cuyas opciones están todas bloqueadas por stock: no se muestra (no bloquea ni se pregunta). */
+export function pasoOpcionalOcultoPorStock(g: PasoStock): boolean {
+  return !(g.obligatorio || g.minimo > 0) && g.opciones.length > 0 && g.opciones.every((o) => !o.disponible) && g.opciones.some((o) => o.bloqueadaPorStock);
+}
+
+/** Un anfitrión de combo no se vende si alguno de sus pasos obligatorios se quedó sin opciones por stock y el combo no tiene alternativas. */
+export function anfitrionBloqueadoPorPaso(pasos: PasoStock[], comboTieneAlternativas: boolean): boolean {
+  return !comboTieneAlternativas && pasos.some(pasoObligatorioSinStock);
+}
