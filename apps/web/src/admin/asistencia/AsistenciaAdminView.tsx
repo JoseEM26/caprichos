@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
+  desactivarEnlacePantalla,
+  estadoEnlacePantalla,
+  EstadoEnlacePantalla,
+  generarEnlacePantalla,
   ConfigAsistenciaAdmin,
   ETIQUETA_ESTADO,
   ETIQUETA_TIPO,
@@ -312,6 +316,68 @@ function ConfigTab({ onError, onOk }: { onError: (m: string | null) => void; onO
       {campo('localLat', 'Latitud del local')}
       {campo('localLng', 'Longitud del local')}
       <button type="button" onClick={() => void guardar()}>Guardar configuración</button>
+      <EnlacePantalla onError={onError} onOk={onOk} />
     </div>
+  );
+}
+
+/** Enlace secreto de la pantalla del local (tablet sin cuenta). El token en claro se muestra una sola vez. */
+function EnlacePantalla({ onError, onOk }: { onError: (m: string | null) => void; onOk: (m: string | null) => void }) {
+  const [estado, setEstado] = useState<EstadoEnlacePantalla | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    estadoEnlacePantalla().then(setEstado).catch((e) => onError(mensajeDe(e, 'No pudimos leer el enlace de la pantalla.')));
+  }, []);
+  const generar = async () => {
+    try {
+      const r = await generarEnlacePantalla();
+      setUrl(`${window.location.origin}${r.ruta}`);
+      setEstado({ activo: true, generadoEn: r.generadoEn });
+      onOk(estado?.activo ? 'Enlace regenerado. El anterior ya no funciona.' : 'Enlace generado.');
+    } catch (e) {
+      onError(mensajeDe(e, 'No se pudo generar el enlace.'));
+    }
+  };
+  const desactivar = async () => {
+    try {
+      setEstado(await desactivarEnlacePantalla());
+      setUrl(null);
+      onOk('Enlace desactivado.');
+    } catch (e) {
+      onError(mensajeDe(e, 'No se pudo desactivar el enlace.'));
+    }
+  };
+  const copiar = async () => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      onOk('Enlace copiado.');
+    } catch {
+      onError('No se pudo copiar. Selecciona el enlace y cópialo a mano.');
+    }
+  };
+  if (!estado) return <div role="status">Cargando enlace…</div>;
+  return (
+    <section aria-label="Enlace de la pantalla" style={{ display: 'grid', gap: 8, borderTop: '1px solid #ddd', paddingTop: 12 }}>
+      <strong>Pantalla del QR (tablet del local)</strong>
+      <div style={{ fontSize: 14 }}>
+        Cualquiera con este enlace ve el código; guárdalo solo en la tablet del local.
+      </div>
+      {url && (
+        <div style={{ display: 'grid', gap: 6 }}>
+          <input readOnly value={url} aria-label="Enlace de la pantalla" onFocus={(e) => e.currentTarget.select()} />
+          <button type="button" onClick={() => void copiar()}>Copiar</button>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" onClick={() => void generar()}>
+          {estado.activo ? 'Regenerar' : 'Generar enlace de la pantalla'}
+        </button>
+        {estado.activo && <button type="button" onClick={() => void desactivar()}>Desactivar</button>}
+      </div>
+      {estado.activo && estado.generadoEn && (
+        <div style={{ fontSize: 12, color: '#666' }}>Enlace activo desde {new Date(estado.generadoEn).toLocaleString('es-PE')}. Regenerar invalida el anterior.</div>
+      )}
+    </section>
   );
 }

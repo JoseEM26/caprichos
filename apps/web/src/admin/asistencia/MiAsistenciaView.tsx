@@ -244,7 +244,7 @@ export function MiAsistenciaView() {
             onClick={() => empezar(pendiente ?? hoy.permitidas[0])}
             style={{ padding: '24px 16px', fontSize: 22, borderRadius: 16, width: '100%' }}
           >
-            {pendiente ? `Marcar ${ETIQUETA_TIPO[pendiente]}` : 'Marcar'}
+            {pendiente ? 'Escanear QR' : 'Marcar'}
           </button>
           {hoy.permitidas.length > 1 && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

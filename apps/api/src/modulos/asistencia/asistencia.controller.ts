@@ -10,7 +10,7 @@ const ipDe = (req: any): string | undefined => {
 };
 
 /** Lo que cualquier persona con horario ve y hace de su propia asistencia (celular). */
-@Controller('asistencia')
+@Controller('admin/asistencia')
 @UseGuards(AccesoGuard)
 export class AsistenciaController {
   constructor(private readonly asistencia: AsistenciaService) {}

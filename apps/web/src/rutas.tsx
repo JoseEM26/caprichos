@@ -10,6 +10,7 @@ import { CartaPublica } from './carta/CartaPublica';
 import { TerminosPage, PrivacidadPage, ReclamosPublicoPage } from './carta/legal';
 import { PantallaCocinaView } from './pantalla/PantallaCocinaView';
 import { PaginaMascota } from './mascota/PaginaMascota';
+import { PantallaAsistenciaPublica } from './admin/asistencia';
 
 export function RutasApp() {
   return (
@@ -20,6 +21,8 @@ export function RutasApp() {
       <Route path="/legal/privacidad" element={<PrivacidadPage />} />
       <Route path="/reclamos" element={<ReclamosPublicoPage />} />
       <Route path="/mascota" element={<PaginaMascota />} />
+      {/* Pantalla del QR de asistencia del local: sin sesión, el enlace secreto va en la ruta */}
+      <Route path="/asistencia/pantalla/:token" element={<PantallaAsistenciaPublica />} />
 
       {/* 2. Pantallas de cocina y TV */}
       <Route

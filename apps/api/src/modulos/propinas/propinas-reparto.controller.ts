@@ -70,7 +70,7 @@ export class PropinasRepartoController {
 }
 
 /** «Mi asistencia»: cada persona ve solo su propia parte de los repartos aprobados o pagados. */
-@Controller('asistencia')
+@Controller('admin/asistencia')
 @UseGuards(AccesoGuard)
 export class PropinasMiController {
   constructor(private readonly reparto: PropinasRepartoService) {}

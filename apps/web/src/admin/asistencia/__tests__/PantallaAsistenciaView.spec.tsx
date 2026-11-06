@@ -2,8 +2,14 @@ import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pantallaQr = vi.fn();
-vi.mock('../asistenciaApi', async (orig) => ({ ...(await orig<any>()), pantallaQr: (...a: any[]) => pantallaQr(...a) }));
+const pantallaQrPublica = vi.fn();
+vi.mock('../asistenciaApi', async (orig) => ({
+  ...(await orig<any>()),
+  pantallaQr: (...a: any[]) => pantallaQr(...a),
+  pantallaQrPublica: (...a: any[]) => pantallaQrPublica(...a),
+}));
 
+import { ErrorApi } from '../../../comun/api';
 import { PantallaAsistenciaView } from '../PantallaAsistenciaView';
 
 const respuesta = (ahora: number, slot: number, codigo: string) => ({
@@ -20,6 +26,7 @@ describe('PantallaAsistenciaView (QR de asistencia)', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-11-06T13:00:10Z'));
     pantallaQr.mockReset();
+    pantallaQrPublica.mockReset();
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -51,5 +58,47 @@ describe('PantallaAsistenciaView (QR de asistencia)', () => {
     });
     expect(pantallaQr).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('codigo-corto')).toHaveTextContent('222 222');
+  });
+
+  describe('pantalla pública con enlace secreto', () => {
+    it('pide el QR con el token y lo muestra', async () => {
+      const slot = Math.floor(Date.parse('2026-11-06T13:00:10Z') / 30_000);
+      pantallaQrPublica.mockResolvedValue(respuesta(Date.parse('2026-11-06T13:00:10Z'), slot, '123 456'));
+      await act(async () => {
+        render(<PantallaAsistenciaView token="tok-123" />);
+      });
+      expect(pantallaQrPublica).toHaveBeenCalledWith('tok-123');
+      expect(pantallaQr).not.toHaveBeenCalled();
+      expect(screen.getByTestId('qr-asistencia')).toHaveAttribute('src', `data:image/png;base64,${slot}`);
+      expect(screen.getByTestId('codigo-corto')).toHaveTextContent('123 456');
+    });
+
+    it('si falla la red, reintenta y luego muestra el QR', async () => {
+      const slot = Math.floor(Date.parse('2026-11-06T13:00:10Z') / 30_000);
+      pantallaQrPublica
+        .mockRejectedValueOnce(new ErrorApi('ERROR_RED', 'sin red'))
+        .mockResolvedValueOnce(respuesta(Date.parse('2026-11-06T13:00:10Z'), slot, '777 777'));
+      await act(async () => {
+        render(<PantallaAsistenciaView token="tok-123" />);
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent('Reintentando');
+      await act(async () => {
+        vi.advanceTimersByTime(5_100);
+      });
+      expect(pantallaQrPublica).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId('codigo-corto')).toHaveTextContent('777 777');
+    });
+
+    it('con enlace inválido (404) avisa y no reintenta', async () => {
+      pantallaQrPublica.mockRejectedValue(new ErrorApi('NO_ENCONTRADO', 'Not Found', 404));
+      await act(async () => {
+        render(<PantallaAsistenciaView token="viejo" />);
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent('Este enlace ya no es válido');
+      await act(async () => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(pantallaQrPublica).toHaveBeenCalledTimes(1);
+    });
   });
 });
