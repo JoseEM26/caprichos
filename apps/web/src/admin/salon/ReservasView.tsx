@@ -7,6 +7,7 @@ import { PisoSalon, Reserva } from './tipos';
 import { ModalFormularioReserva } from './componentes/ModalFormularioReserva';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ConfirmarAprobacionSolicitud } from './componentes/ConfirmarAprobacionSolicitud';
+import { etiquetaMesas } from './componentes/SelectorMesasCroquis';
 import { hoyLima, partesLima } from './fechaLima';
 import { useSalonSocket } from './useSalonSocket';
 import { salonApi } from './api';
@@ -73,9 +74,6 @@ export function ReservasView() {
   const [modalNuevoPedidoAbierto, setModalNuevoPedidoAbierto] = useState(false);
   const [mesasParaPedido, setMesasParaPedido] = useState<string[]>([]);
   const [reservaIdParaPedido, setReservaIdParaPedido] = useState<string | undefined>(undefined);
-
-  // Modal selector de mesa para solicitud WhatsApp
-  const [solicitudParaAsignar, setSolicitudParaAsignar] = useState<SolicitudWhatsApp | null>(null);
 
   // Confirmaciones Sí/No
   const [confirmarAprobarSol, setConfirmarAprobarSol] = useState<SolicitudWhatsApp | null>(null);
@@ -701,7 +699,7 @@ export function ReservasView() {
 
                   <button
                     type="button"
-                    onClick={() => setSolicitudParaAsignar(r)}
+                    onClick={() => setConfirmarAprobarSol(r)}
                     style={{
                       minHeight: '48px',
                       border: '1.5px solid var(--cp-navy)',
@@ -1062,7 +1060,7 @@ export function ReservasView() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {reservasDelDia.map((r) => {
               const horaTexto = partesLima(r.hora).hora || '19:00';
-              const mesaNom = (r.mesas || []).map((m) => m.nombre || `M0${m.numero}`).join(' + ');
+              const mesaNom = etiquetaMesas(r.mesas || []);
 
               return (
                 <div
@@ -1309,7 +1307,7 @@ export function ReservasView() {
             const lima = partesLima(r.hora);
             const fechaStr = lima.fecha ? `${lima.fecha.slice(8, 10)}/${lima.fecha.slice(5, 7)}` : '15/10';
             const horaStr = lima.hora || '19:00';
-            const mesaNom = (r.mesas || []).map((m) => m.nombre || `M0${m.numero}`).join(' + ');
+            const mesaNom = etiquetaMesas(r.mesas || []);
 
             const badgeBg =
               r.estado === 'SENTADA'
@@ -1478,9 +1476,10 @@ export function ReservasView() {
       {confirmarAprobarSol && (
         <ConfirmarAprobacionSolicitud
           solicitud={confirmarAprobarSol}
-          mesas={todasLasMesas}
-          alAprobar={async ({ mesas, hora }) => {
-            await salonApi.aprobarSolicitud(confirmarAprobarSol.id, { mesas, hora });
+          pisos={pisosSalon}
+          obtenerOcupadas={(fecha, hora) => salonApi.mesasOcupadas(fecha, hora)}
+          alAprobar={async ({ mesas, hora, confirmarCapacidad }) => {
+            await salonApi.aprobarSolicitud(confirmarAprobarSol.id, { mesas, hora, confirmarCapacidad });
             setSolicitudes((prev) =>
               prev.map((s) =>
                 s.id === confirmarAprobarSol.id ? { ...s, estado: 'aprobada' as const } : s,
@@ -1594,131 +1593,6 @@ export function ReservasView() {
         errorServidor={errorFormulario}
         alLimpiarError={() => setErrorFormulario(null)}
       />
-
-      {/* Modal Asignar Mesa en el Plano para Solicitud WhatsApp */}
-      {solicitudParaAsignar && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Asignar mesa en el plano"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 85,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <div
-            onClick={() => setSolicitudParaAsignar(null)}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 50,
-              background: 'rgba(11, 44, 62, 0.55)',
-            }}
-          />
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 60,
-              width: 'min(540px, calc(100% - 24px))',
-              background: 'var(--cp-cream)',
-              borderRadius: '20px',
-              padding: '20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 800,
-                  fontSize: '18px',
-                  color: 'var(--cp-navy)',
-                }}
-              >
-                Mesa para {solicitudParaAsignar.nombre}
-              </div>
-              <button
-                type="button"
-                onClick={() => setSolicitudParaAsignar(null)}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '18px',
-                  border: '1.5px solid var(--cp-navy)',
-                  background: 'transparent',
-                  fontWeight: 800,
-                  fontSize: '18px',
-                  cursor: 'pointer',
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-              Elige una mesa con al menos {solicitudParaAsignar.personas} asientos:
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-                gap: '8px',
-                maxHeight: '300px',
-                overflowY: 'auto',
-              }}
-            >
-              {todasLasMesas.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    const mesaTxt = m.nombre || `Mesa ${m.numero}`;
-                    setSolicitudes((prev) =>
-                      prev.map((s) =>
-                        s.id === solicitudParaAsignar.id
-                          ? { ...s, mesa: mesaTxt, mesasIds: [m.id] }
-                          : s,
-                      ),
-                    );
-                    setSolicitudParaAsignar(null);
-                  }}
-                  style={{
-                    minHeight: '64px',
-                    borderRadius: '12px',
-                    border: '1.5px solid var(--cp-navy)',
-                    background: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    cursor: 'pointer',
-                    fontWeight: 800,
-                  }}
-                >
-                  <span>{m.nombre || `Mesa ${m.numero}`}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                    {m.asientos || 4} asientos
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal Nuevo Pedido de Mesa (conectado con Sentar) */}
       {modalNuevoPedidoAbierto && (

@@ -20,13 +20,13 @@ export function PasoFechaHora({ opciones, fecha, hora, onFecha, onHora, ahora = 
     .filter((iso) => horarioDelDia(iso, opciones) !== null);
 
   const horario = fecha ? horarioDelDia(fecha, opciones) : null;
-  const horas = horario ? horasDelDia(horario.abre, horario.cierra) : [];
+  const horas = horario ? horasDelDia(horario.abre, horario.ultimo) : [];
 
   const elegirDia = (iso: string) => {
     onFecha(iso);
     // si la hora elegida antes ya no vale para ese día, se limpia
     const nuevo = horarioDelDia(iso, opciones);
-    if (!nuevo || horaPasada(iso, hora, ahora) || !horasDelDia(nuevo.abre, nuevo.cierra).includes(hora)) onHora('');
+    if (!nuevo || horaPasada(iso, hora, ahora) || !horasDelDia(nuevo.abre, nuevo.ultimo).includes(hora)) onHora('');
   };
 
   if (dias.length === 0) {

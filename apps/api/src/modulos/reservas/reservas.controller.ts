@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -115,6 +116,26 @@ export class ReservasController {
   async sentar(@Param('id') id: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.reservasService.sentar(id, req.usuario, ip);
+  }
+
+  /**
+   * GET /admin/reservas/mesas-ocupadas (reservas/ver)
+   * Mesas que otras reservas activas ocupan a esa fecha y hora (hora Lima). Lo usa el croquis
+   * al aprobar o editar: `excluir` deja fuera la reserva que se está editando.
+   */
+  @Get('mesas-ocupadas')
+  @Permiso('reservas', 'ver')
+  async mesasOcupadas(
+    @Query('fecha') fecha: string,
+    @Query('hora') hora: string,
+    @Query('excluir') excluir?: string,
+  ) {
+    const instante = new Date(`${fecha}T${hora}:00-05:00`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha ?? '') || !/^\d{2}:\d{2}$/.test(hora ?? '') || isNaN(instante.getTime())) {
+      throw new BadRequestException({ codigo: 'FORMATO_INVALIDO', mensaje: 'Indica la fecha y la hora de la reserva' });
+    }
+    const excluirId = excluir && /^\d+$/.test(excluir) ? BigInt(excluir) : null;
+    return this.reservasService.mesasOcupadasEn(instante, excluirId);
   }
 
   /**

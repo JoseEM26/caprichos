@@ -16,7 +16,7 @@ const OPCIONES: OpcionesReserva = {
   activa: true,
   diasMax: 30,
   personasMax: 8,
-  horarios: [0, 1, 2, 3, 4, 5, 6].map((dia) => ({ dia, abre: '12:00', cierra: '23:00' })),
+  horarios: [0, 1, 2, 3, 4, 5, 6].map((dia) => ({ dia, abre: '12:00', cierra: '23:00', ultimo: '22:00' })),
   fechasCerradas: [],
   fechasEspeciales: [],
 };
@@ -150,14 +150,14 @@ describe('Reservar mesa ▸ hoja de tres pasos', () => {
   });
 
   it('el paso de día solo ofrece los días con atención y las horas de media en media hora', () => {
-    const dialogo = abrirHoja({ ...OPCIONES, horarios: [{ dia: 2, abre: '12:00', cierra: '13:00' }], fechasCerradas: [] });
+    const dialogo = abrirHoja({ ...OPCIONES, horarios: [{ dia: 2, abre: '12:00', cierra: '14:00', ultimo: '13:00' }], fechasCerradas: [] });
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Siguiente' }));
     // Solo los martes (dia 2) aparecen como chips de día
     const chipsDia = within(dialogo).getAllByRole('button').filter((b) => /, (mar|mié|lun|jue|vie|sáb|dom)/i.test(b.getAttribute('aria-label') ?? ''));
     expect(chipsDia.length).toBeGreaterThan(0);
     for (const chip of chipsDia) expect(chip.getAttribute('aria-label')).toMatch(/mar/);
     fireEvent.click(chipsDia[0]);
-    // 12:00 a 13:00 cada 30 min: 12:00, 12:30, 1:00 pm
+    // 12:00 hasta la última hora de inicio (13:00, con cierre 14:00) cada 30 min: 12:00, 12:30, 1:00 pm
     expect(within(dialogo).getByRole('button', { name: '12:00 pm' })).toBeInTheDocument();
     expect(within(dialogo).getByRole('button', { name: '12:30 pm' })).toBeInTheDocument();
     expect(within(dialogo).getByRole('button', { name: '1:00 pm' })).toBeInTheDocument();
