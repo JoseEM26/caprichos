@@ -18,12 +18,13 @@ DECLARE
 BEGIN
   SELECT COALESCE(array_agg(DISTINCT o.id), '{}'::BIGINT[]) INTO v_opciones
   FROM opcion o
+  JOIN lista_valor lv ON lv.id = o.valor_id
   JOIN grupo_opciones g ON g.id = o.grupo_id
   JOIN producto_grupo pg ON pg.grupo_id = g.id
   JOIN producto p ON p.id = pg.producto_id
   WHERE upper(trim(p.nombre)) IN ('DÚO PARA COMPARTIR', 'DUO PARA COMPARTIR', 'DÚO IRRESISTIBLE', 'DUO IRRESISTIBLE')
     AND lower(trim(g.nombre)) LIKE 'galleta%'
-    AND lower(trim(o.nombre)) IN ('choco chips', 'avena y pasas', 'red velvet');
+    AND lower(trim(lv.nombre)) IN ('choco chips', 'avena y pasas', 'red velvet');
 
   IF cardinality(v_opciones) = 0 THEN
     RAISE NOTICE 'combos_galleta_sin_sabor: no hay opciones de sabor de galleta en los combos Dúo, no se hace nada';
