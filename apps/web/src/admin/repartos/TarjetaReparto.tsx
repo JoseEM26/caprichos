@@ -30,6 +30,10 @@ interface TarjetaRepartoProps {
   esMio?: boolean;
   esDisponible?: boolean;
   puedeLiquidar?: boolean;
+  /** Solo ADMIN: «Tomar como repartidor». */
+  puedeTomar?: boolean;
+  /** Solo ADMIN y CAJERO: modal de excepción Soltar / reasignar (motivo obligatorio). */
+  alSoltar?: (pedido: PedidoReparto) => void;
   alActualizar: () => void;
   paradaNumero?: number;
   distanciaAprox?: string;
@@ -40,6 +44,8 @@ export function TarjetaReparto({
   esMio = false,
   esDisponible = false,
   puedeLiquidar = false,
+  puedeTomar = false,
+  alSoltar,
   alActualizar,
   paradaNumero,
   distanciaAprox,
@@ -249,26 +255,6 @@ export function TarjetaReparto({
         } catch (err: any) {
           setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
           setErrorAccion(err instanceof ErrorApi ? err.message : 'Error al entregar pedido');
-        } finally {
-          setCargandoAccion(false);
-        }
-      },
-    );
-  };
-
-  const handleLiberar = () => {
-    pedirConfirmacion(
-      '¿Liberar este pedido?',
-      `El pedido ${pedido.codigo} volverá a la lista de pedidos disponibles sin repartidor asignado.`,
-      async () => {
-        try {
-          setCargandoAccion(true);
-          await repartosApi.liberarPedido(pedido.id, 'Liberado por caja/administrador');
-          setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-          alActualizar();
-        } catch (err: any) {
-          setConfirmarAccion((prev) => ({ ...prev, abierto: false }));
-          setErrorAccion(err instanceof ErrorApi ? err.message : 'Error al liberar pedido');
         } finally {
           setCargandoAccion(false);
         }
@@ -574,10 +560,10 @@ export function TarjetaReparto({
             <div>
               Alerta caja: Tomado hace {pedido.minutos_sin_salir ?? 10} min sin salir (posible repartidor desconectado)
             </div>
-            {puedeLiquidar && (
+            {alSoltar && (
               <button
                 type="button"
-                onClick={handleLiberar}
+                onClick={() => alSoltar(pedido)}
                 disabled={cargandoAccion}
                 style={{
                   alignSelf: 'flex-start',
@@ -592,17 +578,17 @@ export function TarjetaReparto({
                   cursor: 'pointer',
                 }}
               >
-                Liberar a disponibles
+                Soltar / reasignar
               </button>
             )}
           </div>
         )}
 
         {/* Liberar pedido por caja/administrador */}
-        {puedeLiquidar && (pedido.repartidor || pedido.repartidor_party_id) && pedido.estado !== 'ENTREGADO' && !pedido.alerta_tomado_sin_salir && (
+        {alSoltar && (pedido.repartidor || pedido.repartidor_party_id) && pedido.estado !== 'ENTREGADO' && !pedido.alerta_tomado_sin_salir && (
           <button
             type="button"
-            onClick={handleLiberar}
+            onClick={() => alSoltar(pedido)}
             disabled={cargandoAccion}
             style={{
               minHeight: '38px',
@@ -617,7 +603,7 @@ export function TarjetaReparto({
               alignSelf: 'flex-start',
             }}
           >
-            Liberar pedido (caja)
+            Soltar / reasignar
           </button>
         )}
 
@@ -825,7 +811,7 @@ export function TarjetaReparto({
         ) : null}
 
         {/* Botones de acción principales según pantalla */}
-        {esDisponible && (
+        {esDisponible && puedeTomar && (
           pedido.lat == null || pedido.lng == null ? (
             <Boton
               disabled
@@ -851,7 +837,7 @@ export function TarjetaReparto({
                 width: '100%',
               }}
             >
-              Tomar pedido
+              Tomar como repartidor
             </Boton>
           )
         )}
