@@ -66,7 +66,7 @@ describe('SUPERVISOR se autoriza sola, como el ADMIN (no escribe el código)', (
     expect(redis.incr).not.toHaveBeenCalled();
     const [registro] = autorizaciones(auditoria);
     expect(registro[0].partyId).toBe(SUPERVISOR);
-    expect(registro[0].motivo).toContain('rol SUPERVISOR');
+    expect(registro[0].motivo).toContain('aprobó');
   });
 
   it('el CAJERO sigue escribiendo el código: sin código 403 CODIGO_INVALIDO y cuenta el intento', async () => {
@@ -100,7 +100,8 @@ describe('quién queda como autorizador', () => {
 
     const [registro] = autorizaciones(auditoria).slice(-1).map(([a]: any[]) => a);
     expect(registro.partyId).toBe(CAJERO);
-    expect(registro.motivo).toContain(`Autoriza el supervisor ${SUPERVISOR}`);
+    expect(registro.motivo).toContain('Aprobó:');
+    expect(registro.despues).toEqual({ aprobadorPartyId: String(SUPERVISOR) });
   });
 
   it('si nadie mostró el código en la ventana reciente, mantiene el respaldo del ADMIN activo', async () => {
@@ -108,6 +109,17 @@ describe('quién queda como autorizador', () => {
     const { codigo } = await service.obtenerCodigoActual(SUPERVISOR);
     await redis.del('supervisor:visor:CAPRICHOS');
 
+    const r = await service.verificarYConsumirCodigo(codigo, CAJERO, 'caja/cobrar');
+    expect(r.party_id).toBe(ADMIN);
+  });
+
+  it('si el SUPERVISOR que mostró el código ya no tiene el rol (retirado o vencido), no aprueba: cae al respaldo del ADMIN', async () => {
+    const { service } = montar();
+    const { codigo } = await service.obtenerCodigoActual(SUPERVISOR);
+    // Le quitan el rol: ya no es ADMIN ni SUPERVISOR vigente
+    (service as any).prisma.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
+      where.party_id === undefined || where.party_id === ADMIN ? { party_id: ADMIN, id: 10n, rol: 'ADMIN' } : null,
+    );
     const r = await service.verificarYConsumirCodigo(codigo, CAJERO, 'caja/cobrar');
     expect(r.party_id).toBe(ADMIN);
   });

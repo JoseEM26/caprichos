@@ -15,6 +15,8 @@ export interface UsuarioItem {
   avisosCorreo?: boolean;
   /** Disponible 24/7 (recibe avisos si nadie con casilla está de turno). */
   horario24_7?: boolean;
+  /** Roles extra con fecha de fin vigente (rol temporal). */
+  rolesTemporales?: Array<{ rol: string; nombre: string; venceEn: string | null; motivo: string | null }>;
   activo: boolean;
   debeCambiar: boolean;
   altaEn?: string;

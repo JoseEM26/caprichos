@@ -107,6 +107,7 @@ model Rol {
   permisos       RolPermiso[]
   usuarios       UserAccount[]
   usuariosExtra  UserAccountRol[]
+  historialRolesExtra UserAccountRolHistorial[]
   notificaciones Notificacion[]
 
   @@map("rol")
@@ -116,11 +117,36 @@ model Rol {
 model UserAccountRol {
   user_account_id BigInt
   rol             String
+  /// Quién lo otorgó (party del ADMIN).
+  otorgado_por    BigInt?
+  otorgado_en     DateTime    @default(now()) @db.Timestamptz
+  /// Hasta cuándo vale el rol. NULL = permanente (hasta que el ADMIN lo quite).
+  vence_en        DateTime?   @db.Timestamptz
+  motivo          String?
   cuenta          UserAccount @relation(fields: [user_account_id], references: [id])
   r               Rol         @relation(fields: [rol], references: [codigo])
 
   @@id([user_account_id, rol])
+  @@index([vence_en], map: "ix_user_account_rol_vence")
   @@map("user_account_rol")
+}
+
+/// Historial permanente e inmutable de los roles extra: otorgado, retirado o vencido.
+model UserAccountRolHistorial {
+  id              BigInt      @id @default(autoincrement())
+  user_account_id BigInt
+  rol             String
+  accion          String      // OTORGADO | RETIRADO | VENCIDO
+  quien_party_id  BigInt?
+  desde           DateTime?   @db.Timestamptz
+  hasta           DateTime?   @db.Timestamptz
+  motivo          String?
+  en              DateTime    @default(now()) @db.Timestamptz
+  cuenta          UserAccount @relation(fields: [user_account_id], references: [id])
+  r               Rol         @relation(fields: [rol], references: [codigo])
+
+  @@index([user_account_id, en], map: "ix_user_account_rol_historial_cuenta")
+  @@map("user_account_rol_historial")
 }
 
 /// Áreas de cocina que atiende un usuario con rol COCINA. Sin filas = ve todas las áreas.
@@ -172,6 +198,7 @@ model UserAccount {
   party                 Party                  @relation(fields: [party_id], references: [id])
   r                     Rol                    @relation(fields: [rol], references: [codigo])
   rolesExtra            UserAccountRol[]
+  rolesHistorial        UserAccountRolHistorial[]
   areasCocina           UserAccountArea[]
   iniciativasCreadas    Iniciativa[]           @relation("IniciativasCreadas")
   iniciativasCambiadas  Iniciativa[]           @relation("IniciativasCambiadas")

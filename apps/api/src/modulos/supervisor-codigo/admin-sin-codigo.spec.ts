@@ -54,7 +54,7 @@ describe('ADMIN sin código de supervisor', () => {
           resultado: 'OK',
           entidad: 'local',
           entidadId: 5n,
-          motivo: 'Acción local/horario: autorizado por rol ADMIN (sin código)',
+          motivo: 'Acción local/horario: aprobó Usuario 1 (sin código)',
         }),
       );
     });
@@ -65,7 +65,7 @@ describe('ADMIN sin código de supervisor', () => {
       const r = await autorizarAdminSinCodigo(prisma, auditoria, 3n, 'caja/cobrar', undefined, 'cobro', 9n);
       expect(r).toEqual({ party_id: 3n, id: 30n });
       expect(auditoria.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({ accion: 'AUTORIZACION_SUPERVISOR', partyId: 3n, motivo: 'Acción caja/cobrar: autorizado por rol SUPERVISOR (sin código)' }),
+        expect.objectContaining({ accion: 'AUTORIZACION_SUPERVISOR', partyId: 3n, motivo: 'Acción caja/cobrar: aprobó Usuario 3 (sin código)' }),
       );
     });
 
@@ -174,7 +174,7 @@ describe('SUPERVISOR sin código de supervisor (misma regla que el ADMIN)', () =
         resultado: 'OK',
         entidad: 'caja',
         entidadId: 7n,
-        motivo: 'Acción cierre: autorizado por rol SUPERVISOR (sin código)',
+        motivo: 'Acción cierre: aprobó Usuario 3 (sin código)',
       }),
     );
   });

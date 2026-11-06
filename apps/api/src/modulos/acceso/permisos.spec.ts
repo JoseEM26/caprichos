@@ -1,5 +1,19 @@
 import { MATRIZ } from './permisos';
 
+describe('iniciativas: todo el personal ve, crea y comenta; cambiar estado solo ADMIN y SUPERVISOR', () => {
+  const roles = ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO', 'COCINA', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR'];
+  it('cada rol del catálogo puede ver, crear y comentar', () => {
+    for (const r of roles) {
+      expect(MATRIZ[r]).toEqual(expect.arrayContaining(['iniciativas/ver', 'iniciativas/crear', 'iniciativas/comentar']));
+    }
+  });
+  it('solo ADMIN y SUPERVISOR cambian el estado', () => {
+    for (const r of roles) {
+      expect(MATRIZ[r].includes('iniciativas/cambiar_estado')).toBe(['ADMIN', 'SUPERVISOR'].includes(r));
+    }
+  });
+});
+
 describe('matriz de permisos del CAJERO (cie-fix, cambio 4)', () => {
   const cajero = MATRIZ.CAJERO;
 
@@ -9,8 +23,8 @@ describe('matriz de permisos del CAJERO (cie-fix, cambio 4)', () => {
     );
   });
 
-  it('no tiene iniciativas, compras, clientes, configuración, usuarios, stock, informes ni anulación de pedidos', () => {
-    const prohibidos = ['iniciativas/', 'compras/', 'clientes/', 'configuracion/', 'usuarios/', 'stock/', 'informes/', 'pedidos/anular'];
+  it('no tiene compras, clientes, configuración, usuarios, stock, informes ni anulación de pedidos', () => {
+    const prohibidos = ['compras/', 'clientes/', 'configuracion/', 'usuarios/', 'stock/', 'informes/', 'pedidos/anular'];
     for (const prefijo of prohibidos) {
       expect(cajero.filter((p) => p.startsWith(prefijo))).toEqual([]);
     }

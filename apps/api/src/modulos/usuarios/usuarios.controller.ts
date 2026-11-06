@@ -28,11 +28,53 @@ import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.
 import { DesactivarUsuarioDto } from './dto/desactivar-usuario.dto';
 import { ReactivarUsuarioDto } from './dto/reactivar-usuario.dto';
 import { EditarPeriodoDto } from './dto/editar-periodo.dto';
+import { OtorgarRolExtraDto } from './dto/rol-temporal.dto';
+import { UsuariosRolesService } from './usuarios-roles.service';
+import { UsuariosActividadService } from './usuarios-actividad.service';
 
 @Controller('admin/usuarios')
 @UseGuards(AccesoGuard)
 export class UsuariosController {
-  constructor(private readonly usuariosService: UsuariosService) {}
+  constructor(
+    private readonly usuariosService: UsuariosService,
+    private readonly rolesService: UsuariosRolesService,
+    private readonly actividadService: UsuariosActividadService,
+  ) {}
+
+  /** Da un rol extra (temporal si trae fecha de fin). Solo ADMIN; queda en el historial de roles. */
+  @Post(':id/roles-extra')
+  @Permiso('usuarios', 'editar')
+  async otorgarRol(@Param('id') id: string, @Body() dto: OtorgarRolExtraDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.rolesService.otorgar(id, dto, req.usuario, ip);
+  }
+
+  /** Quita un rol extra (temporal o permanente) cuando el ADMIN quiera. Solo ADMIN. */
+  @Delete(':id/roles-extra/:rol')
+  @Permiso('usuarios', 'editar')
+  async retirarRol(@Param('id') id: string, @Param('rol') rol: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.rolesService.retirar(id, rol, req.usuario, ip);
+  }
+
+  /** Línea de tiempo de una persona: cambios de su cuenta, roles, horario, asistencia y lo que hizo. Solo ADMIN. */
+  @Get(':id/actividad')
+  @Permiso('usuarios', 'ver')
+  async actividad(
+    @Param('id') id: string,
+    @Query('tipo') tipo: string,
+    @Query('desde') desde: string,
+    @Query('hasta') hasta: string,
+    @Query('pagina') pagina: string,
+    @Query('limite') limite: string,
+    @Req() req: any,
+  ) {
+    return this.actividadService.listar(
+      id,
+      { tipo, desde, hasta, pagina: Number(pagina) || undefined, limite: Number(limite) || undefined },
+      req.usuario,
+    );
+  }
 
   @Get()
   @Permiso('usuarios', 'ver')

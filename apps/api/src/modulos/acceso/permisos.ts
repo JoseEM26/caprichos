@@ -213,6 +213,10 @@ export const MATRIZ: Record<string, string[]> = {
     'propinas/ver',
     'cocina/ver',
     'catalogo/ver',
+    // Iniciativas: todo el personal ve, crea y comenta (el cambio de estado es solo ADMIN y SUPERVISOR)
+    'iniciativas/ver',
+    'iniciativas/crear',
+    'iniciativas/comentar',
     'comprobantes/ver',
     'comprobantes/reimprimir',
     'mesas/ver',
@@ -338,7 +342,10 @@ for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'CALLCENTER', 'ALMACEN', 'REPARTI
 // No recibe diseño de carta, Novedades, informes, usuarios, configuración ni compras (ver la tabla del informe).
 // Y su escritorio operativo (conteos, sin montos).
 // El conteo de apertura (almacen/apertura) no lo tiene el supervisor: sin administración de stock.
-MATRIZ.SUPERVISOR = [...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo'])].filter(
+// Iniciativas: cambiar el estado (NUEVA, EN_REVISION, HECHA, NO_POR_AHORA) lo tienen ADMIN y SUPERVISOR.
+MATRIZ.SUPERVISOR = [
+  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo', 'iniciativas/cambiar_estado']),
+].filter(
   // Sin dinero: el supervisor no cambia ubicación con cobro (ni el conteo de apertura)
   (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion',
 );

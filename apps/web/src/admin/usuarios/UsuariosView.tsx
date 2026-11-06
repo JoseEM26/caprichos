@@ -9,6 +9,7 @@ import { CrearUsuarioModal, ETIQUETAS_ROLES } from './CrearUsuarioModal';
 import { EditarUsuarioModal } from './EditarUsuarioModal';
 import { ClaveInicialModal } from './ClaveInicialModal';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
+import { fechaLimaCorta } from './rolesTemporalesApi';
 
 type PestanaUsuario = 'personal' | 'clientes' | 'horarios' | 'roles';
 
@@ -816,6 +817,12 @@ export function UsuariosView() {
                       <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
                         <span style={{ fontWeight: 700 }}>{u.dni.slice(0, 4)}</span> · {ETIQUETAS_ROLES[u.rol] || u.rol}
                         {(u.roles ?? []).filter((r) => r !== u.rol).map((r) => ` + ${(ETIQUETAS_ROLES[r] || r).split(' (')[0]}`).join('')} · CAPRICHOS
+                        {(u.rolesTemporales ?? []).map((t) => (
+                          <span key={t.rol} style={{ display: 'block', color: 'var(--cp-orange)', fontWeight: 700 }}>
+                            Temporal · {ETIQUETAS_ROLES[t.rol] || t.rol}
+                            {t.venceEn ? ` hasta ${fechaLimaCorta(t.venceEn)}` : ' sin fecha de fin'}
+                          </span>
+                        ))}
                       </div>
                     </div>
                     <span
@@ -1477,6 +1484,7 @@ export function UsuariosView() {
             setUsuarioEditando(null);
             cargarUsuarios();
           }}
+          alCambiarRoles={() => void cargarUsuarios()}
         />
       )}
 
