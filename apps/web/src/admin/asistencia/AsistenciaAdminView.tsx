@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   desactivarEnlacePantalla,
   estadoEnlacePantalla,
@@ -60,8 +61,16 @@ function Chip({ estado }: { estado: string }) {
 
 const SIN_UBICACION = 'Aún no configuras la ubicación del local: nadie podrá marcar';
 
+const PESTANAS: Pestana[] = ['hoy', 'mes', 'marcas', 'config', 'pantalla'];
+
 export function AsistenciaAdminView() {
-  const [pestana, setPestana] = useState<Pestana>('hoy');
+  // Enlace directo (lo usa Capri): /admin/asistencia?pestana=config abre esa pestaña
+  const [params, setParams] = useSearchParams();
+  const deUrl = params.get('pestana') as Pestana | null;
+  const [pestana, setPestana] = useState<Pestana>(deUrl && PESTANAS.includes(deUrl) ? deUrl : 'hoy');
+  useEffect(() => {
+    if (deUrl && PESTANAS.includes(deUrl)) setPestana(deUrl);
+  }, [deUrl]);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cfg, setCfg] = useState<ConfigAsistenciaAdmin | null>(null);
@@ -70,6 +79,7 @@ export function AsistenciaAdminView() {
   }, []);
   const cambiar = (k: Pestana) => {
     setPestana(k);
+    setParams((prev) => { const n = new URLSearchParams(prev); n.set('pestana', k); return n; }, { replace: true });
     setMensaje(null);
     setError(null);
   };

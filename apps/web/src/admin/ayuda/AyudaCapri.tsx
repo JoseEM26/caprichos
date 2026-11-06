@@ -10,12 +10,27 @@ export interface AyudaCapriProps {
   ruta?: string;
 }
 
+const PARAMS_SECCION = ['tab', 'pestana', 'seccion'];
+
+/** Ruta + solo los parámetros que eligen sección (se ignoran `campo`, filtros, ids…: no deben recargar el contexto). */
+export function rutaConSeccion(pathname: string, search: string): string {
+  const entrada = new URLSearchParams(search);
+  const salida = new URLSearchParams();
+  for (const k of PARAMS_SECCION) {
+    const v = entrada.get(k);
+    if (v) salida.set(k, v);
+  }
+  const q = salida.toString();
+  return q ? `${pathname}?${q}` : pathname;
+}
+
 export function AyudaCapri({ ruta }: AyudaCapriProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const esMovil = useEsMovil();
 
-  const rutaActual = ruta ?? location.pathname;
+  // Capri conoce la sección abierta (pestaña de Configuración, de Asistencia…): va en la ruta que se le manda
+  const rutaActual = ruta ?? rutaConSeccion(location.pathname, location.search);
   const {
     abierto,
     estadoCapri,
