@@ -38,6 +38,7 @@ import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
 import { leerConfigPropina } from '../propinas/propinas.service';
 import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
 import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
+import { RequisitoOpcion, lineasDeRequisitosOpcion, requisitosDeOpciones, requisitosFaltantes, saldosDeRequisitos } from '../stock/opcion-requiere';
 import { validarMotivoCortesia } from '../cortesias/cortesia.tipos';
 
 /** Cortesía de una línea: solo con permiso cortesias/dar; sin oferta (la promoción ya tiene su precio). */
@@ -559,6 +560,28 @@ export class PedidosService {
         });
       }
 
+      // Opciones ligadas a stock (opcion_requiere): lo que consume cada una se suma en orden con las anteriores
+      // de la misma línea; la primera que no alcanza responde 409 (cubre «Dona 1» y «Dona 2» con el mismo sabor).
+      const reqsOpciones = await requisitosDeOpciones(this.prisma, opcionesElegidasInfo.map((o) => o.id));
+      // Stock que consume esta línea por sus opciones (cantidad de la línea incluida); se descuenta al crear el pedido
+      const requisitosStockLinea: RequisitoOpcion[] = [];
+      if (reqsOpciones.size > 0) {
+        const saldos = await saldosDeRequisitos(this.prisma, [...reqsOpciones.values()].flat());
+        const acumulado: RequisitoOpcion[] = [];
+        for (const op of opcionesElegidasInfo) {
+          const reqsOp = (reqsOpciones.get(op.id.toString()) ?? []).map((r) => ({ ...r, cantidad: r.cantidad * cantidad }));
+          requisitosStockLinea.push(...reqsOp);
+          acumulado.push(...reqsOp);
+          if (requisitosFaltantes(acumulado, saldos, ahora).length > 0) {
+            throw new ConflictException({
+              codigo: 'OPCION_AGOTADA',
+              mensaje: `No hay stock suficiente para elegir «${op.nombre}»`,
+              opcionId: op.id.toString(),
+            });
+          }
+        }
+      }
+
       // Validar reglas por cada grupo (obligatorio, mínimo, máximo)
       for (const grupo of gruposActivos) {
         const opcionesDeEsteGrupo = opcionesElegidasInfo.filter(
@@ -648,6 +671,10 @@ export class PedidosService {
         partesCombo: combo.partes,
         opciones: opcionesElegidasInfo,
         sabores: saboresLinea,
+        // Cortesía: no toca el stock de las opciones. Si una parte de combo ya descuenta ese producto, no se cuenta dos veces.
+        requisitosOpcion: cortesiaLinea
+          ? []
+          : requisitosStockLinea.filter((r) => !combo.partes.some((p: ParteResueltaCombo) => String(p.productoId) === r.productoId)),
       });
     }
 
@@ -1045,10 +1072,12 @@ export class PedidosService {
       }
 
       // Productos que controlan stock: se descuentan ya (todos los canales) y el tope corta el pedido entero
+      const ventaOpciones = await lineasDeRequisitosOpcion(tx, lineasCalculadas.flatMap((l) => l.requisitosOpcion));
       const ventaProductos = await descontarVentaProductos(
         tx,
         pedido.id,
         [
+          ...ventaOpciones,
           ...lineasCalculadas
             .filter((l) => !l.contenedora)
             .map((l) => ({ productoId: l.productoId, cantidad: l.cantidad * (l.unidadesTamano ?? 1), areaId: l.areaId, sabores: l.sabores })),

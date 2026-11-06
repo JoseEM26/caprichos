@@ -19,6 +19,21 @@ export interface OpcionItem {
   disponible?: boolean;
 }
 
+export interface RequisitoOpcionAdmin {
+  productoId: string;
+  productoNombre: string;
+  saborId: string | null;
+  saborNombre: string | null;
+  cantidad: number;
+}
+
+export interface RequisitosOpcionAdmin {
+  opcionId: string;
+  nombre: string;
+  requisitos: RequisitoOpcionAdmin[];
+  productos: Array<{ id: string; nombre: string; sabores: Array<{ id: string; nombre: string }> }>;
+}
+
 export interface GrupoOpcionItem {
   id: string;
   nombre: string;
@@ -298,6 +313,18 @@ export const catalogoApi = {
     },
   ): Promise<GrupoOpcionItem> {
     return api.patch<GrupoOpcionItem>(`/admin/catalogo/grupos/${id}`, data);
+  },
+
+  /** Stock que consume cada opción (opcion_requiere): requisitos actuales y productos que se pueden enlazar. */
+  async requisitosOpcion(opcionId: string): Promise<RequisitosOpcionAdmin> {
+    return api.get<RequisitosOpcionAdmin>(`/admin/catalogo/opciones/${opcionId}/requisitos`);
+  },
+
+  async guardarRequisitosOpcion(
+    opcionId: string,
+    requisitos: Array<{ productoId: string; saborId: string | null; cantidad: number }>,
+  ): Promise<RequisitosOpcionAdmin> {
+    return api.put<RequisitosOpcionAdmin>(`/admin/catalogo/opciones/${opcionId}/requisitos`, { requisitos });
   },
 
   async crearOpcion(
