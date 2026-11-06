@@ -129,6 +129,18 @@ export interface ConfigAsistenciaAdmin {
 export const pantallaQr = () => api.get<QrPantalla>('/admin/asistencia/pantalla/qr');
 export const miHoy = () => api.get<MiHoy>('/asistencia/mi/hoy');
 export const miHistorial = (dias = 14) => api.get<any[]>(`/asistencia/mi/historial?dias=${dias}`);
+/** Mi parte de los repartos de propinas aprobados o pagados (solo mis filas). */
+export interface MiPropina {
+  anio: number;
+  mes: number;
+  estado: string;
+  horas: number;
+  porcentaje: number;
+  monto: number;
+  pagadoEn: string | null;
+  pagadoMedio: string | null;
+}
+export const miPropinas = () => api.get<MiPropina[]>('/asistencia/mi/propinas');
 export const marcarAsistencia = (datos: DatosMarca) => api.post<ResultadoMarca>('/asistencia/marcar', datos);
 export const reporteHoy = () => api.get<{ jornada: string; filas: FilaHoy[] }>('/admin/asistencia/hoy');
 export const reporteMes = (anio: number, mes: number) =>

@@ -4,11 +4,13 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const miHoy = vi.fn();
 const miHistorial = vi.fn();
 const marcarAsistencia = vi.fn();
+const miPropinas = vi.fn();
 vi.mock('../asistenciaApi', async (orig) => ({
   ...(await orig<any>()),
   miHoy: (...a: any[]) => miHoy(...a),
   miHistorial: (...a: any[]) => miHistorial(...a),
   marcarAsistencia: (...a: any[]) => marcarAsistencia(...a),
+  miPropinas: (...a: any[]) => miPropinas(...a),
 }));
 
 import { MiAsistenciaView } from '../MiAsistenciaView';
@@ -31,6 +33,27 @@ describe('MiAsistenciaView (celular)', () => {
     miHoy.mockReset();
     miHistorial.mockReset().mockResolvedValue([]);
     marcarAsistencia.mockReset();
+    miPropinas.mockReset().mockResolvedValue([]);
+  });
+
+  it('Mis propinas: muestra solo mi parte de los repartos aprobados o pagados', async () => {
+    miHoy.mockResolvedValue(base);
+    miPropinas.mockResolvedValue([
+      { anio: 2026, mes: 10, estado: 'PAGADO', horas: 56, porcentaje: 46.67, monto: 70, pagadoEn: '2026-11-03T15:00:00Z', pagadoMedio: 'EFECTIVO' },
+    ]);
+    render(<MiAsistenciaView />);
+    const bloque = await screen.findByRole('region', { name: 'Mis propinas' });
+    expect(bloque).toHaveTextContent('octubre 2026');
+    expect(bloque).toHaveTextContent('56.00 h · 46.67 %');
+    expect(bloque).toHaveTextContent('S/ 70.00');
+    expect(bloque).toHaveTextContent('Pagado (EFECTIVO)');
+  });
+
+  it('sin repartos aprobados no muestra nada de propinas', async () => {
+    miHoy.mockResolvedValue(base);
+    render(<MiAsistenciaView />);
+    await screen.findByTestId('estado-hoy');
+    expect(screen.queryByRole('region', { name: 'Mis propinas' })).toBeNull();
   });
 
   it('dice qué marca falta y ofrece el botón grande', async () => {

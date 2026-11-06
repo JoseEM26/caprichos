@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ErrorApi } from '../../comun/api';
 import { Cargando } from '../../comun/Cargando';
 import { Insignia } from '../../comun/Insignia';
+import { useSesion } from '../../comun/sesion';
+import { RepartoPropinas } from './RepartoPropinas';
 
 /** Acumulado de un mes de Lima (GET /admin/propinas/mes). Lo cobrado, menos lo devuelto el día de la devolución. */
 interface ResumenMes {
@@ -97,6 +99,9 @@ function Tarjeta({ titulo, valor, detalle }: { titulo: string; valor: number; de
 
 /** Vista admin de propinas: acumulado del mes, por día, medio y canal, y pedidos con propina sin cobro. */
 export function PropinasView() {
+  const { tiene } = useSesion();
+  const puedeReparto = tiene('propinas/repartir');
+  const [pestana, setPestana] = useState<'acumulado' | 'reparto'>('acumulado');
   const actual = useMemo(() => mesActualLima(), []);
   const meses = useMemo(() => opcionesMeses(actual), [actual]);
   const [seleccion, setSeleccion] = useState<{ anio: number; mes: number }>(actual);
@@ -134,6 +139,21 @@ export function PropinasView() {
 
   return (
     <div data-testid="propinas-view" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {puedeReparto && (
+        <div role="tablist" aria-label="Vistas de propinas" style={{ display: 'flex', gap: 8 }}>
+          <button type="button" role="tab" aria-selected={pestana === 'acumulado'} onClick={() => setPestana('acumulado')}>
+            Acumulado
+          </button>
+          <button type="button" role="tab" aria-selected={pestana === 'reparto'} onClick={() => setPestana('reparto')}>
+            Reparto del mes
+          </button>
+        </div>
+      )}
+
+      {pestana === 'reparto' && puedeReparto ? (
+        <RepartoPropinas />
+      ) : (
+      <>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)', maxWidth: 640 }}>
           Propinas que dejan los clientes. Van aparte de la venta: no son ingreso ni salen en los comprobantes. Solo cuentan lo
@@ -277,6 +297,8 @@ export function PropinasView() {
           </>
         )}
       </section>
+      </>
+      )}
     </div>
   );
 }

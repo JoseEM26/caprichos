@@ -427,6 +427,8 @@ export class AsistenciaService {
       horasTrabajadas: p.trabajadasH,
       horasProgramadas: p.programadasH,
       diasTrabajados: p.diasTrabajados,
+      jornadasIncompletas: p.jornadasIncompletas,
+      jornadasARevisar: p.jornadasARevisar,
     }));
   }
 
@@ -602,11 +604,15 @@ export class AsistenciaService {
       let programadasMin = 0;
       let trabajadasMin = 0;
       let diasTrabajados = 0;
+      let jornadasIncompletas = 0;
+      let jornadasARevisar = 0;
       const nombre = cuentas.get(pid)?.nombre ?? `Persona ${pid}`;
       for (const j of dias) {
         const d = this.evaluarDia(pid, j, ctx, ahora, tol);
         filas.push({ ...d.resultado, partyId: Number(pid), nombre, jornada: j });
         if (d.resultado.estado === 'SIN_EVALUAR') continue; // en curso o futuro: no suma a los totales
+        if (d.resultado.estado === 'INCOMPLETO') jornadasIncompletas++;
+        if (d.resultado.estado === 'A_REVISAR') jornadasARevisar++;
         if (d.resultado.estado !== 'DESCANSO') programadasMin += d.resultado.programadaMin;
         trabajadasMin += d.resultado.trabajadaMin;
         if (d.resultado.trabajadaMin > 0) diasTrabajados++;
@@ -617,6 +623,8 @@ export class AsistenciaService {
         programadasH: horas(programadasMin),
         trabajadasH: horas(trabajadasMin),
         diasTrabajados,
+        jornadasIncompletas,
+        jornadasARevisar,
       });
     }
     return { filas, personas: resumen, dias };

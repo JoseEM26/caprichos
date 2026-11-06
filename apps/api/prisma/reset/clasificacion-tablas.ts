@@ -80,6 +80,7 @@ export const CONSERVAR: string[] = [
   'agotado', 'ajuste_opcion', 'alta_demanda', 'archivo', 'area_cocina', 'auditoria', 'caja',
   'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'cortesia', 'devolucion_pedido', 'pedido_cambio_ubicacion', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
   'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
+  'propina_reparto', 'propina_reparto_detalle',
   'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio',
   'compra', 'compra_linea', 'consumo_personal', 'contador_diario', 'conteo_apertura', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta',
@@ -118,6 +119,8 @@ export const FK_PARTY_PERSONAL = [
   'pedido_cambio_ubicacion.ajuste_por_party_id',
   'cortesia.dada_por_party_id', 'cortesia.autorizada_por_party_id',
   'asistencia_marca.party_id', 'asistencia_marca.por_party_id', 'asistencia_dispositivo.party_id', 'asistencia_consentimiento.party_id',
+  'propina_reparto.calculado_por', 'propina_reparto.aprobado_por', 'propina_reparto.pagado_por', 'propina_reparto.anulado_por',
+  'propina_reparto_detalle.party_id',
 ];
 
 /**

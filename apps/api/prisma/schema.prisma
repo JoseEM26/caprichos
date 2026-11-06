@@ -70,6 +70,11 @@ model Party {
   cambiosUbicacionPropuestos PedidoCambioUbicacion[] @relation("CambioUbicacionPropuesto")
   cambiosUbicacionResueltos  PedidoCambioUbicacion[] @relation("CambioUbicacionResuelto")
   cambiosUbicacionAjustes    PedidoCambioUbicacion[] @relation("CambioUbicacionAjuste")
+  propinaRepartosCalculados  PropinaReparto[]       @relation("PropinaRepartoCalculo")
+  propinaRepartosAprobados   PropinaReparto[]       @relation("PropinaRepartoAprobo")
+  propinaRepartosPagados     PropinaReparto[]       @relation("PropinaRepartoPago")
+  propinaRepartosAnulados    PropinaReparto[]       @relation("PropinaRepartoAnulo")
+  propinaRepartoDetalles     PropinaRepartoDetalle[] @relation("PropinaRepartoDetalleParty")
 
   @@map("party")
 }
@@ -85,6 +90,8 @@ model Person {
   pais_nacimiento String?
   /// Disponible 24/7: recibe los avisos por correo si nadie con casilla está de turno.
   horario_24_7    Boolean   @default(false)
+  /// Reparto de propinas: NULL = según rol (ADMIN no participa, el resto sí); true/false = excepción fijada por el ADMIN.
+  participa_propinas Boolean?
   party           Party     @relation(fields: [party_id], references: [id])
 
   @@map("person")
@@ -2621,4 +2628,55 @@ model AsistenciaConsentimiento {
   party       Party    @relation(fields: [party_id], references: [id])
 
   @@map("asistencia_consentimiento")
+}
+
+// ---------------------------------------------------------------------------
+// Reparto mensual de propinas por horas trabajadas (migración 20261231600000_reparto_propinas).
+// Un reparto VIGENTE (no anulado) por mes: índice único parcial en la migración. BORRADOR se recalcula;
+// APROBADO congela las cifras; PAGADO cuando todas las personas tienen fecha de pago; ANULADO con motivo.
+model PropinaReparto {
+  id               BigInt    @id @default(autoincrement())
+  anio             Int       @db.SmallInt
+  mes              Int       @db.SmallInt
+  estado           String    @default("BORRADOR") @db.VarChar(12) // BORRADOR | APROBADO | PAGADO | ANULADO
+  total_propinas   Decimal   @db.Decimal(12, 2)
+  total_horas      Decimal   @db.Decimal(10, 2)
+  calculado_en     DateTime  @db.Timestamptz
+  calculado_por    BigInt
+  aprobado_en      DateTime? @db.Timestamptz
+  aprobado_por     BigInt?
+  pagado_en        DateTime? @db.Timestamptz
+  pagado_por       BigInt?
+  anulado_en       DateTime? @db.Timestamptz
+  anulado_por      BigInt?
+  motivo_anulacion String?
+  nota             String?
+
+  calculadoPor Party                   @relation("PropinaRepartoCalculo", fields: [calculado_por], references: [id])
+  aprobadoPor  Party?                  @relation("PropinaRepartoAprobo", fields: [aprobado_por], references: [id])
+  pagadoPor    Party?                  @relation("PropinaRepartoPago", fields: [pagado_por], references: [id])
+  anuladoPor   Party?                  @relation("PropinaRepartoAnulo", fields: [anulado_por], references: [id])
+  detalle      PropinaRepartoDetalle[]
+
+  @@index([anio, mes])
+  @@map("propina_reparto")
+}
+
+/// Parte de cada persona en un reparto. Solo personas con horas > 0. monto en soles (2 decimales).
+model PropinaRepartoDetalle {
+  reparto_id      BigInt
+  party_id        BigInt
+  horas           Decimal   @db.Decimal(10, 2)
+  porcentaje      Decimal   @db.Decimal(9, 4)
+  monto           Decimal   @db.Decimal(12, 2)
+  ajuste_centimos Int?      // reservado: ajuste manual futuro; sin uso en esta fase
+  pagado_en       DateTime? @db.Timestamptz
+  pagado_medio    String?   @db.VarChar(20)
+  nota            String?
+
+  reparto PropinaReparto @relation(fields: [reparto_id], references: [id])
+  party   Party          @relation("PropinaRepartoDetalleParty", fields: [party_id], references: [id])
+
+  @@id([reparto_id, party_id])
+  @@map("propina_reparto_detalle")
 }
