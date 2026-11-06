@@ -16,8 +16,16 @@ import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
  * Sin sabores activos, el producto sigue con un único saldo en `stock`.
  */
 
-/** Producto que controla stock POR SABOR: la casilla está marcada y tiene al menos un sabor activo. */
-export function controlaPorSabor(prod: { controla_stock: boolean; sabores?: Array<{ activo?: boolean }> | null }): boolean {
+/**
+ * Producto que controla stock POR SABOR: la casilla está marcada, tiene al menos un sabor activo y NO es anfitrión
+ * de una oferta COMBO (un Dúo se arma con los grupos del combo, no con una mezcla de sabores propia).
+ */
+export function controlaPorSabor(prod: {
+  controla_stock: boolean;
+  sabores?: Array<{ activo?: boolean }> | null;
+  ofertasAlcance?: Array<unknown> | null;
+}): boolean {
+  if ((prod.ofertasAlcance ?? []).length > 0) return false;
   return !!prod.controla_stock && (prod.sabores ?? []).some((s) => s.activo !== false);
 }
 
@@ -159,7 +167,12 @@ export async function descontarVentaProductos(
 
   const controlados = await db.producto.findMany({
     where: { id: { in: [...agregado.values()].map((a) => a.productoId) }, controla_stock: true },
-    select: { id: true, nombre: true, sabores: { where: { activo: true }, select: { id: true } } },
+    select: {
+      id: true,
+      nombre: true,
+      sabores: { where: { activo: true }, select: { id: true } },
+      ofertasAlcance: { where: { tipo: 'COMBO' }, select: { id: true }, take: 1 },
+    },
   });
   const porId = new Map<string, any>(controlados.map((p: any) => [p.id.toString(), p]));
 
@@ -174,7 +187,8 @@ export async function descontarVentaProductos(
     const lugarId = await lugarDelProducto(db, a.productoId, a.areaId);
     if (!lugarId) continue;
 
-    if ((prod.sabores ?? []).length > 0) {
+    // Anfitrión de combo (oferta COMBO): no se descuenta por sabor aunque le queden filas de sabor
+    if ((prod.sabores ?? []).length > 0 && (prod.ofertasAlcance ?? []).length === 0) {
       if (a.sabores.size === 0) {
         throw new BadRequestException({
           codigo: 'SABORES_INVALIDOS',
