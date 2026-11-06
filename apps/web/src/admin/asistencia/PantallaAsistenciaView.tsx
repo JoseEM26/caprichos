@@ -119,7 +119,7 @@ export function PantallaAsistenciaView({ token }: { token?: string } = {}) {
       if (timer) clearTimeout(timer);
       clearInterval(reloj);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- el enlace no cambia mientras la pantalla está montada
+    // Nota: el enlace no cambia mientras la pantalla está montada.
   }, [token]);
 
   const restan = qr ? Math.max(0, Math.ceil((qr.cambiaEn - (ahora + offset)) / 1000)) : null;
