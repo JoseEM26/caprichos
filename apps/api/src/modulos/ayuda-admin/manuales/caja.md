@@ -10,10 +10,10 @@ sugerencias:
   - Como cobro un pedido y registro el vuelto
   - Por que un pedido con pago digital no aparece en cocina
   - Como anulo un pedido que el cliente cancelo
-  - Donde veo el pedido de delivery que no se entrego
   - Como doy una cortesia a un cliente
   - Como cambio la ubicacion de un pedido de delivery
   - Que significa Direccion editada o #7 del dia
+  - El repartidor pidio cambiar la forma de pago, como lo valido
 ---
 # Pedidos y caja
 
@@ -133,6 +133,17 @@ Ver tambien: [[informes]]
 6. La insignia Direccion editada aparece en Caja, Repartos y Mis pedidos cuando el punto se cambio; el historial muestra quien lo cambio. No se cambia en pedidos Entregados ni Anulados.
 Ver tambien: [[repartos]]
 
+## Como se hace: Validar un cambio de forma de pago pedido por el repartidor
+1. Cuando un repartidor pide cambiar el pago en la puerta (por ejemplo de efectivo a Yape), aparece el panel Cambios de pago solicitados arriba de la lista de Pedidos y caja, el pedido muestra la insignia Cambio de pago solicitado y llega una notificacion a la campana.
+2. Cada solicitud muestra el Medio original contra el Medio nuevo (con "paga con" si hay efectivo), quien lo pidio y las capturas del pedido para validarlas contra el monto de cada medio.
+3. Aprobar: el pedido pasa al medio nuevo (el plan de pago se reescribe), la captura queda validada y el repartidor recibe el aviso. El pedido sigue sin cobrarse hasta que registres el cobro como siempre.
+4. Rechazar (motivo opcional): el pedido sigue con el medio original, las capturas del intento quedan retiradas en el historial y el repartidor cobra como estaba.
+5. Autorizar entrega sin validar (motivo obligatorio, minimo 5 caracteres): el repartidor puede entregar aunque no puedas validar la captura todavia (por ejemplo, la app del banco no abre). El medio nuevo se aplica, la captura queda pendiente de revision y todo queda auditado con tu nombre y el motivo.
+6. Mientras la solicitud esta pendiente el repartidor no puede marcar Entregado. Ninguna decision pide codigo de supervisor: validar un pago no es anular.
+7. Efecto en el dinero: el efectivo por rendir del repartidor y el cierre cuentan el medio final. Efectivo a Yape: ese pedido ya no es efectivo por rendir. Yape a efectivo: se suma a lo que el repartidor debe liquidar. Pago mixto: solo la parte en efectivo. El total del pedido nunca cambia.
+8. El historial de solicitudes no se edita ni se borra.
+Ver tambien: [[repartos]]
+
 ## Como se hace: Leer las insignias #N del dia y las propinas
 1. "#N del dia" en el detalle del pedido es el orden de llegada a cocina de hoy (referencial; reinicia a medianoche de Lima). El codigo CP-xxxx es el que vale. Un pedido sin numero (anterior a esta funcion) muestra un guion.
 2. Si el pedido trae propina (la dejo el cliente en la carta o el bot), el cobro muestra "Venta S/ X + propina S/ Y (va aparte, no es venta)". Se cobra la suma; la propina no es ingreso ni sale en comprobantes y se ve en [[propinas]] y en el bloque de propinas del [[cierre]].
@@ -146,10 +157,11 @@ Ver tambien: [[repartos]]
 - No se puede cerrar la caja al finalizar el dia si existen pedidos pendientes de cobro; deben cobrarse o anularse primero.
 - Si no puedes cobrar o aprobar un pago y aparece "La caja está cerrada", abre la caja del dia en Caja y cierres.
 - Si un pedido por delivery no tiene ubicacion GPS o referencia clara, debe ubicarse en el mapa antes de enviarse a despacho.
+- "La solicitud ya fue resuelta" (SOLICITUD_NO_VIGENTE): otra persona de Caja ya la aprobo, rechazo o autorizo; recarga la lista. "Escribe el motivo para autorizar la entrega sin validar": falta el motivo (minimo 5 caracteres). "El pedido ya esta anulado o pagado: no se puede cambiar el cobro": ya no admite el cambio.
 - Si la impresora de caja no responde, las etiquetas quedan en cola y no se pierden: la franja de Pedidos y caja lo indica. Al reconectar salen solas.
 
 ## Quien puede hacerlo
 - Pueden ingresar y operar en Pedidos y caja: Administrador y Cajero.
-- El Supervisor ve Pedidos y caja y puede dar cortesias con su codigo, pero no cambia la ubicacion de pedidos. Los demas roles (Cocina, Mozo, Repartidor, Almacen) no tienen acceso a esta pantalla.
+- El Supervisor ve Pedidos y caja y puede dar cortesias con su codigo, pero no cambia la ubicacion de pedidos. Si valida los cambios de forma de pago pedidos por el repartidor (pedidos/validar_cambio_cobro), igual que el Cajero y el Administrador, sin codigo. Los demas roles (Cocina, Mozo, Repartidor, Almacen) no tienen acceso a esta pantalla.
 - La anulacion de pedidos y cobros requiere la autorizacion con el codigo de supervisor de 6 digitos, salvo para el administrador, que anula sin codigo.
 - Errores de cortesia: "El pedido ya esta cobrado: registra la cortesia por separado", "El pedido tiene descuento: registra la cortesia por separado", "El pedido ya tiene comprobante", "Esta linea ya es cortesia", "Las lineas de combo o de promocion no se pueden marcar como cortesia", "Un pedido solo de cortesias no se puede cobrar: registra la cortesia por separado", "La cortesia deja el plan de pago por debajo de cero: rehaz el plan de pago" y, para el supervisor, CODIGO_INVALIDO (el codigo vencio o esta mal: pide el actual).

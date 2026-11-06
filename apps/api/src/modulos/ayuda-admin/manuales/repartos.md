@@ -9,11 +9,11 @@ sugerencias:
   - Como tomo un pedido o una ruta para repartir
   - Como le escribo por WhatsApp al cliente de mi pedido
   - La ubicacion del cliente esta mal, como la corrijo
-  - Como veo que repartidores estan libres u ocupados
   - Como cambio la ubicacion de un pedido de delivery
   - Como veo todos los pedidos de delivery y en que etapa estan
-  - Como suelto o reasigno un pedido
-  - Como tomo un pedido yo mismo como administrador
+  - El cliente quiere pagar con Yape en vez de efectivo, que hago
+  - Donde veo cuanto cobrar y el vuelto de mi pedido
+  - Cuanto tiempo llevo con un pedido
 ---
 # Repartos
 
@@ -44,9 +44,25 @@ Para Administrador, Supervisor, Cajero y Mozo la pantalla es de seguimiento: mue
 5. Orden: tu eliges con cual empezar (Empezar por este) y el resto queda por cercania; es obligatorio respetar el orden. El numero de parada no cambia hasta cerrar la ruta. Saltar este pedido esta permitido con motivo, maximo 2 veces por pedido ("Ya saltaste este pedido 2 veces: reporta la falla"), y queda auditado; el sistema avisa cual sigue ("Saltaste el #2; sigue el #3").
 Antes: [[cocina]]
 
+## Como se hace: Ver todo el detalle de un pedido (dos pantallas)
+1. En Mis pedidos toca el pedido: la hoja inferior tiene dos pantallas con las pestanas Pedido y Tiempos (dos puntos las indican). Cambias tocando la pestana, pulsando Ver tiempos › o Volver, o deslizando el dedo de lado.
+2. Pantalla Pedido: cliente, zona, direccion y referencia, botones Llamar, Chatear por WhatsApp, Google Maps y Waze, y los productos con su tamano, sabores, opciones, nota y las cortesias. Arriba del cobro dice si esta Pagado o Falta cobrar.
+3. El cobro lo detalla todo: el medio (Efectivo, Yape, Plin, Tarjeta, Transferencia o Pago mixto con el monto de cada parte), el total, cuanto cobrar en efectivo, con cuanto paga el cliente y el vuelto a llevar, si la captura del Yape o Plin esta validada, pendiente de validar o ilegible, las cortesias y la nota del cliente. Si el pago es digital y ya esta validado no cobras efectivo.
+4. Pantalla Tiempos: cuatro contadores en vivo (desde que el pedido llego a la tienda, desde que lo tomaste, desde que saliste y la espera en la puerta con su maximo) con los colores del semaforo de siempre (verde, amarillo, naranja, rojo). La espera en la puerta se pone roja al llegar al maximo configurado. Abajo, la linea de tiempo con la hora y los minutos de cada paso: pedido recibido, paso a cocina, listo, tomado, salio, llego a la puerta y entregado. Al entregar, los contadores se detienen.
+Despues: [[caja]]
+
+## Como se hace: Cambiar la forma de pago en la puerta (el cliente quiere pagar distinto)
+1. Si el cliente acordo efectivo y al llegar quiere pagar con Yape, Plin, tarjeta, transferencia o mezclar (por ejemplo efectivo mas Yape), pulsa Cambiar forma de pago en la pantalla Pedido. Solo aparece cuando el pedido va En camino o ya llegaste.
+2. Elige el medio nuevo. Para un pago mixto pulsa Agregar otro medio de pago y reparte los montos (deben sumar el total). Si habra efectivo, anota con cuanto paga para calcular el vuelto.
+3. Por cada parte digital (Yape, Plin o Transferencia) es obligatorio subir la captura: Tomar foto (camara) o Galeria. La tarjeta no pide captura. Si la captura no se lee bien, el sistema pide otra: "La captura de YAPE no se lee bien. Toma otra foto, por favor."
+4. Pulsa Solicitar a Caja. Tu lo solicitas y Caja lo valida: hasta entonces el pedido sigue con el medio original, el boton Entregar pedido queda bloqueado con el aviso "Esperando que Caja valide el pago…" y solo puede haber una solicitud pendiente por pedido.
+5. El estado se ve en vivo y llega por notificacion: Caja aprobo (cobra con el medio nuevo), Caja rechazo (cobra con el medio original; veras el motivo) o Caja autorizo la entrega sin validar el pago (entregas; la captura queda pendiente de revision en Caja).
+6. El efectivo que rindes en caja sigue el medio final aprobado: si pasa de efectivo a Yape ya no rindes ese efectivo; si pasa de Yape a efectivo se suma; en pago mixto solo rindes la parte en efectivo.
+Ver tambien: [[caja]]
+
 ## Como se hace: Entregar un pedido paso a paso
 1. En Mis pedidos, el boton grande cambia segun la etapa: Salir a reparto (pasa a En camino y registra la hora; el cliente recibe aviso por WhatsApp), Llegue a destino (registra el arribo) y Entregar pedido (marca Entregado). Cada accion pide Si, confirmar.
-2. Si el pedido es en efectivo, aparece "Efectivo a rendir: S/ N (se liquida en caja, no se cobra aqui)": entregas y rindes el dinero en caja al terminar.
+2. Si el pedido es en efectivo, aparece "Efectivo a rendir: S/ N (se liquida en caja, no se cobra aqui)": entregas y rindes el dinero en caja al terminar. Si hay un cambio de forma de pago pendiente, Entregar pedido espera la decision de Caja (ver Cambiar la forma de pago en la puerta).
 3. Para llamar usa Llamar; para escribir usa Chatear por WhatsApp. Hay enlaces a Google Maps y Waze.
 4. Cuando entregas o falla el ultimo pedido, la ruta se cierra con el aviso "Ruta terminada". Mis rutas lista las rutas pasadas; los pedidos entregados quedan en gris con un check hasta cerrar la ruta.
 Despues: [[caja]]
@@ -130,13 +146,16 @@ Ver tambien: [[mensajes]]
 - "Abre la caja para mover efectivo" (CAJA_CERRADA): para cobrar o devolver en efectivo la caja de hoy debe estar abierta; en digital no hace falta.
 - "La propuesta ya no esta pendiente": otra persona ya la aprobo, rechazo o se cancelo; recarga.
 - "Falta ubicar": el pedido no tiene punto en el mapa; Caja le pone la ubicacion con Cambiar ubicacion.
+- 409 CAMBIO_COBRO_PENDIENTE "Esperando que Caja valide el pago…": hay un cambio de forma de pago sin resolver; espera a Caja (aprobar, rechazar o autorizar la entrega sin validar).
+- 400 CAPTURA_REQUERIDA: falta la captura de un medio digital del cambio de pago. 400 CAPTURA_ILEGIBLE: toma otra foto. 400 SIN_CAMBIO: elegiste el mismo medio que ya tiene el pedido.
+- 409 ESTADO_INVALIDO "Solo puedes cambiar la forma de pago de un pedido que va en camino o ya llego" o 409 YA_PAGADO: el pedido todavia no salio, ya se entrego o ya esta pagado.
 - Si otro repartidor tomo antes un pedido de la ruta sugerida, el sistema avisa cual se perdio.
 - Si llegas al tope de pedidos simultaneos debes entregar alguno antes de tomar otro.
 - Un repartidor solo ve sus pedidos y el telefono aparece despues de tomar el pedido.
 - La devolucion pendiente por cambio de ubicacion no afecta el cierre de caja mientras no se resuelva: al marcarla como devuelta, en efectivo sale como egreso de la caja de hoy y en digital se descuenta del medio en el cierre.
 
 ## Quien puede hacerlo
-- Repartidor: ver y tomar sus pedidos y rutas, salir, llegar, entregar, reportar fallas, chatear con el cliente de su pedido y proponer la ubicacion real.
+- Repartidor: ver y tomar sus pedidos y rutas, salir, llegar, entregar, reportar fallas, chatear con el cliente de su pedido, proponer la ubicacion real y solicitar el cambio de forma de pago en la puerta (repartos/solicitar_cambio_cobro).
 - Administrador: seguimiento completo, Tomar como repartidor, Soltar / reasignar, resolver incidentes, cambiar ubicaciones y liquidar.
-- Cajero: seguimiento, Soltar / reasignar, resolver incidentes, liquidar y cambiar o aprobar ubicaciones (pedidos/cambiar_ubicacion).
+- Cajero: seguimiento, Soltar / reasignar, resolver incidentes, liquidar y cambiar o aprobar ubicaciones (pedidos/cambiar_ubicacion) y validar los cambios de forma de pago (pedidos/validar_cambio_cobro). El Supervisor tambien valida cambios de forma de pago, sin codigo, porque valida un pago y no anula nada.
 - Supervisor y Mozo: seguimiento en solo lectura (repartos/seguir); el Mozo no ve telefonos y ninguno de los dos suelta ni cambia ubicaciones.

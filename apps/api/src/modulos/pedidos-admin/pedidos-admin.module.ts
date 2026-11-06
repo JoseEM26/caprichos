@@ -17,10 +17,13 @@ import { CambioUbicacionService } from './cambio-ubicacion.service';
 import { PropuestaUbicacionService } from './propuesta-ubicacion.service';
 import { CambioUbicacionController } from './cambio-ubicacion.controller';
 import { PropuestaUbicacionController } from './propuesta-ubicacion.controller';
+import { CambioCobroService } from './cambio-cobro.service';
+import { CambioCobroController } from './cambio-cobro.controller';
+import { PagoPlanService } from '../pedidos/pago-plan.service';
 
 @Module({
   imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule],
-  controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController],
+  controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController],
   providers: [
     PedidosEstadoService,
     UbicarPedidoService,
@@ -28,6 +31,9 @@ import { PropuestaUbicacionController } from './propuesta-ubicacion.controller';
     DevolucionPedidoService,
     CambioUbicacionService,
     PropuestaUbicacionService,
+    CambioCobroService,
+    // Sin estado ni dependencias; PedidosModule no lo exporta
+    PagoPlanService,
   ],
   exports: [PedidosEstadoService],
 })

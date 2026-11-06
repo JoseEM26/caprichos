@@ -51,6 +51,20 @@ describe('caja.calculo', () => {
     expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [] })).toBe(0);
   });
 
+  it('cambio de cobro en la puerta: el efectivo del repartidor sigue el plan final aprobado', () => {
+    // efectivo → Yape: desaparece el efectivo por rendir
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [] })).toBe(0);
+    // Yape → efectivo: se suma
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'EFECTIVO', cobros: [] })).toBe(4000);
+    // mixto efectivo + Yape: solo el renglón de efectivo
+    const plan = [{ medio: 'EFECTIVO', monto: 15 }, { medio: 'YAPE', monto: 25 }];
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [], planPago: plan })).toBe(1500);
+    // todo digital con plan: nada que rendir
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [], planPago: [{ medio: 'YAPE', monto: 25 }, { medio: 'PLIN', monto: 15 }] })).toBe(0);
+    // ya cobrado en caja: no es del repartidor
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [{ anulado_en: null }], planPago: plan })).toBe(0);
+  });
+
   it('delivery cobrado en caja cuenta en la caja y el contra entrega solo al liquidarse, sin duplicar', async () => {
     const cliente: any = {
       pedido: {

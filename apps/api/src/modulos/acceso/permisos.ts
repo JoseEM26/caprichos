@@ -67,6 +67,9 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'cortesias', accion: 'dar' },
   { modulo: 'cortesias', accion: 'ver' },
   { modulo: 'repartos', accion: 'proponer_ubicacion' },
+  // Cambio de forma de pago en la puerta: el repartidor solicita; Caja, Admin y Supervisor validan (sin código: no es anulación)
+  { modulo: 'repartos', accion: 'solicitar_cambio_cobro' },
+  { modulo: 'pedidos', accion: 'validar_cambio_cobro' },
   // Cocina, Stock y Recetas (Ola 5)
   { modulo: 'cocina', accion: 'ver' },
   { modulo: 'cocina', accion: 'despejar' },
@@ -207,6 +210,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/crear',
     'pedidos/cambiar_estado',
     'pedidos/cambiar_ubicacion',
+    'pedidos/validar_cambio_cobro',
     'cortesias/dar',
     'cortesias/ver',
     'caja/abrir',
@@ -332,6 +336,7 @@ export const MATRIZ: Record<string, string[]> = {
     'repartos/reportar',
     'repartos/chat',
     'repartos/proponer_ubicacion',
+    'repartos/solicitar_cambio_cobro',
     'iniciativas/ver',
     'iniciativas/crear',
     'iniciativas/comentar',
