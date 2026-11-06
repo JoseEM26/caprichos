@@ -1,0 +1,460 @@
+/* Apertura del día: tabla compacta por área (en celular, filas apiladas) y diálogo de merma. */
+
+.ap-vista {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 980px;
+  min-width: 0;
+}
+
+.ap-cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ap-fecha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 14px;
+  color: var(--cp-navy);
+}
+
+.ap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ap-ayuda {
+  margin: 0;
+  font-size: 13px;
+  color: var(--cp-soft);
+}
+
+.ap-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.ap-buscar {
+  flex: 1 1 220px;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1.5px solid var(--cp-navy);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  padding: 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ap-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cp-navy);
+  cursor: pointer;
+}
+
+.ap-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--cp-navy);
+}
+
+.ap-boton-texto {
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--cp-navy);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Tabla ─────────────────────────────────────────────────────────────── */
+
+.ap-tabla-wrap {
+  min-width: 0;
+}
+
+.ap-tabla {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--cp-white);
+  border: 1px solid var(--cp-line);
+  border-radius: 12px;
+  overflow: hidden;
+  font-size: 14px;
+  color: var(--cp-navy);
+}
+
+.ap-tabla th,
+.ap-tabla td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: middle;
+  border-top: 1px solid var(--cp-line);
+}
+
+.ap-tabla thead th {
+  background: var(--cp-sand);
+  border-top: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-soft);
+  white-space: nowrap;
+}
+
+.ap-grupo-titulo th {
+  background: var(--cp-cream);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.ap-grupo-cuenta {
+  font-weight: 700;
+  color: var(--cp-soft);
+}
+
+.ap-celda-nombre {
+  min-width: 150px;
+  overflow-wrap: anywhere;
+}
+
+.ap-nombre {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  color: var(--cp-navy);
+}
+
+.ap-nombre-sabor {
+  display: block;
+  padding-left: 26px;
+  font-weight: 700;
+}
+
+.ap-saldo {
+  display: block;
+  font-size: 12px;
+  color: var(--cp-soft);
+}
+
+.ap-saldo--sabor {
+  padding-left: 26px;
+}
+
+.ap-plegar {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--cp-navy);
+  text-align: left;
+  font: inherit;
+}
+
+.ap-chevron {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  transition: transform 0.15s ease;
+}
+
+.ap-plegar[aria-expanded='true'] .ap-chevron {
+  transform: rotate(90deg);
+}
+
+.ap-resumen {
+  font-weight: 700;
+  color: var(--cp-soft);
+}
+
+.ap-total {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--cp-navy);
+}
+
+.ap-fila--error > td:first-child {
+  box-shadow: inset 3px 0 0 var(--cp-rust);
+}
+
+/* Sabor: una línea, un poco más claro que el producto */
+.ap-sabor td {
+  background: #fcf9f4;
+}
+
+.ap-sabor--atenuado td {
+  background: var(--cp-sand);
+}
+
+.ap-sabor .ap-celda-nombre {
+  vertical-align: top;
+  padding-top: 10px;
+}
+
+/* Sabor en 0 sin contar: atenuado, pero legible */
+.ap-sabor--atenuado td {
+  color: var(--cp-soft);
+}
+
+.ap-sabor--atenuado .ap-nombre-sabor,
+.ap-sabor--atenuado .ap-total {
+  color: var(--cp-soft);
+}
+
+.ap-cantidad {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.ap-paso {
+  flex: 0 0 auto;
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid var(--cp-navy);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+}
+
+.ap-paso:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ap-campo {
+  width: 84px;
+  min-width: 0;
+  min-height: 40px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1.5px solid var(--cp-navy);
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  text-align: center;
+  padding: 0 6px;
+}
+
+.ap-campo--error {
+  border-color: var(--cp-rust);
+}
+
+.ap-error-campo {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-rust);
+}
+
+.ap-estado {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.ap-estado small {
+  font-size: 12px;
+  color: var(--cp-soft);
+}
+
+.ap-celda-merma {
+  width: 56px;
+  text-align: center;
+}
+
+.ap-merma-icono {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1.5px solid var(--cp-rust);
+  background: transparent;
+  color: var(--cp-rust);
+}
+
+.ap-merma-icono:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ap-vacio {
+  text-align: center;
+  color: var(--cp-soft);
+  padding: 20px 10px;
+}
+
+.ap-sronly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Foco visible en todo el control */
+.ap-vista button:focus-visible,
+.ap-vista input:focus-visible,
+.ap-modal button:focus-visible,
+.ap-modal input:focus-visible,
+.ap-modal select:focus-visible {
+  outline: 3px solid var(--cp-orange);
+  outline-offset: 2px;
+}
+
+/* ── Mensajes y pie ─────────────────────────────────────────────────────── */
+
+.ap-mensaje {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ap-mensaje--ok {
+  color: var(--cp-green);
+}
+
+.ap-mensaje--error {
+  color: var(--cp-rust);
+}
+
+.ap-pie {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: var(--cp-cream);
+  padding: 8px 0;
+  border-top: 1px solid var(--cp-line);
+}
+
+.ap-pie-nota {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--cp-soft);
+}
+
+/* ── Diálogo de merma ───────────────────────────────────────────────────── */
+
+.ap-modal-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(11, 44, 62, 0.55);
+}
+
+.ap-modal {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, calc(100% - 24px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: var(--cp-white);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 12px 32px rgba(11, 44, 62, 0.25);
+}
+
+/* ── Celular: filas apiladas, cada valor con su etiqueta ──────────────── */
+
+@media (max-width: 720px) {
+  .ap-tabla thead {
+    display: none;
+  }
+
+  .ap-tabla,
+  .ap-tabla tbody,
+  .ap-tabla tr,
+  .ap-tabla th,
+  .ap-tabla td {
+    display: block;
+    width: 100%;
+  }
+
+  .ap-tabla tbody tr {
+    border-top: 1px solid var(--cp-line);
+  }
+
+  .ap-tabla td,
+  .ap-tabla th {
+    border: none;
+    padding: 4px 12px;
+  }
+
+  .ap-tabla .ap-grupo-titulo th {
+    padding: 8px 12px;
+  }
+
+  .ap-tabla .ap-celda-nombre {
+    min-width: 0;
+    padding-top: 10px;
+  }
+
+  .ap-tabla td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--cp-soft);
+  }
+
+  .ap-tabla .ap-celda-merma {
+    width: auto;
+    text-align: left;
+    padding-bottom: 10px;
+  }
+
+  .ap-tabla .ap-nombre-sabor,
+  .ap-tabla .ap-saldo--sabor {
+    padding-left: 24px;
+  }
+
+  .ap-tabla .ap-campo {
+    width: 96px;
+  }
+}

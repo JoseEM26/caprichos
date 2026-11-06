@@ -32,7 +32,7 @@ describe('Apertura con arrastre: quedaron de ayer y produje hoy', () => {
     expect(screen.getByLabelText('Produje hoy GALLETA')).toHaveValue(0);
 
     fireEvent.change(screen.getByLabelText('Produje hoy GALLETA'), { target: { value: '3' } });
-    expect(screen.getByText('Total: 4 + 3 = 7')).toBeInTheDocument();
+    expect(screen.getByText('7', { selector: '.ap-total' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (1)' }));
     await waitFor(() => expect(registrar).toHaveBeenCalledWith([{ productoId: 'g1', cantidad: 4, produccion: 3 }]));

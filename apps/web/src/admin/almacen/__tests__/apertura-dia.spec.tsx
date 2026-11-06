@@ -31,8 +31,9 @@ describe('Apertura del día (conteo de productos controlados)', () => {
     expect(await screen.findByText('DONA CHOCOLATE')).toBeInTheDocument();
     expect(screen.getByLabelText('Quedaron de ayer DONA CHOCOLATE')).toHaveValue(10);
     expect(screen.getByLabelText('Quedaron de ayer GALLETA AVENA')).toHaveValue(6);
-    expect(screen.getByText('Falta la apertura de hoy')).toBeInTheDocument();
-    expect(screen.getByText('Apertura registrada hoy: 8')).toBeInTheDocument();
+    expect(screen.getByText('Falta contar')).toBeInTheDocument();
+    expect(screen.getByText('Contado hoy')).toBeInTheDocument();
+    expect(screen.getByText('Guardado: 8')).toBeInTheDocument();
     expect(screen.getByText(/05\/11\/2026/)).toBeInTheDocument();
   });
 

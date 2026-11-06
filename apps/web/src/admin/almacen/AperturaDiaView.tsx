@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import {
   almacenApi,
   AperturaDiaRespuesta,
@@ -11,11 +11,15 @@ import { Cargando } from '../../comun/Cargando';
 import { Confirmar } from '../../comun/Confirmar';
 import { EstadoError } from '../../comun/EstadoError';
 import { EstadoVacio } from '../../comun/EstadoVacio';
+import { Icono } from '../../comun/Icono';
+import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { ErrorApi } from '../../comun/api';
 import { MermaProductoBoton } from './MermaProductoBoton';
+import './apertura-dia.css';
 
 /** Un cambio de más de la mitad del saldo (o cualquier cantidad si el saldo es 0) pide confirmación. */
 const UMBRAL_DIFERENCIA = 0.5;
+const SIN_AREA = 'Sin área';
 
 /** Texto del campo → entero >= 0, o null si no es un número válido. */
 export function leerCantidad(texto: string): number | null {
@@ -32,6 +36,10 @@ function fechaDMA(iso: string): string {
   const [a, m, d] = iso.split('-');
   return a && m && d ? `${d}/${m}/${a}` : iso;
 }
+
+/** Para buscar sin importar mayúsculas ni tildes. */
+const normalizar = (texto: string) =>
+  texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
 /**
  * Una casilla de conteo: el producto entero, o un sabor de un producto con sabores.
@@ -85,10 +93,19 @@ function casillasDe(productos: AperturaProductoItem[]): Casilla[] {
   );
 }
 
+const tieneSabores = (p: AperturaProductoItem) => !!p.sabores && p.sabores.length > 0;
+
+/** Chip de estado: «Falta contar» (ámbar), «Agotado» (rojo) o «Contado hoy» (verde). */
+function estadoDe(aperturaHoy: boolean, total: number): { texto: string; variante: VarianteInsignia } {
+  if (!aperturaHoy) return { texto: 'Falta contar', variante: 'aviso' };
+  if (total === 0) return { texto: 'Agotado', variante: 'peligro' };
+  return { texto: 'Contado hoy', variante: 'exito' };
+}
+
 /**
  * Conteo de apertura del día con arrastre: el stock no se reinicia. «Quedaron de ayer» viene ya cargado
- * (editable si se contó distinto) y «Produje hoy» se suma. Los productos con sabores se cuentan sabor por sabor.
- * Se guardan los que cambiaron y los que todavía no tienen apertura hoy.
+ * (editable si se contó distinto) y «Produje hoy» se suma. Los productos con sabores se cuentan sabor por sabor,
+ * plegados bajo una sola fila. Se guardan los que cambiaron y los que todavía no tienen apertura hoy.
  */
 export function AperturaDiaView() {
   const [datos, setDatos] = useState<AperturaDiaRespuesta | null>(null);
@@ -100,6 +117,10 @@ export function AperturaDiaView() {
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
   const [exito, setExito] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+  const [soloFaltan, setSoloFaltan] = useState(false);
+  /** Productos con sabores desplegados. Por defecto, plegados salvo que falte contar algo. */
+  const [desplegados, setDesplegados] = useState<Record<string, boolean>>({});
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -110,6 +131,11 @@ export function AperturaDiaView() {
       const cs = casillasDe(res.productos);
       setValores(Object.fromEntries(cs.map((c) => [c.clave, String(c.quedaronAyer)])));
       setProduccion(Object.fromEntries(cs.map((c) => [c.clave, '0'])));
+      const porDefecto = Object.fromEntries(
+        res.productos.filter(tieneSabores).map((p) => [p.productoId, productoPendienteApertura(p)]),
+      );
+      // Lo que el usuario ya plegó o desplegó se conserva al recargar
+      setDesplegados((previo) => ({ ...porDefecto, ...previo }));
     } catch (err) {
       setErrorCarga(err instanceof ErrorApi ? err.message : 'No se pudo cargar la apertura del día.');
     } finally {
@@ -125,6 +151,8 @@ export function AperturaDiaView() {
   const casillas = casillasDe(productos);
   const valorDe = (clave: string) => valores[clave] ?? '';
   const produccionDe = (clave: string) => produccion[clave] ?? '0';
+  const quedaronDe = (c: Casilla) => leerCantidad(valorDe(c.clave)) ?? 0;
+  const producidoDe = (c: Casilla) => leerCantidad(produccionDe(c.clave)) ?? 0;
 
   const aEnviar: Array<{ c: Casilla; cantidad: number; produccionHoy: number }> = [];
   const invalidos: string[] = [];
@@ -196,86 +224,111 @@ export function AperturaDiaView() {
     void enviar();
   };
 
-  /** «Quedaron de ayer» (− y + de 44 px) y «Produje hoy» (+M), para un producto o un sabor. */
-  const controles = (c: Casilla) => {
-    const id = `apertura-${c.clave}`;
-    const idProd = `produccion-${c.clave}`;
-    const invalido = invalidos.includes(c.clave);
-    const quedaron = leerCantidad(valorDe(c.clave)) ?? 0;
-    const producido = leerCantidad(produccionDe(c.clave)) ?? 0;
+  // ── Filtros ────────────────────────────────────────────────────────────────
+  const q = normalizar(busqueda);
+  /** Un sabor se ve si cumple «solo faltan» (si está activo) y la búsqueda (por producto o por sabor). */
+  const saborVisible = (p: AperturaProductoItem, s: { nombre: string; aperturaHoy: boolean }) =>
+    (!soloFaltan || !s.aperturaHoy) && (!q || normalizar(p.nombre).includes(q) || normalizar(s.nombre).includes(q));
+  const saboresVisibles = (p: AperturaProductoItem) => (p.sabores ?? []).filter((s) => saborVisible(p, s));
+  const productoVisible = (p: AperturaProductoItem) =>
+    tieneSabores(p)
+      ? saboresVisibles(p).length > 0
+      : (!soloFaltan || !p.aperturaHoy) && (!q || normalizar(p.nombre).includes(q));
+
+  const visibles = productos.filter(productoVisible);
+  const grupos: Array<{ nombre: string; productos: AperturaProductoItem[] }> = [];
+  for (const p of visibles) {
+    const nombre = p.areaNombre || SIN_AREA;
+    let grupo = grupos.find((g) => g.nombre === nombre);
+    if (!grupo) {
+      grupo = { nombre, productos: [] };
+      grupos.push(grupo);
+    }
+    grupo.productos.push(p);
+  }
+  grupos.sort((a, b) => Number(a.nombre === SIN_AREA) - Number(b.nombre === SIN_AREA));
+
+  const expandibles = visibles.filter(tieneSabores);
+  const todosDesplegados = expandibles.length > 0 && expandibles.every((p) => desplegados[p.productoId]);
+  const alternar = (productoId: string) => setDesplegados((d) => ({ ...d, [productoId]: !d[productoId] }));
+  const desplegarTodos = (abrir: boolean) =>
+    setDesplegados((d) => ({ ...d, ...Object.fromEntries(expandibles.map((p) => [p.productoId, abrir])) }));
+
+  // ── Celdas ─────────────────────────────────────────────────────────────────
+  /** «Quedaron de ayer»: − campo + (el campo acepta escribir). */
+  const celdaQuedaron = (c: Casilla) => {
+    const invalido = leerCantidad(valorDe(c.clave)) === null;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label htmlFor={id} style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-navy)' }}>
-              Quedaron de ayer
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                aria-label={`Quitar uno de ${c.nombre}`}
-                onClick={() => ajustar(c, -1)}
-                disabled={quedaron <= 0}
-                style={botonCantidad}
-              >
-                −
-              </button>
-              <input
-                id={id}
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                aria-label={`Quedaron de ayer ${c.nombre}`}
-                aria-invalid={invalido || undefined}
-                value={valorDe(c.clave)}
-                onChange={(e) => cambiarValor(c.clave, e.target.value)}
-                style={campoNumero(invalido)}
-              />
-              <button
-                type="button"
-                aria-label={`Sumar uno a ${c.nombre}`}
-                onClick={() => ajustar(c, 1)}
-                style={botonCantidad}
-              >
-                +
-              </button>
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label htmlFor={idProd} style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-navy)' }}>
-              Produje hoy (+)
-            </label>
-            <input
-              id={idProd}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              aria-label={`Produje hoy ${c.nombre}`}
-              value={produccionDe(c.clave)}
-              onChange={(e) => cambiarProduccion(c.clave, e.target.value)}
-              style={campoNumero(false)}
-            />
-          </div>
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>
-          {`Total: ${quedaron} + ${producido} = ${quedaron + producido}`}
+      <>
+        <div className="ap-cantidad">
+          <button
+            type="button"
+            className="ap-paso"
+            aria-label={`Quitar uno de ${c.nombre}`}
+            onClick={() => ajustar(c, -1)}
+            disabled={quedaronDe(c) <= 0}
+          >
+            −
+          </button>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            aria-label={`Quedaron de ayer ${c.nombre}`}
+            aria-invalid={invalido || undefined}
+            className={`ap-campo${invalido ? ' ap-campo--error' : ''}`}
+            value={valorDe(c.clave)}
+            onChange={(e) => cambiarValor(c.clave, e.target.value)}
+          />
+          <button
+            type="button"
+            className="ap-paso"
+            aria-label={`Sumar uno a ${c.nombre}`}
+            onClick={() => ajustar(c, 1)}
+          >
+            +
+          </button>
         </div>
         {invalido && (
-          <span role="alert" style={{ fontSize: 12, color: 'var(--cp-rust)', fontWeight: 700 }}>
+          <span role="alert" className="ap-error-campo">
             Escribe un número entero de 0 o más.
           </span>
         )}
-      </div>
+      </>
     );
   };
 
-  /** Línea de estado de la apertura de hoy: «Apertura registrada hoy: N» o «Falta la apertura de hoy». */
-  const estado = (c: Casilla) => (
-    <div style={{ fontSize: 12.5, fontWeight: 700, color: c.aperturaHoy ? 'var(--cp-navy)' : 'var(--cp-rust)' }}>
-      {c.aperturaHoy ? `Apertura registrada hoy: ${c.aperturaCantidad ?? 0}` : 'Falta la apertura de hoy'}
-    </div>
+  /** «Produje hoy (+)»: se suma al saldo al guardar. */
+  const celdaProduccion = (c: Casilla) => {
+    const invalido = leerCantidad(produccionDe(c.clave)) === null;
+    return (
+      <>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          aria-label={`Produje hoy ${c.nombre}`}
+          aria-invalid={invalido || undefined}
+          className={`ap-campo${invalido ? ' ap-campo--error' : ''}`}
+          value={produccionDe(c.clave)}
+          onChange={(e) => cambiarProduccion(c.clave, e.target.value)}
+        />
+        {invalido && (
+          <span role="alert" className="ap-error-campo">
+            Escribe un número entero de 0 o más.
+          </span>
+        )}
+      </>
+    );
+  };
+
+  const chipEstado = (texto: string, variante: VarianteInsignia, detalle?: string) => (
+    <span className="ap-estado">
+      <Insignia variante={variante}>{texto}</Insignia>
+      {detalle && <small>{detalle}</small>}
+    </span>
   );
 
   if (cargando && !datos) {
@@ -300,110 +353,206 @@ export function AperturaDiaView() {
   }
 
   const pendientes = productos.filter(productoPendienteApertura).length;
+  const totalProductos = productos.length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 760 }}>
-      <div style={{ fontSize: 14, color: 'var(--cp-navy)' }}>
-        <b>Día {fechaDMA(datos!.fecha)}</b> · {productos.length} {productos.length === 1 ? 'producto' : 'productos'} con stock
-        propio · {pendientes > 0 ? `faltan ${pendientes} de contar` : 'todos contados hoy'}
+    <div className="ap-vista">
+      <div className="ap-cabecera">
+        <div className="ap-fecha">
+          <b>Día {fechaDMA(datos!.fecha)}</b>
+          <div className="ap-chips">
+            <Insignia variante="neutro">
+              {totalProductos} {totalProductos === 1 ? 'producto' : 'productos'}
+            </Insignia>
+            {pendientes > 0 ? (
+              <Insignia variante="aviso">faltan {pendientes} por contar</Insignia>
+            ) : (
+              <Insignia variante="exito">todos contados hoy</Insignia>
+            )}
+          </div>
+        </div>
+        <p className="ap-ayuda">
+          Cuenta lo que quedó de ayer, suma lo que produjiste hoy y guarda. La carta mostrará cuántos quedan.
+        </p>
       </div>
 
-      <ul
-        aria-label="Productos para contar la apertura"
-        style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}
-      >
-        {productos.map((p) => {
-          const delProducto = casillas.filter((c) => c.productoId === p.productoId);
-          const conSabores = !!p.sabores && p.sabores.length > 0;
-          const conError = delProducto.some((c) => invalidos.includes(c.clave));
-          const total = delProducto.reduce(
-            (suma, c) => suma + (leerCantidad(valorDe(c.clave)) ?? 0) + (leerCantidad(produccionDe(c.clave)) ?? 0),
-            0,
-          );
-          return (
-            <li
-              key={p.productoId}
-              data-testid="apertura-fila"
-              style={{
-                background: 'var(--cp-white)',
-                border: `1px solid ${conError ? 'var(--cp-rust)' : 'var(--cp-line)'}`,
-                borderRadius: 14,
-                padding: '12px 14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-                minWidth: 0,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
-                <div style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-                  <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, color: 'var(--cp-navy)' }}>
-                    {p.nombre}
-                  </div>
-                  {p.areaNombre && <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>{p.areaNombre}</div>}
-                  {conSabores && (
-                    <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Se cuenta por sabor</div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: 13, color: 'var(--cp-navy)' }}>
-                  <div>Saldo actual: <b>{p.saldo}</b></div>
-                  {conSabores && <div>{`Total ahora: ${total}`}</div>}
-                </div>
-              </div>
+      <div className="ap-filtros">
+        <input
+          type="search"
+          className="ap-buscar"
+          placeholder="Buscar producto o sabor"
+          aria-label="Buscar producto o sabor"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+        <label className="ap-check">
+          <input type="checkbox" checked={soloFaltan} onChange={(e) => setSoloFaltan(e.target.checked)} />
+          Solo los que faltan contar
+        </label>
+        {expandibles.length > 0 && (
+          <button type="button" className="ap-boton-texto" onClick={() => desplegarTodos(!todosDesplegados)}>
+            {todosDesplegados ? 'Plegar todos' : 'Desplegar todos'}
+          </button>
+        )}
+      </div>
 
-              {conSabores ? (
-                delProducto.map((c) => (
-                  <div
-                    key={c.clave}
-                    data-testid="apertura-sabor"
-                    style={{ borderTop: '1px solid var(--cp-line)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy)', overflowWrap: 'anywhere', minWidth: 0 }}>
-                        {c.etiqueta}
-                      </div>
-                      <div style={{ fontSize: 13, color: 'var(--cp-navy)' }}>Saldo: <b>{c.saldo}</b></div>
-                    </div>
-                    {estado(c)}
-                    {controles(c)}
-                    <MermaProductoBoton
-                      productoId={c.productoId}
-                      saborId={c.saborId}
-                      nombre={c.nombre}
-                      saldo={c.saldo}
-                      alRegistrar={() => void cargar()}
-                    />
-                  </div>
-                ))
-              ) : (
-                <>
-                  {estado(delProducto[0])}
-                  {controles(delProducto[0])}
-                  <MermaProductoBoton
-                    productoId={delProducto[0].productoId}
-                    nombre={delProducto[0].nombre}
-                    saldo={delProducto[0].saldo}
-                    alRegistrar={() => void cargar()}
-                  />
-                </>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <div className="ap-tabla-wrap">
+        <table className="ap-tabla" aria-label="Conteo de apertura por producto">
+          <thead>
+            <tr>
+              <th scope="col">Producto</th>
+              <th scope="col">Quedaron de ayer</th>
+              <th scope="col">Produje hoy (+)</th>
+              <th scope="col">Total</th>
+              <th scope="col">Estado</th>
+              <th scope="col">
+                <span className="ap-sronly">Botar a merma</span>
+              </th>
+            </tr>
+          </thead>
+          {grupos.map((g) => (
+            <tbody key={g.nombre} className="ap-grupo">
+              <tr className="ap-grupo-titulo">
+                <th colSpan={6} scope="colgroup">
+                  {g.nombre} <span className="ap-grupo-cuenta">· {g.productos.length}</span>
+                </th>
+              </tr>
+              {g.productos.map((p) => {
+                const delProducto = casillas.filter((c) => c.productoId === p.productoId);
+                const total = delProducto.reduce((suma, c) => suma + quedaronDe(c) + producidoDe(c), 0);
+                const conError = delProducto.some((c) => invalidos.includes(c.clave));
+
+                if (!tieneSabores(p)) {
+                  const c = delProducto[0];
+                  return (
+                    <tr key={p.productoId} data-testid="apertura-fila" className={`ap-fila${conError ? ' ap-fila--error' : ''}`}>
+                      <td className="ap-celda-nombre">
+                        <div className="ap-nombre">{p.nombre}</div>
+                        <div className="ap-saldo">Saldo actual: {p.saldo}</div>
+                      </td>
+                      <td data-label="Quedaron de ayer">{celdaQuedaron(c)}</td>
+                      <td data-label="Produje hoy (+)">{celdaProduccion(c)}</td>
+                      <td data-label="Total" className="ap-total">{total}</td>
+                      <td data-label="Estado">
+                        {chipEstado(
+                          estadoDe(c.aperturaHoy, total).texto,
+                          estadoDe(c.aperturaHoy, total).variante,
+                          c.aperturaHoy ? `Guardado: ${c.aperturaCantidad ?? 0}` : undefined,
+                        )}
+                      </td>
+                      <td data-label="Botar a merma" className="ap-celda-merma">
+                        <MermaProductoBoton
+                          compacto
+                          productoId={c.productoId}
+                          nombre={c.nombre}
+                          saldo={c.saldo}
+                          alRegistrar={() => void cargar()}
+                        />
+                      </td>
+                    </tr>
+                  );
+                }
+
+                const abierto = !!desplegados[p.productoId];
+                const saboresVis = delProducto.filter((c) => saborVisible(p, { nombre: c.etiqueta, aperturaHoy: c.aperturaHoy }));
+                const pendientesSabores = delProducto.filter((c) => !c.aperturaHoy).length;
+                const quedaronTotal = delProducto.reduce((s, c) => s + quedaronDe(c), 0);
+                const producidoTotal = delProducto.reduce((s, c) => s + producidoDe(c), 0);
+                const estadoProducto: { texto: string; variante: VarianteInsignia; detalle?: string } =
+                  pendientesSabores > 0
+                    ? { texto: 'Falta contar', variante: 'aviso', detalle: `${pendientesSabores} de ${delProducto.length} sabores` }
+                    : estadoDe(true, total);
+                return (
+                  <Fragment key={p.productoId}>
+                    <tr data-testid="apertura-fila" className={`ap-fila ap-fila--grupo${conError ? ' ap-fila--error' : ''}`}>
+                      <td className="ap-celda-nombre">
+                        <button
+                          type="button"
+                          className="ap-plegar"
+                          aria-expanded={abierto}
+                          aria-label={`${p.nombre}, ${delProducto.length} sabores`}
+                          onClick={() => alternar(p.productoId)}
+                        >
+                          <Icono nombre="chevronDerecha" tamano={16} aria-hidden="true" className="ap-chevron" />
+                          <span>
+                            <span className="ap-nombre">{p.nombre}</span>
+                            <span className="ap-saldo">{delProducto.length} sabores</span>
+                          </span>
+                        </button>
+                      </td>
+                      <td data-label="Quedaron de ayer" className="ap-resumen">{quedaronTotal}</td>
+                      <td data-label="Produje hoy (+)" className="ap-resumen">{producidoTotal}</td>
+                      <td data-label="Total" className="ap-total">{total}</td>
+                      <td data-label="Estado">{chipEstado(estadoProducto.texto, estadoProducto.variante, estadoProducto.detalle)}</td>
+                      <td className="ap-celda-merma" />
+                    </tr>
+                    {abierto &&
+                      saboresVis.map((c) => {
+                        const totalSabor = quedaronDe(c) + producidoDe(c);
+                        const atenuado = !c.aperturaHoy && totalSabor === 0;
+                        const estado = estadoDe(c.aperturaHoy, totalSabor);
+                        return (
+                          <tr
+                            key={c.clave}
+                            data-testid="apertura-sabor"
+                            className={`ap-sabor${atenuado ? ' ap-sabor--atenuado' : ''}${invalidos.includes(c.clave) ? ' ap-fila--error' : ''}`}
+                          >
+                            <td className="ap-celda-nombre">
+                              <span className="ap-nombre-sabor">{c.etiqueta}</span>
+                              <span className="ap-saldo">Saldo {c.saldo}</span>
+                            </td>
+                            <td data-label="Quedaron de ayer">{celdaQuedaron(c)}</td>
+                            <td data-label="Produje hoy (+)">{celdaProduccion(c)}</td>
+                            <td data-label="Total" className="ap-total">{totalSabor}</td>
+                            <td data-label="Estado">
+                              {chipEstado(
+                                estado.texto,
+                                estado.variante,
+                                c.aperturaHoy ? `Guardado: ${c.aperturaCantidad ?? 0}` : undefined,
+                              )}
+                            </td>
+                            <td data-label="Botar a merma" className="ap-celda-merma">
+                              <MermaProductoBoton
+                                compacto
+                                productoId={c.productoId}
+                                saborId={c.saborId}
+                                nombre={c.nombre}
+                                saldo={c.saldo}
+                                alRegistrar={() => void cargar()}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          ))}
+          {grupos.length === 0 && (
+            <tbody>
+              <tr>
+                <td colSpan={6} className="ap-vacio">
+                  Ningún producto coincide con la búsqueda o con el filtro.
+                </td>
+              </tr>
+            </tbody>
+          )}
+        </table>
+      </div>
 
       {exito && (
-        <div role="status" style={{ fontSize: 14, fontWeight: 700, color: 'var(--cp-navy)' }}>
+        <div role="status" className="ap-mensaje ap-mensaje--ok">
           {exito}
         </div>
       )}
       {error && (
-        <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>
+        <div role="alert" className="ap-mensaje ap-mensaje--error">
           {error}
         </div>
       )}
 
-      <div style={{ position: 'sticky', bottom: 0, background: 'var(--cp-cream)', padding: '8px 0' }}>
+      <div className="ap-pie">
         <Boton
           tamano="grande"
           onClick={guardar}
@@ -413,9 +562,7 @@ export function AperturaDiaView() {
         >
           {aEnviar.length > 0 ? `Guardar apertura (${aEnviar.length})` : 'Guardar apertura'}
         </Boton>
-        <div style={{ fontSize: 12, color: 'var(--cp-soft)', marginTop: 4 }}>
-          Se guardan los productos y sabores que cambiaste y los que aún no tienen apertura hoy.
-        </div>
+        <div className="ap-pie-nota">Se guardan los productos y sabores que cambiaste y los que aún no tienen apertura hoy.</div>
       </div>
 
       <Confirmar
@@ -432,31 +579,3 @@ export function AperturaDiaView() {
     </div>
   );
 }
-
-const campoNumero = (invalido: boolean): CSSProperties => ({
-  width: 110,
-  minHeight: 44,
-  boxSizing: 'border-box',
-  borderRadius: 10,
-  border: `1.5px solid ${invalido ? 'var(--cp-rust)' : 'var(--cp-navy)'}`,
-  background: 'var(--cp-white)',
-  color: 'var(--cp-navy)',
-  fontFamily: 'Montserrat, sans-serif',
-  fontWeight: 800,
-  fontSize: 18,
-  textAlign: 'center',
-  padding: '0 8px',
-});
-
-const botonCantidad: CSSProperties = {
-  minWidth: 44,
-  minHeight: 44,
-  borderRadius: 12,
-  border: '1.5px solid var(--cp-navy)',
-  background: 'var(--cp-white)',
-  color: 'var(--cp-navy)',
-  fontFamily: 'Montserrat, sans-serif',
-  fontWeight: 800,
-  fontSize: 20,
-  cursor: 'pointer',
-};
