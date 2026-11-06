@@ -83,12 +83,12 @@ Tiene cuatro pestanas: Repartidores, Todos los pedidos, Mapa y Rutas. Ver el seg
 - Rutas: rutas de los repartidores con filtros de Dia y Repartidor.
 - Si el Administrador toma pedidos como repartidor aparece en el panel con su nombre y "(admin)" mientras los lleve.
 
-## Como se hace: Tomar un pedido como repartidor (solo Administrador)
+## Como se hace: Tomar un envio como repartidor (solo Administrador)
 1. En Todos los pedidos, Mapa o el detalle de un pedido que esta Esperando repartidor, pulsa Tomar como repartidor.
 2. El pedido queda a tu nombre y apareces como "Tu nombre (admin)" en Repartidores. Lo entregas con los mismos pasos de la pantalla de reparto (Salir, Llegue, Entregar).
 Ver tambien: [[caja]]
 
-## Como se hace: Soltar o reasignar un pedido (Administrador y Cajero)
+## Como se hace: Soltar o reasignar un envio (Administrador y Cajero)
 1. Abre un pedido que ya tiene repartidor y no esta entregado y pulsa Soltar / reasignar.
 2. Escribe el Motivo (obligatorio; si no, "Escribe el motivo").
 3. Elige un repartidor destino para Reasignar, o deja "Dejarlo sin repartidor (vuelve a esperando)" y pulsa Soltar pedido. El cambio queda auditado.
