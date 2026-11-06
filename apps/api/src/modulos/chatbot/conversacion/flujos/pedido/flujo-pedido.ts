@@ -4,6 +4,7 @@ import {
   ContextoConversacion,
   ResultadoTransicion,
   AccionMensaje,
+  AccionEnviarLista,
   BotonAccion,
   FilaLista,
 } from '../../tipos-conversacion';
@@ -75,6 +76,100 @@ const ESTADOS_UBICACION_LEGADOS: string[] = ['PEDIDO_DIRECCION_ELEGIR', 'PEDIDO_
 
 function normalizarEstadoUbicacion(estado: EstadoPedidoFlujo): EstadoPedidoFlujo {
   return ESTADOS_UBICACION_LEGADOS.includes(estado) ? 'PEDIDO_UBICACION' : estado;
+}
+
+/** Sabores que se pueden pedir ahora: disponibles y sin agotar (quedan null = sin apertura hoy, no bloquea). */
+function saboresPedibles(prod: any): any[] {
+  return (prod?.sabores || []).filter((s: any) => s.disponible === true && s.quedan !== 0);
+}
+
+/** No se puede pedir: agotado, o con stock por sabor y ningún sabor disponible. */
+function productoAgotado(p: any): boolean {
+  return p.disponible === false || (p.saboresConStock === true && saboresPedibles(p).length === 0);
+}
+
+/** Unidades de un tamaño (Unidad=1, 1/2 docena=6, Docena=12). Sin tamaño o sin dato: 1. */
+function unidadesDeTamano(prod: any, tamanoId?: string): number {
+  const tamano = (prod?.tamanos || []).find((t: any) => String(t.id) === String(tamanoId));
+  return Math.max(1, Number(tamano?.unidades) || 1);
+}
+
+function productoDeCarta(categorias: any[], productoId: string): any | null {
+  for (const cat of categorias || []) {
+    const p = (cat.productos || []).find((x: any) => String(x.id) === String(productoId));
+    if (p) return p;
+  }
+  return null;
+}
+
+/** Lista de sabores que se pueden pedir (máx 10 filas; «Quedan N» cuando quedan 5 o menos). */
+function listaSaboresStock(prod: any, texto: string): AccionEnviarLista {
+  return {
+    tipo: 'enviarLista',
+    texto,
+    botonTexto: 'Elegir sabor',
+    filas: saboresPedibles(prod)
+      .slice(0, 10)
+      .map((s: any) => ({
+        id: `ped_sab_${s.id}`,
+        titulo: String(s.nombre).slice(0, 24),
+        ...(typeof s.quedan === 'number' && s.quedan <= 5 ? { descripcion: `Quedan ${s.quedan}` } : {}),
+      })),
+  };
+}
+
+/** Detalles de una línea en el resumen: con sabor de stock sale «1/2 docena de Fresa». */
+function detallesLinea(i: LineaCarritoBot): string[] {
+  const opciones = i.opciones.map((o) => o.nombre);
+  const saborStock = i.sabores?.[0];
+  if (saborStock) {
+    return [`${i.tamanoNombre ? `${i.tamanoNombre} de ` : ''}${saborStock.nombre}`, ...opciones];
+  }
+  return [i.tamanoNombre, ...opciones, i.sabor].filter((d): d is string => Boolean(d));
+}
+
+/**
+ * El servidor rechazó la línea por SABOR_AGOTADO: esa línea sale del carrito (el resto se conserva) y el
+ * cliente vuelve a la lista de sabores de ese producto. Null si no hay línea que tocar o no queda ningún sabor
+ * (el ejecutor entonces vuelve al carrito como con STOCK_INSUFICIENTE).
+ */
+export function carritoTrasSaborAgotado(
+  carrito: EstadoCarritoPedido,
+  err: { productoId: string; saborId: string; saborNombre?: string },
+  categorias: any[],
+): { pedido: EstadoCarritoPedido; lista: AccionEnviarLista } | null {
+  const idx = carrito.items.findIndex(
+    (i) => i.productoId === String(err.productoId) && i.sabores?.some((s) => s.saborId === String(err.saborId)),
+  );
+  const prod = productoDeCarta(categorias, err.productoId);
+  if (idx < 0 || !prod?.saboresConStock || saboresPedibles(prod).length === 0) return null;
+
+  const linea = carrito.items[idx];
+  const extras = linea.opciones.reduce((s, o) => s + o.precioExtra, 0);
+  const config: ItemEnConfiguracionBot = {
+    productoId: linea.productoId,
+    productoNombre: linea.productoNombre,
+    categoriaId: linea.categoriaId,
+    categoriaNombre: linea.categoriaNombre,
+    tamanoId: linea.tamanoId,
+    tamanoNombre: linea.tamanoNombre,
+    precioBase: Number((linea.precioUnitario - extras).toFixed(2)),
+    opciones: linea.opciones,
+    grupoIndexActual: (prod.grupos || []).length,
+    cantidad: linea.cantidad,
+    noSumaBeneficios: linea.noSumaBeneficios,
+    nota: linea.nota,
+  };
+  const nombre = err.saborNombre || linea.sabores?.[0]?.nombre || '';
+  return {
+    pedido: {
+      ...carrito,
+      estadoInterno: 'PEDIDO_SABOR',
+      items: carrito.items.filter((_, k) => k !== idx),
+      itemEnConfiguracion: config,
+    },
+    lista: listaSaboresStock(prod, TEXTOS_BOT.pedidoSaborAgotado(nombre)),
+  };
 }
 
 export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
@@ -661,7 +756,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (entrada.id?.startsWith('ped_prod_mas_')) {
       const n = Math.max(2, parseInt(entrada.id.replace('ped_prod_mas_', ''), 10) || 2);
       const productos = ordenarPorVentas(
-        (categoria.productos || []).filter((p: any) => p.disponible !== false),
+        (categoria.productos || []).filter((p: any) => !productoAgotado(p)),
         contexto.ventasProductos,
       );
       if ((n - 1) * 10 >= productos.length) {
@@ -697,9 +792,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     // Validar disponibilidad / agotado (Mockup: no sigue el flujo del agotado y ofrece alternativas)
-    if (producto.disponible === false) {
+    if (productoAgotado(producto)) {
       const alternativas = (categoria.productos || [])
-        .filter((p: any) => p.id !== producto.id && p.disponible !== false)
+        .filter((p: any) => p.id !== producto.id && !productoAgotado(p))
         .map((p: any) => p.nombre)
         .slice(0, 2);
 
@@ -910,6 +1005,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const config = pedido.itemEnConfiguracion;
     if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
 
+    const prodStock = productoDeCarta(contexto.categoriasCarta || [], config.productoId);
+    if (prodStock?.saboresConStock) return this.pasoSaborStock(flujo, pedido, entrada, contexto, prodStock);
+
     if (entrada.id?.startsWith('ped_sab_')) {
       config.sabor = entrada.textoOriginal;
     } else if (entrada.textoOriginal.length > 0 && entrada.textoOriginal !== 'omitir') {
@@ -931,6 +1029,65 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         estado: 'PEDIDO_CANTIDAD',
         pedido,
       },
+    };
+  }
+
+  /** Stock por sabor: un solo sabor por línea; las unidades que consume son tamaño × cantidad. */
+  private pasoSaborStock(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+    prod: any,
+  ): ResultadoTransicion {
+    const config = pedido.itemEnConfiguracion as ItemEnConfiguracionBot;
+    const pedibles = saboresPedibles(prod);
+    const saborId = entrada.id?.startsWith('ped_sab_') ? entrada.id.replace('ped_sab_', '') : null;
+    const elegido =
+      pedibles.find((s: any) => String(s.id) === saborId) ||
+      pedibles.find((s: any) => normalizarTexto(s.nombre) === entrada.texto);
+    if (!elegido) {
+      return this.preguntarSaborStock(flujo, pedido, prod, 'Elige un sabor de la lista:');
+    }
+
+    const unidades = unidadesDeTamano(prod, config.tamanoId) * config.cantidad;
+    if (typeof elegido.quedan === 'number' && unidades > elegido.quedan) {
+      return this.preguntarSaborStock(flujo, pedido, prod, TEXTOS_BOT.pedidoSoloQuedanSabor(elegido.quedan, elegido.nombre));
+    }
+
+    config.sabores = [{ saborId: String(elegido.id), nombre: elegido.nombre, cantidad: unidades }];
+    return this.agregarLineaConfigurada(flujo, pedido, contexto);
+  }
+
+  /** Lista de sabores disponibles (un mensaje). Sin ninguno, el producto queda agotado. */
+  private preguntarSaborStock(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    prod: any,
+    texto: string,
+  ): ResultadoTransicion {
+    if (saboresPedibles(prod).length === 0) {
+      return {
+        nuevoEstado: 'PEDIDO_CATEGORIAS',
+        acciones: [
+          {
+            tipo: 'enviarBotones',
+            texto: TEXTOS_BOT.pedidoProductoAgotado(prod.nombre),
+            botones: [{ id: 'btn_categorias', titulo: 'Ver categorías' }, BOTON_VOLVER_MENU],
+          },
+        ],
+        nuevoFlujo: {
+          ...flujo,
+          estado: 'PEDIDO_CATEGORIAS',
+          pedido: { ...pedido, estadoInterno: 'PEDIDO_CATEGORIAS', itemEnConfiguracion: undefined },
+        },
+      };
+    }
+    pedido.estadoInterno = 'PEDIDO_SABOR';
+    return {
+      nuevoEstado: 'PEDIDO_SABOR',
+      acciones: [listaSaboresStock(prod, texto)],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_SABOR', pedido },
     };
   }
 
@@ -1013,6 +1170,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     config.cantidad = cantidad;
+
+    // Stock por sabor: después de la cantidad se elige el sabor (una lista, un solo sabor por línea)
+    const prodStock = productoDeCarta(contexto.categoriasCarta || [], config.productoId);
+    if (prodStock?.saboresConStock) {
+      return this.preguntarSaborStock(flujo, pedido, prodStock, TEXTOS_BOT.pedidoPreguntarSabor());
+    }
 
     // Bebidas: cada envase lleva un nombre distinto en su etiqueta; se piden uno por uno
     if (this.esBebidaConNombres(config.categoriaNombre) || this.bebidasDeCombo(config).length > 0) {
@@ -1194,6 +1357,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       subtotal: subtotalLinea,
       opciones: config.opciones,
       sabor: config.sabor,
+      ...(config.sabores ? { sabores: [...config.sabores] } : {}),
       nota: config.nota,
       noSumaBeneficios: config.noSumaBeneficios,
       personas: config.nombresEnvase && config.nombresEnvase.length > 0 ? [...config.nombresEnvase] : undefined,
@@ -1275,11 +1439,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       const subtotal = Number(pedido.items.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
       const lineasTexto = pedido.items
         .map((i) => {
-          const detalles = [
-            i.tamanoNombre,
-            ...i.opciones.map((o) => o.nombre),
-            i.sabor,
-          ].filter(Boolean);
+          const detalles = detallesLinea(i);
           const detTxt = detalles.length > 0 ? ` (${detalles.join(' · ')})` : '';
           return `• ${i.cantidad}x ${i.productoNombre}${detTxt} — S/ ${i.subtotal.toFixed(2)}`;
         })
@@ -1962,6 +2122,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         opciones: i.opciones.map((o) => o.opcionId),
         nota: i.nota,
         personas: i.personas,
+        // Stock por sabor: unidades por sabor (tamaño × cantidad); el servidor valida suma y stock
+        ...(i.sabores ? { sabores: i.sabores.map((s) => ({ saborId: s.saborId, cantidad: s.cantidad })) } : {}),
       })),
       pago: {
         metodo: pedido.pago?.metodo || 'EFECTIVO',
@@ -2325,7 +2487,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   private lineasResumen(pedido: EstadoCarritoPedido): string {
     return pedido.items
       .map((i) => {
-        const detalles = [i.tamanoNombre, ...i.opciones.map((o) => o.nombre), i.sabor].filter(Boolean);
+        const detalles = detallesLinea(i);
         const detTxt = detalles.length > 0 ? ` · ${detalles.join(' · ')}` : '';
         const cant = i.cantidad > 1 ? `${i.cantidad}× ` : '';
         return `• ${cant}${i.productoNombre}${detTxt} — S/ ${i.subtotal.toFixed(2)}`;
@@ -2373,7 +2535,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     // Sabores (si tiene sabores disponibles)
-    if (prod?.sabores && prod.sabores.length > 0 && !config.sabor) {
+    if (prod?.sabores && prod.sabores.length > 0 && !prod.saboresConStock && !config.sabor) {
       pedido.estadoInterno = 'PEDIDO_SABOR';
       const botonesSabor: BotonAccion[] = prod.sabores
         .filter((s: any) => s.disponible !== false)
@@ -2530,7 +2692,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   ): ResultadoTransicion {
     // Más vendidos primero (los sin ventas siguen el orden de la carta)
     const productos = ordenarPorVentas(
-      (categoria.productos || []).filter((p: any) => p.disponible !== false),
+      (categoria.productos || []).filter((p: any) => !productoAgotado(p)),
       contexto.ventasProductos,
     );
 

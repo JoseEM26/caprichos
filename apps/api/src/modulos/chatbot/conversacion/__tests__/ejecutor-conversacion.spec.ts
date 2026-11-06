@@ -586,6 +586,77 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
     });
   });
 
+  describe('6.b Sabor agotado al confirmar: se quita la línea y se elige otro sabor (una lista)', () => {
+    const categorias = [
+      {
+        id: 'cat_donas',
+        nombre: 'Donas',
+        productos: [
+          {
+            id: 'prod_dona',
+            nombre: 'Dona',
+            disponible: true,
+            saboresConStock: true,
+            tamanos: [{ id: 'tam_media', nombre: '1/2 docena', precio: 18, unidades: 6 }],
+            sabores: [
+              { id: 'sab_fresa', nombre: 'Fresa', disponible: false, quedan: 0 },
+              { id: 'sab_coco', nombre: 'Coco', disponible: true, quedan: null },
+            ],
+          },
+        ],
+      },
+    ];
+    const carrito: any = {
+      estadoInterno: 'PEDIDO_CONFIRMAR',
+      modalidad: 'RECOGER',
+      items: [
+        { lineaId: 'l_dona', productoId: 'prod_dona', productoNombre: 'Dona', categoriaId: 'cat_donas', categoriaNombre: 'Donas', tamanoId: 'tam_media', tamanoNombre: '1/2 docena', cantidad: 1, precioUnitario: 18, subtotal: 18, opciones: [], sabores: [{ saborId: 'sab_fresa', nombre: 'Fresa', cantidad: 6 }], noSumaBeneficios: false },
+        { lineaId: 'l_frappe', productoId: 'prod_frappe', productoNombre: 'Frappe', categoriaId: 'cat_frias', categoriaNombre: 'Frappes', cantidad: 1, precioUnitario: 12, subtotal: 12, opciones: [], noSumaBeneficios: false },
+      ],
+    };
+
+    it('guarda el carrito sin la línea agotada, manda una sola lista de sabores y no escala', async () => {
+      mockPrisma.conversacion.findUnique.mockResolvedValueOnce({ flujo: { version: 2, estado: 'MENU', pedido: null } });
+      mockMensajeria.enviarLista = jest.fn().mockResolvedValue({ exito: true, waMessageId: 'wamid.sabor' });
+
+      const ok = await (service as any).volverAlSaborAgotado(
+        10n,
+        carrito,
+        { productoId: 'prod_dona', saborId: 'sab_fresa', saborNombre: 'Fresa' },
+        categorias,
+        '51999999999',
+        { waMessageId: 'wamid.entrada' },
+      );
+
+      expect(ok).toBe(true);
+      const update = mockPrisma.conversacion.update.mock.calls.at(-1)[0];
+      expect(update.data.flujo.estado).toBe('PEDIDO_SABOR');
+      expect(update.data.flujo.pedido.items.map((i: any) => i.lineaId)).toEqual(['l_frappe']);
+      expect(update.data.flujo.pedido.itemEnConfiguracion).toMatchObject({ productoId: 'prod_dona', tamanoId: 'tam_media', cantidad: 1 });
+      expect(mockMensajeria.enviarLista).toHaveBeenCalledTimes(1);
+      const [, texto, , filas] = mockMensajeria.enviarLista.mock.calls[0];
+      expect(texto).toBe('Ya no quedan Fresa… ¿elegimos otro?');
+      expect(filas.map((f: any) => f.id)).toEqual(['ped_sab_sab_coco']);
+      expect(mockMensajeria.enviarBotones).not.toHaveBeenCalled();
+      expect(mockPrisma.notificacion.create).not.toHaveBeenCalled();
+    });
+
+    it('si ya no queda ningún sabor, no hay lista: devuelve false para que el llamador vuelva al carrito', async () => {
+      const sinSabores = [{ ...categorias[0], productos: [{ ...categorias[0].productos[0], sabores: [{ id: 'sab_fresa', nombre: 'Fresa', disponible: false, quedan: 0 }] }] }];
+      const ok = await (service as any).volverAlSaborAgotado(
+        10n,
+        carrito,
+        { productoId: 'prod_dona', saborId: 'sab_fresa', saborNombre: 'Fresa' },
+        sinSabores,
+        '51999999999',
+        {},
+      );
+      expect(ok).toBe(false);
+      expect(mockPrisma.conversacion.update).not.toHaveBeenCalled();
+      expect(mockMensajeria.enviarLista).not.toHaveBeenCalled();
+    });
+  });
+
   describe('7. La calle de la ubicación del chat llega al pedido delivery', () => {
     const dtoDelivery = (extra: any = {}) => ({
       modalidad: 'DELIVERY',
