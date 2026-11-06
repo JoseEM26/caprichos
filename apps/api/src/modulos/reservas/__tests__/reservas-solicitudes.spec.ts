@@ -43,7 +43,7 @@ describe('ReservasService - Solicitudes y Disponibilidad WhatsApp', () => {
       },
       reserva: {
         create: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]), // sin choques de mesas por defecto
         findUnique: jest.fn(),
         update: jest.fn(),
       },

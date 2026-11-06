@@ -29,7 +29,7 @@ describe('ReservasService', () => {
     prisma = {
       reserva: {
         create: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         update: jest.fn(),
       },

@@ -64,20 +64,20 @@ export const minutosDeHora = (hora: string): number => {
 
 const aHora = (min: number): string => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
-/** Horas cada 30 minutos desde «abre» hasta «cierra», incluidas (igual que validarHorarioAtencion). */
-export function horasDelDia(abre: string, cierra: string): string[] {
+/** Horas cada 30 minutos desde «abre» hasta «ultimo» (la última hora que puede empezar una reserva), incluidas. */
+export function horasDelDia(abre: string, ultimo: string): string[] {
   const horas: string[] = [];
-  for (let t = minutosDeHora(abre); t <= minutosDeHora(cierra); t += 30) horas.push(aHora(t));
+  for (let t = minutosDeHora(abre); t <= minutosDeHora(ultimo); t += 30) horas.push(aHora(t));
   return horas;
 }
 
-/** Horario de atención de una fecha, o null si ese día no se atiende. */
-export function horarioDelDia(iso: string, op: OpcionesReserva): { abre: string; cierra: string } | null {
+/** Horario de reserva de una fecha (abre y última hora de inicio), o null si ese día no se atiende. */
+export function horarioDelDia(iso: string, op: OpcionesReserva): { abre: string; ultimo: string } | null {
   if (op.fechasCerradas.includes(iso)) return null;
   const especial = op.fechasEspeciales.find((f) => f.fecha === iso);
-  if (especial) return { abre: especial.abre, cierra: especial.cierra };
+  if (especial) return { abre: especial.abre, ultimo: especial.ultimo };
   const regular = op.horarios.find((h) => h.dia === diaSemanaIso(iso));
-  return regular ? { abre: regular.abre, cierra: regular.cierra } : null;
+  return regular ? { abre: regular.abre, ultimo: regular.ultimo } : null;
 }
 
 /** Hora ya pasada si la fecha es hoy y la hora no es posterior al momento actual. */

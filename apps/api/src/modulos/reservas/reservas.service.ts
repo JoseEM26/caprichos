@@ -11,12 +11,19 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { formatearHora, obtenerFechaHoraLima } from '../local/local.util';
+import {
+  aMinutos,
+  franjasReserva,
+  horaEnVentanaReserva,
+  horaLegible,
+  reservasSeCruzan,
+  ultimoInicioReserva,
+} from './horario-reserva';
 import { CrearReservaDto } from './dto/crear-reserva.dto';
 import { ActualizarReservaDto } from './dto/actualizar-reserva.dto';
 import { CancelarReservaDto } from './dto/cancelar-reserva.dto';
 import { Ventana24hService } from '../chatbot/servicios/ventana-24h.service';
 import { TEXTOS_RESERVA } from '../chatbot/conversacion/textos-reserva';
-import { generarFranjasPorDefecto } from '../chatbot/conversacion/flujos/reserva/flujo-reserva';
 import { OutboxWhatsappService } from '../chatbot/servicios/outbox-whatsapp.service';
 
 /** 'YYYY-MM-DD' (Lima) a 'DD/MM/YYYY' para el cliente. */
@@ -91,49 +98,55 @@ export class ReservasService {
   }
 
   /**
-   * Valida que la hora caiga dentro del horario de atención del día (hora Lima),
-   * considerando fechas especiales y horario regular por día de semana.
+   * Horario del día (hora Lima) para reservas y para la carta: una fecha especial manda sobre el día
+   * de la semana. Devuelve abre/cierra 'HH:mm' o null si el local no atiende ese día.
    */
-  async validarHorarioAtencion(fechaHora: Date): Promise<void> {
-    const { fechaIso, horaMinutos, diaSemana } = obtenerFechaHoraLima(fechaHora);
-
-    // 1. Fecha especial para el día (anclada a 00:00:00.000Z)
-    const fechaDate = new Date(`${fechaIso}T00:00:00.000Z`);
+  async horarioDelDia(fechaIso: string): Promise<{ abre: string | null; cierra: string | null; motivo: string | null; cerrado: boolean }> {
     const fechaEspecial = await this.prisma.fechaEspecial.findUnique({
-      where: { fecha: fechaDate },
+      where: { fecha: new Date(`${fechaIso}T00:00:00.000Z`) },
     });
-
-    let abre: string | null = null;
-    let cierra: string | null = null;
-
     if (fechaEspecial) {
       if (fechaEspecial.cerrado) {
-        throw new BadRequestException({
-          codigo: 'FUERA_DE_HORARIO',
-          mensaje: `El local se encuentra cerrado en la fecha indicada (${fechaEspecial.motivo || 'Fecha especial'})`,
-        });
+        return { abre: null, cierra: null, motivo: fechaEspecial.motivo || 'Fecha especial', cerrado: true };
       }
-      abre = formatearHora(fechaEspecial.abre);
-      cierra = formatearHora(fechaEspecial.cierra);
-    } else {
-      const horario = await this.prisma.horarioDia.findUnique({
-        where: { dia_semana: diaSemana },
-      });
-
-      if (!horario || horario.cerrado || !horario.abre || !horario.cierra) {
-        throw new BadRequestException({
-          codigo: 'FUERA_DE_HORARIO',
-          mensaje: 'El local no atiende en el día de la semana seleccionado',
-        });
-      }
-      abre = formatearHora(horario.abre);
-      cierra = formatearHora(horario.cierra);
+      return {
+        abre: formatearHora(fechaEspecial.abre),
+        cierra: formatearHora(fechaEspecial.cierra),
+        motivo: fechaEspecial.motivo || null,
+        cerrado: false,
+      };
     }
+    const diaSemana = obtenerFechaHoraLima(new Date(`${fechaIso}T12:00:00-05:00`)).diaSemana;
+    const horario = await this.prisma.horarioDia.findUnique({ where: { dia_semana: diaSemana } });
+    if (!horario || horario.cerrado) {
+      return { abre: null, cierra: null, motivo: null, cerrado: true };
+    }
+    return { abre: formatearHora(horario.abre), cierra: formatearHora(horario.cierra), motivo: null, cerrado: false };
+  }
 
-    if (!abre || !cierra || horaMinutos < abre || horaMinutos > cierra) {
+  /**
+   * Valida que la hora de la reserva (hora Lima) pueda iniciarse en el horario del día:
+   * desde la apertura hasta cierre - DURACION_RESERVA_MIN. El mensaje dice el horario real del día.
+   */
+  async validarHorarioAtencion(fechaHora: Date): Promise<void> {
+    const { fechaIso, horaMinutos } = obtenerFechaHoraLima(fechaHora);
+    const dia = await this.horarioDelDia(fechaIso);
+
+    if (dia.cerrado) {
+      const motivo = dia.motivo && dia.motivo !== 'Fecha especial' ? ` (${dia.motivo})` : '';
       throw new BadRequestException({
         codigo: 'FUERA_DE_HORARIO',
-        mensaje: `La hora seleccionada (${horaMinutos}) está fuera del horario de atención (${abre ?? '--'} a ${cierra ?? '--'})`,
+        mensaje: `El local no atiende ese día${motivo}. Elige otra fecha.`,
+      });
+    }
+
+    if (!horaEnVentanaReserva(horaMinutos, dia.abre, dia.cierra)) {
+      const ultimo = ultimoInicioReserva(dia.abre, dia.cierra);
+      const cola =
+        ultimo !== null ? ` La última reserva empieza a las ${horaLegible(ultimo)}.` : '';
+      throw new BadRequestException({
+        codigo: 'FUERA_DE_HORARIO',
+        mensaje: `Atendemos de ${horaLegible(aMinutos(dia.abre ?? '00:00'))} a ${horaLegible(aMinutos(dia.cierra ?? '00:00'))}.${cola} Elige otra hora.`,
       });
     }
   }
@@ -142,7 +155,18 @@ export class ReservasService {
    * Valida existencia de mesas, que estén activas, sean de tipo MESA,
    * y que la suma de sus asientos alcance para el número de personas.
    */
-  async validarMesasYAsientos(mesaIds: bigint[], personas: number): Promise<void> {
+  async validarMesasYAsientos(
+    mesaIds: bigint[],
+    personas: number,
+    confirmarCapacidad = false,
+  ): Promise<void> {
+    if (new Set(mesaIds.map((id) => id.toString())).size !== mesaIds.length) {
+      throw new BadRequestException({
+        codigo: 'MESA_REPETIDA',
+        mensaje: 'Una mesa aparece dos veces en la reserva. Elige cada mesa una sola vez.',
+      });
+    }
+
     if (mesaIds.length === 0) {
       throw new BadRequestException({
         codigo: 'ASIENTOS_INSUFICIENTES',
@@ -170,7 +194,8 @@ export class ReservasService {
     }
 
     const totalAsientos = mesasDb.reduce((sum, m) => sum + (m.asientos ?? 0), 0);
-    if (totalAsientos < personas) {
+    // Menos asientos que personas: se permite solo si el local lo confirma (confirmarCapacidad)
+    if (totalAsientos < personas && !confirmarCapacidad) {
       const faltan = personas - totalAsientos;
       throw new BadRequestException({
         codigo: 'ASIENTOS_INSUFICIENTES',
@@ -242,7 +267,9 @@ export class ReservasService {
     }
 
     const mesaIds = dto.mesas.map((id) => BigInt(id));
-    await this.validarNuevaReserva(fechaHora, mesaIds, dto.personas);
+    await this.validarNuevaReserva(fechaHora, mesaIds, dto.personas, {
+      confirmarCapacidad: dto.confirmarCapacidad,
+    });
 
     const reserva = await this.insertarReserva(this.prisma, {
       nombre: dto.nombre,
@@ -269,10 +296,16 @@ export class ReservasService {
     return fechaHora;
   }
 
-  /** Horario de atención y mesas/asientos de una reserva nueva. No escribe nada. */
-  private async validarNuevaReserva(fechaHora: Date, mesaIds: bigint[], personas: number) {
+  /** Horario, mesas, asientos y choques de una reserva. No escribe nada. */
+  private async validarNuevaReserva(
+    fechaHora: Date,
+    mesaIds: bigint[],
+    personas: number,
+    opciones: { confirmarCapacidad?: boolean; excluirReservaId?: bigint | null } = {},
+  ) {
     await this.validarHorarioAtencion(fechaHora);
-    await this.validarMesasYAsientos(mesaIds, personas);
+    await this.validarMesasYAsientos(mesaIds, personas, opciones.confirmarCapacidad === true);
+    await this.validarMesasLibres(fechaHora, mesaIds, opciones.excluirReservaId ?? null);
   }
 
   /** Inserta la reserva con sus mesas. Recibe el cliente para correr dentro de una transacción. */
@@ -585,7 +618,10 @@ export class ReservasService {
     }
 
     if (dto.personas !== undefined || dto.mesas !== undefined) {
-      await this.validarMesasYAsientos(nuevosMesaIds, nuevasPersonas);
+      await this.validarMesasYAsientos(nuevosMesaIds, nuevasPersonas, dto.confirmarCapacidad === true);
+    }
+    if (dto.hora !== undefined || dto.personas !== undefined || dto.mesas !== undefined) {
+      await this.validarMesasLibres(nuevaHora, nuevosMesaIds, rId);
     }
 
     const reservaActualizada = await this.prisma.$transaction(async (tx) => {
@@ -845,115 +881,97 @@ export class ReservasService {
   }
 
   /**
-   * Obtiene las franjas horarias disponibles para una fecha (YYYY-MM-DD) y número de personas.
-   * Valida horario de atención (excluye si está cerrado, usa hora_inicio = abre + 1h, hora_fin = cierra - 1h en pasos de 30m).
-   * Filtra las franjas que no tengan mesas con asientos suficientes libres.
+   * Franjas de inicio (hora Lima) con mesas suficientes libres para `personas`.
+   * Usa las mismas reglas que validarHorarioAtencion (horario del día y cierre - duración)
+   * y el mismo cruce de mesas que validarMesasLibres, así que nunca sugiere una hora que luego se rechaza.
    */
   async obtenerFranjasDisponibles(
     fechaIso: string,
     personas: number,
     ahora: Date = new Date(),
   ): Promise<string[]> {
-    // 1. Obtener horario del día (America/Lima)
-    const fechaDate = new Date(`${fechaIso}T00:00:00.000Z`);
-    const fechaEspecial = await this.prisma.fechaEspecial.findUnique({
-      where: { fecha: fechaDate },
-    });
+    const dia = await this.horarioDelDia(fechaIso);
+    if (dia.cerrado) return [];
 
-    let abre: string | null = null;
-    let cierra: string | null = null;
-
-    if (fechaEspecial) {
-      if (fechaEspecial.cerrado) {
-        return [];
-      }
-      abre = formatearHora(fechaEspecial.abre);
-      cierra = formatearHora(fechaEspecial.cierra);
-    } else {
-      const d = new Date(`${fechaIso}T12:00:00-05:00`);
-      const { diaSemana } = obtenerFechaHoraLima(d);
-      const horario = await this.prisma.horarioDia.findUnique({
-        where: { dia_semana: diaSemana },
-      });
-
-      if (!horario || horario.cerrado || !horario.abre || !horario.cierra) {
-        return [];
-      }
-      abre = formatearHora(horario.abre);
-      cierra = formatearHora(horario.cierra);
-    }
-
-    if (!abre || !cierra) {
-      return [];
-    }
-
-    // 2. Generar slots cada 30 minutos (1h después de abrir hasta 1h antes de cerrar)
-    const franjasBase = generarFranjasPorDefecto(abre, cierra);
-
-    // 3. Si la fecha es hoy, filtrar slots pasados
     const { fechaIso: hoyLima, horaMinutos: horaActualLima } = obtenerFechaHoraLima(ahora);
-    const franjasFuturas = franjasBase.filter((h) => {
-      if (fechaIso === hoyLima) {
-        return h > horaActualLima;
-      }
-      return true;
-    });
+    const franjasFuturas = franjasReserva(dia.abre, dia.cierra).filter(
+      (h) => fechaIso !== hoyLima || h > horaActualLima,
+    );
 
-    // 4. Consultar mesas activas
     const mesasActivas = await this.prisma.elementoPlano.findMany({
       where: { activo: true, tipo: 'MESA' },
     });
-
     const totalAsientosSalon = mesasActivas.reduce((sum, m) => sum + (m.asientos ?? 0), 0);
-    if (totalAsientosSalon < personas) {
-      return [];
-    }
+    if (totalAsientosSalon < personas) return [];
 
-    // 5. Consultar reservas activas del día
     const inicioDia = new Date(`${fechaIso}T00:00:00-05:00`);
     const finDia = new Date(`${fechaIso}T23:59:59.999-05:00`);
-
     const reservasDia = await this.prisma.reserva.findMany({
-      where: {
-        estado: { in: ['ACTIVA', 'SENTADA'] },
-        hora: { gte: inicioDia, lte: finDia },
-      },
+      where: { estado: { in: ['ACTIVA', 'SENTADA'] }, hora: { gte: inicioDia, lte: finDia } },
       include: { mesas: true },
     });
 
-    const toleranciaMin = await this.obtenerToleranciaMin();
-
-    // 6. Para cada franja, comprobar si hay mesas suficientes disponibles
     const franjasDisponibles: string[] = [];
-
     for (const horaSlot of franjasFuturas) {
       const slotTime = new Date(`${fechaIso}T${horaSlot}:00-05:00`).getTime();
       const mesasOcupadasIds = new Set<string>();
-
       for (const res of reservasDia) {
-        const resTime = res.hora.getTime();
-        const duracionReservaMs = 60 * 60 * 1000;
-        if (
-          slotTime >= resTime - toleranciaMin * 60 * 1000 &&
-          slotTime < resTime + duracionReservaMs
-        ) {
-          for (const rm of res.mesas) {
-            if (rm.mesa_id) {
-              mesasOcupadasIds.add(rm.mesa_id.toString());
-            }
-          }
+        if (!reservasSeCruzan(slotTime, res.hora.getTime())) continue;
+        for (const rm of res.mesas) {
+          if (rm.mesa_id) mesasOcupadasIds.add(rm.mesa_id.toString());
         }
       }
+      const asientosLibres = mesasActivas
+        .filter((m) => !mesasOcupadasIds.has(m.id.toString()))
+        .reduce((sum, m) => sum + (m.asientos ?? 0), 0);
+      if (asientosLibres >= personas) franjasDisponibles.push(horaSlot);
+    }
+    return franjasDisponibles;
+  }
 
-      const mesasLibres = mesasActivas.filter((m) => !mesasOcupadasIds.has(m.id.toString()));
-      const asientosLibres = mesasLibres.reduce((sum, m) => sum + (m.asientos ?? 0), 0);
-
-      if (asientosLibres >= personas) {
-        franjasDisponibles.push(horaSlot);
+  /**
+   * Mesas que otras reservas activas (ACTIVA o SENTADA) ocupan a esa hora, según el mismo cruce
+   * de las franjas. Sirve al croquis (mesas ocupadas) y a la validación de choques.
+   */
+  async mesasOcupadasEn(
+    fechaHora: Date,
+    excluirReservaId?: bigint | null,
+  ): Promise<Array<{ mesa_id: string; reserva_id: string; nombre: string; hora: string }>> {
+    const margen = 60 * 60 * 1000;
+    const reservas = await this.prisma.reserva.findMany({
+      where: {
+        estado: { in: ['ACTIVA', 'SENTADA'] },
+        hora: { gte: new Date(fechaHora.getTime() - margen), lte: new Date(fechaHora.getTime() + margen) },
+        ...(excluirReservaId ? { id: { not: excluirReservaId } } : {}),
+      },
+      include: { mesas: { include: { mesa: true } } },
+    });
+    const ocupadas: Array<{ mesa_id: string; reserva_id: string; nombre: string; hora: string }> = [];
+    for (const r of reservas) {
+      if (!reservasSeCruzan(fechaHora.getTime(), r.hora.getTime())) continue;
+      for (const rm of r.mesas) {
+        if (rm.mesa_id === null) continue;
+        ocupadas.push({
+          mesa_id: rm.mesa_id.toString(),
+          reserva_id: r.id.toString(),
+          nombre: rm.mesa?.nombre || (rm.mesa?.numero ? `Mesa ${rm.mesa.numero}` : 'Mesa'),
+          hora: horaLegible(aMinutos(obtenerFechaHoraLima(r.hora).horaMinutos)),
+        });
       }
     }
+    return ocupadas;
+  }
 
-    return franjasDisponibles;
+  /** Rechaza si alguna de las mesas ya tiene otra reserva que se cruza con esa hora. */
+  async validarMesasLibres(fechaHora: Date, mesaIds: bigint[], excluirReservaId?: bigint | null): Promise<void> {
+    const ids = new Set(mesaIds.map((id) => id.toString()));
+    const choque = (await this.mesasOcupadasEn(fechaHora, excluirReservaId)).find((o) => ids.has(o.mesa_id));
+    if (choque) {
+      throw new BadRequestException({
+        codigo: 'MESA_OCUPADA',
+        mensaje: `${choque.nombre} ya tiene otra reserva a las ${choque.hora}. Elige otra mesa u otra hora.`,
+      });
+    }
   }
 
   /**
@@ -1014,6 +1032,7 @@ export class ReservasService {
       hora?: string;
       nombre?: string;
       telefono?: string;
+      confirmarCapacidad?: boolean;
     },
     usuario?: UsuarioAutenticado,
     ip?: string,
@@ -1053,7 +1072,9 @@ export class ReservasService {
 
     // Todas las validaciones antes de escribir: si fallan, la solicitud sigue PENDIENTE.
     const mesaIds = dto.mesas.map((id) => BigInt(id));
-    await this.validarNuevaReserva(fechaHora, mesaIds, personas);
+    await this.validarNuevaReserva(fechaHora, mesaIds, personas, {
+      confirmarCapacidad: dto.confirmarCapacidad,
+    });
     const toleranciaMin = await this.obtenerToleranciaMin();
 
     // Reserva, solicitud y aviso al cliente en una sola transacción: no queda reserva huérfana

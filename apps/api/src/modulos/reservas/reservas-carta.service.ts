@@ -7,6 +7,7 @@ import { formatearHora, obtenerFechaHoraLima } from '../local/local.util';
 import { ReservasService } from './reservas.service';
 import { CrearSolicitudWebDto } from './dto/crear-solicitud-web.dto';
 import { diaCortoLima, textosNotificacionSolicitud } from './notificacion-solicitud';
+import { horaUltimoInicio } from './horario-reserva';
 
 /** Límite por IP: solicitudes del POST en una ventana de 10 minutos (Redis). */
 export const RESERVA_WEB_MAX_POR_IP = 5;
@@ -92,17 +93,22 @@ export class ReservasCartaService {
       }),
     ]);
 
-    // dia: 0 = domingo … 6 = sábado, igual que Date.getDay() en el navegador
+    // dia: 0 = domingo … 6 = sábado, igual que Date.getDay() en el navegador.
+    // `ultimo` es la última hora en que puede empezar una reserva (la regla de horario-reserva.ts).
+    // Un día sin una reserva posible se trata como cerrado, igual que en validarHorarioAtencion.
     const diasAbiertos = horarios
       .filter((h) => !h.cerrado && h.abre && h.cierra)
-      .map((h) => ({ dia: h.dia_semana % 7, abre: formatearHora(h.abre), cierra: formatearHora(h.cierra) }));
+      .map((h) => ({ dia: h.dia_semana % 7, abre: formatearHora(h.abre)!, cierra: formatearHora(h.cierra)!, ultimo: horaUltimoInicio(formatearHora(h.abre), formatearHora(h.cierra)) }))
+      .filter((h) => h.ultimo !== null) as { dia: number; abre: string; cierra: string; ultimo: string }[];
 
-    // Una fecha especial sin horario válido se trata como cerrada, igual que en validarHorarioAtencion
     const iso = (f: Date) => f.toISOString().slice(0, 10);
-    const fechasCerradas = especiales.filter((f) => f.cerrado || !f.abre || !f.cierra).map((f) => iso(f.fecha));
-    const fechasEspeciales = especiales
+    const fechasEspecialesValidas = especiales
       .filter((f) => !f.cerrado && f.abre && f.cierra)
-      .map((f) => ({ fecha: iso(f.fecha), abre: formatearHora(f.abre), cierra: formatearHora(f.cierra) }));
+      .map((f) => ({ fecha: iso(f.fecha), abre: formatearHora(f.abre)!, cierra: formatearHora(f.cierra)!, ultimo: horaUltimoInicio(formatearHora(f.abre), formatearHora(f.cierra)) }));
+    const fechasEspeciales = fechasEspecialesValidas.filter((f) => f.ultimo !== null) as { fecha: string; abre: string; cierra: string; ultimo: string }[];
+    const fechasCerradas = especiales
+      .filter((f) => f.cerrado || !f.abre || !f.cierra || !fechasEspeciales.some((e) => e.fecha === iso(f.fecha)))
+      .map((f) => iso(f.fecha));
 
     return {
       activa: true,

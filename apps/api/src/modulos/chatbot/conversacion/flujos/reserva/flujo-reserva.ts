@@ -1,3 +1,4 @@
+import { franjasReserva } from '../../../../reservas/horario-reserva';
 import {
   EntradaNormalizada,
   FlujoConversacion,
@@ -166,24 +167,9 @@ export function parsearHoraUsuario(texto: string): string | null {
 /**
  * Genera franjas de hora por defecto (pasos de 30 min desde 1 hora después de abrir hasta 1 hora antes de cerrar)
  */
+/** Franjas de inicio del bot: las mismas que la carta y las reservas (horario-reserva.ts). */
 export function generarFranjasPorDefecto(abre = '14:00', cierra = '23:00'): string[] {
-  const [hAbre, mAbre] = abre.split(':').map((x) => parseInt(x, 10));
-  const [hCierra, mCierra] = cierra.split(':').map((x) => parseInt(x, 10));
-
-  const tInicio = (hAbre * 60 + (mAbre || 0)) + 60; // 1 hora después de abrir
-  let tFin = (hCierra * 60 + (mCierra || 0)) - 60; // 1 hora antes de cerrar
-
-  if (tFin <= tInicio) {
-    tFin += 1440;
-  }
-
-  const franjas: string[] = [];
-  for (let t = tInicio; t <= tFin; t += 30) {
-    const h = Math.floor(t / 60) % 24;
-    const m = t % 60;
-    franjas.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-  }
-  return franjas.length ? franjas : ['15:00', '15:30', '16:00', '16:30', '17:00'];
+  return franjasReserva(abre, cierra);
 }
 
 export class FlujoReservaSubFlujo implements SubFlujoConversacion {

@@ -187,8 +187,21 @@ export const salonApi = {
 
   aprobarSolicitud: (
     id: string,
-    payload: { mesas: string[]; personas?: number; hora?: string; nombre?: string; telefono?: string },
+    payload: {
+      mesas: string[];
+      personas?: number;
+      hora?: string;
+      nombre?: string;
+      telefono?: string;
+      confirmarCapacidad?: boolean;
+    },
   ) => api.post<{ solicitud: any; reserva: Reserva }>(`/admin/reservas/solicitudes/${id}/aprobar`, payload),
+
+  /** Mesas que otras reservas ocupan a esa fecha (YYYY-MM-DD) y hora (HH:mm, Lima). */
+  mesasOcupadas: (fecha: string, hora: string) =>
+    api.get<Array<{ mesa_id: string; reserva_id: string; nombre: string; hora: string }>>(
+      `/admin/reservas/mesas-ocupadas?fecha=${encodeURIComponent(fecha)}&hora=${encodeURIComponent(hora)}`,
+    ),
 
   rechazarSolicitud: (id: string, payload: { motivo: string; alternativas?: string }) =>
     api.post<any>(`/admin/reservas/solicitudes/${id}/rechazar`, payload),

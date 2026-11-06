@@ -1274,6 +1274,8 @@ model ReservaMesa {
   reserva    Reserva        @relation(fields: [reserva_id], references: [id], onDelete: Cascade)
   mesa       ElementoPlano? @relation(fields: [mesa_id], references: [id], onDelete: SetNull)
 
+  // Una mesa una sola vez por reserva (los nulos no chocan: la mesa se borró del plano)
+  @@unique([reserva_id, mesa_id])
   @@map("reserva_mesa")
 }
 

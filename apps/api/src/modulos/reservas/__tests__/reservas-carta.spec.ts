@@ -206,9 +206,9 @@ describe('ReservasCartaService (carta web)', () => {
         activa: true,
         diasMax: 14,
         personasMax: 6,
-        horarios: [{ dia: 1, abre: '12:00', cierra: '23:00' }],
+        horarios: [{ dia: 1, abre: '12:00', cierra: '23:00', ultimo: '22:00' }],
         fechasCerradas: ['2026-11-10'],
-        fechasEspeciales: [{ fecha: '2026-11-11', abre: '14:00', cierra: '22:00' }],
+        fechasEspeciales: [{ fecha: '2026-11-11', abre: '14:00', cierra: '22:00', ultimo: '21:00' }],
       });
     });
 
