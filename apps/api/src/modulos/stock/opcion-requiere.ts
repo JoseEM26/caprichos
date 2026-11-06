@@ -129,6 +129,12 @@ export function requisitosFaltantes(requisitos: RequisitoOpcion[], saldos: Saldo
     }
   }
   for (const [saborId, { productoId, cantidad }] of porSabor) {
+    // Producto que no controla stock (p. ej. empanadas): su sabor no tiene saldo que mirar; solo cuenta que no esté oculto/agotado
+    const producto = saldos.productos.get(productoId);
+    if (producto && !producto.controlaStock) {
+      if (unidadesDeProducto(producto, ahora) === 0) faltan.push({ productoId, saborId, cantidad });
+      continue;
+    }
     const s = saldos.sabores.get(saborId);
     const alcanza = !!s && s.activo && !sigueAgotado(s.agotadoHasta, ahora) && s.saldo >= cantidad;
     if (!alcanza) faltan.push({ productoId, saborId, cantidad });
