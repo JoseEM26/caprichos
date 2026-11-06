@@ -58,6 +58,7 @@ describe('Resolución ruta + sección → manual', () => {
   });
 
   it('una consulta con varios pares (a&b) exige todos', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const carpeta = fs.mkdtempSync(path.join(require('os').tmpdir(), 'capri-'));
     const base = (extra: string) =>
       `---\nmodulo: caja\ntitulo: T\nruta: /admin/caja\nroles: [ADMIN]\n${extra}\nsugerencias:\n  - a\n---\n## Para que sirve\nx\n`;

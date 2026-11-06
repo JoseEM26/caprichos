@@ -63,7 +63,7 @@ export function CarruselBanners({ imagenes, intervaloSeg, movil, edicion, onEnla
   // precarga de la siguiente imagen
   useEffect(() => {
     if (varios && typeof Image !== 'undefined') new Image().src = url(imagenes[(actual + 1) % n]);
-  }, [actual, varios]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [actual, varios]);
 
   if (!n) return null;
   const b = imagenes[actual];
