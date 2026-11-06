@@ -159,7 +159,10 @@ function detalleOpcion(id: string, productos: ProductoDisp[]): OpcionDetalleComb
 }
 
 const INCLUDE_PARTES = {
-  include: { reemplazos: { orderBy: { orden: 'asc' as const }, include: { producto: true } } },  // reemplazos = alternativas de la parte
+  include: {
+    reemplazos: { orderBy: { orden: 'asc' as const }, include: { producto: true } },  // reemplazos = alternativas de la parte
+    tamano: { include: { tamano_valor: true } },  // tamaño de la parte FIJO (producto_tamano)
+  },
 };
 
 @Injectable()
@@ -420,6 +423,7 @@ export class OfertasService {
               cantidad: p.cantidad || 1,
               categorias: catIds,
               productos: prodIds,
+              tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
@@ -678,6 +682,7 @@ export class OfertasService {
               cantidad: p.cantidad || 1,
               categorias: catIds,
               productos: prodIds,
+              tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
@@ -2153,7 +2158,11 @@ export class OfertasService {
         }
         throw noDisponible(`${nombreDe(principal)} se acaba de agotar; elige otro reemplazo`);
       }
-      partes.push(parteResuelta(oferta.nombre, parte.id!, 'FIJO', principal, parte.cantidad * unidades, null, info));
+      partes.push({
+        ...parteResuelta(oferta.nombre, parte.id!, 'FIJO', principal, parte.cantidad * unidades, null, info),
+        // Tamaño de la parte (solo el principal; una alternativa sale sin tamaño)
+        ...(parte.tamanoId ? { tamano: parte.tamanoNombre ?? null, unidadesTamano: parte.tamanoUnidades ?? 1 } : {}),
+      });
     }
 
     for (const parte of partesOferta.filter((p) => p.tipo === 'A_ELECCION')) {
@@ -2237,6 +2246,26 @@ export class OfertasService {
     }
 
     return { nota: cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '', partes };
+  }
+
+  /**
+   * Tamaño de una parte: solo FIJO de un único producto, y el producto_tamano tiene que ser de ese producto.
+   * Sin tamaño (undefined, null, vacío) devuelve null.
+   */
+  private async tamanoDeParte(
+    tx: Prisma.TransactionClient,
+    tipo: string,
+    prodIds: bigint[],
+    tamanoId?: string | number | null,
+  ): Promise<bigint | null> {
+    if (tamanoId === undefined || tamanoId === null || tamanoId === '') return null;
+    const id = String(tamanoId);
+    const invalido = () =>
+      new BadRequestException({ codigo: 'COMBO_TAMANO_INVALIDO', mensaje: 'El tamaño solo puede elegirse en una parte fija de un producto' });
+    if (tipo !== 'FIJO' || prodIds.length !== 1 || !/^\d+$/.test(id)) throw invalido();
+    const pt = await tx.productoTamano.findUnique({ where: { id: BigInt(id) }, select: { producto_id: true } });
+    if (!pt || pt.producto_id !== prodIds[0]) throw invalido();
+    return BigInt(id);
   }
 
   /**
@@ -2456,6 +2485,9 @@ export class OfertasService {
             cantidad: cp.cantidad,
             categorias: (cp.categorias || []).map((c: any) => c.toString()),
             productos: (cp.productos || []).map((p: any) => p.toString()),
+            tamanoId: cp.tamano ? cp.tamano.id.toString() : null,
+            tamanoNombre: cp.tamano?.tamano_valor?.nombre ?? null,
+            tamanoUnidades: cp.tamano?.unidades ?? 1,
             alternativas: (cp.reemplazos || []).map((r: any) => ({
               id: r.producto_id.toString(),
               nombre: r.producto?.nombre ?? '',

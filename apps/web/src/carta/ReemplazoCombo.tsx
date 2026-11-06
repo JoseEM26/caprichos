@@ -12,6 +12,28 @@ export interface ParteConAlternativas {
   alternativas: AlternativaParteItem[];
 }
 
+/**
+ * Resumen de las partes fijas del combo con su tamaño («Frappe Oreo · Regular 12 oz»). Solo las que salen con su
+ * principal (sin alternativa activa): la alternativa la muestra el aviso de reemplazo.
+ */
+export function partesFijasResumen(oferta: OfertaItem | null): string[] {
+  if (!oferta) return [];
+  return (oferta.combosParte ?? [])
+    .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.alternativasActivas !== true && !!p.principalNombre)
+    .map((p) => (p.tamanoNombre ? `${p.principalNombre} · ${p.tamanoNombre}` : (p.principalNombre as string)));
+}
+
+/** Línea «Incluye: …» con las partes fijas y su tamaño; nada si el combo no tiene partes fijas. */
+export function ResumenPartesFijas({ oferta }: { oferta: OfertaItem | null }) {
+  const nombres = partesFijasResumen(oferta);
+  if (nombres.length === 0) return null;
+  return (
+    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cp-navy)' }}>
+      Incluye: {nombres.join(' + ')}
+    </div>
+  );
+}
+
 /** Combo activo vinculado a un producto de la carta (el producto «Combo Dúo...» abre su ventana de armado). */
 export function comboDeProducto(ofertas: OfertaItem[] | undefined, productoId: string): OfertaItem | null {
   return (

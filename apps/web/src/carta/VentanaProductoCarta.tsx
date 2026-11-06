@@ -18,6 +18,7 @@ import {
   notaReemplazos,
   partesConAlternativas,
   partesEleccion,
+  ResumenPartesFijas,
   repartoAlternativa,
   usosDeSabor,
 } from './ReemplazoCombo';
@@ -370,6 +371,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 Agotado
               </div>
             )}
+            {!comboAgotado && <ResumenPartesFijas oferta={oferta} />}
             <AvisoAlternativasCombo
               partes={comboAgotado ? [] : partesRe}
               elegidos={reemplazos}

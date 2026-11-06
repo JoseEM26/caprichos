@@ -996,6 +996,7 @@ export class PedidosService {
               linea_combo_id: lineaDb.id,
               nombre: parte.nombre,
               cantidad: parte.cantidad,
+              tamano: parte.tamano ?? null,
               precio_unit: new Prisma.Decimal(0),
               subtotal: new Prisma.Decimal(0),
               area_id: parte.areaId,
@@ -1049,7 +1050,8 @@ export class PedidosService {
           ...lineasCalculadas.flatMap((l) =>
             l.partesCombo.map((p: ParteResueltaCombo) => ({
               productoId: p.productoId,
-              cantidad: p.cantidad,
+              // unidades que consume el tamaño de la parte (1/2 docena = 6), igual que la línea normal
+              cantidad: p.cantidad * (p.unidadesTamano ?? 1),
               areaId: p.areaId,
               sabores: p.sabores,
             })),

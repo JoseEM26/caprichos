@@ -686,6 +686,64 @@ describe('OfertasService', () => {
     });
   });
 
+  describe('tamaño de la parte FIJO (combo con tamaño)', () => {
+    const tamanoRow = { id: 77n, producto_id: 5n, unidades: 1, tamano_valor: { nombre: 'Regular 12 oz' } };
+    const combo = (tamano: unknown) => {
+      prismaMock.oferta.findUnique.mockResolvedValue({
+        id: 9n, tipo: 'COMBO', nombre: 'COMBO CAJITA CAPRIKIDS', dias: [], canales: [], creado_en: new Date(),
+        combosPrecio: [],
+        combosParte: [{ id: 100n, tipo: 'FIJO', cantidad: 1, categorias: [], productos: [5n], reemplazos: [], tamano }],
+      });
+      prismaMock.producto.findMany.mockResolvedValue([
+        { id: 5n, nombre: 'FRAPPE OREO', categoria_id: 3n, oculto: false, agotado_hasta: null,
+          categoria: { nombre: 'BEBIDAS', area_id: 1n, area: { nombre: 'Bebidas' } }, controla_stock: false, stocks: [], sabores: [] },
+      ]);
+    };
+
+    it('la línea de la parte sale con el tamaño y sus unidades', async () => {
+      combo({ ...tamanoRow });
+      const res = await service.resolverPartesCombo(9, [{ parteId: '100', productoId: '5' }]);
+      expect(res.partes).toEqual([expect.objectContaining({ productoId: 5n, tamano: 'Regular 12 oz', unidadesTamano: 1 })]);
+    });
+
+    it('una parte sin tamaño no lleva tamaño en la línea', async () => {
+      combo(null);
+      const res = await service.resolverPartesCombo(9, [{ parteId: '100', productoId: '5' }]);
+      expect(res.partes[0].tamano).toBeUndefined();
+    });
+
+    it('guardar: el tamaño tiene que ser del producto de la parte FIJO', async () => {
+      prismaMock.producto.findFirst.mockResolvedValue(null);
+      prismaMock.oferta.findUnique.mockResolvedValue(null);
+      prismaMock.oferta.create.mockResolvedValue({ id: 9n, tipo: 'COMBO', nombre: 'X', combosParte: [] });
+      prismaMock.productoTamano = { findUnique: jest.fn().mockResolvedValue({ producto_id: 6n }) };
+      await expect(service.crearOferta({
+        tipo: 'COMBO', nombre: 'X', tamanos: [{ tamanoValorId: '10', precio: 25 }],
+        partes: [{ tipo: 'FIJO', cantidad: 1, productos: ['5'], tamanoId: '77' }],
+      })).rejects.toMatchObject({ response: { codigo: 'COMBO_TAMANO_INVALIDO' } });
+    });
+
+    it('guardar: una parte FIJO del producto correcto guarda tamano_id; A_ELECCION con tamaño se rechaza', async () => {
+      prismaMock.producto.findFirst.mockResolvedValue(null);
+      prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
+      prismaMock.oferta.findUnique.mockResolvedValue({ id: 9n, tipo: 'COMBO', nombre: 'X', dias: [], canales: [], creado_en: new Date(), combosPrecio: [], combosParte: [] });
+      prismaMock.oferta.create.mockResolvedValue({ id: 9n, tipo: 'COMBO', nombre: 'X', combosParte: [] });
+      prismaMock.productoTamano = { findUnique: jest.fn().mockResolvedValue({ producto_id: 5n }) };
+      await service.crearOferta({
+        tipo: 'COMBO', nombre: 'X', tamanos: [{ tamanoValorId: '10', precio: 25 }],
+        partes: [{ tipo: 'FIJO', cantidad: 1, productos: ['5'], tamanoId: '77' }],
+      });
+      expect(prismaMock.comboParte.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'FIJO', tamano_id: 77n }),
+      });
+      prismaMock.oferta.findUnique.mockResolvedValue(null);
+      await expect(service.crearOferta({
+        tipo: 'COMBO', nombre: 'Y', tamanos: [{ tamanoValorId: '10', precio: 25 }],
+        partes: [{ tipo: 'A_ELECCION', cantidad: 1, categorias: ['3'], productos: [], tamanoId: '77' }],
+      })).rejects.toMatchObject({ response: { codigo: 'COMBO_TAMANO_INVALIDO' } });
+    });
+  });
+
   describe('Cupones', () => {
     it('exige tope de usos obligatorio si el modo es COMPARTIDO (RN-CAP-134 / RQ-OFE-03-02)', async () => {
       await expect(

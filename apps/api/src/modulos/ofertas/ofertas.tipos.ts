@@ -35,6 +35,10 @@ export interface ComboParteItem {
   alternativas?: AlternativaParteItem[];
   /** Calculado en tiempo real: el original no alcanza y hay alguna alternativa con stock. */
   alternativasActivas?: boolean;
+  /** FIJO de un producto: tamaño elegido (producto_tamano) y su nombre; las unidades las usa el stock. */
+  tamanoId?: string | null;
+  tamanoNombre?: string | null;
+  tamanoUnidades?: number;
   /** Calculado en tiempo real. FIJO: principal si está, si no las alternativas disponibles en orden. */
   disponible?: boolean;
   opcionesDisponibles?: string[];
@@ -184,6 +188,9 @@ export interface ParteResueltaCombo {
   categoriaNombre: string | null;
   /** Texto para la comanda: el cambio de reemplazo y «Combo: …». */
   nota: string;
+  /** Tamaño de la parte (nombre, p. ej. «Regular 12 oz») y sus unidades: van a la línea hija y al stock. */
+  tamano?: string | null;
+  unidadesTamano?: number;
   /** Producto por sabor: unidades de cada sabor elegido (suman la cantidad de la parte). Sin sabor, no va. */
   sabores?: { saborId: bigint; nombre: string; cantidad: number }[];
 }

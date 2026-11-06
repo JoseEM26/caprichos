@@ -67,7 +67,6 @@ const LIMITE_FALLOS_USUARIO = 5;
 const LIMITE_FALLOS_IP = 20;
 const MAX_SALTO_KMH = 150;
 const MAX_SALTO_M = 50;
-const INTERVALO_LIMPIEZA_MS = 60 * 60_000;
 export const VERSION_CONSENTIMIENTO = '2026-11';
 export const TEXTO_CONSENTIMIENTO =
   'Para registrar tu asistencia se usan tu ubicación en el momento de marcar, una foto (selfie) y la hora del servidor. ' +
@@ -121,7 +120,6 @@ const isoDe = (d: Date) => d.toISOString().slice(0, 10);
 export class AsistenciaService {
   private readonly fallosUsuario = new Map<string, number[]>();
   private readonly bloqueos = new Map<string, number>();
-  private ultimaLimpieza = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -260,8 +258,6 @@ export class AsistenciaService {
       previas.map((p) => ({ lat: Number(p.lat), lng: Number(p.lng), momento: p.momento })),
     );
     const estado = alertas.length ? 'A_REVISAR' : 'VALIDA';
-
-    this.limpiarSelfiesVencidas(cfg.retencionDias, ahora);
 
     try {
       const marca = await this.prisma.$transaction(async (tx) => {
@@ -505,15 +501,6 @@ export class AsistenciaService {
     const borrados = await this.prisma.asistenciaDispositivo.deleteMany({ where: { party_id: BigInt(partyId) } });
     await this.auditar('CAMBIO', 'REINICIAR_DISPOSITIVO', 'OK', { borrados: borrados.count }, usuario.partyId, ip, 'party', partyId);
     return { ok: true };
-  }
-
-  /** Borra las fotos más viejas que la retención (la marca se conserva). */
-  async limpiarSelfiesVencidas(retencionDias: number, ahora = new Date()): Promise<number> {
-    if (ahora.getTime() - this.ultimaLimpieza < INTERVALO_LIMPIEZA_MS) return 0;
-    this.ultimaLimpieza = ahora.getTime();
-    const corte = new Date(ahora.getTime() - retencionDias * 86_400_000);
-    const r = await this.prisma.asistenciaSelfie.deleteMany({ where: { creado_en: { lt: corte } } });
-    return r.count;
   }
 
   // ---------------------------------------------------------------------------

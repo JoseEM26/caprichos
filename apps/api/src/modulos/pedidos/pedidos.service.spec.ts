@@ -878,7 +878,7 @@ describe('PedidosService', () => {
 
     describe('combo con partes (cajita): una línea hija por parte', () => {
       const partesCajita = [
-        { parteId: 10n, tipo: 'FIJO', productoId: 1n, nombre: 'FRAPPE OREO', cantidad: 1, areaId: 1n, areaNombre: 'Barra', categoriaNombre: 'FRAPPES', nota: 'Combo: Cajita' },
+        { parteId: 10n, tipo: 'FIJO', productoId: 1n, nombre: 'FRAPPE OREO', cantidad: 1, areaId: 1n, areaNombre: 'Barra', categoriaNombre: 'FRAPPES', nota: 'Combo: Cajita', tamano: 'Regular 12 oz', unidadesTamano: 1 },
         { parteId: 11n, tipo: 'A_ELECCION', productoId: 20n, nombre: 'Burbujas', cantidad: 2, areaId: 2n, areaNombre: 'Salados', categoriaNombre: 'JUGUETES', nota: 'Combo: Cajita' },
       ];
       const dtoCajita = (): CrearPedidoDto => ({
@@ -912,7 +912,7 @@ describe('PedidosService', () => {
         const creadas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);
         expect(creadas).toHaveLength(3);
         expect(creadas[0]).toMatchObject({ producto_id: null, area_id: null });
-        expect(creadas[1]).toMatchObject({ producto_id: 1n, linea_combo_id: 50n, nombre: 'FRAPPE OREO', cantidad: 1, area_id: 1n, subtotal: expect.anything(), nombres_persona: ['Juan Perez'] });
+        expect(creadas[1]).toMatchObject({ producto_id: 1n, linea_combo_id: 50n, nombre: 'FRAPPE OREO', tamano: 'Regular 12 oz', cantidad: 1, area_id: 1n, subtotal: expect.anything(), nombres_persona: ['Juan Perez'] });
         expect(creadas[2]).toMatchObject({ producto_id: 20n, linea_combo_id: 50n, nombre: 'Burbujas', cantidad: 2, area_id: 2n, nombres_persona: [] });
         expect(Number(creadas[1].precio_unit)).toBe(0);
         expect(Number(creadas[2].subtotal)).toBe(0);
@@ -923,6 +923,13 @@ describe('PedidosService', () => {
         const ventas = prismaMock.movimientoStock.create.mock.calls.map((c: any) => c[0].data);
         expect(ventas).toEqual([expect.objectContaining({ tipo: 'VENTA', producto_id: 20n, pedido_id: 100n })]);
         expect(Number(ventas[0].cantidad)).toBe(2);
+      });
+
+      it('una parte con tamaño descuenta cantidad × unidades del tamaño', async () => {
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValue({ nota: '', partes: [{ ...partesCajita[1], unidadesTamano: 3 }] });
+        await service.crear(dtoCajita(), 'key-cajita-unidades', { canal: 'MOZO' });
+        const ventas = prismaMock.movimientoStock.create.mock.calls.map((c: any) => c[0].data);
+        expect(Number(ventas[0].cantidad)).toBe(6);
       });
 
       it('producto por sabor en una parte: el sabor sigue a la línea hija y descuenta el saldo de ese sabor', async () => {
