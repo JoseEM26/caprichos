@@ -20,6 +20,7 @@ import { guardarPedido } from './seguimiento';
 import { excesosDeStock, lineasSaborIncompletas, mensajeSaborQuedan, saborRechazadoDe, stockInsuficienteDe, textoSabores } from './stock';
 import { AjusteSaboresLinea } from './AjusteSaboresLinea';
 import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
+import { useEsMovil } from './useEsMovil';
 import {
   ConsultaEnvioRespuesta,
   DatosLocalCarta,
@@ -78,6 +79,8 @@ export function FormularioCheckout({
   const [pasoMaximo, setPasoMaximo] = useState<1 | 2 | 3>(1);
   const [errorPaso, setErrorPaso] = useState<string | null>(null);
   const contenidoRef = useRef<HTMLDivElement>(null);
+  // En celular el pie (total y botones) queda fijo abajo y solo se desplaza el contenido
+  const movil = useEsMovil();
 
   // Modal de mapa a pantalla completa
   const [mapaCompletoAbierto, setMapaCompletoAbierto] = useState(false);
@@ -254,6 +257,8 @@ export function FormularioCheckout({
   // Con cuenta y direcciones guardadas (o cargando) hay que elegir a dónde se envía antes de ver el formulario
   const pideEleccionDireccion =
     Boolean(clienteCuenta) && opcionDireccion === null && (direccionesAnteriores === null || direccionesAnteriores.length > 0);
+  // Paso 2 en delivery sin ubicación elegida: Continuar queda deshabilitado con el aviso junto al botón
+  const faltaElegirDireccion = paso === 2 && modalidad === 'DELIVERY' && pideEleccionDireccion;
 
   // Cálculo del total
   // Envío gratis: por cupón de envío (aplicado) o por la promo ENVIO_GRATIS vigente. El servidor decide al crear el pedido.
@@ -804,16 +809,17 @@ export function FormularioCheckout({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '16px',
+          padding: movil ? 0 : '16px',
           overflowY: 'auto',
         }}
       >
         <div
           style={{
-            width: 'min(580px, 100%)',
-            maxHeight: '92vh',
+            width: movil ? '100%' : 'min(580px, 100%)',
+            maxHeight: movil ? undefined : '92vh',
+            height: movil ? '100%' : undefined,
             backgroundColor: 'var(--cp-cream)',
-            borderRadius: '20px',
+            borderRadius: movil ? 0 : '20px',
             boxShadow: '0 20px 50px rgba(11, 44, 62, 0.3)',
             display: 'flex',
             flexDirection: 'column',
@@ -1007,6 +1013,7 @@ export function FormularioCheckout({
               ref={contenidoRef}
               style={{
                 flex: 1,
+                minHeight: 0,
                 overflowY: 'auto',
                 padding: '20px',
                 display: 'flex',
@@ -1345,6 +1352,11 @@ export function FormularioCheckout({
                         aviso={avisoDireccion}
                         alElegir={(d) => void elegirDireccionAnterior(d)}
                         alNueva={elegirDireccionNueva}
+                        alUbicacionActual={() => {
+                          elegirDireccionNueva();
+                          obtenerUbicacionGps();
+                        }}
+                        cargandoUbicacion={cargandoGps}
                       />
                     )}
                     {!clienteCuenta && pistaDireccion && (
@@ -2270,6 +2282,13 @@ export function FormularioCheckout({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '10px',
+                flexShrink: 0,
+                ...(movil
+                  ? {
+                      boxShadow: '0 -6px 16px rgba(11, 44, 62, 0.12)',
+                      paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+                    }
+                  : {}),
               }}
             >
               {/* Total pequeño visible en los 3 apartados */}
@@ -2397,6 +2416,11 @@ export function FormularioCheckout({
                 </div>
               )}
 
+              {/* Aviso junto al botón cuando falta elegir la ubicación (el botón queda deshabilitado) */}
+              {faltaElegirDireccion && (
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>Elige dónde lo enviamos</div>
+              )}
+
               {/* Botones de navegación según el paso */}
               <div style={{ display: 'flex', gap: '8px' }}>
                 {paso > 1 && (
@@ -2424,17 +2448,18 @@ export function FormularioCheckout({
                   <button
                     type="button"
                     onClick={avanzarPaso}
+                    disabled={faltaElegirDireccion}
                     style={{
                       flex: 1,
                       minHeight: '48px',
                       borderRadius: '12px',
                       border: 'none',
-                      backgroundColor: 'var(--cp-navy)',
-                      color: 'var(--cp-white)',
+                      backgroundColor: faltaElegirDireccion ? 'var(--cp-line)' : 'var(--cp-navy)',
+                      color: faltaElegirDireccion ? 'var(--cp-soft)' : 'var(--cp-white)',
                       fontFamily: 'var(--fuente-titulos)',
                       fontWeight: 800,
                       fontSize: '15px',
-                      cursor: 'pointer',
+                      cursor: faltaElegirDireccion ? 'not-allowed' : 'pointer',
                     }}
                   >
                     Continuar
