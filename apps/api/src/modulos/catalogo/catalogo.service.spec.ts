@@ -118,7 +118,7 @@ describe('CatalogoService', () => {
     it('omite grupos de opciones desactivados en GET /carta (carta, bot y mozo)', async () => {
       const grupo = (id: number, activo: boolean) => ({
         orden: id,
-        grupo: { id: BigInt(id), nombre: `G${id}`, activo, obligatorio: false, minimo: 0, maximo: 1, opciones: [] },
+        grupo: { id: BigInt(id), nombre: `G${id}`, activo, obligatorio: false, minimo: 0, maximo: 1, opciones: [{ id: BigInt(id * 10), activo: true, valor: { nombre: 'Opción' }, precio_extra: 0, agotado_hasta: null }] },
       });
       prisma.categoria.findMany.mockResolvedValue([
         {
@@ -710,6 +710,43 @@ describe('CatalogoService', () => {
     });
   });
 
+  describe('Anfitrión de combo (Dúo): sin mezcla de sabores propia', () => {
+    beforeEach(() => {
+      prisma.stockSabor = { findMany: jest.fn().mockResolvedValue([]) };
+    });
+
+    const duo = (conCombo: boolean) => ({
+      id: BigInt(70),
+      nombre: 'DÚO COMPARTIR',
+      descripcion: null,
+      precio: 30,
+      oculto: false,
+      agotado_hasta: null,
+      no_suma_beneficios: false,
+      controla_stock: false,
+      foto_archivo: null,
+      tamanos: [],
+      ofertasAlcance: conCombo ? [{ id: BigInt(900) }] : [],
+      sabores: [{ id: BigInt(701), nombre: 'Blanco', activo: true, agotado_hasta: null }],
+      grupos: [
+        { orden: 1, grupo: { id: BigInt(71), nombre: 'Galleta 1 · Sabor', activo: true, obligatorio: true, minimo: 1, maximo: 1, opciones: [] } },
+        { orden: 2, grupo: { id: BigInt(72), nombre: 'Dona 1 · Sabor', activo: true, obligatorio: true, minimo: 1, maximo: 1, opciones: [{ id: BigInt(721), activo: true, valor: { nombre: 'Blanco' }, precio_extra: 0, agotado_hasta: null }] } },
+      ],
+    });
+
+    it('un anfitrión de combo no lleva sabores en la carta y sus grupos sin opciones no aparecen', async () => {
+      prisma.categoria.findMany.mockResolvedValue([{ id: BigInt(7), nombre: 'Combos', orden: 1, oculta: false, productos: [duo(true)] }]);
+      const carta = await (service as any).obtenerCarta();
+      expect(carta[0].productos[0]).toMatchObject({ saboresConStock: false, sabores: [], disponible: true });
+      expect(carta[0].productos[0].grupos.map((g: any) => g.nombre)).toEqual(['Dona 1 · Sabor']);
+    });
+
+    it('un producto por sabor normal (sin oferta COMBO) conserva sus sabores', async () => {
+      prisma.categoria.findMany.mockResolvedValue([{ id: BigInt(7), nombre: 'Donas', orden: 1, oculta: false, productos: [duo(false)] }]);
+      const carta = await (service as any).obtenerCarta();
+      expect(carta[0].productos[0].sabores.map((s: any) => s.nombre)).toEqual(['Blanco']);
+    });
+  });
   describe('7. Productos que controlan stock (quedan)', () => {
     const producto = (id: number, controla: boolean) => ({
       id: BigInt(id),

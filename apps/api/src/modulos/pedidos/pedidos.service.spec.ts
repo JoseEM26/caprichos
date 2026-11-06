@@ -1922,6 +1922,36 @@ describe('PedidosService', () => {
       });
     });
 
+    it('anfitrión de combo (Dúo): no pide sabores aunque tenga sabores activos y un grupo sin opciones no bloquea', async () => {
+      const duo = {
+        ...donaSabor,
+        nombre: 'DÚO COMPARTIR',
+        ofertasAlcance: [{ id: 900n }],
+        grupos: [
+          { grupo_id: 30n, grupo: { id: 30n, nombre: 'Galleta 1 · Sabor', obligatorio: true, minimo: 1, maximo: 1, activo: true, opciones: [] } },
+          {
+            grupo_id: 31n,
+            grupo: {
+              id: 31n, nombre: 'Dona 1 · Sabor', obligatorio: true, minimo: 1, maximo: 1, activo: true,
+              opciones: [{ id: 310n, grupo_id: 31n, valor_id: 320n, precio_extra: 0, activo: true, agotado_hasta: null, valor: { id: 320n, nombre: 'Fresa' } }],
+            },
+          },
+        ],
+      };
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(where?.controla_stock ? [{ id: 1n, nombre: 'DÚO COMPARTIR', controla_stock: true, sabores: duo.sabores, ofertasAlcance: duo.ofertasAlcance }] : [duo]),
+      );
+      prismaMock.stock = {
+        findFirst: jest.fn().mockResolvedValue({ id: 9n, lugar_id: 7n }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findMany: jest.fn().mockResolvedValue([{ cantidad: 50 }]),
+        create: jest.fn(),
+      };
+      await service.crear({ ...pedidoBaseDto, lineas: [{ productoId: 1, tamanoId: 5, cantidad: 1, opciones: [310] }] } as any, 'key-duo-combo', { canal: 'CARTA' });
+      expect(prismaMock.pedido.create).toHaveBeenCalled();
+      expect(prismaMock.pedidoLineaSabor.create).not.toHaveBeenCalled();
+    });
+
     it('suma inválida (5 de 6): 400 SABORES_INVALIDOS y no crea el pedido', async () => {
       const err: any = await service.crear(lineaMedia([{ saborId: 11, cantidad: 2 }, { saborId: 12, cantidad: 3 }]) as any, 'key-sab-suma', { canal: 'CARTA' }).catch((e) => e);
       expect(err.getResponse()).toMatchObject({ codigo: 'SABORES_INVALIDOS' });

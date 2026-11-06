@@ -187,6 +187,8 @@ export class CatalogoService implements OnApplicationBootstrap {
               where: { activo: true },
               orderBy: { nombre: 'asc' },
             },
+            // Anfitrión de una oferta COMBO (Dúo): sus pasos son los grupos del combo, no una mezcla propia
+            ofertasAlcance: { where: { tipo: 'COMBO' }, select: { id: true }, take: 1 },
           },
         },
       },
@@ -218,7 +220,9 @@ export class CatalogoService implements OnApplicationBootstrap {
           }
         }
 
-        const sabores: SaborCarta[] = (p.sabores || [])
+        // Anfitrión de combo: nunca se vende por mezcla de sabores propia (sus sabores no viajan a la carta)
+        const esAnfitrionCombo = (p.ofertasAlcance ?? []).length > 0;
+        const sabores: SaborCarta[] = (esAnfitrionCombo ? [] : p.sabores || [])
           .filter((s) => s.activo)
           .map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock));
         const saboresConStock = sabores.some((s) => s.disponible);
@@ -265,7 +269,9 @@ export class CatalogoService implements OnApplicationBootstrap {
                 precioExtra: Number(Number(o.precio_extra).toFixed(2)),
                 disponible: estaDisponible(o.agotado_hasta),
               })),
-          }));
+          }))
+          // Grupo sin opciones activas (p. ej. «Galleta 1 · Sabor» tras quitar sus sabores): no se muestra ni bloquea
+          .filter((g) => g.opciones.length > 0);
 
         productosCarta.push({
           id: p.id.toString(),

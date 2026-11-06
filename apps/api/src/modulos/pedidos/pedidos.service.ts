@@ -442,6 +442,8 @@ export class PedidosService {
           },
         },
         sabores: true,
+        // Anfitrión de una oferta COMBO: sus pasos son los grupos del combo, no una mezcla de sabores propia
+        ofertasAlcance: { where: { tipo: 'COMBO' }, select: { id: true }, take: 1 },
       },
     });
 
@@ -508,10 +510,13 @@ export class PedidosService {
         : [];
 
       // Validar grupos y opciones del producto. Por sabor, sus grupos obligatorios heredados (p. ej. «Sabor»
-      // de donas) no aplican: no se exigen ni se aceptan sus opciones.
+      // de donas) no aplican: no se exigen ni se aceptan sus opciones. Solo cuentan las opciones activas y los
+      // grupos que tienen alguna (un grupo vacío, como «Galleta 1 · Sabor» sin sabores, no bloquea el combo).
       const gruposActivos = prodDb.grupos
         .map((pg) => pg.grupo)
-        .filter((g) => g.activo && !(porSabor && (g.obligatorio || g.minimo > 0)));
+        .filter((g) => g.activo && !(porSabor && (g.obligatorio || g.minimo > 0)))
+        .map((g) => ({ ...g, opciones: g.opciones.filter((o) => o.activo) }))
+        .filter((g) => g.opciones.length > 0);
 
       const todasLasOpcionesDelProducto = gruposActivos.flatMap((g) => g.opciones);
 
