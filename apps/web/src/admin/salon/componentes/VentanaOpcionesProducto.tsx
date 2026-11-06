@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import '../salon.css';
 import {
   ProductoCarta,
@@ -8,6 +8,8 @@ import {
 } from '../../../carta/tipos';
 import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { alternarEleccion } from '../../../carta/eleccionGrupo';
+import { SelectorSaboresMezcla } from '../../../comun/SelectorSaboresMezcla';
+import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../../../comun/saboresMezcla';
 import {
   AvisoReemplazoCombo,
   eleccionesCombo,
@@ -34,6 +36,9 @@ export interface ProductoConfigurado {
   unidades: ConfiguracionUnidad[];
   /** Combo con bebidas: un nombre de envase por bebida (unidad 1: bebida 1, bebida 2...; vacío si no se escribe) */
   nombresBebidas?: string[];
+  /** Mezcla de sabores: unidades por media docena o docena y cuántas de cada sabor */
+  unidadesPorMezcla?: number;
+  sabores?: { saborId: string; cantidad: number; nombre?: string }[];
   precioUnitario: number;
   precioTotal: number;
 }
@@ -87,6 +92,18 @@ export function VentanaOpcionesProducto({
 
   // Nota de cocina
   const [notaCocina, setNotaCocina] = useState('');
+
+  // Mezcla de sabores (donas y galletas): el reparto se recorta al total y al stock de cada sabor
+  const [valorSabores, setValorSabores] = useState<Reparto>({});
+  const saborMode = producto.saboresConStock === true;
+  const unidadesMezcla = tamanoSeleccionado?.unidades ?? 1;
+  const total = unidadesMezcla * cantidad;
+  const saboresDisp = (producto.sabores ?? []).map((s) => ({ id: s.id, nombre: s.nombre, disponible: s.disponible, quedan: s.quedan ?? null }));
+  const valorSaboresOk = saborMode ? recortarAlTope(valorSabores, saboresDisp, total) : {};
+  useEffect(() => {
+    if (saborMode && JSON.stringify(valorSaboresOk) !== JSON.stringify(valorSabores)) setValorSabores(valorSaboresOk);
+  });
+  const saboresListos = !saborMode || repartoValido(valorSaboresOk, total, saboresDisp);
 
   // Búsqueda en grupos
   const [busquedaGrupo, setBusquedaGrupo] = useState<Record<string, string>>({});
@@ -189,7 +206,7 @@ export function VentanaOpcionesProducto({
     return faltantes;
   }, [producto, opcionesActuales]);
 
-  const puedeAgregar = gruposFaltantes.length === 0 && !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos);
+  const puedeAgregar = gruposFaltantes.length === 0 && !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && saboresListos;
 
   // En las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
   const nombresFaltantes = esBebida
@@ -227,6 +244,12 @@ export function VentanaOpcionesProducto({
     const elecciones = eleccionesCombo(oferta, reemplazos);
     alAgregar({
       producto,
+      ...(saborMode
+        ? {
+            unidadesPorMezcla: unidadesMezcla,
+            sabores: aArreglo(valorSaboresOk).map((s) => ({ ...s, nombre: saboresDisp.find((x) => x.id === s.saborId)?.nombre })),
+          }
+        : {}),
       ...(oferta && elecciones.length > 0 ? { ofertaId: String(oferta.id), comboElecciones: elecciones } : {}),
       tamano: tamanoSeleccionado,
       cantidad,
@@ -370,6 +393,10 @@ export function VentanaOpcionesProducto({
               })}
             </div>
           </div>
+        )}
+
+        {saborMode && (
+          <SelectorSaboresMezcla sabores={saboresDisp} total={total} valor={valorSaboresOk} onCambio={setValorSabores} />
         )}
 
         {/* Grupos de opciones */}
@@ -742,9 +769,14 @@ export function VentanaOpcionesProducto({
             Falta elegir: {gruposFaltantes.join(', ')}.
           </div>
         )}
+        {saborMode && !saboresListos && (
+          <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+            Elige los sabores: faltan {faltanUnidades(valorSaboresOk, total)}
+          </div>
+        )}
 
         {/* DT-62: Personalización por unidad */}
-        {cantidad > 1 && (producto.grupos || []).length > 0 && (
+        {cantidad > 1 && (producto.grupos || []).length > 0 && !saborMode && (
           <button
             type="button"
             onClick={() => {
@@ -918,7 +950,7 @@ export function VentanaOpcionesProducto({
               cursor: puedeAgregar ? 'pointer' : 'not-allowed',
             }}
           >
-            <span>{comboAgotado ? 'Agotado' : 'Agregar al pedido'}</span>
+            <span>{comboAgotado ? 'Agotado' : saborMode && !saboresListos ? 'Elige los sabores' : 'Agregar al pedido'}</span>
             <span> · S/ {precioTotal.toFixed(2)}</span>
           </button>
         </div>

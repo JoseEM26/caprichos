@@ -4,7 +4,16 @@ import { CategoriaCarta, DatosLocalCarta, EstadoLocalCarta } from './tipos';
 import { api } from '../comun/api';
 import { OfertaItem } from '../admin/ofertas/ofertasApi';
 import { AvisoTeFaltaPoco } from './AvisoTeFaltaPoco';
-import { excesosDeStock, topeAgregable, unidadesEnCarrito } from './stock';
+import {
+  excesosDeStock,
+  lineasSaborIncompletas,
+  mensajeSaborQuedan,
+  mezclasDisponibles,
+  textoSabores,
+  topeAgregable,
+  unidadesEnCarrito,
+} from './stock';
+import { AjusteSaboresLinea } from './AjusteSaboresLinea';
 
 export interface CajonCarritoProps {
   estadoLocal: EstadoLocalCarta | null;
@@ -28,8 +37,11 @@ export function CajonCarrito({
     eliminarLinea,
     abrirCheckout,
     inventario,
+    lineaAjustandoId,
+    abrirAjusteLinea,
   } = useCarrito();
   const excesos = excesosDeStock(lineas, inventario);
+  const pendientesSabor = lineasSaborIncompletas(lineas);
 
   const [cuponCodigo, setCuponCodigo] = useState('');
   const [cuponAplicado, setCuponAplicado] = useState<{
@@ -84,7 +96,7 @@ export function CajonCarrito({
   const localBloqueado = Boolean(
     estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda),
   );
-  const stockBloqueado = excesos.length > 0;
+  const stockBloqueado = excesos.length > 0 || pendientesSabor.length > 0;
 
   return (
     <div
@@ -100,6 +112,7 @@ export function CajonCarrito({
         justifyContent: 'flex-end',
       }}
     >
+      {lineaAjustandoId && <AjusteSaboresLinea />}
       {/* Fondo clickeable para cerrar */}
       <div
         onClick={cerrarCajon}
@@ -221,14 +234,22 @@ export function CajonCarrito({
           ) : (
             lineas.map((linea) => {
               const info = inventario[String(linea.productoId)];
-              const tope = topeAgregable(info, unidadesEnCarrito(lineas, linea.productoId));
-              const topeMas = tope !== null && tope <= 0;
-              const exceso = excesos.find((e) => e.productoId === String(linea.productoId));
+              const esMezcla = linea.unidadesPorMezcla !== undefined;
+              const tope = esMezcla ? null : topeAgregable(info, unidadesEnCarrito(lineas, linea.productoId));
+              // en mezclas, el + llega hasta lo que queda de los sabores que no usan otras líneas
+              const maxMezclas = esMezcla && info ? mezclasDisponibles(info, lineas, String(linea.productoId), linea.unidadesPorMezcla ?? 1, linea.id) : null;
+              const topeMas = esMezcla ? maxMezclas !== null && linea.cantidad >= maxMezclas : tope !== null && tope <= 0;
+              const exceso = excesos.find((e) => e.productoId === String(linea.productoId) && (!e.saborId || linea.sabores?.some((x) => x.saborId === e.saborId)));
+              const pendiente = pendientesSabor.some((l) => l.id === linea.id);
               const mensajeStock = exceso
-                ? `Solo quedan ${exceso.quedan}: quita unidades de este producto`
-                : topeMas && info?.quedan != null
-                  ? `Solo quedan ${info.quedan}`
-                  : null;
+                ? exceso.saborId
+                  ? mensajeSaborQuedan(exceso.quedan, exceso.saborNombre ?? 'este sabor')
+                  : `Solo quedan ${exceso.quedan}: quita unidades de este producto`
+                : pendiente
+                  ? `Elige los sabores: faltan ${(linea.unidadesPorMezcla ?? 1) * linea.cantidad - (linea.sabores ?? []).reduce((a, x) => a + x.cantidad, 0)}`
+                  : topeMas && info?.quedan != null
+                    ? `Solo quedan ${info.quedan}`
+                    : null;
               const iniciales = linea.nombre
                 .split(' ')
                 .filter(Boolean)
@@ -320,6 +341,12 @@ export function CajonCarrito({
                       </div>
                     )}
 
+                    {esMezcla && (linea.sabores?.length ?? 0) > 0 && (
+                      <div style={{ fontSize: '12px', color: 'var(--cp-navy)', marginTop: '2px', fontWeight: 700, overflowWrap: 'anywhere' }}>
+                        {textoSabores(linea)}
+                      </div>
+                    )}
+
                     {linea.nota && (
                       <div style={{ fontSize: '11px', color: 'var(--cp-rust)', marginTop: '2px', fontStyle: 'italic' }}>
                         Nota: {linea.nota}
@@ -351,6 +378,16 @@ export function CajonCarrito({
                       >
                         {mensajeStock}
                       </div>
+                    )}
+
+                    {(pendiente || (exceso && exceso.saborId)) && (
+                      <button
+                        type="button"
+                        onClick={() => abrirAjusteLinea(linea.id)}
+                        style={{ marginTop: '6px', minHeight: '36px', padding: '0 10px', borderRadius: '9999px', border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        Elegir sabores
+                      </button>
                     )}
                   </div>
 

@@ -5,7 +5,9 @@ import { GrupoOpcionesCarta, OpcionElegida, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
 import { alternarEleccion } from './eleccionGrupo';
-import { etiquetaQuedan, infoStockDe, topeAgregable, unidadesEnCarrito } from './stock';
+import { etiquetaQuedan, infoStockDe, mezclasDisponibles, saboresParaLinea, topeAgregable, unidadesEnCarrito } from './stock';
+import { SelectorSaboresMezcla } from '../comun/SelectorSaboresMezcla';
+import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../comun/saboresMezcla';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import {
   AvisoReemplazoCombo,
@@ -66,6 +68,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const [nota, setNota] = useState('');
   const [busquedas, setBusquedas] = useState<Record<string, string>>({});
   const [zoom, setZoom] = useState(false);
+  const [valorSabores, setValorSabores] = useState<Reparto>({});
 
   const esCombo = producto.grupos.some((g) => g.nombre.includes(' · '));
   // bebidas del combo (grupos «Bebida 1 · Bebida»): cada una lleva su nombre para el envase
@@ -102,10 +105,23 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
   const info = inventario[String(producto.id)] ?? infoStockDe(producto);
   const enCarrito = unidadesEnCarrito(lineas, producto.id);
-  const tope = topeAgregable(info, enCarrito);
+  // Mezcla de sabores (donas y galletas): cada tamaño trae sus unidades y el saldo es por sabor
+  const saborMode = producto.saboresConStock === true;
+  const unidadesMezcla = tamano?.unidades ?? 1;
+  const total = unidadesMezcla * cantidad;
+  const saboresDisp = saborMode ? saboresParaLinea(info, lineas, String(producto.id)) : [];
+  // al cambiar tamaño o cantidad el reparto se recorta al nuevo total y a lo que queda de cada sabor
+  const valorSaboresOk = saborMode ? recortarAlTope(valorSabores, saboresDisp, total) : {};
+  useEffect(() => {
+    if (saborMode && JSON.stringify(valorSaboresOk) !== JSON.stringify(valorSabores)) setValorSabores(valorSaboresOk);
+  });
+  const saboresListos = !saborMode || repartoValido(valorSaboresOk, total, saboresDisp);
+  const faltanSabores = faltanUnidades(valorSaboresOk, total);
+
+  const tope = saborMode ? mezclasDisponibles(info, lineas, String(producto.id), unidadesMezcla) : topeAgregable(info, enCarrito);
   const sinStock = !info.disponible || (info.controlaStock && info.quedan === 0);
   const sinSaldo = tope !== null && tope <= 0;
-  const puedeAgregar = valido && !sinStock && !sinSaldo;
+  const puedeAgregar = valido && saboresListos && !sinStock && !sinSaldo;
   const enTope = tope !== null && cantidad >= tope;
   const etiquetaStock = etiquetaQuedan(info);
   const ayudaStock =
@@ -114,6 +130,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       : enTope
         ? `Solo quedan ${info.quedan}${enCarrito > 0 ? ` · ya tienes ${enCarrito} en tu pedido` : ''}`
         : etiquetaStock;
+  const ayudaSabores = valido && !saboresListos ? `Elige los sabores: faltan ${faltanSabores}` : null;
+  const ayudaMezclas = saborMode && enTope ? 'Ya no quedan más unidades de estos sabores' : null;
   useEffect(() => {
     if (tope !== null && cantidad > Math.max(1, tope)) setCantidad(Math.max(1, tope));
   }, [tope, cantidad]);
@@ -155,8 +173,15 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       cantidad,
       opciones: elegidas,
       personas,
+      // mezcla de sabores: la línea viaja entera (sin «unidades») con el reparto por sabor
+      ...(saborMode
+        ? {
+            unidadesPorMezcla: unidadesMezcla,
+            sabores: aArreglo(valorSaboresOk).map((s) => ({ ...s, nombre: producto.sabores.find((x) => x.id === s.saborId)?.nombre })),
+          }
+        : {}),
       // combo con bebidas: sin «unidades», la línea viaja entera con los nombres en orden de bebida
-      ...(nB > 0 ? {} : { unidades: Array.from({ length: cantidad }, (_, i) => ({ persona: personas[i], opciones: elegidas })) }),
+      ...(nB > 0 || saborMode ? {} : { unidades: Array.from({ length: cantidad }, (_, i) => ({ persona: personas[i], opciones: elegidas })) }),
       nota: [notaReemplazos(partesRe, reemplazos), nota.trim()].filter(Boolean).join(' · ') || undefined,
       ...(oferta && elecciones.length > 0 ? { ofertaId: String(oferta.id), comboElecciones: elecciones } : {}),
       precioUnitario: unitario,
@@ -288,6 +313,16 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   })}
                 </div>
               </div>
+            )}
+
+            {saborMode && (
+              <SelectorSaboresMezcla
+                sabores={saboresDisp}
+                total={total}
+                valor={valorSaboresOk}
+                onCambio={setValorSabores}
+                deshabilitar={soloLectura}
+              />
             )}
 
             {comboAgotado && (
@@ -518,6 +553,16 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   {ayudaStock}
                 </div>
               )}
+              {ayudaSabores && (
+                <div role="status" style={{ flexBasis: '100%', fontSize: 12, fontWeight: 700, lineHeight: '17px', color: 'var(--cp-rust)' }}>
+                  {ayudaSabores}
+                </div>
+              )}
+              {ayudaMezclas && (
+                <div role="status" style={{ flexBasis: '100%', fontSize: 12, fontWeight: 700, lineHeight: '17px', color: 'var(--cp-rust)' }}>
+                  {ayudaMezclas}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--cp-navy)', borderRadius: 12 }}>
                 <button onClick={() => setCantidad((c) => Math.max(1, c - 1))} aria-label="Menos" style={{ width: 44, height: 48, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontSize: 22, fontWeight: 800 }}>
                   −
@@ -561,9 +606,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                       ? 'Agotado'
                       : sinSaldo && valido
                         ? 'Sin más unidades'
-                        : valido
-                          ? 'Agregar al pedido'
-                          : 'Elige las opciones obligatorias'}
+                        : valido && !saboresListos
+                          ? 'Elige los sabores'
+                          : valido
+                            ? 'Agregar al pedido'
+                            : 'Elige las opciones obligatorias'}
                 </span>
                 <span>{fmt(unitario * cantidad)}</span>
               </button>

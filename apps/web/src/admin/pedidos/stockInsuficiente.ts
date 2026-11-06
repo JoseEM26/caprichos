@@ -23,3 +23,33 @@ export function mensajeStockInsuficiente(datos: DatosStockInsuficiente, nombre?:
   const cuantos = datos.quedan === 1 ? `Solo queda 1 de ${producto}` : `Solo quedan ${datos.quedan} de ${producto}`;
   return `${cuantos}. Baja la cantidad en el pedido y vuelve a intentar. El pedido sigue igual.`;
 }
+
+/** Sabor rechazado (409 SABOR_AGOTADO o STOCK_INSUFICIENTE con saborId): el cuerpo viene en `detalles`. */
+export interface DatosSaborRechazado {
+  productoId: string;
+  saborId: string;
+  saborNombre: string;
+  quedan: number;
+  agotado: boolean;
+}
+
+export function leerSaborRechazado(err: unknown): DatosSaborRechazado | null {
+  const e = err as { codigo?: string; detalles?: Record<string, unknown> } | null;
+  if (e?.codigo !== 'SABOR_AGOTADO' && e?.codigo !== 'STOCK_INSUFICIENTE') return null;
+  if (e.detalles?.saborId == null) return null;
+  const quedan = e.codigo === 'SABOR_AGOTADO' ? 0 : Number(e.detalles?.quedan);
+  return {
+    productoId: String(e.detalles?.productoId ?? ''),
+    saborId: String(e.detalles.saborId),
+    saborNombre: typeof e.detalles?.saborNombre === 'string' && e.detalles.saborNombre ? e.detalles.saborNombre : 'este sabor',
+    quedan: Number.isFinite(quedan) ? Math.max(0, Math.floor(quedan)) : 0,
+    agotado: e.codigo === 'SABOR_AGOTADO' || quedan <= 0,
+  };
+}
+
+/** Mensaje del modal: qué sabor cambió y cómo arreglar la línea (el pedido no se pierde). */
+export function mensajeSaborRechazado(datos: DatosSaborRechazado, nombre?: string): string {
+  const producto = nombre ?? 'este producto';
+  const cuanto = datos.agotado ? `Ya no quedan ${datos.saborNombre}` : `Solo quedan ${datos.quedan} de ${datos.saborNombre}`;
+  return `${cuanto} (${producto}). Quita esa línea y agrégala otra vez con los sabores que quedan. El pedido sigue igual.`;
+}

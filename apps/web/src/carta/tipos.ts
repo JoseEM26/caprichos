@@ -2,6 +2,8 @@ export interface TamanoCarta {
   id: string;
   nombre: string;
   precio: number;
+  /** Donas y galletas con sabores: unidades que trae el tamaño (1, 6 o 12). */
+  unidades?: number;
 }
 
 export interface OpcionCarta {
@@ -24,6 +26,17 @@ export interface SaborCarta {
   id: string;
   nombre: string;
   disponible: boolean;
+  activo?: boolean;
+  /** Unidades que quedan de este sabor hoy; null = sin tope. Solo con saboresConStock. */
+  quedan?: number | null;
+}
+
+/** Sabor elegido en una línea de mezcla: cuántas unidades de ese sabor. */
+export interface SaborLinea {
+  saborId: string;
+  cantidad: number;
+  /** Nombre para mostrar en el carrito; no viaja al servidor. */
+  nombre?: string;
 }
 
 export interface ProductoCarta {
@@ -42,6 +55,8 @@ export interface ProductoCarta {
   controlaStock?: boolean;
   /** Unidades que quedan hoy; null si no controla stock o no hay conteo de apertura del día. */
   quedan?: number | null;
+  /** Stock por sabor (donas y galletas por media docena o docena): se elige cuántas de cada sabor. */
+  saboresConStock?: boolean;
 }
 
 export interface CategoriaCarta {
@@ -155,6 +170,9 @@ export interface LineaCarrito {
   ofertaId?: string;
   comboElecciones?: { parteId: string; productoId: string }[];
   unidades?: UnidadPersonalizada[];
+  /** Mezcla de sabores: unidades que reparte cada media docena o docena (del tamaño elegido). */
+  unidadesPorMezcla?: number;
+  sabores?: SaborLinea[];
   precioUnitario: number;
   subtotal: number;
 }
