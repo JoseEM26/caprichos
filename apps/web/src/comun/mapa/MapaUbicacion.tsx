@@ -21,6 +21,8 @@ export interface MapaUbicacionProps {
   local?: PuntoLocal | null;
   ajustarA?: 'ambos' | 'punto' | 'local' | 'auto';
   soloLectura?: boolean;
+  /** Radio en metros: dibuja un círculo alrededor del punto */
+  radioM?: number;
   className?: string;
   style?: CSSProperties;
 }
@@ -34,6 +36,7 @@ export function MapaUbicacion({
   local,
   ajustarA = 'auto',
   soloLectura = false,
+  radioM,
   className,
   style,
 }: MapaUbicacionProps) {
@@ -41,6 +44,7 @@ export function MapaUbicacion({
   const mapa = useRef<L.Map | null>(null);
   const pin = useRef<L.Marker | null>(null);
   const localPin = useRef<L.Marker | null>(null);
+  const circulo = useRef<L.Circle | null>(null);
   const alCambiar = useRef(onCambiar);
   alCambiar.current = onCambiar;
 
@@ -77,6 +81,7 @@ export function MapaUbicacion({
       mapa.current = null;
       pin.current = null;
       localPin.current = null;
+      circulo.current = null;
     };
     // El mapa se crea una sola vez; el punto y el local se sincronizan en los efectos siguientes
   }, []);
@@ -150,6 +155,24 @@ export function MapaUbicacion({
       m.setView(pos, Math.max(m.getZoom(), 16));
     }
   }, [punto, soloLectura]);
+
+  // Círculo del radio alrededor del punto
+  useEffect(() => {
+    const m = mapa.current;
+    if (!m) return;
+    if (!punto || !radioM || radioM <= 0) {
+      circulo.current?.remove();
+      circulo.current = null;
+      return;
+    }
+    const pos: [number, number] = [punto.lat, punto.lng];
+    if (!circulo.current) {
+      circulo.current = L.circle(pos, { radius: radioM, color: '#c2410c', weight: 2, fillOpacity: 0.15, interactive: false }).addTo(m);
+    } else {
+      circulo.current.setLatLng(pos);
+      circulo.current.setRadius(radioM);
+    }
+  }, [punto?.lat, punto?.lng, radioM]);
 
   return (
     <div

@@ -1,4 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+vi.mock('../../../comun/mapa/MapaUbicacion', () => ({
+  MapaUbicacion: (p: any) => (
+    <button data-testid="mapa" data-radio={p.radioM ?? ''} data-punto={p.punto ? `${p.punto.lat},${p.punto.lng}` : ''} onClick={() => p.onCambiar({ lat: -12.5, lng: -77.5 })}>mapa</button>
+  ),
+}));
+vi.mock('../../../comun/mapa/BuscadorDireccion', () => ({ BuscadorDireccion: () => null }));
 import { describe, expect, it, vi } from 'vitest';
 
 const reporteHoy = vi.fn();
@@ -37,6 +43,28 @@ describe('AsistenciaAdminView (solo administrador)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Usar mi ubicación actual' }));
     expect(await screen.findByText(/Precisión obtenida: 45 m/)).toHaveTextContent('peor que 30 m');
     expect(screen.getByRole('link', { name: 'Ver en Google Maps' })).toHaveAttribute('href', 'https://www.google.com/maps?q=-12.1,-77.02');
+  });
+
+  it('ubicación por internet (precisión 809655 m) NO llena las coordenadas y avisa en rojo', async () => {
+    reporteHoy.mockResolvedValue({ jornada: '2026-11-06', filas: [] });
+    (navigator as any).geolocation = {
+      getCurrentPosition: (ok: any) => ok({ coords: { latitude: -1, longitude: -2, accuracy: 809655 } }),
+    };
+    render(<AsistenciaAdminView />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Configuración' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Usar mi ubicación actual' }));
+    expect(await screen.findByText(/no tiene GPS preciso \(precisión 809[.,]7 km/)).toBeInTheDocument();
+    expect(screen.getByTestId('mapa').dataset.punto).toBe('');
+  });
+
+  it('tocar el mapa fija el punto y el texto explica radio y precisión', async () => {
+    reporteHoy.mockResolvedValue({ jornada: '2026-11-06', filas: [] });
+    render(<AsistenciaAdminView />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Configuración' }));
+    fireEvent.click(await screen.findByTestId('mapa'));
+    expect(screen.getByTestId('mapa').dataset.punto).toBe('-12.5,-77.5');
+    expect(screen.getByTestId('mapa').dataset.radio).toBe('10');
+    expect(screen.getByTestId('texto-regla')).toHaveTextContent('a 10 m o menos (radio) y con el GPS del celular con precisión mejor que 25 m');
   });
 
   it('el CSV del mes escapa comas y comillas', () => {

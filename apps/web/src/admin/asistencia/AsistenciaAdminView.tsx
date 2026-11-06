@@ -27,6 +27,9 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoVacio } from '../../comun/EstadoVacio';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { Tarjeta } from '../../comun/Tarjeta';
+import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
+import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
+import { SEDE_DEFECTO } from '../../comun/mapa/sedeDefecto';
 import './asistencia.css';
 
 type Pestana = 'hoy' | 'mes' | 'marcas' | 'config' | 'pantalla';
@@ -397,6 +400,12 @@ function MarcasTab({ onError, onOk }: { onError: Avisar; onOk: Avisar }) {
 }
 
 const PRECISION_BUENA_M = 30;
+/** Peor que esto es ubicación por internet (IP/wifi): no sirve para fijar el punto del local. */
+const PRECISION_INUTIL_M = 100;
+
+/** Precisión legible: metros, o km si pasa de 1000. */
+export const formatearPrecision = (m: number): string =>
+  m >= 1000 ? `${(m / 1000).toLocaleString('es-PE', { maximumFractionDigits: 1 })} km` : `${Math.round(m)} m`;
 
 function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin | null; setCfg: (c: ConfigAsistenciaAdmin) => void; onError: Avisar; onOk: Avisar }) {
   const [leyendo, setLeyendo] = useState(false);
@@ -431,7 +440,13 @@ function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin 
     navigator.geolocation.getCurrentPosition(
       (p) => {
         setLeyendo(false);
-        setPrecision(Math.round(p.coords.accuracy));
+        if (p.coords.accuracy > PRECISION_INUTIL_M) {
+          setPrecision(null);
+          onOk(null);
+          onError(`Este equipo no tiene GPS preciso (precisión ${formatearPrecision(p.coords.accuracy)}, parece ubicación por internet). Mueve el punto en el mapa o usa tu celular dentro del local.`);
+          return;
+        }
+        setPrecision(p.coords.accuracy);
         setCfg({ ...cfg, localLat: Number(p.coords.latitude.toFixed(6)), localLng: Number(p.coords.longitude.toFixed(6)) });
         onError(null);
         onOk('Ubicación tomada. Revísala en el mapa y pulsa «Guardar configuración».');
@@ -443,6 +458,8 @@ function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin 
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
   };
+  const moverPunto = (p: { lat: number; lng: number }) =>
+    setCfg({ ...cfg, localLat: Number(p.lat.toFixed(6)), localLng: Number(p.lng.toFixed(6)) });
   const conUbicacion = cfg.localLat !== null && cfg.localLng !== null;
   return (
     <>
@@ -455,6 +472,22 @@ function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin 
             {campo('localLat', 'Latitud del local', 'Ej. -12.046374')}
             {campo('localLng', 'Longitud del local', 'Ej. -77.042793')}
           </div>
+          <BuscadorDireccion onElegir={(p) => moverPunto(p)} />
+          <MapaUbicacion
+            punto={conUbicacion ? { lat: cfg.localLat as number, lng: cfg.localLng as number } : null}
+            onCambiar={moverPunto}
+            altura={320}
+            etiqueta="Mapa para marcar la ubicación del local"
+            local={conUbicacion ? null : SEDE_DEFECTO}
+            ajustarA={conUbicacion ? 'punto' : 'local'}
+            radioM={cfg.radioM ?? undefined}
+          />
+          <p className="as-ayuda">
+            {conUbicacion ? 'Arrastra el punto o toca el mapa para moverlo.' : 'Toca el mapa para colocar el punto del local: hasta entonces no se guarda ninguno.'}
+          </p>
+          <p className="as-ayuda" data-testid="texto-regla">
+            La asistencia se mide desde este punto: el trabajador debe estar a {cfg.radioM ?? '—'} m o menos (radio) y con el GPS del celular con precisión mejor que {cfg.precisionMaxM ?? '—'} m.
+          </p>
           <div className="as-acciones">
             <Boton type="button" variante="oscuro" cargando={leyendo} onClick={usarMiUbicacion}>Usar mi ubicación actual</Boton>
             {conUbicacion && (
@@ -466,7 +499,7 @@ function ConfigTab({ cfg, setCfg, onError, onOk }: { cfg: ConfigAsistenciaAdmin 
           <p className="as-ayuda">Para usar tu ubicación, tienes que estar dentro del local, de preferencia al centro y con el GPS activado.</p>
           {precision !== null && (
             <div role="status" className={`as-aviso ${precision > PRECISION_BUENA_M ? 'as-aviso--alerta' : 'as-aviso--ok'}`}>
-              Precisión obtenida: {precision} m.
+              Precisión obtenida: {formatearPrecision(precision)}.
               {precision > PRECISION_BUENA_M && ` Es peor que ${PRECISION_BUENA_M} m: sal a un lugar abierto y vuelve a intentar, o corrige las coordenadas a mano.`}
             </div>
           )}
