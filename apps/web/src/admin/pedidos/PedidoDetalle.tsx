@@ -34,6 +34,8 @@ import { salonApi } from '../salon/api';
 import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
 import { SeccionUbicacionPedido } from './SeccionUbicacionPedido';
 import { InsigniaNumeroDia } from './InsigniaNumeroDia';
+import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
+import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 
 export interface PedidoDetalleProps {
   pedido: Pedido;
@@ -162,6 +164,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
     est !== 'NUEVO';
   // Delivery sin repartidor: el servidor no lo deja pasar a ENTREGADO (409 REPARTIDOR_REQUERIDO)
   const sinRepartidor = pedido.modalidad === 'DELIVERY' && !pedido.repartidor_party_id;
+  // Delivery sin punto o sin zona: no se confirma, cobra ni pasa a cocina hasta ubicarlo (el servidor lo rechaza igual)
+  const sinUbicar = deliverySinUbicacion(pedido) && !['ANULADO', 'RECHAZADO', 'ENTREGADO'].includes(String(pedido.estado || '').toUpperCase());
 
   const handleAbrirAnular = async () => {
     if (tieneCobroVigente && !pedido.cobro_vigente_id) {
@@ -838,6 +842,15 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
           <span>S/ {totalNum.toFixed(2)}</span>
         </div>
 
+        {sinUbicar && (
+          <AvisoDeliverySinUbicacion
+            pedidoId={String(pedido.id)}
+            codigo={pedido.codigo}
+            direccion={pedido.entrega_direccion}
+            alActualizar={alActualizar}
+          />
+        )}
+
         {/* 1. Si es por confirmar */}
         {esPorConfirmar && (
           <>
@@ -848,6 +861,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
               <button
                 type="button"
                 onClick={() => setAbrirConfirmarPago(true)}
+                disabled={sinUbicar}
+                title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
                 style={{
                   flex: '1 1 200px',
                   minHeight: 52,
@@ -858,7 +873,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
                   fontFamily: 'Montserrat, sans-serif',
                   fontWeight: 800,
                   fontSize: 15,
-                  cursor: 'pointer',
+                  cursor: sinUbicar ? 'not-allowed' : 'pointer',
+                  opacity: sinUbicar ? 0.6 : 1,
                 }}
               >
                 Confirmar pedido y pago
@@ -996,6 +1012,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
             <button
               type="button"
               onClick={() => setAbrirCobrar(true)}
+              disabled={sinUbicar}
+              title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
               style={{
                 flex: '1 1 140px',
                 minHeight: 48,
@@ -1012,6 +1030,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
             <button
               type="button"
               onClick={() => setAbrirCreditoPersonal(true)}
+              disabled={sinUbicar}
+              title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
               style={{
                 flex: '1 1 180px',
                 minHeight: 48,
@@ -1147,6 +1167,10 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
             setAbrirCobrar(false);
             alActualizar();
           }}
+          alActualizarPedido={() => {
+            setAbrirCobrar(false);
+            alActualizar();
+          }}
         />
       )}
 
@@ -1237,6 +1261,10 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
         <ModalConfirmarPago
           pedido={pedido}
           alCerrar={() => setAbrirConfirmarPago(false)}
+          alActualizarPedido={() => {
+            setAbrirConfirmarPago(false);
+            alActualizar();
+          }}
           alConfirmarExitoso={() => {
             setAbrirConfirmarPago(false);
             alActualizar();

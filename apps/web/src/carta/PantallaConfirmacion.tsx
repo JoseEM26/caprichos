@@ -208,6 +208,13 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
           </div>
         )}
 
+        {creacion && creacion.envio === null && (
+          <div data-testid="envio-por-confirmar" style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <span>Envío</span>
+            <span style={{ fontWeight: 700, textAlign: 'right' }}>Por confirmar: se calcula al recibir tu ubicación</span>
+          </div>
+        )}
+
         {(creacion?.propina ?? estado?.propina ?? 0) > 0 && (
           <div data-testid="propina-confirmacion" style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Propina (para el equipo)</span>

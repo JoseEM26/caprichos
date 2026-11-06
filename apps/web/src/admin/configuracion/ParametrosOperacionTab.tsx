@@ -314,6 +314,11 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Habilita el motor conversacional automático en WhatsApp para responder saludos, menú, horarios y derivaciones a personas.',
     tipo: 'sino',
   },
+  whatsapp_aviso_asignado_activo: {
+    nombre: 'Aviso WhatsApp: Delivery asignado',
+    descripcion: 'Envía aviso automático al cliente con el nombre del repartidor cuando toma su pedido o Caja lo reasigna.',
+    tipo: 'sino',
+  },
   whatsapp_aviso_salida_activo: {
     nombre: 'Aviso WhatsApp: Delivery en camino',
     descripcion: 'Envía aviso automático al cliente con tiempo estimado cuando el repartidor sale con el pedido.',

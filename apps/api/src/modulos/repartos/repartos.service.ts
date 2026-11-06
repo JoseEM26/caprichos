@@ -34,6 +34,12 @@ import {
 } from './rutas-reparto';
 import { FiltrarRutasDto } from './dto/filtrar-rutas.dto';
 
+/** Plan de pago y solicitud de cambio de cobro pendiente: lo que formatearPedidoReparto necesita para el cobro real. */
+const INCLUDE_COBRO = {
+  planPago: { select: { medio: true, monto: true, orden: true }, orderBy: { orden: 'asc' } },
+  solicitudesCambioCobro: { where: { estado: 'PENDIENTE' }, take: 1 },
+} satisfies Prisma.PedidoInclude;
+
 /** Estados de pedido que siguen vivos en el reparto: los únicos que muestra la vista activa. */
 export const ESTADOS_ACTIVOS_REPARTO = ['LISTO', 'EN_CAMINO'] as const;
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
@@ -42,13 +48,14 @@ import { ActualizarConfigRepartoDto } from './dto/actualizar-config-reparto.dto'
 import { IniciarRutaDto } from './dto/iniciar-ruta.dto';
 import { LiberarPedidoDto } from './dto/liberar-pedido.dto';
 import { ReasignarPedidoDto } from './dto/reasignar-pedido.dto';
-import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
+import { AvisosPedidoService, ETAPAS_AVISO } from '../chatbot/servicios/avisos-pedido.service';
 import {
   ESTADO_REPROG,
   MOTIVO_RETIRO,
   NUMERO_PREGUNTA_REPROG,
 } from '../chatbot/servicios/reprogramacion.service';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { efectivoDelPedido } from '../pedidos/pago-plan.service';
 
 export type ColorEsperaReparto = 'VERDE' | 'RETRASADO' | 'TARDE' | 'MUY_TARDE';
 export type ColorEspera = 'verde' | 'naranja' | 'rojo' | ColorEsperaReparto;
@@ -240,6 +247,20 @@ export class RepartosService {
     return { minutosEspera, color };
   }
 
+  /** Solicitud de cambio de cobro PENDIENTE del pedido (si la consulta la incluyó), o null. */
+  private cambioCobroPendiente(p: any) {
+    const s = Array.isArray(p.solicitudesCambioCobro) ? p.solicitudesCambioCobro.find((x: any) => x.estado === 'PENDIENTE') : null;
+    return s
+      ? {
+          id: String(s.id),
+          plan_solicitado: s.plan_solicitado,
+          plan_original: s.plan_original,
+          paga_con: s.paga_con != null ? Number(s.paga_con) : null,
+          solicitado_en: s.solicitado_en,
+        }
+      : null;
+  }
+
   /**
    * Mapea un pedido al formato de salida requerido para las vistas de reparto.
    */
@@ -257,14 +278,19 @@ export class RepartosService {
       config.muyTardeMin,
     );
 
-    const cobroPendienteEfectivo =
-      p.pago_estado !== 'PAGADO' && p.pago_metodo === 'EFECTIVO';
-
     const totalNum = Number(p.total);
+    // Plan de pago (pago dividido o cambio aprobado en la puerta): el efectivo a cobrar es el renglón EFECTIVO
+    const planPago: Array<{ medio: string; monto: number }> = Array.isArray(p.planPago)
+      ? p.planPago.map((f: any) => ({ medio: f.medio, monto: Number(f.monto) }))
+      : [];
+    const efectivoCobrar = p.pago_estado === 'PAGADO' ? 0 : efectivoDelPedido(planPago, p.pago_metodo, totalNum);
+    const cobroPendienteEfectivo = efectivoCobrar > 0;
+
     const pagaConNum = p.paga_con != null ? Number(p.paga_con) : null;
+    const baseVuelto = efectivoCobrar > 0 ? efectivoCobrar : totalNum;
     const vuelto =
-      pagaConNum != null && pagaConNum > totalNum
-        ? Number((pagaConNum - totalNum).toFixed(2))
+      pagaConNum != null && pagaConNum > baseVuelto
+        ? Number((pagaConNum - baseVuelto).toFixed(2))
         : 0;
 
     const cobro = p.pago_estado === 'PAGADO' ? 0 : totalNum;
@@ -339,6 +365,11 @@ export class RepartosService {
       pago_metodo: p.pago_metodo,
       cobro_pendiente_efectivo: cobroPendienteEfectivo,
       cobroPendienteEfectivo,
+      /** Efectivo que debe cobrar el repartidor en la puerta (0 si ya está pagado o es digital) */
+      efectivo_cobrar: efectivoCobrar,
+      plan_pago: planPago,
+      /** Solicitud de cambio de forma de pago esperando a Caja (el pedido no se puede entregar hasta que se resuelva) */
+      cambio_cobro_pendiente: this.cambioCobroPendiente(p),
       paga_con: pagaConNum,
       vuelto,
       cantidad_productos: cantidadProductos,
@@ -372,6 +403,7 @@ export class RepartosService {
       include: {
         zona: true,
         lineas: { select: { cantidad: true } },
+        ...INCLUDE_COBRO,
         mensajesReparto: { where: { numero: NUMERO_PREGUNTA_REPROG, estado: ESTADO_REPROG.REPROGRAMADO }, select: { numero: true } },
       },
       orderBy: { creado_en: 'asc' },
@@ -444,6 +476,7 @@ export class RepartosService {
       include: {
         zona: true,
         lineas: { select: { cantidad: true } },
+        ...INCLUDE_COBRO,
       },
       orderBy: { creado_en: 'asc' },
     });
@@ -460,6 +493,7 @@ export class RepartosService {
       include: {
         zona: true,
         lineas: { select: { cantidad: true } },
+        ...INCLUDE_COBRO,
       },
       orderBy: { creado_en: 'asc' },
     });
@@ -570,6 +604,7 @@ export class RepartosService {
       include: {
         zona: true,
         lineas: { select: { cantidad: true } },
+        ...INCLUDE_COBRO,
         incidentes: { orderBy: { en: 'desc' }, take: 1, select: { en: true } },
       },
     });
@@ -714,6 +749,7 @@ export class RepartosService {
       include: {
         zona: true,
         lineas: { select: { cantidad: true } },
+        ...INCLUDE_COBRO,
         repartidor: {
           include: {
             persona: true,
@@ -1025,7 +1061,7 @@ export class RepartosService {
         (a, b) => new Date(a.creado_en).getTime() - new Date(b.creado_en).getTime(),
       );
       const efectivoPorRendir = pedidos.reduce(
-        (acc, p) => acc + (p.cobro_pendiente_efectivo ? p.total : 0),
+        (acc, p) => acc + (p.cobro_pendiente_efectivo ? p.efectivo_cobrar ?? p.total : 0),
         0,
       );
       const nombre =
@@ -1085,6 +1121,7 @@ export class RepartosService {
       include: {
         zona: true,
         lineas: { select: { cantidad: true } },
+        ...INCLUDE_COBRO,
         repartidor: { include: { persona: true } },
       },
       orderBy: { creado_en: 'desc' },
@@ -1213,12 +1250,15 @@ export class RepartosService {
 
     // Se suma a la ruta en curso del repartidor (o abre una)
     await sumarARuta(this.prisma, partyId, [pedidoId], 'INDIVIDUAL', ahora);
+    // Aviso «ya asignamos a tu delivery»: sin transacción propia, nunca frena la toma
+    await this.avisos?.avisar(pedidoId, 'ASIGNADO');
 
     const pedido = await this.prisma.pedido.findUniqueOrThrow({
       where: { id: pedidoId },
       include: {
         zona: true,
         lineas: { select: { cantidad: true } },
+        ...INCLUDE_COBRO,
       },
     });
 
@@ -1310,6 +1350,7 @@ export class RepartosService {
         include: {
           zona: true,
           lineas: { select: { cantidad: true } },
+          ...INCLUDE_COBRO,
         },
       });
       await tx.pedidoEstadoHistorial.create({
@@ -1402,6 +1443,7 @@ export class RepartosService {
         include: {
           zona: true,
           lineas: { select: { cantidad: true } },
+          ...INCLUDE_COBRO,
         },
       });
       await tx.pedidoEstadoHistorial.create({
@@ -1459,7 +1501,7 @@ export class RepartosService {
 
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
-      include: { zona: true },
+      include: { zona: true, planPago: true },
     });
 
     if (!pedido) {
@@ -1495,11 +1537,27 @@ export class RepartosService {
       });
     }
 
+    // Cambio de forma de pago pendiente: Caja debe validarlo (o autorizar la entrega sin validar) antes de entregar
+    const cambioPendiente = await this.prisma.solicitudCambioCobro.findFirst({
+      where: { pedido_id: pedidoId, estado: 'PENDIENTE' },
+      select: { id: true },
+    });
+    if (cambioPendiente) {
+      throw new ConflictException({
+        codigo: 'CAMBIO_COBRO_PENDIENTE',
+        mensaje: 'Esperando que Caja valide el pago…',
+      });
+    }
+
     const ahora = new Date();
 
     const porRendirEfectivo =
-      pedido.pago_estado !== 'PAGADO' && pedido.pago_metodo === 'EFECTIVO'
-        ? Number(pedido.total)
+      pedido.pago_estado !== 'PAGADO'
+        ? efectivoDelPedido(
+            (pedido as any).planPago?.map((f: any) => ({ medio: f.medio, monto: Number(f.monto) })),
+            pedido.pago_metodo,
+            Number(pedido.total),
+          )
         : 0;
 
     const pedidoActualizado = await this.prisma.$transaction(async (tx) => {
@@ -1512,6 +1570,7 @@ export class RepartosService {
         include: {
           zona: true,
           lineas: { select: { cantidad: true } },
+          ...INCLUDE_COBRO,
         },
       });
       await tx.pedidoEstadoHistorial.create({
@@ -2279,6 +2338,7 @@ export class RepartosService {
               include: {
                 zona: true,
                 lineas: { select: { cantidad: true } },
+                ...INCLUDE_COBRO,
               },
             })
           : [];
@@ -2402,6 +2462,8 @@ export class RepartosService {
       include: { zona: true },
     });
     await sincronizarRuta(this.prisma, BigInt(anteriorRepartidorId), ahora);
+    // Sin repartidor: la próxima toma vuelve a avisar «ya asignamos a tu delivery»
+    await this.prisma.mensajeReparto.deleteMany({ where: { pedido_id: pedidoId, numero: ETAPAS_AVISO.ASIGNADO.numero } });
 
     await this.prisma.pedidoEstadoHistorial.create({
       data: {
@@ -2525,6 +2587,9 @@ export class RepartosService {
     // Sale de la ruta del anterior y entra en la del nuevo repartidor
     if (anteriorRepartidorId != null) await sincronizarRuta(this.prisma, BigInt(anteriorRepartidorId), ahora);
     await sumarARuta(this.prisma, nuevoRepartidorPartyId, [pedidoId], 'INDIVIDUAL', ahora);
+    // El cliente se entera del nuevo delivery: se borra la etapa para que el aviso salga otra vez con el nombre nuevo
+    await this.prisma.mensajeReparto.deleteMany({ where: { pedido_id: pedidoId, numero: ETAPAS_AVISO.ASIGNADO.numero } });
+    await this.avisos?.avisar(pedidoId, 'ASIGNADO');
 
     await this.prisma.pedidoEstadoHistorial.create({
       data: {
@@ -2605,6 +2670,49 @@ export class RepartosService {
   }
 
   /**
+   * Cobro del pedido para la hoja del repartidor: pagado o falta cobrar, medio y plan, efectivo a cobrar con su
+   * vuelto, capturas (validadas o pendientes) y cortesías. Solo de pedidos propios.
+   */
+  private async detalleCobro(p: any) {
+    const total = Number(p.total);
+    const propina = Number(p.propina ?? 0);
+    const totalCobrable = Math.round((total + propina) * 100) / 100;
+    const plan: Array<{ medio: string; monto: number }> =
+      Array.isArray(p.planPago) && p.planPago.length > 0
+        ? p.planPago.map((f: any) => ({ medio: f.medio, monto: Number(f.monto) }))
+        : [{ medio: String(p.pago_metodo ?? p.pago_preferido ?? 'EFECTIVO').toUpperCase(), monto: totalCobrable }];
+    const pagado = p.pago_estado === 'PAGADO';
+    const efectivoCobrar = pagado ? 0 : efectivoDelPedido(Array.isArray(p.planPago) ? plan : null, p.pago_metodo, totalCobrable);
+    const pagaCon = p.paga_con != null ? Number(p.paga_con) : null;
+    const vuelto = pagaCon != null && efectivoCobrar > 0 && pagaCon > efectivoCobrar ? Math.round((pagaCon - efectivoCobrar) * 100) / 100 : 0;
+    const vouchers = await this.prisma.voucherPago.findMany({
+      where: { pedido_id: p.id, reemplazado_en: null, retirado: false },
+      select: { id: true, medio: true, semaforo: true, revisado_en: true },
+      orderBy: { id: 'asc' },
+    });
+    const cortesias = (p.lineas ?? []).filter((l: any) => l.es_cortesia).map((l: any) => ({ nombre: l.nombre, cantidad: l.cantidad }));
+    return {
+      estado: pagado ? 'PAGADO' : 'FALTA_COBRAR',
+      medio: p.pago_metodo ?? null,
+      plan,
+      mixto: plan.length > 1,
+      total,
+      propina,
+      total_cobrable: totalCobrable,
+      efectivo_cobrar: efectivoCobrar,
+      paga_con: pagaCon,
+      vuelto,
+      vouchers: vouchers.map((v) => ({
+        id: String(v.id),
+        medio: v.medio,
+        estado: v.semaforo === 'ILEGIBLE' ? 'ILEGIBLE' : v.revisado_en || pagado ? 'VALIDADO' : 'PENDIENTE',
+      })),
+      cortesias,
+      cambio_pendiente: this.cambioCobroPendiente(p),
+    };
+  }
+
+  /**
    * GET /admin/repartos/:id/resumen-repartidor (repartos/ver): detalle de la hoja inferior para un pedido
    * disponible, propio o próximo. Dirección y teléfono solo si el pedido es de quien pregunta.
    */
@@ -2614,7 +2722,23 @@ export class RepartosService {
     const config = await this.obtenerParametrosReparto();
     const p = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
-      include: { zona: true, lineas: { select: { cantidad: true, nombre: true } } },
+      include: {
+        zona: true,
+        lineas: {
+          select: {
+            cantidad: true,
+            nombre: true,
+            tamano: true,
+            sabor: true,
+            nota: true,
+            es_cortesia: true,
+            opcionesElegidas: { select: { opcion_nombre: true }, orderBy: { id: 'asc' } },
+            sabores: { select: { sabor_nombre: true, cantidad: true }, orderBy: { id: 'asc' } },
+          },
+        },
+        planPago: { orderBy: { orden: 'asc' } },
+        solicitudesCambioCobro: { where: { estado: 'PENDIENTE' }, take: 1 },
+      },
     });
     const esMio = p?.repartidor_party_id != null && BigInt(p.repartidor_party_id) === partyId;
     const esProximo = p != null && ['COLA', 'PREPARANDO'].includes(p.estado) && p.repartidor_party_id == null && p.anulado_en == null;
@@ -2649,7 +2773,23 @@ export class RepartosService {
       estado: prox?.estado ?? p.estado,
       estadoTexto: prox?.estadoTexto ?? (p.estado === 'EN_CAMINO' ? 'En camino' : 'Listo para entrega'),
       minutosEspera,
-      productos: lineasDeCuenta(p.lineas).map((l) => ({ cantidad: l.cantidad, nombre: l.nombre })),
+      productos: lineasDeCuenta(p.lineas).map((l: any) => ({
+        cantidad: l.cantidad,
+        nombre: l.nombre,
+        // Detalle que pidió el cliente: tamaño, sabores y opciones elegidas, nota de la línea y si es cortesía
+        ...(esMio
+          ? {
+              tamano: l.tamano ?? null,
+              sabores: [
+                ...(l.sabor ? [l.sabor] : []),
+                ...((l.sabores ?? []) as Array<{ sabor_nombre: string; cantidad: number }>).map((x) => (x.cantidad > 1 ? `${x.cantidad} ${x.sabor_nombre}` : x.sabor_nombre)),
+              ],
+              opciones: ((l.opcionesElegidas ?? []) as Array<{ opcion_nombre: string }>).map((o) => o.opcion_nombre).filter(Boolean),
+              nota: l.nota ?? null,
+              es_cortesia: !!l.es_cortesia,
+            }
+          : {}),
+      })),
       nota: p.nota ?? null,
       zona: p.zona?.codigo ?? null,
       puedeTomar,
@@ -2659,6 +2799,17 @@ export class RepartosService {
             direccion: p.entrega_direccion,
             referencia: p.entrega_referencia,
             telefono: p.cliente_telefono,
+            cobro: await this.detalleCobro(p),
+            tiempos: {
+              creado_en: p.creado_en,
+              pasa_cocina_en: p.pasa_cocina_en ?? null,
+              listo_en: p.listo_en ?? null,
+              tomado_en: p.tomado_en ?? null,
+              salio_en: p.salio_en ?? null,
+              llego_en: p.llego_en ?? null,
+              entregado_en: p.entregado_en ?? null,
+              espera_max_min: config.esperaMaxMin,
+            },
           }
         : {}),
     };
@@ -2912,6 +3063,7 @@ export class RepartosService {
         entidad: 'pedido', entidadId: id, partyId, ip,
       });
     }
+    for (const id of nuevos) await this.avisos?.avisar(id, 'ASIGNADO');
     for (const f of filas.filter((x) => nuevos.includes(x.id))) {
       this.eventosGateway?.emitirAdmin('pedido:estado', {
         id: Number(f.id), codigo: f.codigo, estado: f.estado, repartidor_party_id: String(partyId),
@@ -3130,6 +3282,7 @@ export class RepartosService {
           entidad: 'pedido', entidadId: id, partyId: actor, ip, motivo: idOpcionLog(idOpcion, destino),
         });
       }
+      for (const id of nuevos) await this.avisos?.avisar(id, 'ASIGNADO');
       for (const f of filas.filter((x) => nuevos.includes(x.id))) {
         this.eventosGateway?.emitirAdmin('pedido:estado', {
           id: Number(f.id), codigo: f.codigo, estado: f.estado, repartidor_party_id: String(destino),

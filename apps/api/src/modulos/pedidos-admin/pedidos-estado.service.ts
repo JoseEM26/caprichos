@@ -1,4 +1,5 @@
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
+import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
 import { PuntosService } from '../clientes/puntos.service';
 import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
 import { totalCobrable } from '../propinas/propinas.util';
@@ -619,12 +620,16 @@ export class PedidosEstadoService {
         where: {
           estado: { in: ['COLA', 'PREPARANDO'] },
           // Pago digital (Yape, Plin, transferencia) sin validar: no pasa a cocina hasta aprobar el voucher o coordinar el pago
-          NOT: {
-            pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
-            pago_estado: 'PENDIENTE',
-            pago_coordinado_en: null,
-            modalidad: { not: 'MESA' },
-          },
+          NOT: [
+            {
+              pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
+              pago_estado: 'PENDIENTE',
+              pago_coordinado_en: null,
+              modalidad: { not: 'MESA' },
+            },
+            // Delivery sin ubicación (punto o zona): sin envío calculado no pasa a cocina
+            { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
+          ],
         },
         orderBy: { creado_en: 'asc' }, // Más viejos primero
         include: {
@@ -1057,6 +1062,9 @@ export class PedidosEstadoService {
       });
     }
 
+    // Delivery sin ubicación (punto y zona): sin envío calculado no pasa a cocina ni avanza
+    exigirDeliveryUbicado(pedido);
+
     // Un delivery no se marca entregado sin repartidor: su efectivo no tendría quién lo liquide
     if (nuevoEstado === 'ENTREGADO' && pedido.modalidad === 'DELIVERY' && !pedido.repartidor_party_id) {
       throw new ConflictException({
@@ -1182,6 +1190,8 @@ export class PedidosEstadoService {
         });
       }
     }
+
+    exigirDeliveryUbicado(pedido);
 
     const metodoUpper = dto.metodo.toUpperCase().trim();
     if (!METODOS_PAGO_PERMITIDOS.includes(metodoUpper as any)) {

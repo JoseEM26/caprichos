@@ -1,4 +1,5 @@
 import { PuntosService } from '../clientes/puntos.service';
+import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { repartirPropina } from '../propinas/propinas.util';
 import { ImpresionService } from '../impresion/impresion.service';
 import { StockService } from '../stock/stock.service';
@@ -312,6 +313,8 @@ export class CobrosService {
           HttpStatus.CONFLICT,
         );
       }
+
+      exigirDeliveryUbicado(pedido);
 
       if (pedido.pago_estado === 'PAGADO' || cobroVigente(pedido.cobros)) {
         throw new HttpException(
@@ -885,6 +888,10 @@ export class CobrosService {
         comprobante_razon: p.comprobante_razon,
         creado_en: p.creado_en,
         minutosEspera,
+        // Para que Caja vea el aviso «falta la ubicación» antes de coordinar o cobrar un delivery
+        entrega_lat: p.entrega_lat != null ? Number(p.entrega_lat) : null,
+        entrega_lng: p.entrega_lng != null ? Number(p.entrega_lng) : null,
+        zona_id: p.zona_id != null ? p.zona_id.toString() : null,
       };
     });
   }
@@ -924,6 +931,8 @@ export class CobrosService {
         HttpStatus.CONFLICT,
       );
     }
+
+    exigirDeliveryUbicado(pedido);
 
     if (pedido.pago_estado === 'PAGADO') {
       throw new HttpException(

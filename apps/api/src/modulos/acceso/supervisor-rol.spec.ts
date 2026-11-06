@@ -28,6 +28,14 @@ describe('rol SUPERVISOR: matriz de permisos', () => {
     expect([...supervisor].sort()).toEqual([...esperado, 'supervisor/ver_codigo', 'escritorio/operativo', 'iniciativas/cambiar_estado'].sort());
   });
 
+  it('valida el cambio de forma de pago en la puerta (como Caja), sin código de supervisor', () => {
+    expect(supervisor).toContain('pedidos/validar_cambio_cobro');
+    expect(MATRIZ.CAJERO).toContain('pedidos/validar_cambio_cobro');
+    expect(MATRIZ.REPARTIDOR).toContain('repartos/solicitar_cambio_cobro');
+    expect(MATRIZ.REPARTIDOR).not.toContain('pedidos/validar_cambio_cobro');
+    expect(MATRIZ.MOZO).not.toContain('pedidos/validar_cambio_cobro');
+  });
+
   it('ve el código rotativo pero NO puede gestionarlo (generar, rotar, desbloquear)', () => {
     expect(supervisor).toContain('supervisor/ver_codigo');
     expect(supervisor).not.toContain('supervisor/gestionar_codigo');

@@ -49,6 +49,7 @@ describe('RepartosService', () => {
 
   beforeEach(async () => {
     prismaMock = {
+      solicitudCambioCobro: { findFirst: jest.fn().mockResolvedValue(null) },
       parametro: {
         findMany: jest.fn().mockResolvedValue([
           { clave: 'rep_naranja_min', valor: 35 },
@@ -75,6 +76,7 @@ describe('RepartosService', () => {
         create: jest.fn(),
       },
       mensajeReparto: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
         upsert: jest.fn(),
         create: jest.fn(),
         findMany: jest.fn(),
@@ -170,6 +172,8 @@ describe('RepartosService', () => {
       const res = await service.tomarPedido('10', repartidor1);
 
       expect(res.id).toBe('10');
+      // Tomar avisa al cliente «ya asignamos a tu delivery» (antes no mandaba ningún aviso)
+      expect(avisosMock.avisar).toHaveBeenCalledWith(10n, 'ASIGNADO');
       expect(prismaMock.pedidoEstadoHistorial.create).toHaveBeenCalled();
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'TOMAR', modulo: 'repartos' }),
@@ -319,6 +323,40 @@ describe('RepartosService', () => {
         response: { codigo: 'REPARTIDOR_REQUERIDO' },
       });
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('POST :id/entregar con un cambio de cobro pendiente: 409 «Esperando que Caja valide el pago», no se entrega', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 35n, codigo: 'CP-0107', modalidad: 'DELIVERY', estado: 'EN_CAMINO', repartidor_party_id: 101n,
+        pago_estado: 'PENDIENTE', pago_metodo: 'EFECTIVO', total: new Prisma.Decimal(40), creado_en: new Date(), zona: null,
+      });
+      prismaMock.solicitudCambioCobro = { findFirst: jest.fn().mockResolvedValue({ id: 3n }) };
+
+      await expect(service.entregar('35', repartidor1)).rejects.toMatchObject({
+        status: 409,
+        response: { codigo: 'CAMBIO_COBRO_PENDIENTE', mensaje: 'Esperando que Caja valide el pago…' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+      expect(prismaMock.solicitudCambioCobro.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { pedido_id: 35n, estado: 'PENDIENTE' } }),
+      );
+    });
+
+    it('POST :id/entregar con el cambio aprobado: el efectivo por rendir sale del plan nuevo', async () => {
+      const base = {
+        id: 36n, codigo: 'CP-0108', modalidad: 'DELIVERY', estado: 'EN_CAMINO', repartidor_party_id: 101n,
+        pago_estado: 'PENDIENTE', total: new Prisma.Decimal(40), creado_en: new Date(), zona: null,
+      };
+      prismaMock.solicitudCambioCobro = { findFirst: jest.fn().mockResolvedValue(null) };
+      // efectivo → Yape aprobado: ya no hay efectivo que rendir
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...base, pago_metodo: 'YAPE', planPago: [] });
+      prismaMock.pedido.update.mockResolvedValue({ ...base, pago_metodo: 'YAPE', estado: 'ENTREGADO' });
+      expect((await service.entregar('36', repartidor1)).por_rendir_efectivo).toBe(0);
+      // efectivo + Yape aprobado: solo el renglón de efectivo
+      const plan = [{ medio: 'EFECTIVO', monto: new Prisma.Decimal(15) }, { medio: 'YAPE', monto: new Prisma.Decimal(25) }];
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...base, pago_metodo: 'YAPE', planPago: plan });
+      prismaMock.pedido.update.mockResolvedValue({ ...base, pago_metodo: 'YAPE', estado: 'ENTREGADO', planPago: plan });
+      expect((await service.entregar('36', repartidor1)).por_rendir_efectivo).toBe(15);
     });
 
     it('POST :id/entregar cambia a ENTREGADO sin cobrar si es contra entrega en efectivo', async () => {

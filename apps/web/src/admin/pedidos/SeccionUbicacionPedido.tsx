@@ -5,7 +5,7 @@ import { useSesion } from '../../comun/sesion';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import { ModalCambiarUbicacion } from './ModalCambiarUbicacion';
 import { InsigniaDireccionEditada } from './InsigniaDireccionEditada';
-import { CambioUbicacion, HistorialUbicacion, cambioUbicacionApi, textoAjuste, textoDifEnvio } from './cambioUbicacionApi';
+import { CambioUbicacion, HistorialUbicacion, ORIGEN_CAMBIO, cambioUbicacionApi, textoAjuste, textoDifEnvio, textoDistancia } from './cambioUbicacionApi';
 
 export interface SeccionUbicacionPedidoProps {
   pedidoId: string;
@@ -105,29 +105,42 @@ export function SeccionUbicacionPedido({ pedidoId, codigo, estado, lat, lng, dir
 
       {propuesta && (
         <div role="region" aria-label="Cambio propuesto" style={{ background: '#fff', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontWeight: 800, fontSize: 13 }}>Cambio de ubicación propuesto por {propuesta.propuestoPorNombre ?? 'el repartidor'}</div>
-          {propuesta.nota && <div style={{ fontSize: 12 }}>Nota: {propuesta.nota}</div>}
-          <div style={{ fontSize: 12 }}>
-            Envío S/ {(propuesta.envioAnterior ?? 0).toFixed(2)} → S/ {(propuesta.envioNuevo ?? 0).toFixed(2)} · {textoDifEnvio(propuesta.diferencia)} · nuevo total S/{' '}
-            {(propuesta.totalNuevo ?? 0).toFixed(2)}
+          <div style={{ fontWeight: 800, fontSize: 13 }}>
+            {propuesta.origen === 'WHATSAPP_CLIENTE'
+              ? propuesta.fueraDeZona
+                ? 'Fuera de zona: la ubicación que envió el cliente está fuera de la zona de reparto'
+                : lat != null
+                  ? 'El cliente envió otra ubicación: ¿usarla?'
+                  : 'El cliente envió su ubicación: ¿usarla?'
+              : `Cambio de ubicación propuesto por ${propuesta.propuestoPorNombre ?? 'el repartidor'}`}
           </div>
+          {propuesta.nota && <div style={{ fontSize: 12 }}>Nota: {propuesta.nota}</div>}
+          {textoDistancia(propuesta) && <div style={{ fontSize: 12, fontWeight: 700 }}>{textoDistancia(propuesta)}</div>}
+          {!propuesta.fueraDeZona && (
+            <div style={{ fontSize: 12 }}>
+              Envío S/ {(propuesta.envioAnterior ?? 0).toFixed(2)} → S/ {(propuesta.envioNuevo ?? 0).toFixed(2)} · {textoDifEnvio(propuesta.diferencia)} · nuevo total S/{' '}
+              {(propuesta.totalNuevo ?? 0).toFixed(2)}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             <MapaUbicacion punto={propuesta.anterior.lat != null ? { lat: propuesta.anterior.lat, lng: propuesta.anterior.lng! } : null} soloLectura altura={140} etiqueta="Antes" />
             <MapaUbicacion punto={{ lat: propuesta.nueva.lat!, lng: propuesta.nueva.lng! }} soloLectura altura={140} etiqueta="Después" />
           </div>
           {puedeCambiar && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <Boton
-                tamano="pequeno"
-                cargando={ocupado}
-                onClick={() =>
-                  decidir(() => cambioUbicacionApi.aprobarPropuesta(pedidoId, propuesta.id), 'Cambio aprobado.')
-                }
-              >
-                Aprobar
-              </Boton>
+              {!propuesta.fueraDeZona && (
+                <Boton
+                  tamano="pequeno"
+                  cargando={ocupado}
+                  onClick={() =>
+                    decidir(() => cambioUbicacionApi.aprobarPropuesta(pedidoId, propuesta.id), 'Cambio aprobado.')
+                  }
+                >
+                  {propuesta.origen === 'WHATSAPP_CLIENTE' ? 'Usar' : 'Aprobar'}
+                </Boton>
+              )}
               <Boton variante="secundario" tamano="pequeno" deshabilitado={ocupado} onClick={() => setRechazando(propuesta)}>
-                Rechazar
+                {propuesta.origen === 'WHATSAPP_CLIENTE' ? 'Descartar' : 'Rechazar'}
               </Boton>
             </div>
           )}
@@ -167,7 +180,7 @@ export function SeccionUbicacionPedido({ pedidoId, codigo, estado, lat, lng, dir
             {historial.cambios.map((c) => (
               <li key={c.id} style={{ fontSize: 12, background: '#fff', borderRadius: 10, padding: 8 }}>
                 <div>
-                  <strong>{c.origen === 'CAJA' ? 'Caja' : 'Repartidor'}</strong> · {c.estado}
+                  <strong>{ORIGEN_CAMBIO[c.origen] ?? c.origen}</strong> · {c.estado}
                   {c.estado === 'APROBADA' && c.resueltoPorNombre ? ` por ${c.resueltoPorNombre}` : ''}
                   {c.estado === 'PROPUESTA' && c.propuestoPorNombre ? ` de ${c.propuestoPorNombre}` : ''}
                 </div>

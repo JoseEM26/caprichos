@@ -1,4 +1,5 @@
 import { textoTiempoPedido } from '../repartos/eta-entrega';
+import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { pedidoEsperandoVoucher } from '../chatbot/servicios/pedido-esperando-voucher.util';
 import { HttpException, HttpStatus, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -742,6 +743,13 @@ export class MensajesService {
 
     const ahora = new Date();
     const pedidoId = BigInt(d.pedido.id);
+    if (this.prisma.pedido.findUnique) {
+      const ubic = await this.prisma.pedido.findUnique({
+        where: { id: pedidoId },
+        select: { modalidad: true, entrega_lat: true, entrega_lng: true, zona_id: true },
+      });
+      if (ubic) exigirDeliveryUbicado(ubic);
+    }
     const pedidoActual = this.prisma.pedido.findUnique
       ? await this.prisma.pedido.findUnique({
           where: { id: pedidoId },

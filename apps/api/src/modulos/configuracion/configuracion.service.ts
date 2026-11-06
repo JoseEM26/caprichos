@@ -133,6 +133,7 @@ export const CLAVES_TEXTO = [
   'chatbot_texto_no_entiendo',
   'chatbot_texto_no_entiendo_derivacion',
   'chatbot_texto_indicacion_pago',
+  'whatsapp_aviso_asignado_activo',
   'whatsapp_aviso_salida_activo',
   'whatsapp_aviso_llegada_activo',
   'whatsapp_aviso_espera_activo',

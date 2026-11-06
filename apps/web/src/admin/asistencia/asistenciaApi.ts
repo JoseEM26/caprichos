@@ -45,6 +45,8 @@ export interface MiHoy {
   pendiente: TipoMarca | null;
   permitidas: TipoMarca[];
   consentimientoAceptado: boolean;
+  consentimientoAceptadoEn?: string | null;
+  textoConsentimiento?: string;
   consentimiento: { version: string; texto: string } | null;
   dispositivoVinculado: boolean;
 }

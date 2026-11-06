@@ -70,6 +70,8 @@ model Party {
   cambiosUbicacionPropuestos PedidoCambioUbicacion[] @relation("CambioUbicacionPropuesto")
   cambiosUbicacionResueltos  PedidoCambioUbicacion[] @relation("CambioUbicacionResuelto")
   cambiosUbicacionAjustes    PedidoCambioUbicacion[] @relation("CambioUbicacionAjuste")
+  cambiosCobroSolicitados    SolicitudCambioCobro[]  @relation("CambioCobroSolicitado")
+  cambiosCobroResueltos      SolicitudCambioCobro[]  @relation("CambioCobroResuelto")
   propinaRepartosCalculados  PropinaReparto[]       @relation("PropinaRepartoCalculo")
   propinaRepartosAprobados   PropinaReparto[]       @relation("PropinaRepartoAprobo")
   propinaRepartosPagados     PropinaReparto[]       @relation("PropinaRepartoPago")
@@ -701,6 +703,7 @@ model Pedido {
   quejasWhatsapp         QuejaWhatsapp[]
   vouchers               VoucherPago[]
   planPago               PedidoPagoPlan[]
+  solicitudesCambioCobro SolicitudCambioCobro[]
   devolucion             DevolucionPedido?
   cambiosUbicacion       PedidoCambioUbicacion[]
   clienteIdentificado    Party?                 @relation("ClienteIdentificadoPedido", fields: [cliente_party_id], references: [id])
@@ -2514,6 +2517,38 @@ model PedidoPagoPlan {
   @@map("pedido_pago_plan")
 }
 
+/// Solicitud de cambio de forma de pago en la puerta (el delivery solicita, Caja valida). Historial inmutable:
+/// solo una PENDIENTE por pedido (índice único parcial) y una fila resuelta no se edita ni se borra (trigger).
+/// Ver migración 20270104100000_cambio_cobro_delivery.
+model SolicitudCambioCobro {
+  id                      BigInt    @id @default(autoincrement())
+  pedido_id               BigInt
+  solicitado_por_party_id BigInt
+  solicitado_en           DateTime  @default(now()) @db.Timestamptz
+  /// PENDIENTE | APROBADA | RECHAZADA | AUTORIZADA_SIN_VALIDAR (CHECK en la BD)
+  estado                  String    @default("PENDIENTE")
+  /// [{medio, monto}] que tenía el pedido al solicitar
+  plan_original           Json
+  /// [{medio, monto}] que pide el repartidor (suma = total cobrable)
+  plan_solicitado         Json
+  /// Efectivo con el que pagará el cliente (para el vuelto); null si no hay efectivo
+  paga_con                Decimal?  @db.Decimal(12, 2)
+  /// Capturas (voucher_pago.id) subidas con la solicitud
+  voucher_ids             BigInt[]
+  /// Motivo de Caja (obligatorio al autorizar sin validar; opcional al rechazar)
+  motivo                  String?
+  resuelto_por_party_id   BigInt?
+  resuelto_en             DateTime? @db.Timestamptz
+
+  pedido        Pedido @relation(fields: [pedido_id], references: [id], onDelete: Restrict)
+  solicitadoPor Party  @relation("CambioCobroSolicitado", fields: [solicitado_por_party_id], references: [id])
+  resueltoPor   Party? @relation("CambioCobroResuelto", fields: [resuelto_por_party_id], references: [id], onDelete: SetNull)
+
+  @@index([pedido_id])
+  @@index([estado])
+  @@map("solicitud_cambio_cobro")
+}
+
 // Reseñas de Google Maps que se muestran en la carta (las trae el servicio de reseñas; visible lo decide el admin)
 model ResenaGoogle {
   id               BigInt    @id @default(autoincrement())
@@ -2541,7 +2576,7 @@ model PedidoCambioUbicacion {
   pedido_id               BigInt
   origen                  String
   estado                  String
-  propuesto_por_party_id  BigInt
+  propuesto_por_party_id  BigInt?
   propuesto_en            DateTime        @default(now()) @db.Timestamptz
   resuelto_por_party_id   BigInt?
   resuelto_en             DateTime?       @db.Timestamptz
@@ -2571,9 +2606,10 @@ model PedidoCambioUbicacion {
   ajuste_en               DateTime?       @db.Timestamptz
   ajuste_movimiento_caja_id BigInt?
   aviso_cliente           String?
+  fuera_de_zona           Boolean         @default(false)
 
   pedido           Pedido          @relation(fields: [pedido_id], references: [id])
-  propuestoPor     Party           @relation("CambioUbicacionPropuesto", fields: [propuesto_por_party_id], references: [id])
+  propuestoPor     Party?          @relation("CambioUbicacionPropuesto", fields: [propuesto_por_party_id], references: [id])
   resueltoPor      Party?          @relation("CambioUbicacionResuelto", fields: [resuelto_por_party_id], references: [id])
   ajustePor        Party?          @relation("CambioUbicacionAjuste", fields: [ajuste_por_party_id], references: [id])
   zonaAnterior     ZonaReparto?    @relation("CambioZonaAnterior", fields: [zona_anterior_id], references: [id])

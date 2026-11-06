@@ -5,7 +5,7 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { nombresDePartes } from './devolucion-pedido.util';
-import { CambioUbicacionService, salidaCambio } from './cambio-ubicacion.service';
+import { CambioUbicacionService, OrigenCambio, salidaCambio } from './cambio-ubicacion.service';
 import { ProponerUbicacionDto } from './dto/proponer-ubicacion.dto';
 import { RechazarPropuestaUbicacionDto } from './dto/rechazar-propuesta-ubicacion.dto';
 
@@ -142,12 +142,12 @@ export class PropuestaUbicacionService {
       where: { estado: 'PROPUESTA' },
       orderBy: { propuesto_en: 'asc' },
       include: {
-        pedido: { select: { id: true, codigo: true, cliente_nombre: true, entrega_direccion: true, envio: true, total: true, pago_estado: true, estado: true } },
+        pedido: { select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true, entrega_direccion: true, entrega_lat: true, entrega_lng: true, envio: true, total: true, pago_estado: true, estado: true } },
         zonaAnterior: { select: { codigo: true } },
         zonaNueva: { select: { codigo: true } },
       },
     });
-    const nombres = await nombresDePartes(this.prisma, filas.map((f) => f.propuesto_por_party_id));
+    const nombres = await nombresDePartes(this.prisma, filas.map((f) => f.propuesto_por_party_id).filter((x): x is bigint => x != null));
     return filas.map((f) => ({
       ...salidaCambio(f, nombres),
       pedidoId: String(f.pedido.id),
@@ -156,6 +156,8 @@ export class PropuestaUbicacionService {
       pagoEstado: f.pedido.pago_estado,
       estadoPedido: f.pedido.estado,
       direccionActual: f.pedido.entrega_direccion,
+      latActual: f.pedido.entrega_lat != null ? Number(f.pedido.entrega_lat) : null,
+      lngActual: f.pedido.entrega_lng != null ? Number(f.pedido.entrega_lng) : null,
     }));
   }
 
@@ -167,7 +169,7 @@ export class PropuestaUbicacionService {
       pedidoId,
       { lat: Number(propuesta.lat_nueva), lng: Number(propuesta.lng_nueva) },
       {
-        origen: 'REPARTIDOR',
+        origen: propuesta.origen as OrigenCambio,
         usuario,
         propuesta: { id: propuesta.id, propuestoPor: propuesta.propuesto_por_party_id, nota: propuesta.nota },
         ip,
@@ -208,7 +210,7 @@ export class PropuestaUbicacionService {
       throw new NotFoundException({ codigo: 'PROPUESTA_NO_ENCONTRADA', mensaje: 'La propuesta no existe' });
     }
     const propuesta = await this.prisma.pedidoCambioUbicacion.findUnique({ where: { id: BigInt(propuestaIdRaw) } });
-    if (!propuesta || propuesta.pedido_id !== pedidoId || propuesta.origen !== 'REPARTIDOR') {
+    if (!propuesta || propuesta.pedido_id !== pedidoId) {
       throw new NotFoundException({ codigo: 'PROPUESTA_NO_ENCONTRADA', mensaje: 'La propuesta no existe en este pedido' });
     }
     if (propuesta.estado !== 'PROPUESTA') {

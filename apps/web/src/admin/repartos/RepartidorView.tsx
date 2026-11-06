@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { BotonProponerUbicacion } from './BotonProponerUbicacion';
 import type { CSSProperties, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
@@ -30,6 +31,8 @@ import {
   RespuestaMios,
   ResumenRepartidor,
 } from './repartosApi';
+import { DosPantallas, PantallaTiempos, CobroDetallado, type PantallaDetalle } from './DetalleDosPantallas';
+import { BotonCambiarFormaPago, useCambioCobro } from './CambioCobroRepartidor';
 import { clasificarEspera, ConfigReparto, CONFIG_REPARTO_DEFECTO, COORDENADAS_TIENDA_DEFECTO } from './calculoRuta';
 
 type VistaRepartidor = 'pedidos' | 'mios';
@@ -149,6 +152,8 @@ export function BotonEtapa({
   /** Motivo por el que no se puede avanzar todavía (orden de entrega); deshabilita el botón. */
   bloqueadoPor?: string;
 }) {
+  // Cambio de forma de pago esperando a Caja: no se puede marcar Entregado hasta que lo valide o autorice
+  if (!bloqueadoPor && etapa.id === 'entregar' && pedido.cambio_cobro_pendiente) bloqueadoPor = 'Esperando que Caja valide el pago…';
   return (
     <>
       <button
@@ -390,6 +395,8 @@ interface DetalleProps {
 function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAlternarRuta, alTomar, alEtapa, alReportar, orden, alEmpezarPor, alSaltar, alChatear }: DetalleProps) {
   const [resumen, setResumen] = useState<ResumenRepartidor | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pantalla, setPantalla] = useState<PantallaDetalle>('pedido');
+  const cambioCobro = useCambioCobro(id, !!mio);
 
   useEffect(() => {
     let vivo = true;
@@ -416,14 +423,8 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
   const noLeToca = conOrden && orden!.siguiente!.id !== mio!.id;
   const botonOrden: CSSProperties = { ...botonBase, width: '100%', minHeight: 48, background: 'var(--cp-white)', color: 'var(--cp-navy)', border: '1.5px solid var(--cp-navy)', fontSize: 14 };
 
-  return (
-    <div data-testid="detalle-pedido" style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: FUENTE_TEXTO, color: 'var(--cp-navy)' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-        <strong style={{ fontFamily: FUENTE_TITULOS, fontSize: 18 }}>{resumen.codigo}</strong>
-        {mio?.ubicacion_editada_en && <InsigniaDireccionEditada />}
-        <span style={chip('var(--cp-sand)', 'var(--cp-soft)')}>{resumen.estadoTexto}</span>
-        <span style={chip(clasificarEspera(resumen.minutosEspera).colorHex, '#fff')}>{resumen.minutosEspera} min de espera</span>
-      </div>
+  const filasCliente = (
+    <>
       <div style={fila}>
         <span>Cliente</span>
         <strong>{resumen.clienteNombre}</strong>
@@ -444,6 +445,10 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
           <strong>{telefono}</strong>
         </div>
       )}
+    </>
+  );
+  const cobroSimple = (
+    <>
       {mio && (
         <div
           style={{
@@ -460,16 +465,27 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
             : `Ya pagado con ${mio.pago_metodo || 'digital'}`}
         </div>
       )}
+    </>
+  );
+  const listaProductos = (
       <div>
         <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--cp-soft)', marginBottom: 2 }}>Productos</div>
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
           {resumen.productos.map((p, i) => (
             <li key={`${p.nombre}-${i}`}>
               {p.cantidad} x {p.nombre}
+              {p.es_cortesia ? ' (cortesía)' : ''}
+              {[p.tamano, ...(p.sabores ?? []), ...(p.opciones ?? [])].filter(Boolean).length > 0 && (
+                <span style={{ color: 'var(--cp-soft)' }}> · {[p.tamano, ...(p.sabores ?? []), ...(p.opciones ?? [])].filter(Boolean).join(', ')}</span>
+              )}
+              {p.nota && <em style={{ color: 'var(--cp-soft)' }}> · «{p.nota}»</em>}
             </li>
           ))}
         </ul>
       </div>
+  );
+  const notaCliente = (
+    <>
       {resumen.nota && (
         <div style={{ fontSize: 14 }}>
           <strong>Nota: </strong>
@@ -477,12 +493,72 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
         </div>
       )}
 
+    </>
+  );
+
+  return (
+    <div data-testid="detalle-pedido" style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: FUENTE_TEXTO, color: 'var(--cp-navy)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        <strong style={{ fontFamily: FUENTE_TITULOS, fontSize: 18 }}>{resumen.codigo}</strong>
+        {mio?.ubicacion_editada_en && <InsigniaDireccionEditada />}
+        <span style={chip('var(--cp-sand)', 'var(--cp-soft)')}>{resumen.estadoTexto}</span>
+        <span style={chip(clasificarEspera(resumen.minutosEspera).colorHex, '#fff')}>{resumen.minutosEspera} min de espera</span>
+      </div>
+      {mio ? (
+        <DosPantallas
+          pantalla={pantalla}
+          alCambiar={setPantalla}
+          pedido={
+            <>
+              {filasCliente}
+              {resumen.referencia && (
+                <div style={fila}>
+                  <span>Referencia</span>
+                  <strong style={{ textAlign: 'right' }}>{resumen.referencia}</strong>
+                </div>
+              )}
+              <ContactoPedido
+                pedido={mio}
+                alChatear={alChatear && chatVigente(mio.estado, mio.entregado_en) ? () => alChatear(mio) : undefined}
+              />
+              {resumen.cobro ? <CobroDetallado cobro={resumen.cobro} nota={resumen.nota} /> : cobroSimple}
+              <BotonCambiarFormaPago
+                pedidoId={id}
+                codigo={resumen.codigo}
+                estado={mio.estado}
+                totalCobrable={resumen.cobro?.total_cobrable ?? Number(mio.total)}
+                medioActual={resumen.cobro?.medio ?? mio.pago_metodo ?? 'EFECTIVO'}
+                solicitud={cambioCobro.vigente}
+                alEnviado={(s) => cambioCobro.fijar(s)}
+              />
+              {listaProductos}
+              {!resumen.cobro && notaCliente}
+            </>
+          }
+          tiempos={
+            <PantallaTiempos
+              tiempos={{
+                creado_en: mio.creado_en,
+                tomado_en: mio.tomado_en,
+                salio_en: mio.salio_en,
+                llego_en: mio.llego_en,
+                entregado_en: mio.entregado_en,
+                espera_max_min: mio.espera_max_min ?? null,
+                ...resumen.tiempos,
+              }}
+            />
+          }
+        />
+      ) : (
+        <>
+          {filasCliente}
+          {listaProductos}
+          {notaCliente}
+        </>
+      )}
+
       {mio ? (
         <>
-          <ContactoPedido
-            pedido={mio}
-            alChatear={alChatear && chatVigente(mio.estado, mio.entregado_en) ? () => alChatear(mio) : undefined}
-          />
           <BotonEtapa
             pedido={mio}
             etapa={etapaDe(mio)}
@@ -501,6 +577,14 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
             </button>
           )}
           <BotonReportar pedido={mio} onReportar={alReportar} />
+          {/* El repartidor propone el punto real del cliente (Caja lo aprueba antes de recalcular el pago) */}
+          <BotonProponerUbicacion
+            pedidoId={mio.id}
+            codigo={mio.codigo}
+            estado={mio.estado}
+            puntoActual={mio.lat != null && mio.lng != null ? { lat: mio.lat, lng: mio.lng } : null}
+            alChatear={alChatear && chatVigente(mio.estado, mio.entregado_en) ? () => alChatear(mio) : undefined}
+          />
         </>
       ) : disponible ? (
         <>
@@ -735,6 +819,10 @@ export function RepartidorView() {
     cargarDatos();
   });
   useEventos('reparto:rutas', () => {
+    cargarDatos();
+  });
+  // Cambio de forma de pago en la puerta: Caja lo resolvió (o se pidió); el botón Entregado se desbloquea en vivo
+  useEventos('cambio-cobro:solicitud', () => {
     cargarDatos();
   });
 

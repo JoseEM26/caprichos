@@ -800,7 +800,14 @@ export class PedidosService {
         entrega?.direccion &&
         entrega.direccion.trim().length >= 5
       ) {
-        // Sin punto, solo dirección escrita de al menos 5 caracteres -> envío null («por calcular»)
+        // La carta ya no pide el punto exacto: dirección escrita y referencia obligatorias; el envío queda «por confirmar»
+        // hasta que llegue la ubicación (WhatsApp, Caja o repartidor) y el pedido queda esperando ubicación
+        if (canalPedido === 'CARTA' && (entrega.referencia?.trim().length ?? 0) < 3) {
+          throw new BadRequestException({
+            codigo: 'REFERENCIA_REQUERIDA',
+            mensaje: 'Para delivery escribe una referencia (por ejemplo: frente al parque, portón negro)',
+          });
+        }
         envio = null;
         zonaId = null;
         entregaOrigen = 'ESCRITA';

@@ -213,7 +213,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'COLA',
         pasa_cocina_en: null,
       };
@@ -264,7 +264,7 @@ describe('PedidosEstadoService', () => {
       expect(salonMock.avisarListo).toHaveBeenCalledWith(10n);
 
       salonMock.avisarListo.mockClear();
-      const delivery = { ...mesa, id: 11n, codigo: 'CP-W011', modalidad: 'DELIVERY' };
+      const delivery = { ...mesa, id: 11n, codigo: 'CP-W011', modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n };
       prismaMock.pedido.findUnique.mockResolvedValue(delivery);
       prismaMock.pedido.update.mockResolvedValue({ ...delivery, estado: 'LISTO' });
       await service.cambiarEstado(11n, { estado: 'LISTO' }, cocinaAuth);
@@ -275,7 +275,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'PREPARANDO',
         listo_en: null,
       };
@@ -300,7 +300,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'LISTO',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -351,7 +351,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'EN_CAMINO',
         repartidor_party_id: 55n,
       };
@@ -366,12 +366,48 @@ describe('PedidosEstadoService', () => {
     });
   });
 
+  describe('delivery sin ubicación: DELIVERY_SIN_UBICACION', () => {
+    const sinUbicar = { id: 10n, codigo: 'CP-W031', modalidad: 'DELIVERY', estado: 'COLA', pago_estado: 'PENDIENTE', entrega_lat: null, entrega_lng: null, zona_id: null, pasa_cocina_en: null };
+
+    it.each(['PREPARANDO', 'LISTO'])('cambiarEstado a %s no pasa a cocina: 409 y no actualiza', async (estado) => {
+      prismaMock.pedido.findUnique.mockResolvedValue(sinUbicar);
+      await expect(service.cambiarEstado(10n, { estado }, cocinaAuth)).rejects.toMatchObject({
+        response: { codigo: 'DELIVERY_SIN_UBICACION', mensaje: 'Para delivery primero ubica la dirección en el mapa (calcula la zona y el envío).' },
+        status: 409,
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('con punto pero sin zona tampoco pasa', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...sinUbicar, entrega_lat: -12.1, entrega_lng: -77 });
+      await expect(service.cambiarEstado(10n, { estado: 'PREPARANDO' }, cocinaAuth)).rejects.toMatchObject({
+        response: { codigo: 'DELIVERY_SIN_UBICACION' },
+      });
+    });
+
+    it('registrarPago (confirmar pedido y pago) queda bloqueado', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(sinUbicar);
+      await expect(service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' }, cajeroAuth)).rejects.toMatchObject({
+        response: { codigo: 'DELIVERY_SIN_UBICACION' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('un pedido de MESA sin punto no se toca', async () => {
+      const mesa = { ...sinUbicar, modalidad: 'MESA' };
+      prismaMock.pedido.findUnique.mockResolvedValue(mesa);
+      prismaMock.pedido.update.mockResolvedValue({ ...mesa, estado: 'PREPARANDO' });
+      const res = await service.cambiarEstado(10n, { estado: 'PREPARANDO' }, cocinaAuth);
+      expect(res.estado).toBe('PREPARANDO');
+    });
+  });
+
   describe('transición inválida (409)', () => {
     it('un delivery sin repartidor no pasa a ENTREGADO: 409 REPARTIDOR_REQUERIDO y no se actualiza', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue({
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'EN_CAMINO',
         repartidor_party_id: null,
       });
@@ -392,7 +428,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'COLA',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -420,7 +456,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'ENTREGADO',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -434,7 +470,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'EN_CAMINO',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -450,7 +486,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'COLA',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -464,7 +500,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'COLA',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -486,7 +522,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'COLA',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -518,7 +554,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'COLA',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -564,7 +600,7 @@ describe('PedidosEstadoService', () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
-        modalidad: 'DELIVERY',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
         estado: 'COLA',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
@@ -1028,12 +1064,15 @@ describe('PedidosEstadoService', () => {
         expect.objectContaining({
           where: {
             estado: { in: ['COLA', 'PREPARANDO'] },
-            NOT: {
-              pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
-              pago_estado: 'PENDIENTE',
-              pago_coordinado_en: null,
-              modalidad: { not: 'MESA' },
-            },
+            NOT: [
+              {
+                pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
+                pago_estado: 'PENDIENTE',
+                pago_coordinado_en: null,
+                modalidad: { not: 'MESA' },
+              },
+              { modalidad: 'DELIVERY', OR: [{ entrega_lat: null }, { entrega_lng: null }, { zona_id: null }] },
+            ],
           },
           orderBy: { creado_en: 'asc' },
         }),

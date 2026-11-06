@@ -10,10 +10,10 @@ sugerencias:
   - Como cobro un pedido y registro el vuelto
   - Por que un pedido con pago digital no aparece en cocina
   - Como anulo un pedido que el cliente cancelo
-  - Donde veo el pedido de delivery que no se entrego
   - Como doy una cortesia a un cliente
   - Como cambio la ubicacion de un pedido de delivery
   - Que significa Direccion editada o #7 del dia
+  - El repartidor pidio cambiar la forma de pago, como lo valido
 ---
 # Pedidos y caja
 
@@ -125,13 +125,32 @@ Una cortesia es una venta a costo 0: no suma ingresos, no sale en comprobantes (
 Ver tambien: [[informes]]
 
 ## Como se hace: Cambiar la ubicacion de un pedido de delivery
-1. Abre el pedido de delivery. En la seccion de ubicacion pulsa Cambiar ubicacion, mueve el pin o busca la direccion (o usa Usar ubicacion de WhatsApp si el cliente la envio en las ultimas 24 h).
+1. Abre el pedido de delivery. En la seccion de ubicacion pulsa Cambiar ubicacion, mueve el pin o busca la direccion (o usa Usar ubicacion de WhatsApp si el cliente la envio en las ultimas 24 h). Funciona igual en un pedido que llego sin ubicacion.
 2. Revisa la comparacion Antes y Despues: zona, Envio, Diferencia y Total. Pulsa Cambiar y confirma "Si, cambiar".
 3. Si el pedido ya estaba pagado y el envio cambio, queda un Saldo por cobrar (cobrar mas) o una Devolucion pendiente (devolver). Pulsa Cobrar saldo o Marcar como devuelta, elige el medio (si no es efectivo, el Codigo de operacion). En efectivo necesitas la caja abierta ("Abre la caja para mover efectivo").
-4. El repartidor tambien puede proponer la ubicacion real: veras la propuesta con mapas y los botones Aprobar o Rechazar.
+4. El repartidor tambien puede proponer la ubicacion real: veras la propuesta con mapas, la distancia al punto actual, la diferencia de envio y los botones Aprobar o Rechazar. Si es el cliente quien envio otra ubicacion por WhatsApp, la tarjeta dice "El cliente envio otra ubicacion: usarla?" con los botones Usar o Descartar.
 5. Una devolucion pendiente por cambio de ubicacion no afecta el cierre mientras no se marque como devuelta.
 6. La insignia Direccion editada aparece en Caja, Repartos y Mis pedidos cuando el punto se cambio; el historial muestra quien lo cambio. No se cambia en pedidos Entregados ni Anulados.
 Ver tambien: [[repartos]]
+
+## Como se hace: Validar un cambio de forma de pago pedido por el repartidor
+1. Cuando un repartidor pide cambiar el pago en la puerta (por ejemplo de efectivo a Yape), aparece el panel Cambios de pago solicitados arriba de la lista de Pedidos y caja, el pedido muestra la insignia Cambio de pago solicitado y llega una notificacion a la campana.
+2. Cada solicitud muestra el Medio original contra el Medio nuevo (con "paga con" si hay efectivo), quien lo pidio y las capturas del pedido para validarlas contra el monto de cada medio.
+3. Aprobar: el pedido pasa al medio nuevo (el plan de pago se reescribe), la captura queda validada y el repartidor recibe el aviso. El pedido sigue sin cobrarse hasta que registres el cobro como siempre.
+4. Rechazar (motivo opcional): el pedido sigue con el medio original, las capturas del intento quedan retiradas en el historial y el repartidor cobra como estaba.
+5. Autorizar entrega sin validar (motivo obligatorio, minimo 5 caracteres): el repartidor puede entregar aunque no puedas validar la captura todavia (por ejemplo, la app del banco no abre). El medio nuevo se aplica, la captura queda pendiente de revision y todo queda auditado con tu nombre y el motivo.
+6. Mientras la solicitud esta pendiente el repartidor no puede marcar Entregado. Ninguna decision pide codigo de supervisor: validar un pago no es anular.
+7. Efecto en el dinero: el efectivo por rendir del repartidor y el cierre cuentan el medio final. Efectivo a Yape: ese pedido ya no es efectivo por rendir. Yape a efectivo: se suma a lo que el repartidor debe liquidar. Pago mixto: solo la parte en efectivo. El total del pedido nunca cambia.
+8. El historial de solicitudes no se edita ni se borra.
+Ver tambien: [[repartos]]
+
+## Como se hace: Atender un delivery que espera la ubicacion del cliente
+1. Desde la carta el cliente ya no marca el punto en el mapa: escribe su direccion y su referencia. El pedido queda Por confirmar con el aviso "Falta la ubicacion: el cliente debe enviarla por WhatsApp" y el envio como "Envio por confirmar".
+2. El mensaje de WhatsApp al cliente ya le pide la ubicacion (clip, Ubicacion, Enviar tu ubicacion actual). Cuando la envia, el pedido se ubica solo: se calcula la zona y el envio, la pantalla se actualiza en vivo y el cliente recibe su confirmacion. No hay que copiar ni pegar nada.
+3. Si el cliente no la envia, pulsa Pedir ubicacion por WhatsApp para reenviarle el pedido. Solo funciona dentro de las 24 horas desde su ultimo mensaje; si ya paso ese tiempo el sistema lo dice ("Pasaron mas de 24 h...") y debes llamarlo o esperar que escriba. Tambien puedes pulsar Ubicar en el mapa.
+4. Mientras falte la ubicacion no se puede confirmar el pedido y el pago, cobrar ni pasar a cocina: el sistema responde "Para delivery primero ubica la direccion en el mapa (calcula la zona y el envio)." y los botones quedan deshabilitados.
+5. Si la ubicacion del cliente cae fuera de la zona de reparto, el pedido queda marcado Fuera de zona, el cliente recibe un aviso y ves la ubicacion como propuesta que solo puedes Descartar; ubica el pedido a mano o habla con el cliente.
+Ver tambien: [[repartos]], [[mensajes]]
 
 ## Como se hace: Leer las insignias #N del dia y las propinas
 1. "#N del dia" en el detalle del pedido es el orden de llegada a cocina de hoy (referencial; reinicia a medianoche de Lima). El codigo CP-xxxx es el que vale. Un pedido sin numero (anterior a esta funcion) muestra un guion.
@@ -145,11 +164,12 @@ Ver tambien: [[repartos]]
 - Si un cliente escribe por WhatsApp con una imagen y no ves el comprobante en la ficha, revisa el chat en Mensajes: la foto queda guardada aunque aun no exista la cuenta.
 - No se puede cerrar la caja al finalizar el dia si existen pedidos pendientes de cobro; deben cobrarse o anularse primero.
 - Si no puedes cobrar o aprobar un pago y aparece "La caja está cerrada", abre la caja del dia en Caja y cierres.
-- Si un pedido por delivery no tiene ubicacion GPS o referencia clara, debe ubicarse en el mapa antes de enviarse a despacho.
+- "La solicitud ya fue resuelta" (SOLICITUD_NO_VIGENTE): otra persona de Caja ya la aprobo, rechazo o autorizo; recarga la lista. "Escribe el motivo para autorizar la entrega sin validar": falta el motivo (minimo 5 caracteres). "El pedido ya esta anulado o pagado: no se puede cambiar el cobro": ya no admite el cambio.
+- Si un pedido por delivery no tiene ubicacion en el mapa, no se confirma, no se cobra y no pasa a cocina (409 DELIVERY_SIN_UBICACION): usa Pedir ubicacion por WhatsApp o Ubicar en el mapa.
 - Si la impresora de caja no responde, las etiquetas quedan en cola y no se pierden: la franja de Pedidos y caja lo indica. Al reconectar salen solas.
 
 ## Quien puede hacerlo
 - Pueden ingresar y operar en Pedidos y caja: Administrador y Cajero.
-- El Supervisor ve Pedidos y caja y puede dar cortesias con su codigo, pero no cambia la ubicacion de pedidos. Los demas roles (Cocina, Mozo, Repartidor, Almacen) no tienen acceso a esta pantalla.
+- El Supervisor ve Pedidos y caja y puede dar cortesias con su codigo, pero no cambia la ubicacion de pedidos. Si valida los cambios de forma de pago pedidos por el repartidor (pedidos/validar_cambio_cobro), igual que el Cajero y el Administrador, sin codigo. Los demas roles (Cocina, Mozo, Repartidor, Almacen) no tienen acceso a esta pantalla.
 - La anulacion de pedidos y cobros requiere la autorizacion con el codigo de supervisor de 6 digitos, salvo para el administrador, que anula sin codigo.
 - Errores de cortesia: "El pedido ya esta cobrado: registra la cortesia por separado", "El pedido tiene descuento: registra la cortesia por separado", "El pedido ya tiene comprobante", "Esta linea ya es cortesia", "Las lineas de combo o de promocion no se pueden marcar como cortesia", "Un pedido solo de cortesias no se puede cobrar: registra la cortesia por separado", "La cortesia deja el plan de pago por debajo de cero: rehaz el plan de pago" y, para el supervisor, CODIGO_INVALIDO (el codigo vencio o esta mal: pide el actual).

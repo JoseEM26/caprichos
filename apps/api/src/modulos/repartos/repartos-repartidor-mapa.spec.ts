@@ -38,6 +38,7 @@ function montar(pedidos: any[], maxPedidos = 3) {
   };
   const prisma: any = {
     parametro: { findMany: jest.fn().mockResolvedValue([{ clave: 'rep_max_pedidos', valor: maxPedidos }]) },
+    voucherPago: { findMany: jest.fn().mockResolvedValue([]) },
     pedido: {
       findMany: jest.fn(async ({ where }: any) =>
         pedidos.filter((p) => where.estado.in.includes(p.estado) && p.modalidad === where.modalidad
@@ -85,6 +86,30 @@ describe('resumenRepartidor', () => {
     expect(ajeno).toMatchObject({ puedeTomar: true, motivoNoTomar: null, productos: [{ cantidad: 2, nombre: 'Pizza' }, { cantidad: 1, nombre: 'Chicha' }] });
     const mio = await service.resumenRepartidor('2', rep(9n));
     expect(mio).toMatchObject({ direccion: 'Calle 1', telefono: '999', puedeTomar: false });
+  });
+
+  it('en un pedido suyo trae el cobro detallado, el detalle de productos y los tiempos; el ajeno no', async () => {
+    const t0 = new Date('2027-01-04T15:00:00Z');
+    const { service } = montar([
+      base({
+        id: 2n, codigo: 'B', repartidor_party_id: 9n, estado: 'EN_CAMINO', pago_estado: 'PENDIENTE', pago_metodo: 'YAPE',
+        paga_con: 20, propina: 0, total: 40, creado_en: t0, pasa_cocina_en: t0, listo_en: t0, tomado_en: t0, salio_en: t0, llego_en: t0,
+        planPago: [{ medio: 'EFECTIVO', monto: 15 }, { medio: 'YAPE', monto: 25 }],
+        lineas: [{ cantidad: 1, nombre: 'Dona', tamano: 'Caja', sabor: null, nota: 'sin nuez', es_cortesia: false, opcionesElegidas: [{ opcion_nombre: 'Glaseado' }], sabores: [{ sabor_nombre: 'Fresa', cantidad: 2 }] }, { cantidad: 1, nombre: 'Café', es_cortesia: true }],
+      }),
+      base({ id: 1n, codigo: 'A' }),
+    ]);
+    const mio: any = await service.resumenRepartidor('2', rep(9n));
+    expect(mio.cobro).toMatchObject({
+      estado: 'FALTA_COBRAR', mixto: true, efectivo_cobrar: 15, paga_con: 20, vuelto: 5,
+      plan: [{ medio: 'EFECTIVO', monto: 15 }, { medio: 'YAPE', monto: 25 }],
+      cortesias: [{ nombre: 'Café', cantidad: 1 }], cambio_pendiente: null,
+    });
+    expect(mio.productos[0]).toMatchObject({ tamano: 'Caja', sabores: ['2 Fresa'], opciones: ['Glaseado'], nota: 'sin nuez' });
+    expect(mio.tiempos).toMatchObject({ creado_en: t0, pasa_cocina_en: t0, listo_en: t0, llego_en: t0, entregado_en: null, espera_max_min: expect.any(Number) });
+    const ajeno: any = await service.resumenRepartidor('1', rep(9n));
+    expect(ajeno).not.toHaveProperty('cobro');
+    expect(ajeno).not.toHaveProperty('tiempos');
   });
 
   it('próximo no se puede tomar; 404 si es de otro, no delivery o inexistente', async () => {

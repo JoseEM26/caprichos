@@ -59,6 +59,7 @@ Ver tambien: [[mensajes]]
 ## Como se hace: Ver la ubicacion que mando el cliente
 1. Cuando el cliente comparte su ubicacion por WhatsApp, el mensaje se ve como una tarjeta con mapa, direccion aproximada y los botones Abrir en Google Maps y Copiar coordenadas.
 2. En un pedido de delivery de Caja o del mozo, el boton Usar ubicacion de WhatsApp toma la ultima ubicacion enviada en las ultimas 24 horas como punto de entrega. Ver [[repartos]].
+3. Si el cliente tiene un delivery reciente sin ubicacion (por confirmar, confirmado, preparando o listo), su ubicacion se asigna sola a ese pedido (el mas reciente) y recibe un mensaje con su envio. Si el pedido ya tenia ubicacion, la nueva queda como propuesta para Caja (Usar o Descartar). Si esta fuera de la zona de reparto, Caja recibe un aviso. Mientras el cliente arma un pedido con el bot, su ubicacion se usa en ese pedido y no se asigna a otro.
 
 ## Como se hace: Cuando el repartidor chatea con el cliente de su pedido
 1. El repartidor puede escribir al cliente de su pedido desde la app de reparto (mientras el pedido esta Listo o En camino y hasta 2 horas despues de entregado). Los mensajes aparecen aqui en la misma conversacion como "Local".

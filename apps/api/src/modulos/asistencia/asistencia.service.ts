@@ -269,12 +269,6 @@ export class AsistenciaService {
   private async marcarValidado(dto: MarcarDto, usuario: UsuarioAutenticado, ahora: Date) {
     const partyId = usuario.partyId;
     const cfg = await this.obtenerConfig();
-    const selfie = decodificarSelfie(dto.selfie);
-
-    if (cfg.localLat === null || cfg.localLng === null) {
-      throw new RechazoAsistencia('LOCAL_SIN_UBICACION', 'El local todavía no tiene ubicación configurada. Avisa al administrador.');
-    }
-
     const huella = huellaDe(dto.dispositivo);
     const dispositivo = await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
     if (dispositivo && dispositivo.huella_hash !== huella) {
@@ -284,10 +278,24 @@ export class AsistenciaService {
       );
     }
 
+    // El aviso se pide una sola vez: se guarda en cuanto llega aceptado, antes de validar lo demás,
+    // para que un rechazo posterior (radio, QR, GPS) no lo pierda. Solo se repite si cambia la versión.
     const consentimiento = await this.prisma.asistenciaConsentimiento.findUnique({ where: { party_id: partyId } });
-    if (!consentimiento && dto.consentimiento !== true) {
-      throw new RechazoAsistencia('CONSENTIMIENTO_REQUERIDO', 'Acepta el aviso de datos personales para marcar.', false);
+    if (consentimiento?.version !== VERSION_CONSENTIMIENTO) {
+      if (dto.consentimiento !== true) {
+        throw new RechazoAsistencia('CONSENTIMIENTO_REQUERIDO', 'Acepta el aviso de datos personales para marcar.', false);
+      }
+      await this.prisma.asistenciaConsentimiento.upsert({
+        where: { party_id: partyId },
+        create: { party_id: partyId, version: VERSION_CONSENTIMIENTO, aceptado_en: ahora },
+        update: { version: VERSION_CONSENTIMIENTO, aceptado_en: ahora },
+      });
     }
+
+    if (cfg.localLat === null || cfg.localLng === null) {
+      throw new RechazoAsistencia('LOCAL_SIN_UBICACION', 'El local todavía no tiene ubicación configurada. Avisa al administrador.');
+    }
+    const selfie = decodificarSelfie(dto.selfie);
 
     const secreto = this.secreto();
     const slot = dto.qr !== undefined && dto.qr !== ''
@@ -359,11 +367,6 @@ export class AsistenciaService {
         } else {
           await tx.asistenciaDispositivo.update({ where: { party_id: partyId }, data: { ultimo_uso_en: ahora } });
         }
-        if (!consentimiento) {
-          await tx.asistenciaConsentimiento.create({
-            data: { party_id: partyId, version: VERSION_CONSENTIMIENTO, aceptado_en: ahora },
-          });
-        }
         return creada;
       });
 
@@ -411,6 +414,7 @@ export class AsistenciaService {
     const tipos = new Set(marcas.map((m) => m.tipo as TipoMarca));
     const consentimiento = await this.prisma.asistenciaConsentimiento.findUnique({ where: { party_id: partyId } });
     const dispositivo = await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
+    const vigente = consentimiento?.version === VERSION_CONSENTIMIENTO;
     return {
       jornada,
       ahora: ahora.toISOString(),
@@ -420,8 +424,10 @@ export class AsistenciaService {
       marcas: marcas.map((m) => ({ tipo: m.tipo, momento: m.momento.toISOString(), estado: m.estado })),
       pendiente: marcaPendiente(tipos),
       permitidas: marcasPermitidas(tipos),
-      consentimientoAceptado: Boolean(consentimiento),
-      consentimiento: consentimiento ? null : { version: VERSION_CONSENTIMIENTO, texto: TEXTO_CONSENTIMIENTO },
+      consentimientoAceptado: vigente,
+      consentimientoAceptadoEn: vigente ? consentimiento!.aceptado_en.toISOString() : null,
+      textoConsentimiento: TEXTO_CONSENTIMIENTO,
+      consentimiento: vigente ? null : { version: VERSION_CONSENTIMIENTO, texto: TEXTO_CONSENTIMIENTO },
       dispositivoVinculado: Boolean(dispositivo),
     };
   }

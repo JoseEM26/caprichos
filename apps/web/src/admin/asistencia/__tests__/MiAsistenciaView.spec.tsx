@@ -87,6 +87,57 @@ describe('MiAsistenciaView (celular)', () => {
     expect(screen.getByRole('button', { name: 'Marcar' })).toBeDisabled();
   });
 
+  describe('aviso de datos una sola vez', () => {
+    const sinAceptar = { ...base, consentimientoAceptado: false, consentimiento: { version: '2026-11', texto: 'Aviso de datos' } };
+    const recorrido = async () => {
+      const pista = { stop: vi.fn() };
+      (navigator as any).mediaDevices = {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [pista] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      };
+      (navigator as any).geolocation = {
+        getCurrentPosition: (ok: any) => ok({ coords: { latitude: -12, longitude: -77, accuracy: 5 } }),
+        watchPosition: (ok: any) => { ok({ coords: { latitude: -12, longitude: -77, accuracy: 5 } }); return 1; },
+        clearWatch: () => undefined,
+      };
+      delete (window as any).BarcodeDetector;
+      Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+      HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { value: 1280, configurable: true });
+      Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { value: 720, configurable: true });
+      HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+        drawImage: vi.fn(),
+        getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(4), width: w, height: h }),
+      })) as any;
+      HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/jpeg;base64,AAAA');
+      jsqrMock.mockReturnValue({ data: 'CAPRICHOS-ASIST:123:abcdef' });
+      fireEvent.click(await screen.findByRole('button', { name: 'Escanear QR' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Tomar selfie' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Confirmar marca' }));
+    };
+
+    it('tras un rechazo no relacionado recarga y el checkbox no reaparece', async () => {
+      miHoy.mockResolvedValueOnce(sinAceptar).mockResolvedValue({ ...base, consentimientoAceptadoEn: '2026-11-06T13:00:00.000Z', textoConsentimiento: 'Aviso de datos' });
+      marcarAsistencia.mockRejectedValue({ codigo: 'FUERA_DE_RADIO', mensaje: 'Estás lejos del local.' });
+      render(<MiAsistenciaView />);
+      fireEvent.click(await screen.findByRole('checkbox'));
+      await recorrido();
+      expect(await screen.findByText('Estás lejos del local.')).toBeInTheDocument();
+      expect(miHoy).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('checkbox')).toBeNull();
+    });
+
+    it('tras aceptar muestra «Aceptaste el aviso…» y Ver aviso despliega el texto', async () => {
+      miHoy.mockResolvedValue({ ...base, consentimientoAceptadoEn: '2026-11-06T13:00:00.000Z', textoConsentimiento: 'Texto del aviso' });
+      render(<MiAsistenciaView />);
+      expect(await screen.findByTestId('aviso-aceptado')).toHaveTextContent(/Aceptaste el aviso de datos el/);
+      expect(screen.queryByText(/Texto del aviso/)).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Ver aviso' }));
+      expect(screen.getByText(/Texto del aviso/)).toBeInTheDocument();
+      expect(screen.queryByRole('checkbox')).toBeNull();
+    });
+  });
+
   describe('escáner QR por cámara', () => {
     const pista = { stop: vi.fn() };
     const abrir = async () => {

@@ -6,6 +6,7 @@ import { useEventos, useTiempoReal } from '../../comun/socket';
 import { pedidosApi, Pedido, RespuestaNoEntregados } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
 import { BandejaPropuestasUbicacion } from './BandejaPropuestasUbicacion';
+import { InsigniaCambioCobro, PanelCambioCobro, useCambiosCobroPendientes } from './PanelCambioCobro';
 import { PanelNoEntregados } from './PanelNoEntregados';
 import { useSesion } from '../../comun/sesion';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
@@ -228,6 +229,8 @@ export function PedidosAdminView() {
 
   // Delivery no entregados (pestaña propia, con su contador)
   const { tiene } = useSesion();
+  const puedeValidarCobro = tiene('pedidos/validar_cambio_cobro');
+  const cambiosCobro = useCambiosCobroPendientes(puedeValidarCobro);
   const puedeLiquidar = tiene('repartos/liquidar');
   const { abierta: cajaAbierta } = useEstadoCajaHoy();
   const [noEntregados, setNoEntregados] = useState<RespuestaNoEntregados | null>(null);
@@ -536,6 +539,7 @@ export function PedidosAdminView() {
       <FranjaImpresion />
     </div>
     {tiene('pedidos/cambiar_ubicacion') && <BandejaPropuestasUbicacion alAplicar={cargarDatos} />}
+    {puedeValidarCobro && <PanelCambioCobro pendientes={cambiosCobro.pendientes} alResolver={() => { cambiosCobro.recargar(); cargarDatos(); }} />}
     <div className="cj-grid">
       {/* PANEL IZQUIERDO */}
       <div className="cj-left">
@@ -819,6 +823,7 @@ export function PedidosAdminView() {
                   </div>
                   <ChipCobroMozo cobro={o.cobroMozo} />
                   {o.ubicacion_editada_en && <InsigniaDireccionEditada />}
+                  {cambiosCobro.pendientes.some((c) => c.pedidoId === String(o.id)) && <InsigniaCambioCobro />}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
                       {itemsTexto || '1 producto'}

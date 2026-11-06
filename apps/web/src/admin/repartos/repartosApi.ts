@@ -28,6 +28,11 @@ export interface PedidoReparto {
   cobro_pendiente_efectivo: boolean;
   cobroPendienteEfectivo?: boolean;
   paga_con: number | null;
+  /** Efectivo que el repartidor debe cobrar en la puerta (según el plan de pago vigente) */
+  efectivo_cobrar?: number;
+  plan_pago?: Array<{ medio: string; monto: number }>;
+  /** Solicitud de cambio de forma de pago esperando a Caja: el pedido no se puede entregar hasta que se resuelva */
+  cambio_cobro_pendiente?: { id: string; plan_original: Array<{ medio: string; monto: number }>; plan_solicitado: Array<{ medio: string; monto: number }>; paga_con: number | null; solicitado_en: string } | null;
   repartidor_party_id: string | null;
   /** Posición del pedido en la ruta del repartidor (1, 2, 3...). Solo en /mios. */
   ordenRuta?: number | null;
@@ -84,13 +89,50 @@ export interface ResumenRepartidor {
   estado: string;
   estadoTexto: string;
   minutosEspera: number;
-  productos: Array<{ cantidad: number; nombre: string }>;
+  productos: Array<{
+    cantidad: number;
+    nombre: string;
+    /** Solo en pedidos propios: lo que pidió el cliente */
+    tamano?: string | null;
+    sabores?: string[];
+    opciones?: string[];
+    nota?: string | null;
+    es_cortesia?: boolean;
+  }>;
   nota: string | null;
   zona: string | null;
   puedeTomar: boolean;
   motivoNoTomar: string | null;
   direccion?: string | null;
+  referencia?: string | null;
   telefono?: string | null;
+  /** Solo en pedidos propios: cobro detallado */
+  cobro?: {
+    estado: 'PAGADO' | 'FALTA_COBRAR';
+    medio: string | null;
+    plan: Array<{ medio: string; monto: number }>;
+    mixto: boolean;
+    total: number;
+    propina: number;
+    total_cobrable: number;
+    efectivo_cobrar: number;
+    paga_con: number | null;
+    vuelto: number;
+    vouchers: Array<{ id: string; medio: string | null; estado: 'VALIDADO' | 'PENDIENTE' | 'ILEGIBLE' }>;
+    cortesias: Array<{ nombre: string; cantidad: number }>;
+    cambio_pendiente: PedidoReparto['cambio_cobro_pendiente'];
+  };
+  /** Solo en pedidos propios: horas de cada paso */
+  tiempos?: {
+    creado_en: string;
+    pasa_cocina_en: string | null;
+    listo_en: string | null;
+    tomado_en: string | null;
+    salio_en: string | null;
+    llego_en: string | null;
+    entregado_en: string | null;
+    espera_max_min: number | null;
+  };
 }
 
 export interface AvisoRepartidor {
