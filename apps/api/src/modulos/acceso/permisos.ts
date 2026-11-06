@@ -277,6 +277,7 @@ export const MATRIZ: Record<string, string[]> = {
     'reservas/crear',
     'reservas/editar',
     'plano/ver',
+    'mesas/ver', // solo lectura: el croquis de Reservas lee las mesas
     'cupones/ver',
     'cupones/canjear',
     'clientes/ver',

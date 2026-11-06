@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Confirmar } from '../../../comun/Confirmar';
-import { PisoSalon } from '../tipos';
+import { PisoPlano, PisoSalon } from '../tipos';
 import { hoyLima, isoLima } from '../fechaLima';
 import { OcupacionMesa, SelectorMesasCroquis, resumenMesas } from './SelectorMesasCroquis';
 
@@ -19,6 +19,8 @@ export interface ConfirmarAprobacionSolicitudProps {
   solicitud: SolicitudAprobable;
   /** Plano del salón: el croquis elige una o varias mesas. */
   pisos: PisoSalon[];
+  /** Dibujo del plano (paredes, barra, cocina...) por piso. */
+  planos?: PisoPlano[];
   /** Mesas que otras reservas ocupan a esa fecha y hora (para marcarlas y no dejarlas elegir). */
   obtenerOcupadas?: (
     fecha: string,
@@ -49,6 +51,7 @@ const estiloCampo = {
 export function ConfirmarAprobacionSolicitud({
   solicitud,
   pisos,
+  planos,
   obtenerOcupadas,
   obtenerAvisos,
   alAprobar,
@@ -196,6 +199,7 @@ export function ConfirmarAprobacionSolicitud({
         ) : (
           <SelectorMesasCroquis
             pisos={pisos}
+            planos={planos}
             seleccionadas={mesasIds}
             personas={solicitud.personas}
             ocupadas={ocupadas}
