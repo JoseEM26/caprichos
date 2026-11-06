@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { ColorComanda, Comanda, LineaComanda } from './cocinaTipos';
-import { duracionLegible } from '../../comun/tiempoLegible';
+import { colorPorMinutos } from './tiempoEnVivo';
+import { NumeroDia, TiempoEspera } from './TiempoEspera';
 
 /** Tiempo para deshacer un «completa» (la línea vuelve a 0) antes de que el botón desaparezca. */
 export const SEGUNDOS_DESHACER = 5;
@@ -24,10 +25,9 @@ export interface ComandaTarjetaProps {
   alDeshacerSalida?: () => void;
 }
 
+/** Color por minutos con los umbrales por defecto (la tarjeta usa los del servidor). */
 export function obtenerColorMinutos(minutos: number): ColorComanda {
-  if (minutos >= 50) return 'ROJO';
-  if (minutos >= 35) return 'NARANJA';
-  return 'VERDE';
+  return colorPorMinutos(minutos);
 }
 
 const normalizarOpcion = (o: any): string => {
@@ -520,49 +520,6 @@ export function ComandaTarjeta({
     return () => clearTimeout(t);
   }, [deshacer]);
 
-  const [minutosEnVivo, setMinutosEnVivo] = useState<number>(() => {
-    if (comanda.creado_en) {
-      const creadoMs = new Date(comanda.creado_en).getTime();
-      if (!isNaN(creadoMs)) {
-        return Math.max(0, Math.floor((Date.now() - creadoMs) / 60000));
-      }
-    }
-    return comanda.minutos ?? 0;
-  });
-
-  useEffect(() => {
-    const actualizar = () => {
-      if (comanda.creado_en) {
-        const creadoMs = new Date(comanda.creado_en).getTime();
-        if (!isNaN(creadoMs)) {
-          setMinutosEnVivo(Math.max(0, Math.floor((Date.now() - creadoMs) / 60000)));
-          return;
-        }
-      }
-      setMinutosEnVivo(comanda.minutos ?? 0);
-    };
-
-    actualizar();
-    const interval = setInterval(actualizar, 15000);
-    return () => clearInterval(interval);
-  }, [comanda.creado_en, comanda.minutos]);
-
-  const colorCalculado: ColorComanda = (() => {
-    if (minutosEnVivo >= 50) return 'ROJO';
-    if (minutosEnVivo >= 35) return 'NARANJA';
-    const colorRaw = comanda.color || comanda.colorEspera;
-    if (colorRaw) return colorRaw.toUpperCase() as ColorComanda;
-    return obtenerColorMinutos(minutosEnVivo);
-  })();
-
-  const tBg =
-    colorCalculado === 'ROJO'
-      ? 'var(--cp-rust)'
-      : colorCalculado === 'NARANJA'
-      ? 'var(--cp-orange)'
-      : 'var(--cp-line)';
-  const tFg = colorCalculado === 'ROJO' ? 'var(--cp-white)' : 'var(--cp-navy)';
-
   const formatoModalidad = () => {
     const mod = (comanda.modalidad || '').toUpperCase();
     if (mod === 'MESA' || mod === 'LOCAL') {
@@ -645,20 +602,13 @@ export function ComandaTarjeta({
             {comanda.ticket || comanda.codigo}
           </span>
         )}
-        <span
-          data-testid="indicador-tiempo"
-          data-color={colorCalculado}
-          style={{
-            fontSize: '12px',
-            fontWeight: 800,
-            borderRadius: '9999px',
-            padding: '2px 10px',
-            background: tBg,
-            color: tFg,
-            flexShrink: 0,
-          }}
-        >
-          {duracionLegible(minutosEnVivo)}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <NumeroDia numero={comanda.numeroDia} />
+          <TiempoEspera
+            desde={comanda.creado_en}
+            minutosRespaldo={comanda.minutos ?? 0}
+            umbrales={comanda.umbrales}
+          />
         </span>
       </div>
 

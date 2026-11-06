@@ -1,4 +1,5 @@
 import { api } from '../../comun/api';
+import { registrarHoraServidor } from './tiempoEnVivo';
 import type {
   AgotadoItem,
   AltaDemandaEstado,
@@ -19,7 +20,10 @@ export async function listarAreasCocina(): Promise<AreaCocina[]> {
 
 export async function listarComandasArea(areaRef: string): Promise<Comanda[]> {
   const query = areaRef ? `?area=${encodeURIComponent(areaRef)}` : '';
-  return api.get<Comanda[]>(`/admin/cocina/comandas${query}`);
+  const comandas = await api.get<Comanda[]>(`/admin/cocina/comandas${query}`);
+  // Hora del servidor: el tiempo en vivo de las tarjetas se cuenta con ella, no con el reloj del navegador
+  registrarHoraServidor(comandas.find((c) => c.ahoraServidor)?.ahoraServidor);
+  return comandas;
 }
 
 export async function despejarComanda(
