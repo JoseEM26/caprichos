@@ -205,12 +205,27 @@ describe('OfertasAdminView', () => {
     (api.patch as any).mockResolvedValue({});
     render(<OfertasAdminView />);
 
-    expect(await screen.findByText('Desactivada · oculta en la carta')).toBeInTheDocument();
-    expect(screen.getByText('Desactivada · se ve como No disponible')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Desactivada: oculta en la carta')).toHaveTextContent('Desactivada');
+    expect(screen.getByLabelText('Desactivada: se ve como No disponible')).toHaveTextContent('Desactivada');
 
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar como No disponible' }));
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith('/admin/ofertas/1/estado', { activo: false, visibleCarta: true }),
     );
+  });
+  it('una oferta desactivada no añade bloques: la insignia es inline de una línea y conserva sus botones', async () => {
+    const lista = [{ ...mockOfertas[0], id: '1', activo: false, visibleCarta: false }];
+    (api.get as any).mockImplementation((url: string) => (url === '/admin/ofertas' ? Promise.resolve(lista) : Promise.resolve([])));
+    render(<OfertasAdminView />);
+
+    const insignia = await screen.findByLabelText('Desactivada: oculta en la carta');
+    expect(insignia.tagName).toBe('SPAN');
+    expect(insignia.className).toContain('oferta-estado');
+    expect(insignia.textContent).toBe('Desactivada');
+    expect(insignia.children.length).toBe(0);
+    const tarjeta = insignia.closest('.oferta-card') as HTMLElement;
+    expect(tarjeta.className).toContain('oferta-card--off');
+    const acciones = tarjeta.querySelector('.oferta-acciones') as HTMLElement;
+    expect(within(acciones).getByRole('button', { name: 'Mostrar como No disponible' })).toBeEnabled();
   });
 });

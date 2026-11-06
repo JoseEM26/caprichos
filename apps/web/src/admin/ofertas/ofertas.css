@@ -1,0 +1,6 @@
+/* Oferta desactivada: se atenua el contenido, pero la fila de botones queda clara y clicable. */
+.oferta-card--off > :not(.oferta-acciones) { opacity: 0.6; }
+.oferta-card--off img { filter: grayscale(0.6); }
+.oferta-cab { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.oferta-cab > :first-child { min-width: 0; flex: 1 1 auto; }
+.oferta-estado { flex: none; white-space: nowrap; max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
