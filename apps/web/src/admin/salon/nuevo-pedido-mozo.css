@@ -405,3 +405,151 @@
     padding: 6px 10px;
   }
 }
+
+/* Paso "¿Qué vas a hacer?" del pedido de mesa: dos grupos con tarjetas grandes.
+   1 columna en celular; 2 columnas desde 640 px. Solo presentación: la lógica está en ModalNuevoPedidoMesa.tsx. */
+
+.np-eleccion {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 4px 2px 2px;
+}
+
+.np-eleccion-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.np-eleccion-titulo {
+  margin: 0;
+  font-family: var(--fuente-titulos);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cp-soft);
+}
+
+.np-eleccion-grilla {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .np-eleccion-grilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.np-eleccion-tarjeta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 84px;
+  margin: 0;
+  padding: 16px 18px;
+  border: 1.5px solid var(--cp-line);
+  border-radius: 16px;
+  background: var(--cp-white);
+  color: var(--cp-navy);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(11, 44, 62, 0.06);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+}
+
+.np-eleccion-tarjeta:hover {
+  border-color: var(--cp-navy);
+  box-shadow: 0 6px 16px rgba(11, 44, 62, 0.12);
+  transform: translateY(-1px);
+}
+
+.np-eleccion-tarjeta:focus-visible {
+  outline: 3px solid var(--cp-orange);
+  outline-offset: 2px;
+}
+
+.np-eleccion-tarjeta:active {
+  transform: translateY(0);
+}
+
+.np-eleccion-tarjeta--equipo {
+  background: var(--cp-sand);
+}
+
+.np-eleccion-tarjeta--equipo:hover {
+  background: var(--cp-white);
+}
+
+.np-eleccion-icono {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--cp-sand);
+  color: var(--cp-navy);
+}
+
+.np-eleccion-tarjeta--equipo .np-eleccion-icono {
+  background: var(--cp-white);
+}
+
+.np-eleccion-icono svg {
+  width: 26px;
+  height: 26px;
+}
+
+.np-eleccion-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.np-eleccion-nombre {
+  font-family: var(--fuente-titulos);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.np-eleccion-desc {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--cp-soft);
+}
+
+.np-eleccion-flecha {
+  flex: none;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--cp-soft);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.np-eleccion-tarjeta:hover .np-eleccion-flecha {
+  color: var(--cp-navy);
+  transform: translateX(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-eleccion-tarjeta,
+  .np-eleccion-flecha {
+    transition: none;
+  }
+  .np-eleccion-tarjeta:hover {
+    transform: none;
+  }
+  .np-eleccion-tarjeta:hover .np-eleccion-flecha {
+    transform: none;
+  }
+}

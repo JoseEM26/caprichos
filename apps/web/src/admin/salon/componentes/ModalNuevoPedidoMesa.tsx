@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useId, useRef, useState, useMemo } from 'react';
 import { useSalonSocket } from '../useSalonSocket';
 import { Confirmar } from '../../../comun/Confirmar';
 import { Cargando } from '../../../comun/Cargando';
@@ -69,6 +69,10 @@ export interface ModalNuevoPedidoMesaProps {
   alRefrescarMesas?: () => Promise<void>;
   /** Permiso mesas/liberar: habilita mantener presionada una mesa ocupada para forzar su liberación */
   puedeForzarLiberacion?: boolean;
+  /** Sin permiso de salón (mesas/ver y mesas/abrir), no se ofrece «En el local (mesa)». Por defecto, sí. */
+  puedeMesa?: boolean;
+  /** Sin permiso de créditos del personal (creditos/ver), no se ofrece «Pedido del personal». Por defecto, sí. */
+  puedePersonal?: boolean;
 }
 
 export interface LineaPedidoMesa {
@@ -152,6 +156,8 @@ export function ModalNuevoPedidoMesa({
   alExitoPedido,
   alRefrescarMesas,
   puedeForzarLiberacion = false,
+  puedeMesa = true,
+  puedePersonal = true,
 }: ModalNuevoPedidoMesaProps) {
   const todasLasMesasIniciales = useMemo(() => {
     const list: string[] = [];
@@ -173,6 +179,9 @@ export function ModalNuevoPedidoMesa({
     }
     return 'local';
   }, [pedidoRepetir]);
+
+  const idTituloDialogo = useId();
+  const idEleccion = useId();
 
   // Pasos: 'modal' | 'staff' | 'floor' | 'plan' | 'cli' | 'items'
   const [paso, setPaso] = useState<'modal' | 'staff' | 'floor' | 'plan' | 'cli' | 'items'>(
@@ -1134,7 +1143,14 @@ export function ModalNuevoPedidoMesa({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Nuevo pedido de mesa"
+        aria-labelledby={idTituloDialogo}
+        onKeyDown={(e) => {
+          // Escape cierra; un diálogo anidado (confirmación, ventana del producto) cierra solo lo suyo
+          if (e.key === 'Escape' && (e.target as HTMLElement).closest('[role="dialog"]') === e.currentTarget) {
+            e.stopPropagation();
+            alCerrar();
+          }
+        }}
         className="salon-overlay salon-pantalla"
         style={{
           position: 'fixed',
@@ -1220,6 +1236,7 @@ export function ModalNuevoPedidoMesa({
                 ←
               </button>
               <div
+                id={idTituloDialogo}
                 style={{
                   fontFamily: 'Montserrat, sans-serif',
                   fontWeight: 800,
@@ -1275,179 +1292,110 @@ export function ModalNuevoPedidoMesa({
           {/* PASO 1: MODALIDAD (¿Qué vas a hacer?)                         */}
           {/* ============================================================= */}
           {paso === 'modal' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  letterSpacing: '0.04em',
-                  color: 'var(--cp-soft)',
-                }}
-              >
-                PARA UN CLIENTE
-              </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-                  gap: '10px',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalidad('local');
-                    if (pisosActivos.length > 1) {
-                      setPaso('floor');
-                    } else {
-                      setPaso('plan');
-                    }
-                  }}
-                  style={{
-                    minHeight: '76px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '14px',
-                    background: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    padding: '8px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: '16px',
+            <div className="np-eleccion">
+              <section className="np-eleccion-grupo" aria-labelledby={`${idEleccion}-cliente`}>
+                <h3 id={`${idEleccion}-cliente`} className="np-eleccion-titulo">
+                  Para un cliente
+                </h3>
+                <div className="np-eleccion-grilla">
+                  {puedeMesa && (
+                    <button
+                      type="button"
+                      className="np-eleccion-tarjeta"
+                      autoFocus
+                      onClick={() => {
+                        setModalidad('local');
+                        setPaso(pisosActivos.length > 1 ? 'floor' : 'plan');
+                      }}
+                    >
+                      <span className="np-eleccion-icono" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="4" y="7" width="16" height="4" rx="1.5" />
+                          <path d="M7 11v8M17 11v8M4 19h2M18 19h2" />
+                        </svg>
+                      </span>
+                      <span className="np-eleccion-texto">
+                        <span className="np-eleccion-nombre">En el local (mesa)</span>
+                        <span className="np-eleccion-desc">Elige el piso y la mesa</span>
+                      </span>
+                      <span className="np-eleccion-flecha" aria-hidden="true">›</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className="np-eleccion-tarjeta"
+                    autoFocus={!puedeMesa}
+                    onClick={() => {
+                      setModalidad('llevar');
+                      setPaso('cli');
                     }}
                   >
-                    En el local (mesa)
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                    Elige el piso y la mesa
-                  </span>
-                </button>
+                    <span className="np-eleccion-icono" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 8h14l-1 12H6L5 8z" />
+                        <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+                      </svg>
+                    </span>
+                    <span className="np-eleccion-texto">
+                      <span className="np-eleccion-nombre">Para llevar</span>
+                      <span className="np-eleccion-desc">Sin mesa: nombre y teléfono</span>
+                    </span>
+                    <span className="np-eleccion-flecha" aria-hidden="true">›</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalidad('llevar');
-                    setPaso('cli');
-                  }}
-                  style={{
-                    minHeight: '76px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '14px',
-                    background: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    padding: '8px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: '16px',
+                  <button
+                    type="button"
+                    className="np-eleccion-tarjeta"
+                    onClick={() => {
+                      setModalidad('delivery');
+                      setPaso('cli');
                     }}
                   >
-                    Para llevar
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                    Sin mesa: nombre y teléfono
-                  </span>
-                </button>
+                    <span className="np-eleccion-icono" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z" />
+                        <circle cx="12" cy="11" r="2" />
+                      </svg>
+                    </span>
+                    <span className="np-eleccion-texto">
+                      <span className="np-eleccion-nombre">Delivery</span>
+                      <span className="np-eleccion-desc">Nombre, teléfono y ubicación</span>
+                    </span>
+                    <span className="np-eleccion-flecha" aria-hidden="true">›</span>
+                  </button>
+                </div>
+              </section>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalidad('delivery');
-                    setPaso('cli');
-                  }}
-                  style={{
-                    minHeight: '76px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '14px',
-                    background: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    padding: '8px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: '16px',
-                    }}
-                  >
-                    Delivery
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                    Nombre, teléfono y ubicación
-                  </span>
-                </button>
-              </div>
-
-              <div
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  letterSpacing: '0.04em',
-                  color: 'var(--cp-soft)',
-                  marginTop: '6px',
-                }}
-              >
-                PARA EL EQUIPO
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setPideMode('personal');
-                  setPaso('staff');
-                }}
-                style={{
-                  minHeight: '64px',
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: '14px',
-                  background: 'var(--cp-sand)',
-                  color: 'var(--cp-navy)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '2px',
-                  padding: '8px',
-                  cursor: 'pointer',
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '16px',
-                  }}
-                >
-                  Pedido del personal
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                  Elige quién compra; el descuento de personal se aplica al cobrar a crédito
-                </span>
-              </button>
+              {puedePersonal && (
+                <section className="np-eleccion-grupo" aria-labelledby={`${idEleccion}-equipo`}>
+                  <h3 id={`${idEleccion}-equipo`} className="np-eleccion-titulo">
+                    Para el equipo
+                  </h3>
+                  <div className="np-eleccion-grilla">
+                    <button
+                      type="button"
+                      className="np-eleccion-tarjeta np-eleccion-tarjeta--equipo"
+                      onClick={() => {
+                        setPideMode('personal');
+                        setPaso('staff');
+                      }}
+                    >
+                      <span className="np-eleccion-icono" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="8" r="4" />
+                          <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+                        </svg>
+                      </span>
+                      <span className="np-eleccion-texto">
+                        <span className="np-eleccion-nombre">Pedido del personal</span>
+                        <span className="np-eleccion-desc">Elige quién compra; el descuento de personal se aplica al cobrar a crédito</span>
+                      </span>
+                      <span className="np-eleccion-flecha" aria-hidden="true">›</span>
+                    </button>
+                  </div>
+                </section>
+              )}
             </div>
           )}
 

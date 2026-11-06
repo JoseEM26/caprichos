@@ -613,7 +613,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
       expect(salonApi.sentarReserva).toHaveBeenCalledWith('res-101');
       // Debe abrirse el modal del nuevo pedido de mesa con Mesa 4 preseleccionada
       expect(
-        screen.getByRole('dialog', { name: 'Nuevo pedido de mesa' }),
+        screen.getByRole('dialog', { name: /Nuevo pedido/ }),
       ).toBeInTheDocument();
     });
   });

@@ -461,19 +461,22 @@ export function MisPedidosView() {
         </ul>
       )}
 
+      </div>
+      )}
+
+      {/* Fuera de las pestañas: Nuevo pedido se abre igual desde Salón que desde Lista */}
       {modalAbierto && (
         <ModalNuevoPedidoMesa
           abierto={true}
           pasoInicial="modal"
           canal="MOZO"
           puedeForzarLiberacion={tiene('mesas/liberar')}
+          puedeMesa={tiene('mesas/ver') && tiene('mesas/abrir')}
+          puedePersonal={tiene('creditos/ver')}
           pisos={pisos}
           alCerrar={() => setModalAbierto(false)}
           alExitoPedido={() => void cargar()}
         />
-      )}
-
-      </div>
       )}
 
       {errorQuitar && (
