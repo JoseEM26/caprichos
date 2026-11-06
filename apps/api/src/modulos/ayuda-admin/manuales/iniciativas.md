@@ -3,7 +3,7 @@ modulo: iniciativas
 titulo: Iniciativas
 ruta: /admin/iniciativas
 permiso: iniciativas/ver
-roles: [ADMIN, COCINA, MOZO, CALLCENTER, ALMACEN, REPARTIDOR]
+roles: [ADMIN, CAJERO, COCINA, MOZO, CALLCENTER, ALMACEN, REPARTIDOR, SUPERVISOR]
 relacionados: [historial, usuarios]
 sugerencias:
   - Como subo una queja o sugerencia de mejora
@@ -14,7 +14,7 @@ sugerencias:
 # Iniciativas
 
 ## Para que sirve
-Espacio colaborativo para que el personal de diferentes areas registre quejas operativas, propuestas de mejora o ideas con fotos de respaldo. Permite al equipo debatir en comentarios y al administrador gestionar el estado de cada iniciativa, quedando registrado en el [[historial]] de auditoria.
+Espacio colaborativo para que el personal de diferentes areas registre quejas operativas, propuestas de mejora o ideas con fotos de respaldo. Esta abierto a todo el personal: cada persona con usuario (Administrador, Cajero, Cocina, Mozo, Call Center, Almacen, Repartidor y Supervisor) puede verlas, crearlas y comentarlas. Permite al equipo debatir en comentarios y al Administrador y al Supervisor gestionar el estado de cada iniciativa, quedando registrado en el [[historial]] de auditoria.
 
 ## Como se hace: Registrar una nueva iniciativa
 1. En la parte superior de la pantalla, pulsar el boton + Nueva iniciativa.
@@ -33,7 +33,7 @@ Ver tambien: [[historial]]
 4. Pulsar el boton Enviar comentario.
 Ver tambien: [[usuarios]]
 
-## Como se hace: Cambiar el estado de una iniciativa (Solo Administrador)
+## Como se hace: Cambiar el estado de una iniciativa (Administrador y Supervisor)
 1. Abrir la iniciativa pulsando Ver y comentar.
 2. En la seccion de estados de la tarjeta, pulsar el boton del estado deseado: Pasar a En revision, Marcar como Hecha o No por ahora.
 3. Aparecera la ventana de confirmacion: ¿Cambiar estado a "...?.
@@ -46,6 +46,5 @@ Despues: [[historial]]
 - Si no se completan el titulo o el detalle, el sistema no permite continuar y resalta los campos pendientes.
 
 ## Quien puede hacerlo
-- Pueden ver, crear iniciativas y comentar: Administrador, Cocina, Mozo, Call Center, Almacen y Repartidor.
-- Unicamente el Administrador puede cambiar el estado de las iniciativas.
-- El rol Cajero no tiene acceso a este modulo segun la matriz de permisos.
+- Todo el personal puede ver, crear iniciativas y comentar: Administrador, Cajero, Cocina, Mozo, Call Center, Almacen, Repartidor y Supervisor (desde esta version el Cajero tambien). El Repartidor entra desde el menu Mas del celular.
+- Solo el Administrador y el Supervisor pueden cambiar el estado de las iniciativas (permiso iniciativas/cambiar_estado).

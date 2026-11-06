@@ -3,14 +3,18 @@ modulo: caja
 titulo: Pedidos y caja
 ruta: /admin/caja
 permiso: caja/ver
-roles: [ADMIN, CAJERO]
-relacionados: [cierre, cocina, comprobantes, repartos, plano, supervisor-codigo, mensajes]
+roles: [ADMIN, CAJERO, SUPERVISOR]
+relacionados: [cierre, cocina, comprobantes, repartos, plano, supervisor-codigo, mensajes, propinas, informes, apertura]
 sugerencias:
   - Como abro la caja al iniciar mi turno
   - Como cobro un pedido y registro el vuelto
   - Por que un pedido con pago digital no aparece en cocina
   - Como anulo un pedido que el cliente cancelo
   - Donde veo el pedido de delivery que no se entrego
+  - Como doy una cortesia a un cliente
+  - Como cambio la ubicacion de un pedido de delivery
+  - Que significa Direccion editada o #7 del dia
+  - Como cobro un pedido que trae propina
 ---
 # Pedidos y caja
 
@@ -107,6 +111,30 @@ Ver tambien: [[repartos]]
 4. Las etiquetas de pedidos anulados, o que llevaron demasiado tiempo en cola, quedan como Vencida y no salen solas. Si hacen falta, se reimprimen desde la pestana Etiquetas.
 Ver tambien: [[cocina]]
 
+## Como se hace: Dar una cortesia (producto a costo S/ 0)
+Una cortesia es una venta a costo 0: no suma ingresos, no sale en comprobantes (SUNAT y PDF) ni da puntos, y no cuenta como merma. Descuenta stock como una venta y queda registrada con su motivo y su valor de lista.
+1. Dentro de un pedido que aun no esta cobrado ni tiene descuento: abre el pedido, en la linea del producto pulsa Dar como cortesia. Tambien se puede al armar el pedido en el local (+ Pedido en mesa), en la linea del pedido.
+2. En la ventana "Dar como cortesia: [producto]" elige el Motivo (obligatorio): Compensacion por error o demora, Cumpleanos o cliente frecuente, Degustacion o promocion, Reclamo del cliente u Otro. Con Otro la Nota es obligatoria; en los demas es opcional (hasta 300 letras).
+3. Pulsa Dar cortesia. La linea queda en S/ 0 con la etiqueta "Cortesia · vale S/ N". Quitar cortesia (solo mientras se arma el pedido) la devuelve a su precio.
+4. Por separado: si el pedido ya esta cobrado, tiene descuento o es una cortesia aparte, pulsa Registrar cortesia (cabecera de Pedidos y caja). Elige el Producto (y el Tamano o el Sabor si lo pide), la Cantidad, el Motivo y, obligatorio, el Pedido de referencia: escribe al menos 3 caracteres del codigo (ej. CP-W012), pulsa Buscar y elige el pedido.
+5. Quien la da: Caja y Administrador la dan directo. El Supervisor escribe ademas el codigo de 6 digitos de su pantalla ("Codigo del supervisor (6 digitos)"), que cambia cada 30 segundos; queda registrado quien la dio y quien la autorizo. El mozo no puede dar cortesias: la pide a Caja.
+6. No se pueden marcar como cortesia las lineas de combos o promociones.
+7. Informe: en Informes, reporte Cortesias (por motivo, por producto y por quien la dio, con valor de lista).
+Ver tambien: [[informes]]
+
+## Como se hace: Cambiar la ubicacion de un pedido de delivery
+1. Abre el pedido de delivery. En la seccion de ubicacion pulsa Cambiar ubicacion, mueve el pin o busca la direccion (o usa Usar ubicacion de WhatsApp si el cliente la envio en las ultimas 24 h).
+2. Revisa la comparacion Antes y Despues: zona, Envio, Diferencia y Total. Pulsa Cambiar y confirma "Si, cambiar".
+3. Si el pedido ya estaba pagado y el envio cambio, queda un Saldo por cobrar (cobrar mas) o una Devolucion pendiente (devolver). Pulsa Cobrar saldo o Marcar como devuelta, elige el medio (si no es efectivo, el Codigo de operacion). En efectivo necesitas la caja abierta ("Abre la caja para mover efectivo").
+4. El repartidor tambien puede proponer la ubicacion real: veras la propuesta con mapas y los botones Aprobar o Rechazar.
+5. Una devolucion pendiente por cambio de ubicacion no afecta el cierre mientras no se marque como devuelta.
+6. La insignia Direccion editada aparece en Caja, Repartos y Mis pedidos cuando el punto se cambio; el historial muestra quien lo cambio. No se cambia en pedidos Entregados ni Anulados.
+Ver tambien: [[repartos]]
+
+## Como se hace: Leer las insignias #N del dia y las propinas
+1. "#N del dia" en el detalle del pedido es el orden de llegada a cocina de hoy (referencial; reinicia a medianoche de Lima). El codigo CP-xxxx es el que vale. Un pedido sin numero (anterior a esta funcion) muestra un guion.
+2. Si el pedido trae propina (la dejo el cliente en la carta o el bot), el cobro muestra "Venta S/ X + propina S/ Y (va aparte, no es venta)". Se cobra la suma; la propina no es ingreso ni sale en comprobantes y se ve en [[propinas]] y en el bloque de propinas del [[cierre]].
+
 ## Errores y dudas comunes
 - Un pedido con pago digital (Yape o Plin) no aparecera en cocina hasta que su comprobante sea aprobado; si la cocina reclama que no ve el pedido, verifique si el voucher sigue pendiente de aprobacion en el modulo de Mensajes.
 - Si al anular se ingresa un codigo de supervisor incorrecto o vencido, aparece el mensaje: Codigo del supervisor invalido. Pídelo nuevamente a la supervisora.
@@ -120,5 +148,6 @@ Ver tambien: [[cocina]]
 
 ## Quien puede hacerlo
 - Pueden ingresar y operar en Pedidos y caja: Administrador y Cajero.
-- Los demas roles (Cocina, Mozo, Repartidor, Almacen) no tienen acceso a esta pantalla.
+- El Supervisor ve Pedidos y caja y puede dar cortesias con su codigo, pero no cambia la ubicacion de pedidos. Los demas roles (Cocina, Mozo, Repartidor, Almacen) no tienen acceso a esta pantalla.
 - La anulacion de pedidos y cobros requiere la autorizacion con el codigo de supervisor de 6 digitos, salvo para el administrador, que anula sin codigo.
+- Errores de cortesia: "El pedido ya esta cobrado: registra la cortesia por separado", "El pedido tiene descuento: registra la cortesia por separado", "El pedido ya tiene comprobante", "Esta linea ya es cortesia", "Las lineas de combo o de promocion no se pueden marcar como cortesia", "Un pedido solo de cortesias no se puede cobrar: registra la cortesia por separado", "La cortesia deja el plan de pago por debajo de cero: rehaz el plan de pago" y, para el supervisor, CODIGO_INVALIDO (el codigo vencio o esta mal: pide el actual).
