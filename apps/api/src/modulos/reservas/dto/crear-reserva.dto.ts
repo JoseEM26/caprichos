@@ -1,4 +1,4 @@
-import { ArrayNotEmpty, IsArray, IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CrearReservaDto {
@@ -21,4 +21,9 @@ export class CrearReservaDto {
   @IsArray({ message: 'mesas debe ser un arreglo de identificadores' })
   @ArrayNotEmpty({ message: 'Debe seleccionar al menos una mesa' })
   mesas!: (number | string)[];
+
+  /** Si las mesas suman menos asientos que personas, el local confirma que la reserva es igual. */
+  @IsOptional()
+  @IsBoolean({ message: 'confirmarCapacidad debe ser verdadero o falso' })
+  confirmarCapacidad?: boolean;
 }

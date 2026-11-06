@@ -8,7 +8,7 @@ export const CLAVES_CONFIG_IMPRESION = {
   ETIQUETA_GENERAL_MODALIDADES: 'impresion_etiqueta_general_modalidades',
   /** Sticker por vaso de bebida: todos los pedidos con bebidas (salón, llevar, delivery). */
   ETIQUETA_BEBIDA_ACTIVO: 'impresion_etiqueta_bebida_activo',
-  /** Sticker por área (futuro). Apagado por defecto hasta que el dueño lo confirme. */
+  /** Sticker por área: uno por cada área con productos, salvo Bebidas (ya sale uno por vaso). Apagado por defecto hasta que el dueño lo confirme. */
   ETIQUETA_AREA_ACTIVO: 'impresion_etiqueta_area_activo',
   /** Comanda completa de salón para la ticketera de Caja al aceptar el pedido. */
   TICKET_COMANDA_SALON_ACTIVO: 'impresion_ticket_comanda_salon_activo',

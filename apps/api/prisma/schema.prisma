@@ -20,6 +20,8 @@ model ControlSistema {
 // ---------- Ola 1: personas, acceso, auditoría y configuración (ADR-004, ADR-008, ADR-014) ----------
 
 model Party {
+  cortesiasDadas       Cortesia[] @relation("CortesiaDadaPor")
+  cortesiasAutorizadas Cortesia[] @relation("CortesiaAutorizadaPor")
   id                       BigInt                 @id @default(autoincrement())
   tipo                     String // PERSONA | ORGANIZACION
   estado                   String                 @default("ACTIVO")
@@ -28,6 +30,7 @@ model Party {
   documentos               PartyIdentifier[]
   usuario                  UserAccount?
   sesiones                 Sesion[]
+  preferencias             PreferenciaUsuario[]
   vouchersReemplazadosPor  VoucherPago[]          @relation("VoucherReemplazadoPor")
   pedidos                  Pedido[]               @relation("ClientePedido")
   pedidosRepartidos        Pedido[]               @relation("RepartidorPedido")
@@ -47,6 +50,10 @@ model Party {
   coberturasReemplaza      CoberturaTurno[]       @relation("CoberturasReemplaza")
   reemplazosDia            ReemplazoDia[]         @relation("ReemplazoDiaTitular")
   reemplazaDias            ReemplazoDia[]         @relation("ReemplazoDiaSuplente")
+  asistenciaMarcas         AsistenciaMarca[]     @relation("AsistenciaMarcaParty")
+  asistenciaCorregidas     AsistenciaMarca[]     @relation("AsistenciaMarcaCorrigio")
+  asistenciaDispositivo    AsistenciaDispositivo?
+  asistenciaConsentimiento AsistenciaConsentimiento?
   pedidosProveedor         PedidoProveedor[]
   comprasProveedor         Compra[]
   pedidosInternosAvisados  PedidoInterno[]
@@ -60,6 +67,14 @@ model Party {
   ajustesMedioAutorizados  CierreAjusteMedio[]   @relation("AjusteMedioAutorizado")
   devolucionesPor          DevolucionPedido[]    @relation("DevolucionPor")
   devolucionesAutorizadas  DevolucionPedido[]    @relation("DevolucionAutorizada")
+  cambiosUbicacionPropuestos PedidoCambioUbicacion[] @relation("CambioUbicacionPropuesto")
+  cambiosUbicacionResueltos  PedidoCambioUbicacion[] @relation("CambioUbicacionResuelto")
+  cambiosUbicacionAjustes    PedidoCambioUbicacion[] @relation("CambioUbicacionAjuste")
+  propinaRepartosCalculados  PropinaReparto[]       @relation("PropinaRepartoCalculo")
+  propinaRepartosAprobados   PropinaReparto[]       @relation("PropinaRepartoAprobo")
+  propinaRepartosPagados     PropinaReparto[]       @relation("PropinaRepartoPago")
+  propinaRepartosAnulados    PropinaReparto[]       @relation("PropinaRepartoAnulo")
+  propinaRepartoDetalles     PropinaRepartoDetalle[] @relation("PropinaRepartoDetalleParty")
 
   @@map("party")
 }
@@ -75,6 +90,8 @@ model Person {
   pais_nacimiento String?
   /// Disponible 24/7: recibe los avisos por correo si nadie con casilla está de turno.
   horario_24_7    Boolean   @default(false)
+  /// Reparto de propinas: NULL = según rol (ADMIN no participa, el resto sí); true/false = excepción fijada por el ADMIN.
+  participa_propinas Boolean?
   party           Party     @relation(fields: [party_id], references: [id])
 
   @@map("person")
@@ -97,6 +114,7 @@ model Rol {
   permisos       RolPermiso[]
   usuarios       UserAccount[]
   usuariosExtra  UserAccountRol[]
+  historialRolesExtra UserAccountRolHistorial[]
   notificaciones Notificacion[]
 
   @@map("rol")
@@ -106,11 +124,36 @@ model Rol {
 model UserAccountRol {
   user_account_id BigInt
   rol             String
+  /// Quién lo otorgó (party del ADMIN).
+  otorgado_por    BigInt?
+  otorgado_en     DateTime    @default(now()) @db.Timestamptz
+  /// Hasta cuándo vale el rol. NULL = permanente (hasta que el ADMIN lo quite).
+  vence_en        DateTime?   @db.Timestamptz
+  motivo          String?
   cuenta          UserAccount @relation(fields: [user_account_id], references: [id])
   r               Rol         @relation(fields: [rol], references: [codigo])
 
   @@id([user_account_id, rol])
+  @@index([vence_en], map: "ix_user_account_rol_vence")
   @@map("user_account_rol")
+}
+
+/// Historial permanente e inmutable de los roles extra: otorgado, retirado o vencido.
+model UserAccountRolHistorial {
+  id              BigInt      @id @default(autoincrement())
+  user_account_id BigInt
+  rol             String
+  accion          String      // OTORGADO | RETIRADO | VENCIDO
+  quien_party_id  BigInt?
+  desde           DateTime?   @db.Timestamptz
+  hasta           DateTime?   @db.Timestamptz
+  motivo          String?
+  en              DateTime    @default(now()) @db.Timestamptz
+  cuenta          UserAccount @relation(fields: [user_account_id], references: [id])
+  r               Rol         @relation(fields: [rol], references: [codigo])
+
+  @@index([user_account_id, en], map: "ix_user_account_rol_historial_cuenta")
+  @@map("user_account_rol_historial")
 }
 
 /// Áreas de cocina que atiende un usuario con rol COCINA. Sin filas = ve todas las áreas.
@@ -162,6 +205,7 @@ model UserAccount {
   party                 Party                  @relation(fields: [party_id], references: [id])
   r                     Rol                    @relation(fields: [rol], references: [codigo])
   rolesExtra            UserAccountRol[]
+  rolesHistorial        UserAccountRolHistorial[]
   areasCocina           UserAccountArea[]
   iniciativasCreadas    Iniciativa[]           @relation("IniciativasCreadas")
   iniciativasCambiadas  Iniciativa[]           @relation("IniciativasCambiadas")
@@ -182,6 +226,18 @@ model Sesion {
   party        Party     @relation(fields: [party_id], references: [id])
 
   @@map("sesion")
+}
+
+/// Preferencias personales de un usuario (una fila por party y clave). Solo para quien la fijó.
+model PreferenciaUsuario {
+  party_id       BigInt
+  clave          String
+  valor          Json
+  actualizado_en DateTime @default(now()) @db.Timestamptz
+  party          Party    @relation(fields: [party_id], references: [id])
+
+  @@id([party_id, clave])
+  @@map("preferencia_usuario")
 }
 
 model Parametro {
@@ -351,6 +407,7 @@ model Categoria {
 }
 
 model Producto {
+  cortesias Cortesia[]
   id                 BigInt           @id @default(autoincrement())
   categoria_id       BigInt
   nombre             String           @unique
@@ -365,6 +422,8 @@ model Producto {
   no_suma_beneficios Boolean          @default(false)
   // Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto
   resaltar_opcion_menos_pedida Boolean @default(false)
+  // Stock de producto terminado (donas, galletas): se controla aunque «Control de almacén» (insumos) esté apagado
+  controla_stock     Boolean          @default(false)
   categoria          Categoria        @relation(fields: [categoria_id], references: [id])
   foto_archivo       Archivo?         @relation(fields: [foto_archivo_id], references: [id])
   tamanos            ProductoTamano[]
@@ -374,6 +433,7 @@ model Producto {
   agotados           Agotado[]
   stocks             Stock[]
   movimientosStock   MovimientoStock[]
+  conteosApertura    ConteoApertura[]
   recetas            Receta[]
   ofertasAlcance     Oferta[]
   comboReemplazos    ComboParteReemplazo[]
@@ -389,9 +449,12 @@ model ProductoTamano {
   tamano_valor_id BigInt
   precio          Decimal       @db.Decimal(12, 2)
   activo          Boolean       @default(true)
+  /// Unidades (donas) que lleva el tamaño: Unidad=1, 1/2 docena=6, Docena=12. Con sabores, se reparten entre ellos.
+  unidades        Int           @default(1)
   producto        Producto      @relation(fields: [producto_id], references: [id])
   tamano_valor    ListaValor    @relation(fields: [tamano_valor_id], references: [id])
   recetaLineas    RecetaLinea[]
+  comboPartes     ComboParte[]
 
   @@unique([producto_id, tamano_valor_id])
   @@map("producto_tamano")
@@ -442,6 +505,7 @@ model ProductoGrupo {
 }
 
 model Sabor {
+  cortesias Cortesia[]
   id            BigInt    @id @default(autoincrement())
   producto_id   BigInt
   nombre        String
@@ -449,9 +513,37 @@ model Sabor {
   agotado_hasta DateTime? @db.Timestamptz
   producto      Producto  @relation(fields: [producto_id], references: [id])
   agotados      Agotado[]
+  stockSabor    StockSabor?
+  movimientos   MovimientoStock[]
+  conteosApertura ConteoApertura[]
+  pedidoLineaSabores PedidoLineaSabor[]
 
   @@unique([producto_id, nombre])
   @@map("sabor")
+}
+
+/// Stock de producto terminado POR SABOR (donas, galletas con sabores). Una fila por sabor.
+model StockSabor {
+  id             BigInt   @id @default(autoincrement())
+  sabor_id       BigInt   @unique
+  cantidad       Decimal  @default(0) @db.Decimal(14, 3)
+  actualizado_en DateTime @default(now()) @updatedAt @db.Timestamptz
+  sabor          Sabor    @relation(fields: [sabor_id], references: [id])
+
+  @@map("stock_sabor")
+}
+
+/// Sabores repartidos en una línea de pedido de un producto controlado por sabor (sigue al pedido).
+model PedidoLineaSabor {
+  id              BigInt      @id @default(autoincrement())
+  pedido_linea_id BigInt
+  sabor_id        BigInt?
+  sabor_nombre    String
+  cantidad        Int
+  pedido_linea    PedidoLinea @relation(fields: [pedido_linea_id], references: [id], onDelete: Cascade)
+  sabor           Sabor?      @relation(fields: [sabor_id], references: [id], onDelete: Restrict)
+
+  @@map("pedido_linea_sabor")
 }
 
 // ---------- Ola 3: zonas de reparto y pedidos de la carta (FT-DEL-01, FT-PED-01..03, DT-57) ----------
@@ -467,11 +559,15 @@ model ZonaReparto {
   pedidos   Pedido[]
   contactos ContactMechanism[]
   direcciones ClienteDireccion[]
+  cambiosUbicacionAnterior PedidoCambioUbicacion[] @relation("CambioZonaAnterior")
+  cambiosUbicacionNueva    PedidoCambioUbicacion[] @relation("CambioZonaNueva")
 
   @@map("zona_reparto")
 }
 
 model Pedido {
+  cortesias          Cortesia[] @relation("CortesiaPedido")
+  cortesiasReferencia Cortesia[] @relation("CortesiaReferencia")
   id                     BigInt                  @id @default(autoincrement())
   codigo                 String                  @unique
   canal                  String                  @default("CARTA")
@@ -545,6 +641,13 @@ model Pedido {
   cobro_mozo_party_id    BigInt?
   // Efectivo que el mozo recibió (Pagó con S/); el vuelto se calcula contra el renglón de efectivo del plan
   cobro_mozo_recibido    Decimal?                @db.Decimal(12, 2)
+  // Cambio de ubicación (RN cambio de punto): cuándo se aplicó el último cambio; null = dirección original
+  ubicacion_editada_en   DateTime?               @db.Timestamptz
+  // Número correlativo del día (referencial, solo cocina): se asigna al llegar a cocina (día Lima de esa hora)
+  numero_dia             Int?
+  fecha_dia              DateTime?               @db.Date
+  // Propina opcional del cliente: va APARTE (no suma a subtotal/total, ni comprobante, ni puntos). Se cobra junto con el pedido
+  propina                Decimal                @default(0) @db.Decimal(12, 2)
 
   party                 Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
@@ -579,11 +682,21 @@ model Pedido {
   vouchers               VoucherPago[]
   planPago               PedidoPagoPlan[]
   devolucion             DevolucionPedido?
+  cambiosUbicacion       PedidoCambioUbicacion[]
   clienteIdentificado    Party?                 @relation("ClienteIdentificadoPedido", fields: [cliente_party_id], references: [id])
 
   @@index([cliente_party_id], map: "pedido_cliente_party_id_idx")
   @@index([ruta_reparto_id], map: "pedido_ruta_reparto_id_idx")
+  @@unique([fecha_dia, numero_dia], map: "pedido_fecha_dia_numero_dia_key")
   @@map("pedido")
+}
+
+// Contador del número del día en cocina: una fila por fecha Lima; ultimo = último número entregado
+model ContadorDiario {
+  fecha  DateTime @id @db.Date
+  ultimo Int      @default(0)
+
+  @@map("contador_diario")
 }
 
 // Una salida del repartidor con sus pedidos: se cierra sola cuando todos llegan a un estado final
@@ -625,6 +738,7 @@ model ClienteDireccion {
 }
 
 model PedidoLinea {
+  es_cortesia      Boolean            @default(false)
   id               BigInt              @id @default(autoincrement())
   pedido_id        BigInt
   producto_id      BigInt?
@@ -655,6 +769,8 @@ model PedidoLinea {
   lineaComboPadre  PedidoLinea?        @relation("ComboPartes", fields: [linea_combo_id], references: [id])
   lineasComboHijas PedidoLinea[]       @relation("ComboPartes")
   opcionesElegidas PedidoLineaOpcion[]
+  sabores          PedidoLineaSabor[]
+  cortesia         Cortesia?
 
   @@map("pedido_linea")
 }
@@ -743,6 +859,8 @@ model CobroPago {
   monto    Decimal  @db.Decimal(12, 2)
   recibido Decimal? @db.Decimal(12, 2)
   vuelto   Decimal? @db.Decimal(12, 2)
+  // Parte de este renglón que es propina (el monto es venta). Entregado = monto + propina.
+  propina  Decimal  @default(0) @db.Decimal(12, 2)
 
   cobro    Cobro    @relation(fields: [cobro_id], references: [id])
 
@@ -760,6 +878,7 @@ model MovimientoCaja {
 
   caja             Caja      @relation(fields: [caja_id], references: [id])
   devolucion       DevolucionPedido[]
+  cambiosUbicacion PedidoCambioUbicacion[]
 
   @@map("movimiento_caja")
 }
@@ -987,6 +1106,7 @@ model LugarStock {
   movimientos      MovimientoStock[]
   trasladosDestino Traslado[]
   cierresDia       CierreDia[]
+  conteosApertura  ConteoApertura[]
 
   @@map("lugar_stock")
 }
@@ -1038,7 +1158,7 @@ model Stock {
 
 model MovimientoStock {
   id                    BigInt            @id @default(autoincrement())
-  tipo                  String            // ENTRADA | SALIDA | AJUSTE | MERMA | DEVOLUCION | VENTA | PRODUCCION_CONSUMO | PRODUCCION_ALTA | TRASLADO_SALIDA | TRASLADO_ENTRADA | DIFERENCIA_CONTEO | ANULACION
+  tipo                  String            // ENTRADA | SALIDA | AJUSTE | MERMA | DEVOLUCION | VENTA | PRODUCCION_CONSUMO | PRODUCCION_ALTA | TRASLADO_SALIDA | TRASLADO_ENTRADA | DIFERENCIA_CONTEO | ANULACION | CORTESIA
   insumo_id             BigInt?
   producto_id           BigInt?
   lugar_id              BigInt
@@ -1047,6 +1167,8 @@ model MovimientoStock {
   destino_valor_id      BigInt?
   pedido_id             BigInt?
   produccion_id         BigInt?
+  /// Sabor del producto por sabor (donas, galletas): el stock se lleva en stock_sabor
+  sabor_id              BigInt?
   traslado_id           BigInt?
   compra_id             BigInt?
   nota                  String?
@@ -1060,10 +1182,32 @@ model MovimientoStock {
   origen_valor          ListaValor?       @relation("MovimientoStockOrigen", fields: [origen_valor_id], references: [id])
   destino_valor         ListaValor?       @relation("MovimientoStockDestino", fields: [destino_valor_id], references: [id])
   pedido                Pedido?           @relation(fields: [pedido_id], references: [id])
+  sabor                 Sabor?            @relation(fields: [sabor_id], references: [id], onDelete: Restrict)
   movimientoAnulado     MovimientoStock?  @relation("MovimientosAnulados", fields: [movimiento_anulado_id], references: [id])
   movimientosRevertidos MovimientoStock[] @relation("MovimientosAnulados")
 
   @@map("movimiento_stock")
+}
+
+/// Conteo de apertura del día (fecha en hora de Lima) de un producto que controla stock. Una fila por día y producto.
+/// Sin sabor_id: conteo del producto entero. Con sabor_id: conteo de ese sabor.
+/// Unicidad por (fecha, producto_id, coalesce(sabor_id, 0)): índice con expresión en la migración
+/// 20261222100000_stock_por_sabor (Prisma no la declara aquí).
+model ConteoApertura {
+  id          BigInt     @id @default(autoincrement())
+  fecha       DateTime   @db.Date
+  producto_id BigInt
+  sabor_id    BigInt?
+  lugar_id    BigInt
+  cantidad    Decimal    @db.Decimal(14, 3)
+  por         BigInt
+  en          DateTime   @default(now()) @db.Timestamptz
+
+  producto    Producto   @relation(fields: [producto_id], references: [id])
+  sabor       Sabor?     @relation(fields: [sabor_id], references: [id], onDelete: Restrict)
+  lugar       LugarStock @relation(fields: [lugar_id], references: [id])
+
+  @@map("conteo_apertura")
 }
 
 model Receta {
@@ -1173,6 +1317,8 @@ model ReservaMesa {
   reserva    Reserva        @relation(fields: [reserva_id], references: [id], onDelete: Cascade)
   mesa       ElementoPlano? @relation(fields: [mesa_id], references: [id], onDelete: SetNull)
 
+  // Una mesa una sola vez por reserva (los nulos no chocan: la mesa se borró del plano)
+  @@unique([reserva_id, mesa_id])
   @@map("reserva_mesa")
 }
 
@@ -1182,6 +1328,10 @@ model PedidoMesa {
   mesa_id     BigInt?
   mesa_nombre String?
   abierta     Boolean        @default(true)
+  /// Posición de la mesa en el pedido (1 = principal). Un pedido puede tener varias mesas abiertas.
+  orden       Int            @default(1)
+  /// Mesa que da nombre al pedido. Unicidad parcial (solo abiertas) en la migración 20261231400000.
+  principal   Boolean        @default(false)
 
   pedido      Pedido         @relation(fields: [pedido_id], references: [id], onDelete: Cascade)
   mesa        ElementoPlano? @relation(fields: [mesa_id], references: [id], onDelete: SetNull)
@@ -1447,19 +1597,23 @@ model ComboParte {
   cantidad   Int      @default(1)
   categorias BigInt[]
   productos  BigInt[]
+  /// Tamaño de la parte FIJO de un solo producto (producto_tamano del producto); sin tamaño, null
+  tamano_id  BigInt?
 
   oferta     Oferta   @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+  tamano     ProductoTamano? @relation(fields: [tamano_id], references: [id], onDelete: SetNull)
   reemplazos ComboParteReemplazo[]
 
   @@map("combo_parte")
 }
 
-/// Plan B, plan C...: productos que reemplazan al principal de una parte FIJO cuando se agota (mismo precio del combo)
+/// Alternativas de una parte (plan B, C... o «si no hay stock, elige»): producto y cantidad que sustituyen la parte cuando no alcanza (mismo precio del combo)
 model ComboParteReemplazo {
   id             BigInt @id @default(autoincrement())
   combo_parte_id BigInt
   producto_id    BigInt
   orden          Int    @default(0)
+  cantidad       Int    @default(1)
 
   parte    ComboParte @relation(fields: [combo_parte_id], references: [id], onDelete: Cascade)
   producto Producto   @relation(fields: [producto_id], references: [id])
@@ -1605,6 +1759,9 @@ model HorarioTrabajo {
   entrada    DateTime @db.Time
   salida     DateTime @db.Time
   activo     Boolean  @default(true)
+  // Almuerzo programado (opcional). Ambos nulos = sin almuerzo programado.
+  almuerzo_inicio DateTime? @db.Time
+  almuerzo_fin    DateTime? @db.Time
 
   party      Party    @relation(fields: [party_id], references: [id])
 
@@ -2354,4 +2511,203 @@ model ResenaGoogle {
   actualizado_en   DateTime  @updatedAt
 
   @@map("resena_google")
+}
+
+/// Historial de cambios de ubicación de un delivery (propuestas del repartidor y cambios directos de Caja).
+/// Solo una fila PROPUESTA por pedido: índice único parcial pedido_cambio_ubicacion_propuesta_unica (migración
+/// 20261229100000_cambio_ubicacion_delivery; Prisma no lo declara). ajuste_* = diferencia de cobro si ya estaba pagado.
+model PedidoCambioUbicacion {
+  id                      BigInt          @id @default(autoincrement())
+  pedido_id               BigInt
+  origen                  String
+  estado                  String
+  propuesto_por_party_id  BigInt
+  propuesto_en            DateTime        @default(now()) @db.Timestamptz
+  resuelto_por_party_id   BigInt?
+  resuelto_en             DateTime?       @db.Timestamptz
+  nota                    String?
+  motivo                  String?
+  lat_anterior            Decimal?        @db.Decimal(9, 6)
+  lng_anterior            Decimal?        @db.Decimal(9, 6)
+  direccion_anterior      String?
+  referencia_anterior     String?
+  zona_anterior_id        BigInt?
+  lat_nueva               Decimal         @db.Decimal(9, 6)
+  lng_nueva               Decimal         @db.Decimal(9, 6)
+  direccion_nueva         String?
+  referencia_nueva        String?
+  zona_nueva_id           BigInt?
+  envio_anterior          Decimal         @db.Decimal(12, 2)
+  envio_nuevo             Decimal?        @db.Decimal(12, 2)
+  total_anterior          Decimal         @db.Decimal(12, 2)
+  total_nuevo             Decimal?        @db.Decimal(12, 2)
+  diferencia_envio        Decimal?        @db.Decimal(12, 2)
+  ajuste_tipo             String?
+  ajuste_monto            Decimal?        @db.Decimal(12, 2)
+  ajuste_estado           String?
+  ajuste_medio            String?
+  ajuste_codigo_operacion String?
+  ajuste_por_party_id     BigInt?
+  ajuste_en               DateTime?       @db.Timestamptz
+  ajuste_movimiento_caja_id BigInt?
+  aviso_cliente           String?
+
+  pedido           Pedido          @relation(fields: [pedido_id], references: [id])
+  propuestoPor     Party           @relation("CambioUbicacionPropuesto", fields: [propuesto_por_party_id], references: [id])
+  resueltoPor      Party?          @relation("CambioUbicacionResuelto", fields: [resuelto_por_party_id], references: [id])
+  ajustePor        Party?          @relation("CambioUbicacionAjuste", fields: [ajuste_por_party_id], references: [id])
+  zonaAnterior     ZonaReparto?    @relation("CambioZonaAnterior", fields: [zona_anterior_id], references: [id])
+  zonaNueva        ZonaReparto?    @relation("CambioZonaNueva", fields: [zona_nueva_id], references: [id])
+  movimientoCaja   MovimientoCaja? @relation(fields: [ajuste_movimiento_caja_id], references: [id])
+
+  @@index([pedido_id])
+  @@index([ajuste_en])
+  @@map("pedido_cambio_ubicacion")
+}
+
+/// Cortesía: venta con costo 0 (no es merma). Dentro de un pedido (pedido_id + pedido_linea_id) o por separado
+/// (pedido_id null; pedido_referencia_id = pedido al que corresponde).
+model Cortesia {
+  id                    BigInt    @id @default(autoincrement())
+  producto_id           BigInt
+  sabor_id              BigInt?
+  cantidad              Int
+  valor_lista           Decimal   @db.Decimal(12, 2)
+  motivo                String
+  nota                  String?
+  pedido_id             BigInt?
+  pedido_linea_id       BigInt?   @unique
+  pedido_referencia_id  BigInt?
+  dada_por_party_id     BigInt
+  autorizada_por_party_id BigInt?
+  creado_en             DateTime  @default(now()) @db.Timestamptz
+  producto              Producto  @relation(fields: [producto_id], references: [id], onDelete: Restrict)
+  sabor                 Sabor?    @relation(fields: [sabor_id], references: [id], onDelete: Restrict)
+  pedido                Pedido?   @relation("CortesiaPedido", fields: [pedido_id], references: [id], onDelete: Restrict)
+  pedidoReferencia      Pedido?   @relation("CortesiaReferencia", fields: [pedido_referencia_id], references: [id], onDelete: Restrict)
+  pedidoLinea           PedidoLinea? @relation(fields: [pedido_linea_id], references: [id], onDelete: Restrict)
+  dadaPor               Party     @relation("CortesiaDadaPor", fields: [dada_por_party_id], references: [id], onDelete: Restrict)
+  autorizadaPor         Party?    @relation("CortesiaAutorizadaPor", fields: [autorizada_por_party_id], references: [id], onDelete: Restrict)
+
+  @@index([creado_en])
+  @@index([producto_id])
+  @@index([pedido_id])
+  @@index([pedido_referencia_id])
+  @@map("cortesia")
+}
+
+// ---------------------------------------------------------------------------
+// Control de asistencia del personal (QR en pantalla del local + GPS + selfie).
+// Las marcas son append-only: las correcciones son filas nuevas (origen = CORRECCION).
+// Unicidad en BD (migración 20261231200000_asistencia): una marca CELULAR por persona,
+// jornada y tipo (índice único parcial, no expresable aquí).
+model AsistenciaMarca {
+  id               BigInt    @id @default(autoincrement())
+  party_id         BigInt
+  jornada          DateTime  @db.Date // día laboral (Lima; antes de las 04:00 cuenta como el día anterior)
+  tipo             String    @db.VarChar(20) // ENTRADA | SALIDA_ALMUERZO | ENTRADA_ALMUERZO | SALIDA
+  origen           String    @default("CELULAR") @db.VarChar(12) // CELULAR | CORRECCION
+  momento          DateTime  @db.Timestamptz // hora del servidor
+  estado           String    @default("VALIDA") @db.VarChar(12) // VALIDA | A_REVISAR
+  motivos_revision String?
+  lat              Decimal?  @db.Decimal(9, 6)
+  lng              Decimal?  @db.Decimal(9, 6)
+  precision_m     Decimal?  @db.Decimal(8, 2)
+  distancia_m     Decimal?  @db.Decimal(8, 2)
+  qr_slot          BigInt?
+  dispositivo_hash String?   @db.VarChar(64)
+  motivo           String?   // solo correcciones: motivo obligatorio
+  por_party_id     BigInt?   // solo correcciones: quién la hizo
+  creado_en        DateTime  @default(now()) @db.Timestamptz
+
+  party            Party                @relation("AsistenciaMarcaParty", fields: [party_id], references: [id])
+  corregidaPor    Party?               @relation("AsistenciaMarcaCorrigio", fields: [por_party_id], references: [id])
+  selfie           AsistenciaSelfie?
+
+  @@unique([party_id, qr_slot])
+  @@index([party_id, jornada])
+  @@map("asistencia_marca")
+}
+
+model AsistenciaSelfie {
+  marca_id   BigInt   @id
+  contenido  Bytes    @db.ByteA
+  mime       String   @db.VarChar(30)
+  creado_en  DateTime @default(now()) @db.Timestamptz
+
+  marca      AsistenciaMarca @relation(fields: [marca_id], references: [id])
+
+  @@map("asistencia_selfie")
+}
+
+model AsistenciaDispositivo {
+  party_id      BigInt    @id
+  huella_hash   String    @db.VarChar(64)
+  vinculado_en  DateTime  @default(now()) @db.Timestamptz
+  ultimo_uso_en DateTime? @db.Timestamptz
+
+  party         Party     @relation(fields: [party_id], references: [id])
+
+  @@map("asistencia_dispositivo")
+}
+
+model AsistenciaConsentimiento {
+  party_id    BigInt   @id
+  version     String   @db.VarChar(20)
+  aceptado_en DateTime @db.Timestamptz
+
+  party       Party    @relation(fields: [party_id], references: [id])
+
+  @@map("asistencia_consentimiento")
+}
+
+// ---------------------------------------------------------------------------
+// Reparto mensual de propinas por horas trabajadas (migración 20261231600000_reparto_propinas).
+// Un reparto VIGENTE (no anulado) por mes: índice único parcial en la migración. BORRADOR se recalcula;
+// APROBADO congela las cifras; PAGADO cuando todas las personas tienen fecha de pago; ANULADO con motivo.
+model PropinaReparto {
+  id               BigInt    @id @default(autoincrement())
+  anio             Int       @db.SmallInt
+  mes              Int       @db.SmallInt
+  estado           String    @default("BORRADOR") @db.VarChar(12) // BORRADOR | APROBADO | PAGADO | ANULADO
+  total_propinas   Decimal   @db.Decimal(12, 2)
+  total_horas      Decimal   @db.Decimal(10, 2)
+  calculado_en     DateTime  @db.Timestamptz
+  calculado_por    BigInt
+  aprobado_en      DateTime? @db.Timestamptz
+  aprobado_por     BigInt?
+  pagado_en        DateTime? @db.Timestamptz
+  pagado_por       BigInt?
+  anulado_en       DateTime? @db.Timestamptz
+  anulado_por      BigInt?
+  motivo_anulacion String?
+  nota             String?
+
+  calculadoPor Party                   @relation("PropinaRepartoCalculo", fields: [calculado_por], references: [id])
+  aprobadoPor  Party?                  @relation("PropinaRepartoAprobo", fields: [aprobado_por], references: [id])
+  pagadoPor    Party?                  @relation("PropinaRepartoPago", fields: [pagado_por], references: [id])
+  anuladoPor   Party?                  @relation("PropinaRepartoAnulo", fields: [anulado_por], references: [id])
+  detalle      PropinaRepartoDetalle[]
+
+  @@index([anio, mes])
+  @@map("propina_reparto")
+}
+
+/// Parte de cada persona en un reparto. Solo personas con horas > 0. monto en soles (2 decimales).
+model PropinaRepartoDetalle {
+  reparto_id      BigInt
+  party_id        BigInt
+  horas           Decimal   @db.Decimal(10, 2)
+  porcentaje      Decimal   @db.Decimal(9, 4)
+  monto           Decimal   @db.Decimal(12, 2)
+  ajuste_centimos Int?      // reservado: ajuste manual futuro; sin uso en esta fase
+  pagado_en       DateTime? @db.Timestamptz
+  pagado_medio    String?   @db.VarChar(20)
+  nota            String?
+
+  reparto PropinaReparto @relation(fields: [reparto_id], references: [id])
+  party   Party          @relation("PropinaRepartoDetalleParty", fields: [party_id], references: [id])
+
+  @@id([reparto_id, party_id])
+  @@map("propina_reparto_detalle")
 }

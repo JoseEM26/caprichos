@@ -12,6 +12,8 @@ import {
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { RepartosService } from './repartos.service';
+import { RepartosChatService } from './repartos-chat.service';
+import { TextoDto } from '../mensajes/dto/mensajes.dto';
 import { FiltrarRepartosDto } from './dto/filtrar-repartos.dto';
 import { FiltrarRutasDto } from './dto/filtrar-rutas.dto';
 import { ReportarFallaDto } from './dto/reportar-falla.dto';
@@ -27,7 +29,10 @@ import { TomarRutaSugeridaDto } from './dto/tomar-ruta-sugerida.dto';
 @Controller('admin/repartos')
 @UseGuards(AccesoGuard)
 export class RepartosController {
-  constructor(private readonly repartosService: RepartosService) {}
+  constructor(
+    private readonly repartosService: RepartosService,
+    private readonly repartosChat: RepartosChatService,
+  ) {}
 
   @Get('config')
   @Permiso('repartos', 'ver')
@@ -217,6 +222,20 @@ export class RepartosController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.repartosService.reportarFalla(id, dto, req.usuario, ip);
+  }
+
+  /** Chat de WhatsApp de un pedido propio y vigente: solo esa conversación. */
+  @Get(':id/chat/mensajes')
+  @Permiso('repartos', 'chat')
+  async chatMensajes(@Param('id') id: string, @Req() req: any) {
+    return this.repartosChat.obtenerChat(id, req.usuario);
+  }
+
+  @Post(':id/chat/mensajes')
+  @Permiso('repartos', 'chat')
+  async chatEnviar(@Param('id') id: string, @Body() dto: TextoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.repartosChat.enviar(id, dto.texto, req.usuario, ip);
   }
 
   @Post(':id/reprogramar')

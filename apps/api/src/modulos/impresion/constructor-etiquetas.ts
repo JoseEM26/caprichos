@@ -7,7 +7,9 @@ import {
   EtiquetaBebidaDatos,
   TicketPagoDatos,
   TicketComandaSalonDatos,
+  esAreaBebidas,
 } from '@caprichos/compartido';
+import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
 export const CRITERIO_BEBIDA_AREAS = ['BARRA', 'BEBIDAS', 'CAFETERIA', 'BAR'];
 export const CRITERIO_BEBIDA_CATEGORIAS = [
@@ -23,6 +25,12 @@ export const CRITERIO_BEBIDA_CATEGORIAS = [
 
 const nombreOpcion = (o: any): string => o.opcion_nombre || o.nombre || '';
 const grupoOpcion = (o: any): string => String(o.grupo_nombre || o.grupo || '');
+
+/** Opciones de la línea para la etiqueta: el reparto por sabor («2 Fresa · 3 Oreo · 1 Manjar») primero, si lo hay. */
+const opcionesConSabores = (linea: any, opciones: string[]): string[] => {
+  const reparto = (linea.sabores || []).map((s: any) => `${s.cantidad} ${s.sabor_nombre}`);
+  return reparto.length > 0 ? [reparto.join(' · '), ...opciones] : opciones;
+};
 
 /** Opciones elegidas de la línea que son una bebida del combo (grupos «Bebida 1 · Bebida»), en orden. */
 export function bebidasDeCombo(linea: any): any[] {
@@ -122,7 +130,7 @@ export function obtenerNombreCliente(pedido: any): string {
 }
 
 export function construirEtiquetaGeneral(pedido: any): EtiquetaGeneralDatos {
-  const lineas: any[] = pedido.lineas || [];
+  const lineas: any[] = lineasDeCuenta(pedido.lineas || []);
   const modalidadPill = obtenerModalidadPill(pedido);
   const hora = formatearHora(pedido.creado_en);
   const fecha = formatearFecha(pedido.creado_en);
@@ -163,7 +171,10 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
 
   const areaMap = new Map<string, any[]>();
   lineas.forEach((l) => {
+    if (l.producto_id == null && l.area_id == null && !l.area) return; // madre de combo: sus partes van por área
     const areaRaw = l.area?.nombre?.trim();
+    // Bebidas no tiene sticker por área: sus vasos ya salen en construirEtiquetasBebida
+    if (esAreaBebidas(areaRaw)) return;
     const areaNombre = (areaRaw || 'SALADOS').toUpperCase();
     if (!areaMap.has(areaNombre)) {
       areaMap.set(areaNombre, []);
@@ -177,9 +188,9 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
 
   for (const [areaNombre, lList] of areaMap.entries()) {
     const lineasArea: EtiquetaAreaLinea[] = lList.map((l) => {
-      const opciones = (l.opcionesElegidas || l.opciones || [])
+      const opciones = opcionesConSabores(l, (l.opcionesElegidas || l.opciones || [])
         .map((o: any) => o.opcion_nombre || o.nombre || '')
-        .filter(Boolean);
+        .filter(Boolean));
       return {
         cantidad: Number(l.cantidad) || 1,
         nombre: l.nombre,
@@ -291,7 +302,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
  * La imprime la ticketera de Caja al aceptarse el pedido; no se usa para llevar ni delivery (lo filtra la regla).
  */
 export function construirTicketComandaSalon(pedido: any): TicketComandaSalonDatos {
-  const lineas: any[] = pedido.lineas || [];
+  const lineas: any[] = lineasDeCuenta(pedido.lineas || []);
   const mesa = pedido.mesa_nombre ? String(pedido.mesa_nombre).trim() : null;
   return {
     tipo: 'TICKET_COMANDA_SALON',
@@ -305,7 +316,7 @@ export function construirTicketComandaSalon(pedido: any): TicketComandaSalonDato
       cantidad: Number(l.cantidad) || 1,
       nombre: l.nombre,
       tamano: l.tamano || null,
-      opciones: (l.opcionesElegidas || l.opciones || []).map((o: any) => o.opcion_nombre || o.nombre || '').filter(Boolean),
+      opciones: opcionesConSabores(l, (l.opcionesElegidas || l.opciones || []).map((o: any) => o.opcion_nombre || o.nombre || '').filter(Boolean)),
       nota: l.nota || null,
     })),
     nota: pedido.nota || null,
@@ -361,7 +372,14 @@ export function claveDeTrabajo(job: { tipo: string; payload: any }): string | nu
 const num = (v: unknown): number => Math.round(Number(v ?? 0) * 100) / 100;
 
 /** Ticket/voucher de pago para la ticketera térmica; el agente lo maquetea a 58 u 80 mm. */
-export function construirTicketPago(pedido: any, local: any, comprobante?: any): TicketPagoDatos {
+// ponytail: el tipo `propina` y `ajusteUbicacion` ya están en packages/compartido/src; el dist publicado puede ir
+// atrasado, así que se declaran aquí en la intersección para no depender del orden de construcción.
+export function construirTicketPago(
+  pedido: any,
+  local: any,
+  comprobante?: any,
+  ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null,
+): TicketPagoDatos & { propina?: number; ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } } {
   const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   const cobro = (pedido.cobros || []).find((c: any) => !c.anulado_en);
   const ahora = cobro?.en ?? new Date();
@@ -380,14 +398,18 @@ export function construirTicketPago(pedido: any, local: any, comprobante?: any):
     modalidad: pedido.modalidad || '',
     lineas: (pedido.lineas || []).map((l: any) => ({
       cantidad: l.cantidad,
-      nombre: l.nombre,
+      nombre: l.es_cortesia ? `${l.nombre} · Cortesía` : l.nombre,
       tamano: l.tamano ?? null,
       subtotal: num(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
     })),
+    // total = venta (comprobante). La propina va en su propia línea; el pago por medio es venta + propina (lo entregado)
     total: num(pedido.total),
+    propina: num(pedido.propina ?? 0),
+    // Solo si hay ajuste de cambio de dirección pendiente: sin él, el ticket sale igual que antes
+    ...(ajusteUbicacion ? { ajusteUbicacion: { tipo: ajusteUbicacion.tipo, monto: num(ajusteUbicacion.monto) } } : {}),
     pagos: (cobro?.pagos || []).map((p: any) => ({
       medio: p.medio,
-      monto: num(p.monto),
+      monto: num(num(p.monto) + num(p.propina ?? 0)),
       recibido: p.recibido == null ? null : num(p.recibido),
       vuelto: p.vuelto == null ? null : num(p.vuelto),
     })),

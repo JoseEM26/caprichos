@@ -1,5 +1,11 @@
 export type ColorComanda = 'VERDE' | 'NARANJA' | 'ROJO';
 
+/** Minutos de espera a partir de los que la comanda pasa a naranja (atención) y a rojo (urgente). Vienen de Ajustes de cocina. */
+export interface UmbralesCocina {
+  naranjaMin: number;
+  rojoMin: number;
+}
+
 export interface AreaCocina {
   id: string;
   nombre: string;
@@ -58,6 +64,12 @@ export interface Comanda {
   lineas: LineaComanda[];
   /** La propia área ya despejó: la comanda es solo seguimiento (sin Despejar). */
   despejada?: boolean;
+  /** Número del día en cocina (referencial). null en pedidos anteriores a la función. */
+  numeroDia?: number | null;
+  /** Hora del servidor al responder (ISO): el navegador cuenta el tiempo con su desfase. */
+  ahoraServidor?: string;
+  /** Umbrales de color vigentes en el servidor. */
+  umbrales?: UmbralesCocina;
   /** Todas las áreas del pedido con su estado (la propia incluida). */
   areas?: AreaComandaPedido[];
 }
@@ -69,6 +81,8 @@ export interface HistorialComanda {
   areaNombre: string;
   ticket: string;
   codigo: string;
+  /** Número del día en cocina (referencial). */
+  numeroDia?: number | null;
   canal: string;
   modalidad: string;
   mesa?: string | null;

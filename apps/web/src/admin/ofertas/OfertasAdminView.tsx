@@ -228,8 +228,8 @@ function generarPastillasPartes(
           : null;
       const prod = prodId ? productos.find((p) => p.id === prodId) : null;
       const prodNombre = prod ? prod.nombre : cp.nombre || 'Producto';
-      const nRemp = (cp.reemplazos || []).length;
-      const sufijo = nRemp > 0 ? ` (o ${nRemp} ${nRemp === 1 ? 'reemplazo' : 'reemplazos'})` : '';
+      const nAlt = (cp.alternativas || []).length;
+      const sufijo = nAlt > 0 ? ` (o ${nAlt} ${nAlt === 1 ? 'alternativa' : 'alternativas'})` : '';
       return `${cant} × ${prodNombre.toUpperCase()}${sufijo}`;
     }
 
@@ -298,7 +298,7 @@ export function OfertasAdminView() {
 
   // Catálogo para autocompletar y partes
   const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string; productos: any[] }>>([]);
-  const [productos, setProductos] = useState<Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number; noSumaBeneficios?: boolean }>>([]);
+  const [productos, setProductos] = useState<Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number; noSumaBeneficios?: boolean; tamanos?: Array<{ id: string; nombre: string; precio?: number }> }>>([]);
   const [, setCargando] = useState(false);
 
   // Estados de ayuda y modales
@@ -383,6 +383,7 @@ export function OfertasAdminView() {
                 categoria: c.nombre,
                 precio: p.precio,
                 noSumaBeneficios: Boolean(p.noSumaBeneficios),
+                tamanos: (p.tamanos || []).map((t: any) => ({ id: String(t.id), nombre: t.nombre, precio: t.precio })),
               });
             });
           });

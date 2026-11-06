@@ -85,6 +85,8 @@ export interface ProductoCierreDiaItem {
   nombre: string;
   sistema: number;
   unidad: string;
+  /** Producto por sabor: el desglose de lo que hay de cada sabor (su merma va por «Botar a merma»). */
+  sabores?: Array<{ saborId: string; nombre: string; sistema: number }>;
 }
 
 export interface FilaCierreDiaDto {
@@ -118,7 +120,76 @@ export interface ListarMovimientosRespuesta {
   movimientos: MovimientoItem[];
 }
 
+/** Conteo de apertura de un sabor de un producto (donas, galletas con sabores). */
+export interface AperturaSaborItem {
+  saborId: string;
+  nombre: string;
+  saldo: number;
+  aperturaHoy: boolean;
+  aperturaCantidad: number | null;
+  /** Lo que se produjo hoy (ya sumado al saldo). */
+  producidoHoy: number;
+  /** Lo que quedó de ayer: el saldo sin lo producido hoy. Se propone en la apertura y se puede corregir. */
+  quedaronAyer: number;
+}
+
+/** Conteo de apertura del día: un producto controlado con su saldo y si ya se contó hoy. */
+export interface AperturaProductoItem {
+  productoId: string;
+  nombre: string;
+  areaNombre: string | null;
+  saldo: number;
+  aperturaHoy: boolean;
+  aperturaCantidad: number | null;
+  producidoHoy: number;
+  quedaronAyer: number;
+  /** Solo productos con sabores: el conteo se hace por sabor. */
+  sabores?: AperturaSaborItem[];
+}
+
+export interface AperturaDiaRespuesta {
+  /** YYYY-MM-DD (día de Lima) */
+  fecha: string;
+  productos: AperturaProductoItem[];
+}
+
+/**
+ * ¿Falta contar hoy? Con sabores falta si algún sabor no tiene apertura; sin sabores, si el producto no la tiene.
+ */
+export function productoPendienteApertura(p: AperturaProductoItem): boolean {
+  return p.sabores && p.sabores.length > 0 ? p.sabores.some((s) => !s.aperturaHoy) : !p.aperturaHoy;
+}
+
+/**
+ * Una línea del envío: el producto entero o uno de sus sabores.
+ * `cantidad` = lo que quedó de ayer (contado); `produccion` = lo que se produjo hoy (se suma).
+ */
+export type ItemApertura =
+  | { productoId: string; cantidad: number; produccion?: number }
+  | { productoId: string; saborId: string; cantidad: number; produccion?: number };
+
+export type MotivoMermaProducto = 'VENCIDO' | 'DANADO' | 'SE_CAYO' | 'OTRO';
+
+export interface MermaProductoDto {
+  productoId: string;
+  saborId?: string;
+  cantidad: number;
+  motivo: MotivoMermaProducto;
+  nota?: string;
+}
+
 export const almacenApi = {
+  /** Productos con control de stock propio y su conteo de apertura de hoy (permiso almacen/apertura). */
+  obtenerApertura: () => api.get<AperturaDiaRespuesta>('/admin/almacen/apertura'),
+
+  /** Registra el conteo de apertura de hoy; solo las líneas enviadas (producto o sabor). */
+  registrarApertura: (items: ItemApertura[]) =>
+    api.post<{ ok: true; registrados: number }>('/admin/almacen/apertura', { items }),
+
+  /** Botar a merma de un producto o sabor (permiso almacen/merma_producto). Sin código de supervisor. */
+  mermaProducto: (dto: MermaProductoDto) =>
+    api.post<{ ok: true; id: string; saldo: number }>('/admin/almacen/merma-producto', dto),
+
   listarMovimientos: async (filtros?: { tipo?: string; insumoId?: string; buscar?: string; desde?: string; hasta?: string }): Promise<ListarMovimientosRespuesta> => {
     const params = new URLSearchParams();
     if (filtros?.tipo && filtros.tipo !== 'Todos') params.append('tipo', filtros.tipo);

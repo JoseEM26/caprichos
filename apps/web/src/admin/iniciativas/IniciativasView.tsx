@@ -29,7 +29,7 @@ const ESTILO_ESTADO: Record<string, { bg: string; fg: string }> = {
 };
 
 export function IniciativasView() {
-  const { usuario } = useSesion();
+  const { tiene } = useSesion();
   const [, startTransition] = useTransition();
 
   const [iniciativas, setIniciativas] = useState<IniciativaItem[]>([]);
@@ -167,12 +167,14 @@ export function IniciativasView() {
     }
   };
 
-  const esAdmin = (usuario?.rol || '').toUpperCase() === 'ADMIN';
+  // Cambiar el estado: ADMIN y SUPERVISOR (permiso iniciativas/cambiar_estado). Crear y comentar: todo el personal.
+  const puedeCambiarEstado = tiene('iniciativas/cambiar_estado');
+  const puedeCrear = tiene('iniciativas/crear');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       <div style={{ fontSize: '13px', lineHeight: '19px', color: 'var(--cp-soft)' }}>
-        Aquí cualquiera del equipo sube una queja, una mejora o una idea, con su captura y su comentario. Todos pueden verlas y comentar; cada una dice quién la subió. El administrador las revisa y les cambia el estado. Todo queda en el Historial de acciones.
+        Aquí cualquiera del equipo sube una queja, una mejora o una idea, con su captura y su comentario. Todos pueden verlas y comentar; cada una dice quién la subió. El administrador y el supervisor las revisan y les cambian el estado. Todo queda en el Historial de acciones.
       </div>
 
       {/* Tarjetas de resumen (contadores dinámicos) */}
@@ -258,6 +260,7 @@ export function IniciativasView() {
 
       {/* Botón nueva iniciativa, buscador y filtros en combo */}
       <BarraFiltros>
+        {puedeCrear && (
         <button
           type="button"
           onClick={() => setModalNuevaAbierto(true)}
@@ -276,6 +279,7 @@ export function IniciativasView() {
         >
           + Nueva iniciativa
         </button>
+        )}
         <div style={{ flex: '2 1 220px', minWidth: 0 }}>
           <label htmlFor="in-q" style={{ position: 'absolute', left: '-9999px' }}>
             Buscar iniciativas
@@ -529,10 +533,10 @@ export function IniciativasView() {
                   )}
 
                   {/* Acciones de estado (solo administrador) */}
-                  {esAdmin && (
+                  {puedeCambiarEstado && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--cp-soft)' }}>
-                        CAMBIAR ESTADO (solo administrador)
+                        CAMBIAR ESTADO (administrador y supervisor)
                       </span>
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         {item.estado !== 'EN_REVISION' && (

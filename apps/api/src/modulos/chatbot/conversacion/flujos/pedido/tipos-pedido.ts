@@ -4,9 +4,6 @@
 export type EstadoPedidoFlujo =
   | 'PEDIDO_MODALIDAD'
   | 'PEDIDO_UBICACION'
-  | 'PEDIDO_DIRECCION_ELEGIR'
-  | 'PEDIDO_DIRECCION_TEXTO'
-  | 'PEDIDO_REFERENCIA'
   | 'PEDIDO_CATEGORIAS'
   | 'PEDIDO_PRODUCTOS'
   | 'PEDIDO_TAMANO'
@@ -21,8 +18,6 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_QUITAR_ITEM'
   | 'PEDIDO_OFERTA_APLICAR'
   | 'PEDIDO_OFERTA_FALTA'
-  | 'PEDIDO_PREGUNTA_CUPON'
-  | 'PEDIDO_INGRESAR_CUPON'
   | 'PEDIDO_CONFIRMAR_NOMBRE'
   | 'PEDIDO_INGRESAR_NOMBRE'
   | 'PEDIDO_INGRESAR_TELEFONO'
@@ -35,9 +30,9 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_COMPROBANTE_DNI'
   | 'PEDIDO_COMPROBANTE_RUC'
   | 'PEDIDO_COMPROBANTE_RAZON'
-  | 'PEDIDO_PUNTOS_PREGUNTA'
-  | 'PEDIDO_PUNTOS_NUMERO'
   | 'PEDIDO_RESUMEN_CONFIRMAR'
+  | 'PEDIDO_PROPINA'
+  | 'PEDIDO_PROPINA_MONTO'
   | 'PEDIDO_CANCELAR_CONFIRMAR';
 
 export interface OpcionElegidaBot {
@@ -46,6 +41,13 @@ export interface OpcionElegidaBot {
   precioExtra: number;
   grupoId?: string;
   grupoNombre?: string;
+}
+
+/** Sabor de un producto con stock por sabor: unidades que consume la línea (tamaño × cantidad). */
+export interface SaborLineaBot {
+  saborId: string;
+  nombre: string;
+  cantidad: number;
 }
 
 export interface LineaCarritoBot {
@@ -61,6 +63,8 @@ export interface LineaCarritoBot {
   subtotal: number;
   opciones: OpcionElegidaBot[];
   sabor?: string;
+  /** Producto con stock por sabor: un solo sabor por línea (todas las unidades del tamaño) */
+  sabores?: SaborLineaBot[];
   nota?: string;
   noSumaBeneficios: boolean;
   /** Un nombre por envase (bebidas): va en la etiqueta pegada al envase */
@@ -78,6 +82,7 @@ export interface ItemEnConfiguracionBot {
   opciones: OpcionElegidaBot[];
   grupoIndexActual: number;
   sabor?: string;
+  sabores?: SaborLineaBot[];
   nota?: string;
   cantidad: number;
   noSumaBeneficios: boolean;
@@ -127,6 +132,8 @@ export interface EstadoCarritoPedido {
   estadoInterno: EstadoPedidoFlujo;
   /** Pago dividido en curso: primer medio y su monto mientras se elige el segundo. */
   pagoDiv?: { medio1?: MedioPagoBot; monto1?: number };
+  /** Propina opcional en soles (aparte de la venta). undefined = aún no se preguntó. */
+  propina?: number;
   modalidad?: 'DELIVERY' | 'RECOGER';
   entrega?: DatosEntregaBot;
   cliente?: DatosClienteBot;
@@ -152,16 +159,9 @@ export interface EstadoCarritoPedido {
     precio: number;
   };
   ofertasRechazadas?: string[];
-  cuponCodigo?: string;
-  cuponDescuento?: number;
-  cuponPreguntado?: boolean;
   pago?: DatosPagoBot;
   comprobante?: DatosComprobanteBot;
   idempotenciaPaso?: string;
   timestampUltimaAccion?: number;
   estadoPrevioCancelacion?: EstadoPedidoFlujo;
-  /** Ya se resolvió a qué cuenta suman los puntos de este pedido */
-  puntosResuelto?: boolean;
-  /** Qué se le está preguntando al cliente en PEDIDO_PUNTOS_PREGUNTA */
-  puntosModo?: 'SIN_CUENTA' | 'RECORDATORIO';
 }

@@ -8,6 +8,7 @@ import { PedidosAdminView } from './pedidos';
 import { CocinaAdminView } from './cocina';
 import { RepartosView } from './repartos';
 import { CierreView } from './cierre';
+import { PropinasView } from './propinas';
 import { ComprobantesView, ReclamosAdminView } from './comprobantes';
 import { PlanoView, ReservasView, MisPedidosView } from './salon';
 import { StockView } from './stock';
@@ -18,10 +19,11 @@ import { OfertasAdminView } from './ofertas';
 import { IniciativasView } from './iniciativas';
 import { CreditosView } from './creditos';
 import { ComprasView } from './compras';
-import { AlmacenView } from './almacen';
+import { AlmacenView, AperturaDiaView } from './almacen';
 import { MensajesView } from './mensajes';
 import { NotificacionesView } from './notificaciones';
 import { PantallasView } from './pantallas';
+import { AsistenciaAdminView, MiAsistenciaView, PantallaAsistenciaView } from './asistencia';
 import {
   DisenadorView,
   DestacadasView,
@@ -110,6 +112,15 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'caja/ver',
     componente: CierreView,
     icono: 'cierre',
+  },
+  {
+    clave: 'propinas',
+    nombre: 'Propinas',
+    grupo: 'Operación',
+    ruta: '/admin/propinas',
+    permisoMinimo: 'propinas/ver',
+    componente: PropinasView,
+    icono: 'propinas',
   },
   {
     clave: 'cocina',
@@ -230,6 +241,15 @@ export const MODULOS: DefinicionModulo[] = [
     ruta: '/admin/almacen',
     permisoMinimo: 'stock/ver',
     componente: AlmacenView,
+    icono: 'almacen',
+  },
+  {
+    clave: 'apertura',
+    nombre: 'Apertura del día',
+    grupo: 'Compras y stock',
+    ruta: '/admin/apertura',
+    permisoMinimo: 'almacen/apertura',
+    componente: AperturaDiaView,
     icono: 'almacen',
   },
   {
@@ -388,6 +408,33 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'auditoria/ver',
     componente: AuditoriaView,
     icono: 'historial',
+  },
+  {
+    clave: 'asistencia',
+    nombre: 'Asistencia',
+    grupo: 'Operación',
+    ruta: '/admin/asistencia',
+    permisoMinimo: 'asistencia/administrar',
+    componente: AsistenciaAdminView,
+    icono: 'asistencia',
+  },
+  {
+    clave: 'asistencia-pantalla',
+    nombre: 'Pantalla de asistencia',
+    grupo: 'Configuración',
+    ruta: '/admin/asistencia/pantalla',
+    permisoMinimo: 'asistencia/pantalla',
+    componente: PantallaAsistenciaView,
+    icono: 'pantallas',
+  },
+  {
+    clave: 'mi-asistencia',
+    nombre: 'Mi asistencia',
+    grupo: 'Operación',
+    ruta: '/admin/mi-asistencia',
+    permisoMinimo: 'asistencia/marcar',
+    componente: MiAsistenciaView,
+    icono: 'asistencia',
   },
   {
     clave: 'pantallas',

@@ -79,7 +79,23 @@ export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy 
   }
 
   /**
-   * Ejecuta un ciclo de verificación de recordatorios (2 horas antes) y aviso de tolerancia vencida.
+   * Minutos antes de la hora en que sale el único recordatorio (parámetro reserva_recordatorio_min, por defecto 30).
+   */
+  async minutosAntesRecordatorio(): Promise<number> {
+    try {
+      const param = await this.prisma.parametro.findUnique({
+        where: { clave: 'reserva_recordatorio_min' },
+      });
+      const minutos = parseInt(String(param?.valor ?? ''), 10);
+      return minutos > 0 ? minutos : 30;
+    } catch {
+      return 30;
+    }
+  }
+
+  /**
+   * Ejecuta un ciclo: el recordatorio (uno solo, 30 min antes, si el parámetro lo activa) y el aviso
+   * de tolerancia vencida (la reserva pasa a «No llegó»).
    */
   async ejecutarCiclo(ahora: Date = new Date()): Promise<{
     recordatoriosEnviados: number;
@@ -112,23 +128,22 @@ export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy 
           bloqueadoPorOtraInstancia: true,
         };
       }
-      // 1. RECORDATORIO 2 HORAS ANTES (Opcional según parámetro)
+      // 1. RECORDATORIO UNICO, 30 MIN ANTES (opcional según parámetro). Sin duplicar: marca de enviado.
       const recordatorioActivo = await this.esRecordatorioActivo();
       if (recordatorioActivo) {
         const ahoraMs = ahora.getTime();
-        // Ventana de 2 horas antes: entre 105 minutos y 135 minutos hacia el futuro
-        const minVentana = new Date(ahoraMs + 105 * 60 * 1000);
-        const maxVentana = new Date(ahoraMs + 135 * 60 * 1000);
+        const minutosAntes = await this.minutosAntesRecordatorio();
 
         const reservasParaRecordar = await this.prisma.reserva.findMany({
           where: {
             estado: 'ACTIVA',
             recordatorio_enviado: false,
             hora: {
-              gte: minVentana,
-              lte: maxVentana,
+              gte: ahora,
+              lte: new Date(ahoraMs + minutosAntes * 60 * 1000),
             },
           },
+          include: { mesas: { include: { mesa: true } } },
         });
 
         for (const r of reservasParaRecordar) {
@@ -136,10 +151,15 @@ export class RecordatorioReservasTarea implements OnModuleInit, OnModuleDestroy 
           if (!tel) continue;
 
           const { horaMinutos } = obtenerFechaHoraLima(r.hora);
+          const mesas = r.mesas
+            .map((rm) => rm.mesa?.nombre || (rm.mesa?.numero ? `Mesa ${rm.mesa.numero}` : 'Mesa'))
+            .join(', ');
           const mensajeTexto = TEXTOS_RESERVA.recordatorioReservaCliente({
             nombre: r.nombre,
             personas: r.personas,
             hora: horaMinutos,
+            mesas,
+            minutos: Math.max(1, Math.round((r.hora.getTime() - ahoraMs) / 60000)),
             toleranciaMin: r.tolerancia_min || 15,
           });
 

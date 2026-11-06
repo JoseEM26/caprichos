@@ -14,6 +14,8 @@ export interface EstadoControlAlmacen {
   insumosConReceta: number;
   insumosSinStock: number;
   productosEnRiesgo: number;
+  /** Productos con stock propio (casilla «Controlar stock de este producto»), independientes de este interruptor. */
+  productosControlados: number;
 }
 
 export const stockApi = {

@@ -22,10 +22,15 @@ export function errorCombinacionRoles(principal: string, extras: string[]): stri
   return null;
 }
 
-/** Roles de la cuenta: principal primero, luego los extra. */
+/** Un rol extra vale si no tiene fecha de vencimiento o si todavía no llega. */
+export function vigenciaRolExtra(ahora: Date = new Date()) {
+  return [{ vence_en: null }, { vence_en: { gt: ahora } }];
+}
+
+/** Roles de la cuenta: principal primero, luego los extra vigentes (un rol vencido no cuenta). */
 export async function rolesDeCuenta(prisma: PrismaService, userAccountId: bigint, rolPrincipal: string): Promise<string[]> {
   const extras = await prisma.userAccountRol.findMany({
-    where: { user_account_id: userAccountId },
+    where: { user_account_id: userAccountId, OR: vigenciaRolExtra() },
     select: { rol: true },
     orderBy: { rol: 'asc' },
   });

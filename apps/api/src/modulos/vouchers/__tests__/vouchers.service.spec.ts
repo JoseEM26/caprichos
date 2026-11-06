@@ -741,6 +741,27 @@ describe('VouchersService', () => {
         );
       });
 
+      it('con propina: el plan debe cubrir venta + propina (S/ 40), no solo la venta (S/ 35)', async () => {
+        prismaMock.pedido.findUnique.mockResolvedValue({
+          id: 50n, codigo: 'PED-50', party_id: 101n, total: 35, propina: 5, estado: 'NUEVO', modalidad: 'SALON',
+          pago_metodo: null, pago_estado: 'PENDIENTE', pago_coordinado_en: null, comprobante_tipo: 'BOLETA', comprobante_doc: null,
+        });
+
+        const sinPropina = await service
+          .enviarACaja('50', '', mozoUsuario, undefined, planValido)
+          .catch((e) => e);
+        expect(sinPropina.getResponse()).toMatchObject({ codigo: 'PLAN_PAGO_NO_CUADRA' });
+
+        const cuadra = [
+          { medio: 'EFECTIVO', monto: 20 },
+          { medio: 'YAPE', monto: 20 },
+        ];
+        await expect(service.enviarACaja('50', '', mozoUsuario, undefined, cuadra)).resolves.toEqual({ ok: true });
+        expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ mensaje: expect.stringContaining('(Efectivo S/ 20.00 · Yape S/ 20.00)') }),
+        });
+      });
+
       it('no cobra ni aprueba: solo toca el plan y el medio preferido, nunca el estado de pago', async () => {
         await service.enviarACaja('50', '', mozoUsuario, undefined, planValido);
 

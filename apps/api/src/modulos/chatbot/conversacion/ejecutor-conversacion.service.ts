@@ -17,8 +17,9 @@ import { textosNotificacionSolicitud } from '../../reservas/notificacion-solicit
 import { ChatbotIaService } from '../ia/chatbot-ia.service';
 import { ChatbotConfiguracionService } from '../configuracion/chatbot-configuracion.service';
 import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
-import { vistaPreviaPedidoBot } from './vista-previa-pedido.util';
+import { vistaPreviaPedidoBot, vistaPreviaUbicacionBot } from './vista-previa-pedido.util';
 import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
+import { carritoTrasSaborAgotado } from './flujos/pedido/flujo-pedido';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
 import {
@@ -54,6 +55,12 @@ import { obtenerFechaHoraLima } from '../../local/local.util';
 import { DireccionesClienteService } from '../../clientes/direcciones-cliente.service';
 import { OutboxWhatsappService } from '../servicios/outbox-whatsapp.service';
 import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servicios/tope-pedidos-sin-pagar.util';
+import {
+  leerExpiraPagoMin,
+  motivoSalidaValidarPago,
+  pedidoIdDePago,
+  sacarDeValidarPago,
+} from './validar-pago-salida.util';
 
 export interface EntradaProcesarMensaje extends EntradaRawInput {
   waMessageId?: string;
@@ -91,50 +98,38 @@ export class EjecutorConversacionService {
   ) {}
 
   /**
-   * Origen del pedido de WhatsApp. TELEFONO_PROPIO se vuelve a resolver aquí por el número de quien escribe (no se
-   * confía en lo guardado); TELEFONO_DICTADO lleva la cuenta elegida, que el servidor valida; NINGUNO = invitado de verdad.
+   * Origen del pedido de WhatsApp: los puntos van SIEMPRE al celular de quien escribe. El bot no acepta otro número
+   * (el de contacto para la entrega nunca suma puntos) ni ofrece canjear.
    */
-  private async origenPedidoWhatsapp(
-    puntos: { modo: string; partyId?: string; telefono?: string } | undefined,
-    conversacion: { telefono: string },
-  ): Promise<any> {
-    const base = { canal: 'WHATSAPP' as const, telefonoRemitente: conversacion.telefono };
-    if (!puntos) return base;
-    if (puntos.modo === 'NINGUNO') return { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
-    if (puntos.modo === 'TELEFONO_PROPIO') {
-      const propia = await this.direccionesService?.cuentaPorTelefono(conversacion.telefono);
-      return propia ? { ...base, clientePartyId: propia.partyId } : { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
-    }
-    // Celular elegido en el chat (sin cuenta previa): el party de puntos de ese celular, no el de quien escribe
-    if (puntos.telefono) return { ...base, telefonoPuntos: puntos.telefono };
-    return puntos.partyId ? { ...base, telefonoRemitente: undefined, clientePartyId: puntos.partyId } : { ...base, telefonoRemitente: undefined, sinCuentaCliente: true };
+  private origenPedidoWhatsapp(conversacion: { telefono: string }): {
+    canal: 'WHATSAPP';
+    telefonoRemitente: string;
+    telefonoPuntos: string;
+  } {
+    return { canal: 'WHATSAPP', telefonoRemitente: conversacion.telefono, telefonoPuntos: conversacion.telefono };
   }
 
-  /** Deja en el chat qué cuenta se eligió y cómo (TELEFONO_PROPIO | TELEFONO_DICTADO | invitado). */
-  private async registrarEleccionPuntos(
-    conversacionId: bigint | string,
-    puntos: { modo: string; partyId?: string; telefono?: string } | undefined,
-    codigoPedido: string,
-  ): Promise<void> {
-    if (!puntos) return;
+  /**
+   * Delivery con ubicación y sin dirección escrita: la calle aproximada es la que el webhook ya sacó de esa
+   * ubicación del chat (direccionAprox, Nominatim). Así el pedido y el reparto la muestran. Nunca lanza.
+   */
+  private async conCalleDeLaUbicacion<T extends { modalidad?: string; entrega?: any }>(dto: T, conversacionId: bigint): Promise<T> {
+    const entrega = dto?.entrega;
+    if (dto?.modalidad !== 'DELIVERY' || entrega?.lat == null || entrega?.lng == null || entrega?.direccion) return dto;
     try {
-      await this.prisma.mensajeChat.create({
-        data: {
-          conversacion_id: BigInt(conversacionId),
-          direccion: 'SALE',
-          autor: 'BOT',
-          tipo: 'SISTEMA',
-          contenido: {
-            texto:
-              puntos.modo === 'NINGUNO'
-                ? `Pedido ${codigoPedido}: el cliente eligió no sumar puntos (invitado).`
-                : `Pedido ${codigoPedido}: puntos a la cuenta #${puntos.partyId ?? 'del teléfono'} elegida por ${puntos.modo}.`,
-            puntos: { modo: puntos.modo, partyId: puntos.partyId ?? null, pedido: codigoPedido },
-          } as any,
-        },
+      const recientes = await this.prisma.mensajeChat.findMany({
+        where: { conversacion_id: conversacionId, direccion: 'ENTRA' },
+        orderBy: { id: 'desc' },
+        take: 10,
+        select: { contenido: true },
       });
+      const punto = recientes
+        .map((m) => (m.contenido as any)?.ubicacion)
+        .find((u) => u && Number(u.lat) === Number(entrega.lat) && Number(u.lng) === Number(entrega.lng));
+      return punto?.direccionAprox ? { ...dto, entrega: { ...entrega, direccion: punto.direccionAprox } } : dto;
     } catch (err: any) {
-      this.logger.warn(`No se pudo registrar la elección de puntos: ${err.message}`);
+      this.logger.warn(`No se pudo leer la calle de la ubicación: ${err.message}`);
+      return dto;
     }
   }
 
@@ -323,44 +318,106 @@ export class EjecutorConversacionService {
    * (pagado/rechazado, anulado, entregado, cancelado, inexistente o vencido) la conversación vuelve a MENU.
    * Devuelve el flujo vigente. Sin pedidoId en el flujo no se puede saber: se deja como está.
    */
+  /** Pedido rechazado por stock: el carrito vuelve tal cual (estado PEDIDO_ACCION_CARRITO) y se avisa en un mensaje. */
+  private async volverAlCarritoSinStock(
+    conversacionId: bigint,
+    carrito: any,
+    mensaje: string,
+    destinoEnvio: string | null | undefined,
+    entradaRaw: any,
+  ): Promise<void> {
+    const actual = await this.prisma.conversacion.findUnique({ where: { id: conversacionId }, select: { flujo: true } });
+    const flujoVuelta = {
+      ...((actual?.flujo as any) || {}),
+      estado: 'PEDIDO_ACCION_CARRITO',
+      pedido: { ...carrito, estadoInterno: 'PEDIDO_ACCION_CARRITO' },
+    };
+    await this.prisma.conversacion.update({ where: { id: conversacionId }, data: { flujo: flujoVuelta as any } });
+    const texto = `${mensaje} 😅 ¿Quieres ajustar tu pedido?`;
+    const botones = [
+      { id: 'ped_ver_carrito', titulo: 'Ajustar cantidad' },
+      { id: 'ped_quitar', titulo: 'Quitar' },
+      { id: 'btn_persona', titulo: 'Hablar con persona' },
+    ];
+    let metaId: string | null = null;
+    if (destinoEnvio) {
+      const res = await this.mensajeria.enviarBotones(destinoEnvio, texto, botones, {
+        conversacionId,
+        replyToWaMessageId: entradaRaw?.waMessageId,
+      });
+      metaId = res.waMessageId || null;
+    }
+    await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: conversacionId,
+        direccion: 'SALE',
+        autor: 'BOT',
+        tipo: 'BOTON',
+        contenido: { texto, botones } as any,
+        meta_id: metaId,
+      },
+    });
+  }
+
+  /**
+   * Sabor agotado al confirmar: la línea de ese sabor sale del carrito y el cliente elige otro sabor en una lista
+   * (un mensaje). Devuelve false si no se puede (sin línea o sin sabores): el llamador vuelve al carrito.
+   */
+  private async volverAlSaborAgotado(
+    conversacionId: bigint,
+    carrito: EstadoCarritoPedido,
+    err: { productoId: string; saborId: string; saborNombre?: string },
+    categorias: any[],
+    destinoEnvio: string | null | undefined,
+    entradaRaw: any,
+  ): Promise<boolean> {
+    const vuelta = carritoTrasSaborAgotado(carrito, err, categorias);
+    if (!vuelta) return false;
+    const actual = await this.prisma.conversacion.findUnique({ where: { id: conversacionId }, select: { flujo: true } });
+    const flujoVuelta = {
+      ...((actual?.flujo as any) || {}),
+      estado: 'PEDIDO_SABOR',
+      pedido: vuelta.pedido,
+    };
+    await this.prisma.conversacion.update({ where: { id: conversacionId }, data: { flujo: flujoVuelta as any } });
+    const { lista } = vuelta;
+    let metaId: string | null = null;
+    if (destinoEnvio) {
+      const res = await this.mensajeria.enviarLista(destinoEnvio, lista.texto, lista.botonTexto, lista.filas, {
+        conversacionId,
+        replyToWaMessageId: entradaRaw?.waMessageId,
+      });
+      metaId = res.waMessageId || null;
+    }
+    await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: conversacionId,
+        direccion: 'SALE',
+        autor: 'BOT',
+        tipo: 'LISTA',
+        contenido: { texto: lista.texto, botonTexto: lista.botonTexto, filas: lista.filas } as any,
+        meta_id: metaId,
+      },
+    });
+    this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacionId.toString() });
+    return true;
+  }
+
   private async salirDeValidarPagoSiVencido(conversacion: any, flujo: FlujoConversacion | null): Promise<FlujoConversacion | null> {
-    const pago = (flujo as any)?.pago;
-    const pedidoId = pago?.pedidoId;
-    if (!pedidoId || !/^\d+$/.test(String(pedidoId)) || typeof this.prisma.pedido?.findUnique !== 'function') return flujo;
+    const pedidoId = pedidoIdDePago(flujo);
+    if (!pedidoId || typeof this.prisma.pedido?.findUnique !== 'function') return flujo;
     try {
-      const pedido: any = await this.prisma.pedido.findUnique({ where: { id: BigInt(pedidoId) } });
-      let motivo: string | null = null;
-      if (!pedido) motivo = 'el pedido ya no existe';
-      else if (['ANULADO', 'ENTREGADO', 'CANCELADO'].includes(String(pedido.estado))) motivo = `el pedido está ${pedido.estado}`;
-      else if (pedido.pago_estado && pedido.pago_estado !== 'PENDIENTE') motivo = `el pago está ${pedido.pago_estado}`;
-      else if (!Number(pago.timestampUltimoVoucher)) {
-        // Con un comprobante enviado el chat sigue en Validar pago hasta que Caja decida (nunca se oculta un voucher sin revisar);
-        // solo vence la espera de un comprobante que nunca llegó.
-        const expiraMin = await this.leerParametroNumero('chatbot_pago_expira_min', 30);
-        const ref = pedido.creado_en ? new Date(pedido.creado_en).getTime() : 0;
-        if (expiraMin > 0 && ref && Date.now() - ref > expiraMin * 60000) motivo = `venció la espera de pago (${expiraMin} min)`;
-      }
+      const pedido: any = await this.prisma.pedido.findUnique({ where: { id: pedidoId } });
+      const motivo = motivoSalidaValidarPago(
+        pedido,
+        (flujo as any)?.pago,
+        new Date(),
+        await leerExpiraPagoMin(this.prisma),
+      );
       if (!motivo) return flujo;
 
-      const nuevoFlujo: any = { ...(flujo as any) };
-      if (nuevoFlujo.estado === 'VALIDAR_PAGO') nuevoFlujo.estado = 'MENU';
-      const data: any = { estado: 'MENU', flujo: nuevoFlujo };
-      if (conversacion.tomado_por == null && conversacion.motivo_derivacion !== 'CALIFICACION_BAJA') {
-        data.duenio = 'BOT';
-        data.urgente = false;
-        data.motivo_derivacion = null;
-      }
-      await this.prisma.conversacion.update({ where: { id: conversacion.id }, data });
+      const { flujo: nuevoFlujo, data } = await sacarDeValidarPago(this.prisma, conversacion, flujo, motivo);
       Object.assign(conversacion, data);
-      await this.prisma.mensajeChat.create({
-        data: {
-          conversacion_id: conversacion.id,
-          direccion: 'SALE',
-          autor: 'BOT',
-          tipo: 'SISTEMA',
-          contenido: { texto: `La conversación salió de «Validar pago»: ${motivo}.` } as any,
-        },
-      });
       this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacion.id.toString() });
       return nuevoFlujo;
     } catch (err: any) {
@@ -936,30 +993,7 @@ export class EjecutorConversacionService {
       }
     }
 
-    // Libreta del cliente con cuenta (party por el teléfono de quien escribe): solo en el paso de delivery
-    // y cuando elige una dirección anterior. Sin cuenta o sin direcciones queda null.
-    let direccionesCliente: Array<{
-      id: string;
-      direccion: string;
-      referencia: string | null;
-      lat: number | null;
-      lng: number | null;
-      alias: string | null;
-    }> | null = null;
-    const estadoPedidoPrevio = String(flujoPrevio?.estado ?? '');
-    if (
-      this.direccionesService &&
-      (estadoPedidoPrevio === 'PEDIDO_MODALIDAD' || estadoPedidoPrevio === 'PEDIDO_DIRECCION_ELEGIR')
-    ) {
-      try {
-        const partyId = await this.direccionesService.resolverPartyPorTelefono(conversacion.telefono);
-        if (partyId) direccionesCliente = await this.direccionesService.listar(partyId, { limite: 5 });
-      } catch (err: any) {
-        this.logger.warn(`Error consultando direcciones del cliente: ${err.message}`);
-      }
-    }
-
-    // Puntos: la cuenta del propio número (con saldo). El celular que elige el cliente se guarda en el flujo, sin consultarlo
+    // Puntos: la cuenta del propio número de quien escribe (con saldo). El bot no acepta otro número para puntos
     let puntosCtx: ContextoConversacion['puntos'] = undefined;
     const estadoPrevio = String(flujoPrevio?.estado ?? '');
     const textoEntradaPuntos = normalizarEntrada(entradaRaw);
@@ -983,21 +1017,6 @@ export class EjecutorConversacionService {
       } catch (err: any) {
         this.logger.warn(`Error consultando puntos del cliente: ${err.message}`);
         puntosCtx = undefined;
-      }
-    }
-
-    // Cobertura de la dirección anterior elegida: misma consulta que una ubicación compartida
-    if (!resultadoEnvio && estadoPedidoPrevio === 'PEDIDO_DIRECCION_ELEGIR' && this.zonasService) {
-      const idElegido = normalizarEntrada(entradaRaw).id ?? '';
-      const dirElegida = idElegido.startsWith('ped_dir_')
-        ? direccionesCliente?.find((d) => `ped_dir_${d.id}` === idElegido)
-        : undefined;
-      if (dirElegida && dirElegida.lat != null && dirElegida.lng != null) {
-        try {
-          resultadoEnvio = await this.zonasService.consultarEnvio(dirElegida.lat, dirElegida.lng);
-        } catch (err: any) {
-          this.logger.warn(`Error consultando cobertura de dirección anterior: ${err.message}`);
-        }
       }
     }
 
@@ -1121,6 +1140,13 @@ export class EjecutorConversacionService {
       } catch (err: any) {
         this.logger.warn(`Sin vista previa del pedido (se cobra el precio de lista del servidor): ${err.message}`);
       }
+    } else if (resultadoEnvio && pedidoEnCurso?.modalidad === 'DELIVERY') {
+      // Ubicación antes del carrito: el envío de la zona (y la promo de envío) sale ya del servidor
+      try {
+        vistaPreviaPedido = await vistaPreviaUbicacionBot(this.prisma, resultadoEnvio.tarifa);
+      } catch (err: any) {
+        this.logger.warn(`Sin envío para la ubicación (queda por calcular): ${err.message}`);
+      }
     }
 
     const contexto: ContextoConversacion = {
@@ -1141,7 +1167,6 @@ export class EjecutorConversacionService {
       minutosInactividad,
       inactividadExpirada,
       resultadoEnvio,
-      direccionesCliente,
       puntos: puntosCtx,
       franjasDisponiblesReserva,
       solicitudesPendientesTelefono,
@@ -1908,15 +1933,33 @@ export class EjecutorConversacionService {
         try {
           if (this.pedidosService) {
             const pedidoCreado = await this.pedidosService.crear(
-              accion.dto,
+              await this.conCalleDeLaUbicacion(accion.dto, conversacion.id),
               accion.claveIdempotencia,
-              await this.origenPedidoWhatsapp(accion.puntos, conversacion),
+              this.origenPedidoWhatsapp(conversacion),
             );
             codigoFinal = pedidoCreado.codigo;
-            await this.registrarEleccionPuntos(conversacion.id, accion.puntos, pedidoCreado.codigo);
             // La campana del pedido nuevo la crea PedidosService.crear (igual para carta, mozo y WhatsApp)
           }
         } catch (err: any) {
+          // Sin stock de un producto que controla stock: se vuelve al carrito, en un solo mensaje y sin escalar
+          if (err?.response?.codigo === 'STOCK_INSUFICIENTE' && accion.carrito) {
+            await this.volverAlCarritoSinStock(conversacion.id, accion.carrito, err.response.mensaje, destinoEnvio, entradaRaw);
+            continue;
+          }
+          // Sabor agotado: se elige otro sabor de ese producto (lista); si ya no queda ninguno, vuelve al carrito
+          if (err?.response?.codigo === 'SABOR_AGOTADO' && accion.carrito) {
+            const volvio = await this.volverAlSaborAgotado(conversacion.id, accion.carrito, err.response, categoriasCarta, destinoEnvio, entradaRaw);
+            if (!volvio) {
+              await this.volverAlCarritoSinStock(
+                conversacion.id,
+                accion.carrito,
+                `Ya no quedan ${err.response.saborNombre ?? 'ese sabor'}`,
+                destinoEnvio,
+                entradaRaw,
+              );
+            }
+            continue;
+          }
           this.logger.error(`Error creando pedido desde chatbot: ${err.message}`, err.stack);
           await this.prisma.conversacion.update({
             where: { id: conversacion.id },
@@ -1959,8 +2002,6 @@ export class EjecutorConversacionService {
           continue;
         }
 
-        // Con qué celular suma el pedido: el elegido en el chat, o el de quien escribe si eligió su propia cuenta
-        const celularPuntos = accion.puntos?.telefono ?? (accion.puntos?.modo === 'TELEFONO_PROPIO' ? conversacion.telefono : undefined);
         // Una línea con la carta virtual al confirmar (sin repetirla en cada mensaje)
         const textoConfirmacion =
           TEXTOS_BOT.pedidoConfirmadoExito({
@@ -1972,7 +2013,6 @@ export class EjecutorConversacionService {
               ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio),
             ),
             datosPago: accion.datosPagoTexto,
-            puntosTerminacion: celularPuntos ? celularPuntos.slice(-3) : undefined,
           }) + `\n\n${TEXTOS_SOLO_MENUS.lineaCartaConfirmacion(cartaUrlPublica)}`;
 
         let metaId: string | null = null;

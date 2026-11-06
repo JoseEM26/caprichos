@@ -342,7 +342,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
       )}
       {seccion(
         '2. Etiquetas por área',
-        'Una por cada área que tiene productos en el pedido. Cada área la imprime en su propia etiquetera.',
+        'Una por cada área con productos en el pedido, salvo Bebidas (sus vasos ya tienen su etiqueta en la sección 3). Cada área la imprime en su propia etiquetera.',
         grupo('AREA:'),
         'Este pedido no tiene etiquetas por área.',
       )}

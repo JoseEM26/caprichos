@@ -471,6 +471,15 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
         parameters: [{ type: 'text', text: sanearVariablePlantilla(opciones.botonCodigo) }],
       });
     }
+    // Botones de respuesta rápida (encuesta): Meta devuelve el payload al tocarlos; index es la posición del botón en la plantilla
+    (opciones?.botonesRespuesta ?? []).forEach((payloadBoton, indice) => {
+      components.push({
+        type: 'button',
+        sub_type: 'quick_reply',
+        index: String(indice),
+        parameters: [{ type: 'payload', payload: payloadBoton }],
+      });
+    });
 
     const payload: any = {
       messaging_product: 'whatsapp',

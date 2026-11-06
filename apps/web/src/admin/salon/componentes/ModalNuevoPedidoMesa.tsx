@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useId, useRef, useState, useMemo } from 'react';
 import { useSalonSocket } from '../useSalonSocket';
 import { Confirmar } from '../../../comun/Confirmar';
 import { Cargando } from '../../../comun/Cargando';
@@ -11,16 +11,21 @@ import { SEDE_DEFECTO, cargarSede } from '../../../comun/mapa/sedeDefecto';
 import { CategoriaCarta, ProductoCarta, OpcionCarta as OpcionProducto } from '../../../carta/tipos';
 import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from '../tipos';
 import { CuadriculaPlano } from './CuadriculaPlano';
+import { SelectorMesasCroquis } from './SelectorMesasCroquis';
 import { comboDeProducto } from '../../../carta/ReemplazoCombo';
 import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
+import { unidadesDeLinea } from '../../../carta/stock';
 import { ModalLiberarMesa } from './ModalLiberarMesa';
 import { VistaPreviaMesa } from './VistaPreviaMesa';
 import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
 import { salonApi } from '../api';
+import { useSesion } from '../../../comun/sesion';
+import { ModalCortesia } from '../../cortesias/ModalCortesia';
 import '../salon.css';
 import '../nuevo-pedido-mozo.css';
 import { pedidosApi } from '../../pedidos/pedidosApi';
+import { leerSaborRechazado, leerStockInsuficiente, mensajeSaborRechazado, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
 import { comprobantesApi } from '../../comprobantes/comprobantesApi';
 import { ModalVoucherPedido } from '../ModalVoucherPedido';
 import { PlanPagoEditor } from './PlanPagoEditor';
@@ -67,10 +72,26 @@ export interface ModalNuevoPedidoMesaProps {
   alRefrescarMesas?: () => Promise<void>;
   /** Permiso mesas/liberar: habilita mantener presionada una mesa ocupada para forzar su liberación */
   puedeForzarLiberacion?: boolean;
+  /** Sin permiso de salón (mesas/ver y mesas/abrir), no se ofrece «En el local (mesa)». Por defecto, sí. */
+  puedeMesa?: boolean;
+  /** Sin permiso de créditos del personal (creditos/ver), no se ofrece «Pedido del personal». Por defecto, sí. */
+  puedePersonal?: boolean;
+}
+
+/** Permisos de cortesía sin romper si el componente se usa fuera del contexto de sesión (pruebas sueltas). */
+function usePermisosCortesia(): { puede: boolean; esSupervisor: boolean } {
+  try {
+    const sesion = useSesion();
+    return { puede: sesion.tiene('cortesias/dar'), esSupervisor: sesion.usuario?.rol === 'SUPERVISOR' };
+  } catch {
+    return { puede: false, esSupervisor: false };
+  }
 }
 
 export interface LineaPedidoMesa {
   id: string;
+  /** Cortesía de la línea: sale a S/ 0. El código (solo el SUPERVISOR) viaja en la cabecera al enviar. */
+  cortesia?: { motivo: string; nota?: string; codigo?: string };
   productoId: string | number;
   nombre: string;
   tamanoId?: string | number;
@@ -84,6 +105,11 @@ export interface LineaPedidoMesa {
   personas?: string[];
   ofertaId?: string;
   comboElecciones?: { parteId: string; productoId: string }[];
+  /** Mezcla de sabores: unidades por media docena o docena y cuántas de cada sabor */
+  unidadesPorMezcla?: number;
+  /** Producto con stock: unidades que trae el tamaño (1/2 docena = 6) */
+  unidadesTamano?: number;
+  sabores?: { saborId: string; cantidad: number; nombre?: string }[];
 }
 
 /** Medio con el que paga el cliente de llevar o delivery (lo elige el mozo al registrar). */
@@ -96,6 +122,23 @@ interface ClienteBuscado {
   puntos: number;
   /** Id del party de la cuenta (lo manda el pedido como clientePartyId) */
   partyId: string;
+}
+
+/** Producto para la ventana de opciones: el saldo de cada sabor menos lo que ya llevan las líneas del pedido. */
+function productoConSaldoLibre(producto: ProductoCarta, lineas: LineaPedidoMesa[]): ProductoCarta {
+  if (!producto.sabores) return producto;
+  const usados: Record<string, number> = {};
+  for (const l of lineas) {
+    if (String(l.productoId) !== String(producto.id)) continue;
+    for (const s of l.sabores ?? []) usados[s.saborId] = (usados[s.saborId] ?? 0) + s.cantidad;
+  }
+  return {
+    ...producto,
+    sabores: producto.sabores.map((s) => ({
+      ...s,
+      quedan: typeof s.quedan === 'number' ? Math.max(0, s.quedan - (usados[String(s.id)] ?? 0)) : null,
+    })),
+  };
 }
 
 /** Marca la primera coincidencia de `q` (ya en minúsculas) dentro de `texto` */
@@ -128,6 +171,8 @@ export function ModalNuevoPedidoMesa({
   alExitoPedido,
   alRefrescarMesas,
   puedeForzarLiberacion = false,
+  puedeMesa = true,
+  puedePersonal = true,
 }: ModalNuevoPedidoMesaProps) {
   const todasLasMesasIniciales = useMemo(() => {
     const list: string[] = [];
@@ -149,6 +194,9 @@ export function ModalNuevoPedidoMesa({
     }
     return 'local';
   }, [pedidoRepetir]);
+
+  const idTituloDialogo = useId();
+  const idEleccion = useId();
 
   // Pasos: 'modal' | 'staff' | 'floor' | 'plan' | 'cli' | 'items'
   const [paso, setPaso] = useState<'modal' | 'staff' | 'floor' | 'plan' | 'cli' | 'items'>(
@@ -494,6 +542,8 @@ export function ModalNuevoPedidoMesa({
 
   // Carrito de líneas de pedido
   const [lineas, setLineas] = useState<LineaPedidoMesa[]>([]);
+  const { puede: puedeCortesia, esSupervisor: pideCodigoCortesia } = usePermisosCortesia();
+  const [lineaCortesiaId, setLineaCortesiaId] = useState<string | null>(null);
 
   // Si hay pedidoRepetir y ya cargó la carta, precargar líneas
   useEffect(() => {
@@ -518,6 +568,7 @@ export function ModalNuevoPedidoMesa({
         nombre: l.nombre || prodMatch?.nombre || 'Producto',
         tamanoId: tamMatch?.id,
         tamanoNombre: l.tamano || tamMatch?.nombre || undefined,
+        unidadesTamano: tamMatch?.unidades,
         cantidad: cant,
         precioUnitario: unit,
         precioTotal: unit * cant,
@@ -588,6 +639,12 @@ export function ModalNuevoPedidoMesa({
   // Aviso al tocar una mesa que no se puede elegir
   const [avisoMesa, setAvisoMesa] = useState<string | null>(null);
 
+  // Personas de la mesa (opcional). Si los asientos no alcanzan, se avisa y el local confirma antes de enviar.
+  const [personasTxt, setPersonasTxt] = useState('');
+  const [capacidadAceptada, setCapacidadAceptada] = useState(false);
+  const [avisoCapacidad, setAvisoCapacidad] = useState(false);
+  const personasNum = /^\d+$/.test(personasTxt.trim()) && Number(personasTxt) > 0 ? Number(personasTxt) : undefined;
+
   // Cargar carta al montar
   useEffect(() => {
     let cancel = false;
@@ -655,6 +712,46 @@ export function ModalNuevoPedidoMesa({
       .reduce((acc, m) => acc + (Number(m.asientos) || 4), 0);
   }, [mesasSeleccionadas, todasLasMesas]);
 
+  // Capacidad real de las mesas elegidas (asientos, como en el servidor) frente a las personas
+  const capacidadElegida = useMemo(
+    () => todasLasMesas.filter((m) => mesasSeleccionadas.includes(m.id)).reduce((acc, m) => acc + (m.asientos ?? 0), 0),
+    [mesasSeleccionadas, todasLasMesas],
+  );
+  const asientosFaltan = personasNum !== undefined && mesasSeleccionadas.length > 0 ? Math.max(0, personasNum - capacidadElegida) : 0;
+
+  // Croquis: mesas ocupadas (no elegibles) y reservadas (se ven, pero se pueden elegir)
+  const ocupadasCroquis = useMemo(
+    () =>
+      Object.fromEntries(
+        todasLasMesas.filter((m) => m.estado === 'OCUPADA').map((m) => [m.id, { nombre: m.pedido?.codigo ?? null }]),
+      ),
+    [todasLasMesas],
+  );
+  const reservadasCroquis = useMemo(
+    () =>
+      Object.fromEntries(
+        todasLasMesas
+          .filter((m) => m.estado !== 'OCUPADA' && m.reserva)
+          .map((m) => [m.id, { reservaId: m.reserva?.id, nombre: m.reserva?.nombre ?? null, hora: m.reserva?.hora ?? null }]),
+      ),
+    [todasLasMesas],
+  );
+
+  // Croquis nuevo (elegir una o varias mesas): tocar una libre la elige; en «Tomar pedido», la primera abre la carta
+  const alCambiarSeleccionCroquis = (ids: string[]) => {
+    setAvisoMesa(null);
+    setCapacidadAceptada(false);
+    if (modoPlano === 'one') {
+      const nueva = ids.find((id) => !mesasSeleccionadas.includes(id));
+      if (nueva) {
+        setMesasSeleccionadas([nueva]);
+        setPaso('items');
+      }
+      return;
+    }
+    setMesasSeleccionadas(ids);
+  };
+
   // Manejar clic en mesa en el plano
   const handleClicMesa = (mesa: MesaSalon) => {
     if (modoPlano === 'free') {
@@ -703,6 +800,9 @@ export function ModalNuevoPedidoMesa({
       nota: config.nota,
       ofertaId: config.ofertaId,
       comboElecciones: config.comboElecciones,
+      unidadesPorMezcla: config.unidadesPorMezcla,
+      unidadesTamano: config.tamano?.unidades,
+      sabores: config.sabores,
       personas: config.nombresBebidas ?? config.unidades.map((u) => u.nombreVaso).filter(Boolean),
     };
 
@@ -715,6 +815,8 @@ export function ModalNuevoPedidoMesa({
       prev
         .map((lin) => {
           if (lin.id === id) {
+            // con mezcla de sabores la cantidad cambia el reparto: se quita la línea y se vuelve a agregar
+            if (lin.unidadesPorMezcla !== undefined) return lin;
             const nuevaCantidad = lin.cantidad + delta;
             if (nuevaCantidad <= 0) return null;
             return {
@@ -736,7 +838,7 @@ export function ModalNuevoPedidoMesa({
 
   // Subtotal, Descuentos y Total
   const subtotal = useMemo(() => {
-    return lineas.reduce((acc, l) => acc + l.precioTotal, 0);
+    return lineas.reduce((acc, l) => acc + (l.cortesia ? 0 : l.precioTotal), 0);
   }, [lineas]);
 
   const descuento = useMemo(() => {
@@ -867,6 +969,11 @@ export function ModalNuevoPedidoMesa({
       enfocarCampo(primero.foco);
       return;
     }
+    // Personas de más frente a los asientos: se avisa y el local lo confirma (el servidor lo exige igual)
+    if (modalidad === 'local' && asientosFaltan > 0 && !capacidadAceptada) {
+      setAvisoCapacidad(true);
+      return;
+    }
     setConfirmarEnviar(true);
   };
   const intentarContinuarCli = () => {
@@ -907,8 +1014,14 @@ export function ModalNuevoPedidoMesa({
           ofertaId: lin.ofertaId,
           comboElecciones: lin.comboElecciones,
           personas: personas && personas.length > 0 ? personas : lin.personas,
+          ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
+          ...(lin.cortesia ? { cortesia: { motivo: lin.cortesia.motivo, nota: lin.cortesia.nota } } : {}),
         };
       });
+      // El SUPERVISOR presenta su código al marcar la cortesía; viaja en la cabecera del envío
+      const codigoCortesia = lineas.find((l) => l.cortesia?.codigo)?.cortesia?.codigo;
+      // Solo se pasa si hay cortesía con código: el resto de los envíos no cambia
+      const cabeceraCortesia = codigoCortesia ? ([codigoCortesia] as const) : ([] as const);
 
       // desde Pedidos y caja el canal es CAJA; el mozo desde el salón sigue siendo MOZO
       const canalEnvio: 'MOZO' | 'CAJA' = canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO');
@@ -923,6 +1036,9 @@ export function ModalNuevoPedidoMesa({
             reservaId: reservaIdPreseleccionada,
             cuponCodigo: cuponAplicado?.codigo,
             canal: canalEnvio,
+            // Personas (opcional): el servidor valida los asientos; confirmarCapacidad la deja pasar si el local lo aceptó
+            personas: personasNum,
+            ...(capacidadAceptada ? { confirmarCapacidad: true } : {}),
             esPersonal: pideMode === 'personal',
             colaboradorPartyId: staffElegido?.partyId,
             clientePartyId: clientePideId,
@@ -942,6 +1058,7 @@ export function ModalNuevoPedidoMesa({
                   },
           },
           idempotencyKey,
+          codigoCortesia,
         );
       } else {
         const telDigitos = cliTelefono.replace(/\D/g, '');
@@ -982,6 +1099,7 @@ export function ModalNuevoPedidoMesa({
             clientePartyId: clientePideId,
           },
           idempotencyKey,
+          ...cabeceraCortesia,
         );
       }
 
@@ -1014,6 +1132,18 @@ export function ModalNuevoPedidoMesa({
         } catch {
           /* se mantiene la lista anterior */
         }
+      } else if (err?.codigo === 'STOCK_INSUFICIENTE' || err?.codigo === 'SABOR_AGOTADO') {
+        // Sin cerrar el modal: se vuelve a los productos para bajar la cantidad o cambiar el producto
+        const sabor = leerSaborRechazado(err);
+        if (sabor) {
+          const linea = lineas.find((l) => String(l.productoId) === sabor.productoId);
+          setErrorEnvio(mensajeSaborRechazado(sabor, linea?.nombre));
+        } else {
+          const datos = leerStockInsuficiente(err);
+          const linea = lineas.find((l) => String(l.productoId) === datos?.productoId);
+          setErrorEnvio(datos ? mensajeStockInsuficiente(datos, linea?.nombre) : 'No hay stock suficiente para este pedido.');
+        }
+        setPaso('items');
       } else if (err?.codigo === 'MESA_OCUPADA') {
         setErrorEnvio(
           err.message ||
@@ -1091,7 +1221,14 @@ export function ModalNuevoPedidoMesa({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Nuevo pedido de mesa"
+        aria-labelledby={idTituloDialogo}
+        onKeyDown={(e) => {
+          // Escape cierra; un diálogo anidado (confirmación, ventana del producto) cierra solo lo suyo
+          if (e.key === 'Escape' && (e.target as HTMLElement).closest('[role="dialog"]') === e.currentTarget) {
+            e.stopPropagation();
+            alCerrar();
+          }
+        }}
         className="salon-overlay salon-pantalla"
         style={{
           position: 'fixed',
@@ -1177,6 +1314,7 @@ export function ModalNuevoPedidoMesa({
                 ←
               </button>
               <div
+                id={idTituloDialogo}
                 style={{
                   fontFamily: 'Montserrat, sans-serif',
                   fontWeight: 800,
@@ -1232,179 +1370,110 @@ export function ModalNuevoPedidoMesa({
           {/* PASO 1: MODALIDAD (¿Qué vas a hacer?)                         */}
           {/* ============================================================= */}
           {paso === 'modal' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  letterSpacing: '0.04em',
-                  color: 'var(--cp-soft)',
-                }}
-              >
-                PARA UN CLIENTE
-              </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-                  gap: '10px',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalidad('local');
-                    if (pisosActivos.length > 1) {
-                      setPaso('floor');
-                    } else {
-                      setPaso('plan');
-                    }
-                  }}
-                  style={{
-                    minHeight: '76px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '14px',
-                    background: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    padding: '8px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: '16px',
+            <div className="np-eleccion">
+              <section className="np-eleccion-grupo" aria-labelledby={`${idEleccion}-cliente`}>
+                <h3 id={`${idEleccion}-cliente`} className="np-eleccion-titulo">
+                  Para un cliente
+                </h3>
+                <div className="np-eleccion-grilla">
+                  {puedeMesa && (
+                    <button
+                      type="button"
+                      className="np-eleccion-tarjeta"
+                      autoFocus
+                      onClick={() => {
+                        setModalidad('local');
+                        setPaso(pisosActivos.length > 1 ? 'floor' : 'plan');
+                      }}
+                    >
+                      <span className="np-eleccion-icono" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="4" y="7" width="16" height="4" rx="1.5" />
+                          <path d="M7 11v8M17 11v8M4 19h2M18 19h2" />
+                        </svg>
+                      </span>
+                      <span className="np-eleccion-texto">
+                        <span className="np-eleccion-nombre">En el local (mesa)</span>
+                        <span className="np-eleccion-desc">Elige el piso y la mesa</span>
+                      </span>
+                      <span className="np-eleccion-flecha" aria-hidden="true">›</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className="np-eleccion-tarjeta"
+                    autoFocus={!puedeMesa}
+                    onClick={() => {
+                      setModalidad('llevar');
+                      setPaso('cli');
                     }}
                   >
-                    En el local (mesa)
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                    Elige el piso y la mesa
-                  </span>
-                </button>
+                    <span className="np-eleccion-icono" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 8h14l-1 12H6L5 8z" />
+                        <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+                      </svg>
+                    </span>
+                    <span className="np-eleccion-texto">
+                      <span className="np-eleccion-nombre">Para llevar</span>
+                      <span className="np-eleccion-desc">Sin mesa: nombre y teléfono</span>
+                    </span>
+                    <span className="np-eleccion-flecha" aria-hidden="true">›</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalidad('llevar');
-                    setPaso('cli');
-                  }}
-                  style={{
-                    minHeight: '76px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '14px',
-                    background: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    padding: '8px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: '16px',
+                  <button
+                    type="button"
+                    className="np-eleccion-tarjeta"
+                    onClick={() => {
+                      setModalidad('delivery');
+                      setPaso('cli');
                     }}
                   >
-                    Para llevar
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                    Sin mesa: nombre y teléfono
-                  </span>
-                </button>
+                    <span className="np-eleccion-icono" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z" />
+                        <circle cx="12" cy="11" r="2" />
+                      </svg>
+                    </span>
+                    <span className="np-eleccion-texto">
+                      <span className="np-eleccion-nombre">Delivery</span>
+                      <span className="np-eleccion-desc">Nombre, teléfono y ubicación</span>
+                    </span>
+                    <span className="np-eleccion-flecha" aria-hidden="true">›</span>
+                  </button>
+                </div>
+              </section>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalidad('delivery');
-                    setPaso('cli');
-                  }}
-                  style={{
-                    minHeight: '76px',
-                    border: '1.5px solid var(--cp-navy)',
-                    borderRadius: '14px',
-                    background: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    padding: '8px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: '16px',
-                    }}
-                  >
-                    Delivery
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                    Nombre, teléfono y ubicación
-                  </span>
-                </button>
-              </div>
-
-              <div
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  letterSpacing: '0.04em',
-                  color: 'var(--cp-soft)',
-                  marginTop: '6px',
-                }}
-              >
-                PARA EL EQUIPO
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setPideMode('personal');
-                  setPaso('staff');
-                }}
-                style={{
-                  minHeight: '64px',
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: '14px',
-                  background: 'var(--cp-sand)',
-                  color: 'var(--cp-navy)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '2px',
-                  padding: '8px',
-                  cursor: 'pointer',
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '16px',
-                  }}
-                >
-                  Pedido del personal
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                  Elige quién compra; el descuento de personal se aplica al cobrar a crédito
-                </span>
-              </button>
+              {puedePersonal && (
+                <section className="np-eleccion-grupo" aria-labelledby={`${idEleccion}-equipo`}>
+                  <h3 id={`${idEleccion}-equipo`} className="np-eleccion-titulo">
+                    Para el equipo
+                  </h3>
+                  <div className="np-eleccion-grilla">
+                    <button
+                      type="button"
+                      className="np-eleccion-tarjeta np-eleccion-tarjeta--equipo"
+                      onClick={() => {
+                        setPideMode('personal');
+                        setPaso('staff');
+                      }}
+                    >
+                      <span className="np-eleccion-icono" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="8" r="4" />
+                          <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+                        </svg>
+                      </span>
+                      <span className="np-eleccion-texto">
+                        <span className="np-eleccion-nombre">Pedido del personal</span>
+                        <span className="np-eleccion-desc">Elige quién compra; el descuento de personal se aplica al cobrar a crédito</span>
+                      </span>
+                      <span className="np-eleccion-flecha" aria-hidden="true">›</span>
+                    </button>
+                  </div>
+                </section>
+              )}
             </div>
           )}
 
@@ -1654,8 +1723,8 @@ export function ModalNuevoPedidoMesa({
                 })}
               </div>
 
-              {/* Selector de piso si hay más de 1 */}
-              {pisosActivos.length > 1 && (
+              {/* Selector de piso si hay más de 1 (en el croquis de elegir mesas, sus propias pestañas) */}
+              {modoPlano === 'free' && pisosActivos.length > 1 && (
                 <div className="salon-pisos" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {pisosActivos.map((f) => (
                     <button
@@ -1769,19 +1838,53 @@ export function ModalNuevoPedidoMesa({
                 </div>
               )}
 
-              {/* El plano del local, con sus paredes, cocina, barra y mesas */}
-              <div style={{ maxWidth: '100%', overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
-                <CuadriculaPlano
-                  columnas={planoActual?.cuadriculaAncho ?? planoActual?.cuadricula_ancho ?? pisoActual?.cuadricula_ancho ?? 20}
-                  filas={planoActual?.cuadriculaAlto ?? planoActual?.cuadricula_alto ?? pisoActual?.cuadricula_alto ?? 12}
-                  elementos={elementosPlano}
-                  modoSalon
-                  mesasSalon={mesasPiso}
-                  mesasSeleccionadasIds={mesasSeleccionadas}
-                  onSeleccionarMesaSalon={handleClicMesa}
-                  alMantenerMesaSalon={(m) => setVistaPreviaId(String(m.id))}
-                />
-              </div>
+              {/* Liberar o marcar: el plano de siempre (tocar una ocupada la libera) */}
+              {modoPlano === 'free' && (
+                <div style={{ maxWidth: '100%', overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
+                  <CuadriculaPlano
+                    columnas={planoActual?.cuadriculaAncho ?? planoActual?.cuadricula_ancho ?? pisoActual?.cuadricula_ancho ?? 20}
+                    filas={planoActual?.cuadriculaAlto ?? planoActual?.cuadricula_alto ?? pisoActual?.cuadricula_alto ?? 12}
+                    elementos={elementosPlano}
+                    modoSalon
+                    mesasSalon={mesasPiso}
+                    mesasSeleccionadasIds={mesasSeleccionadas}
+                    onSeleccionarMesaSalon={handleClicMesa}
+                    alMantenerMesaSalon={(m) => setVistaPreviaId(String(m.id))}
+                  />
+                </div>
+              )}
+
+              {/* Tomar pedido o juntar varias: el croquis nuevo (con paredes, cocina y barra del plano) */}
+              {modoPlano !== 'free' && (
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: 'var(--cp-navy)' }}>
+                    Personas (opcional)
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={personasTxt}
+                      onChange={(e) => {
+                        setPersonasTxt(e.target.value);
+                        setCapacidadAceptada(false);
+                      }}
+                      aria-label="Personas"
+                      style={{ width: 90, minHeight: 44, borderRadius: 10, border: '1.5px solid var(--cp-line)', padding: '0 10px', fontSize: 16 }}
+                    />
+                  </label>
+                  <SelectorMesasCroquis
+                    pisos={pisosActivos}
+                    planos={planoPisos}
+                    seleccionadas={mesasSeleccionadas}
+                    onCambio={alCambiarSeleccionCroquis}
+                    personas={personasNum}
+                    ocupadas={ocupadasCroquis}
+                    reservadas={reservadasCroquis}
+                    alMantenerMesa={(m) => setVistaPreviaId(String(m.id))}
+                    alTocarOcupada={(m) => setAvisoMesa(`${m.nombre || `Mesa ${m.numero}`} está ocupada. Elige una mesa libre.`)}
+                  />
+                </>
+              )}
               {avisoMesa && (
                 <div
                   role="alert"
@@ -2907,6 +3010,8 @@ export function ModalNuevoPedidoMesa({
                           <span className="np-qty">
                             <button
                               type="button"
+                              disabled={lin.unidadesPorMezcla !== undefined}
+                              title={lin.unidadesPorMezcla !== undefined ? 'Con sabores: quita la línea y vuelve a agregarla para cambiar la cantidad' : undefined}
                               onClick={() => actualizarCantidadLinea(lin.id, -1)}
                             >
                               −
@@ -2914,6 +3019,8 @@ export function ModalNuevoPedidoMesa({
                             <span>{lin.cantidad}</span>
                             <button
                               type="button"
+                              disabled={lin.unidadesPorMezcla !== undefined}
+                              title={lin.unidadesPorMezcla !== undefined ? 'Con sabores: quita la línea y vuelve a agregarla para cambiar la cantidad' : undefined}
                               onClick={() => actualizarCantidadLinea(lin.id, 1)}
                             >
                               +
@@ -2923,7 +3030,7 @@ export function ModalNuevoPedidoMesa({
                             {lin.cantidad} x {lin.nombre}
                             {lin.tamanoNombre && <small> · {lin.tamanoNombre}</small>}
                           </span>
-                          <span className="np-linea-precio">S/ {lin.precioTotal.toFixed(2)}</span>
+                          <span className="np-linea-precio">S/ {(lin.cortesia ? 0 : lin.precioTotal).toFixed(2)}</span>
                           <button
                             type="button"
                             className="np-quitar"
@@ -2932,9 +3039,48 @@ export function ModalNuevoPedidoMesa({
                             Quitar
                           </button>
                         </div>
+                        {puedeCortesia && !lin.ofertaId && !(lin.comboElecciones ?? []).length && (
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            {lin.cortesia ? (
+                              <>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--cp-rust)' }}>
+                                  Cortesía · vale S/ {lin.precioTotal.toFixed(2)}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="np-quitar"
+                                  onClick={() => setLineas((prev) => prev.map((x) => (x.id === lin.id ? { ...x, cortesia: undefined } : x)))}
+                                >
+                                  Quitar cortesía
+                                </button>
+                              </>
+                            ) : (
+                              <button type="button" className="np-quitar" onClick={() => setLineaCortesiaId(lin.id)}>
+                                Dar como cortesía
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {lineaCortesiaId === lin.id && (
+                          <ModalCortesia
+                            titulo={`Dar como cortesía: ${lin.nombre}`}
+                            resumen="La línea sale a S/ 0.00 al enviar el pedido."
+                            pideCodigo={pideCodigoCortesia}
+                            alCerrar={() => setLineaCortesiaId(null)}
+                            alConfirmar={async (datos, codigo) => {
+                              setLineas((prev) => prev.map((x) => (x.id === lin.id ? { ...x, cortesia: { ...datos, codigo } } : x)));
+                              setLineaCortesiaId(null);
+                            }}
+                          />
+                        )}
                         {(lin.personas || []).length > 0 && (
                           <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
                             Para: {lin.personas?.join(', ')}
+                          </div>
+                        )}
+                        {(lin.sabores ?? []).length > 0 && (
+                          <div style={{ fontSize: '11px', color: 'var(--cp-navy)', fontWeight: 700 }}>
+                            {(lin.sabores ?? []).map((x) => `${x.cantidad} ${x.nombre ?? 'sabor'}`).join(' · ')}
                           </div>
                         )}
                         {lin.nota && (
@@ -3124,10 +3270,13 @@ export function ModalNuevoPedidoMesa({
       {/* Ventana de Opciones de Producto */}
       {productoSeleccionado && (
         <VentanaOpcionesProducto
-          producto={productoSeleccionado}
+          producto={productoConSaldoLibre(productoSeleccionado, lineas)}
           alCerrar={() => setProductoSeleccionado(null)}
           alAgregar={handleAgregarProductoConfigurado}
           oferta={comboDeProducto(ofertasCombo, productoSeleccionado.id)}
+          enCarrito={lineas
+            .filter((l) => String(l.productoId) === String(productoSeleccionado.id))
+            .reduce((acc, l) => acc + unidadesDeLinea(l), 0)}
         />
       )}
 
@@ -3149,6 +3298,21 @@ export function ModalNuevoPedidoMesa({
         cargando={enviando}
         alConfirmar={handleEnviarPedido}
         alCancelar={() => setConfirmarEnviar(false)}
+      />
+
+      {/* Aviso de capacidad: las mesas no alcanzan para las personas (el local decide) */}
+      <Confirmar
+        abierto={avisoCapacidad}
+        titulo="¿Enviar con menos asientos que personas?"
+        mensaje={`Las mesas elegidas suman ${capacidadElegida} asientos y son ${personasNum ?? 0} personas: faltan ${asientosFaltan}. Si el local lo confirma, el pedido se abre igual.`}
+        textoConfirmar="Sí, enviar igual"
+        textoNo="No, revisar"
+        alConfirmar={() => {
+          setAvisoCapacidad(false);
+          setCapacidadAceptada(true);
+          setConfirmarEnviar(true);
+        }}
+        alCancelar={() => setAvisoCapacidad(false)}
       />
 
       {/* Voucher del pedido digital recién creado */}

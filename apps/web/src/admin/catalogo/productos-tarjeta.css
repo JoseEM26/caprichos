@@ -22,6 +22,7 @@
 .pt-ins--agotado { background: var(--cp-rust); }
 .pt-ins--desactivado { background: var(--cp-soft); }
 .pt-ins--promo { background: var(--cp-orange); color: var(--cp-navy); }
+.pt-ins--stock { background: var(--cp-cream); color: var(--cp-navy); border: 1.5px solid var(--cp-navy); }
 .pt-acciones {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

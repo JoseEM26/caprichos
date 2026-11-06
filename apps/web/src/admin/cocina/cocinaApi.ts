@@ -1,4 +1,5 @@
 import { api } from '../../comun/api';
+import { registrarHoraServidor } from './tiempoEnVivo';
 import type {
   AgotadoItem,
   AltaDemandaEstado,
@@ -19,7 +20,10 @@ export async function listarAreasCocina(): Promise<AreaCocina[]> {
 
 export async function listarComandasArea(areaRef: string): Promise<Comanda[]> {
   const query = areaRef ? `?area=${encodeURIComponent(areaRef)}` : '';
-  return api.get<Comanda[]>(`/admin/cocina/comandas${query}`);
+  const comandas = await api.get<Comanda[]>(`/admin/cocina/comandas${query}`);
+  // Hora del servidor: el tiempo en vivo de las tarjetas se cuenta con ella, no con el reloj del navegador
+  registrarHoraServidor(comandas.find((c) => c.ahoraServidor)?.ahoraServidor);
+  return comandas;
 }
 
 export async function despejarComanda(
@@ -56,9 +60,23 @@ export async function despacharPedido(
   );
 }
 
-/** Ajustes de la pantalla que lee el personal (GET /admin/cocina/ajustes). */
-export async function obtenerAjustesCocina(): Promise<{ confirmarDespejar: boolean }> {
-  return api.get<{ confirmarDespejar: boolean }>('/admin/cocina/ajustes');
+/**
+ * Ajustes de la pantalla que lee el personal (GET /admin/cocina/ajustes).
+ * `confirmarDespejar` es el valor efectivo para quien consulta: su preferencia personal o, si no tiene, el general.
+ */
+export interface AjustesCocina {
+  confirmarDespejar: boolean;
+  confirmarDespejarGeneral?: boolean;
+  personalizado?: boolean;
+}
+
+export async function obtenerAjustesCocina(): Promise<AjustesCocina> {
+  return api.get<AjustesCocina>('/admin/cocina/ajustes');
+}
+
+/** Preferencia personal de «Confirmar al despejar». null la quita y vuelve al valor general del local. */
+export async function guardarMisAjustesCocina(confirmarDespejar: boolean | null): Promise<AjustesCocina> {
+  return api.put<AjustesCocina>('/admin/cocina/mis-ajustes', { confirmarDespejar });
 }
 
 export async function listarHistorialCocina(

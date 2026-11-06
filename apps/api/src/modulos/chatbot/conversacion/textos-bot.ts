@@ -84,14 +84,11 @@ export const BOTONES_PEDIDO_MODALIDAD: BotonAccion[] = [
   { id: 'ped_mod_recojer', titulo: 'Para recoger' },
 ];
 
-export const BOTONES_PEDIDO_UBICACION: BotonAccion[] = [
-  { id: 'ped_loc_share', titulo: 'Compartir ubicación' },
-  { id: 'ped_loc_escribir', titulo: 'Escribir dirección' },
-];
+/** Delivery: solo se pide la ubicación actual; el único botón deja salir al menú. */
+export const BOTONES_PEDIDO_UBICACION: BotonAccion[] = [BOTON_VOLVER_MENU];
 
 export const BOTONES_PEDIDO_UBICACION_FALLIDA: BotonAccion[] = [
   { id: 'ped_mod_recojer', titulo: 'Para recoger' },
-  { id: 'ped_loc_escribir', titulo: 'Escribir dirección' },
   BOTON_VOLVER_MENU,
 ];
 
@@ -125,6 +122,11 @@ export const BOTONES_PEDIDO_NOMBRE_CONFIRMAR: BotonAccion[] = [
 export const BOTONES_PEDIDO_COMPROBANTE: BotonAccion[] = [
   { id: 'ped_comp_boleta', titulo: 'Boleta' },
   { id: 'ped_comp_factura', titulo: 'Factura' },
+];
+
+export const BOTONES_PEDIDO_PROPINA: BotonAccion[] = [
+  { id: 'ped_propina_no', titulo: 'Sin propina' },
+  { id: 'ped_propina_si', titulo: 'Dejar propina' },
 ];
 
 export const BOTONES_PEDIDO_CONFIRMAR_FINAL: BotonAccion[] = [
@@ -636,51 +638,21 @@ export const TEXTOS_BOT = {
   },
 
   pedidoPedirUbicacion: (): string => {
-    return 'Anotado: Delivery. ¿Dónde te lo llevamos? Comparte tu ubicación actual para que el repartidor te encuentre.';
-  },
-
-  pedidoUbicacionClipAyuda: (): string => {
-    return 'Toca el clip 📎 y selecciona "Ubicación" para compartir tu ubicación actual, o escribe tu dirección.';
+    return '¿Dónde te lo llevamos? 📍 Envíanos tu ubicación actual: toca el clip 📎 > Ubicación > Enviar mi ubicación actual.';
   },
 
   pedidoFueraDeCobertura: (): string => {
-    return 'Tu ubicación está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local.';
+    return 'Tu ubicación está fuera de nuestra zona de reparto. Puedes pedir para recoger en el local o enviarnos otra ubicación.';
   },
 
+  /** Ubicación recibida: el envío y, en el mismo mensaje, las categorías. */
   pedidoUbicacionExitosa: (envio: number | null, esGratis: boolean): string => {
-    if (esGratis) return 'Tu ubicación fue localizada correctamente. El envío a tu ubicación es gratis. Elige una categoría:';
-    if (envio === null) return 'Tu ubicación fue localizada correctamente. El costo del envío lo confirma un asesor. Elige una categoría:';
-    return `Tu ubicación fue localizada correctamente. El envío a tu ubicación cuesta S/ ${envio.toFixed(2)}. Elige una categoría:`;
-  },
-
-  pedidoEscribirDireccionPrompt: (): string => {
-    return 'Sin problema, escríbeme tu dirección cuando termines tu pedido (distrito, calle, manzana y lote). Un asesor te escribe, te ubica en el mapa y te confirma el costo del envío. Elige una categoría.';
-  },
-
-  pedidoPedirReferencia: (): string => {
-    return 'Por favor indícanos una referencia para el repartidor (por ejemplo: frente al parque, portón blanco, timbre 2):';
-  },
-
-  /** Cliente con cuenta y direcciones guardadas: elegir una anterior o pedir ubicación nueva. */
-  pedidoDireccionesAnteriores: (): string => {
-    return '¡Qué gusto verte de nuevo! 😊 ¿Lo enviamos a una dirección anterior o a una nueva?';
-  },
-
-  pedidoDireccionAnteriorElegida: (direccion: string, envio: number | null, esGratis: boolean): string => {
     const txtEnvio = esGratis
-      ? 'El envío es gratis.'
+      ? 'El envío a tu ubicación es gratis.'
       : envio === null
         ? 'El costo del envío lo confirma un asesor.'
-        : `El envío cuesta S/ ${envio.toFixed(2)}.`;
-    return `Perfecto, lo enviamos a ${direccion}. ${txtEnvio} Elige una categoría:`;
-  },
-
-  pedidoDireccionAnteriorSinCoordenadas: (direccion: string): string => {
-    return `Anotado: lo enviamos a ${direccion}. Un asesor te confirmará el costo del envío. Elige una categoría:`;
-  },
-
-  pedidoDireccionAnteriorFueraCobertura: (): string => {
-    return 'Esa dirección quedó fuera de nuestra zona de reparto. Comparte una nueva ubicación o escribe otra dirección.';
+        : `El envío a tu ubicación cuesta S/ ${envio.toFixed(2)}.`;
+    return `¡Listo, te encontramos! ${txtEnvio} Elige una categoría:`;
   },
 
   pedidoRecojoConfirmado: (): string => {
@@ -734,6 +706,16 @@ export const TEXTOS_BOT = {
     return '¿Qué sabor prefieres?';
   },
 
+  /** Repregunta del sabor cuando las unidades pedidas superan lo que queda de ese sabor (misma lista). */
+  pedidoSoloQuedanSabor: (quedan: number, saborNombre: string): string => {
+    return `Solo quedan ${quedan} de ${saborNombre} 😅 Elige otro sabor:`;
+  },
+
+  /** El sabor se agotó después de armar el carrito (lo rechazó el servidor): vuelve a elegir sabor. */
+  pedidoSaborAgotado: (saborNombre: string): string => {
+    return `Ya no quedan ${saborNombre}… ¿elegimos otro?`;
+  },
+
   pedidoPreguntarNotas: (nombreProd: string): string => {
     return `¿Tienes alguna indicación especial para ${nombreProd}? Si no tienes notas, presiona Continuar.`;
   },
@@ -762,8 +744,15 @@ export const TEXTOS_BOT = {
     return `El pedido mínimo para delivery es S/ ${minimo.toFixed(2)} en productos. Te faltan S/ ${faltante.toFixed(2)}; agrega algo más.`;
   },
 
-  pedidoConfirmarNombre: (nombrePerfil: string): string => {
-    return `¿Confirmas que tu nombre es ${nombrePerfil}? 👤`;
+  /** Mismo mensaje de siempre: se agrega la línea de puntos (solo acumulan, con el celular de quien escribe). */
+  pedidoConfirmarNombre: (nombrePerfil: string, puntos: { celular: string | null; saldo: number | null }): string => {
+    const donde = puntos.celular ? `tu número ${puntos.celular}` : 'tu número de WhatsApp';
+    const saldo = puntos.saldo !== null ? `\nTu saldo: ${Number(puntos.saldo).toFixed(2)} puntos.` : '';
+    return (
+      `¿Confirmas que tu nombre es ${nombrePerfil}? 👤\n\n` +
+      `⭐ Con este pedido sumas puntos en ${donde}. Aquí solo se acumulan; los canjeas en nuestra carta virtual.` +
+      saldo
+    );
   },
 
   pedidoIngresarNombre: (): string => {
@@ -835,12 +824,26 @@ export const TEXTOS_BOT = {
     return `Descuento ${corto} −S/ ${monto.toFixed(2)}`;
   },
 
+  pedidoPropinaPregunta: (tope: number): string =>
+    `*Propina opcional para el equipo*\n` +
+    `Si quieres dejar una propina, va aparte de tu pedido: no es parte de la venta ni del comprobante. ` +
+    `Máximo S/ ${tope.toFixed(2)}.`,
+
+  pedidoPropinaMonto: (tope: number): string =>
+    `¿Cuánto quieres dejar de propina? Escribe el monto en soles (por ejemplo 5 o 2.50), máximo S/ ${tope.toFixed(2)}. ` +
+    `Escribe 0 si no quieres dejar propina.`,
+
+  pedidoPropinaInvalida: (tope: number): string =>
+    `Escribe un monto en soles entre 0 y S/ ${tope.toFixed(2)}, con hasta 2 decimales.`,
+
   pedidoResumenFinal: (params: {
     lineasTexto: string;
     /** Una línea corta: «Descuento <promo> −S/ x» (solo si la promoción con casilla BOT aplica) */
     descuentoTexto?: string;
     envioTexto: string;
     total: number;
+    /** Propina (aparte de la venta): se muestra como línea antes del total a pagar */
+    propina?: number;
     modalidad: string;
     direccionTexto?: string;
     pagoTexto: string;
@@ -853,6 +856,7 @@ export const TEXTOS_BOT = {
       descuentoTexto,
       envioTexto,
       total,
+      propina,
       modalidad,
       direccionTexto,
       pagoTexto,
@@ -869,6 +873,7 @@ export const TEXTOS_BOT = {
       `Este es tu resumen:\n` +
       `${lineasTexto}${descBloque}\n` +
       `Envío: ${envioTexto}\n` +
+      (propina && propina > 0 ? `Propina: S/ ${propina.toFixed(2)}\n` : '') +
       `*Total: S/ ${total.toFixed(2)}*\n\n` +
       `Modalidad: ${modalidad}${dirBloque}\n` +
       `Pago: ${pagoTexto}\n` +
@@ -885,11 +890,10 @@ export const TEXTOS_BOT = {
     datosPago?: string;
     /** Pago dividido: una captura por medio digital, con su monto */
     capturas?: Array<{ medio: string; monto: number }>;
-    /** Últimos 3 dígitos del celular al que suma puntos el pedido (si suma) */
-    puntosTerminacion?: string;
   }): string => {
-    const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago, capturas, puntosTerminacion } = params;
-    const puntosBloque = puntosTerminacion ? `\n\n⭐ Sumas puntos con el ***${puntosTerminacion}.` : '';
+    const { codigo, tiempoMin, tiempoMax, esPagoDigital, datosPago, capturas } = params;
+    // Todo pedido del bot suma al celular de quien escribe (no se promete una cantidad: depende del cobro)
+    const puntosBloque = '\n\n⭐ Sumaste puntos en este pedido; los usas en la carta virtual.';
     const datosBloque = `${puntosBloque}${datosPago ? `\n\n${datosPago}` : ''}`;
 
     if (esPagoDigital && capturas && capturas.length >= 1) {

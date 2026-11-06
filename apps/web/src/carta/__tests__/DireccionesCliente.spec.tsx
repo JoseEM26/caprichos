@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { api } from '../../comun/api';
 import { CarritoProvider, useCarrito } from '../CarritoContext';
 import { FormularioCheckout } from '../FormularioCheckout';
@@ -153,6 +153,10 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     expect(screen.getByRole('button', { name: /Av\. Las Palmeras 123/ })).toBeInTheDocument();
     expect(screen.getByText('Portón azul')).toBeInTheDocument();
     expect(screen.getByText('usada 3 veces')).toBeInTheDocument();
+    // la otra ubicación queda en el historial plegado
+    expect(screen.queryByText('usada 1 vez')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver historial de ubicaciones anteriores (1)' })).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Ver historial de ubicaciones anteriores (1)' }));
     expect(screen.getByText('usada 1 vez')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Otra dirección' })).toBeInTheDocument();
     // hasta elegir no aparece el formulario de dirección
@@ -208,7 +212,8 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
     await irAUbicacion();
 
-    fireEvent.click(await screen.findByRole('button', { name: /Jr\. Los Olivos 45/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver historial de ubicaciones anteriores (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: /Jr\. Los Olivos 45/ }));
 
     expect(document.getElementById('f-direccion')).toHaveValue('Jr. Los Olivos 45');
     expect(api.get).not.toHaveBeenCalledWith(expect.stringContaining('/carta/envio'));
@@ -222,6 +227,92 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
 
     expect(document.getElementById('f-direccion')).toHaveValue('');
     expect(document.getElementById('f-referencia')).toHaveValue('');
+  });
+
+  it('la ubicación principal es la más usada; con empate gana la más reciente', async () => {
+    mockApi({
+      direcciones: [
+        { id: '1', direccion: 'Calle Uno', referencia: null, lat: null, lng: null, alias: null, usos: 2, ultimoUsoEn: '2026-10-01T10:00:00.000Z', origen: 'CARTA' },
+        { id: '2', direccion: 'Calle Dos', referencia: null, lat: null, lng: null, alias: null, usos: 5, ultimoUsoEn: '2026-09-01T10:00:00.000Z', origen: 'CARTA' },
+        { id: '3', direccion: 'Calle Tres', referencia: null, lat: null, lng: null, alias: null, usos: 2, ultimoUsoEn: '2026-10-25T10:00:00.000Z', origen: 'CARTA' },
+      ],
+    });
+    vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
+    await irAUbicacion();
+
+    expect(await screen.findByRole('button', { name: /Calle Dos/ })).toBeInTheDocument();
+    expect(screen.getByText('Tu ubicación habitual')).toBeInTheDocument();
+    expect(screen.getByText('usada 5 veces')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Calle Tres/ })).not.toBeInTheDocument();
+  });
+
+  it('el historial va plegado y se ordena por uso (empate: más reciente primero)', async () => {
+    mockApi({
+      direcciones: [
+        { id: '1', direccion: 'Calle Uno', referencia: null, lat: null, lng: null, alias: null, usos: 2, ultimoUsoEn: '2026-10-01T10:00:00.000Z', origen: 'CARTA' },
+        { id: '2', direccion: 'Calle Dos', referencia: null, lat: null, lng: null, alias: null, usos: 5, ultimoUsoEn: '2026-09-01T10:00:00.000Z', origen: 'CARTA' },
+        { id: '3', direccion: 'Calle Tres', referencia: null, lat: null, lng: null, alias: null, usos: 2, ultimoUsoEn: '2026-10-25T10:00:00.000Z', origen: 'CARTA' },
+        { id: '4', direccion: 'Calle Cuatro', referencia: null, lat: null, lng: null, alias: null, usos: 1, ultimoUsoEn: '2026-10-30T10:00:00.000Z', origen: 'CARTA' },
+      ],
+    });
+    vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
+    await irAUbicacion();
+
+    const boton = await screen.findByRole('button', { name: 'Ver historial de ubicaciones anteriores (3)' });
+    expect(boton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('group', { name: 'Ubicaciones anteriores' })).not.toBeInTheDocument();
+
+    fireEvent.click(boton);
+    expect(boton).toHaveAttribute('aria-expanded', 'true');
+    const grupo = screen.getByRole('group', { name: 'Ubicaciones anteriores' });
+    const nombres = within(grupo)
+      .getAllByRole('button')
+      .map((b) => within(b).getByText(/^Calle /).textContent);
+    expect(nombres).toEqual(['Calle Tres', 'Calle Uno', 'Calle Cuatro']);
+
+    fireEvent.click(boton);
+    expect(boton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('group', { name: 'Ubicaciones anteriores' })).not.toBeInTheDocument();
+  });
+
+  it('elegir una del historial la usa y cierra la lista', async () => {
+    vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
+    await irAUbicacion();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver historial de ubicaciones anteriores (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: /Jr\. Los Olivos 45/ }));
+
+    await waitFor(() => expect(document.getElementById('f-direccion')).toHaveValue('Jr. Los Olivos 45'));
+    expect(screen.queryByText('¿A dónde lo enviamos?')).not.toBeInTheDocument();
+  });
+
+  it('sin ubicación elegida el botón Continuar está deshabilitado con un aviso; al elegir se habilita', async () => {
+    vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
+    await irAUbicacion();
+
+    const continuar = await screen.findByRole('button', { name: /^Continuar$/ });
+    expect(continuar).toBeDisabled();
+    expect(screen.getByText('Elige dónde lo enviamos')).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Av\. Las Palmeras 123/ }));
+    // el texto del envío depende del subtotal del carrito (persiste entre pruebas): solo se mira la zona
+    expect(await screen.findByText(/^Zona Z1 · envío/)).toBeInTheDocument();
+    expect(screen.queryByText('Elige dónde lo enviamos')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Continuar$/ })).toBeEnabled();
+  });
+
+  it('«Usar mi ubicación actual» sigue visible en la lista y toma el punto del GPS', async () => {
+    const geo = { getCurrentPosition: vi.fn((ok: (p: unknown) => void) => ok({ coords: { latitude: -12.05, longitude: -77.04, accuracy: 20 } })) };
+    Object.defineProperty(navigator, 'geolocation', { value: geo, configurable: true });
+    vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
+    await irAUbicacion();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Usar mi ubicación actual' }));
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/carta/envio?lat=-12.05&lng=-77.04'));
+    expect(screen.queryByText('¿A dónde lo enviamos?')).not.toBeInTheDocument();
+    expect(screen.getByText('Mi pedido llega aquí')).toBeInTheDocument();
+    Object.defineProperty(navigator, 'geolocation', { value: undefined, configurable: true });
   });
 
   it('sin sesión no aparece la lista', async () => {
@@ -275,6 +366,60 @@ describe('Cuenta ▸ Mis direcciones', () => {
     await waitFor(() => expect(screen.queryByText('Av. Las Palmeras 123')).not.toBeInTheDocument());
     expect(api.delete).toHaveBeenCalledWith('/carta/cuenta/direcciones/7');
     expect(screen.getByText('Jr. Los Olivos 45')).toBeInTheDocument();
+  });
+
+  it('muestra como máximo 2; «Ver todas» despliega el resto y «Ver menos» lo pliega', async () => {
+    const tres = [
+      ...direccionesGuardadas,
+      { id: '10', direccion: 'Calle Las Flores 9', referencia: null, lat: null, lng: null, alias: null, usos: 1, ultimoUsoEn: '2026-09-01T10:00:00.000Z', origen: 'WHATSAPP' },
+    ];
+    mockApi({ direcciones: tres });
+    abrirCuenta();
+
+    expect(await screen.findByText('Av. Las Palmeras 123')).toBeInTheDocument();
+    expect(screen.queryByText('Calle Las Flores 9')).not.toBeInTheDocument();
+    const ver = screen.getByRole('button', { name: 'Ver todas (3)' });
+    expect(ver).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(ver);
+    expect(screen.getByText('Calle Las Flores 9')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver menos' })).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver menos' }));
+    expect(screen.queryByText('Calle Las Flores 9')).not.toBeInTheDocument();
+  });
+
+  it('quita una dirección que estaba oculta tras «Ver todas»', async () => {
+    const tres = [
+      ...direccionesGuardadas,
+      { id: '10', direccion: 'Calle Las Flores 9', referencia: null, lat: null, lng: null, alias: null, usos: 1, ultimoUsoEn: '2026-09-01T10:00:00.000Z', origen: 'WHATSAPP' },
+    ];
+    mockApi({ direcciones: tres });
+    vi.mocked(api.delete).mockResolvedValue({ ok: true });
+    abrirCuenta();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver todas (3)' }));
+    fireEvent.click(screen.getByRole('button', { name: /Quitar dirección Calle Las Flores 9/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, quitar' }));
+    await waitFor(() => expect(screen.queryByText('Calle Las Flores 9')).not.toBeInTheDocument());
+    expect(api.delete).toHaveBeenCalledWith('/carta/cuenta/direcciones/10');
+    expect(screen.queryByRole('button', { name: /Ver todas/ })).not.toBeInTheDocument();
+  });
+
+  it('muestra la etiqueta de origen y el texto que manda el servidor (solo coordenadas)', async () => {
+    mockApi({
+      direcciones: [
+        { id: '20', direccion: 'Ubicación que enviaste el 5 nov', referencia: null, lat: -12.01, lng: -76.95, alias: null, usos: 1, ultimoUsoEn: '2026-11-05T15:00:00.000Z', origen: 'WHATSAPP' },
+        { id: '21', direccion: 'Ubicación guardada el 6 nov', referencia: null, lat: -12.02, lng: -76.96, alias: null, usos: 1, ultimoUsoEn: '2026-11-06T15:00:00.000Z', origen: 'CARTA' },
+      ],
+    });
+    abrirCuenta();
+
+    expect(await screen.findByText('Ubicación que enviaste el 5 nov')).toBeInTheDocument();
+    expect(screen.getByText('Enviada por WhatsApp')).toBeInTheDocument();
+    expect(screen.getByText('Ubicación guardada el 6 nov')).toBeInTheDocument();
+    expect(screen.getByText('Guardada en la carta')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ver todas/ })).not.toBeInTheDocument();
   });
 
   it('sin direcciones muestra el estado vacío', async () => {

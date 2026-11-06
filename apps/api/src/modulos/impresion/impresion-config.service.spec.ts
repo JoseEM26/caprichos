@@ -1,6 +1,13 @@
+jest.mock('@nestjs/jwt', () => ({
+  JwtService: jest.fn().mockImplementation(() => ({ signAsync: jest.fn(), verifyAsync: jest.fn() })),
+  JwtModule: { registerAsync: jest.fn().mockReturnValue({ module: class MockJwtModule {} }) },
+}));
+
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ImpresionConfigService, reglasDto } from './impresion-config.service';
 import { REGLAS_IMPRESION_DEFECTO } from '@caprichos/compartido';
+import { ImpresionConfigController } from './impresion-config.controller';
+import { CLAVE_PERMISO } from '../acceso/permiso.decorator';
 
 const latidoOk = (roles: string[]) => ({
   latido_impresora: 'lista',
@@ -32,6 +39,7 @@ describe('ImpresionConfigService', () => {
       parametro: {
         findMany: jest.fn().mockResolvedValue([]),
         upsert: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       printJob: { count: jest.fn().mockResolvedValue(3) },
     };
@@ -65,6 +73,8 @@ describe('ImpresionConfigService', () => {
       expect(vaso).toMatchObject({ destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Barra' });
       const area = m.ruteo.filter((r) => r.tipo === 'ETIQUETA_AREA');
       expect(area.every((r) => r.activo === false)).toBe(true);
+      // Bebidas no lleva sticker por área (ya tiene uno por vaso): el ruteo solo lista las demás áreas
+      expect(area.map((r) => r.areaId)).toEqual(['2']);
       const comanda = m.ruteo.find((r) => r.tipo === 'TICKET_COMANDA_SALON')!;
       expect(comanda).toMatchObject({ destinoAreaId: null, destinoNombre: 'Caja' });
     });
@@ -241,6 +251,62 @@ describe('ImpresionConfigService', () => {
       await expect(service.guardarReglas({ generalModalidades: ['PLANETA'] }, undefined)).rejects.toThrow(BadRequestException);
       await expect(service.guardarReglas({ bebidaActivo: 'no' as any }, undefined)).rejects.toThrow(BadRequestException);
       expect(prisma.parametro.upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST reglas/restablecer', () => {
+    const CLAVES_BORRADAS = [
+      'impresion_etiqueta_general_modalidades',
+      'impresion_etiqueta_bebida_activo',
+      'impresion_etiqueta_area_activo',
+      'impresion_ticket_comanda_salon_activo',
+      'impresion_ticket_comanda_area_activo',
+    ].sort();
+
+    it('borra solo las claves de reglas (no impresion_vence_min) y devuelve los defectos', async () => {
+      // Tras cambiar reglas, la tabla tiene valores distintos a los defectos.
+      // Primera lectura (antes): valores cambiados. Segunda (después de borrar): sin filas.
+      prisma.parametro.findMany
+        .mockResolvedValueOnce([
+          { clave: 'impresion_etiqueta_bebida_activo', valor: false },
+          { clave: 'impresion_etiqueta_area_activo', valor: true },
+        ])
+        .mockResolvedValueOnce([]);
+      const r = await service.restablecerReglas({ partyId: 1n } as any);
+      const where = prisma.parametro.deleteMany.mock.calls[0][0].where.clave.in;
+      expect([...where].sort()).toEqual(CLAVES_BORRADAS);
+      expect(where).not.toContain('impresion_vence_min');
+      expect(prisma.parametro.upsert).not.toHaveBeenCalled();
+      expect(r).toEqual({ ok: true, reglas: reglasDto(REGLAS_IMPRESION_DEFECTO) });
+    });
+
+    it('es idempotente: sin filas guardadas responde los defectos y no falla', async () => {
+      const primera = await service.restablecerReglas(undefined);
+      const segunda = await service.restablecerReglas(undefined);
+      expect(primera).toEqual(segunda);
+      expect(primera.reglas).toEqual(reglasDto(REGLAS_IMPRESION_DEFECTO));
+    });
+
+    it('audita con RESTABLECER_REGLAS_IMPRESION con antes y después', async () => {
+      prisma.parametro.findMany
+        .mockResolvedValueOnce([{ clave: 'impresion_etiqueta_bebida_activo', valor: false }])
+        .mockResolvedValueOnce([]);
+      await service.restablecerReglas({ partyId: 7n } as any, '10.0.0.1');
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'RESTABLECER_REGLAS_IMPRESION',
+        entidad: 'parametro',
+        partyId: 7n,
+        ip: '10.0.0.1',
+        antes: expect.objectContaining({ bebidaActivo: false }),
+        despues: reglasDto(REGLAS_IMPRESION_DEFECTO),
+      }));
+    });
+
+    it('exige configuracion/editar', () => {
+      const permiso = Reflect.getMetadata(CLAVE_PERMISO, ImpresionConfigController.prototype.restablecerReglas);
+      expect(permiso).toEqual({ modulo: 'configuracion', accion: 'editar' });
     });
   });
 });

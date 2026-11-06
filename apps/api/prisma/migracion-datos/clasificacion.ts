@@ -35,7 +35,7 @@ export const MIGRAR: string[] = [
 /** Tablas que NO se migran, agrupadas por motivo. */
 const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['transacciones de venta: pedidos, cobros, comprobantes y reclamos', [
-    'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_estado_historial', 'secuencia_pedido',
+    'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_linea_sabor', 'pedido_estado_historial', 'secuencia_pedido', 'pedido_cambio_ubicacion', 'cortesia', 'contador_diario',
     'pedido_mesa', 'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
     'incidente_entrega', 'incidente_entrega_foto', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto',
   ]],
@@ -56,17 +56,26 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
     'notificacion', 'mensaje_carta', 'ia_consumo', 'uso_externo', 'correo_envio',
   ]],
   ['stock y compras: saldos, movimientos y pedidos a proveedores', [
-    'stock', 'movimiento_stock', 'pedido_proveedor', 'pedido_proveedor_linea', 'compra', 'compra_linea',
-    'traslado', 'pedido_interno', 'produccion',
+    'stock', 'stock_sabor', 'movimiento_stock', 'pedido_proveedor', 'pedido_proveedor_linea', 'compra', 'compra_linea',
+    'traslado', 'pedido_interno', 'produccion', 'conteo_apertura',
   ]],
   ['seguridad y llaves: secretos, llaves de dispositivos y colas de impresión', [
     'supervisor_secreto', 'device_key', 'print_job', 'sesion',
+  ]],
+  ['asistencia del personal: marcas, selfies, dispositivos y consentimientos (datos personales e historial de la base de origen)', [
+    'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
+  ]],
+  ['reparto de propinas: montos pagados a cada persona por mes (dinero real, historial propio de cada base)', [
+    'propina_reparto', 'propina_reparto_detalle',
   ]],
   ['lectura de notificaciones por persona: cada usuario tiene su propio estado, no se migra', [
     'notificacion_lectura',
   ]],
   ['roles extra de cada cuenta: se asignan de nuevo en la base destino tras migrar el personal', [
-    'user_account_rol', 'user_account_area',
+    'user_account_rol', 'user_account_rol_historial', 'user_account_area',
+  ]],
+  ['preferencias personales de cada usuario (p. ej. confirmar al despejar): cada persona fija la suya en su base', [
+    'preferencia_usuario',
   ]],
   ['trazas y control técnico', [
     'auditoria', 'sys_control', 'iniciativa', 'iniciativa_comentario',
@@ -83,7 +92,7 @@ export const TABLAS_SENSIBLES: string[] = [
   'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
   'contact_mechanism', 'cliente_direccion', 'conversacion', 'mensaje_chat', 'whatsapp_mensaje',
   'saliente_whatsapp', 'notificacion', 'cobro', 'caja', 'cierre_caja', 'cierre_ajuste_medio', 'devolucion_pedido', 'pedido', 'reserva',
-  'reclamo', 'encuesta', 'stock', 'movimiento_stock', 'ia_consumo', 'data_request',
+  'reclamo', 'encuesta', 'stock', 'stock_sabor', 'movimiento_stock', 'ia_consumo', 'data_request',
 ];
 
 /** Columnas que NUNCA se exportan, en ninguna tabla (contraseñas, hashes, PIN). */

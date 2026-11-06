@@ -1,4 +1,5 @@
 import { PuntosService } from '../clientes/puntos.service';
+import { repartirPropina } from '../propinas/propinas.util';
 import { ImpresionService } from '../impresion/impresion.service';
 import { StockService } from '../stock/stock.service';
 import { OfertasService } from '../ofertas/ofertas.service';
@@ -28,6 +29,7 @@ import {
   autorizarAdminSinCodigo,
 } from '../supervisor-codigo/supervisor-codigo.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
+import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import {
   MEDIOS_COBRO,
@@ -349,16 +351,23 @@ export class CobrosService {
         );
       }
 
-      // Los montos de los pagos deben sumar exactamente el total (en céntimos, sin floats)
-      const totalPedido = aCentimos(pedido.total);
+      // Los montos de los pagos son lo que entrega el cliente por cada medio: venta + propina.
+      // Deben sumar exactamente lo que se cobra (en céntimos, sin floats).
+      const propinaPedido = Number(pedido.propina ?? 0);
+      const totalPedido = aCentimos(pedido.total) + aCentimos(propinaPedido);
       const totalPagos = dto.pagos.reduce((acc, p) => acc + aCentimos(p.monto), 0);
       const diferencia = totalPagos - totalPedido;
+      // Propina por renglón, en proporción a lo cobrado por medio (la venta del renglón es monto - propina)
+      const propinasRenglon = repartirPropina(
+        dto.pagos.map((p) => ({ monto: Number(p.monto) })),
+        propinaPedido,
+      );
 
       if (diferencia !== 0) {
         throw new HttpException(
           {
             codigo: 'PAGO_NO_CUADRA',
-            mensaje: `La suma de los pagos (S/ ${enPesos(totalPagos).toFixed(2)}) no coincide con el total del pedido (S/ ${enPesos(totalPedido).toFixed(2)})`,
+            mensaje: `La suma de los pagos (S/ ${enPesos(totalPagos).toFixed(2)}) no coincide con ${propinaPedido > 0 ? 'el total del pedido más la propina' : 'el total del pedido'} (S/ ${enPesos(totalPedido).toFixed(2)})`,
             diferencia: enPesos(diferencia),
           },
           HttpStatus.BAD_REQUEST,
@@ -412,12 +421,15 @@ export class CobrosService {
           credito_personal: Boolean(pedido.es_personal),
           cobrado_por: BigInt(usuario.partyId),
           pagos: {
-            create: dto.pagos.map((p) => {
+            create: dto.pagos.map((p, i) => {
               const esEfectivo = p.medio.toUpperCase() === 'EFECTIVO';
               const conRecibido = esEfectivo && p.recibido !== undefined && p.recibido !== null;
+              const propina = propinasRenglon[i];
               return {
                 medio: p.medio.toUpperCase(),
-                monto: new Prisma.Decimal(enPesos(aCentimos(p.monto))),
+                // monto = venta del renglón; propina = su parte de propina (monto + propina = lo entregado)
+                monto: new Prisma.Decimal(enPesos(aCentimos(p.monto) - aCentimos(propina))),
+                propina: new Prisma.Decimal(propina),
                 recibido: conRecibido ? new Prisma.Decimal(enPesos(aCentimos(p.recibido))) : null,
                 vuelto: conRecibido
                   ? new Prisma.Decimal(enPesos(aCentimos(p.recibido) - aCentimos(p.monto)))
@@ -449,6 +461,9 @@ export class CobrosService {
         sinVoucherAutorizado,
       };
     });
+
+    // Caja cobró: las conversaciones de Validar pago de este pedido salen de la espera sin avisar al cliente (idempotente)
+    await cerrarValidarPagoDePedido(this.prisma, cobro.pedido_id, 'Caja registró el cobro', this.eventosGateway);
 
     // Si el mozo ya emitió la nota de venta al enviar a Caja, su ticket salió ya en la ticketera: no se repite.
     // Se mira antes de emitir (el cobro podría emitir otra nota si el comprobante cambió).
@@ -529,6 +544,7 @@ export class CobrosService {
         pagos: cobro.pagos.map((p) => ({
           medio: p.medio,
           monto: Number(p.monto),
+          propina: Number(p.propina),
           recibido: p.recibido !== null && p.recibido !== undefined ? Number(p.recibido) : null,
           vuelto: p.vuelto !== null && p.vuelto !== undefined ? Number(p.vuelto) : null,
         })),
@@ -562,6 +578,7 @@ export class CobrosService {
         id: p.id.toString(),
         medio: p.medio,
         monto: Number(p.monto),
+        propina: Number(p.propina),
         recibido: p.recibido !== null && p.recibido !== undefined ? Number(p.recibido) : null,
         vuelto: p.vuelto !== null && p.vuelto !== undefined ? Number(p.vuelto) : null,
       })),
@@ -767,10 +784,11 @@ export class CobrosService {
       return actual;
     });
 
-    // el cobro anulado devuelve el stock y reversa los puntos que había sumado
+    // el cobro anulado devuelve el stock de insumos y reversa los puntos; los productos que controlan stock
+    // siguen vendidos (el pedido sigue vivo y se descontaron al crearlo)
     for (const paso of [
       () => this.puntosService?.reversarPorPedido(cobro.pedido_id),
-      () => this.stockService?.revertirPorPedido(cobro.pedido_id, undefined, usuario?.partyId),
+      () => this.stockService?.revertirPorPedido(cobro.pedido_id, undefined, usuario?.partyId, { soloInsumos: true }),
     ]) {
       try {
         await paso();
@@ -858,6 +876,8 @@ export class CobrosService {
         pago_preferido: p.pago_preferido,
         pago_metodo: p.pago_metodo,
         total: Number(p.total),
+        // Propina aparte: el cobro pide venta + propina
+        propina: Number(p.propina ?? 0),
         cliente_nombre: p.cliente_nombre,
         cliente_telefono: p.cliente_telefono,
         comprobante_tipo: p.comprobante_tipo,
@@ -940,6 +960,7 @@ export class CobrosService {
         pago_coordinado_por: BigInt(usuario.partyId),
       },
     });
+    await cerrarValidarPagoDePedido(this.prisma, pedido.id, 'Caja coordinó el pago', this.eventosGateway);
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',

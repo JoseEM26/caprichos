@@ -90,7 +90,7 @@ describe('RecordatorioReservasTarea', () => {
       });
 
       const ahora = new Date('2026-10-27T18:00:00.000Z');
-      const horaReserva = new Date(ahora.getTime() + 120 * 60 * 1000); // 2 horas exactamente
+      const horaReserva = new Date(ahora.getTime() + 30 * 60 * 1000); // 30 min exactamente
 
       const mockReservas = [
         {
@@ -102,6 +102,7 @@ describe('RecordatorioReservasTarea', () => {
           tolerancia_min: 15,
           estado: 'ACTIVA',
           recordatorio_enviado: false,
+          mesas: [{ mesa_id: 1n, mesa: { nombre: null, numero: 3 } }],
         },
       ];
 
@@ -116,10 +117,27 @@ describe('RecordatorioReservasTarea', () => {
 
       expect(resultado.recordatoriosEnviados).toBe(1);
       expect(mockOutbox.encolar).toHaveBeenCalledWith(expect.objectContaining({ telefono: '51987654321', carga: expect.objectContaining({ plantillaClave: 'RESERVA_RECORDATORIO' }) }), expect.anything());
+      const textoEnviado = mockOutbox.encolar.mock.calls.at(-1)[0].carga.textoLibre as string;
+      expect(textoEnviado).toContain('en 30 min');
+      expect(textoEnviado).toContain('Mesa 3');
       expect(mockPrisma.reserva.update).toHaveBeenCalledWith({
         where: { id: 101n },
         data: { recordatorio_enviado: true },
       });
+    });
+
+    it('la búsqueda del recordatorio es solo la ventana hasta reserva_recordatorio_min (30 por defecto)', async () => {
+      mockPrisma.parametro.findUnique.mockResolvedValue({ clave: 'chatbot_reserva_recordatorio', valor: 'si' });
+      mockPrisma.reserva.findMany.mockResolvedValue([]);
+
+      const ahora = new Date('2026-10-27T18:00:00.000Z');
+      await tarea.ejecutarCiclo(ahora);
+
+      const where = mockPrisma.reserva.findMany.mock.calls[0][0].where;
+      expect(where.estado).toBe('ACTIVA');
+      expect(where.recordatorio_enviado).toBe(false);
+      expect(where.hora.gte).toEqual(ahora);
+      expect(where.hora.lte).toEqual(new Date(ahora.getTime() + 30 * 60 * 1000));
     });
 
     it('notifica al cliente cuando la tolerancia de la reserva vence y se pasa a NO_ASISTIO', async () => {

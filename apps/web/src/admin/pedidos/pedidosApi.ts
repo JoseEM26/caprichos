@@ -39,6 +39,12 @@ export interface LineaPedido {
     id: string;
     nombre: string;
   } | null;
+  /** Cortesía: la línea sale a S/ 0 y su valor de lista va en cortesia.valor_lista */
+  es_cortesia?: boolean;
+  cortesia?: { valor_lista: string | number } | null;
+  producto_id?: string | null;
+  oferta_id?: string | null;
+  linea_combo_id?: string | null;
 }
 
 export interface HistorialEstado {
@@ -69,6 +75,13 @@ export interface Pedido {
   pago_estado?: string | null;
   pago_preferido?: string | null;
   cobro_vigente_id?: string | number | null;
+  /** Número del día en cocina (referencial); null si no llegó a cocina */
+  numero_dia?: number | null;
+  fecha_dia?: string | null;
+  /** Último cambio de ubicación (ISO); null si la dirección es la original */
+  ubicacion_editada_en?: string | null;
+  /** Saldo por cobrar o devolución pendiente por el cambio de ubicación (solo si aplica) */
+  ajusteUbicacionPendiente?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null;
   /** Cobro por mozo (envío a Caja): null si no lo envió o el pedido ya está PAGADO */
   cobroMozo?: {
     en: string;
@@ -82,6 +95,8 @@ export interface Pedido {
     pide?: 'BOLETA' | 'FACTURA' | null;
   } | null;
   paga_con?: string | number | null;
+  /** Propina aparte de la venta (el cobro pide venta + propina) */
+  propina?: string | number | null;
   /** Pago dividido: monto por medio (vacío si el pedido no tiene plan) */
   planPago?: Array<{ medio: string; monto: string | number }>;
   /** Puntos del pedido (ganados, por ganar o motivo por el que no suma) */
@@ -241,6 +256,8 @@ export interface PedidoPorCobrar {
   pago_preferido?: string | null;
   pago_metodo: string | null;
   total: number;
+  /** Propina aparte de la venta: lo que se cobra es total + propina */
+  propina?: number;
   cliente_nombre: string | null;
   cliente_telefono: string | null;
   comprobante_tipo: string;
@@ -365,12 +382,14 @@ export const pedidosApi = {
       lineas: Array<{
         productoId: string | number;
         tamanoId?: string | number;
+        /** Cortesía de la línea (solo con permiso cortesias/dar): sale a S/ 0 */
+        cortesia?: { motivo: string; nota?: string };
         cantidad: number;
         opciones?: (string | number)[];
         nota?: string;
         personas?: string[];
         ofertaId?: string;
-        comboElecciones?: { parteId: string; productoId: string }[];
+        comboElecciones?: { parteId: string; productoId: string; saborId?: string }[];
       }>;
       pago: {
         metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
@@ -403,10 +422,15 @@ export const pedidosApi = {
       canal?: 'MOZO' | 'CAJA';
     },
     idempotencyKey?: string,
+    /** Solo si hay líneas de cortesía y quien envía es SUPERVISOR: su código de 6 dígitos */
+    codigoSupervisor?: string,
   ): Promise<any> {
     const headers: Record<string, string> = {};
     if (idempotencyKey) {
       headers['Idempotency-Key'] = idempotencyKey;
+    }
+    if (codigoSupervisor) {
+      headers['x-codigo-supervisor'] = codigoSupervisor;
     }
     try {
       return await api.post('/admin/pedidos', dto, { headers });

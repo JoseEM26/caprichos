@@ -28,13 +28,31 @@ El cambio aplica a quien crea cuenta o recupera contraseña desde ese momento. L
 
 ## Número que recibe la verificación
 
-Configuración › Parámetros de operación › **Número que recibe la verificación**: el celular del negocio con código de país (por ejemplo `51914244077`). Si se deja vacío, se usa el **WhatsApp de contacto** del local (Configuración › Mi local › Contacto).
+Configuración › Parámetros de operación › **Número que recibe la verificación**: el celular del negocio con código de país (por ejemplo `51914244077`). Si se deja vacío, se usa en este orden:
+
+1. La variable del servidor **`VERIFICACION_WHATSAPP_NUMERO`** (solo si está definida y bien escrita).
+2. El **WhatsApp de contacto** del local (Configuración › Mi local › Contacto).
+
+El número del parámetro gana siempre sobre la variable. Un número mal escrito se ignora y se sigue con el orden de arriba.
 
 Si no hay ningún número, el modo WHATSAPP_ENTRANTE muestra «La verificación del celular no está disponible en este momento» y no falla en silencio. Revisa el número antes de avisar a los clientes.
 
+## Fijar el número de la demo (sin tocar prod)
+
+El mensaje tiene que llegar al número que atiende el webhook de **esa** instalación. La demo tiene su propio número de prueba de Meta; si el botón abre el WhatsApp real de Caprichos, el mensaje llega a producción y la demo nunca lo ve («no reconoce en tiempo real», la carta espera 10 minutos y vence).
+
+Para la demo hay dos formas, en este orden de preferencia:
+
+- **Parámetro** (Configuración › Parámetros de operación › Número que recibe la verificación): escribe el número de prueba de Meta de la demo, solo dígitos con código de país. Es lo más visible para el dueño.
+- **Variable en el `.env` del servidor demo**: `VERIFICACION_WHATSAPP_NUMERO=<número de prueba con 51>`. El compose de demo ya la pasa al contenedor de la API (vacía por defecto). Tras cambiarla, redesplegar o recrear el contenedor `api` de la demo. **No** tocar el `.env` de producción ni su compose.
+
+El número **no** va en Git ni en esta guía: se pone en el servidor o en el parámetro de la demo.
+
 ## Qué probar en la demo
 
-- La demo usa el **número de prueba de Meta**. Ese número **recibe** mensajes de cualquiera, pero **solo envía** a los celulares autorizados.
+- El número de prueba de Meta **solo recibe** mensajes de celulares que estén agregados como destinatarios de prueba en la consola de Meta (sección de la API de WhatsApp, destinatarios de prueba). Si el celular de prueba no está agregado, su mensaje no llega y la carta no avanza. Esto **no está confirmado** en las pruebas de este repositorio: compruébalo enviando un mensaje desde un celular agregado y desde uno sin agregar antes de dar por buena la demo.
+- Mientras tanto, la confirmación que la API envía de vuelta («Listo ✅ ya verificamos tu celular…») puede **no llegar** si el celular de prueba no está autorizado para recibir. Aun así la carta avanza: la verificación se marca al **recibir** el mensaje, no al enviar la confirmación.
+- Si el mensaje no llega, la carta muestra a los 60 s la pista «¿Ya enviaste el mensaje y no avanza?» y ofrece pedir un enlace nuevo. Si no hay ningún número configurado, muestra «La verificación del celular no está disponible».
 - Por eso, en la demo, la confirmación que la API envía de vuelta («Listo ✅ ya verificamos tu celular…») puede **no llegar** si el celular de prueba no está autorizado. Aun así la carta avanza: la verificación se marca al **recibir** el mensaje, no al enviar la confirmación.
 - Prueba: crear cuenta con el celular, enviar el mensaje desde WhatsApp, ver que la carta avanza sola; probar con un enlace vencido; probar que otro celular no sirve con el enlace de un tercero.
 - Con el número real de producción, la confirmación sí debe llegar.

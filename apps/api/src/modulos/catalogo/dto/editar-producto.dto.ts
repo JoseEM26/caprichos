@@ -59,6 +59,11 @@ export class EditarProductoDto {
   @IsBoolean()
   resaltarOpcionMenosPedida?: boolean;
 
+  /** Controla el stock de este producto (donas, galletas), aunque «Control de almacén» de insumos esté apagado. */
+  @IsOptional()
+  @IsBoolean()
+  controlaStock?: boolean;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

@@ -11,6 +11,7 @@ import type {
 import {
   despejarComanda,
   despacharPedido,
+  guardarMisAjustesCocina,
   marcarUnidadesLinea,
   devolverComanda,
   listarAreasCocina,
@@ -27,6 +28,7 @@ import {
   reproducirCampanaCocina,
   setSilenciado,
 } from './audioAlerta';
+import type { AjustesCocina } from './cocinaApi';
 import { ComandaTarjeta, SEGUNDOS_DESHACER } from './ComandaTarjeta';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
@@ -37,6 +39,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { useSesion } from '../../comun/sesion';
+import { AvisoAperturaHoy } from '../almacen/AvisoAperturaHoy';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export type ModoCocina = 'area' | 'hist';
@@ -170,8 +173,12 @@ export function CocinaAdminView() {
     return () => clearTimeout(t);
   }, [saliendo]);
 
-  // Ajuste «Confirmar al despejar» (Configuración › Cocina). Por defecto, pide confirmación.
+  // «Preguntar antes de despejar»: valor efectivo para este cocinero (su preferencia o, si no tiene, el general del local)
   const [confirmarDespejar, setConfirmarDespejar] = useState<boolean>(true);
+  const [confirmarGeneral, setConfirmarGeneral] = useState<boolean>(true);
+  const [personalizado, setPersonalizado] = useState<boolean>(false);
+  const [guardandoAjuste, setGuardandoAjuste] = useState<boolean>(false);
+  const [avisoAjuste, setAvisoAjuste] = useState<string | null>(null);
 
   // Audio
   const [silenciado, setSilenciadoEstado] = useState<boolean>(estaSilenciado());
@@ -245,12 +252,18 @@ export function CocinaAdminView() {
   }, []);
 
   // Ajustes de cocina: si no se pueden leer, se queda con la confirmación encendida
+  const aplicarAjustesCocina = (a: AjustesCocina | null | undefined) => {
+    setConfirmarDespejar(a?.confirmarDespejar !== false);
+    setConfirmarGeneral(a?.confirmarDespejarGeneral !== false);
+    setPersonalizado(a?.personalizado === true);
+  };
+
   useEffect(() => {
     if (!puedeVer) return;
     Promise.resolve()
       .then(() => obtenerAjustesCocina())
-      .then((a) => setConfirmarDespejar(a?.confirmarDespejar !== false))
-      .catch(() => setConfirmarDespejar(true));
+      .then((a) => aplicarAjustesCocina(a))
+      .catch(() => aplicarAjustesCocina(null));
   }, [puedeVer]);
 
   // Inicialización (montaje inicial)
@@ -341,6 +354,23 @@ export function CocinaAdminView() {
     const nuevo = !silenciado;
     setSilenciadoEstado(nuevo);
     setSilenciado(nuevo);
+  };
+
+  // Guarda mi preferencia al instante (null = usar la del local). Si falla, vuelve como estaba.
+  const cambiarAjusteDespejar = async (valor: boolean | null, efectivo: boolean) => {
+    const previo = { confirmar: confirmarDespejar, personal: personalizado };
+    setConfirmarDespejar(efectivo);
+    setGuardandoAjuste(true);
+    setAvisoAjuste(null);
+    try {
+      aplicarAjustesCocina(await guardarMisAjustesCocina(valor));
+    } catch {
+      setConfirmarDespejar(previo.confirmar);
+      setPersonalizado(previo.personal);
+      setAvisoAjuste('No se guardó. Intenta de nuevo.');
+    } finally {
+      setGuardandoAjuste(false);
+    }
   };
 
   const seleccionarAreaMockup = (areaId: string) => {
@@ -613,6 +643,9 @@ export function CocinaAdminView() {
         color: 'var(--cp-navy)',
       }}
     >
+      {/* 0. Conteo de apertura del día pendiente (productos con control de stock propio) */}
+      <AvisoAperturaHoy />
+
       {/* 1. Texto de ayuda de los tiempos */}
       <div style={{ fontSize: '13px', color: 'var(--cp-soft)', lineHeight: '1.5' }}>
         Cada área ve solo lo suyo y lo despeja con un toque cuando lo terminó. Los
@@ -848,6 +881,66 @@ export function CocinaAdminView() {
             }}
           />
         </button>
+
+        {/* Preferencia personal de cada cocinero: si está marcada, Despejar pide Sí o No */}
+        <label
+          title="Solo para ti. Si la apagas, Despejar quita la comanda directo; «Deshacer» sigue disponible."
+          style={{
+            minHeight: '44px',
+            padding: '0 14px',
+            borderRadius: '12px',
+            border: '1.5px solid var(--cp-navy)',
+            background: confirmarDespejar ? 'var(--cp-white)' : 'transparent',
+            color: 'var(--cp-navy)',
+            fontWeight: 800,
+            fontSize: '13px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxSizing: 'border-box',
+            cursor: guardandoAjuste ? 'wait' : 'pointer',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={confirmarDespejar}
+            disabled={guardandoAjuste}
+            onChange={(e) => void cambiarAjusteDespejar(e.target.checked, e.target.checked)}
+            aria-describedby="ayuda-preguntar-despejar"
+            style={{ width: '20px', height: '20px', margin: 0, accentColor: 'var(--cp-navy)' }}
+          />
+          <span>Preguntar antes de despejar</span>
+          <span id="ayuda-preguntar-despejar" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+            Solo para ti. Si la apagas, Despejar quita la comanda directo; «Deshacer» sigue disponible.
+          </span>
+        </label>
+
+        {personalizado && confirmarDespejar !== confirmarGeneral && (
+          <button
+            type="button"
+            onClick={() => void cambiarAjusteDespejar(null, confirmarGeneral)}
+            disabled={guardandoAjuste}
+            style={{
+              minHeight: '44px',
+              padding: '0 8px',
+              border: 0,
+              background: 'transparent',
+              color: 'var(--cp-navy)',
+              fontWeight: 700,
+              fontSize: '12px',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+            }}
+          >
+            Usar la del local
+          </button>
+        )}
+
+        {avisoAjuste && (
+          <span role="alert" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-red, #b3261e)' }}>
+            {avisoAjuste}
+          </span>
+        )}
       </div>
 
       {/* 5. Selector de Área y Pantalla completa */}

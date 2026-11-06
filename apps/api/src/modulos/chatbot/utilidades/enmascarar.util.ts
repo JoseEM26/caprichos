@@ -77,6 +77,17 @@ export function enmascararTelefono(telefono: string): string {
 }
 
 /**
+ * Celular para el aviso de puntos del bot: «9•• ••• 123» (solo los 3 últimos dígitos).
+ * Null si no es un celular peruano (p. ej. un BSUID de WhatsApp): el texto dice «tu número de WhatsApp».
+ * Aparte de enmascararTelefono porque ese deja 2 dígitos y este aviso pide 3.
+ */
+export function celularPuntosEnmascarado(telefono: string | null | undefined): string | null {
+  const nacional = normalizarTelefono(String(telefono ?? '')).replace(/^51/, '');
+  if (!/^9\d{8}$/.test(nacional)) return null;
+  return `${nacional[0]}•• ••• ${nacional.slice(-3)}`;
+}
+
+/**
  * Genera el hash criptográfico SHA-256 del teléfono o BSUID normalizado para búsquedas e indexación seguras.
  */
 export function hashTelefono(telefono: string): string {

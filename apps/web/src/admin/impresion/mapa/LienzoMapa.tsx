@@ -436,7 +436,7 @@ export function LienzoMapa({
         <Interruptor
           id="mapa-impresion-area"
           titulo="Sticker por área"
-          ayuda="Apagado hasta que lo confirmes: un sticker por cada área"
+          ayuda="Apagado hasta que lo confirmes: un sticker por área, salvo Bebidas"
           activo={r.areaActivo}
           deshabilitado={bloqueado}
           onCambiar={(v) => onCambiarRegla({ areaActivo: v }, 'reglas')}

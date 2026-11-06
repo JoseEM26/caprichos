@@ -3,7 +3,7 @@ jest.mock('../../../ofertas/envio-gratis-promo', () => ({
 }));
 
 import { calcularEnvioDelivery } from '../../../ofertas/envio-gratis-promo';
-import { vistaPreviaPedidoBot } from '../vista-previa-pedido.util';
+import { vistaPreviaPedidoBot, vistaPreviaUbicacionBot } from '../vista-previa-pedido.util';
 
 const mockEnvio = calcularEnvioDelivery as jest.Mock;
 
@@ -67,5 +67,28 @@ describe('vistaPreviaPedidoBot', () => {
   it('sin carrito no hay vista previa', async () => {
     const vista = await vistaPreviaPedidoBot({ prisma: {} as any }, { ...pedidoDelivery(), items: [] }, 5);
     expect(vista).toBeNull();
+  });
+});
+
+describe('vistaPreviaUbicacionBot (ubicación antes del carrito)', () => {
+  beforeEach(() => mockEnvio.mockReset());
+
+  it('el envío de la zona con las reglas del servidor, con subtotal 0', async () => {
+    mockEnvio.mockResolvedValue({ envio: 5, promo: null });
+    const vista = await vistaPreviaUbicacionBot({} as any, 5);
+    expect(mockEnvio).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ subtotal: 0, tarifaZona: 5, canal: 'WHATSAPP' }));
+    expect(vista).toEqual({ subtotal: 0, descuento: 0, descuentoNombre: null, envio: 5, envioGratis: false });
+  });
+
+  it('con la promo de envío gratis queda en 0', async () => {
+    mockEnvio.mockResolvedValue({ envio: 0, promo: { id: '5', nombre: 'Envío gratis', hasta: null, compraMinima: null } });
+    const vista = await vistaPreviaUbicacionBot({} as any, 5);
+    expect(vista.envioGratis).toBe(true);
+  });
+
+  it('sin zona conocida el envío queda por calcular', async () => {
+    const vista = await vistaPreviaUbicacionBot({} as any, null);
+    expect(vista.envio).toBeNull();
+    expect(mockEnvio).not.toHaveBeenCalled();
   });
 });

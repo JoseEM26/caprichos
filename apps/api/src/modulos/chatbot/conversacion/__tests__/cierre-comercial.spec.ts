@@ -162,6 +162,16 @@ describe('Cierre Comercial Determinista y Promociones (cta-bot)', () => {
       expect(oferta?.sugerenciaVentaAdicional).toBe('Combínalo con Chicha Morada 500ml y ahorras S/ 4');
     });
 
+    it('no ofrece como complemento un producto sin saldo (quedan 0)', () => {
+      const catalogoSinSaldo = catalogoSimulado.map((c) => ({
+        ...c,
+        productos: c.productos.map((p: any) => (p.nombre === 'Chicha Morada 500ml' ? { ...p, quedan: 0 } : p)),
+      }));
+      const oferta = buscarOfertaParaProducto(productoSandwich, [ofertaComboDuo], catalogoSinSaldo);
+      expect(oferta?.complementoNombre).toBeUndefined();
+      expect(oferta?.sugerenciaVentaAdicional).toBeUndefined();
+    });
+
     it('debe generar botones con [Pedir este producto], [Ver la promo] y [Volver al menú] priorizados', () => {
       const oferta = buscarOfertaParaProducto(productoSandwich, [ofertaComboDuo], catalogoSimulado);
       const cierre = generarCierreComercial({

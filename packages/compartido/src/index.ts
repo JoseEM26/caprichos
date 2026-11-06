@@ -10,6 +10,7 @@ export {
   REGLAS_IMPRESION_DEFECTO,
   ROLES_COCINA_AREA,
   AREA_BEBIDAS,
+  esAreaBebidas,
 } from './constantes/index.js';
 export type { ReglasImpresion } from './constantes/index.js';
 export type { RolSistema } from './constantes/index.js';

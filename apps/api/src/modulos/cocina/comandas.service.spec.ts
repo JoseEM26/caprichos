@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ComandasService } from './comandas.service';
+import { ComandasService, distribucionSabores } from './comandas.service';
 import { SalonService } from '../salon/salon.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -38,10 +38,13 @@ describe('ComandasService', () => {
           { clave: 'rep_rojo_min', valor: 50 },
         ]),
       },
+      // Número del día al llegar a cocina (numero-dia.ts): contador y pedido atómicos
+      $queryRaw: jest.fn().mockResolvedValue([{ ultimo: 1 }]),
       pedido: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       comandaArea: {
         findUnique: jest.fn(),
@@ -96,6 +99,57 @@ describe('ComandasService', () => {
   });
 
   describe('sincronizarPedido e idempotencia', () => {
+    it('combo: la madre (sin producto ni área) no genera comanda; cada parte va a la comanda de su área', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 3n,
+        codigo: 'CP-0103',
+        estado: 'COLA',
+        lineas: [
+          { id: 30n, nombre: 'COMBO CAJITA CAPRIKIDS', area_id: null, producto_id: null, producto: null },
+          { id: 31n, nombre: 'FRAPPE OREO', area_id: 1n, producto_id: 5n, linea_combo_id: 30n, producto: null },
+          { id: 32n, nombre: 'Burbujas', area_id: 2n, producto_id: 6n, linea_combo_id: 30n, producto: null },
+        ],
+        comandas: [],
+      });
+      prisma.comandaArea.create.mockResolvedValue({ id: 1 });
+
+      const creadas = await service.sincronizarPedido(3n);
+      expect(creadas).toBe(2);
+      const areas = prisma.comandaArea.create.mock.calls.map((c: any) => c[0].data.area_id);
+      expect(areas).toEqual([1n, 2n]);
+    });
+
+    it('la primera llegada a cocina asigna el número del día; una segunda sincronización no lo cambia', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 4n,
+        codigo: 'CP-0104',
+        estado: 'COLA',
+        numero_dia: null,
+        lineas: [{ id: 40n, nombre: 'Americano', area_id: 1n, producto: null }],
+        comandas: [],
+      });
+      prisma.comandaArea.create.mockResolvedValue({ id: 1 });
+
+      await service.sincronizarPedido(4n);
+      expect(prisma.pedido.updateMany).toHaveBeenCalledWith({
+        where: { id: 4n, numero_dia: null },
+        data: expect.objectContaining({ numero_dia: 1 }),
+      });
+
+      // Ya tiene comandas: no vuelve a numerar
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 4n,
+        codigo: 'CP-0104',
+        estado: 'COLA',
+        numero_dia: 1,
+        lineas: [{ id: 40n, nombre: 'Americano', area_id: 1n, producto: null }],
+        comandas: [{ area_id: 1n }],
+      });
+      prisma.pedido.updateMany.mockClear();
+      await service.sincronizarPedido(4n);
+      expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
+    });
+
     it('crea filas de comanda_area por cada área involucrada y llama a descuentoService por primera vez', async () => {
       const mockPedido = {
         id: 1n,
@@ -661,5 +715,21 @@ describe('ComandasService', () => {
       expect(texto).not.toContain('entrega_direccion');
       expect(texto).toContain('Ana');
     });
+  });
+});
+
+describe('distribucionSabores (cocina: reparto por sabor de la línea)', () => {
+  it('muestra cada sabor con sus unidades; sin reparto no hay texto', () => {
+    expect(
+      distribucionSabores({
+        sabores: [
+          { sabor_nombre: 'Fresa', cantidad: 2 },
+          { sabor_nombre: 'Oreo', cantidad: 3 },
+          { sabor_nombre: 'Manjar', cantidad: 1 },
+        ],
+      }),
+    ).toBe('2 Fresa · 3 Oreo · 1 Manjar');
+    expect(distribucionSabores({ sabores: [] })).toBeNull();
+    expect(distribucionSabores({})).toBeNull();
   });
 });

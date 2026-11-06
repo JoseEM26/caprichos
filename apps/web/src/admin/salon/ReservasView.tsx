@@ -7,6 +7,7 @@ import { PisoSalon, Reserva } from './tipos';
 import { ModalFormularioReserva } from './componentes/ModalFormularioReserva';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ConfirmarAprobacionSolicitud } from './componentes/ConfirmarAprobacionSolicitud';
+import { etiquetaMesas } from './componentes/SelectorMesasCroquis';
 import { hoyLima, partesLima } from './fechaLima';
 import { useSalonSocket } from './useSalonSocket';
 import { salonApi } from './api';
@@ -30,6 +31,14 @@ export interface SolicitudWhatsApp {
 
 function partesSolicitud(horaIso: string | null | undefined) {
   return { horaIso: horaIso || '', ...partesLima(horaIso) };
+}
+
+/** Texto de la insignia de una reserva. NO_ASISTIO es «No llegó» (la mesa ya no está retenida). */
+function etiquetaEstadoReserva(estado: string): string {
+  if (estado === 'SENTADA') return 'Atendida';
+  if (estado === 'CANCELADA') return 'Cancelada';
+  if (estado === 'NO_ASISTIO') return 'No llegó';
+  return 'Confirmada';
 }
 
 export function ReservasView() {
@@ -73,9 +82,6 @@ export function ReservasView() {
   const [modalNuevoPedidoAbierto, setModalNuevoPedidoAbierto] = useState(false);
   const [mesasParaPedido, setMesasParaPedido] = useState<string[]>([]);
   const [reservaIdParaPedido, setReservaIdParaPedido] = useState<string | undefined>(undefined);
-
-  // Modal selector de mesa para solicitud WhatsApp
-  const [solicitudParaAsignar, setSolicitudParaAsignar] = useState<SolicitudWhatsApp | null>(null);
 
   // Confirmaciones Sí/No
   const [confirmarAprobarSol, setConfirmarAprobarSol] = useState<SolicitudWhatsApp | null>(null);
@@ -196,6 +202,17 @@ export function ReservasView() {
   // Fecha actual formateada (YYYY-MM-DD)
   const hoyIso = useMemo(() => hoyLima(), []);
 
+  /** Reactiva una reserva «No llegó» de hoy (el cliente llegó tarde). El servidor valida y audita. */
+  const reactivarReserva = async (r: Reserva) => {
+    setErrorGlobal(null);
+    try {
+      const actualizada = await salonApi.reactivarReserva(r.id);
+      setReservas((prev) => prev.map((x) => (x.id === actualizada.id ? actualizada : x)));
+    } catch (err: any) {
+      setErrorGlobal(err?.message || 'No fue posible reactivar la reserva.');
+    }
+  };
+
   // Fecha seleccionada formateada (YYYY-MM-DD)
   const diaIso = useMemo(() => {
     return `${mesActual.y}-${String(mesActual.m + 1).padStart(2, '0')}-${String(diaSeleccionado).padStart(2, '0')}`;
@@ -246,6 +263,7 @@ export function ReservasView() {
         if (filtroEstado === 'Atendida' && r.estado !== 'SENTADA') return false;
         if (filtroEstado === 'Cancelada' && r.estado !== 'CANCELADA') return false;
         if (filtroEstado === 'Pendiente' && r.estado !== 'ACTIVA') return false;
+        if (filtroEstado === 'No llegó' && r.estado !== 'NO_ASISTIO') return false;
       }
       if (filtroPersonas !== 'todos') {
         if (String(r.personas) !== filtroPersonas) return false;
@@ -701,7 +719,7 @@ export function ReservasView() {
 
                   <button
                     type="button"
-                    onClick={() => setSolicitudParaAsignar(r)}
+                    onClick={() => setConfirmarAprobarSol(r)}
                     style={{
                       minHeight: '48px',
                       border: '1.5px solid var(--cp-navy)',
@@ -1062,7 +1080,7 @@ export function ReservasView() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {reservasDelDia.map((r) => {
               const horaTexto = partesLima(r.hora).hora || '19:00';
-              const mesaNom = (r.mesas || []).map((m) => m.nombre || `M0${m.numero}`).join(' + ');
+              const mesaNom = etiquetaMesas(r.mesas || []);
 
               return (
                 <div
@@ -1125,20 +1143,16 @@ export function ReservasView() {
                             ? '#DDF1E3'
                             : r.estado === 'CANCELADA'
                             ? '#FDECE8'
-                            : '#FFF1C9',
+                            : r.estado === 'NO_ASISTIO' ? '#E9ECF2' : '#FFF1C9',
                         color:
                           r.estado === 'SENTADA'
                             ? '#14502B'
                             : r.estado === 'CANCELADA'
                             ? 'var(--cp-rust)'
-                            : '#7A5C00',
+                            : r.estado === 'NO_ASISTIO' ? '#4A5468' : '#7A5C00',
                       }}
                     >
-                      {r.estado === 'SENTADA'
-                        ? 'Atendida'
-                        : r.estado === 'CANCELADA'
-                        ? 'Cancelada'
-                        : 'Confirmada'}
+                      {etiquetaEstadoReserva(r.estado)}
                     </span>
 
                     {r.estado === 'ACTIVA' && (
@@ -1158,6 +1172,26 @@ export function ReservasView() {
                         }}
                       >
                         Sentar
+                      </button>
+                    )}
+
+                    {r.estado === 'NO_ASISTIO' && partesLima(r.hora).fecha === hoyIso && (
+                      <button
+                        type="button"
+                        onClick={() => reactivarReserva(r)}
+                        style={{
+                          minHeight: '34px',
+                          padding: '0 12px',
+                          borderRadius: '8px',
+                          border: 0,
+                          background: 'var(--cp-orange)',
+                          color: 'var(--cp-navy)',
+                          fontWeight: 800,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Reactivar
                       </button>
                     )}
                   </div>
@@ -1279,7 +1313,7 @@ export function ReservasView() {
               valorPorDefecto="todos"
               opciones={[
                 { valor: 'todos', etiqueta: 'Todos' },
-                ...['Confirmada', 'Pendiente', 'Cancelada', 'Atendida'].map((e) => ({ valor: e, etiqueta: e })),
+                ...['Confirmada', 'Pendiente', 'Cancelada', 'Atendida', 'No llegó'].map((e) => ({ valor: e, etiqueta: e })),
               ]}
               alCambiar={setFiltroEstado}
             />
@@ -1309,7 +1343,7 @@ export function ReservasView() {
             const lima = partesLima(r.hora);
             const fechaStr = lima.fecha ? `${lima.fecha.slice(8, 10)}/${lima.fecha.slice(5, 7)}` : '15/10';
             const horaStr = lima.hora || '19:00';
-            const mesaNom = (r.mesas || []).map((m) => m.nombre || `M0${m.numero}`).join(' + ');
+            const mesaNom = etiquetaMesas(r.mesas || []);
 
             const badgeBg =
               r.estado === 'SENTADA'
@@ -1318,15 +1352,12 @@ export function ReservasView() {
                 ? 'var(--cp-rust)'
                 : r.estado === 'ACTIVA'
                 ? 'var(--cp-navy)'
+                : r.estado === 'NO_ASISTIO'
+                ? 'var(--cp-soft)'
                 : 'var(--cp-gold)';
             const badgeFg =
               r.estado === 'CANCELADA' ? 'var(--cp-white)' : 'var(--cp-cream)';
-            const badgeTexto =
-              r.estado === 'SENTADA'
-                ? 'Atendida'
-                : r.estado === 'CANCELADA'
-                ? 'Cancelada'
-                : 'Confirmada';
+            const badgeTexto = etiquetaEstadoReserva(r.estado);
 
             return (
               <div
@@ -1417,6 +1448,24 @@ export function ReservasView() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                  {r.estado === 'NO_ASISTIO' && partesLima(r.hora).fecha === hoyIso && (
+                    <button
+                      type="button"
+                      onClick={() => reactivarReserva(r)}
+                      style={{
+                        flex: 1,
+                        minHeight: '44px',
+                        border: 0,
+                        borderRadius: '12px',
+                        background: 'var(--cp-orange)',
+                        color: 'var(--cp-navy)',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Reactivar
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -1478,9 +1527,11 @@ export function ReservasView() {
       {confirmarAprobarSol && (
         <ConfirmarAprobacionSolicitud
           solicitud={confirmarAprobarSol}
-          mesas={todasLasMesas}
-          alAprobar={async ({ mesas, hora }) => {
-            await salonApi.aprobarSolicitud(confirmarAprobarSol.id, { mesas, hora });
+          pisos={pisosSalon}
+          obtenerOcupadas={(fecha, hora) => salonApi.mesasOcupadas(fecha, hora)}
+          obtenerAvisos={(fecha, hora, mesaIds) => salonApi.avisosMesas(fecha, hora, mesaIds)}
+          alAprobar={async ({ mesas, hora, confirmarCapacidad }) => {
+            await salonApi.aprobarSolicitud(confirmarAprobarSol.id, { mesas, hora, confirmarCapacidad });
             setSolicitudes((prev) =>
               prev.map((s) =>
                 s.id === confirmarAprobarSol.id ? { ...s, estado: 'aprobada' as const } : s,
@@ -1594,131 +1645,6 @@ export function ReservasView() {
         errorServidor={errorFormulario}
         alLimpiarError={() => setErrorFormulario(null)}
       />
-
-      {/* Modal Asignar Mesa en el Plano para Solicitud WhatsApp */}
-      {solicitudParaAsignar && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Asignar mesa en el plano"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 85,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <div
-            onClick={() => setSolicitudParaAsignar(null)}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 50,
-              background: 'rgba(11, 44, 62, 0.55)',
-            }}
-          />
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 60,
-              width: 'min(540px, calc(100% - 24px))',
-              background: 'var(--cp-cream)',
-              borderRadius: '20px',
-              padding: '20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 800,
-                  fontSize: '18px',
-                  color: 'var(--cp-navy)',
-                }}
-              >
-                Mesa para {solicitudParaAsignar.nombre}
-              </div>
-              <button
-                type="button"
-                onClick={() => setSolicitudParaAsignar(null)}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '18px',
-                  border: '1.5px solid var(--cp-navy)',
-                  background: 'transparent',
-                  fontWeight: 800,
-                  fontSize: '18px',
-                  cursor: 'pointer',
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-              Elige una mesa con al menos {solicitudParaAsignar.personas} asientos:
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-                gap: '8px',
-                maxHeight: '300px',
-                overflowY: 'auto',
-              }}
-            >
-              {todasLasMesas.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    const mesaTxt = m.nombre || `Mesa ${m.numero}`;
-                    setSolicitudes((prev) =>
-                      prev.map((s) =>
-                        s.id === solicitudParaAsignar.id
-                          ? { ...s, mesa: mesaTxt, mesasIds: [m.id] }
-                          : s,
-                      ),
-                    );
-                    setSolicitudParaAsignar(null);
-                  }}
-                  style={{
-                    minHeight: '64px',
-                    borderRadius: '12px',
-                    border: '1.5px solid var(--cp-navy)',
-                    background: 'var(--cp-white)',
-                    color: 'var(--cp-navy)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    cursor: 'pointer',
-                    fontWeight: 800,
-                  }}
-                >
-                  <span>{m.nombre || `Mesa ${m.numero}`}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                    {m.asientos || 4} asientos
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal Nuevo Pedido de Mesa (conectado con Sentar) */}
       {modalNuevoPedidoAbierto && (

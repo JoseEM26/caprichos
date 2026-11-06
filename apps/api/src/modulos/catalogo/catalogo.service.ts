@@ -15,6 +15,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import {
   CategoriaCarta,
   ProductoCarta,
+  SaborCarta,
 } from './catalogo.tipos';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { EditarProductoDto } from './dto/editar-producto.dto';
@@ -34,6 +35,7 @@ import {
   CrearListaDto,
 } from './dto/lista.dto';
 import { invalidarOpcionesMenosPedida } from '../cocina/opcion-menos-pedida';
+import { estadoSaborCarta, estadoSaboresHoy, quedanProductos } from '../stock/producto-controlado';
 
 export function normalizarTexto(texto: string): string {
   if (!texto) return '';
@@ -123,6 +125,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       by: ['producto_id'],
       where: {
         producto_id: { not: null },
+        es_cortesia: false,
         pedido: { estado: { notIn: ['RECHAZADO', 'ANULADO'] }, creado_en: { gte: new Date(ahora - 90 * 86_400_000) } },
       },
       _sum: { cantidad: true },
@@ -189,6 +192,15 @@ export class CatalogoService implements OnApplicationBootstrap {
       },
     });
 
+    const quedanPorProducto = await quedanProductos(
+      this.prisma,
+      categorias.flatMap((c) => c.productos.map((p) => p.id)),
+    );
+    const estadoSabores = await estadoSaboresHoy(
+      this.prisma,
+      categorias.flatMap((c) => c.productos.flatMap((p) => p.sabores.map((s) => s.id))),
+    );
+
     const terminosBusqueda = q && q.trim() ? normalizarTexto(q).split(/\s+/).filter(Boolean) : [];
 
     const resultado: CategoriaCarta[] = [];
@@ -206,7 +218,25 @@ export class CatalogoService implements OnApplicationBootstrap {
           }
         }
 
-        const disponible = estaDisponible(p.agotado_hasta);
+        const sabores: SaborCarta[] = (p.sabores || [])
+          .filter((s) => s.activo)
+          .map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock));
+        const saboresConStock = sabores.some((s) => s.disponible);
+        // Producto por sabor: su stock y su disponibilidad salen de los sabores (quedan = suma de los disponibles)
+        const porSabor = p.controla_stock && sabores.length > 0;
+        const quedanProducto = quedanPorProducto.get(p.id.toString()) ?? null;
+        const disponibles = sabores.filter((s) => s.disponible);
+        const quedan = porSabor
+          ? disponibles.length === 0
+            ? 0
+            : disponibles.every((s) => s.quedan !== null)
+              ? disponibles.reduce((acc, s) => acc + (s.quedan ?? 0), 0)
+              : null
+          : quedanProducto;
+        // Producto que controla stock: sin saldo no se vende (aunque no esté marcado como agotado)
+        const disponible = porSabor
+          ? estaDisponible(p.agotado_hasta) && saboresConStock
+          : estaDisponible(p.agotado_hasta) && !(quedan !== null && quedan <= 0);
         const agotadoHasta =
           p.agotado_hasta && !disponible
             ? p.agotado_hasta.toISOString()
@@ -216,6 +246,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           id: t.id.toString(),
           nombre: t.tamano_valor?.nombre || '',
           precio: Number(Number(t.precio).toFixed(2)),
+          unidades: t.unidades,
         }));
 
         const grupos = (p.grupos || [])
@@ -236,14 +267,6 @@ export class CatalogoService implements OnApplicationBootstrap {
               })),
           }));
 
-        const sabores = (p.sabores || [])
-          .filter((s) => s.activo)
-          .map((s) => ({
-            id: s.id.toString(),
-            nombre: s.nombre,
-            disponible: estaDisponible(s.agotado_hasta),
-          }));
-
         productosCarta.push({
           id: p.id.toString(),
           nombre: p.nombre,
@@ -256,6 +279,9 @@ export class CatalogoService implements OnApplicationBootstrap {
           noSumaBeneficios: p.no_suma_beneficios,
           disponible,
           agotadoHasta,
+          controlaStock: p.controla_stock,
+          saboresConStock,
+          quedan,
         });
       }
 
@@ -345,6 +371,10 @@ export class CatalogoService implements OnApplicationBootstrap {
           },
         })
       : [];
+    const estadoSabores = await estadoSaboresHoy(
+      this.prisma,
+      productos.flatMap((p) => p.sabores.map((s) => s.id)),
+    );
     const hoy = obtenerAhoraLima().fechaIso;
     const aItem = (o: any) => {
       const desde = formatearFecha(o.fecha_desde);
@@ -378,6 +408,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
+      controlaStock: p.controla_stock,
       promociones: ofertas
         .filter((o) => o.alcance_producto_id === p.id || (!o.alcance_producto_id && o.alcance_categoria_id === p.categoria_id))
         .map(aItem),
@@ -389,6 +420,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         nombre: t.tamano_valor?.nombre || '',
         precio: Number(Number(t.precio).toFixed(2)),
         activo: t.activo,
+        unidades: t.unidades,
       })),
       grupos: (p.grupos || []).map((pg) => ({
         id: pg.grupo.id.toString(),
@@ -406,12 +438,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           disponible: estaDisponible(o.agotado_hasta),
         })),
       })),
-      sabores: (p.sabores || []).map((s) => ({
-        id: s.id.toString(),
-        nombre: s.nombre,
-        activo: s.activo,
-        disponible: estaDisponible(s.agotado_hasta),
-      })),
+      sabores: (p.sabores || []).map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock)),
     }));
   }
 
@@ -446,6 +473,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         mensaje: 'El producto no existe',
       });
     }
+    const estadoSabores = await estadoSaboresHoy(this.prisma, (p.sabores || []).map((s) => s.id));
 
     return {
       id: p.id.toString(),
@@ -463,6 +491,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
+      controlaStock: p.controla_stock,
       fotoUrl: obtenerFotoUrl(p.foto_archivo),
       tamanos: (p.tamanos || []).map((t) => ({
         id: t.id.toString(),
@@ -470,6 +499,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         nombre: t.tamano_valor?.nombre || '',
         precio: Number(Number(t.precio).toFixed(2)),
         activo: t.activo,
+        unidades: t.unidades,
       })),
       grupos: (p.grupos || []).map((pg) => ({
         id: pg.grupo.id.toString(),
@@ -486,12 +516,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           disponible: estaDisponible(o.agotado_hasta),
         })),
       })),
-      sabores: (p.sabores || []).map((s) => ({
-        id: s.id.toString(),
-        nombre: s.nombre,
-        activo: s.activo,
-        disponible: estaDisponible(s.agotado_hasta),
-      })),
+      sabores: (p.sabores || []).map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock)),
     };
   }
 
@@ -550,6 +575,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           orden: dto.orden ?? 0,
           no_suma_beneficios: dto.noSumaBeneficios ?? false,
           resaltar_opcion_menos_pedida: dto.resaltarOpcionMenosPedida ?? false,
+          controla_stock: dto.controlaStock ?? false,
           oculto: false,
         },
       });
@@ -562,6 +588,7 @@ export class CatalogoService implements OnApplicationBootstrap {
               tamano_valor_id: this.parsearId(t.tamanoValorId),
               precio: t.precio,
               activo: t.activo ?? true,
+              unidades: t.unidades ?? 1,
             },
           });
         }
@@ -673,6 +700,9 @@ export class CatalogoService implements OnApplicationBootstrap {
       }
     }
 
+    // Foto: solo se toca si el cliente manda la clave. Clave ausente = conservar
+    // la foto actual; `null` explícito = quitarla. El front omite la clave si el
+    // admin no cambió la foto (no mandar null por defecto: borraría la imagen).
     const fotoArchivoId =
       dto.fotoArchivoId !== undefined
         ? dto.fotoArchivoId
@@ -694,6 +724,7 @@ export class CatalogoService implements OnApplicationBootstrap {
             dto.noSumaBeneficios !== undefined ? dto.noSumaBeneficios : undefined,
           resaltar_opcion_menos_pedida:
             dto.resaltarOpcionMenosPedida !== undefined ? dto.resaltarOpcionMenosPedida : undefined,
+          controla_stock: dto.controlaStock !== undefined ? dto.controlaStock : undefined,
           foto_archivo_id: fotoArchivoId,
         },
       });
@@ -717,12 +748,14 @@ export class CatalogoService implements OnApplicationBootstrap {
             update: {
               precio: t.precio,
               activo: t.activo ?? true,
+              ...(t.unidades !== undefined ? { unidades: t.unidades } : {}),
             },
             create: {
               producto_id: pId,
               tamano_valor_id: tamanoValorId,
               precio: t.precio,
               activo: t.activo ?? true,
+              unidades: t.unidades ?? 1,
             },
           });
         }

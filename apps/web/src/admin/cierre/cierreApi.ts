@@ -97,6 +97,8 @@ export interface MontosEsperados {
   };
   desglose: {
     ventasEfectivo: number;
+    /** Propinas del día, aparte de la venta. Efectivo ya suma al esperado; digital ya está en medios. */
+    propinas?: { total: number; efectivo: number; digital: number };
     ingresos: number;
     egresos: number;
   };

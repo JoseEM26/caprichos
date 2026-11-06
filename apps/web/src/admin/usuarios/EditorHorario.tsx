@@ -76,6 +76,28 @@ export function EditorHorario({ valor, alCambiar, deshabilitado }: Props) {
                     style={estiloHora}
                   />
                 </label>
+                <label style={{ flex: '1 1 90px', fontSize: '12px', fontWeight: 700 }}>
+                  Almuerzo: inicio
+                  <input
+                    type="time"
+                    aria-label={`Inicio del almuerzo del ${d.nombre.toLowerCase()}`}
+                    value={e.almuerzoInicio ?? ''}
+                    disabled={deshabilitado}
+                    onChange={(ev) => cambiar(d.dia, { almuerzoInicio: ev.target.value })}
+                    style={estiloHora}
+                  />
+                </label>
+                <label style={{ flex: '1 1 90px', fontSize: '12px', fontWeight: 700 }}>
+                  Almuerzo: fin
+                  <input
+                    type="time"
+                    aria-label={`Fin del almuerzo del ${d.nombre.toLowerCase()}`}
+                    value={e.almuerzoFin ?? ''}
+                    disabled={deshabilitado}
+                    onChange={(ev) => cambiar(d.dia, { almuerzoFin: ev.target.value })}
+                    style={estiloHora}
+                  />
+                </label>
                 <div style={{ flex: '1 1 100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
                     {formatoHoras(horasTurno(e.entrada, e.salida))}

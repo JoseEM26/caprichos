@@ -14,6 +14,15 @@ export class HorarioDiaDto {
 
   @Matches(HORA, { message: 'La salida debe tener formato HH:MM' })
   salida!: string; // si es menor que la entrada, el turno cruza la medianoche
+
+  /** Almuerzo programado (opcional): ambos o ninguno. */
+  @IsOptional()
+  @Matches(HORA, { message: 'El inicio de almuerzo debe tener formato HH:MM' })
+  almuerzoInicio?: string;
+
+  @IsOptional()
+  @Matches(HORA, { message: 'El fin de almuerzo debe tener formato HH:MM' })
+  almuerzoFin?: string;
 }
 
 export class ReemplazoDiaDto {

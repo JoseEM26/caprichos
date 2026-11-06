@@ -78,10 +78,10 @@ export class LineaPedidoDto {
   @IsOptional()
   ofertaId?: number | string | null;
 
-  /** Combo con parte fija: qué producto se eligió (principal o reemplazo). El servidor valida que esté disponible. */
+  /** Combo: qué producto se eligió en cada parte (una entrada por unidad). Producto por sabor: el sabor de esa unidad. El servidor valida disponibilidad y saldo. */
   @IsOptional()
   @IsArray({ message: 'comboElecciones debe ser una lista' })
-  comboElecciones?: { parteId: number | string; productoId: number | string }[];
+  comboElecciones?: { parteId: number | string; productoId: number | string; saborId?: number | string }[];
 
   @IsInt({ message: 'La cantidad debe ser un entero' })
   @Min(1, { message: 'La cantidad mínima es 1' })
@@ -90,6 +90,11 @@ export class LineaPedidoDto {
   @IsOptional()
   @IsArray({ message: 'opciones debe ser una lista' })
   opciones?: (number | string)[];
+
+  /** Producto por sabor: reparto de sus unidades (tamaño.unidades × cantidad) entre sabores. El servidor valida la suma. */
+  @IsOptional()
+  @IsArray({ message: 'sabores debe ser una lista' })
+  sabores?: { saborId: number | string; cantidad: number }[];
 
   @IsOptional()
   @IsString()
@@ -101,6 +106,10 @@ export class LineaPedidoDto {
 
   @IsOptional()
   precio?: any;
+
+  /** Cortesía de esta línea (solo con permiso cortesias/dar): sale a S/ 0. El servidor valida motivo y nota. */
+  @IsOptional()
+  cortesia?: { motivo: string; nota?: string };
 }
 
 export class PlanPagoItemDto {
@@ -203,6 +212,13 @@ export class CrearPedidoDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   puntosCanje?: number;
+
+  /** Propina opcional en soles (va aparte de la venta). Solo carta y bot, con el interruptor encendido. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  propina?: number;
 
   @IsOptional()
   @IsBoolean()

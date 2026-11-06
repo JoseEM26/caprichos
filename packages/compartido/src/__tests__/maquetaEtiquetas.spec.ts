@@ -70,4 +70,21 @@ describe('lineasTicketPago', () => {
     expect(ls.find((l) => l.texto.startsWith('TOTAL'))?.texto).toMatch(/S\/ 36\.00$/);
     expect(ls[0]).toMatchObject({ texto: 'Caprichos', centrado: true, negrita: true });
   });
+
+  it('propina: línea propia debajo del TOTAL (la venta); sin propina no aparece', () => {
+    const conPropina = lineasTicketPago({ ...t, propina: 5 }, 48).map((l) => l.texto);
+    const total = conPropina.findIndex((x) => x.startsWith('TOTAL'));
+    expect(conPropina[total]).toMatch(/S\/ 36\.00$/);
+    expect(conPropina[total + 1]).toMatch(/^Propina \(aparte\)\s+S\/ 5\.00$/);
+    expect(lineasTicketPago(t, 48).some((l) => l.texto.includes('Propina'))).toBe(false);
+  });
+
+  it('ajuste por cambio de dirección: saldo o devolución pendiente; sin ajuste no aparece', () => {
+    const saldo = lineasTicketPago({ ...t, ajusteUbicacion: { tipo: 'SALDO', monto: 6 } }, 48).map((l) => l.texto);
+    expect(saldo).toContain('Ajuste por cambio de dirección: +S/ 6.00');
+    const devo = lineasTicketPago({ ...t, ajusteUbicacion: { tipo: 'DEVOLUCION', monto: 2.5 } }, 48).map((l) => l.texto);
+    expect(devo).toContain('Devolución pendiente S/ 2.50');
+    const sin = lineasTicketPago({ ...t, ajusteUbicacion: null }, 48).map((l) => l.texto);
+    expect(sin.some((x) => x.includes('Ajuste') || x.includes('Devolución pendiente'))).toBe(false);
+  });
 });

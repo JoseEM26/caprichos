@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import '../salon.css';
 import {
   ProductoCarta,
@@ -8,14 +8,23 @@ import {
 } from '../../../carta/tipos';
 import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { alternarEleccion } from '../../../carta/eleccionGrupo';
+import { SelectorSaboresMezcla } from '../../../comun/SelectorSaboresMezcla';
+import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../../../comun/saboresMezcla';
 import {
-  AvisoReemplazoCombo,
+  AvisoAlternativasCombo,
   eleccionesCombo,
-  eleccionInicial,
+  faltaElegirJuguetes,
   faltaElegirReemplazo,
   notaReemplazos,
-  partesConReemplazo,
+  partesConAlternativas,
+  partesEleccion,
+  ResumenPartesFijas,
+  repartoAlternativa,
+  usosDeSabor,
 } from '../../../carta/ReemplazoCombo';
+import { SelectorEleccionCombo } from '../../../carta/SelectorEleccionCombo';
+import { etiquetaUltimos, infoStockDe, topeAgregable, topeTamano } from '../../../carta/stock';
+import { maximoMezclas } from '../../../comun/saboresMezcla';
 
 export interface ConfiguracionUnidad {
   opciones: OpcionProducto[];
@@ -34,6 +43,9 @@ export interface ProductoConfigurado {
   unidades: ConfiguracionUnidad[];
   /** Combo con bebidas: un nombre de envase por bebida (unidad 1: bebida 1, bebida 2...; vacío si no se escribe) */
   nombresBebidas?: string[];
+  /** Mezcla de sabores: unidades por media docena o docena y cuántas de cada sabor */
+  unidadesPorMezcla?: number;
+  sabores?: { saborId: string; cantidad: number; nombre?: string }[];
   precioUnitario: number;
   precioTotal: number;
 }
@@ -44,6 +56,8 @@ export interface VentanaOpcionesProductoProps {
   alAgregar: (config: ProductoConfigurado) => void;
   /** Combo vinculado al producto: avisa si una parte fija se agotó y ofrece reemplazos */
   oferta?: OfertaItem | null;
+  /** Unidades de este producto que ya van en el pedido (todas sus líneas): descuentan del saldo */
+  enCarrito?: number;
 }
 
 const recortar = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
@@ -53,6 +67,7 @@ export function VentanaOpcionesProducto({
   alCerrar,
   alAgregar,
   oferta = null,
+  enCarrito = 0,
 }: VentanaOpcionesProductoProps) {
   if (!producto) return null;
 
@@ -81,12 +96,45 @@ export function VentanaOpcionesProducto({
   const [avisoNombres, setAvisoNombres] = useState(false);
 
   // Combo: reemplazos de partes fijas agotadas
-  const partesRe = useMemo(() => partesConReemplazo(oferta), [oferta]);
-  const [reemplazos, setReemplazos] = useState<Record<string, string>>(() => eleccionInicial(partesRe));
+  const partesRe = useMemo(() => partesConAlternativas(oferta), [oferta]);
+  // Sin alternativa elegida al inicio: el cliente la escoge (no se asigna sola)
+  const [reemplazos, setReemplazos] = useState<Record<string, string>>({});
   const comboAgotado = oferta?.disponible === false;
+  // Partes A_ELECCION con lista (juguetes): cuántas de cada opción; el total depende de la cantidad del combo
+  const partesJug = useMemo(() => partesEleccion(oferta, reemplazos), [oferta, reemplazos]);
+  const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
 
   // Nota de cocina
   const [notaCocina, setNotaCocina] = useState('');
+
+  // Mezcla de sabores (donas y galletas): el reparto se recorta al total y al stock de cada sabor
+  const [valorSabores, setValorSabores] = useState<Reparto>({});
+  const saborMode = producto.saboresConStock === true;
+  // Con stock por sabor, los grupos obligatorios heredados («Sabor» de empanadas) no se muestran ni se exigen
+  const gruposVisibles = useMemo(
+    () => (saborMode ? (producto.grupos || []).filter((g) => !(g.obligatorio || (g.minimo && g.minimo > 0))) : producto.grupos || []),
+    [producto, saborMode],
+  );
+  const unidadesMezcla = tamanoSeleccionado?.unidades ?? 1;
+  const total = unidadesMezcla * cantidad;
+  const saboresDisp = (producto.sabores ?? []).map((s) => ({ id: s.id, nombre: s.nombre, disponible: s.disponible, quedan: s.quedan ?? null }));
+  const valorSaboresOk = saborMode ? recortarAlTope(valorSabores, saboresDisp, total) : {};
+  useEffect(() => {
+    if (saborMode && JSON.stringify(valorSaboresOk) !== JSON.stringify(valorSabores)) setValorSabores(valorSaboresOk);
+  });
+  const saboresListos = !saborMode || repartoValido(valorSaboresOk, total, saboresDisp);
+  // Stock sin sabores: cada tamaño consume sus unidades (1/2 docena = 6); el tope son las que quedan menos el pedido
+  const infoStock = infoStockDe(producto);
+  const libres = topeAgregable(infoStock, enCarrito);
+  // Con sabores, el tope son las mezclas que caben en lo que queda de cada sabor (ya descontado lo de otras líneas)
+  const tamanoSinStock = (unidades: number) => (saborMode ? maximoMezclas(saboresDisp, unidades) === 0 : libres !== null && unidades > libres);
+  const tope = saborMode ? maximoMezclas(saboresDisp, unidadesMezcla) : topeTamano(infoStock, enCarrito, unidadesMezcla);
+  const tamanoNoCabe = tamanos.length > 0 && tope === 0;
+  const enTopeStock = tope !== null && cantidad >= tope;
+  const franjaUltimos = infoStock.quedan !== 0 ? etiquetaUltimos(infoStock) : null;
+  useEffect(() => {
+    if (tope !== null && cantidad > Math.max(1, tope)) setCantidad(Math.max(1, tope));
+  }, [tope, cantidad]);
 
   // Búsqueda en grupos
   const [busquedaGrupo, setBusquedaGrupo] = useState<Record<string, string>>({});
@@ -174,8 +222,7 @@ export function VentanaOpcionesProducto({
   // Validar selecciones obligatorias
   const gruposFaltantes = useMemo(() => {
     const faltantes: string[] = [];
-    const grupos = producto.grupos || [];
-    for (const g of grupos) {
+    for (const g of gruposVisibles) {
       if (g.obligatorio || (g.minimo && g.minimo > 0)) {
         const minReq = g.minimo || 1;
         const seleccionadas = opcionesActuales.filter((o) =>
@@ -187,9 +234,15 @@ export function VentanaOpcionesProducto({
       }
     }
     return faltantes;
-  }, [producto, opcionesActuales]);
+  }, [gruposVisibles, opcionesActuales]);
 
-  const puedeAgregar = gruposFaltantes.length === 0 && !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos);
+  const puedeAgregar =
+    gruposFaltantes.length === 0 &&
+    !comboAgotado &&
+    (tope === null || (tope > 0 && cantidad <= tope)) &&
+    !faltaElegirReemplazo(partesRe, reemplazos) &&
+    !faltaElegirJuguetes(partesJug, juguetes, cantidad) &&
+    saboresListos;
 
   // En las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
   const nombresFaltantes = esBebida
@@ -224,9 +277,15 @@ export function VentanaOpcionesProducto({
       }
     }
 
-    const elecciones = eleccionesCombo(oferta, reemplazos);
+    const elecciones = eleccionesCombo(oferta, reemplazos, juguetes);
     alAgregar({
       producto,
+      ...(saborMode
+        ? {
+            unidadesPorMezcla: unidadesMezcla,
+            sabores: aArreglo(valorSaboresOk).map((s) => ({ ...s, nombre: saboresDisp.find((x) => x.id === s.saborId)?.nombre })),
+          }
+        : {}),
       ...(oferta && elecciones.length > 0 ? { ofertaId: String(oferta.id), comboElecciones: elecciones } : {}),
       tamano: tamanoSeleccionado,
       cantidad,
@@ -339,6 +398,12 @@ export function VentanaOpcionesProducto({
         </div>
 
         {/* Variantes / Tamaños */}
+        {franjaUltimos && (
+          <div data-testid="ultimos-ventana" style={{ alignSelf: 'flex-start', background: 'var(--cp-rust)', color: '#FFFFFF', fontWeight: 800, fontSize: '13px', borderRadius: '9999px', padding: '4px 14px' }}>
+            {franjaUltimos}
+          </div>
+        )}
+
         {tamanos.length > 0 && (
           <div>
             <div style={{ fontWeight: 800, marginBottom: '6px', color: 'var(--cp-navy)' }}>
@@ -347,24 +412,32 @@ export function VentanaOpcionesProducto({
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {tamanos.map((v) => {
                 const activo = tamanoSeleccionado?.id === v.id;
+                const noCabe = tamanoSinStock(v.unidades ?? 1);
                 return (
                   <button
                     key={v.id}
                     type="button"
                     onClick={() => setTamanoSeleccionado(v)}
+                    disabled={noCabe}
                     style={{
                       minHeight: '44px',
-                      padding: '0 14px',
+                      padding: noCabe ? '4px 14px' : '0 14px',
                       borderRadius: '12px',
                       border: '1.5px solid var(--cp-navy)',
-                      background: activo ? 'var(--cp-navy)' : 'transparent',
-                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      background: activo && !noCabe ? 'var(--cp-navy)' : 'transparent',
+                      color: activo && !noCabe ? 'var(--cp-cream)' : 'var(--cp-navy)',
                       fontWeight: 700,
                       fontSize: '13px',
-                      cursor: 'pointer',
+                      opacity: noCabe ? 0.5 : 1,
+                      cursor: noCabe ? 'not-allowed' : 'pointer',
                     }}
                   >
                     {v.nombre} · S/ {Number(v.precio || 0).toFixed(2)}
+                    {noCabe && (
+                      <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+                        {libres && libres > 0 ? `Solo quedan ${libres}` : 'No hay stock suficiente'}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -372,8 +445,12 @@ export function VentanaOpcionesProducto({
           </div>
         )}
 
+        {saborMode && (
+          <SelectorSaboresMezcla sabores={saboresDisp} total={total} valor={valorSaboresOk} onCambio={setValorSabores} />
+        )}
+
         {/* Grupos de opciones */}
-        {(producto.grupos || []).map((g) => {
+        {gruposVisibles.map((g) => {
           const qBuscada = (busquedaGrupo[g.id] || '').toLowerCase().trim();
           const opcionesVisibles = qBuscada
             ? g.opciones.filter((o) => o.nombre.toLowerCase().includes(qBuscada))
@@ -703,11 +780,26 @@ export function VentanaOpcionesProducto({
             Agotado
           </div>
         )}
-        <AvisoReemplazoCombo
+        {!comboAgotado && <ResumenPartesFijas oferta={oferta} />}
+        <AvisoAlternativasCombo
           partes={comboAgotado ? [] : partesRe}
           elegidos={reemplazos}
-          onElegir={(parteId, productoId) => setReemplazos((prev) => ({ ...prev, [parteId]: productoId }))}
+          onElegir={(parteId, alt) => {
+            setReemplazos((prev) => ({ ...prev, [parteId]: alt.id }));
+            setJuguetes((prev) => ({ ...prev, [parteId]: repartoAlternativa(alt) }));
+          }}
         />
+        {!comboAgotado &&
+          partesJug.map((parte) => (
+            <SelectorEleccionCombo
+              key={parte.parteId}
+              parte={parte}
+              unidades={cantidad}
+              valor={juguetes[parte.parteId] ?? {}}
+              onCambio={(v) => setJuguetes((prev) => ({ ...prev, [parte.parteId]: v }))}
+              usos={usosDeSabor([], juguetes)}
+            />
+          ))}
 
         {/* Nota para cocina */}
         <div>
@@ -742,9 +834,14 @@ export function VentanaOpcionesProducto({
             Falta elegir: {gruposFaltantes.join(', ')}.
           </div>
         )}
+        {saborMode && !saboresListos && (
+          <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+            Elige los sabores: faltan {faltanUnidades(valorSaboresOk, total)}
+          </div>
+        )}
 
         {/* DT-62: Personalización por unidad */}
-        {cantidad > 1 && (producto.grupos || []).length > 0 && (
+        {cantidad > 1 && (producto.grupos || []).length > 0 && !saborMode && (
           <button
             type="button"
             onClick={() => {
@@ -883,7 +980,8 @@ export function VentanaOpcionesProducto({
             </b>
             <button
               type="button"
-              onClick={() => setCantidad((c) => c + 1)}
+              onClick={() => setCantidad((c) => (enTopeStock ? c : c + 1))}
+              disabled={enTopeStock}
               aria-label="Más cantidad"
               style={{
                 width: '44px',
@@ -893,7 +991,8 @@ export function VentanaOpcionesProducto({
                 background: 'transparent',
                 fontWeight: 800,
                 fontSize: '20px',
-                cursor: 'pointer',
+                opacity: enTopeStock ? 0.35 : 1,
+                cursor: enTopeStock ? 'not-allowed' : 'pointer',
               }}
             >
               +
@@ -918,7 +1017,15 @@ export function VentanaOpcionesProducto({
               cursor: puedeAgregar ? 'pointer' : 'not-allowed',
             }}
           >
-            <span>{comboAgotado ? 'Agotado' : 'Agregar al pedido'}</span>
+            <span>
+              {comboAgotado
+                ? 'Agotado'
+                : tamanoNoCabe
+                  ? 'No hay stock suficiente'
+                  : saborMode && !saboresListos
+                    ? 'Elige los sabores'
+                    : 'Agregar al pedido'}
+            </span>
             <span> · S/ {precioTotal.toFixed(2)}</span>
           </button>
         </div>

@@ -2,6 +2,7 @@ import { ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { TextoEd } from './edicion';
 import { useEsMovil } from './useEsMovil';
+import { etiquetaQuedan, etiquetaUltimos, infoStockDe } from './stock';
 
 export interface InfoRankingProducto {
   puesto?: number;
@@ -33,11 +34,13 @@ export function TarjetaProducto({
   organizacion = 'SECCIONES',
   insigniaBeneficio,
 }: TarjetaProductoProps) {
-  const { abrirModalProducto } = useCarrito();
+  const { abrirModalProducto, inventario } = useCarrito();
   const movil = useEsMovil();
+  const info = inventario[String(producto.id)] ?? infoStockDe(producto);
 
   const estaAgotado = (() => {
-    if (!producto.disponible) return true;
+    if (!info.disponible) return true;
+    if (info.controlaStock && info.quedan === 0) return true;
     if (producto.agotadoHasta) {
       return new Date(producto.agotadoHasta) > new Date();
     }
@@ -73,6 +76,9 @@ export function TarjetaProducto({
   const tagCacao = PRODUCTOS_100_CACAO.has(producto.nombre.trim().toUpperCase())
     ? '100% CACAO'
     : '';
+
+  const textoQuedan = estaAgotado ? null : etiquetaQuedan(info);
+  const textoUltimos = estaAgotado ? null : etiquetaUltimos(info);
 
   const esLista = organizacion === 'LISTA';
   const cardDir = movil ? 'row' : esLista ? 'row' : 'column';
@@ -297,6 +303,46 @@ export function TarjetaProducto({
               }}
             >
               {tagCacao}
+            </span>
+          </div>
+        )}
+
+        {textoUltimos && (
+          <div>
+            <span
+              data-testid={`ultimos-${producto.id}`}
+              style={{
+                fontSize: '12px',
+                fontWeight: 800,
+                background: 'var(--cp-rust)',
+                color: '#FFFFFF',
+                borderRadius: '9999px',
+                padding: '3px 12px',
+                display: 'inline-block',
+                fontFamily: 'Montserrat, sans-serif',
+              }}
+            >
+              {textoUltimos}
+            </span>
+          </div>
+        )}
+
+        {textoQuedan && (
+          <div>
+            <span
+              data-testid={`quedan-${producto.id}`}
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: 'var(--cp-sand)',
+                color: 'var(--cp-navy)',
+                borderRadius: '9999px',
+                padding: '2px 10px',
+                display: 'inline-block',
+                fontFamily: 'Montserrat, sans-serif',
+              }}
+            >
+              {textoQuedan}
             </span>
           </div>
         )}

@@ -137,7 +137,10 @@ describe('PedidosService', () => {
         create: jest.fn(),
       },
       producto: {
-        findMany: jest.fn().mockResolvedValue([mockProductoCafe]),
+        // La consulta de productos que controlan stock (descuento al crear) no devuelve nada en estos casos
+        findMany: jest.fn().mockImplementation(({ where }) =>
+          Promise.resolve(where?.controla_stock ? [] : [mockProductoCafe]),
+        ),
       },
       oferta: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
       parametro: {
@@ -192,7 +195,7 @@ describe('PedidosService', () => {
         detalles: [],
       }),
       emitirCuponesParaPedido: jest.fn().mockResolvedValue([]),
-      validarEleccionesCombo: jest.fn().mockResolvedValue(''),
+      resolverPartesCombo: jest.fn().mockResolvedValue({ nota: '', partes: [] }),
     };
 
     direccionesMock = {
@@ -852,7 +855,7 @@ describe('PedidosService', () => {
       });
 
       it('devuelve 409 COMBO_PARTE_NO_DISPONIBLE si la elección no está disponible y no crea el pedido', async () => {
-        ofertasServiceMock.validarEleccionesCombo.mockRejectedValueOnce(
+        ofertasServiceMock.resolverPartesCombo.mockRejectedValueOnce(
           new HttpException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje: 'x' }, HttpStatus.CONFLICT),
         );
         await expect(service.crear(dtoCombo(), 'idemp-combo-409')).rejects.toMatchObject({
@@ -863,13 +866,90 @@ describe('PedidosService', () => {
       });
 
       it('guarda en la nota de la línea el producto realmente elegido', async () => {
-        ofertasServiceMock.validarEleccionesCombo.mockResolvedValueOnce('Combo Dúo · Empanada (en lugar de Club Sandwich)');
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValueOnce({ nota: 'Combo Dúo · Empanada (en lugar de Club Sandwich)', partes: [] });
         prismaMock.pedido.create.mockResolvedValue({ id: 120n, codigo: 'CP-W120', estado: 'COLA', subtotal: 28, envio: 5, total: 33 });
         await service.crear(dtoCombo(), 'idemp-combo-ok');
-        expect(ofertasServiceMock.validarEleccionesCombo).toHaveBeenCalledWith(3, [{ parteId: 100, productoId: 7 }]);
+        expect(ofertasServiceMock.resolverPartesCombo).toHaveBeenCalledWith(3, [{ parteId: 100, productoId: 7 }], 2);
         expect(prismaMock.pedidoLinea.create.mock.calls[0][0].data.nota).toBe(
           'Combo Dúo · Empanada (en lugar de Club Sandwich) · Sin azúcar',
         );
+      });
+    });
+
+    describe('combo con partes (cajita): una línea hija por parte', () => {
+      const partesCajita = [
+        { parteId: 10n, tipo: 'FIJO', productoId: 1n, nombre: 'FRAPPE OREO', cantidad: 1, areaId: 1n, areaNombre: 'Barra', categoriaNombre: 'FRAPPES', nota: 'Combo: Cajita', tamano: 'Regular 12 oz', unidadesTamano: 1 },
+        { parteId: 11n, tipo: 'A_ELECCION', productoId: 20n, nombre: 'Burbujas', cantidad: 2, areaId: 2n, areaNombre: 'Salados', categoriaNombre: 'JUGUETES', nota: 'Combo: Cajita' },
+      ];
+      const dtoCajita = (): CrearPedidoDto => ({
+        ...pedidoBaseDto,
+        modalidad: 'MESA' as const,
+        entrega: undefined,
+        lineas: [{ productoId: 1, tamanoId: 10, cantidad: 1, opciones: [200], ofertaId: 9, comboElecciones: [{ parteId: 11, productoId: 20 }, { parteId: 11, productoId: 20 }] }],
+      });
+
+      beforeEach(() => {
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValue({ nota: '', partes: partesCajita });
+        prismaMock.pedido.create.mockResolvedValue({ id: 100n, codigo: 'CP-W100', estado: 'COLA', subtotal: 27, envio: null, total: 27 });
+        prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+          Promise.resolve(where?.controla_stock ? [{ id: 20n, nombre: 'Burbujas', sabores: [] }] : [mockProductoCafe]),
+        );
+        prismaMock.lugarStock = { findFirst: jest.fn().mockResolvedValue({ id: 7n }) };
+        prismaMock.stock = {
+          findFirst: jest.fn().mockResolvedValue({ id: 9n, lugar_id: 7n }),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findMany: jest.fn().mockResolvedValue([{ cantidad: 9 }]),
+          create: jest.fn(),
+        };
+        prismaMock.conteoApertura = { findFirst: jest.fn().mockResolvedValue(null) };
+        prismaMock.movimientoStock = { create: jest.fn().mockResolvedValue({}) };
+        prismaMock.agotado = { create: jest.fn() };
+        prismaMock.producto.findUnique = jest.fn().mockResolvedValue({ agotado_hasta: null });
+      });
+
+      it('la madre no lleva producto ni área; cada parte es una línea hija con su área y sin cobro', async () => {
+        await service.crear(dtoCajita(), 'key-cajita-lineas', { canal: 'MOZO' });
+        const creadas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);
+        expect(creadas).toHaveLength(3);
+        expect(creadas[0]).toMatchObject({ producto_id: null, area_id: null });
+        expect(creadas[1]).toMatchObject({ producto_id: 1n, linea_combo_id: 50n, nombre: 'FRAPPE OREO', tamano: 'Regular 12 oz', cantidad: 1, area_id: 1n, subtotal: expect.anything(), nombres_persona: ['Juan Perez'] });
+        expect(creadas[2]).toMatchObject({ producto_id: 20n, linea_combo_id: 50n, nombre: 'Burbujas', cantidad: 2, area_id: 2n, nombres_persona: [] });
+        expect(Number(creadas[1].precio_unit)).toBe(0);
+        expect(Number(creadas[2].subtotal)).toBe(0);
+      });
+
+      it('descuenta el stock de cada juguete y no el de la madre', async () => {
+        await service.crear(dtoCajita(), 'key-cajita-stock', { canal: 'MOZO' });
+        const ventas = prismaMock.movimientoStock.create.mock.calls.map((c: any) => c[0].data);
+        expect(ventas).toEqual([expect.objectContaining({ tipo: 'VENTA', producto_id: 20n, pedido_id: 100n })]);
+        expect(Number(ventas[0].cantidad)).toBe(2);
+      });
+
+      it('una parte con tamaño descuenta cantidad × unidades del tamaño', async () => {
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValue({ nota: '', partes: [{ ...partesCajita[1], unidadesTamano: 3 }] });
+        await service.crear(dtoCajita(), 'key-cajita-unidades', { canal: 'MOZO' });
+        const ventas = prismaMock.movimientoStock.create.mock.calls.map((c: any) => c[0].data);
+        expect(Number(ventas[0].cantidad)).toBe(6);
+      });
+
+      it('producto por sabor en una parte: el sabor sigue a la línea hija y descuenta el saldo de ese sabor', async () => {
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValue({
+          nota: '',
+          partes: [{ parteId: 11n, tipo: 'A_ELECCION', productoId: 20n, nombre: 'Dona', cantidad: 2, areaId: 2n, areaNombre: 'Salados', categoriaNombre: 'DONAS', nota: 'Combo: Cajita', sabores: [{ saborId: 501n, nombre: 'Fresa', cantidad: 2 }] }],
+        });
+        prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+          Promise.resolve(where?.controla_stock ? [{ id: 20n, nombre: 'Dona', sabores: [{ id: 501n, nombre: 'Fresa', activo: true, agotado_hasta: null }] }] : [mockProductoCafe]),
+        );
+        prismaMock.stockSabor = {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest.fn().mockResolvedValue({ cantidad: 5 }),
+        };
+        prismaMock.pedidoLineaSabor = { create: jest.fn().mockResolvedValue({}) };
+        await service.crear(dtoCajita(), 'key-combo-sabor', { canal: 'MOZO' });
+        expect(prismaMock.pedidoLineaSabor.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ pedido_linea_id: 50n, sabor_id: 501n, sabor_nombre: 'Fresa', cantidad: 2 }),
+        });
+        expect(prismaMock.stockSabor.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ sabor_id: 501n }) }));
       });
     });
 
@@ -1017,6 +1097,104 @@ describe('PedidosService', () => {
           expect(pedidoCreadoData.pago_estado).toBe('PENDIENTE');
         }
       });
+    });
+  });
+
+  describe('cortesía en una línea del pedido', () => {
+    it('sin permiso cortesias/dar responde 403 SIN_PERMISO_CORTESIA', async () => {
+      const dto: any = {
+        ...pedidoBaseDto,
+        modalidad: 'RECOGER',
+        lineas: [{ ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'RECLAMO_CLIENTE' } }],
+      };
+      await expect(service.crear(dto, 'idemp-cort-403', { canal: 'MOZO', usuarioPartyId: 55n })).rejects.toMatchObject({
+        status: 403,
+        response: { codigo: 'SIN_PERMISO_CORTESIA' },
+      });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('con permiso: la línea sale a S/ 0, guarda su valor de lista y el pedido no suma esa línea', async () => {
+      // Producto base 12 + extra 2 = 14 x 2 = 28 de valor de lista
+      let pedidoData: any = null;
+      const lineasData: any[] = [];
+      const cortesiasData: any[] = [];
+      prismaMock.pedido.create.mockImplementation(({ data }: any) => {
+        pedidoData = data;
+        return Promise.resolve({ id: 500n, codigo: 'CP-W500', estado: 'COLA', subtotal: Number(data.subtotal), envio: 0, total: Number(data.total) });
+      });
+      prismaMock.pedidoLinea.create.mockImplementation(({ data }: any) => {
+        lineasData.push(data);
+        return Promise.resolve({ id: 900n + BigInt(lineasData.length), ...data });
+      });
+      prismaMock.cortesia = { create: jest.fn(({ data }: any) => { cortesiasData.push(data); return Promise.resolve(data); }) };
+
+      // Una línea normal (28) y la misma producto como cortesía: el pedido cobra solo 28
+      const dto: any = {
+        ...pedidoBaseDto,
+        modalidad: 'RECOGER',
+        lineas: [pedidoBaseDto.lineas[0], { ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'DEGUSTACION_PROMOCION' } }],
+      };
+      const res = await service.crear(dto, 'idemp-cort-ok', { canal: 'CAJA', usuarioPartyId: 55n, puedeCortesia: true, omitirChequeoCarta: true });
+
+      expect(res.subtotal).toBe(28);
+      expect(res.total).toBe(28);
+      expect(Number(pedidoData.total)).toBe(28);
+      expect(lineasData[1]).toMatchObject({ es_cortesia: true });
+      expect(Number(lineasData[1].precio_unit)).toBe(0);
+      expect(Number(lineasData[1].subtotal)).toBe(0);
+      expect(cortesiasData[0]).toMatchObject({ motivo: 'DEGUSTACION_PROMOCION', pedido_id: 500n, dada_por_party_id: 55n });
+      expect(Number(cortesiasData[0].valor_lista)).toBe(28);
+    });
+  });
+
+  describe('cortesía en un pedido de mesa (local)', () => {
+    it('sin permiso cortesias/dar en mesa responde 403 SIN_PERMISO_CORTESIA (el mozo)', async () => {
+      const dto: any = {
+        ...pedidoBaseDto,
+        modalidad: 'MESA',
+        lineas: [{ ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'RECLAMO_CLIENTE' } }],
+      };
+      await expect(
+        service.crear(dto, 'idemp-cort-mesa-403', { canal: 'MOZO', usuarioPartyId: 55n, mesasIds: [6n], mesaNombre: 'Mesa 6' }),
+      ).rejects.toMatchObject({ status: 403, response: { codigo: 'SIN_PERMISO_CORTESIA' } });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('con permiso (caja o admin) la cortesía en mesa sale a S/ 0 y el pedido no la cobra', async () => {
+      let pedidoData: any = null;
+      const lineasData: any[] = [];
+      const cortesiasData: any[] = [];
+      prismaMock.pedido.create.mockImplementation(({ data }: any) => {
+        pedidoData = data;
+        return Promise.resolve({ id: 501n, codigo: 'CP-M501', estado: 'COLA', subtotal: Number(data.subtotal), envio: 0, total: Number(data.total) });
+      });
+      prismaMock.pedidoLinea.create.mockImplementation(({ data }: any) => {
+        lineasData.push(data);
+        return Promise.resolve({ id: 950n + BigInt(lineasData.length), ...data });
+      });
+      prismaMock.cortesia = { create: jest.fn(({ data }: any) => { cortesiasData.push(data); return Promise.resolve(data); }) };
+      prismaMock.pedidoMesa = { create: jest.fn().mockResolvedValue({}) };
+
+      const dto: any = {
+        ...pedidoBaseDto,
+        modalidad: 'MESA',
+        lineas: [pedidoBaseDto.lineas[0], { ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'DEGUSTACION_PROMOCION' } }],
+      };
+      const res = await service.crear(dto, 'idemp-cort-mesa-ok', {
+        canal: 'CAJA',
+        usuarioPartyId: 55n,
+        puedeCortesia: true,
+        omitirChequeoCarta: true,
+        mesasIds: [6n],
+        mesaNombre: 'Mesa 6',
+      });
+
+      expect(res.total).toBe(28);
+      expect(Number(pedidoData.total)).toBe(28);
+      expect(lineasData[1]).toMatchObject({ es_cortesia: true });
+      expect(Number(lineasData[1].subtotal)).toBe(0);
+      expect(cortesiasData[0]).toMatchObject({ motivo: 'DEGUSTACION_PROMOCION', pedido_id: 501n, dada_por_party_id: 55n });
     });
   });
 
@@ -1547,6 +1725,243 @@ describe('PedidosService', () => {
       const capturado = crearCapturado();
       await service.crear(pedidoBaseDto, 'idemp-celular-ok', { canal: 'CARTA' });
       expect(capturado.data.cliente_party_id).toBe(300n);
+    });
+  });
+
+  describe('productos que controlan stock al crear el pedido (todos los canales)', () => {
+    const soloMesa = { ...pedidoBaseDto, modalidad: 'MESA' as const, entrega: undefined };
+
+    beforeEach(() => {
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(where?.controla_stock ? [{ id: 1n, nombre: 'Americano', controla_stock: true }] : [mockProductoCafe]),
+      );
+      prismaMock.pedido.create.mockResolvedValue({ id: 100n, codigo: 'CP-W001', estado: 'COLA', subtotal: 28, envio: null, total: 28 });
+      prismaMock.lugarStock = { findFirst: jest.fn().mockResolvedValue({ id: 7n }) };
+      prismaMock.stock = {
+        findFirst: jest.fn().mockResolvedValue({ id: 9n, lugar_id: 7n }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findMany: jest.fn().mockResolvedValue([{ cantidad: 1 }]),
+        create: jest.fn(),
+      };
+      prismaMock.conteoApertura = { findFirst: jest.fn().mockResolvedValue(null) };
+      prismaMock.movimientoStock = { create: jest.fn().mockResolvedValue({}) };
+      prismaMock.agotado = { create: jest.fn() };
+      prismaMock.producto.findUnique = jest.fn().mockResolvedValue({ agotado_hasta: null });
+    });
+
+    it.each([
+      ['CARTA', undefined, pedidoBaseDto],
+      ['MOZO', { canal: 'MOZO' }, soloMesa],
+      ['CAJA', { canal: 'CAJA' }, soloMesa],
+      ['WHATSAPP', { canal: 'WHATSAPP' }, pedidoBaseDto],
+    ])('canal %s: descuenta el producto al crear con movimiento VENTA ligado al pedido', async (_canal, origen, dto) => {
+      await service.crear(dto as any, `key-${_canal}`, origen as any);
+      expect(prismaMock.movimientoStock.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'VENTA', producto_id: 1n, pedido_id: 100n }),
+      });
+    });
+
+    it('sin conteo de apertura hoy también limita por el saldo: descuento condicional contra el saldo', async () => {
+      await service.crear(pedidoBaseDto, 'key-sin-apertura', { canal: 'WHATSAPP' });
+      expect(prismaMock.stock.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ producto_id: 1n }) }),
+      );
+      expect(prismaMock.stock.updateMany.mock.calls[0][0].where.cantidad).toEqual({ gte: expect.anything() });
+    });
+
+    it('sin apertura hoy y saldo 0: responde 409 STOCK_INSUFICIENTE con quedan 0 y no descuenta', async () => {
+      prismaMock.stock.updateMany.mockResolvedValue({ count: 0 });
+      prismaMock.stock.findMany.mockResolvedValue([{ cantidad: 0 }]);
+      const err: any = await service.crear(pedidoBaseDto, 'key-saldo-cero', { canal: 'CARTA' }).catch((e) => e);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toMatchObject({ codigo: 'STOCK_INSUFICIENTE', productoId: '1', quedan: 0 });
+      expect(prismaMock.movimientoStock.create).not.toHaveBeenCalled();
+    });
+
+    it('con apertura hoy y saldo insuficiente responde 409 STOCK_INSUFICIENTE con productoId y quedan', async () => {
+      prismaMock.conteoApertura.findFirst.mockResolvedValue({ cantidad: 5 });
+      prismaMock.stock.updateMany.mockResolvedValue({ count: 0 });
+      prismaMock.stock.findMany.mockResolvedValue([{ cantidad: 1 }]);
+      const err: any = await service.crear(pedidoBaseDto, 'key-tope', { canal: 'CARTA' }).catch((e) => e);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toEqual({
+        codigo: 'STOCK_INSUFICIENTE',
+        mensaje: 'Solo quedan 1 de Americano',
+        productoId: '1',
+        quedan: 1,
+      });
+    });
+
+    it('tamaño de 1/2 docena (6 unidades): cada tamaño descuenta 6 del saldo, no 1', async () => {
+      prismaMock.conteoApertura.findFirst.mockResolvedValue({ cantidad: 10 });
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where?.controla_stock
+            ? [{ id: 1n, nombre: 'Americano', controla_stock: true }]
+            : [{ ...mockProductoCafe, controla_stock: true, tamanos: [{ ...mockProductoCafe.tamanos[0], unidades: 6 }] }],
+        ),
+      );
+      const linea = { ...pedidoBaseDto.lineas[0], tamanoId: 10, cantidad: 2 } as any;
+      await service.crear({ ...pedidoBaseDto, lineas: [linea] } as any, 'key-media-docena', { canal: 'CARTA' });
+      expect(Number(prismaMock.stock.updateMany.mock.calls[0][0].data.cantidad.decrement)).toBe(12);
+      expect(prismaMock.movimientoStock.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'VENTA', producto_id: 1n, pedido_id: 100n, cantidad: expect.anything() }),
+      });
+      expect(Number(prismaMock.movimientoStock.create.mock.calls[0][0].data.cantidad)).toBe(12);
+    });
+
+    it('suma las líneas repetidas del mismo producto en un solo descuento (2 + 3 = 5)', async () => {
+      prismaMock.conteoApertura.findFirst.mockResolvedValue({ cantidad: 10 });
+      const linea = pedidoBaseDto.lineas[0];
+      await service.crear({ ...pedidoBaseDto, lineas: [linea, { ...linea, cantidad: 3 }] } as any, 'key-repetidas', { canal: 'CARTA' });
+      expect(prismaMock.stock.updateMany).toHaveBeenCalledTimes(1);
+      expect(Number(prismaMock.stock.updateMany.mock.calls[0][0].data.cantidad.decrement)).toBe(5);
+    });
+
+    it('galleta sin sabores: 2 × 1/2 docena descuenta 12 unidades del stock del producto (no 2)', async () => {
+      const galleta = {
+        ...mockProductoCafe,
+        nombre: 'GALLETA CHOCO CHIPS',
+        controla_stock: true,
+        sabores: [],
+        grupos: [],
+        tamanos: [{ id: 5n, producto_id: 1n, tamano_valor_id: 100n, precio: 18, unidades: 6, tamano_valor: { id: 100n, nombre: '1/2 docena' } }],
+      };
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(where?.controla_stock ? [{ id: 1n, nombre: 'GALLETA CHOCO CHIPS', controla_stock: true, sabores: [] }] : [galleta]),
+      );
+      prismaMock.conteoApertura.findFirst.mockResolvedValue({ cantidad: 20 });
+      prismaMock.stock.findMany.mockResolvedValue([{ cantidad: 8 }]);
+      await service.crear({ ...pedidoBaseDto, lineas: [{ productoId: 1, tamanoId: 5, cantidad: 2 }] } as any, 'key-galleta-media', { canal: 'CARTA' });
+      expect(prismaMock.stock.updateMany).toHaveBeenCalledTimes(1);
+      expect(Number(prismaMock.stock.updateMany.mock.calls[0][0].data.cantidad.decrement)).toBe(12);
+      expect(prismaMock.movimientoStock.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'VENTA', producto_id: 1n, pedido_id: 100n, cantidad: expect.anything() }),
+      });
+    });
+  });
+  describe('productos por sabor al crear el pedido (stock por sabor)', () => {
+    const donaSabor = {
+      id: 1n,
+      nombre: 'Dona',
+      precio: 3,
+      oculto: false,
+      agotado_hasta: null,
+      controla_stock: true,
+      categoria_id: 1n,
+      no_suma_beneficios: false,
+      area_id: null,
+      categoria: { id: 1n, nombre: 'Dulces', area_id: 1n, area: { id: 1n, nombre: 'Salados', tipo: 'COCINA' } },
+      tamanos: [
+        { id: 5n, producto_id: 1n, tamano_valor_id: 100n, precio: 18, unidades: 6, tamano_valor: { id: 100n, nombre: '1/2 docena' } },
+      ],
+      grupos: [],
+      sabores: [
+        { id: 11n, producto_id: 1n, nombre: 'Fresa', activo: true, agotado_hasta: null },
+        { id: 12n, producto_id: 1n, nombre: 'Oreo', activo: true, agotado_hasta: null },
+      ],
+    };
+    const lineaMedia = (sabores: any[]) => ({ ...pedidoBaseDto, lineas: [{ productoId: 1, tamanoId: 5, cantidad: 1, sabores }] });
+
+    beforeEach(() => {
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(where?.controla_stock ? [{ id: 1n, nombre: 'Dona', controla_stock: true, sabores: donaSabor.sabores }] : [donaSabor]),
+      );
+      prismaMock.pedido.create.mockResolvedValue({ id: 100n, codigo: 'CP-W001', estado: 'COLA', subtotal: 18, envio: null, total: 18 });
+      prismaMock.lugarStock = { findFirst: jest.fn().mockResolvedValue({ id: 7n }) };
+      prismaMock.stock = { findFirst: jest.fn(), updateMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]), create: jest.fn() };
+      prismaMock.conteoApertura = { findFirst: jest.fn().mockResolvedValue(null) };
+      prismaMock.stockSabor = {
+        findUnique: jest.fn().mockResolvedValue({ cantidad: 1 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        upsert: jest.fn().mockResolvedValue({}),
+      };
+      prismaMock.pedidoLineaSabor = { create: jest.fn().mockResolvedValue({}) };
+      prismaMock.movimientoStock = { create: jest.fn().mockResolvedValue({}) };
+      prismaMock.agotado = { create: jest.fn() };
+      prismaMock.sabor = { findMany: jest.fn().mockResolvedValue([]) };
+    });
+
+    it('reparte la media docena entre sabores: guarda cada sabor de la línea y descuenta por sabor', async () => {
+      await service.crear(lineaMedia([{ saborId: 11, cantidad: 2 }, { saborId: 12, cantidad: 4 }]) as any, 'key-sab-ok', { canal: 'CARTA' });
+      expect(prismaMock.pedidoLineaSabor.create).toHaveBeenCalledWith({
+        data: { pedido_linea_id: 50n, sabor_id: 11n, sabor_nombre: 'Fresa', cantidad: 2 },
+      });
+      expect(prismaMock.pedidoLineaSabor.create).toHaveBeenCalledWith({
+        data: { pedido_linea_id: 50n, sabor_id: 12n, sabor_nombre: 'Oreo', cantidad: 4 },
+      });
+      expect(prismaMock.movimientoStock.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'VENTA', producto_id: 1n, sabor_id: 11n, pedido_id: 100n }),
+      });
+      expect(prismaMock.stock.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('ignora el grupo obligatorio heredado «Sabor» (opciones de empanada): sin opciones el pedido pasa', async () => {
+      const grupoHeredado = {
+        id: 30n,
+        nombre: 'Sabor',
+        obligatorio: true,
+        minimo: 1,
+        maximo: 1,
+        activo: true,
+        opciones: [
+          { id: 300n, grupo_id: 30n, valor_id: 310n, precio_extra: 0, activo: true, agotado_hasta: null, valor: { id: 310n, nombre: 'Empanada de pollo' } },
+        ],
+      };
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where?.controla_stock
+            ? [{ id: 1n, nombre: 'Dona', controla_stock: true, sabores: donaSabor.sabores }]
+            : [{ ...donaSabor, grupos: [{ grupo_id: 30n, grupo: grupoHeredado }] }],
+        ),
+      );
+      await service.crear(lineaMedia([{ saborId: 11, cantidad: 6 }]) as any, 'key-sab-grupo-heredado', { canal: 'CARTA' });
+      expect(prismaMock.pedido.create).toHaveBeenCalled();
+      expect(prismaMock.pedidoLineaSabor.create).toHaveBeenCalledWith({
+        data: { pedido_linea_id: 50n, sabor_id: 11n, sabor_nombre: 'Fresa', cantidad: 6 },
+      });
+    });
+
+    it('suma inválida (5 de 6): 400 SABORES_INVALIDOS y no crea el pedido', async () => {
+      const err: any = await service.crear(lineaMedia([{ saborId: 11, cantidad: 2 }, { saborId: 12, cantidad: 3 }]) as any, 'key-sab-suma', { canal: 'CARTA' }).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'SABORES_INVALIDOS' });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('sin sabores en la línea: 400 SABORES_INVALIDOS con el nombre del producto', async () => {
+      const err: any = await service.crear(lineaMedia([]) as any, 'key-sab-faltan', { canal: 'CARTA' }).catch((e) => e);
+      expect(err.getResponse()).toEqual({ codigo: 'SABORES_INVALIDOS', mensaje: 'Elige los sabores de Dona' });
+    });
+
+    it('sabor agotado: 409 SABOR_AGOTADO con productoId, saborId y saborNombre', async () => {
+      prismaMock.producto.findMany.mockImplementation(() =>
+        Promise.resolve([{ ...donaSabor, sabores: [{ ...donaSabor.sabores[0], agotado_hasta: new Date('9999-12-31T23:59:59Z') }, donaSabor.sabores[1]] }]),
+      );
+      const err: any = await service.crear(lineaMedia([{ saborId: 11, cantidad: 6 }]) as any, 'key-sab-agotado', { canal: 'CARTA' }).catch((e) => e);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toEqual({
+        codigo: 'SABOR_AGOTADO',
+        mensaje: 'El sabor Fresa está agotado',
+        productoId: '1',
+        saborId: '11',
+        saborNombre: 'Fresa',
+      });
+    });
+
+    it('con apertura de hoy del sabor y pedido mayor al saldo: 409 STOCK_INSUFICIENTE por sabor', async () => {
+      prismaMock.conteoApertura.findFirst.mockResolvedValue({ cantidad: 10 });
+      prismaMock.stockSabor.updateMany.mockResolvedValue({ count: 0 });
+      prismaMock.stockSabor.findUnique.mockResolvedValue({ cantidad: 1 });
+      const err: any = await service.crear(lineaMedia([{ saborId: 11, cantidad: 6 }]) as any, 'key-sab-tope', { canal: 'CARTA' }).catch((e) => e);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toEqual({
+        codigo: 'STOCK_INSUFICIENTE',
+        mensaje: 'Solo quedan 1 de Fresa',
+        productoId: '1',
+        saborId: '11',
+        saborNombre: 'Fresa',
+        quedan: 1,
+      });
     });
   });
 });

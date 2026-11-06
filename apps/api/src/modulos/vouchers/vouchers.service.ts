@@ -1,4 +1,5 @@
 import { esSoloMozo, rolEfectivoMozo } from '../acceso/roles-usuario';
+import { totalCobrable } from '../propinas/propinas.util';
 import {
   BadRequestException,
   ConflictException,
@@ -160,6 +161,7 @@ export class VouchersService {
           modalidad: true,
           pago_estado: true,
           pago_coordinado_en: true,
+          propina: true,
           planPago: { select: { medio: true, monto: true } },
         },
       });
@@ -269,7 +271,7 @@ export class VouchersService {
       pedidoTotal: pedido
         ? opciones.medio && pedido.planPago?.length
           ? montoDeMedioDigital(pedido.planPago, opciones.medio) || null
-          : montoEsperadoVoucher(pedido.planPago, pedido.total != null ? Number(pedido.total) : null)
+          : montoEsperadoVoucher(pedido.planPago, pedido.total != null ? totalCobrable(pedido) : null)
         : null,
       medioEsperado: opciones.medio || (pedido?.pago_preferido as any) || (pedido?.pago_metodo as any) || null,
       titularEsperado: config.titularEsperado,
@@ -456,7 +458,7 @@ export class VouchersService {
         pedidoTotal: pedido
           ? medioDelPlan
             ? montoDeMedioDigital(pedido.planPago, medioDelPlan) || null
-            : montoEsperadoVoucher(pedido.planPago, pedido.total != null ? Number(pedido.total) : null)
+            : montoEsperadoVoucher(pedido.planPago, pedido.total != null ? totalCobrable(pedido) : null)
           : null,
         medioEsperado,
         titularEsperado: config.titularEsperado,
@@ -681,6 +683,7 @@ export class VouchersService {
         id: true,
         codigo: true,
         total: true,
+        propina: true,
         pago_estado: true,
         comprobante_tipo: true,
         comprobante_doc: true,
@@ -696,7 +699,7 @@ export class VouchersService {
     }
 
     // Pago dividido: el plan debe sumar el total del pedido (lo valida PagoPlanService)
-    const planValidado = conPlan ? this.pagoPlan.validar(plan as PlanPagoItem[], Number(pedido.total)) : null;
+    const planValidado = conPlan ? this.pagoPlan.validar(plan as PlanPagoItem[], totalCobrable(pedido)) : null;
     const desglose = planValidado
       ? planValidado.map((f) => `${NOMBRE_MEDIO_CAJA[f.medio]} S/ ${f.monto.toFixed(2)}`).join(' · ')
       : null;
@@ -706,7 +709,7 @@ export class VouchersService {
     const montoEfectivo = planValidado
       ? planValidado.filter((f) => f.medio === 'EFECTIVO').reduce((acc, f) => acc + f.monto, 0)
       : medioNormalizado === 'EFECTIVO'
-        ? Number(pedido.total)
+        ? totalCobrable(pedido)
         : 0;
     const recibido = this.recibidoEfectivo(opciones.recibido, montoEfectivo);
     const comprobante = this.comprobanteDelEnvio(pedido, opciones.comprobante);
@@ -1061,7 +1064,7 @@ export class VouchersService {
                 ...(flujo.pago || {}),
                 pedidoId: destino.id.toString(),
                 pedidoCodigo: destino.codigo,
-                monto: Number(destino.total),
+                monto: totalCobrable(destino),
               },
             },
           },
@@ -1113,7 +1116,7 @@ export class VouchersService {
     const id = this.parsearId(pedidoId);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
-      select: { id: true, codigo: true, party_id: true, total: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true },
+      select: { id: true, codigo: true, party_id: true, total: true, propina: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true },
     });
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'El pedido no existe' });
@@ -1124,7 +1127,7 @@ export class VouchersService {
     if (esSoloMozo(usuario) && !puedeSubirVoucher(pedido, 'MOZO')) {
       throw new ConflictException({ codigo: 'PLAN_BLOQUEADO', mensaje: 'El pago ya fue aprobado; pide a Caja cualquier cambio del plan' });
     }
-    const planValidado = this.pagoPlan.validar(plan as PlanPagoItem[], Number(pedido.total));
+    const planValidado = this.pagoPlan.validar(plan as PlanPagoItem[], totalCobrable(pedido));
     if (!planValidado) {
       throw new BadRequestException({ codigo: 'PLAN_PAGO_INVALIDO', mensaje: 'El plan de pago no es válido' });
     }
@@ -1172,7 +1175,7 @@ export class VouchersService {
     const pedido = voucher.pedido_id
       ? await this.prisma.pedido.findUnique({
           where: { id: voucher.pedido_id },
-          select: { id: true, party_id: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true, total: true },
+          select: { id: true, party_id: true, estado: true, modalidad: true, pago_metodo: true, pago_estado: true, pago_coordinado_en: true, total: true, propina: true },
         })
       : null;
     if (esSoloMozo(usuario) && (!pedido || pedido.party_id == null || BigInt(pedido.party_id) !== BigInt(usuario.partyId))) {

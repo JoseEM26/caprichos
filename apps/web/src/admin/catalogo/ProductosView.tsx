@@ -15,6 +15,7 @@ import {
   CategoriaAdmin,
   ListaAdmin,
   GrupoOpcionItem,
+  SaborItem,
 } from './catalogoApi';
 import { EditorOpcionesTamanos } from './EditorOpcionesTamanos';
 import { BotonVistaPrevia } from './VistaPreviaProducto';
@@ -23,6 +24,31 @@ import { esSoloMozoUsuario, tieneRolUsuario } from '../../comun/rolesUsuario';
 
 const PPAGE = 24;
 
+
+/** Casilla «Controlar stock»: stock propio del producto (donas, galletas), aparte del control de insumos. */
+function CasillaControlaStock({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minHeight: 44, fontWeight: 700 }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-describedby="ayuda-controla-stock"
+        style={{ width: 22, height: 22, marginTop: 2, flexShrink: 0 }}
+      />
+      <span>
+        Controlar stock de este producto
+        <span
+          id="ayuda-controla-stock"
+          style={{ display: 'block', fontWeight: 400, fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)', marginTop: 2 }}
+        >
+          Para productos que se acaban, como donas o galletas: se descuenta al vender, se marca Agotado al llegar a 0
+          y la carta muestra cuántos quedan. Necesita el conteo de apertura de cada día.
+        </span>
+      </span>
+    </label>
+  );
+}
 
 /** Aviso de producto en promoción: reemplaza al botón «no suma puntos». */
 function AvisoPromocion({ p }: { p: ProductoAdmin }) {
@@ -68,6 +94,13 @@ function AvisoPromocion({ p }: { p: ProductoAdmin }) {
   );
 }
 
+/**
+ * Qué hizo el admin con la foto en el modal Editar. Solo `NUEVA` y `QUITADA`
+ * viajan al servidor: `SIN_CAMBIO` omite `fotoArchivoId` del payload, así la
+ * foto actual se conserva (el PATCH solo la toca si la clave viene).
+ */
+type CambioFotoEdicion = 'SIN_CAMBIO' | 'NUEVA' | 'QUITADA';
+
 export function ProductosView() {
   const navigate = useNavigate();
   const { usuario, tiene } = useSesion();
@@ -110,6 +143,7 @@ export function ProductosView() {
   const [npCategoriaId, setNpCategoriaId] = useState<string>('');
   const [npPrecio, setNpPrecio] = useState('');
   const [npDesc, setNpDesc] = useState('');
+  const [npControlaStock, setNpControlaStock] = useState(false);
   // «¿Cómo se vende?»: null = lo decide la categoría (llevaOpciones); al tocar una tarjeta queda la elección
   const [npModoElegido, setNpModoElegido] = useState<'unico' | 'opciones' | null>(null);
   const [npOpc, setNpOpc] = useState<EstadoOpciones>(ESTADO_VACIO);
@@ -130,10 +164,12 @@ export function ProductosView() {
   const [edCategoriaId, setEdCategoriaId] = useState('');
   const [edPrecio, setEdPrecio] = useState('');
   const [edOculto, setEdOculto] = useState(false);
+  const [edControlaStock, setEdControlaStock] = useState(false);
   const [edFotoUrl, setEdFotoUrl] = useState<string | null>(null);
   const [edFotoArchivoId, setEdFotoArchivoId] = useState<string | null>(null);
+  const [edFotoCambio, setEdFotoCambio] = useState<CambioFotoEdicion>('SIN_CAMBIO');
   const subidaEdFoto = useSubidaArchivo();
-  const [edSabores, setEdSabores] = useState<Array<{ id?: string; nombre: string; activo?: boolean }>>([]);
+  const [edSabores, setEdSabores] = useState<Array<SaborItem>>([]);
   const [edNuevoSabor, setEdNuevoSabor] = useState('');
   const [edError, setEdError] = useState('');
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
@@ -359,8 +395,10 @@ export function ProductosView() {
     setEdCategoriaId(p.categoriaId);
     setEdPrecio(p.precio.toFixed(2));
     setEdOculto(p.oculto === true);
+    setEdControlaStock(p.controlaStock === true);
     setEdFotoUrl(p.fotoUrl || null);
     setEdFotoArchivoId(null);
+    setEdFotoCambio('SIN_CAMBIO');
     setEdSabores(p.sabores.map((s) => ({ ...s })));
     setEdNuevoSabor('');
     setEdError('');
@@ -386,7 +424,11 @@ export function ProductosView() {
             categoriaId: edCategoriaId,
             precio: precioNum,
             oculto: edOculto,
-            fotoArchivoId: edFotoArchivoId,
+            controlaStock: edControlaStock,
+            // Sin cambio: no viaja la clave, y el servidor conserva la foto.
+            ...(edFotoCambio === 'SIN_CAMBIO'
+              ? {}
+              : { fotoArchivoId: edFotoCambio === 'NUEVA' ? edFotoArchivoId : null }),
             sabores: edSabores.map((s) => ({
               id: s.id,
               nombre: s.nombre,
@@ -413,6 +455,7 @@ export function ProductosView() {
       const res = await catalogoApi.subirFoto(file);
       setEdFotoUrl(res.url);
       setEdFotoArchivoId(res.id);
+      setEdFotoCambio('NUEVA');
     });
   };
 
@@ -435,12 +478,20 @@ export function ProductosView() {
       accion: () => {
         setEdFotoUrl(null);
         setEdFotoArchivoId(null);
+        setEdFotoCambio('QUITADA');
       },
     });
   };
 
   // Abrir modal Tamaños y opciones (el contenido vive en EditorOpcionesTamanos)
   const abrirOpciones = (p: ProductoAdmin) => setProductoEnOpciones(p);
+
+  // Tarjeta: «Unidad · 1/2 docena (6) · Docena (12)». Solo tamaños activos; con 1 unidad no lleva número.
+  const textoUnidadesTamanos = (p: ProductoAdmin) =>
+    p.tamanos
+      .filter((t) => t.activo !== false)
+      .map((t) => ((t.unidades ?? 1) === 1 ? t.nombre : `${t.nombre} (${t.unidades})`))
+      .join(' · ');
 
   // Resumen para la insignia del botón: «3 tamaños · 2 grupos»
   const resumenOpciones = (p: ProductoAdmin) => {
@@ -496,10 +547,11 @@ export function ProductosView() {
             categoriaId: npCategoriaId,
             precio: precioNum,
             descripcion: npDesc.trim() || undefined,
+            controlaStock: npControlaStock,
             ...(npFotoArchivoId ? { fotoArchivoId: npFotoArchivoId } : {}),
             ...(conOpciones
               ? {
-                  tamanos: npOpc.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: t.precio, activo: t.activo })),
+                  tamanos: npOpc.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: t.precio, activo: t.activo, unidades: t.unidades })),
                   grupos: npOpc.grupos.map((g, orden) => ({ grupoId: g.grupoId, orden })),
                   resaltarOpcionMenosPedida: npOpc.resaltarMenosPedida === true,
                 }
@@ -509,6 +561,7 @@ export function ProductosView() {
           setNpNombre('');
           setNpPrecio('');
           setNpDesc('');
+          setNpControlaStock(false);
           setNpModoElegido(null);
           setNpOpc(ESTADO_VACIO);
           elegirNpFoto(null);
@@ -970,6 +1023,11 @@ export function ProductosView() {
                 {p.promociones && p.promociones.length > 0 && (
                   <span className="pt-ins pt-ins--promo">En promoción</span>
                 )}
+                {p.controlaStock && (
+                  <span className="pt-ins pt-ins--stock">
+                    {(p.sabores?.length ?? 0) > 0 ? 'Stock por sabor' : 'Con stock'}
+                  </span>
+                )}
               </div>
               {p.fotoUrl && (
                 <img
@@ -1043,6 +1101,15 @@ export function ProductosView() {
                   </div>
                 </div>
               </div>
+
+              {textoUnidadesTamanos(p) && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--cp-soft)' }}>
+                    TAMAÑOS (UNIDADES)
+                  </div>
+                  <div style={{ fontSize: 13 }}>{textoUnidadesTamanos(p)}</div>
+                </div>
+              )}
 
               {/* Producto en promoción: sin botón, con aviso (los combos no cuentan: suelto sí suma) */}
               {(p.promociones?.length ?? 0) > 0 && (
@@ -1528,6 +1595,8 @@ export function ProductosView() {
             </div>
 
 
+            <CasillaControlaStock checked={npControlaStock} onChange={setNpControlaStock} />
+
             {/* Foto */}
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <div
@@ -1813,6 +1882,8 @@ export function ProductosView() {
               Mostrar en la carta
             </label>
 
+            <CasillaControlaStock checked={edControlaStock} onChange={setEdControlaStock} />
+
             {/* Sabores gestionables (Donas, Galletas, Pizzas, etc.) */}
             <div>
               <div style={{ fontWeight: 700, marginBottom: 4 }}>
@@ -1820,9 +1891,8 @@ export function ProductosView() {
               </div>
               <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)', marginBottom: 6 }}>
                 Son las opciones que el cliente elige al pedir este producto (p. ej. el relleno o
-                sabor de una dona). El bot de WhatsApp las ofrece al pedir, cocina las usa para
-                marcar agotados y los avisos de agotados también las usan. Toca una opción para
-                marcarla como agotada.
+                sabor de una dona). El bot de WhatsApp las ofrece al pedir, y los avisos de agotados
+                también las usan. Toca «Disponible» o «Agotado» para cada una.
               </div>
               <div
                 style={{
@@ -1835,20 +1905,43 @@ export function ProductosView() {
                   gap: 8,
                 }}
               >
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {edSabores.map((s, sIdx) => {
-                    const activo = s.activo !== false;
-                    return (
+                {edSabores.length === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
+                    Este producto no tiene sabores. Agrega uno abajo si el cliente elige entre varios.
+                  </div>
+                )}
+                {edSabores.map((s, sIdx) => {
+                  const activo = s.activo !== false;
+                  const sinApertura = s.quedan === null || s.quedan === undefined;
+                  return (
+                    <div
+                      key={s.id ?? `nuevo-${sIdx}`}
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        gap: 8,
+                        borderBottom: '1px solid var(--cp-line)',
+                        paddingBottom: 6,
+                      }}
+                    >
+                      <div style={{ flex: '1 1 120px', minWidth: 0, overflowWrap: 'anywhere' }}>
+                        <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--cp-navy)' }}>{s.nombre}</div>
+                        {edControlaStock && (
+                          <div style={{ fontSize: 12, fontWeight: 700, color: sinApertura ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>
+                            {sinApertura ? 'Sin apertura hoy' : `Quedan ${s.quedan}`}
+                          </div>
+                        )}
+                      </div>
                       <button
-                        key={sIdx}
-                        onClick={() => {
-                          const clon = [...edSabores];
-                          clon[sIdx].activo = !activo;
-                          setEdSabores(clon);
-                        }}
+                        type="button"
+                        aria-pressed={activo}
+                        aria-label={`${s.nombre}: ${activo ? 'disponible, tocar para marcar agotado' : 'agotado, tocar para marcar disponible'}`}
+                        onClick={() => setEdSabores(edSabores.map((x, k) => (k === sIdx ? { ...x, activo: !activo } : x)))}
                         style={{
-                          minHeight: 36,
-                          padding: '0 10px',
+                          minHeight: 44,
+                          minWidth: 44,
+                          padding: '0 12px',
                           borderRadius: 9999,
                           border: '1.5px solid var(--cp-navy)',
                           background: activo ? 'var(--cp-navy)' : 'transparent',
@@ -1858,11 +1951,16 @@ export function ProductosView() {
                           cursor: 'pointer',
                         }}
                       >
-                        {s.nombre} {activo ? '✓' : '(Agotado)'}
+                        {activo ? 'Disponible' : 'Agotado'}
                       </button>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
+                {edControlaStock && edSabores.length > 0 && (
+                  <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)' }}>
+                    El stock de cada sabor se registra en «Apertura del día» (Almacén), no aquí.
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input
                     type="text"

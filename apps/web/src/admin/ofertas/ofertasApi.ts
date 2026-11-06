@@ -6,6 +6,21 @@ export interface ComboPrecioItem {
   precio: number;
 }
 
+/** Opción de una parte con lista (juguetes, donas) o alternativa: si se puede elegir ahora y, por sabor, cada sabor con su saldo. */
+export interface OpcionDetalleCombo {
+  id: string;
+  nombre: string;
+  disponible: boolean;
+  /** Bloqueada por saldo 0 (se muestra «No hay stock») */
+  sinStock?: boolean;
+  sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
+}
+
+/** Alternativa de una parte: producto y cantidad («si no hay stock, el cliente podrá elegir»). Mismo precio del combo. */
+export interface AlternativaParteItem extends OpcionDetalleCombo {
+  cantidad: number;
+}
+
 export interface ComboParteItem {
   id?: string;
   tipo?: 'A_ELECCION' | 'UNA_DE' | 'FIJO';
@@ -16,13 +31,20 @@ export interface ComboParteItem {
   productos?: any[];
   opciones?: any[];
   orden?: number;
-  /** Solo FIJO: plan B, plan C... (ids de producto en orden) */
-  reemplazos?: string[];
-  reemplazosDetalle?: { id: string; nombre: string }[];
+  /** Alternativas en orden. Entrada (admin): producto y cantidad; salida: además disponibilidad ahora. */
+  alternativas?: AlternativaParteItem[];
+  /** Calculado por el servidor: el original no alcanza y hay alguna alternativa con stock. */
+  alternativasActivas?: boolean;
   /** Calculado por el servidor en tiempo real */
   disponible?: boolean;
   opcionesDisponibles?: string[];
   principalNombre?: string;
+  /** FIJO de un producto: tamaño (producto_tamano) elegido y su nombre; vacío = sin tamaño */
+  tamanoId?: string | null;
+  tamanoNombre?: string | null;
+  tamanoUnidades?: number;
+  /** A_ELECCION con lista (juguetes, donas): cada opción y si se puede elegir ahora. */
+  opcionesDetalle?: OpcionDetalleCombo[];
 }
 
 export interface LlevaPagaConfig {
@@ -86,6 +108,8 @@ export interface OfertaItem {
   /** Combo: se puede armar ahora (calculado; no cambia `activo`) */
   disponible?: boolean;
   motivoAgotado?: string | null;
+  /** Combo no armable por saldo 0 de sus productos: se muestra «No disponible». */
+  sinStock?: boolean;
   combosPartes?: ComboParteItem[];
   llevaPaga?: LlevaPagaConfig | null;
 }

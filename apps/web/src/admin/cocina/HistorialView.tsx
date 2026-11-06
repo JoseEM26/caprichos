@@ -3,6 +3,7 @@ import type { HistorialComanda } from './cocinaTipos';
 import { devolverComanda } from './cocinaApi';
 import { Confirmar } from '../../comun/Confirmar';
 import { EstadoError } from '../../comun/EstadoError';
+import { NumeroDia } from './TiempoEspera';
 
 export interface HistorialViewProps {
   historial: HistorialComanda[];
@@ -114,6 +115,7 @@ export function HistorialView({
                   boxShadow: '0 2px 6px rgba(11, 44, 62, 0.04)',
                 }}
               >
+                <NumeroDia numero={h.numeroDia} />
                 <span
                   style={{
                     fontFamily: 'Montserrat, sans-serif',

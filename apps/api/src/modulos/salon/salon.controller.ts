@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -14,6 +15,9 @@ import { SalonService } from './salon.service';
 import { AbrirPedidoMesaDto } from './dto/abrir-pedido-mesa.dto';
 import { LiberarMesaDto } from './dto/liberar-mesa.dto';
 import { CambiarMesaDto } from './dto/cambiar-mesa.dto';
+import { AgregarMesasDto } from './dto/agregar-mesas.dto';
+import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
+import { requiereCodigoCortesia } from '../cortesias/cortesia.tipos';
 
 @Controller('admin/salon')
 @UseGuards(AccesoGuard)
@@ -37,6 +41,11 @@ export class SalonController {
    */
   @Post('pedidos')
   @Permiso('mesas', 'abrir')
+  // Una línea de cortesía: el SUPERVISOR presenta su código (Caja y ADMIN no), igual que en Pedidos
+  @RequiereCodigoSupervisor('cortesias/dar', {
+    condicion: (req) => requiereCodigoCortesia(req) && (req.body?.lineas ?? []).some((l: any) => !!l?.cortesia),
+    exigeCodigoSupervisor: true,
+  })
   async abrirPedido(
     @Body() dto: AbrirPedidoMesaDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -44,7 +53,7 @@ export class SalonController {
     @Req() req: any,
   ) {
     const clave = idempotencyKey || xIdempotencyKey;
-    return this.salonService.abrirPedido(dto, req.usuario, clave);
+    return this.salonService.abrirPedido(dto, req.usuario, clave, req.supervisor?.supervisorPartyId ?? req.supervisor?.party_id);
   }
 
   /**
@@ -70,7 +79,29 @@ export class SalonController {
   @Permiso('mesas', 'abrir')
   async cambiarMesa(@Param('id') id: string, @Body() dto: CambiarMesaDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.salonService.cambiarMesaPedido(id, dto.mesaId, req.usuario, ip);
+    return this.salonService.cambiarMesaPedido(id, dto.mesaId, req.usuario, ip, dto.desdeMesaId);
+  }
+
+  /**
+   * 8) POST /admin/salon/pedidos/:id/mesas (mesas/abrir) { mesaIds }
+   * Suma mesas juntas a un pedido de salón abierto (máximo 6 en total).
+   */
+  @Post('pedidos/:id/mesas')
+  @Permiso('mesas', 'abrir')
+  async agregarMesas(@Param('id') id: string, @Body() dto: AgregarMesasDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.salonService.agregarMesasPedido(id, dto.mesaIds, req.usuario, ip);
+  }
+
+  /**
+   * 9) DELETE /admin/salon/pedidos/:id/mesas/:mesaId (mesas/abrir)
+   * Quita una mesa del pedido; la mesa queda libre. El pedido conserva al menos una.
+   */
+  @Delete('pedidos/:id/mesas/:mesaId')
+  @Permiso('mesas', 'abrir')
+  async quitarMesa(@Param('id') id: string, @Param('mesaId') mesaId: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.salonService.quitarMesaPedido(id, mesaId, req.usuario, ip);
   }
 
   /**

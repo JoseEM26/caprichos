@@ -2,6 +2,8 @@ export interface TamanoCarta {
   id: string;
   nombre: string;
   precio: number;
+  /** Donas y galletas con sabores: unidades que trae el tamaño (1, 6 o 12). */
+  unidades?: number;
 }
 
 export interface OpcionCarta {
@@ -24,6 +26,17 @@ export interface SaborCarta {
   id: string;
   nombre: string;
   disponible: boolean;
+  activo?: boolean;
+  /** Unidades que quedan de este sabor hoy; null = sin tope. Solo con saboresConStock. */
+  quedan?: number | null;
+}
+
+/** Sabor elegido en una línea de mezcla: cuántas unidades de ese sabor. */
+export interface SaborLinea {
+  saborId: string;
+  cantidad: number;
+  /** Nombre para mostrar en el carrito; no viaja al servidor. */
+  nombre?: string;
 }
 
 export interface ProductoCarta {
@@ -38,6 +51,12 @@ export interface ProductoCarta {
   noSumaBeneficios: boolean;
   disponible: boolean;
   agotadoHasta: string | null;
+  /** Producto terminado con conteo (donas, galletas). Ausente o false = sin control de stock. */
+  controlaStock?: boolean;
+  /** Unidades que quedan hoy; null si no controla stock o no hay conteo de apertura del día. */
+  quedan?: number | null;
+  /** Stock por sabor (donas y galletas por media docena o docena): se elige cuántas de cada sabor. */
+  saboresConStock?: boolean;
 }
 
 export interface CategoriaCarta {
@@ -92,6 +111,8 @@ export interface DatosLocalCarta {
   envioGratisModo?: 'desde' | 'mas_de' | string;
   pedidoMinimo: number | null;
   puntosPorcentaje?: number;
+  /** Propina opcional: interruptor de la carta y tope en soles (lo decide el dueño en Configuración) */
+  propina?: { carta: boolean; bot: boolean; tope: number };
   /** Pedir como invitado (sin celular): lo decide el dueño en Configuración. Sin dato = no permitido. */
   invitadoPermitido?: boolean;
   lat?: number;
@@ -149,8 +170,13 @@ export interface LineaCarrito {
   personas?: string[];
   /** Combo con parte fija: el combo y qué producto se eligió en cada parte (principal o reemplazo) */
   ofertaId?: string;
-  comboElecciones?: { parteId: string; productoId: string }[];
+  comboElecciones?: { parteId: string; productoId: string; saborId?: string }[];
   unidades?: UnidadPersonalizada[];
+  /** Mezcla de sabores: unidades que reparte cada media docena o docena (del tamaño elegido). */
+  unidadesPorMezcla?: number;
+  /** Producto con stock: unidades que trae el tamaño elegido (1/2 docena = 6); cada cantidad consume estas unidades. */
+  unidadesTamano?: number;
+  sabores?: SaborLinea[];
   precioUnitario: number;
   subtotal: number;
 }
@@ -198,4 +224,6 @@ export interface PedidoConfirmado {
   clienteNombre: string;
   modalidad: ModalidadEntrega;
   seguimientoToken: string;
+  /** Propina aparte de la venta (0 o ausente = sin propina) */
+  propina?: number;
 }

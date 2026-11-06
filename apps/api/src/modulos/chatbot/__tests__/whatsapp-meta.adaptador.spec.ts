@@ -775,6 +775,19 @@ describe('WhatsAppMetaAdaptador: plantilla con botón copiar código', () => {
     ]);
   });
 
+  it('botonesRespuesta: un componente quick_reply por botón, en orden, con su payload (index 0, 1, 2)', async () => {
+    await adaptador.enviarPlantilla('51987654321', 'caprichos_encuesta_posventa', 'es', ['Ana', 'CP-1'], {
+      botonesRespuesta: ['encuesta:1', 'encuesta:3', 'encuesta:5'],
+    });
+
+    expect(envios[0].template.components).toEqual([
+      { type: 'body', parameters: [{ type: 'text', text: 'Ana' }, { type: 'text', text: 'CP-1' }] },
+      { type: 'button', sub_type: 'quick_reply', index: '0', parameters: [{ type: 'payload', payload: 'encuesta:1' }] },
+      { type: 'button', sub_type: 'quick_reply', index: '1', parameters: [{ type: 'payload', payload: 'encuesta:3' }] },
+      { type: 'button', sub_type: 'quick_reply', index: '2', parameters: [{ type: 'payload', payload: 'encuesta:5' }] },
+    ]);
+  });
+
   it('sin botonCodigo: solo el componente body (otras plantillas no cambian)', async () => {
     await adaptador.enviarPlantilla('51987654321', 'caprichos_delivery_en_camino', 'es', ['Juan', 'CP-1', '25']);
 

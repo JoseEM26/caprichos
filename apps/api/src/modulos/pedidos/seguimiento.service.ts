@@ -119,6 +119,7 @@ export interface SeguimientoPedido {
   estadoEtiqueta: string;
   modalidad: Modalidad;
   total: number;
+  propina?: number;
   terminado: boolean;
   anulado: boolean;
   pasos: PasoSeguimiento[];
@@ -171,6 +172,7 @@ const SELECCION_SEGUIMIENTO = {
   estado: true,
   modalidad: true,
   total: true,
+  propina: true,
   creado_en: true,
   pasa_cocina_en: true,
   listo_en: true,
@@ -210,6 +212,7 @@ type PedidoSeguimiento = {
   estado: string;
   modalidad: string;
   total: { toString(): string };
+  propina?: { toString(): string } | null;
   creado_en: Date;
   pasa_cocina_en: Date | null;
   listo_en: Date | null;
@@ -235,6 +238,7 @@ const textoRango = (min: number, max: number) =>
 
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from '../clientes/explicar-puntos-pedido';
+import { lineasDeCuenta } from './lineas-combo.util';
 
 @Injectable()
 export class SeguimientoService {
@@ -387,7 +391,7 @@ export class SeguimientoService {
         pedido.eta_min != null && pedido.eta_max != null ? { min: pedido.eta_min, max: pedido.eta_max } : null;
       rango = restanteEnCamino(prometido, ctx.cfg.respaldoMin, pedido.despachado_en, ctx.ahora, ctx.cfg.pasoMin);
     } else {
-      const unidades = (pedido.lineas ?? []).reduce((s, l) => s + Number(l.cantidad || 0), 0);
+      const unidades = lineasDeCuenta(pedido.lineas ?? []).reduce((s, l) => s + Number(l.cantidad || 0), 0);
       const lat = pedido.entrega_lat == null ? null : Number(pedido.entrega_lat);
       const lng = pedido.entrega_lng == null ? null : Number(pedido.entrega_lng);
       rango =
@@ -429,6 +433,8 @@ export class SeguimientoService {
       estadoEtiqueta: ETIQUETA_ESTADO[pedido.estado] ?? pedido.estado,
       modalidad,
       total: Number(pedido.total.toString()),
+      // Propina aparte de la venta (0 = sin propina)
+      propina: Number(pedido.propina?.toString() ?? 0),
       terminado: anulado || pedido.estado === 'ENTREGADO',
       anulado,
       pasos,

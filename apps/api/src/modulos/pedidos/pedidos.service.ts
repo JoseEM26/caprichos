@@ -4,6 +4,7 @@ import { DireccionesClienteService } from '../clientes/direcciones-cliente.servi
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -20,6 +21,7 @@ import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
 import { calcularEnvioDelivery, PromoEnvioGratis } from '../ofertas/envio-gratis-promo';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { ParteResueltaCombo } from '../ofertas/ofertas.tipos';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto, EntregaDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
@@ -33,9 +35,39 @@ import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
+import { leerConfigPropina } from '../propinas/propinas.service';
+import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
+import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
+import { validarMotivoCortesia } from '../cortesias/cortesia.tipos';
+
+/** Cortesía de una línea: solo con permiso cortesias/dar; sin oferta (la promoción ya tiene su precio). */
+function validarCortesiaLinea(l: { ofertaId?: unknown; cortesia?: { motivo: string; nota?: string } }, origen?: OrigenPedido) {
+  if (!origen?.puedeCortesia || origen.usuarioPartyId === undefined) {
+    throw new ForbiddenException({ codigo: 'SIN_PERMISO_CORTESIA', mensaje: 'No tienes permiso para dar cortesías' });
+  }
+  if (l.ofertaId) {
+    throw new BadRequestException({ codigo: 'CORTESIA_EN_OFERTA', mensaje: 'Un combo o una promoción no puede ser cortesía' });
+  }
+  return validarMotivoCortesia(l.cortesia?.motivo, l.cortesia?.nota);
+}
 
 /** Pista pública de la dirección anterior: nunca la dirección completa (ver enmascararDireccion). */
 export type PistaDireccion = { existe: false } | { existe: true; zona: string | null; direccion: string | null };
+
+/** Bebida (lleva un nombre por unidad para el envase), según su categoría o su área de cocina. */
+function esBebidaPorNombres(categoria?: string | null, area?: string | null): boolean {
+  const catNombre = (categoria || '').toUpperCase();
+  const areaNombre = (area || '').toUpperCase();
+  return (
+    catNombre.includes('FRAPPE') ||
+    catNombre.includes('ICED') ||
+    catNombre.includes('FROZEN') ||
+    catNombre.includes('CALIENTE') ||
+    catNombre.includes('BEBIDA') ||
+    areaNombre.includes('BARRA') ||
+    areaNombre.includes('BEBIDA')
+  );
+}
 
 /**
  * Dirección con la mayor parte oculta: «Av. Los G••••». Se ven la vía corta («Av.») y un conector corto
@@ -67,6 +99,9 @@ export interface OrigenPedido {
   /** WhatsApp: el cliente eligió no sumar puntos; no se busca ninguna cuenta por teléfono */
   sinCuentaCliente?: boolean;
   esPersonal?: boolean;
+  /** Quien da cortesías (permiso cortesias/dar) y el supervisor que presentó su código, si lo hubo. */
+  puedeCortesia?: boolean;
+  supervisorCortesiaPartyId?: bigint | string | number;
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
   omitirChequeoCarta?: boolean;
@@ -147,6 +182,24 @@ export class PedidosService {
    * Cliente con cuenta del pedido: celular (solo MOZO/CAJA), cuenta de la carta o teléfono de WhatsApp.
    * Null = invitado. Un clienteTelefono de carta o WhatsApp se ignora.
    */
+  /**
+   * Propina del pedido (monto en soles). Sin interruptor encendido para el canal, se ignora (0). Con
+   * propina inválida o sobre el tope, rechaza. Sin propina no toca la configuración.
+   */
+  private async validarPropina(valor: unknown, canal: string): Promise<number> {
+    if (valor === undefined || valor === null || valor === '') return 0;
+    const cfg = await leerConfigPropina(this.prisma);
+    if (!propinaActivaParaCanal(cfg.activa, canal)) return 0;
+    const r = normalizarPropina(valor, cfg.tope);
+    if (!r.valido) {
+      throw new BadRequestException({
+        codigo: 'PROPINA_INVALIDA',
+        mensaje: `La propina debe ser un monto en soles, con hasta 2 decimales y no mayor a S/ ${cfg.tope}`,
+      });
+    }
+    return r.monto;
+  }
+
   private async clienteIdentificado(dto: CrearPedidoDto, origen?: OrigenPedido): Promise<bigint | null> {
     const canal = origen?.canal ?? 'CARTA';
     if (canal === 'MOZO' || canal === 'CAJA') {
@@ -388,6 +441,7 @@ export class PedidosService {
             },
           },
         },
+        sabores: true,
       },
     });
 
@@ -423,6 +477,7 @@ export class PedidosService {
       // Determinar precio base y tamaño
       let precioBase = 0;
       let tamanoNombre: string | null = null;
+      let unidadesTamano = 1;
 
       if (prodDb.tamanos.length > 0) {
         if (!l.tamanoId) {
@@ -441,14 +496,22 @@ export class PedidosService {
         }
         precioBase = Number(tamDb.precio);
         tamanoNombre = tamDb.tamano_valor?.nombre || `Tamaño ${tamDb.id}`;
+        unidadesTamano = tamDb.unidades ?? 1;
       } else {
         precioBase = Number(prodDb.precio);
       }
 
-      // Validar grupos y opciones del producto
+      // Producto por sabor (controla stock y tiene sabores activos): sus unidades se reparten entre sabores
+      const porSabor = controlaPorSabor(prodDb);
+      const saboresLinea = porSabor
+        ? validarSaboresLinea(prodDb, unidadesTamano, cantidad, l.sabores, ahora)
+        : [];
+
+      // Validar grupos y opciones del producto. Por sabor, sus grupos obligatorios heredados (p. ej. «Sabor»
+      // de donas) no aplican: no se exigen ni se aceptan sus opciones.
       const gruposActivos = prodDb.grupos
         .map((pg) => pg.grupo)
-        .filter((g) => g.activo);
+        .filter((g) => g.activo && !(porSabor && (g.obligatorio || g.minimo > 0)));
 
       const todasLasOpcionesDelProducto = gruposActivos.flatMap((g) => g.opciones);
 
@@ -524,21 +587,16 @@ export class PedidosService {
         (acc, op) => acc + op.precio_extra,
         0,
       );
-      const precioUnitario = Number((precioBase + sumaExtras).toFixed(2));
-      const lineaSubtotal = Number((precioUnitario * cantidad).toFixed(2));
+      const precioUnitarioLista = Number((precioBase + sumaExtras).toFixed(2));
+      const valorListaLinea = Number((precioUnitarioLista * cantidad).toFixed(2));
+      // Cortesía (venta a costo 0): la línea sale a S/ 0; su valor de lista queda guardado (no suma al pedido)
+      const cortesiaLinea = l.cortesia ? validarCortesiaLinea(l, origen) : null;
+      const precioUnitario = cortesiaLinea ? 0 : precioUnitarioLista;
+      const lineaSubtotal = cortesiaLinea ? 0 : valorListaLinea;
       subtotalCalculado += lineaSubtotal;
 
       // Bebidas llevan personas[] con tantos nombres como unidades
-      const catNombre = (prodDb.categoria?.nombre || '').toUpperCase();
-      const areaNombre = (prodDb.categoria?.area?.nombre || '').toUpperCase();
-      const esBebida =
-        catNombre.includes('FRAPPE') ||
-        catNombre.includes('ICED') ||
-        catNombre.includes('FROZEN') ||
-        catNombre.includes('CALIENTE') ||
-        catNombre.includes('BEBIDA') ||
-        areaNombre.includes('BARRA') ||
-        areaNombre.includes('BEBIDA');
+      const esBebida = esBebidaPorNombres(prodDb.categoria?.nombre, prodDb.categoria?.area?.nombre);
 
       const personasAsignadas: string[] = [];
       if (esBebida) {
@@ -556,11 +614,12 @@ export class PedidosService {
         }
       }
 
-      // Combo con parte fija: la elección debe ser el principal o un reemplazo disponible (409 si no)
-      const notaCombo =
-        l.ofertaId && l.comboElecciones?.length
-          ? await this.ofertasService.validarEleccionesCombo(l.ofertaId, l.comboElecciones)
-          : '';
+      // Combo: la parte FIJO debe ser el principal o un reemplazo disponible (409 si no); las A_ELECCION, lo elegido.
+      // Cada parte sale en su propia línea hija (cocina y stock); la madre sigue llevando el precio del combo.
+      const combo = l.ofertaId
+        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad)
+        : { nota: '', partes: [] };
+      const contenedora = combo.partes.length > 0;
 
       lineasCalculadas.push({
         productoId: prodDb.id,
@@ -570,16 +629,30 @@ export class PedidosService {
         nombre: prodDb.nombre,
         tamano: tamanoNombre,
         cantidad,
+        // unidades que consume cada tamaño (1/2 docena = 6): el stock se descuenta en unidades
+        unidadesTamano,
         precioUnitario,
         subtotal: lineaSubtotal,
-        areaId: prodDb.categoria?.area_id ?? null,
-        nota: [notaCombo, l.nota?.trim()].filter(Boolean).join(' · ') || null,
+        cortesia: cortesiaLinea ? { ...cortesiaLinea, valorLista: valorListaLinea } : null,
+        // Línea madre de combo: sin producto ni área propios; la cocina ve solo sus hijas
+        contenedora,
+        areaId: contenedora ? null : (prodDb.categoria?.area_id ?? null),
+        nota: [combo.nota, l.nota?.trim()].filter(Boolean).join(' · ') || null,
         nombresPersona: personasAsignadas,
+        personasEntrada: Array.isArray(l.personas) ? l.personas : [],
+        partesCombo: combo.partes,
         opciones: opcionesElegidasInfo,
+        sabores: saboresLinea,
       });
     }
 
     subtotalCalculado = Number(subtotalCalculado.toFixed(2));
+    if (lineasCalculadas.every((l) => l.cortesia)) {
+      throw new BadRequestException({
+        codigo: 'PEDIDO_SOLO_CORTESIA',
+        mensaje: 'Un pedido solo de cortesías no se cobra: regístralas por separado',
+      });
+    }
 
     // 5.0. Cliente con cuenta identificado (suma puntos, historial y direcciones)
     const clienteFinal = await this.clienteIdentificado(dto, origen);
@@ -603,7 +676,8 @@ export class PedidosService {
     const canalPedido = origen?.canal || 'CARTA';
     const desgloseDescuento = await this.ofertasService.calcularDescuentosParaPedido({
       subtotal: subtotalCalculado,
-      lineas: lineasCalculadas.map((lin) => ({
+      // Las cortesías no entran a promociones ni descuentos (su precio ya es 0)
+      lineas: lineasCalculadas.filter((lin) => !lin.cortesia).map((lin) => ({
         productoId: lin.productoId,
         categoriaId: lin.categoriaId,
         cantidad: lin.cantidad,
@@ -749,12 +823,17 @@ export class PedidosService {
 
     const totalCalculado = Number(Math.max(0, subtotalCalculado - descuentoAplicado + (envio ?? 0)).toFixed(2));
 
+    // 7.5. Propina opcional: va APARTE de la venta (no suma al total, comprobante ni puntos). Lo que paga el
+    // cliente (plan, voucher, efectivo) es total + propina.
+    const propinaPedido = await this.validarPropina(dto.propina, origen?.canal ?? 'CARTA');
+    const aCobrar = Number((totalCalculado + propinaPedido).toFixed(2));
+
     // 8. Validación de pago (con plan: el efectivo se compara contra su parte, no contra el total)
-    const planPago = this.pagoPlan.validar(dto.pago.plan, totalCalculado);
+    const planPago = this.pagoPlan.validar(dto.pago.plan, aCobrar);
     const montoEfectivo = planPago
       ? this.pagoPlan.montoEfectivo(planPago)
       : dto.pago.metodo === 'EFECTIVO'
-        ? totalCalculado
+        ? aCobrar
         : 0;
     if (dto.pago.pagaCon !== undefined && montoEfectivo > 0 && Number(dto.pago.pagaCon) < montoEfectivo) {
       throw new BadRequestException({
@@ -779,6 +858,8 @@ export class PedidosService {
 
     // Nunca se rechaza una venta por el DNI: una boleta mayor a S/ 700 sin DNI se crea y el cobro la exige.
 
+    let agotadosPorVenta: bigint[] = [];
+    let saboresAgotadosPorVenta: bigint[] = [];
     const pedidoCreado = await this.prisma.$transaction(async (tx) => {
       // Generación del código correlativo CP-W###
       let codigo: string;
@@ -825,6 +906,7 @@ export class PedidosService {
           descuento: new Prisma.Decimal(descuentoAplicado),
           envio: envio !== null ? new Prisma.Decimal(envio) : null,
           total: new Prisma.Decimal(totalCalculado),
+          propina: new Prisma.Decimal(propinaPedido),
           oferta_id: desgloseDescuento.ofertaId
             ? BigInt(desgloseDescuento.ofertaId)
             : (lineasCalculadas.find((l) => l.ofertaId)?.ofertaId ?? null),
@@ -868,7 +950,7 @@ export class PedidosService {
         const lineaDb = await tx.pedidoLinea.create({
           data: {
             pedido_id: pedido.id,
-            producto_id: lin.productoId,
+            producto_id: lin.contenedora ? null : lin.productoId,
             oferta_id: lin.ofertaId ?? null,
             nombre: lin.nombre,
             tamano: lin.tamano,
@@ -878,6 +960,7 @@ export class PedidosService {
             area_id: lin.areaId,
             nombres_persona: lin.nombresPersona,
             nota: lin.nota,
+            es_cortesia: !!lin.cortesia,
             opciones: lin.opciones.map((o: any) => ({
               id: o.id.toString(),
               nombre: o.nombre,
@@ -886,6 +969,50 @@ export class PedidosService {
             })),
           },
         });
+
+        if (lin.cortesia) {
+          await tx.cortesia.create({
+            data: {
+              producto_id: lin.productoId,
+              cantidad: lin.cantidad,
+              valor_lista: new Prisma.Decimal(lin.cortesia.valorLista),
+              motivo: lin.cortesia.motivo,
+              nota: lin.cortesia.nota,
+              pedido_id: pedido.id,
+              pedido_linea_id: lineaDb.id,
+              dada_por_party_id: BigInt(origen!.usuarioPartyId!),
+              autorizada_por_party_id: origen?.supervisorCortesiaPartyId ? BigInt(origen.supervisorCortesiaPartyId) : null,
+            },
+          });
+        }
+
+        // Partes del combo: una línea hija por producto, sin cobro (el precio ya va en la madre)
+        for (const parte of lin.partesCombo) {
+          const esBebidaParte = esBebidaPorNombres(parte.categoriaNombre ?? undefined, parte.areaNombre ?? undefined);
+          const hija = await tx.pedidoLinea.create({
+            data: {
+              pedido_id: pedido.id,
+              producto_id: parte.productoId,
+              linea_combo_id: lineaDb.id,
+              nombre: parte.nombre,
+              cantidad: parte.cantidad,
+              tamano: parte.tamano ?? null,
+              precio_unit: new Prisma.Decimal(0),
+              subtotal: new Prisma.Decimal(0),
+              area_id: parte.areaId,
+              nombres_persona: esBebidaParte
+                ? Array.from({ length: parte.cantidad }, (_, u) => lin.personasEntrada[u]?.trim() || clienteNombre || 'Mesa')
+                : [],
+              nota: parte.nota,
+            },
+          });
+          // Producto por sabor de la parte: sus sabores siguen a la línea hija (igual que en una línea normal)
+          for (const sb of parte.sabores ?? []) {
+            await tx.pedidoLineaSabor.create({
+              data: { pedido_linea_id: hija.id, sabor_id: sb.saborId, sabor_nombre: sb.nombre, cantidad: sb.cantidad },
+            });
+          }
+        }
 
         for (const op of lin.opciones) {
           await tx.pedidoLineaOpcion.create({
@@ -899,7 +1026,41 @@ export class PedidosService {
             },
           });
         }
+
+        for (const sb of lin.sabores) {
+          await tx.pedidoLineaSabor.create({
+            data: {
+              pedido_linea_id: lineaDb.id,
+              sabor_id: sb.saborId,
+              sabor_nombre: sb.nombre,
+              cantidad: sb.cantidad,
+            },
+          });
+        }
       }
+
+      // Productos que controlan stock: se descuentan ya (todos los canales) y el tope corta el pedido entero
+      const ventaProductos = await descontarVentaProductos(
+        tx,
+        pedido.id,
+        [
+          ...lineasCalculadas
+            .filter((l) => !l.contenedora)
+            .map((l) => ({ productoId: l.productoId, cantidad: l.cantidad * (l.unidadesTamano ?? 1), areaId: l.areaId, sabores: l.sabores })),
+          ...lineasCalculadas.flatMap((l) =>
+            l.partesCombo.map((p: ParteResueltaCombo) => ({
+              productoId: p.productoId,
+              // unidades que consume el tamaño de la parte (1/2 docena = 6), igual que la línea normal
+              cantidad: p.cantidad * (p.unidadesTamano ?? 1),
+              areaId: p.areaId,
+              sabores: p.sabores,
+            })),
+          ),
+        ],
+        pedido.party_id ?? BigInt(1),
+      );
+      agotadosPorVenta = ventaProductos.agotados;
+      saboresAgotadosPorVenta = ventaProductos.saboresAgotados;
 
       // Historial de estado inicial
       await tx.pedidoEstadoHistorial.create({
@@ -984,6 +1145,33 @@ export class PedidosService {
       return pedido;
     });
 
+    // Productos que esta venta dejó agotados: aviso al equipo y carta al día (fuera de la transacción)
+    if (agotadosPorVenta.length > 0 || saboresAgotadosPorVenta.length > 0) {
+      for (const pid of agotadosPorVenta) {
+        this.avisosInternosService?.notificarElementoAgotado('PRODUCTO', pid).catch(() => {});
+      }
+      for (const sid of saboresAgotadosPorVenta) {
+        this.avisosInternosService?.notificarElementoAgotado('SABOR', sid).catch(() => {});
+      }
+      const agotadosAhora = await this.prisma.producto.findMany({
+        where: { agotado_hasta: { gt: new Date() } },
+        select: { id: true },
+      });
+      const saboresAhora = await this.prisma.sabor.findMany({
+        where: { agotado_hasta: { gt: new Date() } },
+        select: { id: true },
+      });
+      this.eventosGateway?.emitirAdmin('stock:cambio', {});
+      this.eventosGateway?.emitirAdmin('carta:disponibilidad', {
+        productos: agotadosAhora.map((p) => p.id.toString()),
+        sabores: saboresAhora.map((sb) => sb.id.toString()),
+        opciones: [],
+        productoIds: agotadosAhora.map((p) => p.id.toString()),
+        saborIds: saboresAhora.map((sb) => sb.id.toString()),
+        opcionIds: [],
+      });
+    }
+
     // 9.5. Canje de puntos: se descuenta del saldo y del total del pedido
     let totalFinal = Number(pedidoCreado.total);
     if (puntosCanje > 0 && this.puntosService && origen?.clientePartyId) {
@@ -1051,6 +1239,7 @@ export class PedidosService {
       descuento: Number(pedidoCreado.descuento || 0),
       envio: pedidoCreado.envio !== null ? Number(pedidoCreado.envio) : null,
       total: totalFinal,
+      propina: propinaPedido,
       puntosCanjeados: puntosCanje,
       mensaje:
         origen?.canal === 'MOZO'

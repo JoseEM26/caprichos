@@ -1,19 +1,28 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { calcularPrecioLinea } from '@caprichos/compartido';
 import { GrupoOpcionesCarta, OpcionElegida, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
 import { alternarEleccion } from './eleccionGrupo';
+import { etiquetaQuedan, etiquetaUltimos, infoStockDe, mezclasDisponibles, saboresParaLinea, topeAgregable, topeTamano, unidadesEnCarrito } from './stock';
+import { maximoMezclas } from '../comun/saboresMezcla';
+import { SelectorSaboresMezcla } from '../comun/SelectorSaboresMezcla';
+import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../comun/saboresMezcla';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import {
-  AvisoReemplazoCombo,
+  AvisoAlternativasCombo,
   eleccionesCombo,
-  eleccionInicial,
+  faltaElegirJuguetes,
   faltaElegirReemplazo,
   notaReemplazos,
-  partesConReemplazo,
+  partesConAlternativas,
+  partesEleccion,
+  ResumenPartesFijas,
+  repartoAlternativa,
+  usosDeSabor,
 } from './ReemplazoCombo';
+import { SelectorEleccionCombo } from './SelectorEleccionCombo';
 
 interface Props {
   producto: ProductoCarta;
@@ -42,29 +51,40 @@ const nombreCorto = (g: GrupoOpcionesCarta): string => (g.nombre.includes(' · '
  * unidad, DT-62, es del pedido de caja y mozo: VentanaProducto.)
  */
 export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura = false, esMovilPreview, oferta = null }: Props) {
-  const { agregarLinea } = useCarrito();
+  const { agregarLinea, inventario, lineas } = useCarrito();
   const esMovilDetectado = useEsMovil();
   const movil = esMovilPreview !== undefined ? esMovilPreview : esMovilDetectado;
+
+  // Con stock por sabor (donas, galletas) los grupos obligatorios heredados («Sabor» de empanadas) no aplican:
+  // no se muestran, no se exigen y sus opciones no viajan con la línea.
+  const gruposCarta = producto.saboresConStock === true ? producto.grupos.filter((g) => !(g.obligatorio || g.minimo >= 1)) : producto.grupos;
 
   const [tamanoId, setTamanoId] = useState<string | null>(producto.tamanos[0]?.id ?? null);
   const [sel, setSel] = useState<Record<string, string[]>>(() => {
     const inicial: Record<string, string[]> = {};
-    for (const g of producto.grupos) {
+    for (const g of gruposCarta) {
       // elección única y obligatoria: parte con la primera opción marcada
       inicial[g.id] = g.maximo === 1 && g.minimo >= 1 && g.opciones[0] ? [g.opciones[0].id] : [];
     }
     return inicial;
   });
-  const partesRe = useMemo(() => partesConReemplazo(oferta), [oferta]);
-  const [reemplazos, setReemplazos] = useState<Record<string, string>>(() => eleccionInicial(partesRe));
+  const partesRe = useMemo(() => partesConAlternativas(oferta), [oferta]);
+  // Sin alternativa elegida al inicio: el cliente la escoge (no se asigna sola)
+  const [reemplazos, setReemplazos] = useState<Record<string, string>>({});
   const comboAgotado = oferta?.disponible === false;
-  const elecciones = eleccionesCombo(oferta, reemplazos);
+  // Partes A_ELECCION con lista (juguetes): cuántas de cada opción; el total depende de la cantidad del combo
+  const partesJug = useMemo(() => partesEleccion(oferta, reemplazos), [oferta, reemplazos]);
+  const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
   const [cantidad, setCantidad] = useState(1);
+  const elecciones = eleccionesCombo(oferta, reemplazos, juguetes);
+  // Saldo por sabor ya comprometido (este combo y el carrito): el + de cada sabor no lo supera
+  const usosSabor = usosDeSabor(lineas, juguetes);
   const [nombres, setNombres] = useState<string[]>([]);
   const [avisoNombres, setAvisoNombres] = useState(false);
   const [nota, setNota] = useState('');
   const [busquedas, setBusquedas] = useState<Record<string, string>>({});
   const [zoom, setZoom] = useState(false);
+  const [valorSabores, setValorSabores] = useState<Reparto>({});
 
   const esCombo = producto.grupos.some((g) => g.nombre.includes(' · '));
   // bebidas del combo (grupos «Bebida 1 · Bebida»): cada una lleva su nombre para el envase
@@ -73,7 +93,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const secciones = useMemo(() => {
     const claves: string[] = [];
     const mapa: Record<string, GrupoOpcionesCarta[]> = {};
-    for (const g of producto.grupos) {
+    for (const g of gruposCarta) {
       const k = claveSeccion(g);
       if (!mapa[k]) {
         mapa[k] = [];
@@ -82,13 +102,13 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       mapa[k].push(g);
     }
     return { claves, mapa };
-  }, [producto.grupos]);
+  }, [gruposCarta]);
   const [abierta, setAbierta] = useState<string>(secciones.claves[0] ?? '');
 
   const tamano = producto.tamanos.find((t) => t.id === tamanoId) ?? null;
   const precioBase = tamano ? tamano.precio : producto.precio;
 
-  const elegidas: OpcionElegida[] = producto.grupos.flatMap((g) =>
+  const elegidas: OpcionElegida[] = gruposCarta.flatMap((g) =>
     (sel[g.id] ?? []).flatMap((oid) => {
       const o = g.opciones.find((x) => x.id === oid);
       return o ? [{ id: o.id, nombre: o.nombre, precioExtra: o.precioExtra, grupoId: g.id, grupoNombre: g.nombre }] : [];
@@ -96,7 +116,50 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   );
   const unitario = calcularPrecioLinea({ precioBase, opciones: elegidas, cantidad: 1 }).precioUnitario;
   const valido =
-    !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && producto.grupos.every((g) => (sel[g.id] ?? []).length >= g.minimo);
+    !faltaElegirJuguetes(partesJug, juguetes, cantidad) &&
+    !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && gruposCarta.every((g) => (sel[g.id] ?? []).length >= g.minimo);
+
+  // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
+  const info = inventario[String(producto.id)] ?? infoStockDe(producto);
+  const enCarrito = unidadesEnCarrito(lineas, producto.id);
+  // Mezcla de sabores (donas y galletas): cada tamaño trae sus unidades y el saldo es por sabor
+  const saborMode = producto.saboresConStock === true;
+  const unidadesMezcla = tamano?.unidades ?? 1;
+  const total = unidadesMezcla * cantidad;
+  const saboresDisp = saborMode ? saboresParaLinea(info, lineas, String(producto.id)) : [];
+  // al cambiar tamaño o cantidad el reparto se recorta al nuevo total y a lo que queda de cada sabor
+  const valorSaboresOk = saborMode ? recortarAlTope(valorSabores, saboresDisp, total) : {};
+  useEffect(() => {
+    if (saborMode && JSON.stringify(valorSaboresOk) !== JSON.stringify(valorSabores)) setValorSabores(valorSaboresOk);
+  });
+  const saboresListos = !saborMode || repartoValido(valorSaboresOk, total, saboresDisp);
+  const faltanSabores = faltanUnidades(valorSaboresOk, total);
+
+  // Sin sabores: cada cantidad consume las unidades del tamaño (1/2 docena = 6); con sabores, el tope son las mezclas
+  const libres = topeAgregable(info, enCarrito);
+  const tope = saborMode ? mezclasDisponibles(info, lineas, String(producto.id), unidadesMezcla) : topeTamano(info, enCarrito, unidadesMezcla);
+  // Sin sabores, un tamaño no cabe si pasa de lo libre; con sabores, si no cabe ni una mezcla de ese tamaño
+  const tamanoSinStock = (unidades: number) =>
+    saborMode ? maximoMezclas(saboresParaLinea(info, lineas, String(producto.id)), unidades) === 0 : libres !== null && unidades > libres;
+  const sinStock = !info.disponible || (info.controlaStock && info.quedan === 0);
+  const sinSaldo = tope !== null && tope <= 0;
+  // tamaño que no cabe en lo que queda (tope 0, con o sin sabores): no se puede agregar
+  const tamanoNoCabe = producto.tamanos.length > 0 && tope === 0;
+  const puedeAgregar = valido && saboresListos && !sinStock && !sinSaldo;
+  const enTope = tope !== null && cantidad >= tope;
+  const etiquetaStock = etiquetaQuedan(info);
+  const franjaUltimos = sinStock ? null : etiquetaUltimos(info);
+  const ayudaStock =
+    sinStock || info.quedan === null || tamanoNoCabe
+      ? null
+      : enTope
+        ? `Solo quedan ${info.quedan}${enCarrito > 0 ? ` · ya tienes ${enCarrito} en tu pedido` : ''}`
+        : etiquetaStock;
+  const ayudaSabores = valido && !saboresListos ? `Elige los sabores: faltan ${faltanSabores}` : null;
+  const ayudaMezclas = saborMode && enTope ? 'Ya no quedan más unidades de estos sabores' : null;
+  useEffect(() => {
+    if (tope !== null && cantidad > Math.max(1, tope)) setCantidad(Math.max(1, tope));
+  }, [tope, cantidad]);
 
   const alternar = (g: GrupoOpcionesCarta, oid: string) => {
     setSel((prev) => ({ ...prev, [g.id]: alternarEleccion(g, prev[g.id] ?? [], oid) }));
@@ -109,7 +172,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       : '';
 
   const agregar = () => {
-    if (!valido) return;
+    if (!puedeAgregar) return;
     // en las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
     if (esBebida && !esCombo) {
       const faltan = Array.from({ length: cantidad }, (_, i) => i).filter((i) => !(nombres[i] ?? '').trim());
@@ -131,12 +194,22 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       fotoUrl: producto.fotoUrl,
       tamanoId: tamano?.id,
       tamanoNombre: tamano?.nombre,
+      unidadesTamano: unidadesMezcla,
       precioBase,
       cantidad,
       opciones: elegidas,
       personas,
+      // mezcla de sabores: la línea viaja entera (sin «unidades») con el reparto por sabor
+      ...(saborMode
+        ? {
+            unidadesPorMezcla: unidadesMezcla,
+            sabores: aArreglo(valorSaboresOk).map((s) => ({ ...s, nombre: producto.sabores.find((x) => x.id === s.saborId)?.nombre })),
+          }
+        : {}),
       // combo con bebidas: sin «unidades», la línea viaja entera con los nombres en orden de bebida
-      ...(nB > 0 ? {} : { unidades: Array.from({ length: cantidad }, (_, i) => ({ persona: personas[i], opciones: elegidas })) }),
+      ...(nB > 0 || saborMode ? {} : { unidades: Array.from({ length: cantidad }, (_, i) => ({ persona: personas[i], opciones: elegidas })) }),
+      // sin sabores: el tamaño dice cuántas unidades consume cada cantidad (para el stock del carrito)
+      ...(saborMode ? {} : { unidadesTamano: unidadesMezcla }),
       nota: [notaReemplazos(partesRe, reemplazos), nota.trim()].filter(Boolean).join(' · ') || undefined,
       ...(oferta && elecciones.length > 0 ? { ofertaId: String(oferta.id), comboElecciones: elecciones } : {}),
       precioUnitario: unitario,
@@ -242,6 +315,12 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               <span style={{ ...titulo, fontWeight: 800, fontSize: 26, color: 'var(--cp-rust)' }}>{fmt(unitario)}</span>
             </div>
 
+            {franjaUltimos && (
+              <div data-testid="ultimos-ventana" style={{ ...titulo, alignSelf: 'flex-start', background: 'var(--cp-rust)', color: '#FFFFFF', fontWeight: 800, fontSize: 13, borderRadius: 9999, padding: '4px 14px' }}>
+                {franjaUltimos}
+              </div>
+            )}
+
             {producto.tamanos.length > 0 && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -251,18 +330,25 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 8 }}>
                   {producto.tamanos.map((t) => {
                     const on = t.id === tamanoId;
+                    const noCabe = tamanoSinStock(t.unidades ?? 1);
                     return (
                       <button
                         key={t.id}
                         onClick={() => setTamanoId(t.id)}
                         aria-pressed={on}
-                        style={{ minHeight: 64, borderRadius: 14, border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, textAlign: 'left' }}
+                        disabled={noCabe}
+                        style={{ minHeight: 64, borderRadius: 14, border: `2px solid ${on && !noCabe ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, textAlign: 'left', opacity: noCabe ? 0.5 : 1, cursor: noCabe ? 'not-allowed' : 'pointer' }}
                       >
                         <span style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-                          <span style={{ width: 16, height: 16, borderRadius: 8, border: '2px solid var(--cp-navy)', background: on ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
+                          <span style={{ width: 16, height: 16, borderRadius: 8, border: '2px solid var(--cp-navy)', background: on && !noCabe ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
                           <span style={{ flex: 1, fontWeight: 700, fontSize: 13, lineHeight: '17px' }}>{t.nombre}</span>
                         </span>
                         <span style={{ ...titulo, fontWeight: 800, fontSize: 15, color: 'var(--cp-rust)', paddingLeft: 24 }}>{fmt(t.precio)}</span>
+                        {noCabe && (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--cp-rust)', paddingLeft: 24 }}>
+                            {libres && libres > 0 ? `Solo quedan ${libres}` : 'No hay stock suficiente'}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -270,16 +356,43 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               </div>
             )}
 
+            {saborMode && (
+              <SelectorSaboresMezcla
+                sabores={saboresDisp}
+                total={total}
+                valor={valorSaboresOk}
+                onCambio={setValorSabores}
+                deshabilitar={soloLectura}
+              />
+            )}
+
             {comboAgotado && (
               <div role="status" style={{ fontWeight: 800, color: 'var(--cp-rust)' }}>
                 Agotado
               </div>
             )}
-            <AvisoReemplazoCombo
+            {!comboAgotado && <ResumenPartesFijas oferta={oferta} />}
+            <AvisoAlternativasCombo
               partes={comboAgotado ? [] : partesRe}
               elegidos={reemplazos}
-              onElegir={(parteId, productoId) => setReemplazos((prev) => ({ ...prev, [parteId]: productoId }))}
+              onElegir={(parteId, alt) => {
+                setReemplazos((prev) => ({ ...prev, [parteId]: alt.id }));
+                setJuguetes((prev) => ({ ...prev, [parteId]: repartoAlternativa(alt) }));
+              }}
             />
+
+            {!comboAgotado &&
+              partesJug.map((parte) => (
+                <SelectorEleccionCombo
+                  key={parte.parteId}
+                  parte={parte}
+                  unidades={cantidad}
+                  valor={juguetes[parte.parteId] ?? {}}
+                  onCambio={(v) => setJuguetes((prev) => ({ ...prev, [parte.parteId]: v }))}
+                  deshabilitar={soloLectura}
+                  usos={usosSabor}
+                />
+              ))}
 
             {esCombo ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -359,7 +472,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 })}
               </div>
             ) : (
-              producto.grupos.map((g) => {
+              gruposCarta.map((g) => {
                 const f = filtrar(g);
                 const obligatorio = g.minimo >= 1;
                 return (
@@ -493,26 +606,46 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
             </div>
 
             <div style={{ position: 'sticky', bottom: 0, zIndex: 1, margin: '0 -24px -24px', padding: '12px 24px 16px', background: 'var(--cp-cream)', borderTop: '1px solid var(--cp-line)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              {ayudaStock && (
+                <div role="status" style={{ flexBasis: '100%', fontSize: 12, fontWeight: 700, lineHeight: '17px', color: enTope ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>
+                  {ayudaStock}
+                </div>
+              )}
+              {ayudaSabores && (
+                <div role="status" style={{ flexBasis: '100%', fontSize: 12, fontWeight: 700, lineHeight: '17px', color: 'var(--cp-rust)' }}>
+                  {ayudaSabores}
+                </div>
+              )}
+              {ayudaMezclas && (
+                <div role="status" style={{ flexBasis: '100%', fontSize: 12, fontWeight: 700, lineHeight: '17px', color: 'var(--cp-rust)' }}>
+                  {ayudaMezclas}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--cp-navy)', borderRadius: 12 }}>
                 <button onClick={() => setCantidad((c) => Math.max(1, c - 1))} aria-label="Menos" style={{ width: 44, height: 48, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontSize: 22, fontWeight: 800 }}>
                   −
                 </button>
                 <span style={{ minWidth: 28, textAlign: 'center', fontWeight: 700 }}>{cantidad}</span>
-                <button onClick={() => setCantidad((c) => c + 1)} aria-label="Más" style={{ width: 44, height: 48, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontSize: 22, fontWeight: 800 }}>
+                <button
+                  onClick={() => setCantidad((c) => (tope !== null && c >= tope ? c : c + 1))}
+                  disabled={enTope}
+                  aria-label="Más"
+                  style={{ width: 44, height: 48, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontSize: 22, fontWeight: 800, opacity: enTope ? 0.35 : 1, cursor: enTope ? 'not-allowed' : 'pointer' }}
+                >
                   +
                 </button>
               </div>
               <button
                 onClick={soloLectura ? undefined : agregar}
-                disabled={soloLectura ? true : !valido}
+                disabled={soloLectura ? true : !puedeAgregar}
                 aria-label={soloLectura ? 'Vista previa deshabilitada' : undefined}
                 style={{
                   flex: '1 1 200px',
                   minHeight: 52,
                   border: 0,
                   borderRadius: 12,
-                  background: soloLectura ? 'var(--cp-sand)' : valido ? 'var(--cp-orange)' : 'var(--cp-line)',
-                  color: soloLectura ? 'var(--cp-navy)' : valido ? '#fff' : 'var(--cp-soft)',
+                  background: soloLectura ? 'var(--cp-sand)' : puedeAgregar ? 'var(--cp-orange)' : 'var(--cp-line)',
+                  color: soloLectura ? 'var(--cp-navy)' : puedeAgregar ? '#fff' : 'var(--cp-soft)',
                   ...titulo,
                   fontWeight: 800,
                   fontSize: 14,
@@ -524,7 +657,21 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   opacity: soloLectura ? 0.9 : 1,
                 }}
               >
-                <span>{soloLectura ? 'Vista previa' : comboAgotado ? 'Agotado' : valido ? 'Agregar al pedido' : 'Elige las opciones obligatorias'}</span>
+                <span>
+                  {soloLectura
+                    ? 'Vista previa'
+                    : comboAgotado || sinStock
+                      ? 'Agotado'
+                      : sinSaldo && valido
+                        ? tamanoNoCabe
+                          ? 'No hay stock suficiente'
+                          : 'Sin más unidades'
+                        : valido && !saboresListos
+                          ? 'Elige los sabores'
+                          : valido
+                            ? 'Agregar al pedido'
+                            : 'Elige las opciones obligatorias'}
+                </span>
                 <span>{fmt(unitario * cantidad)}</span>
               </button>
             </div>

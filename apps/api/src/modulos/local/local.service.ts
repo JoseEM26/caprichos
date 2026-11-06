@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { topePropina } from '../propinas/propinas.util';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -283,6 +284,8 @@ export class LocalService {
               'pedido_minimo',
               'puntos_porcentaje',
               'carta_invitado_activo',
+              'propina_activa',
+              'propina_tope',
             ],
           },
         },
@@ -298,6 +301,8 @@ export class LocalService {
     const envioGratisModo = parametros.find((p) => p.clave === 'envio_gratis_modo')?.valor;
     const pedidoMinimo = parametros.find((p) => p.clave === 'pedido_minimo')?.valor;
     const puntosPorcentaje = Number(parametros.find((p) => p.clave === 'puntos_porcentaje')?.valor);
+    const propinaActiva = parametros.find((p) => p.clave === 'propina_activa')?.valor as any;
+    const propinaTope = topePropina(parametros.find((p) => p.clave === 'propina_tope')?.valor);
     // Sin parámetro o «no»: pedir como invitado NO permitido (debe poner su celular para sumar puntos)
     const invitadoParam = parametros.find((p) => p.clave === 'carta_invitado_activo')?.valor;
     const invitadoPermitido = String(invitadoParam ?? '').toLowerCase().trim() === 'si';
@@ -346,6 +351,8 @@ export class LocalService {
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,
       puntosPorcentaje: puntosPorcentaje > 0 ? puntosPorcentaje : 5,
       invitadoPermitido,
+      // Propina opcional por canal (interruptor propina_activa) y tope en soles
+      propina: { carta: propinaActiva?.carta === true, bot: propinaActiva?.bot === true, tope: propinaTope },
     };
   }
 

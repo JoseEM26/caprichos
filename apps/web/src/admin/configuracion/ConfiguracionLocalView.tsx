@@ -26,6 +26,7 @@ import { TarjetaConfirmarDespejarConfiguracion } from './TarjetaConfirmarDespeja
 import { TarjetaMinutosPreparacionConfiguracion } from './TarjetaMinutosPreparacionConfiguracion';
 import { TarjetaResenasGoogleConfiguracion } from './TarjetaResenasGoogleConfiguracion';
 import { TarjetaInvitadoConfiguracion } from './TarjetaInvitadoConfiguracion';
+import { TarjetaPropinaConfiguracion } from './TarjetaPropinaConfiguracion';
 import { TarjetaPantallaIngresoConfiguracion } from './TarjetaPantallaIngresoConfiguracion';
 import { BuscadorConfiguracion } from './BuscadorConfiguracion';
 import { NavegacionConfiguracion, useEsMovil, grupoDe } from './NavegacionConfiguracion';
@@ -965,6 +966,7 @@ export function ConfiguracionLocalView() {
               {tabId === 'operacion' && <TarjetaNotificacionesConfiguracion />}
               {tabId === 'operacion' && <TarjetaResenasGoogleConfiguracion />}
               {tabId === 'operacion' && <TarjetaInvitadoConfiguracion />}
+              {tabId === 'operacion' && <TarjetaPropinaConfiguracion />}
               {tabId === 'operacion' && (
                 <div
                   style={{

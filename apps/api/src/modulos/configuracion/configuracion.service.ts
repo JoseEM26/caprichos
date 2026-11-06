@@ -12,6 +12,7 @@ import { MODO_CODIGO_PLANTILLA, MODO_WHATSAPP_ENTRANTE } from '../clientes/verif
 
 export const CLAVES_NUMERICAS = [
   'notif_sonido_intervalo_seg',
+  'propina_tope',
   'tiempo_prometido_min',
   'tiempo_max_min',
   'envio_gratis_monto',
@@ -69,6 +70,7 @@ export const CLAVES_NUMERICAS = [
   'eta_paso_min',
   'eta_base_sin_zona_min',
   'reserva_tolerancia_min',
+  'reserva_recordatorio_min',
   // Reservas desde la carta web: cuántas pendientes por celular, días de anticipación y personas máximas
   'reserva_web_max_pendientes',
   'reserva_web_dias_max',
@@ -87,6 +89,7 @@ export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]>
   eta_paso_min: [1, 30, true, 'El redondeo debe ser un entero entre 1 y 30 minutos'],
   eta_base_sin_zona_min: [0.5, 60, false, 'Los minutos de puerta sin zona deben estar entre 0.5 y 60'],
   reserva_tolerancia_min: [1, 180, true, 'La tolerancia de reserva debe ser un entero entre 1 y 180 minutos'],
+  reserva_recordatorio_min: [5, 240, true, 'El recordatorio de reserva debe ser un entero entre 5 y 240 minutos antes'],
   reserva_web_max_pendientes: [1, 10, true, 'Las solicitudes pendientes por celular deben ser un entero entre 1 y 10'],
   reserva_web_dias_max: [1, 365, true, 'Los días de anticipación deben ser un entero entre 1 y 365'],
   reserva_web_max_personas: [1, 200, true, 'Las personas máximas por reserva web deben ser un entero entre 1 y 200'],
@@ -162,6 +165,7 @@ export const ALCANCES_SONIDO_NOTIF = ['TODOS_NO_LEIDOS', 'SOLO_URGENTES', 'SOLO_
 
 export const CLAVES_OBJETO = [
   'pausa_alta_demanda',
+  'propina_activa',
   'local_datos',
   'local_pagos',
 ] as const;
@@ -227,6 +231,12 @@ export class ConfiguracionService {
         throw new BadRequestException({
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El valor debe ser un número mayor o igual a 0',
+        });
+      }
+      if (clave === 'propina_tope' && (valor < 1 || valor > 1000)) {
+        throw new BadRequestException({
+          codigo: 'VALOR_INVALIDO',
+          mensaje: 'El tope de propina debe estar entre S/ 1 y S/ 1000',
         });
       }
       if (clave === 'cocina_minutos_preparacion_defecto' && (!Number.isInteger(valor) || valor < 1 || valor > 120)) {
@@ -344,6 +354,17 @@ export class ConfiguracionService {
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El valor debe ser un objeto o estructura válida',
         });
+      }
+      if (clave === 'propina_activa') {
+        // Interruptor por canal: { carta: boolean, bot: boolean }. Sin propina de mozo ni de caja.
+        const v = valor as Record<string, unknown>;
+        if (typeof v.carta !== 'boolean' || typeof v.bot !== 'boolean') {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'La propina se enciende o apaga por canal: carta y bot (verdadero o falso)',
+          });
+        }
+        valor = { carta: v.carta, bot: v.bot };
       }
     }
 

@@ -134,10 +134,12 @@ export function buscarOfertaParaProducto(
           const complementosIds = (otraParte.productos || []).map((id: any) => String(id));
           const complementosCats = (otraParte.categorias || []).map((id: any) => String(id));
 
-          // Buscar el producto en el catálogo
+          // Buscar el producto en el catálogo (sin saldo: quedan 0 o agotado, no se ofrece como complemento)
           for (const cat of catalogo) {
             const prodComp = (cat.productos || []).find((cp: any) =>
-              complementosIds.includes(String(cp.id)) || complementosCats.includes(String(cat.id)),
+              (complementosIds.includes(String(cp.id)) || complementosCats.includes(String(cat.id))) &&
+              cp.disponible !== false &&
+              cp.quedan !== 0,
             );
             if (prodComp) {
               complementoNombre = prodComp.nombre;

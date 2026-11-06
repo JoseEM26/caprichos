@@ -56,7 +56,15 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'repartos', accion: 'tomar' },
   { modulo: 'repartos', accion: 'entregar' },
   { modulo: 'repartos', accion: 'reportar' },
+  // Chat de WhatsApp de un pedido propio (solo texto, solo mientras el pedido siga vigente)
+  { modulo: 'repartos', accion: 'chat' },
   { modulo: 'repartos', accion: 'liquidar' },
+  // Cambio de ubicación de un delivery: Caja aprueba/cambia (con dinero: sin supervisor); el repartidor propone
+  { modulo: 'pedidos', accion: 'cambiar_ubicacion' },
+  // Cortesías (venta a costo 0): Caja y ADMIN la dan; el SUPERVISOR con su código. Ver: Caja y ADMIN
+  { modulo: 'cortesias', accion: 'dar' },
+  { modulo: 'cortesias', accion: 'ver' },
+  { modulo: 'repartos', accion: 'proponer_ubicacion' },
   // Cocina, Stock y Recetas (Ola 5)
   { modulo: 'cocina', accion: 'ver' },
   { modulo: 'cocina', accion: 'despejar' },
@@ -115,6 +123,10 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'almacen', accion: 'traslados' },
   { modulo: 'almacen', accion: 'pedidos_internos' },
   { modulo: 'almacen', accion: 'cierre' },
+  // Conteo de apertura del día de los productos que controlan stock (donas, galletas)
+  { modulo: 'almacen', accion: 'apertura' },
+  // Merma de producto terminado (sin código de supervisor): Cocina decide y queda auditada
+  { modulo: 'almacen', accion: 'merma_producto' },
   { modulo: 'produccion', accion: 'ver' },
   { modulo: 'produccion', accion: 'crear' },
   { modulo: 'produccion', accion: 'anular' },
@@ -169,9 +181,18 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Vouchers y lectura IA (vch-api)
   { modulo: 'vouchers', accion: 'subir' },
   { modulo: 'vouchers', accion: 'ver' },
+  // Control de asistencia: marcar (todo el personal con horario), reportes y correcciones (solo ADMIN),
+  // pantalla del QR del local (solo ADMIN por defecto)
+  { modulo: 'asistencia', accion: 'marcar' },
+  { modulo: 'asistencia', accion: 'administrar' },
+  { modulo: 'asistencia', accion: 'pantalla' },
   // Mascota Capri (mas-api)
   { modulo: 'mascota', accion: 'ver' },
   { modulo: 'mascota', accion: 'editar' },
+  // Propinas (acumulado del mes, solo lectura)
+  { modulo: 'propinas', accion: 'ver' },
+  // Reparto mensual de propinas por horas (cálculo, aprobación, pago y anulación): solo ADMIN
+  { modulo: 'propinas', accion: 'repartir' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
@@ -179,16 +200,25 @@ export const MATRIZ: Record<string, string[]> = {
   // Caja y cobro, pedidos sin anular (la anulación de un entregado sin cobro la autoriza el PIN
   // de supervisor), cocina y carta en solo lectura. Escritorio no tiene permiso propio.
   CAJERO: [
+    'almacen/apertura',
     'pedidos/ver',
     'pedidos/crear',
     'pedidos/cambiar_estado',
+    'pedidos/cambiar_ubicacion',
+    'cortesias/dar',
+    'cortesias/ver',
     'caja/abrir',
     'caja/cobrar',
     'caja/movimientos',
     'caja/cerrar',
     'caja/ver',
+    'propinas/ver',
     'cocina/ver',
     'catalogo/ver',
+    // Iniciativas: todo el personal ve, crea y comenta (el cambio de estado es solo ADMIN y SUPERVISOR)
+    'iniciativas/ver',
+    'iniciativas/crear',
+    'iniciativas/comentar',
     'comprobantes/ver',
     'comprobantes/reimprimir',
     'mesas/ver',
@@ -200,6 +230,8 @@ export const MATRIZ: Record<string, string[]> = {
     'vouchers/ver',
   ],
   COCINA: [
+    'almacen/apertura',
+    'almacen/merma_producto',
     'pedidos/ver',
     'pedidos/cambiar_estado',
     'cocina/ver',
@@ -270,6 +302,7 @@ export const MATRIZ: Record<string, string[]> = {
     'almacen/traslados',
     'almacen/pedidos_internos',
     'almacen/cierre',
+    'almacen/apertura',
     'compras/ver',
     'compras/crear',
     'proveedores/ver',
@@ -292,6 +325,8 @@ export const MATRIZ: Record<string, string[]> = {
     'repartos/tomar',
     'repartos/entregar',
     'repartos/reportar',
+    'repartos/chat',
+    'repartos/proponer_ubicacion',
     'iniciativas/ver',
     'iniciativas/crear',
     'iniciativas/comentar',
@@ -300,8 +335,20 @@ export const MATRIZ: Record<string, string[]> = {
   ],
 };
 
+// Marcar asistencia desde el celular: todo el personal que puede tener horario (no el ADMIN, que ya lo tiene todo)
+for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR']) {
+  MATRIZ[rol] = [...MATRIZ[rol], 'asistencia/marcar'];
+}
+
 // Supervisor: la unión de lo que tienen CAJERO y MOZO, más ver el código rotativo de 6 dígitos.
 // No recibe diseño de carta, Novedades, informes, usuarios, configuración ni compras (ver la tabla del informe).
 // Y su escritorio operativo (conteos, sin montos).
-MATRIZ.SUPERVISOR = [...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo'])];
+// El conteo de apertura (almacen/apertura) no lo tiene el supervisor: sin administración de stock.
+// Iniciativas: cambiar el estado (NUEVA, EN_REVISION, HECHA, NO_POR_AHORA) lo tienen ADMIN y SUPERVISOR.
+MATRIZ.SUPERVISOR = [
+  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo', 'iniciativas/cambiar_estado']),
+].filter(
+  // Sin dinero: el supervisor no cambia ubicación con cobro (ni el conteo de apertura)
+  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion',
+);
 

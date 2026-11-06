@@ -5,6 +5,10 @@ export class ProduccionTandasDto {
   @IsNotEmpty({ message: 'La receta es obligatoria' })
   recetaId!: string | number;
 
+  /** Producto por sabor: sabor que se produce (obligatorio en esos productos). */
+  @IsOptional()
+  saborId?: string | number;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: 'El número de tandas debe ser un número' })

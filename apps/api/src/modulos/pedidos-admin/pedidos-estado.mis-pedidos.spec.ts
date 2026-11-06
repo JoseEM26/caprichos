@@ -93,9 +93,11 @@ describe('PedidosEstadoService.misPedidos', () => {
       id: '3',
       codigo: 'CP-M001',
       estado: 'EN_CAMINO',
+      propina: 0,
       modalidad: 'MESA',
       mesaNombre: 'Mesa 3',
       clienteNombre: 'Mesa 3',
+      ubicacionEditadaEn: null,
       total: 5,
       pagoEstado: 'PENDIENTE',
       pagoMetodo: null,
@@ -108,7 +110,7 @@ describe('PedidosEstadoService.misPedidos', () => {
       puedeSubirVoucher: true,
       vouchersPorMedio: [],
       creadoEn: new Date('2026-10-29T14:00:00Z'),
-      lineas: [{ id: '11', nombre: 'Café', cantidad: 2, tamano: null, opciones: [], nota: null, precioUnit: 5, subtotal: 10, lista: false }],
+      lineas: [{ id: '11', nombre: 'Café', cantidad: 2, tamano: null, opciones: [], sabores: [], nota: null, precioUnit: 5, subtotal: 10, lista: false }],
       progreso: {
         etapa: 'EN_CAMINO',
         etiqueta: 'En camino',
@@ -201,11 +203,12 @@ describe('PedidosEstadoService.misPedidos', () => {
     const res = await service.misPedidos(mozo);
 
     expect(res.pedidos[0].lineas).toEqual([
-      { id: '21', nombre: 'Cheesecake', cantidad: 3, tamano: 'Grande', opciones: ['Oreo', 'Crema'], nota: 'Sin nueces', precioUnit: 12.5, subtotal: 37.5, lista: true },
-      { id: '22', nombre: 'Limonada', cantidad: 2, tamano: null, opciones: [], nota: null, precioUnit: 8, subtotal: null, lista: false },
+      { id: '21', nombre: 'Cheesecake', cantidad: 3, tamano: 'Grande', opciones: ['Oreo', 'Crema'], sabores: [], nota: 'Sin nueces', precioUnit: 12.5, subtotal: 37.5, lista: true },
+      { id: '22', nombre: 'Limonada', cantidad: 2, tamano: null, opciones: [], sabores: [], nota: null, precioUnit: 8, subtotal: null, lista: false },
     ]);
     const select = prisma.pedido.findMany.mock.calls[0][0].select;
     expect(select.lineas.select.opcionesElegidas).toEqual({ select: { opcion_nombre: true }, orderBy: { id: 'asc' } });
+    expect(select.lineas.select.sabores).toEqual({ select: { sabor_nombre: true, cantidad: true }, orderBy: { id: 'asc' } });
     expect(select.lineas.select).toMatchObject({ tamano: true, nota: true, precio_unit: true, subtotal: true, listas: true });
     expect(prisma.pedido.findMany).toHaveBeenCalledTimes(1);
   });

@@ -5,9 +5,11 @@ import { FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { pedidosApi, Pedido, RespuestaNoEntregados } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
+import { BandejaPropuestasUbicacion } from './BandejaPropuestasUbicacion';
 import { PanelNoEntregados } from './PanelNoEntregados';
 import { useSesion } from '../../comun/sesion';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
+import { RegistrarCortesiaModal } from '../cortesias/RegistrarCortesiaModal';
 import { salonApi } from '../salon/api';
 import type { PisoSalon } from '../salon/tipos';
 import { reproducirCampana } from './audioAlerta';
@@ -17,6 +19,7 @@ import './pedidos.css';
 import { FiltroDiasPedidos } from './FiltroDiasPedidos';
 import { RangoPedidos, parametrosDeRango, rangoHoy } from './filtroDias';
 import { nombreMedio } from './planPago';
+import { InsigniaDireccionEditada } from './InsigniaDireccionEditada';
 
 export function canalLabel(c?: string | null) {
   if (!c) return 'Web';
@@ -200,6 +203,7 @@ export function PedidosAdminView() {
   const [rango, setRango] = useState<RangoPedidos>(() => rangoHoy());
   const [pendientesAnteriores, setPendientesAnteriores] = useState<number>(0);
   const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false);
+  const [cortesiaSeparadaAbierta, setCortesiaSeparadaAbierta] = useState(false);
   const [pedidoRepetir, setPedidoRepetir] = useState<Pedido | null>(null);
   const [pisosSalon, setPisosSalon] = useState<PisoSalon[]>([]);
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
@@ -531,6 +535,7 @@ export function PedidosAdminView() {
       <BannerCajaCerrada compacto />
       <FranjaImpresion />
     </div>
+    {tiene('pedidos/cambiar_ubicacion') && <BandejaPropuestasUbicacion alAplicar={cargarDatos} />}
     <div className="cj-grid">
       {/* PANEL IZQUIERDO */}
       <div className="cj-left">
@@ -571,6 +576,16 @@ export function PedidosAdminView() {
                 style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: '1.5px solid var(--cp-rust, #B2500F)', background: 'transparent', color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
               >
                 {noEntregados?.total} no {noEntregados?.total === 1 ? 'entregado' : 'entregados'}
+              </button>
+            )}
+
+            {tiene('cortesias/dar') && (
+              <button
+                type="button"
+                onClick={() => setCortesiaSeparadaAbierta(true)}
+                style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: '1.5px solid var(--cp-navy, #0B2C3E)', background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
+              >
+                Registrar cortesía
               </button>
             )}
 
@@ -803,6 +818,7 @@ export function PedidosAdminView() {
                     {canalLabel(o.canal)} · {modLabel(o.modalidad)} · {o.cliente_nombre || 'Cliente'}
                   </div>
                   <ChipCobroMozo cobro={o.cobroMozo} />
+                  {o.ubicacion_editada_en && <InsigniaDireccionEditada />}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
                       {itemsTexto || '1 producto'}
@@ -925,6 +941,16 @@ export function PedidosAdminView() {
           />
         )}
       </div>
+      {cortesiaSeparadaAbierta && (
+        <RegistrarCortesiaModal
+          alCerrar={() => setCortesiaSeparadaAbierta(false)}
+          alRegistrar={() => {
+          setCortesiaSeparadaAbierta(false);
+          cargarDatos();
+          }}
+        />
+      )}
+
       {nuevoPedidoAbierto && (
         <ModalNuevoPedidoMesa
           abierto={true}

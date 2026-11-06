@@ -22,6 +22,7 @@ import {
   obtenerInicioDiaLima,
 } from './cocina.util';
 import { opcionesMenosPedidasPorProducto } from './opcion-menos-pedida';
+import { asignarNumeroDia } from './numero-dia';
 
 export interface DescuentoPedidoHook {
   descontarPedido(pedidoId: bigint | string | number): Promise<any> | any;
@@ -44,6 +45,12 @@ const ESTADOS_PARA_LISTO = ['COLA', 'PREPARANDO'];
 /** Ventana para deshacer un despeje: bajar unidades en esos segundos (mismo usuario) reabre el área. */
 const VENTANA_DESHACER_DESPEJE_MS = 15_000;
 
+/** Reparto por sabor de una línea («2 Fresa · 3 Oreo»), o null si la línea no lleva sabores repartidos. */
+export function distribucionSabores(l: { sabores?: Array<{ sabor_nombre: string; cantidad: number }> | null }): string | null {
+  const lista = l.sabores ?? [];
+  return lista.length > 0 ? lista.map((s) => `${s.cantidad} ${s.sabor_nombre}`).join(' · ') : null;
+}
+
 /**
  * Líneas del pedido que pertenecen a un área, con los campos que usa la pantalla de cocina.
  * `marcadas`: por producto, las opciones «menos pedida»; cada opción elegida lleva `pocoPedida`.
@@ -61,7 +68,8 @@ function lineasDeArea(lineas: any[], areaId: bigint, marcadas: Map<string, Set<s
         listas: l.listas ?? 0,
         despachadas: l.despachadas ?? 0,
         tamano: l.tamano ?? null,
-        sabor: l.sabor ?? null,
+        sabor: l.sabor ?? distribucionSabores(l),
+        sabores: (l.sabores ?? []).map((s: any) => ({ nombre: s.sabor_nombre, cantidad: s.cantidad })),
         combo: comboNombre,
         combo_nombre: comboNombre,
         opciones: extraerOpciones(l).map((o) => ({
@@ -153,6 +161,7 @@ export class ComandasService {
               },
             },
             opcionesElegidas: true,
+            sabores: true,
           },
         },
         comandas: true,
@@ -203,16 +212,22 @@ export class ComandasService {
     const ahora = new Date();
     const llegoEn = pedido.pasa_cocina_en ?? pedido.creado_en ?? ahora;
 
-    for (const areaId of areasACrear) {
-      await this.prisma.comandaArea.create({
-        data: {
-          pedido_id: pId,
-          area_id: areaId,
-          estado: 'EN_COCINA',
-          llego_en: llegoEn,
-        },
-      });
-    }
+    // Primera llegada a cocina: comandas y número del día en una misma transacción
+    await this.prisma.$transaction(async (tx) => {
+      for (const areaId of areasACrear) {
+        await tx.comandaArea.create({
+          data: {
+            pedido_id: pId,
+            area_id: areaId,
+            estado: 'EN_COCINA',
+            llego_en: llegoEn,
+          },
+        });
+      }
+      if (esPrimeraVez && pedido.numero_dia == null) {
+        await asignarNumeroDia(tx, pId, ahora);
+      }
+    });
 
     // Gancho de descuento: sólo si se crearon comandas por primera vez y el servicio existe
     if (esPrimeraVez && this.descuentoService?.descontarPedido) {
@@ -397,6 +412,7 @@ export class ComandasService {
                   },
                 },
                 opcionesElegidas: true,
+                sabores: true,
               },
             },
           },
@@ -453,6 +469,11 @@ export class ComandasService {
         minutosEspera: minutos,
         color,
         colorEspera: color,
+        // Referencial: número del día en cocina (null si el pedido es anterior a la función)
+        numeroDia: p.numero_dia ?? null,
+        // Hora del servidor y umbrales: el navegador cuenta el tiempo en vivo con ellos
+        ahoraServidor: ahora.toISOString(),
+        umbrales,
         llego_en: c.llego_en,
         creado_en: p.creado_en,
         lineas: lineasDeArea(p.lineas, area.id, marcadas),
@@ -1209,6 +1230,7 @@ export class ComandasService {
                   },
                 },
                 opcionesElegidas: true,
+                sabores: true,
               },
             },
           },
@@ -1238,7 +1260,8 @@ export class ComandasService {
           nombre: l.nombre,
           cantidad: l.cantidad,
           tamano: l.tamano ?? null,
-          sabor: l.sabor ?? null,
+          sabor: l.sabor ?? distribucionSabores(l),
+          sabores: (l.sabores ?? []).map((s: any) => ({ nombre: s.sabor_nombre, cantidad: s.cantidad })),
           combo: extraerNombreCombo(l),
           opciones: extraerOpciones(l),
           personas: l.nombres_persona ?? [],
@@ -1260,6 +1283,7 @@ export class ComandasService {
         modalidad: p.modalidad,
         cliente: p.cliente_nombre ?? null,
         mesa,
+        numeroDia: p.numero_dia ?? null,
         llego_en: llegoEn,
         despejada_en: despejadaEn,
         despejada_por: c.despejada_por?.toString() ?? null,

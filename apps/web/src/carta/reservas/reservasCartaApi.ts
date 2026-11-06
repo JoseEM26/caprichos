@@ -6,9 +6,10 @@ export interface OpcionesReserva {
   diasMax: number;
   personasMax: number;
   /** dia: 0 = domingo … 6 = sábado (igual que Date.getDay) */
-  horarios: { dia: number; abre: string; cierra: string }[];
+  /** `ultimo`: la última hora en que puede empezar una reserva (la regla que aplica el servidor). */
+  horarios: { dia: number; abre: string; cierra: string; ultimo: string }[];
   fechasCerradas: string[];
-  fechasEspeciales: { fecha: string; abre: string; cierra: string }[];
+  fechasEspeciales: { fecha: string; abre: string; cierra: string; ultimo: string }[];
 }
 
 export interface DatosSolicitudReserva {

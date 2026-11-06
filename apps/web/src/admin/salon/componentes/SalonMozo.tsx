@@ -7,7 +7,8 @@ import { CuadriculaPlano } from './CuadriculaPlano';
 import { ModalNuevoPedidoMesa } from './ModalNuevoPedidoMesa';
 import { ModalPrecuenta } from './ModalPrecuenta';
 import { VistaPreviaMesa } from './VistaPreviaMesa';
-import { nombreMesaSalon, useCambioDeMesa } from './CambioDeMesa';
+import { nombreMesaSalon, useCambioDeMesa, useSumarMesas } from './CambioDeMesa';
+import { useSesion } from '../../../comun/sesion';
 
 export interface SalonMozoProps {
   /** Permiso mesas/liberar: la vista previa ofrece «Forzar liberación» */
@@ -67,6 +68,9 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
   useEventos('plano:cambio', cargarPlano);
 
   const cambio = useCambioDeMesa(() => void cargar());
+  const sumar = useSumarMesas(() => void cargar());
+  const { tiene } = useSesion();
+  const puedeAbrirMesas = tiene('mesas/abrir');
 
   const pisoActual = pisos.find((p) => p.id === pisoId) ?? pisos[0];
   const mesas: MesaSalon[] = pisoActual?.mesas ?? [];
@@ -92,7 +96,12 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
   const cuenta = buscarMesa(cuentaId);
   const vista = buscarMesa(vistaId);
 
+  // Mesas del mismo pedido que esta (la vista previa y «Quitar mesa» las necesitan)
+  const mesasDelPedidoDe = (m: MesaSalon): MesaSalon[] =>
+    m.pedido ? mesas.filter((x) => x.pedido?.id === m.pedido?.id) : [];
+
   const tocarMesa = (mesa: MesaSalon) => {
+    if (sumar.tocarMesa(mesa)) return;
     if (cambio.tocarMesa(mesa)) return;
     if (mesa.estado === 'OCUPADA' && mesa.pedido) setCuentaId(mesa.id);
     else if (mesa.estado === 'LIBRE') setNuevoEnId(mesa.id);
@@ -117,6 +126,7 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
       )}
 
       {cambio.ui}
+      {sumar.ui}
 
       {cargando && <Cargando mensaje="Cargando el salón" />}
       {!cargando && error && <p role="alert" className="mpv-ayuda">No pudimos cargar el salón. Revisa la conexión.</p>}
@@ -132,7 +142,8 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
             filas={filas}
             elementos={elementos}
             modoSalon
-            modoDestino={cambio.modoDestino}
+            modoDestino={cambio.modoDestino || sumar.modoDestino}
+            mesasSeleccionadasIds={sumar.seleccionadas}
             mesasSalon={mesas}
             onSeleccionarMesaSalon={tocarMesa}
             alMantenerMesaSalon={(m) => setVistaId(m.id)}
@@ -176,6 +187,12 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
           alCambiarMesa={(m) => {
             setVistaId(null);
             if (m.pedido) cambio.iniciar({ pedidoId: m.pedido.id, codigo: m.pedido.codigo, mesa: m });
+          }}
+          puedeAbrirMesas={puedeAbrirMesas}
+          mesasDelPedido={mesasDelPedidoDe(vista)}
+          alAgregarMesa={(m) => {
+            setVistaId(null);
+            if (m.pedido) sumar.iniciar({ pedidoId: m.pedido.id, codigo: m.pedido.codigo, mesa: m, mesasEnPedido: mesasDelPedidoDe(m).length });
           }}
           alCambiar={() => void cargar()}
         />

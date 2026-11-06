@@ -1,10 +1,12 @@
 import {
   construirTicketNotaMozo,
+  construirTicketPago,
   esLineaBebida,
   construirEtiquetaGeneral,
   construirEtiquetasArea,
   construirEtiquetasBebida,
   construirTodasLasEtiquetas,
+  construirTicketComandaSalon,
 } from './constructor-etiquetas';
 
 describe('Constructor server-side de etiquetas', () => {
@@ -101,6 +103,31 @@ describe('Constructor server-side de etiquetas', () => {
     expect(resumen.bebidas).toHaveLength(2);
   });
 
+  it('Bebidas no tiene sticker por área: solo Salados y Postres, y los vasos siguen igual', () => {
+    const pedido: any = {
+      ...pedidoMock,
+      lineas: [
+        { id: 1n, cantidad: 1, nombre: 'Limonada', area: { id: 1n, nombre: 'Bebidas' }, categoria: { nombre: 'Bebidas' }, opciones: [] },
+        { id: 2n, cantidad: 1, nombre: 'Empanada', area: { id: 2n, nombre: 'Salados' }, opciones: [] },
+        { id: 3n, cantidad: 1, nombre: 'Brownie', area: { id: 3n, nombre: 'Postres' }, opciones: [] },
+      ],
+    };
+    const areas = construirEtiquetasArea(pedido);
+    expect(areas.map((a) => a.areaNombre)).toEqual(['SALADOS', 'POSTRES']);
+    expect(areas.every((a) => a.totalAreas === 2)).toBe(true);
+    expect(construirEtiquetasBebida(pedido)).toHaveLength(1);
+  });
+
+  it('un pedido solo de bebidas no genera ninguna etiqueta por área', () => {
+    const pedido: any = {
+      ...pedidoMock,
+      lineas: [{ id: 1n, cantidad: 2, nombre: 'Limonada', area: { id: 1n, nombre: 'Bebidas' }, opciones: [] }],
+    };
+    const resumen = construirTodasLasEtiquetas(pedido);
+    expect(resumen.areas).toEqual([]);
+    expect(resumen.bebidas).toHaveLength(2);
+  });
+
   const comboBase = (extra: any): any => ({
     codigo: 'CP-7',
     modalidad: 'RECOGER',
@@ -148,6 +175,17 @@ describe('Constructor server-side de etiquetas', () => {
   });
 });
 
+describe('construirTicketPago: ajuste por cambio de dirección', () => {
+  const pedido = { codigo: 'CP-9', total: 20, lineas: [{ cantidad: 1, nombre: 'Lomo', subtotal: 20 }], cobros: [] };
+
+  it('con ajuste pendiente lleva el ajuste; sin él no agrega la clave (el ticket sale como antes)', () => {
+    const con = construirTicketPago(pedido, {}, undefined, { tipo: 'SALDO', monto: 4 });
+    expect(con.ajusteUbicacion).toEqual({ tipo: 'SALDO', monto: 4 });
+    const sin = construirTicketPago(pedido, {}, undefined, null);
+    expect(sin).not.toHaveProperty('ajusteUbicacion');
+  });
+});
+
 describe('construirTicketNotaMozo (nota que el mozo envía a Caja)', () => {
   const pedido = { codigo: 'PED-50', total: 35, lineas: [{ cantidad: 1, nombre: 'Lomo', subtotal: 35 }], cobros: [] };
 
@@ -181,5 +219,52 @@ describe('construirTicketNotaMozo (nota que el mozo envía a Caja)', () => {
     expect(t.pagos[0]).toEqual({ medio: 'EFECTIVO', monto: 20, recibido: 25, vuelto: 5 });
     expect(t.pagos[1]).toEqual({ medio: 'YAPE', monto: 15, recibido: null, vuelto: null });
     expect(t.cobradoPorMozo).toBeNull();
+  });
+});
+
+describe('Etiquetas con reparto por sabor (stock por sabor)', () => {
+  // Donas con reparto: el sabor aparece en las opciones de la línea, antes que las opciones elegidas
+  const pedidoDonas: any = {
+    id: 202n,
+    codigo: 'CP-202',
+    modalidad: 'MESA',
+    mesa_nombre: '5',
+    cliente_nombre: 'Luis',
+    canal: 'CARTA',
+    nota: null,
+    creado_en: new Date('2026-11-05T15:00:00.000Z'),
+    lineas: [
+      {
+        id: 9n,
+        cantidad: 1,
+        nombre: 'Dona',
+        tamano: '1/2 docena',
+        nota: null,
+        area: { id: 3n, nombre: 'Salados' },
+        categoria: { nombre: 'Dulces' },
+        nombres_persona: [],
+        opcionesElegidas: [],
+        sabores: [
+          { sabor_nombre: 'Fresa', cantidad: 2 },
+          { sabor_nombre: 'Oreo', cantidad: 3 },
+          { sabor_nombre: 'Manjar', cantidad: 1 },
+        ],
+      },
+    ],
+  };
+
+  it('la etiqueta de área muestra «2 Fresa · 3 Oreo · 1 Manjar» en las opciones de la línea', () => {
+    const areas = construirEtiquetasArea(pedidoDonas);
+    expect(areas[0].lineas[0].opciones).toEqual(['2 Fresa · 3 Oreo · 1 Manjar']);
+  });
+
+  it('el ticket de comanda también lo muestra, y una línea sin sabores queda igual', () => {
+    const ticket = construirTicketComandaSalon(pedidoDonas);
+    expect(ticket.lineas[0].opciones).toEqual(['2 Fresa · 3 Oreo · 1 Manjar']);
+    const sinSabores = construirTicketComandaSalon({
+      ...pedidoDonas,
+      lineas: [{ ...pedidoDonas.lineas[0], sabores: [], opcionesElegidas: [{ opcion_nombre: 'Caja x6' }] }],
+    });
+    expect(sinSabores.lineas[0].opciones).toEqual(['Caja x6']);
   });
 });

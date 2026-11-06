@@ -9,14 +9,19 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  * (descuento de promoción con casilla BOT y envío, ver vista-previa-pedido.util.ts) el total es el que cobra el servidor.
  */
 export function calcularTotales(pedido: EstadoCarritoPedido, vista?: VistaPreviaPedidoBot | null) {
+  // total = venta (sin propina). aCobrar = total + propina: lo que el cliente paga (montos, plan, efectivo).
+  const propina = r2(pedido.propina ?? 0);
   if (vista) {
     const total = Math.max(0, r2(vista.subtotal - vista.descuento + (vista.envio ?? 0)));
-    return { subtotal: vista.subtotal, descuento: vista.descuento, descuentoNombre: vista.descuentoNombre, envio: vista.envio, total };
+    return {
+      subtotal: vista.subtotal, descuento: vista.descuento, descuentoNombre: vista.descuentoNombre, envio: vista.envio,
+      total, propina, aCobrar: r2(total + propina),
+    };
   }
   const subtotal = r2(pedido.items.reduce((s, i) => s + i.subtotal, 0));
   const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
   const total = Math.max(0, r2(subtotal + (envio || 0)));
-  return { subtotal, descuento: 0, descuentoNombre: null, envio, total };
+  return { subtotal, descuento: 0, descuentoNombre: null, envio, total, propina, aCobrar: r2(total + propina) };
 }
 
 export const NOMBRE_MEDIO: Record<MedioPagoBot, string> = {

@@ -13,13 +13,16 @@ describe('CatalogoService', () => {
 
   beforeEach(async () => {
     prisma = {
+      // Conteo de apertura del día (productos que controlan stock): sin aperturas en estos casos
+      conteoApertura: { findMany: jest.fn().mockResolvedValue([]) },
       categoria: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
       },
       producto: {
-        findMany: jest.fn(),
+        // quedanProductos pide los productos que controlan stock: sin ninguno por defecto
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -704,6 +707,114 @@ describe('CatalogoService', () => {
       expect(prisma.productoGrupo.deleteMany).toHaveBeenCalledWith({
         where: { producto_id: BigInt(1), grupo_id: { notIn: [BigInt(4)] } },
       });
+    });
+  });
+
+  describe('7. Productos que controlan stock (quedan)', () => {
+    const producto = (id: number, controla: boolean) => ({
+      id: BigInt(id),
+      nombre: `Dona ${id}`,
+      descripcion: null,
+      precio: 5.0,
+      oculto: false,
+      agotado_hasta: null,
+      no_suma_beneficios: false,
+      controla_stock: controla,
+      foto_archivo: null,
+      tamanos: [],
+      grupos: [],
+      sabores: [],
+    });
+
+    beforeEach(() => {
+      prisma.categoria.findMany.mockResolvedValue([
+        { id: BigInt(3), nombre: 'Donas', orden: 1, oculta: false, productos: [producto(30, true), producto(31, true), producto(32, false)] },
+      ]);
+      prisma.producto.findMany.mockResolvedValue([{ id: BigInt(30) }, { id: BigInt(31) }]);
+      prisma.stock = {
+        findMany: jest.fn().mockResolvedValue([
+          { producto_id: BigInt(30), cantidad: 3.7 },
+          { producto_id: BigInt(31), cantidad: 0 },
+        ]),
+      };
+    });
+
+    it('quedan es el saldo entero hacia abajo y se agota en 0 aunque no esté marcado', async () => {
+      const carta = await (service as any).obtenerCarta();
+      const [a, b, sinControl] = carta[0].productos;
+      expect(a).toMatchObject({ controlaStock: true, quedan: 3, disponible: true });
+      expect(b).toMatchObject({ controlaStock: true, quedan: 0, disponible: false });
+      expect(sinControl).toMatchObject({ controlaStock: false, quedan: null, disponible: true });
+    });
+
+    it('sin apertura hoy el saldo sigue siendo el tope (quedan = saldo, 0 no se vende)', async () => {
+      prisma.conteoApertura.findMany.mockResolvedValue([]);
+      const carta = await (service as any).obtenerCarta();
+      expect(carta[0].productos[0]).toMatchObject({ controlaStock: true, quedan: 3, disponible: true });
+      expect(carta[0].productos[1]).toMatchObject({ controlaStock: true, quedan: 0, disponible: false });
+    });
+  });
+  describe('8. Productos por sabor en la carta (stock por sabor)', () => {
+    const donaSabor = (saboresAgotados: number[] = []) => ({
+      id: BigInt(40),
+      nombre: 'Dona por sabor',
+      descripcion: null,
+      precio: 3.0,
+      oculto: false,
+      agotado_hasta: null,
+      no_suma_beneficios: false,
+      controla_stock: true,
+      foto_archivo: null,
+      tamanos: [{ id: BigInt(9), tamano_valor_id: BigInt(7), precio: 18, activo: true, unidades: 6, tamano_valor: { nombre: '1/2 docena' } }],
+      grupos: [],
+      sabores: [
+        { id: BigInt(401), nombre: 'Fresa', activo: true, agotado_hasta: saboresAgotados.includes(401) ? new Date('9999-12-31T23:59:59Z') : null },
+        { id: BigInt(402), nombre: 'Oreo', activo: true, agotado_hasta: saboresAgotados.includes(402) ? new Date('9999-12-31T23:59:59Z') : null },
+      ],
+    });
+
+    it('con apertura por sabor: quedan = suma de los disponibles y cada sabor lleva su quedan; unidades en el tamaño', async () => {
+      prisma.categoria.findMany.mockResolvedValue([{ id: BigInt(4), nombre: 'Donas', orden: 1, oculta: false, productos: [donaSabor()] }]);
+      prisma.conteoApertura.findMany.mockImplementation(async ({ where }: any) =>
+        where.sabor_id ? [{ sabor_id: BigInt(401), cantidad: 4 }, { sabor_id: BigInt(402), cantidad: 6 }] : [],
+      );
+      prisma.stockSabor = {
+        findMany: jest.fn().mockResolvedValue([{ sabor_id: BigInt(401), cantidad: 3.5 }, { sabor_id: BigInt(402), cantidad: 6 }]),
+      };
+      const carta = await (service as any).obtenerCarta();
+      const p = carta[0].productos[0];
+      expect(p.tamanos[0]).toMatchObject({ nombre: '1/2 docena', unidades: 6 });
+      expect(p.sabores).toEqual([
+        { id: '401', nombre: 'Fresa', activo: true, disponible: true, quedan: 3 },
+        { id: '402', nombre: 'Oreo', activo: true, disponible: true, quedan: 6 },
+      ]);
+      // quedan del producto = suma de los sabores disponibles (3 + 6)
+      expect(p).toMatchObject({ controlaStock: true, saboresConStock: true, quedan: 9, disponible: true });
+    });
+
+    it('si todos los sabores están agotados o a 0 con apertura, el producto no está disponible', async () => {
+      prisma.categoria.findMany.mockResolvedValue([{ id: BigInt(4), nombre: 'Donas', orden: 1, oculta: false, productos: [donaSabor([401])] }]);
+      prisma.conteoApertura.findMany.mockImplementation(async ({ where }: any) =>
+        where.sabor_id ? [{ sabor_id: BigInt(401), cantidad: 4 }, { sabor_id: BigInt(402), cantidad: 6 }] : [],
+      );
+      prisma.stockSabor = {
+        findMany: jest.fn().mockResolvedValue([{ sabor_id: BigInt(401), cantidad: 0 }, { sabor_id: BigInt(402), cantidad: 0 }]),
+      };
+      const carta = await (service as any).obtenerCarta();
+      expect(carta[0].productos[0]).toMatchObject({ saboresConStock: false, quedan: 0, disponible: false });
+    });
+
+    it('sin apertura de los sabores: el saldo de cada sabor es el tope; sin filas de stock no hay disponibles', async () => {
+      prisma.categoria.findMany.mockResolvedValue([{ id: BigInt(4), nombre: 'Donas', orden: 1, oculta: false, productos: [donaSabor()] }]);
+      prisma.conteoApertura.findMany.mockResolvedValue([]);
+      prisma.stockSabor = { findMany: jest.fn().mockResolvedValue([{ sabor_id: BigInt(402), cantidad: 2 }]) };
+      const carta = await (service as any).obtenerCarta();
+      const p = carta[0].productos[0];
+      expect(p.sabores).toEqual([
+        { id: '401', nombre: 'Fresa', activo: true, disponible: false, quedan: 0 },
+        { id: '402', nombre: 'Oreo', activo: true, disponible: true, quedan: 2 },
+      ]);
+      expect(p).toMatchObject({ saboresConStock: true, quedan: 2, disponible: true });
     });
   });
 });

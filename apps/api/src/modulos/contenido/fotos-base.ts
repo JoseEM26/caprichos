@@ -11,7 +11,6 @@ export const FOTOS: Record<string, string> = {
   MOCACCINO: 'mocaccino',
   'OREO LATTE': 'oreo_latte',
   'SALTAMEL BROWNIE': 'saltamel_brownie',
-  '1/2 DOCENA DONUTS O GALLETAS': 'media_docena_donas',
   'COMBO CAJITA CAPRIKIDS': 'caprikids',
   'DÚO IRRESISTIBLE': 'duo_irresistible',
   'DÚO PARA COMPARTIR': 'duo_compartir',

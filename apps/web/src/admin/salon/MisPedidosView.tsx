@@ -15,6 +15,7 @@ import { ProgresoPedido } from './ProgresoPedido';
 import { SalonMozo } from './componentes/SalonMozo';
 import { medioDigitalVoucher } from '../pedidos/mediosPago';
 import type { MiPedido, PisoSalon, RangoMisPedidos, RespuestaMisPedidos } from './tipos';
+import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
 import './mis-pedidos.css';
 import './mis-pedidos-voucher.css';
 
@@ -333,6 +334,7 @@ export function MisPedidosView() {
                 <div className="mp-card-cabeza">
                   <span className="mp-card-fila">
                     <strong className="mp-codigo">{p.codigo}</strong>
+                    {p.ubicacionEditadaEn && <InsigniaDireccionEditada />}
                     {p.clienteNombre && (
                       <span className="mpv-cliente" title={p.clienteNombre}>
                         · {p.clienteNombre}
@@ -412,6 +414,12 @@ export function MisPedidosView() {
                       <dd>{PAGO[p.pagoEstado ?? ''] ?? (p.pagoEstado || 'Sin dato')}</dd>
                       <dt>Total</dt>
                       <dd>{soles(p.total)}</dd>
+                      {(p.propina ?? 0) > 0 && (
+                        <>
+                          <dt>Propina (aparte)</dt>
+                          <dd data-testid="mis-pedidos-propina">{soles(p.propina ?? 0)}</dd>
+                        </>
+                      )}
                     </dl>
                     {((p.historialVouchers ?? 0) >= 2 || (p.historialVouchers ?? 0) > (p.vouchers ?? 0)) && (
                       <HistorialVoucher pedidoId={p.id} total={p.historialVouchers ?? 0} />
@@ -461,19 +469,22 @@ export function MisPedidosView() {
         </ul>
       )}
 
+      </div>
+      )}
+
+      {/* Fuera de las pestañas: Nuevo pedido se abre igual desde Salón que desde Lista */}
       {modalAbierto && (
         <ModalNuevoPedidoMesa
           abierto={true}
           pasoInicial="modal"
           canal="MOZO"
           puedeForzarLiberacion={tiene('mesas/liberar')}
+          puedeMesa={tiene('mesas/ver') && tiene('mesas/abrir')}
+          puedePersonal={tiene('creditos/ver')}
           pisos={pisos}
           alCerrar={() => setModalAbierto(false)}
           alExitoPedido={() => void cargar()}
         />
-      )}
-
-      </div>
       )}
 
       {errorQuitar && (

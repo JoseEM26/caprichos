@@ -17,7 +17,10 @@ import { useCarrito } from './CarritoContext';
 import { PuntosCanje, estimarPuntos } from './cuenta/PuntosCanje';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { guardarPedido } from './seguimiento';
+import { excesosDeStock, lineasSaborIncompletas, mensajeSaborQuedan, saborRechazadoDe, stockInsuficienteDe, textoSabores } from './stock';
+import { AjusteSaboresLinea } from './AjusteSaboresLinea';
 import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
+import { useEsMovil } from './useEsMovil';
 import {
   ConsultaEnvioRespuesta,
   DatosLocalCarta,
@@ -53,13 +56,31 @@ export function FormularioCheckout({
     abrirCajon,
     limpiarCarrito,
     setPedidoConfirmado,
+    inventario,
+    marcarQuedan,
+    marcarQuedanSabor,
+    ajustarCantidadProducto,
+    lineaAjustandoId,
+    abrirAjusteLinea,
   } = useCarrito();
+
+  // Productos que superan lo que queda (el saldo cambió) y el 409 del último envío.
+  // Las mezclas sin sabores completos también frenan el envío.
+  const excesos = excesosDeStock(lineas, inventario);
+  const pendientesSabor = lineasSaborIncompletas(lineas);
+  const enviarBloqueadoPorStock = excesos.length > 0 || pendientesSabor.length > 0;
+  const [stockRechazado, setStockRechazado] = useState<{ productoId: string | null; quedan: number; mensaje: string; saborId?: string } | null>(null);
+  useEffect(() => {
+    if (!checkoutAbierto) setStockRechazado(null);
+  }, [checkoutAbierto]);
 
   // Control de apartados (pasos 1, 2, 3)
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
   const [pasoMaximo, setPasoMaximo] = useState<1 | 2 | 3>(1);
   const [errorPaso, setErrorPaso] = useState<string | null>(null);
   const contenidoRef = useRef<HTMLDivElement>(null);
+  // En celular el pie (total y botones) queda fijo abajo y solo se desplaza el contenido
+  const movil = useEsMovil();
 
   // Modal de mapa a pantalla completa
   const [mapaCompletoAbierto, setMapaCompletoAbierto] = useState(false);
@@ -106,6 +127,8 @@ export function FormularioCheckout({
   // Medio de pago
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('YAPE');
   const [pagaCon, setPagaCon] = useState('');
+  // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
+  const [propinaTexto, setPropinaTexto] = useState('');
   const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
 
   // Estado de envío
@@ -236,6 +259,8 @@ export function FormularioCheckout({
   // Con cuenta y direcciones guardadas (o cargando) hay que elegir a dónde se envía antes de ver el formulario
   const pideEleccionDireccion =
     Boolean(clienteCuenta) && opcionDireccion === null && (direccionesAnteriores === null || direccionesAnteriores.length > 0);
+  // Paso 2 en delivery sin ubicación elegida: Continuar queda deshabilitado con el aviso junto al botón
+  const faltaElegirDireccion = paso === 2 && modalidad === 'DELIVERY' && pideEleccionDireccion;
 
   // Cálculo del total
   // Envío gratis: por cupón de envío (aplicado) o por la promo ENVIO_GRATIS vigente. El servidor decide al crear el pedido.
@@ -423,6 +448,15 @@ export function FormularioCheckout({
 
   // Pedido mínimo: solo para DELIVERY, sobre el subtotal de productos. Sin parámetro configurado no hay mínimo.
   const minimoDelivery = datosLocal?.pedidoMinimo && datosLocal.pedidoMinimo > 0 ? datosLocal.pedidoMinimo : 0;
+  const propinaActiva = datosLocal?.propina?.carta === true;
+  const topePropina = datosLocal?.propina?.tope && datosLocal.propina.tope > 0 ? datosLocal.propina.tope : 200;
+  const propinaLimpia = propinaTexto.trim().replace(',', '.');
+  const propinaFormatoOk = propinaLimpia === '' || /^\d+(\.\d{1,2})?$/.test(propinaLimpia);
+  const propinaNum = propinaActiva && propinaFormatoOk && propinaLimpia !== '' ? Number(propinaLimpia) : 0;
+  const propinaCobrable = propinaActiva && propinaFormatoOk && propinaNum > 0 && propinaNum <= topePropina ? Math.round(propinaNum * 100) / 100 : 0;
+  const propinaInvalida = propinaActiva && propinaLimpia !== '' && (!propinaFormatoOk || propinaNum > topePropina);
+  // Lo que paga el cliente: venta + propina (el comprobante y los puntos usan solo la venta)
+  const aCobrar = Number((totalCalculado + propinaCobrable).toFixed(2));
   const faltanteMinimo =
     modalidad === 'DELIVERY' && minimoDelivery > 0 && subtotal < minimoDelivery
       ? Number((minimoDelivery - subtotal).toFixed(2))
@@ -483,10 +517,14 @@ export function FormularioCheckout({
       }
     }
 
+    if (propinaInvalida) {
+      return `La propina debe ser un monto entre S/ 0 y S/ ${topePropina.toFixed(2)}, con hasta 2 decimales`;
+    }
+
     if (metodoPago === 'EFECTIVO' && pagaCon.trim()) {
       const pagaConNum = Number(pagaCon);
-      if (isNaN(pagaConNum) || pagaConNum < totalCalculado) {
-        return `El monto con el que pagas (S/ ${pagaCon}) no puede ser menor al total (S/ ${totalCalculado.toFixed(2)})`;
+      if (isNaN(pagaConNum) || pagaConNum < aCobrar) {
+        return `El monto con el que pagas (S/ ${pagaCon}) no puede ser menor a lo que pagas (S/ ${aCobrar.toFixed(2)})`;
       }
     }
 
@@ -558,6 +596,25 @@ export function FormularioCheckout({
     hacerScrollArriba();
   };
 
+  // Deja cada producto con lo que queda (o lo quita si no queda nada); los datos del cliente no se tocan
+  // Con sabores, el ajuste es reelegir los sabores de la línea (ventana de ajuste); el resto del pedido no se toca
+  const ajustarPedidoAStock = () => {
+    const conSabor = excesos.find((e) => e.saborId) ?? (stockRechazado?.saborId ? { productoId: stockRechazado.productoId } : undefined);
+    const linea = conSabor
+      ? lineas.find((l) => String(l.productoId) === String(conSabor.productoId) && (l.sabores ?? []).length > 0)
+      : pendientesSabor[0];
+    if (conSabor || pendientesSabor.length > 0) {
+      if (linea) abrirAjusteLinea(linea.id);
+      setStockRechazado(null);
+      setErrorEnvio(null);
+      return;
+    }
+    for (const e of excesos) ajustarCantidadProducto(e.productoId, e.quedan);
+    if (stockRechazado?.productoId) ajustarCantidadProducto(stockRechazado.productoId, stockRechazado.quedan);
+    setStockRechazado(null);
+    setErrorEnvio(null);
+  };
+
   // Enviar pedido a la API
   const enviarPedido = async (e?: FormEvent) => {
     if (e) e.preventDefault();
@@ -568,6 +625,15 @@ export function FormularioCheckout({
 
     if (estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda)) {
       setErrorEnvio('La carta se encuentra cerrada o en pausa: no se pueden enviar pedidos.');
+      return;
+    }
+
+    if (enviarBloqueadoPorStock) {
+      setErrorEnvio(
+        excesos.length > 0
+          ? 'Hay productos por encima de lo que queda. Ajusta tu pedido antes de enviar.'
+          : `Elige los sabores de ${pendientesSabor[0].nombre} antes de enviar.`,
+      );
       return;
     }
 
@@ -620,6 +686,7 @@ export function FormularioCheckout({
           nota: lin.nota,
           ofertaId: lin.ofertaId,
           comboElecciones: lin.comboElecciones,
+          ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
         });
       }
     }
@@ -657,6 +724,7 @@ export function FormularioCheckout({
       },
       cuponCodigo: cuponAplicado ? cuponAplicado.codigo : undefined,
       puntosCanje: !cuponAplicado && puntosAplicados > 0 ? puntosAplicados : undefined,
+      propina: propinaCobrable > 0 ? propinaCobrable : undefined,
     };
 
     try {
@@ -683,6 +751,7 @@ export function FormularioCheckout({
         subtotal: respuesta.subtotal,
         envio: respuesta.envio,
         total: respuesta.total,
+        propina: respuesta.propina,
         mensaje: respuesta.mensaje,
         clienteNombre: nombre.trim(),
         modalidad,
@@ -690,7 +759,18 @@ export function FormularioCheckout({
       });
     } catch (err) {
       if (err instanceof ErrorApi) {
-        if (err.codigo === 'PRODUCTO_AGOTADO') {
+        const sabor = saborRechazadoDe(err);
+        const stock = stockInsuficienteDe(err);
+        if (sabor) {
+          // el sabor pasa a su nuevo saldo: la línea queda marcada y el ajuste reabre sus sabores
+          marcarQuedanSabor(sabor.productoId, sabor.saborId, sabor.quedan);
+          setStockRechazado({ productoId: sabor.productoId, quedan: sabor.quedan, mensaje: mensajeSaborQuedan(sabor.quedan, sabor.saborNombre), saborId: sabor.saborId });
+          setErrorEnvio(null);
+        } else if (stock) {
+          setStockRechazado(stock);
+          if (stock.productoId) marcarQuedan(stock.productoId, stock.quedan);
+          setErrorEnvio(null);
+        } else if (err.codigo === 'PRODUCTO_AGOTADO') {
           setErrorEnvio(err.message || 'Uno de los productos seleccionados se encuentra agotado.');
         } else if (err.codigo === 'COMBO_PARTE_NO_DISPONIBLE') {
           setErrorEnvio(`${err.message} Tu carrito sigue igual: quita el combo y vuelve a agregarlo para elegir otro reemplazo.`);
@@ -733,6 +813,7 @@ export function FormularioCheckout({
 
   return (
     <>
+      {lineaAjustandoId && <AjusteSaboresLinea />}
       <div
         role="dialog"
         aria-modal="true"
@@ -745,16 +826,17 @@ export function FormularioCheckout({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '16px',
+          padding: movil ? 0 : '16px',
           overflowY: 'auto',
         }}
       >
         <div
           style={{
-            width: 'min(580px, 100%)',
-            maxHeight: '92vh',
+            width: movil ? '100%' : 'min(580px, 100%)',
+            maxHeight: movil ? undefined : '92vh',
+            height: movil ? '100%' : undefined,
             backgroundColor: 'var(--cp-cream)',
-            borderRadius: '20px',
+            borderRadius: movil ? 0 : '20px',
             boxShadow: '0 20px 50px rgba(11, 44, 62, 0.3)',
             display: 'flex',
             flexDirection: 'column',
@@ -948,6 +1030,7 @@ export function FormularioCheckout({
               ref={contenidoRef}
               style={{
                 flex: 1,
+                minHeight: 0,
                 overflowY: 'auto',
                 padding: '20px',
                 display: 'flex',
@@ -1224,6 +1307,9 @@ export function FormularioCheckout({
                             ? 'Opcional. Con tu celular sumas puntos.'
                             : 'Tu celular: sumas puntos con tu número, sin contraseña.'}
                         </div>
+                        <div style={{ fontSize: '11px', color: 'var(--cp-soft)', marginTop: '2px' }}>
+                          Te enviaremos una breve encuesta de satisfacción por WhatsApp
+                        </div>
                       </div>
                           {clienteCuenta && otroTelefono && clienteCuenta.telefono && (
                             <button
@@ -1283,6 +1369,11 @@ export function FormularioCheckout({
                         aviso={avisoDireccion}
                         alElegir={(d) => void elegirDireccionAnterior(d)}
                         alNueva={elegirDireccionNueva}
+                        alUbicacionActual={() => {
+                          elegirDireccionNueva();
+                          obtenerUbicacionGps();
+                        }}
+                        cargandoUbicacion={cargandoGps}
                       />
                     )}
                     {!clienteCuenta && pistaDireccion && (
@@ -1923,6 +2014,26 @@ export function FormularioCheckout({
                       </div>
                     )}
 
+                    {propinaActiva && (
+                      <div data-testid="propina-carta">
+                        <label htmlFor="f-propina" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', display: 'block', marginBottom: '4px' }}>
+                          Propina opcional para el equipo (S/)
+                        </label>
+                        <input
+                          id="f-propina"
+                          type="text"
+                          inputMode="decimal"
+                          value={propinaTexto}
+                          onChange={(e) => setPropinaTexto(e.target.value)}
+                          placeholder="0.00"
+                          style={{ width: '100%', minHeight: '44px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', backgroundColor: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 12px', fontSize: '16px' }}
+                        />
+                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px', marginTop: '4px' }}>
+                          Va aparte de tu pedido: no es parte del total de productos ni del comprobante. Máximo S/ {topePropina.toFixed(2)}. Déjalo vacío si no quieres dejar propina.
+                        </div>
+                      </div>
+                    )}
+
                     {metodoPago === 'TARJETA' && (
                       <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
                         Pagas con tarjeta de débito o crédito cuando recibes o recoges tu pedido (pos inalámbrico).
@@ -1947,10 +2058,10 @@ export function FormularioCheckout({
                           id="f-paga-con"
                           type="number"
                           step="0.10"
-                          min={totalCalculado}
+                          min={aCobrar}
                           value={pagaCon}
                           onChange={(e) => setPagaCon(e.target.value)}
-                          placeholder={`Ej.: ${Math.ceil(totalCalculado / 10) * 10}`}
+                          placeholder={`Ej.: ${Math.ceil(aCobrar / 10) * 10}`}
                           style={{
                             width: '100%',
                             minHeight: '44px',
@@ -2099,6 +2210,17 @@ export function FormularioCheckout({
                       gap: '8px',
                     }}
                   >
+                    {lineas.some((l) => l.sabores?.length) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--cp-navy)' }}>
+                        {lineas
+                          .filter((l) => l.sabores?.length)
+                          .map((l) => (
+                            <span key={l.id} style={{ overflowWrap: 'anywhere' }}>
+                              <b>{`${l.cantidad} × ${l.nombre}`}</b>{`: ${textoSabores(l)}`}
+                            </span>
+                          ))}
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
                       <span>Subtotal productos</span>
                       <span style={{ fontWeight: 700 }}>S/ {subtotal.toFixed(2)}</span>
@@ -2162,6 +2284,13 @@ export function FormularioCheckout({
                       </div>
                     )}
 
+                    {propinaCobrable > 0 && (
+                      <div data-testid="propina-resumen" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                        <span>Propina (para el equipo)</span>
+                        <span style={{ fontWeight: 700 }}>S/ {propinaCobrable.toFixed(2)}</span>
+                      </div>
+                    )}
+
                     <div
                       style={{
                         borderTop: '1px solid var(--cp-line)',
@@ -2175,7 +2304,7 @@ export function FormularioCheckout({
                       }}
                     >
                       <span>Total a pagar</span>
-                      <span style={{ color: 'var(--cp-rust)' }}>S/ {totalCalculado.toFixed(2)}</span>
+                      <span style={{ color: 'var(--cp-rust)' }}>S/ {aCobrar.toFixed(2)}</span>
                     </div>
 
                     {clienteCuenta && (
@@ -2197,6 +2326,13 @@ export function FormularioCheckout({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '10px',
+                flexShrink: 0,
+                ...(movil
+                  ? {
+                      boxShadow: '0 -6px 16px rgba(11, 44, 62, 0.12)',
+                      paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+                    }
+                  : {}),
               }}
             >
               {/* Total pequeño visible en los 3 apartados */}
@@ -2212,7 +2348,7 @@ export function FormularioCheckout({
               >
                 <span>Total a pagar:</span>
                 <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--cp-rust)' }}>
-                  S/ {totalCalculado.toFixed(2)}
+                  S/ {aCobrar.toFixed(2)}
                 </span>
               </div>
 
@@ -2266,6 +2402,45 @@ export function FormularioCheckout({
                 </div>
               )}
 
+              {/* Stock: productos por encima de lo que queda, con el ajuste del pedido */}
+              {(enviarBloqueadoPorStock || stockRechazado) && (
+                <div
+                  role="alert"
+                  style={{
+                    backgroundColor: '#FDECEA',
+                    color: 'var(--cp-rust)',
+                    border: '1.5px solid var(--cp-rust)',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    lineHeight: '17px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  {excesos.map((e) => (
+                    <span key={`${e.productoId}-${e.saborId ?? ''}`}>
+                      {e.saborId ? mensajeSaborQuedan(e.quedan, e.saborNombre ?? 'este sabor') : `Solo quedan ${e.quedan} de ${e.nombre}`}
+                    </span>
+                  ))}
+                  {pendientesSabor.map((l) => (
+                    <span key={l.id}>{`Elige los sabores de ${l.nombre} (${textoSabores(l) || 'aún sin sabores'})`}</span>
+                  ))}
+                  {stockRechazado && !excesos.some((e) => e.productoId === stockRechazado.productoId) && (
+                    <span>{stockRechazado.mensaje}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={ajustarPedidoAStock}
+                    style={{ alignSelf: 'flex-start', border: 0, background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                  >
+                    Ajustar mi pedido
+                  </button>
+                </div>
+              )}
+
               {/* Mensaje de error del apartado o de la API */}
               {(errorPaso || errorEnvio) && (
                 <div
@@ -2283,6 +2458,11 @@ export function FormularioCheckout({
                 >
                   {errorPaso || errorEnvio}
                 </div>
+              )}
+
+              {/* Aviso junto al botón cuando falta elegir la ubicación (el botón queda deshabilitado) */}
+              {faltaElegirDireccion && (
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>Elige dónde lo enviamos</div>
               )}
 
               {/* Botones de navegación según el paso */}
@@ -2312,17 +2492,18 @@ export function FormularioCheckout({
                   <button
                     type="button"
                     onClick={avanzarPaso}
+                    disabled={faltaElegirDireccion}
                     style={{
                       flex: 1,
                       minHeight: '48px',
                       borderRadius: '12px',
                       border: 'none',
-                      backgroundColor: 'var(--cp-navy)',
-                      color: 'var(--cp-white)',
+                      backgroundColor: faltaElegirDireccion ? 'var(--cp-line)' : 'var(--cp-navy)',
+                      color: faltaElegirDireccion ? 'var(--cp-soft)' : 'var(--cp-white)',
                       fontFamily: 'var(--fuente-titulos)',
                       fontWeight: 800,
                       fontSize: '15px',
-                      cursor: 'pointer',
+                      cursor: faltaElegirDireccion ? 'not-allowed' : 'pointer',
                     }}
                   >
                     Continuar
@@ -2330,22 +2511,26 @@ export function FormularioCheckout({
                 ) : (
                   <button
                     type="button"
-                    disabled={enviando}
+                    disabled={enviando || enviarBloqueadoPorStock}
                     onClick={() => void enviarPedido()}
                     style={{
                       flex: 1,
                       minHeight: '48px',
                       borderRadius: '12px',
                       border: 0,
-                      backgroundColor: enviando ? 'var(--cp-line)' : 'var(--cp-orange)',
-                      color: enviando ? 'var(--cp-soft)' : '#FFFFFF',
+                      backgroundColor: enviando || enviarBloqueadoPorStock ? 'var(--cp-line)' : 'var(--cp-orange)',
+                      color: enviando || enviarBloqueadoPorStock ? 'var(--cp-soft)' : '#FFFFFF',
                       fontFamily: 'var(--fuente-titulos)',
                       fontWeight: 800,
                       fontSize: '15px',
-                      cursor: enviando ? 'not-allowed' : 'pointer',
+                      cursor: enviando || enviarBloqueadoPorStock ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {enviando ? 'Enviando pedido...' : `Enviar pedido · S/ ${totalCalculado.toFixed(2)}`}
+                    {enviando
+                      ? 'Enviando pedido...'
+                      : enviarBloqueadoPorStock
+                        ? 'Ajusta tu pedido para enviar'
+                        : `Enviar pedido · S/ ${aCobrar.toFixed(2)}`}
                   </button>
                 )}
               </div>

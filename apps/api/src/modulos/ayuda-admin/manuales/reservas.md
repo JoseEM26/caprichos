@@ -51,7 +51,9 @@ Ver tambien: [[plano]]
 Ver tambien: [[plano]]
 
 ## Errores y dudas comunes
-- El sistema no permite agendar dos reservas en la misma mesa a la misma hora para evitar sobreventa.
+- El sistema no permite agendar dos reservas en la misma mesa a la misma hora para evitar sobreventa. La mesa queda reservada desde la hora de la reserva hasta 15 minutos despues (la tolerancia); la reserva no tiene una duracion fija, dura lo que dure el pedido.
+- Si pasan 15 minutos de la hora sin que el cliente llegue, la reserva pasa sola a «No llegó» y la mesa queda libre (el mozo puede usarla igual). Si el cliente llega tarde el mismo dia, pulsar Reactivar en la reserva.
+- Al elegir una mesa, si otra reserva de esa mesa es menos de 2 horas antes, aparece un aviso: la mesa puede seguir ocupada. No bloquea.
 - Se puede filtrar las reservas por fecha navegando en el calendario mensual y pulsando el dia deseado.
 - Si los clientes llegan con mas personas de las reservadas, se debe editar la reserva para reasignar una mesa mas grande o juntar mesas si el plano lo permite.
 

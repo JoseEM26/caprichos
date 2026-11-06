@@ -1,4 +1,5 @@
 import {
+  IsInt,
   IsArray,
   IsBoolean,
   IsNotEmpty,
@@ -21,6 +22,12 @@ export class TamanoProductoInputDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  /** Unidades que lleva el tamaño (entero ≥ 1): Unidad=1, 1/2 docena=6, Docena=12. Sin valor: 1 al crear, sin cambio al editar. */
+  @IsOptional()
+  @IsInt({ message: 'Las unidades del tamaño deben ser un entero' })
+  @Min(1, { message: 'Las unidades del tamaño deben ser al menos 1' })
+  unidades?: number;
 }
 
 export class GrupoProductoInputDto {
@@ -63,6 +70,11 @@ export class CrearProductoDto {
   @IsOptional()
   @IsBoolean()
   resaltarOpcionMenosPedida?: boolean;
+
+  /** Controla el stock de este producto (donas, galletas), aunque «Control de almacén» de insumos esté apagado. */
+  @IsOptional()
+  @IsBoolean()
+  controlaStock?: boolean;
 
   @IsOptional()
   @IsArray()

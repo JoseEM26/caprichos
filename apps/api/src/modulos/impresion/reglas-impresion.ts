@@ -7,7 +7,9 @@ import {
 } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 
-const CLAVES = Object.values(CLAVES_CONFIG_IMPRESION).filter((c) => c !== CLAVES_CONFIG_IMPRESION.VENCE_MIN);
+/** Claves de reglas (sin el plazo de vencimiento, que no es una regla del mapa). */
+export const CLAVES_REGLAS = Object.values(CLAVES_CONFIG_IMPRESION).filter((c) => c !== CLAVES_CONFIG_IMPRESION.VENCE_MIN);
+const CLAVES = CLAVES_REGLAS;
 
 /** Convierte los valores guardados en `parametro` en reglas; lo que falte o sea inválido usa el defecto. */
 export function reglasDesdeValores(valores: Record<string, unknown>): ReglasImpresion {

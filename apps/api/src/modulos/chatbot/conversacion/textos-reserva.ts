@@ -149,13 +149,16 @@ export const TEXTOS_RESERVA = {
     return `Hola ${datos.nombre}, no pudimos confirmar tu solicitud de reserva para el ${datos.fechaTexto} a las ${datos.hora}. Motivo: ${datos.motivo}.${alt}`;
   },
 
+  /** Único recordatorio, unos minutos antes: hora, personas, mesas y tolerancia. Corto. */
   recordatorioReservaCliente: (datos: {
     nombre: string;
     personas: number;
     hora: string;
+    mesas: string;
+    minutos: number;
     toleranciaMin: number;
   }) =>
-    `Hola ${datos.nombre}, te recordamos tu reserva para ${datos.personas} personas hoy a las ${datos.hora}. Te esperamos con ${datos.toleranciaMin} minutos de tolerancia.`,
+    `Hola ${datos.nombre}, en ${datos.minutos} min tienes tu reserva a las ${datos.hora} para ${datos.personas} personas${datos.mesas ? ` (${datos.mesas})` : ''}. Te esperamos; tienes ${datos.toleranciaMin} min de tolerancia.`,
 
   toleranciaVencidaCliente: (datos: {
     nombre: string;

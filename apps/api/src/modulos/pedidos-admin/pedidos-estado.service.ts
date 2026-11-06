@@ -1,6 +1,7 @@
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import { PuntosService } from '../clientes/puntos.service';
 import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
+import { totalCobrable } from '../propinas/propinas.util';
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
@@ -55,6 +56,8 @@ import {
   obtenerInicioDiaLima,
   sumarDiasFechaIso,
 } from '../cocina/cocina.util';
+import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { ajustesPendientesUbicacion } from './cambio-ubicacion.util';
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 
@@ -283,6 +286,7 @@ export class PedidosEstadoService {
           lineas: {
             include: {
               opcionesElegidas: true,
+              sabores: true,
               area: true,
             },
           },
@@ -300,6 +304,7 @@ export class PedidosEstadoService {
     const ahora = new Date();
     const esAdmin = usuarioActual?.rol === 'ADMIN';
     const cobrosMozo = await this.cobrosMozoDe(pedidos);
+    const ajustes = await ajustesPendientesUbicacion(this.prisma, pedidos.map((p) => p.id));
 
     const items = pedidos.map((p) => {
       const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
@@ -315,6 +320,7 @@ export class PedidosEstadoService {
         ...p,
         cobro_vigente_id: cobroVigenteId,
         cobroMozo: cobrosMozo.get(String(p.id)) ?? null,
+        ajusteUbicacionPendiente: ajustes.get(String(p.id)) ?? null,
         comprobante_doc: esAdmin ? p.comprobante_doc : enmascararDni(p.comprobante_doc || ''),
         minutosEspera,
         color,
@@ -446,6 +452,7 @@ export class PedidosEstadoService {
         modalidad: true,
         mesa_nombre: true,
         total: true,
+        propina: true,
         pago_estado: true,
         pago_metodo: true,
         pago_coordinado_en: true,
@@ -453,6 +460,7 @@ export class PedidosEstadoService {
         creado_en: true,
         pasa_cocina_en: true,
         entregado_mesa_en: true,
+        ubicacion_editada_en: true,
         repartidor_party_id: true,
         despachado_en: true,
         eta_min: true,
@@ -470,7 +478,12 @@ export class PedidosEstadoService {
             nota: true,
             precio_unit: true,
             subtotal: true,
+            // Cortesía: la línea sale a S/ 0; su valor de lista se muestra aparte
+            es_cortesia: true,
+            cortesia: { select: { valor_lista: true } },
             opcionesElegidas: { select: { opcion_nombre: true }, orderBy: { id: 'asc' } },
+            // Producto por sabor: reparto de las unidades entre sabores
+            sabores: { select: { sabor_nombre: true, cantidad: true }, orderBy: { id: 'asc' } },
             // Solo para contar líneas por área del progreso; no se devuelven
             area_id: true,
             producto: { select: { categoria: { select: { area_id: true } } } },
@@ -505,9 +518,13 @@ export class PedidosEstadoService {
         estado: p.estado,
         modalidad: p.modalidad,
         mesaNombre: p.mesa_nombre,
+        // Último cambio de ubicación (la insignia «Dirección editada»); null si la dirección es la original
+        ubicacionEditadaEn: p.ubicacion_editada_en ?? null,
         // Nombre del cliente para reconocer el pedido; nunca teléfono ni DNI. Mesa sin nombre: la mesa.
         clienteNombre: p.cliente_nombre?.trim() || (p.modalidad === 'MESA' ? p.mesa_nombre : null) || null,
         total: Number(p.total),
+        // Propina del pedido (va aparte); lo que el cliente paga = total + propina
+        propina: Number(p.propina ?? 0),
         pagoEstado: p.pago_estado,
         pagoMetodo: p.pago_metodo,
         // Pago dividido: plan por medio y la parte digital (lo que lleva voucher)
@@ -525,7 +542,7 @@ export class PedidosEstadoService {
         vouchersPorMedio: mediosDigitalesDelPedido(
           p.planPago.map((f) => ({ medio: f.medio, monto: Number(f.monto) })),
           p.pago_metodo,
-          Number(p.total),
+          totalCobrable(p),
         ).map((m) => ({
           medio: m.medio,
           monto: m.monto,
@@ -537,16 +554,20 @@ export class PedidosEstadoService {
             p.vouchers.find((v) => v.reemplazado_en == null && voucherCubreMedio(v.medio, m.medio))?.id?.toString() ?? null,
         })),
         creadoEn: p.creado_en,
-        lineas: p.lineas.map((l) => ({
+        lineas: lineasDeCuenta(p.lineas).map((l) => ({
           id: String(l.id),
           nombre: l.nombre,
           cantidad: l.cantidad,
           tamano: l.tamano || null,
           // Nombres de las opciones elegidas, como en las etiquetas de cocina
           opciones: l.opcionesElegidas.map((o) => o.opcion_nombre).filter(Boolean),
+          // Reparto por sabor («2 Fresa · 3 Oreo»): cada sabor con sus unidades
+          sabores: (l.sabores ?? []).map((sb) => ({ nombre: sb.sabor_nombre, cantidad: sb.cantidad })),
           nota: l.nota || null,
           precioUnit: Number(l.precio_unit),
           subtotal: l.subtotal != null ? Number(l.subtotal) : null,
+          // Solo en las cortesías: el resto de las líneas conserva su forma
+          ...(l.es_cortesia ? { esCortesia: true, valorLista: l.cortesia ? Number(l.cortesia.valor_lista) : null } : {}),
           // Cocina ya tiene todas las unidades de la línea listas (listas = cantidad)
           lista: l.listas >= l.cantidad,
         })),
@@ -585,6 +606,7 @@ export class PedidosEstadoService {
           lineas: {
             include: {
               opcionesElegidas: true,
+              sabores: true,
               area: true,
             },
           },
@@ -608,6 +630,7 @@ export class PedidosEstadoService {
           lineas: {
             include: {
               opcionesElegidas: true,
+              sabores: true,
               area: true,
             },
           },
@@ -641,7 +664,7 @@ export class PedidosEstadoService {
         nota: p.nota,
         creado_en: p.creado_en,
         listo_en: p.listo_en,
-        lineas: p.lineas,
+        lineas: lineasDeCuenta(p.lineas),
         minutosEspera,
         color,
         colorEspera,
@@ -740,6 +763,9 @@ export class PedidosEstadoService {
         lineas: {
           include: {
             opcionesElegidas: true,
+            // Cortesía: valor de lista (la línea sale a S/ 0)
+            cortesia: { select: { valor_lista: true } },
+            sabores: true,
             area: true,
           },
         },
@@ -807,10 +833,12 @@ export class PedidosEstadoService {
     const puntos = (await explicarPedidosPorId(this.prisma, [pedido.id]).catch(() => null))?.get(String(pedido.id)) ?? null;
 
     const cobroMozo = (await this.cobrosMozoDe([pedido])).get(String(pedido.id)) ?? null;
+    const ajusteUbicacionPendiente = (await ajustesPendientesUbicacion(this.prisma, [pedido.id])).get(String(pedido.id)) ?? null;
 
     const { incidentes, ...pedidoSinIncidentes } = pedido;
     return {
       ...pedidoSinIncidentes,
+      ajusteUbicacionPendiente,
       prueba_entrega: await construirPruebaEntrega(this.prisma, incidentes?.[0]),
       puntos,
       cobro_vigente_id: cobroVigenteId,

@@ -767,6 +767,22 @@
   color: var(--cp-navy);
 }
 
+/* Lo recomendado: texto de ayuda y botón para volver a esas reglas. */
+.mapa-recomendado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.mapa-recomendado-ayuda {
+  margin: 0;
+  max-width: 70ch;
+}
+
 .mapa-regla-unica,
 .mapa-duplicados {
   margin: 0;

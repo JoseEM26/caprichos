@@ -17,6 +17,10 @@ import { CocinaController } from './cocina.controller';
 import { ComandasService } from './comandas.service';
 import { AgotadosService } from './agotados.service';
 import { AltaDemandaService } from './alta-demanda.service';
+import { AjustesPersonalesCocinaService } from './ajustes-personales.service';
+import { MisAjustesCocinaDto } from './dto/mis-ajustes-cocina.dto';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
@@ -27,6 +31,7 @@ describe('CocinaController', () => {
   let comandasService: any;
   let agotadosService: any;
   let altaDemandaService: any;
+  let ajustesPersonales: any;
   let prismaMock: any;
 
   beforeEach(async () => {
@@ -50,12 +55,18 @@ describe('CocinaController', () => {
       configurar: jest.fn().mockResolvedValue({ ok: true }),
     };
 
+    ajustesPersonales = {
+      obtener: jest.fn().mockResolvedValue({ confirmarDespejar: true, confirmarDespejarGeneral: true, personalizado: false }),
+      guardar: jest.fn().mockResolvedValue({ confirmarDespejar: false, confirmarDespejarGeneral: true, personalizado: true }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CocinaController],
       providers: [
         { provide: ComandasService, useValue: comandasService },
         { provide: AgotadosService, useValue: agotadosService },
         { provide: AltaDemandaService, useValue: altaDemandaService },
+        { provide: AjustesPersonalesCocinaService, useValue: ajustesPersonales },
         { provide: PrismaService, useValue: prismaMock },
         { provide: RedisService, useValue: {} },
       ],
@@ -173,6 +184,35 @@ describe('CocinaController', () => {
     it('un ADMIN no tiene restricción de área aunque tenga áreas guardadas', async () => {
       expect(await controller.listarAreas({ usuario: { partyId: 9n, rol: 'ADMIN' } })).toEqual(areasApi);
       expect(prismaMock.userAccount.findUnique).not.toHaveBeenCalled();
+    });
+  });
+  describe('ajustes personales de cocina', () => {
+    const cocinero = { usuario: { partyId: 7n, rol: 'COCINA', roles: ['COCINA'] } };
+
+    it('GET ajustes devuelve el efectivo para el party del token', async () => {
+      await expect(controller.obtenerAjustes(cocinero)).resolves.toMatchObject({ confirmarDespejar: true });
+      expect(ajustesPersonales.obtener).toHaveBeenCalledWith(7n);
+    });
+
+    it('PUT mis-ajustes usa el usuario del token y pasa el valor del cuerpo', async () => {
+      await controller.guardarMisAjustes({ confirmarDespejar: false }, cocinero);
+      expect(ajustesPersonales.guardar).toHaveBeenCalledWith(cocinero.usuario, false, undefined);
+    });
+
+    it('PUT mis-ajustes acepta null (quitar la preferencia)', async () => {
+      await controller.guardarMisAjustes({ confirmarDespejar: null }, cocinero);
+      expect(ajustesPersonales.guardar).toHaveBeenCalledWith(cocinero.usuario, null, undefined);
+    });
+
+    it('el cuerpo valida tipos: solo true, false o null', async () => {
+      const valida = async (body: unknown) =>
+        (await validate(plainToInstance(MisAjustesCocinaDto, body))).length === 0;
+      expect(await valida({ confirmarDespejar: true })).toBe(true);
+      expect(await valida({ confirmarDespejar: false })).toBe(true);
+      expect(await valida({ confirmarDespejar: null })).toBe(true);
+      expect(await valida({ confirmarDespejar: 'no' })).toBe(false);
+      expect(await valida({ confirmarDespejar: 1 })).toBe(false);
+      expect(await valida({})).toBe(false);
     });
   });
 });

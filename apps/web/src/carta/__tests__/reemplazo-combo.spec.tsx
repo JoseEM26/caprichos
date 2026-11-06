@@ -7,7 +7,7 @@ import { ProductoCarta } from '../tipos';
 
 const agregarLinea = vi.fn();
 vi.mock('../CarritoContext', () => ({
-  useCarrito: () => ({ abrirModalProducto: vi.fn(), agregarLinea, cantidadTotal: 0, subtotal: 0 }),
+  useCarrito: () => ({ abrirModalProducto: vi.fn(), agregarLinea, cantidadTotal: 0, subtotal: 0, lineas: [], inventario: {} }),
 }));
 
 const producto: ProductoCarta = {
@@ -15,7 +15,8 @@ const producto: ProductoCarta = {
   tamanos: [], grupos: [], sabores: [], noSumaBeneficios: false, disponible: true, agotadoHasta: null,
 };
 
-const combo = (disponible: boolean, opcionesDisponibles: string[]): OfertaItem =>
+/** Combo con el principal «Club Sandwich» (FIJO). Las alternativas llevan su disponibilidad (stock) ahora. */
+const combo = (disponible: boolean, opcionesDisponibles: string[], alternativasActivas = false, extra: Record<string, unknown> = {}): OfertaItem =>
   ({
     id: '1', tipo: 'COMBO', nombre: 'Combo Dúo Irresistible', descripcion: null, lleva: null, paga: null,
     alcanceCategoriaId: null, alcanceProductoId: '10', descuentoTipo: null, descuentoValor: null, compraMinima: null,
@@ -25,13 +26,17 @@ const combo = (disponible: boolean, opcionesDisponibles: string[]): OfertaItem =
     combosParte: [
       {
         id: '100', tipo: 'FIJO', cantidad: 1, categorias: [], productos: ['5'], principalNombre: 'Club Sandwich',
-        reemplazos: ['7', '8'], reemplazosDetalle: [{ id: '7', nombre: 'Empanada' }, { id: '8', nombre: 'Croissant' }],
-        disponible, opcionesDisponibles,
+        alternativas: [
+          { id: '7', nombre: 'Empanada', cantidad: 1, disponible: opcionesDisponibles.includes('7') },
+          { id: '8', nombre: 'Croissant', cantidad: 2, disponible: opcionesDisponibles.includes('8') },
+        ],
+        alternativasActivas,
+        disponible, opcionesDisponibles, ...extra,
       },
     ],
   }) as OfertaItem;
 
-describe('Combo con plan B en la carta', () => {
+describe('Combo con alternativas en la carta (si no hay stock, elige)', () => {
   it('principal disponible: no hay aviso y se puede agregar', () => {
     render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['5'])} />);
     expect(screen.queryByTestId('aviso-reemplazo-combo')).toBeNull();
@@ -41,10 +46,10 @@ describe('Combo con plan B en la carta', () => {
     expect(agregarLinea.mock.calls[0][0].comboElecciones).toEqual([{ parteId: '100', productoId: '5' }]);
   });
 
-  it('principal agotado: avisa y obliga a elegir uno de los reemplazos disponibles', () => {
+  it('principal agotado: avisa, muestra todas las alternativas y exige elegir una', () => {
     agregarLinea.mockClear();
-    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['7', '8'])} />);
-    expect(screen.getByText('Club Sandwich no está disponible ahora; elige uno de estos:')).toBeInTheDocument();
+    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['7', '8'], true)} />);
+    expect(screen.getByText('Sin stock de Club Sandwich: elige una alternativa (mismo precio)')).toBeInTheDocument();
     const agregar = screen.getByRole('button', { name: /Elige las opciones obligatorias/i });
     expect(agregar).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Empanada' }));
@@ -54,10 +59,48 @@ describe('Combo con plan B en la carta', () => {
     expect(agregarLinea.mock.calls[0][0].comboElecciones).toEqual([{ parteId: '100', productoId: '7' }]);
   });
 
-  it('si solo queda un reemplazo viene preseleccionado', () => {
-    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['8'])} />);
-    expect(screen.getByRole('button', { name: 'Croissant' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /Agregar al pedido/i })).toBeEnabled();
+  it('una alternativa con cantidad 2 se completa sola: 2 unidades, mismo precio', () => {
+    agregarLinea.mockClear();
+    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['7', '8'], true)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Croissant × 2' }));
+    fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/i }));
+    expect(agregarLinea.mock.calls[0][0].comboElecciones).toEqual([
+      { parteId: '100', productoId: '8' },
+      { parteId: '100', productoId: '8' },
+    ]);
+    expect(agregarLinea.mock.calls[0][0].precioUnitario).toBe(30);
+  });
+
+  it('alternativa por sabor: no se completa sola; el cliente elige el sabor y viaja con él', () => {
+    agregarLinea.mockClear();
+    const oferta = combo(true, [], true);
+    const parte = oferta.combosParte![0];
+    parte.alternativas = [
+      { id: '9', nombre: 'QUEQUE', cantidad: 1, disponible: true, sabores: [{ id: '601', nombre: 'Marmoleado', disponible: true, saldo: 4 }] },
+    ];
+    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={oferta} />);
+    expect(screen.getByRole('button', { name: /Elige las opciones obligatorias/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'QUEQUE' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar QUEQUE · Marmoleado' }));
+    fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/i }));
+    expect(agregarLinea.mock.calls[0][0].comboElecciones).toEqual([{ parteId: '100', productoId: '9', saborId: '601' }]);
+  });
+
+  it('las alternativas agotadas salen bloqueadas con «No hay stock»', () => {
+    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['7'], true)} />);
+    expect(screen.getByRole('button', { name: 'Croissant × 2 · No hay stock' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Empanada' })).toBeEnabled();
+  });
+
+  it('sin alternativa activa (el principal alcanza) no hay bloque y no se preselecciona nada', () => {
+    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['5', '7'], false)} />);
+    expect(screen.queryByTestId('aviso-reemplazo-combo')).toBeNull();
+  });
+
+  it('con alternativa activa, el cliente escoge; no viene preseleccionada aunque solo quede una', () => {
+    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['7'], true)} />);
+    expect(screen.getByRole('button', { name: 'Empanada' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /Elige las opciones obligatorias/i })).toBeDisabled();
   });
 
   it('combo agotado: la tarjeta dice Agotado y no tiene botón de agregar', () => {

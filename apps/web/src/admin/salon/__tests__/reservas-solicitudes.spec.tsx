@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { ReservasView } from '../ReservasView';
 import { salonApi } from '../api';
 import * as sesionModulo from '../../../comun/sesion';
@@ -25,9 +25,12 @@ vi.mock('../api', () => ({
     actualizarReserva: vi.fn(),
     cancelarReserva: vi.fn(),
     sentarReserva: vi.fn(),
+    reactivarReserva: vi.fn(),
+    avisosMesas: vi.fn().mockResolvedValue([]),
     obtenerCarta: vi.fn(),
     listarSolicitudes: vi.fn(),
     aprobarSolicitud: vi.fn(),
+    mesasOcupadas: vi.fn().mockResolvedValue([]),
     rechazarSolicitud: vi.fn(),
   },
 }));
@@ -164,6 +167,7 @@ describe('Gestión de Solicitudes de Reserva por WhatsApp (Admin Salon)', () => 
       expect(salonApi.aprobarSolicitud).toHaveBeenCalledWith('15', {
         mesas: ['2'],
         hora: '2099-12-20T19:30:00-05:00',
+        confirmarCapacidad: false,
       });
     });
   });
@@ -299,7 +303,9 @@ describe('Gestión de Solicitudes de Reserva por WhatsApp (Admin Salon)', () => 
       const btnElegir = screen.getByRole('button', { name: 'Elige una mesa' });
       expect(btnElegir).toBeDisabled();
 
-      fireEvent.click(screen.getByRole('button', { name: /Mesa 1/ }));
+      // El croquis elige la mesa 1 tocándola (dentro del diálogo: el número 1 aparece también en el calendario)
+      const dialogo = screen.getByRole('dialog', { name: /¿Aprobar la reserva de Tomás Ríos\?/i });
+      fireEvent.click(within(dialogo).getByText('1'));
       const btnSi = screen.getByRole('button', { name: 'Sí, aprobar' });
       expect(btnSi).toBeEnabled();
       fireEvent.click(btnSi);
@@ -308,6 +314,7 @@ describe('Gestión de Solicitudes de Reserva por WhatsApp (Admin Salon)', () => 
         expect(salonApi.aprobarSolicitud).toHaveBeenCalledWith('41', {
           mesas: ['1'],
           hora: '2099-12-20T20:00:00-05:00',
+          confirmarCapacidad: false,
         });
       });
     });
@@ -324,9 +331,9 @@ describe('Gestión de Solicitudes de Reserva por WhatsApp (Admin Salon)', () => 
 
       fireEvent.click(screen.getByRole('button', { name: /Aprobar y guardar la mesa/i }));
 
-      expect(screen.getByRole('status')).toHaveTextContent(
-        'La hora solicitada ya pasó. Elige una hora nueva para aprobar o rechaza la solicitud.',
-      );
+      expect(
+        screen.getByText('La hora solicitada ya pasó. Elige una hora nueva para aprobar o rechaza la solicitud.'),
+      ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Elige una hora futura' })).toBeDisabled();
 
       fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2099-12-21' } });
@@ -340,6 +347,7 @@ describe('Gestión de Solicitudes de Reserva por WhatsApp (Admin Salon)', () => 
         expect(salonApi.aprobarSolicitud).toHaveBeenCalledWith('42', {
           mesas: ['2'],
           hora: '2099-12-21T18:30:00-05:00',
+          confirmarCapacidad: false,
         });
       });
     });

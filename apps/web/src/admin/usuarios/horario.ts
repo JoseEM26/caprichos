@@ -15,6 +15,9 @@ export interface DiaEstado {
   trabaja: boolean;
   entrada: string;
   salida: string;
+  /** Almuerzo programado; '' = sin almuerzo */
+  almuerzoInicio?: string;
+  almuerzoFin?: string;
 }
 export type HorarioEstado = Record<number, DiaEstado>;
 /** día -> partyId del reemplazo ('' = sin reemplazo) */
@@ -28,7 +31,16 @@ export function horarioVacio(): HorarioEstado {
 
 export function horarioDesdeServidor(horarios: HorarioDiaApi[]): HorarioEstado {
   const h = horarioVacio();
-  horarios.forEach((x) => (h[x.dia] = { trabaja: true, entrada: x.entrada, salida: x.salida }));
+  horarios.forEach(
+    (x) =>
+      (h[x.dia] = {
+        trabaja: true,
+        entrada: x.entrada,
+        salida: x.salida,
+        almuerzoInicio: x.almuerzoInicio ?? '',
+        almuerzoFin: x.almuerzoFin ?? '',
+      }),
+  );
   return h;
 }
 
@@ -69,6 +81,9 @@ export function validarHorario(h: HorarioEstado): string | null {
     const e = h[d.dia];
     if (e.trabaja && (!e.entrada || !e.salida)) return `Completa la entrada y la salida del ${d.nombre.toLowerCase()}.`;
     if (e.trabaja && e.entrada === e.salida) return `El ${d.nombre.toLowerCase()} tiene la misma hora de entrada y de salida.`;
+    if (e.trabaja && Boolean(e.almuerzoInicio) !== Boolean(e.almuerzoFin)) {
+      return `Completa el inicio y el fin del almuerzo del ${d.nombre.toLowerCase()} (o quita los dos).`;
+    }
   }
   return null;
 }
@@ -78,6 +93,9 @@ export function horariosParaEnviar(h: HorarioEstado): HorarioDiaApi[] {
     dia: d.dia,
     entrada: h[d.dia].entrada,
     salida: h[d.dia].salida,
+    ...(h[d.dia].almuerzoInicio && h[d.dia].almuerzoFin
+      ? { almuerzoInicio: h[d.dia].almuerzoInicio, almuerzoFin: h[d.dia].almuerzoFin }
+      : {}),
   }));
 }
 

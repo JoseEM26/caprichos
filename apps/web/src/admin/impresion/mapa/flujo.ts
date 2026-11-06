@@ -11,7 +11,7 @@ export type ClavePieza = 'BEBIDA' | 'RESUMEN' | 'AREA' | 'COMANDA' | 'COMANDA_AR
 export const PIEZAS: Record<ClavePieza, { titulo: string; que: string; paraQue: string }> = {
   BEBIDA: { titulo: 'Sticker de bebida', que: 'Sale uno por cada bebida', paraQue: 'Un vaso marcado para cada bebida, para no confundirlas en la barra.' },
   RESUMEN: { titulo: 'Sticker de resumen', que: 'Sale uno con el total del pedido', paraQue: 'Muestra el monto y la modalidad para cobrar y entregar.' },
-  AREA: { titulo: 'Sticker por área', que: 'Sale uno por cada área del pedido', paraQue: 'Para que cada área (salados, postres…) sepa qué le toca preparar.' },
+  AREA: { titulo: 'Sticker por área', que: 'Un sticker por cada área con productos, salvo Bebidas (que ya tiene uno por cada vaso)', paraQue: 'Para que cada área (salados, postres…) sepa qué le toca preparar.' },
   COMANDA: { titulo: 'Comanda de salón', que: 'Hoja con cada línea para la cocina', paraQue: 'Lo que la cocina y el mozo leen en mesa o local.' },
   COMANDA_AREA: { titulo: 'Comanda por área', que: 'Una hoja por área para su cocina', paraQue: 'Cada cocina recibe solo las líneas de su área, en su ticketera (o en la de Caja si no tiene).' },
   PAGO: { titulo: 'Ticket de pago', que: 'Lo que se entrega al cobrar', paraQue: 'El comprobante de la venta. Siempre sale en Caja.' },
@@ -216,7 +216,7 @@ export function derivarFlujo(mapa: MapaImpresionDatos, esc: Escenario): PiezaFlu
     ...PIEZAS.AREA,
     reglaActiva: r.areaActivo,
     sale: r.areaActivo,
-    motivo: r.areaActivo ? 'Un sticker por cada área del pedido' : 'Apagado: actívalo cuando lo confirmes',
+    motivo: r.areaActivo ? 'Un sticker por cada área con productos, salvo Bebidas' : 'Apagado: actívalo cuando lo confirmes',
     salidas: salidas('ETIQUETA_AREA', 'ETIQUETERA'),
   };
 

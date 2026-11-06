@@ -3503,7 +3503,6 @@ const comboBuild = (def, base) => Object.assign(mk('combos', def.n, def.desc || 
 COMBO_BUILD = (def, base) => comboBuild(def, base);
 const P = [
   mk('combos', 'COMBO CAJITA CAPRIKIDS', 'Frappé Oreo 12 oz + nuggets artesanales + papas nativas mini con salchichas ahumadas + 2 juguetes a elección. Para niño o niña. Válido para salón y delivery', 'caprikids', [ { n: 'Cajita', p: 27 } ], [ { id: 'jug', name: 'Juguetes (elige 2)', type: 'many', min: 2, max: 2, opts: [ { id: 'j1', n: 'Pistola de burbujas', p: 0 }, { id: 'j2', n: 'Burbujas', p: 0 }, { id: 'j3', n: 'Squishy', p: 0 } ] } ], 'Presentación'),
-  mk('combos', '1/2 DOCENA DONUTS O GALLETAS', 'Producto elaborado del día, muy fresco. Escoge tus sabores favoritos y escríbelos en la nota', 'docena', [ { n: '1/2 docena', p: 21 } ], [], 'Presentación'),
   mk('frappes', 'FRAPPE OREO', 'La bebida más vendida de toda la carta: la cantidad ideal de galletas Oreo, el dulzor exacto que no empalaga y una dosis sutil de espresso, con leche cremosa, chantilly, galletas Oreo y Oreo triturado', 'oreo', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR, SHOTS, TOPPINGS ]),
   mk('frappes', 'FRAPPE CHOCO LÚCUMA', 'El oro de los incas: lúcuma peruana con cacao 100 % puro. Decorado con chantilly, syrop de cacao y chispas de chocolate', 'chocolucuma', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR, SHOTS, TOPPINGS ]),
   mk('frappes', 'FRAPPE CAFÉ', 'Clásico: espresso doble recién extraído, leche con un toque sutil de canela, chantilly y chispas de chocolate', 'cafe', T3(14.5, 16.5, 17.5), [ LECHE, DULZOR, SHOTS, TOPPINGS ]),

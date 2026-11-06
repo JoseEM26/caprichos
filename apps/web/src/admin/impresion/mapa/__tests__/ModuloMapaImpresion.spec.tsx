@@ -374,4 +374,34 @@ describe('Mapa de impresión: leyenda, detalle y presión larga', () => {
     montar({ editar: true });
     expect(await screen.findByText('Un solo equipo por área y tipo de máquina, y uno en Caja.')).toBeInTheDocument();
   });
+
+  it('«Restablecer a lo recomendado» pide confirmación, llama al endpoint, vuelve a leer y avisa', async () => {
+    const obtener = vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    const restablecer = vi.spyOn(impresionApi, 'restablecerReglasImpresion').mockResolvedValue({ ok: true, reglas: mapa().reglas });
+    montar({ editar: true });
+    fireEvent.click(await screen.findByRole('button', { name: 'Restablecer a lo recomendado' }));
+    expect(await screen.findByText(/No cambia a qué área atiende cada equipo\./)).toBeInTheDocument();
+    expect(restablecer).not.toHaveBeenCalled();
+    const llamadasAntes = obtener.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, restablecer' }));
+    await waitFor(() => expect(restablecer).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('status')).toHaveTextContent('Reglas restablecidas');
+    await waitFor(() => expect(obtener.mock.calls.length).toBeGreaterThan(llamadasAntes));
+  });
+
+  it('cancelar la confirmación de restablecer no llama al servidor', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    const restablecer = vi.spyOn(impresionApi, 'restablecerReglasImpresion').mockResolvedValue({ ok: true, reglas: mapa().reglas });
+    montar({ editar: true });
+    fireEvent.click(await screen.findByRole('button', { name: 'Restablecer a lo recomendado' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'No, cancelar' }));
+    expect(restablecer).not.toHaveBeenCalled();
+  });
+
+  it('sin permiso de editar no hay botón de restablecer, pero sí el texto de lo recomendado', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    montar({ editar: false });
+    expect(await screen.findByText(/Lo recomendado:/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Restablecer a lo recomendado' })).not.toBeInTheDocument();
+  });
 });

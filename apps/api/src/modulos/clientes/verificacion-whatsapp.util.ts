@@ -85,16 +85,26 @@ export async function modoVerificacion(prisma: PrismaService): Promise<ModoVerif
     : MODO_WHATSAPP_ENTRANTE;
 }
 
+/** Variable de entorno opcional del número que recibe la verificación (la define el despliegue de la demo). */
+export const VARIABLE_NUMERO_VERIFICACION = 'VERIFICACION_WHATSAPP_NUMERO';
+
 /**
- * Número al que el cliente escribe, con código de país (p. ej. 51914244077). Usa el parámetro propio si está
- * bien escrito; si no, el WhatsApp de contacto del local (Configuración › Mi local › Contacto). Null si no hay ninguno.
+ * Número al que el cliente escribe, con código de país (p. ej. 51914244077). Orden:
+ *  1. parámetro `verificacion_whatsapp_numero` si está bien escrito;
+ *  2. variable de entorno VERIFICACION_WHATSAPP_NUMERO (la demo apunta aquí a su número de prueba de Meta);
+ *  3. WhatsApp de contacto del local (Configuración › Mi local › Contacto).
+ * Null si no hay ninguno válido.
  */
-export async function numeroVerificacion(prisma: PrismaService): Promise<string | null> {
-  const propio = normalizarCelularPeru(String((await leerParametro(prisma, CLAVE_NUMERO_VERIFICACION)) ?? ''));
-  const local = propio.valido
-    ? propio
-    : normalizarCelularPeru(String(((await leerParametro(prisma, 'local_datos')) as { whatsapp?: unknown } | null)?.whatsapp ?? ''));
-  return local.valido && local.celular9 ? `51${local.celular9}` : null;
+export async function numeroVerificacion(prisma: PrismaService, env: NodeJS.ProcessEnv = process.env): Promise<string | null> {
+  const aNumero = (bruto: unknown): string | null => {
+    const n = normalizarCelularPeru(String(bruto ?? ''));
+    return n.valido && n.celular9 ? `51${n.celular9}` : null;
+  };
+  const propio = aNumero(await leerParametro(prisma, CLAVE_NUMERO_VERIFICACION));
+  if (propio) return propio;
+  const deEntorno = aNumero(env[VARIABLE_NUMERO_VERIFICACION]);
+  if (deEntorno) return deEntorno;
+  return aNumero(((await leerParametro(prisma, 'local_datos')) as { whatsapp?: unknown } | null)?.whatsapp);
 }
 
 export function generarToken(): string {
@@ -144,7 +154,8 @@ export async function estadoVerificacion(redis: RedisVerificacion, secreto: stri
 }
 
 /** Busca «Mi código: TOKEN» en el mensaje (8 caracteres alfanuméricos). */
-const REGEX_TOKEN_MENSAJE = /mi c[oó]digo:?\s*([A-Za-z0-9]{8})(?![A-Za-z0-9])/i;
+// Tolera espacio antes de los dos puntos ("código :") y la falta de dos puntos.
+const REGEX_TOKEN_MENSAJE = /mi c[oó]digo\s*:?\s*([A-Za-z0-9]{8})(?![A-Za-z0-9])/i;
 
 /**
  * Atiende un mensaje entrante de texto. Devuelve la frase a responder, o null si el texto no trae un token
@@ -156,7 +167,8 @@ export async function atenderMensajeVerificacion(
   texto: string,
   remitenteRaw: string,
 ): Promise<string | null> {
-  const m = REGEX_TOKEN_MENSAJE.exec(texto || '');
+  // NFC: una «ó» escrita como o + tilde combinada también cuenta
+  const m = REGEX_TOKEN_MENSAJE.exec(String(texto || '').normalize('NFC'));
   if (!m) return null;
   const token = m[1].toUpperCase();
   const clave = claveToken(token, secreto);

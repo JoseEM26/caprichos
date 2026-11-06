@@ -68,6 +68,9 @@ export interface MesaSalon {
     total?: number;
     /** Hora en que se tomó el pedido (ISO) */
     creadoEn?: string;
+    /** Mesa principal del pedido (la que lleva su nombre) y su orden entre las mesas juntas */
+    esPrincipal?: boolean;
+    orden?: number;
     /** Cocina y entrega en vivo (misma función que «Mis pedidos») */
     progreso?: ProgresoPedido;
     lineas?: Array<{ cantidad: number; nombre: string; detalle: string; opciones?: string[] }>;
@@ -219,9 +222,13 @@ export interface MiPedido {
   estado: string;
   modalidad: string;
   mesaNombre: string | null;
+  /** Último cambio de ubicación (ISO): insignia «Dirección editada»; null si la dirección es la original */
+  ubicacionEditadaEn?: string | null;
   /** Nombre del cliente (o la mesa si no hay nombre). Nunca teléfono ni DNI. */
   clienteNombre?: string | null;
   total: number;
+  /** Propina del pedido (aparte de la venta; 0 = sin propina) */
+  propina?: number;
   pagoEstado: string | null;
   /** YAPE | PLIN | TRANSFERENCIA | EFECTIVO | … (null si no se eligió) */
   pagoMetodo: string | null;

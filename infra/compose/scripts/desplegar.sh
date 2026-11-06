@@ -142,7 +142,22 @@ compose up -d postgres redis
 # se ejecuta. Solo se permiten operaciones aditivas (nuevas tablas, columnas opcionales/con default).
 echo "==> [3/5] Aplicando migraciones de base de datos (prisma migrate deploy)..."
 export TAG="$TAG"
-if ! compose run --rm api prisma migrate deploy --schema=prisma/schema.prisma; then
+SALIDA_MIGRACION="$(mktemp)"
+migrar() { compose run --rm api prisma migrate deploy --schema=prisma/schema.prisma 2>&1 | tee "$SALIDA_MIGRACION"; return "${PIPESTATUS[0]}"; }
+MIGRADO=0
+if migrar; then
+  MIGRADO=1
+else
+  # Solo en demo: una migración que falló (P3009/P3018) queda marcada como fallida y bloquea las siguientes.
+  # Las migraciones corren en una sola transacción, así que no dejó cambios: se marca revertida y se reintenta una vez.
+  FALLIDA="$(grep -oE '[0-9]{14}_[a-z0-9_]+' "$SALIDA_MIGRACION" | head -1 || true)"
+  if [[ "$AMBIENTE" == "demo" && -n "$FALLIDA" ]] && grep -qE 'P3009|P3018' "$SALIDA_MIGRACION"; then
+    echo "==> [demo] Marcando la migración fallida '${FALLIDA}' como revertida y reintentando una vez..."
+    compose run --rm api prisma migrate resolve --rolled-back "$FALLIDA" --schema=prisma/schema.prisma || true
+    if migrar; then MIGRADO=1; fi
+  fi
+fi
+if [[ "$MIGRADO" != "1" ]]; then
   echo ""
   echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
   echo "ERROR CRÍTICO: Fallaron las migraciones de base de datos con la nueva versión."

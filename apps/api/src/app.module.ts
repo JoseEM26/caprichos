@@ -15,8 +15,11 @@ import { ArchivosModule } from './modulos/archivos/archivos.module';
 import { ZonasModule } from './modulos/zonas/zonas.module';
 import { PedidosModule } from './modulos/pedidos/pedidos.module';
 import { PedidosAdminModule } from './modulos/pedidos-admin/pedidos-admin.module';
+import { CortesiasModule } from './modulos/cortesias/cortesias.module';
 import { CajaModule } from './modulos/caja/caja.module';
 import { CierreModule } from './modulos/cierre/cierre.module';
+import { PropinasModule } from './modulos/propinas/propinas.module';
+import { PropinasRepartoModule } from './modulos/propinas/propinas-reparto.module';
 import { RepartosModule } from './modulos/repartos/repartos.module';
 import { CocinaModule } from './modulos/cocina/cocina.module';
 import { PlanoModule } from './modulos/plano/plano.module';
@@ -38,6 +41,7 @@ import { CreditosModule } from './modulos/creditos/creditos.module';
 import { IniciativasModule } from './modulos/iniciativas/iniciativas.module';
 import { MensajesModule } from './modulos/mensajes/mensajes.module';
 import { PantallasModule } from './modulos/pantallas/pantallas.module';
+import { AsistenciaModule } from './modulos/asistencia/asistencia.module';
 import { ContenidoModule } from './modulos/contenido/contenido.module';
 import { SupervisorCodigoModule } from './modulos/supervisor-codigo/supervisor-codigo.module';
 import { ChatbotModule } from './modulos/chatbot/chatbot.module';
@@ -67,8 +71,11 @@ import { ResenasModule } from './modulos/resenas/resenas.module';
     ZonasModule,
     PedidosModule,
     PedidosAdminModule,
+    CortesiasModule,
     CajaModule,
     CierreModule,
+    PropinasModule,
+    PropinasRepartoModule,
     RepartosModule,
     CocinaModule,
     PlanoModule,
@@ -86,6 +93,7 @@ import { ResenasModule } from './modulos/resenas/resenas.module';
     StockModule,
     MensajesModule,
     PantallasModule,
+    AsistenciaModule,
     IniciativasModule,
     CreditosModule,
     ComprasModule,

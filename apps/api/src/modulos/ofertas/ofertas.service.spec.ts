@@ -178,10 +178,10 @@ describe('OfertasService', () => {
         canales: ['CARTA'], limite_usos: null, usos_actuales: 0, no_suma_beneficios: false, orden: 1,
         activo: true, creado_en: new Date(), combosPrecio: [],
       };
-      const crear = (reemplazos: (string | number)[]) =>
+      const crear = (ids: (string | number)[]) =>
         service.crearOferta({
           tipo: 'COMBO', nombre: 'Dúo', tamanos: [{ tamanoValorId: '10', precio: 25 }],
-          partes: [{ tipo: 'FIJO', cantidad: 1, productos: ['5'], reemplazos }],
+          partes: [{ tipo: 'FIJO', cantidad: 1, productos: ['5'], alternativas: ids.map((productoId) => ({ productoId })) }],
         });
 
       beforeEach(() => {
@@ -201,16 +201,41 @@ describe('OfertasService', () => {
         const res = await crear(['8', 7]);
         expect(prismaMock.comboParteReemplazo.createMany).toHaveBeenCalledWith({
           data: [
-            { combo_parte_id: 100n, producto_id: 8n, orden: 0 },
-            { combo_parte_id: 100n, producto_id: 7n, orden: 1 },
+            { combo_parte_id: 100n, producto_id: 8n, orden: 0, cantidad: 1 },
+            { combo_parte_id: 100n, producto_id: 7n, orden: 1, cantidad: 1 },
           ],
         });
-        expect(res.combosParte![0].reemplazos).toEqual(['8', '7']);
+        expect(res.combosParte![0].alternativas!.map((a) => a.id)).toEqual(['8', '7']);
       });
 
       it('rechaza repetidos y el producto principal como reemplazo', async () => {
         await expect(crear(['8', '8'])).rejects.toThrow(BadRequestException);
         await expect(crear(['5'])).rejects.toThrow(BadRequestException);
+      });
+
+      it('guarda la cantidad de cada alternativa (2 galletas, 1 carrot cake)', async () => {
+        prismaMock.producto.findMany.mockResolvedValueOnce([{ id: 7n }, { id: 8n }]);
+        prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
+        prismaMock.oferta.findUnique.mockResolvedValue({ ...comboBase, combosParte: [] });
+        await service.crearOferta({
+          tipo: 'COMBO', nombre: 'Dúo', tamanos: [{ tamanoValorId: '10', precio: 25 }],
+          partes: [{ tipo: 'A_ELECCION', cantidad: 2, categorias: ['3'], productos: [], alternativas: [
+            { productoId: '7', cantidad: 2 }, { productoId: '8' },
+          ] }],
+        });
+        expect(prismaMock.comboParteReemplazo.createMany).toHaveBeenCalledWith({
+          data: [
+            { combo_parte_id: 100n, producto_id: 7n, orden: 0, cantidad: 2 },
+            { combo_parte_id: 100n, producto_id: 8n, orden: 1, cantidad: 1 },
+          ],
+        });
+      });
+
+      it('rechaza una cantidad de alternativa menor a 1', async () => {
+        await expect(service.crearOferta({
+          tipo: 'COMBO', nombre: 'Dúo', tamanos: [{ tamanoValorId: '10', precio: 25 }],
+          partes: [{ tipo: 'A_ELECCION', cantidad: 2, categorias: ['3'], productos: [], alternativas: [{ productoId: '7', cantidad: 0 }] }],
+        })).rejects.toMatchObject({ response: { codigo: 'COMBO_REEMPLAZO_INVALIDO' } });
       });
     });
 
@@ -256,6 +281,76 @@ describe('OfertasService', () => {
       it('rechaza un producto que no es reemplazo de la parte', async () => {
         comboConParte(true);
         await expect(service.validarEleccionesCombo(1, [{ parteId: '100', productoId: '99' }])).rejects.toThrow(ConflictException);
+      });
+    });
+
+    describe('resolverPartesCombo: elecciones A_ELECCION con lista de productos (juguetes)', () => {
+      const cajita = (agotadoBurbujas: boolean) => {
+        const ahora = Date.now();
+        prismaMock.oferta.findUnique.mockResolvedValue({
+          id: 9n, tipo: 'COMBO', nombre: 'COMBO CAJITA CAPRIKIDS', dias: [], canales: [], creado_en: new Date(),
+          combosPrecio: [],
+          combosParte: [{ id: 200n, tipo: 'A_ELECCION', cantidad: 2, categorias: [], productos: [30n, 31n, 32n], reemplazos: [] }],
+        });
+        const juguete = (id: bigint, nombre: string, agotado: Date | null = null) => ({
+          id, nombre, categoria_id: 8n, oculto: false, agotado_hasta: agotado,
+          categoria: { nombre: 'JUGUETES', area_id: 4n, area: { nombre: 'Salados' } },
+        });
+        prismaMock.producto.findMany.mockResolvedValue([
+          juguete(30n, 'Pistola de burbujas'),
+          juguete(31n, 'Burbujas'),
+          juguete(32n, 'Squishy', agotadoBurbujas ? new Date(ahora + 3600000) : null),
+        ]);
+      };
+
+      it('dos juguetes distintos: una línea hija por juguete, en el área de su categoría, sin cobro', async () => {
+        cajita(false);
+        const res = await service.resolverPartesCombo(9, [{ parteId: '200', productoId: '30' }, { parteId: '200', productoId: '31' }]);
+        expect(res.partes).toEqual([
+          expect.objectContaining({ parteId: 200n, tipo: 'A_ELECCION', productoId: 30n, nombre: 'Pistola de burbujas', cantidad: 1, areaId: 4n, areaNombre: 'Salados' }),
+          expect.objectContaining({ parteId: 200n, tipo: 'A_ELECCION', productoId: 31n, nombre: 'Burbujas', cantidad: 1, areaId: 4n }),
+        ]);
+        expect(res.partes[0].nota).toBe('Combo: COMBO CAJITA CAPRIKIDS');
+      });
+
+      it('el mismo juguete repetido suma unidades en una sola línea hija', async () => {
+        cajita(false);
+        const res = await service.resolverPartesCombo(9, [{ parteId: '200', productoId: '32' }, { parteId: '200', productoId: '32' }]);
+        expect(res.partes).toEqual([expect.objectContaining({ productoId: 32n, cantidad: 2 })]);
+      });
+
+      it('con unidades del combo, exige cantidad × elecciones por parte (2 cajitas = 4 juguetes)', async () => {
+        cajita(false);
+        const dos = [{ parteId: '200', productoId: '30' }, { parteId: '200', productoId: '31' }];
+        await expect(service.resolverPartesCombo(9, dos, 2)).rejects.toMatchObject({
+          response: { codigo: 'COMBO_ELECCION_INCOMPLETA' },
+          status: 400,
+        });
+        const cuatro = [...dos, { parteId: '200', productoId: '30' }, { parteId: '200', productoId: '31' }];
+        const res = await service.resolverPartesCombo(9, cuatro, 2);
+        expect(res.partes.map((p) => p.cantidad)).toEqual([2, 2]);
+      });
+
+      it('sin elegir juguetes rechaza con 400 COMBO_ELECCION_INCOMPLETA (la parte tiene lista)', async () => {
+        cajita(false);
+        await expect(service.resolverPartesCombo(9, [])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_ELECCION_INCOMPLETA' },
+        });
+      });
+
+      it('un juguete agotado no se puede elegir: 409 COMBO_PARTE_NO_DISPONIBLE', async () => {
+        cajita(true);
+        await expect(service.resolverPartesCombo(9, [{ parteId: '200', productoId: '32' }, { parteId: '200', productoId: '31' }])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_PARTE_NO_DISPONIBLE' },
+          status: 409,
+        });
+      });
+
+      it('un producto fuera de la lista de la parte rechaza con 400 COMBO_PARTE_NO_PERMITIDA', async () => {
+        cajita(false);
+        await expect(service.resolverPartesCombo(9, [{ parteId: '200', productoId: '99' }, { parteId: '200', productoId: '31' }])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_PARTE_NO_PERMITIDA' },
+        });
       });
     });
 
@@ -406,6 +501,246 @@ describe('OfertasService', () => {
       });
       const errors3 = await validate(dto3);
       expect(errors3.some((e) => e.property === 'compraMinima')).toBe(true);
+    });
+  });
+
+  describe('resolverPartesCombo: alternativas de la parte (si no hay stock, elige)', () => {
+    const alt = (productoId: bigint, nombre: string, cantidad: number) => ({ producto_id: productoId, cantidad, producto: { nombre } });
+    const cat = { nombre: 'DONAS', area_id: 2n, area: { nombre: 'Dulces' } };
+    const catGalletas = { nombre: 'GALLETAS', area_id: 2n, area: { nombre: 'Dulces' } };
+    // Complemento «2 donas» (A_ELECCION de la categoría DONAS) con alternativas: 2 galletas, 1 carrot cake, 1 queque
+    const combo = (saldoGlaseada: number, saldoFresa: number) => {
+      prismaMock.oferta.findUnique.mockResolvedValue({
+        id: 9n, tipo: 'COMBO', nombre: 'Combo Dúo Para Compartir', dias: [], canales: [], creado_en: new Date(),
+        combosPrecio: [],
+        combosParte: [{ id: 300n, tipo: 'A_ELECCION', cantidad: 2, categorias: [7n], productos: [],
+          reemplazos: [alt(50n, 'GALLETA CHOCO CHIPS', 2), alt(51n, 'CARROT CAKE', 1), alt(52n, 'QUEQUE', 1)] }],
+      });
+      prismaMock.producto.findMany.mockResolvedValue([
+        { id: 40n, nombre: 'DONA GLASEADA', categoria_id: 7n, oculto: false, agotado_hasta: null, categoria: cat, controla_stock: true, stocks: [{ cantidad: saldoGlaseada }], sabores: [] },
+        { id: 41n, nombre: 'DONA ARTESANAL', categoria_id: 7n, oculto: false, agotado_hasta: null, categoria: cat, controla_stock: true, stocks: [],
+          sabores: [{ id: 501n, nombre: 'Fresa', activo: true, agotado_hasta: null, stockSabor: { cantidad: saldoFresa } }] },
+        { id: 50n, nombre: 'GALLETA CHOCO CHIPS', categoria_id: 8n, oculto: false, agotado_hasta: null, categoria: catGalletas, controla_stock: true, stocks: [{ cantidad: 5 }], sabores: [] },
+        { id: 51n, nombre: 'CARROT CAKE', categoria_id: 8n, oculto: false, agotado_hasta: null, categoria: catGalletas, controla_stock: true, stocks: [{ cantidad: 0 }], sabores: [] },
+        { id: 52n, nombre: 'QUEQUE', categoria_id: 8n, oculto: false, agotado_hasta: null, categoria: catGalletas, controla_stock: true, stocks: [],
+          sabores: [
+            { id: 601n, nombre: 'Marmoleado', activo: true, agotado_hasta: null, stockSabor: { cantidad: 4 } },
+            { id: 602n, nombre: 'Vainilla', activo: true, agotado_hasta: null, stockSabor: { cantidad: 0 } },
+          ] },
+      ]);
+    };
+
+    it('el combo no sale «No disponible» mientras una alternativa tenga stock; las agotadas salen con «No hay stock»', async () => {
+      combo(0, 0);
+      const oferta = await service.obtenerOfertaPorId(9);
+      expect(oferta.disponible).toBe(true);
+      expect(oferta.sinStock).toBeFalsy();
+      const parte = oferta.combosParte![0];
+      expect(parte.alternativasActivas).toBe(true);
+      expect(parte.alternativas!.find((a) => a.id === '50')).toMatchObject({ cantidad: 2, disponible: true });
+      expect(parte.alternativas!.find((a) => a.id === '51')).toMatchObject({ disponible: false, sinStock: true });
+    });
+
+    it('sin donas: 2 galletas por la parte, con su cantidad, sin precio extra y con nota', async () => {
+      combo(0, 0);
+      const res = await service.resolverPartesCombo(9, [{ parteId: '300', productoId: '50' }, { parteId: '300', productoId: '50' }]);
+      expect(res.partes).toEqual([expect.objectContaining({ productoId: 50n, cantidad: 2, tipo: 'A_ELECCION', areaId: 2n })]);
+      expect(res.nota).toBe('Combo Dúo Para Compartir · GALLETA CHOCO CHIPS (en lugar de las opciones de la parte)');
+    });
+
+    it('con donas en stock la alternativa se rechaza: 409 COMBO_ALTERNATIVA_NO_APLICA', async () => {
+      combo(3, 0);
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '50' }, { parteId: '300', productoId: '50' }])).rejects.toMatchObject({
+        response: { codigo: 'COMBO_ALTERNATIVA_NO_APLICA' },
+        status: 409,
+      });
+    });
+
+    it('con donas en stock pero no bastan para 2 (1 sola): la alternativa sí se acepta', async () => {
+      combo(1, 0);
+      const res = await service.resolverPartesCombo(9, [{ parteId: '300', productoId: '50' }, { parteId: '300', productoId: '50' }]);
+      expect(res.partes[0]).toEqual(expect.objectContaining({ productoId: 50n, cantidad: 2 }));
+    });
+
+    it('la alternativa exige su cantidad exacta: 1 galleta cuando son 2 responde 400 COMBO_ELECCION_INCOMPLETA', async () => {
+      combo(0, 0);
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '50' }])).rejects.toMatchObject({
+        response: { codigo: 'COMBO_ELECCION_INCOMPLETA' },
+        status: 400,
+      });
+    });
+
+    it('una sola alternativa por parte: dos distintas responden 400 COMBO_PARTE_NO_PERMITIDA', async () => {
+      combo(0, 0);
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '51' }, { parteId: '300', productoId: '52' }])).rejects.toMatchObject({
+        response: { codigo: 'COMBO_PARTE_NO_PERMITIDA' },
+      });
+    });
+
+    it('una alternativa agotada sale bloqueada: 409 COMBO_PARTE_NO_DISPONIBLE «No hay stock»', async () => {
+      combo(0, 0);
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '51' }])).rejects.toMatchObject({
+        response: { codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje: 'No hay stock de CARROT CAKE; elige otro' },
+        status: 409,
+      });
+    });
+
+    it('alternativa por sabor: el queque Marmoleado lleva su sabor para descontar', async () => {
+      combo(0, 0);
+      const res = await service.resolverPartesCombo(9, [{ parteId: '300', productoId: '52', saborId: '601' }]);
+      expect(res.partes).toEqual([expect.objectContaining({ productoId: 52n, cantidad: 1, sabores: [{ saborId: 601n, nombre: 'Marmoleado', cantidad: 1 }] })]);
+    });
+
+    it('alternativa por sabor sin sabor elegido: 400 SABORES_INVALIDOS', async () => {
+      combo(0, 0);
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '52' }])).rejects.toMatchObject({
+        response: { codigo: 'SABORES_INVALIDOS' },
+        status: 400,
+      });
+    });
+
+    it('alternativa por sabor sin saldo: 409 STOCK_INSUFICIENTE con el sabor', async () => {
+      combo(0, 0);
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '52', saborId: '602' }])).rejects.toMatchObject({
+        response: { codigo: 'STOCK_INSUFICIENTE', saborNombre: 'Vainilla', quedan: 0 },
+        status: 409,
+      });
+    });
+  });
+
+  describe('resolverPartesCombo: stock heredado (donas y sabores del Dúo)', () => {
+    const combo = () => {
+      prismaMock.oferta.findUnique.mockResolvedValue({
+        id: 9n, tipo: 'COMBO', nombre: 'Combo Dúo Para Compartir', dias: [], canales: [], creado_en: new Date(),
+        combosPrecio: [],
+        combosParte: [{ id: 300n, tipo: 'A_ELECCION', cantidad: 2, categorias: [], productos: [40n, 41n, 42n], reemplazos: [] }],
+      });
+      const cat = { nombre: 'DONAS', area_id: 2n, area: { nombre: 'Dulces' } };
+      prismaMock.producto.findMany.mockResolvedValue([
+        // sin sabores: saldo del producto
+        { id: 40n, nombre: 'DONA GLASEADA', categoria_id: 7n, oculto: false, agotado_hasta: null, categoria: cat, controla_stock: true, stocks: [{ cantidad: 0 }], sabores: [] },
+        { id: 42n, nombre: 'KEKE', categoria_id: 7n, oculto: false, agotado_hasta: null, categoria: cat, controla_stock: true, stocks: [{ cantidad: 1 }], sabores: [] },
+        // con sabores: el saldo vive en cada sabor
+        {
+          id: 41n, nombre: 'DONA ARTESANAL', categoria_id: 7n, oculto: false, agotado_hasta: null, categoria: cat, controla_stock: true, stocks: [],
+          sabores: [
+            { id: 501n, nombre: 'Fresa', activo: true, agotado_hasta: null, stockSabor: { cantidad: 3 } },
+            { id: 502n, nombre: 'Oreo', activo: true, agotado_hasta: null, stockSabor: { cantidad: 0 } },
+          ],
+        },
+      ]);
+    };
+
+    it('una dona con saldo 0 no se puede elegir: 409 COMBO_PARTE_NO_DISPONIBLE «No hay stock»', async () => {
+      combo();
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '40' }, { parteId: '300', productoId: '42' }])).rejects.toMatchObject({
+        response: { codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje: 'No hay stock de DONA GLASEADA; elige otro' },
+        status: 409,
+      });
+    });
+
+    it('producto sin sabores: dos unidades con saldo 1 responde 409 STOCK_INSUFICIENTE (suma de las partes)', async () => {
+      combo();
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '42' }, { parteId: '300', productoId: '42' }])).rejects.toMatchObject({
+        response: { codigo: 'STOCK_INSUFICIENTE', quedan: 1 },
+        status: 409,
+      });
+    });
+
+    it('producto por sabor sin sabor elegido: 400 SABORES_INVALIDOS', async () => {
+      combo();
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '41' }, { parteId: '300', productoId: '41' }])).rejects.toMatchObject({
+        response: { codigo: 'SABORES_INVALIDOS' },
+        status: 400,
+      });
+    });
+
+    it('sabor sin saldo no se puede repartir: 409 STOCK_INSUFICIENTE con el sabor', async () => {
+      combo();
+      await expect(
+        service.resolverPartesCombo(9, [{ parteId: '300', productoId: '41', saborId: '502' }, { parteId: '300', productoId: '41', saborId: '501' }]),
+      ).rejects.toMatchObject({ response: { codigo: 'STOCK_INSUFICIENTE', saborNombre: 'Oreo', quedan: 0 }, status: 409 });
+    });
+
+    it('dos donas del mismo sabor (2 de 3 Fresa) se aceptan y el sabor sale en la línea hija', async () => {
+      combo();
+      const res = await service.resolverPartesCombo(9, [
+        { parteId: '300', productoId: '41', saborId: '501' },
+        { parteId: '300', productoId: '41', saborId: '501' },
+      ]);
+      expect(res.partes).toEqual([expect.objectContaining({ productoId: 41n, cantidad: 2, sabores: [{ saborId: 501n, nombre: 'Fresa', cantidad: 2 }] })]);
+    });
+
+    it('elegir dos Fresa cuando solo hay 1 responde 409 STOCK_INSUFICIENTE', async () => {
+      combo();
+      prismaMock.producto.findMany.mockResolvedValue([
+        {
+          id: 41n, nombre: 'DONA ARTESANAL', categoria_id: 7n, oculto: false, agotado_hasta: null,
+          categoria: { nombre: 'DONAS', area_id: 2n, area: { nombre: 'Dulces' } }, controla_stock: true, stocks: [],
+          sabores: [{ id: 501n, nombre: 'Fresa', activo: true, agotado_hasta: null, stockSabor: { cantidad: 1 } }],
+        },
+      ]);
+      await expect(
+        service.resolverPartesCombo(9, [{ parteId: '300', productoId: '41', saborId: '501' }, { parteId: '300', productoId: '41', saborId: '501' }]),
+      ).rejects.toMatchObject({ response: { codigo: 'STOCK_INSUFICIENTE', quedan: 1, saborNombre: 'Fresa' }, status: 409 });
+    });
+  });
+
+  describe('tamaño de la parte FIJO (combo con tamaño)', () => {
+    const tamanoRow = { id: 77n, producto_id: 5n, unidades: 1, tamano_valor: { nombre: 'Regular 12 oz' } };
+    const combo = (tamano: unknown) => {
+      prismaMock.oferta.findUnique.mockResolvedValue({
+        id: 9n, tipo: 'COMBO', nombre: 'COMBO CAJITA CAPRIKIDS', dias: [], canales: [], creado_en: new Date(),
+        combosPrecio: [],
+        combosParte: [{ id: 100n, tipo: 'FIJO', cantidad: 1, categorias: [], productos: [5n], reemplazos: [], tamano }],
+      });
+      prismaMock.producto.findMany.mockResolvedValue([
+        { id: 5n, nombre: 'FRAPPE OREO', categoria_id: 3n, oculto: false, agotado_hasta: null,
+          categoria: { nombre: 'BEBIDAS', area_id: 1n, area: { nombre: 'Bebidas' } }, controla_stock: false, stocks: [], sabores: [] },
+      ]);
+    };
+
+    it('la línea de la parte sale con el tamaño y sus unidades', async () => {
+      combo({ ...tamanoRow });
+      const res = await service.resolverPartesCombo(9, [{ parteId: '100', productoId: '5' }]);
+      expect(res.partes).toEqual([expect.objectContaining({ productoId: 5n, tamano: 'Regular 12 oz', unidadesTamano: 1 })]);
+    });
+
+    it('una parte sin tamaño no lleva tamaño en la línea', async () => {
+      combo(null);
+      const res = await service.resolverPartesCombo(9, [{ parteId: '100', productoId: '5' }]);
+      expect(res.partes[0].tamano).toBeUndefined();
+    });
+
+    it('guardar: el tamaño tiene que ser del producto de la parte FIJO', async () => {
+      prismaMock.producto.findFirst.mockResolvedValue(null);
+      prismaMock.oferta.findUnique.mockResolvedValue(null);
+      prismaMock.oferta.create.mockResolvedValue({ id: 9n, tipo: 'COMBO', nombre: 'X', combosParte: [] });
+      prismaMock.productoTamano = { findUnique: jest.fn().mockResolvedValue({ producto_id: 6n }) };
+      await expect(service.crearOferta({
+        tipo: 'COMBO', nombre: 'X', tamanos: [{ tamanoValorId: '10', precio: 25 }],
+        partes: [{ tipo: 'FIJO', cantidad: 1, productos: ['5'], tamanoId: '77' }],
+      })).rejects.toMatchObject({ response: { codigo: 'COMBO_TAMANO_INVALIDO' } });
+    });
+
+    it('guardar: una parte FIJO del producto correcto guarda tamano_id; A_ELECCION con tamaño se rechaza', async () => {
+      prismaMock.producto.findFirst.mockResolvedValue(null);
+      prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
+      prismaMock.oferta.findUnique.mockResolvedValue({ id: 9n, tipo: 'COMBO', nombre: 'X', dias: [], canales: [], creado_en: new Date(), combosPrecio: [], combosParte: [] });
+      prismaMock.oferta.create.mockResolvedValue({ id: 9n, tipo: 'COMBO', nombre: 'X', combosParte: [] });
+      prismaMock.productoTamano = { findUnique: jest.fn().mockResolvedValue({ producto_id: 5n }) };
+      await service.crearOferta({
+        tipo: 'COMBO', nombre: 'X', tamanos: [{ tamanoValorId: '10', precio: 25 }],
+        partes: [{ tipo: 'FIJO', cantidad: 1, productos: ['5'], tamanoId: '77' }],
+      });
+      expect(prismaMock.comboParte.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'FIJO', tamano_id: 77n }),
+      });
+      prismaMock.oferta.findUnique.mockResolvedValue(null);
+      await expect(service.crearOferta({
+        tipo: 'COMBO', nombre: 'Y', tamanos: [{ tamanoValorId: '10', precio: 25 }],
+        partes: [{ tipo: 'A_ELECCION', cantidad: 1, categorias: ['3'], productos: [], tamanoId: '77' }],
+      })).rejects.toMatchObject({ response: { codigo: 'COMBO_TAMANO_INVALIDO' } });
     });
   });
 

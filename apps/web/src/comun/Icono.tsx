@@ -45,9 +45,11 @@ export const TRAZOS_ICONOS: Record<string, string> = {
   mirest:
     'M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16',
   pantallas: 'M2 4h20v13H2z M8 21h8 M12 17v4',
+  asistencia: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 6v6l4 2',
   plano: 'M3 3h18v18H3z M3 9h18 M9 21V9',
   cierre:
     'M2 7h20v14H2z M16 14a2 2 0 1 1-4 0 2 2 0 0 1 4 0z M6 3h12v4H6z',
+  propinas: 'M12 2v20 M17 6H9.5a3 3 0 0 0 0 6h5a3 3 0 0 1 0 6H6',
   usuarios:
     'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   historial: 'M3 12a9 9 0 1 0 3-6.7 M3 4v5h5 M12 7v5l3 3',

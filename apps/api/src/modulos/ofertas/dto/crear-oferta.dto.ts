@@ -86,10 +86,14 @@ export class ComboParteDto {
   @IsArray({ message: 'productos debe ser un arreglo' })
   productos?: (string | number)[];
 
-  /** Solo FIJO: plan B, plan C... en orden. Sin repetir ni incluir el principal. */
+  /** Alternativas en orden («si no hay stock, elige»): producto y cantidad. Sin repetir ni ser producto de la parte. */
   @IsOptional()
-  @IsArray({ message: 'reemplazos debe ser un arreglo' })
-  reemplazos?: (string | number)[];
+  @IsArray({ message: 'alternativas debe ser un arreglo' })
+  alternativas?: { productoId: string | number; cantidad?: number }[];
+
+  /** Tamaño (producto_tamano) de la parte FIJO de un producto. Null o vacío = sin tamaño. */
+  @IsOptional()
+  tamanoId?: string | number | null;
 }
 
 export class CrearOfertaDto {

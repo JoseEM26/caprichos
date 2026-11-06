@@ -23,8 +23,8 @@ const GRUPOS = [
 ];
 const INICIAL: EstadoOpciones = {
   tamanos: [
-    { tamanoValorId: 'v1', nombre: 'Regular 12 oz', precio: 6, activo: true },
-    { tamanoValorId: 'v2', nombre: 'Grande 16 oz', precio: 7, activo: true },
+    { tamanoValorId: 'v1', nombre: 'Regular 12 oz', precio: 6, activo: true, unidades: 1 },
+    { tamanoValorId: 'v2', nombre: 'Grande 16 oz', precio: 7, activo: true, unidades: 1 },
   ],
   grupos: [],
 };
@@ -60,7 +60,7 @@ describe('EditorOpcionesTamanos', () => {
     fireEvent.change(screen.getByLabelText('Elegir de la lista'), { target: { value: 'v3' } });
     fireEvent.click(screen.getByText('Agregar a este producto'));
     expect(emitir).toHaveBeenLastCalledWith(expect.objectContaining({
-      tamanos: expect.arrayContaining([{ tamanoValorId: 'v3', nombre: 'Extra 21 oz', precio: 5, activo: true }]),
+      tamanos: expect.arrayContaining([{ tamanoValorId: 'v3', nombre: 'Extra 21 oz', precio: 5, activo: true, unidades: 1 }]),
     }));
     expect(editar).not.toHaveBeenCalled();
     expect(crear).not.toHaveBeenCalled();
@@ -153,7 +153,7 @@ describe('EditorOpcionesTamanos', () => {
     expect(editar).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Sí, guardar'));
     await waitFor(() => expect(editar).toHaveBeenCalledWith('p1', {
-      tamanos: [{ tamanoValorId: 'v1', precio: 6, activo: true }],
+      tamanos: [{ tamanoValorId: 'v1', precio: 6, activo: true, unidades: 1 }],
       grupos: [],
       sincronizarGrupos: true,
       resaltarOpcionMenosPedida: false,

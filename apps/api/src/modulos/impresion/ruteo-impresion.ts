@@ -22,9 +22,9 @@ function equipoConRol(ctx: ContextoRuteo, areaId: bigint, rol: RolImpresora): bo
 
 /**
  * Destino de un trabajo: el id del área cuyo equipo lo imprime, o NULL (Caja).
- * Stickers: el sticker por área va a su área si esa área tiene etiquetera asignada, y el sticker por vaso va a
- * Bebidas si tiene etiquetera. Comanda por área: a la ticketera de su área si la tiene. Lo demás (general,
- * comanda de salón, pago) es de Caja. Con el equipo asignado pero caído, el trabajo espera en su cola.
+ * Stickers: el sticker por área va a su área si esa área tiene etiquetera asignada (Bebidas no genera ninguno: no
+ * se encola ni se lista), y el sticker por vaso va a Bebidas si tiene etiquetera. Comanda por área: a la
+ * ticketera de su área si la tiene. Lo demás (general, comanda de salón, pago) es de Caja. Con el equipo asignado pero caído, el trabajo espera en su cola.
  */
 export function destinoDeTrabajo(
   tipo: TipoTrabajoImpresion | string,

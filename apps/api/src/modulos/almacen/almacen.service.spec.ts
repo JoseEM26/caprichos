@@ -44,6 +44,10 @@ describe('AlmacenService', () => {
 
     prisma = {
       $transaction: jest.fn(async (cb) => cb(prisma)),
+      // Productos por sabor: un producto sin sabores activos (la merma va por el saldo del producto, como antes)
+      sabor: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       insumo: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
@@ -543,6 +547,154 @@ describe('AlmacenService', () => {
           where: { insumo_id: 1n, lugar_id: 11n },
           data: { cantidad: { increment: new Prisma.Decimal(0.75) } },
         }),
+      );
+    });
+  });
+
+  describe('apertura por sabor (GET y POST /admin/almacen/apertura)', () => {
+    const dona = {
+      id: 50n,
+      nombre: 'Dona',
+      controla_stock: true,
+      categoria: { area_id: 3n, area: { nombre: 'Salados' } },
+      sabores: [
+        { id: 11n, nombre: 'Fresa', activo: true },
+        { id: 12n, nombre: 'Oreo', activo: true },
+      ],
+    };
+
+    beforeEach(() => {
+      prisma.producto.findMany = jest.fn().mockResolvedValue([dona]);
+      prisma.lugarStock.findFirst.mockImplementation(async (args: any) =>
+        args?.where?.nombre?.contains === 'Salados' ? { id: 11n, nombre: 'Salados' } : { id: 10n, nombre: 'Almacén central' },
+      );
+      prisma.stock.findFirst.mockResolvedValue(null);
+      prisma.stock.findMany = jest.fn().mockResolvedValue([]);
+      prisma.movimientoStock.create.mockResolvedValue({ id: 160n });
+      prisma.movimientoStock.findMany = jest.fn().mockResolvedValue([]); // «Produje hoy» del día (arrastre)
+      prisma.stockSabor = {
+        upsert: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([{ sabor_id: 11n, cantidad: new Prisma.Decimal('4') }]),
+      };
+      prisma.conteoApertura = {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([{ sabor_id: 11n, cantidad: new Prisma.Decimal('10'), producto_id: 50n }]),
+        create: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
+      };
+      prisma.sabor = { findMany: jest.fn(), findUnique: jest.fn().mockResolvedValue({ agotado_hasta: null }), update: jest.fn() };
+      prisma.agotado = { create: jest.fn(), updateMany: jest.fn() };
+    });
+
+    it('GET: un producto por sabor trae sabores con saldo y apertura, y el saldo del producto es la suma', async () => {
+      const res: any = await service.obtenerApertura();
+      const p = res.productos[0];
+      expect(p.sabores).toEqual([
+        { saborId: '11', nombre: 'Fresa', saldo: 4, aperturaHoy: true, aperturaCantidad: 10, producidoHoy: 0, quedaronAyer: 4 },
+        { saborId: '12', nombre: 'Oreo', saldo: 0, aperturaHoy: false, aperturaCantidad: null, producidoHoy: 0, quedaronAyer: 0 },
+      ]);
+      expect(p).toMatchObject({ saldo: 4, aperturaHoy: true });
+    });
+
+    it('GET: un producto oculto no entra a la apertura (la consulta excluye oculto)', async () => {
+      await service.obtenerApertura();
+      expect(prisma.producto.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { controla_stock: true, oculto: false } }),
+      );
+    });
+
+    it('POST: producto por sabor sin saborId: 400 SABOR_REQUERIDO; con saborId fija el saldo de ese sabor', async () => {
+      await expect(
+        service.registrarApertura({ items: [{ productoId: '50', cantidad: 6 }] } as any, mockUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'SABOR_REQUERIDO' } });
+
+      await service.registrarApertura({ items: [{ productoId: '50', saborId: '11', cantidad: 6 }] } as any, mockUsuario);
+      expect(prisma.stockSabor.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { sabor_id: 11n } }),
+      );
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ tipo: 'AJUSTE', sabor_id: 11n, nota: 'Apertura del día' }) }),
+      );
+    });
+
+    it('POST: un sabor ajeno al producto o un producto sin sabores con saborId responde 400', async () => {
+      await expect(
+        service.registrarApertura({ items: [{ productoId: '50', saborId: '99', cantidad: 1 }] } as any, mockUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'SABORES_INVALIDOS' } });
+      prisma.producto.findMany = jest.fn().mockResolvedValue([{ ...dona, sabores: [] }]);
+      await expect(
+        service.registrarApertura({ items: [{ productoId: '50', saborId: '11', cantidad: 1 }] } as any, mockUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'PRODUCTO_SIN_SABORES' } });
+    });
+  });
+
+  describe('stock por sabor (donas): producción, apertura y merma', () => {
+    const recetaDona = (sabores: any[]) => ({
+      id: 1n,
+      rinde: new Prisma.Decimal('12'),
+      es_produccion: true,
+      producto_id: 50n,
+      producto: { id: 50n, nombre: 'Dona', controla_stock: true, sabores },
+      lineas: [],
+    });
+    const conSabores = [{ id: 11n, nombre: 'Fresa', activo: true }, { id: 12n, nombre: 'Oreo', activo: true }];
+
+    beforeEach(() => {
+      prisma.lugarStock.findFirst.mockImplementation(async (args: any) =>
+        args?.where?.nombre?.contains === 'Salados' ? { id: 11n, nombre: 'Salados' } : { id: 10n, nombre: 'Almacén central' },
+      );
+      prisma.movimientoStock.create.mockResolvedValue({ id: 150n });
+      prisma.stockSabor = {
+        upsert: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn().mockResolvedValue({ cantidad: new Prisma.Decimal('12') }),
+      };
+      prisma.sabor = { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue({ agotado_hasta: null }), update: jest.fn() };
+      prisma.agotado = { create: jest.fn(), updateMany: jest.fn() };
+    });
+
+    it('producción de un producto por sabor exige el sabor y lo suma a ese sabor', async () => {
+      prisma.receta.findUnique.mockResolvedValue(recetaDona(conSabores));
+      await expect(service.registrarProduccion({ recetaId: 1, unidadesObtenidas: 12 }, mockUsuario)).rejects.toMatchObject({
+        response: { codigo: 'SABOR_REQUERIDO' },
+      });
+
+      await service.registrarProduccion({ recetaId: 1, unidadesObtenidas: 12, saborId: 11 }, mockUsuario);
+      expect(prisma.stockSabor.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { sabor_id: 11n }, update: { cantidad: { increment: new Prisma.Decimal(12) } } }),
+      );
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ tipo: 'PRODUCCION_ALTA', sabor_id: 11n, producto_id: 50n }) }),
+      );
+    });
+
+    it('producción de un sabor que no es del producto: 400 SABORES_INVALIDOS', async () => {
+      prisma.receta.findUnique.mockResolvedValue(recetaDona(conSabores));
+      await expect(service.registrarProduccion({ recetaId: 1, unidadesObtenidas: 12, saborId: 99 }, mockUsuario)).rejects.toMatchObject({
+        response: { codigo: 'SABORES_INVALIDOS' },
+      });
+    });
+
+    it('merma de un producto por sabor exige el sabor y descuenta de ese sabor', async () => {
+      prisma.insumo.findUnique.mockResolvedValue(null);
+      prisma.producto.findUnique.mockResolvedValue({ id: 50n, nombre: 'Dona', controla_stock: true });
+      prisma.sabor.findMany.mockResolvedValue([{ id: 11n, nombre: 'Fresa', activo: true }]);
+      prisma.lugarStock.findUnique.mockResolvedValue({ id: 11n, nombre: 'Salados' });
+      prisma.stock.findFirst.mockResolvedValue(null);
+      prisma.stockSabor.update = jest.fn().mockResolvedValue({});
+      await expect(
+        service.mermaMultiple({ lineas: [{ insumoId: 50, cantidad: 2, origen: 'Salados', destino: 'Desecho' }] } as any, mockUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'SABOR_REQUERIDO' } });
+
+      await service.mermaMultiple(
+        { lineas: [{ insumoId: 50, cantidad: 2, origen: 'Salados', destino: 'Desecho', saborId: 11 }] } as any,
+        mockUsuario,
+      );
+      expect(prisma.stockSabor.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { sabor_id: 11n } }),
+      );
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ tipo: 'MERMA', sabor_id: 11n }) }),
       );
     });
   });

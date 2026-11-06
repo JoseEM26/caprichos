@@ -7,9 +7,11 @@ import { Confirmar } from '../../comun/Confirmar';
 import { ErrorApi } from '../../comun/api';
 import { Icono } from '../../comun/Icono';
 import { ModalReportarFalla } from './ModalReportarFalla';
+import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
 import { BotonCancelarEspera } from './EsperaEntrega';
 import { MapaRepartidor, type PuntoRepartidor, type PosicionMarcador } from './MapaRepartidor';
 import { HojaInferior } from './HojaInferior';
+import { ChatPedidoReparto, chatVigente } from './ChatPedidoReparto';
 import { SaltarPedidoModal } from './SaltarPedidoModal';
 import { colorOpcion } from './OpcionesRutaSugerida';
 import { HojaRutasSugeridas, ALTO_PLEGADA_PX, FRACCION_MEDIA, type AlturaRutas } from './HojaRutasSugeridas';
@@ -315,24 +317,26 @@ const cajaMenu: CSSProperties = {
   overflow: 'hidden',
 };
 
-/** Teléfono, llamada, WhatsApp y navegación. Solo de pedidos ya tomados por este repartidor. */
-function ContactoPedido({ pedido }: { pedido: PedidoReparto }) {
+/** Chat de WhatsApp, llamada y navegación. Solo de pedidos ya tomados por este repartidor. */
+function ContactoPedido({ pedido, alChatear }: { pedido: PedidoReparto; alChatear?: () => void }) {
   const enlace: CSSProperties = { ...botonBase, fontSize: 13 };
   const telefono = pedido.cliente_telefono;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {telefono && alChatear && (
+        <button
+          type="button"
+          data-testid={`btn-chatear-${pedido.id}`}
+          onClick={alChatear}
+          style={{ ...enlace, width: '100%', background: 'var(--cp-green)', color: 'var(--cp-white)', border: 'none' }}
+        >
+          Chatear por WhatsApp
+        </button>
+      )}
       {telefono && (
         <div style={dosColumnas}>
           <a href={`tel:${telefono}`} style={{ ...enlace, background: 'var(--cp-white)', border: '1.5px solid var(--cp-navy)', color: 'var(--cp-navy)' }}>
             Llamar
-          </a>
-          <a
-            href={`https://wa.me/51${telefono.replace(/\D/g, '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ ...enlace, background: 'var(--cp-green)', color: 'var(--cp-white)' }}
-          >
-            WhatsApp
           </a>
         </div>
       )}
@@ -378,10 +382,12 @@ interface DetalleProps {
   orden?: { siguiente: PedidoReparto | null; pendientes: number; enCurso: boolean };
   alEmpezarPor?: (p: PedidoReparto) => void;
   alSaltar?: (p: PedidoReparto) => void;
+  /** Abre el chat de WhatsApp de este pedido (solo mientras sigue vigente). */
+  alChatear?: (p: PedidoReparto) => void;
 }
 
 /** Contenido de la hoja de un pedido: lo que dice el servidor y las acciones que le tocan según su estado. */
-function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAlternarRuta, alTomar, alEtapa, alReportar, orden, alEmpezarPor, alSaltar }: DetalleProps) {
+function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAlternarRuta, alTomar, alEtapa, alReportar, orden, alEmpezarPor, alSaltar, alChatear }: DetalleProps) {
   const [resumen, setResumen] = useState<ResumenRepartidor | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -414,6 +420,7 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
     <div data-testid="detalle-pedido" style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: FUENTE_TEXTO, color: 'var(--cp-navy)' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
         <strong style={{ fontFamily: FUENTE_TITULOS, fontSize: 18 }}>{resumen.codigo}</strong>
+        {mio?.ubicacion_editada_en && <InsigniaDireccionEditada />}
         <span style={chip('var(--cp-sand)', 'var(--cp-soft)')}>{resumen.estadoTexto}</span>
         <span style={chip(clasificarEspera(resumen.minutosEspera).colorHex, '#fff')}>{resumen.minutosEspera} min de espera</span>
       </div>
@@ -472,7 +479,10 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
 
       {mio ? (
         <>
-          <ContactoPedido pedido={mio} />
+          <ContactoPedido
+            pedido={mio}
+            alChatear={alChatear && chatVigente(mio.estado, mio.entregado_en) ? () => alChatear(mio) : undefined}
+          />
           <BotonEtapa
             pedido={mio}
             etapa={etapaDe(mio)}
@@ -545,7 +555,7 @@ function puntoTerminado(p: { id: string; lat: number; lng: number; cliente: stri
 }
 
 /** Detalle de solo lectura de un pedido ya terminado de la ruta en curso (sin acciones). */
-function DetalleTerminado({ p }: { p: PedidoDeRuta }) {
+function DetalleTerminado({ p, alChatear }: { p: PedidoDeRuta; alChatear?: (p: PedidoDeRuta) => void }) {
   const fila: CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 14 };
   const bien = p.estadoFinal === 'ENTREGADO';
   return (
@@ -561,6 +571,16 @@ function DetalleTerminado({ p }: { p: PedidoDeRuta }) {
       {p.direccion && <div style={fila}><span>Dirección</span><strong style={{ textAlign: 'right' }}>{p.direccion}</strong></div>}
       {p.motivo_falla && <div style={fila}><span>Motivo</span><strong>{p.motivo_falla}</strong></div>}
       <div style={{ color: 'var(--cp-soft)', fontSize: 13, fontWeight: 700 }}>Este pedido ya terminó: solo lectura.</div>
+      {alChatear && p.cliente_telefono && p.estadoFinal === 'ENTREGADO' && chatVigente('ENTREGADO', p.horaFinal) && (
+        <button
+          type="button"
+          data-testid={`btn-chatear-${p.id}`}
+          onClick={() => alChatear(p)}
+          style={{ ...botonBase, width: '100%', background: 'var(--cp-green)', color: 'var(--cp-white)', border: 'none', fontSize: 14 }}
+        >
+          Chatear por WhatsApp
+        </button>
+      )}
     </div>
   );
 }
@@ -640,6 +660,7 @@ export function RepartidorView() {
   const [confirmacion, setConfirmacion] = useState<ConfirmarAccionModal>({ abierto: false, titulo: '', mensaje: '', accion: async () => {} });
   const [ejecutando, setEjecutando] = useState(false);
   const [pedidoParaFalla, setPedidoParaFalla] = useState<PedidoReparto | null>(null);
+  const [chatPedido, setChatPedido] = useState<{ id: string; codigo: string } | null>(null);
   const [pedidoParaSaltar, setPedidoParaSaltar] = useState<PedidoReparto | null>(null);
   const [saltando, setSaltando] = useState(false);
   const [opcionSugeridaId, setOpcionSugeridaId] = useState<string | null>(null);
@@ -1272,7 +1293,13 @@ export function RepartidorView() {
       {hoja && hoja.tipo !== 'rutas' && (
         <HojaInferior titulo={tituloHoja} desdeAbajo={BARRA_TOTAL} alCerrar={() => setHoja(null)}>
           {hoja.tipo === 'detalle' && terminados.some((p) => p.id === hoja.id) && (
-            <DetalleTerminado p={terminados.find((p) => p.id === hoja.id)!} />
+            <DetalleTerminado
+              p={terminados.find((p) => p.id === hoja.id)!}
+              alChatear={(p) => {
+                setHoja(null);
+                setChatPedido({ id: p.id, codigo: p.codigo });
+              }}
+            />
           )}
           {hoja.tipo === 'misRutas' && (
             <MisRutas
@@ -1298,6 +1325,11 @@ export function RepartidorView() {
               orden={ordenRuta}
               alEmpezarPor={empezarPor}
               alSaltar={setPedidoParaSaltar}
+              alChatear={(p) => {
+                setHoja(null);
+                setMenuMarcador(null);
+                setChatPedido({ id: p.id, codigo: p.codigo });
+              }}
             />
           )}
           {hoja.tipo === 'hechos' && <HechosHoy hechos={hechosHoy} />}
@@ -1385,6 +1417,7 @@ export function RepartidorView() {
         alConfirmar={alSalir}
         alCancelar={() => setConfirmarSalida(false)}
       />
+      {chatPedido && <ChatPedidoReparto pedidoId={chatPedido.id} codigo={chatPedido.codigo} alCerrar={() => setChatPedido(null)} />}
       {pedidoParaSaltar && (
         <SaltarPedidoModal
           codigo={pedidoParaSaltar.codigo}

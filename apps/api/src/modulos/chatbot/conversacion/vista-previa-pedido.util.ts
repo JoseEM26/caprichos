@@ -7,6 +7,21 @@ import { VistaPreviaPedidoBot } from './tipos-conversacion';
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
+ * Envío de una ubicación recibida antes de tener carrito (subtotal 0): mismas reglas del servidor que la vista previa.
+ * Sin zona conocida el envío queda por calcular (null).
+ */
+export async function vistaPreviaUbicacionBot(
+  prisma: PrismaService,
+  tarifaZona: number | null | undefined,
+): Promise<VistaPreviaPedidoBot> {
+  const envio =
+    tarifaZona === null || tarifaZona === undefined
+      ? null
+      : (await calcularEnvioDelivery(prisma, { subtotal: 0, tarifaZona: Number(tarifaZona), canal: 'WHATSAPP' })).envio;
+  return { subtotal: 0, descuento: 0, descuentoNombre: null, envio, envioGratis: envio === 0 };
+}
+
+/**
  * Vista previa del pedido del bot con las MISMAS funciones del servidor: descuentos automáticos de la
  * promoción con casilla «Vale también por WhatsApp» (calcularDescuentosParaPedido, sin cupones) y envío
  * (calcularEnvioDelivery, con la promo de envío gratis por horario). El total del bot sale de aquí.

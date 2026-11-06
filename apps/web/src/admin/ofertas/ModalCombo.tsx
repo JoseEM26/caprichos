@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ComboPrecioItem, ComboParteItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
 import { PrevisualizacionCarta } from './PrevisualizacionCarta';
-import { ReemplazosParteFijo } from './ReemplazosParteFijo';
+import { AlternativasParte } from './AlternativasParte';
 
 const DIAS = [
   ['lun', 'Lunes', 'Lun'],
@@ -35,7 +35,7 @@ interface ModalComboProps {
   comboAEditar?: OfertaItem | null;
   onCerrar: () => void;
   onGuardar: (datos: any) => Promise<void>;
-  productosDisponibles?: Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number }>;
+  productosDisponibles?: Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number; tamanos?: Array<{ id: string; nombre: string; precio?: number }> }>;
   categoriasDisponibles?: string[];
   categorias?: Array<{ id: string; nombre: string; productos?: any[] }>;
 }
@@ -194,6 +194,8 @@ export function ModalCombo({
               nombre: p.nombre || (p.tipo === 'A_ELECCION' ? 'Bebida a elección' : 'Parte'),
               tipoParte: p.tipoParte || (p.tipo === 'FIJO' ? 'FIJO' : 'A_ELECCION'),
               cantidad: p.cantidad || 1,
+              alternativas: p.alternativas || [],
+              tamanoId: p.tamanoId ?? null,
             }))
           : [],
       );
@@ -488,7 +490,8 @@ export function ModalCombo({
           cantidad: p.cantidad || 1,
           categorias: (p.categorias || []).map((c: any) => String(c)),
           productos: (p.productos || []).map((pr: any) => String(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
-          reemplazos: p.tipoParte === 'FIJO' || p.tipo === 'FIJO' ? (p.reemplazos || []).map(String) : undefined,
+          alternativas: (p.alternativas || []).map((a) => ({ productoId: String(a.id), cantidad: a.cantidad || 1 })),
+          tamanoId: p.tamanoId || null,
           orden: idx + 1,
         })),
         combosPartes: partes.map((p, idx) => ({
@@ -498,7 +501,8 @@ export function ModalCombo({
           cantidad: p.cantidad || 1,
           categorias: (p.categorias || []).map((c: any) => String(c)),
           productos: (p.productos || []).map((pr: any) => String(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
-          reemplazos: p.tipoParte === 'FIJO' || p.tipo === 'FIJO' ? (p.reemplazos || []).map(String) : undefined,
+          alternativas: (p.alternativas || []).map((a) => ({ productoId: String(a.id), cantidad: a.cantidad || 1 })),
+          tamanoId: p.tamanoId || null,
           orden: idx + 1,
         })),
       };
@@ -1199,7 +1203,7 @@ export function ModalCombo({
                                 setPartes((prev) =>
                                   prev.map((p, i) =>
                                     i === idx
-                                      ? { ...p, productos: prodId ? [prodId] : [], reemplazos: (p.reemplazos || []).filter((r) => r !== prodId) }
+                                      ? { ...p, productos: prodId ? [prodId] : [], tamanoId: null, alternativas: (p.alternativas || []).filter((a) => String(a.id) !== prodId) }
                                       : p,
                                   ),
                                 );
@@ -1224,24 +1228,43 @@ export function ModalCombo({
                             <span style={{ fontSize: '12px', color: 'var(--cp-soft)', display: 'block', marginTop: '6px' }}>
                               Ejemplo: Este producto vendrá siempre incluido en el combo de manera fija.
                             </span>
-                            {(() => {
-                              const principalId = sl.productos?.[0]
-                                ? String(typeof sl.productos[0] === 'object' ? sl.productos[0].id || sl.productos[0].productoId : sl.productos[0])
-                                : '';
-                              if (!principalId) return null;
-                              return (
-                                <ReemplazosParteFijo
-                                  principalId={principalId}
-                                  principalNombre={productosDisponibles.find((p) => String(p.id) === principalId)?.nombre ?? ''}
-                                  reemplazos={(sl.reemplazos || []).map(String)}
-                                  productos={productosDisponibles}
-                                  onCambiar={(ids) =>
-                                    setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, reemplazos: ids } : p)))
-                                  }
-                                />
-                              );
-                            })()}
                           </div>
+                        )}
+
+                        {tipoParte === 'FIJO' && (() => {
+                          const prodFijo = productosDisponibles.find((x) => String(x.id) === String(sl.productos?.[0] ?? ''));
+                          const tamanosFijo = prodFijo?.tamanos ?? [];
+                          if (tamanosFijo.length === 0) return null;
+                          return (
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>Tamaño del producto fijo:</div>
+                              <select
+                                aria-label="Tamaño del producto fijo"
+                                value={sl.tamanoId ?? ''}
+                                onChange={(e) => {
+                                  const valor = e.target.value || null;
+                                  setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, tamanoId: valor } : p)));
+                                }}
+                                style={{ width: '100%', boxSizing: 'border-box', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 10px', fontSize: '14px' }}
+                              >
+                                <option value="">Sin tamaño</option>
+                                {tamanosFijo.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          );
+                        })()}
+
+                        {tipoParte !== 'OPCIONES' && (
+                          <AlternativasParte
+                            principalId={tipoParte === 'FIJO' ? String(sl.productos?.[0] ?? '') : undefined}
+                            alternativas={sl.alternativas || []}
+                            productos={productosDisponibles}
+                            onCambiar={(alts) => setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, alternativas: alts } : p)))}
+                          />
                         )}
 
                         {tipoParte === 'OPCIONES' && (

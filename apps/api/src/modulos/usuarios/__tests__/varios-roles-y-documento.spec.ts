@@ -95,6 +95,7 @@ describe('UsuariosService: alta con varios roles, documento CE e importación', 
         })),
       },
       userAccountRol: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      userAccountRolHistorial: { create: jest.fn().mockResolvedValue({}) },
       partyRole: { create: jest.fn().mockResolvedValue({}) },
     };
     prismaMock = {
@@ -143,7 +144,7 @@ describe('UsuariosService: alta con varios roles, documento CE e importación', 
       data: expect.objectContaining({ tipo: 'CE', numero: 'AB12345' }),
     });
     expect(tx.userAccountRol.createMany).toHaveBeenCalledWith({
-      data: [{ user_account_id: 50n, rol: 'MOZO' }],
+      data: [expect.objectContaining({ user_account_id: 50n, rol: 'MOZO' })],
     });
     // El ingreso es el inicio del periodo TRABAJADOR, no una columna de la cuenta
     expect(tx.partyRole.create).toHaveBeenCalledTimes(1);
@@ -179,7 +180,7 @@ describe('UsuariosService: alta con varios roles, documento CE e importación', 
     const datos = tx.userAccount.create.mock.calls[0][0].data;
     expect(await argon2.verify(datos.hash, 'AB12345')).toBe(true);
     expect(datos.debe_cambiar).toBe(true);
-    expect(tx.userAccountRol.createMany).toHaveBeenCalledWith({ data: [{ user_account_id: 50n, rol: 'MOZO' }] });
+    expect(tx.userAccountRol.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ user_account_id: 50n, rol: 'MOZO' })] });
     // Una sola auditoría, con conteos y sin nombres ni documentos
     const imp = auditoriaMock.registrar.mock.calls.map((c: any[]) => c[0]).filter((a: any) => a.accion === 'IMPORTAR_PERSONAL');
     expect(imp).toHaveLength(1);

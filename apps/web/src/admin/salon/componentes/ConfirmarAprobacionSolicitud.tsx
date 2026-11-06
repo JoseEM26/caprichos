@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Confirmar } from '../../../comun/Confirmar';
-import { MesaSalon } from '../tipos';
+import { PisoSalon } from '../tipos';
 import { hoyLima, isoLima } from '../fechaLima';
+import { OcupacionMesa, SelectorMesasCroquis, resumenMesas } from './SelectorMesasCroquis';
 
 export interface SolicitudAprobable {
   nombre: string;
@@ -16,9 +17,17 @@ export interface SolicitudAprobable {
 
 export interface ConfirmarAprobacionSolicitudProps {
   solicitud: SolicitudAprobable;
-  mesas: MesaSalon[];
+  /** Plano del salón: el croquis elige una o varias mesas. */
+  pisos: PisoSalon[];
+  /** Mesas que otras reservas ocupan a esa fecha y hora (para marcarlas y no dejarlas elegir). */
+  obtenerOcupadas?: (
+    fecha: string,
+    hora: string,
+  ) => Promise<Array<{ mesa_id: string; reserva_id: string; nombre: string; hora: string; motivo?: string }>>;
+  /** Avisos suaves de las mesas elegidas (no bloquean): otra reserva de la mesa menos de 2 horas antes. */
+  obtenerAvisos?: (fecha: string, hora: string, mesaIds: string[]) => Promise<string[]>;
   /** Debe lanzar el error del API para que se muestre dentro del diálogo. */
-  alAprobar: (datos: { mesas: string[]; hora: string }) => Promise<void>;
+  alAprobar: (datos: { mesas: string[]; hora: string; confirmarCapacidad: boolean }) => Promise<void>;
   alCancelar: () => void;
 }
 
@@ -34,20 +43,26 @@ const estiloCampo = {
 } as const;
 
 /**
- * Aprobar una solicitud de WhatsApp: elegir mesa(s) y confirmar la hora.
- * No asigna mesa por su cuenta: sin mesa elegida el botón queda deshabilitado.
+ * Aprobar una solicitud de WhatsApp: elegir una o varias mesas en el croquis y confirmar la hora.
+ * Si las mesas suman menos asientos que personas, avisa y pide confirmar (no bloquea para siempre).
  */
 export function ConfirmarAprobacionSolicitud({
   solicitud,
-  mesas,
+  pisos,
+  obtenerOcupadas,
+  obtenerAvisos,
   alAprobar,
   alCancelar,
 }: ConfirmarAprobacionSolicitudProps) {
+  const todasLasMesas = useMemo(() => pisos.flatMap((p) => p.mesas || []), [pisos]);
   const [mesasIds, setMesasIds] = useState<string[]>(() =>
-    (solicitud.mesasIds ?? []).filter((id) => mesas.some((m) => m.id === id)),
+    (solicitud.mesasIds ?? []).filter((id) => todasLasMesas.some((m) => m.id === id)),
   );
   const [fecha, setFecha] = useState(solicitud.fecha);
   const [hora, setHora] = useState(solicitud.hora);
+  const [confirmarCapacidad, setConfirmarCapacidad] = useState(false);
+  const [ocupadas, setOcupadas] = useState<Record<string, OcupacionMesa>>({});
+  const [avisos, setAvisos] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
@@ -56,31 +71,72 @@ export function ConfirmarAprobacionSolicitud({
   const instanteElegido = Date.parse(isoLima(fecha, hora));
   const horaFutura = !Number.isNaN(instanteElegido) && instanteElegido > Date.now();
 
-  const asientos = mesasIds.reduce(
-    (suma, id) => suma + (mesas.find((m) => m.id === id)?.asientos ?? 4),
-    0,
-  );
-  const faltan = Math.max(0, solicitud.personas - asientos);
+  // Mesas ocupadas a la fecha y hora elegidas (las que ya tienen otra reserva que se cruza)
+  useEffect(() => {
+    if (!obtenerOcupadas || !fecha || !hora) return;
+    let vigente = true;
+    obtenerOcupadas(fecha, hora)
+      .then((lista) => {
+        if (vigente) {
+          setOcupadas(
+            Object.fromEntries(
+              lista.map((o) => [o.mesa_id, { reservaId: o.reserva_id, nombre: o.nombre, hora: o.hora }]),
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        if (vigente) setOcupadas({});
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [obtenerOcupadas, fecha, hora]);
+
+  // Aviso suave (no bloquea): otra reserva de alguna mesa elegida a menos de 2 horas antes
+  const mesasKey = mesasIds.join(',');
+  useEffect(() => {
+    if (!obtenerAvisos || !fecha || !hora || !mesasKey) {
+      setAvisos([]);
+      return;
+    }
+    let vigente = true;
+    obtenerAvisos(fecha, hora, mesasKey.split(','))
+      .then((lista) => {
+        if (vigente) setAvisos(lista);
+      })
+      .catch(() => {
+        if (vigente) setAvisos([]);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [obtenerAvisos, fecha, hora, mesasKey]);
+
+  const elegidas = todasLasMesas.filter((m) => mesasIds.includes(m.id));
+  const { faltan } = resumenMesas(elegidas, solicitud.personas);
+  const choqueConOcupada = mesasIds.some((id) => ocupadas[id]);
 
   const motivoBloqueo =
     mesasIds.length === 0
       ? 'Elige una mesa'
       : !horaFutura
         ? 'Elige una hora futura'
-        : faltan > 0
-          ? `Faltan ${faltan} asientos`
-          : null;
-
-  const alternarMesa = (id: string) => {
-    setError(null);
-    setMesasIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
+        : choqueConOcupada
+          ? 'Hay mesas ocupadas a esa hora'
+          : faltan > 0 && !confirmarCapacidad
+            ? 'Confirma la capacidad'
+            : null;
 
   const aprobar = async () => {
     setError(null);
     setCargando(true);
     try {
-      await alAprobar({ mesas: mesasIds, hora: isoLima(fecha, hora) });
+      await alAprobar({
+        mesas: mesasIds,
+        hora: isoLima(fecha, hora),
+        confirmarCapacidad: faltan > 0 && confirmarCapacidad,
+      });
     } catch (err: any) {
       setError(err?.message || 'No fue posible aprobar la solicitud.');
       setCargando(false);
@@ -104,53 +160,6 @@ export function ConfirmarAprobacionSolicitud({
           La hora solicitada ya pasó. Elige una hora nueva para aprobar o rechaza la solicitud.
         </div>
       )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        <div style={estiloEtiqueta}>Mesa(s) a asignar</div>
-        {mesas.length === 0 ? (
-          <div style={{ fontSize: '13px', color: 'var(--cp-rust)' }}>
-            No hay mesas activas en el salón.
-          </div>
-        ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))',
-              gap: '8px',
-              maxHeight: '200px',
-              overflowY: 'auto',
-            }}
-          >
-            {mesas.map((m) => {
-              const elegida = mesasIds.includes(m.id);
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  aria-pressed={elegida}
-                  onClick={() => alternarMesa(m.id)}
-                  style={{
-                    minHeight: '56px',
-                    borderRadius: '12px',
-                    border: '1.5px solid var(--cp-navy)',
-                    background: elegida ? 'var(--cp-navy)' : 'var(--cp-white)',
-                    color: elegida ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    fontWeight: 800,
-                  }}
-                >
-                  <span>{m.nombre || `Mesa ${m.numero}`}</span>
-                  <span style={{ fontSize: '11px', opacity: 0.8 }}>{m.asientos || 4} asientos</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -179,6 +188,41 @@ export function ConfirmarAprobacionSolicitud({
           />
         </label>
       </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={estiloEtiqueta}>Mesa(s) a asignar</div>
+        {todasLasMesas.length === 0 ? (
+          <div style={{ fontSize: '13px', color: 'var(--cp-rust)' }}>No hay mesas activas en el salón.</div>
+        ) : (
+          <SelectorMesasCroquis
+            pisos={pisos}
+            seleccionadas={mesasIds}
+            personas={solicitud.personas}
+            ocupadas={ocupadas}
+            onCambio={(ids) => {
+              setError(null);
+              setMesasIds(ids);
+            }}
+          />
+        )}
+      </div>
+
+      {avisos.map((aviso) => (
+        <div key={aviso} role="status" style={{ fontSize: '13px', color: 'var(--cp-navy)', fontWeight: 600 }}>
+          {aviso}
+        </div>
+      ))}
+
+      {faltan > 0 && (
+        <label style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
+          <input
+            type="checkbox"
+            checked={confirmarCapacidad}
+            onChange={(e) => setConfirmarCapacidad(e.target.checked)}
+          />
+          Confirmo que la reserva es igual aunque falten asientos
+        </label>
+      )}
 
       {error && (
         <div role="alert" style={{ fontSize: '13px', color: 'var(--cp-rust)', fontWeight: 700 }}>

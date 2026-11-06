@@ -5,7 +5,7 @@ import { alternarEleccion } from '../eleccionGrupo';
 import { ProductoCarta, GrupoOpcionesCarta } from '../tipos';
 
 vi.mock('../CarritoContext', () => ({
-  useCarrito: () => ({ abrirModalProducto: vi.fn(), agregarLinea: vi.fn(), cantidadTotal: 0, subtotal: 0 }),
+  useCarrito: () => ({ abrirModalProducto: vi.fn(), agregarLinea: vi.fn(), cantidadTotal: 0, subtotal: 0, lineas: [], inventario: {} }),
 }));
 
 const papas = { id: 'p1', nombre: 'Papas nativas 350 g', precioExtra: 6, disponible: true };

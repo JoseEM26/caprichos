@@ -1,4 +1,5 @@
 import { Coordenadas, PedidoRutaInput, RutaService } from './ruta.service';
+import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
 /** Parámetros del tiempo estimado (tabla parametro). Valores por defecto si faltan. */
 export interface ConfigEta {
@@ -206,7 +207,7 @@ export async function textoTiempoPedido(
           zonaMax: pedido.zona?.minutos_max ?? null,
           lat: pedido.entrega_lat == null ? null : Number(pedido.entrega_lat),
           lng: pedido.entrega_lng == null ? null : Number(pedido.entrega_lng),
-          unidades: (pedido.lineas ?? []).reduce((s: number, l: { cantidad: number }) => s + Number(l.cantidad || 0), 0),
+          unidades: lineasDeCuenta<{ cantidad: number }>(pedido.lineas ?? []).reduce((s: number, l: { cantidad: number }) => s + Number(l.cantidad || 0), 0),
         },
         cfg,
       )

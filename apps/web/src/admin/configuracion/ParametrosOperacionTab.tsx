@@ -71,7 +71,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   },
   verificacion_whatsapp_numero: {
     nombre: 'Número que recibe la verificación',
-    descripcion: 'Celular del negocio con código de país (p. ej. 51914244077). Vacío = usa el WhatsApp de contacto del local.',
+    descripcion: 'Celular del negocio con código de país (p. ej. 51914244077). Vacío = usa la variable del servidor VERIFICACION_WHATSAPP_NUMERO o, si no existe, el WhatsApp de contacto del local.',
     tipo: 'texto',
   },
   reprog_recargo_modo: {
@@ -154,6 +154,12 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   reserva_tolerancia_min: {
     nombre: 'Tolerancia de reserva',
     descripcion: 'Minutos de espera de cortesía antes de liberar una mesa reservada.',
+    tipo: 'numero',
+    sufijo: 'minutos',
+  },
+  reserva_recordatorio_min: {
+    nombre: 'Recordatorio de reserva',
+    descripcion: 'Minutos antes de la hora en que se envía el único recordatorio por WhatsApp (si el recordatorio está encendido).',
     tipo: 'numero',
     sufijo: 'minutos',
   },
@@ -375,7 +381,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   },
   whatsapp_aviso_encuesta_activo: {
     nombre: 'Aviso WhatsApp: Encuesta de satisfacción posventa',
-    descripcion: 'Envía encuesta interactiva de calificación del 1 al 5 al cliente tras la entrega de su pedido.',
+    descripcion: 'Encendido: se envía una encuesta de satisfacción por plantilla a todo pedido con teléfono, 30 min después de entregado (según «Espera antes de enviar la encuesta»). Requiere la plantilla caprichos_encuesta_posventa aprobada en Meta.',
     tipo: 'sino',
   },
   chatbot_pago_recordatorio_activo: {

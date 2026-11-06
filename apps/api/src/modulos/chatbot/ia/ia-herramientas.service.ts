@@ -7,6 +7,7 @@ import { LocalService } from '../../local/local.service';
 import { ZonasService } from '../../zonas/zonas.service';
 import { HerramientaIaDefinicion } from './tipos-ia';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
+import { lineasDeCuenta } from '../../pedidos/lineas-combo.util';
 
 /**
  * Servicio de herramientas de SOLO LECTURA (function calling) para OpenAI.
@@ -469,7 +470,7 @@ export class IaHerramientasService {
       };
     }
 
-    const productos = (pedido.lineas || []).map(
+    const productos = lineasDeCuenta(pedido.lineas || []).map(
       (linea: any) => `${linea.cantidad}x ${linea.nombre || 'Producto'}`,
     );
 

@@ -8,6 +8,8 @@ export type ColorEspera = 'verde' | 'amarillo' | 'naranja' | 'rojo';
 export interface PedidoReparto {
   id: string;
   codigo: string;
+  /** Último cambio de ubicación (ISO); null si la dirección es la original */
+  ubicacion_editada_en?: string | null;
   modalidad: string;
   estado: string;
   cliente_nombre: string;
@@ -189,6 +191,23 @@ export interface ReasignarPedidoDto {
   motivo: string;
 }
 
+/** Chat de WhatsApp de un pedido propio del repartidor (solo esa conversación). */
+export interface MensajeChatRepartidor {
+  id: string;
+  de: 'cliente' | 'local';
+  texto: string;
+  en: string;
+}
+
+export interface ChatRepartidor {
+  disponible: boolean;
+  motivo?: string;
+  cliente?: { nombre: string; telefono: string };
+  ventanaAbierta?: boolean;
+  atendidoPorLocal?: boolean;
+  mensajes?: MensajeChatRepartidor[];
+}
+
 export interface MensajeReparto {
   pedido_id: string;
   numero: number;
@@ -295,6 +314,12 @@ export const repartosApi = {
 
   obtenerResumen: () =>
     api.get<ResumenRepartos>('/admin/repartos/resumen'),
+
+  obtenerChat: (pedidoId: string) =>
+    api.get<ChatRepartidor>(`/admin/repartos/${pedidoId}/chat/mensajes`),
+
+  enviarChat: (pedidoId: string, texto: string) =>
+    api.post<{ id: string }>(`/admin/repartos/${pedidoId}/chat/mensajes`, { texto }),
 
   consultarMensajes: (id: string) =>
     api.get<MensajeReparto[]>(`/admin/repartos/${id}/mensajes`),

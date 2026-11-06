@@ -49,12 +49,17 @@ export interface AbrirPedidoMesaPayload {
     nota?: string;
     personas?: string[];
     ofertaId?: string;
-    comboElecciones?: { parteId: string; productoId: string }[];
+    comboElecciones?: { parteId: string; productoId: string; saborId?: string }[];
+    /** Cortesía de la línea (solo con permiso cortesias/dar): sale a S/ 0 */
+    cortesia?: { motivo: string; nota?: string };
   }>;
   nota?: string;
   reservaId?: string;
   cuponCodigo?: string;
   canal?: 'MOZO' | 'CAJA';
+  /** Personas de la mesa: el servidor valida los asientos (confirmarCapacidad la permite si faltan) */
+  personas?: number;
+  confirmarCapacidad?: boolean;
   esPersonal?: boolean;
   colaboradorPartyId?: string | number;
   /** Cliente con cuenta elegido en «¿Quién pide?» (id del party); suma puntos al cobrar */
@@ -126,10 +131,12 @@ export const salonApi = {
   misPedidos: (rango: RangoMisPedidos) =>
     api.get<RespuestaMisPedidos>(`/admin/pedidos/mis-pedidos?rango=${rango}`),
 
-  abrirPedidoMesa: (payload: AbrirPedidoMesaPayload, idempotencyKey: string) =>
+  /** codigoSupervisor: solo si hay líneas de cortesía y quien envía es SUPERVISOR (6 dígitos) */
+  abrirPedidoMesa: (payload: AbrirPedidoMesaPayload, idempotencyKey: string, codigoSupervisor?: string) =>
     api.post('/admin/salon/pedidos', payload, {
       headers: {
         'Idempotency-Key': idempotencyKey,
+        ...(codigoSupervisor ? { 'x-codigo-supervisor': codigoSupervisor } : {}),
       },
     }),
 
@@ -139,9 +146,25 @@ export const salonApi = {
       { motivo, ...(forzar ? { forzar: true } : {}) },
     ),
 
-  /** Pasa el pedido de mesa a otra mesa libre (409 MESA_OCUPADA si no lo está) */
-  cambiarMesaPedido: (pedidoId: string, mesaId: string) =>
-    api.post<{ ok: boolean; mesa: string }>(`/admin/salon/pedidos/${pedidoId}/cambiar-mesa`, { mesaId }),
+  /** Pasa el pedido de mesa a otra mesa libre (409 MESA_OCUPADA si no lo está). Con desdeMesaId mueve solo esa mesa. */
+  cambiarMesaPedido: (pedidoId: string, mesaId: string, desdeMesaId?: string) =>
+    api.post<{ ok: boolean; mesa: string }>(`/admin/salon/pedidos/${pedidoId}/cambiar-mesa`, {
+      mesaId,
+      ...(desdeMesaId ? { desdeMesaId } : {}),
+    }),
+
+  /** Suma mesas libres a un pedido de salón abierto (máximo 6 en total). Devuelve el nombre «Mesas 3 y 4». */
+  agregarMesasPedido: (pedidoId: string, mesaIds: string[]) =>
+    api.post<{ ok: boolean; mesa: string; mesas: Array<{ id: string | null }> }>(
+      `/admin/salon/pedidos/${pedidoId}/mesas`,
+      { mesaIds },
+    ),
+
+  /** Quita una mesa del pedido; la mesa queda libre. El pedido conserva al menos una. */
+  quitarMesaPedido: (pedidoId: string, mesaId: string) =>
+    api.delete<{ ok: boolean; mesa: string; mesas: Array<{ id: string | null }> }>(
+      `/admin/salon/pedidos/${pedidoId}/mesas/${mesaId}`,
+    ),
 
   marcarEntregadoMesa: (pedidoId: string) =>
     api.post<{ ok: boolean; id: string; codigo: string }>(
@@ -180,6 +203,15 @@ export const salonApi = {
       `/admin/reservas/${id}/sentar`,
     ),
 
+  /** Vuelve a ACTIVA una reserva «No llegó» de hoy (el cliente llegó tarde). Auditada en el servidor. */
+  reactivarReserva: (id: string) => api.post<Reserva>(`/admin/reservas/${id}/reactivar`, {}),
+
+  /** Avisos suaves (no bloquean) para las mesas elegidas a esa fecha y hora (YYYY-MM-DD, HH:mm). */
+  avisosMesas: (fecha: string, hora: string, mesaIds: string[]) =>
+    api.get<{ avisos: string[] }>(
+      `/admin/reservas/avisos-mesas?fecha=${encodeURIComponent(fecha)}&hora=${encodeURIComponent(hora)}&mesas=${mesaIds.join(',')}`,
+    ).then((r) => r.avisos),
+
   listarSolicitudes: (estado?: string) => {
     const qs = estado ? `?estado=${estado}` : '';
     return api.get<any[]>(`/admin/reservas/solicitudes${qs}`);
@@ -187,8 +219,21 @@ export const salonApi = {
 
   aprobarSolicitud: (
     id: string,
-    payload: { mesas: string[]; personas?: number; hora?: string; nombre?: string; telefono?: string },
+    payload: {
+      mesas: string[];
+      personas?: number;
+      hora?: string;
+      nombre?: string;
+      telefono?: string;
+      confirmarCapacidad?: boolean;
+    },
   ) => api.post<{ solicitud: any; reserva: Reserva }>(`/admin/reservas/solicitudes/${id}/aprobar`, payload),
+
+  /** Mesas que otras reservas ocupan a esa fecha (YYYY-MM-DD) y hora (HH:mm, Lima). */
+  mesasOcupadas: (fecha: string, hora: string) =>
+    api.get<Array<{ mesa_id: string; reserva_id: string; nombre: string; hora: string }>>(
+      `/admin/reservas/mesas-ocupadas?fecha=${encodeURIComponent(fecha)}&hora=${encodeURIComponent(hora)}`,
+    ),
 
   rechazarSolicitud: (id: string, payload: { motivo: string; alternativas?: string }) =>
     api.post<any>(`/admin/reservas/solicitudes/${id}/rechazar`, payload),

@@ -22,7 +22,6 @@ function mapaBase(over: Partial<MapaImpresionDatos> = {}): MapaImpresionDatos {
     ruteo: [
       { tipo: 'ETIQUETA_GENERAL', areaId: null, destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: true },
       { tipo: 'ETIQUETA_BEBIDA', areaId: '1', destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Etiquetera bar', activo: true },
-      { tipo: 'ETIQUETA_AREA', areaId: '1', destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Etiquetera bar', activo: false },
       { tipo: 'ETIQUETA_AREA', areaId: '2', destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: false },
       { tipo: 'ETIQUETA_AREA', areaId: '3', destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: false },
       { tipo: 'TICKET_COMANDA_SALON', areaId: null, destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: true },
@@ -64,6 +63,15 @@ describe('derivarFlujo', () => {
     const f = derivarFlujo(mapaBase(), DELIVERY);
     expect(pieza(f, 'AREA').reglaActiva).toBe(false);
     expect(pieza(f, 'AREA').sale).toBe(false);
+  });
+
+  it('sticker por área: Bebidas no aparece en sus salidas y la pieza lo dice', () => {
+    const f = derivarFlujo(mapaBase({ reglas: { ...mapaBase().reglas, areaActivo: true } }), DELIVERY);
+    const area = pieza(f, 'AREA');
+    expect(area.sale).toBe(true);
+    expect(area.que).toBe('Un sticker por cada área con productos, salvo Bebidas (que ya tiene uno por cada vaso)');
+    expect(area.salidas).toHaveLength(2);
+    expect(area.salidas.some((s) => s.slot === '1')).toBe(false);
   });
 
   it('área con equipo: el sticker va a su equipo, sin espera', () => {

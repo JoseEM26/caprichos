@@ -6,6 +6,8 @@ import { BotonEtapa, BotonReportar, etapaDe } from './RepartidorView';
 import { Insignia } from '../../comun/Insignia';
 import { PedidoReparto, repartosApi, MensajeReparto } from './repartosApi';
 import { ModalReportarFalla } from './ModalReportarFalla';
+import { BotonProponerUbicacion } from './BotonProponerUbicacion';
+import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
 import { ModalResolverFalla } from './ModalResolverFalla';
 import { ErrorApi } from '../../comun/api';
 import { clasificarEspera } from './calculoRuta';
@@ -127,7 +129,6 @@ export function TarjetaReparto({
     ? pedido.cliente_telefono.replace(/\D/g, '').slice(-9)
     : null;
   const telUrl = telDigitos ? `tel:${telDigitos}` : null;
-  const waUrl = telDigitos ? `https://wa.me/51${telDigitos}` : null;
 
   // Acciones con confirmación
   const pedirConfirmacion = (
@@ -324,6 +325,7 @@ export function TarjetaReparto({
               >
                 {pedido.codigo}
               </span>
+              {pedido.ubicacion_editada_en && <InsigniaDireccionEditada />}
               {pedido.zona && (
                 <span
                   style={{
@@ -416,7 +418,7 @@ export function TarjetaReparto({
               {pedido.cliente_nombre}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-              {telUrl ? 'Teléfono registrado (usa Llamar o WhatsApp)' : 'Sin teléfono registrado'}
+              {telUrl ? 'Teléfono registrado (usa Llamar o el chat de WhatsApp)' : 'Sin teléfono registrado'}
             </div>
           </div>
 
@@ -442,31 +444,6 @@ export function TarjetaReparto({
                 }}
               >
                 Llamar
-              </a>
-            )}
-            {waUrl && (
-              <a
-                href={waUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Escribir por WhatsApp a ${pedido.cliente_nombre}`}
-                style={{
-                  minWidth: '76px',
-                  minHeight: '44px',
-                  boxSizing: 'border-box',
-                  borderRadius: '12px',
-                  background: 'var(--cp-green, #2F7A45)',
-                  color: 'var(--cp-white)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  textDecoration: 'none',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  padding: '0 12px',
-                }}
-              >
-                WhatsApp
               </a>
             )}
           </div>
@@ -892,6 +869,9 @@ export function TarjetaReparto({
             )}
 
             <BotonReportar pedido={pedido} onReportar={() => setModalFallaAbierto(true)} />
+
+            {/* Propuesta de la ubicación real (caja la aprueba antes de cambiar nada) */}
+            <BotonProponerUbicacion pedidoId={pedido.id} codigo={pedido.codigo} estado={pedido.estado} />
           </div>
         )}
       </div>

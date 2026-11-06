@@ -237,12 +237,7 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoConEnvio);
 
-      // Pide referencia de entrega
-      expect(resultado.nuevoEstado).toBe('PEDIDO_REFERENCIA');
-      entrada = normalizarEntrada({ texto: 'Frente al parque, portón blanco' });
-      resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoConEnvio);
-
-      // Pasa a categorías para armar su pedido
+      // La ubicación pasa directo a categorías (sin paso de referencia)
       expect(resultado.nuevoEstado).toBe('PEDIDO_CATEGORIAS');
       expect(resultado.nuevoFlujo.pedido?.entrega?.modalidad).toBe('DELIVERY');
       expect(resultado.nuevoFlujo.pedido?.entrega?.tarifaEnvio).toBe(5.0);
@@ -352,12 +347,12 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoBase);
       expect(resultado.nuevoEstado).toBe('PEDIDO_UBICACION');
 
-      // Ingresar dirección fuera de rango
+      // Ubicación fuera de rango (solo la ubicación actual cuenta; el texto libre repite la instrucción)
       const contextoFueraCobertura: ContextoConversacion = {
         ...contextoBase,
         resultadoEnvio: { cubierto: false, tarifa: null },
       };
-      entrada = normalizarEntrada({ texto: 'Chosica Km 35' });
+      entrada = normalizarEntrada({ tipo: 'location', ubicacion: { latitud: -11.9, longitud: -76.7 } });
       resultado = transicionarEstado(resultado.nuevoFlujo, entrada, contextoFueraCobertura);
 
       expect(resultado.nuevoEstado).toBe('PEDIDO_UBICACION');
@@ -421,7 +416,6 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
         estadoInterno: 'PEDIDO_INGRESAR_TELEFONO',
         modalidad: 'RECOGER',
         cliente: { nombre: 'Cliente Meta' },
-        cuponPreguntado: true,
         items: [
           {
             lineaId: 'lin_1',
@@ -740,7 +734,8 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       const textos = resultado.acciones
         .map((a: any) => `${a.texto ?? ''} ${a.botones?.map((b: any) => b.titulo).join(' ') ?? ''}`)
         .join(' ');
-      expect(textos).not.toMatch(/promo|oferta|descuento|cup[oó]n|ahorr|puntos/i);
+      // La línea de puntos (solo acumular, con el celular de quien escribe) sí va en este mensaje; las promos no
+      expect(textos).not.toMatch(/promo|oferta|descuento|cup[oó]n|ahorr/i);
     });
   });
 
@@ -826,6 +821,35 @@ describe('Flujo de Pedido por WhatsApp (Ola 2, Agente C - FT-BOT-01)', () => {
       expect(accionCrear.dto.cliente.nombre).toBe('Carlos Test');
       expect(accionCrear.dto.cliente.telefono).toBe('987654321');
       expect(accionCrear.dto.lineas[0].productoId).toBe('prod_clasica');
+    });
+  });
+
+  describe('11. Productos que controlan stock: no se ofrece más de lo que queda', () => {
+    it('la pregunta de cantidad solo ofrece 1 unidad si quedan 1, y pedir 2 repreguntan con el saldo', () => {
+      const contextoQuedan: ContextoConversacion = {
+        ...contextoBase,
+        categoriasCarta: [
+          {
+            ...categoriaHamburguesas,
+            productos: categoriaHamburguesas.productos.map((p) => (p.id === 'prod_clasica' ? { ...p, quedan: 1 } : p)),
+          },
+        ],
+      };
+      let resultado = transicionarEstado(null, normalizarEntrada({ listRowId: 'pedir' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_mod_recojer' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_cat_cat_hamb' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_prod_prod_clasica' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_tam_tam_simple' }), contextoQuedan);
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ listRowId: 'ped_op_op_tartara' }), contextoQuedan);
+
+      expect(resultado.nuevoEstado).toBe('PEDIDO_CANTIDAD');
+      const botones = (resultado.acciones[0] as any).botones.map((b: any) => b.id);
+      expect(botones).toEqual(['ped_cant_1']);
+
+      resultado = transicionarEstado(resultado.nuevoFlujo, normalizarEntrada({ buttonPayload: 'ped_cant_2' }), contextoQuedan);
+      expect(resultado.nuevoEstado).toBe('PEDIDO_CANTIDAD');
+      expect((resultado.acciones[0] as any).texto).toBe('Solo quedan 1 de Hamburguesa Clásica 😅 ¿Cuántas quieres?');
+      expect(resultado.nuevoFlujo.pedido?.items?.length ?? 0).toBe(0);
     });
   });
 });

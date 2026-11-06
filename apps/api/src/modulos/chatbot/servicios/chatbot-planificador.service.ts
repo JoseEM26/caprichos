@@ -351,11 +351,14 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
         }
       }
 
-      // 3. Encuesta posventa tras X minutos de ENTREGADO (o, en mesa, de la entrega en mesa o del cobro)
+      // 3. Encuesta posventa tras X minutos de la entrega, para todo pedido con teléfono (carta, bot, mozo y caja).
+      //    Delivery y recojo: entregado_en (cocina o reparto). Mesa: entregado en mesa o el cobro.
+      //    Para llevar/recoger que quedó LISTO y se cobró sin pasar por cocina (no fija entregado_en): el cobro vigente.
       if (params.avisoEncuestaActivo) {
         const limiteEntregado = new Date(ahora.getTime() - params.encuestaEsperaMin * 60000);
         // Solo entregas recientes: sin ventana, activar la encuesta enviaría a todo el historial
         const desde = new Date(ahora.getTime() - VENTANA_REVISION_MS);
+        const cobroVigenteEnVentana = { some: { anulado_en: null, en: { gte: desde, lte: limiteEntregado } } };
         const pedidosParaEncuesta = await this.prisma.pedido.findMany({
           where: {
             estado: { notIn: ['ANULADO'] },
@@ -364,7 +367,8 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
             OR: [
               { entregado_en: { gte: desde, lte: limiteEntregado } },
               { modalidad: 'MESA', entregado_mesa_en: { gte: desde, lte: limiteEntregado } },
-              { modalidad: 'MESA', cobros: { some: { anulado_en: null, en: { gte: desde, lte: limiteEntregado } } } },
+              { modalidad: 'MESA', cobros: cobroVigenteEnVentana },
+              { modalidad: { notIn: ['DELIVERY', 'MESA'] }, estado: { in: ['LISTO', 'ENTREGADO'] }, cobros: cobroVigenteEnVentana },
             ],
           },
           select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true },

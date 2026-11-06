@@ -2,6 +2,9 @@ import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/** Unidades que lleva cada tamaño de la carta (donas y galletas con sabores). */
+const UNIDADES_POR_TAMANO: Record<string, number> = { 'Unidad': 1, '1/2 docena': 6, 'Docena': 12 };
+
 const prisma = new PrismaClient();
 
 function slugify(text: string): string {
@@ -189,6 +192,8 @@ export async function main() {
   // 5. Productos, tamaños, grupos asociados y sabores
   for (let pIdx = 0; pIdx < P.length; pIdx++) {
     const p = P[pIdx];
+    // El combo cajita (con sus juguetes) lo asegura la migración 20261225100000 y seed-ofertas: no se siembra desde la maqueta
+    if (p.name === 'COMBO CAJITA CAPRIKIDS') continue;
     const catId = mapaCategorias.get(p.cat) || mapaCategorias.get('complementos')!;
     const precioBase = p.variants && p.variants.length > 0 ? p.variants[0].p : 0;
 
@@ -208,6 +213,8 @@ export async function main() {
         precio: precioBase,
         orden: pIdx + 1,
         oculto: false,
+        // Postres controla stock desde la instalación (igual que la migración 20261226200000)
+        controla_stock: p.cat === 'complementos',
       },
     });
 
@@ -216,6 +223,8 @@ export async function main() {
       for (const v of p.variants) {
         const tamanoValorId = mapaTamanos.get(v.n);
         if (tamanoValorId) {
+          // Unidades por tamaño (stock por sabor): Unidad=1, 1/2 docena=6, Docena=12
+          const unidades = UNIDADES_POR_TAMANO[v.n] ?? 1;
           await prisma.productoTamano.upsert({
             where: {
               producto_id_tamano_valor_id: {
@@ -223,12 +232,13 @@ export async function main() {
                 tamano_valor_id: tamanoValorId,
               },
             },
-            update: { precio: v.p, activo: true },
+            update: { precio: v.p, activo: true, unidades },
             create: {
               producto_id: producto.id,
               tamano_valor_id: tamanoValorId,
               precio: v.p,
               activo: true,
+              unidades,
             },
           });
         }

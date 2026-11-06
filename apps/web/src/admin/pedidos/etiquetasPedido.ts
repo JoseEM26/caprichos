@@ -1,4 +1,4 @@
-import type { TicketPagoDatos } from '@caprichos/compartido';
+import { esAreaBebidas, type TicketPagoDatos } from '@caprichos/compartido';
 import { Pedido, LineaPedido } from './pedidosApi';
 import { canalLabel, modLabel } from './PedidosAdminView';
 
@@ -170,10 +170,11 @@ export function armarEtiquetas(pedido: Pedido): ResumenEtiquetas {
   };
 
   // 2. Por Área
-  // Agrupa las líneas por linea.area.nombre; si no trae área usa 'SALADOS'
+  // Agrupa las líneas por linea.area.nombre; si no trae área usa 'SALADOS'. Bebidas no lleva sticker por área.
   const areaMap = new Map<string, LineaPedido[]>();
   lineas.forEach((l) => {
     const areaRaw = l.area?.nombre?.trim();
+    if (esAreaBebidas(areaRaw)) return;
     const areaNombre = (areaRaw || 'SALADOS').toUpperCase();
     if (!areaMap.has(areaNombre)) {
       areaMap.set(areaNombre, []);

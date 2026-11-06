@@ -7,6 +7,7 @@ import {
 import * as crypto from 'crypto';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
+import { vigenciaRolExtra } from '../acceso/roles-usuario';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import {
   exigirPinNoBloqueado,
@@ -43,17 +44,54 @@ const ROLES_SIN_CODIGO = ['ADMIN', 'SUPERVISOR'];
 export async function esOperadorSinCodigo(
   prisma: PrismaService,
   operadorPartyId: bigint | string | undefined,
+  /** Solo el ADMIN queda exento (acciones que el SUPERVISOR debe autorizar con su código, p. ej. cortesías). */
+  soloAdmin = false,
 ): Promise<{ party_id: bigint; id: bigint; rol: string } | null> {
   if (operadorPartyId === undefined) return null;
-  // ADMIN solo como principal (no se combina); SUPERVISOR como principal o como rol extra
+  // ADMIN solo como principal (no se combina); SUPERVISOR como principal o como rol extra VIGENTE (temporal o no)
   return prisma.userAccount.findFirst({
     where: {
       party_id: BigInt(operadorPartyId),
       activo: true,
-      OR: [{ rol: { in: ROLES_SIN_CODIGO } }, { rolesExtra: { some: { rol: 'SUPERVISOR' } } }],
+      OR: soloAdmin
+        ? [{ rol: 'ADMIN' }]
+        : [
+            { rol: { in: ROLES_SIN_CODIGO } },
+            { rolesExtra: { some: { rol: 'SUPERVISOR', OR: vigenciaRolExtra() } } },
+          ],
     },
     select: { party_id: true, id: true, rol: true },
   });
+}
+
+/**
+ * Quién puede mostrar el código y, por tanto, quedar como aprobador: ADMIN o SUPERVISOR vigente
+ * (principal o temporal). Lo usa la atribución del visor y la autorización guardada: si el rol se quitó
+ * o venció, su código deja de valer aunque el visor siga en Redis.
+ */
+export async function esAprobadorVigente(prisma: PrismaService, partyId: bigint | string | undefined): Promise<boolean> {
+  if (partyId === undefined) return false;
+  return (await esOperadorSinCodigo(prisma, partyId)) !== null;
+}
+
+/** Nombre y cargo (titular o suplente) de quien aprueba, para dejarlo en la auditoría. */
+export async function describirAprobador(
+  prisma: PrismaService,
+  partyId: bigint | string,
+): Promise<string> {
+  const pid = BigInt(partyId);
+  // Si la lectura del nombre falla, la aprobación no se cae: queda el número de la persona en la auditoría.
+  try {
+    const [persona, cuenta] = await Promise.all([
+      prisma.person.findUnique({ where: { party_id: pid }, select: { nombres: true, apellidos: true } }),
+      prisma.userAccount.findUnique({ where: { party_id: pid }, select: { rol: true } }),
+    ]);
+    const nombre = persona ? `${persona.nombres} ${persona.apellidos ?? ''}`.trim() : `Usuario ${pid}`;
+    const cargo = cuenta?.rol === 'SUPERVISOR' ? 'supervisor titular' : cuenta?.rol === 'ADMIN' ? 'administrador' : 'supervisor suplente';
+    return `${nombre} (${cargo})`;
+  } catch {
+    return `Usuario ${pid}`;
+  }
 }
 
 export async function autorizarAdminSinCodigo(
@@ -64,8 +102,9 @@ export async function autorizarAdminSinCodigo(
   ip?: string,
   entidad?: string,
   entidadId?: bigint,
+  soloAdmin = false,
 ): Promise<{ party_id: bigint; id: bigint } | null> {
-  const admin = await esOperadorSinCodigo(prisma, operadorPartyId);
+  const admin = await esOperadorSinCodigo(prisma, operadorPartyId, soloAdmin);
   if (!admin) return null;
   await auditoria.registrar({
     categoria: 'ACCESO',
@@ -74,7 +113,8 @@ export async function autorizarAdminSinCodigo(
     resultado: 'OK',
     entidad: entidad ?? 'supervisor_codigo',
     entidadId,
-    motivo: `Acción ${accion}: autorizado por rol ${admin.rol} (sin código)`,
+    motivo: `Acción ${accion}: aprobó ${await describirAprobador(prisma, admin.party_id)} (sin código)`,
+    despues: { aprobadorPartyId: admin.party_id.toString() },
     partyId: admin.party_id,
     ip,
   });
@@ -273,8 +313,10 @@ export class SupervisorCodigoService {
     entidad?: string,
     entidadId?: bigint,
     localCodigo = LOCAL_CODIGO_DEFECTO,
+    exigirCodigoSupervisor = false,
   ): Promise<{ party_id: bigint; id: bigint; supervisorPartyId: bigint; supervisorId: bigint }> {
     // 0. El ADMIN nunca da código (sería él mismo aprobándose): queda auditado y no cuenta intentos.
+    //    Con exigirCodigoSupervisor, el SUPERVISOR tampoco queda exento y debe presentar su código.
     const admin = await autorizarAdminSinCodigo(
       this.prisma,
       this.auditoria,
@@ -283,6 +325,7 @@ export class SupervisorCodigoService {
       ip,
       entidad,
       entidadId,
+      exigirCodigoSupervisor,
     );
     if (admin) {
       return { ...admin, supervisorPartyId: admin.party_id, supervisorId: admin.id };
@@ -305,7 +348,11 @@ export class SupervisorCodigoService {
           HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
-      if (vigente) {
+      const [pp, ii] = (vigente ?? '').split(':');
+      // La autorización sigue valiendo solo mientras quien la dio siga siendo ADMIN o SUPERVISOR vigente
+      if (vigente && pp && (await esAprobadorVigente(this.prisma, pp))) {
+        const sup = BigInt(pp);
+        const supId = BigInt(ii ?? pp);
         await this.auditoria.registrar({
           categoria: 'ACCESO',
           modulo: 'supervisor',
@@ -313,13 +360,11 @@ export class SupervisorCodigoService {
           resultado: 'OK',
           entidad: entidad ?? 'supervisor_codigo',
           entidadId,
-          motivo: `Acción ${accion} autorizada con la autorización vigente del código del supervisor`,
+          motivo: `Acción ${accion} autorizada por ${await describirAprobador(this.prisma, sup)} con una autorización vigente del código`,
+          despues: { aprobadorPartyId: sup.toString() },
           partyId: BigInt(operadorPartyId),
           ip,
         });
-        const [pp, ii] = vigente.split(':');
-        const sup = BigInt(pp);
-        const supId = BigInt(ii ?? pp);
         return { party_id: sup, id: supId, supervisorPartyId: sup, supervisorId: supId };
       }
     }
@@ -348,8 +393,10 @@ export class SupervisorCodigoService {
 
     // Quien autoriza es quien mostró el código por última vez (ADMIN o SUPERVISOR). Si nadie lo mostró en la
     // ventana reciente, se usa el respaldo de siempre: un ADMIN activo (queda visible en auditoría).
+    // El visor cuenta solo si sigue siendo ADMIN o SUPERVISOR vigente (un rol temporal vencido o retirado no autoriza)
     const visor = await this.leerVisorCodigo(redis, localCodigo);
-    const adminSupervisor = visor
+    const visorVigente = visor !== null && (await esAprobadorVigente(this.prisma, visor));
+    const adminSupervisor = visorVigente
       ? await this.prisma.userAccount.findUnique({
           where: { party_id: visor },
           select: { party_id: true, id: true },
@@ -494,7 +541,8 @@ export class SupervisorCodigoService {
       resultado: 'OK',
       entidad: entidad ?? 'supervisor_codigo',
       entidadId,
-      motivo: `Acción ${accion} autorizada exitosamente mediante código rotativo (desfase de reloj: ${desfase > 0 ? '+' : ''}${desfase} paso). Autoriza el supervisor ${supervisorPartyId}`,
+      motivo: `Acción ${accion} autorizada mediante código rotativo (desfase de reloj: ${desfase > 0 ? '+' : ''}${desfase} paso). Aprobó: ${await describirAprobador(this.prisma, supervisorPartyId)}`,
+      despues: { aprobadorPartyId: supervisorPartyId.toString() },
       partyId: partyIdOperadorNum,
       ip,
     });
