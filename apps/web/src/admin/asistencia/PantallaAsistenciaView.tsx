@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ErrorApi } from '../../comun/api';
+import './asistencia.css';
 import { pantallaQr, pantallaQrPublica, QrPantalla } from './asistenciaApi';
 
 /**
@@ -54,18 +55,7 @@ export function PantallaAsistenciaView({ token }: { token?: string } = {}) {
   const restan = qr ? Math.max(0, Math.ceil((qr.cambiaEn - (ahora + offset)) / 1000)) : null;
 
   return (
-    <section
-      aria-label="Pantalla de asistencia"
-      style={{
-        display: 'grid',
-        justifyItems: 'center',
-        alignContent: 'center',
-        gap: 16,
-        padding: 24,
-        textAlign: 'center',
-        ...(publica ? { minHeight: '100vh', background: 'var(--cp-cream)' } : {}),
-      }}
-    >
+    <section aria-label="Pantalla de asistencia" className={`pa-pantalla${publica ? ' pa-pantalla--publica' : ''}`}>
       <h2 style={{ margin: 0 }}>Marca tu asistencia</h2>
       <p style={{ margin: 0 }}>Abre «Mi asistencia» en tu celular y escanea este código.</p>
       {qr ? (
@@ -73,22 +63,22 @@ export function PantallaAsistenciaView({ token }: { token?: string } = {}) {
           src={qr.qr}
           alt="Código QR de asistencia"
           data-testid="qr-asistencia"
-          style={{ width: 'min(70vmin, 480px)', height: 'auto', background: '#fff', padding: 12, borderRadius: 12 }}
+          className="pa-qr"
         />
       ) : (
         <div role="status">Cargando código…</div>
       )}
       {qr && (
         <>
-          <div aria-live="polite" data-testid="cuenta-regresiva" style={{ fontSize: 18 }}>
+          <div aria-live="polite" data-testid="cuenta-regresiva" className="pa-cuenta">
             El código cambia en {restan} s
           </div>
-          <div style={{ fontSize: 14 }}>
-            Si la cámara no funciona, escribe este código: <strong data-testid="codigo-corto" style={{ fontSize: 28, letterSpacing: 4 }}>{qr.codigo}</strong>
+          <div>
+            Si la cámara no funciona, escribe este código: <strong data-testid="codigo-corto" className="pa-codigo">{qr.codigo}</strong>
           </div>
         </>
       )}
-      {error && <div role="alert">{error}</div>}
+      {error && <div role="alert" className="as-aviso as-aviso--error">{error}</div>}
     </section>
   );
 }

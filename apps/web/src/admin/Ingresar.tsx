@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
 import { ErrorApi } from '../comun/api';
 import { destinoTrasIngresar } from '../comun/destinoTrasIngresar';
@@ -151,6 +151,10 @@ export function Ingresar() {
   const { ingresar, usuario, debeCambiar, cargando: sesionCargando } = useSesion();
   const navigate = useNavigate();
   const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  // Destino: el que dejó la ruta protegida (state.desde) o el del atajo (?siguiente=); solo rutas internas /admin/…
+  const destinoPedido = () => destinoTrasIngresar((location.state as any)?.desde ?? params.get('siguiente'));
+  const paraAsistencia = destinoPedido() === '/admin/mi-asistencia';
   const avisoSalida = (location.state as { aviso?: string } | null)?.aviso;
   const pantallaAncha = useEsPantallaAncha();
   const contenidoIngreso = useContenidoIngreso();
@@ -166,11 +170,11 @@ export function Ingresar() {
       if (debeCambiar) {
         navigate('/admin/cambiar-clave', { replace: true });
       } else {
-        const destino = destinoTrasIngresar((location.state as any)?.desde);
+        const destino = destinoPedido();
         navigate(destino, { replace: true });
       }
     }
-  }, [sesionCargando, usuario, debeCambiar, navigate, location.state]);
+  }, [sesionCargando, usuario, debeCambiar, navigate, location.state, params]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -208,7 +212,7 @@ export function Ingresar() {
       if (resultado.debeCambiar) {
         navigate('/admin/cambiar-clave', { replace: true });
       } else {
-        const destino = destinoTrasIngresar((location.state as any)?.desde);
+        const destino = destinoPedido();
         navigate(destino, { replace: true });
       }
     } catch (err: any) {
@@ -271,8 +275,16 @@ export function Ingresar() {
           CAPRICHOS
         </div>
         <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-          Panel del local · Inicia sesión
+          {paraAsistencia ? 'Ingresa para marcar tu asistencia' : 'Panel del local · Inicia sesión'}
         </div>
+        {paraAsistencia && (
+          <span
+            data-testid="destino-asistencia"
+            style={{ display: 'inline-flex', padding: '2px 10px', borderRadius: 9999, fontSize: 12, fontWeight: 700, background: 'var(--cp-sand)', color: 'var(--cp-navy)', border: '1px solid var(--cp-line)' }}
+          >
+            Destino: Mi asistencia
+          </span>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -433,6 +445,25 @@ export function Ingresar() {
           {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
         </button>
       </form>
+
+      {!paraAsistencia && (
+        <button
+          type="button"
+          onClick={() => setParams({ siguiente: '/admin/mi-asistencia' })}
+          style={{
+            minHeight: '48px',
+            borderRadius: '12px',
+            border: '1.5px solid var(--cp-navy)',
+            background: 'transparent',
+            color: 'var(--cp-navy)',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: 'pointer',
+          }}
+        >
+          Marcar mi asistencia
+        </button>
+      )}
     </div>
   );
 
