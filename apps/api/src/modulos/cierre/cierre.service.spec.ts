@@ -218,6 +218,9 @@ describe('CierreService', () => {
       devolucionPedido: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      pedidoCambioUbicacion: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       party: {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockResolvedValue({
@@ -1455,6 +1458,16 @@ describe('CierreService', () => {
       ]);
       const res = await service.obtenerDigitales();
       expect(res.medios.yape).toMatchObject({ sistema: 200, devuelto: 0 });
+    });
+
+    it('un saldo de cambio de ubicación cobrado por Yape suma y una devolución de cambio resta; lo pendiente no cuenta', async () => {
+      prismaMock.pedidoCambioUbicacion.findMany.mockResolvedValue([
+        { ajuste_tipo: 'SALDO', ajuste_estado: 'COBRADO', ajuste_medio: 'YAPE', ajuste_monto: 6, ajuste_en: new Date('2026-10-21T17:00:00Z') },
+        { ajuste_tipo: 'DEVOLUCION', ajuste_estado: 'DEVUELTO', ajuste_medio: 'YAPE', ajuste_monto: 4, ajuste_en: new Date('2026-10-21T18:00:00Z') },
+        { ajuste_tipo: 'DEVOLUCION', ajuste_estado: 'PENDIENTE', ajuste_medio: 'YAPE', ajuste_monto: 9, ajuste_en: null },
+      ]);
+      const res = await service.obtenerDigitales();
+      expect(res.medios.yape).toMatchObject({ cobrado: 206, devuelto: -4, sistema: 202 });
     });
 
     it('el ADMIN ve el esperado de Yape ya descontada la devolución', async () => {

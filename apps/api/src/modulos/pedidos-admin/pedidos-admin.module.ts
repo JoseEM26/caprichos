@@ -13,15 +13,21 @@ import { ChatbotModule } from '../chatbot/chatbot.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
 import { ComprobantesModule } from '../comprobantes/comprobantes.module';
 import { DevolucionPedidoService } from './devolucion-pedido.service';
+import { CambioUbicacionService } from './cambio-ubicacion.service';
+import { PropuestaUbicacionService } from './propuesta-ubicacion.service';
+import { CambioUbicacionController } from './cambio-ubicacion.controller';
+import { PropuestaUbicacionController } from './propuesta-ubicacion.controller';
 
 @Module({
   imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule],
-  controllers: [PedidosAdminController],
+  controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController],
   providers: [
     PedidosEstadoService,
     UbicarPedidoService,
     PedidoComprobanteService,
     DevolucionPedidoService,
+    CambioUbicacionService,
+    PropuestaUbicacionService,
   ],
   exports: [PedidosEstadoService],
 })

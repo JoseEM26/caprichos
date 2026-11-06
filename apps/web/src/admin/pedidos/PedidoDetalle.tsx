@@ -30,6 +30,7 @@ import {
 } from '../creditos/creditosApi';
 import { salonApi } from '../salon/api';
 import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
+import { SeccionUbicacionPedido } from './SeccionUbicacionPedido';
 
 export interface PedidoDetalleProps {
   pedido: Pedido;
@@ -348,6 +349,18 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
             </>
           )}
         </div>
+
+        {esDelivery && (
+          <SeccionUbicacionPedido
+            pedidoId={String(pedido.id)}
+            codigo={pedido.codigo}
+            estado={pedido.estado}
+            lat={hasMapCoords ? Number(pedido.entrega_lat) : null}
+            lng={hasMapCoords ? Number(pedido.entrega_lng) : null}
+            direccion={pedido.entrega_direccion}
+            alActualizar={alActualizar}
+          />
+        )}
 
         {/* 5 Tabs */}
         <div role="tablist" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

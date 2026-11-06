@@ -61,6 +61,9 @@ model Party {
   ajustesMedioAutorizados  CierreAjusteMedio[]   @relation("AjusteMedioAutorizado")
   devolucionesPor          DevolucionPedido[]    @relation("DevolucionPor")
   devolucionesAutorizadas  DevolucionPedido[]    @relation("DevolucionAutorizada")
+  cambiosUbicacionPropuestos PedidoCambioUbicacion[] @relation("CambioUbicacionPropuesto")
+  cambiosUbicacionResueltos  PedidoCambioUbicacion[] @relation("CambioUbicacionResuelto")
+  cambiosUbicacionAjustes    PedidoCambioUbicacion[] @relation("CambioUbicacionAjuste")
 
   @@map("party")
 }
@@ -513,6 +516,8 @@ model ZonaReparto {
   pedidos   Pedido[]
   contactos ContactMechanism[]
   direcciones ClienteDireccion[]
+  cambiosUbicacionAnterior PedidoCambioUbicacion[] @relation("CambioZonaAnterior")
+  cambiosUbicacionNueva    PedidoCambioUbicacion[] @relation("CambioZonaNueva")
 
   @@map("zona_reparto")
 }
@@ -591,6 +596,8 @@ model Pedido {
   cobro_mozo_party_id    BigInt?
   // Efectivo que el mozo recibió (Pagó con S/); el vuelto se calcula contra el renglón de efectivo del plan
   cobro_mozo_recibido    Decimal?                @db.Decimal(12, 2)
+  // Cambio de ubicación (RN cambio de punto): cuándo se aplicó el último cambio; null = dirección original
+  ubicacion_editada_en   DateTime?               @db.Timestamptz
 
   party                 Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
@@ -625,6 +632,7 @@ model Pedido {
   vouchers               VoucherPago[]
   planPago               PedidoPagoPlan[]
   devolucion             DevolucionPedido?
+  cambiosUbicacion       PedidoCambioUbicacion[]
   clienteIdentificado    Party?                 @relation("ClienteIdentificadoPedido", fields: [cliente_party_id], references: [id])
 
   @@index([cliente_party_id], map: "pedido_cliente_party_id_idx")
@@ -807,6 +815,7 @@ model MovimientoCaja {
 
   caja             Caja      @relation(fields: [caja_id], references: [id])
   devolucion       DevolucionPedido[]
+  cambiosUbicacion PedidoCambioUbicacion[]
 
   @@map("movimiento_caja")
 }
@@ -2427,4 +2436,56 @@ model ResenaGoogle {
   actualizado_en   DateTime  @updatedAt
 
   @@map("resena_google")
+}
+
+/// Historial de cambios de ubicación de un delivery (propuestas del repartidor y cambios directos de Caja).
+/// Solo una fila PROPUESTA por pedido: índice único parcial pedido_cambio_ubicacion_propuesta_unica (migración
+/// 20261229100000_cambio_ubicacion_delivery; Prisma no lo declara). ajuste_* = diferencia de cobro si ya estaba pagado.
+model PedidoCambioUbicacion {
+  id                      BigInt          @id @default(autoincrement())
+  pedido_id               BigInt
+  origen                  String
+  estado                  String
+  propuesto_por_party_id  BigInt
+  propuesto_en            DateTime        @default(now()) @db.Timestamptz
+  resuelto_por_party_id   BigInt?
+  resuelto_en             DateTime?       @db.Timestamptz
+  nota                    String?
+  motivo                  String?
+  lat_anterior            Decimal?        @db.Decimal(9, 6)
+  lng_anterior            Decimal?        @db.Decimal(9, 6)
+  direccion_anterior      String?
+  referencia_anterior     String?
+  zona_anterior_id        BigInt?
+  lat_nueva               Decimal         @db.Decimal(9, 6)
+  lng_nueva               Decimal         @db.Decimal(9, 6)
+  direccion_nueva         String?
+  referencia_nueva        String?
+  zona_nueva_id           BigInt?
+  envio_anterior          Decimal         @db.Decimal(12, 2)
+  envio_nuevo             Decimal?        @db.Decimal(12, 2)
+  total_anterior          Decimal         @db.Decimal(12, 2)
+  total_nuevo             Decimal?        @db.Decimal(12, 2)
+  diferencia_envio        Decimal?        @db.Decimal(12, 2)
+  ajuste_tipo             String?
+  ajuste_monto            Decimal?        @db.Decimal(12, 2)
+  ajuste_estado           String?
+  ajuste_medio            String?
+  ajuste_codigo_operacion String?
+  ajuste_por_party_id     BigInt?
+  ajuste_en               DateTime?       @db.Timestamptz
+  ajuste_movimiento_caja_id BigInt?
+  aviso_cliente           String?
+
+  pedido           Pedido          @relation(fields: [pedido_id], references: [id])
+  propuestoPor     Party           @relation("CambioUbicacionPropuesto", fields: [propuesto_por_party_id], references: [id])
+  resueltoPor      Party?          @relation("CambioUbicacionResuelto", fields: [resuelto_por_party_id], references: [id])
+  ajustePor        Party?          @relation("CambioUbicacionAjuste", fields: [ajuste_por_party_id], references: [id])
+  zonaAnterior     ZonaReparto?    @relation("CambioZonaAnterior", fields: [zona_anterior_id], references: [id])
+  zonaNueva        ZonaReparto?    @relation("CambioZonaNueva", fields: [zona_nueva_id], references: [id])
+  movimientoCaja   MovimientoCaja? @relation(fields: [ajuste_movimiento_caja_id], references: [id])
+
+  @@index([pedido_id])
+  @@index([ajuste_en])
+  @@map("pedido_cambio_ubicacion")
 }

@@ -6,6 +6,7 @@ import { BotonEtapa, BotonReportar, etapaDe } from './RepartidorView';
 import { Insignia } from '../../comun/Insignia';
 import { PedidoReparto, repartosApi, MensajeReparto } from './repartosApi';
 import { ModalReportarFalla } from './ModalReportarFalla';
+import { BotonProponerUbicacion } from './BotonProponerUbicacion';
 import { ModalResolverFalla } from './ModalResolverFalla';
 import { ErrorApi } from '../../comun/api';
 import { clasificarEspera } from './calculoRuta';
@@ -892,6 +893,9 @@ export function TarjetaReparto({
             )}
 
             <BotonReportar pedido={pedido} onReportar={() => setModalFallaAbierto(true)} />
+
+            {/* Propuesta de la ubicación real (caja la aprueba antes de cambiar nada) */}
+            <BotonProponerUbicacion pedidoId={pedido.id} codigo={pedido.codigo} estado={pedido.estado} />
           </div>
         )}
       </div>
