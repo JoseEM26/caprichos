@@ -117,6 +117,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'almacen', accion: 'cierre' },
   // Conteo de apertura del día de los productos que controlan stock (donas, galletas)
   { modulo: 'almacen', accion: 'apertura' },
+  // Merma de producto terminado (sin código de supervisor): Cocina decide y queda auditada
+  { modulo: 'almacen', accion: 'merma_producto' },
   { modulo: 'produccion', accion: 'ver' },
   { modulo: 'produccion', accion: 'crear' },
   { modulo: 'produccion', accion: 'anular' },
@@ -204,6 +206,7 @@ export const MATRIZ: Record<string, string[]> = {
   ],
   COCINA: [
     'almacen/apertura',
+    'almacen/merma_producto',
     'pedidos/ver',
     'pedidos/cambiar_estado',
     'cocina/ver',

@@ -571,6 +571,7 @@ describe('AlmacenService', () => {
       prisma.stock.findFirst.mockResolvedValue(null);
       prisma.stock.findMany = jest.fn().mockResolvedValue([]);
       prisma.movimientoStock.create.mockResolvedValue({ id: 160n });
+      prisma.movimientoStock.findMany = jest.fn().mockResolvedValue([]); // «Produje hoy» del día (arrastre)
       prisma.stockSabor = {
         upsert: jest.fn().mockResolvedValue({}),
         findUnique: jest.fn().mockResolvedValue(null),
@@ -590,8 +591,8 @@ describe('AlmacenService', () => {
       const res: any = await service.obtenerApertura();
       const p = res.productos[0];
       expect(p.sabores).toEqual([
-        { saborId: '11', nombre: 'Fresa', saldo: 4, aperturaHoy: true, aperturaCantidad: 10 },
-        { saborId: '12', nombre: 'Oreo', saldo: 0, aperturaHoy: false, aperturaCantidad: null },
+        { saborId: '11', nombre: 'Fresa', saldo: 4, aperturaHoy: true, aperturaCantidad: 10, producidoHoy: 0, quedaronAyer: 4 },
+        { saborId: '12', nombre: 'Oreo', saldo: 0, aperturaHoy: false, aperturaCantidad: null, producidoHoy: 0, quedaronAyer: 0 },
       ]);
       expect(p).toMatchObject({ saldo: 4, aperturaHoy: true });
     });

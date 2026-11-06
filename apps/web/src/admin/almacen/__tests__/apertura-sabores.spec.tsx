@@ -11,16 +11,16 @@ const DONA = {
   productoId: 'd1',
   nombre: 'DONA',
   areaNombre: 'Cocina',
-  saldo: 9,
+  saldo: 9, quedaronAyer: 9, producidoHoy: 0,
   aperturaHoy: false,
   aperturaCantidad: null,
   sabores: [
-    { saborId: 's1', nombre: 'Chocolate', saldo: 5, aperturaHoy: true, aperturaCantidad: 5 },
-    { saborId: 's2', nombre: 'Vainilla', saldo: 4, aperturaHoy: false, aperturaCantidad: null },
+    { saborId: 's1', nombre: 'Chocolate', saldo: 5, quedaronAyer: 5, producidoHoy: 0, aperturaHoy: true, aperturaCantidad: 5 },
+    { saborId: 's2', nombre: 'Vainilla', saldo: 4, quedaronAyer: 4, producidoHoy: 0, aperturaHoy: false, aperturaCantidad: null },
   ],
 };
-const GALLETA = { productoId: 'g1', nombre: 'GALLETA AVENA', areaNombre: null, saldo: 6, aperturaHoy: true, aperturaCantidad: 6 };
-const TORTA = { productoId: 't1', nombre: 'TORTA', areaNombre: null, saldo: 3, aperturaHoy: false, aperturaCantidad: null };
+const GALLETA = { productoId: 'g1', nombre: 'GALLETA AVENA', areaNombre: null, saldo: 6, quedaronAyer: 6, producidoHoy: 0, aperturaHoy: true, aperturaCantidad: 6 };
+const TORTA = { productoId: 't1', nombre: 'TORTA', areaNombre: null, saldo: 3, quedaronAyer: 3, producidoHoy: 0, aperturaHoy: false, aperturaCantidad: null };
 
 function sesionCon(permisos: string[]) {
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
@@ -45,12 +45,12 @@ describe('Apertura del día por sabor', () => {
     expect(await screen.findByText('DONA')).toBeInTheDocument();
     expect(screen.getByText('Se cuenta por sabor')).toBeInTheDocument();
     expect(screen.getAllByTestId('apertura-sabor')).toHaveLength(2);
-    expect(screen.getByLabelText('¿Cuántos hay ahora? DONA · Chocolate')).toHaveValue(5);
-    expect(screen.getByLabelText('¿Cuántos hay ahora? DONA · Vainilla')).toHaveValue(4);
+    expect(screen.getByLabelText('Quedaron de ayer DONA · Chocolate')).toHaveValue(5);
+    expect(screen.getByLabelText('Quedaron de ayer DONA · Vainilla')).toHaveValue(4);
     expect(screen.getByText('Apertura registrada hoy: 5')).toBeInTheDocument();
     expect(screen.getByText('Falta la apertura de hoy')).toBeInTheDocument();
     // el producto sin sabores sigue igual
-    expect(screen.getByLabelText('¿Cuántos hay ahora? GALLETA AVENA')).toHaveValue(6);
+    expect(screen.getByLabelText('Quedaron de ayer GALLETA AVENA')).toHaveValue(6);
     expect(screen.getByText(/faltan 1 de contar/)).toBeInTheDocument();
   });
 
@@ -59,7 +59,7 @@ describe('Apertura del día por sabor', () => {
     render(<AperturaDiaView />);
     expect(await screen.findByText('Total ahora: 9')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('¿Cuántos hay ahora? DONA · Chocolate'), { target: { value: '7' } });
+    fireEvent.change(screen.getByLabelText('Quedaron de ayer DONA · Chocolate'), { target: { value: '7' } });
     expect(screen.getByText('Total ahora: 11')).toBeInTheDocument();
   });
 
@@ -68,10 +68,10 @@ describe('Apertura del día por sabor', () => {
     render(<AperturaDiaView />);
     await screen.findByText('Total ahora: 9');
     fireEvent.click(screen.getByRole('button', { name: 'Sumar uno a DONA · Vainilla' }));
-    expect(screen.getByLabelText('¿Cuántos hay ahora? DONA · Vainilla')).toHaveValue(5);
-    expect(screen.getByLabelText('¿Cuántos hay ahora? DONA · Chocolate')).toHaveValue(5);
+    expect(screen.getByLabelText('Quedaron de ayer DONA · Vainilla')).toHaveValue(5);
+    expect(screen.getByLabelText('Quedaron de ayer DONA · Chocolate')).toHaveValue(5);
     fireEvent.click(screen.getByRole('button', { name: 'Quitar uno de DONA · Chocolate' }));
-    expect(screen.getByLabelText('¿Cuántos hay ahora? DONA · Chocolate')).toHaveValue(4);
+    expect(screen.getByLabelText('Quedaron de ayer DONA · Chocolate')).toHaveValue(4);
   });
 
   it('envía con saborId a los sabores y sin saborId a los demás, solo lo pendiente o cambiado', async () => {
@@ -84,8 +84,8 @@ describe('Apertura del día por sabor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (2)' }));
     await waitFor(() =>
       expect(registrar).toHaveBeenCalledWith([
-        { productoId: 'd1', saborId: 's2', cantidad: 4 },
-        { productoId: 't1', cantidad: 3 },
+        { productoId: 'd1', saborId: 's2', cantidad: 4, produccion: 0 },
+        { productoId: 't1', cantidad: 3, produccion: 0 },
       ]),
     );
   });
@@ -95,7 +95,7 @@ describe('Apertura del día por sabor', () => {
     const registrar = vi.spyOn(almacenApi, 'registrarApertura').mockResolvedValue({ ok: true, registrados: 2 });
     render(<AperturaDiaView />);
     await screen.findByText('Total ahora: 9');
-    fireEvent.change(screen.getByLabelText('¿Cuántos hay ahora? DONA · Chocolate'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Quedaron de ayer DONA · Chocolate'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (2)' }));
 
     expect(await screen.findByText(/DONA · Chocolate \(saldo 5, ahora 1\)/)).toBeInTheDocument();
@@ -106,8 +106,8 @@ describe('Apertura del día por sabor', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, guardar' }));
     await waitFor(() =>
       expect(registrar).toHaveBeenCalledWith([
-        { productoId: 'd1', saborId: 's1', cantidad: 1 },
-        { productoId: 'd1', saborId: 's2', cantidad: 4 },
+        { productoId: 'd1', saborId: 's1', cantidad: 1, produccion: 0 },
+        { productoId: 'd1', saborId: 's2', cantidad: 4, produccion: 0 },
       ]),
     );
   });
@@ -117,7 +117,7 @@ describe('Apertura del día por sabor', () => {
     const registrar = vi.spyOn(almacenApi, 'registrarApertura');
     render(<AperturaDiaView />);
     await screen.findByText('Total ahora: 9');
-    fireEvent.change(screen.getByLabelText('¿Cuántos hay ahora? DONA · Vainilla'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Quedaron de ayer DONA · Vainilla'), { target: { value: '' } });
     expect(screen.getByText('Escribe un número entero de 0 o más.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Guardar apertura/ })).toBeDisabled();
     expect(registrar).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('Apertura del día por sabor', () => {
   it('un producto con la lista de sabores vacía se cuenta como producto normal', async () => {
     cargarCon([{ ...TORTA, sabores: [] }]);
     render(<AperturaDiaView />);
-    expect(await screen.findByLabelText('¿Cuántos hay ahora? TORTA')).toHaveValue(3);
+    expect(await screen.findByLabelText('Quedaron de ayer TORTA')).toHaveValue(3);
     expect(screen.queryByTestId('apertura-sabor')).toBeNull();
     expect(screen.queryByText('Se cuenta por sabor')).toBeNull();
   });

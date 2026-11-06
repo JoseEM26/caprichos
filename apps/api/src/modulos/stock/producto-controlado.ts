@@ -535,3 +535,161 @@ export function estadoSaborCarta(
     quedan,
   };
 }
+
+/** Nota de los movimientos de producción que suma la apertura del día («Produje hoy»). */
+export const NOTA_PRODUCE_HOY = 'Produje hoy';
+
+/** Motivos de merma de producto terminado. Sin código de supervisor: queda auditada en movimiento_stock (quién y cuándo). */
+export const MOTIVOS_MERMA_PRODUCTO = ['VENCIDO', 'DANADO', 'SE_CAYO', 'OTRO'] as const;
+export type MotivoMermaProducto = (typeof MOTIVOS_MERMA_PRODUCTO)[number];
+export const ETIQUETA_MOTIVO_MERMA: Record<MotivoMermaProducto, string> = {
+  VENCIDO: 'Vencido',
+  DANADO: 'Dañado',
+  SE_CAYO: 'Se cayó',
+  OTRO: 'Otro',
+};
+
+/** Lo producido hoy (suma de «Produje hoy») de un producto entero o de un sabor. */
+export async function producidoHoyDe(db: any, productoId: bigint, saborId: bigint | null, fecha: string = fechaLimaHoy()) {
+  const movs = await db.movimientoStock.findMany({
+    where: {
+      tipo: 'ENTRADA',
+      nota: NOTA_PRODUCE_HOY,
+      producto_id: productoId,
+      sabor_id: saborId,
+      en: { gte: new Date(`${fecha}T05:00:00.000Z`) }, // medianoche de Lima (UTC-5, sin horario de verano)
+    },
+    select: { cantidad: true },
+  });
+  return movs.reduce((acc: number, m: any) => acc + Number(m.cantidad), 0);
+}
+
+/**
+ * Apertura con arrastre. `quedaron` es lo que quedó de ayer (corrige el saldo si se contó distinto) y `produccion`
+ * se SUMA como «Produje hoy». El saldo nunca se reinicia: si ya hubo producción hoy, se conserva.
+ */
+export async function registrarAperturaArrastre(
+  db: any,
+  c: {
+    productoId: bigint;
+    saborId: bigint | null;
+    quedaron: number;
+    produccion: number;
+    areaId: bigint | null | undefined;
+    por: bigint;
+    ahora: Date;
+    fecha: string;
+  },
+) {
+  const previa = await producidoHoyDe(db, c.productoId, c.saborId, c.fecha);
+  const objetivo = c.quedaron + previa;
+  if (c.saborId) await fijarAperturaSabor(db, c.productoId, c.saborId, objetivo, c.areaId, c.por, c.ahora, c.fecha);
+  else await fijarAperturaProducto(db, c.productoId, objetivo, c.areaId, c.por, c.ahora, c.fecha);
+  if (c.produccion <= 0) return;
+
+  const lugarId = await lugarDelProducto(db, c.productoId, c.areaId);
+  if (!lugarId) return;
+  const cantidad = new Prisma.Decimal(c.produccion);
+  if (c.saborId) {
+    await db.stockSabor.upsert({
+      where: { sabor_id: c.saborId },
+      update: { cantidad: { increment: cantidad } },
+      create: { sabor_id: c.saborId, cantidad },
+    });
+  } else {
+    const fila = await db.stock.findFirst({ where: { producto_id: c.productoId, lugar_id: lugarId } });
+    if (fila) await db.stock.update({ where: { id: fila.id }, data: { cantidad: { increment: cantidad } } });
+    else await db.stock.create({ data: { producto_id: c.productoId, lugar_id: lugarId, cantidad } });
+  }
+  await db.movimientoStock.create({
+    data: {
+      tipo: 'ENTRADA',
+      producto_id: c.productoId,
+      sabor_id: c.saborId,
+      lugar_id: lugarId,
+      cantidad,
+      por: c.por,
+      nota: NOTA_PRODUCE_HOY,
+    },
+  });
+  await db.conteoApertura.updateMany({
+    where: { fecha: fechaColumna(c.fecha), producto_id: c.productoId, sabor_id: c.saborId },
+    data: { cantidad: { increment: cantidad }, en: c.ahora },
+  });
+  if (c.saborId) await sincronizarAgotadoSabor(db, c.saborId, await saldoSabor(db, c.saborId), c.ahora, c.por);
+  else await sincronizarAgotadoProducto(db, c.productoId, await saldoProducto(db, c.productoId), c.ahora);
+}
+
+/**
+ * Merma de producto terminado (o de un sabor): descuenta del saldo y deja MERMA en movimiento_stock con quién y cuándo.
+ * No mira el interruptor «Control de almacén» ni pide código de supervisor. Más que el saldo → 409 STOCK_INSUFICIENTE.
+ */
+export async function mermarProductoControlado(
+  db: any,
+  c: {
+    productoId: bigint;
+    nombre: string;
+    saborId: bigint | null;
+    saborNombre?: string | null;
+    cantidad: number;
+    motivo: MotivoMermaProducto;
+    nota?: string | null;
+    areaId: bigint | null | undefined;
+    por: bigint;
+    ahora: Date;
+    fecha: string;
+  },
+): Promise<{ movimientoId: bigint; saldo: number }> {
+  const etiqueta = ETIQUETA_MOTIVO_MERMA[c.motivo];
+  const cant = new Prisma.Decimal(c.cantidad);
+  const lugarId = await lugarDelProducto(db, c.productoId, c.areaId);
+  if (!lugarId) throw new BadRequestException({ codigo: 'SIN_LUGAR_STOCK', mensaje: `No hay dónde descontar ${c.nombre}` });
+  const etiquetaItem = c.saborNombre ? `${c.nombre} · ${c.saborNombre}` : c.nombre;
+
+  const saldoActual = c.saborId ? await saldoSabor(db, c.saborId) : await saldoProducto(db, c.productoId);
+  const insuficiente = () =>
+    new ConflictException({
+      codigo: 'STOCK_INSUFICIENTE',
+      mensaje: `Solo quedan ${Math.max(0, Math.floor(saldoActual))} de ${etiquetaItem}`,
+      productoId: c.productoId.toString(),
+      quedan: Math.max(0, Math.floor(saldoActual)),
+    });
+  if (c.cantidad > saldoActual) throw insuficiente();
+
+  if (c.saborId) {
+    const r = await db.stockSabor.updateMany({
+      where: { sabor_id: c.saborId, cantidad: { gte: cant } },
+      data: { cantidad: { decrement: cant } },
+    });
+    if (r.count === 0) throw insuficiente();
+  } else {
+    const r = await db.stock.updateMany({
+      where: { producto_id: c.productoId, lugar_id: lugarId, cantidad: { gte: cant } },
+      data: { cantidad: { decrement: cant } },
+    });
+    if (r.count === 0) throw insuficiente();
+  }
+
+  const mov = await db.movimientoStock.create({
+    data: {
+      tipo: 'MERMA',
+      producto_id: c.productoId,
+      sabor_id: c.saborId,
+      lugar_id: lugarId,
+      cantidad: cant.negated(),
+      por: c.por,
+      nota: `Merma · ${etiqueta}${c.nota?.trim() ? ` · ${c.nota.trim()}` : ''}`,
+    },
+  });
+
+  const saldo = c.saborId ? await saldoSabor(db, c.saborId) : await saldoProducto(db, c.productoId);
+  if (await aperturaDeSaborOProductoHoy(db, c)) {
+    if (c.saborId) await sincronizarAgotadoSabor(db, c.saborId, saldo, c.ahora, c.por);
+    else await sincronizarAgotadoProducto(db, c.productoId, saldo, c.ahora);
+  }
+  return { movimientoId: mov.id, saldo };
+}
+
+async function aperturaDeSaborOProductoHoy(db: any, c: { productoId: bigint; saborId: bigint | null; fecha: string }) {
+  return c.saborId ? aperturaDeSaborHoy(db, c.saborId, c.fecha) : aperturaDeHoy(db, c.productoId, c.fecha);
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { almacenApi, ProductoCierreDiaItem, CierreDiaDto } from './almacenApi';
 import { Confirmar } from '../../comun/Confirmar';
+import { MermaProductoBoton } from './MermaProductoBoton';
 
 interface ModalCerrarDiaProps {
   abierto: boolean;
@@ -25,20 +26,23 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
   alGuardar,
 }) => {
   const [items, setItems] = useState<ItemCierreForm[]>([]);
+  /** Productos por sabor: su stock está por sabor, así que se muestran con su desglose y se botan por sabor. */
+  const [porSabor, setPorSabor] = useState<ProductoCierreDiaItem[]>([]);
   const [cargando, setCargando] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
 
-  useEffect(() => {
-    if (abierto) {
-      setCargando(true);
-      setErrorMsg('');
-      setConfirmarAbierto(false);
-      almacenApi
-        .obtenerProductosCierreDia()
-        .then((res: ProductoCierreDiaItem[]) => {
-          setItems(
-            res.map((it) => ({
+  const cargarProductos = () => {
+    setCargando(true);
+    setErrorMsg('');
+    almacenApi
+      .obtenerProductosCierreDia()
+      .then((res: ProductoCierreDiaItem[]) => {
+        setPorSabor(res.filter((it) => it.sabores && it.sabores.length > 0));
+        setItems(
+          res
+            .filter((it) => !(it.sabores && it.sabores.length > 0))
+            .map((it) => ({
               insumoId: it.insumoId,
               productoId: it.productoId,
               nombre: it.nombre,
@@ -48,12 +52,18 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
               desechoMerma: '0',
               destino: 'Desecho',
             })),
-          );
-        })
-        .catch((err: any) => {
-          setErrorMsg(err.message || 'Error al cargar productos del día para el cierre.');
-        })
-        .finally(() => setCargando(false));
+        );
+      })
+      .catch((err: any) => {
+        setErrorMsg(err.message || 'Error al cargar productos del día para el cierre.');
+      })
+      .finally(() => setCargando(false));
+  };
+
+  useEffect(() => {
+    if (abierto) {
+      setConfirmarAbierto(false);
+      cargarProductos();
     }
   }, [abierto]);
 
@@ -197,15 +207,50 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
           </div>
         )}
 
-        {cargando && items.length === 0 ? (
+        {cargando && items.length === 0 && porSabor.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 24, color: 'var(--cp-soft)' }}>
             Cargando productos del día...
           </div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && porSabor.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 24, color: 'var(--cp-soft)' }}>
             No se encontraron productos de producción ni insumos frescos para cerrar hoy.
           </div>
         ) : (
+          <>
+          {porSabor.length > 0 && (
+            <section aria-label="Productos por sabor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--cp-navy)' }}>Por sabor: lo que sobra se bota a merma por sabor</div>
+              {porSabor.map((p) => (
+                <div key={`prod-sab-${p.productoId}`} style={{ background: 'var(--cp-cream)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>{p.nombre}</span>
+                    <span style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Total en stock: <b>{p.sistema} {p.unidad}</b></span>
+                  </div>
+                  {(p.sabores ?? []).map((sb) => (
+                    <div key={sb.saborId} data-testid="cierre-sabor" style={{ borderTop: '1px solid var(--cp-line)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 13 }}>
+                        {sb.nombre}: <b>{sb.sistema}</b>
+                      </div>
+                      <MermaProductoBoton
+                        productoId={p.productoId!}
+                        saborId={sb.saborId}
+                        nombre={`${p.nombre} · ${sb.nombre}`}
+                        saldo={sb.sistema}
+                        alRegistrar={cargarProductos}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </section>
+          )}
+          {items.length === 0 ? (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={alCerrar} style={{ minHeight: 44, padding: '0 16px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                Cerrar
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {items.map((it, idx) => {
@@ -378,6 +423,8 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
               </button>
             </div>
           </form>
+          )}
+          </>
         )}
       </div>
 

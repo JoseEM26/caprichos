@@ -8,8 +8,8 @@ import * as sesionModulo from '../../../comun/sesion';
 import { ErrorApi } from '../../../comun/api';
 
 const PRODUCTOS = [
-  { productoId: 'd1', nombre: 'DONA CHOCOLATE', areaNombre: 'Cocina', saldo: 10, aperturaHoy: false, aperturaCantidad: null },
-  { productoId: 'g1', nombre: 'GALLETA AVENA', areaNombre: null, saldo: 6, aperturaHoy: true, aperturaCantidad: 8 },
+  { productoId: 'd1', nombre: 'DONA CHOCOLATE', areaNombre: 'Cocina', saldo: 10, quedaronAyer: 10, producidoHoy: 0, aperturaHoy: false, aperturaCantidad: null },
+  { productoId: 'g1', nombre: 'GALLETA AVENA', areaNombre: null, saldo: 6, quedaronAyer: 6, producidoHoy: 0, aperturaHoy: true, aperturaCantidad: 8 },
 ];
 
 function sesionCon(permisos: string[]) {
@@ -29,8 +29,8 @@ describe('Apertura del día (conteo de productos controlados)', () => {
   it('carga los productos con el saldo precargado y el estado de hoy de cada uno', async () => {
     render(<AperturaDiaView />);
     expect(await screen.findByText('DONA CHOCOLATE')).toBeInTheDocument();
-    expect(screen.getByLabelText('¿Cuántos hay ahora? DONA CHOCOLATE')).toHaveValue(10);
-    expect(screen.getByLabelText('¿Cuántos hay ahora? GALLETA AVENA')).toHaveValue(6);
+    expect(screen.getByLabelText('Quedaron de ayer DONA CHOCOLATE')).toHaveValue(10);
+    expect(screen.getByLabelText('Quedaron de ayer GALLETA AVENA')).toHaveValue(6);
     expect(screen.getByText('Falta la apertura de hoy')).toBeInTheDocument();
     expect(screen.getByText('Apertura registrada hoy: 8')).toBeInTheDocument();
     expect(screen.getByText(/05\/11\/2026/)).toBeInTheDocument();
@@ -43,7 +43,7 @@ describe('Apertura del día (conteo de productos controlados)', () => {
 
     // la dona no tiene apertura hoy: se guarda aunque no la toque; la galleta ya está contada y no cambió
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (1)' }));
-    await waitFor(() => expect(registrar).toHaveBeenCalledWith([{ productoId: 'd1', cantidad: 10 }]));
+    await waitFor(() => expect(registrar).toHaveBeenCalledWith([{ productoId: 'd1', cantidad: 10, produccion: 0 }]));
     expect(await screen.findByRole('status')).toHaveTextContent('Apertura guardada: 1 producto.');
   });
 
@@ -52,15 +52,15 @@ describe('Apertura del día (conteo de productos controlados)', () => {
     render(<AperturaDiaView />);
     await screen.findByText('GALLETA AVENA');
     fireEvent.click(screen.getByRole('button', { name: 'Sumar uno a GALLETA AVENA' }));
-    expect(screen.getByLabelText('¿Cuántos hay ahora? GALLETA AVENA')).toHaveValue(7);
+    expect(screen.getByLabelText('Quedaron de ayer GALLETA AVENA')).toHaveValue(7);
     fireEvent.click(screen.getByRole('button', { name: 'Quitar uno de DONA CHOCOLATE' }));
-    expect(screen.getByLabelText('¿Cuántos hay ahora? DONA CHOCOLATE')).toHaveValue(9);
+    expect(screen.getByLabelText('Quedaron de ayer DONA CHOCOLATE')).toHaveValue(9);
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (2)' }));
     await waitFor(() =>
       expect(registrar).toHaveBeenCalledWith([
-        { productoId: 'd1', cantidad: 9 },
-        { productoId: 'g1', cantidad: 7 },
+        { productoId: 'd1', cantidad: 9, produccion: 0 },
+        { productoId: 'g1', cantidad: 7, produccion: 0 },
       ]),
     );
   });
@@ -69,7 +69,7 @@ describe('Apertura del día (conteo de productos controlados)', () => {
     const registrar = vi.spyOn(almacenApi, 'registrarApertura').mockResolvedValue({ ok: true, registrados: 1 });
     render(<AperturaDiaView />);
     await screen.findByText('DONA CHOCOLATE');
-    fireEvent.change(screen.getByLabelText('¿Cuántos hay ahora? DONA CHOCOLATE'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Quedaron de ayer DONA CHOCOLATE'), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (1)' }));
 
     expect(screen.getByText(/¿Guardar una diferencia grande\?/)).toBeInTheDocument();
@@ -78,14 +78,14 @@ describe('Apertura del día (conteo de productos controlados)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (1)' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, guardar' }));
-    await waitFor(() => expect(registrar).toHaveBeenCalledWith([{ productoId: 'd1', cantidad: 2 }]));
+    await waitFor(() => expect(registrar).toHaveBeenCalledWith([{ productoId: 'd1', cantidad: 2, produccion: 0 }]));
   });
 
   it('un número no válido bloquea el guardado', async () => {
     const registrar = vi.spyOn(almacenApi, 'registrarApertura');
     render(<AperturaDiaView />);
     await screen.findByText('DONA CHOCOLATE');
-    fireEvent.change(screen.getByLabelText('¿Cuántos hay ahora? DONA CHOCOLATE'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Quedaron de ayer DONA CHOCOLATE'), { target: { value: '' } });
     expect(screen.getByText('Escribe un número entero de 0 o más.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Guardar apertura/ })).toBeDisabled();
     expect(registrar).not.toHaveBeenCalled();
@@ -97,7 +97,7 @@ describe('Apertura del día (conteo de productos controlados)', () => {
     await screen.findByText('DONA CHOCOLATE');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (1)' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión con el servidor');
-    expect(screen.getByLabelText('¿Cuántos hay ahora? DONA CHOCOLATE')).toHaveValue(10);
+    expect(screen.getByLabelText('Quedaron de ayer DONA CHOCOLATE')).toHaveValue(10);
   });
 
   it('sin productos controlados explica cómo marcarlos en el Catálogo', async () => {
