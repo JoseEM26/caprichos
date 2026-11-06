@@ -139,9 +139,25 @@ export const salonApi = {
       { motivo, ...(forzar ? { forzar: true } : {}) },
     ),
 
-  /** Pasa el pedido de mesa a otra mesa libre (409 MESA_OCUPADA si no lo está) */
-  cambiarMesaPedido: (pedidoId: string, mesaId: string) =>
-    api.post<{ ok: boolean; mesa: string }>(`/admin/salon/pedidos/${pedidoId}/cambiar-mesa`, { mesaId }),
+  /** Pasa el pedido de mesa a otra mesa libre (409 MESA_OCUPADA si no lo está). Con desdeMesaId mueve solo esa mesa. */
+  cambiarMesaPedido: (pedidoId: string, mesaId: string, desdeMesaId?: string) =>
+    api.post<{ ok: boolean; mesa: string }>(`/admin/salon/pedidos/${pedidoId}/cambiar-mesa`, {
+      mesaId,
+      ...(desdeMesaId ? { desdeMesaId } : {}),
+    }),
+
+  /** Suma mesas libres a un pedido de salón abierto (máximo 6 en total). Devuelve el nombre «Mesas 3 y 4». */
+  agregarMesasPedido: (pedidoId: string, mesaIds: string[]) =>
+    api.post<{ ok: boolean; mesa: string; mesas: Array<{ id: string | null }> }>(
+      `/admin/salon/pedidos/${pedidoId}/mesas`,
+      { mesaIds },
+    ),
+
+  /** Quita una mesa del pedido; la mesa queda libre. El pedido conserva al menos una. */
+  quitarMesaPedido: (pedidoId: string, mesaId: string) =>
+    api.delete<{ ok: boolean; mesa: string; mesas: Array<{ id: string | null }> }>(
+      `/admin/salon/pedidos/${pedidoId}/mesas/${mesaId}`,
+    ),
 
   marcarEntregadoMesa: (pedidoId: string) =>
     api.post<{ ok: boolean; id: string; codigo: string }>(

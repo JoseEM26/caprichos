@@ -19,6 +19,7 @@ import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { progresoDelPedido, ProgresoPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { etiquetaMesasPedido, MAX_MESAS_PEDIDO, nombreUnaMesa } from './mesas-pedido.util';
 
 @Injectable()
 export class SalonService {
@@ -225,7 +226,20 @@ export class SalonService {
       });
     }
 
-    const mesasIds = dto.mesas.map((m) => BigInt(m));
+    if (dto.mesas.length > MAX_MESAS_PEDIDO) {
+      throw new BadRequestException({
+        codigo: 'MESAS_LIMITE',
+        mensaje: `Un pedido puede ocupar hasta ${MAX_MESAS_PEDIDO} mesas juntas`,
+      });
+    }
+
+    const mesasIds = dto.mesas.map((m) => parseIdMesa(m));
+    if (new Set(mesasIds.map((id) => id.toString())).size !== mesasIds.length) {
+      throw new BadRequestException({
+        codigo: 'MESA_REPETIDA',
+        mensaje: 'Una mesa aparece dos veces en el pedido. Elige cada mesa una sola vez.',
+      });
+    }
 
     // Validar existencia y estado de las mesas
     const mesasDb = await this.prisma.elementoPlano.findMany({
@@ -262,9 +276,14 @@ export class SalonService {
       });
     }
 
-    const mesaNombre = mesasDb
-      .map((m) => (m.numero ? `Mesa ${m.numero}` : m.nombre || `Mesa ${m.id}`))
-      .join(', ');
+    // La primera mesa elegida es la principal (da el nombre al pedido)
+    const mesasOrdenadas = mesasIds.map((id) => mesasDb.find((m) => m.id === id)!);
+    const mesaNombre = etiquetaMesasPedido(mesasOrdenadas);
+
+    // Con personas (sentar una reserva o el mozo lo indica) la capacidad se valida igual que en reservas
+    if (dto.personas !== undefined && this.reservasService) {
+      await this.reservasService.validarMesasYAsientos(mesasIds, dto.personas, dto.confirmarCapacidad === true);
+    }
 
     // Sin cuenta, el nombre lo escribe el mozo (obligatorio). Con cuenta, nombre y teléfono salen de la cuenta
     // (pedidos.service). El teléfono es opcional: sin él el pedido se guarda sin teléfono real.
@@ -332,14 +351,16 @@ export class SalonService {
             }
           }
 
-          // 2. Crear las filas pedido_mesa en la misma tx
-          for (const mesa of mesasDb) {
+          // 2. Crear las filas pedido_mesa en la misma tx (la primera es la principal)
+          for (const [indice, mesa] of mesasOrdenadas.entries()) {
             await tx.pedidoMesa.create({
               data: {
                 pedido_id: pedido.id,
                 mesa_id: mesa.id,
-                mesa_nombre: mesa.numero ? `Mesa ${mesa.numero}` : (mesa.nombre || `Mesa ${mesa.id}`),
+                mesa_nombre: nombreUnaMesa(mesa),
                 abierta: true,
+                principal: indice === 0,
+                orden: indice + 1,
               },
             });
           }
@@ -412,7 +433,7 @@ export class SalonService {
 
     return {
       ...resultadoPedido,
-      mesas: mesasDb.map((m) => ({
+      mesas: mesasOrdenadas.map((m) => ({
         id: m.id.toString(),
         numero: m.numero,
         nombre: m.nombre,
@@ -672,9 +693,12 @@ export class SalonService {
     mesaId: string,
     usuario?: UsuarioAutenticado,
     ip?: string,
+    desdeMesaId?: string,
   ) {
     const pId = BigInt(pedidoId);
     const destinoId = BigInt(mesaId);
+    // Con desdeMesaId se mueve solo esa mesa del pedido; sin él, la mesa destino reemplaza a todo el conjunto
+    const origenId = desdeMesaId !== undefined ? parseIdMesa(desdeMesaId) : null;
 
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pId },
@@ -700,6 +724,10 @@ export class SalonService {
         codigo: 'PEDIDO_SIN_MESA',
         mensaje: 'El pedido no está abierto en ninguna mesa',
       });
+    }
+    const filaOrigen = origenId !== null ? abiertas.find((pm) => pm.mesa_id === origenId) : undefined;
+    if (origenId !== null && !filaOrigen) {
+      throw new NotFoundException({ codigo: 'MESA_NO_EN_PEDIDO', mensaje: 'Esa mesa no es de este pedido' });
     }
 
     const destino = await this.prisma.elementoPlano.findUnique({ where: { id: destinoId } });
@@ -728,12 +756,28 @@ export class SalonService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        if (filaOrigen) {
+          // Mover una mesa: la fila pasa a la mesa destino con la misma posición (principal u orden)
+          await tx.pedidoMesa.update({ where: { id: filaOrigen.id }, data: { abierta: false } });
+          await tx.pedidoMesa.create({
+            data: {
+              pedido_id: pId,
+              mesa_id: destinoId,
+              mesa_nombre: nombreDestino,
+              abierta: true,
+              principal: filaOrigen.principal,
+              orden: filaOrigen.orden,
+            },
+          });
+          await this.refrescarMesasPedido(tx, pId);
+          return;
+        }
         await tx.pedidoMesa.updateMany({
           where: { pedido_id: pId, abierta: true },
           data: { abierta: false },
         });
         await tx.pedidoMesa.create({
-          data: { pedido_id: pId, mesa_id: destinoId, mesa_nombre: nombreDestino, abierta: true },
+          data: { pedido_id: pId, mesa_id: destinoId, mesa_nombre: nombreDestino, abierta: true, principal: true, orden: 1 },
         });
         await tx.pedido.update({ where: { id: pId }, data: { mesa_nombre: nombreDestino } });
       });
@@ -764,15 +808,14 @@ export class SalonService {
       despues: { mesaId: destinoId.toString(), mesa: nombreDestino },
     });
 
-    for (const pm of abiertas) {
+    for (const pm of filaOrigen ? [filaOrigen] : abiertas) {
       if (pm.mesa_id) {
         this.eventosGateway.emitirAdmin('salon:mesa', { mesaId: pm.mesa_id.toString(), estado: 'LIBRE' });
       }
     }
     this.eventosGateway.emitirAdmin('salon:mesa', { mesaId: destinoId.toString(), estado: 'OCUPADA' });
     // Cocina y «Mis pedidos» refrescan el nombre de mesa del pedido
-    this.eventosGateway.emitirAdmin('cocina:comanda', { pedidoId: Number(pId), areaId: null, completo: false });
-    this.eventosGateway.emitirAdmin('pedido:progreso', { id: Number(pId), codigo: pedido.codigo });
+    this.emitirCambioMesas(pId, pedido.codigo);
 
     return {
       ok: true,
@@ -781,6 +824,237 @@ export class SalonService {
       mesaId: destinoId.toString(),
       mesa: nombreDestino,
       anteriores,
+    };
+  }
+
+  /**
+   * 8) POST /admin/salon/pedidos/:id/mesas (mesas/abrir) { mesaIds }
+   * Suma mesas juntas a un pedido de salón abierto. Mismas reglas que abrir: libres, activas, sin repetir,
+   * máximo 6 mesas en total. Audita AGREGAR_MESA y deja el nombre del pedido con todas sus mesas.
+   */
+  async agregarMesasPedido(
+    pedidoId: string | number | bigint,
+    mesaIds: Array<string | number>,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const pId = BigInt(pedidoId);
+    const ids = mesaIds.map((m) => parseIdMesa(m));
+    if (ids.length === 0) {
+      throw new BadRequestException({ codigo: 'MESAS_REQUERIDAS', mensaje: 'Elige al menos una mesa para sumar' });
+    }
+    if (new Set(ids.map((id) => id.toString())).size !== ids.length) {
+      throw new BadRequestException({ codigo: 'MESA_REPETIDA', mensaje: 'Una mesa aparece dos veces. Elige cada mesa una sola vez.' });
+    }
+
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pId },
+      include: { mesas: { where: { abierta: true }, include: { mesa: true } } },
+    });
+    this.validarPedidoDeMesas(pedido, 'sumar mesas');
+
+    const yaEnPedido = ids.find((id) => pedido!.mesas.some((pm) => pm.mesa_id === id));
+    if (yaEnPedido !== undefined) {
+      throw new ConflictException({ codigo: 'MESA_REPETIDA', mensaje: 'Esa mesa ya es de este pedido' });
+    }
+    if (pedido!.mesas.length + ids.length > MAX_MESAS_PEDIDO) {
+      throw new BadRequestException({
+        codigo: 'MESAS_LIMITE',
+        mensaje: `Un pedido puede ocupar hasta ${MAX_MESAS_PEDIDO} mesas juntas`,
+      });
+    }
+
+    const mesasDb = await this.prisma.elementoPlano.findMany({ where: { id: { in: ids }, tipo: 'MESA' } });
+    if (mesasDb.length !== ids.length) {
+      throw new NotFoundException({ codigo: 'MESA_NO_ENCONTRADA', mensaje: 'Una o más mesas no existen o no son mesas' });
+    }
+    const inactiva = mesasDb.find((m) => !m.activo);
+    if (inactiva) {
+      throw new BadRequestException({
+        codigo: 'MESA_INACTIVA',
+        mensaje: `La mesa ${inactiva.numero ?? inactiva.nombre ?? inactiva.id} no está activa`,
+      });
+    }
+    const ocupada = await this.prisma.pedidoMesa.findFirst({
+      where: { mesa_id: { in: ids }, abierta: true },
+      include: { mesa: true },
+    });
+    if (ocupada) {
+      const num = ocupada.mesa?.numero ?? ocupada.mesa?.nombre ?? ocupada.mesa_id?.toString();
+      throw new ConflictException({ codigo: 'MESA_OCUPADA', mensaje: `La mesa ${num} ya está ocupada` });
+    }
+
+    const mesasOrdenadas = ids.map((id) => mesasDb.find((m) => m.id === id)!);
+    const base = Math.max(0, ...pedido!.mesas.map((pm) => pm.orden ?? 0));
+    let abiertas: any[];
+    try {
+      abiertas = await this.prisma.$transaction(async (tx) => {
+        for (const [indice, mesa] of mesasOrdenadas.entries()) {
+          await tx.pedidoMesa.create({
+            data: {
+              pedido_id: pId,
+              mesa_id: mesa.id,
+              mesa_nombre: nombreUnaMesa(mesa),
+              abierta: true,
+              principal: false,
+              orden: base + indice + 1,
+            },
+          });
+        }
+        return this.refrescarMesasPedido(tx, pId);
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002' || (error?.message && error.message.includes('ux_pedido_mesa'))) {
+        throw new ConflictException({ codigo: 'MESA_OCUPADA', mensaje: 'Una de las mesas ya está ocupada' });
+      }
+      throw error;
+    }
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'mesas',
+      accion: 'AGREGAR_MESA',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pId,
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+      antes: { mesas: pedido!.mesas.map((pm) => pm.mesa_id?.toString() ?? null) },
+      despues: { mesas: abiertas.map((pm) => pm.mesa_id?.toString() ?? null) },
+    });
+
+    for (const mesa of mesasOrdenadas) {
+      this.eventosGateway.emitirAdmin('salon:mesa', { mesaId: mesa.id.toString(), estado: 'OCUPADA' });
+    }
+    this.emitirCambioMesas(pId, pedido!.codigo);
+
+    return this.resumenMesasPedido(pId, pedido!.codigo, abiertas);
+  }
+
+  /**
+   * 9) DELETE /admin/salon/pedidos/:id/mesas/:mesaId (mesas/abrir)
+   * Quita una mesa del pedido (queda libre). Un pedido conserva al menos una mesa: para cambiarla, usar cambiar-mesa.
+   * Si quita la principal, la siguiente pasa a serlo.
+   */
+  async quitarMesaPedido(
+    pedidoId: string | number | bigint,
+    mesaId: string | number,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const pId = BigInt(pedidoId);
+    const mId = parseIdMesa(mesaId);
+
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pId },
+      include: { mesas: { where: { abierta: true }, include: { mesa: true } } },
+    });
+    this.validarPedidoDeMesas(pedido, 'quitar mesas');
+
+    const fila = pedido!.mesas.find((pm) => pm.mesa_id === mId);
+    if (!fila) {
+      throw new NotFoundException({ codigo: 'MESA_NO_EN_PEDIDO', mensaje: 'Esa mesa no es de este pedido' });
+    }
+    if (pedido!.mesas.length === 1) {
+      throw new ConflictException({
+        codigo: 'ULTIMA_MESA',
+        mensaje: 'El pedido necesita al menos una mesa. Para cambiarla, usa «Cambiar mesa».',
+      });
+    }
+
+    const abiertas = await this.prisma.$transaction(async (tx) => {
+      await tx.pedidoMesa.update({ where: { id: fila.id }, data: { abierta: false } });
+      return this.refrescarMesasPedido(tx, pId);
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'mesas',
+      accion: 'QUITAR_MESA',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pId,
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+      antes: { mesas: pedido!.mesas.map((pm) => pm.mesa_id?.toString() ?? null) },
+      despues: { mesaQuitada: mId.toString(), mesas: abiertas.map((pm) => pm.mesa_id?.toString() ?? null) },
+    });
+
+    this.eventosGateway.emitirAdmin('salon:mesa', { mesaId: mId.toString(), estado: 'LIBRE' });
+    this.emitirCambioMesas(pId, pedido!.codigo);
+
+    return this.resumenMesasPedido(pId, pedido!.codigo, abiertas);
+  }
+
+  /** Pedido que puede cambiar sus mesas: de salón, no anulado y con al menos una mesa abierta. */
+  private validarPedidoDeMesas(pedido: { modalidad: string; estado: string; mesas: unknown[] } | null, accion: string): void {
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+    if (pedido.modalidad !== 'MESA') {
+      throw new BadRequestException({ codigo: 'MODALIDAD_INVALIDA', mensaje: `Solo los pedidos de salón pueden ${accion}` });
+    }
+    if (pedido.estado === 'ANULADO') {
+      throw new ConflictException({ codigo: 'ESTADO_INVALIDO', mensaje: `Un pedido anulado no puede ${accion}` });
+    }
+    if (pedido.mesas.length === 0) {
+      throw new ConflictException({ codigo: 'PEDIDO_SIN_MESA', mensaje: 'El pedido no está abierto en ninguna mesa' });
+    }
+  }
+
+  /**
+   * Deja las mesas abiertas del pedido en orden (la principal primero, luego por orden e id) y pone su
+   * nombre al pedido («Mesas 3 y 4»). Quita primero la principal de todas: el índice único parcial no
+   * admite dos principales abiertas a la vez.
+   */
+  private async refrescarMesasPedido(tx: Prisma.TransactionClient, pedidoId: bigint) {
+    const abiertas = await tx.pedidoMesa.findMany({
+      where: { pedido_id: pedidoId, abierta: true },
+      include: { mesa: true },
+      orderBy: [{ principal: 'desc' }, { orden: 'asc' }, { id: 'asc' }],
+    });
+    await tx.pedidoMesa.updateMany({
+      where: { pedido_id: pedidoId, abierta: true },
+      data: { principal: false },
+    });
+    for (const [indice, pm] of abiertas.entries()) {
+      await tx.pedidoMesa.update({
+        where: { id: pm.id },
+        data: { principal: indice === 0, orden: indice + 1 },
+      });
+    }
+    await tx.pedido.update({
+      where: { id: pedidoId },
+      data: {
+        mesa_nombre: etiquetaMesasPedido(
+          abiertas.map((pm) => ({ numero: pm.mesa?.numero ?? null, nombre: pm.mesa?.nombre ?? pm.mesa_nombre })),
+        ),
+      },
+    });
+    return abiertas;
+  }
+
+  private emitirCambioMesas(pedidoId: bigint, codigo: string) {
+    this.eventosGateway.emitirAdmin('cocina:comanda', { pedidoId: Number(pedidoId), areaId: null, completo: false });
+    this.eventosGateway.emitirAdmin('pedido:progreso', { id: Number(pedidoId), codigo });
+  }
+
+  private resumenMesasPedido(
+    pedidoId: bigint,
+    codigo: string,
+    abiertas: Array<{ mesa_id: bigint | null; mesa?: { numero?: number | null; nombre?: string | null } | null; mesa_nombre?: string | null }>,
+  ) {
+    const mesas = abiertas.map((pm) => ({
+      id: pm.mesa_id?.toString() ?? null,
+      numero: pm.mesa?.numero ?? null,
+      nombre: pm.mesa?.nombre ?? pm.mesa_nombre ?? null,
+    }));
+    return {
+      ok: true,
+      pedidoId: pedidoId.toString(),
+      codigo,
+      mesas,
+      mesa: etiquetaMesasPedido(mesas.map((m) => ({ numero: m.numero, nombre: m.nombre }))),
     };
   }
 
@@ -825,4 +1099,13 @@ export class SalonService {
       mozoPartyId,
     });
   }
+}
+
+/** Id de mesa que llega como texto o número. 400 si no es un id numérico. */
+function parseIdMesa(valor: string | number | bigint): bigint {
+  const texto = String(valor).trim();
+  if (!/^\d+$/.test(texto)) {
+    throw new BadRequestException({ codigo: 'MESA_INVALIDA', mensaje: 'Id de mesa inválido' });
+  }
+  return BigInt(texto);
 }
