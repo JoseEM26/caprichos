@@ -1,3 +1,4 @@
+import { hoyLima, normalizarBotonesBanner, vigenteHoy } from './banner-botones';
 import {
   BadRequestException,
   Injectable,
@@ -405,15 +406,38 @@ export class ContenidoService {
       novedadesEncabezado,
       conocenos: normalizarConocenos(paramConocenos?.valor),
       novedadesMomentos: normalizarGaleria((paramMomentos?.valor as any)?.fotos).filter((f) => f.activo),
-      banner: contenidoConfig.banner ?? {
-        activo: false,
-        tag: '',
-        title: '',
-        sub: '',
-      },
+      banner: await this.bannerPublico(
+        contenidoConfig.banner && typeof contenidoConfig.banner === 'object'
+          ? contenidoConfig.banner
+          : { activo: false, tag: '', title: '', sub: '' },
+      ),
       promos: contenidoConfig.promos ?? [],
       disposicion: resolverDisposicionCarta(contenidoConfig.disposicion),
     };
+  }
+
+  /**
+   * Banner que ve el cliente: solo los banners de imagen vigentes hoy (fechas de Lima) y los enlaces a
+   * categorías o productos que siguen existiendo y visibles; el resto deja de enlazar.
+   */
+  private async bannerPublico(crudo: any) {
+    const banner = normalizarBotonesBanner(crudo);
+    const hoy = hoyLima();
+    const lista = banner.imagenes.filter((b: any) => vigenteHoy(b, hoy)) as any[];
+    const ids = (tipo: string) => lista.filter((b) => b.enlace?.tipo === tipo).map((b) => BigInt(b.enlace.valor));
+    const cats = ids('CATEGORIA');
+    const prods = ids('PRODUCTO');
+    const okCat = new Set(cats.length ? (await this.prisma.categoria.findMany({ where: { id: { in: cats }, oculta: false }, select: { id: true } })).map((c: any) => c.id.toString()) : []);
+    const okProd = new Set(prods.length ? (await this.prisma.producto.findMany({ where: { id: { in: prods }, oculto: false }, select: { id: true } })).map((p: any) => p.id.toString()) : []);
+    const imagenes = lista.map((b) => {
+      const t = b.enlace?.tipo;
+      if ((t === 'CATEGORIA' && !okCat.has(b.enlace.valor)) || (t === 'PRODUCTO' && !okProd.has(b.enlace.valor))) {
+        const { enlace: _x, ...sin } = b;
+        return sin;
+      }
+      return b;
+    });
+    return { ...banner, imagenes };
   }
 
   // =========================================================================
@@ -558,6 +582,8 @@ export class ContenidoService {
       const previa = (borradorExistente?.contenido as any)?.disposicion ?? (publicada?.contenido as any)?.disposicion;
       const entrante = dto.contenido.disposicion !== undefined ? dto.contenido.disposicion : resolverDisposicionCarta(previa);
       contenido = { ...dto.contenido, disposicion: resolverDisposicionCarta(entrante, true) };
+      const bn = contenido.banner;
+      if (bn && typeof bn === 'object' && !Array.isArray(bn)) contenido.banner = normalizarBotonesBanner(bn, true);
     }
 
     const data = {

@@ -22,6 +22,9 @@ import { BloqueEditable, BotonBarra } from './edicion/BloqueEditable';
 import { Fantasma, LienzoEdicion } from './edicion/LienzoEdicion';
 import { moverIndice, reubicar, siguiente } from './edicion/mover';
 import { subirFotoEdicion } from './edicion/subirFoto';
+import { PopoverBanners } from './PopoverBanners';
+import { estadoBanner } from '../../carta/CarruselBanners';
+import type { BannerImagen } from '../../carta/CarruselBanners';
 import { useBorrador } from './edicion/useBorrador';
 
 interface CategoriaAdmin {
@@ -67,7 +70,7 @@ interface MomentosBorrador {
   nuevos: { id: string; titulo: string; foto: string }[];
 }
 
-type Banner = BannerCarta & { activo: boolean; tag: string; title: string; sub: string };
+type Banner = BannerCarta & { activo: boolean; tag: string; title: string; sub: string; textoBotonPrincipal: string; botonPrincipalActivo: boolean; textoBotonSecundario: string; botonSecundarioActivo: boolean; modo: 'MES' | 'IMAGENES'; intervaloSeg: number; imagenes: BannerImagen[] };
 
 interface EstadoDis {
   layout: 'secciones' | 'lista' | 'grande';
@@ -114,7 +117,7 @@ const COLUMNAS: DisposicionCarta['carta']['columnasPc'][] = ['auto', '2', '3', '
 const FOCOS = ['arriba', 'centro', 'abajo'] as const;
 const NOMBRE_TAMANO: Record<string, string> = { compacto: 'Compacto', chico: 'Chico', normal: 'Normal', grande: 'Grande' };
 
-const BANNER_BASE: Banner = { activo: true, tag: 'NOVEDAD DEL MES', title: 'Frappe Maracuyá Tropical', sub: 'Con pulpa natural de maracuyá y crema batida.' };
+const BANNER_BASE: Banner = { activo: true, tag: 'NOVEDAD DEL MES', title: 'Frappe Maracuyá Tropical', sub: 'Con pulpa natural de maracuyá y crema batida.', textoBotonPrincipal: 'Pedir ahora', botonPrincipalActivo: true, textoBotonSecundario: 'Ver la carta', botonSecundarioActivo: true, modo: 'MES', intervaloSeg: 5, imagenes: [] };
 
 /** Momentos en el orden elegido, con los cambios del borrador encima de lo que hay en la base. */
 export function momentosVisibles(base: DestacadaAdmin[], m: MomentosBorrador): HistoriaCírculo[] {
@@ -373,8 +376,22 @@ export function DisenadorView() {
       let onFoto: ((f: File) => void) | undefined;
       if (idSec === 'mes') {
         const campo = celular ? 'tamanoCelular' : 'tamanoPc';
-        acciones = (
+        const modoImg = e.banner.modo === 'IMAGENES';
+        const modos = (
           <>
+            <BotonBarra pulsado={!modoImg} onClick={() => setBanner({ modo: 'MES' })}>Caprichos del mes</BotonBarra>
+            <BotonBarra pulsado={modoImg} onClick={() => setBanner({ modo: 'IMAGENES' })}>Mis banners (imágenes)</BotonBarra>
+          </>
+        );
+        acciones = modoImg ? (
+          <>
+            {modos}
+            <BotonBarra onClick={() => alternarPop(clave, 'imagenes')} pulsado={pop?.bloque === clave && pop.tipo === 'imagenes'}>Administrar banners</BotonBarra>
+            {!e.banner.imagenes.some((x) => estadoBanner(x).id === 'ACTIVO') && <span role="status">No hay banners activos: se muestra Caprichos del mes</span>}
+          </>
+        ) : (
+          <>
+            {modos}
             <BotonBarra onClick={() => setDisposicion((x) => ({ ...x, banner: { ...x.banner, [campo]: siguiente(TAM_BANNER, x.banner[campo]) } }))}>
               Tamaño: {NOMBRE_TAMANO[d.banner[campo]]}
             </BotonBarra>
@@ -390,7 +407,44 @@ export function DisenadorView() {
           </>
         );
         onFoto = (f) => subirYAplicar(f, (url) => setBanner({ foto: url }));
-        if (pop?.bloque === clave && pop.tipo === 'banner') {
+        if (pop?.bloque === clave && pop.tipo === 'imagenes' && modoImg) {
+          popover = (
+            <PopoverBanners
+              imagenes={e.banner.imagenes}
+              intervaloSeg={e.banner.intervaloSeg}
+              categorias={e.categorias.filter((c) => !c.oculto).map((c) => ({ id: c.id, nombre: c.nombre }))}
+              productos={e.productos.filter((p) => !p.oculto).map((p) => ({ id: p.id, nombre: p.nombre }))}
+              movil={celular}
+              onImagenes={(imagenes) => setBanner({ imagenes })}
+              onIntervalo={(intervaloSeg) => setBanner({ intervaloSeg })}
+            />
+          );
+        } else if (pop?.bloque === clave && (pop.tipo === 'btn:principal' || pop.tipo === 'btn:secundario')) {
+          const k = pop.tipo === 'btn:principal' ? 'Principal' : 'Secundario';
+          const campoTexto = `textoBoton${k}` as 'textoBotonPrincipal' | 'textoBotonSecundario';
+          const campoActivo = `boton${k}Activo` as 'botonPrincipalActivo' | 'botonSecundarioActivo';
+          popover = (
+            <>
+              <strong>Botón {k.toLowerCase()}</strong>
+              <label>
+                Texto del botón
+                <input
+                  type="text"
+                  maxLength={24}
+                  defaultValue={e.banner[campoTexto]}
+                  onBlur={(ev) => {
+                    const t = ev.target.value.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
+                    if (t && t !== e.banner[campoTexto]) setBanner({ [campoTexto]: t });
+                    else ev.target.value = e.banner[campoTexto];
+                  }}
+                />
+              </label>
+              <label>
+                <input type="checkbox" checked={e.banner[campoActivo]} onChange={(ev) => setBanner({ [campoActivo]: ev.target.checked })} /> Mostrar este botón
+              </label>
+            </>
+          );
+        } else if (pop?.bloque === clave && pop.tipo === 'banner') {
           const todos = e.productos.map((p) => p.nombre);
           popover = (
             <>
@@ -583,6 +637,15 @@ export function DisenadorView() {
       <Fantasma key={`agregar-${clave}`} etiqueta={etiqueta} estilo={estilo} onClick={() => entradaMomento.current?.click()} />
     ),
     accion(clave) {
+      const m = /^banner\.boton:(principal|secundario)(:mostrar)?$/.exec(clave);
+      if (m) {
+        if (m[2]) setBanner({ [m[1] === 'principal' ? 'botonPrincipalActivo' : 'botonSecundarioActivo']: true });
+        else {
+          setSelRaw('seccion:mes');
+          alternarPop('seccion:mes', `btn:${m[1]}`);
+        }
+        return;
+      }
       if (clave === 'banner.producto') {
         setSelRaw('seccion:mes');
         alternarPop('seccion:mes', 'banner');
@@ -593,7 +656,7 @@ export function DisenadorView() {
   const publicar = async () => {
     await b.guardarYa();
     await api.post('/admin/contenido/disenador/publicar', {});
-    setMensaje('Cambios publicados en la carta');
+    setMensaje('¡Listo! Tus cambios ya se ven en la carta');
     seleccionar(null);
     await cargarDatos();
     setTimeout(() => setMensaje(null), 4000);

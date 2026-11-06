@@ -322,6 +322,21 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
     }
   };
 
+  const abrirEnlaceBanner = (e: { tipo: string; valor?: string }) => {
+    if (e.tipo === 'PRODUCTO') {
+      const prod = categorias.flatMap((c) => c.productos).find((p) => p.id === e.valor);
+      if (prod) return abrirModalProducto(prod);
+    } else if (e.tipo === 'CATEGORIA') {
+      const cat = categorias.find((c) => c.id === e.valor);
+      if (cat) {
+        setPagina('carta');
+        setCategoriaActivaId(cat.id);
+        return;
+      }
+    }
+    irACarta();
+  };
+
   const cambiarPagina = (p: PaginaCarta) => {
     if (ed) return; // el editor en sitio muestra una sola página
     setPagina(p);
@@ -349,6 +364,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
           banner={contenido?.banner}
           onPedir={pedirDestacadoPortada}
           onVerCarta={irACarta}
+          onEnlace={abrirEnlaceBanner}
           tamanoPc={disp.banner.tamanoPc}
           tamanoCelular={disp.banner.tamanoCelular}
           ajusteFoto={disp.banner.ajusteFoto}
