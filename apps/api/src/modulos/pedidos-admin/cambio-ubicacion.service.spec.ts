@@ -80,6 +80,26 @@ describe('CambioUbicacionService', () => {
     await expect(service.cambiarPorCaja('7', punto, caja)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('cambio directo de Caja cancela la propuesta pendiente del repartidor (misma transacción)', async () => {
+    prisma.pedidoCambioUbicacion.findMany.mockResolvedValueOnce([{ id: 55n }]);
+    await service.cambiarPorCaja('7', punto, caja);
+    expect(prisma.pedidoCambioUbicacion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { pedido_id: 7n, estado: 'PROPUESTA' } }),
+    );
+    expect(prisma.pedidoCambioUbicacion.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [55n] }, estado: 'PROPUESTA' },
+      data: expect.objectContaining({
+        estado: 'CANCELADA',
+        motivo: 'Caja cambió la ubicación directamente',
+      }),
+    });
+  });
+
+  it('sin propuesta pendiente no toca nada de propuestas', async () => {
+    await service.cambiarPorCaja('7', punto, caja);
+    expect(prisma.pedidoCambioUbicacion.updateMany).not.toHaveBeenCalled();
+  });
+
   it('pedido sin pagar: el total cambia con el envío nuevo y no deja ajuste', async () => {
     const r = await service.cambiarPorCaja('7', punto, caja);
     expect(r).toMatchObject({ zona: 'Z3', envioAnterior: 0, envioNuevo: 6, diferencia: 6, totalNuevo: 46, ajuste: null, avisoCliente: 'SIN_WHATSAPP' });

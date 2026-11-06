@@ -372,9 +372,14 @@ export function claveDeTrabajo(job: { tipo: string; payload: any }): string | nu
 const num = (v: unknown): number => Math.round(Number(v ?? 0) * 100) / 100;
 
 /** Ticket/voucher de pago para la ticketera térmica; el agente lo maquetea a 58 u 80 mm. */
-// ponytail: el tipo `propina` ya está en packages/compartido/src; el dist publicado puede ir atrasado, así que se
-// declara aquí en la intersección para no depender del orden de construcción.
-export function construirTicketPago(pedido: any, local: any, comprobante?: any): TicketPagoDatos & { propina?: number } {
+// ponytail: el tipo `propina` y `ajusteUbicacion` ya están en packages/compartido/src; el dist publicado puede ir
+// atrasado, así que se declaran aquí en la intersección para no depender del orden de construcción.
+export function construirTicketPago(
+  pedido: any,
+  local: any,
+  comprobante?: any,
+  ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null,
+): TicketPagoDatos & { propina?: number; ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } } {
   const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   const cobro = (pedido.cobros || []).find((c: any) => !c.anulado_en);
   const ahora = cobro?.en ?? new Date();
@@ -400,6 +405,8 @@ export function construirTicketPago(pedido: any, local: any, comprobante?: any):
     // total = venta (comprobante). La propina va en su propia línea; el pago por medio es venta + propina (lo entregado)
     total: num(pedido.total),
     propina: num(pedido.propina ?? 0),
+    // Solo si hay ajuste de cambio de dirección pendiente: sin él, el ticket sale igual que antes
+    ...(ajusteUbicacion ? { ajusteUbicacion: { tipo: ajusteUbicacion.tipo, monto: num(ajusteUbicacion.monto) } } : {}),
     pagos: (cobro?.pagos || []).map((p: any) => ({
       medio: p.medio,
       monto: num(num(p.monto) + num(p.propina ?? 0)),

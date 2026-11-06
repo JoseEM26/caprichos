@@ -1,5 +1,6 @@
 import {
   construirTicketNotaMozo,
+  construirTicketPago,
   esLineaBebida,
   construirEtiquetaGeneral,
   construirEtiquetasArea,
@@ -171,6 +172,17 @@ describe('Constructor server-side de etiquetas', () => {
       comboBase({ nombre: 'Frappe Moca', cantidad: 2, categoria: { nombre: 'Frappes' }, nombres_persona: ['Ana', 'Luis'] }),
     );
     expect(b.map((x) => x.persona)).toEqual(['Ana', 'Luis']);
+  });
+});
+
+describe('construirTicketPago: ajuste por cambio de dirección', () => {
+  const pedido = { codigo: 'CP-9', total: 20, lineas: [{ cantidad: 1, nombre: 'Lomo', subtotal: 20 }], cobros: [] };
+
+  it('con ajuste pendiente lleva el ajuste; sin él no agrega la clave (el ticket sale como antes)', () => {
+    const con = construirTicketPago(pedido, {}, undefined, { tipo: 'SALDO', monto: 4 });
+    expect(con.ajusteUbicacion).toEqual({ tipo: 'SALDO', monto: 4 });
+    const sin = construirTicketPago(pedido, {}, undefined, null);
+    expect(sin).not.toHaveProperty('ajusteUbicacion');
   });
 });
 

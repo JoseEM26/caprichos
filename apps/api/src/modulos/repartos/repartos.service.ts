@@ -317,6 +317,8 @@ export class RepartosService {
       cliente_telefono: clienteTelefono,
       direccion: p.entrega_direccion,
       referencia: p.entrega_referencia,
+      // Último cambio de ubicación (insignia «Dirección editada» en la tarjeta del repartidor y de Caja)
+      ubicacion_editada_en: p.ubicacion_editada_en ?? null,
       lat: p.entrega_lat != null ? Number(p.entrega_lat) : null,
       lng: p.entrega_lng != null ? Number(p.entrega_lng) : null,
       coordenadas:

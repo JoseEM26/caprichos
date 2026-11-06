@@ -97,6 +97,7 @@ describe('PedidosEstadoService.misPedidos', () => {
       modalidad: 'MESA',
       mesaNombre: 'Mesa 3',
       clienteNombre: 'Mesa 3',
+      ubicacionEditadaEn: null,
       total: 5,
       pagoEstado: 'PENDIENTE',
       pagoMetodo: null,

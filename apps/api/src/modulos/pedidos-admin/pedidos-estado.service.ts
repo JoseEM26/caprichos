@@ -57,6 +57,7 @@ import {
   sumarDiasFechaIso,
 } from '../cocina/cocina.util';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { ajustesPendientesUbicacion } from './cambio-ubicacion.util';
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 
@@ -303,6 +304,7 @@ export class PedidosEstadoService {
     const ahora = new Date();
     const esAdmin = usuarioActual?.rol === 'ADMIN';
     const cobrosMozo = await this.cobrosMozoDe(pedidos);
+    const ajustes = await ajustesPendientesUbicacion(this.prisma, pedidos.map((p) => p.id));
 
     const items = pedidos.map((p) => {
       const { minutosEspera, color, colorEspera } = this.calcularMinutosYColor(
@@ -318,6 +320,7 @@ export class PedidosEstadoService {
         ...p,
         cobro_vigente_id: cobroVigenteId,
         cobroMozo: cobrosMozo.get(String(p.id)) ?? null,
+        ajusteUbicacionPendiente: ajustes.get(String(p.id)) ?? null,
         comprobante_doc: esAdmin ? p.comprobante_doc : enmascararDni(p.comprobante_doc || ''),
         minutosEspera,
         color,
@@ -457,6 +460,7 @@ export class PedidosEstadoService {
         creado_en: true,
         pasa_cocina_en: true,
         entregado_mesa_en: true,
+        ubicacion_editada_en: true,
         repartidor_party_id: true,
         despachado_en: true,
         eta_min: true,
@@ -514,6 +518,8 @@ export class PedidosEstadoService {
         estado: p.estado,
         modalidad: p.modalidad,
         mesaNombre: p.mesa_nombre,
+        // Último cambio de ubicación (la insignia «Dirección editada»); null si la dirección es la original
+        ubicacionEditadaEn: p.ubicacion_editada_en ?? null,
         // Nombre del cliente para reconocer el pedido; nunca teléfono ni DNI. Mesa sin nombre: la mesa.
         clienteNombre: p.cliente_nombre?.trim() || (p.modalidad === 'MESA' ? p.mesa_nombre : null) || null,
         total: Number(p.total),
@@ -827,10 +833,12 @@ export class PedidosEstadoService {
     const puntos = (await explicarPedidosPorId(this.prisma, [pedido.id]).catch(() => null))?.get(String(pedido.id)) ?? null;
 
     const cobroMozo = (await this.cobrosMozoDe([pedido])).get(String(pedido.id)) ?? null;
+    const ajusteUbicacionPendiente = (await ajustesPendientesUbicacion(this.prisma, [pedido.id])).get(String(pedido.id)) ?? null;
 
     const { incidentes, ...pedidoSinIncidentes } = pedido;
     return {
       ...pedidoSinIncidentes,
+      ajusteUbicacionPendiente,
       prueba_entrega: await construirPruebaEntrega(this.prisma, incidentes?.[0]),
       puntos,
       cobro_vigente_id: cobroVigenteId,

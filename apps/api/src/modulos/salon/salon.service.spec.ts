@@ -844,6 +844,18 @@ describe('SalonService', () => {
       expect(sin.pisos[0].mesas[0].pedido.cliente).toBeNull();
     });
 
+    it('obtenerMesas dice si la mesa es la principal del pedido y su orden (para quitar mesa)', async () => {
+      const elementos = [
+        {
+          ...mesaConPedido('Ana')[0],
+          pedidosMesa: [{ id: 502n, abierta: true, principal: false, orden: 2, pedido: mesaConPedido('Ana')[0].pedidosMesa[0].pedido }],
+        },
+      ];
+      prismaMock.piso.findMany.mockResolvedValue([{ id: 1n, nombre: 'Piso 1', activo: true, cuadricula_ancho: 20, cuadricula_alto: 12, elementos }]);
+      const r: any = await service.obtenerMesas();
+      expect(r.pisos[0].mesas[0].pedido).toMatchObject({ id: '1001', esPrincipal: false, orden: 2 });
+    });
+
     it('sin cliente.nombre, clienteNombre pasa como nombre del pedido de mesa', async () => {
       prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
       prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
