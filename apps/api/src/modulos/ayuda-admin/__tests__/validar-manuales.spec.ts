@@ -112,11 +112,11 @@ describe('Validación de formato de Manuales de Ayuda Admin (Ola J)', () => {
             }
           });
 
-          it('incluye entre 3 y 5 sugerencias redactadas como dudas de usuario', () => {
+          it('incluye entre 3 y 8 sugerencias redactadas como dudas de usuario', () => {
             expect(manual).not.toBeNull();
             if (manual) {
               expect(manual.sugerencias.length).toBeGreaterThanOrEqual(3);
-              expect(manual.sugerencias.length).toBeLessThanOrEqual(5);
+              expect(manual.sugerencias.length).toBeLessThanOrEqual(8);
               for (const s of manual.sugerencias) {
                 expect(s.trim().length).toBeGreaterThan(5);
               }

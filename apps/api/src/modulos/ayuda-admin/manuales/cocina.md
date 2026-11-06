@@ -4,12 +4,16 @@ titulo: Cocina
 ruta: /admin/cocina
 permiso: cocina/ver
 roles: [ADMIN, CAJERO, COCINA]
-relacionados: [caja, almacen, stock, pantallas, supervisor-codigo]
+relacionados: [caja, almacen, stock, pantallas, supervisor-codigo, apertura, productos, usuarios]
 sugerencias:
   - Como despejo una comanda que ya prepare
   - Como pongo en pausa la cocina por alta demanda
   - Como marco un plato o ingrediente como agotado
   - Como devuelvo una comanda que despeje por error
+  - Que significa el tiempo en colores de cada comanda
+  - Que es el numero del dia (#7) de un pedido
+  - Por que sale Falta el conteo de apertura de hoy
+  - Como hago que no me pregunte Si o No al despejar
 ---
 # Cocina
 
@@ -31,7 +35,7 @@ Despues: [[repartos]]
 Ver tambien: [[pantallas]]
 
 ## Como se hace: Devolver una comanda despejada por error
-1. Ir a la pestana Despejadas hoy en la barra superior.
+1. Ir a la pestana Despejadas hoy (junto a Pantalla del area).
 2. Ubicar la comanda en la lista de despejadas de hoy.
 3. Pulsar el boton Devolver a cocina.
 4. La comanda volvera de inmediato a la pantalla activa conservando su tiempo transcurrido original.
@@ -44,7 +48,7 @@ Ver tambien: [[caja]]
 Ver tambien: [[mirest]]
 
 ## Como se hace: Marcar un producto como agotado
-1. Pulsar el boton Agotar producto en la cabecera.
+1. Pulsar el boton Marcar agotado en la cabecera (marca un producto, sabor u opcion que se acabo hoy; deja de ofrecerse al instante en la carta y en el chatbot).
 2. Buscar el plato en el catalogo de [[productos]] o el ingrediente en [[stock]].
 3. Elegir la duracion del agotado: Solo por el turno de hoy o Hasta que se reactive manualmente.
 4. Pulsar Confirmar agotado. El producto dejara de estar disponible para pedidos de inmediato.
@@ -52,7 +56,7 @@ Despues: [[productos]]
 Ver tambien: [[stock]]
 
 ## Como se hace: Registrar una merma de cocina
-1. Pulsar el boton Mermas en la barra superior.
+1. Pulsar el boton Registrar mermas en la barra superior (por caida, vencimiento, mala preparacion o calibracion; sirve para productos o insumos).
 2. Seleccionar el insumo afectado registrado en [[stock]], ingresar la cantidad y unidad de medida.
 3. Elegir el motivo: Se cayo, Vencido, Mal preparado u Otro (especificando detalle).
 4. Pulsar Registrar merma. Si el insumo o cantidad requiere autorizacion, el sistema solicitara el Codigo del supervisor de 6 digitos obtenido en [[supervisor-codigo]] antes de confirmar (el administrador no lo necesita).
@@ -60,8 +64,28 @@ Requiere: [[supervisor-codigo]]
 Despues: [[almacen]]
 Ver tambien: [[stock]]
 
+## Como se hace: Leer el tiempo en vivo y el numero del dia
+1. Cada tarjeta de comanda muestra un reloj en vivo desde que el pedido entro a cocina: mm:ss (h:mm:ss pasada la hora) con una etiqueta de color: En tiempo (verde), Atencion (naranja, desde 35 min) o Urgente (rojo, desde 50 min). El reloj corre con la hora del servidor, asi que no se desfasa aunque el equipo este mal de hora.
+2. En la tarjeta aparece grande el numero del dia, por ejemplo #7: es el orden en que el pedido llego a cocina hoy. Es solo referencial: el codigo CP-xxxx sigue siendo el que vale; no va en comprobantes. Un pedido anterior a esta funcion no muestra numero.
+3. El numero se asigna la primera vez que el pedido llega a cocina y reinicia a #1 cada dia a la medianoche de Lima. Un pedido numerado conserva su numero aunque se anule. En Pedidos y caja se ve como "#N del dia".
+4. En las pantallas de TV de [[pantallas]] el tiempo se ve mas grande con la misma etiqueta.
+Ver tambien: [[caja]]
+
+## Como se hace: Que no me pregunte Si o No al despejar
+1. En la cabecera de Cocina activa o apaga la casilla Preguntar antes de despejar. Es un ajuste propio de cada cocinero; el boton Usar la del local lo devuelve al valor general del local (Configuracion, Confirmar al despejar).
+2. Con la casilla apagada, pulsar Despejar despeja de inmediato sin la ventana Si, despejar. Si despejas por error, usa la pestana Despejadas hoy y Devolver a cocina.
+
+## Como se hace: Atender el aviso de apertura del dia
+1. Si hay productos con control de stock sin contar, arriba de Cocina aparece "Falta el conteo de apertura de hoy (N productos)" con el boton Contar ahora.
+2. Pulsalo y completa el conteo en [[apertura]]. Ahi tambien se botan a merma las donas o galletas vencidas.
+Despues: [[apertura]]
+
+## Como se hace: Atender solo mi area (usuarios con rol Cocina)
+1. Cada usuario con rol Cocina tiene asignadas las areas que atiende (se editan en [[usuarios]], edicion del usuario). La pantalla recuerda el area elegida por cada usuario.
+2. Un combo como la Cajita Caprikids sale a cocina como lineas hijas: cada parte va a su area, con su cantidad y tamano, sin cobro propio; la linea madre del combo no tiene comanda.
+
 ## Errores y dudas comunes
-- Las tarjetas cambian de color segun el tiempo de espera: verde (tiempo optimo), amarillo (alerta de preparacion) y rojo (pedido retrasado con mas de 13 minutos).
+- Las tarjetas cambian de color segun el tiempo de espera, con una etiqueta que acompana al color: verde En tiempo, naranja Atencion (desde 35 minutos) y rojo Urgente (desde 50 minutos). Los minutos de corte son los parametros rep_naranja_min y rep_rojo_min de Configuracion. Ver la seccion del tiempo en vivo.
 - Para silenciar o activar la campana de alerta sonora de nuevos pedidos, pulsar el icono de campana junto a las pestanas.
 - Si una orden tiene platos de varias areas, cada area debe despejar su parte de forma independiente antes de que el pedido pase a LISTO.
 - Las comandas que ya despejo tu area no cuentan en el contador de pendientes ni disparan la alerta: solo se muestran para seguimiento hasta que las demas areas terminen.
