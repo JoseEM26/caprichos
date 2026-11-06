@@ -35,12 +35,14 @@ import {
   ResumenRepartos,
   RespuestaMios,
   PedidoPerdido,
+  PanelRepartidores as DatosPanel,
 } from './repartosApi';
+import { PanelRepartidores } from './PanelRepartidores';
 import { RepartidorView } from './RepartidorView';
 import { RutasAdmin } from './RutasAdmin';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
-type ModoVista = 'mapa' | 'lista' | 'rutas';
+type ModoVista = 'mapa' | 'lista' | 'rutas' | 'panel';
 type FiltroRetraso = 'todos' | NivelEspera;
 
 
@@ -63,7 +65,7 @@ function RepartosAdminView() {
   // Modo de vista: 'mapa' por defecto; sincronizado con URL si viene ?vista=lista o ?vista=mios
   const vistaUrl = searchParams.get('vista');
   const [modoVista, setModoVista] = useState<ModoVista>(
-    vistaUrl === 'rutas' ? 'rutas' : vistaUrl === 'lista' || vistaUrl === 'mios' ? 'lista' : 'mapa',
+    vistaUrl === 'rutas' ? 'rutas' : vistaUrl === 'panel' && !esRolRepartidor ? 'panel' : vistaUrl === 'lista' || vistaUrl === 'mios' ? 'lista' : 'mapa',
   );
 
   // Filtro de rol / repartidor: arranca en 'all' ("Todos (caja)") o el id del repartidor
@@ -93,6 +95,7 @@ function RepartosAdminView() {
   });
   const [todos, setTodos] = useState<PedidoReparto[]>([]);
   const [, setResumen] = useState<ResumenRepartos | null>(null);
+  const [panel, setPanel] = useState<DatosPanel | null>(null);
 
   // Selección de pedido para la hoja inferior (Decisión 7)
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
@@ -117,8 +120,10 @@ function RepartosAdminView() {
       setModoVista('mapa');
     } else if (vistaUrl === 'lista' || vistaUrl === 'mios') {
       setModoVista('lista');
+    } else if (vistaUrl === 'panel' && !esRolRepartidor) {
+      setModoVista('panel');
     }
-  }, [vistaUrl]);
+  }, [vistaUrl, esRolRepartidor]);
 
   // La pantalla completa es este estado: que el navegador salga de su Fullscreen API no la cierra.
   const alternarPantallaCompleta = () => {
@@ -136,13 +141,15 @@ function RepartosAdminView() {
     setError(null);
 
     try {
-      const [disp, res, mios, tod, cfg, zGeo] = await Promise.all([
+      const [disp, res, mios, tod, cfg, zGeo, pan] = await Promise.all([
         repartosApi.listarDisponibles().catch(() => []),
         repartosApi.obtenerResumen().catch(() => null),
         repartosApi.listarMios().catch(() => ({ pedidos: [], orden: [], paso: [], ruta: [] })),
         repartosApi.listarTodos().catch(() => []),
         repartosApi.obtenerConfig().catch(() => CONFIG_REPARTO_DEFECTO),
         repartosApi.obtenerZonasPoligonos().catch(() => ZONAS_GEO_DEFECTO),
+        // Solo Caja/Admin: al REPARTIDOR el servidor le responde 403
+        esRolRepartidor ? Promise.resolve(null) : repartosApi.obtenerPanel().catch(() => null),
       ]);
 
       // Los nombres se limpian aquí una sola vez: ningún teléfono ni número largo llega a la pantalla
@@ -155,12 +162,13 @@ function RepartosAdminView() {
       setTodos(sinNumeros(tod));
       if (cfg) setConfig(cfg);
       if (zGeo) setZonasGeo(zGeo);
+      setPanel(pan);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar los repartos');
     } finally {
       setCargando(false);
     }
-  }, [puedeVer]);
+  }, [puedeVer, esRolRepartidor]);
 
   const acciones = useAccionesReparto({ alActualizar: cargarDatos });
 
@@ -483,7 +491,11 @@ function RepartosAdminView() {
           lng: p.lng!,
           etiqueta: p.cliente_nombre,
           codigo: p.codigo,
-          detalle: enReparto ? 'en reparto' : 'esperando repartidor',
+          detalle: p.repartidor?.nombre
+            ? `lo lleva ${p.repartidor.nombre.split(' ')[0]}`
+            : enReparto
+              ? 'en reparto'
+              : 'sin repartidor',
           color: infoEspera.color,
           orden: numeroOrden,
           minutosEspera: p.minutosEspera,
@@ -504,8 +516,13 @@ function RepartosAdminView() {
   // Pedido seleccionado al tocar un marcador
   const pedidoSeleccionado = useMemo(() => {
     if (!pedidoSeleccionadoId) return null;
-    return pedidosBase.find((p) => p.id === pedidoSeleccionadoId) || null;
-  }, [pedidoSeleccionadoId, pedidosBase]);
+    return (
+      pedidosBase.find((p) => p.id === pedidoSeleccionadoId) ||
+      panel?.sin_tomar.find((p) => p.id === pedidoSeleccionadoId) ||
+      panel?.repartidores.flatMap((r) => r.pedidos).find((p) => p.id === pedidoSeleccionadoId) ||
+      null
+    );
+  }, [pedidoSeleccionadoId, pedidosBase, panel]);
 
   // Agrupación por zona para la vista Lista
   // La lista es general: los que más esperan primero; la zona es solo un filtro opcional
@@ -657,6 +674,29 @@ function RepartosAdminView() {
             >
               Rutas
             </button>
+{!esRolRepartidor && (
+            <button
+              type="button"
+              aria-pressed={modoVista === 'panel'}
+              onClick={() => {
+                setModoVista('panel');
+                setSearchParams({ vista: 'panel' });
+              }}
+              style={{
+                minHeight: '36px',
+                padding: '0 14px',
+                borderRadius: '9px',
+                border: 'none',
+                background: modoVista === 'panel' ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
+                color: modoVista === 'panel' ? 'var(--cp-cream, #FFFDF8)' : 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              Repartidores
+            </button>
+)}
           </div>
 
           {/* Botón Pantalla Completa en PC y Celular (Decisión 2) */}
@@ -799,6 +839,23 @@ function RepartosAdminView() {
         </div>
       ) : error ? (
         <EstadoError mensaje={error} alReintentar={cargarDatos} />
+      ) : modoVista === 'panel' && panel ? (
+        <>
+          <PanelRepartidores panel={panel} config={config} alAbrir={setPedidoSeleccionadoId} />
+          {pedidoSeleccionado && (
+            <ResumenPedidoReparto
+              pedido={pedidoSeleccionado}
+              esMio={false}
+              esDisponible={pedidoSeleccionado.estado === 'LISTO' && !pedidoSeleccionado.repartidor_party_id}
+              puedeLiquidar={puedeLiquidar}
+              alCerrar={() => setPedidoSeleccionadoId(null)}
+              alActualizar={cargarDatos}
+              acciones={acciones}
+            />
+          )}
+        </>
+      ) : modoVista === 'panel' ? (
+        <EstadoError mensaje="No se pudo cargar el panel de repartidores." alReintentar={cargarDatos} />
       ) : modoVista === 'mapa' ? (
         /* VISTA MAPA PRINCIPAL (Decisión 2 del dueño) */
         <div
@@ -809,6 +866,10 @@ function RepartosAdminView() {
             ...(pantallaCompleta ? { flex: '1 1 auto', minHeight: 0, position: 'relative' } : {}),
           }}
         >
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--cp-soft, #5A6E78)' }}>
+            Pin con anillo: ya lo lleva un repartidor (su nombre sale en la etiqueta). Pin sin anillo: «sin repartidor».
+            Color: minutos de espera.
+          </p>
           {/* Componente de Mapa Leaflet con Zonas Sombreadas y Marcadores */}
           <MapaRepartos
             puntos={puntosMapa}

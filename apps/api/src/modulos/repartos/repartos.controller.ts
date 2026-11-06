@@ -128,6 +128,13 @@ export class RepartosController {
       : this.repartosService.obtenerResumen();
   }
 
+  /** Panel de repartidores para caja y admin: el REPARTIDOR recibe 403 (lo valida el servicio). */
+  @Get('panel')
+  @Permiso('repartos', 'ver')
+  async panelRepartidores(@Req() req: any) {
+    return this.repartosService.obtenerPanelRepartidores(req.usuario);
+  }
+
   @Get(':id/mensajes')
   @Permiso('repartos', 'ver')
   async consultarMensajes(@Param('id') id: string, @Req() req?: any) {
