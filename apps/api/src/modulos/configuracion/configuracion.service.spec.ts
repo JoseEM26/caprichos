@@ -132,6 +132,29 @@ describe('ConfiguracionService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('propina_activa: el interruptor es por canal (carta y bot, booleanos); otra forma se rechaza', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'propina_activa', valor: { carta: true, bot: false } });
+
+      await service.actualizar('propina_activa', { carta: true, bot: false, extra: 'x' }, adminAuth);
+      expect(prismaMock.parametro.upsert.mock.calls[0][0].create.valor).toEqual({ carta: true, bot: false });
+
+      await expect(service.actualizar('propina_activa', { carta: 'si', bot: false }, adminAuth)).rejects.toMatchObject({
+        response: { codigo: 'VALOR_INVALIDO' },
+      });
+      await expect(service.actualizar('propina_activa', true, adminAuth)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('propina_tope: entre S/ 1 y S/ 1000', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'propina_tope', valor: 50 });
+
+      await expect(service.actualizar('propina_tope', 0, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      await expect(service.actualizar('propina_tope', 1001, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      await service.actualizar('propina_tope', 50, adminAuth);
+      expect(prismaMock.parametro.upsert).toHaveBeenCalled();
+    });
+
     it('valor no texto para clave de texto → rechaza con 400 VALOR_INVALIDO', async () => {
       await expect(
         service.actualizar('envio_gratis_modo', 123, adminAuth),

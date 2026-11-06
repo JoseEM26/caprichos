@@ -111,6 +111,8 @@ export interface DatosLocalCarta {
   envioGratisModo?: 'desde' | 'mas_de' | string;
   pedidoMinimo: number | null;
   puntosPorcentaje?: number;
+  /** Propina opcional: interruptor de la carta y tope en soles (lo decide el dueño en Configuración) */
+  propina?: { carta: boolean; bot: boolean; tope: number };
   /** Pedir como invitado (sin celular): lo decide el dueño en Configuración. Sin dato = no permitido. */
   invitadoPermitido?: boolean;
   lat?: number;
@@ -222,4 +224,6 @@ export interface PedidoConfirmado {
   clienteNombre: string;
   modalidad: ModalidadEntrega;
   seguimientoToken: string;
+  /** Propina aparte de la venta (0 o ausente = sin propina) */
+  propina?: number;
 }

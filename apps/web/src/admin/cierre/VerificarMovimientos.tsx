@@ -13,6 +13,9 @@ export interface ResumenAdmin {
   plin: number;
   transferencia: number;
   tarjeta: number;
+  /** Propinas del día (aparte de la venta): efectivo suma al esperado; digital ya va en yape/plin/etc. */
+  propinasEfectivo?: number;
+  propinasDigital?: number;
   efectivoEsperado: number;
 }
 
@@ -93,13 +96,20 @@ export function VerificarMovimientos(p: Props) {
           {medios.map((m) => (
             <Tarjeta key={m.n} t={m.n} v={m.m} />
           ))}
+          {r && (r.propinasEfectivo ?? 0) + (r.propinasDigital ?? 0) > 0 && (
+            <Tarjeta
+              t="Propinas del día"
+              v={(r.propinasEfectivo ?? 0) + (r.propinasDigital ?? 0)}
+              ayuda="Propinas aparte de la venta: no son ingreso ni comprobante. Las devoluciones del día ya están descontadas."
+            />
+          )}
           <Tarjeta t="Ingresos de caja" v={p.ingresos} />
           <Tarjeta t="Egresos de caja" v={p.egresos} />
           {r && (
             <Tarjeta
               t="Efectivo esperado"
               v={r.efectivoEsperado}
-              ayuda="Efectivo esperado = apertura + cobros en efectivo + ingresos − egresos"
+              ayuda="Efectivo esperado = apertura + cobros en efectivo + propinas en efectivo + ingresos − egresos"
               fuerte
             />
           )}

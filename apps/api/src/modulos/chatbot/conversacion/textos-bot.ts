@@ -124,6 +124,11 @@ export const BOTONES_PEDIDO_COMPROBANTE: BotonAccion[] = [
   { id: 'ped_comp_factura', titulo: 'Factura' },
 ];
 
+export const BOTONES_PEDIDO_PROPINA: BotonAccion[] = [
+  { id: 'ped_propina_no', titulo: 'Sin propina' },
+  { id: 'ped_propina_si', titulo: 'Dejar propina' },
+];
+
 export const BOTONES_PEDIDO_CONFIRMAR_FINAL: BotonAccion[] = [
   { id: 'ped_confirmar', titulo: 'Confirmar pedido' },
   { id: 'ped_cambiar', titulo: 'Cambiar algo' },
@@ -819,12 +824,26 @@ export const TEXTOS_BOT = {
     return `Descuento ${corto} −S/ ${monto.toFixed(2)}`;
   },
 
+  pedidoPropinaPregunta: (tope: number): string =>
+    `*Propina opcional para el equipo*\n` +
+    `Si quieres dejar una propina, va aparte de tu pedido: no es parte de la venta ni del comprobante. ` +
+    `Máximo S/ ${tope.toFixed(2)}.`,
+
+  pedidoPropinaMonto: (tope: number): string =>
+    `¿Cuánto quieres dejar de propina? Escribe el monto en soles (por ejemplo 5 o 2.50), máximo S/ ${tope.toFixed(2)}. ` +
+    `Escribe 0 si no quieres dejar propina.`,
+
+  pedidoPropinaInvalida: (tope: number): string =>
+    `Escribe un monto en soles entre 0 y S/ ${tope.toFixed(2)}, con hasta 2 decimales.`,
+
   pedidoResumenFinal: (params: {
     lineasTexto: string;
     /** Una línea corta: «Descuento <promo> −S/ x» (solo si la promoción con casilla BOT aplica) */
     descuentoTexto?: string;
     envioTexto: string;
     total: number;
+    /** Propina (aparte de la venta): se muestra como línea antes del total a pagar */
+    propina?: number;
     modalidad: string;
     direccionTexto?: string;
     pagoTexto: string;
@@ -837,6 +856,7 @@ export const TEXTOS_BOT = {
       descuentoTexto,
       envioTexto,
       total,
+      propina,
       modalidad,
       direccionTexto,
       pagoTexto,
@@ -853,6 +873,7 @@ export const TEXTOS_BOT = {
       `Este es tu resumen:\n` +
       `${lineasTexto}${descBloque}\n` +
       `Envío: ${envioTexto}\n` +
+      (propina && propina > 0 ? `Propina: S/ ${propina.toFixed(2)}\n` : '') +
       `*Total: S/ ${total.toFixed(2)}*\n\n` +
       `Modalidad: ${modalidad}${dirBloque}\n` +
       `Pago: ${pagoTexto}\n` +

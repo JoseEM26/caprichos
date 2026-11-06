@@ -1,6 +1,7 @@
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import { PuntosService } from '../clientes/puntos.service';
 import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
+import { totalCobrable } from '../propinas/propinas.util';
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
@@ -448,6 +449,7 @@ export class PedidosEstadoService {
         modalidad: true,
         mesa_nombre: true,
         total: true,
+        propina: true,
         pago_estado: true,
         pago_metodo: true,
         pago_coordinado_en: true,
@@ -512,6 +514,8 @@ export class PedidosEstadoService {
         // Nombre del cliente para reconocer el pedido; nunca teléfono ni DNI. Mesa sin nombre: la mesa.
         clienteNombre: p.cliente_nombre?.trim() || (p.modalidad === 'MESA' ? p.mesa_nombre : null) || null,
         total: Number(p.total),
+        // Propina del pedido (va aparte); lo que el cliente paga = total + propina
+        propina: Number(p.propina ?? 0),
         pagoEstado: p.pago_estado,
         pagoMetodo: p.pago_metodo,
         // Pago dividido: plan por medio y la parte digital (lo que lleva voucher)
@@ -529,7 +533,7 @@ export class PedidosEstadoService {
         vouchersPorMedio: mediosDigitalesDelPedido(
           p.planPago.map((f) => ({ medio: f.medio, monto: Number(f.monto) })),
           p.pago_metodo,
-          Number(p.total),
+          totalCobrable(p),
         ).map((m) => ({
           medio: m.medio,
           monto: m.monto,

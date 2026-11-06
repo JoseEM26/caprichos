@@ -127,6 +127,8 @@ export function FormularioCheckout({
   // Medio de pago
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('YAPE');
   const [pagaCon, setPagaCon] = useState('');
+  // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
+  const [propinaTexto, setPropinaTexto] = useState('');
   const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
 
   // Estado de envío
@@ -446,6 +448,15 @@ export function FormularioCheckout({
 
   // Pedido mínimo: solo para DELIVERY, sobre el subtotal de productos. Sin parámetro configurado no hay mínimo.
   const minimoDelivery = datosLocal?.pedidoMinimo && datosLocal.pedidoMinimo > 0 ? datosLocal.pedidoMinimo : 0;
+  const propinaActiva = datosLocal?.propina?.carta === true;
+  const topePropina = datosLocal?.propina?.tope && datosLocal.propina.tope > 0 ? datosLocal.propina.tope : 200;
+  const propinaLimpia = propinaTexto.trim().replace(',', '.');
+  const propinaFormatoOk = propinaLimpia === '' || /^\d+(\.\d{1,2})?$/.test(propinaLimpia);
+  const propinaNum = propinaActiva && propinaFormatoOk && propinaLimpia !== '' ? Number(propinaLimpia) : 0;
+  const propinaCobrable = propinaActiva && propinaFormatoOk && propinaNum > 0 && propinaNum <= topePropina ? Math.round(propinaNum * 100) / 100 : 0;
+  const propinaInvalida = propinaActiva && propinaLimpia !== '' && (!propinaFormatoOk || propinaNum > topePropina);
+  // Lo que paga el cliente: venta + propina (el comprobante y los puntos usan solo la venta)
+  const aCobrar = Number((totalCalculado + propinaCobrable).toFixed(2));
   const faltanteMinimo =
     modalidad === 'DELIVERY' && minimoDelivery > 0 && subtotal < minimoDelivery
       ? Number((minimoDelivery - subtotal).toFixed(2))
@@ -506,10 +517,14 @@ export function FormularioCheckout({
       }
     }
 
+    if (propinaInvalida) {
+      return `La propina debe ser un monto entre S/ 0 y S/ ${topePropina.toFixed(2)}, con hasta 2 decimales`;
+    }
+
     if (metodoPago === 'EFECTIVO' && pagaCon.trim()) {
       const pagaConNum = Number(pagaCon);
-      if (isNaN(pagaConNum) || pagaConNum < totalCalculado) {
-        return `El monto con el que pagas (S/ ${pagaCon}) no puede ser menor al total (S/ ${totalCalculado.toFixed(2)})`;
+      if (isNaN(pagaConNum) || pagaConNum < aCobrar) {
+        return `El monto con el que pagas (S/ ${pagaCon}) no puede ser menor a lo que pagas (S/ ${aCobrar.toFixed(2)})`;
       }
     }
 
@@ -709,6 +724,7 @@ export function FormularioCheckout({
       },
       cuponCodigo: cuponAplicado ? cuponAplicado.codigo : undefined,
       puntosCanje: !cuponAplicado && puntosAplicados > 0 ? puntosAplicados : undefined,
+      propina: propinaCobrable > 0 ? propinaCobrable : undefined,
     };
 
     try {
@@ -735,6 +751,7 @@ export function FormularioCheckout({
         subtotal: respuesta.subtotal,
         envio: respuesta.envio,
         total: respuesta.total,
+        propina: respuesta.propina,
         mensaje: respuesta.mensaje,
         clienteNombre: nombre.trim(),
         modalidad,
@@ -1997,6 +2014,26 @@ export function FormularioCheckout({
                       </div>
                     )}
 
+                    {propinaActiva && (
+                      <div data-testid="propina-carta">
+                        <label htmlFor="f-propina" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', display: 'block', marginBottom: '4px' }}>
+                          Propina opcional para el equipo (S/)
+                        </label>
+                        <input
+                          id="f-propina"
+                          type="text"
+                          inputMode="decimal"
+                          value={propinaTexto}
+                          onChange={(e) => setPropinaTexto(e.target.value)}
+                          placeholder="0.00"
+                          style={{ width: '100%', minHeight: '44px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', backgroundColor: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 12px', fontSize: '16px' }}
+                        />
+                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px', marginTop: '4px' }}>
+                          Va aparte de tu pedido: no es parte del total de productos ni del comprobante. Máximo S/ {topePropina.toFixed(2)}. Déjalo vacío si no quieres dejar propina.
+                        </div>
+                      </div>
+                    )}
+
                     {metodoPago === 'TARJETA' && (
                       <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
                         Pagas con tarjeta de débito o crédito cuando recibes o recoges tu pedido (pos inalámbrico).
@@ -2021,10 +2058,10 @@ export function FormularioCheckout({
                           id="f-paga-con"
                           type="number"
                           step="0.10"
-                          min={totalCalculado}
+                          min={aCobrar}
                           value={pagaCon}
                           onChange={(e) => setPagaCon(e.target.value)}
-                          placeholder={`Ej.: ${Math.ceil(totalCalculado / 10) * 10}`}
+                          placeholder={`Ej.: ${Math.ceil(aCobrar / 10) * 10}`}
                           style={{
                             width: '100%',
                             minHeight: '44px',
@@ -2247,6 +2284,13 @@ export function FormularioCheckout({
                       </div>
                     )}
 
+                    {propinaCobrable > 0 && (
+                      <div data-testid="propina-resumen" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                        <span>Propina (para el equipo)</span>
+                        <span style={{ fontWeight: 700 }}>S/ {propinaCobrable.toFixed(2)}</span>
+                      </div>
+                    )}
+
                     <div
                       style={{
                         borderTop: '1px solid var(--cp-line)',
@@ -2260,7 +2304,7 @@ export function FormularioCheckout({
                       }}
                     >
                       <span>Total a pagar</span>
-                      <span style={{ color: 'var(--cp-rust)' }}>S/ {totalCalculado.toFixed(2)}</span>
+                      <span style={{ color: 'var(--cp-rust)' }}>S/ {aCobrar.toFixed(2)}</span>
                     </div>
 
                     {clienteCuenta && (
@@ -2304,7 +2348,7 @@ export function FormularioCheckout({
               >
                 <span>Total a pagar:</span>
                 <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--cp-rust)' }}>
-                  S/ {totalCalculado.toFixed(2)}
+                  S/ {aCobrar.toFixed(2)}
                 </span>
               </div>
 
@@ -2486,7 +2530,7 @@ export function FormularioCheckout({
                       ? 'Enviando pedido...'
                       : enviarBloqueadoPorStock
                         ? 'Ajusta tu pedido para enviar'
-                        : `Enviar pedido · S/ ${totalCalculado.toFixed(2)}`}
+                        : `Enviar pedido · S/ ${aCobrar.toFixed(2)}`}
                   </button>
                 )}
               </div>

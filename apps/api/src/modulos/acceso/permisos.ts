@@ -181,6 +181,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Mascota Capri (mas-api)
   { modulo: 'mascota', accion: 'ver' },
   { modulo: 'mascota', accion: 'editar' },
+  // Propinas (acumulado del mes, solo lectura)
+  { modulo: 'propinas', accion: 'ver' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
@@ -198,6 +200,7 @@ export const MATRIZ: Record<string, string[]> = {
     'caja/movimientos',
     'caja/cerrar',
     'caja/ver',
+    'propinas/ver',
     'cocina/ver',
     'catalogo/ver',
     'comprobantes/ver',

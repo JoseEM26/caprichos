@@ -74,7 +74,12 @@ interface TarjetaSeguimientoProps {
 function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: TarjetaSeguimientoProps) {
   const { estado, error } = useSeguimientoPedido(pedido.codigo, pedido.token);
   const anulado = estado?.anulado === true;
-  const total = creacion?.total ?? estado?.total;
+  // Lo que paga el cliente: la venta más la propina (si dejó)
+  const total = creacion
+    ? Number(creacion.total) + Number(creacion.propina ?? 0)
+    : estado
+      ? estado.total + (estado.propina ?? 0)
+      : undefined;
 
   let mensaje: string;
   if (error === 'NO_ENCONTRADO') mensaje = 'No encontramos este pedido. Puede que ya no esté disponible.';
@@ -200,6 +205,13 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
                 ? 'GRATIS'
                 : `S/ ${Number(creacion.envio).toFixed(2)}`}
             </span>
+          </div>
+        )}
+
+        {(creacion?.propina ?? estado?.propina ?? 0) > 0 && (
+          <div data-testid="propina-confirmacion" style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Propina (para el equipo)</span>
+            <span style={{ fontWeight: 700 }}>S/ {Number(creacion?.propina ?? estado?.propina ?? 0).toFixed(2)}</span>
           </div>
         )}
 

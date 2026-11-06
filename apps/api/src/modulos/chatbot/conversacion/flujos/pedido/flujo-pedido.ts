@@ -8,6 +8,7 @@ import {
   BotonAccion,
   FilaLista,
 } from '../../tipos-conversacion';
+import { normalizarPropina } from '../../../../propinas/propinas.util';
 import { SubFlujoConversacion, RegistroSubFlujos } from '../registro-flujos';
 import {
   EstadoPedidoFlujo,
@@ -28,6 +29,7 @@ import {
   BOTONES_PEDIDO_NOMBRE_CONFIRMAR,
   BOTONES_PEDIDO_COMPROBANTE,
   BOTONES_PEDIDO_CONFIRMAR_FINAL,
+  BOTONES_PEDIDO_PROPINA,
   BOTONES_PEDIDO_CANCELAR_CONFIRMAR,
   BOTONES_PEDIDO_NOTAS,
   BOTONES_PEDIDO_CANTIDADES,
@@ -583,6 +585,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
       case 'PEDIDO_RESUMEN_CONFIRMAR':
         return this.pasoResumenConfirmar(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_PROPINA':
+        return this.pasoPropina(flujo, pedido, entrada, contexto, false);
+
+      case 'PEDIDO_PROPINA_MONTO':
+        return this.pasoPropina(flujo, pedido, entrada, contexto, true);
 
       default:
         return this.renderizarEstado('PEDIDO_CATEGORIAS', flujo, pedido, contexto);
@@ -1770,7 +1778,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     if (metodo === 'EFECTIVO') {
-      return this.pedirMontoEfectivo(flujo, { ...pedido, pago: { metodo: 'EFECTIVO' } }, calcularTotales(pedido, contexto.vistaPreviaPedido).total);
+      return this.pedirMontoEfectivo(flujo, { ...pedido, pago: { metodo: 'EFECTIVO' } }, calcularTotales(pedido, contexto.vistaPreviaPedido).aCobrar);
     }
     const nuevoPedido: EstadoCarritoPedido = { ...pedido, pago: { metodo } };
     const res = this.avanzarHaciaCheckout(flujo, nuevoPedido, contexto);
@@ -1811,7 +1819,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const totalPedido = calcularTotales(pedido, contexto.vistaPreviaPedido).total;
+    const totalPedido = calcularTotales(pedido, contexto.vistaPreviaPedido).aCobrar;
     const plan = pedido.pago?.plan;
     // Con pago dividido el efectivo cubre solo su parte
     const parte = plan?.find((f) => f.medio === 'EFECTIVO')?.monto ?? totalPedido;
@@ -1857,7 +1865,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     const primero = pedido.pagoDiv?.medio1;
-    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { aCobrar: total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const resto = Number((total - (pedido.pagoDiv?.monto1 ?? 0)).toFixed(2));
     const medios = mediosActivos(contexto.datosLocalPublicos)
       .filter((m) => m !== primero)
@@ -1891,7 +1899,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (!medio || !activos.includes(medio) || (estado === 'PEDIDO_PAGO_DIV_MEDIO2' && medio === pedido.pagoDiv?.medio1)) {
       return this.mostrarMediosDivididos(estado, flujo, pedido, contexto);
     }
-    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { aCobrar: total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     if (estado === 'PEDIDO_PAGO_DIV_MEDIO1') {
       const nuevoPedido: EstadoCarritoPedido = {
@@ -1944,7 +1952,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { aCobrar: total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const medio1 = pedido.pagoDiv?.medio1;
     if (!medio1) return this.mostrarMediosDivididos('PEDIDO_PAGO_DIV_MEDIO1', flujo, pedido, contexto);
     const monto =
@@ -2156,7 +2164,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     // 11.2. Construir DTO de PedidosService.crear
-    const { total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { aCobrar: total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     const clienteNombre =
       pedido.cliente?.nombre ||
@@ -2175,6 +2183,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         telefono: clienteTelefono,
       },
       modalidad: pedido.modalidad || 'RECOGER',
+      ...(pedido.propina ? { propina: pedido.propina } : {}),
       entrega:
         pedido.modalidad === 'DELIVERY'
           ? {
@@ -2247,6 +2256,69 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         estado: 'MENU',
         pedido: null, // Carrito terminado y limpiado
       },
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // PASO 3.5: Propina opcional. Va aparte de la venta; «Sin propina» o 0 = no dejar.
+  // -------------------------------------------------------------------------
+  private pedirPropina(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const tope = Number(contexto.datosLocalPublicos?.propina?.tope || 200);
+    const nuevoPedido: EstadoCarritoPedido = { ...pedido, estadoInterno: 'PEDIDO_PROPINA' };
+    return {
+      nuevoEstado: 'PEDIDO_PROPINA',
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: TEXTOS_BOT.pedidoPropinaPregunta(tope),
+          botones: BOTONES_PEDIDO_PROPINA,
+        },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_PROPINA', pedido: nuevoPedido },
+    };
+  }
+
+  private pasoPropina(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+    esperandoMonto: boolean,
+  ): ResultadoTransicion {
+    const tope = Number(contexto.datosLocalPublicos?.propina?.tope || 200);
+    const fijar = (monto: number): ResultadoTransicion => {
+      const nuevo: EstadoCarritoPedido = { ...pedido, propina: monto };
+      return this.avanzarHaciaCheckout({ ...flujo, pedido: nuevo }, nuevo, contexto);
+    };
+
+    if (!esperandoMonto && entrada.id === 'ped_propina_si') {
+      const nuevoPedido: EstadoCarritoPedido = { ...pedido, estadoInterno: 'PEDIDO_PROPINA_MONTO' };
+      return {
+        nuevoEstado: 'PEDIDO_PROPINA_MONTO',
+        acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.pedidoPropinaMonto(tope) }],
+        nuevoFlujo: { ...flujo, estado: 'PEDIDO_PROPINA_MONTO', pedido: nuevoPedido },
+      };
+    }
+    if (entrada.id === 'ped_propina_no' || /sin propina|^no$/i.test(entrada.texto.trim())) {
+      return fijar(0);
+    }
+    const r = normalizarPropina(entrada.textoOriginal, tope);
+    if (r.valido) return fijar(r.monto);
+
+    // Monto no válido: se vuelve a pedir en el mismo paso
+    const texto = TEXTOS_BOT.pedidoPropinaInvalida(tope);
+    const acciones: ResultadoTransicion['acciones'] = esperandoMonto
+      ? [{ tipo: 'enviarTexto', texto }]
+      : [{ tipo: 'enviarBotones', texto, botones: BOTONES_PEDIDO_PROPINA }];
+    const estado = esperandoMonto ? 'PEDIDO_PROPINA_MONTO' : 'PEDIDO_PROPINA';
+    return {
+      nuevoEstado: estado,
+      acciones,
+      nuevoFlujo: { ...flujo, estado, pedido },
     };
   }
 
@@ -2371,6 +2443,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       };
     }
 
+    // 3.5. Propina opcional (interruptor del bot): antes del pago, para que los montos ya la incluyan
+    if (pedido.propina === undefined && contexto.datosLocalPublicos?.propina?.bot === true) {
+      return this.pedirPropina(flujo, pedido, contexto);
+    }
+
     // 4. Medio de pago
     if (!pedido.pago?.metodo) {
       return this.mostrarOpcionesPago(flujo, pedido, contexto);
@@ -2411,7 +2488,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const { envio, descuento, descuentoNombre, total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { envio, descuento, descuentoNombre, propina, aCobrar } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     const lineasTexto = this.lineasResumen(pedido);
 
@@ -2465,7 +2542,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
             lineasTexto,
             descuentoTexto,
             envioTexto,
-            total,
+            total: aCobrar,
+            propina,
             modalidad: pedido.modalidad === 'DELIVERY' ? 'Delivery' : 'Para recoger',
             direccionTexto,
             pagoTexto,
@@ -2533,7 +2611,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
   /** Resumen con total justo antes de «¿Cómo pagarás?». Usa las mismas líneas y totales que el resumen final. */
   private resumenAntesDePagar(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
-    const { subtotal, envio, total, descuento, descuentoNombre } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { subtotal, envio, aCobrar: total, propina, descuento, descuentoNombre } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const lineas = this.lineasResumen(pedido);
     const descuentoTxt = descuento > 0 ? `${TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento)}\n` : '';
     const envioTxt =
@@ -2549,6 +2627,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       `Subtotal: S/ ${subtotal.toFixed(2)}\n` +
       descuentoTxt +
       `${envioTxt}\n` +
+      (propina > 0 ? `Propina: S/ ${propina.toFixed(2)}\n` : '') +
       `*TOTAL: S/ ${total.toFixed(2)}*`
     );
   }

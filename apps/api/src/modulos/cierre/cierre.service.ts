@@ -853,6 +853,12 @@ export class CierreService {
       },
       desglose: {
         ventasEfectivo: montos.ventasEfectivo,
+        // Propinas del día: aparte de las ventas (no son ingreso). Efectivo y digital ya están en medios.
+        propinas: {
+          total: enPesos(aCentimos(montos.propinasEfectivo) + aCentimos(montos.propinasDigitales)),
+          efectivo: montos.propinasEfectivo,
+          digital: montos.propinasDigitales,
+        },
         ingresos: montos.ingresos,
         egresos: montos.egresos,
         liquidadoRepartidores: montos.liquidadoEfectivo,

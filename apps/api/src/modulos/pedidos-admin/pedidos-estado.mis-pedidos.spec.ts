@@ -93,6 +93,7 @@ describe('PedidosEstadoService.misPedidos', () => {
       id: '3',
       codigo: 'CP-M001',
       estado: 'EN_CAMINO',
+      propina: 0,
       modalidad: 'MESA',
       mesaNombre: 'Mesa 3',
       clienteNombre: 'Mesa 3',

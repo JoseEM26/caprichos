@@ -209,6 +209,13 @@ export class CrearPedidoDto {
   @Min(0)
   puntosCanje?: number;
 
+  /** Propina opcional en soles (va aparte de la venta). Solo carta y bot, con el interruptor encendido. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  propina?: number;
+
   @IsOptional()
   @IsBoolean()
   esPersonal?: boolean;

@@ -48,6 +48,7 @@ export const TRAZOS_ICONOS: Record<string, string> = {
   plano: 'M3 3h18v18H3z M3 9h18 M9 21V9',
   cierre:
     'M2 7h20v14H2z M16 14a2 2 0 1 1-4 0 2 2 0 0 1 4 0z M6 3h12v4H6z',
+  propinas: 'M12 2v20 M17 6H9.5a3 3 0 0 0 0 6h5a3 3 0 0 1 0 6H6',
   usuarios:
     'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   historial: 'M3 12a9 9 0 1 0 3-6.7 M3 4v5h5 M12 7v5l3 3',

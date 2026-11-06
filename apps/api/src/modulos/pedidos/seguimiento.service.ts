@@ -119,6 +119,7 @@ export interface SeguimientoPedido {
   estadoEtiqueta: string;
   modalidad: Modalidad;
   total: number;
+  propina?: number;
   terminado: boolean;
   anulado: boolean;
   pasos: PasoSeguimiento[];
@@ -171,6 +172,7 @@ const SELECCION_SEGUIMIENTO = {
   estado: true,
   modalidad: true,
   total: true,
+  propina: true,
   creado_en: true,
   pasa_cocina_en: true,
   listo_en: true,
@@ -210,6 +212,7 @@ type PedidoSeguimiento = {
   estado: string;
   modalidad: string;
   total: { toString(): string };
+  propina?: { toString(): string } | null;
   creado_en: Date;
   pasa_cocina_en: Date | null;
   listo_en: Date | null;
@@ -430,6 +433,8 @@ export class SeguimientoService {
       estadoEtiqueta: ETIQUETA_ESTADO[pedido.estado] ?? pedido.estado,
       modalidad,
       total: Number(pedido.total.toString()),
+      // Propina aparte de la venta (0 = sin propina)
+      propina: Number(pedido.propina?.toString() ?? 0),
       terminado: anulado || pedido.estado === 'ENTREGADO',
       anulado,
       pasos,

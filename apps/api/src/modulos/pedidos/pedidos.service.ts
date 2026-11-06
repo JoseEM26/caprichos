@@ -34,6 +34,8 @@ import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
+import { leerConfigPropina } from '../propinas/propinas.service';
+import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
 import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
 
 /** Pista pública de la dirección anterior: nunca la dirección completa (ver enmascararDireccion). */
@@ -164,6 +166,24 @@ export class PedidosService {
    * Cliente con cuenta del pedido: celular (solo MOZO/CAJA), cuenta de la carta o teléfono de WhatsApp.
    * Null = invitado. Un clienteTelefono de carta o WhatsApp se ignora.
    */
+  /**
+   * Propina del pedido (monto en soles). Sin interruptor encendido para el canal, se ignora (0). Con
+   * propina inválida o sobre el tope, rechaza. Sin propina no toca la configuración.
+   */
+  private async validarPropina(valor: unknown, canal: string): Promise<number> {
+    if (valor === undefined || valor === null || valor === '') return 0;
+    const cfg = await leerConfigPropina(this.prisma);
+    if (!propinaActivaParaCanal(cfg.activa, canal)) return 0;
+    const r = normalizarPropina(valor, cfg.tope);
+    if (!r.valido) {
+      throw new BadRequestException({
+        codigo: 'PROPINA_INVALIDA',
+        mensaje: `La propina debe ser un monto en soles, con hasta 2 decimales y no mayor a S/ ${cfg.tope}`,
+      });
+    }
+    return r.monto;
+  }
+
   private async clienteIdentificado(dto: CrearPedidoDto, origen?: OrigenPedido): Promise<bigint | null> {
     const canal = origen?.canal ?? 'CARTA';
     if (canal === 'MOZO' || canal === 'CAJA') {
@@ -775,12 +795,17 @@ export class PedidosService {
 
     const totalCalculado = Number(Math.max(0, subtotalCalculado - descuentoAplicado + (envio ?? 0)).toFixed(2));
 
+    // 7.5. Propina opcional: va APARTE de la venta (no suma al total, comprobante ni puntos). Lo que paga el
+    // cliente (plan, voucher, efectivo) es total + propina.
+    const propinaPedido = await this.validarPropina(dto.propina, origen?.canal ?? 'CARTA');
+    const aCobrar = Number((totalCalculado + propinaPedido).toFixed(2));
+
     // 8. Validación de pago (con plan: el efectivo se compara contra su parte, no contra el total)
-    const planPago = this.pagoPlan.validar(dto.pago.plan, totalCalculado);
+    const planPago = this.pagoPlan.validar(dto.pago.plan, aCobrar);
     const montoEfectivo = planPago
       ? this.pagoPlan.montoEfectivo(planPago)
       : dto.pago.metodo === 'EFECTIVO'
-        ? totalCalculado
+        ? aCobrar
         : 0;
     if (dto.pago.pagaCon !== undefined && montoEfectivo > 0 && Number(dto.pago.pagaCon) < montoEfectivo) {
       throw new BadRequestException({
@@ -853,6 +878,7 @@ export class PedidosService {
           descuento: new Prisma.Decimal(descuentoAplicado),
           envio: envio !== null ? new Prisma.Decimal(envio) : null,
           total: new Prisma.Decimal(totalCalculado),
+          propina: new Prisma.Decimal(propinaPedido),
           oferta_id: desgloseDescuento.ofertaId
             ? BigInt(desgloseDescuento.ofertaId)
             : (lineasCalculadas.find((l) => l.ofertaId)?.ofertaId ?? null),
@@ -1166,6 +1192,7 @@ export class PedidosService {
       descuento: Number(pedidoCreado.descuento || 0),
       envio: pedidoCreado.envio !== null ? Number(pedidoCreado.envio) : null,
       total: totalFinal,
+      propina: propinaPedido,
       puntosCanjeados: puntosCanje,
       mensaje:
         origen?.canal === 'MOZO'

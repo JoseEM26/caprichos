@@ -5,6 +5,7 @@ export const TITULOS_VISTA: Record<string, { titulo: string; subtitulo: string }
   caja: { titulo: "Pedidos y caja", subtitulo: "El cajero verifica cada pedido y lo acepta antes de que pase a cocina." },
   mensajes: { titulo: "Mensajes de WhatsApp", subtitulo: "Chats del bot: pausa, aprobación de pagos y respuestas rápidas." },
   cierre: { titulo: "Caja y cierres", subtitulo: "Abre en cero cada mañana, registra movimientos, cuadra el día contra lo que hay en caja y en las billeteras, y guarda todo en el historial." },
+  propinas: { titulo: "Propinas", subtitulo: "Lo que dejan los clientes para el equipo, por mes, día, medio de pago y canal. Va aparte de la venta." },
   cocina: { titulo: "Pantalla de cocina", subtitulo: "Pedidos aceptados por caja, con su tiempo." },
   repartos: { titulo: "Repartos", subtitulo: "Pedidos de delivery listos para salir." },
   reservas: { titulo: "Reservas", subtitulo: "Agenda de mesas por fecha, hora y comensales." },

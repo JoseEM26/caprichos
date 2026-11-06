@@ -839,6 +839,7 @@ describe('CierreService', () => {
             ingresos: 20.0,
             egresos: 15.0,
             liquidadoRepartidores: 0,
+            propinas: { total: 0, efectivo: 0, digital: 0 },
           },
         }),
       );

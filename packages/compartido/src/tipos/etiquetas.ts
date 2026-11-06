@@ -40,7 +40,10 @@ export interface TicketPagoDatos {
   who: string;
   modalidad: string;
   lineas: { cantidad: number; nombre: string; tamano?: string | null; subtotal: number }[];
+  /** Venta (sin propina): es la base del comprobante */
   total: number;
+  /** Propina aparte de la venta: línea propia en el ticket interno; no entra al comprobante */
+  propina?: number;
   pagos: { medio: string; monto: number; recibido?: number | null; vuelto?: number | null }[];
   plan?: { medio: string; monto: number }[];
   /**

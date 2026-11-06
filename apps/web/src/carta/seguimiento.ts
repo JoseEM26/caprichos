@@ -48,6 +48,8 @@ export interface EstadoSeguimiento {
   estadoEtiqueta: string;
   modalidad: ModalidadEntrega;
   total: number;
+  /** Propina aparte de la venta (0 o ausente = sin propina) */
+  propina?: number;
   terminado: boolean;
   anulado: boolean;
   pasos: PasoSeguimiento[];

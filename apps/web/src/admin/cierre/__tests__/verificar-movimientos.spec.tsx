@@ -33,7 +33,7 @@ describe('Verificar movimientos del turno', () => {
     expect(screen.getByText('S/ 94.50')).toBeInTheDocument();
     for (const t of ['Cobros por medio de pago', 'Pedidos cobrados en el turno', 'Movimientos de caja', 'Pendientes'])
       expect(screen.getByRole('heading', { name: t })).toBeInTheDocument();
-    expect(screen.getByText(/apertura \+ cobros en efectivo \+ ingresos − egresos/)).toBeInTheDocument();
+    expect(screen.getByText(/apertura \+ cobros en efectivo \+ propinas en efectivo \+ ingresos − egresos/)).toBeInTheDocument();
     expect(screen.queryByText('Tarjeta')).not.toBeInTheDocument();
     expect(screen.getByText('panel pendientes')).toBeInTheDocument();
   });

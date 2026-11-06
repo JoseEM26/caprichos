@@ -283,6 +283,55 @@ describe('Ola F5: Caja y Cierres', () => {
     });
   });
 
+  it('propinas del día: línea propia con efectivo y digital; el total vendido resta la propina digital de Yape', async () => {
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 10, estado: 'ABIERTA', apertura: 50 } } as any);
+    vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
+    vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
+    vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
+    vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValueOnce({
+      cajaId: 10,
+      fecha: `${hoy}T00:00:00.000Z`,
+      cobrados: [],
+      movimientos: [],
+      apertura: 50,
+      // efectivo esperado ya incluye la propina en efectivo (4): 50 + 300 + 4 + 0 - 0
+      efectivoEsperado: 354,
+      // yape 210 incluye 6 de propina digital (lo que entró a la cuenta)
+      medios: { efectivo: 354, yape: 210, plin: 0, transferencia: 0, tarjeta: 120 },
+      desglose: {
+        ventasEfectivo: 300,
+        propinas: { total: 10, efectivo: 4, digital: 6 },
+        ingresos: 0,
+        egresos: 0,
+      },
+    });
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
+      usuario: { partyId: '1', nombres: 'Admin Kevin', rol: 'ADMIN' },
+      permisos: ['caja/ver', 'caja/cerrar'],
+      debeCambiar: false,
+      cargando: false,
+      autenticado: true,
+      ingresar: vi.fn(),
+      salir: vi.fn(),
+      renovar: vi.fn(),
+      refrescarYo: vi.fn(),
+      marcarClaveCambiada: vi.fn(),
+      tiene: vi.fn().mockReturnValue(true),
+    });
+
+    render(<CierreView />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cierre-propinas-total')).toHaveTextContent('s/ 10.00');
+    });
+    expect(screen.getByTestId('cierre-propinas-efectivo')).toHaveTextContent('s/ 4.00');
+    expect(screen.getByTestId('cierre-propinas-digital')).toHaveTextContent('s/ 6.00');
+    // venta: 300 efectivo + 210 Yape + 120 tarjeta - 6 de propina digital = 624 (no 630)
+    expect(screen.getByText('s/ 624.00')).toBeInTheDocument();
+    expect(screen.getByText('S/ 354.00')).toBeInTheDocument();
+  });
+
   it('una caja de un día anterior abierta no se muestra como la caja de hoy', async () => {
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: false, caja: null } as any);
     vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);

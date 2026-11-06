@@ -82,6 +82,8 @@ export interface Pedido {
     pide?: 'BOLETA' | 'FACTURA' | null;
   } | null;
   paga_con?: string | number | null;
+  /** Propina aparte de la venta (el cobro pide venta + propina) */
+  propina?: string | number | null;
   /** Pago dividido: monto por medio (vacío si el pedido no tiene plan) */
   planPago?: Array<{ medio: string; monto: string | number }>;
   /** Puntos del pedido (ganados, por ganar o motivo por el que no suma) */
@@ -241,6 +243,8 @@ export interface PedidoPorCobrar {
   pago_preferido?: string | null;
   pago_metodo: string | null;
   total: number;
+  /** Propina aparte de la venta: lo que se cobra es total + propina */
+  propina?: number;
   cliente_nombre: string | null;
   cliente_telefono: string | null;
   comprobante_tipo: string;

@@ -598,6 +598,8 @@ model Pedido {
   cobro_mozo_recibido    Decimal?                @db.Decimal(12, 2)
   // Cambio de ubicación (RN cambio de punto): cuándo se aplicó el último cambio; null = dirección original
   ubicacion_editada_en   DateTime?               @db.Timestamptz
+  // Propina opcional del cliente: va APARTE (no suma a subtotal/total, ni comprobante, ni puntos). Se cobra junto con el pedido
+  propina                Decimal                @default(0) @db.Decimal(12, 2)
 
   party                 Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
@@ -798,6 +800,8 @@ model CobroPago {
   monto    Decimal  @db.Decimal(12, 2)
   recibido Decimal? @db.Decimal(12, 2)
   vuelto   Decimal? @db.Decimal(12, 2)
+  // Parte de este renglón que es propina (el monto es venta). Entregado = monto + propina.
+  propina  Decimal  @default(0) @db.Decimal(12, 2)
 
   cobro    Cobro    @relation(fields: [cobro_id], references: [id])
 
