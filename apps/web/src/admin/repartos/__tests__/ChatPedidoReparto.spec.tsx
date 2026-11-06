@@ -29,8 +29,8 @@ describe('chatVigente: el chat dura mientras el pedido siga en curso o hasta 2 h
 });
 
 describe('ChatPedidoReparto: hilo de un solo cliente con caja para escribir', () => {
-  let obtener: ReturnType<typeof vi.spyOn>;
-  let enviar: ReturnType<typeof vi.spyOn>;
+  let obtener: any;
+  let enviar: any;
 
   beforeEach(() => {
     obtener = vi.spyOn(repartosApi, 'obtenerChat').mockResolvedValue(conMensajes);
