@@ -3,6 +3,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { api } from '../../../comun/api';
 import { PropinasView } from '../PropinasView';
 
+// La vista lee los permisos de la sesión; aquí el ADMIN ve todo (incluida la pestaña de reparto).
+vi.mock('../../../comun/sesion', async (orig) => ({
+  ...(await orig<any>()),
+  useSesion: () => ({ tiene: () => true, usuario: { rol: 'ADMIN' } }),
+}));
+
 const resumen = {
   anio: 2026,
   mes: 11,

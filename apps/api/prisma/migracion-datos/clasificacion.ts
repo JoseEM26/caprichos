@@ -65,6 +65,9 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['asistencia del personal: marcas, selfies, dispositivos y consentimientos (datos personales e historial de la base de origen)', [
     'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
   ]],
+  ['reparto de propinas: montos pagados a cada persona por mes (dinero real, historial propio de cada base)', [
+    'propina_reparto', 'propina_reparto_detalle',
+  ]],
   ['lectura de notificaciones por persona: cada usuario tiene su propio estado, no se migra', [
     'notificacion_lectura',
   ]],

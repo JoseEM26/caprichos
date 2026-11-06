@@ -5,10 +5,14 @@ import {
   MiHoy,
   TipoMarca,
   identificadorDispositivo,
+  MiPropina,
   marcarAsistencia,
   miHistorial,
   miHoy as cargarMiHoy,
+  miPropinas,
 } from './asistenciaApi';
+
+const MESES_TEXTO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 type Paso = 'inicio' | 'escanear' | 'ubicacion' | 'selfie' | 'confirmar' | 'listo';
 
@@ -49,6 +53,7 @@ function pedirUbicacion(): Promise<{ lat: number; lng: number; precision: number
 export function MiAsistenciaView() {
   const [hoy, setHoy] = useState<MiHoy | null>(null);
   const [historial, setHistorial] = useState<any[]>([]);
+  const [propinas, setPropinas] = useState<MiPropina[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tipo, setTipo] = useState<TipoMarca | null>(null);
@@ -68,6 +73,8 @@ export function MiAsistenciaView() {
       const [h, hist] = await Promise.all([cargarMiHoy(), miHistorial(7)]);
       setHoy(h);
       setHistorial(hist);
+      // Mis propinas: solo mi parte de los repartos aprobados o pagados. Si falla, no se muestra.
+      setPropinas(await miPropinas().catch(() => []));
       setError(null);
     } catch (e) {
       setError(mensajeDe(e, 'No pudimos cargar tu asistencia.'));
@@ -297,6 +304,20 @@ export function MiAsistenciaView() {
 
       {mensajeOk && <div role="status">{mensajeOk}</div>}
       {error && <div role="alert">{error}</div>}
+
+      {propinas.length > 0 && (
+        <section aria-label="Mis propinas" style={{ display: 'grid', gap: 6 }}>
+          <h3 style={{ margin: 0 }}>Mis propinas</h3>
+          {propinas.map((p) => (
+            <div key={`${p.anio}-${p.mes}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, gap: 8 }}>
+              <span>{MESES_TEXTO[p.mes - 1]} {p.anio}</span>
+              <span>{p.horas.toFixed(2)} h · {p.porcentaje.toFixed(2)} %</span>
+              <strong>S/ {p.monto.toFixed(2)}</strong>
+              <span>{p.pagadoEn ? `Pagado (${p.pagadoMedio ?? 'sin medio'})` : 'Por pagar'}</span>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section aria-label="Historial de los últimos días" style={{ display: 'grid', gap: 6 }}>
         <h3 style={{ margin: 0 }}>Últimos días</h3>

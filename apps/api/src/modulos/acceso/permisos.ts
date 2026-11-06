@@ -191,6 +191,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'mascota', accion: 'editar' },
   // Propinas (acumulado del mes, solo lectura)
   { modulo: 'propinas', accion: 'ver' },
+  // Reparto mensual de propinas por horas (cálculo, aprobación, pago y anulación): solo ADMIN
+  { modulo: 'propinas', accion: 'repartir' },
 ] as const;
 
 export const MATRIZ: Record<string, string[]> = {
