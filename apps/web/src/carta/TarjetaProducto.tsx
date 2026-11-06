@@ -2,7 +2,7 @@ import { ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { TextoEd } from './edicion';
 import { useEsMovil } from './useEsMovil';
-import { etiquetaQuedan, infoStockDe } from './stock';
+import { etiquetaQuedan, etiquetaUltimos, infoStockDe } from './stock';
 
 export interface InfoRankingProducto {
   puesto?: number;
@@ -78,6 +78,7 @@ export function TarjetaProducto({
     : '';
 
   const textoQuedan = estaAgotado ? null : etiquetaQuedan(info);
+  const textoUltimos = estaAgotado ? null : etiquetaUltimos(info);
 
   const esLista = organizacion === 'LISTA';
   const cardDir = movil ? 'row' : esLista ? 'row' : 'column';
@@ -302,6 +303,26 @@ export function TarjetaProducto({
               }}
             >
               {tagCacao}
+            </span>
+          </div>
+        )}
+
+        {textoUltimos && (
+          <div>
+            <span
+              data-testid={`ultimos-${producto.id}`}
+              style={{
+                fontSize: '12px',
+                fontWeight: 800,
+                background: 'var(--cp-rust)',
+                color: '#FFFFFF',
+                borderRadius: '9999px',
+                padding: '3px 12px',
+                display: 'inline-block',
+                fontFamily: 'Montserrat, sans-serif',
+              }}
+            >
+              {textoUltimos}
             </span>
           </div>
         )}

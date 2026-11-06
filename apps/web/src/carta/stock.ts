@@ -5,6 +5,9 @@ import type { LineaCarrito, ProductoCarta, SaborLinea } from './tipos';
 /** Hasta cuántas unidades se muestra la etiqueta «Quedan N». Ajustable. */
 export const UMBRAL_QUEDAN = 5;
 
+/** Desde cuántas unidades (o menos) aparece la franja «¡Últimos N!» en la tarjeta y en la ventana. */
+export const UMBRAL_ULTIMOS = 3;
+
 /** Cada cuánto, como mínimo, la carta vuelve a pedirse al abrir el carrito o el checkout. */
 export const INTERVALO_REFRESCO_STOCK_MS = 20_000;
 
@@ -99,21 +102,38 @@ export function mensajeSaborQuedan(quedan: number, saborNombre: string): string 
   return quedan <= 0 ? `Ya no quedan ${saborNombre}` : `Solo quedan ${quedan} de ${saborNombre}`;
 }
 
-/** Texto discreto de la carta: «Quedan N» hasta el umbral y «¡Última unidad!» con 1. Null en el resto. */
+/** Franja «¡Últimos N!» con 1 a UMBRAL_ULTIMOS unidades (N = lo que queda). Null con 0, más, o sin control. */
+export function etiquetaUltimos(info: InfoStock): string | null {
+  if (!info.controlaStock || info.quedan === null || info.quedan <= 0 || info.quedan > UMBRAL_ULTIMOS) return null;
+  return `¡Últimos ${info.quedan}!`;
+}
+
+/** Texto discreto de la carta: «Quedan N» entre UMBRAL_ULTIMOS y UMBRAL_QUEDAN (la franja cubre las últimas). */
 export function etiquetaQuedan(info: InfoStock): string | null {
-  if (!info.controlaStock || info.quedan === null || info.quedan <= 0 || info.quedan > UMBRAL_QUEDAN) return null;
-  return info.quedan === 1 ? '¡Última unidad!' : `Quedan ${info.quedan}`;
+  if (!info.controlaStock || info.quedan === null || info.quedan <= UMBRAL_ULTIMOS || info.quedan > UMBRAL_QUEDAN) return null;
+  return `Quedan ${info.quedan}`;
+}
+
+/** Unidades que consume una línea: cantidad × unidades por mezcla (sabores) o por tamaño (1/2 docena = 6). */
+export function unidadesDeLinea(l: { cantidad: number; unidadesPorMezcla?: number; unidadesTamano?: number }): number {
+  return l.cantidad * (l.unidadesPorMezcla ?? l.unidadesTamano ?? 1);
 }
 
 /** Unidades del producto en todas sus líneas del carrito (varias líneas comparten el saldo). */
 export function unidadesEnCarrito(lineas: LineaCarrito[], productoId: string): number {
-  return lineas.reduce((acc, l) => (String(l.productoId) === String(productoId) ? acc + l.cantidad : acc), 0);
+  return lineas.reduce((acc, l) => (String(l.productoId) === String(productoId) ? acc + unidadesDeLinea(l) : acc), 0);
 }
 
-/** Cuántas unidades más se pueden agregar; null si el producto no tiene límite. */
+/** Cuántas unidades más se pueden agregar (saldo menos lo que ya va en el carrito); null si no tiene límite. */
 export function topeAgregable(info: InfoStock | undefined, enCarrito: number): number | null {
   if (!info || !info.controlaStock || info.quedan === null) return null;
   return Math.max(0, info.quedan - enCarrito);
+}
+
+/** Cuántas veces cabe un tamaño de `unidades` en lo que queda; null si no tiene límite. 0 = ese tamaño no cabe. */
+export function topeTamano(info: InfoStock | undefined, enCarrito: number, unidades: number): number | null {
+  const libres = topeAgregable(info, enCarrito);
+  return libres === null ? null : Math.floor(libres / Math.max(1, unidades));
 }
 
 /** Productos del carrito cuya suma supera lo que queda (el saldo cambió desde que se agregaron). */
@@ -145,6 +165,7 @@ export function excesosDeStock(lineas: LineaCarrito[], inventario: InventarioCar
 
 /** Recorta las líneas de un producto para que sumen como mucho `maximo`, quitando desde la última; las de 0 salen. */
 export function recortarLineasProducto(lineas: LineaCarrito[], productoId: string, maximo: number): LineaCarrito[] {
+  // `maximo` son unidades (no tamaños): una línea de 1/2 docena consume 6 por cada cantidad
   let restan = Math.max(0, maximo);
   const nuevas: LineaCarrito[] = [];
   for (const l of lineas) {
@@ -152,8 +173,9 @@ export function recortarLineasProducto(lineas: LineaCarrito[], productoId: strin
       nuevas.push(l);
       continue;
     }
-    const cantidad = Math.min(l.cantidad, restan);
-    restan -= cantidad;
+    const porCantidad = unidadesDeLinea({ ...l, cantidad: 1 });
+    const cantidad = Math.min(l.cantidad, Math.floor(restan / porCantidad));
+    restan -= cantidad * porCantidad;
     if (cantidad === 0) continue;
     if (cantidad === l.cantidad) {
       nuevas.push(l);
@@ -164,6 +186,7 @@ export function recortarLineasProducto(lineas: LineaCarrito[], productoId: strin
       cantidad,
       subtotal: Number((l.precioUnitario * cantidad).toFixed(2)),
       unidades: l.unidades?.slice(0, cantidad),
+      sabores: l.sabores && l.unidadesPorMezcla !== undefined ? recortarSaboresAlTotal(l.sabores, l.unidadesPorMezcla * cantidad) : l.sabores,
     });
   }
   return nuevas;

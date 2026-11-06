@@ -1658,6 +1658,24 @@ describe('PedidosService', () => {
       });
     });
 
+    it('tamaño de 1/2 docena (6 unidades): cada tamaño descuenta 6 del saldo, no 1', async () => {
+      prismaMock.conteoApertura.findFirst.mockResolvedValue({ cantidad: 10 });
+      prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where?.controla_stock
+            ? [{ id: 1n, nombre: 'Americano', controla_stock: true }]
+            : [{ ...mockProductoCafe, controla_stock: true, tamanos: [{ ...mockProductoCafe.tamanos[0], unidades: 6 }] }],
+        ),
+      );
+      const linea = { ...pedidoBaseDto.lineas[0], tamanoId: 10, cantidad: 2 } as any;
+      await service.crear({ ...pedidoBaseDto, lineas: [linea] } as any, 'key-media-docena', { canal: 'CARTA' });
+      expect(Number(prismaMock.stock.updateMany.mock.calls[0][0].data.cantidad.decrement)).toBe(12);
+      expect(prismaMock.movimientoStock.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'VENTA', producto_id: 1n, pedido_id: 100n, cantidad: expect.anything() }),
+      });
+      expect(Number(prismaMock.movimientoStock.create.mock.calls[0][0].data.cantidad)).toBe(12);
+    });
+
     it('suma las líneas repetidas del mismo producto en un solo descuento (2 + 3 = 5)', async () => {
       prismaMock.conteoApertura.findFirst.mockResolvedValue({ cantidad: 10 });
       const linea = pedidoBaseDto.lineas[0];
