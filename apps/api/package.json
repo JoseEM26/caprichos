@@ -17,6 +17,7 @@
     "datos:exportar": "ts-node prisma/migracion-datos/exportar.ts",
     "datos:importar": "ts-node prisma/migracion-datos/importar.ts",
     "datos:clave-inicial": "ts-node prisma/migracion-datos/clave-inicial.ts",
+    "seed:ejemplo-menos-pedida": "ts-node prisma/seed-ejemplo-menos-pedida.ts",
     "seed:carta": "ts-node prisma/seed-carta.ts",
     "seed:zonas": "ts-node prisma/seed-zonas.ts",
     "seed:caja": "ts-node prisma/seed-caja.ts",

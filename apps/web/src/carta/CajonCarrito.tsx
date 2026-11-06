@@ -11,6 +11,7 @@ import {
   mezclasDisponibles,
   textoSabores,
   topeAgregable,
+  unidadesDeLinea,
   unidadesEnCarrito,
 } from './stock';
 import { AjusteSaboresLinea } from './AjusteSaboresLinea';
@@ -238,7 +239,8 @@ export function CajonCarrito({
               const tope = esMezcla ? null : topeAgregable(info, unidadesEnCarrito(lineas, linea.productoId), linea.unidadesTamano ?? 1);
               // en mezclas, el + llega hasta lo que queda de los sabores que no usan otras líneas
               const maxMezclas = esMezcla && info ? mezclasDisponibles(info, lineas, String(linea.productoId), linea.unidadesPorMezcla ?? 1, linea.id) : null;
-              const topeMas = esMezcla ? maxMezclas !== null && linea.cantidad >= maxMezclas : tope !== null && tope <= 0;
+              // sin sabores, el + suma las unidades del tamaño (1/2 docena = 6): se bloquea si ya no caben
+              const topeMas = esMezcla ? maxMezclas !== null && linea.cantidad >= maxMezclas : tope !== null && tope < unidadesDeLinea({ cantidad: 1, unidadesTamano: linea.unidadesTamano });
               const exceso = excesos.find((e) => e.productoId === String(linea.productoId) && (!e.saborId || linea.sabores?.some((x) => x.saborId === e.saborId)));
               const pendiente = pendientesSabor.some((l) => l.id === linea.id);
               const mensajeStock = exceso

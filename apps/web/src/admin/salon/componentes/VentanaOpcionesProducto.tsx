@@ -21,6 +21,7 @@ import {
   partesEleccion,
 } from '../../../carta/ReemplazoCombo';
 import { SelectorEleccionCombo } from '../../../carta/SelectorEleccionCombo';
+import { etiquetaUltimos, infoStockDe, topeAgregable, topeTamano } from '../../../carta/stock';
 
 export interface ConfiguracionUnidad {
   opciones: OpcionProducto[];
@@ -52,6 +53,8 @@ export interface VentanaOpcionesProductoProps {
   alAgregar: (config: ProductoConfigurado) => void;
   /** Combo vinculado al producto: avisa si una parte fija se agotó y ofrece reemplazos */
   oferta?: OfertaItem | null;
+  /** Unidades de este producto que ya van en el pedido (todas sus líneas): descuentan del saldo */
+  enCarrito?: number;
 }
 
 const recortar = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
@@ -61,6 +64,7 @@ export function VentanaOpcionesProducto({
   alCerrar,
   alAgregar,
   oferta = null,
+  enCarrito = 0,
 }: VentanaOpcionesProductoProps) {
   if (!producto) return null;
 
@@ -115,6 +119,17 @@ export function VentanaOpcionesProducto({
     if (saborMode && JSON.stringify(valorSaboresOk) !== JSON.stringify(valorSabores)) setValorSabores(valorSaboresOk);
   });
   const saboresListos = !saborMode || repartoValido(valorSaboresOk, total, saboresDisp);
+  // Stock sin sabores: cada tamaño consume sus unidades (1/2 docena = 6); el tope son las que quedan menos el pedido
+  const infoStock = infoStockDe(producto);
+  const libres = topeAgregable(infoStock, enCarrito);
+  const tamanoSinStock = (unidades: number) => !saborMode && libres !== null && unidades > libres;
+  const tope = saborMode ? null : topeTamano(infoStock, enCarrito, unidadesMezcla);
+  const tamanoNoCabe = tamanos.length > 0 && tope === 0;
+  const enTopeStock = tope !== null && cantidad >= tope;
+  const franjaUltimos = infoStock.quedan !== 0 ? etiquetaUltimos(infoStock) : null;
+  useEffect(() => {
+    if (tope !== null && cantidad > Math.max(1, tope)) setCantidad(Math.max(1, tope));
+  }, [tope, cantidad]);
 
   // Búsqueda en grupos
   const [busquedaGrupo, setBusquedaGrupo] = useState<Record<string, string>>({});
@@ -219,6 +234,7 @@ export function VentanaOpcionesProducto({
   const puedeAgregar =
     gruposFaltantes.length === 0 &&
     !comboAgotado &&
+    (tope === null || (tope > 0 && cantidad <= tope)) &&
     !faltaElegirReemplazo(partesRe, reemplazos) &&
     !faltaElegirJuguetes(partesJug, juguetes, cantidad) &&
     saboresListos;
@@ -377,6 +393,12 @@ export function VentanaOpcionesProducto({
         </div>
 
         {/* Variantes / Tamaños */}
+        {franjaUltimos && (
+          <div data-testid="ultimos-ventana" style={{ alignSelf: 'flex-start', background: 'var(--cp-rust)', color: '#FFFFFF', fontWeight: 800, fontSize: '13px', borderRadius: '9999px', padding: '4px 14px' }}>
+            {franjaUltimos}
+          </div>
+        )}
+
         {tamanos.length > 0 && (
           <div>
             <div style={{ fontWeight: 800, marginBottom: '6px', color: 'var(--cp-navy)' }}>
@@ -385,24 +407,32 @@ export function VentanaOpcionesProducto({
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {tamanos.map((v) => {
                 const activo = tamanoSeleccionado?.id === v.id;
+                const noCabe = tamanoSinStock(v.unidades ?? 1);
                 return (
                   <button
                     key={v.id}
                     type="button"
                     onClick={() => setTamanoSeleccionado(v)}
+                    disabled={noCabe}
                     style={{
                       minHeight: '44px',
-                      padding: '0 14px',
+                      padding: noCabe ? '4px 14px' : '0 14px',
                       borderRadius: '12px',
                       border: '1.5px solid var(--cp-navy)',
-                      background: activo ? 'var(--cp-navy)' : 'transparent',
-                      color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                      background: activo && !noCabe ? 'var(--cp-navy)' : 'transparent',
+                      color: activo && !noCabe ? 'var(--cp-cream)' : 'var(--cp-navy)',
                       fontWeight: 700,
                       fontSize: '13px',
-                      cursor: 'pointer',
+                      opacity: noCabe ? 0.5 : 1,
+                      cursor: noCabe ? 'not-allowed' : 'pointer',
                     }}
                   >
                     {v.nombre} · S/ {Number(v.precio || 0).toFixed(2)}
+                    {noCabe && (
+                      <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+                        {libres && libres > 0 ? `Solo quedan ${libres}` : 'No hay stock suficiente'}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -940,7 +970,8 @@ export function VentanaOpcionesProducto({
             </b>
             <button
               type="button"
-              onClick={() => setCantidad((c) => c + 1)}
+              onClick={() => setCantidad((c) => (enTopeStock ? c : c + 1))}
+              disabled={enTopeStock}
               aria-label="Más cantidad"
               style={{
                 width: '44px',
@@ -950,7 +981,8 @@ export function VentanaOpcionesProducto({
                 background: 'transparent',
                 fontWeight: 800,
                 fontSize: '20px',
-                cursor: 'pointer',
+                opacity: enTopeStock ? 0.35 : 1,
+                cursor: enTopeStock ? 'not-allowed' : 'pointer',
               }}
             >
               +
@@ -975,7 +1007,15 @@ export function VentanaOpcionesProducto({
               cursor: puedeAgregar ? 'pointer' : 'not-allowed',
             }}
           >
-            <span>{comboAgotado ? 'Agotado' : saborMode && !saboresListos ? 'Elige los sabores' : 'Agregar al pedido'}</span>
+            <span>
+              {comboAgotado
+                ? 'Agotado'
+                : tamanoNoCabe
+                  ? 'No hay stock suficiente'
+                  : saborMode && !saboresListos
+                    ? 'Elige los sabores'
+                    : 'Agregar al pedido'}
+            </span>
             <span> · S/ {precioTotal.toFixed(2)}</span>
           </button>
         </div>

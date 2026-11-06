@@ -9,6 +9,8 @@ import { VentanaProductoCarta } from '../VentanaProductoCarta';
 import { ProductoCarta, LineaCarrito } from '../tipos';
 import {
   etiquetaQuedan,
+  etiquetaUltimos,
+  UMBRAL_ULTIMOS,
   excesosDeStock,
   infoStockDe,
   recortarLineasProducto,
@@ -60,13 +62,28 @@ const sembrarCarrito = (lineas: LineaCarrito[]) => sessionStorage.setItem('capri
 beforeEach(() => sessionStorage.clear());
 
 describe('lógica de stock (stock.ts)', () => {
-  it('etiqueta: «Quedan N» hasta el umbral, «¡Última unidad!» con 1, nada en 0, sobre el umbral o sin control', () => {
-    expect(etiquetaQuedan(infoStockDe(conStock(3)))).toBe('Quedan 3');
-    expect(etiquetaQuedan(infoStockDe(conStock(1)))).toBe('¡Última unidad!');
+  it('franja «¡Últimos N!» solo con 1 a 3 unidades; «Quedan N» entre 4 y 5; nada en 0, sobre el umbral o sin control', () => {
+    expect(UMBRAL_ULTIMOS).toBe(3);
+    expect([3, 2, 1].map((n) => etiquetaUltimos(infoStockDe(conStock(n))))).toEqual(['¡Últimos 3!', '¡Últimos 2!', '¡Últimos 1!']);
+    expect(etiquetaUltimos(infoStockDe(conStock(4)))).toBeNull();
+    expect(etiquetaUltimos(infoStockDe(conStock(0)))).toBeNull();
+    expect(etiquetaUltimos(infoStockDe({ ...base, quedan: 2 }))).toBeNull();
+    expect(etiquetaQuedan(infoStockDe(conStock(4)))).toBe('Quedan 4');
+    expect(etiquetaQuedan(infoStockDe(conStock(3)))).toBeNull();
     expect(etiquetaQuedan(infoStockDe(conStock(0)))).toBeNull();
     expect(etiquetaQuedan(infoStockDe(conStock(12)))).toBeNull();
     expect(etiquetaQuedan(infoStockDe(conStock(null)))).toBeNull();
-    expect(etiquetaQuedan(infoStockDe({ ...base, quedan: 3 }))).toBeNull();
+    expect(etiquetaQuedan(infoStockDe({ ...base, quedan: 4 }))).toBeNull();
+  });
+
+  it('unidades: un tamaño de 6 consume 6 del saldo, no 1', () => {
+    const media: LineaCarrito = { ...linea('m', '1', 2), unidadesTamano: 6 };
+    expect(unidadesEnCarrito([media], '1')).toBe(12);
+    expect(excesosDeStock([media], { '1': infoStockDe(conStock(10)) })).toEqual([
+      { productoId: '1', nombre: 'Dona de chocolate', pedidas: 12, quedan: 10 },
+    ]);
+    // ajustar a 10 unidades deja 1 media docena (6) y no parte la línea
+    expect(recortarLineasProducto([media], '1', 10).map((l) => l.cantidad)).toEqual([1]);
   });
 
   it('tope: el saldo lo comparten todas las líneas del mismo producto', () => {
@@ -123,31 +140,37 @@ describe('tarjeta de producto', () => {
       </CarritoProvider>,
     );
 
-  it('quedan 3 muestra «Quedan 3»', () => {
+  it('quedan 3 muestra la franja «¡Últimos 3!»', () => {
     renderTarjeta(conStock(3));
-    expect(screen.getByText('Quedan 3')).toBeTruthy();
+    expect(screen.getByTestId('ultimos-1').textContent).toBe('¡Últimos 3!');
     expect(screen.getByRole('button', { name: 'Pedir Dona de chocolate' })).toBeTruthy();
   });
 
-  it('quedan 1 muestra «¡Última unidad!»', () => {
+  it('quedan 1 muestra «¡Últimos 1!»', () => {
     renderTarjeta(conStock(1));
-    expect(screen.getByText('¡Última unidad!')).toBeTruthy();
+    expect(screen.getByText('¡Últimos 1!')).toBeTruthy();
+  });
+
+  it('quedan 4 muestra «Quedan 4» y no la franja', () => {
+    renderTarjeta(conStock(4));
+    expect(screen.getByText('Quedan 4')).toBeTruthy();
+    expect(screen.queryByTestId('ultimos-1')).toBeNull();
   });
 
   it('quedan 0 queda agotada, sin etiqueta', () => {
     renderTarjeta(conStock(0));
-    expect(screen.queryByText(/Quedan|Última/)).toBeNull();
+    expect(screen.queryByText(/Quedan|Últimos/)).toBeNull();
     expect((screen.getByRole('button', { name: 'Dona de chocolate agotado' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('quedan 12 no muestra etiqueta', () => {
     renderTarjeta(conStock(12));
-    expect(screen.queryByText(/Quedan|Última/)).toBeNull();
+    expect(screen.queryByText(/Quedan|Últimos/)).toBeNull();
   });
 
   it('sin controlaStock no cambia nada aunque traiga quedan', () => {
     renderTarjeta({ ...base, quedan: 3 });
-    expect(screen.queryByText(/Quedan|Última/)).toBeNull();
+    expect(screen.queryByText(/Quedan|Últimos/)).toBeNull();
     expect((screen.getByRole('button', { name: 'Pedir Dona de chocolate' }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
@@ -188,6 +211,65 @@ describe('ventana de producto', () => {
   it('quedan 0 muestra Agotado', () => {
     renderVentana(conStock(0));
     expect(boton('Agotado').disabled).toBe(true);
+  });
+
+  const tamanos = [
+    { id: 'u', nombre: 'Unidad', precio: 6, unidades: 1 },
+    { id: 'm', nombre: '1/2 docena', precio: 30, unidades: 6 },
+  ];
+
+  it('franja «¡Últimos N!» en la ventana con 3, 2 y 1; no con 4 ni 0', () => {
+    for (const n of [3, 2, 1]) {
+      const { unmount } = render(
+        <CarritoProvider>
+          <VentanaProductoCarta producto={conStock(n)} esBebida={false} onCerrar={() => {}} />
+        </CarritoProvider>,
+      );
+      expect(screen.getByTestId('ultimos-ventana').textContent).toBe(`¡Últimos ${n}!`);
+      unmount();
+    }
+    const { unmount } = render(
+      <CarritoProvider>
+        <VentanaProductoCarta producto={conStock(4)} esBebida={false} onCerrar={() => {}} />
+      </CarritoProvider>,
+    );
+    expect(screen.queryByTestId('ultimos-ventana')).toBeNull();
+    unmount();
+  });
+
+  it('tamaño de 1/2 docena (6) con 2 que quedan: deshabilitado con «Solo quedan 2»; agregar bloqueado si está elegido', () => {
+    renderVentana(conStock(2, { tamanos }));
+    const media = screen.getByRole('button', { name: /1\/2 docena/ }) as HTMLButtonElement;
+    expect(media.disabled).toBe(true);
+    expect(media.textContent).toContain('Solo quedan 2');
+    expect((screen.getByRole('button', { name: /^Unidad/ }) as HTMLButtonElement).disabled).toBe(false);
+    expect(boton('Agregar al pedido').disabled).toBe(false);
+  });
+
+  it('sin unidades libres, los tamaños dicen «No hay stock suficiente» y no se pueden agregar', () => {
+    sembrarCarrito([{ ...linea('a', '1', 4), unidadesTamano: 1 }]);
+    renderVentana(conStock(4, { tamanos }));
+    // dos tamaños (Unidad y 1/2 docena) y el botón Agregar
+    expect(screen.getAllByText('No hay stock suficiente')).toHaveLength(3);
+    expect((screen.getByRole('button', { name: /1\/2 docena/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(boton('No hay stock suficiente').disabled).toBe(true);
+  });
+
+  it('tamaño de 1/2 docena con 5 que quedan: deshabilitado y «Solo quedan 5»', () => {
+    renderVentana(conStock(5, { tamanos }));
+    expect((screen.getByRole('button', { name: /1\/2 docena/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Solo quedan 5')).toBeTruthy();
+  });
+
+  it('con unidades ya en el carrito, el + y Agregar se bloquean al superar lo que queda', () => {
+    sembrarCarrito([{ ...linea('a', '1', 1), unidadesTamano: 1 }]);
+    renderVentana(conStock(4, { tamanos }));
+    // quedan 4, en carrito 1 unidad: 3 libres (no caben 6); la Unidad admite hasta 3
+    expect(boton('Más').disabled).toBe(false);
+    fireEvent.click(boton('Más'));
+    fireEvent.click(boton('Más'));
+    expect(boton('Más').disabled).toBe(true);
+    expect(boton('Agregar al pedido').disabled).toBe(false);
   });
 
   it('sin controlaStock el selector no tiene tope', () => {

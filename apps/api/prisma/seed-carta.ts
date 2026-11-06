@@ -213,6 +213,8 @@ export async function main() {
         precio: precioBase,
         orden: pIdx + 1,
         oculto: false,
+        // Postres controla stock desde la instalación (igual que la migración 20261226200000)
+        controla_stock: p.cat === 'complementos',
       },
     });
 

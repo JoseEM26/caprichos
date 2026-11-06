@@ -5,7 +5,7 @@ import { GrupoOpcionesCarta, OpcionElegida, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
 import { alternarEleccion } from './eleccionGrupo';
-import { etiquetaQuedan, infoStockDe, mezclasDisponibles, saboresParaLinea, topeAgregable, unidadesEnCarrito } from './stock';
+import { etiquetaQuedan, etiquetaUltimos, infoStockDe, mezclasDisponibles, saboresParaLinea, topeAgregable, topeTamano, unidadesEnCarrito } from './stock';
 import { SelectorSaboresMezcla } from '../comun/SelectorSaboresMezcla';
 import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../comun/saboresMezcla';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
@@ -129,14 +129,20 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const saboresListos = !saborMode || repartoValido(valorSaboresOk, total, saboresDisp);
   const faltanSabores = faltanUnidades(valorSaboresOk, total);
 
-  const tope = saborMode ? mezclasDisponibles(info, lineas, String(producto.id), unidadesMezcla) : topeAgregable(info, enCarrito, unidadesMezcla);
+  // Sin sabores: cada cantidad consume las unidades del tamaño (1/2 docena = 6); con sabores, el tope son las mezclas
+  const libres = topeAgregable(info, enCarrito);
+  const tope = saborMode ? mezclasDisponibles(info, lineas, String(producto.id), unidadesMezcla) : topeTamano(info, enCarrito, unidadesMezcla);
+  const tamanoSinStock = (unidades: number) => !saborMode && libres !== null && unidades > libres;
   const sinStock = !info.disponible || (info.controlaStock && info.quedan === 0);
   const sinSaldo = tope !== null && tope <= 0;
+  // tamaño que no cabe en lo que queda (tope 0 sin sabores): no se puede agregar
+  const tamanoNoCabe = !saborMode && producto.tamanos.length > 0 && tope === 0;
   const puedeAgregar = valido && saboresListos && !sinStock && !sinSaldo;
   const enTope = tope !== null && cantidad >= tope;
   const etiquetaStock = etiquetaQuedan(info);
+  const franjaUltimos = sinStock ? null : etiquetaUltimos(info);
   const ayudaStock =
-    sinStock || info.quedan === null
+    sinStock || info.quedan === null || tamanoNoCabe
       ? null
       : enTope
         ? `Solo quedan ${info.quedan}${enCarrito > 0 ? ` · ya tienes ${enCarrito} en tu pedido` : ''}`
@@ -194,6 +200,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         : {}),
       // combo con bebidas: sin «unidades», la línea viaja entera con los nombres en orden de bebida
       ...(nB > 0 || saborMode ? {} : { unidades: Array.from({ length: cantidad }, (_, i) => ({ persona: personas[i], opciones: elegidas })) }),
+      // sin sabores: el tamaño dice cuántas unidades consume cada cantidad (para el stock del carrito)
+      ...(saborMode ? {} : { unidadesTamano: unidadesMezcla }),
       nota: [notaReemplazos(partesRe, reemplazos), nota.trim()].filter(Boolean).join(' · ') || undefined,
       ...(oferta && elecciones.length > 0 ? { ofertaId: String(oferta.id), comboElecciones: elecciones } : {}),
       precioUnitario: unitario,
@@ -299,6 +307,12 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               <span style={{ ...titulo, fontWeight: 800, fontSize: 26, color: 'var(--cp-rust)' }}>{fmt(unitario)}</span>
             </div>
 
+            {franjaUltimos && (
+              <div data-testid="ultimos-ventana" style={{ ...titulo, alignSelf: 'flex-start', background: 'var(--cp-rust)', color: '#FFFFFF', fontWeight: 800, fontSize: 13, borderRadius: 9999, padding: '4px 14px' }}>
+                {franjaUltimos}
+              </div>
+            )}
+
             {producto.tamanos.length > 0 && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -308,18 +322,25 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 8 }}>
                   {producto.tamanos.map((t) => {
                     const on = t.id === tamanoId;
+                    const noCabe = tamanoSinStock(t.unidades ?? 1);
                     return (
                       <button
                         key={t.id}
                         onClick={() => setTamanoId(t.id)}
                         aria-pressed={on}
-                        style={{ minHeight: 64, borderRadius: 14, border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, textAlign: 'left' }}
+                        disabled={noCabe}
+                        style={{ minHeight: 64, borderRadius: 14, border: `2px solid ${on && !noCabe ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, textAlign: 'left', opacity: noCabe ? 0.5 : 1, cursor: noCabe ? 'not-allowed' : 'pointer' }}
                       >
                         <span style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-                          <span style={{ width: 16, height: 16, borderRadius: 8, border: '2px solid var(--cp-navy)', background: on ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
+                          <span style={{ width: 16, height: 16, borderRadius: 8, border: '2px solid var(--cp-navy)', background: on && !noCabe ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
                           <span style={{ flex: 1, fontWeight: 700, fontSize: 13, lineHeight: '17px' }}>{t.nombre}</span>
                         </span>
                         <span style={{ ...titulo, fontWeight: 800, fontSize: 15, color: 'var(--cp-rust)', paddingLeft: 24 }}>{fmt(t.precio)}</span>
+                        {noCabe && (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--cp-rust)', paddingLeft: 24 }}>
+                            {libres && libres > 0 ? `Solo quedan ${libres}` : 'No hay stock suficiente'}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -629,7 +650,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                     : comboAgotado || sinStock
                       ? 'Agotado'
                       : sinSaldo && valido
-                        ? 'Sin más unidades'
+                        ? tamanoNoCabe
+                          ? 'No hay stock suficiente'
+                          : 'Sin más unidades'
                         : valido && !saboresListos
                           ? 'Elige los sabores'
                           : valido

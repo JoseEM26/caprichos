@@ -14,6 +14,7 @@ import { CuadriculaPlano } from './CuadriculaPlano';
 import { comboDeProducto } from '../../../carta/ReemplazoCombo';
 import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
+import { unidadesDeLinea } from '../../../carta/stock';
 import { ModalLiberarMesa } from './ModalLiberarMesa';
 import { VistaPreviaMesa } from './VistaPreviaMesa';
 import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
@@ -87,6 +88,8 @@ export interface LineaPedidoMesa {
   comboElecciones?: { parteId: string; productoId: string }[];
   /** Mezcla de sabores: unidades por media docena o docena y cuántas de cada sabor */
   unidadesPorMezcla?: number;
+  /** Producto con stock: unidades que trae el tamaño (1/2 docena = 6) */
+  unidadesTamano?: number;
   sabores?: { saborId: string; cantidad: number; nombre?: string }[];
 }
 
@@ -522,6 +525,7 @@ export function ModalNuevoPedidoMesa({
         nombre: l.nombre || prodMatch?.nombre || 'Producto',
         tamanoId: tamMatch?.id,
         tamanoNombre: l.tamano || tamMatch?.nombre || undefined,
+        unidadesTamano: tamMatch?.unidades,
         cantidad: cant,
         precioUnitario: unit,
         precioTotal: unit * cant,
@@ -708,6 +712,7 @@ export function ModalNuevoPedidoMesa({
       ofertaId: config.ofertaId,
       comboElecciones: config.comboElecciones,
       unidadesPorMezcla: config.unidadesPorMezcla,
+      unidadesTamano: config.tamano?.unidades,
       sabores: config.sabores,
       personas: config.nombresBebidas ?? config.unidades.map((u) => u.nombreVaso).filter(Boolean),
     };
@@ -3158,6 +3163,9 @@ export function ModalNuevoPedidoMesa({
           alCerrar={() => setProductoSeleccionado(null)}
           alAgregar={handleAgregarProductoConfigurado}
           oferta={comboDeProducto(ofertasCombo, productoSeleccionado.id)}
+          enCarrito={lineas
+            .filter((l) => String(l.productoId) === String(productoSeleccionado.id))
+            .reduce((acc, l) => acc + unidadesDeLinea(l), 0)}
         />
       )}
 
