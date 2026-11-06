@@ -74,7 +74,7 @@ describe('Nuevo producto: ¿Cómo se vende?', () => {
     await waitFor(() => expect(crear).toHaveBeenCalled());
     const arg = crear.mock.calls[0][0];
     expect(arg.nombre).toBe('CAFE');
-    expect(arg.tamanos).toEqual([{ tamanoValorId: 'v1', precio: 0, activo: true }]);
+    expect(arg.tamanos).toEqual([{ tamanoValorId: 'v1', precio: 0, activo: true, unidades: 1 }]);
     expect(arg.grupos).toEqual([]);
   });
 });

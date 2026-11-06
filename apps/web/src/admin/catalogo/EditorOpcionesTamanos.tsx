@@ -401,7 +401,7 @@ export function EditorOpcionesTamanos({
     setTamanos(c);
   };
   const agregarTamano = (v: { id: string; nombre: string }) => {
-    setTamanos([...estado.tamanos, { tamanoValorId: v.id, nombre: v.nombre, precio: precioBase, activo: true }]);
+    setTamanos([...estado.tamanos, { tamanoValorId: v.id, nombre: v.nombre, precio: precioBase, activo: true, unidades: 1 }]);
     setElegido(''); setNuevoNombre(''); setAgregando(false); setError('');
   };
 
@@ -465,7 +465,12 @@ export function EditorOpcionesTamanos({
     setGuardando(true);
     try {
       await catalogoApi.editarProducto(producto.id, {
-        tamanos: estado.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: Number(t.precio) || 0, activo: t.activo })),
+        tamanos: estado.tamanos.map((t) => ({
+          tamanoValorId: t.tamanoValorId,
+          precio: Number(t.precio) || 0,
+          activo: t.activo,
+          unidades: t.unidades,
+        })),
         grupos: estado.grupos.map((g, orden) => ({ grupoId: g.grupoId, orden })),
         sincronizarGrupos: true,
         resaltarOpcionMenosPedida: estado.resaltarMenosPedida === true,
@@ -492,6 +497,7 @@ export function EditorOpcionesTamanos({
       <div className="eo-ayuda-general" aria-label="Para qué sirve">
         <div className="eo-titulo">Para qué sirve</div>
         <p><b>Tamaños:</b> el cliente elige UN tamaño y cada uno tiene su precio (Regular 12 oz S/ 6, Grande 16 oz S/ 7). Si el producto no tiene tamaños, se vende a un precio único.</p>
+        <p><b>Unidades:</b> cuántas unidades del producto incluye cada tamaño (Unidad 1, 1/2 docena 6, Docena 12). Así se descuenta el stock por sabor.</p>
         <p><b>Opciones que se le preguntan al cliente:</b> preguntas que aparecen al pedir (¿qué leche?, ¿extra shot?). Cada opción puede sumar un precio extra. <b>Obligatoria</b> = el cliente debe responder; <b>Varias</b> = puede marcar más de una; <b>Máximo</b> = cuántas a la vez.</p>
       </div>
       {errorCarga && <div role="alert" className="eo-error">{errorCarga}</div>}
@@ -526,6 +532,11 @@ export function EditorOpcionesTamanos({
               detalle="Es el precio final de este tamaño, no un extra. Debe ser 0 o más.">
               <input className="eo-input" type="number" step="0.5" min={0} aria-label={`Precio de ${t.nombre}`} value={t.precio}
                 onChange={(e) => setTam(i, { precio: parseFloat(e.target.value) })} />
+            </Ayuda>
+            <Ayuda id={`tam-u-${t.tamanoValorId}`} etiqueta="Unidades" ayuda="Sirve para descontar el stock: una 1/2 docena descuenta 6 unidades."
+              detalle="Unidad = 1. 1/2 docena = 6. Docena = 12. Cada venta de este tamaño descuenta esa cantidad del stock de cada sabor.">
+              <input className="eo-input" type="number" step="1" min={1} aria-label={`Unidades de ${t.nombre}`} value={t.unidades}
+                onChange={(e) => setTam(i, { unidades: Number(e.target.value) })} />
             </Ayuda>
             <div className="eo-campo" style={{ flex: '0 0 auto' }}>
               <div className="eo-etiqueta">Estado</div>

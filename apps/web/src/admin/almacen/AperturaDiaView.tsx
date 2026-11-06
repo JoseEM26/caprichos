@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
-import { almacenApi, AperturaDiaRespuesta, AperturaProductoItem } from './almacenApi';
+import {
+  almacenApi,
+  AperturaDiaRespuesta,
+  AperturaProductoItem,
+  ItemApertura,
+  productoPendienteApertura,
+} from './almacenApi';
 import { Boton } from '../../comun/Boton';
 import { Cargando } from '../../comun/Cargando';
 import { Confirmar } from '../../comun/Confirmar';
@@ -27,8 +33,53 @@ function fechaDMA(iso: string): string {
 }
 
 /**
+ * Una casilla de conteo: el producto entero, o un sabor de un producto con sabores.
+ * `nombre` (completo, «DONA · Chocolate») sirve para mensajes y etiquetas accesibles.
+ */
+interface Casilla {
+  clave: string;
+  productoId: string;
+  saborId?: string;
+  etiqueta: string;
+  nombre: string;
+  saldo: number;
+  aperturaHoy: boolean;
+  aperturaCantidad: number | null;
+}
+
+const claveCasilla = (productoId: string, saborId?: string) => (saborId ? `${productoId}#${saborId}` : productoId);
+
+function casillasDe(productos: AperturaProductoItem[]): Casilla[] {
+  return productos.flatMap((p) =>
+    p.sabores && p.sabores.length > 0
+      ? p.sabores.map((s) => ({
+          clave: claveCasilla(p.productoId, s.saborId),
+          productoId: p.productoId,
+          saborId: s.saborId,
+          etiqueta: s.nombre,
+          nombre: `${p.nombre} · ${s.nombre}`,
+          saldo: s.saldo,
+          aperturaHoy: s.aperturaHoy,
+          aperturaCantidad: s.aperturaCantidad,
+        }))
+      : [
+          {
+            clave: p.productoId,
+            productoId: p.productoId,
+            etiqueta: p.nombre,
+            nombre: p.nombre,
+            saldo: p.saldo,
+            aperturaHoy: p.aperturaHoy,
+            aperturaCantidad: p.aperturaCantidad,
+          },
+        ],
+  );
+}
+
+/**
  * Conteo de apertura del día: cuántos hay de cada producto controlado al empezar.
- * Se guardan los que el usuario cambió y los que todavía no tienen apertura hoy.
+ * Los productos con sabores se cuentan sabor por sabor. Se guardan los que el usuario cambió
+ * y los que todavía no tienen apertura hoy.
  */
 export function AperturaDiaView() {
   const [datos, setDatos] = useState<AperturaDiaRespuesta | null>(null);
@@ -46,7 +97,7 @@ export function AperturaDiaView() {
     try {
       const res = await almacenApi.obtenerApertura();
       setDatos(res);
-      setValores(Object.fromEntries(res.productos.map((p) => [p.productoId, String(p.saldo)])));
+      setValores(Object.fromEntries(casillasDe(res.productos).map((c) => [c.clave, String(c.saldo)])));
     } catch (err) {
       setErrorCarga(err instanceof ErrorApi ? err.message : 'No se pudo cargar la apertura del día.');
     } finally {
@@ -59,25 +110,27 @@ export function AperturaDiaView() {
   }, [cargar]);
 
   const productos = datos?.productos ?? [];
+  const casillas = casillasDe(productos);
+  const valorDe = (clave: string) => valores[clave] ?? '';
 
-  const aEnviar: Array<{ p: AperturaProductoItem; cantidad: number }> = [];
+  const aEnviar: Array<{ c: Casilla; cantidad: number }> = [];
   const invalidos: string[] = [];
-  for (const p of productos) {
-    const cantidad = leerCantidad(valores[p.productoId] ?? '');
-    if (cantidad === null) invalidos.push(p.productoId);
-    else if (!p.aperturaHoy || cantidad !== p.saldo) aEnviar.push({ p, cantidad });
+  for (const c of casillas) {
+    const cantidad = leerCantidad(valorDe(c.clave));
+    if (cantidad === null) invalidos.push(c.clave);
+    else if (!c.aperturaHoy || cantidad !== c.saldo) aEnviar.push({ c, cantidad });
   }
-  const grandes = aEnviar.filter((x) => esGrande(x.p.saldo, x.cantidad));
+  const grandes = aEnviar.filter((x) => esGrande(x.c.saldo, x.cantidad));
 
-  const cambiarValor = (productoId: string, texto: string) => {
+  const cambiarValor = (clave: string, texto: string) => {
     setExito(null);
     setError(null);
-    setValores((v) => ({ ...v, [productoId]: texto }));
+    setValores((v) => ({ ...v, [clave]: texto }));
   };
 
-  const ajustar = (p: AperturaProductoItem, delta: number) => {
-    const actual = leerCantidad(valores[p.productoId] ?? '') ?? 0;
-    cambiarValor(p.productoId, String(Math.max(0, actual + delta)));
+  const ajustar = (c: Casilla, delta: number) => {
+    const actual = leerCantidad(valorDe(c.clave)) ?? 0;
+    cambiarValor(c.clave, String(Math.max(0, actual + delta)));
   };
 
   const enviar = async () => {
@@ -90,9 +143,12 @@ export function AperturaDiaView() {
     setGuardando(true);
     setError(null);
     try {
-      const res = await almacenApi.registrarApertura(
-        aEnviar.map((x) => ({ productoId: x.p.productoId, cantidad: x.cantidad })),
+      const items: ItemApertura[] = aEnviar.map(({ c, cantidad }) =>
+        c.saborId
+          ? { productoId: c.productoId, saborId: c.saborId, cantidad }
+          : { productoId: c.productoId, cantidad },
       );
+      const res = await almacenApi.registrarApertura(items);
       setExito(`Apertura guardada: ${res.registrados} ${res.registrados === 1 ? 'producto' : 'productos'}.`);
       await cargar();
     } catch (err) {
@@ -120,6 +176,76 @@ export function AperturaDiaView() {
     void enviar();
   };
 
+  /** Campo «¿Cuántos hay ahora?» con − y + de 44 px, para un producto o un sabor. */
+  const controles = (c: Casilla) => {
+    const id = `apertura-${c.clave}`;
+    const invalido = invalidos.includes(c.clave);
+    const cantidad = leerCantidad(valorDe(c.clave)) ?? 0;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label htmlFor={id} style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-navy)' }}>
+          ¿Cuántos hay ahora?
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            aria-label={`Quitar uno de ${c.nombre}`}
+            onClick={() => ajustar(c, -1)}
+            disabled={cantidad <= 0}
+            style={botonCantidad}
+          >
+            −
+          </button>
+          <input
+            id={id}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            aria-label={`¿Cuántos hay ahora? ${c.nombre}`}
+            aria-invalid={invalido || undefined}
+            value={valorDe(c.clave)}
+            onChange={(e) => cambiarValor(c.clave, e.target.value)}
+            style={{
+              width: 110,
+              minHeight: 44,
+              boxSizing: 'border-box',
+              borderRadius: 10,
+              border: `1.5px solid ${invalido ? 'var(--cp-rust)' : 'var(--cp-navy)'}`,
+              background: 'var(--cp-white)',
+              color: 'var(--cp-navy)',
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 800,
+              fontSize: 18,
+              textAlign: 'center',
+              padding: '0 8px',
+            }}
+          />
+          <button
+            type="button"
+            aria-label={`Sumar uno a ${c.nombre}`}
+            onClick={() => ajustar(c, 1)}
+            style={botonCantidad}
+          >
+            +
+          </button>
+        </div>
+        {invalido && (
+          <span role="alert" style={{ fontSize: 12, color: 'var(--cp-rust)', fontWeight: 700 }}>
+            Escribe un número entero de 0 o más.
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  /** Línea de estado de la apertura de hoy: «Apertura registrada hoy: N» o «Falta la apertura de hoy». */
+  const estado = (c: Casilla) => (
+    <div style={{ fontSize: 12.5, fontWeight: 700, color: c.aperturaHoy ? 'var(--cp-navy)' : 'var(--cp-rust)' }}>
+      {c.aperturaHoy ? `Apertura registrada hoy: ${c.aperturaCantidad ?? 0}` : 'Falta la apertura de hoy'}
+    </div>
+  );
+
   if (cargando && !datos) {
     return (
       <div style={{ padding: 20 }}>
@@ -141,7 +267,7 @@ export function AperturaDiaView() {
     );
   }
 
-  const pendientes = productos.filter((p) => !p.aperturaHoy).length;
+  const pendientes = productos.filter(productoPendienteApertura).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 760 }}>
@@ -155,17 +281,17 @@ export function AperturaDiaView() {
         style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}
       >
         {productos.map((p) => {
-          const id = p.productoId;
-          const valor = valores[id] ?? '';
-          const invalido = invalidos.includes(id);
-          const cantidad = leerCantidad(valor) ?? 0;
+          const delProducto = casillas.filter((c) => c.productoId === p.productoId);
+          const conSabores = !!p.sabores && p.sabores.length > 0;
+          const conError = delProducto.some((c) => invalidos.includes(c.clave));
+          const total = delProducto.reduce((suma, c) => suma + (leerCantidad(valorDe(c.clave)) ?? 0), 0);
           return (
             <li
-              key={id}
+              key={p.productoId}
               data-testid="apertura-fila"
               style={{
                 background: 'var(--cp-white)',
-                border: `1px solid ${invalido ? 'var(--cp-rust)' : 'var(--cp-line)'}`,
+                border: `1px solid ${conError ? 'var(--cp-rust)' : 'var(--cp-line)'}`,
                 borderRadius: 14,
                 padding: '12px 14px',
                 display: 'flex',
@@ -180,76 +306,39 @@ export function AperturaDiaView() {
                     {p.nombre}
                   </div>
                   {p.areaNombre && <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>{p.areaNombre}</div>}
+                  {conSabores && (
+                    <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Se cuenta por sabor</div>
+                  )}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--cp-navy)' }}>Saldo actual: <b>{p.saldo}</b></div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: 13, color: 'var(--cp-navy)' }}>
+                  <div>Saldo actual: <b>{p.saldo}</b></div>
+                  {conSabores && <div>{`Total ahora: ${total}`}</div>}
+                </div>
               </div>
 
-              <div
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: p.aperturaHoy ? 'var(--cp-navy)' : 'var(--cp-rust)',
-                }}
-              >
-                {p.aperturaHoy
-                  ? `Apertura registrada hoy: ${p.aperturaCantidad ?? 0}`
-                  : 'Falta la apertura de hoy'}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label htmlFor={`apertura-${id}`} style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-navy)' }}>
-                  ¿Cuántos hay ahora?
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    aria-label={`Quitar uno de ${p.nombre}`}
-                    onClick={() => ajustar(p, -1)}
-                    disabled={cantidad <= 0}
-                    style={botonCantidad}
+              {conSabores ? (
+                delProducto.map((c) => (
+                  <div
+                    key={c.clave}
+                    data-testid="apertura-sabor"
+                    style={{ borderTop: '1px solid var(--cp-line)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}
                   >
-                    −
-                  </button>
-                  <input
-                    id={`apertura-${id}`}
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    step={1}
-                    aria-label={`¿Cuántos hay ahora? ${p.nombre}`}
-                    aria-invalid={invalido || undefined}
-                    value={valor}
-                    onChange={(e) => cambiarValor(id, e.target.value)}
-                    style={{
-                      width: 110,
-                      minHeight: 44,
-                      boxSizing: 'border-box',
-                      borderRadius: 10,
-                      border: `1.5px solid ${invalido ? 'var(--cp-rust)' : 'var(--cp-navy)'}`,
-                      background: 'var(--cp-white)',
-                      color: 'var(--cp-navy)',
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 800,
-                      fontSize: 18,
-                      textAlign: 'center',
-                      padding: '0 8px',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    aria-label={`Sumar uno a ${p.nombre}`}
-                    onClick={() => ajustar(p, 1)}
-                    style={botonCantidad}
-                  >
-                    +
-                  </button>
-                </div>
-                {invalido && (
-                  <span role="alert" style={{ fontSize: 12, color: 'var(--cp-rust)', fontWeight: 700 }}>
-                    Escribe un número entero de 0 o más.
-                  </span>
-                )}
-              </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--cp-navy)', overflowWrap: 'anywhere', minWidth: 0 }}>
+                        {c.etiqueta}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--cp-navy)' }}>Saldo: <b>{c.saldo}</b></div>
+                    </div>
+                    {estado(c)}
+                    {controles(c)}
+                  </div>
+                ))
+              ) : (
+                <>
+                  {estado(delProducto[0])}
+                  {controles(delProducto[0])}
+                </>
+              )}
             </li>
           );
         })}
@@ -277,7 +366,7 @@ export function AperturaDiaView() {
           {aEnviar.length > 0 ? `Guardar apertura (${aEnviar.length})` : 'Guardar apertura'}
         </Boton>
         <div style={{ fontSize: 12, color: 'var(--cp-soft)', marginTop: 4 }}>
-          Se guardan los productos que cambiaste y los que aún no tienen apertura hoy.
+          Se guardan los productos y sabores que cambiaste y los que aún no tienen apertura hoy.
         </div>
       </div>
 
@@ -285,7 +374,7 @@ export function AperturaDiaView() {
         abierto={confirmarAbierto}
         titulo="¿Guardar una diferencia grande?"
         mensaje={`Hay ${grandes.length} ${grandes.length === 1 ? 'producto' : 'productos'} con una diferencia de más de la mitad frente al saldo: ${grandes
-          .map((x) => `${x.p.nombre} (saldo ${x.p.saldo}, ahora ${x.cantidad})`)
+          .map((x) => `${x.c.nombre} (saldo ${x.c.saldo}, ahora ${x.cantidad})`)
           .join('; ')}. ¿Guardar igual?`}
         textoSi="Sí, guardar"
         textoNo="No, revisar"

@@ -1,11 +1,16 @@
 import type { ProductoAdmin } from './catalogoApi';
 
-/** Un tamaño del producto con su precio. `tamanoValorId` es el id del valor en la lista TAMANO. */
+/**
+ * Un tamaño del producto con su precio. `tamanoValorId` es el id del valor en la lista TAMANO.
+ * `unidades`: cuántas unidades del producto incluye (1 = Unidad, 6 = 1/2 docena, 12 = Docena).
+ * Sirve para descontar el stock por sabor.
+ */
 export interface TamanoEstado {
   tamanoValorId: string;
   nombre: string;
   precio: number;
   activo: boolean;
+  unidades: number;
 }
 
 /** Un grupo de opciones que se le pregunta al cliente en este producto. */
@@ -35,6 +40,7 @@ export function estadoDesdeProducto(p: ProductoAdmin): EstadoOpciones {
       nombre: t.nombre,
       precio: t.precio,
       activo: t.activo !== false,
+      unidades: t.unidades ?? 1,
     })),
     grupos: (p.grupos || []).map((g) => ({
       grupoId: g.id,
@@ -52,6 +58,9 @@ export function validarTamanos(tamanos: TamanoEstado[]): string | null {
   for (const t of tamanos) {
     if (!Number.isFinite(t.precio) || t.precio < 0) {
       return `El precio de «${t.nombre}» debe ser 0 o más.`;
+    }
+    if (!Number.isInteger(t.unidades) || t.unidades < 1) {
+      return `Las unidades de «${t.nombre}» deben ser un número entero de 1 o más.`;
     }
     const clave = t.nombre.trim().toLowerCase();
     if (vistos.has(clave)) return `El tamaño «${t.nombre}» está repetido en este producto.`;
