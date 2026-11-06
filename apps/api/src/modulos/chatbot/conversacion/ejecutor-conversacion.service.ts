@@ -19,6 +19,7 @@ import { ChatbotConfiguracionService } from '../configuracion/chatbot-configurac
 import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
 import { vistaPreviaPedidoBot, vistaPreviaUbicacionBot } from './vista-previa-pedido.util';
 import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
+import { carritoTrasSaborAgotado } from './flujos/pedido/flujo-pedido';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
 import {
@@ -356,6 +357,50 @@ export class EjecutorConversacionService {
         meta_id: metaId,
       },
     });
+  }
+
+  /**
+   * Sabor agotado al confirmar: la línea de ese sabor sale del carrito y el cliente elige otro sabor en una lista
+   * (un mensaje). Devuelve false si no se puede (sin línea o sin sabores): el llamador vuelve al carrito.
+   */
+  private async volverAlSaborAgotado(
+    conversacionId: bigint,
+    carrito: EstadoCarritoPedido,
+    err: { productoId: string; saborId: string; saborNombre?: string },
+    categorias: any[],
+    destinoEnvio: string | null | undefined,
+    entradaRaw: any,
+  ): Promise<boolean> {
+    const vuelta = carritoTrasSaborAgotado(carrito, err, categorias);
+    if (!vuelta) return false;
+    const actual = await this.prisma.conversacion.findUnique({ where: { id: conversacionId }, select: { flujo: true } });
+    const flujoVuelta = {
+      ...((actual?.flujo as any) || {}),
+      estado: 'PEDIDO_SABOR',
+      pedido: vuelta.pedido,
+    };
+    await this.prisma.conversacion.update({ where: { id: conversacionId }, data: { flujo: flujoVuelta as any } });
+    const { lista } = vuelta;
+    let metaId: string | null = null;
+    if (destinoEnvio) {
+      const res = await this.mensajeria.enviarLista(destinoEnvio, lista.texto, lista.botonTexto, lista.filas, {
+        conversacionId,
+        replyToWaMessageId: entradaRaw?.waMessageId,
+      });
+      metaId = res.waMessageId || null;
+    }
+    await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: conversacionId,
+        direccion: 'SALE',
+        autor: 'BOT',
+        tipo: 'LISTA',
+        contenido: { texto: lista.texto, botonTexto: lista.botonTexto, filas: lista.filas } as any,
+        meta_id: metaId,
+      },
+    });
+    this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacionId.toString() });
+    return true;
   }
 
   private async salirDeValidarPagoSiVencido(conversacion: any, flujo: FlujoConversacion | null): Promise<FlujoConversacion | null> {
@@ -1899,6 +1944,20 @@ export class EjecutorConversacionService {
           // Sin stock de un producto que controla stock: se vuelve al carrito, en un solo mensaje y sin escalar
           if (err?.response?.codigo === 'STOCK_INSUFICIENTE' && accion.carrito) {
             await this.volverAlCarritoSinStock(conversacion.id, accion.carrito, err.response.mensaje, destinoEnvio, entradaRaw);
+            continue;
+          }
+          // Sabor agotado: se elige otro sabor de ese producto (lista); si ya no queda ninguno, vuelve al carrito
+          if (err?.response?.codigo === 'SABOR_AGOTADO' && accion.carrito) {
+            const volvio = await this.volverAlSaborAgotado(conversacion.id, accion.carrito, err.response, categoriasCarta, destinoEnvio, entradaRaw);
+            if (!volvio) {
+              await this.volverAlCarritoSinStock(
+                conversacion.id,
+                accion.carrito,
+                `Ya no quedan ${err.response.saborNombre ?? 'ese sabor'}`,
+                destinoEnvio,
+                entradaRaw,
+              );
+            }
             continue;
           }
           this.logger.error(`Error creando pedido desde chatbot: ${err.message}`, err.stack);

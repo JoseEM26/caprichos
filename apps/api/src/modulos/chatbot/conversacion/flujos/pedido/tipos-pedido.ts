@@ -41,6 +41,13 @@ export interface OpcionElegidaBot {
   grupoNombre?: string;
 }
 
+/** Sabor de un producto con stock por sabor: unidades que consume la línea (tamaño × cantidad). */
+export interface SaborLineaBot {
+  saborId: string;
+  nombre: string;
+  cantidad: number;
+}
+
 export interface LineaCarritoBot {
   lineaId: string;
   productoId: string;
@@ -54,6 +61,8 @@ export interface LineaCarritoBot {
   subtotal: number;
   opciones: OpcionElegidaBot[];
   sabor?: string;
+  /** Producto con stock por sabor: un solo sabor por línea (todas las unidades del tamaño) */
+  sabores?: SaborLineaBot[];
   nota?: string;
   noSumaBeneficios: boolean;
   /** Un nombre por envase (bebidas): va en la etiqueta pegada al envase */
@@ -71,6 +80,7 @@ export interface ItemEnConfiguracionBot {
   opciones: OpcionElegidaBot[];
   grupoIndexActual: number;
   sabor?: string;
+  sabores?: SaborLineaBot[];
   nota?: string;
   cantidad: number;
   noSumaBeneficios: boolean;

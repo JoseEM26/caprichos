@@ -701,6 +701,16 @@ export const TEXTOS_BOT = {
     return '¿Qué sabor prefieres?';
   },
 
+  /** Repregunta del sabor cuando las unidades pedidas superan lo que queda de ese sabor (misma lista). */
+  pedidoSoloQuedanSabor: (quedan: number, saborNombre: string): string => {
+    return `Solo quedan ${quedan} de ${saborNombre} 😅 Elige otro sabor:`;
+  },
+
+  /** El sabor se agotó después de armar el carrito (lo rechazó el servidor): vuelve a elegir sabor. */
+  pedidoSaborAgotado: (saborNombre: string): string => {
+    return `Ya no quedan ${saborNombre}… ¿elegimos otro?`;
+  },
+
   pedidoPreguntarNotas: (nombreProd: string): string => {
     return `¿Tienes alguna indicación especial para ${nombreProd}? Si no tienes notas, presiona Continuar.`;
   },
