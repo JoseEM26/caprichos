@@ -370,7 +370,7 @@ export const pedidosApi = {
         nota?: string;
         personas?: string[];
         ofertaId?: string;
-        comboElecciones?: { parteId: string; productoId: string }[];
+        comboElecciones?: { parteId: string; productoId: string; saborId?: string }[];
       }>;
       pago: {
         metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';

@@ -34,7 +34,8 @@ import {
   ReglaAcumulacionItem,
   ResolucionCombo,
 } from './ofertas.tipos';
-import { calcularDisponibilidadCombo, productoDisponible, ProductoDisp } from './combo-disponibilidad.util';
+import { calcularDisponibilidadCombo, productoDisponible, ProductoDisp, saborDisponible } from './combo-disponibilidad.util';
+import { estaDisponible } from '../catalogo/catalogo.service';
 import {
   estaVigente,
   formatearFecha,
@@ -109,6 +110,31 @@ function parteResuelta(
     areaNombre: p?.areaNombre ?? null,
     categoriaNombre: p?.categoriaNombre ?? null,
     nota: [cambio, `Combo: ${ofertaNombre}`].filter(Boolean).join(' · '),
+  };
+}
+
+/** Campos de stock que necesitan los combos para saber si una elección tiene saldo (producto y sabores activos). */
+const SELECT_STOCK_COMBO = {
+  controla_stock: true,
+  stocks: { select: { cantidad: true } },
+  sabores: {
+    where: { activo: true },
+    select: { id: true, nombre: true, activo: true, agotado_hasta: true, stockSabor: { select: { cantidad: true } } },
+  },
+};
+
+/** Saldo y sabores de un producto leído con SELECT_STOCK_COMBO. */
+function stockDeProducto(f: any): Pick<ProductoDisp, 'controlaStock' | 'saldo' | 'sabores'> {
+  return {
+    controlaStock: !!f.controla_stock,
+    saldo: (f.stocks ?? []).reduce((acc: number, s: any) => acc + Number(s.cantidad), 0),
+    sabores: (f.sabores ?? []).map((s: any) => ({
+      id: s.id.toString(),
+      nombre: s.nombre,
+      activo: !!s.activo,
+      agotadoHasta: s.agotado_hasta ?? null,
+      saldo: Number(s.stockSabor?.cantidad ?? 0),
+    })),
   };
 }
 
@@ -1936,7 +1962,7 @@ export class OfertasService {
    */
   async validarEleccionesCombo(
     ofertaId: bigint | string | number,
-    elecciones: { parteId: string | number; productoId: string | number }[],
+    elecciones: { parteId: string | number; productoId: string | number; saborId?: string | number }[],
   ): Promise<string> {
     return (await this.resolverPartesCombo(ofertaId, elecciones)).nota;
   }
@@ -1949,7 +1975,7 @@ export class OfertasService {
    */
   async resolverPartesCombo(
     ofertaId: bigint | string | number,
-    elecciones: { parteId: string | number; productoId: string | number }[],
+    elecciones: { parteId: string | number; productoId: string | number; saborId?: string | number }[],
     unidades = 1,
   ): Promise<ResolucionCombo> {
     const oferta = await this.obtenerOfertaPorId(ofertaId);
@@ -1973,6 +1999,7 @@ export class OfertasService {
             oculto: true,
             agotado_hasta: true,
             categoria: { select: { nombre: true, area_id: true, area: { select: { nombre: true } } } },
+            ...SELECT_STOCK_COMBO,
           },
         })
       : [];
@@ -1988,6 +2015,7 @@ export class OfertasService {
           areaNombre: f.categoria?.area?.nombre ?? null,
           oculto: !!f.oculto,
           agotadoHasta: f.agotado_hasta ?? null,
+          ...stockDeProducto(f),
         },
       ]),
     );
@@ -2008,6 +2036,7 @@ export class OfertasService {
       partes.push(parteResuelta(oferta.nombre, parte.id!, 'FIJO', idElegido, parte.cantidad * unidades, cambio, info));
     }
 
+    const porParte: { parteId: string; productoId: string; n: number; sabores: Map<string, number> }[] = [];
     for (const parte of (oferta.combosParte ?? []).filter((p) => p.tipo === 'A_ELECCION')) {
       const picks = elecciones.filter((e) => String(e.parteId) === parte.id);
       const requeridas = parte.cantidad * unidades;
@@ -2027,7 +2056,7 @@ export class OfertasService {
           mensaje: `Elige exactamente ${requeridas} opción(es) para ${oferta.nombre}`,
         });
       }
-      const porProducto = new Map<string, number>();
+      const porProducto = new Map<string, { n: number; sabores: Map<string, number> }>();
       for (const pk of picks) {
         const id = String(pk.productoId);
         const prod = info.get(id);
@@ -2037,12 +2066,70 @@ export class OfertasService {
             mensaje: `${prod?.nombre ?? 'El producto elegido'} no es una opción de ${oferta.nombre}`,
           });
         }
-        if (!productoDisponible(prod)) throw noDisponible(`${prod.nombre} está agotado; elige otro`);
-        porProducto.set(id, (porProducto.get(id) ?? 0) + 1);
+        if (!productoDisponible(prod)) {
+          throw noDisponible(prod.controlaStock ? `No hay stock de ${prod.nombre}; elige otro` : `${prod.nombre} está agotado; elige otro`);
+        }
+        const g = porProducto.get(id) ?? { n: 0, sabores: new Map<string, number>() };
+        g.n += 1;
+        // Producto por sabor: cada unidad lleva su sabor (sin sabor no se puede descontar)
+        if (prod.controlaStock && (prod.sabores ?? []).length > 0) {
+          const saborId = String(pk.saborId ?? '');
+          if (!prod.sabores!.some((s) => s.id === saborId)) {
+            throw new BadRequestException({ codigo: 'SABORES_INVALIDOS', mensaje: `Elige el sabor de ${prod.nombre}` });
+          }
+          g.sabores.set(saborId, (g.sabores.get(saborId) ?? 0) + 1);
+        }
+        porProducto.set(id, g);
       }
-      for (const [id, n] of porProducto) {
-        partes.push(parteResuelta(oferta.nombre, parte.id!, 'A_ELECCION', id, n, null, info));
+      for (const [id, g] of porProducto) porParte.push({ parteId: parte.id!, productoId: id, n: g.n, sabores: g.sabores });
+    }
+
+    // Saldo: lo elegido en todas las partes suma por producto (y por sabor). Si no alcanza, no se arma el combo.
+    const totales = new Map<string, { n: number; sabores: Map<string, number> }>();
+    for (const x of porParte) {
+      const t = totales.get(x.productoId) ?? { n: 0, sabores: new Map<string, number>() };
+      t.n += x.n;
+      for (const [s, n] of x.sabores) t.sabores.set(s, (t.sabores.get(s) ?? 0) + n);
+      totales.set(x.productoId, t);
+    }
+    for (const [id, t] of totales) {
+      const prod = info.get(id)!;
+      if (!prod.controlaStock) continue;
+      if ((prod.sabores ?? []).length > 0) {
+        for (const [saborId, n] of t.sabores) {
+          const sab = prod.sabores!.find((s) => s.id === saborId)!;
+          const quedan = Math.max(0, Math.floor(sab.saldo));
+          if (!estaDisponible(sab.agotadoHasta)) {
+            throw new ConflictException({ codigo: 'SABOR_AGOTADO', mensaje: `El sabor ${sab.nombre} está agotado`, productoId: id, saborId, saborNombre: sab.nombre });
+          }
+          if (n > sab.saldo) {
+            throw new ConflictException({
+              codigo: 'STOCK_INSUFICIENTE',
+              mensaje: `Solo quedan ${quedan} de ${sab.nombre}`,
+              productoId: id,
+              saborId,
+              saborNombre: sab.nombre,
+              quedan,
+            });
+          }
+        }
+      } else if (t.n > (prod.saldo ?? 0)) {
+        const quedan = Math.max(0, Math.floor(prod.saldo ?? 0));
+        throw new ConflictException({ codigo: 'STOCK_INSUFICIENTE', mensaje: `Solo quedan ${quedan} de ${prod.nombre}`, productoId: id, quedan });
       }
+    }
+
+    for (const x of porParte) {
+      const prod = info.get(x.productoId)!;
+      const sabores = [...x.sabores].map(([saborId, cantidad]) => ({
+        saborId: BigInt(saborId),
+        nombre: prod.sabores?.find((s) => s.id === saborId)?.nombre ?? '',
+        cantidad,
+      }));
+      partes.push({
+        ...parteResuelta(oferta.nombre, x.parteId, 'A_ELECCION', x.productoId, x.n, null, info),
+        ...(sabores.length ? { sabores } : {}),
+      });
     }
 
     return { nota: cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '', partes };
@@ -2089,14 +2176,15 @@ export class OfertasService {
     }
     const filas = await this.prisma.producto.findMany({
       where: { OR: [{ id: { in: [...ids] } }, { categoria_id: { in: [...cats] } }] },
-      select: { id: true, nombre: true, categoria_id: true, oculto: true, agotado_hasta: true },
+      select: { id: true, nombre: true, categoria_id: true, oculto: true, agotado_hasta: true, ...SELECT_STOCK_COMBO },
     });
-    const productos: ProductoDisp[] = filas.map((f) => ({
+    const productos: ProductoDisp[] = filas.map((f: any) => ({
       id: f.id.toString(),
       nombre: f.nombre,
       categoriaId: f.categoria_id.toString(),
       oculto: f.oculto,
       agotadoHasta: f.agotado_hasta,
+      ...stockDeProducto(f),
     }));
     for (const c of combos) {
       const r = calcularDisponibilidadCombo(
@@ -2105,6 +2193,11 @@ export class OfertasService {
       );
       c.disponible = r.disponible;
       c.motivoAgotado = r.motivoAgotado;
+      // Sin armar por saldo: alguno de sus productos (o categorías) está en 0, no solo agotado a mano
+      const delCombo = productos.filter(
+        (x) => c.combosParte!.some((p) => [...p.productos, ...(p.reemplazos ?? [])].includes(x.id) || p.categorias.includes(x.categoriaId)),
+      );
+      c.sinStock = !r.disponible && delCombo.some((x) => x.controlaStock && !x.oculto && estaDisponible(x.agotadoHasta) && !productoDisponible(x));
       c.combosParte!.forEach((p, i) => {
         p.disponible = r.partes[i].disponible;
         p.opcionesDisponibles = r.partes[i].opcionesDisponibles;
@@ -2113,7 +2206,18 @@ export class OfertasService {
           // Lista explícita (p. ej. juguetes): cada opción con su nombre y si se puede elegir ahora
           p.opcionesDetalle = p.productos.map((id) => {
             const f = productos.find((x) => x.id === id);
-            return { id, nombre: f?.nombre ?? '', disponible: !!f && productoDisponible(f) };
+            const sabores = f?.controlaStock && (f.sabores ?? []).length > 0
+              ? f.sabores!.map((s) => ({
+                  id: s.id,
+                  nombre: s.nombre,
+                  disponible: saborDisponible(s),
+                  saldo: Math.max(0, Math.floor(s.saldo)),
+                }))
+              : undefined;
+            const disponible = !!f && productoDisponible(f);
+            // Bloqueada solo por saldo (no por ocultar ni agotar a mano): la carta dice «No hay stock»
+            const sinStock = !disponible && !!f && !f.oculto && estaDisponible(f.agotadoHasta) && !!f.controlaStock;
+            return { id, nombre: f?.nombre ?? '', disponible, ...(sinStock ? { sinStock } : {}), ...(sabores ? { sabores } : {}) };
           });
         }
       });

@@ -924,6 +924,26 @@ describe('PedidosService', () => {
         expect(ventas).toEqual([expect.objectContaining({ tipo: 'VENTA', producto_id: 20n, pedido_id: 100n })]);
         expect(Number(ventas[0].cantidad)).toBe(2);
       });
+
+      it('producto por sabor en una parte: el sabor sigue a la línea hija y descuenta el saldo de ese sabor', async () => {
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValue({
+          nota: '',
+          partes: [{ parteId: 11n, tipo: 'A_ELECCION', productoId: 20n, nombre: 'Dona', cantidad: 2, areaId: 2n, areaNombre: 'Salados', categoriaNombre: 'DONAS', nota: 'Combo: Cajita', sabores: [{ saborId: 501n, nombre: 'Fresa', cantidad: 2 }] }],
+        });
+        prismaMock.producto.findMany.mockImplementation(({ where }: any) =>
+          Promise.resolve(where?.controla_stock ? [{ id: 20n, nombre: 'Dona', sabores: [{ id: 501n, nombre: 'Fresa', activo: true, agotado_hasta: null }] }] : [mockProductoCafe]),
+        );
+        prismaMock.stockSabor = {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest.fn().mockResolvedValue({ cantidad: 5 }),
+        };
+        prismaMock.pedidoLineaSabor = { create: jest.fn().mockResolvedValue({}) };
+        await service.crear(dtoCajita(), 'key-combo-sabor', { canal: 'MOZO' });
+        expect(prismaMock.pedidoLineaSabor.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ pedido_linea_id: 50n, sabor_id: 501n, sabor_nombre: 'Fresa', cantidad: 2 }),
+        });
+        expect(prismaMock.stockSabor.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ sabor_id: 501n }) }));
+      });
     });
 
     describe('canje de puntos (DT-55)', () => {

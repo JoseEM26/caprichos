@@ -49,7 +49,7 @@ export interface AbrirPedidoMesaPayload {
     nota?: string;
     personas?: string[];
     ofertaId?: string;
-    comboElecciones?: { parteId: string; productoId: string }[];
+    comboElecciones?: { parteId: string; productoId: string; saborId?: string }[];
   }>;
   nota?: string;
   reservaId?: string;

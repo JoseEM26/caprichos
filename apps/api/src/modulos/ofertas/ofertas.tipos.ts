@@ -10,6 +10,16 @@ export interface ComboPrecioItem {
   precio: number;
 }
 
+/** Opción de una parte A_ELECCION con lista de productos. Producto por sabor: cada sabor con su saldo. */
+export interface OpcionDetalleCombo {
+  id: string;
+  nombre: string;
+  disponible: boolean;
+  /** Bloqueada por saldo 0 (producto o sabores), no por agotado a mano. */
+  sinStock?: boolean;
+  sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
+}
+
 export interface ComboParteItem {
   id?: string;
   tipo: TipoComboParte;
@@ -23,8 +33,8 @@ export interface ComboParteItem {
   disponible?: boolean;
   opcionesDisponibles?: string[];
   principalNombre?: string;
-  /** A_ELECCION con lista de productos: cada opción y si se puede elegir ahora (agotada = no). */
-  opcionesDetalle?: { id: string; nombre: string; disponible: boolean }[];
+  /** A_ELECCION con lista de productos: cada opción y si se puede elegir ahora (sin saldo = no). */
+  opcionesDetalle?: OpcionDetalleCombo[];
 }
 
 export interface OfertaItem {
@@ -62,6 +72,8 @@ export interface OfertaItem {
   /** Solo combos: se puede armar ahora (no cambia `activo`). */
   disponible?: boolean;
   motivoAgotado?: string | null;
+  /** Combo no armable porque sus productos se acabaron (saldo 0): la carta dice «No disponible», no «Agotado». */
+  sinStock?: boolean;
   categoriaNombre?: string | null;
   productoNombre?: string | null;
   vigenteAhora?: boolean;
@@ -166,6 +178,8 @@ export interface ParteResueltaCombo {
   categoriaNombre: string | null;
   /** Texto para la comanda: el cambio de reemplazo y «Combo: …». */
   nota: string;
+  /** Producto por sabor: unidades de cada sabor elegido (suman la cantidad de la parte). Sin sabor, no va. */
+  sabores?: { saborId: bigint; nombre: string; cantidad: number }[];
 }
 
 export interface ResolucionCombo {

@@ -19,6 +19,7 @@ import {
   notaReemplazos,
   partesConReemplazo,
   partesEleccion,
+  usosDeSabor,
 } from '../../../carta/ReemplazoCombo';
 import { SelectorEleccionCombo } from '../../../carta/SelectorEleccionCombo';
 import { etiquetaUltimos, infoStockDe, topeAgregable, topeTamano } from '../../../carta/stock';
@@ -790,6 +791,7 @@ export function VentanaOpcionesProducto({
               unidades={cantidad}
               valor={juguetes[parte.parteId] ?? {}}
               onCambio={(v) => setJuguetes((prev) => ({ ...prev, [parte.parteId]: v }))}
+              usos={usosDeSabor([], juguetes)}
             />
           ))}
 

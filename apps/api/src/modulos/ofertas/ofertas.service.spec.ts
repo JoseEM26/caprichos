@@ -479,6 +479,84 @@ describe('OfertasService', () => {
     });
   });
 
+  describe('resolverPartesCombo: stock heredado (donas y sabores del Dúo)', () => {
+    const combo = () => {
+      prismaMock.oferta.findUnique.mockResolvedValue({
+        id: 9n, tipo: 'COMBO', nombre: 'Combo Dúo Para Compartir', dias: [], canales: [], creado_en: new Date(),
+        combosPrecio: [],
+        combosParte: [{ id: 300n, tipo: 'A_ELECCION', cantidad: 2, categorias: [], productos: [40n, 41n, 42n], reemplazos: [] }],
+      });
+      const cat = { nombre: 'DONAS', area_id: 2n, area: { nombre: 'Dulces' } };
+      prismaMock.producto.findMany.mockResolvedValue([
+        // sin sabores: saldo del producto
+        { id: 40n, nombre: 'DONA GLASEADA', categoria_id: 7n, oculto: false, agotado_hasta: null, categoria: cat, controla_stock: true, stocks: [{ cantidad: 0 }], sabores: [] },
+        { id: 42n, nombre: 'KEKE', categoria_id: 7n, oculto: false, agotado_hasta: null, categoria: cat, controla_stock: true, stocks: [{ cantidad: 1 }], sabores: [] },
+        // con sabores: el saldo vive en cada sabor
+        {
+          id: 41n, nombre: 'DONA ARTESANAL', categoria_id: 7n, oculto: false, agotado_hasta: null, categoria: cat, controla_stock: true, stocks: [],
+          sabores: [
+            { id: 501n, nombre: 'Fresa', activo: true, agotado_hasta: null, stockSabor: { cantidad: 3 } },
+            { id: 502n, nombre: 'Oreo', activo: true, agotado_hasta: null, stockSabor: { cantidad: 0 } },
+          ],
+        },
+      ]);
+    };
+
+    it('una dona con saldo 0 no se puede elegir: 409 COMBO_PARTE_NO_DISPONIBLE «No hay stock»', async () => {
+      combo();
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '40' }, { parteId: '300', productoId: '42' }])).rejects.toMatchObject({
+        response: { codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje: 'No hay stock de DONA GLASEADA; elige otro' },
+        status: 409,
+      });
+    });
+
+    it('producto sin sabores: dos unidades con saldo 1 responde 409 STOCK_INSUFICIENTE (suma de las partes)', async () => {
+      combo();
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '42' }, { parteId: '300', productoId: '42' }])).rejects.toMatchObject({
+        response: { codigo: 'STOCK_INSUFICIENTE', quedan: 1 },
+        status: 409,
+      });
+    });
+
+    it('producto por sabor sin sabor elegido: 400 SABORES_INVALIDOS', async () => {
+      combo();
+      await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '41' }, { parteId: '300', productoId: '41' }])).rejects.toMatchObject({
+        response: { codigo: 'SABORES_INVALIDOS' },
+        status: 400,
+      });
+    });
+
+    it('sabor sin saldo no se puede repartir: 409 STOCK_INSUFICIENTE con el sabor', async () => {
+      combo();
+      await expect(
+        service.resolverPartesCombo(9, [{ parteId: '300', productoId: '41', saborId: '502' }, { parteId: '300', productoId: '41', saborId: '501' }]),
+      ).rejects.toMatchObject({ response: { codigo: 'STOCK_INSUFICIENTE', saborNombre: 'Oreo', quedan: 0 }, status: 409 });
+    });
+
+    it('dos donas del mismo sabor (2 de 3 Fresa) se aceptan y el sabor sale en la línea hija', async () => {
+      combo();
+      const res = await service.resolverPartesCombo(9, [
+        { parteId: '300', productoId: '41', saborId: '501' },
+        { parteId: '300', productoId: '41', saborId: '501' },
+      ]);
+      expect(res.partes).toEqual([expect.objectContaining({ productoId: 41n, cantidad: 2, sabores: [{ saborId: 501n, nombre: 'Fresa', cantidad: 2 }] })]);
+    });
+
+    it('elegir dos Fresa cuando solo hay 1 responde 409 STOCK_INSUFICIENTE', async () => {
+      combo();
+      prismaMock.producto.findMany.mockResolvedValue([
+        {
+          id: 41n, nombre: 'DONA ARTESANAL', categoria_id: 7n, oculto: false, agotado_hasta: null,
+          categoria: { nombre: 'DONAS', area_id: 2n, area: { nombre: 'Dulces' } }, controla_stock: true, stocks: [],
+          sabores: [{ id: 501n, nombre: 'Fresa', activo: true, agotado_hasta: null, stockSabor: { cantidad: 1 } }],
+        },
+      ]);
+      await expect(
+        service.resolverPartesCombo(9, [{ parteId: '300', productoId: '41', saborId: '501' }, { parteId: '300', productoId: '41', saborId: '501' }]),
+      ).rejects.toMatchObject({ response: { codigo: 'STOCK_INSUFICIENTE', quedan: 1, saborNombre: 'Fresa' }, status: 409 });
+    });
+  });
+
   describe('Cupones', () => {
     it('exige tope de usos obligatorio si el modo es COMPARTIDO (RN-CAP-134 / RQ-OFE-03-02)', async () => {
       await expect(

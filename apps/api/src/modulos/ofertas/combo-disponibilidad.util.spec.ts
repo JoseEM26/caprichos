@@ -1,6 +1,6 @@
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 
-import { calcularDisponibilidadCombo, ParteDisp, ProductoDisp } from './combo-disponibilidad.util';
+import { calcularDisponibilidadCombo, ParteDisp, ProductoDisp, productoDisponible, SaborDisp } from './combo-disponibilidad.util';
 
 const futuro = new Date(Date.now() + 3600_000);
 const prod = (id: string, extra: Partial<ProductoDisp> = {}): ProductoDisp => ({
@@ -47,5 +47,37 @@ describe('calcularDisponibilidadCombo', () => {
     const parte: ParteDisp = { tipo: 'A_ELECCION', cantidad: 2, categorias: ['1'], productos: [], reemplazos: [] };
     expect(calcularDisponibilidadCombo([parte], [prod('1'), prod('2', { categoriaId: '9' })]).disponible).toBe(true);
     expect(calcularDisponibilidadCombo([parte], [prod('1', { agotadoHasta: futuro }), prod('2', { categoriaId: '9' })]).disponible).toBe(false);
+  });
+
+  describe('stock heredado', () => {
+    const sabor = (id: string, saldo: number, extra: Partial<SaborDisp> = {}): SaborDisp => ({
+      id, nombre: `S${id}`, activo: true, agotadoHasta: null, saldo, ...extra,
+    });
+
+    it('producto que controla stock con saldo 0 no está disponible; con saldo, sí', () => {
+      expect(productoDisponible(prod('1', { controlaStock: true, saldo: 0 }))).toBe(false);
+      expect(productoDisponible(prod('1', { controlaStock: true, saldo: 2 }))).toBe(true);
+    });
+
+    it('producto por sabor: disponible si algún sabor activo tiene saldo', () => {
+      expect(productoDisponible(prod('1', { controlaStock: true, sabores: [sabor('a', 0), sabor('b', 1)] }))).toBe(true);
+      expect(productoDisponible(prod('1', { controlaStock: true, sabores: [sabor('a', 0), sabor('b', 0, { activo: false })] }))).toBe(false);
+    });
+
+    it('sin control de stock el saldo no cuenta (bebidas y empanada no cambian)', () => {
+      expect(productoDisponible(prod('1', { controlaStock: false, saldo: 0 }))).toBe(true);
+    });
+
+    it('UNA_DE de donas en 0 no deja elegir y la parte sin opciones deja el combo sin disponibilidad', () => {
+      const parte: ParteDisp = { tipo: 'UNA_DE', cantidad: 1, categorias: [], productos: ['1'], reemplazos: [] };
+      const r = calcularDisponibilidadCombo([parte], [prod('1', { controlaStock: true, saldo: 0 })]);
+      expect(r.disponible).toBe(false);
+      expect(r.motivoAgotado).toBe('Falta una de las opciones');
+    });
+
+    it('FIJO con principal sin stock usa el reemplazo con saldo', () => {
+      const r = calcularDisponibilidadCombo([fijo(['11'])], [prod('10', { controlaStock: true, saldo: 0 }), prod('11', { controlaStock: true, saldo: 4 })]);
+      expect(r.partes[0].opcionesDisponibles).toEqual(['11']);
+    });
   });
 });

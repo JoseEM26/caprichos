@@ -95,9 +95,9 @@ export function TarjetaOferta({
   // Vigencia
   const aplicaHoy = oferta.vigenteAhora !== false;
   // Combo sin con qué armarse (principal y reemplazos agotados): se ve agotado y no se puede agregar
-  const agotado = oferta.tipo === 'COMBO' && oferta.disponible === false;
-  // Desactivada (visible_carta = «Mostrar como No disponible»): se ve, pero no se puede pedir
-  const noDisponible = oferta.activo === false;
+  const agotado = oferta.tipo === 'COMBO' && oferta.disponible === false && oferta.sinStock !== true;
+  // Desactivada (visible_carta = «Mostrar como No disponible»), o armable solo con productos sin saldo: no se puede pedir
+  const noDisponible = oferta.activo === false || (oferta.tipo === 'COMBO' && oferta.sinStock === true);
   const sinPedir = agotado || noDisponible;
 
   const cardDir = movil ? 'row' : 'column';

@@ -1,4 +1,4 @@
-import type { OfertaItem } from '../admin/ofertas/ofertasApi';
+import type { ComboParteItem, OfertaItem } from '../admin/ofertas/ofertasApi';
 import { Reparto, totalElegido } from '../comun/saboresMezcla';
 
 export interface ParteConReemplazo {
@@ -50,6 +50,7 @@ export function notaReemplazos(partes: ParteConReemplazo[], elegidos: Record<str
 export interface ComboEleccion {
   parteId: string;
   productoId: string;
+  saborId?: string;
 }
 
 /** Partes A_ELECCION con lista de productos (p. ej. juguetes): el cliente elige cuántas de cada una. */
@@ -57,8 +58,14 @@ export interface ParteEleccion {
   parteId: string;
   /** Opciones por combo: el servidor exige cantidad × unidades elegidas. */
   cantidad: number;
-  opciones: { id: string; nombre: string; disponible: boolean }[];
+  opciones: NonNullable<ComboParteItem['opcionesDetalle']>;
 }
+
+/**
+ * Clave del contador de una opción en el reparto de una parte. Producto normal: «productoId». Producto por sabor:
+ * «productoId|saborId» (cada unidad lleva su sabor, como en la mezcla de sabores de la carta).
+ */
+export const claveSabor = (productoId: string, saborId: string): string => `${productoId}|${saborId}`;
 
 export function partesEleccion(oferta: OfertaItem | null): ParteEleccion[] {
   if (!oferta) return [];
@@ -78,11 +85,35 @@ export function eleccionesCombo(
     .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.productos?.[0] !== undefined)
     .map((p) => ({ parteId: String(p.id), productoId: elegidos[String(p.id)] ?? String(p.productos![0]) }));
   const eleccion = partesEleccion(oferta).flatMap((parte) =>
-    Object.entries(juguetes[parte.parteId] ?? {}).flatMap(([productoId, n]) =>
-      Array.from({ length: n }, () => ({ parteId: parte.parteId, productoId })),
-    ),
+    Object.entries(juguetes[parte.parteId] ?? {}).flatMap(([clave, n]) => {
+      const [productoId, saborId] = clave.split('|');
+      return Array.from({ length: n }, () => ({ parteId: parte.parteId, productoId, ...(saborId ? { saborId } : {}) }));
+    }),
   );
   return [...fijas, ...eleccion];
+}
+
+/**
+ * Unidades ya comprometidas por sabor (id del sabor → unidades): lo que eligen las partes del combo que se está
+ * armando, más lo que ya hay en el carrito (líneas con sabores y elecciones de otros combos). Sirve para que el +
+ * de un sabor nunca supere su saldo.
+ */
+export function usosDeSabor(
+  lineas: { sabores?: { saborId: string; cantidad: number }[]; comboElecciones?: { saborId?: string }[] }[],
+  juguetes: Record<string, Reparto>,
+): Record<string, number> {
+  const usos: Record<string, number> = {};
+  const sumar = (saborId: string | undefined, n: number) => {
+    if (saborId) usos[saborId] = (usos[saborId] ?? 0) + n;
+  };
+  for (const l of lineas) {
+    for (const s of l.sabores ?? []) sumar(String(s.saborId), s.cantidad);
+    for (const e of l.comboElecciones ?? []) sumar(e.saborId, 1);
+  }
+  for (const reparto of Object.values(juguetes)) {
+    for (const [clave, n] of Object.entries(reparto)) sumar(clave.split('|')[1], n);
+  }
+  return usos;
 }
 
 /** Falta (o sobra) elegir en alguna parte A_ELECCION: hay que elegir cantidad × unidades exactas. */

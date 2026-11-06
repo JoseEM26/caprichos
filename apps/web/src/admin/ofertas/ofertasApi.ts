@@ -23,8 +23,15 @@ export interface ComboParteItem {
   disponible?: boolean;
   opcionesDisponibles?: string[];
   principalNombre?: string;
-  /** A_ELECCION con lista (juguetes): cada opción y si se puede elegir ahora */
-  opcionesDetalle?: { id: string; nombre: string; disponible: boolean }[];
+  /** A_ELECCION con lista (juguetes): cada opción y si se puede elegir ahora. Producto por sabor: cada sabor con su saldo. */
+  opcionesDetalle?: {
+    id: string;
+    nombre: string;
+    disponible: boolean;
+    /** Bloqueada por saldo 0 (se muestra «No hay stock») */
+    sinStock?: boolean;
+    sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
+  }[];
 }
 
 export interface LlevaPagaConfig {
@@ -88,6 +95,8 @@ export interface OfertaItem {
   /** Combo: se puede armar ahora (calculado; no cambia `activo`) */
   disponible?: boolean;
   motivoAgotado?: string | null;
+  /** Combo no armable por saldo 0 de sus productos: se muestra «No disponible». */
+  sinStock?: boolean;
   combosPartes?: ComboParteItem[];
   llevaPaga?: LlevaPagaConfig | null;
 }

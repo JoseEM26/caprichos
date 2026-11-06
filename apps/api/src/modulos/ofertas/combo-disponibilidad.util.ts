@@ -1,5 +1,14 @@
 import { estaDisponible } from '../catalogo/catalogo.service';
 
+/** Sabor de un producto por sabor, con su saldo (stock_sabor). */
+export interface SaborDisp {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  agotadoHasta: Date | string | null;
+  saldo: number;
+}
+
 /** Producto mínimo que necesita el cálculo (todo como texto para no depender de bigint). */
 export interface ProductoDisp {
   id: string;
@@ -7,6 +16,12 @@ export interface ProductoDisp {
   categoriaId: string;
   oculto: boolean;
   agotadoHasta: Date | string | null;
+  /** Controla stock (producto terminado): con saldo 0 la elección queda bloqueada. */
+  controlaStock?: boolean;
+  /** Saldo del producto sin sabores. */
+  saldo?: number;
+  /** Sabores activos del producto: con sabores, el saldo vive en cada sabor. */
+  sabores?: SaborDisp[];
 }
 
 export interface ParteDisp {
@@ -32,9 +47,20 @@ export interface ComboDisponibilidad {
   partes: ParteDisponibilidad[];
 }
 
-/** Disponible = ni oculto (desactivado) ni agotado. */
+/** Sabor disponible = activo, no agotado y con saldo. */
+export function saborDisponible(s: SaborDisp): boolean {
+  return s.activo && estaDisponible(s.agotadoHasta) && s.saldo > 0;
+}
+
+/**
+ * Disponible = ni oculto (desactivado) ni agotado; si controla stock, además con saldo: un producto por sabor
+ * necesita algún sabor con saldo, uno sin sabores necesita saldo > 0. Sin stock controlado, no cambia.
+ */
 export function productoDisponible(p: ProductoDisp | undefined): boolean {
-  return !!p && !p.oculto && estaDisponible(p.agotadoHasta);
+  if (!p || p.oculto || !estaDisponible(p.agotadoHasta)) return false;
+  if (!p.controlaStock) return true;
+  if ((p.sabores ?? []).length > 0) return (p.sabores ?? []).some(saborDisponible);
+  return (p.saldo ?? 0) > 0;
 }
 
 /**

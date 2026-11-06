@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { Reparto, totalElegido } from '../comun/saboresMezcla';
-import type { ParteEleccion } from './ReemplazoCombo';
+import { claveSabor, type ParteEleccion } from './ReemplazoCombo';
 
 interface Props {
   parte: ParteEleccion;
@@ -9,6 +9,8 @@ interface Props {
   valor: Reparto;
   onCambio: (valor: Reparto) => void;
   deshabilitar?: boolean;
+  /** Unidades ya comprometidas por sabor (este combo + carrito): el + de un sabor nunca supera su saldo. */
+  usos?: Record<string, number>;
 }
 
 const boton: CSSProperties = {
@@ -28,7 +30,7 @@ const boton: CSSProperties = {
  * Elegir las opciones de una parte del combo (p. ej. «2 juguetes»): un contador por opción, sin repetir
  * más de lo elegido en total. Las opciones agotadas se ven, pero no se pueden elegir.
  */
-export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshabilitar = false }: Props) {
+export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshabilitar = false, usos = {} }: Props) {
   const total = parte.cantidad * unidades;
   const elegidas = totalElegido(valor);
   const faltan = Math.max(0, total - elegidas);
@@ -40,6 +42,50 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
     else delete nuevo[id];
     onCambio(nuevo);
   };
+
+  // Una fila: nombre (con aviso si no hay stock), y −, cantidad, + (el + solo si puedeMas)
+  const fila = (clave: string, etiqueta: string, cantidad: number, disponible: boolean, puedeMas: boolean, aviso: string | null, indentada = false) => (
+    <div
+      key={clave}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        minHeight: 48,
+        opacity: disponible ? 1 : 0.5,
+        paddingLeft: indentada ? 12 : 0,
+      }}
+    >
+      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--cp-navy)' }}>
+        {etiqueta}
+        {aviso && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--cp-rust)' }}>{aviso}</span>}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          type="button"
+          aria-label={`Quitar ${etiqueta}`}
+          onClick={() => fijar(clave, cantidad - 1)}
+          disabled={deshabilitar || cantidad === 0}
+          style={{ ...boton, opacity: cantidad === 0 ? 0.4 : 1 }}
+        >
+          −
+        </button>
+        <span aria-label={`Cantidad de ${etiqueta}`} style={{ minWidth: 24, textAlign: 'center', fontWeight: 800 }}>
+          {cantidad}
+        </span>
+        <button
+          type="button"
+          aria-label={`Agregar ${etiqueta}`}
+          onClick={() => fijar(clave, cantidad + 1)}
+          disabled={!puedeMas}
+          style={{ ...boton, opacity: puedeMas ? 1 : 0.4 }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -62,42 +108,25 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
       </div>
 
       {parte.opciones.map((o) => {
+        if (o.sabores && o.sabores.length > 0) {
+          // Producto por sabor: un contador por sabor; el + no supera el saldo del sabor (ni lo que ya va en el combo o carrito)
+          return (
+            <div key={o.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--cp-navy)' }}>{o.nombre}</span>
+              {o.sabores.map((s) => {
+                const clave = claveSabor(o.id, s.id);
+                const cantidad = valor[clave] ?? 0;
+                const restan = s.saldo - (usos[s.id] ?? 0);
+                const puedeMas = !deshabilitar && s.disponible && elegidas < total && restan > 0;
+                const sinStock = !s.disponible || (restan <= 0 && cantidad === 0);
+                return fila(clave, `${o.nombre} · ${s.nombre}`, cantidad, !sinStock, puedeMas, sinStock ? 'No hay stock' : null, true);
+              })}
+            </div>
+          );
+        }
         const cantidad = valor[o.id] ?? 0;
         const puedeMas = !deshabilitar && o.disponible && elegidas < total;
-        return (
-          <div
-            key={o.id}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 48, opacity: o.disponible ? 1 : 0.5 }}
-          >
-            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--cp-navy)' }}>
-              {o.nombre}
-              {!o.disponible && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--cp-rust)' }}>Agotado</span>}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button
-                type="button"
-                aria-label={`Quitar ${o.nombre}`}
-                onClick={() => fijar(o.id, cantidad - 1)}
-                disabled={deshabilitar || cantidad === 0}
-                style={{ ...boton, opacity: cantidad === 0 ? 0.4 : 1 }}
-              >
-                −
-              </button>
-              <span aria-label={`Cantidad de ${o.nombre}`} style={{ minWidth: 24, textAlign: 'center', fontWeight: 800 }}>
-                {cantidad}
-              </span>
-              <button
-                type="button"
-                aria-label={`Agregar ${o.nombre}`}
-                onClick={() => fijar(o.id, cantidad + 1)}
-                disabled={!puedeMas}
-                style={{ ...boton, opacity: puedeMas ? 1 : 0.4 }}
-              >
-                +
-              </button>
-            </div>
-          </div>
-        );
+        return fila(o.id, o.nombre, cantidad, o.disponible, puedeMas, o.disponible ? null : o.sinStock ? 'No hay stock' : 'Agotado');
       })}
     </div>
   );

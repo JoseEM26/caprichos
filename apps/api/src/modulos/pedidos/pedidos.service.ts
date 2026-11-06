@@ -918,7 +918,7 @@ export class PedidosService {
         // Partes del combo: una línea hija por producto, sin cobro (el precio ya va en la madre)
         for (const parte of lin.partesCombo) {
           const esBebidaParte = esBebidaPorNombres(parte.categoriaNombre ?? undefined, parte.areaNombre ?? undefined);
-          await tx.pedidoLinea.create({
+          const hija = await tx.pedidoLinea.create({
             data: {
               pedido_id: pedido.id,
               producto_id: parte.productoId,
@@ -934,6 +934,12 @@ export class PedidosService {
               nota: parte.nota,
             },
           });
+          // Producto por sabor de la parte: sus sabores siguen a la línea hija (igual que en una línea normal)
+          for (const sb of parte.sabores ?? []) {
+            await tx.pedidoLineaSabor.create({
+              data: { pedido_linea_id: hija.id, sabor_id: sb.saborId, sabor_nombre: sb.nombre, cantidad: sb.cantidad },
+            });
+          }
         }
 
         for (const op of lin.opciones) {
@@ -970,7 +976,12 @@ export class PedidosService {
             .filter((l) => !l.contenedora)
             .map((l) => ({ productoId: l.productoId, cantidad: l.cantidad * (l.unidadesTamano ?? 1), areaId: l.areaId, sabores: l.sabores })),
           ...lineasCalculadas.flatMap((l) =>
-            l.partesCombo.map((p: ParteResueltaCombo) => ({ productoId: p.productoId, cantidad: p.cantidad, areaId: p.areaId })),
+            l.partesCombo.map((p: ParteResueltaCombo) => ({
+              productoId: p.productoId,
+              cantidad: p.cantidad,
+              areaId: p.areaId,
+              sabores: p.sabores,
+            })),
           ),
         ],
         pedido.party_id ?? BigInt(1),

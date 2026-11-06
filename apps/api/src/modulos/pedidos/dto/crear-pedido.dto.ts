@@ -78,10 +78,10 @@ export class LineaPedidoDto {
   @IsOptional()
   ofertaId?: number | string | null;
 
-  /** Combo con parte fija: qué producto se eligió (principal o reemplazo). El servidor valida que esté disponible. */
+  /** Combo: qué producto se eligió en cada parte (una entrada por unidad). Producto por sabor: el sabor de esa unidad. El servidor valida disponibilidad y saldo. */
   @IsOptional()
   @IsArray({ message: 'comboElecciones debe ser una lista' })
-  comboElecciones?: { parteId: number | string; productoId: number | string }[];
+  comboElecciones?: { parteId: number | string; productoId: number | string; saborId?: number | string }[];
 
   @IsInt({ message: 'La cantidad debe ser un entero' })
   @Min(1, { message: 'La cantidad mínima es 1' })

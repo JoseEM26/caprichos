@@ -19,6 +19,7 @@ import {
   notaReemplazos,
   partesConReemplazo,
   partesEleccion,
+  usosDeSabor,
 } from './ReemplazoCombo';
 import { SelectorEleccionCombo } from './SelectorEleccionCombo';
 
@@ -74,6 +75,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
   const [cantidad, setCantidad] = useState(1);
   const elecciones = eleccionesCombo(oferta, reemplazos, juguetes);
+  // Saldo por sabor ya comprometido (este combo y el carrito): el + de cada sabor no lo supera
+  const usosSabor = usosDeSabor(lineas, juguetes);
   const [nombres, setNombres] = useState<string[]>([]);
   const [avisoNombres, setAvisoNombres] = useState(false);
   const [nota, setNota] = useState('');
@@ -381,6 +384,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   valor={juguetes[parte.parteId] ?? {}}
                   onCambio={(v) => setJuguetes((prev) => ({ ...prev, [parte.parteId]: v }))}
                   deshabilitar={soloLectura}
+                  usos={usosSabor}
                 />
               ))}
 

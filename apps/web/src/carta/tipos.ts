@@ -168,7 +168,7 @@ export interface LineaCarrito {
   personas?: string[];
   /** Combo con parte fija: el combo y qué producto se eligió en cada parte (principal o reemplazo) */
   ofertaId?: string;
-  comboElecciones?: { parteId: string; productoId: string }[];
+  comboElecciones?: { parteId: string; productoId: string; saborId?: string }[];
   unidades?: UnidadPersonalizada[];
   /** Mezcla de sabores: unidades que reparte cada media docena o docena (del tamaño elegido). */
   unidadesPorMezcla?: number;
