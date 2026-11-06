@@ -24,7 +24,7 @@ describe('PanelRepartidores', () => {
   it('muestra libre, ocupado con 2/3, sin tomar y resumen', () => {
     render(<PanelRepartidores panel={panel} config={CONFIG_REPARTO_DEFECTO} alAbrir={() => {}} />);
     expect(screen.getByText(/1 repartidores libres · 1 ocupados · 1 pedidos sin tomar/)).toBeTruthy();
-    expect(screen.getByText('LIBRE')).toBeTruthy();
+    expect(screen.getByText('Libre · Sin pedidos')).toBeTruthy();
     expect(screen.getByText('OCUPADO (2)')).toBeTruthy();
     expect(screen.getByText('2/3')).toBeTruthy();
     expect(screen.getByText(/Efectivo por rendir: S\/ 70.00/)).toBeTruthy();

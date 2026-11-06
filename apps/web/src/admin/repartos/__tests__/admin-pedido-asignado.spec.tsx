@@ -109,9 +109,9 @@ describe('Administrador con un pedido asignado a sí mismo (panel de Repartos)',
   });
 
   it('Tomar pedido pide "¿Seguro que quieres tomar este pedido?" con Sí/No; No no toma el pedido', async () => {
-    render(<TarjetaReparto pedido={pedidoBase({ estado: 'LISTO', repartidor_party_id: null })} esDisponible alActualizar={() => {}} />);
+    render(<TarjetaReparto pedido={pedidoBase({ estado: 'LISTO', repartidor_party_id: null })} esDisponible puedeTomar alActualizar={() => {}} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tomar pedido' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tomar como repartidor' }));
 
     expect(screen.getByText('¿Seguro que quieres tomar este pedido?')).toBeInTheDocument();
     expect(screen.getByText(/Quedará asignado a ti/)).toBeInTheDocument();
@@ -122,9 +122,9 @@ describe('Administrador con un pedido asignado a sí mismo (panel de Repartos)',
   });
 
   it('Tomar pedido con Sí/Confirmar llama a la API con el id del pedido', async () => {
-    render(<TarjetaReparto pedido={pedidoBase({ estado: 'LISTO', repartidor_party_id: null })} esDisponible alActualizar={() => {}} />);
+    render(<TarjetaReparto pedido={pedidoBase({ estado: 'LISTO', repartidor_party_id: null })} esDisponible puedeTomar alActualizar={() => {}} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tomar pedido' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tomar como repartidor' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, confirmar' }));
 
     await waitFor(() => expect(repartosApi.tomarPedido).toHaveBeenCalledWith('501'));

@@ -26,6 +26,12 @@ import { SaltarPedidoDto } from './dto/saltar-pedido.dto';
 import { TomarRutaDto } from './dto/tomar-ruta.dto';
 import { TomarRutaSugeridaDto } from './dto/tomar-ruta-sugerida.dto';
 
+/** Lecturas del seguimiento: las ve quien reparte (ver) y quien solo sigue el delivery (seguir). */
+const VER_O_SEGUIR = [
+    { modulo: 'repartos', accion: 'ver' },
+    { modulo: 'repartos', accion: 'seguir' },
+  ];
+
 @Controller('admin/repartos')
 @UseGuards(AccesoGuard)
 export class RepartosController {
@@ -35,7 +41,7 @@ export class RepartosController {
   ) {}
 
   @Get('config')
-  @Permiso('repartos', 'ver')
+  @Permiso(VER_O_SEGUIR)
   async obtenerConfig() {
     return this.repartosService.obtenerConfig();
   }
@@ -51,7 +57,7 @@ export class RepartosController {
   }
 
   @Get('zonas')
-  @Permiso('repartos', 'ver')
+  @Permiso(VER_O_SEGUIR)
   async listarZonas() {
     return this.repartosService.listarZonas();
   }
@@ -79,7 +85,7 @@ export class RepartosController {
 
   /** Rutas de cualquier repartidor para caja/admin; si lo llama un repartidor ve solo las suyas. */
   @Get('rutas')
-  @Permiso('repartos', 'ver')
+  @Permiso(VER_O_SEGUIR)
   async listarRutas(@Query() filtros: FiltrarRutasDto, @Req() req: any) {
     return this.repartosService.listarRutas(filtros, req.usuario);
   }
@@ -130,9 +136,16 @@ export class RepartosController {
 
   /** Panel de repartidores para caja y admin: el REPARTIDOR recibe 403 (lo valida el servicio). */
   @Get('panel')
-  @Permiso('repartos', 'ver')
+  @Permiso(VER_O_SEGUIR)
   async panelRepartidores(@Req() req: any) {
     return this.repartosService.obtenerPanelRepartidores(req.usuario);
+  }
+
+  /** Todos los pedidos delivery de hoy en cualquier estado, para el seguimiento (nunca REPARTIDOR). */
+  @Get('seguimiento')
+  @Permiso(VER_O_SEGUIR)
+  async seguimiento(@Req() req: any) {
+    return this.repartosService.listarSeguimiento(req.usuario);
   }
 
   @Get(':id/mensajes')
@@ -144,7 +157,7 @@ export class RepartosController {
   }
 
   @Get()
-  @Permiso('repartos', 'ver')
+  @Permiso(VER_O_SEGUIR)
   async listarTodos(@Query() filtros: FiltrarRepartosDto, @Req() req: any) {
     return this.repartosService.listarTodos(filtros, req.usuario);
   }

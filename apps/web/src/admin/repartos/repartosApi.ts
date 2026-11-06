@@ -175,6 +175,8 @@ export type EtapaReparto = 'TOMADO' | 'EN_CAMINO' | 'LLEGADO';
 export interface RepartidorPanel {
   party_id: string;
   nombre: string;
+  /** El administrador que tomó pedidos: reparte como uno más (su nombre lleva «(admin)»). */
+  es_admin?: boolean;
   libre: boolean;
   pedidos: Array<PedidoReparto & { etapa: EtapaReparto }>;
   efectivo_por_rendir: number;
@@ -187,6 +189,19 @@ export interface PanelRepartidores {
   resumen: { repartidores_libres: number; repartidores_ocupados: number; pedidos_sin_tomar: number };
   repartidores: RepartidorPanel[];
   sin_tomar: PedidoReparto[];
+}
+
+export type SeccionSeguimiento = 'ESPERANDO' | 'PREPARACION' | 'EN_CAMINO' | 'ENTREGADOS' | 'INCIDENTE';
+
+/** Pedido delivery de hoy en cualquier estado, con su sección y quién lo lleva. */
+export interface PedidoSeguimiento extends PedidoReparto {
+  seccion: SeccionSeguimiento;
+  etapa: EtapaReparto | null;
+}
+
+export interface Seguimiento {
+  generado_en: string;
+  pedidos: PedidoSeguimiento[];
 }
 
 export interface PedidoPerdido {
@@ -335,6 +350,8 @@ export const repartosApi = {
     api.get<ResumenRepartos>('/admin/repartos/resumen'),
 
   obtenerPanel: () => api.get<PanelRepartidores>('/admin/repartos/panel'),
+
+  obtenerSeguimiento: () => api.get<Seguimiento>('/admin/repartos/seguimiento'),
 
   obtenerChat: (pedidoId: string) =>
     api.get<ChatRepartidor>(`/admin/repartos/${pedidoId}/chat/mensajes`),

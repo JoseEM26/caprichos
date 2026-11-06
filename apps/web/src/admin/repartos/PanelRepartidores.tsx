@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { clasificarEspera, ConfigReparto } from './calculoRuta';
 import { nombreClienteVisible } from './textoVisible';
 import type { PanelRepartidores as Panel, PedidoReparto, EtapaReparto } from './repartosApi';
@@ -91,12 +93,27 @@ export function PanelRepartidores({
   alAbrir: (id: string) => void;
 }) {
   const { resumen } = panel;
+  // Filtro opcional: un repartidor real (de la lista del servidor); «todos» muestra a todos
+  const [filtro, setFiltro] = useState('todos');
+  const visibles = filtro === 'todos' ? panel.repartidores : panel.repartidores.filter((r) => r.party_id === filtro);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <p style={{ margin: 0, fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }} aria-live="polite">
         {resumen.repartidores_libres} repartidores libres · {resumen.repartidores_ocupados} ocupados ·{' '}
         {resumen.pedidos_sin_tomar} pedidos sin tomar
       </p>
+      <BarraFiltros role="group" aria-label="Filtrar por repartidor">
+        <FiltroCombo
+          etiqueta="Repartidor"
+          valor={filtro}
+          valorPorDefecto="todos"
+          opciones={[
+            { valor: 'todos', etiqueta: 'Todos los repartidores' },
+            ...panel.repartidores.map((r) => ({ valor: r.party_id, etiqueta: r.nombre })),
+          ]}
+          alCambiar={setFiltro}
+        />
+      </BarraFiltros>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14, alignItems: 'start' }}>
         <section style={{ ...tarjeta, borderColor: 'var(--cp-orange, #E67929)' }} aria-label="Sin tomar">
           <h3 style={{ margin: 0, fontSize: 16, color: 'var(--cp-rust, #B2500F)' }}>
@@ -110,7 +127,7 @@ export function PanelRepartidores({
               .map((p) => <FilaPedido key={p.id} p={p} etapa={null} config={config} alAbrir={alAbrir} />)
           )}
         </section>
-        {panel.repartidores.map((r) => (
+        {visibles.map((r) => (
           <section key={r.party_id} style={tarjeta} aria-label={`Repartidor ${r.nombre}`}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
               <h3 style={{ margin: 0, fontSize: 16, color: 'var(--cp-navy, #0B2C3E)' }}>{r.nombre}</h3>
@@ -125,7 +142,7 @@ export function PanelRepartidores({
                 color: r.libre ? '#2E8B57' : 'var(--cp-orange, #E67929)',
               }}
             >
-              {r.libre ? 'LIBRE' : `OCUPADO (${r.pedidos.length})`}
+              {r.libre ? 'Libre · Sin pedidos' : `OCUPADO (${r.pedidos.length})`}
             </strong>
             {r.pedidos.map((p) => (
               <FilaPedido key={p.id} p={p} etapa={p.etapa} config={config} alAbrir={alAbrir} />

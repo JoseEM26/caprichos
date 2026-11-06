@@ -174,24 +174,17 @@ describe('Cocina', () => {
 });
 
 describe('Repartos', () => {
-  it('recarga los pedidos LISTO y las rutas con reparto:rutas', async () => {
-    const disp = vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValue([]);
-    vi.spyOn(repartosApi, 'obtenerResumen').mockResolvedValue(null as any);
-    vi.spyOn(repartosApi, 'listarMios').mockResolvedValue({ pedidos: [], orden: [], paso: [], ruta: [] } as any);
-    vi.spyOn(repartosApi, 'listarTodos').mockResolvedValue([]);
+  it('recarga el seguimiento y el panel con reparto:rutas', async () => {
+    const seg = vi.spyOn(repartosApi, 'obtenerSeguimiento').mockResolvedValue({ generado_en: '', pedidos: [] });
+    vi.spyOn(repartosApi, 'obtenerPanel').mockResolvedValue(null as any);
     vi.spyOn(repartosApi, 'obtenerConfig').mockResolvedValue(null as any);
     vi.spyOn(repartosApi, 'obtenerZonasPoligonos').mockResolvedValue(null as any);
-    const rutas = vi.spyOn(repartosApi, 'listarRutasSugeridas').mockResolvedValue({ opciones: [], sinUbicacion: [], cupo: 0 } as any);
 
     render(<MemoryRouter><RepartosView /></MemoryRouter>);
-    await waitFor(() => expect(disp).toHaveBeenCalled());
-    const d0 = disp.mock.calls.length;
-    const r0 = rutas.mock.calls.length;
+    await waitFor(() => expect(seg).toHaveBeenCalled());
+    const s0 = seg.mock.calls.length;
 
     act(() => fake.emitir('reparto:rutas', {}));
-    await waitFor(() => {
-      expect(disp.mock.calls.length).toBeGreaterThan(d0);
-      expect(rutas.mock.calls.length).toBeGreaterThan(r0);
-    });
+    await waitFor(() => expect(seg.mock.calls.length).toBeGreaterThan(s0));
   });
 });
