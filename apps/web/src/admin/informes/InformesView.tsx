@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { api } from '../../comun/api';
+import { cortesiasApi } from '../cortesias/cortesiasApi';
+import { filasInformeCortesias } from '../cortesias/informeCortesias';
 
 interface ReporteItem {
   id: string;
@@ -41,6 +43,7 @@ const CATALOGO_INICIAL: ReporteItem[] = [
   { id: 'medios', nombre: 'Caja por medio de pago', categoria: 'Caja', queResponde: 'Por día: efectivo, Yape, Plin, transferencia, tarjeta y otros lado a lado.', filtrosTexto: 'Fecha, caja', exportaTexto: 'PDF · Excel', kpiClave: 'Digital', kpiValor: '-', filasTotal: 0 },
   { id: 'arqueo', nombre: 'Arqueo y diferencias', categoria: 'Caja', queResponde: 'Solo los cierres donde faltó o sobró efectivo, con la explicación que dejó el cajero.', filtrosTexto: 'Fecha, caja', exportaTexto: 'PDF', kpiClave: 'Cierres con diferencia', kpiValor: '-', filasTotal: 0 },
   { id: 'cobrar', nombre: 'Pendiente de cobro', categoria: 'Caja', queResponde: 'Pedidos aceptados que todavía no se cobraron, con su método de pago.', filtrosTexto: 'Canal, estado', exportaTexto: 'PDF · Excel', kpiClave: 'Pedidos sin cobrar', kpiValor: '-', filasTotal: 0 },
+  { id: 'cortesias', nombre: 'Cortesías', categoria: 'Ventas', queResponde: 'Lo regalado a costo 0: por motivo, por producto y por quién la dio, con su valor de lista.', filtrosTexto: 'Fecha', exportaTexto: 'Excel', kpiClave: 'Valor de lista regalado', kpiValor: '-', filasTotal: 0 },
   { id: 'stockbajo', nombre: 'Stock bajo', categoria: 'Inventario', queResponde: 'Insumos por debajo del mínimo: cuánto hay en almacén y cocina, y cuánto falta.', filtrosTexto: 'Almacén', exportaTexto: 'PDF · Excel', kpiClave: 'Insumos bajo el mínimo', kpiValor: '-', filasTotal: 0, sinFecha: true },
   { id: 'kardex', nombre: 'Kardex de insumos', categoria: 'Inventario', queResponde: 'Entradas, salidas y mermas más recientes, con origen y destino.', filtrosTexto: 'Fecha, insumo', exportaTexto: 'Excel', kpiClave: 'Movimientos', kpiValor: '-', filasTotal: 0 },
   { id: 'mermas', nombre: 'Mermas', categoria: 'Inventario', queResponde: 'Pérdidas por insumo y motivo.', filtrosTexto: 'Fecha', exportaTexto: 'Excel', kpiClave: 'Registros', kpiValor: '-', filasTotal: 0 },
@@ -138,6 +141,32 @@ export function InformesView() {
     }
     setCargandoReporte(true);
     let montado = true;
+    if (reporteAbiertoId === 'cortesias') {
+      cortesiasApi
+        .informe({ desde, hasta })
+        .then((res) => {
+          if (!montado) return;
+          setReporteDetalle({
+            id: 'cortesias',
+            nombre: 'Cortesías',
+            categoria: 'Ventas',
+            queResponde: 'Lo regalado a costo 0: por motivo, por producto y por quién la dio, con su valor de lista.',
+            periodoTexto: textoPeriodo,
+            filtrosActivosTexto: textoFiltrosActivos,
+            ...filasInformeCortesias(res),
+          });
+        })
+        .catch((err: any) => {
+          if (montado) setReporteDetalle(null);
+          if (montado) setMensajeExportacion(err?.mensaje || 'No se pudo cargar el informe de cortesías.');
+        })
+        .finally(() => {
+          if (montado) setCargandoReporte(false);
+        });
+      return () => {
+        montado = false;
+      };
+    }
     api
       .get<ReporteDetalleData>(`/admin/informes/${reporteAbiertoId}?desde=${desde}&hasta=${hasta}&canal=${canal}&pago=${pago}&modalidad=${modalidad}`)
       .then((res: any) => {

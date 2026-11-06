@@ -41,7 +41,7 @@ import { siguienteCorrelativo } from './secuencia';
 import { armarDatosPdf } from './pdf/comprobante-datos';
 import { generarPdfComprobante } from './pdf/comprobante-pdf';
 import { leerParametroNumerico } from '../impresion/estado-impresion';
-import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { lineasParaComprobante } from '../pedidos/lineas-combo.util';
 
 /** Plazo de la comunicación de baja de una factura en SUNAT (días). */
 export const PLAZO_BAJA_FACTURA_DIAS = 7;
@@ -114,7 +114,7 @@ export class ComprobantesService {
       direccion,
       correo: null,
       igvPct: cfgIgv,
-      lineas: lineasDeCuenta(pedido.lineas || []).map((l: any) => ({
+      lineas: lineasParaComprobante(pedido.lineas || []).map((l: any) => ({
         nombre: l.nombre,
         cantidad: Number(l.cantidad) || 1,
         subtotalCents: aCentimos(Number(l.subtotal ?? Number(l.precio_unit) * (Number(l.cantidad) || 1))),
@@ -1098,7 +1098,7 @@ export class ComprobantesService {
     const fechaLima = formatearFechaHoraLima(new Date(fechaCobro));
 
     // Detalle de productos con opciones y cantidades
-    const detalle = lineasDeCuenta(pedido.lineas || []).map((l: any) => ({
+    const detalle = lineasParaComprobante(pedido.lineas || []).map((l: any) => ({
       id: l.id.toString(),
       nombre: l.nombre,
       cantidad: l.cantidad,

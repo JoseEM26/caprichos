@@ -1093,6 +1093,54 @@ describe('PedidosService', () => {
     });
   });
 
+  describe('cortesía en una línea del pedido', () => {
+    it('sin permiso cortesias/dar responde 403 SIN_PERMISO_CORTESIA', async () => {
+      const dto: any = {
+        ...pedidoBaseDto,
+        modalidad: 'RECOGER',
+        lineas: [{ ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'RECLAMO_CLIENTE' } }],
+      };
+      await expect(service.crear(dto, 'idemp-cort-403', { canal: 'MOZO', usuarioPartyId: 55n })).rejects.toMatchObject({
+        status: 403,
+        response: { codigo: 'SIN_PERMISO_CORTESIA' },
+      });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('con permiso: la línea sale a S/ 0, guarda su valor de lista y el pedido no suma esa línea', async () => {
+      // Producto base 12 + extra 2 = 14 x 2 = 28 de valor de lista
+      let pedidoData: any = null;
+      const lineasData: any[] = [];
+      const cortesiasData: any[] = [];
+      prismaMock.pedido.create.mockImplementation(({ data }: any) => {
+        pedidoData = data;
+        return Promise.resolve({ id: 500n, codigo: 'CP-W500', estado: 'COLA', subtotal: Number(data.subtotal), envio: 0, total: Number(data.total) });
+      });
+      prismaMock.pedidoLinea.create.mockImplementation(({ data }: any) => {
+        lineasData.push(data);
+        return Promise.resolve({ id: 900n + BigInt(lineasData.length), ...data });
+      });
+      prismaMock.cortesia = { create: jest.fn(({ data }: any) => { cortesiasData.push(data); return Promise.resolve(data); }) };
+
+      // Una línea normal (28) y la misma producto como cortesía: el pedido cobra solo 28
+      const dto: any = {
+        ...pedidoBaseDto,
+        modalidad: 'RECOGER',
+        lineas: [pedidoBaseDto.lineas[0], { ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'DEGUSTACION_PROMOCION' } }],
+      };
+      const res = await service.crear(dto, 'idemp-cort-ok', { canal: 'CAJA', usuarioPartyId: 55n, puedeCortesia: true, omitirChequeoCarta: true });
+
+      expect(res.subtotal).toBe(28);
+      expect(res.total).toBe(28);
+      expect(Number(pedidoData.total)).toBe(28);
+      expect(lineasData[1]).toMatchObject({ es_cortesia: true });
+      expect(Number(lineasData[1].precio_unit)).toBe(0);
+      expect(Number(lineasData[1].subtotal)).toBe(0);
+      expect(cortesiasData[0]).toMatchObject({ motivo: 'DEGUSTACION_PROMOCION', pedido_id: 500n, dada_por_party_id: 55n });
+      expect(Number(cortesiasData[0].valor_lista)).toBe(28);
+    });
+  });
+
   describe('aviso de pedido recibido al cliente (carta)', () => {
     let avisar: jest.Mock;
 

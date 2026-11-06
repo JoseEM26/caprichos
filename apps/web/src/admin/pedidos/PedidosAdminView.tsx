@@ -9,6 +9,7 @@ import { BandejaPropuestasUbicacion } from './BandejaPropuestasUbicacion';
 import { PanelNoEntregados } from './PanelNoEntregados';
 import { useSesion } from '../../comun/sesion';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
+import { RegistrarCortesiaModal } from '../cortesias/RegistrarCortesiaModal';
 import { salonApi } from '../salon/api';
 import type { PisoSalon } from '../salon/tipos';
 import { reproducirCampana } from './audioAlerta';
@@ -201,6 +202,7 @@ export function PedidosAdminView() {
   const [rango, setRango] = useState<RangoPedidos>(() => rangoHoy());
   const [pendientesAnteriores, setPendientesAnteriores] = useState<number>(0);
   const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false);
+  const [cortesiaSeparadaAbierta, setCortesiaSeparadaAbierta] = useState(false);
   const [pedidoRepetir, setPedidoRepetir] = useState<Pedido | null>(null);
   const [pisosSalon, setPisosSalon] = useState<PisoSalon[]>([]);
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
@@ -576,6 +578,16 @@ export function PedidosAdminView() {
               </button>
             )}
 
+            {tiene('cortesias/dar') && (
+              <button
+                type="button"
+                onClick={() => setCortesiaSeparadaAbierta(true)}
+                style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: '1.5px solid var(--cp-navy, #0B2C3E)', background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
+              >
+                Registrar cortesía
+              </button>
+            )}
+
             <button
               type="button"
               className="cj-nuevo"
@@ -927,6 +939,16 @@ export function PedidosAdminView() {
           />
         )}
       </div>
+      {cortesiaSeparadaAbierta && (
+        <RegistrarCortesiaModal
+          alCerrar={() => setCortesiaSeparadaAbierta(false)}
+          alRegistrar={() => {
+          setCortesiaSeparadaAbierta(false);
+          cargarDatos();
+          }}
+        />
+      )}
+
       {nuevoPedidoAbierto && (
         <ModalNuevoPedidoMesa
           abierto={true}

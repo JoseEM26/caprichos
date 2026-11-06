@@ -1,4 +1,5 @@
 import { esSoloMozo } from '../acceso/roles-usuario';
+import { puedeDarCortesia, requiereCodigoCortesia } from '../cortesias/cortesia.tipos';
 import {
   Body,
   Controller,
@@ -48,6 +49,11 @@ export class PedidosAdminController {
 
   @Post()
   @Permiso('pedidos', 'crear')
+  // Una línea de cortesía: el SUPERVISOR presenta su código (Caja y ADMIN no)
+  @RequiereCodigoSupervisor('cortesias/dar', {
+    condicion: (req) => requiereCodigoCortesia(req) && (req.body?.lineas ?? []).some((l: any) => !!l?.cortesia),
+    exigeCodigoSupervisor: true,
+  })
   async crear(
     @Body() dto: CrearPedidoDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -64,6 +70,8 @@ export class PedidosAdminController {
       clientePartyId: dto.colaboradorPartyId,
       esPersonal: dto.esPersonal,
       omitirChequeoCarta: true,
+      puedeCortesia: puedeDarCortesia(req.usuario),
+      supervisorCortesiaPartyId: req.supervisor?.supervisorPartyId ?? req.supervisor?.party_id,
     });
     if (res?.id && this.impresionService) {
       try {

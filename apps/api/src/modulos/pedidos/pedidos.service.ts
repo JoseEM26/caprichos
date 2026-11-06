@@ -4,6 +4,7 @@ import { DireccionesClienteService } from '../clientes/direcciones-cliente.servi
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -35,6 +36,18 @@ import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
 import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
+import { validarMotivoCortesia } from '../cortesias/cortesia.tipos';
+
+/** Cortesía de una línea: solo con permiso cortesias/dar; sin oferta (la promoción ya tiene su precio). */
+function validarCortesiaLinea(l: { ofertaId?: unknown; cortesia?: { motivo: string; nota?: string } }, origen?: OrigenPedido) {
+  if (!origen?.puedeCortesia || origen.usuarioPartyId === undefined) {
+    throw new ForbiddenException({ codigo: 'SIN_PERMISO_CORTESIA', mensaje: 'No tienes permiso para dar cortesías' });
+  }
+  if (l.ofertaId) {
+    throw new BadRequestException({ codigo: 'CORTESIA_EN_OFERTA', mensaje: 'Un combo o una promoción no puede ser cortesía' });
+  }
+  return validarMotivoCortesia(l.cortesia?.motivo, l.cortesia?.nota);
+}
 
 /** Pista pública de la dirección anterior: nunca la dirección completa (ver enmascararDireccion). */
 export type PistaDireccion = { existe: false } | { existe: true; zona: string | null; direccion: string | null };
@@ -84,6 +97,9 @@ export interface OrigenPedido {
   /** WhatsApp: el cliente eligió no sumar puntos; no se busca ninguna cuenta por teléfono */
   sinCuentaCliente?: boolean;
   esPersonal?: boolean;
+  /** Quien da cortesías (permiso cortesias/dar) y el supervisor que presentó su código, si lo hubo. */
+  puedeCortesia?: boolean;
+  supervisorCortesiaPartyId?: bigint | string | number;
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
   omitirChequeoCarta?: boolean;
@@ -551,8 +567,12 @@ export class PedidosService {
         (acc, op) => acc + op.precio_extra,
         0,
       );
-      const precioUnitario = Number((precioBase + sumaExtras).toFixed(2));
-      const lineaSubtotal = Number((precioUnitario * cantidad).toFixed(2));
+      const precioUnitarioLista = Number((precioBase + sumaExtras).toFixed(2));
+      const valorListaLinea = Number((precioUnitarioLista * cantidad).toFixed(2));
+      // Cortesía (venta a costo 0): la línea sale a S/ 0; su valor de lista queda guardado (no suma al pedido)
+      const cortesiaLinea = l.cortesia ? validarCortesiaLinea(l, origen) : null;
+      const precioUnitario = cortesiaLinea ? 0 : precioUnitarioLista;
+      const lineaSubtotal = cortesiaLinea ? 0 : valorListaLinea;
       subtotalCalculado += lineaSubtotal;
 
       // Bebidas llevan personas[] con tantos nombres como unidades
@@ -593,6 +613,7 @@ export class PedidosService {
         unidadesTamano,
         precioUnitario,
         subtotal: lineaSubtotal,
+        cortesia: cortesiaLinea ? { ...cortesiaLinea, valorLista: valorListaLinea } : null,
         // Línea madre de combo: sin producto ni área propios; la cocina ve solo sus hijas
         contenedora,
         areaId: contenedora ? null : (prodDb.categoria?.area_id ?? null),
@@ -606,6 +627,12 @@ export class PedidosService {
     }
 
     subtotalCalculado = Number(subtotalCalculado.toFixed(2));
+    if (lineasCalculadas.every((l) => l.cortesia)) {
+      throw new BadRequestException({
+        codigo: 'PEDIDO_SOLO_CORTESIA',
+        mensaje: 'Un pedido solo de cortesías no se cobra: regístralas por separado',
+      });
+    }
 
     // 5.0. Cliente con cuenta identificado (suma puntos, historial y direcciones)
     const clienteFinal = await this.clienteIdentificado(dto, origen);
@@ -629,7 +656,8 @@ export class PedidosService {
     const canalPedido = origen?.canal || 'CARTA';
     const desgloseDescuento = await this.ofertasService.calcularDescuentosParaPedido({
       subtotal: subtotalCalculado,
-      lineas: lineasCalculadas.map((lin) => ({
+      // Las cortesías no entran a promociones ni descuentos (su precio ya es 0)
+      lineas: lineasCalculadas.filter((lin) => !lin.cortesia).map((lin) => ({
         productoId: lin.productoId,
         categoriaId: lin.categoriaId,
         cantidad: lin.cantidad,
@@ -906,6 +934,7 @@ export class PedidosService {
             area_id: lin.areaId,
             nombres_persona: lin.nombresPersona,
             nota: lin.nota,
+            es_cortesia: !!lin.cortesia,
             opciones: lin.opciones.map((o: any) => ({
               id: o.id.toString(),
               nombre: o.nombre,
@@ -914,6 +943,22 @@ export class PedidosService {
             })),
           },
         });
+
+        if (lin.cortesia) {
+          await tx.cortesia.create({
+            data: {
+              producto_id: lin.productoId,
+              cantidad: lin.cantidad,
+              valor_lista: new Prisma.Decimal(lin.cortesia.valorLista),
+              motivo: lin.cortesia.motivo,
+              nota: lin.cortesia.nota,
+              pedido_id: pedido.id,
+              pedido_linea_id: lineaDb.id,
+              dada_por_party_id: BigInt(origen!.usuarioPartyId!),
+              autorizada_por_party_id: origen?.supervisorCortesiaPartyId ? BigInt(origen.supervisorCortesiaPartyId) : null,
+            },
+          });
+        }
 
         // Partes del combo: una línea hija por producto, sin cobro (el precio ya va en la madre)
         for (const parte of lin.partesCombo) {

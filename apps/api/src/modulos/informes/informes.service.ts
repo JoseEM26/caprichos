@@ -640,8 +640,9 @@ export class InformesService {
       }
 
       case 'producto': {
+        // Las cortesías no son ventas: no cuentan unidades ni montos (van en el informe «Cortesías»)
         const lineas = await this.prisma.pedidoLinea.findMany({
-          where: { pedido: { ...where, estado: { notIn: ['RECHAZADO', 'ANULADO'] } } },
+          where: { es_cortesia: false, pedido: { ...where, estado: { notIn: ['RECHAZADO', 'ANULADO'] } } },
           include: { producto: true },
         });
         const pMap: Record<string, { q: number; sub: number }> = {};
@@ -681,7 +682,7 @@ export class InformesService {
 
       case 'categoria': {
         const lineas = await this.prisma.pedidoLinea.findMany({
-          where: { pedido: { ...where, estado: { notIn: ['RECHAZADO', 'ANULADO'] } } },
+          where: { es_cortesia: false, pedido: { ...where, estado: { notIn: ['RECHAZADO', 'ANULADO'] } } },
           include: { producto: { include: { categoria: true } } },
         });
         const cMap: Record<string, { q: number; sub: number }> = {};
@@ -1489,7 +1490,7 @@ export class InformesService {
 
     // Ranking actual por categoría y producto (desde líneas de pedidos no anulados)
     const lineas = await this.prisma.pedidoLinea.findMany({
-      where: { pedido: { estado: { notIn: ['RECHAZADO', 'ANULADO'] } } },
+      where: { es_cortesia: false, pedido: { estado: { notIn: ['RECHAZADO', 'ANULADO'] } } },
       include: { producto: { include: { categoria: true } } },
     });
 

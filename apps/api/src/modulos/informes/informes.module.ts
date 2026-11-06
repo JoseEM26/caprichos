@@ -3,8 +3,10 @@ import { InformesController } from './informes.controller';
 import { InformesService } from './informes.service';
 import { EncuestasEstadisticaController } from './encuestas-estadistica.controller';
 import { EncuestasEstadisticaService } from './encuestas-estadistica.service';
+import { CortesiasModule } from '../cortesias/cortesias.module';
 
 @Module({
+  imports: [CortesiasModule],
   controllers: [InformesController, EncuestasEstadisticaController],
   providers: [InformesService, EncuestasEstadisticaService],
   exports: [InformesService],
