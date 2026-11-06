@@ -297,6 +297,10 @@ export class RepartosService {
     if (esRepartidor && !esMio) {
       clienteTelefono = null;
     }
+    // El MOZO solo sigue el delivery (repartos/seguir): nunca ve el teléfono del cliente
+    if (usuarioActual?.rol === 'MOZO') {
+      clienteTelefono = null;
+    }
 
     // Espera en puerta: minutos desde la llegada y si ya superó la espera máxima (aviso en pantalla del repartidor)
     const esperaMin =
@@ -958,6 +962,157 @@ export class RepartosService {
     }));
 
     return this.rutaService.calcularLadosYZonas(puntos, config.localCoords);
+  }
+
+  /**
+   * GET /admin/repartos/panel (repartos/ver, nunca REPARTIDOR):
+   * Repartidores activos con los pedidos que llevan (etapa, horas, espera y efectivo por rendir)
+   * y los pedidos sin tomar, más el resumen de libres y ocupados. Reutiliza listarTodos.
+   */
+  async obtenerPanelRepartidores(usuario: UsuarioAutenticado) {
+    if (usuario.rol === 'REPARTIDOR') {
+      throw new ForbiddenException({
+        codigo: 'SOLO_CAJA_ADMIN',
+        mensaje: 'El panel de repartidores no es para repartidores',
+      });
+    }
+
+    const config = await this.obtenerParametrosReparto();
+    const [cuentas, activos] = await Promise.all([
+      this.prisma.userAccount.findMany({
+        where: { rol: 'REPARTIDOR', activo: true },
+        include: { party: { include: { persona: true } } },
+        orderBy: { id: 'asc' },
+      }),
+      this.listarTodos({}, usuario),
+    ]);
+    // Un ADMIN que tomó pedidos reparte como uno más: aparece con su nombre y «(admin)» mientras los lleve
+    const idsConPedidos = [...new Set(activos.map((p) => p.repartidor_party_id).filter((x) => x != null))].map((x) => BigInt(x as string));
+    const cuentasAdmin = idsConPedidos.length
+      ? (
+          await this.prisma.userAccount.findMany({
+            where: { rol: 'ADMIN', party_id: { in: idsConPedidos } },
+            include: { party: { include: { persona: true } } },
+          })
+        ).filter((c: any) => c.rol === 'ADMIN')
+      : [];
+    const esAdminParty = new Set(cuentasAdmin.map((c: any) => String(c.party_id)));
+
+    const etapaDe = (p: any) => (p.llego_en ? 'LLEGADO' : p.salio_en ? 'EN_CAMINO' : 'TOMADO');
+    const porRepartidor = new Map<string, any[]>();
+    const sinTomar: any[] = [];
+    for (const p of activos) {
+      if (p.repartidor_party_id == null) {
+        if (p.estado === 'LISTO' && p.motivo_falla == null) sinTomar.push(p);
+        continue;
+      }
+      const lista = porRepartidor.get(p.repartidor_party_id) ?? [];
+      lista.push({ ...p, etapa: etapaDe(p) });
+      porRepartidor.set(p.repartidor_party_id, lista);
+    }
+
+    const nombreCuenta = (c: any) =>
+      c.party?.persona
+        ? `${c.party.persona.nombres} ${c.party.persona.apellidos || ''}`.trim()
+        : `Repartidor #${c.party_id}`;
+    const cuentaPorParty = new Map([...cuentas, ...cuentasAdmin].map((c: any) => [String(c.party_id), c]));
+    // Repartidores con pedidos vivos aunque ya no estén activos: se muestran para no perderlos de vista
+    const partyIds = new Set([...cuentaPorParty.keys(), ...porRepartidor.keys()]);
+
+    const repartidores = [...partyIds].map((partyId) => {
+      const cuenta = cuentaPorParty.get(partyId);
+      const pedidos = (porRepartidor.get(partyId) ?? []).sort(
+        (a, b) => new Date(a.creado_en).getTime() - new Date(b.creado_en).getTime(),
+      );
+      const efectivoPorRendir = pedidos.reduce(
+        (acc, p) => acc + (p.cobro_pendiente_efectivo ? p.total : 0),
+        0,
+      );
+      const nombre =
+        cuenta != null
+          ? nombreCuenta(cuenta)
+          : pedidos[0]?.repartidor?.nombre ?? `Repartidor #${partyId}`;
+      const esAdmin = esAdminParty.has(partyId);
+      return {
+        party_id: partyId,
+        nombre: esAdmin ? `${nombre} (admin)` : nombre,
+        es_admin: esAdmin,
+        libre: pedidos.length === 0,
+        pedidos,
+        efectivo_por_rendir: Number(efectivoPorRendir.toFixed(2)),
+      };
+    });
+    repartidores.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+    return {
+      generado_en: new Date().toISOString(),
+      max_pedidos: config.maxPedidos,
+      resumen: {
+        repartidores_libres: repartidores.filter((r) => r.libre).length,
+        repartidores_ocupados: repartidores.filter((r) => !r.libre).length,
+        pedidos_sin_tomar: sinTomar.length,
+      },
+      repartidores,
+      sin_tomar: sinTomar.sort(
+        (a, b) => new Date(a.creado_en).getTime() - new Date(b.creado_en).getTime(),
+      ),
+    };
+  }
+
+  /**
+   * GET /admin/repartos/seguimiento (repartos/ver o repartos/seguir, nunca REPARTIDOR):
+   * todos los pedidos DELIVERY de hoy (hora de Lima) en cualquier estado, más los que siguen vivos
+   * de días anteriores, cada uno con su sección, para saber qué lleva y entrega cada quien.
+   */
+  async listarSeguimiento(usuario: UsuarioAutenticado) {
+    if (usuario.rol === 'REPARTIDOR') {
+      throw new ForbiddenException({
+        codigo: 'SOLO_CAJA_ADMIN',
+        mensaje: 'El seguimiento de repartos no es para repartidores',
+      });
+    }
+    const config = await this.obtenerParametrosReparto();
+    const { inicio } = limitesDiaLima(hoyLima(), hoyLima());
+    const pedidos = await this.prisma.pedido.findMany({
+      where: {
+        modalidad: 'DELIVERY',
+        OR: [
+          { creado_en: { gte: inicio } },
+          { entregado_en: { gte: inicio } },
+          { estado: { in: [...ESTADOS_ACTIVOS_REPARTO] } },
+        ],
+      },
+      include: {
+        zona: true,
+        lineas: { select: { cantidad: true } },
+        repartidor: { include: { persona: true } },
+      },
+      orderBy: { creado_en: 'desc' },
+      take: 500, // ponytail: tope por rendimiento; un día de delivery no llega ni a la mitad
+    });
+    const ahora = new Date();
+    const seccionDe = (p: any) => {
+      if (p.estado === 'ENTREGADO') return 'ENTREGADOS';
+      if (p.estado === 'ANULADO' || p.motivo_falla != null) return 'INCIDENTE';
+      if (p.estado === 'LISTO' || p.estado === 'EN_CAMINO') return p.repartidor_party_id == null ? 'ESPERANDO' : 'EN_CAMINO';
+      return 'PREPARACION';
+    };
+    return {
+      generado_en: ahora.toISOString(),
+      pedidos: pedidos.map((p: any) => ({
+        ...this.formatearPedidoReparto(p, config, ahora, usuario),
+        seccion: seccionDe(p),
+        etapa: p.llego_en ? 'LLEGADO' : p.salio_en ? 'EN_CAMINO' : p.tomado_en ? 'TOMADO' : null,
+        repartidor: p.repartidor
+          ? {
+              id: String(p.repartidor.id),
+              nombre: p.repartidor.persona
+                ? `${p.repartidor.persona.nombres} ${p.repartidor.persona.apellidos || ''}`.trim()
+                : `Repartidor #${p.repartidor.id}`,
+            }
+          : null,
+      })),
+    };
   }
 
   /**
@@ -2170,6 +2325,16 @@ export class RepartosService {
     };
   }
 
+  /** Soltar o reasignar un pedido es una excepción (se cayó el repartidor): solo ADMIN y CAJERO. */
+  private exigirCajaOAdmin(usuario: UsuarioAutenticado) {
+    if (usuario.rol !== 'ADMIN' && usuario.rol !== 'CAJERO') {
+      throw new ForbiddenException({
+        codigo: 'SOLO_CAJA_ADMIN',
+        mensaje: 'Soltar o reasignar un pedido es solo para caja y administración',
+      });
+    }
+  }
+
   /**
    * POST /admin/repartos/:id/liberar (repartos/liquidar - Caja/Admin)
    * Libera la asignación de un pedido tomado para que regrese a la cola de disponibles.
@@ -2180,6 +2345,7 @@ export class RepartosService {
     usuario: UsuarioAutenticado,
     ip?: string,
   ) {
+    this.exigirCajaOAdmin(usuario);
     const pedidoId = this.parsearId(id);
     const partyId = BigInt(usuario.partyId);
     const config = await this.obtenerParametrosReparto();
@@ -2280,6 +2446,7 @@ export class RepartosService {
     usuario: UsuarioAutenticado,
     ip?: string,
   ) {
+    this.exigirCajaOAdmin(usuario);
     const pedidoId = this.parsearId(id);
     const partyId = BigInt(usuario.partyId);
     const nuevoRepartidorPartyId = this.parsearId(dto.repartidorPartyId);

@@ -47,6 +47,13 @@ import {
   verificarPayload,
 } from './asistencia.qr';
 import { ConfigurarAsistenciaDto, CorregirMarcaDto, MarcarDto } from './dto/asistencia.dto';
+import {
+  CLAVE_ENLACE_PANTALLA,
+  EnlacePantalla,
+  generarTokenPantalla,
+  hashToken,
+  tokenCoincide,
+} from './asistencia.pantalla';
 
 /** Rechazo de negocio. `contar` = si suma a los intentos fallidos del límite. */
 export class RechazoAsistencia extends Error {
@@ -146,6 +153,72 @@ export class AsistenciaService {
     });
     await this.auditar('CAMBIO', 'EDITAR_CONFIG', 'OK', { antes, despues }, usuario?.partyId, ip, 'parametro', null);
     return despues;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Enlace público de la pantalla del local (tablet sin cuenta)
+  // ---------------------------------------------------------------------------
+
+  private async enlacePantalla(): Promise<EnlacePantalla | null> {
+    const fila = await this.prisma.parametro.findUnique({ where: { clave: CLAVE_ENLACE_PANTALLA } });
+    const v = fila?.valor as Partial<EnlacePantalla> | null | undefined;
+    return v && typeof v.tokenHash === 'string' && typeof v.generadoEn === 'string' ? (v as EnlacePantalla) : null;
+  }
+
+  async estadoEnlacePantalla(): Promise<{ activo: boolean; generadoEn: string | null }> {
+    const e = await this.enlacePantalla();
+    return { activo: e !== null, generadoEn: e?.generadoEn ?? null };
+  }
+
+  /** Genera o regenera el enlace (invalida el anterior). Devuelve la ruta con el token en claro: se muestra una sola vez. */
+  async generarEnlacePantalla(usuario?: UsuarioAutenticado, ip?: string) {
+    const token = generarTokenPantalla();
+    const valor: EnlacePantalla = { tokenHash: hashToken(token), generadoEn: new Date().toISOString() };
+    await this.prisma.parametro.upsert({
+      where: { clave: CLAVE_ENLACE_PANTALLA },
+      create: { clave: CLAVE_ENLACE_PANTALLA, valor: valor as any },
+      update: { valor: valor as any },
+    });
+    await this.auditar('CAMBIO', 'GENERAR_ENLACE_PANTALLA', 'OK', { generadoEn: valor.generadoEn }, usuario?.partyId, ip, 'parametro', null);
+    return { ruta: `/asistencia/pantalla/${token}`, generadoEn: valor.generadoEn };
+  }
+
+  async desactivarEnlacePantalla(usuario?: UsuarioAutenticado, ip?: string) {
+    await this.prisma.parametro.deleteMany({ where: { clave: CLAVE_ENLACE_PANTALLA } });
+    await this.auditar('CAMBIO', 'DESACTIVAR_ENLACE_PANTALLA', 'OK', {}, usuario?.partyId, ip, 'parametro', null);
+    return { activo: false, generadoEn: null };
+  }
+
+  /** Mismo QR que la pantalla admin, pero solo con el enlace válido. Sin enlace o token malo: 404 idéntico. */
+  async qrPantallaPublica(token: string, ahora = new Date()) {
+    const e = await this.enlacePantalla();
+    if (!e || !tokenCoincide(e.tokenHash, token)) throw new NotFoundException();
+    return this.qrPantalla(ahora);
+  }
+
+  /** Manifest de la PWA «QR Asistencia» para ese enlace. Solo lleva la ruta del propio token: ningún dato del local. */
+  async manifestPantallaPublica(token: string) {
+    const e = await this.enlacePantalla();
+    if (!e || !tokenCoincide(e.tokenHash, token)) throw new NotFoundException();
+    const ruta = `/asistencia/pantalla/${token}`;
+    return {
+      name: 'QR Asistencia',
+      short_name: 'QR Asistencia',
+      lang: 'es',
+      id: ruta,
+      start_url: ruta,
+      scope: ruta,
+      display: 'fullscreen',
+      display_override: ['fullscreen', 'standalone'],
+      orientation: 'any',
+      theme_color: '#0B2C3E',
+      background_color: '#FBF4EC',
+      icons: [
+        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    };
   }
 
   // ---------------------------------------------------------------------------

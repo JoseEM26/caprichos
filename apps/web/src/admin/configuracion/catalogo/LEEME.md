@@ -41,3 +41,10 @@ falla si un `data-cfg-id` / `CampoConfig id` literal no existe en el catálogo, 
 - `impresion.ts`, `ayuda.ts`, `vouchers.ts`, `ingreso.ts`: tarjetas respectivas (ver comentarios TODO al inicio de cada archivo).
 - `operacion.ts`: tiempos, wifi, áreas de cocina, textos y avisos por campo del formulario genérico.
 - Pendiente aparte: usar `CampoAyuda` en los inputs de esas pestañas hijas (hoy solo hay `CampoConfig`/`data-cfg-id` de ejemplo en Parámetros y Chatbot).
+
+## Enlaces de Capri (asistente de ayuda)
+
+Los manuales de `apps/api/src/modulos/ayuda-admin/manuales/config-*.md` enlazan cada ajuste con `[Texto](/admin/mirest?tab=<pestaña>&campo=<id>)`
+(Impresión además lleva `&seccion=mapa|equipos|cola`). Capri recibe la ruta con `tab`/`pestana`/`seccion` y responde con el manual de esa sección.
+Si agregas una pestaña a `CATEGORIAS_CONFIG` o un ajuste al catálogo, agrega su manual de sección / su línea en «Ajustes»;
+la prueba `ayuda-secciones.spec.ts` (API) falla si un enlace apunta a un `tab` o `campo` que ya no existe o si una pestaña queda sin manual.

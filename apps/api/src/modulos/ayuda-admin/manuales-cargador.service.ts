@@ -18,6 +18,8 @@ export class ManualesCargadorService implements OnModuleInit {
   private rutaCarpetaManuales: string;
   private manualesPorModulo = new Map<string, ManualAyuda>();
   private manualesPorRuta = new Map<string, ManualAyuda>();
+  /** Manuales de sección (frontmatter `seccion:`), agrupados por la clave de su módulo. */
+  private seccionesPorModulo = new Map<string, ManualAyuda[]>();
   private cargado = false;
 
   constructor() {
@@ -60,6 +62,7 @@ export class ManualesCargadorService implements OnModuleInit {
     const carpeta = rutaAlternativa || this.rutaCarpetaManuales;
     this.manualesPorModulo.clear();
     this.manualesPorRuta.clear();
+    this.seccionesPorModulo.clear();
 
     if (!fs.existsSync(carpeta)) {
       this.logger.warn(`La carpeta de manuales no existe: ${carpeta}`);
@@ -73,7 +76,11 @@ export class ManualesCargadorService implements OnModuleInit {
         const rutaCompleta = path.join(carpeta, archivo);
         const contenidoCrudo = fs.readFileSync(rutaCompleta, 'utf-8');
         const manual = this.parsearManual(archivo, contenidoCrudo);
-        if (manual) {
+        if (manual?.seccion) {
+          const lista = this.seccionesPorModulo.get(manual.modulo) ?? [];
+          lista.push(manual);
+          this.seccionesPorModulo.set(manual.modulo, lista);
+        } else if (manual) {
           this.manualesPorModulo.set(manual.modulo, manual);
           this.manualesPorRuta.set(manual.ruta, manual);
         }
@@ -106,7 +113,7 @@ export class ManualesCargadorService implements OnModuleInit {
       return null;
     }
 
-    const { paraQueSirve, seccionesComoSeHace, erroresYDudas, quienPuedeHacerlo, mencionesDoblesCorchetes } =
+    const { paraQueSirve, seccionesComoSeHace, erroresYDudas, quienPuedeHacerlo, mencionesDoblesCorchetes, ajustes } =
       this.extraerSeccionesMarkdown(markdownCuerpo);
 
     return {
@@ -118,6 +125,9 @@ export class ManualesCargadorService implements OnModuleInit {
       roles: fm.roles,
       sugerencias: fm.sugerencias,
       relacionados: fm.relacionados,
+      seccion: fm.seccion,
+      activaCon: fm.activaCon,
+      ajustes,
       contenido: markdownCuerpo,
       paraQueSirve,
       seccionesComoSeHace,
@@ -136,8 +146,10 @@ export class ManualesCargadorService implements OnModuleInit {
     const roles: string[] = [];
     const sugerencias: string[] = [];
     const relacionados: string[] = [];
+    let seccion: string | undefined = undefined;
+    const activaCon: string[] = [];
 
-    let leyendoLista: 'roles' | 'sugerencias' | 'relacionados' | null = null;
+    let leyendoLista: 'roles' | 'sugerencias' | 'relacionados' | 'activa_con' | null = null;
 
     for (const rawLinea of lineas) {
       const linea = rawLinea.trim();
@@ -151,6 +163,8 @@ export class ManualesCargadorService implements OnModuleInit {
           roles.push(item.toUpperCase());
         } else if (leyendoLista === 'relacionados') {
           relacionados.push(item.toLowerCase());
+        } else if (leyendoLista === 'activa_con') {
+          activaCon.push(item.toLowerCase());
         }
         continue;
       }
@@ -200,6 +214,16 @@ export class ManualesCargadorService implements OnModuleInit {
           leyendoLista = 'sugerencias';
         } else if (clave === 'relacionados') {
           leyendoLista = 'relacionados';
+        } else if (clave === 'seccion') {
+          seccion = valor.toLowerCase() || undefined;
+          leyendoLista = null;
+        } else if (clave === 'activa_con') {
+          leyendoLista = 'activa_con';
+          const inline = valor.match(/^\[(.*)\]$/);
+          if (inline) {
+            leyendoLista = null;
+            activaCon.push(...inline[1].split(',').map((r) => r.trim().toLowerCase()).filter(Boolean));
+          }
         }
       }
     }
@@ -212,6 +236,8 @@ export class ManualesCargadorService implements OnModuleInit {
       roles,
       sugerencias,
       relacionados,
+      seccion,
+      activaCon,
     };
   }
 
@@ -249,6 +275,7 @@ export class ManualesCargadorService implements OnModuleInit {
     let paraQueSirve: string | undefined;
     let erroresYDudas: string | undefined;
     let quienPuedeHacerlo: string | undefined;
+    const ajustes: string[] = [];
     const seccionesComoSeHace: import('./ayuda-grafo.tipos').SeccionComoSeHace[] = [];
 
     for (const [tituloSec, lineasSec] of seccionesMap.entries()) {
@@ -295,6 +322,10 @@ export class ManualesCargadorService implements OnModuleInit {
           pasos: lineasPasosLimpias.join('\n').trim(),
           relaciones,
         });
+      } else if (tNorm.startsWith('ajustes') || tNorm.startsWith('donde se configura')) {
+        for (const l of lineasSec) {
+          if (l.trim().startsWith('- ')) ajustes.push(l.trim().slice(2));
+        }
       } else if (tNorm.includes('errores') || tNorm.includes('dudas')) {
         erroresYDudas = lineasSec.join('\n').trim();
       } else if (tNorm.includes('quien puede')) {
@@ -307,6 +338,7 @@ export class ManualesCargadorService implements OnModuleInit {
       seccionesComoSeHace,
       erroresYDudas,
       quienPuedeHacerlo,
+      ajustes,
       mencionesDoblesCorchetes: Array.from(mencionesDoblesCorchetesSet),
     };
   }
@@ -333,6 +365,69 @@ export class ManualesCargadorService implements OnModuleInit {
   obtenerPorModulo(modulo: string): ManualAyuda | undefined {
     if (!this.cargado) this.cargarManuales();
     return this.manualesPorModulo.get(modulo);
+  }
+
+  /** Manuales de sección y temáticos (los que llevan `seccion:`). */
+  obtenerSecciones(): ManualAyuda[] {
+    if (!this.cargado) this.cargarManuales();
+    return Array.from(this.seccionesPorModulo.values()).flat();
+  }
+
+  /**
+   * Resuelve una ruta del admin con su consulta (`/admin/mirest?tab=horario&campo=x`) a:
+   * el manual general del módulo y, si la consulta activa una sección (`activa_con`), el manual de esa sección.
+   */
+  resolverRuta(ruta: string): { manual?: ManualAyuda; seccion?: ManualAyuda } {
+    const manual = this.obtenerPorRuta(ruta);
+    if (!manual) return {};
+    const consulta = new URLSearchParams((ruta.split('#')[0].split('?')[1] ?? ''));
+    const seccion = (this.seccionesPorModulo.get(manual.modulo) ?? []).find((s) =>
+      // cada entrada es `param=valor` o varios unidos con `&` (todos deben coincidir)
+      (s.activaCon ?? []).some((entrada) =>
+        entrada.split('&').every((par) => {
+          const [k, v] = par.split('=');
+          return !!k && !!v && (consulta.get(k)?.toLowerCase() ?? '') === v;
+        }),
+      ),
+    );
+    return { manual, seccion };
+  }
+
+  /** Ruta con consulta que abre la sección (la primera de `activa_con`), o la ruta del módulo si no tiene. */
+  rutaDeSeccion(seccion: ManualAyuda): string {
+    const par = seccion.activaCon?.[0];
+    return par ? `${seccion.ruta}?${par}` : seccion.ruta;
+  }
+
+  /** Un enlace (con o sin consulta) solo se ofrece si el rol puede ver el módulo y, si abre una sección, esa sección. */
+  esEnlacePermitido(ruta: string, rol: string): boolean {
+    const { manual, seccion } = this.resolverRuta(ruta);
+    if (!manual || !this.esManualAccesibleParaRol(manual, rol)) return false;
+    // /admin (escritorio) captura por prefijo cualquier ruta desconocida: solo vale si la ruta es exactamente esa
+    const base = ruta.split(/[?#]/)[0].replace(/\/+$/, '');
+    if (manual.ruta === '/admin' && base !== '/admin') return false;
+    return !seccion || this.esManualAccesibleParaRol(seccion, rol);
+  }
+
+  /** Enlaces `[Texto](/admin/...?...)` del texto de un manual, con su texto visible. */
+  extraerEnlacesProfundos(texto: string): EnlaceAyuda[] {
+    const salida: EnlaceAyuda[] = [];
+    for (const m of (texto || '').matchAll(/\[([^\]]+)\]\((\/admin[^)\s]*)\)/g)) {
+      salida.push({ texto: m[1].trim(), ruta: m[2] });
+    }
+    return salida;
+  }
+
+  /** Todos los enlaces profundos que aparecen en manuales que el rol puede ver (lista blanca de enlaces de Capri). */
+  obtenerEnlacesProfundosAccesibles(rol: string): EnlaceAyuda[] {
+    const vistos = new Map<string, EnlaceAyuda>();
+    const manuales = [...this.obtenerManualesAccesibles(rol), ...this.obtenerSecciones().filter((s) => this.esManualAccesibleParaRol(s, rol))];
+    for (const m of manuales) {
+      for (const e of this.extraerEnlacesProfundos(m.contenido)) {
+        if (!vistos.has(e.ruta) && this.esEnlacePermitido(e.ruta, rol)) vistos.set(e.ruta, e);
+      }
+    }
+    return Array.from(vistos.values());
   }
 
   /**
@@ -385,10 +480,11 @@ export class ManualesCargadorService implements OnModuleInit {
    */
   obtenerEnlacesAccesibles(rol: string): EnlaceAyuda[] {
     const accesibles = this.obtenerManualesAccesibles(rol);
-    return accesibles.map((m) => ({
-      texto: `Ir a ${m.titulo}`,
-      ruta: m.ruta,
-    }));
+    const modulos = accesibles.map((m) => ({ texto: `Ir a ${m.titulo}`, ruta: m.ruta }));
+    const secciones = this.obtenerSecciones()
+      .filter((s) => s.activaCon?.length && this.esManualAccesibleParaRol(s, rol))
+      .map((s) => ({ texto: `Ir a ${s.titulo}`, ruta: this.rutaDeSeccion(s) }));
+    return [...modulos, ...secciones];
   }
 
   /**

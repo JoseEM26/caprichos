@@ -7,6 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { jpegProductoWhatsApp } from './imagen-whatsapp';
+import { anfitrionBloqueadoPorPaso, opcionesSinStock, pasoOpcionalOcultoPorStock } from '../stock/opcion-requiere';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -187,8 +188,13 @@ export class CatalogoService implements OnApplicationBootstrap {
               where: { activo: true },
               orderBy: { nombre: 'asc' },
             },
-            // Anfitrión de una oferta COMBO (Dúo): sus pasos son los grupos del combo, no una mezcla propia
-            ofertasAlcance: { where: { tipo: 'COMBO' }, select: { id: true }, take: 1 },
+            // Anfitrión de una oferta COMBO (Dúo): sus pasos son los grupos del combo, no una mezcla propia.
+            // Con alternativas configuradas (combo_parte_reemplazo) el combo no sale «No disponible» por un paso.
+            ofertasAlcance: {
+              where: { tipo: 'COMBO' },
+              select: { id: true, combosParte: { where: { reemplazos: { some: {} } }, select: { id: true }, take: 1 } },
+              take: 1,
+            },
           },
         },
       },
@@ -197,6 +203,11 @@ export class CatalogoService implements OnApplicationBootstrap {
     const quedanPorProducto = await quedanProductos(
       this.prisma,
       categorias.flatMap((c) => c.productos.map((p) => p.id)),
+    );
+    // Opciones de grupo ligadas a stock (opcion_requiere): cuáles no alcanzan con el saldo ahora
+    const sinStockOpcion = await opcionesSinStock(
+      this.prisma,
+      categorias.flatMap((c) => c.productos.flatMap((p) => p.grupos.flatMap((pg) => pg.grupo.opciones.filter((o) => o.activo).map((o) => o.id)))),
     );
     const estadoSabores = await estadoSaboresHoy(
       this.prisma,
@@ -237,15 +248,6 @@ export class CatalogoService implements OnApplicationBootstrap {
               ? disponibles.reduce((acc, s) => acc + (s.quedan ?? 0), 0)
               : null
           : quedanProducto;
-        // Producto que controla stock: sin saldo no se vende (aunque no esté marcado como agotado)
-        const disponible = porSabor
-          ? estaDisponible(p.agotado_hasta) && saboresConStock
-          : estaDisponible(p.agotado_hasta) && !(quedan !== null && quedan <= 0);
-        const agotadoHasta =
-          p.agotado_hasta && !disponible
-            ? p.agotado_hasta.toISOString()
-            : null;
-
         const tamanos = (p.tamanos || []).map((t) => ({
           id: t.id.toString(),
           nombre: t.tamano_valor?.nombre || '',
@@ -253,25 +255,58 @@ export class CatalogoService implements OnApplicationBootstrap {
           unidades: t.unidades,
         }));
 
-        const grupos = (p.grupos || [])
+        const gruposTodos = (p.grupos || [])
           .filter((pg) => pg.grupo && pg.grupo.activo)
-          .map((pg) => ({
-            id: pg.grupo.id.toString(),
-            nombre: pg.grupo.nombre,
-            obligatorio: pg.grupo.obligatorio,
-            minimo: pg.grupo.minimo,
-            maximo: pg.grupo.maximo,
-            opciones: (pg.grupo.opciones || [])
-              .filter((o) => o.activo)
-              .map((o) => ({
-                id: o.id.toString(),
-                nombre: o.valor?.nombre || '',
-                precioExtra: Number(Number(o.precio_extra).toFixed(2)),
-                disponible: estaDisponible(o.agotado_hasta),
-              })),
-          }))
+          .map((pg) => {
+            const opcionesActivas = (pg.grupo.opciones || []).filter((o) => o.activo);
+            const opciones = opcionesActivas.map((o) => ({
+              id: o.id.toString(),
+              nombre: o.valor?.nombre || '',
+              precioExtra: Number(Number(o.precio_extra).toFixed(2)),
+              disponible: estaDisponible(o.agotado_hasta) && !sinStockOpcion.has(o.id.toString()),
+            }));
+            const bloqueadas = opcionesActivas.filter((o) => sinStockOpcion.has(o.id.toString())).map((o) => o.valor?.nombre || '');
+            const libres = opciones.filter((o) => o.disponible).map((o) => o.nombre);
+            // Plan B visible: hay opciones agotadas por stock y otras que se pueden elegir
+            const aviso = bloqueadas.length > 0 && libres.length > 0
+              ? `Se acabaron: ${bloqueadas.join(', ')}. Elige entre: ${libres.join(', ')}`
+              : null;
+            return {
+              id: pg.grupo.id.toString(),
+              nombre: pg.grupo.nombre,
+              obligatorio: pg.grupo.obligatorio,
+              minimo: pg.grupo.minimo,
+              maximo: pg.grupo.maximo,
+              opciones,
+              aviso,
+              // Todas sus opciones bloqueadas por stock (sin plan B en el paso)
+              sinStock: bloqueadas.length > 0 && libres.length === 0,
+            };
+          })
           // Grupo sin opciones activas (p. ej. «Galleta 1 · Sabor» tras quitar sus sabores): no se muestra ni bloquea
           .filter((g) => g.opciones.length > 0);
+        // Paso de sabor que solo tiene sentido con donas en saldo: si es opcional y se queda sin opciones por stock, no se muestra
+        const pasosStock = gruposTodos.map((g) => ({
+          g,
+          paso: {
+            obligatorio: g.obligatorio,
+            minimo: g.minimo,
+            opciones: g.opciones.map((o) => ({ disponible: o.disponible, bloqueadaPorStock: sinStockOpcion.has(o.id) })),
+          },
+        }));
+        const grupos = pasosStock.filter(({ paso }) => !pasoOpcionalOcultoPorStock(paso)).map(({ g }) => g);
+
+        // Producto que controla stock: sin saldo no se vende (aunque no esté marcado como agotado).
+        // Anfitrión de combo: un paso OBLIGATORIO sin ninguna opción por stock (y sin alternativas en el combo) lo deja «No disponible».
+        const esAnfitrionConAlternativas = (p.ofertasAlcance?.[0]?.combosParte ?? []).length > 0;
+        const disponible = (porSabor
+          ? estaDisponible(p.agotado_hasta) && saboresConStock
+          : estaDisponible(p.agotado_hasta) && !(quedan !== null && quedan <= 0))
+          && !(esAnfitrionCombo && anfitrionBloqueadoPorPaso(pasosStock.map((x) => x.paso), esAnfitrionConAlternativas));
+        const agotadoHasta =
+          p.agotado_hasta && !disponible
+            ? p.agotado_hasta.toISOString()
+            : null;
 
         productosCarta.push({
           id: p.id.toString(),
@@ -524,6 +559,102 @@ export class CatalogoService implements OnApplicationBootstrap {
       })),
       sabores: (p.sabores || []).map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock)),
     };
+  }
+
+  // --- Enlace de cada opción con el stock (opcion_requiere) ---
+
+  /** Requisitos de stock de una opción y los productos (con sus sabores) que se pueden enlazar. */
+  async listarRequisitosOpcion(opcionId: string) {
+    const id = this.parsearId(opcionId);
+    const opcion = await this.prisma.opcion.findUnique({ where: { id }, select: { id: true, valor: { select: { nombre: true } } } });
+    if (!opcion) throw new NotFoundException({ codigo: 'OPCION_NO_ENCONTRADA', mensaje: 'La opción no existe' });
+    const [filas, productos] = await Promise.all([
+      this.prisma.opcionRequiere.findMany({
+        where: { opcion_id: id },
+        orderBy: { id: 'asc' },
+        select: { producto_id: true, sabor_id: true, cantidad: true, producto: { select: { nombre: true } }, sabor: { select: { nombre: true } } },
+      }),
+      this.prisma.producto.findMany({
+        where: { controla_stock: true },
+        orderBy: { nombre: 'asc' },
+        select: { id: true, nombre: true, sabores: { where: { activo: true }, orderBy: { nombre: 'asc' }, select: { id: true, nombre: true } } },
+      }),
+    ]);
+    return {
+      opcionId: id.toString(),
+      nombre: opcion.valor?.nombre ?? '',
+      requisitos: filas.map((f) => ({
+        productoId: f.producto_id.toString(),
+        productoNombre: f.producto.nombre,
+        saborId: f.sabor_id ? f.sabor_id.toString() : null,
+        saborNombre: f.sabor?.nombre ?? null,
+        cantidad: f.cantidad,
+      })),
+      productos: productos.map((p) => ({
+        id: p.id.toString(),
+        nombre: p.nombre,
+        sabores: p.sabores.map((s) => ({ id: s.id.toString(), nombre: s.nombre })),
+      })),
+    };
+  }
+
+  /**
+   * Reemplaza los requisitos de una opción. Sin requisitos, la opción vuelve a depender solo de agotado_hasta.
+   * 400 si la cantidad no es 1..99, si se repite un producto/sabor o si el sabor no es de ese producto.
+   */
+  async guardarRequisitosOpcion(
+    opcionId: string,
+    requisitos: Array<{ productoId: string | number; saborId?: string | number | null; cantidad: number }>,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const id = this.parsearId(opcionId);
+    const opcion = await this.prisma.opcion.findUnique({ where: { id }, select: { id: true, valor: { select: { nombre: true } } } });
+    if (!opcion) throw new NotFoundException({ codigo: 'OPCION_NO_ENCONTRADA', mensaje: 'La opción no existe' });
+    const antes = await this.prisma.opcionRequiere.findMany({ where: { opcion_id: id }, select: { producto_id: true, sabor_id: true, cantidad: true } });
+
+    const vistos = new Set<string>();
+    const filas: Array<{ opcion_id: bigint; producto_id: bigint; sabor_id: bigint | null; cantidad: number }> = [];
+    for (const r of requisitos ?? []) {
+      const productoId = this.parsearId(r.productoId);
+      const saborId = r.saborId ? this.parsearId(r.saborId) : null;
+      const cantidad = Math.floor(Number(r.cantidad));
+      if (!Number.isFinite(cantidad) || cantidad < 1 || cantidad > 99) {
+        throw new BadRequestException({ codigo: 'CANTIDAD_INVALIDA', mensaje: 'La cantidad debe ser un número entre 1 y 99' });
+      }
+      const clave = `${productoId}|${saborId ?? ''}`;
+      if (vistos.has(clave)) {
+        throw new BadRequestException({ codigo: 'REQUISITO_REPETIDO', mensaje: 'Un producto (o sabor) aparece dos veces en la misma opción' });
+      }
+      vistos.add(clave);
+      const prod = await this.prisma.producto.findUnique({ where: { id: productoId }, select: { id: true, nombre: true } });
+      if (!prod) throw new NotFoundException({ codigo: 'PRODUCTO_NO_ENCONTRADO', mensaje: 'El producto no existe' });
+      if (saborId) {
+        const sabor = await this.prisma.sabor.findFirst({ where: { id: saborId, producto_id: productoId }, select: { id: true } });
+        if (!sabor) throw new BadRequestException({ codigo: 'SABOR_INVALIDO', mensaje: `El sabor no pertenece a ${prod.nombre}` });
+      }
+      filas.push({ opcion_id: id, producto_id: productoId, sabor_id: saborId, cantidad });
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.opcionRequiere.deleteMany({ where: { opcion_id: id } }),
+      this.prisma.opcionRequiere.createMany({ data: filas }),
+    ]);
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'CAMBIAR_STOCK_OPCION',
+      resultado: 'OK',
+      entidad: 'opcion',
+      entidadId: id,
+      antes: antes.map((a) => ({ productoId: a.producto_id.toString(), saborId: a.sabor_id?.toString() ?? null, cantidad: a.cantidad })),
+      despues: filas.map((f) => ({ productoId: f.producto_id.toString(), saborId: f.sabor_id?.toString() ?? null, cantidad: f.cantidad })),
+      usuario,
+      ip,
+    } as any);
+
+    return this.listarRequisitosOpcion(opcionId);
   }
 
   async crearProducto(dto: CrearProductoDto, usuario?: UsuarioAutenticado, ip?: string) {

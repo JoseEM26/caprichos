@@ -11,6 +11,18 @@ import {
   miHoy as cargarMiHoy,
   miPropinas,
 } from './asistenciaApi';
+import { Boton } from '../../comun/Boton';
+import { Cargando } from '../../comun/Cargando';
+import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
+import { leerQrDeVideo, mensajeErrorCamara, pedirCamara } from './escanerQr';
+import './asistencia.css';
+
+const VARIANTE_ESTADO: Record<string, VarianteInsignia> = {
+  CUMPLIO: 'exito', TARDANZA: 'aviso', SALIO_ANTES: 'aviso', SALIO_DESPUES: 'neutro',
+  FALTA: 'peligro', INCOMPLETO: 'peligro', A_REVISAR: 'acento', DESCANSO: 'neutro', SIN_EVALUAR: 'neutro',
+};
+const NOMBRES_PASOS = ['QR', 'Ubicación', 'Selfie', 'Confirmar'];
+const INDICE_PASO: Partial<Record<Paso, number>> = { escanear: 0, ubicacion: 1, selfie: 2, confirmar: 3 };
 
 const MESES_TEXTO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -67,6 +79,9 @@ export function MiAsistenciaView() {
   const [mensajeOk, setMensajeOk] = useState<string | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
   const flujo = useRef<MediaStream | null>(null);
+  const [modoCamara, setModoCamara] = useState<'environment' | 'user'>('environment');
+  const [variasCamaras, setVariasCamaras] = useState(false);
+  const [errorCamara, setErrorCamara] = useState<string | null>(null);
 
   const recargar = async () => {
     try {
@@ -95,7 +110,7 @@ export function MiAsistenciaView() {
 
   async function abrirCamara(modo: 'environment' | 'user') {
     detenerCamara();
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: modo }, audio: false });
+    const stream = await pedirCamara(modo);
     flujo.current = stream;
     if (video.current) {
       video.current.srcObject = stream;
@@ -109,40 +124,40 @@ export function MiAsistenciaView() {
     setError(null);
     setCodigo('');
     setQrTexto(null);
+    setModoCamara('environment');
     setUbicacion(null);
     setSelfie(null);
     setPaso('escanear');
   };
 
-  // Escaneo con BarcodeDetector cuando el navegador lo trae; si no, código manual.
+  // Escaneo del QR: BarcodeDetector si existe; si no, jsQR. El código manual siempre queda a la vista.
   useEffect(() => {
     if (paso !== 'escanear') return;
-    const Detector = (window as any).BarcodeDetector;
     let activo = true;
-    let intervalo: ReturnType<typeof setInterval> | undefined;
+    let parar: (() => void) | undefined;
+    setErrorCamara(null);
     (async () => {
       try {
-        await abrirCamara('environment');
-        if (!Detector || !video.current) return;
-        const det = new Detector({ formats: ['qr_code'] });
-        intervalo = setInterval(async () => {
-          if (!activo || !video.current) return;
-          const codigos = await det.detect(video.current).catch(() => []);
-          if (codigos.length && activo) {
-            setQrTexto(codigos[0].rawValue);
-            setPaso('ubicacion');
-          }
-        }, 400);
-      } catch {
-        // Sin cámara: queda el código manual
+        await abrirCamara(modoCamara);
+        if (!activo) return;
+        navigator.mediaDevices.enumerateDevices?.()
+          .then((d) => activo && setVariasCamaras(d.filter((x) => x.kind === 'videoinput').length > 1))
+          .catch(() => undefined);
+        if (!video.current) return;
+        parar = leerQrDeVideo(video.current, (texto) => {
+          setQrTexto(texto);
+          setPaso('ubicacion');
+        });
+      } catch (e) {
+        if (activo) setErrorCamara(mensajeErrorCamara(e));
       }
     })();
     return () => {
       activo = false;
-      if (intervalo) clearInterval(intervalo);
+      parar?.();
       detenerCamara();
     };
-  }, [paso]);
+  }, [paso, modoCamara]);
 
   // Ubicación al entrar a su paso
   useEffect(() => {
@@ -165,7 +180,7 @@ export function MiAsistenciaView() {
   // Cámara frontal para la selfie
   useEffect(() => {
     if (paso !== 'selfie') return;
-    abrirCamara('user').catch(() => setError('No pudimos abrir la cámara. Revisa el permiso del navegador.'));
+    abrirCamara('user').catch((e) => setError(mensajeErrorCamara(e)));
     return () => detenerCamara();
   }, [paso]);
 
@@ -206,125 +221,171 @@ export function MiAsistenciaView() {
     }
   }
 
-  if (cargando) return <div role="status">Cargando tu asistencia…</div>;
-  if (!hoy) return <div role="alert">{error ?? 'No pudimos cargar tu asistencia.'}</div>;
+  if (cargando) return <Cargando mensaje="Cargando tu asistencia…" />;
+  if (!hoy) return <div role="alert" className="ma-resultado ma-resultado--error"><strong>No pudimos cargar tu asistencia</strong><span>{error ?? 'Revisa tu conexión e intenta otra vez.'}</span></div>;
 
   const pendiente = hoy.pendiente;
   const faltaConsent = hoy.consentimiento !== null && !hoy.consentimientoAceptado;
   const puedeMarcar = (pendiente !== null || hoy.permitidas.length > 0) && (!faltaConsent || aceptaConsent);
+  const indice = INDICE_PASO[paso];
+  const horaLima = new Date(hoy.ahora).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div style={{ display: 'grid', gap: 16, maxWidth: 520, margin: '0 auto', padding: 16 }}>
-      <h2 style={{ margin: 0 }}>Mi asistencia</h2>
-      <div data-testid="estado-hoy" style={{ fontSize: 18 }}>
-        {pendiente ? <>Te falta marcar: <strong>{ETIQUETA_TIPO[pendiente]}</strong></> : 'Hoy ya no tienes marcas pendientes'}
-      </div>
-      {hoy.turno && (
-        <div style={{ fontSize: 14 }}>
-          Tu turno: {hoy.turno.entrada} a {hoy.turno.salida}
-          {hoy.turno.almuerzo ? ` (almuerzo ${hoy.turno.almuerzo})` : ''}
+    <div className="ma-vista">
+      <section className="ma-estado" aria-label="Estado de hoy">
+        <span className="ma-fecha">Hoy {hoy.jornada} · {horaLima}</span>
+        <div data-testid="estado-hoy" className="ma-estado-txt">
+          {pendiente ? <>Te falta marcar: <strong>{ETIQUETA_TIPO[pendiente]}</strong></> : 'Hoy ya no tienes marcas pendientes'}
         </div>
-      )}
-      {!hoy.turno && <div style={{ fontSize: 14 }}>Hoy no tienes turno programado.</div>}
+        {hoy.turno ? (
+          <div className="ma-turno">
+            Tu turno: {hoy.turno.entrada} a {hoy.turno.salida}
+            {hoy.turno.almuerzo ? ` (almuerzo ${hoy.turno.almuerzo})` : ''}
+          </div>
+        ) : (
+          <div className="ma-turno">Hoy no tienes turno programado.</div>
+        )}
+        {hoy.marcas.length > 0 && (
+          <div className="ma-marcas">
+            {hoy.marcas.map((m: any, i: number) => (
+              <Insignia key={m.id ?? i} variante="exito">{ETIQUETA_TIPO[m.tipo as TipoMarca] ?? m.tipo}</Insignia>
+            ))}
+          </div>
+        )}
+      </section>
 
       {faltaConsent && hoy.consentimiento && (
-        <label style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid #ccc', borderRadius: 8 }}>
+        <label className="ma-consent">
           <span>{hoy.consentimiento.texto}</span>
-          <span>
+          <span className="ma-check">
             <input type="checkbox" checked={aceptaConsent} onChange={(e) => setAceptaConsent(e.target.checked)} /> Acepto el tratamiento de mis datos para el control de asistencia.
           </span>
         </label>
+      )}
+
+      {indice !== undefined && (
+        <ol className="ma-pasos" aria-label="Pasos de la marca">
+          {NOMBRES_PASOS.map((n, i) => (
+            <li key={n} data-estado={i < indice ? 'hecho' : i === indice ? 'actual' : 'pendiente'} aria-current={i === indice ? 'step' : undefined}>
+              <span>{i < indice ? '✓' : i + 1}</span>
+              {n}
+            </li>
+          ))}
+        </ol>
       )}
 
       {paso === 'inicio' && (
         <>
           <button
             type="button"
+            className="ma-grande"
             disabled={!puedeMarcar || enviando}
             onClick={() => empezar(pendiente ?? hoy.permitidas[0])}
-            style={{ padding: '24px 16px', fontSize: 22, borderRadius: 16, width: '100%' }}
           >
-            {pendiente ? `Marcar ${ETIQUETA_TIPO[pendiente]}` : 'Marcar'}
+            {pendiente ? 'Escanear QR' : 'Marcar'}
           </button>
           {hoy.permitidas.length > 1 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div className="ma-otras">
               {hoy.permitidas
                 .filter((t) => t !== pendiente)
                 .map((t) => (
-                  <button key={t} type="button" disabled={!puedeMarcar} onClick={() => empezar(t)}>
+                  <Boton key={t} type="button" variante="secundario" disabled={!puedeMarcar} onClick={() => empezar(t)}>
                     {ETIQUETA_TIPO[t]}
-                  </button>
+                  </Boton>
                 ))}
             </div>
           )}
+          {faltaConsent && !aceptaConsent && <p className="as-ayuda">Acepta el aviso de datos para poder marcar.</p>}
         </>
       )}
 
       {paso === 'escanear' && (
-        <section style={{ display: 'grid', gap: 8 }}>
-          <div>Apunta la cámara al QR de la pantalla del local.</div>
-          <video ref={video} muted playsInline style={{ width: '100%', borderRadius: 8 }} />
-          <label>
+        <section className="ma-card">
+          <h3>1. Escanea el QR</h3>
+          <div className="as-ayuda">Apunta la cámara al QR de la pantalla del local.</div>
+          <video ref={video} muted playsInline autoPlay className="ma-video" />
+          {errorCamara && <div role="alert" className="as-aviso as-aviso--alerta" data-testid="error-camara">{errorCamara}</div>}
+          {variasCamaras && !errorCamara && (
+            <Boton type="button" variante="secundario" onClick={() => setModoCamara((m) => (m === 'environment' ? 'user' : 'environment'))}>
+              Cambiar cámara
+            </Boton>
+          )}
+          <label className="as-campo">
             O escribe el código de 6 dígitos de la pantalla
             <input
               inputMode="numeric"
               maxLength={7}
+              className="ma-codigo"
               value={codigo}
               onChange={(e) => setCodigo(e.target.value)}
-              style={{ display: 'block', fontSize: 24, width: '100%' }}
             />
           </label>
-          <button type="button" disabled={codigo.replace(/\s+/g, '').length !== 6} onClick={() => setPaso('ubicacion')}>
+          <Boton type="button" tamano="grande" disabled={codigo.replace(/\s+/g, '').length !== 6} onClick={() => setPaso('ubicacion')}>
             Continuar
-          </button>
-          <button type="button" onClick={() => setPaso('inicio')}>Cancelar</button>
+          </Boton>
+          <Boton type="button" variante="texto" onClick={() => setPaso('inicio')}>Cancelar</Boton>
         </section>
       )}
 
-      {paso === 'ubicacion' && <div role="status">Leyendo tu ubicación precisa…</div>}
+      {paso === 'ubicacion' && (
+        <section className="ma-card">
+          <h3>2. Ubicación</h3>
+          <Cargando mensaje="Leyendo tu ubicación precisa…" />
+          {error && <Boton type="button" variante="texto" onClick={() => setPaso('inicio')}>Cancelar</Boton>}
+        </section>
+      )}
 
       {paso === 'selfie' && (
-        <section style={{ display: 'grid', gap: 8 }}>
-          <div>Tómate una selfie para confirmar tu marca.</div>
-          <video ref={video} muted playsInline style={{ width: '100%', borderRadius: 8 }} />
-          <button type="button" onClick={() => void tomarSelfie()}>Tomar selfie</button>
+        <section className="ma-card">
+          <h3>3. Selfie</h3>
+          <div className="as-ayuda">Tómate una selfie para confirmar tu marca.</div>
+          <video ref={video} muted playsInline className="ma-video" />
+          <Boton type="button" tamano="grande" onClick={() => void tomarSelfie()}>Tomar selfie</Boton>
         </section>
       )}
 
       {paso === 'confirmar' && tipo && (
-        <section style={{ display: 'grid', gap: 8 }}>
+        <section className="ma-card">
+          <h3>4. Confirmar</h3>
           <div>Confirmar: <strong>{ETIQUETA_TIPO[tipo]}</strong></div>
-          {selfie && <img alt="Selfie de la marca" src={`data:image/jpeg;base64,${selfie}`} style={{ width: 120, borderRadius: 8 }} />}
-          <button type="button" disabled={enviando} onClick={() => void enviar()} style={{ padding: 16, fontSize: 18 }}>
+          {selfie && <img alt="Selfie de la marca" src={`data:image/jpeg;base64,${selfie}`} className="as-selfie" style={{ maxWidth: 140 }} />}
+          <Boton type="button" tamano="grande" disabled={enviando} onClick={() => void enviar()}>
             {enviando ? 'Registrando…' : 'Confirmar marca'}
-          </button>
-          <button type="button" onClick={() => setPaso('inicio')}>Cancelar</button>
+          </Boton>
+          <Boton type="button" variante="texto" onClick={() => setPaso('inicio')}>Cancelar</Boton>
         </section>
       )}
 
-      {mensajeOk && <div role="status">{mensajeOk}</div>}
-      {error && <div role="alert">{error}</div>}
+      {mensajeOk && (
+        <div role="status" className="ma-resultado ma-resultado--ok"><strong>Marca registrada</strong><span>{mensajeOk}</span></div>
+      )}
+      {error && (
+        <div role="alert" className="ma-resultado ma-resultado--error"><strong>No se pudo marcar</strong><span>{error}</span></div>
+      )}
 
       {propinas.length > 0 && (
-        <section aria-label="Mis propinas" style={{ display: 'grid', gap: 6 }}>
-          <h3 style={{ margin: 0 }}>Mis propinas</h3>
+        <section aria-label="Mis propinas" className="ma-lista">
+          <h3 className="as-sub">Mis propinas</h3>
           {propinas.map((p) => (
-            <div key={`${p.anio}-${p.mes}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, gap: 8 }}>
-              <span>{MESES_TEXTO[p.mes - 1]} {p.anio}</span>
-              <span>{p.horas.toFixed(2)} h · {p.porcentaje.toFixed(2)} %</span>
+            <div key={`${p.anio}-${p.mes}`} className="ma-item">
+              <span>
+                <b>{MESES_TEXTO[p.mes - 1]} {p.anio}</b>
+                <small>{p.horas.toFixed(2)} h · {p.porcentaje.toFixed(2)} %</small>
+              </span>
               <strong>S/ {p.monto.toFixed(2)}</strong>
-              <span>{p.pagadoEn ? `Pagado (${p.pagadoMedio ?? 'sin medio'})` : 'Por pagar'}</span>
+              <Insignia variante={p.pagadoEn ? 'exito' : 'aviso'}>{p.pagadoEn ? `Pagado (${p.pagadoMedio ?? 'sin medio'})` : 'Por pagar'}</Insignia>
             </div>
           ))}
         </section>
       )}
 
-      <section aria-label="Historial de los últimos días" style={{ display: 'grid', gap: 6 }}>
-        <h3 style={{ margin: 0 }}>Últimos días</h3>
+      <section aria-label="Historial de los últimos días" className="ma-lista">
+        <h3 className="as-sub">Últimos días</h3>
+        {historial.length === 0 && <p className="as-ayuda">Aún no tienes días registrados.</p>}
         {historial.map((d) => (
-          <div key={d.jornada} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-            <span>{d.jornada}</span>
-            <span>{ETIQUETA_ESTADO[d.estado] ?? d.estado}</span>
+          <div key={d.jornada} className="ma-item">
+            <b>{d.jornada}</b>
+            <Insignia variante={VARIANTE_ESTADO[d.estado] ?? 'neutro'}>{ETIQUETA_ESTADO[d.estado] ?? d.estado}</Insignia>
           </div>
         ))}
       </section>

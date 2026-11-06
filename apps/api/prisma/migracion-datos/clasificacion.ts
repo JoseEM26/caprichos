@@ -23,7 +23,7 @@ export const MIGRAR: string[] = [
   // Reparto y plano de mesas
   'zona_reparto', 'piso', 'elemento_plano',
   // Ofertas, combos y cupones fijos
-  'oferta', 'combo_precio', 'combo_parte', 'combo_parte_reemplazo', 'cupon',
+  'oferta', 'combo_precio', 'combo_parte', 'combo_parte_reemplazo', 'opcion_requiere', 'cupon',
   // Recetas e insumos (catálogo, sin stock ni movimientos)
   'insumo', 'receta', 'receta_linea', 'ajuste_opcion',
   // Contenido de la carta y de la web

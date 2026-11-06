@@ -53,6 +53,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'caja', accion: 'cerrar' },
   { modulo: 'caja', accion: 'ver' },
   { modulo: 'repartos', accion: 'ver' },
+  // Seguimiento de solo lectura de los deliveries (qué entrega y lleva cada repartidor): quien atiende delivery sin repartir
+  { modulo: 'repartos', accion: 'seguir' },
   { modulo: 'repartos', accion: 'tomar' },
   { modulo: 'repartos', accion: 'entregar' },
   { modulo: 'repartos', accion: 'reportar' },
@@ -225,6 +227,7 @@ export const MATRIZ: Record<string, string[]> = {
     'mesas/abrir',
     'mesas/liberar',
     'repartos/ver',
+    'repartos/seguir',
     'repartos/liquidar',
     'vouchers/subir',
     'vouchers/ver',
@@ -262,6 +265,7 @@ export const MATRIZ: Record<string, string[]> = {
     'mesas/abrir',
     'mesas/liberar',
     'cocina/despachar',
+    'repartos/seguir',
     'reservas/ver',
     'reservas/crear',
     'reservas/editar',
@@ -277,6 +281,7 @@ export const MATRIZ: Record<string, string[]> = {
     'reservas/crear',
     'reservas/editar',
     'plano/ver',
+    'mesas/ver', // solo lectura: el croquis de Reservas lee las mesas
     'cupones/ver',
     'cupones/canjear',
     'clientes/ver',

@@ -12,6 +12,10 @@ interface ResumenPedidoRepartoProps {
   esMio?: boolean;
   esDisponible?: boolean;
   puedeLiquidar?: boolean;
+  /** Solo ADMIN: «Tomar como repartidor» en un pedido esperando repartidor. */
+  puedeTomar?: boolean;
+  /** Solo ADMIN y CAJERO: abre el modal de excepción Soltar / reasignar (motivo obligatorio). */
+  alSoltar?: (pedido: PedidoReparto) => void;
   alCerrar?: () => void;
   alActualizar?: () => void;
   acciones: ReturnType<typeof useAccionesReparto>;
@@ -38,6 +42,8 @@ export function ResumenPedidoReparto({
   esMio = false,
   esDisponible = false,
   puedeLiquidar = false,
+  puedeTomar = false,
+  alSoltar,
   alCerrar,
   alActualizar,
   acciones,
@@ -269,10 +275,10 @@ export function ResumenPedidoReparto({
           <div>
             Alerta caja: Tomado hace {pedido.minutos_sin_salir ?? 10} min sin salir (posible repartidor desconectado)
           </div>
-          {puedeLiquidar && (
+          {alSoltar && (
             <button
               type="button"
-              onClick={() => acciones.liberar(pedido, 'Liberado por caja: demora sin salir')}
+              onClick={() => alSoltar(pedido)}
               disabled={acciones.cargandoAccion}
               style={{
                 alignSelf: 'flex-start',
@@ -287,7 +293,7 @@ export function ResumenPedidoReparto({
                 cursor: 'pointer',
               }}
             >
-              Liberar a disponibles
+              Soltar / reasignar
             </button>
           )}
         </div>
@@ -451,7 +457,12 @@ export function ResumenPedidoReparto({
       )}
 
       {/* UN SOLO BOTÓN GRANDE DE ESTADO (Tomar pedido, En camino, He llegado, Entregado) - Decisión 7 */}
-      {esDisponible && (
+      {esDisponible && !puedeTomar && (
+        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-soft, #5A6E78)', textAlign: 'center', padding: '6px 0' }}>
+          Esperando que un repartidor lo tome
+        </div>
+      )}
+      {esDisponible && puedeTomar && (
         faltaUbicar ? (
           <Boton
             disabled
@@ -489,7 +500,7 @@ export function ResumenPedidoReparto({
               boxShadow: '0 4px 12px rgba(230, 121, 41, 0.35)',
             }}
           >
-            {acciones.cargandoAccion ? 'Tomando...' : 'Tomar pedido'}
+            {acciones.cargandoAccion ? 'Tomando...' : 'Tomar como repartidor'}
           </button>
         )
       )}
@@ -523,10 +534,10 @@ export function ResumenPedidoReparto({
       )}
 
       {/* Liberar pedido por caja/administrador */}
-      {puedeLiquidar && (pedido.repartidor || pedido.repartidor_party_id) && pedido.estado !== 'ENTREGADO' && !pedido.alerta_tomado_sin_salir && (
+      {alSoltar && (pedido.repartidor || pedido.repartidor_party_id) && pedido.estado !== 'ENTREGADO' && !pedido.alerta_tomado_sin_salir && (
         <button
           type="button"
-          onClick={() => acciones.liberar(pedido, 'Liberado por caja/administrador')}
+          onClick={() => alSoltar(pedido)}
           disabled={acciones.cargandoAccion}
           style={{
             minHeight: '44px',
@@ -541,7 +552,7 @@ export function ResumenPedidoReparto({
             width: '100%',
           }}
         >
-          Liberar pedido a disponibles (caja)
+          Soltar / reasignar
         </button>
       )}
 

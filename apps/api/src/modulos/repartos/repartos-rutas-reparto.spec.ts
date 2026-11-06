@@ -10,7 +10,7 @@ import { sincronizarRuta, sumarARuta } from './rutas-reparto';
 
 const A = { partyId: 10n, rol: 'REPARTIDOR', debeCambiar: false } as any;
 const B = { partyId: 20n, rol: 'REPARTIDOR', debeCambiar: false } as any;
-const CAJA = { partyId: 1n, rol: 'CAJA', debeCambiar: false } as any;
+const CAJA = { partyId: 1n, rol: 'CAJERO', debeCambiar: false } as any;
 
 const ped = (id: bigint, o: any = {}) => ({
   id, codigo: `CP-${id}`, estado: 'LISTO', modalidad: 'DELIVERY', repartidor_party_id: null, ruta_reparto_id: null,

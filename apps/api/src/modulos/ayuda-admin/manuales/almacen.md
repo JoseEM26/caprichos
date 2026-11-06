@@ -4,12 +4,13 @@ titulo: Almacén
 ruta: /admin/almacen
 permiso: stock/ver
 roles: [ADMIN, ALMACEN, COCINA]
-relacionados: [stock, compras, cocina, supervisor-codigo]
+relacionados: [stock, compras, cocina, supervisor-codigo, apertura, productos]
 sugerencias:
   - ¿Cómo traslado insumos del almacén a la cocina o barra?
   - ¿Cómo registro una merma de productos dañados o vencidos?
   - ¿Cómo anoto los productos que preparé hoy en producción?
   - ¿Por qué el sistema me pide el código del supervisor al anular?
+  - ¿Dónde cuento las donas y galletas del día?
 ---
 # Almacén
 
@@ -68,6 +69,12 @@ El control de almacen decide si vender toca el stock. Apagado, al cobrar un pedi
 Nota: solo el administrador puede encender o apagar el control. Mientras este apagado, las pantallas de almacen, stock y compras muestran una franja de aviso.
 Antes: [[stock]]
 Ver tambien: [[compras]]
+
+## Como se hace: Contar los productos terminados (donas, galletas, postres)
+1. El Almacen y el Control de almacen son solo para insumos y recetas. Los productos terminados que controlan stock (donas, galletas, postres) se cuentan cada dia en Apertura del dia: ver [[apertura]].
+2. Si en Cocina o en Almacen aparece "Falta el conteo de apertura de hoy (N productos)", pulsa Contar ahora.
+3. Cuales productos se cuentan y como se descuentan por sabor y por tamano se configura en [[productos]].
+Despues: [[apertura]]
 
 ## Errores y dudas comunes
 - Cuando se requiere el codigo del supervisor: el codigo de 6 digitos se exige siempre para anular cualquier movimiento previo, para anular tandas de produccion y para registrar mermas o ajustes grandes de 10 o mas unidades. El administrador no necesita codigo en ninguno de estos casos.

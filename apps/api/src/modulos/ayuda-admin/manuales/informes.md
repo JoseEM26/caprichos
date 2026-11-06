@@ -4,12 +4,13 @@ titulo: Informes
 ruta: /admin/informes
 permiso: auditoria/ver
 roles: [ADMIN]
-relacionados: [caja, cierre, comprobantes, indicadores, mapa]
+relacionados: [caja, cierre, comprobantes, indicadores, mapa, propinas]
 sugerencias:
   - ¿Cómo consulto las ventas de un día o de una semana específica?
   - ¿Cómo exporto un informe de ventas o productos a Excel?
   - ¿Dónde veo los pedidos que fueron rechazados o anulados?
   - ¿Cómo imprimo o descargo en PDF un reporte de caja?
+  - ¿Dónde veo cuánto se regaló en cortesías?
 ---
 # Informes
 
@@ -38,6 +39,12 @@ Ver tambien: [[historial]]
 1. En la vista del reporte abierto, pulsa el boton "Imprimir o PDF".
 2. Se abrira la ventana estandar de impresion del sistema operativo configurada de forma limpia para mandar a la impresora o seleccionar la opcion "Guardar como PDF".
 Ver tambien: [[comprobantes]]
+
+## Como se hace: Ver el reporte de Cortesias
+1. En la lista de informes abre Cortesias (categoria Ventas): "Lo regalado a costo 0: por motivo, por producto y por quien la dio, con su valor de lista". Filtra por Fecha.
+2. Arriba ves tres cifras: Cortesias, Unidades regaladas y Valor de lista regalado.
+3. La tabla va por secciones: Por motivo, Por producto, Por quien la dio y Detalle (fecha, producto y sabor, cantidad, valor de lista, motivo y nota, pedido o pedido de referencia, y quien la dio con "autoriza ..." si la autorizo un supervisor).
+4. Las cortesias no cuentan en las ventas de los informes, ni en comprobantes ni en puntos. Como darlas: ver [[caja]].
 
 ## Errores y dudas comunes
 - Que significa el aviso "Desde es posterior a Hasta": aparece cuando la fecha inicial elegida en el calendario es mayor que la fecha de cierre. Corrige las fechas en los selectores para que el reporte pueda procesar los datos.

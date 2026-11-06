@@ -3,13 +3,16 @@ modulo: notificaciones
 titulo: Notificaciones
 ruta: /admin/notificaciones
 permiso: notificaciones/ver
-roles: [ADMIN, COCINA, MOZO, CALLCENTER, ALMACEN, REPARTIDOR]
-relacionados: [cocina, caja, stock, mensajes, repartos]
+roles: [ADMIN, COCINA, MOZO, CALLCENTER, ALMACEN, REPARTIDOR, SUPERVISOR]
+relacionados: [cocina, caja, stock, mensajes, repartos, reservas, escritorio]
 sugerencias:
   - ¿Dónde veo los pedidos demorados y alertas urgentes de mi área?
   - ¿Cómo marco las notificaciones como leídas?
   - ¿Cómo creo un nuevo aviso para el equipo del local?
   - ¿Cómo voy directamente a resolver un pedido o mensaje pendiente?
+  - ¿Por qué suena la campana cada pocos segundos?
+  - ¿Por qué parpadea el menú de Reservas?
+  - ¿Por qué no me llegan los avisos de pedidos nuevos?
 ---
 # Notificaciones
 
@@ -41,6 +44,16 @@ Ver tambien: [[historial]]
 4. Elige la prioridad ("Normal" o "Urgente") y los roles destinatarios.
 5. Pulsa el botón "Enviar aviso". La notificación aparecerá instantáneamente en el panel de los colaboradores conectados.
 Despues: [[notificaciones]]
+
+## Como se hace: Entender la campana y los avisos que no se pierden
+1. La campana de arriba muestra cuantos avisos sin leer tienes; el contador tambien aparece en el titulo de la pestana del navegador.
+2. Cada pedido nuevo y cada reserva nueva tienen su aviso y le llega solo a quien puede atenderlo (por ejemplo, las reservas a quien tiene permiso de Reservas, los vouchers a Caja).
+3. Cuando llega un aviso nuevo sale un aviso grande durante unos 8 segundos y luego se minimiza a la campana. Mientras no lo marques como leido suena un sonido cada 15 segundos.
+4. Cada persona marca sus propios avisos: que uno los lea no los marca leidos para los demas. Tambien los avisos calculados (como "Caja sin abrir") se marcan por usuario.
+5. El orden es: primero los no leidos por urgencia (los urgentes primero) y al final los leidos.
+6. Las solicitudes de reserva pendientes (de la carta o de WhatsApp) aparecen como aviso urgente y el menu Reservas parpadea con su contador hasta atenderlas. Ver [[reservas]].
+7. El boton "Marcar todas leidas" solo aparece si el Administrador lo dejo activo; si esta apagado cada aviso se marca aparte.
+Ver tambien: [[reservas]]
 
 ## Errores y dudas comunes
 - Las alertas desaparecen solas: las notificaciones operativas de pedidos demorados o mensajes pendientes se resuelven y retiran automáticamente cuando el pedido cambia de estado o el mensaje es atendido por el personal.

@@ -136,7 +136,7 @@ export const MODULOS: DefinicionModulo[] = [
     nombre: 'Repartos',
     grupo: 'Operación',
     ruta: '/admin/repartos',
-    permisoMinimo: 'repartos/ver',
+    permisoMinimo: 'repartos',
     componente: RepartosView,
     icono: 'repartos',
   },

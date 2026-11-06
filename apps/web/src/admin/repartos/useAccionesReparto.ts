@@ -149,46 +149,6 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
     );
   };
 
-  const liberar = (pedido: PedidoReparto, motivo = 'Liberado desde panel') => {
-    pedirConfirmacion(
-      '¿Liberar este pedido?',
-      `El pedido ${pedido.codigo} volverá a la lista de pedidos disponibles sin repartidor asignado.`,
-      async () => {
-        try {
-          setCargandoAccion(true);
-          await repartosApi.liberarPedido(pedido.id, motivo);
-          cerrarConfirmacion();
-          alActualizar();
-        } catch (err: any) {
-          cerrarConfirmacion();
-          setErrorAccion(err instanceof ErrorApi ? err.message : 'Error al liberar pedido');
-        } finally {
-          setCargandoAccion(false);
-        }
-      },
-    );
-  };
-
-  const reasignar = (pedido: PedidoReparto, nuevoRepartidorPartyId: string, motivo = 'Reasignado desde panel') => {
-    pedirConfirmacion(
-      '¿Reasignar este pedido?',
-      `El pedido ${pedido.codigo} se asignará al nuevo repartidor seleccionado.`,
-      async () => {
-        try {
-          setCargandoAccion(true);
-          await repartosApi.reasignarPedido(pedido.id, nuevoRepartidorPartyId, motivo);
-          cerrarConfirmacion();
-          alActualizar();
-        } catch (err: any) {
-          cerrarConfirmacion();
-          setErrorAccion(err instanceof ErrorApi ? err.message : 'Error al reasignar pedido');
-        } finally {
-          setCargandoAccion(false);
-        }
-      },
-    );
-  };
-
   return {
     cargandoAccion,
     errorAccion,
@@ -199,7 +159,5 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
     salir,
     llegue,
     entregar,
-    liberar,
-    reasignar,
   };
 }

@@ -1016,9 +1016,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       ? entrada.id.replace('ped_op_', '')
       : null;
 
-    let opcion = (grupoActual.opciones || []).find((o: any) => String(o.id) === opIdMatch);
+    // Solo las opciones que se pueden pedir ahora (agotadas o sin stock no se aceptan)
+    const pedibles = (grupoActual.opciones || []).filter((o: any) => o.disponible !== false);
+    let opcion = pedibles.find((o: any) => String(o.id) === opIdMatch);
     if (!opcion) {
-      opcion = (grupoActual.opciones || []).find(
+      opcion = pedibles.find(
         (o: any) => normalizarTexto(o.nombre) === entrada.texto,
       );
     }
@@ -2730,7 +2732,13 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     };
   }
 
+  /** Paso de combo con opciones agotadas por stock: primero una línea de aviso (plan B), luego lo que se puede elegir. */
   private construirAccionGrupo(g: any): AccionMensaje[] {
+    const avisoStock: AccionMensaje[] = g.aviso ? [{ tipo: 'enviarTexto', texto: g.aviso } as AccionMensaje] : [];
+    return [...avisoStock, ...this.construirAccionGrupoBase(g)];
+  }
+
+  private construirAccionGrupoBase(g: any): AccionMensaje[] {
     const esObligatorio = g.obligatorio || g.minimo > 0;
     const opciones = (g.opciones || []).filter((o: any) => o.disponible !== false);
 

@@ -264,6 +264,7 @@ export class PedidosEstadoService {
       where.OR = [
         { codigo: { contains: q, mode: 'insensitive' } },
         { cliente_nombre: { contains: q, mode: 'insensitive' } },
+        { mesa_nombre: { contains: q, mode: 'insensitive' } },
       ];
     }
 

@@ -127,8 +127,20 @@ export interface ConfigAsistenciaAdmin {
 }
 
 export const pantallaQr = () => api.get<QrPantalla>('/admin/asistencia/pantalla/qr');
-export const miHoy = () => api.get<MiHoy>('/asistencia/mi/hoy');
-export const miHistorial = (dias = 14) => api.get<any[]>(`/asistencia/mi/historial?dias=${dias}`);
+/** Pantalla del local sin sesión: el enlace secreto va en la ruta (el token no se guarda en la web). */
+export const pantallaQrPublica = (token: string) =>
+  api.get<QrPantalla>(`/carta/asistencia-pantalla/${encodeURIComponent(token)}/qr`);
+
+export interface EstadoEnlacePantalla {
+  activo: boolean;
+  generadoEn: string | null;
+}
+export const estadoEnlacePantalla = () => api.get<EstadoEnlacePantalla>('/admin/asistencia/pantalla/enlace');
+/** Genera o regenera (invalida el anterior). La ruta trae el token en claro: solo se muestra una vez. */
+export const generarEnlacePantalla = () => api.post<{ ruta: string; generadoEn: string }>('/admin/asistencia/pantalla/enlace', {});
+export const desactivarEnlacePantalla = () => api.delete<EstadoEnlacePantalla>('/admin/asistencia/pantalla/enlace');
+export const miHoy = () => api.get<MiHoy>('/admin/asistencia/mi/hoy');
+export const miHistorial = (dias = 14) => api.get<any[]>(`/admin/asistencia/mi/historial?dias=${dias}`);
 /** Mi parte de los repartos de propinas aprobados o pagados (solo mis filas). */
 export interface MiPropina {
   anio: number;
@@ -140,8 +152,8 @@ export interface MiPropina {
   pagadoEn: string | null;
   pagadoMedio: string | null;
 }
-export const miPropinas = () => api.get<MiPropina[]>('/asistencia/mi/propinas');
-export const marcarAsistencia = (datos: DatosMarca) => api.post<ResultadoMarca>('/asistencia/marcar', datos);
+export const miPropinas = () => api.get<MiPropina[]>('/admin/asistencia/mi/propinas');
+export const marcarAsistencia = (datos: DatosMarca) => api.post<ResultadoMarca>('/admin/asistencia/marcar', datos);
 export const reporteHoy = () => api.get<{ jornada: string; filas: FilaHoy[] }>('/admin/asistencia/hoy');
 export const reporteMes = (anio: number, mes: number) =>
   api.get<{ dias: string[]; filas: FilaMes[]; personas: ResumenMes[] }>(`/admin/asistencia/mes?anio=${anio}&mes=${mes}&formato=json`);

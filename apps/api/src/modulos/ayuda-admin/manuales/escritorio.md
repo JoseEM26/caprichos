@@ -3,13 +3,15 @@ modulo: escritorio
 titulo: Escritorio
 ruta: /admin
 permiso:
-roles: [ADMIN, CAJERO, COCINA, MOZO, CALLCENTER, ALMACEN, REPARTIDOR]
-relacionados: [caja, cocina, repartos, compras, informes]
+roles: [ADMIN, CAJERO, COCINA, MOZO, CALLCENTER, ALMACEN, REPARTIDOR, SUPERVISOR]
+relacionados: [caja, cocina, repartos, compras, informes, reservas, plano, notificaciones, supervisor-codigo]
 sugerencias:
   - Como cambio el periodo de fechas para ver las ventas
   - Donde veo si algun insumo se esta quedando sin stock
   - Por que no veo los graficos de ventas en mi usuario
   - Que significan los pedidos pendientes en mi pantalla
+  - Que veo en el escritorio del supervisor
+  - Por que el supervisor no ve dinero en su escritorio
 ---
 # Escritorio
 
@@ -34,6 +36,15 @@ Ver tambien: [[stock]]
 1. En la seccion inferior del panel, revisar los contadores de tareas pendientes segun el puesto asignado.
 2. Pulsar sobre cualquiera de los enlaces de acceso directo para abrir el modulo correspondiente, como [[caja]] (Pedidos y caja), [[cocina]] o [[repartos]].
 Ver tambien: [[caja]], [[cocina]], [[repartos]]
+
+## Como se hace: Usar el escritorio del Supervisor
+1. Si tu rol es Supervisor, el escritorio es propio y no muestra dinero ni graficos de ventas: sirve para vigilar la operacion del dia.
+2. Pedidos: contadores Por confirmar, En cola, En preparacion, Listos, En reparto y No entregados. Al tocar uno abre Pedidos y caja, Cocina o Repartos.
+3. Reservas de hoy: "Reservas para hoy", que abre [[reservas]].
+4. Salon y caja: "Mesas ocupadas de N" y "Mesas libres" (abren el [[plano]]) y "Caja de hoy" con su estado: Abierta, Cerrada o Sin abrir hoy.
+5. Avisos: cuantos avisos sin leer tienes; abre [[notificaciones]]. El Supervisor recibe los avisos de caja.
+6. Para dictar el codigo de autorizacion usa Codigo del supervisor ([[supervisor-codigo]]).
+Ver tambien: [[supervisor-codigo]]
 
 ## Como se hace: Entender de donde salen las cifras
 1. Mirar el rango de fechas que aparece arriba de las tarjetas: por defecto son los ultimos 30 dias.
