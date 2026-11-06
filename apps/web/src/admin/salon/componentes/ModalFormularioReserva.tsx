@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Boton } from '../../../comun/Boton';
 import { Confirmar } from '../../../comun/Confirmar';
 import { Campo } from '../../../comun/Campo';
-import { MesaSalon, Reserva } from '../tipos';
+import { MesaSalon, PisoPlano, PisoSalon, Reserva } from '../tipos';
+import { SelectorMesasCroquis } from './SelectorMesasCroquis';
 import { hoyLima, partesLima } from '../fechaLima';
 
 export interface ModalFormularioReservaProps {
@@ -10,6 +11,9 @@ export interface ModalFormularioReservaProps {
   reservaParaEditar?: Reserva | null;
   fechaPorDefecto?: string; // YYYY-MM-DD
   mesasDisponibles: MesaSalon[];
+  /** Con pisos se elige en el croquis (con `planos` dibuja paredes, barra, cocina...); sin ellos, botones. */
+  pisos?: PisoSalon[];
+  planos?: PisoPlano[];
   alCerrar: () => void;
   alGuardar: (datos: {
     id?: string;
@@ -28,6 +32,8 @@ export function ModalFormularioReserva({
   reservaParaEditar,
   fechaPorDefecto,
   mesasDisponibles,
+  pisos,
+  planos,
   alCerrar,
   alGuardar,
   errorServidor,
@@ -453,7 +459,19 @@ export function ModalFormularioReserva({
                 </span>
               </div>
 
-              {/* Mesas disponibles como botones */}
+              {pisos && pisos.length > 0 ? (
+                <SelectorMesasCroquis
+                  pisos={pisos}
+                  planos={planos}
+                  seleccionadas={mesasElegidasIds}
+                  personas={personas}
+                  onCambio={(ids) => {
+                    alLimpiarError?.();
+                    setErrorValidacion(null);
+                    setMesasElegidasIds(ids);
+                  }}
+                />
+              ) : (
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {mesasDisponibles.map((m) => {
                   const estaElegida = mesasElegidasIds.includes(m.id);
@@ -491,6 +509,7 @@ export function ModalFormularioReserva({
                   );
                 })}
               </div>
+              )}
 
               {/* Cálculo dinámico: «Faltan N asientos» */}
               {faltanAsientos > 0 ? (

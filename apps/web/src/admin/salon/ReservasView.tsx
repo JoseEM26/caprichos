@@ -3,7 +3,7 @@ import { useSesion } from '../../comun/sesion';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
-import { PisoSalon, Reserva } from './tipos';
+import { PisoPlano, PisoSalon, Reserva } from './tipos';
 import { ModalFormularioReserva } from './componentes/ModalFormularioReserva';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ConfirmarAprobacionSolicitud } from './componentes/ConfirmarAprobacionSolicitud';
@@ -49,6 +49,9 @@ export function ReservasView() {
 
   // Mesas del salón
   const [pisosSalon, setPisosSalon] = useState<PisoSalon[]>([]);
+  // Dibujo del plano (paredes, barra, cocina...): lo trae /admin/plano; las mesas, /admin/salon/mesas
+  const [planoPisos, setPlanoPisos] = useState<PisoPlano[]>([]);
+  const [errorMapa, setErrorMapa] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [errorGlobal, setErrorGlobal] = useState<string | null>(null);
 
@@ -97,7 +100,20 @@ export function ReservasView() {
       const diaIso = `${mesActual.y}-${String(mesActual.m + 1).padStart(2, '0')}-${String(diaSeleccionado).padStart(2, '0')}`;
       const mesIso = `${mesActual.y}-${String(mesActual.m + 1).padStart(2, '0')}`;
 
-      const resMesas = salonApi.obtenerMesas ? await Promise.resolve(salonApi.obtenerMesas()).catch(() => null) : null;
+      // El mapa no se traga el error: si falla mesas o plano se avisa con «Reintentar»
+      let falloMapa = false;
+      const resMesas = salonApi.obtenerMesas
+        ? await Promise.resolve(salonApi.obtenerMesas()).catch(() => {
+            falloMapa = true;
+            return null;
+          })
+        : null;
+      const resPlano = salonApi.obtenerPlano
+        ? await Promise.resolve(salonApi.obtenerPlano()).catch(() => {
+            falloMapa = true;
+            return null;
+          })
+        : null;
       const resAgenda = salonApi.agenda ? await Promise.resolve(salonApi.agenda(diaIso)).catch(() => null) : null;
       const resReservas = salonApi.listarReservas ? await Promise.resolve(salonApi.listarReservas()).catch(() => null) : null;
       const resSolicitudes = salonApi.listarSolicitudes ? await Promise.resolve(salonApi.listarSolicitudes()).catch(() => null) : null;
@@ -106,6 +122,8 @@ export function ReservasView() {
       }
 
       if (resMesas?.pisos) setPisosSalon(resMesas.pisos);
+      if (Array.isArray(resPlano)) setPlanoPisos(resPlano);
+      setErrorMapa(falloMapa);
       if (Array.isArray(resAgenda)) setAgendaReservas(resAgenda);
       if (Array.isArray(resReservas)) setReservas(resReservas);
       if (Array.isArray(resSolicitudes)) {
@@ -143,6 +161,12 @@ export function ReservasView() {
         .obtenerMesas()
         .then((res) => {
           if (res?.pisos) setPisosSalon(res.pisos);
+        })
+        .catch(() => {});
+      salonApi
+        .obtenerPlano?.()
+        .then((res) => {
+          if (Array.isArray(res)) setPlanoPisos(res);
         })
         .catch(() => {});
     },
@@ -378,6 +402,43 @@ export function ReservasView() {
         width: '100%',
       }}
     >
+      {errorMapa && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            flexWrap: 'wrap',
+            padding: '10px 14px',
+            borderRadius: '12px',
+            background: '#FBEDE9',
+            border: '1.5px solid var(--cp-rust)',
+            color: 'var(--cp-rust)',
+            fontSize: '13px',
+            fontWeight: 700,
+          }}
+        >
+          No se pudo cargar el mapa.
+          <button
+            type="button"
+            onClick={cargarDatos}
+            style={{
+              minHeight: '36px',
+              padding: '0 14px',
+              borderRadius: '10px',
+              border: '1.5px solid var(--cp-rust)',
+              background: 'var(--cp-white)',
+              color: 'var(--cp-rust)',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
       {/* Toast de aviso en vivo de Socket.IO (salon:listo) */}
       {avisoListo && (
         <div
@@ -1528,6 +1589,7 @@ export function ReservasView() {
         <ConfirmarAprobacionSolicitud
           solicitud={confirmarAprobarSol}
           pisos={pisosSalon}
+          planos={planoPisos}
           obtenerOcupadas={(fecha, hora) => salonApi.mesasOcupadas(fecha, hora)}
           obtenerAvisos={(fecha, hora, mesaIds) => salonApi.avisosMesas(fecha, hora, mesaIds)}
           alAprobar={async ({ mesas, hora, confirmarCapacidad }) => {
@@ -1637,6 +1699,8 @@ export function ReservasView() {
         abierto={modalFormularioAbierto}
         reservaParaEditar={reservaParaEditar}
         mesasDisponibles={todasLasMesas}
+        pisos={pisosSalon}
+        planos={planoPisos}
         alCerrar={() => {
           setModalFormularioAbierto(false);
           setReservaParaEditar(null);
