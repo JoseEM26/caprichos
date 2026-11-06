@@ -20,6 +20,8 @@ model ControlSistema {
 // ---------- Ola 1: personas, acceso, auditoría y configuración (ADR-004, ADR-008, ADR-014) ----------
 
 model Party {
+  cortesiasDadas       Cortesia[] @relation("CortesiaDadaPor")
+  cortesiasAutorizadas Cortesia[] @relation("CortesiaAutorizadaPor")
   id                       BigInt                 @id @default(autoincrement())
   tipo                     String // PERSONA | ORGANIZACION
   estado                   String                 @default("ACTIVO")
@@ -367,6 +369,7 @@ model Categoria {
 }
 
 model Producto {
+  cortesias Cortesia[]
   id                 BigInt           @id @default(autoincrement())
   categoria_id       BigInt
   nombre             String           @unique
@@ -463,6 +466,7 @@ model ProductoGrupo {
 }
 
 model Sabor {
+  cortesias Cortesia[]
   id            BigInt    @id @default(autoincrement())
   producto_id   BigInt
   nombre        String
@@ -523,6 +527,8 @@ model ZonaReparto {
 }
 
 model Pedido {
+  cortesias          Cortesia[] @relation("CortesiaPedido")
+  cortesiasReferencia Cortesia[] @relation("CortesiaReferencia")
   id                     BigInt                  @id @default(autoincrement())
   codigo                 String                  @unique
   canal                  String                  @default("CARTA")
@@ -679,6 +685,7 @@ model ClienteDireccion {
 }
 
 model PedidoLinea {
+  es_cortesia      Boolean            @default(false)
   id               BigInt              @id @default(autoincrement())
   pedido_id        BigInt
   producto_id      BigInt?
@@ -710,6 +717,7 @@ model PedidoLinea {
   lineasComboHijas PedidoLinea[]       @relation("ComboPartes")
   opcionesElegidas PedidoLineaOpcion[]
   sabores          PedidoLineaSabor[]
+  cortesia         Cortesia?
 
   @@map("pedido_linea")
 }
@@ -1095,7 +1103,7 @@ model Stock {
 
 model MovimientoStock {
   id                    BigInt            @id @default(autoincrement())
-  tipo                  String            // ENTRADA | SALIDA | AJUSTE | MERMA | DEVOLUCION | VENTA | PRODUCCION_CONSUMO | PRODUCCION_ALTA | TRASLADO_SALIDA | TRASLADO_ENTRADA | DIFERENCIA_CONTEO | ANULACION
+  tipo                  String            // ENTRADA | SALIDA | AJUSTE | MERMA | DEVOLUCION | VENTA | PRODUCCION_CONSUMO | PRODUCCION_ALTA | TRASLADO_SALIDA | TRASLADO_ENTRADA | DIFERENCIA_CONTEO | ANULACION | CORTESIA
   insumo_id             BigInt?
   producto_id           BigInt?
   lugar_id              BigInt
@@ -2488,4 +2496,35 @@ model PedidoCambioUbicacion {
   @@index([pedido_id])
   @@index([ajuste_en])
   @@map("pedido_cambio_ubicacion")
+}
+
+/// Cortesía: venta con costo 0 (no es merma). Dentro de un pedido (pedido_id + pedido_linea_id) o por separado
+/// (pedido_id null; pedido_referencia_id = pedido al que corresponde).
+model Cortesia {
+  id                    BigInt    @id @default(autoincrement())
+  producto_id           BigInt
+  sabor_id              BigInt?
+  cantidad              Int
+  valor_lista           Decimal   @db.Decimal(12, 2)
+  motivo                String
+  nota                  String?
+  pedido_id             BigInt?
+  pedido_linea_id       BigInt?   @unique
+  pedido_referencia_id  BigInt?
+  dada_por_party_id     BigInt
+  autorizada_por_party_id BigInt?
+  creado_en             DateTime  @default(now()) @db.Timestamptz
+  producto              Producto  @relation(fields: [producto_id], references: [id], onDelete: Restrict)
+  sabor                 Sabor?    @relation(fields: [sabor_id], references: [id], onDelete: Restrict)
+  pedido                Pedido?   @relation("CortesiaPedido", fields: [pedido_id], references: [id], onDelete: Restrict)
+  pedidoReferencia      Pedido?   @relation("CortesiaReferencia", fields: [pedido_referencia_id], references: [id], onDelete: Restrict)
+  pedidoLinea           PedidoLinea? @relation(fields: [pedido_linea_id], references: [id], onDelete: Restrict)
+  dadaPor               Party     @relation("CortesiaDadaPor", fields: [dada_por_party_id], references: [id], onDelete: Restrict)
+  autorizadaPor         Party?    @relation("CortesiaAutorizadaPor", fields: [autorizada_por_party_id], references: [id], onDelete: Restrict)
+
+  @@index([creado_en])
+  @@index([producto_id])
+  @@index([pedido_id])
+  @@index([pedido_referencia_id])
+  @@map("cortesia")
 }

@@ -78,7 +78,7 @@ export const ANONIMIZAR: Record<string, ReglaAnonimizar[]> = {
 
 export const CONSERVAR: string[] = [
   'agotado', 'ajuste_opcion', 'alta_demanda', 'archivo', 'area_cocina', 'auditoria', 'caja',
-  'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'devolucion_pedido', 'pedido_cambio_ubicacion', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
+  'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'cortesia', 'devolucion_pedido', 'pedido_cambio_ubicacion', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
   'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio',
   'compra', 'compra_linea', 'consumo_personal', 'conteo_apertura', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta',
@@ -115,6 +115,7 @@ export const FK_PARTY_PERSONAL = [
   'devolucion_pedido.por_party_id', 'devolucion_pedido.autorizado_por_party_id',
   'pedido_cambio_ubicacion.propuesto_por_party_id', 'pedido_cambio_ubicacion.resuelto_por_party_id',
   'pedido_cambio_ubicacion.ajuste_por_party_id',
+  'cortesia.dada_por_party_id', 'cortesia.autorizada_por_party_id',
 ];
 
 /**

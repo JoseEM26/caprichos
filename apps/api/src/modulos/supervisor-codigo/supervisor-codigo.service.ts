@@ -43,6 +43,8 @@ const ROLES_SIN_CODIGO = ['ADMIN', 'SUPERVISOR'];
 export async function esOperadorSinCodigo(
   prisma: PrismaService,
   operadorPartyId: bigint | string | undefined,
+  /** Solo el ADMIN queda exento (acciones que el SUPERVISOR debe autorizar con su código, p. ej. cortesías). */
+  soloAdmin = false,
 ): Promise<{ party_id: bigint; id: bigint; rol: string } | null> {
   if (operadorPartyId === undefined) return null;
   // ADMIN solo como principal (no se combina); SUPERVISOR como principal o como rol extra
@@ -50,7 +52,9 @@ export async function esOperadorSinCodigo(
     where: {
       party_id: BigInt(operadorPartyId),
       activo: true,
-      OR: [{ rol: { in: ROLES_SIN_CODIGO } }, { rolesExtra: { some: { rol: 'SUPERVISOR' } } }],
+      OR: soloAdmin
+        ? [{ rol: 'ADMIN' }]
+        : [{ rol: { in: ROLES_SIN_CODIGO } }, { rolesExtra: { some: { rol: 'SUPERVISOR' } } }],
     },
     select: { party_id: true, id: true, rol: true },
   });
@@ -64,8 +68,9 @@ export async function autorizarAdminSinCodigo(
   ip?: string,
   entidad?: string,
   entidadId?: bigint,
+  soloAdmin = false,
 ): Promise<{ party_id: bigint; id: bigint } | null> {
-  const admin = await esOperadorSinCodigo(prisma, operadorPartyId);
+  const admin = await esOperadorSinCodigo(prisma, operadorPartyId, soloAdmin);
   if (!admin) return null;
   await auditoria.registrar({
     categoria: 'ACCESO',
@@ -273,8 +278,10 @@ export class SupervisorCodigoService {
     entidad?: string,
     entidadId?: bigint,
     localCodigo = LOCAL_CODIGO_DEFECTO,
+    exigirCodigoSupervisor = false,
   ): Promise<{ party_id: bigint; id: bigint; supervisorPartyId: bigint; supervisorId: bigint }> {
     // 0. El ADMIN nunca da código (sería él mismo aprobándose): queda auditado y no cuenta intentos.
+    //    Con exigirCodigoSupervisor, el SUPERVISOR tampoco queda exento y debe presentar su código.
     const admin = await autorizarAdminSinCodigo(
       this.prisma,
       this.auditoria,
@@ -283,6 +290,7 @@ export class SupervisorCodigoService {
       ip,
       entidad,
       entidadId,
+      exigirCodigoSupervisor,
     );
     if (admin) {
       return { ...admin, supervisorPartyId: admin.party_id, supervisorId: admin.id };

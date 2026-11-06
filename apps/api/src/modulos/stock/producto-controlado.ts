@@ -131,11 +131,14 @@ export interface LineaVentaProducto {
  */
 export async function descontarVentaProductos(
   db: any,
-  pedidoId: bigint,
+  pedidoId: bigint | null,
   lineas: LineaVentaProducto[],
   por: bigint,
   ahora = new Date(),
+  /** CORTESIA: salida por cortesía por separado (sin pedido propio). Por defecto VENTA. */
+  opciones: { tipo?: 'VENTA' | 'CORTESIA' } = {},
 ): Promise<{ agotados: bigint[]; saboresAgotados: bigint[] }> {
+  const tipo = opciones.tipo ?? 'VENTA';
   const agregado = new Map<string, { productoId: bigint; cantidad: number; areaId?: bigint | null; sabores: Map<string, SaborVenta> }>();
   for (const l of lineas) {
     const k = l.productoId.toString();
@@ -180,7 +183,7 @@ export async function descontarVentaProductos(
       }
       const sabores = [...a.sabores.values()].sort((x, y) => (x.saborId < y.saborId ? -1 : x.saborId > y.saborId ? 1 : 0));
       for (const s of sabores) {
-        const r = await descontarSabor(db, { pedidoId, productoId: a.productoId, lugarId, sabor: s, por, ahora });
+        const r = await descontarSabor(db, { pedidoId, productoId: a.productoId, lugarId, sabor: s, por, ahora, tipo });
         if (r === 'AGOTADO') saboresAgotados.push(s.saborId);
       }
       continue;
@@ -203,13 +206,13 @@ export async function descontarVentaProductos(
 
     await db.movimientoStock.create({
       data: {
-        tipo: 'VENTA',
+        tipo,
         producto_id: a.productoId,
         lugar_id: lugarId,
         cantidad,
         pedido_id: pedidoId,
         por,
-        nota: `Venta · pedido ${pedidoId}`,
+        nota: tipo === 'CORTESIA' ? 'Cortesía' : `Venta · pedido ${pedidoId}`,
       },
     });
 
@@ -226,7 +229,7 @@ export async function descontarVentaProductos(
  */
 async function descontarSabor(
   db: any,
-  c: { pedidoId: bigint; productoId: bigint; lugarId: bigint; sabor: SaborVenta; por: bigint; ahora: Date },
+  c: { pedidoId: bigint | null; productoId: bigint; lugarId: bigint; sabor: SaborVenta; por: bigint; ahora: Date; tipo: 'VENTA' | 'CORTESIA' },
 ): Promise<'AGOTADO' | null> {
   const { sabor } = c;
   const cantidad = new Prisma.Decimal(sabor.cantidad);
@@ -248,14 +251,14 @@ async function descontarSabor(
 
   await db.movimientoStock.create({
     data: {
-      tipo: 'VENTA',
+      tipo: c.tipo,
       producto_id: c.productoId,
       sabor_id: sabor.saborId,
       lugar_id: c.lugarId,
       cantidad,
       pedido_id: c.pedidoId,
       por: c.por,
-      nota: `Venta · pedido ${c.pedidoId} · ${sabor.nombre}`,
+      nota: c.tipo === 'CORTESIA' ? `Cortesía · ${sabor.nombre}` : `Venta · pedido ${c.pedidoId} · ${sabor.nombre}`,
     },
   });
 

@@ -441,6 +441,10 @@ export class AlmacenService {
         tipoNombre = 'Venta';
         chipBg = 'var(--cp-sand)';
         chipFg = 'var(--cp-navy)';
+      } else if (m.tipo === 'CORTESIA') {
+        tipoNombre = 'Cortesía';
+        chipBg = 'var(--cp-sand)';
+        chipFg = 'var(--cp-navy)';
       } else if (m.tipo === 'ANULACION') {
         tipoNombre = 'Anulación';
         chipBg = 'var(--cp-line)';
@@ -862,7 +866,7 @@ export class AlmacenService {
       });
     }
 
-    if (movOriginal.tipo === 'ANULACION' || movOriginal.tipo === 'VENTA') {
+    if (movOriginal.tipo === 'ANULACION' || movOriginal.tipo === 'VENTA' || movOriginal.tipo === 'CORTESIA') {
       throw new BadRequestException({
         codigo: 'MOVIMIENTO_AUTOMATICO_NO_ANULABLE',
         mensaje: 'Los movimientos generados automáticamente por cobro o anulación no se pueden anular manualmente',

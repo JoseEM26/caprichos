@@ -66,12 +66,19 @@ export class SupervisorCodigoGuard implements CanActivate {
       return true;
     }
 
-    const supervisor = await this.supervisorCodigoService.verificarYConsumirCodigo(
-      codigo,
-      req.usuario?.partyId,
-      meta.accion,
-      ip,
-    );
+    // Solo las acciones que exigen código al SUPERVISOR pasan el 8.º argumento (las demás, la llamada de siempre)
+    const supervisor = meta.exigeCodigoSupervisor
+      ? await this.supervisorCodigoService.verificarYConsumirCodigo(
+          codigo,
+          req.usuario?.partyId,
+          meta.accion,
+          ip,
+          undefined,
+          undefined,
+          undefined,
+          true,
+        )
+      : await this.supervisorCodigoService.verificarYConsumirCodigo(codigo, req.usuario?.partyId, meta.accion, ip);
 
     req.supervisor = supervisor;
     req.codigoSupervisorVerificado = true;

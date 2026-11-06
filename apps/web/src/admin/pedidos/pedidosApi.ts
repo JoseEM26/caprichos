@@ -39,6 +39,12 @@ export interface LineaPedido {
     id: string;
     nombre: string;
   } | null;
+  /** Cortesía: la línea sale a S/ 0 y su valor de lista va en cortesia.valor_lista */
+  es_cortesia?: boolean;
+  cortesia?: { valor_lista: string | number } | null;
+  producto_id?: string | null;
+  oferta_id?: string | null;
+  linea_combo_id?: string | null;
 }
 
 export interface HistorialEstado {
@@ -365,6 +371,8 @@ export const pedidosApi = {
       lineas: Array<{
         productoId: string | number;
         tamanoId?: string | number;
+        /** Cortesía de la línea (solo con permiso cortesias/dar): sale a S/ 0 */
+        cortesia?: { motivo: string; nota?: string };
         cantidad: number;
         opciones?: (string | number)[];
         nota?: string;
@@ -403,10 +411,15 @@ export const pedidosApi = {
       canal?: 'MOZO' | 'CAJA';
     },
     idempotencyKey?: string,
+    /** Solo si hay líneas de cortesía y quien envía es SUPERVISOR: su código de 6 dígitos */
+    codigoSupervisor?: string,
   ): Promise<any> {
     const headers: Record<string, string> = {};
     if (idempotencyKey) {
       headers['Idempotency-Key'] = idempotencyKey;
+    }
+    if (codigoSupervisor) {
+      headers['x-codigo-supervisor'] = codigoSupervisor;
     }
     try {
       return await api.post('/admin/pedidos', dto, { headers });

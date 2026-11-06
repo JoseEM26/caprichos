@@ -5,6 +5,8 @@ export const CLAVE_REQUIERE_CODIGO_SUPERVISOR = 'requiere_codigo_supervisor';
 
 export interface OpcionesRequiereCodigo {
   condicion?: (req: any) => boolean;
+  /** El SUPERVISOR (principal) también presenta código; por defecto queda exento como el ADMIN. */
+  exigeCodigoSupervisor?: boolean;
 }
 
 export function RequiereCodigoSupervisor(

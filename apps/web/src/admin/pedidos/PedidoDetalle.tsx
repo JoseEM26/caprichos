@@ -10,12 +10,14 @@ import {
   type ValorComprobante,
 } from './SelectorComprobante';
 import { useSesion } from '../../comun/sesion';
-import { Pedido, pedidosApi } from './pedidosApi';
+import { LineaPedido, Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { PruebaEntregaFallida } from './PruebaEntregaFallida';
 import { ModalAnular } from './ModalAnular';
+import { ModalCortesia } from '../cortesias/ModalCortesia';
+import { cortesiasApi } from '../cortesias/cortesiasApi';
 import { ModalRechazarCobroMozo } from './ModalRechazarCobroMozo';
 import { ModalUbicar } from './ModalUbicar';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
@@ -64,8 +66,23 @@ function valorDelPedido(pedido: Pedido): ValorComprobante {
   };
 }
 
+/** Solo se puede dar cortesía sobre una línea de producto, sin combo ni oferta, en un pedido sin cobrar ni descuento. */
+function puedeCortesiaLinea(pedido: Pedido, it: LineaPedido): boolean {
+  return (
+    !it.es_cortesia &&
+    !!it.producto_id &&
+    !it.linea_combo_id &&
+    !it.oferta_id &&
+    pedido.pago_estado !== 'PAGADO' &&
+    Number(pedido.descuento || 0) === 0
+  );
+}
+
 export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: PedidoDetalleProps) {
-  const { tiene } = useSesion();
+  const { tiene, usuario } = useSesion();
+  // El SUPERVISOR presenta su código para dar una cortesía; ADMIN y Caja no
+  const pideCodigoCortesia = usuario?.rol === 'SUPERVISOR';
+  const [lineaCortesia, setLineaCortesia] = useState<LineaPedido | null>(null);
   const [tab, setTab] = useState<TabDetalle>('pedido');
 
   // Modales
@@ -421,8 +438,22 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
                         </span>
                       )}
                     </span>
-                    <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'right' }}>
                       S/ {Number(it.subtotal || 0).toFixed(2)}
+                      {it.es_cortesia && (
+                        <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
+                          Cortesía · vale S/ {Number(it.cortesia?.valor_lista ?? 0).toFixed(2)}
+                        </span>
+                      )}
+                      {puedeCortesiaLinea(pedido, it) && tiene('cortesias/dar') && (
+                        <button
+                          type="button"
+                          onClick={() => setLineaCortesia(it)}
+                          style={{ display: 'block', marginTop: 4, marginLeft: 'auto', minHeight: 36, fontSize: 12, fontWeight: 800, background: 'none', border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 8, padding: '4px 8px', cursor: 'pointer' }}
+                        >
+                          Dar como cortesía
+                        </button>
+                      )}
                     </span>
                   </div>
                 ))}
@@ -1112,6 +1143,20 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
           alCerrar={() => setAbrirCobrar(false)}
           alCobrarExitoso={() => {
             setAbrirCobrar(false);
+            alActualizar();
+          }}
+        />
+      )}
+
+      {lineaCortesia && (
+        <ModalCortesia
+          titulo={`Dar como cortesía: ${lineaCortesia.nombre}`}
+          resumen={`Pedido ${pedido.codigo}. La línea pasa a S/ 0.00 y el total del pedido baja.`}
+          pideCodigo={pideCodigoCortesia}
+          alCerrar={() => setLineaCortesia(null)}
+          alConfirmar={async (datos, codigo) => {
+            await cortesiasApi.darEnLinea(pedido.id, lineaCortesia.id, datos, codigo);
+            setLineaCortesia(null);
             alActualizar();
           }}
         />

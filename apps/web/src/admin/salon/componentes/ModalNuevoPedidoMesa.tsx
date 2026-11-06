@@ -19,6 +19,8 @@ import { ModalLiberarMesa } from './ModalLiberarMesa';
 import { VistaPreviaMesa } from './VistaPreviaMesa';
 import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
 import { salonApi } from '../api';
+import { useSesion } from '../../../comun/sesion';
+import { ModalCortesia } from '../../cortesias/ModalCortesia';
 import '../salon.css';
 import '../nuevo-pedido-mozo.css';
 import { pedidosApi } from '../../pedidos/pedidosApi';
@@ -75,8 +77,20 @@ export interface ModalNuevoPedidoMesaProps {
   puedePersonal?: boolean;
 }
 
+/** Permisos de cortesía sin romper si el componente se usa fuera del contexto de sesión (pruebas sueltas). */
+function usePermisosCortesia(): { puede: boolean; esSupervisor: boolean } {
+  try {
+    const sesion = useSesion();
+    return { puede: sesion.tiene('cortesias/dar'), esSupervisor: sesion.usuario?.rol === 'SUPERVISOR' };
+  } catch {
+    return { puede: false, esSupervisor: false };
+  }
+}
+
 export interface LineaPedidoMesa {
   id: string;
+  /** Cortesía de la línea: sale a S/ 0. El código (solo el SUPERVISOR) viaja en la cabecera al enviar. */
+  cortesia?: { motivo: string; nota?: string; codigo?: string };
   productoId: string | number;
   nombre: string;
   tamanoId?: string | number;
@@ -527,6 +541,8 @@ export function ModalNuevoPedidoMesa({
 
   // Carrito de líneas de pedido
   const [lineas, setLineas] = useState<LineaPedidoMesa[]>([]);
+  const { puede: puedeCortesia, esSupervisor: pideCodigoCortesia } = usePermisosCortesia();
+  const [lineaCortesiaId, setLineaCortesiaId] = useState<string | null>(null);
 
   // Si hay pedidoRepetir y ya cargó la carta, precargar líneas
   useEffect(() => {
@@ -775,7 +791,7 @@ export function ModalNuevoPedidoMesa({
 
   // Subtotal, Descuentos y Total
   const subtotal = useMemo(() => {
-    return lineas.reduce((acc, l) => acc + l.precioTotal, 0);
+    return lineas.reduce((acc, l) => acc + (l.cortesia ? 0 : l.precioTotal), 0);
   }, [lineas]);
 
   const descuento = useMemo(() => {
@@ -947,8 +963,13 @@ export function ModalNuevoPedidoMesa({
           comboElecciones: lin.comboElecciones,
           personas: personas && personas.length > 0 ? personas : lin.personas,
           ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
+          ...(lin.cortesia ? { cortesia: { motivo: lin.cortesia.motivo, nota: lin.cortesia.nota } } : {}),
         };
       });
+      // El SUPERVISOR presenta su código al marcar la cortesía; viaja en la cabecera del envío
+      const codigoCortesia = lineas.find((l) => l.cortesia?.codigo)?.cortesia?.codigo;
+      // Solo se pasa si hay cortesía con código: el resto de los envíos no cambia
+      const cabeceraCortesia = codigoCortesia ? ([codigoCortesia] as const) : ([] as const);
 
       // desde Pedidos y caja el canal es CAJA; el mozo desde el salón sigue siendo MOZO
       const canalEnvio: 'MOZO' | 'CAJA' = canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO');
@@ -1022,6 +1043,7 @@ export function ModalNuevoPedidoMesa({
             clientePartyId: clientePideId,
           },
           idempotencyKey,
+          ...cabeceraCortesia,
         );
       }
 
@@ -2918,7 +2940,7 @@ export function ModalNuevoPedidoMesa({
                             {lin.cantidad} x {lin.nombre}
                             {lin.tamanoNombre && <small> · {lin.tamanoNombre}</small>}
                           </span>
-                          <span className="np-linea-precio">S/ {lin.precioTotal.toFixed(2)}</span>
+                          <span className="np-linea-precio">S/ {(lin.cortesia ? 0 : lin.precioTotal).toFixed(2)}</span>
                           <button
                             type="button"
                             className="np-quitar"
@@ -2927,6 +2949,40 @@ export function ModalNuevoPedidoMesa({
                             Quitar
                           </button>
                         </div>
+                        {puedeCortesia && modalidad !== 'local' && !lin.ofertaId && !(lin.comboElecciones ?? []).length && (
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            {lin.cortesia ? (
+                              <>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--cp-rust)' }}>
+                                  Cortesía · vale S/ {lin.precioTotal.toFixed(2)}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="np-quitar"
+                                  onClick={() => setLineas((prev) => prev.map((x) => (x.id === lin.id ? { ...x, cortesia: undefined } : x)))}
+                                >
+                                  Quitar cortesía
+                                </button>
+                              </>
+                            ) : (
+                              <button type="button" className="np-quitar" onClick={() => setLineaCortesiaId(lin.id)}>
+                                Dar como cortesía
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {lineaCortesiaId === lin.id && (
+                          <ModalCortesia
+                            titulo={`Dar como cortesía: ${lin.nombre}`}
+                            resumen="La línea sale a S/ 0.00 al enviar el pedido."
+                            pideCodigo={pideCodigoCortesia}
+                            alCerrar={() => setLineaCortesiaId(null)}
+                            alConfirmar={async (datos, codigo) => {
+                              setLineas((prev) => prev.map((x) => (x.id === lin.id ? { ...x, cortesia: { ...datos, codigo } } : x)));
+                              setLineaCortesiaId(null);
+                            }}
+                          />
+                        )}
                         {(lin.personas || []).length > 0 && (
                           <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
                             Para: {lin.personas?.join(', ')}

@@ -61,7 +61,8 @@ export class PuntosService {
       lineas.map((l) => ({
         productoId: l.producto_id ?? `linea-${l.id}`,
         subtotal: Number(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
-        noSumaBeneficios: l.producto?.no_suma_beneficios ?? true,
+        // Una cortesía no suma puntos ni se canjea
+        noSumaBeneficios: (l.producto?.no_suma_beneficios ?? true) || l.es_cortesia,
         enPromocion: l.oferta_id !== null || l.linea_combo_id !== null,
       })),
       (descuentoDetalle as any) ?? [],

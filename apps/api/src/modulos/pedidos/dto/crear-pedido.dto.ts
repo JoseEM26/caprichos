@@ -106,6 +106,10 @@ export class LineaPedidoDto {
 
   @IsOptional()
   precio?: any;
+
+  /** Cortesía de esta línea (solo con permiso cortesias/dar): sale a S/ 0. El servidor valida motivo y nota. */
+  @IsOptional()
+  cortesia?: { motivo: string; nota?: string };
 }
 
 export class PlanPagoItemDto {

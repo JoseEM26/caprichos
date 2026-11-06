@@ -391,7 +391,7 @@ export function construirTicketPago(pedido: any, local: any, comprobante?: any):
     modalidad: pedido.modalidad || '',
     lineas: (pedido.lineas || []).map((l: any) => ({
       cantidad: l.cantidad,
-      nombre: l.nombre,
+      nombre: l.es_cortesia ? `${l.nombre} · Cortesía` : l.nombre,
       tamano: l.tamano ?? null,
       subtotal: num(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
     })),

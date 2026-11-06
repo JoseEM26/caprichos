@@ -125,6 +125,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       by: ['producto_id'],
       where: {
         producto_id: { not: null },
+        es_cortesia: false,
         pedido: { estado: { notIn: ['RECHAZADO', 'ANULADO'] }, creado_en: { gte: new Date(ahora - 90 * 86_400_000) } },
       },
       _sum: { cantidad: true },

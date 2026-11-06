@@ -472,6 +472,9 @@ export class PedidosEstadoService {
             nota: true,
             precio_unit: true,
             subtotal: true,
+            // Cortesía: la línea sale a S/ 0; su valor de lista se muestra aparte
+            es_cortesia: true,
+            cortesia: { select: { valor_lista: true } },
             opcionesElegidas: { select: { opcion_nombre: true }, orderBy: { id: 'asc' } },
             // Producto por sabor: reparto de las unidades entre sabores
             sabores: { select: { sabor_nombre: true, cantidad: true }, orderBy: { id: 'asc' } },
@@ -553,6 +556,8 @@ export class PedidosEstadoService {
           nota: l.nota || null,
           precioUnit: Number(l.precio_unit),
           subtotal: l.subtotal != null ? Number(l.subtotal) : null,
+          // Solo en las cortesías: el resto de las líneas conserva su forma
+          ...(l.es_cortesia ? { esCortesia: true, valorLista: l.cortesia ? Number(l.cortesia.valor_lista) : null } : {}),
           // Cocina ya tiene todas las unidades de la línea listas (listas = cantidad)
           lista: l.listas >= l.cantidad,
         })),
@@ -748,6 +753,8 @@ export class PedidosEstadoService {
         lineas: {
           include: {
             opcionesElegidas: true,
+            // Cortesía: valor de lista (la línea sale a S/ 0)
+            cortesia: { select: { valor_lista: true } },
             sabores: true,
             area: true,
           },
