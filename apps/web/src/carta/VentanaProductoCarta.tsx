@@ -64,7 +64,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     const inicial: Record<string, string[]> = {};
     for (const g of gruposCarta) {
       // elección única y obligatoria: parte con la primera opción marcada
-      inicial[g.id] = g.maximo === 1 && g.minimo >= 1 && g.opciones[0] ? [g.opciones[0].id] : [];
+      const primera = g.opciones.find((o) => o.disponible !== false);
+      inicial[g.id] = g.maximo === 1 && g.minimo >= 1 && primera ? [primera.id] : [];
     }
     return inicial;
   });
@@ -162,6 +163,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   }, [tope, cantidad]);
 
   const alternar = (g: GrupoOpcionesCarta, oid: string) => {
+    // Una opción agotada por stock no se puede elegir (sí quitar si ya estaba marcada)
+    const op = g.opciones.find((x) => x.id === oid);
+    if (op && op.disponible === false && !(sel[g.id] ?? []).includes(oid)) return;
     setSel((prev) => ({ ...prev, [g.id]: alternarEleccion(g, prev[g.id] ?? [], oid) }));
   };
 
@@ -438,19 +442,23 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                                     {g.minimo >= 1 ? 'Elige 1' : g.maximo > 1 ? `Opcional, hasta ${g.maximo}` : 'Opcional'}
                                   </span>
                                 </div>
+                                {g.aviso && <div role="status" style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust)', marginBottom: 6 }}>{g.aviso}</div>}
                                 {f.grande && buscador(g, 40, `Buscar ${nombreCorto(g).toLowerCase()}`)}
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, ...(f.grande ? { maxHeight: 236, overflowY: 'auto' } : {}) }}>
                                   {f.lista.map((o) => {
                                     const on = (sel[g.id] ?? []).includes(o.id);
+                                    const agotada = o.disponible === false;
                                     return (
                                       <button
                                         key={o.id}
                                         onClick={() => alternar(g, o.id)}
                                         aria-pressed={on}
-                                        style={{ minHeight: 40, padding: '0 12px', borderRadius: 9999, border: `1.5px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: on ? 'rgba(230,121,41,0.16)' : 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 600, fontSize: 13 }}
+                                        disabled={agotada && !on}
+                                        style={{ minHeight: 40, padding: '0 12px', borderRadius: 9999, border: `1.5px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: on ? 'rgba(230,121,41,0.16)' : 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 600, fontSize: 13, opacity: agotada ? 0.5 : 1, cursor: agotada && !on ? 'not-allowed' : 'pointer' }}
                                       >
                                         {on ? '✓ ' : ''}
                                         {o.nombre}
+                                        {agotada && <span style={{ fontWeight: 700, color: 'var(--cp-soft)' }}> · Agotado</span>}
                                         {o.precioExtra > 0 && <span style={{ fontWeight: 700, color: 'var(--cp-rust)' }}> +{fmt(o.precioExtra)}</span>}
                                       </button>
                                     );
@@ -483,19 +491,23 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                         {etiquetaGrupo(g)}
                       </span>
                     </div>
+                    {g.aviso && <div role="status" style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust)', marginBottom: 8 }}>{g.aviso}</div>}
                     {f.grande && buscador(g, 44, `Buscar en ${g.nombre}`)}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, ...(f.grande ? { maxHeight: 300, overflowY: 'auto' } : {}) }}>
                       {f.lista.map((o) => {
                         const on = (sel[g.id] ?? []).includes(o.id);
+                        const agotada = o.disponible === false;
                         return (
                           <button
                             key={o.id}
                             onClick={() => alternar(g, o.id)}
                             aria-pressed={on}
-                            style={{ minHeight: 44, borderRadius: 9999, border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 14px 0 10px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', fontSize: 13 }}
+                            disabled={agotada && !on}
+                            style={{ minHeight: 44, borderRadius: 9999, border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 14px 0 10px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', fontSize: 13, opacity: agotada ? 0.5 : 1, cursor: agotada && !on ? 'not-allowed' : 'pointer' }}
                           >
                             <span style={{ width: 16, height: 16, borderRadius: g.maximo === 1 ? 10 : 6, border: '2px solid var(--cp-navy)', background: on ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
                             <span style={{ fontWeight: 600 }}>{o.nombre}</span>
+                            {agotada && <span style={{ fontWeight: 700, color: 'var(--cp-soft)' }}>Agotado</span>}
                             {o.precioExtra > 0 && <span style={{ fontWeight: 700, color: 'var(--cp-rust)' }}>+{fmt(o.precioExtra)}</span>}
                           </button>
                         );
@@ -661,7 +673,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   {soloLectura
                     ? 'Vista previa'
                     : comboAgotado || sinStock
-                      ? 'Agotado'
+                      ? producto.grupos.some((g) => g.sinStock) ? 'No disponible' : 'Agotado'
                       : sinSaldo && valido
                         ? tamanoNoCabe
                           ? 'No hay stock suficiente'

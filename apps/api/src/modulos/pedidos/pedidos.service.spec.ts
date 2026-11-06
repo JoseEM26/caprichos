@@ -119,6 +119,7 @@ describe('PedidosService', () => {
   beforeEach(async () => {
     prismaMock = {
       partyRole: { findFirst: jest.fn().mockResolvedValue({ id: 1n }) },
+      opcionRequiere: { findMany: jest.fn().mockResolvedValue([]) },
       pedido: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
@@ -1950,6 +1951,52 @@ describe('PedidosService', () => {
       await service.crear({ ...pedidoBaseDto, lineas: [{ productoId: 1, tamanoId: 5, cantidad: 1, opciones: [310] }] } as any, 'key-duo-combo', { canal: 'CARTA' });
       expect(prismaMock.pedido.create).toHaveBeenCalled();
       expect(prismaMock.pedidoLineaSabor.create).not.toHaveBeenCalled();
+    });
+
+    describe('opciones ligadas a stock (opcion_requiere)', () => {
+      const duoStock = {
+        ...donaSabor,
+        nombre: 'DÚO COMPARTIR',
+        ofertasAlcance: [{ id: 900n }],
+        grupos: [
+          { grupo_id: 31n, grupo: { id: 31n, nombre: 'Dona 1 · Sabor', obligatorio: true, minimo: 1, maximo: 1, activo: true, opciones: [{ id: 310n, grupo_id: 31n, valor_id: 320n, precio_extra: 0, activo: true, agotado_hasta: null, valor: { id: 320n, nombre: 'Fresa' } }] } },
+          { grupo_id: 32n, grupo: { id: 32n, nombre: 'Dona 2 · Sabor', obligatorio: true, minimo: 1, maximo: 1, activo: true, opciones: [{ id: 311n, grupo_id: 32n, valor_id: 321n, precio_extra: 0, activo: true, agotado_hasta: null, valor: { id: 321n, nombre: 'Fresa' } }] } },
+        ],
+      };
+      // Dona 1 y Dona 2 consumen cada una 1 del MISMO sabor (501) de la dona (producto 20)
+      const preparar = (saldoSabor: number) => {
+        prismaMock.opcionRequiere.findMany.mockResolvedValue([
+          { opcion_id: 310n, producto_id: 20n, sabor_id: 501n, cantidad: 1 },
+          { opcion_id: 311n, producto_id: 20n, sabor_id: 501n, cantidad: 1 },
+        ]);
+        prismaMock.producto.findMany.mockImplementation(({ where, select }: any) => {
+          if (select?.stocks) {
+            return Promise.resolve([{ id: 20n, oculto: false, agotado_hasta: null, controla_stock: true, stocks: [], sabores: [{ id: 501n, producto_id: 20n, activo: true, agotado_hasta: null, stockSabor: { cantidad: saldoSabor } }] }]);
+          }
+          return Promise.resolve(where?.controla_stock ? [{ id: 1n, nombre: 'DÚO COMPARTIR', controla_stock: true, sabores: [], ofertasAlcance: duoStock.ofertasAlcance }] : [duoStock]);
+        });
+        prismaMock.stock = {
+          findFirst: jest.fn().mockResolvedValue({ id: 9n, lugar_id: 7n }),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findMany: jest.fn().mockResolvedValue([{ cantidad: 50 }]),
+          create: jest.fn(),
+        };
+      };
+      const dto = { ...pedidoBaseDto, lineas: [{ productoId: 1, tamanoId: 5, cantidad: 1, opciones: [310, 311] }] } as any;
+
+      it('mismo sabor con saldo 1: la segunda opción no cabe -> 409 OPCION_AGOTADA y no crea el pedido', async () => {
+        preparar(1);
+        const err: any = await service.crear(dto, 'key-opcion-sabor-1', { canal: 'CARTA' }).catch((e) => e);
+        expect(err.getStatus()).toBe(409);
+        expect(err.getResponse()).toMatchObject({ codigo: 'OPCION_AGOTADA', opcionId: '311' });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('mismo sabor con saldo 2: las dos opciones caben y el pedido pasa', async () => {
+        preparar(2);
+        await service.crear(dto, 'key-opcion-sabor-2', { canal: 'CARTA' });
+        expect(prismaMock.pedido.create).toHaveBeenCalled();
+      });
     });
 
     it('suma inválida (5 de 6): 400 SABORES_INVALIDOS y no crea el pedido', async () => {

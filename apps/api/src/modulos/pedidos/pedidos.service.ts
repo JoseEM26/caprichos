@@ -38,6 +38,7 @@ import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
 import { leerConfigPropina } from '../propinas/propinas.service';
 import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
 import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
+import { RequisitoOpcion, requisitosDeOpciones, requisitosFaltantes, saldosDeRequisitos } from '../stock/opcion-requiere';
 import { validarMotivoCortesia } from '../cortesias/cortesia.tipos';
 
 /** Cortesía de una línea: solo con permiso cortesias/dar; sin oferta (la promoción ya tiene su precio). */
@@ -557,6 +558,24 @@ export class PedidosService {
           grupo_id: opDb.grupo_id,
           grupo_nombre: grupoPadre?.nombre || 'Opciones',
         });
+      }
+
+      // Opciones ligadas a stock (opcion_requiere): lo que consume cada una se suma en orden con las anteriores
+      // de la misma línea; la primera que no alcanza responde 409 (cubre «Dona 1» y «Dona 2» con el mismo sabor).
+      const reqsOpciones = await requisitosDeOpciones(this.prisma, opcionesElegidasInfo.map((o) => o.id));
+      if (reqsOpciones.size > 0) {
+        const saldos = await saldosDeRequisitos(this.prisma, [...reqsOpciones.values()].flat());
+        const acumulado: RequisitoOpcion[] = [];
+        for (const op of opcionesElegidasInfo) {
+          acumulado.push(...(reqsOpciones.get(op.id.toString()) ?? []).map((r) => ({ ...r, cantidad: r.cantidad * cantidad })));
+          if (requisitosFaltantes(acumulado, saldos, ahora).length > 0) {
+            throw new ConflictException({
+              codigo: 'OPCION_AGOTADA',
+              mensaje: `No hay stock suficiente para elegir «${op.nombre}»`,
+              opcionId: op.id.toString(),
+            });
+          }
+        }
       }
 
       // Validar reglas por cada grupo (obligatorio, mínimo, máximo)

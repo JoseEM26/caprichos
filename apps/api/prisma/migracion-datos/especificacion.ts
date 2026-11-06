@@ -145,6 +145,14 @@ export const ESPECIFICACION: Record<string, Espec> = {
     clave: ['combo_parte', 'producto'],
     refs: { combo_parte: ref('combo_parte_id', 'combo_parte'), producto: ref('producto_id', 'producto') },
   },
+  opcion_requiere: {
+    clave: ['opcion', 'producto', 'sabor'],
+    refs: {
+      opcion: ref('opcion_id', 'opcion'),
+      producto: ref('producto_id', 'producto'),
+      sabor: ref('sabor_id', 'sabor', true),
+    },
+  },
   cupon: {
     clave: ['codigo_base'],
     refs: { categoria: ref('categoria_id', 'categoria', true), producto: ref('producto_id', 'producto', true) },

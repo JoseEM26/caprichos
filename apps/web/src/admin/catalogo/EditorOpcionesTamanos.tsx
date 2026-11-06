@@ -18,6 +18,7 @@ import {
   validarTamanos,
 } from './editorOpcionesTipos';
 import './editor-opciones.css';
+import { EnlacesStockOpciones } from './EnlacesStockOpciones';
 
 export type { EstadoOpciones, GrupoEstado, TamanoEstado } from './editorOpcionesTipos';
 
@@ -606,6 +607,14 @@ export function EditorOpcionesTamanos({
       </div>
 
       <VistaCliente tamanos={estado.tamanos} grupos={gruposActivos} />
+
+      {producto && puedeEditar && (
+        <EnlacesStockOpciones
+          opciones={grupos
+            .filter((g) => estado.grupos.some((x) => x.grupoId === g.id))
+            .flatMap((g) => (g.opciones ?? []).map((o) => ({ id: o.id, nombre: `${g.nombre} · ${o.nombre}` })))}
+        />
+      )}
 
       {error && <div role="alert" className="eo-error">{error}</div>}
 

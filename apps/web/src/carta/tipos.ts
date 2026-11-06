@@ -20,6 +20,10 @@ export interface GrupoOpcionesCarta {
   minimo: number;
   maximo: number;
   opciones: OpcionCarta[];
+  /** Plan B: «Se acabaron: X. Elige entre: Y» */
+  aviso?: string | null;
+  /** Todas las opciones del paso agotadas por stock: el combo no se puede armar */
+  sinStock?: boolean;
 }
 
 export interface SaborCarta {

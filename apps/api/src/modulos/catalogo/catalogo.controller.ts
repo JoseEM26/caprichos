@@ -340,6 +340,23 @@ export class CatalogoController {
     return this.catalogoService.asignarGrupoCategorias(id, dto.categoriaIds, req.usuario, ip);
   }
 
+  @Get('opciones/:id/requisitos')
+  @Permiso('catalogo', 'ver')
+  async verRequisitosOpcion(@Param('id') id: string) {
+    return this.catalogoService.listarRequisitosOpcion(id);
+  }
+
+  @Put('opciones/:id/requisitos')
+  @Permiso('catalogo', 'editar')
+  async guardarRequisitosOpcion(
+    @Param('id') id: string,
+    @Body() dto: { requisitos: Array<{ productoId: string; saborId?: string | null; cantidad: number }> },
+    @Req() req: any,
+  ) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.guardarRequisitosOpcion(id, dto?.requisitos ?? [], req.usuario, ip);
+  }
+
   @Post('grupos/:id/opciones')
   @Permiso('catalogo', 'crear')
   async crearOpcion(@Param('id') id: string, @Body() dto: CrearOpcionDto, @Req() req: any) {

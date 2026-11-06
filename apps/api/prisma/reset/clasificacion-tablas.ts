@@ -81,7 +81,7 @@ export const CONSERVAR: string[] = [
   'categoria', 'cierre_ajuste_medio', 'cierre_caja', 'cortesia', 'devolucion_pedido', 'pedido_cambio_ubicacion', 'cierre_dia', 'cierre_medio', 'cliente_whatsapp_consentimiento',
   'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
   'propina_reparto', 'propina_reparto_detalle',
-  'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio',
+  'cobertura_turno', 'cobro', 'cobro_pago', 'comanda_area', 'combo_parte', 'combo_parte_reemplazo', 'combo_precio', 'opcion_requiere',
   'compra', 'compra_linea', 'consumo_personal', 'contador_diario', 'conteo_apertura', 'conteo_cierre', 'cupon', 'cupon_emitido',
   'destacada', 'destacada_foto', 'device_key', 'elemento_plano', 'employee_detail', 'encuesta',
   'encuesta_posventa', 'fecha_especial', 'foto_local', 'grupo_opciones', 'horario_dia',

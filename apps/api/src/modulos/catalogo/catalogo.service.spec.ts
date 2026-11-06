@@ -15,6 +15,7 @@ describe('CatalogoService', () => {
     prisma = {
       // Conteo de apertura del día (productos que controlan stock): sin aperturas en estos casos
       conteoApertura: { findMany: jest.fn().mockResolvedValue([]) },
+      opcionRequiere: { findMany: jest.fn().mockResolvedValue([]) },
       categoria: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
@@ -852,6 +853,120 @@ describe('CatalogoService', () => {
         { id: '402', nombre: 'Oreo', activo: true, disponible: true, quedan: 2 },
       ]);
       expect(p).toMatchObject({ saboresConStock: true, quedan: 2, disponible: true });
+    });
+  });
+
+  describe('7. Opciones ligadas a stock (opcion_requiere) en el combo', () => {
+    const grupoOpcion = (grupoId: bigint, nombre: string, opciones: any[]) => ({
+      grupo: { id: grupoId, nombre, obligatorio: true, minimo: 1, maximo: 1, activo: true, opciones },
+    });
+    const opcion = (id: bigint, nombre: string, grupoId: bigint) => ({
+      id, grupo_id: grupoId, valor_id: id, precio_extra: 0, activo: true, agotado_hasta: null, valor: { id, nombre },
+    });
+    const dona = (stock: number) => ({
+      id: BigInt(57), nombre: 'DONAS ARTESANALES', oculto: false, agotado_hasta: null, controla_stock: true,
+      stocks: [], sabores: [{ id: BigInt(101), producto_id: BigInt(57), activo: true, agotado_hasta: null, stockSabor: { cantidad: stock } }],
+    });
+    const duo = (cPlanB: boolean) => ({
+      id: BigInt(1), nombre: 'DÚO PARA COMPARTIR', descripcion: null, precio: 20, oculto: false, agotado_hasta: null,
+      no_suma_beneficios: false, foto_archivo: null, tamanos: [], sabores: [],
+      ofertasAlcance: [{ id: BigInt(1), combosParte: cPlanB ? [{ id: BigInt(9) }] : [] }],
+      grupos: [
+        grupoOpcion(BigInt(1), 'Complemento 1 · Complemento', [opcion(BigInt(11), '2 Donas', BigInt(1)), opcion(BigInt(12), '2 Galletas choco chips', BigInt(1))]),
+        grupoOpcion(BigInt(2), 'Dona 1 · Sabor', [opcion(BigInt(21), 'Crema pastelera', BigInt(2))]),
+      ],
+    });
+    const preparar = (d: any, stockDona: number) => {
+      prisma.categoria.findMany.mockResolvedValue([{ id: BigInt(2), nombre: 'Combos', orden: 1, oculta: false, productos: [d] }]);
+      prisma.opcionRequiere.findMany.mockResolvedValue([
+        { opcion_id: BigInt(11), producto_id: BigInt(57), sabor_id: null, cantidad: 2 },
+        { opcion_id: BigInt(21), producto_id: BigInt(57), sabor_id: BigInt(101), cantidad: 1 },
+      ]);
+      prisma.producto.findMany.mockImplementation(({ select }: any) =>
+        Promise.resolve(select?.stocks ? [dona(stockDona)] : []),
+      );
+    };
+
+    it('donas sin stock: «2 Donas» y el sabor no se pueden elegir; la galleta sí', async () => {
+      preparar(duo(false), 0);
+      const producto = (await service.obtenerCarta())[0].productos[0];
+      const [complemento, sabor] = producto.grupos as any[];
+      expect(complemento.opciones.find((o: any) => o.nombre === '2 Donas')?.disponible).toBe(false);
+      expect(complemento.opciones.find((o: any) => o.nombre === '2 Galletas choco chips')?.disponible).toBe(true);
+      expect(sabor.opciones[0].disponible).toBe(false);
+      expect(complemento.aviso).toBe('Se acabaron: 2 Donas. Elige entre: 2 Galletas choco chips');
+    });
+
+    it('sin plan B y un paso sin ninguna opción pedible: el combo sale no disponible', async () => {
+      preparar(duo(false), 0);
+      const producto = (await service.obtenerCarta())[0].productos[0];
+      expect(producto.disponible).toBe(false);
+    });
+
+    it('con alternativas configuradas en el combo, el combo sigue disponible', async () => {
+      preparar(duo(true), 0);
+      const producto = (await service.obtenerCarta())[0].productos[0];
+      expect(producto.disponible).toBe(true);
+    });
+
+    it('con stock de donas, todas las opciones se pueden elegir y no hay aviso', async () => {
+      preparar(duo(false), 5);
+      const producto = (await service.obtenerCarta())[0].productos[0];
+      expect(producto.grupos.flatMap((g: any) => g.opciones).every((o: any) => o.disponible)).toBe(true);
+      expect(producto.grupos.every((g: any) => g.aviso === null)).toBe(true);
+    });
+  });
+
+  describe('8. Enlace opción → stock (admin)', () => {
+    const preparar = () => {
+      prisma.opcion = { ...prisma.opcion, findUnique: jest.fn().mockResolvedValue({ id: BigInt(11), valor: { nombre: '2 Donas' } }) };
+      prisma.opcionRequiere = {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      };
+      prisma.producto.findUnique = jest.fn().mockResolvedValue({ id: BigInt(57), nombre: 'DONAS ARTESANALES' });
+      prisma.sabor = { findFirst: jest.fn().mockResolvedValue(null) };
+      prisma.$transaction = jest.fn().mockResolvedValue([]);
+      auditoria.registrar = jest.fn().mockResolvedValue(undefined);
+    };
+
+    it('cantidad fuera de 1..99 -> 400 CANTIDAD_INVALIDA', async () => {
+      preparar();
+      const err: any = await service.guardarRequisitosOpcion('11', [{ productoId: '57', cantidad: 0 }]).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'CANTIDAD_INVALIDA' });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('el mismo producto dos veces -> 400 REQUISITO_REPETIDO', async () => {
+      preparar();
+      const err: any = await service.guardarRequisitosOpcion('11', [{ productoId: '57', cantidad: 1 }, { productoId: '57', cantidad: 2 }]).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'REQUISITO_REPETIDO' });
+    });
+
+    it('sabor que no es del producto -> 400 SABOR_INVALIDO', async () => {
+      preparar();
+      const err: any = await service.guardarRequisitosOpcion('11', [{ productoId: '57', saborId: '999', cantidad: 1 }]).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'SABOR_INVALIDO' });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('guarda reemplazando los requisitos y deja rastro en auditoría', async () => {
+      preparar();
+      await service.guardarRequisitosOpcion('11', [{ productoId: '57', cantidad: 2 }], undefined, '1.2.3.4');
+      expect(prisma.opcionRequiere.deleteMany).toHaveBeenCalledWith({ where: { opcion_id: BigInt(11) } });
+      expect(prisma.opcionRequiere.createMany).toHaveBeenCalledWith({
+        data: [{ opcion_id: BigInt(11), producto_id: BigInt(57), sabor_id: null, cantidad: 2 }],
+      });
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CAMBIAR_STOCK_OPCION', entidadId: BigInt(11) }));
+    });
+
+    it('opción inexistente -> 404 OPCION_NO_ENCONTRADA', async () => {
+      preparar();
+      prisma.opcion.findUnique = jest.fn().mockResolvedValue(null);
+      const err: any = await service.guardarRequisitosOpcion('11', []).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'OPCION_NO_ENCONTRADA' });
     });
   });
 });

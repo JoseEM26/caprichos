@@ -437,6 +437,7 @@ model Producto {
   recetas            Receta[]
   ofertasAlcance     Oferta[]
   comboReemplazos    ComboParteReemplazo[]
+  opcionRequisitos   OpcionRequiere[]
   cuponesAlcance     Cupon[]
   rankingsMes        RankingMes[]
 
@@ -487,6 +488,7 @@ model Opcion {
   pedidoLineaOpciones PedidoLineaOpcion[]
   agotados            Agotado[]
   ajustes             AjusteOpcion[]
+  requisitos          OpcionRequiere[]
 
   @@unique([grupo_id, valor_id])
   @@map("opcion")
@@ -517,9 +519,27 @@ model Sabor {
   movimientos   MovimientoStock[]
   conteosApertura ConteoApertura[]
   pedidoLineaSabores PedidoLineaSabor[]
+  opcionRequisitos   OpcionRequiere[]
 
   @@unique([producto_id, nombre])
   @@map("sabor")
+}
+
+/// Stock que consume elegir una opción de grupo (p. ej. «2 Donas» = 2 de DONAS ARTESANALES; un sabor = 1 de ese sabor).
+/// Sin filas, la opción solo mira agotado_hasta. Índice único sobre COALESCE(sabor_id, 0) (ver migración).
+model OpcionRequiere {
+  id          BigInt   @id @default(autoincrement())
+  opcion_id   BigInt
+  producto_id BigInt
+  sabor_id    BigInt?
+  cantidad    Int      @default(1)
+
+  opcion      Opcion   @relation(fields: [opcion_id], references: [id], onDelete: Cascade)
+  producto    Producto @relation(fields: [producto_id], references: [id])
+  sabor       Sabor?   @relation(fields: [sabor_id], references: [id], onDelete: Cascade)
+
+  @@index([producto_id])
+  @@map("opcion_requiere")
 }
 
 /// Stock de producto terminado POR SABOR (donas, galletas con sabores). Una fila por sabor.

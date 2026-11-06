@@ -47,7 +47,7 @@ const TITULOS: Record<string, string> = {
   grupo_opciones: 'Grupos de opciones', opcion: 'Opciones', producto_grupo: 'Grupos asignados a productos',
   sabor: 'Sabores', zona_reparto: 'Zonas de reparto', piso: 'Pisos del plano', elemento_plano: 'Mesas y elementos del plano',
   oferta: 'Ofertas', combo_precio: 'Precios de combo', combo_parte: 'Partes de combo',
-  combo_parte_reemplazo: 'Reemplazos de partes de combo', cupon: 'Cupones fijos',
+  combo_parte_reemplazo: 'Reemplazos de partes de combo', opcion_requiere: 'Stock que consume cada opción', cupon: 'Cupones fijos',
   insumo: 'Insumos (catálogo)', receta: 'Recetas', receta_linea: 'Líneas de receta', ajuste_opcion: 'Ajustes de opción',
   novedad: 'Novedades', novedad_foto: 'Fotos de novedades', destacada: 'Destacadas', destacada_foto: 'Fotos de destacadas',
   respuesta_rapida: 'Respuestas rápidas', version_carta: 'Versión publicada de la carta', foto_local: 'Fotos del local',
