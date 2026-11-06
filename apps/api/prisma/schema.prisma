@@ -50,6 +50,10 @@ model Party {
   coberturasReemplaza      CoberturaTurno[]       @relation("CoberturasReemplaza")
   reemplazosDia            ReemplazoDia[]         @relation("ReemplazoDiaTitular")
   reemplazaDias            ReemplazoDia[]         @relation("ReemplazoDiaSuplente")
+  asistenciaMarcas         AsistenciaMarca[]     @relation("AsistenciaMarcaParty")
+  asistenciaCorregidas     AsistenciaMarca[]     @relation("AsistenciaMarcaCorrigio")
+  asistenciaDispositivo    AsistenciaDispositivo?
+  asistenciaConsentimiento AsistenciaConsentimiento?
   pedidosProveedor         PedidoProveedor[]
   comprasProveedor         Compra[]
   pedidosInternosAvisados  PedidoInterno[]
@@ -1709,6 +1713,9 @@ model HorarioTrabajo {
   entrada    DateTime @db.Time
   salida     DateTime @db.Time
   activo     Boolean  @default(true)
+  // Almuerzo programado (opcional). Ambos nulos = sin almuerzo programado.
+  almuerzo_inicio DateTime? @db.Time
+  almuerzo_fin    DateTime? @db.Time
 
   party      Party    @relation(fields: [party_id], references: [id])
 
@@ -2541,4 +2548,69 @@ model Cortesia {
   @@index([pedido_id])
   @@index([pedido_referencia_id])
   @@map("cortesia")
+}
+
+// ---------------------------------------------------------------------------
+// Control de asistencia del personal (QR en pantalla del local + GPS + selfie).
+// Las marcas son append-only: las correcciones son filas nuevas (origen = CORRECCION).
+// Unicidad en BD (migración 20261231200000_asistencia): una marca CELULAR por persona,
+// jornada y tipo (índice único parcial, no expresable aquí).
+model AsistenciaMarca {
+  id               BigInt    @id @default(autoincrement())
+  party_id         BigInt
+  jornada          DateTime  @db.Date // día laboral (Lima; antes de las 04:00 cuenta como el día anterior)
+  tipo             String    @db.VarChar(20) // ENTRADA | SALIDA_ALMUERZO | ENTRADA_ALMUERZO | SALIDA
+  origen           String    @default("CELULAR") @db.VarChar(12) // CELULAR | CORRECCION
+  momento          DateTime  @db.Timestamptz // hora del servidor
+  estado           String    @default("VALIDA") @db.VarChar(12) // VALIDA | A_REVISAR
+  motivos_revision String?
+  lat              Decimal?  @db.Decimal(9, 6)
+  lng              Decimal?  @db.Decimal(9, 6)
+  precision_m     Decimal?  @db.Decimal(8, 2)
+  distancia_m     Decimal?  @db.Decimal(8, 2)
+  qr_slot          BigInt?
+  dispositivo_hash String?   @db.VarChar(64)
+  motivo           String?   // solo correcciones: motivo obligatorio
+  por_party_id     BigInt?   // solo correcciones: quién la hizo
+  creado_en        DateTime  @default(now()) @db.Timestamptz
+
+  party            Party                @relation("AsistenciaMarcaParty", fields: [party_id], references: [id])
+  corregidaPor    Party?               @relation("AsistenciaMarcaCorrigio", fields: [por_party_id], references: [id])
+  selfie           AsistenciaSelfie?
+
+  @@unique([party_id, qr_slot])
+  @@index([party_id, jornada])
+  @@map("asistencia_marca")
+}
+
+model AsistenciaSelfie {
+  marca_id   BigInt   @id
+  contenido  Bytes    @db.ByteA
+  mime       String   @db.VarChar(30)
+  creado_en  DateTime @default(now()) @db.Timestamptz
+
+  marca      AsistenciaMarca @relation(fields: [marca_id], references: [id])
+
+  @@map("asistencia_selfie")
+}
+
+model AsistenciaDispositivo {
+  party_id      BigInt    @id
+  huella_hash   String    @db.VarChar(64)
+  vinculado_en  DateTime  @default(now()) @db.Timestamptz
+  ultimo_uso_en DateTime? @db.Timestamptz
+
+  party         Party     @relation(fields: [party_id], references: [id])
+
+  @@map("asistencia_dispositivo")
+}
+
+model AsistenciaConsentimiento {
+  party_id    BigInt   @id
+  version     String   @db.VarChar(20)
+  aceptado_en DateTime @db.Timestamptz
+
+  party       Party    @relation(fields: [party_id], references: [id])
+
+  @@map("asistencia_consentimiento")
 }

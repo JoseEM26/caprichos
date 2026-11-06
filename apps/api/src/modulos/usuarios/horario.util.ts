@@ -22,13 +22,25 @@ export async function guardarHorarioTx(tx: any, partyId: bigint, dto: Configurar
           mensaje: 'La entrada y la salida no pueden ser iguales',
         });
       }
+      if (Boolean(h.almuerzoInicio) !== Boolean(h.almuerzoFin)) {
+        throw new BadRequestException({
+          codigo: 'HORARIO_INVALIDO',
+          mensaje: 'El almuerzo necesita inicio y fin (o ninguno)',
+        });
+      }
     }
     const existentes: any[] = await tx.horarioTrabajo.findMany({ where: { party_id: partyId } });
     for (let dia = 0; dia <= 6; dia++) {
       const quiere = dto.horarios.find((h) => h.dia === dia);
       const filas = existentes.filter((e) => e.dia_semana === dia);
       if (quiere) {
-        const data = { entrada: aHora(quiere.entrada), salida: aHora(quiere.salida), activo: true };
+        const data = {
+          entrada: aHora(quiere.entrada),
+          salida: aHora(quiere.salida),
+          almuerzo_inicio: quiere.almuerzoInicio ? aHora(quiere.almuerzoInicio) : null,
+          almuerzo_fin: quiere.almuerzoFin ? aHora(quiere.almuerzoFin) : null,
+          activo: true,
+        };
         if (filas.length) await tx.horarioTrabajo.update({ where: { id: filas[0].id }, data });
         else await tx.horarioTrabajo.create({ data: { party_id: partyId, dia_semana: dia, ...data } });
         if (filas.length > 1) {

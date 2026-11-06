@@ -22,6 +22,7 @@ import { AlmacenView, AperturaDiaView } from './almacen';
 import { MensajesView } from './mensajes';
 import { NotificacionesView } from './notificaciones';
 import { PantallasView } from './pantallas';
+import { AsistenciaAdminView, MiAsistenciaView, PantallaAsistenciaView } from './asistencia';
 import {
   DisenadorView,
   DestacadasView,
@@ -397,6 +398,33 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'auditoria/ver',
     componente: AuditoriaView,
     icono: 'historial',
+  },
+  {
+    clave: 'asistencia',
+    nombre: 'Asistencia',
+    grupo: 'Operación',
+    ruta: '/admin/asistencia',
+    permisoMinimo: 'asistencia/administrar',
+    componente: AsistenciaAdminView,
+    icono: 'asistencia',
+  },
+  {
+    clave: 'asistencia-pantalla',
+    nombre: 'Pantalla de asistencia',
+    grupo: 'Configuración',
+    ruta: '/admin/asistencia/pantalla',
+    permisoMinimo: 'asistencia/pantalla',
+    componente: PantallaAsistenciaView,
+    icono: 'pantallas',
+  },
+  {
+    clave: 'mi-asistencia',
+    nombre: 'Mi asistencia',
+    grupo: 'Operación',
+    ruta: '/admin/mi-asistencia',
+    permisoMinimo: 'asistencia/marcar',
+    componente: MiAsistenciaView,
+    icono: 'asistencia',
   },
   {
     clave: 'pantallas',
