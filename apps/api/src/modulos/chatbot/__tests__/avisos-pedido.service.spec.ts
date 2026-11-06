@@ -303,3 +303,102 @@ describe('AvisosPedidoService: puntos en los avisos de la carta', () => {
     expect(cargaEncolada().plantillaClave).toBe('DELIVERY_ENTREGADO');
   });
 });
+
+describe('AvisosPedidoService: ciclo de avisos del delivery (asignado, salió, llegó, entregado)', () => {
+  let servicio: AvisosPedidoService;
+  let prisma: any;
+  let outbox: any;
+  let parametros: Record<string, unknown>;
+  let yaEnviadas: Set<number>;
+
+  const textoEncolado = (i = 0) => outbox.encolar.mock.calls[i][0].carga.textoLibre as string;
+
+  beforeEach(() => {
+    parametros = {};
+    yaEnviadas = new Set();
+    const pedido = {
+      id: BigInt(88), codigo: 'CP-088', cliente_nombre: 'Marta', cliente_telefono: '987654321', modalidad: 'DELIVERY',
+      total: 30, pago_metodo: 'EFECTIVO', pago_preferido: 'EFECTIVO', canal: 'WEB', repartidor_party_id: BigInt(5),
+      puntos_ganados: 0, party_id: null, cliente_party_id: null,
+    };
+    prisma = {
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
+      pedido: { findUnique: jest.fn(async () => pedido), findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      person: { findUnique: jest.fn().mockResolvedValue({ nombres: 'Luis Alberto' }) },
+      // Sin fila del parámetro (undefined) = nunca configurado
+      parametro: { findUnique: jest.fn(async ({ where }: any) => (where.clave in parametros ? { valor: parametros[where.clave] } : null)) },
+      mensajeReparto: {
+        findUnique: jest.fn(async ({ where }: any) => (yaEnviadas.has(where.pedido_id_numero.numero) ? { numero: 1 } : null)),
+        create: jest.fn(async ({ data }: any) => { yaEnviadas.add(data.numero); return {}; }),
+      },
+    };
+    outbox = { encolar: jest.fn().mockResolvedValue(true), despertar: jest.fn() };
+    servicio = new AvisosPedidoService(prisma, outbox);
+  });
+
+  it('los cuatro avisos del ciclo se encolan cuando están encendidos, con su plantilla para ventana cerrada', async () => {
+    parametros = {
+      whatsapp_aviso_asignado_activo: 'si', whatsapp_aviso_salida_activo: 'si',
+      whatsapp_aviso_llegada_activo: 'si', whatsapp_aviso_entregado_activo: 'si',
+    };
+    for (const etapa of ['ASIGNADO', 'SALIDA', 'LLEGADA', 'ENTREGADO'] as const) {
+      expect((await servicio.avisar(88, etapa)).estado).toBe('ENCOLADO');
+    }
+    const plantillas = outbox.encolar.mock.calls.map((c: any) => c[0].carga.plantillaClave);
+    expect(plantillas).toEqual(['DELIVERY_ASIGNADO', 'DELIVERY_SALIDA', 'DELIVERY_LLEGADA', 'DELIVERY_ENTREGADO']);
+    expect(textoEncolado(0)).toContain('Luis');
+    expect(textoEncolado(0)).not.toContain('Alberto');
+  });
+
+  it('regresión: con el aviso de salida apagado (como dejó la migración de 02/11) el «salió» no se mandaba y el «llegó» sí', async () => {
+    parametros = { whatsapp_aviso_salida_activo: 'no', whatsapp_aviso_llegada_activo: 'si' };
+    expect(await servicio.avisar(88, 'SALIDA')).toEqual({ estado: 'OMITIDO', motivo: 'DESACTIVADO' });
+    expect((await servicio.avisar(88, 'LLEGADA')).estado).toBe('ENCOLADO');
+    expect(outbox.encolar).toHaveBeenCalledTimes(1);
+  });
+
+  it('ASIGNADO viene encendido por defecto si el parámetro no existe, y se apaga con «no»', async () => {
+    expect((await servicio.avisar(88, 'ASIGNADO')).estado).toBe('ENCOLADO');
+    yaEnviadas.clear();
+    parametros.whatsapp_aviso_asignado_activo = 'no';
+    expect(await servicio.avisar(88, 'ASIGNADO')).toEqual({ estado: 'OMITIDO', motivo: 'DESACTIVADO' });
+    expect(outbox.encolar).toHaveBeenCalledTimes(1);
+  });
+
+  it('idempotente por pedido y evento: el repartidor toca dos veces y el cliente recibe un solo aviso', async () => {
+    parametros.whatsapp_aviso_salida_activo = 'si';
+    expect((await servicio.avisar(88, 'SALIDA')).estado).toBe('ENCOLADO');
+    expect((await servicio.avisar(88, 'SALIDA')).estado).toBe('YA_ENVIADO');
+    expect(outbox.encolar).toHaveBeenCalledTimes(1);
+  });
+
+  it('ASIGNADO sin repartidor en el pedido se omite con motivo', async () => {
+    prisma.pedido.findUnique.mockResolvedValue({ ...(await prisma.pedido.findUnique()), repartidor_party_id: null });
+    expect(await servicio.avisar(88, 'ASIGNADO')).toEqual({ estado: 'OMITIDO', motivo: 'SIN_REPARTIDOR' });
+  });
+
+  it('nuevo intento tras un retiro: la clave del outbox ya existía y el aviso no se pierde (sale con otra clave)', async () => {
+    parametros.whatsapp_aviso_salida_activo = 'si';
+    outbox.encolar.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    expect((await servicio.avisar(88, 'SALIDA')).estado).toBe('ENCOLADO');
+    expect(outbox.encolar).toHaveBeenCalledTimes(2);
+    expect(outbox.encolar.mock.calls[1][0].clave).toMatch(/^pedido-88-SALIDA-\d+$/);
+  });
+
+  it('fallo al encolar: queda registrado como FALLIDO con motivo y no lanza (no frena el reparto)', async () => {
+    parametros.whatsapp_aviso_salida_activo = 'si';
+    outbox.encolar.mockRejectedValue(new Error('db caída'));
+    const res = await servicio.avisar(88, 'SALIDA');
+    expect(res).toEqual({ estado: 'FALLIDO', motivo: 'db caída' });
+  });
+
+  it('un aviso omitido deja registro estructurado para soporte, sin teléfono ni nombre', async () => {
+    const aviso = jest.spyOn((servicio as any).logger, 'warn').mockImplementation(() => undefined);
+    parametros.whatsapp_aviso_salida_activo = 'no';
+    await servicio.avisar(88, 'SALIDA');
+    const registro = aviso.mock.calls.map((c: any) => String(c[0])).find((t: string) => t.includes('aviso_pedido_omitido')) ?? '';
+    expect(registro).toContain('aviso_pedido_omitido');
+    expect(registro).toContain('DESACTIVADO');
+    expect(registro).not.toMatch(/987654321|Marta/);
+  });
+});

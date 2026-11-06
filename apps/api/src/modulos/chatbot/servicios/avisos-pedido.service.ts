@@ -19,6 +19,8 @@ export const ETAPAS_AVISO: Record<
   EtapaAvisoReparto,
   { numero: number; parametro: string; cualquierModalidad?: boolean }
 > = {
+  // Un repartidor tomó el pedido (o caja lo reasignó). Activo por defecto aunque el parámetro no exista.
+  ASIGNADO: { numero: 15, parametro: 'whatsapp_aviso_asignado_activo' },
   SALIDA: { numero: 1, parametro: 'whatsapp_aviso_salida_activo' },
   LLEGADA: { numero: 2, parametro: 'whatsapp_aviso_llegada_activo' },
   INSISTENCIA: { numero: 3, parametro: 'whatsapp_aviso_llegada_activo' },
@@ -53,7 +55,7 @@ const MEDIOS_DIGITALES: Record<string, string> = {
  * Etapas del intento de entrega: al retirar la movilidad se borran para que el nuevo intento avise otra vez.
  * La 5 (pregunta RETIRO) guarda la respuesta del cliente; la 10 (REENVIADO) es el aviso de reenvío.
  */
-export const NUMEROS_INTENTO = [1, 2, 3, 4, 5, 10];
+export const NUMEROS_INTENTO = [1, 2, 3, 4, 5, 10, 15];
 
 export const esParametroActivo = (valor: unknown) =>
   valor === true || String(valor).toLowerCase() === 'si';
@@ -71,6 +73,8 @@ export interface DatosAviso {
   recargo?: number;
   /** RETIRO: modo del recargo, solo para explicar al cliente que es el costo del delivery. */
   recargoModo?: 'IGUAL_ENVIO' | 'FIJO' | 'SIN_COSTO';
+  /** ASIGNADO: nombre de pila del repartidor (se lee del pedido al avisar). */
+  repartidorNombre?: string;
   /** SALIDA: rango del tiempo estimado («25 a 30»), calculado al avisar. */
   tiempoTexto?: string | null;
   /** RECIBIDO: enlace de seguimiento del pedido (null si no hay origen público configurado). */
@@ -105,7 +109,12 @@ export class AvisosPedidoService {
     tx?: Prisma.TransactionClient,
   ): Promise<ResultadoAviso> {
     try {
-      return await this.avisarSinProteger(BigInt(pedidoId), etapa, datos, tx);
+      const res = await this.avisarSinProteger(BigInt(pedidoId), etapa, datos, tx);
+      // Registro para soporte: por qué un aviso no salió (sin teléfono, apagado, sin repartidor...), sin datos personales
+      if (res.estado === 'OMITIDO' && res.motivo !== 'NO_ES_DELIVERY') {
+        this.logger.warn(JSON.stringify({ evento: 'aviso_pedido_omitido', pedidoId: String(pedidoId), etapa, motivo: res.motivo }));
+      }
+      return res;
     } catch (err: any) {
       this.logger.error(`Aviso ${etapa} del pedido ${pedidoId} falló: ${err?.message}`, err?.stack);
       // Dentro de una transacción ajena el error debe propagarse para que esa transacción se deshaga
@@ -145,6 +154,7 @@ export class AvisosPedidoService {
         party_id: true,
         cliente_party_id: true,
         puntos_ganados: true,
+        repartidor_party_id: true,
       },
     });
     if (!pedido) return { estado: 'OMITIDO', motivo: 'PEDIDO_NO_ENCONTRADO' };
@@ -164,7 +174,13 @@ export class AvisosPedidoService {
     if (!telefono) return { estado: 'OMITIDO', motivo: 'SIN_TELEFONO' };
 
     const flag = await db.parametro.findUnique({ where: { clave: cfg.parametro } });
-    if (!esParametroActivo(flag?.valor)) return { estado: 'OMITIDO', motivo: 'DESACTIVADO' };
+    // ASIGNADO viene encendido si el parámetro aún no existe; el resto exige «Sí» explícito
+    if (!parametroActivoConDefecto(flag?.valor, etapa === 'ASIGNADO')) return { estado: 'OMITIDO', motivo: 'DESACTIVADO' };
+    if (etapa === 'ASIGNADO') {
+      if (!pedido.repartidor_party_id) return { estado: 'OMITIDO', motivo: 'SIN_REPARTIDOR' };
+      const persona = await db.person.findUnique({ where: { party_id: pedido.repartidor_party_id }, select: { nombres: true } });
+      datos = { ...datos, repartidorNombre: (persona?.nombres ?? '').trim().split(/\s+/)[0] || 'nuestro repartidor' };
+    }
 
     const nombre = pedido.cliente_nombre || 'Cliente';
     const medio = etapa === 'RECIBIDO' ? MEDIOS_DIGITALES[String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase()] ?? null : null;
@@ -205,17 +221,11 @@ export class AvisosPedidoService {
       await t.mensajeReparto.create({
         data: { pedido_id: pedidoId, numero: cfg.numero, enviado_en: new Date(), estado: 'PENDIENTE' },
       });
-      return this.outbox.encolar(
-        {
-          telefono,
-          tipo: 'TEXTO',
-          clave: `pedido-${pedidoId}-${etapa}`,
-          origen: 'AVISO_PEDIDO',
-          pedidoId,
-          carga,
-        },
-        t,
-      );
+      const mensaje = { telefono, tipo: 'TEXTO' as const, origen: 'AVISO_PEDIDO', pedidoId, carga };
+      if (await this.outbox.encolar({ ...mensaje, clave: `pedido-${pedidoId}-${etapa}` }, t)) return true;
+      // La etapa se borró para un nuevo intento (retiro, reasignación) pero la clave del outbox sigue: sin
+      // sufijo el aviso se perdía en silencio. La fila de mensaje_reparto ya garantiza una sola vez por intento.
+      return this.outbox.encolar({ ...mensaje, clave: `pedido-${pedidoId}-${etapa}-${Date.now()}` }, t);
     };
 
     let nuevo: boolean;
@@ -371,6 +381,8 @@ export class AvisosPedidoService {
         return TEXTOS_REPARTO.aceptado(nombre, codigo);
       case 'LISTO':
         return TEXTOS_REPARTO.listo(nombre, codigo);
+      case 'ASIGNADO':
+        return TEXTOS_REPARTO.asignado(nombre, codigo, datos.repartidorNombre ?? 'nuestro repartidor');
       case 'SALIDA': {
         if (datos.tiempoTexto) return TEXTOS_REPARTO.salida(nombre, codigo, datos.tiempoTexto);
         const p = await this.prisma.parametro.findUnique({ where: { clave: 'tiempo_prometido_min' } });
