@@ -235,13 +235,18 @@ export function CierreView() {
 
   // Ventas por medio: el efectivo es lo vendido en efectivo, no el esperado en caja
   const ventasEfectivo = esperado?.desglose?.ventasEfectivo ?? 0;
+  // Propinas del día (van aparte de la venta). Los medios digitales del servidor ya las incluyen (es lo que entró a
+  // Yape, Plin, etc.), así que el total vendido las resta; el efectivo esperado sí las suma (están en la caja).
+  const propinasEfectivo = esperado?.desglose?.propinas?.efectivo ?? 0;
+  const propinasDigital = esperado?.desglose?.propinas?.digital ?? 0;
+  const propinasTotal = Math.round((propinasEfectivo + propinasDigital) * 100) / 100;
   const ventasTotales = useMemo(() => {
     if (esperado) {
       const { yape = 0, plin = 0, transferencia = 0, tarjeta = 0 } = esperado.medios || {};
-      return ventasEfectivo + yape + plin + transferencia + tarjeta;
+      return Math.round((ventasEfectivo + yape + plin + transferencia + tarjeta - propinasDigital) * 100) / 100;
     }
     return pedidosCobrados.reduce((acc, p) => acc + p.total, 0);
-  }, [esperado, pedidosCobrados, ventasEfectivo]);
+  }, [esperado, pedidosCobrados, ventasEfectivo, propinasDigital]);
 
   const movimientosVigentes = useMemo(() => movimientos.filter((m) => !m.anulado_en), [movimientos]);
 
@@ -257,8 +262,8 @@ export function CierreView() {
 
   const efectivoEsperado = useMemo(() => {
     if (esperado?.efectivoEsperado !== undefined) return esperado.efectivoEsperado;
-    return aperturaMonto + ventasEfectivo + ingresosExtra - egresosGasto;
-  }, [esperado, aperturaMonto, ventasEfectivo, ingresosExtra, egresosGasto]);
+    return aperturaMonto + ventasEfectivo + propinasEfectivo + ingresosExtra - egresosGasto;
+  }, [esperado, aperturaMonto, ventasEfectivo, propinasEfectivo, ingresosExtra, egresosGasto]);
 
   const montoDigital = (clave: ClaveDigital) => digitales?.medios[clave]?.monto ?? 0;
 
@@ -887,6 +892,46 @@ export function CierreView() {
                       <span>Total vendido</span>
                       <span>s/ {ventasTotales.toFixed(2)}</span>
                     </div>
+                    {propinasDigital > 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                        Yape, Plin, transferencia y tarjeta incluyen S/ {propinasDigital.toFixed(2)} de propinas digitales; no son venta y no se suman al total vendido.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Propinas del día: aparte de la venta (no es ingreso ni sale en comprobantes) */}
+                  <div
+                    data-testid="cierre-propinas-dia"
+                    style={{
+                      background: 'var(--cp-white, #FFFFFF)',
+                      border: '1px solid var(--cp-line, #E3D6C6)',
+                      borderRadius: 14,
+                      padding: '14px 16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 15, color: 'var(--cp-navy, #0B2C3E)' }}>
+                        Propinas del día
+                      </span>
+                      <span data-testid="cierre-propinas-total" style={{ fontWeight: 800, fontSize: 16, color: 'var(--cp-navy, #0B2C3E)' }}>
+                        s/ {propinasTotal.toFixed(2)}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                      <span>En efectivo (ya suma en el efectivo esperado)</span>
+                      <span data-testid="cierre-propinas-efectivo">s/ {propinasEfectivo.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                      <span>Digital (ya está en Yape, Plin, transferencia o tarjeta)</span>
+                      <span data-testid="cierre-propinas-digital">s/ {propinasDigital.toFixed(2)}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+                      Son del equipo: no son ingreso ni venta, no salen en los comprobantes y no descuadran el cierre. Las devoluciones
+                      del día ya están descontadas.
+                    </div>
                   </div>
 
                   {/* Efectivo que debe haber en caja */}
@@ -911,6 +956,10 @@ export function CierreView() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                       <span>+ Ventas en efectivo</span>
                       <span style={{ fontWeight: 700 }}>s/ {ventasEfectivo.toFixed(2)}</span>
+                    </div>
+                    <div data-testid="esperado-propinas-efectivo" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                      <span>+ Propinas en efectivo (van aparte de la venta)</span>
+                      <span style={{ fontWeight: 700 }}>s/ {propinasEfectivo.toFixed(2)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                       <span>+ Ingresos extras</span>
@@ -1529,6 +1578,8 @@ export function CierreView() {
                         plin: esperado.medios?.plin ?? 0,
                         transferencia: esperado.medios?.transferencia ?? 0,
                         tarjeta: esperado.medios?.tarjeta ?? 0,
+                        propinasEfectivo,
+                        propinasDigital,
                         efectivoEsperado,
                       }
                     : null

@@ -18,6 +18,9 @@ export interface MontosSistema {
   ingresos: number;
   egresos: number;
   liquidadoEfectivo: number;
+  /** Propinas cobradas (van aparte de la venta; ya están dentro de esperadoEfectivo y de los sistema*). */
+  propinasEfectivo: number;
+  propinasDigitales: number;
 }
 
 /** Subconjunto de PrismaService/TransactionClient que usa el cálculo de caja. */
@@ -219,25 +222,54 @@ export async function calcularMontosCaja(
   });
 
   let ventasEfectivo = 0;
+  let propinasEfectivo = 0;
+  let propinasDigitales = 0;
   let sistemaYape = 0;
   let sistemaPlin = 0;
   let sistemaTransferencia = 0;
   let sistemaTarjeta = 0;
 
+  // pago.monto es la venta del renglón y pago.propina su propina: lo que entró por el medio es la suma.
+  // Las ventas (ventasEfectivo) no incluyen propina; el efectivo esperado sí, porque está en la caja.
   for (const cobro of cobros) {
     for (const pago of cobro.pagos) {
       const medio = (pago.medio || '').trim().toUpperCase();
       const monto = aCentimos(pago.monto);
+      const propina = aCentimos(pago.propina);
       if (medio === 'EFECTIVO') {
         ventasEfectivo += monto;
+        propinasEfectivo += propina;
       } else if (medio === 'YAPE') {
-        sistemaYape += monto;
+        sistemaYape += monto + propina;
+        propinasDigitales += propina;
       } else if (medio === 'PLIN') {
-        sistemaPlin += monto;
+        sistemaPlin += monto + propina;
+        propinasDigitales += propina;
       } else if (medio === 'TRANSFERENCIA') {
-        sistemaTransferencia += monto;
+        sistemaTransferencia += monto + propina;
+        propinasDigitales += propina;
       } else if (medio === 'TARJETA') {
-        sistemaTarjeta += monto;
+        sistemaTarjeta += monto + propina;
+        propinasDigitales += propina;
+      }
+    }
+  }
+
+  // Devoluciones del día de la caja: la propina del pedido devuelto sale ese día (por el medio de su cobro).
+  // Es el mismo criterio del acumulado mensual (resumenMes), así que el cierre y el acumulado no divergen.
+  // Las ventas por medio no cambian: igual que hoy, una devolución no resta de sistemaYape/Plin/etc.
+  const inicioDia = new Date(caja.fecha.getTime() + 5 * 60 * 60 * 1000);
+  const devueltos = await cliente.pedido.findMany({
+    where: { devolucion: { is: { creado_en: { gte: inicioDia, lt: new Date(inicioDia.getTime() + MS_DIA) } } } },
+    select: { cobros: { where: { anulado_en: null }, select: { pagos: { select: { medio: true, propina: true } } } } },
+  });
+  for (const p of devueltos) {
+    for (const cobro of p.cobros ?? []) {
+      for (const pago of cobro.pagos ?? []) {
+        const propina = aCentimos(pago.propina);
+        const medio = (pago.medio || '').trim().toUpperCase();
+        if (medio === 'EFECTIVO') propinasEfectivo -= propina;
+        else if (['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'].includes(medio)) propinasDigitales -= propina;
       }
     }
   }
@@ -258,7 +290,7 @@ export async function calcularMontosCaja(
   const liquidadoEfectivo = liquidaciones.reduce((acc, liq) => acc + aCentimos(liq.entregado), 0);
 
   const esperado =
-    aCentimos(caja.apertura) + ventasEfectivo + liquidadoEfectivo + ingresos - egresos;
+    aCentimos(caja.apertura) + ventasEfectivo + propinasEfectivo + liquidadoEfectivo + ingresos - egresos;
 
   return {
     esperadoEfectivo: enPesos(esperado),
@@ -270,5 +302,7 @@ export async function calcularMontosCaja(
     ingresos: enPesos(ingresos),
     egresos: enPesos(egresos),
     liquidadoEfectivo: enPesos(liquidadoEfectivo),
+    propinasEfectivo: enPesos(propinasEfectivo),
+    propinasDigitales: enPesos(propinasDigitales),
   };
 }

@@ -426,6 +426,37 @@ describe('CobrosService', () => {
       );
     });
 
+    it('cobro con propina: el cliente entrega venta + propina; la propina va aparte en el renglón y el vuelto cuenta la propina', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock, propina: new Prisma.Decimal(5) }); // total 50 + propina 5
+
+      prismaMock.cobro.create.mockResolvedValue({
+        id: 78n,
+        pedido_id: 100n,
+        caja_id: 10n,
+        total: new Prisma.Decimal(50.0),
+        credito_personal: false,
+        cobrado_por: 2n,
+        en: new Date(),
+        pagos: [{ id: 1n, medio: 'EFECTIVO', monto: new Prisma.Decimal(50.0), propina: new Prisma.Decimal(5), recibido: new Prisma.Decimal(60.0), vuelto: new Prisma.Decimal(5.0) }],
+      });
+      prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, pago_estado: 'PAGADO', pago_metodo: 'EFECTIVO' });
+
+      // Cuadra con venta + propina (55): con solo el total (50) sería PAGO_NO_CUADRA
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 50, recibido: 60 }] }, cajeroUsuario),
+      ).rejects.toMatchObject({ response: { codigo: 'PAGO_NO_CUADRA' } });
+
+      const res = await service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 55, recibido: 60 }] }, cajeroUsuario);
+
+      const renglon = prismaMock.cobro.create.mock.calls[0][0].data.pagos.create[0];
+      expect(Number(renglon.monto)).toBe(50); // venta del renglón
+      expect(Number(renglon.propina)).toBe(5); // propina del renglón
+      expect(Number(renglon.vuelto)).toBe(5); // recibido 60 - (venta + propina) 55
+      expect(res.pagos[0].propina).toBe(5);
+      expect(res.total).toBe(50); // el total de la venta no cambia
+    });
+
     it('pago mixto -> asigna MIXTO, calcula vuelto solo sobre el efectivo y procesa la transacción', async () => {
       prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
       prismaMock.pedido.findUnique.mockResolvedValue({

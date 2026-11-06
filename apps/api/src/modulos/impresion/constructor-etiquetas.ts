@@ -372,7 +372,9 @@ export function claveDeTrabajo(job: { tipo: string; payload: any }): string | nu
 const num = (v: unknown): number => Math.round(Number(v ?? 0) * 100) / 100;
 
 /** Ticket/voucher de pago para la ticketera térmica; el agente lo maquetea a 58 u 80 mm. */
-export function construirTicketPago(pedido: any, local: any, comprobante?: any): TicketPagoDatos {
+// ponytail: el tipo `propina` ya está en packages/compartido/src; el dist publicado puede ir atrasado, así que se
+// declara aquí en la intersección para no depender del orden de construcción.
+export function construirTicketPago(pedido: any, local: any, comprobante?: any): TicketPagoDatos & { propina?: number } {
   const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   const cobro = (pedido.cobros || []).find((c: any) => !c.anulado_en);
   const ahora = cobro?.en ?? new Date();
@@ -395,10 +397,12 @@ export function construirTicketPago(pedido: any, local: any, comprobante?: any):
       tamano: l.tamano ?? null,
       subtotal: num(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
     })),
+    // total = venta (comprobante). La propina va en su propia línea; el pago por medio es venta + propina (lo entregado)
     total: num(pedido.total),
+    propina: num(pedido.propina ?? 0),
     pagos: (cobro?.pagos || []).map((p: any) => ({
       medio: p.medio,
-      monto: num(p.monto),
+      monto: num(num(p.monto) + num(p.propina ?? 0)),
       recibido: p.recibido == null ? null : num(p.recibido),
       vuelto: p.vuelto == null ? null : num(p.vuelto),
     })),

@@ -70,4 +70,12 @@ describe('lineasTicketPago', () => {
     expect(ls.find((l) => l.texto.startsWith('TOTAL'))?.texto).toMatch(/S\/ 36\.00$/);
     expect(ls[0]).toMatchObject({ texto: 'Caprichos', centrado: true, negrita: true });
   });
+
+  it('propina: línea propia debajo del TOTAL (la venta); sin propina no aparece', () => {
+    const conPropina = lineasTicketPago({ ...t, propina: 5 }, 48).map((l) => l.texto);
+    const total = conPropina.findIndex((x) => x.startsWith('TOTAL'));
+    expect(conPropina[total]).toMatch(/S\/ 36\.00$/);
+    expect(conPropina[total + 1]).toMatch(/^Propina \(aparte\)\s+S\/ 5\.00$/);
+    expect(lineasTicketPago(t, 48).some((l) => l.texto.includes('Propina'))).toBe(false);
+  });
 });

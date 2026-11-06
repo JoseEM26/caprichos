@@ -12,6 +12,7 @@ import { MODO_CODIGO_PLANTILLA, MODO_WHATSAPP_ENTRANTE } from '../clientes/verif
 
 export const CLAVES_NUMERICAS = [
   'notif_sonido_intervalo_seg',
+  'propina_tope',
   'tiempo_prometido_min',
   'tiempo_max_min',
   'envio_gratis_monto',
@@ -162,6 +163,7 @@ export const ALCANCES_SONIDO_NOTIF = ['TODOS_NO_LEIDOS', 'SOLO_URGENTES', 'SOLO_
 
 export const CLAVES_OBJETO = [
   'pausa_alta_demanda',
+  'propina_activa',
   'local_datos',
   'local_pagos',
 ] as const;
@@ -227,6 +229,12 @@ export class ConfiguracionService {
         throw new BadRequestException({
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El valor debe ser un número mayor o igual a 0',
+        });
+      }
+      if (clave === 'propina_tope' && (valor < 1 || valor > 1000)) {
+        throw new BadRequestException({
+          codigo: 'VALOR_INVALIDO',
+          mensaje: 'El tope de propina debe estar entre S/ 1 y S/ 1000',
         });
       }
       if (clave === 'cocina_minutos_preparacion_defecto' && (!Number.isInteger(valor) || valor < 1 || valor > 120)) {
@@ -344,6 +352,17 @@ export class ConfiguracionService {
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El valor debe ser un objeto o estructura válida',
         });
+      }
+      if (clave === 'propina_activa') {
+        // Interruptor por canal: { carta: boolean, bot: boolean }. Sin propina de mozo ni de caja.
+        const v = valor as Record<string, unknown>;
+        if (typeof v.carta !== 'boolean' || typeof v.bot !== 'boolean') {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'La propina se enciende o apaga por canal: carta y bot (verdadero o falso)',
+          });
+        }
+        valor = { carta: v.carta, bot: v.bot };
       }
     }
 

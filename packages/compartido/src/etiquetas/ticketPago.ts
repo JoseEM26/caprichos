@@ -65,6 +65,8 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
   }
   p(linea);
   p(fila('TOTAL', soles(t.total), c), { negrita: true });
+  // Propina aparte: línea propia, no es venta ni va en el comprobante
+  if (t.propina && t.propina > 0) p(fila('Propina (aparte)', soles(t.propina), c));
   if (t.pagos.length) {
     p('Pago:');
     for (const x of t.pagos) {

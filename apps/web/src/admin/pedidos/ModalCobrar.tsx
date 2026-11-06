@@ -46,7 +46,9 @@ export function ModalCobrar({
   cobrar = pedidosApi.cobrar,
 }: ModalCobrarProps) {
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
-  const totalPedido = Number(pedido.total) || 0;
+  // Lo que se cobra: la venta más la propina (la propina va aparte: no es venta ni comprobante)
+  const propinaPedido = Number(pedido.propina) || 0;
+  const totalPedido = (Number(pedido.total) || 0) + propinaPedido;
 
   // Con plan de pago (pago dividido) se precargan sus filas por medio; sin plan, una fila como antes
   const [pagos, setPagos] = useState<FilaPago[]>(() =>
@@ -363,6 +365,12 @@ export function ModalCobrar({
           <span>S/ {totalPedido.toFixed(2)}</span>
         </div>
 
+        {propinaPedido > 0 && (
+          <div data-testid="cobro-propina" style={{ fontSize: 13, color: 'var(--cp-navy, #0B2C3E)', marginTop: -6, marginBottom: 6 }}>
+            Venta S/ {(totalPedido - propinaPedido).toFixed(2)} + propina S/ {propinaPedido.toFixed(2)} (va aparte, no es venta)
+          </div>
+        )}
+
         {/* Filas de pagos */}
         {pagos.map((fila, idx) => {
           const esEfectivo = mismoMedio(fila.medio, 'Efectivo');
@@ -673,7 +681,7 @@ export function ModalCobrar({
                       extraido: lectura.extraido,
                       medio: medioDigital,
                     }}
-                    pedido={{ total: pedido.total, medio: medioDigital }}
+                    pedido={{ total: totalPedido, medio: medioDigital }}
                     puedeVer
                   />
                 )}

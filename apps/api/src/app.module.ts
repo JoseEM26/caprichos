@@ -18,6 +18,7 @@ import { PedidosAdminModule } from './modulos/pedidos-admin/pedidos-admin.module
 import { CortesiasModule } from './modulos/cortesias/cortesias.module';
 import { CajaModule } from './modulos/caja/caja.module';
 import { CierreModule } from './modulos/cierre/cierre.module';
+import { PropinasModule } from './modulos/propinas/propinas.module';
 import { RepartosModule } from './modulos/repartos/repartos.module';
 import { CocinaModule } from './modulos/cocina/cocina.module';
 import { PlanoModule } from './modulos/plano/plano.module';
@@ -72,6 +73,7 @@ import { ResenasModule } from './modulos/resenas/resenas.module';
     CortesiasModule,
     CajaModule,
     CierreModule,
+    PropinasModule,
     RepartosModule,
     CocinaModule,
     PlanoModule,

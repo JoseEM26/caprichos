@@ -92,6 +92,45 @@ describe('caja.calculo', () => {
     expect(montos.sistemaYape).toBe(20);
   });
 
+  it('propina: suma al efectivo esperado y a su medio digital; la devolución del día la resta (sin doble conteo)', async () => {
+    const cliente: any = {
+      pedido: {
+        // pedido devuelto hoy: su propina en efectivo (5) sale de la caja; la digital (2) sale del día
+        findMany: jest.fn().mockResolvedValue([{ cobros: [{ pagos: [{ medio: 'EFECTIVO', propina: new Prisma.Decimal(5) }, { medio: 'YAPE', propina: new Prisma.Decimal(0) }] }] }]),
+      },
+      cobro: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 1n,
+            anulado_en: null,
+            pagos: [
+              { medio: 'EFECTIVO', monto: new Prisma.Decimal(30), propina: new Prisma.Decimal(5) },
+              { medio: 'YAPE', monto: new Prisma.Decimal(20), propina: new Prisma.Decimal(2) },
+            ],
+          },
+        ]),
+      },
+      movimientoCaja: { findMany: jest.fn().mockResolvedValue([]) },
+      liquidacion: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+
+    const montos = await calcularMontosCaja(cliente, {
+      id: 10n,
+      fecha: new Date('2026-11-06T00:00:00.000Z'),
+      apertura: new Prisma.Decimal(50),
+    });
+
+    // venta en efectivo 30; propina efectiva 5 cobrada y devuelta hoy => 0 neta
+    expect(montos.ventasEfectivo).toBe(30);
+    expect(montos.propinasEfectivo).toBe(0);
+    expect(montos.esperadoEfectivo).toBe(80);
+    // Yape incluye su propina cobrada (22); la digital neta es 2 - 0 (la devolución digital no traía propina)
+    expect(montos.sistemaYape).toBe(22);
+    expect(montos.propinasDigitales).toBe(2);
+    // la ventana de devoluciones es el día Lima de la caja (05:00Z a 05:00Z del día siguiente)
+    expect(cliente.pedido.findMany.mock.calls[0][0].where.devolucion.is.creado_en.gte.toISOString()).toBe('2026-11-06T05:00:00.000Z');
+  });
+
   it('el cobro anulado (conservado, RNF-CAP-014) no cuenta en lo esperado: solo los vigentes de la caja', async () => {
     const cobros = [
       { id: 1n, caja_id: 10n, anulado_en: null, pagos: [{ medio: 'EFECTIVO', monto: new Prisma.Decimal(30) }] },

@@ -31,6 +31,8 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_COMPROBANTE_RUC'
   | 'PEDIDO_COMPROBANTE_RAZON'
   | 'PEDIDO_RESUMEN_CONFIRMAR'
+  | 'PEDIDO_PROPINA'
+  | 'PEDIDO_PROPINA_MONTO'
   | 'PEDIDO_CANCELAR_CONFIRMAR';
 
 export interface OpcionElegidaBot {
@@ -130,6 +132,8 @@ export interface EstadoCarritoPedido {
   estadoInterno: EstadoPedidoFlujo;
   /** Pago dividido en curso: primer medio y su monto mientras se elige el segundo. */
   pagoDiv?: { medio1?: MedioPagoBot; monto1?: number };
+  /** Propina opcional en soles (aparte de la venta). undefined = aún no se preguntó. */
+  propina?: number;
   modalidad?: 'DELIVERY' | 'RECOGER';
   entrega?: DatosEntregaBot;
   cliente?: DatosClienteBot;

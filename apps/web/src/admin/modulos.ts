@@ -8,6 +8,7 @@ import { PedidosAdminView } from './pedidos';
 import { CocinaAdminView } from './cocina';
 import { RepartosView } from './repartos';
 import { CierreView } from './cierre';
+import { PropinasView } from './propinas';
 import { ComprobantesView, ReclamosAdminView } from './comprobantes';
 import { PlanoView, ReservasView, MisPedidosView } from './salon';
 import { StockView } from './stock';
@@ -111,6 +112,15 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'caja/ver',
     componente: CierreView,
     icono: 'cierre',
+  },
+  {
+    clave: 'propinas',
+    nombre: 'Propinas',
+    grupo: 'Operación',
+    ruta: '/admin/propinas',
+    permisoMinimo: 'propinas/ver',
+    componente: PropinasView,
+    icono: 'propinas',
   },
   {
     clave: 'cocina',

@@ -222,6 +222,8 @@ export interface MiPedido {
   /** Nombre del cliente (o la mesa si no hay nombre). Nunca teléfono ni DNI. */
   clienteNombre?: string | null;
   total: number;
+  /** Propina del pedido (aparte de la venta; 0 = sin propina) */
+  propina?: number;
   pagoEstado: string | null;
   /** YAPE | PLIN | TRANSFERENCIA | EFECTIVO | … (null si no se eligió) */
   pagoMetodo: string | null;

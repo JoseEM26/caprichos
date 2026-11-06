@@ -412,6 +412,12 @@ export function MisPedidosView() {
                       <dd>{PAGO[p.pagoEstado ?? ''] ?? (p.pagoEstado || 'Sin dato')}</dd>
                       <dt>Total</dt>
                       <dd>{soles(p.total)}</dd>
+                      {(p.propina ?? 0) > 0 && (
+                        <>
+                          <dt>Propina (aparte)</dt>
+                          <dd data-testid="mis-pedidos-propina">{soles(p.propina ?? 0)}</dd>
+                        </>
+                      )}
                     </dl>
                     {((p.historialVouchers ?? 0) >= 2 || (p.historialVouchers ?? 0) > (p.vouchers ?? 0)) && (
                       <HistorialVoucher pedidoId={p.id} total={p.historialVouchers ?? 0} />
