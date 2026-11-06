@@ -1,5 +1,5 @@
 import { BadRequestException, HttpException } from '@nestjs/common';
-import { AsistenciaService } from './asistencia.service';
+import { AsistenciaService, VERSION_CONSENTIMIENTO } from './asistencia.service';
 import { payloadQr, secretoQr, slotDe, codigoCorto } from './asistencia.qr';
 import { MarcarDto } from './dto/asistencia.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -25,8 +25,9 @@ function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo
   let dispositivo: Fila | null = opts.dispositivo === undefined || opts.dispositivo === null
     ? null
     : { party_id: 7n, huella_hash: opts.dispositivo };
-  let consentimiento: Fila | null = opts.consentimiento ? { party_id: 7n, version: 'x', aceptado_en: AHORA } : null;
+  let consentimiento: Fila | null = opts.consentimiento ? { party_id: 7n, version: VERSION_CONSENTIMIENTO, aceptado_en: AHORA } : null;
   let id = 1n;
+  let upserts = 0;
   const parametro = opts.parametro === undefined
     ? { clave: 'asistencia.config', valor: { localLat: LOCAL.lat, localLng: LOCAL.lng } }
     : opts.parametro;
@@ -54,6 +55,7 @@ function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo
     asistenciaConsentimiento: {
       findUnique: async () => consentimiento,
       create: async ({ data }: any) => (consentimiento = { ...data }),
+      upsert: async ({ create, update }: any) => { upserts++; return (consentimiento = consentimiento ? { ...consentimiento, ...update } : { ...create }); },
     },
     asistenciaMarca: {
       findFirst: async ({ where }: any) => filtrar(marcas, where)[0] ?? null,
@@ -83,7 +85,7 @@ function bdFalsa(opts: { parametro?: Record<string, unknown> | null; dispositivo
     party: { findUnique: async () => ({ id: 7n }) },
     $transaction: async (cb: (tx: any) => Promise<unknown>) => cb(bd),
   };
-  return { bd, marcas, selfies, get dispositivo() { return dispositivo; } };
+  return { bd, marcas, selfies, get dispositivo() { return dispositivo; }, get consentimiento() { return consentimiento; }, get upserts() { return upserts; } };
 }
 
 function servicio(opts?: Parameters<typeof bdFalsa>[0]) {
@@ -184,6 +186,23 @@ describe('AsistenciaService.marcar', () => {
   it('la primera vez exige aceptar el consentimiento de datos personales', async () => {
     const { svc } = servicio();
     expect(await error(svc.marcar(dto({ consentimiento: false }), LUIS, undefined, AHORA))).toMatchObject({ codigo: 'CONSENTIMIENTO_REQUERIDO' });
+  });
+
+  it('un rechazo por radio con consentimiento aceptado lo guarda y la siguiente marca ya no lo pide', async () => {
+    const { svc, b } = servicio();
+    const lejos = dto({ lat: LOCAL.lat + 0.01 });
+    await error(svc.marcar(lejos, LUIS, undefined, AHORA));
+    expect(b.consentimiento).toMatchObject({ party_id: 7n, version: VERSION_CONSENTIMIENTO });
+    const r = await svc.marcar(dto({ consentimiento: undefined }), LUIS, undefined, AHORA);
+    expect(r.ok).toBe(true);
+  });
+
+  it('con el aviso ya aceptado, otra marca con consentimiento no lo duplica', async () => {
+    const { svc, b } = servicio();
+    await svc.marcar(dto(), LUIS, undefined, AHORA);
+    await error(svc.marcar(dto({ tipo: 'ENTRADA' }), LUIS, undefined, AHORA));
+    await svc.marcar(dto({ tipo: 'SALIDA' }), LUIS, undefined, AHORA).catch(() => undefined);
+    expect(b.upserts).toBe(1);
   });
 
   it('exige selfie JPEG', async () => {

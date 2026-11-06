@@ -26,7 +26,7 @@ Estado de la funcion: la asistencia esta probada en preproduccion. En produccion
 ## Como se hace: Marcar mi entrada, almuerzo o salida
 1. Entra al sistema con tu usuario. Si estas en la pantalla de ingreso, puedes pulsar Marcar mi asistencia: despues de iniciar sesion te lleva directo a Mi asistencia. En el menu tambien aparece Marcar asistencia.
 2. Arriba lees el estado del dia: "Te falta marcar: Entrada" (o la que toque) y tu turno, por ejemplo "Tu turno: 09:00 a 18:00 (almuerzo 13:00-14:00)". Si no hay turno dice "Hoy no tienes turno programado.".
-3. La primera vez aparece un aviso de datos personales (se usan tu ubicacion, tu selfie y la hora). Marca la casilla "Acepto el tratamiento de mis datos para el control de asistencia." Sin aceptar no puedes marcar.
+3. Solo la primera vez aparece un aviso de datos personales (se usan tu ubicacion, tu selfie y la hora). Marca la casilla "Acepto el tratamiento de mis datos para el control de asistencia." Sin aceptar no puedes marcar. Se acepta una sola vez: queda guardado aunque esa primera marca sea rechazada (por ejemplo, fuera del radio) y no se vuelve a pedir; abajo ves "Aceptaste el aviso de datos el..." con el enlace Ver aviso.
 4. Pulsa el boton grande Escanear QR. Los pasos aparecen arriba: QR, Ubicacion, Selfie, Confirmar.
 5. Paso 1, QR: apunta la camara al QR de la pantalla del local. Cambia cada 30 segundos, asi que escanea el que esta en pantalla en ese momento. Se lee solo.
 6. Paso 2, Ubicacion: el celular pide permiso de ubicacion. Acepta. Dice "Leyendo tu ubicacion precisa..." y pasa solo al siguiente paso.
