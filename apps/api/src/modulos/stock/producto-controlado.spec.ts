@@ -18,7 +18,7 @@ function fakeDb(init: { producto?: any; stock?: number | null; apertura?: number
   const st = {
     producto: { id: DONA, nombre: 'Dona', controla_stock: init.controla ?? true, agotado_hasta: null as Date | null },
     stock: init.stock === null || init.stock === undefined ? [] : [{ id: 9n, producto_id: DONA, lugar_id: LUGAR, cantidad: init.stock }],
-    apertura: init.apertura === null || init.apertura === undefined ? [] : [{ fecha: HOY, producto_id: DONA, lugar_id: LUGAR, cantidad: init.apertura }],
+    apertura: (init.apertura === null || init.apertura === undefined ? [] : [{ fecha: HOY, producto_id: DONA, sabor_id: null as bigint | null, lugar_id: LUGAR, cantidad: init.apertura }]) as any[],
     movimientos: [] as any[],
     agotados: [] as any[],
   };
@@ -70,24 +70,22 @@ function fakeDb(init: { producto?: any; stock?: number | null; apertura?: number
       }),
     },
     conteoApertura: {
-      findUnique: jest.fn(async ({ where }: any) => {
-        const k = where.fecha_producto_id;
-        const f = st.apertura.find((a) => a.fecha === k.fecha.toISOString().slice(0, 10) && a.producto_id === k.producto_id);
+      findFirst: jest.fn(async ({ where }: any) => {
+        const f = st.apertura.find((a) => a.fecha === where.fecha.toISOString().slice(0, 10) && a.producto_id === where.producto_id && (a.sabor_id ?? null) === (where.sabor_id ?? null));
         return f ? { ...f } : null;
       }),
       findMany: jest.fn(async ({ where }: any) =>
-        st.apertura.filter((a) => a.fecha === where.fecha.toISOString().slice(0, 10) && where.producto_id.in.includes(a.producto_id)),
+        st.apertura.filter((a) => a.fecha === where.fecha.toISOString().slice(0, 10) && where.producto_id.in.includes(a.producto_id) && (a.sabor_id ?? null) === null),
       ),
-      upsert: jest.fn(async ({ where, update, create }: any) => {
-        const k = where.fecha_producto_id;
-        const f = st.apertura.find((a) => a.fecha === k.fecha.toISOString().slice(0, 10) && a.producto_id === k.producto_id);
-        if (f) {
-          f.cantidad = Number(update.cantidad);
-          return f;
-        }
-        const nueva = { fecha: create.fecha.toISOString().slice(0, 10), producto_id: create.producto_id, lugar_id: create.lugar_id, cantidad: Number(create.cantidad) };
+      create: jest.fn(async ({ data }: any) => {
+        const nueva = { id: 60n, fecha: data.fecha.toISOString().slice(0, 10), producto_id: data.producto_id, sabor_id: data.sabor_id ?? null, lugar_id: data.lugar_id, cantidad: Number(data.cantidad) };
         st.apertura.push(nueva);
         return nueva;
+      }),
+      update: jest.fn(async ({ data }: any) => {
+        const f = st.apertura[0];
+        f.cantidad = Number(data.cantidad);
+        return f;
       }),
     },
     movimientoStock: {

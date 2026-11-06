@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ComandasService } from './comandas.service';
+import { ComandasService, distribucionSabores } from './comandas.service';
 import { SalonService } from '../salon/salon.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -661,5 +661,21 @@ describe('ComandasService', () => {
       expect(texto).not.toContain('entrega_direccion');
       expect(texto).toContain('Ana');
     });
+  });
+});
+
+describe('distribucionSabores (cocina: reparto por sabor de la línea)', () => {
+  it('muestra cada sabor con sus unidades; sin reparto no hay texto', () => {
+    expect(
+      distribucionSabores({
+        sabores: [
+          { sabor_nombre: 'Fresa', cantidad: 2 },
+          { sabor_nombre: 'Oreo', cantidad: 3 },
+          { sabor_nombre: 'Manjar', cantidad: 1 },
+        ],
+      }),
+    ).toBe('2 Fresa · 3 Oreo · 1 Manjar');
+    expect(distribucionSabores({ sabores: [] })).toBeNull();
+    expect(distribucionSabores({})).toBeNull();
   });
 });

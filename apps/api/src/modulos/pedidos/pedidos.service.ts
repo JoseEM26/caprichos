@@ -33,7 +33,7 @@ import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
-import { descontarVentaProductos } from '../stock/producto-controlado';
+import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
 
 /** Pista pública de la dirección anterior: nunca la dirección completa (ver enmascararDireccion). */
 export type PistaDireccion = { existe: false } | { existe: true; zona: string | null; direccion: string | null };
@@ -389,6 +389,7 @@ export class PedidosService {
             },
           },
         },
+        sabores: true,
       },
     });
 
@@ -424,6 +425,7 @@ export class PedidosService {
       // Determinar precio base y tamaño
       let precioBase = 0;
       let tamanoNombre: string | null = null;
+      let unidadesTamano = 1;
 
       if (prodDb.tamanos.length > 0) {
         if (!l.tamanoId) {
@@ -442,9 +444,16 @@ export class PedidosService {
         }
         precioBase = Number(tamDb.precio);
         tamanoNombre = tamDb.tamano_valor?.nombre || `Tamaño ${tamDb.id}`;
+        unidadesTamano = tamDb.unidades ?? 1;
       } else {
         precioBase = Number(prodDb.precio);
       }
+
+      // Producto por sabor (controla stock y tiene sabores activos): sus unidades se reparten entre sabores
+      const porSabor = controlaPorSabor(prodDb);
+      const saboresLinea = porSabor
+        ? validarSaboresLinea(prodDb, unidadesTamano, cantidad, l.sabores, ahora)
+        : [];
 
       // Validar grupos y opciones del producto
       const gruposActivos = prodDb.grupos
@@ -577,6 +586,7 @@ export class PedidosService {
         nota: [notaCombo, l.nota?.trim()].filter(Boolean).join(' · ') || null,
         nombresPersona: personasAsignadas,
         opciones: opcionesElegidasInfo,
+        sabores: saboresLinea,
       });
     }
 
@@ -781,6 +791,7 @@ export class PedidosService {
     // Nunca se rechaza una venta por el DNI: una boleta mayor a S/ 700 sin DNI se crea y el cobro la exige.
 
     let agotadosPorVenta: bigint[] = [];
+    let saboresAgotadosPorVenta: bigint[] = [];
     const pedidoCreado = await this.prisma.$transaction(async (tx) => {
       // Generación del código correlativo CP-W###
       let codigo: string;
@@ -901,16 +912,28 @@ export class PedidosService {
             },
           });
         }
+
+        for (const sb of lin.sabores) {
+          await tx.pedidoLineaSabor.create({
+            data: {
+              pedido_linea_id: lineaDb.id,
+              sabor_id: sb.saborId,
+              sabor_nombre: sb.nombre,
+              cantidad: sb.cantidad,
+            },
+          });
+        }
       }
 
       // Productos que controlan stock: se descuentan ya (todos los canales) y el tope corta el pedido entero
       const ventaProductos = await descontarVentaProductos(
         tx,
         pedido.id,
-        lineasCalculadas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, areaId: l.areaId })),
+        lineasCalculadas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, areaId: l.areaId, sabores: l.sabores })),
         pedido.party_id ?? BigInt(1),
       );
       agotadosPorVenta = ventaProductos.agotados;
+      saboresAgotadosPorVenta = ventaProductos.saboresAgotados;
 
       // Historial de estado inicial
       await tx.pedidoEstadoHistorial.create({
@@ -996,21 +1019,28 @@ export class PedidosService {
     });
 
     // Productos que esta venta dejó agotados: aviso al equipo y carta al día (fuera de la transacción)
-    if (agotadosPorVenta.length > 0) {
+    if (agotadosPorVenta.length > 0 || saboresAgotadosPorVenta.length > 0) {
       for (const pid of agotadosPorVenta) {
         this.avisosInternosService?.notificarElementoAgotado('PRODUCTO', pid).catch(() => {});
+      }
+      for (const sid of saboresAgotadosPorVenta) {
+        this.avisosInternosService?.notificarElementoAgotado('SABOR', sid).catch(() => {});
       }
       const agotadosAhora = await this.prisma.producto.findMany({
         where: { agotado_hasta: { gt: new Date() } },
         select: { id: true },
       });
-      this.eventosGateway.emitirAdmin('stock:cambio', {});
-      this.eventosGateway.emitirAdmin('carta:disponibilidad', {
+      const saboresAhora = await this.prisma.sabor.findMany({
+        where: { agotado_hasta: { gt: new Date() } },
+        select: { id: true },
+      });
+      this.eventosGateway?.emitirAdmin('stock:cambio', {});
+      this.eventosGateway?.emitirAdmin('carta:disponibilidad', {
         productos: agotadosAhora.map((p) => p.id.toString()),
-        sabores: [],
+        sabores: saboresAhora.map((sb) => sb.id.toString()),
         opciones: [],
         productoIds: agotadosAhora.map((p) => p.id.toString()),
-        saborIds: [],
+        saborIds: saboresAhora.map((sb) => sb.id.toString()),
         opcionIds: [],
       });
     }

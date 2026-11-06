@@ -5,6 +5,10 @@ export class LineaMermaDto {
   @IsNotEmpty({ message: 'El ID del insumo o producto es obligatorio' })
   insumoId!: string | number;
 
+  /** Producto por sabor: sabor al que se descuenta la merma (obligatorio en esos productos). */
+  @IsOptional()
+  saborId?: string | number;
+
   @IsNumber({}, { message: 'La cantidad debe ser un número' })
   @Min(0.001, { message: 'La cantidad debe ser mayor a 0' })
   cantidad!: number;

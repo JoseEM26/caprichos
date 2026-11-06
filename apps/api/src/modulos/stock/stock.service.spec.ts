@@ -481,6 +481,33 @@ describe('StockService', () => {
         }),
       );
     });
+
+    it('producto por sabor: al anular, repone el saldo de ese sabor (no el del producto) y reactiva si queda saldo', async () => {
+      prisma.movimientoStock.findFirst.mockResolvedValueOnce(null);
+      prisma.movimientoStock.findMany.mockResolvedValueOnce([
+        { id: 703n, tipo: 'VENTA', insumo_id: null, producto_id: 55n, sabor_id: 11n, lugar_id: 20n, cantidad: new Prisma.Decimal(2) },
+      ]);
+      prisma.stockSabor = {
+        upsert: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn().mockResolvedValue({ cantidad: new Prisma.Decimal(2) }),
+      };
+      prisma.sabor = {
+        findUnique: jest.fn().mockResolvedValue({ agotado_hasta: new Date('9999-12-31T23:59:59Z'), producto_id: 55n }),
+        update: jest.fn().mockResolvedValue({}),
+      };
+      prisma.agotado = { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() };
+
+      const res = await service.revertirPorPedido('102');
+      expect(res).toEqual({ ok: true, movimientosRevertidos: 1 });
+      expect(prisma.stockSabor.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { sabor_id: 11n }, update: { cantidad: { increment: new Prisma.Decimal(2) } } }),
+      );
+      expect(prisma.stock.findFirst).not.toHaveBeenCalled();
+      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ tipo: 'ANULACION', sabor_id: 11n, producto_id: 55n }) }),
+      );
+      expect(prisma.sabor.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 11n }, data: { agotado_hasta: null } }));
+    });
   });
 
   describe('productos por tanda y alertas en descontarPorPedido (DT-58, RN-CAP-041)', () => {

@@ -44,6 +44,12 @@ const ESTADOS_PARA_LISTO = ['COLA', 'PREPARANDO'];
 /** Ventana para deshacer un despeje: bajar unidades en esos segundos (mismo usuario) reabre el área. */
 const VENTANA_DESHACER_DESPEJE_MS = 15_000;
 
+/** Reparto por sabor de una línea («2 Fresa · 3 Oreo»), o null si la línea no lleva sabores repartidos. */
+export function distribucionSabores(l: { sabores?: Array<{ sabor_nombre: string; cantidad: number }> | null }): string | null {
+  const lista = l.sabores ?? [];
+  return lista.length > 0 ? lista.map((s) => `${s.cantidad} ${s.sabor_nombre}`).join(' · ') : null;
+}
+
 /**
  * Líneas del pedido que pertenecen a un área, con los campos que usa la pantalla de cocina.
  * `marcadas`: por producto, las opciones «menos pedida»; cada opción elegida lleva `pocoPedida`.
@@ -61,7 +67,8 @@ function lineasDeArea(lineas: any[], areaId: bigint, marcadas: Map<string, Set<s
         listas: l.listas ?? 0,
         despachadas: l.despachadas ?? 0,
         tamano: l.tamano ?? null,
-        sabor: l.sabor ?? null,
+        sabor: l.sabor ?? distribucionSabores(l),
+        sabores: (l.sabores ?? []).map((s: any) => ({ nombre: s.sabor_nombre, cantidad: s.cantidad })),
         combo: comboNombre,
         combo_nombre: comboNombre,
         opciones: extraerOpciones(l).map((o) => ({
@@ -153,6 +160,7 @@ export class ComandasService {
               },
             },
             opcionesElegidas: true,
+            sabores: true,
           },
         },
         comandas: true,
@@ -397,6 +405,7 @@ export class ComandasService {
                   },
                 },
                 opcionesElegidas: true,
+                sabores: true,
               },
             },
           },
@@ -1209,6 +1218,7 @@ export class ComandasService {
                   },
                 },
                 opcionesElegidas: true,
+                sabores: true,
               },
             },
           },
@@ -1238,7 +1248,8 @@ export class ComandasService {
           nombre: l.nombre,
           cantidad: l.cantidad,
           tamano: l.tamano ?? null,
-          sabor: l.sabor ?? null,
+          sabor: l.sabor ?? distribucionSabores(l),
+          sabores: (l.sabores ?? []).map((s: any) => ({ nombre: s.sabor_nombre, cantidad: s.cantidad })),
           combo: extraerNombreCombo(l),
           opciones: extraerOpciones(l),
           personas: l.nombres_persona ?? [],

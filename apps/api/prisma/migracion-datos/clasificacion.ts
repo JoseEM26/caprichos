@@ -35,7 +35,7 @@ export const MIGRAR: string[] = [
 /** Tablas que NO se migran, agrupadas por motivo. */
 const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
   ['transacciones de venta: pedidos, cobros, comprobantes y reclamos', [
-    'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_estado_historial', 'secuencia_pedido',
+    'pedido', 'pedido_linea', 'pedido_linea_opcion', 'pedido_linea_sabor', 'pedido_estado_historial', 'secuencia_pedido',
     'pedido_mesa', 'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'reclamo', 'comanda_area', 'mensaje_reparto',
     'incidente_entrega', 'incidente_entrega_foto', 'pedido_pago_plan', 'voucher_pago', 'ruta_reparto',
   ]],
@@ -56,7 +56,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
     'notificacion', 'mensaje_carta', 'ia_consumo', 'uso_externo', 'correo_envio',
   ]],
   ['stock y compras: saldos, movimientos y pedidos a proveedores', [
-    'stock', 'movimiento_stock', 'pedido_proveedor', 'pedido_proveedor_linea', 'compra', 'compra_linea',
+    'stock', 'stock_sabor', 'movimiento_stock', 'pedido_proveedor', 'pedido_proveedor_linea', 'compra', 'compra_linea',
     'traslado', 'pedido_interno', 'produccion', 'conteo_apertura',
   ]],
   ['seguridad y llaves: secretos, llaves de dispositivos y colas de impresión', [
@@ -86,7 +86,7 @@ export const TABLAS_SENSIBLES: string[] = [
   'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
   'contact_mechanism', 'cliente_direccion', 'conversacion', 'mensaje_chat', 'whatsapp_mensaje',
   'saliente_whatsapp', 'notificacion', 'cobro', 'caja', 'cierre_caja', 'cierre_ajuste_medio', 'devolucion_pedido', 'pedido', 'reserva',
-  'reclamo', 'encuesta', 'stock', 'movimiento_stock', 'ia_consumo', 'data_request',
+  'reclamo', 'encuesta', 'stock', 'stock_sabor', 'movimiento_stock', 'ia_consumo', 'data_request',
 ];
 
 /** Columnas que NUNCA se exportan, en ninguna tabla (contraseñas, hashes, PIN). */

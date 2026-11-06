@@ -65,6 +65,7 @@ export class SalonService {
                     lineas: {
                       include: {
                         opcionesElegidas: true,
+                        sabores: true,
                         producto: { select: { categoria: { select: { area_id: true } } } },
                       },
                     },

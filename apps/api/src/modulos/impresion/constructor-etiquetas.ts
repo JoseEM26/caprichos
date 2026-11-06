@@ -25,6 +25,12 @@ export const CRITERIO_BEBIDA_CATEGORIAS = [
 const nombreOpcion = (o: any): string => o.opcion_nombre || o.nombre || '';
 const grupoOpcion = (o: any): string => String(o.grupo_nombre || o.grupo || '');
 
+/** Opciones de la línea para la etiqueta: el reparto por sabor («2 Fresa · 3 Oreo · 1 Manjar») primero, si lo hay. */
+const opcionesConSabores = (linea: any, opciones: string[]): string[] => {
+  const reparto = (linea.sabores || []).map((s: any) => `${s.cantidad} ${s.sabor_nombre}`);
+  return reparto.length > 0 ? [reparto.join(' · '), ...opciones] : opciones;
+};
+
 /** Opciones elegidas de la línea que son una bebida del combo (grupos «Bebida 1 · Bebida»), en orden. */
 export function bebidasDeCombo(linea: any): any[] {
   return (linea.opcionesElegidas || linea.opciones || []).filter((o: any) => {
@@ -180,9 +186,9 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
 
   for (const [areaNombre, lList] of areaMap.entries()) {
     const lineasArea: EtiquetaAreaLinea[] = lList.map((l) => {
-      const opciones = (l.opcionesElegidas || l.opciones || [])
+      const opciones = opcionesConSabores(l, (l.opcionesElegidas || l.opciones || [])
         .map((o: any) => o.opcion_nombre || o.nombre || '')
-        .filter(Boolean);
+        .filter(Boolean));
       return {
         cantidad: Number(l.cantidad) || 1,
         nombre: l.nombre,
@@ -308,7 +314,7 @@ export function construirTicketComandaSalon(pedido: any): TicketComandaSalonDato
       cantidad: Number(l.cantidad) || 1,
       nombre: l.nombre,
       tamano: l.tamano || null,
-      opciones: (l.opcionesElegidas || l.opciones || []).map((o: any) => o.opcion_nombre || o.nombre || '').filter(Boolean),
+      opciones: opcionesConSabores(l, (l.opcionesElegidas || l.opciones || []).map((o: any) => o.opcion_nombre || o.nombre || '').filter(Boolean)),
       nota: l.nota || null,
     })),
     nota: pedido.nota || null,

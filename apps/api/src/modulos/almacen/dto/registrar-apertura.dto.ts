@@ -1,10 +1,15 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, IsNotEmpty, IsString, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 
 export class LineaAperturaDto {
   @IsNotEmpty({ message: 'El producto es obligatorio' })
   @IsString()
   productoId!: string;
+
+  /** Producto por sabor: sabor cuyo saldo se fija (obligatorio en esos productos; prohibido en los demás). */
+  @IsOptional()
+  @IsString({ message: 'El sabor debe ser un identificador' })
+  saborId?: string;
 
   @IsInt({ message: 'La cantidad debe ser un número entero' })
   @Min(0, { message: 'La cantidad no puede ser negativa' })

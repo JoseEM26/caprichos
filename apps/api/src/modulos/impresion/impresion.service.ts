@@ -104,6 +104,7 @@ const INCLUDE_LINEAS_PEDIDO = {
         },
       },
       opcionesElegidas: true,
+      sabores: true,
     },
   },
 };
@@ -659,6 +660,7 @@ export class ImpresionService {
                 },
               },
               opcionesElegidas: true,
+              sabores: true,
             },
           },
         },
@@ -924,6 +926,7 @@ export class ImpresionService {
               },
             },
             opcionesElegidas: true,
+            sabores: true,
           },
         },
       },

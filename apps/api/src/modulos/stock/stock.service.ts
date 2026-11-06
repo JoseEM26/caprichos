@@ -18,6 +18,7 @@ import { convertirAUnidadAlmacen, insumosDeLinea } from './receta.util';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { controlAlmacenActivo } from './control-almacen';
+import { saldoSabor, sincronizarAgotadoSabor } from './producto-controlado';
 
 @Injectable()
 export class StockService {
@@ -1049,6 +1050,7 @@ export class StockService {
 
     const insumosRevertidos: bigint[] = [];
     const productosRevertidos: bigint[] = [];
+    const saboresRevertidos: bigint[] = [];
 
     await (txExterno ? Promise.resolve() : this.prisma.$transaction(async (tx: any) => {
       const db = txExterno || tx;
@@ -1079,6 +1081,14 @@ export class StockService {
               },
             });
           }
+        } else if (mov.sabor_id) {
+          // Producto por sabor: se repone el saldo de ese sabor (no el del producto)
+          saboresRevertidos.push(mov.sabor_id);
+          await db.stockSabor.upsert({
+            where: { sabor_id: mov.sabor_id },
+            update: { cantidad: { increment: mov.cantidad } },
+            create: { sabor_id: mov.sabor_id, cantidad: mov.cantidad },
+          });
         } else if (mov.producto_id) {
           productosRevertidos.push(mov.producto_id);
           // Reponer stock producto terminado de forma atómica
@@ -1110,6 +1120,7 @@ export class StockService {
             tipo: 'ANULACION',
             insumo_id: mov.insumo_id || null,
             producto_id: mov.producto_id || null,
+            sabor_id: mov.sabor_id || null,
             lugar_id: mov.lugar_id,
             cantidad: mov.cantidad,
             pedido_id: id,
@@ -1123,6 +1134,10 @@ export class StockService {
 
     // Reactivar disponibilidad si corresponde (insumo o producto repuesto)
     await this.verificarYReactivarAgotados(insumosRevertidos, productosRevertidos);
+    for (const sid of saboresRevertidos) {
+      const saldo = await saldoSabor(runner, sid);
+      if (saldo > 0) await sincronizarAgotadoSabor(runner, sid, saldo, new Date(), porId);
+    }
 
     if (this.eventosGateway) {
       for (const mov of ventas) {

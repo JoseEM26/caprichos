@@ -2,6 +2,9 @@ import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/** Unidades que lleva cada tamaño de la carta (donas y galletas con sabores). */
+const UNIDADES_POR_TAMANO: Record<string, number> = { 'Unidad': 1, '1/2 docena': 6, 'Docena': 12 };
+
 const prisma = new PrismaClient();
 
 function slugify(text: string): string {
@@ -216,6 +219,8 @@ export async function main() {
       for (const v of p.variants) {
         const tamanoValorId = mapaTamanos.get(v.n);
         if (tamanoValorId) {
+          // Unidades por tamaño (stock por sabor): Unidad=1, 1/2 docena=6, Docena=12
+          const unidades = UNIDADES_POR_TAMANO[v.n] ?? 1;
           await prisma.productoTamano.upsert({
             where: {
               producto_id_tamano_valor_id: {
@@ -223,12 +228,13 @@ export async function main() {
                 tamano_valor_id: tamanoValorId,
               },
             },
-            update: { precio: v.p, activo: true },
+            update: { precio: v.p, activo: true, unidades },
             create: {
               producto_id: producto.id,
               tamano_valor_id: tamanoValorId,
               precio: v.p,
               activo: true,
+              unidades,
             },
           });
         }

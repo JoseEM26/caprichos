@@ -283,6 +283,7 @@ export class PedidosEstadoService {
           lineas: {
             include: {
               opcionesElegidas: true,
+              sabores: true,
               area: true,
             },
           },
@@ -471,6 +472,8 @@ export class PedidosEstadoService {
             precio_unit: true,
             subtotal: true,
             opcionesElegidas: { select: { opcion_nombre: true }, orderBy: { id: 'asc' } },
+            // Producto por sabor: reparto de las unidades entre sabores
+            sabores: { select: { sabor_nombre: true, cantidad: true }, orderBy: { id: 'asc' } },
             // Solo para contar líneas por área del progreso; no se devuelven
             area_id: true,
             producto: { select: { categoria: { select: { area_id: true } } } },
@@ -544,6 +547,8 @@ export class PedidosEstadoService {
           tamano: l.tamano || null,
           // Nombres de las opciones elegidas, como en las etiquetas de cocina
           opciones: l.opcionesElegidas.map((o) => o.opcion_nombre).filter(Boolean),
+          // Reparto por sabor («2 Fresa · 3 Oreo»): cada sabor con sus unidades
+          sabores: (l.sabores ?? []).map((sb) => ({ nombre: sb.sabor_nombre, cantidad: sb.cantidad })),
           nota: l.nota || null,
           precioUnit: Number(l.precio_unit),
           subtotal: l.subtotal != null ? Number(l.subtotal) : null,
@@ -585,6 +590,7 @@ export class PedidosEstadoService {
           lineas: {
             include: {
               opcionesElegidas: true,
+              sabores: true,
               area: true,
             },
           },
@@ -608,6 +614,7 @@ export class PedidosEstadoService {
           lineas: {
             include: {
               opcionesElegidas: true,
+              sabores: true,
               area: true,
             },
           },
@@ -740,6 +747,7 @@ export class PedidosEstadoService {
         lineas: {
           include: {
             opcionesElegidas: true,
+            sabores: true,
             area: true,
           },
         },

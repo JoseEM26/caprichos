@@ -91,6 +91,11 @@ export class LineaPedidoDto {
   @IsArray({ message: 'opciones debe ser una lista' })
   opciones?: (number | string)[];
 
+  /** Producto por sabor: reparto de sus unidades (tamaño.unidades × cantidad) entre sabores. El servidor valida la suma. */
+  @IsOptional()
+  @IsArray({ message: 'sabores debe ser una lista' })
+  sabores?: { saborId: number | string; cantidad: number }[];
+
   @IsOptional()
   @IsString()
   nota?: string;

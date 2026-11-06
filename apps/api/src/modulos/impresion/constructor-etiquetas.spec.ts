@@ -5,6 +5,7 @@ import {
   construirEtiquetasArea,
   construirEtiquetasBebida,
   construirTodasLasEtiquetas,
+  construirTicketComandaSalon,
 } from './constructor-etiquetas';
 
 describe('Constructor server-side de etiquetas', () => {
@@ -206,5 +207,52 @@ describe('construirTicketNotaMozo (nota que el mozo envía a Caja)', () => {
     expect(t.pagos[0]).toEqual({ medio: 'EFECTIVO', monto: 20, recibido: 25, vuelto: 5 });
     expect(t.pagos[1]).toEqual({ medio: 'YAPE', monto: 15, recibido: null, vuelto: null });
     expect(t.cobradoPorMozo).toBeNull();
+  });
+});
+
+describe('Etiquetas con reparto por sabor (stock por sabor)', () => {
+  // Donas con reparto: el sabor aparece en las opciones de la línea, antes que las opciones elegidas
+  const pedidoDonas: any = {
+    id: 202n,
+    codigo: 'CP-202',
+    modalidad: 'MESA',
+    mesa_nombre: '5',
+    cliente_nombre: 'Luis',
+    canal: 'CARTA',
+    nota: null,
+    creado_en: new Date('2026-11-05T15:00:00.000Z'),
+    lineas: [
+      {
+        id: 9n,
+        cantidad: 1,
+        nombre: 'Dona',
+        tamano: '1/2 docena',
+        nota: null,
+        area: { id: 3n, nombre: 'Salados' },
+        categoria: { nombre: 'Dulces' },
+        nombres_persona: [],
+        opcionesElegidas: [],
+        sabores: [
+          { sabor_nombre: 'Fresa', cantidad: 2 },
+          { sabor_nombre: 'Oreo', cantidad: 3 },
+          { sabor_nombre: 'Manjar', cantidad: 1 },
+        ],
+      },
+    ],
+  };
+
+  it('la etiqueta de área muestra «2 Fresa · 3 Oreo · 1 Manjar» en las opciones de la línea', () => {
+    const areas = construirEtiquetasArea(pedidoDonas);
+    expect(areas[0].lineas[0].opciones).toEqual(['2 Fresa · 3 Oreo · 1 Manjar']);
+  });
+
+  it('el ticket de comanda también lo muestra, y una línea sin sabores queda igual', () => {
+    const ticket = construirTicketComandaSalon(pedidoDonas);
+    expect(ticket.lineas[0].opciones).toEqual(['2 Fresa · 3 Oreo · 1 Manjar']);
+    const sinSabores = construirTicketComandaSalon({
+      ...pedidoDonas,
+      lineas: [{ ...pedidoDonas.lineas[0], sabores: [], opcionesElegidas: [{ opcion_nombre: 'Caja x6' }] }],
+    });
+    expect(sinSabores.lineas[0].opciones).toEqual(['Caja x6']);
   });
 });

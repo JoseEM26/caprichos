@@ -405,6 +405,8 @@ model ProductoTamano {
   tamano_valor_id BigInt
   precio          Decimal       @db.Decimal(12, 2)
   activo          Boolean       @default(true)
+  /// Unidades (donas) que lleva el tamaño: Unidad=1, 1/2 docena=6, Docena=12. Con sabores, se reparten entre ellos.
+  unidades        Int           @default(1)
   producto        Producto      @relation(fields: [producto_id], references: [id])
   tamano_valor    ListaValor    @relation(fields: [tamano_valor_id], references: [id])
   recetaLineas    RecetaLinea[]
@@ -465,9 +467,37 @@ model Sabor {
   agotado_hasta DateTime? @db.Timestamptz
   producto      Producto  @relation(fields: [producto_id], references: [id])
   agotados      Agotado[]
+  stockSabor    StockSabor?
+  movimientos   MovimientoStock[]
+  conteosApertura ConteoApertura[]
+  pedidoLineaSabores PedidoLineaSabor[]
 
   @@unique([producto_id, nombre])
   @@map("sabor")
+}
+
+/// Stock de producto terminado POR SABOR (donas, galletas con sabores). Una fila por sabor.
+model StockSabor {
+  id             BigInt   @id @default(autoincrement())
+  sabor_id       BigInt   @unique
+  cantidad       Decimal  @default(0) @db.Decimal(14, 3)
+  actualizado_en DateTime @default(now()) @updatedAt @db.Timestamptz
+  sabor          Sabor    @relation(fields: [sabor_id], references: [id])
+
+  @@map("stock_sabor")
+}
+
+/// Sabores repartidos en una línea de pedido de un producto controlado por sabor (sigue al pedido).
+model PedidoLineaSabor {
+  id              BigInt      @id @default(autoincrement())
+  pedido_linea_id BigInt
+  sabor_id        BigInt?
+  sabor_nombre    String
+  cantidad        Int
+  pedido_linea    PedidoLinea @relation(fields: [pedido_linea_id], references: [id], onDelete: Cascade)
+  sabor           Sabor?      @relation(fields: [sabor_id], references: [id], onDelete: Restrict)
+
+  @@map("pedido_linea_sabor")
 }
 
 // ---------- Ola 3: zonas de reparto y pedidos de la carta (FT-DEL-01, FT-PED-01..03, DT-57) ----------
@@ -671,6 +701,7 @@ model PedidoLinea {
   lineaComboPadre  PedidoLinea?        @relation("ComboPartes", fields: [linea_combo_id], references: [id])
   lineasComboHijas PedidoLinea[]       @relation("ComboPartes")
   opcionesElegidas PedidoLineaOpcion[]
+  sabores          PedidoLineaSabor[]
 
   @@map("pedido_linea")
 }
@@ -1064,6 +1095,8 @@ model MovimientoStock {
   destino_valor_id      BigInt?
   pedido_id             BigInt?
   produccion_id         BigInt?
+  /// Sabor del producto por sabor (donas, galletas): el stock se lleva en stock_sabor
+  sabor_id              BigInt?
   traslado_id           BigInt?
   compra_id             BigInt?
   nota                  String?
@@ -1077,6 +1110,7 @@ model MovimientoStock {
   origen_valor          ListaValor?       @relation("MovimientoStockOrigen", fields: [origen_valor_id], references: [id])
   destino_valor         ListaValor?       @relation("MovimientoStockDestino", fields: [destino_valor_id], references: [id])
   pedido                Pedido?           @relation(fields: [pedido_id], references: [id])
+  sabor                 Sabor?            @relation(fields: [sabor_id], references: [id], onDelete: Restrict)
   movimientoAnulado     MovimientoStock?  @relation("MovimientosAnulados", fields: [movimiento_anulado_id], references: [id])
   movimientosRevertidos MovimientoStock[] @relation("MovimientosAnulados")
 
@@ -1084,19 +1118,23 @@ model MovimientoStock {
 }
 
 /// Conteo de apertura del día (fecha en hora de Lima) de un producto que controla stock. Una fila por día y producto.
+/// Sin sabor_id: conteo del producto entero. Con sabor_id: conteo de ese sabor.
+/// Unicidad por (fecha, producto_id, coalesce(sabor_id, 0)): índice con expresión en la migración
+/// 20261222100000_stock_por_sabor (Prisma no la declara aquí).
 model ConteoApertura {
   id          BigInt     @id @default(autoincrement())
   fecha       DateTime   @db.Date
   producto_id BigInt
+  sabor_id    BigInt?
   lugar_id    BigInt
   cantidad    Decimal    @db.Decimal(14, 3)
   por         BigInt
   en          DateTime   @default(now()) @db.Timestamptz
 
   producto    Producto   @relation(fields: [producto_id], references: [id])
+  sabor       Sabor?     @relation(fields: [sabor_id], references: [id], onDelete: Restrict)
   lugar       LugarStock @relation(fields: [lugar_id], references: [id])
 
-  @@unique([fecha, producto_id])
   @@map("conteo_apertura")
 }
 
