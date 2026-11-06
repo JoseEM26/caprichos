@@ -12,6 +12,7 @@ import { ConfiguracionController } from '../configuracion/configuracion.controll
 import { CocinaController } from '../cocina/cocina.controller';
 import { UsuariosController } from '../usuarios/usuarios.controller';
 import { PedidosAdminController } from '../pedidos-admin/pedidos-admin.controller';
+import { SalonController } from '../salon/salon.controller';
 
 describe('Acciones Protegidas por Código de Supervisor (DT-61 / RFC 6238)', () => {
   let reflector: Reflector;
@@ -78,6 +79,43 @@ describe('Acciones Protegidas por Código de Supervisor (DT-61 / RFC 6238)', () 
       const res = await guard.canActivate(ctx);
       expect(res).toBe(true);
       expect(supervisorServiceMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Cortesía en un pedido de mesa (SalonController.abrirPedido)', () => {
+    const conCortesia = { mesas: [6], lineas: [{ productoId: 1, cantidad: 1, cortesia: { motivo: 'RECLAMO_CLIENTE' } }] };
+
+    it('SUPERVISOR que da una cortesía en mesa sin código responde 403 CODIGO_INVALIDO', async () => {
+      const ctx = mockContext(SalonController.prototype.abrirPedido, {
+        headers: {},
+        body: conCortesia,
+        usuario: { partyId: 5n, rol: 'SUPERVISOR' },
+      });
+
+      await expect(guard.canActivate(ctx)).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        response: { codigo: 'CODIGO_INVALIDO' },
+      });
+    });
+
+    it('CAJA da la cortesía en mesa sin código de supervisor (solo el SUPERVISOR lo presenta)', async () => {
+      const ctx = mockContext(SalonController.prototype.abrirPedido, {
+        headers: {},
+        body: conCortesia,
+        usuario: { partyId: 7n, rol: 'CAJERO' },
+      });
+
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    });
+
+    it('SUPERVISOR sin cortesía en el pedido de mesa no requiere código', async () => {
+      const ctx = mockContext(SalonController.prototype.abrirPedido, {
+        headers: {},
+        body: { mesas: [6], lineas: [{ productoId: 1, cantidad: 1 }] },
+        usuario: { partyId: 5n, rol: 'SUPERVISOR' },
+      });
+
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
     });
   });
 

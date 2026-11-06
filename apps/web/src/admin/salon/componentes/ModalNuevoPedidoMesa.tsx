@@ -1058,6 +1058,7 @@ export function ModalNuevoPedidoMesa({
                   },
           },
           idempotencyKey,
+          codigoCortesia,
         );
       } else {
         const telDigitos = cliTelefono.replace(/\D/g, '');
@@ -3038,7 +3039,7 @@ export function ModalNuevoPedidoMesa({
                             Quitar
                           </button>
                         </div>
-                        {puedeCortesia && modalidad !== 'local' && !lin.ofertaId && !(lin.comboElecciones ?? []).length && (
+                        {puedeCortesia && !lin.ofertaId && !(lin.comboElecciones ?? []).length && (
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             {lin.cortesia ? (
                               <>

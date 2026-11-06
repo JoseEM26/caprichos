@@ -63,7 +63,7 @@ describe('SalonController', () => {
 
     const res = await controller.abrirPedido(dto, 'idem-1', undefined, reqMock);
 
-    expect(salonService.abrirPedido).toHaveBeenCalledWith(dto, reqMock.usuario, 'idem-1');
+    expect(salonService.abrirPedido).toHaveBeenCalledWith(dto, reqMock.usuario, 'idem-1', undefined);
     expect(res.codigo).toBe('CP-W001');
   });
 

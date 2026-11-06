@@ -1148,6 +1148,56 @@ describe('PedidosService', () => {
     });
   });
 
+  describe('cortesía en un pedido de mesa (local)', () => {
+    it('sin permiso cortesias/dar en mesa responde 403 SIN_PERMISO_CORTESIA (el mozo)', async () => {
+      const dto: any = {
+        ...pedidoBaseDto,
+        modalidad: 'MESA',
+        lineas: [{ ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'RECLAMO_CLIENTE' } }],
+      };
+      await expect(
+        service.crear(dto, 'idemp-cort-mesa-403', { canal: 'MOZO', usuarioPartyId: 55n, mesasIds: [6n], mesaNombre: 'Mesa 6' }),
+      ).rejects.toMatchObject({ status: 403, response: { codigo: 'SIN_PERMISO_CORTESIA' } });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('con permiso (caja o admin) la cortesía en mesa sale a S/ 0 y el pedido no la cobra', async () => {
+      let pedidoData: any = null;
+      const lineasData: any[] = [];
+      const cortesiasData: any[] = [];
+      prismaMock.pedido.create.mockImplementation(({ data }: any) => {
+        pedidoData = data;
+        return Promise.resolve({ id: 501n, codigo: 'CP-M501', estado: 'COLA', subtotal: Number(data.subtotal), envio: 0, total: Number(data.total) });
+      });
+      prismaMock.pedidoLinea.create.mockImplementation(({ data }: any) => {
+        lineasData.push(data);
+        return Promise.resolve({ id: 950n + BigInt(lineasData.length), ...data });
+      });
+      prismaMock.cortesia = { create: jest.fn(({ data }: any) => { cortesiasData.push(data); return Promise.resolve(data); }) };
+      prismaMock.pedidoMesa = { create: jest.fn().mockResolvedValue({}) };
+
+      const dto: any = {
+        ...pedidoBaseDto,
+        modalidad: 'MESA',
+        lineas: [pedidoBaseDto.lineas[0], { ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'DEGUSTACION_PROMOCION' } }],
+      };
+      const res = await service.crear(dto, 'idemp-cort-mesa-ok', {
+        canal: 'CAJA',
+        usuarioPartyId: 55n,
+        puedeCortesia: true,
+        omitirChequeoCarta: true,
+        mesasIds: [6n],
+        mesaNombre: 'Mesa 6',
+      });
+
+      expect(res.total).toBe(28);
+      expect(Number(pedidoData.total)).toBe(28);
+      expect(lineasData[1]).toMatchObject({ es_cortesia: true });
+      expect(Number(lineasData[1].subtotal)).toBe(0);
+      expect(cortesiasData[0]).toMatchObject({ motivo: 'DEGUSTACION_PROMOCION', pedido_id: 501n, dada_por_party_id: 55n });
+    });
+  });
+
   describe('aviso de pedido recibido al cliente (carta)', () => {
     let avisar: jest.Mock;
 

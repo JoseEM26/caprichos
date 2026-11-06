@@ -16,6 +16,8 @@ import { AbrirPedidoMesaDto } from './dto/abrir-pedido-mesa.dto';
 import { LiberarMesaDto } from './dto/liberar-mesa.dto';
 import { CambiarMesaDto } from './dto/cambiar-mesa.dto';
 import { AgregarMesasDto } from './dto/agregar-mesas.dto';
+import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
+import { requiereCodigoCortesia } from '../cortesias/cortesia.tipos';
 
 @Controller('admin/salon')
 @UseGuards(AccesoGuard)
@@ -39,6 +41,11 @@ export class SalonController {
    */
   @Post('pedidos')
   @Permiso('mesas', 'abrir')
+  // Una línea de cortesía: el SUPERVISOR presenta su código (Caja y ADMIN no), igual que en Pedidos
+  @RequiereCodigoSupervisor('cortesias/dar', {
+    condicion: (req) => requiereCodigoCortesia(req) && (req.body?.lineas ?? []).some((l: any) => !!l?.cortesia),
+    exigeCodigoSupervisor: true,
+  })
   async abrirPedido(
     @Body() dto: AbrirPedidoMesaDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -46,7 +53,7 @@ export class SalonController {
     @Req() req: any,
   ) {
     const clave = idempotencyKey || xIdempotencyKey;
-    return this.salonService.abrirPedido(dto, req.usuario, clave);
+    return this.salonService.abrirPedido(dto, req.usuario, clave, req.supervisor?.supervisorPartyId ?? req.supervisor?.party_id);
   }
 
   /**

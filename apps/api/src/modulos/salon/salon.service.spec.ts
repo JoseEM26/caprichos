@@ -541,6 +541,42 @@ describe('SalonService', () => {
     });
   });
 
+  describe('2b. Cortesía en un pedido de mesa (abrirPedido)', () => {
+    beforeEach(() => {
+      prismaMock.elementoPlano.findMany.mockResolvedValue([{ id: 6n, numero: 6, tipo: 'MESA', activo: true }]);
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([]);
+      prismaMock.reservaMesa.findMany.mockResolvedValue([]);
+      pedidosServiceMock.crear.mockResolvedValue({ id: '81', codigo: 'CP-M081', total: 10 });
+    });
+
+    const dtoConCortesia: any = {
+      mesas: [6],
+      lineas: [{ productoId: 1, cantidad: 1, cortesia: { motivo: 'RECLAMO_CLIENTE' } }],
+      cliente: { nombre: 'Ana Ruiz' },
+    };
+
+    it('CAJERO (con cortesias/dar) puede dar cortesía en mesa: el pedido recibe puedeCortesia y el supervisor que presentó código', async () => {
+      await service.abrirPedido({ ...dtoConCortesia, canal: 'CAJA' }, { partyId: 9n, rol: 'CAJERO', debeCambiar: false }, 'k-c1', 77n);
+
+      const [, , opciones] = pedidosServiceMock.crear.mock.calls[0];
+      expect(opciones).toMatchObject({ canal: 'CAJA', puedeCortesia: true, supervisorCortesiaPartyId: 77n });
+    });
+
+    it('ADMIN tambien puede dar cortesía en mesa (sin código de supervisor)', async () => {
+      await service.abrirPedido(dtoConCortesia, { partyId: 1n, rol: 'ADMIN', debeCambiar: false }, 'k-a1');
+
+      const [, , opciones] = pedidosServiceMock.crear.mock.calls[0];
+      expect(opciones).toMatchObject({ puedeCortesia: true, supervisorCortesiaPartyId: undefined });
+    });
+
+    it('MOZO no tiene cortesias/dar: el pedido de mesa llega sin puedeCortesia (la creación responde 403)', async () => {
+      await service.abrirPedido(dtoConCortesia, { partyId: 10n, rol: 'MOZO', debeCambiar: false }, 'k-m1');
+
+      const [, , opciones] = pedidosServiceMock.crear.mock.calls[0];
+      expect(opciones.puedeCortesia).toBe(false);
+    });
+  });
+
   describe('3. Liberar mesa manual (liberarMesaManual)', () => {
     it('liberar sin motivo o con menos de 5 caracteres -> 400 MOTIVO_INVALIDO', async () => {
       prismaMock.elementoPlano.findUnique.mockResolvedValue({

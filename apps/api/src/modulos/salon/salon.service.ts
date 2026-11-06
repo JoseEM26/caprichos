@@ -19,6 +19,7 @@ import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { progresoDelPedido, ProgresoPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
 import { etiquetaMesasPedido, MAX_MESAS_PEDIDO, nombreUnaMesa } from './mesas-pedido.util';
 
 @Injectable()
@@ -223,6 +224,8 @@ export class SalonService {
     dto: AbrirPedidoMesaDto,
     usuario?: UsuarioAutenticado,
     idempotencyKeyHeader?: string,
+    /** SUPERVISOR que presentó su código para una línea de cortesía (lo llena SupervisorCodigoGuard) */
+    supervisorCortesiaPartyId?: bigint | string | number,
   ) {
     if (!dto.mesas || dto.mesas.length === 0) {
       throw new BadRequestException({
@@ -341,6 +344,9 @@ export class SalonService {
         mesasIds,
         mesaNombre,
         omitirChequeoCarta: true,
+        // Cortesías en mesa: mismo permiso cortesias/dar que en Pedidos (Caja y ADMIN; el MOZO no)
+        puedeCortesia: puedeDarCortesia(usuario),
+        supervisorCortesiaPartyId,
         enTransaccion: async (tx, pedido) => {
           // 1. Doble chequeo dentro de la transacción
           for (const mesa of mesasDb) {

@@ -50,6 +50,8 @@ export interface AbrirPedidoMesaPayload {
     personas?: string[];
     ofertaId?: string;
     comboElecciones?: { parteId: string; productoId: string; saborId?: string }[];
+    /** Cortesía de la línea (solo con permiso cortesias/dar): sale a S/ 0 */
+    cortesia?: { motivo: string; nota?: string };
   }>;
   nota?: string;
   reservaId?: string;
@@ -129,10 +131,12 @@ export const salonApi = {
   misPedidos: (rango: RangoMisPedidos) =>
     api.get<RespuestaMisPedidos>(`/admin/pedidos/mis-pedidos?rango=${rango}`),
 
-  abrirPedidoMesa: (payload: AbrirPedidoMesaPayload, idempotencyKey: string) =>
+  /** codigoSupervisor: solo si hay líneas de cortesía y quien envía es SUPERVISOR (6 dígitos) */
+  abrirPedidoMesa: (payload: AbrirPedidoMesaPayload, idempotencyKey: string, codigoSupervisor?: string) =>
     api.post('/admin/salon/pedidos', payload, {
       headers: {
         'Idempotency-Key': idempotencyKey,
+        ...(codigoSupervisor ? { 'x-codigo-supervisor': codigoSupervisor } : {}),
       },
     }),
 
