@@ -189,17 +189,26 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
     aplicarCarta(todosLosProductos);
   }, [todosLosProductos]);
 
+  // Un combo con producto propio (Dúo, Cajita) ya se vende desde su tarjeta de producto:
+  // no se repite en Promociones.
+  const ofertasPromo = useMemo(() => {
+    const ids = new Set(todosLosProductos.map((p) => String(p.id)));
+    return ofertas.filter(
+      (o) => !(o.tipo === 'COMBO' && o.alcanceProductoId && ids.has(String(o.alcanceProductoId))),
+    );
+  }, [ofertas, todosLosProductos]);
+
   // Filtrado reactivo de ofertas por búsqueda
   const ofertasFiltradas = useMemo(() => {
     const qLimpio = normalizarTexto(busqueda.trim());
-    if (!qLimpio) return ofertas;
+    if (!qLimpio) return ofertasPromo;
 
     const terminos = qLimpio.split(/\s+/).filter(Boolean);
-    return ofertas.filter((o) => {
+    return ofertasPromo.filter((o) => {
       const texto = normalizarTexto(`${o.nombre} ${o.descripcion || ''} ${o.productoNombre || ''}`);
       return terminos.every((t) => texto.includes(t));
     });
-  }, [ofertas, busqueda]);
+  }, [ofertasPromo, busqueda]);
 
   // Si se debe mostrar la sección de promociones
   const mostrarPromociones =
@@ -209,12 +218,12 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
   // Lista de chips para la cabecera (Promociones destacada después de TODA LA CARTA)
   const categoriasChips = useMemo(() => {
     const lista: { id: string; nombre: string }[] = [];
-    if (ofertas.length > 0) {
+    if (ofertasPromo.length > 0) {
       lista.push({ id: 'promociones', nombre: 'PROMOCIONES' });
     }
     lista.push(...categorias.map((c) => ({ id: c.id, nombre: c.nombre })));
     return lista;
-  }, [ofertas, categorias]);
+  }, [ofertasPromo, categorias]);
 
   // Filtrado reactivo de categorías y productos por término de búsqueda
   const categoriasFiltradas = useMemo(() => {
