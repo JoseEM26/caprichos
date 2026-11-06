@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 const reporteHoy = vi.fn();
@@ -22,8 +22,21 @@ describe('AsistenciaAdminView (solo administrador)', () => {
     });
     render(<AsistenciaAdminView />);
     expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
-    expect(screen.getByText('Tardanza')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('Tardanza')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reiniciar celular' })).toBeInTheDocument();
+  });
+
+  it('sin ubicación del local lo avisa y «Usar mi ubicación actual» llena las coordenadas con su precisión', async () => {
+    reporteHoy.mockResolvedValue({ jornada: '2026-11-06', filas: [] });
+    (navigator as any).geolocation = {
+      getCurrentPosition: (ok: any) => ok({ coords: { latitude: -12.1, longitude: -77.02, accuracy: 45 } }),
+    };
+    render(<AsistenciaAdminView />);
+    expect(await screen.findByTestId('aviso-sin-ubicacion')).toHaveTextContent('nadie podrá marcar');
+    fireEvent.click(screen.getByRole('tab', { name: 'Configuración' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Usar mi ubicación actual' }));
+    expect(await screen.findByText(/Precisión obtenida: 45 m/)).toHaveTextContent('peor que 30 m');
+    expect(screen.getByRole('link', { name: 'Ver en Google Maps' })).toHaveAttribute('href', 'https://www.google.com/maps?q=-12.1,-77.02');
   });
 
   it('el CSV del mes escapa comas y comillas', () => {
