@@ -75,6 +75,13 @@ export interface Pedido {
   pago_estado?: string | null;
   pago_preferido?: string | null;
   cobro_vigente_id?: string | number | null;
+  /** Número del día en cocina (referencial); null si no llegó a cocina */
+  numero_dia?: number | null;
+  fecha_dia?: string | null;
+  /** Último cambio de ubicación (ISO); null si la dirección es la original */
+  ubicacion_editada_en?: string | null;
+  /** Saldo por cobrar o devolución pendiente por el cambio de ubicación (solo si aplica) */
+  ajusteUbicacionPendiente?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null;
   /** Cobro por mozo (envío a Caja): null si no lo envió o el pedido ya está PAGADO */
   cobroMozo?: {
     en: string;

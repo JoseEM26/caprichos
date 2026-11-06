@@ -33,6 +33,7 @@ import {
 import { salonApi } from '../salon/api';
 import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
 import { SeccionUbicacionPedido } from './SeccionUbicacionPedido';
+import { InsigniaNumeroDia } from './InsigniaNumeroDia';
 
 export interface PedidoDetalleProps {
   pedido: Pedido;
@@ -240,6 +241,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
           <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 22, color: 'var(--cp-navy, #0B2C3E)' }}>
             {pedido.codigo}
           </div>
+          <InsigniaNumeroDia numero={pedido.numero_dia} />
           <span
             style={{
               fontSize: 12,

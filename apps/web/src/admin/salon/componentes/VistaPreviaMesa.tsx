@@ -21,6 +21,20 @@ export interface VistaPreviaMesaProps {
   alCambiar: () => void;
   /** Permiso cocina/despachar: muestra las casillas de entrega y «Marcar como entregado» */
   puedeDespachar?: boolean;
+  /** Permiso mesas/abrir: muestra «Agregar mesa» y «Quitar mesa» (con pedido abierto) */
+  puedeAbrirMesas?: boolean;
+  /** Todas las mesas del mismo pedido (incluida esta). Sin él, «Quitar mesa» solo ve esta mesa. */
+  mesasDelPedido?: MesaSalon[];
+  /** Pasa el pedido a modo «sumar mesas» en el croquis (lo arma el padre) */
+  alAgregarMesa?: (mesa: MesaSalon) => void;
+}
+
+/** Orden de las mesas de un pedido igual que el servidor: la principal primero, luego por orden. */
+function mesasEnOrden(mesas: MesaSalon[]): MesaSalon[] {
+  return [...mesas].sort((a, b) => {
+    const principal = Number(!!b.pedido?.esPrincipal) - Number(!!a.pedido?.esPrincipal);
+    return principal || (a.pedido?.orden ?? 0) - (b.pedido?.orden ?? 0);
+  });
 }
 
 /** Una línea del pedido en la lista de entrega, con su área y las unidades listas sin entregar. */
@@ -66,8 +80,16 @@ export function VistaPreviaMesa({
   alCambiarMesa,
   alCambiar,
   puedeDespachar = false,
+  puedeAbrirMesas = false,
+  mesasDelPedido,
+  alAgregarMesa,
 }: VistaPreviaMesaProps) {
   const [forzando, setForzando] = useState(false);
+  // «Quitar mesa»: primero se elige cuál (lista), después Sí/No
+  const [eligiendoQuitar, setEligiendoQuitar] = useState(false);
+  const [mesaQuitar, setMesaQuitar] = useState<MesaSalon | null>(null);
+  const [quitando, setQuitando] = useState(false);
+  const [errorQuitar, setErrorQuitar] = useState<string | null>(null);
   // Líneas marcadas para entregar (solo seleccionan; el envío pide confirmación Sí/No)
   const [seleccion, setSeleccion] = useState<Set<string>>(() => new Set());
   const [confirmandoEntrega, setConfirmandoEntrega] = useState(false);
@@ -124,6 +146,30 @@ export function VistaPreviaMesa({
   };
   const nombre = nombreMesaSalon(mesa);
   const hace = haceLegible(pedido?.creadoEn);
+  // Mesas del pedido en su orden; si el padre no las pasa, solo está esta
+  const mesasPedido = mesasEnOrden(mesasDelPedido?.length ? mesasDelPedido : [mesa]);
+  const sinMesasParaQuitar = mesasPedido.length <= 1;
+  const otrasDe = (quitada: MesaSalon) => mesasPedido.filter((m) => m.id !== quitada.id);
+  const siguientePrincipal = mesaQuitar?.pedido?.esPrincipal ? otrasDe(mesaQuitar)[0] : undefined;
+
+  const quitarMesa = async () => {
+    if (!pedido || !mesaQuitar) return;
+    setQuitando(true);
+    setErrorQuitar(null);
+    try {
+      await salonApi.quitarMesaPedido(pedido.id, mesaQuitar.id);
+      setMesaQuitar(null);
+      setEligiendoQuitar(false);
+      alCerrar();
+      alCambiar();
+    } catch (err) {
+      setErrorQuitar(err instanceof ErrorApi ? err.message : 'No se pudo quitar la mesa. Intenta de nuevo.');
+      setMesaQuitar(null);
+    } finally {
+      setQuitando(false);
+    }
+  };
+
   const cliente = pedido?.cliente || null;
   const mozo = pedido?.mozo || null;
 
@@ -350,6 +396,29 @@ export function VistaPreviaMesa({
             {pedido?.codigo && <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Pedido {pedido.codigo}</div>}
           </div>
 
+          {eligiendoQuitar && (
+            <div
+              role="group"
+              aria-label="Mesas del pedido"
+              style={{ padding: '12px 22px', borderTop: '1px solid var(--cp-line)', display: 'flex', flexDirection: 'column', gap: '8px' }}
+            >
+              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--cp-navy)' }}>¿Qué mesa quitas del pedido?</div>
+              {mesasPedido.map((m) => (
+                <Boton key={m.id} variante="secundario" onClick={() => setMesaQuitar(m)}>
+                  {`Quitar ${nombreMesaSalon(m)}${m.pedido?.esPrincipal ? ' (principal)' : ''}`}
+                </Boton>
+              ))}
+              <Boton variante="texto" onClick={() => setEligiendoQuitar(false)}>
+                Volver
+              </Boton>
+            </div>
+          )}
+          {errorQuitar && (
+            <div role="alert" style={{ padding: '0 22px 10px', fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+              {errorQuitar}
+            </div>
+          )}
+
           <div
             style={{
               padding: '12px 22px',
@@ -370,6 +439,21 @@ export function VistaPreviaMesa({
                 Cambiar de mesa
               </Boton>
             )}
+            {puedeAbrirMesas && alAgregarMesa && (
+              <Boton variante="secundario" onClick={() => alAgregarMesa(mesa)} disabled={!pedido}>
+                Agregar mesa
+              </Boton>
+            )}
+            {puedeAbrirMesas && pedido && (
+              <Boton
+                variante="secundario"
+                onClick={() => setEligiendoQuitar(true)}
+                disabled={sinMesasParaQuitar}
+                title={sinMesasParaQuitar ? 'El pedido necesita al menos una mesa. Para cambiarla, usa «Cambiar de mesa».' : undefined}
+              >
+                Quitar mesa
+              </Boton>
+            )}
             {puedeForzar && (
               <Boton variante="peligro" onClick={() => setForzando(true)}>
                 Forzar liberación
@@ -381,6 +465,23 @@ export function VistaPreviaMesa({
           </div>
         </div>
       </div>
+
+      <Confirmar
+        abierto={mesaQuitar !== null}
+        titulo={mesaQuitar ? `¿Quitar ${nombreMesaSalon(mesaQuitar)} del pedido?` : ''}
+        mensaje={
+          mesaQuitar
+            ? siguientePrincipal
+              ? `${nombreMesaSalon(mesaQuitar)} queda libre. Es la principal: ${nombreMesaSalon(siguientePrincipal)} pasa a serlo. El pedido sigue en sus otras mesas.`
+              : `${nombreMesaSalon(mesaQuitar)} queda libre. El pedido sigue en ${otrasDe(mesaQuitar).map(nombreMesaSalon).join(' y ')}. No se anula ni se cobra.`
+            : ''
+        }
+        textoConfirmar="Sí, quitar mesa"
+        textoNo="No, volver"
+        cargando={quitando}
+        alConfirmar={quitarMesa}
+        alCancelar={() => setMesaQuitar(null)}
+      />
 
       <Confirmar
         abierto={confirmandoEntrega}

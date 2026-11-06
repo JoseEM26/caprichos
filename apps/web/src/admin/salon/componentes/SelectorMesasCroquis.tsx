@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CuadriculaPlano } from './CuadriculaPlano';
-import { ElementoPlano, MesaSalon, PisoSalon } from '../tipos';
+import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from '../tipos';
 
 /**
  * Croquis para elegir UNA o VARIAS mesas (reservas, y después pedidos de salón).
@@ -21,12 +21,20 @@ export interface OcupacionMesa {
 
 export interface SelectorMesasCroquisProps {
   pisos: PisoSalon[];
+  /** Dibujo del plano (paredes, cocina, barra...) por piso; el endpoint del salón no lo trae. Sin él, solo se ven las mesas. */
+  planos?: PisoPlano[];
   seleccionadas: string[];
   onCambio: (ids: string[]) => void;
   /** Personas de la reserva. Sin valor no se avisa de capacidad. */
   personas?: number;
   /** Mesas no elegibles a esa hora, por id de mesa. */
   ocupadas?: Record<string, OcupacionMesa>;
+  /** Mesas reservadas a esa hora: se ven marcadas (R) pero siguen siendo elegibles. */
+  reservadas?: Record<string, OcupacionMesa>;
+  /** Mantener 2 s una mesa ocupada (vista previa). Sin él, no hay vista previa. */
+  alMantenerMesa?: (mesa: MesaSalon) => void;
+  /** Tocar una mesa ocupada (no se elige): quien lo usa puede avisar por qué. */
+  alTocarOcupada?: (mesa: MesaSalon) => void;
   deshabilitado?: boolean;
 }
 
@@ -68,10 +76,14 @@ const estiloBoton = (activo: boolean) =>
 
 export function SelectorMesasCroquis({
   pisos,
+  planos,
   seleccionadas,
   onCambio,
   personas,
   ocupadas = {},
+  reservadas = {},
+  alMantenerMesa,
+  alTocarOcupada,
   deshabilitado = false,
 }: SelectorMesasCroquisProps) {
   const pisosActivos = useMemo(() => pisos.filter((p) => p.activo !== false), [pisos]);
@@ -106,9 +118,10 @@ export function SelectorMesasCroquis({
         asientos: m.asientos,
         activo: m.activo,
       }));
-    const otros = (pisoActual?.elementos || []).filter((e) => e.tipo !== 'MESA');
+    const dibujo = planos?.find((pl) => pl.id === pisoActual?.id)?.elementos ?? pisoActual?.elementos ?? [];
+    const otros = dibujo.filter((e) => e.tipo !== 'MESA' && e.activo !== false);
     return [...otros, ...mesasComoElemento];
-  }, [pisoActual]);
+  }, [pisoActual, planos]);
 
   // Las mesas del piso llevan el estado que pide el croquis: ocupada = otra reserva a esa hora.
   const mesasDelPiso: MesaSalon[] = useMemo(
@@ -117,20 +130,26 @@ export function SelectorMesasCroquis({
         .filter((m) => m.activo)
         .map((m) => {
           const ocupada = ocupadas[m.id];
+          // Ocupada con su pedido (modal de pedidos): se ve el pedido; sin pedido, la marca de reserva de siempre
+          const marca = ocupada && !m.pedido ? ocupada : ocupada ? null : reservadas[m.id];
           return {
             ...m,
             estado: ocupada ? 'OCUPADA' : 'LIBRE',
-            pedido: null,
-            reserva: ocupada
-              ? { id: ocupada.reservaId ?? '', hora: ocupada.hora ?? '', nombre: ocupada.nombre ?? 'Reserva', personas: 0 }
+            pedido: ocupada && m.pedido ? m.pedido : null,
+            reserva: marca
+              ? { id: marca.reservaId ?? '', hora: marca.hora ?? '', nombre: marca.nombre ?? 'Reserva', personas: 0 }
               : null,
           } as MesaSalon;
         }),
-    [pisoActual, ocupadas],
+    [pisoActual, ocupadas, reservadas],
   );
 
   const alTocarMesa = (mesa: MesaSalon) => {
-    if (deshabilitado || ocupadas[mesa.id]) return;
+    if (deshabilitado) return;
+    if (ocupadas[mesa.id]) {
+      alTocarOcupada?.(mesa);
+      return;
+    }
     onCambio(
       seleccionadas.includes(mesa.id)
         ? seleccionadas.filter((id) => id !== mesa.id)
@@ -173,6 +192,7 @@ export function SelectorMesasCroquis({
           mesasSalon={mesasDelPiso}
           mesasSeleccionadasIds={seleccionadas}
           onSeleccionarMesaSalon={alTocarMesa}
+          alMantenerMesaSalon={alMantenerMesa}
         />
       </div>
 

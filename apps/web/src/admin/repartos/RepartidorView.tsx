@@ -7,6 +7,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { ErrorApi } from '../../comun/api';
 import { Icono } from '../../comun/Icono';
 import { ModalReportarFalla } from './ModalReportarFalla';
+import { InsigniaDireccionEditada } from '../pedidos/InsigniaDireccionEditada';
 import { BotonCancelarEspera } from './EsperaEntrega';
 import { MapaRepartidor, type PuntoRepartidor, type PosicionMarcador } from './MapaRepartidor';
 import { HojaInferior } from './HojaInferior';
@@ -316,7 +317,7 @@ const cajaMenu: CSSProperties = {
   overflow: 'hidden',
 };
 
-/** Teléfono, llamada, WhatsApp y navegación. Solo de pedidos ya tomados por este repartidor. */
+/** Chat de WhatsApp, llamada y navegación. Solo de pedidos ya tomados por este repartidor. */
 function ContactoPedido({ pedido, alChatear }: { pedido: PedidoReparto; alChatear?: () => void }) {
   const enlace: CSSProperties = { ...botonBase, fontSize: 13 };
   const telefono = pedido.cliente_telefono;
@@ -336,14 +337,6 @@ function ContactoPedido({ pedido, alChatear }: { pedido: PedidoReparto; alChatea
         <div style={dosColumnas}>
           <a href={`tel:${telefono}`} style={{ ...enlace, background: 'var(--cp-white)', border: '1.5px solid var(--cp-navy)', color: 'var(--cp-navy)' }}>
             Llamar
-          </a>
-          <a
-            href={`https://wa.me/51${telefono.replace(/\D/g, '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ ...enlace, background: 'var(--cp-green)', color: 'var(--cp-white)' }}
-          >
-            WhatsApp
           </a>
         </div>
       )}
@@ -427,6 +420,7 @@ function DetallePedido({ id, mio, disponible, proximo, enRuta, recarga, alAltern
     <div data-testid="detalle-pedido" style={{ display: 'flex', flexDirection: 'column', gap: 10, fontFamily: FUENTE_TEXTO, color: 'var(--cp-navy)' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
         <strong style={{ fontFamily: FUENTE_TITULOS, fontSize: 18 }}>{resumen.codigo}</strong>
+        {mio?.ubicacion_editada_en && <InsigniaDireccionEditada />}
         <span style={chip('var(--cp-sand)', 'var(--cp-soft)')}>{resumen.estadoTexto}</span>
         <span style={chip(clasificarEspera(resumen.minutosEspera).colorHex, '#fff')}>{resumen.minutosEspera} min de espera</span>
       </div>

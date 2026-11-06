@@ -55,6 +55,9 @@ export interface AbrirPedidoMesaPayload {
   reservaId?: string;
   cuponCodigo?: string;
   canal?: 'MOZO' | 'CAJA';
+  /** Personas de la mesa: el servidor valida los asientos (confirmarCapacidad la permite si faltan) */
+  personas?: number;
+  confirmarCapacidad?: boolean;
   esPersonal?: boolean;
   colaboradorPartyId?: string | number;
   /** Cliente con cuenta elegido en «¿Quién pide?» (id del party); suma puntos al cobrar */

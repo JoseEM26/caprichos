@@ -1,4 +1,4 @@
-import { calcularAjusteCobro, sumarAjustesCambioDigitales, textoAvisoEnvio, textoDiferencia } from './cambio-ubicacion.util';
+import { ajustesPendientesUbicacion, calcularAjusteCobro, sumarAjustesCambioDigitales, textoAvisoEnvio, textoDiferencia } from './cambio-ubicacion.util';
 
 describe('cambio de ubicación: cálculo puro', () => {
   it('sin pago no hay ajuste de cobro (el total simplemente cambia)', () => {
@@ -37,5 +37,30 @@ describe('cambio de ubicación: cálculo puro', () => {
     );
     expect(r.cobrados).toEqual({ yape: 6, plin: 0, transferencia: 0, tarjeta: 0 });
     expect(r.devueltos).toEqual({ yape: 0, plin: 2.5, transferencia: 0, tarjeta: 0 });
+  });
+});
+
+describe('ajuste de ubicación pendiente (listas, detalle y ticket)', () => {
+  it('devuelve solo los pedidos con saldo o devolución sin resolver', async () => {
+    const db: any = {
+      pedidoCambioUbicacion: {
+        findMany: jest.fn().mockResolvedValue([
+          { pedido_id: 7n, ajuste_tipo: 'SALDO', ajuste_monto: { toString: () => '6.5' } },
+          { pedido_id: 7n, ajuste_tipo: 'DEVOLUCION', ajuste_monto: 1 },
+        ]),
+      },
+    };
+    const mapa = await ajustesPendientesUbicacion(db, [7n, 8n]);
+    expect(db.pedidoCambioUbicacion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ pedido_id: { in: [7n, 8n] }, ajuste_estado: 'PENDIENTE' }) }),
+    );
+    expect(mapa.get('7')).toEqual({ tipo: 'SALDO', monto: 6.5 });
+    expect(mapa.has('8')).toBe(false);
+  });
+
+  it('sin pedidos no consulta', async () => {
+    const db: any = { pedidoCambioUbicacion: { findMany: jest.fn() } };
+    expect((await ajustesPendientesUbicacion(db, [])).size).toBe(0);
+    expect(db.pedidoCambioUbicacion.findMany).not.toHaveBeenCalled();
   });
 });

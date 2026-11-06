@@ -63,6 +63,10 @@ describe('PedidosEstadoService', () => {
       cobro: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      // Cambios de ubicación: por defecto ninguno (ajuste pendiente = null)
+      pedidoCambioUbicacion: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       // Por defecto el pedido ya tiene un voucher útil; las pruebas del pago digital lo quitan
       voucherPago: {
         findFirst: jest.fn().mockResolvedValue({ id: 9n }),
@@ -669,6 +673,47 @@ describe('PedidosEstadoService', () => {
       expect(prismaMock.pedido.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ anulacion_aprobada_por: 1n }) }),
       );
+    });
+  });
+
+  describe('numero del día, dirección editada y ajuste pendiente en el detalle', () => {
+    it('obtenerPorId expone numero_dia, fecha_dia y ubicacion_editada_en; ajuste pendiente si lo hay', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 10n,
+        codigo: 'CP-W010',
+        comprobante_doc: null,
+        creado_en: new Date(),
+        numero_dia: 7,
+        fecha_dia: new Date('2026-11-06T00:00:00.000Z'),
+        ubicacion_editada_en: new Date('2026-11-06T16:00:00Z'),
+        lineas: [],
+        historial: [],
+      });
+      prismaMock.pedidoCambioUbicacion.findMany.mockResolvedValueOnce([
+        { pedido_id: 10n, ajuste_tipo: 'DEVOLUCION', ajuste_monto: 2.5 },
+      ]);
+
+      const res: any = await service.obtenerPorId(10n, adminAuth);
+      expect(res).toMatchObject({
+        numero_dia: 7,
+        ubicacion_editada_en: new Date('2026-11-06T16:00:00Z'),
+        ajusteUbicacionPendiente: { tipo: 'DEVOLUCION', monto: 2.5 },
+      });
+    });
+
+    it('sin número del día (pedido anterior) llega null y sin ajuste llega null', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 11n,
+        codigo: 'CP-W011',
+        comprobante_doc: null,
+        creado_en: new Date(),
+        numero_dia: null,
+        lineas: [],
+        historial: [],
+      });
+      const res: any = await service.obtenerPorId(11n, adminAuth);
+      expect(res.numero_dia).toBeNull();
+      expect(res.ajusteUbicacionPendiente).toBeNull();
     });
   });
 

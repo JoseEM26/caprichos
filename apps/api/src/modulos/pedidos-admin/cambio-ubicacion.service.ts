@@ -44,6 +44,9 @@ export interface CalculoCambio {
 
 type Cliente = Prisma.TransactionClient;
 
+/** Motivo con que queda cancelada la propuesta pendiente del repartidor cuando Caja cambia el punto directo. */
+export const MOTIVO_PROPUESTA_CANCELADA_POR_CAJA = 'Caja cambió la ubicación directamente';
+
 /**
  * Cambio del punto de un delivery por Caja (RN cambio de ubicación): se previsualiza zona, envío y total, se
  * confirma y se aplica. Si el pedido ya estaba pagado, la diferencia queda como saldo por cobrar (envío mayor) o
@@ -199,7 +202,7 @@ export class CambioUbicacionService {
     ctx: { origen: 'CAJA' | 'REPARTIDOR'; usuario: UsuarioAutenticado; propuesta?: PropuestaAplicada; ip?: string },
   ) {
     const usuarioId = BigInt(ctx.usuario.partyId);
-    const { pedido, calc, fila } = await this.prisma.$transaction(async (tx) => {
+    const { pedido, calc, fila, canceladas } = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM pedido WHERE id = ${pedidoId} FOR UPDATE`;
       const actual = await tx.pedido.findUnique({ where: { id: pedidoId } });
       if (!actual) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
@@ -225,6 +228,28 @@ export class CambioUbicacionService {
 
       const c = await this.calcular(tx, actual, punto.lat, punto.lng);
       const ahora = new Date();
+
+      // Caja cambia el punto directo mientras el repartidor tiene una propuesta pendiente: esa propuesta queda
+      // cancelada (ya no aplica sobre el punto de hoy). Dentro de la misma transacción.
+      let canceladas: bigint[] = [];
+      if (!ctx.propuesta) {
+        const pendientesRepartidor = await tx.pedidoCambioUbicacion.findMany({
+          where: { pedido_id: pedidoId, estado: 'PROPUESTA' },
+          select: { id: true },
+        });
+        canceladas = pendientesRepartidor.map((f) => f.id);
+        if (canceladas.length > 0) {
+          await tx.pedidoCambioUbicacion.updateMany({
+            where: { id: { in: canceladas }, estado: 'PROPUESTA' },
+            data: {
+              estado: 'CANCELADA',
+              motivo: MOTIVO_PROPUESTA_CANCELADA_POR_CAJA,
+              resuelto_por_party_id: usuarioId,
+              resuelto_en: ahora,
+            },
+          });
+        }
+      }
 
       await tx.pedido.update({
         where: { id: pedidoId },
@@ -304,8 +329,17 @@ export class CambioUbicacionService {
         },
         tx,
       );
-      return { pedido: actual, calc: c, fila };
+      return { pedido: actual, calc: c, fila, canceladas };
     });
+
+    // El repartidor lo ve al refrescar (su propuesta ya no está pendiente)
+    for (const propuestaId of canceladas) {
+      this.eventosGateway?.emitirAdmin('ubicacion:propuesta', {
+        pedidoId: String(pedido.id),
+        propuestaId: String(propuestaId),
+        estado: 'CANCELADA',
+      });
+    }
 
     // Aviso al cliente solo si cambió el envío (ventana 24 h, sin plantilla). Fuera de la transacción: nunca la tumba.
     let avisoCliente: string | null = null;

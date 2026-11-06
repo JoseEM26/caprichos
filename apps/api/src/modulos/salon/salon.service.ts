@@ -115,6 +115,9 @@ export class SalonService {
               total?: number;
               progreso: ProgresoPedido;
               lineas?: Array<{ cantidad: number; nombre: string; detalle: string; opciones: string[] }>;
+              /** Mesa principal del pedido (la que lleva su nombre) y su orden entre las mesas juntas */
+              esPrincipal: boolean;
+              orden: number;
             } | null = null;
             let pedidoCodigo: string | null = null;
             let mozoNombre: string | null = null;
@@ -139,6 +142,8 @@ export class SalonService {
               pedidoInfo = {
                 id: ped.id.toString(),
                 codigo: ped.codigo,
+                esPrincipal: pedidoMesaAbierto.principal === true,
+                orden: pedidoMesaAbierto.orden ?? 0,
                 estado: ped.estado,
                 mozo: mozoNombre || null,
                 cliente: ped.cliente_nombre?.trim() || null,

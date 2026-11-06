@@ -63,6 +63,7 @@ import {
 } from './ruteo-impresion';
 import { leerReglasImpresion } from './reglas-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { ajustesPendientesUbicacion } from '../pedidos-admin/cambio-ubicacion.util';
 
 /** Estados de print_job que cuentan como "en cola" para el admin y para no reencolar dos veces. */
 const TIPOS_ETIQUETA = ['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'];
@@ -765,11 +766,12 @@ export class ImpresionService {
         this.logger.warn(`No se encontró el pedido ${pedidoId} para encolar el ticket`);
         return;
       }
-      const [local, comprobante] = await Promise.all([
+      const [local, comprobante, ajuste] = await Promise.all([
         this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null),
         this.prisma.comprobante.findFirst({ where: { pedido_id: pedido.id, anulado_en: null } }).catch(() => null),
+        ajustesPendientesUbicacion(this.prisma, [pedido.id]).then((m) => m.get(String(pedido.id)) ?? null).catch(() => null),
       ]);
-      const payload = construirTicketPago(pedido, (local?.valor as any) || {}, comprobante);
+      const payload = construirTicketPago(pedido, (local?.valor as any) || {}, comprobante, ajuste);
       const clave = `${pedido.id}-TICKET_PAGO`;
       await this.prisma.printJob.upsert({
         where: { clave_idempotencia: clave },
