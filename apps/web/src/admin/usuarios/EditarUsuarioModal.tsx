@@ -36,12 +36,18 @@ import { AUTOCOMPLETAR_CLAVE, AVISO_REINGRESO, FORMATO_CORREO_ADMIN } from './cl
 import { CambiarClaveModal } from './CambiarClaveModal';
 import { FotoUsuarioAdmin } from './FotoUsuarioAdmin';
 import { SeccionAreasCocina, type AreaCocinaOpcion } from './SeccionAreasCocina';
+import { DarRolTemporalModal } from './DarRolTemporalModal';
+import { ActividadUsuario } from './ActividadUsuario';
+import { fechaLimaCorta, quitarRolExtra, type RolTemporal } from './rolesTemporalesApi';
+import { Insignia } from '../../comun/Insignia';
 
 export interface EditarUsuarioModalProps {
   usuario: UsuarioItem | null;
   abierto: boolean;
   alCerrar: () => void;
   alUsuarioEditado: (usuario: UsuarioItem) => void;
+  /** Se llama tras dar o quitar un rol extra: la lista se vuelve a leer sin cerrar el editor. */
+  alCambiarRoles?: () => void;
 }
 
 const OPCIONES_ROLES = ROLES_ASIGNABLES.map((rol) => ({
@@ -52,11 +58,18 @@ const OPCIONES_ROLES = ROLES_ASIGNABLES.map((rol) => ({
 const iguales = (a: string[], b: string[]): boolean =>
   a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
 
+/** Roles extra que se editan en el formulario: sin el principal y sin los temporales (esos se dan aparte). */
+const permanentesDe = (u: UsuarioItem): string[] => {
+  const temporales = (u.rolesTemporales ?? []).map((t) => t.rol);
+  return (u.roles ?? []).filter((r) => r !== u.rol && !temporales.includes(r));
+};
+
 export function EditarUsuarioModal({
   usuario,
   abierto,
   alCerrar,
   alUsuarioEditado,
+  alCambiarRoles,
 }: EditarUsuarioModalProps) {
   const { usuario: yo, salir } = useSesion();
   const navigate = useNavigate();
@@ -83,7 +96,12 @@ export function EditarUsuarioModal({
   const [areasCocina, setAreasCocina] = useState<string[]>([]);
   const [areasOriginales, setAreasOriginales] = useState<string[]>([]);
   const [areasDisponibles, setAreasDisponibles] = useState<AreaCocinaOpcion[]>([]);
-  const rolEsCocina = rol === 'COCINA' || otrosRoles.includes('COCINA');
+  // Roles temporales: se muestran y se dan aparte, no entran a la lista de otros roles del editor
+  const [temporales, setTemporales] = useState<RolTemporal[]>([]);
+  const [darRolAbierto, setDarRolAbierto] = useState(false);
+  const [quitarTemporal, setQuitarTemporal] = useState<RolTemporal | null>(null);
+  const [msgRoles, setMsgRoles] = useState('');
+  const rolEsCocina = rol === 'COCINA' || otrosRoles.includes('COCINA') || temporales.some((t) => t.rol === 'COCINA');
 
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -157,7 +175,9 @@ export function EditarUsuarioModal({
       setRol(usuario.rol);
       setAvisosCorreo(Boolean(usuario.avisosCorreo));
       setHorario247(Boolean(usuario.horario24_7));
-      setOtrosRoles((usuario.roles ?? []).filter((r) => r !== usuario.rol));
+      setOtrosRoles(permanentesDe(usuario));
+      setTemporales(usuario.rolesTemporales ?? []);
+      setMsgRoles('');
       setPaisNacimiento(usuario.paisNacimiento ?? '');
       setErrores({});
       setErrorServidor(null);
@@ -233,7 +253,7 @@ export function EditarUsuarioModal({
         }
         if (quitarCorreo) cuerpo.correo = '';
         else if (correoNuevo.trim()) cuerpo.correo = correoNuevo.trim();
-        if (!iguales(otrosRoles, (usuario.roles ?? []).filter((r) => r !== usuario.rol))) {
+        if (!iguales(otrosRoles, permanentesDe(usuario))) {
           cuerpo.otrosRoles = otrosRoles;
         }
         if (paisNacimiento.trim() !== (usuario.paisNacimiento ?? '')) cuerpo.paisNacimiento = paisNacimiento.trim();
@@ -569,6 +589,45 @@ export function EditarUsuarioModal({
               deshabilitado={guardando || !esAdmin}
             />
 
+            {esAdmin && (
+              <section
+                aria-label="Roles temporales"
+                style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--cp-line)', paddingTop: '12px' }}
+              >
+                <strong style={{ color: 'var(--cp-navy)' }}>Roles temporales</strong>
+                <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                  Un rol extra con fecha de fin (por ejemplo, supervisor suplente). Al vencer deja de valer solo.
+                </div>
+                {temporales.length === 0 && <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>Ninguno.</div>}
+                {temporales.map((t) => (
+                  <div key={t.rol} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '13px', color: 'var(--cp-navy)' }}>
+                    <Insignia variante="aviso">
+                      Temporal · {t.venceEn ? `hasta ${fechaLimaCorta(t.venceEn)}` : 'sin fecha de fin'}
+                    </Insignia>
+                    <span>{t.nombre}</span>
+                    {t.motivo && <span style={{ color: 'var(--cp-soft)' }}>({t.motivo})</span>}
+                    <button
+                      type="button"
+                      onClick={() => setQuitarTemporal(t)}
+                      disabled={guardando}
+                      style={{ border: 0, background: 'none', color: 'var(--cp-rust)', fontWeight: 700, cursor: 'pointer', minHeight: '32px' }}
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+                <div>
+                  <Boton variante="secundario" type="button" onClick={() => setDarRolAbierto(true)} deshabilitado={guardando}>
+                    Dar rol temporal
+                  </Boton>
+                </div>
+                {msgRoles && (
+                  <div role="status" style={{ fontSize: '13px', color: 'var(--cp-navy)', fontWeight: 700 }}>
+                    {msgRoles}
+                  </div>
+                )}
+              </section>
+            )}
             <SelectorOtrosRoles
               principal={rol}
               valor={otrosRoles}
@@ -603,6 +662,7 @@ export function EditarUsuarioModal({
             )}
 
             <HistorialLaboral usuarioId={usuario.id} esAdmin={esAdmin} deshabilitado={guardando} />
+            {esAdmin && <ActividadUsuario key={usuario.id} usuarioId={usuario.id} deshabilitado={guardando} />}
 
             {puedeRecibirAlertasWhatsApp(rol) && (
               <BloqueAlertasWhatsApp
@@ -654,6 +714,50 @@ export function EditarUsuarioModal({
         cargando={guardando}
         alConfirmar={guardarHorario}
         alCancelar={() => setConfirmarHorario(false)}
+      />
+
+      <DarRolTemporalModal
+        usuarioId={usuario.id}
+        rolesActuales={[usuario.rol, ...(usuario.roles ?? []), ...temporales.map((t) => t.rol)]}
+        abierto={darRolAbierto}
+        alCerrar={() => setDarRolAbierto(false)}
+        alDarRol={(dado, mensaje) => {
+          setDarRolAbierto(false);
+          setMsgRoles(mensaje);
+          // Se refleja aquí sin cerrar el editor: temporal con fecha, o extra permanente en el formulario
+          if (dado.venceEn) {
+            setTemporales((prev) => [
+              ...prev.filter((t) => t.rol !== dado.rol),
+              { rol: dado.rol, nombre: ETIQUETAS_ROLES[dado.rol] || dado.rol, venceEn: dado.venceEn, motivo: dado.motivo },
+            ]);
+          } else {
+            setOtrosRoles((prev) => [...prev.filter((r) => r !== dado.rol), dado.rol]);
+          }
+          alCambiarRoles?.();
+        }}
+      />
+
+      <Confirmar
+        abierto={quitarTemporal !== null}
+        titulo="¿Quitar este rol?"
+        mensaje={quitarTemporal ? `Quitarle a ${usuario.nombres} ${usuario.apellidos} el rol ${quitarTemporal.nombre}. Queda en el historial.` : ''}
+        textoSi="Sí, quitar"
+        textoNo="No"
+        peligro
+        alConfirmar={async () => {
+          if (!quitarTemporal) return;
+          try {
+            await quitarRolExtra(usuario.id, quitarTemporal.rol);
+            setTemporales((prev) => prev.filter((t) => t.rol !== quitarTemporal.rol));
+            setMsgRoles(`Rol ${quitarTemporal.nombre} quitado.`);
+            alCambiarRoles?.();
+          } catch (err) {
+            setErrorServidor(err instanceof ErrorApi ? err.message : 'No se pudo quitar el rol.');
+          } finally {
+            setQuitarTemporal(null);
+          }
+        }}
+        alCancelar={() => setQuitarTemporal(null)}
       />
 
       <Confirmar

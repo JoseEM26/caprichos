@@ -16,12 +16,13 @@ describe('IniciativasView', () => {
     renovar: vi.fn(),
     refrescarYo: vi.fn(),
     marcarClaveCambiada: vi.fn(),
-    tiene: vi.fn().mockReturnValue(true),
+    tiene: () => true,
   };
 
   const sesionMozo = {
     ...sesionAdmin,
     usuario: { id: '2', partyId: '2', nombres: 'Mozo Prueba', rol: 'MOZO' },
+    tiene: (p: string) => ['iniciativas/ver', 'iniciativas/crear', 'iniciativas/comentar'].includes(p),
   };
 
   const datosEjemplo: api.RespuestaIniciativas = {
@@ -147,7 +148,7 @@ describe('IniciativasView', () => {
 
     fireEvent.click(screen.getByText('Ver y comentar'));
 
-    expect(screen.getByText('CAMBIAR ESTADO (solo administrador)')).toBeInTheDocument();
+    expect(screen.getByText('CAMBIAR ESTADO (administrador y supervisor)')).toBeInTheDocument();
     const btnEnRevision = screen.getByText('Pasar a En revisión');
     fireEvent.click(btnEnRevision);
 
@@ -170,7 +171,7 @@ describe('IniciativasView', () => {
 
     fireEvent.click(screen.getByText('Ver y comentar'));
 
-    expect(screen.queryByText('CAMBIAR ESTADO (solo administrador)')).not.toBeInTheDocument();
+    expect(screen.queryByText('CAMBIAR ESTADO (administrador y supervisor)')).not.toBeInTheDocument();
   });
 
   it('muestra miniatura en tarjeta y detalle, y al hacer clic abre el visor con botón Cerrar', async () => {

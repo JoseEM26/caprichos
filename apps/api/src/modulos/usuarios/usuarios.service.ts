@@ -173,6 +173,7 @@ export class UsuariosService {
       }),
     ]);
 
+    const ahora = new Date();
     const elementos = usuarios.map((u) => {
       const dniDoc = u.party?.documentos?.[0]?.numero ?? '';
       return {
@@ -183,7 +184,15 @@ export class UsuariosService {
         dni: enmascararDni(dniDoc),
         tipoDocumento: u.party?.documentos?.[0]?.tipo ?? 'DNI',
         rol: u.rol,
-        roles: [u.rol, ...(u.rolesExtra ?? []).map((r) => r.rol)],
+        roles: [u.rol, ...(u.rolesExtra ?? []).filter((r) => !r.vence_en || r.vence_en > ahora).map((r) => r.rol)],
+        rolesTemporales: (u.rolesExtra ?? [])
+          .filter((r) => r.vence_en && r.vence_en > ahora)
+          .map((r) => ({
+            rol: r.rol,
+            nombre: ROLES.find((x) => x.codigo === r.rol)?.nombre ?? r.rol,
+            venceEn: r.vence_en,
+            motivo: r.motivo,
+          })),
         paisNacimiento: u.party?.persona?.pais_nacimiento ?? null,
         avisosCorreo: Boolean(u.avisos_correo),
         horario24_7: Boolean(u.party?.persona?.horario_24_7),
@@ -406,8 +415,13 @@ export class UsuariosService {
 
         if (extras.length) {
           await tx.userAccountRol.createMany({
-            data: extras.map((rol) => ({ user_account_id: userAccount.id, rol })),
+            data: extras.map((rol) => ({ user_account_id: userAccount.id, rol, otorgado_por: usuarioActual?.partyId ?? null })),
           });
+          for (const rol of extras) {
+            await tx.userAccountRolHistorial.create({
+              data: { user_account_id: userAccount.id, rol, accion: 'OTORGADO', quien_party_id: usuarioActual?.partyId ?? null, desde: new Date() },
+            });
+          }
         }
 
         // Historial laboral: cada periodo es un party_role TRABAJADOR. Con reingreso: ingreso → día antes; reingreso → abierto.
@@ -867,12 +881,20 @@ export class UsuariosService {
 
     // Roles: el principal y los extra. Si cambia el principal y no llegan extras, se conservan los extra sin el nuevo principal.
     const rolNuevo = dto.rol !== undefined ? dto.rol : usuario.rol;
-    const rolesExtraAntes = (usuario.rolesExtra ?? []).map((r) => r.rol).sort();
-    const rolesAntes = [usuario.rol, ...rolesExtraAntes];
+    // Los roles temporales (con fecha) no se tocan desde el editor: se dan y se quitan con su propia acción.
+    const ahoraRoles = new Date();
+    const vigentes = (usuario.rolesExtra ?? []).filter((r) => !r.vence_en || r.vence_en.getTime() > ahoraRoles.getTime());
+    const temporalesAntes = vigentes.filter((r) => r.vence_en).map((r) => r.rol).sort();
+    const rolesExtraAntes = vigentes.filter((r) => !r.vence_en).map((r) => r.rol).sort();
+    const rolesAntes = [usuario.rol, ...rolesExtraAntes, ...temporalesAntes];
     const rolesPedidos = dto.rol !== undefined || dto.otrosRoles !== undefined;
+    const otrosPedidos = (dto.otrosRoles !== undefined ? dto.otrosRoles : rolesExtraAntes.filter((r) => r !== rolNuevo)).filter(
+      (r) => !temporalesAntes.includes(r),
+    );
     const extrasNuevos = rolesPedidos
-      ? this.rolesExtraValidos(rolNuevo, dto.otrosRoles !== undefined ? dto.otrosRoles : rolesExtraAntes.filter((r) => r !== rolNuevo))
-      : rolesExtraAntes;
+      ? this.rolesExtraValidos(rolNuevo, [...otrosPedidos, ...temporalesAntes])
+      : [...rolesExtraAntes, ...temporalesAntes];
+    const extrasPermanentesNuevos = extrasNuevos.filter((r) => !temporalesAntes.includes(r));
     const rolesDespues = [rolNuevo, ...extrasNuevos];
     const rolesCambian = !iguales(rolesAntes, rolesDespues);
 
@@ -983,12 +1005,26 @@ export class UsuariosService {
           await tx.userAccount.update({ where: { id: usuario.id }, data: cuentaData });
         }
 
-        // Los extra se reemplazan por completo (la asignación de un rol extra no tiene estado «activo»).
+        // Extras permanentes: se quitan los que sobran y se agregan los nuevos (con historial). Los temporales no cambian.
         if (rolesCambian) {
-          await tx.userAccountRol.deleteMany({ where: { user_account_id: usuario.id } });
-          if (extrasNuevos.length) {
+          const quitar = rolesExtraAntes.filter((r) => !extrasPermanentesNuevos.includes(r));
+          const agregar = extrasPermanentesNuevos.filter((r) => !rolesExtraAntes.includes(r));
+          if (quitar.length) {
+            await tx.userAccountRol.deleteMany({ where: { user_account_id: usuario.id, rol: { in: quitar } } });
+          }
+          if (agregar.length) {
             await tx.userAccountRol.createMany({
-              data: extrasNuevos.map((rol) => ({ user_account_id: usuario.id, rol })),
+              data: agregar.map((rol) => ({ user_account_id: usuario.id, rol, otorgado_por: usuarioActual?.partyId ?? null })),
+            });
+          }
+          for (const rol of quitar) {
+            await tx.userAccountRolHistorial.create({
+              data: { user_account_id: usuario.id, rol, accion: 'RETIRADO', quien_party_id: usuarioActual?.partyId ?? null, desde: null, hasta: new Date() },
+            });
+          }
+          for (const rol of agregar) {
+            await tx.userAccountRolHistorial.create({
+              data: { user_account_id: usuario.id, rol, accion: 'OTORGADO', quien_party_id: usuarioActual?.partyId ?? null, desde: new Date() },
             });
           }
         }
