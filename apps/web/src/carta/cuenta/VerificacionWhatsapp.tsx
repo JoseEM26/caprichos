@@ -28,6 +28,8 @@ export const esRespuestaWhatsappEntrante = (r: unknown): r is RespuestaVerificac
 /** Cada 2 s, como máximo 10 minutos (lo que dura el token). */
 const INTERVALO_MS = 2000;
 const MAX_SONDEOS = 300;
+/** Tras este tiempo sin verificar, se explica qué revisar (si no, el cliente no sabe si el envío llegó). */
+const SONDEOS_AVISO = 30; // 60 s
 
 type Estado = 'pendiente' | 'verificado' | 'vencido';
 
@@ -65,16 +67,19 @@ export function VerificacionWhatsapp({
   puedeReenviar: boolean;
 }) {
   const [estado, setEstado] = useState<Estado>('pendiente');
+  const [lento, setLento] = useState(false);
   // La referencia evita que un cambio de función reinicie el sondeo
   const alVerificarRef = useRef(alVerificar);
   alVerificarRef.current = alVerificar;
 
   useEffect(() => {
     setEstado('pendiente');
+    setLento(false);
     let activo = true;
     let sondeos = 0;
     const timer = setInterval(async () => {
       sondeos += 1;
+      if (sondeos === SONDEOS_AVISO && activo) setLento(true);
       if (sondeos > MAX_SONDEOS) {
         clearInterval(timer);
         if (activo) setEstado('vencido');
@@ -113,6 +118,11 @@ export function VerificacionWhatsapp({
         <div role="status" style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft)' }}>
           {mensaje ?? 'Toca enviar en WhatsApp y vuelve aquí.'} Cuando llegue tu mensaje, pasamos solos al siguiente paso.
           <div style={{ marginTop: 4 }}>Esperando tu mensaje de WhatsApp...</div>
+          {lento && (
+            <div style={{ marginTop: 8, fontWeight: 700, color: 'var(--cp-rust)' }}>
+              ¿Ya enviaste el mensaje y no avanza? Revisa que lo hayas mandado desde tu WhatsApp al número de Caprichos, sin cambiar el texto. Si sigue igual, pide un enlace nuevo o avisa al local.
+            </div>
+          )}
         </div>
       )}
       {estado === 'vencido' && (

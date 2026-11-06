@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import * as cuentaModulo from '../CuentaContext';
 import { FormularioAcceso } from '../FormularioAcceso';
+import { VerificacionWhatsapp } from '../VerificacionWhatsapp';
 import { api } from '../../../comun/api';
 import { comprobantesApi } from '../../../admin/comprobantes/comprobantesApi';
 
@@ -144,5 +145,24 @@ describe('FormularioAcceso en modo WHATSAPP_ENTRANTE (recuperar contraseña)', (
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar mi contraseña' }));
 
     await waitFor(() => expect(post).toHaveBeenCalledWith('/carta/cuenta/recuperar/confirmar', { telefono: '914244077', contrasenaNueva: 'clave-nueva-123' }));
+  });
+});
+
+describe('VerificacionWhatsapp: si el mensaje no llega', () => {
+  it('tras 60 s sin verificar explica qué revisar, en vez de quedarse mudo', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(api, 'get').mockResolvedValue({ estado: 'pendiente' });
+      render(
+        <VerificacionWhatsapp token="ABCD2345" enlace="https://wa.me/51914244077" alVerificar={vi.fn()} alReenviar={vi.fn()} puedeReenviar />,
+      );
+      expect(screen.queryByText(/no avanza/)).toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(60000);
+      });
+      expect(screen.getByText(/no avanza/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

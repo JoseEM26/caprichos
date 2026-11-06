@@ -47,6 +47,8 @@ services:
       WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
       WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v25.0}
       ADMIN_WHATSAPP_NUMBERS: ${ADMIN_WHATSAPP_NUMBERS:-}
+      # Número que recibe la verificación del celular (solo dígitos con 51). Demo: el número de prueba de Meta. Vacío = WhatsApp de contacto del local
+      VERIFICACION_WHATSAPP_NUMERO: ${VERIFICACION_WHATSAPP_NUMERO:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
       # Reseñas de Google Maps (carta): la clave vive solo en el .env del servidor
