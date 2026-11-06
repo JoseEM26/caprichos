@@ -113,6 +113,17 @@ describe('quién queda como autorizador', () => {
     expect(r.party_id).toBe(ADMIN);
   });
 
+  it('si el SUPERVISOR que mostró el código ya no tiene el rol (retirado o vencido), no aprueba: cae al respaldo del ADMIN', async () => {
+    const { service } = montar();
+    const { codigo } = await service.obtenerCodigoActual(SUPERVISOR);
+    // Le quitan el rol: ya no es ADMIN ni SUPERVISOR vigente
+    (service as any).prisma.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
+      where.party_id === undefined || where.party_id === ADMIN ? { party_id: ADMIN, id: 10n, rol: 'ADMIN' } : null,
+    );
+    const r = await service.verificarYConsumirCodigo(codigo, CAJERO, 'caja/cobrar');
+    expect(r.party_id).toBe(ADMIN);
+  });
+
   it('la pantalla del supervisor no deja el código en Redis, solo quién lo vio', async () => {
     const { service, redis } = montar();
     const { codigo } = await service.obtenerCodigoActual(SUPERVISOR);

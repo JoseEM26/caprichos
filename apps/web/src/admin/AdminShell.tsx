@@ -540,6 +540,32 @@ export function AdminShell() {
               <Icono nombre="usuarios" tamano={18} />
               <span>Mi perfil</span>
             </button>
+            {tiene('iniciativas/ver') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMasRepartidorAbierto(false);
+                  navigate('/admin/iniciativas');
+                }}
+                style={{
+                  minHeight: '48px',
+                  border: '1.5px solid var(--cp-line)',
+                  borderRadius: '12px',
+                  background: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 16px',
+                  gap: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <Icono nombre="iniciativas" tamano={18} />
+                <span>Iniciativas (quejas, mejoras e ideas)</span>
+              </button>
+            )}
 
             <button
               type="button"
