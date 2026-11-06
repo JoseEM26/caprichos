@@ -23,7 +23,7 @@ const cajita = (): OfertaItem =>
     dias: [], horaDesde: null, horaHasta: null, fechaDesde: null, fechaHasta: null, canales: ['CARTA'],
     limiteUsos: null, usosActuales: 0, noSumaBeneficios: false, orden: 1, activo: true, creadoEn: '', disponible: true,
     combosParte: [
-      { id: '100', tipo: 'FIJO', cantidad: 1, categorias: [], productos: ['5'], principalNombre: 'FRAPPE OREO', reemplazos: [], disponible: true, opcionesDisponibles: ['5'] },
+      { id: '100', tipo: 'FIJO', cantidad: 1, categorias: [], productos: ['5'], principalNombre: 'FRAPPE OREO', alternativas: [], disponible: true, opcionesDisponibles: ['5'] },
       {
         id: '200', tipo: 'A_ELECCION', cantidad: 2, categorias: [], productos: ['30', '31', '32'],
         opcionesDetalle: [

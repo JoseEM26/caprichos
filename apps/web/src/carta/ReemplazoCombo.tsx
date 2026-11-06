@@ -1,10 +1,15 @@
-import type { ComboParteItem, OfertaItem } from '../admin/ofertas/ofertasApi';
+import type { AlternativaParteItem, ComboParteItem, OfertaItem, OpcionDetalleCombo } from '../admin/ofertas/ofertasApi';
 import { Reparto, totalElegido } from '../comun/saboresMezcla';
 
-export interface ParteConReemplazo {
+/**
+ * Parte del combo sin saldo para su original: el cliente elige una alternativa (producto y cantidad propios,
+ * mismo precio del combo). Solo aparece cuando el servidor marca `alternativasActivas`.
+ */
+export interface ParteConAlternativas {
   parteId: string;
-  principalNombre: string;
-  opciones: { id: string; nombre: string }[];
+  /** Lo que falta: el principal (FIJO) o las opciones de la parte. */
+  faltanteNombre: string;
+  alternativas: AlternativaParteItem[];
 }
 
 /** Combo activo vinculado a un producto de la carta (el producto «Combo Dúo...» abre su ventana de armado). */
@@ -16,35 +21,25 @@ export function comboDeProducto(ofertas: OfertaItem[] | undefined, productoId: s
   );
 }
 
-/** Partes FIJO cuyo principal no está disponible: el cliente debe elegir uno de los reemplazos disponibles. */
-export function partesConReemplazo(oferta: OfertaItem | null): ParteConReemplazo[] {
+/** Partes cuyo original no alcanza: se ofrecen sus alternativas (todas, con las agotadas bloqueadas). */
+export function partesConAlternativas(oferta: OfertaItem | null): ParteConAlternativas[] {
   if (!oferta) return [];
   return (oferta.combosParte ?? [])
-    .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.opcionesDisponibles && p.opcionesDisponibles.length > 0)
-    .filter((p) => !p.opcionesDisponibles!.includes(String(p.productos?.[0])))
-    .map((p) => ({
-      parteId: String(p.id),
-      principalNombre: p.principalNombre || 'El producto principal',
-      opciones: (p.reemplazosDetalle ?? []).filter((r) => p.opcionesDisponibles!.includes(r.id)),
-    }));
-}
-
-/** Elección inicial: si solo queda un reemplazo, ya viene elegido. */
-export function eleccionInicial(partes: ParteConReemplazo[]): Record<string, string> {
-  const e: Record<string, string> = {};
-  for (const p of partes) if (p.opciones.length === 1) e[p.parteId] = p.opciones[0].id;
-  return e;
-}
-
-/** Texto para la nota del pedido: «Empanada en lugar de Club Sandwich». */
-export function notaReemplazos(partes: ParteConReemplazo[], elegidos: Record<string, string>): string {
-  return partes
+    .filter((p) => p.alternativasActivas === true && (p.alternativas ?? []).length > 0)
     .map((p) => {
-      const o = p.opciones.find((x) => x.id === elegidos[p.parteId]);
-      return o ? `${o.nombre} (en lugar de ${p.principalNombre})` : '';
-    })
-    .filter(Boolean)
-    .join(' · ');
+      const esFijo = (p.tipo ?? p.tipoParte) === 'FIJO';
+      const nombres = (p.opcionesDetalle ?? []).map((o) => o.nombre).filter(Boolean);
+      return {
+        parteId: String(p.id),
+        faltanteNombre: esFijo ? p.principalNombre || 'el producto principal' : nombres.length ? nombres.join(' / ') : 'la elección',
+        alternativas: p.alternativas ?? [],
+      };
+    });
+}
+
+/** Reparto inicial al elegir una alternativa: sin sabores ya quedan completas sus unidades; con sabor, el cliente las elige. */
+export function repartoAlternativa(alt: AlternativaParteItem): Reparto {
+  return alt.sabores && alt.sabores.length > 0 ? {} : { [alt.id]: alt.cantidad };
 }
 
 export interface ComboEleccion {
@@ -53,12 +48,12 @@ export interface ComboEleccion {
   saborId?: string;
 }
 
-/** Partes A_ELECCION con lista de productos (p. ej. juguetes): el cliente elige cuántas de cada una. */
+/** Partes con lista de productos (juguetes, donas) o la alternativa elegida: el cliente elige cuántas de cada una. */
 export interface ParteEleccion {
   parteId: string;
   /** Opciones por combo: el servidor exige cantidad × unidades elegidas. */
   cantidad: number;
-  opciones: NonNullable<ComboParteItem['opcionesDetalle']>;
+  opciones: OpcionDetalleCombo[];
 }
 
 /**
@@ -67,14 +62,32 @@ export interface ParteEleccion {
  */
 export const claveSabor = (productoId: string, saborId: string): string => `${productoId}|${saborId}`;
 
-export function partesEleccion(oferta: OfertaItem | null): ParteEleccion[] {
-  if (!oferta) return [];
-  return (oferta.combosParte ?? [])
-    .filter((p) => (p.tipo ?? p.tipoParte) === 'A_ELECCION' && (p.opcionesDetalle ?? []).length > 0)
-    .map((p) => ({ parteId: String(p.id), cantidad: p.cantidad, opciones: p.opcionesDetalle ?? [] }));
+/** Alternativa elegida para una parte, si la hay (solo cuando el original no alcanza). */
+function alternativaElegida(p: ComboParteItem, elegidos: Record<string, string>): AlternativaParteItem | undefined {
+  if (p.alternativasActivas !== true) return undefined;
+  return (p.alternativas ?? []).find((a) => a.id === elegidos[String(p.id)]);
 }
 
-/** Elecciones por parte del combo: FIJO (principal o reemplazo) y A_ELECCION (cada unidad elegida, repetida por producto). */
+/**
+ * Qué elige el cliente con cantidad: la alternativa elegida (si el original no alcanza) o, si no, la lista de
+ * productos de la parte A_ELECCION (juguetes, donas). Con alternativas activas sin elegir, la lista original no se muestra.
+ */
+export function partesEleccion(oferta: OfertaItem | null, elegidos: Record<string, string> = {}): ParteEleccion[] {
+  if (!oferta) return [];
+  return (oferta.combosParte ?? []).flatMap((p): ParteEleccion[] => {
+    const parteId = String(p.id);
+    if (p.alternativasActivas === true) {
+      const alt = alternativaElegida(p, elegidos);
+      return alt ? [{ parteId, cantidad: alt.cantidad, opciones: [alt] }] : [];
+    }
+    if ((p.tipo ?? p.tipoParte) === 'A_ELECCION' && (p.opcionesDetalle ?? []).length > 0) {
+      return [{ parteId, cantidad: p.cantidad, opciones: p.opcionesDetalle ?? [] }];
+    }
+    return [];
+  });
+}
+
+/** Elecciones por parte del combo: FIJO (principal si no falta stock) y lo elegido en cada parte (cada unidad, repetida por producto). */
 export function eleccionesCombo(
   oferta: OfertaItem | null,
   elegidos: Record<string, string>,
@@ -82,9 +95,9 @@ export function eleccionesCombo(
 ): ComboEleccion[] {
   if (!oferta) return [];
   const fijas = (oferta.combosParte ?? [])
-    .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.productos?.[0] !== undefined)
-    .map((p) => ({ parteId: String(p.id), productoId: elegidos[String(p.id)] ?? String(p.productos![0]) }));
-  const eleccion = partesEleccion(oferta).flatMap((parte) =>
+    .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.productos?.[0] !== undefined && p.alternativasActivas !== true)
+    .map((p) => ({ parteId: String(p.id), productoId: String(p.productos![0]) }));
+  const eleccion = partesEleccion(oferta, elegidos).flatMap((parte) =>
     Object.entries(juguetes[parte.parteId] ?? {}).flatMap(([clave, n]) => {
       const [productoId, saborId] = clave.split('|');
       return Array.from({ length: n }, () => ({ parteId: parte.parteId, productoId, ...(saborId ? { saborId } : {}) }));
@@ -116,21 +129,34 @@ export function usosDeSabor(
   return usos;
 }
 
-/** Falta (o sobra) elegir en alguna parte A_ELECCION: hay que elegir cantidad × unidades exactas. */
+/** Falta (o sobra) elegir en alguna parte: hay que elegir cantidad × unidades exactas. */
 export function faltaElegirJuguetes(partes: ParteEleccion[], juguetes: Record<string, Reparto>, unidades: number): boolean {
   return partes.some((p) => totalElegido(juguetes[p.parteId] ?? {}) !== p.cantidad * unidades);
 }
 
-export const faltaElegirReemplazo = (partes: ParteConReemplazo[], elegidos: Record<string, string>): boolean =>
+/** Hay una parte sin original disponible y sin alternativa elegida. */
+export const faltaElegirReemplazo = (partes: ParteConAlternativas[], elegidos: Record<string, string>): boolean =>
   partes.some((p) => !elegidos[p.parteId]);
 
-interface Props {
-  partes: ParteConReemplazo[];
-  elegidos: Record<string, string>;
-  onElegir: (parteId: string, productoId: string) => void;
+/** Texto para la nota del pedido: «Gala (en lugar de Club Sandwich)». */
+export function notaReemplazos(partes: ParteConAlternativas[], elegidos: Record<string, string>): string {
+  return partes
+    .map((p) => {
+      const a = p.alternativas.find((x) => x.id === elegidos[p.parteId]);
+      return a ? `${a.nombre} (en lugar de ${p.faltanteNombre})` : '';
+    })
+    .filter(Boolean)
+    .join(' · ');
 }
 
-export function AvisoReemplazoCombo({ partes, elegidos, onElegir }: Props) {
+interface Props {
+  partes: ParteConAlternativas[];
+  elegidos: Record<string, string>;
+  onElegir: (parteId: string, alternativa: AlternativaParteItem) => void;
+}
+
+/** «Sin stock de X: elige una alternativa (mismo precio)»: todas las alternativas; las agotadas quedan bloqueadas. */
+export function AvisoAlternativasCombo({ partes, elegidos, onElegir }: Props) {
   if (partes.length === 0) return null;
   return (
     <div data-testid="aviso-reemplazo-combo" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -138,21 +164,22 @@ export function AvisoReemplazoCombo({ partes, elegidos, onElegir }: Props) {
         <div
           key={p.parteId}
           role="group"
-          aria-label={`Reemplazo de ${p.principalNombre}`}
+          aria-label={`Alternativas de ${p.faltanteNombre}`}
           style={{ border: '1.5px solid var(--cp-orange)', borderRadius: 14, padding: 12, background: 'var(--cp-white)' }}
         >
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
-            {p.principalNombre} no está disponible ahora; elige uno de estos:
+            Sin stock de {p.faltanteNombre}: elige una alternativa (mismo precio)
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {p.opciones.map((o) => {
-              const on = elegidos[p.parteId] === o.id;
+            {p.alternativas.map((a) => {
+              const on = elegidos[p.parteId] === a.id;
               return (
                 <button
-                  key={o.id}
+                  key={a.id}
                   type="button"
                   aria-pressed={on}
-                  onClick={() => onElegir(p.parteId, o.id)}
+                  disabled={!a.disponible}
+                  onClick={() => onElegir(p.parteId, a)}
                   style={{
                     minHeight: 44,
                     padding: '0 14px',
@@ -162,9 +189,13 @@ export function AvisoReemplazoCombo({ partes, elegidos, onElegir }: Props) {
                     color: on ? '#FFFFFF' : 'var(--cp-navy)',
                     fontWeight: 700,
                     fontSize: 13,
+                    opacity: a.disponible ? 1 : 0.5,
+                    cursor: a.disponible ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  {o.nombre}
+                  {a.nombre}
+                  {a.cantidad > 1 ? ` × ${a.cantidad}` : ''}
+                  {!a.disponible ? ' · No hay stock' : ''}
                 </button>
               );
             })}

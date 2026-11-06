@@ -11,14 +11,14 @@ import { alternarEleccion } from '../../../carta/eleccionGrupo';
 import { SelectorSaboresMezcla } from '../../../comun/SelectorSaboresMezcla';
 import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../../../comun/saboresMezcla';
 import {
-  AvisoReemplazoCombo,
+  AvisoAlternativasCombo,
   eleccionesCombo,
-  eleccionInicial,
   faltaElegirJuguetes,
   faltaElegirReemplazo,
   notaReemplazos,
-  partesConReemplazo,
+  partesConAlternativas,
   partesEleccion,
+  repartoAlternativa,
   usosDeSabor,
 } from '../../../carta/ReemplazoCombo';
 import { SelectorEleccionCombo } from '../../../carta/SelectorEleccionCombo';
@@ -95,11 +95,12 @@ export function VentanaOpcionesProducto({
   const [avisoNombres, setAvisoNombres] = useState(false);
 
   // Combo: reemplazos de partes fijas agotadas
-  const partesRe = useMemo(() => partesConReemplazo(oferta), [oferta]);
-  const [reemplazos, setReemplazos] = useState<Record<string, string>>(() => eleccionInicial(partesRe));
+  const partesRe = useMemo(() => partesConAlternativas(oferta), [oferta]);
+  // Sin alternativa elegida al inicio: el cliente la escoge (no se asigna sola)
+  const [reemplazos, setReemplazos] = useState<Record<string, string>>({});
   const comboAgotado = oferta?.disponible === false;
   // Partes A_ELECCION con lista (juguetes): cuántas de cada opción; el total depende de la cantidad del combo
-  const partesJug = useMemo(() => partesEleccion(oferta), [oferta]);
+  const partesJug = useMemo(() => partesEleccion(oferta, reemplazos), [oferta, reemplazos]);
   const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
 
   // Nota de cocina
@@ -778,10 +779,13 @@ export function VentanaOpcionesProducto({
             Agotado
           </div>
         )}
-        <AvisoReemplazoCombo
+        <AvisoAlternativasCombo
           partes={comboAgotado ? [] : partesRe}
           elegidos={reemplazos}
-          onElegir={(parteId, productoId) => setReemplazos((prev) => ({ ...prev, [parteId]: productoId }))}
+          onElegir={(parteId, alt) => {
+            setReemplazos((prev) => ({ ...prev, [parteId]: alt.id }));
+            setJuguetes((prev) => ({ ...prev, [parteId]: repartoAlternativa(alt) }));
+          }}
         />
         {!comboAgotado &&
           partesJug.map((parte) => (

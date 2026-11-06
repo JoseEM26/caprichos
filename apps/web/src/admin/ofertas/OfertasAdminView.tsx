@@ -228,8 +228,8 @@ function generarPastillasPartes(
           : null;
       const prod = prodId ? productos.find((p) => p.id === prodId) : null;
       const prodNombre = prod ? prod.nombre : cp.nombre || 'Producto';
-      const nRemp = (cp.reemplazos || []).length;
-      const sufijo = nRemp > 0 ? ` (o ${nRemp} ${nRemp === 1 ? 'reemplazo' : 'reemplazos'})` : '';
+      const nAlt = (cp.alternativas || []).length;
+      const sufijo = nAlt > 0 ? ` (o ${nAlt} ${nAlt === 1 ? 'alternativa' : 'alternativas'})` : '';
       return `${cant} × ${prodNombre.toUpperCase()}${sufijo}`;
     }
 

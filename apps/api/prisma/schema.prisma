@@ -1526,12 +1526,13 @@ model ComboParte {
   @@map("combo_parte")
 }
 
-/// Plan B, plan C...: productos que reemplazan al principal de una parte FIJO cuando se agota (mismo precio del combo)
+/// Alternativas de una parte (plan B, C... o «si no hay stock, elige»): producto y cantidad que sustituyen la parte cuando no alcanza (mismo precio del combo)
 model ComboParteReemplazo {
   id             BigInt @id @default(autoincrement())
   combo_parte_id BigInt
   producto_id    BigInt
   orden          Int    @default(0)
+  cantidad       Int    @default(1)
 
   parte    ComboParte @relation(fields: [combo_parte_id], references: [id], onDelete: Cascade)
   producto Producto   @relation(fields: [producto_id], references: [id])
