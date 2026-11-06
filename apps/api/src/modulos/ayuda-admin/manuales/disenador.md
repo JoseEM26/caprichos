@@ -43,7 +43,26 @@ Ver tambien: [[disenador]]
 ## Como se hace: configurar promociones y banner
 1. En la parte superior verás dos cajas grandes de promociones. Pulsa el botón "Editar texto y precio" para actualizar la etiqueta, título, descripción, precio actual y precio anterior tachado. Pulsa "Guardar".
 2. Si deseas que la segunda promoción aparezca primero, pulsa el botón "Intercambiar lugar".
-3. Para el banner publicitario superior, activa o desactiva la casilla "Activado" e ingresa la etiqueta, el título y el texto del anuncio en los campos correspondientes.
+3. Para el banner superior, en modo "Edición" pulsa sobre el banner: aparece su barra con "Caprichos del mes" y "Mis banners (imágenes)". Escribe encima de la etiqueta, el título y el texto para cambiarlos.
+Ver tambien: [[novedades]]
+
+## Como se hace: editar los botones del banner "Caprichos del mes"
+1. En modo "Edición", pulsa el botón "Pedir ahora" o "Ver la carta" dentro del banner. Se abre un editor pequeño.
+2. Escribe el nuevo texto del botón (de 1 a 24 caracteres; no se admite código HTML) y pulsa fuera del campo para guardarlo.
+3. Para esconder el botón, apaga "Mostrar este botón". En el diseñador el botón se ve atenuado, tachado y con la etiqueta "Oculto"; pulsa sobre él para volver a mostrarlo. En la carta pública un botón oculto no aparece.
+4. Si ocultas los dos botones, el banner muestra solo el título y el texto, sin espacio vacío.
+5. Pulsa "Publicar cambios" y confirma con "Sí, publicar" para que los vea el cliente; "Descartar" devuelve lo publicado.
+
+## Como se hace: reemplazar el banner por tus propias imágenes
+1. En modo "Edición", pulsa sobre el banner y elige "Mis banners (imágenes)". Luego pulsa "Administrar banners".
+2. Paso "Sube tus imágenes": pulsa "Subir mi primer banner", o arrastra o pega la imagen. Medida ideal: 1600×500 px; si es de otro tamaño se recorta al centro. Máximo 8 banners de 5 MB cada uno.
+3. En cada banner escribe qué dice la imagen (para quien no la puede ver) y elige a dónde lleva al tocarla: "Sin enlace", "La carta", "Una categoría", "Un producto" o "Enlace externo" (solo direcciones que empiecen con https://, se abren en pestaña nueva).
+4. Opcional: sube una imagen distinta para celular (medida ideal 1200×900 px); si no la subes se usa la misma imagen recortada al centro. Usa "Ver en PC" y "Ver en celular" para comprobarlo.
+5. Opcional: "Mostrar desde" y "Mostrar hasta" para programar el banner (hora de Lima). Cada banner indica su estado: Activo, Programado, Vencido u Oculto.
+6. Ordena con "Subir" y "Bajar", oculta con el interruptor "Mostrar este banner" y elimina con "Eliminar" y "Sí".
+7. Paso "Ajusta cómo se mueven": elige cuánto dura cada imagen (de 3 a 15 segundos) y pulsa "Reproducir" para verlo. Con una sola imagen no hay movimiento ni flechas.
+8. Si ningún banner está activo o vigente, la carta muestra "Caprichos del mes" y el diseñador avisa "No hay banners activos: se muestra Caprichos del mes".
+9. Pulsa "Publicar cambios" y "Sí, publicar". Verás "¡Listo! Tus cambios ya se ven en la carta".
 Ver tambien: [[novedades]]
 
 ## Como se hace: cambiar el orden, el tamaño y la posición de la carta
