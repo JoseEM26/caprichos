@@ -75,6 +75,8 @@ export function MiAsistenciaView() {
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number; precision: number } | null>(null);
   const [selfie, setSelfie] = useState<string | null>(null);
   const [aceptaConsent, setAceptaConsent] = useState(false);
+  const [aceptadoEnSesion, setAceptadoEnSesion] = useState(false);
+  const [verAviso, setVerAviso] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [mensajeOk, setMensajeOk] = useState<string | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
@@ -214,6 +216,13 @@ export function MiAsistenciaView() {
       setPaso('listo');
       await recargar();
     } catch (e) {
+      const x = e as any;
+      const codigo = x?.codigo ?? x?.response?.codigo;
+      // El servidor guarda el aviso aceptado aunque la marca se rechace: se recarga para no volver a pedirlo.
+      if (codigo !== 'CONSENTIMIENTO_REQUERIDO') {
+        if (aceptaConsent) setAceptadoEnSesion(true);
+        await recargar();
+      }
       setError(mensajeDe(e, 'No se pudo registrar tu marca. Intenta otra vez.'));
       setPaso('inicio');
     } finally {
@@ -225,7 +234,7 @@ export function MiAsistenciaView() {
   if (!hoy) return <div role="alert" className="ma-resultado ma-resultado--error"><strong>No pudimos cargar tu asistencia</strong><span>{error ?? 'Revisa tu conexión e intenta otra vez.'}</span></div>;
 
   const pendiente = hoy.pendiente;
-  const faltaConsent = hoy.consentimiento !== null && !hoy.consentimientoAceptado;
+  const faltaConsent = hoy.consentimiento !== null && !hoy.consentimientoAceptado && !aceptadoEnSesion;
   const puedeMarcar = (pendiente !== null || hoy.permitidas.length > 0) && (!faltaConsent || aceptaConsent);
   const indice = INDICE_PASO[paso];
   const horaLima = new Date(hoy.ahora).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
@@ -261,6 +270,14 @@ export function MiAsistenciaView() {
             <input type="checkbox" checked={aceptaConsent} onChange={(e) => setAceptaConsent(e.target.checked)} /> Acepto el tratamiento de mis datos para el control de asistencia.
           </span>
         </label>
+      )}
+
+      {!faltaConsent && hoy.consentimientoAceptado && hoy.consentimientoAceptadoEn && (
+        <p className="as-ayuda" data-testid="aviso-aceptado">
+          Aceptaste el aviso de datos el {new Date(hoy.consentimientoAceptadoEn).toLocaleDateString('es-PE', { timeZone: 'America/Lima' })}.{' '}
+          <button type="button" className="ma-enlace" onClick={() => setVerAviso((v) => !v)}>{verAviso ? 'Ocultar aviso' : 'Ver aviso'}</button>
+          {verAviso && <span> {hoy.textoConsentimiento}</span>}
+        </p>
       )}
 
       {indice !== undefined && (
