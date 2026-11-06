@@ -18,6 +18,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { ModalPrevisualizacionCarta } from './ModalPrevisualizacionCarta';
 import { api } from '../../comun/api';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
+import './ofertas.css';
 
 const NOMBRES_DIAS_CORTO: Record<number, string> = {
   1: 'Lun',
@@ -136,8 +137,13 @@ const botonVisibilidadCarta: CSSProperties = {
 };
 
 /** Qué se ve en la carta de una oferta desactivada (visible_carta). */
-function etiquetaDesactivada(o: OfertaItem): string {
-  return o.visibleCarta === false ? 'Desactivada · oculta en la carta' : 'Desactivada · se ve como No disponible';
+function detalleDesactivada(o: OfertaItem): string {
+  return o.visibleCarta === false ? 'Desactivada: oculta en la carta' : 'Desactivada: se ve como No disponible';
+}
+
+/** Insignia de estado de una sola línea; el detalle de la carta va en tooltip y aria-label, sin ocupar espacio. */
+function insigniaEstado(o: OfertaItem, activo: string): { texto: string; title?: string } {
+  return o.activo ? { texto: activo } : { texto: 'Desactivada', title: detalleDesactivada(o) };
 }
 
 function formatearHora12(hStr?: string | null): string {
@@ -834,6 +840,7 @@ export function OfertasAdminView() {
               return (
                 <div
                   key={pr.id}
+                  className={pr.activo ? 'oferta-card' : 'oferta-card oferta-card--off'}
                   style={{
                     backgroundColor: 'var(--cp-white)',
                     border: '1px solid var(--cp-line)',
@@ -842,7 +849,6 @@ export function OfertasAdminView() {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '10px',
-                    opacity: pr.activo ? 1 : 0.6,
                   }}
                 >
                   {pr.imagenUrl ? (
@@ -884,7 +890,7 @@ export function OfertasAdminView() {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
+                  <div className="oferta-cab">
                     <span
                       style={{
                         fontFamily: 'Montserrat, sans-serif',
@@ -897,7 +903,10 @@ export function OfertasAdminView() {
                       {pr.nombre}
                     </span>
                     <span
-                      style={{
+                      className="oferta-estado"
+                    title={insigniaEstado(pr, 'Activa').title}
+                    aria-label={insigniaEstado(pr, 'Activa').title}
+                    style={{
                         flex: 'none',
                         fontSize: '12px',
                         fontWeight: 700,
@@ -907,7 +916,7 @@ export function OfertasAdminView() {
                         color: 'var(--cp-navy)',
                       }}
                     >
-                      {pr.activo ? 'Activa' : etiquetaDesactivada(pr)}
+                      {insigniaEstado(pr, 'Activa').texto}
                     </span>
                   </div>
                   {pr.tipo === 'COMBO' && pr.disponible === false && (
@@ -975,7 +984,7 @@ export function OfertasAdminView() {
                     ))}
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
+                  <div className="oferta-acciones" style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
                     {!pr.activo && (
                       <button type="button" onClick={() => cambiarVisibilidadDesactivada(pr)} style={botonVisibilidadCarta}>
                         {pr.visibleCarta === false ? 'Mostrar como No disponible' : 'Ocultar de la carta'}
@@ -1140,6 +1149,7 @@ export function OfertasAdminView() {
               return (
                 <div
                   key={d.id}
+                  className={d.activo ? 'oferta-card' : 'oferta-card oferta-card--off'}
                   style={{
                     backgroundColor: 'var(--cp-white)',
                     border: '1px solid var(--cp-line)',
@@ -1148,7 +1158,6 @@ export function OfertasAdminView() {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '8px',
-                    opacity: d.activo ? 1 : 0.6,
                   }}
                 >
                   {d.imagenUrl ? (
@@ -1190,7 +1199,7 @@ export function OfertasAdminView() {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
+                  <div className="oferta-cab">
                     <span
                       style={{
                         fontFamily: 'Montserrat, sans-serif',
@@ -1202,7 +1211,10 @@ export function OfertasAdminView() {
                       {d.nombre}
                     </span>
                     <span
-                      style={{
+                      className="oferta-estado"
+                    title={insigniaEstado(d, 'Activo').title}
+                    aria-label={insigniaEstado(d, 'Activo').title}
+                    style={{
                         flex: 'none',
                         fontSize: '12px',
                         fontWeight: 700,
@@ -1212,7 +1224,7 @@ export function OfertasAdminView() {
                         color: 'var(--cp-navy)',
                       }}
                     >
-                      {d.activo ? 'Activo' : etiquetaDesactivada(d)}
+                      {insigniaEstado(d, 'Activo').texto}
                     </span>
                   </div>
 
@@ -1248,7 +1260,7 @@ export function OfertasAdminView() {
                     {Number(d.compraMinima) > 0 ? `Compra mínima s/ ${d.compraMinima}` : 'Sin compra mínima'}
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
+                  <div className="oferta-acciones" style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
                     {!d.activo && (
                       <button type="button" onClick={() => cambiarVisibilidadDesactivada(d)} style={botonVisibilidadCarta}>
                         {d.visibleCarta === false ? 'Mostrar como No disponible' : 'Ocultar de la carta'}
@@ -1659,6 +1671,7 @@ export function OfertasAdminView() {
                 return (
                   <div
                     key={c.id}
+                    className={c.activo ? 'oferta-card' : 'oferta-card oferta-card--off'}
                     style={{
                       backgroundColor: 'var(--cp-white)',
                       border: '1px solid var(--cp-line)',
@@ -1667,7 +1680,6 @@ export function OfertasAdminView() {
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '8px',
-                      opacity: c.activo ? 1 : 0.6,
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px', alignItems: 'center' }}>
@@ -1757,7 +1769,7 @@ export function OfertasAdminView() {
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
+                    <div className="oferta-acciones" style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
                       <button
                         type="button"
                         onClick={() => {
