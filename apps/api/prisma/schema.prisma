@@ -454,6 +454,7 @@ model ProductoTamano {
   producto        Producto      @relation(fields: [producto_id], references: [id])
   tamano_valor    ListaValor    @relation(fields: [tamano_valor_id], references: [id])
   recetaLineas    RecetaLinea[]
+  comboPartes     ComboParte[]
 
   @@unique([producto_id, tamano_valor_id])
   @@map("producto_tamano")
@@ -1596,8 +1597,11 @@ model ComboParte {
   cantidad   Int      @default(1)
   categorias BigInt[]
   productos  BigInt[]
+  /// Tamaño de la parte FIJO de un solo producto (producto_tamano del producto); sin tamaño, null
+  tamano_id  BigInt?
 
   oferta     Oferta   @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+  tamano     ProductoTamano? @relation(fields: [tamano_id], references: [id], onDelete: SetNull)
   reemplazos ComboParteReemplazo[]
 
   @@map("combo_parte")

@@ -90,6 +90,10 @@ export class ComboParteDto {
   @IsOptional()
   @IsArray({ message: 'alternativas debe ser un arreglo' })
   alternativas?: { productoId: string | number; cantidad?: number }[];
+
+  /** Tamaño (producto_tamano) de la parte FIJO de un producto. Null o vacío = sin tamaño. */
+  @IsOptional()
+  tamanoId?: string | number | null;
 }
 
 export class CrearOfertaDto {

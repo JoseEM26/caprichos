@@ -39,6 +39,10 @@ export interface ComboParteItem {
   disponible?: boolean;
   opcionesDisponibles?: string[];
   principalNombre?: string;
+  /** FIJO de un producto: tamaño (producto_tamano) elegido y su nombre; vacío = sin tamaño */
+  tamanoId?: string | null;
+  tamanoNombre?: string | null;
+  tamanoUnidades?: number;
   /** A_ELECCION con lista (juguetes, donas): cada opción y si se puede elegir ahora. */
   opcionesDetalle?: OpcionDetalleCombo[];
 }
