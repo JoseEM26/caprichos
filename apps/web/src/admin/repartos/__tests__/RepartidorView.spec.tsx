@@ -380,6 +380,16 @@ describe('RepartidorView: pantalla toda mapa del repartidor', () => {
       expect(screen.queryByTestId('hoja-inferior')).toBeNull();
     });
 
+    it('12b. Chatear por WhatsApp en mi pedido vigente abre el chat de ese pedido dentro de la pantalla', async () => {
+      const spyChat = vi.spyOn(repartosApi, 'obtenerChat').mockResolvedValue({ disponible: true, cliente: { nombre: 'Rosa Sanchez', telefono: '***4321' }, ventanaAbierta: true, atendidoPorLocal: false, mensajes: [] });
+      await abrirDetalleMio();
+      fireEvent.click(screen.getByTestId('btn-chatear-101'));
+      const chat = await screen.findByRole('dialog', { name: 'Chat de WhatsApp del pedido CP-0101' });
+      expect(spyChat).toHaveBeenCalledWith('101');
+      expect(within(chat).getByText('Aún no hay mensajes desde que se creó el pedido.')).toBeInTheDocument();
+      expect(screen.queryByTestId('hoja-inferior')).toBeNull();
+    });
+
     it('13. se cierra deslizando el asa hacia abajo; un deslizamiento corto no la cierra', async () => {
       await abrirDetalleMio();
       const asa = screen.getByTestId('hoja-asa');
