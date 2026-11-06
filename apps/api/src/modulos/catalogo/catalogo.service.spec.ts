@@ -969,4 +969,67 @@ describe('CatalogoService', () => {
       expect(err.getResponse()).toMatchObject({ codigo: 'OPCION_NO_ENCONTRADA' });
     });
   });
+
+  describe('9. Pasos opcionales y obligatorios con stock (Dúo)', () => {
+    const grupoOpcion = (grupoId: bigint, nombre: string, opciones: any[], obligatorio: boolean, minimo: number) => ({
+      grupo: { id: grupoId, nombre, obligatorio, minimo, maximo: 1, activo: true, opciones },
+    });
+    const opcion = (id: bigint, nombre: string, grupoId: bigint) => ({
+      id, grupo_id: grupoId, valor_id: id, precio_extra: 0, activo: true, agotado_hasta: null, valor: { id, nombre },
+    });
+    const dona = {
+      id: BigInt(57), nombre: 'DONAS ARTESANALES', oculto: false, agotado_hasta: null, controla_stock: true,
+      stocks: [], sabores: [{ id: BigInt(101), producto_id: BigInt(57), activo: true, agotado_hasta: null, stockSabor: { cantidad: 0 } }],
+    };
+    // Complemento obligatorio: «2 Donas» (sin donas) y galletas (con stock). Sabor de dona: opcional (minimo 0).
+    const duo = (complementos: any[], saborObligatorio = false) => ({
+      id: BigInt(1), nombre: 'DÚO PARA COMPARTIR', descripcion: null, precio: 20, oculto: false, agotado_hasta: null,
+      no_suma_beneficios: false, foto_archivo: null, tamanos: [], sabores: [],
+      ofertasAlcance: [{ id: BigInt(1), combosParte: [] }],
+      grupos: [
+        grupoOpcion(BigInt(1), 'Complemento 1 · Complemento', complementos, true, 1),
+        grupoOpcion(BigInt(2), 'Dona 1 · Sabor', [opcion(BigInt(21), 'Crema pastelera', BigInt(2))], saborObligatorio, saborObligatorio ? 1 : 0),
+      ],
+    });
+    const preparar = (d: any) => {
+      prisma.categoria.findMany.mockResolvedValue([{ id: BigInt(2), nombre: 'Combos', orden: 1, oculta: false, productos: [d] }]);
+      prisma.opcionRequiere.findMany.mockResolvedValue([
+        { opcion_id: BigInt(11), producto_id: BigInt(57), sabor_id: null, cantidad: 2 },
+        { opcion_id: BigInt(21), producto_id: BigInt(57), sabor_id: BigInt(101), cantidad: 1 },
+      ]);
+      prisma.producto.findMany.mockImplementation(({ select }: any) => Promise.resolve(select?.stocks ? [dona] : []));
+    };
+    const complementos = (conGalletas: boolean) => [
+      opcion(BigInt(11), '2 Donas', BigInt(1)),
+      ...(conGalletas ? [opcion(BigInt(12), 'Keke Marmoleado', BigInt(1))] : []),
+    ];
+
+    it('Dúo con donas en 0 sigue disponible con los complementos restantes; el paso de sabor opcional no se muestra', async () => {
+      preparar(duo(complementos(true)));
+      const producto = (await service.obtenerCarta())[0].productos[0];
+      expect(producto.disponible).toBe(true);
+      expect(producto.grupos.map((g: any) => g.nombre)).toEqual(['Complemento 1 · Complemento']);
+      const complemento = producto.grupos[0];
+      expect(complemento.opciones.find((o: any) => o.nombre === '2 Donas')?.disponible).toBe(false);
+      expect(complemento.opciones.find((o: any) => o.nombre === 'Keke Marmoleado')?.disponible).toBe(true);
+    });
+
+    it('Dúo con TODOS los complementos agotados (paso obligatorio sin opciones, sin alternativas) → no disponible', async () => {
+      preparar(duo(complementos(false)));
+      const producto = (await service.obtenerCarta())[0].productos[0];
+      expect(producto.disponible).toBe(false);
+    });
+
+    it('un paso OPCIONAL sin opciones pedibles no bloquea el producto', async () => {
+      preparar(duo(complementos(true), false));
+      const producto = (await service.obtenerCarta())[0].productos[0];
+      expect(producto.disponible).toBe(true);
+    });
+
+    it('un paso obligatorio de sabor sin opciones pedibles sí bloquea (regla obligatoria, sin alternativas)', async () => {
+      preparar(duo(complementos(true), true));
+      const producto = (await service.obtenerCarta())[0].productos[0];
+      expect(producto.disponible).toBe(false);
+    });
+  });
 });

@@ -80,4 +80,33 @@ describe('combo con opciones agotadas por stock (carta web)', () => {
     const boton = screen.getByText('No disponible').closest('button') as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
   });
+  it('un paso OPCIONAL agotado por stock no bloquea: el combo con su complemento obligatorio se puede agregar', () => {
+    renderVentana({
+      ...base,
+      grupos: [
+        {
+          id: '13',
+          nombre: 'Complemento 1 · Complemento',
+          obligatorio: true,
+          minimo: 1,
+          maximo: 1,
+          aviso: null,
+          sinStock: false,
+          opciones: [{ id: '131', nombre: 'Keke Marmoleado', precioExtra: 0, disponible: true }],
+        },
+        {
+          id: '14',
+          nombre: 'Dona 1 · Sabor',
+          obligatorio: false,
+          minimo: 0,
+          maximo: 1,
+          aviso: null,
+          sinStock: true,
+          opciones: [{ id: '141', nombre: 'Fresa', precioExtra: 0, disponible: false }],
+        },
+      ],
+    });
+    const agregar = screen.getAllByRole('button').find((b) => /agregar/i.test(b.textContent ?? '') && !/personalizar/i.test(b.textContent ?? ''));
+    expect((agregar as HTMLButtonElement).disabled).toBe(false);
+  });
 });

@@ -59,6 +59,7 @@ describe('OfertasService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       comboParteReemplazo: { createMany: jest.fn() },
+      opcionRequiere: { findMany: jest.fn().mockResolvedValue([]) },
       comboPrecio: {
         create: jest.fn(),
         deleteMany: jest.fn(),
@@ -1323,6 +1324,60 @@ describe('OfertasService', () => {
       // 5 % por defecto de lo elegible
       expect(res.puntosEstimados).toBe(1.25);
       expect(res.puntosPorcentaje).toBe(5);
+    });
+  });
+
+  describe('oferta COMBO del Dúo y sus pasos con stock (misma regla que la carta)', () => {
+    const parte = { id: 9n, oferta_id: 1n, tipo: 'UNA_DE', cantidad: 1, categorias: [], productos: [58n], tamano_id: null, tamano: null, reemplazos: [] };
+    // Galleta de la parte UNA_DE: sin control de stock (siempre disponible)
+    const galleta = { id: 58n, nombre: 'GALLETA CHOCO CHIPS', oculto: false, agotado_hasta: null, controla_stock: false, categoria_id: 2n, categoria: { nombre: 'Galletas', area_id: 1n, area: { nombre: 'Salados' } }, stocks: [], sabores: [] };
+    const comboDuo = {
+      id: 1n, tipo: 'COMBO', nombre: 'Dúo para compartir', descripcion: null, lleva: null, paga: null,
+      alcance_categoria_id: null, alcance_producto_id: 1n, descuento_tipo: null, descuento_valor: null,
+      compra_minima: null, dias: [], hora_desde: null, hora_hasta: null, fecha_desde: null, fecha_hasta: null,
+      canales: ['CARTA'], limite_usos: null, usos_actuales: 0, no_suma_beneficios: false, orden: 1, activo: true,
+      creado_en: new Date(), categoria: null, producto: { id: 1n, nombre: 'DÚO PARA COMPARTIR' }, imagen_archivo_id: null,
+      imagen_archivo: null, combosPrecio: [], combosParte: [parte], mostrar_en_saludo_bot: false, solo_primera_compra: false,
+      visible_carta: true,
+    };
+    const donas = {
+      id: 57n, nombre: 'DONAS ARTESANALES', oculto: false, agotado_hasta: null, controla_stock: true, categoria_id: 2n,
+      stocks: [], sabores: [{ id: 101n, producto_id: 57n, activo: true, agotado_hasta: null, stockSabor: { cantidad: 0 } }],
+    };
+    const hostCon = (complementos: any[]) => ({
+      id: 1n,
+      grupos: [
+        { grupo: { activo: true, obligatorio: true, minimo: 1, opciones: complementos } },
+        { grupo: { activo: true, obligatorio: false, minimo: 0, opciones: [{ id: 21n, agotado_hasta: null, activo: true }] } },
+      ],
+    });
+    const preparar = (complementos: any[]) => {
+      prismaMock.oferta.findMany.mockResolvedValue([comboDuo]);
+      prismaMock.opcionRequiere.findMany.mockResolvedValue([
+        { opcion_id: 11n, producto_id: 57n, sabor_id: null, cantidad: 2 },
+        { opcion_id: 21n, producto_id: 57n, sabor_id: 101n, cantidad: 1 },
+      ]);
+      prismaMock.producto.findMany.mockImplementation(({ where, select }: any) => {
+        if (select?.grupos) return Promise.resolve([hostCon(complementos)]);
+        if (where?.OR) return Promise.resolve([galleta]); // productos de las partes
+        return Promise.resolve([donas]); // saldo de las donas
+      });
+    };
+
+    it('Dúo con donas en 0 sigue disponible si queda un complemento con stock', async () => {
+      preparar([
+        { id: 11n, agotado_hasta: null, activo: true },
+        { id: 12n, agotado_hasta: null, activo: true },
+      ]);
+      const [oferta] = await service.listarOfertas('COMBO');
+      expect(oferta.disponible).toBe(true);
+    });
+
+    it('Dúo con TODOS los complementos agotados por stock → oferta no disponible', async () => {
+      preparar([{ id: 11n, agotado_hasta: null, activo: true }]);
+      const [oferta] = await service.listarOfertas('COMBO');
+      expect(oferta.disponible).toBe(false);
+      expect(oferta.motivoAgotado).toBe('Sin stock de un paso obligatorio del combo');
     });
   });
 });

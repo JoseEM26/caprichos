@@ -7,7 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { jpegProductoWhatsApp } from './imagen-whatsapp';
-import { opcionesSinStock } from '../stock/opcion-requiere';
+import { anfitrionBloqueadoPorPaso, opcionesSinStock, pasoOpcionalOcultoPorStock } from '../stock/opcion-requiere';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -255,18 +255,17 @@ export class CatalogoService implements OnApplicationBootstrap {
           unidades: t.unidades,
         }));
 
-        const grupos = (p.grupos || [])
+        const gruposTodos = (p.grupos || [])
           .filter((pg) => pg.grupo && pg.grupo.activo)
           .map((pg) => {
-            const opciones = (pg.grupo.opciones || [])
-              .filter((o) => o.activo)
-              .map((o) => ({
-                id: o.id.toString(),
-                nombre: o.valor?.nombre || '',
-                precioExtra: Number(Number(o.precio_extra).toFixed(2)),
-                disponible: estaDisponible(o.agotado_hasta) && !sinStockOpcion.has(o.id.toString()),
-              }));
-            const bloqueadas = (pg.grupo.opciones || []).filter((o) => o.activo && sinStockOpcion.has(o.id.toString())).map((o) => o.valor?.nombre || '');
+            const opcionesActivas = (pg.grupo.opciones || []).filter((o) => o.activo);
+            const opciones = opcionesActivas.map((o) => ({
+              id: o.id.toString(),
+              nombre: o.valor?.nombre || '',
+              precioExtra: Number(Number(o.precio_extra).toFixed(2)),
+              disponible: estaDisponible(o.agotado_hasta) && !sinStockOpcion.has(o.id.toString()),
+            }));
+            const bloqueadas = opcionesActivas.filter((o) => sinStockOpcion.has(o.id.toString())).map((o) => o.valor?.nombre || '');
             const libres = opciones.filter((o) => o.disponible).map((o) => o.nombre);
             // Plan B visible: hay opciones agotadas por stock y otras que se pueden elegir
             const aviso = bloqueadas.length > 0 && libres.length > 0
@@ -280,21 +279,30 @@ export class CatalogoService implements OnApplicationBootstrap {
               maximo: pg.grupo.maximo,
               opciones,
               aviso,
-              // Todas sus opciones bloqueadas por stock: sin plan B en el paso, el combo no se puede armar
+              // Todas sus opciones bloqueadas por stock (sin plan B en el paso)
               sinStock: bloqueadas.length > 0 && libres.length === 0,
             };
           })
           // Grupo sin opciones activas (p. ej. «Galleta 1 · Sabor» tras quitar sus sabores): no se muestra ni bloquea
           .filter((g) => g.opciones.length > 0);
+        // Paso de sabor que solo tiene sentido con donas en saldo: si es opcional y se queda sin opciones por stock, no se muestra
+        const pasosStock = gruposTodos.map((g) => ({
+          g,
+          paso: {
+            obligatorio: g.obligatorio,
+            minimo: g.minimo,
+            opciones: g.opciones.map((o) => ({ disponible: o.disponible, bloqueadaPorStock: sinStockOpcion.has(o.id) })),
+          },
+        }));
+        const grupos = pasosStock.filter(({ paso }) => !pasoOpcionalOcultoPorStock(paso)).map(({ g }) => g);
 
         // Producto que controla stock: sin saldo no se vende (aunque no esté marcado como agotado).
-        // Anfitrión de combo: si un paso queda sin ninguna opción por stock y el combo no tiene alternativas, no se vende.
+        // Anfitrión de combo: un paso OBLIGATORIO sin ninguna opción por stock (y sin alternativas en el combo) lo deja «No disponible».
         const esAnfitrionConAlternativas = (p.ofertasAlcance?.[0]?.combosParte ?? []).length > 0;
-        const pasoSinStock = grupos.some((g) => g.sinStock);
         const disponible = (porSabor
           ? estaDisponible(p.agotado_hasta) && saboresConStock
           : estaDisponible(p.agotado_hasta) && !(quedan !== null && quedan <= 0))
-          && !(esAnfitrionCombo && pasoSinStock && !esAnfitrionConAlternativas);
+          && !(esAnfitrionCombo && anfitrionBloqueadoPorPaso(pasosStock.map((x) => x.paso), esAnfitrionConAlternativas));
         const agotadoHasta =
           p.agotado_hasta && !disponible
             ? p.agotado_hasta.toISOString()
