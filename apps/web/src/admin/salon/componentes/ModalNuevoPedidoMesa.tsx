@@ -21,7 +21,7 @@ import { salonApi } from '../api';
 import '../salon.css';
 import '../nuevo-pedido-mozo.css';
 import { pedidosApi } from '../../pedidos/pedidosApi';
-import { leerStockInsuficiente, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
+import { leerSaborRechazado, leerStockInsuficiente, mensajeSaborRechazado, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
 import { comprobantesApi } from '../../comprobantes/comprobantesApi';
 import { ModalVoucherPedido } from '../ModalVoucherPedido';
 import { PlanPagoEditor } from './PlanPagoEditor';
@@ -85,6 +85,9 @@ export interface LineaPedidoMesa {
   personas?: string[];
   ofertaId?: string;
   comboElecciones?: { parteId: string; productoId: string }[];
+  /** Mezcla de sabores: unidades por media docena o docena y cuántas de cada sabor */
+  unidadesPorMezcla?: number;
+  sabores?: { saborId: string; cantidad: number; nombre?: string }[];
 }
 
 /** Medio con el que paga el cliente de llevar o delivery (lo elige el mozo al registrar). */
@@ -704,6 +707,8 @@ export function ModalNuevoPedidoMesa({
       nota: config.nota,
       ofertaId: config.ofertaId,
       comboElecciones: config.comboElecciones,
+      unidadesPorMezcla: config.unidadesPorMezcla,
+      sabores: config.sabores,
       personas: config.nombresBebidas ?? config.unidades.map((u) => u.nombreVaso).filter(Boolean),
     };
 
@@ -716,6 +721,8 @@ export function ModalNuevoPedidoMesa({
       prev
         .map((lin) => {
           if (lin.id === id) {
+            // con mezcla de sabores la cantidad cambia el reparto: se quita la línea y se vuelve a agregar
+            if (lin.unidadesPorMezcla !== undefined) return lin;
             const nuevaCantidad = lin.cantidad + delta;
             if (nuevaCantidad <= 0) return null;
             return {
@@ -908,6 +915,7 @@ export function ModalNuevoPedidoMesa({
           ofertaId: lin.ofertaId,
           comboElecciones: lin.comboElecciones,
           personas: personas && personas.length > 0 ? personas : lin.personas,
+          ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
         };
       });
 
@@ -1015,11 +1023,17 @@ export function ModalNuevoPedidoMesa({
         } catch {
           /* se mantiene la lista anterior */
         }
-      } else if (err?.codigo === 'STOCK_INSUFICIENTE') {
+      } else if (err?.codigo === 'STOCK_INSUFICIENTE' || err?.codigo === 'SABOR_AGOTADO') {
         // Sin cerrar el modal: se vuelve a los productos para bajar la cantidad o cambiar el producto
-        const datos = leerStockInsuficiente(err);
-        const linea = lineas.find((l) => String(l.productoId) === datos?.productoId);
-        setErrorEnvio(datos ? mensajeStockInsuficiente(datos, linea?.nombre) : 'No hay stock suficiente para este pedido.');
+        const sabor = leerSaborRechazado(err);
+        if (sabor) {
+          const linea = lineas.find((l) => String(l.productoId) === sabor.productoId);
+          setErrorEnvio(mensajeSaborRechazado(sabor, linea?.nombre));
+        } else {
+          const datos = leerStockInsuficiente(err);
+          const linea = lineas.find((l) => String(l.productoId) === datos?.productoId);
+          setErrorEnvio(datos ? mensajeStockInsuficiente(datos, linea?.nombre) : 'No hay stock suficiente para este pedido.');
+        }
         setPaso('items');
       } else if (err?.codigo === 'MESA_OCUPADA') {
         setErrorEnvio(
@@ -2914,6 +2928,8 @@ export function ModalNuevoPedidoMesa({
                           <span className="np-qty">
                             <button
                               type="button"
+                              disabled={lin.unidadesPorMezcla !== undefined}
+                              title={lin.unidadesPorMezcla !== undefined ? 'Con sabores: quita la línea y vuelve a agregarla para cambiar la cantidad' : undefined}
                               onClick={() => actualizarCantidadLinea(lin.id, -1)}
                             >
                               −
@@ -2921,6 +2937,8 @@ export function ModalNuevoPedidoMesa({
                             <span>{lin.cantidad}</span>
                             <button
                               type="button"
+                              disabled={lin.unidadesPorMezcla !== undefined}
+                              title={lin.unidadesPorMezcla !== undefined ? 'Con sabores: quita la línea y vuelve a agregarla para cambiar la cantidad' : undefined}
                               onClick={() => actualizarCantidadLinea(lin.id, 1)}
                             >
                               +
@@ -2942,6 +2960,11 @@ export function ModalNuevoPedidoMesa({
                         {(lin.personas || []).length > 0 && (
                           <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
                             Para: {lin.personas?.join(', ')}
+                          </div>
+                        )}
+                        {(lin.sabores ?? []).length > 0 && (
+                          <div style={{ fontSize: '11px', color: 'var(--cp-navy)', fontWeight: 700 }}>
+                            {(lin.sabores ?? []).map((x) => `${x.cantidad} ${x.nombre ?? 'sabor'}`).join(' · ')}
                           </div>
                         )}
                         {lin.nota && (
