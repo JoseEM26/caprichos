@@ -6,6 +6,8 @@ export interface TamanoItem {
   nombre: string;
   precio: number;
   activo?: boolean;
+  /** Unidades del producto que incluye el tamaño (1, 6, 12). Descuenta el stock por sabor. */
+  unidades?: number;
 }
 
 export interface OpcionItem {
@@ -37,6 +39,8 @@ export interface SaborItem {
   nombre: string;
   activo?: boolean;
   disponible?: boolean;
+  /** Stock de hoy de este sabor (de la apertura del día). null = sin apertura hoy. */
+  quedan?: number | null;
 }
 
 export interface PromocionProducto {
@@ -134,7 +138,7 @@ export const catalogoApi = {
     noSumaBeneficios?: boolean;
     resaltarOpcionMenosPedida?: boolean;
     controlaStock?: boolean;
-    tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean }>;
+    tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean; unidades?: number }>;
     grupos?: Array<{ grupoId: string | number; orden?: number }>;
     sabores?: string[];
   }): Promise<ProductoAdmin> {
@@ -154,7 +158,7 @@ export const catalogoApi = {
       noSumaBeneficios?: boolean;
       resaltarOpcionMenosPedida?: boolean;
       controlaStock?: boolean;
-      tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean }>;
+      tamanos?: Array<{ tamanoValorId: string | number; precio: number; activo?: boolean; unidades?: number }>;
       grupos?: Array<{ grupoId: string | number; orden?: number }>;
       sabores?: Array<{ id?: string | number; nombre: string; activo?: boolean }>;
       /** true: los grupos que no vengan en `grupos` se desligan de este producto. */

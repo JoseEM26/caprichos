@@ -15,6 +15,7 @@ import {
   CategoriaAdmin,
   ListaAdmin,
   GrupoOpcionItem,
+  SaborItem,
 } from './catalogoApi';
 import { EditorOpcionesTamanos } from './EditorOpcionesTamanos';
 import { BotonVistaPrevia } from './VistaPreviaProducto';
@@ -168,7 +169,7 @@ export function ProductosView() {
   const [edFotoArchivoId, setEdFotoArchivoId] = useState<string | null>(null);
   const [edFotoCambio, setEdFotoCambio] = useState<CambioFotoEdicion>('SIN_CAMBIO');
   const subidaEdFoto = useSubidaArchivo();
-  const [edSabores, setEdSabores] = useState<Array<{ id?: string; nombre: string; activo?: boolean }>>([]);
+  const [edSabores, setEdSabores] = useState<Array<SaborItem>>([]);
   const [edNuevoSabor, setEdNuevoSabor] = useState('');
   const [edError, setEdError] = useState('');
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
@@ -485,6 +486,13 @@ export function ProductosView() {
   // Abrir modal Tamaños y opciones (el contenido vive en EditorOpcionesTamanos)
   const abrirOpciones = (p: ProductoAdmin) => setProductoEnOpciones(p);
 
+  // Tarjeta: «Unidad · 1/2 docena (6) · Docena (12)». Solo tamaños activos; con 1 unidad no lleva número.
+  const textoUnidadesTamanos = (p: ProductoAdmin) =>
+    p.tamanos
+      .filter((t) => t.activo !== false)
+      .map((t) => ((t.unidades ?? 1) === 1 ? t.nombre : `${t.nombre} (${t.unidades})`))
+      .join(' · ');
+
   // Resumen para la insignia del botón: «3 tamaños · 2 grupos»
   const resumenOpciones = (p: ProductoAdmin) => {
     const t = p.tamanos.length;
@@ -543,7 +551,7 @@ export function ProductosView() {
             ...(npFotoArchivoId ? { fotoArchivoId: npFotoArchivoId } : {}),
             ...(conOpciones
               ? {
-                  tamanos: npOpc.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: t.precio, activo: t.activo })),
+                  tamanos: npOpc.tamanos.map((t) => ({ tamanoValorId: t.tamanoValorId, precio: t.precio, activo: t.activo, unidades: t.unidades })),
                   grupos: npOpc.grupos.map((g, orden) => ({ grupoId: g.grupoId, orden })),
                   resaltarOpcionMenosPedida: npOpc.resaltarMenosPedida === true,
                 }
@@ -1015,7 +1023,11 @@ export function ProductosView() {
                 {p.promociones && p.promociones.length > 0 && (
                   <span className="pt-ins pt-ins--promo">En promoción</span>
                 )}
-                {p.controlaStock && <span className="pt-ins pt-ins--stock">Con stock</span>}
+                {p.controlaStock && (
+                  <span className="pt-ins pt-ins--stock">
+                    {(p.sabores?.length ?? 0) > 0 ? 'Stock por sabor' : 'Con stock'}
+                  </span>
+                )}
               </div>
               {p.fotoUrl && (
                 <img
@@ -1089,6 +1101,15 @@ export function ProductosView() {
                   </div>
                 </div>
               </div>
+
+              {textoUnidadesTamanos(p) && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--cp-soft)' }}>
+                    TAMAÑOS (UNIDADES)
+                  </div>
+                  <div style={{ fontSize: 13 }}>{textoUnidadesTamanos(p)}</div>
+                </div>
+              )}
 
               {/* Producto en promoción: sin botón, con aviso (los combos no cuentan: suelto sí suma) */}
               {(p.promociones?.length ?? 0) > 0 && (
@@ -1870,9 +1891,8 @@ export function ProductosView() {
               </div>
               <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)', marginBottom: 6 }}>
                 Son las opciones que el cliente elige al pedir este producto (p. ej. el relleno o
-                sabor de una dona). El bot de WhatsApp las ofrece al pedir, cocina las usa para
-                marcar agotados y los avisos de agotados también las usan. Toca una opción para
-                marcarla como agotada.
+                sabor de una dona). El bot de WhatsApp las ofrece al pedir, y los avisos de agotados
+                también las usan. Toca «Disponible» o «Agotado» para cada una.
               </div>
               <div
                 style={{
@@ -1885,20 +1905,43 @@ export function ProductosView() {
                   gap: 8,
                 }}
               >
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {edSabores.map((s, sIdx) => {
-                    const activo = s.activo !== false;
-                    return (
+                {edSabores.length === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
+                    Este producto no tiene sabores. Agrega uno abajo si el cliente elige entre varios.
+                  </div>
+                )}
+                {edSabores.map((s, sIdx) => {
+                  const activo = s.activo !== false;
+                  const sinApertura = s.quedan === null || s.quedan === undefined;
+                  return (
+                    <div
+                      key={s.id ?? `nuevo-${sIdx}`}
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        gap: 8,
+                        borderBottom: '1px solid var(--cp-line)',
+                        paddingBottom: 6,
+                      }}
+                    >
+                      <div style={{ flex: '1 1 120px', minWidth: 0, overflowWrap: 'anywhere' }}>
+                        <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--cp-navy)' }}>{s.nombre}</div>
+                        {edControlaStock && (
+                          <div style={{ fontSize: 12, fontWeight: 700, color: sinApertura ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>
+                            {sinApertura ? 'Sin apertura hoy' : `Quedan ${s.quedan}`}
+                          </div>
+                        )}
+                      </div>
                       <button
-                        key={sIdx}
-                        onClick={() => {
-                          const clon = [...edSabores];
-                          clon[sIdx].activo = !activo;
-                          setEdSabores(clon);
-                        }}
+                        type="button"
+                        aria-pressed={activo}
+                        aria-label={`${s.nombre}: ${activo ? 'disponible, tocar para marcar agotado' : 'agotado, tocar para marcar disponible'}`}
+                        onClick={() => setEdSabores(edSabores.map((x, k) => (k === sIdx ? { ...x, activo: !activo } : x)))}
                         style={{
-                          minHeight: 36,
-                          padding: '0 10px',
+                          minHeight: 44,
+                          minWidth: 44,
+                          padding: '0 12px',
                           borderRadius: 9999,
                           border: '1.5px solid var(--cp-navy)',
                           background: activo ? 'var(--cp-navy)' : 'transparent',
@@ -1908,11 +1951,16 @@ export function ProductosView() {
                           cursor: 'pointer',
                         }}
                       >
-                        {s.nombre} {activo ? '✓' : '(Agotado)'}
+                        {activo ? 'Disponible' : 'Agotado'}
                       </button>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
+                {edControlaStock && edSabores.length > 0 && (
+                  <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)' }}>
+                    El stock de cada sabor se registra en «Apertura del día» (Almacén), no aquí.
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input
                     type="text"

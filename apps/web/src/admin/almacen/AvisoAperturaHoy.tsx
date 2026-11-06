@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
-import { almacenApi } from './almacenApi';
+import { almacenApi, productoPendienteApertura } from './almacenApi';
 
 function useSesionSegura() {
   try {
@@ -23,7 +23,7 @@ export function AvisoAperturaHoy() {
     almacenApi
       .obtenerApertura()
       .then((r) => {
-        if (vivo) setPendientes(r.productos.filter((p) => !p.aperturaHoy).length);
+        if (vivo) setPendientes(r.productos.filter(productoPendienteApertura).length);
       })
       .catch(() => {});
     return () => {

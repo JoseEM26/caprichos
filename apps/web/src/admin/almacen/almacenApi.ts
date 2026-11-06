@@ -118,6 +118,15 @@ export interface ListarMovimientosRespuesta {
   movimientos: MovimientoItem[];
 }
 
+/** Conteo de apertura de un sabor de un producto (donas, galletas con sabores). */
+export interface AperturaSaborItem {
+  saborId: string;
+  nombre: string;
+  saldo: number;
+  aperturaHoy: boolean;
+  aperturaCantidad: number | null;
+}
+
 /** Conteo de apertura del día: un producto controlado con su saldo y si ya se contó hoy. */
 export interface AperturaProductoItem {
   productoId: string;
@@ -126,6 +135,8 @@ export interface AperturaProductoItem {
   saldo: number;
   aperturaHoy: boolean;
   aperturaCantidad: number | null;
+  /** Solo productos con sabores: el conteo se hace por sabor. */
+  sabores?: AperturaSaborItem[];
 }
 
 export interface AperturaDiaRespuesta {
@@ -134,12 +145,22 @@ export interface AperturaDiaRespuesta {
   productos: AperturaProductoItem[];
 }
 
+/**
+ * ¿Falta contar hoy? Con sabores falta si algún sabor no tiene apertura; sin sabores, si el producto no la tiene.
+ */
+export function productoPendienteApertura(p: AperturaProductoItem): boolean {
+  return p.sabores && p.sabores.length > 0 ? p.sabores.some((s) => !s.aperturaHoy) : !p.aperturaHoy;
+}
+
+/** Una línea del envío: el producto entero o uno de sus sabores. */
+export type ItemApertura = { productoId: string; cantidad: number } | { productoId: string; saborId: string; cantidad: number };
+
 export const almacenApi = {
   /** Productos con control de stock propio y su conteo de apertura de hoy (permiso almacen/apertura). */
   obtenerApertura: () => api.get<AperturaDiaRespuesta>('/admin/almacen/apertura'),
 
-  /** Registra el conteo de apertura de hoy; solo los productos enviados. */
-  registrarApertura: (items: Array<{ productoId: string; cantidad: number }>) =>
+  /** Registra el conteo de apertura de hoy; solo las líneas enviadas (producto o sabor). */
+  registrarApertura: (items: ItemApertura[]) =>
     api.post<{ ok: true; registrados: number }>('/admin/almacen/apertura', { items }),
 
   listarMovimientos: async (filtros?: { tipo?: string; insumoId?: string; buscar?: string; desde?: string; hasta?: string }): Promise<ListarMovimientosRespuesta> => {
