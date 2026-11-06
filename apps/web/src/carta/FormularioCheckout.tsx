@@ -17,7 +17,8 @@ import { useCarrito } from './CarritoContext';
 import { PuntosCanje, estimarPuntos } from './cuenta/PuntosCanje';
 import { useCuentaOpcional } from './cuenta/CuentaContext';
 import { guardarPedido } from './seguimiento';
-import { excesosDeStock, stockInsuficienteDe } from './stock';
+import { excesosDeStock, lineasSaborIncompletas, mensajeSaborQuedan, saborRechazadoDe, stockInsuficienteDe, textoSabores } from './stock';
+import { AjusteSaboresLinea } from './AjusteSaboresLinea';
 import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
 import {
   ConsultaEnvioRespuesta,
@@ -56,13 +57,18 @@ export function FormularioCheckout({
     setPedidoConfirmado,
     inventario,
     marcarQuedan,
+    marcarQuedanSabor,
     ajustarCantidadProducto,
+    lineaAjustandoId,
+    abrirAjusteLinea,
   } = useCarrito();
 
-  // Productos que superan lo que queda (el saldo cambió) y el 409 del último envío
+  // Productos que superan lo que queda (el saldo cambió) y el 409 del último envío.
+  // Las mezclas sin sabores completos también frenan el envío.
   const excesos = excesosDeStock(lineas, inventario);
-  const enviarBloqueadoPorStock = excesos.length > 0;
-  const [stockRechazado, setStockRechazado] = useState<{ productoId: string | null; quedan: number; mensaje: string } | null>(null);
+  const pendientesSabor = lineasSaborIncompletas(lineas);
+  const enviarBloqueadoPorStock = excesos.length > 0 || pendientesSabor.length > 0;
+  const [stockRechazado, setStockRechazado] = useState<{ productoId: string | null; quedan: number; mensaje: string; saborId?: string } | null>(null);
   useEffect(() => {
     if (!checkoutAbierto) setStockRechazado(null);
   }, [checkoutAbierto]);
@@ -571,7 +577,18 @@ export function FormularioCheckout({
   };
 
   // Deja cada producto con lo que queda (o lo quita si no queda nada); los datos del cliente no se tocan
+  // Con sabores, el ajuste es reelegir los sabores de la línea (ventana de ajuste); el resto del pedido no se toca
   const ajustarPedidoAStock = () => {
+    const conSabor = excesos.find((e) => e.saborId) ?? (stockRechazado?.saborId ? { productoId: stockRechazado.productoId } : undefined);
+    const linea = conSabor
+      ? lineas.find((l) => String(l.productoId) === String(conSabor.productoId) && (l.sabores ?? []).length > 0)
+      : pendientesSabor[0];
+    if (conSabor || pendientesSabor.length > 0) {
+      if (linea) abrirAjusteLinea(linea.id);
+      setStockRechazado(null);
+      setErrorEnvio(null);
+      return;
+    }
     for (const e of excesos) ajustarCantidadProducto(e.productoId, e.quedan);
     if (stockRechazado?.productoId) ajustarCantidadProducto(stockRechazado.productoId, stockRechazado.quedan);
     setStockRechazado(null);
@@ -592,7 +609,11 @@ export function FormularioCheckout({
     }
 
     if (enviarBloqueadoPorStock) {
-      setErrorEnvio('Hay productos por encima de lo que queda. Ajusta tu pedido antes de enviar.');
+      setErrorEnvio(
+        excesos.length > 0
+          ? 'Hay productos por encima de lo que queda. Ajusta tu pedido antes de enviar.'
+          : `Elige los sabores de ${pendientesSabor[0].nombre} antes de enviar.`,
+      );
       return;
     }
 
@@ -645,6 +666,7 @@ export function FormularioCheckout({
           nota: lin.nota,
           ofertaId: lin.ofertaId,
           comboElecciones: lin.comboElecciones,
+          ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
         });
       }
     }
@@ -715,8 +737,14 @@ export function FormularioCheckout({
       });
     } catch (err) {
       if (err instanceof ErrorApi) {
+        const sabor = saborRechazadoDe(err);
         const stock = stockInsuficienteDe(err);
-        if (stock) {
+        if (sabor) {
+          // el sabor pasa a su nuevo saldo: la línea queda marcada y el ajuste reabre sus sabores
+          marcarQuedanSabor(sabor.productoId, sabor.saborId, sabor.quedan);
+          setStockRechazado({ productoId: sabor.productoId, quedan: sabor.quedan, mensaje: mensajeSaborQuedan(sabor.quedan, sabor.saborNombre), saborId: sabor.saborId });
+          setErrorEnvio(null);
+        } else if (stock) {
           setStockRechazado(stock);
           if (stock.productoId) marcarQuedan(stock.productoId, stock.quedan);
           setErrorEnvio(null);
@@ -763,6 +791,7 @@ export function FormularioCheckout({
 
   return (
     <>
+      {lineaAjustandoId && <AjusteSaboresLinea />}
       <div
         role="dialog"
         aria-modal="true"
@@ -2132,6 +2161,17 @@ export function FormularioCheckout({
                       gap: '8px',
                     }}
                   >
+                    {lineas.some((l) => l.sabores?.length) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--cp-navy)' }}>
+                        {lineas
+                          .filter((l) => l.sabores?.length)
+                          .map((l) => (
+                            <span key={l.id} style={{ overflowWrap: 'anywhere' }}>
+                              <b>{`${l.cantidad} × ${l.nombre}`}</b>{`: ${textoSabores(l)}`}
+                            </span>
+                          ))}
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
                       <span>Subtotal productos</span>
                       <span style={{ fontWeight: 700 }}>S/ {subtotal.toFixed(2)}</span>
@@ -2318,7 +2358,12 @@ export function FormularioCheckout({
                   }}
                 >
                   {excesos.map((e) => (
-                    <span key={e.productoId}>{`Solo quedan ${e.quedan} de ${e.nombre}`}</span>
+                    <span key={`${e.productoId}-${e.saborId ?? ''}`}>
+                      {e.saborId ? mensajeSaborQuedan(e.quedan, e.saborNombre ?? 'este sabor') : `Solo quedan ${e.quedan} de ${e.nombre}`}
+                    </span>
+                  ))}
+                  {pendientesSabor.map((l) => (
+                    <span key={l.id}>{`Elige los sabores de ${l.nombre} (${textoSabores(l) || 'aún sin sabores'})`}</span>
                   ))}
                   {stockRechazado && !excesos.some((e) => e.productoId === stockRechazado.productoId) && (
                     <span>{stockRechazado.mensaje}</span>
