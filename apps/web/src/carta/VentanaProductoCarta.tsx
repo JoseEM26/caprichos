@@ -13,10 +13,13 @@ import {
   AvisoReemplazoCombo,
   eleccionesCombo,
   eleccionInicial,
+  faltaElegirJuguetes,
   faltaElegirReemplazo,
   notaReemplazos,
   partesConReemplazo,
+  partesEleccion,
 } from './ReemplazoCombo';
+import { SelectorEleccionCombo } from './SelectorEleccionCombo';
 
 interface Props {
   producto: ProductoCarta;
@@ -65,8 +68,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const partesRe = useMemo(() => partesConReemplazo(oferta), [oferta]);
   const [reemplazos, setReemplazos] = useState<Record<string, string>>(() => eleccionInicial(partesRe));
   const comboAgotado = oferta?.disponible === false;
-  const elecciones = eleccionesCombo(oferta, reemplazos);
+  // Partes A_ELECCION con lista (juguetes): cuántas de cada opción; el total depende de la cantidad del combo
+  const partesJug = useMemo(() => partesEleccion(oferta), [oferta]);
+  const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
   const [cantidad, setCantidad] = useState(1);
+  const elecciones = eleccionesCombo(oferta, reemplazos, juguetes);
   const [nombres, setNombres] = useState<string[]>([]);
   const [avisoNombres, setAvisoNombres] = useState(false);
   const [nota, setNota] = useState('');
@@ -104,6 +110,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   );
   const unitario = calcularPrecioLinea({ precioBase, opciones: elegidas, cantidad: 1 }).precioUnitario;
   const valido =
+    !faltaElegirJuguetes(partesJug, juguetes, cantidad) &&
     !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && gruposCarta.every((g) => (sel[g.id] ?? []).length >= g.minimo);
 
   // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
@@ -339,6 +346,18 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               elegidos={reemplazos}
               onElegir={(parteId, productoId) => setReemplazos((prev) => ({ ...prev, [parteId]: productoId }))}
             />
+
+            {!comboAgotado &&
+              partesJug.map((parte) => (
+                <SelectorEleccionCombo
+                  key={parte.parteId}
+                  parte={parte}
+                  unidades={cantidad}
+                  valor={juguetes[parte.parteId] ?? {}}
+                  onCambio={(v) => setJuguetes((prev) => ({ ...prev, [parte.parteId]: v }))}
+                  deshabilitar={soloLectura}
+                />
+              ))}
 
             {esCombo ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

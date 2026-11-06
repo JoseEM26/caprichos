@@ -1,7 +1,12 @@
 import 'dotenv/config';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+
+/** Combo cajita: la misma SQL que la migración (idempotente), para bases nuevas que no la corrieron antes de la carta. */
+const MIGRACION_COMBO_CAJITA = path.join(__dirname, 'migrations/20261225100000_combo_cajita_caprikids/migration.sql');
 
 export async function main() {
   console.log('--- Iniciando semilla de ofertas, promociones, cupones y parámetros ---');
@@ -91,6 +96,10 @@ export async function main() {
   const tamanoGrande = await prisma.listaValor.findFirst({
     where: { nombre: { contains: 'Grande', mode: 'insensitive' } },
   });
+
+  // 3b. Combo cajita CAPRIKIDS: productos, juguetes, oferta y partes (idempotente, igual que la migración)
+  await prisma.$executeRawUnsafe(fs.readFileSync(MIGRACION_COMBO_CAJITA, 'utf8'));
+  console.log('Combo cajita CAPRIKIDS asegurado.');
 
   // 4. Combos de ejemplo (2 combos)
   // Combo 1: Combo Dúo Para Compartir

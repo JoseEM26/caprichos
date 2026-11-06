@@ -1,4 +1,5 @@
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
+import { Reparto, totalElegido } from '../comun/saboresMezcla';
 
 export interface ParteConReemplazo {
   parteId: string;
@@ -51,12 +52,42 @@ export interface ComboEleccion {
   productoId: string;
 }
 
-/** Qué se eligió en cada parte FIJO del combo (el principal si está, si no el reemplazo elegido): lo valida el servidor. */
-export function eleccionesCombo(oferta: OfertaItem | null, elegidos: Record<string, string>): ComboEleccion[] {
+/** Partes A_ELECCION con lista de productos (p. ej. juguetes): el cliente elige cuántas de cada una. */
+export interface ParteEleccion {
+  parteId: string;
+  /** Opciones por combo: el servidor exige cantidad × unidades elegidas. */
+  cantidad: number;
+  opciones: { id: string; nombre: string; disponible: boolean }[];
+}
+
+export function partesEleccion(oferta: OfertaItem | null): ParteEleccion[] {
   if (!oferta) return [];
   return (oferta.combosParte ?? [])
+    .filter((p) => (p.tipo ?? p.tipoParte) === 'A_ELECCION' && (p.opcionesDetalle ?? []).length > 0)
+    .map((p) => ({ parteId: String(p.id), cantidad: p.cantidad, opciones: p.opcionesDetalle ?? [] }));
+}
+
+/** Elecciones por parte del combo: FIJO (principal o reemplazo) y A_ELECCION (cada unidad elegida, repetida por producto). */
+export function eleccionesCombo(
+  oferta: OfertaItem | null,
+  elegidos: Record<string, string>,
+  juguetes: Record<string, Reparto> = {},
+): ComboEleccion[] {
+  if (!oferta) return [];
+  const fijas = (oferta.combosParte ?? [])
     .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.productos?.[0] !== undefined)
     .map((p) => ({ parteId: String(p.id), productoId: elegidos[String(p.id)] ?? String(p.productos![0]) }));
+  const eleccion = partesEleccion(oferta).flatMap((parte) =>
+    Object.entries(juguetes[parte.parteId] ?? {}).flatMap(([productoId, n]) =>
+      Array.from({ length: n }, () => ({ parteId: parte.parteId, productoId })),
+    ),
+  );
+  return [...fijas, ...eleccion];
+}
+
+/** Falta (o sobra) elegir en alguna parte A_ELECCION: hay que elegir cantidad × unidades exactas. */
+export function faltaElegirJuguetes(partes: ParteEleccion[], juguetes: Record<string, Reparto>, unidades: number): boolean {
+  return partes.some((p) => totalElegido(juguetes[p.parteId] ?? {}) !== p.cantidad * unidades);
 }
 
 export const faltaElegirReemplazo = (partes: ParteConReemplazo[], elegidos: Record<string, string>): boolean =>

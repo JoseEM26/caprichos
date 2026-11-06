@@ -23,6 +23,8 @@ export interface ComboParteItem {
   disponible?: boolean;
   opcionesDisponibles?: string[];
   principalNombre?: string;
+  /** A_ELECCION con lista (juguetes): cada opción y si se puede elegir ahora */
+  opcionesDetalle?: { id: string; nombre: string; disponible: boolean }[];
 }
 
 export interface LlevaPagaConfig {

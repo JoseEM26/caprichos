@@ -24,6 +24,7 @@ import { TEXTOS_CAMBIOS } from '../chatbot/conversacion/flujos/cambios/textos-ca
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { leerBloqueosSpam } from '../chatbot/configuracion/bloqueo-spam.util';
 import { MOTIVO_BLOQUEO_SPAM } from '../chatbot/configuracion/chatbot-configuracion.service';
+import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos';
@@ -391,7 +392,7 @@ export class MensajesService {
             codigo: pedido.codigo,
             medio: pedido.pago_preferido ?? pedido.pago_metodo ?? null,
             total: pedido.total.toString(),
-            lineas: pedido.lineas.map((l: any) => {
+            lineas: lineasDeCuenta(pedido.lineas).map((l: any) => {
               const op = (Array.isArray(l.opciones) ? l.opciones : []).map((o: any) => (typeof o === 'string' ? o : o?.nombre ?? o?.opcion_nombre)).filter(Boolean);
               return [`${l.cantidad} x ${l.nombre}${l.tamano ? ' ' + l.tamano : ''}`, ...op].join(' · ');
             }),

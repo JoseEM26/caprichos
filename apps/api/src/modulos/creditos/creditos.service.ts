@@ -9,6 +9,7 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { cobroVigente } from '../caja/caja.calculo';
 import { FiltrarCreditosDto } from './dto/filtrar-creditos.dto';
+import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
 const NOMBRES_MESES = [
   'Enero',
@@ -464,7 +465,7 @@ export class CreditosService {
 
         const lineasTexto: string[] = [];
         if (item.pedido?.lineas && item.pedido.lineas.length > 0) {
-          for (const l of item.pedido.lineas) {
+          for (const l of lineasDeCuenta<(typeof item.pedido.lineas)[number]>(item.pedido.lineas)) {
             const tam = l.tamano ? ` (${l.tamano})` : '';
             lineasTexto.push(`${l.cantidad} × ${l.nombre}${tam}`);
           }

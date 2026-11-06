@@ -48,6 +48,7 @@ import {
   MOTIVO_RETIRO,
   NUMERO_PREGUNTA_REPROG,
 } from '../chatbot/servicios/reprogramacion.service';
+import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
 export type ColorEsperaReparto = 'VERDE' | 'RETRASADO' | 'TARDE' | 'MUY_TARDE';
 export type ColorEspera = 'verde' | 'naranja' | 'rojo' | ColorEsperaReparto;
@@ -281,7 +282,7 @@ export class RepartosService {
 
     // Cantidad total de productos en el pedido
     const cantidadProductos = Array.isArray(p.lineas)
-      ? p.lineas.reduce((acc: number, l: any) => acc + (Number(l.cantidad) || 0), 0)
+      ? lineasDeCuenta(p.lineas).reduce((acc: number, l: any) => acc + (Number(l.cantidad) || 0), 0)
       : (p._count?.lineas ?? 0);
 
     // Regla de privacidad: el teléfono completo del cliente SOLO se muestra después de tomar el pedido.
@@ -2430,7 +2431,7 @@ export class RepartosService {
       ...this.estadoProximo(p),
       minutosEspera: this.calcularMinutosYColor(p.creado_en, ahora).minutosEspera,
       creadoEn: p.creado_en,
-      cantidadProductos: p.lineas.reduce((a, l) => a + (Number(l.cantidad) || 0), 0),
+      cantidadProductos: lineasDeCuenta(p.lineas).reduce((a, l) => a + (Number(l.cantidad) || 0), 0),
     }));
   }
 
@@ -2479,7 +2480,7 @@ export class RepartosService {
       estado: prox?.estado ?? p.estado,
       estadoTexto: prox?.estadoTexto ?? (p.estado === 'EN_CAMINO' ? 'En camino' : 'Listo para entrega'),
       minutosEspera,
-      productos: p.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre })),
+      productos: lineasDeCuenta(p.lineas).map((l) => ({ cantidad: l.cantidad, nombre: l.nombre })),
       nota: p.nota ?? null,
       zona: p.zona?.codigo ?? null,
       puedeTomar,

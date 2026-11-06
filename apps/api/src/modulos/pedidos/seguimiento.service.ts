@@ -235,6 +235,7 @@ const textoRango = (min: number, max: number) =>
 
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from '../clientes/explicar-puntos-pedido';
+import { lineasDeCuenta } from './lineas-combo.util';
 
 @Injectable()
 export class SeguimientoService {
@@ -387,7 +388,7 @@ export class SeguimientoService {
         pedido.eta_min != null && pedido.eta_max != null ? { min: pedido.eta_min, max: pedido.eta_max } : null;
       rango = restanteEnCamino(prometido, ctx.cfg.respaldoMin, pedido.despachado_en, ctx.ahora, ctx.cfg.pasoMin);
     } else {
-      const unidades = (pedido.lineas ?? []).reduce((s, l) => s + Number(l.cantidad || 0), 0);
+      const unidades = lineasDeCuenta(pedido.lineas ?? []).reduce((s, l) => s + Number(l.cantidad || 0), 0);
       const lat = pedido.entrega_lat == null ? null : Number(pedido.entrega_lat);
       const lng = pedido.entrega_lng == null ? null : Number(pedido.entrega_lng);
       rango =

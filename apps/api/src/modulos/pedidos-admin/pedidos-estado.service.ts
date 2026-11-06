@@ -55,6 +55,7 @@ import {
   obtenerInicioDiaLima,
   sumarDiasFechaIso,
 } from '../cocina/cocina.util';
+import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 
@@ -540,7 +541,7 @@ export class PedidosEstadoService {
             p.vouchers.find((v) => v.reemplazado_en == null && voucherCubreMedio(v.medio, m.medio))?.id?.toString() ?? null,
         })),
         creadoEn: p.creado_en,
-        lineas: p.lineas.map((l) => ({
+        lineas: lineasDeCuenta(p.lineas).map((l) => ({
           id: String(l.id),
           nombre: l.nombre,
           cantidad: l.cantidad,
@@ -648,7 +649,7 @@ export class PedidosEstadoService {
         nota: p.nota,
         creado_en: p.creado_en,
         listo_en: p.listo_en,
-        lineas: p.lineas,
+        lineas: lineasDeCuenta(p.lineas),
         minutosEspera,
         color,
         colorEspera,

@@ -14,10 +14,13 @@ import {
   AvisoReemplazoCombo,
   eleccionesCombo,
   eleccionInicial,
+  faltaElegirJuguetes,
   faltaElegirReemplazo,
   notaReemplazos,
   partesConReemplazo,
+  partesEleccion,
 } from '../../../carta/ReemplazoCombo';
+import { SelectorEleccionCombo } from '../../../carta/SelectorEleccionCombo';
 
 export interface ConfiguracionUnidad {
   opciones: OpcionProducto[];
@@ -89,6 +92,9 @@ export function VentanaOpcionesProducto({
   const partesRe = useMemo(() => partesConReemplazo(oferta), [oferta]);
   const [reemplazos, setReemplazos] = useState<Record<string, string>>(() => eleccionInicial(partesRe));
   const comboAgotado = oferta?.disponible === false;
+  // Partes A_ELECCION con lista (juguetes): cuántas de cada opción; el total depende de la cantidad del combo
+  const partesJug = useMemo(() => partesEleccion(oferta), [oferta]);
+  const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
 
   // Nota de cocina
   const [notaCocina, setNotaCocina] = useState('');
@@ -210,7 +216,12 @@ export function VentanaOpcionesProducto({
     return faltantes;
   }, [gruposVisibles, opcionesActuales]);
 
-  const puedeAgregar = gruposFaltantes.length === 0 && !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && saboresListos;
+  const puedeAgregar =
+    gruposFaltantes.length === 0 &&
+    !comboAgotado &&
+    !faltaElegirReemplazo(partesRe, reemplazos) &&
+    !faltaElegirJuguetes(partesJug, juguetes, cantidad) &&
+    saboresListos;
 
   // En las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
   const nombresFaltantes = esBebida
@@ -245,7 +256,7 @@ export function VentanaOpcionesProducto({
       }
     }
 
-    const elecciones = eleccionesCombo(oferta, reemplazos);
+    const elecciones = eleccionesCombo(oferta, reemplazos, juguetes);
     alAgregar({
       producto,
       ...(saborMode
@@ -739,6 +750,16 @@ export function VentanaOpcionesProducto({
           elegidos={reemplazos}
           onElegir={(parteId, productoId) => setReemplazos((prev) => ({ ...prev, [parteId]: productoId }))}
         />
+        {!comboAgotado &&
+          partesJug.map((parte) => (
+            <SelectorEleccionCombo
+              key={parte.parteId}
+              parte={parte}
+              unidades={cantidad}
+              valor={juguetes[parte.parteId] ?? {}}
+              onCambio={(v) => setJuguetes((prev) => ({ ...prev, [parte.parteId]: v }))}
+            />
+          ))}
 
         {/* Nota para cocina */}
         <div>

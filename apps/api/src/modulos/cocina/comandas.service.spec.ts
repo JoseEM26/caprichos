@@ -96,6 +96,26 @@ describe('ComandasService', () => {
   });
 
   describe('sincronizarPedido e idempotencia', () => {
+    it('combo: la madre (sin producto ni área) no genera comanda; cada parte va a la comanda de su área', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 3n,
+        codigo: 'CP-0103',
+        estado: 'COLA',
+        lineas: [
+          { id: 30n, nombre: 'COMBO CAJITA CAPRIKIDS', area_id: null, producto_id: null, producto: null },
+          { id: 31n, nombre: 'FRAPPE OREO', area_id: 1n, producto_id: 5n, linea_combo_id: 30n, producto: null },
+          { id: 32n, nombre: 'Burbujas', area_id: 2n, producto_id: 6n, linea_combo_id: 30n, producto: null },
+        ],
+        comandas: [],
+      });
+      prisma.comandaArea.create.mockResolvedValue({ id: 1 });
+
+      const creadas = await service.sincronizarPedido(3n);
+      expect(creadas).toBe(2);
+      const areas = prisma.comandaArea.create.mock.calls.map((c: any) => c[0].data.area_id);
+      expect(areas).toEqual([1n, 2n]);
+    });
+
     it('crea filas de comanda_area por cada área involucrada y llama a descuentoService por primera vez', async () => {
       const mockPedido = {
         id: 1n,

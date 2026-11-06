@@ -1,6 +1,7 @@
 import { calcularComprobante, EntradaCalculo, TotalesCalculados } from '../facturacion/facturacion.calculo';
 import { identificarCliente, DatosComprobante } from '../facturacion/facturacion.datos';
 import { esc, fechaIsoLima, horaLima, montoEnLetras, montoXml } from './sunat.util';
+import { lineasDeCuenta } from '../../pedidos/lineas-combo.util';
 
 /** Namespaces de UBL 2.1 y de SUNAT usados en factura, boleta, resumen y comunicación de baja. */
 const NS_INVOICE =
@@ -190,7 +191,7 @@ function cabeceraEmisorResumen(e: EmisorXml): string {
  * idDoc = RC-{AAAAMMDD}-{correlativo} (sin RUC: el RUC va en el nombre del archivo); fechaEmision = día en que se genera; fechaRef = día de las boletas.
  */
 export function armarResumenDiarioXml(p: { idDoc: string; emisor: EmisorXml; fechaEmision: Date; fechaRef: string; igvPct: number; lineas: LineaResumen[] }): string {
-  const lineas = p.lineas
+  const lineas = lineasDeCuenta(p.lineas)
     .map((l, i) => {
       const dniOk = l.documento && /^\d{8}$/.test(l.documento);
       const tipoCliente = dniOk ? '1' : '0';
@@ -232,7 +233,7 @@ export function armarBajaXml(p: {
   fechaRef: string;
   lineas: Array<{ serie: string; numero: number; motivo: string }>;
 }): string {
-  const lineas = p.lineas
+  const lineas = lineasDeCuenta(p.lineas)
     .map(
       (l, i) =>
         `<sac:VoidedDocumentsLine><cbc:LineID>${i + 1}</cbc:LineID><cbc:DocumentTypeCode>01</cbc:DocumentTypeCode>` +

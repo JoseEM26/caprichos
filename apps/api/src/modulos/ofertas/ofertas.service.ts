@@ -30,9 +30,11 @@ import {
   DesgloseDescuentosPedido,
   DetalleDescuentoAplicado,
   OfertaItem,
+  ParteResueltaCombo,
   ReglaAcumulacionItem,
+  ResolucionCombo,
 } from './ofertas.tipos';
-import { calcularDisponibilidadCombo, ProductoDisp } from './combo-disponibilidad.util';
+import { calcularDisponibilidadCombo, productoDisponible, ProductoDisp } from './combo-disponibilidad.util';
 import {
   estaVigente,
   formatearFecha,
@@ -77,6 +79,37 @@ function horaCupon(v?: string | null): Date | null {
 /** «YYYY-MM-DD» a Date para columnas @db.Date. */
 function fechaCupon(v?: string | null): Date | null {
   return v ? new Date(`${v.slice(0, 10)}T00:00:00.000Z`) : null;
+}
+
+/** Datos de un producto de combo que necesita la resolución de partes. */
+interface InfoProductoCombo extends ProductoDisp {
+  categoriaNombre: string | null;
+  areaId: bigint | null;
+  areaNombre: string | null;
+}
+
+/** Línea de cocina de una parte: el producto, su área (la de su categoría) y la nota «Combo: …». */
+function parteResuelta(
+  ofertaNombre: string,
+  parteId: string,
+  tipo: 'FIJO' | 'A_ELECCION',
+  productoId: string,
+  cantidad: number,
+  cambio: string | null,
+  info: Map<string, InfoProductoCombo>,
+): ParteResueltaCombo {
+  const p = info.get(productoId);
+  return {
+    parteId: BigInt(parteId),
+    tipo,
+    productoId: BigInt(productoId),
+    nombre: p?.nombre ?? '',
+    cantidad,
+    areaId: p?.areaId ?? null,
+    areaNombre: p?.areaNombre ?? null,
+    categoriaNombre: p?.categoriaNombre ?? null,
+    nota: [cambio, `Combo: ${ofertaNombre}`].filter(Boolean).join(' · '),
+  };
 }
 
 const INCLUDE_PARTES = {
@@ -1905,32 +1938,114 @@ export class OfertasService {
     ofertaId: bigint | string | number,
     elecciones: { parteId: string | number; productoId: string | number }[],
   ): Promise<string> {
+    return (await this.resolverPartesCombo(ofertaId, elecciones)).nota;
+  }
+
+  /**
+   * Al crear el pedido: qué sale de cada parte del combo, una línea por producto (ParteResueltaCombo).
+   * FIJO: el principal o un reemplazo disponible (409 si no). A_ELECCION con lista de productos: exactamente
+   * `cantidad × unidades` elegidas, solo de esa lista y sin agotados. Una parte A_ELECCION por categoría (bebidas
+   * del Dúo) sin elecciones no genera líneas, como antes. `nota` va a comanda y ticket.
+   */
+  async resolverPartesCombo(
+    ofertaId: bigint | string | number,
+    elecciones: { parteId: string | number; productoId: string | number }[],
+    unidades = 1,
+  ): Promise<ResolucionCombo> {
     const oferta = await this.obtenerOfertaPorId(ofertaId);
-    if (oferta.tipo !== 'COMBO') return '';
+    if (oferta.tipo !== 'COMBO') return { nota: '', partes: [] };
     const noDisponible = (mensaje: string) =>
       new ConflictException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje });
     if (oferta.disponible === false) throw noDisponible(`${oferta.nombre} está agotado: ${oferta.motivoAgotado ?? ''}`.trim());
 
+    const ids = new Set<string>();
+    for (const p of oferta.combosParte ?? []) {
+      [...p.productos, ...(p.reemplazos ?? [])].forEach((x) => ids.add(String(x)));
+      elecciones.filter((e) => String(e.parteId) === p.id).forEach((e) => ids.add(String(e.productoId)));
+    }
+    const filas = ids.size
+      ? await this.prisma.producto.findMany({
+          where: { id: { in: [...ids].map((x) => BigInt(x)) } },
+          select: {
+            id: true,
+            nombre: true,
+            categoria_id: true,
+            oculto: true,
+            agotado_hasta: true,
+            categoria: { select: { nombre: true, area_id: true, area: { select: { nombre: true } } } },
+          },
+        })
+      : [];
+    const info = new Map<string, InfoProductoCombo>(
+      filas.map((f: any) => [
+        f.id.toString(),
+        {
+          id: f.id.toString(),
+          nombre: f.nombre,
+          categoriaId: f.categoria_id?.toString() ?? '',
+          categoriaNombre: f.categoria?.nombre ?? null,
+          areaId: f.categoria?.area_id ?? null,
+          areaNombre: f.categoria?.area?.nombre ?? null,
+          oculto: !!f.oculto,
+          agotadoHasta: f.agotado_hasta ?? null,
+        },
+      ]),
+    );
+
+    const partes: ParteResueltaCombo[] = [];
     const cambios: string[] = [];
     for (const parte of (oferta.combosParte ?? []).filter((p) => p.tipo === 'FIJO')) {
       const elegido = elecciones.find((e) => String(e.parteId) === parte.id)?.productoId;
       const idElegido = elegido !== undefined ? String(elegido) : parte.opcionesDisponibles?.[0];
       if (!idElegido || !parte.opcionesDisponibles?.includes(idElegido)) {
-        const prod = idElegido
-          ? await this.prisma.producto.findMany({ where: { id: { in: [BigInt(idElegido)] } }, select: { nombre: true } })
-          : [];
-        throw noDisponible(`${prod[0]?.nombre ?? 'El producto elegido'} se acaba de agotar; elige otro reemplazo`);
+        throw noDisponible(`${info.get(String(idElegido))?.nombre ?? 'El producto elegido'} se acaba de agotar; elige otro reemplazo`);
       }
+      let cambio: string | null = null;
       if (idElegido !== parte.productos[0]) {
-        const nombres = await this.prisma.producto.findMany({
-          where: { id: { in: [BigInt(idElegido), BigInt(parte.productos[0])] } },
-          select: { id: true, nombre: true },
+        cambio = `${info.get(idElegido)?.nombre ?? ''} (en lugar de ${info.get(parte.productos[0])?.nombre ?? ''})`;
+        cambios.push(cambio);
+      }
+      partes.push(parteResuelta(oferta.nombre, parte.id!, 'FIJO', idElegido, parte.cantidad * unidades, cambio, info));
+    }
+
+    for (const parte of (oferta.combosParte ?? []).filter((p) => p.tipo === 'A_ELECCION')) {
+      const picks = elecciones.filter((e) => String(e.parteId) === parte.id);
+      const requeridas = parte.cantidad * unidades;
+      if (picks.length === 0) {
+        // Con lista de productos (juguetes) es obligatoria; por categoría (bebidas del Dúo) no genera líneas
+        if (parte.productos.length > 0) {
+          throw new BadRequestException({
+            codigo: 'COMBO_ELECCION_INCOMPLETA',
+            mensaje: `Elige ${requeridas} opción(es) para ${oferta.nombre}`,
+          });
+        }
+        continue;
+      }
+      if (picks.length !== requeridas) {
+        throw new BadRequestException({
+          codigo: 'COMBO_ELECCION_INCOMPLETA',
+          mensaje: `Elige exactamente ${requeridas} opción(es) para ${oferta.nombre}`,
         });
-        const n = (id: string) => nombres.find((x) => x.id.toString() === id)?.nombre ?? '';
-        cambios.push(`${n(idElegido)} (en lugar de ${n(parte.productos[0])})`);
+      }
+      const porProducto = new Map<string, number>();
+      for (const pk of picks) {
+        const id = String(pk.productoId);
+        const prod = info.get(id);
+        if (!prod || !(parte.productos.includes(id) || parte.categorias.includes(prod.categoriaId))) {
+          throw new BadRequestException({
+            codigo: 'COMBO_PARTE_NO_PERMITIDA',
+            mensaje: `${prod?.nombre ?? 'El producto elegido'} no es una opción de ${oferta.nombre}`,
+          });
+        }
+        if (!productoDisponible(prod)) throw noDisponible(`${prod.nombre} está agotado; elige otro`);
+        porProducto.set(id, (porProducto.get(id) ?? 0) + 1);
+      }
+      for (const [id, n] of porProducto) {
+        partes.push(parteResuelta(oferta.nombre, parte.id!, 'A_ELECCION', id, n, null, info));
       }
     }
-    return cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '';
+
+    return { nota: cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '', partes };
   }
 
   /** Reemplazos (plan B, C...) de una parte FIJO: sin repetir, sin el principal y solo productos que existan. */
@@ -1994,6 +2109,13 @@ export class OfertasService {
         p.disponible = r.partes[i].disponible;
         p.opcionesDisponibles = r.partes[i].opcionesDisponibles;
         if (p.tipo === 'FIJO') p.principalNombre = productos.find((x) => x.id === p.productos[0])?.nombre ?? '';
+        if (p.tipo === 'A_ELECCION' && p.productos.length > 0) {
+          // Lista explícita (p. ej. juguetes): cada opción con su nombre y si se puede elegir ahora
+          p.opcionesDetalle = p.productos.map((id) => {
+            const f = productos.find((x) => x.id === id);
+            return { id, nombre: f?.nombre ?? '', disponible: !!f && productoDisponible(f) };
+          });
+        }
       });
     }
     return items;

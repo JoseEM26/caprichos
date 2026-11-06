@@ -9,6 +9,7 @@ import {
   TicketComandaSalonDatos,
   esAreaBebidas,
 } from '@caprichos/compartido';
+import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
 export const CRITERIO_BEBIDA_AREAS = ['BARRA', 'BEBIDAS', 'CAFETERIA', 'BAR'];
 export const CRITERIO_BEBIDA_CATEGORIAS = [
@@ -129,7 +130,7 @@ export function obtenerNombreCliente(pedido: any): string {
 }
 
 export function construirEtiquetaGeneral(pedido: any): EtiquetaGeneralDatos {
-  const lineas: any[] = pedido.lineas || [];
+  const lineas: any[] = lineasDeCuenta(pedido.lineas || []);
   const modalidadPill = obtenerModalidadPill(pedido);
   const hora = formatearHora(pedido.creado_en);
   const fecha = formatearFecha(pedido.creado_en);
@@ -170,6 +171,7 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
 
   const areaMap = new Map<string, any[]>();
   lineas.forEach((l) => {
+    if (l.producto_id == null && l.area_id == null && !l.area) return; // madre de combo: sus partes van por área
     const areaRaw = l.area?.nombre?.trim();
     // Bebidas no tiene sticker por área: sus vasos ya salen en construirEtiquetasBebida
     if (esAreaBebidas(areaRaw)) return;
@@ -300,7 +302,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
  * La imprime la ticketera de Caja al aceptarse el pedido; no se usa para llevar ni delivery (lo filtra la regla).
  */
 export function construirTicketComandaSalon(pedido: any): TicketComandaSalonDatos {
-  const lineas: any[] = pedido.lineas || [];
+  const lineas: any[] = lineasDeCuenta(pedido.lineas || []);
   const mesa = pedido.mesa_nombre ? String(pedido.mesa_nombre).trim() : null;
   return {
     tipo: 'TICKET_COMANDA_SALON',

@@ -23,6 +23,8 @@ export interface ComboParteItem {
   disponible?: boolean;
   opcionesDisponibles?: string[];
   principalNombre?: string;
+  /** A_ELECCION con lista de productos: cada opción y si se puede elegir ahora (agotada = no). */
+  opcionesDetalle?: { id: string; nombre: string; disponible: boolean }[];
 }
 
 export interface OfertaItem {
@@ -149,4 +151,25 @@ export interface DesgloseDescuentosPedido {
   detalles: DetalleDescuentoAplicado[];
   /** El cupón canjeado da envío gratis (no descuenta productos). Solo delivery; lo aplica el pedido. */
   envioGratisCupon?: boolean;
+}
+
+/** Una línea de cocina que sale de una parte de combo (FIJO o A_ELECCION), por producto. */
+export interface ParteResueltaCombo {
+  parteId: bigint;
+  tipo: 'FIJO' | 'A_ELECCION';
+  productoId: bigint;
+  nombre: string;
+  /** Unidades de este producto (parte.cantidad × unidades del combo, o las elegidas). */
+  cantidad: number;
+  areaId: bigint | null;
+  areaNombre: string | null;
+  categoriaNombre: string | null;
+  /** Texto para la comanda: el cambio de reemplazo y «Combo: …». */
+  nota: string;
+}
+
+export interface ResolucionCombo {
+  /** Nota de la línea madre (reemplazos del combo), como antes. */
+  nota: string;
+  partes: ParteResueltaCombo[];
 }

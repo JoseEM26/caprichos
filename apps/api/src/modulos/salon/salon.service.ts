@@ -18,6 +18,7 @@ import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { progresoDelPedido, ProgresoPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
+import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
 @Injectable()
 export class SalonService {
@@ -143,7 +144,7 @@ export class SalonService {
                 creadoEn: ped.creado_en,
                 total: ped.total ? Number(ped.total) : (ped.subtotal ? Number(ped.subtotal) : 0),
                 progreso: progresoDelPedido(ped as any, { ahora, preparacion }),
-                lineas: ((ped as any).lineas || []).map((l: any) => ({
+                lineas: lineasDeCuenta((ped as any).lineas || []).map((l: any) => ({
                   cantidad: l.cantidad,
                   nombre: l.nombre,
                   detalle: l.tamano ? `${l.tamano}${l.nota ? ` · ${l.nota}` : ''}` : (l.nota || ''),

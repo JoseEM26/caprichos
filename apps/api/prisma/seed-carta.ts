@@ -192,6 +192,8 @@ export async function main() {
   // 5. Productos, tamaños, grupos asociados y sabores
   for (let pIdx = 0; pIdx < P.length; pIdx++) {
     const p = P[pIdx];
+    // El combo cajita (con sus juguetes) lo asegura la migración 20261225100000 y seed-ofertas: no se siembra desde la maqueta
+    if (p.name === 'COMBO CAJITA CAPRIKIDS') continue;
     const catId = mapaCategorias.get(p.cat) || mapaCategorias.get('complementos')!;
     const precioBase = p.variants && p.variants.length > 0 ? p.variants[0].p : 0;
 

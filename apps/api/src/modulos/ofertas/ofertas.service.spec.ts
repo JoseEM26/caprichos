@@ -259,6 +259,76 @@ describe('OfertasService', () => {
       });
     });
 
+    describe('resolverPartesCombo: elecciones A_ELECCION con lista de productos (juguetes)', () => {
+      const cajita = (agotadoBurbujas: boolean) => {
+        const ahora = Date.now();
+        prismaMock.oferta.findUnique.mockResolvedValue({
+          id: 9n, tipo: 'COMBO', nombre: 'COMBO CAJITA CAPRIKIDS', dias: [], canales: [], creado_en: new Date(),
+          combosPrecio: [],
+          combosParte: [{ id: 200n, tipo: 'A_ELECCION', cantidad: 2, categorias: [], productos: [30n, 31n, 32n], reemplazos: [] }],
+        });
+        const juguete = (id: bigint, nombre: string, agotado: Date | null = null) => ({
+          id, nombre, categoria_id: 8n, oculto: false, agotado_hasta: agotado,
+          categoria: { nombre: 'JUGUETES', area_id: 4n, area: { nombre: 'Salados' } },
+        });
+        prismaMock.producto.findMany.mockResolvedValue([
+          juguete(30n, 'Pistola de burbujas'),
+          juguete(31n, 'Burbujas'),
+          juguete(32n, 'Squishy', agotadoBurbujas ? new Date(ahora + 3600000) : null),
+        ]);
+      };
+
+      it('dos juguetes distintos: una línea hija por juguete, en el área de su categoría, sin cobro', async () => {
+        cajita(false);
+        const res = await service.resolverPartesCombo(9, [{ parteId: '200', productoId: '30' }, { parteId: '200', productoId: '31' }]);
+        expect(res.partes).toEqual([
+          expect.objectContaining({ parteId: 200n, tipo: 'A_ELECCION', productoId: 30n, nombre: 'Pistola de burbujas', cantidad: 1, areaId: 4n, areaNombre: 'Salados' }),
+          expect.objectContaining({ parteId: 200n, tipo: 'A_ELECCION', productoId: 31n, nombre: 'Burbujas', cantidad: 1, areaId: 4n }),
+        ]);
+        expect(res.partes[0].nota).toBe('Combo: COMBO CAJITA CAPRIKIDS');
+      });
+
+      it('el mismo juguete repetido suma unidades en una sola línea hija', async () => {
+        cajita(false);
+        const res = await service.resolverPartesCombo(9, [{ parteId: '200', productoId: '32' }, { parteId: '200', productoId: '32' }]);
+        expect(res.partes).toEqual([expect.objectContaining({ productoId: 32n, cantidad: 2 })]);
+      });
+
+      it('con unidades del combo, exige cantidad × elecciones por parte (2 cajitas = 4 juguetes)', async () => {
+        cajita(false);
+        const dos = [{ parteId: '200', productoId: '30' }, { parteId: '200', productoId: '31' }];
+        await expect(service.resolverPartesCombo(9, dos, 2)).rejects.toMatchObject({
+          response: { codigo: 'COMBO_ELECCION_INCOMPLETA' },
+          status: 400,
+        });
+        const cuatro = [...dos, { parteId: '200', productoId: '30' }, { parteId: '200', productoId: '31' }];
+        const res = await service.resolverPartesCombo(9, cuatro, 2);
+        expect(res.partes.map((p) => p.cantidad)).toEqual([2, 2]);
+      });
+
+      it('sin elegir juguetes rechaza con 400 COMBO_ELECCION_INCOMPLETA (la parte tiene lista)', async () => {
+        cajita(false);
+        await expect(service.resolverPartesCombo(9, [])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_ELECCION_INCOMPLETA' },
+        });
+      });
+
+      it('un juguete agotado no se puede elegir: 409 COMBO_PARTE_NO_DISPONIBLE', async () => {
+        cajita(true);
+        await expect(service.resolverPartesCombo(9, [{ parteId: '200', productoId: '32' }, { parteId: '200', productoId: '31' }])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_PARTE_NO_DISPONIBLE' },
+          status: 409,
+        });
+      });
+
+      it('un producto fuera de la lista de la parte rechaza con 400 COMBO_PARTE_NO_PERMITIDA', async () => {
+        cajita(false);
+        await expect(service.resolverPartesCombo(9, [{ parteId: '200', productoId: '99' }, { parteId: '200', productoId: '31' }])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_PARTE_NO_PERMITIDA' },
+        });
+      });
+    });
+
     it('cambia estado de oferta con Sí/No (activar/desactivar)', async () => {
       prismaMock.oferta.update.mockResolvedValueOnce({
         id: 1n,

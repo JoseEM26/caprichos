@@ -20,6 +20,7 @@ import { LocalService } from '../local/local.service';
 import { ZonasService } from '../zonas/zonas.service';
 import { calcularEnvioDelivery, PromoEnvioGratis } from '../ofertas/envio-gratis-promo';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { ParteResueltaCombo } from '../ofertas/ofertas.tipos';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto, EntregaDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
@@ -37,6 +38,21 @@ import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '
 
 /** Pista pública de la dirección anterior: nunca la dirección completa (ver enmascararDireccion). */
 export type PistaDireccion = { existe: false } | { existe: true; zona: string | null; direccion: string | null };
+
+/** Bebida (lleva un nombre por unidad para el envase), según su categoría o su área de cocina. */
+function esBebidaPorNombres(categoria?: string | null, area?: string | null): boolean {
+  const catNombre = (categoria || '').toUpperCase();
+  const areaNombre = (area || '').toUpperCase();
+  return (
+    catNombre.includes('FRAPPE') ||
+    catNombre.includes('ICED') ||
+    catNombre.includes('FROZEN') ||
+    catNombre.includes('CALIENTE') ||
+    catNombre.includes('BEBIDA') ||
+    areaNombre.includes('BARRA') ||
+    areaNombre.includes('BEBIDA')
+  );
+}
 
 /**
  * Dirección con la mayor parte oculta: «Av. Los G••••». Se ven la vía corta («Av.») y un conector corto
@@ -540,16 +556,7 @@ export class PedidosService {
       subtotalCalculado += lineaSubtotal;
 
       // Bebidas llevan personas[] con tantos nombres como unidades
-      const catNombre = (prodDb.categoria?.nombre || '').toUpperCase();
-      const areaNombre = (prodDb.categoria?.area?.nombre || '').toUpperCase();
-      const esBebida =
-        catNombre.includes('FRAPPE') ||
-        catNombre.includes('ICED') ||
-        catNombre.includes('FROZEN') ||
-        catNombre.includes('CALIENTE') ||
-        catNombre.includes('BEBIDA') ||
-        areaNombre.includes('BARRA') ||
-        areaNombre.includes('BEBIDA');
+      const esBebida = esBebidaPorNombres(prodDb.categoria?.nombre, prodDb.categoria?.area?.nombre);
 
       const personasAsignadas: string[] = [];
       if (esBebida) {
@@ -567,11 +574,12 @@ export class PedidosService {
         }
       }
 
-      // Combo con parte fija: la elección debe ser el principal o un reemplazo disponible (409 si no)
-      const notaCombo =
-        l.ofertaId && l.comboElecciones?.length
-          ? await this.ofertasService.validarEleccionesCombo(l.ofertaId, l.comboElecciones)
-          : '';
+      // Combo: la parte FIJO debe ser el principal o un reemplazo disponible (409 si no); las A_ELECCION, lo elegido.
+      // Cada parte sale en su propia línea hija (cocina y stock); la madre sigue llevando el precio del combo.
+      const combo = l.ofertaId
+        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad)
+        : { nota: '', partes: [] };
+      const contenedora = combo.partes.length > 0;
 
       lineasCalculadas.push({
         productoId: prodDb.id,
@@ -583,9 +591,13 @@ export class PedidosService {
         cantidad,
         precioUnitario,
         subtotal: lineaSubtotal,
-        areaId: prodDb.categoria?.area_id ?? null,
-        nota: [notaCombo, l.nota?.trim()].filter(Boolean).join(' · ') || null,
+        // Línea madre de combo: sin producto ni área propios; la cocina ve solo sus hijas
+        contenedora,
+        areaId: contenedora ? null : (prodDb.categoria?.area_id ?? null),
+        nota: [combo.nota, l.nota?.trim()].filter(Boolean).join(' · ') || null,
         nombresPersona: personasAsignadas,
+        personasEntrada: Array.isArray(l.personas) ? l.personas : [],
+        partesCombo: combo.partes,
         opciones: opcionesElegidasInfo,
         sabores: saboresLinea,
       });
@@ -882,7 +894,7 @@ export class PedidosService {
         const lineaDb = await tx.pedidoLinea.create({
           data: {
             pedido_id: pedido.id,
-            producto_id: lin.productoId,
+            producto_id: lin.contenedora ? null : lin.productoId,
             oferta_id: lin.ofertaId ?? null,
             nombre: lin.nombre,
             tamano: lin.tamano,
@@ -900,6 +912,27 @@ export class PedidosService {
             })),
           },
         });
+
+        // Partes del combo: una línea hija por producto, sin cobro (el precio ya va en la madre)
+        for (const parte of lin.partesCombo) {
+          const esBebidaParte = esBebidaPorNombres(parte.categoriaNombre ?? undefined, parte.areaNombre ?? undefined);
+          await tx.pedidoLinea.create({
+            data: {
+              pedido_id: pedido.id,
+              producto_id: parte.productoId,
+              linea_combo_id: lineaDb.id,
+              nombre: parte.nombre,
+              cantidad: parte.cantidad,
+              precio_unit: new Prisma.Decimal(0),
+              subtotal: new Prisma.Decimal(0),
+              area_id: parte.areaId,
+              nombres_persona: esBebidaParte
+                ? Array.from({ length: parte.cantidad }, (_, u) => lin.personasEntrada[u]?.trim() || clienteNombre || 'Mesa')
+                : [],
+              nota: parte.nota,
+            },
+          });
+        }
 
         for (const op of lin.opciones) {
           await tx.pedidoLineaOpcion.create({
@@ -930,7 +963,14 @@ export class PedidosService {
       const ventaProductos = await descontarVentaProductos(
         tx,
         pedido.id,
-        lineasCalculadas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, areaId: l.areaId, sabores: l.sabores })),
+        [
+          ...lineasCalculadas
+            .filter((l) => !l.contenedora)
+            .map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, areaId: l.areaId, sabores: l.sabores })),
+          ...lineasCalculadas.flatMap((l) =>
+            l.partesCombo.map((p: ParteResueltaCombo) => ({ productoId: p.productoId, cantidad: p.cantidad, areaId: p.areaId })),
+          ),
+        ],
         pedido.party_id ?? BigInt(1),
       );
       agotadosPorVenta = ventaProductos.agotados;
