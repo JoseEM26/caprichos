@@ -200,7 +200,7 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
   },
   verificacion_whatsapp_numero: {
     grupo: 'clientes', titulo: 'Número de WhatsApp que recibe la verificación',
-    descripcion: 'Número del negocio al que el cliente escribe para verificar su celular, solo dígitos con código de país (por ejemplo 51914244077). Si se deja vacío se usa el WhatsApp de contacto del local (Configuración › Mi local › Contacto).',
+    descripcion: 'Número del negocio al que el cliente escribe para verificar su celular, solo dígitos con código de país (por ejemplo 51914244077). Si se deja vacío se usa la variable del servidor VERIFICACION_WHATSAPP_NUMERO (la demo la usa para su número de prueba) o, si no existe, el WhatsApp de contacto del local (Configuración › Mi local › Contacto).',
     ejemplo: 'Con 51914244077, el botón abre WhatsApp con ese número y el mensaje «Hola Caprichos, quiero verificar mi celular. Mi código: …».',
     efecto: 'Si cambias el número, los enlaces nuevos van al número nuevo. Si no hay número (ni este ni el de contacto), el modo WHATSAPP_ENTRANTE muestra «verificación no disponible» en vez de fallar en silencio.',
     porDefecto: 'vacío (usa el WhatsApp de contacto del local)', rango: 'celular de 9 dígitos con +51 opcional',

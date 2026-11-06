@@ -162,6 +162,20 @@ describe('Modo y número de verificación', () => {
     expect(await numeroVerificacion(prismaConParametros({ verificacion_whatsapp_numero: '', local_datos: { whatsapp: '+51 914244077' } }) as any)).toBe('51914244077');
     expect(await numeroVerificacion(prismaConParametros({}) as any)).toBeNull();
   });
+
+  it('prioridad: parámetro bien escrito > variable VERIFICACION_WHATSAPP_NUMERO > WhatsApp de contacto', async () => {
+    const env = { VERIFICACION_WHATSAPP_NUMERO: '+51 999 000 111' } as NodeJS.ProcessEnv;
+    const local = { local_datos: { whatsapp: '914 244 077' } };
+    // Sin parámetro: gana la variable de entorno, no el número real del local
+    expect(await numeroVerificacion(prismaConParametros(local) as any, env)).toBe('51999000111');
+    // Parámetro bien escrito: gana sobre la variable
+    expect(await numeroVerificacion(prismaConParametros({ ...local, verificacion_whatsapp_numero: '51988777666' }) as any, env)).toBe('51988777666');
+    // Parámetro mal escrito: se ignora y sigue con la variable
+    expect(await numeroVerificacion(prismaConParametros({ ...local, verificacion_whatsapp_numero: '12345' }) as any, env)).toBe('51999000111');
+    // Variable mal escrita o vacía: cae al WhatsApp de contacto del local
+    expect(await numeroVerificacion(prismaConParametros(local) as any, { VERIFICACION_WHATSAPP_NUMERO: '' } as any)).toBe('51914244077');
+    expect(await numeroVerificacion(prismaConParametros(local) as any, { VERIFICACION_WHATSAPP_NUMERO: 'abc' } as any)).toBe('51914244077');
+  });
 });
 
 describe('Registro en modo WHATSAPP_ENTRANTE', () => {

@@ -71,7 +71,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   },
   verificacion_whatsapp_numero: {
     nombre: 'Número que recibe la verificación',
-    descripcion: 'Celular del negocio con código de país (p. ej. 51914244077). Vacío = usa el WhatsApp de contacto del local.',
+    descripcion: 'Celular del negocio con código de país (p. ej. 51914244077). Vacío = usa la variable del servidor VERIFICACION_WHATSAPP_NUMERO o, si no existe, el WhatsApp de contacto del local.',
     tipo: 'texto',
   },
   reprog_recargo_modo: {

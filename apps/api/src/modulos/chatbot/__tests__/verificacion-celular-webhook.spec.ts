@@ -36,7 +36,11 @@ function redisFalso() {
     expire: jest.fn().mockResolvedValue(1),
     del: jest.fn(async (...ks: string[]) => ks.length),
     exists: jest.fn(async (k: string) => (datos.has(k) ? 1 : 0)),
-    eval: jest.fn().mockResolvedValue(1),
+    // Libera el candado de serie como el script de Redis (si el token coincide)
+    eval: jest.fn(async (_script: string, _n: number, llave: string) => {
+      datos.delete(llave);
+      return 1;
+    }),
   };
 }
 
@@ -114,6 +118,44 @@ describe('Verificación del celular en el webhook (WHATSAPP_ENTRANTE)', () => {
 
     expect(motor.procesarMensajeEntrante).toHaveBeenCalledTimes(1);
     expect(mensajeria.enviarTexto).not.toHaveBeenCalled();
+  });
+
+  it('verifica con cualquier formato de remitente que Meta envía (con o sin 51, en el mismo número)', async () => {
+    const token = await iniciarVerificacion(redis as any, secretoVerificacion(config), '987654321', 'REGISTRO');
+    // Sin código de país: Meta lo manda con 51 en from, pero el 9 local también se acepta
+    await webhook.procesarPayload(mensajeTexto('wamid.F1', '987654321', `Mi código: ${token}`));
+    await tick();
+
+    expect(redis.datos.get('cliente:reg:ok:987654321')).toBe('1');
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_VERIFICADO);
+  });
+
+  it('acepta el texto prellenado con variaciones: mayúsculas, «código» sin tilde, espacio antes de los dos puntos, saltos de línea y tilde descompuesta', async () => {
+    const variantes = [
+      (t: string) => `MI CÓDIGO: ${t}`,
+      (t: string) => `hola caprichos, quiero verificar mi celular. mi codigo: ${t.toLowerCase()}`,
+      (t: string) => `Hola Caprichos, quiero verificar mi celular. Mi código : ${t}`,
+      (t: string) => `Hola Caprichos, quiero verificar mi celular.\nMi código:\n${t}`,
+      (t: string) => `Hola Caprichos, quiero verificar mi celular. Mi cO\u0301digo: ${t}`,
+    ];
+    for (const [i, variante] of variantes.entries()) {
+      const token = await iniciarVerificacion(redis as any, secretoVerificacion(config), '987654321', 'REGISTRO');
+      mensajeria.enviarTexto.mockClear();
+      await webhook.procesarPayload(mensajeTexto(`wamid.T${i}`, TEL, variante(token)));
+      await tick();
+      expect({ variante: i, enviado: mensajeria.enviarTexto.mock.calls[0]?.[1] }).toEqual({ variante: i, enviado: RESPUESTA_VERIFICADO });
+    }
+    expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
+  });
+
+  it('un token ajeno (de otro celular) no verifica aunque el texto sea perfecto', async () => {
+    const token = await iniciarVerificacion(redis as any, secretoVerificacion(config), '912345678', 'REGISTRO');
+    await webhook.procesarPayload(mensajeTexto('wamid.A1', TEL, `Hola Caprichos, quiero verificar mi celular. Mi código: ${token}`));
+    await tick();
+
+    expect(redis.datos.has('cliente:reg:ok:912345678')).toBe(false);
+    expect(redis.datos.has('cliente:reg:ok:987654321')).toBe(false);
+    expect(mensajeria.enviarTexto).toHaveBeenCalledWith(TEL, RESPUESTA_NO_VERIFICADO);
   });
 
   it('el mismo mensaje (mismo wa_message_id) no se procesa dos veces', async () => {
