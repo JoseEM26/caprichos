@@ -32,6 +32,27 @@ export const BOTONES_REPROGRAMACION = [
   { id: 'reprogramar_no', titulo: 'No, cancelar' },
 ];
 
+/** Resumen del pedido para el aviso «Recibimos tu pedido» (productos, total y estado del envío). */
+export interface ResumenRecibido {
+  lineas: string[];
+  total: number;
+  medioPago: string;
+  /** Delivery sin punto en el mapa: el envío se calcula al recibir la ubicación y se le pide al cliente. */
+  envioPorConfirmar: boolean;
+  /** Delivery con envío ya calculado (soles) */
+  envio?: number | null;
+}
+
+const bloqueResumen = (r: ResumenRecibido): string =>
+  `\n\n🧾 Tu pedido:\n${r.lineas.map((l) => `• ${l}`).join('\n')}\n💰 Total: S/ ${r.total.toFixed(2)}${r.envioPorConfirmar ? ' (sin envío)' : ''}`;
+
+const bloqueEnvio = (r: ResumenRecibido): string => {
+  if (r.envioPorConfirmar) {
+    return '\n\n🛵 Envío por confirmar: se calcula al recibir tu ubicación.\n📍 Envíanos tu ubicación: toca el clip 📎 → Ubicación → Enviar tu ubicación actual.';
+  }
+  return r.envio != null ? `\n\n🛵 Envío: ${r.envio === 0 ? 'gratis' : `S/ ${r.envio.toFixed(2)}`}.` : '';
+};
+
 export const TEXTOS_REPARTO = {
   aceptado: (nombre: string, codigo: string): PayloadAvisoReparto => ({
     textoLibre: `¡Hola ${nombre}! 😊 Gracias por tu pedido ${codigo}. Ya lo estamos preparando con mucho cariño.`,
@@ -115,8 +136,10 @@ export const TEXTOS_REPARTO = {
    * Pedido de la carta virtual con pago digital: el asesor gestiona el voucher por este chat. `medio` es Yape, Plin o transferencia.
    * El enlace de seguimiento va en el texto libre (ventana abierta). La plantilla no cambia: no tiene la variable.
    */
-  recibidoDigital: (nombre: string, codigo: string, medio: string, enlace?: string | null): PayloadAvisoReparto => ({
-    textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉 En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por ${medio}. Mientras tanto, por favor envíanos la foto de tu voucher por aquí mismo 📸 🙏${enlace ? ` Sigue tu pedido aquí: ${enlace}` : ''}`,
+  recibidoDigital: (nombre: string, codigo: string, medio: string, enlace?: string | null, resumen?: ResumenRecibido | null): PayloadAvisoReparto => ({
+    textoLibre: resumen
+      ? `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉${bloqueResumen(resumen)}\n\n💳 Pago por ${medio}: envíanos por aquí mismo la captura (foto) de tu pago 📸 y un asesor la revisará para confirmar tu pedido. 🙏${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`
+      : `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉 En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por ${medio}. Mientras tanto, por favor envíanos la foto de tu voucher por aquí mismo 📸 🙏${enlace ? ` Sigue tu pedido aquí: ${enlace}` : ''}`,
     plantillaClave: 'CARTA_RECIBIDO_DIGITAL',
     variablesPlantilla: [nombre, codigo, medio],
   }),
@@ -125,7 +148,16 @@ export const TEXTOS_REPARTO = {
    * Pedido de la carta virtual pagado en efectivo u otro medio no digital, con el enlace de seguimiento.
    * Ventana cerrada: la plantilla nueva solo si `plantillaSeguimiento` (Meta ya la aprobó); si no, la vigente sin enlace.
    */
-  recibidoEfectivo: (nombre: string, codigo: string, enlace?: string | null, plantillaSeguimiento = false): PayloadAvisoReparto => {
+  recibidoEfectivo: (nombre: string, codigo: string, enlace?: string | null, plantillaSeguimiento = false, resumen?: ResumenRecibido | null): PayloadAvisoReparto => {
+    if (resumen) {
+      const plantilla = enlace && plantillaSeguimiento
+        ? { plantillaClave: 'CARTA_RECIBIDO_SEGUIMIENTO', variablesPlantilla: [nombre, codigo, enlace] }
+        : { plantillaClave: 'CARTA_RECIBIDO_EFECTIVO', variablesPlantilla: [nombre, codigo] };
+      return {
+        textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso.${bloqueResumen(resumen)}\n\n💵 Pago: ${resumen.medioPago}.${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`,
+        ...plantilla,
+      };
+    }
     if (enlace && plantillaSeguimiento) {
       return {
         textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso. Sigue tu pedido aquí: ${enlace}. ¡Gracias por preferir Caprichos! 💛`,

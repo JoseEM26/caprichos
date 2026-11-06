@@ -2541,7 +2541,7 @@ model PedidoCambioUbicacion {
   pedido_id               BigInt
   origen                  String
   estado                  String
-  propuesto_por_party_id  BigInt
+  propuesto_por_party_id  BigInt?
   propuesto_en            DateTime        @default(now()) @db.Timestamptz
   resuelto_por_party_id   BigInt?
   resuelto_en             DateTime?       @db.Timestamptz
@@ -2571,9 +2571,10 @@ model PedidoCambioUbicacion {
   ajuste_en               DateTime?       @db.Timestamptz
   ajuste_movimiento_caja_id BigInt?
   aviso_cliente           String?
+  fuera_de_zona           Boolean         @default(false)
 
   pedido           Pedido          @relation(fields: [pedido_id], references: [id])
-  propuestoPor     Party           @relation("CambioUbicacionPropuesto", fields: [propuesto_por_party_id], references: [id])
+  propuestoPor     Party?          @relation("CambioUbicacionPropuesto", fields: [propuesto_por_party_id], references: [id])
   resueltoPor      Party?          @relation("CambioUbicacionResuelto", fields: [resuelto_por_party_id], references: [id])
   ajustePor        Party?          @relation("CambioUbicacionAjuste", fields: [ajuste_por_party_id], references: [id])
   zonaAnterior     ZonaReparto?    @relation("CambioZonaAnterior", fields: [zona_anterior_id], references: [id])

@@ -71,6 +71,7 @@ export interface Pedido {
   entrega_referencia?: string | null;
   entrega_lat?: number | string | null;
   entrega_lng?: number | string | null;
+  zona_id?: number | string | null;
   pago_metodo?: string | null;
   pago_estado?: string | null;
   pago_preferido?: string | null;
@@ -265,6 +266,10 @@ export interface PedidoPorCobrar {
   comprobante_razon: string | null;
   creado_en: string;
   minutosEspera: number;
+  entrega_lat?: number | null;
+  entrega_lng?: number | null;
+  zona_id?: string | null;
+  entrega_direccion?: string | null;
 }
 
 export interface PagoItem {

@@ -3,6 +3,7 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { CambioUbicacionService } from './cambio-ubicacion.service';
 import { PropuestaUbicacionService } from './propuesta-ubicacion.service';
+import { UbicacionWhatsappPedidoService } from './ubicacion-whatsapp-pedido.service';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 import { LiquidarAjusteUbicacionDto } from './dto/liquidar-ajuste-ubicacion.dto';
 import { RechazarPropuestaUbicacionDto } from './dto/rechazar-propuesta-ubicacion.dto';
@@ -23,6 +24,7 @@ export class CambioUbicacionController {
   constructor(
     private readonly cambio: CambioUbicacionService,
     private readonly propuestas: PropuestaUbicacionService,
+    private readonly ubicacionWhatsapp: UbicacionWhatsappPedidoService,
   ) {}
 
   @Get(':id/ubicacion/previsualizar')
@@ -40,6 +42,14 @@ export class CambioUbicacionController {
   async cambiar(@Param('id') id: string, @Body() dto: UbicarPedidoDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.cambio.cambiarPorCaja(id, dto, req.usuario, ip);
+  }
+
+  /** Reenvía al cliente el pedido de ubicación por WhatsApp (solo con la ventana de 24 h abierta). */
+  @Post(':id/ubicacion/pedir-whatsapp')
+  @Permiso('pedidos', 'cambiar_ubicacion')
+  async pedirWhatsapp(@Param('id') id: string, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.ubicacionWhatsapp.pedirUbicacion(id, req.usuario, ip);
   }
 
   @Get(':id/ubicacion/historial')

@@ -4,7 +4,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { ErrorApi } from '../../comun/api';
 import { useEventos } from '../../comun/socket';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
-import { PropuestaPendiente, cambioUbicacionApi, textoDifEnvio } from './cambioUbicacionApi';
+import { PropuestaPendiente, cambioUbicacionApi, textoDifEnvio, textoDistancia } from './cambioUbicacionApi';
 
 /**
  * Bandeja de Caja: propuestas de ubicación del repartidor pendientes. Cada una con mapa antes/después, envío nuevo y
@@ -76,23 +76,33 @@ export function BandejaPropuestasUbicacion({ alAplicar }: { alAplicar?: () => vo
       {propuestas.map((p) => (
         <article key={p.id} aria-label={`Propuesta del pedido ${p.codigo}`} style={{ background: '#fff', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 13 }}>
-            <strong>{p.codigo}</strong> · Cambio de ubicación propuesto por {p.propuestoPorNombre ?? 'el repartidor'}
+            <strong>{p.codigo}</strong> ·{' '}
+            {p.origen === 'WHATSAPP_CLIENTE'
+              ? p.fueraDeZona
+                ? 'Fuera de zona: ubicación del cliente (WhatsApp)'
+                : 'El cliente envió otra ubicación: ¿usarla?'
+              : `Cambio de ubicación propuesto por ${p.propuestoPorNombre ?? 'el repartidor'}`}
           </div>
           {p.nota && <div style={{ fontSize: 12 }}>Nota: {p.nota}</div>}
-          <div style={{ fontSize: 12 }}>
-            Envío S/ {(p.envioAnterior ?? 0).toFixed(2)} → S/ {(p.envioNuevo ?? 0).toFixed(2)} · {textoDifEnvio(p.diferencia)} · nuevo total S/ {(p.totalNuevo ?? 0).toFixed(2)}
-            {p.pagoEstado === 'PAGADO' && ' · ya pagado (quedará saldo o devolución)'}
-          </div>
+          {textoDistancia(p) && <div style={{ fontSize: 12, fontWeight: 700 }}>{textoDistancia(p)}</div>}
+          {!p.fueraDeZona && (
+            <div style={{ fontSize: 12 }}>
+              Envío S/ {(p.envioAnterior ?? 0).toFixed(2)} → S/ {(p.envioNuevo ?? 0).toFixed(2)} · {textoDifEnvio(p.diferencia)} · nuevo total S/ {(p.totalNuevo ?? 0).toFixed(2)}
+              {p.pagoEstado === 'PAGADO' && ' · ya pagado (quedará saldo o devolución)'}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             <MapaUbicacion punto={p.anterior.lat != null ? { lat: p.anterior.lat, lng: p.anterior.lng! } : null} soloLectura altura={130} etiqueta="Antes" />
             <MapaUbicacion punto={{ lat: p.nueva.lat!, lng: p.nueva.lng! }} soloLectura altura={130} etiqueta="Después" />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Boton tamano="pequeno" deshabilitado={ocupado} onClick={() => setAprobando(p)}>
-              Aprobar
-            </Boton>
+            {!p.fueraDeZona && (
+              <Boton tamano="pequeno" deshabilitado={ocupado} onClick={() => setAprobando(p)}>
+                {p.origen === 'WHATSAPP_CLIENTE' ? 'Usar' : 'Aprobar'}
+              </Boton>
+            )}
             <Boton variante="secundario" tamano="pequeno" deshabilitado={ocupado} onClick={() => setRechazando(p)}>
-              Rechazar
+              {p.origen === 'WHATSAPP_CLIENTE' ? 'Descartar' : 'Rechazar'}
             </Boton>
           </div>
         </article>

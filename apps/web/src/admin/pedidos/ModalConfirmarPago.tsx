@@ -9,18 +9,22 @@ import { CapturasPlanDigital, ExcepcionSinVoucher } from './CapturasPlanDigital'
 import type { VoucherPagoItem } from '../vouchers/tipos';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
+import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
+import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 
 export interface ModalConfirmarPagoProps {
   pedido: Pedido;
   alCerrar: () => void;
   alConfirmarExitoso: () => void;
+  /** Se ubicó el pedido desde el aviso: la lista vuelve a leerlo (por defecto solo cierra el modal) */
+  alActualizarPedido?: () => void;
 }
 
 const MEDIOS_PC = ['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia'] as const;
 
 const MOTIVO_MINIMO = 5;
 
-export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: ModalConfirmarPagoProps) {
+export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alActualizarPedido }: ModalConfirmarPagoProps) {
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
   const [contactado, setContactado] = useState(false);
   // Pasos: 1 Cliente · 2 Pago y comprobante · 3 Revisar y confirmar (los tres quedan montados: no se pierde lo subido al volver)
@@ -70,8 +74,8 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
   const codigoCorregido = (m: string): boolean => codigos[m] !== undefined && codigoLeido(m) !== '' && codigos[m].trim() !== codigoLeido(m);
   const codigosFaltan = codigosRequeridos.filter((m) => valorCodigo(m).trim() === '');
   const esDelivery = (pedido.modalidad || '').toUpperCase() === 'DELIVERY';
-  const tieneUbicacion =
-    (pedido.entrega_lat != null && pedido.entrega_lng != null) || Boolean(pedido.zona);
+  // Sin punto Y zona (envío calculado) no hay confirmación: el servidor lo rechaza igual (DELIVERY_SIN_UBICACION)
+  const sinUbicar = deliverySinUbicacion(pedido);
 
   const handleConfirmar = () => {
     if (!contactado) {
@@ -79,9 +83,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
       setMsg('Marca la casilla confirmando que hablaste con el cliente.');
       return;
     }
-    if (esDelivery && !tieneUbicacion) {
+    if (esDelivery && sinUbicar) {
       setPaso(1);
-      setMsg('Para delivery primero ubica la dirección en el mapa (calcula la zona y el envío).');
+      setMsg(MENSAJE_DELIVERY_SIN_UBICACION);
       return;
     }
     if ((esDigital || multiples) && !comprobanteListo) {
@@ -225,6 +229,14 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
               ×
             </button>
           </div>
+          {sinUbicar && (
+            <AvisoDeliverySinUbicacion
+              pedidoId={String(pedido.id)}
+              codigo={pedido.codigo}
+              direccion={pedido.entrega_direccion}
+              alActualizar={alActualizarPedido ?? alCerrar}
+            />
+          )}
           <ol data-testid="pasos-confirmar" style={{ display: 'flex', gap: 8, listStyle: 'none', margin: 0, padding: 0, flexWrap: 'wrap' }}>
             {PASOS.map((p) => {
               const activo = paso === p.n;
@@ -555,8 +567,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso }: Mod
               <button
                 type="button"
                 onClick={handleConfirmar}
-                disabled={enviando || codigosFaltan.length > 0}
-                style={{ flex: '2 1 220px', minHeight: 52, border: 0, borderRadius: 12, background: 'var(--cp-orange, #E67929)', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 15, cursor: enviando || codigosFaltan.length > 0 ? 'not-allowed' : 'pointer', opacity: codigosFaltan.length > 0 ? 0.6 : 1 }}
+                disabled={enviando || codigosFaltan.length > 0 || sinUbicar}
+                title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
+                style={{ flex: '2 1 220px', minHeight: 52, border: 0, borderRadius: 12, background: 'var(--cp-orange, #E67929)', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat,sans-serif', fontWeight: 800, fontSize: 15, cursor: enviando || codigosFaltan.length > 0 || sinUbicar ? 'not-allowed' : 'pointer', opacity: codigosFaltan.length > 0 || sinUbicar ? 0.6 : 1 }}
               >
                 {enviando ? 'Confirmando...' : 'Confirmar y enviar a cocina'}
               </button>

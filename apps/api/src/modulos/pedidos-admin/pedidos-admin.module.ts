@@ -16,6 +16,8 @@ import { DevolucionPedidoService } from './devolucion-pedido.service';
 import { CambioUbicacionService } from './cambio-ubicacion.service';
 import { PropuestaUbicacionService } from './propuesta-ubicacion.service';
 import { CambioUbicacionController } from './cambio-ubicacion.controller';
+import { UbicacionWhatsappPedidoService } from './ubicacion-whatsapp-pedido.service';
+import { UBICACION_PEDIDO_PUERTO } from '../chatbot/puerto/ubicacion-pedido.puerto';
 import { PropuestaUbicacionController } from './propuesta-ubicacion.controller';
 
 @Module({
@@ -28,7 +30,9 @@ import { PropuestaUbicacionController } from './propuesta-ubicacion.controller';
     DevolucionPedidoService,
     CambioUbicacionService,
     PropuestaUbicacionService,
+    UbicacionWhatsappPedidoService,
+    { provide: UBICACION_PEDIDO_PUERTO, useExisting: UbicacionWhatsappPedidoService },
   ],
-  exports: [PedidosEstadoService],
+  exports: [PedidosEstadoService, UBICACION_PEDIDO_PUERTO],
 })
 export class PedidosAdminModule {}

@@ -14,6 +14,9 @@ import { calcularAjusteCobro, ESTADOS_CERRADOS_UBICACION, textoAvisoEnvio } from
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 import { LiquidarAjusteUbicacionDto } from './dto/liquidar-ajuste-ubicacion.dto';
 
+/** Quién origina un cambio de punto: Caja, el repartidor (propuesta) o el cliente por WhatsApp. */
+export type OrigenCambio = 'CAJA' | 'REPARTIDOR' | 'WHATSAPP_CLIENTE';
+
 export interface PuntoCambio {
   lat: number;
   lng: number;
@@ -24,7 +27,7 @@ export interface PuntoCambio {
 /** Propuesta del repartidor que Caja aprueba: se marca APROBADA dentro de la misma transacción. */
 export interface PropuestaAplicada {
   id: bigint;
-  propuestoPor: bigint;
+  propuestoPor: bigint | null;
   nota: string | null;
 }
 
@@ -199,9 +202,17 @@ export class CambioUbicacionService {
   async aplicarCambio(
     pedidoId: bigint,
     punto: PuntoCambio,
-    ctx: { origen: 'CAJA' | 'REPARTIDOR'; usuario: UsuarioAutenticado; propuesta?: PropuestaAplicada; ip?: string },
+    ctx: {
+      origen: OrigenCambio;
+      /** null = lo aplica el sistema (ubicación que el cliente envió por WhatsApp) */
+      usuario: UsuarioAutenticado | null;
+      propuesta?: PropuestaAplicada;
+      ip?: string;
+      /** El aviso al cliente lo manda quien llama (p. ej. la confirmación de la ubicación por WhatsApp) */
+      omitirAvisoCliente?: boolean;
+    },
   ) {
-    const usuarioId = BigInt(ctx.usuario.partyId);
+    const usuarioId = ctx.usuario ? BigInt(ctx.usuario.partyId) : null;
     const { pedido, calc, fila, canceladas } = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM pedido WHERE id = ${pedidoId} FOR UPDATE`;
       const actual = await tx.pedido.findUnique({ where: { id: pedidoId } });
@@ -256,7 +267,7 @@ export class CambioUbicacionService {
         data: {
           entrega_lat: new Prisma.Decimal(punto.lat),
           entrega_lng: new Prisma.Decimal(punto.lng),
-          entrega_origen: 'MAPA',
+          entrega_origen: ctx.origen === 'WHATSAPP_CLIENTE' ? 'WHATSAPP' : 'MAPA',
           zona_id: c.zona.zonaId,
           envio: new Prisma.Decimal(c.envioNuevo),
           total: new Prisma.Decimal(c.totalNuevo),
@@ -289,6 +300,7 @@ export class CambioUbicacionService {
         estado: 'APROBADA',
         resuelto_por_party_id: usuarioId,
         resuelto_en: ahora,
+        fuera_de_zona: false,
       };
       const historia = {
         lat_anterior: actual.entrega_lat != null ? Number(actual.entrega_lat) : null,
@@ -309,7 +321,7 @@ export class CambioUbicacionService {
               ...historia,
               pedido_id: pedidoId,
               origen: ctx.origen,
-              propuesto_por_party_id: usuarioId,
+              propuesto_por_party_id: usuarioId ?? actual.cliente_party_id ?? null,
               propuesto_en: ahora,
             },
           });
@@ -318,13 +330,13 @@ export class CambioUbicacionService {
         {
           categoria: 'CAMBIO',
           modulo: 'pedidos',
-          accion: ctx.origen === 'CAJA' ? 'CAMBIAR_UBICACION' : 'APROBAR_PROPUESTA_UBICACION',
+          accion: ctx.propuesta ? 'APROBAR_PROPUESTA_UBICACION' : ctx.origen === 'CAJA' ? 'CAMBIAR_UBICACION' : 'ASIGNAR_UBICACION_WHATSAPP',
           resultado: 'OK',
           entidad: 'pedido',
           entidadId: pedidoId,
           antes: { lat: historia.lat_anterior, lng: historia.lng_anterior, envio: c.envioAnterior, total: c.totalAnterior },
-          despues: { lat: punto.lat, lng: punto.lng, zona: c.zona.codigo, envio: c.envioNuevo, total: c.totalNuevo, ajuste: c.ajuste },
-          partyId: usuarioId,
+          despues: { lat: punto.lat, lng: punto.lng, zona: c.zona.codigo, envio: c.envioNuevo, total: c.totalNuevo, ajuste: c.ajuste, origen: ctx.origen },
+          partyId: usuarioId ?? undefined,
           ip: ctx.ip,
         },
         tx,
@@ -343,7 +355,7 @@ export class CambioUbicacionService {
 
     // Aviso al cliente solo si cambió el envío (ventana 24 h, sin plantilla). Fuera de la transacción: nunca la tumba.
     let avisoCliente: string | null = null;
-    if (calc.diferencia !== 0) {
+    if (calc.diferencia !== 0 && !ctx.omitirAvisoCliente) {
       avisoCliente = await this.avisarCliente(pedido.cliente_telefono, {
         codigo: pedido.codigo,
         envioAnterior: calc.envioAnterior,
@@ -524,7 +536,7 @@ export function salidaCambio(
     id: bigint;
     origen: string;
     estado: string;
-    propuesto_por_party_id: bigint;
+    propuesto_por_party_id: bigint | null;
     propuesto_en: Date;
     resuelto_por_party_id: bigint | null;
     resuelto_en: Date | null;
@@ -553,6 +565,7 @@ export function salidaCambio(
     ajuste_por_party_id: bigint | null;
     ajuste_en: Date | null;
     aviso_cliente: string | null;
+    fuera_de_zona?: boolean;
   },
   nombres: Map<string, string>,
 ) {
@@ -561,7 +574,8 @@ export function salidaCambio(
     id: String(f.id),
     origen: f.origen,
     estado: f.estado,
-    propuestoPorNombre: nombres.get(String(f.propuesto_por_party_id)) ?? null,
+    propuestoPorNombre: f.propuesto_por_party_id != null ? nombres.get(String(f.propuesto_por_party_id)) ?? null : null,
+    fueraDeZona: f.fuera_de_zona ?? false,
     propuestoEn: f.propuesto_en,
     resueltoPorNombre: f.resuelto_por_party_id != null ? nombres.get(String(f.resuelto_por_party_id)) ?? null : null,
     resueltoEn: f.resuelto_en,

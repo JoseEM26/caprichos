@@ -271,6 +271,32 @@ describe('PedidosService', () => {
       );
     });
 
+    describe('delivery sin punto en el mapa (esperando ubicación)', () => {
+      it('con dirección y referencia es válido: sin zona ni envío, el total no suma envío', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W002', estado: 'COLA', subtotal: 28.0, envio: null, total: 28.0 });
+        const dto: any = { ...pedidoBaseDto, entrega: { direccion: 'Av. Las Palmeras 123', referencia: 'Frente al parque' } };
+
+        const res = await service.crear(dto, 'idemp-sin-punto', { canal: 'CARTA' });
+
+        expect(res.envio).toBeNull();
+        expect(zonasServiceMock.detectar).not.toHaveBeenCalled();
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(data).toMatchObject({ entrega_lat: null, entrega_lng: null, zona_id: null, entrega_origen: 'ESCRITA', envio: null });
+        expect(Number(data.total)).toBe(28);
+      });
+
+      it('sin referencia en la carta: 400 REFERENCIA_REQUERIDA y no se crea', async () => {
+        const dto: any = { ...pedidoBaseDto, entrega: { direccion: 'Av. Las Palmeras 123' } };
+        await expect(service.crear(dto, 'idemp-sin-ref', { canal: 'CARTA' })).rejects.toMatchObject({ response: { codigo: 'REFERENCIA_REQUERIDA' } });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('sin dirección ni punto: 400 UBICACION_REQUERIDA', async () => {
+        const dto: any = { ...pedidoBaseDto, entrega: { referencia: 'Frente al parque' } };
+        await expect(service.crear(dto, 'idemp-sin-dir', { canal: 'CARTA' })).rejects.toMatchObject({ response: { codigo: 'UBICACION_REQUERIDA' } });
+      });
+    });
+
     describe('pago dividido (plan)', () => {
       // Delivery con total 33.0 (subtotal 28 + envío 5)
       const conPlan = (plan: any, extraPago: Record<string, unknown> = {}): CrearPedidoDto => ({

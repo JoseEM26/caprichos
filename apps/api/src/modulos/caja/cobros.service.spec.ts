@@ -280,6 +280,19 @@ describe('CobrosService', () => {
       );
     });
 
+    it('delivery sin ubicación no se cobra -> 409 DELIVERY_SIN_UBICACION', async () => {
+      prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock, estado: 'COLA', modalidad: 'DELIVERY', entrega_lat: null, entrega_lng: null, zona_id: null });
+      await expect(
+        service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 50 }] }, cajeroUsuario),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({ codigo: 'DELIVERY_SIN_UBICACION' }),
+          status: HttpStatus.CONFLICT,
+        }),
+      );
+    });
+
     it('doble cobro -> 409 YA_COBRADO si pedido ya figura PAGADO', async () => {
       prismaMock.caja.findUnique.mockResolvedValue(cajaAbiertaMock);
       prismaMock.pedido.findUnique.mockResolvedValue({
@@ -1163,6 +1176,30 @@ describe('CobrosService', () => {
           resultado: 'OK',
         }),
       );
+    });
+
+    it('delivery sin ubicación no se coordina -> 409 DELIVERY_SIN_UBICACION y no actualiza', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 20n, codigo: 'CP-W020', estado: 'COLA', pago_estado: 'PENDIENTE', comprobante_tipo: 'BOLETA',
+        modalidad: 'DELIVERY', entrega_lat: null, entrega_lng: null, zona_id: null,
+      });
+      await expect(service.marcarCoordinado('20', cajeroUsuario)).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({ codigo: 'DELIVERY_SIN_UBICACION' }),
+          status: HttpStatus.CONFLICT,
+        }),
+      );
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('delivery con punto y zona se coordina sin trabas', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 20n, codigo: 'CP-W020', estado: 'COLA', pago_estado: 'PENDIENTE', comprobante_tipo: 'BOLETA',
+        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
+      });
+      prismaMock.pedido.update.mockResolvedValue({ id: 20n, codigo: 'CP-W020', pago_estado: 'COORDINADO', pago_coordinado_en: new Date(), pago_coordinado_por: 2n });
+      const res = await service.marcarCoordinado('20', cajeroUsuario);
+      expect(res.pago_estado).toBe('COORDINADO');
     });
 
     it('pedido anulado no puede coordinarse -> 409 PEDIDO_ANULADO', async () => {

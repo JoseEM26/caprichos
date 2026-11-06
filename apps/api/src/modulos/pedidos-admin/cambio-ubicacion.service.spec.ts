@@ -108,6 +108,21 @@ describe('CambioUbicacionService', () => {
     expect(auditoria.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'CAMBIAR_UBICACION' }), prisma);
   });
 
+  it('ubicación de WhatsApp (sistema, sin usuario): recalcula, guarda origen WHATSAPP_CLIENTE y audita sin usuario; no manda el aviso genérico si se omite', async () => {
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ cliente_telefono: '987654321', cliente_party_id: 12n }));
+    const r = await service.aplicarCambio(7n, punto, { origen: 'WHATSAPP_CLIENTE', usuario: null, omitirAvisoCliente: true });
+    expect(r).toMatchObject({ zona: 'Z3', envioNuevo: 6, totalNuevo: 46, avisoCliente: null });
+    expect(prisma.pedido.update.mock.calls[0][0].data).toMatchObject({ entrega_origen: 'WHATSAPP' });
+    expect(prisma.pedidoCambioUbicacion.create.mock.calls[0][0].data).toMatchObject({
+      origen: 'WHATSAPP_CLIENTE', propuesto_por_party_id: 12n, resuelto_por_party_id: null,
+    });
+    expect(auditoria.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ accion: 'ASIGNAR_UBICACION_WHATSAPP', despues: expect.objectContaining({ origen: 'WHATSAPP_CLIENTE' }) }),
+      prisma,
+    );
+    expect(ventana.enviarMensajeNegocio).not.toHaveBeenCalled();
+  });
+
   it('pagado y envío mayor: saldo por cobrar de la diferencia', async () => {
     prisma.pedido.findUnique.mockResolvedValue(pedido({ pago_estado: 'PAGADO', total: 40 }));
     prisma.cobro.findFirst.mockResolvedValue({ total: 40 });

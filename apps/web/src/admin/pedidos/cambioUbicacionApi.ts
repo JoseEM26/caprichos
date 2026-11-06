@@ -22,7 +22,9 @@ export interface AjusteCobro {
 /** Un cambio del historial (propuesta, aprobado, rechazado o cancelado). */
 export interface CambioUbicacion {
   id: string;
-  origen: 'CAJA' | 'REPARTIDOR';
+  origen: 'CAJA' | 'REPARTIDOR' | 'WHATSAPP_CLIENTE';
+  /** La ubicación del cliente cayó fuera de la zona de reparto (no se puede aplicar) */
+  fueraDeZona?: boolean;
   estado: 'PROPUESTA' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA';
   propuestoPorNombre: string | null;
   propuestoEn: string;
@@ -68,6 +70,9 @@ export interface PropuestaPendiente extends CambioUbicacion {
   pagoEstado: string | null;
   estadoPedido: string;
   direccionActual: string | null;
+  /** Punto actual del pedido (para la distancia a la propuesta) */
+  latActual?: number | null;
+  lngActual?: number | null;
 }
 
 export const cambioUbicacionApi = {
@@ -80,6 +85,11 @@ export const cambioUbicacionApi = {
     dto: { lat: number; lng: number; direccion?: string; referencia?: string },
   ): Promise<PrevisualizacionCambio & { id: string; cambioId: string; codigo: string; avisoCliente: string | null }> {
     return api.post(`/admin/pedidos/${pedidoId}/ubicacion/cambiar`, dto);
+  },
+
+  /** Caja reenvía al cliente el pedido de ubicación por WhatsApp (solo con la ventana de 24 h abierta). */
+  pedirUbicacionWhatsapp(pedidoId: string): Promise<{ enviado: boolean }> {
+    return api.post(`/admin/pedidos/${pedidoId}/ubicacion/pedir-whatsapp`);
   },
 
   historial(pedidoId: string): Promise<HistorialUbicacion> {
@@ -134,3 +144,23 @@ export function textoAjuste(a: AjusteCobro): string {
   if (a.tipo === 'SALDO') return a.estado === 'COBRADO' ? `Saldo cobrado ${monto}` : `Saldo por cobrar ${monto}`;
   return a.estado === 'DEVUELTO' ? `Devuelto ${monto}` : `Devolución pendiente ${monto}`;
 }
+
+/** Metros entre dos puntos (haversine), para decir a Caja a qué distancia queda la ubicación propuesta. */
+export function distanciaMetros(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const rad = (g: number) => (g * Math.PI) / 180;
+  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** «A 120 m» / «A 1.4 km» del punto actual; null si el pedido aún no tiene punto. */
+export function textoDistancia(c: Pick<CambioUbicacion, 'anterior' | 'nueva'>): string | null {
+  if (c.anterior.lat == null || c.anterior.lng == null || c.nueva.lat == null || c.nueva.lng == null) return null;
+  const m = distanciaMetros({ lat: c.anterior.lat, lng: c.anterior.lng }, { lat: c.nueva.lat, lng: c.nueva.lng });
+  return m < 1000 ? `A ${Math.round(m)} m del punto actual` : `A ${(m / 1000).toFixed(1)} km del punto actual`;
+}
+
+export const ORIGEN_CAMBIO: Record<CambioUbicacion['origen'], string> = {
+  CAJA: 'Caja',
+  REPARTIDOR: 'Repartidor',
+  WHATSAPP_CLIENTE: 'Cliente (WhatsApp)',
+};
