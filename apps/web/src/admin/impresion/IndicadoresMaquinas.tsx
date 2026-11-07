@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { RolImpresora } from '@caprichos/compartido';
-import { MaquinasImpresion, NOMBRE_MAQUINA, programaApagado } from './useEstadoMaquinas';
+import { MaquinasImpresion, NOMBRE_MAQUINA } from './useEstadoMaquinas';
 import { PanelInstalarPrograma } from './PanelInstalarPrograma';
 import { PruebaImpresion } from './PruebaImpresion';
 
@@ -108,9 +108,8 @@ export function IndicadoresMaquinas({
             {alVerCola && (
               <button type="button" className="cola-btn" onClick={() => { setAbierto(null); alVerCola(); }}>Ver cola</button>
             )}
-            {programaApagado(maquinas) && (
-              <button type="button" className="cola-btn" onClick={() => { setAbierto(null); setInstalar(true); }}>Instalar programa de impresión</button>
-            )}
+            {/* Siempre disponible: también sirve para volver a descargarlo o vincular otra PC con el programa ya corriendo */}
+            <button type="button" className="cola-btn" onClick={() => { setAbierto(null); setInstalar(true); }}>Instalar programa de impresión</button>
           </div>
         </div>
       )}

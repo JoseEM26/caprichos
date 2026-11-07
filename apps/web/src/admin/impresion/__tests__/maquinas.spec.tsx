@@ -39,11 +39,11 @@ describe('indicadores de máquinas', () => {
     expect(screen.getByRole('button', { name: 'Instalar programa de impresión' })).toBeInTheDocument();
   });
 
-  it('con ambas conectadas no ofrece instalar', () => {
+  it('con ambas conectadas sigue ofreciendo instalar/descargar el programa', () => {
     render(<MemoryRouter><IndicadoresMaquinas maquinas={{ ETIQUETERA: ok, TICKETERA: ok } as any} /></MemoryRouter>);
     fireEvent.click(screen.getByTestId('indicador-etiquetera'));
     expect(screen.getByRole('region', { name: 'Estado de Etiquetera' })).toHaveTextContent('Etiquetera: conectada');
-    expect(screen.queryByRole('button', { name: 'Instalar programa de impresión' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Instalar programa de impresión' })).toBeInTheDocument();
   });
 
   it('el panel de instalación muestra descarga, pasos y el código de un solo uso', async () => {
