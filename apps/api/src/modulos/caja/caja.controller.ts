@@ -31,9 +31,14 @@ export class CajaController {
 
   @Post('abrir')
   @Permiso('caja', 'abrir')
-  async abrirCaja(@Body() dto: AbrirCajaDto, @Req() req: any) {
+  async abrirCaja(
+    @Body() dto: AbrirCajaDto,
+    @Req() req: any,
+    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
+  ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.cajaService.abrirCaja(dto, req.usuario, ip);
+    // El código solo se exige si el monto difiere del oficial: lo decide el servicio, no un decorador fijo.
+    return this.cajaService.abrirCaja(dto, req.usuario, ip, codigoSupervisor);
   }
 
   @Get('actual')

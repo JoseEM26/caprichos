@@ -145,6 +145,12 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Aplica desde el monto exacto ("desde") o solo si supera el monto ("mas_de").',
     tipo: 'texto',
   },
+  caja_monto_inicial: {
+    nombre: 'Monto inicial de la caja',
+    descripcion: 'Dinero con el que se abre la caja cada día. Solo el administrador lo cambia; otro monto al abrir pide código de supervisor.',
+    tipo: 'numero',
+    sufijo: 'S/',
+  },
   pedido_minimo: {
     nombre: 'Pedido mínimo para delivery',
     descripcion: 'Monto mínimo en compras requerido para poder solicitar envío a domicilio.',

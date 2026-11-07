@@ -4,11 +4,13 @@ import { Prisma } from '@prisma/client';
 import { CajaService } from './caja.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 
 describe('CajaService', () => {
   let service: CajaService;
   let prismaMock: any;
   let auditoriaMock: any;
+  let supervisorMock: any;
 
   const cajeroUsuario = {
     id: 2n,
@@ -34,6 +36,10 @@ describe('CajaService', () => {
       pedido: { findMany: jest.fn().mockResolvedValue([]) },
       liquidacion: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: jest.fn().mockResolvedValue([]),
+      // monto inicial oficial S/ 150; por defecto nadie es ADMIN/SUPERVISOR
+      parametro: { findUnique: jest.fn().mockResolvedValue({ clave: 'caja_monto_inicial', valor: 150 }) },
+      userAccount: { findFirst: jest.fn().mockResolvedValue(null), findUnique: jest.fn().mockResolvedValue(null) },
+      person: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     prismaMock.$transaction = jest.fn().mockImplementation(async (cb: any) => cb(prismaMock));
 
@@ -41,11 +47,16 @@ describe('CajaService', () => {
       registrar: jest.fn().mockResolvedValue(undefined),
     };
 
+    supervisorMock = {
+      verificarYConsumirCodigo: jest.fn().mockResolvedValue({ party_id: 2n, id: 2n, supervisorPartyId: 9n, supervisorId: 9n }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CajaService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: AuditoriaService, useValue: auditoriaMock },
+        { provide: SupervisorCodigoService, useValue: supervisorMock },
       ],
     }).compile();
 
@@ -90,6 +101,67 @@ describe('CajaService', () => {
           entidad: 'caja',
         }),
       );
+    });
+
+    describe('monto inicial oficial', () => {
+      const cajaCreada = (monto: number) => ({
+        id: 11n, fecha: new Date('2026-10-21T00:00:00.000Z'), apertura: new Prisma.Decimal(monto),
+        estado: 'ABIERTA', abierta_por: 2n, cerrada_por: null, cerrada_en: null,
+      });
+      beforeEach(() => {
+        prismaMock.caja.findUnique.mockResolvedValue(null);
+      });
+
+      it('abre con el monto oficial sin pedir código', async () => {
+        prismaMock.caja.create.mockResolvedValue(cajaCreada(150));
+        await service.abrirCaja({ apertura: 150 }, cajeroUsuario);
+        expect(supervisorMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
+      });
+
+      it('sin monto, abre con el oficial', async () => {
+        prismaMock.caja.create.mockResolvedValue(cajaCreada(150));
+        await service.abrirCaja({}, cajeroUsuario);
+        expect(prismaMock.caja.create.mock.calls[0][0].data.apertura.toString()).toBe('150');
+      });
+
+      it('no-admin con monto distinto y sin código: 403 y no abre', async () => {
+        await expect(service.abrirCaja({ apertura: 200 }, cajeroUsuario)).rejects.toMatchObject({
+          status: HttpStatus.FORBIDDEN,
+          response: { codigo: 'MONTO_INICIAL_REQUIERE_CODIGO' },
+        });
+        expect(prismaMock.caja.create).not.toHaveBeenCalled();
+      });
+
+      it('no-admin con monto distinto y código válido: abre y audita quién aprobó', async () => {
+        prismaMock.caja.create.mockResolvedValue(cajaCreada(200));
+        await service.abrirCaja({ apertura: 200 }, cajeroUsuario, '1.1.1.1', '123456');
+        expect(supervisorMock.verificarYConsumirCodigo).toHaveBeenCalledWith('123456', 2n, 'caja/abrir_monto_distinto', '1.1.1.1', 'caja');
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+          expect.objectContaining({
+            accion: 'ABRIR_CAJA',
+            despues: expect.objectContaining({ apertura: 200, montoOficial: 150, distintoDelOficial: true, abiertaPor: '2', aprobadoPor: '9' }),
+          }),
+        );
+      });
+
+      it('código inválido: el rechazo del verificador sube y no abre', async () => {
+        supervisorMock.verificarYConsumirCodigo.mockRejectedValue(new HttpException({ codigo: 'CODIGO_INVALIDO' }, HttpStatus.FORBIDDEN));
+        await expect(service.abrirCaja({ apertura: 200 }, cajeroUsuario, undefined, '000000')).rejects.toMatchObject({ status: 403 });
+        expect(prismaMock.caja.create).not.toHaveBeenCalled();
+      });
+
+      it('ADMIN cambia el monto sin escribir código (el verificador lo autoriza solo)', async () => {
+        prismaMock.userAccount.findFirst.mockResolvedValue({ party_id: 1n, id: 1n, rol: 'ADMIN' });
+        supervisorMock.verificarYConsumirCodigo.mockResolvedValue({ party_id: 1n, id: 1n, supervisorPartyId: 1n, supervisorId: 1n });
+        prismaMock.caja.create.mockResolvedValue(cajaCreada(300));
+        await service.abrirCaja({ apertura: 300 }, { partyId: 1n, rol: 'ADMIN' });
+        expect(supervisorMock.verificarYConsumirCodigo).toHaveBeenCalledWith(undefined, 1n, 'caja/abrir_monto_distinto', undefined, 'caja');
+      });
+
+      it('precarga: la caja cerrada devuelve el monto oficial', async () => {
+        const r = await service.obtenerCajaActual(cajeroUsuario);
+        expect(r.montoInicialOficial).toBe(150);
+      });
     });
 
     it('apertura duplicada -> 409 CAJA_YA_ABIERTA si ya existe caja hoy', async () => {
@@ -406,7 +478,7 @@ describe('CajaService', () => {
       prismaMock.caja.findFirst.mockResolvedValue(null);
       prismaMock.caja.create.mockRejectedValue(Object.assign(new Error('unique'), { code: 'P2002' }));
 
-      await expect(service.abrirCaja({ apertura: 0 } as any, { partyId: 1n, rol: 'ADMIN' })).rejects.toMatchObject({
+      await expect(service.abrirCaja({ apertura: 150 } as any, { partyId: 1n, rol: 'ADMIN' })).rejects.toMatchObject({
         response: { codigo: 'CAJA_YA_ABIERTA' },
         status: HttpStatus.CONFLICT,
       });

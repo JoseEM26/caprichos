@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import {
@@ -20,6 +21,8 @@ import { MODO_CODIGO_PLANTILLA, MODO_WHATSAPP_ENTRANTE } from '../clientes/verif
 export const CLAVES_NUMERICAS = [
   'notif_sonido_intervalo_seg',
   'propina_tope',
+  // Monto inicial oficial de la caja (S/, hasta 2 decimales, 0 a 5000): solo el ADMIN lo cambia
+  'caja_monto_inicial',
   'tiempo_prometido_min',
   'tiempo_max_min',
   'envio_gratis_monto',
@@ -261,6 +264,20 @@ export class ConfiguracionService {
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El tope de propina debe estar entre S/ 1 y S/ 1000',
         });
+      }
+      if (clave === 'caja_monto_inicial') {
+        if (usuarioActual?.rol !== 'ADMIN') {
+          throw new ForbiddenException({
+            codigo: 'SOLO_ADMIN',
+            mensaje: 'Solo el administrador puede cambiar el monto inicial de la caja',
+          });
+        }
+        if (valor > 5000 || Math.round(valor * 100) / 100 !== valor) {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'El monto inicial debe estar entre S/ 0 y S/ 5000, con máximo dos decimales',
+          });
+        }
       }
       if ((Object.values(CLAVES_TAMANO_ETIQUETA) as string[]).includes(clave) && !medidaEtiquetaValida(valor)) {
         throw new BadRequestException({

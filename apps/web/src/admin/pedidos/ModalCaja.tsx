@@ -14,6 +14,8 @@ import { ErrorApi } from '../../comun/api';
 import { SeccionEquipos } from '../impresion/SeccionEquipos';
 import { SeccionColaPruebas } from '../impresion/SeccionColaPruebas';
 import { ModalCoordinarPago } from './ModalCoordinarPago';
+import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
+import { usePideCodigo } from '../../comun/usePideCodigo';
 
 export interface ModalCajaProps {
   cajaInfo: CajaActualRespuesta | null;
@@ -33,7 +35,18 @@ export function ModalCaja({
   );
 
   // Estado para apertura
-  const [montoApertura, setMontoApertura] = useState<string>('0.00');
+  // Precargado con el monto inicial oficial; el ADMIN lo cambia libre, el resto necesita código de supervisor
+  const montoOficial = cajaInfo?.montoInicialOficial ?? 0;
+  const [montoApertura, setMontoApertura] = useState<string>(montoOficial.toFixed(2));
+  const [codigoApertura, setCodigoApertura] = useState<string>('');
+  const pideCodigo = usePideCodigo();
+  const montoDistinto = Math.round((parseFloat(montoApertura) || 0) * 100) !== Math.round(montoOficial * 100);
+  const necesitaCodigo = pideCodigo && montoDistinto;
+  // Si el monto oficial llega después de abrir el modal y nadie tocó el campo, se precarga
+  const [montoTocado, setMontoTocado] = useState<boolean>(false);
+  useEffect(() => {
+    if (!montoTocado) setMontoApertura(montoOficial.toFixed(2));
+  }, [montoOficial, montoTocado]);
   const [abriendoCaja, setAbriendoCaja] = useState<boolean>(false);
   const [mostrarConfirmarAbrir, setMostrarConfirmarAbrir] = useState<boolean>(false);
 
@@ -99,7 +112,10 @@ export function ModalCaja({
     setErrorMensaje('');
     try {
       const val = parseFloat(montoApertura);
-      await pedidosApi.abrirCaja(isNaN(val) ? 0 : Math.max(0, val));
+      await pedidosApi.abrirCaja(
+        isNaN(val) ? 0 : Math.max(0, val),
+        necesitaCodigo ? codigoApertura : undefined,
+      );
       alActualizarCaja();
       setPestana('movimientos');
     } catch (err: any) {
@@ -404,7 +420,10 @@ export function ModalCaja({
                 type="text"
                 inputMode="decimal"
                 value={montoApertura}
-                onChange={(e) => setMontoApertura(e.target.value)}
+                onChange={(e) => {
+                  setMontoTocado(true);
+                  setMontoApertura(e.target.value);
+                }}
                 placeholder="0.00"
                 style={{
                   width: '100%',
@@ -416,7 +435,19 @@ export function ModalCaja({
                   fontSize: 16,
                 }}
               />
+              <div style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', marginTop: 4 }}>
+                Monto inicial oficial: S/ {montoOficial.toFixed(2)}. Solo el administrador lo configura.
+              </div>
             </div>
+
+            {necesitaCodigo && (
+              <CampoCodigoSupervisor
+                id="codigo-apertura-caja"
+                valor={codigoApertura}
+                onChange={setCodigoApertura}
+                ayuda="Es un monto distinto del oficial: pide el código a la supervisora o al administrador."
+              />
+            )}
 
             <Boton
               variante="primario"
@@ -425,6 +456,10 @@ export function ModalCaja({
                 const val = parseFloat(montoApertura);
                 if (isNaN(val) || val < 0) {
                   setErrorMensaje('El monto no puede ser negativo.');
+                  return;
+                }
+                if (necesitaCodigo && codigoApertura.length !== 6) {
+                  setErrorMensaje('Para abrir con otro monto escribe el código del supervisor (6 dígitos).');
                   return;
                 }
                 setMostrarConfirmarAbrir(true);

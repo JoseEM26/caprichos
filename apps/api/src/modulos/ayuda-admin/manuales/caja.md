@@ -22,8 +22,9 @@ Modulo central para la recepcion, seguimiento y cobro de pedidos en salon, para 
 
 ## Como se hace: Abrir la caja del turno
 1. En la barra superior, pulsar el boton Abrir caja.
-2. En el campo Monto inicial en efectivo, ingresar el fondo fijo de apertura en soles.
-3. Pulsar el boton Abrir caja ahora. El estado de la barra superior cambiara a Caja abierta.
+2. En el campo Monto inicial en soles ya aparece el monto oficial que configura el administrador (Configuracion > Parametros del sistema > Caja > Monto inicial de la caja). Si es el correcto, no se toca.
+3. Si hay que abrir con otro monto: el administrador lo escribe sin pedir nada (queda auditado). El cajero escribe el monto y el sistema pide el codigo del supervisor (6 digitos, lo ve la supervisora en su pantalla). El supervisor tampoco lo escribe: se autoriza solo y queda registrado.
+4. Pulsar el boton Abrir caja ahora. El estado de la barra superior cambiara a Caja abierta. Si el codigo es incorrecto o falta, la caja no se abre y el sistema avisa.
 Antes: [[supervisor-codigo]]
 Despues: [[caja]]
 

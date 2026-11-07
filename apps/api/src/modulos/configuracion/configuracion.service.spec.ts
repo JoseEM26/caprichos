@@ -155,6 +155,19 @@ describe('ConfiguracionService', () => {
       expect(prismaMock.parametro.upsert).toHaveBeenCalled();
     });
 
+    it('caja_monto_inicial: solo ADMIN, de 0 a 5000 con máximo dos decimales', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'caja_monto_inicial', valor: 150.5 });
+
+      await expect(service.actualizar('caja_monto_inicial', 100, { ...adminAuth, rol: 'SUPERVISOR' } as any)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+      await expect(service.actualizar('caja_monto_inicial', 100)).rejects.toMatchObject({ response: { codigo: 'SOLO_ADMIN' } });
+      await expect(service.actualizar('caja_monto_inicial', -1, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      await expect(service.actualizar('caja_monto_inicial', 5001, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      await expect(service.actualizar('caja_monto_inicial', 10.123, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      await service.actualizar('caja_monto_inicial', 150.5, adminAuth);
+      expect(prismaMock.parametro.upsert).toHaveBeenCalled();
+    });
+
     it('avisos de stock: 0–20 enteros, 0 desactiva y la franja nunca pasa del aviso', async () => {
       prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
       prismaMock.parametro.findUnique.mockResolvedValue(null); // el otro vale su defecto (5 y 3)

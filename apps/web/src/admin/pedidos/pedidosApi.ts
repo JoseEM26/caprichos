@@ -224,6 +224,8 @@ export interface CobroTurno {
 export interface CajaActualRespuesta {
   caja: CajaInfo | null;
   abierta: boolean;
+  /** Monto inicial oficial (S/): precarga la apertura. */
+  montoInicialOficial?: number;
   cajaAnteriorAbierta?: { fecha: string } | null;
   cobrados?: CobroTurno[];
   totalesPorMedio: Record<string, number>;
@@ -467,8 +469,9 @@ export const pedidosApi = {
     return api.get<CajaActualRespuesta>('/admin/caja/actual');
   },
 
-  async abrirCaja(apertura: number): Promise<CajaInfo> {
-    return api.post<CajaInfo>('/admin/caja/abrir', { apertura });
+  async abrirCaja(apertura: number, codigoSupervisor?: string): Promise<CajaInfo> {
+    const headers = codigoSupervisor ? { 'X-Codigo-Supervisor': codigoSupervisor.trim() } : undefined;
+    return api.post<CajaInfo>('/admin/caja/abrir', { apertura }, headers ? { headers } : undefined);
   },
 
   async cobrar(dto: CobrarDto): Promise<any> {

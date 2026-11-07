@@ -63,12 +63,13 @@ describe('CajaController', () => {
 
   it('abrirCaja delega a cajaService.abrirCaja con usuario e IP', async () => {
     const req = { usuario: mockUsuario, ip: '127.0.0.1' };
-    const res = await controller.abrirCaja({ apertura: 100 }, req);
+    const res = await controller.abrirCaja({ apertura: 100 }, req, '123456');
 
     expect(cajaServiceMock.abrirCaja).toHaveBeenCalledWith(
       { apertura: 100 },
       mockUsuario,
       '127.0.0.1',
+      '123456',
     );
     expect(res).toEqual({ id: '1', estado: 'ABIERTA' });
   });
