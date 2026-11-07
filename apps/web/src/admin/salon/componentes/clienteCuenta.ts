@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { api } from '../../../comun/api';
 
 /** Dirección guardada en la libreta del cliente con cuenta (GET /admin/clientes/por-telefono/:telefono) */
@@ -66,4 +67,44 @@ export function fechaCortaDireccion(iso: string | null): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return 'sin fecha';
   return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/**
+ * Busca la cuenta sola cuando el celular tiene 9 dígitos y empieza con 9. Solo vale la respuesta del
+ * último celular (las viejas se ignoran) y no repite la búsqueda si el celular no cambió.
+ */
+export function useCuentaPorCelular(telefono: string) {
+  const valido = /^9\d{8}$/.test(telefono);
+  const [estado, setEstado] = useState<{
+    tel: string;
+    cuenta: CuentaCliente | null;
+    buscando: boolean;
+    error: string | null;
+  }>({ tel: '', cuenta: null, buscando: false, error: null });
+
+  useEffect(() => {
+    if (!valido) {
+      setEstado((e) => (e.tel === '' ? e : { tel: '', cuenta: null, buscando: false, error: null }));
+      return;
+    }
+    let vigente = true;
+    setEstado({ tel: telefono, cuenta: null, buscando: true, error: null });
+    buscarCuentaPorTelefono(telefono)
+      .then((cuenta) => vigente && setEstado({ tel: telefono, cuenta, buscando: false, error: null }))
+      .catch((err) =>
+        vigente && setEstado({ tel: telefono, cuenta: null, buscando: false, error: mensajeErrorCuenta(err) }),
+      );
+    return () => {
+      vigente = false;
+    };
+  }, [telefono, valido]);
+
+  // Mientras no coincida con el celular escrito, el estado guardado es de otro número: no se muestra
+  const actual = valido && estado.tel === telefono;
+  return {
+    cuenta: actual ? estado.cuenta : null,
+    buscando: valido && (!actual || estado.buscando),
+    error: actual ? estado.error : null,
+    sinCuenta: actual && !estado.buscando && !estado.error && estado.cuenta === null,
+  };
 }

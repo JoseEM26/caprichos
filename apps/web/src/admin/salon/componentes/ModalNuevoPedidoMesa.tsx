@@ -49,10 +49,8 @@ import {
 } from '../../pedidos/planPago';
 import { listarPersonalActivo, ColaboradorActivo as PersonalItem } from '../../creditos/creditosApi';
 import {
-  buscarCuentaPorTelefono,
+  useCuentaPorCelular,
   fechaCortaDireccion,
-  mensajeErrorCuenta,
-  type CuentaCliente,
   type DireccionCliente,
 } from './clienteCuenta';
 
@@ -260,8 +258,8 @@ export function ModalNuevoPedidoMesa({
   }, []);
 
   // Datos cliente (para llevar o delivery)
-  const [cliNombre, setCliNombre] = useState(pedidoRepetir?.cliente_nombre || '');
-  const [cliTelefono, setCliTelefono] = useState(pedidoRepetir?.cliente_telefono || '');
+  const [cliNombre, setCliNombre] = useState<string>(pedidoRepetir?.cliente_nombre || '');
+  const [cliTelefono, setCliTelefono] = useState<string>(pedidoRepetir?.cliente_telefono || '');
   const [cliDireccion, setCliDireccion] = useState(pedidoRepetir?.entrega_direccion || '');
   const [cliReferencia, setCliReferencia] = useState(pedidoRepetir?.entrega_referencia || '');
   const [cliPagaCon, setCliPagaCon] = useState(
@@ -319,71 +317,56 @@ export function ModalNuevoPedidoMesa({
     };
   }, [cliPuntoMapa]);
 
-  // Para llevar / delivery: 'invitado' pide nombre y teléfono; 'cuenta' toma los datos de la cuenta por celular
-  const [modoCli, setModoCli] = useState<'invitado' | 'cuenta'>('invitado');
-  const [telCli, setTelCli] = useState('');
-  const [cuenta, setCuenta] = useState<CuentaCliente | null>(null);
-  const [buscandoCuenta, setBuscandoCuenta] = useState(false);
-  const [errorCuenta, setErrorCuenta] = useState<string | null>(null);
-  const [sinCuenta, setSinCuenta] = useState(false);
+  // El celular (cliTelefono) va primero: con 9 dígitos se busca la cuenta y, si existe, se autocompleta el nombre
+  // (editable) y la libreta de direcciones. Sin cuenta, el nombre se escribe y el cliente se crea como hoy.
+  const telCli = cliTelefono.replace(/\D/g, '');
+  const { cuenta, buscando: buscandoCuenta, error: errorCuenta, sinCuenta } = useCuentaPorCelular(telCli);
   // Dirección de la libreta elegida: id de la dirección, 'nueva' o null (todavía no eligió)
   const [direccionElegida, setDireccionElegida] = useState<string | null>(null);
+  const nombreAutocompletado = useRef('');
+  const huboCuenta = useRef(false);
 
   useEffect(() => {
-    if (modoCli !== 'cuenta') return;
-    // Cambiar o borrar el celular quita los datos de la cuenta anterior (no deben colarse al pedido)
-    setCuenta(null);
-    setSinCuenta(false);
-    setErrorCuenta(null);
-    setCliNombre('');
-    setCliTelefono('');
-    setCliDireccion('');
-    setCliReferencia('');
-    setCliPuntoMapa(null);
-    setDireccionElegida(null);
-    if (telCli.length !== 9) {
-      setBuscandoCuenta(false);
+    const auto = nombreAutocompletado.current;
+    if (cuenta) {
+      // Solo rellena si el nombre está vacío o es el que puso la búsqueda anterior: lo que escribió el usuario se respeta
+      setCliNombre((prev) => (prev.trim() === '' || prev === auto ? cuenta.nombre : prev));
+      nombreAutocompletado.current = cuenta.nombre;
+      huboCuenta.current = true;
+      setDireccionElegida(cuenta.direcciones.length === 0 ? 'nueva' : null);
       return;
     }
-    let vigente = true;
-    setBuscandoCuenta(true);
-    buscarCuentaPorTelefono(telCli)
-      .then((c) => {
-        if (!vigente) return;
-        if (!c) {
-          setSinCuenta(true);
-          return;
-        }
-        setCuenta(c);
-        setCliNombre(c.nombre);
-        setCliTelefono(c.telefono ?? '');
-        setDireccionElegida(c.direcciones.length === 0 ? 'nueva' : null);
-      })
-      .catch((err) => {
-        if (vigente) setErrorCuenta(mensajeErrorCuenta(err));
-      })
-      .finally(() => {
-        if (vigente) setBuscandoCuenta(false);
-      });
-    return () => {
-      vigente = false;
-    };
-  }, [telCli, modoCli]);
-
-  const cambiarModoCli = (m: 'invitado' | 'cuenta') => {
-    if (m === modoCli) return;
-    setModoCli(m);
-    setTelCli('');
-    setCuenta(null);
-    setSinCuenta(false);
-    setErrorCuenta(null);
+    if (!huboCuenta.current) return;
+    // Cambió o borró el celular: se van los datos de la cuenta anterior (no deben colarse al pedido)
+    huboCuenta.current = false;
+    nombreAutocompletado.current = '';
+    setCliNombre((prev) => (prev === auto ? '' : prev));
     setDireccionElegida(null);
-    setCliNombre('');
-    setCliTelefono('');
     setCliDireccion('');
     setCliReferencia('');
     setCliPuntoMapa(null);
-  };
+  }, [cuenta]);
+
+  const avisoCuentaCelular = (
+    <>
+      {buscandoCuenta && <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>Buscando cuenta…</div>}
+      {errorCuenta && (
+        <div role="alert" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
+          {errorCuenta}
+        </div>
+      )}
+      {cuenta && (
+        <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-ok)' }}>
+          Cliente registrado: {cuenta.nombre}
+        </div>
+      )}
+      {sinCuenta && (
+        <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
+          Celular sin cuenta: escribe el nombre del cliente.
+        </div>
+      )}
+    </>
+  );
 
   const elegirDireccionAnterior = (d: DireccionCliente) => {
     setDireccionElegida(d.id);
@@ -400,24 +383,22 @@ export function ModalNuevoPedidoMesa({
   };
 
   // Datos del cliente (para llevar / delivery). «Continuar» no se deshabilita: al tocarlo muestra qué falta
-  // y lleva el foco al campo (ver intentarContinuarCli). Con cuenta basta la cuenta; si no, nombre de 2+ letras.
+  // y lleva el foco al campo (ver intentarContinuarCli). Hace falta celular válido y nombre de 2+ letras.
   // Delivery: hace falta dirección (escrita o en el mapa), venga de la libreta o sea nueva.
   const errorDatosCli =
-    modoCli === 'cuenta' && cuenta === null
-      ? { mensaje: 'Busca y elige la cuenta del cliente', foco: ['#cli-cel'] }
-      : modoCli === 'invitado' && cliNombre.trim().length < 2
+    !/^9\d{8}$/.test(telCli)
+      ? { mensaje: 'Escribe el celular del cliente: 9 dígitos que empiecen con 9', foco: ['#cli-cel'] }
+      : cliNombre.trim().length < 2
         ? { mensaje: 'Escribe el nombre del cliente (mínimo 2 letras)', foco: ['#cli-nombre'] }
         : modalidad === 'delivery' && cliDireccion.trim().length === 0 && cliPuntoMapa === null
           ? { mensaje: 'Escribe la dirección o marca el punto en el mapa', foco: ['#cli-direccion'] }
           : null;
   const cliListo = errorDatosCli === null;
   // Celular del cliente del delivery (cuenta o invitado): para ver si mandó su ubicación por WhatsApp
-  const telUbicacionDelivery = modoCli === 'cuenta' ? telCli : cliTelefono.replace(/\D/g, '');
+  const telUbicacionDelivery = telCli;
   const telefonoUbicacionDelivery = /^9\d{8}$/.test(telUbicacionDelivery) ? telUbicacionDelivery : null;
   // Con cuenta y direcciones guardadas, el formulario de dirección aparece solo si elige «Dirección nueva»
-  const mostrarFormDireccion =
-    modoCli === 'invitado' ||
-    (cuenta !== null && direccionElegida !== null);
+  const mostrarFormDireccion = cuenta === null || direccionElegida !== null;
 
   // ¿Quién pide? ('anon' | 'cliente' | 'personal')
   const [pideMode, setPideMode] = useState<'anon' | 'cliente' | 'personal'>(
@@ -436,7 +417,7 @@ export function ModalNuevoPedidoMesa({
   const clientePideId =
     pideMode === 'cliente' &&
     clienteEncontrado?.partyId &&
-    !(modalidad !== 'local' && modoCli === 'cuenta' && cuenta !== null)
+    !(modalidad !== 'local' && cuenta !== null)
       ? clienteEncontrado.partyId
       : undefined;
   const [resultadosCliente, setResultadosCliente] = useState<ClienteBuscado[]>([]);
@@ -1175,7 +1156,7 @@ export function ModalNuevoPedidoMesa({
             canal: canalEnvio,
             comprobante: aComprobanteAlta(valorComp),
             // Solo con cuenta: el pedido suma puntos y guarda la dirección en su libreta
-            clienteTelefono: modoCli === 'cuenta' && cuenta ? telCli : undefined,
+            clienteTelefono: cuenta ? telCli : undefined,
             clientePartyId: clientePideId,
           },
           idempotencyKey,
@@ -2052,142 +2033,36 @@ export function ModalNuevoPedidoMesa({
           {/* ============================================================= */}
           {paso === 'cli' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Quién es el cliente: con cuenta (celular) o invitado */}
-              <div role="group" aria-label="Tipo de cliente" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {(
-                  [
-                    ['cuenta', 'Cliente con cuenta (celular)'],
-                    ['invitado', 'Invitado'],
-                  ] as const
-                ).map(([valor, texto]) => (
-                  <button
-                    key={valor}
-                    type="button"
-                    aria-pressed={modoCli === valor}
-                    onClick={() => cambiarModoCli(valor)}
-                    style={{
-                      minHeight: '44px',
-                      padding: '0 16px',
-                      borderRadius: '9999px',
-                      border: `1.5px solid ${modoCli === valor ? 'var(--cp-navy)' : 'var(--cp-line)'}`,
-                      background: modoCli === valor ? 'var(--cp-navy)' : 'var(--cp-white)',
-                      color: modoCli === valor ? 'var(--cp-white)' : 'var(--cp-navy)',
-                      fontWeight: 800,
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {texto}
-                  </button>
-                ))}
-              </div>
-
-              {modoCli === 'cuenta' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div>
-                    <label
-                      htmlFor="cli-cel"
-                      style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}
-                    >
-                      Celular del cliente (9 dígitos) *
-                    </label>
-                    <input
-                      id="cli-cel"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      value={telCli}
-                      onChange={(e) => setTelCli(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                      placeholder="Ej.: 987654321"
-                      style={{
-                        width: '100%',
-                        maxWidth: '260px',
-                        boxSizing: 'border-box',
-                        minHeight: '46px',
-                        borderRadius: '10px',
-                        border: '1.5px solid var(--cp-line)',
-                        background: 'var(--cp-white)',
-                        padding: '0 12px',
-                        fontSize: '14px',
-                      }}
-                    />
-                  </div>
-
-                  {buscandoCuenta && (
-                    <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>Buscando cuenta…</div>
-                  )}
-
-                  {errorCuenta && (
-                    <div role="alert" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
-                      {errorCuenta}
-                    </div>
-                  )}
-
-                  {sinCuenta && !buscandoCuenta && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        flexWrap: 'wrap',
-                        fontSize: '14px',
-                        fontWeight: 700,
-                        color: 'var(--cp-navy)',
-                      }}
-                    >
-                      <span>No hay cuenta con ese celular.</span>
-                      <button
-                        type="button"
-                        onClick={() => cambiarModoCli('invitado')}
-                        style={{
-                          minHeight: '44px',
-                          padding: '0 14px',
-                          borderRadius: '10px',
-                          border: '1.5px solid var(--cp-navy)',
-                          background: 'transparent',
-                          color: 'var(--cp-navy)',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Seguir como invitado
-                      </button>
-                    </div>
-                  )}
-
-                  {cuenta && (
-                    <div
-                      role="status"
-                      style={{
-                        background: 'var(--cp-white)',
-                        border: '1.5px solid var(--cp-ok)',
-                        borderRadius: '14px',
-                        padding: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        fontSize: '14px',
-                        color: 'var(--cp-navy)',
-                      }}
-                    >
-                      <b style={{ fontSize: '15px' }}>{cuenta.nombre}</b>
-                      <span>Celular: {cuenta.telefono || 'sin celular'}</span>
-                      <span>Puntos: {Number(cuenta.puntos).toFixed(2)}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {modoCli === 'invitado' && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '10px',
-                }}
-              >
+              {/* El celular va primero: al completar los 9 dígitos se busca la cuenta y se autocompleta el nombre */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div>
-                  <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                  <label htmlFor="cli-cel" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                    Celular del cliente (9 dígitos) *
+                  </label>
+                  <input
+                    id="cli-cel"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={cliTelefono}
+                    onChange={(e) => setCliTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                    placeholder="9 dígitos"
+                    style={{
+                      maxWidth: '260px',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: '46px',
+                  borderRadius: '10px',
+                  border: '1.5px solid var(--cp-line)',
+                  background: 'var(--cp-white)',
+                  padding: '0 12px',
+                  fontSize: '14px',
+                    }}
+                  />
+                </div>
+                {avisoCuentaCelular}
+                <div>
+                  <label htmlFor="cli-nombre" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
                     Nombre *
                   </label>
                   <input
@@ -2197,42 +2072,18 @@ export function ModalNuevoPedidoMesa({
                     onChange={(e) => setCliNombre(e.target.value)}
                     placeholder="Ej.: María López"
                     style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: '46px',
-                      borderRadius: '10px',
-                      border: '1.5px solid var(--cp-line)',
-                      background: 'var(--cp-white)',
-                      padding: '0 12px',
-                      fontSize: '14px',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                    Teléfono (WhatsApp) *
-                  </label>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    value={cliTelefono}
-                    onChange={(e) => setCliTelefono(e.target.value)}
-                    placeholder="9 dígitos"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: '46px',
-                      borderRadius: '10px',
-                      border: '1.5px solid var(--cp-line)',
-                      background: 'var(--cp-white)',
-                      padding: '0 12px',
-                      fontSize: '14px',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: '46px',
+                  borderRadius: '10px',
+                  border: '1.5px solid var(--cp-line)',
+                  background: 'var(--cp-white)',
+                  padding: '0 12px',
+                  fontSize: '14px',
                     }}
                   />
                 </div>
               </div>
-              )}
 
               {/* Libreta del cliente con cuenta: direcciones anteriores o una nueva */}
               {modalidad === 'delivery' && cuenta && cuenta.direcciones.length > 0 && (
@@ -2696,6 +2547,45 @@ export function ModalNuevoPedidoMesa({
                 {/* Mesa: nombre obligatorio para la boleta, la etiqueta y la lista; teléfono opcional */}
                 {modalidad === 'local' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {pideMode !== 'cliente' && (
+                      <>
+                        <label htmlFor="np-telefono-mesa" style={{ fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)' }}>
+                          Teléfono (opcional)
+                        </label>
+                        <input
+                          id="np-telefono-mesa"
+                          type="tel"
+                          inputMode="numeric"
+                          value={cliTelefono}
+                          onChange={(e) => setCliTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                          placeholder="9 dígitos"
+                          aria-invalid={!telefonoMesaValido}
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            minHeight: '40px',
+                            borderRadius: '10px',
+                            border: `1.5px solid ${telefonoMesaValido ? 'var(--cp-line)' : 'var(--cp-rust)'}`,
+                            background: 'var(--cp-white)',
+                            padding: '0 12px',
+                            fontSize: '14px',
+                          }}
+                        />
+                        {telefonoMesaValido ? (
+                          cuenta || buscandoCuenta || errorCuenta ? (
+                            avisoCuentaCelular
+                          ) : (
+                            <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+                              Si lo escribes le enviamos una encuesta por WhatsApp al terminar
+                            </span>
+                          )
+                        ) : (
+                          <span role="alert" style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
+                            El teléfono debe tener 9 dígitos y empezar con 9
+                          </span>
+                        )}
+                      </>
+                    )}
                     <label htmlFor="np-nombre-mesa" style={{ fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)' }}>
                       Nombre del cliente *
                     </label>
@@ -2730,41 +2620,6 @@ export function ModalNuevoPedidoMesa({
                       <span role="alert" style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
                         {errorNombreMesa}
                       </span>
-                    )}
-                    {pideMode !== 'cliente' && (
-                      <>
-                        <label htmlFor="np-telefono-mesa" style={{ fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)' }}>
-                          Teléfono (opcional)
-                        </label>
-                        <input
-                          id="np-telefono-mesa"
-                          type="tel"
-                          inputMode="numeric"
-                          value={cliTelefono}
-                          onChange={(e) => setCliTelefono(e.target.value)}
-                          placeholder="9 dígitos"
-                          aria-invalid={!telefonoMesaValido}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            minHeight: '40px',
-                            borderRadius: '10px',
-                            border: `1.5px solid ${telefonoMesaValido ? 'var(--cp-line)' : 'var(--cp-rust)'}`,
-                            background: 'var(--cp-white)',
-                            padding: '0 12px',
-                            fontSize: '14px',
-                          }}
-                        />
-                        {telefonoMesaValido ? (
-                          <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                            Si lo escribes le enviamos una encuesta por WhatsApp al terminar
-                          </span>
-                        ) : (
-                          <span role="alert" style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
-                            El teléfono debe tener 9 dígitos y empezar con 9
-                          </span>
-                        )}
-                      </>
                     )}
                   </div>
                 )}

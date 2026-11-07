@@ -172,3 +172,32 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     expect(payload.cliente).toBeUndefined();
   });
 });
+
+describe('Pedido de mesa: celular primero con autocompletado del nombre', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(salonApi.obtenerCarta).mockResolvedValue(cartaConCafe as any);
+    vi.mocked(salonApi.obtenerPlano).mockResolvedValue([] as any);
+    vi.mocked(listarPersonalActivo).mockResolvedValue([]);
+    vi.mocked(api.get).mockImplementation(async (ruta: string) =>
+      ruta.startsWith('/admin/clientes/por-telefono/')
+        ? ({ encontrado: true, party: '1', nombre: 'Ana Pérez', telefono: '987654321', puntos: 0, direcciones: [] } as any)
+        : ({ items: [] } as any),
+    );
+  });
+
+  it('el celular va antes del nombre y al escribir 9 dígitos rellena el nombre (editable), con una sola búsqueda', async () => {
+    render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
+    await agregarCafe();
+    const tel = await screen.findByLabelText('Teléfono (opcional)');
+    const nombre = screen.getByLabelText('Nombre del cliente *') as HTMLInputElement;
+    expect(tel.compareDocumentPosition(nombre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.change(tel, { target: { value: '987654321' } });
+    expect(await screen.findByText('Cliente registrado: Ana Pérez')).toBeInTheDocument();
+    expect(nombre.value).toBe('Ana Pérez');
+    fireEvent.change(nombre, { target: { value: 'Ana P.' } });
+    expect(nombre.value).toBe('Ana P.');
+    expect(vi.mocked(api.get).mock.calls.filter((c) => String(c[0]).includes('por-telefono'))).toHaveLength(1);
+  });
+});

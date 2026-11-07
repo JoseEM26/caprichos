@@ -40,7 +40,7 @@ async function abrirQuienPide() {
 
 /** Llamadas de búsqueda de clientes (el modal hace otras llamadas a api.get) */
 function llamadasClientes() {
-  return vi.mocked(api.get).mock.calls.filter((c) => String(c[0]).startsWith('/admin/clientes'));
+  return vi.mocked(api.get).mock.calls.filter((c) => String(c[0]).startsWith('/admin/clientes') && !String(c[0]).includes('/por-telefono/'));
 }
 
 /** Deja correr las promesas pendientes dentro de act */

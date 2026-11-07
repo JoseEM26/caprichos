@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
@@ -139,49 +139,65 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     });
   });
 
-  it('Celular encontrado rellena nombre y teléfono desde la cuenta y oculta esos campos', async () => {
+  it('Celular encontrado autocompleta el nombre editable y avisa «Cliente registrado»', async () => {
     respuestaCuenta = cuentaAna;
     abrirPaso('Para llevar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
+    // El celular va primero (antes que el nombre)
+    const cel = screen.getByLabelText(/Celular del cliente/);
+    const nombre = screen.getByLabelText('Nombre *') as HTMLInputElement;
+    expect(cel.compareDocumentPosition(nombre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Invitado/ })).toBeNull();
+
     await escribirCelular('987654321');
-
-    const tarjeta = await screen.findByRole('status');
-    expect(within(tarjeta).getByText('Ana Pérez')).toBeInTheDocument();
-    expect(within(tarjeta).queryByText(/DNI/)).toBeNull();
-    expect(within(tarjeta).getByText('Celular: 987654321')).toBeInTheDocument();
-    expect(within(tarjeta).getByText('Puntos: 12.50')).toBeInTheDocument();
-
-    expect(screen.queryByPlaceholderText('Ej.: María López')).toBeNull();
-    expect(screen.queryByPlaceholderText('9 dígitos')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Continuar a productos →' })).toBeEnabled();
+    expect(await screen.findByText('Cliente registrado: Ana Pérez')).toBeInTheDocument();
+    expect(nombre.value).toBe('Ana Pérez');
     expect(api.get).toHaveBeenCalledWith('/admin/clientes/por-telefono/987654321');
+
+    // Editable: lo que escribe el usuario se respeta
+    fireEvent.change(nombre, { target: { value: 'Ana P.' } });
+    expect(nombre.value).toBe('Ana P.');
+    expect(screen.getByRole('button', { name: 'Continuar a productos →' })).toBeEnabled();
   });
 
-  it('Celular sin cuenta muestra el aviso y ofrece seguir como invitado', async () => {
+  it('No pisa un nombre que el usuario ya escribió antes de que llegue la cuenta', async () => {
+    respuestaCuenta = cuentaAna;
+    abrirPaso('Para llevar');
+    const nombre = screen.getByLabelText('Nombre *') as HTMLInputElement;
+    fireEvent.change(nombre, { target: { value: 'Anita' } });
+    await escribirCelular('987654321');
+    await screen.findByText('Cliente registrado: Ana Pérez');
+    expect(nombre.value).toBe('Anita');
+  });
+
+  it('Borrar el celular quita el nombre autocompletado', async () => {
+    respuestaCuenta = cuentaAna;
+    abrirPaso('Para llevar');
+    await escribirCelular('987654321');
+    await screen.findByText('Cliente registrado: Ana Pérez');
+    await escribirCelular('98765432');
+    await waitFor(() => expect((screen.getByLabelText('Nombre *') as HTMLInputElement).value).toBe(''));
+    expect(screen.queryByText(/Cliente registrado/)).toBeNull();
+  });
+
+  it('Celular sin cuenta: el nombre se escribe a mano y el celular es obligatorio', async () => {
     respuestaCuenta = { encontrado: false };
     abrirPaso('Para llevar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
-    await escribirCelular('955512345');
-
-    expect(await screen.findByText('No hay cuenta con ese celular.')).toBeInTheDocument();
-    // Sin cuenta el botón sigue activo: al tocarlo dice qué falta y no avanza
     fireEvent.click(screen.getByRole('button', { name: 'Continuar a productos →' }));
-    expect(screen.getByText('Busca y elige la cuenta del cliente')).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('Ej.: Lucía o Mesa 4')).toBeNull();
+    expect(screen.getByText(/Escribe el celular del cliente/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Seguir como invitado' }));
-
-    expect(screen.getByPlaceholderText('Ej.: María López')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('9 dígitos')).toBeInTheDocument();
+    await escribirCelular('955512345');
+    expect(await screen.findByText(/Celular sin cuenta/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar a productos →' }));
+    expect(screen.getByText('Escribe el nombre del cliente (mínimo 2 letras)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre *')).toBeInTheDocument();
   });
 
   it('error 429 muestra un mensaje claro de demasiadas búsquedas', async () => {
     respuestaCuenta = Object.assign(new Error('x'), { statusCode: 429, codigo: 'DEMASIADAS_BUSQUEDAS' });
     abrirPaso('Para llevar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
     await escribirCelular('987654321');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Demasiadas búsquedas seguidas');
@@ -191,9 +207,8 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     respuestaCuenta = cuentaAna;
     abrirPaso('Delivery');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
     await escribirCelular('987654321');
-    await screen.findByRole('status');
+    await screen.findByText(/Cliente registrado/);
 
     expect(
       screen.getByText('¿Usar una ubicación anterior?'),
@@ -230,9 +245,8 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     respuestaCuenta = { ...cuentaAna, direcciones: [] };
     abrirPaso('Delivery');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
     await escribirCelular('987654321');
-    await screen.findByRole('status');
+    await screen.findByText(/Cliente registrado/);
 
     expect(
       screen.queryByText('¿Usar una ubicación anterior?'),
@@ -243,25 +257,24 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     expect(screen.getByPlaceholderText('Jr. / Av. / Calle y número')).toHaveFocus();
   });
 
-  it('invitado no envía clienteTelefono y pide nombre y teléfono', async () => {
+  it('sin cuenta no envía clienteTelefono y manda el nombre y celular escritos', async () => {
     abrirPaso('Para llevar');
 
-    fireEvent.change(screen.getByPlaceholderText('Ej.: María López'), { target: { value: 'Ana' } });
-    fireEvent.change(screen.getByPlaceholderText('9 dígitos'), { target: { value: '987654321' } });
+    await escribirCelular('987654321');
+    await screen.findByText(/Celular sin cuenta/);
+    fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'Ana' } });
 
     const pedido = await registrarCafe();
     expect(pedido.clienteTelefono).toBeUndefined();
     expect(pedido.cliente).toEqual({ nombre: 'Ana', telefono: '987654321' });
-    expect(api.get).not.toHaveBeenCalledWith(expect.stringContaining('/admin/clientes/por-telefono/'));
   });
 
   it('con cuenta envía clienteTelefono y los datos de la cuenta', async () => {
     respuestaCuenta = cuentaAna;
     abrirPaso('Para llevar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
     await escribirCelular('987654321');
-    await screen.findByRole('status');
+    await screen.findByText(/Cliente registrado/);
 
     const pedido = await registrarCafe();
     expect(pedido.clienteTelefono).toBe('987654321');
@@ -272,9 +285,8 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
   it('con cuenta por celular en el paso de datos no se pisa con el cliente de ¿Quién pide?', async () => {
     respuestaCuenta = cuentaAna;
     abrirPaso('Para llevar');
-    fireEvent.click(screen.getByRole('button', { name: 'Cliente con cuenta (celular)' }));
     await escribirCelular('987654321');
-    await screen.findByRole('status');
+    await screen.findByText(/Cliente registrado/);
 
     fireEvent.click(screen.getByRole('button', { name: 'Continuar a productos →' }));
     fireEvent.click(await screen.findByText('Café Americano'));
