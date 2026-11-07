@@ -309,8 +309,8 @@ export function ModalNuevoPedidoMesa({
   }, []);
 
   // Datos cliente (para llevar o delivery)
-  const [cliNombre, setCliNombre] = useState(pedidoBase?.cliente_nombre || '');
-  const [cliTelefono, setCliTelefono] = useState(pedidoBase?.cliente_telefono || '');
+  const [cliNombre, setCliNombre] = useState<string>(pedidoBase?.cliente_nombre || '');
+  const [cliTelefono, setCliTelefono] = useState<string>(pedidoBase?.cliente_telefono || '');
   const [cliDireccion, setCliDireccion] = useState(pedidoBase?.entrega_direccion || '');
   const [cliReferencia, setCliReferencia] = useState(pedidoBase?.entrega_referencia || '');
   const [cliPagaCon, setCliPagaCon] = useState(
