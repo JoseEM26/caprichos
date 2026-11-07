@@ -228,7 +228,7 @@ export class PropuestaUbicacionService {
           rol_destino: 'CAJERO',
           titulo,
           mensaje: `Pedido ${codigo}: revisa el mapa y el envío antes de aprobar`,
-          enlace: '/admin/pedidos',
+          enlace: '/admin/caja',
         },
       });
       this.eventosGateway?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo });

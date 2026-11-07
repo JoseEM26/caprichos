@@ -415,7 +415,7 @@ export class CambioCobroService {
           rol_destino: 'CAJERO',
           titulo,
           mensaje: `Pedido ${codigo}: valida la captura y aprueba o rechaza el cambio`,
-          enlace: '/admin/pedidos',
+          enlace: '/admin/caja',
         },
       });
       this.eventosGateway?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo });

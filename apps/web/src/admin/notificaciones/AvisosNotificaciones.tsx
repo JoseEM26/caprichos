@@ -20,7 +20,8 @@ export const TEXTO_PRIORIDAD: Record<NotificacionAdmin['prioridad'], string> = {
 
 /** Ruta a la que lleva un aviso: la suya, o la del módulo donde se resuelve. */
 export function rutaDeAviso(n: NotificacionAdmin): string {
-  if (n.ruta) return n.ruta;
+  // Avisos viejos guardaron «/admin/pedidos», que no existe: los pedidos viven en Caja
+  if (n.ruta) return n.ruta.replace(/^\/admin\/pedidos(?=$|[?#])/, '/admin/caja');
   if (n.modulo === 'compras') return '/admin/compras?tab=pedir';
   return MODULOS.find((m) => m.clave === n.modulo)?.ruta ?? '/admin/notificaciones';
 }

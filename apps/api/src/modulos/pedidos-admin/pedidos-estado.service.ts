@@ -165,7 +165,7 @@ export class PedidosEstadoService {
       }
       try {
         await this.prisma.notificacion.create({
-          data: { tipo: 'ANULACION_SIN_DEVOLUCION', rol_destino: 'CAJERO', titulo: 'Revisa una anulación', mensaje, enlace: '/admin/pedidos' },
+          data: { tipo: 'ANULACION_SIN_DEVOLUCION', rol_destino: 'CAJERO', titulo: 'Revisa una anulación', mensaje, enlace: '/admin/caja' },
         });
       } catch (e) {
         this.logger.error(`No se pudo avisar a Caja de la devolución fallida del pedido ${pedidoId}: ${String(e)}`);

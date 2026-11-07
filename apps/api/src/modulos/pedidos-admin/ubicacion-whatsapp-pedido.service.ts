@@ -179,7 +179,7 @@ export class UbicacionWhatsappPedidoService implements UbicacionPedidoPuerto {
           mensaje: fueraDeZona
             ? 'La ubicación del cliente está fuera de la zona de reparto: revísala en el pedido.'
             : '¿Usarla? Revisa el mapa y el envío en el pedido (Usar o Descartar).',
-          enlace: '/admin/pedidos',
+          enlace: '/admin/caja',
         },
       });
       this.eventosGateway?.emitirAdmin('notificaciones:nueva', { id: n.id.toString(), titulo });

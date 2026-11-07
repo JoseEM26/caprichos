@@ -1249,7 +1249,7 @@ export class PedidosService {
           rol_destino: null,
           titulo: `Pedido nuevo ${pedidoCreado.codigo}`,
           mensaje: `${pedidoCreado.canal} · ${pedidoCreado.modalidad} · S/ ${Number(pedidoCreado.total).toFixed(2)}`,
-          enlace: '/admin/pedidos',
+          enlace: `/admin/caja?pedido=${pedidoCreado.id}`,
         },
       });
       this.eventosGateway.emitirAdmin('notificaciones:nueva', {
