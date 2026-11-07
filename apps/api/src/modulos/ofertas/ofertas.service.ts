@@ -1628,13 +1628,22 @@ export class OfertasService {
       return [];
     }
 
-    // 3. Buscar cupones de modo UNICO_COMPROBANTE activos
-    const cuponesCandidatos = await this.prisma.cupon.findMany({
+    // 3. Buscar cupones de modo UNICO_COMPROBANTE activos Y vigentes hoy (fechas, días y horario) y que valgan
+    // en el canal del pedido: un cupón activo pero fuera de vigencia o de otro canal no debe salir en el comprobante
+    const ahoraVigencia = new Date();
+    const pedidoOrigen = await this.prisma.pedido.findUnique({ where: { id: idBig }, select: { canal: true } });
+    const canalCupon = pedidoOrigen?.canal ? canalOferta(pedidoOrigen.canal) : undefined;
+    const cuponesActivos = await this.prisma.cupon.findMany({
       where: {
         modo: 'UNICO_COMPROBANTE',
         activo: true,
       },
     });
+    const cuponesCandidatos = cuponesActivos.filter(
+      (c) =>
+        cuponEnHorario(c, ahoraVigencia) &&
+        (!canalCupon || !(c.canales ?? []).length || ofertaIncluyeCanal((c.canales ?? []) as string[], canalCupon)),
+    );
 
     if (cuponesCandidatos.length === 0) {
       return [];

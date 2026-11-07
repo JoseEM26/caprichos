@@ -856,6 +856,36 @@ describe('OfertasService', () => {
       expect(reimpresos[0].codigo).toBe(emitidos[0].codigo);
     });
 
+    it('no emite cupones fuera de vigencia ni de otro canal aunque estén activos', async () => {
+      prismaMock.cuponEmitido.findMany.mockResolvedValueOnce([]);
+      prismaMock.reglaAcumulacion.upsert.mockResolvedValueOnce({
+        id: 1, cupones_por_comprobante: 5, cupon_con_descuento: false, promo_con_descuento: false, texto_pie: 'Pie',
+      });
+      prismaMock.pedido.findUnique.mockResolvedValueOnce({ canal: 'MOZO' });
+      const ayer = new Date(Date.now() - 24 * 3600 * 1000);
+      const hace10 = new Date(Date.now() - 10 * 24 * 3600 * 1000);
+      prismaMock.cupon.findMany.mockResolvedValueOnce([
+        // vencido: su fecha_hasta ya pasó
+        { id: 20n, codigo_base: 'VENCIDO', dias_validez: 15, canales: ['CARTA', 'CAJA'], fecha_desde: hace10, fecha_hasta: ayer, dias: [], hora_desde: null, hora_hasta: null },
+        // otro canal: solo carta web
+        { id: 21n, codigo_base: 'SOLOWEB', dias_validez: 15, canales: ['CARTA'], fecha_desde: null, fecha_hasta: null, dias: [], hora_desde: null, hora_hasta: null },
+        // vigente y de caja
+        { id: 22n, codigo_base: 'BUENO', dias_validez: 15, canales: ['CARTA', 'CAJA'], fecha_desde: null, fecha_hasta: null, dias: [], hora_desde: null, hora_hasta: null },
+      ]);
+      prismaMock.cuponEmitido.create.mockImplementation(({ data }: any) =>
+        Promise.resolve({
+          id: 200n, cupon_id: data.cupon_id, codigo: data.codigo, pedido_origen_id: data.pedido_origen_id, vence_en: data.vence_en,
+          estado: 'VIGENTE', canjeado_en: null, pedido_canje_id: null, motivo_anulacion: null, anulado_en: null, anulado_por: null,
+          creado_en: new Date(),
+          cupon: { codigo_base: 'BUENO', descripcion: 'd', descuento_tipo: 'MONTO', descuento_valor: new Prisma.Decimal(5) },
+        }),
+      );
+      const emitidos = await service.emitirCuponesParaPedido(60n);
+      expect(emitidos.length).toBe(1);
+      const creados = prismaMock.cuponEmitido.create.mock.calls.map((c: any) => String(c[0].data.cupon_id));
+      expect(creados).toEqual(['22']);
+    });
+
     it('anula un cupón emitido solo si está vigente (RQ-OFE-03-11)', async () => {
       prismaMock.cuponEmitido.findUnique.mockResolvedValueOnce({
         id: 100n,
