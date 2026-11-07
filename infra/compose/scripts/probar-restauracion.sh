@@ -29,8 +29,11 @@ trap limpiar EXIT
 
 docker run -d --name "$C" -e POSTGRES_PASSWORD=test_restore_pwd -e POSTGRES_DB=restore_test -e POSTGRES_USER=restore_test \
   postgres:16-alpine >/dev/null
-for _ in $(seq 1 40); do
-  docker exec "$C" pg_isready -U restore_test -d restore_test >/dev/null 2>&1 && break
+# La imagen de PostgreSQL arranca un servidor temporal para inicializar, lo apaga y arranca el definitivo:
+# pg_isready ya responde en el temporal, así que se espera al SEGUNDO "ready to accept connections".
+for _ in $(seq 1 60); do
+  [[ "$(docker logs "$C" 2>&1 | grep -c 'ready to accept connections')" -ge 2 ]] \
+    && docker exec "$C" pg_isready -U restore_test -d restore_test >/dev/null 2>&1 && break
   sleep 1
 done
 
