@@ -13,7 +13,7 @@ sugerencias:
   - Como veo todos los pedidos de delivery y en que etapa estan
   - El cliente quiere pagar con Yape en vez de efectivo, que hago
   - Donde veo cuanto cobrar y el vuelto de mi pedido
-  - Cuanto tiempo llevo con un pedido
+  - Que significan los numeros de pendientes, en cocina y listos para repartir
 ---
 # Repartos
 
@@ -23,6 +23,13 @@ Modulo de asignacion, ruta y seguimiento de los pedidos a domicilio. Muestra los
 Segun el rol la pantalla es distinta: el Repartidor conserva su pantalla todo-mapa para celular con solo sus pedidos; los demas roles ven la vista de seguimiento.
 
 Para Administrador, Supervisor, Cajero y Mozo la pantalla es de seguimiento: muestra que lleva y entrega cada repartidor y todos los pedidos de delivery.
+
+## Contadores del delivery (se actualizan solos)
+- Arriba de la pantalla de seguimiento hay cinco cuadros con numero: Pendientes (destacado: En cocina + Listos para repartir + En camino), En cocina (pedidos de delivery aceptados que aun se preparan), Listos para repartir (cocina ya los despacho y falta que un repartidor los tome), En camino (ya los lleva un repartidor) y Entregados hoy.
+- No hace falta recargar: cuando cocina marca listo o despeja el pedido, cuando entra un pedido nuevo o cuando un repartidor lo toma, sale, llega o entrega, los numeros cambian en el momento. Si se cae la conexion se vuelven a calcular al reconectar, al volver a la pestana y cada unos 45 segundos.
+- No cuentan los anulados, los que tienen una falla reportada ni los pedidos de mesa o de llevar.
+- En el menu lateral, Repartos muestra una insignia con los Listos para repartir (lo que pide accion) y parpadea como los demas avisos.
+- El Repartidor ve en su barra inferior un numero en Pedidos (los que puede tomar) y otro en Mis pedidos (los que ya lleva); solo cuenta lo suyo y lo disponible.
 
 ## Reglas de seguridad y aislamiento
 1. Cada repartidor ve y toca solo sus pedidos; si intenta con uno ajeno el sistema responde 403 NO_ASIGNADO ("Solo puedes tomar rutas para ti" / "Este pedido no esta asignado a ti").

@@ -3,7 +3,7 @@ import { BotonProponerUbicacion } from './BotonProponerUbicacion';
 import type { CSSProperties, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
-import { useEventos } from '../../comun/socket';
+import { useEventos, useTiempoReal } from '../../comun/socket';
 import { Confirmar } from '../../comun/Confirmar';
 import { ErrorApi } from '../../comun/api';
 import { Icono } from '../../comun/Icono';
@@ -216,13 +216,18 @@ function BarraInferior({
   masAbierto,
   alVista,
   alMas,
+  porTomar = 0,
+  mios = 0,
 }: {
+  porTomar?: number;
+  mios?: number;
   vista: VistaRepartidor;
   masAbierto: boolean;
   alVista: (v: VistaRepartidor) => void;
   alMas: () => void;
 }) {
   const boton = (activo: boolean): CSSProperties => ({
+    position: 'relative',
     flex: 1,
     minHeight: 48,
     borderRadius: 12,
@@ -262,10 +267,12 @@ function BarraInferior({
       <button type="button" data-testid="btn-ver-pedidos" aria-current={vista === 'pedidos' ? 'page' : undefined} onClick={() => alVista('pedidos')} style={boton(vista === 'pedidos')}>
         <Icono nombre="mapa" tamano={20} />
         <span>Pedidos</span>
+        <InsigniaCuenta n={porTomar} texto="por tomar" id="cuenta-por-tomar" />
       </button>
       <button type="button" data-testid="btn-ver-mis-pedidos" aria-current={vista === 'mios' ? 'page' : undefined} onClick={() => alVista('mios')} style={boton(vista === 'mios')}>
         <Icono nombre="repartos" tamano={20} />
         <span>Mis pedidos</span>
+        <InsigniaCuenta n={mios} texto="en mis pedidos" id="cuenta-mis-pedidos" />
       </button>
       <button type="button" data-testid="btn-mas" aria-haspopup="menu" aria-expanded={masAbierto} onClick={alMas} style={boton(masAbierto)}>
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
@@ -275,9 +282,23 @@ function BarraInferior({
         </svg>
         <span>Más</span>
       </button>
+      <span role="status" aria-live="polite" data-testid="cuentas-repartidor" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+        {`${porTomar} por tomar, ${mios} en mis pedidos`}
+      </span>
     </nav>
   );
 }
+
+const InsigniaCuenta = ({ n, texto, id }: { n: number; texto: string; id: string }) => (
+  <span
+    data-testid={id}
+    aria-hidden="true"
+    title={`${n} ${texto}`}
+    style={{ position: 'absolute', top: 2, right: 6, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 10, background: n > 0 ? 'var(--cp-orange)' : 'rgba(255,255,255,0.25)', color: n > 0 ? 'var(--cp-navy)' : 'var(--cp-cream)', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+  >
+    {n}
+  </span>
+);
 
 const itemMenu: CSSProperties = {
   minHeight: 48,
@@ -815,6 +836,8 @@ export function RepartidorView() {
     cargarDatos();
     sugeridas.recargar();
   });
+  // Respaldo: al reconectar, al volver a la pestaña y cada 60 s sin socket se vuelve a cargar (cocina despacha sin avisar a esta pantalla)
+  useTiempoReal(['pedido:nuevo', 'pedido:progreso', 'cocina:comanda'], cargarDatos);
   useEventos('reparto:incidente', () => {
     cargarDatos();
   });
@@ -1473,7 +1496,7 @@ export function RepartidorView() {
         />
       )}
 
-      <BarraInferior vista={vista} masAbierto={masAbierto} alVista={cambiarVista} alMas={() => setMasAbierto((v) => !v)} />
+      <BarraInferior vista={vista} masAbierto={masAbierto} alVista={cambiarVista} alMas={() => setMasAbierto((v) => !v)} porTomar={disponibles.length} mios={pedidosActivos.length} />
 
       <Confirmar
         abierto={confirmacion.abierto}

@@ -354,7 +354,17 @@ function consultaRutas(filtros?: Record<string, string | number | undefined>): s
   return qs ? `?${qs}` : '';
 }
 
+export interface ContadoresDelivery {
+  enCocina: number;
+  listos: number;
+  enCamino: number;
+  pendientes: number;
+  entregadosHoy: number;
+}
+
 export const repartosApi = {
+  contadoresDelivery: () => api.get<ContadoresDelivery>('/admin/repartos/contadores'),
+
   listarRutasSugeridas: () =>
     api.get<RespuestaRutasSugeridas>('/admin/repartos/rutas-sugeridas'),
 

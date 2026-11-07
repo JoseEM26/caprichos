@@ -20,6 +20,7 @@ import { repartosApi, PedidoReparto, PedidoSeguimiento, PanelRepartidores as Dat
 import { PanelRepartidores } from './PanelRepartidores';
 import { RepartidorView } from './RepartidorView';
 import { RutasAdmin } from './RutasAdmin';
+import { ContadoresDeliveryChips, useContadoresDelivery } from './ContadoresDelivery';
 
 type Vista = 'panel' | 'todos' | 'mapa' | 'rutas';
 
@@ -79,6 +80,7 @@ function SeguimientoRepartosView() {
     }
   }, []);
 
+  const contadores = useContadoresDelivery();
   const acciones = useAccionesReparto({ alActualizar: cargarDatos });
 
   useEffect(() => {
@@ -186,6 +188,8 @@ function SeguimientoRepartosView() {
           </button>
         ))}
       </div>
+
+      <ContadoresDeliveryChips datos={contadores} />
 
       <div
         role="status"

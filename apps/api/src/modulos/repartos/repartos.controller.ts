@@ -134,6 +134,13 @@ export class RepartosController {
       : this.repartosService.obtenerResumen();
   }
 
+  /** Contadores del delivery por etapa (en cocina, listos, en camino, entregados hoy). */
+  @Get('contadores')
+  @Permiso(VER_O_SEGUIR)
+  async contadores(@Req() req: any) {
+    return this.repartosService.contadoresDelivery(req.usuario);
+  }
+
   /** Panel de repartidores para caja y admin: el REPARTIDOR recibe 403 (lo valida el servicio). */
   @Get('panel')
   @Permiso(VER_O_SEGUIR)

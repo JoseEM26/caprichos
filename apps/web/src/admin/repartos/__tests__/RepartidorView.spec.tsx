@@ -123,6 +123,7 @@ describe('RepartidorView: pantalla toda mapa del repartidor', () => {
       if (evento === 'pedido:estado') alEstado = cb;
     });
 
+    vi.spyOn(socketModulo, 'useTiempoReal').mockImplementation(() => {});
     vi.spyOn(repartosApi, 'listarMios').mockResolvedValue({ pedidos: [mio1, mio2], orden: ['102', '101'], paso: [], ruta: [] });
     vi.spyOn(repartosApi, 'listarDisponibles').mockResolvedValue([disp1, disp2, disp3]);
     vi.spyOn(repartosApi, 'listarProximos').mockResolvedValue([proximo]);
@@ -154,13 +155,21 @@ describe('RepartidorView: pantalla toda mapa del repartidor', () => {
     vi.useRealTimers();
   };
 
+  it('0. la barra muestra «por tomar» y «mis pedidos» con lo que ya ve este repartidor', async () => {
+    montar();
+    await esperarMapa();
+    expect(screen.getByTestId('cuenta-por-tomar').textContent).toBe('3');
+    expect(screen.getByTestId('cuentas-repartidor').textContent).toBe('3 por tomar, 2 en mis pedidos');
+    expect(screen.getByTestId('cuenta-mis-pedidos').textContent).toBe('2');
+  });
+
   it('1. barra inferior con tres botones grandes y sin vista de tarjetas ni pestañas', async () => {
     montar();
     await esperarMapa();
 
     const barra = screen.getByRole('navigation', { name: 'Navegación del repartidor' });
     const botones = within(barra).getAllByRole('button');
-    expect(botones.map((b) => b.textContent)).toEqual(['Pedidos', 'Mis pedidos', 'Más']);
+    expect(botones.map((b) => b.textContent)).toEqual(['Pedidos3', 'Mis pedidos2', 'Más']);
     botones.forEach((b) => expect(parseInt(b.style.minHeight, 10)).toBeGreaterThanOrEqual(44));
 
     expect(screen.queryByRole('tab')).toBeNull();

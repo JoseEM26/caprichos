@@ -1001,6 +1001,39 @@ export class RepartosService {
   }
 
   /**
+   * GET /admin/repartos/contadores (repartos/ver o seguir, nunca REPARTIDOR): cuántos pedidos de delivery hay
+   * por etapa, con las mismas secciones del seguimiento. Sin listas: solo estado y repartidor de los vivos.
+   * enCocina = aceptados y preparándose; listos = ya despachados por cocina sin repartidor;
+   * enCamino = con repartidor (LISTO o EN_CAMINO); pendientes = suma de las tres; entregadosHoy = hora de Lima.
+   * Los anulados y los que tienen falla quedan fuera (van a incidentes).
+   */
+  async contadoresDelivery(usuario: UsuarioAutenticado) {
+    if (usuario.rol === 'REPARTIDOR') {
+      throw new ForbiddenException({
+        codigo: 'SOLO_CAJA_ADMIN',
+        mensaje: 'Los contadores de delivery no son para repartidores',
+      });
+    }
+    const { inicio } = limitesDiaLima(hoyLima(), hoyLima());
+    const [vivos, entregadosHoy] = await Promise.all([
+      this.prisma.pedido.findMany({
+        where: { modalidad: 'DELIVERY', estado: { in: ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'] }, motivo_falla: null },
+        select: { estado: true, repartidor_party_id: true },
+      }),
+      this.prisma.pedido.count({ where: { modalidad: 'DELIVERY', estado: 'ENTREGADO', entregado_en: { gte: inicio } } }),
+    ]);
+    let enCocina = 0;
+    let listos = 0;
+    let enCamino = 0;
+    for (const p of vivos) {
+      if (p.estado === 'COLA' || p.estado === 'PREPARANDO') enCocina++;
+      else if (p.repartidor_party_id == null) listos++;
+      else enCamino++;
+    }
+    return { enCocina, listos, enCamino, pendientes: enCocina + listos + enCamino, entregadosHoy };
+  }
+
+  /**
    * GET /admin/repartos/panel (repartos/ver, nunca REPARTIDOR):
    * Repartidores activos con los pedidos que llevan (etapa, horas, espera y efectivo por rendir)
    * y los pedidos sin tomar, más el resumen de libres y ocupados. Reutiliza listarTodos.
