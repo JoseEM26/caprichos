@@ -125,4 +125,53 @@ describe('Editar usuario: controles de administración', () => {
     expect(await screen.findByText('Pantalla de ingreso')).toBeInTheDocument();
     expect(sesion.salir).toHaveBeenCalled();
   });
+
+  it('se reparte en pestañas: Datos, Roles, Horario, Reemplazos e Historial', async () => {
+    abrir();
+    await screen.findByLabelText('Nombres');
+    const nombres = screen.getAllByRole('tab').map((t) => t.textContent);
+    expect(nombres).toEqual(['Datos', 'Roles', 'Horario', 'Reemplazos', 'Historial']);
+    fireEvent.click(screen.getByRole('tab', { name: 'Roles' }));
+    expect(screen.getByRole('tab', { name: 'Roles' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Roles temporales')).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: 'Horario' }));
+    expect(screen.getByRole('button', { name: 'Guardar horario y reemplazos' })).toBeInTheDocument();
+  });
+
+  it('cambiar de pestaña no pierde lo escrito', async () => {
+    abrir();
+    fireEvent.change(await screen.findByLabelText('Nombres'), { target: { value: 'Ana María' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Roles' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Datos' }));
+    expect(screen.getByLabelText('Nombres')).toHaveValue('Ana María');
+  });
+
+  it('un error de validación en Roles lleva a esa pestaña; en Datos, a Datos', async () => {
+    abrir();
+    fireEvent.change(await screen.findByLabelText('Nombres'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Roles' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Los nombres son requeridos')).toBeVisible();
+    expect(screen.getByRole('tab', { name: /Datos/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('con cambios sin guardar avisa antes de cerrar; sin cambios cierra directo', async () => {
+    const alCerrar = vi.fn();
+    render(
+      <MemoryRouter>
+        <EditarUsuarioModal abierto usuario={PERSONA} alCerrar={alCerrar} alUsuarioEditado={vi.fn()} />
+      </MemoryRouter>,
+    );
+    await screen.findByLabelText('Nombres');
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(alCerrar).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText('Nombres'), { target: { value: 'Otra' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(alCerrar).toHaveBeenCalledTimes(1);
+    fireEvent.click(await screen.findByRole('button', { name: 'No, seguir editando' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, cerrar' }));
+    expect(alCerrar).toHaveBeenCalledTimes(2);
+  });
 });

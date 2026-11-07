@@ -1295,6 +1295,13 @@ export function ModalNuevoPedidoMesa({
               justifyContent: 'space-between',
               alignItems: 'center',
               gap: '8px',
+              // Encabezado fijo: solo el cuerpo del modal se desplaza
+              position: 'sticky',
+              top: '-20px',
+              zIndex: 3,
+              background: 'var(--cp-cream)',
+              margin: '-20px -20px 0',
+              padding: '14px 20px 8px',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

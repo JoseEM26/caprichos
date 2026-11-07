@@ -31,9 +31,10 @@ Ver tambien: [[historial]]
 
 ## Como se hace: editar datos y cambiar el rol de un usuario
 1. En la tabla de usuarios, busca al empleado y pulsa el botón "Editar" en su fila.
-2. Puedes modificar sus nombres, apellidos, teléfono o correo.
+2. El editor tiene cinco pestañas: Datos (documento, nombres, apellidos, país, correo, foto y Cambiar contraseña), Roles (Rol principal, Roles temporales, otros roles, áreas de cocina y avisos de WhatsApp), Horario, Reemplazos e Historial. El botón "?" del encabezado explica cuáles se guardan juntas.
 3. Si cambias el campo "Rol" para otorgarle mayores o distintos accesos en el sistema, esta acción se considera crítica.
-4. Al pulsar "Guardar cambios", si entras como administrador solo confirmas con "Sí, confirmar". Otros roles deben pedir el código rotativo de 6 dígitos del supervisor (visible en el módulo [[supervisor-codigo]]) y luego pulsar "Sí, confirmar".
+4. Datos y Roles se guardan juntos con "Guardar cambios"; Horario y Reemplazos se guardan aparte con "Guardar horario y reemplazos". Si cierras con cambios sin guardar, el sistema pregunta "¿Cerrar sin guardar?" ("Sí, cerrar" o "No, seguir editando").
+5. Al pulsar "Guardar cambios", si entras como administrador solo confirmas con "Sí, confirmar". Otros roles deben pedir el código rotativo de 6 dígitos del supervisor (visible en el módulo [[supervisor-codigo]]) y luego pulsar "Sí, confirmar".
 Requiere: [[supervisor-codigo]]
 Ver tambien: [[historial]]
 
