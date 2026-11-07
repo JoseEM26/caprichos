@@ -24,6 +24,7 @@ import { AnularCuponEmitidoDto } from './dto/anular-cupon-emitido.dto';
 import { CanjearCuponDto } from './dto/canjear-cupon.dto';
 import { partyClienteDelPedido } from '../clientes/cliente-del-pedido';
 import { ValidarCuponDto } from './dto/validar-cupon.dto';
+import { ValidarCuponCajaDto } from './dto/validar-cupon-caja.dto';
 import {
   CuponEmitidoItem,
   CuponItem,
@@ -1482,6 +1483,29 @@ export class OfertasService {
     };
   }
 
+  /** Vista previa de un cupón en caja/mozo: no canjea nada; el canje ocurre al crear el pedido. */
+  async validarCuponParaCaja(dto: ValidarCuponCajaDto) {
+    const canal = dto.canal === 'MOZO' ? 'MOZO' : 'CAJA';
+    const codigo = dto.codigo.trim().toUpperCase();
+    const vista = await this.vistaPreviaDescuentos(dto.lineas as any, codigo, null, canal);
+    const cupon = vista.detalles.find((d) => d.tipo === 'CUPON');
+    if (!cupon && !vista.envioGratisCupon) {
+      // El cupón es válido pero otra oferta automática da más descuento y no se acumulan
+      throw new BadRequestException({
+        codigo: 'CUPON_NO_SUMA',
+        mensaje: 'Este cupón no se aplica: el pedido ya tiene una promoción con mayor descuento',
+      });
+    }
+    return {
+      valido: true,
+      codigo,
+      descuento: cupon?.monto ?? 0,
+      envioGratis: vista.envioGratisCupon,
+      descuentoTotal: vista.descuentoTotal,
+      mensaje: cupon ? `Cupón ${codigo} aplicado` : `Cupón ${codigo}: envío gratis`,
+    };
+  }
+
   async canjearCuponEnCaja(dto: CanjearCuponDto, usuario?: any) {
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: BigInt(dto.pedidoId) },
@@ -1676,6 +1700,7 @@ export class OfertasService {
     lineas: { productoId: string; cantidad: number; subtotal: number; precioUnitario: number }[],
     cuponCodigo?: string,
     clientePartyId?: string | null,
+    canal: string = 'CARTA',
   ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean }> {
     const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
     const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
@@ -1701,10 +1726,11 @@ export class OfertasService {
     const desglose = await this.calcularDescuentosParaPedido({
       subtotal,
       lineas: lineasCalc,
-      canal: 'CARTA',
+      canal,
       cuponCodigo: cuponCodigo || null,
       clientePartyId: clientePartyId || null,
-      clienteConSesion: !!clientePartyId,
+      // igual que al crear el pedido: la primera compra solo cuenta con sesión en la carta
+      clienteConSesion: canal === 'CARTA' && !!clientePartyId,
     });
     const conCupon = !!(desglose.cuponId || desglose.cuponEmitidoId);
     const montoCanjeable = montoElegiblePuntos(lineasCalc, conCupon ? [] : desglose.detalles);

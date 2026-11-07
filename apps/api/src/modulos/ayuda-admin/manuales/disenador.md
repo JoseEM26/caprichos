@@ -59,7 +59,7 @@ Ver tambien: [[novedades]]
 3. En cada banner escribe qué dice la imagen (para quien no la puede ver) y elige a dónde lleva al tocarla: "Sin enlace", "La carta", "Una categoría", "Un producto" o "Enlace externo" (solo direcciones que empiecen con https://, se abren en pestaña nueva).
 4. Opcional: sube una imagen distinta para celular (medida ideal 1200×900 px); si no la subes se usa la misma imagen recortada al centro. Usa "Ver en PC" y "Ver en celular" para comprobarlo.
 5. Opcional: "Mostrar desde" y "Mostrar hasta" para programar el banner (hora de Lima). Cada banner indica su estado: Activo, Programado, Vencido u Oculto.
-6. Ordena con "Subir" y "Bajar", oculta con el interruptor "Mostrar este banner" y elimina con "Eliminar" y "Sí".
+6. Ordena arrastrando el asa "⠿" de cada banner hasta donde quieras (una línea naranja marca dónde caerá; funciona también con el dedo), o con los botones "Subir" y "Bajar". Con teclado: enfoca el asa, pulsa Espacio para tomar el banner, las flechas arriba y abajo para moverlo y Espacio para soltarlo; el lector de pantalla anuncia, por ejemplo, "Banner 2 movido a la posición 1". Oculta con el interruptor "Mostrar este banner" y elimina con "Eliminar" y "Sí".
 7. Paso "Ajusta cómo se mueven": elige cuánto dura cada imagen (de 3 a 15 segundos) y pulsa "Reproducir" para verlo. Con una sola imagen no hay movimiento ni flechas.
 8. Si ningún banner está activo o vigente, la carta muestra "Caprichos del mes" y el diseñador avisa "No hay banners activos: se muestra Caprichos del mes".
 9. Pulsa "Publicar cambios" y "Sí, publicar". Verás "¡Listo! Tus cambios ya se ven en la carta".
