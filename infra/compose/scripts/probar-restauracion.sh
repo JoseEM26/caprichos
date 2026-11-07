@@ -27,35 +27,8 @@ C="caprichos-restore-test-$(date +%s)"
 limpiar() { docker rm -f "$C" >/dev/null 2>&1 || true; }
 trap limpiar EXIT
 
-docker run -d --name "$C" -e POSTGRES_PASSWORD=test_restore_pwd -e POSTGRES_DB=restore_test -e POSTGRES_USER=restore_test \
-  postgres:16-alpine >/dev/null
-# La imagen de PostgreSQL arranca un servidor temporal para inicializar, lo apaga y arranca el definitivo:
-# pg_isready ya responde en el temporal, así que se espera al SEGUNDO "ready to accept connections".
-for _ in $(seq 1 60); do
-  [[ "$(docker logs "$C" 2>&1 | grep -c 'ready to accept connections')" -ge 2 ]] \
-    && docker exec "$C" pg_isready -U restore_test -d restore_test >/dev/null 2>&1 && break
-  sleep 1
-done
-
-# El volcado asigna dueños (OWNER TO <usuario>); en la base temporal esos usuarios no existen y la restauración
-# se detendría. Se crean vacíos, solo dentro del contenedor temporal.
-for ROL in $(gzip -dc "$DUMP" | grep -oE 'OWNER TO [A-Za-z0-9_]+' | awk '{print $3}' | sort -u); do
-  [[ "$ROL" == "restore_test" ]] && continue
-  docker exec "$C" psql -U restore_test -d restore_test -c "CREATE ROLE \"${ROL}\" SUPERUSER" >/dev/null 2>&1 || true
-done
-
-echo "==> Restaurando en la base temporal..."
-if ! gzip -dc "$DUMP" | docker exec -i "$C" psql -v ON_ERROR_STOP=1 -U restore_test -d restore_test >/dev/null 2>"/tmp/restore-err-$$.txt"; then
-  echo "FALLA: la restauración dio errores. Primeras líneas:" >&2
-  head -5 "/tmp/restore-err-$$.txt" >&2
-  rm -f "/tmp/restore-err-$$.txt"
-  exit 1
-fi
-rm -f "/tmp/restore-err-$$.txt"
-
-consulta() { docker exec "$C" psql -U restore_test -d restore_test -tA -c "$1" 2>/dev/null || echo "?"; }
-echo "Tablas en el esquema público: $(consulta "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")"
-for t in parametro categoria producto user_account pedido; do
-  echo "Filas en ${t}: $(consulta "SELECT count(*) FROM ${t}")"
-done
+source "$(dirname "$0")/lib-restauracion.sh"
+pg_temporal_iniciar "$C"
+pg_temporal_restaurar "$C" "$DUMP" || exit 1
+pg_temporal_resumen "$C"
 echo "OK: el respaldo se restaura sin errores. La base temporal se eliminó."
