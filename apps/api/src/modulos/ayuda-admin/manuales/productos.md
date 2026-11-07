@@ -80,6 +80,11 @@ Despues: [[apertura]]
 5. Si no alcanza el saldo, la carta muestra la opcion agotada y el pedido responde 409 OPCION_AGOTADA ("No hay stock suficiente para elegir X").
 Ver tambien: [[ofertas]]
 
+## Que ve el cliente cuando pide 2 o mas bebidas con opciones
+- En un producto con grupos de opciones (endulzante, leche, hielo, toppings), si el cliente sube la cantidad a 2 o mas aparece el interruptor "Todas iguales / Elegir por bebida". Por defecto es "Todas iguales": una sola eleccion para todas.
+- En "Elegir por bebida" sale una seccion por vaso (Bebida 1, Bebida 2...) con los mismos grupos; cada una valida sus obligatorios y muestra su precio. "Copiar a todas" pasa la eleccion de la Bebida 1 a las demas.
+- Las bebidas con la misma eleccion quedan juntas en una linea del carrito y las diferentes en lineas separadas; cada vaso sale con su nombre y sus opciones en la etiqueta y la comanda. El bot de WhatsApp todavia no lo ofrece. El tamano es uno solo para todas.
+
 ## Que ve el cliente cuando hay poco stock
 - 4 o 5 unidades: "Quedan 4" (discreto). 3 unidades: franja "¡Quedan solo 3, ya se acaban!". 2 unidades: "¡Últimas 2!". 1 unidad: "¡Última dona!" (o "¡Última unidad!" si el nombre del producto no es simple). Sin saldo: Agotado.
 - Con sabores, cada sabor avisa en la ventana del producto ("Fresa: ¡última!", "Oreo: quedan 2") y la tarjeta avisa por el total.

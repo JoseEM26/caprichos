@@ -24,6 +24,7 @@ import {
   usosDeSabor,
 } from './ReemplazoCombo';
 import { SelectorEleccionCombo } from './SelectorEleccionCombo';
+import { agruparUnidadesIguales } from './unidadesPorBebida';
 
 interface Props {
   producto: ProductoCarta;
@@ -78,6 +79,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const partesJug = useMemo(() => partesEleccion(oferta, reemplazos), [oferta, reemplazos]);
   const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
   const [cantidad, setCantidad] = useState(1);
+  // Opciones distintas por bebida: con cantidad 2 o más cada vaso puede llevar su propia elección
+  const [porBebida, setPorBebida] = useState(false);
+  const [selUnidad, setSelUnidad] = useState<Record<number, Record<string, string[]>>>({});
   const elecciones = eleccionesCombo(oferta, reemplazos, juguetes);
   // Saldo por sabor ya comprometido (este combo y el carrito): el + de cada sabor no lo supera
   const usosSabor = usosDeSabor(lineas, juguetes);
@@ -110,16 +114,27 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const tamano = producto.tamanos.find((t) => t.id === tamanoId) ?? null;
   const precioBase = tamano ? tamano.precio : producto.precio;
 
-  const elegidas: OpcionElegida[] = gruposCarta.flatMap((g) =>
-    (sel[g.id] ?? []).flatMap((oid) => {
-      const o = g.opciones.find((x) => x.id === oid);
-      return o ? [{ id: o.id, nombre: o.nombre, precioExtra: o.precioExtra, grupoId: g.id, grupoNombre: g.nombre }] : [];
-    }),
-  );
+  const elegidasDe = (selX: Record<string, string[]>): OpcionElegida[] =>
+    gruposCarta.flatMap((g) =>
+      (selX[g.id] ?? []).flatMap((oid) => {
+        const o = g.opciones.find((x) => x.id === oid);
+        return o ? [{ id: o.id, nombre: o.nombre, precioExtra: o.precioExtra, grupoId: g.id, grupoNombre: g.nombre }] : [];
+      }),
+    );
+  const elegidas = elegidasDe(sel);
   const unitario = calcularPrecioLinea({ precioBase, opciones: elegidas, cantidad: 1 }).precioUnitario;
+  const precioDe = (ops: OpcionElegida[]) => calcularPrecioLinea({ precioBase, opciones: ops, cantidad: 1 }).precioUnitario;
+  const puedePorBebida = cantidad >= 2 && !esCombo && producto.saboresConStock !== true && gruposCarta.length > 0;
+  const activoPorBebida = porBebida && puedePorBebida;
+  // la elección de la bebida i es la suya; si aún no la tocó, la común
+  const selDe = (i: number): Record<string, string[]> => selUnidad[i] ?? sel;
+  const unidadesBebida = activoPorBebida ? Array.from({ length: cantidad }, (_, i) => elegidasDe(selDe(i))) : [];
+  const totalPrecio = activoPorBebida ? Number(unidadesBebida.reduce((a, ops) => a + precioDe(ops), 0).toFixed(2)) : Number((unitario * cantidad).toFixed(2));
+  const bebidaCompleta = (i: number) => gruposCarta.every((g) => (selDe(i)[g.id] ?? []).length >= g.minimo);
+  const gruposOk = activoPorBebida ? Array.from({ length: cantidad }, (_, i) => i).every(bebidaCompleta) : gruposCarta.every((g) => (sel[g.id] ?? []).length >= g.minimo);
   const valido =
     !faltaElegirJuguetes(partesJug, juguetes, cantidad) &&
-    !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && gruposCarta.every((g) => (sel[g.id] ?? []).length >= g.minimo);
+    !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && gruposOk;
 
   // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
   const info = inventario[String(producto.id)] ?? infoStockDe(producto);
@@ -177,6 +192,20 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     setSel((prev) => ({ ...prev, [g.id]: alternarEleccion(g, prev[g.id] ?? [], oid) }));
   };
 
+  const alternarDe = (i: number, g: GrupoOpcionesCarta, oid: string) => {
+    const actual = selDe(i);
+    const op = g.opciones.find((x) => x.id === oid);
+    if (op && op.disponible === false && !(actual[g.id] ?? []).includes(oid)) return;
+    setSelUnidad((prev) => ({ ...prev, [i]: { ...(prev[i] ?? sel), [g.id]: alternarEleccion(g, actual[g.id] ?? [], oid) } }));
+  };
+
+  // «Copiar a todas»: la elección de la Bebida 1 pasa a las demás (y queda como la común)
+  const copiarATodas = () => {
+    const base = selDe(0);
+    setSel(base);
+    setSelUnidad(Object.fromEntries(Array.from({ length: cantidad }, (_, i) => [i, base])));
+  };
+
   const consejoHielo = /poco hielo|menos hielo/i.test(nota)
     ? 'Con poco hielo el vaso queda con menos volumen de bebida.'
     : /no tan helado|menos helado|sin tanto hielo/i.test(nota)
@@ -200,6 +229,32 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       nB > 0
         ? Array.from({ length: cantidad * nB }, (_, i) => (nombres[i] ?? '').trim())
         : Array.from({ length: cantidad }, (_, i) => (esBebida ? (nombres[i] ?? '').trim() : ''));
+    const notaFinal = [notaReemplazos(partesRe, reemplazos), nota.trim()].filter(Boolean).join(' · ') || undefined;
+    if (activoPorBebida) {
+      // las bebidas con la misma configuración van en una línea; las distintas, en líneas aparte
+      const unidades = unidadesBebida.map((opciones, i) => ({ persona: personas[i], opciones }));
+      for (const grupo of agruparUnidadesIguales(unidades)) {
+        const unit = precioDe(grupo[0].opciones);
+        agregarLinea({
+          productoId: producto.id,
+          nombre: producto.nombre,
+          fotoUrl: producto.fotoUrl,
+          tamanoId: tamano?.id,
+          tamanoNombre: tamano?.nombre,
+          unidadesTamano: unidadesMezcla,
+          precioBase,
+          cantidad: grupo.length,
+          opciones: grupo[0].opciones,
+          personas: grupo.map((u) => u.persona ?? ''),
+          unidades: grupo,
+          nota: notaFinal,
+          precioUnitario: unit,
+          subtotal: Number((unit * grupo.length).toFixed(2)),
+        });
+      }
+      onCerrar();
+      return;
+    }
     agregarLinea({
       productoId: producto.id,
       nombre: producto.nombre,
@@ -237,17 +292,17 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     .map((w) => w[0]?.toUpperCase())
     .join('');
 
-  const filtrar = (g: GrupoOpcionesCarta) => {
-    const q = (busquedas[g.id] ?? '').trim().toLowerCase();
-    const lista = g.opciones.filter((o) => !q || o.nombre.toLowerCase().includes(q) || (sel[g.id] ?? []).includes(o.id));
-    return { grande: g.opciones.length > 8, q: busquedas[g.id] ?? '', lista };
+  const filtrar = (g: GrupoOpcionesCarta, selX: Record<string, string[]> = sel, clave: string = g.id) => {
+    const q = (busquedas[clave] ?? '').trim().toLowerCase();
+    const lista = g.opciones.filter((o) => !q || o.nombre.toLowerCase().includes(q) || (selX[g.id] ?? []).includes(o.id));
+    return { grande: g.opciones.length > 8, q: busquedas[clave] ?? '', lista };
   };
 
-  const buscador = (g: GrupoOpcionesCarta, alto: number, etiqueta: string) => (
+  const buscador = (g: GrupoOpcionesCarta, alto: number, etiqueta: string, clave: string = g.id) => (
     <input
       type="search"
-      value={busquedas[g.id] ?? ''}
-      onChange={(e) => setBusquedas((p) => ({ ...p, [g.id]: e.target.value }))}
+      value={busquedas[clave] ?? ''}
+      onChange={(e) => setBusquedas((p) => ({ ...p, [clave]: e.target.value }))}
       placeholder={etiqueta}
       aria-label={etiqueta}
       style={{ width: '100%', boxSizing: 'border-box', minHeight: alto, borderRadius: 9999, border: '1.5px solid var(--cp-line)', background: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 14px', fontSize: 13, marginBottom: 6 }}
@@ -263,7 +318,46 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         ? `OPCIONAL · HASTA ${g.maximo}`
         : 'OPCIONAL';
 
-  const nombreSticker = (i: number): string => recortar((nombres[i] ?? '').trim() || 'TU NOMBRE', 14);
+  // Un grupo de opciones (sin combo): la elección común, o la de la bebida `bebida` (0 en adelante)
+  const bloqueGrupo = (g: GrupoOpcionesCarta, selX: Record<string, string[]>, onAlt: (oid: string) => void, clave: string, bebida?: number) => {
+    const f = filtrar(g, selX, clave);
+    const obligatorio = g.minimo >= 1;
+    return (
+      <div key={clave}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ ...titulo, fontWeight: 800, fontSize: 14, letterSpacing: '0.01em' }}>{g.nombre}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, background: obligatorio ? 'var(--cp-navy)' : 'transparent', color: obligatorio ? 'var(--cp-cream)' : 'var(--cp-soft)', borderRadius: 9999, padding: '2px 10px', border: `1px solid ${obligatorio ? 'var(--cp-navy)' : 'var(--cp-soft)'}` }}>
+            {etiquetaGrupo(g)}
+          </span>
+        </div>
+        {g.aviso && <div role="status" style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust)', marginBottom: 8 }}>{g.aviso}</div>}
+        {f.grande && buscador(g, 44, `Buscar en ${g.nombre}`, clave)}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, ...(f.grande ? { maxHeight: 300, overflowY: 'auto' } : {}) }}>
+          {f.lista.map((o) => {
+            const on = (selX[g.id] ?? []).includes(o.id);
+            const agotada = o.disponible === false;
+            return (
+              <button
+                key={o.id}
+                onClick={() => onAlt(o.id)}
+                aria-pressed={on}
+                aria-label={bebida === undefined ? undefined : `Bebida ${bebida + 1}, ${g.nombre}: ${o.nombre}`}
+                disabled={agotada && !on}
+                style={{ minHeight: 44, borderRadius: 9999, border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 14px 0 10px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', fontSize: 13, opacity: agotada ? 0.5 : 1, cursor: agotada && !on ? 'not-allowed' : 'pointer' }}
+              >
+                <span style={{ width: 16, height: 16, borderRadius: g.maximo === 1 ? 10 : 6, border: '2px solid var(--cp-navy)', background: on ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
+                <span style={{ fontWeight: 600 }}>{o.nombre}</span>
+                {agotada && <span style={{ fontWeight: 700, color: 'var(--cp-soft)' }}>Agotado</span>}
+                {o.precioExtra > 0 && <span style={{ fontWeight: 700, color: 'var(--cp-rust)' }}>+{fmt(o.precioExtra)}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const nombreSticker =(i: number): string => recortar((nombres[i] ?? '').trim() || 'TU NOMBRE', 14);
 
   return (
     <>
@@ -489,42 +583,45 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 })}
               </div>
             ) : (
-              gruposCarta.map((g) => {
-                const f = filtrar(g);
-                const obligatorio = g.minimo >= 1;
-                return (
-                  <div key={g.id}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span style={{ ...titulo, fontWeight: 800, fontSize: 14, letterSpacing: '0.01em' }}>{g.nombre}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, background: obligatorio ? 'var(--cp-navy)' : 'transparent', color: obligatorio ? 'var(--cp-cream)' : 'var(--cp-soft)', borderRadius: 9999, padding: '2px 10px', border: `1px solid ${obligatorio ? 'var(--cp-navy)' : 'var(--cp-soft)'}` }}>
-                        {etiquetaGrupo(g)}
-                      </span>
-                    </div>
-                    {g.aviso && <div role="status" style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-rust)', marginBottom: 8 }}>{g.aviso}</div>}
-                    {f.grande && buscador(g, 44, `Buscar en ${g.nombre}`)}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, ...(f.grande ? { maxHeight: 300, overflowY: 'auto' } : {}) }}>
-                      {f.lista.map((o) => {
-                        const on = (sel[g.id] ?? []).includes(o.id);
-                        const agotada = o.disponible === false;
-                        return (
-                          <button
-                            key={o.id}
-                            onClick={() => alternar(g, o.id)}
-                            aria-pressed={on}
-                            disabled={agotada && !on}
-                            style={{ minHeight: 44, borderRadius: 9999, border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 14px 0 10px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', fontSize: 13, opacity: agotada ? 0.5 : 1, cursor: agotada && !on ? 'not-allowed' : 'pointer' }}
-                          >
-                            <span style={{ width: 16, height: 16, borderRadius: g.maximo === 1 ? 10 : 6, border: '2px solid var(--cp-navy)', background: on ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
-                            <span style={{ fontWeight: 600 }}>{o.nombre}</span>
-                            {agotada && <span style={{ fontWeight: 700, color: 'var(--cp-soft)' }}>Agotado</span>}
-                            {o.precioExtra > 0 && <span style={{ fontWeight: 700, color: 'var(--cp-rust)' }}>+{fmt(o.precioExtra)}</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
+              <>
+                {puedePorBebida && (
+                  <div role="group" aria-label="¿Todas las bebidas iguales?" style={{ display: 'flex', gap: 6, background: 'var(--cp-white)', border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: 4 }}>
+                    {[
+                      { valor: false, texto: 'Todas iguales' },
+                      { valor: true, texto: 'Elegir por bebida' },
+                    ].map((m) => (
+                      <button
+                        key={m.texto}
+                        type="button"
+                        onClick={() => setPorBebida(m.valor)}
+                        aria-pressed={porBebida === m.valor}
+                        style={{ flex: 1, minHeight: 44, border: 0, borderRadius: 10, fontWeight: 800, fontSize: 13, background: porBebida === m.valor ? 'var(--cp-navy)' : 'transparent', color: porBebida === m.valor ? 'var(--cp-cream)' : 'var(--cp-navy)', cursor: 'pointer' }}
+                      >
+                        {m.texto}
+                      </button>
+                    ))}
                   </div>
-                );
-              })
+                )}
+                {activoPorBebida
+                  ? Array.from({ length: cantidad }, (_, i) => (
+                      <div key={i} role="group" aria-label={`Bebida ${i + 1}`} style={{ border: `1.5px solid ${bebidaCompleta(i) ? 'var(--cp-line)' : 'var(--cp-orange)'}`, borderRadius: 14, padding: '10px 12px', background: 'var(--cp-white)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ ...titulo, fontWeight: 800, fontSize: 15 }}>
+                            {`Bebida ${i + 1}`}
+                            {(nombres[i] ?? '').trim() ? ` · ${(nombres[i] ?? '').trim()}` : ''}
+                          </span>
+                          <span style={{ ...titulo, fontWeight: 800, fontSize: 14, color: 'var(--cp-rust)' }}>{fmt(precioDe(unidadesBebida[i]))}</span>
+                          {i === 0 && (
+                            <button type="button" onClick={copiarATodas} style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: '1.5px solid var(--cp-navy)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                              Copiar a todas
+                            </button>
+                          )}
+                        </div>
+                        {gruposCarta.map((g) => bloqueGrupo(g, selDe(i), (oid) => alternarDe(i, g, oid), `${g.id}#${i}`, i))}
+                      </div>
+                    ))
+                  : gruposCarta.map((g) => bloqueGrupo(g, sel, (oid) => alternar(g, oid), g.id))}
+              </>
             )}
 
             {nB > 0 && (
@@ -695,7 +792,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                             ? libre ? `Agregar ${llevas} al pedido` : 'Agregar al pedido'
                             : 'Elige las opciones obligatorias'}
                 </span>
-                <span>{fmt(unitario * cantidad)}</span>
+                <span>{fmt(totalPrecio)}</span>
               </button>
             </div>
           </div>

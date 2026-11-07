@@ -16,6 +16,7 @@ import { comboDeProducto } from '../../../carta/ReemplazoCombo';
 import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
 import { unidadesDeLinea } from '../../../carta/stock';
+import { agruparUnidadesIguales } from '../../../carta/unidadesPorBebida';
 import { ModalLiberarMesa } from './ModalLiberarMesa';
 import { VistaPreviaMesa } from './VistaPreviaMesa';
 import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
@@ -783,6 +784,34 @@ export function ModalNuevoPedidoMesa({
 
   // Agregar producto desde VentanaOpcionesProducto
   const handleAgregarProductoConfigurado = (config: ProductoConfigurado) => {
+    // Opciones distintas por bebida: las iguales van juntas en una línea y las diferentes en líneas aparte
+    // (el envío manda las opciones por línea, así que cada línea lleva solo unidades con la misma elección)
+    const grupos = agruparUnidadesIguales(config.unidades);
+    if (grupos.length > 1) {
+      const base = config.tamano ? config.tamano.precio : config.producto.precio || 0;
+      const nuevas = grupos.map((g, k): LineaPedidoMesa => {
+        const unit = base + g[0].opciones.reduce((a, o) => a + Number(o.precioExtra || 0), 0);
+        return {
+          id: `${config.producto.id}-${Date.now()}-${k}-${Math.random().toString(36).substr(2, 4)}`,
+          productoId: config.producto.id,
+          nombre: config.producto.nombre,
+          tamanoId: config.tamano ? config.tamano.id : undefined,
+          tamanoNombre: config.tamano ? config.tamano.nombre : undefined,
+          cantidad: g.length,
+          precioUnitario: unit,
+          precioTotal: unit * g.length,
+          opciones: g[0].opciones,
+          unidades: g.map((u) => ({ persona: u.nombreVaso, opciones: u.opciones })),
+          nota: config.nota,
+          ofertaId: config.ofertaId,
+          comboElecciones: config.comboElecciones,
+          unidadesTamano: config.tamano?.unidades,
+          personas: g.map((u) => u.nombreVaso).filter(Boolean),
+        };
+      });
+      setLineas((prev) => [...prev, ...nuevas]);
+      return;
+    }
     const nuevaLinea: LineaPedidoMesa = {
       id: `${config.producto.id}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       productoId: config.producto.id,
