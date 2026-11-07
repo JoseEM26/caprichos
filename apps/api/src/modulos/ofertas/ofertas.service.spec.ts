@@ -57,12 +57,18 @@ describe('OfertasService', () => {
       producto: {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({ id: 900n }),
+        update: jest.fn(),
       },
+      categoria: { findFirst: jest.fn().mockResolvedValue({ id: 50n }), create: jest.fn().mockResolvedValue({ id: 50n }) },
+      areaCocina: { findFirst: jest.fn().mockResolvedValue({ id: 1n }) },
+      productoTamano: { upsert: jest.fn(), updateMany: jest.fn() },
       comboParteReemplazo: { createMany: jest.fn() },
       opcionRequiere: { findMany: jest.fn().mockResolvedValue([]) },
       comboPrecio: {
         create: jest.fn(),
         deleteMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       comboParte: {
         create: jest.fn().mockResolvedValue({ id: 100n }),
@@ -169,6 +175,28 @@ describe('OfertasService', () => {
       expect(res.nombre).toBe('Dúo Especial');
       expect(prismaMock.comboPrecio.create).toHaveBeenCalled();
       expect(prismaMock.comboParte.create).toHaveBeenCalled();
+    });
+
+    it('crear un combo crea y enlaza su producto anfitrión sin tocar Productos', async () => {
+      prismaMock.producto.findFirst.mockResolvedValue(null);
+      prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
+      const creada = { id: 3n, tipo: 'COMBO', nombre: 'Dúo Compartir', descripcion: 'x', alcance_producto_id: null, imagen_archivo_id: 4n, dias: [], canales: [], creado_en: new Date(), combosPrecio: [], combosParte: [] };
+      prismaMock.oferta.create.mockResolvedValue(creada);
+      prismaMock.oferta.findUnique.mockResolvedValue(creada);
+      await service.crearOferta({ tipo: 'COMBO', nombre: 'Dúo Compartir', tamanos: [{ tamanoValorId: '10', precio: 45 }], partes: [] });
+      expect(prismaMock.producto.create).toHaveBeenCalledWith({ data: expect.objectContaining({ nombre: 'Dúo Compartir', foto_archivo_id: 4n }) });
+      expect(prismaMock.oferta.update).toHaveBeenCalledWith({ where: { id: 3n }, data: { producto: { connect: { id: 900n } } } });
+    });
+
+    it('un combo puede renombrarse al nombre de su propio anfitrión pero no al de otro producto', async () => {
+      const existente = { id: 3n, tipo: 'COMBO', nombre: 'Dúo', alcance_producto_id: 900n, dias: [], canales: [], creado_en: new Date(), combosPrecio: [], combosParte: [] };
+      prismaMock.oferta.findUnique.mockResolvedValue(existente);
+      prismaMock.oferta.findFirst.mockResolvedValue(null);
+      prismaMock.oferta.update.mockResolvedValue(existente);
+      prismaMock.producto.findFirst.mockResolvedValueOnce({ id: 900n });
+      await expect(service.actualizarOferta(3, { nombre: 'Dúo Compartir' })).resolves.toBeDefined();
+      prismaMock.producto.findFirst.mockResolvedValueOnce({ id: 123n });
+      await expect(service.actualizarOferta(3, { nombre: 'Frappé' })).rejects.toThrow(ConflictException);
     });
 
     describe('reemplazos de la parte FIJO (plan B, C...)', () => {
@@ -353,6 +381,16 @@ describe('OfertasService', () => {
           response: { codigo: 'COMBO_PARTE_NO_PERMITIDA' },
         });
       });
+    });
+
+    it('apagar un combo oculta su anfitrión y encenderlo lo devuelve a la carta', async () => {
+      const combo = { id: 3n, tipo: 'COMBO', nombre: 'Dúo', alcance_producto_id: 900n, dias: [], canales: [], creado_en: new Date(), combosPrecio: [], combosParte: [] };
+      prismaMock.oferta.update.mockResolvedValue({ ...combo, activo: false });
+      await service.cambiarEstadoOferta('3', false);
+      expect(prismaMock.producto.update).toHaveBeenCalledWith({ where: { id: 900n }, data: { oculto: true } });
+      prismaMock.oferta.update.mockResolvedValue({ ...combo, activo: true });
+      await service.cambiarEstadoOferta('3', true);
+      expect(prismaMock.producto.update).toHaveBeenLastCalledWith({ where: { id: 900n }, data: { oculto: false } });
     });
 
     it('cambia estado de oferta con Sí/No (activar/desactivar)', async () => {
@@ -717,7 +755,7 @@ describe('OfertasService', () => {
       prismaMock.producto.findFirst.mockResolvedValue(null);
       prismaMock.oferta.findUnique.mockResolvedValue(null);
       prismaMock.oferta.create.mockResolvedValue({ id: 9n, tipo: 'COMBO', nombre: 'X', combosParte: [] });
-      prismaMock.productoTamano = { findUnique: jest.fn().mockResolvedValue({ producto_id: 6n }) };
+      prismaMock.productoTamano = { ...prismaMock.productoTamano, findUnique: jest.fn().mockResolvedValue({ producto_id: 6n }) };
       await expect(service.crearOferta({
         tipo: 'COMBO', nombre: 'X', tamanos: [{ tamanoValorId: '10', precio: 25 }],
         partes: [{ tipo: 'FIJO', cantidad: 1, productos: ['5'], tamanoId: '77' }],
@@ -729,7 +767,7 @@ describe('OfertasService', () => {
       prismaMock.oferta.findUnique.mockResolvedValueOnce(null);
       prismaMock.oferta.findUnique.mockResolvedValue({ id: 9n, tipo: 'COMBO', nombre: 'X', dias: [], canales: [], creado_en: new Date(), combosPrecio: [], combosParte: [] });
       prismaMock.oferta.create.mockResolvedValue({ id: 9n, tipo: 'COMBO', nombre: 'X', combosParte: [] });
-      prismaMock.productoTamano = { findUnique: jest.fn().mockResolvedValue({ producto_id: 5n }) };
+      prismaMock.productoTamano = { ...prismaMock.productoTamano, findUnique: jest.fn().mockResolvedValue({ producto_id: 5n }) };
       await service.crearOferta({
         tipo: 'COMBO', nombre: 'X', tamanos: [{ tamanoValorId: '10', precio: 25 }],
         partes: [{ tipo: 'FIJO', cantidad: 1, productos: ['5'], tamanoId: '77' }],
