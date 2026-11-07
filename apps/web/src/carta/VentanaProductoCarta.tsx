@@ -7,7 +7,7 @@ import { useEsMovil } from './useEsMovil';
 import { alternarEleccion } from './eleccionGrupo';
 import { useUmbralesStock } from './umbralesStock';
 import { etiquetaQuedan, etiquetaUltimos, infoStockDe, mezclasDisponibles, saboresParaLinea, topeAgregable, topeTamano, unidadesEnCarrito } from './stock';
-import { maximoMezclas } from '../comun/saboresMezcla';
+import { maximoMezclas, totalElegido } from '../comun/saboresMezcla';
 import { SelectorSaboresMezcla } from '../comun/SelectorSaboresMezcla';
 import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../comun/saboresMezcla';
 import type { OfertaItem } from '../admin/ofertas/ofertasApi';
@@ -128,15 +128,21 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   // Mezcla de sabores (donas y galletas): cada tamaño trae sus unidades y el saldo es por sabor
   const saborMode = producto.saboresConStock === true;
   const unidadesMezcla = tamano?.unidades ?? 1;
-  const total = unidadesMezcla * cantidad;
+  // Unidades sueltas (sin tamano o tamano de 1): el cliente reparte lo que quiera entre los sabores y la cantidad es la suma
+  const libre = saborMode && unidadesMezcla === 1;
+  const total = libre ? Infinity : unidadesMezcla * cantidad;
   const saboresDisp = saborMode ? saboresParaLinea(info, lineas, String(producto.id)) : [];
   // al cambiar tamaño o cantidad el reparto se recorta al nuevo total y a lo que queda de cada sabor
   const valorSaboresOk = saborMode ? recortarAlTope(valorSabores, saboresDisp, total) : {};
   useEffect(() => {
     if (saborMode && JSON.stringify(valorSaboresOk) !== JSON.stringify(valorSabores)) setValorSabores(valorSaboresOk);
   });
-  const saboresListos = !saborMode || repartoValido(valorSaboresOk, total, saboresDisp);
-  const faltanSabores = faltanUnidades(valorSaboresOk, total);
+  const llevas = totalElegido(valorSaboresOk);
+  useEffect(() => {
+    if (libre && cantidad !== Math.max(1, llevas)) setCantidad(Math.max(1, llevas));
+  });
+  const saboresListos = !saborMode || (libre ? llevas > 0 : repartoValido(valorSaboresOk, total, saboresDisp));
+  const faltanSabores = libre ? 1 : faltanUnidades(valorSaboresOk, total);
 
   // Sin sabores: cada cantidad consume las unidades del tamaño (1/2 docena = 6); con sabores, el tope son las mezclas
   const libres = topeAgregable(info, enCarrito);
@@ -158,7 +164,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       : enTope
         ? `Solo quedan ${info.quedan}${enCarrito > 0 ? ` · ya tienes ${enCarrito} en tu pedido` : ''}`
         : etiquetaStock;
-  const ayudaSabores = valido && !saboresListos ? `Elige los sabores: faltan ${faltanSabores}` : null;
+  const ayudaSabores = valido && !saboresListos ? (libre ? 'Elige al menos un sabor' : `Elige los sabores: faltan ${faltanSabores}`) : null;
   const ayudaMezclas = saborMode && enTope ? 'Ya no quedan más unidades de estos sabores' : null;
   useEffect(() => {
     if (tope !== null && cantidad > Math.max(1, tope)) setCantidad(Math.max(1, tope));
@@ -366,6 +372,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               <SelectorSaboresMezcla
                 sabores={saboresDisp}
                 total={total}
+                libre={libre}
                 valor={valorSaboresOk}
                 onCambio={setValorSabores}
                 deshabilitar={soloLectura}
@@ -635,6 +642,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   {ayudaMezclas}
                 </div>
               )}
+              {!libre && (
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--cp-navy)', borderRadius: 12 }}>
                 <button onClick={() => setCantidad((c) => Math.max(1, c - 1))} aria-label="Menos" style={{ width: 44, height: 48, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontSize: 22, fontWeight: 800 }}>
                   −
@@ -649,6 +657,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   +
                 </button>
               </div>
+              )}
               <button
                 onClick={soloLectura ? undefined : agregar}
                 disabled={soloLectura ? true : !puedeAgregar}
@@ -683,7 +692,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                         : valido && !saboresListos
                           ? 'Elige los sabores'
                           : valido
-                            ? 'Agregar al pedido'
+                            ? libre ? `Agregar ${llevas} al pedido` : 'Agregar al pedido'
                             : 'Elige las opciones obligatorias'}
                 </span>
                 <span>{fmt(unitario * cantidad)}</span>

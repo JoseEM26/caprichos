@@ -25,7 +25,7 @@ import {
 import { SelectorEleccionCombo } from '../../../carta/SelectorEleccionCombo';
 import { useUmbralesStock } from '../../../carta/umbralesStock';
 import { etiquetaUltimos, infoStockDe, topeAgregable, topeTamano } from '../../../carta/stock';
-import { maximoMezclas } from '../../../comun/saboresMezcla';
+import { maximoMezclas, totalElegido } from '../../../comun/saboresMezcla';
 
 export interface ConfiguracionUnidad {
   opciones: OpcionProducto[];
@@ -117,13 +117,19 @@ export function VentanaOpcionesProducto({
     [producto, saborMode],
   );
   const unidadesMezcla = tamanoSeleccionado?.unidades ?? 1;
-  const total = unidadesMezcla * cantidad;
+  // Unidades sueltas (sin tamano o tamano de 1): se reparte lo que se quiera entre los sabores y la cantidad es la suma
+  const libre = saborMode && unidadesMezcla === 1;
+  const total = libre ? Infinity : unidadesMezcla * cantidad;
   const saboresDisp = (producto.sabores ?? []).map((s) => ({ id: s.id, nombre: s.nombre, disponible: s.disponible, quedan: s.quedan ?? null }));
   const valorSaboresOk = saborMode ? recortarAlTope(valorSabores, saboresDisp, total) : {};
   useEffect(() => {
     if (saborMode && JSON.stringify(valorSaboresOk) !== JSON.stringify(valorSabores)) setValorSabores(valorSaboresOk);
   });
-  const saboresListos = !saborMode || repartoValido(valorSaboresOk, total, saboresDisp);
+  const llevas = totalElegido(valorSaboresOk);
+  useEffect(() => {
+    if (libre && cantidad !== Math.max(1, llevas)) setCantidad(Math.max(1, llevas));
+  });
+  const saboresListos = !saborMode || (libre ? llevas > 0 : repartoValido(valorSaboresOk, total, saboresDisp));
   // Stock sin sabores: cada tamaño consume sus unidades (1/2 docena = 6); el tope son las que quedan menos el pedido
   const infoStock = infoStockDe(producto);
   const umbrales = useUmbralesStock(true);
@@ -448,7 +454,7 @@ export function VentanaOpcionesProducto({
         )}
 
         {saborMode && (
-          <SelectorSaboresMezcla sabores={saboresDisp} total={total} valor={valorSaboresOk} onCambio={setValorSabores} />
+          <SelectorSaboresMezcla sabores={saboresDisp} total={total} libre={libre} valor={valorSaboresOk} onCambio={setValorSabores} />
         )}
 
         {/* Grupos de opciones */}
@@ -838,7 +844,7 @@ export function VentanaOpcionesProducto({
         )}
         {saborMode && !saboresListos && (
           <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
-            Elige los sabores: faltan {faltanUnidades(valorSaboresOk, total)}
+            {libre ? 'Elige al menos un sabor' : `Elige los sabores: faltan ${faltanUnidades(valorSaboresOk, total)}`}
           </div>
         )}
 
@@ -952,6 +958,7 @@ export function VentanaOpcionesProducto({
             marginTop: '8px',
           }}
         >
+          {!libre && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               type="button"
@@ -1000,6 +1007,7 @@ export function VentanaOpcionesProducto({
               +
             </button>
           </div>
+          )}
 
           <button
             type="button"
@@ -1026,7 +1034,9 @@ export function VentanaOpcionesProducto({
                   ? 'No hay stock suficiente'
                   : saborMode && !saboresListos
                     ? 'Elige los sabores'
-                    : 'Agregar al pedido'}
+                    : libre
+                      ? `Agregar ${llevas} al pedido`
+                      : 'Agregar al pedido'}
             </span>
             <span> · S/ {precioTotal.toFixed(2)}</span>
           </button>

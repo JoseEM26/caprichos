@@ -17,6 +17,8 @@ interface Props {
   valor: Reparto;
   onCambio: (valor: Reparto) => void;
   deshabilitar?: boolean;
+  /** Modo libre (unidades sueltas): sin total fijo; la cantidad de cada sabor suma lo que lleva el cliente. */
+  libre?: boolean;
 }
 
 const boton: CSSProperties = {
@@ -48,7 +50,7 @@ const chip: CSSProperties = {
  * Reparto de las unidades de una media docena o docena entre los sabores disponibles.
  * Los agotados no se muestran; cada sabor tiene tope por lo que queda.
  */
-export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabilitar = false }: Props) {
+export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabilitar = false, libre = false }: Props) {
   const umbrales = useUmbralesStock();
   if (total <= 0) return null;
 
@@ -58,7 +60,7 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
   const faltan = faltanUnidades(valor, total);
   const sobran = Math.max(0, elegidas - total);
   const completo = elegidas === total;
-  const porcentaje = Math.min(100, Math.round((Math.min(elegidas, total) / total) * 100));
+  const porcentaje = libre ? 0 : Math.min(100, Math.round((Math.min(elegidas, total) / total) * 100));
 
   const fijar = (saborId: string, cantidad: number) => {
     const nuevo: Reparto = { ...valor };
@@ -68,11 +70,11 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
   };
 
   return (
-    <div role="group" aria-label="Sabores de la mezcla" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div role="group" aria-label={libre ? 'Sabores y cantidades' : 'Sabores de la mezcla'} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <div aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
-          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-navy)' }}>{`Elegidas ${elegidas} de ${total}`}</span>
-          {completo ? (
+          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--cp-navy)' }}>{libre ? `Llevas ${elegidas}` : `Elegidas ${elegidas} de ${total}`}</span>
+          {libre ? null : completo ? (
             <span style={{ fontWeight: 800, fontSize: 12, color: '#2F9E57' }}>Completo ✓</span>
           ) : sobran > 0 ? (
             <span style={{ fontWeight: 800, fontSize: 12, color: 'var(--cp-rust)' }}>{`Sobran ${sobran}: quita unidades`}</span>
@@ -90,6 +92,7 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
         </button>
       </div>
 
+      {!libre && (
       <div
         role="progressbar"
         aria-label="Sabores elegidos"
@@ -100,11 +103,13 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
       >
         <div style={{ width: `${porcentaje}%`, height: '100%', background: completo ? '#2F9E57' : 'var(--cp-orange)', transition: 'width 150ms' }} />
       </div>
+      )}
 
       {visibles.length === 0 ? (
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>No hay sabores disponibles ahora.</div>
       ) : (
         <>
+          {!libre && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft)' }}>Todas del mismo sabor:</span>
             {visibles.map((s) => {
@@ -124,6 +129,7 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
               );
             })}
           </div>
+          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {visibles.map((s) => {

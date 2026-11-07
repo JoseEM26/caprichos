@@ -68,7 +68,7 @@ Despues: [[apertura]]
 1. En el editor del producto, en "Sabores o variantes" agrega cada sabor en "Nuevo sabor (ej.: Pistacho, Nutella, Americana)". Cada sabor se marca Disponible o Agotado tocandolo, y muestra "Quedan N" o "Sin apertura hoy". Los sabores son las opciones que el cliente elige (relleno, sabor) y tambien las usa el bot de WhatsApp.
 2. El stock de cada sabor no se escribe aqui: se registra en Apertura del dia (Almacen).
 3. En Tamanos y precios, en la columna Unidades escribe cuantas unidades incluye cada tamano: Unidad 1, 1/2 docena 6, Docena 12. Asi, vender una media docena descuenta 6 del stock, y el tope en la carta se calcula en unidades.
-4. El cliente reparte las unidades de la media docena o docena entre sabores (selector con "Completo" cuando termina de repartir, atajo "Todas del mismo sabor"). En cocina, mis pedidos y etiquetas se ve el reparto, por ejemplo "2 Fresa · 3 Oreo".
+4. El cliente reparte las unidades de la media docena o docena entre sabores (selector con "Completo" cuando termina de repartir, atajo "Todas del mismo sabor"). Si el producto se vende por unidad (sin tamano o tamano de 1 unidad), el cliente no elige una cantidad antes: usa los botones - y + de cada sabor, ve "Llevas N" y pulsa "Agregar N al pedido" (por ejemplo 3 Fresa y 2 Oreo en un solo paso). En cocina, mis pedidos y etiquetas se ve el reparto, por ejemplo "2 Fresa · 3 Oreo".
 5. Los sabores sin stock salen bloqueados ("No hay stock" o "Solo quedan N de X"); al llegar a 0 ese sabor se marca Agotado solo.
 6. Galletas sin sabores: la galleta (por ejemplo choco chips) lleva un stock unico por producto, en unidades, sin sabores; la media docena descuenta 6.
 

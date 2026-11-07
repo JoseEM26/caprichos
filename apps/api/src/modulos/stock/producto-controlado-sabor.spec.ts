@@ -171,6 +171,16 @@ describe('productos por sabor (stock de donas y galletas con sabores)', () => {
       ]);
     });
 
+    it('unidades sueltas: 3 donas (1 × 3) en 3 sabores distintos de un solo paso; si no suman 3 se rechaza', () => {
+      const r = validarSaboresLinea(prod, 1, 3, [
+        { saborId: FRESA, cantidad: 1 },
+        { saborId: OREO, cantidad: 1 },
+        { saborId: MANJAR, cantidad: 1 },
+      ], AHORA);
+      expect(r).toHaveLength(3);
+      expect(() => validarSaboresLinea(prod, 1, 3, [{ saborId: FRESA, cantidad: 2 }], AHORA)).toThrow(BadRequestException);
+    });
+
     it('la cantidad de la línea multiplica las unidades: 2 docenas (12 × 2) = 24', () => {
       expect(() => validarSaboresLinea(prod, 12, 2, [{ saborId: FRESA, cantidad: 24 }], AHORA)).not.toThrow();
       expect(() => validarSaboresLinea(prod, 12, 2, [{ saborId: FRESA, cantidad: 12 }], AHORA)).toThrow(BadRequestException);
