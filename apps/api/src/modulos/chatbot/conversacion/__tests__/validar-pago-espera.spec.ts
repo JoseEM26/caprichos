@@ -331,6 +331,34 @@ describe('Comportamiento del Bot en estado VALIDAR_PAGO (Contrato Sección 3)', 
       expect(silencios()[0][0].data.contenido.texto).toContain('ya se avisó a Caja');
     });
 
+    it('total / yapear: responde con total, Yape y captura, 1 vez cada 5 min, sin tomar el chat', async () => {
+      const pago = { pedidoCodigo: 'CP-W044', monto: 174.75, medio: 'YAPE', avisoPersonaEnviado: true, avisoPersonaEn: new Date().toISOString() };
+      const frases = ['Cuanto sería el total porfavor', 'Esta bien rápido', 'Para poder yapear'];
+      let flujo: any = { pago };
+      for (const texto of frases) {
+        prismaMock.conversacion.findUnique.mockResolvedValueOnce(conv(flujo));
+        await service.procesarMensajeEntrante(20n, { texto });
+        const ult = prismaMock.conversacion.update.mock.calls.at(-1)?.[0]?.data?.flujo;
+        if (ult?.pago?.respuestaDatosEn) flujo = ult;
+      }
+      // «Cuanto sería el total» responde; «Esta bien rápido» calla; «yapear» cae dentro de los 5 min y calla
+      expect(mensajeriaMock.enviarTexto).toHaveBeenCalledTimes(1);
+      const texto = mensajeriaMock.enviarTexto.mock.calls[0][1];
+      expect(texto).toContain('S/ 174.75');
+      expect(texto).toContain('Yape');
+      expect(texto).toContain('captura');
+      expect(silencios()).toHaveLength(2);
+      for (const [a] of prismaMock.conversacion.update.mock.calls) {
+        expect(a.data.duenio).toBeUndefined();
+        expect(a.data.estado).toBeUndefined();
+      }
+      // pasados 5 min, «yapear» vuelve a responder
+      const hace6 = new Date(Date.now() - 6 * 60000).toISOString();
+      prismaMock.conversacion.findUnique.mockResolvedValueOnce(conv({ pago: { ...pago, respuestaDatosEn: hace6 } }));
+      await service.procesarMensajeEntrante(20n, { texto: 'Para poder yapear' });
+      expect(mensajeriaMock.enviarTexto).toHaveBeenCalledTimes(2);
+    });
+
     it('pasado el plazo vuelve a avisar con botones y a notificar a Caja', async () => {
       const hace20 = new Date(Date.now() - 20 * 60000).toISOString();
       prismaMock.conversacion.findUnique.mockResolvedValueOnce(
