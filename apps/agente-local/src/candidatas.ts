@@ -34,14 +34,21 @@ export function filtrarImpresorasWindows(lista: ImpresoraWindowsInfo[]): Impreso
 const PARECE_ETIQUETERA = /tsc|4barcode|4b-?20|label|etiq|zebra|tspl|gk\d|godex|argox/i;
 const PARECE_TICKETERA = /pos|receipt|ticket|thermal|termic|epson tm|xprinter|rongta|58|80mm|escpos/i;
 
+/** Ticketera del local: driver 3nStar «POS-80» / «POS-80C» (RPT-Drivers). Se reconoce primero y sin dudar. */
+export const ES_TICKETERA_LOCAL = /\bpos[\s-]?80c?\b/i;
+
 export function sugerirRol(texto: string): RolImpresora | undefined {
+  if (ES_TICKETERA_LOCAL.test(texto)) return 'TICKETERA';
   if (PARECE_ETIQUETERA.test(texto)) return 'ETIQUETERA';
   if (PARECE_TICKETERA.test(texto)) return 'TICKETERA';
   return undefined;
 }
 
 export function candidatasDeWindows(lista: ImpresoraWindowsInfo[]): CandidataLocal[] {
-  return filtrarImpresorasWindows(lista).map((i) => ({
+  const ordenadas = [...filtrarImpresorasWindows(lista)].sort(
+    (a, b) => Number(ES_TICKETERA_LOCAL.test(`${b.nombre} ${b.driver ?? ''}`)) - Number(ES_TICKETERA_LOCAL.test(`${a.nombre} ${a.driver ?? ''}`)),
+  );
+  return ordenadas.map((i) => ({
     id: i.nombre,
     nombre: i.nombre,
     destino: i.nombre,
