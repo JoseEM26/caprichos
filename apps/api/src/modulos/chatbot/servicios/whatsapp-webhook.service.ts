@@ -209,6 +209,10 @@ export class WhatsappWebhookService {
       if (estadoFinal === 'FALLIDO' && previo && previo.estado !== 'FALLIDO' && previo.direccion === 'SALIENTE') {
         await this.atenderFalloAsincrono(previo, waMessageId, errorCodigo, errorDetalle);
       }
+      // El saliente del outbox figuraba ENVIADO: ahora pasa a FALLIDO con el motivo de Meta (visible y reenviable en Salientes)
+      if (estadoFinal === 'FALLIDO' && this.outbox) {
+        await this.outbox.marcarFalloAsincrono(waMessageId, errorCodigo, errorDetalle);
+      }
     } catch (err: any) {
       this.logger.error(`Error actualizando estado para waMessageId ${waMessageId}: ${err.message}`);
     }
@@ -498,7 +502,8 @@ export class WhatsappWebhookService {
 
     // 1. Detección de consentimiento Ley 29733 (BAJA / STOP / NO MAS / ALTA)
     const textoNorm = texto.toLowerCase().trim();
-    if (textoNorm === 'baja' || textoNorm === 'stop' || textoNorm === 'no mas') {
+    // «no mas» ya no da de baja: es la respuesta natural a «¿algo más?» y dejaba al cliente sin avisos de su pedido
+    if (textoNorm === 'baja' || textoNorm === 'stop') {
       await this.prisma.clienteWhatsappConsentimiento.upsert({
         where: { telefono_hash: telHash },
         create: {
@@ -761,7 +766,6 @@ export class WhatsappWebhookService {
     const esComandoBajaOAlta =
       textoNorm === 'baja' ||
       textoNorm === 'stop' ||
-      textoNorm === 'no mas' ||
       textoNorm === 'alta' ||
       textoNorm === 'start';
 
@@ -808,12 +812,36 @@ export class WhatsappWebhookService {
         } catch (err: any) {
           this.logger.error(
             `Error al invocar motor conversacional para conversación ${conversacion.id}: ${err.message}`,
+            err.stack,
           );
+          // El mensaje ya quedó registrado (no se reintenta): sin esto el cliente se quedaba sin respuesta ni aviso
+          await this.avisarFalloDelBot(telefonoNorm, waMessageId);
         }
       }
     }
 
     return true;
+  }
+
+  /** Disculpa breve cuando el motor del bot falla: una sola vez por mensaje (clave idempotente) y sin lanzar error. */
+  private async avisarFalloDelBot(telefono: string | null, waMessageId?: string): Promise<void> {
+    if (!telefono || !waMessageId || !this.outbox) return;
+    try {
+      await this.outbox.encolar({
+        telefono,
+        tipo: 'TEXTO',
+        clave: `error-bot-${waMessageId}`,
+        origen: 'BOT_ERROR',
+        carga: {
+          textoLibre: 'Tuvimos un inconveniente al procesar tu mensaje 🙏 Escríbelo de nuevo en un momento, o escribe *asesor* y una persona te ayuda.',
+          autor: 'BOT',
+          etapa: 'ERROR_BOT',
+        },
+      });
+      this.outbox.despertar();
+    } catch (err: any) {
+      this.logger.error(`No se pudo avisar al cliente del fallo del bot: ${err.message}`);
+    }
   }
 
   /**

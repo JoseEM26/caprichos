@@ -153,6 +153,32 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       return { codigo: causaPlantilla.codigo, mensaje: causaPlantilla.mensaje, reintentable: false, httpStatus: status };
     }
 
+    // 1. Destinatario no verificado en el número de prueba de Meta (131030 o allowed list). Va antes que la
+    // regla de BSUID: su texto dice «Recipient phone number not in allowed list» y se confundía con un BSUID.
+    if (
+      code === 131030 ||
+      fullLower.includes('allowed list') ||
+      fullLower.includes('recipient is not in')
+    ) {
+      return {
+        codigo: 'DESTINATARIO_NO_VERIFICADO',
+        mensaje: 'Este numero no esta autorizado en el numero de prueba de Meta',
+        reintentable: false,
+        httpStatus: status,
+      };
+    }
+
+    // 1.b Parámetro inválido (código 100) con destinatario normal: es un error del contenido (botón o lista fuera de
+    // límite, media, etc.), no del identificador. Solo con BSUID real se pide el número de celular.
+    if (code === 100 && !esBsuid) {
+      return {
+        codigo: 'PARAMETRO_INVALIDO',
+        mensaje: `Meta rechazó un dato del mensaje (parámetro inválido): ${msg}`,
+        reintentable: false,
+        httpStatus: status,
+      };
+    }
+
     // 0. BSUID no permitido o rechazado por Meta (código 100, 131009 o detalles de recipient/formato)
     if (
       esBsuid ||
@@ -242,8 +268,8 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       };
     }
 
-    // 4. Rate limit / 429
-    if (status === 429 || code === 131048 || code === 130429) {
+    // 4. Rate limit / 429 (131056 demasiados mensajes al mismo número, 80007 límite de la cuenta): se reintenta
+    if (status === 429 || [131048, 130429, 131056, 80007].includes(code)) {
       return {
         codigo: 'LIMITE_TASA_EXCEDIDO',
         mensaje: 'Límite de tasa de mensajes excedido en Meta. Reintento programado.',
@@ -252,8 +278,8 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       };
     }
 
-    // 5. Errores de servidor 5xx
-    if (status >= 500) {
+    // 5. Errores de servidor 5xx y fallos pasajeros de Meta con 4xx (131000 error genérico, 131016 servicio no disponible)
+    if (status >= 500 || code === 131000 || code === 131016) {
       return {
         codigo: 'ERROR_SERVIDOR_META',
         mensaje: `Error interno de Meta (${status}): ${msg}`,
@@ -385,7 +411,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       messaging_product: 'whatsapp',
       ...destinatario,
       type: 'text',
-      text: { preview_url: false, body: texto },
+      text: { preview_url: false, body: texto.slice(0, 4096) }, // tope de Meta: más largo da error 100
     };
 
     if (opciones?.replyToWaMessageId) {

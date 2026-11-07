@@ -198,9 +198,10 @@ describe('Bot con menú (decisión del dueño)', () => {
       expect(tipos(ejecutar({ listRowId: 'faq_delivery' }, ctx))).toEqual(['enviarBotones']);
     });
 
-    it('«promociones» por texto no tiene respuesta propia: vuelve al menú', () => {
+    it('«promociones» por texto responde con las promociones por canal (pedido del dueño 07/11)', () => {
       const r = ejecutar({ texto: 'hay promociones hoy' });
-      expect(tipos(r)).toEqual(['enviarLista']);
+      expect(tipos(r)).toEqual(['enviarBotones']);
+      expect(JSON.stringify(r.acciones)).toContain('no tenemos promociones activas');
     });
   });
 

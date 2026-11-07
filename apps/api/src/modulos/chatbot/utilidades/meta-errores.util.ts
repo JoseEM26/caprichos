@@ -125,3 +125,19 @@ export function detalleDeErrorMeta(
   if (!error) return undefined;
   return error.detalleOriginal ? detalleTecnicoMeta(error.metaCodigo, error.detalleOriginal) : error.mensaje;
 }
+
+/**
+ * Código de clasificación interno de un código numérico de Meta que llega por el webhook (estado «failed»), el mismo
+ * que el adaptador le da a un rechazo inmediato. Lo que no se conoce queda ERROR_META.
+ */
+export function codigoInternoDeMeta(metaCodigo: number | string | null | undefined, texto = ''): string {
+  const n = Number(metaCodigo);
+  if (!n) return 'ERROR_META';
+  const plantilla = causaPlantillaMeta(n, texto.toLowerCase());
+  if (plantilla) return plantilla.codigo;
+  if (n === 131047) return 'FUERA_DE_VENTANA_24H';
+  if (n === 131026 || n === 131009) return 'NUMERO_INVALIDO';
+  if (n === 131030) return 'DESTINATARIO_NO_VERIFICADO';
+  if (n === 190) return 'TOKEN_VENCIDO';
+  return 'ERROR_META';
+}

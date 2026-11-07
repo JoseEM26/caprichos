@@ -21,6 +21,7 @@ import { vistaPreviaPedidoBot, vistaPreviaUbicacionBot } from './vista-previa-pe
 import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
 import { CODIGOS_COMBO_RECHAZADO, carritoTrasComboRechazado, carritoTrasSaborAgotado } from './flujos/pedido/flujo-pedido';
 import { productosComboNoBot } from './flujos/pedido/combo-bot';
+import { ofertasFueraDeWhatsapp } from '../utilidades/ofertas-canal.util';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
 import {
@@ -874,6 +875,7 @@ export class EjecutorConversacionService {
     let datosLocalPublicos: any = null;
     let categoriasCarta: any[] = [];
     let ofertas: any[] = [];
+    let promosFuera: ReturnType<typeof ofertasFueraDeWhatsapp> = { soloWeb: [], soloLocal: [] };
     let anfitrionesNoBot: string[] = [];
     let ventasProductos: Record<string, number> = {};
     let pedidoActivo: any = null;
@@ -902,7 +904,10 @@ export class EjecutorConversacionService {
         ofertas = await this.ofertasService.listarOfertas(undefined, true, 'WHATSAPP');
         // Anfitriones de combos que el bot no vende hoy (sin casilla WhatsApp, agotados o fuera de horario): no salen en sus listas
         try {
-          anfitrionesNoBot = productosComboNoBot(await this.ofertasService.listarOfertas('COMBO', true), ofertas);
+          // Todas las activas (sin filtrar canal): de ahí salen los combos que el bot no vende y las promos solo web o solo local
+          const todasActivas = (await this.ofertasService.listarOfertas(undefined, true)) ?? [];
+          anfitrionesNoBot = productosComboNoBot(todasActivas.filter((o: any) => o.tipo === 'COMBO'), ofertas);
+          promosFuera = ofertasFueraDeWhatsapp(todasActivas);
         } catch (err: any) {
           this.logger.warn(`Sin la lista de combos para filtrar la carta del bot: ${err.message}`);
         }
@@ -1204,6 +1209,8 @@ export class EjecutorConversacionService {
       datosLocalPublicos,
       categoriasCarta,
       ofertas,
+      ofertasSoloWeb: promosFuera.soloWeb,
+      ofertasSoloLocal: promosFuera.soloLocal,
       productosComboNoBot: anfitrionesNoBot,
       ventasProductos,
       pedidoActivo,

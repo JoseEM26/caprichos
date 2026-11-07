@@ -224,6 +224,16 @@ export interface InfoOfertaBot {
   horasTexto?: string;
 }
 
+/** Promociones que NO valen por WhatsApp: se nombran, pero no se ofrecen por el chat. */
+export interface PromosFueraDeWhatsapp {
+  /** Valen en la carta web (`tambienLocal`: además en el local). */
+  soloWeb: (InfoOfertaBot & { tambienLocal?: boolean })[];
+  /** Valen solo en el local. */
+  soloLocal: InfoOfertaBot[];
+  /** Enlace de la carta web. */
+  cartaUrl?: string;
+}
+
 export interface InfoOpcionBot {
   nombre: string;
   precioExtra?: number;
@@ -456,37 +466,70 @@ export const TEXTOS_BOT = {
     return lineas.filter(Boolean).join('\n').slice(0, 1024);
   },
 
-  promocionesHoy: (ofertas: InfoOfertaBot[]): string => {
-    if (!ofertas || ofertas.length === 0) {
+  /**
+   * Promociones por canal, en bloques cortos (máx. 1024 caracteres, el tope del cuerpo de WhatsApp):
+   *  1. Las que valen por este chat (se piden desde «Hacer un pedido» o «Pedir este»).
+   *  2. Las SOLO de la carta web: se nombran y se manda al enlace, nunca se ofrecen por el chat.
+   *  3. Las solo del local.
+   *  4. Las que hoy no aplican.
+   * Si no cabe todo, se recorta desde el final (primero las que hoy no aplican, luego local, web, WhatsApp) y se avisa.
+   */
+  promocionesHoy: (ofertas: InfoOfertaBot[], fuera?: PromosFueraDeWhatsapp): string => {
+    const vigentes = (ofertas || []).filter((o) => o.vigenteAhora);
+    const noVigentes = (ofertas || []).filter((o) => !o.vigenteAhora);
+    const soloWeb = fuera?.soloWeb ?? [];
+    const soloLocal = fuera?.soloLocal ?? [];
+    if (vigentes.length + noVigentes.length + soloWeb.length + soloLocal.length === 0) {
       return 'Por el momento no tenemos promociones activas para hoy. ¡Revisa nuestra carta para ver todos los productos!';
     }
 
-    const lineas: string[] = ['*Promociones y ofertas:*'];
-    const vigentes = ofertas.filter((o) => o.vigenteAhora);
-    const noVigentes = ofertas.filter((o) => !o.vigenteAhora);
+    const detalle = (o: InfoOfertaBot) => {
+      const desc = o.descripcion ? ` — ${o.descripcion}` : '';
+      const min = o.compraMinima ? ` (Compra mín. s/ ${o.compraMinima.toFixed(2)})` : '';
+      return `• *${o.nombre}*${desc}${min}`;
+    };
+    const enlace = fuera?.cartaUrl?.trim();
+    // Cada sección: encabezado, filas y pie (el enlace de la carta va siempre con la de la web)
+    const secciones: { cabecera: string; filas: string[]; pie?: string }[] = [
+      {
+        cabecera: '🏷 *Vigentes hoy (las pides por aquí):*',
+        filas: vigentes.flatMap((o) => [
+          detalle(o),
+          // Combo que el bot vende: el precio de cada tamaño; se pide desde «Hacer un pedido» o el botón «Pedir este»
+          ...(o.tipo === 'COMBO' && o.combosPrecio?.length
+            ? [`   ${o.combosPrecio.map((c) => `${c.tamanoNombre ? `${c.tamanoNombre} ` : ''}S/ ${Number(c.precio).toFixed(2)}`).join(' · ')}`]
+            : []),
+        ]),
+      },
+      {
+        cabecera: '🌐 *Solo en nuestra carta web (no se piden por este chat):*',
+        filas: soloWeb.map((o) => `${detalle(o)}${o.tambienLocal ? ' (y en el local)' : ''}`),
+        pie: enlace ? `👉 ${enlace}` : undefined,
+      },
+      { cabecera: '🏪 *Solo en el local:*', filas: soloLocal.map(detalle) },
+      {
+        cabecera: '📅 *Otras promociones (hoy no aplican):*',
+        filas: noVigentes.map((o) => `• *${o.nombre}*${o.diasTexto ? ` (aplica: ${o.diasTexto})` : ''}`),
+      },
+    ];
 
-    if (vigentes.length > 0) {
-      lineas.push('\n🏷 *Vigentes hoy:*');
-      vigentes.forEach((o) => {
-        const desc = o.descripcion ? ` — ${o.descripcion}` : '';
-        const min = o.compraMinima ? ` (Compra mín. s/ ${o.compraMinima.toFixed(2)})` : '';
-        lineas.push(`• *${o.nombre}*${desc}${min}`);
-        // Combo que el bot vende: el precio de cada tamaño; se pide desde «Hacer un pedido» o el botón «Pedir este»
-        if (o.tipo === 'COMBO' && o.combosPrecio?.length) {
-          lineas.push(`   ${o.combosPrecio.map((c) => `${c.tamanoNombre ? `${c.tamanoNombre} ` : ''}S/ ${Number(c.precio).toFixed(2)}`).join(' · ')}`);
-        }
-      });
+    const armar = (recortado: boolean) => {
+      const bloques = secciones
+        .filter((sec) => sec.filas.length > 0)
+        .map((sec) => [sec.cabecera, ...sec.filas, ...(sec.pie ? [sec.pie] : [])].join('\n'));
+      const cola = recortado ? `…y más promociones en nuestra carta${enlace ? `: ${enlace}` : '.'}` : '';
+      return ['*Promociones y ofertas:*', ...bloques, ...(cola ? [cola] : [])].join('\n\n');
+    };
+
+    let texto = armar(false);
+    // Recorta una fila a la vez desde el final (la sección que menos importa primero) hasta que quepa
+    for (const sec of [...secciones].reverse()) {
+      while (texto.length > 1024 && sec.filas.length > 0) {
+        sec.filas.pop();
+        texto = armar(true);
+      }
     }
-
-    if (noVigentes.length > 0) {
-      lineas.push('\n📅 *Otras promociones (Hoy no aplica):*');
-      noVigentes.forEach((o) => {
-        const cuando = o.diasTexto ? ` (Aplica: ${o.diasTexto})` : ' (Hoy no aplica)';
-        lineas.push(`• *${o.nombre}*: Hoy no aplica${cuando}`);
-      });
-    }
-
-    return lineas.join('\n').slice(0, 1024);
+    return texto.slice(0, 1024);
   },
 
   // ---------------------------------------------------------------------------

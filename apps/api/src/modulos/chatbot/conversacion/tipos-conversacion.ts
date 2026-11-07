@@ -337,6 +337,10 @@ export interface ContextoConversacion {
   datosLocalPublicos?: any;
   categoriasCarta?: any[];
   ofertas?: any[];
+  /** Promociones vigentes que valen en la carta web y NO por WhatsApp (el bot las nombra, no las vende). */
+  ofertasSoloWeb?: any[];
+  /** Promociones vigentes solo del local. */
+  ofertasSoloLocal?: any[];
   /** Productos anfitriones de un combo activo que el bot NO vende (canal sin WhatsApp, agotado o fuera de horario): no salen en sus listas. */
   productosComboNoBot?: string[];
   /** Unidades vendidas por productoId (últimos 90 días), para ordenar los carruseles. */

@@ -12,7 +12,7 @@ import {
 } from '../puerto/whatsapp-mensajeria.puerto';
 import { botonCodigoDe, CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
 import { enmascararTelefono, ORIGEN_CODIGO_CUENTA, textoParaPersonal } from '../utilidades/enmascarar.util';
-import { CODIGOS_PLANTILLA_PERMANENTES, separarDetalleTecnico } from '../utilidades/meta-errores.util';
+import { codigoInternoDeMeta, CODIGOS_PLANTILLA_PERMANENTES, separarDetalleTecnico } from '../utilidades/meta-errores.util';
 import { mapearErrorWhatsApp } from '../../mensajes/utilidades/error-whatsapp.util';
 import { PayloadMensajeNegocio, Ventana24hService } from './ventana-24h.service';
 import { enviarCarruselConRespaldo, resumenCarrusel } from './carrusel.util';
@@ -545,6 +545,25 @@ export class OutboxWhatsappService {
     });
     if (!viejo) return 0;
     return Math.max(0, Math.floor((ahora.getTime() - viejo.creado_en.getTime()) / 1000));
+  }
+
+  /**
+   * Meta aceptó el mensaje (ENVIADO) y después avisó por el webhook que no lo entregó (estado «failed»). Sin esto el
+   * panel decía «Enviado» de un mensaje que el cliente nunca recibió. Pasa a FALLIDO con el motivo, avisa por la
+   * campana y se puede reenviar o descartar desde Salientes. Devuelve false si no es un saliente del outbox.
+   */
+  async marcarFalloAsincrono(waMessageId: string, metaCodigo: string | null, detalle: string | null): Promise<boolean> {
+    const fila = await this.prisma.salienteWhatsapp.findFirst({ where: { wa_message_id: waMessageId, estado: 'ENVIADO' } });
+    if (!fila) return false;
+    const error = `[${codigoInternoDeMeta(metaCodigo, detalle ?? '')}] ${metaCodigo ? `[${metaCodigo}] ` : ''}${detalle ?? ''}`.trim();
+    const r = await this.prisma.salienteWhatsapp.updateMany({
+      where: { id: fila.id, estado: 'ENVIADO' },
+      data: { estado: 'FALLIDO', ultimo_error: error, actualizado_en: new Date() },
+    });
+    if (r.count === 0) return false;
+    this.logger.error(JSON.stringify({ evento: 'outbox_fallo_asincrono', id: fila.id.toString(), origen: fila.origen, error }));
+    await this.notificarFallido(fila, error);
+    return true;
   }
 
   /** Reenvía un FALLIDO: vuelve a PENDIENTE con los intentos en cero. Queda auditado. */

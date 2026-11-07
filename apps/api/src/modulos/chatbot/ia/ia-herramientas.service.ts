@@ -3,6 +3,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { CatalogoService } from '../../catalogo/catalogo.service';
 import { OfertasService } from '../../ofertas/ofertas.service';
+import { ofertasFueraDeWhatsapp } from '../utilidades/ofertas-canal.util';
 import { LocalService } from '../../local/local.service';
 import { ZonasService } from '../../zonas/zonas.service';
 import { HerramientaIaDefinicion } from './tipos-ia';
@@ -290,17 +291,29 @@ export class IaHerramientasService {
     }
 
     const ofertas = await this.ofertasService.listarOfertas(undefined, true, 'WHATSAPP');
-    const resultado = (ofertas || []).map((o: any) => ({
-      nombre: o.nombre,
-      tipo: o.tipo,
-      beneficio: o.descripcion || `Descuento especial en ${o.nombre}`,
-      disponibleHoy: true,
-    }));
+    // Solo las vigentes hoy (antes salían también las de otros días como «vigentes»)
+    const resultado = (ofertas || [])
+      .filter((o: any) => o.vigenteAhora !== false)
+      .map((o: any) => ({
+        nombre: o.nombre,
+        tipo: o.tipo,
+        beneficio: o.descripcion || `Descuento especial en ${o.nombre}`,
+        disponibleHoy: true,
+      }));
+    // Promos que NO valen por WhatsApp: se nombran y se manda a la carta; nunca se ofrecen ni se prometen por el chat
+    const fuera = ofertasFueraDeWhatsapp((await this.ofertasService.listarOfertas(undefined, true)) ?? []);
+    const soloCartaWeb = fuera.soloWeb.map((o) => ({ nombre: o.nombre, tipo: o.tipo, tambienEnElLocal: o.tambienLocal }));
+    const soloEnElLocal = fuera.soloLocal.map((o) => ({ nombre: o.nombre, tipo: o.tipo }));
 
     return {
       vigentesHoy: resultado,
       total: resultado.length,
-      mensaje: resultado.length > 0
+      soloCartaWeb,
+      soloEnElLocal,
+      nota:
+        'vigentesHoy se pueden pedir por este chat. soloCartaWeb valen únicamente en la carta web: menciónalas como «solo en la carta web» ' +
+        'e invita a verlas allí; NUNCA ofrezcas ni prometas aplicarlas por WhatsApp. soloEnElLocal valen solo en el local.',
+      mensaje: resultado.length + soloCartaWeb.length + soloEnElLocal.length > 0
         ? 'Estas son las promociones vigentes hoy.'
         : 'Hoy no tenemos promociones activas, pero puedes revisar nuestra carta con excelentes opciones.',
     };

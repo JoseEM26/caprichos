@@ -90,6 +90,9 @@ Ver tambien: [[caja]]
 2. Un error temporal (falla de conexion, limite de Meta) se reintenta solo con esperas de 30 segundos, 2 minutos, 10 minutos y 1 hora. Si tras 5 intentos sigue fallando, queda fallido con la leyenda Intentos agotados.
 3. Un cliente en BAJA no recibe mensajes y no genera aviso: es lo esperado.
 4. Cada mensaje fallido avisa a Caja y Admin en la campana de notificaciones.
+5. Si Meta acepta un mensaje y despues avisa que no lo entrego (por ejemplo el cliente cambio de numero o paso de 24 horas), el mensaje pasa de Enviado a Fallido con el motivo, avisa en la campana y se puede reenviar o descartar desde Salientes.
+6. Cada fallido muestra el motivo en espanol; el codigo de Meta y el texto original los ve solo el Administrador. Un cliente que escribe baja o stop deja de recibir mensajes; escribir "no mas" ya no cuenta como baja.
+7. Si el bot tiene un problema al procesar un mensaje del cliente, le responde una disculpa breve y le invita a escribir de nuevo o a pedir un asesor.
 
 ## Errores y dudas comunes
 - Un pedido con pago digital no validado no aparecera en cocina hasta que su voucher sea aprobado por una persona; esto evita que se preparen pedidos sin respaldo financiero.

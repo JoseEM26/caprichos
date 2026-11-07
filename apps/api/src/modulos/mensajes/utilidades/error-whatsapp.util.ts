@@ -5,9 +5,31 @@ import { causaPlantillaMeta, causaPorCodigoPlantilla } from '../../chatbot/utili
  * Regla: sin exponer detalles técnicos, contraseñas, tokens ni teléfonos completos. El detalle técnico
  * (código de Meta y texto original) se muestra aparte y solo a ADMIN.
  */
+/** Códigos de Meta (numéricos) que la pantalla explica en español, con qué hacer. */
+const MENSAJES_META: Record<string, string> = {
+  '131049': 'Meta no entregó el mensaje para cuidar la calidad de la cuenta (el cliente recibió muchos mensajes de empresas). Reintentar más tarde o pedir que escriba primero.',
+  '131056': 'Se enviaron demasiados mensajes al mismo número en poco tiempo. Se reintenta solo.',
+  '131000': 'Meta tuvo un fallo pasajero. Se reintenta solo.',
+  '131016': 'El servicio de Meta no estaba disponible. Se reintenta solo.',
+  '131021': 'El destinatario es el mismo número del negocio.',
+  '131031': 'La cuenta de WhatsApp Business está bloqueada o restringida por Meta. Hay que revisarla en Meta.',
+  '131051': 'El tipo de mensaje no es compatible con WhatsApp.',
+  '131052': 'Meta no pudo descargar la imagen o archivo del mensaje.',
+  '131053': 'Meta no pudo cargar la imagen o archivo del mensaje.',
+  '133010': 'El número de WhatsApp del negocio no está registrado en Meta. Hay que revisarlo en Meta.',
+  '368': 'Meta bloqueó temporalmente la cuenta por incumplir sus políticas. Hay que revisarla en Meta.',
+};
+
 export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | null): string {
   const c = String(codigo || '').toUpperCase();
   const d = String(detalle || '').toLowerCase();
+
+  // Parámetro inválido: un dato del mensaje (botón, lista, imagen) que Meta no aceptó
+  if (c === 'PARAMETRO_INVALIDO') return 'Meta rechazó un dato del mensaje (por ejemplo un texto demasiado largo). Pide a un administrador revisar el detalle técnico.';
+
+  // Código de Meta explicado: el de clasificación numérico o el prefijo «[131049]» del detalle
+  const metaNumerico = /^\d{3,6}$/.test(c) ? c : d.match(/^\[(\d{3,6})\]/)?.[1];
+  if (metaNumerico && MENSAJES_META[metaNumerico]) return MENSAJES_META[metaNumerico];
 
   // Plantillas de Meta: por código exacto (132000-132016), el código de clasificación o el numérico del webhook
   const causaPlantilla = causaPorCodigoPlantilla(c) ?? (/^\d{6}$/.test(c) ? causaPlantillaMeta(Number(c), d) : null);
@@ -30,7 +52,7 @@ export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | n
     d.includes('session has expired') ||
     d.includes('token expired') ||
     d.includes('invalid oauth') ||
-    d.includes('190')
+    /\b190\b/.test(d)
   ) {
     return 'El acceso a WhatsApp vencio: avisa a quien administra la cuenta';
   }
@@ -52,7 +74,7 @@ export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | n
     c === 'IDENTIFICADOR_NO_PERMITIDO' ||
     d.includes('por su identificador') ||
     d.includes('pidele su numero') ||
-    ((c === 'NUMERO_INVALIDO' || c === 'ERROR_META' || d.includes('100') || d.includes('131009') || d.includes('131026')) &&
+    ((c === 'NUMERO_INVALIDO' || c === 'ERROR_META' || /\b100\b/.test(d) || d.includes('131009') || d.includes('131026')) &&
       (d.includes('recipient') || d.includes('bsuid') || d.includes('identificador') || d.includes('format')))
   ) {
     return 'Meta no permite escribir a este contacto por su identificador. Pidele su numero de celular.';

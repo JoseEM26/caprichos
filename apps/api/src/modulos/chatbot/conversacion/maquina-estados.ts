@@ -1021,57 +1021,7 @@ export function transicionarEstado(
     idInteractivo === 'faq_promos' ||
     coincideAlgunaPalabra(texto, PALABRAS_PROMOS);
 
-  if (esPromociones) {
-    if (contexto.funcionesActivas?.promociones === false) {
-      return {
-        nuevoEstado: 'CARTA_PROMOS',
-        acciones: [
-          {
-            tipo: 'enviarBotones',
-            texto: TEXTOS_FUNCIONES_DESACTIVADAS.promociones,
-            botones: [BOTON_VER_CARTA, BOTON_VOLVER_MENU],
-          },
-        ],
-        nuevoFlujo: {
-          ...flujo,
-          estado: 'CARTA_PROMOS',
-          repreguntasFallidas: 0,
-        },
-      };
-    }
-
-    const nuevoEstado: EstadoConversacion = 'CARTA_PROMOS';
-    const textoPromos = TEXTOS_BOT.promocionesHoy(contexto.ofertas || []);
-    const botonesPromos = [BOTON_VER_CARTA, BOTON_VOLVER_MENU];
-    // Carrusel si hay 2 o más promociones vigentes de un producto concreto (más vendidos primero)
-    const tarjetasPromos = tarjetasDePromociones(contexto);
-    return {
-      nuevoEstado,
-      acciones: tarjetasPromos.length >= 2
-        ? accionesPaginaCarrusel({
-            tarjetas: tarjetasPromos,
-            pagina: paginaPromos,
-            cuerpoPrimera: textoPromos,
-            cuerpoSiguientes: 'Más promociones para ti 💛\nDesliza y toca «Pedir este» en la que quieras.',
-            respaldoPrimera: { texto: textoPromos, botones: botonesPromos },
-            idVerMas: (n) => `promo_mas_${n}`,
-            botonTarjeta: botonesPromos.find((b: any) => /menu/i.test(b.id)) ?? botonesPromos[0],
-            textoVerMas: (q) => `Hay ${q} ${q === 1 ? 'promoción más' : 'promociones más'}. ¿Las vemos?`,
-            botonesExtra: botonesPromos,
-            textoLista: 'Más promociones para ti 💛',
-          }).concat(
-            tarjetasPromos.length <= paginaPromos * 10
-              ? [{ tipo: 'enviarBotones', texto: '¿Qué más te provoca? 💛', botones: botonesPromos, ...(paginaPromos === 1 ? { soloSiCarruselSalio: true } : {}) }]
-              : [],
-          )
-        : [{ tipo: 'enviarBotones', texto: textoPromos, botones: botonesPromos }],
-      nuevoFlujo: {
-        ...flujo,
-        estado: nuevoEstado,
-        repreguntasFallidas: 0,
-      },
-    };
-  }
+  if (esPromociones) return respuestaPromociones(flujo, contexto, paginaPromos);
 
   // 7. Navegación de la carta: Selección de categoría o productos
   // 7.a Ver más categorías
@@ -2103,6 +2053,13 @@ function transicionarSoloMenus(
     ]);
   }
 
+  // 9.b Promociones: antes el bot con menú no las entendía y respondía «Elige una opción del menú»
+  const paginaPromos = id.startsWith('promo_mas_') ? Math.max(2, parseInt(id.slice(10), 10) || 2) : 1;
+  if (paginaPromos > 1 || esId('btn_promociones', 'promos', 'faq_promos') || hay(PALABRAS_PROMOS)) {
+    const r = respuestaPromociones(flujo, contexto, paginaPromos);
+    return { ...r, nuevoEstado: 'MENU', nuevoFlujo: { ...r.nuevoFlujo, estado: 'MENU', pedido: null } };
+  }
+
   // 10. Preguntas frecuentes concretas
   const faq = claveFaqSoloMenus(id, texto);
   if (faq) {
@@ -2154,6 +2111,66 @@ function transicionarSoloMenus(
       filas: FILAS_MENU_PRINCIPAL,
     },
   ]);
+}
+
+/**
+ * Respuesta de «Promociones»: las que valen por este chat, las SOLO de la carta web (se nombran con el enlace, nunca se
+ * ofrecen por el chat) y las solo del local. Sirve al motor completo y al bot con menú (MODO_SOLO_MENUS).
+ */
+function respuestaPromociones(flujo: FlujoConversacion, contexto: ContextoConversacion, paginaPromos: number): ResultadoTransicion {
+    if (contexto.funcionesActivas?.promociones === false) {
+      return {
+        nuevoEstado: 'CARTA_PROMOS',
+        acciones: [
+          {
+            tipo: 'enviarBotones',
+            texto: TEXTOS_FUNCIONES_DESACTIVADAS.promociones,
+            botones: [BOTON_VER_CARTA, BOTON_VOLVER_MENU],
+          },
+        ],
+        nuevoFlujo: {
+          ...flujo,
+          estado: 'CARTA_PROMOS',
+          repreguntasFallidas: 0,
+        },
+      };
+    }
+
+    const nuevoEstado: EstadoConversacion = 'CARTA_PROMOS';
+    const textoPromos = TEXTOS_BOT.promocionesHoy(contexto.ofertas || [], {
+      soloWeb: contexto.ofertasSoloWeb || [],
+      soloLocal: contexto.ofertasSoloLocal || [],
+      cartaUrl: contexto.cartaUrlPublica,
+    });
+    const botonesPromos = [BOTON_VER_CARTA, BOTON_VOLVER_MENU];
+    // Carrusel si hay 2 o más promociones vigentes de un producto concreto (más vendidos primero)
+    const tarjetasPromos = tarjetasDePromociones(contexto);
+    return {
+      nuevoEstado,
+      acciones: tarjetasPromos.length >= 2
+        ? accionesPaginaCarrusel({
+            tarjetas: tarjetasPromos,
+            pagina: paginaPromos,
+            cuerpoPrimera: textoPromos,
+            cuerpoSiguientes: 'Más promociones para ti 💛\nDesliza y toca «Pedir este» en la que quieras.',
+            respaldoPrimera: { texto: textoPromos, botones: botonesPromos },
+            idVerMas: (n) => `promo_mas_${n}`,
+            botonTarjeta: botonesPromos.find((b: any) => /menu/i.test(b.id)) ?? botonesPromos[0],
+            textoVerMas: (q) => `Hay ${q} ${q === 1 ? 'promoción más' : 'promociones más'}. ¿Las vemos?`,
+            botonesExtra: botonesPromos,
+            textoLista: 'Más promociones para ti 💛',
+          }).concat(
+            tarjetasPromos.length <= paginaPromos * 10
+              ? [{ tipo: 'enviarBotones', texto: '¿Qué más te provoca? 💛', botones: botonesPromos, ...(paginaPromos === 1 ? { soloSiCarruselSalio: true } : {}) }]
+              : [],
+          )
+        : [{ tipo: 'enviarBotones', texto: textoPromos, botones: botonesPromos }],
+      nuevoFlujo: {
+        ...flujo,
+        estado: nuevoEstado,
+        repreguntasFallidas: 0,
+      },
+    };
 }
 
 /** Tarjetas de las promociones vigentes que apuntan a un producto de la carta, ordenadas por ventas. */
