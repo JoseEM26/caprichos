@@ -76,7 +76,13 @@ if [[ -f /opt/caprichos/restic.env ]]; then
   if docker run --rm --env-file /opt/caprichos/restic.env restic/restic:0.17.3 snapshots >/dev/null 2>&1; then
     echo "Repositorio restic ya existe."
   else
-    docker run --rm --env-file /opt/caprichos/restic.env restic/restic:0.17.3 init 2>&1 | grep -vi "password\|key" | sed 's/^/  /' || true
+    # El error real de restic se muestra (sin él no se sabe si falla la llave, el bucket o la dirección),
+    # pero con los valores secretos tapados: se reemplazan por *** antes de imprimir.
+    SALIDA_INIT=$(docker run --rm --env-file /opt/caprichos/restic.env restic/restic:0.17.3 init 2>&1 || true)
+    for secreto in "${V[RESTIC_PASSWORD]:-}" "${V[AWS_ACCESS_KEY_ID]:-}" "${V[AWS_SECRET_ACCESS_KEY]:-}"; do
+      [[ -n "$secreto" ]] && SALIDA_INIT="${SALIDA_INIT//"$secreto"/***}"
+    done
+    printf '%s\n' "$SALIDA_INIT" | head -n 8 | cut -c1-300 | sed 's/^/  restic: /'
     docker run --rm --env-file /opt/caprichos/restic.env restic/restic:0.17.3 snapshots >/dev/null 2>&1 \
       && echo "Repositorio restic iniciado." || { echo "ERROR: no se pudo iniciar el repositorio restic (revise credenciales y bucket)." >&2; exit 1; }
   fi
