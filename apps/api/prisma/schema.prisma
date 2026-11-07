@@ -421,6 +421,8 @@ model Producto {
   orden              Int              @default(0)
   oculto             Boolean          @default(false)
   agotado_hasta      DateTime?        @db.Timestamptz
+  /// MANUAL (se quita solo a mano) | AUTOMATICO (saldo 0; vuelve al reponer/abrir). NULL con agotado_hasta = MANUAL.
+  agotado_origen     String?
   no_suma_beneficios Boolean          @default(false)
   // Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto
   resaltar_opcion_menos_pedida Boolean @default(false)
@@ -515,6 +517,8 @@ model Sabor {
   nombre        String
   activo        Boolean   @default(true)
   agotado_hasta DateTime? @db.Timestamptz
+  /// MANUAL | AUTOMATICO (ver producto.agotado_origen)
+  agotado_origen String?
   producto      Producto  @relation(fields: [producto_id], references: [id])
   agotados      Agotado[]
   stockSabor    StockSabor?
@@ -1096,6 +1100,8 @@ model Agotado {
   hasta         DateTime? @db.Timestamptz
   reactivado_en DateTime? @db.Timestamptz
   por           BigInt
+  /// MANUAL | AUTOMATICO; NULL = MANUAL
+  origen        String?
 
   producto Producto? @relation(fields: [producto_id], references: [id])
   opcion   Opcion?   @relation(fields: [opcion_id], references: [id])

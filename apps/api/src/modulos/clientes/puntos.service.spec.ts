@@ -384,6 +384,24 @@ describe('PuntosService', () => {
       );
     });
 
+    it('con la transacción del pedido (tx) todo ocurre dentro de ella: no abre otra transacción', async () => {
+      prismaMock.customerDetail.findFirst.mockResolvedValue({ puntos: '10.00' });
+      const tx: any = {
+        pedido: { findUnique: jest.fn().mockResolvedValue(null), update: jest.fn() },
+        partyRole: { findFirst: jest.fn().mockResolvedValue({ id: 50n, party_id: 200n, customer_detail: { party_role_id: 50n, puntos: '10.00' } }) },
+        movimientoPuntos: { create: jest.fn() },
+        customerDetail: { update: jest.fn().mockResolvedValue({ puntos: '7.50' }) },
+      };
+      prismaMock.$transaction.mockClear();
+
+      const res = await service.canjear(200n, 2.5, 300n, tx);
+
+      expect(res.saldoRestante).toBe(7.5);
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(tx.movimientoPuntos.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tipo: 'CANJE', pedido_id: 300n }) }));
+      expect(tx.pedido.update).toHaveBeenCalledWith({ where: { id: 300n }, data: { puntos_canjeados: 2.5 } });
+    });
+
     it('canje con pedido: el tope es el monto elegible (sin descuento ni promoción), no el total', async () => {
       prismaMock.customerDetail.findFirst.mockResolvedValue({ puntos: '100.00' });
       prismaMock.partyRole.findFirst.mockResolvedValue({

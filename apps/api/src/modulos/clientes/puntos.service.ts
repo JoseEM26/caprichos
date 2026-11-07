@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { partyClienteDelPedido } from './cliente-del-pedido';
@@ -52,8 +53,8 @@ export class PuntosService {
   }
 
   /** Productos sin descuento ni promoción de un pedido: la base que suma y que se puede canjear. */
-  private async montoElegiblePedido(pId: bigint, descuentoDetalle: unknown): Promise<number> {
-    const lineas = await this.prisma.pedidoLinea.findMany({
+  private async montoElegiblePedido(pId: bigint, descuentoDetalle: unknown, db: Pick<Prisma.TransactionClient, 'pedidoLinea'> = this.prisma): Promise<number> {
+    const lineas = await db.pedidoLinea.findMany({
       where: { pedido_id: pId },
       include: { producto: { select: { no_suma_beneficios: true } } },
     });
@@ -296,7 +297,10 @@ export class PuntosService {
     partyId: bigint | string,
     puntosACanjear: number,
     pedidoId?: bigint | string,
+    tx?: Prisma.TransactionClient,
   ): Promise<{ puntosCanjeados: number; saldoRestante: number }> {
+    // Con `tx` (la transacción del pedido) todo ocurre dentro de ella: un fallo revierte también el pedido y su stock.
+    const db = tx ?? this.prisma;
     const id = BigInt(partyId);
     const puntos = Math.round(Number(puntosACanjear) * 100) / 100;
 
@@ -319,11 +323,11 @@ export class PuntosService {
 
     // Si viene pedidoId, validar que no exceda el monto de productos
     if (pId) {
-      const pedido = await this.prisma.pedido.findUnique({
+      const pedido = await db.pedido.findUnique({
         where: { id: pId },
       });
       if (pedido) {
-        const maxCanjeable = await this.montoElegiblePedido(pId, pedido.descuento_detalle);
+        const maxCanjeable = await this.montoElegiblePedido(pId, pedido.descuento_detalle, db);
         if (puntos > maxCanjeable) {
           throw new BadRequestException({
             codigo: 'TOPE_CANJE_EXCEDIDO',
@@ -333,7 +337,7 @@ export class PuntosService {
       }
     }
 
-    const rolCliente = await this.prisma.partyRole.findFirst({
+    const rolCliente = await db.partyRole.findFirst({
       where: {
         party_id: id,
         rol: 'CLIENTE',
@@ -350,7 +354,7 @@ export class PuntosService {
     }
 
     let nuevoSaldo = 0;
-    await this.prisma.$transaction(async (tx) => {
+    const aplicar = async (tx: Prisma.TransactionClient) => {
       await tx.movimientoPuntos.create({
         data: {
           party_id: id,
@@ -375,7 +379,9 @@ export class PuntosService {
           data: { puntos_canjeados: puntos },
         });
       }
-    });
+    };
+    if (tx) await aplicar(tx);
+    else await this.prisma.$transaction(aplicar);
 
     return { puntosCanjeados: puntos, saldoRestante: Math.max(0, nuevoSaldo) };
   }

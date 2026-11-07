@@ -82,6 +82,8 @@ export interface ProductoAdmin {
   oculto: boolean;
   disponible: boolean;
   agotadoHasta?: string | null;
+  /** Por qué está agotado: a mano (no vuelve solo) o por stock en 0 (vuelve al reponer); null si está disponible. */
+  agotadoOrigen?: 'MANUAL' | 'AUTOMATICO' | null;
   noSumaBeneficios: boolean;
   /** Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto. */
   resaltarOpcionMenosPedida?: boolean;

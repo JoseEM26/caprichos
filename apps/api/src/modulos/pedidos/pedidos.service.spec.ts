@@ -1024,9 +1024,32 @@ describe('PedidosService', () => {
 
         await service.crear({ ...pedidoBaseDto, puntosCanje: 10 }, 'idemp-canje-ok', { clientePartyId: 200n });
 
-        expect(puntosServiceMock.canjear).toHaveBeenCalledWith(200n, 10, 101n);
+        expect(puntosServiceMock.canjear).toHaveBeenCalledWith(200n, 10, 101n, expect.anything());
         const ultimoUpdate = prismaMock.pedido.update.mock.calls.at(-1)[0];
         expect(ultimoUpdate.data.total.toNumber()).toBe(23.0);
+      });
+
+      it('si el canje falla, el error sale de la MISMA transacción (revierte pedido y stock) y no deja un pedido ANULADO', async () => {
+        puntosServiceMock.obtenerSaldo.mockResolvedValue(50);
+        prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W004', estado: 'COLA', subtotal: 28.0, envio: 5.0, total: 33.0 });
+        puntosServiceMock.canjear.mockRejectedValueOnce(new BadRequestException({ codigo: 'PUNTOS_INSUFICIENTES' }));
+        let dentroDeTx: any = null;
+        const txOriginal = prismaMock.$transaction.getMockImplementation();
+        prismaMock.$transaction.mockImplementation(async (fn: any, ...r: any[]) => {
+          dentroDeTx = fn;
+          return txOriginal!(fn, ...r);
+        });
+
+        await expect(
+          service.crear({ ...pedidoBaseDto, puntosCanje: 10 }, 'idemp-canje-falla', { clientePartyId: 200n }),
+        ).rejects.toMatchObject({ response: { codigo: 'PUNTOS_INSUFICIENTES' } });
+
+        expect(dentroDeTx).not.toBeNull();
+        // el canje recibió el cliente de la transacción (no el prisma global)
+        expect(puntosServiceMock.canjear.mock.calls[0][3]).toBeDefined();
+        // ya no se "anula a posteriori": nada escribe ANULADO fuera de la transacción
+        const anulaciones = prismaMock.pedido.update.mock.calls.filter((c: any) => c[0].data.estado === 'ANULADO');
+        expect(anulaciones).toHaveLength(0);
       });
     });
 

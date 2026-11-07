@@ -35,6 +35,8 @@ Ver tambien: [[stock]]
 2. En la tarjeta o fila del producto, pulsa el boton "Marcar agotado" (o "Marcar disponible" si ya se encontraba agotado).
 3. Se abrira una ventana de confirmacion explicando que el producto dejara o volvera a ofrecerse en la carta virtual y el chatbot.
 4. Pulsa "Si, continuar". El estado cambiara de inmediato sin recargar la pagina.
+
+Hay dos tipos de agotado y la tarjeta (y el editor) dicen cual es. "Agotado a mano (no vuelve solo)": lo marcaste tu o cocina con "Marcar agotado"; se queda asi hasta que alguien pulse "Marcar disponible" aqui o Reactivar en Cocina > Agotados. No lo quita la apertura del dia, ni reponer stock, ni anular un pedido. "Agotado por stock (vuelve al reponer)": el sistema lo marco porque el saldo de un producto con "Controlar stock" llego a 0; vuelve solo al reponer, al hacer la apertura del dia o al anular un pedido que lo habia descontado. Si apagas "Controlar stock" y guardas, se limpia el agotado por stock pero se respeta el agotado a mano. La carta y el bot muestran no disponible en ambos casos.
 Antes: [[stock]]
 Ver tambien: [[cocina]]
 

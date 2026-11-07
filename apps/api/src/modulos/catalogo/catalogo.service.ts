@@ -36,7 +36,7 @@ import {
   CrearListaDto,
 } from './dto/lista.dto';
 import { invalidarOpcionesMenosPedida } from '../cocina/opcion-menos-pedida';
-import { aperturaHoyProductos, estadoSaborCarta, estadoSaboresHoy, quedanProductos } from '../stock/producto-controlado';
+import { aperturaHoyProductos, estadoSaborCarta, estadoSaboresHoy, limpiarAgotadosAutomaticosDeProducto, quedanProductos } from '../stock/producto-controlado';
 
 export function normalizarTexto(texto: string): string {
   if (!texto) return '';
@@ -79,6 +79,18 @@ function sinSaldoAdmin(
   const activos = (p.sabores ?? []).filter((s) => s.activo);
   if (activos.length > 0) return !activos.some((s) => (estadoSabores.get(s.id.toString())?.saldo ?? 0) >= 1);
   return (quedan.get(p.id.toString()) ?? 0) <= 0;
+}
+
+/**
+ * Por qué se ve «Agotado» en el admin: MANUAL (agotado_hasta puesto a mano, no vuelve solo), AUTOMATICO (saldo 0 por
+ * stock controlado, vuelve al reponer) o null si está disponible. Un agotado sin origen guardado se lee como MANUAL.
+ */
+export function origenAgotadoAdmin(
+  p: { agotado_hasta: Date | null; agotado_origen?: string | null },
+  sinSaldo: boolean,
+): 'MANUAL' | 'AUTOMATICO' | null {
+  if (!estaDisponible(p.agotado_hasta)) return p.agotado_origen === 'AUTOMATICO' ? 'AUTOMATICO' : 'MANUAL';
+  return sinSaldo ? 'AUTOMATICO' : null;
 }
 
 @Injectable()
@@ -473,6 +485,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       oculto: p.oculto,
       disponible: estaDisponible(p.agotado_hasta) && !sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan),
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
+      agotadoOrigen: origenAgotadoAdmin(p, sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan)),
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
       controlaStock: p.controla_stock,
@@ -564,6 +577,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       oculto: p.oculto,
       disponible: estaDisponible(p.agotado_hasta) && !sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan),
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
+      agotadoOrigen: origenAgotadoAdmin(p, sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan)),
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
       controlaStock: p.controla_stock,
@@ -888,6 +902,10 @@ export class CatalogoService implements OnApplicationBootstrap {
         : actual.foto_archivo_id;
 
     await this.prisma.$transaction(async (tx) => {
+      // Apagar «Controlar stock»: el agotado automático (saldo 0) ya no aplica y se limpia; el MANUAL se respeta.
+      if (dto.controlaStock === false && actual.controla_stock) {
+        await limpiarAgotadosAutomaticosDeProducto(tx, pId);
+      }
       await tx.producto.update({
         where: { id: pId },
         data: {
@@ -1062,9 +1080,14 @@ export class CatalogoService implements OnApplicationBootstrap {
       fechaAgotado = new Date('9999-12-31T23:59:59Z');
     }
 
+    // Agotar desde el admin es MANUAL: no vuelve solo al reponer ni al abrir el día.
     await this.prisma.producto.update({
       where: { id: pId },
-      data: { agotado_hasta: fechaAgotado },
+      data: { agotado_hasta: fechaAgotado, agotado_origen: 'MANUAL' },
+    });
+    await this.prisma.agotado.updateMany({
+      where: { producto_id: pId, reactivado_en: null },
+      data: { origen: 'MANUAL' },
     });
 
     await this.auditoria.registrar({
@@ -1105,7 +1128,11 @@ export class CatalogoService implements OnApplicationBootstrap {
 
     await this.prisma.producto.update({
       where: { id: pId },
-      data: { agotado_hasta: null },
+      data: { agotado_hasta: null, agotado_origen: null },
+    });
+    await this.prisma.agotado.updateMany({
+      where: { producto_id: pId, reactivado_en: null },
+      data: { reactivado_en: new Date() },
     });
 
     await this.auditoria.registrar({
