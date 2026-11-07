@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { textoSabores } from './cocinaTipos';
 import type { ColorComanda, Comanda, LineaComanda } from './cocinaTipos';
 import { colorPorMinutos } from './tiempoEnVivo';
 import { NumeroDia, TiempoEspera } from './TiempoEspera';
@@ -67,7 +68,6 @@ function DescripcionLinea({ it }: { it: LineaComanda }) {
   const opciones = (it.opciones || []).filter((o) => normalizarOpcion(o));
   const partes: ReactNode[] = [];
   if (it.tamano) partes.push(<span key="tamano">{it.tamano}</span>);
-  if (it.sabor) partes.push(<span key="sabor">{it.sabor}</span>);
   opciones.forEach((o, i) => {
     const texto = normalizarOpcion(o);
     const destacada = typeof o === 'object' && o !== null && o.pocoPedida === true;
@@ -124,9 +124,17 @@ function DescripcionLinea({ it }: { it: LineaComanda }) {
       </span>
     ) : null;
 
-  if (partes.length === 0 && !nombres) return null;
+  const sabores = textoSabores(it);
+  const saboresVista = sabores ? (
+    <span data-testid="linea-sabores" style={{ display: 'block', fontSize: '14px', fontWeight: 800, color: 'var(--cp-navy)' }}>
+      {sabores}
+    </span>
+  ) : null;
+
+  if (partes.length === 0 && !nombres && !saboresVista) return null;
   return (
     <>
+      {saboresVista}
       {nombres}
       {partes.length === 0 ? null : <br />}
       <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>

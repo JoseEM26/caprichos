@@ -5,6 +5,7 @@ import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { listarDespacho, marcarPedidoAtendido } from './cocinaApi';
 import { reproducirCampanaCocina } from './audioAlerta';
 import { TiempoEspera } from './TiempoEspera';
+import { textoSabores } from './cocinaTipos';
 import type { LineaComanda, PedidoDespacho, UmbralesCocina } from './cocinaTipos';
 
 const VERDE = '#2F7A45';
@@ -19,7 +20,7 @@ const MODALIDAD: Record<string, string> = {
 /** Tamaño, sabor, opciones y personas de la línea, en texto corrido. */
 export function detalleLinea(l: LineaComanda): string[] {
   const opciones = (l.opciones || []).map((o) => (typeof o === 'string' ? o : (o?.nombre ?? ''))).filter(Boolean);
-  return [l.tamano, l.sabor, ...opciones, ...(l.personas || []).map((p) => `Para ${p}`)].filter((x): x is string => Boolean(x));
+  return [l.tamano, ...opciones, ...(l.personas || []).map((p) => `Para ${p}`)].filter((x): x is string => Boolean(x));
 }
 
 /** Quién o dónde: mesa, cliente o ambos. */
@@ -105,6 +106,11 @@ function EstadoAreas({ p, grande }: { p: PedidoDespacho; grande?: boolean }) {
             {a.lineas.map((l) => (
               <li key={l.id} style={{ marginBottom: grande ? '8px' : '2px' }}>
                 <strong>{l.cantidad}×</strong> {l.nombre}
+                {textoSabores(l) && (
+                  <div data-testid="linea-sabores" style={{ fontSize: grande ? '22px' : '14px', fontWeight: 800, color: 'var(--cp-navy)' }}>
+                    {textoSabores(l)}
+                  </div>
+                )}
                 {detalleLinea(l).length > 0 && (
                   <div style={{ fontSize: grande ? '20px' : '12px', color: 'var(--cp-soft)' }}>{detalleLinea(l).join(' · ')}</div>
                 )}

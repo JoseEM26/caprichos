@@ -5,6 +5,7 @@ import {
   listarComandasArea,
 } from '../admin/cocina/cocinaApi';
 import { conectarSocket, useEventos } from '../comun/socket';
+import { textoSabores } from '../admin/cocina/cocinaTipos';
 import type { UmbralesCocina } from '../admin/cocina/cocinaTipos';
 import { colorPorMinutos, useTiempoEnVivo } from '../admin/cocina/tiempoEnVivo';
 import { COLOR_TV, NumeroDia, TiempoEspera } from '../admin/cocina/TiempoEspera';
@@ -405,7 +406,7 @@ export function PantallaCocinaView() {
 
         const detalles = [
           l.tamano,
-          l.sabor,
+          textoSabores(l),
           ...(l.opciones || []).map((o: any) =>
             typeof o === 'string' ? o : o?.nombre || o?.texto || '',
           ),

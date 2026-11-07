@@ -14,6 +14,12 @@ export interface AreaCocina {
   comandas_pendientes?: number;
 }
 
+/** «3 Fresa · 3 Oreo» si la línea reparte sus unidades por sabor; si no, el sabor simple (o null). */
+export function textoSabores(l: { sabor?: string | null; sabores?: Array<{ nombre: string; cantidad: number }> }): string | null {
+  const reparto = (l.sabores ?? []).map((s) => `${s.cantidad} ${s.nombre}`).join(' · ');
+  return reparto || l.sabor || null;
+}
+
 export interface LineaComanda {
   /** Id de la línea del pedido: lo que se marca como lista o se despacha. */
   id: string;
@@ -25,6 +31,8 @@ export interface LineaComanda {
   despachadas?: number;
   tamano?: string | null;
   sabor?: string | null;
+  /** Reparto de unidades por sabor (producto por sabor): media docena = 3 Fresa + 3 Oreo. */
+  sabores?: Array<{ nombre: string; cantidad: number }>;
   combo?: string | null;
   combo_nombre?: string | null;
   /** pocoPedida: esta opción elegida es la menos pedida de su grupo (últimos 30 días) y el producto tiene el check. */
