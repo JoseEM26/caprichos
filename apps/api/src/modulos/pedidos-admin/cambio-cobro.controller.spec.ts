@@ -12,7 +12,7 @@ describe('CambioCobroController: permisos de las rutas', () => {
     expect(permisoDe('resolver')).toEqual({ modulo: 'pedidos', accion: 'validar_cambio_cobro' });
     expect(permisoDe('pendientes')).toEqual({ modulo: 'pedidos', accion: 'validar_cambio_cobro' });
     for (const rol of ['ADMIN', 'CAJERO', 'SUPERVISOR']) expect(MATRIZ[rol]).toContain('pedidos/validar_cambio_cobro');
-    for (const rol of ['REPARTIDOR', 'MOZO', 'COCINA', 'CALLCENTER']) expect(MATRIZ[rol]).not.toContain('pedidos/validar_cambio_cobro');
+    for (const rol of ['REPARTIDOR', 'MOZO', 'COCINA']) expect(MATRIZ[rol]).not.toContain('pedidos/validar_cambio_cobro');
     expect(MATRIZ.ADMIN).toContain('repartos/solicitar_cambio_cobro');
     expect(MATRIZ.CAJERO).not.toContain('repartos/solicitar_cambio_cobro');
   });

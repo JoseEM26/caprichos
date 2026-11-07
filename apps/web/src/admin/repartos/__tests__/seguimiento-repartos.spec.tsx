@@ -155,7 +155,7 @@ describe('Menú: módulo Repartos', () => {
     const m = MODULOS.find((x) => x.clave === 'repartos')!;
     return permisos.some((p) => p === m.permisoMinimo || p.startsWith(`${m.permisoMinimo}/`));
   };
-  it('lo ven quien sigue el delivery (seguir) y el repartidor (ver), no cocina ni callcenter', () => {
+  it('lo ven quien sigue el delivery (seguir) y el repartidor (ver) y no cocina', () => {
     expect(visible(['repartos/seguir'])).toBe(true);
     expect(visible(['repartos/ver', 'repartos/tomar'])).toBe(true);
     expect(visible(['cocina/ver', 'reservas/ver'])).toBe(false);

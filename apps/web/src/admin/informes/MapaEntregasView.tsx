@@ -43,7 +43,7 @@ const CANALES = [
   ['todos', 'Todos'],
   ['Web', 'Carta web'],
   ['WhatsApp', 'WhatsApp'],
-  ['Call center', 'Call center'],
+  ['Call center', 'Teléfono'],
 ];
 const ZOOM_INICIAL = 14;
 

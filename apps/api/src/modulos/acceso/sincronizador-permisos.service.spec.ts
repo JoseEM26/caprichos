@@ -22,6 +22,7 @@ describe('SincronizadorPermisosService', () => {
       rolPermiso: {
         findMany: jest.fn().mockResolvedValue(vinculos),
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
     return { prisma, servicio: new SincronizadorPermisosService(prisma) };
@@ -60,8 +61,18 @@ describe('SincronizadorPermisosService', () => {
     expect(prisma.rolPermiso.createMany).not.toHaveBeenCalled();
   });
 
+  it('borra los permisos del rol eliminado CALLCENTER y nunca lo vincula de nuevo', async () => {
+    const { prisma, servicio } = armar(permisosConId, vinculosDeMatriz());
+    await servicio.sincronizar();
+    expect(prisma.rolPermiso.deleteMany).toHaveBeenCalledWith({ where: { rol: { in: ['CALLCENTER'] } } });
+    expect(prisma.rolPermiso.createMany).not.toHaveBeenCalled();
+  });
+
   it('un fallo de base al arrancar no tumba la API', async () => {
-    const prisma: any = { permiso: { findMany: jest.fn().mockRejectedValue(new Error('sin base')) } };
+    const prisma: any = {
+      permiso: { findMany: jest.fn().mockRejectedValue(new Error('sin base')) },
+      rolPermiso: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    };
     await expect(new SincronizadorPermisosService(prisma).onModuleInit()).resolves.toBeUndefined();
   });
 });

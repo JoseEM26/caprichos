@@ -100,4 +100,4 @@ Ver tambien: [[ofertas]]
 ## Quien puede hacerlo
 - Administrador: tiene acceso completo para crear productos, modificar precios, actualizar fotografias, cambiar opciones, editar sabores y alternar el estado de agotado o disponible.
 - Cajero: puede entrar al modulo para consultar los precios, descripciones y disponibilidad de los productos, pero no tiene permisos para crear productos nuevos ni modificar los existentes.
-- Otros roles (Cocina, Mozo, Repartidor, Almacen, Call Center): no tienen acceso a este modulo.
+- Otros roles (Cocina, Mozo, Repartidor, Almacen): no tienen acceso a este modulo.

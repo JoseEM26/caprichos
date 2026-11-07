@@ -3,7 +3,7 @@ modulo: reservas
 titulo: Reservas
 ruta: /admin/reservas
 permiso: reservas/ver
-roles: [ADMIN, MOZO, CALLCENTER, SUPERVISOR]
+roles: [ADMIN, MOZO, SUPERVISOR]
 relacionados: [plano, caja, clientes, mensajes, notificaciones]
 sugerencias:
   - Como registro una reserva de mesa por telefono o presencial
@@ -71,8 +71,8 @@ Despues: [[caja]]
 - "La hora de la reserva ya paso" / "La hora solicitada ya paso. Elige una hora nueva para aprobar la reserva.": cambia la hora al aprobar.
 - "Solo se pueden editar reservas en estado ACTIVA" (Confirmada): una reserva Atendida, Cancelada o No llego ya no se edita.
 - El plano marca la mesa reservada con R solo como aviso visual: no bloquea pedidos del mozo.
-- "No se pudo cargar el mapa." / Reintentar: recarga el croquis; el Call Center puede ver las mesas (solo lectura) para esto.
+- "No se pudo cargar el mapa." / Reintentar: recarga el croquis.
 - "No tienes permiso": tu rol no puede crear o editar reservas.
 
 ## Quien puede hacerlo
-Administrador, Mozo, Supervisor y Call Center ven, crean y editan reservas (reservas/ver, crear, editar). Cajero, Repartidor, Cocina y Almacen no tienen acceso.
+Administrador, Mozo y Supervisor ven, crean y editan reservas (reservas/ver, crear, editar). Cajero, Repartidor, Cocina y Almacen no tienen acceso.

@@ -92,4 +92,4 @@ Ver tambien: [[historial]]
 - No se pide código de supervisor en este módulo: las publicaciones y descartes se validan únicamente mediante la confirmación de Sí o No.
 
 ## Quien puede hacerlo
-Solo los usuarios con el rol Administrador (ADMIN) pueden ingresar a este módulo, realizar modificaciones en el borrador y publicar cambios en la carta virtual. Los demás roles (cajero, cocina, mozo, repartidor, almacén y call center) no tienen acceso a esta pantalla.
+Solo los usuarios con el rol Administrador (ADMIN) pueden ingresar a este módulo, realizar modificaciones en el borrador y publicar cambios en la carta virtual. Los demás roles (cajero, cocina, mozo, repartidor y almacén) no tienen acceso a esta pantalla.

@@ -3,7 +3,7 @@ modulo: notificaciones
 titulo: Notificaciones
 ruta: /admin/notificaciones
 permiso: notificaciones/ver
-roles: [ADMIN, COCINA, MOZO, CALLCENTER, ALMACEN, REPARTIDOR, SUPERVISOR]
+roles: [ADMIN, COCINA, MOZO, ALMACEN, REPARTIDOR, SUPERVISOR]
 relacionados: [cocina, caja, stock, mensajes, repartos, reservas, escritorio]
 sugerencias:
   - ¿Dónde veo los pedidos demorados y alertas urgentes de mi área?
@@ -61,4 +61,4 @@ Ver tambien: [[reservas]]
 - Código de supervisor: no se requiere código de supervisor para consultar ni gestionar notificaciones.
 
 ## Quien puede hacerlo
-El módulo de Notificaciones cuenta con una amplia cobertura en el equipo y está disponible mediante el permiso notificaciones/ver para los roles Administrador (ADMIN), Cocina (COCINA), Mozo (MOZO), Call Center (CALLCENTER), Almacén (ALMACEN) y Repartidor (REPARTIDOR). Cada colaborador visualiza las alertas relevantes para su puesto operativo.
+El módulo de Notificaciones cuenta con una amplia cobertura en el equipo y está disponible mediante el permiso notificaciones/ver para los roles Administrador (ADMIN), Cocina (COCINA), Mozo (MOZO), Almacén (ALMACEN) y Repartidor (REPARTIDOR). Cada colaborador visualiza las alertas relevantes para su puesto operativo.

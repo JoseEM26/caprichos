@@ -3,7 +3,7 @@ modulo: mi-asistencia
 titulo: Mi asistencia
 ruta: /admin/mi-asistencia
 permiso: asistencia/marcar
-roles: [ADMIN, CAJERO, COCINA, MOZO, CALLCENTER, ALMACEN, REPARTIDOR, SUPERVISOR]
+roles: [ADMIN, CAJERO, COCINA, MOZO, ALMACEN, REPARTIDOR, SUPERVISOR]
 relacionados: [asistencia, asistencia-pantalla, propinas, usuarios, escritorio]
 sugerencias:
   - Como marco mi entrada con el QR de la pantalla
@@ -73,4 +73,4 @@ Ver tambien: [[propinas]]
 - Nadie puede marcar por mi: el sistema solo acepta la marca desde mi sesion, mi celular vinculado y mi selfie.
 
 ## Quien puede hacerlo
-Todo el personal con usuario: Administrador, Cajero, Cocina, Mozo, Call Center, Almacen, Repartidor y Supervisor tienen el permiso asistencia/marcar. El repartidor en celular llega por un boton pequeno Asistencia dentro de Repartos. Las marcas de los demas solo las ve el administrador en [[asistencia]].
+Todo el personal con usuario: Administrador, Cajero, Cocina, Mozo, Almacen, Repartidor y Supervisor tienen el permiso asistencia/marcar. El repartidor en celular llega por un boton pequeno Asistencia dentro de Repartos. Las marcas de los demas solo las ve el administrador en [[asistencia]].

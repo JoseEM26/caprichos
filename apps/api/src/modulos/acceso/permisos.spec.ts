@@ -1,7 +1,7 @@
-import { MATRIZ } from './permisos';
+import { MATRIZ, ROLES, ROLES_ELIMINADOS } from './permisos';
 
 describe('iniciativas: todo el personal ve, crea y comenta; cambiar estado solo ADMIN y SUPERVISOR', () => {
-  const roles = ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO', 'COCINA', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR'];
+  const roles = ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO', 'COCINA', 'ALMACEN', 'REPARTIDOR'];
   it('cada rol del catálogo puede ver, crear y comentar', () => {
     for (const r of roles) {
       expect(MATRIZ[r]).toEqual(expect.arrayContaining(['iniciativas/ver', 'iniciativas/crear', 'iniciativas/comentar']));
@@ -78,7 +78,7 @@ describe('permiso supervisor/ver_codigo', () => {
   it('ADMIN y SUPERVISOR ven el código; ningún otro rol lo tiene', () => {
     expect(MATRIZ.ADMIN).toContain('supervisor/ver_codigo');
     expect(MATRIZ.SUPERVISOR).toContain('supervisor/ver_codigo');
-    const otrosRoles = ['CAJERO', 'COCINA', 'MOZO', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR'];
+    const otrosRoles = ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR'];
     for (const r of otrosRoles) {
       expect(MATRIZ[r]).not.toContain('supervisor/ver_codigo');
     }
@@ -89,7 +89,7 @@ describe('permisos mascota (mas-api)', () => {
   it('solo ADMIN tiene mascota/ver y mascota/editar; ningún otro rol los tiene', () => {
     expect(MATRIZ.ADMIN).toContain('mascota/ver');
     expect(MATRIZ.ADMIN).toContain('mascota/editar');
-    const otrosRoles = ['CAJERO', 'COCINA', 'MOZO', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR'];
+    const otrosRoles = ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR'];
     for (const r of otrosRoles) {
       expect(MATRIZ[r]).not.toContain('mascota/ver');
       expect(MATRIZ[r]).not.toContain('mascota/editar');
@@ -110,5 +110,23 @@ describe('matriz de permisos del REPARTIDOR (pantalla Para elegir y Mi ruta)', (
   it('no tiene liquidar ni configurar reparto (eso es del administrador y de caja)', () => {
     expect(MATRIZ.REPARTIDOR).not.toContain('repartos/liquidar');
     expect(MATRIZ.REPARTIDOR).not.toContain('configuracion/editar');
+  });
+});
+
+describe('rol CALLCENTER eliminado: el chat de WhatsApp es de MOZO y CAJERO', () => {
+  const chat = ['mensajes/ver', 'mensajes/tomar', 'mensajes/enviar', 'mensajes/cerrar', 'whatsapp_salientes/ver', 'whatsapp_salientes/reenviar', 'whatsapp_salientes/descartar'];
+  it('MOZO, CAJERO y SUPERVISOR tienen mensajes/* y whatsapp_salientes/*', () => {
+    for (const r of ['MOZO', 'CAJERO', 'SUPERVISOR']) expect(MATRIZ[r]).toEqual(expect.arrayContaining(chat));
+  });
+  it('CAJERO canjea cupones en caja (POST /admin/cupones/canjear)', () => {
+    expect(MATRIZ.CAJERO).toContain('cupones/canjear');
+  });
+  it('cocina, almacén y repartidor no atienden el chat', () => {
+    for (const r of ['COCINA', 'ALMACEN', 'REPARTIDOR']) expect(MATRIZ[r].filter((p) => p.startsWith('mensajes/'))).toEqual([]);
+  });
+  it('ya no hay rol CALLCENTER en la lista ni en la matriz, y está marcado como eliminado', () => {
+    expect(ROLES.map((r) => r.codigo)).not.toContain('CALLCENTER');
+    expect(MATRIZ.CALLCENTER).toBeUndefined();
+    expect(ROLES_ELIMINADOS).toContain('CALLCENTER');
   });
 });

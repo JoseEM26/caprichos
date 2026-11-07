@@ -17,7 +17,6 @@ const ROLES_COLUMNAS = [
   { id: 'cajero', n: 'Cajero' },
   { id: 'cocina', n: 'Cocina' },
   { id: 'mozo', n: 'Mozo' },
-  { id: 'callcenter', n: 'Call center' },
   { id: 'almacen', n: 'Almacén' },
   { id: 'produccion', n: 'Producción' },
   { id: 'repartidor', n: 'Repartidor' },
@@ -27,13 +26,14 @@ const MODULOS_MATRIZ = [
   { id: 'caja', n: 'Pedidos y caja', roles: ['cajero'] },
   { id: 'cocina', n: 'Cocina', roles: ['cocina'] },
   { id: 'repartos', n: 'Repartos', roles: ['repartidor'] },
-  { id: 'reservas', n: 'Reservas', roles: ['cajero', 'mozo', 'callcenter'] },
+  { id: 'reservas', n: 'Reservas', roles: ['cajero', 'mozo'] },
   { id: 'comprobantes', n: 'Comprobantes', roles: ['cajero'] },
-  { id: 'clientes', n: 'Clientes', roles: ['cajero', 'callcenter'] },
+  { id: 'clientes', n: 'Clientes', roles: ['cajero'] },
   { id: 'stock', n: 'Stock y recetas', roles: ['cocina', 'almacen', 'produccion'] },
   { id: 'recetas', n: 'Recetas', roles: ['cocina', 'almacen', 'produccion'] },
   { id: 'almacen', n: 'Almacén', roles: ['almacen', 'produccion'] },
   { id: 'compras', n: 'Compras', roles: ['almacen'] },
+  { id: 'mensajes', n: 'Mensajes de WhatsApp', roles: ['cajero', 'mozo'] },
 ];
 
 export function UsuariosView() {
@@ -245,7 +245,6 @@ export function UsuariosView() {
       cajero: 0,
       produccion: 0,
       mozo: 0,
-      callcenter: 0,
       repartidor: 0,
     };
     for (const u of baseUsuarios) {
@@ -254,7 +253,6 @@ export function UsuariosView() {
       else if (r === 'CAJERO') conteo.cajero++;
       else if (r === 'COCINA' || r === 'BARRA') conteo.produccion++;
       else if (r === 'MOZO') conteo.mozo++;
-      else if (r === 'CALLCENTER') conteo.callcenter++;
       else if (r === 'REPARTIDOR') conteo.repartidor++;
     }
     return conteo;
@@ -638,7 +636,6 @@ export function UsuariosView() {
                 { valor: 'cajero', etiqueta: 'Cajero', cantidad: conteoRoles.cajero },
                 { valor: 'produccion', etiqueta: 'Producción', cantidad: conteoRoles.produccion },
                 { valor: 'mozo', etiqueta: 'Mozo', cantidad: conteoRoles.mozo },
-                { valor: 'callcenter', etiqueta: 'Call center', cantidad: conteoRoles.callcenter },
                 { valor: 'repartidor', etiqueta: 'Motorizado', cantidad: conteoRoles.repartidor },
               ]}
               alCambiar={(v) => {
