@@ -46,7 +46,7 @@ import {
   obtenerNombreMostrar,
 } from '../../mensajes/utilidades/nombre-contacto.util';
 import { EntradaRawInput, normalizarEntrada, esSaludo } from './normalizador-entrada.util';
-import { transicionarEstado, MODO_SOLO_MENUS } from './maquina-estados';
+import { transicionarEstado } from './maquina-estados';
 import {
   AccionMensaje,
   ContextoConversacion,
@@ -1156,9 +1156,9 @@ export class EjecutorConversacionService {
       this.logger.warn(`Error al consultar reservas para contexto: ${err.message}`);
     }
 
-    // Bot solo con menús: la IA no se consulta en el camino normal (el motor nuevo nunca la pide)
+    // La IA solo entra como ayuda antes del «no entendí» del bot con menú; requiere chatbot_ia_activo = 'si'
     let chatbotIaActivo = false;
-    if (this.chatbotIaService && !MODO_SOLO_MENUS) {
+    if (this.chatbotIaService) {
       try {
         chatbotIaActivo = await this.chatbotIaService.estaDisponible();
       } catch (err: any) {

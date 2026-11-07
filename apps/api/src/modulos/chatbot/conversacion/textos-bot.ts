@@ -1046,6 +1046,21 @@ export const TEXTOS_SOLO_MENUS = {
 
   sinPedidoActivo: (url: string): string => `No tienes un pedido activo con este número. Carta: ${url}`,
 
+  ubicacionRecibida: (codigo: string): string =>
+    `Recibí tu ubicación 📍 y ya se la pasé al equipo para tu pedido *${codigo}*.`,
+
+  tiempoEstimado: (min?: number | null, max?: number | null, estado?: string | null): string => {
+    if (!min && !max) return '';
+    if (['ENTREGADO', 'ANULADO', 'CANCELADO'].includes(String(estado || '').toUpperCase())) return '';
+    const rango = min && max && min !== max ? `${min} a ${max}` : `${max || min}`;
+    return `\nTiempo estimado: *${rango} min*.`;
+  },
+
+  acuse: (): string => '¡Con gusto! 💛 Aquí estoy si necesitas algo más.',
+
+  derivadoPorNoEntender: (): string =>
+    'No logré entenderte, así que avisé a una persona del equipo para que te ayude. Te responde en breve 💛',
+
   menuNoEntiendo: (textoPersonalizado?: string | null): string =>
     textoPersonalizado?.trim() || 'Elige una opción del menú.',
 };

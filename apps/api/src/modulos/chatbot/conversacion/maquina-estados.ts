@@ -150,7 +150,21 @@ const PALABRAS_ETA = [
   'a que hora llega',
   'a que hora sale',
   'donde esta',
+  'dentro de cuanto',
+  'en cuanto llega',
+  'cuando llega',
+  'ya viene',
+  'ya llega',
+  'confirma',
+  'confirmado',
 ];
+
+/** Agradecimientos o acuses cortos: se contestan con una línea, sin menú (solo si el mensaje es exactamente eso). */
+const ACUSES_CORTOS = ['ok', 'oki', 'okey', 'okay', 'listo', 'vale', 'dale', 'ok gracias', 'perfecto', 'genial', 'entendido', 'de acuerdo', '👍', '👌', '🙏'];
+
+/** Estados de pedido que ya no cuentan como «activo». */
+const ESTADOS_PEDIDO_TERMINADOS = ['ENTREGADO', 'ANULADO', 'CANCELADO', 'FINALIZADO', 'RECHAZADO'];
+const pedidoVigente = (p: any): boolean => Boolean(p) && !ESTADOS_PEDIDO_TERMINADOS.includes(String(p.estado || '').toUpperCase());
 
 /** Palabras clave para cambio de dirección */
 const PALABRAS_CAMBIO_DIR = [
@@ -1924,7 +1938,7 @@ function transicionarSoloMenus(
   }
 
   // Saludo y regreso al menú (fuera de un pedido o pago en curso: ahí lo atiende el flujo de pedido)
-  if (!enPedido && !enPago && (esId('menu', 'btn_menu', 'volver_menu', 'inicio') || esSaludoPuro(texto) || texto === '0')) {
+  if (!enPedido && !enPago && (esId('menu', 'btn_menu', 'volver_menu', 'inicio') || esSaludoPuro(texto) || ['comenzar', 'opciones', '0'].includes(texto))) {
     return saludo();
   }
 
@@ -1986,6 +2000,25 @@ function transicionarSoloMenus(
     if (r) return r;
   }
 
+  // 3.b Ubicación enviada por chat con un pedido de delivery vigente: se avisa al equipo (no se ignora)
+  if (entrada.tipo === 'ubicacion' && entrada.ubicacion && !enPedido && !enPago) {
+    const p = contexto.pedidoActivo;
+    if (pedidoVigente(p) && String(p.modalidad || '').toUpperCase() === 'DELIVERY' && p.id != null) {
+      return respuesta([
+        {
+          tipo: 'crearSolicitudCambio',
+          pedidoId: String(p.id),
+          pedidoCodigo: String(p.codigo),
+          tipoCambio: 'DIRECCION',
+          detalle: 'El cliente envió su ubicación por el chat',
+          lat: entrada.ubicacion.latitud,
+          lng: entrada.ubicacion.longitud,
+        },
+        { tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.ubicacionRecibida(String(p.codigo)) },
+      ]);
+    }
+  }
+
   // 4. Hacer pedido: botón «Hacer pedido», «Pedir este» de la carta o texto como «quiero pedir»
   if (esId('pedir', 'btn_pedido', 'btn_pedir') || id.startsWith('ped_') || hay([...PALABRAS_PEDIDO, 'nuevo pedido'])) {
     // Desde el menú, el flujo de pedido arranca como si viniera del menú
@@ -2022,7 +2055,8 @@ function transicionarSoloMenus(
     if (contexto.limiteConsultasExcedido) {
       return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_BOT.miPedidoDemasiadasConsultas(), botones: [BOTON_VOLVER_MENU] }]);
     }
-    const p = contexto.pedidoActivo;
+    const conCodigo = /CP-\d{4}/i.test(entrada.textoOriginal || '') || id.startsWith('ord_');
+    const p = conCodigo || pedidoVigente(contexto.pedidoActivo) ? contexto.pedidoActivo : null;
     if (!p) {
       return respuesta([{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.sinPedidoActivo(url), botones: [BOTON_HACER_PEDIDO, BOTON_VOLVER_MENU] }]);
     }
@@ -2031,7 +2065,7 @@ function transicionarSoloMenus(
     return respuesta([
       {
         tipo: 'enviarBotones',
-        texto: `${TEXTOS_SOLO_MENUS.estadoPedido(String(p.codigo), String(p.estado), p.pago_estado)}\nSíguelo aquí: ${enlaceSeguimiento}`,
+        texto: `${TEXTOS_SOLO_MENUS.estadoPedido(String(p.codigo), String(p.estado), p.pago_estado)}${TEXTOS_SOLO_MENUS.tiempoEstimado(p.eta_min, p.eta_max, p.estado)}\nSíguelo aquí: ${enlaceSeguimiento}`,
         botones: [BOTON_VOLVER_MENU, BOTON_HABLAR_PERSONA],
       },
     ]);
@@ -2087,7 +2121,10 @@ function transicionarSoloMenus(
     );
   }
 
-  // 13. Despedida o agradecimiento
+  // 13. Despedida o agradecimiento («ok», «gracias», 👍): una línea, sin menú
+  if (ACUSES_CORTOS.includes(texto.trim()) || ACUSES_CORTOS.includes((entrada.textoOriginal || '').trim().toLowerCase())) {
+    return respuesta([{ tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.acuse() }]);
+  }
   if (hay(PALABRAS_DESPEDIDA)) {
     return respuesta([
       {
@@ -2101,8 +2138,21 @@ function transicionarSoloMenus(
   // 14. Primer contacto sin intención clara: saludo con el menú
   if (flujo.estado === 'INICIO') return saludo();
 
-  // 15. Cualquier otro texto o botón: el menú, en un solo mensaje
-  return respuesta([
+  // 15. Texto libre que ninguna regla entendió: primero la IA (si está encendida); al segundo «no entendí» seguido, a una persona
+  if (contexto.chatbotIaActivo && texto.trim() && !id) {
+    return respuesta([{ tipo: 'consultarIa', pregunta: entrada.textoOriginal || texto }]);
+  }
+  if ((flujo.repreguntasFallidas || 0) >= 1) {
+    return {
+      nuevoEstado: 'ATENCION_PERSONA',
+      acciones: [
+        { tipo: 'pasarAPersona', motivo: 'BOT_NO_ENTIENDE', mensajeCliente: entrada.textoOriginal },
+        { tipo: 'enviarTexto', texto: TEXTOS_SOLO_MENUS.derivadoPorNoEntender() },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'ATENCION_PERSONA', pedido: null, repreguntasFallidas: 0 },
+    };
+  }
+  const noEntendi = respuesta([
     {
       tipo: 'enviarLista',
       texto: TEXTOS_SOLO_MENUS.menuNoEntiendo(contexto.textosPersonalizados?.chatbot_texto_no_entiendo),
@@ -2111,6 +2161,7 @@ function transicionarSoloMenus(
       filas: FILAS_MENU_PRINCIPAL,
     },
   ]);
+  return { ...noEntendi, nuevoFlujo: { ...noEntendi.nuevoFlujo, repreguntasFallidas: 1 } };
 }
 
 /**
