@@ -12,6 +12,7 @@ sugerencias:
   - ¿Qué se imprime y cuándo? Me imprime cosas que no tienen que ver
   - ¿Cómo agrego otra computadora para imprimir?
   - ¿Cómo reintento un papel que falló?
+  - ¿Cómo reimprimo un sticker o un ticket que ya salió?
 ---
 # Configuración: Impresión
 
@@ -50,6 +51,9 @@ Decide qué papeles se imprimen (ticket del pago, comanda de salón, stickers de
 1. "Imprimir una prueba en cada impresora" saca una hoja que dice "PRUEBA - no es un pedido" en cada impresora elegida. No cuenta como venta.
 2. "Lo último que se imprimió" lista los últimos 10 papeles: qué pieza, de qué pedido, en qué PC y si salió bien, falló o espera, con el motivo en palabras simples.
 3. Si algo falló, revisa papel y cable y pulsa "Reintentar".
+4. La lista (y "Ver toda la cola") se separa en pestañas: "Todo", "Stickers (etiquetera)" y "Tickets (térmica)", cada una con su contador. Cada fila dice qué es: "STICKER · Bebida", "STICKER · Área Cocina", "TICKET · Pago", "TICKET · Comanda salón" o "PRUEBA"; muestra el pedido, la hora (con fecha si no es de hoy), la PC y el estado, con el motivo si falló.
+5. "Reintentar" vuelve a mandar el mismo papel que no salió. "Reimprimir" saca una copia nueva (marcada COPIA) de uno que ya salió, falló o venció, en la misma máquina, sin tocar el original. Pide confirmación Sí/No y queda en el historial de auditoría con quién lo pidió.
+6. Para varios: marca las casillas y pulsa "Reimprimir seleccionados", o usa "Reimprimir todos los stickers fallidos" / "Reimprimir todos los tickets fallidos". Máximo 30 papeles a la vez; si ya pediste la copia hace un momento, o el papel sigue en cola, o el pedido está anulado, no se copia y se te dice por qué. Si el sticker general está apagado, igual puedes reimprimir uno que ya existe.
 
 ## Como se hace: cambiar el tamaño de los stickers
 1. Entra a Parámetros del sistema, grupo "Etiquetas e impresión" ([Parámetros](/admin/mirest?tab=parametros)).
@@ -90,6 +94,7 @@ Al final de la pantalla, "Vista avanzada" abre el mapa dibujado, "Equipos y esta
 - "Bebidas no tiene computadora: los vasos están saliendo en Caja": vincula la PC de Bebidas y en "Esta PC imprime lo de" elige Bebidas.
 - Los papeles no salen: mira la luz de la PC en el Paso 1. Si dice "El programa no está abierto en esta PC", ábrelo (o activa el arranque automático); lo pendiente sale solo.
 - Un papel viejo no salió solo al reconectar: pasó el tiempo de espera y se venció; pulsa "Reintentar" en "Lo último que se imprimió".
+- Quiero otro sticker o ticket igual a uno que ya salió: en "Lo último que se imprimió" (o "Ver toda la cola") busca la fila, pulsa "Reimprimir" y confirma. Sale en la misma máquina, marcado COPIA.
 - El sticker sale cortado o con mucho espacio: la medida de Parámetros no coincide con el rollo cargado.
 - "No elegiste impresora de tickets/stickers": entra a "Cambiar impresoras" de esa PC y elige una.
 - Perdí la llave: no se puede volver a ver; crea una nueva y desactiva la anterior.

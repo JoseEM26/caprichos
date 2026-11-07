@@ -18,6 +18,18 @@ export interface TrabajoImpresionAdmin {
   tomadoEn?: string | null;
   impresoEn?: string | null;
   payload: any;
+  /** Máquina que lo imprime: stickers = ETIQUETERA, tickets = TICKETERA. */
+  maquina?: 'ETIQUETERA' | 'TICKETERA';
+  /** PC/equipo que lo imprime o imprimió (Caja si no hay otro). */
+  equipoNombre?: string;
+}
+
+export interface RespuestaReimpresion {
+  ok: boolean;
+  creados: number;
+  rechazados: Array<{ id: string; motivo: string }>;
+  trabajoIds: string[];
+  mensaje: string;
 }
 
 /** Estado visible de una etiqueta del pedido, derivado de su último print_job. */
@@ -228,12 +240,14 @@ export const impresionApi = {
     pedido?: string;
     pagina?: number;
     limite?: number;
-  }): Promise<{ items: TrabajoImpresionAdmin[]; total: number; pagina: number; paginas: number }> => {
+    maquina?: 'ETIQUETERA' | 'TICKETERA';
+  }): Promise<{ items: TrabajoImpresionAdmin[]; total: number; pagina: number; paginas: number; conteo?: { stickers: number; tickets: number } }> => {
     const params = new URLSearchParams();
     if (filtros?.estado) params.set('estado', filtros.estado);
     if (filtros?.pedido) params.set('pedido', filtros.pedido);
     if (filtros?.pagina) params.set('pagina', String(filtros.pagina));
     if (filtros?.limite) params.set('limite', String(filtros.limite));
+    if (filtros?.maquina) params.set('maquina', filtros.maquina);
     const qs = params.toString() ? `?${params.toString()}` : '';
     return api.get(`/admin/impresion/trabajos${qs}`);
   },
@@ -271,6 +285,11 @@ export const impresionApi = {
 
   descartarTrabajo: async (id: string): Promise<{ ok: boolean; descartadas: number; mensaje: string }> => {
     return api.post(`/admin/impresion/trabajos/${id}/descartar`, {});
+  },
+
+  /** Copia nueva (misma máquina) de uno o varios trabajos, o de todos los fallidos de una máquina. */
+  reimprimirTrabajos: async (body: { ids?: string[]; grupo?: 'STICKERS_FALLIDOS' | 'TICKETS_FALLIDOS' }): Promise<RespuestaReimpresion> => {
+    return api.post('/admin/impresion/cola/reimprimir', body);
   },
 
   reintentarTrabajo: async (id: string): Promise<{ ok: boolean; mensaje: string }> => {
