@@ -20,16 +20,17 @@ export function validarRuc(ruc?: string | null): boolean {
 }
 
 /**
- * Tipo de comprobante que hay que elegir al pedir un pedido, cobrarlo o cambiarlo: boleta o factura.
- * La nota de venta no es comprobante elegible (decisión del dueño, 03/11/2026).
+ * Tipo de comprobante que se elige al pedir un pedido, cobrarlo o cambiarlo: simple (por defecto), boleta o factura.
+ * SIMPLE es un ticket interno: sin datos del cliente y sin SUNAT. La nota de venta no es elegible (03/11/2026).
  */
-export function esComprobanteElegible(tipo?: string | null): tipo is 'BOLETA' | 'FACTURA' {
-  return tipo === 'BOLETA' || tipo === 'FACTURA';
+export type TipoComprobantePedido = 'SIMPLE' | 'BOLETA' | 'FACTURA';
+export function esComprobanteElegible(tipo?: string | null): tipo is TipoComprobantePedido {
+  return tipo === 'SIMPLE' || tipo === 'BOLETA' || tipo === 'FACTURA';
 }
 
 /**
  * Valida los datos requeridos según el tipo de comprobante solicitado.
- * - NOTA_VENTA: no exige documento ni razón social.
+ * - SIMPLE y NOTA_VENTA: no exigen documento ni razón social.
  * - BOLETA: DNI opcional; si se escribe, debe tener 8 dígitos.
  * - FACTURA: exige RUC válido de 11 dígitos (10, 15, 17 o 20) y razón social no vacía.
  */
@@ -41,7 +42,7 @@ export function validarDocumentoComprobante(
 ): { valido: boolean; motivo?: string } {
   const tipoNormalizado = (tipo || 'NOTA_VENTA').trim().toUpperCase();
 
-  if (tipoNormalizado === 'NOTA_VENTA') {
+  if (tipoNormalizado === 'NOTA_VENTA' || tipoNormalizado === 'SIMPLE') {
     return { valido: true };
   }
 

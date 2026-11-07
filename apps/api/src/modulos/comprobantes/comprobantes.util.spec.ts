@@ -1,6 +1,7 @@
 import {
   extraerOpciones,
   enmascararDni,
+  esComprobanteElegible,
   formatearCorrelativo,
   formatearFechaHoraLima,
   validarDni,
@@ -62,6 +63,13 @@ describe('comprobantes.util', () => {
     it('acepta NOTA_VENTA sin exigir documento ni razón social', () => {
       expect(validarDocumentoComprobante('NOTA_VENTA')).toEqual({ valido: true });
       expect(validarDocumentoComprobante('nota_venta', null, null)).toEqual({ valido: true });
+    });
+
+    it('acepta SIMPLE sin exigir nada y lo reconoce como elegible', () => {
+      expect(validarDocumentoComprobante('SIMPLE')).toEqual({ valido: true });
+      expect(validarDocumentoComprobante('SIMPLE', null, null, 5000)).toEqual({ valido: true });
+      expect(esComprobanteElegible('SIMPLE')).toBe(true);
+      expect(esComprobanteElegible('NOTA_VENTA')).toBe(false);
     });
 
     it('valida BOLETA con DNI válido', () => {

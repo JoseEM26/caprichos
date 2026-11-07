@@ -182,7 +182,7 @@ export interface DatosPagoBot {
 }
 
 export interface DatosComprobanteBot {
-  tipo: 'BOLETA' | 'FACTURA' | 'NINGUNO';
+  tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA' | 'NINGUNO';
   dni?: string;
   ruc?: string;
   razonSocial?: string;

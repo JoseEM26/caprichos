@@ -10,6 +10,7 @@ sugerencias:
   - Donde veo los pedidos que necesitan boleta o factura electronica
   - Como marco un comprobante como emitido en el facturador
   - Que datos necesito para emitir una factura
+  - Que es el comprobante simple y se envia a SUNAT
 ---
 # Comprobantes
 
@@ -36,8 +37,19 @@ Ver tambien: [[cierre]]
 Antes: [[caja]]
 Ver tambien: [[cierre]]
 
+## Como se hace: Elegir el comprobante del pedido (simple, boleta o factura)
+1. En la carta virtual, en WhatsApp, en Nuevo pedido del mozo y en [[caja]] el pedido lleva uno de tres comprobantes. Por defecto es Comprobante simple.
+2. Comprobante simple es el ticket interno del pedido: no pide DNI ni RUC y no se envia a SUNAT.
+3. Boleta pide el DNI de 8 digitos (es opcional hasta S/ 700; por encima de S/ 700 es obligatorio). Factura pide RUC de 11 digitos y razon social.
+4. El documento se guarda solo en el pedido y en el comprobante, nunca en la cuenta del cliente.
+5. Antes de cobrar, en el detalle del pedido pulsa Cambiar comprobante para pasar de uno a otro. Con un comprobante ya emitido hay que anularlo antes.
+6. Solo la boleta y la factura se emiten a SUNAT y aparecen en Electronicos SUNAT; el simple no deja nada pendiente de envio.
+Antes: [[caja]]
+Ver tambien: [[cierre]]
+
 ## Errores y dudas comunes
-- Para emitir una factura, es requisito obligatorio contar con un RUC valido de 11 digitos que inicie con 10 o 20 y su correspondiente razon social.
+- Un pedido con Comprobante simple no tiene boleta ni factura: no sale en Por emitir ni en Electronicos SUNAT. Si el cliente la pide despues, usa Cambiar comprobante antes de cobrar.
+- Para emitir una factura, es requisito obligatorio contar con un RUC valido de 11 digitos que inicie con 10, 15, 17 o 20 y su correspondiente razon social.
 - La reimpresion de notas de venta deja huella en el sistema indicando cuantas veces se ha reimpreso el ticket para prevenir duplicidades en cobranza.
 - Si la ticketera no imprime, revisar que tenga papel y este encendida antes de reintentar la reimpresion.
 

@@ -67,17 +67,20 @@ describe('Nuevo pedido en Caja: comprobante', () => {
     );
   });
 
-  it('sin elegir boleta o factura no registra: el selector es obligatorio', async () => {
+  it('por defecto es Comprobante simple: se registra sin pedir datos y manda solo el tipo', async () => {
     await llegarAResumenLlevar();
     const grupo = screen.getByRole('group', { name: 'Comprobante' });
-    expect(within(grupo).getByTestId('comprobante-BOLETA').getAttribute('aria-pressed')).toBe('false');
-    expect(within(grupo).getByTestId('comprobante-FACTURA').getAttribute('aria-pressed')).toBe('false');
+    expect(within(grupo).getByTestId('comprobante-SIMPLE').getAttribute('aria-pressed')).toBe('true');
     expect(screen.queryByRole('button', { name: /Nota de venta|Sin elegir/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
-    expect(screen.queryByRole('button', { name: 'Sí, registrar' })).toBeNull();
-    expect(pedidosApi.crearPedidoAdmin).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
+    await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0]).toHaveProperty('comprobante', { tipo: 'SIMPLE' });
+  });
 
-    fireEvent.click(within(grupo).getByTestId('comprobante-BOLETA'));
+  it('con boleta sin DNI manda solo el tipo BOLETA', async () => {
+    await llegarAResumenLlevar();
+    fireEvent.click(within(screen.getByRole('group', { name: 'Comprobante' })).getByTestId('comprobante-BOLETA'));
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));

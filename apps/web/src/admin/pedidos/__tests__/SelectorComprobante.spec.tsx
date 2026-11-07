@@ -8,9 +8,10 @@ import {
   aPayloadComprobante,
   avisoValorComprobante,
   errorValorComprobante,
+  type ValorComprobante,
 } from '../SelectorComprobante';
 
-const v = (tipo: 'BOLETA' | 'FACTURA' | null, doc = '', razon = '', direccion = '') => ({ tipo, doc, razon, direccion });
+const v = (tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA' | null, doc = '', razon = '', direccion = '') => ({ tipo, doc, razon, direccion });
 
 describe('reglas del comprobante (espejo de la API)', () => {
   it('boleta: DNI opcional y 8 dígitos si se escribe; sobre S/ 700 sin DNI solo hay aviso, no error', () => {
@@ -28,9 +29,17 @@ describe('reglas del comprobante (espejo de la API)', () => {
     expect(errorValorComprobante(v('FACTURA', '20123456789', 'Acme SAC'))).toBeNull();
   });
 
-  it('sin elegir es error: boleta o factura es obligatoria (no hay nota de venta)', () => {
-    expect(errorValorComprobante(VALOR_COMPROBANTE_VACIO)).toEqual({ campo: 'tipo', mensaje: 'Elige boleta o factura' });
-    expect(aPayloadComprobante(VALOR_COMPROBANTE_VACIO)).toBeUndefined();
+  it('el comprobante simple es el valor inicial, no pide datos y manda solo el tipo (sin SUNAT)', () => {
+    expect(VALOR_COMPROBANTE_VACIO.tipo).toBe('SIMPLE');
+    expect(errorValorComprobante(v('SIMPLE', '12345678', 'X'))).toBeNull();
+    expect(aPayloadComprobante(v('SIMPLE', '12345678', 'X'))).toEqual({ tipo: 'SIMPLE' });
+    expect(aComprobanteAlta(v('SIMPLE', '12345678', 'X'))).toEqual({ tipo: 'SIMPLE' });
+  });
+
+  it('sin elegir (null, pedido antiguo) sigue siendo error y no manda nada', () => {
+    expect(errorValorComprobante(v(null))?.campo).toBe('tipo');
+    expect(aPayloadComprobante(v(null))).toBeUndefined();
+    expect(aComprobanteAlta(v(null))).toBeUndefined();
   });
 
   it('el cuerpo para la API omite lo vacío; el de alta usa dni, ruc y razonSocial', () => {
@@ -43,7 +52,6 @@ describe('reglas del comprobante (espejo de la API)', () => {
     });
     expect(aComprobanteAlta(v('BOLETA', '12345678'))).toEqual({ tipo: 'BOLETA', dni: '12345678' });
     expect(aComprobanteAlta(v('FACTURA', '20123456789', 'Acme SAC'))).toEqual({ tipo: 'FACTURA', ruc: '20123456789', razonSocial: 'Acme SAC' });
-    expect(aComprobanteAlta(VALOR_COMPROBANTE_VACIO)).toBeUndefined();
   });
 });
 
@@ -65,15 +73,20 @@ describe('SelectorComprobante', () => {
     expect(ruc.getAttribute('aria-invalid')).toBe('false');
   });
 
-  it('el selector es obligatorio: sin elegir ningún botón queda marcado, avisa y no ofrece «Sin elegir»', () => {
+  it('el selector arranca en Comprobante simple, sin aviso y sin ofrecer «Sin elegir»', () => {
     render(<SelectorComprobante idPrefijo="s" valor={VALOR_COMPROBANTE_VACIO} onChange={() => {}} />);
     expect(screen.getByRole('group', { name: 'Comprobante' })).toBeTruthy();
+    expect(screen.getByTestId('comprobante-SIMPLE').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByTestId('comprobante-BOLETA').getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByTestId('comprobante-FACTURA').getAttribute('aria-pressed')).toBe('false');
-    expect(screen.getByText('Elige boleta o factura para continuar.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Sin elegir' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Nota de venta' })).toBeNull();
     expect(screen.queryByLabelText('DNI (opcional)')).toBeNull();
+  });
+
+  it('un pedido antiguo sin comprobante (null) avisa que hay que elegir', () => {
+    render(<SelectorComprobante idPrefijo="s" valor={{ ...VALOR_COMPROBANTE_VACIO, tipo: null }} onChange={() => {}} />);
+    expect(screen.getByText('Elige comprobante simple, boleta o factura para continuar.')).toBeTruthy();
   });
 
   it('al elegir boleta aparece el DNI opcional y el aviso desaparece', () => {
@@ -85,6 +98,24 @@ describe('SelectorComprobante', () => {
     fireEvent.click(screen.getByTestId('comprobante-BOLETA'));
     expect(screen.getByTestId('comprobante-BOLETA').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByLabelText('DNI (opcional)')).toBeTruthy();
-    expect(screen.queryByText('Elige boleta o factura para continuar.')).toBeNull();
+    expect(screen.queryByText(/para continuar/)).toBeNull();
+  });
+});
+
+describe('SelectorComprobante: tres opciones', () => {
+  it('muestra Comprobante simple, Boleta y Factura; simple no muestra campos', () => {
+    const Envoltura = () => {
+      const [valor, setValor] = useState<ValorComprobante>(VALOR_COMPROBANTE_VACIO);
+      return <SelectorComprobante idPrefijo="t" valor={valor} onChange={setValor} />;
+    };
+    render(<Envoltura />);
+    expect(screen.getByTestId('comprobante-SIMPLE').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByLabelText(/DNI/)).toBeNull();
+    fireEvent.click(screen.getByTestId('comprobante-BOLETA'));
+    expect(screen.getByLabelText(/DNI/)).toBeTruthy();
+    fireEvent.click(screen.getByTestId('comprobante-FACTURA'));
+    expect(screen.getByLabelText('RUC')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('comprobante-SIMPLE'));
+    expect(screen.queryByLabelText('RUC')).toBeNull();
   });
 });

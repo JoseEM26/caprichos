@@ -136,6 +136,27 @@ describe('ComprobantesService', () => {
     });
   });
 
+  describe('0. comprobante simple: ticket interno, no emite ni va a SUNAT', () => {
+    it('SIMPLE devuelve null: no consume correlativo, no crea fila ni deja pendiente de envío', async () => {
+      prepararEmision(pedidoEmision({ id: 120n, comprobante_tipo: 'SIMPLE' }), 1);
+
+      const res = await service.emitirParaPedido(120n);
+
+      expect(res).toBeNull();
+      expect(prismaMock.$queryRaw).not.toHaveBeenCalled();
+      expect(prismaMock.comprobante.create).not.toHaveBeenCalled();
+    });
+
+    it('BOLETA y FACTURA sí crean la fila PENDIENTE_ENVIO para SUNAT', async () => {
+      prepararEmision(pedidoEmision({ id: 121n }), 1);
+      const boleta = await service.emitirParaPedido(121n);
+      expect(boleta.tipo).toBe('BOLETA');
+      expect(prismaMock.comprobante.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ facturacion_estado: 'PENDIENTE_ENVIO' }) }),
+      );
+    });
+  });
+
   describe('3. boleta con DNI válido e inválido', () => {
 
 

@@ -120,6 +120,7 @@ export const BOTONES_PEDIDO_NOMBRE_CONFIRMAR: BotonAccion[] = [
 ];
 
 export const BOTONES_PEDIDO_COMPROBANTE: BotonAccion[] = [
+  { id: 'ped_comp_simple', titulo: 'Comprobante simple' },
   { id: 'ped_comp_boleta', titulo: 'Boleta' },
   { id: 'ped_comp_factura', titulo: 'Factura' },
 ];
@@ -801,7 +802,23 @@ export const TEXTOS_BOT = {
   },
 
   pedidoComprobanteTipo: (): string => {
-    return '¿Qué comprobante de pago deseas? Elige boleta o factura.';
+    return '¿Cómo quieres tu comprobante?\n\nEl comprobante simple es el ticket de tu pedido, sin datos tuyos. La boleta y la factura se emiten a SUNAT.';
+  },
+
+  pedidoComprobanteDniInvalido: (): string => {
+    return 'El DNI debe tener exactamente 8 dígitos. Escríbelo de nuevo o escribe "omitir":';
+  },
+
+  pedidoComprobanteDniObligatorio: (): string => {
+    return 'Una boleta de más de S/ 700 exige DNI (8 dígitos). Escríbelo, por favor:';
+  },
+
+  pedidoComprobanteRucInvalido: (): string => {
+    return 'El RUC debe tener 11 dígitos y empezar con 10, 15, 17 o 20. Escríbelo de nuevo:';
+  },
+
+  pedidoComprobanteRazonVacia: (): string => {
+    return 'Necesito la razón social para la factura. Escríbela, por favor:';
   },
 
   pedidoComprobanteDni: (): string => {

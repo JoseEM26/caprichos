@@ -112,8 +112,8 @@ export function FormularioCheckout({
   const [pistaDireccion, setPistaDireccion] = useState<{ zona: string | null; direccion: string | null } | null>(null);
   const [usarUltimaDireccion, setUsarUltimaDireccion] = useState(false);
 
-  // Comprobante (Boleta o Factura)
-  const [tipoComprobante, setTipoComprobante] = useState<TipoComprobante>('BOLETA');
+  // Comprobante: simple (por defecto, sin datos ni SUNAT), boleta o factura
+  const [tipoComprobante, setTipoComprobante] = useState<TipoComprobante>('SIMPLE');
   const [dni, setDni] = useState('');
   const [ruc, setRuc] = useState('');
   const [razonSocial, setRazonSocial] = useState('');
@@ -471,8 +471,8 @@ export function FormularioCheckout({
   const validarPaso3 = (): string | null => {
     if (tipoComprobante === 'FACTURA') {
       const rucLimpio = ruc.trim();
-      if (!/^\d{11}$/.test(rucLimpio)) {
-        return 'Para factura se exige un RUC válido de 11 dígitos (un RUC de 10 dígitos no se acepta)';
+      if (!/^(10|15|17|20)\d{9}$/.test(rucLimpio)) {
+        return 'Para factura se exige un RUC válido de 11 dígitos que empiece con 10, 15, 17 o 20 (un RUC de 10 dígitos no se acepta)';
       }
       if (!razonSocial.trim()) {
         return 'Para factura se exige la razón social';
@@ -1584,49 +1584,45 @@ export function FormularioCheckout({
                     </div>
 
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setTipoComprobante('BOLETA')}
-                        style={{
-                          flex: 1,
-                          minHeight: '44px',
-                          borderRadius: '10px',
-                          border:
-                            tipoComprobante === 'BOLETA'
-                              ? '2px solid var(--cp-orange)'
-                              : '1.5px solid var(--cp-line)',
-                          backgroundColor:
-                            tipoComprobante === 'BOLETA' ? 'var(--cp-sand)' : 'var(--cp-white)',
-                          color: 'var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: '13px',
-                        }}
-                      >
-                        Boleta
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTipoComprobante('FACTURA')}
-                        style={{
-                          flex: 1,
-                          minHeight: '44px',
-                          borderRadius: '10px',
-                          border:
-                            tipoComprobante === 'FACTURA'
-                              ? '2px solid var(--cp-orange)'
-                              : '1.5px solid var(--cp-line)',
-                          backgroundColor:
-                            tipoComprobante === 'FACTURA' ? 'var(--cp-sand)' : 'var(--cp-white)',
-                          color: 'var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: '13px',
-                        }}
-                      >
-                        Factura
-                      </button>
+                      {(
+                        [
+                          ['SIMPLE', 'Comprobante simple'],
+                          ['BOLETA', 'Boleta'],
+                          ['FACTURA', 'Factura'],
+                        ] as const
+                      ).map(([tipo, etiqueta]) => (
+                        <button
+                          key={tipo}
+                          type="button"
+                          aria-pressed={tipoComprobante === tipo}
+                          onClick={() => setTipoComprobante(tipo)}
+                          style={{
+                            flex: 1,
+                            minHeight: '44px',
+                            borderRadius: '10px',
+                            border:
+                              tipoComprobante === tipo
+                                ? '2px solid var(--cp-orange)'
+                                : '1.5px solid var(--cp-line)',
+                            backgroundColor:
+                              tipoComprobante === tipo ? 'var(--cp-sand)' : 'var(--cp-white)',
+                            color: 'var(--cp-navy)',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                          }}
+                        >
+                          {etiqueta}
+                        </button>
+                      ))}
                     </div>
 
-                    {tipoComprobante === 'BOLETA' ? (
+                    {tipoComprobante === 'SIMPLE' ? (
+                      <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                        Es el ticket de tu pedido, sin datos tuyos. Si necesitas boleta o factura con SUNAT, elígela aquí.
+                      </div>
+                    ) : null}
+
+                    {tipoComprobante === 'SIMPLE' ? null : tipoComprobante === 'BOLETA' ? (
                       <div>
                         <label
                           htmlFor="f-dni"

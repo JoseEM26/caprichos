@@ -350,8 +350,8 @@ export function ElectronicosTab() {
         <section aria-label="Boleta electrónica por defecto" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ fontWeight: 800 }}>Boleta electrónica por defecto</div>
           <p style={{ margin: 0, fontSize: 13 }}>
-            El comprobante es obligatorio en todo pedido: boleta o factura (la nota de venta ya no cuenta). Con Sí, el selector
-            del mozo y de Caja empieza con Boleta como sugerencia, pero hay que confirmarla igual. Con No, empieza sin elegir.
+            Todo pedido lleva comprobante simple (por defecto, sin SUNAT), boleta o factura. Esta marca ya no cambia el valor
+            inicial del selector: el mozo y Caja empiezan con Comprobante simple.
           </p>
           <div role="group" aria-label="Boleta electrónica por defecto" style={{ display: 'flex', gap: 8 }}>
             <button

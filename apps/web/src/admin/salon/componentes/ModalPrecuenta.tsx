@@ -67,10 +67,10 @@ const DIGITALES = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 /** Medios del plan que llevan captura: los digitales y la copia del POS (tarjeta). */
 const MEDIOS_CON_VOUCHER = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
 
-/** Comprobante guardado en el pedido (la boleta puede no tener DNI); sin boleta ni factura, sin elegir. */
+/** Comprobante guardado en el pedido (la boleta puede no tener DNI); sin simple, boleta ni factura (nota de venta antigua), sin elegir. */
 const valorInicial = (c: ModalPrecuentaProps['comprobantePedido']): ValorComprobante => {
   const t = String(c?.tipo ?? '').toUpperCase();
-  const tipo: TipoComprobanteSel | null = t === 'BOLETA' || t === 'FACTURA' ? t : null;
+  const tipo: TipoComprobanteSel | null = t === 'SIMPLE' || t === 'BOLETA' || t === 'FACTURA' ? t : null;
   return {
     tipo,
     doc: tipo === null ? '' : c?.documento ?? '',

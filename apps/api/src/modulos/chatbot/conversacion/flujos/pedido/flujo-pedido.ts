@@ -2212,6 +2212,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
+    if (entrada.id === 'ped_comp_simple' || entrada.texto.includes('simple')) {
+      // Ticket interno: no pide ningún dato ni va a SUNAT
+      return this.avanzarHaciaCheckout(flujo, { ...pedido, comprobante: { tipo: 'SIMPLE' } }, contexto);
+    }
+
     if (entrada.id === 'ped_comp_boleta' || entrada.texto.includes('boleta')) {
       const nuevoPedido: EstadoCarritoPedido = {
         ...pedido,
@@ -2265,14 +2270,26 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const raw = entrada.textoOriginal.replace(/\D/g, '');
-    const dni = raw.length === 8 ? raw : undefined;
+    const texto = entrada.textoOriginal.trim();
+    const omitir = ['omitir', 'no', 'sin dni'].includes(texto.toLowerCase());
+    // Boleta de más de S/ 700: el DNI es obligatorio (SUNAT); el servidor y Caja lo vuelven a exigir
+    const { aCobrar, propina } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const exigeDni = aCobrar - (propina ?? 0) > 700;
+    if (omitir ? exigeDni : !/^\d{8}$/.test(texto)) {
+      return {
+        nuevoEstado: 'PEDIDO_COMPROBANTE_DNI',
+        acciones: [
+          { tipo: 'enviarTexto', texto: exigeDni ? TEXTOS_BOT.pedidoComprobanteDniObligatorio() : TEXTOS_BOT.pedidoComprobanteDniInvalido() },
+        ],
+        nuevoFlujo: flujo,
+      };
+    }
 
     const nuevoPedido: EstadoCarritoPedido = {
       ...pedido,
       comprobante: {
         tipo: 'BOLETA',
-        dni,
+        ...(omitir ? {} : { dni: texto }),
       },
     };
 
@@ -2285,14 +2302,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     entrada: EntradaNormalizada,
     _contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const ruc = entrada.textoOriginal.replace(/\D/g, '');
-    if (ruc.length !== 11) {
+    const ruc = entrada.textoOriginal.trim();
+    if (!/^(10|15|17|20)\d{9}$/.test(ruc)) {
       return {
         nuevoEstado: 'PEDIDO_COMPROBANTE_RUC',
         acciones: [
           {
             tipo: 'enviarTexto',
-            texto: 'El RUC debe tener exactamente 11 dígitos. Por favor escríbelo nuevamente:',
+            texto: TEXTOS_BOT.pedidoComprobanteRucInvalido(),
           },
         ],
         nuevoFlujo: flujo,
@@ -2331,6 +2348,13 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
     const razonSocial = entrada.textoOriginal.trim();
+    if (razonSocial.length < 3) {
+      return {
+        nuevoEstado: 'PEDIDO_COMPROBANTE_RAZON',
+        acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_BOT.pedidoComprobanteRazonVacia() }],
+        nuevoFlujo: flujo,
+      };
+    }
     const nuevoPedido: EstadoCarritoPedido = {
       ...pedido,
       comprobante: {
@@ -3276,6 +3300,28 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
             },
           ],
           nuevoFlujo: { ...flujo, estado: 'PEDIDO_VER_CARRITO', pedido },
+        };
+      }
+      case 'PEDIDO_COMPROBANTE_TIPO':
+        return {
+          nuevoEstado: estado,
+          acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoComprobanteTipo(), botones: BOTONES_PEDIDO_COMPROBANTE }],
+          nuevoFlujo: { ...flujo, estado, pedido },
+        };
+      case 'PEDIDO_COMPROBANTE_DNI':
+      case 'PEDIDO_COMPROBANTE_RUC':
+      case 'PEDIDO_COMPROBANTE_RAZON': {
+        // «No cancelar» vuelve a pedir el mismo dato (no al inicio del pedido)
+        const texto =
+          estado === 'PEDIDO_COMPROBANTE_DNI'
+            ? TEXTOS_BOT.pedidoComprobanteDni()
+            : estado === 'PEDIDO_COMPROBANTE_RUC'
+              ? TEXTOS_BOT.pedidoComprobanteRuc()
+              : TEXTOS_BOT.pedidoComprobanteRazon();
+        return {
+          nuevoEstado: estado,
+          acciones: [{ tipo: 'enviarTexto', texto }],
+          nuevoFlujo: { ...flujo, estado, pedido },
         };
       }
       default:

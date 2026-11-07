@@ -870,8 +870,9 @@ export class VouchersService {
     const usaElegido = elegidoTipo !== '';
     const tipo = usaElegido ? elegidoTipo : String(pedido.comprobante_tipo ?? '').trim().toUpperCase();
     if (!esComprobanteElegible(tipo)) {
-      throw new BadRequestException({ codigo: 'COMPROBANTE_OBLIGATORIO', mensaje: 'Elige boleta o factura antes de enviar a Caja' });
+      throw new BadRequestException({ codigo: 'COMPROBANTE_OBLIGATORIO', mensaje: 'Elige comprobante simple, boleta o factura antes de enviar a Caja' });
     }
+    if (tipo === 'SIMPLE') return { tipo, doc: null, razon: null, direccion: null };
     const doc = usaElegido ? String(elegido?.doc ?? '').trim() || null : pedido.comprobante_doc?.trim() || null;
     const razon = usaElegido ? String(elegido?.razon ?? '').trim() || null : pedido.comprobante_razon?.trim() || null;
     const direccion = usaElegido ? String(elegido?.direccion ?? '').trim() || null : pedido.comprobante_direccion?.trim() || null;

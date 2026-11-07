@@ -640,13 +640,41 @@ describe('PedidosService', () => {
       expect(prismaMock.pedido.create).not.toHaveBeenCalled();
     });
 
-    it('comprobante obligatorio: sin tipo, o nota de venta, -> 400 COMPROBANTE_OBLIGATORIO y no crea el pedido', async () => {
-      for (const comprobante of [undefined, { tipo: 'NOTA_VENTA' } as any]) {
-        await expect(service.crear({ ...pedidoBaseDto, comprobante }, 'idemp-sin-comp')).rejects.toMatchObject({
-          response: { codigo: 'COMPROBANTE_OBLIGATORIO' },
-        });
-      }
+    it('tipo de comprobante desconocido (p. ej. nota de venta) -> 400 COMPROBANTE_INVALIDO y no crea el pedido', async () => {
+      await expect(
+        service.crear({ ...pedidoBaseDto, comprobante: { tipo: 'NOTA_VENTA' } as any }, 'idemp-sin-comp'),
+      ).rejects.toMatchObject({ response: { codigo: 'COMPROBANTE_INVALIDO' } });
       expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    it('comprobante simple (o sin comprobante) se guarda como SIMPLE y no guarda documento ni razón social', async () => {
+      prismaMock.pedido.create.mockResolvedValue({ id: 100n, codigo: 'CP-W001', estado: 'COLA', subtotal: 28.0, envio: 5.0, total: 33.0 });
+      for (const comprobante of [undefined, { tipo: 'SIMPLE', dni: '12345678', ruc: '20123456789', razonSocial: 'X' } as any]) {
+        prismaMock.pedido.create.mockClear();
+        await service.crear({ ...pedidoBaseDto, comprobante }, 'idemp-simple');
+        expect(prismaMock.pedido.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              comprobante_tipo: 'SIMPLE',
+              comprobante_doc: null,
+              comprobante_razon: null,
+              comprobante_direccion: null,
+            }),
+          }),
+        );
+      }
+    });
+
+    it('factura con RUC de prefijo inválido (11 dígitos pero no 10/15/17/20) -> 400 FACTURA_DATOS_INCOMPLETOS', async () => {
+      await expect(
+        service.crear({ ...pedidoBaseDto, comprobante: { tipo: 'FACTURA', ruc: '30123456789', razonSocial: 'Acme SAC' } }, 'idemp-f-3'),
+      ).rejects.toMatchObject({ response: { codigo: 'FACTURA_DATOS_INCOMPLETOS' } });
+    });
+
+    it('boleta con DNI de menos de 8 dígitos -> 400 DNI_INVALIDO', async () => {
+      await expect(
+        service.crear({ ...pedidoBaseDto, comprobante: { tipo: 'BOLETA', dni: '1234' } }, 'idemp-b-1'),
+      ).rejects.toMatchObject({ response: { codigo: 'DNI_INVALIDO' } });
     });
 
     it('boleta hasta S/ 700 sin DNI pasa: nunca se rechaza la venta por el DNI', async () => {

@@ -144,8 +144,8 @@ export class PagoPedidoDto {
 }
 
 export class ComprobantePedidoDto {
-  @IsIn(['BOLETA', 'FACTURA'], { message: 'Elige boleta o factura' })
-  tipo!: 'BOLETA' | 'FACTURA';
+  @IsIn(['SIMPLE', 'BOLETA', 'FACTURA'], { message: 'Elige comprobante simple, boleta o factura' })
+  tipo!: 'SIMPLE' | 'BOLETA' | 'FACTURA';
 
   @IsOptional()
   @IsString()

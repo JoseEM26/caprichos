@@ -19,9 +19,9 @@ describe('PedidoComprobanteService.cambiar (PATCH comprobante)', () => {
     pago_estado: 'PENDIENTE',
     total: 40,
     comprobante_tipo: 'NOTA_VENTA',
-    comprobante_doc: null,
-    comprobante_razon: null,
-    comprobante_direccion: null,
+    comprobante_doc: null as string | null,
+    comprobante_razon: null as string | null,
+    comprobante_direccion: null as string | null,
   };
 
   const construir = (sobrescribe: Partial<typeof pedidoBase> = {}, comprobante: any = null, conteo = 1) => {
@@ -68,6 +68,14 @@ describe('PedidoComprobanteService.cambiar (PATCH comprobante)', () => {
     const { servicio, prisma } = construir({ total: 900 });
     await servicio.cambiar('5', { tipo: 'BOLETA' });
     expect(prisma.pedido.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ comprobante_tipo: 'BOLETA', comprobante_doc: null }) }));
+  });
+
+  it('cambia a comprobante simple: borra documento, razón y dirección aunque lleguen', async () => {
+    const { servicio, prisma } = construir({ comprobante_tipo: 'FACTURA', comprobante_doc: '20123456789', comprobante_razon: 'Acme SAC' });
+    await servicio.cambiar('5', { tipo: 'SIMPLE', doc: '12345678', razon: 'X', direccion: 'Y' });
+    expect(prisma.pedido.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { comprobante_tipo: 'SIMPLE', comprobante_doc: null, comprobante_razon: null, comprobante_direccion: null } }),
+    );
   });
 
   it('pedido ya cobrado: 409 y no escribe', async () => {

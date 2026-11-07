@@ -34,7 +34,7 @@ import { PagoPlanService } from './pago-plan.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
-import { esComprobanteElegible } from '../comprobantes/comprobantes.util';
+import { esComprobanteElegible, validarRuc } from '../comprobantes/comprobantes.util';
 import { leerConfigPropina } from '../propinas/propinas.service';
 import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
 import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
@@ -386,18 +386,18 @@ export class PedidosService {
       }
     }
 
-    // 4. Comprobante obligatorio en todo canal: boleta o factura (la nota de venta no es comprobante)
-    const tipoElegido = dto.comprobante?.tipo;
+    // 4. Comprobante en todo canal: simple (por defecto, sin SUNAT), boleta o factura
+    const tipoElegido = dto.comprobante?.tipo ?? 'SIMPLE';
     if (!esComprobanteElegible(tipoElegido)) {
       throw new BadRequestException({
-        codigo: 'COMPROBANTE_OBLIGATORIO',
-        mensaje: 'Elige boleta o factura para tu pedido',
+        codigo: 'COMPROBANTE_INVALIDO',
+        mensaje: 'Elige comprobante simple, boleta o factura para tu pedido',
       });
     }
     if (tipoElegido === 'FACTURA') {
       const ruc = dto.comprobante?.ruc?.trim();
       const razonSocial = dto.comprobante?.razonSocial?.trim();
-      if (!ruc || !/^\d{11}$/.test(ruc) || !razonSocial || razonSocial.length === 0) {
+      if (!ruc || !validarRuc(ruc) || !razonSocial || razonSocial.length === 0) {
         throw new BadRequestException({
           codigo: 'FACTURA_DATOS_INCOMPLETOS',
           mensaje: 'La factura exige RUC de 11 dígitos y razón social',

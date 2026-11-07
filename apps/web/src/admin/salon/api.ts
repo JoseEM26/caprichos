@@ -76,7 +76,7 @@ export interface AbrirPedidoMesaPayload {
     plan?: PlanPagoItem[];
   };
   /** Comprobante que pide Caja: boleta o factura, obligatorio */
-  comprobante?: { tipo: 'BOLETA' | 'FACTURA'; dni?: string; ruc?: string; razonSocial?: string; direccion?: string };
+  comprobante?: { tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA'; dni?: string; ruc?: string; razonSocial?: string; direccion?: string };
 }
 
 export interface CrearReservaPayload {

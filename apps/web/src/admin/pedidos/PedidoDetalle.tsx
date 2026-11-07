@@ -57,10 +57,10 @@ function FilaDato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   );
 }
 
-/** Comprobante guardado en el pedido como valor del selector. Sin boleta ni factura guardada, sin elegir. */
+/** Comprobante guardado en el pedido como valor del selector. Sin simple, boleta ni factura guardada (nota de venta antigua), sin elegir. */
 function valorDelPedido(pedido: Pedido): ValorComprobante {
   const t = String(pedido.comprobante_tipo ?? '').toUpperCase();
-  const tipo: TipoComprobanteSel | null = t === 'BOLETA' || t === 'FACTURA' ? t : null;
+  const tipo: TipoComprobanteSel | null = t === 'SIMPLE' || t === 'BOLETA' || t === 'FACTURA' ? t : null;
   return {
     tipo,
     doc: tipo === null ? '' : pedido.comprobante_doc ?? '',
@@ -1410,7 +1410,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
       <Confirmar
         abierto={confirmarCambio}
         titulo="Cambiar comprobante"
-        mensaje={`¿Cambiar el comprobante del pedido a ${valorCambio.tipo === 'FACTURA' ? 'Factura' : 'Boleta'}${valorCambio.doc.trim() ? ` (${valorCambio.tipo === 'FACTURA' ? 'RUC' : 'DNI'} ${valorCambio.doc.trim()})` : ''}? Caja lo emitirá al cobrar.`}
+        mensaje={`¿Cambiar el comprobante del pedido a ${valorCambio.tipo ? etiquetaComprobante(valorCambio.tipo) : ''}${valorCambio.tipo !== 'SIMPLE' && valorCambio.doc.trim() ? ` (${valorCambio.tipo === 'FACTURA' ? 'RUC' : 'DNI'} ${valorCambio.doc.trim()})` : ''}? ${valorCambio.tipo === 'SIMPLE' ? 'No se envía a SUNAT.' : 'Caja lo emitirá al cobrar.'}`}
         textoSi="Sí, cambiar"
         textoNo="No"
         cargando={guardandoComp}
@@ -1419,7 +1419,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
           setErrorComp(null);
           try {
             const dto = aPayloadComprobante(valorCambio);
-            if (!dto) throw new Error('Elige boleta o factura');
+            if (!dto) throw new Error('Elige comprobante simple, boleta o factura');
             await pedidosApi.cambiarComprobante(pedido.id, dto);
             setConfirmarCambio(false);
             setCambiandoComp(false);

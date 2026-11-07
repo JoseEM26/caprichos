@@ -617,7 +617,7 @@ model Pedido {
   descuento              Decimal                 @default(0) @db.Decimal(12, 2)
   envio                  Decimal?                @db.Decimal(12, 2)
   total                  Decimal                 @db.Decimal(12, 2)
-  comprobante_tipo       String                  @default("BOLETA")
+  comprobante_tipo       String                  @default("SIMPLE") // SIMPLE (ticket interno, sin SUNAT) | BOLETA | FACTURA
   comprobante_doc        String?
   comprobante_razon      String?
   comprobante_direccion  String?

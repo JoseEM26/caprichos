@@ -57,7 +57,7 @@ export class PedidoComprobanteService {
     }
 
     const tipo = dto.tipo;
-    const doc = dto.doc?.trim() || null;
+    const doc = tipo === 'SIMPLE' ? null : dto.doc?.trim() || null;
     const razon = tipo === 'FACTURA' ? dto.razon?.trim() || null : null;
     const direccion = tipo === 'FACTURA' ? dto.direccion?.trim() || null : null;
 

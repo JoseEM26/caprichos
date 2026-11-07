@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -269,7 +270,8 @@ export class ComprobantesService {
   /**
    * Emite el comprobante para un pedido cobrado.
    * - Es idempotente: si ya existe el comprobante para el pedido, lo devuelve.
-   * - Solo BOLETA o FACTURA (obligatorio): serie B002/F002 (parámetros) y se envían a SUNAT.
+   * - SIMPLE (ticket interno): no emite nada y devuelve null.
+   * - BOLETA o FACTURA: serie B002/F002 (parámetros) y se envían a SUNAT.
    * - Sin tipo válido o con documento inválido, falla: nunca sale como nota de venta.
    * - Con tx (transacción externa) no hace red: la boleta/factura queda PENDIENTE_ENVIO y la tarea la envía.
    */
@@ -278,7 +280,7 @@ export class ComprobantesService {
     tx?: Prisma.TransactionClient | any,
     usuario?: UsuarioAutenticado,
     ip?: string,
-  ) {
+  ): Promise<any> {
     const pedidoId = this.parsearId(pedidoIdRaw, 'pedido');
     const db = tx ?? this.prisma;
 
@@ -308,11 +310,13 @@ export class ComprobantesService {
       });
     }
 
-    // 3. Boleta o factura obligatoria; el documento se valida (la nota de venta ya no es comprobante)
+    // 3. Comprobante simple: ticket interno, no se emite nada ni se envía a SUNAT
+    if (pedido.comprobante_tipo === 'SIMPLE') return null;
+    // Boleta o factura; el documento se valida (la nota de venta ya no es comprobante)
     if (!esComprobanteElegible(pedido.comprobante_tipo)) {
       throw new BadRequestException({
         codigo: 'COMPROBANTE_OBLIGATORIO',
-        mensaje: 'Elige boleta o factura antes de emitir el comprobante',
+        mensaje: 'Elige comprobante simple, boleta o factura antes de emitir el comprobante',
       });
     }
     const tipoFinal = pedido.comprobante_tipo;
@@ -1247,6 +1251,12 @@ export class ComprobantesService {
     let comprobante: Comprobante | null = pedido.comprobante[0] ?? null;
     if (!comprobante) {
       const emitido = await this.emitirParaPedido(pedido.id, undefined, usuario, ip);
+      if (!emitido) {
+        throw new ConflictException({
+          codigo: 'COMPROBANTE_SIMPLE',
+          mensaje: 'Este pedido es con comprobante simple: no tiene boleta ni factura. Usa el ticket del pedido.',
+        });
+      }
       comprobante = await this.prisma.comprobante.findUnique({
         where: { id: BigInt(emitido.id) },
       });
@@ -1313,6 +1323,12 @@ export class ComprobantesService {
     let comprobante: Comprobante | null = pedido.comprobante[0] ?? null;
     if (!comprobante) {
       const emitido = await this.emitirParaPedido(pedido.id, undefined, usuario, ip);
+      if (!emitido) {
+        throw new ConflictException({
+          codigo: 'COMPROBANTE_SIMPLE',
+          mensaje: 'Este pedido es con comprobante simple: no tiene boleta ni factura. Usa el ticket del pedido.',
+        });
+      }
       comprobante = await this.prisma.comprobante.findUnique({
         where: { id: BigInt(emitido.id) },
       });
