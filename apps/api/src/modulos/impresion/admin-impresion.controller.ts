@@ -21,6 +21,8 @@ import {
   VaciarColaDto,
   ReimprimirDto,
   PruebaImpresionDto,
+  ElegirImpresoraDto,
+  PruebaTodasDto,
 } from './dto';
 
 @Controller(['admin/impresion', 'api/admin/impresion'])
@@ -93,7 +95,22 @@ export class AdminImpresionController {
   @Post('prueba')
   @Permiso('pedidos', 'ver')
   async pruebaImpresion(@Body() dto: PruebaImpresionDto, @Req() req: any) {
-    return this.impresionService.encolarPrueba(dto.rol, req.usuario, this.ip(req));
+    return this.impresionService.encolarPrueba(dto.rol, req.usuario, this.ip(req), dto.impresoraId, dto.equipoId);
+  }
+
+  /** «Probar TODAS»: una hoja con número grande en cada impresora del equipo del local. */
+  @Post('prueba-todas')
+  @Permiso('configuracion', 'editar')
+  async pruebaTodas(@Body() dto: PruebaTodasDto, @Req() req: any) {
+    return this.impresionService.encolarPruebaTodas(req.usuario, this.ip(req), dto.equipoId);
+  }
+
+  /** «Usar esta impresora»: elige cuál de las impresoras del equipo del local es la etiquetera o la ticketera. */
+  @Post('seleccion')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('configuracion', 'editar')
+  async elegirImpresora(@Body() dto: ElegirImpresoraDto, @Req() req: any) {
+    return this.impresionService.elegirImpresora(dto.rol, dto.impresoraId, req.usuario, this.ip(req), dto.equipoId);
   }
 
   @Get('prueba/:id')

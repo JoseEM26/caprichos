@@ -23,6 +23,13 @@ export async function listarImpresorasWindows(): Promise<string[]> {
   return Array.isArray(j) ? j : [j];
 }
 
+/** Nombre, controlador y puerto de cada impresora instalada (ayuda a distinguir las virtuales y a reconocer la USB). */
+export async function listarImpresorasWindowsDetalle(): Promise<{ nombre: string; driver?: string; puerto?: string }[]> {
+  const out = await powershell('Get-Printer | Select-Object Name,DriverName,PortName | ConvertTo-Json -Compress');
+  const j = out.trim() ? JSON.parse(out) : [];
+  return (Array.isArray(j) ? j : [j]).map((p: any) => ({ nombre: p.Name, driver: p.DriverName, puerto: p.PortName }));
+}
+
 // Envío RAW al spooler (sin driver gráfico): sirve para TSPL y ESC/POS por igual
 const SCRIPT_RAW = `
 Add-Type -TypeDefinition @"
@@ -86,7 +93,7 @@ export class ImpresoraWindows implements IDispositivoImpresora {
       }
       return { estado: 'error', detalle: `Estado de la impresora: ${estado}` };
     } catch {
-      return { estado: 'desconectada', detalle: `No se encuentra la impresora "${this.nombre}" en este equipo` };
+      return { estado: 'desconectada', detalle: `Impresora guardada no encontrada: ${this.nombre}` };
     }
   }
 }

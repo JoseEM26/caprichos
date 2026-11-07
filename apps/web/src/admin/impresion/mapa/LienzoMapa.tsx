@@ -419,28 +419,56 @@ export function LienzoMapa({
         </div>,
       );
     }
+    const pildoras = (id: string, campo: 'areaModalidades' | 'bebidaModalidades') => (
+      <div className="mapa-sale-en">
+        <span className="mapa-sale-en-etiqueta">Sale en:</span>
+        <div role="group" aria-label={`Modalidades del ${id}`} className="mapa-pildoras">
+          {GRUPOS_MODALIDAD.map((g) => {
+            const on = g.mods.every((m) => r[campo].includes(m));
+            return (
+              <button
+                key={g.id}
+                type="button"
+                aria-pressed={on}
+                disabled={bloqueado}
+                className={`mapa-pildora ${on ? 'mapa-pildora--on' : ''}`}
+                onClick={() => onCambiarRegla({ [campo]: alternarGrupo(r[campo], g.mods) }, 'reglas')}
+              >
+                {g.titulo}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
     if (p.clave === 'BEBIDA') {
       return celda(
-        <Interruptor
-          id="mapa-impresion-bebida"
-          titulo="Sticker de bebida"
-          ayuda="Sale en cada pedido que lleve bebidas"
-          activo={r.bebidaActivo}
-          deshabilitado={bloqueado}
-          onCambiar={(v) => onCambiarRegla({ bebidaActivo: v }, 'reglas')}
-        />,
+        <>
+          <Interruptor
+            id="mapa-impresion-bebida"
+            titulo="Sticker de bebida"
+            ayuda="Un vaso por bebida, en los tipos de pedido que elijas (la PC de bebidas)"
+            activo={r.bebidaActivo}
+            deshabilitado={bloqueado}
+            onCambiar={(v) => onCambiarRegla({ bebidaActivo: v }, 'reglas')}
+          />
+          {pildoras('sticker de bebida', 'bebidaModalidades')}
+        </>,
       );
     }
     if (p.clave === 'AREA') {
       return celda(
-        <Interruptor
-          id="mapa-impresion-area"
-          titulo="Sticker por área"
-          ayuda="Apagado hasta que lo confirmes: un sticker por área, salvo Bebidas"
-          activo={r.areaActivo}
-          deshabilitado={bloqueado}
-          onCambiar={(v) => onCambiarRegla({ areaActivo: v }, 'reglas')}
-        />,
+        <>
+          <Interruptor
+            id="mapa-impresion-area"
+            titulo="Sticker por área"
+            ayuda="Un sticker por área, salvo Bebidas, en los tipos de pedido que elijas"
+            activo={r.areaActivo}
+            deshabilitado={bloqueado}
+            onCambiar={(v) => onCambiarRegla({ areaActivo: v }, 'reglas')}
+          />
+          {pildoras('sticker por área', 'areaModalidades')}
+        </>,
       );
     }
     if (p.clave === 'COMANDA_AREA') {

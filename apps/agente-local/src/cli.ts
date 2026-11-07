@@ -3,12 +3,19 @@ import * as path from 'path';
 import * as readline from 'readline';
 import { obtenerConfiguracion, rutaArchivoConfiguracion } from './config';
 import type { ArchivoConfiguracion } from './config';
-import { ImpresoraWindows, listarImpresorasWindows } from './impresora/impresoraWindows';
+import { ImpresoraWindows, listarImpresorasWindows, listarImpresorasWindowsDetalle } from './impresora/impresoraWindows';
+import { candidatasDeLinux, candidatasDeWindows, idGuardado } from './candidatas';
+import type { CandidataLocal } from './candidatas';
+import { activarAutoarranque, autoarranqueActivo, desactivarAutoarranque } from './autoarranque';
+import { generarPruebaEtiqueta, generarPruebaTicket } from './pruebaImpresora';
 import { ImpresoraUsb } from './impresora/impresoraUsb';
 import { ImpresoraRed, esDestinoRed, parsearDestinoRed } from './impresora/impresoraRed';
 import type { IDispositivoImpresora } from './impresora/dispositivo.interface';
 import { ClienteApiImpresion, canjearCodigoVinculo } from './api/clienteApi';
+import { comandoEstado, comandoImpresoras, comandoProbarTodas, comandoProbarUna, comandoUsar, ejecutarMenu } from './comandos';
+import type { DepsComandos } from './comandos';
 import { AgenteLocalServicio } from './agente/bucle';
+import type { EquipoLocal } from './agente/bucle';
 import { esperarEnter, describirError } from './arranque';
 import {
   generarTsplTrabajo,
@@ -202,6 +209,74 @@ async function imprimirPruebaRed(rol: RolImpresora, destino: string, logger: (m:
   }
 }
 
+/** Impresoras reales del equipo (sin PDF, OneNote, Fax, XPS ni duplicados «Copiar 1»), con identificación estable. */
+export async function listarCandidatasLocales(): Promise<CandidataLocal[]> {
+  if (process.platform === 'win32') {
+    const lista = await listarImpresorasWindowsDetalle().catch(async () =>
+      (await listarImpresorasWindows().catch(() => [] as string[])).map((nombre) => ({ nombre })),
+    );
+    return candidatasDeWindows(lista);
+  }
+  return candidatasDeLinux(listarImpresorasLinux());
+}
+
+/** Guarda la impresora de un rol en config.json (destino + identidad estable) conservando el resto. */
+export function guardarImpresoraElegida(rol: RolImpresora, c: CandidataLocal, ruta = rutaArchivoConfiguracion()): ArchivoConfiguracion {
+  const actual = leerArchivoConfiguracion(ruta);
+  const nuevo: ArchivoConfiguracion =
+    rol === 'ETIQUETERA'
+      ? { ...actual, etiquetera: c.destino, etiqueteraId: c.identidad }
+      : { ...actual, ticketera: c.destino, ticketeraId: c.identidad };
+  fs.mkdirSync(path.dirname(ruta), { recursive: true });
+  fs.writeFileSync(ruta, JSON.stringify(nuevo, null, 2), { mode: 0o600 });
+  return nuevo;
+}
+
+/** El equipo para el bucle: lista lo que ve, crea el dispositivo y guarda lo elegido en el panel. */
+export function crearEquipoLocal(archivoInicial: ArchivoConfiguracion, ruta = rutaArchivoConfiguracion()): EquipoLocal {
+  let archivo = archivoInicial;
+  return {
+    listar: listarCandidatasLocales,
+    crear: (c, rol) => crearDispositivo(c.destino, c.identidad, rol),
+    idActual: (rol) =>
+      rol === 'ETIQUETERA' ? idGuardado(archivo.etiquetera, archivo.etiqueteraId) : idGuardado(archivo.ticketera, archivo.ticketeraId),
+    guardar: (rol, c) => {
+      archivo = guardarImpresoraElegida(rol, c, ruta);
+    },
+  };
+}
+
+/** Dependencias reales de los comandos de terminal (impresoras de este equipo, config.json, consola). */
+export function depsComandos(logger: (m: string) => void = console.log): DepsComandos {
+  const ruta = rutaArchivoConfiguracion();
+  const archivo = leerArchivoConfiguracion(ruta);
+  return {
+    listar: listarCandidatasLocales,
+    crear: (c, rol) => crearDispositivo(c.destino, c.identidad, rol),
+    guardar: (rol, c) => void guardarImpresoraElegida(rol, c, ruta),
+    archivo,
+    relear: () => leerArchivoConfiguracion(ruta),
+    config: obtenerConfiguracion(process.env, archivo),
+    autoarranque: () => autoarranqueActivo(),
+    log: logger,
+  };
+}
+
+/** Menú numerado (probar todas, elegir, estado, arranque) para no recordar comandos. */
+async function abrirMenu(): Promise<void> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    await ejecutarMenu((t) => preguntar(rl, t), depsComandos(), rutaArchivoConfiguracion(), {
+      alternarAutoarranque:
+        process.platform === 'win32'
+          ? async () => ((await autoarranqueActivo()) ? (await desactivarAutoarranque()).mensaje : (await activarAutoarranque()).mensaje)
+          : undefined,
+    });
+  } finally {
+    rl.close();
+  }
+}
+
 export function leerArchivoConfiguracion(ruta = rutaArchivoConfiguracion()): ArchivoConfiguracion {
   try {
     return JSON.parse(fs.readFileSync(ruta, 'utf-8'));
@@ -247,7 +322,7 @@ export async function ejecutarAsistente(
     }
     const esWin = process.platform === 'win32';
     const detectadas: ImpresoraDetectada[] = esWin
-      ? (await listarImpresorasWindows().catch(() => [])).map((n) => ({ destino: n, puedeEscribir: true }))
+      ? (await listarCandidatasLocales()).map((c) => ({ destino: c.destino, modelo: c.detalle, sugerido: c.sugerido, puedeEscribir: true }))
       : listarImpresorasLinux();
     if (!detectadas.length) {
       logger(esWin ? 'No se encontraron impresoras instaladas en Windows.' : 'No hay impresoras USB en /dev/usb/lp*. Revisa el cable.');
@@ -327,6 +402,26 @@ export async function ejecutarAsistente(
     fs.mkdirSync(path.dirname(ruta), { recursive: true });
     fs.writeFileSync(ruta, JSON.stringify(cfg, null, 2), { mode: 0o600 });
     logger(`Configuración guardada en ${ruta}`);
+    logger('Esa impresora queda guardada: al encender la computadora el programa se conecta SOLO a ella. Para cambiarla, usa Configuración > Impresión en Caprichos.');
+    // Prueba en la impresora local elegida (la de red ya ofreció la suya al configurarla)
+    for (const [rol, destino] of [['ETIQUETERA', etiquetera], ['TICKETERA', ticketera]] as [RolImpresora, string | undefined][]) {
+      if (!destino || esDestinoRed(destino)) continue;
+      if ((await ask(`¿Imprimir una página de prueba en la ${rol === 'ETIQUETERA' ? 'etiquetera' : 'ticketera'} (${destino})? (S/n): `)).toLowerCase() === 'n') continue;
+      try {
+        const nombre = detectadas.find((d) => d.destino === destino)?.modelo ?? destino;
+        const config = obtenerConfiguracion(process.env, cfg);
+        await crearDispositivo(destino, undefined, rol).escribir(
+          rol === 'ETIQUETERA' ? generarPruebaEtiqueta(nombre, rol, config.etiqueta) : generarPruebaTicket(nombre, rol, config.ticketColumnas),
+        );
+        logger('✔ Página de prueba enviada. Si no salió en la impresora que esperabas, vuelve a elegir.');
+      } catch (err: any) {
+        logger(`✖ No se imprimió la prueba: ${err.message}`);
+      }
+    }
+    if (process.platform === 'win32' && !(await autoarranqueActivo())) {
+      const r = await activarAutoarranque();
+      logger(r.ok ? `✔ ${r.mensaje} (Para quitarlo: programa autoarranque desactivar)` : `AVISO: ${r.mensaje}`);
+    }
     for (const d of [etiquetera, ticketera]) {
       if (d && d.startsWith('/') && detectadas.find((x) => x.destino === d && !x.puedeEscribir)) {
         logger(`AVISO: sin permiso para usar ${d}. Ejecuta \`sudo usermod -aG lp $USER\` y reinicia el equipo.`);
@@ -344,6 +439,31 @@ export async function ejecutarAsistente(
 export async function main(): Promise<void> {
   const comando = process.argv[2]?.trim().toLowerCase();
 
+  if (comando === 'probar' && process.argv[3]) {
+    const ok = await comandoProbarUna(depsComandos(), process.argv.slice(3).join(' '));
+    await esperarEnter();
+    process.exit(ok ? 0 : 1);
+  }
+  if (comando === 'probar-todas') {
+    await comandoProbarTodas(depsComandos());
+    await esperarEnter();
+    process.exit(0);
+  }
+  if (comando === 'usar') {
+    const ok = await comandoUsar(depsComandos(), process.argv[3] ?? '', process.argv.slice(4).join(' '));
+    await esperarEnter();
+    process.exit(ok ? 0 : 1);
+  }
+  if (comando === 'estado') {
+    await comandoEstado(depsComandos(), rutaArchivoConfiguracion());
+    await esperarEnter();
+    process.exit(0);
+  }
+  if (comando === 'menu') {
+    await abrirMenu();
+    process.exit(0);
+  }
+
   if (comando === 'probar') {
     const res = await ejecutarComandoProbar();
     await esperarEnter();
@@ -357,12 +477,17 @@ export async function main(): Promise<void> {
   }
 
   if (comando === 'impresoras') {
-    if (process.platform === 'win32') {
-      (await listarImpresorasWindows().catch(() => [])).forEach((n, i) => console.log(`  ${i + 1}) ${n}`));
+    await comandoImpresoras(depsComandos());
+    await esperarEnter();
+    process.exit(0);
+  }
+
+  if (comando === 'autoarranque') {
+    const accion = process.argv[3]?.trim().toLowerCase();
+    if (accion === 'activar' || accion === 'desactivar') {
+      console.log((await (accion === 'activar' ? activarAutoarranque() : desactivarAutoarranque())).mensaje);
     } else {
-      const l = listarImpresorasLinux();
-      console.log(l.length ? 'Impresoras encontradas en este equipo:' : 'No hay impresoras USB en /dev/usb/lp*.');
-      l.forEach((d, i) => console.log(`  ${i + 1}) ${describirImpresora(d)}`));
+      console.log(`Arranque automático: ${(await autoarranqueActivo()) ? 'ACTIVADO' : 'desactivado'}. Usa "autoarranque activar" o "autoarranque desactivar".`);
     }
     await esperarEnter();
     process.exit(0);
@@ -370,7 +495,7 @@ export async function main(): Promise<void> {
 
   if (comando === 'configurar' || comando === 'vincular') {
     await ejecutarAsistente();
-    await esperarEnter();
+    await abrirMenu();
     process.exit(0);
   }
 
@@ -387,7 +512,9 @@ export async function main(): Promise<void> {
   const config = obtenerConfiguracion(process.env, archivo);
   const clienteApi = new ClienteApiImpresion(config.apiUrl, config.agenteKey);
   const impresoras: Partial<Record<'ETIQUETERA' | 'TICKETERA', IDispositivoImpresora>> = {};
-  const etiquetera = config.etiquetera ?? (config.ticketera ? undefined : config.impresoraRuta);
+  // Sin elegir nada: en Windows no se inventa una ruta Linux (el panel pide elegir de la lista); en Linux sigue valiendo IMPRESORA_RUTA
+  const rutaPorDefecto = process.platform === 'win32' && !process.env.IMPRESORA_RUTA && !process.env.PRINTER_PATH ? undefined : config.impresoraRuta;
+  const etiquetera = config.etiquetera ?? (config.ticketera ? undefined : rutaPorDefecto);
   if (etiquetera) impresoras.ETIQUETERA = crearDispositivo(etiquetera, archivo.etiqueteraId, 'ETIQUETERA');
   if (config.ticketera) impresoras.TICKETERA = crearDispositivo(config.ticketera, archivo.ticketeraId, 'TICKETERA');
 
@@ -395,6 +522,7 @@ export async function main(): Promise<void> {
     config,
     clienteApi,
     impresoras,
+    equipo: crearEquipoLocal(archivo),
   });
 
   const finalizar = () => {

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { EstadoImpresora, RolImpresora } from '@caprichos/compartido';
 
 export class ImpresoraLatidoDto {
@@ -12,6 +12,36 @@ export class ImpresoraLatidoDto {
   @IsOptional()
   @IsString()
   detalle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  id?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  nombre?: string;
+}
+
+export class CandidataLatidoDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(300)
+  id!: string;
+
+  @IsString()
+  @MaxLength(300)
+  nombre!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  detalle?: string;
+
+  @IsOptional()
+  @IsIn(['ETIQUETERA', 'TICKETERA'])
+  sugerido?: RolImpresora;
 }
 
 export class LatidoDto {
@@ -34,4 +64,12 @@ export class LatidoDto {
   @ValidateNested({ each: true })
   @Type(() => ImpresoraLatidoDto)
   impresoras?: ImpresoraLatidoDto[];
+
+  /** Impresoras que ve el equipo del local (aditivo: los programas viejos no la mandan). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => CandidataLatidoDto)
+  candidatas?: CandidataLatidoDto[];
 }

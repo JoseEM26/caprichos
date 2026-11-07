@@ -472,12 +472,12 @@ describe('ImpresionService', () => {
 
       const res = await service.reimprimirEtiqueta('80', { tipo: 'TODAS' });
 
-      // El sticker por área está apagado por defecto: solo sale el de vaso, y la general ya está en cola
+      // Por defecto salen vaso y área (llevar/recoger/delivery); la general ya está en cola
       const tipos = prismaMock.printJob.create.mock.calls.map((c: any) => c[0].data.tipo);
-      expect(tipos).toEqual(['ETIQUETA_BEBIDA']);
-      expect(res.cantidad).toBe(1);
+      expect([...tipos].sort()).toEqual(['ETIQUETA_AREA', 'ETIQUETA_BEBIDA']);
+      expect(res.cantidad).toBe(2);
       expect(res.omitidas).toBe(1);
-      expect(res.noAplican).toBe(1);
+      expect(res.noAplican).toBe(0);
     });
 
     it('reimprimir TODAS con el sticker por área activado lo incluye (con su destino)', async () => {

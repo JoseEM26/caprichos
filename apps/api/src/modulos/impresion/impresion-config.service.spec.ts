@@ -65,14 +65,14 @@ describe('ImpresionConfigService', () => {
       ]);
     });
 
-    it('el sticker general sale en Caja; el de vaso va a Bebidas si tiene etiquetera; el de área, apagado', async () => {
+    it('el sticker general sale en Caja; el de vaso va a Bebidas si tiene etiquetera; el de área, como diga la regla', async () => {
       const m = await service.obtenerMapa();
       const general = m.ruteo.find((r) => r.tipo === 'ETIQUETA_GENERAL')!;
       expect(general).toMatchObject({ destinoAreaId: null, destinoNombre: 'Caja', activo: true });
       const vaso = m.ruteo.find((r) => r.tipo === 'ETIQUETA_BEBIDA')!;
       expect(vaso).toMatchObject({ destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Barra' });
       const area = m.ruteo.filter((r) => r.tipo === 'ETIQUETA_AREA');
-      expect(area.every((r) => r.activo === false)).toBe(true);
+      expect(area.every((r) => r.activo === true)).toBe(true);
       // Bebidas no lleva sticker por área (ya tiene uno por vaso): el ruteo solo lista las demás áreas
       expect(area.map((r) => r.areaId)).toEqual(['2']);
       const comanda = m.ruteo.find((r) => r.tipo === 'TICKET_COMANDA_SALON')!;
@@ -257,6 +257,8 @@ describe('ImpresionConfigService', () => {
   describe('POST reglas/restablecer', () => {
     const CLAVES_BORRADAS = [
       'impresion_etiqueta_general_modalidades',
+      'impresion_etiqueta_area_modalidades',
+      'impresion_etiqueta_bebida_modalidades',
       'impresion_etiqueta_bebida_activo',
       'impresion_etiqueta_area_activo',
       'impresion_ticket_comanda_salon_activo',

@@ -16,6 +16,8 @@ import {
   AREA_BEBIDAS,
   EstadoAdminImpresion,
   EstadoImpresora,
+  EquipoEstadoImpresion,
+  RespuestaLatido,
   RespuestaTomarTrabajos,
   RolImpresora,
   rolDeTrabajo,
@@ -48,8 +50,12 @@ import {
   areasDeLineas,
 } from './constructor-etiquetas';
 import {
+  claveSeleccion,
+  agenteConectado,
   consultarEstadoAgente,
   empaquetarDetalleLatido,
+  leerCandidatasLatido,
+  leerSeleccion,
   estadoPorRol,
   leerParametroNumerico,
   rolesDeclarados,
@@ -130,6 +136,7 @@ export class ImpresionService {
     deviceKeyId?: bigint,
     roles?: RolImpresora[],
     areaId: bigint | null = null,
+    pruebas = false,
   ): Promise<RespuestaTomarTrabajos> {
     // Con roles, solo los trabajos de las máquinas que el agente puede imprimir ahora; el resto espera en cola.
     // Por área: un equipo de área solo toma lo suyo (destino_area_id); Caja (areaId null) toma lo de destino NULL.
@@ -166,7 +173,8 @@ export class ImpresionService {
           SELECT id FROM "print_job"
           WHERE estado = 'PENDIENTE'
             AND destino_area_id IS NOT DISTINCT FROM ${areaId}::bigint
-            AND tipo = ANY(${tipos}::text[])
+            AND (tipo = ANY(${tipos}::text[])
+              OR (${pruebas}::boolean AND pedido_id IS NULL AND payload->'prueba'->>'impresoraId' IS NOT NULL))
           ORDER BY id ASC
           LIMIT ${limite}
           FOR UPDATE SKIP LOCKED
@@ -184,7 +192,19 @@ export class ImpresionService {
         // Fallback para entornos donde raw SQL no soporte FOR UPDATE SKIP LOCKED (ej: SQLite mock)
         this.logger.warn(`Fallo $queryRaw SKIP LOCKED, usando findMany: ${err.message}`);
         const filas = await tx.printJob.findMany({
-          where: { estado: 'PENDIENTE', destino_area_id: areaId, ...(tipos ? { tipo: { in: tipos } } : {}) },
+          where: {
+            estado: 'PENDIENTE',
+            destino_area_id: areaId,
+            ...(tipos
+              ? {
+                  OR: [
+                    { tipo: { in: tipos } },
+                    // ponytail: respaldo sin SQL crudo; acepta cualquier prueba sin pedido (la consulta real filtra por payload.prueba)
+                    ...(pruebas ? [{ pedido_id: null }] : []),
+                  ],
+                }
+              : {}),
+          },
           orderBy: { id: 'asc' },
           take: limite,
           select: { id: true },
@@ -276,7 +296,9 @@ export class ImpresionService {
 
     // Caso de error: incrementar intentos y volver a PENDIENTE o pasar a FALLIDO al 5to
     const nuevosIntentos = trabajo.intentos + 1;
-    const pasaAFallido = nuevosIntentos >= 5;
+    // Una prueba dirigida no se reintenta sola: el dueño ve el motivo y pulsa Reintentar
+    const esPruebaDirigida = Boolean((trabajo.payload as any)?.prueba?.impresoraId);
+    const pasaAFallido = nuevosIntentos >= 5 || esPruebaDirigida;
     const estadoFinal = pasaAFallido ? 'FALLIDO' : 'PENDIENTE';
     const detalleError =
       dto.error?.trim() ||
@@ -297,7 +319,7 @@ export class ImpresionService {
   /**
    * Guarda el latido periódico del agente en su DeviceKey.
    */
-  async registrarLatido(dto: LatidoDto, deviceKeyId: bigint): Promise<void> {
+  async registrarLatido(dto: LatidoDto, deviceKeyId: bigint): Promise<RespuestaLatido> {
     let antes: any = null;
     try {
       antes = await this.prisma.deviceKey.findUnique({ where: { id: deviceKeyId } });
@@ -311,7 +333,7 @@ export class ImpresionService {
         ultimo_latido: new Date(),
         latido_version: dto.version,
         latido_impresora: dto.impresora,
-        latido_detalle: empaquetarDetalleLatido(dto.detalle, dto.impresoras),
+        latido_detalle: empaquetarDetalleLatido(dto.detalle, dto.impresoras, dto.candidatas),
         ultima_conexion: new Date(),
       },
     });
@@ -319,12 +341,15 @@ export class ImpresionService {
     const ahora = {
       ultimo_latido: new Date(),
       latido_impresora: dto.impresora,
-      latido_detalle: empaquetarDetalleLatido(dto.detalle, dto.impresoras),
+      latido_detalle: empaquetarDetalleLatido(dto.detalle, dto.impresoras, dto.candidatas),
     };
     const impresoras = estadoPorRol(ahora);
     if (JSON.stringify(impresoras) !== estadoAntes) {
       this.eventos?.emitirAdmin('impresion:estado', { impresoras });
     }
+    // Lo que el dueño eligió en el panel viaja en la respuesta; un programa viejo la ignora
+    const seleccion = await this.leerSeleccionAgente(deviceKeyId);
+    return Object.keys(seleccion).length ? { seleccion } : {};
   }
 
   /**
@@ -358,7 +383,112 @@ export class ImpresionService {
       impresoras: estadoPorRol(agente),
       pendientes,
       fallidos,
+      candidatas: conectado ? leerCandidatasLatido(agente?.latido_detalle) : [],
+      seleccion: agente ? await this.leerSeleccionAgente(agente.id) : {},
+      equipos: await this.estadoPorEquipo(ahora),
     };
+  }
+
+  /** Estado de cada computadora vinculada: el panel avisa cuál falta y cuánto espera en su cola. */
+  private async estadoPorEquipo(ahora: number): Promise<EquipoEstadoImpresion[]> {
+    try {
+      const equipos = await this.prisma.deviceKey.findMany({
+        where: { tipo: 'AGENTE', activo: true },
+        orderBy: { id: 'asc' },
+        include: { area: { select: { nombre: true } } },
+      } as any);
+      return await Promise.all(
+        (equipos as any[]).map(async (e) => {
+          const conectado = agenteConectado(e.ultimo_latido, ahora);
+          return {
+            deviceKeyId: e.id.toString(),
+            nombre: e.nombre,
+            areaId: e.area_id ? e.area_id.toString() : null,
+            areaNombre: e.area?.nombre ?? null,
+            conectado,
+            impresoras: estadoPorRol(e, ahora),
+            candidatas: conectado ? leerCandidatasLatido(e.latido_detalle) : [],
+            seleccion: await this.leerSeleccionAgente(e.id),
+            pendientes: await this.prisma.printJob.count({
+              where: { estado: { in: ['PENDIENTE', 'IMPRIMIENDO'] }, destino_area_id: e.area_id ?? null },
+            }),
+          };
+        }),
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  private async leerSeleccionAgente(deviceKeyId: bigint) {
+    try {
+      const p = await this.prisma.parametro.findUnique({ where: { clave: claveSeleccion(deviceKeyId) } });
+      return leerSeleccion(p?.valor);
+    } catch {
+      return {};
+    }
+  }
+
+  /** Agente conectado con el último latido, o error claro. Las impresoras que ve solo las conoce su programa. */
+  private async agenteConectadoConCandidatas(equipoId?: string) {
+    let id: bigint | undefined;
+    try {
+      id = equipoId ? BigInt(equipoId) : undefined;
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Equipo no válido' });
+    }
+    // Sin equipo: la computadora de Caja si hay, o la que latió último
+    const orden = { ultimo_latido: { sort: 'desc', nulls: 'last' } } as const;
+    const agente =
+      (!id && (await this.prisma.deviceKey.findFirst({ where: { tipo: 'AGENTE', activo: true, area_id: null }, orderBy: orden }))) ||
+      (await this.prisma.deviceKey.findFirst({ where: { tipo: 'AGENTE', activo: true, ...(id ? { id } : {}) }, orderBy: orden }));
+    if (!agente || !agenteConectado(agente.ultimo_latido)) {
+      throw new HttpException(
+        { codigo: 'PROGRAMA_SIN_CONEXION', mensaje: 'El programa de impresión no está conectado: ábrelo en la computadora del local' },
+        HttpStatus.CONFLICT,
+      );
+    }
+    const candidatas = leerCandidatasLatido(agente.latido_detalle);
+    if (!candidatas.length) {
+      throw new HttpException(
+        { codigo: 'PROGRAMA_SIN_LISTA', mensaje: 'Este programa no informa sus impresoras: actualiza el programa de impresión para elegir desde aquí' },
+        HttpStatus.CONFLICT,
+      );
+    }
+    return { agente, candidatas };
+  }
+
+  /** «Usar esta impresora»: se guarda por equipo; el programa la toma en su próximo latido y la deja guardada para siempre. */
+  async elegirImpresora(rol: RolImpresora, impresoraId: string, usuario?: UsuarioAutenticado, ip?: string, equipoId?: string) {
+    const { agente, candidatas } = await this.agenteConectadoConCandidatas(equipoId);
+    const c = candidatas.find((x) => x.id === impresoraId);
+    if (!c) {
+      throw new HttpException(
+        { codigo: 'IMPRESORA_NO_ENCONTRADA', mensaje: 'Esa impresora ya no aparece en el equipo del local. Actualiza la lista.' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    const actual = await this.leerSeleccionAgente(agente.id);
+    const valor = { ...actual, [rol]: impresoraId };
+    await this.prisma.parametro.upsert({
+      where: { clave: claveSeleccion(agente.id) },
+      create: { clave: claveSeleccion(agente.id), valor: valor as any },
+      update: { valor: valor as any },
+    });
+    if (this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'IMPRESORA_ELEGIDA',
+        entidad: 'device_key',
+        entidadId: agente.id,
+        partyId: usuario.partyId,
+        despues: { rol, impresora: c.nombre },
+        ip,
+      });
+    }
+    this.eventos?.emitirAdmin('impresion:estado', {});
+    return { ok: true, seleccion: valor, mensaje: `La ${rol === 'ETIQUETERA' ? 'etiquetera' : 'ticketera'} será: ${c.nombre}. El programa la guarda y la usará siempre.` };
   }
 
   /**
@@ -1049,7 +1179,22 @@ export class ImpresionService {
    * Prueba de impresión: una etiqueta o un ticket de ejemplo, sin pedido real, por la cola normal.
    * No cuenta en pedidos ni dispara avisos (pedido_id NULL). Una cada 10 s por máquina.
    */
-  async encolarPrueba(rol: RolImpresora, usuario?: UsuarioAutenticado, ip?: string) {
+  async encolarPrueba(rol: RolImpresora, usuario?: UsuarioAutenticado, ip?: string, impresoraId?: string, equipoId?: string) {
+    // Prueba dirigida a UNA impresora del equipo (para saber cuál es cuál): solo si el programa informó su lista
+    let dirigida: { impresoraId: string; nombre: string } | null = null;
+    let areaDestino: bigint | null = null;
+    if (impresoraId) {
+      const { agente, candidatas } = await this.agenteConectadoConCandidatas(equipoId);
+      const c = candidatas.find((x) => x.id === impresoraId);
+      if (!c) {
+        throw new HttpException(
+          { codigo: 'IMPRESORA_NO_ENCONTRADA', mensaje: 'Esa impresora ya no aparece en el equipo del local. Actualiza la lista.' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      dirigida = { impresoraId: c.id, nombre: c.nombre };
+      areaDestino = agente.area_id ?? null;
+    }
     const reciente = await this.prisma.printJob.findFirst({
       where: {
         pedido_id: null,
@@ -1076,11 +1221,13 @@ export class ImpresionService {
       data: {
         pedido_id: null,
         tipo: esTicket ? 'TICKET_PAGO' : 'ETIQUETA_GENERAL',
-        payload: (esTicket
-          ? construirTicketPrueba(local?.valor, quien)
-          : construirEtiquetaPrueba(local?.valor, quien)) as any,
+        payload: {
+          ...(esTicket ? construirTicketPrueba(local?.valor, quien) : construirEtiquetaPrueba(local?.valor, quien)),
+          ...(dirigida ? { prueba: dirigida } : {}),
+        } as any,
         copia: false,
         estado: 'PENDIENTE',
+        ...(dirigida ? { destino_area_id: areaDestino } : {}),
       },
     });
 
@@ -1092,7 +1239,7 @@ export class ImpresionService {
         entidad: 'print_job',
         entidadId: trabajo.id,
         partyId: usuario.partyId,
-        despues: { rol },
+        despues: { rol, ...(dirigida ? { impresora: dirigida.nombre } : {}) },
         ip,
       });
     }
@@ -1105,6 +1252,62 @@ export class ImpresionService {
         ? 'Ticket de prueba enviado a la cola de la ticketera'
         : 'Etiqueta de prueba enviada a la cola de la etiquetera',
     };
+  }
+
+  /**
+   * «Probar TODAS»: una hoja en cada impresora real que ve el programa, con «Impresora N de M» grande,
+   * para saber cuál es cuál. El número sigue el orden de la lista que muestra el panel y el programa.
+   * Una impresora que no dice si es de etiquetas o de tickets recibe las dos hojas.
+   */
+  async encolarPruebaTodas(usuario?: UsuarioAutenticado, ip?: string, equipoId?: string) {
+    const { agente, candidatas } = await this.agenteConectadoConCandidatas(equipoId);
+    const reciente = await this.prisma.printJob.findFirst({
+      where: { pedido_id: null, en: { gt: new Date(Date.now() - ESPERA_PRUEBA_MS) }, destino_area_id: agente.area_id ?? null },
+      select: { id: true },
+    });
+    if (reciente) {
+      throw new HttpException(
+        { codigo: 'PRUEBA_FRECUENTE', mensaje: 'Espera unos segundos antes de otra prueba de esta computadora' },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    const local = await this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null);
+    const trabajos: Array<{ trabajoId: string; impresoraId: string; rol: RolImpresora }> = [];
+    for (let i = 0; i < candidatas.length; i++) {
+      const c = candidatas[i];
+      const roles: RolImpresora[] = c.sugerido ? [c.sugerido] : ['ETIQUETERA', 'TICKETERA'];
+      for (const rol of roles) {
+        const esTicket = rol === 'TICKETERA';
+        const t = await this.prisma.printJob.create({
+          data: {
+            pedido_id: null,
+            tipo: esTicket ? 'TICKET_PAGO' : 'ETIQUETA_GENERAL',
+            payload: {
+              ...(esTicket ? construirTicketPrueba(local?.valor, 'prueba') : construirEtiquetaPrueba(local?.valor, 'prueba')),
+              prueba: { impresoraId: c.id, nombre: c.nombre, marca: `Impresora ${i + 1} de ${candidatas.length}` },
+            } as any,
+            copia: false,
+            estado: 'PENDIENTE',
+            destino_area_id: agente.area_id ?? null,
+          },
+        });
+        trabajos.push({ trabajoId: t.id.toString(), impresoraId: c.id, rol });
+      }
+    }
+    if (this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'IMPRESION_PRUEBA_TODAS',
+        entidad: 'device_key',
+        entidadId: agente.id,
+        partyId: usuario.partyId,
+        despues: { impresoras: candidatas.length },
+        ip,
+      });
+    }
+    this.eventos?.emitirAdmin('impresion:cola', { prueba: true });
+    return { ok: true, total: candidatas.length, trabajos, mensaje: `Se mandó una hoja de prueba a cada una de las ${candidatas.length} impresoras` };
   }
 
   /** Estado de una prueba (la pantalla lo consulta hasta que sale o falla). */

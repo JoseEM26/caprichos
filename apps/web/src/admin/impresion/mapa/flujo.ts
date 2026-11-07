@@ -192,9 +192,15 @@ export function derivarFlujo(mapa: MapaImpresionDatos, esc: Escenario): PiezaFlu
   const bebida: PiezaFlujo = {
     clave: 'BEBIDA',
     ...PIEZAS.BEBIDA,
-    reglaActiva: r.bebidaActivo,
-    sale: r.bebidaActivo && esc.conBebidas,
-    motivo: !r.bebidaActivo ? 'Apagado en las reglas' : !esc.conBebidas ? 'El pedido no lleva bebidas' : 'Un vaso por cada bebida',
+    reglaActiva: r.bebidaActivo && r.bebidaModalidades.length > 0,
+    sale: r.bebidaActivo && r.bebidaModalidades.includes(esc.modalidad) && esc.conBebidas,
+    motivo: !r.bebidaActivo
+      ? 'Apagado en las reglas'
+      : !r.bebidaModalidades.includes(esc.modalidad)
+        ? `No sale en ${NOMBRE_MODALIDAD[esc.modalidad]}`
+        : !esc.conBebidas
+          ? 'El pedido no lleva bebidas'
+          : 'Un vaso por cada bebida',
     salidas: salidas('ETIQUETA_BEBIDA', 'ETIQUETERA'),
   };
 
@@ -214,9 +220,13 @@ export function derivarFlujo(mapa: MapaImpresionDatos, esc: Escenario): PiezaFlu
   const area: PiezaFlujo = {
     clave: 'AREA',
     ...PIEZAS.AREA,
-    reglaActiva: r.areaActivo,
-    sale: r.areaActivo,
-    motivo: r.areaActivo ? 'Un sticker por cada área con productos, salvo Bebidas' : 'Apagado: actívalo cuando lo confirmes',
+    reglaActiva: r.areaActivo && r.areaModalidades.length > 0,
+    sale: r.areaActivo && r.areaModalidades.includes(esc.modalidad),
+    motivo: !r.areaActivo
+      ? 'Apagado en las reglas'
+      : r.areaModalidades.includes(esc.modalidad)
+        ? 'Un sticker por cada área con productos, salvo Bebidas'
+        : `No sale en ${NOMBRE_MODALIDAD[esc.modalidad]}`,
     salidas: salidas('ETIQUETA_AREA', 'ETIQUETERA'),
   };
 

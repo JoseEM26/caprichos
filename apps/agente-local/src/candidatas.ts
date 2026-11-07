@@ -1,0 +1,84 @@
+import type { ImpresoraCandidata, RolImpresora } from '@caprichos/compartido';
+
+/** Impresora tal como la ve el equipo, con lo necesario para abrirla (destino) y reconocerla (id estable). */
+export interface CandidataLocal extends ImpresoraCandidata {
+  /** Nombre del spooler (Windows), ruta del dispositivo (Linux) o tcp://ip:puerto. */
+  destino: string;
+  /** Linux: MFG MDL|serie, estable aunque cambie el número de lpN. */
+  identidad?: string;
+}
+
+export interface ImpresoraWindowsInfo {
+  nombre: string;
+  driver?: string;
+  puerto?: string;
+}
+
+const NOMBRE_VIRTUAL = /pdf|onenote|fax|xps|document writer|print to file|imprimir (en|a) (archivo|pdf)|snagit|cutepdf|primopdf|dopdf|send to|enviar a|teams|anydesk/i;
+const PUERTO_VIRTUAL = /^(portprompt|file|nul|xpsport|shrfax|microsoft\.|pdf|ica_)/i;
+const COPIA = /\s*\((copiar|copia|copy)\s*\d+\)\s*$/i;
+
+/** PDF, OneNote, Fax, XPS, «imprimir a archivo»: no sirven para etiquetas ni tickets. */
+export function esImpresoraVirtual(i: ImpresoraWindowsInfo): boolean {
+  return NOMBRE_VIRTUAL.test(i.nombre) || NOMBRE_VIRTUAL.test(i.driver ?? '') || PUERTO_VIRTUAL.test(i.puerto ?? '');
+}
+
+/** Quita las virtuales y los duplicados «(Copiar 1)» cuya impresora original también está en la lista. */
+export function filtrarImpresorasWindows(lista: ImpresoraWindowsInfo[]): ImpresoraWindowsInfo[] {
+  const nombres = new Set(lista.map((i) => i.nombre.toLowerCase()));
+  return lista.filter(
+    (i) => !esImpresoraVirtual(i) && !(COPIA.test(i.nombre) && nombres.has(i.nombre.replace(COPIA, '').toLowerCase())),
+  );
+}
+
+const PARECE_ETIQUETERA = /tsc|4barcode|4b-?20|label|etiq|zebra|tspl|gk\d|godex|argox/i;
+const PARECE_TICKETERA = /pos|receipt|ticket|thermal|termic|epson tm|xprinter|rongta|58|80mm|escpos/i;
+
+export function sugerirRol(texto: string): RolImpresora | undefined {
+  if (PARECE_ETIQUETERA.test(texto)) return 'ETIQUETERA';
+  if (PARECE_TICKETERA.test(texto)) return 'TICKETERA';
+  return undefined;
+}
+
+export function candidatasDeWindows(lista: ImpresoraWindowsInfo[]): CandidataLocal[] {
+  return filtrarImpresorasWindows(lista).map((i) => ({
+    id: i.nombre,
+    nombre: i.nombre,
+    destino: i.nombre,
+    detalle: [i.driver, i.puerto && `puerto ${i.puerto}`].filter(Boolean).join(' · ') || undefined,
+    sugerido: sugerirRol(`${i.nombre} ${i.driver ?? ''}`),
+  }));
+}
+
+export interface ImpresoraLinuxInfo {
+  destino: string;
+  modelo?: string;
+  lenguaje?: string;
+  sugerido?: RolImpresora;
+  identidad?: string;
+}
+
+/** Linux: el id es la identidad (modelo|serie); si dos impresoras la comparten, se usa la ruta para no confundirlas. */
+export function candidatasDeLinux(lista: ImpresoraLinuxInfo[]): CandidataLocal[] {
+  return lista.map((i) => {
+    const repetida = !!i.identidad && lista.filter((x) => x.identidad === i.identidad).length > 1;
+    return {
+      id: i.identidad && !repetida ? i.identidad : i.destino,
+      nombre: i.modelo ?? i.destino,
+      destino: i.destino,
+      identidad: i.identidad,
+      detalle: [i.destino, i.lenguaje].filter(Boolean).join(' · '),
+      sugerido: i.sugerido ?? sugerirRol(i.modelo ?? ''),
+    };
+  });
+}
+
+/** Lo que viaja al servidor: sin datos internos. */
+export function paraServidor(c: CandidataLocal): ImpresoraCandidata {
+  return { id: c.id, nombre: c.nombre, ...(c.detalle ? { detalle: c.detalle } : {}), ...(c.sugerido ? { sugerido: c.sugerido } : {}) };
+}
+
+/** Identificación estable de lo guardado en la configuración (identidad en Linux; si no, el destino). */
+export function idGuardado(destino?: string, identidad?: string): string | undefined {
+  return destino ? identidad ?? destino : undefined;
+}

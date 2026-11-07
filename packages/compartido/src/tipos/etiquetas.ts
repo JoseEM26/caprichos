@@ -20,6 +20,29 @@ export interface ImpresoraReportada {
   rol: RolImpresora;
   estado: EstadoImpresora;
   detalle?: string;
+  /** Identificación estable de la impresora en uso (nombre del spooler, MFG MDL|serie o ruta). */
+  id?: string;
+  /** Nombre legible de la impresora en uso. */
+  nombre?: string;
+}
+
+/** Impresora que el programa del local ve en su equipo (sin las virtuales: PDF, OneNote, Fax, XPS). */
+export interface ImpresoraCandidata {
+  /** Identificación estable: no cambia al reiniciar la computadora. */
+  id: string;
+  nombre: string;
+  /** Puerto, modelo o ruta, para reconocerla. */
+  detalle?: string;
+  /** Por su lenguaje o nombre parece de este tipo. */
+  sugerido?: RolImpresora;
+}
+
+/** Impresora elegida por rol en Configuración › Impresión (identificación estable). */
+export type SeleccionImpresoras = Partial<Record<RolImpresora, string>>;
+
+/** Respuesta del latido: lo que el dueño eligió en el panel (programas viejos la ignoran). */
+export interface RespuestaLatido {
+  seleccion?: SeleccionImpresoras;
 }
 
 /** Estado de una máquina tal como lo ve el admin (con el motivo si no está bien). */
@@ -29,6 +52,9 @@ export interface EstadoMaquinaImpresion {
   motivo: string | null;
   /** Dato de conexión cuando lo hay (ej. «Red 192.168.1.50:9100»). */
   detalle?: string;
+  /** Impresora en uso (identificación estable y nombre), si el programa la informa. */
+  impresoraId?: string;
+  impresoraNombre?: string;
 }
 
 export interface TicketPagoDatos {
@@ -174,6 +200,16 @@ export interface PeticionTomarTrabajos {
   max: number;
   /** Solo trabajos de estos roles (los que el agente puede imprimir ahora). Sin roles: todos. */
   roles?: RolImpresora[];
+  /** Además, pruebas dirigidas a una impresora concreta (payload.prueba.impresoraId), aunque no haya máquina lista. */
+  pruebas?: boolean;
+}
+
+/** Marca de una prueba dirigida a una impresora concreta del equipo (dentro del payload del trabajo). */
+export interface PruebaDirigida {
+  impresoraId: string;
+  nombre?: string;
+  /** «Impresora 3 de 15»: número grande en la hoja de «Probar todas». */
+  marca?: string;
 }
 
 export interface RespuestaTomarTrabajos {
@@ -192,6 +228,23 @@ export interface PeticionLatido {
   detalle?: string;
   /** Estado de cada máquina configurada (etiquetera y ticketera). */
   impresoras?: ImpresoraReportada[];
+  /** Impresoras que ve el equipo (aditivo: los programas viejos no la mandan). */
+  candidatas?: ImpresoraCandidata[];
+}
+
+/** Una computadora con el programa vinculado (Caja, Bebidas...), con su propia llave, impresoras y elección. */
+export interface EquipoEstadoImpresion {
+  deviceKeyId: string;
+  nombre: string;
+  /** null = Caja */
+  areaId: string | null;
+  areaNombre: string | null;
+  conectado: boolean;
+  impresoras: Record<RolImpresora, EstadoMaquinaImpresion>;
+  candidatas: ImpresoraCandidata[];
+  seleccion: SeleccionImpresoras;
+  /** Trabajos esperando a ESTA computadora (si está apagada, no se pierden: esperan aquí). */
+  pendientes: number;
 }
 
 export interface EstadoAdminImpresion {
@@ -202,4 +255,10 @@ export interface EstadoAdminImpresion {
   fallidos: number;
   /** Estado por máquina; sin latido, ambas «el programa del local no está corriendo». */
   impresoras?: Record<RolImpresora, EstadoMaquinaImpresion>;
+  /** Cada computadora vinculada por separado (las pruebas y la impresora fija son POR computadora). */
+  equipos?: EquipoEstadoImpresion[];
+  /** Impresoras detectadas en el equipo del local (vacío si el programa es viejo o no está). */
+  candidatas?: ImpresoraCandidata[];
+  /** Lo elegido en el panel por rol (puede no haberse aplicado aún). */
+  seleccion?: SeleccionImpresoras;
 }

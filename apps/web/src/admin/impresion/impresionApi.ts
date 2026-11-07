@@ -122,6 +122,8 @@ export interface EquipoMapa {
 
 export interface ReglasMapa {
   generalModalidades: string[];
+  areaModalidades: string[];
+  bebidaModalidades: string[];
   bebidaActivo: boolean;
   areaActivo: boolean;
   comandaSalonActivo: boolean;
@@ -235,8 +237,28 @@ export const impresionApi = {
   },
 
   /** Prueba de impresión: una etiqueta o un ticket de ejemplo, sin pedido real. */
-  pruebaImpresion: async (rol: RolImpresora): Promise<{ ok: boolean; trabajoId: string; mensaje: string }> => {
-    return api.post('/admin/impresion/prueba', { rol });
+  pruebaImpresion: async (
+    rol: RolImpresora,
+    impresoraId?: string,
+    equipoId?: string,
+  ): Promise<{ ok: boolean; trabajoId: string; mensaje: string }> => {
+    return api.post('/admin/impresion/prueba', { rol, ...(impresoraId ? { impresoraId } : {}), ...(equipoId ? { equipoId } : {}) });
+  },
+
+  /** «Probar TODAS»: una hoja con número en cada impresora de esa computadora. */
+  pruebaTodas: async (
+    equipoId?: string,
+  ): Promise<{ ok: boolean; total: number; trabajos: { trabajoId: string; impresoraId: string; rol: RolImpresora }[]; mensaje: string }> => {
+    return api.post('/admin/impresion/prueba-todas', equipoId ? { equipoId } : {});
+  },
+
+  /** «Usar esta impresora»: queda guardada en el programa de esa computadora. */
+  elegirImpresora: async (
+    rol: RolImpresora,
+    impresoraId: string,
+    equipoId?: string,
+  ): Promise<{ ok: boolean; mensaje: string }> => {
+    return api.post('/admin/impresion/seleccion', { rol, impresoraId, ...(equipoId ? { equipoId } : {}) });
   },
 
   estadoPrueba: async (
