@@ -5,7 +5,7 @@
   "description": "Monorepo modular de la plataforma Caprichos (café artesanal en Lima)",
   "scripts": {
     "lint": "eslint .",
-    "test": "pnpm --filter @caprichos/api test",
+    "test": "pnpm --filter @caprichos/compartido test && pnpm --filter @caprichos/agente-local test && pnpm --filter @caprichos/api test && pnpm --filter @caprichos/web test",
     "build": "pnpm --filter @caprichos/compartido build && pnpm --filter @caprichos/agente-local build && pnpm --filter @caprichos/api build && pnpm --filter @caprichos/web build",
     "check:deps": "depcruise --config .dependency-cruiser.js --ignore-known .dependency-cruiser-known-violations.json apps/api/src",
     "dev:api": "pnpm --filter @caprichos/api start:dev",

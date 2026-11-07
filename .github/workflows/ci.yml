@@ -14,7 +14,8 @@ jobs:
   validate:
     name: Validar código (lint, dependencias, pruebas, build)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Ahora corre las pruebas de TODOS los paquetes (compartido, agente-local, API y web): antes solo las de la API
+    timeout-minutes: 25
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -43,7 +44,7 @@ jobs:
       - name: Compilar aplicaciones (build)
         run: pnpm run build
 
-      - name: Pruebas unitarias
+      - name: Pruebas unitarias (compartido, agente local, API y web)
         run: pnpm run test
 
   docker-trivy:

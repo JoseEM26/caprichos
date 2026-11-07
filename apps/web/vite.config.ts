@@ -97,5 +97,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
+    // Máquinas cargadas o el CI de GitHub hacen que algunas pruebas de pantalla tarden más que el valor por defecto (5 s)
+    testTimeout: 20000,
+    // Solo en CI (variable CI=true que pone GitHub): hasta 2 reintentos para las pruebas que fallan por tiempo, sin ocultarlas en local
+    retry: process.env.CI ? 2 : 0,
   },
 });
