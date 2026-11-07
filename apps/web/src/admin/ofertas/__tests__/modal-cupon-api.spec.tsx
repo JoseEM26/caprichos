@@ -51,6 +51,7 @@ describe('ModalCupon envía los nombres de la API (CrearCuponDto)', () => {
     fireEvent.change(document.getElementById('cp-d')!, { target: { value: 'Envío gratis de 2 a 6' } });
     fireEvent.click(screen.getByRole('button', { name: 'Envío gratis' }));
     expect(document.getElementById('cp-v')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Mié' }));
     fireEvent.change(screen.getByLabelText(/Desde las/), { target: { value: '14:00' } });
     fireEvent.change(screen.getByLabelText(/Hasta las/), { target: { value: '18:00' } });
@@ -71,6 +72,7 @@ describe('ModalCupon envía los nombres de la API (CrearCuponDto)', () => {
     fireEvent.change(document.getElementById('cp-c')!, { target: { value: 'x' } });
     fireEvent.change(document.getElementById('cp-d')!, { target: { value: 'y' } });
     fireEvent.click(screen.getByRole('button', { name: 'Envío gratis' }));
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     fireEvent.change(screen.getByLabelText(/Desde las/), { target: { value: '18:00' } });
     fireEvent.change(screen.getByLabelText(/Hasta las/), { target: { value: '14:00' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cupón' }));
