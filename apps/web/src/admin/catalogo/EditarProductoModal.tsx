@@ -42,8 +42,11 @@ export interface EditarProductoModalProps {
 export function EditarProductoModal(p: EditarProductoModalProps) {
   const esCombo = p.producto.esAnfitrionCombo === true;
   const [confirmarSalir, setConfirmarSalir] = useState(false);
+  const [confirmarOpciones, setConfirmarOpciones] = useState(false);
   const inicial = useRef(JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores]));
   const sucio = JSON.stringify([p.nombre, p.categoriaId, p.precio, p.oculto, p.controlaStock, p.fotoUrl, p.sabores]) !== inicial.current;
+  // Tamaños y opciones reemplaza a este modal (nunca dos a la vez): con cambios sin guardar, se avisa antes.
+  const abrirOpciones = () => (sucio ? setConfirmarOpciones(true) : p.alAbrirOpciones());
   const cerrar = () => (sucio ? setConfirmarSalir(true) : p.alCancelar());
   const bloqueado = !p.puedeEditar;
 
@@ -100,7 +103,7 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
       {p.puedeEditar && (
         <section className="ep-sec" aria-label="Tamaños y opciones">
           <h3 className="ep-h">Tamaños y opciones</h3>
-          <button type="button" className="eo-btn ep-enlace" onClick={p.alAbrirOpciones}>
+          <button type="button" className="eo-btn ep-enlace" onClick={abrirOpciones}>
             Tamaños y opciones · {p.resumenOpciones}
           </button>
           {p.vistaPrevia}
@@ -215,6 +218,9 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
       <Confirmar abierto={confirmarSalir} titulo="¿Salir sin guardar?" mensaje="Hiciste cambios en este producto que aún no se guardaron."
         textoSi="Sí, salir" textoNo="No" peligro
         alConfirmar={() => { setConfirmarSalir(false); p.alCancelar(); }} alCancelar={() => setConfirmarSalir(false)} />
+      <Confirmar abierto={confirmarOpciones} titulo="Hay cambios sin guardar" mensaje="Si abres «Tamaños y opciones» se descartan los cambios de este producto. Guarda primero si quieres conservarlos."
+        textoSi="Descartar y abrir" textoNo="Volver" peligro
+        alConfirmar={() => { setConfirmarOpciones(false); p.alAbrirOpciones(); }} alCancelar={() => setConfirmarOpciones(false)} />
     </>
   );
 }

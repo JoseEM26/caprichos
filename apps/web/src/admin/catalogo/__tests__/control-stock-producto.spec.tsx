@@ -82,7 +82,7 @@ describe('Productos: casilla «Controlar stock de este producto»', () => {
     await waitFor(() =>
       expect(editar).toHaveBeenCalledWith(
         'p1',
-        expect.objectContaining({ controlaStock: true, nombre: 'DONA DE CHOCOLATE', precio: 4 }),
+        { controlaStock: true }, // solo viaja lo que cambió
       ),
     );
   });

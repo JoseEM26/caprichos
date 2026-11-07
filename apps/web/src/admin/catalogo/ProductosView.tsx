@@ -385,6 +385,7 @@ export function ProductosView() {
 
   // Abrir modal Editar
   const abrirEditar = (p: ProductoAdmin) => {
+    setProductoEnOpciones(null); // un solo modal a la vez
     setProductoEnEdicion(p);
     setEdNombre(p.nombre);
     setEdCategoriaId(p.categoriaId);
@@ -414,21 +415,21 @@ export function ProductosView() {
       accion: async () => {
         try {
           setGuardandoEdicion(true);
-          await catalogoApi.editarProducto(productoEnEdicion.id, {
-            nombre: edNombre.trim(),
-            categoriaId: edCategoriaId,
-            precio: precioNum,
-            oculto: edOculto,
-            controlaStock: edControlaStock,
+          // Solo viajan los campos que el dueño cambió: así no se pisa nada que otro guardado haya cambiado antes.
+          const o = productoEnEdicion;
+          const saboresNuevos = edSabores.map((s) => ({ id: s.id, nombre: s.nombre, activo: s.activo !== false }));
+          const saboresViejos = o.sabores.map((s) => ({ id: s.id, nombre: s.nombre, activo: s.activo !== false }));
+          await catalogoApi.editarProducto(o.id, {
+            ...(edNombre.trim() !== o.nombre ? { nombre: edNombre.trim() } : {}),
+            ...(edCategoriaId !== o.categoriaId ? { categoriaId: edCategoriaId } : {}),
+            ...(precioNum !== o.precio ? { precio: precioNum } : {}),
+            ...(edOculto !== (o.oculto === true) ? { oculto: edOculto } : {}),
+            ...(edControlaStock !== (o.controlaStock === true) ? { controlaStock: edControlaStock } : {}),
             // Sin cambio: no viaja la clave, y el servidor conserva la foto.
             ...(edFotoCambio === 'SIN_CAMBIO'
               ? {}
               : { fotoArchivoId: edFotoCambio === 'NUEVA' ? edFotoArchivoId : null }),
-            sabores: edSabores.map((s) => ({
-              id: s.id,
-              nombre: s.nombre,
-              activo: s.activo !== false,
-            })),
+            ...(JSON.stringify(saboresNuevos) !== JSON.stringify(saboresViejos) ? { sabores: saboresNuevos } : {}),
           });
           setProductoEnEdicion(null);
           await cargarDatos();
@@ -479,7 +480,11 @@ export function ProductosView() {
   };
 
   // Abrir modal Tamaños y opciones (el contenido vive en EditorOpcionesTamanos)
-  const abrirOpciones = (p: ProductoAdmin) => setProductoEnOpciones(p);
+  // Reemplaza al modal de edición (si estaba abierto): un solo modal a la vez, siempre con el producto fresco de la lista.
+  const abrirOpciones = (p: ProductoAdmin) => {
+    setProductoEnEdicion(null);
+    setProductoEnOpciones(p);
+  };
 
   // Tarjeta: «Unidad · 1/2 docena (6) · Docena (12)». Solo tamaños activos; con 1 unidad no lleva número.
   const textoUnidadesTamanos = (p: ProductoAdmin) =>
