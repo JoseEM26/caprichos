@@ -64,6 +64,16 @@ export class ActualizarTextosBotDto {
   @IsString({ message: 'El texto de envío gratis debe ser una cadena' })
   @MaxLength(200, { message: 'El texto de envío gratis no puede exceder 200 caracteres' })
   chatbot_texto_envio_gratis?: string;
+
+  @IsOptional()
+  @IsString({ message: 'El texto de inicio de combo debe ser una cadena' })
+  @MaxLength(300, { message: 'El texto de inicio de combo no puede exceder 300 caracteres' })
+  chatbot_texto_combo_intro?: string;
+
+  @IsOptional()
+  @IsString({ message: 'El texto de plan B del combo debe ser una cadena' })
+  @MaxLength(300, { message: 'El texto de plan B del combo no puede exceder 300 caracteres' })
+  chatbot_texto_combo_plan_b?: string;
 }
 
 export class RestablecerTextoBotDto {

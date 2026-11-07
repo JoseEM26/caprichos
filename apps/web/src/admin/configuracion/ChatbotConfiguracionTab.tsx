@@ -20,7 +20,9 @@ export type ClaveTextoBot =
   | 'chatbot_texto_no_entiendo'
   | 'chatbot_texto_no_entiendo_derivacion'
   | 'chatbot_texto_indicacion_pago'
-  | 'chatbot_texto_envio_gratis';
+  | 'chatbot_texto_envio_gratis'
+  | 'chatbot_texto_combo_intro'
+  | 'chatbot_texto_combo_plan_b';
 
 export const CLAVES_TEXTOS_BOT: ClaveTextoBot[] = [
   'chatbot_texto_bienvenida',
@@ -31,6 +33,8 @@ export const CLAVES_TEXTOS_BOT: ClaveTextoBot[] = [
   'chatbot_texto_no_entiendo_derivacion',
   'chatbot_texto_indicacion_pago',
   'chatbot_texto_envio_gratis',
+  'chatbot_texto_combo_intro',
+  'chatbot_texto_combo_plan_b',
 ];
 
 export interface FuncionesBotState {
@@ -201,6 +205,18 @@ export const META_TEXTOS: Record<
     efecto: 'Lo ve el cliente en el resumen del pedido por WhatsApp, en lugar de la línea «Envío: …».',
     ejemplo: '🛵 Envío gratis por «{promo}»',
   },
+  chatbot_texto_combo_intro: {
+    titulo: 'Inicio al armar un combo',
+    descripcion: 'Primer mensaje cuando el cliente elige un combo por WhatsApp. Usa {combo} para el nombre y {incluye} para la línea «Incluye: …» con lo que va fijo.',
+    efecto: 'Lo ve el cliente al elegir un combo, antes de pedirle el tamaño y sus elecciones.',
+    ejemplo: 'Vamos a armar tu *{combo}* 💛\n{incluye}',
+  },
+  chatbot_texto_combo_plan_b: {
+    titulo: 'Aviso de plan B en un combo',
+    descripcion: 'Texto cuando una parte fija del combo se agotó y hay alternativas. Usa {faltante} para lo agotado y {alternativas} para lo que se ofrece.',
+    efecto: 'Lo ve el cliente al armar el combo, junto a los botones con las alternativas. El precio del combo no cambia.',
+    ejemplo: 'Hoy no hay {faltante} 😅 ¿Lo cambiamos por {alternativas}?',
+  },
 };
 
 const CLAVES_TEXTOS_ATENCION: ClaveTextoBot[] = [
@@ -249,6 +265,8 @@ const TEXTOS_DEFECTO_BASE: TextosBotState = {
   chatbot_texto_no_entiendo_derivacion: '',
   chatbot_texto_indicacion_pago: '',
   chatbot_texto_envio_gratis: '',
+  chatbot_texto_combo_intro: '',
+  chatbot_texto_combo_plan_b: '',
 };
 
 type ModalAccion =
