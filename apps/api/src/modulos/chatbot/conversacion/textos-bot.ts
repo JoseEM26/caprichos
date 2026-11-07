@@ -246,6 +246,8 @@ export interface InfoProductoBot {
   sabores?: { nombre: string; disponible: boolean }[];
 }
 
+const TEXTO_ENVIO_GRATIS_DEFECTO = '🛵 Envío gratis por «{promo}»';
+
 export const TEXTOS_BOT = {
   /**
    * Saludo de bienvenida (mockup línea 139 + aviso de alta demanda / pausa / horario cerrado).
@@ -824,6 +826,12 @@ export const TEXTOS_BOT = {
     return `Descuento ${corto} −S/ ${monto.toFixed(2)}`;
   },
 
+  /** Línea de envío gratis por promoción: «🛵 Envío gratis por «<promo>»». La plantilla es configurable ({promo}). */
+  lineaEnvioGratisBot: (nombre: string, plantilla?: string): string =>
+    (plantilla?.trim() || TEXTO_ENVIO_GRATIS_DEFECTO).replace(/\{promo\}/g, nombre.trim().slice(0, 40)),
+
+  lineaFaltaEnvioGratisBot: (falta: number): string => `Te faltan S/ ${falta.toFixed(2)} para envío gratis 🛵`,
+
   pedidoPropinaPregunta: (tope: number): string =>
     `*Propina opcional para el equipo*\n` +
     `Si quieres dejar una propina, va aparte de tu pedido: no es parte de la venta ni del comprobante. ` +
@@ -841,6 +849,10 @@ export const TEXTOS_BOT = {
     /** Una línea corta: «Descuento <promo> −S/ x» (solo si la promoción con casilla BOT aplica) */
     descuentoTexto?: string;
     envioTexto: string;
+    /** Línea completa de envío cuando una promoción de envío gratis aplica (reemplaza «Envío: …») */
+    envioLinea?: string;
+    /** «Te faltan S/ x para envío gratis» (solo si una promoción vigente por WhatsApp pide una compra mínima) */
+    faltaEnvioTexto?: string;
     total: number;
     /** Propina (aparte de la venta): se muestra como línea antes del total a pagar */
     propina?: number;
@@ -855,6 +867,8 @@ export const TEXTOS_BOT = {
       lineasTexto,
       descuentoTexto,
       envioTexto,
+      envioLinea,
+      faltaEnvioTexto,
       total,
       propina,
       modalidad,
@@ -872,7 +886,8 @@ export const TEXTOS_BOT = {
     return (
       `Este es tu resumen:\n` +
       `${lineasTexto}${descBloque}\n` +
-      `Envío: ${envioTexto}\n` +
+      `${envioLinea ?? `Envío: ${envioTexto}`}\n` +
+      (faltaEnvioTexto ? `${faltaEnvioTexto}\n` : '') +
       (propina && propina > 0 ? `Propina: S/ ${propina.toFixed(2)}\n` : '') +
       `*Total: S/ ${total.toFixed(2)}*\n\n` +
       `Modalidad: ${modalidad}${dirBloque}\n` +

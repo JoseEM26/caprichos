@@ -1,60 +1,96 @@
 /**
- * Canales de las promociones (Descuento, Lleva y paga, Combo, Envío gratis).
- * El selector elige carta y/o local; la casilla «Vale también por WhatsApp (bot)» agrega BOT.
- * «WHATSAPP» (datos anteriores de «Solo WhatsApp») cuenta como BOT al leer.
+ * Canales de las ofertas (Descuento, Lleva y paga, Combo, Envío gratis y Cupón).
+ * Un solo selector «¿Dónde aplica?» con tres casillas: Carta web, En el local (caja y mozo) y WhatsApp (bot).
+ * Se guarda en `canales` como CARTA, ADMIN (local) y BOT. Valores históricos al leer: TODOS = carta y local,
+ * WEB = carta, CAJA/MOZO/LOCAL = local, WHATSAPP = BOT.
  */
 
-export const CANALES_SELECTOR = [
-  { clave: 'todos', nombre: 'Carta web y en el local' },
-  { clave: 'carta', nombre: 'Solo carta web' },
-  { clave: 'local', nombre: 'Solo en el local' },
-];
+export type TipoOfertaCanal = 'DESCUENTO' | 'LLEVA_PAGA' | 'COMBO' | 'ENVIO_GRATIS' | 'CUPON';
 
-/** Dato viejo que solo valía por WhatsApp: se muestra solo cuando la promo ya está así. */
-const SOLO_BOT_LEGADO = { clave: 'solo-bot', nombre: 'Solo WhatsApp (dato anterior)' };
-
-export function opcionesCanal(canalActual: string) {
-  return canalActual === 'solo-bot' ? [...CANALES_SELECTOR, SOLO_BOT_LEGADO] : CANALES_SELECTOR;
+export interface CanalesEstado {
+  carta: boolean;
+  local: boolean;
+  bot: boolean;
 }
 
-/** Canales que se guardan a partir del selector y la casilla. */
-export function canalesDesdeSelector(canal: string, valeBot: boolean): string[] {
-  if (canal === 'solo-bot') return ['BOT'];
-  const base = canal === 'carta' ? ['CARTA'] : canal === 'local' ? ['ADMIN'] : ['CARTA', 'ADMIN'];
-  return valeBot ? [...base, 'BOT'] : base;
+/** WhatsApp encendido por defecto solo donde el bot ya aplica el tipo (el combo y el cupón no). */
+export function canalesPorDefecto(tipo: TipoOfertaCanal): CanalesEstado {
+  return { carta: true, local: true, bot: tipo === 'DESCUENTO' || tipo === 'LLEVA_PAGA' || tipo === 'ENVIO_GRATIS' };
 }
 
-/** Estado del selector y la casilla a partir de los canales guardados. */
-export function selectorDesdeCanales(canales: string[] | null | undefined): { canal: string; valeBot: boolean } {
-  const normas = (canales || []).map((c) => c.toUpperCase());
-  const valeBot = normas.includes('BOT') || normas.includes('WHATSAPP');
-  const sinBot = normas.filter((c) => c !== 'BOT' && c !== 'WHATSAPP');
-  if (sinBot.length === 0 && valeBot) return { canal: 'solo-bot', valeBot: true };
-  if (sinBot.includes('TODOS') || (sinBot.includes('CARTA') && sinBot.includes('ADMIN'))) return { canal: 'todos', valeBot };
-  if (sinBot.includes('ADMIN')) return { canal: 'local', valeBot };
-  return { canal: 'carta', valeBot };
+/** Estado de las casillas a partir de los canales guardados. */
+export function estadoDesdeCanales(canales: string[] | null | undefined): CanalesEstado {
+  const n = (canales || []).map((c) => c.toUpperCase());
+  const todos = n.includes('TODOS');
+  return {
+    carta: todos || n.includes('CARTA') || n.includes('WEB'),
+    local: todos || n.some((c) => ['ADMIN', 'CAJA', 'MOZO', 'LOCAL'].includes(c)),
+    bot: n.includes('BOT') || n.includes('WHATSAPP'),
+  };
 }
 
-interface CasillaBotProps {
+/** Canales que se guardan a partir de las casillas. `valorLocal`: el cupón guarda CAJA en vez de ADMIN. */
+export function canalesDesdeEstado(e: CanalesEstado, valorLocal = 'ADMIN'): string[] {
+  return [...(e.carta ? ['CARTA'] : []), ...(e.local ? [valorLocal] : []), ...(e.bot ? ['BOT'] : [])];
+}
+
+export const ERROR_SIN_CANALES = 'Elige al menos un lugar donde aplica: carta web, en el local o WhatsApp.';
+
+/** Texto de ayuda según el tipo y el estado de las casillas (cambia al marcar o desmarcar WhatsApp). */
+export function ayudaCanales(tipo: TipoOfertaCanal, e: CanalesEstado): string {
+  const donde = [e.carta && 'la carta web', e.local && 'el local (caja y mozo)', e.bot && 'WhatsApp'].filter(Boolean) as string[];
+  if (donde.length === 0) return 'No aplica en ningún lugar: marca al menos uno.';
+  const lista = donde.length === 1 ? donde[0] : `${donde.slice(0, -1).join(', ')} y ${donde[donde.length - 1]}`;
+  const base = `Aplica en ${lista}.`;
+  if (tipo === 'CUPON') return `${base} El bot de WhatsApp todavía no pide códigos de cupón, por eso no se puede activar por WhatsApp.`;
+  if (!e.bot) return `${base} El bot de WhatsApp no la aplica ni la ofrece.`;
+  const bot: Record<Exclude<TipoOfertaCanal, 'CUPON'>, string> = {
+    ENVIO_GRATIS: 'El bot de WhatsApp no cobra envío en el delivery dentro del horario, días y fechas elegidos.',
+    DESCUENTO: 'El bot de WhatsApp aplica este descuento al total del pedido y lo muestra en el resumen.',
+    LLEVA_PAGA: 'El bot de WhatsApp aplica esta promoción al total del pedido y la muestra en el resumen.',
+    COMBO: 'El bot de WhatsApp la ofrece en sus promociones y en el cierre de venta; el armado del combo con sus elecciones es en la carta web.',
+  };
+  return `${base} ${bot[tipo]}`;
+}
+
+interface SelectorCanalesProps {
+  /** Prefijo de los ids de las casillas: `${id}-carta`, `${id}-local`, `${id}-bot`. */
   id: string;
-  checked: boolean;
-  onChange: (valor: boolean) => void;
-  /** Solo WhatsApp (dato anterior): la casilla queda marcada y fija. */
-  bloqueada?: boolean;
+  tipo: TipoOfertaCanal;
+  valor: CanalesEstado;
+  onChange: (valor: CanalesEstado) => void;
+  /** Para primera compra: solo carta web, el selector queda fijo. */
+  bloqueado?: boolean;
 }
 
-export function CasillaBot({ id, checked, onChange, bloqueada }: CasillaBotProps) {
-  return (
-    <label htmlFor={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '13px', fontWeight: 700 }}>
+export function SelectorCanales({ id, tipo, valor, onChange, bloqueado }: SelectorCanalesProps) {
+  const botNoDisponible = tipo === 'CUPON';
+  const casilla = { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, minHeight: '32px' } as const;
+  const item = (clave: keyof CanalesEstado, etiqueta: string, desactivada = false) => (
+    <label htmlFor={`${id}-${clave}`} style={casilla}>
       <input
-        id={id}
+        id={`${id}-${clave}`}
         type="checkbox"
-        checked={checked || bloqueada === true}
-        disabled={bloqueada === true}
-        onChange={(e) => onChange(e.target.checked)}
+        checked={valor[clave] && !desactivada}
+        disabled={bloqueado || desactivada}
+        onChange={(e) => onChange({ ...valor, [clave]: e.target.checked })}
       />
-      Vale también por WhatsApp (bot)
+      {etiqueta}
     </label>
+  );
+  return (
+    <fieldset
+      data-testid={`${id}-canales`}
+      style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}
+    >
+      <legend style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>¿Dónde aplica?</legend>
+      {item('carta', 'Carta web')}
+      {item('local', 'En el local (caja y mozo)')}
+      {item('bot', 'WhatsApp (bot)', botNoDisponible)}
+      <span data-testid={`${id}-ayuda`} style={{ fontSize: '11px', lineHeight: '15px', color: 'var(--cp-soft)' }}>
+        {bloqueado ? 'Solo en la carta web.' : ayudaCanales(tipo, botNoDisponible ? { ...valor, bot: false } : valor)}
+      </span>
+    </fieldset>
   );
 }
 

@@ -108,6 +108,9 @@ export interface OfertaItem {
   /** Combo: se puede armar ahora (calculado; no cambia `activo`) */
   disponible?: boolean;
   motivoAgotado?: string | null;
+  /** Última desactivación a mano (de la auditoría): cuándo y quién. Solo en el listado del panel. */
+  desactivadaEn?: string | null;
+  desactivadaPor?: string | null;
   /** Combo no armable por saldo 0 de sus productos: se muestra «No disponible». */
   sinStock?: boolean;
   combosPartes?: ComboParteItem[];

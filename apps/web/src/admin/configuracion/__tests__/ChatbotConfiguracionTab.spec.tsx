@@ -25,6 +25,7 @@ const CONFIG_API_REAL_FIXTURE: ConfiguracionBotRespuesta = {
       'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.',
     chatbot_texto_indicacion_pago:
       'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',
+    chatbot_texto_envio_gratis: '🛵 Envío gratis por «{promo}»',
   },
   textosDefecto: {
     chatbot_texto_bienvenida:
@@ -41,6 +42,7 @@ const CONFIG_API_REAL_FIXTURE: ConfiguracionBotRespuesta = {
       'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.',
     chatbot_texto_indicacion_pago:
       'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',
+    chatbot_texto_envio_gratis: '🛵 Envío gratis por «{promo}»',
   },
   funciones: {
     pedido: true,

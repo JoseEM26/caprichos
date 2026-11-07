@@ -32,7 +32,7 @@ describe('ModalEnvioGratis (editor de la promoción de envío)', () => {
     const onGuardar = vi.fn().mockResolvedValue(undefined);
     render(<ModalEnvioGratis abierto ofertaAEditar={null} onCerrar={() => {}} onGuardar={onGuardar} />);
     fireEvent.change(screen.getByLabelText(/Nombre de la promoción/), { target: { value: 'Envío gratis' } });
-    fireEvent.click(screen.getByLabelText(/Vale también por WhatsApp/));
+    fireEvent.click(screen.getByLabelText('WhatsApp (bot)'));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(onGuardar).toHaveBeenCalled());
     expect(onGuardar.mock.calls[0][0].canales).toEqual(['CARTA', 'ADMIN']);

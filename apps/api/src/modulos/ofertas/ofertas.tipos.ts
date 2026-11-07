@@ -84,6 +84,9 @@ export interface OfertaItem {
   motivoAgotado?: string | null;
   /** Combo no armable porque sus productos se acabaron (saldo 0): la carta dice «No disponible», no «Agotado». */
   sinStock?: boolean;
+  /** Última vez que alguien la desactivó a mano (de la auditoría); solo en el listado del panel. */
+  desactivadaEn?: string | null;
+  desactivadaPor?: string | null;
   categoriaNombre?: string | null;
   productoNombre?: string | null;
   vigenteAhora?: boolean;

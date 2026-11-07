@@ -1,6 +1,6 @@
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { OfertasService } from '../../ofertas/ofertas.service';
-import { calcularEnvioDelivery } from '../../ofertas/envio-gratis-promo';
+import { aplicaPromoEnvio, calcularEnvioDelivery, promoEnvioGratisVigente } from '../../ofertas/envio-gratis-promo';
 import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
 import { VistaPreviaPedidoBot } from './tipos-conversacion';
 
@@ -52,11 +52,23 @@ export async function vistaPreviaPedidoBot(
   }
 
   let envio: number | null = 0;
+  let envioPromoNombre: string | null = null;
+  let envioGratisFalta: number | null = null;
   if (pedido.modalidad === 'DELIVERY') {
-    if (tarifaZona === null || tarifaZona === undefined) {
-      envio = null;
+    // Una promo de Envío gratis vigente por WhatsApp deja el envío en 0 aunque la zona aún no se conozca
+    // (ubicar el pedido después aplica la misma regla); sin promo, la tarifa de la zona o «por confirmar».
+    const promo = await promoEnvioGratisVigente(deps.prisma, 'WHATSAPP');
+    if (aplicaPromoEnvio(promo, subtotal)) {
+      envio = 0;
+      envioPromoNombre = promo!.nombre;
     } else {
-      envio = (await calcularEnvioDelivery(deps.prisma, { subtotal, tarifaZona: Number(tarifaZona), canal: 'WHATSAPP' })).envio;
+      if (promo?.compraMinima != null) envioGratisFalta = r2(promo.compraMinima - subtotal);
+      envio =
+        tarifaZona === null || tarifaZona === undefined
+          ? null
+          : (await calcularEnvioDelivery(deps.prisma, { subtotal, tarifaZona: Number(tarifaZona), canal: 'WHATSAPP' })).envio;
+      // La regla de envío gratis por monto también puede dejarlo en 0: ahí no hay «faltante» de la promo
+      if (envio === 0) envioGratisFalta = null;
     }
   }
 
@@ -66,5 +78,7 @@ export async function vistaPreviaPedidoBot(
     descuentoNombre,
     envio,
     envioGratis: envio === 0 && pedido.modalidad === 'DELIVERY',
+    envioPromoNombre,
+    envioGratisFalta,
   };
 }

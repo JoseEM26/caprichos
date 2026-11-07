@@ -322,6 +322,10 @@ export interface VistaPreviaPedidoBot {
   envio: number | null;
   /** Delivery con envío 0 (promo de envío gratis por horario o por monto). */
   envioGratis: boolean;
+  /** Nombre de la promoción de Envío gratis (con WhatsApp activo) que dejó el envío en 0. */
+  envioPromoNombre?: string | null;
+  /** Soles que faltan para llegar a la compra mínima de una promoción de envío gratis vigente por WhatsApp. */
+  envioGratisFalta?: number | null;
 }
 
 export interface ContextoConversacion {

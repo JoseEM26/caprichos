@@ -645,7 +645,7 @@ export class PedidosService {
       // Combo: la parte FIJO debe ser el principal o un reemplazo disponible (409 si no); las A_ELECCION, lo elegido.
       // Cada parte sale en su propia línea hija (cocina y stock); la madre sigue llevando el precio del combo.
       const combo = l.ofertaId
-        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad)
+        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA')
         : { nota: '', partes: [] };
       const contenedora = combo.partes.length > 0;
 
