@@ -10,6 +10,18 @@ import {
   GrupoOpcionItem,
   ProductoAdmin,
 } from './catalogoApi';
+import { listarAreasCocina } from '../cocina/cocinaApi';
+import type { AreaCocina } from '../cocina/cocinaTipos';
+
+const AYUDA_AREA = 'Define en qué pantalla de Cocina aparecen los productos de esta categoría.';
+const estiloSelectArea = {
+  minHeight: 44,
+  borderRadius: 10,
+  border: '1.5px solid var(--cp-navy)',
+  background: 'var(--cp-white)',
+  padding: '0 10px',
+  fontSize: 14,
+} as const;
 
 // Detectar si una lista es un grupo interno de combos para no mostrarla en la columna izquierda
 function esGrupoInternoCombo(lst: ListaAdmin): boolean {
@@ -49,6 +61,11 @@ export function ListasCategoriasView() {
   // Formulario editar un elemento de la lista
   const [editandoItemId, setEditandoItemId] = useState<string | null>(null);
   const [editandoItemValor, setEditandoItemValor] = useState('');
+
+  // Área de cocina de la categoría de carta (al crear y al editar)
+  const [areasCocina, setAreasCocina] = useState<AreaCocina[]>([]);
+  const [nuevaCatAreaId, setNuevaCatAreaId] = useState('');
+  const [editandoAreaId, setEditandoAreaId] = useState('');
 
   // Mensaje de validación / error local
   const [mensajeLocal, setMensajeLocal] = useState('');
@@ -90,6 +107,7 @@ export function ListasCategoriasView() {
         catalogoApi.listarProductos({ incluyeOcultos: true }),
       ]);
       setCategoriasCarta(cats);
+      listarAreasCocina().then(setAreasCocina).catch(() => setAreasCocina([]));
       setListas(lsts);
       setGrupos(grps);
       setProductos(prods);
@@ -291,6 +309,7 @@ export function ListasCategoriasView() {
       try {
         const nueva = await catalogoApi.crearCategoria({
           nombre: val,
+          ...(nuevaCatAreaId ? { areaId: nuevaCatAreaId } : {}),
           llevaOpciones: true,
           oculta: false,
         });
@@ -340,9 +359,12 @@ export function ListasCategoriasView() {
         return;
       }
       try {
-        await catalogoApi.actualizarCategoria(itemId, { nombre: val });
+        const act = await catalogoApi.actualizarCategoria(itemId, {
+          nombre: val,
+          areaId: editandoAreaId || undefined,
+        });
         setCategoriasCarta((prev) =>
-          prev.map((c) => (c.id === itemId ? { ...c, nombre: val } : c)),
+          prev.map((c) => (c.id === itemId ? { ...c, ...act, nombre: val } : c)),
         );
         setEditandoItemId(null);
         setMensajeLocal('');
@@ -825,6 +847,24 @@ export function ListasCategoriasView() {
                   Agregar a la lista
                 </button>
               </div>
+              {itemIzquierdaActual.id === 'carta' && (
+                <label style={{ fontSize: 13, fontWeight: 700 }}>
+                  Área de cocina donde se prepara
+                  <select
+                    value={nuevaCatAreaId}
+                    onChange={(e) => setNuevaCatAreaId(e.target.value)}
+                    style={{ ...estiloSelectArea, display: 'block', width: '100%', marginTop: 4 }}
+                  >
+                    <option value="">Primera área (por defecto)</option>
+                    {areasCocina.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <span style={{ fontWeight: 400, color: 'var(--cp-soft)' }}>{AYUDA_AREA}</span>
+                </label>
+              )}
             </div>
           )}
 
@@ -868,6 +908,8 @@ export function ListasCategoriasView() {
                   const usosTexto = cantProductos
                     ? `${cantProductos} ${cantProductos === 1 ? 'producto' : 'productos'}`
                     : 'Sin productos todavía';
+                  const nombreArea =
+                    cat.areaNombre || areasCocina.find((a) => a.id === cat.areaId)?.nombre;
 
                   return (
                     <div
@@ -889,6 +931,7 @@ export function ListasCategoriasView() {
                             <div style={{ fontWeight: 700, fontSize: 14 }}>{cat.nombre}</div>
                             <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
                               {usosTexto}
+                              {nombreArea ? ` · Cocina: ${nombreArea}` : ''}
                             </div>
                           </div>
 
@@ -915,6 +958,7 @@ export function ListasCategoriasView() {
                             onClick={() => {
                               setEditandoItemId(cat.id);
                               setEditandoItemValor(cat.nombre);
+                              setEditandoAreaId(cat.areaId);
                               setMensajeLocal('');
                             }}
                             aria-label={`Editar nombre de ${cat.nombre}`}
@@ -969,6 +1013,21 @@ export function ListasCategoriasView() {
                               fontSize: 14,
                             }}
                           />
+                          <label style={{ flex: '1 1 100%', fontSize: 13, fontWeight: 700 }}>
+                            Área de cocina donde se prepara
+                            <select
+                              value={editandoAreaId}
+                              onChange={(e) => setEditandoAreaId(e.target.value)}
+                              style={{ ...estiloSelectArea, display: 'block', width: '100%', marginTop: 4 }}
+                            >
+                              {areasCocina.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.nombre}
+                                </option>
+                              ))}
+                            </select>
+                            <span style={{ fontWeight: 400, color: 'var(--cp-soft)' }}>{AYUDA_AREA}</span>
+                          </label>
                           <button
                             onClick={() => handleGuardarEdicionItem(cat.id)}
                             style={{
