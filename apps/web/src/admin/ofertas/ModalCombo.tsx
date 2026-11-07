@@ -1,6 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
-import { CasillaBot, SelectorVisibleCarta, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
+import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ComboPrecioItem, ComboParteItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -139,8 +139,7 @@ export function ModalCombo({
   const [horaHasta, setHoraHasta] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
-  const [canal, setCanal] = useState('todos');
-  const [valeBot, setValeBot] = useState(false);
+  const [canales, setCanales] = useState<CanalesEstado>(canalesPorDefecto('COMBO'));
   const [visibleCarta, setVisibleCarta] = useState(true);
 
   // Estados de control
@@ -209,7 +208,7 @@ export function ModalCombo({
       const fHasta = comboAEditar.fechaHasta || comboAEditar.fechaFin;
       setFechaDesde(fDesde ? fDesde.slice(0, 10) : '');
       setFechaHasta(fHasta ? fHasta.slice(0, 10) : '');
-      { const sel = selectorDesdeCanales(comboAEditar.canales); setCanal(sel.canal); setValeBot(sel.valeBot); }
+      setCanales(estadoDesdeCanales(comboAEditar.canales));
       setVisibleCarta(comboAEditar.visibleCarta !== false);
       setPaso(1);
       setMensajeError('');
@@ -230,8 +229,7 @@ export function ModalCombo({
       setHoraHasta('');
       setFechaDesde('');
       setFechaHasta('');
-      setCanal('todos');
-      setValeBot(false);
+      setCanales(canalesPorDefecto('COMBO'));
       setPaso(1);
       setMensajeError('');
       setParteAbiertaIndex(0);
@@ -443,6 +441,10 @@ export function ModalCombo({
 
   const ejecutarGuardar = async () => {
     setConfirmarGuardar(false);
+    if (!canales.carta && !canales.local && !canales.bot) {
+      setMensajeError(ERROR_SIN_CANALES);
+      return;
+    }
     setGuardando(true);
     setMensajeError('');
     try {
@@ -471,7 +473,7 @@ export function ModalCombo({
         fechaInicio: fechaDesde || undefined,
         fechaHasta: fechaHasta || undefined,
         fechaFin: fechaHasta || undefined,
-        canales: canalesDesdeSelector(canal, valeBot),
+        canales: canalesDesdeEstado(canales),
         activo: comboAEditar ? comboAEditar.activo : true,
         ...(comboAEditar ? { visibleCarta } : {}),
         imagenArchivoId: fotoArchivoId,
@@ -535,7 +537,7 @@ export function ModalCombo({
     horaHasta: horaHasta || null,
     fechaDesde: fechaDesde || null,
     fechaHasta: fechaHasta || null,
-    canales: canalesDesdeSelector(canal, valeBot),
+    canales: canalesDesdeEstado(canales),
     activo: true,
   };
 
@@ -1628,22 +1630,7 @@ export function ModalCombo({
                   />
                 </div>
                 <div style={{ flex: 1, minWidth: '140px' }}>
-                  <label htmlFor="canal-combo" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                    Canal:
-                  </label>
-                  <select
-                    id="canal-combo"
-                    value={canal}
-                    onChange={(e) => setCanal(e.target.value)}
-                    style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
-                  >
-                    {opcionesCanal(canal).map((c) => (
-                      <option key={c.clave} value={c.clave}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  <CasillaBot id="canal-combo-bot" checked={valeBot} onChange={setValeBot} bloqueada={canal === 'solo-bot'} />
+                  <SelectorCanales id="canal-combo" tipo="COMBO" valor={canales} onChange={setCanales} />
                   {comboAEditar && <SelectorVisibleCarta id="combo-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
                 </div>
               </div>

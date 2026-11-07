@@ -1,6 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
-import { CasillaBot, SelectorVisibleCarta, canalesDesdeSelector, opcionesCanal, selectorDesdeCanales } from './canalesPromo';
+import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -76,8 +76,7 @@ export function ModalLlevaPaga({
   const [horaHasta, setHoraHasta] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
-  const [canal, setCanal] = useState('todos');
-  const [valeBot, setValeBot] = useState(false);
+  const [canales, setCanales] = useState<CanalesEstado>(canalesPorDefecto('LLEVA_PAGA'));
   const [visibleCarta, setVisibleCarta] = useState(true);
 
   // Paso 3: Beneficio
@@ -132,7 +131,7 @@ export function ModalLlevaPaga({
       setHoraHasta(ofertaAEditar.horaFin || ofertaAEditar.horaHasta || '');
       setFechaDesde(ofertaAEditar.fechaInicio ? ofertaAEditar.fechaInicio.slice(0, 10) : ofertaAEditar.fechaDesde ? ofertaAEditar.fechaDesde.slice(0, 10) : '');
       setFechaHasta(ofertaAEditar.fechaFin ? ofertaAEditar.fechaFin.slice(0, 10) : ofertaAEditar.fechaHasta ? ofertaAEditar.fechaHasta.slice(0, 10) : '');
-      { const sel = selectorDesdeCanales(ofertaAEditar.canales); setCanal(sel.canal); setValeBot(sel.valeBot); }
+      setCanales(estadoDesdeCanales(ofertaAEditar.canales));
       setVisibleCarta(ofertaAEditar.visibleCarta !== false);
       setPaso(1);
       setMensajeError('');
@@ -149,8 +148,7 @@ export function ModalLlevaPaga({
       setHoraHasta('');
       setFechaDesde('');
       setFechaHasta('');
-      setCanal('todos');
-      setValeBot(false);
+      setCanales(canalesPorDefecto('LLEVA_PAGA'));
       setPaso(1);
       setMensajeError('');
     }
@@ -341,6 +339,10 @@ export function ModalLlevaPaga({
 
   const ejecutarGuardar = async () => {
     setConfirmarGuardar(false);
+    if (!canales.carta && !canales.local && !canales.bot) {
+      setMensajeError(ERROR_SIN_CANALES);
+      return;
+    }
     setGuardando(true);
     setMensajeError('');
     try {
@@ -367,7 +369,7 @@ export function ModalLlevaPaga({
         fechaDesde: fechaDesde || undefined,
         fechaFin: fechaHasta || undefined,
         fechaHasta: fechaHasta || undefined,
-        canales: canalesDesdeSelector(canal, valeBot),
+        canales: canalesDesdeEstado(canales),
         imagenArchivoId: fotoArchivoId,
         llevaPaga: {
           lleva: qLleva,
@@ -406,7 +408,7 @@ export function ModalLlevaPaga({
     horaHasta: horaHasta || null,
     fechaDesde: fechaDesde || null,
     fechaHasta: fechaHasta || null,
-    canales: canalesDesdeSelector(canal, valeBot),
+    canales: canalesDesdeEstado(canales),
     activo: true,
   };
 
@@ -885,22 +887,7 @@ export function ModalLlevaPaga({
             {/* Canales y Fechas */}
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: '140px' }}>
-                <label htmlFor="lp-canal" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                  Canales válidos:
-                </label>
-                <select
-                  id="lp-canal"
-                  value={canal}
-                  onChange={(e) => setCanal(e.target.value)}
-                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
-                >
-                  {opcionesCanal(canal).map((c) => (
-                    <option key={c.clave} value={c.clave}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
-                  <CasillaBot id="lp-canal-bot" checked={valeBot} onChange={setValeBot} bloqueada={canal === 'solo-bot'} />
+                <SelectorCanales id="lp-canal" tipo="LLEVA_PAGA" valor={canales} onChange={setCanales} />
                   {ofertaAEditar && <SelectorVisibleCarta id="lp-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
               </div>
               <div style={{ flex: 1, minWidth: '130px' }}>

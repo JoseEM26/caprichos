@@ -1,7 +1,7 @@
 import { calcularEnvioFinal, ReglaEnvioGratis } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { leerReglaEnvioGratis } from '../zonas/envio-gratis';
-import { estaVigente, formatearHora } from './ofertas.util';
+import { canalOferta, estaVigente, formatearHora } from './ofertas.util';
 
 /** Promoción ENVIO_GRATIS vigente para un canal. `compraMinima` null = sin mínimo. */
 export interface PromoEnvioGratis {
@@ -12,16 +12,8 @@ export interface PromoEnvioGratis {
   compraMinima: number | null;
 }
 
-/**
- * Canal de oferta que le toca a un pedido. La carta web es CARTA; los pedidos de local
- * (mozo, caja, personal, local) son ADMIN; WhatsApp y el bot son BOT (la promo solo aplica
- * si su casilla «Vale también por WhatsApp» está marcada, es decir si incluye BOT).
- */
-export function canalOfertaParaEnvio(canalPedido: string): 'CARTA' | 'ADMIN' | 'BOT' {
-  if (canalPedido === 'CARTA') return 'CARTA';
-  if (canalPedido === 'WHATSAPP' || canalPedido === 'BOT') return 'BOT';
-  return 'ADMIN';
-}
+/** Alias histórico: el canal de oferta de un pedido (ver ofertas.util). */
+export const canalOfertaParaEnvio = canalOferta;
 
 /** Primera promo ENVIO_GRATIS (por orden) activa y vigente ahora para el canal. Sin filtrar compra mínima. */
 export async function promoEnvioGratisVigente(

@@ -105,6 +105,35 @@ export function formatearFecha(val: Date | string | null | undefined): string | 
   return m ? m[1] : str;
 }
 
+/** Canal de oferta que le toca a un pedido o consulta: carta web, local (caja, mozo, personal) o bot de WhatsApp. */
+export type CanalOferta = 'CARTA' | 'ADMIN' | 'BOT';
+
+export function canalOferta(canal: string): CanalOferta {
+  const c = (canal ?? '').toUpperCase();
+  if (c === 'CARTA' || c === 'WEB') return 'CARTA';
+  if (c === 'WHATSAPP' || c === 'BOT') return 'BOT';
+  return 'ADMIN';
+}
+
+/**
+ * ¿Los canales guardados de una oferta (o cupón) incluyen este canal? Acepta los valores históricos:
+ * CAJA/MOZO/LOCAL = ADMIN, WEB = CARTA, WHATSAPP = BOT. Vacío vale en carta y local, nunca en el bot.
+ */
+export function ofertaIncluyeCanal(canales: string[] | null | undefined, canal: CanalOferta): boolean {
+  const norm = (canales ?? []).map((c) => c.toUpperCase());
+  if (norm.length === 0) return canal !== 'BOT';
+  if (canal === 'BOT') return norm.includes('BOT') || norm.includes('WHATSAPP');
+  if (norm.includes('TODOS')) return true;
+  const alias = canal === 'CARTA' ? ['CARTA', 'WEB'] : ['ADMIN', 'CAJA', 'MOZO', 'LOCAL'];
+  return norm.some((c) => alias.includes(c));
+}
+
+/** Alta de oferta nueva: carta y local siempre; WhatsApp solo en los tipos que el bot ya aplica. */
+export const TIPOS_OFERTA_BOT_APLICA = ['DESCUENTO', 'LLEVA_PAGA', 'ENVIO_GRATIS'] as const;
+export function canalesPorDefecto(tipo: string): string[] {
+  return (TIPOS_OFERTA_BOT_APLICA as readonly string[]).includes(tipo) ? ['CARTA', 'ADMIN', 'BOT'] : ['CARTA', 'ADMIN'];
+}
+
 /**
  * Evalúa si una oferta o descuento está vigente en este momento según:
  * - dias (1..7, RN-CAP-132)
@@ -130,9 +159,6 @@ export function estaVigente(
 ): boolean {
   if (!oferta.activo) return false;
 
-  // El bot de WhatsApp es el canal BOT (o WHATSAPP); «TODOS» no lo incluye: solo cuenta la casilla explícita
-  const canalBot = canal && ['BOT', 'WHATSAPP'].includes(canal.toUpperCase());
-
   if (
     oferta.limite_usos !== null &&
     oferta.limite_usos !== undefined &&
@@ -143,22 +169,8 @@ export function estaVigente(
 
   const { fechaIso, minutosDesdeMedianoche, diaSemana } = obtenerAhoraLima(ahora);
 
-  // Validar canal
-  if (canal && oferta.canales && oferta.canales.length > 0) {
-    const canalesNorm = oferta.canales.map((c) => c.toUpperCase());
-    if (canalBot) {
-      // «WHATSAPP» es el valor que guardaba el editor viejo para «Solo WhatsApp»: sigue valiendo como BOT
-      if (!canalesNorm.includes('BOT') && !canalesNorm.includes('WHATSAPP')) return false;
-    } else {
-      const canalNorm = canal.toUpperCase();
-      if (!canalesNorm.includes(canalNorm) && !canalesNorm.includes('TODOS')) {
-        return false;
-      }
-    }
-  } else if (canalBot) {
-    // Bot: sin canales marcados la promoción no vale por WhatsApp (solo cuenta la casilla explícita)
-    return false;
-  }
+  // Canal: UNA sola regla para carta, local (caja/mozo) y bot. «TODOS» no incluye WhatsApp: solo cuenta BOT explícito.
+  if (canal && !ofertaIncluyeCanal(oferta.canales, canalOferta(canal))) return false;
 
   // Validar días de la semana
   if (oferta.dias && oferta.dias.length > 0 && oferta.dias.length < 7) {

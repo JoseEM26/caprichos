@@ -46,7 +46,10 @@ import {
 import { estaDisponible } from '../catalogo/catalogo.service';
 import { anfitrionBloqueadoPorPaso, opcionesSinStock } from '../stock/opcion-requiere';
 import {
+  canalesPorDefecto,
+  canalOferta,
   estaVigente,
+  ofertaIncluyeCanal,
   formatearFecha,
   formatearHora,
   generarCodigoCuponUnico,
@@ -212,7 +215,39 @@ export class OfertasService {
       },
     });
 
-    return this.conDisponibilidad(ofertasDb.map((o) => this.mapearOferta(o, canal)));
+    let items = ofertasDb.map((o) => this.mapearOferta(o, canal));
+    // Bot de WhatsApp: solo lista lo que vale por WhatsApp (casilla «WhatsApp (bot)»); no ofrece lo que hoy no se puede armar
+    const esBot = !!canal && canalOferta(canal) === 'BOT';
+    if (esBot) items = items.filter((o) => ofertaIncluyeCanal(o.canales, 'BOT'));
+    items = await this.conDisponibilidad(items);
+    if (esBot) return items.filter((o) => !(o.tipo === 'COMBO' && o.disponible === false));
+    // Panel de administración: cuándo y quién la desactivó por última vez (de la auditoría, sin tabla nueva)
+    if (!canal && !paraCarta) await this.conUltimaDesactivacion(items);
+    return items;
+  }
+
+  /** Agrega `desactivadaEn` y `desactivadaPor` a las ofertas desactivadas a mano, según la auditoría de «desactivar». */
+  private async conUltimaDesactivacion(items: OfertaItem[]): Promise<void> {
+    const apagadas = items.filter((o) => !o.activo);
+    if (apagadas.length === 0) return;
+    const filas = await this.prisma.auditoria.findMany({
+      where: { modulo: 'ofertas', accion: 'desactivar', entidad: 'oferta', entidad_id: { in: apagadas.map((o) => BigInt(o.id)) } },
+      orderBy: { en: 'desc' },
+      select: { entidad_id: true, en: true, party_id: true },
+    });
+    const ultima = new Map<string, { en: Date; party: bigint | null }>();
+    for (const f of filas) if (f.entidad_id !== null && !ultima.has(String(f.entidad_id))) ultima.set(String(f.entidad_id), { en: f.en, party: f.party_id });
+    const partys = [...new Set([...ultima.values()].map((u) => u.party).filter((x): x is bigint => x !== null))];
+    const personas = partys.length
+      ? await this.prisma.person.findMany({ where: { party_id: { in: partys } }, select: { party_id: true, nombres: true, apellidos: true } })
+      : [];
+    const nombres = new Map(personas.map((p) => [String(p.party_id), `${p.nombres} ${p.apellidos ?? ''}`.trim()]));
+    for (const o of apagadas) {
+      const u = ultima.get(o.id);
+      if (!u) continue;
+      o.desactivadaEn = u.en.toISOString();
+      o.desactivadaPor = u.party ? nombres.get(String(u.party)) ?? null : null;
+    }
   }
 
   async obtenerOfertaPorId(id: bigint | string | number): Promise<OfertaItem> {
@@ -334,7 +369,7 @@ export class OfertasService {
           fecha_hasta: fechaHastaDate,
           // La primera compra solo se canjea en la carta web
           // Por defecto no vale por WhatsApp (casilla desmarcada); el envío gratis sí sale marcado
-          canales: soloPrimeraCompra ? ['CARTA'] : dto.canales ?? (esEnvio ? ['CARTA', 'ADMIN', 'BOT'] : ['CARTA', 'ADMIN']),
+          canales: soloPrimeraCompra ? ['CARTA'] : dto.canales ?? canalesPorDefecto(tipoFinal),
           limite_usos: dto.limiteUsos ?? null,
           no_suma_beneficios: dto.noSumaBeneficios ?? false,
           mostrar_en_saludo_bot: dto.mostrarEnSaludoBot ?? false,
@@ -712,6 +747,19 @@ export class OfertasService {
       despues: dto,
       partyId: usuario?.partyId,
     });
+
+    if (dto.canales !== undefined && JSON.stringify([...(ofertaExistente.canales ?? [])].sort()) !== JSON.stringify([...(actualizada!.canales ?? [])].sort())) {
+      await this.auditoriaService.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'ofertas',
+        accion: 'cambiar_canales',
+        entidad: 'oferta',
+        entidadId: BigInt(id),
+        antes: { canales: ofertaExistente.canales },
+        despues: { canales: actualizada!.canales },
+        partyId: usuario?.partyId,
+      });
+    }
 
     this.eventosGateway.emitirAdmin('ofertas:actualizado', { id: id.toString() });
 
@@ -2004,9 +2052,14 @@ export class OfertasService {
     ofertaId: bigint | string | number,
     elecciones: { parteId: string | number; productoId: string | number; saborId?: string | number }[],
     unidades = 1,
+    canal?: string,
   ): Promise<ResolucionCombo> {
     const oferta = await this.obtenerOfertaPorId(ofertaId);
     if (oferta.tipo !== 'COMBO') return { nota: '', partes: [] };
+    // Misma regla de canal que el resto de ofertas: con la casilla del canal apagada, el id no sirve
+    if (canal && !ofertaIncluyeCanal(oferta.canales, canalOferta(canal))) {
+      throw new BadRequestException({ codigo: 'OFERTA_NO_APLICA_CANAL', mensaje: `${oferta.nombre} no está disponible en este canal` });
+    }
     const noDisponible = (mensaje: string) =>
       new ConflictException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje });
     if (oferta.disponible === false) throw noDisponible(`${oferta.nombre} está agotado: ${oferta.motivoAgotado ?? ''}`.trim());

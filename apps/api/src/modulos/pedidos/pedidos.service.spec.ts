@@ -896,7 +896,7 @@ describe('PedidosService', () => {
         ofertasServiceMock.resolverPartesCombo.mockResolvedValueOnce({ nota: 'Combo Dúo · Empanada (en lugar de Club Sandwich)', partes: [] });
         prismaMock.pedido.create.mockResolvedValue({ id: 120n, codigo: 'CP-W120', estado: 'COLA', subtotal: 28, envio: 5, total: 33 });
         await service.crear(dtoCombo(), 'idemp-combo-ok');
-        expect(ofertasServiceMock.resolverPartesCombo).toHaveBeenCalledWith(3, [{ parteId: 100, productoId: 7 }], 2);
+        expect(ofertasServiceMock.resolverPartesCombo).toHaveBeenCalledWith(3, [{ parteId: 100, productoId: 7 }], 2, 'CARTA');
         expect(prismaMock.pedidoLinea.create.mock.calls[0][0].data.nota).toBe(
           'Combo Dúo · Empanada (en lugar de Club Sandwich) · Sin azúcar',
         );

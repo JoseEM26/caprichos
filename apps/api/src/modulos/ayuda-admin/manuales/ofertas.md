@@ -36,7 +36,7 @@ Ver tambien: [[novedades]]
 ## Como se hace: Entender el stock, el plan B y los avisos de un combo
 1. El stock se hereda: cada eleccion del cliente descuenta el stock de su propio producto (y sabor) al vender, y las lineas se mandan a [[cocina]] por area.
 2. Si un producto del combo se acaba, la carta ofrece las Alternativas de esa parte (plan B). Si ninguna tiene stock, o si el unico paso obligatorio sin opciones se acabo, el combo se muestra "No disponible" (en vez de Agotado). Si es una opcion enlazada a stock y esta agotada, la carta avisa "Se acabaron: X. Elige entre: Y" (ver [[productos]], Enlazar una opcion con el stock).
-3. En el bot de WhatsApp: un combo agotado avisa que se acabo y sugiere otra cosa; el bot arma el pedido por botones con las reglas de la carta. Una promocion solo vale por WhatsApp si tiene marcada la casilla "Vale tambien por WhatsApp (bot)" (en el editor de la oferta, junto al canal).
+3. En el bot de WhatsApp: un combo agotado avisa que se acabo y sugiere otra cosa; el bot arma el pedido por botones con las reglas de la carta. Una oferta solo vale por WhatsApp si tiene marcada la casilla "WhatsApp (bot)" en "¿Dónde aplica?" del editor (ver "Elegir donde aplica una oferta").
 4. Errores: 409 STOCK_INSUFICIENTE "Solo quedan N de X" y 409 SABOR_AGOTADO "El sabor X esta agotado": la eleccion no se puede vender; el cliente cambia de eleccion.
 
 ## Como se hace: El combo Cajita Caprikids (partes que salen a cocina como lineas hijas)
@@ -48,9 +48,22 @@ Ver tambien: [[cocina]]
 
 ## Como se hace: Armar una promocion "Llevas mas, pagas menos" (2x1, 3x2)
 1. En Promociones pulsa + Armar oferta y elige Llevas mas, pagas menos.
-2. Elige los productos, la cantidad que lleva y paga, los canales (carta, salon, y la casilla Vale tambien por WhatsApp (bot)), los dias y la vigencia.
+2. Elige los productos, la cantidad que lleva y paga, donde aplica (Carta web, En el local y WhatsApp (bot)), los dias y la vigencia.
 3. Pulsa guardar y confirma con "Si, continuar".
 Antes: [[productos]]
+
+## Como se hace: Elegir donde aplica una oferta (carta web, local y WhatsApp)
+1. En el editor de cada oferta (combo, 2x1, descuento, envio gratis) busca "¿Dónde aplica?" y marca las casillas: "Carta web", "En el local (caja y mozo)" y "WhatsApp (bot)". Hay que dejar al menos una marcada.
+2. El texto de ayuda debajo cambia segun lo marcado: dice en que canales aplica y, si WhatsApp esta apagado, que el bot no la aplica ni la ofrece.
+3. Con WhatsApp marcado: el descuento y el 2x1 se aplican al total del pedido del bot y salen en su resumen; el envio gratis deja el delivery en S/ 0 dentro del horario, dias, fechas, compra minima y limite de pedidos, y el resumen dice "Envio gratis por «nombre»" (si aun no hay ubicacion tambien queda gratis al ubicar el pedido; si falta compra minima el bot avisa cuanto falta); el combo se ofrece en las promociones y en el cierre de venta del bot, pero su armado con elecciones es en la carta web. Ese texto del resumen se puede cambiar en Configuracion, Chatbot y WhatsApp (Textos del bot).
+4. Una oferta nueva viene con carta y local marcados; WhatsApp viene marcado en descuento, 2x1 y envio gratis, y apagado en combos. Las ofertas que ya existian conservan lo que tenian.
+5. Los cupones se canjean en la carta web y en caja: el bot todavia no pide codigos, por eso WhatsApp aparece apagado y bloqueado en el cupon.
+6. Los cambios de canal quedan en la auditoria como "cambiar_canales". El servidor no aplica desde el bot una oferta con WhatsApp apagado, aunque llegue su numero.
+
+## Como se hace: Distinguir "Agotado automaticamente" de "Desactivada por ti"
+1. "Agotado automaticamente · vuelve sola cuando haya stock" (naranja): el combo esta activo pero falta stock. Se muestra el motivo ("falta X, Y y las bebidas a elegir") y, si tiene plan B, "hay alternativas configuradas". Al reponer el stock vuelve solo a la carta y al bot; no hay que tocar nada. El sistema nunca cambia el estado Activo por stock.
+2. "Desactivada por ti · no vuelve sola" (gris): alguien la desactivo a proposito. Sigue desactivada aunque haya stock y solo vuelve con el boton "Activar". Debajo se ve "Ultima vez desactivada: fecha por usuario".
+3. Si esta desactivada y ademas falta stock, manda "Desactivada por ti" y aparece la nota "ademas hoy le falta stock".
 
 ## Como se hace: Crear un descuento directo
 1. Dirigete a la pestana "Descuentos".
@@ -82,6 +95,8 @@ Ver tambien: [[indicadores]]
 - Como se prevé la apariencia de una oferta en la carta: en la pestana de promociones puedes pulsar el boton "Ver como se ve en la carta" para abrir una previsualizacion exacta de como vera el cliente la oferta en la carta web.
 - Se pueden acumular cupones con ofertas automaticas: las condiciones de acumulacion se configuran en la pestana "Reglas". Por defecto, el sistema restringe combinaciones que afecten el margen minimo del negocio.
 - Donde revisar canjes de cupones: dentro de la pestana "Cupones", pulsa el boton "Historial de cupones" para auditar que pedidos y clientes utilizaron cada codigo.
+
+- El bot no me muestra una oferta: revisa que tenga "WhatsApp (bot)" marcado en "¿Dónde aplica?", que este activa y vigente hoy (dia y hora de Lima) y, si es combo, que no este agotado por stock.
 
 ## Quien puede hacerlo
 - Administrador: es el unico rol autorizado para ingresar al modulo, crear promociones, configurar descuentos, emitir cupones y ajustar las reglas de acumulacion.

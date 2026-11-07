@@ -15,13 +15,14 @@ export function calcularTotales(pedido: EstadoCarritoPedido, vista?: VistaPrevia
     const total = Math.max(0, r2(vista.subtotal - vista.descuento + (vista.envio ?? 0)));
     return {
       subtotal: vista.subtotal, descuento: vista.descuento, descuentoNombre: vista.descuentoNombre, envio: vista.envio,
+      envioPromoNombre: vista.envioPromoNombre ?? null, envioGratisFalta: vista.envioGratisFalta ?? null,
       total, propina, aCobrar: r2(total + propina),
     };
   }
   const subtotal = r2(pedido.items.reduce((s, i) => s + i.subtotal, 0));
   const envio = pedido.modalidad === 'DELIVERY' ? (pedido.entrega?.tarifaEnvio ?? null) : 0;
   const total = Math.max(0, r2(subtotal + (envio || 0)));
-  return { subtotal, descuento: 0, descuentoNombre: null, envio, total, propina, aCobrar: r2(total + propina) };
+  return { subtotal, descuento: 0, descuentoNombre: null, envio, envioPromoNombre: null, envioGratisFalta: null, total, propina, aCobrar: r2(total + propina) };
 }
 
 export const NOMBRE_MEDIO: Record<MedioPagoBot, string> = {

@@ -11,6 +11,7 @@ import { ModalCombo } from './ModalCombo';
 import { ModalLlevaPaga } from './ModalLlevaPaga';
 import { ModalDescuento } from './ModalDescuento';
 import { ModalEnvioGratis } from './ModalEnvioGratis';
+import { estadoDesdeCanales } from './canalesPromo';
 import { ModalCupon } from './ModalCupon';
 import { ModalHistorialCupones, HistorialMovimiento } from './ModalHistorialCupones';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -146,6 +147,53 @@ function insigniaEstado(o: OfertaItem, activo: string): { texto: string; title?:
   return o.activo ? { texto: activo } : { texto: 'Desactivada', title: detalleDesactivada(o) };
 }
 
+/** «21/11/2026 14:30» en hora de Lima, para «Última vez desactivada». */
+function fechaHoraLima(iso: string): string {
+  const f = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  return f.format(new Date(iso)).replace(',', '');
+}
+
+/**
+ * Dos estados que no se confunden: «Agotado automáticamente» (por falta de stock; vuelve sola al reponerse)
+ * y «Desactivada por ti» (a mano; no vuelve sola). Si está desactivada a mano y además falta stock, manda la
+ * desactivación y el stock queda como nota.
+ */
+function AvisoEstadoOferta({ o }: { o: OfertaItem }) {
+  const sinStock = o.tipo === 'COMBO' && o.disponible === false;
+  const motivo = o.motivoAgotado ? o.motivoAgotado.replace(/^Falta /, 'falta ') : '';
+  const conAlternativas = (o.combosParte ?? []).some((p) => (p.alternativas?.length ?? 0) > 0);
+  const chip = { alignSelf: 'flex-start', fontSize: '12px', fontWeight: 700, borderRadius: '9999px', padding: '3px 9px' } as const;
+  if (!o.activo) {
+    const ultima = o.desactivadaEn ? `Última vez desactivada: ${fechaHoraLima(o.desactivadaEn)}${o.desactivadaPor ? ` por ${o.desactivadaPor}` : ''}` : '';
+    const explica = `Alguien la desactivó a propósito. No vuelve sola: hay que pulsar Activar.${ultima ? ` ${ultima}.` : ''}`;
+    return (
+      <>
+        <span data-testid="insignia-desactivada-manual" title={explica} aria-label={explica} style={{ ...chip, backgroundColor: 'var(--cp-line)', color: 'var(--cp-navy)' }}>
+          Desactivada por ti · no vuelve sola
+        </span>
+        {ultima && <span data-testid="ultima-desactivacion" style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>{ultima}</span>}
+        {sinStock && <span data-testid="nota-falta-stock" style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>además hoy le falta stock</span>}
+      </>
+    );
+  }
+  if (!sinStock) return null;
+  const explica = `Se apagó sola por falta de stock${motivo ? ` (${motivo})` : ''}. Vuelve sola cuando haya stock; no hay que activarla.`;
+  return (
+    <>
+      <span data-testid="insignia-agotado-auto" title={explica} aria-label={explica} style={{ ...chip, backgroundColor: 'var(--cp-orange)', color: 'var(--cp-navy)' }}>
+        Agotado automáticamente · vuelve sola cuando haya stock
+      </span>
+      {(motivo || conAlternativas) && (
+        <span data-testid="motivo-agotado" style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+          {motivo}
+          {motivo && conAlternativas ? ' · ' : ''}
+          {conAlternativas ? 'hay alternativas configuradas' : ''}
+        </span>
+      )}
+    </>
+  );
+}
+
 function formatearHora12(hStr?: string | null): string {
   if (!hStr) return '';
   const parts = hStr.split(':');
@@ -191,15 +239,8 @@ function formatearHorarioOferta(o: {
       ? ` · ${fDesde ? `desde ${fDesde}` : ''}${fHasta ? ` hasta ${fHasta}` : ''}`
       : '';
 
-  let canalesTxt = 'Todos los canales';
-  if (o.canales && o.canales.length > 0 && !o.canales.includes('TODOS')) {
-    if (o.canales.length === 1) {
-      const c = o.canales[0].toUpperCase();
-      if (c === 'CARTA' || c === 'WEB') canalesTxt = 'Carta web';
-      else if (c === 'ADMIN' || c === 'CAJA' || c === 'LOCAL') canalesTxt = 'En el local';
-      else if (c === 'BOT' || c === 'WHATSAPP') canalesTxt = 'WhatsApp';
-    }
-  }
+  const ce = estadoDesdeCanales(o.canales && o.canales.length > 0 ? o.canales : ['CARTA', 'ADMIN']);
+  const canalesTxt = [ce.carta && 'Carta web', ce.local && 'En el local', ce.bot && 'WhatsApp'].filter(Boolean).join(' + ') || 'Sin canal';
 
   return `${diasTxt} · ${horasTxt}${fechasTxt} · ${canalesTxt}`;
 }
@@ -919,22 +960,7 @@ export function OfertasAdminView() {
                       {insigniaEstado(pr, 'Activa').texto}
                     </span>
                   </div>
-                  {pr.tipo === 'COMBO' && pr.disponible === false && (
-                    <span
-                      data-testid="insignia-agotado-auto"
-                      style={{
-                        alignSelf: 'flex-start',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        borderRadius: '9999px',
-                        padding: '3px 9px',
-                        backgroundColor: 'var(--cp-rust)',
-                        color: 'var(--cp-white)',
-                      }}
-                    >
-                      Agotado automáticamente{pr.motivoAgotado ? `: ${pr.motivoAgotado.replace(/^Falta /, 'falta ')}` : ''}
-                    </span>
-                  )}
+                  <AvisoEstadoOferta o={pr} />
 
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
                     <span
@@ -1227,6 +1253,7 @@ export function OfertasAdminView() {
                       {insigniaEstado(d, 'Activo').texto}
                     </span>
                   </div>
+                  <AvisoEstadoOferta o={d} />
 
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
                     <span

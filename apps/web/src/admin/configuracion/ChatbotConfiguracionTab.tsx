@@ -19,7 +19,8 @@ export type ClaveTextoBot =
   | 'chatbot_texto_fuera_horario'
   | 'chatbot_texto_no_entiendo'
   | 'chatbot_texto_no_entiendo_derivacion'
-  | 'chatbot_texto_indicacion_pago';
+  | 'chatbot_texto_indicacion_pago'
+  | 'chatbot_texto_envio_gratis';
 
 export const CLAVES_TEXTOS_BOT: ClaveTextoBot[] = [
   'chatbot_texto_bienvenida',
@@ -29,6 +30,7 @@ export const CLAVES_TEXTOS_BOT: ClaveTextoBot[] = [
   'chatbot_texto_no_entiendo',
   'chatbot_texto_no_entiendo_derivacion',
   'chatbot_texto_indicacion_pago',
+  'chatbot_texto_envio_gratis',
 ];
 
 export interface FuncionesBotState {
@@ -193,6 +195,12 @@ export const META_TEXTOS: Record<
     efecto: 'Aviso: hoy el bot no lee este texto; las indicaciones de pago salen de los datos de cuentas de Pagos. Guardarlo no cambia lo que recibe el cliente.',
     ejemplo: 'Envíanos aquí la captura de tu Yape.',
   },
+  chatbot_texto_envio_gratis: {
+    titulo: 'Línea de envío gratis en el resumen',
+    descripcion: 'Texto del resumen del pedido cuando una promoción de Envío gratis (con WhatsApp activo) aplica al delivery. Usa {promo} para el nombre de la promoción.',
+    efecto: 'Lo ve el cliente en el resumen del pedido por WhatsApp, en lugar de la línea «Envío: …».',
+    ejemplo: '🛵 Envío gratis por «{promo}»',
+  },
 };
 
 const CLAVES_TEXTOS_ATENCION: ClaveTextoBot[] = [
@@ -240,6 +248,7 @@ const TEXTOS_DEFECTO_BASE: TextosBotState = {
   chatbot_texto_no_entiendo: '',
   chatbot_texto_no_entiendo_derivacion: '',
   chatbot_texto_indicacion_pago: '',
+  chatbot_texto_envio_gratis: '',
 };
 
 type ModalAccion =
