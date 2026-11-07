@@ -3,6 +3,7 @@ import { CocinaController } from './cocina.controller';
 import { CocinaExistenciasController } from './cocina-existencias.controller';
 import { ComandasService } from './comandas.service';
 import { AgotadosService } from './agotados.service';
+import { DespachoService } from './despacho.service';
 import { AltaDemandaService } from './alta-demanda.service';
 import { SalonModule } from '../salon/salon.module';
 import { AvisosInternosModule } from '../chatbot/avisos-internos/avisos-internos.module';
@@ -18,7 +19,7 @@ import { AjustesPersonalesCocinaService } from './ajustes-personales.service';
     forwardRef(() => ChatbotModule),
   ],
   controllers: [CocinaController, CocinaExistenciasController],
-  providers: [ComandasService, AgotadosService, AltaDemandaService, AjustesPersonalesCocinaService],
+  providers: [ComandasService, AgotadosService, AltaDemandaService, AjustesPersonalesCocinaService, DespachoService],
   exports: [ComandasService, AgotadosService, AltaDemandaService],
 })
 export class CocinaModule {}

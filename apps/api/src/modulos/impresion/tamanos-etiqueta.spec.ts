@@ -78,7 +78,7 @@ describe('validación de los parámetros de tamaño', () => {
 
 describe('qué stickers salen según la modalidad', () => {
   it('el general solo sale en llevar, recoger y delivery; nunca en mesa o local', () => {
-    const r = REGLAS_IMPRESION_DEFECTO;
+    const r = { ...REGLAS_IMPRESION_DEFECTO, generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'] }; // apagado de fábrica
     for (const m of ['DELIVERY', 'RECOGER', 'LLEVAR']) expect(aplicaSegunReglas('ETIQUETA_GENERAL', m, r)).toBe(true);
     for (const m of ['MESA', 'LOCAL']) expect(aplicaSegunReglas('ETIQUETA_GENERAL', m, r)).toBe(false);
   });
@@ -111,7 +111,7 @@ describe('ImpresionService: tamaño al entregar el trabajo y modalidades al enco
       printJob: { updateMany: jest.fn().mockResolvedValue({ count: 0 }), findMany: jest.fn(), upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(1) },
       deviceKey: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       areaCocina: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
-      parametro: { findMany: jest.fn().mockResolvedValue([]) },
+      parametro: { findMany: jest.fn().mockResolvedValue([{ clave: 'impresion_etiqueta_general_modalidades', valor: ['LLEVAR', 'RECOGER', 'DELIVERY'] }]) },
       pedido: { findUnique: jest.fn() },
       $transaction: jest.fn(async (cb) => cb(prismaMock)),
       $queryRaw: jest.fn(),

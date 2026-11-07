@@ -14,6 +14,7 @@ import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { ComandasService } from './comandas.service';
+import { DespachoService } from './despacho.service';
 import { AgotadosService } from './agotados.service';
 import { AltaDemandaService } from './alta-demanda.service';
 import { ComandasQueryDto } from './dto/comandas-query.dto';
@@ -21,6 +22,7 @@ import { HistorialQueryDto } from './dto/historial-query.dto';
 import { AgotarDto } from './dto/agotar.dto';
 import { AltaDemandaDto } from './dto/alta-demanda.dto';
 import { MarcarListasDto } from './dto/marcar-listas.dto';
+import { AtendidoDto } from './dto/atendido.dto';
 import { DespacharDto } from './dto/despachar.dto';
 import { MisAjustesCocinaDto } from './dto/mis-ajustes-cocina.dto';
 import { AjustesPersonalesCocinaService } from './ajustes-personales.service';
@@ -36,6 +38,7 @@ export class CocinaController {
     private readonly altaDemandaService: AltaDemandaService,
     private readonly ajustesPersonales: AjustesPersonalesCocinaService,
     private readonly prisma: PrismaService,
+    private readonly despacho: DespachoService,
   ) {}
 
   /** Áreas que ve el usuario en cocina (null = todas). Regla única en areasPermitidasDeUsuario. */
@@ -74,6 +77,20 @@ export class CocinaController {
       if (x.despejada !== y.despejada) return x.despejada ? 1 : -1;
       return new Date(x.creado_en || x.llego_en).getTime() - new Date(y.creado_en || y.llego_en).getTime();
     });
+  }
+
+  /** Pantalla Despacho: pedidos completos del día, todas las áreas juntas (atendidos=true los incluye). */
+  @Get('despacho')
+  @Permiso('cocina', 'despacho')
+  async listarDespacho(@Query('atendidos') atendidos?: string) {
+    return this.despacho.listar(atendidos === 'true' || atendidos === '1');
+  }
+
+  @Post('despacho/:pedidoId/atendido')
+  @Permiso('cocina', 'despacho')
+  async marcarAtendido(@Param('pedidoId') pedidoId: string, @Body() dto: AtendidoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.despacho.marcarAtendido(pedidoId, dto.atendido, req.usuario, ip);
   }
 
   @Post('comandas/:pedidoId/:areaId/despejar')

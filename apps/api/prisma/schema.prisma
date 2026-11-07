@@ -633,6 +633,9 @@ model Pedido {
   pago_coordinado_por    BigInt?
   despachado_en          DateTime?               @db.Timestamptz
   despachado_por         BigInt?
+  /// Pantalla Despacho de Cocina: el despachador marcó el pedido completo como atendido (no cambia su estado)
+  atendido_despacho_en   DateTime?               @db.Timestamptz
+  atendido_despacho_por  BigInt?
   confirmado_en          DateTime?               @db.Timestamptz
   confirmado_por         BigInt?
   pasa_cocina_en         DateTime?               @db.Timestamptz

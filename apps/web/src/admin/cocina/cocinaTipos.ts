@@ -175,3 +175,38 @@ export interface TrasladoItem {
   recibidoEn?: string | null;
 }
 
+
+/** Una área dentro de un pedido de la pantalla Despacho: sus productos y si ya está lista. */
+export interface AreaDespacho {
+  areaId: string;
+  areaNombre: string;
+  listo: boolean;
+  lineas: LineaComanda[];
+}
+
+/** Pedido completo (todas las áreas juntas) de la pantalla Despacho. */
+export interface PedidoDespacho {
+  pedidoId: string;
+  codigo: string;
+  modalidad: string;
+  cliente: string | null;
+  mesa: string | null;
+  nota: string | null;
+  creado_en: string;
+  minutos: number;
+  direccion: string | null;
+  referencia: string | null;
+  telefono: string | null;
+  areas: AreaDespacho[];
+  /** Todas sus áreas están listas. */
+  completo: boolean;
+  atendido: boolean;
+  atendido_en: string | null;
+  atendido_por: string | null;
+}
+
+export interface DespachoRespuesta {
+  ahoraServidor: string;
+  umbrales: UmbralesCocina;
+  pedidos: PedidoDespacho[];
+}

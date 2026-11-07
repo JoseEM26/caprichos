@@ -41,7 +41,7 @@ export interface ReglasImpresion {
 }
 
 export const REGLAS_IMPRESION_DEFECTO: ReglasImpresion = {
-  generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
+  generalModalidades: [], // apagado por decisión del dueño (07/11/2026); se reactiva en el Mapa de impresión
   areaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
   bebidaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
   bebidaActivo: true,

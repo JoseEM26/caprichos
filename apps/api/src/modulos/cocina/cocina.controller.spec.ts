@@ -15,6 +15,7 @@ jest.mock('@nestjs/jwt', () => {
 import { Test, TestingModule } from '@nestjs/testing';
 import { CocinaController } from './cocina.controller';
 import { ComandasService } from './comandas.service';
+import { DespachoService } from './despacho.service';
 import { AgotadosService } from './agotados.service';
 import { AltaDemandaService } from './alta-demanda.service';
 import { AjustesPersonalesCocinaService } from './ajustes-personales.service';
@@ -67,6 +68,7 @@ describe('CocinaController', () => {
         { provide: AgotadosService, useValue: agotadosService },
         { provide: AltaDemandaService, useValue: altaDemandaService },
         { provide: AjustesPersonalesCocinaService, useValue: ajustesPersonales },
+        { provide: DespachoService, useValue: { listar: jest.fn().mockResolvedValue({ pedidos: [] }), marcarAtendido: jest.fn() } },
         { provide: PrismaService, useValue: prismaMock },
         { provide: RedisService, useValue: {} },
       ],

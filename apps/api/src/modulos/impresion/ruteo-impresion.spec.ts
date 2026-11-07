@@ -66,12 +66,14 @@ describe('tiposDeRoles', () => {
 describe('aplicaSegunReglas (modalidad y activos)', () => {
   const r = REGLAS_IMPRESION_DEFECTO;
 
-  it('el sticker general solo sale en llevar, recoger y delivery por defecto', () => {
-    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'LLEVAR', r)).toBe(true);
-    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'RECOGER', r)).toBe(true);
-    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'DELIVERY', r)).toBe(true);
-    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'MESA', r)).toBe(false);
-    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'LOCAL', r)).toBe(false);
+  it('el sticker general viene APAGADO de fábrica; reactivado, solo sale en llevar, recoger y delivery', () => {
+    for (const m of ['LLEVAR', 'RECOGER', 'DELIVERY', 'MESA']) expect(aplicaSegunReglas('ETIQUETA_GENERAL', m, r)).toBe(false);
+    const on = { ...r, generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'] };
+    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'LLEVAR', on)).toBe(true);
+    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'RECOGER', on)).toBe(true);
+    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'DELIVERY', on)).toBe(true);
+    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'MESA', on)).toBe(false);
+    expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'LOCAL', on)).toBe(false);
   });
 
   it('el sticker por vaso sale por defecto solo en llevar, recoger y delivery (la PC de bebidas), y es editable', () => {

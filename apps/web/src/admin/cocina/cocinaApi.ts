@@ -5,6 +5,7 @@ import type {
   AltaDemandaEstado,
   AreaCocina,
   Comanda,
+  DespachoRespuesta,
   DuracionAgotado,
   HistorialComanda,
   InsumoExistenciaCocina,
@@ -285,3 +286,18 @@ export async function buscarItemsDeCarta(): Promise<ItemCartaBuscable[]> {
   }
 }
 
+
+/** Pantalla Despacho: pedidos completos del día (con `atendidos` también los ya atendidos). */
+export async function listarDespacho(atendidos = false): Promise<DespachoRespuesta> {
+  const r = await api.get<DespachoRespuesta>(`/admin/cocina/despacho${atendidos ? '?atendidos=true' : ''}`);
+  registrarHoraServidor(r.ahoraServidor);
+  return r;
+}
+
+/** Marca o desmarca el pedido como atendido (idempotente). */
+export async function marcarPedidoAtendido(pedidoId: string, atendido: boolean): Promise<{ ok: boolean; atendido: boolean }> {
+  return api.post<{ ok: boolean; atendido: boolean }>(
+    `/admin/cocina/despacho/${encodeURIComponent(pedidoId)}/atendido`,
+    { atendido },
+  );
+}

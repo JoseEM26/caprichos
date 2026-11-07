@@ -68,7 +68,8 @@ describe('ImpresionConfigService', () => {
     it('el sticker general sale en Caja; el de vaso va a Bebidas si tiene etiquetera; el de área, como diga la regla', async () => {
       const m = await service.obtenerMapa();
       const general = m.ruteo.find((r) => r.tipo === 'ETIQUETA_GENERAL')!;
-      expect(general).toMatchObject({ destinoAreaId: null, destinoNombre: 'Caja', activo: true });
+      // Apagado de fábrica (decisión del dueño 07/11): sigue ruteado a Caja, pero inactivo
+      expect(general).toMatchObject({ destinoAreaId: null, destinoNombre: 'Caja', activo: false });
       const vaso = m.ruteo.find((r) => r.tipo === 'ETIQUETA_BEBIDA')!;
       expect(vaso).toMatchObject({ destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Barra' });
       const area = m.ruteo.filter((r) => r.tipo === 'ETIQUETA_AREA');

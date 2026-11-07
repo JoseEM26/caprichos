@@ -1,3 +1,4 @@
+import { CLAVES_FACTURACION, interpretarConfig } from '../comprobantes/facturacion/facturacion.config';
 import {
   BadRequestException,
   ForbiddenException,
@@ -912,7 +913,7 @@ export class ImpresionService {
         this.prisma.comprobante.findFirst({ where: { pedido_id: pedido.id, anulado_en: null } }).catch(() => null),
         ajustesPendientesUbicacion(this.prisma, [pedido.id]).then((m) => m.get(String(pedido.id)) ?? null).catch(() => null),
       ]);
-      const payload = construirTicketPago(pedido, (local?.valor as any) || {}, comprobante, ajuste);
+      const payload = construirTicketPago(pedido, (local?.valor as any) || {}, comprobante, ajuste, await this.igvPct());
       const clave = `${pedido.id}-TICKET_PAGO`;
       await this.prisma.printJob.upsert({
         where: { clave_idempotencia: clave },
@@ -932,6 +933,16 @@ export class ImpresionService {
       }
     } catch (err: any) {
       this.logger.error(`Error al encolar el ticket del pedido ${pedidoIdInput}: ${err.message}`, err.stack);
+    }
+  }
+
+  /** % de IGV vigente (parámetro facturacion_igv_pct); null si no se puede leer: el ticket sale sin desglose. */
+  private async igvPct(): Promise<number | null> {
+    try {
+      const f = await this.prisma.parametro.findMany({ where: { clave: CLAVES_FACTURACION.igv } });
+      return interpretarConfig(Object.fromEntries(f.map((x) => [x.clave, x.valor]))).igvPct;
+    } catch {
+      return null;
     }
   }
 
@@ -957,6 +968,7 @@ export class ImpresionService {
       datos.pagos,
       datos.recibido,
       datos.mozo,
+      await this.igvPct(),
     );
     const clave = `${pedido.id}-NOTA_MOZO-${comprobante.id}`;
     await this.prisma.printJob.upsert({

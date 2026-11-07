@@ -76,6 +76,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'cocina', accion: 'ver' },
   { modulo: 'cocina', accion: 'despejar' },
   { modulo: 'cocina', accion: 'despachar' },
+  // Pantalla Despacho: pedidos completos de todas las áreas y marca de atendido
+  { modulo: 'cocina', accion: 'despacho' },
   { modulo: 'cocina', accion: 'devolver' },
   { modulo: 'cocina', accion: 'agotar' },
   { modulo: 'cocina', accion: 'demanda' },
@@ -231,6 +233,7 @@ export const MATRIZ: Record<string, string[]> = {
     'caja/ver',
     'propinas/ver',
     'cocina/ver',
+    'cocina/despacho',
     'catalogo/ver',
     // Iniciativas: todo el personal ve, crea y comenta (el cambio de estado es solo ADMIN y SUPERVISOR)
     'iniciativas/ver',
@@ -256,6 +259,7 @@ export const MATRIZ: Record<string, string[]> = {
     'cocina/ver',
     'cocina/despejar',
     'cocina/despachar',
+    'cocina/despacho',
     'cocina/devolver',
     'cocina/agotar',
     'cocina/demanda',

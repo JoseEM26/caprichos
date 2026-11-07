@@ -312,12 +312,27 @@ export function armarEtiquetas(pedido: Pedido): ResumenEtiquetas {
  * Datos del ticket de pago para la vista previa (la misma maqueta que imprime la ticketera).
  * Antes de cobrar no hay cobro registrado: el pago sale del medio elegido o del plan de pago del pedido.
  */
-export function armarTicketPago(pedido: Pedido): TicketPagoDatos {
+export function armarTicketPago(pedido: Pedido, igvPct: number = 18): TicketPagoDatos {
   const num = (v: unknown) => Math.round(Number(v ?? 0) * 100) / 100;
   const total = num(pedido.total);
   const plan = (pedido.planPago || []).map((p) => ({ medio: String(p.medio), monto: num(p.monto) }));
+  // Mismo criterio que el servidor (construirTicketPago): el tipo de comprobante del pedido manda el diseño
+  const tipoDoc = pedido.comprobante_tipo === 'BOLETA' || pedido.comprobante_tipo === 'FACTURA' ? pedido.comprobante_tipo : 'SIMPLE';
+  const doc = pedido.comprobante_doc?.trim() || null;
+  const documento: TicketPagoDatos['documento'] =
+    tipoDoc === 'SIMPLE'
+      ? { tipo: 'SIMPLE' }
+      : {
+          tipo: tipoDoc,
+          clienteNombre: pedido.comprobante_razon?.trim() || pedido.cliente_nombre || null,
+          docTipo: tipoDoc === 'FACTURA' ? 'RUC' : doc?.length === 8 ? 'DNI' : doc ? 'CE' : null,
+          docNumero: doc,
+          direccion: tipoDoc === 'FACTURA' ? pedido.comprobante_direccion?.trim() || null : null,
+          igvPct,
+        };
   return {
     tipo: 'TICKET_PAGO',
+    documento,
     local: { nombre: 'Caprichos' },
     codigo: pedido.codigo,
     fecha: formatearFecha(pedido.creado_en),

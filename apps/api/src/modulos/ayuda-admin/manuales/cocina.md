@@ -11,7 +11,7 @@ sugerencias:
   - Como marco un plato o ingrediente como agotado
   - Como devuelvo una comanda que despeje por error
   - Que significa el tiempo en colores de cada comanda
-  - Que es el numero del dia (#7) de un pedido
+  - Como despacho un pedido completo con todas sus areas
   - Por que sale Falta el conteo de apertura de hoy
   - Como anulo un pedido que ya esta en cocina
 ---
@@ -93,6 +93,16 @@ Despues: [[apertura]]
 1. Cada usuario con rol Cocina tiene asignadas las areas que atiende (se editan en [[usuarios]], edicion del usuario). La pantalla recuerda el area elegida por cada usuario.
 2. Un combo como la Cajita Caprikids sale a cocina como lineas hijas: cada parte va a su area, con su cantidad y tamano, sin cobro propio; la linea madre del combo no tiene comanda.
 
+## Como se hace: Despachar pedidos completos (pestana Despacho)
+1. Abre la pestana Despacho. Muestra los pedidos vigentes de hoy con todas sus areas juntas, del mas antiguo al mas reciente. Los anulados no salen.
+2. Cada tarjeta trae el codigo, la modalidad (mesa, llevar o delivery), el cliente o la mesa, los minutos de espera y los productos agrupados por area. Cada area dice Lista o Pendiente.
+3. Cuando todas las areas estan listas, la tarjeta se marca COMPLETO (borde verde) y suena el aviso. Junta lo de cada area y entrega el pedido entero.
+4. Pulsa el check grande de la tarjeta para marcarlo como atendido. Queda guardado con quien lo marco y a que hora, y la tarjeta se oculta.
+5. Para ver los ya atendidos, activa Ver atendidos: salen atenuados. Su check los reabre si se marcaron por error.
+6. Toca una tarjeta para abrir el detalle en grande: productos con tamano, opciones y notas por area; en delivery, cliente, telefono y direccion. Tiene el mismo check.
+7. La pantalla se actualiza sola con los pedidos nuevos y los cambios de cada area. Marcar atendido no cambia el estado del pedido ni cierra su cobro.
+Antes: [[caja]]
+
 ## Errores y dudas comunes
 - Las tarjetas cambian de color segun el tiempo de espera, con una etiqueta que acompana al color: verde En tiempo, naranja Atencion (desde 35 minutos) y rojo Urgente (desde 50 minutos). Los minutos de corte son los parametros rep_naranja_min y rep_rojo_min de Configuracion. Ver la seccion del tiempo en vivo.
 - Para silenciar o activar la campana de alerta sonora de nuevos pedidos, pulsar el icono de campana junto a las pestanas.
@@ -102,3 +112,4 @@ Despues: [[apertura]]
 ## Quien puede hacerlo
 - Personal de Cocina y Administrador tienen control operativo total para despejar, agotar, activar alta demanda y registrar mermas.
 - El Cajero puede ver la pantalla en modo consulta para verificar el estado de preparacion de los pedidos.
+- La pestana Despacho (permiso cocina/despacho) la usan Administrador, Supervisor, Cocina y Cajero; el Mozo no la ve.

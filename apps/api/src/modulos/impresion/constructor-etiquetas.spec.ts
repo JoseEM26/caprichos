@@ -268,3 +268,24 @@ describe('Etiquetas con reparto por sabor (stock por sabor)', () => {
     expect(sinSabores.lineas[0].opciones).toEqual(['Caja x6']);
   });
 });
+
+describe('construirTicketPago: documento por tipo de comprobante', () => {
+  const base = { codigo: 'P-1', total: 118, lineas: [], cobros: [], cliente_nombre: 'Ana' };
+  it('sin tipo o SIMPLE: comprobante simple, sin datos de cliente ni IGV', () => {
+    expect(construirTicketPago(base, {}, undefined, null, 18).documento).toEqual({ tipo: 'SIMPLE' });
+  });
+  it('BOLETA: cliente y DNI del pedido, con IGV', () => {
+    const d = construirTicketPago({ ...base, comprobante_tipo: 'BOLETA', comprobante_doc: '12345678' }, {}, { tipo: 'BOLETA', numero_texto: 'B002-1' }, null, 18).documento;
+    expect(d).toMatchObject({ tipo: 'BOLETA', clienteNombre: 'Ana', docTipo: 'DNI', docNumero: '12345678', igvPct: 18 });
+  });
+  it('FACTURA: RUC, razón social y dirección del pedido', () => {
+    const d = construirTicketPago(
+      { ...base, comprobante_tipo: 'FACTURA', comprobante_doc: '20123456789', comprobante_razon: 'ACME SAC', comprobante_direccion: 'Av. Sol 1' },
+      {}, { tipo: 'FACTURA', numero_texto: 'F002-1' }, null, 18,
+    ).documento;
+    expect(d).toMatchObject({ tipo: 'FACTURA', clienteNombre: 'ACME SAC', docTipo: 'RUC', docNumero: '20123456789', direccion: 'Av. Sol 1' });
+  });
+  it('BOLETA sin documento: docNumero nulo (el ticket dice VARIOS)', () => {
+    expect(construirTicketPago({ ...base, cliente_nombre: '', comprobante_tipo: 'BOLETA' }, {}, undefined, null, 18).documento?.docNumero).toBeNull();
+  });
+});

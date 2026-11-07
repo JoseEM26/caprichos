@@ -41,4 +41,19 @@ describe('ticket de pago', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Papel 58 mm' }));
     expect(screen.getByTestId('ticket-pago')).toHaveAttribute('data-columnas', '32');
   });
+
+  it('la vista previa sigue el tipo de comprobante: simple, boleta y factura', () => {
+    const simple = render(<TicketPagoPrevia datos={armarTicketPago(pedido)} />);
+    expect(screen.getByTestId('ticket-pago')).toHaveTextContent('COMPROBANTE SIMPLE');
+    expect(screen.getByTestId('ticket-pago')).not.toHaveTextContent('IGV');
+    simple.unmount();
+    const factura = { ...pedido, comprobante_tipo: 'FACTURA', comprobante_doc: '20123456789', comprobante_razon: 'ACME SAC', comprobante_direccion: 'Av. Sol 1' } as Pedido;
+    const t = armarTicketPago(factura);
+    render(<TicketPagoPrevia datos={t} />);
+    const pre = screen.getByTestId('ticket-pago');
+    expect(pre).toHaveTextContent('FACTURA ELECTRÓNICA');
+    expect(pre).toHaveTextContent('RUC: 20123456789');
+    expect(pre).toHaveTextContent('IGV (18%)');
+    expect(pre.querySelectorAll('div')).toHaveLength(lineasTicketPago(t, 48).length);
+  });
 });

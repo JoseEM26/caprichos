@@ -207,7 +207,7 @@ describe('coc-pantalla: Nuevos requerimientos de pantalla de cocina', () => {
   });
 
   // Sin pestaña Despacho: cocina solo muestra lo suyo (Pantalla del área y Despejadas hoy)
-  it('g) La vista de cocina tiene solo las pestañas Pantalla del área y Despejadas hoy', async () => {
+  it('g) La vista de cocina tiene las pestañas Pantalla del área y Despejadas hoy; Despacho solo con el permiso cocina/despacho', async () => {
     vi.spyOn(cocinaApi, 'listarAreasCocina').mockResolvedValue([
       { id: '1', nombre: 'Bebidas', comandasPendientes: 0 },
     ]);
@@ -218,7 +218,12 @@ describe('coc-pantalla: Nuevos requerimientos de pantalla de cocina', () => {
       pausa: false,
     });
 
-    render(
+    // Sin el permiso cocina/despacho no hay pestaña Despacho; con él aparece
+    const sesion = vi.mocked(sesionModulo.useSesion);
+    const completa = sesion();
+    sesion.mockReturnValue({ ...completa, tiene: vi.fn((p: string) => p !== 'cocina/despacho') });
+
+    const { unmount } = render(
       <BrowserRouter>
         <CocinaAdminView />
       </BrowserRouter>,
@@ -230,7 +235,14 @@ describe('coc-pantalla: Nuevos requerimientos de pantalla de cocina', () => {
 
     const pestanas = within(screen.getByRole('tablist', { name: 'Vista de cocina' })).getAllByRole('tab');
     expect(pestanas.map((t) => t.textContent)).toEqual(['Pantalla del área', 'Despejadas hoy']);
-    expect(screen.queryByRole('tab', { name: /Despacho/i })).not.toBeInTheDocument();
+    unmount();
+    sesion.mockReturnValue({ ...completa, tiene: vi.fn().mockReturnValue(true) });
+    render(
+      <BrowserRouter>
+        <CocinaAdminView />
+      </BrowserRouter>,
+    );
+    expect(await screen.findByRole('tab', { name: 'Despacho' })).toBeInTheDocument();
   });
 
   // 5. Pestaña «Despejadas hoy» y reordenamiento al devolver

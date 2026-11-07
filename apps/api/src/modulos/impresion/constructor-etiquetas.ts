@@ -383,12 +383,29 @@ export function construirTicketPago(
   local: any,
   comprobante?: any,
   ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null,
+  igvPct?: number | null,
 ): TicketPagoDatos & { propina?: number; ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } } {
   const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   const cobro = (pedido.cobros || []).find((c: any) => !c.anulado_en);
   const ahora = cobro?.en ?? new Date();
+  // Diseño por tipo de comprobante: el del pedido (SIMPLE si no hay); BOLETA/FACTURA llevan los datos del cliente de ESE comprobante
+  const tipoDoc = pedido.comprobante_tipo === 'BOLETA' || pedido.comprobante_tipo === 'FACTURA' ? pedido.comprobante_tipo : 'SIMPLE';
+  const esFactura = tipoDoc === 'FACTURA';
+  const doc = texto(pedido.comprobante_doc) || texto(comprobante?.documento);
+  const documento: NonNullable<TicketPagoDatos['documento']> =
+    tipoDoc === 'SIMPLE'
+      ? { tipo: 'SIMPLE' }
+      : {
+          tipo: tipoDoc,
+          clienteNombre: texto(pedido.comprobante_razon) || texto(comprobante?.razon_social) || texto(pedido.cliente_nombre),
+          docTipo: esFactura ? 'RUC' : doc?.length === 8 ? 'DNI' : doc ? 'CE' : null,
+          docNumero: doc,
+          direccion: esFactura ? texto(pedido.comprobante_direccion) : null,
+          igvPct: igvPct ?? null,
+        };
   return {
     tipo: 'TICKET_PAGO',
+    documento,
     local: {
       nombre: texto(local?.nombre) || 'Caprichos',
       razonSocial: texto(local?.razon_social) || texto(local?.razonSocial),
@@ -445,8 +462,9 @@ export function construirTicketNotaMozo(
   pagos: Array<{ medio: string; monto: number }>,
   recibido: number | null,
   mozo: string | null,
+  igvPct?: number | null,
 ): TicketPagoDatos {
-  const base = construirTicketPago({ ...pedido, cobros: [] }, local, comprobante);
+  const base = construirTicketPago({ ...pedido, cobros: [] }, local, comprobante, null, igvPct);
   const efectivo = pagos.filter((p) => p.medio === 'EFECTIVO').reduce((acc, p) => acc + Number(p.monto), 0);
   return {
     ...base,

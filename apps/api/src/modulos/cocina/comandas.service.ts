@@ -56,7 +56,7 @@ export function distribucionSabores(l: { sabores?: Array<{ sabor_nombre: string;
  * Líneas del pedido que pertenecen a un área, con los campos que usa la pantalla de cocina.
  * `marcadas`: por producto, las opciones «menos pedida»; cada opción elegida lleva `pocoPedida`.
  */
-function lineasDeArea(lineas: any[], areaId: bigint, marcadas: Map<string, Set<string>> = new Map()) {
+export function lineasDeArea(lineas: any[], areaId: bigint, marcadas: Map<string, Set<string>> = new Map()) {
   return lineas
     .filter((l) => (l.area_id ?? l.producto?.categoria?.area_id) === areaId)
     .map((l) => {

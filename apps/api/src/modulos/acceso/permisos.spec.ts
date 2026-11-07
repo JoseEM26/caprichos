@@ -131,3 +131,12 @@ describe('rol CALLCENTER eliminado: el chat de WhatsApp es de MOZO y CAJERO', ()
     expect(ROLES_ELIMINADOS).toContain('CALLCENTER');
   });
 });
+
+describe('permiso de la pantalla Despacho (cocina/despacho)', () => {
+  it.each(['ADMIN', 'SUPERVISOR', 'COCINA', 'CAJERO'])('%s lo tiene', (rol) => {
+    expect(MATRIZ[rol]).toContain('cocina/despacho');
+  });
+  it.each(['MOZO', 'REPARTIDOR', 'ALMACEN'])('%s no lo tiene', (rol) => {
+    expect(MATRIZ[rol] ?? []).not.toContain('cocina/despacho');
+  });
+});

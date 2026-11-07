@@ -8,6 +8,8 @@ jest.mock('../../comun/socket/eventos.gateway', () => ({
   },
 }));
 
+const GENERAL_ON = { clave: 'impresion_etiqueta_general_modalidades', valor: ['LLEVAR', 'RECOGER', 'DELIVERY'] };
+
 describe('ImpresionService', () => {
   let service: ImpresionService;
   let prismaMock: any;
@@ -34,6 +36,8 @@ describe('ImpresionService', () => {
       pedido: {
         findUnique: jest.fn(),
       },
+      // El sticker general viene apagado de fábrica: estas pruebas lo encienden para seguir cubriéndolo
+      parametro: { findMany: jest.fn().mockResolvedValue([GENERAL_ON]) },
       $transaction: jest.fn(async (cb) => cb(prismaMock)),
       $queryRaw: jest.fn(),
       $executeRaw: jest.fn(),
@@ -481,7 +485,7 @@ describe('ImpresionService', () => {
     });
 
     it('reimprimir TODAS con el sticker por área activado lo incluye (con su destino)', async () => {
-      prismaMock.parametro = { findMany: jest.fn().mockResolvedValue([{ clave: 'impresion_etiqueta_area_activo', valor: true }]) };
+      prismaMock.parametro = { findMany: jest.fn().mockResolvedValue([GENERAL_ON, { clave: 'impresion_etiqueta_area_activo', valor: true }]) };
       prismaMock.printJob.findMany.mockResolvedValue([]);
       prismaMock.printJob.create.mockResolvedValue({ id: 900n });
 
@@ -513,7 +517,7 @@ describe('ImpresionService', () => {
     });
 
     it('estadoEtiquetasPedido muestra el estado real de cada etiqueta y el resumen', async () => {
-      prismaMock.parametro = { findMany: jest.fn().mockResolvedValue([{ clave: 'impresion_etiqueta_area_activo', valor: true }]) };
+      prismaMock.parametro = { findMany: jest.fn().mockResolvedValue([GENERAL_ON, { clave: 'impresion_etiqueta_area_activo', valor: true }]) };
       prismaMock.printJob.findMany.mockResolvedValue([
         {
           id: 12n, tipo: 'ETIQUETA_AREA', payload: { areaNombre: 'BARRA' }, estado: 'PENDIENTE',

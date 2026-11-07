@@ -35,6 +35,7 @@ import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
 import { ModalPedirAlmacen } from './ModalPedirAlmacen';
 import { HistorialView } from './HistorialView';
+import { DespachoView } from './DespachoView';
 import { Confirmar } from '../../comun/Confirmar';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
@@ -43,7 +44,7 @@ import { useSesion } from '../../comun/sesion';
 import { AvisoAperturaHoy } from '../almacen/AvisoAperturaHoy';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
-export type ModoCocina = 'area' | 'hist';
+export type ModoCocina = 'area' | 'hist' | 'despacho';
 
 const AREAS_MOCKUP = [
   { id: 'todas', n: 'Todas' },
@@ -146,6 +147,7 @@ export function CocinaAdminView() {
   const puedeVer = tiene('cocina/ver');
   const puedeDespejar = tiene('cocina/despejar');
   const puedeDespachar = tiene('cocina/despachar');
+  const puedeVerDespacho = tiene('cocina/despacho');
   const puedeAnular = tiene('pedidos/anular');
   const [anulando, setAnulando] = useState<Comanda | null>(null);
 
@@ -1020,6 +1022,27 @@ export function CocinaAdminView() {
         >
           Despejadas hoy
         </button>
+        {puedeVerDespacho && (
+          <button
+            role="tab"
+            aria-selected={modo === 'despacho'}
+            type="button"
+            onClick={() => setModo('despacho')}
+            style={{
+              minHeight: '44px',
+              padding: '0 18px',
+              borderRadius: '12px',
+              border: '1.5px solid var(--cp-navy)',
+              background: modo === 'despacho' ? 'var(--cp-navy)' : 'transparent',
+              color: modo === 'despacho' ? 'var(--cp-cream)' : 'var(--cp-navy)',
+              fontWeight: 800,
+              fontSize: '13px',
+              cursor: 'pointer',
+            }}
+          >
+            Despacho
+          </button>
+        )}
       </div>
 
       {/* Mensajes de error general */}
@@ -1075,6 +1098,8 @@ export function CocinaAdminView() {
           )}
         </div>
       )}
+
+      {modo === 'despacho' && puedeVerDespacho && <DespachoView />}
 
       {modo === 'hist' && (
         <HistorialView
