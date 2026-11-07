@@ -295,13 +295,13 @@
 @media (min-width: 900px) {
   .np-items {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-columns: minmax(0, 1fr) minmax(400px, 42%);
     align-items: start;
     gap: 14px;
   }
 
   .np-grilla {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
   }
 
@@ -310,10 +310,6 @@
   }
 
   .np-carrito {
-    position: sticky;
-    top: 0;
-    max-height: calc(100vh - 170px);
-    max-height: calc(100dvh - 170px);
     padding: 12px;
     gap: 10px;
   }
@@ -325,24 +321,8 @@
 }
 
 @media (max-width: 899px) {
-  .np-catalogo {
-    padding-bottom: 72px;
-  }
-
   .np-carrito {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 70;
-    max-height: 80vh;
-    max-height: 80dvh;
-    overflow-y: auto;
-    border: 0;
     border-top: 2px solid var(--cp-orange);
-    border-radius: 16px 16px 0 0;
-    box-shadow: 0 -10px 28px rgba(11, 44, 62, 0.25);
-    padding: 0 12px 12px;
     gap: 8px;
   }
 
@@ -551,5 +531,110 @@
   }
   .np-eleccion-tarjeta:hover .np-eleccion-flecha {
     transform: none;
+  }
+}
+
+/* ---- Estructura estable del modal (tablet/celular) ----
+   Panel con altura acotada a la pantalla visible (dvh); cabecera fija, solo el cuerpo hace scroll.
+   En el paso de productos el scroll lo reparten el catálogo y el pedido, y el botón de enviar queda
+   siempre visible al pie del pedido. */
+.salon-panel.np-panel {
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+
+.np-cuerpo {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.np-cuerpo--items {
+  overflow: hidden;
+  gap: 0;
+}
+
+.np-cuerpo--items > .np-items {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.np-catalogo {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.np-carrito {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Botón de enviar: pegado al pie del pedido (gana al sticky genérico de salon.css) */
+.np-carrito > .np-enviar {
+  position: sticky !important;
+  bottom: 0;
+  z-index: 2;
+  flex: none;
+  min-height: 52px !important;
+  box-shadow: 0 -8px 10px -6px rgba(11, 44, 62, 0.18);
+}
+
+@media (min-width: 900px) {
+  /* Tablet horizontal / PC: catálogo a la izquierda y pedido en panel lateral, cada uno con su scroll */
+  .np-items {
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .np-carrito {
+    position: static;
+    max-height: 100%;
+  }
+
+  .np-lineas {
+    flex: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 899px) {
+  /* Tablet vertical / celular: el pedido es una hoja al pie del propio panel (sin position:fixed) */
+  .np-items {
+    gap: 8px;
+  }
+
+  .np-catalogo {
+    flex: 1 1 auto;
+    padding-bottom: 8px;
+  }
+
+  .np-carrito {
+    position: relative;
+    flex: 0 1 auto;
+    z-index: 1;
+    max-height: 62%;
+    max-height: 62dvh;
+    padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-radius: 16px;
+    box-shadow: 0 -6px 18px rgba(11, 44, 62, 0.18);
+  }
+
+  .np-carrito:not(.np-carrito--abierto) {
+    overflow: hidden;
+    flex: none;
+  }
+
+  .np-barra-carrito {
+    flex: none;
+    min-height: 52px;
   }
 }

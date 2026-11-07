@@ -1316,13 +1316,11 @@ export function ModalNuevoPedidoMesa({
 
         {/* Contenedor Modal */}
         <div
-          className="salon-panel"
+          className="salon-panel np-panel"
           style={{
             position: 'relative',
             zIndex: 60,
             width: 'min(1120px, calc(100% - 24px))',
-            maxHeight: 'calc(100% - 24px)',
-            overflowY: 'auto',
             background: 'var(--cp-cream)',
             borderRadius: '20px',
             boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
@@ -1427,6 +1425,8 @@ export function ModalNuevoPedidoMesa({
             </div>
           )}
 
+          {/* Cuerpo: único que hace scroll; cabecera arriba y pie del pedido siempre visibles */}
+          <div className={paso === 'items' ? 'np-cuerpo np-cuerpo--items' : 'np-cuerpo'}>
           {/* ============================================================= */}
           {/* PASO 1: MODALIDAD (¿Qué vas a hacer?)                         */}
           {/* ============================================================= */}
@@ -3200,6 +3200,7 @@ export function ModalNuevoPedidoMesa({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
 
