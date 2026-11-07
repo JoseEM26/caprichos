@@ -20,6 +20,7 @@ import {
   DescartarDto,
   VaciarColaDto,
   ReimprimirDto,
+  ReimprimirTrabajosDto,
   PruebaImpresionDto,
   ElegirImpresoraDto,
   PruebaTodasDto,
@@ -43,10 +44,11 @@ export class AdminImpresionController {
     @Query('pedido') pedido?: string,
     @Query('pagina') pagina?: string,
     @Query('limite') limite?: string,
+    @Query('maquina') maquina?: string,
   ) {
     const pag = pagina ? parseInt(pagina, 10) : 1;
     const lim = limite ? parseInt(limite, 10) : 20;
-    return this.impresionService.listarTrabajos(estado, pedido, pag, lim);
+    return this.impresionService.listarTrabajos(estado, pedido, pag, lim, maquina);
   }
 
   @Get('cola')
@@ -71,6 +73,21 @@ export class AdminImpresionController {
   @Permiso('pedidos', 'cambiar_estado')
   async vaciarCola(@Body() dto: VaciarColaDto, @Req() req: any) {
     return this.impresionService.vaciarCola(dto, req.usuario, this.ip(req));
+  }
+
+  /** Reimprimir = copia nueva en la misma máquina (por ids o por grupo de fallidos). Distinto de «reintentar». */
+  @Post('cola/reimprimir')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('pedidos', 'cambiar_estado')
+  async reimprimirCola(@Body() dto: ReimprimirTrabajosDto, @Req() req: any) {
+    return this.impresionService.reimprimirTrabajos(dto, req.usuario, this.ip(req));
+  }
+
+  @Post('cola/:id/reimprimir')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('pedidos', 'cambiar_estado')
+  async reimprimirTrabajo(@Param('id') id: string, @Req() req: any) {
+    return this.impresionService.reimprimirTrabajos({ ids: [id] }, req.usuario, this.ip(req));
   }
 
   @Post('trabajos/:id/descartar')

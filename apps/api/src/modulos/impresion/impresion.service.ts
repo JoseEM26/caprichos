@@ -92,6 +92,9 @@ const ESTADO_ETIQUETA: Record<string, string> = {
 
 /** Roles que pueden descartar etiquetas de la cola. */
 const ROLES_DESCARTAR = ['ADMIN', 'CAJERO'];
+/** Tope de papeles por pedido de reimpresión y de copias esperando en cola (anti doble clic y anti avalancha). */
+const MAX_REIMPRESION_JUNTA = 30;
+const MAX_COPIAS_EN_COLA = 60;
 
 const FILTROS_COLA: Record<string, string> = {
   pendientes: 'PENDIENTE',
@@ -500,6 +503,7 @@ export class ImpresionService {
     pedido?: string,
     pagina = 1,
     limite = 20,
+    maquina?: string,
   ) {
     const skip = Math.max(0, (pagina - 1) * limite);
     const take = Math.min(Math.max(1, limite), 100);
@@ -517,6 +521,15 @@ export class ImpresionService {
       ];
     }
 
+    // Conteo por máquina con el mismo filtro de estado/pedido (sin el de máquina), para las pestañas
+    const [nStickers, nTickets] = await Promise.all([
+      this.prisma.printJob.count({ where: { ...where, tipo: { in: tiposDeRoles(['ETIQUETERA']) } } }),
+      this.prisma.printJob.count({ where: { ...where, tipo: { in: tiposDeRoles(['TICKETERA']) } } }),
+    ]);
+    if (maquina === 'ETIQUETERA' || maquina === 'TICKETERA') {
+      where.tipo = { in: tiposDeRoles([maquina]) };
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.printJob.findMany({
         where,
@@ -530,6 +543,8 @@ export class ImpresionService {
               mesa_nombre: true,
             },
           },
+          deviceKey: { select: { nombre: true } },
+          destinoArea: { select: { nombre: true } },
         },
         orderBy: { id: 'desc' },
         skip,
@@ -554,10 +569,129 @@ export class ImpresionService {
         tomadoEn: t.tomado_en?.toISOString() || null,
         impresoEn: t.impreso_en?.toISOString() || null,
         payload: t.payload,
+        maquina: rolDeTrabajo(t.tipo),
+        equipoNombre: (t as any).deviceKey?.nombre ?? ((t as any).destinoArea?.nombre ? `PC de ${(t as any).destinoArea.nombre}` : 'Caja'),
       })),
       total,
       pagina,
       paginas: Math.ceil(total / take) || 1,
+      conteo: { stickers: nStickers, tickets: nTickets },
+    };
+  }
+
+  /**
+   * Reimprimir = COPIA nueva de algo que ya existe (salió bien, falló, venció o se descartó), en la MISMA
+   * máquina (mismo tipo y destino). No toca el original. «Reintentar» es otra cosa: reactiva el mismo trabajo.
+   * Acepta una lista de ids o un grupo («STICKERS_FALLIDOS» / «TICKETS_FALLIDOS»). Devuelve qué se hizo y qué no, y por qué.
+   */
+  async reimprimirTrabajos(
+    dto: { ids?: Array<string | number>; grupo?: string },
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    let ids: bigint[] = [];
+    if (dto.grupo) {
+      const rol = dto.grupo === 'STICKERS_FALLIDOS' ? 'ETIQUETERA' : dto.grupo === 'TICKETS_FALLIDOS' ? 'TICKETERA' : null;
+      if (!rol) {
+        throw new BadRequestException({ codigo: 'GRUPO_INVALIDO', mensaje: 'Grupo de reimpresión no válido' });
+      }
+      const f = await this.prisma.printJob.findMany({
+        where: { estado: { in: ['FALLIDO', 'VENCIDO'] }, tipo: { in: tiposDeRoles([rol]) } },
+        select: { id: true },
+        orderBy: { id: 'desc' },
+        take: MAX_REIMPRESION_JUNTA,
+      });
+      ids = f.map((x) => x.id);
+    } else {
+      try {
+        ids = [...new Set((dto.ids ?? []).map((i) => String(i)))].map((i) => BigInt(i));
+      } catch {
+        throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador no válido' });
+      }
+    }
+    if (ids.length === 0) {
+      throw new BadRequestException({ codigo: 'SIN_TRABAJOS', mensaje: 'No hay nada que reimprimir' });
+    }
+    if (ids.length > MAX_REIMPRESION_JUNTA) {
+      throw new BadRequestException({
+        codigo: 'DEMASIADOS',
+        mensaje: `Se pueden reimprimir hasta ${MAX_REIMPRESION_JUNTA} papeles a la vez. Hazlo en tandas.`,
+      });
+    }
+    const copiasEnCola = await this.prisma.printJob.count({ where: { copia: true, estado: { in: ESTADOS_EN_COLA } } });
+    if (copiasEnCola + ids.length > MAX_COPIAS_EN_COLA) {
+      throw new HttpException(
+        { codigo: 'MUCHAS_COPIAS_EN_COLA', mensaje: 'Ya hay muchas copias esperando salir. Espera a que se impriman.' },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const originales = await this.prisma.printJob.findMany({
+      where: { id: { in: ids } },
+      include: { pedido: { select: { estado: true, codigo: true } } },
+    });
+    const porId = new Map(originales.map((o) => [o.id.toString(), o]));
+    const creados: any[] = [];
+    const rechazados: Array<{ id: string; motivo: string }> = [];
+    const hace5s = new Date(Date.now() - 5000);
+    for (const id of ids) {
+      const k = id.toString();
+      const o: any = porId.get(k);
+      const rechazar = (motivo: string) => rechazados.push({ id: k, motivo });
+      if (!o) { rechazar('Ese papel ya no existe'); continue; }
+      if (ESTADOS_EN_COLA.includes(o.estado)) { rechazar('Todavía está en cola: sale solo, no hace falta copia'); continue; }
+      if (o.pedido_id && o.pedido?.estado === 'ANULADO') { rechazar('El pedido está anulado'); continue; }
+      const reciente = await this.prisma.printJob.findFirst({
+        where: {
+          clave_idempotencia: { startsWith: `copia:${k}:` },
+          OR: [{ estado: { in: ESTADOS_EN_COLA } }, { en: { gt: hace5s } }],
+        },
+        select: { id: true },
+      });
+      if (reciente) { rechazar('Ya pediste una copia hace un momento'); continue; }
+      creados.push(
+        await this.prisma.printJob.create({
+          data: {
+            pedido_id: o.pedido_id,
+            area_id: o.area_id,
+            destino_area_id: o.destino_area_id,
+            tipo: o.tipo,
+            payload: o.payload as any,
+            copia: true,
+            estado: 'PENDIENTE',
+            clave_idempotencia: `copia:${k}:${Date.now()}`,
+          },
+        }),
+      );
+    }
+
+    if (this.auditoria && usuario && creados.length > 0) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'REIMPRIMIR_TRABAJOS',
+        entidad: 'print_job',
+        partyId: usuario.partyId,
+        despues: {
+          originales: ids.map(String),
+          copias: creados.map((c) => c.id.toString()),
+          rechazados: rechazados.length,
+          grupo: dto.grupo ?? null,
+        },
+        ip,
+      });
+    }
+    if (creados.length > 0) this.eventos?.emitirAdmin('impresion:cola', { reimpresas: creados.length });
+
+    return {
+      ok: creados.length > 0,
+      creados: creados.length,
+      rechazados,
+      trabajoIds: creados.map((c) => c.id.toString()),
+      mensaje:
+        creados.length > 0
+          ? `Se enviaron ${creados.length} copia(s) a imprimir${rechazados.length ? `; ${rechazados.length} no se copiaron` : ''}`
+          : `No se creó ninguna copia: ${rechazados[0]?.motivo ?? 'nada que copiar'}`,
     };
   }
 

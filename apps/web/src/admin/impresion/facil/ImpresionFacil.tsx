@@ -6,6 +6,8 @@ import { Cargando } from '../../../comun/Cargando';
 import { Confirmar } from '../../../comun/Confirmar';
 import { ErrorApi } from '../../../comun/api';
 import { impresionApi, type EquipoMapa, type MapaImpresionDatos, type ReglasMapa, type TrabajoImpresionAdmin } from '../impresionApi';
+import { ListaTrabajos, type PestanaMaquina } from '../ListaTrabajos';
+import { ColaImpresion } from '../ColaImpresion';
 import { ImpresorasDelEquipo } from '../ImpresorasDelEquipo';
 import { PanelInstalarPrograma } from '../PanelInstalarPrograma';
 import { VistaPieza } from '../mapa/VistaPiezaEjemplo';
@@ -17,12 +19,9 @@ import {
   celdaExiste,
   celdaMarcada,
   estadoDePC,
-  estadoDeTrabajo,
   filasVisibles,
   fraseSaleEn,
   lineasDePC,
-  motivoDeTrabajo,
-  piezaDeTrabajo,
   type ClaveFila,
   type ColumnaId,
 } from './logicaFacil';
@@ -447,6 +446,10 @@ function PasoProbar({
   const [probando, setProbando] = useState(false);
   const [aReintentar, setAReintentar] = useState<TrabajoImpresionAdmin | null>(null);
   const [errorReintento, setErrorReintento] = useState<string | null>(null);
+  const [pestana, setPestana] = useState<PestanaMaquina>('TODO');
+  const [verCola, setVerCola] = useState(false);
+  const { tiene, usuario } = useSesion();
+  const puedeReimprimir = (usuario?.rol || '').toUpperCase() === 'ADMIN' || tiene('pedidos/cambiar_estado');
 
   const probarTodo = async () => {
     if (!mapa) return;
@@ -517,34 +520,24 @@ function PasoProbar({
           {errorReintento}
         </div>
       )}
-      {trabajos.length === 0 ? (
-        <p className="if-vacio" data-testid="ultimos-trabajos">Todavía no se imprimió nada.</p>
-      ) : (
-        <ul className="if-trabajos" data-testid="ultimos-trabajos">
-          {trabajos.map((t) => {
-            const est = estadoDeTrabajo(t.estado);
-            const pc = pcDe(t);
-            const motivo = motivoDeTrabajo(t, pc.conectada);
-            const puedeReintentar = ['FALLIDO', 'VENCIDO'].includes(t.estado);
-            return (
-              <li key={t.id} className="if-trabajo" data-testid={`trabajo-${t.id}`}>
-                <div className="if-trabajo-fila">
-                  <strong>{piezaDeTrabajo(t)}</strong>
-                  <span className="if-trabajo-pedido">{t.pedidoCodigo ? `Pedido ${t.pedidoCodigo}` : 'Sin pedido'}</span>
-                  <span className="if-trabajo-pc">en {pc.nombre}</span>
-                  <span className={`if-estado if-estado--${est.id}`}>{est.texto}</span>
-                </div>
-                {motivo && <div className="if-trabajo-motivo">{motivo}</div>}
-                {puedeReintentar && puedeEditar && (
-                  <button type="button" className="if-sec" onClick={() => setAReintentar(t)}>
-                    Reintentar
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <ListaTrabajos
+        trabajos={trabajos.map((t) => ({ ...t, equipoNombre: t.equipoNombre ?? pcDe(t).nombre }))}
+        pestana={pestana}
+        alCambiarPestana={setPestana}
+        puedeReimprimir={puedeReimprimir}
+        puedeReintentar={puedeEditar}
+        alReimprimir={async (cuerpo) => {
+          const r = await impresionApi.reimprimirTrabajos(cuerpo);
+          alCambiar();
+          return r;
+        }}
+        alReintentar={(t) => setAReintentar(t)}
+        pcConectada={(t) => pcDe(t).conectada}
+        testIdLista="ultimos-trabajos"
+        vacio="Todavía no se imprimió nada."
+      />
+      <button type="button" className="lt-enlace" onClick={() => setVerCola(true)}>Ver toda la cola</button>
+      {verCola && <ColaImpresion alCerrar={() => { setVerCola(false); alCambiar(); }} />}
       <Confirmar
         abierto={!!aReintentar}
         titulo="¿Reintentar este papel?"

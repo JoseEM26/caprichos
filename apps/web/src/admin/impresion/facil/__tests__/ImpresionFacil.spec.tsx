@@ -152,16 +152,37 @@ describe('Impresión en 3 pasos', () => {
       ],
     });
     const fallo = await screen.findByTestId('trabajo-7');
-    expect(fallo).toHaveTextContent('Sticker de bebida');
+    expect(fallo).toHaveTextContent('STICKER · Bebida');
     expect(fallo).toHaveTextContent('en PC Bebidas');
     expect(fallo).toHaveTextContent('Falló');
     expect(fallo).toHaveTextContent('No se pudo imprimir: Sin papel');
     expect(screen.getByTestId('trabajo-6')).toHaveTextContent('Salió bien');
-    expect(screen.getByTestId('trabajo-5')).toHaveTextContent('Hoja de prueba');
+    expect(screen.getByTestId('trabajo-5')).toHaveTextContent('PRUEBA');
     expect(screen.getByTestId('trabajo-5')).toHaveTextContent('En cola');
     fireEvent.click(within(fallo).getByRole('button', { name: 'Reintentar' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, reintentar' }));
     await waitFor(() => expect(reintentar).toHaveBeenCalledWith('7'));
+  });
+
+  it('lo último se separa en pestañas con contador, reimprime en la misma máquina y ofrece Ver toda la cola', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    const reimprimir = vi.spyOn(impresionApi, 'reimprimirTrabajos').mockResolvedValue({ ok: true, creados: 1, rechazados: [], trabajoIds: ['9'], mensaje: 'Se enviaron 1 copia(s) a imprimir' });
+    montar({
+      trabajos: [
+        { id: '7', pedidoId: '5', pedidoCodigo: 'CP-5', clienteNombre: '', tipo: 'ETIQUETA_BEBIDA', estado: 'IMPRESO', intentos: 1, error: null, copia: false, en: '', destinoAreaId: '1', payload: {} },
+        { id: '6', pedidoId: '5', pedidoCodigo: 'CP-5', clienteNombre: '', tipo: 'TICKET_PAGO', estado: 'IMPRESO', intentos: 1, error: null, copia: false, en: '', destinoAreaId: null, payload: {} },
+      ],
+    });
+    await screen.findByTestId('trabajo-7');
+    expect(screen.getByTestId('cuenta-ETIQUETERA')).toHaveTextContent('1');
+    expect(screen.getByTestId('cuenta-TICKETERA')).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('tab', { name: /Tickets \(térmica\)/ }));
+    expect(screen.queryByTestId('trabajo-7')).toBeNull();
+    fireEvent.click(within(screen.getByTestId('trabajo-6')).getByRole('button', { name: 'Reimprimir' }));
+    expect(screen.getByText('Se imprimirá otra copia del ticket del pago del pedido CP-5 en PC Caja.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, reimprimir' }));
+    await waitFor(() => expect(reimprimir).toHaveBeenCalledWith({ ids: ['6'] }));
+    expect(screen.getByRole('button', { name: 'Ver toda la cola' })).toBeInTheDocument();
   });
 
   it('sin permiso de editar las casillas quedan bloqueadas', async () => {

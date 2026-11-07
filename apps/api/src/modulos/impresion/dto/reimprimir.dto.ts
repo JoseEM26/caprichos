@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class ReimprimirDto {
   @IsNotEmpty({ message: 'El tipo de etiqueta es obligatorio' })
@@ -25,4 +25,16 @@ export class ReimprimirDto {
   @IsOptional()
   @IsBoolean({ message: 'forzar debe ser verdadero o falso' })
   forzar?: boolean;
+}
+
+/** Reimpresión desde la cola: lista de trabajos o un grupo de fallidos de una máquina. */
+export class ReimprimirTrabajosDto {
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30, { message: 'Máximo 30 papeles a la vez' })
+  ids?: Array<string | number>;
+
+  @IsOptional()
+  @IsIn(['STICKERS_FALLIDOS', 'TICKETS_FALLIDOS'], { message: 'Grupo no válido' })
+  grupo?: string;
 }

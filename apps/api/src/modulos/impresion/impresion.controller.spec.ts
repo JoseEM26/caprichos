@@ -29,6 +29,7 @@ describe('Controladores de Impresión', () => {
       obtenerEstadoAdmin: jest.fn().mockResolvedValue({ agente: 'conectado' }),
       listarTrabajos: jest.fn().mockResolvedValue({ items: [], total: 0 }),
       reintentarTrabajo: jest.fn().mockResolvedValue({ ok: true }),
+      reimprimirTrabajos: jest.fn().mockResolvedValue({ ok: true }),
       reimprimirEtiqueta: jest.fn().mockResolvedValue({ ok: true }),
       listarLlavesAgente: jest.fn().mockResolvedValue([]),
       crearLlaveAgente: jest.fn().mockResolvedValue({ id: '1', llave: 'agk_123' }),
@@ -91,7 +92,18 @@ describe('Controladores de Impresión', () => {
         'CP-01',
         2,
         10,
+        undefined,
       );
+    });
+
+    it('GET /trabajos pasa la máquina; POST /cola/reimprimir y /cola/:id/reimprimir delegan con el usuario', async () => {
+      await adminController.listarTrabajos(undefined, undefined, '1', '10', 'TICKETERA');
+      expect(impresionServiceMock.listarTrabajos).toHaveBeenLastCalledWith(undefined, undefined, 1, 10, 'TICKETERA');
+      const req = { usuario: { partyId: 1n }, ip: '9.9.9.9' };
+      await adminController.reimprimirTrabajo('12', req);
+      expect(impresionServiceMock.reimprimirTrabajos).toHaveBeenCalledWith({ ids: ['12'] }, req.usuario, '9.9.9.9');
+      await adminController.reimprimirCola({ grupo: 'STICKERS_FALLIDOS' }, req);
+      expect(impresionServiceMock.reimprimirTrabajos).toHaveBeenLastCalledWith({ grupo: 'STICKERS_FALLIDOS' }, req.usuario, '9.9.9.9');
     });
 
     it('POST /trabajos/:id/reintentar delega al servicio', async () => {

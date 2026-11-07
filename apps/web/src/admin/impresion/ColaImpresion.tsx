@@ -7,6 +7,9 @@ import { useEventos } from '../../comun/socket';
 import { EstadoAdminImpresion } from '@caprichos/compartido';
 import { FiltroCola, GrupoCola, RespuestaCola, impresionApi } from './impresionApi';
 import { FiltroCombo } from '../../comun/FiltroCombo';
+import { useSesion } from '../../comun/sesion';
+import { ListaTrabajos, type PestanaMaquina } from './ListaTrabajos';
+import type { TrabajoImpresionAdmin } from './impresionApi';
 import './cola-impresion.css';
 
 const FILTROS: Array<[FiltroCola, string]> = [
@@ -17,6 +20,15 @@ const FILTROS: Array<[FiltroCola, string]> = [
   ['descartados', 'Descartados'],
   ['impresos', 'Impresos'],
 ];
+
+const ESTADO_DE_FILTRO: Record<FiltroCola, string> = {
+  pendientes: 'PENDIENTE',
+  en_curso: 'IMPRIMIENDO',
+  impresos: 'IMPRESO',
+  fallidos: 'FALLIDO',
+  vencidos: 'VENCIDO',
+  descartados: 'DESCARTADO',
+};
 
 const NOMBRE_ESTADO: Record<string, string> = {
   PENDIENTE: 'pendiente',
@@ -52,17 +64,29 @@ export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
   const [confirmaVaciar, setConfirmaVaciar] = useState(false);
   const [grupoDescartar, setGrupoDescartar] = useState<GrupoCola | null>(null);
   const [trabajando, setTrabajando] = useState(false);
+  const { tiene, usuario } = useSesion();
+  const puedeReimprimir = (usuario?.rol || '').toUpperCase() === 'ADMIN' || tiene('pedidos/cambiar_estado');
+  const [vista, setVista] = useState<'maquina' | 'pedido'>('maquina');
+  const [pestana, setPestana] = useState<PestanaMaquina>('TODO');
+  const [papeles, setPapeles] = useState<{ items: TrabajoImpresionAdmin[]; conteo?: { stickers: number; tickets: number } } | null>(null);
 
   const cargar = useCallback(async () => {
     try {
-      const [c, a] = await Promise.all([impresionApi.listarCola(filtro, pagina), impresionApi.obtenerEstado()]);
+      const [c, a, t] = await Promise.all([
+        impresionApi.listarCola(filtro, pagina),
+        impresionApi.obtenerEstado(),
+        impresionApi
+          .listarTrabajos({ estado: ESTADO_DE_FILTRO[filtro], limite: 100, maquina: pestana === 'TODO' ? undefined : pestana })
+          .catch(() => null),
+      ]);
+      setPapeles(t);
       setCola(c);
       setAgente(a);
       setError(null);
     } catch (e: any) {
       setError(e?.message || 'No se pudo cargar la cola de impresión');
     }
-  }, [filtro, pagina]);
+  }, [filtro, pagina, pestana]);
 
   useEffect(() => {
     void cargar();
@@ -167,13 +191,38 @@ export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
           />
         </div>
 
+        <div role="group" aria-label="Cómo ver la cola" className="cola-filtros">
+          <button type="button" className="cola-btn" aria-pressed={vista === 'maquina'} onClick={() => setVista('maquina')}>Por máquina</button>
+          <button type="button" className="cola-btn" aria-pressed={vista === 'pedido'} onClick={() => setVista('pedido')}>Por pedido</button>
+        </div>
+
+        {vista === 'maquina' && papeles && (
+          <ListaTrabajos
+            trabajos={papeles.items}
+            conteo={papeles.conteo}
+            filtradaPorServidor
+            pestana={pestana}
+            alCambiarPestana={setPestana}
+            puedeReimprimir={puedeReimprimir}
+            puedeReintentar={puedeReimprimir}
+            alReimprimir={async (cuerpo) => {
+              const r = await impresionApi.reimprimirTrabajos(cuerpo);
+              await cargar();
+              return r;
+            }}
+            alReintentar={(t) => void ejecutar(() => impresionApi.reintentarTrabajo(t.id), () => undefined)}
+            testIdLista="cola-trabajos"
+            vacio="No hay papeles con este filtro."
+          />
+        )}
+
         {error && <EstadoError mensaje={error} alReintentar={() => void cargar()} />}
         {!cola && !error && <Cargando mensaje="Cargando la cola de impresión" />}
-        {cola && cola.items.length === 0 && !error && (
+        {vista === 'pedido' && cola && cola.items.length === 0 && !error && (
           <EstadoVacio titulo="No hay etiquetas aquí" descripcion="No hay etiquetas con este filtro." />
         )}
 
-        {cola?.items.map((g) => {
+        {vista === 'pedido' && cola?.items.map((g) => {
           const descartable = (g.estados.PENDIENTE || 0) + (g.estados.FALLIDO || 0) > 0;
           return (
             <div key={g.pedidoId ?? g.trabajoIds[0]} className="cola-grupo" data-testid="cola-grupo">
@@ -201,7 +250,7 @@ export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
           );
         })}
 
-        {cola && cola.paginas > 1 && (
+        {vista === 'pedido' && cola && cola.paginas > 1 && (
           <div className="cola-acciones">
             <button type="button" className="cola-btn" disabled={pagina <= 1} onClick={() => setPagina(pagina - 1)}>Anterior</button>
             <span className="cola-ayuda" style={{ alignSelf: 'center' }}>Página {cola.pagina} de {cola.paginas}</span>
