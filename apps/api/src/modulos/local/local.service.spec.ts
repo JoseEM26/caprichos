@@ -452,6 +452,19 @@ describe('LocalService', () => {
       expect(res.horario[1].dia).toBe('Martes');
     });
 
+    it('obtenerDatosPublicosLocal expone los umbrales de aviso de stock (5 y 3 si no existen)', async () => {
+      prismaMock.horarioDia.findMany.mockResolvedValue([]);
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      expect((await service.obtenerDatosPublicosLocal()).avisoStock).toEqual({ quedan: 5, ultimas: 3 });
+      prismaMock.parametro.findMany.mockResolvedValue([
+        { clave: 'aviso_stock_quedan_desde', valor: 8 },
+        { clave: 'aviso_stock_ultimas_desde', valor: 0 },
+      ]);
+      expect((await service.obtenerDatosPublicosLocal()).avisoStock).toEqual({ quedan: 8, ultimas: 0 });
+      prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'aviso_stock_quedan_desde', valor: 99 }]);
+      expect((await service.obtenerDatosPublicosLocal()).avisoStock).toEqual({ quedan: 5, ultimas: 3 });
+    });
+
     it('obtenerDatosPublicosLocal indica si pedir como invitado está permitido (false si no existe el parámetro)', async () => {
       prismaMock.parametro.findMany.mockResolvedValue([{ clave: 'carta_invitado_activo', valor: 'si' }]);
       prismaMock.horarioDia.findMany.mockResolvedValue([]);

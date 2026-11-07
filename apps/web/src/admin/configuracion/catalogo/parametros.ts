@@ -32,6 +32,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'entrega', titulo: 'Tiempo prometido de entrega', claves: ['tiempo_prometido_min', 'tiempo_max_min', 'eta_factor_urbano', 'eta_productos_desde', 'eta_extra_por_producto_min', 'eta_parada_min', 'eta_margen_min', 'eta_paso_min', 'eta_base_sin_zona_min'] },
   { id: 'envio', titulo: 'Envío gratis y pedido mínimo', claves: ['envio_gratis_monto', 'envio_gratis_modo', 'pedido_minimo'] },
   { id: 'clientes', titulo: 'Puntos, personal y reservas', claves: ['puntos_porcentaje', 'descuento_personal_pct', 'reserva_tolerancia_min', 'reserva_recordatorio_min', 'reserva_web_activa', 'reserva_web_max_pendientes', 'reserva_web_dias_max', 'reserva_web_max_personas', 'carta_aviso_entrada', 'verificacion_celular_modo', 'verificacion_whatsapp_numero'] },
+  { id: 'stock', titulo: 'Avisos de «se está acabando» (stock de productos)', claves: ['aviso_stock_quedan_desde', 'aviso_stock_ultimas_desde'] },
   { id: 'colores', titulo: 'Colores de espera en cocina y en el mapa de reparto', claves: ['rep_naranja_min', 'rep_rojo_min', 'reparto_retrasado_min', 'reparto_tarde_min', 'reparto_muy_tarde_min', 'reparto_velocidad_kmh', 'rep_max_pedidos', 'reparto_max_pedidos'] },
   { id: 'demanda', titulo: 'Alta demanda', claves: ['pausa_alta_demanda', 'alta_demanda_min_base'] },
   { id: 'puerta', titulo: 'Entrega fallida y reprogramación', claves: ['reparto_insistencia_min', 'reparto_espera_max_min', 'reprog_recargo_modo', 'reparto_recargo_reprogramacion', 'reprog_respuesta_min', 'reprog_max_intentos'] },
@@ -188,6 +189,20 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con 30: el cliente puede pedir mesa para hoy o hasta dentro de 30 días.',
     efecto: 'Subirlo deja reservar con más meses de anticipación; bajarlo acorta las fechas que se ofrecen en la carta.',
     porDefecto: '30', unidad: 'días', rango: 'entero de 1 a 365', palabras: ['reserva', 'anticipacion', 'dias', 'fecha', 'futuro'], peligro: 'bajo',
+  },
+  aviso_stock_quedan_desde: {
+    grupo: 'stock', titulo: 'Avisar «Quedan N» desde (unidades)',
+    descripcion: 'Desde cuántas unidades el cliente ve «Quedan N» en la carta, en el pedido por WhatsApp y en el salón, para los productos con stock controlado (donas, galletas, postres). 0 apaga el aviso.',
+    ejemplo: 'Con 5, el cliente ve «Quedan 5» y «Quedan 4»; con 3 o menos ve la franja «¡Últimas!».',
+    efecto: 'Se aplica en el acto a la carta y al bot. No puede ser menor que la franja «¡Últimas!».',
+    porDefecto: '5', unidad: 'unidades', rango: 'entero de 0 a 20', palabras: ['stock', 'quedan', 'se acaba', 'ultimas', 'aviso', 'donas', 'galletas', 'agotando', 'poco stock'], peligro: 'bajo',
+  },
+  aviso_stock_ultimas_desde: {
+    grupo: 'stock', titulo: 'Franja «¡Últimas!» desde (unidades)',
+    descripcion: 'Desde cuántas unidades aparece la franja llamativa: «¡Última dona!» con 1, «¡Últimas 2!» con 2 y «¡Quedan solo N, ya se acaban!» con más. 0 apaga la franja. No puede ser mayor que el aviso «Quedan N».',
+    ejemplo: 'Con 3, el cliente ve «¡Quedan solo 3, ya se acaban!» cuando quedan 3 donas.',
+    efecto: 'Se aplica en el acto a la carta y al bot.',
+    porDefecto: '3', unidad: 'unidades', rango: 'entero de 0 a 20 (igual o menor que «Quedan N»)', palabras: ['stock', 'ultimas', 'ultima', 'franja', 'ya se acaban', 'aviso', 'donas', 'galletas'], peligro: 'bajo',
   },
   reserva_web_max_personas: {
     grupo: 'clientes', titulo: 'Personas máximas por reserva desde la carta',

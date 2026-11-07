@@ -1,8 +1,5 @@
 /** Funciones puras del selector de sabores mezclados (donas y galletas por media docena o docena). */
 
-/** Hasta cuántas unidades se muestra «Quedan N» junto al sabor. */
-export const UMBRAL_QUEDAN_SABOR = 5;
-
 /** Cantidad elegida por saborId. Los sabores con 0 no cuentan. */
 export type Reparto = Record<string, number>;
 

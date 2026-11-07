@@ -7,10 +7,10 @@ import { CajonCarrito } from '../CajonCarrito';
 import { TarjetaProducto } from '../TarjetaProducto';
 import { VentanaProductoCarta } from '../VentanaProductoCarta';
 import { ProductoCarta, LineaCarrito } from '../tipos';
+import { fijarUmbralesStock, reiniciarUmbralesStock } from '../umbralesStock';
 import {
   etiquetaQuedan,
   etiquetaUltimos,
-  UMBRAL_ULTIMOS,
   excesosDeStock,
   infoStockDe,
   recortarLineasProducto,
@@ -60,21 +60,39 @@ const linea = (id: string, productoId: string, cantidad: number, nombre = 'Dona 
 
 const sembrarCarrito = (lineas: LineaCarrito[]) => sessionStorage.setItem('caprichos_carrito', JSON.stringify(lineas));
 
-beforeEach(() => sessionStorage.clear());
+beforeEach(() => {
+  sessionStorage.clear();
+  reiniciarUmbralesStock();
+});
 
 describe('lógica de stock (stock.ts)', () => {
-  it('franja «¡Últimos N!» solo con 1 a 3 unidades; «Quedan N» entre 4 y 5; nada en 0, sobre el umbral o sin control', () => {
-    expect(UMBRAL_ULTIMOS).toBe(3);
-    expect([3, 2, 1].map((n) => etiquetaUltimos(infoStockDe(conStock(n))))).toEqual(['¡Últimos 3!', '¡Últimos 2!', '¡Últimos 1!']);
-    expect(etiquetaUltimos(infoStockDe(conStock(4)))).toBeNull();
-    expect(etiquetaUltimos(infoStockDe(conStock(0)))).toBeNull();
+  it('franja con 1 a 3 unidades; «Quedan N» con 4 y 5; nada en 0, sobre el umbral o sin control', () => {
+    const franja = (n: number | null, nombre?: string) => etiquetaUltimos(infoStockDe(conStock(n)), nombre);
+    expect(franja(3)).toBe('¡Quedan solo 3, ya se acaban!');
+    expect(franja(2)).toBe('¡Últimas 2!');
+    expect(franja(1)).toBe('¡Última unidad!');
+    expect(franja(1, 'Donas')).toBe('¡Última dona!');
+    expect(franja(4)).toBeNull();
+    expect(franja(0)).toBeNull();
     expect(etiquetaUltimos(infoStockDe({ ...base, quedan: 2 }))).toBeNull();
+    expect(etiquetaQuedan(infoStockDe(conStock(5)))).toBe('Quedan 5');
     expect(etiquetaQuedan(infoStockDe(conStock(4)))).toBe('Quedan 4');
     expect(etiquetaQuedan(infoStockDe(conStock(3)))).toBeNull();
     expect(etiquetaQuedan(infoStockDe(conStock(0)))).toBeNull();
-    expect(etiquetaQuedan(infoStockDe(conStock(12)))).toBeNull();
+    expect(etiquetaQuedan(infoStockDe(conStock(6)))).toBeNull();
     expect(etiquetaQuedan(infoStockDe(conStock(null)))).toBeNull();
     expect(etiquetaQuedan(infoStockDe({ ...base, quedan: 4 }))).toBeNull();
+  });
+
+  it('umbrales configurables: se respetan y 0 los apaga', () => {
+    const u = { quedan: 8, ultimas: 2 };
+    expect(etiquetaQuedan(infoStockDe(conStock(8)), undefined, u)).toBe('Quedan 8');
+    expect(etiquetaQuedan(infoStockDe(conStock(3)), undefined, u)).toBe('Quedan 3');
+    expect(etiquetaUltimos(infoStockDe(conStock(2)), undefined, u)).toBe('¡Últimas 2!');
+    const nada = { quedan: 0, ultimas: 0 };
+    expect([1, 2, 3, 5].map((n) => [etiquetaQuedan(infoStockDe(conStock(n)), undefined, nada), etiquetaUltimos(infoStockDe(conStock(n)), undefined, nada)])).toEqual([
+      [null, null], [null, null], [null, null], [null, null],
+    ]);
   });
 
   it('unidades: un tamaño de 6 consume 6 del saldo, no 1', () => {
@@ -141,15 +159,28 @@ describe('tarjeta de producto', () => {
       </CarritoProvider>,
     );
 
-  it('quedan 3 muestra la franja «¡Últimos 3!»', () => {
+  it('quedan 3 muestra la franja «¡Quedan solo 3, ya se acaban!»', () => {
     renderTarjeta(conStock(3));
-    expect(screen.getByTestId('ultimos-1').textContent).toBe('¡Últimos 3!');
+    expect(screen.getByTestId('ultimos-1').textContent).toBe('¡Quedan solo 3, ya se acaban!');
     expect(screen.getByRole('button', { name: 'Pedir Dona de chocolate' })).toBeTruthy();
   });
 
-  it('quedan 1 muestra «¡Últimos 1!»', () => {
-    renderTarjeta(conStock(1));
-    expect(screen.getByText('¡Últimos 1!')).toBeTruthy();
+  it('quedan 2 muestra «¡Últimas 2!» y quedan 1, «¡Última unidad!» (o «¡Última dona!» si el nombre es simple)', () => {
+    const { unmount } = renderTarjeta(conStock(2));
+    expect(screen.getByText('¡Últimas 2!')).toBeTruthy();
+    unmount();
+    const uno = renderTarjeta(conStock(1));
+    expect(screen.getByText('¡Última unidad!')).toBeTruthy();
+    uno.unmount();
+    renderTarjeta(conStock(1, { nombre: 'Dona' }));
+    expect(screen.getByText('¡Última dona!')).toBeTruthy();
+  });
+
+  it('los umbrales de Configuración cambian lo que se ve en la tarjeta', () => {
+    fijarUmbralesStock({ quedan: 8, ultimas: 1 });
+    renderTarjeta(conStock(7));
+    expect(screen.getByText('Quedan 7')).toBeTruthy();
+    expect(screen.queryByTestId('ultimos-1')).toBeNull();
   });
 
   it('quedan 4 muestra «Quedan 4» y no la franja', () => {
@@ -160,18 +191,18 @@ describe('tarjeta de producto', () => {
 
   it('quedan 0 queda agotada, sin etiqueta', () => {
     renderTarjeta(conStock(0));
-    expect(screen.queryByText(/Quedan|Últimos/)).toBeNull();
+    expect(screen.queryByText(/Quedan|Últim/)).toBeNull();
     expect((screen.getByRole('button', { name: 'Dona de chocolate agotado' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('quedan 12 no muestra etiqueta', () => {
     renderTarjeta(conStock(12));
-    expect(screen.queryByText(/Quedan|Últimos/)).toBeNull();
+    expect(screen.queryByText(/Quedan|Últim/)).toBeNull();
   });
 
   it('sin controlaStock no cambia nada aunque traiga quedan', () => {
     renderTarjeta({ ...base, quedan: 3 });
-    expect(screen.queryByText(/Quedan|Últimos/)).toBeNull();
+    expect(screen.queryByText(/Quedan|Últim/)).toBeNull();
     expect((screen.getByRole('button', { name: 'Pedir Dona de chocolate' }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
@@ -219,14 +250,16 @@ describe('ventana de producto', () => {
     { id: 'm', nombre: '1/2 docena', precio: 30, unidades: 6 },
   ];
 
-  it('franja «¡Últimos N!» en la ventana con 3, 2 y 1; no con 4 ni 0', () => {
+  it('franja en la ventana con 3, 2 y 1; no con 4 ni 0', () => {
+    const esperado: Record<number, string> = { 3: '¡Quedan solo 3, ya se acaban!', 2: '¡Últimas 2!', 1: '¡Última unidad!' };
     for (const n of [3, 2, 1]) {
       const { unmount } = render(
         <CarritoProvider>
           <VentanaProductoCarta producto={conStock(n)} esBebida={false} onCerrar={() => {}} />
         </CarritoProvider>,
       );
-      expect(screen.getByTestId('ultimos-ventana').textContent).toBe(`¡Últimos ${n}!`);
+      const franja = screen.getByTestId('ultimos-ventana');
+      expect(franja.textContent).toBe(esperado[n]);
       unmount();
     }
     const { unmount } = render(

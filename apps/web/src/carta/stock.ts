@@ -1,12 +1,8 @@
+import { avisoStock, type UmbralesAvisoStock } from '@caprichos/compartido';
 import { ErrorApi } from '../comun/api';
+import { umbralesStockActuales } from './umbralesStock';
 import { maximoMezclas, type SaborMezcla } from '../comun/saboresMezcla';
 import type { LineaCarrito, ProductoCarta, SaborLinea } from './tipos';
-
-/** Hasta cuántas unidades se muestra la etiqueta «Quedan N». Ajustable. */
-export const UMBRAL_QUEDAN = 5;
-
-/** Desde cuántas unidades (o menos) aparece la franja «¡Últimos N!» en la tarjeta y en la ventana. */
-export const UMBRAL_ULTIMOS = 3;
 
 /** Cada cuánto, como mínimo, la carta vuelve a pedirse al abrir el carrito o el checkout. */
 export const INTERVALO_REFRESCO_STOCK_MS = 20_000;
@@ -102,16 +98,19 @@ export function mensajeSaborQuedan(quedan: number, saborNombre: string): string 
   return quedan <= 0 ? `Ya no quedan ${saborNombre}` : `Solo quedan ${quedan} de ${saborNombre}`;
 }
 
-/** Franja «¡Últimos N!» con 1 a UMBRAL_ULTIMOS unidades (N = lo que queda). Null con 0, más, o sin control. */
-export function etiquetaUltimos(info: InfoStock): string | null {
-  if (!info.controlaStock || info.quedan === null || info.quedan <= 0 || info.quedan > UMBRAL_ULTIMOS) return null;
-  return `¡Últimos ${info.quedan}!`;
+/**
+ * Franja llamativa: «¡Última dona!», «¡Últimas 2!» o «¡Quedan solo 3, ya se acaban!» (hasta el umbral de franja).
+ * `nombre` es el producto (para «¡Última dona!»). Null con 0, más unidades, o sin control.
+ */
+export function etiquetaUltimos(info: InfoStock, nombre?: string, umbrales: UmbralesAvisoStock = umbralesStockActuales()): string | null {
+  const a = avisoStock({ controlaStock: info.controlaStock, quedan: info.quedan, nombre }, umbrales);
+  return a?.tipo === 'franja' ? a.texto : null;
 }
 
-/** Texto discreto de la carta: «Quedan N» entre UMBRAL_ULTIMOS y UMBRAL_QUEDAN (la franja cubre las últimas). */
-export function etiquetaQuedan(info: InfoStock): string | null {
-  if (!info.controlaStock || info.quedan === null || info.quedan <= UMBRAL_ULTIMOS || info.quedan > UMBRAL_QUEDAN) return null;
-  return `Quedan ${info.quedan}`;
+/** Texto discreto de la carta: «Quedan 4» pasada la franja y hasta el umbral de aviso. */
+export function etiquetaQuedan(info: InfoStock, nombre?: string, umbrales: UmbralesAvisoStock = umbralesStockActuales()): string | null {
+  const a = avisoStock({ controlaStock: info.controlaStock, quedan: info.quedan, nombre }, umbrales);
+  return a?.tipo === 'quedan' ? a.texto : null;
 }
 
 /** Unidades que consume una línea: cantidad × unidades por mezcla (sabores) o por tamaño (1/2 docena = 6). */

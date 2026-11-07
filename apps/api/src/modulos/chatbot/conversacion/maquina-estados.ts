@@ -1,3 +1,4 @@
+import { lineaAvisoStock } from './flujos/pedido/aviso-stock-bot.util';
 import { accionesPaginaCarrusel, LIMITES_CARRUSEL, ordenarPorVentas, tarjetaProducto } from '../servicios/carrusel.util';
 import {
   BOTON_HABLAR_PERSONA,
@@ -1819,7 +1820,7 @@ function accionesCartaSoloMenus(contexto: ContextoConversacion, url: string): an
     return [{ tipo: 'enviarBotones', texto: TEXTOS_SOLO_MENUS.cartaSinProductos(url), botones: [BOTON_VOLVER_MENU] }];
   }
   const destacados = ordenarPorVentas([...unicos.values()], contexto.ventasProductos).slice(0, LIMITES_CARRUSEL.max);
-  const tarjetas = destacados.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica));
+  const tarjetas = destacados.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica, lineaAvisoStock(p, contexto)));
   const cuerpo = TEXTOS_SOLO_MENUS.cartaDestacados(url);
   if (tarjetas.length < LIMITES_CARRUSEL.min) {
     return [{ tipo: 'enviarBotones', texto: cuerpo, botones: [BOTON_VOLVER_MENU] }];

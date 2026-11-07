@@ -5,6 +5,7 @@ import { GrupoOpcionesCarta, OpcionElegida, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { useEsMovil } from './useEsMovil';
 import { alternarEleccion } from './eleccionGrupo';
+import { useUmbralesStock } from './umbralesStock';
 import { etiquetaQuedan, etiquetaUltimos, infoStockDe, mezclasDisponibles, saboresParaLinea, topeAgregable, topeTamano, unidadesEnCarrito } from './stock';
 import { maximoMezclas } from '../comun/saboresMezcla';
 import { SelectorSaboresMezcla } from '../comun/SelectorSaboresMezcla';
@@ -122,6 +123,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
 
   // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
   const info = inventario[String(producto.id)] ?? infoStockDe(producto);
+  const umbrales = useUmbralesStock();
   const enCarrito = unidadesEnCarrito(lineas, producto.id);
   // Mezcla de sabores (donas y galletas): cada tamaño trae sus unidades y el saldo es por sabor
   const saborMode = producto.saboresConStock === true;
@@ -148,8 +150,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const tamanoNoCabe = producto.tamanos.length > 0 && tope === 0;
   const puedeAgregar = valido && saboresListos && !sinStock && !sinSaldo;
   const enTope = tope !== null && cantidad >= tope;
-  const etiquetaStock = etiquetaQuedan(info);
-  const franjaUltimos = sinStock ? null : etiquetaUltimos(info);
+  const etiquetaStock = etiquetaQuedan(info, producto.nombre, umbrales);
+  const franjaUltimos = sinStock ? null : etiquetaUltimos(info, producto.nombre, umbrales);
   const ayudaStock =
     sinStock || info.quedan === null || tamanoNoCabe
       ? null

@@ -46,6 +46,7 @@ import { FranjaAvisoCarta } from './FranjaAvisoCarta';
 import { useBeneficiosCarta } from './useBeneficiosCarta';
 import { TextoEd, useEdicion } from './edicion';
 import { ModalAvisoEntrada } from './ModalAvisoEntrada';
+import { fijarUmbralesStock } from './umbralesStock';
 
 const INFO_CATEGORIA: Record<string, { title: string; note: string }> = {
   COMBOS: { title: 'Combos Dúo', note: 'Precio por tamaño de bebida' },
@@ -150,7 +151,10 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
       setCategorias(Array.isArray(resCarta) ? resCarta : []);
       setOfertas(Array.isArray(resOfertas) ? resOfertas : []);
       if (resEstado) setEstadoLocal(resEstado);
-      if (resLocal) setDatosLocal(resLocal);
+      if (resLocal) {
+        setDatosLocal(resLocal);
+        fijarUmbralesStock(resLocal.avisoStock);
+      }
 
     } catch (err) {
       setError(
@@ -174,6 +178,7 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
     setOfertas(vistaPrevia.ofertas);
     setEstadoLocal(vistaPrevia.estadoLocal);
     setDatosLocal(vistaPrevia.datosLocal);
+    fijarUmbralesStock(vistaPrevia.datosLocal?.avisoStock);
     setContenido(vistaPrevia.contenido);
     setCargando(false);
   }, [vistaPrevia]);

@@ -3,6 +3,7 @@ import { useCarrito } from './CarritoContext';
 import { TextoEd } from './edicion';
 import { useEsMovil } from './useEsMovil';
 import { etiquetaQuedan, etiquetaUltimos, infoStockDe } from './stock';
+import { useUmbralesStock } from './umbralesStock';
 
 export interface InfoRankingProducto {
   puesto?: number;
@@ -37,6 +38,7 @@ export function TarjetaProducto({
   const { abrirModalProducto, inventario } = useCarrito();
   const movil = useEsMovil();
   const info = inventario[String(producto.id)] ?? infoStockDe(producto);
+  const umbrales = useUmbralesStock();
 
   const estaAgotado = (() => {
     if (!info.disponible) return true;
@@ -77,8 +79,8 @@ export function TarjetaProducto({
     ? '100% CACAO'
     : '';
 
-  const textoQuedan = estaAgotado ? null : etiquetaQuedan(info);
-  const textoUltimos = estaAgotado ? null : etiquetaUltimos(info);
+  const textoQuedan = estaAgotado ? null : etiquetaQuedan(info, producto.nombre, umbrales);
+  const textoUltimos = estaAgotado ? null : etiquetaUltimos(info, producto.nombre, umbrales);
 
   const esLista = organizacion === 'LISTA';
   const cardDir = movil ? 'row' : esLista ? 'row' : 'column';

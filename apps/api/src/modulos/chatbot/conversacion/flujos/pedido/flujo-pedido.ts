@@ -16,6 +16,8 @@ import {
   LineaCarritoBot,
   ItemEnConfiguracionBot,
 } from './tipos-pedido';
+import { avisoStock } from '@caprichos/compartido';
+import { lineaAvisoStock, lineasAvisoResumen, umbralesDe } from './aviso-stock-bot.util';
 import { ordenarPorVentas, tarjetaProducto, accionesPaginaCarrusel as accionesPaginaCarruselGenerica } from '../../../servicios/carrusel.util';
 import {
   TEXTOS_BOT,
@@ -1080,7 +1082,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
+          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
           botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
@@ -1199,7 +1201,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
+          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
           botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
@@ -2492,7 +2494,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   ): ResultadoTransicion {
     const { envio, descuento, descuentoNombre, propina, aCobrar, envioPromoNombre, envioGratisFalta } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
-    const lineasTexto = this.lineasResumen(pedido);
+    const lineasTexto = this.lineasResumen(pedido, contexto);
 
 
     const descuentoTexto = descuento > 0 ? TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento) : undefined;
@@ -2622,7 +2624,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   /** Resumen con total justo antes de «¿Cómo pagarás?». Usa las mismas líneas y totales que el resumen final. */
   private resumenAntesDePagar(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
     const { subtotal, envio, aCobrar: total, propina, descuento, descuentoNombre, envioPromoNombre, envioGratisFalta } = calcularTotales(pedido, contexto.vistaPreviaPedido);
-    const lineas = this.lineasResumen(pedido);
+    const lineas = this.lineasResumen(pedido, contexto);
     const descuentoTxt = descuento > 0 ? `${TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento)}\n` : '';
     const envioTxt =
       pedido.modalidad !== 'DELIVERY'
@@ -2646,8 +2648,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   }
 
   /** Líneas del carrito: cantidad, tamaño/opciones y precio (compartido por el resumen previo y el final). */
-  private lineasResumen(pedido: EstadoCarritoPedido): string {
-    return pedido.items
+  private lineasResumen(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
+    const avisos = lineasAvisoResumen(pedido.items, (id) => productoDeCarta(contexto.categoriasCarta || [], id), unidadesDeTamano, contexto);
+    const lineas = pedido.items
       .map((i) => {
         const detalles = detallesLinea(i);
         const detTxt = detalles.length > 0 ? ` · ${detalles.join(' · ')}` : '';
@@ -2655,6 +2658,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         return `• ${cant}${i.productoNombre}${detTxt} — S/ ${i.subtotal.toFixed(2)}`;
       })
       .join('\n');
+    return avisos.length ? `${lineas}\n${avisos.join('\n')}` : lineas;
   }
 
   // -------------------------------------------------------------------------
@@ -2731,7 +2735,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
+          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
           botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
@@ -2894,10 +2898,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const filas: FilaLista[] = visibles.map((p: any) => {
       const precio = Number(p.precio || 0);
       const desc = p.descripcion ? ` · ${p.descripcion}` : '';
+      const aviso = avisoStock({ controlaStock: true, quedan: p.quedan, nombre: p.nombre }, umbralesDe(contexto));
       return {
         id: `ped_prod_${p.id}`,
         titulo: p.nombre.slice(0, 24),
-        descripcion: `S/ ${precio.toFixed(2)}${desc}`.slice(0, 72),
+        descripcion: `S/ ${precio.toFixed(2)}${aviso ? ` · ${aviso.texto}` : desc}`.slice(0, 72),
       };
     });
 
@@ -2955,7 +2960,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   ): AccionMensaje[] {
     const lista: any = listaBase;
     return accionesPaginaCarruselGenerica({
-      tarjetas: productos.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica)),
+      tarjetas: productos.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica, lineaAvisoStock(p, contexto))),
       pagina,
       cuerpoPrimera: TEXTOS_BOT.carruselFavoritos(categoria.nombre, productos.length),
       cuerpoSiguientes: TEXTOS_BOT.carruselMasOpciones(),

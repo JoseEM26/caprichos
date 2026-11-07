@@ -562,6 +562,7 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
         'chatbot_texto_no_entiendo_derivacion',
         'chatbot_texto_indicacion_pago',
         'chatbot_texto_envio_gratis',
+        'chatbot_texto_aviso_stock',
       ].sort();
 
       expect(Object.keys(respuesta.textos).sort()).toEqual(clavesTextosEsperadas);

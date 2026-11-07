@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
 } from '@nestjs/common';
+import { UMBRALES_AVISO_STOCK_DEFECTO } from '@caprichos/compartido';
 import { hoyLima } from '../reclamos/textos-legales';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -75,6 +76,9 @@ export const CLAVES_NUMERICAS = [
   'reserva_web_max_pendientes',
   'reserva_web_dias_max',
   'reserva_web_max_personas',
+  // Avisos de stock de productos terminados (carta, admin y bot)
+  'aviso_stock_quedan_desde',
+  'aviso_stock_ultimas_desde',
 ] as const;
 
 /** Rangos de parámetros con lectura acotada: [mínimo, máximo, solo enteros, mensaje]. */
@@ -94,6 +98,8 @@ export const RANGOS_NUMERICOS: Record<string, [number, number, boolean, string]>
   reserva_web_dias_max: [1, 365, true, 'Los días de anticipación deben ser un entero entre 1 y 365'],
   reserva_web_max_personas: [1, 200, true, 'Las personas máximas por reserva web deben ser un entero entre 1 y 200'],
   chatbot_ia_tope_mensual_usd: [1, 500, false, 'El tope mensual debe estar entre 1 y 500 USD'],
+  aviso_stock_quedan_desde: [0, 20, true, 'El aviso «Quedan N» debe ser un entero entre 0 y 20 (0 = sin aviso)'],
+  aviso_stock_ultimas_desde: [0, 20, true, 'La franja «¡Últimas!» debe ser un entero entre 0 y 20 (0 = sin franja)'],
   voucher_ia_corte_min: [1, 120, true, 'La pausa del corte automático debe ser un entero entre 1 y 120 minutos'],
 };
 
@@ -134,6 +140,7 @@ export const CLAVES_TEXTO = [
   'chatbot_texto_no_entiendo_derivacion',
   'chatbot_texto_indicacion_pago',
   'chatbot_texto_envio_gratis',
+  'chatbot_texto_aviso_stock',
   'whatsapp_aviso_asignado_activo',
   'whatsapp_aviso_salida_activo',
   'whatsapp_aviso_llegada_activo',
@@ -378,6 +385,22 @@ export class ConfiguracionService {
     const rango = RANGOS_NUMERICOS[clave];
     if (rango && (valor < rango[0] || valor > rango[1] || (rango[2] && !Number.isInteger(valor)))) {
       throw new BadRequestException({ codigo: 'RANGO_INVALIDO', mensaje: rango[3] });
+    }
+
+    // La franja «¡Últimas!» nunca pasa del aviso «Quedan N»: se compara contra el otro parámetro ya guardado
+    if (clave === 'aviso_stock_quedan_desde' || clave === 'aviso_stock_ultimas_desde') {
+      const otraClave = clave === 'aviso_stock_quedan_desde' ? 'aviso_stock_ultimas_desde' : 'aviso_stock_quedan_desde';
+      const otro = await this.prisma.parametro.findUnique({ where: { clave: otraClave } });
+      const def = UMBRALES_AVISO_STOCK_DEFECTO;
+      const otroValor = typeof otro?.valor === 'number' ? otro.valor : otraClave === 'aviso_stock_quedan_desde' ? def.quedan : def.ultimas;
+      const quedan = clave === 'aviso_stock_quedan_desde' ? valor : otroValor;
+      const ultimas = clave === 'aviso_stock_ultimas_desde' ? valor : otroValor;
+      if (ultimas > quedan) {
+        throw new BadRequestException({
+          codigo: 'RANGO_INVALIDO',
+          mensaje: `La franja «¡Últimas!» (${ultimas}) no puede ser mayor que el aviso «Quedan N» (${quedan})`,
+        });
+      }
     }
 
     // Validaciones específicas para parámetros de reparto
