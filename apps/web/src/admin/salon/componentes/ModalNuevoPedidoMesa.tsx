@@ -841,10 +841,44 @@ export function ModalNuevoPedidoMesa({
     return lineas.reduce((acc, l) => acc + (l.cortesia ? 0 : l.precioTotal), 0);
   }, [lineas]);
 
+  // Lo que descontará el servidor (promociones del canal local + cupón): el total y el plan de pago
+  // deben salir con ese mismo descuento o el servidor responde que el plan no cuadra.
+  const [descuentoServidor, setDescuentoServidor] = useState<number | null>(null);
+  const claveDescuento = JSON.stringify([
+    lineas.filter((l) => !l.cortesia).map((l) => [l.productoId, l.cantidad, l.precioTotal]),
+    cuponAplicado?.codigo ?? null,
+  ]);
+  useEffect(() => {
+    const aValidar = lineas.filter((l) => !l.cortesia);
+    if (aValidar.length === 0) {
+      setDescuentoServidor(null);
+      return;
+    }
+    let vigente = true;
+    Promise.resolve(
+      api.post<{ descuentoTotal: number }>('/admin/ofertas/vista-previa', {
+        canal: canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO'),
+        codigo: cuponAplicado?.codigo,
+        lineas: aValidar.map((l) => ({
+          productoId: l.productoId,
+          cantidad: l.cantidad,
+          subtotal: l.precioTotal,
+          precioUnitario: l.precioUnitario,
+        })),
+      }),
+    )
+      .then((r) => vigente && setDescuentoServidor(typeof r?.descuentoTotal === 'number' ? Math.round(r.descuentoTotal * 100) / 100 : null))
+      .catch(() => vigente && setDescuentoServidor(null));
+    return () => {
+      vigente = false;
+    };
+  }, [claveDescuento]);
+
   const descuento = useMemo(() => {
+    if (descuentoServidor !== null) return descuentoServidor;
     if (cuponAplicado) return cuponAplicado.descuento;
     return 0;
-  }, [cuponAplicado]);
+  }, [descuentoServidor, cuponAplicado]);
 
   const envioCalculado = useMemo(() => {
     if (modalidad !== 'delivery') return 0;
@@ -856,7 +890,7 @@ export function ModalNuevoPedidoMesa({
     );
   }, [modalidad, zonaInfo, subtotal]);
 
-  const total = Math.max(0, subtotal - descuento + envioCalculado);
+  const total = Math.max(0, Math.round((subtotal - descuento + envioCalculado) * 100) / 100);
 
   // Plan de pago: se valida contra el total; la parte digital (si hay) pide voucher opcional
   const errorPlanAhora = total > 0 ? errorPlan(total, filasPlan) : 'Agrega productos al pedido';
@@ -3191,7 +3225,7 @@ export function ModalNuevoPedidoMesa({
                         fontWeight: 700,
                       }}
                     >
-                      <span>Cupón ({cuponAplicado?.codigo})</span>
+                      <span>{cuponAplicado ? `Descuentos (cupón ${cuponAplicado.codigo})` : 'Descuento'}</span>
                       <span>- S/ {descuento.toFixed(2)}</span>
                     </div>
                   )}

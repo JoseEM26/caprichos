@@ -20,12 +20,27 @@ import { CrearCuponDto } from './dto/crear-cupon.dto';
 import { ActualizarCuponDto } from './dto/actualizar-cupon.dto';
 import { AnularCuponEmitidoDto } from './dto/anular-cupon-emitido.dto';
 import { CanjearCuponDto } from './dto/canjear-cupon.dto';
-import { ValidarCuponCajaDto } from './dto/validar-cupon-caja.dto';
+import { ValidarCuponCajaDto, VistaPreviaDescuentosCajaDto } from './dto/validar-cupon-caja.dto';
 
 @Controller('admin/ofertas')
 @UseGuards(AccesoGuard)
 export class OfertasController {
   constructor(private readonly ofertasService: OfertasService) {}
+
+  /**
+   * Lo que descontará el servidor al crear el pedido de mesa/caja (promociones del canal local + cupón).
+   * El «Nuevo pedido» lo usa para armar el total y el plan de pago con el mismo monto que se cobra.
+   */
+  @Post('vista-previa')
+  @Permiso('pedidos', 'crear')
+  async vistaPrevia(@Body() dto: VistaPreviaDescuentosCajaDto) {
+    return this.ofertasService.vistaPreviaDescuentos(
+      dto.lineas as any,
+      dto.codigo?.trim() ? dto.codigo.trim().toUpperCase() : undefined,
+      null,
+      dto.canal === 'MOZO' ? 'MOZO' : 'CAJA',
+    );
+  }
 
   @Get()
   @Permiso('ofertas', 'ver')

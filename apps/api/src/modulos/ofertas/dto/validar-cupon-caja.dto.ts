@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsDefined, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
-class LineaCuponCajaDto {
+export class LineaCuponCajaDto {
   @IsDefined()
   productoId!: string | number;
 
@@ -20,6 +20,23 @@ export class ValidarCuponCajaDto {
   @IsString({ message: 'El código es obligatorio' })
   @IsNotEmpty({ message: 'El código no puede estar vacío' })
   codigo!: string;
+
+  @IsOptional()
+  @IsIn(['CAJA', 'MOZO'])
+  canal?: 'CAJA' | 'MOZO';
+
+  @IsArray({ message: 'Agrega productos al pedido' })
+  @ArrayMinSize(1, { message: 'Agrega productos al pedido' })
+  @ValidateNested({ each: true })
+  @Type(() => LineaCuponCajaDto)
+  lineas!: LineaCuponCajaDto[];
+}
+
+/** Descuentos que el servidor aplicará al pedido de mesa/caja (promociones automáticas y cupón opcional). */
+export class VistaPreviaDescuentosCajaDto {
+  @IsOptional()
+  @IsString()
+  codigo?: string;
 
   @IsOptional()
   @IsIn(['CAJA', 'MOZO'])
