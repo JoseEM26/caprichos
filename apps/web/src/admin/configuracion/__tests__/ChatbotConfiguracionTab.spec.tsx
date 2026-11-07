@@ -26,6 +26,7 @@ const CONFIG_API_REAL_FIXTURE: ConfiguracionBotRespuesta = {
     chatbot_texto_indicacion_pago:
       'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',
     chatbot_texto_envio_gratis: '🛵 Envío gratis por «{promo}»',
+    chatbot_texto_aviso_stock: '🍩 {aviso}',
   },
   textosDefecto: {
     chatbot_texto_bienvenida:
@@ -43,6 +44,7 @@ const CONFIG_API_REAL_FIXTURE: ConfiguracionBotRespuesta = {
     chatbot_texto_indicacion_pago:
       'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',
     chatbot_texto_envio_gratis: '🛵 Envío gratis por «{promo}»',
+    chatbot_texto_aviso_stock: '🍩 {aviso}',
   },
   funciones: {
     pedido: true,

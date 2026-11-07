@@ -155,6 +155,25 @@ describe('ConfiguracionService', () => {
       expect(prismaMock.parametro.upsert).toHaveBeenCalled();
     });
 
+    it('avisos de stock: 0–20 enteros, 0 desactiva y la franja nunca pasa del aviso', async () => {
+      prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
+      prismaMock.parametro.findUnique.mockResolvedValue(null); // el otro vale su defecto (5 y 3)
+      await expect(service.actualizar('aviso_stock_quedan_desde', 21, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('aviso_stock_quedan_desde', 2.5, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      await expect(service.actualizar('aviso_stock_ultimas_desde', -1, adminAuth)).rejects.toMatchObject({ response: { codigo: 'VALOR_INVALIDO' } });
+      // franja 6 > aviso por defecto 5
+      await expect(service.actualizar('aviso_stock_ultimas_desde', 6, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      // aviso 2 < franja por defecto 3
+      await expect(service.actualizar('aviso_stock_quedan_desde', 2, adminAuth)).rejects.toMatchObject({ response: { codigo: 'RANGO_INVALIDO' } });
+      expect(prismaMock.parametro.upsert).not.toHaveBeenCalled();
+
+      expect((await service.actualizar('aviso_stock_quedan_desde', 8, adminAuth)).valor).toBe(8);
+      expect((await service.actualizar('aviso_stock_ultimas_desde', 0, adminAuth)).valor).toBe(0);
+      prismaMock.parametro.findUnique.mockResolvedValue({ valor: 0 });
+      expect((await service.actualizar('aviso_stock_quedan_desde', 0, adminAuth)).valor).toBe(0);
+      expect(auditoriaMock.registrar).toHaveBeenCalled();
+    });
+
     it('valor no texto para clave de texto → rechaza con 400 VALOR_INVALIDO', async () => {
       await expect(
         service.actualizar('envio_gratis_modo', 123, adminAuth),

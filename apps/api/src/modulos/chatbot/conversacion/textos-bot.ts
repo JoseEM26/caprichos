@@ -722,8 +722,8 @@ export const TEXTOS_BOT = {
     return `¿Tienes alguna indicación especial para ${nombreProd}? Si no tienes notas, presiona Continuar.`;
   },
 
-  pedidoPreguntarCantidad: (nombreProd: string): string => {
-    return `¿Cuántas unidades deseas de ${nombreProd}? Elige una opción o escribe el número:`;
+  pedidoPreguntarCantidad: (nombreProd: string, avisoStock?: string | null): string => {
+    return `${avisoStock ? `${avisoStock}\n` : ''}¿Cuántas unidades deseas de ${nombreProd}? Elige una opción o escribe el número:`;
   },
 
   pedidoProductoAgregado: (nombreProd: string, subtotalLinea: number): string => {

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { fijarUmbralesStock, reiniciarUmbralesStock } from '../../carta/umbralesStock';
 import { SelectorSaboresMezcla } from '../SelectorSaboresMezcla';
 import type { SaborMezcla } from '../saboresMezcla';
 
@@ -10,6 +11,33 @@ const sabores: SaborMezcla[] = [
   { id: 'x', nombre: 'Agotada', disponible: true, quedan: 0 },
   { id: 'y', nombre: 'Inactiva', disponible: false, quedan: 8 },
 ];
+
+beforeEach(() => reiniciarUmbralesStock());
+
+describe('SelectorSaboresMezcla: aviso por sabor', () => {
+  const lista: SaborMezcla[] = [
+    { id: 'f', nombre: 'Fresa', disponible: true, quedan: 1 },
+    { id: 'o', nombre: 'Oreo', disponible: true, quedan: 2 },
+    { id: 'm', nombre: 'Manjar', disponible: true, quedan: 9 },
+  ];
+  it('«¡Última!» con 1 y «Quedan N» hasta el umbral, con el aviso completo en el title', () => {
+    render(<SelectorSaboresMezcla sabores={lista} total={6} valor={{}} onCambio={() => {}} />);
+    expect(screen.getByTitle('Fresa: ¡última!').textContent).toBe('¡Última!');
+    expect(screen.getByTitle('Oreo: quedan 2').textContent).toBe('Quedan 2');
+    expect(screen.queryByText('Quedan 9')).toBeNull();
+  });
+
+  it('respeta el umbral configurado', () => {
+    fijarUmbralesStock({ quedan: 10, ultimas: 3 });
+    render(<SelectorSaboresMezcla sabores={lista} total={6} valor={{}} onCambio={() => {}} />);
+    expect(screen.getByTitle('Manjar: quedan 9')).toBeTruthy();
+    cleanup();
+    fijarUmbralesStock({ quedan: 0, ultimas: 0 });
+    render(<SelectorSaboresMezcla sabores={lista} total={6} valor={{}} onCambio={() => {}} />);
+    expect(screen.queryByText('¡Última!')).toBeNull();
+    expect(screen.queryByText('Quedan 2')).toBeNull();
+  });
+});
 
 describe('SelectorSaboresMezcla', () => {
   it('muestra los sabores disponibles; el que no tiene saldo sale bloqueado con «No hay stock»; los inactivos no salen', () => {

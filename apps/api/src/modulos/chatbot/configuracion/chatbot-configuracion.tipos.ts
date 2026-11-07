@@ -46,6 +46,8 @@ export const TEXTOS_BOT_DEFECTO = {
     'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',
 
   chatbot_texto_envio_gratis: '🛵 Envío gratis por «{promo}»',
+
+  chatbot_texto_aviso_stock: '🍩 {aviso}',
 } as const;
 
 export type ClaveTextoBot = keyof typeof TEXTOS_BOT_DEFECTO;
@@ -59,6 +61,7 @@ export const CLAVES_TEXTOS_BOT: ClaveTextoBot[] = [
   'chatbot_texto_no_entiendo_derivacion',
   'chatbot_texto_indicacion_pago',
   'chatbot_texto_envio_gratis',
+  'chatbot_texto_aviso_stock',
 ];
 
 /**

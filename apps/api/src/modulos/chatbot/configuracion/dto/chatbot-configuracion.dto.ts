@@ -64,6 +64,11 @@ export class ActualizarTextosBotDto {
   @IsString({ message: 'El texto de envío gratis debe ser una cadena' })
   @MaxLength(200, { message: 'El texto de envío gratis no puede exceder 200 caracteres' })
   chatbot_texto_envio_gratis?: string;
+
+  @IsOptional()
+  @IsString({ message: 'El texto de aviso de stock debe ser una cadena' })
+  @MaxLength(200, { message: 'El texto de aviso de stock no puede exceder 200 caracteres' })
+  chatbot_texto_aviso_stock?: string;
 }
 
 export class RestablecerTextoBotDto {

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { umbralesAvisoStock } from '@caprichos/compartido';
 import { topePropina } from '../propinas/propinas.util';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -286,6 +287,8 @@ export class LocalService {
               'carta_invitado_activo',
               'propina_activa',
               'propina_tope',
+              'aviso_stock_quedan_desde',
+              'aviso_stock_ultimas_desde',
             ],
           },
         },
@@ -350,6 +353,11 @@ export class LocalService {
       envioGratisModo: typeof envioGratisModo === 'string' ? envioGratisModo : 'mas_de',
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,
       puntosPorcentaje: puntosPorcentaje > 0 ? puntosPorcentaje : 5,
+      // Umbrales de «Quedan N» y «¡Últimas!» (Configuración); sin parámetro valen 5 y 3
+      avisoStock: umbralesAvisoStock(
+        parametros.find((p) => p.clave === 'aviso_stock_quedan_desde')?.valor,
+        parametros.find((p) => p.clave === 'aviso_stock_ultimas_desde')?.valor,
+      ),
       invitadoPermitido,
       // Propina opcional por canal (interruptor propina_activa) y tope en soles
       propina: { carta: propinaActiva?.carta === true, bot: propinaActiva?.bot === true, tope: propinaTope },

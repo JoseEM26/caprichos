@@ -13,7 +13,7 @@ sugerencias:
   - ¿Cómo hago que las donas o galletas descuenten stock al venderse?
   - ¿Cómo configuro los sabores de las donas y cuántas unidades trae cada tamaño?
   - ¿Cómo enlazo una opción como '2 Donas' con el stock?
-  - ¿Por qué la carta dice Quedan 4 o Últimos 2?
+  - ¿Por qué la carta dice Quedan 4 o Últimas 2?
 ---
 # Productos
 
@@ -81,7 +81,10 @@ Despues: [[apertura]]
 Ver tambien: [[ofertas]]
 
 ## Que ve el cliente cuando hay poco stock
-- 4 o 5 unidades: "Quedan N". 1 a 3 unidades: franja "!Ultimos N!". Sin saldo: Agotado.
+- 4 o 5 unidades: "Quedan 4" (discreto). 3 unidades: franja "¡Quedan solo 3, ya se acaban!". 2 unidades: "¡Últimas 2!". 1 unidad: "¡Última dona!" (o "¡Última unidad!" si el nombre del producto no es simple). Sin saldo: Agotado.
+- Con sabores, cada sabor avisa en la ventana del producto ("Fresa: ¡última!", "Oreo: quedan 2") y la tarjeta avisa por el total.
+- El bot de WhatsApp agrega la misma línea (por ejemplo "🍩 ¡Quedan solo 3, ya se acaban!") en el menú, al pedir la cantidad y en el resumen si el pedido se lleva casi todo el saldo. Lo agotado sigue sin mostrarse.
+- Desde cuántas unidades avisa se ajusta en Configuración, Parámetros del sistema: "Avisar «Quedan N» desde" (5 por defecto) y "Franja «¡Últimas!» desde" (3 por defecto), de 0 a 20; 0 lo apaga. La franja nunca puede pasar del aviso. El texto del bot se edita en Configuración, Chatbot.
 - Si el cliente pide mas de lo que queda: "Solo quedan N de X" y el boton Ajustar mi pedido recorta el pedido sin vaciar el carrito.
 - Plan B en las opciones: si algunas opciones estan agotadas por stock y otras no, la carta avisa "Se acabaron: X. Elige entre: Y".
 

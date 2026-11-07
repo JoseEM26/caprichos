@@ -186,6 +186,18 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'personas',
   },
+  aviso_stock_quedan_desde: {
+    nombre: 'Avisar «Quedan N» desde (unidades)',
+    descripcion: 'Desde cuántas unidades el cliente ve «Quedan N» en un producto con stock controlado. 0 = sin aviso.',
+    tipo: 'numero',
+    sufijo: 'unidades',
+  },
+  aviso_stock_ultimas_desde: {
+    nombre: 'Franja «¡Últimas!» desde (unidades)',
+    descripcion: 'Desde cuántas unidades aparece la franja «¡Última dona!», «¡Últimas 2!» o «¡Quedan solo 3, ya se acaban!». No puede pasar del aviso «Quedan N». 0 = sin franja.',
+    tipo: 'numero',
+    sufijo: 'unidades',
+  },
   puntos_porcentaje: {
     nombre: 'Porcentaje de puntos',
     descripcion: 'Porcentaje del monto consumido que el cliente acumula en puntos fidelidad.',

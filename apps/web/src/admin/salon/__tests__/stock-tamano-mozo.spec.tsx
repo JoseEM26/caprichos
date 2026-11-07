@@ -32,7 +32,7 @@ describe('mozo: stock por tamaño', () => {
     expect(media.disabled).toBe(true);
     expect(media.textContent).toContain('Solo quedan 2');
     expect((screen.getByRole('button', { name: /^Unidad/ }) as HTMLButtonElement).disabled).toBe(false);
-    expect(screen.getByTestId('ultimos-ventana').textContent).toBe('¡Últimos 2!');
+    expect(screen.getByTestId('ultimos-ventana').textContent).toBe('¡Últimas 2!');
   });
 
   it('con unidades ya en el pedido, el + se bloquea y Agregar sigue activo mientras quepa', () => {

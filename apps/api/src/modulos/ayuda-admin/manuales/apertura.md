@@ -9,7 +9,7 @@ sugerencias:
   - Como hago el conteo de apertura de las donas y galletas
   - Que es Quedaron de ayer y Produje hoy
   - Como boto a merma una dona vencida
-  - Por que la carta dice Quedan 4 o Ultimos 2
+  - Por que la carta dice Quedan 4 o Ultimas 2
   - Que hago si el sistema dice Solo quedan N
   - Por que me pide confirmar una diferencia grande
   - Como activo el control de stock de un producto
@@ -42,8 +42,9 @@ Despues: [[cocina]]
 2. Al dia siguiente aparecera en Apertura del dia para contarlo. Si el producto tiene sabores, el stock se lleva por sabor; las galletas sin sabores llevan un stock unico en unidades.
 
 ## Que ve el cliente en la carta
-- Con 4 o 5 unidades: "Quedan N" (discreto).
-- Con 1 a 3 unidades: franja "!Ultimos N!".
+- Con 4 o 5 unidades: "Quedan 4" (discreto).
+- Con 3: "¡Quedan solo 3, ya se acaban!". Con 2: "¡Últimas 2!". Con 1: "¡Última dona!" (o "¡Última unidad!").
+- Desde cuántas unidades se avisa lo decide el dueño en Configuración, Parámetros del sistema (5 y 3 por defecto; 0 lo apaga). El bot de WhatsApp avisa igual.
 - Con 0: el boton dice Agotado y no se puede agregar. Si un sabor se agota solo ese sabor queda bloqueado.
 - La carta se refresca sola cada 20 segundos y al abrir el carrito o el pago.
 
