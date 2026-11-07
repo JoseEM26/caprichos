@@ -45,6 +45,7 @@ import {
   esRemitenteSinTelefono,
   obtenerNombreMostrar,
 } from '../../mensajes/utilidades/nombre-contacto.util';
+import { detalleDatosPago } from './flujos/pago/textos-pago';
 import { EntradaRawInput, normalizarEntrada, esSaludo } from './normalizador-entrada.util';
 import { transicionarEstado } from './maquina-estados';
 import {
@@ -71,6 +72,9 @@ export interface EntradaProcesarMensaje extends EntradaRawInput {
   telMask?: string;
   id?: string;
 }
+
+/** Mensajes sobre total, monto o dónde pagar (sin tildes, en minúsculas). */
+const TEMA_DATOS_PAGO = /total|monto|precio|cuanto|yape|plin|numero|cuenta|donde (pago|pagar|deposito|yapeo)|transferenc|deposit/;
 
 @Injectable()
 export class EjecutorConversacionService {
@@ -1482,6 +1486,32 @@ export class EjecutorConversacionService {
           this.eventos?.emitirAdmin('notificaciones:nueva', {
             id: notif.id.toString(),
             titulo: notif.titulo,
+          });
+          return true;
+        }
+
+        // Pregunta por el total o por dónde pagar: se responde siempre (máx. 1 vez cada 5 min), sin tomar el chat.
+        const textoPlano = (entradaRaw.texto || entradaRaw.textoOriginal || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const ultimaRespDatos = pago.respuestaDatosEn ? Date.parse(pago.respuestaDatosEn) : NaN;
+        const datosRecientes = !isNaN(ultimaRespDatos) && Date.now() - ultimaRespDatos < 5 * 60000;
+        if (destinoEnvio && !datosRecientes && TEMA_DATOS_PAGO.test(textoPlano)) {
+          const total = Number(pago.monto ?? contexto.pedidoActivo?.total ?? 0);
+          const medio = String(pago.medio || 'YAPE').toUpperCase();
+          const respuesta =
+            `El total de tu pedido${pago.pedidoCodigo ? ` ${pago.pedidoCodigo}` : ''} es S/ ${total.toFixed(2)}.\n` +
+            `Método de pago: ${medio}\n\n` +
+            `${detalleDatosPago(medio, contexto.datosLocalPublicos?.mediosPagoVisibles, total.toFixed(2))}\n\n` +
+            `Envíanos la captura de tu pago por este mismo chat 📎 y una persona de Caja la revisa.`;
+          await this.mensajeria.enviarTexto(destinoEnvio, respuesta, {
+            conversacionId: conversacion.id,
+            replyToWaMessageId: entradaRaw.waMessageId,
+          });
+          await this.prisma.mensajeChat.create({
+            data: { conversacion_id: conversacion.id, direccion: 'SALE', autor: 'BOT', tipo: 'TEXTO', contenido: { texto: respuesta } },
+          });
+          await this.prisma.conversacion.update({
+            where: { id: conversacion.id },
+            data: { flujo: { ...flujo, pago: { ...pago, respuestaDatosEn: new Date().toISOString() } } },
           });
           return true;
         }

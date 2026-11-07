@@ -67,6 +67,33 @@ export interface InfoSeguimientoPago {
   altaDemanda?: boolean;
 }
 
+/** Bloque «Yape: número, titular» / Plin / transferencia, según el medio. */
+export function detalleDatosPago(med: string, datosLocalPagos: any, tot: string): string {
+  const pagos = datosLocalPagos || {};
+  let detalle = '';
+  if (med === 'YAPE') {
+    const y = pagos.yape || {};
+    const num = y.numero || '9XX XXX XXX';
+    const tit = y.titular ? `\n• Titular: ${y.titular}` : '';
+    detalle = `📲 Yape:\n• Número: ${num}${tit}`;
+  } else if (med === 'PLIN') {
+    const p = pagos.plin || {};
+    const num = p.numero || '9XX XXX XXX';
+    const tit = p.titular ? `\n• Titular: ${p.titular}` : '';
+    detalle = `📲 Plin:\n• Número: ${num}${tit}`;
+  } else if (med === 'TRANSFERENCIA') {
+    const t = pagos.transferencia || {};
+    const bco = t.banco ? ` (${t.banco})` : '';
+    const cta = t.cuenta || 'Consultar en caja';
+    const tit = t.titular ? `\n• Titular: ${t.titular}` : '';
+    const cci = t.cci ? `\n• CCI: ${t.cci}` : '';
+    detalle = `🏦 Transferencia bancaria${bco}:\n• Cuenta: ${cta}${cci}${tit}`;
+  } else {
+    detalle = `📲 Pago digital:\n• Monto: S/ ${tot}`;
+  }
+  return detalle;
+}
+
 /**
  * Catálogo de textos del flujo de Pago (FT-BOT-02, HU-CAP-130, 131, 132, 139, 030).
  * Todos los textos respetan <= 1024 caracteres y replican fielmente el guión del mockup Chatbot.dc.html.
@@ -76,29 +103,7 @@ export const TEXTOS_PAGO = {
     const cod = info.codigo;
     const tot = Number(info.total).toFixed(2);
     const med = (info.metodo || 'YAPE').toUpperCase();
-    const pagos = info.datosLocalPagos || {};
-
-    let detalle = '';
-    if (med === 'YAPE') {
-      const y = pagos.yape || {};
-      const num = y.numero || '9XX XXX XXX';
-      const tit = y.titular ? `\n• Titular: ${y.titular}` : '';
-      detalle = `📲 Yape:\n• Número: ${num}${tit}`;
-    } else if (med === 'PLIN') {
-      const p = pagos.plin || {};
-      const num = p.numero || '9XX XXX XXX';
-      const tit = p.titular ? `\n• Titular: ${p.titular}` : '';
-      detalle = `📲 Plin:\n• Número: ${num}${tit}`;
-    } else if (med === 'TRANSFERENCIA') {
-      const t = pagos.transferencia || {};
-      const bco = t.banco ? ` (${t.banco})` : '';
-      const cta = t.cuenta || 'Consultar en caja';
-      const tit = t.titular ? `\n• Titular: ${t.titular}` : '';
-      const cci = t.cci ? `\n• CCI: ${t.cci}` : '';
-      detalle = `🏦 Transferencia bancaria${bco}:\n• Cuenta: ${cta}${cci}${tit}`;
-    } else {
-      detalle = `📲 Pago digital:\n• Monto: S/ ${tot}`;
-    }
+    const detalle = detalleDatosPago(med, info.datosLocalPagos, tot);
 
     return `Listo. Recibimos tu pedido ${cod}; pasa a cocina apenas validemos tu pago.\nTotal a pagar: S/ ${tot}\nMétodo de pago: ${med}\n\n${detalle}\n\nPor favor envíanos la captura de tu comprobante por aquí 📎 para verificar tu pago.`;
   },
