@@ -23,6 +23,8 @@ import { ModalUbicar } from './ModalUbicar';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { EtiquetasPedido } from './EtiquetasPedido';
+import { InsigniaModalidad } from './InsigniaModalidad';
+import { NombreCliente } from './TarjetaPedidoCaja';
 import { canalLabel, modLabel, getBadge, ChipCobroMozo } from './PedidosAdminView';
 import { EtiquetaCajaCerrada, esperaCajaCerrada } from './BannerCajaCerrada';
 import {
@@ -301,9 +303,11 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
         )}
 
         <div style={{ fontSize: 13, lineHeight: '19px', color: 'var(--cp-soft, #2C4C5D)' }}>
-          {canalLabel(pedido.canal)} · {modLabel(pedido.modalidad)}
-          <br />
-          {pedido.cliente_nombre || 'Cliente'} · {pedido.cliente_telefono || 'Sin teléfono'}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}><NombreCliente pedido={pedido} /></div>
+            <InsigniaModalidad modalidad={pedido.modalidad} mesaNombre={pedido.mesa_nombre} />
+          </div>
+          {canalLabel(pedido.canal)} · {modLabel(pedido.modalidad)} · {pedido.cliente_telefono || 'Sin teléfono'}
           {esDelivery && (
             <>
               <br />

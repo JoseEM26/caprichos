@@ -41,7 +41,7 @@ Despues: [[caja]]
 4. Solo se mueve la foto: el pago se aprueba aparte. Un voucher que ya aprobó un pago no se puede mover.
 
 ## Como se hace: Cobrar un pedido
-1. En la lista de pedidos o desde la pestana Por confirmar o Pago por coordinar, ubicar el pedido y pulsar el boton Cobrar.
+1. En la lista de pedidos (cada tarjeta muestra grande el nombre del cliente y, al lado, la modalidad con su icono: moto para Delivery, bolsa para Para llevar, mesa o En el local) o desde la pestana Por confirmar o Pago por coordinar, ubicar el pedido y pulsar el boton Cobrar.
 2. Seleccionar el medio de pago: Efectivo, Yape, Plin, Tarjeta o Transferencia.
 3. Si el medio es efectivo, ingresar el monto recibido en el campo Recibido para que la pantalla calcule el vuelto exacto. Tambien se pueden combinar multiples medios de pago si el cliente divide la cuenta.
 4. Pulsar el boton Confirmar cobro para finalizar.

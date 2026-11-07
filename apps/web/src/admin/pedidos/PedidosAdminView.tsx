@@ -6,7 +6,7 @@ import { useEventos, useTiempoReal } from '../../comun/socket';
 import { pedidosApi, Pedido, RespuestaNoEntregados } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
 import { BandejaPropuestasUbicacion } from './BandejaPropuestasUbicacion';
-import { InsigniaCambioCobro, PanelCambioCobro, useCambiosCobroPendientes } from './PanelCambioCobro';
+import { PanelCambioCobro, useCambiosCobroPendientes } from './PanelCambioCobro';
 import { PanelNoEntregados } from './PanelNoEntregados';
 import { useSesion } from '../../comun/sesion';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
@@ -15,12 +15,12 @@ import { salonApi } from '../salon/api';
 import type { PisoSalon } from '../salon/tipos';
 import { reproducirCampana } from './audioAlerta';
 import { FranjaImpresion } from './FranjaImpresion';
-import { BannerCajaCerrada, EtiquetaCajaCerrada, esperaCajaCerrada, useEstadoCajaHoy } from './BannerCajaCerrada';
+import { BannerCajaCerrada, esperaCajaCerrada, useEstadoCajaHoy } from './BannerCajaCerrada';
 import './pedidos.css';
 import { FiltroDiasPedidos } from './FiltroDiasPedidos';
 import { RangoPedidos, parametrosDeRango, rangoHoy } from './filtroDias';
 import { nombreMedio } from './planPago';
-import { InsigniaDireccionEditada } from './InsigniaDireccionEditada';
+import { TarjetaPedidoCaja } from './TarjetaPedidoCaja';
 
 export function canalLabel(c?: string | null) {
   if (!c) return 'Web';
@@ -775,64 +775,16 @@ export function PedidosAdminView() {
             </div>
           ) : (
             pedidosPaginados.map((o) => {
-              const seleccionado = pedidoSeleccionadoId === o.id;
-              const resaltado = pedidosResaltados.has(String(o.id));
-              const itemsTexto = (o.lineas || []).map((l) => `${l.cantidad}× ${l.nombre}`).join(', ');
-              const badge = getBadge(o);
-              const cajaCerradaEspera = esperaCajaCerrada(o, cajaAbierta);
-
               return (
-                <button
+                <TarjetaPedidoCaja
                   key={o.id}
-                  type="button"
-                  onClick={() => setPedidoSeleccionadoId(o.id)}
-                  className={`cj-pedido-card ${resaltado ? 'cj-resaltado' : ''}`}
-                  style={{
-                    textAlign: 'left',
-                    background: 'var(--cp-white, #FFFFFF)',
-                    border: `1.5px solid ${seleccionado ? 'var(--cp-orange, #E67929)' : 'var(--cp-line, #E3D6C6)'}`,
-                    borderRadius: 12,
-                    padding: 12,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                    width: '100%',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 16 }}>
-                      {o.codigo}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        borderRadius: 9999,
-                        padding: '2px 10px',
-                        background: badge.bg,
-                        color: badge.fg,
-                      }}
-                    >
-                      {badge.l}
-                    </span>
-                    {cajaCerradaEspera && <EtiquetaCajaCerrada />}
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
-                    {canalLabel(o.canal)} · {modLabel(o.modalidad)} · {o.cliente_nombre || 'Cliente'}
-                  </div>
-                  <ChipCobroMozo cobro={o.cobroMozo} />
-                  {o.ubicacion_editada_en && <InsigniaDireccionEditada />}
-                  {cambiosCobro.pendientes.some((c) => c.pedidoId === String(o.id)) && <InsigniaCambioCobro />}
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
-                      {itemsTexto || '1 producto'}
-                    </span>
-                    <span style={{ fontWeight: 800, color: 'var(--cp-rust, #B2500F)', whiteSpace: 'nowrap' }}>
-                      s/ {Number(o.total || 0).toFixed(2)}
-                    </span>
-                  </div>
-                </button>
+                  pedido={o}
+                  seleccionado={pedidoSeleccionadoId === o.id}
+                  resaltado={pedidosResaltados.has(String(o.id))}
+                  cajaCerradaEspera={esperaCajaCerrada(o, cajaAbierta)}
+                  cambioCobroPendiente={cambiosCobro.pendientes.some((c) => c.pedidoId === String(o.id))}
+                  alSeleccionar={setPedidoSeleccionadoId}
+                />
               );
             })
           )}
