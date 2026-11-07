@@ -374,6 +374,11 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Usa la plantilla con el enlace de seguimiento fuera de la ventana de 24 h. Solo en «Sí» cuando Meta apruebe la plantilla.',
     tipo: 'sino',
   },
+  whatsapp_plantilla_delivery_ubicacion_activa: {
+    nombre: 'Aviso WhatsApp: Delivery con ubicación (plantilla)',
+    descripcion: 'Usa las plantillas que piden la ubicación fuera de la ventana de 24 h. Solo en «Sí» cuando Meta apruebe las plantillas.',
+    tipo: 'sino',
+  },
   whatsapp_aviso_recibido_activo: {
     nombre: 'Aviso WhatsApp: Pedido recibido desde la carta',
     descripcion: 'Avisa al cliente que recibimos su pedido de la carta virtual. Con Yape, Plin o transferencia, avisa que un asesor gestiona el voucher por este chat.',

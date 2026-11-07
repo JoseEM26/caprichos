@@ -102,6 +102,7 @@ async function configurarParametrosDemo() {
     { clave: 'whatsapp_aviso_encuesta_activo', valor: 'si' },
     { clave: 'whatsapp_aviso_voucher_recordatorio_activo', valor: 'no' },
     { clave: 'whatsapp_plantilla_recibido_seguimiento_activa', valor: 'no' },
+    { clave: 'whatsapp_plantilla_delivery_ubicacion_activa', valor: 'no' },
     { clave: 'chatbot_pago_recordatorio_activo', valor: 'no' },
     { clave: 'reparto_insistencia_min', valor: 3 },
     { clave: 'reparto_espera_max_min', valor: 10 },

@@ -36,7 +36,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'demanda', titulo: 'Alta demanda', claves: ['pausa_alta_demanda', 'alta_demanda_min_base'] },
   { id: 'puerta', titulo: 'Entrega fallida y reprogramación', claves: ['reparto_insistencia_min', 'reparto_espera_max_min', 'reprog_recargo_modo', 'reparto_recargo_reprogramacion', 'reprog_respuesta_min', 'reprog_max_intentos'] },
   { id: 'encuesta', titulo: 'Encuesta posventa', claves: ['encuesta_espera_min', 'encuesta_puntaje_queja', 'encuesta_ventana_dias'] },
-  { id: 'avisos', titulo: 'Avisos automáticos por WhatsApp al cliente', claves: ['chatbot_activo', 'whatsapp_aviso_recibido_activo', 'whatsapp_aviso_pago_confirmado_activo', 'whatsapp_aviso_listo_activo', 'whatsapp_aviso_recojo_activo', 'whatsapp_aviso_asignado_activo', 'whatsapp_aviso_salida_activo', 'whatsapp_aviso_llegada_activo', 'whatsapp_aviso_espera_activo', 'whatsapp_aviso_entregado_activo', 'whatsapp_aviso_encuesta_activo', 'whatsapp_aviso_voucher_recordatorio_activo', 'whatsapp_plantilla_recibido_seguimiento_activa', 'whatsapp_aviso_bienvenida_puntos_activo', 'whatsapp_aviso_puntos_ganados_activo', 'whatsapp_aviso_cuenta_activo'] },
+  { id: 'avisos', titulo: 'Avisos automáticos por WhatsApp al cliente', claves: ['chatbot_activo', 'whatsapp_aviso_recibido_activo', 'whatsapp_aviso_pago_confirmado_activo', 'whatsapp_aviso_listo_activo', 'whatsapp_aviso_recojo_activo', 'whatsapp_aviso_asignado_activo', 'whatsapp_aviso_salida_activo', 'whatsapp_aviso_llegada_activo', 'whatsapp_aviso_espera_activo', 'whatsapp_aviso_entregado_activo', 'whatsapp_aviso_encuesta_activo', 'whatsapp_aviso_voucher_recordatorio_activo', 'whatsapp_plantilla_recibido_seguimiento_activa', 'whatsapp_plantilla_delivery_ubicacion_activa', 'whatsapp_aviso_bienvenida_puntos_activo', 'whatsapp_aviso_puntos_ganados_activo', 'whatsapp_aviso_cuenta_activo'] },
   { id: 'pago', titulo: 'Pagos digitales por el chat', claves: ['chatbot_pago_recordatorio_activo', 'chatbot_pago_recordatorio_min', 'chatbot_pago_expira_min'] },
   { id: 'ia', titulo: 'Inteligencia artificial', claves: ['chatbot_ia_activo', 'chatbot_ia_tope_mensual_usd', 'chatbot_ia_max_por_hora_telefono', 'ayuda_ia_activo'] },
   { id: 'alertas', titulo: 'Alertas internas y modo asistido', claves: ['alerta_voucher_min_1', 'alerta_voucher_min_2', 'espera_cliente_aviso_min', 'chat_tomado_liberar_min', 'alerta_pedido_sin_confirmar_min', 'asistido_espera_min'] },
@@ -376,6 +376,13 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con «No», un pedido en efectivo fuera de la ventana de 24 h recibe el mensaje de siempre.',
     efecto: 'Con la ventana abierta el enlace siempre sale en el texto. Este interruptor solo cambia el envío fuera de la ventana de 24 h.',
     porDefecto: 'No', rango: SI_NO, palabras: ['plantilla', 'enlace', 'seguimiento', 'pedido recibido', 'meta'], peligro: 'medio',
+  },
+  whatsapp_plantilla_delivery_ubicacion_activa: {
+    grupo: 'avisos', titulo: 'Plantilla de delivery con ubicación',
+    descripcion: 'Cuando alguien pide por la web con delivery, aún no tiene ubicación y no está en la ventana de 24 h, el aviso de pedido recibido usa la plantilla que también le pide su ubicación. Actívalo cuando Meta apruebe las plantillas caprichos_pedido_delivery_ubicacion_*. En «No» sale la plantilla anterior, sin pedir la ubicación.',
+    ejemplo: 'Con «Sí», un cliente nuevo que pide delivery recibe «Envíanos tu ubicación: toca el clip».',
+    efecto: 'Con la ventana abierta el texto libre ya pide la ubicación. Si Meta rechaza la plantilla, se envía la anterior una sola vez.',
+    porDefecto: 'No', rango: SI_NO, palabras: ['plantilla', 'ubicación', 'delivery', 'pedido recibido', 'meta', 'clip'], peligro: 'medio',
   },
   whatsapp_aviso_bienvenida_puntos_activo: {
     grupo: 'avisos', titulo: 'Aviso: bienvenida a los puntos (primer pedido)',
