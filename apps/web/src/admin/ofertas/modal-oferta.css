@@ -1,0 +1,7 @@
+/* Pie y avisos comunes de los modales de Ofertas (pestañas). */
+.mo-pendiente { margin-right: auto; font-size: 13px; font-weight: 700; color: var(--cp-rust, #B3412E); }
+.mo-btn { min-height: 44px; padding: 0 20px; border-radius: 12px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: transparent; color: var(--cp-navy, #0B2C3E); font-weight: 800; font-size: 14px; cursor: pointer; }
+.mo-btn.principal { border: 0; background: var(--cp-orange, #E67929); }
+.mo-btn:disabled { opacity: 0.6; cursor: wait; }
+.mo-error { background: color-mix(in srgb, var(--cp-rust, #B3412E) 15%, var(--cp-cream, #FBF4EC)); border: 1.5px solid var(--cp-rust, #B3412E); border-radius: 12px; padding: 8px 12px; margin: 8px 16px 0; color: var(--cp-rust, #B3412E); font-weight: 700; font-size: 13px; }
+.mo-tarjeta { background: var(--cp-white, #fff); border: 1px solid var(--cp-line, #E3D6C6); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 14px; }

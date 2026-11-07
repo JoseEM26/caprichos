@@ -20,13 +20,15 @@ const mockCategorias = [
   { id: '4', nombre: 'Iced', productos: [{ id: 3, nombre: 'Iced Latte', precio: 10 }] },
 ];
 
-describe('Asistente de Ofertas y Previsualización', () => {
+const irA = (nombre: RegExp) => fireEvent.click(screen.getByRole('tab', { name: nombre }));
+
+describe('Modales de Ofertas con pestañas y Previsualización', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('ModalCombo (Constructor de Combos por Pasos)', () => {
-    it('navega entre los 4 pasos, valida cada paso y conserva los datos al ir y volver', async () => {
+    it('navega entre las 4 pestañas, marca la que tiene error al guardar y conserva los datos al ir y volver', async () => {
       const onGuardarMock = vi.fn().mockResolvedValue(undefined);
       const onCerrarMock = vi.fn();
 
@@ -40,64 +42,47 @@ describe('Asistente de Ofertas y Previsualización', () => {
         />,
       );
 
-      // Verificamos Paso 1
-      expect(screen.getByText(/Paso 1 de 4: Nombre y categoría/i)).toBeInTheDocument();
+      // Pestañas del modal
+      expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Datos', 'Partes y alternativas', 'Cuándo y dónde', 'Resumen']);
+      expect(screen.getByTestId('paso-1-combo')).toBeInTheDocument();
 
-      // Intentar avanzar sin nombre -> Debe mostrar error de validación
-      const btnSiguiente = screen.getByRole('button', { name: /Siguiente/i });
-      fireEvent.click(btnSiguiente);
+      // Guardar sin nombre -> error visible y marcado en la pestaña
+      fireEvent.click(screen.getByRole('button', { name: /Guardar combo/i }));
       expect(await screen.findByText('Escribe el nombre del combo.')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /Datos/ })).toHaveTextContent('!');
 
-      // Escribir nombre y categoría
-      const inputNombre = screen.getByLabelText(/Nombre del combo \*/i);
-      fireEvent.change(inputNombre, { target: { value: 'Combo Desayuno Dulce' } });
-      const inputDesc = screen.getByLabelText(/Descripción corta/i);
-      fireEvent.change(inputDesc, { target: { value: 'Frappé y Waffle para iniciar el día' } });
+      // Escribir nombre y descripción
+      fireEvent.change(screen.getByLabelText(/Nombre del combo \*/i), { target: { value: 'Combo Desayuno Dulce' } });
+      fireEvent.change(screen.getByLabelText(/Descripción corta/i), { target: { value: 'Frappé y Waffle para iniciar el día' } });
 
-      // Avanzar al Paso 2
-      fireEvent.click(btnSiguiente);
-      expect(await screen.findByText(/Paso 2 de 4: ¿Qué lleva el combo\?/i)).toBeInTheDocument();
+      // Partes: agregar una "+ 2 bebidas a elección"
+      irA(/Partes y alternativas/);
+      fireEvent.click(screen.getByRole('button', { name: /\+ 2 bebidas a elección/i }));
+      fireEvent.change(screen.getByDisplayValue('Bebidas a elección'), { target: { value: 'Bebidas del Desayuno' } });
 
-      // En Paso 2, agregar una parte usando "+ 2 bebidas a elección"
-      const btnAgregarBebida = screen.getByRole('button', { name: /\+ 2 bebidas a elección/i });
-      fireEvent.click(btnAgregarBebida);
-
-      // La parte agregada tiene input con "Bebidas a elección"
-      const inputNombreParte = screen.getByDisplayValue('Bebidas a elección');
-      fireEvent.change(inputNombreParte, { target: { value: 'Bebidas del Desayuno' } });
-
-      // Retroceder al Paso 1 y verificar que los datos se conservaron
-      const btnAtras = screen.getByRole('button', { name: /Atrás/i });
-      fireEvent.click(btnAtras);
-      expect(await screen.findByText(/Paso 1 de 4: Nombre y categoría/i)).toBeInTheDocument();
+      // Volver a Datos: lo escrito se conserva
+      irA(/^Datos/);
       expect(screen.getByDisplayValue('Combo Desayuno Dulce')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Frappé y Waffle para iniciar el día')).toBeInTheDocument();
 
-      // Volver al Paso 2 y comprobar que los datos de partes siguen ahí
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-      expect(await screen.findByDisplayValue('Bebidas del Desayuno')).toBeInTheDocument();
+      // Y la parte sigue ahí
+      irA(/Partes y alternativas/);
+      expect(screen.getByDisplayValue('Bebidas del Desayuno')).toBeInTheDocument();
 
-      // Avanzar al Paso 3: Cuánto vale
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-      expect(await screen.findByText(/Paso 3 de 4: ¿Cuánto vale el combo/i)).toBeInTheDocument();
+      // Precio del tamaño (Datos)
+      irA(/^Datos/);
+      fireEvent.change(screen.getByLabelText('Precio del tamaño'), { target: { value: '18' } });
 
-      // Configurar precio en Paso 3
-      const inputPrecio = screen.getByLabelText('Precio del tamaño');
-      fireEvent.change(inputPrecio, { target: { value: '18' } });
-
-      // Avanzar al Paso 4: Visualización
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+      // Resumen
+      irA(/Resumen/);
       expect(await screen.findByTestId('paso-4-combo')).toBeInTheDocument();
       expect(screen.getByText('Resumen del combo')).toBeInTheDocument();
       expect(screen.getAllByText('Combo Desayuno Dulce').length).toBeGreaterThanOrEqual(1);
 
       // Guardar combo -> abre diálogo de confirmación Sí/No (no window.confirm)
-      const btnGuardar = screen.getByRole('button', { name: /Guardar combo/i });
-      fireEvent.click(btnGuardar);
-
+      fireEvent.click(screen.getByRole('button', { name: /Guardar combo/i }));
       expect(await screen.findByText('¿Guardar nuevo combo?')).toBeInTheDocument();
-      const btnConfirmar = screen.getByRole('button', { name: 'Confirmar' });
-      fireEvent.click(btnConfirmar);
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
 
       await waitFor(() => {
         expect(onGuardarMock).toHaveBeenCalledWith(
@@ -121,18 +106,17 @@ describe('Asistente de Ofertas y Previsualización', () => {
         />,
       );
 
-      // Paso 1: llenar nombre
+      // Datos: llenar nombre
       fireEvent.change(screen.getByLabelText(/Nombre del combo \*/i), { target: { value: 'Combo Cálculo' } });
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+      irA(/Partes y alternativas/);
 
-      // Paso 2: agregar un complemento fijo con Frappé Clásico (S/ 12)
+      // Partes: agregar un complemento fijo con Frappé Clásico (S/ 12)
       fireEvent.click(screen.getByRole('button', { name: /\+ 1 complemento fijo/i }));
       const selectProducto = screen.getByRole('combobox');
       fireEvent.change(selectProducto, { target: { value: '1' } }); // Frappé Clásico S/ 12
 
-      // Avanzar a Paso 3
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-      expect(await screen.findByText(/Paso 3 de 4: ¿Cuánto vale el combo/i)).toBeInTheDocument();
+      // Volver a Datos (precio por tamaño)
+      irA(/^Datos/);
 
       // Caso A: Precio combo S/ 10 (Suma productos sueltos es S/ 12) -> Ahorro S/ 2 (17%)
       const inputPrecio = screen.getByLabelText('Precio del tamaño');
@@ -145,7 +129,7 @@ describe('Asistente de Ofertas y Previsualización', () => {
       expect(screen.getByTestId('aviso-combo-caro')).toHaveTextContent(/sale más caro que comprar por separado/i);
     });
 
-    it('al editar un combo existente carga todos los pasos con sus datos', async () => {
+    it('al editar un combo existente carga todas las pestañas con sus datos', async () => {
       const comboExistente: OfertaItem = {
         id: '10',
         tipo: 'COMBO',
@@ -177,18 +161,17 @@ describe('Asistente de Ofertas y Previsualización', () => {
         />,
       );
 
-      // Paso 1 debe tener los datos precargados
+      // Datos precargados
       expect(screen.getByDisplayValue('Combo Existente Cargado')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Descripción del combo existente')).toBeInTheDocument();
 
-      // Paso 2 cargado
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-      expect(await screen.findByDisplayValue('2 Bebidas')).toBeInTheDocument();
-
-      // Paso 3 cargado
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-      expect(await screen.findByDisplayValue('22')).toBeInTheDocument();
+      // Precio por tamaño cargado (Datos)
+      expect(screen.getByDisplayValue('22')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Personal')).toBeInTheDocument();
+
+      // Partes cargadas
+      irA(/Partes y alternativas/);
+      expect(await screen.findByDisplayValue('2 Bebidas')).toBeInTheDocument();
     });
   });
 
@@ -261,12 +244,9 @@ describe('Asistente de Ofertas y Previsualización', () => {
         />,
       );
 
-      // Llenar Paso 1 y avanzar a Paso 3
+      // «Qué descuenta» tiene nombre, a qué aplica y el valor
       fireEvent.change(screen.getByLabelText(/Nombre del descuento \*/i), { target: { value: 'Descuento 15%' } });
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i })); // Paso 2
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i })); // Paso 3
-
-      expect(await screen.findByText(/Paso 3 de 4: Beneficio del descuento/i)).toBeInTheDocument();
+      expect(await screen.findByTestId('paso-3-descuento')).toBeInTheDocument();
 
       const inputValor = screen.getByLabelText(/Valor del descuento \*/i);
 
@@ -306,12 +286,11 @@ describe('Asistente de Ofertas y Previsualización', () => {
         />,
       );
 
-      // Paso 1
       fireEvent.change(screen.getByLabelText(/Nombre del descuento \*/i), { target: { value: 'Descuento Mínima' } });
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
-      // Paso 2: Condiciones y compra mínima
-      expect(await screen.findByText(/Paso 2 de 4: Condiciones y vigencia/i)).toBeInTheDocument();
+      // Pestaña Condiciones: compra mínima
+      irA(/Condiciones/);
+      expect(await screen.findByTestId('paso-condiciones-descuento')).toBeInTheDocument();
       expect(
         screen.getByText(/Opcional\. El descuento solo se aplica si la compra llega a este monto\. Deja 0 si no hay minimo/i),
       ).toBeInTheDocument();
@@ -334,7 +313,7 @@ describe('Asistente de Ofertas y Previsualización', () => {
       expect(screen.getByText(/Monto mínimo que debe sumar el pedido para que el descuento se active/i)).toBeInTheDocument();
     });
 
-    it('en Paso 4 muestra el ejemplo didáctico con productos reales y los textos dinámicos', async () => {
+    it('en la Vista previa muestra el ejemplo didáctico con productos reales y los textos dinámicos', async () => {
       render(
         <ModalDescuento
           abierto={true}
@@ -346,11 +325,10 @@ describe('Asistente de Ofertas y Previsualización', () => {
       );
 
       fireEvent.change(screen.getByLabelText(/Nombre del descuento \*/i), { target: { value: 'Descuento Paso 4' } });
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i })); // Paso 2
-      fireEvent.change(screen.getByLabelText(/Compra mínima \(S\/\):/i), { target: { value: '30' } });
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i })); // Paso 3
       fireEvent.change(screen.getByLabelText(/Valor del descuento \*/i), { target: { value: '15' } });
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i })); // Paso 4
+      irA(/Condiciones/);
+      fireEvent.change(screen.getByLabelText(/Compra mínima \(S\/\):/i), { target: { value: '30' } });
+      irA(/Vista previa/);
 
       expect(await screen.findByTestId('paso-4-descuento')).toBeInTheDocument();
       expect(screen.getByTestId('ejemplo-calculado-dinamico-valor')).toHaveTextContent(
@@ -363,7 +341,7 @@ describe('Asistente de Ofertas y Previsualización', () => {
   });
 
   describe('ModalLlevaPaga (Asistente 2x1 con ejemplo calculado)', () => {
-    it('avanza por los 4 pasos y muestra ejemplo didáctico 2x1', async () => {
+    it('recorre las pestañas y muestra ejemplo didáctico 2x1', async () => {
       render(
         <ModalLlevaPaga
           abierto={true}
@@ -374,7 +352,7 @@ describe('Asistente de Ofertas y Previsualización', () => {
         />,
       );
 
-      expect(screen.getByText(/Paso 1 de 4: Nombre y a qué aplica/i)).toBeInTheDocument();
+      expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Qué lleva y paga', 'Cuándo y dónde', 'Vista previa']);
       fireEvent.change(screen.getByLabelText(/Nombre de la promoción \*/i), { target: { value: '2x1 Iced Coffee' } });
 
       // Agregar un producto a los componentes en Paso 1
@@ -387,17 +365,15 @@ describe('Asistente de Ofertas y Previsualización', () => {
       const btnMas = screen.getByRole('button', { name: '+' });
       fireEvent.click(btnMas);
 
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i })); // Paso 2
-      expect(await screen.findByText(/Paso 2 de 4: Condiciones de aplicación/i)).toBeInTheDocument();
+      irA(/Cuándo y dónde/);
+      expect(await screen.findByTestId('paso-2-lleva-paga')).toBeInTheDocument();
+      irA(/Qué lleva y paga/);
 
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i })); // Paso 3
-      expect(await screen.findByText(/Paso 3 de 4: Beneficio/i)).toBeInTheDocument();
-
-      // Configurar precio en Paso 3
+      // Configurar precio (misma pestaña)
       const inputPrecio = screen.getByLabelText(/Precio final de la promo/i);
       fireEvent.change(inputPrecio, { target: { value: '12' } });
 
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i })); // Paso 4
+      irA(/Vista previa/);
       expect(await screen.findByTestId('paso-4-lleva-paga')).toBeInTheDocument();
       expect(screen.getByTestId('ejemplo-calculado-lleva-paga')).toBeInTheDocument();
     });

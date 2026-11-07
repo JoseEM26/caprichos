@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, type CSSProperties } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { MenuMasOferta } from './MenuMasOferta';
 import {
   ofertasApi,
   OfertaItem,
@@ -124,18 +125,6 @@ function calcularVigenciaOferta(
 
   return { texto: 'Vigente ahora', ok: true };
 }
-
-const botonVisibilidadCarta: CSSProperties = {
-  width: '100%',
-  minHeight: '34px',
-  border: '1.5px dashed var(--cp-navy)',
-  borderRadius: '10px',
-  backgroundColor: 'transparent',
-  color: 'var(--cp-navy)',
-  fontWeight: 700,
-  fontSize: '12px',
-  cursor: 'pointer',
-};
 
 /** Qué se ve en la carta de una oferta desactivada (visible_carta). */
 function detalleDesactivada(o: OfertaItem): string {
@@ -1010,81 +999,56 @@ export function OfertasAdminView() {
                     ))}
                   </div>
 
-                  <div className="oferta-acciones" style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
-                    {!pr.activo && (
-                      <button type="button" onClick={() => cambiarVisibilidadDesactivada(pr)} style={botonVisibilidadCarta}>
-                        {pr.visibleCarta === false ? 'Mostrar como No disponible' : 'Ocultar de la carta'}
-                      </button>
-                    )}
+                  <div className="oferta-acciones" style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
                     <button
                       type="button"
                       onClick={() => {
-                        setOfertaParaPreview(pr);
-                        setModalPreviewAbierto(true);
+                        if (pr.tipo === 'COMBO') {
+                          setComboAEditar(pr);
+                          setModalComboAbierto(true);
+                        } else {
+                          setLlevaPagaAEditar(pr);
+                          setModalLlevaPagaAbierto(true);
+                        }
                       }}
-                      aria-label={`Ver cómo se ve ${pr.nombre} en la carta`}
                       style={{
-                        width: '100%',
-                        minHeight: '38px',
-                        border: '1.5px solid var(--cp-line)',
+                        flex: 1,
+                        minHeight: '44px',
+                        border: '1.5px solid var(--cp-navy)',
                         borderRadius: '10px',
-                        backgroundColor: 'var(--cp-sand)',
+                        backgroundColor: 'transparent',
                         color: 'var(--cp-navy)',
                         fontWeight: 700,
                         fontSize: '12px',
                         cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
                       }}
                     >
-                      Ver como se ve en la carta
+                      Editar
                     </button>
-
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (pr.tipo === 'COMBO') {
-                            setComboAEditar(pr);
-                            setModalComboAbierto(true);
-                          } else {
-                            setLlevaPagaAEditar(pr);
-                            setModalLlevaPagaAbierto(true);
-                          }
-                        }}
-                        style={{
-                          flex: 1,
-                          minHeight: '44px',
-                          border: '1.5px solid var(--cp-navy)',
-                          borderRadius: '10px',
-                          backgroundColor: 'transparent',
-                          color: 'var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => pedirCambioEstadoOferta(pr)}
-                        style={{
-                          flex: 1,
-                          minHeight: '44px',
-                          border: '1.5px solid var(--cp-navy)',
-                          borderRadius: '10px',
-                          backgroundColor: 'transparent',
-                          color: 'var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {pr.activo ? 'Desactivar' : 'Activar'}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => pedirCambioEstadoOferta(pr)}
+                      style={{
+                        flex: 1,
+                        minHeight: '44px',
+                        border: '1.5px solid var(--cp-navy)',
+                        borderRadius: '10px',
+                        backgroundColor: 'transparent',
+                        color: 'var(--cp-navy)',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {pr.activo ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <MenuMasOferta
+                      nombre={pr.nombre}
+                      acciones={[
+                        { id: 'ver-carta', etiqueta: 'Ver cómo se ve en la carta', alElegir: () => { setOfertaParaPreview(pr); setModalPreviewAbierto(true); } },
+                        ...(!pr.activo ? [{ id: 'visibilidad', etiqueta: pr.visibleCarta === false ? 'Mostrar como No disponible' : 'Ocultar de la carta', alElegir: () => cambiarVisibilidadDesactivada(pr) }] : []),
+                      ]}
+                    />
                   </div>
                 </div>
               );
@@ -1287,83 +1251,56 @@ export function OfertasAdminView() {
                     {Number(d.compraMinima) > 0 ? `Compra mínima s/ ${d.compraMinima}` : 'Sin compra mínima'}
                   </div>
 
-                  <div className="oferta-acciones" style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
-                    {!d.activo && (
-                      <button type="button" onClick={() => cambiarVisibilidadDesactivada(d)} style={botonVisibilidadCarta}>
-                        {d.visibleCarta === false ? 'Mostrar como No disponible' : 'Ocultar de la carta'}
-                      </button>
-                    )}
-                    {!esEnvio && (
+                  <div className="oferta-acciones" style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
                     <button
                       type="button"
                       onClick={() => {
-                        setOfertaParaPreview(d);
-                        setModalPreviewAbierto(true);
+                        if (esEnvio) {
+                          setEnvioAEditar(d);
+                          setModalEnvioAbierto(true);
+                          return;
+                        }
+                        setDescuentoAEditar(d);
+                        setModalDescuentoAbierto(true);
                       }}
-                      aria-label={`Ver cómo se ve ${d.nombre} en la carta`}
                       style={{
-                        width: '100%',
-                        minHeight: '38px',
-                        border: '1.5px solid var(--cp-line)',
+                        flex: 1,
+                        minHeight: '44px',
+                        border: '1.5px solid var(--cp-navy)',
                         borderRadius: '10px',
-                        backgroundColor: 'var(--cp-sand)',
+                        backgroundColor: 'transparent',
                         color: 'var(--cp-navy)',
                         fontWeight: 700,
                         fontSize: '12px',
                         cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
                       }}
                     >
-                      Ver como se ve en la carta
+                      Editar
                     </button>
-                    )}
-
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (esEnvio) {
-                            setEnvioAEditar(d);
-                            setModalEnvioAbierto(true);
-                            return;
-                          }
-                          setDescuentoAEditar(d);
-                          setModalDescuentoAbierto(true);
-                        }}
-                        style={{
-                          flex: 1,
-                          minHeight: '44px',
-                          border: '1.5px solid var(--cp-navy)',
-                          borderRadius: '10px',
-                          backgroundColor: 'transparent',
-                          color: 'var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => pedirCambioEstadoOferta(d)}
-                        style={{
-                          flex: 1,
-                          minHeight: '44px',
-                          border: '1.5px solid var(--cp-navy)',
-                          borderRadius: '10px',
-                          backgroundColor: 'transparent',
-                          color: 'var(--cp-navy)',
-                          fontWeight: 700,
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {d.activo ? 'Desactivar' : 'Activar'}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => pedirCambioEstadoOferta(d)}
+                      style={{
+                        flex: 1,
+                        minHeight: '44px',
+                        border: '1.5px solid var(--cp-navy)',
+                        borderRadius: '10px',
+                        backgroundColor: 'transparent',
+                        color: 'var(--cp-navy)',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {d.activo ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <MenuMasOferta
+                      nombre={d.nombre}
+                      acciones={[
+                        ...(!esEnvio ? [{ id: 'ver-carta', etiqueta: 'Ver cómo se ve en la carta', alElegir: () => { setOfertaParaPreview(d); setModalPreviewAbierto(true); } }] : []),
+                        ...(!d.activo ? [{ id: 'visibilidad', etiqueta: d.visibleCarta === false ? 'Mostrar como No disponible' : 'Ocultar de la carta', alElegir: () => cambiarVisibilidadDesactivada(d) }] : []),
+                      ]}
+                    />
                   </div>
                 </div>
               );

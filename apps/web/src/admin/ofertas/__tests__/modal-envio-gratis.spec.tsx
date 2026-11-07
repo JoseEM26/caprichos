@@ -8,6 +8,7 @@ describe('ModalEnvioGratis (editor de la promoción de envío)', () => {
     render(<ModalEnvioGratis abierto ofertaAEditar={null} onCerrar={() => {}} onGuardar={onGuardar} />);
 
     fireEvent.change(screen.getByLabelText(/Nombre de la promoción/), { target: { value: 'Delivery gratis de 2 a 6 pm' } });
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Mié' }));
     fireEvent.change(screen.getByLabelText(/Desde las/), { target: { value: '14:00' } });
     fireEvent.change(screen.getByLabelText(/Hasta las/), { target: { value: '18:00' } });
@@ -32,6 +33,7 @@ describe('ModalEnvioGratis (editor de la promoción de envío)', () => {
     const onGuardar = vi.fn().mockResolvedValue(undefined);
     render(<ModalEnvioGratis abierto ofertaAEditar={null} onCerrar={() => {}} onGuardar={onGuardar} />);
     fireEvent.change(screen.getByLabelText(/Nombre de la promoción/), { target: { value: 'Envío gratis' } });
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     fireEvent.click(screen.getByLabelText('WhatsApp (bot)'));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
     await waitFor(() => expect(onGuardar).toHaveBeenCalled());
@@ -42,6 +44,7 @@ describe('ModalEnvioGratis (editor de la promoción de envío)', () => {
     const onGuardar = vi.fn();
     render(<ModalEnvioGratis abierto ofertaAEditar={null} onCerrar={() => {}} onGuardar={onGuardar} />);
     fireEvent.change(screen.getByLabelText(/Nombre de la promoción/), { target: { value: 'Envío' } });
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     fireEvent.change(screen.getByLabelText(/Desde las/), { target: { value: '18:00' } });
     fireEvent.change(screen.getByLabelText(/Hasta las/), { target: { value: '14:00' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));

@@ -69,12 +69,10 @@ describe('Alternativas de una parte (si no hay stock, elige)', () => {
       combosParte: [{ id: '100', tipo: 'FIJO', cantidad: 1, categorias: [], productos: ['5'], alternativas: [{ id: '7', nombre: 'Empanada', cantidad: 2, disponible: true }] }],
     } as unknown as OfertaItem;
     render(<ModalCombo abierto comboAEditar={combo} onCerrar={() => {}} onGuardar={async (d) => { guardado = d; }} productosDisponibles={productos} categorias={[]} />);
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Partes y alternativas/ }));
     expect(await screen.findByText('Si no hay stock, el cliente podrá elegir:')).toBeInTheDocument();
     expect(screen.getByText('Empanada')).toBeInTheDocument();
     expect(screen.getByLabelText('Cantidad de Empanada')).toHaveValue(2);
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
     fireEvent.click(screen.getByTestId('btn-guardar-combo'));
     fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }));
     expect(guardado?.partes?.[0]?.alternativas).toEqual([{ productoId: '7', cantidad: 2 }]);
@@ -90,7 +88,7 @@ describe('Alternativas de una parte (si no hay stock, elige)', () => {
       combosParte: [{ id: '200', tipo: 'A_ELECCION', cantidad: 2, categorias: [], productos: ['9'], alternativas: [] }],
     } as unknown as OfertaItem;
     render(<ModalCombo abierto comboAEditar={combo} onCerrar={() => {}} onGuardar={async () => {}} productosDisponibles={productos} categorias={[]} />);
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Partes y alternativas/ }));
     expect(await screen.findByText('Si no hay stock, el cliente podrá elegir:')).toBeInTheDocument();
   });
 });

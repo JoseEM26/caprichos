@@ -1,10 +1,12 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
 import { PrevisualizacionCarta } from './PrevisualizacionCarta';
+import { ModalConPestanas } from '../../comun/ModalConPestanas';
+import { AvisoErrorOferta, ConfirmarSalir, PieOferta, primeraConError, useCambiosSinGuardar, useCierreConConfirmacion } from './modalOfertaComun';
 
 const DIAS = [
   ['lun', 'Lunes', 'Lun'],
@@ -39,6 +41,9 @@ interface ModalDescuentoProps {
   categorias?: Array<{ id: string; nombre: string; productos?: any[] }>;
 }
 
+// Referencia estable: un [] nuevo en cada render reiniciaría el formulario sin parar.
+const SIN_CATEGORIAS: never[] = [];
+
 export function ModalDescuento({
   abierto,
   descuentoAEditar,
@@ -46,12 +51,10 @@ export function ModalDescuento({
   onGuardar,
   productosDisponibles = [],
   categoriasDisponibles = CATEGORIAS_DEF,
-  categorias = [],
+  categorias = SIN_CATEGORIAS,
 }: ModalDescuentoProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Paso del asistente (1 a 4)
-  const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
+  const [pestana, setPestana] = useState('que');
+  const [verErrores, setVerErrores] = useState(false);
 
   // Paso 1: Nombre, foto y a qué aplica
   const [nombre, setNombre] = useState('');
@@ -137,7 +140,8 @@ export function ModalDescuento({
       setVisibleCarta(descuentoAEditar.visibleCarta !== false);
       setMostrarEnSaludo(Boolean(descuentoAEditar.mostrarEnSaludoBot));
       setSoloPrimeraCompra(Boolean(descuentoAEditar.soloPrimeraCompra));
-      setPaso(1);
+      setPestana('que');
+      setVerErrores(false);
       setMensajeError('');
       setProductoComboAbierto(false);
       setProductoBusqueda('');
@@ -159,41 +163,25 @@ export function ModalDescuento({
       setCanales(canalesPorDefecto('DESCUENTO'));
       setMostrarEnSaludo(false);
       setSoloPrimeraCompra(false);
-      setPaso(1);
+      setPestana('que');
+      setVerErrores(false);
       setMensajeError('');
       setProductoComboAbierto(false);
       setProductoBusqueda('');
     }
   }, [descuentoAEditar, abierto, listaCategoriasNombres]);
 
-  // Accesibilidad: auto-focus y Escape
+  // Esc cierra primero las confirmaciones abiertas (el modal queda bloqueado mientras tanto)
   useEffect(() => {
     if (!abierto) return;
-
-    const timer = setTimeout(() => {
-      dialogRef.current?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (confirmarQuitarFoto) {
-          setConfirmarQuitarFoto(false);
-          return;
-        }
-        if (confirmarGuardar) {
-          setConfirmarGuardar(false);
-          return;
-        }
-        onCerrar();
-      }
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (confirmarQuitarFoto) setConfirmarQuitarFoto(false);
+      else if (confirmarGuardar) setConfirmarGuardar(false);
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [abierto, confirmarQuitarFoto, confirmarGuardar, onCerrar]);
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  }, [abierto, confirmarQuitarFoto, confirmarGuardar]);
 
   const toggleDia = (d: string) => {
     setDias((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
@@ -382,79 +370,53 @@ export function ModalDescuento({
     setMinima(limpio);
   };
 
-  // Validación por paso
-  const validarPasoActual = (pasoAValidar: number): boolean => {
-    setMensajeError('');
-    if (pasoAValidar === 1) {
-      if (!nombre.trim()) {
-        setMensajeError('Escribe el nombre del descuento.');
-        return false;
-      }
-      if (aplica === 'cat' && !categoria) {
-        setMensajeError('Elige la categoría.');
-        return false;
-      }
-      if (aplica === 'prod' && !producto) {
-        setMensajeError('Elige el producto.');
-        return false;
-      }
-      return true;
-    }
-
-    if (pasoAValidar === 2) {
-      if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) {
-        setMensajeError('Escribe las dos horas (desde y hasta) o déjalas vacías.');
-        return false;
-      }
-      if (horaDesde && horaHasta && horaDesde >= horaHasta) {
-        setMensajeError('La hora de inicio debe ser antes de la hora final.');
-        return false;
-      }
-      if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
-        setMensajeError('La fecha de inicio no puede ser después de la final.');
-        return false;
-      }
-      const minNum = parseFloat(minima.replace(',', '.'));
-      if (!isNaN(minNum) && minNum < 0) {
-        setMensajeError('La compra mínima no puede ser negativa.');
-        return false;
-      }
-      return true;
-    }
-
-    if (pasoAValidar === 3) {
-      const valNum = parseFloat(valor.replace(',', '.'));
-      if (isNaN(valNum) || valNum <= 0) {
-        setMensajeError(tipo === 'pct' ? 'El porcentaje va de 1 a 100.' : 'El monto debe ser mayor que 0.');
-        return false;
-      }
-      if (tipo === 'pct' && (valNum < 1 || valNum > 100)) {
-        setMensajeError('El porcentaje va de 1 a 100.');
-        return false;
-      }
-      if (tipo === 'monto' && valNum > 9999.99) {
-        setMensajeError('El monto no puede superar S/ 9999.99.');
-        return false;
-      }
-      return true;
-    }
-
-    return true;
+  // Errores pendientes por pestaña (sin efectos): null = la pestaña está bien.
+  const errorQue = (): string | null => {
+    if (!nombre.trim()) return 'Escribe el nombre del descuento.';
+    if (aplica === 'cat' && !categoria) return 'Elige la categoría.';
+    if (aplica === 'prod' && !producto) return 'Elige el producto.';
+    const valNum = parseFloat(valor.replace(',', '.'));
+    if (isNaN(valNum) || valNum <= 0) return tipo === 'pct' ? 'El porcentaje va de 1 a 100.' : 'El monto debe ser mayor que 0.';
+    if (tipo === 'pct' && (valNum < 1 || valNum > 100)) return 'El porcentaje va de 1 a 100.';
+    if (tipo === 'monto' && valNum > 9999.99) return 'El monto no puede superar S/ 9999.99.';
+    return null;
   };
-
-  const irSiguientePaso = () => {
-    if (validarPasoActual(paso)) {
-      if (paso < 4) {
-        setPaso((prev) => (prev + 1) as any);
-      }
-    }
+  const errorCuando = (): string | null => {
+    if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) return 'Escribe las dos horas (desde y hasta) o déjalas vacías.';
+    if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de inicio debe ser antes de la hora final.';
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
+    if (!canales.carta && !canales.local && !canales.bot && !soloPrimeraCompra) return ERROR_SIN_CANALES;
+    return null;
   };
+  const errorCondiciones = (): string | null => {
+    const minNum = parseFloat(minima.replace(',', '.'));
+    if (!isNaN(minNum) && minNum < 0) return 'La compra mínima no puede ser negativa.';
+    return null;
+  };
+  const erroresPestanas = [
+    { id: 'que', error: errorQue() },
+    { id: 'cuando', error: errorCuando() },
+    { id: 'condiciones', error: errorCondiciones() },
+  ];
+  const marca = (id: string) => {
+    const hay = verErrores && !!erroresPestanas.find((e) => e.id === id)?.error;
+    return hay ? { insignia: '!', insigniaError: true } : {};
+  };
+  const firma = JSON.stringify([nombre, fotoArchivoId, aplica, categoria, producto, dias, horaDesde, horaHasta, fechaDesde, fechaHasta, canales, visibleCarta, mostrarEnSaludo, soloPrimeraCompra, minima, tipo, valor]);
+  const sucio = useCambiosSinGuardar(abierto, firma);
+  const { cerrar, confirmando, setConfirmando } = useCierreConConfirmacion(sucio, onCerrar);
 
-  const irPasoAnterior = () => {
-    setMensajeError('');
-    if (paso > 1) {
-      setPaso((prev) => (prev - 1) as any);
+  // Guardar: si hay un error, salta a la primera pestaña con error y lo muestra; si no, pide confirmar.
+  const intentarGuardar = () => {
+    setVerErrores(true);
+    const e = primeraConError(erroresPestanas);
+    if (e) {
+      setPestana(e.id);
+      setMensajeError(e.error as string);
+      return;
     }
+    setMensajeError('');
+    setConfirmarGuardar(true);
   };
 
   const ejecutarGuardar = async () => {
@@ -536,158 +498,20 @@ export function ModalDescuento({
   if (!abierto) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 60,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <div
-        onClick={onCerrar}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundColor: 'rgba(11, 44, 62, 0.55)',
-          zIndex: 60,
-        }}
-        aria-hidden="true"
-      />
-
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={descuentoAEditar ? 'Editar descuento' : 'Nuevo descuento automático'}
-        tabIndex={-1}
-        style={{
-          position: 'relative',
-          zIndex: 65,
-          width: 'min(920px, calc(100% - 24px))',
-          maxHeight: 'min(860px, calc(100% - 24px))',
-          backgroundColor: 'var(--cp-cream)',
-          borderRadius: '20px',
-          boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
-          padding: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '14px',
-          boxSizing: 'border-box',
-          overflowY: 'auto',
-        }}
-      >
-        {/* Cabecera */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid var(--cp-line)', paddingBottom: '12px' }}>
-          <div>
-            <div
-              style={{
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: '22px',
-                color: 'var(--cp-navy)',
-              }}
-            >
-              {descuentoAEditar ? 'Editar descuento' : 'Nuevo descuento automático'}
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-              Asistente por pasos para configurar descuentos por porcentaje o monto
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onCerrar}
-            aria-label="Cerrar modal"
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '22px',
-              border: '1.5px solid var(--cp-navy)',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontSize: '20px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Progreso por pasos */}
-        <nav
-          aria-label="Progreso del asistente"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'var(--cp-white)',
-            borderRadius: '14px',
-            padding: '10px 14px',
-            border: '1px solid var(--cp-line)',
-            flexWrap: 'wrap',
-          }}
-        >
-          {[
-            { num: 1, titulo: '1. Nombre y a qué aplica' },
-            { num: 2, titulo: '2. Condiciones' },
-            { num: 3, titulo: '3. Beneficio' },
-            { num: 4, titulo: '4. Vista previa y ejemplo' },
-          ].map((st) => {
-            const esActivo = paso === st.num;
-            const esCompletado = paso > st.num;
-            return (
-              <button
-                key={st.num}
-                type="button"
-                onClick={() => {
-                  if (st.num < paso || validarPasoActual(paso)) {
-                    setPaso(st.num as any);
-                  }
-                }}
-                aria-current={esActivo ? 'step' : undefined}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'transparent',
-                  border: 0,
-                  padding: '6px 10px',
-                  borderRadius: '8px',
-                  backgroundColor: esActivo ? 'var(--cp-sand)' : 'transparent',
-                  color: esActivo ? 'var(--cp-navy)' : esCompletado ? '#2E7D32' : 'var(--cp-soft)',
-                  fontWeight: esActivo ? 800 : 700,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                <span
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '12px',
-                    backgroundColor: esActivo ? 'var(--cp-navy)' : esCompletado ? '#2E7D32' : 'var(--cp-line)',
-                    color: esActivo || esCompletado ? '#fff' : 'var(--cp-navy)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 800,
-                  }}
-                >
-                  {esCompletado ? '✓' : st.num}
-                </span>
-                <span>{st.titulo}</span>
-              </button>
-            );
-          })}
-        </nav>
-
+    <>
+      <ModalConPestanas
+        titulo={descuentoAEditar ? 'Editar descuento' : 'Nuevo descuento automático'}
+        subtitulo="Descuento automático por porcentaje o monto"
+        alCerrar={cerrar}
+        bloquearCierre={guardando || confirmarQuitarFoto || confirmarGuardar || confirmando}
+        pestanaActiva={pestana}
+        alCambiarPestana={setPestana}
+        ancho={920}
+        bajoPestanas={<AvisoErrorOferta mensaje={mensajeError} />}
+        pie={<PieOferta sucio={sucio} alCancelar={cerrar} alGuardar={intentarGuardar} guardando={guardando} textoGuardar="Guardar descuento" testidGuardar="btn-guardar-descuento" />}
+        pestanas={[
+          { id: 'que', etiqueta: 'Qué descuenta', ...marca('que'), contenido: (
+<>
         {/* Aviso fijo: este formulario rebaja productos, no el envío */}
         <div
           role="note"
@@ -705,29 +529,6 @@ export function ModalDescuento({
         >
           Este descuento rebaja el precio de los productos. Si quieres delivery gratis, no uses este formulario: usa «+ Envío gratis».
         </div>
-
-        {/* Error de validación */}
-        {mensajeError && (
-          <div
-            role="alert"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--cp-rust) 15%, var(--cp-cream))',
-              border: '1.5px solid var(--cp-rust)',
-              borderRadius: '12px',
-              padding: '10px 14px',
-              color: 'var(--cp-rust)',
-              fontWeight: 700,
-              fontSize: '13px',
-            }}
-          >
-            {mensajeError}
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* PASO 1: NOMBRE Y A QUÉ APLICA                                 */}
-        {/* ============================================================== */}
-        {paso === 1 && (
           <div
             data-testid="paso-1-descuento"
             style={{
@@ -740,9 +541,6 @@ export function ModalDescuento({
               gap: '14px',
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
-              Paso 1 de 4: Nombre y a qué aplica
-            </div>
 
             <div>
               <label htmlFor="desc-nombre" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
@@ -1019,219 +817,6 @@ export function ModalDescuento({
               )}
             </div>
           </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* PASO 2: CONDICIONES (DÍAS, HORARIO, CANALES, VIGENCIA)        */}
-        {/* ============================================================== */}
-        {paso === 2 && (
-          <div
-            data-testid="paso-2-descuento"
-            style={{
-              backgroundColor: 'var(--cp-white)',
-              border: '1px solid var(--cp-line)',
-              borderRadius: '14px',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-            }}
-          >
-            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
-              Paso 2 de 4: Condiciones y vigencia
-            </div>
-
-            {/* Días */}
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>Días que aplica:</div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {DIAS.map(([code, full]) => {
-                  const on = dias.includes(code);
-                  return (
-                    <button
-                      key={code}
-                      type="button"
-                      onClick={() => toggleDia(code)}
-                      aria-pressed={on}
-                      style={{
-                        minHeight: '34px',
-                        padding: '0 12px',
-                        borderRadius: '9999px',
-                        border: '1.5px solid var(--cp-navy)',
-                        backgroundColor: on ? 'var(--cp-navy)' : 'transparent',
-                        color: on ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {full}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Horas */}
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '130px' }}>
-                <label htmlFor="desc-h-desde" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                  Hora desde:
-                </label>
-                <input
-                  id="desc-h-desde"
-                  type="time"
-                  value={horaDesde}
-                  onChange={(e) => setHoraDesde(e.target.value)}
-                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
-                />
-              </div>
-              <div style={{ flex: 1, minWidth: '130px' }}>
-                <label htmlFor="desc-h-hasta" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                  Hora hasta:
-                </label>
-                <input
-                  id="desc-h-hasta"
-                  type="time"
-                  value={horaHasta}
-                  onChange={(e) => setHoraHasta(e.target.value)}
-                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
-                />
-              </div>
-            </div>
-
-            {/* Saludo del chat y primera compra */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-              <label htmlFor="desc-saludo" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '13px', fontWeight: 600 }}>
-                <input
-                  id="desc-saludo"
-                  type="checkbox"
-                  checked={mostrarEnSaludo}
-                  onChange={(e) => setMostrarEnSaludo(e.target.checked)}
-                  style={{ marginTop: '3px' }}
-                />
-                <span>
-                  Mostrar al inicio del chat de WhatsApp
-                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 400, color: 'var(--cp-soft)' }}>
-                    Cuando el cliente escribe «hola», el bot le ofrece esta promoción para pedir en la carta online (sin costo por mensaje). Solo se muestra una: la de menor orden que esté vigente hoy.
-                  </span>
-                </span>
-              </label>
-              <label htmlFor="desc-primera" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '13px', fontWeight: 600 }}>
-                <input
-                  id="desc-primera"
-                  type="checkbox"
-                  checked={soloPrimeraCompra}
-                  onChange={(e) => setSoloPrimeraCompra(e.target.checked)}
-                  style={{ marginTop: '3px' }}
-                />
-                <span>
-                  Solo primera compra del cliente (celular con sesión)
-                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 400, color: 'var(--cp-soft)' }}>
-                    Se aplica solo si el cliente inició sesión en la carta online y su celular nunca tuvo un pedido válido. No aplica a promociones ni combos. Solo en la carta web y como máximo un mes: pon una fecha de fin.
-                  </span>
-                </span>
-              </label>
-            </div>
-
-            {/* Canales, Fechas y Compra mínima */}
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '140px' }}>
-                <SelectorCanales id="desc-canal" tipo="DESCUENTO" valor={canales} onChange={setCanales} bloqueado={soloPrimeraCompra} />
-                  {descuentoAEditar && <SelectorVisibleCarta id="desc-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
-              </div>
-              <div style={{ flex: 1, minWidth: '180px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                  <label htmlFor="desc-minima" style={{ fontSize: '12px', fontWeight: 700 }}>
-                    Compra mínima (S/):
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setMostrarAyudaMinima((prev) => !prev)}
-                    aria-label="Ayuda sobre compra mínima"
-                    title="Monto mínimo que debe sumar el pedido para que el descuento se active."
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--cp-sand)',
-                      border: '1px solid var(--cp-line)',
-                      color: 'var(--cp-navy)',
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0,
-                    }}
-                  >
-                    ?
-                  </button>
-                </div>
-                <input
-                  id="desc-minima"
-                  type="text"
-                  inputMode="decimal"
-                  value={minima}
-                  onChange={(e) => manejarCambioMinima(e.target.value)}
-                  placeholder="0.00 (sin mínimo)"
-                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
-                />
-                <div style={{ fontSize: '11px', color: 'var(--cp-soft)', marginTop: '4px', lineHeight: '14px' }}>
-                  Opcional. El descuento solo se aplica si la compra llega a este monto. Deja 0 si no hay minimo
-                </div>
-                {textoDinamicoMinima && (
-                  <div
-                    data-testid="ejemplo-dinamico-minima"
-                    style={{ fontSize: '11px', color: '#2E7D32', fontWeight: 700, marginTop: '3px' }}
-                  >
-                    {textoDinamicoMinima}
-                  </div>
-                )}
-                {avisoMinima && (
-                  <div role="alert" style={{ color: 'var(--cp-rust)', fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>
-                    {avisoMinima}
-                  </div>
-                )}
-                {mostrarAyudaMinima && (
-                  <div style={{ fontSize: '11px', backgroundColor: 'var(--cp-sand)', padding: '6px 8px', borderRadius: '6px', marginTop: '4px', color: 'var(--cp-navy)', lineHeight: '14px' }}>
-                    Monto mínimo que debe sumar el pedido para que el descuento se active. Deja 0 si no hay mínimo.
-                  </div>
-                )}
-              </div>
-              <div style={{ flex: 1, minWidth: '130px' }}>
-                <label htmlFor="desc-f-desde" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                  Fecha inicio (opcional):
-                </label>
-                <input
-                  id="desc-f-desde"
-                  type="date"
-                  value={fechaDesde}
-                  onChange={(e) => setFechaDesde(e.target.value)}
-                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
-                />
-              </div>
-              <div style={{ flex: 1, minWidth: '130px' }}>
-                <label htmlFor="desc-f-hasta" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                  Fecha fin (opcional):
-                </label>
-                <input
-                  id="desc-f-hasta"
-                  type="date"
-                  value={fechaHasta}
-                  onChange={(e) => setFechaHasta(e.target.value)}
-                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* PASO 3: BENEFICIO (TIPO Y VALOR)                              */}
-        {/* ============================================================== */}
-        {paso === 3 && (
           <div
             data-testid="paso-3-descuento"
             style={{
@@ -1244,9 +829,6 @@ export function ModalDescuento({
               gap: '14px',
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
-              Paso 3 de 4: Beneficio del descuento
-            </div>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div>
@@ -1407,12 +989,223 @@ export function ModalDescuento({
               {aplica === 'toda' ? 'en toda la carta' : aplica === 'cat' ? `en la categoría ${categoria}` : `en ${producto}`}.
             </div>
           </div>
-        )}
+</>
+          ) },
+          { id: 'cuando', etiqueta: 'Cuándo y dónde', ...marca('cuando'), contenido: (
+          <div
+            data-testid="paso-2-descuento"
+            style={{
+              backgroundColor: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            {/* Días */}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>Días que aplica:</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {DIAS.map(([code, full]) => {
+                  const on = dias.includes(code);
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => toggleDia(code)}
+                      aria-pressed={on}
+                      style={{
+                        minHeight: '34px',
+                        padding: '0 12px',
+                        borderRadius: '9999px',
+                        border: '1.5px solid var(--cp-navy)',
+                        backgroundColor: on ? 'var(--cp-navy)' : 'transparent',
+                        color: on ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {full}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-        {/* ============================================================== */}
-        {/* PASO 4: PREVISUALIZACIÓN Y EJEMPLO CALCULADO                   */}
-        {/* ============================================================== */}
-        {paso === 4 && (
+            {/* Horas */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="desc-h-desde" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Hora desde:
+                </label>
+                <input
+                  id="desc-h-desde"
+                  type="time"
+                  value={horaDesde}
+                  onChange={(e) => setHoraDesde(e.target.value)}
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="desc-h-hasta" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Hora hasta:
+                </label>
+                <input
+                  id="desc-h-hasta"
+                  type="time"
+                  value={horaHasta}
+                  onChange={(e) => setHoraHasta(e.target.value)}
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="desc-f-desde" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Fecha inicio (opcional):
+                </label>
+                <input
+                  id="desc-f-desde"
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="desc-f-hasta" style={{ fontSize: '12px', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                  Fecha fin (opcional):
+                </label>
+                <input
+                  id="desc-f-hasta"
+                  type="date"
+                  value={fechaHasta}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '140px' }}>
+                <SelectorCanales id="desc-canal" tipo="DESCUENTO" valor={canales} onChange={setCanales} bloqueado={soloPrimeraCompra} />
+                  {descuentoAEditar && <SelectorVisibleCarta id="desc-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
+              </div>
+            </div>
+          </div>
+          ) },
+          { id: 'condiciones', etiqueta: 'Condiciones', ...marca('condiciones'), contenido: (
+          <div
+            data-testid="paso-condiciones-descuento"
+            style={{
+              backgroundColor: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            {/* Saludo del chat y primera compra */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+              <label htmlFor="desc-saludo" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '13px', fontWeight: 600 }}>
+                <input
+                  id="desc-saludo"
+                  type="checkbox"
+                  checked={mostrarEnSaludo}
+                  onChange={(e) => setMostrarEnSaludo(e.target.checked)}
+                  style={{ marginTop: '3px' }}
+                />
+                <span>
+                  Mostrar al inicio del chat de WhatsApp
+                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 400, color: 'var(--cp-soft)' }}>
+                    Cuando el cliente escribe «hola», el bot le ofrece esta promoción para pedir en la carta online (sin costo por mensaje). Solo se muestra una: la de menor orden que esté vigente hoy.
+                  </span>
+                </span>
+              </label>
+              <label htmlFor="desc-primera" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '13px', fontWeight: 600 }}>
+                <input
+                  id="desc-primera"
+                  type="checkbox"
+                  checked={soloPrimeraCompra}
+                  onChange={(e) => setSoloPrimeraCompra(e.target.checked)}
+                  style={{ marginTop: '3px' }}
+                />
+                <span>
+                  Solo primera compra del cliente (celular con sesión)
+                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 400, color: 'var(--cp-soft)' }}>
+                    Se aplica solo si el cliente inició sesión en la carta online y su celular nunca tuvo un pedido válido. No aplica a promociones ni combos. Solo en la carta web y como máximo un mes: pon una fecha de fin.
+                  </span>
+                </span>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '180px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                  <label htmlFor="desc-minima" style={{ fontSize: '12px', fontWeight: 700 }}>
+                    Compra mínima (S/):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setMostrarAyudaMinima((prev) => !prev)}
+                    aria-label="Ayuda sobre compra mínima"
+                    title="Monto mínimo que debe sumar el pedido para que el descuento se active."
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--cp-sand)',
+                      border: '1px solid var(--cp-line)',
+                      color: 'var(--cp-navy)',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                    }}
+                  >
+                    ?
+                  </button>
+                </div>
+                <input
+                  id="desc-minima"
+                  type="text"
+                  inputMode="decimal"
+                  value={minima}
+                  onChange={(e) => manejarCambioMinima(e.target.value)}
+                  placeholder="0.00 (sin mínimo)"
+                  style={{ width: '100%', minHeight: '38px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 8px' }}
+                />
+                <div style={{ fontSize: '11px', color: 'var(--cp-soft)', marginTop: '4px', lineHeight: '14px' }}>
+                  Opcional. El descuento solo se aplica si la compra llega a este monto. Deja 0 si no hay minimo
+                </div>
+                {textoDinamicoMinima && (
+                  <div
+                    data-testid="ejemplo-dinamico-minima"
+                    style={{ fontSize: '11px', color: '#2E7D32', fontWeight: 700, marginTop: '3px' }}
+                  >
+                    {textoDinamicoMinima}
+                  </div>
+                )}
+                {avisoMinima && (
+                  <div role="alert" style={{ color: 'var(--cp-rust)', fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>
+                    {avisoMinima}
+                  </div>
+                )}
+                {mostrarAyudaMinima && (
+                  <div style={{ fontSize: '11px', backgroundColor: 'var(--cp-sand)', padding: '6px 8px', borderRadius: '6px', marginTop: '4px', color: 'var(--cp-navy)', lineHeight: '14px' }}>
+                    Monto mínimo que debe sumar el pedido para que el descuento se active. Deja 0 si no hay mínimo.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          ) },
+          { id: 'vista', etiqueta: 'Vista previa', contenido: (
           <div
             data-testid="paso-4-descuento"
             style={{
@@ -1480,81 +1273,10 @@ export function ModalDescuento({
               />
             </div>
           </div>
-        )}
-
-        {/* Navegación inferior */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '10px',
-            borderTop: '1.5px solid var(--cp-line)',
-            paddingTop: '12px',
-          }}
-        >
-          <button
-            type="button"
-            onClick={irPasoAnterior}
-            disabled={paso === 1}
-            style={{
-              minHeight: '44px',
-              padding: '0 20px',
-              borderRadius: '12px',
-              border: '1.5px solid var(--cp-navy)',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontWeight: 800,
-              fontSize: '14px',
-              cursor: paso === 1 ? 'not-allowed' : 'pointer',
-              opacity: paso === 1 ? 0.3 : 1,
-            }}
-          >
-            ← Atrás
-          </button>
-
-          {paso < 4 ? (
-            <button
-              type="button"
-              onClick={irSiguientePaso}
-              data-testid="btn-siguiente-paso"
-              style={{
-                minHeight: '44px',
-                padding: '0 24px',
-                borderRadius: '12px',
-                border: 0,
-                backgroundColor: 'var(--cp-orange)',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: 'pointer',
-              }}
-            >
-              Siguiente →
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmarGuardar(true)}
-              disabled={guardando}
-              data-testid="btn-guardar-descuento"
-              style={{
-                minHeight: '44px',
-                padding: '0 28px',
-                borderRadius: '12px',
-                border: 0,
-                backgroundColor: 'var(--cp-orange)',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: guardando ? 'wait' : 'pointer',
-              }}
-            >
-              {guardando ? 'Guardando...' : 'Guardar descuento'}
-            </button>
-          )}
-        </div>
-
+          ) },
+        ]}
+      />
+      <ConfirmarSalir abierto={confirmando} alSalir={() => { setConfirmando(false); onCerrar(); }} alQuedarse={() => setConfirmando(false)} />
         {/* Confirmación para quitar foto */}
         <ModalConfirmacion
           abierto={confirmarQuitarFoto}
@@ -1572,7 +1294,6 @@ export function ModalDescuento({
           onConfirmar={ejecutarGuardar}
           onCancelar={() => setConfirmarGuardar(false)}
         />
-      </div>
-    </div>
+    </>
   );
 }

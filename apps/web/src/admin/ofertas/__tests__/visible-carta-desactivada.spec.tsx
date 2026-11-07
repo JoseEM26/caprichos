@@ -38,7 +38,7 @@ describe('ModalDescuento: el control solo aparece al editar', () => {
   async function irAlPasoDeCanales(props: Record<string, unknown>) {
     render(<ModalDescuento abierto onCerrar={() => {}} onGuardar={vi.fn()} productosDisponibles={[]} categorias={[]} {...props} />);
     fireEvent.change(document.getElementById('desc-nombre')!, { target: { value: '10% de prueba' } });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     await waitFor(() => expect(document.getElementById('desc-canal-bot')).not.toBeNull());
   }
 
