@@ -32,6 +32,12 @@ jobs:
       - run: pnpm --filter @caprichos/compartido build
       - run: pnpm --filter @caprichos/agente-local empaquetar:win
       - run: pnpm --filter @caprichos/agente-local empaquetar:linux
+      # Humo: el binario Linux (mismo código que el .exe) debe imprimir su salida y terminar; si queda mudo, falla el pipeline
+      - name: Prueba de humo del programa
+        run: |
+          out=$(AGENTE_CONFIG=/tmp/humo-config.json timeout 20 apps/agente-local/dist-exe/agente-impresion-linux impresoras </dev/null 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "impresoras" || { echo "El programa no mostró salida"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: agente-impresion
