@@ -212,6 +212,7 @@ export const META_TEXTOS: Record<
     descripcion: 'Línea que el bot agrega en el menú, al pedir la cantidad y en el resumen cuando un producto con stock controlado está por agotarse. Usa {aviso} para el texto automático («¡Última dona!», «¡Quedan solo 3, ya se acaban!»).',
     efecto: 'Lo ve el cliente al pedir por WhatsApp. Desde cuántas unidades se avisa se cambia en Parámetros del sistema.',
     ejemplo: '🍩 {aviso}',
+  },
   chatbot_texto_combo_intro: {
     titulo: 'Inicio al armar un combo',
     descripcion: 'Primer mensaje cuando el cliente elige un combo por WhatsApp. Usa {combo} para el nombre y {incluye} para la línea «Incluye: …» con lo que va fijo.',
