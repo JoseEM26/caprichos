@@ -6,7 +6,7 @@ import {
   generarTsplTrabajo,
   generarBytesTrabajo,
 } from '../generadorTspl';
-import { LOGO_BASE64 } from '../logoBitmap';
+import { FUENTES_TSPL } from '../tipografia';
 import type {
   EtiquetaGeneralDatos,
   EtiquetaAreaDatos,
@@ -14,7 +14,18 @@ import type {
 } from '@caprichos/compartido';
 
 const V = { formato: { orientacion: 'vertical' as const } };
-const H = { formato: { orientacion: 'horizontal' as const } };
+
+/** Textos TEXT sin girar de un script: cada uno cabe en el lienzo W x H dots. */
+function verificarDentro(tspl: string, W: number, H: number) {
+  let n = 0;
+  for (const m of tspl.matchAll(/^TEXT (\d+),(\d+),"(\d)",0,(\d+),(\d+),"(.*)"$/gm)) {
+    const f = FUENTES_TSPL[m[3]];
+    expect(+m[1] + m[6].length * f.ancho * +m[4], m[6]).toBeLessThanOrEqual(W);
+    expect(+m[2] + f.alto * +m[5], m[6]).toBeLessThanOrEqual(H);
+    n++;
+  }
+  expect(n).toBeGreaterThan(3);
+}
 
 describe('generadorTspl', () => {
   const datosGeneral: EtiquetaGeneralDatos = {
@@ -46,16 +57,8 @@ describe('generadorTspl', () => {
     hora: '15:30',
     fecha: '26/10/2026',
     lineas: [
-      {
-        cantidad: 1,
-        nombre: 'Croissant de Jamón y Queso',
-        opciones: ['Bien tostado'],
-      },
-      {
-        cantidad: 2,
-        nombre: 'Empanada de Carne',
-        opciones: ['Con limón'],
-      },
+      { cantidad: 1, nombre: 'Croissant de Jamón y Queso', opciones: ['Bien tostado'] },
+      { cantidad: 2, nombre: 'Empanada de Carne', opciones: ['Con limón'] },
     ],
     esCompacta: true,
     nota: 'Mesa con niños',
@@ -75,57 +78,60 @@ describe('generadorTspl', () => {
     hora: '15:30',
   };
 
-  describe('etiqueta general', () => {
-    it('genera comandos iniciales, marco doble, cabecera y pie requeridos', () => {
-      const tspl = generarEtiquetaGeneral(datosGeneral, V);
-      expect(tspl).toContain('SIZE 63.5 mm,101.6 mm\r\n');
+  describe('etiqueta general (100 x 100 mm, sin girar)', () => {
+    it('SIZE de fábrica, sin giro, con código, modalidad, cliente y PRINT', () => {
+      const tspl = generarEtiquetaGeneral(datosGeneral);
+      expect(tspl).toContain('SIZE 100 mm,100 mm\r\n');
       expect(tspl).toContain('GAP 3 mm,0 mm\r\n');
       expect(tspl).toContain('DIRECTION 1\r\n');
-      expect(tspl).toContain('CLS\r\n');
       expect(tspl).toContain('CODEPAGE 1252\r\n');
-      // Marco doble
-      expect(tspl).toContain('BOX 16,16,492,796,4,16\r\n');
-      expect(tspl).toContain('BOX 26,26,482,786,2,10\r\n');
-      // Cabecera negra con CAPRICHOS y REVERSE
-      expect(tspl).toContain('CAPRICHOS');
-      expect(tspl).toContain('Pedido completo');
-      expect(tspl).toContain('REVERSE 28,28,452,78\r\n');
-      // Rombo separador
-      expect(tspl).toContain('BAR 36,');
-      // Codigo del pedido y modalidad pill
+      expect(tspl).not.toMatch(/",90,|",270,/);
       expect(tspl).toContain('PED-101');
       expect(tspl).toContain('MESA 4');
-      // Pie y PRINT
-      expect(tspl).toContain('Sale en: Etiquetera de caja');
-      expect(tspl).toContain('26/10/2026');
+      expect(tspl).toContain('JUAN P');
       expect(tspl).toContain('PRINT 1,1\r\n');
+      verificarDentro(tspl, 800, 800);
     });
 
-    it('incluye número de copias cuando se solicita reimpresion o copia', () => {
-      const tspl = generarEtiquetaGeneral(datosGeneral, { copias: 2 });
-      expect(tspl).toContain('PRINT 1,2\r\n');
+    it('el rollo del agente (orientación, ancho, alto, giro) no cambia un sticker con tamaño propio', () => {
+      const tspl = generarEtiquetaGeneral(datosGeneral, { formato: { orientacion: 'vertical', anchoMm: 63.5, altoMm: 101.6, giro: 270 } });
+      expect(tspl).toContain('SIZE 100 mm,100 mm\r\n');
+      expect(tspl).not.toMatch(/",270,/);
     });
 
-    it('muestra indicador de más productos cuando la lista supera 5', () => {
-      const conMuchosProductos: EtiquetaGeneralDatos = {
+    it('usa el tamaño que manda la API (tamanoMm) y el lienzo lo sigue', () => {
+      const tspl = generarEtiquetaGeneral({ ...datosGeneral, tamanoMm: { anchoMm: 80, altoMm: 120 } });
+      expect(tspl).toContain('SIZE 80 mm,120 mm\r\n');
+      verificarDentro(tspl, 640, 960);
+    });
+
+    it('un tamaño fuera de rango se ignora y sale el de fábrica', () => {
+      expect(generarEtiquetaGeneral({ ...datosGeneral, tamanoMm: { anchoMm: 5, altoMm: 900 } })).toContain('SIZE 100 mm,100 mm');
+    });
+
+    it('incluye número de copias cuando se solicita reimpresión o copia', () => {
+      expect(generarEtiquetaGeneral(datosGeneral, { copias: 2 })).toContain('PRINT 1,2\r\n');
+    });
+
+    it('con 60 productos resume con "+ N MAS" y no escribe fuera del lienzo', () => {
+      const muchos: EtiquetaGeneralDatos = {
         ...datosGeneral,
-        cantidadProductos: 7,
-        productos: [
-          { cantidad: 1, nombre: 'P1' },
-          { cantidad: 1, nombre: 'P2' },
-          { cantidad: 1, nombre: 'P3' },
-          { cantidad: 1, nombre: 'P4' },
-          { cantidad: 1, nombre: 'P5' },
-          { cantidad: 1, nombre: 'P6' },
-          { cantidad: 1, nombre: 'P7' },
-        ],
+        cantidadProductos: 60,
+        productos: Array.from({ length: 60 }, (_, i) => ({ cantidad: 1, nombre: `Producto ${i + 1}` })),
       };
-      const tspl = generarEtiquetaGeneral(conMuchosProductos, V);
-      expect(tspl).toContain('+ 2 producto(s)');
+      const tspl = generarEtiquetaGeneral(muchos);
+      expect(tspl).toMatch(/\+ \d+ MAS \(\d+ UNID\.\)/);
+      verificarDentro(tspl, 800, 800);
+    });
+
+    it('delivery: dirección y celular salen en el sticker', () => {
+      const tspl = generarEtiquetaGeneral({ ...datosGeneral, modalidadPill: 'DELIVERY', direccion: 'Av. Larga 123', telefono: '987654321' });
+      expect(tspl).toContain('DIR: Av. Larga 123');
+      expect(tspl).toContain('TEL: 987654321');
     });
   });
 
-  describe('etiqueta de área', () => {
+  describe('etiqueta de área (rollo del agente)', () => {
     it('genera cabecera con el nombre de área e índice', () => {
       const tspl = generarEtiquetaArea(datosArea, V);
       expect(tspl).toContain('COCINA');
@@ -138,7 +144,6 @@ describe('generadorTspl', () => {
 
     it('soporta versión compacta cuando hay múltiples líneas', () => {
       const tspl = generarEtiquetaArea(datosArea, V);
-      // En compacta las opciones van en la misma línea separadas por coma
       expect(tspl).toContain('Bien tostado');
       expect(tspl).toContain('Con limón');
     });
@@ -147,14 +152,7 @@ describe('generadorTspl', () => {
       const noCompacta: EtiquetaAreaDatos = {
         ...datosArea,
         esCompacta: false,
-        lineas: [
-          {
-            cantidad: 1,
-            nombre: 'Hamburguesa Artesanal',
-            tamano: 'Doble',
-            opciones: ['Término medio', 'Sin cebolla', 'Papas extra'],
-          },
-        ],
+        lineas: [{ cantidad: 1, nombre: 'Hamburguesa Artesanal', tamano: 'Doble', opciones: ['Término medio', 'Sin cebolla', 'Papas extra'] }],
       };
       const tspl = generarEtiquetaArea(noCompacta, V);
       expect(tspl).toContain('Hamburguesa Artesanal');
@@ -163,39 +161,37 @@ describe('generadorTspl', () => {
     });
   });
 
-  describe('etiqueta por bebida (vaso)', () => {
-    it('genera nombre del bebedor gigante, bebida, opciones y recuadro contiene', () => {
-      const tspl = generarEtiquetaBebida(datosBebida, V);
-      expect(tspl).toContain('BEBIDA 1 de 2');
-      expect(tspl).toContain('MARÍA');
-      expect(tspl).toContain('CAPPUCCINO VAINILLA');
-      expect(tspl).toContain('12oz');
+  describe('etiqueta por bebida (vaso, 76 x 38 mm)', () => {
+    it('SIZE de fábrica, código, índice 1/2, persona, bebida con tamaño, opciones, cliente y hora', () => {
+      const tspl = generarEtiquetaBebida(datosBebida);
+      expect(tspl).toContain('SIZE 76 mm,38 mm\r\n');
+      expect(tspl).toContain('PED-101');
+      expect(tspl).toContain('1/2');
+      expect(tspl).toContain('MAR');
+      expect(tspl).toContain('CAPPUCCINO');
+      expect(tspl).toContain('12OZ');
       expect(tspl).toContain('Leche de avena');
-      expect(tspl).toContain('CONTIENE:');
-      expect(tspl).toContain('Avena, canela, espresso doble');
-      expect(tspl).toContain('Para: Juan Pérez');
+      expect(tspl).toContain('CONTIENE: Avena, canela, espresso doble');
+      expect(tspl).toContain('Para: Juan P');
       expect(tspl).toContain('15:30');
       expect(tspl).toContain('PRINT 1,1\r\n');
+      verificarDentro(tspl, 608, 304);
     });
 
-    it('adapta el tamaño de fuente para nombres de personas largos', () => {
-      const nombreLargo: EtiquetaBebidaDatos = {
-        ...datosBebida,
-        persona: 'MAXIMILIANO DE LOS RÍOS',
-      };
-      const tspl = generarEtiquetaBebida(nombreLargo, V);
-      // No debe romperse ni desbordar; debe estar contenido
+    it('con tamanoMm 100 x 100 cambia el SIZE y sigue cuadrando', () => {
+      const tspl = generarEtiquetaBebida({ ...datosBebida, tamanoMm: { anchoMm: 100, altoMm: 100 } });
+      expect(tspl).toContain('SIZE 100 mm,100 mm\r\n');
+      verificarDentro(tspl, 800, 800);
+    });
+
+    it('nombres de personas largos no se salen del sticker', () => {
+      const tspl = generarEtiquetaBebida({ ...datosBebida, persona: 'MAXIMILIANO DE LOS RÍOS Y OTROS APELLIDOS MUY LARGOS' });
       expect(tspl).toContain('MAXIMILIANO');
+      verificarDentro(tspl, 608, 304);
     });
 
     it('soporta numeración variable de bebidas (ej. 3 de 5)', () => {
-      const bebida3de5: EtiquetaBebidaDatos = {
-        ...datosBebida,
-        bebidaIndex: 3,
-        totalBebidas: 5,
-      };
-      const tspl = generarEtiquetaBebida(bebida3de5, V);
-      expect(tspl).toContain('BEBIDA 3 de 5');
+      expect(generarEtiquetaBebida({ ...datosBebida, bebidaIndex: 3, totalBebidas: 5 })).toContain('3/5');
     });
   });
 
@@ -203,10 +199,8 @@ describe('generadorTspl', () => {
     it('convierte texto con acentos y ñ a bytes en Windows-1252 sin caracteres corruptos UTF-8', () => {
       const bytes = generarBytesTrabajo('ETIQUETA_BEBIDA', datosBebida);
       expect(Buffer.isBuffer(bytes)).toBe(true);
-
-      // Verificamos que 'Í' de MARÍA se codifica en byte 0xCD (Windows-1252), no los dos bytes de UTF-8 [0xC3, 0x8D]
-      const hex = bytes.toString('hex');
-      expect(hex).toContain('4d4152cd41'); // M A R Í A en hex CP1252 (Í = CD)
+      // 'Í' de MARÍA es el byte 0xCD (Windows-1252), no los dos bytes de UTF-8 [0xC3, 0x8D]
+      expect(bytes.toString('hex')).toContain('4d4152cd41');
     });
   });
 
@@ -217,67 +211,36 @@ describe('generadorTspl', () => {
         who: 'CLIENTE CON UN NOMBRE EXTREMADAMENTE LARGO QUE EXCEDE CUALQUIER ANCHO NORMAL DE ETIQUETA FISICA',
         nota: 'ESTA ES UNA NOTA GIGANTE ESCRITA POR UN CLIENTE QUE QUIERE DESCRIBIR CADA DETALLE DE COMO PREPARAR SU PEDIDO CON VEINTE CONDICIONES DISTINTAS',
       };
-      const tspl = generarEtiquetaGeneral(conTextoExtremo, V);
+      const tspl = generarEtiquetaGeneral(conTextoExtremo);
       expect(tspl).toContain('...');
       expect(tspl).toContain('CLIENTE');
+      verificarDentro(tspl, 800, 800);
     });
   });
 
   describe('generarTsplTrabajo despachador unificado', () => {
-    it('despacha correctamente a cada generador segun el tipo', () => {
-      const general = generarTsplTrabajo('ETIQUETA_GENERAL', datosGeneral);
-      expect(general).toContain('PEDIDO');
-
-      const area = generarTsplTrabajo('ETIQUETA_AREA', datosArea);
-      expect(area).toContain('COCINA');
-
-      const bebida = generarTsplTrabajo('ETIQUETA_BEBIDA', datosBebida);
-      expect(bebida).toContain('BEBIDA 1 de 2');
+    it('despacha correctamente a cada generador según el tipo', () => {
+      expect(generarTsplTrabajo('ETIQUETA_GENERAL', datosGeneral)).toContain('SIZE 100 mm,100 mm');
+      expect(generarTsplTrabajo('ETIQUETA_AREA', datosArea)).toContain('COCINA');
+      expect(generarTsplTrabajo('ETIQUETA_BEBIDA', datosBebida)).toContain('SIZE 76 mm,38 mm');
     });
   });
 
-  describe('formato apaisado (defecto) y logo', () => {
-    it('por defecto sale vertical-girado sobre rollo 101.6 x 63.5 mm, DIRECTION 1, con el logo en BITMAP OVERWRITE', () => {
-      for (const t of [
-        generarEtiquetaGeneral(datosGeneral),
-        generarEtiquetaArea(datosArea),
-        generarEtiquetaBebida(datosBebida),
-      ]) {
-        expect(t).toContain('SIZE 101.6 mm,63.5 mm\r\n');
-        expect(t).toContain('DIRECTION 1\r\n');
-        expect(t).toMatch(/BITMAP \d+,\d+,8,64,0,/);
-        expect(t).toMatch(/REVERSE \d+,28,84,452/);
-        expect(t).toMatch(/TEXT \d+,\d+,"\d",90,/);
-        expect(t).toContain('PRINT 1,1\r\n');
-      }
+  describe('rollo del agente (solo etiqueta de área) y logo', () => {
+    it('el área sigue por defecto vertical-girado sobre rollo 101.6 x 63.5 mm, con el logo en BITMAP OVERWRITE', () => {
+      const t = generarEtiquetaArea(datosArea);
+      expect(t).toContain('SIZE 101.6 mm,63.5 mm\r\n');
+      expect(t).toContain('DIRECTION 1\r\n');
+      expect(t).toMatch(/BITMAP \d+,\d+,8,64,0,/);
+      expect(t).toMatch(/TEXT \d+,\d+,"\d",90,/);
+      expect(t).toContain('PRINT 1,1\r\n');
     });
 
-    it('el contenido cabe en el lienzo 813 x 508 dots', () => {
-      const t = generarEtiquetaGeneral(datosGeneral, H);
-      for (const m of t.matchAll(/^TEXT (\d+),(\d+),/gm)) {
-        expect(Number(m[1])).toBeLessThan(813);
-        expect(Number(m[2])).toBeLessThan(508);
-      }
-    });
-
-    it('la orientacion y el tamano son configurables', () => {
-      const v = generarEtiquetaGeneral(datosGeneral, V);
-      expect(v).toContain('SIZE 63.5 mm,101.6 mm\r\n');
-      expect(v).toMatch(/BITMAP \d+,\d+,8,64,0,/);
-      const c = generarEtiquetaBebida(datosBebida, { formato: { anchoMm: 100, altoMm: 60, direccion: 0, gapMm: 2 } });
-      expect(c).toContain('SIZE 100 mm,60 mm\r\n');
+    it('la orientación y el tamaño del rollo siguen configurables para el área; DIRECTION y GAP también para los stickers', () => {
+      expect(generarEtiquetaArea(datosArea, V)).toContain('SIZE 63.5 mm,101.6 mm\r\n');
+      const c = generarEtiquetaBebida(datosBebida, { formato: { direccion: 0, gapMm: 2 } });
       expect(c).toContain('GAP 2 mm,0 mm\r\n');
       expect(c).toContain('DIRECTION 0\r\n');
-    });
-
-    it('los bytes llevan el bitmap del logo crudo (512 bytes) y el texto en Windows-1252', () => {
-      const bytes = generarBytesTrabajo('ETIQUETA_GENERAL', datosGeneral, false, { orientacion: 'horizontal' });
-      const i = bytes.indexOf(Buffer.from('BITMAP 34,34,8,64,0,'));
-      expect(i).toBeGreaterThan(0);
-      const logo = Buffer.from(LOGO_BASE64, 'base64');
-      expect(bytes.subarray(i + 20, i + 20 + 512).equals(logo)).toBe(true);
-      expect(bytes.subarray(i + 20 + 512, i + 20 + 514).toString()).toBe('\r\n');
-      expect(bytes.includes(Buffer.from('J'))).toBe(true);
     });
   });
 });

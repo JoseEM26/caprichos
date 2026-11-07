@@ -40,6 +40,8 @@ export interface EtiquetaEstado {
 export interface EstadoEtiquetasPedido {
   pedidoId: string;
   codigo: string;
+  /** Medida de los stickers en mm (parámetros del sistema), para la vista previa */
+  tamanos?: { bebida: { anchoMm: number; altoMm: number }; general: { anchoMm: number; altoMm: number } };
   etiquetas: EtiquetaEstado[];
   resumen: {
     total: number;

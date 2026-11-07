@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { lineasTicketComandaSalon } from '../etiquetas/ticketComanda.js';
 import { rolDeTrabajo } from '../tipos/etiquetas.js';
-import { maquetarGeneral } from '../etiquetas/maquetaEtiquetas.js';
+import { maquetarGeneral } from '../etiquetas/maquetaStickers.js';
 import type { TicketComandaSalonDatos, EtiquetaGeneralDatos } from '../tipos/etiquetas.js';
 
 const comanda: TicketComandaSalonDatos = {
@@ -54,12 +54,12 @@ describe('sticker general con monto total', () => {
 
   it('muestra TOTAL S/ con dos decimales cuando el trabajo lo trae', () => {
     const textos = maquetarGeneral({ ...general, total: 23.5 }).primitivas.flatMap((p) => (p.t === 'texto' ? [p.texto] : []));
-    expect(textos).toContain('TOTAL S/ 23.50');
+    expect(textos).toContain('S/ 23.50');
   });
 
   it('un trabajo viejo sin total sale igual que antes (sin línea de total)', () => {
     const textos = maquetarGeneral(general).primitivas.flatMap((p) => (p.t === 'texto' ? [p.texto] : []));
-    expect(textos.some((t) => t.startsWith('TOTAL'))).toBe(false);
+    expect(textos.some((t) => t.startsWith('S/'))).toBe(false);
   });
 });
 

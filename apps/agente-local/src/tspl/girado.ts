@@ -1,5 +1,5 @@
 import { maquetarEtiqueta } from '@caprichos/compartido';
-import type { EtiquetaGeneralDatos, EtiquetaAreaDatos, EtiquetaBebidaDatos, Primitiva } from '@caprichos/compartido';
+import type { EtiquetaAreaDatos, Primitiva } from '@caprichos/compartido';
 import { limpiarParaTspl } from './codepage1252';
 import { comandosInicio, comandoLogo, type FormatoEtiqueta } from './formato';
 
@@ -11,14 +11,14 @@ import { comandosInicio, comandoLogo, type FormatoEtiqueta } from './formato';
  *   giro 270: logico (x,y) -> fisico (y, W - x)   (la cabecera queda en el borde izquierdo)
  * Referencia de TEXT con rotacion: el punto es la esquina superior izquierda del texto SIN girar.
  */
-export function primitivasATspl(prim: Primitiva[], W: number, H: number, giro: 90 | 270): string {
-  // Rectangulo logico -> rectangulo fisico {X, Y, w, h}
+export function primitivasATspl(prim: Primitiva[], W: number, H: number, giro: 0 | 90 | 270): string {
+  // Rectangulo logico -> rectangulo fisico {X, Y, w, h}; giro 0 = sin girar (stickers de bebida y general)
   const rect = (x: number, y: number, w: number, h: number) =>
-    giro === 90 ? { X: H - (y + h), Y: x, w: h, h: w } : { X: y, Y: W - (x + w), w: h, h: w };
+    giro === 0 ? { X: x, Y: y, w, h } : giro === 90 ? { X: H - (y + h), Y: x, w: h, h: w } : { X: y, Y: W - (x + w), w: h, h: w };
   let s = '';
   for (const p of prim) {
     if (p.t === 'texto') {
-      const [X, Y] = giro === 90 ? [H - p.y, p.x] : [p.y, W - p.x];
+      const [X, Y] = giro === 0 ? [p.x, p.y] : giro === 90 ? [H - p.y, p.x] : [p.y, W - p.x];
       s += `TEXT ${Math.round(X)},${Math.round(Y)},"${p.fuente}",${giro},${p.xm},${p.ym},"${limpiarParaTspl(p.texto)}"\r\n`;
     } else if (p.t === 'caja') {
       const r = rect(p.x1, p.y1, p.x2 - p.x1, p.y2 - p.y1);
@@ -38,8 +38,8 @@ export function primitivasATspl(prim: Primitiva[], W: number, H: number, giro: 9
 }
 
 function generar(
-  tipo: 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA',
-  d: EtiquetaGeneralDatos | EtiquetaAreaDatos | EtiquetaBebidaDatos,
+  tipo: 'ETIQUETA_AREA',
+  d: EtiquetaAreaDatos,
   copias: number,
   f: FormatoEtiqueta
 ): string {
@@ -47,6 +47,4 @@ function generar(
   return comandosInicio(f) + primitivasATspl(m.primitivas, m.W, m.H, f.giro) + `PRINT 1,${copias}\r\n`;
 }
 
-export const generarGeneralG = (d: EtiquetaGeneralDatos, copias: number, f: FormatoEtiqueta) => generar('ETIQUETA_GENERAL', d, copias, f);
 export const generarAreaG = (d: EtiquetaAreaDatos, copias: number, f: FormatoEtiqueta) => generar('ETIQUETA_AREA', d, copias, f);
-export const generarBebidaG = (d: EtiquetaBebidaDatos, copias: number, f: FormatoEtiqueta) => generar('ETIQUETA_BEBIDA', d, copias, f);

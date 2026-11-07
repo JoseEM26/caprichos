@@ -26,11 +26,11 @@ describe('CLI - Comandos de prueba y volcado', () => {
     const trabajos = memoria.obtenerTrabajosEscritos();
     expect(trabajos).toHaveLength(3);
     // General
-    expect(trabajos[0].toString()).toContain('PEDIDO');
+    expect(trabajos[0].toString()).toContain('SIZE 100 mm,100 mm');
     // Area
     expect(trabajos[1].toString()).toContain('COCINA');
     // Bebida
-    expect(trabajos[2].toString()).toContain('BEBIDA 1 de 2');
+    expect(trabajos[2].toString()).toContain('SIZE 76 mm,38 mm');
   });
 
   it('ejecutarComandoProbar maneja errores de impresora sin lanzar excepcion no capturada', async () => {
@@ -63,8 +63,8 @@ describe('CLI - Comandos de prueba y volcado', () => {
       path.join(dirTemporal, 'etiqueta-general.tspl'),
       'utf-8'
     );
-    expect(contenidoGeneral).toContain('SIZE 101.6 mm,63.5 mm');
-    expect(contenidoGeneral).toContain('PEDIDO');
+    expect(contenidoGeneral).toContain('SIZE 100 mm,100 mm');
+    expect(contenidoGeneral).toContain('PRINT 1,1');
 
     // Limpieza
     fs.rmSync(dirTemporal, { recursive: true, force: true });

@@ -61,7 +61,7 @@ import {
   destinoDeTrabajo,
   tiposDeRoles,
 } from './ruteo-impresion';
-import { leerReglasImpresion } from './reglas-impresion';
+import { leerReglasImpresion, leerTamanosEtiqueta } from './reglas-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { ajustesPendientesUbicacion } from '../pedidos-admin/cambio-ubicacion.util';
 
@@ -211,11 +211,22 @@ export class ImpresionService {
         orderBy: { id: 'asc' },
       });
 
+      // El tamaño del sticker se lee al entregar: un trabajo que esperaba en cola sale con la medida vigente
+      const tamanos = actualizados.some((t) => t.tipo === 'ETIQUETA_GENERAL' || t.tipo === 'ETIQUETA_BEBIDA')
+        ? await leerTamanosEtiqueta(this.prisma)
+        : null;
+      const conTamano = (t: (typeof actualizados)[number]) =>
+        tamanos && t.tipo === 'ETIQUETA_GENERAL'
+          ? { ...(t.payload as any), tamanoMm: tamanos.general }
+          : tamanos && t.tipo === 'ETIQUETA_BEBIDA'
+            ? { ...(t.payload as any), tamanoMm: tamanos.bebida }
+            : (t.payload as any);
+
       return {
         trabajos: actualizados.map((t) => ({
           id: t.id.toString(),
           tipo: t.tipo as TipoTrabajoImpresion,
-          payload: t.payload as any,
+          payload: conTamano(t),
           copia: t.copia,
           intentos: t.intentos,
         })),
@@ -1158,6 +1169,7 @@ export class ImpresionService {
 
     const { areas, bebidas } = construirTodasLasEtiquetas(pedido);
     const reglas = await leerReglasImpresion(this.prisma);
+    const tamanos = await leerTamanosEtiqueta(this.prisma);
     const esperadas = [
       ...(aplicaSegunReglas('ETIQUETA_GENERAL', pedido.modalidad, reglas)
         ? [{ clave: CLAVE_GENERAL, tipo: 'ETIQUETA_GENERAL', titulo: 'General del pedido', detalle: 'Resumen con total, etiquetera de caja' }]
@@ -1209,6 +1221,8 @@ export class ImpresionService {
     return {
       pedidoId: String(pedido.id),
       codigo: pedido.codigo,
+      /** Medida de los stickers (mm) para la vista previa */
+      tamanos,
       etiquetas,
       resumen: {
         total: etiquetas.length,

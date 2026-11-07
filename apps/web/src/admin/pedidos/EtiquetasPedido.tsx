@@ -130,13 +130,13 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
   };
 
   const previaDe = (e: EtiquetaEstado) => {
-    if (e.tipo === 'ETIQUETA_GENERAL') return <EtiquetaGeneral datos={resumen.general} />;
+    if (e.tipo === 'ETIQUETA_GENERAL') return <EtiquetaGeneral datos={resumen.general} tamano={estado?.tamanos?.general} />;
     if (e.tipo === 'ETIQUETA_AREA') {
       const area = resumen.areas.find((a) => `AREA:${a.areaNombre}` === e.clave);
       return area ? <EtiquetaArea datos={area} /> : null;
     }
     const bebida = resumen.bebidas.find((b) => `BEBIDA:${b.bebidaIndex}` === e.clave);
-    return bebida ? <EtiquetaBebida datos={bebida} /> : null;
+    return bebida ? <EtiquetaBebida datos={bebida} tamano={estado?.tamanos?.bebida} /> : null;
   };
 
   const tarjeta = (e: EtiquetaEstado) => {
@@ -225,11 +225,18 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
 
   // Todas las etiquetas salen de la vista previa (aunque falle la consulta de estado);
   // el estado real de cada una se toma de print_job cuando llega.
+  // El sticker general solo existe para llevar, recoger y delivery: en mesa no se ofrece ni se puede reimprimir.
+  // La API dice cuáles aplican; mientras carga, se decide por la modalidad del pedido.
+  const llevaGeneral = estado
+    ? estado.etiquetas.some((e) => e.clave === 'GENERAL')
+    : ['DELIVERY', 'RECOGER', 'LLEVAR'].includes(String(pedido.modalidad || '').toUpperCase());
   const base: EtiquetaEstado[] = [
-    {
-      clave: 'GENERAL', tipo: 'ETIQUETA_GENERAL' as const, titulo: 'General del pedido',
-      detalle: 'Bolsa o bandeja, etiquetera de caja',
-    },
+    ...(llevaGeneral
+      ? [{
+          clave: 'GENERAL', tipo: 'ETIQUETA_GENERAL' as const, titulo: 'General del pedido',
+          detalle: 'Bolsa o bandeja, etiquetera de caja',
+        }]
+      : []),
     ...resumen.areas.map((a) => ({
       clave: `AREA:${a.areaNombre}`, tipo: 'ETIQUETA_AREA' as const, titulo: `Área ${a.areaNombre}`,
       detalle: 'Etiqueta de la cocina de esta área',
@@ -335,10 +342,16 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
         </div>
       )}
 
-      {seccion(
-        '1. Etiqueta general del pedido',
-        'Una por pedido, para la bolsa o la bandeja. Sale en la etiquetera de caja.',
-        grupo('GENERAL'),
+      {llevaGeneral ? (
+        seccion(
+          '1. Etiqueta general del pedido',
+          'Una por pedido, para la bolsa o la bandeja. Sale en la etiquetera de caja.',
+          grupo('GENERAL'),
+        )
+      ) : (
+        <div role="note" data-testid="sin-general" style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
+          Este pedido es en el local: no lleva etiqueta general (solo sale para llevar, recoger y delivery). El voucher sale por la ticketera.
+        </div>
       )}
       {seccion(
         '2. Etiquetas por área',
@@ -363,7 +376,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
             ['area', 'Reimprimir las de área'],
             ['bebida', 'Reimprimir las de bebida'],
           ] as const
-        ).map(([grupo, texto]) => (
+        ).filter(([grupo]) => grupo !== 'general' || llevaGeneral).map(([grupo, texto]) => (
           <div key={grupo} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
             <button type="button" onClick={() => setAccion({ tipo: 'grupo', grupo })} style={BOTON_SECUNDARIO}>
               {texto}

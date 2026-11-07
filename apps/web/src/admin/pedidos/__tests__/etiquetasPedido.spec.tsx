@@ -22,7 +22,7 @@ function crearPedidoBase(parcial: Partial<Pedido> = {}): Pedido {
     id: 'ped-1',
     codigo: 'CP-W999',
     canal: 'MOZO',
-    modalidad: 'MESA',
+    modalidad: 'DELIVERY',
     mesa_nombre: '3',
     cliente_nombre: 'Jose Espinoza',
     cliente_telefono: '999888777',
@@ -261,12 +261,10 @@ describe('EtiquetasPedido (componente React)', () => {
     // 3. Vista previa = las primitivas de la maqueta compartida, dibujadas en SVG (con el nombre en grande y el logo)
     const svgs = screen.getAllByRole('img', { name: /Vista previa de la etiqueta/ });
     expect(svgs.length).toBeGreaterThan(0);
-    expect(svgs[0]).toHaveAttribute('data-maqueta', '508x813');
+    expect(svgs[0]).toHaveAttribute('data-maqueta', '800x800');
     expect(svgs[0]).toHaveTextContent('JOSE ESPINOZA');
-    expect(svgs[0].querySelector('path[data-logo]')).not.toBeNull();
 
-    // 4. "Sale en" correcto para Caja, Barra y Cocina
-    expect(screen.getByText(/Sale en: Etiquetera de caja/i)).toBeInTheDocument();
+    // 4. "Sale en" correcto para Barra y Cocina (el sticker general ya no lo lleva: su pie es unidades y total)
     expect(screen.getByText(/Sale en: Etiquetera de barra/i)).toBeInTheDocument();
     expect(screen.getByText(/Sale en: Etiquetera de cocina/i)).toBeInTheDocument();
 

@@ -11,7 +11,16 @@ export {
   ROLES_COCINA_AREA,
   AREA_BEBIDAS,
   esAreaBebidas,
+  CLAVES_TAMANO_ETIQUETA,
+  TAMANO_BEBIDA_DEFECTO,
+  TAMANO_GENERAL_DEFECTO,
+  TAMANOS_ETIQUETA_DEFECTO,
+  TAMANO_ETIQUETA_MIN_MM,
+  TAMANO_ETIQUETA_MAX_MM,
+  medidaEtiquetaValida,
+  tamanosDesdeValores,
 } from './constantes/index.js';
+export type { TamanoMm, TamanosEtiqueta } from './constantes/index.js';
 export type { ReglasImpresion } from './constantes/index.js';
 export type { RolSistema } from './constantes/index.js';
 export * from './tipos/index.js';
@@ -53,11 +62,9 @@ export {
   medirAnchoTexto,
   truncar,
   ajustarLineas,
-  maquetarGeneral,
   maquetarArea,
-  maquetarBebida,
-  maquetarEtiqueta,
 } from './etiquetas/maquetaEtiquetas.js';
+export { maquetarGeneral, maquetarBebida, maquetarEtiqueta } from './etiquetas/maquetaStickers.js';
 export type { FuenteTspl, Primitiva, Maqueta, FormatoMaqueta } from './etiquetas/maquetaEtiquetas.js';
 export { lineasTicketPago } from './etiquetas/ticketPago.js';
 export { lineasTicketComandaSalon } from './etiquetas/ticketComanda.js';
