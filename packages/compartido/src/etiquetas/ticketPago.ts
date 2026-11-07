@@ -55,15 +55,41 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
   if (t.local.ruc) p(`RUC ${t.local.ruc}`, { centrado: true });
   if (t.local.direccion) p(t.local.direccion, { centrado: true });
   p(linea);
+  const d = t.documento ?? null;
+  if (d) {
+    const titulo = d.tipo === 'FACTURA' ? 'FACTURA ELECTRÓNICA' : d.tipo === 'BOLETA' ? 'BOLETA DE VENTA ELECTRÓNICA' : 'COMPROBANTE SIMPLE';
+    p(titulo, { centrado: true, negrita: true });
+    if (d.tipo === 'SIMPLE') p('Documento interno, sin valor tributario', { centrado: true });
+    else if (t.comprobante?.numero) p(t.comprobante.numero, { centrado: true, negrita: true });
+    p(linea);
+  }
   p(`Pedido ${t.codigo}`);
   p(`${t.fecha} ${t.hora}`);
-  if (t.who) p(`Cliente: ${t.who}`);
+  if (d && d.tipo !== 'SIMPLE') {
+    // Cliente del comprobante: boleta sin datos sale a «VARIOS»; factura lleva RUC, razón social y dirección
+    if (d.tipo === 'FACTURA') {
+      if (d.docNumero) p(`${d.docTipo ?? 'RUC'}: ${d.docNumero}`);
+      for (const r of envolver(`Razón social: ${d.clienteNombre ?? ''}`, c)) p(r);
+      if (d.direccion) for (const r of envolver(`Dirección: ${d.direccion}`, c)) p(r);
+    } else {
+      p(`Cliente: ${d.clienteNombre || 'VARIOS'}`);
+      if (d.docNumero) p(`${d.docTipo ?? 'DNI'}: ${d.docNumero}`);
+    }
+    if (t.who) p(`Atendido: ${t.who}`);
+  } else if (t.who) p(`Cliente: ${t.who}`);
   if (t.modalidad) p(`Modalidad: ${t.modalidad}`);
   p(linea);
   for (const l of t.lineas) {
     p(fila(`${l.cantidad} x ${l.nombre}${l.tamano ? ` (${l.tamano})` : ''}`, soles(l.subtotal), c));
   }
   p(linea);
+  if (d && d.tipo !== 'SIMPLE' && d.igvPct != null && d.igvPct >= 0) {
+    // Desglose: el total ya incluye el IGV
+    const base = Math.round((t.total / (1 + d.igvPct / 100)) * 100) / 100;
+    const igv = Math.round((t.total - base) * 100) / 100;
+    p(fila('Op. gravada', soles(base), c));
+    p(fila(`IGV (${d.igvPct}%)`, soles(igv), c));
+  }
   p(fila('TOTAL', soles(t.total), c), { negrita: true });
   // Propina aparte: línea propia, no es venta ni va en el comprobante
   if (t.propina && t.propina > 0) p(fila('Propina (aparte)', soles(t.propina), c));
@@ -86,7 +112,7 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
   }
   if (t.comprobante) {
     p(linea);
-    p(`${t.comprobante.tipo.replace('_', ' ')} ${t.comprobante.numero}`);
+    if (!d) p(`${t.comprobante.tipo.replace('_', ' ')} ${t.comprobante.numero}`); // con el título de arriba ya sale el número
     if (t.comprobante.representacion) for (const r of envolver(t.comprobante.representacion, c)) p(r);
     // Bloque del QR entre la representación y el hash: si no hay cadena, el ticket sale como antes (sin bloque)
     if (t.comprobante.cadenaQr) p('', { centrado: true, qr: t.comprobante.cadenaQr });

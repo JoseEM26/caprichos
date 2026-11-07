@@ -90,6 +90,19 @@ export interface TicketPagoDatos {
   } | null;
   /** Nota de venta enviada por el mozo: nombre de quien cobró en mesa. */
   cobradoPorMozo?: string | null;
+  /**
+   * Tipo de comprobante que se imprime y los datos del cliente de ESE comprobante (nunca de su cuenta).
+   * SIMPLE = ticket interno sin SUNAT; BOLETA y FACTURA muestran cliente, documento y desglose del IGV.
+   * Sin este campo el ticket sale como antes.
+   */
+  documento?: {
+    tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA';
+    clienteNombre?: string | null;
+    docTipo?: 'DNI' | 'RUC' | 'CE' | null;
+    docNumero?: string | null;
+    direccion?: string | null;
+    igvPct?: number | null;
+  } | null;
 }
 
 export type EstadoPrintJob = 'PENDIENTE' | 'IMPRIMIENDO' | 'IMPRESO' | 'FALLIDO';
