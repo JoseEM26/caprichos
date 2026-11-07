@@ -102,6 +102,18 @@ export class MensajesController {
     return this.mensajes.reanudar(id, req.usuario, ipDe(req));
   }
 
+  @Post('conversaciones/:id/visto')
+  @Permiso('mensajes', 'ver')
+  visto(@Param('id') id: string, @Req() req: any) {
+    return this.mensajes.marcarVisto(id, req.usuario, ipDe(req));
+  }
+
+  @Post('conversaciones/:id/no-visto')
+  @Permiso('mensajes', 'ver')
+  noVisto(@Param('id') id: string, @Req() req: any) {
+    return this.mensajes.marcarNoVisto(id, req.usuario, ipDe(req));
+  }
+
   @Post('conversaciones/:id/atendido')
   @Permiso('mensajes', 'cerrar')
   atendido(@Param('id') id: string, @Req() req: any) {

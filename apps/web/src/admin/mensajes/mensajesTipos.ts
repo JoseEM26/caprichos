@@ -1,7 +1,7 @@
 import type { UbicacionChat } from './TarjetaUbicacion';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
-export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos';
+export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos';
 
 export interface MensajeItem {
   id: string;
@@ -12,6 +12,8 @@ export interface MensajeItem {
   texto: string;
   ubicacion?: UbicacionChat | null;
   hora: string;
+  /** Fecha y hora exactas (ISO) del mensaje, para los separadores de día y el title de la burbuja. */
+  fecha?: string;
   estado?: string;
   /** Solo ADMIN: código de clasificación interno (p. ej. PLANTILLA_FORMATO_VARIABLE). */
   errorCodigo?: string | null;
@@ -41,7 +43,11 @@ export interface ChatResumen {
   urgente: boolean;
   ultimo: string;
   hora: string;
+  /** Fecha y hora (ISO) del último mensaje: la lista la muestra como hora, «Ayer», día o fecha. */
+  fecha?: string;
   sinLeer: number;
+  /** Marca manual «No visto», compartida por todo el equipo. */
+  marcadoNoVisto?: boolean;
   esperaMin?: number | null;
   /** Minutos que el último mensaje del cliente lleva sin respuesta (sin persona que lo tomó); null si ya se respondió. */
   sinRespuestaMin?: number | null;
@@ -93,6 +99,7 @@ export interface DetalleConversacion {
   modalidad: string | null;
   estado: EstadoChat;
   urgente: boolean;
+  marcadoNoVisto?: boolean;
   dueno: string | null;
   esMio: boolean;
   ocupado: boolean;
@@ -124,6 +131,7 @@ export interface RespuestaListarChats {
     atender: number;
     bot: number;
     atendidos: number;
+    sinVer?: number;
     bloqueadosSpam?: number;
   };
   chats: ChatResumen[];

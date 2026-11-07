@@ -1,4 +1,5 @@
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
+import { fechaCompletaChat } from './fechasChat';
 import { MensajeItem } from './mensajesTipos';
 import { TarjetaUbicacion } from './TarjetaUbicacion';
 
@@ -26,7 +27,13 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
       )}
       {m.ubicacion ? <TarjetaUbicacion ubicacion={m.ubicacion} /> : m.texto && <div className="msg-texto">{m.texto}</div>}
       <div className="msg-pie">
-        <span>{m.hora}</span>
+        <span
+          data-testid="hora-mensaje"
+          title={m.fecha ? fechaCompletaChat(m.fecha) : undefined}
+          aria-label={m.fecha ? fechaCompletaChat(m.fecha) : undefined}
+        >
+          {m.hora}
+        </span>
         {!esCliente && (
           <>
             {m.estado === 'FALLIDO' ? (

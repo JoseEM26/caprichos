@@ -57,6 +57,14 @@ export async function marcarAtendido(id: string): Promise<{ ok: boolean }> {
   return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/atendido`, {});
 }
 
+export async function marcarChatVisto(id: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/visto`, {});
+}
+
+export async function marcarChatNoVisto(id: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/no-visto`, {});
+}
+
 export async function aprobarPagoChat(id: string): Promise<{ ok: boolean }> {
   return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/aprobar-pago`, {});
 }

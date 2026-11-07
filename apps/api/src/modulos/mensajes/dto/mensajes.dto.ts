@@ -12,8 +12,8 @@ import {
 
 export class ListarConversacionesDto {
   @IsOptional()
-  @IsIn(['todos', 'atender', 'bot', 'atendidos'])
-  filtro?: 'todos' | 'atender' | 'bot' | 'atendidos';
+  @IsIn(['todos', 'atender', 'bot', 'atendidos', 'novistos'])
+  filtro?: 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos';
 
   @IsOptional()
   @IsString()

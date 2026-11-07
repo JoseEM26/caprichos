@@ -10,6 +10,8 @@ import {
   listarConversaciones,
   listarRespuestasRapidas,
   marcarAtendido,
+  marcarChatNoVisto,
+  marcarChatVisto,
   obtenerDetalleConversacion,
   pausarBot,
   pulirMensaje,
@@ -58,7 +60,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
 
   const [cargando, setCargando] = useState(true);
   const [chats, setChats] = useState<ChatResumen[]>([]);
-  const [conteos, setConteos] = useState({ todos: 0, atender: 0, bot: 0, atendidos: 0, bloqueadosSpam: 0 });
+  const [conteos, setConteos] = useState({ todos: 0, atender: 0, bot: 0, atendidos: 0, sinVer: 0, bloqueadosSpam: 0 });
   const [filtro, setFiltro] = useState<FiltroChat>('todos');
   const [soloBloqueados, setSoloBloqueados] = useState(false);
   const [modalDesbloqueo, setModalDesbloqueo] = useState(false);
@@ -186,7 +188,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     try {
       const res = await listarConversaciones(filtro, busqueda);
       setChats(res.chats);
-      setConteos({ bloqueadosSpam: 0, ...res.conteos });
+      setConteos({ bloqueadosSpam: 0, sinVer: 0, ...res.conteos });
 
       const pendiente = telefonoPendiente.current;
       const delCliente = pendiente
@@ -213,6 +215,44 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
       setCargando(false);
     }
   }, [filtro, busqueda]);
+
+  // Chat que la persona abrió ella misma: solo ese se da por visto (el que se abre solo al cargar la lista, no)
+  const abiertoPorPersona = React.useRef<string | null>(null);
+
+  const alMarcarVisto = useCallback(
+    async (id: string) => {
+      try {
+        await marcarChatVisto(id);
+      } catch {
+        /* se reintenta en el siguiente refresco */
+      }
+      await cargarLista(true);
+      setDetalle((prev) => (prev && prev.id === id ? { ...prev, marcadoNoVisto: false } : prev));
+    },
+    [cargarLista],
+  );
+
+  const alMarcarNoVisto = useCallback(
+    async (id: string) => {
+      if (abiertoPorPersona.current === id) abiertoPorPersona.current = null;
+      try {
+        await marcarChatNoVisto(id);
+      } catch {
+        return;
+      }
+      setDetalle((prev) => (prev && prev.id === id ? { ...prev, marcadoNoVisto: true } : prev));
+      await cargarLista(true);
+    },
+    [cargarLista],
+  );
+
+  // Si llegan mensajes mientras el chat sigue abierto por la persona, se dan por vistos
+  useEffect(() => {
+    const id = abiertoPorPersona.current;
+    if (!id) return;
+    const fila = chats.find((c) => c.id === id);
+    if (fila && fila.sinLeer > 0 && !fila.marcadoNoVisto) void marcarChatVisto(id).then(() => cargarLista(true)).catch(() => {});
+  }, [chats, cargarLista]);
 
   // Cargar respuestas rápidas una vez
   useEffect(() => {
@@ -616,9 +656,14 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
           chats={chatsOrdenados}
           chatSeleccionadoId={chatSeleccionadoId}
           onSeleccionar={(id) => {
+            abiertoPorPersona.current = id;
+            const fila = chats.find((c) => c.id === id);
+            if (fila && (fila.sinLeer > 0 || fila.marcadoNoVisto)) void alMarcarVisto(id);
             setChatSeleccionadoId(id);
             setChatAbiertoMovil(true);
           }}
+          onMarcarNoVisto={alMarcarNoVisto}
+          onMarcarVisto={alMarcarVisto}
         />
 
         <section className="msg-chat" aria-label="Conversación">
@@ -640,6 +685,20 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 onDesbloquear={() => setModalDesbloqueo(true)}
                 acciones={acciones}
               />
+              <button
+                type="button"
+                className="msg-btn msg-btn-no-visto"
+                data-testid="btn-no-visto-detalle"
+                onClick={() => {
+                  if (detalle.marcadoNoVisto) void alMarcarVisto(detalle.id);
+                  else {
+                    void alMarcarNoVisto(detalle.id);
+                    setChatAbiertoMovil(false);
+                  }
+                }}
+              >
+                {detalle.marcadoNoVisto ? 'Marcar como visto' : 'Marcar como no visto'}
+              </button>
               <FlujoMensajes mensajes={detalle.mensajes} eventos={eventos} onReintentar={handleReintentarMensaje} />
               <BarraAccionPendiente
                 detalle={detalle}

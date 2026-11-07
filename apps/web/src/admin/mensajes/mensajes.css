@@ -899,3 +899,60 @@
     padding: 0;
   }
 }
+
+/* Chats sin ver y fechas */
+.msg-li-fila {
+  position: relative;
+}
+.msg-li-fila .msg-fila {
+  padding-right: 58px;
+}
+.msg-fila[data-sin-ver='1'] {
+  background: #FFF8EF;
+  box-shadow: inset 4px 0 0 #E67929;
+}
+.msg-fila[data-sin-ver='1'] .msg-nombre {
+  font-weight: 800;
+}
+.msg-opciones {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+}
+.msg-opciones-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+.msg-opciones .msg-menu {
+  min-width: 200px;
+  bottom: calc(100% + 4px);
+  top: auto;
+}
+.msg-chip-no-visto {
+  background: #FDE8D3;
+  border-color: #E67929;
+  color: #6B2F00;
+  font-weight: 700;
+}
+.msg-sin-ver-total {
+  color: #8A4300;
+  font-weight: 700;
+}
+.msg-dia {
+  align-self: center;
+  margin: 8px 0 4px;
+}
+.msg-dia span {
+  display: inline-block;
+  padding: 3px 14px;
+  border-radius: 999px;
+  background: #0B2C3E;
+  color: #FBF4EC;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.msg-btn-no-visto {
+  align-self: flex-end;
+  min-height: 44px;
+  margin: 4px 10px 0;
+}

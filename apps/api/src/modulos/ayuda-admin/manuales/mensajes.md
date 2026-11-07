@@ -6,6 +6,7 @@ permiso: mensajes/ver
 roles: [ADMIN, CAJERO, MOZO, SUPERVISOR]
 relacionados: [caja, reclamos, clientes, cocina, repartos, reservas]
 sugerencias:
+  - Como marco un chat como no visto para volver despues
   - Como respondo cuando un cliente pide hablar con una persona
   - Como valido un voucher de Yape o Plin con la lectura de IA
   - Que hago si expiro la ventana de 24 horas del chat
@@ -93,6 +94,15 @@ Ver tambien: [[caja]]
 5. Si Meta acepta un mensaje y despues avisa que no lo entrego (por ejemplo el cliente cambio de numero o paso de 24 horas), el mensaje pasa de Enviado a Fallido con el motivo, avisa en la campana y se puede reenviar o descartar desde Salientes.
 6. Cada fallido muestra el motivo en espanol; el codigo de Meta y el texto original los ve solo el Administrador. Un cliente que escribe baja o stop deja de recibir mensajes; escribir "no mas" ya no cuenta como baja.
 7. Si el bot tiene un problema al procesar un mensaje del cliente, le responde una disculpa breve y le invita a escribir de nuevo o a pedir un asesor.
+
+## Como se hace: Marcar un chat como no visto y leer las fechas
+1. Arriba de la lista, junto a Por atender, aparece el contador N sin ver. Los chats sin ver tienen una franja naranja, el nombre en negrita y la etiqueta Sin ver (mensajes nuevos del cliente) o No visto (marcado a mano).
+2. Para verlos juntos, pulsar la pestana No vistos.
+3. Para acordarse de volver a un chat, pulsar el boton de tres puntos de su fila y elegir Marcar como no visto, o abrir el chat y pulsar Marcar como no visto sobre la conversacion. La marca es del chat: la ve todo el equipo.
+4. La marca no se quita sola al abrir la lista: se quita al abrir ese chat o al elegir Marcar como visto en el menu de la fila.
+5. Dentro del chat, una franja con el dia (Hoy, Ayer, o Martes 3 de noviembre) separa los mensajes de cada dia, y cada mensaje muestra su hora. Al pasar el cursor o tocar la hora se ve la fecha completa, por ejemplo 3 nov 2026, 15:37.
+6. En la lista, el ultimo mensaje muestra la hora si es de hoy, Ayer, el dia de la semana si es de esta semana, o la fecha como 03/11/26 si es mas antiguo. Todo en hora de Lima.
+Ver tambien: [[caja]]
 
 ## Errores y dudas comunes
 - Un pedido con pago digital no validado no aparecera en cocina hasta que su voucher sea aprobado por una persona; esto evita que se preparen pedidos sin respaldo financiero.

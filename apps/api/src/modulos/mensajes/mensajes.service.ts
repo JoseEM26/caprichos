@@ -28,9 +28,9 @@ import { MOTIVO_BLOQUEO_SPAM } from '../chatbot/configuracion/chatbot-configurac
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
-export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos';
+export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos';
 
-const GRUPOS: Record<Exclude<FiltroChat, 'todos'>, EstadoChat[]> = {
+const GRUPOS: Record<Exclude<FiltroChat, 'todos' | 'novistos'>, EstadoChat[]> = {
   atender: ['atencion', 'validar'],
   bot: ['bot', 'pausado'],
   atendidos: ['atendido'],
@@ -47,6 +47,9 @@ const error = (status: HttpStatus, codigo: string, mensaje: string) =>
 
 const hora = (d: Date) =>
   new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(d);
+
+/** Un chat está «sin ver» si el cliente escribió después de la última vez que se abrió, o si alguien lo marcó a mano. */
+const sinVer = (f: { sinLeer: number; marcadoNoVisto: boolean }) => f.sinLeer > 0 || f.marcadoNoVisto;
 
 /** Estado que ve la consola, derivado de las columnas de `conversacion` (la tabla no tiene «pausado»). */
 export function estadoDe(c: { estado: string; duenio: string; urgente: boolean }): EstadoChat {
@@ -185,7 +188,11 @@ export class MensajesService {
       const ult = c.mensajes[0];
       let sinLeer = 0;
       if (estado === 'atencion' || estado === 'validar') {
-        for (const m of c.mensajes) { if (m.autor !== 'CLIENTE') break; sinLeer++; }
+        for (const m of c.mensajes) {
+          if (m.autor !== 'CLIENTE') break;
+          if (c.visto_en && m.en <= c.visto_en) break;
+          sinLeer++;
+        }
       }
       const prefijo = !ult ? '' : ult.autor === 'CLIENTE' ? '' : ult.autor === 'BOT' ? 'Bot: ' : 'Tú: ';
       return {
@@ -199,6 +206,8 @@ export class MensajesService {
         urgente: c.urgente,
         ultimo: ult ? prefijo + (ult.tipo === 'IMAGEN' ? 'Foto' : textoDe(ult)) : '',
         hora: ult ? hora(ult.en) : hora(c.ultima_actividad),
+        fecha: (ult ? ult.en : c.ultima_actividad).toISOString(),
+        marcadoNoVisto: c.marcado_no_visto,
         ultimaActividadDate: c.ultima_actividad,
         sinLeer,
         // El último mensaje es del cliente y nadie lo tomó: minutos que lleva sin respuesta (null si no aplica)
@@ -209,12 +218,13 @@ export class MensajesService {
         bloqueoSpam: bloqueos?.get(c.telefono) ?? null,
       };
     });
-    const cuenta = (g: Exclude<FiltroChat, 'todos'>) => filas.filter((f) => GRUPOS[g].includes(f.estado)).length;
+    const cuenta = (g: Exclude<FiltroChat, 'todos' | 'novistos'>) => filas.filter((f) => GRUPOS[g].includes(f.estado)).length;
     const termino = q.toLowerCase().trim();
     const digitos = termino.replace(/\D/g, '');
     const chats = filas.filter(
       (f) =>
-        (filtro === 'todos' || GRUPOS[filtro].includes(f.estado)) &&
+        (filtro === 'todos' ||
+          (filtro === 'novistos' ? sinVer(f) : GRUPOS[filtro].includes(f.estado))) &&
         (!termino ||
           f.nombre.toLowerCase().includes(termino) ||
           (f.nombre_contacto && f.nombre_contacto.toLowerCase().includes(termino)) ||
@@ -234,6 +244,7 @@ export class MensajesService {
         atender: cuenta('atender'),
         bot: cuenta('bot'),
         atendidos: cuenta('atendidos'),
+        sinVer: filas.filter(sinVer).length,
         bloqueadosSpam: filas.filter((f) => f.bloqueoSpam?.activo).length,
       },
       chats,
@@ -348,6 +359,7 @@ export class MensajesService {
       modalidad: pedido ? MODALIDADES[pedido.modalidad] ?? pedido.modalidad : null,
       estado,
       urgente: c.urgente,
+      marcadoNoVisto: c.marcado_no_visto,
       dueno: this.dueno(c),
       esMio: !!c.tomado_por && c.tomado_por === yo,
       ocupado: !!c.tomado_por && c.tomado_por !== yo,
@@ -381,6 +393,7 @@ export class MensajesService {
           texto: textoDe(m),
           ubicacion: contenido.ubicacion ?? null,
           hora: hora(m.en),
+          fecha: m.en.toISOString(),
           estado: estadoMsg,
           errorCodigo: esAdmin ? errorCodigo : null,
           errorDetalle: esAdmin ? tecnico?.original ?? null : null,
@@ -713,6 +726,23 @@ export class MensajesService {
     } catch {
       // opcional
     }
+    return { ok: true };
+  }
+
+  /** Abrir el chat (o «Marcar como visto»): lo deja visto para todo el equipo. No mueve el chat en la lista. */
+  async marcarVisto(id: string, _usuario: UsuarioAutenticado, _ip?: string) {
+    const c = await this.cargar(id);
+    await this.prisma.conversacion.update({ where: { id: c.id }, data: { visto_en: new Date(), marcado_no_visto: false } });
+    this.aviso(c.id);
+    return { ok: true };
+  }
+
+  /** «Marcar como no visto»: recordatorio compartido para volver al chat. Solo se limpia al abrirlo o al marcarlo visto. */
+  async marcarNoVisto(id: string, usuario: UsuarioAutenticado, ip?: string) {
+    const c = await this.cargar(id);
+    await this.prisma.conversacion.update({ where: { id: c.id }, data: { marcado_no_visto: true } });
+    this.aviso(c.id);
+    await this.auditar(usuario, 'MARCAR_NO_VISTO', c.id, undefined, ip);
     return { ok: true };
   }
 

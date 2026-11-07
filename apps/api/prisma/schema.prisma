@@ -2039,6 +2039,10 @@ model Conversacion {
   phone_number_id    String?
   /// Ese mismo numero para mostrar (display_phone_number), p. ej. 51914244077.
   numero_receptor    String?
+  /// Última vez que alguien del equipo abrió el chat: lo que el cliente escribió después está «sin ver»
+  visto_en           DateTime?          @db.Timestamptz
+  /// Marca manual «No visto» (como WhatsApp): compartida por todo el equipo hasta abrir el chat o «Marcar como visto»
+  marcado_no_visto   Boolean            @default(false)
 
   party              Party?           @relation(fields: [party_id], references: [id])
   tomadoPorUsuario   UserAccount?       @relation(fields: [tomado_por], references: [id])
