@@ -39,7 +39,7 @@ describe('pruebas de impresión', () => {
     expect(data.copia).toBe(false);
     expect(data.payload.codigo).toBe('PRUEBA');
     expect(data.payload.who).toBe('Ana');
-    expect(data.payload.nota).toContain('PRUEBA DE ETIQUETA');
+    expect(data.payload.nota).toContain('PRUEBA - no es un pedido');
     expect(prisma.pedido.findUnique).not.toHaveBeenCalled();
     expect(res.trabajoId).toBe('42');
   });

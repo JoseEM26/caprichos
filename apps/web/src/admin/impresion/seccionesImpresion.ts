@@ -1,7 +1,10 @@
 import { maquinasConProblema, programaApagado, type MaquinasImpresion } from './useEstadoMaquinas';
 
 /** Secciones del módulo Impresión de Configuración. Van en ?tab=impresion&seccion=<id>. */
-export const SECCIONES_IMPRESION = ['mapa', 'equipos', 'cola'] as const;
+/** «facil» es la pantalla de 3 pasos (la de siempre); mapa, equipos y cola son la «Vista avanzada». */
+export const SECCIONES_IMPRESION = ['facil', 'mapa', 'equipos', 'cola'] as const;
+/** Las tres de la vista avanzada (llevan pestañas). */
+export const SECCIONES_AVANZADAS = ['mapa', 'equipos', 'cola'] as const;
 export type SeccionImpresion = (typeof SECCIONES_IMPRESION)[number];
 
 /** Última sección que vio el dueño: al volver a Impresión se abre esa. */
@@ -29,13 +32,13 @@ export function guardarSeccionRecordada(seccion: SeccionImpresion): void {
 
 /**
  * Sección que corresponde a una URL de Configuración.
- * Enlaces viejos: ?tab=mapa-impresion → mapa; ?tab=impresion sin sección (era «Impresión de etiquetas») → equipos.
+ * Enlaces viejos: ?tab=mapa-impresion → mapa. Sin sección se abre siempre la pantalla fácil de 3 pasos
+ * (ya no se recuerda la última sección: así el dueño no cae en la vista avanzada por accidente).
  */
-export function seccionDesdeUrl(tab: string | null, seccion: string | null, recordada: SeccionImpresion | null): SeccionImpresion {
+export function seccionDesdeUrl(tab: string | null, seccion: string | null, _recordada?: SeccionImpresion | null): SeccionImpresion {
   if (tab === 'mapa-impresion') return 'mapa';
   if (esSeccion(seccion)) return seccion;
-  if (tab === 'impresion' && !seccion) return 'equipos';
-  return recordada ?? 'mapa';
+  return 'facil';
 }
 
 export type NivelSalud = 'ok' | 'aviso' | 'falla' | 'sin_datos';

@@ -2,11 +2,14 @@ import { useRef, type KeyboardEvent } from 'react';
 import { ModuloMapaImpresion } from './mapa/ModuloMapaImpresion';
 import { SeccionEquipos } from './SeccionEquipos';
 import { SeccionColaPruebas } from './SeccionColaPruebas';
-import { SECCIONES_IMPRESION, saludEquipos, type SeccionImpresion } from './seccionesImpresion';
+import { ImpresionFacil } from './facil/ImpresionFacil';
+import { SECCIONES_AVANZADAS, saludEquipos, type SeccionImpresion } from './seccionesImpresion';
 import { useEstadoMaquinas } from './useEstadoMaquinas';
 import './modulo-impresion.css';
 
-const TEXTO_SECCION: Record<SeccionImpresion, { nombre: string; ayuda: string; icono: string }> = {
+type SeccionAvanzada = (typeof SECCIONES_AVANZADAS)[number];
+
+const TEXTO_SECCION: Record<SeccionAvanzada, { nombre: string; ayuda: string; icono: string }> = {
   mapa: {
     nombre: 'Mapa',
     ayuda: 'Qué sale y dónde',
@@ -47,16 +50,16 @@ export function ModuloImpresion({
   seccion: SeccionImpresion;
   alCambiarSeccion: (s: SeccionImpresion) => void;
 }) {
-  const botones = useRef<Partial<Record<SeccionImpresion, HTMLButtonElement | null>>>({});
+  const botones = useRef<Partial<Record<SeccionAvanzada, HTMLButtonElement | null>>>({});
 
-  const elegir = (s: SeccionImpresion, conFoco: boolean) => {
+  const elegir = (s: SeccionAvanzada, conFoco: boolean) => {
     alCambiarSeccion(s);
     if (conFoco) botones.current[s]?.focus();
   };
 
   const alTeclear = (e: KeyboardEvent<HTMLButtonElement>) => {
-    const n = SECCIONES_IMPRESION.length;
-    const i = SECCIONES_IMPRESION.indexOf(seccion);
+    const n = SECCIONES_AVANZADAS.length;
+    const i = SECCIONES_AVANZADAS.indexOf(seccion as SeccionAvanzada);
     let j: number | null = null;
     if (e.key === 'ArrowRight') j = (i + 1) % n;
     else if (e.key === 'ArrowLeft') j = (i - 1 + n) % n;
@@ -64,13 +67,24 @@ export function ModuloImpresion({
     else if (e.key === 'End') j = n - 1;
     if (j === null) return;
     e.preventDefault();
-    elegir(SECCIONES_IMPRESION[j], true);
+    elegir(SECCIONES_AVANZADAS[j], true);
   };
+
+  if (seccion === 'facil') {
+    return (
+      <div className="imp-modulo">
+        <ImpresionFacil alVistaAvanzada={() => alCambiarSeccion('mapa')} />
+      </div>
+    );
+  }
 
   return (
     <div className="imp-modulo">
+      <button type="button" className="imp-volver" data-testid="imp-volver-facil" onClick={() => alCambiarSeccion('facil')}>
+        ← Volver a la pantalla fácil (3 pasos)
+      </button>
       <div role="tablist" aria-label="Secciones de Impresión" className="imp-tabs">
-        {SECCIONES_IMPRESION.map((s) => {
+        {SECCIONES_AVANZADAS.map((s) => {
           const activa = s === seccion;
           return (
             <button

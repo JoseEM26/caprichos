@@ -42,7 +42,7 @@ export function lineasTicketComandaSalon(t: TicketComandaSalonDatos, columnas: n
   const bloque = (texto: string, cols: number, extra: Partial<LineaComanda> = {}, sangria = '') =>
     partir(texto, cols - sangria.length).forEach((t2) => p(sangria + t2, extra));
 
-  p(t.area ? `COMANDA · ${t.area}` : 'COMANDA', { centrado: true, negrita: true });
+  p(t.area ? `COMANDA · ${t.area}` : 'COMANDA · SALÓN', { centrado: true, negrita: true });
   p(`Pedido ${t.codigo}`, { centrado: true, negrita: true });
   p('-'.repeat(c));
   if (t.mesa) p(`Mesa: ${t.mesa}`, { negrita: true });

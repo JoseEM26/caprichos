@@ -1,13 +1,21 @@
 import type { EntradaConfig } from './tipos';
 
-// Pestaña «Impresión» (apps/web/src/admin/impresion): un solo módulo con tres secciones (apartado = ?seccion=).
+// Pestaña «Impresión» (apps/web/src/admin/impresion): la pantalla fácil de 3 pasos (apartado «facil», la que abre por defecto)
+// y la «Vista avanzada» con tres secciones (apartado = ?seccion=mapa|equipos|cola).
 // Los ids de «mapa» van en data-cfg-id dentro de LienzoMapa.tsx; el resto, con data-cfg-id literal.
 
-const MAPA = 'Impresión · Mapa';
-const EQUIPOS = 'Impresión · Equipos y estado';
-const COLA = 'Impresión · Cola y pruebas';
+const FACIL = 'Impresión · 3 pasos';
+const MAPA = 'Impresión · Vista avanzada · Mapa';
+const EQUIPOS = 'Impresión · Vista avanzada · Equipos y estado';
+const COLA = 'Impresión · Vista avanzada · Cola y pruebas';
 
 export const IMPRESION: EntradaConfig[] = [
+  // Pantalla fácil: 3 pasos
+  { id: 'impresion-como-funciona', tab: 'impresion', apartado: 'facil', seccion: FACIL, titulo: 'Cómo funciona la impresión', descripcion: 'Resumen de cuatro líneas: las reglas (qué se imprime) son una sola para todo el local; cada computadora solo dice qué impresoras tiene y de qué área se encarga; si una PC está apagada sus papeles esperan y salen al encenderla; si un área no tiene PC, sale en Caja.', palabras: ['como funciona', 'explicacion', 'ayuda', 'impresion', 'una para todas', 'cada pc', 'reglas'] },
+  { id: 'impresion-paso-computadoras', tab: 'impresion', apartado: 'facil', seccion: FACIL, titulo: 'Paso 1 · Tus computadoras', descripcion: 'Una tarjeta por cada computadora con el programa de impresión: luz verde o roja y una frase de cómo está («Lista», «El programa no está abierto en esta PC», «No elegiste impresora de tickets»), su ticketera y su etiquetera, «Cambiar impresoras» (lista numerada con «Imprimir prueba») y el selector «Esta PC imprime lo de: Caja / Bebidas…». «Agregar otra computadora» da el código y el programa.', ejemplo: 'La PC de Bebidas imprime lo de Bebidas: los stickers de vaso salen allá.', palabras: ['computadoras', 'pc', 'equipos', 'agregar computadora', 'vincular', 'instalar programa', 'codigo', 'impresora', 'ticketera', 'etiquetera', 'bebidas', 'caja', 'area', 'cambiar impresora', 'estado'], peligro: 'medio', permiso: 'configuracion/editar' },
+  { id: 'impresion-paso-que-se-imprime', tab: 'impresion', apartado: 'facil', seccion: FACIL, titulo: 'Paso 2 · Qué se imprime (tabla)', descripcion: 'Una tabla con las piezas (ticket del pago, comanda de salón, sticker de bebida, sticker por área, sticker general) y tres columnas: en el local, para llevar y delivery. Marca con ✓ lo que sale en cada una. «Recomendado para Caprichos», «Solo ticket en todos los pedidos» y «Todo apagado excepto ticket» rellenan la tabla de una vez; «Ver ejemplo» muestra el papel y «Sale en» dice en qué máquina sale.', ejemplo: 'Recomendado: ticket siempre, comanda solo en el local, stickers de bebida y por área solo para llevar y delivery.', palabras: ['que se imprime', 'tabla', 'casillas', 'recomendado', 'atajo', 'sticker', 'etiqueta', 'comanda', 'ticket', 'vaso', 'bebida', 'area', 'general', 'delivery', 'llevar', 'local', 'mesa', 'ver ejemplo', 'sale en', 'imprime cosas que no'], peligro: 'medio', permiso: 'configuracion/editar' },
+  { id: 'impresion-paso-probar', tab: 'impresion', apartado: 'facil', seccion: FACIL, titulo: 'Paso 3 · Probar y lo último impreso', descripcion: '«Imprimir una prueba en cada impresora» saca una hoja marcada «PRUEBA — no es un pedido» en cada impresora elegida de cada PC. Debajo, «Lo último que se imprimió»: los últimos 10 papeles con su PC, si salió bien, falló o espera, el motivo en palabras simples y «Reintentar».', ejemplo: 'Un sticker que falló por falta de papel: pon papel y pulsa Reintentar.', palabras: ['probar', 'prueba', 'ultimo impreso', 'ultimos trabajos', 'reintentar', 'fallo', 'cola', 'no imprime', 'hoja de prueba'], peligro: 'bajo' },
+
   // Mapa: qué sale y dónde
   { id: 'mapa-impresion-bebida', tab: 'impresion', apartado: 'mapa', seccion: MAPA, titulo: 'Sticker de bebida', descripcion: 'Enciende o apaga el sticker que sale por cada vaso con bebida. Por defecto sale en pedidos para llevar, recoger y delivery (no en mesa) y se imprime en la computadora asignada a Bebidas, o en Caja si no hay. Los botones «Sale en» eligen los tipos de pedido.', ejemplo: 'Apagado: los vasos ya no salen con sticker; el resto de tickets sigue igual.', palabras: ['vaso', 'bebida', 'sticker', 'etiqueta', 'bebidas', 'imprimir', 'mapa'], peligro: 'medio', permiso: 'configuracion/editar' },
   { id: 'mapa-impresion-area', tab: 'impresion', apartado: 'mapa', seccion: MAPA, titulo: 'Sticker por área', descripcion: 'Enciende o apaga un sticker por cada área con productos (Salados, Postres…), para que cada área lo reciba en su equipo. Bebidas no lleva este sticker: ya sale uno por cada vaso. Por defecto sale en llevar, recoger y delivery, en la computadora de Caja; los botones «Sale en» eligen los tipos de pedido.', palabras: ['area', 'salados', 'postres', 'bebidas', 'sticker por area', 'cocina', 'mapa'], peligro: 'medio', permiso: 'configuracion/editar' },

@@ -5,6 +5,8 @@ export interface TrabajoImpresionAdmin {
   id: string;
   /** NULL en las pruebas de impresión (no tienen pedido). */
   pedidoId: string | null;
+  /** Área cuya computadora lo imprime; null = Caja. */
+  destinoAreaId?: string | null;
   pedidoCodigo: string;
   clienteNombre: string;
   tipo: string;

@@ -225,7 +225,7 @@ describe('Integridad de enlaces profundos de los manuales', () => {
   const tabs = new Set(pestanasDeConfiguracion());
   const campos = idsDeCatalogo();
   const rutas = rutasDeModulos();
-  const secciones = new Set(['mapa', 'equipos', 'cola']);
+  const secciones = new Set(['facil', 'mapa', 'equipos', 'cola']);
   const todos = [...cargador.obtenerTodos(), ...cargador.obtenerSecciones()];
   const enlaces = todos.flatMap((m) => cargador.extraerEnlacesProfundos(m.contenido).map((e) => ({ archivo: m.archivo, ...e })));
 

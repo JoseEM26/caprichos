@@ -181,7 +181,7 @@ export function ModuloMapaImpresion() {
   const pedirRestablecerReglas = () => {
     setConfirmacion({
       titulo: 'Restablecer las reglas recomendadas',
-      mensaje: 'Se volverán a las reglas recomendadas: sticker de bebida en todos los pedidos, sticker de resumen solo en llevar y delivery, comanda de salón encendida, sticker por área y comanda por área apagados. No cambia a qué área atiende cada equipo.',
+      mensaje: 'Se volverán a las reglas recomendadas: sticker de bebida y sticker por área solo para llevar, recoger y delivery, comanda de salón encendida, sticker general y comanda por área apagados. No cambia a qué área atiende cada equipo.',
       textoSi: 'Sí, restablecer',
       alConfirmar: () => void ejecutarRestablecerReglas(),
     });
@@ -264,8 +264,8 @@ export function ModuloMapaImpresion() {
       <p className="mapa-regla-unica">Un solo equipo por área y tipo de máquina, y uno en Caja.</p>
       <div className="mapa-recomendado">
         <p className="mapa-recomendado-ayuda">
-          <strong>Lo recomendado:</strong> sticker de bebida en todos los pedidos; sticker de resumen solo en llevar y delivery;
-          comanda de salón encendida; sticker por área y comanda por área apagados.
+          <strong>Lo recomendado:</strong> sticker de bebida y sticker por área solo para llevar, recoger y delivery;
+          comanda de salón encendida; sticker general y comanda por área apagados.
         </p>
         {puedeEditar && (
           <Boton

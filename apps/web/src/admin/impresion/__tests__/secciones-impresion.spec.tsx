@@ -176,12 +176,12 @@ describe('SeccionColaPruebas (Cola y pruebas)', () => {
 });
 
 describe('funciones puras del módulo Impresión', () => {
-  it('seccionDesdeUrl: enlaces viejos, sección explícita y valor recordado', () => {
+  it('seccionDesdeUrl: enlace viejo, sección explícita y, si no hay, la pantalla fácil', () => {
     expect(seccionDesdeUrl('mapa-impresion', null, 'cola')).toBe('mapa');
-    expect(seccionDesdeUrl('impresion', null, 'mapa')).toBe('equipos');
+    expect(seccionDesdeUrl('impresion', null, 'mapa')).toBe('facil');
     expect(seccionDesdeUrl('impresion', 'cola', 'mapa')).toBe('cola');
-    expect(seccionDesdeUrl('impresion', 'inventada', 'cola')).toBe('cola');
-    expect(seccionDesdeUrl('impresion', 'inventada', null)).toBe('mapa');
+    expect(seccionDesdeUrl('impresion', 'facil', null)).toBe('facil');
+    expect(seccionDesdeUrl('impresion', 'inventada', 'cola')).toBe('facil');
   });
 
   it('saludEquipos: verde, ámbar, roja o sin datos', () => {

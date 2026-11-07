@@ -113,7 +113,7 @@ function pie(L: Lienzo, izq: string, der: string, fuente: FuenteTspl = '2'): num
 export function maquetarBebida(d: EtiquetaBebidaDatos, tam: { anchoMm?: number; altoMm?: number } = {}): Maqueta {
   const L = lienzo({ anchoMm: tam.anchoMm ?? TAMANO_BEBIDA_DEFECTO.anchoMm, altoMm: tam.altoMm ?? TAMANO_BEBIDA_DEFECTO.altoMm });
   // Cabecera: codigo del pedido (izq) e indice "1/3" (der)
-  let y = banda(L, L.b + 4, '4', d.codigo || 'PED-000', `${d.bebidaIndex}/${d.totalBebidas}`) + 6;
+  let y = banda(L, L.b + 4, '4', d.codigo || 'PED-000', `BEBIDA ${d.bebidaIndex}/${d.totalBebidas}`) + 6;
   // Pie: "Para: cliente" y hora
   const finCuerpo = pie(L, d.who, d.hora) - 4;
   const cuerpo = finCuerpo - y;
@@ -178,7 +178,7 @@ export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number
   const hPill = alto('4') + 8;
   texto(L, L.x0 + 8, y + 4, '4', 1, pillTxtCortado, true);
   inverso(L, L.x0, y, wPill, hPill);
-  const canal = `${d.canal} - ${d.fecha}`;
+  const canal = `GENERAL | ${d.canal} - ${d.fecha}`;
   const nCanal: Nivel = ['3', 1];
   const libreCanal = L.w - wPill - 14;
   if (libreCanal >= 8 * ancho('3')) {

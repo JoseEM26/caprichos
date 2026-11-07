@@ -133,25 +133,30 @@ describe('Configuración: módulo único de Impresión', () => {
     expect(seccion(/^Mapa/)).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('la pestaña vieja ?tab=impresion (era Impresión de etiquetas) redirige a Equipos y estado', async () => {
+  it('sin sección, ?tab=impresion abre la pantalla fácil de 3 pasos', async () => {
     montar('/admin/configuracion?tab=impresion');
-    await waitFor(() => expect(ubicacion()).toBe('?tab=impresion&seccion=equipos'));
-    expect(seccion(/^Equipos y estado/)).toHaveAttribute('aria-selected', 'true');
-    expect(await screen.findByText('Llaves de autenticación del agente')).toBeInTheDocument();
+    await waitFor(() => expect(ubicacion()).toBe('?tab=impresion&seccion=facil'));
+    expect(await screen.findByTestId('impresion-facil')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: 'Secciones de Impresión' })).not.toBeInTheDocument();
   });
 
-  it('recuerda la última sección al volver a Impresión desde otra pestaña', async () => {
-    montar('/admin/configuracion?tab=impresion&seccion=mapa');
-    fireEvent.click(seccion(/^Cola y pruebas/));
-    await waitFor(() => expect(ubicacion()).toBe('?tab=impresion&seccion=cola'));
+  it('«Vista avanzada» abre las tres secciones y «Volver» regresa a los 3 pasos', async () => {
+    montar('/admin/configuracion?tab=impresion&seccion=facil');
+    fireEvent.click(await screen.findByTestId('vista-avanzada'));
+    await waitFor(() => expect(ubicacion()).toBe('?tab=impresion&seccion=mapa'));
+    expect(seccion(/^Mapa/)).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByTestId('imp-volver-facil'));
+    await waitFor(() => expect(ubicacion()).toBe('?tab=impresion&seccion=facil'));
+    expect(await screen.findByTestId('paso-2')).toBeInTheDocument();
+  });
 
+  it('al volver a Impresión desde otra pestaña siempre abre la pantalla fácil', async () => {
+    montar('/admin/configuracion?tab=impresion&seccion=mapa');
     fireEvent.click(within(navegacion()).getByRole('tab', { name: /^Datos del local/ }));
     await waitFor(() => expect(ubicacion()).toContain('tab=local'));
-
     fireEvent.click(within(navegacion()).getByRole('tab', { name: /^Impresión/ }));
-    await waitFor(() => expect(ubicacion()).toBe('?tab=impresion&seccion=cola'));
-    expect(seccion(/^Cola y pruebas/)).toHaveAttribute('aria-selected', 'true');
-    expect(localStorage.getItem('cfg_impresion_seccion')).toBe('cola');
+    await waitFor(() => expect(ubicacion()).toBe('?tab=impresion&seccion=facil'));
+    expect(await screen.findByTestId('paso-1')).toBeInTheDocument();
   });
 
   it('las flechas, Inicio y Fin mueven la selección entre secciones', async () => {
@@ -213,8 +218,11 @@ describe('Configuración: módulo único de Impresión', () => {
     expect(idsInvalidos()).toEqual([]);
     const impresion = CATALOGO.filter((e) => e.tab === 'impresion');
     expect(impresion.length).toBeGreaterThan(0);
-    for (const e of impresion) expect(['mapa', 'equipos', 'cola']).toContain(e.apartado);
+    for (const e of impresion) expect(['facil', 'mapa', 'equipos', 'cola']).toContain(e.apartado);
     expect(CATALOGO.some((e) => e.tab === 'mapa-impresion')).toBe(false);
+    expect(buscar(CATALOGO, 'tus computadoras').map((r) => r.entrada.id)).toContain('impresion-paso-computadoras');
+    expect(buscar(CATALOGO, 'recomendado').map((r) => r.entrada.id)).toContain('impresion-paso-que-se-imprime');
+    expect(buscar(CATALOGO, 'ultimo impreso').map((r) => r.entrada.id)).toContain('impresion-paso-probar');
     expect(buscar(CATALOGO, 'impresroa').map((r) => r.entrada.id)).toContain('impresion-agente');
   });
 });

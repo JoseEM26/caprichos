@@ -427,6 +427,12 @@
       "modulo": "cocina"
     },
     {
+      "id": "cocina#anular-un-pedido-que-ya-esta-en-cocina",
+      "tipo": "tarea",
+      "etiqueta": "Anular un pedido que ya esta en cocina",
+      "modulo": "cocina"
+    },
+    {
       "id": "cocina#activar-el-modo-de-alta-demanda",
       "tipo": "tarea",
       "etiqueta": "Activar el modo de alta demanda",
@@ -466,6 +472,12 @@
       "id": "cocina#atender-solo-mi-area-usuarios-con-rol-cocina",
       "tipo": "tarea",
       "etiqueta": "Atender solo mi area (usuarios con rol Cocina)",
+      "modulo": "cocina"
+    },
+    {
+      "id": "cocina#despachar-pedidos-completos-pestana-despacho",
+      "tipo": "tarea",
+      "etiqueta": "Despachar pedidos completos (pestana Despacho)",
       "modulo": "cocina"
     },
     {
@@ -521,6 +533,12 @@
       "id": "comprobantes#gestionar-comprobantes-electronicos-por-emitir",
       "tipo": "tarea",
       "etiqueta": "Gestionar comprobantes electronicos por emitir",
+      "modulo": "comprobantes"
+    },
+    {
+      "id": "comprobantes#elegir-el-comprobante-del-pedido-simple-boleta-o-factura",
+      "tipo": "tarea",
+      "etiqueta": "Elegir el comprobante del pedido (simple, boleta o factura)",
       "modulo": "comprobantes"
     },
     {
@@ -1885,27 +1903,33 @@
       "modulo": "mirest"
     },
     {
-      "id": "mirest#impresion#encender-o-apagar-lo-que-se-imprime",
+      "id": "mirest#impresion#paso-1-tus-computadoras",
       "tipo": "tarea",
-      "etiqueta": "encender o apagar lo que se imprime",
+      "etiqueta": "Paso 1, tus computadoras",
       "modulo": "mirest"
     },
     {
-      "id": "mirest#impresion#conectar-el-programa-de-impresion-a-la-pc-de-caja",
+      "id": "mirest#impresion#paso-2-que-se-imprime",
       "tipo": "tarea",
-      "etiqueta": "conectar el programa de impresión a la PC de Caja",
+      "etiqueta": "Paso 2, qué se imprime",
       "modulo": "mirest"
     },
     {
-      "id": "mirest#impresion#crear-o-desactivar-una-llave-del-agente",
+      "id": "mirest#impresion#paso-3-probar",
       "tipo": "tarea",
-      "etiqueta": "crear o desactivar una llave del agente",
+      "etiqueta": "Paso 3, probar",
       "modulo": "mirest"
     },
     {
-      "id": "mirest#impresion#reintentar-trabajos-fallidos-y-hacer-pruebas",
+      "id": "mirest#impresion#cambiar-el-tamano-de-los-stickers",
       "tipo": "tarea",
-      "etiqueta": "reintentar trabajos fallidos y hacer pruebas",
+      "etiqueta": "cambiar el tamaño de los stickers",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#impresion#vista-avanzada-y-llaves",
+      "tipo": "tarea",
+      "etiqueta": "vista avanzada y llaves",
       "modulo": "mirest"
     },
     {
@@ -3560,6 +3584,16 @@
     },
     {
       "tipo": "pertenece_a",
+      "origen": "cocina#anular-un-pedido-que-ya-esta-en-cocina",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina#anular-un-pedido-que-ya-esta-en-cocina",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
       "origen": "cocina#activar-el-modo-de-alta-demanda",
       "destino": "cocina"
     },
@@ -3662,6 +3696,16 @@
       "tipo": "pertenece_a",
       "origen": "cocina#atender-solo-mi-area-usuarios-con-rol-cocina",
       "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#despachar-pedidos-completos-pestana-despacho",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "antes",
+      "origen": "cocina#despachar-pedidos-completos-pestana-despacho",
+      "destino": "caja"
     },
     {
       "tipo": "requiere_permiso",
@@ -3836,6 +3880,21 @@
     {
       "tipo": "ver_tambien",
       "origen": "comprobantes#gestionar-comprobantes-electronicos-por-emitir",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "comprobantes#elegir-el-comprobante-del-pedido-simple-boleta-o-factura",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "antes",
+      "origen": "comprobantes#elegir-el-comprobante-del-pedido-simple-boleta-o-factura",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "comprobantes#elegir-el-comprobante-del-pedido-simple-boleta-o-factura",
       "destino": "cierre"
     },
     {
@@ -7910,22 +7969,27 @@
     },
     {
       "tipo": "pertenece_a",
-      "origen": "mirest#impresion#encender-o-apagar-lo-que-se-imprime",
+      "origen": "mirest#impresion#paso-1-tus-computadoras",
       "destino": "mirest"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "mirest#impresion#conectar-el-programa-de-impresion-a-la-pc-de-caja",
+      "origen": "mirest#impresion#paso-2-que-se-imprime",
       "destino": "mirest"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "mirest#impresion#crear-o-desactivar-una-llave-del-agente",
+      "origen": "mirest#impresion#paso-3-probar",
       "destino": "mirest"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "mirest#impresion#reintentar-trabajos-fallidos-y-hacer-pruebas",
+      "origen": "mirest#impresion#cambiar-el-tamano-de-los-stickers",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#impresion#vista-avanzada-y-llaves",
       "destino": "mirest"
     },
     {

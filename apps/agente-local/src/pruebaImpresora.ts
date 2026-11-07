@@ -23,7 +23,7 @@ export function generarPruebaTicket(nombre: string, rol: RolImpresora, columnas 
     `${ESC}@${ESC}t\x10${ESC}a\x01${ESC}E\x01`,
     // «Impresora 3 de 15: nombre»: letra doble alto y ancho para leerla de lejos
     ...(marca ? [`${GS}!\x11${marca.slice(0, Math.floor(columnas / 2))}\n${GS}!\x00`] : []),
-    'CAPRICHOS - PRUEBA DE IMPRESION\n',
+    'PRUEBA - no es un pedido\nCAPRICHOS - PRUEBA DE IMPRESION\n',
     `${ESC}E\x00${raya}\n`,
     `${ESC}a\x00`,
     `Impresora: ${nombre}\n`,

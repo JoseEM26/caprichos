@@ -8,54 +8,62 @@ permiso: local/ver
 roles: [ADMIN]
 relacionados: [caja, cocina, pantallas]
 sugerencias:
-  - ¿Cómo enciendo o apago el sticker de bebida o la comanda de salón?
-  - ¿Cómo conecto el programa de impresión a la PC de Caja?
-  - ¿Cómo reintento una etiqueta que falló?
-  - ¿Cómo creo una llave para el agente de impresión?
+  - ¿Cómo funciona la impresión? ¿Se configura por cada PC o una para todas?
+  - ¿Qué se imprime y cuándo? Me imprime cosas que no tienen que ver
+  - ¿Cómo agrego otra computadora para imprimir?
+  - ¿Cómo reintento un papel que falló?
 ---
 # Configuración: Impresión
 
 ## Para que sirve
-Gobierna qué se imprime (stickers de bebida y por área, comanda de salón), en qué equipo (etiquetera o ticketera) y el estado de las impresoras. La pestaña tiene tres secciones: Mapa (qué se imprime), Equipos y estado (el programa de impresión de la PC de Caja y sus llaves) y Cola y pruebas (trabajos pendientes y fallidos). Se usa desde [[caja]] y [[cocina]].
+Decide qué papeles se imprimen (ticket del pago, comanda de salón, stickers de bebida, por área y general), en qué computadora salen y si todo está bien conectado. La pantalla tiene 3 pasos: 1) Tus computadoras, 2) Qué se imprime y 3) Probar. Se usa desde [[caja]] y [[cocina]].
 
-## Como se hace: encender o apagar lo que se imprime
-1. En Configuración del local abre "Impresión" y la sección "Mapa" ([Impresión](/admin/mirest?tab=impresion); enlace directo a la sección: /admin/mirest?tab=impresion&seccion=mapa).
-2. Enciende o apaga "Sticker de bebida", "Sticker por área" o "Comanda de salón" y confirma. Los stickers de bebida y por área salen por defecto en llevar, recoger y delivery; los botones "Sale en" lo cambian.
-3. El sticker general (todo el pedido, con la lista de productos) solo sale para pedidos para llevar, recoger y delivery; un pedido en el local no lleva sticker general y su voucher sale por la ticketera normal. Tampoco sale ningún sticker de bebida ni de área en pedidos en el local, salvo que lo cambies con los botones "Sale en". El sticker de bebida sale por cada vaso en el equipo de Bebidas (o en Caja si no hay). La comanda de salón sale en la ticketera de Caja al aceptar un pedido de mesa o local; no sale para llevar ni delivery.
+## Como funciona (lo importante, en 4 líneas)
+1. Las reglas (qué se imprime) son UNA sola para todo el local. No se configuran por computadora.
+2. Cada computadora solo dice qué impresoras tiene (ticketera, etiquetera) y de qué área se encarga (Caja, Bebidas…).
+3. Si una PC está apagada, sus papeles esperan y salen al encenderla; no se pierden.
+4. Si un área no tiene computadora, su papel sale en Caja.
+
+## Lo que sale hoy (de fábrica)
+- Ticket o comprobante del pago: siempre, en la ticketera de Caja, al cobrar.
+- Comanda de salón: solo en pedidos en el local (mesa), en la ticketera de Caja.
+- Sticker de bebida (uno por vaso): solo para llevar, recoger y delivery, en la PC de Bebidas (o en Caja si no hay).
+- Sticker por área (uno por cada área con productos, sin Bebidas): solo para llevar, recoger y delivery, en la PC de esa área (o en Caja).
+- Sticker general (todo el pedido): apagado.
+- Comanda por área: apagada.
+- En el local no sale ningún sticker.
+
+## Como se hace: Paso 1, tus computadoras
+1. Abre Configuración del local, pestaña "Impresión" ([Impresión](/admin/mirest?tab=impresion)). Se abre en el Paso 1.
+2. Cada tarjeta es una computadora con el programa. La luz y la frase dicen cómo está: "Lista", "El programa no está abierto en esta PC", "No elegiste impresora de tickets", "Se acabó el papel"…
+3. En "Esta PC imprime lo de" elige Caja, Bebidas u otra área. Cada área y tipo de máquina tiene una sola computadora; si ya hay una, el sistema pregunta antes de reemplazarla.
+4. Con "Cambiar impresoras" ves las impresoras reales de esa PC, numeradas. Pulsa "Imprimir prueba" en una para ver cuál es; luego "Usar como ticketera" o "Usar como etiquetera". Queda guardada: al encender la PC se conecta sola.
+5. Para sumar una computadora pulsa "Agregar otra computadora": te da un código de un solo uso y el programa para descargar (Windows o Linux).
+
+## Como se hace: Paso 2, qué se imprime
+1. Baja al Paso 2. Las filas son los papeles y las columnas son "En el local", "Para llevar" y "Delivery".
+2. Marca o desmarca con ✓ lo que quieres. Cada fila dice en una frase qué es y "Sale en" qué máquina. "Ver ejemplo" muestra el papel tal como sale.
+3. Los atajos de arriba rellenan toda la tabla: "Recomendado para Caprichos" (ticket siempre; comanda solo en el local; stickers de bebida y por área solo para llevar y delivery), "Solo ticket en todos los pedidos" (ticket y comanda en el local, sin stickers) y "Todo apagado excepto ticket".
+4. El ticket del pago siempre sale: su casilla está fija.
+
+## Como se hace: Paso 3, probar
+1. "Imprimir una prueba en cada impresora" saca una hoja que dice "PRUEBA - no es un pedido" en cada impresora elegida. No cuenta como venta.
+2. "Lo último que se imprimió" lista los últimos 10 papeles: qué pieza, de qué pedido, en qué PC y si salió bien, falló o espera, con el motivo en palabras simples.
+3. Si algo falló, revisa papel y cable y pulsa "Reintentar".
 
 ## Como se hace: cambiar el tamaño de los stickers
 1. Entra a Parámetros del sistema, grupo "Etiquetas e impresión" ([Parámetros](/admin/mirest?tab=parametros)).
-2. Cambia el ancho y el alto (en milímetros, enteros de 30 a 200) del sticker de bebida (de fábrica 76 x 38) o del sticker general (de fábrica 100 x 100). Pon lo mismo que dice el rollo cargado en la etiquetera.
-3. Guarda. Desde ese momento todo sticker que se imprima sale con la medida nueva, también los que ya estaban esperando en cola. El diseño se acomoda solo: si el pedido trae muchos productos baja la letra y, si aun así no caben, pone "+ N MAS" con las unidades que faltan, sin salirse del sticker.
+2. Cambia el ancho y el alto (en milímetros, de 30 a 200) del sticker de bebida (de fábrica 76 x 38) o del sticker general (de fábrica 100 x 100). Pon lo mismo que dice el rollo cargado.
+3. Guarda. Todo sticker que se imprima sale con la medida nueva, también los que esperaban en cola.
 
-## Como se hace: conectar el programa de impresión a la PC de Caja
-1. Abre la sección "Equipos y estado" (/admin/mirest?tab=impresion&seccion=equipos).
-2. Descarga el programa de impresión (Windows o Linux) y vincúlalo con el código de un solo uso. Desde ahí eliges qué equipo es la etiquetera y cuál la ticketera.
-3. El estado dice si el programa está conectado (último latido) y si la impresora está lista, sin papel, desconectada o con error. Sin conexión, las etiquetas se acumulan como pendientes. "Actualizar" vuelve a consultar.
-
-## Como se hace: saber cuál impresora es cuál y dejarla fija
-1. En "Equipos y estado" aparece un bloque por cada computadora con el programa (Caja, Bebidas...). Cada una lista SUS impresoras reales, numeradas; no salen PDF, OneNote, Fax ni XPS.
-2. Pulsa "Probar TODAS": cada impresora imprime "Impresora N de M" en grande. Mira cuál sacó la hoja. También puedes usar "Imprimir prueba" en una sola.
-3. En la impresora correcta pulsa "Usar como etiquetera" o "Usar como ticketera" y confirma. Queda guardada en esa computadora: al apagar y encender, el programa se conecta SOLO a esa impresora, hasta que la cambies aquí.
-4. Si la guardada no está encendida, el estado dice "La impresora elegida no aparece (nombre)" y el programa la busca solo; nunca cambia a otra por su cuenta.
-5. El estado por máquina dice una de cuatro cosas: "El programa no está corriendo", "Aún no elegiste la impresora para este rol", "La impresora elegida no aparece (nombre)" o "Lista".
-6. Si una computadora está apagada, el panel avisa cuál falta y que sus trabajos esperan en cola (no se pierden).
-7. En la computadora también hay comandos (impresoras, probar-todas, usar etiquetera 3, estado, autoarranque activar); el panel los muestra para copiar. Guía: docs/operacion/GUIA-elegir-impresora-y-autoarranque.md.
-
-## Como se hace: repartir entre dos computadoras
-Por defecto la PC de Caja imprime el ticket de pago y la comanda, y para llevar, recoger y delivery el sticker general y los stickers por área. La segunda PC (asignada al área Bebidas con "Asignar equipo" en el Mapa) imprime solo los stickers de bebida de llevar, recoger y delivery. Qué pedidos saca cada sticker se cambia con los botones "Sale en" de cada regla en el Mapa.
-
-## Como se hace: crear o desactivar una llave del agente
-1. En "Llaves de acceso del agente de impresión" escribe un nombre para reconocer la PC (por ejemplo "Agente PC Caja 1") y pulsa "Crear llave".
-2. Cópiala antes de cerrar el aviso: se muestra una sola vez.
-3. Desactivar una llave deja a esa PC sin imprimir hasta darle una nueva. Solo el Administrador las crea o desactiva.
-
-## Como se hace: reintentar trabajos fallidos y hacer pruebas
-1. Abre la sección "Cola y pruebas" (/admin/mirest?tab=impresion&seccion=cola).
-2. Los trabajos fallan tras 5 intentos; reintenta los fallidos cuando haya papel para que el agente los imprima de nuevo.
-3. Las pruebas de impresión imprimen una pieza marcada PRUEBA para comprobar la etiquetera y la ticketera; no hacen ningún pedido.
+## Como se hace: vista avanzada y llaves
+Al final de la pantalla, "Vista avanzada" abre el mapa dibujado, "Equipos y estado" (comandos del programa, llaves de acceso) y "Cola y pruebas" completas. Es lo mismo de los 3 pasos con más detalle; para crear o desactivar una llave del agente: "Equipos y estado", escribe un nombre y pulsa "Crear llave" (se muestra una sola vez; solo el Administrador). Enlaces: [Mapa](/admin/mirest?tab=impresion&seccion=mapa), [Equipos y estado](/admin/mirest?tab=impresion&seccion=equipos), [Cola y pruebas](/admin/mirest?tab=impresion&seccion=cola).
 
 ## Ajustes: Impresión
+- **Cómo funciona la impresión**: Las reglas (qué se imprime) son una sola para todo el local; cada computadora solo dice qué impresoras tiene y de qué área se encarga; si una PC está apagada sus papeles esperan y salen al encenderla; si un área no tiene PC, sale en Caja. [Cómo funciona la impresión](/admin/mirest?tab=impresion&seccion=facil&campo=impresion-como-funciona)
+- **Paso 1 · Tus computadoras**: Una tarjeta por cada computadora con el programa: luz, frase de estado, su ticketera y su etiquetera, «Cambiar impresoras» y «Esta PC imprime lo de: Caja / Bebidas…». «Agregar otra computadora» da el código y el programa. Ejemplo: La PC de Bebidas imprime lo de Bebidas: los stickers de vaso salen allá. Permiso: configuracion/editar. [Paso 1 · Tus computadoras](/admin/mirest?tab=impresion&seccion=facil&campo=impresion-paso-computadoras)
+- **Paso 2 · Qué se imprime (tabla)**: Tabla de piezas por tipo de pedido (en el local, para llevar, delivery) con casillas ✓, tres atajos arriba y «Ver ejemplo» en cada fila. Ejemplo: Recomendado: ticket siempre, comanda solo en el local, stickers de bebida y por área solo para llevar y delivery. Permiso: configuracion/editar. [Paso 2 · Qué se imprime (tabla)](/admin/mirest?tab=impresion&seccion=facil&campo=impresion-paso-que-se-imprime)
+- **Paso 3 · Probar y lo último impreso**: «Imprimir una prueba en cada impresora» y la lista de los últimos 10 papeles con su estado, el motivo y «Reintentar». Ejemplo: Un sticker que falló por falta de papel: pon papel y pulsa Reintentar. [Paso 3 · Probar y lo último impreso](/admin/mirest?tab=impresion&seccion=facil&campo=impresion-paso-probar)
 - **Sticker de bebida**: Enciende o apaga el sticker que sale por cada vaso con bebida. Por defecto sale en pedidos para llevar, recoger y delivery (no en mesa) y se imprime en la computadora asignada a Bebidas, o en Caja si no hay. Los botones «Sale en» eligen los tipos de pedido. Ejemplo: Apagado: los vasos ya no salen con sticker; el resto de tickets sigue igual. Permiso: configuracion/editar. [Sticker de bebida](/admin/mirest?tab=impresion&seccion=mapa&campo=mapa-impresion-bebida)
 - **Sticker por área**: Enciende o apaga un sticker por cada área con productos (Salados, Postres…), para que cada área lo reciba en su equipo. Bebidas no lleva este sticker: ya sale uno por cada vaso. Por defecto sale en llevar, recoger y delivery, en la computadora de Caja; los botones «Sale en» eligen los tipos de pedido. Permiso: configuracion/editar. [Sticker por área](/admin/mirest?tab=impresion&seccion=mapa&campo=mapa-impresion-area)
 - **Comanda de salón**: Enciende o apaga la comanda que sale en la ticketera de Caja al aceptar un pedido de mesa o local, con cada línea, tamaño, opciones y notas. No sale para llevar ni delivery. Permiso: configuracion/editar. [Comanda de salón](/admin/mirest?tab=impresion&seccion=mapa&campo=mapa-impresion-comanda)
@@ -75,14 +83,16 @@ Por defecto la PC de Caja imprime el ticket de pago y la comanda, y para llevar,
 - **Sticker general: ancho** (impresion_etiqueta_general_ancho_mm): Medida en milímetros del ancho del sticker general del pedido (bolsa o bandeja, solo para llevar, recoger y delivery), tal como se ve la etiqueta puesta de frente en la etiquetera. Poner aquí lo mismo que dice el rollo cargado: el diseño se ajusta solo a esta medida (la letra baja de tamaño y se recorta con «…» o «+ N más» antes de salirse). Debe ser un número entero de 30 a 200. Ejemplo: Con 100: es el primer 100 de «100 x 100». [Sticker general: ancho](/admin/mirest?tab=parametros&campo=parametros-impresion-etiqueta-general-ancho-mm)
 - **Sticker general: alto** (impresion_etiqueta_general_alto_mm): Medida en milímetros del alto del sticker general del pedido (bolsa o bandeja, solo para llevar, recoger y delivery), tal como se ve la etiqueta puesta de frente en la etiquetera. Poner aquí lo mismo que dice el rollo cargado: el diseño se ajusta solo a esta medida (la letra baja de tamaño y se recorta con «…» o «+ N más» antes de salirse). Debe ser un número entero de 30 a 200. Ejemplo: Con 100: es el segundo 100 de «100 x 100». [Sticker general: alto](/admin/mirest?tab=parametros&campo=parametros-impresion-etiqueta-general-alto-mm)
 
+
 ## Errores y dudas comunes
-- Las etiquetas no salen: revisa en "Equipos y estado" si el agente está conectado y la impresora lista; si no, se acumulan como pendientes.
-- Una etiqueta vieja no salió sola al reconectar: pasó el vencimiento ("Vencimiento de etiquetas no impresas") y quedó VENCIDA; se reimprime a mano.
-- Un pedido en mesa no tiene etiqueta general: es lo normal. Un pedido en el local no lleva ningún sticker, solo el voucher por la ticketera.
-- La etiqueta sale cortada o con mucho espacio: la medida de Parámetros no coincide con el rollo cargado; corrígela en el grupo "Etiquetas e impresión".
-- El panel dice "El programa no está corriendo": abre el programa en esa computadora (o actívale el arranque automático con "autoarranque activar").
-- El panel dice "La impresora elegida no aparece": está apagada, desconectada o cambió de nombre; enciéndela, o elige otra con "Usar como...".
+- ¿Se configura por cada PC o una para todas? Las reglas (Paso 2) son una sola para todo el local. Cada PC solo elige sus impresoras y su área (Paso 1).
+- Me sale un papel que no pedí: mira la tabla del Paso 2 y apaga esa pieza en esa columna. En el local no debe salir ningún sticker.
+- "Bebidas no tiene computadora: los vasos están saliendo en Caja": vincula la PC de Bebidas y en "Esta PC imprime lo de" elige Bebidas.
+- Los papeles no salen: mira la luz de la PC en el Paso 1. Si dice "El programa no está abierto en esta PC", ábrelo (o activa el arranque automático); lo pendiente sale solo.
+- Un papel viejo no salió solo al reconectar: pasó el tiempo de espera y se venció; pulsa "Reintentar" en "Lo último que se imprimió".
+- El sticker sale cortado o con mucho espacio: la medida de Parámetros no coincide con el rollo cargado.
+- "No elegiste impresora de tickets/stickers": entra a "Cambiar impresoras" de esa PC y elige una.
 - Perdí la llave: no se puede volver a ver; crea una nueva y desactiva la anterior.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría. Encender o apagar lo que se imprime requiere configuracion/editar; crear llaves, solo ADMIN.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría. Cambiar qué se imprime requiere configuracion/editar; crear llaves, solo ADMIN.

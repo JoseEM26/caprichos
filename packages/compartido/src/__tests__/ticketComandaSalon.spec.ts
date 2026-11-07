@@ -70,8 +70,8 @@ describe('comanda por área (TICKET_COMANDA_AREA)', () => {
     expect(textos.some((t) => t.includes('Frappe Mocha'))).toBe(true);
   });
 
-  it('sin área la cabecera de la comanda de salón no cambia', () => {
-    expect(lineasTicketComandaSalon(comanda, 32)[0].texto).toBe('COMANDA');
+  it('sin área la cabecera dice COMANDA · SALÓN', () => {
+    expect(lineasTicketComandaSalon(comanda, 32)[0].texto).toBe('COMANDA · SALÓN');
   });
 
   it('se imprime en la ticketera, como la comanda de salón', () => {

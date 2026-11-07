@@ -499,7 +499,7 @@ export function construirEtiquetaPrueba(local: any, quien: string, ahora = new D
     fecha: formatearFecha(ahora),
     cantidadProductos: 1,
     productos: [{ cantidad: 1, nombre: 'Linea de ejemplo', tamano: null }],
-    nota: 'PRUEBA DE ETIQUETA: no es un pedido',
+    nota: 'PRUEBA - no es un pedido',
     printer: 'Etiquetera de caja',
   };
 }
@@ -522,7 +522,7 @@ export function construirTicketPrueba(local: any, quien: string, ahora = new Dat
     fecha: formatearFecha(ahora),
     hora: formatearHora(ahora),
     who: `Prueba pedida por ${quien}`,
-    modalidad: 'PRUEBA DE TICKET (SIN VALOR)',
+    modalidad: 'PRUEBA - no es un pedido (SIN VALOR)',
     lineas: [
       { cantidad: 1, nombre: 'Linea de ejemplo 1 SIN VALOR', tamano: null, subtotal: 0 },
       { cantidad: 1, nombre: 'Linea de ejemplo 2 SIN VALOR', tamano: null, subtotal: 0 },

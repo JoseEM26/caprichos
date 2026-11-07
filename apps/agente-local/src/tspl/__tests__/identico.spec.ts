@@ -6,13 +6,13 @@ import { generarTicketEscPos } from '../../escpos/generadorTicket';
 import { muestraEtiquetaArea } from '../../datosMuestra';
 
 // Huellas del TSPL / ESC-POS que se imprimia ANTES de mover la maqueta a @caprichos/compartido:
-// si cambia una, cambio lo que sale en el papel.
+// si cambia una, cambio lo que sale en el papel. (Sticker de área: la cabecera dice «STICKER AREA N de M», 08/11/2026.)
 const huella = (s: string | Buffer) => createHash('sha256').update(typeof s === 'string' ? Buffer.from(s, 'latin1') : s).digest('hex').slice(0, 16);
 
 describe('la maqueta compartida imprime lo mismo que antes', () => {
   const esperado: Record<string, string[]> = {
-    '90': ['fe70c6562b8f588a'],
-    '270': ['6a4128c09418bf63'],
+    '90': ['8d88d06a71b98613'],
+    '270': ['0b79cd8ce4536f49'],
   };
   for (const giro of [90, 270] as const) {
     it(`TSPL de la etiqueta de area (la que sigue en el rollo del agente), giro ${giro}`, () => {

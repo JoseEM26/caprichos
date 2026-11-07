@@ -9,7 +9,7 @@ const FUENTES: Record<string, string[]> = {
   ayuda: [resolve(dir, 'TarjetaAyudaIaConfiguracion.tsx')],
   ingreso: [resolve(dir, 'TarjetaPantallaIngresoConfiguracion.tsx')],
   // Impresión: equipos y cola están literales en sus secciones; los del mapa van por data-cfg-id={id} (ver test abajo).
-  impresion: [resolve(dir, '../impresion/SeccionEquipos.tsx'), resolve(dir, '../impresion/ImpresorasDelEquipo.tsx'), resolve(dir, '../impresion/SeccionColaPruebas.tsx')],
+  impresion: [resolve(dir, '../impresion/SeccionEquipos.tsx'), resolve(dir, '../impresion/ImpresorasDelEquipo.tsx'), resolve(dir, '../impresion/SeccionColaPruebas.tsx'), resolve(dir, '../impresion/facil/ImpresionFacil.tsx')],
 };
 const re = /(?:data-cfg-id=|<CampoConfig\s+id=|cfgId=)"([a-z0-9-]+)"/g;
 

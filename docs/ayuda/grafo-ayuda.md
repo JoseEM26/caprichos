@@ -9,12 +9,12 @@ pnpm --filter @caprichos/api ayuda:grafo
 
 ## Métricas del Grafo
 
-- **Nodos totales**: 350
+- **Nodos totales**: 354
   - Módulos: 41
-  - Tareas (`## Como se hace`): 274
+  - Tareas (`## Como se hace`): 278
   - Roles del sistema: 7
   - Permisos requeridos: 28
-- **Aristas tipadas totales**: 1210
+- **Aristas tipadas totales**: 1218
 
 ## Diagrama Mermaid de Módulos y Relaciones
 

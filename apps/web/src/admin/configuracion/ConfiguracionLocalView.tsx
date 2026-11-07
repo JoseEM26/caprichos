@@ -442,7 +442,7 @@ export function ConfiguracionLocalView() {
       (prev) => {
         const next = new URLSearchParams(prev);
         next.set('tab', id);
-        if (id === 'impresion') next.set('seccion', (apartado as SeccionImpresion) || seccionRecordada || 'mapa');
+        if (id === 'impresion') next.set('seccion', (apartado as SeccionImpresion) || 'facil');
         if (campo) next.set('campo', campo);
         else next.delete('campo');
         return next;
