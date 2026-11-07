@@ -285,6 +285,20 @@ describe('PedidosService', () => {
         expect(Number(data.total)).toBe(28);
       });
 
+      it('desde la carta con coordenadas (GPS o mapa) y sin dirección ni referencia: cae en su zona y calcula envío', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 102n, codigo: 'CP-W003', estado: 'COLA', subtotal: 28.0, envio: 5, total: 33.0 });
+        const dto: any = { ...pedidoBaseDto, entrega: { lat: -12.046374, lng: -77.042793, origen: 'MAPA' } };
+
+        await service.crear(dto, 'idemp-con-punto', { canal: 'CARTA' });
+
+        expect(zonasServiceMock.detectar).toHaveBeenCalledWith(-12.046374, -77.042793);
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(data.zona_id).not.toBeNull();
+        expect(data).toMatchObject({ entrega_origen: 'MAPA' });
+        expect(Number(data.envio)).toBeGreaterThanOrEqual(0);
+        expect(data.entrega_lat).not.toBeNull();
+      });
+
       it('sin referencia en la carta: 400 REFERENCIA_REQUERIDA y no se crea', async () => {
         const dto: any = { ...pedidoBaseDto, entrega: { direccion: 'Av. Las Palmeras 123' } };
         await expect(service.crear(dto, 'idemp-sin-ref', { canal: 'CARTA' })).rejects.toMatchObject({ response: { codigo: 'REFERENCIA_REQUERIDA' } });

@@ -175,7 +175,7 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     expect(document.getElementById('f-referencia')).toHaveValue('Portón azul');
   });
 
-  it('ubicación anterior sin texto: muestra mini mapa y texto legible (no coordenadas) y al elegirla reutiliza sus coordenadas', async () => {
+  it('ubicación anterior sin texto: muestra mini mapa y texto legible (no coordenadas) y al elegirla coloca el pin', async () => {
     mockApi({
       direcciones: [
         { id: '9', direccion: 'Punto marcado en el mapa', referencia: null, lat: -12.0186, lng: -76.958, alias: null, usos: 1, ultimoUsoEn: '2026-10-20T15:04:00.000Z', origen: 'WHATSAPP' },
@@ -189,9 +189,9 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Punto marcado en el mapa/ }));
 
-    // La ubicación guardada se reutiliza sin pedirla otra vez (ya no hay mapa en el checkout)
     expect(await screen.findByText('Zona Z1 · envío S/ 5.00')).toBeInTheDocument();
     expect(api.get).toHaveBeenCalledWith('/carta/envio?lat=-12.0186&lng=-76.958');
+    expect(document.querySelector('.leaflet-marker-icon')).not.toBeNull();
     expect(document.body.textContent).not.toMatch(/-12\.0186|-76\.958/);
   });
 
@@ -301,13 +301,18 @@ describe('Carta ▸ direcciones anteriores en el checkout', () => {
     expect(screen.getByRole('button', { name: /^Continuar$/ })).toBeEnabled();
   });
 
-  it('el checkout ya no pide el punto exacto: sin botón de ubicación actual ni mapa', async () => {
+  it('«Usar mi ubicación actual» sigue visible en la lista y toma el punto del GPS', async () => {
+    const geo = { getCurrentPosition: vi.fn((ok: (p: unknown) => void) => ok({ coords: { latitude: -12.05, longitude: -77.04, accuracy: 20 } })) };
+    Object.defineProperty(navigator, 'geolocation', { value: geo, configurable: true });
     vi.spyOn(cuentaModulo, 'useCuentaOpcional').mockReturnValue(cuentaCon());
     await irAUbicacion();
 
-    await screen.findByText('¿A dónde lo enviamos?');
-    expect(screen.queryByRole('button', { name: 'Usar mi ubicación actual' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Mi pedido llega aquí')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Usar mi ubicación actual' }));
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/carta/envio?lat=-12.05&lng=-77.04'));
+    expect(screen.queryByText('¿A dónde lo enviamos?')).not.toBeInTheDocument();
+    expect(screen.getByText('Mi pedido llega aquí')).toBeInTheDocument();
+    Object.defineProperty(navigator, 'geolocation', { value: undefined, configurable: true });
   });
 
   it('sin sesión no aparece la lista', async () => {

@@ -10,6 +10,8 @@ interface SelectorDireccionesClienteProps {
   alElegir: (direccion: DireccionCliente) => void;
   alNueva: () => void;
   /** Usa la ubicación actual del celular (mismo flujo que «Usar mi ubicación actual» del formulario) */
+  alUbicacionActual: () => void;
+  cargandoUbicacion: boolean;
 }
 
 const textoUsos = (usos: number) => (usos === 1 ? 'usada 1 vez' : `usada ${usos} veces`);
@@ -46,6 +48,8 @@ export function SelectorDireccionesCliente({
   aviso,
   alElegir,
   alNueva,
+  alUbicacionActual,
+  cargandoUbicacion,
 }: SelectorDireccionesClienteProps) {
   const [historialAbierto, setHistorialAbierto] = useState(false);
   const idHistorial = useId();
@@ -176,6 +180,25 @@ export function SelectorDireccionesCliente({
           )}
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={alUbicacionActual}
+              style={{
+                flex: '1 1 160px',
+                minHeight: '44px',
+                padding: '0 12px',
+                borderRadius: '12px',
+                border: '1.5px solid var(--cp-navy)',
+                backgroundColor: 'var(--cp-sand)',
+                color: 'var(--cp-navy)',
+                fontWeight: 800,
+                fontSize: '14px',
+                cursor: ocupado ? 'wait' : 'pointer',
+              }}
+            >
+              {cargandoUbicacion ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
+            </button>
             <button
               type="button"
               disabled={ocupado}

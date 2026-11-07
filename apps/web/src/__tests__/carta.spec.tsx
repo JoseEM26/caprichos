@@ -644,7 +644,7 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     expect(screen.getByLabelText(/Paso 2: Ubicación \(actual\)/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
     expect(
-      screen.getByText('Para delivery escribe tu dirección (al menos 5 caracteres)'),
+      screen.getByText('Para delivery debes indicar una dirección de al menos 5 caracteres o usar tu ubicación'),
     ).toBeInTheDocument();
   });
 
@@ -681,6 +681,170 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     expect(screen.getByLabelText(/Paso 2: Ubicación \(actual\)/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Dirección escrita/i)).toHaveValue('Calle Los Robles 450');
     expect(screen.getByLabelText(/Referencia/i)).toHaveValue('Casa con reja negra');
+  });
+
+  it('el envío muestra zona y tarifa, y se recalcula con el carrito actual sin consultar la zona de nuevo', async () => {
+    window.sessionStorage.clear();
+    const consultas: string[] = [];
+    vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+      if (url.includes('/carta/direcciones')) {
+        return {
+          resultados: [{ texto: 'Av. Campoy 450, San Juan de Lurigancho', lat: -12.019, lng: -76.963 }],
+          apagado: false,
+        };
+      }
+      if (url.includes('/carta/envio')) {
+        consultas.push(url);
+        return { cubierto: true, zona: 'Z4', tarifa: 4.5, tarifaZona: 4.5, gratisDesde: 50, modoGratis: 'mas_de' };
+      }
+      return {};
+    });
+
+    function WrapperCarritoCambiante() {
+      const { agregarLinea, abrirCheckout } = useCarrito();
+      return (
+        <div>
+          <button
+            onClick={() => {
+              agregarLinea({ productoId: 'prod-1', nombre: 'Frappé Clásico', precioBase: 14.5, cantidad: 1, opciones: [], precioUnitario: 14.5, subtotal: 14.5 });
+              abrirCheckout();
+            }}
+          >
+            Iniciar Checkout
+          </button>
+          <button
+            onClick={() =>
+              agregarLinea({ productoId: 'prod-2', nombre: 'Torta', precioBase: 60, cantidad: 1, opciones: [], precioUnitario: 60, subtotal: 60 })
+            }
+          >
+            Agregar torta
+          </button>
+          <FormularioCheckout estadoLocal={estadoAbierto} datosLocal={datosLocalEjemplo} />
+        </div>
+      );
+    }
+
+    render(
+      <CarritoProvider>
+        <WrapperCarritoCambiante />
+      </CarritoProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Iniciar Checkout'));
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Mariana' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987112233' } });
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Marcar en el mapa/i }));
+    fireEvent.change(screen.getByLabelText(/Buscar dirección/i), { target: { value: 'Av. Campoy' } });
+    fireEvent.click(await screen.findByRole('button', { name: /Av. Campoy 450/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Confirmar ubicación/i })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar ubicación/i }));
+
+    // Subtotal 14.50: zona y tarifa, sin promo
+    expect(screen.getByText('Zona Z4 · envío S/ 4.50')).toBeInTheDocument();
+
+    // Subtotal 74.50 (> 50): el mismo punto pasa a gratis, con la tarifa a la vista, y no hay nueva consulta
+    const consultasAntes = consultas.length;
+    fireEvent.click(screen.getByText('Agregar torta'));
+    expect(screen.getByText('Zona Z4 · envío S/ 4.50 (gratis por tu compra sobre S/ 50)')).toBeInTheDocument();
+    expect(consultas.length).toBe(consultasAntes);
+  });
+
+  it('fuera de cobertura: avisa y no muestra zona ni envío', async () => {
+    window.sessionStorage.clear();
+    vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+      if (url.includes('/carta/direcciones')) {
+        return {
+          resultados: [{ texto: 'Av. Campoy 450, San Juan de Lurigancho', lat: -12.019, lng: -76.963 }],
+          apagado: false,
+        };
+      }
+      if (url.includes('/carta/envio')) {
+        return { cubierto: false, zona: null, tarifa: null, tarifaZona: null, gratisDesde: 70, modoGratis: 'mas_de' };
+      }
+      return {};
+    });
+    render(
+      <CarritoProvider>
+        <WrapperCheckout />
+      </CarritoProvider>,
+    );
+    fireEvent.click(screen.getByText('Iniciar Checkout'));
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Mariana' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987112233' } });
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Marcar en el mapa/i }));
+    fireEvent.change(screen.getByLabelText(/Buscar dirección/i), { target: { value: 'Av. Campoy' } });
+    fireEvent.click(await screen.findByRole('button', { name: /Av. Campoy 450/i }));
+
+    expect((await screen.findAllByText(/fuera de la zona de reparto/i)).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/envío S\/ /)).not.toBeInTheDocument();
+  });
+
+  it('«Marcar en el mapa» abre la pantalla completa con el marcador de la tienda y «Confirmar ubicación» la cierra con el punto confirmado', async () => {
+    vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+      if (url.includes('/carta/direcciones')) {
+        return {
+          resultados: [
+            { texto: 'Av. Campoy 450, San Juan de Lurigancho', lat: -12.019, lng: -76.963 },
+          ],
+          apagado: false,
+        };
+      }
+      if (url.includes('/carta/envio')) {
+        return { cubierto: true, zona: 'Z4', tarifa: 4.5, tarifaZona: 4.5, gratisDesde: 50, modoGratis: 'mas_de' };
+      }
+      return {};
+    });
+
+    render(
+      <CarritoProvider>
+        <WrapperCheckout />
+      </CarritoProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Iniciar Checkout'));
+    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
+    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Mariana' } });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '987112233' } });
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+
+    // En paso 2 tocar «Marcar en el mapa»
+    fireEvent.click(screen.getByRole('button', { name: /Marcar en el mapa/i }));
+
+    // Se abre la ventana a pantalla completa
+    const modalMapa = screen.getByRole('dialog', { name: 'Marca dónde recibes tu pedido' });
+    expect(modalMapa).toBeInTheDocument();
+    expect(screen.getByText('Marca dónde recibes tu pedido')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cerrar mapa')).toBeInTheDocument();
+
+    // Marcador de la tienda visible en el mapa
+    expect(modalMapa.textContent).toContain('Caprichos');
+    expect(modalMapa.textContent).toContain(datosLocalEjemplo.direccion);
+
+    // Botón confirmar deshabilitado hasta que haya punto
+    const btnConfirmar = screen.getByRole('button', { name: /Confirmar ubicación/i });
+    expect(btnConfirmar).toBeDisabled();
+
+    // Seleccionar dirección en el buscador
+    const inputBuscar = screen.getByLabelText(/Buscar dirección/i);
+    fireEvent.change(inputBuscar, { target: { value: 'Av. Campoy' } });
+
+    const optResult = await screen.findByRole('button', { name: /Av. Campoy 450/i });
+    fireEvent.click(optResult);
+
+    // Ahora punto confirmado habilitado
+    await waitFor(() => {
+      expect(btnConfirmar).not.toBeDisabled();
+    });
+
+    // Confirmar ubicación cierra la pantalla completa y marca confirmada en el formulario
+    fireEvent.click(btnConfirmar);
+    expect(screen.queryByRole('dialog', { name: 'Marca dónde recibes tu pedido' })).not.toBeInTheDocument();
+    expect(screen.getByText('Ubicación confirmada')).toBeInTheDocument();
+    expect(screen.getByText('Zona Z4 · envío S/ 4.50')).toBeInTheDocument();
   });
 
   it('recoger muestra la tienda en un mapa pequeño de solo lectura con su dirección', async () => {
