@@ -82,6 +82,10 @@ export interface EtiquetaGeneralDatos {
   cantidadProductos: number;
   productos: EtiquetaGeneralProducto[];
   nota?: string | null;
+  total?: number | null;
+  /** Solo delivery */
+  direccion?: string | null;
+  telefono?: string | null;
   printer: string;
 }
 
@@ -166,6 +170,11 @@ export function armarEtiquetas(pedido: Pedido): ResumenEtiquetas {
     cantidadProductos,
     productos: productosGeneral,
     nota: pedido.nota || null,
+    total: pedido.total != null && pedido.total !== '' ? Number(pedido.total) : null,
+    // Solo delivery: dirección y celular van en el sticker (igual que arma la API)
+    ...(String(pedido.modalidad || '').toUpperCase() === 'DELIVERY'
+      ? { direccion: pedido.entrega_direccion?.trim() || null, telefono: pedido.cliente_telefono?.trim() || null }
+      : {}),
     printer: 'Etiquetera de caja',
   };
 

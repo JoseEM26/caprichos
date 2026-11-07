@@ -493,6 +493,30 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'minutos',
   },
+  impresion_etiqueta_bebida_ancho_mm: {
+    nombre: 'Sticker de bebida: ancho (mm)',
+    descripcion: 'Medida en milímetros del ancho del sticker que sale por cada vaso. Número entero de 30 a 200; debe coincidir con el rollo de la etiquetera.',
+    tipo: 'numero',
+    sufijo: 'mm',
+  },
+  impresion_etiqueta_bebida_alto_mm: {
+    nombre: 'Sticker de bebida: alto (mm)',
+    descripcion: 'Medida en milímetros del alto del sticker que sale por cada vaso. Número entero de 30 a 200; debe coincidir con el rollo de la etiquetera.',
+    tipo: 'numero',
+    sufijo: 'mm',
+  },
+  impresion_etiqueta_general_ancho_mm: {
+    nombre: 'Sticker general: ancho (mm)',
+    descripcion: 'Medida en milímetros del ancho del sticker general del pedido (bolsa o bandeja, solo para llevar, recoger y delivery). Número entero de 30 a 200; debe coincidir con el rollo de la etiquetera.',
+    tipo: 'numero',
+    sufijo: 'mm',
+  },
+  impresion_etiqueta_general_alto_mm: {
+    nombre: 'Sticker general: alto (mm)',
+    descripcion: 'Medida en milímetros del alto del sticker general del pedido (bolsa o bandeja, solo para llevar, recoger y delivery). Número entero de 30 a 200; debe coincidir con el rollo de la etiquetera.',
+    tipo: 'numero',
+    sufijo: 'mm',
+  },
 };
 
 interface ParametrosOperacionTabProps {

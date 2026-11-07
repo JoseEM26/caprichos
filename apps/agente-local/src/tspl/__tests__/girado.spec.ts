@@ -3,24 +3,9 @@ import { generarTsplTrabajo } from '../generadorTspl';
 import { resolverFormato, formatoDesdeConfig } from '../formato';
 import { FUENTES_TSPL } from '../tipografia';
 import { LOGO_BASE64_90, LOGO_BASE64_270 } from '../logoBitmap';
-import { muestraEtiquetaGeneral, muestraEtiquetaArea, muestraEtiquetaBebida } from '../../datosMuestra';
+import { muestraEtiquetaArea } from '../../datosMuestra';
 
 const largo = 'ADMINISTRACION INTERNACIONAL DE EMPRESAS';
-const bebidaLarga = {
-  ...muestraEtiquetaBebida,
-  persona: 'MARIA ELENA GUADALUPE DEL CARMEN',
-  bebidaNombre: 'CAPPUCCINO VAINILLA CARAMELO SALADO CON CREMA BATIDA Y CHISPAS',
-  opciones: ['Leche de avena sin lactosa', 'Sin azucar', 'Extra canela en polvo', 'Doble shot espresso', 'Temperatura muy caliente', 'Vaso reutilizable grande'],
-  contiene: 'Avena, canela, espresso doble, vainilla natural, caramelo salado, crema batida, chispas de chocolate, jarabe de arce, leche vegetal, sirope de agave, canela molida, nuez moscada, cacao amargo, miel de abeja, esencia de vainilla',
-  who: 'Para: Juan Alberto Perez de la Cruz Quispe',
-};
-const generalLargo = {
-  ...muestraEtiquetaGeneral,
-  who: 'CLIENTE CON UN NOMBRE EXTREMADAMENTE LARGO QUE EXCEDE TODO',
-  cantidadProductos: 9,
-  productos: Array.from({ length: 9 }, (_, i) => ({ cantidad: i + 1, nombre: `Producto numero ${i + 1} con nombre bastante largo ${largo}`, tamano: '12oz' })),
-  nota: largo + ' ' + largo,
-};
 const areaLarga = {
   ...muestraEtiquetaArea,
   who: 'CLIENTE CON UN NOMBRE EXTREMADAMENTE LARGO QUE EXCEDE TODO',
@@ -29,12 +14,8 @@ const areaLarga = {
   lineas: Array.from({ length: 6 }, (_, i) => ({ cantidad: 2, nombre: `Sandwich especial numero ${i} ${largo}`, tamano: 'Grande', opciones: ['Sin cebolla ni tomate', 'Con extra queso fundido', 'Salsa aparte'] })),
 };
 const casos = [
-  ['ETIQUETA_GENERAL', muestraEtiquetaGeneral],
   ['ETIQUETA_AREA', muestraEtiquetaArea],
-  ['ETIQUETA_BEBIDA', muestraEtiquetaBebida],
-  ['ETIQUETA_GENERAL', generalLargo],
   ['ETIQUETA_AREA', areaLarga],
-  ['ETIQUETA_BEBIDA', bebidaLarga],
 ] as const;
 
 type R = { X0: number; X1: number; Y0: number; Y1: number };
@@ -56,11 +37,11 @@ function cajas(t: string) {
   return { textos, boxes: boxes.slice(2) }; // los 2 primeros son el marco
 }
 
-describe('vertical-girado', () => {
+describe('vertical-girado (etiqueta de area)', () => {
   it('es el defecto: SIZE fisico 101.6 x 63.5, giro 90 y logo rotado', () => {
     expect(resolverFormato()).toMatchObject({ orientacion: 'vertical-girado', anchoMm: 101.6, altoMm: 63.5, giro: 90 });
     expect(formatoDesdeConfig({})).toMatchObject({ orientacion: 'vertical-girado', giro: 90 });
-    const t = generarTsplTrabajo('ETIQUETA_BEBIDA', muestraEtiquetaBebida);
+    const t = generarTsplTrabajo('ETIQUETA_AREA', muestraEtiquetaArea);
     expect(t).toContain('SIZE 101.6 mm,63.5 mm\r\n');
     expect(t).toMatch(/TEXT \d+,\d+,"\d",90,/);
     expect(t).toContain(Buffer.from(LOGO_BASE64_90, 'base64').toString('latin1'));
@@ -69,14 +50,14 @@ describe('vertical-girado', () => {
   it('el giro es configurable (ETIQUETA_GIRO / formato)', () => {
     expect(formatoDesdeConfig({ ETIQUETA_GIRO: '270' }).giro).toBe(270);
     expect(formatoDesdeConfig({}, { giro: 270 }).giro).toBe(270);
-    const t = generarTsplTrabajo('ETIQUETA_BEBIDA', muestraEtiquetaBebida, false, { giro: 270 });
+    const t = generarTsplTrabajo('ETIQUETA_AREA', muestraEtiquetaArea, false, { giro: 270 });
     expect(t).toMatch(/TEXT \d+,\d+,"\d",270,/);
     expect(t).not.toMatch(/",90,/);
     expect(t).toContain(Buffer.from(LOGO_BASE64_270, 'base64').toString('latin1'));
   });
 
   it('la cabecera queda en el borde derecho con 90 y en el izquierdo con 270', () => {
-    const x = (g: 90 | 270) => +/^REVERSE (\d+),/m.exec(generarTsplTrabajo('ETIQUETA_BEBIDA', muestraEtiquetaBebida, false, { giro: g }))![1];
+    const x = (g: 90 | 270) => +/^REVERSE (\d+),/m.exec(generarTsplTrabajo('ETIQUETA_AREA', muestraEtiquetaArea, false, { giro: g }))![1];
     expect(x(90)).toBeGreaterThan(600);
     expect(x(270)).toBeLessThan(100);
   });
@@ -99,9 +80,4 @@ describe('vertical-girado', () => {
             }
         }
       });
-
-  it('con datos largos resume con "+ N mas" y recorta el CONTIENE con ...', () => {
-    expect(generarTsplTrabajo('ETIQUETA_GENERAL', generalLargo)).toMatch(/\+ \d+ más/);
-    expect(generarTsplTrabajo('ETIQUETA_BEBIDA', bebidaLarga)).toContain('...');
-  });
 });

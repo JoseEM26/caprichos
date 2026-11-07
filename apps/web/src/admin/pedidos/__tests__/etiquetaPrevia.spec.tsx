@@ -12,7 +12,7 @@ const datos: EtiquetaGeneralDatos = {
 };
 
 describe('vista previa SVG = maqueta compartida', () => {
-  it('dibuja una forma por primitiva, con cada texto en su fuente y el logo', () => {
+  it('dibuja una forma por primitiva y cada texto en su fuente', () => {
     const m = maquetarGeneral(datos);
     const { container } = render(<EtiquetaGeneral datos={datos} />);
     const svg = container.querySelector('svg')!;
@@ -21,7 +21,6 @@ describe('vista previa SVG = maqueta compartida', () => {
     const dibujados = [...svg.querySelectorAll('text')];
     expect(dibujados.map((t) => t.textContent)).toEqual(textos.map((t) => (t.t === 'texto' ? t.texto : '')));
     expect(dibujados.map((t) => t.getAttribute('data-fuente'))).toEqual(textos.map((t) => (t.t === 'texto' ? t.fuente : '')));
-    expect(svg.querySelectorAll('path[data-logo]')).toHaveLength(1);
     expect(svg.querySelectorAll('rect').length).toBeGreaterThan(m.primitivas.filter((p) => p.t === 'barra').length);
   });
 });

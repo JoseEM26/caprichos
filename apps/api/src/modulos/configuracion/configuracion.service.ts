@@ -2,7 +2,13 @@ import {
   BadRequestException,
   Injectable,
 } from '@nestjs/common';
-import { UMBRALES_AVISO_STOCK_DEFECTO } from '@caprichos/compartido';
+import {
+  CLAVES_TAMANO_ETIQUETA,
+  TAMANO_ETIQUETA_MAX_MM,
+  TAMANO_ETIQUETA_MIN_MM,
+  UMBRALES_AVISO_STOCK_DEFECTO,
+  medidaEtiquetaValida,
+} from '@caprichos/compartido';
 import { hoyLima } from '../reclamos/textos-legales';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -56,6 +62,11 @@ export const CLAVES_NUMERICAS = [
   'asistido_espera_min',
   'impresion_alerta_min',
   'impresion_vence_min',
+  // Tamano de los stickers en mm (enteros 30 a 200): bebida y general
+  'impresion_etiqueta_bebida_ancho_mm',
+  'impresion_etiqueta_bebida_alto_mm',
+  'impresion_etiqueta_general_ancho_mm',
+  'impresion_etiqueta_general_alto_mm',
   'caja_aviso_apertura_min',
   'voucher_ia_corte_min',
   'zonas_snap_m',
@@ -249,6 +260,12 @@ export class ConfiguracionService {
         throw new BadRequestException({
           codigo: 'VALOR_INVALIDO',
           mensaje: 'El tope de propina debe estar entre S/ 1 y S/ 1000',
+        });
+      }
+      if ((Object.values(CLAVES_TAMANO_ETIQUETA) as string[]).includes(clave) && !medidaEtiquetaValida(valor)) {
+        throw new BadRequestException({
+          codigo: 'VALOR_INVALIDO',
+          mensaje: `La medida de la etiqueta debe ser un número entero de milímetros entre ${TAMANO_ETIQUETA_MIN_MM} y ${TAMANO_ETIQUETA_MAX_MM}`,
         });
       }
       if (clave === 'cocina_minutos_preparacion_defecto' && (!Number.isInteger(valor) || valor < 1 || valor > 120)) {

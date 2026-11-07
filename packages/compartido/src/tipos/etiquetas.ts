@@ -90,6 +90,11 @@ export interface EtiquetaGeneralDatos {
   nota?: string | null;
   /** Monto total del pedido (sticker de resumen para llevar/recoger y delivery). Ausente en trabajos viejos. */
   total?: number | null;
+  /** Solo delivery: dirección de entrega y celular del cliente (van en el sticker para el repartidor). */
+  direccion?: string | null;
+  telefono?: string | null;
+  /** Tamaño del sticker en mm; la API lo pone al entregar el trabajo al programa de impresión. Ausente: el de fábrica. */
+  tamanoMm?: { anchoMm: number; altoMm: number };
   printer: string;
 }
 
@@ -130,6 +135,8 @@ export interface EtiquetaBebidaDatos {
   contiene?: string | null;
   who: string;
   hora: string;
+  /** Tamaño del sticker en mm; la API lo pone al entregar el trabajo al programa de impresión. Ausente: el de fábrica. */
+  tamanoMm?: { anchoMm: number; altoMm: number };
 }
 
 /** Comanda de salón: todas las líneas del pedido con tamaño, opciones y notas, para la cocina y el mozo. */

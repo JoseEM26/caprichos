@@ -4,6 +4,10 @@ import {
   MODALIDADES_PEDIDO,
   REGLAS_IMPRESION_DEFECTO,
   ReglasImpresion,
+  TAMANOS_ETIQUETA_DEFECTO,
+  CLAVES_TAMANO_ETIQUETA,
+  TamanosEtiqueta,
+  tamanosDesdeValores,
 } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 
@@ -76,4 +80,14 @@ export function valoresDesdeCambio(cambio: Partial<{
     out[clave] = cambio[campo];
   }
   return out;
+}
+
+/** Tamaño de los stickers de bebida y general (mm) desde `parametro`; sin configurar o inválido, el de fábrica. */
+export async function leerTamanosEtiqueta(prisma: PrismaService): Promise<TamanosEtiqueta> {
+  try {
+    const filas = await prisma.parametro.findMany({ where: { clave: { in: Object.values(CLAVES_TAMANO_ETIQUETA) } } });
+    return tamanosDesdeValores(Object.fromEntries(filas.map((f) => [f.clave, f.valor])));
+  } catch {
+    return TAMANOS_ETIQUETA_DEFECTO;
+  }
 }

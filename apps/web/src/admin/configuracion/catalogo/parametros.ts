@@ -41,7 +41,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'pago', titulo: 'Pagos digitales por el chat', claves: ['chatbot_pago_recordatorio_activo', 'chatbot_pago_recordatorio_min', 'chatbot_pago_expira_min'] },
   { id: 'ia', titulo: 'Inteligencia artificial', claves: ['chatbot_ia_activo', 'chatbot_ia_tope_mensual_usd', 'chatbot_ia_max_por_hora_telefono', 'ayuda_ia_activo'] },
   { id: 'alertas', titulo: 'Alertas internas y modo asistido', claves: ['alerta_voucher_min_1', 'alerta_voucher_min_2', 'espera_cliente_aviso_min', 'chat_tomado_liberar_min', 'alerta_pedido_sin_confirmar_min', 'asistido_espera_min'] },
-  { id: 'impresion', titulo: 'Etiquetas e impresión', claves: ['impresion_alerta_min', 'impresion_vence_min'] },
+  { id: 'impresion', titulo: 'Etiquetas e impresión', claves: ['impresion_alerta_min', 'impresion_vence_min', 'impresion_etiqueta_bebida_ancho_mm', 'impresion_etiqueta_bebida_alto_mm', 'impresion_etiqueta_general_ancho_mm', 'impresion_etiqueta_general_alto_mm'] },
 ];
 
 const SI_NO = 'Sí o No';
@@ -554,6 +554,34 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'Con 180: al reconectar tras 4 horas, las etiquetas viejas no salen solas.',
     efecto: 'Subirlo imprime etiquetas atrasadas al reconectar; bajarlo evita imprimir pedidos que ya salieron.',
     porDefecto: '180', unidad: 'minutos', rango: 'mayor que 0', palabras: ['etiquetas vencidas', 'impresora', 'reconectar', 'cola', 'reimprimir', 'imprimir solas'], peligro: 'medio',
+  },
+  impresion_etiqueta_bebida_ancho_mm: {
+    grupo: 'impresion', titulo: 'Sticker de bebida: ancho',
+    descripcion: 'Medida en milímetros del ancho del sticker que sale por cada vaso, tal como se ve la etiqueta puesta de frente en la etiquetera. Poner aquí lo mismo que dice el rollo cargado: el diseño se ajusta solo a esta medida (la letra baja de tamaño y se recorta con «…» o «+ N más» antes de salirse). Debe ser un número entero de 30 a 200.',
+    ejemplo: 'Con 76: es el 76 de «76 x 38».',
+    efecto: 'Cambiarlo afecta a los stickers que se impriman desde que guardas, también a los que ya esperan en cola. Si la medida no coincide con el rollo, la etiqueta sale cortada o con espacio de sobra.',
+    porDefecto: '76', unidad: 'milímetros', rango: 'entero de 30 a 200', palabras: ['etiqueta', 'sticker', 'tamano', 'medida', 'milimetros', 'etiquetera', 'rollo', 'bebida', 'general', 'ancho', 'alto'], peligro: 'medio',
+  },
+  impresion_etiqueta_bebida_alto_mm: {
+    grupo: 'impresion', titulo: 'Sticker de bebida: alto',
+    descripcion: 'Medida en milímetros del alto del sticker que sale por cada vaso, tal como se ve la etiqueta puesta de frente en la etiquetera. Poner aquí lo mismo que dice el rollo cargado: el diseño se ajusta solo a esta medida (la letra baja de tamaño y se recorta con «…» o «+ N más» antes de salirse). Debe ser un número entero de 30 a 200.',
+    ejemplo: 'Con 38: es el 38 de «76 x 38».',
+    efecto: 'Cambiarlo afecta a los stickers que se impriman desde que guardas, también a los que ya esperan en cola. Si la medida no coincide con el rollo, la etiqueta sale cortada o con espacio de sobra.',
+    porDefecto: '38', unidad: 'milímetros', rango: 'entero de 30 a 200', palabras: ['etiqueta', 'sticker', 'tamano', 'medida', 'milimetros', 'etiquetera', 'rollo', 'bebida', 'general', 'ancho', 'alto'], peligro: 'medio',
+  },
+  impresion_etiqueta_general_ancho_mm: {
+    grupo: 'impresion', titulo: 'Sticker general: ancho',
+    descripcion: 'Medida en milímetros del ancho del sticker general del pedido (bolsa o bandeja, solo para llevar, recoger y delivery), tal como se ve la etiqueta puesta de frente en la etiquetera. Poner aquí lo mismo que dice el rollo cargado: el diseño se ajusta solo a esta medida (la letra baja de tamaño y se recorta con «…» o «+ N más» antes de salirse). Debe ser un número entero de 30 a 200.',
+    ejemplo: 'Con 100: es el primer 100 de «100 x 100».',
+    efecto: 'Cambiarlo afecta a los stickers que se impriman desde que guardas, también a los que ya esperan en cola. Si la medida no coincide con el rollo, la etiqueta sale cortada o con espacio de sobra.',
+    porDefecto: '100', unidad: 'milímetros', rango: 'entero de 30 a 200', palabras: ['etiqueta', 'sticker', 'tamano', 'medida', 'milimetros', 'etiquetera', 'rollo', 'bebida', 'general', 'ancho', 'alto'], peligro: 'medio',
+  },
+  impresion_etiqueta_general_alto_mm: {
+    grupo: 'impresion', titulo: 'Sticker general: alto',
+    descripcion: 'Medida en milímetros del alto del sticker general del pedido (bolsa o bandeja, solo para llevar, recoger y delivery), tal como se ve la etiqueta puesta de frente en la etiquetera. Poner aquí lo mismo que dice el rollo cargado: el diseño se ajusta solo a esta medida (la letra baja de tamaño y se recorta con «…» o «+ N más» antes de salirse). Debe ser un número entero de 30 a 200.',
+    ejemplo: 'Con 100: es el segundo 100 de «100 x 100».',
+    efecto: 'Cambiarlo afecta a los stickers que se impriman desde que guardas, también a los que ya esperan en cola. Si la medida no coincide con el rollo, la etiqueta sale cortada o con espacio de sobra.',
+    porDefecto: '100', unidad: 'milímetros', rango: 'entero de 30 a 200', palabras: ['etiqueta', 'sticker', 'tamano', 'medida', 'milimetros', 'etiquetera', 'rollo', 'bebida', 'general', 'ancho', 'alto'], peligro: 'medio',
   },
 };
 

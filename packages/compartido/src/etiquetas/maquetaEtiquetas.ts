@@ -1,4 +1,4 @@
-import type { EtiquetaAreaDatos, EtiquetaBebidaDatos, EtiquetaGeneralDatos, TipoEtiqueta } from '../tipos/etiquetas.js';
+import type { EtiquetaAreaDatos } from '../tipos/etiquetas.js';
 
 /**
  * Maqueta unica de los stickers (fuente de verdad del agente de impresion y de la vista previa del panel).
@@ -245,41 +245,6 @@ const topeSobreRecuadro = (C: Contexto, top: number | null) => (top === null ? C
 
 const salida = (C: Contexto): Maqueta => ({ W: C.W, H: C.H, primitivas: C.prim });
 
-export function maquetarGeneral(d: EtiquetaGeneralDatos, f: FormatoMaqueta = {}): Maqueta {
-  const C = inicio(f, 'CAPRICHOS', 'Pedido completo');
-  let y = 124;
-  texto(C, centrar(X0, C.w, 'PEDIDO', '2'), y, '2', 1, 'PEDIDO');
-  const codigo = d.codigo || 'PED-000';
-  const xm = codigo.length * 48 <= C.w ? 2 : 1;
-  texto(C, centrar(X0, C.w, codigo, '4', xm), y + 26, '4', xm, codigo);
-  y += 26 + 32 * xm + 12;
-  rombos(C, y);
-  y += 16;
-  const pillTxt = (d.modalidadPill || 'SALON').toUpperCase();
-  pillDerecha(C, y, pillTxt);
-  texto(C, X0, y + 4, '2', 1, truncar(`${d.canal} - ${d.hora}`, Math.floor((C.w - medirAnchoTexto(pillTxt, '2') - 28) / 12)));
-  y += PILL_ALTO + 14;
-  y = nombreGrande(C, y, d.who, false) + 4;
-  rombos(C, y);
-  y += 14;
-  const cant = `${d.cantidadProductos} PRODUCTO${d.cantidadProductos === 1 ? '' : 'S'}`;
-  texto(C, centrar(X0, C.w, cant, '3'), y, '3', 1, cant);
-  y += 34;
-  if (d.total != null) {
-    const tot = `TOTAL S/ ${Number(d.total).toFixed(2)}`;
-    texto(C, centrar(X0, C.w, tot, '3'), y, '3', 1, tot);
-    y += 34;
-  }
-
-  const top = d.nota ? recuadroAbajo(C, `NOTA: ${d.nota}`, 3) : null;
-  const bloques = (d.productos || []).map((p) =>
-    lineas(`• ${p.cantidad} x ${p.nombre}${p.tamano ? ` ${p.tamano}` : ''}`, C.w, '2', 2).map((t, i) => ({ t, f: '2', dx: i ? 12 : 0 }))
-  );
-  llenar(C, bloques, y, topeSobreRecuadro(C, top));
-  pie(C, `Sale en: ${d.printer}`, d.fecha);
-  return salida(C);
-}
-
 export function maquetarArea(d: EtiquetaAreaDatos, f: FormatoMaqueta = {}): Maqueta {
   const C = inicio(f, d.areaNombre || 'SALADOS', `Area ${d.areaIndex || 1} de ${d.totalAreas || 1}`);
   let y = 124;
@@ -308,46 +273,4 @@ export function maquetarArea(d: EtiquetaAreaDatos, f: FormatoMaqueta = {}): Maqu
   llenar(C, bloques, y, topeSobreRecuadro(C, top));
   pie(C, `Sale en: ${d.printer}`, d.fecha);
   return salida(C);
-}
-
-export function maquetarBebida(d: EtiquetaBebidaDatos, f: FormatoMaqueta = {}): Maqueta {
-  const C = inicio(f, 'CAPRICHOS', 'Cafeteria artesanal');
-  let y = 124;
-  texto(C, X0, y + 4, '2', 1, `BEBIDA ${d.bebidaIndex} de ${d.totalBebidas}`);
-  pillDerecha(C, y, truncar(d.codigo || 'PED-000', 14));
-  y += PILL_ALTO + 12;
-  y = nombreGrande(C, y, d.persona, true) + 4;
-  rombos(C, y);
-  y += 16;
-
-  // Bebida: fuente 4 si entra entera en 2 lineas, si no fuente 3 hasta 3 lineas
-  const nb = (d.bebidaNombre || 'BEBIDA').trim().toUpperCase().replace(/\s+/g, ' ');
-  const l4 = lineas(nb, C.w, '4');
-  const [fb, lb] = l4.length <= 2 && l4.join(' ') === nb ? ['4', l4] : ['3', lineas(nb, C.w, '3', 3)];
-  lb.forEach((l, i) => texto(C, centrar(X0, C.w, l, fb), y + i * (alto(fb) + 6), fb, 1, l));
-  y += lb.length * (alto(fb) + 6);
-  if (d.tamano?.trim()) {
-    const t = truncar(d.tamano.trim(), Math.floor((C.w - 16) / 12));
-    pill(C, centrar(X0, C.w, t, '2') - 8, y + 2, t);
-    y += PILL_ALTO + 10;
-  }
-  y += 4;
-
-  const top = d.contiene ? recuadroAbajo(C, d.contiene, 5, 'CONTIENE:') : null;
-  const bloques = (d.opciones || []).map((o) =>
-    lineas(`• ${o}`, C.w - 8, '2', 2).map((t, i) => ({ t, f: '2', dx: i ? 20 : 8 }))
-  );
-  llenar(C, bloques, y, topeSobreRecuadro(C, top));
-  pie(C, d.who, d.hora);
-  return salida(C);
-}
-
-export function maquetarEtiqueta(
-  tipo: TipoEtiqueta,
-  datos: EtiquetaGeneralDatos | EtiquetaAreaDatos | EtiquetaBebidaDatos,
-  f: FormatoMaqueta = {}
-): Maqueta {
-  if (tipo === 'ETIQUETA_GENERAL') return maquetarGeneral(datos as EtiquetaGeneralDatos, f);
-  if (tipo === 'ETIQUETA_AREA') return maquetarArea(datos as EtiquetaAreaDatos, f);
-  return maquetarBebida(datos as EtiquetaBebidaDatos, f);
 }

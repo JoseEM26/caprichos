@@ -15,3 +15,4 @@ export * from './etiquetas.js';
 
 export * from './impresion.js';
 export * from './cocina.js';
+export * from './tamanosEtiqueta.js';

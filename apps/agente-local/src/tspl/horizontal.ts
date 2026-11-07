@@ -1,4 +1,4 @@
-import type { EtiquetaGeneralDatos, EtiquetaAreaDatos, EtiquetaBebidaDatos } from '@caprichos/compartido';
+import type { EtiquetaAreaDatos } from '@caprichos/compartido';
 import { medirAnchoTexto, truncar, ajustarLineas, generarComandoTexto as T, FUENTES_TSPL } from './tipografia';
 import { generarSeparadorRombos } from './rombos';
 import { comandosInicio, comandoLogo, MM_A_DOTS, type FormatoEtiqueta } from './formato';
@@ -87,42 +87,8 @@ function recuadro(x: number, y: number, w: number, lineas: string[], encabezado?
   lineas.forEach((l, i) => (s += T(x + 8, yy + i * paso, '2', 1, 1, l)));
   return s;
 }
-const altoRecuadro = (n: number, enc: boolean) => n * 20 + 12 + (enc ? 20 : 0);
 
 const divisor = (L: Lienzo, y0: number) => `BAR ${L.xd - 14},${y0},2,${L.yFin - y0}\r\n`;
-
-export function generarGeneralH(d: EtiquetaGeneralDatos, copias: number, f: FormatoEtiqueta): string {
-  const L = lienzo(f);
-  let s = comandosInicio(f) + marcoYCabecera(L, 'CAPRICHOS', 'Pedido completo');
-  s += T(centrar(L.xi, L.wi, 'PEDIDO', '2'), L.yCuerpo, '2', 1, 1, 'PEDIDO');
-  const codigo = d.codigo || 'PED-000';
-  const xm = codigo.length * 48 <= L.wi ? 2 : 1;
-  s += T(centrar(L.xi, L.wi, codigo, '4', xm), L.yCuerpo + 26, '4', xm, xm, codigo);
-  s += rombos(L.yCuerpo + 108, L.xi, L.xi + L.wi);
-  s += T(L.xi, L.yCuerpo + 128, '2', 1, 1, truncar(`${d.canal} - ${d.hora}`, 14));
-  s += pillDerecha(L.xi, L.wi, L.yCuerpo + 124, (d.modalidadPill || 'SALON').toUpperCase());
-  s += nombreEnColumna(L.xi, L.wi, L.yCuerpo + 170, d.who);
-  s += rombos(L.yCuerpo + 214, L.xi, L.xi + L.wi);
-  const cant = `${d.cantidadProductos} PRODUCTO${d.cantidadProductos === 1 ? '' : 'S'}`;
-  s += T(centrar(L.xi, L.wi, cant, '3'), L.yCuerpo + 236, '3', 1, 1, cant);
-
-  s += divisor(L, L.yCuerpo);
-  const lineasNota = d.nota ? ajustarLineas(`NOTA: ${d.nota}`, Math.floor((L.wd - 16) / 12), 2) : [];
-  const limite = L.yFin - (lineasNota.length ? altoRecuadro(lineasNota.length, false) + 8 : 0);
-  let y = L.yCuerpo;
-  const prods = (d.productos || []).slice(0, 5);
-  for (const p of prods) {
-    for (const l of ajustarLineas(`• ${p.cantidad} x ${p.nombre}${p.tamano ? ` ${p.tamano}` : ''}`, Math.floor(L.wd / 12), 2)) {
-      if (y + 22 <= limite) s += T(L.xd, y, '2', 1, 1, l);
-      y += 22;
-    }
-  }
-  if ((d.productos || []).length > 5 && y + 22 <= limite) {
-    s += T(L.xd + 12, y, '2', 1, 1, `+ ${d.productos.length - 5} producto(s) más`);
-  }
-  if (lineasNota.length) s += recuadro(L.xd, limite + 4, L.wd, lineasNota);
-  return s + pie(L, `Sale en: ${d.printer}`, d.fecha) + `PRINT 1,${copias}\r\n`;
-}
 
 export function generarAreaH(d: EtiquetaAreaDatos, copias: number, f: FormatoEtiqueta): string {
   const L = lienzo(f);
@@ -158,39 +124,4 @@ export function generarAreaH(d: EtiquetaAreaDatos, copias: number, f: FormatoEti
     y += 6;
   }
   return s + pie(L, `Sale en: ${d.printer}`, d.fecha) + `PRINT 1,${copias}\r\n`;
-}
-
-export function generarBebidaH(d: EtiquetaBebidaDatos, copias: number, f: FormatoEtiqueta): string {
-  const L = lienzo(f);
-  const anchoTotal = L.W - 2 * L.xi;
-  let s = comandosInicio(f) + marcoYCabecera(L, 'CAPRICHOS', 'Cafeteria artesanal');
-  s += T(L.xi, L.yCuerpo + 6, '2', 1, 1, `BEBIDA ${d.bebidaIndex} de ${d.totalBebidas}`);
-  s += pillDerecha(L.xi, anchoTotal, L.yCuerpo + 2, d.codigo || 'PED-000');
-
-  const n = (d.persona || 'Cliente').trim().toUpperCase();
-  const xm = n.length * 48 <= anchoTotal ? 2 : 1;
-  const nombre = truncar(n, Math.floor(anchoTotal / (24 * xm)));
-  s += T(centrar(L.xi, anchoTotal, nombre, '4', xm), L.yCuerpo + 34, '4', xm, xm, nombre);
-  s += rombos(L.yCuerpo + 114, L.xi, L.xi + anchoTotal);
-
-  const y0 = L.yCuerpo + 132;
-  s += divisor(L, y0 - 4);
-  let y = y0;
-  for (const lb of ajustarLineas((d.bebidaNombre || 'BEBIDA').toUpperCase(), Math.floor(L.wi / 16), 3)) {
-    s += T(centrar(L.xi, L.wi, lb, '3'), y, '3', 1, 1, lb);
-    y += 26;
-  }
-  if (d.tamano) s += pill(L.xi + Math.floor((L.wi - (medirAnchoTexto(d.tamano.trim(), '2', 1) + 16)) / 2), y + 4, d.tamano.trim());
-
-  const contiene = d.contiene ? ajustarLineas(d.contiene, Math.floor((L.wd - 16) / 12), 2) : [];
-  const limite = L.yFin - (contiene.length ? altoRecuadro(contiene.length, true) + 8 : 0);
-  let yo = y0;
-  for (const opt of d.opciones || []) {
-    for (const lo of ajustarLineas(`• ${opt}`, Math.floor(L.wd / 12), 2)) {
-      if (yo + 20 <= limite) s += T(L.xd, yo, '2', 1, 1, lo);
-      yo += 20;
-    }
-  }
-  if (contiene.length) s += recuadro(L.xd, limite + 4, L.wd, contiene, 'CONTIENE:');
-  return s + pie(L, d.who, d.hora) + `PRINT 1,${copias}\r\n`;
 }

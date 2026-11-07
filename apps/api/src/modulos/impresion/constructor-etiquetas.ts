@@ -157,6 +157,10 @@ export function construirEtiquetaGeneral(pedido: any): EtiquetaGeneralDatos {
     productos: productosGeneral,
     nota: pedido.nota || null,
     total: pedido.total != null ? Number(pedido.total) : null,
+    // Solo delivery: el repartidor lleva dirección y celular en el sticker
+    ...(String(pedido.modalidad || '').toUpperCase() === 'DELIVERY'
+      ? { direccion: pedido.entrega_direccion?.trim() || null, telefono: pedido.cliente_telefono?.trim() || null }
+      : {}),
     printer: 'Etiquetera de caja',
   };
 }

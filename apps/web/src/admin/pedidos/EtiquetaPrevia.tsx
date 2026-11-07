@@ -103,8 +103,14 @@ export function EtiquetaSvg({ maqueta, etiqueta }: { maqueta: Maqueta; etiqueta:
   );
 }
 
-export function EtiquetaGeneral({ datos }: { datos: EtiquetaGeneralDatos }) {
-  const m = useMemo(() => maquetarEtiqueta('ETIQUETA_GENERAL', datos), [datos]);
+/** Medida del sticker en mm (ancho x alto); sin ella, la de fábrica. */
+export interface TamanoPrevia {
+  anchoMm?: number;
+  altoMm?: number;
+}
+
+export function EtiquetaGeneral({ datos, tamano }: { datos: EtiquetaGeneralDatos; tamano?: TamanoPrevia }) {
+  const m = useMemo(() => maquetarEtiqueta('ETIQUETA_GENERAL', datos, tamano), [datos, tamano?.anchoMm, tamano?.altoMm]);
   return <EtiquetaSvg maqueta={m} etiqueta="general" />;
 }
 
@@ -113,8 +119,8 @@ export function EtiquetaArea({ datos }: { datos: EtiquetaAreaDatos }) {
   return <EtiquetaSvg maqueta={m} etiqueta={`del area ${datos.areaNombre}`} />;
 }
 
-export function EtiquetaBebida({ datos }: { datos: EtiquetaBebidaDatos }) {
-  const m = useMemo(() => maquetarEtiqueta('ETIQUETA_BEBIDA', datos), [datos]);
+export function EtiquetaBebida({ datos, tamano }: { datos: EtiquetaBebidaDatos; tamano?: TamanoPrevia }) {
+  const m = useMemo(() => maquetarEtiqueta('ETIQUETA_BEBIDA', datos, tamano), [datos, tamano?.anchoMm, tamano?.altoMm]);
   return <EtiquetaSvg maqueta={m} etiqueta={`de bebida ${datos.bebidaIndex}`} />;
 }
 
