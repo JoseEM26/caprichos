@@ -111,10 +111,24 @@ function DescripcionLinea({ it }: { it: LineaComanda }) {
       </span>,
     );
 
-  if (partes.length === 0) return null;
+  // nombre que el cliente puso a cada bebida (una línea por unidad, en el orden en que se pidió)
+  const personas = (it.personas || []).map((p) => p?.trim()).filter(Boolean);
+  const nombres =
+    personas.length > 0 ? (
+      <span data-testid="linea-personas" style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: 'var(--cp-navy)' }}>
+        {personas.map((p, i) => (
+          <span key={i} style={{ display: 'block' }}>
+            {it.nombre} — para {p}
+          </span>
+        ))}
+      </span>
+    ) : null;
+
+  if (partes.length === 0 && !nombres) return null;
   return (
     <>
-      <br />
+      {nombres}
+      {partes.length === 0 ? null : <br />}
       <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
         {partes.map((p, i) => (
           <span key={i}>

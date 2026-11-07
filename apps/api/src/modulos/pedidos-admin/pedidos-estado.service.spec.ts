@@ -1252,6 +1252,22 @@ describe('PedidosEstadoService', () => {
       expect(res[1].codigo).toBe('CP-W002');
     });
 
+    it('devuelve en cada línea el nombre que el cliente puso a cada bebida (nombres_persona)', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([
+        {
+          id: 4n,
+          codigo: 'CP-W004',
+          estado: 'COLA',
+          creado_en: new Date(),
+          lineas: [{ id: 1n, nombre: 'Frappe fresa', cantidad: 2, nombres_persona: ['Ana', 'Luis'] }],
+        },
+      ]);
+
+      const res = await service.listarCocina(false, cocinaAuth);
+
+      expect((res[0].lineas as any[])[0].nombres_persona).toEqual(['Ana', 'Luis']);
+    });
+
     it('si historial=true debe buscar pedidos listos del día', async () => {
       prismaMock.pedido.findMany.mockResolvedValue([
         { id: 3n, codigo: 'CP-W003', estado: 'LISTO', creado_en: new Date(), lineas: [] },
