@@ -144,7 +144,7 @@ describe('Sticker general solo para llevar, recoger y delivery', () => {
     await screen.findByText('2 etiquetas: 0 impresas, 1 en cola, 1 fallidas');
     expect(screen.queryByRole('article', { name: 'Etiqueta General del pedido' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Reimprimir la general/i })).toBeNull();
-    expect(screen.getByTestId('sin-general')).toHaveTextContent('no lleva etiqueta general');
+    expect(screen.getByTestId('sin-general')).toHaveTextContent('no lleva ninguna etiqueta');
   });
 
   it.each(['DELIVERY', 'RECOGER'])('pedido %s: sí muestra la general y su vista previa con el tamaño configurado', async (modalidad) => {

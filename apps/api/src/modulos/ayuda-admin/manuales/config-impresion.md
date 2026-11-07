@@ -21,7 +21,7 @@ Gobierna qué se imprime (stickers de bebida y por área, comanda de salón), en
 ## Como se hace: encender o apagar lo que se imprime
 1. En Configuración del local abre "Impresión" y la sección "Mapa" ([Impresión](/admin/mirest?tab=impresion); enlace directo a la sección: /admin/mirest?tab=impresion&seccion=mapa).
 2. Enciende o apaga "Sticker de bebida", "Sticker por área" o "Comanda de salón" y confirma. El sticker por área viene apagado hasta que el dueño lo confirme.
-3. El sticker general (todo el pedido, con la lista de productos) solo sale para pedidos para llevar, recoger y delivery; un pedido en el local no lleva sticker general y su voucher sale por la ticketera normal. El sticker de bebida sale por cada vaso, en cualquier modalidad, en el equipo de Bebidas (o en Caja si no hay). La comanda de salón sale en la ticketera de Caja al aceptar un pedido de mesa o local; no sale para llevar ni delivery.
+3. El sticker general (todo el pedido, con la lista de productos) solo sale para pedidos para llevar, recoger y delivery; un pedido en el local no lleva sticker general y su voucher sale por la ticketera normal. Tampoco sale ningún sticker de bebida ni de área en pedidos en el local: solo delivery y recoger llevan stickers. El sticker de bebida sale por cada vaso en el equipo de Bebidas (o en Caja si no hay). La comanda de salón sale en la ticketera de Caja al aceptar un pedido de mesa o local; no sale para llevar ni delivery.
 
 ## Como se hace: cambiar el tamaño de los stickers
 1. Entra a Parámetros del sistema, grupo "Etiquetas e impresión" ([Parámetros](/admin/mirest?tab=parametros)).
@@ -65,7 +65,7 @@ Gobierna qué se imprime (stickers de bebida y por área, comanda de salón), en
 ## Errores y dudas comunes
 - Las etiquetas no salen: revisa en "Equipos y estado" si el agente está conectado y la impresora lista; si no, se acumulan como pendientes.
 - Una etiqueta vieja no salió sola al reconectar: pasó el vencimiento ("Vencimiento de etiquetas no impresas") y quedó VENCIDA; se reimprime a mano.
-- Un pedido en mesa no tiene etiqueta general: es lo normal. Solo se imprime el sticker de cada vaso y el voucher por la ticketera.
+- Un pedido en mesa no tiene etiqueta general: es lo normal. Un pedido en el local no lleva ningún sticker, solo el voucher por la ticketera.
 - La etiqueta sale cortada o con mucho espacio: la medida de Parámetros no coincide con el rollo cargado; corrígela en el grupo "Etiquetas e impresión".
 - Perdí la llave: no se puede volver a ver; crea una nueva y desactiva la anterior.
 

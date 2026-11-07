@@ -83,9 +83,11 @@ describe('qué stickers salen según la modalidad', () => {
     for (const m of ['MESA', 'LOCAL']) expect(aplicaSegunReglas('ETIQUETA_GENERAL', m, r)).toBe(false);
   });
 
-  it('el sticker de bebida sale en todas las modalidades', () => {
-    for (const m of ['DELIVERY', 'RECOGER', 'LLEVAR', 'MESA', 'LOCAL']) {
-      expect(aplicaSegunReglas('ETIQUETA_BEBIDA', m, REGLAS_IMPRESION_DEFECTO)).toBe(true);
+  it('bebida y área: solo delivery, recoger y llevar; en mesa o local ningún sticker', () => {
+    const r = { ...REGLAS_IMPRESION_DEFECTO, areaActivo: true };
+    for (const t of ['ETIQUETA_BEBIDA', 'ETIQUETA_AREA']) {
+      for (const m of ['DELIVERY', 'RECOGER', 'LLEVAR']) expect(aplicaSegunReglas(t, m, r)).toBe(true);
+      for (const m of ['MESA', 'LOCAL']) expect(aplicaSegunReglas(t, m, r)).toBe(false);
     }
   });
 });
@@ -140,11 +142,10 @@ describe('ImpresionService: tamaño al entregar el trabajo y modalidades al enco
   });
   const claves = () => prismaMock.printJob.upsert.mock.calls.map((c: any) => c[0].where.clave_idempotencia as string);
 
-  it('MESA: encola el vaso pero NO el sticker general', async () => {
+  it('MESA: no encola ningún sticker (ni general, ni vaso)', async () => {
     prismaMock.pedido.findUnique.mockResolvedValue(pedido('MESA'));
     await service.encolarEtiquetasPedido(7n);
-    expect(claves()).toContain('7-ETIQUETA_BEBIDA-1');
-    expect(claves()).not.toContain('7-ETIQUETA_GENERAL');
+    expect(claves().filter((c: string) => c.includes('ETIQUETA'))).toEqual([]);
   });
 
   it.each(['DELIVERY', 'RECOGER'])('%s: encola el sticker general y el vaso', async (m) => {

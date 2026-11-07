@@ -227,9 +227,8 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
   // el estado real de cada una se toma de print_job cuando llega.
   // El sticker general solo existe para llevar, recoger y delivery: en mesa no se ofrece ni se puede reimprimir.
   // La API dice cuáles aplican; mientras carga, se decide por la modalidad del pedido.
-  const llevaGeneral = estado
-    ? estado.etiquetas.some((e) => e.clave === 'GENERAL')
-    : ['DELIVERY', 'RECOGER', 'LLEVAR'].includes(String(pedido.modalidad || '').toUpperCase());
+  const esLlevar = ['DELIVERY', 'RECOGER', 'LLEVAR'].includes(String(pedido.modalidad || '').toUpperCase());
+  const llevaGeneral = estado ? estado.etiquetas.some((e) => e.clave === 'GENERAL') : esLlevar;
   const base: EtiquetaEstado[] = [
     ...(llevaGeneral
       ? [{
@@ -237,11 +236,11 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
           detalle: 'Bolsa o bandeja, etiquetera de caja',
         }]
       : []),
-    ...resumen.areas.map((a) => ({
+    ...(esLlevar ? resumen.areas : []).map((a) => ({
       clave: `AREA:${a.areaNombre}`, tipo: 'ETIQUETA_AREA' as const, titulo: `Área ${a.areaNombre}`,
       detalle: 'Etiqueta de la cocina de esta área',
     })),
-    ...resumen.bebidas.map((b) => ({
+    ...(esLlevar ? resumen.bebidas : []).map((b) => ({
       clave: `BEBIDA:${b.bebidaIndex}`, tipo: 'ETIQUETA_BEBIDA' as const,
       titulo: `Bebida ${b.bebidaIndex} de ${b.totalBebidas}`,
       detalle: [b.bebidaNombre, b.tamano, b.persona ? `para ${b.persona}` : null].filter(Boolean).join(' · '),
@@ -350,7 +349,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
         )
       ) : (
         <div role="note" data-testid="sin-general" style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)' }}>
-          Este pedido es en el local: no lleva etiqueta general (solo sale para llevar, recoger y delivery). El voucher sale por la ticketera.
+          Este pedido es en el local: no lleva ninguna etiqueta (los stickers solo salen para llevar, recoger y delivery). El voucher sale por la ticketera.
         </div>
       )}
       {seccion(

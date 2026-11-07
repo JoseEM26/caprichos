@@ -74,15 +74,17 @@ describe('aplicaSegunReglas (modalidad y activos)', () => {
     expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'LOCAL', r)).toBe(false);
   });
 
-  it('el sticker por vaso va en todas las modalidades (salón incluido) mientras esté activo', () => {
-    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'MESA', r)).toBe(true);
+  it('el sticker por vaso va en delivery y recoger (no en mesa) mientras esté activo', () => {
+    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'MESA', r)).toBe(false);
     expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'DELIVERY', r)).toBe(true);
-    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'MESA', { ...r, bebidaActivo: false })).toBe(false);
+    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'RECOGER', r)).toBe(true);
+    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'DELIVERY', { ...r, bebidaActivo: false })).toBe(false);
   });
 
   it('el sticker por área está apagado por defecto', () => {
-    expect(aplicaSegunReglas('ETIQUETA_AREA', 'MESA', r)).toBe(false);
-    expect(aplicaSegunReglas('ETIQUETA_AREA', 'MESA', { ...r, areaActivo: true })).toBe(true);
+    expect(aplicaSegunReglas('ETIQUETA_AREA', 'DELIVERY', r)).toBe(false);
+    expect(aplicaSegunReglas('ETIQUETA_AREA', 'DELIVERY', { ...r, areaActivo: true })).toBe(true);
+    expect(aplicaSegunReglas('ETIQUETA_AREA', 'MESA', { ...r, areaActivo: true })).toBe(false);
   });
 
   it('la comanda de salón solo es para mesa/local, nunca llevar ni delivery', () => {

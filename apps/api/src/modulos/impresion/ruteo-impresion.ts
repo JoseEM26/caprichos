@@ -52,15 +52,19 @@ export function tiposDeRoles(roles: RolImpresora[]): string[] {
   ];
 }
 
+/** Modalidades que llevan stickers de bebida y de área (el general sigue la regla configurable). */
+const MODALIDADES_CON_STICKER: string[] = ['DELIVERY', 'RECOGER', 'LLEVAR'];
+
 /** Si el tipo de trabajo se encola para un pedido con esa modalidad según las reglas (sin tocar destinos). */
 export function aplicaSegunReglas(tipo: string, modalidad: string, reglas: ReglasImpresion): boolean {
   switch (tipo) {
     case 'ETIQUETA_GENERAL':
       return reglas.generalModalidades.includes(modalidad);
+    // Decisión del dueño: en el local (mesa) no sale ningún sticker; solo llevar, recoger y delivery
     case 'ETIQUETA_BEBIDA':
-      return reglas.bebidaActivo;
+      return reglas.bebidaActivo && MODALIDADES_CON_STICKER.includes(modalidad);
     case 'ETIQUETA_AREA':
-      return reglas.areaActivo;
+      return reglas.areaActivo && MODALIDADES_CON_STICKER.includes(modalidad);
     case 'TICKET_COMANDA_SALON':
       return reglas.comandaSalonActivo && (MODALIDADES_SALON as readonly string[]).includes(modalidad);
     // Comanda por área: en cualquier modalidad (la cocina de cada área prepara también llevar y delivery).
