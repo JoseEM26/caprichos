@@ -295,3 +295,17 @@ describe('AsistenciaService.qrPantalla', () => {
     expect(q.qr.startsWith('data:image/png')).toBe(true);
   });
 });
+
+describe('AsistenciaService.miHoy: localConUbicacion', () => {
+  it('con ubicación configurada es true y no expone coordenadas', async () => {
+    const { svc } = servicio();
+    const r = await svc.miHoy(LUIS.partyId, AHORA);
+    expect(r.localConUbicacion).toBe(true);
+    expect(JSON.stringify(r)).not.toMatch(/localLat|localLng|lat"|lng"/);
+  });
+
+  it('sin ubicación configurada es false', async () => {
+    const { svc } = servicio({ parametro: null });
+    expect((await svc.miHoy(LUIS.partyId, AHORA)).localConUbicacion).toBe(false);
+  });
+});

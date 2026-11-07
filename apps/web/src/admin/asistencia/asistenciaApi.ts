@@ -49,6 +49,8 @@ export interface MiHoy {
   textoConsentimiento?: string;
   consentimiento: { version: string; texto: string } | null;
   dispositivoVinculado: boolean;
+  /** false: el administrador aún no fijó el punto del local. */
+  localConUbicacion?: boolean;
 }
 
 export interface ResultadoMarca {
