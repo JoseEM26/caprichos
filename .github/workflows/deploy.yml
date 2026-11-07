@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       accion:
-        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), configurar-resenas (guarda el secreto OPENWEBNINJA_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), cargar-resenas (carga inicial de reseñas de Google del local buscado en consulta_resenas; demo o prod, prod exige PRODUCCION y no es lo normal), configurar-sunat (guarda los secretos SUNAT_AMBIENTE, SUNAT_SOL_USUARIO, SUNAT_SOL_CLAVE, SUNAT_CERT_P12_B64 y SUNAT_CERT_CLAVE en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), configurar-correo (guarda el secreto RESEND_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), configurar-whatsapp (guarda los secretos WHATSAPP_VERIFY_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_TOKEN y WHATSAPP_APP_SECRET que existan en el entorno, en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto)'
+        description: 'Acción: desplegar (normal), sanear-demo (borra cuentas de clientes, SOLO demo), respaldar-demo (copia manual de la demo), exportar-datos-demo (paquete de configuración y contenido de la demo), importar-datos-produccion (importa el paquete a PRODUCCIÓN), configurar-dominios-demo (la demo pasa a demo.caprichos.pe y conserva el dominio adicional), configurar-resenas (guarda el secreto OPENWEBNINJA_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), cargar-resenas (carga inicial de reseñas de Google del local buscado en consulta_resenas; demo o prod, prod exige PRODUCCION y no es lo normal), configurar-sunat (guarda los secretos SUNAT_AMBIENTE, SUNAT_SOL_USUARIO, SUNAT_SOL_CLAVE, SUNAT_CERT_P12_B64 y SUNAT_CERT_CLAVE en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), configurar-correo (guarda el secreto RESEND_API_KEY en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), configurar-whatsapp (guarda los secretos WHATSAPP_VERIFY_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_TOKEN y WHATSAPP_APP_SECRET que existan en el entorno, en el .env del ambiente y redespliega con el mismo tag; demo o prod, prod exige PRODUCCION), preparar-produccion (crea el .env de PRODUCCIÓN con claves aleatorias; no despliega), crear-admin-produccion (roles y primer administrador de PRODUCCIÓN; la clave queda en un archivo del servidor), sincronizar-proxy (actualiza los middlewares de Traefik; simulacro por defecto), probar-restauracion (restaura el último respaldo en una base temporal; demo o prod), probar-restauracion-externa (baja el último respaldo del repositorio externo restic/Backblaze y lo restaura en una base temporal; solo lectura; demo o prod, prod exige PRODUCCION), instalar-monitor (Uptime Kuma solo local en el servidor), ver-estado-servidor (consumo del VPS y respaldos; solo lectura), consultar-pedido (dónde quedó un pedido; solo lectura, demo), programar-respaldos (cron diario de prod, copia cifrada en R2 y aviso a Uptime Kuma; simulacro por defecto)'
         required: false
         default: 'desplegar'
         type: choice
@@ -43,6 +43,7 @@ on:
           - crear-admin-produccion
           - sincronizar-proxy
           - probar-restauracion
+          - probar-restauracion-externa
           - instalar-monitor
           - ver-estado-servidor
           - consultar-pedido
@@ -236,6 +237,13 @@ jobs:
             ACCION="probar-restauracion"
             if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
               echo "::error::probar-restauracion en demo se lanza desde la rama preprod."
+              exit 1
+            fi
+          fi
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "probar-restauracion-externa" ]; then
+            ACCION="probar-restauracion-externa"
+            if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::probar-restauracion-externa en demo se lanza desde la rama preprod."
               exit 1
             fi
           fi
@@ -1767,6 +1775,79 @@ jobs:
             echo ""
             echo '```'
             grep -E "^(Respaldo|AVISO|Tablas|Filas|OK|FALLA|ERROR)" restauracion.log || echo "(sin datos: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Baja el último respaldo del repositorio EXTERNO (restic/Backblaze), lo restaura en una base temporal y cuenta filas. Solo lectura.
+  probar-restauracion-externa:
+    name: Probar restauración desde el respaldo externo
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'probar-restauracion-externa'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: probar-restauracion-externa
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts de esta versión)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Restaurar el respaldo externo en una base temporal
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/probar-restauracion-externa.sh $AMBIENTE" 2>&1 | tee restauracion-externa.log
+
+      - name: Resumen (solo conteos)
+        if: always()
+        run: |
+          {
+            echo "## Prueba de restauración externa"
+            echo ""
+            echo '```'
+            grep -E "^(Snapshots|Check|Snapshot|AVISO|Tablas|Filas|OK|FALLA|ERROR)" restauracion-externa.log || echo "(sin datos: revise el log del paso anterior)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
