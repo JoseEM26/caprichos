@@ -235,7 +235,8 @@ export function MiAsistenciaView() {
 
   const pendiente = hoy.pendiente;
   const faltaConsent = hoy.consentimiento !== null && !hoy.consentimientoAceptado && !aceptadoEnSesion;
-  const puedeMarcar = (pendiente !== null || hoy.permitidas.length > 0) && (!faltaConsent || aceptaConsent);
+  const sinUbicacion = hoy.localConUbicacion === false;
+  const puedeMarcar = !sinUbicacion && (pendiente !== null || hoy.permitidas.length > 0) && (!faltaConsent || aceptaConsent);
   const indice = INDICE_PASO[paso];
   const horaLima = new Date(hoy.ahora).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
 
@@ -262,6 +263,12 @@ export function MiAsistenciaView() {
           </div>
         )}
       </section>
+
+      {sinUbicacion && (
+        <div role="alert" className="as-aviso as-aviso--alerta" data-testid="aviso-sin-ubicacion">
+          El administrador aún no configuró la ubicación del local. Todavía no puedes marcar; avísale.
+        </div>
+      )}
 
       {faltaConsent && hoy.consentimiento && (
         <label className="ma-consent">

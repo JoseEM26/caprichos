@@ -115,7 +115,11 @@ describe('manifest de la app «QR Asistencia»', () => {
     expect(m.id).toBe(m.start_url);
     expect(m.scope).toBe(m.start_url);
     expect(m.display).toBe('fullscreen');
-    expect(m.icons.length).toBeGreaterThanOrEqual(2);
+    expect(m.icons).toEqual([
+      { src: '/icons/qr-asistencia-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icons/qr-asistencia-512.png', sizes: '512x512', type: 'image/png' },
+      { src: '/icons/qr-asistencia-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ]);
     const texto = JSON.stringify(m);
     expect(texto).not.toMatch(/Caprichos|local|persona|dni/i);
   });
@@ -129,4 +133,23 @@ describe('manifest de la app «QR Asistencia»', () => {
     await svc.desactivarEnlacePantalla();
     await expect(svc.manifestPantallaPublica(nuevo)).rejects.toBeInstanceOf(NotFoundException);
   });
+});
+
+describe('íconos de «QR Asistencia»', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const fs = require('fs');
+  const path = require('path');
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  const dir = path.resolve(__dirname, '../../../../web/public/icons');
+
+  it.each([['qr-asistencia-192.png', 192], ['qr-asistencia-512.png', 512], ['qr-asistencia-maskable-512.png', 512]])(
+    '%s existe, mide %i px y pesa menos de 30 KB',
+    (nombre: string, lado: number) => {
+      const b = fs.readFileSync(path.join(dir, nombre));
+      expect(b.subarray(1, 4).toString()).toBe('PNG');
+      expect(b.readUInt32BE(16)).toBe(lado);
+      expect(b.readUInt32BE(20)).toBe(lado);
+      expect(b.length).toBeLessThan(30 * 1024);
+    },
+  );
 });
