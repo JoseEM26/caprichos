@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import type { ClipboardEvent, DragEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent } from 'react';
 import { CarruselBanners, estadoBanner } from '../../carta/CarruselBanners';
 import type { BannerImagen, EnlaceBanner } from '../../carta/CarruselBanners';
 import { Boton } from '../../comun/Boton';
@@ -29,6 +29,14 @@ interface Props {
   onImagenes: (l: BannerImagen[]) => void;
   onIntervalo: (n: number) => void;
 }
+
+/** Lo mismo que quitar el elemento de `de` y meterlo en `a`. */
+export const moverEnLista = <T,>(lista: T[], de: number, a: number): T[] => {
+  const l = [...lista];
+  l.splice(a, 0, l.splice(de, 1)[0]);
+  return l;
+};
+const soloLectores = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' } as const;
 
 const nuevoId = () => `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const titulo = { margin: '8px 0 0', fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 15 } as const;
@@ -64,12 +72,57 @@ export function PopoverBanners({ imagenes, intervaloSeg, categorias, productos, 
   const [reproduciendo, setReproduciendo] = useState(false);
   const [buscar, setBuscar] = useState<Record<string, string>>({});
   const entrada = useRef<HTMLInputElement>(null);
+  const raiz = useRef<HTMLDivElement>(null);
+  // Reordenar: con puntero (ratón o dedo) `arrastre`; con teclado `tomado`. `aviso` lo lee el lector de pantalla.
+  const [arrastre, setArrastre] = useState<{ id: string; origen: number; destino: number } | null>(null);
+  const [tomado, setTomado] = useState<string | null>(null);
+  const [aviso, setAviso] = useState('');
+  const devolverFoco = useRef<string | null>(null);
+  useEffect(() => {
+    if (!devolverFoco.current) return;
+    raiz.current?.querySelector<HTMLElement>(`[data-asa="${devolverFoco.current}"]`)?.focus();
+    devolverFoco.current = null;
+  });
 
   const cambiar = (id: string, p: Partial<BannerImagen>) => onImagenes(imagenes.map((x) => (x.id === id ? { ...x, ...p } : x)));
-  const mover = (i: number, d: number) => {
-    const l = [...imagenes];
-    [l[i], l[i + d]] = [l[i + d], l[i]];
-    onImagenes(l);
+  const reordenar = (de: number, a: number) => {
+    if (de === a || a < 0 || a >= imagenes.length) return;
+    onImagenes(moverEnLista(imagenes, de, a));
+    setAviso(`Banner ${de + 1} movido a la posición ${a + 1}`);
+  };
+  const mover = (i: number, d: number) => reordenar(i, i + d);
+  // Fila bajo el puntero según la altura de cada tarjeta (sirve igual con ratón y con dedo)
+  const filaBajo = (y: number) => {
+    const filas = Array.from(raiz.current?.querySelectorAll('[data-banner-fila]') ?? []);
+    const i = filas.findIndex((f) => y < f.getBoundingClientRect().bottom);
+    return i === -1 ? Math.max(filas.length - 1, 0) : i;
+  };
+  const alAgarrar = (ev: PointerEvent<HTMLButtonElement>, id: string, i: number) => {
+    if (ev.button !== 0) return;
+    ev.currentTarget.setPointerCapture?.(ev.pointerId);
+    setArrastre({ id, origen: i, destino: i });
+  };
+  const alArrastrar = (ev: PointerEvent<HTMLButtonElement>) => {
+    if (arrastre) setArrastre({ ...arrastre, destino: filaBajo(ev.clientY) });
+  };
+  const alSoltarAsa = (ev: PointerEvent<HTMLButtonElement>) => {
+    if (!arrastre) return;
+    ev.currentTarget.releasePointerCapture?.(ev.pointerId);
+    reordenar(arrastre.origen, filaBajo(ev.clientY));
+    setArrastre(null);
+  };
+  const alTeclaAsa = (ev: KeyboardEvent<HTMLButtonElement>, id: string, i: number) => {
+    if (ev.key === ' ' || ev.key === 'Enter') {
+      ev.preventDefault();
+      setTomado(tomado === id ? null : id);
+      setAviso(tomado === id ? `Banner ${i + 1} soltado en la posición ${i + 1}` : `Banner ${i + 1} tomado. Usa las flechas arriba y abajo para moverlo y Espacio para soltarlo`);
+    } else if (ev.key === 'Escape' && tomado === id) {
+      setTomado(null);
+    } else if (tomado === id && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) {
+      ev.preventDefault();
+      devolverFoco.current = id;
+      reordenar(i, i + (ev.key === 'ArrowUp' ? -1 : 1));
+    }
   };
   const subir = async (f: File | undefined | null, aplicar: (url: string) => void) => {
     if (!f) return;
@@ -115,7 +168,8 @@ export function PopoverBanners({ imagenes, intervaloSeg, categorias, productos, 
   );
 
   return (
-    <div data-editor-banners onPaste={alPegar} onDragOver={(ev) => ev.preventDefault()} onDrop={alSoltar} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div ref={raiz} data-editor-banners onPaste={alPegar} onDragOver={(ev) => ev.preventDefault()} onDrop={alSoltar} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div role="log" aria-live="polite" style={soloLectores}>{aviso}</div>
       <h3 style={titulo}>1. Elige qué se ve</h3>
       <p style={ayuda}>Ahora estás usando <strong>Tus banners</strong>. Para volver al banner de siempre, elige «Caprichos del mes» arriba.</p>
 
@@ -140,9 +194,25 @@ export function PopoverBanners({ imagenes, intervaloSeg, categorias, productos, 
             const rota = (b.enlace?.tipo === 'CATEGORIA' && !categorias.some((c) => c.id === b.enlace!.valor)) || (b.enlace?.tipo === 'PRODUCTO' && !productos.some((p) => p.id === b.enlace!.valor));
             const lista = b.enlace?.tipo === 'CATEGORIA' ? categorias : productos.filter((p) => !buscar[b.id] || p.nombre.toLowerCase().includes(buscar[b.id].toLowerCase()));
             return (
-              <div key={b.id} data-banner-fila style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: 10, display: 'flex', flexDirection: 'column', gap: 8, opacity: b.activo ? 1 : 0.6 }}>
+              <div key={b.id} data-banner-fila data-destino={arrastre && arrastre.destino === i && arrastre.origen !== i ? '' : undefined} style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: 10, display: 'flex', flexDirection: 'column', gap: 8, opacity: arrastre?.id === b.id ? 0.5 : b.activo ? 1 : 0.6, ...(arrastre && arrastre.destino === i && arrastre.origen !== i ? (arrastre.origen > i ? { borderTop: '4px solid var(--cp-orange)' } : { borderBottom: '4px solid var(--cp-orange)' }) : {}), ...(tomado === b.id ? { outline: '3px solid var(--cp-orange)' } : {}) }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <strong>Banner {i + 1}</strong>
+                  <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      data-asa={b.id}
+                      aria-label={`Arrastrar banner ${i + 1}`}
+                      aria-pressed={tomado === b.id}
+                      title="Arrastra para cambiar el orden"
+                      onPointerDown={(ev) => alAgarrar(ev, b.id, i)}
+                      onPointerMove={alArrastrar}
+                      onPointerUp={alSoltarAsa}
+                      onPointerCancel={() => setArrastre(null)}
+                      onKeyDown={(ev) => alTeclaAsa(ev, b.id, i)}
+                      onBlur={(ev) => ev.relatedTarget && setTomado((t) => (t === b.id ? null : t))}
+                      style={{ ...tactil, border: 0, background: 'none', cursor: arrastre ? 'grabbing' : 'grab', fontSize: 22, color: 'var(--cp-navy)', touchAction: 'none' }}
+                    >⠿</button>
+                    Banner {i + 1}
+                  </strong>
                   <Insignia variante={est.id === 'ACTIVO' ? 'exito' : est.id === 'VENCIDO' ? 'peligro' : est.id === 'PROGRAMADO' ? 'aviso' : 'neutro'}>{est.texto}</Insignia>
                 </div>
                 <div role="group" aria-label={`Cómo se ve el banner ${i + 1}`} style={{ display: 'flex', gap: 6 }}>
