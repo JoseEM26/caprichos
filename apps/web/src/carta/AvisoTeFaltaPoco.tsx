@@ -57,9 +57,11 @@ export function obtenerAvisoTeFaltaPoco(params: {
       matchingLines = lineas.filter(
         (l) => String(l.productoId) === String(o.alcanceProductoId),
       );
-    } else if (o.alcanceCategoriaId) {
-      const cat = categorias.find((c) => String(c.id) === String(o.alcanceCategoriaId));
-      const prodsEnCat = new Set((cat?.productos || []).map((p) => String(p.id)));
+    } else if (o.alcanceCategoriaId || o.alcanceCategoriaIds?.length) {
+      const idsCat = (o.alcanceCategoriaIds?.length ? o.alcanceCategoriaIds : [o.alcanceCategoriaId]).map(String);
+      const prodsEnCat = new Set(
+        categorias.filter((c) => idsCat.includes(String(c.id))).flatMap((c) => (c.productos || []).map((p) => String(p.id))),
+      );
       matchingLines = lineas.filter((l) => prodsEnCat.has(String(l.productoId)));
     }
 

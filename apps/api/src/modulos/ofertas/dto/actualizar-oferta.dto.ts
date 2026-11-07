@@ -39,6 +39,10 @@ export class ActualizarOfertaDto {
   paga?: number | null;
 
   @IsOptional()
+  @IsArray()
+  alcanceCategoriaIds?: (string | number)[] | null;
+
+  @IsOptional()
   alcanceCategoriaId?: string | number | null;
 
   @IsOptional()

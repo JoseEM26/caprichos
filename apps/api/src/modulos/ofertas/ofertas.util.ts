@@ -224,3 +224,18 @@ export function generarCodigoCuponUnico(codigoBase: string): string {
   const baseLimpia = codigoBase.trim().toUpperCase();
   return `${baseLimpia}-${sufijo}`;
 }
+
+/** Categorías a las que alcanza una oferta: la lista nueva o, en filas antiguas, la categoría única. */
+export function categoriasAlcance(o: {
+  alcance_categoria_ids?: bigint[] | null;
+  alcance_categoria_id?: bigint | null;
+}): bigint[] {
+  if (o.alcance_categoria_ids?.length) return o.alcance_categoria_ids;
+  return o.alcance_categoria_id ? [o.alcance_categoria_id] : [];
+}
+
+/** Ids de categoría que manda el admin (lista o id único), sin repetidos ni vacíos. */
+export function idsCategoriaDto(dto: { alcanceCategoriaIds?: (string | number)[] | null; alcanceCategoriaId?: string | number | null }): bigint[] {
+  const crudos = dto.alcanceCategoriaIds ?? (dto.alcanceCategoriaId ? [dto.alcanceCategoriaId] : []);
+  return [...new Set(crudos.filter((x) => x !== '' && x !== null && x !== undefined).map((x) => String(x)))].map((x) => BigInt(x));
+}

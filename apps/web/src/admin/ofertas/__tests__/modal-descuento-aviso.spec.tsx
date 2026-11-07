@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ModalDescuento } from '../ModalDescuento';
 
@@ -35,5 +35,28 @@ describe('ModalDescuento (aviso de delivery)', () => {
     expect(screen.getByTestId('advertencia-delivery')).toBeTruthy();
     fireEvent.change(campo, { target: { value: 'Reparto gratis' } });
     expect(screen.getByTestId('advertencia-delivery')).toBeTruthy();
+  });
+});
+
+describe('ModalDescuento (varias categorías)', () => {
+  it('permite marcar varias categorías y guarda sus ids', async () => {
+    const onGuardar = vi.fn().mockResolvedValue(undefined);
+    const categorias = [
+      { id: '1', nombre: 'Frappes' },
+      { id: '2', nombre: 'Waffles' },
+      { id: '3', nombre: 'Café' },
+    ];
+    render(<ModalDescuento abierto descuentoAEditar={null} onCerrar={() => {}} onGuardar={onGuardar} categorias={categorias} />);
+    fireEvent.change(screen.getByLabelText(/Nombre del descuento/), { target: { value: 'Dulces' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Varias categorías' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Waffles' }));
+    expect(screen.getByRole('button', { name: 'Frappes' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Waffles' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Café' })).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByTestId('btn-guardar-descuento'));
+    const dialogo = await screen.findByRole('dialog', { name: 'Confirmar acción' });
+    fireEvent.click(within(dialogo).getAllByRole('button').find((b) => /guardar|sí|confirm/i.test(b.textContent || ''))!);
+    await vi.waitFor(() => expect(onGuardar).toHaveBeenCalled());
+    expect(onGuardar.mock.calls[0][0].alcanceCategoriaIds).toEqual(['1', '2']);
   });
 });

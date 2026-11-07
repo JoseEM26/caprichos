@@ -113,7 +113,15 @@ export function buscarOfertaParaProducto(
 
     const tipo = String(o.tipo || '').toUpperCase();
     const alcanceProdId = o.alcance_producto_id ? String(o.alcance_producto_id) : (o.alcanceProductoId ? String(o.alcanceProductoId) : null);
-    const alcanceCatId = o.alcance_categoria_id ? String(o.alcance_categoria_id) : (o.alcanceCategoriaId ? String(o.alcanceCategoriaId) : null);
+    const alcanceCatIds: string[] = o.alcance_categoria_ids?.length
+      ? o.alcance_categoria_ids.map(String)
+      : o.alcanceCategoriaIds?.length
+        ? o.alcanceCategoriaIds.map(String)
+        : o.alcance_categoria_id
+          ? [String(o.alcance_categoria_id)]
+          : o.alcanceCategoriaId
+            ? [String(o.alcanceCategoriaId)]
+            : [];
 
     // Caso A: COMBO
     if (tipo === 'COMBO') {
@@ -183,8 +191,8 @@ export function buscarOfertaParaProducto(
     if (tipo === 'LLEVA_PAGA' || /^\d+x\d+$/i.test(tipo)) {
       const coincide =
         (alcanceProdId && alcanceProdId === prodIdStr) ||
-        (alcanceCatId && alcanceCatId === catIdStr) ||
-        (!alcanceProdId && !alcanceCatId);
+        (alcanceCatIds.length > 0 && alcanceCatIds.includes(catIdStr)) ||
+        (!alcanceProdId && !alcanceCatIds.length);
 
       if (coincide && precioProd > 0) {
         const lleva = Number(o.lleva || 2);
@@ -211,8 +219,8 @@ export function buscarOfertaParaProducto(
     if (tipo === 'DESCUENTO') {
       const coincide =
         (alcanceProdId && alcanceProdId === prodIdStr) ||
-        (alcanceCatId && alcanceCatId === catIdStr) ||
-        (!alcanceProdId && !alcanceCatId);
+        (alcanceCatIds.length > 0 && alcanceCatIds.includes(catIdStr)) ||
+        (!alcanceProdId && !alcanceCatIds.length);
 
       if (coincide && precioProd > 0) {
         const tipoDesc = String(o.descuentoTipo || o.descuento_tipo || 'PORCENTAJE').toUpperCase();

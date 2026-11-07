@@ -1575,6 +1575,8 @@ model Oferta {
   lleva                Int?
   paga                 Int?
   alcance_categoria_id BigInt?
+  // Varias categorías (descuento solo en ellas). alcance_categoria_id queda con la primera por compatibilidad
+  alcance_categoria_ids BigInt[]      @default([])
   alcance_producto_id  BigInt?
   descuento_tipo       String?        // PORCENTAJE | MONTO
   descuento_valor      Decimal?       @db.Decimal(12, 2)

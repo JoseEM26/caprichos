@@ -974,6 +974,30 @@ describe('OfertasService', () => {
       expect(res.detalles[0].nombre).toBe('20% en Frappés');
     });
 
+    it('descuento en varias categorías: aplica solo a las marcadas; una sola (fila antigua) sigue igual', async () => {
+      prismaMock.reglaAcumulacion.upsert.mockResolvedValue({ id: 1, cupon_con_descuento: false });
+      const base = {
+        id: 5n, tipo: 'DESCUENTO', nombre: '10% en dos', descuento_tipo: 'PORCENTAJE',
+        descuento_valor: new Prisma.Decimal(10), alcance_producto_id: null, compra_minima: null,
+        dias: [], hora_desde: null, hora_hasta: null, fecha_desde: null, fecha_hasta: null,
+        canales: ['CARTA'], limite_usos: null, usos_actuales: 0, activo: true,
+      };
+      const lineas = [
+        { productoId: 10n, categoriaId: 1n, cantidad: 1, subtotal: 30.0, precioUnitario: 30.0 },
+        { productoId: 20n, categoriaId: 2n, cantidad: 1, subtotal: 20.0, precioUnitario: 20.0 },
+        { productoId: 30n, categoriaId: 3n, cantidad: 1, subtotal: 50.0, precioUnitario: 50.0 },
+      ];
+      prismaMock.oferta.findMany.mockResolvedValueOnce([
+        { ...base, alcance_categoria_id: 1n, alcance_categoria_ids: [1n, 2n] },
+      ]);
+      const varias = await service.calcularDescuentosParaPedido({ subtotal: 100, lineas, canal: 'CARTA' });
+      expect(varias.descuentoTotal).toBe(5.0); // 10% de 30 + 20, la categoría 3 no cuenta
+
+      prismaMock.oferta.findMany.mockResolvedValueOnce([{ ...base, alcance_categoria_id: 1n, alcance_categoria_ids: [] }]);
+      const una = await service.calcularDescuentosParaPedido({ subtotal: 100, lineas, canal: 'CARTA' });
+      expect(una.descuentoTotal).toBe(3.0);
+    });
+
     it('excluye productos con no_suma_beneficios = true (DT-65)', async () => {
       prismaMock.reglaAcumulacion.upsert.mockResolvedValueOnce({
         id: 1,

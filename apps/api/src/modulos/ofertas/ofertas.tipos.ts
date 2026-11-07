@@ -55,6 +55,9 @@ export interface OfertaItem {
   lleva: number | null;
   paga: number | null;
   alcanceCategoriaId: string | null;
+  /** Todas las categorías del alcance (una sola marcada = lista de uno). */
+  alcanceCategoriaIds: string[];
+  categoriasNombres?: string[];
   alcanceProductoId: string | null;
   descuentoTipo: TipoDescuento | null;
   descuentoValor: number | null;
@@ -160,6 +163,7 @@ export interface DetalleDescuentoAplicado {
   montoDescontado: number;
   alcance?: 'TODA' | 'CATEGORIA' | 'PRODUCTO';
   alcanceId?: string | null;
+  alcanceIds?: string[];
   lineasAfectadas?: Array<{
     productoId: string;
     cantidad: number;
