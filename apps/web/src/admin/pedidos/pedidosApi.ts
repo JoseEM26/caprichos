@@ -13,6 +13,65 @@ export type EstadoPedido =
 
 export type ColorEspera = 'verde' | 'naranja' | 'rojo';
 
+/** Línea del editor de pedidos tal como la guardó el servidor (con la selección que se eligió). */
+export interface LineaEdicionPedido {
+  lineaId: string;
+  productoId: string | null;
+  nombre: string;
+  tamano: string | null;
+  tamanoId: string | null;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+  opciones: Array<{ id: string | null; nombre: string; grupo?: string; precioExtra: number }>;
+  sabores: Array<{ saborId: string; nombre: string; cantidad: number }>;
+  nota: string | null;
+  personas: string[];
+  ofertaId: string | null;
+  /** Combo: solo se puede quitar o dejar tal cual */
+  bloqueada: boolean;
+  partesCombo: Array<{ nombre: string; cantidad: number }>;
+}
+
+export interface DatosEdicionPedido {
+  id: string;
+  codigo: string;
+  version: number;
+  estado: string;
+  modalidad: 'DELIVERY' | 'RECOGER' | 'MESA';
+  canal: string;
+  mesa?: string | null;
+  cliente: { nombre: string | null; telefono: string | null };
+  entrega: { direccion: string | null; referencia: string | null; lat: number | null; lng: number | null; origen: string | null; zona: string | null };
+  subtotal: number;
+  descuento: number;
+  envio: number | null;
+  total: number;
+  propina: number;
+  tieneVoucher: boolean;
+  editandoPor: { partyId: string; nombre: string } | null;
+  lineas: LineaEdicionPedido[];
+}
+
+export interface EdicionPedidoPayload {
+  version: number;
+  lineas: Array<{
+    lineaId?: string;
+    productoId: string | number;
+    tamanoId?: string | number;
+    cantidad: number;
+    opciones?: (string | number)[];
+    nota?: string;
+    ofertaId?: string;
+    comboElecciones?: { parteId: string | number; productoId: string | number; saborId?: string | number }[];
+    personas?: string[];
+    sabores?: { saborId: string | number; cantidad: number }[];
+  }>;
+  cliente?: { nombre: string; telefono?: string };
+  modalidad?: 'DELIVERY' | 'RECOGER' | 'MESA';
+  entrega?: { direccion?: string; referencia?: string; lat?: number; lng?: number; origen?: 'GPS' | 'ESCRITA' | 'MAPA' | 'WHATSAPP' | 'ENLACE' };
+}
+
 export interface LineaPedidoOpcion {
   id?: string;
   grupo?: string;
@@ -380,6 +439,21 @@ export const pedidosApi = {
       ...(sinVoucher ? { sinVoucher } : {}),
       ...(codigosOperacion?.length ? { codigosOperacion } : {}),
     });
+  },
+
+  /** «Editar pedido»: datos del pedido (líneas con su selección, cliente, entrega) y su versión. 409 si ya no se puede editar. */
+  async obtenerParaEditar(id: string | number): Promise<DatosEdicionPedido> {
+    return api.get<DatosEdicionPedido>(`/admin/pedidos/${id}/editar`);
+  },
+
+  /** Guarda la edición. 409 PEDIDO_MODIFICADO si alguien lo cambió antes (version vieja). */
+  async guardarEdicion(id: string | number, dto: EdicionPedidoPayload): Promise<{ id: string; codigo: string; version: number; estado: string; total: number; totalAnterior: number; cambios: string[] }> {
+    return api.post(`/admin/pedidos/${id}/editar`, dto);
+  },
+
+  /** Avisa a las demás pantallas que este usuario abrió (true) o cerró (false) el editor del pedido. */
+  async avisarEditando(id: string | number, activo: boolean): Promise<void> {
+    await api.post(`/admin/pedidos/${id}/editando`, { activo });
   },
 
   async crearPedidoAdmin(

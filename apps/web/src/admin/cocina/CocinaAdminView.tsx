@@ -343,6 +343,11 @@ export function CocinaAdminView() {
     cargarAreas();
     if (modo === 'area') cargarComandas(areaSeleccionada);
   });
+  // Un pedido editado cambia sus líneas y su comanda: se recarga igual que con un cambio de estado
+  useEventos('pedido:editado', () => {
+    cargarAreas();
+    if (modo === 'area') cargarComandas(areaSeleccionada);
+  });
 
   // Respaldo y cambios que no traían recarga: agotados, avance del salón, reconexión, volver a la pestaña
   useTiempoReal(['carta:disponibilidad', 'cocina:comanda-actualizada', 'pedido:progreso', 'pedido:pago'], () => {

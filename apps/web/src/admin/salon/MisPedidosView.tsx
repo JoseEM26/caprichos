@@ -186,6 +186,7 @@ export function MisPedidosView() {
 
   useEventos('pedido:nuevo', cargar);
   useEventos('pedido:estado', cargar);
+  useEventos('pedido:editado', cargar);
   useEventos('pedido:pago', cargar);
   // Cambio de área en cocina (despeje o devolución) y «entregado en mesa»: refrescan el progreso
   useEventos('cocina:comanda', cargar);

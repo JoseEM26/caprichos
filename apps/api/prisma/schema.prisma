@@ -677,6 +677,8 @@ model Pedido {
   fecha_dia              DateTime?               @db.Date
   // Propina opcional del cliente: va APARTE (no suma a subtotal/total, ni comprobante, ni puntos). Se cobra junto con el pedido
   propina                Decimal                @default(0) @db.Decimal(12, 2)
+  // Control de versión optimista de «Editar pedido»: sube 1 con cada edición; guardar con una versión vieja da 409 PEDIDO_MODIFICADO
+  version                Int                    @default(0)
 
   party                 Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
