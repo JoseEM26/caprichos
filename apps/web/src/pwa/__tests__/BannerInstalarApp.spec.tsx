@@ -36,10 +36,13 @@ describe('BannerInstalarApp', () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia;
   });
 
-  it('no aparece si el navegador todavía no dio el evento de instalar', async () => {
+  it('sin el evento del navegador (otro equipo, aviso ya usado) sigue ofreciendo los pasos manuales', async () => {
     const { BannerInstalarApp } = await cargarBanner();
-    const { container } = render(<BannerInstalarApp />);
-    expect(container).toBeEmptyDOMElement();
+    render(<BannerInstalarApp />);
+    expect(screen.getByRole('button', { name: /Instalar app/ })).toBeDefined();
+    // el panel del local tampoco pierde la opción
+    render(<BannerInstalarApp compacto />);
+    expect(screen.getAllByRole('button', { name: /Instalar app/ }).length).toBeGreaterThan(1);
   });
 
   it('aparece con el botón Instalar cuando llega el evento y llama al aviso del navegador', async () => {

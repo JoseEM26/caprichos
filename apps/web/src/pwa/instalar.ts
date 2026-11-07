@@ -62,9 +62,13 @@ export function descartarInstalar(): void {
   avisar();
 }
 
-/** Hay algo que ofrecer: el botón de instalar (Chrome/Android) o la guía (iOS), y no está ya instalada. */
+/**
+ * Siempre hay algo que ofrecer mientras no esté instalada EN ESTE equipo: el aviso del navegador, la guía de iOS o los pasos
+ * manuales. Chrome da el aviso una sola vez por carga y no lo da si ya se instaló o se descartó antes, así que depender del
+ * evento hacía desaparecer la opción en otros equipos o tras cerrar el aviso.
+ */
 export function puedeInstalar(): boolean {
-  return !estaInstalada() && (diferido !== null || esIos());
+  return !estaInstalada();
 }
 
 /** true si el navegador da el aviso de instalar (no iOS); false si solo cabe la guía. */

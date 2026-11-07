@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useState, type CSSProperties } from 'react';
+import { BotonInstalarApp } from './BotonInstalarApp';
 import {
   descartarInstalar,
   esIos,
@@ -38,6 +39,8 @@ export function BannerInstalarApp({ compacto = false }: { compacto?: boolean }) 
   if (!compacto && estaDescartado()) return null;
 
   const ios = !tieneAvisoNativo() && esIos();
+  // Sin aviso del navegador y sin iOS (otro equipo, aviso ya usado o descartado): el botón abre los pasos manuales
+  const manual = !tieneAvisoNativo() && !ios;
 
   const pulsar = async () => {
     if (ios) {
@@ -46,6 +49,8 @@ export function BannerInstalarApp({ compacto = false }: { compacto?: boolean }) 
     }
     await instalar();
   };
+
+  if (compacto && manual) return <BotonInstalarApp />;
 
   if (compacto) {
     return (
@@ -85,7 +90,8 @@ export function BannerInstalarApp({ compacto = false }: { compacto?: boolean }) 
           {ios ? `Así pides más rápido, desde tu pantalla de inicio. ${GUIA_IOS}` : 'Así pides más rápido, desde tu pantalla de inicio.'}
         </div>
       </div>
-      {!ios && (
+      {manual && <BotonInstalarApp />}
+      {!ios && !manual && (
         <button type="button" onClick={pulsar} style={botonInstalar}>
           Instalar
         </button>

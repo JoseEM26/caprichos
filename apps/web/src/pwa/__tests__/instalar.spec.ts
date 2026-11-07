@@ -41,7 +41,8 @@ describe('instalar (PWA)', () => {
   it('no ofrece nada hasta que llega el evento diferido', async () => {
     const m = await cargar();
     m.iniciarCapturaInstalar();
-    expect(m.puedeInstalar()).toBe(false);
+    // sin evento sigue ofreciendo los pasos manuales (otro equipo, aviso ya usado)
+    expect(m.puedeInstalar()).toBe(true);
     expect(m.tieneAvisoNativo()).toBe(false);
   });
 

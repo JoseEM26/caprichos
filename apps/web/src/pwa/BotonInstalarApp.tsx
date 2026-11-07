@@ -146,7 +146,7 @@ function Instrucciones() {
           Abre el menú <strong>⋮</strong> del navegador (arriba a la derecha).
         </Paso>
         <Paso n={2}>
-          Elige <strong>«Instalar app»</strong> o <strong>«Añadir a pantalla de inicio»</strong>.
+          Elige <strong>«Instalar app»</strong>, <strong>«Instalar Caprichos»</strong> o <strong>«Añadir a pantalla de inicio»</strong>. En computadora también sale un ícono de instalar al final de la barra de direcciones.
         </Paso>
       </ol>
       <p style={{ margin: 0, fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft)' }}>

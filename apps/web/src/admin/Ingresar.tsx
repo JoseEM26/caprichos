@@ -3,6 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useSesion } from '../comun/sesion';
 import { ErrorApi } from '../comun/api';
 import { destinoTrasIngresar } from '../comun/destinoTrasIngresar';
+import { BotonInstalarApp } from '../pwa/BotonInstalarApp';
 import {
   FRASE_INGRESO_DEFECTO,
   IMAGEN_INGRESO_DEFECTO,
@@ -445,6 +446,11 @@ export function Ingresar() {
           {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
         </button>
       </form>
+
+      {/* Instalar la app desde cualquier equipo, sin iniciar sesión */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+        <BotonInstalarApp />
+      </div>
 
       {!paraAsistencia && (
         <button
