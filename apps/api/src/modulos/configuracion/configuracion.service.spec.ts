@@ -310,6 +310,20 @@ describe('ConfiguracionService', () => {
     });
   });
 
+  describe('lectura de vouchers con IA', () => {
+    it('permite guardar voucher_ia_activo (true -> «si») y los datos de las cuentas', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockResolvedValue({ clave: 'voucher_ia_activo', valor: 'si' });
+      await service.actualizar('voucher_ia_activo', true, adminAuth);
+      expect(prismaMock.parametro.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { clave: 'voucher_ia_activo' }, update: { valor: 'si' } }),
+      );
+      for (const clave of ['voucher_titular_nombre', 'voucher_yape_numero', 'voucher_plin_numero']) {
+        await expect(service.actualizar(clave, '977503006', adminAuth)).resolves.toBeDefined();
+      }
+    });
+  });
+
   describe('avisos: sonido y «Marcar todas leídas»', () => {
     beforeEach(() => {
       prismaMock.parametro.findUnique.mockResolvedValue(null);

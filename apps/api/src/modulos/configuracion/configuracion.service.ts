@@ -128,6 +128,11 @@ export const RANGOS_PROTECCION_SPAM: Record<string, [number, number, string]> = 
 };
 
 export const CLAVES_TEXTO = [
+  // Lectura de vouchers con IA: interruptor y datos de las cuentas que reciben el pago
+  'voucher_ia_activo',
+  'voucher_titular_nombre',
+  'voucher_yape_numero',
+  'voucher_plin_numero',
   'envio_gratis_modo',
   'reprog_recargo_modo',
   'carta_aviso_entrada',
@@ -323,6 +328,7 @@ export class ConfiguracionService {
         clave === 'carta_invitado_activo' ||
         clave === 'chatbot_activo' ||
         clave === 'chatbot_ia_activo' ||
+        clave === 'voucher_ia_activo' ||
         clave === 'reserva_web_activa' ||
         clave === 'chatbot_avisos_equipo_activo' ||
         clave === 'cocina_confirmar_despejar' ||
