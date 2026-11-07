@@ -67,7 +67,8 @@ export function ModalDescuento({
   const subidaFoto = useSubidaArchivo();
   const [confirmarQuitarFoto, setConfirmarQuitarFoto] = useState(false);
   const [aplica, setAplica] = useState<'toda' | 'cat' | 'prod'>('toda');
-  const [categoria, setCategoria] = useState('');
+  // Nombres de las categorías marcadas (una o varias)
+  const [categoria, setCategoria] = useState<string[]>([]);
   const [producto, setProducto] = useState('');
   const [productoBusqueda, setProductoBusqueda] = useState('');
   const [productoComboAbierto, setProductoComboAbierto] = useState(false);
@@ -117,15 +118,23 @@ export function ModalDescuento({
 
       if (descuentoAEditar.alcanceCategoriaId || descuentoAEditar.categoriaNombre) {
         setAplica('cat');
-        setCategoria(descuentoAEditar.categoriaNombre || '');
+        const idsGuardados = descuentoAEditar.alcanceCategoriaIds?.length
+          ? descuentoAEditar.alcanceCategoriaIds
+          : descuentoAEditar.alcanceCategoriaId
+            ? [descuentoAEditar.alcanceCategoriaId]
+            : [];
+        const nombresGuardados = idsGuardados
+          .map((id) => categorias.find((c) => String(c.id) === String(id))?.nombre)
+          .filter((n): n is string => !!n);
+        setCategoria(nombresGuardados.length ? nombresGuardados : descuentoAEditar.categoriaNombre ? [descuentoAEditar.categoriaNombre] : []);
         setProducto('');
       } else if (descuentoAEditar.alcanceProductoId || descuentoAEditar.productoNombre) {
         setAplica('prod');
         setProducto(descuentoAEditar.productoNombre || '');
-        setCategoria('');
+        setCategoria([]);
       } else {
         setAplica('toda');
-        setCategoria('');
+        setCategoria([]);
         setProducto('');
       }
 
@@ -153,7 +162,7 @@ export function ModalDescuento({
       setValor('10');
       setMinima('');
       setAplica('toda');
-      setCategoria(listaCategoriasNombres[0] || '');
+      setCategoria(listaCategoriasNombres[0] ? [listaCategoriasNombres[0]] : []);
       setProducto('');
       setDias([]);
       setHoraDesde('');
@@ -169,7 +178,7 @@ export function ModalDescuento({
       setProductoComboAbierto(false);
       setProductoBusqueda('');
     }
-  }, [descuentoAEditar, abierto, listaCategoriasNombres]);
+  }, [descuentoAEditar, abierto, listaCategoriasNombres, categorias]);
 
   // Esc cierra primero las confirmaciones abiertas (el modal queda bloqueado mientras tanto)
   useEffect(() => {
@@ -213,8 +222,9 @@ export function ModalDescuento({
     let prodEjemplo = null;
     if (aplica === 'prod' && producto) {
       prodEjemplo = productosDisponibles.find((p) => p.nombre.toLowerCase() === producto.toLowerCase());
-    } else if (aplica === 'cat' && categoria) {
-      prodEjemplo = productosDisponibles.find((p) => p.categoria && p.categoria.toLowerCase() === categoria.toLowerCase());
+    } else if (aplica === 'cat' && categoria.length) {
+      const elegidas = categoria.map((c) => c.toLowerCase());
+      prodEjemplo = productosDisponibles.find((p) => p.categoria && elegidas.includes(p.categoria.toLowerCase()));
     }
     if (!prodEjemplo && productosDisponibles.length > 0) {
       prodEjemplo = productosDisponibles[0];
@@ -373,7 +383,7 @@ export function ModalDescuento({
   // Errores pendientes por pestaña (sin efectos): null = la pestaña está bien.
   const errorQue = (): string | null => {
     if (!nombre.trim()) return 'Escribe el nombre del descuento.';
-    if (aplica === 'cat' && !categoria) return 'Elige la categoría.';
+    if (aplica === 'cat' && categoria.length === 0) return 'Elige al menos una categoría.';
     if (aplica === 'prod' && !producto) return 'Elige el producto.';
     const valNum = parseFloat(valor.replace(',', '.'));
     if (isNaN(valNum) || valNum <= 0) return tipo === 'pct' ? 'El porcentaje va de 1 a 100.' : 'El monto debe ser mayor que 0.';
@@ -434,12 +444,18 @@ export function ModalDescuento({
       });
       const valNum = parseFloat(valor.replace(',', '.'));
       const prodObj = productosDisponibles.find((p) => p.nombre.toLowerCase() === producto.toLowerCase());
+      const idsCategoriasElegidas = categoria
+        .map((n) => categorias.find((c) => c.nombre === n)?.id)
+        .filter((id): id is string => !!id);
 
       const payload = {
         nombre: nombre.trim(),
         tipo: 'DESCUENTO',
         aplicaA: aplica === 'toda' ? 'TODA_LA_CARTA' : aplica === 'cat' ? 'CATEGORIA' : 'PRODUCTO',
-        categoriaNombre: aplica === 'cat' ? categoria : undefined,
+        categoriaNombre: aplica === 'cat' ? categoria.join(', ') : undefined,
+        // El servidor guarda el alcance por id; vacío limpia el alcance anterior al editar
+        alcanceCategoriaIds: aplica === 'cat' ? idsCategoriasElegidas : [],
+        alcanceProductoId: aplica === 'prod' && prodObj ? prodObj.id : null,
         productoId: aplica === 'prod' && prodObj ? prodObj.id : undefined,
         productoNombre: aplica === 'prod' ? producto : undefined,
         descuentoTipo: tipo === 'pct' ? 'PORCENTAJE' : 'MONTO',
@@ -482,7 +498,7 @@ export function ModalDescuento({
     descuentoValor: parseFloat(valor.replace(',', '.')) || 0,
     compraMinima: parseFloat(minima) || 0,
     aplicaA: aplica === 'toda' ? 'TODA_LA_CARTA' : aplica === 'cat' ? 'CATEGORIA' : 'PRODUCTO',
-    categoriaNombre: aplica === 'cat' ? categoria : undefined,
+    categoriaNombre: aplica === 'cat' ? categoria.join(', ') : undefined,
     productoNombre: aplica === 'prod' ? producto : undefined,
     imagenUrl: fotoUrl,
     imagenArchivoId: fotoArchivoId,
@@ -676,7 +692,7 @@ export function ModalDescuento({
                     cursor: 'pointer',
                   }}
                 >
-                  Una categoría
+                  Varias categorías
                 </button>
                 <button
                   type="button"
@@ -707,8 +723,9 @@ export function ModalDescuento({
                       <button
                         key={cat}
                         type="button"
+                        aria-pressed={categoria.includes(cat)}
                         onClick={() => {
-                          setCategoria(cat);
+                          setCategoria((prev) => (prev.includes(cat) ? prev.filter((x) => x !== cat) : [...prev, cat]));
                           setMensajeError('');
                         }}
                         style={{
@@ -716,8 +733,8 @@ export function ModalDescuento({
                           padding: '0 12px',
                           borderRadius: '9999px',
                           border: '1.5px solid var(--cp-navy)',
-                          backgroundColor: categoria === cat ? 'var(--cp-navy)' : 'transparent',
-                          color: categoria === cat ? 'var(--cp-cream)' : 'var(--cp-navy)',
+                          backgroundColor: categoria.includes(cat) ? 'var(--cp-navy)' : 'transparent',
+                          color: categoria.includes(cat) ? 'var(--cp-cream)' : 'var(--cp-navy)',
                           fontWeight: 700,
                           fontSize: '12px',
                           cursor: 'pointer',
@@ -986,7 +1003,7 @@ export function ModalDescuento({
             >
               <strong>Beneficio configurado:</strong> Descuento de{' '}
               <strong>{tipo === 'pct' ? `${valor || 0} %` : `S/ ${parseFloat(valor) ? parseFloat(valor).toFixed(2) : '0.00'}`}</strong>{' '}
-              {aplica === 'toda' ? 'en toda la carta' : aplica === 'cat' ? `en la categoría ${categoria}` : `en ${producto}`}.
+              {aplica === 'toda' ? 'en toda la carta' : aplica === 'cat' ? `en ${categoria.length === 1 ? 'la categoría' : 'las categorías'} ${categoria.join(', ')}` : `en ${producto}`}.
             </div>
           </div>
 </>

@@ -88,7 +88,7 @@ export function calcularMapaBeneficios(
           return true;
         }
         // Por categoría
-        if (o.alcanceCategoriaId && String(o.alcanceCategoriaId) === String(cat.id)) {
+        if ((o.alcanceCategoriaIds?.length ? o.alcanceCategoriaIds : [o.alcanceCategoriaId]).some((x) => x && String(x) === String(cat.id))) {
           return true;
         }
         return false;

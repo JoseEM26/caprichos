@@ -70,6 +70,8 @@ export interface OfertaItem {
   subtipo?: string | null;
   aplicaA?: 'TODA_LA_CARTA' | 'CATEGORIA' | 'PRODUCTO';
   alcanceCategoriaId?: string | null;
+  alcanceCategoriaIds?: string[];
+  categoriasNombres?: string[];
   alcanceProductoId?: string | null;
   categoriaId?: string | null;
   categoriaNombre?: string | null;

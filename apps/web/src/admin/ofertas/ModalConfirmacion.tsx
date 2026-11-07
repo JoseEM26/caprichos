@@ -1,3 +1,6 @@
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+
 interface ModalConfirmacionProps {
   abierto: boolean;
   titulo: string;
@@ -17,10 +20,19 @@ export function ModalConfirmacion({
   onConfirmar,
   onCancelar,
 }: ModalConfirmacionProps) {
+  useEffect(() => {
+    if (!abierto) return;
+    const alTeclear = (e: KeyboardEvent) => e.key === 'Escape' && onCancelar();
+    document.addEventListener('keydown', alTeclear);
+    return () => document.removeEventListener('keydown', alTeclear);
+  }, [abierto, onCancelar]);
+
   if (!abierto) return null;
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 90 }}>
+  // Portal al body con z-index por encima de los modales con pestañas (z 50/60): si quedaba debajo, la confirmación
+  // no se veía y el modal (bloqueado mientras hay una confirmación abierta) parecía imposible de cerrar.
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 5000 }}>
       {/* Fondo clickeable para cerrar */}
       <div
         onClick={onCancelar}
@@ -104,6 +116,7 @@ export function ModalConfirmacion({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

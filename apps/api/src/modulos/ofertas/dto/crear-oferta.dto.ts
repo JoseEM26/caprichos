@@ -119,6 +119,10 @@ export class CrearOfertaDto {
   paga?: number;
 
   @IsOptional()
+  @IsArray()
+  alcanceCategoriaIds?: (string | number)[] | null;
+
+  @IsOptional()
   alcanceCategoriaId?: string | number | null;
 
   @IsOptional()

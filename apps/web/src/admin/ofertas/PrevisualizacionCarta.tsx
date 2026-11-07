@@ -92,6 +92,7 @@ export function PrevisualizacionCarta({
       subtipo: oferta.subtipo || null,
       aplicaA: oferta.aplicaA || 'TODA_LA_CARTA',
       alcanceCategoriaId: oferta.alcanceCategoriaId || null,
+      alcanceCategoriaIds: oferta.alcanceCategoriaIds || [],
       alcanceProductoId: oferta.alcanceProductoId || null,
       categoriaId: oferta.categoriaId || null,
       categoriaNombre: oferta.categoriaNombre || null,

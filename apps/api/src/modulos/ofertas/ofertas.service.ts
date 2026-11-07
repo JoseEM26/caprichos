@@ -53,6 +53,8 @@ import {
   ofertaIncluyeCanal,
   formatearFecha,
   formatearHora,
+  categoriasAlcance,
+  idsCategoriaDto,
   generarCodigoCuponUnico,
   obtenerAhoraLima,
 } from './ofertas.util';
@@ -61,10 +63,11 @@ import { canalOfertaParaEnvio, CAMPOS_BENEFICIO_ENVIO } from './envio-gratis-pro
 
 /** Si la promoción (DESCUENTO o LLEVA_PAGA) alcanza a esta línea según su alcance: categoría, producto o toda la carta. */
 function alcanceCubreLinea(
-  d: { alcance_categoria_id: bigint | null; alcance_producto_id: bigint | null },
+  d: { alcance_categoria_id: bigint | null; alcance_categoria_ids?: bigint[]; alcance_producto_id: bigint | null },
   l: { productoId: bigint; categoriaId?: bigint | null },
 ): boolean {
-  if (d.alcance_categoria_id) return !!l.categoriaId && l.categoriaId === d.alcance_categoria_id;
+  const cats = categoriasAlcance(d);
+  if (cats.length) return !!l.categoriaId && cats.includes(l.categoriaId);
   if (d.alcance_producto_id) return l.productoId === d.alcance_producto_id;
   return true;
 }
@@ -359,7 +362,8 @@ export class OfertasService {
             : {
                 lleva: dto.lleva ?? null,
                 paga: dto.paga ?? null,
-                alcance_categoria_id: dto.alcanceCategoriaId ? BigInt(dto.alcanceCategoriaId) : null,
+                alcance_categoria_id: idsCategoriaDto(dto)[0] ?? null,
+                alcance_categoria_ids: idsCategoriaDto(dto),
                 alcance_producto_id: dto.alcanceProductoId ? BigInt(dto.alcanceProductoId) : null,
                 descuento_tipo: descTipoFinal ?? null,
                 descuento_valor: dto.descuentoValor !== undefined && dto.descuentoValor !== null ? new Prisma.Decimal(dto.descuentoValor) : null,
@@ -566,8 +570,10 @@ export class OfertasService {
     if (dto.descripcion !== undefined) data.descripcion = dto.descripcion?.trim() || null;
     if (dto.lleva !== undefined) data.lleva = dto.lleva;
     if (dto.paga !== undefined) data.paga = dto.paga;
-    if (dto.alcanceCategoriaId !== undefined) {
-      data.categoria = dto.alcanceCategoriaId ? { connect: { id: BigInt(dto.alcanceCategoriaId) } } : { disconnect: true };
+    if (dto.alcanceCategoriaIds !== undefined || dto.alcanceCategoriaId !== undefined) {
+      const ids = idsCategoriaDto(dto);
+      data.categoria = ids.length ? { connect: { id: ids[0] } } : { disconnect: true };
+      data.alcance_categoria_ids = ids;
     }
     if (dto.alcanceProductoId !== undefined) {
       data.producto = dto.alcanceProductoId ? { connect: { id: BigInt(dto.alcanceProductoId) } } : { disconnect: true };
@@ -630,6 +636,7 @@ export class OfertasService {
         descuento_tipo: null,
         descuento_valor: null,
         categoria: { disconnect: true },
+        alcance_categoria_ids: [],
         producto: { disconnect: true },
       });
     }
@@ -1836,10 +1843,8 @@ export class OfertasService {
         let baseLinea = 0;
         const elegibles = d.solo_primera_compra ? lineasSinPromo : lineasElegibles;
 
-        if (d.alcance_categoria_id) {
-          const matching = elegibles.filter(
-            (l) => l.categoriaId && l.categoriaId === d.alcance_categoria_id,
-          );
+        if (categoriasAlcance(d).length) {
+          const matching = elegibles.filter((l) => alcanceCubreLinea(d, l));
           for (const m of matching) {
             baseLinea += m.subtotal;
             lineasAfectadas.push({
@@ -1889,8 +1894,8 @@ export class OfertasService {
         let matching: typeof lineasElegibles = [];
         if (d.alcance_producto_id) {
           matching = lineasElegibles.filter((l) => l.productoId === d.alcance_producto_id);
-        } else if (d.alcance_categoria_id) {
-          matching = lineasElegibles.filter((l) => l.categoriaId && l.categoriaId === d.alcance_categoria_id);
+        } else if (categoriasAlcance(d).length) {
+          matching = lineasElegibles.filter((l) => alcanceCubreLinea(d, l));
         } else {
           matching = lineasElegibles;
         }
@@ -1935,8 +1940,9 @@ export class OfertasService {
             descuentoTipo: d.tipo === 'LLEVA_PAGA' ? 'MONTO' : (d.descuento_tipo as any),
             descuentoValor: d.tipo === 'LLEVA_PAGA' ? monto : Number(d.descuento_valor),
             montoDescontado: monto,
-            alcance: d.alcance_categoria_id ? 'CATEGORIA' : (d.alcance_producto_id ? 'PRODUCTO' : 'TODA'),
-            alcanceId: d.alcance_categoria_id ? d.alcance_categoria_id.toString() : (d.alcance_producto_id ? d.alcance_producto_id.toString() : null),
+            alcance: categoriasAlcance(d).length ? 'CATEGORIA' : (d.alcance_producto_id ? 'PRODUCTO' : 'TODA'),
+            alcanceIds: categoriasAlcance(d).map((x) => x.toString()),
+            alcanceId: categoriasAlcance(d).length ? categoriasAlcance(d)[0].toString() : (d.alcance_producto_id ? d.alcance_producto_id.toString() : null),
             lineasAfectadas,
           },
         };
@@ -2445,6 +2451,20 @@ export class OfertasService {
 
   /** Agrega `disponible`, `motivoAgotado` y por parte `opcionesDisponibles` a los combos (tiempo real, no toca `activo`). */
   private async conDisponibilidad(items: OfertaItem[]): Promise<OfertaItem[]> {
+    // Nombres de las categorías del alcance (una consulta); categoriaNombre las junta para los textos
+    const idsCat = [...new Set(items.flatMap((i) => i.alcanceCategoriaIds ?? []))];
+    if (idsCat.length) {
+      const cats = await this.prisma.categoria.findMany({
+        where: { id: { in: idsCat.map((x) => BigInt(x)) } },
+        select: { id: true, nombre: true },
+      });
+      const nombre = new Map(cats.map((c) => [c.id.toString(), c.nombre]));
+      for (const i of items) {
+        if (!i.alcanceCategoriaIds?.length) continue;
+        i.categoriasNombres = i.alcanceCategoriaIds.map((x) => nombre.get(x)).filter((n): n is string => !!n);
+        i.categoriaNombre = i.categoriasNombres.join(', ') || i.categoriaNombre;
+      }
+    }
     const combos = items.filter((i) => i.tipo === 'COMBO' && i.combosParte?.length);
     if (combos.length === 0) return items;
     const partes = combos.flatMap((c) => c.combosParte!);
@@ -2588,7 +2608,8 @@ export class OfertasService {
       descripcion: o.descripcion,
       lleva: o.lleva,
       paga: o.paga,
-      alcanceCategoriaId: o.alcance_categoria_id ? o.alcance_categoria_id.toString() : null,
+      alcanceCategoriaId: categoriasAlcance(o)[0]?.toString() ?? null,
+      alcanceCategoriaIds: categoriasAlcance(o).map((x) => x.toString()),
       alcanceProductoId: o.alcance_producto_id ? o.alcance_producto_id.toString() : null,
       descuentoTipo: o.descuento_tipo,
       descuentoValor: o.descuento_valor !== null ? Number(o.descuento_valor) : null,

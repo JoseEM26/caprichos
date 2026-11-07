@@ -11,7 +11,7 @@ import { anfitrionBloqueadoPorPaso, opcionesSinStock, pasoOpcionalOcultoPorStock
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
-import { estaVigente, formatearFecha, obtenerAhoraLima } from '../ofertas/ofertas.util';
+import { estaVigente, formatearFecha, obtenerAhoraLima, categoriasAlcance } from '../ofertas/ofertas.util';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import {
   CategoriaCarta,
@@ -444,7 +444,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           where: { activo: true, tipo: { in: ['DESCUENTO', 'LLEVA_PAGA'] } },
           select: {
             id: true, nombre: true, tipo: true, activo: true, alcance_producto_id: true,
-            alcance_categoria_id: true, dias: true, hora_desde: true, hora_hasta: true,
+            alcance_categoria_id: true, alcance_categoria_ids: true, dias: true, hora_desde: true, hora_hasta: true,
             fecha_desde: true, fecha_hasta: true, canales: true, limite_usos: true, usos_actuales: true,
           },
         })
@@ -469,7 +469,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           | 'EN_CURSO',
       };
     };
-    const generales = ofertas.filter((o) => !o.alcance_producto_id && !o.alcance_categoria_id).map(aItem);
+    const generales = ofertas.filter((o) => !o.alcance_producto_id && !categoriasAlcance(o).length).map(aItem);
 
     return productos.map((p) => ({
       id: p.id.toString(),
@@ -493,7 +493,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       quedan: p.controla_stock ? stockAdmin.quedan.get(p.id.toString()) ?? 0 : null,
       aperturaHoy: p.controla_stock ? stockAdmin.apertura.has(p.id.toString()) : null,
       promociones: ofertas
-        .filter((o) => o.alcance_producto_id === p.id || (!o.alcance_producto_id && o.alcance_categoria_id === p.categoria_id))
+        .filter((o) => o.alcance_producto_id === p.id || (!o.alcance_producto_id && categoriasAlcance(o).includes(p.categoria_id)))
         .map(aItem),
       promocionesGenerales: generales,
       fotoUrl: obtenerFotoUrl(p.foto_archivo),
