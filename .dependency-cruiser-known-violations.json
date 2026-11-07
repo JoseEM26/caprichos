@@ -1,0 +1,3458 @@
+[
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/acceso/acceso.module.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/acceso/mi-perfil.service.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/acceso/mi-perfil.service.ts",
+    "to": "apps/api/src/modulos/correo/avisos-mensajes.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/acceso/mi-perfil.service.ts",
+    "to": "apps/api/src/modulos/usuarios/usuarios.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/almacen/almacen.controller.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/requiere-codigo-supervisor.decorator.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/almacen/almacen.module.ts",
+    "to": "apps/api/src/modulos/stock/stock.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/almacen/almacen.module.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/supervisor-codigo.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/almacen/almacen.service.ts",
+    "to": "apps/api/src/modulos/stock/producto-controlado.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/almacen/almacen.service.ts",
+    "to": "apps/api/src/modulos/stock/stock.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/almacen/almacen.service.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/supervisor-codigo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/almacen/dto/merma-producto.dto.ts",
+    "to": "apps/api/src/modulos/stock/producto-controlado.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/asistencia/asistencia-selfies.tarea.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ayuda-admin/ayuda-admin.module.ts",
+    "to": "apps/api/src/modulos/chatbot/ia/chatbot-ia.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ayuda-admin/ayuda-admin.service.ts",
+    "to": "apps/api/src/modulos/chatbot/ia/chatbot-ia.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ayuda-admin/ayuda-admin.service.ts",
+    "to": "apps/api/src/modulos/chatbot/ia/ia-consumo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ayuda-admin/ayuda-admin.service.ts",
+    "to": "apps/api/src/modulos/chatbot/ia/ia-privacidad.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ayuda-admin/ayuda-admin.service.ts",
+    "to": "apps/api/src/modulos/chatbot/ia/tipos-ia.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja-aviso-apertura.service.ts",
+    "to": "apps/api/src/modulos/local/local.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja-aviso-apertura.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.controller.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/requiere-codigo-supervisor.decorator.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.module.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.module.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.module.ts",
+    "to": "apps/api/src/modulos/impresion/impresion.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.module.ts",
+    "to": "apps/api/src/modulos/local/local.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.module.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.module.ts",
+    "to": "apps/api/src/modulos/salon/salon.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.module.ts",
+    "to": "apps/api/src/modulos/stock/stock.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/caja.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/chatbot/conversacion/validar-pago-salida.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/clientes/puntos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/impresion/impresion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/pedidos/delivery-ubicacion.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/propinas/propinas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/salon/salon.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/stock/stock.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/supervisor-codigo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/cobros.service.ts",
+    "to": "apps/api/src/modulos/usuarios/usuarios.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/caja/comprobante-pago.util.ts",
+    "to": "apps/api/src/modulos/pedidos/pago-plan.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/catalogo/catalogo.service.ts",
+    "to": "apps/api/src/modulos/cocina/opcion-menos-pedida.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/catalogo/catalogo.service.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/catalogo/catalogo.service.ts",
+    "to": "apps/api/src/modulos/stock/opcion-requiere.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/catalogo/catalogo.service.ts",
+    "to": "apps/api/src/modulos/stock/producto-controlado.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/adaptadores/whatsapp-meta.adaptador.ts",
+    "to": "apps/api/src/modulos/catalogo/catalogo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/adaptadores/whatsapp-meta.adaptador.ts",
+    "to": "apps/api/src/modulos/catalogo/imagen-whatsapp.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/avisos-internos/alertas-espera.service.ts",
+    "to": "apps/api/src/modulos/impresion/estado-impresion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/avisos-internos/alertas-espera.service.ts",
+    "to": "apps/api/src/modulos/stock/control-almacen.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.module.ts",
+    "to": "apps/api/src/modulos/configuracion/configuracion.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.module.ts",
+    "to": "apps/api/src/modulos/correo/correo.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.service.ts",
+    "to": "apps/api/src/modulos/configuracion/configuracion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.service.ts",
+    "to": "apps/api/src/modulos/correo/avisos-equipo-correo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.service.ts",
+    "to": "apps/api/src/modulos/stock/control-almacen.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.service.ts",
+    "to": "apps/api/src/modulos/usuarios/alertas-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/acceso/acceso.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/catalogo/catalogo.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/direcciones/direcciones.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/local/local.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/reservas/reservas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/vouchers/vouchers.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "to": "apps/api/src/modulos/zonas/zonas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/cierre-comercial.util.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/catalogo/catalogo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/clientes/direcciones-cliente.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/clientes/puntos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/local/local.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/mensajes/utilidades/nombre-contacto.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/pedidos/seguimiento.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/reservas/notificacion-solicitud.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/reservas/reservas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/ejecutor-conversacion.service.ts",
+    "to": "apps/api/src/modulos/zonas/zonas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/flujos/pedido/combo-bot.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/flujos/pedido/flujo-pedido.ts",
+    "to": "apps/api/src/modulos/propinas/propinas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/flujos/reserva/flujo-reserva.ts",
+    "to": "apps/api/src/modulos/reservas/horario-reserva.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/maquina-estados.ts",
+    "to": "apps/api/src/modulos/pedidos/seguimiento.tokens.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/vista-previa-pedido.util.ts",
+    "to": "apps/api/src/modulos/ofertas/envio-gratis-promo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/conversacion/vista-previa-pedido.util.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/ia/chatbot-ia.module.ts",
+    "to": "apps/api/src/modulos/catalogo/catalogo.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/ia/chatbot-ia.module.ts",
+    "to": "apps/api/src/modulos/local/local.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/ia/chatbot-ia.module.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/ia/chatbot-ia.module.ts",
+    "to": "apps/api/src/modulos/zonas/zonas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/ia/ia-herramientas.service.ts",
+    "to": "apps/api/src/modulos/catalogo/catalogo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/ia/ia-herramientas.service.ts",
+    "to": "apps/api/src/modulos/local/local.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/ia/ia-herramientas.service.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/ia/ia-herramientas.service.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/ia/ia-herramientas.service.ts",
+    "to": "apps/api/src/modulos/zonas/zonas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/avisos-pedido.service.ts",
+    "to": "apps/api/src/modulos/clientes/cliente-del-pedido.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/avisos-pedido.service.ts",
+    "to": "apps/api/src/modulos/pedidos/seguimiento.tokens.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/avisos-pedido.service.ts",
+    "to": "apps/api/src/modulos/repartos/eta-entrega.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/carrusel.util.ts",
+    "to": "apps/api/src/modulos/catalogo/imagen-inicial.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/chatbot-planificador.service.ts",
+    "to": "apps/api/src/modulos/repartos/recargo-reprogramacion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/outbox-whatsapp.service.ts",
+    "to": "apps/api/src/modulos/impresion/estado-impresion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/outbox-whatsapp.service.ts",
+    "to": "apps/api/src/modulos/mensajes/utilidades/error-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/quejas-whatsapp.service.ts",
+    "to": "apps/api/src/modulos/mensajes/utilidades/nombre-contacto.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/recordatorio-reservas.tarea.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/recordatorio-reservas.tarea.ts",
+    "to": "apps/api/src/modulos/reservas/reservas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/vigilante-sin-respuesta.service.ts",
+    "to": "apps/api/src/modulos/mensajes/utilidades/nombre-contacto.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/whatsapp-webhook.service.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/whatsapp-webhook.service.ts",
+    "to": "apps/api/src/modulos/clientes/verificacion-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/whatsapp-webhook.service.ts",
+    "to": "apps/api/src/modulos/direcciones/direcciones.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/whatsapp-webhook.service.ts",
+    "to": "apps/api/src/modulos/impresion/estado-impresion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/whatsapp-webhook.service.ts",
+    "to": "apps/api/src/modulos/mensajes/utilidades/nombre-contacto.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/chatbot/servicios/whatsapp-webhook.service.ts",
+    "to": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.controller.ts",
+    "to": "apps/api/src/modulos/caja/dto/cobrar.dto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.module.ts",
+    "to": "apps/api/src/modulos/caja/caja.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.module.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.service.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.service.ts",
+    "to": "apps/api/src/modulos/caja/cobros.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.service.ts",
+    "to": "apps/api/src/modulos/caja/dto/cobrar.dto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.service.ts",
+    "to": "apps/api/src/modulos/chatbot/conversacion/validar-pago-salida.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.service.ts",
+    "to": "apps/api/src/modulos/clientes/puntos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.service.ts",
+    "to": "apps/api/src/modulos/pedidos-admin/cambio-ubicacion.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.service.ts",
+    "to": "apps/api/src/modulos/pedidos-admin/devolucion-pedido.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.service.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/supervisor-codigo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.util.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cierre/cierre.util.ts",
+    "to": "apps/api/src/modulos/cocina/cocina.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/aviso-cuenta.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/outbox-whatsapp.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/aviso-cuenta.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/aviso-cuenta.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/modo-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/clientes.module.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/clientes.service.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/clientes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/clientes.service.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/clientes.service.ts",
+    "to": "apps/api/src/modulos/reclamos/textos-legales.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/clientes.service.ts",
+    "to": "apps/api/src/modulos/usuarios/alertas-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/codigo-registro.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/outbox-whatsapp.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/codigo-registro.service.ts",
+    "to": "apps/api/src/modulos/usuarios/alertas-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/direcciones-cliente.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/explicar-puntos-pedido.ts",
+    "to": "apps/api/src/modulos/ofertas/puntos-elegibles.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/party-puntos.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/party-puntos.service.ts",
+    "to": "apps/api/src/modulos/usuarios/alertas-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/puntos.service.ts",
+    "to": "apps/api/src/modulos/ofertas/puntos-elegibles.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/recuperar-clave.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/outbox-whatsapp.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/recuperar-clave.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/clientes/verificacion-whatsapp.util.ts",
+    "to": "apps/api/src/modulos/usuarios/alertas-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/agotados.service.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/ajustes-personales.service.ts",
+    "to": "apps/api/src/modulos/preferencias/preferencias-usuario.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/cocina.controller.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/requiere-codigo-supervisor.decorator.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/cocina.module.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/cocina.module.ts",
+    "to": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/cocina.module.ts",
+    "to": "apps/api/src/modulos/preferencias/preferencias.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/cocina.module.ts",
+    "to": "apps/api/src/modulos/salon/salon.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/comandas.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/avisos-pedido.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/comandas.service.ts",
+    "to": "apps/api/src/modulos/pedidos/delivery-ubicacion.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cocina/comandas.service.ts",
+    "to": "apps/api/src/modulos/salon/salon.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/compras/compras.module.ts",
+    "to": "apps/api/src/modulos/stock/stock.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/compras/compras.service.ts",
+    "to": "apps/api/src/modulos/stock/stock.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/comprobantes-certificado-aviso.service.ts",
+    "to": "apps/api/src/modulos/correo/avisos-equipo-correo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/comprobantes-certificado-aviso.service.ts",
+    "to": "apps/api/src/modulos/correo/destinatarios.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/comprobantes-salud.service.ts",
+    "to": "apps/api/src/modulos/impresion/estado-impresion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/comprobantes.module.ts",
+    "to": "apps/api/src/modulos/correo/correo.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/comprobantes.module.ts",
+    "to": "apps/api/src/modulos/local/local.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/comprobantes.service.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/comprobantes.service.ts",
+    "to": "apps/api/src/modulos/impresion/estado-impresion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/comprobantes.service.ts",
+    "to": "apps/api/src/modulos/local/local.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/comprobantes.service.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/pdf/comprobante-datos.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/comprobantes/sunat/sunat.xml.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/configuracion/configuracion.controller.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/requiere-codigo-supervisor.decorator.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/configuracion/configuracion.service.ts",
+    "to": "apps/api/src/modulos/clientes/verificacion-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/configuracion/configuracion.service.ts",
+    "to": "apps/api/src/modulos/reclamos/textos-legales.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/configuracion/configuracion.service.ts",
+    "to": "apps/api/src/modulos/usuarios/alertas-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/contenido/contenido.module.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/contenido/contenido.service.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cortesias/cortesias.controller.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/requiere-codigo-supervisor.decorator.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/cortesias/cortesias.service.ts",
+    "to": "apps/api/src/modulos/stock/producto-controlado.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/creditos/creditos.service.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/creditos/creditos.service.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/direcciones/direcciones.module.ts",
+    "to": "apps/api/src/modulos/acceso/acceso.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/impresion/constructor-etiquetas.ts",
+    "to": "apps/api/src/modulos/comprobantes/facturacion/representacion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/impresion/constructor-etiquetas.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/impresion/impresion.module.ts",
+    "to": "apps/api/src/modulos/acceso/acceso.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/impresion/impresion.service.ts",
+    "to": "apps/api/src/modulos/pedidos-admin/cambio-ubicacion.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/informes/informes.controller.ts",
+    "to": "apps/api/src/modulos/cortesias/cortesias.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/informes/informes.controller.ts",
+    "to": "apps/api/src/modulos/cortesias/dto/cortesias.dto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/informes/informes.module.ts",
+    "to": "apps/api/src/modulos/cortesias/cortesias.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/informes/informes.service.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/informes/informes.service.ts",
+    "to": "apps/api/src/modulos/local/local.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/informes/informes.service.ts",
+    "to": "apps/api/src/modulos/stock/control-almacen.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/iniciativas/iniciativas.module.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/iniciativas/iniciativas.service.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/local/local.controller.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/requiere-codigo-supervisor.decorator.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/local/local.service.ts",
+    "to": "apps/api/src/modulos/propinas/propinas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.module.ts",
+    "to": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/configuracion/bloqueo-spam.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/configuracion/chatbot-configuracion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/conversacion/flujo-liberado.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/conversacion/flujos/cambios/textos-cambios.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/conversacion/flujos/pago/textos-pago.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/pedido-esperando-voucher.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/ventana-24h.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/meta-errores.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/pedidos/delivery-ubicacion.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "to": "apps/api/src/modulos/repartos/eta-entrega.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/utilidades/error-whatsapp.util.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/meta-errores.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/utilidades/nombre-contacto.util.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/mensajes/whatsapp-meta.gateway.ts",
+    "to": "apps/api/src/modulos/chatbot/puerto/whatsapp-mensajeria.puerto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/notificaciones/notificaciones.service.ts",
+    "to": "apps/api/src/modulos/stock/control-almacen.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ofertas/combo-disponibilidad.util.ts",
+    "to": "apps/api/src/modulos/catalogo/catalogo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ofertas/envio-gratis-promo.ts",
+    "to": "apps/api/src/modulos/zonas/envio-gratis.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ofertas/ofertas-publico.controller.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ofertas/ofertas.module.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "to": "apps/api/src/modulos/catalogo/catalogo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/carrusel.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "to": "apps/api/src/modulos/clientes/cliente-del-pedido.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "to": "apps/api/src/modulos/stock/opcion-requiere.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/cambio-cobro.service.ts",
+    "to": "apps/api/src/modulos/pedidos/pago-plan.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/cambio-cobro.service.ts",
+    "to": "apps/api/src/modulos/propinas/propinas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/cambio-cobro.service.ts",
+    "to": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/cambio-ubicacion.service.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/cambio-ubicacion.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/ventana-24h.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/cambio-ubicacion.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/cambio-ubicacion.service.ts",
+    "to": "apps/api/src/modulos/ofertas/envio-gratis-promo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/cambio-ubicacion.service.ts",
+    "to": "apps/api/src/modulos/zonas/zonas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/cambio-ubicacion.util.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/devolucion-pedido.service.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/devolucion-pedido.service.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/devolucion-pedido.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/devolucion-pedido.util.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/devolucion-pedido.util.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/reprogramacion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/dto/liquidar-ajuste-ubicacion.dto.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/dto/registrar-pago.dto.ts",
+    "to": "apps/api/src/modulos/caja/dto/cobrar.dto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedido-comprobante.service.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.controller.ts",
+    "to": "apps/api/src/modulos/cortesias/cortesia.tipos.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.controller.ts",
+    "to": "apps/api/src/modulos/impresion/dto/reimprimir.dto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.controller.ts",
+    "to": "apps/api/src/modulos/impresion/impresion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.controller.ts",
+    "to": "apps/api/src/modulos/pedidos/dto/crear-pedido.dto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.controller.ts",
+    "to": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.controller.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/requiere-codigo-supervisor.decorator.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.controller.ts",
+    "to": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/chatbot/puerto/ubicacion-pedido.puerto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/impresion/impresion.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/pedidos/pago-plan.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/salon/salon.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/stock/stock.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/vouchers/vouchers.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-admin.module.ts",
+    "to": "apps/api/src/modulos/zonas/zonas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/caja/caja.calculo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/caja/comprobante-pago.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/avisos-pedido.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/reprogramacion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/clientes/explicar-puntos-pedidos.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/clientes/puntos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/cocina/cocina.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/cocina/tiempo-preparacion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/impresion/impresion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/pedidos/delivery-ubicacion.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/pedidos/pago-plan.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/pedidos/progreso-pedido.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/propinas/propinas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/repartos/eta-entrega.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/repartos/prueba-entrega.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/salon/salon.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/stock/stock.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/supervisor-codigo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/usuarios/usuarios.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/vouchers/regla-cambio-voucher.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/pedidos-estado.service.ts",
+    "to": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/ubicacion-whatsapp-pedido.service.ts",
+    "to": "apps/api/src/modulos/chatbot/puerto/ubicacion-pedido.puerto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/ubicacion-whatsapp-pedido.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/ventana-24h.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/ubicar-pedido.service.ts",
+    "to": "apps/api/src/modulos/ofertas/envio-gratis-promo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos-admin/ubicar-pedido.service.ts",
+    "to": "apps/api/src/modulos/zonas/zonas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.controller.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "to": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "to": "apps/api/src/modulos/local/local.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "to": "apps/api/src/modulos/vouchers/vouchers.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "to": "apps/api/src/modulos/zonas/zonas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/avisos-pedido.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/clientes/cumpleanos.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/clientes/direcciones-cliente.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/clientes/invitado-carta.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/clientes/party-puntos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/clientes/puntos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/cortesias/cortesia.tipos.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/local/local.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/ofertas/envio-gratis-promo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/ofertas/ofertas.tipos.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/ofertas/puntos-elegibles.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/propinas/propinas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/propinas/propinas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/stock/opcion-requiere.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/stock/producto-controlado.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "to": "apps/api/src/modulos/zonas/zonas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/progreso-pedido.ts",
+    "to": "apps/api/src/modulos/cocina/tiempo-preparacion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/progreso-pedido.ts",
+    "to": "apps/api/src/modulos/repartos/eta-entrega.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/seguimiento.controller.ts",
+    "to": "apps/api/src/modulos/clientes/clientes.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/seguimiento.controller.ts",
+    "to": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/seguimiento.service.ts",
+    "to": "apps/api/src/modulos/clientes/explicar-puntos-pedido.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/seguimiento.service.ts",
+    "to": "apps/api/src/modulos/clientes/explicar-puntos-pedidos.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/seguimiento.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/pedidos/seguimiento.service.ts",
+    "to": "apps/api/src/modulos/repartos/eta-entrega.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/propinas/propinas-reparto.module.ts",
+    "to": "apps/api/src/modulos/asistencia/asistencia.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/propinas/propinas-reparto.service.ts",
+    "to": "apps/api/src/modulos/asistencia/asistencia.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/reclamos/reclamos.util.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/eta-entrega.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/recargo-reprogramacion.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/reprogramacion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos-chat.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/ventana-24h.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos-chat.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos-chat.service.ts",
+    "to": "apps/api/src/modulos/mensajes/mensajes.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos.controller.ts",
+    "to": "apps/api/src/modulos/mensajes/dto/mensajes.dto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos.module.ts",
+    "to": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos.module.ts",
+    "to": "apps/api/src/modulos/mensajes/mensajes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/avisos-pedido.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/reprogramacion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos.service.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/repartos/repartos.service.ts",
+    "to": "apps/api/src/modulos/pedidos/pago-plan.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/resenas/resenas-google.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/resenas/resenas.module.ts",
+    "to": "apps/api/src/modulos/acceso/acceso.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/reservas/reservas-carta.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/reservas/reservas-carta.service.ts",
+    "to": "apps/api/src/modulos/usuarios/alertas-whatsapp.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/reservas/reservas.module.ts",
+    "to": "apps/api/src/modulos/chatbot/chatbot.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/reservas/reservas.service.ts",
+    "to": "apps/api/src/modulos/chatbot/conversacion/textos-reserva.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/reservas/reservas.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/outbox-whatsapp.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/reservas/reservas.service.ts",
+    "to": "apps/api/src/modulos/chatbot/servicios/ventana-24h.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/reservas/reservas.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/dto/abrir-pedido-mesa.dto.ts",
+    "to": "apps/api/src/modulos/pedidos/dto/crear-pedido.dto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.controller.ts",
+    "to": "apps/api/src/modulos/cortesias/cortesia.tipos.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.controller.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/requiere-codigo-supervisor.decorator.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.module.ts",
+    "to": "apps/api/src/modulos/impresion/impresion.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.module.ts",
+    "to": "apps/api/src/modulos/pedidos/pedidos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.module.ts",
+    "to": "apps/api/src/modulos/reservas/reservas.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/chatbot/utilidades/enmascarar.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/cocina/tiempo-preparacion.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/cortesias/cortesia.tipos.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/impresion/impresion.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/pedidos/dto/crear-pedido.dto.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/pedidos/lineas-combo.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/pedidos/pedidos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/pedidos/progreso-pedido.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/plano/plano.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/salon/salon.service.ts",
+    "to": "apps/api/src/modulos/reservas/reservas.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/stock/producto-controlado.ts",
+    "to": "apps/api/src/modulos/cocina/cocina.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/stock/stock.module.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/stock/stock.service.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/stock/stock.service.ts",
+    "to": "apps/api/src/modulos/cocina/cocina.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/usuarios/usuarios.controller.ts",
+    "to": "apps/api/src/modulos/supervisor-codigo/requiere-codigo-supervisor.decorator.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/usuarios/usuarios.module.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/usuarios/usuarios.module.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/usuarios/usuarios.service.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/usuarios/usuarios.service.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/usuarios/usuarios.service.ts",
+    "to": "apps/api/src/modulos/clientes/celular-party.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/usuarios/usuarios.service.ts",
+    "to": "apps/api/src/modulos/correo/avisos-mensajes.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/usuarios/usuarios.service.ts",
+    "to": "apps/api/src/modulos/correo/roles-avisos.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers-ia.service.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers-ia.service.ts",
+    "to": "apps/api/src/modulos/chatbot/ia/ia-consumo.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.module.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.module.ts",
+    "to": "apps/api/src/modulos/chatbot/avisos-internos/avisos-internos.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.module.ts",
+    "to": "apps/api/src/modulos/chatbot/ia/chatbot-ia.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.module.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.module.ts",
+    "to": "apps/api/src/modulos/impresion/impresion.module.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.module.ts",
+    "to": "apps/api/src/modulos/pedidos/pago-plan.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "to": "apps/api/src/modulos/archivos/archivos.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "to": "apps/api/src/modulos/comprobantes/comprobantes.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "to": "apps/api/src/modulos/local/local.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "to": "apps/api/src/modulos/pedidos/pago-plan.service.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/vouchers/vouchers.service.ts",
+    "to": "apps/api/src/modulos/propinas/propinas.util.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "apps/api/src/modulos/zonas/zonas.service.ts",
+    "to": "apps/api/src/modulos/ofertas/envio-gratis-promo.ts",
+    "rule": {
+      "severity": "error",
+      "name": "modulo-sin-importes-internos"
+    }
+  }
+]
