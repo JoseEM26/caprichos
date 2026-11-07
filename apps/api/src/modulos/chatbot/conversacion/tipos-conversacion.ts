@@ -337,6 +337,8 @@ export interface ContextoConversacion {
   datosLocalPublicos?: any;
   categoriasCarta?: any[];
   ofertas?: any[];
+  /** Productos anfitriones de un combo activo que el bot NO vende (canal sin WhatsApp, agotado o fuera de horario): no salen en sus listas. */
+  productosComboNoBot?: string[];
   /** Unidades vendidas por productoId (últimos 90 días), para ordenar los carruseles. */
   ventasProductos?: Record<string, number>;
   pedidoActivo?: any;

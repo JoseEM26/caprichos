@@ -128,8 +128,8 @@ export function ofertaIncluyeCanal(canales: string[] | null | undefined, canal: 
   return norm.some((c) => alias.includes(c));
 }
 
-/** Alta de oferta nueva: carta y local siempre; WhatsApp solo en los tipos que el bot ya aplica. */
-export const TIPOS_OFERTA_BOT_APLICA = ['DESCUENTO', 'LLEVA_PAGA', 'ENVIO_GRATIS'] as const;
+/** Alta de oferta nueva: carta y local siempre; WhatsApp en los tipos que el bot aplica o arma (combos incluidos; cupones no). */
+export const TIPOS_OFERTA_BOT_APLICA = ['DESCUENTO', 'LLEVA_PAGA', 'ENVIO_GRATIS', 'COMBO'] as const;
 export function canalesPorDefecto(tipo: string): string[] {
   return (TIPOS_OFERTA_BOT_APLICA as readonly string[]).includes(tipo) ? ['CARTA', 'ADMIN', 'BOT'] : ['CARTA', 'ADMIN'];
 }

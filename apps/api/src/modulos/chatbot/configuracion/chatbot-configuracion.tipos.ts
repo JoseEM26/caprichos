@@ -48,6 +48,10 @@ export const TEXTOS_BOT_DEFECTO = {
   chatbot_texto_envio_gratis: '🛵 Envío gratis por «{promo}»',
 
   chatbot_texto_aviso_stock: '🍩 {aviso}',
+  chatbot_texto_combo_intro: 'Vamos a armar tu *{combo}* 💛\n{incluye}',
+
+  chatbot_texto_combo_plan_b:
+    'Hoy no hay {faltante} 😅 ¿Lo cambiamos por {alternativas}? El precio de tu combo no cambia.',
 } as const;
 
 export type ClaveTextoBot = keyof typeof TEXTOS_BOT_DEFECTO;
@@ -62,6 +66,8 @@ export const CLAVES_TEXTOS_BOT: ClaveTextoBot[] = [
   'chatbot_texto_indicacion_pago',
   'chatbot_texto_envio_gratis',
   'chatbot_texto_aviso_stock',
+  'chatbot_texto_combo_intro',
+  'chatbot_texto_combo_plan_b',
 ];
 
 /**

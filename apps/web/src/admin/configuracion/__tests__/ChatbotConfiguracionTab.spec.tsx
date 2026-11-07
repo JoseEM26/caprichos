@@ -27,6 +27,8 @@ const CONFIG_API_REAL_FIXTURE: ConfiguracionBotRespuesta = {
       'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',
     chatbot_texto_envio_gratis: '🛵 Envío gratis por «{promo}»',
     chatbot_texto_aviso_stock: '🍩 {aviso}',
+    chatbot_texto_combo_intro: 'Vamos a armar tu *{combo}* 💛\n{incluye}',
+    chatbot_texto_combo_plan_b: 'Hoy no hay {faltante} 😅 ¿Lo cambiamos por {alternativas}?',
   },
   textosDefecto: {
     chatbot_texto_bienvenida:
@@ -45,6 +47,8 @@ const CONFIG_API_REAL_FIXTURE: ConfiguracionBotRespuesta = {
       'Si pagas por Yape, Plin o transferencia, envíanos aquí la captura de tu comprobante.',
     chatbot_texto_envio_gratis: '🛵 Envío gratis por «{promo}»',
     chatbot_texto_aviso_stock: '🍩 {aviso}',
+    chatbot_texto_combo_intro: 'Vamos a armar tu *{combo}* 💛\n{incluye}',
+    chatbot_texto_combo_plan_b: 'Hoy no hay {faltante} 😅 ¿Lo cambiamos por {alternativas}?',
   },
   funciones: {
     pedido: true,

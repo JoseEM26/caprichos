@@ -952,6 +952,22 @@ describe('PedidosService', () => {
         expect(Number(ventas[0].cantidad)).toBe(2);
       });
 
+      it('desde WhatsApp (bot) el combo se resuelve con el canal WHATSAPP y crea las mismas líneas hijas', async () => {
+        await service.crear(dtoCajita(), 'key-cajita-bot', { canal: 'WHATSAPP', telefonoRemitente: '987654321', telefonoPuntos: '987654321' });
+        expect(ofertasServiceMock.resolverPartesCombo).toHaveBeenCalledWith(9, dtoCajita().lineas[0].comboElecciones, 1, 'WHATSAPP');
+        const creadas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);
+        expect(creadas).toHaveLength(3);
+        expect(creadas[2]).toMatchObject({ producto_id: 20n, linea_combo_id: 50n, nombre: 'Burbujas', cantidad: 2 });
+      });
+
+      it('el canal apagado del combo rechaza el pedido del bot sin crear nada', async () => {
+        ofertasServiceMock.resolverPartesCombo.mockRejectedValueOnce(
+          new BadRequestException({ codigo: 'OFERTA_NO_APLICA_CANAL', mensaje: 'Cajita no está disponible en este canal' }),
+        );
+        await expect(service.crear(dtoCajita(), 'key-cajita-bot-off', { canal: 'WHATSAPP', telefonoRemitente: '987654321', telefonoPuntos: '987654321' })).rejects.toMatchObject({ response: { codigo: 'OFERTA_NO_APLICA_CANAL' } });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
       it('una parte con tamaño descuenta cantidad × unidades del tamaño', async () => {
         ofertasServiceMock.resolverPartesCombo.mockResolvedValue({ nota: '', partes: [{ ...partesCajita[1], unidadesTamano: 3 }] });
         await service.crear(dtoCajita(), 'key-cajita-unidades', { canal: 'MOZO' });

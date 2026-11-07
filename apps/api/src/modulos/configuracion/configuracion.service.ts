@@ -141,6 +141,8 @@ export const CLAVES_TEXTO = [
   'chatbot_texto_indicacion_pago',
   'chatbot_texto_envio_gratis',
   'chatbot_texto_aviso_stock',
+  'chatbot_texto_combo_intro',
+  'chatbot_texto_combo_plan_b',
   'whatsapp_aviso_asignado_activo',
   'whatsapp_aviso_salida_activo',
   'whatsapp_aviso_llegada_activo',

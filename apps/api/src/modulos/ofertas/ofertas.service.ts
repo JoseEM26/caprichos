@@ -219,6 +219,8 @@ export class OfertasService {
     // Bot de WhatsApp: solo lista lo que vale por WhatsApp (casilla «WhatsApp (bot)»); no ofrece lo que hoy no se puede armar
     const esBot = !!canal && canalOferta(canal) === 'BOT';
     if (esBot) items = items.filter((o) => ofertaIncluyeCanal(o.canales, 'BOT'));
+    // Carta web y local comparten esta lista: un combo solo para WhatsApp no aparece en ninguna de las dos
+    if (paraCarta) items = items.filter((o) => o.tipo !== 'COMBO' || ofertaIncluyeCanal(o.canales, 'CARTA') || ofertaIncluyeCanal(o.canales, 'ADMIN'));
     items = await this.conDisponibilidad(items);
     if (esBot) return items.filter((o) => !(o.tipo === 'COMBO' && o.disponible === false));
     // Panel de administración: cuándo y quién la desactivó por última vez (de la auditoría, sin tabla nueva)

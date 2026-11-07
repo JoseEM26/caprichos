@@ -65,7 +65,7 @@ describe('canal de oferta: una sola regla para carta, local y bot', () => {
     expect(canalesPorDefecto('ENVIO_GRATIS')).toEqual(['CARTA', 'ADMIN', 'BOT']);
     expect(canalesPorDefecto('DESCUENTO')).toEqual(['CARTA', 'ADMIN', 'BOT']);
     expect(canalesPorDefecto('LLEVA_PAGA')).toEqual(['CARTA', 'ADMIN', 'BOT']);
-    expect(canalesPorDefecto('COMBO')).toEqual(['CARTA', 'ADMIN']);
+    expect(canalesPorDefecto('COMBO')).toEqual(['CARTA', 'ADMIN', 'BOT']);
   });
 
   it('los datos existentes siguen igual: lo que tenía BOT lo conserva, lo que no, no', () => {
@@ -215,6 +215,28 @@ describe('OfertasService: canal WhatsApp, stock y desactivación', () => {
     const [o] = await service.listarOfertas();
     expect(o.desactivadaEn).toBe(cuando.toISOString());
     expect(o.desactivadaPor).toBe('Ana Ruiz');
+  });
+
+  it('canales del combo: solo WhatsApp no sale en la carta web ni en el local; solo carta o solo local no se ofrece en el bot', async () => {
+    prisma.producto.findMany.mockResolvedValue([producto(8)]);
+    const todos = [
+      combo(30n, { nombre: 'Solo bot', canales: ['BOT'] }),
+      combo(31n, { nombre: 'Solo carta', canales: ['CARTA'] }),
+      combo(32n, { nombre: 'Solo local', canales: ['ADMIN'] }),
+      combo(33n, { nombre: 'Todos', canales: ['CARTA', 'ADMIN', 'BOT'] }),
+    ];
+    prisma.oferta.findMany.mockResolvedValue(todos);
+    const carta = await service.listarOfertas(undefined, false, 'CARTA', true);
+    expect(carta.map((o) => o.nombre)).toEqual(['Solo carta', 'Solo local', 'Todos']);
+    const bot = await service.listarOfertas(undefined, true, 'WHATSAPP');
+    expect(bot.map((o) => o.nombre)).toEqual(['Solo bot', 'Todos']);
+    // y el servidor no deja venderlo por un canal apagado aunque llegue el id
+    for (const [id, canal, ok] of [[30n, 'CARTA', false], [30n, 'MOZO', false], [31n, 'WHATSAPP', false], [32n, 'CARTA', false], [32n, 'WHATSAPP', false], [32n, 'MOZO', true], [30n, 'WHATSAPP', true]] as const) {
+      prisma.oferta.findUnique.mockResolvedValue(todos.find((t) => t.id === id));
+      const r = service.resolverPartesCombo(id, [], 1, canal);
+      if (ok) await expect(r).resolves.toBeDefined();
+      else await expect(r).rejects.toMatchObject({ response: { codigo: 'OFERTA_NO_APLICA_CANAL' } });
+    }
   });
 
   it('un combo con WhatsApp apagado rechaza el id si llega desde el bot, y con WhatsApp encendido lo resuelve', async () => {

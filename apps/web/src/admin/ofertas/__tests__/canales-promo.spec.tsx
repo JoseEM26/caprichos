@@ -26,7 +26,8 @@ describe('canales de las ofertas (tres casillas: carta, local, WhatsApp)', () =>
     expect(canalesPorDefecto('ENVIO_GRATIS')).toEqual({ carta: true, local: true, bot: true });
     expect(canalesPorDefecto('DESCUENTO').bot).toBe(true);
     expect(canalesPorDefecto('LLEVA_PAGA').bot).toBe(true);
-    expect(canalesPorDefecto('COMBO')).toEqual({ carta: true, local: true, bot: false });
+    expect(canalesPorDefecto('COMBO')).toEqual({ carta: true, local: true, bot: true });
+    expect(canalesPorDefecto('CUPON').bot).toBe(false);
   });
 
   it('el texto de ayuda cambia con el estado y nunca dice «no la aplica» cuando WhatsApp está encendido', () => {

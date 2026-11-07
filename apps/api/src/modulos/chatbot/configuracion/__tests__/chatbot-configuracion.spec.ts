@@ -552,7 +552,7 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
       expect((respuesta as any).consumoIa).toBeUndefined();
       expect((respuesta as any).textosPorDefecto).toBeUndefined();
 
-      // 2. Claves de textos exactas (8 claves reales)
+      // 2. Claves de textos exactas (10 claves reales)
       const clavesTextosEsperadas = [
         'chatbot_texto_bienvenida',
         'chatbot_texto_despedida',
@@ -563,6 +563,8 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
         'chatbot_texto_indicacion_pago',
         'chatbot_texto_envio_gratis',
         'chatbot_texto_aviso_stock',
+        'chatbot_texto_combo_intro',
+        'chatbot_texto_combo_plan_b',
       ].sort();
 
       expect(Object.keys(respuesta.textos).sort()).toEqual(clavesTextosEsperadas);

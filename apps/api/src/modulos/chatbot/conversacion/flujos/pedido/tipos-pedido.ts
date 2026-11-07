@@ -9,6 +9,8 @@ export type EstadoPedidoFlujo =
   | 'PEDIDO_TAMANO'
   | 'PEDIDO_GRUPO_OPCION'
   | 'PEDIDO_SABOR'
+  | 'PEDIDO_COMBO_PARTE'
+  | 'PEDIDO_COMBO_CONFIRMAR'
   | 'PEDIDO_NOTA'
   | 'PEDIDO_NOMBRES_ENVASE'
   | 'PEDIDO_NOMBRES_CONFIRMAR'
@@ -50,6 +52,60 @@ export interface SaborLineaBot {
   cantidad: number;
 }
 
+/** Opción de una parte del combo (alternativa o producto de la lista). Con sabores, cada unidad lleva su sabor. */
+export interface OpcionComboBot {
+  id: string;
+  nombre: string;
+  /** Alternativas: unidades por combo (p. ej. 2 galletas). */
+  cantidad?: number;
+  sabores?: { id: string; nombre: string; saldo: number }[];
+}
+
+/** Lo que el cliente elige en una parte del combo: la alternativa (plan B) o N opciones de una lista. */
+export interface PasoComboBot {
+  parteId: string;
+  tipo: 'ALTERNATIVA' | 'ELECCION';
+  /** Lo que falta (alternativa) o categoría de la lista (elección), para el texto del paso. */
+  etiqueta: string;
+  /** ELECCION: unidades por elegir (cantidad de la parte × cantidad del combo). ALTERNATIVA: una alternativa. */
+  total: number;
+  hechos: number;
+  opciones: OpcionComboBot[];
+  /** ALTERNATIVA elegida: faltan sus unidades (cantidad × combos) por repartir en sabores. */
+  alternativa?: OpcionComboBot;
+  /** Unidades de la alternativa ya con producto y sabor. */
+  unidadesAlternativa?: number;
+}
+
+export interface EleccionComboBot {
+  parteId: string;
+  productoId: string;
+  saborId?: string;
+  /** «Sirena» o «Fresa (Dona)»: para el resumen. */
+  nombre: string;
+}
+
+/** Combo en armado (o ya armado) dentro de una línea del bot. */
+export interface ComboEnConfiguracionBot {
+  ofertaId: string;
+  nombre: string;
+  pasos: PasoComboBot[];
+  /** Paso en curso y página de la lista de opciones («Ver más»). */
+  idx: number;
+  pagina: number;
+  elecciones: EleccionComboBot[];
+  /** Partes con producto fijo que viajan solas (parte y producto). */
+  fijas: { parteId: string; productoId: string; nombre: string }[];
+  /** Combos que lleva la línea: cada alternativa o lista pide cantidad × unidades elecciones. */
+  unidades: number;
+  /** Se pidió ya elegir las partes (evita repetir el paso al volver del nombre de envase). */
+  partesListas?: boolean;
+  /** El cliente vio el resumen y lo confirmó. */
+  confirmado?: boolean;
+  /** Producto con sabor elegido a la espera de su sabor. */
+  saborDe?: { parteId: string; opcion: OpcionComboBot };
+}
+
 export interface LineaCarritoBot {
   lineaId: string;
   productoId: string;
@@ -69,6 +125,11 @@ export interface LineaCarritoBot {
   noSumaBeneficios: boolean;
   /** Un nombre por envase (bebidas): va en la etiqueta pegada al envase */
   personas?: string[];
+  /** Combo con elecciones (mismo contrato que la carta): el servidor crea las líneas hijas y descuenta stock. */
+  ofertaId?: string;
+  comboElecciones?: { parteId: string; productoId: string; saborId?: string }[];
+  /** Lo que lleva el combo, para el resumen («Club Sándwich», «Sirena»). */
+  comboDetalle?: string[];
 }
 
 export interface ItemEnConfiguracionBot {
@@ -88,6 +149,8 @@ export interface ItemEnConfiguracionBot {
   noSumaBeneficios: boolean;
   /** Nombres de envase ya escritos mientras se pregunta uno por uno */
   nombresEnvase?: string[];
+  /** Producto anfitrión de un combo vendible por el bot: tras la cantidad se eligen sus partes. */
+  combo?: ComboEnConfiguracionBot;
 }
 
 export interface DatosEntregaBot {
