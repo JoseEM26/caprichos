@@ -34,8 +34,8 @@ export function useUmbralesStock(cargarSiFalta = false): UmbralesAvisoStock {
   useEffect(() => {
     if (!cargarSiFalta || cargado) return;
     cargado = true;
-    api
-      .get<{ avisoStock?: { quedan?: unknown; ultimas?: unknown } }>('/carta/local')
+    // Promise.resolve: tolera una respuesta no prometida (p. ej. un simulacro de `api` en pruebas) sin romper la ventana
+    Promise.resolve(api.get<{ avisoStock?: { quedan?: unknown; ultimas?: unknown } }>('/carta/local'))
       .then((d) => fijarUmbralesStock(d?.avisoStock))
       .catch(() => undefined);
   }, [cargarSiFalta]);
