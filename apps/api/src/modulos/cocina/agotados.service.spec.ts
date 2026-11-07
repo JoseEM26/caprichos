@@ -122,7 +122,7 @@ describe('AgotadosService', () => {
       // Verifica que en producto se escribió exactamente la fecha de HASTA_REACTIVAR (9999-12-31)
       expect(prisma.producto.update).toHaveBeenCalledWith({
         where: { id: 5n },
-        data: { agotado_hasta: new Date('9999-12-31T23:59:59Z') },
+        data: { agotado_hasta: new Date('9999-12-31T23:59:59Z'), agotado_origen: 'MANUAL' },
       });
       expect(prisma.agotado.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -215,7 +215,7 @@ describe('AgotadosService', () => {
       expect(res.ok).toBe(true);
       expect(prisma.sabor.update).toHaveBeenCalledWith({
         where: { id: 8n },
-        data: { agotado_hasta: esperadoAgotadoHasta },
+        data: { agotado_hasta: esperadoAgotadoHasta, agotado_origen: 'MANUAL' },
       });
     });
   });
@@ -278,7 +278,7 @@ describe('AgotadosService', () => {
       expect(res.ok).toBe(true);
       expect(prisma.producto.update).toHaveBeenCalledWith({
         where: { id: 4n },
-        data: { agotado_hasta: null },
+        data: { agotado_hasta: null, agotado_origen: null },
       });
       expect(prisma.agotado.update).toHaveBeenCalledWith({
         where: { id: 200n },

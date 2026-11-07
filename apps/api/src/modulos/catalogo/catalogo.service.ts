@@ -36,7 +36,7 @@ import {
   CrearListaDto,
 } from './dto/lista.dto';
 import { invalidarOpcionesMenosPedida } from '../cocina/opcion-menos-pedida';
-import { estadoSaborCarta, estadoSaboresHoy, quedanProductos } from '../stock/producto-controlado';
+import { aperturaHoyProductos, estadoSaborCarta, estadoSaboresHoy, limpiarAgotadosAutomaticosDeProducto, quedanProductos } from '../stock/producto-controlado';
 
 export function normalizarTexto(texto: string): string {
   if (!texto) return '';
@@ -64,6 +64,33 @@ export function obtenerFotoUrl(archivo?: { ruta: string } | null): string | null
   }
   const limpia = archivo.ruta.replace(/^\/+/, '');
   return `/archivos/${limpia}`;
+}
+
+/**
+ * Producto que controla stock y ya no tiene saldo: por sabor, ningún sabor activo con saldo; sin sabores, saldo 0.
+ * Igual que la carta (el admin no debe mostrar «Disponible» lo que el cliente ve agotado).
+ */
+function sinSaldoAdmin(
+  p: { id: bigint; controla_stock: boolean; sabores?: Array<{ id: bigint; activo: boolean }> },
+  estadoSabores: Map<string, { saldo: number }>,
+  quedan: Map<string, number>,
+): boolean {
+  if (!p.controla_stock) return false;
+  const activos = (p.sabores ?? []).filter((s) => s.activo);
+  if (activos.length > 0) return !activos.some((s) => (estadoSabores.get(s.id.toString())?.saldo ?? 0) >= 1);
+  return (quedan.get(p.id.toString()) ?? 0) <= 0;
+}
+
+/**
+ * Por qué se ve «Agotado» en el admin: MANUAL (agotado_hasta puesto a mano, no vuelve solo), AUTOMATICO (saldo 0 por
+ * stock controlado, vuelve al reponer) o null si está disponible. Un agotado sin origen guardado se lee como MANUAL.
+ */
+export function origenAgotadoAdmin(
+  p: { agotado_hasta: Date | null; agotado_origen?: string | null },
+  sinSaldo: boolean,
+): 'MANUAL' | 'AUTOMATICO' | null {
+  if (!estaDisponible(p.agotado_hasta)) return p.agotado_origen === 'AUTOMATICO' ? 'AUTOMATICO' : 'MANUAL';
+  return sinSaldo ? 'AUTOMATICO' : null;
 }
 
 @Injectable()
@@ -346,6 +373,14 @@ export class CatalogoService implements OnApplicationBootstrap {
   // 2. PRODUCTOS (ADMIN)
   // =========================================================================
 
+  /** Saldo de hoy y si ya se contó la apertura, de los productos que controlan stock (solo lectura para el admin). */
+  private async stockAdminDe(productos: Array<{ id: bigint; controla_stock: boolean }>) {
+    const ids = productos.filter((p) => p.controla_stock).map((p) => p.id);
+    if (ids.length === 0) return { quedan: new Map<string, number>(), apertura: new Set<string>() };
+    const [quedan, apertura] = await Promise.all([quedanProductos(this.prisma, ids), aperturaHoyProductos(this.prisma, ids)]);
+    return { quedan, apertura };
+  }
+
   async listarProductosAdmin(filtros: FiltrarProductosDto) {
     const where: any = {};
 
@@ -396,6 +431,8 @@ export class CatalogoService implements OnApplicationBootstrap {
         sabores: {
           orderBy: { nombre: 'asc' },
         },
+        // Anfitrión de una oferta COMBO (el Dúo, la Cajita): solo lectura, sin migración.
+        ofertasAlcance: { where: { tipo: 'COMBO' }, select: { id: true }, take: 1 },
       },
     });
 
@@ -416,6 +453,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       this.prisma,
       productos.flatMap((p) => p.sabores.map((s) => s.id)),
     );
+    const stockAdmin = await this.stockAdminDe(productos);
     const hoy = obtenerAhoraLima().fechaIso;
     const aItem = (o: any) => {
       const desde = formatearFecha(o.fecha_desde);
@@ -445,11 +483,15 @@ export class CatalogoService implements OnApplicationBootstrap {
       precio: Number(Number(p.precio).toFixed(2)),
       orden: p.orden,
       oculto: p.oculto,
-      disponible: estaDisponible(p.agotado_hasta),
+      disponible: estaDisponible(p.agotado_hasta) && !sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan),
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
+      agotadoOrigen: origenAgotadoAdmin(p, sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan)),
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
       controlaStock: p.controla_stock,
+      esAnfitrionCombo: (p.ofertasAlcance ?? []).length > 0,
+      quedan: p.controla_stock ? stockAdmin.quedan.get(p.id.toString()) ?? 0 : null,
+      aperturaHoy: p.controla_stock ? stockAdmin.apertura.has(p.id.toString()) : null,
       promociones: ofertas
         .filter((o) => o.alcance_producto_id === p.id || (!o.alcance_producto_id && o.alcance_categoria_id === p.categoria_id))
         .map(aItem),
@@ -479,7 +521,10 @@ export class CatalogoService implements OnApplicationBootstrap {
           disponible: estaDisponible(o.agotado_hasta),
         })),
       })),
-      sabores: (p.sabores || []).map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock)),
+      sabores: (p.sabores || []).map((s) => ({
+        ...estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock),
+        aperturaHoy: estadoSabores.get(s.id.toString())?.aperturaHoy ?? false,
+      })),
     }));
   }
 
@@ -505,6 +550,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           },
         },
         sabores: true,
+        ofertasAlcance: { where: { tipo: 'COMBO' }, select: { id: true }, take: 1 },
       },
     });
 
@@ -515,6 +561,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       });
     }
     const estadoSabores = await estadoSaboresHoy(this.prisma, (p.sabores || []).map((s) => s.id));
+    const stockAdmin = await this.stockAdminDe([p]);
 
     return {
       id: p.id.toString(),
@@ -528,11 +575,15 @@ export class CatalogoService implements OnApplicationBootstrap {
       precio: Number(Number(p.precio).toFixed(2)),
       orden: p.orden,
       oculto: p.oculto,
-      disponible: estaDisponible(p.agotado_hasta),
+      disponible: estaDisponible(p.agotado_hasta) && !sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan),
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
+      agotadoOrigen: origenAgotadoAdmin(p, sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan)),
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
       controlaStock: p.controla_stock,
+      esAnfitrionCombo: (p.ofertasAlcance ?? []).length > 0,
+      quedan: p.controla_stock ? stockAdmin.quedan.get(p.id.toString()) ?? 0 : null,
+      aperturaHoy: p.controla_stock ? stockAdmin.apertura.has(p.id.toString()) : null,
       fotoUrl: obtenerFotoUrl(p.foto_archivo),
       tamanos: (p.tamanos || []).map((t) => ({
         id: t.id.toString(),
@@ -557,7 +608,10 @@ export class CatalogoService implements OnApplicationBootstrap {
           disponible: estaDisponible(o.agotado_hasta),
         })),
       })),
-      sabores: (p.sabores || []).map((s) => estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock)),
+      sabores: (p.sabores || []).map((s) => ({
+        ...estadoSaborCarta(s, estadoSabores.get(s.id.toString()), p.controla_stock),
+        aperturaHoy: estadoSabores.get(s.id.toString())?.aperturaHoy ?? false,
+      })),
     };
   }
 
@@ -848,6 +902,10 @@ export class CatalogoService implements OnApplicationBootstrap {
         : actual.foto_archivo_id;
 
     await this.prisma.$transaction(async (tx) => {
+      // Apagar «Controlar stock»: el agotado automático (saldo 0) ya no aplica y se limpia; el MANUAL se respeta.
+      if (dto.controlaStock === false && actual.controla_stock) {
+        await limpiarAgotadosAutomaticosDeProducto(tx, pId);
+      }
       await tx.producto.update({
         where: { id: pId },
         data: {
@@ -933,8 +991,9 @@ export class CatalogoService implements OnApplicationBootstrap {
       if (dto.sabores) {
         for (const s of dto.sabores) {
           if (s.id) {
-            await tx.sabor.update({
-              where: { id: this.parsearId(s.id) },
+            // Solo sabores de ESTE producto: un id ajeno no se toca.
+            await tx.sabor.updateMany({
+              where: { id: this.parsearId(s.id), producto_id: pId },
               data: {
                 nombre: s.nombre.trim(),
                 activo: s.activo ?? true,
@@ -1021,9 +1080,14 @@ export class CatalogoService implements OnApplicationBootstrap {
       fechaAgotado = new Date('9999-12-31T23:59:59Z');
     }
 
+    // Agotar desde el admin es MANUAL: no vuelve solo al reponer ni al abrir el día.
     await this.prisma.producto.update({
       where: { id: pId },
-      data: { agotado_hasta: fechaAgotado },
+      data: { agotado_hasta: fechaAgotado, agotado_origen: 'MANUAL' },
+    });
+    await this.prisma.agotado.updateMany({
+      where: { producto_id: pId, reactivado_en: null },
+      data: { origen: 'MANUAL' },
     });
 
     await this.auditoria.registrar({
@@ -1064,7 +1128,11 @@ export class CatalogoService implements OnApplicationBootstrap {
 
     await this.prisma.producto.update({
       where: { id: pId },
-      data: { agotado_hasta: null },
+      data: { agotado_hasta: null, agotado_origen: null },
+    });
+    await this.prisma.agotado.updateMany({
+      where: { producto_id: pId, reactivado_en: null },
+      data: { reactivado_en: new Date() },
     });
 
     await this.auditoria.registrar({

@@ -366,7 +366,7 @@ describe('StockService', () => {
       // Verificamos que se actualizó agotado_hasta en el producto
       expect(prisma.producto.update).toHaveBeenCalledWith({
         where: { id: 32n },
-        data: { agotado_hasta: FECHA_HASTA_REACTIVAR },
+        data: { agotado_hasta: FECHA_HASTA_REACTIVAR, agotado_origen: 'AUTOMATICO' },
       });
 
       // Verificamos que se creó registro en tabla agotado
@@ -492,7 +492,7 @@ describe('StockService', () => {
         findUnique: jest.fn().mockResolvedValue({ cantidad: new Prisma.Decimal(2) }),
       };
       prisma.sabor = {
-        findUnique: jest.fn().mockResolvedValue({ agotado_hasta: new Date('9999-12-31T23:59:59Z'), producto_id: 55n }),
+        findUnique: jest.fn().mockResolvedValue({ agotado_hasta: new Date('9999-12-31T23:59:59Z'), agotado_origen: 'AUTOMATICO', producto_id: 55n }),
         update: jest.fn().mockResolvedValue({}),
       };
       prisma.agotado = { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() };
@@ -506,7 +506,7 @@ describe('StockService', () => {
       expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ tipo: 'ANULACION', sabor_id: 11n, producto_id: 55n }) }),
       );
-      expect(prisma.sabor.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 11n }, data: { agotado_hasta: null } }));
+      expect(prisma.sabor.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 11n }, data: { agotado_hasta: null, agotado_origen: null } }));
     });
   });
 
@@ -599,11 +599,26 @@ describe('StockService', () => {
   });
 
   describe('verificarYReactivarAgotados (FT-STK-01 / RN-CAP-041)', () => {
+    it('NO reactiva un producto agotado a mano (MANUAL) aunque haya insumos o stock', async () => {
+      prisma.producto.findUnique.mockResolvedValue({
+        id: 30n,
+        agotado_hasta: new Date('2099-12-31T23:59:59.999Z'),
+        agotado_origen: 'MANUAL',
+      });
+      prisma.stock.findMany.mockResolvedValue([{ id: 950n, producto_id: 30n, cantidad: new Prisma.Decimal(5) }]);
+      prisma.recetaLinea.findMany.mockResolvedValue([{ receta: { producto_id: 30n, es_produccion: false }, insumo_id: 5n }]);
+
+      const res = await service.verificarYReactivarAgotados(['5'], ['30']);
+      expect(res.reactivados).toEqual([]);
+      expect(prisma.producto.update).not.toHaveBeenCalled();
+    });
+
     it('reactiva producto cuando todos sus insumos tienen stock positivo', async () => {
       prisma.producto.findUnique.mockResolvedValueOnce({
         id: 30n,
         nombre: 'Cappuccino',
         agotado_hasta: new Date('2099-12-31T23:59:59.999Z'),
+        agotado_origen: 'AUTOMATICO',
       });
       prisma.recetaLinea.findMany.mockResolvedValueOnce([
         { receta: { producto_id: 30n, es_produccion: false } },
@@ -620,7 +635,7 @@ describe('StockService', () => {
       expect(prisma.producto.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 30n },
-          data: { agotado_hasta: null },
+          data: { agotado_hasta: null, agotado_origen: null },
         }),
       );
     });

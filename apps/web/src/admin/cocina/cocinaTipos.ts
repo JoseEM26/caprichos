@@ -99,6 +99,8 @@ export type DuracionAgotado = 'HOY' | 'HASTA_REACTIVAR';
 export interface AgotadoItem {
   id: string;
   tipo: TipoAgotado;
+  /** MANUAL (no vuelve solo) o AUTOMATICO (saldo 0; vuelve al reponer). */
+  origen?: 'MANUAL' | 'AUTOMATICO';
   alcance: string;
   duracion: string;
   productoId?: string | null;

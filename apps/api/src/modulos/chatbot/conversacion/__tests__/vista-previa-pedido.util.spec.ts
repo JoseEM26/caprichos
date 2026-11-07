@@ -1,5 +1,7 @@
 jest.mock('../../../ofertas/envio-gratis-promo', () => ({
   calcularEnvioDelivery: jest.fn(),
+  promoEnvioGratisVigente: jest.fn().mockResolvedValue(null),
+  aplicaPromoEnvio: (p: any, s: number) => !!p && (p.compraMinima === null || s >= p.compraMinima),
 }));
 
 import { calcularEnvioDelivery } from '../../../ofertas/envio-gratis-promo';
@@ -44,7 +46,7 @@ describe('vistaPreviaPedidoBot', () => {
       expect.objectContaining({ subtotal: 40, canal: 'WHATSAPP' }),
     );
     expect(mockEnvio).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ subtotal: 40, tarifaZona: 5, canal: 'WHATSAPP' }));
-    expect(vista).toEqual({ subtotal: 40, descuento: 4, descuentoNombre: 'Martes 2x1', envio: 0, envioGratis: true });
+    expect(vista).toEqual({ subtotal: 40, descuento: 4, descuentoNombre: 'Martes 2x1', envio: 0, envioGratis: true, envioPromoNombre: null, envioGratisFalta: null });
   });
 
   it('sin zona conocida el envío queda por calcular y no se llama al cálculo de envío', async () => {

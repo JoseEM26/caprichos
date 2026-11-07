@@ -55,7 +55,7 @@ export function SelectorPedidoCortesia({ seleccionado, alElegir, alError }: Prop
       q ? 250 : 0,
     );
     return () => clearTimeout(t);
-  }, [q, abierto]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [q, abierto]);
 
   const elegir = (p: Pedido) => {
     alElegir(p);

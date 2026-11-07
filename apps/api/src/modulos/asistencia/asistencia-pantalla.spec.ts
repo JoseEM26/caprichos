@@ -87,10 +87,12 @@ describe('enlace público de la pantalla del local', () => {
 
 // Prefijos que Traefik manda a la API: /admin y /carta. Por eso la app móvil y el QR público cuelgan de ellos.
 describe('rutas de asistencia que llegan a la API', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports -- se cargan los controladores en la prueba para leer sus metadatos */
   const { PATH_METADATA } = require('@nestjs/common/constants');
   const { AsistenciaController } = require('./asistencia.controller');
   const { AsistenciaPantallaPublicaController } = require('./asistencia-pantalla.controller');
   const { PropinasMiController } = require('../propinas/propinas-reparto.controller');
+  /* eslint-enable @typescript-eslint/no-require-imports */
 
   it('Mi asistencia y marcar cuelgan de admin/asistencia', () => {
     expect(Reflect.getMetadata(PATH_METADATA, AsistenciaController)).toBe('admin/asistencia');

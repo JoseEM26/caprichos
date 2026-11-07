@@ -71,6 +71,7 @@ describe('Productos: casilla «Controlar stock de este producto»', () => {
     render(<MemoryRouter><ProductosView /></MemoryRouter>);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Editar' }))[0]);
     const d = await screen.findByRole('dialog', { name: /Editar: DONA DE CHOCOLATE/ });
+    fireEvent.click(within(d).getByRole('tab', { name: /Stock y sabores/ }));
 
     const casilla = within(d).getByRole('checkbox', { name: CHECK });
     expect(casilla).not.toBeChecked();
@@ -97,6 +98,7 @@ describe('Productos: casilla «Controlar stock de este producto»', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Editar' })[0]);
     const d = await screen.findByRole('dialog', { name: /Editar: DONA DE CHOCOLATE/ });
+    fireEvent.click(within(d).getByRole('tab', { name: /Stock y sabores/ }));
     expect(within(d).getByRole('checkbox', { name: CHECK })).toBeChecked();
   });
 });

@@ -645,7 +645,7 @@ export class PedidosService {
       // Combo: la parte FIJO debe ser el principal o un reemplazo disponible (409 si no); las A_ELECCION, lo elegido.
       // Cada parte sale en su propia línea hija (cocina y stock); la madre sigue llevando el precio del combo.
       const combo = l.ofertaId
-        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad)
+        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA')
         : { nota: '', partes: [] };
       const contenedora = combo.partes.length > 0;
 
@@ -899,6 +899,7 @@ export class PedidosService {
 
     let agotadosPorVenta: bigint[] = [];
     let saboresAgotadosPorVenta: bigint[] = [];
+    let totalFinal = 0;
     const pedidoCreado = await this.prisma.$transaction(async (tx) => {
       // Generación del código correlativo CP-W###
       let codigo: string;
@@ -1183,6 +1184,18 @@ export class PedidosService {
         await this.avisosInternosService.notificarNuevoPedido(pedido.id, tx);
       }
 
+      // 9.5. Canje de puntos DENTRO de la misma transacción: si falla, se revierte todo (pedido, stock controlado,
+      // cupones y puntos) en lugar de dejar un pedido ANULADO con el stock ya descontado.
+      totalFinal = Number(pedido.total);
+      if (puntosCanje > 0 && this.puntosService && origen?.clientePartyId) {
+        await this.puntosService.canjear(origen.clientePartyId as any, puntosCanje, pedido.id, tx);
+        totalFinal = Number(Math.max(0, totalFinal - puntosCanje).toFixed(2));
+        await tx.pedido.update({
+          where: { id: pedido.id },
+          data: { total: new Prisma.Decimal(totalFinal) },
+        });
+      }
+
       return pedido;
     });
 
@@ -1211,25 +1224,6 @@ export class PedidosService {
         saborIds: saboresAhora.map((sb) => sb.id.toString()),
         opcionIds: [],
       });
-    }
-
-    // 9.5. Canje de puntos: se descuenta del saldo y del total del pedido
-    let totalFinal = Number(pedidoCreado.total);
-    if (puntosCanje > 0 && this.puntosService && origen?.clientePartyId) {
-      try {
-        await this.puntosService.canjear(origen.clientePartyId as any, puntosCanje, pedidoCreado.id);
-        totalFinal = Number(Math.max(0, totalFinal - puntosCanje).toFixed(2));
-        await this.prisma.pedido.update({
-          where: { id: pedidoCreado.id },
-          data: { total: new Prisma.Decimal(totalFinal) },
-        });
-      } catch (err) {
-        await this.prisma.pedido.update({
-          where: { id: pedidoCreado.id },
-          data: { estado: 'ANULADO', motivo_anulacion: 'Canje de puntos rechazado' },
-        });
-        throw err;
-      }
     }
 
     // 10. Emitir evento en tiempo real por WebSocket

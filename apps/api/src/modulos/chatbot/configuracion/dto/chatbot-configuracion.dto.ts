@@ -59,6 +59,11 @@ export class ActualizarTextosBotDto {
     message: `El texto de indicación de pago no puede exceder ${LIMITE_CUERPO_TEXTO} caracteres de WhatsApp`,
   })
   chatbot_texto_indicacion_pago?: string;
+
+  @IsOptional()
+  @IsString({ message: 'El texto de envío gratis debe ser una cadena' })
+  @MaxLength(200, { message: 'El texto de envío gratis no puede exceder 200 caracteres' })
+  chatbot_texto_envio_gratis?: string;
 }
 
 export class RestablecerTextoBotDto {

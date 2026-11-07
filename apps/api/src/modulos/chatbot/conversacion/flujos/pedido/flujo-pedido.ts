@@ -2490,7 +2490,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     pedido: EstadoCarritoPedido,
     contexto: ContextoConversacion,
   ): ResultadoTransicion {
-    const { envio, descuento, descuentoNombre, propina, aCobrar } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { envio, descuento, descuentoNombre, propina, aCobrar, envioPromoNombre, envioGratisFalta } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
     const lineasTexto = this.lineasResumen(pedido);
 
@@ -2544,6 +2544,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
             lineasTexto,
             descuentoTexto,
             envioTexto,
+            envioLinea:
+              pedido.modalidad === 'DELIVERY' && envioPromoNombre
+                ? TEXTOS_BOT.lineaEnvioGratisBot(envioPromoNombre, contexto.textosPersonalizados?.chatbot_texto_envio_gratis)
+                : undefined,
+            faltaEnvioTexto:
+              pedido.modalidad === 'DELIVERY' && envioGratisFalta && envioGratisFalta > 0
+                ? TEXTOS_BOT.lineaFaltaEnvioGratisBot(envioGratisFalta)
+                : undefined,
             total: aCobrar,
             propina,
             modalidad: pedido.modalidad === 'DELIVERY' ? 'Delivery' : 'Para recoger',
@@ -2613,13 +2621,15 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
   /** Resumen con total justo antes de «¿Cómo pagarás?». Usa las mismas líneas y totales que el resumen final. */
   private resumenAntesDePagar(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
-    const { subtotal, envio, aCobrar: total, propina, descuento, descuentoNombre } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+    const { subtotal, envio, aCobrar: total, propina, descuento, descuentoNombre, envioPromoNombre, envioGratisFalta } = calcularTotales(pedido, contexto.vistaPreviaPedido);
     const lineas = this.lineasResumen(pedido);
     const descuentoTxt = descuento > 0 ? `${TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento)}\n` : '';
     const envioTxt =
       pedido.modalidad !== 'DELIVERY'
         ? 'Recojo en tienda'
-        : envio === null
+        : envioPromoNombre
+          ? TEXTOS_BOT.lineaEnvioGratisBot(envioPromoNombre, contexto.textosPersonalizados?.chatbot_texto_envio_gratis)
+          : envio === null
           ? 'Delivery: lo confirma un asesor al ubicarte'
           : envio > 0
             ? `Delivery: S/ ${envio.toFixed(2)}`
@@ -2629,6 +2639,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       `Subtotal: S/ ${subtotal.toFixed(2)}\n` +
       descuentoTxt +
       `${envioTxt}\n` +
+      (pedido.modalidad === 'DELIVERY' && envioGratisFalta && envioGratisFalta > 0 ? `${TEXTOS_BOT.lineaFaltaEnvioGratisBot(envioGratisFalta)}\n` : '') +
       (propina > 0 ? `Propina: S/ ${propina.toFixed(2)}\n` : '') +
       `*TOTAL: S/ ${total.toFixed(2)}*`
     );

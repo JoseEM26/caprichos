@@ -26,6 +26,7 @@ describe('Check «Resaltar en cocina la opción menos pedida» en el editor de p
       return <EditorOpcionesTamanos modo="borrador" valor={v} onChange={(n) => { setV(n); emitidos.push(n); }} />;
     }
     render(<Borrador />);
+    fireEvent.click(screen.getByRole('tab', { name: /Preguntas al cliente/ }));
     const check = screen.getByRole('checkbox', { name: CHECK });
     expect(check).not.toBeChecked();
     fireEvent.click(check);
@@ -42,6 +43,7 @@ describe('Check «Resaltar en cocina la opción menos pedida» en el editor de p
     const editar = vi.spyOn(catalogoApi, 'editarProducto').mockResolvedValue(producto);
     render(<EditorOpcionesTamanos modo="guardado" producto={producto} alGuardar={() => {}} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: /Preguntas al cliente/ }));
     const check = await screen.findByRole('checkbox', { name: CHECK });
     expect(check).not.toBeChecked();
     fireEvent.click(check);
@@ -54,6 +56,7 @@ describe('Check «Resaltar en cocina la opción menos pedida» en el editor de p
   it('un producto que ya lo tiene encendido lo muestra marcado', async () => {
     const producto: any = { id: '11', nombre: 'MOCHA', precio: 9, tamanos: [], grupos: [], resaltarOpcionMenosPedida: true, sabores: [], categoriaId: '1', categoria: { id: '1', nombre: 'Cafés' } };
     render(<EditorOpcionesTamanos modo="guardado" producto={producto} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Preguntas al cliente/ }));
     expect(await screen.findByRole('checkbox', { name: CHECK })).toBeChecked();
   });
 });

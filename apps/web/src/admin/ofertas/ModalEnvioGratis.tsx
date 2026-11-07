@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { OfertaItem } from './ofertasApi';
-import { SelectorVisibleCarta } from './canalesPromo';
+import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
 
 const DIAS = [
   ['lun', 'Lun'],
@@ -12,12 +12,6 @@ const DIAS = [
   ['dom', 'Dom'],
 ];
 
-const CANALES_ENVIO = [
-  { clave: 'todos', nombre: 'Carta web y en el local', canales: ['CARTA', 'ADMIN'] },
-  { clave: 'carta', nombre: 'Solo carta web', canales: ['CARTA'] },
-  { clave: 'local', nombre: 'Solo en el local', canales: ['ADMIN'] },
-];
-
 interface ModalEnvioGratisProps {
   abierto: boolean;
   ofertaAEditar?: OfertaItem | null;
@@ -27,7 +21,7 @@ interface ModalEnvioGratisProps {
 
 /**
  * Promoción «Envío gratis»: el delivery no cobra envío en el horario, días, fechas y canal elegidos.
- * No lleva descuento ni productos. WhatsApp (el bot) no la recibe.
+ * No lleva descuento ni productos. Con WhatsApp (bot) activo, el bot también cobra el delivery sin envío.
  */
 export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }: ModalEnvioGratisProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -37,13 +31,11 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
   const [horaHasta, setHoraHasta] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
-  const [canal, setCanal] = useState('todos');
+  const [canales, setCanales] = useState<CanalesEstado>(canalesPorDefecto('ENVIO_GRATIS'));
   const [compraMinima, setCompraMinima] = useState('');
   const [limiteUsos, setLimiteUsos] = useState('');
   const [orden, setOrden] = useState('0');
   const [visibleCarta, setVisibleCarta] = useState(true);
-  // Por defecto el envío gratis sí vale por WhatsApp (bot); se puede desmarcar
-  const [valeBot, setValeBot] = useState(true);
   const [mensajeError, setMensajeError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
@@ -57,19 +49,11 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
       setHoraHasta(ofertaAEditar.horaHasta || '');
       setFechaDesde(ofertaAEditar.fechaDesde ? ofertaAEditar.fechaDesde.slice(0, 10) : '');
       setFechaHasta(ofertaAEditar.fechaHasta ? ofertaAEditar.fechaHasta.slice(0, 10) : '');
-      const canalesOferta = (ofertaAEditar.canales || []).map((c) => c.toUpperCase());
-      setCanal(
-        canalesOferta.includes('CARTA') && canalesOferta.includes('ADMIN')
-          ? 'todos'
-          : canalesOferta.includes('ADMIN')
-            ? 'local'
-            : 'carta',
-      );
+      setCanales(estadoDesdeCanales(ofertaAEditar.canales));
       setCompraMinima(ofertaAEditar.compraMinima ? String(ofertaAEditar.compraMinima) : '');
       setLimiteUsos(ofertaAEditar.limiteUsos ? String(ofertaAEditar.limiteUsos) : '');
       setOrden(String(ofertaAEditar.orden ?? 0));
       setVisibleCarta(ofertaAEditar.visibleCarta !== false);
-      setValeBot(canalesOferta.includes('BOT'));
     } else {
       setNombre('');
       setDias([]);
@@ -77,12 +61,11 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
       setHoraHasta('');
       setFechaDesde('');
       setFechaHasta('');
-      setCanal('todos');
+      setCanales(canalesPorDefecto('ENVIO_GRATIS'));
       setCompraMinima('');
       setLimiteUsos('');
       setOrden('0');
       setVisibleCarta(true);
-      setValeBot(true);
     }
   }, [abierto, ofertaAEditar]);
 
@@ -116,7 +99,10 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
     }
 
     const diasNum = dias.map((code) => DIAS.findIndex((x) => x[0] === code) + 1);
-    const canalElegido = CANALES_ENVIO.find((c) => c.clave === canal) ?? CANALES_ENVIO[0];
+    if (!canales.carta && !canales.local && !canales.bot) {
+      setMensajeError(ERROR_SIN_CANALES);
+      return;
+    }
 
     setGuardando(true);
     setMensajeError('');
@@ -134,7 +120,7 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
         fechaInicio: fechaDesde || null,
         fechaHasta: fechaHasta || null,
         fechaFin: fechaHasta || null,
-        canales: valeBot ? [...canalElegido.canales, 'BOT'] : canalElegido.canales,
+        canales: canalesDesdeEstado(canales),
         compraMinima: compraMinima.trim() ? minima : null,
         limiteUsos: limiteUsos.trim() ? parseInt(limiteUsos, 10) : null,
         orden: parseInt(orden, 10) || 0,
@@ -177,7 +163,7 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
       >
         <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px', color: 'var(--cp-navy)' }}>{titulo}</div>
         <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-          El delivery no cobra envío dentro del horario, días y fechas que elijas. No descuenta productos. El bot de WhatsApp no la aplica.
+          El delivery no cobra envío dentro del horario, días y fechas que elijas. No descuenta productos.
         </div>
 
         <label style={campo}>
@@ -236,21 +222,7 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
           </label>
         </div>
 
-        <label style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '14px', fontWeight: 700 }}>
-          <input type="checkbox" checked={valeBot} onChange={(e) => setValeBot(e.target.checked)} />
-          Vale también por WhatsApp (bot)
-        </label>
-
-        <label style={campo}>
-          ¿Dónde aplica?
-          <select value={canal} onChange={(e) => setCanal(e.target.value)} style={input}>
-            {CANALES_ENVIO.map((c) => (
-              <option key={c.clave} value={c.clave}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectorCanales id="envio-canal" tipo="ENVIO_GRATIS" valor={canales} onChange={setCanales} />
 
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <label style={{ ...campo, flex: '1 1 140px' }}>

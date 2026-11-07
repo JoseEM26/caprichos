@@ -18,9 +18,12 @@ import {
   SaborItem,
 } from './catalogoApi';
 import { EditorOpcionesTamanos } from './EditorOpcionesTamanos';
+import { EditarProductoModal } from './EditarProductoModal';
+import { Tip } from './ayudaOpciones';
 import { BotonVistaPrevia } from './VistaPreviaProducto';
 import { ESTADO_VACIO, EstadoOpciones, validarTamanos } from './editorOpcionesTipos';
 import { esSoloMozoUsuario, tieneRolUsuario } from '../../comun/rolesUsuario';
+import { textosOrigenAgotado } from './origenAgotado';
 
 const PPAGE = 24;
 
@@ -28,25 +31,17 @@ const PPAGE = 24;
 /** Casilla «Controlar stock»: stock propio del producto (donas, galletas), aparte del control de insumos. */
 function CasillaControlaStock({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minHeight: 44, fontWeight: 700 }}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        aria-describedby="ayuda-controla-stock"
-        style={{ width: 22, height: 22, marginTop: 2, flexShrink: 0 }}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      <label className="eo-interruptor">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+        <span className="eo-pista" aria-hidden="true" />
+        <span className="eo-interruptor-texto">Controlar stock de este producto</span>
+      </label>
+      <Tip
+        etiqueta="Controlar stock"
+        texto="Para productos que se acaban, como donas o galletas: se descuenta al vender, se marca Agotado al llegar a 0 y la carta muestra cuántos quedan. Necesita el conteo de apertura de cada día."
       />
-      <span>
-        Controlar stock de este producto
-        <span
-          id="ayuda-controla-stock"
-          style={{ display: 'block', fontWeight: 400, fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)', marginTop: 2 }}
-        >
-          Para productos que se acaban, como donas o galletas: se descuenta al vender, se marca Agotado al llegar a 0
-          y la carta muestra cuántos quedan. Necesita el conteo de apertura de cada día.
-        </span>
-      </span>
-    </label>
+    </div>
   );
 }
 
@@ -1020,6 +1015,11 @@ export function ProductosView() {
                 <span className={off ? 'pt-ins pt-ins--agotado' : 'pt-ins'}>
                   {off ? 'AGOTADO' : 'DISPONIBLE'}
                 </span>
+                {off && (
+                  <span className="pt-ins pt-ins--agotado" title={textosOrigenAgotado(p.agotadoOrigen).ayuda}>
+                    {textosOrigenAgotado(p.agotadoOrigen).corto}
+                  </span>
+                )}
                 {p.promociones && p.promociones.length > 0 && (
                   <span className="pt-ins pt-ins--promo">En promoción</span>
                 )}
@@ -1726,364 +1726,27 @@ export function ProductosView() {
       {/* MODAL: EDITAR PRODUCTO                                              */}
       {/* =================================================================== */}
       {productoEnEdicion && (
-        <>
-          <div
-            onClick={() => setProductoEnEdicion(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 50,
-              background: 'rgba(11,44,62,0.55)',
-            }}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Editar: ${productoEnEdicion.nombre}`}
-            style={{
-              position: 'fixed',
-              zIndex: 60,
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%,-50%)',
-              width: 'min(620px, calc(100% - 24px))',
-              maxHeight: 'calc(100% - 24px)',
-              overflowY: 'auto',
-              background: 'var(--cp-cream)',
-              borderRadius: 20,
-              boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
-              padding: 20,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 800,
-                  fontSize: 20,
-                  lineHeight: '26px',
-                }}
-              >
-                Editar: {productoEnEdicion.nombre}
-              </div>
-              <button
-                onClick={() => setProductoEnEdicion(null)}
-                aria-label="Cerrar"
-                style={{
-                  flex: 'none',
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  border: '1.5px solid var(--cp-navy)',
-                  background: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontSize: 20,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Nombre */}
-            <div>
-              <label style={{ fontWeight: 700, display: 'block', marginBottom: 4 }}>Nombre</label>
-              <input
-                type="text"
-                value={edNombre}
-                onChange={(e) => setEdNombre(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 48,
-                  borderRadius: 12,
-                  border: '1.5px solid var(--cp-line)',
-                  background: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 12px',
-                  fontSize: 14,
-                }}
-              />
-            </div>
-
-            {/* Categoría */}
-            <div>
-              <label style={{ fontWeight: 700, display: 'block', marginBottom: 4 }}>
-                Categoría
-              </label>
-              <select
-                value={edCategoriaId}
-                onChange={(e) => setEdCategoriaId(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 48,
-                  borderRadius: 12,
-                  border: '1.5px solid var(--cp-navy)',
-                  background: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 12px',
-                  fontSize: 14,
-                }}
-              >
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Precio */}
-            <div>
-              <label style={{ fontWeight: 700, display: 'block', marginBottom: 4 }}>
-                Precio (s/)
-              </label>
-              <input
-                type="number"
-                step="0.50"
-                value={edPrecio}
-                onChange={(e) => setEdPrecio(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  minHeight: 48,
-                  borderRadius: 12,
-                  border: '1.5px solid var(--cp-line)',
-                  background: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  padding: '0 12px',
-                  fontSize: 14,
-                }}
-              />
-            </div>
-
-            {/* Mostrar en la carta (misma lógica que Desactivar/Activar) */}
-            <label
-              style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, fontWeight: 700 }}
-            >
-              <input
-                type="checkbox"
-                checked={!edOculto}
-                onChange={(e) => setEdOculto(!e.target.checked)}
-                style={{ width: 22, height: 22 }}
-              />
-              Mostrar en la carta
-            </label>
-
-            <CasillaControlaStock checked={edControlaStock} onChange={setEdControlaStock} />
-
-            {/* Sabores gestionables (Donas, Galletas, Pizzas, etc.) */}
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                Sabores o variantes (opciones que el cliente elige, como relleno o sabor)
-              </div>
-              <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)', marginBottom: 6 }}>
-                Son las opciones que el cliente elige al pedir este producto (p. ej. el relleno o
-                sabor de una dona). El bot de WhatsApp las ofrece al pedir, y los avisos de agotados
-                también las usan. Toca «Disponible» o «Agotado» para cada una.
-              </div>
-              <div
-                style={{
-                  background: 'var(--cp-white)',
-                  borderRadius: 12,
-                  padding: 10,
-                  border: '1px solid var(--cp-line)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                }}
-              >
-                {edSabores.length === 0 && (
-                  <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
-                    Este producto no tiene sabores. Agrega uno abajo si el cliente elige entre varios.
-                  </div>
-                )}
-                {edSabores.map((s, sIdx) => {
-                  const activo = s.activo !== false;
-                  const sinApertura = s.quedan === null || s.quedan === undefined;
-                  return (
-                    <div
-                      key={s.id ?? `nuevo-${sIdx}`}
-                      style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        alignItems: 'center',
-                        gap: 8,
-                        borderBottom: '1px solid var(--cp-line)',
-                        paddingBottom: 6,
-                      }}
-                    >
-                      <div style={{ flex: '1 1 120px', minWidth: 0, overflowWrap: 'anywhere' }}>
-                        <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--cp-navy)' }}>{s.nombre}</div>
-                        {edControlaStock && (
-                          <div style={{ fontSize: 12, fontWeight: 700, color: sinApertura ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>
-                            {sinApertura ? 'Sin apertura hoy' : `Quedan ${s.quedan}`}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        aria-pressed={activo}
-                        aria-label={`${s.nombre}: ${activo ? 'disponible, tocar para marcar agotado' : 'agotado, tocar para marcar disponible'}`}
-                        onClick={() => setEdSabores(edSabores.map((x, k) => (k === sIdx ? { ...x, activo: !activo } : x)))}
-                        style={{
-                          minHeight: 44,
-                          minWidth: 44,
-                          padding: '0 12px',
-                          borderRadius: 9999,
-                          border: '1.5px solid var(--cp-navy)',
-                          background: activo ? 'var(--cp-navy)' : 'transparent',
-                          color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {activo ? 'Disponible' : 'Agotado'}
-                      </button>
-                    </div>
-                  );
-                })}
-                {edControlaStock && edSabores.length > 0 && (
-                  <div style={{ fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft)' }}>
-                    El stock de cada sabor se registra en «Apertura del día» (Almacén), no aquí.
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    type="text"
-                    value={edNuevoSabor}
-                    onChange={(e) => setEdNuevoSabor(e.target.value)}
-                    placeholder="Nuevo sabor (ej.: Pistacho, Nutella, Americana)"
-                    style={{
-                      flex: 1,
-                      minHeight: 38,
-                      borderRadius: 8,
-                      border: '1.5px solid var(--cp-line)',
-                      padding: '0 10px',
-                      fontSize: 13,
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      if (!edNuevoSabor.trim()) return;
-                      setEdSabores([...edSabores, { nombre: edNuevoSabor.trim(), activo: true }]);
-                      setEdNuevoSabor('');
-                    }}
-                    style={{
-                      minHeight: 38,
-                      padding: '0 14px',
-                      borderRadius: 8,
-                      border: 0,
-                      background: 'var(--cp-navy)',
-                      color: 'var(--cp-cream)',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    + Agregar
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Imagen */}
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>Imagen</div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <img
-                  src={edFotoUrl || '/logo.png'}
-                  alt="Imagen actual"
-                  style={{
-                    width: 96,
-                    height: 96,
-                    borderRadius: 12,
-                    objectFit: 'contain',
-                    background: 'var(--cp-sand)',
-                    border: '1.5px dashed var(--cp-soft)',
-                  }}
-                />
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <label
-                    style={{
-                      minHeight: 44,
-                      padding: '0 16px',
-                      border: '1.5px solid var(--cp-navy)',
-                      borderRadius: 12,
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: 'var(--cp-navy)',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {subidaEdFoto.subiendo ? 'Subiendo imagen…' : 'Subir imagen'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={manejarSubidaFoto}
-                      disabled={subidaEdFoto.subiendo}
-                      style={{ position: 'absolute', left: -9999 }}
-                    />
-                  </label>
-                  <IndicadorSubida estado={subidaEdFoto.estado} error={subidaEdFoto.error} onReintentar={subidaEdFoto.reintentar} />
-                  {edFotoUrl && (
-                    <button
-                      onClick={quitarFoto}
-                      style={{
-                        minHeight: 44,
-                        padding: '0 16px',
-                        border: '1.5px solid var(--cp-rust)',
-                        borderRadius: 12,
-                        background: 'transparent',
-                        color: 'var(--cp-rust)',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Quitar imagen
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {edError && (
-              <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust)' }}>
-                {edError}
-              </div>
-            )}
-
-            {puedeEditar && (
-              <button
-                type="button"
-                onClick={() => abrirOpciones(productoEnEdicion!)}
-                style={{
-                  minHeight: 44,
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: 12,
-                  background: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
-                Tamaños y opciones · {resumenOpciones(productoEnEdicion!)}
-              </button>
-            )}
-
+        <EditarProductoModal
+          key={productoEnEdicion.id}
+          producto={productoEnEdicion}
+          categorias={categorias}
+          nombre={edNombre} setNombre={setEdNombre}
+          categoriaId={edCategoriaId} setCategoriaId={setEdCategoriaId}
+          precio={edPrecio} setPrecio={setEdPrecio}
+          oculto={edOculto} setOculto={setEdOculto}
+          controlaStock={edControlaStock} setControlaStock={setEdControlaStock}
+          fotoUrl={edFotoUrl}
+          subiendoFoto={subidaEdFoto.subiendo}
+          estadoFoto={subidaEdFoto.estado} errorFoto={subidaEdFoto.error} alReintentarFoto={subidaEdFoto.reintentar}
+          alSubirFoto={manejarSubidaFoto}
+          alQuitarFoto={quitarFoto}
+          sabores={edSabores} setSabores={setEdSabores}
+          nuevoSabor={edNuevoSabor} setNuevoSabor={setEdNuevoSabor}
+          error={edError}
+          puedeEditar={puedeEditar}
+          resumenOpciones={resumenOpciones(productoEnEdicion)}
+          alAbrirOpciones={() => abrirOpciones(productoEnEdicion)}
+          vistaPrevia={(
             <BotonVistaPrevia
               bloque
               sinGuardar
@@ -2097,152 +1760,29 @@ export function ProductosView() {
                 sabores: edSabores,
               })}
             />
-
-            {/* Barra de acciones fija abajo: el formulario hace scroll por encima */}
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                position: 'sticky',
-                bottom: -20,
-                margin: '8px -20px -20px',
-                padding: '12px 20px 20px',
-                background: 'var(--cp-cream)',
-                borderTop: '1px solid var(--cp-line)',
-                zIndex: 1,
-              }}
-            >
-              <button
-                onClick={guardarEdicion}
-                disabled={guardandoEdicion}
-                style={{
-                  flex: 1,
-                  minHeight: 52,
-                  border: 0,
-                  borderRadius: 12,
-                  background: 'var(--cp-orange)',
-                  color: 'var(--cp-navy)',
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 800,
-                  fontSize: 15,
-                  cursor: 'pointer',
-                }}
-              >
-                Guardar
-              </button>
-              <button
-                onClick={() => setProductoEnEdicion(null)}
-                style={{
-                  flex: 1,
-                  minHeight: 52,
-                  border: '1.5px solid var(--cp-navy)',
-                  borderRadius: 12,
-                  background: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </>
+          )}
+          guardando={guardandoEdicion}
+          alGuardar={guardarEdicion}
+          alCancelar={() => setProductoEnEdicion(null)}
+        />
       )}
 
       {/* =================================================================== */}
       {/* MODAL: OPCIONES Y TAMAÑOS                                          */}
       {/* =================================================================== */}
       {productoEnOpciones && (
-        <>
-          <div
-            onClick={() => setProductoEnOpciones(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 50,
-              background: 'rgba(11,44,62,0.55)',
-            }}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Tamaños y opciones"
-            style={{
-              position: 'fixed',
-              zIndex: 60,
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%,-50%)',
-              width: 'min(1120px, calc(100% - 24px))',
-              maxHeight: 'calc(100% - 24px)',
-              overflowY: 'auto',
-              background: 'var(--cp-cream)',
-              borderRadius: 20,
-              boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
-              padding: 20,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: 8,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 800,
-                    fontSize: 22,
-                    lineHeight: '27px',
-                  }}
-                >
-                  Tamaños y opciones: {productoEnOpciones.nombre}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-                  Tamaños y opciones de este producto.
-                </div>
-              </div>
-              <button
-                onClick={() => setProductoEnOpciones(null)}
-                aria-label="Cerrar"
-                style={{
-                  flex: 'none',
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  border: '1.5px solid var(--cp-navy)',
-                  background: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontSize: 20,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <EditorOpcionesTamanos
-              key={productoEnOpciones.id}
-              modo="guardado"
-              producto={productoEnOpciones}
-              precioBase={productoEnOpciones.precio}
-              puedeEditar={puedeEditar}
-              alGuardar={async () => {
-                setProductoEnOpciones(null);
-                await cargarDatos();
-              }}
-              alCancelar={() => setProductoEnOpciones(null)}
-            />
-          </div>
-        </>
+        <EditorOpcionesTamanos
+          key={productoEnOpciones.id}
+          modo="guardado"
+          producto={productoEnOpciones}
+          precioBase={productoEnOpciones.precio}
+          puedeEditar={puedeEditar}
+          alGuardar={async () => {
+            setProductoEnOpciones(null);
+            await cargarDatos();
+          }}
+          alCancelar={() => setProductoEnOpciones(null)}
+        />
       )}
 
       {/* =================================================================== */}

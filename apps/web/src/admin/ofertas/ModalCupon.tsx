@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CuponItem } from './ofertasApi';
+import { CanalesEstado, SelectorCanales, canalesDesdeEstado, estadoDesdeCanales } from './canalesPromo';
 
 const CATEGORIAS_DEF = [
   'Combos',
@@ -13,12 +14,6 @@ const CATEGORIAS_DEF = [
   'Postres',
 ];
 
-const CANALES = [
-  { clave: 'TODOS', nombre: 'Todos los canales' },
-  { clave: 'CARTA', nombre: 'Solo carta web' },
-  { clave: 'LOCAL', nombre: 'Solo en el local' },
-];
-
 const DIAS = [
   ['lun', 'Lun', 1],
   ['mar', 'Mar', 2],
@@ -28,22 +23,6 @@ const DIAS = [
   ['sab', 'Sáb', 6],
   ['dom', 'Dom', 7],
 ] as const;
-
-/** Canales guardados del cupón -> opción del selector. */
-function canalDeCupon(canales: string[] | null | undefined): string {
-  const c = (canales || []).map((x) => x.toUpperCase());
-  if (c.includes('CARTA') && c.includes('CAJA')) return 'TODOS';
-  if (c.includes('CARTA')) return 'CARTA';
-  if (c.includes('CAJA')) return 'LOCAL';
-  return 'TODOS';
-}
-
-/** Canales del cupón en la API: se canjea en la carta (CARTA) y en caja (CAJA). Nunca por chat. */
-function canalesDeCupon(canal: string): string[] {
-  if (canal === 'CARTA') return ['CARTA'];
-  if (canal === 'LOCAL') return ['CAJA'];
-  return ['CARTA', 'CAJA'];
-}
 
 interface ModalCuponProps {
   abierto: boolean;
@@ -87,7 +66,7 @@ export function ModalCupon({
   const [productoBusqueda, setProductoBusqueda] = useState('');
   const [tituloImpreso, setTituloImpreso] = useState('En tu siguiente compra');
   const [validezDias, setValidezDias] = useState(String(validezReglasDefecto));
-  const [canal, setCanal] = useState('TODOS');
+  const [canales, setCanales] = useState<CanalesEstado>({ carta: true, local: true, bot: false });
   const [requiereCuenta, setRequiereCuenta] = useState(false);
   const [mensajeError, setMensajeError] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -119,7 +98,7 @@ export function ModalCupon({
       }
       setTituloImpreso(cuponAEditar.tituloImpreso || 'En tu siguiente compra');
       setValidezDias(cuponAEditar.diasValidez || cuponAEditar.diasValidezImpreso ? String(cuponAEditar.diasValidez || cuponAEditar.diasValidezImpreso) : String(validezReglasDefecto));
-      setCanal(canalDeCupon(cuponAEditar.canales));
+      setCanales({ ...estadoDesdeCanales(cuponAEditar.canales), bot: false });
       setRequiereCuenta(Boolean(cuponAEditar.requiereCuenta));
       setMensajeError('');
     } else {
@@ -141,7 +120,7 @@ export function ModalCupon({
       setProducto('');
       setTituloImpreso('En tu siguiente compra');
       setValidezDias(String(validezReglasDefecto));
-      setCanal('TODOS');
+      setCanales({ carta: true, local: true, bot: false });
       setRequiereCuenta(false);
       setMensajeError('');
     }
@@ -152,6 +131,10 @@ export function ModalCupon({
   const validarYGuardar = async () => {
     if (!codigoBase.trim()) {
       setMensajeError('Escribe el código base del cupón.');
+      return;
+    }
+    if (!canales.carta && !canales.local) {
+      setMensajeError('Elige al menos un lugar donde aplica: carta web o en el local.');
       return;
     }
     if (!descripcion.trim()) {
@@ -204,7 +187,7 @@ export function ModalCupon({
         compraMinima: parseFloat(minima) || 0,
         categoriaId: aplica === 'cat' && categoriaObj ? categoriaObj.id : undefined,
         productoId: aplica === 'prod' && prodObj ? prodObj.id : undefined,
-        canales: canalesDeCupon(canal),
+        canales: canalesDesdeEstado(canales, 'CAJA'),
         requiereCuenta,
         diasValidez: modo === 'UNICO_COMPROBANTE' ? (parseInt(validezDias, 10) || 15) : undefined,
         topeUsos: modo === 'COMPARTIDO' ? (parseInt(maxUsos, 10) || 5000) : undefined,
@@ -392,7 +375,7 @@ export function ModalCupon({
             <div style={{ fontSize: '12px', lineHeight: '16px', color: 'var(--cp-soft)', marginTop: '4px' }}>
               {modo === 'UNICO_COMPROBANTE'
                 ? `Cada comprobante le agrega 6 letras y números al azar: ${codigoBase ? codigoBase.toUpperCase() : 'DUO20'}-K7M2QX.`
-                : 'Los clientes escribirán este código en la carta virtual o en el chatbot.'}
+                : 'Los clientes escribirán este código en la carta virtual o en caja.'}
             </div>
           </div>
 
@@ -951,32 +934,8 @@ export function ModalCupon({
           )}
         </div>
 
-        {/* Canal */}
-        <div>
-          <div style={{ fontWeight: 700, marginBottom: '4px' }}>Canal</div>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {CANALES.map((c) => (
-              <button
-                key={c.clave}
-                type="button"
-                onClick={() => setCanal(c.clave)}
-                style={{
-                  minHeight: '44px',
-                  padding: '0 12px',
-                  borderRadius: '9999px',
-                  border: '1.5px solid var(--cp-navy)',
-                  backgroundColor: canal === c.clave ? 'var(--cp-navy)' : 'transparent',
-                  color: canal === c.clave ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                {c.nombre}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Dónde aplica */}
+        <SelectorCanales id="cupon-canal" tipo="CUPON" valor={canales} onChange={setCanales} />
 
         {/* Requiere cuenta */}
         <div>

@@ -211,10 +211,10 @@ describe('cupón de envío gratis (ofertas)', () => {
       });
     });
 
-    it('la lista para el bot marca vigente la promo de envío solo si tiene BOT', async () => {
+    it('la lista para el bot lista la promo de envío solo si tiene BOT', async () => {
       const base = { id: 9n, tipo: 'ENVIO_GRATIS', nombre: 'Envío', dias: [], hora_desde: null, hora_hasta: null, fecha_desde: null, fecha_hasta: null, activo: true, limite_usos: null, usos_actuales: 0, descripcion: null, lleva: null, paga: null, descuento_tipo: null, descuento_valor: null, compra_minima: null, orden: 0, creado_en: new Date(), no_suma_beneficios: false, mostrar_en_saludo_bot: false, solo_primera_compra: false, visible_carta: true, imagen_archivo: null, categoria: null, producto: null, combosPrecio: [], combosParte: [], alcance_categoria_id: null, alcance_producto_id: null, imagen_archivo_id: null };
       prismaMock.oferta.findMany.mockResolvedValueOnce([{ ...base, canales: ['CARTA', 'ADMIN'] }]);
-      expect((await service.listarOfertas(undefined, true, 'WHATSAPP'))[0].vigenteAhora).toBe(false);
+      expect(await service.listarOfertas(undefined, true, 'WHATSAPP')).toHaveLength(0); // sin WhatsApp el bot ni la lista
 
       prismaMock.oferta.findMany.mockResolvedValueOnce([{ ...base, canales: ['CARTA', 'ADMIN', 'BOT'] }]);
       expect((await service.listarOfertas(undefined, true, 'BOT'))[0].vigenteAhora).toBe(true);

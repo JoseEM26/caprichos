@@ -16,6 +16,11 @@ import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
  * Sin sabores activos, el producto sigue con un único saldo en `stock`.
  */
 
+export const ORIGEN_MANUAL = 'MANUAL';
+export const ORIGEN_AUTOMATICO = 'AUTOMATICO';
+/** Solo el agotado AUTOMATICO (saldo 0) vuelve solo; NULL u otro valor se trata como MANUAL (no reactivar lo apagado a propósito). */
+export const esAgotadoAutomatico = (origen: string | null | undefined) => origen === ORIGEN_AUTOMATICO;
+
 /**
  * Producto que controla stock POR SABOR: la casilla está marcada, tiene al menos un sabor activo y NO es anfitrión
  * de una oferta COMBO (un Dúo se arma con los grupos del combo, no con una mezcla de sabores propia).
@@ -87,10 +92,10 @@ async function guardarConteo(
  * Reutiliza agotado_hasta y la tabla agotado (igual que cocina y verificarYReactivarAgotados).
  */
 export async function sincronizarAgotadoProducto(db: any, productoId: bigint, saldo: number, ahora = new Date()) {
-  const prod = await db.producto.findUnique({ where: { id: productoId }, select: { agotado_hasta: true } });
+  const prod = await db.producto.findUnique({ where: { id: productoId }, select: { agotado_hasta: true, agotado_origen: true } });
   const agotado = !!prod?.agotado_hasta && new Date(prod.agotado_hasta) > ahora;
   if (saldo <= 0 && !agotado) {
-    await db.producto.update({ where: { id: productoId }, data: { agotado_hasta: FECHA_HASTA_REACTIVAR } });
+    await db.producto.update({ where: { id: productoId }, data: { agotado_hasta: FECHA_HASTA_REACTIVAR, agotado_origen: ORIGEN_AUTOMATICO } });
     await db.agotado.create({
       data: {
         producto_id: productoId,
@@ -100,12 +105,14 @@ export async function sincronizarAgotadoProducto(db: any, productoId: bigint, sa
         hasta: FECHA_HASTA_REACTIVAR,
         por: BigInt(1),
         reactivado_en: null,
+        origen: ORIGEN_AUTOMATICO,
       },
     });
     return 'AGOTADO' as const;
   }
-  if (saldo > 0 && agotado) {
-    await db.producto.update({ where: { id: productoId }, data: { agotado_hasta: null } });
+  // Un agotado MANUAL (o sin origen) no vuelve solo: solo se quita a mano.
+  if (saldo > 0 && agotado && esAgotadoAutomatico(prod?.agotado_origen)) {
+    await db.producto.update({ where: { id: productoId }, data: { agotado_hasta: null, agotado_origen: null } });
     await db.agotado.updateMany({
       where: { producto_id: productoId, reactivado_en: null },
       data: { reactivado_en: ahora },
@@ -113,6 +120,29 @@ export async function sincronizarAgotadoProducto(db: any, productoId: bigint, sa
     return 'REACTIVADO' as const;
   }
   return null;
+}
+
+/**
+ * Al apagar «Controlar stock»: quita el agotado AUTOMATICO del producto y de sus sabores (y cierra su historial
+ * abierto). El MANUAL no se toca: sigue hasta que alguien lo quite.
+ */
+export async function limpiarAgotadosAutomaticosDeProducto(db: any, productoId: bigint, ahora = new Date()) {
+  await db.producto.updateMany({
+    where: { id: productoId, agotado_origen: ORIGEN_AUTOMATICO },
+    data: { agotado_hasta: null, agotado_origen: null },
+  });
+  await db.sabor.updateMany({
+    where: { producto_id: productoId, agotado_origen: ORIGEN_AUTOMATICO },
+    data: { agotado_hasta: null, agotado_origen: null },
+  });
+  await db.agotado.updateMany({
+    where: {
+      reactivado_en: null,
+      origen: ORIGEN_AUTOMATICO,
+      OR: [{ producto_id: productoId }, { sabor: { producto_id: productoId } }],
+    },
+    data: { reactivado_en: ahora },
+  });
 }
 
 /** Sabor repartido en una línea: unidades de ese sabor. */
@@ -292,10 +322,10 @@ export async function saldoSabor(db: any, saborId: bigint): Promise<number> {
  * agotado. Reutiliza sabor.agotado_hasta y la tabla agotado (tipo SABOR). Las ventas y mermas solo lo llaman con saldo 0.
  */
 export async function sincronizarAgotadoSabor(db: any, saborId: bigint, saldo: number, ahora = new Date(), por: bigint = BigInt(1)) {
-  const sab = await db.sabor.findUnique({ where: { id: saborId }, select: { agotado_hasta: true, producto_id: true } });
+  const sab = await db.sabor.findUnique({ where: { id: saborId }, select: { agotado_hasta: true, agotado_origen: true, producto_id: true } });
   const agotado = !!sab?.agotado_hasta && new Date(sab.agotado_hasta) > ahora;
   if (saldo <= 0 && !agotado) {
-    await db.sabor.update({ where: { id: saborId }, data: { agotado_hasta: FECHA_HASTA_REACTIVAR } });
+    await db.sabor.update({ where: { id: saborId }, data: { agotado_hasta: FECHA_HASTA_REACTIVAR, agotado_origen: ORIGEN_AUTOMATICO } });
     await db.agotado.create({
       data: {
         sabor_id: saborId,
@@ -305,12 +335,13 @@ export async function sincronizarAgotadoSabor(db: any, saborId: bigint, saldo: n
         hasta: FECHA_HASTA_REACTIVAR,
         por,
         reactivado_en: null,
+        origen: ORIGEN_AUTOMATICO,
       },
     });
     return 'AGOTADO' as const;
   }
-  if (saldo > 0 && agotado) {
-    await db.sabor.update({ where: { id: saborId }, data: { agotado_hasta: null } });
+  if (saldo > 0 && agotado && esAgotadoAutomatico(sab?.agotado_origen)) {
+    await db.sabor.update({ where: { id: saborId }, data: { agotado_hasta: null, agotado_origen: null } });
     await db.agotado.updateMany({
       where: { sabor_id: saborId, reactivado_en: null },
       data: { reactivado_en: ahora },
@@ -471,6 +502,16 @@ export async function fijarAperturaProducto(
   }
   await guardarConteo(db, { fecha, productoId, saborId: null, lugarId, cantidad, por, ahora });
   await sincronizarAgotadoProducto(db, productoId, cantidad, ahora);
+}
+
+/** Ids de productos (sin sabor) que ya tienen conteo de apertura hoy. El saldo arrastra del día anterior, pero el admin necesita saber si falta contar hoy. */
+export async function aperturaHoyProductos(db: any, ids: bigint[], fecha: string = fechaLimaHoy()): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const filas = await db.conteoApertura.findMany({
+    where: { fecha: fechaColumna(fecha), producto_id: { in: ids }, sabor_id: null },
+    select: { producto_id: true },
+  });
+  return new Set(filas.map((f: any) => f.producto_id.toString()));
 }
 
 /** Quedan de cada producto que controla stock (saldo entero, mínimo 0). Los demás productos no aparecen en el mapa. */

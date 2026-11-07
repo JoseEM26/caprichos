@@ -15,6 +15,7 @@ describe('CatalogoService', () => {
     prisma = {
       // Conteo de apertura del día (productos que controlan stock): sin aperturas en estos casos
       conteoApertura: { findMany: jest.fn().mockResolvedValue([]) },
+      agotado: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       opcionRequiere: { findMany: jest.fn().mockResolvedValue([]) },
       categoria: {
         findMany: jest.fn(),
@@ -440,7 +441,12 @@ describe('CatalogoService', () => {
 
       expect(prisma.producto.update).toHaveBeenCalledWith({
         where: { id: BigInt(15) },
-        data: { agotado_hasta: expect.any(Date) },
+        data: { agotado_hasta: expect.any(Date), agotado_origen: 'MANUAL' },
+      });
+      // Si había un agotado automático abierto, pasa a MANUAL (no vuelve solo)
+      expect(prisma.agotado.updateMany).toHaveBeenCalledWith({
+        where: { producto_id: BigInt(15), reactivado_en: null },
+        data: { origen: 'MANUAL' },
       });
 
       expect(auditoria.registrar).toHaveBeenCalledWith(
@@ -480,7 +486,7 @@ describe('CatalogoService', () => {
 
       expect(prisma.producto.update).toHaveBeenCalledWith({
         where: { id: BigInt(15) },
-        data: { agotado_hasta: null },
+        data: { agotado_hasta: null, agotado_origen: null },
       });
 
       expect(auditoria.registrar).toHaveBeenCalledWith(
@@ -711,6 +717,61 @@ describe('CatalogoService', () => {
     });
   });
 
+  describe('Editar sabores y «Controlar stock» de un producto', () => {
+    const actual = { id: BigInt(1), nombre: 'A', precio: 5, oculto: false, categoria_id: BigInt(1), tamanos: [], grupos: [], sabores: [] };
+    beforeEach(() => {
+      prisma.producto.findUnique.mockResolvedValue(actual);
+      jest.spyOn(service, 'obtenerProductoPorId').mockResolvedValue({} as any);
+      prisma.sabor = { updateMany: jest.fn(), upsert: jest.fn(), update: jest.fn(), findMany: jest.fn().mockResolvedValue([]) };
+    });
+
+    it('apagar «Controlar stock» (true -> false) limpia el agotado AUTOMATICO y respeta el MANUAL', async () => {
+      prisma.producto.findUnique.mockResolvedValue({ ...actual, controla_stock: true });
+      prisma.producto.updateMany = jest.fn();
+      prisma.agotado.updateMany = jest.fn();
+      await service.editarProducto(1, { controlaStock: false } as any);
+      expect(prisma.producto.updateMany).toHaveBeenCalledWith({
+        where: { id: BigInt(1), agotado_origen: 'AUTOMATICO' },
+        data: { agotado_hasta: null, agotado_origen: null },
+      });
+      expect(prisma.sabor.updateMany).toHaveBeenCalledWith({
+        where: { producto_id: BigInt(1), agotado_origen: 'AUTOMATICO' },
+        data: { agotado_hasta: null, agotado_origen: null },
+      });
+      // Nunca se limpia por una condición que incluya lo MANUAL
+      for (const c of [...prisma.producto.updateMany.mock.calls, ...prisma.sabor.updateMany.mock.calls]) {
+        expect(c[0].where.agotado_origen).toBe('AUTOMATICO');
+      }
+    });
+
+    it('no limpia agotados si Controlar stock ya estaba apagado o se mantiene encendido', async () => {
+      prisma.producto.updateMany = jest.fn();
+      prisma.agotado.updateMany = jest.fn();
+      prisma.producto.findUnique.mockResolvedValue({ ...actual, controla_stock: false });
+      await service.editarProducto(1, { controlaStock: false } as any);
+      prisma.producto.findUnique.mockResolvedValue({ ...actual, controla_stock: true });
+      await service.editarProducto(1, { controlaStock: true } as any);
+      expect(prisma.producto.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('guarda controlaStock con el producto', async () => {
+      await service.editarProducto(1, { controlaStock: true } as any);
+      expect(prisma.producto.update.mock.calls[0][0].data.controla_stock).toBe(true);
+      await service.editarProducto(1, { nombre: 'A' } as any);
+      expect(prisma.producto.update.mock.calls[1][0].data.controla_stock).toBeUndefined();
+    });
+
+    it('marcar un sabor Disponible/Agotado cambia activo solo si el sabor es de este producto; el nuevo se crea sin stock', async () => {
+      await service.editarProducto(1, { sabores: [{ id: '7', nombre: 'Fresa', activo: false }, { nombre: 'Oreo', activo: true }] } as any);
+      expect(prisma.sabor.updateMany).toHaveBeenCalledWith({
+        where: { id: BigInt(7), producto_id: BigInt(1) },
+        data: { nombre: 'Fresa', activo: false },
+      });
+      expect(prisma.sabor.update).not.toHaveBeenCalled();
+      expect(prisma.sabor.upsert.mock.calls[0][0].where).toEqual({ producto_id_nombre: { producto_id: BigInt(1), nombre: 'Oreo' } });
+    });
+  });
+
   describe('Anfitrión de combo (Dúo): sin mezcla de sabores propia', () => {
     beforeEach(() => {
       prisma.stockSabor = { findMany: jest.fn().mockResolvedValue([]) };
@@ -853,6 +914,55 @@ describe('CatalogoService', () => {
         { id: '402', nombre: 'Oreo', activo: true, disponible: true, quedan: 2 },
       ]);
       expect(p).toMatchObject({ saboresConStock: true, quedan: 2, disponible: true });
+    });
+  });
+
+  describe('9. Stock y combo en el listado admin', () => {
+    const prod = (extra: any = {}) => ({
+      id: BigInt(50), categoria_id: BigInt(4), categoria: { id: BigInt(4), nombre: 'Donas' }, nombre: 'DONA', descripcion: null,
+      precio: 4, orden: 0, oculto: false, agotado_hasta: null, no_suma_beneficios: false, controla_stock: true,
+      foto_archivo: null, tamanos: [], grupos: [], sabores: [], ofertasAlcance: [], ...extra,
+    });
+    const sab = (id: number, activo = true) => ({ id: BigInt(id), nombre: 'S' + id, activo, agotado_hasta: null });
+
+    it('un anfitrión de combo se marca esAnfitrionCombo (solo lectura); el resto no', async () => {
+      prisma.producto.findMany.mockResolvedValue([prod({ controla_stock: false, ofertasAlcance: [{ id: BigInt(1) }] }), prod({ id: BigInt(51), controla_stock: false })]);
+      const r = await service.listarProductosAdmin({} as any);
+      expect(prisma.producto.findMany.mock.calls[0][0].include.ofertasAlcance).toEqual({ where: { tipo: 'COMBO' }, select: { id: true }, take: 1 });
+      expect(r.map((x: any) => x.esAnfitrionCombo)).toEqual([true, false]);
+    });
+
+    it('sin sabores: quedan es el saldo, aperturaHoy refleja el conteo de hoy y saldo 0 sale NO disponible', async () => {
+      prisma.producto.findMany.mockResolvedValue([prod()]);
+      prisma.stock = { findMany: jest.fn().mockResolvedValue([{ producto_id: BigInt(50), cantidad: 0 }]) };
+      prisma.conteoApertura.findMany.mockResolvedValue([]);
+      const [p] = (await service.listarProductosAdmin({} as any)) as any[];
+      expect(p).toMatchObject({ controlaStock: true, quedan: 0, aperturaHoy: false, disponible: false });
+
+      prisma.stock.findMany.mockResolvedValue([{ producto_id: BigInt(50), cantidad: 5 }]);
+      prisma.conteoApertura.findMany.mockResolvedValue([{ producto_id: BigInt(50) }]);
+      const [q] = (await service.listarProductosAdmin({} as any)) as any[];
+      expect(q).toMatchObject({ quedan: 5, aperturaHoy: true, disponible: true });
+    });
+
+    it('por sabor: con todos los sabores en 0 el admin muestra el producto no disponible; con saldo, disponible', async () => {
+      prisma.producto.findMany.mockResolvedValue([prod({ sabores: [sab(501), sab(502)] })]);
+      prisma.stockSabor = { findMany: jest.fn().mockResolvedValue([]) };
+      prisma.stock = { findMany: jest.fn().mockResolvedValue([]) };
+      let [p] = (await service.listarProductosAdmin({} as any)) as any[];
+      expect(p.disponible).toBe(false);
+      expect(p.sabores.map((s: any) => [s.quedan, s.aperturaHoy])).toEqual([[0, false], [0, false]]);
+
+      prisma.stockSabor.findMany.mockResolvedValue([{ sabor_id: BigInt(502), cantidad: 3 }]);
+      [p] = (await service.listarProductosAdmin({} as any)) as any[];
+      expect(p.disponible).toBe(true);
+      expect(p.sabores[1]).toMatchObject({ quedan: 3, disponible: true });
+    });
+
+    it('un producto que no controla stock no se ve afectado', async () => {
+      prisma.producto.findMany.mockResolvedValue([prod({ controla_stock: false })]);
+      const [p] = (await service.listarProductosAdmin({} as any)) as any[];
+      expect(p).toMatchObject({ disponible: true, quedan: null, aperturaHoy: null });
     });
   });
 
