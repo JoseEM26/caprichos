@@ -78,15 +78,25 @@ export function CuadroEscribir({
         </div>
       ) : (
         <div className="msg-escribir">
-          <input
-            type="text"
+          <textarea
+            rows={1}
             placeholder="Escribe un mensaje"
+            title="Enter envía · Shift+Enter baja a otra línea"
             aria-label="Escribe un mensaje"
             value={textoMensaje}
             disabled={detalle.ocupado}
-            onChange={(e) => onCambiarTexto(e.target.value)}
+            onChange={(e) => {
+              onCambiarTexto(e.target.value);
+              // crece con las líneas (hasta 6) y vuelve a una sola al vaciarse
+              e.target.style.height = 'auto';
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
+            }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') onEnviar();
+              // Enter envía; Shift+Enter baja a la línea siguiente sin enviar
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                onEnviar();
+              }
             }}
           />
           <button
