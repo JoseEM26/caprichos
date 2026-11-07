@@ -34,7 +34,7 @@ if [[ -n "${V[RESTIC_REPOSITORY]:-}" ]]; then
   [[ "${V[RESTIC_REPOSITORY]}" == s3:* ]] || { echo "ERROR: RESTIC_REPOSITORY debe empezar con s3:" >&2; exit 1; }
 fi
 for p in RESTIC_PASSWORD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY KUMA_PUSH_PROD KUMA_PUSH_DEMO; do
-  [[ "${V[$p]:-}" =~ ^[A-Za-z0-9:/._-]*$ ]] || { echo "ERROR: ${p} tiene caracteres no permitidos (solo letras, números y : / . _ -)." >&2; exit 1; }
+  [[ "${V[$p]:-}" =~ ^[A-Za-z0-9:/._+=-]*$ ]] || { echo "ERROR: ${p} tiene caracteres no permitidos (solo letras, números y : / . _ + = -)." >&2; exit 1; }
 done
 
 if [[ "$MODO" == "simulacro" ]]; then
