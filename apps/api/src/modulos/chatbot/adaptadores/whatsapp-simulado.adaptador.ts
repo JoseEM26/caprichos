@@ -296,7 +296,7 @@ export class WhatsAppSimuladoAdaptador implements WhatsAppMensajeriaPuerto {
     }
   }
 
-  async marcarLeido(waMessageId: string): Promise<boolean> {
+  async marcarLeido(waMessageId: string, _phoneNumberId?: string): Promise<boolean> {
     this.logger.log(`[SIMULADO] Marcar como leído mensaje ${waMessageId}`);
     try {
       await this.prisma.whatsappMensaje.updateMany({

@@ -12,6 +12,8 @@ export interface FilaLista {
 }
 
 export interface OpcionesEnvio {
+  /** Numero de WhatsApp Business desde el que se envia (el que recibio al cliente). Sin el, el WHATSAPP_PHONE_ID. */
+  phoneNumberId?: string;
   pedidoId?: bigint | string;
   conversacionId?: bigint | string;
   replyToWaMessageId?: string;
@@ -79,7 +81,7 @@ export interface WhatsAppMensajeriaPuerto {
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp>;
 
-  marcarLeido(waMessageId: string): Promise<boolean>;
+  marcarLeido(waMessageId: string, phoneNumberId?: string): Promise<boolean>;
 
   estaConectado(): EstadoConexionWhatsApp;
 }

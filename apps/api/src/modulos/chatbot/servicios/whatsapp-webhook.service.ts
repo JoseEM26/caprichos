@@ -69,6 +69,12 @@ export const TIPOS_MEDIA_PERMITIDOS = [
   'application/pdf',
 ];
 
+/** Numero de WhatsApp Business que recibio un evento (phone_number_id de Meta y numero para mostrar). */
+export interface ReceptorWhatsapp {
+  id: string;
+  display?: string;
+}
+
 @Injectable()
 export class WhatsappWebhookService {
   private readonly logger = new Logger(WhatsappWebhookService.name);
@@ -333,15 +339,15 @@ export class WhatsappWebhookService {
   /**
    * Procesa un mensaje entrante de un cliente (texto, interactivo/botón o imagen).
    */
-  private async procesarMensajeEntrante(msg: any, contacts: any[] = []) {
+  private async procesarMensajeEntrante(msg: any, contacts: any[] = [], receptor?: ReceptorWhatsapp) {
     // Un solo mensaje por conversación a la vez: el toque rápido espera al anterior y lee el estado ya guardado.
     const de = String(msg?.from || msg?.from_user_id || contacts?.[0]?.wa_id || msg?.id || '').replace(/\D/g, '') || String(msg?.from_user_id || msg?.id || 'anon');
     let redisCliente: any = null;
     try { redisCliente = this.redis?.obtenerCliente() ?? null; } catch { redisCliente = null; }
-    return ejecutarEnSerie(`wa:${de}`, redisCliente, () => this.procesarMensajeEntranteSerie(msg, contacts));
+    return ejecutarEnSerie(`wa:${de}`, redisCliente, () => this.procesarMensajeEntranteSerie(msg, contacts, receptor));
   }
 
-  private async procesarMensajeEntranteSerie(msg: any, contacts: any[] = []) {
+  private async procesarMensajeEntranteSerie(msg: any, contacts: any[] = [], receptor?: ReceptorWhatsapp) {
     const waMessageId = msg.id;
 
     // Contacto y nombre de perfil defensivo (contacts[].profile.name)
@@ -472,6 +478,8 @@ export class WhatsappWebhookService {
           nombre_contacto: nombrePerfil,
           nombre_editado: false,
           identificador_tipo: tipoIdentificador,
+          phone_number_id: receptor?.id ?? null,
+          numero_receptor: receptor?.display ?? null,
           flujo: nombrePerfil ? { nombre_perfil_wa: nombrePerfil } : undefined,
           ultima_actividad: new Date(),
         },
@@ -492,6 +500,12 @@ export class WhatsappWebhookService {
 
       if (conversacion.identificador_tipo !== tipoIdentificador) {
         dataUpdate.identificador_tipo = tipoIdentificador;
+      }
+
+      // Se responde desde el numero por el que escribio el cliente (la ventana de 24 h es por numero)
+      if (receptor && conversacion.phone_number_id !== receptor.id) {
+        dataUpdate.phone_number_id = receptor.id;
+        dataUpdate.numero_receptor = receptor.display ?? null;
       }
 
       conversacion = await this.prisma.conversacion.update({
@@ -1281,6 +1295,28 @@ export class WhatsappWebhookService {
   /**
    * Procesa el cuerpo completo del Webhook de WhatsApp de forma asíncrona y segura.
    */
+  /**
+   * Numero de la cuenta que recibio el evento (metadata del payload firmado). Solo cifras: otra cosa se omite con log.
+   * Si WHATSAPP_PHONE_IDS_EXTRA esta definida, solo valen WHATSAPP_PHONE_ID y esos; si no, cualquier numero de la
+   * cuenta firmada (asi el numero antiguo funciona sin configurar nada). Sin metadata: numero de siempre.
+   */
+  private receptorDe(metadata: any): ReceptorWhatsapp | undefined | 'OMITIR' {
+    const id = String(metadata?.phone_number_id ?? '').trim();
+    if (!id) return undefined;
+    const principal = (this.configService.get<string>('WHATSAPP_PHONE_ID', '') ?? '').trim();
+    const extra = (this.configService.get<string>('WHATSAPP_PHONE_IDS_EXTRA', '') ?? '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const permitido = !/^[0-9]{5,25}$/.test(id) ? false : !extra.length || id === principal || extra.includes(id);
+    if (!permitido) {
+      this.logger.warn(`Evento de WhatsApp omitido: numero receptor no permitido (${id.slice(0, 30)})`);
+      return 'OMITIR';
+    }
+    const display = String(metadata?.display_phone_number ?? '').replace(/[^0-9+]/g, '').slice(0, 20);
+    return { id, display: display || undefined };
+  }
+
   async procesarPayload(payload: any) {
     if (!payload || payload.object !== 'whatsapp_business_account') {
       return { procesados: 0, estados: 0 };
@@ -1296,6 +1332,9 @@ export class WhatsappWebhookService {
         const val = change.value;
         if (!val) continue;
 
+        const receptor = this.receptorDe(val.metadata);
+        if (receptor === 'OMITIR') continue;
+
         // 1. Estados de entrega (sent, delivered, read, failed)
         if (Array.isArray(val.statuses)) {
           for (const status of val.statuses) {
@@ -1307,7 +1346,7 @@ export class WhatsappWebhookService {
         // 2. Mensajes entrantes
         if (Array.isArray(val.messages)) {
           for (const msg of val.messages) {
-            const nuevo = await this.procesarMensajeEntrante(msg, val.contacts);
+            const nuevo = await this.procesarMensajeEntrante(msg, val.contacts, receptor);
             if (nuevo) mensajesProcesados++;
           }
         }

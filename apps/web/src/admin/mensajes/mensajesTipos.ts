@@ -20,6 +20,8 @@ export interface MensajeItem {
   /** Solo ADMIN: código numérico de Meta (p. ej. 132012). */
   metaCodigo?: string | null;
   motivoFallo?: string | null;
+  /** false: reintentar no sirve (ventana de 24 h); hay que reabrir con plantilla. */
+  puedeReintentar?: boolean;
 }
 
 export interface BloqueoSpam {
@@ -95,6 +97,8 @@ export interface DetalleConversacion {
   esMio: boolean;
   ocupado: boolean;
   ventanaAbierta?: boolean;
+  /** Numero de la cuenta al que escribio el cliente (ej. 51914244077). */
+  numeroReceptor?: string | null;
   modo?: 'meta' | 'simulado';
   simulado?: boolean;
   mensajes: MensajeItem[];

@@ -35,4 +35,11 @@ describe('Burbuja de un mensaje fallido', () => {
     render(<BurbujaMensaje mensaje={{ ...base, motivoFallo: 'La plantilla de WhatsApp no se pudo enviar.' }} onReintentar={vi.fn()} />);
     expect(screen.queryByText('Detalle técnico')).toBeNull();
   });
+
+  it('con error de 24 h (puedeReintentar false) no ofrece Reintentar; con otros errores si', () => {
+    const { rerender } = render(<BurbujaMensaje mensaje={{ ...base, motivoFallo: 'Ventana cerrada', puedeReintentar: false }} onReintentar={vi.fn()} />);
+    expect(screen.queryByText('Reintentar')).toBeNull();
+    rerender(<BurbujaMensaje mensaje={{ ...base, motivoFallo: 'Fallo temporal', puedeReintentar: true }} onReintentar={vi.fn()} />);
+    expect(screen.getByText('Reintentar')).toBeTruthy();
+  });
 });

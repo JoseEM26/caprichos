@@ -20,6 +20,16 @@ const MENSAJES_META: Record<string, string> = {
   '368': 'Meta bloqueó temporalmente la cuenta por incumplir sus políticas. Hay que revisarla en Meta.',
 };
 
+/** Meta cuenta las 24 h por numero de la cuenta: el cliente pudo escribirle a otro numero. */
+export const TEXTO_VENTANA_24H =
+  'El cliente no le ha escrito a este numero en las ultimas 24 horas: si escribio a otro numero de la cuenta, el bot responde desde ese. Usa «Reabrir con plantilla»';
+
+/** Errores de ventana de 24 h: reintentar el mismo texto no sirve, hay que reabrir con plantilla. */
+export const esErrorVentana24h = (codigo?: string | null, detalle?: string | null): boolean =>
+  codigo === 'VENTANA_CERRADA' ||
+  codigo === 'FUERA_DE_VENTANA_24H' ||
+  /131047|24 hours|24-hour/i.test(detalle ?? '');
+
 export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | null): string {
   const c = String(codigo || '').toUpperCase();
   const d = String(detalle || '').toLowerCase();
@@ -65,7 +75,7 @@ export function mapearErrorWhatsApp(codigo?: string | null, detalle?: string | n
     d.includes('24-hour') ||
     d.includes('131047')
   ) {
-    return 'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada';
+    return TEXTO_VENTANA_24H;
   }
 
   // BSUID o identificador no permitido o rechazado por Meta (100 / 131009 / formato / recipient)

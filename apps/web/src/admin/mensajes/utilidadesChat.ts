@@ -74,3 +74,10 @@ export function telefonoDeUrl(): string {
     return '';
   }
 }
+
+/** 51914244077 pasa a «+51 914 244 077»; otro formato se muestra con «+» delante. */
+export function formatearNumeroReceptor(n: string): string {
+  const d = n.replace(/\D/g, "");
+  const m = /^(51)(\d{3})(\d{3})(\d{3})$/.exec(d);
+  return m ? `+${m[1]} ${m[2]} ${m[3]} ${m[4]}` : `+${d}`;
+}

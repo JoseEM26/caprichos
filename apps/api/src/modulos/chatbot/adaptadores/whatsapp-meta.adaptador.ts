@@ -101,6 +101,34 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     };
   }
 
+  /** Numero emisor: el de la conversacion si es valido (solo cifras); si no, el WHATSAPP_PHONE_ID de siempre. */
+  private phoneDe(opciones?: { phoneNumberId?: string }): string {
+    const p = (opciones?.phoneNumberId ?? '').trim();
+    return /^[0-9]{5,25}$/.test(p) ? p : this.phoneId;
+  }
+
+  /**
+   * Fija el numero emisor de este envio. Orden: el que pidio quien llama; el de la conversacion
+   * (por conversacionId o por telefono: cubre bot, Mensajes, outbox, reintentos y avisos); si no hay, el de siempre.
+   * Un solo punto para todos los emisores. Un fallo de lectura nunca rompe el envio.
+   */
+  private async conNumero(opciones?: OpcionesEnvio, telefono?: string): Promise<OpcionesEnvio | undefined> {
+    if (opciones?.phoneNumberId) return opciones;
+    try {
+      const convId = this.parsearId(opciones?.conversacionId);
+      const tel = telefono ? [telefono, normalizarTelefono(telefono)].filter(Boolean) : [];
+      if (!convId && !tel.length) return opciones;
+      const c = await this.prisma.conversacion.findFirst({
+        where: convId ? { id: convId } : { telefono: { in: tel as string[] } },
+        select: { phone_number_id: true },
+      });
+      return c?.phone_number_id ? { ...opciones, phoneNumberId: c.phone_number_id } : opciones;
+    } catch (e: any) {
+      this.logger.warn(`No se pudo leer el numero de la conversacion: ${e?.message}`);
+      return opciones;
+    }
+  }
+
   private parsearId(id?: bigint | string): bigint | undefined {
     if (!id) return undefined;
     try {
@@ -393,11 +421,12 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     texto: string,
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
+    opciones = await this.conNumero(opciones, telefono);
     const destinatario = construirDestinatario(telefono);
     const telHash = hashTelefono(telefono);
     const telMask = enmascararTelefono(telefono);
 
-    if (!this.token || !this.phoneId) {
+    if (!this.token || !this.phoneDe(opciones)) {
       return {
         exito: false,
         estado: 'FALLIDO',
@@ -406,7 +435,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       };
     }
 
-    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneDe(opciones)}/messages`;
     const payload: any = {
       messaging_product: 'whatsapp',
       ...destinatario,
@@ -457,11 +486,12 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     variables?: Record<string, string> | string[],
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
+    opciones = await this.conNumero(opciones, telefono);
     const destinatario = construirDestinatario(telefono);
     const telHash = hashTelefono(telefono);
     const telMask = enmascararTelefono(telefono);
 
-    if (!this.token || !this.phoneId) {
+    if (!this.token || !this.phoneDe(opciones)) {
       return {
         exito: false,
         estado: 'FALLIDO',
@@ -470,7 +500,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       };
     }
 
-    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneDe(opciones)}/messages`;
 
     // Armar componentes de la plantilla según variables
     const components: any[] = [];
@@ -555,11 +585,12 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     botones: BotonAccion[],
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
+    opciones = await this.conNumero(opciones, telefono);
     const destinatario = construirDestinatario(telefono);
     const telHash = hashTelefono(telefono);
     const telMask = enmascararTelefono(telefono);
 
-    if (!this.token || !this.phoneId) {
+    if (!this.token || !this.phoneDe(opciones)) {
       return {
         exito: false,
         estado: 'FALLIDO',
@@ -568,7 +599,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       };
     }
 
-    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneDe(opciones)}/messages`;
 
     // Meta permite máximo 3 botones en reply buttons
     const botonesFormateados = botones.slice(0, 3).map((btn) => ({
@@ -632,11 +663,12 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     filas: FilaLista[],
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
+    opciones = await this.conNumero(opciones, telefono);
     const destinatario = construirDestinatario(telefono);
     const telHash = hashTelefono(telefono);
     const telMask = enmascararTelefono(telefono);
 
-    if (!this.token || !this.phoneId) {
+    if (!this.token || !this.phoneDe(opciones)) {
       return {
         exito: false,
         estado: 'FALLIDO',
@@ -645,7 +677,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       };
     }
 
-    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneDe(opciones)}/messages`;
 
     // Meta permite máximo 10 filas en listas interactivas
     const filasFormateadas = filas.slice(0, 10).map((fila) => ({
@@ -712,13 +744,13 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
   private static readonly VIDA_MEDIA_MS = 25 * 24 * 3600 * 1000;
 
   /** Sube un JPEG a la Media API de Meta y devuelve el media id (null si falla). */
-  async subirMedia(jpg: Buffer): Promise<string | null> {
+  async subirMedia(jpg: Buffer, phoneNumberId?: string): Promise<string | null> {
     const form = new FormData();
     form.append('messaging_product', 'whatsapp');
     form.append('type', 'image/jpeg');
     form.append('file', new Blob([new Uint8Array(jpg)], { type: 'image/jpeg' }), 'imagen.jpg');
     try {
-      const r = await fetch(`https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/media`, {
+      const r = await fetch(`https://graph.facebook.com/${this.apiVersion}/${this.phoneDe({ phoneNumberId })}/media`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${this.token}` },
         body: form,
@@ -734,17 +766,20 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
   }
 
   /** Media id de la imagen de una tarjeta, con caché en `parametro` por (producto + sha1 del JPEG). Null = usar link. */
-  private async mediaIdTarjeta(imagenUrl: string | null): Promise<string | null> {
+  private async mediaIdTarjeta(imagenUrl: string | null, phoneNumberId?: string): Promise<string | null> {
     const productoId = /\/carta\/productos\/(\d+)\/imagen-wa\.jpg/.exec(imagenUrl ?? '')?.[1];
     if (!productoId || !this.catalogo) return null;
     try {
       const foto = await this.catalogo.fotoProductoVisible(productoId);
       if (!foto) return null;
       const jpg = await jpegProductoWhatsApp(productoId, foto.nombre, foto.ruta, this.configService.get<string>('UPLOADS_DIR') || './data/uploads');
-      const clave = `wa_media:${productoId}:${createHash('sha1').update(jpg).digest('hex')}`;
+      // Los media id van ligados al numero que sube: otro numero usa su propia cache y subida.
+      const phone = this.phoneDe({ phoneNumberId });
+      const sufijo = phone === this.phoneId ? '' : `:${phone}`;
+      const clave = `wa_media:${productoId}:${createHash('sha1').update(jpg).digest('hex')}${sufijo}`;
       const previo: any = (await this.prisma.parametro.findUnique({ where: { clave } }))?.valor;
       if (previo?.mediaId && Date.now() - Number(previo.en) < WhatsAppMetaAdaptador.VIDA_MEDIA_MS) return previo.mediaId;
-      const mediaId = await this.subirMedia(jpg);
+      const mediaId = await this.subirMedia(jpg, phoneNumberId);
       if (mediaId) {
         const valor = { mediaId, en: Date.now() };
         await this.prisma.parametro.upsert({ where: { clave }, create: { clave, valor }, update: { valor } });
@@ -757,13 +792,13 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
   }
 
   /** Media ids de todas las tarjetas, 4 subidas a la vez. */
-  private async mediaIdsCarrusel(carga: CargaCarrusel): Promise<Array<string | null>> {
+  private async mediaIdsCarrusel(carga: CargaCarrusel, phoneNumberId?: string): Promise<Array<string | null>> {
     const ids: Array<string | null> = new Array(carga.tarjetas.length).fill(null);
     let sig = 0;
     const worker = async () => {
       while (sig < ids.length) {
         const i = sig++;
-        ids[i] = await this.mediaIdTarjeta(carga.tarjetas[i].imagenUrl);
+        ids[i] = await this.mediaIdTarjeta(carga.tarjetas[i].imagenUrl, phoneNumberId);
       }
     };
     await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
@@ -782,10 +817,11 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
   }
 
   async enviarCarrusel(telefono: string, carga: CargaCarrusel, opciones?: OpcionesEnvio): Promise<ResultadoEnvioWhatsApp> {
+    opciones = await this.conNumero(opciones, telefono);
     const destinatario = construirDestinatario(telefono);
     const telMask = enmascararTelefono(telefono);
 
-    if (!this.token || !this.phoneId) {
+    if (!this.token || !this.phoneDe(opciones)) {
       return {
         exito: false,
         estado: 'FALLIDO',
@@ -798,7 +834,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       return { exito: false, estado: 'FALLIDO', errorCodigo: 'CARRUSEL_SIN_URL_PUBLICA', errorDetalle: 'Las tarjetas necesitan imagen HTTPS pública' };
     }
 
-    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneDe(opciones)}/messages`;
     const armar = (ids: Array<string | null>) => {
       const payload: any = {
         messaging_product: 'whatsapp',
@@ -812,7 +848,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     const marcar = (ids: Array<string | null>) => carga.tarjetas.forEach((t, i) => (t.via = ids[i] ? 'id' : 'link'));
 
     // Imagen por media id subido (no depende de que Meta descargue el link); sin subida, link
-    let ids = await this.mediaIdsCarrusel(carga);
+    let ids = await this.mediaIdsCarrusel(carga, opciones?.phoneNumberId);
     marcar(ids);
     let resultado = await this.ejecutarConReintentos(url, armar(ids), telMask);
     if (!resultado.exito && ids.some(Boolean)) {
@@ -859,11 +895,12 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     caption?: string,
     opciones?: OpcionesEnvio,
   ): Promise<ResultadoEnvioWhatsApp> {
+    opciones = await this.conNumero(opciones, telefono);
     const destinatario = construirDestinatario(telefono);
     const telHash = hashTelefono(telefono);
     const telMask = enmascararTelefono(telefono);
 
-    if (!this.token || !this.phoneId) {
+    if (!this.token || !this.phoneDe(opciones)) {
       return {
         exito: false,
         estado: 'FALLIDO',
@@ -872,7 +909,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       };
     }
 
-    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneDe(opciones)}/messages`;
     const esUrl = urlOArchivo.startsWith('http://') || urlOArchivo.startsWith('https://');
 
     const payload: any = {
@@ -920,10 +957,11 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
     };
   }
 
-  async marcarLeido(waMessageId: string): Promise<boolean> {
-    if (!this.token || !this.phoneId) return false;
+  async marcarLeido(waMessageId: string, phoneNumberId?: string): Promise<boolean> {
+    const opciones = { phoneNumberId };
+    if (!this.token || !this.phoneDe(opciones)) return false;
 
-    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneId}/messages`;
+    const url = `https://graph.facebook.com/${this.apiVersion}/${this.phoneDe(opciones)}/messages`;
     const payload = {
       messaging_product: 'whatsapp',
       status: 'read',

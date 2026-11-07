@@ -99,7 +99,9 @@ Ver tambien: [[caja]]
 - La inteligencia artificial nunca aprueba ni rechaza pagos por su cuenta; el semaforo y los datos extraidos son una guia visual para que el operador decida.
 - Toda imagen de comprobante que llega por WhatsApp se guarda y se analiza, aunque el cliente no tenga pedido asociado o escriba sin telefono. Si la IA no puede leerla, queda como Sin lectura y la decide una persona.
 - Si Meta no entrega la imagen (mas de 5 MB o falla la descarga), Caja recibe el aviso Comprobante no recibido: pide al cliente que la reenvie.
-- Si el mensaje muestra un icono rojo de error de envio, pulsar el boton Reintentar envio.
+- Si el mensaje muestra un icono rojo de error de envio, pulsar el boton Reintentar envio. Excepcion: si el motivo habla de las 24 horas no aparece Reintentar, porque repetir el mismo texto no sirve; usa Reabrir con plantilla.
+- Cuando un chat tiene el dato "Escribio al: +51 ..." en la cabecera, ese es el numero de WhatsApp de la cuenta al que escribio el cliente. La cuenta puede tener varios numeros (por ejemplo el nuevo y el antiguo) y el bot, Caja y Mensajes siempre responden desde el mismo numero por el que escribio el cliente. Las 24 horas de WhatsApp se cuentan por numero: si el motivo dice que el cliente no le ha escrito a este numero en las ultimas 24 horas, es posible que haya escrito a otro numero de la cuenta; espera a que el bot responda desde ese o usa Reabrir con plantilla.
+- Un mensaje del equipo o del bot que no muestra estado de envio no es un envio de prueba: Modo simulado solo aparece cuando la cuenta de WhatsApp no esta conectada (faltan sus credenciales).
 - Si el bot esta interfiriendo en una conversacion delicada, pulsar Pausar bot para detener sus respuestas automaticas en ese chat; al finalizar la consulta, pulsar Reanudar bot.
 - El nombre del contacto se puede editar pulsando el icono del lapiz al costado del nombre en la cabecera.
 - Un pedido de la carta virtual con Yape, Plin o transferencia y celular deja su chat en Validar pago y urgente: el cliente recibe el aviso de que un asesor gestionara el voucher, y el chat aparece aqui para que lo atiendas.

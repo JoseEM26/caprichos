@@ -2035,8 +2035,12 @@ model Conversacion {
   identificador_tipo String             @default("TELEFONO") // TELEFONO | USUARIO_WA
   motivo_derivacion  String?
   ultima_actividad   DateTime           @default(now()) @db.Timestamptz
+  /// phone_number_id de Meta del numero al que escribio el cliente; desde ese se le responde.
+  phone_number_id    String?
+  /// Ese mismo numero para mostrar (display_phone_number), p. ej. 51914244077.
+  numero_receptor    String?
 
-  party              Party?             @relation(fields: [party_id], references: [id])
+  party              Party?           @relation(fields: [party_id], references: [id])
   tomadoPorUsuario   UserAccount?       @relation(fields: [tomado_por], references: [id])
   mensajes           MensajeChat[]
   solicitudesReserva SolicitudReserva[]

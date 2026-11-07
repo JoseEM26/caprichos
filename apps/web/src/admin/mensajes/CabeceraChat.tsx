@@ -1,7 +1,7 @@
 import { InsigniaBloqueoSpam } from './BloqueoSpam';
 import { DetalleConversacion } from './mensajesTipos';
 import { MenuChat, MenuChatProps } from './MenuChat';
-import { ESTADOS_BG, ESTADOS_LABEL, esUsuarioWhatsApp, obtenerColorAvatar, obtenerIniciales } from './utilidadesChat';
+import { ESTADOS_BG, ESTADOS_LABEL, esUsuarioWhatsApp, formatearNumeroReceptor, obtenerColorAvatar, obtenerIniciales } from './utilidadesChat';
 
 export interface CabeceraChatProps {
   detalle: DetalleConversacion;
@@ -33,6 +33,9 @@ export function CabeceraChat({ detalle, puedeDesbloquear, onVolver, onAbrirDetal
           {esUsuarioWhatsApp(detalle) ? 'Usuario de WhatsApp' : detalle.telefono}
           {detalle.modalidad ? ` · ${detalle.modalidad}` : ''}
         </span>
+        {detalle.numeroReceptor && (
+          <span className="msg-chead-tel">Escribió al: {formatearNumeroReceptor(detalle.numeroReceptor)}</span>
+        )}
       </div>
       <div className="msg-chead-chips">
         <span className="msg-chip" style={{ background: detalle.urgente ? '#F8C9C9' : ESTADOS_BG[detalle.estado] || '#EEF2F4' }}>

@@ -32,14 +32,14 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
             {m.estado === 'FALLIDO' ? (
               <span style={{ color: '#A3261A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span>{m.motivoFallo ? `No se pudo enviar: ${m.motivoFallo}` : 'No se pudo enviar'}</span>
-                <button
+                {m.puedeReintentar !== false && <button
                   type="button"
                   className="msg-btn"
                   onClick={() => onReintentar(m.id)}
                   style={{ minHeight: 32, padding: '0 8px', borderColor: '#A3261A', color: '#A3261A', fontSize: 12 }}
                 >
                   Reintentar
-                </button>
+                </button>}
                 {m.errorDetalle && (
                   <details style={{ flexBasis: '100%', fontWeight: 400, fontSize: 12, color: '#54656F' }}>
                     <summary>Detalle técnico</summary>

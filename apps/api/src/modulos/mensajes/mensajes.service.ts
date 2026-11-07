@@ -16,7 +16,7 @@ import {
 } from './utilidades/nombre-contacto.util';
 import { flujoLiberadoParaBot } from '../chatbot/conversacion/flujo-liberado.util';
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
-import { mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
+import { esErrorVentana24h, mapearErrorWhatsApp } from './utilidades/error-whatsapp.util';
 import { separarDetalleTecnico } from '../chatbot/utilidades/meta-errores.util';
 import { EditarNombreContactoDto } from './dto/mensajes.dto';
 import { MATRIZ } from '../acceso/permisos';
@@ -354,13 +354,14 @@ export class MensajesService {
       ventanaAbierta,
       modo,
       simulado,
+      numeroReceptor: c.numero_receptor ?? null,
       mensajes: mensajes.map((m) => {
         const wa = m.whatsappMensaje || (m.meta_id ? waPorMetaId.get(m.meta_id) : null);
         const contenido = (m.contenido as any) || {};
         const estadoMsg =
           wa?.estado ||
           contenido.estado ||
-          (m.direccion === 'SALE' ? (m.meta_id ? 'ENVIADO' : 'SIMULADO') : undefined);
+          (m.direccion === 'SALE' ? (m.meta_id ? 'ENVIADO' : modo === 'simulado' ? 'SIMULADO' : undefined) : undefined);
         const errorCodigo = wa?.error_codigo || contenido.errorCodigo || null;
         const errorDetalle = wa?.error_detalle || contenido.errorDetalle || null;
         const motivoFallo =
@@ -385,6 +386,7 @@ export class MensajesService {
           errorDetalle: esAdmin ? tecnico?.original ?? null : null,
           metaCodigo: esAdmin ? tecnico?.codigoMeta ?? null : null,
           motivoFallo,
+          puedeReintentar: estadoMsg === 'FALLIDO' ? !esErrorVentana24h(errorCodigo, errorDetalle) : undefined,
         };
       }),
       pedido: pedido

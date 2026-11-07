@@ -69,6 +69,11 @@ export class VariablesEntorno {
   @IsOptional()
   WHATSAPP_PHONE_ID?: string;
 
+  /** Numeros adicionales de la misma cuenta (phone_number_id, separados por coma). Vacio: se acepta cualquiera de la cuenta firmada. */
+  @IsString()
+  @IsOptional()
+  WHATSAPP_PHONE_IDS_EXTRA?: string;
+
   @IsString()
   @IsOptional()
   WHATSAPP_VERIFY_TOKEN?: string;
