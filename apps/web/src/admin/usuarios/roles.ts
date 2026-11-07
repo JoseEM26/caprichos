@@ -4,7 +4,6 @@ export const ROLES_ASIGNABLES: string[] = [
   'CAJERO',
   'MOZO',
   'COCINA',
-  'CALLCENTER',
   'ALMACEN',
   'REPARTIDOR',
   'SUPERVISOR',
@@ -51,7 +50,8 @@ export const ETIQUETAS_ROLES: Record<string, string> = {
   COCINA: 'Cocina (Comandas y preparación)',
   BARRA: 'Barra (Bebidas y postres)',
   REPARTIDOR: 'Repartidor (Delivery)',
-  CALLCENTER: 'Call center (Atención y pedidos)',
+  // Rol eliminado: solo para mostrar el nombre en historiales antiguos
+  CALLCENTER: 'Call Center (rol eliminado)',
   ALMACEN: 'Almacén (Stock y compras)',
   SUPERVISOR: 'Supervisor (Caja y salón, y ve el código de supervisor)',
 };

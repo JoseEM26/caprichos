@@ -21,11 +21,6 @@
       "etiqueta": "Rol: MOZO"
     },
     {
-      "id": "rol:CALLCENTER",
-      "tipo": "rol",
-      "etiqueta": "Rol: CALLCENTER"
-    },
-    {
       "id": "rol:ALMACEN",
       "tipo": "rol",
       "etiqueta": "Rol: ALMACEN"
@@ -34,6 +29,11 @@
       "id": "rol:REPARTIDOR",
       "tipo": "rol",
       "etiqueta": "Rol: REPARTIDOR"
+    },
+    {
+      "id": "rol:SUPERVISOR",
+      "tipo": "rol",
+      "etiqueta": "Rol: SUPERVISOR"
     },
     {
       "id": "almacen",
@@ -78,6 +78,132 @@
       "modulo": "almacen"
     },
     {
+      "id": "almacen#encender-o-apagar-el-control-de-almacen",
+      "tipo": "tarea",
+      "etiqueta": "Encender o apagar el control de almacen",
+      "modulo": "almacen"
+    },
+    {
+      "id": "almacen#contar-los-productos-terminados-donas-galletas-postres",
+      "tipo": "tarea",
+      "etiqueta": "Contar los productos terminados (donas, galletas, postres)",
+      "modulo": "almacen"
+    },
+    {
+      "id": "apertura",
+      "tipo": "modulo",
+      "etiqueta": "Apertura del dia (conteo de productos terminados) (apertura)",
+      "modulo": "apertura",
+      "ruta": "/admin/apertura"
+    },
+    {
+      "id": "permiso:almacen/apertura",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: almacen/apertura"
+    },
+    {
+      "id": "apertura#hacer-el-conteo-de-apertura",
+      "tipo": "tarea",
+      "etiqueta": "Hacer el conteo de apertura",
+      "modulo": "apertura"
+    },
+    {
+      "id": "apertura#botar-un-producto-a-merma",
+      "tipo": "tarea",
+      "etiqueta": "Botar un producto a merma",
+      "modulo": "apertura"
+    },
+    {
+      "id": "apertura#activar-el-control-de-stock-de-un-producto",
+      "tipo": "tarea",
+      "etiqueta": "Activar el control de stock de un producto",
+      "modulo": "apertura"
+    },
+    {
+      "id": "asistencia-pantalla",
+      "tipo": "modulo",
+      "etiqueta": "Pantalla de asistencia (QR) (asistencia-pantalla)",
+      "modulo": "asistencia-pantalla",
+      "ruta": "/admin/asistencia/pantalla"
+    },
+    {
+      "id": "permiso:asistencia/pantalla",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: asistencia/pantalla"
+    },
+    {
+      "id": "asistencia-pantalla#poner-la-pantalla-en-la-tablet-del-local",
+      "tipo": "tarea",
+      "etiqueta": "Poner la pantalla en la tablet del local",
+      "modulo": "asistencia-pantalla"
+    },
+    {
+      "id": "asistencia-pantalla#instalar-la-app-qr-asistencia-en-la-tablet",
+      "tipo": "tarea",
+      "etiqueta": "Instalar la app QR Asistencia en la tablet",
+      "modulo": "asistencia-pantalla"
+    },
+    {
+      "id": "asistencia-pantalla#regenerar-o-desactivar-el-enlace",
+      "tipo": "tarea",
+      "etiqueta": "Regenerar o desactivar el enlace",
+      "modulo": "asistencia-pantalla"
+    },
+    {
+      "id": "asistencia",
+      "tipo": "modulo",
+      "etiqueta": "Asistencia del personal (asistencia)",
+      "modulo": "asistencia",
+      "ruta": "/admin/asistencia"
+    },
+    {
+      "id": "permiso:asistencia/administrar",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: asistencia/administrar"
+    },
+    {
+      "id": "asistencia#ver-como-va-el-dia-pestana-hoy",
+      "tipo": "tarea",
+      "etiqueta": "Ver como va el dia (pestana Hoy)",
+      "modulo": "asistencia"
+    },
+    {
+      "id": "asistencia#ver-el-mes-y-descargarlo-pestana-mensual",
+      "tipo": "tarea",
+      "etiqueta": "Ver el mes y descargarlo (pestana Mensual)",
+      "modulo": "asistencia"
+    },
+    {
+      "id": "asistencia#revisar-marcas-y-selfies",
+      "tipo": "tarea",
+      "etiqueta": "Revisar marcas y selfies",
+      "modulo": "asistencia"
+    },
+    {
+      "id": "asistencia#corregir-una-marca-olvidada",
+      "tipo": "tarea",
+      "etiqueta": "Corregir una marca olvidada",
+      "modulo": "asistencia"
+    },
+    {
+      "id": "asistencia#fijar-la-ubicacion-del-local-y-las-reglas-pestana-configuracion",
+      "tipo": "tarea",
+      "etiqueta": "Fijar la ubicacion del local y las reglas (pestana Configuracion)",
+      "modulo": "asistencia"
+    },
+    {
+      "id": "asistencia#reiniciar-el-celular-de-una-persona",
+      "tipo": "tarea",
+      "etiqueta": "Reiniciar el celular de una persona",
+      "modulo": "asistencia"
+    },
+    {
+      "id": "asistencia#preparar-la-pantalla-del-qr",
+      "tipo": "tarea",
+      "etiqueta": "Preparar la pantalla del QR",
+      "modulo": "asistencia"
+    },
+    {
       "id": "caja",
       "tipo": "modulo",
       "etiqueta": "Pedidos y caja (caja)",
@@ -96,6 +222,12 @@
       "modulo": "caja"
     },
     {
+      "id": "caja#regla-de-caja-abierta",
+      "tipo": "tarea",
+      "etiqueta": "Regla de caja abierta",
+      "modulo": "caja"
+    },
+    {
       "id": "caja#mover-un-voucher-al-pedido-correcto",
       "tipo": "tarea",
       "etiqueta": "mover un voucher al pedido correcto",
@@ -105,6 +237,12 @@
       "id": "caja#cobrar-un-pedido",
       "tipo": "tarea",
       "etiqueta": "Cobrar un pedido",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#aplicar-un-cupon-en-un-pedido-nuevo",
+      "tipo": "tarea",
+      "etiqueta": "Aplicar un cupon en un pedido nuevo",
       "modulo": "caja"
     },
     {
@@ -150,6 +288,36 @@
       "modulo": "caja"
     },
     {
+      "id": "caja#dar-una-cortesia-producto-a-costo-s-0",
+      "tipo": "tarea",
+      "etiqueta": "Dar una cortesia (producto a costo S/ 0)",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#cambiar-la-ubicacion-de-un-pedido-de-delivery",
+      "tipo": "tarea",
+      "etiqueta": "Cambiar la ubicacion de un pedido de delivery",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#validar-un-cambio-de-forma-de-pago-pedido-por-el-repartidor",
+      "tipo": "tarea",
+      "etiqueta": "Validar un cambio de forma de pago pedido por el repartidor",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#atender-un-delivery-que-espera-la-ubicacion-del-cliente",
+      "tipo": "tarea",
+      "etiqueta": "Atender un delivery que espera la ubicacion del cliente",
+      "modulo": "caja"
+    },
+    {
+      "id": "caja#leer-las-insignias-n-del-dia-y-las-propinas",
+      "tipo": "tarea",
+      "etiqueta": "Leer las insignias #N del dia y las propinas",
+      "modulo": "caja"
+    },
+    {
       "id": "cierre",
       "tipo": "modulo",
       "etiqueta": "Caja y cierres (cierre)",
@@ -187,6 +355,12 @@
       "modulo": "cierre"
     },
     {
+      "id": "cierre#entender-las-propinas-cortesias-y-ajustes-en-el-cierre",
+      "tipo": "tarea",
+      "etiqueta": "Entender las propinas, cortesias y ajustes en el cierre",
+      "modulo": "cierre"
+    },
+    {
       "id": "clientes",
       "tipo": "modulo",
       "etiqueta": "Clientes (clientes)",
@@ -220,6 +394,12 @@
       "id": "clientes#editar-datos-y-descuentos-de-un-cliente",
       "tipo": "tarea",
       "etiqueta": "Editar datos y descuentos de un cliente",
+      "modulo": "clientes"
+    },
+    {
+      "id": "clientes#entender-la-verificacion-del-celular-del-cliente",
+      "tipo": "tarea",
+      "etiqueta": "Entender la verificacion del celular del cliente",
       "modulo": "clientes"
     },
     {
@@ -262,6 +442,30 @@
       "id": "cocina#registrar-una-merma-de-cocina",
       "tipo": "tarea",
       "etiqueta": "Registrar una merma de cocina",
+      "modulo": "cocina"
+    },
+    {
+      "id": "cocina#leer-el-tiempo-en-vivo-y-el-numero-del-dia",
+      "tipo": "tarea",
+      "etiqueta": "Leer el tiempo en vivo y el numero del dia",
+      "modulo": "cocina"
+    },
+    {
+      "id": "cocina#que-no-me-pregunte-si-o-no-al-despejar",
+      "tipo": "tarea",
+      "etiqueta": "Que no me pregunte Si o No al despejar",
+      "modulo": "cocina"
+    },
+    {
+      "id": "cocina#atender-el-aviso-de-apertura-del-dia",
+      "tipo": "tarea",
+      "etiqueta": "Atender el aviso de apertura del dia",
+      "modulo": "cocina"
+    },
+    {
+      "id": "cocina#atender-solo-mi-area-usuarios-con-rol-cocina",
+      "tipo": "tarea",
+      "etiqueta": "Atender solo mi area (usuarios con rol Cocina)",
       "modulo": "cocina"
     },
     {
@@ -422,6 +626,18 @@
       "modulo": "disenador"
     },
     {
+      "id": "disenador#editar-los-botones-del-banner-caprichos-del-mes",
+      "tipo": "tarea",
+      "etiqueta": "editar los botones del banner \"Caprichos del mes\"",
+      "modulo": "disenador"
+    },
+    {
+      "id": "disenador#reemplazar-el-banner-por-tus-propias-imagenes",
+      "tipo": "tarea",
+      "etiqueta": "reemplazar el banner por tus propias imágenes",
+      "modulo": "disenador"
+    },
+    {
       "id": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
       "tipo": "tarea",
       "etiqueta": "cambiar el orden, el tamaño y la posición de la carta",
@@ -456,6 +672,12 @@
       "id": "escritorio#revisar-pendientes-y-tareas-del-turno",
       "tipo": "tarea",
       "etiqueta": "Revisar pendientes y tareas del turno",
+      "modulo": "escritorio"
+    },
+    {
+      "id": "escritorio#usar-el-escritorio-del-supervisor",
+      "tipo": "tarea",
+      "etiqueta": "Usar el escritorio del Supervisor",
       "modulo": "escritorio"
     },
     {
@@ -557,6 +779,12 @@
       "modulo": "informes"
     },
     {
+      "id": "informes#ver-el-reporte-de-cortesias",
+      "tipo": "tarea",
+      "etiqueta": "Ver el reporte de Cortesias",
+      "modulo": "informes"
+    },
+    {
       "id": "iniciativas",
       "tipo": "modulo",
       "etiqueta": "Iniciativas (iniciativas)",
@@ -581,9 +809,9 @@
       "modulo": "iniciativas"
     },
     {
-      "id": "iniciativas#cambiar-el-estado-de-una-iniciativa-solo-administrador",
+      "id": "iniciativas#cambiar-el-estado-de-una-iniciativa-administrador-y-supervisor",
       "tipo": "tarea",
-      "etiqueta": "Cambiar el estado de una iniciativa (Solo Administrador)",
+      "etiqueta": "Cambiar el estado de una iniciativa (Administrador y Supervisor)",
       "modulo": "iniciativas"
     },
     {
@@ -726,6 +954,24 @@
       "modulo": "mensajes"
     },
     {
+      "id": "mensajes#ver-la-ubicacion-que-mando-el-cliente",
+      "tipo": "tarea",
+      "etiqueta": "Ver la ubicacion que mando el cliente",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#ver-como-el-cliente-arma-un-combo-por-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "Ver como el cliente arma un combo por WhatsApp",
+      "modulo": "mensajes"
+    },
+    {
+      "id": "mensajes#cuando-el-repartidor-chatea-con-el-cliente-de-su-pedido",
+      "tipo": "tarea",
+      "etiqueta": "Cuando el repartidor chatea con el cliente de su pedido",
+      "modulo": "mensajes"
+    },
+    {
       "id": "mensajes#reabrir-una-conversacion-fuera-de-la-ventana-de-24-horas",
       "tipo": "tarea",
       "etiqueta": "Reabrir una conversacion fuera de la ventana de 24 horas",
@@ -744,6 +990,42 @@
       "modulo": "mensajes"
     },
     {
+      "id": "mi-asistencia",
+      "tipo": "modulo",
+      "etiqueta": "Mi asistencia (mi-asistencia)",
+      "modulo": "mi-asistencia",
+      "ruta": "/admin/mi-asistencia"
+    },
+    {
+      "id": "permiso:asistencia/marcar",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: asistencia/marcar"
+    },
+    {
+      "id": "mi-asistencia#marcar-mi-entrada-almuerzo-o-salida",
+      "tipo": "tarea",
+      "etiqueta": "Marcar mi entrada, almuerzo o salida",
+      "modulo": "mi-asistencia"
+    },
+    {
+      "id": "mi-asistencia#marcar-con-el-codigo-de-6-digitos-si-la-camara-no-lee-el-qr",
+      "tipo": "tarea",
+      "etiqueta": "Marcar con el codigo de 6 digitos (si la camara no lee el QR)",
+      "modulo": "mi-asistencia"
+    },
+    {
+      "id": "mi-asistencia#marcar-el-almuerzo",
+      "tipo": "tarea",
+      "etiqueta": "Marcar el almuerzo",
+      "modulo": "mi-asistencia"
+    },
+    {
+      "id": "mi-asistencia#ver-mis-ultimos-dias-y-mis-propinas",
+      "tipo": "tarea",
+      "etiqueta": "Ver mis ultimos dias y mis propinas",
+      "modulo": "mi-asistencia"
+    },
+    {
       "id": "mirest",
       "tipo": "modulo",
       "etiqueta": "Configuración del local (mirest)",
@@ -751,34 +1033,46 @@
       "ruta": "/admin/mirest"
     },
     {
-      "id": "mirest#actualizar-datos-basicos-y-de-contacto",
+      "id": "mirest#llegar-rapido-a-un-ajuste",
       "tipo": "tarea",
-      "etiqueta": "actualizar datos básicos y de contacto",
+      "etiqueta": "llegar rápido a un ajuste",
       "modulo": "mirest"
     },
     {
-      "id": "mirest#configurar-horario-y-fechas-especiales",
+      "id": "mirest#guardar-cambios-en-configuracion",
       "tipo": "tarea",
-      "etiqueta": "configurar horario y fechas especiales",
+      "etiqueta": "guardar cambios en Configuración",
       "modulo": "mirest"
     },
     {
-      "id": "mirest#configurar-pagos-y-entregas",
+      "id": "mirest#saber-en-que-seccion-esta-cada-cosa",
       "tipo": "tarea",
-      "etiqueta": "configurar pagos y entregas",
+      "etiqueta": "saber en qué sección está cada cosa",
       "modulo": "mirest"
     },
     {
-      "id": "mirest#activar-alta-demanda-o-pausar-pedidos",
-      "tipo": "tarea",
-      "etiqueta": "activar alta demanda o pausar pedidos",
-      "modulo": "mirest"
+      "id": "mis-pedidos",
+      "tipo": "modulo",
+      "etiqueta": "Mis pedidos (mozo) (mis-pedidos)",
+      "modulo": "mis-pedidos",
+      "ruta": "/admin/mis-pedidos"
     },
     {
-      "id": "mirest#cambiar-las-imagenes-de-la-pantalla-de-ingreso",
+      "id": "permiso:pedidos/crear",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: pedidos/crear"
+    },
+    {
+      "id": "mis-pedidos#buscar-y-seguir-un-pedido",
       "tipo": "tarea",
-      "etiqueta": "cambiar las imágenes de la pantalla de ingreso",
-      "modulo": "mirest"
+      "etiqueta": "Buscar y seguir un pedido",
+      "modulo": "mis-pedidos"
+    },
+    {
+      "id": "mis-pedidos#subir-cambiar-o-quitar-el-voucher-de-un-pedido",
+      "tipo": "tarea",
+      "etiqueta": "Subir, cambiar o quitar el voucher de un pedido",
+      "modulo": "mis-pedidos"
     },
     {
       "id": "notificaciones",
@@ -808,6 +1102,12 @@
       "id": "notificaciones#crear-un-nuevo-aviso-interno-para-el-equipo",
       "tipo": "tarea",
       "etiqueta": "crear un nuevo aviso interno para el equipo",
+      "modulo": "notificaciones"
+    },
+    {
+      "id": "notificaciones#entender-la-campana-y-los-avisos-que-no-se-pierden",
+      "tipo": "tarea",
+      "etiqueta": "Entender la campana y los avisos que no se pierden",
       "modulo": "notificaciones"
     },
     {
@@ -860,9 +1160,45 @@
       "etiqueta": "Permiso: ofertas/ver"
     },
     {
-      "id": "ofertas#armar-un-combo-o-promocion-2x1",
+      "id": "ofertas#armar-un-combo-constructor-con-pestanas",
       "tipo": "tarea",
-      "etiqueta": "Armar un combo o promocion 2x1",
+      "etiqueta": "Armar un combo (constructor con pestanas)",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#entender-el-stock-el-plan-b-y-los-avisos-de-un-combo",
+      "tipo": "tarea",
+      "etiqueta": "Entender el stock, el plan B y los avisos de un combo",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#el-combo-cajita-caprikids-partes-que-salen-a-cocina-como-lineas-hijas",
+      "tipo": "tarea",
+      "etiqueta": "El combo Cajita Caprikids (partes que salen a cocina como lineas hijas)",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#armar-una-promocion-llevas-mas-pagas-menos-2x1-3x2",
+      "tipo": "tarea",
+      "etiqueta": "Armar una promocion \"Llevas mas, pagas menos\" (2x1, 3x2)",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#elegir-donde-aplica-una-oferta-carta-web-local-y-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "Elegir donde aplica una oferta (carta web, local y WhatsApp)",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#vender-combos-por-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "Vender combos por WhatsApp",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#distinguir-agotado-automaticamente-de-desactivada-por-ti",
+      "tipo": "tarea",
+      "etiqueta": "Distinguir \"Agotado automaticamente\" de \"Desactivada por ti\"",
       "modulo": "ofertas"
     },
     {
@@ -881,6 +1217,12 @@
       "id": "ofertas#pausar-o-desactivar-una-oferta-activa",
       "tipo": "tarea",
       "etiqueta": "Pausar o desactivar una oferta activa",
+      "modulo": "ofertas"
+    },
+    {
+      "id": "ofertas#ocultar-o-mostrar-una-oferta-desactivada",
+      "tipo": "tarea",
+      "etiqueta": "Ocultar o mostrar una oferta desactivada",
       "modulo": "ofertas"
     },
     {
@@ -963,6 +1305,18 @@
       "modulo": "plano"
     },
     {
+      "id": "plano#atender-un-grupo-en-varias-mesas-agregar-quitar-y-mover-mesas",
+      "tipo": "tarea",
+      "etiqueta": "Atender un grupo en varias mesas (agregar, quitar y mover mesas)",
+      "modulo": "plano"
+    },
+    {
+      "id": "plano#dar-una-cortesia-en-una-mesa",
+      "tipo": "tarea",
+      "etiqueta": "Dar una cortesia en una mesa",
+      "modulo": "plano"
+    },
+    {
       "id": "productos",
       "tipo": "modulo",
       "etiqueta": "Productos (productos)",
@@ -992,6 +1346,72 @@
       "tipo": "tarea",
       "etiqueta": "Configurar tamanos y grupos de opciones",
       "modulo": "productos"
+    },
+    {
+      "id": "productos#controlar-el-stock-de-un-producto-terminado-donas-galletas-postres",
+      "tipo": "tarea",
+      "etiqueta": "Controlar el stock de un producto terminado (donas, galletas, postres)",
+      "modulo": "productos"
+    },
+    {
+      "id": "productos#configurar-sabores-y-unidades-por-tamano-donas-y-galletas",
+      "tipo": "tarea",
+      "etiqueta": "Configurar sabores y unidades por tamano (donas y galletas)",
+      "modulo": "productos"
+    },
+    {
+      "id": "productos#enlazar-una-opcion-con-el-stock-stock-de-cada-opcion-enlaces-de-stock",
+      "tipo": "tarea",
+      "etiqueta": "Enlazar una opcion con el stock (Stock de cada opcion / Enlaces de stock)",
+      "modulo": "productos"
+    },
+    {
+      "id": "propinas",
+      "tipo": "modulo",
+      "etiqueta": "Propinas (propinas)",
+      "modulo": "propinas",
+      "ruta": "/admin/propinas"
+    },
+    {
+      "id": "permiso:propinas/ver",
+      "tipo": "permiso",
+      "etiqueta": "Permiso: propinas/ver"
+    },
+    {
+      "id": "propinas#encender-o-apagar-la-propina-y-poner-el-tope",
+      "tipo": "tarea",
+      "etiqueta": "Encender o apagar la propina y poner el tope",
+      "modulo": "propinas"
+    },
+    {
+      "id": "propinas#ver-lo-acumulado-del-mes-pestana-acumulado",
+      "tipo": "tarea",
+      "etiqueta": "Ver lo acumulado del mes (pestana Acumulado)",
+      "modulo": "propinas"
+    },
+    {
+      "id": "propinas#cobrar-un-pedido-con-propina-y-verla-en-el-cierre",
+      "tipo": "tarea",
+      "etiqueta": "Cobrar un pedido con propina y verla en el cierre",
+      "modulo": "propinas"
+    },
+    {
+      "id": "propinas#calcular-y-aprobar-el-reparto-del-mes-solo-administrador",
+      "tipo": "tarea",
+      "etiqueta": "Calcular y aprobar el reparto del mes (solo Administrador)",
+      "modulo": "propinas"
+    },
+    {
+      "id": "propinas#pagar-el-reparto",
+      "tipo": "tarea",
+      "etiqueta": "Pagar el reparto",
+      "modulo": "propinas"
+    },
+    {
+      "id": "propinas#ver-mi-parte-de-propinas",
+      "tipo": "tarea",
+      "etiqueta": "Ver mi parte de propinas",
+      "modulo": "propinas"
     },
     {
       "id": "recetas",
@@ -1073,9 +1493,69 @@
       "etiqueta": "Permiso: repartos/ver"
     },
     {
+      "id": "repartos#tomar-pedidos-y-empezar-una-ruta",
+      "tipo": "tarea",
+      "etiqueta": "Tomar pedidos y empezar una ruta",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#ver-todo-el-detalle-de-un-pedido-dos-pantallas",
+      "tipo": "tarea",
+      "etiqueta": "Ver todo el detalle de un pedido (dos pantallas)",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#cambiar-la-forma-de-pago-en-la-puerta-el-cliente-quiere-pagar-distinto",
+      "tipo": "tarea",
+      "etiqueta": "Cambiar la forma de pago en la puerta (el cliente quiere pagar distinto)",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#entregar-un-pedido-paso-a-paso",
+      "tipo": "tarea",
+      "etiqueta": "Entregar un pedido paso a paso",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#chatear-por-whatsapp-con-el-cliente-de-mi-pedido",
+      "tipo": "tarea",
+      "etiqueta": "Chatear por WhatsApp con el cliente de mi pedido",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#corregir-la-ubicacion-real-de-un-pedido-repartidor-propone",
+      "tipo": "tarea",
+      "etiqueta": "Corregir la ubicacion real de un pedido (repartidor propone)",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#cambiar-la-ubicacion-de-un-pedido-de-delivery-caja-o-administrador",
+      "tipo": "tarea",
+      "etiqueta": "Cambiar la ubicacion de un pedido de delivery (Caja o Administrador)",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#tomar-un-envio-como-repartidor-solo-administrador",
+      "tipo": "tarea",
+      "etiqueta": "Tomar un envio como repartidor (solo Administrador)",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#soltar-o-reasignar-un-envio-administrador-y-cajero",
+      "tipo": "tarea",
+      "etiqueta": "Soltar o reasignar un envio (Administrador y Cajero)",
+      "modulo": "repartos"
+    },
+    {
       "id": "repartos#reportar-una-falla-en-la-entrega-no-contesta-o-direccion-erronea",
       "tipo": "tarea",
       "etiqueta": "Reportar una falla en la entrega (no contesta o direccion erronea)",
+      "modulo": "repartos"
+    },
+    {
+      "id": "repartos#saber-que-avisos-de-whatsapp-recibe-el-cliente-del-delivery",
+      "tipo": "tarea",
+      "etiqueta": "saber que avisos de WhatsApp recibe el cliente del delivery",
       "modulo": "repartos"
     },
     {
@@ -1097,27 +1577,33 @@
       "etiqueta": "Permiso: reservas/ver"
     },
     {
-      "id": "reservas#crear-una-nueva-reserva",
+      "id": "reservas#crear-una-reserva",
       "tipo": "tarea",
-      "etiqueta": "Crear una nueva reserva",
+      "etiqueta": "Crear una reserva",
       "modulo": "reservas"
     },
     {
-      "id": "reservas#aprobar-o-rechazar-solicitudes-de-whatsapp",
+      "id": "reservas#aprobar-o-rechazar-una-solicitud-carta-o-whatsapp",
       "tipo": "tarea",
-      "etiqueta": "Aprobar o rechazar solicitudes de WhatsApp",
+      "etiqueta": "Aprobar o rechazar una solicitud (carta o WhatsApp)",
       "modulo": "reservas"
     },
     {
-      "id": "reservas#sentar-a-los-clientes-al-llegar-al-local",
+      "id": "reservas#sentar-a-los-clientes-cuando-llegan",
       "tipo": "tarea",
-      "etiqueta": "Sentar a los clientes al llegar al local",
+      "etiqueta": "Sentar a los clientes cuando llegan",
       "modulo": "reservas"
     },
     {
-      "id": "reservas#cancelar-una-reserva",
+      "id": "reservas#cuando-el-cliente-no-llega-no-llego-y-reactivar",
       "tipo": "tarea",
-      "etiqueta": "Cancelar una reserva",
+      "etiqueta": "Cuando el cliente no llega (No llego y Reactivar)",
+      "modulo": "reservas"
+    },
+    {
+      "id": "reservas#cancelar-o-cambiar-una-reserva",
+      "tipo": "tarea",
+      "etiqueta": "Cancelar o cambiar una reserva",
       "modulo": "reservas"
     },
     {
@@ -1182,6 +1668,12 @@
       "modulo": "supervisor-codigo"
     },
     {
+      "id": "supervisor-codigo#usar-el-codigo-como-supervisor",
+      "tipo": "tarea",
+      "etiqueta": "Usar el codigo como Supervisor",
+      "modulo": "supervisor-codigo"
+    },
+    {
       "id": "usuarios",
       "tipo": "modulo",
       "etiqueta": "Usuarios (usuarios)",
@@ -1224,6 +1716,30 @@
       "modulo": "usuarios"
     },
     {
+      "id": "usuarios#dar-un-rol-temporal-por-ejemplo-supervisor-suplente",
+      "tipo": "tarea",
+      "etiqueta": "Dar un rol temporal (por ejemplo supervisor suplente)",
+      "modulo": "usuarios"
+    },
+    {
+      "id": "usuarios#dar-varios-roles-permanentes-a-una-persona",
+      "tipo": "tarea",
+      "etiqueta": "Dar varios roles permanentes a una persona",
+      "modulo": "usuarios"
+    },
+    {
+      "id": "usuarios#registrar-un-usuario-por-pasos-y-con-otros-documentos",
+      "tipo": "tarea",
+      "etiqueta": "Registrar un usuario por pasos y con otros documentos",
+      "modulo": "usuarios"
+    },
+    {
+      "id": "usuarios#ver-la-actividad-y-el-historial-laboral-de-una-persona",
+      "tipo": "tarea",
+      "etiqueta": "Ver la actividad y el historial laboral de una persona",
+      "modulo": "usuarios"
+    },
+    {
       "id": "zonas",
       "tipo": "modulo",
       "etiqueta": "Zonas de reparto (zonas)",
@@ -1259,6 +1775,336 @@
       "tipo": "tarea",
       "etiqueta": "editar el polígono de coordenadas de una zona",
       "modulo": "zonas"
+    },
+    {
+      "id": "mirest#alta-demanda#activar-la-alta-demanda-con-minutos-extra",
+      "tipo": "tarea",
+      "etiqueta": "activar la alta demanda con minutos extra",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#alta-demanda#pausar-la-recepcion-de-pedidos",
+      "tipo": "tarea",
+      "etiqueta": "pausar la recepción de pedidos",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#alta-demanda#apagar-la-alta-demanda",
+      "tipo": "tarea",
+      "etiqueta": "apagar la alta demanda",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#chatbot#pausar-o-encender-una-funcion-del-bot",
+      "tipo": "tarea",
+      "etiqueta": "pausar o encender una función del bot",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#chatbot#cambiar-los-mensajes-fijos-del-bot",
+      "tipo": "tarea",
+      "etiqueta": "cambiar los mensajes fijos del bot",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#chatbot#configurar-la-proteccion-contra-spam",
+      "tipo": "tarea",
+      "etiqueta": "configurar la protección contra spam",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#chatbot#anonimizar-mensajes-antiguos-y-atender-derechos-del-cliente-ley-29733",
+      "tipo": "tarea",
+      "etiqueta": "anonimizar mensajes antiguos y atender derechos del cliente (Ley 29733)",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#chatbot#encender-o-apagar-un-aviso-automatico-de-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "encender o apagar un aviso automático de WhatsApp",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#cocina#pedir-o-no-confirmacion-al-despejar-comandas",
+      "tipo": "tarea",
+      "etiqueta": "pedir o no confirmación al despejar comandas",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#cocina#cambiar-los-minutos-de-preparacion-por-defecto",
+      "tipo": "tarea",
+      "etiqueta": "cambiar los minutos de preparación por defecto",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#entrega-zonas#cambiar-el-envio-gratis-o-el-pedido-minimo",
+      "tipo": "tarea",
+      "etiqueta": "cambiar el envío gratis o el pedido mínimo",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#entrega-zonas#cambiar-tarifa-minutos-o-estado-de-una-zona",
+      "tipo": "tarea",
+      "etiqueta": "cambiar tarifa, minutos o estado de una zona",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#horario#cambiar-el-horario-de-un-dia-de-la-semana",
+      "tipo": "tarea",
+      "etiqueta": "cambiar el horario de un día de la semana",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#horario#cerrar-o-abrir-un-dia-completo",
+      "tipo": "tarea",
+      "etiqueta": "cerrar o abrir un día completo",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#horario#registrar-un-feriado-o-un-horario-especial",
+      "tipo": "tarea",
+      "etiqueta": "registrar un feriado o un horario especial",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#horario#quitar-una-fecha-especial",
+      "tipo": "tarea",
+      "etiqueta": "quitar una fecha especial",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#ia#encender-o-apagar-la-ia-de-capri",
+      "tipo": "tarea",
+      "etiqueta": "encender o apagar la IA de Capri",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#ia#configurar-la-lectura-de-vouchers-con-ia",
+      "tipo": "tarea",
+      "etiqueta": "configurar la lectura de vouchers con IA",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#impresion#encender-o-apagar-lo-que-se-imprime",
+      "tipo": "tarea",
+      "etiqueta": "encender o apagar lo que se imprime",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#impresion#conectar-el-programa-de-impresion-a-la-pc-de-caja",
+      "tipo": "tarea",
+      "etiqueta": "conectar el programa de impresión a la PC de Caja",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#impresion#crear-o-desactivar-una-llave-del-agente",
+      "tipo": "tarea",
+      "etiqueta": "crear o desactivar una llave del agente",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#impresion#reintentar-trabajos-fallidos-y-hacer-pruebas",
+      "tipo": "tarea",
+      "etiqueta": "reintentar trabajos fallidos y hacer pruebas",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#datos-local#cambiar-el-nombre-y-el-lema-del-local",
+      "tipo": "tarea",
+      "etiqueta": "cambiar el nombre y el lema del local",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#datos-local#poner-la-direccion-y-el-punto-del-local-en-el-mapa",
+      "tipo": "tarea",
+      "etiqueta": "poner la dirección y el punto del local en el mapa",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#datos-local#cambiar-el-telefono-y-el-whatsapp-de-contacto",
+      "tipo": "tarea",
+      "etiqueta": "cambiar el teléfono y el WhatsApp de contacto",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#datos-local#agregar-las-redes-sociales",
+      "tipo": "tarea",
+      "etiqueta": "agregar las redes sociales",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#datos-local#registrar-los-datos-fiscales-de-la-empresa",
+      "tipo": "tarea",
+      "etiqueta": "registrar los datos fiscales de la empresa",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#operacion#encender-o-apagar-una-funcion-general",
+      "tipo": "tarea",
+      "etiqueta": "encender o apagar una función general",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#operacion#encender-la-propina-por-canal-y-fijar-el-tope",
+      "tipo": "tarea",
+      "etiqueta": "encender la propina por canal y fijar el tope",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#operacion#ajustar-el-sonido-de-las-notificaciones",
+      "tipo": "tarea",
+      "etiqueta": "ajustar el sonido de las notificaciones",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#operacion#mostrar-resenas-de-google-en-la-carta",
+      "tipo": "tarea",
+      "etiqueta": "mostrar reseñas de Google en la carta",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#operacion#cambiar-tiempo-prometido-tolerancia-de-reservas-puntos-o-descuento-del-personal",
+      "tipo": "tarea",
+      "etiqueta": "cambiar tiempo prometido, tolerancia de reservas, puntos o descuento del personal",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#pagos#encender-o-apagar-un-medio-de-pago",
+      "tipo": "tarea",
+      "etiqueta": "encender o apagar un medio de pago",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#pagos#poner-el-numero-de-yape-y-plin",
+      "tipo": "tarea",
+      "etiqueta": "poner el número de Yape y Plin",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#pagos#poner-la-cuenta-para-transferencias",
+      "tipo": "tarea",
+      "etiqueta": "poner la cuenta para transferencias",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#ingreso#elegir-y-ordenar-las-imagenes-del-carrusel",
+      "tipo": "tarea",
+      "etiqueta": "elegir y ordenar las imágenes del carrusel",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#ingreso#subir-una-foto-propia",
+      "tipo": "tarea",
+      "etiqueta": "subir una foto propia",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#ingreso#cambiar-la-frase-de-la-pantalla",
+      "tipo": "tarea",
+      "etiqueta": "cambiar la frase de la pantalla",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#ingreso#guardar-los-cambios",
+      "tipo": "tarea",
+      "etiqueta": "guardar los cambios",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#parametros#encontrar-un-parametro",
+      "tipo": "tarea",
+      "etiqueta": "encontrar un parámetro",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#parametros#cambiar-un-parametro",
+      "tipo": "tarea",
+      "etiqueta": "cambiar un parámetro",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#propinas#encender-o-apagar-la-propina-en-la-carta-o-en-whatsapp",
+      "tipo": "tarea",
+      "etiqueta": "encender o apagar la propina en la carta o en WhatsApp",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#propinas#cambiar-el-tope-de-propina-por-pedido",
+      "tipo": "tarea",
+      "etiqueta": "cambiar el tope de propina por pedido",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#reparto#cambiar-los-colores-de-espera-y-el-maximo-de-pedidos-por-repartidor",
+      "tipo": "tarea",
+      "etiqueta": "cambiar los colores de espera y el máximo de pedidos por repartidor",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#reparto#cambiar-la-espera-en-la-puerta-y-la-reprogramacion",
+      "tipo": "tarea",
+      "etiqueta": "cambiar la espera en la puerta y la reprogramación",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#reparto#encender-o-apagar-los-avisos-de-whatsapp-de-reparto",
+      "tipo": "tarea",
+      "etiqueta": "encender o apagar los avisos de WhatsApp de reparto",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#reservas#cambiar-la-tolerancia-o-el-recordatorio-de-la-reserva",
+      "tipo": "tarea",
+      "etiqueta": "cambiar la tolerancia o el recordatorio de la reserva",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#reservas#apagar-o-limitar-las-reservas-desde-la-carta",
+      "tipo": "tarea",
+      "etiqueta": "apagar o limitar las reservas desde la carta",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#textos#cambiar-los-terminos-y-condiciones-o-la-politica-de-privacidad",
+      "tipo": "tarea",
+      "etiqueta": "cambiar los términos y condiciones o la política de privacidad",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#textos#cambiar-cuando-llega-la-encuesta-posventa",
+      "tipo": "tarea",
+      "etiqueta": "cambiar cuándo llega la encuesta posventa",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#verificacion-celular#elegir-el-modo-de-verificacion",
+      "tipo": "tarea",
+      "etiqueta": "elegir el modo de verificación",
+      "modulo": "mirest"
+    },
+    {
+      "id": "mirest#verificacion-celular#elegir-el-numero-que-recibe-la-verificacion",
+      "tipo": "tarea",
+      "etiqueta": "elegir el número que recibe la verificación",
+      "modulo": "mirest"
+    },
+    {
+      "id": "asistencia#config#poner-la-ubicacion-del-local",
+      "tipo": "tarea",
+      "etiqueta": "poner la ubicación del local",
+      "modulo": "asistencia"
+    },
+    {
+      "id": "asistencia#config#cambiar-el-radio-la-tolerancia-y-la-precision-del-gps",
+      "tipo": "tarea",
+      "etiqueta": "cambiar el radio, la tolerancia y la precisión del GPS",
+      "modulo": "asistencia"
+    },
+    {
+      "id": "asistencia#config#cambiar-cuantos-dias-se-guardan-las-selfies",
+      "tipo": "tarea",
+      "etiqueta": "cambiar cuántos días se guardan las selfies",
+      "modulo": "asistencia"
     }
   ],
   "aristas": [
@@ -1325,6 +2171,26 @@
     {
       "tipo": "relacionado_con",
       "origen": "almacen",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "apertura",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "almacen",
       "destino": "recetas"
     },
     {
@@ -1476,6 +2342,351 @@
       "tipo": "ver_tambien",
       "origen": "almacen",
       "destino": "stock"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "almacen#encender-o-apagar-el-control-de-almacen",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "antes",
+      "origen": "almacen#encender-o-apagar-el-control-de-almacen",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen#encender-o-apagar-el-control-de-almacen",
+      "destino": "compras"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "almacen",
+      "destino": "compras"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "almacen#contar-los-productos-terminados-donas-galletas-postres",
+      "destino": "almacen"
+    },
+    {
+      "tipo": "despues",
+      "origen": "almacen#contar-los-productos-terminados-donas-galletas-postres",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "despues",
+      "origen": "almacen",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "apertura",
+      "destino": "permiso:almacen/apertura"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:COCINA",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ALMACEN",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "apertura",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "apertura",
+      "destino": "stock"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "stock",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "apertura",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "apertura",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "apertura",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "apertura#hacer-el-conteo-de-apertura",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "antes",
+      "origen": "apertura#hacer-el-conteo-de-apertura",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "apertura",
+      "destino": "productos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "apertura#hacer-el-conteo-de-apertura",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "apertura",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "apertura#botar-un-producto-a-merma",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "apertura#activar-el-control-de-stock-de-un-producto",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "asistencia-pantalla",
+      "destino": "permiso:asistencia/pantalla"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia-pantalla",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia-pantalla",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mi-asistencia",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia-pantalla",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "pantallas",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia-pantalla",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia-pantalla#poner-la-pantalla-en-la-tablet-del-local",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "despues",
+      "origen": "asistencia-pantalla#poner-la-pantalla-en-la-tablet-del-local",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "despues",
+      "origen": "asistencia-pantalla",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia-pantalla#instalar-la-app-qr-asistencia-en-la-tablet",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia-pantalla#regenerar-o-desactivar-el-enlace",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "asistencia-pantalla#regenerar-o-desactivar-el-enlace",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "asistencia-pantalla",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "asistencia",
+      "destino": "permiso:asistencia/administrar"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mi-asistencia",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "propinas",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia",
+      "destino": "historial"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "historial",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#ver-como-va-el-dia-pestana-hoy",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "asistencia#ver-como-va-el-dia-pestana-hoy",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "asistencia",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#ver-el-mes-y-descargarlo-pestana-mensual",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#revisar-marcas-y-selfies",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#corregir-una-marca-olvidada",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "asistencia#corregir-una-marca-olvidada",
+      "destino": "historial"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "asistencia",
+      "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#fijar-la-ubicacion-del-local-y-las-reglas-pestana-configuracion",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#reiniciar-el-celular-de-una-persona",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "asistencia#reiniciar-el-celular-de-una-persona",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "asistencia",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#preparar-la-pantalla-del-qr",
+      "destino": "asistencia"
     },
     {
       "tipo": "requiere_permiso",
@@ -1490,6 +2701,11 @@
     {
       "tipo": "puede_usar",
       "origen": "rol:CAJERO",
+      "destino": "caja"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
       "destino": "caja"
     },
     {
@@ -1565,6 +2781,26 @@
     {
       "tipo": "relacionado_con",
       "origen": "caja",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "propinas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "caja"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "caja",
       "destino": "historial"
     },
     {
@@ -1585,6 +2821,11 @@
     {
       "tipo": "despues",
       "origen": "caja#abrir-la-caja-del-turno",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#regla-de-caja-abierta",
       "destino": "caja"
     },
     {
@@ -1626,6 +2867,11 @@
       "tipo": "ver_tambien",
       "origen": "caja",
       "destino": "cierre"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#aplicar-un-cupon-en-un-pedido-nuevo",
+      "destino": "caja"
     },
     {
       "tipo": "pertenece_a",
@@ -1758,6 +3004,66 @@
       "destino": "cocina"
     },
     {
+      "tipo": "pertenece_a",
+      "origen": "caja#dar-una-cortesia-producto-a-costo-s-0",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#dar-una-cortesia-producto-a-costo-s-0",
+      "destino": "informes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja",
+      "destino": "informes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#cambiar-la-ubicacion-de-un-pedido-de-delivery",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#cambiar-la-ubicacion-de-un-pedido-de-delivery",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#validar-un-cambio-de-forma-de-pago-pedido-por-el-repartidor",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#validar-un-cambio-de-forma-de-pago-pedido-por-el-repartidor",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#atender-un-delivery-que-espera-la-ubicacion-del-cliente",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#atender-un-delivery-que-espera-la-ubicacion-del-cliente",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja#atender-un-delivery-que-espera-la-ubicacion-del-cliente",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "caja",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "caja#leer-las-insignias-n-del-dia-y-las-propinas",
+      "destino": "caja"
+    },
+    {
       "tipo": "requiere_permiso",
       "origen": "cierre",
       "destino": "permiso:caja/ver"
@@ -1770,6 +3076,11 @@
     {
       "tipo": "puede_usar",
       "origen": "rol:CAJERO",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
       "destino": "cierre"
     },
     {
@@ -1815,7 +3126,22 @@
     {
       "tipo": "relacionado_con",
       "origen": "cierre",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "propinas",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cierre",
       "destino": "informes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "cierre"
     },
     {
       "tipo": "relacionado_con",
@@ -1948,6 +3274,21 @@
       "destino": "supervisor-codigo"
     },
     {
+      "tipo": "pertenece_a",
+      "origen": "cierre#entender-las-propinas-cortesias-y-ajustes-en-el-cierre",
+      "destino": "cierre"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre#entender-las-propinas-cortesias-y-ajustes-en-el-cierre",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cierre",
+      "destino": "propinas"
+    },
+    {
       "tipo": "requiere_permiso",
       "origen": "clientes",
       "destino": "permiso:clientes/ver"
@@ -1955,11 +3296,6 @@
     {
       "tipo": "puede_usar",
       "origen": "rol:ADMIN",
-      "destino": "clientes"
-    },
-    {
-      "tipo": "puede_usar",
-      "origen": "rol:CALLCENTER",
       "destino": "clientes"
     },
     {
@@ -1998,6 +3334,21 @@
       "destino": "zonas"
     },
     {
+      "tipo": "relacionado_con",
+      "origen": "zonas",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "clientes",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "clientes"
+    },
+    {
       "tipo": "pertenece_a",
       "origen": "clientes#registrar-un-cliente-nuevo-desde-mostrador-o-telefono",
       "destino": "clientes"
@@ -2066,6 +3417,16 @@
       "tipo": "ver_tambien",
       "origen": "clientes",
       "destino": "zonas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "clientes#entender-la-verificacion-del-celular-del-cliente",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "clientes#entender-la-verificacion-del-celular-del-cliente",
+      "destino": "mensajes"
     },
     {
       "tipo": "requiere_permiso",
@@ -2120,17 +3481,32 @@
     {
       "tipo": "relacionado_con",
       "origen": "cocina",
+      "destino": "productos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "productos",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
       "destino": "repartos"
     },
     {
       "tipo": "relacionado_con",
       "origen": "cocina",
       "destino": "mirest"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "cocina",
-      "destino": "productos"
     },
     {
       "tipo": "pertenece_a",
@@ -2251,6 +3627,41 @@
       "tipo": "ver_tambien",
       "origen": "cocina#registrar-una-merma-de-cocina",
       "destino": "stock"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#leer-el-tiempo-en-vivo-y-el-numero-del-dia",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "cocina#leer-el-tiempo-en-vivo-y-el-numero-del-dia",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#que-no-me-pregunte-si-o-no-al-despejar",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#atender-el-aviso-de-apertura-del-dia",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cocina#atender-el-aviso-de-apertura-del-dia",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "despues",
+      "origen": "cocina",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "cocina#atender-solo-mi-area-usuarios-con-rol-cocina",
+      "destino": "cocina"
     },
     {
       "tipo": "requiere_permiso",
@@ -2764,6 +4175,21 @@
     },
     {
       "tipo": "pertenece_a",
+      "origen": "disenador#editar-los-botones-del-banner-caprichos-del-mes",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "disenador#reemplazar-el-banner-por-tus-propias-imagenes",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "disenador#reemplazar-el-banner-por-tus-propias-imagenes",
+      "destino": "novedades"
+    },
+    {
+      "tipo": "pertenece_a",
       "origen": "disenador#cambiar-el-orden-el-tamano-y-la-posicion-de-la-carta",
       "destino": "disenador"
     },
@@ -2824,17 +4250,17 @@
     },
     {
       "tipo": "puede_usar",
-      "origen": "rol:CALLCENTER",
-      "destino": "escritorio"
-    },
-    {
-      "tipo": "puede_usar",
       "origen": "rol:ALMACEN",
       "destino": "escritorio"
     },
     {
       "tipo": "puede_usar",
       "origen": "rol:REPARTIDOR",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
       "destino": "escritorio"
     },
     {
@@ -2890,6 +4316,46 @@
     {
       "tipo": "relacionado_con",
       "origen": "escritorio",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reservas",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "plano"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "plano",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "supervisor-codigo",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
       "destino": "stock"
     },
     {
@@ -2966,6 +4432,21 @@
       "tipo": "ver_tambien",
       "origen": "escritorio",
       "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "escritorio#usar-el-escritorio-del-supervisor",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio#usar-el-escritorio-del-supervisor",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "escritorio",
+      "destino": "supervisor-codigo"
     },
     {
       "tipo": "pertenece_a",
@@ -3255,21 +4736,6 @@
     {
       "tipo": "relacionado_con",
       "origen": "informes",
-      "destino": "caja"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "caja",
-      "destino": "informes"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "informes",
-      "destino": "cierre"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "informes",
       "destino": "comprobantes"
     },
     {
@@ -3288,6 +4754,16 @@
       "destino": "informes"
     },
     {
+      "tipo": "relacionado_con",
+      "origen": "informes",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "propinas",
+      "destino": "informes"
+    },
+    {
       "tipo": "pertenece_a",
       "origen": "informes#abrir-y-consultar-un-informe-del-catalogo",
       "destino": "informes"
@@ -3346,6 +4822,11 @@
       "tipo": "ver_tambien",
       "origen": "informes",
       "destino": "comprobantes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "informes#ver-el-reporte-de-cortesias",
+      "destino": "informes"
     },
     {
       "tipo": "requiere_permiso",
@@ -3355,6 +4836,11 @@
     {
       "tipo": "puede_usar",
       "origen": "rol:ADMIN",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
       "destino": "iniciativas"
     },
     {
@@ -3369,17 +4855,17 @@
     },
     {
       "tipo": "puede_usar",
-      "origen": "rol:CALLCENTER",
-      "destino": "iniciativas"
-    },
-    {
-      "tipo": "puede_usar",
       "origen": "rol:ALMACEN",
       "destino": "iniciativas"
     },
     {
       "tipo": "puede_usar",
       "origen": "rol:REPARTIDOR",
+      "destino": "iniciativas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
       "destino": "iniciativas"
     },
     {
@@ -3434,12 +4920,12 @@
     },
     {
       "tipo": "pertenece_a",
-      "origen": "iniciativas#cambiar-el-estado-de-una-iniciativa-solo-administrador",
+      "origen": "iniciativas#cambiar-el-estado-de-una-iniciativa-administrador-y-supervisor",
       "destino": "iniciativas"
     },
     {
       "tipo": "despues",
-      "origen": "iniciativas#cambiar-el-estado-de-una-iniciativa-solo-administrador",
+      "origen": "iniciativas#cambiar-el-estado-de-una-iniciativa-administrador-y-supervisor",
       "destino": "historial"
     },
     {
@@ -3769,7 +5255,17 @@
     },
     {
       "tipo": "puede_usar",
-      "origen": "rol:CALLCENTER",
+      "origen": "rol:CAJERO",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:MOZO",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
       "destino": "mensajes"
     },
     {
@@ -3795,7 +5291,32 @@
     {
       "tipo": "relacionado_con",
       "origen": "mensajes",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reservas",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
       "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mensajes",
+      "destino": "ofertas"
     },
     {
       "tipo": "pertenece_a",
@@ -3884,6 +5405,31 @@
     },
     {
       "tipo": "pertenece_a",
+      "origen": "mensajes#ver-la-ubicacion-que-mando-el-cliente",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#ver-como-el-cliente-arma-un-combo-por-whatsapp",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#cuando-el-repartidor-chatea-con-el-cliente-de-su-pedido",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#cuando-el-repartidor-chatea-con-el-cliente-de-su-pedido",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
       "origen": "mensajes#reabrir-una-conversacion-fuera-de-la-ventana-de-24-horas",
       "destino": "mensajes"
     },
@@ -3906,6 +5452,131 @@
       "tipo": "pertenece_a",
       "origen": "mensajes#entender-por-que-un-mensaje-quedo-fallido",
       "destino": "mensajes"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "mi-asistencia",
+      "destino": "permiso:asistencia/marcar"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:COCINA",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:MOZO",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ALMACEN",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:REPARTIDOR",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mi-asistencia",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "propinas",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mi-asistencia",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mi-asistencia",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "escritorio",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mi-asistencia#marcar-mi-entrada-almuerzo-o-salida",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mi-asistencia#marcar-mi-entrada-almuerzo-o-salida",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mi-asistencia",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mi-asistencia#marcar-mi-entrada-almuerzo-o-salida",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mi-asistencia",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mi-asistencia#marcar-con-el-codigo-de-6-digitos-si-la-camara-no-lee-el-qr",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mi-asistencia#marcar-con-el-codigo-de-6-digitos-si-la-camara-no-lee-el-qr",
+      "destino": "asistencia-pantalla"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mi-asistencia#marcar-el-almuerzo",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mi-asistencia#ver-mis-ultimos-dias-y-mis-propinas",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mi-asistencia#ver-mis-ultimos-dias-y-mis-propinas",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mi-asistencia",
+      "destino": "propinas"
     },
     {
       "tipo": "requiere_permiso",
@@ -3963,89 +5634,169 @@
       "destino": "mirest"
     },
     {
-      "tipo": "pertenece_a",
-      "origen": "mirest#actualizar-datos-basicos-y-de-contacto",
-      "destino": "mirest"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "mirest#actualizar-datos-basicos-y-de-contacto",
-      "destino": "zonas"
-    },
-    {
-      "tipo": "ver_tambien",
+      "tipo": "relacionado_con",
       "origen": "mirest",
-      "destino": "zonas"
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "pantallas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "pantallas",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "mirest"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "mirest#configurar-horario-y-fechas-especiales",
-      "destino": "mirest"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "mirest#configurar-horario-y-fechas-especiales",
+      "origen": "mirest#llegar-rapido-a-un-ajuste",
       "destino": "mirest"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "mirest#configurar-pagos-y-entregas",
+      "origen": "mirest#guardar-cambios-en-configuracion",
       "destino": "mirest"
     },
     {
-      "tipo": "ver_tambien",
-      "origen": "mirest#configurar-pagos-y-entregas",
+      "tipo": "pertenece_a",
+      "origen": "mirest#saber-en-que-seccion-esta-cada-cosa",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "mis-pedidos",
+      "destino": "permiso:pedidos/crear"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:MOZO",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mis-pedidos",
+      "destino": "plano"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "plano",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mis-pedidos",
       "destino": "caja"
     },
     {
+      "tipo": "relacionado_con",
+      "origen": "caja",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mis-pedidos",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mis-pedidos",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reservas",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mis-pedidos",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mis-pedidos",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mis-pedidos#buscar-y-seguir-un-pedido",
+      "destino": "mis-pedidos"
+    },
+    {
       "tipo": "ver_tambien",
-      "origen": "mirest",
+      "origen": "mis-pedidos#buscar-y-seguir-un-pedido",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mis-pedidos",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mis-pedidos#subir-cambiar-o-quitar-el-voucher-de-un-pedido",
+      "destino": "mis-pedidos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mis-pedidos#subir-cambiar-o-quitar-el-voucher-de-un-pedido",
+      "destino": "plano"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mis-pedidos",
+      "destino": "plano"
+    },
+    {
+      "tipo": "despues",
+      "origen": "mis-pedidos#subir-cambiar-o-quitar-el-voucher-de-un-pedido",
       "destino": "caja"
     },
     {
-      "tipo": "pertenece_a",
-      "origen": "mirest#activar-alta-demanda-o-pausar-pedidos",
-      "destino": "mirest"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "mirest#activar-alta-demanda-o-pausar-pedidos",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "mirest",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "antes",
-      "origen": "mirest#activar-alta-demanda-o-pausar-pedidos",
-      "destino": "cocina"
-    },
-    {
-      "tipo": "antes",
-      "origen": "mirest",
-      "destino": "cocina"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "mirest#activar-alta-demanda-o-pausar-pedidos",
-      "destino": "historial"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "mirest",
-      "destino": "historial"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "mirest#cambiar-las-imagenes-de-la-pantalla-de-ingreso",
-      "destino": "mirest"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "mirest#cambiar-las-imagenes-de-la-pantalla-de-ingreso",
-      "destino": "mirest"
+      "tipo": "despues",
+      "origen": "mis-pedidos",
+      "destino": "caja"
     },
     {
       "tipo": "requiere_permiso",
@@ -4069,17 +5820,17 @@
     },
     {
       "tipo": "puede_usar",
-      "origen": "rol:CALLCENTER",
-      "destino": "notificaciones"
-    },
-    {
-      "tipo": "puede_usar",
       "origen": "rol:ALMACEN",
       "destino": "notificaciones"
     },
     {
       "tipo": "puede_usar",
       "origen": "rol:REPARTIDOR",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
       "destino": "notificaciones"
     },
     {
@@ -4130,6 +5881,16 @@
     {
       "tipo": "relacionado_con",
       "origen": "notificaciones",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "reservas",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "notificaciones",
       "destino": "historial"
     },
     {
@@ -4181,6 +5942,21 @@
       "tipo": "despues",
       "origen": "notificaciones#crear-un-nuevo-aviso-interno-para-el-equipo",
       "destino": "notificaciones"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "notificaciones#entender-la-campana-y-los-avisos-que-no-se-pierden",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "notificaciones#entender-la-campana-y-los-avisos-que-no-se-pierden",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "notificaciones",
+      "destino": "reservas"
     },
     {
       "tipo": "requiere_permiso",
@@ -4345,16 +6121,26 @@
     {
       "tipo": "relacionado_con",
       "origen": "ofertas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "cocina",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "ofertas",
       "destino": "indicadores"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "ofertas#armar-un-combo-o-promocion-2x1",
+      "origen": "ofertas#armar-un-combo-constructor-con-pestanas",
       "destino": "ofertas"
     },
     {
       "tipo": "antes",
-      "origen": "ofertas#armar-un-combo-o-promocion-2x1",
+      "origen": "ofertas#armar-un-combo-constructor-con-pestanas",
       "destino": "productos"
     },
     {
@@ -4364,7 +6150,7 @@
     },
     {
       "tipo": "despues",
-      "origen": "ofertas#armar-un-combo-o-promocion-2x1",
+      "origen": "ofertas#armar-un-combo-constructor-con-pestanas",
       "destino": "caja"
     },
     {
@@ -4374,13 +6160,58 @@
     },
     {
       "tipo": "ver_tambien",
-      "origen": "ofertas#armar-un-combo-o-promocion-2x1",
+      "origen": "ofertas#armar-un-combo-constructor-con-pestanas",
       "destino": "novedades"
     },
     {
       "tipo": "ver_tambien",
       "origen": "ofertas",
       "destino": "novedades"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#entender-el-stock-el-plan-b-y-los-avisos-de-un-combo",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#el-combo-cajita-caprikids-partes-que-salen-a-cocina-como-lineas-hijas",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas#el-combo-cajita-caprikids-partes-que-salen-a-cocina-como-lineas-hijas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "ofertas",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#armar-una-promocion-llevas-mas-pagas-menos-2x1-3x2",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "ofertas#armar-una-promocion-llevas-mas-pagas-menos-2x1-3x2",
+      "destino": "productos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#elegir-donde-aplica-una-oferta-carta-web-local-y-whatsapp",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#vender-combos-por-whatsapp",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#distinguir-agotado-automaticamente-de-desactivada-por-ti",
+      "destino": "ofertas"
     },
     {
       "tipo": "pertenece_a",
@@ -4436,6 +6267,11 @@
       "tipo": "ver_tambien",
       "origen": "ofertas",
       "destino": "indicadores"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "ofertas#ocultar-o-mostrar-una-oferta-desactivada",
+      "destino": "ofertas"
     },
     {
       "tipo": "requiere_permiso",
@@ -4515,16 +6351,6 @@
     {
       "tipo": "puede_usar",
       "origen": "rol:ADMIN",
-      "destino": "pantallas"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "pantallas",
-      "destino": "mirest"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "mirest",
       "destino": "pantallas"
     },
     {
@@ -4614,7 +6440,7 @@
     },
     {
       "tipo": "puede_usar",
-      "origen": "rol:CALLCENTER",
+      "origen": "rol:SUPERVISOR",
       "destino": "plano"
     },
     {
@@ -4708,6 +6534,16 @@
       "destino": "cierre"
     },
     {
+      "tipo": "pertenece_a",
+      "origen": "plano#atender-un-grupo-en-varias-mesas-agregar-quitar-y-mover-mesas",
+      "destino": "plano"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "plano#dar-una-cortesia-en-una-mesa",
+      "destino": "plano"
+    },
+    {
       "tipo": "requiere_permiso",
       "origen": "productos",
       "destino": "permiso:catalogo/ver"
@@ -4720,6 +6556,11 @@
     {
       "tipo": "puede_usar",
       "origen": "rol:CAJERO",
+      "destino": "productos"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
       "destino": "productos"
     },
     {
@@ -4748,99 +6589,229 @@
       "destino": "caja"
     },
     {
+      "tipo": "pertenece_a",
+      "origen": "productos#crear-un-producto-nuevo",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos#crear-un-producto-nuevo",
+      "destino": "listas"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos",
+      "destino": "listas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "productos#crear-un-producto-nuevo",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "productos",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos#crear-un-producto-nuevo",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos",
+      "destino": "stock"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#marcar-un-producto-como-agotado-o-disponible",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos#marcar-un-producto-como-agotado-o-disponible",
+      "destino": "stock"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos",
+      "destino": "stock"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos#marcar-un-producto-como-agotado-o-disponible",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#editar-precio-foto-o-sabores-de-un-producto",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos#editar-precio-foto-o-sabores-de-un-producto",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos",
+      "destino": "disenador"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#configurar-tamanos-y-grupos-de-opciones",
+      "destino": "productos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "productos#configurar-tamanos-y-grupos-de-opciones",
+      "destino": "listas"
+    },
+    {
+      "tipo": "despues",
+      "origen": "productos#configurar-tamanos-y-grupos-de-opciones",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#controlar-el-stock-de-un-producto-terminado-donas-galletas-postres",
+      "destino": "productos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "productos#controlar-el-stock-de-un-producto-terminado-donas-galletas-postres",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "despues",
+      "origen": "productos",
+      "destino": "apertura"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#configurar-sabores-y-unidades-por-tamano-donas-y-galletas",
+      "destino": "productos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "productos#enlazar-una-opcion-con-el-stock-stock-de-cada-opcion-enlaces-de-stock",
+      "destino": "productos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos#enlazar-una-opcion-con-el-stock-stock-de-cada-opcion-enlaces-de-stock",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "productos",
+      "destino": "ofertas"
+    },
+    {
+      "tipo": "requiere_permiso",
+      "origen": "propinas",
+      "destino": "permiso:propinas/ver"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:ADMIN",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:CAJERO",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
+      "destino": "propinas"
+    },
+    {
       "tipo": "relacionado_con",
-      "origen": "productos",
-      "destino": "cocina"
+      "origen": "propinas",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "propinas",
+      "destino": "historial"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "historial",
+      "destino": "propinas"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "productos#crear-un-producto-nuevo",
-      "destino": "productos"
+      "origen": "propinas#encender-o-apagar-la-propina-y-poner-el-tope",
+      "destino": "propinas"
     },
     {
-      "tipo": "antes",
-      "origen": "productos#crear-un-producto-nuevo",
-      "destino": "listas"
+      "tipo": "pertenece_a",
+      "origen": "propinas#ver-lo-acumulado-del-mes-pestana-acumulado",
+      "destino": "propinas"
     },
     {
-      "tipo": "antes",
-      "origen": "productos",
-      "destino": "listas"
+      "tipo": "ver_tambien",
+      "origen": "propinas#ver-lo-acumulado-del-mes-pestana-acumulado",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "propinas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "propinas#cobrar-un-pedido-con-propina-y-verla-en-el-cierre",
+      "destino": "propinas"
     },
     {
       "tipo": "despues",
-      "origen": "productos#crear-un-producto-nuevo",
-      "destino": "recetas"
+      "origen": "propinas#cobrar-un-pedido-con-propina-y-verla-en-el-cierre",
+      "destino": "cierre"
     },
     {
       "tipo": "despues",
-      "origen": "productos",
-      "destino": "recetas"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "productos#crear-un-producto-nuevo",
-      "destino": "stock"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "productos",
-      "destino": "stock"
+      "origen": "propinas",
+      "destino": "cierre"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "productos#marcar-un-producto-como-agotado-o-disponible",
-      "destino": "productos"
+      "origen": "propinas#calcular-y-aprobar-el-reparto-del-mes-solo-administrador",
+      "destino": "propinas"
     },
     {
       "tipo": "antes",
-      "origen": "productos#marcar-un-producto-como-agotado-o-disponible",
-      "destino": "stock"
+      "origen": "propinas#calcular-y-aprobar-el-reparto-del-mes-solo-administrador",
+      "destino": "asistencia"
     },
     {
       "tipo": "antes",
-      "origen": "productos",
-      "destino": "stock"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "productos#marcar-un-producto-como-agotado-o-disponible",
-      "destino": "cocina"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "productos",
-      "destino": "cocina"
+      "origen": "propinas",
+      "destino": "asistencia"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "productos#editar-precio-foto-o-sabores-de-un-producto",
-      "destino": "productos"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "productos#editar-precio-foto-o-sabores-de-un-producto",
-      "destino": "disenador"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "productos",
-      "destino": "disenador"
+      "origen": "propinas#pagar-el-reparto",
+      "destino": "propinas"
     },
     {
       "tipo": "pertenece_a",
-      "origen": "productos#configurar-tamanos-y-grupos-de-opciones",
-      "destino": "productos"
-    },
-    {
-      "tipo": "antes",
-      "origen": "productos#configurar-tamanos-y-grupos-de-opciones",
-      "destino": "listas"
-    },
-    {
-      "tipo": "despues",
-      "origen": "productos#configurar-tamanos-y-grupos-de-opciones",
-      "destino": "recetas"
+      "origen": "propinas#ver-mi-parte-de-propinas",
+      "destino": "propinas"
     },
     {
       "tipo": "requiere_permiso",
@@ -5113,6 +7084,11 @@
       "destino": "repartos"
     },
     {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
+      "destino": "repartos"
+    },
+    {
       "tipo": "relacionado_con",
       "origen": "repartos",
       "destino": "cocina"
@@ -5130,7 +7106,132 @@
     {
       "tipo": "relacionado_con",
       "origen": "repartos",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "usuarios",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "asistencia",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "repartos",
+      "destino": "mi-asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#tomar-pedidos-y-empezar-una-ruta",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "antes",
+      "origen": "repartos#tomar-pedidos-y-empezar-una-ruta",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "antes",
+      "origen": "repartos",
+      "destino": "cocina"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#ver-todo-el-detalle-de-un-pedido-dos-pantallas",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "repartos#ver-todo-el-detalle-de-un-pedido-dos-pantallas",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "repartos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#cambiar-la-forma-de-pago-en-la-puerta-el-cliente-quiere-pagar-distinto",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "repartos#cambiar-la-forma-de-pago-en-la-puerta-el-cliente-quiere-pagar-distinto",
+      "destino": "caja"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "repartos",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#entregar-un-pedido-paso-a-paso",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "despues",
+      "origen": "repartos#entregar-un-pedido-paso-a-paso",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#chatear-por-whatsapp-con-el-cliente-de-mi-pedido",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "repartos#chatear-por-whatsapp-con-el-cliente-de-mi-pedido",
       "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "repartos",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#corregir-la-ubicacion-real-de-un-pedido-repartidor-propone",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "repartos#corregir-la-ubicacion-real-de-un-pedido-repartidor-propone",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#cambiar-la-ubicacion-de-un-pedido-de-delivery-caja-o-administrador",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "repartos#cambiar-la-ubicacion-de-un-pedido-de-delivery-caja-o-administrador",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#tomar-un-envio-como-repartidor-solo-administrador",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "repartos#tomar-un-envio-como-repartidor-solo-administrador",
+      "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "repartos#soltar-o-reasignar-un-envio-administrador-y-cajero",
+      "destino": "repartos"
     },
     {
       "tipo": "pertenece_a",
@@ -5143,9 +7244,9 @@
       "destino": "mensajes"
     },
     {
-      "tipo": "ver_tambien",
-      "origen": "repartos",
-      "destino": "mensajes"
+      "tipo": "pertenece_a",
+      "origen": "repartos#saber-que-avisos-de-whatsapp-recibe-el-cliente-del-delivery",
+      "destino": "repartos"
     },
     {
       "tipo": "pertenece_a",
@@ -5169,7 +7270,7 @@
     },
     {
       "tipo": "puede_usar",
-      "origen": "rol:CALLCENTER",
+      "origen": "rol:SUPERVISOR",
       "destino": "reservas"
     },
     {
@@ -5193,23 +7294,13 @@
       "destino": "reservas"
     },
     {
-      "tipo": "relacionado_con",
-      "origen": "reservas",
-      "destino": "mensajes"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "mensajes",
-      "destino": "reservas"
-    },
-    {
       "tipo": "pertenece_a",
-      "origen": "reservas#crear-una-nueva-reserva",
+      "origen": "reservas#crear-una-reserva",
       "destino": "reservas"
     },
     {
       "tipo": "antes",
-      "origen": "reservas#crear-una-nueva-reserva",
+      "origen": "reservas#crear-una-reserva",
       "destino": "plano"
     },
     {
@@ -5219,7 +7310,7 @@
     },
     {
       "tipo": "ver_tambien",
-      "origen": "reservas#crear-una-nueva-reserva",
+      "origen": "reservas#crear-una-reserva",
       "destino": "clientes"
     },
     {
@@ -5229,12 +7320,12 @@
     },
     {
       "tipo": "pertenece_a",
-      "origen": "reservas#aprobar-o-rechazar-solicitudes-de-whatsapp",
+      "origen": "reservas#aprobar-o-rechazar-una-solicitud-carta-o-whatsapp",
       "destino": "reservas"
     },
     {
       "tipo": "antes",
-      "origen": "reservas#aprobar-o-rechazar-solicitudes-de-whatsapp",
+      "origen": "reservas#aprobar-o-rechazar-una-solicitud-carta-o-whatsapp",
       "destino": "mensajes"
     },
     {
@@ -5243,28 +7334,13 @@
       "destino": "mensajes"
     },
     {
-      "tipo": "ver_tambien",
-      "origen": "reservas#aprobar-o-rechazar-solicitudes-de-whatsapp",
-      "destino": "plano"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "reservas",
-      "destino": "plano"
-    },
-    {
       "tipo": "pertenece_a",
-      "origen": "reservas#sentar-a-los-clientes-al-llegar-al-local",
-      "destino": "reservas"
-    },
-    {
-      "tipo": "antes",
-      "origen": "reservas#sentar-a-los-clientes-al-llegar-al-local",
+      "origen": "reservas#sentar-a-los-clientes-cuando-llegan",
       "destino": "reservas"
     },
     {
       "tipo": "despues",
-      "origen": "reservas#sentar-a-los-clientes-al-llegar-al-local",
+      "origen": "reservas#sentar-a-los-clientes-cuando-llegan",
       "destino": "caja"
     },
     {
@@ -5273,19 +7349,14 @@
       "destino": "caja"
     },
     {
-      "tipo": "ver_tambien",
-      "origen": "reservas#sentar-a-los-clientes-al-llegar-al-local",
-      "destino": "plano"
-    },
-    {
       "tipo": "pertenece_a",
-      "origen": "reservas#cancelar-una-reserva",
+      "origen": "reservas#cuando-el-cliente-no-llega-no-llego-y-reactivar",
       "destino": "reservas"
     },
     {
-      "tipo": "ver_tambien",
-      "origen": "reservas#cancelar-una-reserva",
-      "destino": "plano"
+      "tipo": "pertenece_a",
+      "origen": "reservas#cancelar-o-cambiar-una-reserva",
+      "destino": "reservas"
     },
     {
       "tipo": "requiere_permiso",
@@ -5413,6 +7484,11 @@
       "destino": "supervisor-codigo"
     },
     {
+      "tipo": "puede_usar",
+      "origen": "rol:SUPERVISOR",
+      "destino": "supervisor-codigo"
+    },
+    {
       "tipo": "relacionado_con",
       "origen": "supervisor-codigo",
       "destino": "usuarios"
@@ -5486,6 +7562,21 @@
       "tipo": "ver_tambien",
       "origen": "supervisor-codigo#rotar-el-secreto-del-local-por-seguridad",
       "destino": "historial"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "supervisor-codigo#usar-el-codigo-como-supervisor",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "supervisor-codigo#usar-el-codigo-como-supervisor",
+      "destino": "escritorio"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "supervisor-codigo",
+      "destino": "escritorio"
     },
     {
       "tipo": "requiere_permiso",
@@ -5598,6 +7689,36 @@
       "destino": "usuarios"
     },
     {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#dar-un-rol-temporal-por-ejemplo-supervisor-suplente",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "usuarios#dar-un-rol-temporal-por-ejemplo-supervisor-suplente",
+      "destino": "supervisor-codigo"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#dar-varios-roles-permanentes-a-una-persona",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#registrar-un-usuario-por-pasos-y-con-otros-documentos",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "usuarios#ver-la-actividad-y-el-historial-laboral-de-una-persona",
+      "destino": "usuarios"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "usuarios#ver-la-actividad-y-el-historial-laboral-de-una-persona",
+      "destino": "historial"
+    },
+    {
       "tipo": "requiere_permiso",
       "origen": "zonas",
       "destino": "permiso:zonas/ver"
@@ -5681,6 +7802,361 @@
       "tipo": "ver_tambien",
       "origen": "zonas",
       "destino": "mapa"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#alta-demanda#activar-la-alta-demanda-con-minutos-extra",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#alta-demanda#pausar-la-recepcion-de-pedidos",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#alta-demanda#apagar-la-alta-demanda",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#chatbot#pausar-o-encender-una-funcion-del-bot",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#chatbot#cambiar-los-mensajes-fijos-del-bot",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#chatbot#configurar-la-proteccion-contra-spam",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#chatbot#anonimizar-mensajes-antiguos-y-atender-derechos-del-cliente-ley-29733",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#chatbot#encender-o-apagar-un-aviso-automatico-de-whatsapp",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#cocina#pedir-o-no-confirmacion-al-despejar-comandas",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#cocina#cambiar-los-minutos-de-preparacion-por-defecto",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#entrega-zonas#cambiar-el-envio-gratis-o-el-pedido-minimo",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#entrega-zonas#cambiar-tarifa-minutos-o-estado-de-una-zona",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mirest#entrega-zonas#cambiar-tarifa-minutos-o-estado-de-una-zona",
+      "destino": "zonas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "repartos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#horario#cambiar-el-horario-de-un-dia-de-la-semana",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#horario#cerrar-o-abrir-un-dia-completo",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#horario#registrar-un-feriado-o-un-horario-especial",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#horario#quitar-una-fecha-especial",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#ia#encender-o-apagar-la-ia-de-capri",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#ia#configurar-la-lectura-de-vouchers-con-ia",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#impresion#encender-o-apagar-lo-que-se-imprime",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#impresion#conectar-el-programa-de-impresion-a-la-pc-de-caja",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#impresion#crear-o-desactivar-una-llave-del-agente",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#impresion#reintentar-trabajos-fallidos-y-hacer-pruebas",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#datos-local#cambiar-el-nombre-y-el-lema-del-local",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#datos-local#poner-la-direccion-y-el-punto-del-local-en-el-mapa",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#datos-local#cambiar-el-telefono-y-el-whatsapp-de-contacto",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#datos-local#agregar-las-redes-sociales",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#datos-local#registrar-los-datos-fiscales-de-la-empresa",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "antes",
+      "origen": "mirest#datos-local#registrar-los-datos-fiscales-de-la-empresa",
+      "destino": "caja"
+    },
+    {
+      "tipo": "despues",
+      "origen": "mirest#datos-local#registrar-los-datos-fiscales-de-la-empresa",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "comprobantes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#operacion#encender-o-apagar-una-funcion-general",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#operacion#encender-la-propina-por-canal-y-fijar-el-tope",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#operacion#ajustar-el-sonido-de-las-notificaciones",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#operacion#mostrar-resenas-de-google-en-la-carta",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#operacion#cambiar-tiempo-prometido-tolerancia-de-reservas-puntos-o-descuento-del-personal",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "propinas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "stock"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "recetas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "resenas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "notificaciones"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#pagos#encender-o-apagar-un-medio-de-pago",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#pagos#poner-el-numero-de-yape-y-plin",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#pagos#poner-la-cuenta-para-transferencias",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#ingreso#elegir-y-ordenar-las-imagenes-del-carrusel",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#ingreso#subir-una-foto-propia",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#ingreso#cambiar-la-frase-de-la-pantalla",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#ingreso#guardar-los-cambios",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#parametros#encontrar-un-parametro",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#parametros#cambiar-un-parametro",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#propinas#encender-o-apagar-la-propina-en-la-carta-o-en-whatsapp",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#propinas#cambiar-el-tope-de-propina-por-pedido",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#reparto#cambiar-los-colores-de-espera-y-el-maximo-de-pedidos-por-repartidor",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#reparto#cambiar-la-espera-en-la-puerta-y-la-reprogramacion",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#reparto#encender-o-apagar-los-avisos-de-whatsapp-de-reparto",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "mapa"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#reservas#cambiar-la-tolerancia-o-el-recordatorio-de-la-reserva",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#reservas#apagar-o-limitar-las-reservas-desde-la-carta",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "reservas"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "plano"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#textos#cambiar-los-terminos-y-condiciones-o-la-politica-de-privacidad",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#textos#cambiar-cuando-llega-la-encuesta-posventa",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "reclamos"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#verificacion-celular#elegir-el-modo-de-verificacion",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mirest#verificacion-celular#elegir-el-numero-que-recibe-la-verificacion",
+      "destino": "mirest"
+    },
+    {
+      "tipo": "relacionado_con",
+      "origen": "mirest",
+      "destino": "clientes"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#config#poner-la-ubicacion-del-local",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#config#cambiar-el-radio-la-tolerancia-y-la-precision-del-gps",
+      "destino": "asistencia"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "asistencia#config#cambiar-cuantos-dias-se-guardan-las-selfies",
+      "destino": "asistencia"
     }
   ]
 }

@@ -65,7 +65,6 @@ function EscritorioGeneral() {
     CAJERO: 'Cajero',
     COCINA: 'Cocina',
     MOZO: 'Mozo',
-    CALLCENTER: 'Call center',
     ALMACEN: 'Almacén',
     PRODUCCION: 'Producción',
     REPARTIDOR: 'Repartidor',

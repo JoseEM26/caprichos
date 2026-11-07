@@ -9,18 +9,21 @@ pnpm --filter @caprichos/api ayuda:grafo
 
 ## Métricas del Grafo
 
-- **Nodos totales**: 209
-  - Módulos: 35
-  - Tareas (`## Como se hace`): 145
+- **Nodos totales**: 350
+  - Módulos: 41
+  - Tareas (`## Como se hace`): 274
   - Roles del sistema: 7
-  - Permisos requeridos: 22
-- **Aristas tipadas totales**: 884
+  - Permisos requeridos: 28
+- **Aristas tipadas totales**: 1210
 
 ## Diagrama Mermaid de Módulos y Relaciones
 
 ```mermaid
 flowchart TD
   almacen["Almacén (/admin/almacen)"]
+  apertura["Apertura del dia (conteo de productos terminados) (/admin/apertura)"]
+  asistencia_pantalla["Pantalla de asistencia (QR) (/admin/asistencia/pantalla)"]
+  asistencia["Asistencia del personal (/admin/asistencia)"]
   caja["Pedidos y caja (/admin/caja)"]
   cierre["Caja y cierres (/admin/cierre)"]
   clientes["Clientes (/admin/clientes)"]
@@ -39,7 +42,9 @@ flowchart TD
   mapa["Mapa de entregas (/admin/mapa)"]
   mascota["Mascota Capri (/admin/mascota)"]
   mensajes["Mensajes de WhatsApp (/admin/mensajes)"]
+  mi_asistencia["Mi asistencia (/admin/mi-asistencia)"]
   mirest["Configuración del local (/admin/mirest)"]
+  mis_pedidos["Mis pedidos (mozo) (/admin/mis-pedidos)"]
   notificaciones["Notificaciones (/admin/notificaciones)"]
   novedades["Novedades y publicidad (/admin/novedades)"]
   ofertas["Ofertas y descuentos (/admin/ofertas)"]
@@ -47,6 +52,7 @@ flowchart TD
   pantallas["Pantallas (/admin/pantallas)"]
   plano["Plano del local (/admin/plano)"]
   productos["Productos (/admin/productos)"]
+  propinas["Propinas (/admin/propinas)"]
   recetas["Recetas (/admin/recetas)"]
   reclamos["Libro de reclamaciones (/admin/reclamos)"]
   repartos["Repartos (/admin/repartos)"]
@@ -63,6 +69,10 @@ flowchart TD
   cocina -->|relacionado_con| almacen
   almacen -->|relacionado_con| supervisor_codigo
   supervisor_codigo -->|relacionado_con| almacen
+  almacen -->|relacionado_con| apertura
+  apertura -->|relacionado_con| almacen
+  almacen -->|relacionado_con| productos
+  productos -->|relacionado_con| almacen
   almacen -->|relacionado_con| recetas
   almacen -->|relacionado_con| informes
   almacen -->|relacionado_con| historial
@@ -77,6 +87,41 @@ flowchart TD
   almacen -->|ver_tambien| historial
   almacen -->|despues| cierre
   almacen -->|ver_tambien| stock
+  almacen -->|ver_tambien| compras
+  almacen -->|despues| apertura
+  apertura -->|relacionado_con| productos
+  productos -->|relacionado_con| apertura
+  apertura -->|relacionado_con| stock
+  stock -->|relacionado_con| apertura
+  apertura -->|relacionado_con| cocina
+  cocina -->|relacionado_con| apertura
+  apertura -->|relacionado_con| caja
+  caja -->|relacionado_con| apertura
+  apertura -->|relacionado_con| escritorio
+  escritorio -->|relacionado_con| apertura
+  apertura -->|antes| productos
+  apertura -->|despues| cocina
+  asistencia_pantalla -->|relacionado_con| asistencia
+  asistencia -->|relacionado_con| asistencia_pantalla
+  asistencia_pantalla -->|relacionado_con| mi_asistencia
+  mi_asistencia -->|relacionado_con| asistencia_pantalla
+  asistencia_pantalla -->|relacionado_con| pantallas
+  pantallas -->|relacionado_con| asistencia_pantalla
+  asistencia_pantalla -->|relacionado_con| usuarios
+  usuarios -->|relacionado_con| asistencia_pantalla
+  asistencia_pantalla -->|despues| mi_asistencia
+  asistencia_pantalla -->|ver_tambien| asistencia
+  asistencia -->|relacionado_con| mi_asistencia
+  mi_asistencia -->|relacionado_con| asistencia
+  asistencia -->|relacionado_con| usuarios
+  usuarios -->|relacionado_con| asistencia
+  asistencia -->|relacionado_con| propinas
+  propinas -->|relacionado_con| asistencia
+  asistencia -->|relacionado_con| historial
+  historial -->|relacionado_con| asistencia
+  asistencia -->|ver_tambien| usuarios
+  asistencia -->|ver_tambien| historial
+  asistencia -->|ver_tambien| mi_asistencia
   caja -->|relacionado_con| cierre
   cierre -->|relacionado_con| caja
   caja -->|relacionado_con| cocina
@@ -91,6 +136,10 @@ flowchart TD
   supervisor_codigo -->|relacionado_con| caja
   caja -->|relacionado_con| mensajes
   mensajes -->|relacionado_con| caja
+  caja -->|relacionado_con| propinas
+  propinas -->|relacionado_con| caja
+  caja -->|relacionado_con| informes
+  informes -->|relacionado_con| caja
   caja -->|relacionado_con| historial
   caja -->|antes| supervisor_codigo
   caja -->|antes| cocina
@@ -103,6 +152,8 @@ flowchart TD
   caja -->|antes| plano
   caja -->|ver_tambien| repartos
   caja -->|ver_tambien| cocina
+  caja -->|ver_tambien| informes
+  caja -->|ver_tambien| mensajes
   cierre -->|relacionado_con| repartos
   repartos -->|relacionado_con| cierre
   cierre -->|relacionado_con| supervisor_codigo
@@ -111,7 +162,10 @@ flowchart TD
   comprobantes -->|relacionado_con| cierre
   cierre -->|relacionado_con| mensajes
   mensajes -->|relacionado_con| cierre
+  cierre -->|relacionado_con| propinas
+  propinas -->|relacionado_con| cierre
   cierre -->|relacionado_con| informes
+  informes -->|relacionado_con| cierre
   cierre -->|relacionado_con| plano
   cierre -->|antes| caja
   cierre -->|ver_tambien| caja
@@ -122,6 +176,7 @@ flowchart TD
   cierre -->|ver_tambien| comprobantes
   cierre -->|requiere| supervisor_codigo
   cierre -->|ver_tambien| supervisor_codigo
+  cierre -->|ver_tambien| propinas
   clientes -->|relacionado_con| caja
   caja -->|relacionado_con| clientes
   clientes -->|relacionado_con| ofertas
@@ -129,6 +184,9 @@ flowchart TD
   clientes -->|relacionado_con| mensajes
   mensajes -->|relacionado_con| clientes
   clientes -->|relacionado_con| zonas
+  zonas -->|relacionado_con| clientes
+  clientes -->|relacionado_con| usuarios
+  usuarios -->|relacionado_con| clientes
   clientes -->|despues| caja
   clientes -->|ver_tambien| mensajes
   clientes -->|ver_tambien| caja
@@ -140,9 +198,12 @@ flowchart TD
   pantallas -->|relacionado_con| cocina
   cocina -->|relacionado_con| supervisor_codigo
   supervisor_codigo -->|relacionado_con| cocina
+  cocina -->|relacionado_con| productos
+  productos -->|relacionado_con| cocina
+  cocina -->|relacionado_con| usuarios
+  usuarios -->|relacionado_con| cocina
   cocina -->|relacionado_con| repartos
   cocina -->|relacionado_con| mirest
-  cocina -->|relacionado_con| productos
   cocina -->|antes| caja
   cocina -->|despues| repartos
   cocina -->|ver_tambien| pantallas
@@ -152,6 +213,7 @@ flowchart TD
   cocina -->|ver_tambien| stock
   cocina -->|requiere| supervisor_codigo
   cocina -->|despues| almacen
+  cocina -->|despues| apertura
   compras -->|relacionado_con| stock
   stock -->|relacionado_con| compras
   compras -->|relacionado_con| cierre
@@ -209,6 +271,14 @@ flowchart TD
   compras -->|relacionado_con| escritorio
   escritorio -->|relacionado_con| informes
   informes -->|relacionado_con| escritorio
+  escritorio -->|relacionado_con| reservas
+  reservas -->|relacionado_con| escritorio
+  escritorio -->|relacionado_con| plano
+  plano -->|relacionado_con| escritorio
+  escritorio -->|relacionado_con| notificaciones
+  notificaciones -->|relacionado_con| escritorio
+  escritorio -->|relacionado_con| supervisor_codigo
+  supervisor_codigo -->|relacionado_con| escritorio
   escritorio -->|relacionado_con| stock
   escritorio -->|ver_tambien| informes
   escritorio -->|despues| compras
@@ -216,6 +286,7 @@ flowchart TD
   escritorio -->|ver_tambien| caja
   escritorio -->|ver_tambien| cocina
   escritorio -->|ver_tambien| repartos
+  escritorio -->|ver_tambien| supervisor_codigo
   historial -->|relacionado_con| usuarios
   usuarios -->|relacionado_con| historial
   historial -->|relacionado_con| supervisor_codigo
@@ -246,13 +317,12 @@ flowchart TD
   indicadores -->|despues| productos
   indicadores -->|ver_tambien| disenador
   indicadores -->|antes| ofertas
-  informes -->|relacionado_con| caja
-  caja -->|relacionado_con| informes
-  informes -->|relacionado_con| cierre
   informes -->|relacionado_con| comprobantes
   comprobantes -->|relacionado_con| informes
   informes -->|relacionado_con| mapa
   mapa -->|relacionado_con| informes
+  informes -->|relacionado_con| propinas
+  propinas -->|relacionado_con| informes
   informes -->|ver_tambien| indicadores
   informes -->|ver_tambien| cierre
   informes -->|ver_tambien| historial
@@ -296,12 +366,27 @@ flowchart TD
   reclamos -->|relacionado_con| mensajes
   mensajes -->|relacionado_con| cocina
   cocina -->|relacionado_con| mensajes
+  mensajes -->|relacionado_con| repartos
+  repartos -->|relacionado_con| mensajes
+  mensajes -->|relacionado_con| reservas
+  reservas -->|relacionado_con| mensajes
   mensajes -->|relacionado_con| notificaciones
+  mensajes -->|relacionado_con| ofertas
   mensajes -->|ver_tambien| caja
   mensajes -->|ver_tambien| clientes
   mensajes -->|ver_tambien| reclamos
   mensajes -->|ver_tambien| notificaciones
   mensajes -->|despues| cocina
+  mensajes -->|ver_tambien| repartos
+  mi_asistencia -->|relacionado_con| propinas
+  propinas -->|relacionado_con| mi_asistencia
+  mi_asistencia -->|relacionado_con| usuarios
+  usuarios -->|relacionado_con| mi_asistencia
+  mi_asistencia -->|relacionado_con| escritorio
+  escritorio -->|relacionado_con| mi_asistencia
+  mi_asistencia -->|antes| asistencia_pantalla
+  mi_asistencia -->|ver_tambien| asistencia
+  mi_asistencia -->|ver_tambien| propinas
   mirest -->|relacionado_con| zonas
   zonas -->|relacionado_con| mirest
   mirest -->|relacionado_con| supervisor_codigo
@@ -311,11 +396,26 @@ flowchart TD
   historial -->|relacionado_con| mirest
   mirest -->|relacionado_con| caja
   caja -->|relacionado_con| mirest
-  mirest -->|ver_tambien| zonas
-  mirest -->|ver_tambien| caja
-  mirest -->|requiere| supervisor_codigo
-  mirest -->|antes| cocina
-  mirest -->|ver_tambien| historial
+  mirest -->|relacionado_con| asistencia
+  asistencia -->|relacionado_con| mirest
+  mirest -->|relacionado_con| pantallas
+  pantallas -->|relacionado_con| mirest
+  mirest -->|relacionado_con| usuarios
+  usuarios -->|relacionado_con| mirest
+  mis_pedidos -->|relacionado_con| plano
+  plano -->|relacionado_con| mis_pedidos
+  mis_pedidos -->|relacionado_con| caja
+  caja -->|relacionado_con| mis_pedidos
+  mis_pedidos -->|relacionado_con| cocina
+  cocina -->|relacionado_con| mis_pedidos
+  mis_pedidos -->|relacionado_con| reservas
+  reservas -->|relacionado_con| mis_pedidos
+  mis_pedidos -->|relacionado_con| notificaciones
+  notificaciones -->|relacionado_con| mis_pedidos
+  mis_pedidos -->|relacionado_con| propinas
+  mis_pedidos -->|ver_tambien| cocina
+  mis_pedidos -->|antes| plano
+  mis_pedidos -->|despues| caja
   notificaciones -->|relacionado_con| cocina
   cocina -->|relacionado_con| notificaciones
   notificaciones -->|relacionado_con| caja
@@ -325,10 +425,13 @@ flowchart TD
   notificaciones -->|relacionado_con| mensajes
   notificaciones -->|relacionado_con| repartos
   repartos -->|relacionado_con| notificaciones
+  notificaciones -->|relacionado_con| reservas
+  reservas -->|relacionado_con| notificaciones
   notificaciones -->|relacionado_con| historial
   notificaciones -->|despues| cocina
   notificaciones -->|ver_tambien| caja
   notificaciones -->|ver_tambien| historial
+  notificaciones -->|ver_tambien| reservas
   novedades -->|relacionado_con| ofertas
   ofertas -->|relacionado_con| novedades
   novedades -->|relacionado_con| productos
@@ -345,10 +448,13 @@ flowchart TD
   caja -->|relacionado_con| ofertas
   ofertas -->|relacionado_con| comprobantes
   comprobantes -->|relacionado_con| ofertas
+  ofertas -->|relacionado_con| cocina
+  cocina -->|relacionado_con| ofertas
   ofertas -->|relacionado_con| indicadores
   ofertas -->|antes| productos
   ofertas -->|despues| caja
   ofertas -->|ver_tambien| novedades
+  ofertas -->|ver_tambien| cocina
   ofertas -->|ver_tambien| caja
   ofertas -->|ver_tambien| clientes
   ofertas -->|ver_tambien| indicadores
@@ -357,8 +463,6 @@ flowchart TD
   paleta -->|ver_tambien| disenador
   paleta -->|despues| disenador
   paleta -->|ver_tambien| mirest
-  pantallas -->|relacionado_con| mirest
-  mirest -->|relacionado_con| pantallas
   pantallas -->|relacionado_con| notificaciones
   notificaciones -->|relacionado_con| pantallas
   pantallas -->|despues| cocina
@@ -380,13 +484,21 @@ flowchart TD
   productos -->|relacionado_con| recetas
   recetas -->|relacionado_con| productos
   productos -->|relacionado_con| caja
-  productos -->|relacionado_con| cocina
   productos -->|antes| listas
   productos -->|despues| recetas
   productos -->|ver_tambien| stock
   productos -->|antes| stock
   productos -->|ver_tambien| cocina
   productos -->|ver_tambien| disenador
+  productos -->|despues| apertura
+  productos -->|ver_tambien| ofertas
+  propinas -->|relacionado_con| usuarios
+  usuarios -->|relacionado_con| propinas
+  propinas -->|relacionado_con| historial
+  historial -->|relacionado_con| propinas
+  propinas -->|ver_tambien| caja
+  propinas -->|despues| cierre
+  propinas -->|antes| asistencia
   recetas -->|relacionado_con| stock
   stock -->|relacionado_con| recetas
   recetas -->|relacionado_con| almacen
@@ -414,18 +526,22 @@ flowchart TD
   repartos -->|relacionado_con| cocina
   repartos -->|relacionado_con| zonas
   zonas -->|relacionado_con| repartos
-  repartos -->|relacionado_con| mensajes
+  repartos -->|relacionado_con| usuarios
+  usuarios -->|relacionado_con| repartos
+  repartos -->|relacionado_con| asistencia
+  asistencia -->|relacionado_con| repartos
+  repartos -->|relacionado_con| mi_asistencia
+  repartos -->|antes| cocina
+  repartos -->|despues| caja
+  repartos -->|ver_tambien| caja
   repartos -->|ver_tambien| mensajes
   reservas -->|relacionado_con| caja
   caja -->|relacionado_con| reservas
   reservas -->|relacionado_con| clientes
   clientes -->|relacionado_con| reservas
-  reservas -->|relacionado_con| mensajes
-  mensajes -->|relacionado_con| reservas
   reservas -->|antes| plano
   reservas -->|ver_tambien| clientes
   reservas -->|antes| mensajes
-  reservas -->|ver_tambien| plano
   reservas -->|despues| caja
   stock -->|relacionado_con| supervisor_codigo
   stock -->|despues| compras
@@ -442,6 +558,7 @@ flowchart TD
   supervisor_codigo -->|despues| caja
   supervisor_codigo -->|ver_tambien| usuarios
   supervisor_codigo -->|ver_tambien| historial
+  supervisor_codigo -->|ver_tambien| escritorio
   usuarios -->|relacionado_con| mensajes
   usuarios -->|relacionado_con| reclamos
   usuarios -->|ver_tambien| historial
@@ -454,6 +571,18 @@ flowchart TD
   zonas -->|despues| caja
   zonas -->|ver_tambien| repartos
   zonas -->|ver_tambien| mapa
+  mirest -->|relacionado_con| mensajes
+  mirest -->|relacionado_con| repartos
+  mirest -->|relacionado_con| comprobantes
+  mirest -->|relacionado_con| propinas
+  mirest -->|relacionado_con| stock
+  mirest -->|relacionado_con| recetas
+  mirest -->|relacionado_con| notificaciones
+  mirest -->|relacionado_con| mapa
+  mirest -->|relacionado_con| reservas
+  mirest -->|relacionado_con| plano
+  mirest -->|relacionado_con| reclamos
+  mirest -->|relacionado_con| clientes
 ```
 
 ## Listado de Módulos y Rutas
@@ -461,6 +590,9 @@ flowchart TD
 | Módulo | Título | Ruta |
 | :--- | :--- | :--- |
 | `almacen` | Almacén | `/admin/almacen` |
+| `apertura` | Apertura del dia (conteo de productos terminados) | `/admin/apertura` |
+| `asistencia-pantalla` | Pantalla de asistencia (QR) | `/admin/asistencia/pantalla` |
+| `asistencia` | Asistencia del personal | `/admin/asistencia` |
 | `caja` | Pedidos y caja | `/admin/caja` |
 | `cierre` | Caja y cierres | `/admin/cierre` |
 | `clientes` | Clientes | `/admin/clientes` |
@@ -479,7 +611,9 @@ flowchart TD
 | `mapa` | Mapa de entregas | `/admin/mapa` |
 | `mascota` | Mascota Capri | `/admin/mascota` |
 | `mensajes` | Mensajes de WhatsApp | `/admin/mensajes` |
+| `mi-asistencia` | Mi asistencia | `/admin/mi-asistencia` |
 | `mirest` | Configuración del local | `/admin/mirest` |
+| `mis-pedidos` | Mis pedidos (mozo) | `/admin/mis-pedidos` |
 | `notificaciones` | Notificaciones | `/admin/notificaciones` |
 | `novedades` | Novedades y publicidad | `/admin/novedades` |
 | `ofertas` | Ofertas y descuentos | `/admin/ofertas` |
@@ -487,6 +621,7 @@ flowchart TD
 | `pantallas` | Pantallas | `/admin/pantallas` |
 | `plano` | Plano del local | `/admin/plano` |
 | `productos` | Productos | `/admin/productos` |
+| `propinas` | Propinas | `/admin/propinas` |
 | `recetas` | Recetas | `/admin/recetas` |
 | `reclamos` | Libro de reclamaciones | `/admin/reclamos` |
 | `repartos` | Repartos | `/admin/repartos` |

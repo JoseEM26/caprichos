@@ -32,7 +32,7 @@ Ver tambien: [[repartos]]
 
 ## Como se hace: Filtrar por fechas y canal de pedido
 1. En el control de periodo, selecciona el intervalo deseado entre "Ultimos 7 dias", "Ultimos 30 dias" o "Todo el historial".
-2. En el control de canal, selecciona "Todos los canales" o segmenta los pedidos recibidos por "Web", "WhatsApp" o "Call center".
+2. En el control de canal, selecciona "Todos los canales" o segmenta los pedidos recibidos por "Web", "WhatsApp" o "Teléfono".
 3. Los puntos de entrega y los cuadros estadisticos se recalcularan inmediatamente.
 Ver tambien: [[informes]]
 

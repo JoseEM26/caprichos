@@ -16,7 +16,6 @@ const NOMBRE_ROL: Record<string, string> = {
   CAJERO: 'Cajero',
   COCINA: 'Cocina y barra',
   MOZO: 'Mozo',
-  CALLCENTER: 'Call center',
   ALMACEN: 'Almacén',
   PRODUCCION: 'Producción',
   REPARTIDOR: 'Repartidor',

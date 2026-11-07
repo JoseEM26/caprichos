@@ -13,12 +13,14 @@ export const ROLES: readonly DefinicionRol[] = [
   { codigo: 'CAJERO', nombre: 'Cajero' },
   { codigo: 'COCINA', nombre: 'Cocina (todas las áreas)' },
   { codigo: 'MOZO', nombre: 'Mozo' },
-  { codigo: 'CALLCENTER', nombre: 'Call Center' },
   { codigo: 'ALMACEN', nombre: 'Almacén' },
   { codigo: 'REPARTIDOR', nombre: 'Repartidor' },
   // Persona encargada del local: caja, salón y ve el código de supervisor. Sin administración.
   { codigo: 'SUPERVISOR', nombre: 'Supervisor' },
 ] as const;
+
+/** Roles retirados del sistema: el sincronizador les borra los permisos y nunca los recrea. */
+export const ROLES_ELIMINADOS: readonly string[] = ['CALLCENTER'];
 
 export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'usuarios', accion: 'ver' },
@@ -205,6 +207,15 @@ export const MATRIZ: Record<string, string[]> = {
   // Caja y cobro, pedidos sin anular (la anulación de un entregado sin cobro la autoriza el PIN
   // de supervisor), cocina y carta en solo lectura. Escritorio no tiene permiso propio.
   CAJERO: [
+    // Chat de WhatsApp (Mensajes): lo atienden MOZO y CAJERO (antes el rol CALLCENTER, eliminado)
+    'mensajes/ver',
+    'mensajes/tomar',
+    'mensajes/enviar',
+    'mensajes/cerrar',
+    'whatsapp_salientes/ver',
+    'whatsapp_salientes/reenviar',
+    'whatsapp_salientes/descartar',
+    'cupones/canjear', // canje en caja (antes solo lo tenía el rol CALLCENTER, eliminado)
     'almacen/apertura',
     'pedidos/ver',
     'pedidos/crear',
@@ -263,6 +274,14 @@ export const MATRIZ: Record<string, string[]> = {
     'notificaciones/marcar',
   ],
   MOZO: [
+    // Chat de WhatsApp (Mensajes): lo atienden MOZO y CAJERO (antes el rol CALLCENTER, eliminado)
+    'mensajes/ver',
+    'mensajes/tomar',
+    'mensajes/enviar',
+    'mensajes/cerrar',
+    'whatsapp_salientes/ver',
+    'whatsapp_salientes/reenviar',
+    'whatsapp_salientes/descartar',
     'pedidos/crear',
     'plano/ver',
     'mesas/ver',
@@ -279,28 +298,6 @@ export const MATRIZ: Record<string, string[]> = {
     'notificaciones/ver',
     'notificaciones/marcar',
     'vouchers/subir',
-  ],
-  CALLCENTER: [
-    'reservas/ver',
-    'reservas/crear',
-    'reservas/editar',
-    'plano/ver',
-    'mesas/ver', // solo lectura: el croquis de Reservas lee las mesas
-    'cupones/ver',
-    'cupones/canjear',
-    'clientes/ver',
-    'mensajes/ver',
-    'mensajes/tomar',
-    'mensajes/enviar',
-    'mensajes/cerrar',
-    'whatsapp_salientes/ver',
-    'whatsapp_salientes/reenviar',
-    'whatsapp_salientes/descartar',
-    'iniciativas/ver',
-    'iniciativas/crear',
-    'iniciativas/comentar',
-    'notificaciones/ver',
-    'notificaciones/marcar',
   ],
   ALMACEN: [
     'stock/ver',
@@ -346,7 +343,7 @@ export const MATRIZ: Record<string, string[]> = {
 };
 
 // Marcar asistencia desde el celular: todo el personal que puede tener horario (no el ADMIN, que ya lo tiene todo)
-for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR']) {
+for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR']) {
   MATRIZ[rol] = [...MATRIZ[rol], 'asistencia/marcar'];
 }
 
@@ -358,7 +355,7 @@ for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'CALLCENTER', 'ALMACEN', 'REPARTI
 MATRIZ.SUPERVISOR = [
   ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo', 'iniciativas/cambiar_estado']),
 ].filter(
-  // Sin dinero: el supervisor no cambia ubicación con cobro (ni el conteo de apertura)
-  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion',
+  // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni hace el conteo de apertura
+  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear',
 );
 

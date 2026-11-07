@@ -86,3 +86,21 @@ describe('importar-personal (consola)', () => {
     expect(lineas).toContain('fila 2: creada — Ana Ruiz (CAJERO) · aviso: Fecha de salida no registrada: corregir en el historial laboral.');
   });
 });
+
+describe('importar-personal: el rol eliminado Call Center', () => {
+  const CSV_CC = [
+    'nombres,apellidos,tipo_documento,documento,celular,fecha_nacimiento,fecha_ingreso,fecha_reingreso,pais_nacimiento,rol_principal,roles_extra,activo',
+    'Ana,Ruiz,DNI,11112222,,,,,,Call Center,CAJERO,si',
+    'Eva,Paz,DNI,33334444,,,,,,CAJERO,Call Center|MOZO,si',
+  ].join('\n');
+
+  it('se asigna MOZO (sin repetir) y el simulacro lo avisa', async () => {
+    const { filas } = filasDesdeCsv(CSV_CC);
+    expect(filas[0].fila).toMatchObject({ rol: 'MOZO', otrosRoles: ['CAJERO'] });
+    expect(filas[1].fila).toMatchObject({ rol: 'CAJERO', otrosRoles: ['MOZO'] });
+    const salidas: string[] = [];
+    const servicio = servicioFalso([{ indice: 0, estado: 'OK' }, { indice: 1, estado: 'OK' }]);
+    await ejecutarImportacion(CSV_CC, false, servicio as any, (l) => salidas.push(l));
+    expect(salidas.join('\n')).toMatch(/Ana Ruiz \(MOZO\) · aviso: el rol Call Center ya no existe: se asigna MOZO/);
+  });
+});
