@@ -415,7 +415,7 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
       );
     });
 
-    it('ante mensaje no entendido responde siempre con el menú de botones, sin derivar ni llamar a la IA', async () => {
+    it('ante mensaje no entendido: primero el menú; al segundo seguido deriva a una persona (sin IA apagada)', async () => {
       // Bot solo con menús: texto libre que no es botón -> el menú, un solo mensaje, en cada intento
       mockPrisma.conversacion.findUnique.mockResolvedValueOnce({
         id: 12n,
@@ -450,10 +450,11 @@ describe('EjecutorConversacionService (Integración de Conversación)', () => {
         waMessageId: 'wamid.fallo.2',
       });
 
-      expect(mockMensajeria.enviarLista).toHaveBeenCalledTimes(2);
-      expect(mockMensajeria.enviarTexto).not.toHaveBeenCalledWith(
+      // Primer «no entendí»: menú. Segundo seguido: se avisa a una persona (ya no se repite el menú)
+      expect(mockMensajeria.enviarLista).toHaveBeenCalledTimes(1);
+      expect(mockMensajeria.enviarTexto).toHaveBeenCalledWith(
         '51987654321',
-        expect.stringContaining('mejor te paso con una persona'),
+        expect.stringContaining('avisé a una persona'),
         expect.anything(),
       );
     });
