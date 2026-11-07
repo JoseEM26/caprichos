@@ -9,7 +9,11 @@ import {
   WhatsAppMensajeriaPuerto,
 } from '../puerto/whatsapp-mensajeria.puerto';
 import { botonCodigoDe, CATALOGO_PLANTILLAS } from '../catalogo/plantillas.catalogo';
+import { CODIGOS_PLANTILLA_PERMANENTES } from '../utilidades/meta-errores.util';
 import { enmascararTelefono, hashTelefono } from '../utilidades/enmascarar.util';
+
+const esFalloDePlantilla = (codigo?: string | null): boolean =>
+  !!codigo && (codigo === 'PLANTILLA_NO_CONFIGURADA' || CODIGOS_PLANTILLA_PERMANENTES.includes(codigo));
 
 export const DURACION_VENTANA_24H_MS = 24 * 60 * 60 * 1000;
 
@@ -18,6 +22,8 @@ export interface PayloadMensajeNegocio {
   plantillaClave?: keyof typeof CATALOGO_PLANTILLAS;
   variablesPlantilla?: Record<string, string> | string[];
   botones?: BotonAccion[];
+  /** Plantilla a probar una sola vez si Meta rechaza la principal (p. ej. aún no aprobada). */
+  plantillaRespaldo?: { plantillaClave: keyof typeof CATALOGO_PLANTILLAS; variablesPlantilla: string[] };
 }
 
 @Injectable()
@@ -193,13 +199,28 @@ export class Ventana24hService {
     const botonesRespuesta = definicion.botones?.length && payload.botones?.length ? payload.botones.map((b) => b.id) : undefined;
     let opcionesPlantilla = botonCodigo ? { ...opciones, botonCodigo } : opciones;
     if (botonesRespuesta) opcionesPlantilla = { ...opcionesPlantilla, botonesRespuesta };
-    const resultadoPlantilla = await this.mensajeria.enviarPlantilla(
+    let resultadoPlantilla = await this.mensajeria.enviarPlantilla(
       telefono,
       definicion.nombre,
       definicion.idioma,
       payload.variablesPlantilla,
       opcionesPlantilla,
     );
+
+    if (!resultadoPlantilla.exito && payload.plantillaRespaldo && esFalloDePlantilla(resultadoPlantilla.errorCodigo)) {
+      // Nada salió (Meta rechazó la plantilla): una sola vez con la vigente, sin duplicar mensajes
+      this.logger.warn(`Plantilla '${definicion.nombre}' rechazada para ${telMask} (${resultadoPlantilla.errorCodigo}); se usa la de respaldo`);
+      const respaldo = CATALOGO_PLANTILLAS[payload.plantillaRespaldo.plantillaClave];
+      if (respaldo) {
+        resultadoPlantilla = await this.mensajeria.enviarPlantilla(
+          telefono,
+          respaldo.nombre,
+          respaldo.idioma,
+          payload.plantillaRespaldo.variablesPlantilla,
+          opciones,
+        );
+      }
+    }
 
     if (!resultadoPlantilla.exito) {
       this.logger.warn(

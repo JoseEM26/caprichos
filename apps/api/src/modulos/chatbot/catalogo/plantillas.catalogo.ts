@@ -164,6 +164,22 @@ export const CATALOGO_PLANTILLAS: Record<string, DefinicionPlantilla> = {
     texto: '¡Hola {{1}}! 😊 Recibimos tu pedido {{2}}, ¡gracias por tu compra! Ya está en proceso. 🙏',
     descripcion: 'Aviso al cliente al crear un pedido de la carta pagado en efectivo (ventana cerrada).',
   },
+  CARTA_DELIVERY_UBICACION_DIGITAL: {
+    nombre: 'caprichos_pedido_delivery_ubicacion_digital',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente', 'codigo_pedido', 'medio_pago'],
+    texto: '¡Hola {{1}}! 😊 Recibimos tu pedido {{2}}, ¡muchas gracias! Para confirmarlo, envíanos por este chat la captura de tu pago por {{3}}. Envío por confirmar: lo calculamos al recibir tu ubicación. Envíanos tu ubicación: toca el clip 📎 → Ubicación → Enviar tu ubicación actual. ¡Gracias por preferir Caprichos! 💛',
+    descripcion: 'Pedido delivery de la carta con Yape, Plin o transferencia, cuando el cliente aún no tiene ubicación y no hay ventana de 24 h: pide la captura del pago y la ubicación. Se usa solo con whatsapp_plantilla_delivery_ubicacion_activa en «Sí»; si Meta la rechaza, cae a caprichos_pedido_recibido_digital. Pendiente de aprobar en Meta (UTILITY).',
+  },
+  CARTA_DELIVERY_UBICACION_EFECTIVO: {
+    nombre: 'caprichos_pedido_delivery_ubicacion_efectivo',
+    categoria: 'UTILITY',
+    idioma: 'es',
+    variables: ['nombre_cliente', 'codigo_pedido'],
+    texto: '¡Hola {{1}}! 😊 Recibimos tu pedido {{2}}, ¡gracias por tu compra! Envío por confirmar: lo calculamos al recibir tu ubicación. Envíanos tu ubicación: toca el clip 📎 → Ubicación → Enviar tu ubicación actual. ¡Gracias por preferir Caprichos! 💛',
+    descripcion: 'Pedido delivery de la carta en efectivo, cuando el cliente aún no tiene ubicación y no hay ventana de 24 h: pide la ubicación. Se usa solo con whatsapp_plantilla_delivery_ubicacion_activa en «Sí»; si Meta la rechaza, cae a la plantilla vigente de pedido recibido. Pendiente de aprobar en Meta (UTILITY).',
+  },
   CARTA_RECIBIDO_SEGUIMIENTO: {
     nombre: 'caprichos_pedido_recibido_seguimiento',
     categoria: 'UTILITY',

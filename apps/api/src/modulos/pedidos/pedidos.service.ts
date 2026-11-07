@@ -1139,14 +1139,18 @@ export class PedidosService {
 
       // Actualizar canje o uso de cupones u ofertas si aplicó
       if (desgloseDescuento.cuponEmitidoId) {
-        await tx.cuponEmitido.update({
-          where: { id: BigInt(desgloseDescuento.cuponEmitidoId) },
+        // Condicional: dos pedidos a la vez no pueden gastar el mismo cupón emitido
+        const gastado = await tx.cuponEmitido.updateMany({
+          where: { id: BigInt(desgloseDescuento.cuponEmitidoId), estado: { not: 'CANJEADO' } },
           data: {
             estado: 'CANJEADO',
             canjeado_en: new Date(),
             pedido_canje_id: pedido.id,
           },
         });
+        if (gastado.count === 0) {
+          throw new ConflictException({ codigo: 'CUPON_YA_CANJEADO', mensaje: 'Este cupón ya fue canjeado' });
+        }
       } else if (desgloseDescuento.cuponId) {
         await tx.cupon.update({
           where: { id: BigInt(desgloseDescuento.cuponId) },

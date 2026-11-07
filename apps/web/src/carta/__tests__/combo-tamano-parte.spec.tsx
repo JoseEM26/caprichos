@@ -46,11 +46,9 @@ describe('tamaño de la parte fija del combo', () => {
         categorias={[]}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Partes y alternativas/ }));
     const selectTamano = await screen.findByLabelText('Tamaño del producto fijo');
     fireEvent.change(selectTamano, { target: { value: '77' } });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
     fireEvent.click(screen.getByTestId('btn-guardar-combo'));
     fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }));
     expect(guardado?.partes?.[0]?.tamanoId).toBe('77');

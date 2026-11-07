@@ -4,3 +4,11 @@
 .oferta-cab { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
 .oferta-cab > :first-child { min-width: 0; flex: 1 1 auto; }
 .oferta-estado { flex: none; white-space: nowrap; max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
+
+/* Menú «⋯» de las tarjetas: la fila de botones principales es igual en todas */
+.oferta-mas { position: relative; flex: 0 0 auto; }
+.oferta-mas-boton { min-width: 44px; min-height: 44px; border: 1.5px solid var(--cp-navy); border-radius: 10px; background: transparent; color: var(--cp-navy); font-weight: 800; font-size: 18px; line-height: 1; cursor: pointer; }
+.oferta-mas-boton:disabled { opacity: 0.4; cursor: not-allowed; }
+.oferta-mas-lista { position: absolute; right: 0; bottom: calc(100% + 4px); z-index: 20; min-width: 230px; display: flex; flex-direction: column; background: var(--cp-white, #fff); border: 1.5px solid var(--cp-navy); border-radius: 10px; box-shadow: 0 8px 24px rgba(11, 44, 62, 0.25); padding: 4px; }
+.oferta-mas-item { min-height: 44px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--cp-navy); font-weight: 700; font-size: 13px; text-align: left; cursor: pointer; }
+.oferta-mas-item:hover, .oferta-mas-item:focus-visible { background: var(--cp-sand); outline: none; }

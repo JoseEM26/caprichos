@@ -23,6 +23,9 @@ Tambien muestra tu turno de hoy, las marcas que ya hiciste, tus ultimos 7 dias c
 
 Estado de la funcion: la asistencia esta probada en preproduccion. En produccion se activa cuando el administrador deja la ubicacion del local configurada y publica la pantalla del QR; mientras el local no tenga ubicacion nadie puede marcar.
 
+## Que pasa si el local no tiene ubicacion
+Si el administrador aun no fijo la ubicacion del local, al abrir Mi asistencia ves el aviso "El administrador aun no configuro la ubicacion del local. Todavia no puedes marcar; avisale." y el boton Escanear QR queda desactivado (tampoco se puede escribir el codigo). Tu historial y tus propinas se siguen viendo. Avisa al administrador: cuando guarde el punto en [[asistencia]], pestana Configuracion, vuelve a abrir la pantalla y ya podras marcar. El repartidor ve el mismo aviso.
+
 ## Como se hace: Marcar mi entrada, almuerzo o salida
 1. Entra al sistema con tu usuario. Si estas en la pantalla de ingreso, puedes pulsar Marcar mi asistencia: despues de iniciar sesion te lleva directo a Mi asistencia. En el menu tambien aparece Marcar asistencia.
 2. Arriba lees el estado del dia: "Te falta marcar: Entrada" (o la que toque) y tu turno, por ejemplo "Tu turno: 09:00 a 18:00 (almuerzo 13:00-14:00)". Si no hay turno dice "Hoy no tienes turno programado.".

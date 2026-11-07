@@ -48,6 +48,11 @@ Antes: [[cocina]]
 Despues: [[comprobantes]]
 Ver tambien: [[cierre]]
 
+## Como se hace: Aplicar un cupon en un pedido nuevo
+1. En Nuevo pedido (de Caja o del mozo), pulsar Cupon, escribir el codigo y pulsar Aplicar. El sistema lo valida con las mismas reglas de la carta (vigencia, horario, compra minima, usos y acumulacion con promociones) y muestra el descuento en el resumen.
+2. Si no sirve, aparece el motivo en claro: no existe, vencido, ya canjeado, compra minima no alcanzada, sin usos disponibles o ya hay una promocion con mayor descuento. Solo valida: el cupon se gasta al registrar el pedido y no se puede usar dos veces.
+3. Si se cambian los productos despues de aplicarlo, el cupon se quita y hay que aplicarlo otra vez. Quitar lo deja sin descuento. Pueden hacerlo Administrador, Cajero, Mozo y Supervisor.
+
 ## Como se hace: Adjuntar la foto del comprobante al cobrar
 1. Al elegir Yape, Plin o Transferencia aparece la seccion Comprobante del pago digital. Tomar la foto del voucher con la camara o subir el archivo; la imagen se reduce en el navegador y se guarda como archivo privado, como prueba.
 2. Al terminar la subida, la pantalla muestra la lectura de la IA: semaforo, motivos y datos extraidos (monto, operacion, billetera, titular y fecha) comparados con el total. La lectura es informativa y la decision es de la persona de caja, pero una foto que la IA marca como ILEGIBLE no cuenta como comprobante: la pantalla avisa "No se lee: sube otra foto o confirma sin comprobante con codigo del supervisor" (el administrador no necesita codigo: solo el motivo).

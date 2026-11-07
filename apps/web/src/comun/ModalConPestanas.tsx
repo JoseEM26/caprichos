@@ -8,6 +8,8 @@ export interface PestanaModal {
   etiqueta: string;
   /** Conteo o marca junto a la etiqueta (p. ej. 3). Se oculta si es null/undefined. */
   insignia?: number | string | null;
+  /** true = la insignia se pinta como aviso de error pendiente en esa pestaña. */
+  insigniaError?: boolean;
   contenido: ReactNode;
   /** false = el contenido se desmonta al salir de la pestaña (por defecto se conserva su estado). */
   persistente?: boolean;
@@ -64,7 +66,7 @@ export function BarraPestanas({ pestanas, activa, alCambiar, base, etiqueta }: {
           tabIndex={p.id === activa ? 0 : -1} data-foco-inicial={p.id === activa ? '' : undefined}
           onClick={() => alCambiar(p.id)}>
           {p.etiqueta}
-          {p.insignia != null && p.insignia !== '' && <span className="mcp-insignia">{p.insignia}</span>}
+          {p.insignia != null && p.insignia !== '' && <span className={p.insigniaError ? 'mcp-insignia mcp-insignia-error' : 'mcp-insignia'} {...(p.insigniaError ? { 'aria-label': 'con errores', role: 'img' } : {})}>{p.insignia}</span>}
         </button>
       ))}
     </div>

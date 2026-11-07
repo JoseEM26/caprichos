@@ -19,7 +19,8 @@ import { ChatbotConfiguracionService } from '../configuracion/chatbot-configurac
 import { BOTON_VOLVER_MENU, TEXTOS_BOT, TEXTOS_SOLO_MENUS, TEXTO_ASISTIDO_FRASE_FIJA } from './textos-bot';
 import { vistaPreviaPedidoBot, vistaPreviaUbicacionBot } from './vista-previa-pedido.util';
 import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
-import { carritoTrasSaborAgotado } from './flujos/pedido/flujo-pedido';
+import { CODIGOS_COMBO_RECHAZADO, carritoTrasComboRechazado, carritoTrasSaborAgotado } from './flujos/pedido/flujo-pedido';
+import { productosComboNoBot } from './flujos/pedido/combo-bot';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
 import {
@@ -46,6 +47,7 @@ import {
 import { EntradaRawInput, normalizarEntrada, esSaludo } from './normalizador-entrada.util';
 import { transicionarEstado, MODO_SOLO_MENUS } from './maquina-estados';
 import {
+  AccionMensaje,
   ContextoConversacion,
   VistaPreviaPedidoBot,
   DatosHorarioLocal,
@@ -401,6 +403,42 @@ export class EjecutorConversacionService {
     });
     this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacionId.toString() });
     return true;
+  }
+
+  /** Combo rechazado al confirmar: el cliente vuelve a elegir sus partes (lista o botones) en un solo mensaje. */
+  private async volverAlComboRechazado(
+    conversacionId: bigint,
+    vuelta: { pedido: EstadoCarritoPedido; acciones: AccionMensaje[] },
+    destinoEnvio: string | null | undefined,
+    entradaRaw: any,
+  ): Promise<void> {
+    const actual = await this.prisma.conversacion.findUnique({ where: { id: conversacionId }, select: { flujo: true } });
+    await this.prisma.conversacion.update({
+      where: { id: conversacionId },
+      data: { flujo: { ...((actual?.flujo as any) || {}), estado: 'PEDIDO_COMBO_PARTE', pedido: vuelta.pedido } as any },
+    });
+    for (const a of vuelta.acciones) {
+      const opciones = { conversacionId, replyToWaMessageId: entradaRaw?.waMessageId };
+      let metaId: string | null = null;
+      let tipo: 'TEXTO' | 'BOTON' | 'LISTA' = 'TEXTO';
+      let contenido: any = {};
+      if (a.tipo === 'enviarTexto') {
+        if (destinoEnvio) metaId = (await this.mensajeria.enviarTexto(destinoEnvio, a.texto, opciones)).waMessageId || null;
+        contenido = { texto: a.texto };
+      } else if (a.tipo === 'enviarBotones') {
+        if (destinoEnvio) metaId = (await this.mensajeria.enviarBotones(destinoEnvio, a.texto, a.botones, opciones)).waMessageId || null;
+        tipo = 'BOTON';
+        contenido = { texto: a.texto, botones: a.botones };
+      } else if (a.tipo === 'enviarLista') {
+        if (destinoEnvio) metaId = (await this.mensajeria.enviarLista(destinoEnvio, a.texto, a.botonTexto, a.filas, opciones)).waMessageId || null;
+        tipo = 'LISTA';
+        contenido = { texto: a.texto, botonTexto: a.botonTexto, filas: a.filas };
+      } else continue;
+      await this.prisma.mensajeChat.create({
+        data: { conversacion_id: conversacionId, direccion: 'SALE', autor: 'BOT', tipo, contenido, meta_id: metaId },
+      });
+    }
+    this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacionId.toString() });
   }
 
   private async salirDeValidarPagoSiVencido(conversacion: any, flujo: FlujoConversacion | null): Promise<FlujoConversacion | null> {
@@ -836,6 +874,7 @@ export class EjecutorConversacionService {
     let datosLocalPublicos: any = null;
     let categoriasCarta: any[] = [];
     let ofertas: any[] = [];
+    let anfitrionesNoBot: string[] = [];
     let ventasProductos: Record<string, number> = {};
     let pedidoActivo: any = null;
     let limiteConsultasExcedido = false;
@@ -861,6 +900,12 @@ export class EjecutorConversacionService {
 
       if (this.ofertasService) {
         ofertas = await this.ofertasService.listarOfertas(undefined, true, 'WHATSAPP');
+        // Anfitriones de combos que el bot no vende hoy (sin casilla WhatsApp, agotados o fuera de horario): no salen en sus listas
+        try {
+          anfitrionesNoBot = productosComboNoBot(await this.ofertasService.listarOfertas('COMBO', true), ofertas);
+        } catch (err: any) {
+          this.logger.warn(`Sin la lista de combos para filtrar la carta del bot: ${err.message}`);
+        }
       }
 
       const altaDemandaExtra = (estadoCarta as any)?.altaDemandaExtra || 0;
@@ -1159,6 +1204,7 @@ export class EjecutorConversacionService {
       datosLocalPublicos,
       categoriasCarta,
       ofertas,
+      productosComboNoBot: anfitrionesNoBot,
       ventasProductos,
       pedidoActivo,
       errorServicio,
@@ -1941,6 +1987,18 @@ export class EjecutorConversacionService {
             // La campana del pedido nuevo la crea PedidosService.crear (igual para carta, mozo y WhatsApp)
           }
         } catch (err: any) {
+          // Combo rechazado al confirmar (se agotó una parte): se eligen sus partes de nuevo con lo que hay hoy
+          if (accion.carrito && (CODIGOS_COMBO_RECHAZADO.includes(String(err?.response?.codigo)) || err?.response?.codigo === 'STOCK_INSUFICIENTE' || err?.response?.codigo === 'OFERTA_NO_APLICA_CANAL')) {
+            const vuelta = carritoTrasComboRechazado(accion.carrito, err.response, categoriasCarta, ofertas, textosPersonalizados);
+            if (vuelta) {
+              await this.volverAlComboRechazado(conversacion.id, vuelta, destinoEnvio, entradaRaw);
+              continue;
+            }
+            if (err.response.codigo !== 'STOCK_INSUFICIENTE') {
+              await this.volverAlCarritoSinStock(conversacion.id, accion.carrito, err.response.mensaje ?? 'Ese combo ya no está disponible', destinoEnvio, entradaRaw);
+              continue;
+            }
+          }
           // Sin stock de un producto que controla stock: se vuelve al carrito, en un solo mensaje y sin escalar
           if (err?.response?.codigo === 'STOCK_INSUFICIENTE' && accion.carrito) {
             await this.volverAlCarritoSinStock(conversacion.id, accion.carrito, err.response.mensaje, destinoEnvio, entradaRaw);

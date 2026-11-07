@@ -61,6 +61,11 @@ Ver tambien: [[mensajes]]
 2. En un pedido de delivery de Caja o del mozo, el boton Usar ubicacion de WhatsApp toma la ultima ubicacion enviada en las ultimas 24 horas como punto de entrega. Ver [[repartos]].
 3. Si el cliente tiene un delivery reciente sin ubicacion (por confirmar, confirmado, preparando o listo), su ubicacion se asigna sola a ese pedido (el mas reciente) y recibe un mensaje con su envio. Si el pedido ya tenia ubicacion, la nueva queda como propuesta para Caja (Usar o Descartar). Si esta fuera de la zona de reparto, Caja recibe un aviso. Mientras el cliente arma un pedido con el bot, su ubicacion se usa en ese pedido y no se asigna a otro.
 
+## Como se hace: Ver como el cliente arma un combo por WhatsApp
+1. Si el combo tiene marcado "WhatsApp (bot)" en "¿Dónde aplica?" (ver [[ofertas]]), el cliente puede pedirlo en el chat: el bot dice que incluye, pide tamaño y elecciones una por una (por ejemplo "Elige tu opcion 1 de 2") y al final muestra el resumen con el total para confirmar.
+2. En el chat veras esos mensajes como botones o listas. Si una parte fija se agoto, el cliente ve el aviso de plan B con las alternativas; si escribe "atras" corrige la ultima eleccion y con "cancelar" sale del pedido.
+3. El pedido que llega ya trae el combo con sus partes (cada una en su area de cocina) y el stock descontado, igual que uno de la carta. Si algo se agoto justo al confirmar, el bot le ofrece elegir de nuevo esa parte sin pasar el chat a una persona.
+
 ## Como se hace: Cuando el repartidor chatea con el cliente de su pedido
 1. El repartidor puede escribir al cliente de su pedido desde la app de reparto (mientras el pedido esta Listo o En camino y hasta 2 horas despues de entregado). Los mensajes aparecen aqui en la misma conversacion como "Local".
 2. Si tu tienes tomado el chat, el repartidor ve "El local esta atendiendo este chat ahora. Podras escribir cuando lo suelte."; sueltalo para que pueda escribir. Si pasaron 24 horas sin respuesta del cliente, solo se puede reabrir con plantilla (ver abajo).

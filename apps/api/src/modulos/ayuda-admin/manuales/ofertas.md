@@ -20,14 +20,14 @@ sugerencias:
 ## Para que sirve
 Permite gestionar la estrategia de promociones y descuentos comerciales del negocio. Desde este modulo se configuran combos especiales sobre [[productos]], promociones de tipo lleva y paga (como 2x1 o 3x2), rebajas porcentuales o fijas sobre articulos o categorias completas, y cupones de descuento canjeables por codigo al cobrar en [[caja]].
 
-## Como se hace: Armar un combo (constructor por pasos)
+## Como se hace: Armar un combo (constructor con pestanas)
 Un combo es un paquete con precio propio que el cliente arma eligiendo por partes; aparece en la carta como un producto mas (categoria COMBOS por defecto) y se descuenta producto por producto del stock al vender. Un combo no recibe descuentos ni 2x1.
 1. Abre la pestana Promociones y pulsa + Armar oferta. En "Que oferta quieres armar?" elige Combo ("Varios productos por un precio. El cliente elige dentro de cada parte.") o "Llevas mas, pagas menos" (precio especial por llevar varias unidades del mismo producto, como 2x1 o 3x2).
-2. Paso 1 de 4, Nombre y categoria de la carta: escribe el nombre, elige la categoria de la carta y, si quieres, sube la Foto de la oferta (si no, la carta muestra la letra inicial sobre fondo dorado).
-3. Paso 2 de 4, Que lleva el combo: agrega las partes. Hay tres tipos: "2 bebidas a eleccion" (el cliente escoge entre las categorias que marques, por ejemplo Frappes, Iced o Calientes; se indica la cantidad), "1 complemento fijo" (un producto especifico e invariable, con su Tamano si lo necesita, por ejemplo "Regular 12 oz") y "Una de estas opciones" (el cliente escoge una alternativa armada, por ejemplo una porcion de torta o una dona artesanal). Puedes reordenar y quitar partes. Hace falta al menos una ("Agrega al menos una parte al combo.").
+2. El combo se arma en 4 pestanas que puedes recorrer en cualquier orden: "Datos", "Partes y alternativas", "Cuando y donde" y "Resumen". Si una pestana tiene un error pendiente aparece una marca roja "!" en su nombre. Pestana Datos: escribe el nombre, elige la categoria de la carta y, si quieres, sube la Foto de la oferta (si no, la carta muestra la letra inicial sobre fondo dorado).
+3. Pestana "Partes y alternativas" (que lleva el combo): agrega las partes. Hay tres tipos: "2 bebidas a eleccion" (el cliente escoge entre las categorias que marques, por ejemplo Frappes, Iced o Calientes; se indica la cantidad), "1 complemento fijo" (un producto especifico e invariable, con su Tamano si lo necesita, por ejemplo "Regular 12 oz") y "Una de estas opciones" (el cliente escoge una alternativa armada, por ejemplo una porcion de torta o una dona artesanal). Puedes reordenar y quitar partes. Hace falta al menos una ("Agrega al menos una parte al combo.").
 4. En una parte fija puedes definir Alternativas: "Si no hay stock, el cliente podra elegir:". Buscas un producto en "Buscar un producto para agregar como opcion...", le pones Cantidad (cuantas unidades consume) y las ordenas con Subir y Bajar o las quitas con Quitar. Se ofrecen solo cuando el complemento no alcanza, al mismo precio del combo; las agotadas salen bloqueadas.
-5. Paso 3 de 4, Cuanto vale el combo y cuando aplica: pon los Precios del combo por tamano (cada tamano con nombre y precio mayor a 0; "+ Agregar otro tamano"), mira la comparacion con la "Suma estimada de productos por separado" y el aviso "Combo mas caro que compras sueltas" si el precio supera la suma. Define los Dias de la semana y el horario (las dos horas o ninguna), y la vigencia por fechas.
-6. Paso 4 de 4: revisa la Previsualizacion en la carta virtual y guarda con confirmacion "Guardar nuevo combo?" / "Guardar cambios del combo?".
+5. De vuelta en la pestana Datos pon los Precios del combo por tamano (cada tamano con nombre y precio mayor a 0; "+ Agregar otro tamano"), y mira la comparacion con la "Suma estimada de productos por separado" y el aviso "Combo mas caro que compras sueltas" si el precio supera la suma. En la pestana "Cuando y donde" define los Dias de la semana y el horario (las dos horas o ninguna), la vigencia por fechas y "Donde aplica" (carta web, en el local, WhatsApp).
+6. Pestana "Resumen": revisa la Previsualizacion en la carta virtual. Pulsa "Guardar combo" (abajo, siempre visible): si falta algo, te lleva a la primera pestana con error y te dice que falta; si todo esta bien, pide la confirmacion "Guardar nuevo combo?" / "Guardar cambios del combo?". Si cierras con cambios sin guardar (se ve "Hay cambios sin guardar"), pregunta "Salir sin guardar?" con Si, salir / No.
 7. Al editar un combo puedes elegir como se ve cuando esta desactivado ("Mostrar como No disponible" u ocultarlo).
 Antes: [[productos]]
 Despues: [[caja]]
@@ -43,7 +43,7 @@ Ver tambien: [[novedades]]
 1. La Cajita Caprikids es un combo con producto propio (no se repite en Promociones): lleva nuggets, papas mini, un frappe en tamano fijo (Regular 12 oz) y dos juguetes a eleccion.
 2. En la carta, en mozo y en Caja el cliente elige dos juguetes (cantidad exacta; los agotados no se pueden elegir). Se muestra "Incluye: producto · tamano".
 3. En cocina el combo sale desglosado: la linea madre es solo el contenedor (lleva el precio del combo y no tiene comanda) y cada parte va en su linea hija a su area, con su cantidad y tamano, sin cobro. Comprobantes, ticket y cuenta muestran solo la linea madre. Al anular el pedido el stock de cada hija se devuelve.
-4. El tamano de una parte fija se elige en el constructor (Paso 2) para que la etiqueta de la bebida y la comanda salgan con ese tamano y se descuente cantidad × unidades del tamano.
+4. El tamano de una parte fija se elige en la pestana "Partes y alternativas" para que la etiqueta de la bebida y la comanda salgan con ese tamano y se descuente cantidad × unidades del tamano.
 Ver tambien: [[cocina]]
 
 ## Como se hace: Armar una promocion "Llevas mas, pagas menos" (2x1, 3x2)
@@ -55,10 +55,18 @@ Antes: [[productos]]
 ## Como se hace: Elegir donde aplica una oferta (carta web, local y WhatsApp)
 1. En el editor de cada oferta (combo, 2x1, descuento, envio gratis) busca "¿Dónde aplica?" y marca las casillas: "Carta web", "En el local (caja y mozo)" y "WhatsApp (bot)". Hay que dejar al menos una marcada.
 2. El texto de ayuda debajo cambia segun lo marcado: dice en que canales aplica y, si WhatsApp esta apagado, que el bot no la aplica ni la ofrece.
-3. Con WhatsApp marcado: el descuento y el 2x1 se aplican al total del pedido del bot y salen en su resumen; el envio gratis deja el delivery en S/ 0 dentro del horario, dias, fechas, compra minima y limite de pedidos, y el resumen dice "Envio gratis por «nombre»" (si aun no hay ubicacion tambien queda gratis al ubicar el pedido; si falta compra minima el bot avisa cuanto falta); el combo se ofrece en las promociones y en el cierre de venta del bot, pero su armado con elecciones es en la carta web. Ese texto del resumen se puede cambiar en Configuracion, Chatbot y WhatsApp (Textos del bot).
-4. Una oferta nueva viene con carta y local marcados; WhatsApp viene marcado en descuento, 2x1 y envio gratis, y apagado en combos. Las ofertas que ya existian conservan lo que tenian.
+3. Con WhatsApp marcado: el descuento y el 2x1 se aplican al total del pedido del bot y salen en su resumen; el envio gratis deja el delivery en S/ 0 dentro del horario, dias, fechas, compra minima y limite de pedidos, y el resumen dice "Envio gratis por «nombre»" (si aun no hay ubicacion tambien queda gratis al ubicar el pedido; si falta compra minima el bot avisa cuanto falta); el combo se ofrece en las promociones del bot con su precio por tamano y se vende alli mismo (ver "Vender combos por WhatsApp"). Ese texto del resumen se puede cambiar en Configuracion, Chatbot y WhatsApp (Textos del bot).
+4. Una oferta nueva viene con carta y local marcados; WhatsApp viene marcado en descuento, 2x1, envio gratis y combos (el cupon no lo lleva). Las ofertas que ya existian conservan lo que tenian.
 5. Los cupones se canjean en la carta web y en caja: el bot todavia no pide codigos, por eso WhatsApp aparece apagado y bloqueado en el cupon.
 6. Los cambios de canal quedan en la auditoria como "cambiar_canales". El servidor no aplica desde el bot una oferta con WhatsApp apagado, aunque llegue su numero.
+
+## Como se hace: Vender combos por WhatsApp
+1. Abre el combo (Promociones, Combos), busca "¿Dónde aplica?" y marca "WhatsApp (bot)". Un combo nuevo ya viene con carta, local y WhatsApp marcados; si lo quieres solo en la carta o solo en el local, desmarca los otros. Un combo solo para WhatsApp no sale en la carta web ni en caja y mozo, y uno de solo carta o solo local nunca se ofrece ni se vende por el bot. Los combos que ya existian conservan lo que tenian: activa WhatsApp a mano en cada uno.
+2. El cliente ve el combo en las promociones del bot (con el precio de cada tamaño) y en la lista de su categoria. Al elegirlo, el bot dice que incluye y le pregunta tamaño, las opciones del combo (bebidas, complemento, sabores) y, si el combo tiene partes con lista de productos (por ejemplo los juguetes de la Cajita), le pide cada eleccion una por una: 1 de 2, 2 de 2. Las opciones agotadas no se muestran.
+3. Si una parte fija se agoto y el combo tiene plan B, el bot avisa "Hoy no hay Club Sandwich, ¿lo cambiamos por Empanada o Croissant?" con las alternativas; el precio del combo no cambia. El texto se puede cambiar en Configuracion, Chatbot y WhatsApp (Textos del bot).
+4. Antes de agregarlo, el bot muestra el resumen con el total y pregunta si lo agrega o quiere cambiar. En cualquier momento el cliente puede escribir "atras" para corregir o "cancelar". Despues sigue el flujo normal de entrega y pago.
+5. Al confirmar, el sistema valida de nuevo el stock, los dias, la hora y el limite de usos. Si algo se agoto justo en ese momento, el bot avisa con amabilidad y le deja elegir de nuevo esa parte con lo que hay. Por WhatsApp se arman hasta 5 combos a la vez.
+6. Si el combo se agota, esta fuera de su dia u hora, o llego a su limite de usos, el bot deja de ofrecerlo solo; cuando vuelva a estar disponible reaparece sin tocar nada.
 
 ## Como se hace: Distinguir "Agotado automaticamente" de "Desactivada por ti"
 1. "Agotado automaticamente · vuelve sola cuando haya stock" (naranja): el combo esta activo pero falta stock. Se muestra el motivo ("falta X, Y y las bebidas a elegir") y, si tiene plan B, "hay alternativas configuradas". Al reponer el stock vuelve solo a la carta y al bot; no hay que tocar nada. El sistema nunca cambia el estado Activo por stock.
@@ -67,11 +75,11 @@ Antes: [[productos]]
 
 ## Como se hace: Crear un descuento directo
 1. Dirigete a la pestana "Descuentos".
-2. Pulsa el boton "+ Nuevo descuento".
-3. Selecciona si el descuento se aplicara como porcentaje (por ejemplo 10% o 20%) o como monto fijo en soles.
-4. Elige si la rebaja aplica a un producto individual o a una categoria entera de la carta.
-5. Define los dias de la semana, los horarios validos y las fechas de inicio y fin del descuento.
-6. Pulsa "Guardar descuento" y confirma con "Si, continuar".
+2. Pulsa el boton "+ Nuevo descuento". El formulario tiene 4 pestanas: "Que descuenta", "Cuando y donde", "Condiciones" y "Vista previa"; las pestanas con un error pendiente muestran una marca "!".
+3. En "Que descuenta": nombre, a que aplica (toda la carta, una categoria o un producto) y si el descuento es porcentaje (por ejemplo 10% o 20%) o monto fijo en soles con su valor.
+4. En "Cuando y donde": dias de la semana, horarios, fechas de inicio y fin y "Donde aplica".
+5. En "Condiciones": compra minima, "Mostrar al inicio del chat de WhatsApp" y "Solo primera compra".
+6. Pulsa "Guardar descuento" (abajo) y confirma con "Si, continuar". Las promociones "Lleva y paga" funcionan igual con 3 pestanas ("Que lleva y paga", "Cuando y donde" y "Vista previa"); el cupon con "Datos del cupon", "Cuando y donde" y "Condiciones"; el envio gratis con "Datos" y "Cuando y donde".
 Antes: [[productos]]
 Ver tambien: [[caja]]
 
@@ -91,8 +99,12 @@ Ver tambien: [[clientes]]
 4. Si la promocion llego a su fin definitivo, pulsa "Desactivar" y confirma la baja con "Si, confirmar".
 Ver tambien: [[indicadores]]
 
+## Como se hace: Ocultar o mostrar una oferta desactivada
+1. Todas las tarjetas tienen la misma fila: "Editar", "Activar" o "Desactivar" y el menu "..." (Mas acciones).
+2. En el menu "..." de una oferta desactivada elige "Ocultar de la carta" o "Mostrar como No disponible". Con el teclado: flecha abajo abre el menu, flechas se mueven, Esc lo cierra.
+
 ## Errores y dudas comunes
-- Como se prevé la apariencia de una oferta en la carta: en la pestana de promociones puedes pulsar el boton "Ver como se ve en la carta" para abrir una previsualizacion exacta de como vera el cliente la oferta en la carta web.
+- Como se prevé la apariencia de una oferta en la carta: en la pestana de promociones abre el menu "..." (Mas acciones) de la tarjeta y elige "Ver como se ve en la carta" para abrir una previsualizacion exacta de como vera el cliente la oferta en la carta web.
 - Se pueden acumular cupones con ofertas automaticas: las condiciones de acumulacion se configuran en la pestana "Reglas". Por defecto, el sistema restringe combinaciones que afecten el margen minimo del negocio.
 - Donde revisar canjes de cupones: dentro de la pestana "Cupones", pulsa el boton "Historial de cupones" para auditar que pedidos y clientes utilizaron cada codigo.
 

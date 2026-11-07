@@ -26,7 +26,8 @@ describe('canales de las ofertas (tres casillas: carta, local, WhatsApp)', () =>
     expect(canalesPorDefecto('ENVIO_GRATIS')).toEqual({ carta: true, local: true, bot: true });
     expect(canalesPorDefecto('DESCUENTO').bot).toBe(true);
     expect(canalesPorDefecto('LLEVA_PAGA').bot).toBe(true);
-    expect(canalesPorDefecto('COMBO')).toEqual({ carta: true, local: true, bot: false });
+    expect(canalesPorDefecto('COMBO')).toEqual({ carta: true, local: true, bot: true });
+    expect(canalesPorDefecto('CUPON').bot).toBe(false);
   });
 
   it('el texto de ayuda cambia con el estado y nunca dice «no la aplica» cuando WhatsApp está encendido', () => {
@@ -48,7 +49,7 @@ const descuentoBase = {
 async function irAlPasoDeCanales(props: Record<string, unknown>) {
   render(<ModalDescuento abierto onCerrar={() => {}} onGuardar={vi.fn()} productosDisponibles={[]} categorias={[]} {...props} />);
   fireEvent.change(document.getElementById('desc-nombre')!, { target: { value: '10% de prueba' } });
-  fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
+  fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
   await waitFor(() => expect(document.getElementById('desc-canal-bot')).not.toBeNull());
   return {
     carta: document.getElementById('desc-canal-carta') as HTMLInputElement,
@@ -91,7 +92,7 @@ describe('ModalLlevaPaga: ¿Dónde aplica?', () => {
   async function abrirCanales(oferta: unknown) {
     const { ModalLlevaPaga } = await import('../ModalLlevaPaga');
     render(<ModalLlevaPaga abierto ofertaAEditar={oferta as any} onCerrar={() => {}} onGuardar={vi.fn()} productosDisponibles={[]} categorias={[]} />);
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     await waitFor(() => expect(document.getElementById('lp-canal-bot')).not.toBeNull());
     return document.getElementById('lp-canal-bot') as HTMLInputElement;
   }
@@ -117,14 +118,14 @@ describe('ModalCombo: ¿Dónde aplica?', () => {
   it('al editar un combo con BOT queda marcado; sin BOT, desmarcado y la ayuda lo dice', async () => {
     const { ModalCombo } = await import('../ModalCombo');
     const { unmount } = render(<ModalCombo abierto comboAEditar={{ ...comboBase, canales: ['CARTA', 'ADMIN', 'BOT'] }} onCerrar={() => {}} onGuardar={vi.fn()} productosDisponibles={[]} categorias={[]} />);
-    for (let i = 0; i < 2; i++) fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     await waitFor(() => expect(document.getElementById('canal-combo-bot')).not.toBeNull());
     expect((document.getElementById('canal-combo-bot') as HTMLInputElement).checked).toBe(true);
     expect(screen.getByTestId('canal-combo-ayuda').textContent).toMatch(/la ofrece en sus promociones/);
     unmount();
 
     render(<ModalCombo abierto comboAEditar={comboBase} onCerrar={() => {}} onGuardar={vi.fn()} productosDisponibles={[]} categorias={[]} />);
-    for (let i = 0; i < 2; i++) fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     await waitFor(() => expect(document.getElementById('canal-combo-bot')).not.toBeNull());
     expect((document.getElementById('canal-combo-bot') as HTMLInputElement).checked).toBe(false);
     expect(screen.getByTestId('canal-combo-ayuda').textContent).toMatch(/no la aplica ni la ofrece/);
@@ -134,6 +135,7 @@ describe('ModalCombo: ¿Dónde aplica?', () => {
 describe('ModalEnvioGratis: ¿Dónde aplica?', () => {
   it('sin la frase fija: con WhatsApp encendido dice que el bot cobra sin envío; apagado, que no la aplica', () => {
     render(<ModalEnvioGratis abierto ofertaAEditar={null} onCerrar={() => {}} onGuardar={vi.fn()} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     expect(document.body.textContent).not.toMatch(/El bot de WhatsApp no la aplica\.(?! ni)/);
     expect((screen.getByLabelText('WhatsApp (bot)') as HTMLInputElement).checked).toBe(true);
     expect(screen.getByTestId('envio-canal-ayuda').textContent).toMatch(/no cobra envío en el delivery/);
@@ -145,6 +147,7 @@ describe('ModalEnvioGratis: ¿Dónde aplica?', () => {
     const onGuardar = vi.fn().mockResolvedValue(undefined);
     render(<ModalEnvioGratis abierto ofertaAEditar={null} onCerrar={() => {}} onGuardar={onGuardar} />);
     fireEvent.change(screen.getByLabelText(/Nombre de la promoción/), { target: { value: 'Envío gratis' } });
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     for (const n of ['Carta web', 'En el local (caja y mozo)', 'WhatsApp (bot)']) fireEvent.click(screen.getByLabelText(n));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
     expect(screen.getByRole('alert').textContent).toMatch(/al menos un lugar/);
@@ -160,6 +163,7 @@ describe('ModalEnvioGratis: ¿Dónde aplica?', () => {
 describe('ModalCupon: ¿Dónde aplica?', () => {
   it('WhatsApp aparece apagado y deshabilitado con la razón; no se guarda BOT', () => {
     render(<ModalCupon abierto cuponAEditar={null} onCerrar={() => {}} onGuardar={vi.fn()} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Cuándo y dónde/ }));
     const bot = screen.getByLabelText('WhatsApp (bot)') as HTMLInputElement;
     expect(bot.checked).toBe(false);
     expect(bot.disabled).toBe(true);

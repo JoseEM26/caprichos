@@ -168,13 +168,13 @@ export function ordenarPorVentas<T extends { id: string | number }>(productos: T
 }
 
 /** Tarjeta de un producto de la carta: foto (o iniciales), nombre, precio («Desde S/ X» si tiene tamaños) y «Pedir este». */
-export function tarjetaProducto(p: any, cartaUrlPublica?: string | null): TarjetaCarrusel {
+export function tarjetaProducto(p: any, cartaUrlPublica?: string | null, avisoStock?: string | null): TarjetaCarrusel {
   const precios: number[] = (p.tamanos ?? []).map((t: any) => Number(t.precio)).filter((n: number) => n > 0);
   const precio = precios.length ? `Desde S/ ${Math.min(...precios).toFixed(2)}` : `S/ ${Number(p.precio || 0).toFixed(2)}`;
   return {
     nombre: String(p.nombre),
     imagenUrl: imagenProductoCarrusel(cartaUrlPublica, { id: String(p.id), nombre: String(p.nombre), fotoUrl: p.fotoUrl }),
-    cuerpo: `${String(p.nombre).slice(0, 100)}\n${precio}`,
+    cuerpo: `${String(p.nombre).slice(0, avisoStock ? 70 : 100)}\n${precio}${avisoStock ? `\n${avisoStock}` : ''}`,
     boton: { id: `ped_prod_${p.id}`, titulo: 'Pedir este' },
   };
 }

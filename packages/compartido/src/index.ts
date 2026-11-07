@@ -64,3 +64,12 @@ export { lineasTicketComandaSalon } from './etiquetas/ticketComanda.js';
 export type { LineaComanda } from './etiquetas/ticketComanda.js';
 export type { LineaTicket } from './etiquetas/ticketPago.js';
 export { LOGO_BASE64, LOGO_BASE64_90, LOGO_BASE64_270, LOGO_LADO } from './etiquetas/logoBitmap.js';
+export {
+  UMBRALES_AVISO_STOCK_DEFECTO,
+  AVISO_STOCK_MAX,
+  umbralesAvisoStock,
+  unidadNatural,
+  avisoStock,
+  avisoSabor,
+} from './utilidades/avisos-stock.js';
+export type { UmbralesAvisoStock, AvisoStock } from './utilidades/avisos-stock.js';

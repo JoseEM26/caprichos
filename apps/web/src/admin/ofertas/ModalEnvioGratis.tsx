@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ModalConPestanas } from '../../comun/ModalConPestanas';
+import { AvisoErrorOferta, ConfirmarSalir, PieOferta, primeraConError, useCambiosSinGuardar, useCierreConConfirmacion } from './modalOfertaComun';
 import { OfertaItem } from './ofertasApi';
 import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
 
@@ -24,7 +26,8 @@ interface ModalEnvioGratisProps {
  * No lleva descuento ni productos. Con WhatsApp (bot) activo, el bot también cobra el delivery sin envío.
  */
 export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }: ModalEnvioGratisProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const [pestana, setPestana] = useState('datos');
+  const [verErrores, setVerErrores] = useState(false);
   const [nombre, setNombre] = useState('');
   const [dias, setDias] = useState<string[]>([]);
   const [horaDesde, setHoraDesde] = useState('');
@@ -42,6 +45,8 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
   useEffect(() => {
     if (!abierto) return;
     setMensajeError('');
+    setPestana('datos');
+    setVerErrores(false);
     if (ofertaAEditar) {
       setNombre(ofertaAEditar.nombre || '');
       setDias((ofertaAEditar.dias || []).map((d) => DIAS[(d - 1 + 7) % 7]?.[0] || 'lun'));
@@ -69,9 +74,29 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
     }
   }, [abierto, ofertaAEditar]);
 
-  useEffect(() => {
-    if (abierto) dialogRef.current?.focus();
-  }, [abierto]);
+  const minimaNum = parseFloat(compraMinima.replace(',', '.'));
+  const errorDatos = (): string | null => {
+    if (!nombre.trim()) return 'Escribe el nombre de la promoción, por ejemplo «Delivery gratis de 2 a 6 pm».';
+    if (compraMinima.trim() && (isNaN(minimaNum) || minimaNum < 0)) return 'La compra mínima debe ser un monto mayor o igual a 0, o déjala vacía.';
+    return null;
+  };
+  const errorCuando = (): string | null => {
+    if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de fin debe ser después de la hora de inicio.';
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
+    if (!canales.carta && !canales.local && !canales.bot) return ERROR_SIN_CANALES;
+    return null;
+  };
+  const erroresPestanas = [
+    { id: 'datos', error: errorDatos() },
+    { id: 'cuando', error: errorCuando() },
+  ];
+  const marca = (id: string) => {
+    const hay = verErrores && !!erroresPestanas.find((e) => e.id === id)?.error;
+    return hay ? { insignia: '!', insigniaError: true } : {};
+  };
+  const firma = JSON.stringify([nombre, dias, horaDesde, horaHasta, fechaDesde, fechaHasta, canales, compraMinima, limiteUsos, orden, visibleCarta]);
+  const sucio = useCambiosSinGuardar(abierto, firma);
+  const { cerrar, confirmando, setConfirmando } = useCierreConConfirmacion(sucio, onCerrar);
 
   if (!abierto) return null;
 
@@ -79,30 +104,17 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
     setDias((prev) => (prev.includes(codigo) ? prev.filter((d) => d !== codigo) : [...prev, codigo]));
   };
 
+  // Guardar: si hay un error, salta a la primera pestaña con error y lo muestra.
   const guardar = async () => {
-    if (!nombre.trim()) {
-      setMensajeError('Escribe el nombre de la promoción, por ejemplo «Delivery gratis de 2 a 6 pm».');
+    setVerErrores(true);
+    const e = primeraConError(erroresPestanas);
+    if (e) {
+      setPestana(e.id);
+      setMensajeError(e.error as string);
       return;
     }
-    if (horaDesde && horaHasta && horaDesde >= horaHasta) {
-      setMensajeError('La hora de fin debe ser después de la hora de inicio.');
-      return;
-    }
-    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
-      setMensajeError('La fecha de inicio no puede ser después de la final.');
-      return;
-    }
-    const minima = parseFloat(compraMinima.replace(',', '.'));
-    if (compraMinima.trim() && (isNaN(minima) || minima < 0)) {
-      setMensajeError('La compra mínima debe ser un monto mayor o igual a 0, o déjala vacía.');
-      return;
-    }
-
+    const minima = minimaNum;
     const diasNum = dias.map((code) => DIAS.findIndex((x) => x[0] === code) + 1);
-    if (!canales.carta && !canales.local && !canales.bot) {
-      setMensajeError(ERROR_SIN_CANALES);
-      return;
-    }
 
     setGuardando(true);
     setMensajeError('');
@@ -140,37 +152,43 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
   const input = { minHeight: '44px', padding: '0 10px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', fontSize: '14px' };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div onClick={onCerrar} style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(11, 44, 62, 0.55)' }} aria-hidden="true" />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={titulo}
-        tabIndex={-1}
-        style={{
-          position: 'relative',
-          width: 'min(560px, calc(100% - 24px))',
-          maxHeight: 'calc(100% - 24px)',
-          overflowY: 'auto',
-          backgroundColor: 'var(--cp-cream)',
-          borderRadius: '20px',
-          padding: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '14px',
-        }}
-      >
-        <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: '22px', color: 'var(--cp-navy)' }}>{titulo}</div>
-        <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-          El delivery no cobra envío dentro del horario, días y fechas que elijas. No descuenta productos.
-        </div>
-
-        <label style={campo}>
-          Nombre de la promoción
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} style={input} maxLength={120} placeholder="Delivery gratis de 2 a 6 pm" />
-        </label>
-
+    <>
+      <ModalConPestanas
+        titulo={titulo}
+        subtitulo="El delivery no cobra envío dentro del horario, días y fechas que elijas. No descuenta productos."
+        alCerrar={cerrar}
+        bloquearCierre={guardando || confirmando}
+        pestanaActiva={pestana}
+        alCambiarPestana={setPestana}
+        ancho={600}
+        bajoPestanas={<AvisoErrorOferta mensaje={mensajeError} />}
+        pie={<PieOferta sucio={sucio} alCancelar={cerrar} alGuardar={guardar} guardando={guardando} textoGuardar="Guardar" />}
+        pestanas={[
+          { id: 'datos', etiqueta: 'Datos', ...marca('datos'), contenido: (
+            <>
+            <label style={campo}>
+              Nombre de la promoción
+              <input value={nombre} onChange={(e) => setNombre(e.target.value)} style={input} maxLength={120} placeholder="Delivery gratis de 2 a 6 pm" />
+            </label>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <label style={{ ...campo, flex: '1 1 140px' }}>
+                Compra mínima S/ (opcional)
+                <input inputMode="decimal" value={compraMinima} onChange={(e) => setCompraMinima(e.target.value)} style={input} placeholder="Sin mínimo" />
+              </label>
+              <label style={{ ...campo, flex: '1 1 140px' }}>
+                Límite de pedidos (opcional)
+                <input inputMode="numeric" value={limiteUsos} onChange={(e) => setLimiteUsos(e.target.value)} style={input} placeholder="Sin límite" />
+              </label>
+              <label style={{ ...campo, flex: '0 1 100px' }}>
+                Orden
+                <input inputMode="numeric" value={orden} onChange={(e) => setOrden(e.target.value)} style={input} />
+              </label>
+            </div>
+            {ofertaAEditar && <SelectorVisibleCarta id="envio-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
+            </>
+          ) },
+          { id: 'cuando', etiqueta: 'Cuándo y dónde', ...marca('cuando'), contenido: (
+            <>
         <div style={campo}>
           Días (si no eliges ninguno, todos los días)
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -223,48 +241,11 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
         </div>
 
         <SelectorCanales id="envio-canal" tipo="ENVIO_GRATIS" valor={canales} onChange={setCanales} />
-
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <label style={{ ...campo, flex: '1 1 140px' }}>
-            Compra mínima S/ (opcional)
-            <input inputMode="decimal" value={compraMinima} onChange={(e) => setCompraMinima(e.target.value)} style={input} placeholder="Sin mínimo" />
-          </label>
-          <label style={{ ...campo, flex: '1 1 140px' }}>
-            Límite de pedidos (opcional)
-            <input inputMode="numeric" value={limiteUsos} onChange={(e) => setLimiteUsos(e.target.value)} style={input} placeholder="Sin límite" />
-          </label>
-          <label style={{ ...campo, flex: '0 1 100px' }}>
-            Orden
-            <input inputMode="numeric" value={orden} onChange={(e) => setOrden(e.target.value)} style={input} />
-          </label>
-        </div>
-
-        {ofertaAEditar && <SelectorVisibleCarta id="envio-visible-carta" visibleCarta={visibleCarta} onChange={setVisibleCarta} />}
-
-        {mensajeError && (
-          <div role="alert" style={{ fontSize: '13px', color: 'var(--cp-rust)' }}>
-            {mensajeError}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={onCerrar}
-            style={{ minHeight: '44px', padding: '0 16px', borderRadius: '12px', border: '1.5px solid var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, cursor: 'pointer' }}
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={guardar}
-            disabled={guardando}
-            style={{ minHeight: '44px', padding: '0 18px', borderRadius: '12px', border: 0, backgroundColor: 'var(--cp-orange)', color: 'var(--cp-navy)', fontWeight: 800, cursor: guardando ? 'not-allowed' : 'pointer' }}
-          >
-            {guardando ? 'Guardando…' : 'Guardar'}
-          </button>
-        </div>
-      </div>
-    </div>
+            </>
+          ) },
+        ]}
+      />
+      <ConfirmarSalir abierto={confirmando} alSalir={() => { setConfirmando(false); onCerrar(); }} alQuedarse={() => setConfirmando(false)} />
+    </>
   );
 }

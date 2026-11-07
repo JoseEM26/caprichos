@@ -26,6 +26,8 @@ export interface PayloadAvisoReparto {
   plantillaClave: string;
   variablesPlantilla: string[];
   botones?: { id: string; titulo: string }[];
+  /** Plantilla vigente a la que se cae si Meta rechaza la principal (no aprobada). */
+  plantillaRespaldo?: { plantillaClave: string; variablesPlantilla: string[] };
 }
 
 export const BOTONES_REPROGRAMACION = [
@@ -224,5 +226,18 @@ export function conPuntosEntregado(base: PayloadAvisoReparto, nombre: string, co
     textoLibre: `${base.textoLibre} Ganaste ${g} puntos. Total: ${t}.`,
     plantillaClave: 'DELIVERY_ENTREGADO_PUNTOS',
     variablesPlantilla: [nombre, codigo, g, t],
+  };
+}
+
+/**
+ * Delivery sin ubicación y sin ventana de 24 h: plantilla que pide la ubicación (el texto libre, con ventana
+ * abierta, ya la pide). Si Meta la rechaza, cae a la plantilla que traía el payload. `medio` null = efectivo.
+ */
+export function conPlantillaUbicacion(base: PayloadAvisoReparto, nombre: string, codigo: string, medio: string | null): PayloadAvisoReparto {
+  return {
+    ...base,
+    plantillaClave: medio ? 'CARTA_DELIVERY_UBICACION_DIGITAL' : 'CARTA_DELIVERY_UBICACION_EFECTIVO',
+    variablesPlantilla: medio ? [nombre, codigo, medio] : [nombre, codigo],
+    plantillaRespaldo: { plantillaClave: base.plantillaClave, variablesPlantilla: base.variablesPlantilla },
   };
 }

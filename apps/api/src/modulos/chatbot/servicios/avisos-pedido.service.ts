@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { enmascararTelefono, telefonoEnviable } from '../utilidades/enmascarar.util';
 import { CargaSaliente, OutboxWhatsappService } from './outbox-whatsapp.service';
-import { EtapaAvisoReparto, ResumenRecibido, TEXTOS_REPARTO, PayloadAvisoReparto, conBienvenidaPuntos, conPuntosEntregado } from '../conversacion/textos-reparto';
+import { EtapaAvisoReparto, ResumenRecibido, TEXTOS_REPARTO, PayloadAvisoReparto, conBienvenidaPuntos, conPlantillaUbicacion, conPuntosEntregado } from '../conversacion/textos-reparto';
 import { partyClienteDelPedido } from '../../clientes/cliente-del-pedido';
 import { urlPublicaCarta } from './carrusel.util';
 import { parametroActivoConDefecto, whatsappSimulado } from '../utilidades/modo-whatsapp.util';
@@ -81,6 +81,8 @@ export interface DatosAviso {
   enlaceSeguimiento?: string | null;
   /** RECIBIDO efectivo: usar la plantilla con enlace (solo si Meta ya la aprobó y el parámetro está en «Sí»). */
   plantillaSeguimiento?: boolean;
+  /** RECIBIDO delivery sin ubicación: usar las plantillas que piden la ubicación (parámetro whatsapp_plantilla_delivery_ubicacion_activa). */
+  plantillaUbicacion?: boolean;
   /** RECIBIDO: productos, total, medio y estado del envío (se arma al avisar). */
   resumen?: ResumenRecibido | null;
 }
@@ -193,6 +195,7 @@ export class AvisosPedidoService {
         ...datos,
         enlaceSeguimiento: this.enlaceSeguimiento(pedidoId, pedido.codigo),
         plantillaSeguimiento: esParametroActivo(flagPlantilla?.valor),
+        plantillaUbicacion: esParametroActivo((await db.parametro.findUnique({ where: { clave: 'whatsapp_plantilla_delivery_ubicacion_activa' } }))?.valor),
         resumen: await this.resumenRecibido(db, pedidoId),
       };
     }
@@ -367,9 +370,13 @@ export class AvisosPedidoService {
     medio: string | null,
     extra: ExtraPuntos | null,
   ): Promise<PayloadAvisoReparto> {
-    const base = await this.construirPayload(etapa, nombre, codigo, datos, medio);
-    if (extra?.tipo === 'BIENVENIDA') return conBienvenidaPuntos(base, nombre, codigo, extra.enlace, !medio);
+    let base = await this.construirPayload(etapa, nombre, codigo, datos, medio);
+    if (extra?.tipo === 'BIENVENIDA') base = conBienvenidaPuntos(base, nombre, codigo, extra.enlace, !medio);
     if (extra?.tipo === 'PUNTOS') return conPuntosEntregado(base, nombre, codigo, extra.ganados, extra.total);
+    // Con ventana abierta sale el texto libre (ya pide la ubicación); la plantilla solo rige fuera de ella
+    if (etapa === 'RECIBIDO' && datos.plantillaUbicacion && datos.resumen?.envioPorConfirmar) {
+      return conPlantillaUbicacion(base, nombre, codigo, medio);
+    }
     return base;
   }
 

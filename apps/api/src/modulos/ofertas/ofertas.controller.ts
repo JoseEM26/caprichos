@@ -20,6 +20,7 @@ import { CrearCuponDto } from './dto/crear-cupon.dto';
 import { ActualizarCuponDto } from './dto/actualizar-cupon.dto';
 import { AnularCuponEmitidoDto } from './dto/anular-cupon-emitido.dto';
 import { CanjearCuponDto } from './dto/canjear-cupon.dto';
+import { ValidarCuponCajaDto } from './dto/validar-cupon-caja.dto';
 
 @Controller('admin/ofertas')
 @UseGuards(AccesoGuard)
@@ -117,6 +118,16 @@ export class CuponesController {
     @Req() req: any,
   ) {
     return this.ofertasService.anularCuponEmitido(id, dto, req.usuario);
+  }
+
+  /**
+   * Solo valida (no canjea): descuento del cupón para el carrito del salón/caja con las mismas reglas
+   * que al crear el pedido (calcularDescuentosParaPedido). Lo usa quien arma pedidos en caja o mozo.
+   */
+  @Post('validar')
+  @Permiso('pedidos', 'crear')
+  async validarEnCaja(@Body() dto: ValidarCuponCajaDto) {
+    return this.ofertasService.validarCuponParaCaja(dto);
   }
 
   @Post('canjear')

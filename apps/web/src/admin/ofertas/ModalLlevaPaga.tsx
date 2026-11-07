@@ -1,10 +1,12 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
 import { PrevisualizacionCarta } from './PrevisualizacionCarta';
+import { ModalConPestanas } from '../../comun/ModalConPestanas';
+import { AvisoErrorOferta, ConfirmarSalir, PieOferta, primeraConError, useCambiosSinGuardar, useCierreConConfirmacion } from './modalOfertaComun';
 
 const DIAS = [
   ['lun', 'Lunes', 'Lun'],
@@ -54,10 +56,8 @@ export function ModalLlevaPaga({
   categoriasDisponibles = CATEGORIAS_DEF,
   categorias = [],
 }: ModalLlevaPagaProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Paso del asistente (1 a 4)
-  const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
+  const [pestana, setPestana] = useState('que');
+  const [verErrores, setVerErrores] = useState(false);
 
   // Paso 1: Nombre, foto y a qué aplica
   const [nombre, setNombre] = useState('');
@@ -133,7 +133,8 @@ export function ModalLlevaPaga({
       setFechaHasta(ofertaAEditar.fechaFin ? ofertaAEditar.fechaFin.slice(0, 10) : ofertaAEditar.fechaHasta ? ofertaAEditar.fechaHasta.slice(0, 10) : '');
       setCanales(estadoDesdeCanales(ofertaAEditar.canales));
       setVisibleCarta(ofertaAEditar.visibleCarta !== false);
-      setPaso(1);
+      setPestana('que');
+      setVerErrores(false);
       setMensajeError('');
     } else {
       setNombre('');
@@ -149,39 +150,23 @@ export function ModalLlevaPaga({
       setFechaDesde('');
       setFechaHasta('');
       setCanales(canalesPorDefecto('LLEVA_PAGA'));
-      setPaso(1);
+      setPestana('que');
+      setVerErrores(false);
       setMensajeError('');
     }
   }, [ofertaAEditar, abierto]);
 
-  // Accesibilidad: auto-focus y Escape
+  // Esc cierra primero las confirmaciones abiertas (el modal queda bloqueado mientras tanto)
   useEffect(() => {
     if (!abierto) return;
-
-    const timer = setTimeout(() => {
-      dialogRef.current?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (confirmarQuitarFoto) {
-          setConfirmarQuitarFoto(false);
-          return;
-        }
-        if (confirmarGuardar) {
-          setConfirmarGuardar(false);
-          return;
-        }
-        onCerrar();
-      }
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (confirmarQuitarFoto) setConfirmarQuitarFoto(false);
+      else if (confirmarGuardar) setConfirmarGuardar(false);
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [abierto, confirmarQuitarFoto, confirmarGuardar, onCerrar]);
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  }, [abierto, confirmarQuitarFoto, confirmarGuardar]);
 
   const totalUnidades = componentes.reduce((acc, c) => acc + c.cantidad, 0);
 
@@ -269,72 +254,46 @@ export function ModalLlevaPaga({
     };
   }, [componentes, productosDisponibles, precio, qLleva, qPaga]);
 
-  // Validación por paso
-  const validarPasoActual = (pasoAValidar: number): boolean => {
-    setMensajeError('');
-    if (pasoAValidar === 1) {
-      if (!nombre.trim()) {
-        setMensajeError('Escribe el nombre de la promoción.');
-        return false;
-      }
-      if (componentes.length === 0) {
-        setMensajeError('Agrega al menos un producto o categoría a la promoción.');
-        return false;
-      }
-      return true;
-    }
-
-    if (pasoAValidar === 2) {
-      if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) {
-        setMensajeError('Escribe las dos horas (desde y hasta) o déjalas vacías.');
-        return false;
-      }
-      if (horaDesde && horaHasta && horaDesde >= horaHasta) {
-        setMensajeError('La hora de inicio debe ser antes de la hora final.');
-        return false;
-      }
-      if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
-        setMensajeError('La fecha de inicio no puede ser después de la final.');
-        return false;
-      }
-      return true;
-    }
-
-    if (pasoAValidar === 3) {
-      const pNum = parseFloat(precio.replace(',', '.'));
-      if (isNaN(pNum) || !(pNum > 0)) {
-        setMensajeError('Escribe el precio de la promoción.');
-        return false;
-      }
-      if (qPaga >= qLleva) {
-        setMensajeError('Debe pagar menos de lo que lleva (por ejemplo, lleva 2 y paga 1).');
-        return false;
-      }
-      if (totalUnidades !== qLleva) {
-        setMensajeError(
-          `Esta promoción lleva ${qLleva} unidades y el contenido suma ${totalUnidades}. Agrega o quita unidades para que coincida.`,
-        );
-        return false;
-      }
-      return true;
-    }
-
-    return true;
+  // Errores pendientes por pestaña (sin efectos): null = la pestaña está bien.
+  const errorQue = (): string | null => {
+    if (!nombre.trim()) return 'Escribe el nombre de la promoción.';
+    if (componentes.length === 0) return 'Agrega al menos un producto o categoría a la promoción.';
+    const pNum = parseFloat(precio.replace(',', '.'));
+    if (isNaN(pNum) || !(pNum > 0)) return 'Escribe el precio de la promoción.';
+    if (qPaga >= qLleva) return 'Debe pagar menos de lo que lleva (por ejemplo, lleva 2 y paga 1).';
+    if (totalUnidades !== qLleva) return `Esta promoción lleva ${qLleva} unidades y el contenido suma ${totalUnidades}. Agrega o quita unidades para que coincida.`;
+    return null;
   };
-
-  const irSiguientePaso = () => {
-    if (validarPasoActual(paso)) {
-      if (paso < 4) {
-        setPaso((prev) => (prev + 1) as any);
-      }
-    }
+  const errorCuando = (): string | null => {
+    if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) return 'Escribe las dos horas (desde y hasta) o déjalas vacías.';
+    if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de inicio debe ser antes de la hora final.';
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
+    if (!canales.carta && !canales.local && !canales.bot) return ERROR_SIN_CANALES;
+    return null;
   };
+  const erroresPestanas = [
+    { id: 'que', error: errorQue() },
+    { id: 'cuando', error: errorCuando() },
+  ];
+  const marca = (id: string) => {
+    const hay = verErrores && !!erroresPestanas.find((e) => e.id === id)?.error;
+    return hay ? { insignia: '!', insigniaError: true } : {};
+  };
+  const firma = JSON.stringify([nombre, fotoArchivoId, componentes, dias, horaDesde, horaHasta, fechaDesde, fechaHasta, canales, visibleCarta, qLleva, qPaga, precio]);
+  const sucio = useCambiosSinGuardar(abierto, firma);
+  const { cerrar, confirmando, setConfirmando } = useCierreConConfirmacion(sucio, onCerrar);
 
-  const irPasoAnterior = () => {
-    setMensajeError('');
-    if (paso > 1) {
-      setPaso((prev) => (prev - 1) as any);
+  // Guardar: si hay un error, salta a la primera pestaña con error y lo muestra; si no, pide confirmar.
+  const intentarGuardar = () => {
+    setVerErrores(true);
+    const e = primeraConError(erroresPestanas);
+    if (e) {
+      setPestana(e.id);
+      setMensajeError(e.error as string);
+      return;
     }
+    setMensajeError('');
+    setConfirmarGuardar(true);
   };
 
   const ejecutarGuardar = async () => {
@@ -415,180 +374,20 @@ export function ModalLlevaPaga({
   if (!abierto) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 60,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <div
-        onClick={onCerrar}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundColor: 'rgba(11, 44, 62, 0.55)',
-          zIndex: 60,
-        }}
-        aria-hidden="true"
-      />
-
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={ofertaAEditar ? 'Editar promoción 2x1' : 'Nueva promoción 2x1'}
-        tabIndex={-1}
-        style={{
-          position: 'relative',
-          zIndex: 65,
-          width: 'min(920px, calc(100% - 24px))',
-          maxHeight: 'min(860px, calc(100% - 24px))',
-          backgroundColor: 'var(--cp-cream)',
-          borderRadius: '20px',
-          boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
-          padding: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '14px',
-          boxSizing: 'border-box',
-          overflowY: 'auto',
-        }}
-      >
-        {/* Cabecera */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid var(--cp-line)', paddingBottom: '12px' }}>
-          <div>
-            <div
-              style={{
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: '22px',
-                color: 'var(--cp-navy)',
-              }}
-            >
-              {ofertaAEditar ? 'Editar promoción 2x1' : 'Nueva promoción 2x1 (lleva X paga Y)'}
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-              Asistente por pasos para configurar promociones por volumen
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onCerrar}
-            aria-label="Cerrar modal"
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '22px',
-              border: '1.5px solid var(--cp-navy)',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontSize: '20px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Indicador de progreso por pasos */}
-        <nav
-          aria-label="Progreso del asistente"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'var(--cp-white)',
-            borderRadius: '14px',
-            padding: '10px 14px',
-            border: '1px solid var(--cp-line)',
-            flexWrap: 'wrap',
-          }}
-        >
-          {[
-            { num: 1, titulo: '1. Nombre y a qué aplica' },
-            { num: 2, titulo: '2. Condiciones' },
-            { num: 3, titulo: '3. Beneficio' },
-            { num: 4, titulo: '4. Vista previa y ejemplo' },
-          ].map((st) => {
-            const esActivo = paso === st.num;
-            const esCompletado = paso > st.num;
-            return (
-              <button
-                key={st.num}
-                type="button"
-                onClick={() => {
-                  if (st.num < paso || validarPasoActual(paso)) {
-                    setPaso(st.num as any);
-                  }
-                }}
-                aria-current={esActivo ? 'step' : undefined}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'transparent',
-                  border: 0,
-                  padding: '6px 10px',
-                  borderRadius: '8px',
-                  backgroundColor: esActivo ? 'var(--cp-sand)' : 'transparent',
-                  color: esActivo ? 'var(--cp-navy)' : esCompletado ? '#2E7D32' : 'var(--cp-soft)',
-                  fontWeight: esActivo ? 800 : 700,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                <span
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '12px',
-                    backgroundColor: esActivo ? 'var(--cp-navy)' : esCompletado ? '#2E7D32' : 'var(--cp-line)',
-                    color: esActivo || esCompletado ? '#fff' : 'var(--cp-navy)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 800,
-                  }}
-                >
-                  {esCompletado ? '✓' : st.num}
-                </span>
-                <span>{st.titulo}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Error de validación */}
-        {mensajeError && (
-          <div
-            role="alert"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--cp-rust) 15%, var(--cp-cream))',
-              border: '1.5px solid var(--cp-rust)',
-              borderRadius: '12px',
-              padding: '10px 14px',
-              color: 'var(--cp-rust)',
-              fontWeight: 700,
-              fontSize: '13px',
-            }}
-          >
-            {mensajeError}
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* PASO 1: NOMBRE Y A QUÉ APLICA                                 */}
-        {/* ============================================================== */}
-        {paso === 1 && (
+    <>
+      <ModalConPestanas
+        titulo={ofertaAEditar ? 'Editar promoción 2x1' : 'Nueva promoción 2x1'}
+        subtitulo="Promoción «lleva X, paga Y»"
+        alCerrar={cerrar}
+        bloquearCierre={guardando || confirmarQuitarFoto || confirmarGuardar || confirmando}
+        pestanaActiva={pestana}
+        alCambiarPestana={setPestana}
+        ancho={920}
+        bajoPestanas={<AvisoErrorOferta mensaje={mensajeError} />}
+        pie={<PieOferta sucio={sucio} alCancelar={cerrar} alGuardar={intentarGuardar} guardando={guardando} textoGuardar="Guardar promoción" testidGuardar="btn-guardar-lleva-paga" />}
+        pestanas={[
+          { id: 'que', etiqueta: 'Qué lleva y paga', ...marca('que'), contenido: (
+<>
           <div
             data-testid="paso-1-lleva-paga"
             style={{
@@ -601,9 +400,6 @@ export function ModalLlevaPaga({
               gap: '14px',
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
-              Paso 1 de 4: Nombre y a qué aplica
-            </div>
 
             <div>
               <label htmlFor="lp-nombre" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
@@ -803,12 +599,83 @@ export function ModalLlevaPaga({
               </div>
             </div>
           </div>
-        )}
+          <div
+            data-testid="paso-3-lleva-paga"
+            style={{
+              backgroundColor: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
 
-        {/* ============================================================== */}
-        {/* PASO 2: CONDICIONES (DÍAS, HORARIOS, CANALES, VIGENCIA)        */}
-        {/* ============================================================== */}
-        {paso === 2 && (
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="lp-q-lleva" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
+                  Lleva (unidades) *
+                </label>
+                <input
+                  id="lp-q-lleva"
+                  type="number"
+                  min={2}
+                  max={20}
+                  value={qLleva}
+                  onChange={(e) => setQLleva(parseInt(e.target.value) || 2)}
+                  style={{ width: '100%', minHeight: '42px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: '16px', fontWeight: 800 }}
+                />
+              </div>
+
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <label htmlFor="lp-q-paga" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
+                  Paga (unidades) *
+                </label>
+                <input
+                  id="lp-q-paga"
+                  type="number"
+                  min={1}
+                  max={qLleva - 1}
+                  value={qPaga}
+                  onChange={(e) => setQPaga(parseInt(e.target.value) || 1)}
+                  style={{ width: '100%', minHeight: '42px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: '16px', fontWeight: 800 }}
+                />
+              </div>
+
+              <div style={{ flex: 1, minWidth: '150px' }}>
+                <label htmlFor="lp-precio" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
+                  Precio final de la promo (S/) *
+                </label>
+                <input
+                  id="lp-precio"
+                  type="number"
+                  step="0.5"
+                  min={0.1}
+                  value={precio}
+                  onChange={(e) => setPrecio(e.target.value)}
+                  placeholder="Ej.: 11.50"
+                  style={{ width: '100%', minHeight: '42px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: '16px', fontWeight: 800, color: 'var(--cp-rust)' }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                backgroundColor: 'var(--cp-sand)',
+                borderRadius: '10px',
+                padding: '10px 14px',
+                fontSize: '13px',
+                color: 'var(--cp-navy)',
+              }}
+            >
+              <strong>Resumen del beneficio:</strong> Promoción <strong>{qLleva}x{qPaga}</strong> con precio especial de <strong>S/ {parseFloat(precio) ? parseFloat(precio).toFixed(2) : '0.00'}</strong>.
+              Total de unidades asignadas en el Paso 1: <strong>{totalUnidades}</strong> de <strong>{qLleva}</strong> necesarias.
+            </div>
+          </div>
+</>
+          ) },
+          { id: 'cuando', etiqueta: 'Cuándo y dónde', ...marca('cuando'), contenido: (
           <div
             data-testid="paso-2-lleva-paga"
             style={{
@@ -821,9 +688,6 @@ export function ModalLlevaPaga({
               gap: '14px',
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
-              Paso 2 de 4: Condiciones de aplicación
-            </div>
 
             {/* Días */}
             <div>
@@ -916,95 +780,8 @@ export function ModalLlevaPaga({
               </div>
             </div>
           </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* PASO 3: BENEFICIO (LLEVA X PAGA Y, PRECIO)                    */}
-        {/* ============================================================== */}
-        {paso === 3 && (
-          <div
-            data-testid="paso-3-lleva-paga"
-            style={{
-              backgroundColor: 'var(--cp-white)',
-              border: '1px solid var(--cp-line)',
-              borderRadius: '14px',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-            }}
-          >
-            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
-              Paso 3 de 4: Beneficio (Lleva X, Paga Y)
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '130px' }}>
-                <label htmlFor="lp-q-lleva" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                  Lleva (unidades) *
-                </label>
-                <input
-                  id="lp-q-lleva"
-                  type="number"
-                  min={2}
-                  max={20}
-                  value={qLleva}
-                  onChange={(e) => setQLleva(parseInt(e.target.value) || 2)}
-                  style={{ width: '100%', minHeight: '42px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: '16px', fontWeight: 800 }}
-                />
-              </div>
-
-              <div style={{ flex: 1, minWidth: '130px' }}>
-                <label htmlFor="lp-q-paga" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                  Paga (unidades) *
-                </label>
-                <input
-                  id="lp-q-paga"
-                  type="number"
-                  min={1}
-                  max={qLleva - 1}
-                  value={qPaga}
-                  onChange={(e) => setQPaga(parseInt(e.target.value) || 1)}
-                  style={{ width: '100%', minHeight: '42px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: '16px', fontWeight: 800 }}
-                />
-              </div>
-
-              <div style={{ flex: 1, minWidth: '150px' }}>
-                <label htmlFor="lp-precio" style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                  Precio final de la promo (S/) *
-                </label>
-                <input
-                  id="lp-precio"
-                  type="number"
-                  step="0.5"
-                  min={0.1}
-                  value={precio}
-                  onChange={(e) => setPrecio(e.target.value)}
-                  placeholder="Ej.: 11.50"
-                  style={{ width: '100%', minHeight: '42px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 12px', fontSize: '16px', fontWeight: 800, color: 'var(--cp-rust)' }}
-                />
-              </div>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: 'var(--cp-sand)',
-                borderRadius: '10px',
-                padding: '10px 14px',
-                fontSize: '13px',
-                color: 'var(--cp-navy)',
-              }}
-            >
-              <strong>Resumen del beneficio:</strong> Promoción <strong>{qLleva}x{qPaga}</strong> con precio especial de <strong>S/ {parseFloat(precio) ? parseFloat(precio).toFixed(2) : '0.00'}</strong>.
-              Total de unidades asignadas en el Paso 1: <strong>{totalUnidades}</strong> de <strong>{qLleva}</strong> necesarias.
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* PASO 4: PREVISUALIZACIÓN Y EJEMPLO CALCULADO                   */}
-        {/* ============================================================== */}
-        {paso === 4 && (
+          ) },
+          { id: 'vista', etiqueta: 'Vista previa', contenido: (
           <div
             data-testid="paso-4-lleva-paga"
             style={{
@@ -1058,81 +835,10 @@ export function ModalLlevaPaga({
               />
             </div>
           </div>
-        )}
-
-        {/* Navegación inferior */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '10px',
-            borderTop: '1.5px solid var(--cp-line)',
-            paddingTop: '12px',
-          }}
-        >
-          <button
-            type="button"
-            onClick={irPasoAnterior}
-            disabled={paso === 1}
-            style={{
-              minHeight: '44px',
-              padding: '0 20px',
-              borderRadius: '12px',
-              border: '1.5px solid var(--cp-navy)',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontWeight: 800,
-              fontSize: '14px',
-              cursor: paso === 1 ? 'not-allowed' : 'pointer',
-              opacity: paso === 1 ? 0.3 : 1,
-            }}
-          >
-            ← Atrás
-          </button>
-
-          {paso < 4 ? (
-            <button
-              type="button"
-              onClick={irSiguientePaso}
-              data-testid="btn-siguiente-paso"
-              style={{
-                minHeight: '44px',
-                padding: '0 24px',
-                borderRadius: '12px',
-                border: 0,
-                backgroundColor: 'var(--cp-orange)',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: 'pointer',
-              }}
-            >
-              Siguiente →
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmarGuardar(true)}
-              disabled={guardando}
-              data-testid="btn-guardar-lleva-paga"
-              style={{
-                minHeight: '44px',
-                padding: '0 28px',
-                borderRadius: '12px',
-                border: 0,
-                backgroundColor: 'var(--cp-orange)',
-                color: 'var(--cp-navy)',
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: guardando ? 'wait' : 'pointer',
-              }}
-            >
-              {guardando ? 'Guardando...' : 'Guardar promoción'}
-            </button>
-          )}
-        </div>
-
+          ) },
+        ]}
+      />
+      <ConfirmarSalir abierto={confirmando} alSalir={() => { setConfirmando(false); onCerrar(); }} alQuedarse={() => setConfirmando(false)} />
         {/* Confirmación para quitar foto */}
         <ModalConfirmacion
           abierto={confirmarQuitarFoto}
@@ -1150,7 +856,6 @@ export function ModalLlevaPaga({
           onConfirmar={ejecutarGuardar}
           onCancelar={() => setConfirmarGuardar(false)}
         />
-      </div>
-    </div>
+    </>
   );
 }

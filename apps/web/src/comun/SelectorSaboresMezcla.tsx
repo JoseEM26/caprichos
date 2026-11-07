@@ -1,8 +1,9 @@
 import type { CSSProperties } from 'react';
+import { avisoSabor } from '@caprichos/compartido';
+import { useUmbralesStock } from '../carta/umbralesStock';
 import {
   Reparto,
   SaborMezcla,
-  UMBRAL_QUEDAN_SABOR,
   faltanUnidades,
   todasDeUn,
   topeParaSabor,
@@ -48,6 +49,7 @@ const chip: CSSProperties = {
  * Los agotados no se muestran; cada sabor tiene tope por lo que queda.
  */
 export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabilitar = false }: Props) {
+  const umbrales = useUmbralesStock();
   if (total <= 0) return null;
 
   // Sabor sin saldo (quedan 0) sigue en la lista, bloqueado con «No hay stock»; no se puede subir su cantidad
@@ -149,8 +151,13 @@ export function SelectorSaboresMezcla({ sabores, total, valor, onCambio, deshabi
                     {s.quedan === 0 ? (
                       <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: 'var(--cp-rust)' }}>No hay stock</span>
                     ) : (
-                      s.quedan !== null && s.quedan <= UMBRAL_QUEDAN_SABOR && (
-                        <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: 'var(--cp-soft)' }}>{`Quedan ${s.quedan}`}</span>
+                      avisoSabor(s.nombre, s.quedan, umbrales) && (
+                        <span
+                          title={avisoSabor(s.nombre, s.quedan, umbrales) ?? undefined}
+                          style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: s.quedan === 1 ? 'var(--cp-rust)' : 'var(--cp-soft)' }}
+                        >
+                          {s.quedan === 1 ? '¡Última!' : `Quedan ${s.quedan}`}
+                        </span>
                       )
                     )}
                   </div>

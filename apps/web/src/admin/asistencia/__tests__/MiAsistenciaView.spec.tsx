@@ -39,6 +39,23 @@ describe('MiAsistenciaView (celular)', () => {
     miPropinas.mockReset().mockResolvedValue([]);
   });
 
+  it('sin ubicación del local: aviso con role alert y no deja marcar; historial sigue', async () => {
+    miHoy.mockResolvedValue({ ...base, localConUbicacion: false });
+    render(<MiAsistenciaView />);
+    const aviso = await screen.findByTestId('aviso-sin-ubicacion');
+    expect(aviso).toHaveAttribute('role', 'alert');
+    expect(aviso).toHaveTextContent('El administrador aún no configuró la ubicación del local. Todavía no puedes marcar; avísale.');
+    expect(screen.getByRole('button', { name: 'Escanear QR' })).toBeDisabled();
+    expect(miHistorial).toHaveBeenCalled();
+  });
+
+  it('con ubicación del local: sin aviso y puede marcar', async () => {
+    miHoy.mockResolvedValue({ ...base, localConUbicacion: true });
+    render(<MiAsistenciaView />);
+    expect(await screen.findByRole('button', { name: 'Escanear QR' })).toBeEnabled();
+    expect(screen.queryByTestId('aviso-sin-ubicacion')).toBeNull();
+  });
+
   it('Mis propinas: muestra solo mi parte de los repartos aprobados o pagados', async () => {
     miHoy.mockResolvedValue(base);
     miPropinas.mockResolvedValue([

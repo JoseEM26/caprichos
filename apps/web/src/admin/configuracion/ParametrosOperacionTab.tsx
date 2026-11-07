@@ -186,6 +186,18 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     tipo: 'numero',
     sufijo: 'personas',
   },
+  aviso_stock_quedan_desde: {
+    nombre: 'Avisar «Quedan N» desde (unidades)',
+    descripcion: 'Desde cuántas unidades el cliente ve «Quedan N» en un producto con stock controlado. 0 = sin aviso.',
+    tipo: 'numero',
+    sufijo: 'unidades',
+  },
+  aviso_stock_ultimas_desde: {
+    nombre: 'Franja «¡Últimas!» desde (unidades)',
+    descripcion: 'Desde cuántas unidades aparece la franja «¡Última dona!», «¡Últimas 2!» o «¡Quedan solo 3, ya se acaban!». No puede pasar del aviso «Quedan N». 0 = sin franja.',
+    tipo: 'numero',
+    sufijo: 'unidades',
+  },
   puntos_porcentaje: {
     nombre: 'Porcentaje de puntos',
     descripcion: 'Porcentaje del monto consumido que el cliente acumula en puntos fidelidad.',
@@ -372,6 +384,11 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   whatsapp_plantilla_recibido_seguimiento_activa: {
     nombre: 'Aviso WhatsApp: Pedido recibido con enlace (plantilla)',
     descripcion: 'Usa la plantilla con el enlace de seguimiento fuera de la ventana de 24 h. Solo en «Sí» cuando Meta apruebe la plantilla.',
+    tipo: 'sino',
+  },
+  whatsapp_plantilla_delivery_ubicacion_activa: {
+    nombre: 'Aviso WhatsApp: Delivery con ubicación (plantilla)',
+    descripcion: 'Usa las plantillas que piden la ubicación fuera de la ventana de 24 h. Solo en «Sí» cuando Meta apruebe las plantillas.',
     tipo: 'sino',
   },
   whatsapp_aviso_recibido_activo: {

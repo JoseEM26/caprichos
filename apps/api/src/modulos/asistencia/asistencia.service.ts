@@ -214,9 +214,9 @@ export class AsistenciaService {
       theme_color: '#0B2C3E',
       background_color: '#FBF4EC',
       icons: [
-        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-        { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: '/icons/qr-asistencia-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/qr-asistencia-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icons/qr-asistencia-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       ],
     };
   }
@@ -415,6 +415,7 @@ export class AsistenciaService {
     const consentimiento = await this.prisma.asistenciaConsentimiento.findUnique({ where: { party_id: partyId } });
     const dispositivo = await this.prisma.asistenciaDispositivo.findUnique({ where: { party_id: partyId } });
     const vigente = consentimiento?.version === VERSION_CONSENTIMIENTO;
+    const cfg = await this.obtenerConfig();
     return {
       jornada,
       ahora: ahora.toISOString(),
@@ -429,6 +430,8 @@ export class AsistenciaService {
       textoConsentimiento: TEXTO_CONSENTIMIENTO,
       consentimiento: vigente ? null : { version: VERSION_CONSENTIMIENTO, texto: TEXTO_CONSENTIMIENTO },
       dispositivoVinculado: Boolean(dispositivo),
+      /** Solo si hay punto configurado; nunca las coordenadas. */
+      localConUbicacion: cfg.localLat !== null && cfg.localLng !== null,
     };
   }
 

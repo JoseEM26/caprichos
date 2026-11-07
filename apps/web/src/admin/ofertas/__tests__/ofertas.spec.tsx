@@ -208,7 +208,8 @@ describe('OfertasAdminView', () => {
     expect(await screen.findByLabelText('Desactivada: oculta en la carta')).toHaveTextContent('Desactivada');
     expect(screen.getByLabelText('Desactivada: se ve como No disponible')).toHaveTextContent('Desactivada');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mostrar como No disponible' }));
+    fireEvent.click(screen.getAllByRole('button', { name: /^Más acciones de/ })[0]);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Mostrar como No disponible' }));
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith('/admin/ofertas/1/estado', { activo: false, visibleCarta: true }),
     );
@@ -226,6 +227,41 @@ describe('OfertasAdminView', () => {
     const tarjeta = insignia.closest('.oferta-card') as HTMLElement;
     expect(tarjeta.className).toContain('oferta-card--off');
     const acciones = tarjeta.querySelector('.oferta-acciones') as HTMLElement;
-    expect(within(acciones).getByRole('button', { name: 'Mostrar como No disponible' })).toBeEnabled();
+    expect(within(acciones).getByRole('button', { name: 'Activar' })).toBeEnabled();
+    expect(within(acciones).getByRole('button', { name: 'Editar' })).toBeEnabled();
+    expect(within(acciones).queryByRole('button', { name: 'Mostrar como No disponible' })).toBeNull();
+  });
+
+  it('el menú ⋯ pone las mismas acciones principales en tarjetas activas y desactivadas, y se maneja con teclado', async () => {
+    const lista = [
+      { ...mockOfertas[0], id: '1', nombre: 'Combo A', activo: true },
+      { ...mockOfertas[0], id: '3', nombre: 'Combo B', activo: false, visibleCarta: false },
+    ];
+    (api.get as any).mockImplementation((url: string) => (url === '/admin/ofertas' ? Promise.resolve(lista) : Promise.resolve([])));
+    render(<OfertasAdminView />);
+
+    const filas = (await screen.findAllByRole('button', { name: /^Más acciones de/ })).map((b) => b.closest('.oferta-acciones') as HTMLElement);
+    expect(filas).toHaveLength(2);
+    const nombres = filas.map((f) => Array.from(f.children).map((c) => c.textContent));
+    expect(nombres[0]).toEqual(['Editar', 'Desactivar', '⋯']);
+    expect(nombres[1]).toEqual(['Editar', 'Activar', '⋯']);
+
+    // Teclado: ↓ abre y enfoca el primero; ↓ avanza; Esc cierra y devuelve el foco al botón
+    const boton = screen.getByRole('button', { name: 'Más acciones de Combo B' });
+    expect(boton).toHaveAttribute('aria-haspopup', 'menu');
+    boton.focus();
+    fireEvent.keyDown(boton, { key: 'ArrowDown' });
+    const items = await screen.findAllByRole('menuitem');
+    expect(items.map((i) => i.textContent)).toEqual(['Ver cómo se ve en la carta', 'Mostrar como No disponible']);
+    expect(items[0]).toHaveFocus();
+    fireEvent.keyDown(items[0], { key: 'ArrowDown' });
+    expect(items[1]).toHaveFocus();
+    fireEvent.keyDown(items[1], { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(boton).toHaveFocus();
+
+    // La tarjeta activa solo ofrece «Ver cómo se ve», sin Ocultar/Mostrar
+    fireEvent.click(screen.getByRole('button', { name: 'Más acciones de Combo A' }));
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Ver cómo se ve en la carta']);
   });
 });

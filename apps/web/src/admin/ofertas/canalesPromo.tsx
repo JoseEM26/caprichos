@@ -13,9 +13,9 @@ export interface CanalesEstado {
   bot: boolean;
 }
 
-/** WhatsApp encendido por defecto solo donde el bot ya aplica el tipo (el combo y el cupón no). */
+/** WhatsApp encendido por defecto en todo lo que el bot ya aplica o arma (el cupón no: el bot no pide códigos). */
 export function canalesPorDefecto(tipo: TipoOfertaCanal): CanalesEstado {
-  return { carta: true, local: true, bot: tipo === 'DESCUENTO' || tipo === 'LLEVA_PAGA' || tipo === 'ENVIO_GRATIS' };
+  return { carta: true, local: true, bot: tipo !== 'CUPON' };
 }
 
 /** Estado de las casillas a partir de los canales guardados. */
@@ -48,7 +48,7 @@ export function ayudaCanales(tipo: TipoOfertaCanal, e: CanalesEstado): string {
     ENVIO_GRATIS: 'El bot de WhatsApp no cobra envío en el delivery dentro del horario, días y fechas elegidos.',
     DESCUENTO: 'El bot de WhatsApp aplica este descuento al total del pedido y lo muestra en el resumen.',
     LLEVA_PAGA: 'El bot de WhatsApp aplica esta promoción al total del pedido y la muestra en el resumen.',
-    COMBO: 'El bot de WhatsApp la ofrece en sus promociones y en el cierre de venta; el armado del combo con sus elecciones es en la carta web.',
+    COMBO: 'El bot de WhatsApp la ofrece en sus promociones y guía al cliente paso a paso para armarla (tamaño y elecciones), con el mismo stock y plan B de la carta.',
   };
   return `${base} ${bot[tipo]}`;
 }

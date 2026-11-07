@@ -217,6 +217,8 @@ export interface InfoOfertaBot {
   descuentoValor?: number | null;
   compraMinima?: number | null;
   vigenteAhora: boolean;
+  /** Combos: precio por tamaño («Regular S/ 33.00 · Grande S/ 37.00»). */
+  combosPrecio?: { tamanoNombre?: string; precio: number }[];
   diasTexto?: string;
   horasTexto?: string;
 }
@@ -468,6 +470,10 @@ export const TEXTOS_BOT = {
         const desc = o.descripcion ? ` — ${o.descripcion}` : '';
         const min = o.compraMinima ? ` (Compra mín. s/ ${o.compraMinima.toFixed(2)})` : '';
         lineas.push(`• *${o.nombre}*${desc}${min}`);
+        // Combo que el bot vende: el precio de cada tamaño; se pide desde «Hacer un pedido» o el botón «Pedir este»
+        if (o.tipo === 'COMBO' && o.combosPrecio?.length) {
+          lineas.push(`   ${o.combosPrecio.map((c) => `${c.tamanoNombre ? `${c.tamanoNombre} ` : ''}S/ ${Number(c.precio).toFixed(2)}`).join(' · ')}`);
+        }
       });
     }
 
@@ -722,8 +728,8 @@ export const TEXTOS_BOT = {
     return `¿Tienes alguna indicación especial para ${nombreProd}? Si no tienes notas, presiona Continuar.`;
   },
 
-  pedidoPreguntarCantidad: (nombreProd: string): string => {
-    return `¿Cuántas unidades deseas de ${nombreProd}? Elige una opción o escribe el número:`;
+  pedidoPreguntarCantidad: (nombreProd: string, avisoStock?: string | null): string => {
+    return `${avisoStock ? `${avisoStock}\n` : ''}¿Cuántas unidades deseas de ${nombreProd}? Elige una opción o escribe el número:`;
   },
 
   pedidoProductoAgregado: (nombreProd: string, subtotalLinea: number): string => {

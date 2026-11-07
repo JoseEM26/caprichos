@@ -1,9 +1,11 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { OfertaItem, ComboPrecioItem, ComboParteItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
+import { ModalConPestanas } from '../../comun/ModalConPestanas';
+import { AvisoErrorOferta, ConfirmarSalir, PieOferta, primeraConError, useCambiosSinGuardar, useCierreConConfirmacion } from './modalOfertaComun';
 import { PrevisualizacionCarta } from './PrevisualizacionCarta';
 import { AlternativasParte } from './AlternativasParte';
 
@@ -105,6 +107,9 @@ export function calcularSumaPreciosSueltos(
   return Math.round(total * 100) / 100;
 }
 
+// Referencia estable: un [] nuevo en cada render reiniciaría el formulario sin parar.
+const SIN_CATEGORIAS: never[] = [];
+
 export function ModalCombo({
   abierto,
   comboAEditar,
@@ -112,12 +117,10 @@ export function ModalCombo({
   onGuardar,
   productosDisponibles = [],
   categoriasDisponibles = CATEGORIAS_DEF,
-  categorias = [],
+  categorias = SIN_CATEGORIAS,
 }: ModalComboProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Paso del asistente (1 a 4)
-  const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
+  const [pestana, setPestana] = useState('datos');
+  const [verErrores, setVerErrores] = useState(false);
 
   // Paso 1: Nombre, descripción, categoría y foto
   const [nombre, setNombre] = useState('');
@@ -210,7 +213,8 @@ export function ModalCombo({
       setFechaHasta(fHasta ? fHasta.slice(0, 10) : '');
       setCanales(estadoDesdeCanales(comboAEditar.canales));
       setVisibleCarta(comboAEditar.visibleCarta !== false);
-      setPaso(1);
+      setPestana('datos');
+      setVerErrores(false);
       setMensajeError('');
       setParteAbiertaIndex(0);
     } else {
@@ -230,40 +234,24 @@ export function ModalCombo({
       setFechaDesde('');
       setFechaHasta('');
       setCanales(canalesPorDefecto('COMBO'));
-      setPaso(1);
+      setPestana('datos');
+      setVerErrores(false);
       setMensajeError('');
       setParteAbiertaIndex(0);
     }
   }, [comboAEditar, abierto, listaCategorias]);
 
-  // Accesibilidad: auto-focus y tecla Escape
+  // Esc cierra primero las confirmaciones abiertas (el modal queda bloqueado mientras tanto)
   useEffect(() => {
     if (!abierto) return;
-
-    const timer = setTimeout(() => {
-      dialogRef.current?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (confirmarQuitarFoto) {
-          setConfirmarQuitarFoto(false);
-          return;
-        }
-        if (confirmarGuardar) {
-          setConfirmarGuardar(false);
-          return;
-        }
-        onCerrar();
-      }
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (confirmarQuitarFoto) setConfirmarQuitarFoto(false);
+      else if (confirmarGuardar) setConfirmarGuardar(false);
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [abierto, confirmarQuitarFoto, confirmarGuardar, onCerrar]);
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  }, [abierto, confirmarQuitarFoto, confirmarGuardar]);
 
   // Acciones en tamaños
   const agregarTamano = () => {
@@ -353,90 +341,59 @@ export function ModalCombo({
   // Letra inicial para vista cuando no hay foto
   const letraInicial = (nombre.trim()[0] || 'C').toUpperCase();
 
-  // VALIDACIÓN POR PASO
-  const validarPasoActual = (pasoAValidar: number): boolean => {
-    setMensajeError('');
-    if (pasoAValidar === 1) {
-      if (!nombre.trim()) {
-        setMensajeError('Escribe el nombre del combo.');
-        return false;
-      }
-      return true;
-    }
-
-    if (pasoAValidar === 2) {
-      if (partes.length === 0) {
-        setMensajeError('Agrega al menos una parte al combo.');
-        return false;
-      }
-      for (let i = 0; i < partes.length; i++) {
-        const p = partes[i];
-        if (!p.nombre || !p.nombre.trim()) {
-          setMensajeError(`La parte ${i + 1} debe tener un nombre.`);
-          return false;
-        }
-        const tipoP = p.tipoParte || p.tipo || 'A_ELECCION';
-        if (tipoP === 'FIJO') {
-          const prods = p.productos || [];
-          if (prods.length === 0) {
-            setMensajeError(`La parte "${p.nombre}" debe tener al menos un producto seleccionado.`);
-            return false;
-          }
-        } else if (tipoP === 'OPCIONES') {
-          const opcs = p.opciones || [];
-          if (opcs.length === 0) {
-            setMensajeError(`La parte "${p.nombre}" debe tener al menos una opción configurada.`);
-            return false;
-          }
-        } else {
-          // A_ELECCION
-          const cats = p.categorias || [];
-          const prods = p.productos || [];
-          if (cats.length === 0 && prods.length === 0) {
-            setMensajeError(`La parte "${p.nombre}" debe tener al menos una categoría o producto seleccionado.`);
-            return false;
-          }
-        }
-      }
-      return true;
-    }
-
-    if (pasoAValidar === 3) {
-      if (tamanos.length === 0 || tamanos.some((t) => !t.tamanoNombre.trim() || !(Number(t.precio) > 0))) {
-        setMensajeError('Cada tamaño debe tener un nombre y un precio mayor a 0.');
-        return false;
-      }
-      if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) {
-        setMensajeError('Escribe las dos horas (desde y hasta) o déjalas vacías.');
-        return false;
-      }
-      if (horaDesde && horaHasta && horaDesde >= horaHasta) {
-        setMensajeError('La hora de inicio debe ser antes de la hora final.');
-        return false;
-      }
-      if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
-        setMensajeError('La fecha de inicio no puede ser después de la final.');
-        return false;
-      }
-      return true;
-    }
-
-    return true;
+  // Errores pendientes por pestaña (sin efectos): null = la pestaña está bien.
+  const errorDatos = (): string | null => {
+    if (!nombre.trim()) return 'Escribe el nombre del combo.';
+    if (tamanos.length === 0 || tamanos.some((t) => !t.tamanoNombre.trim() || !(Number(t.precio) > 0))) return 'Cada tamaño debe tener un nombre y un precio mayor a 0.';
+    return null;
   };
-
-  const irSiguientePaso = () => {
-    if (validarPasoActual(paso)) {
-      if (paso < 4) {
-        setPaso((prev) => (prev + 1) as any);
+  const errorPartes = (): string | null => {
+    if (partes.length === 0) return 'Agrega al menos una parte al combo.';
+    for (let i = 0; i < partes.length; i++) {
+      const p = partes[i];
+      if (!p.nombre || !p.nombre.trim()) return `La parte ${i + 1} debe tener un nombre.`;
+      const tipoP = p.tipoParte || p.tipo || 'A_ELECCION';
+      if (tipoP === 'FIJO') {
+        if ((p.productos || []).length === 0) return `La parte "${p.nombre}" debe tener al menos un producto seleccionado.`;
+      } else if (tipoP === 'OPCIONES') {
+        if ((p.opciones || []).length === 0) return `La parte "${p.nombre}" debe tener al menos una opción configurada.`;
+      } else if ((p.categorias || []).length === 0 && (p.productos || []).length === 0) {
+        return `La parte "${p.nombre}" debe tener al menos una categoría o producto seleccionado.`;
       }
     }
+    return null;
   };
+  const errorCuando = (): string | null => {
+    if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) return 'Escribe las dos horas (desde y hasta) o déjalas vacías.';
+    if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de inicio debe ser antes de la hora final.';
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
+    if (!canales.carta && !canales.local && !canales.bot) return ERROR_SIN_CANALES;
+    return null;
+  };
+  const erroresPestanas = [
+    { id: 'datos', error: errorDatos() },
+    { id: 'partes', error: errorPartes() },
+    { id: 'cuando', error: errorCuando() },
+  ];
+  const marca = (id: string) => {
+    const hay = verErrores && !!erroresPestanas.find((e) => e.id === id)?.error;
+    return hay ? { insignia: '!', insigniaError: true } : {};
+  };
+  const firma = JSON.stringify([nombre, descripcion, categoriaId, fotoArchivoId, partes, tamanos, dias, horaDesde, horaHasta, fechaDesde, fechaHasta, canales, visibleCarta]);
+  const sucio = useCambiosSinGuardar(abierto, firma);
+  const { cerrar, confirmando, setConfirmando } = useCierreConConfirmacion(sucio, onCerrar);
 
-  const irPasoAnterior = () => {
-    setMensajeError('');
-    if (paso > 1) {
-      setPaso((prev) => (prev - 1) as any);
+  // Guardar: si hay un error, salta a la primera pestaña con error y lo muestra; si no, pide confirmar.
+  const intentarGuardar = () => {
+    setVerErrores(true);
+    const e = primeraConError(erroresPestanas);
+    if (e) {
+      setPestana(e.id);
+      setMensajeError(e.error as string);
+      return;
     }
+    setMensajeError('');
+    setConfirmarGuardar(true);
   };
 
   const ejecutarGuardar = async () => {
@@ -544,181 +501,20 @@ export function ModalCombo({
   if (!abierto) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 60,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      {/* Fondo oscuro clickeable */}
-      <div
-        onClick={onCerrar}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundColor: 'rgba(11, 44, 62, 0.55)',
-          zIndex: 60,
-        }}
-        aria-hidden="true"
-      />
-
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={comboAEditar ? 'Editar combo' : 'Constructor de combos'}
-        tabIndex={-1}
-        style={{
-          position: 'relative',
-          zIndex: 65,
-          width: 'min(980px, calc(100% - 24px))',
-          maxHeight: 'min(860px, calc(100% - 24px))',
-          backgroundColor: 'var(--cp-cream)',
-          borderRadius: '20px',
-          boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
-          padding: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '14px',
-          boxSizing: 'border-box',
-          overflowY: 'auto',
-        }}
-      >
-        {/* Cabecera del asistente */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid var(--cp-line)', paddingBottom: '12px' }}>
-          <div>
-            <div
-              style={{
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: '22px',
-                color: 'var(--cp-navy)',
-              }}
-            >
-              {comboAEditar ? 'Editar combo' : 'Constructor de combos'}
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-              Crea o edita combos por pasos con previsualización en vivo para la carta virtual
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onCerrar}
-            aria-label="Cerrar constructor de combos"
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '22px',
-              border: '1.5px solid var(--cp-navy)',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontSize: '20px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Indicador de progreso por pasos */}
-        <nav
-          aria-label="Progreso del asistente"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'var(--cp-white)',
-            borderRadius: '14px',
-            padding: '10px 14px',
-            border: '1px solid var(--cp-line)',
-            flexWrap: 'wrap',
-          }}
-        >
-          {[
-            { num: 1, titulo: '1. Nombre y categoría' },
-            { num: 2, titulo: '2. Qué lleva' },
-            { num: 3, titulo: '3. Cuánto vale' },
-            { num: 4, titulo: '4. Visualización' },
-          ].map((st) => {
-            const esActivo = paso === st.num;
-            const esCompletado = paso > st.num;
-            return (
-              <button
-                key={st.num}
-                type="button"
-                onClick={() => {
-                  if (st.num < paso || validarPasoActual(paso)) {
-                    setPaso(st.num as any);
-                  }
-                }}
-                aria-current={esActivo ? 'step' : undefined}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'transparent',
-                  border: 0,
-                  padding: '6px 10px',
-                  borderRadius: '8px',
-                  backgroundColor: esActivo ? 'var(--cp-sand)' : 'transparent',
-                  color: esActivo ? 'var(--cp-navy)' : esCompletado ? '#2E7D32' : 'var(--cp-soft)',
-                  fontWeight: esActivo ? 800 : 700,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                <span
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '12px',
-                    backgroundColor: esActivo ? 'var(--cp-navy)' : esCompletado ? '#2E7D32' : 'var(--cp-line)',
-                    color: esActivo || esCompletado ? '#fff' : 'var(--cp-navy)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 800,
-                  }}
-                >
-                  {esCompletado ? '✓' : st.num}
-                </span>
-                <span>{st.titulo}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Mensaje de error / advertencia de validación */}
-        {mensajeError && (
-          <div
-            role="alert"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--cp-rust) 15%, var(--cp-cream))',
-              border: '1.5px solid var(--cp-rust)',
-              borderRadius: '12px',
-              padding: '10px 14px',
-              color: 'var(--cp-rust)',
-              fontWeight: 700,
-              fontSize: '13px',
-            }}
-          >
-            {mensajeError}
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* PASO 1: NOMBRE Y CATEGORÍA                                    */}
-        {/* ============================================================== */}
-        {paso === 1 && (
+    <>
+      <ModalConPestanas
+        titulo={comboAEditar ? 'Editar combo' : 'Constructor de combos'}
+        subtitulo="Combo con partes fijas, a elección o alternativas"
+        alCerrar={cerrar}
+        bloquearCierre={guardando || confirmarQuitarFoto || confirmarGuardar || confirmando}
+        pestanaActiva={pestana}
+        alCambiarPestana={setPestana}
+        ancho={960}
+        bajoPestanas={<AvisoErrorOferta mensaje={mensajeError} />}
+        pie={<PieOferta sucio={sucio} alCancelar={cerrar} alGuardar={intentarGuardar} guardando={guardando} textoGuardar="Guardar combo" testidGuardar="btn-guardar-combo" />}
+        pestanas={[
+          { id: 'datos', etiqueta: 'Datos', ...marca('datos'), contenido: (
+<>
           <div
             data-testid="paso-1-combo"
             style={{
@@ -731,9 +527,6 @@ export function ModalCombo({
               gap: '14px',
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
-              Paso 1 de 4: Nombre y categoría de la carta
-            </div>
             <div style={{ fontSize: '13px', color: 'var(--cp-soft)', marginTop: '-8px' }}>
               Define cómo se llamará el combo, en qué categoría de la carta vivirá y su imagen ilustrativa.
             </div>
@@ -911,12 +704,195 @@ export function ModalCombo({
               </div>
             </div>
           </div>
-        )}
+          <div
+            data-testid="paso-3-combo"
+            style={{
+              backgroundColor: 'var(--cp-white)',
+              border: '1px solid var(--cp-line)',
+              borderRadius: '14px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            <div style={{ fontSize: '13px', color: 'var(--cp-soft)', marginTop: '-8px' }}>
+              Define el precio por tamaño del combo y compara automáticamente con el valor de compra suelta.
+            </div>
 
-        {/* ============================================================== */}
-        {/* PASO 2: QUÉ LLEVA (PARTES DEL COMBO)                           */}
-        {/* ============================================================== */}
-        {paso === 2 && (
+            {/* Lista de precios por tamaño */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ fontWeight: 700, fontSize: '13px' }}>
+                Precios del combo por tamaño *
+              </div>
+
+              {tamanos.map((t, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={t.tamanoNombre}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTamanos((prev) => prev.map((item, i) => (i === idx ? { ...item, tamanoNombre: val } : item)));
+                    }}
+                    placeholder="Tamaño, ej.: Regular, Grande"
+                    aria-label="Nombre del tamaño"
+                    style={{
+                      flex: 2,
+                      minHeight: '42px',
+                      borderRadius: '8px',
+                      border: '1.5px solid var(--cp-line)',
+                      padding: '0 12px',
+                      fontSize: '14px',
+                    }}
+                  />
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <span style={{ position: 'absolute', left: '10px', top: '12px', fontSize: '14px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+                      S/
+                    </span>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min={0}
+                      value={t.precio || ''}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setTamanos((prev) => prev.map((item, i) => (i === idx ? { ...item, precio: val } : item)));
+                      }}
+                      placeholder="0.00"
+                      aria-label="Precio del tamaño"
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        minHeight: '42px',
+                        borderRadius: '8px',
+                        border: '1.5px solid var(--cp-line)',
+                        padding: '0 12px 0 32px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                      }}
+                    />
+                  </div>
+                  {tamanos.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => quitarTamano(idx)}
+                      aria-label="Quitar tamaño"
+                      style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '19px',
+                        border: '1.5px solid var(--cp-rust)',
+                        backgroundColor: 'transparent',
+                        color: 'var(--cp-rust)',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={agregarTamano}
+                style={{
+                  alignSelf: 'flex-start',
+                  minHeight: '36px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  border: '1.5px dashed var(--cp-navy)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  marginTop: '4px',
+                }}
+              >
+                + Agregar otro tamaño
+              </button>
+            </div>
+
+            {/* COMPARACIÓN AUTOMÁTICA CONTRA PRECIOS SUELTOS */}
+            <div
+              data-testid="caja-ahorro-combo"
+              style={{
+                backgroundColor: esMasCaroQueSueltos
+                  ? 'color-mix(in srgb, #D97706 15%, var(--cp-cream))'
+                  : ahorroCalculado > 0
+                  ? 'color-mix(in srgb, #2E7D32 15%, var(--cp-cream))'
+                  : 'var(--cp-sand)',
+                border: `1.5px solid ${esMasCaroQueSueltos ? '#D97706' : ahorroCalculado > 0 ? '#2E7D32' : 'var(--cp-line)'}`,
+                borderRadius: '12px',
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
+                  Suma estimada de productos por separado:
+                </span>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--cp-navy)' }}>
+                  S/ {sumaIndividuales.toFixed(2)}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
+                  Precio del combo ({tamanos[0]?.tamanoNombre || 'Regular'}):
+                </span>
+                <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--cp-rust)' }}>
+                  S/ {precioBaseCombo.toFixed(2)}
+                </span>
+              </div>
+
+              {/* Mensaje de ahorro o aviso de combo caro */}
+              {esMasCaroQueSueltos ? (
+                <div
+                  data-testid="aviso-combo-caro"
+                  style={{
+                    marginTop: '6px',
+                    padding: '8px 10px',
+                    backgroundColor: '#FEF3C7',
+                    borderRadius: '8px',
+                    color: '#92400E',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                  }}
+                >
+                  Aviso: el combo (S/ {precioBaseCombo.toFixed(2)}) sale más caro que comprar por separado (S/ {sumaIndividuales.toFixed(2)}).
+                </div>
+              ) : ahorroCalculado > 0 ? (
+                <div
+                  data-testid="mensaje-ahorro-combo"
+                  style={{
+                    marginTop: '6px',
+                    padding: '8px 10px',
+                    backgroundColor: '#DCFCE7',
+                    borderRadius: '8px',
+                    color: '#166534',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                  }}
+                >
+                  Ahorro para el cliente: S/ {ahorroCalculado.toFixed(2)} ({porcentajeAhorro} %)
+                </div>
+              ) : (
+                <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '4px' }}>
+                  El precio coincide con la suma individual de sus partes.
+                </div>
+              )}
+            </div>
+
+          </div>
+</>
+          ) },
+          { id: 'partes', etiqueta: 'Partes y alternativas', ...marca('partes'), contenido: (
           <div
             data-testid="paso-2-combo"
             style={{
@@ -929,9 +905,6 @@ export function ModalCombo({
               gap: '14px',
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
-              Paso 2 de 4: ¿Qué lleva el combo?
-            </div>
             <div style={{ fontSize: '13px', color: 'var(--cp-soft)', marginTop: '-8px' }}>
               Arma las partes del combo con lenguaje claro. Al venderse, cada producto se descuenta individualmente de stock. Del combo se puede comprar cada producto suelto; vendido suelto sí suma puntos.
             </div>
@@ -1375,14 +1348,10 @@ export function ModalCombo({
               </button>
             </div>
           </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* PASO 3: CUÁNTO VALE (PRECIOS Y CONDICIONES)                   */}
-        {/* ============================================================== */}
-        {paso === 3 && (
+          ) },
+          { id: 'cuando', etiqueta: 'Cuándo y dónde', ...marca('cuando'), contenido: (
           <div
-            data-testid="paso-3-combo"
+            data-testid="paso-cuando-combo"
             style={{
               backgroundColor: 'var(--cp-white)',
               border: '1px solid var(--cp-line)',
@@ -1393,182 +1362,6 @@ export function ModalCombo({
               gap: '14px',
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--cp-navy)' }}>
-              Paso 3 de 4: ¿Cuánto vale el combo y cuándo aplica?
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)', marginTop: '-8px' }}>
-              Define el precio por tamaño del combo y compara automáticamente con el valor de compra suelta.
-            </div>
-
-            {/* Lista de precios por tamaño */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontWeight: 700, fontSize: '13px' }}>
-                Precios del combo por tamaño *
-              </div>
-
-              {tamanos.map((t, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    value={t.tamanoNombre}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setTamanos((prev) => prev.map((item, i) => (i === idx ? { ...item, tamanoNombre: val } : item)));
-                    }}
-                    placeholder="Tamaño, ej.: Regular, Grande"
-                    aria-label="Nombre del tamaño"
-                    style={{
-                      flex: 2,
-                      minHeight: '42px',
-                      borderRadius: '8px',
-                      border: '1.5px solid var(--cp-line)',
-                      padding: '0 12px',
-                      fontSize: '14px',
-                    }}
-                  />
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <span style={{ position: 'absolute', left: '10px', top: '12px', fontSize: '14px', fontWeight: 700, color: 'var(--cp-soft)' }}>
-                      S/
-                    </span>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min={0}
-                      value={t.precio || ''}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setTamanos((prev) => prev.map((item, i) => (i === idx ? { ...item, precio: val } : item)));
-                      }}
-                      placeholder="0.00"
-                      aria-label="Precio del tamaño"
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        minHeight: '42px',
-                        borderRadius: '8px',
-                        border: '1.5px solid var(--cp-line)',
-                        padding: '0 12px 0 32px',
-                        fontSize: '14px',
-                        fontWeight: 700,
-                      }}
-                    />
-                  </div>
-                  {tamanos.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => quitarTamano(idx)}
-                      aria-label="Quitar tamaño"
-                      style={{
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '19px',
-                        border: '1.5px solid var(--cp-rust)',
-                        backgroundColor: 'transparent',
-                        color: 'var(--cp-rust)',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-
-              <button
-                type="button"
-                onClick={agregarTamano}
-                style={{
-                  alignSelf: 'flex-start',
-                  minHeight: '36px',
-                  padding: '0 14px',
-                  borderRadius: '8px',
-                  border: '1.5px dashed var(--cp-navy)',
-                  backgroundColor: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  marginTop: '4px',
-                }}
-              >
-                + Agregar otro tamaño
-              </button>
-            </div>
-
-            {/* COMPARACIÓN AUTOMÁTICA CONTRA PRECIOS SUELTOS */}
-            <div
-              data-testid="caja-ahorro-combo"
-              style={{
-                backgroundColor: esMasCaroQueSueltos
-                  ? 'color-mix(in srgb, #D97706 15%, var(--cp-cream))'
-                  : ahorroCalculado > 0
-                  ? 'color-mix(in srgb, #2E7D32 15%, var(--cp-cream))'
-                  : 'var(--cp-sand)',
-                border: `1.5px solid ${esMasCaroQueSueltos ? '#D97706' : ahorroCalculado > 0 ? '#2E7D32' : 'var(--cp-line)'}`,
-                borderRadius: '12px',
-                padding: '14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
-                  Suma estimada de productos por separado:
-                </span>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--cp-navy)' }}>
-                  S/ {sumaIndividuales.toFixed(2)}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
-                  Precio del combo ({tamanos[0]?.tamanoNombre || 'Regular'}):
-                </span>
-                <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--cp-rust)' }}>
-                  S/ {precioBaseCombo.toFixed(2)}
-                </span>
-              </div>
-
-              {/* Mensaje de ahorro o aviso de combo caro */}
-              {esMasCaroQueSueltos ? (
-                <div
-                  data-testid="aviso-combo-caro"
-                  style={{
-                    marginTop: '6px',
-                    padding: '8px 10px',
-                    backgroundColor: '#FEF3C7',
-                    borderRadius: '8px',
-                    color: '#92400E',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                  }}
-                >
-                  Aviso: el combo (S/ {precioBaseCombo.toFixed(2)}) sale más caro que comprar por separado (S/ {sumaIndividuales.toFixed(2)}).
-                </div>
-              ) : ahorroCalculado > 0 ? (
-                <div
-                  data-testid="mensaje-ahorro-combo"
-                  style={{
-                    marginTop: '6px',
-                    padding: '8px 10px',
-                    backgroundColor: '#DCFCE7',
-                    borderRadius: '8px',
-                    color: '#166534',
-                    fontWeight: 800,
-                    fontSize: '13px',
-                  }}
-                >
-                  Ahorro para el cliente: S/ {ahorroCalculado.toFixed(2)} ({porcentajeAhorro} %)
-                </div>
-              ) : (
-                <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '4px' }}>
-                  El precio coincide con la suma individual de sus partes.
-                </div>
-              )}
-            </div>
-
             {/* Condiciones opcionales: Días, horarios, canales y fechas */}
             <div style={{ borderTop: '1px solid var(--cp-line)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--cp-navy)' }}>
@@ -1636,12 +1429,8 @@ export function ModalCombo({
               </div>
             </div>
           </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* PASO 4: VISUALIZACIÓN Y PREVIEW                               */}
-        {/* ============================================================== */}
-        {paso === 4 && (
+          ) },
+          { id: 'resumen', etiqueta: 'Resumen', contenido: (
           <div
             data-testid="paso-4-combo"
             style={{
@@ -1704,84 +1493,10 @@ export function ModalCombo({
               />
             </div>
           </div>
-        )}
-
-        {/* Barra inferior de navegación: Atrás / Siguiente / Guardar */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '10px',
-            borderTop: '1.5px solid var(--cp-line)',
-            paddingTop: '12px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <button
-            type="button"
-            onClick={irPasoAnterior}
-            disabled={paso === 1}
-            style={{
-              minHeight: '44px',
-              padding: '0 20px',
-              borderRadius: '12px',
-              border: '1.5px solid var(--cp-navy)',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontWeight: 800,
-              fontSize: '14px',
-              cursor: paso === 1 ? 'not-allowed' : 'pointer',
-              opacity: paso === 1 ? 0.3 : 1,
-            }}
-          >
-            ← Atrás
-          </button>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {paso < 4 ? (
-              <button
-                type="button"
-                onClick={irSiguientePaso}
-                data-testid="btn-siguiente-paso"
-                style={{
-                  minHeight: '44px',
-                  padding: '0 24px',
-                  borderRadius: '12px',
-                  border: 0,
-                  backgroundColor: 'var(--cp-orange)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                }}
-              >
-                Siguiente →
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmarGuardar(true)}
-                disabled={guardando}
-                data-testid="btn-guardar-combo"
-                style={{
-                  minHeight: '44px',
-                  padding: '0 28px',
-                  borderRadius: '12px',
-                  border: 0,
-                  backgroundColor: 'var(--cp-orange)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '14px',
-                  cursor: guardando ? 'wait' : 'pointer',
-                }}
-              >
-                {guardando ? 'Guardando...' : 'Guardar combo'}
-              </button>
-            )}
-          </div>
-        </div>
-
+          ) },
+        ]}
+      />
+      <ConfirmarSalir abierto={confirmando} alSalir={() => { setConfirmando(false); onCerrar(); }} alQuedarse={() => setConfirmando(false)} />
         {/* Modal de confirmación para quitar foto */}
         <ModalConfirmacion
           abierto={confirmarQuitarFoto}
@@ -1799,7 +1514,6 @@ export function ModalCombo({
           onConfirmar={ejecutarGuardar}
           onCancelar={() => setConfirmarGuardar(false)}
         />
-      </div>
-    </div>
+    </>
   );
 }

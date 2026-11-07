@@ -16,6 +16,20 @@ import {
   LineaCarritoBot,
   ItemEnConfiguracionBot,
 } from './tipos-pedido';
+import { avisoStock } from '@caprichos/compartido';
+import { lineaAvisoStock, lineasAvisoResumen, umbralesDe } from './aviso-stock-bot.util';
+import {
+  MAX_COMBOS_CON_ELECCION,
+  PlantillasCombo,
+  accionesPasoCombo,
+  armarPasosCombo,
+  comboVendibleBot,
+  detalleCombo,
+  eleccionesParaServidor,
+  iniciarCombo,
+  procesarEntradaCombo,
+} from './combo-bot';
+import { BOTONES_COMBO_CONFIRMAR, TEXTOS_COMBO } from '../../textos-combo';
 import { ordenarPorVentas, tarjetaProducto, accionesPaginaCarrusel as accionesPaginaCarruselGenerica } from '../../../servicios/carrusel.util';
 import {
   TEXTOS_BOT,
@@ -153,6 +167,18 @@ function productoDeCarta(categorias: any[], productoId: string): any | null {
   return null;
 }
 
+/** Anfitrión de un combo que el bot no vende hoy (canal sin WhatsApp, agotado o fuera de horario): no se ofrece. */
+function ocultoEnBot(p: any, contexto: ContextoConversacion): boolean {
+  return (contexto.productosComboNoBot ?? []).includes(String(p?.id));
+}
+
+function plantillasCombo(contexto: ContextoConversacion): PlantillasCombo {
+  return {
+    intro: contexto.textosPersonalizados?.chatbot_texto_combo_intro,
+    planB: contexto.textosPersonalizados?.chatbot_texto_combo_plan_b,
+  };
+}
+
 /** Lista de sabores que se pueden pedir con esas unidades (máx 10 filas; «Quedan N» cuando quedan 5 o menos). */
 function listaSaboresStock(prod: any, texto: string, unidades = 1): AccionEnviarLista {
   return {
@@ -176,7 +202,7 @@ function detallesLinea(i: LineaCarritoBot): string[] {
   if (saborStock) {
     return [`${i.tamanoNombre ? `${i.tamanoNombre} de ` : ''}${saborStock.nombre}`, ...opciones];
   }
-  return [i.tamanoNombre, ...opciones, i.sabor].filter((d): d is string => Boolean(d));
+  return [i.tamanoNombre, ...opciones, i.sabor, ...(i.comboDetalle ?? [])].filter((d): d is string => Boolean(d));
 }
 
 /**
@@ -222,6 +248,57 @@ export function carritoTrasSaborAgotado(
       itemEnConfiguracion: config,
     },
     lista: listaSaboresStock(prod, TEXTOS_BOT.pedidoSaborAgotado(nombre), unidadesLinea),
+  };
+}
+
+export const CODIGOS_COMBO_RECHAZADO = ['COMBO_PARTE_NO_DISPONIBLE', 'COMBO_ELECCION_INCOMPLETA', 'COMBO_PARTE_NO_PERMITIDA', 'COMBO_ALTERNATIVA_NO_APLICA'];
+
+/**
+ * El servidor rechazó un combo al confirmar (se agotó una parte o el saldo cambió): la línea del combo sale del carrito
+ * (el resto se conserva) y el cliente vuelve a elegir sus partes con lo que hay hoy (plan B incluido). Null si no hay
+ * un combo que rehacer (el ejecutor entonces vuelve al carrito con el mensaje).
+ */
+export function carritoTrasComboRechazado(
+  carrito: EstadoCarritoPedido,
+  err: { codigo?: string; mensaje?: string; productoId?: string | number },
+  categorias: any[],
+  ofertas: any[],
+  textos?: Record<string, string>,
+): { pedido: EstadoCarritoPedido; acciones: AccionMensaje[] } | null {
+  const porCodigo = CODIGOS_COMBO_RECHAZADO.includes(String(err.codigo));
+  const idx = carrito.items.findIndex(
+    (i) => i.ofertaId && (porCodigo || i.comboElecciones?.some((e) => e.productoId === String(err.productoId))),
+  );
+  if (idx < 0) return null;
+  const linea = carrito.items[idx];
+  const oferta = comboVendibleBot(ofertas, linea.productoId);
+  if (!oferta) return null;
+  const combo = iniciarCombo(oferta);
+  if (!armarPasosCombo(combo, oferta, linea.cantidad, categorias) || combo.pasos.length === 0) return null;
+  const prod = productoDeCarta(categorias, linea.productoId);
+  const extras = linea.opciones.reduce((s, o) => s + o.precioExtra, 0);
+  const config: ItemEnConfiguracionBot = {
+    productoId: linea.productoId,
+    productoNombre: linea.productoNombre,
+    categoriaId: linea.categoriaId,
+    categoriaNombre: linea.categoriaNombre,
+    tamanoId: linea.tamanoId,
+    tamanoNombre: linea.tamanoNombre,
+    precioBase: Number((linea.precioUnitario - extras).toFixed(2)),
+    opciones: linea.opciones,
+    grupoIndexActual: (prod?.grupos || []).length,
+    cantidad: linea.cantidad,
+    noSumaBeneficios: linea.noSumaBeneficios,
+    nota: linea.nota,
+    nombresEnvase: linea.personas,
+    combo,
+  };
+  return {
+    pedido: { ...carrito, estadoInterno: 'PEDIDO_COMBO_PARTE', items: carrito.items.filter((_, k) => k !== idx), itemEnConfiguracion: config },
+    acciones: [
+      { tipo: 'enviarTexto', texto: TEXTOS_COMBO.seAgoto(err.mensaje || 'Se agotó algo de tu combo') },
+      ...accionesPasoCombo(combo, { intro: textos?.chatbot_texto_combo_intro, planB: textos?.chatbot_texto_combo_plan_b }),
+    ],
   };
 }
 
@@ -536,6 +613,12 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       case 'PEDIDO_CANTIDAD':
         return this.pasoCantidad(flujo, pedido, entrada, contexto);
 
+      case 'PEDIDO_COMBO_PARTE':
+        return this.pasoComboParte(flujo, pedido, entrada, contexto);
+
+      case 'PEDIDO_COMBO_CONFIRMAR':
+        return this.pasoComboConfirmar(flujo, pedido, entrada, contexto);
+
       case 'PEDIDO_NOMBRES_ENVASE':
         return this.pasoNombresEnvase(flujo, pedido, entrada, contexto);
 
@@ -815,7 +898,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     if (entrada.id?.startsWith('ped_prod_mas_')) {
       const n = Math.max(2, parseInt(entrada.id.replace('ped_prod_mas_', ''), 10) || 2);
       const productos = ordenarPorVentas(
-        (categoria.productos || []).filter((p: any) => !productoAgotado(p)),
+        (categoria.productos || []).filter((p: any) => !productoAgotado(p) && !ocultoEnBot(p, contexto)),
         contexto.ventasProductos,
       );
       if ((n - 1) * 10 >= productos.length) {
@@ -851,9 +934,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     // Validar disponibilidad / agotado (Mockup: no sigue el flujo del agotado y ofrece alternativas)
-    if (productoAgotado(producto)) {
+    if (productoAgotado(producto) || ocultoEnBot(producto, contexto)) {
       const alternativas = (categoria.productos || [])
-        .filter((p: any) => p.id !== producto.id && !productoAgotado(p))
+        .filter((p: any) => p.id !== producto.id && !productoAgotado(p) && !ocultoEnBot(p, contexto))
         .map((p: any) => p.nombre)
         .slice(0, 2);
 
@@ -887,16 +970,31 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       noSumaBeneficios: Boolean(producto.noSumaBeneficios),
     };
 
+    // Combo que el bot vende: sus partes se eligen tras la cantidad; aquí solo se presenta
+    const comboOferta = comboVendibleBot(contexto.ofertas, String(producto.id));
+    let introCombo: AccionMensaje[] = [];
+    if (comboOferta) {
+      configInicial.combo = iniciarCombo(comboOferta);
+      introCombo = [
+        {
+          tipo: 'enviarTexto',
+          texto: TEXTOS_COMBO.intro(comboOferta.nombre, configInicial.combo.fijas.map((f) => f.nombre), plantillasCombo(contexto).intro),
+        },
+      ];
+    }
+
     const nuevoPedido: EstadoCarritoPedido = {
       ...pedido,
       productoSeleccionadoId: String(producto.id),
       itemEnConfiguracion: configInicial,
     };
 
+    const conIntro = (r: ResultadoTransicion): ResultadoTransicion => ({ ...r, acciones: [...introCombo, ...r.acciones] });
+
     // A. ¿Tiene tamaños / variantes? Solo se ofrecen los que caben en lo que queda (docena no cabe en 3)
     const tamanosOfrecidos = tamanosQueCaben(producto);
     if (tamanosOfrecidos.length > 1) {
-      return this.preguntarTamano(flujo, nuevoPedido, producto, TEXTOS_BOT.pedidoPreguntarTamano(producto.nombre));
+      return conIntro(this.preguntarTamano(flujo, nuevoPedido, producto, TEXTOS_BOT.pedidoPreguntarTamano(producto.nombre)));
     }
 
     // Si solo cabe un tamaño, asignar su precio base
@@ -907,7 +1005,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     // B. Pasar a grupos de opciones o cantidad
-    return this.avanzarConfiguracionProducto(flujo, nuevoPedido, producto, contexto);
+    return conIntro(this.avanzarConfiguracionProducto(flujo, nuevoPedido, producto, contexto));
   }
 
   // -------------------------------------------------------------------------
@@ -1080,7 +1178,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
+          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
           botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
@@ -1199,7 +1297,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
+          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
           botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
@@ -1259,13 +1357,130 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       return this.preguntarSaborStock(flujo, pedido, prodStock, TEXTOS_BOT.pedidoPreguntarSabor());
     }
 
+    return this.continuarTrasCantidad(flujo, pedido, config, contexto);
+  }
+
+  /**
+   * Tras la cantidad: partes del combo (alternativas y listas), nombres de envase y, al final, el resumen/línea.
+   * Se vuelve a llamar al terminar las partes: `partesListas` evita repetir el paso.
+   */
+  private continuarTrasCantidad(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    config: ItemEnConfiguracionBot,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    if (config.combo && !config.combo.partesListas) {
+      const oferta = comboVendibleBot(contexto.ofertas, config.productoId);
+      if (!oferta || !armarPasosCombo(config.combo, oferta, config.cantidad, contexto.categoriasCarta || [])) {
+        return this.mostrarCategorias(flujo, { ...pedido, itemEnConfiguracion: undefined }, contexto, TEXTOS_COMBO.noDisponible(config.combo.nombre));
+      }
+      if (config.combo.pasos.length > 0) {
+        if (config.cantidad > MAX_COMBOS_CON_ELECCION) {
+          pedido.estadoInterno = 'PEDIDO_CANTIDAD';
+          return {
+            nuevoEstado: 'PEDIDO_CANTIDAD',
+            acciones: [
+              {
+                tipo: 'enviarBotones',
+                texto: TEXTOS_COMBO.maximo(config.combo.nombre, MAX_COMBOS_CON_ELECCION),
+                botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
+              },
+            ],
+            nuevoFlujo: { ...flujo, estado: 'PEDIDO_CANTIDAD', pedido },
+          };
+        }
+        pedido.estadoInterno = 'PEDIDO_COMBO_PARTE';
+        return {
+          nuevoEstado: 'PEDIDO_COMBO_PARTE',
+          acciones: accionesPasoCombo(config.combo, plantillasCombo(contexto)),
+          nuevoFlujo: { ...flujo, estado: 'PEDIDO_COMBO_PARTE', pedido },
+        };
+      }
+      config.combo.partesListas = true;
+    }
+
     // Bebidas: cada envase lleva un nombre distinto en su etiqueta; se piden uno por uno
     if (this.esBebidaConNombres(config.categoriaNombre) || this.bebidasDeCombo(config).length > 0) {
-      config.nombresEnvase = [];
+      // Combo que volvió a elegir una parte: los nombres ya escritos se conservan si siguen completos
+      if (config.nombresEnvase?.length !== this.totalEnvases(config)) config.nombresEnvase = [];
+      else return this.confirmarNombresEnvase(flujo, pedido, config);
       return this.preguntarNombreEnvase(flujo, pedido, config);
     }
 
     return this.agregarLineaConfigurada(flujo, pedido, contexto);
+  }
+
+  private pasoComboParte(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const config = pedido.itemEnConfiguracion;
+    if (!config?.combo) return this.mostrarCategorias(flujo, pedido, contexto);
+    const r = procesarEntradaCombo(config.combo, entrada, plantillasCombo(contexto));
+    if (r.estado === 'reiniciar') return this.reiniciarCombo(flujo, pedido, config, entrada, contexto);
+    if (r.estado === 'listo') {
+      config.combo.partesListas = true;
+      return this.continuarTrasCantidad(flujo, pedido, config, contexto);
+    }
+    pedido.estadoInterno = 'PEDIDO_COMBO_PARTE';
+    return { nuevoEstado: 'PEDIDO_COMBO_PARTE', acciones: r.acciones, nuevoFlujo: { ...flujo, estado: 'PEDIDO_COMBO_PARTE', pedido } };
+  }
+
+  /** Vuelve a elegir el combo desde cero (tamaño, opciones y partes). */
+  private reiniciarCombo(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    config: ItemEnConfiguracionBot,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const r = this.pasoProductos(
+      flujo,
+      { ...pedido, categoriaSeleccionadaId: config.categoriaId, itemEnConfiguracion: undefined },
+      { ...entrada, id: `ped_prod_${config.productoId}`, texto: '' },
+      contexto,
+    );
+    return { ...r, acciones: [{ tipo: 'enviarTexto', texto: TEXTOS_COMBO.nuevamente() }, ...r.acciones] };
+  }
+
+  /** Resumen del combo armado y confirmación antes de agregarlo. */
+  private confirmarCombo(flujo: FlujoConversacion, pedido: EstadoCarritoPedido, config: ItemEnConfiguracionBot): ResultadoTransicion {
+    const combo = config.combo!;
+    const extras = config.opciones.reduce((s, o) => s + o.precioExtra, 0);
+    const detalles = [...config.opciones.map((o) => o.nombre), ...detalleCombo(combo)];
+    pedido.estadoInterno = 'PEDIDO_COMBO_CONFIRMAR';
+    return {
+      nuevoEstado: 'PEDIDO_COMBO_CONFIRMAR',
+      acciones: [
+        {
+          tipo: 'enviarBotones',
+          texto: TEXTOS_COMBO.resumen(combo.nombre, config.tamanoNombre, detalles, config.cantidad, (config.precioBase + extras) * config.cantidad),
+          botones: BOTONES_COMBO_CONFIRMAR,
+        },
+      ],
+      nuevoFlujo: { ...flujo, estado: 'PEDIDO_COMBO_CONFIRMAR', pedido },
+    };
+  }
+
+  private pasoComboConfirmar(
+    flujo: FlujoConversacion,
+    pedido: EstadoCarritoPedido,
+    entrada: EntradaNormalizada,
+    contexto: ContextoConversacion,
+  ): ResultadoTransicion {
+    const config = pedido.itemEnConfiguracion;
+    if (!config?.combo) return this.mostrarCategorias(flujo, pedido, contexto);
+    if (entrada.id === 'ped_combo_ok' || ['si', 'ok', 'listo', 'agregar'].includes(entrada.texto)) {
+      config.combo.confirmado = true;
+      return this.agregarLineaConfigurada(flujo, pedido, contexto);
+    }
+    if (entrada.id === 'ped_combo_cambiar' || ['no', 'cambiar', 'atras'].includes(entrada.texto)) {
+      return this.reiniciarCombo(flujo, pedido, config, entrada, contexto);
+    }
+    return this.confirmarCombo(flujo, pedido, config);
   }
 
   /** Unidades que quedan de un producto que controla stock (null si no lo controla). */
@@ -1402,6 +1617,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   ): ResultadoTransicion {
     const config = pedido.itemEnConfiguracion;
     if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
+    if (config.combo && !config.combo.confirmado) return this.confirmarCombo(flujo, pedido, config);
     const cantidad = config.cantidad;
 
     // Calcular precio unitario y subtotal de la línea
@@ -1441,6 +1657,14 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       nota: config.nota,
       noSumaBeneficios: config.noSumaBeneficios,
       personas: config.nombresEnvase && config.nombresEnvase.length > 0 ? [...config.nombresEnvase] : undefined,
+      // Combo con elecciones: mismo contrato que la carta (el servidor crea las líneas hijas y descuenta el stock)
+      ...(config.combo && eleccionesParaServidor(config.combo).length > 0
+        ? {
+            ofertaId: config.combo.ofertaId,
+            comboElecciones: eleccionesParaServidor(config.combo),
+            comboDetalle: detalleCombo(config.combo),
+          }
+        : {}),
     };
 
     const nuevosItems = [...pedido.items, nuevaLinea];
@@ -2203,6 +2427,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         opciones: i.opciones.map((o) => o.opcionId),
         nota: i.nota,
         personas: i.personas,
+        ...(i.ofertaId ? { ofertaId: i.ofertaId, comboElecciones: i.comboElecciones ?? [] } : {}),
         // Stock por sabor: unidades por sabor (tamaño × cantidad); el servidor valida suma y stock
         ...(i.sabores ? { sabores: i.sabores.map((s) => ({ saborId: s.saborId, cantidad: s.cantidad })) } : {}),
       })),
@@ -2492,7 +2717,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   ): ResultadoTransicion {
     const { envio, descuento, descuentoNombre, propina, aCobrar, envioPromoNombre, envioGratisFalta } = calcularTotales(pedido, contexto.vistaPreviaPedido);
 
-    const lineasTexto = this.lineasResumen(pedido);
+    const lineasTexto = this.lineasResumen(pedido, contexto);
 
 
     const descuentoTexto = descuento > 0 ? TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento) : undefined;
@@ -2622,7 +2847,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   /** Resumen con total justo antes de «¿Cómo pagarás?». Usa las mismas líneas y totales que el resumen final. */
   private resumenAntesDePagar(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
     const { subtotal, envio, aCobrar: total, propina, descuento, descuentoNombre, envioPromoNombre, envioGratisFalta } = calcularTotales(pedido, contexto.vistaPreviaPedido);
-    const lineas = this.lineasResumen(pedido);
+    const lineas = this.lineasResumen(pedido, contexto);
     const descuentoTxt = descuento > 0 ? `${TEXTOS_BOT.lineaDescuentoBot(descuentoNombre, descuento)}\n` : '';
     const envioTxt =
       pedido.modalidad !== 'DELIVERY'
@@ -2646,8 +2871,9 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   }
 
   /** Líneas del carrito: cantidad, tamaño/opciones y precio (compartido por el resumen previo y el final). */
-  private lineasResumen(pedido: EstadoCarritoPedido): string {
-    return pedido.items
+  private lineasResumen(pedido: EstadoCarritoPedido, contexto: ContextoConversacion): string {
+    const avisos = lineasAvisoResumen(pedido.items, (id) => productoDeCarta(contexto.categoriasCarta || [], id), unidadesDeTamano, contexto);
+    const lineas = pedido.items
       .map((i) => {
         const detalles = detallesLinea(i);
         const detTxt = detalles.length > 0 ? ` · ${detalles.join(' · ')}` : '';
@@ -2655,6 +2881,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         return `• ${cant}${i.productoNombre}${detTxt} — S/ ${i.subtotal.toFixed(2)}`;
       })
       .join('\n');
+    return avisos.length ? `${lineas}\n${avisos.join('\n')}` : lineas;
   }
 
   // -------------------------------------------------------------------------
@@ -2731,7 +2958,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       acciones: [
         {
           tipo: 'enviarBotones',
-          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre),
+          texto: TEXTOS_BOT.pedidoPreguntarCantidad(config.productoNombre, lineaAvisoStock(productoDeCarta(contexto.categoriasCarta || [], config.productoId), contexto)),
           botones: this.botonesCantidad(config.productoId, contexto, config.tamanoId),
         },
       ],
@@ -2860,7 +3087,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   ): ResultadoTransicion {
     // Más vendidos primero (los sin ventas siguen el orden de la carta)
     const productos = ordenarPorVentas(
-      (categoria.productos || []).filter((p: any) => !productoAgotado(p)),
+      (categoria.productos || []).filter((p: any) => !productoAgotado(p) && !ocultoEnBot(p, contexto)),
       contexto.ventasProductos,
     );
 
@@ -2894,10 +3121,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const filas: FilaLista[] = visibles.map((p: any) => {
       const precio = Number(p.precio || 0);
       const desc = p.descripcion ? ` · ${p.descripcion}` : '';
+      const aviso = avisoStock({ controlaStock: true, quedan: p.quedan, nombre: p.nombre }, umbralesDe(contexto));
       return {
         id: `ped_prod_${p.id}`,
         titulo: p.nombre.slice(0, 24),
-        descripcion: `S/ ${precio.toFixed(2)}${desc}`.slice(0, 72),
+        descripcion: `S/ ${precio.toFixed(2)}${aviso ? ` · ${aviso.texto}` : desc}`.slice(0, 72),
       };
     });
 
@@ -2955,7 +3183,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   ): AccionMensaje[] {
     const lista: any = listaBase;
     return accionesPaginaCarruselGenerica({
-      tarjetas: productos.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica)),
+      tarjetas: productos.map((p) => tarjetaProducto(p, contexto.cartaUrlPublica, lineaAvisoStock(p, contexto))),
       pagina,
       cuerpoPrimera: TEXTOS_BOT.carruselFavoritos(categoria.nombre, productos.length),
       cuerpoSiguientes: TEXTOS_BOT.carruselMasOpciones(),
@@ -3019,6 +3247,19 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         return this.pedirUbicacion(flujo, pedido);
       case 'PEDIDO_CATEGORIAS':
         return this.mostrarCategorias(flujo, pedido, contexto);
+      case 'PEDIDO_COMBO_PARTE':
+        if (pedido.itemEnConfiguracion?.combo) {
+          return {
+            nuevoEstado: 'PEDIDO_COMBO_PARTE',
+            acciones: accionesPasoCombo(pedido.itemEnConfiguracion.combo, plantillasCombo(contexto)),
+            nuevoFlujo: { ...flujo, estado: 'PEDIDO_COMBO_PARTE', pedido },
+          };
+        }
+        return this.mostrarCategorias(flujo, pedido, contexto);
+      case 'PEDIDO_COMBO_CONFIRMAR':
+        return pedido.itemEnConfiguracion?.combo
+          ? this.confirmarCombo(flujo, pedido, pedido.itemEnConfiguracion)
+          : this.mostrarCategorias(flujo, pedido, contexto);
       case 'PEDIDO_VER_CARRITO':
       case 'PEDIDO_ACCION_CARRITO': {
         const subtotal = Number(pedido.items.reduce((s, i) => s + i.subtotal, 0).toFixed(2));

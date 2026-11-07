@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CuponItem } from './ofertasApi';
 import { CanalesEstado, SelectorCanales, canalesDesdeEstado, estadoDesdeCanales } from './canalesPromo';
+import { ModalConPestanas } from '../../comun/ModalConPestanas';
+import { AvisoErrorOferta, ConfirmarSalir, PieOferta, primeraConError, useCambiosSinGuardar, useCierreConConfirmacion } from './modalOfertaComun';
 
 const CATEGORIAS_DEF = [
   'Combos',
@@ -70,6 +72,8 @@ export function ModalCupon({
   const [requiereCuenta, setRequiereCuenta] = useState(false);
   const [mensajeError, setMensajeError] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const [pestana, setPestana] = useState('datos');
+  const [verErrores, setVerErrores] = useState(false);
 
   useEffect(() => {
     if (cuponAEditar) {
@@ -101,6 +105,8 @@ export function ModalCupon({
       setCanales({ ...estadoDesdeCanales(cuponAEditar.canales), bot: false });
       setRequiereCuenta(Boolean(cuponAEditar.requiereCuenta));
       setMensajeError('');
+      setPestana('datos');
+      setVerErrores(false);
     } else {
       setModo('UNICO_COMPROBANTE');
       setCodigoBase('');
@@ -123,51 +129,61 @@ export function ModalCupon({
       setCanales({ carta: true, local: true, bot: false });
       setRequiereCuenta(false);
       setMensajeError('');
+      setPestana('datos');
+      setVerErrores(false);
     }
   }, [cuponAEditar, abierto, validezReglasDefecto]);
 
+  // Errores pendientes por pestaña (sin efectos): null = la pestaña está bien.
+  const esEnvio = tipo === 'envio';
+  const errorDatos = (): string | null => {
+    if (!codigoBase.trim()) return 'Escribe el código base del cupón.';
+    if (!descripcion.trim()) return 'Escribe una descripción.';
+    const v = esEnvio ? 0 : parseFloat(valor.replace(',', '.'));
+    if (!esEnvio && (isNaN(v) || !(v > 0))) return 'Escribe el valor del descuento.';
+    if (tipo === 'pct' && v > 100) return 'Un porcentaje no puede pasar de 100.';
+    return null;
+  };
+  const errorCuando = (): string | null => {
+    if (!canales.carta && !canales.local) return 'Elige al menos un lugar donde aplica: carta web o en el local.';
+    if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de fin debe ser después de la hora de inicio.';
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
+    return null;
+  };
+  const errorCondiciones = (): string | null => {
+    if (aplica === 'cat' && !categoria) return 'Elige la categoría.';
+    if (aplica === 'prod' && !producto) return 'Elige el producto.';
+    return null;
+  };
+  const erroresPestanas = [
+    { id: 'datos', error: errorDatos() },
+    { id: 'cuando', error: errorCuando() },
+    { id: 'condiciones', error: errorCondiciones() },
+  ];
+  const marca = (id: string) => {
+    const hay = verErrores && !!erroresPestanas.find((e) => e.id === id)?.error;
+    return hay ? { insignia: '!', insigniaError: true } : {};
+  };
+  const firma = JSON.stringify([modo, codigoBase, descripcion, tipo, dias, horaDesde, horaHasta, valor, minima, fechaDesde, fechaHasta, maxUsos, porCliente, aplica, categoria, producto, tituloImpreso, validezDias, canales, requiereCuenta]);
+  const sucio = useCambiosSinGuardar(abierto, firma);
+  const { cerrar, confirmando, setConfirmando } = useCierreConConfirmacion(sucio, onCerrar);
+
   if (!abierto) return null;
 
-  const validarYGuardar = async () => {
-    if (!codigoBase.trim()) {
-      setMensajeError('Escribe el código base del cupón.');
+  // Guardar: si hay un error, salta a la primera pestaña con error y lo muestra.
+  const intentarGuardar = () => {
+    setVerErrores(true);
+    const e = primeraConError(erroresPestanas);
+    if (e) {
+      setPestana(e.id);
+      setMensajeError(e.error as string);
       return;
     }
-    if (!canales.carta && !canales.local) {
-      setMensajeError('Elige al menos un lugar donde aplica: carta web o en el local.');
-      return;
-    }
-    if (!descripcion.trim()) {
-      setMensajeError('Escribe una descripción.');
-      return;
-    }
-    const esEnvio = tipo === 'envio';
-    const valNum = esEnvio ? 0 : parseFloat(valor.replace(',', '.'));
-    if (!esEnvio && (isNaN(valNum) || !(valNum > 0))) {
-      setMensajeError('Escribe el valor del descuento.');
-      return;
-    }
-    if (tipo === 'pct' && valNum > 100) {
-      setMensajeError('Un porcentaje no puede pasar de 100.');
-      return;
-    }
-    if (aplica === 'cat' && !categoria) {
-      setMensajeError('Elige la categoría.');
-      return;
-    }
-    if (aplica === 'prod' && !producto) {
-      setMensajeError('Elige el producto.');
-      return;
-    }
-    if (horaDesde && horaHasta && horaDesde >= horaHasta) {
-      setMensajeError('La hora de fin debe ser después de la hora de inicio.');
-      return;
-    }
-    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
-      setMensajeError('La fecha de inicio no puede ser después de la final.');
-      return;
-    }
+    void validarYGuardar();
+  };
 
+  const validarYGuardar = async () => {
+    const valNum = esEnvio ? 0 : parseFloat(valor.replace(',', '.'));
     setGuardando(true);
     setMensajeError('');
     try {
@@ -214,71 +230,19 @@ export function ModalCupon({
   );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 60 }}>
-      {/* Fondo clickeable */}
-      <div
-        onClick={onCerrar}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundColor: 'rgba(11, 44, 62, 0.55)',
-          zIndex: 60,
-        }}
-      />
-
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Nuevo cupón"
-        style={{
-          position: 'absolute',
-          zIndex: 65,
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 'min(860px, calc(100% - 24px))',
-          maxHeight: 'calc(100% - 24px)',
-          overflowY: 'auto',
-          backgroundColor: 'var(--cp-cream)',
-          borderRadius: '20px',
-          boxShadow: '0 20px 50px rgba(11, 44, 62, 0.4)',
-          padding: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: '20px',
-              color: 'var(--cp-navy)',
-            }}
-          >
-            {cuponAEditar ? 'Editar cupón' : 'Nuevo cupón'}
-          </div>
-          <button
-            type="button"
-            onClick={onCerrar}
-            aria-label="Cerrar"
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '22px',
-              border: '1.5px solid var(--cp-navy)',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontSize: '20px',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            ×
-          </button>
-        </div>
-
+    <>
+      <ModalConPestanas
+        titulo={cuponAEditar ? 'Editar cupón' : 'Nuevo cupón'}
+        alCerrar={cerrar}
+        bloquearCierre={guardando || confirmando}
+        pestanaActiva={pestana}
+        alCambiarPestana={setPestana}
+        ancho={860}
+        bajoPestanas={<AvisoErrorOferta mensaje={mensajeError} />}
+        pie={<PieOferta sucio={sucio} alCancelar={cerrar} alGuardar={intentarGuardar} guardando={guardando} textoGuardar="Guardar cupón" />}
+        pestanas={[
+          { id: 'datos', etiqueta: 'Datos del cupón', ...marca('datos'), contenido: (
+            <>
         {/* ¿Cómo se entrega este cupón? */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ fontWeight: 800 }}>¿Cómo se entrega este cupón?</div>
@@ -500,29 +464,12 @@ export function ModalCupon({
           </div>
           )}
 
-          <div style={{ flex: '1 1 100px' }}>
-            <label htmlFor="cp-m" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-              Compra mínima (s/)
-            </label>
-            <input
-              id="cp-m"
-              type="text"
-              value={minima}
-              onChange={(e) => setMinima(e.target.value)}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                minHeight: '44px',
-                borderRadius: '12px',
-                border: '1.5px solid var(--cp-line)',
-                backgroundColor: 'var(--cp-white)',
-                padding: '0 12px',
-                fontSize: '14px',
-              }}
-            />
-          </div>
         </div>
 
+            </>
+          ) },
+          { id: 'cuando', etiqueta: 'Cuándo y dónde', ...marca('cuando'), contenido: (
+            <>
         {/* Horario opcional del cupón (vacío = todo el tiempo) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ fontWeight: 700 }}>Días (si no eliges ninguno, todos los días)</div>
@@ -664,6 +611,77 @@ export function ModalCupon({
           )}
         </div>
 
+        {/* Sección comprobante o compartido */}
+        <div
+          style={{
+            border: '1.5px dashed var(--cp-navy)',
+            borderRadius: '12px',
+            padding: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          {modo === 'COMPARTIDO' ? (
+            <div style={{ fontSize: '13px', lineHeight: '19px' }}>
+              Este cupón <b>no se imprime</b> en el comprobante: tú lo repartes en afiches, volantes o redes y el cliente
+              escribe el código en la carta. Se acaba cuando llega al tope de usos.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontWeight: 700 }}>Cómo sale en el comprobante</div>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ flex: '2 1 200px' }}>
+                  <label htmlFor="cp-ti" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                    Frase de arriba
+                  </label>
+                  <input
+                    id="cp-ti"
+                    type="text"
+                    value={tituloImpreso}
+                    onChange={(e) => setTituloImpreso(e.target.value)}
+                    placeholder="En tu siguiente compra"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      minHeight: '48px',
+                      borderRadius: '12px',
+                      border: '1.5px solid var(--cp-line)',
+                      backgroundColor: 'var(--cp-white)',
+                      padding: '0 12px',
+                    }}
+                  />
+                </div>
+                <div style={{ flex: '1 1 120px' }}>
+                  <label htmlFor="cp-va" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                    Vale (días)
+                  </label>
+                  <input
+                    id="cp-va"
+                    type="text"
+                    value={validezDias}
+                    onChange={(e) => setValidezDias(e.target.value)}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      minHeight: '48px',
+                      borderRadius: '12px',
+                      border: '1.5px solid var(--cp-line)',
+                      backgroundColor: 'var(--cp-white)',
+                      padding: '0 12px',
+                    }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <SelectorCanales id="cupon-canal" tipo="CUPON" valor={canales} onChange={setCanales} />
+            </>
+          ) },
+          { id: 'condiciones', etiqueta: 'Condiciones', ...marca('condiciones'), contenido: (
+            <>
         {/* Aplica a */}
         <div>
           <div style={{ fontWeight: 700, marginBottom: '4px' }}>Aplica a</div>
@@ -868,75 +886,29 @@ export function ModalCupon({
           )}
         </div>
 
-        {/* Sección comprobante o compartido */}
-        <div
-          style={{
-            border: '1.5px dashed var(--cp-navy)',
-            borderRadius: '12px',
-            padding: '10px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-          }}
-        >
-          {modo === 'COMPARTIDO' ? (
-            <div style={{ fontSize: '13px', lineHeight: '19px' }}>
-              Este cupón <b>no se imprime</b> en el comprobante: tú lo repartes en afiches, volantes o redes y el cliente
-              escribe el código en la carta. Se acaba cuando llega al tope de usos.
-            </div>
-          ) : (
-            <>
-              <div style={{ fontWeight: 700 }}>Cómo sale en el comprobante</div>
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <div style={{ flex: '2 1 200px' }}>
-                  <label htmlFor="cp-ti" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                    Frase de arriba
-                  </label>
-                  <input
-                    id="cp-ti"
-                    type="text"
-                    value={tituloImpreso}
-                    onChange={(e) => setTituloImpreso(e.target.value)}
-                    placeholder="En tu siguiente compra"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: '48px',
-                      borderRadius: '12px',
-                      border: '1.5px solid var(--cp-line)',
-                      backgroundColor: 'var(--cp-white)',
-                      padding: '0 12px',
-                    }}
-                  />
-                </div>
-                <div style={{ flex: '1 1 120px' }}>
-                  <label htmlFor="cp-va" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                    Vale (días)
-                  </label>
-                  <input
-                    id="cp-va"
-                    type="text"
-                    value={validezDias}
-                    onChange={(e) => setValidezDias(e.target.value)}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      minHeight: '48px',
-                      borderRadius: '12px',
-                      border: '1.5px solid var(--cp-line)',
-                      backgroundColor: 'var(--cp-white)',
-                      padding: '0 12px',
-                    }}
-                  />
-                </div>
-              </div>
-            </>
-          )}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 100px' }}>
+            <label htmlFor="cp-m" style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+              Compra mínima (s/)
+            </label>
+            <input
+              id="cp-m"
+              type="text"
+              value={minima}
+              onChange={(e) => setMinima(e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                minHeight: '44px',
+                borderRadius: '12px',
+                border: '1.5px solid var(--cp-line)',
+                backgroundColor: 'var(--cp-white)',
+                padding: '0 12px',
+                fontSize: '14px',
+              }}
+            />
+          </div>
         </div>
-
-        {/* Dónde aplica */}
-        <SelectorCanales id="cupon-canal" tipo="CUPON" valor={canales} onChange={setCanales} />
-
         {/* Requiere cuenta */}
         <div>
           <div style={{ fontWeight: 700, marginBottom: '4px' }}>Requiere que el cliente pida con su cuenta</div>
@@ -978,50 +950,11 @@ export function ModalCupon({
           </div>
         </div>
 
-        {mensajeError && (
-          <div role="alert" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-rust)' }}>
-            {mensajeError}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={validarYGuardar}
-            disabled={guardando}
-            style={{
-              flex: 1,
-              minHeight: '52px',
-              border: 0,
-              borderRadius: '12px',
-              backgroundColor: 'var(--cp-orange)',
-              color: 'var(--cp-navy)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 800,
-              fontSize: '15px',
-              cursor: guardando ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {guardando ? 'Guardando...' : 'Guardar cupón'}
-          </button>
-          <button
-            type="button"
-            onClick={onCerrar}
-            style={{
-              flex: 1,
-              minHeight: '52px',
-              border: '1.5px solid var(--cp-navy)',
-              borderRadius: '12px',
-              backgroundColor: 'transparent',
-              color: 'var(--cp-navy)',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
+            </>
+          ) },
+        ]}
+      />
+      <ConfirmarSalir abierto={confirmando} alSalir={() => { setConfirmando(false); onCerrar(); }} alQuedarse={() => setConfirmando(false)} />
+    </>
   );
 }

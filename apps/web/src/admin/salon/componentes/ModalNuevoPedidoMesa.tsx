@@ -589,7 +589,7 @@ export function ModalNuevoPedidoMesa({
 
   // Cupón
   const [cuponInput, setCuponInput] = useState('');
-  const [cuponAplicado, setCuponAplicado] = useState<{ codigo: string; descuento: number } | null>(
+  const [cuponAplicado, setCuponAplicado] = useState<{ codigo: string; descuento: number; envioGratis?: boolean } | null>(
     null,
   );
   const [cuponError, setCuponError] = useState<string | null>(null);
@@ -878,29 +878,46 @@ export function ModalNuevoPedidoMesa({
       setCuponError('Escribe el código del cupón.');
       return;
     }
-    try {
-      const res: any = await api.post('/ofertas/cupones/validar', {
-        codigo: cod,
-        subtotal: Math.max(subtotal, 10),
-        canal: pasoInicial === 'modal' ? 'CAJA' : 'MOZO',
-      });
-      if (res && (res.valido || res.descuento !== undefined)) {
-        const descVal = Number(res.descuento ?? Math.round(subtotal * 0.1 * 100) / 100);
-        setCuponAplicado({ codigo: cod, descuento: descVal });
-        setCuponError(null);
-        return;
-      }
-    } catch {
-      // Fallback para códigos conocidos de prueba o DB
+    const aValidar = lineas.filter((l) => !l.cortesia);
+    if (aValidar.length === 0) {
+      setCuponError('Agrega productos al pedido antes de aplicar el cupón.');
+      return;
     }
-    if (cod === 'DESCUENTO10' || cod === 'PROMO10' || cod === 'CAPRICHOS10' || cod === 'BIENVENIDO10') {
-      const d = Math.round(subtotal * 0.1 * 100) / 100;
-      setCuponAplicado({ codigo: cod, descuento: d });
-      setCuponError(null);
-    } else {
-      setCuponError('Ese cupón no existe o está vencido.');
+    setCuponError(null);
+    try {
+      // Mismo cálculo que al crear el pedido (canal CAJA o MOZO); no canjea nada: el cupón se gasta al registrar
+      const res = await api.post<{ valido: boolean; descuento: number; envioGratis: boolean; mensaje: string }>('/admin/cupones/validar', {
+        codigo: cod,
+        canal: pasoInicial === 'modal' ? 'CAJA' : 'MOZO',
+        lineas: aValidar.map((l) => ({
+          productoId: String(l.productoId),
+          cantidad: l.cantidad,
+          subtotal: l.precioTotal,
+          precioUnitario: l.precioUnitario,
+        })),
+      });
+      setCuponAplicado({ codigo: cod, descuento: Number(res.descuento) || 0, envioGratis: !!res.envioGratis });
+    } catch (err: any) {
+      setCuponAplicado(null);
+      setCuponError(
+        err?.statusCode === 403
+          ? 'No tienes permiso para aplicar cupones.'
+          : err?.message || 'No se pudo validar el cupón. Revisa la conexión e inténtalo de nuevo.',
+      );
     }
   };
+
+  // Si el pedido cambia, el descuento del cupón ya no vale: hay que aplicarlo otra vez
+  const firmaPedido = lineas.map((l) => `${l.productoId}:${l.cantidad}:${l.precioTotal}:${l.cortesia ? 1 : 0}`).join('|');
+  const firmaCupon = useRef(firmaPedido);
+  useEffect(() => {
+    if (firmaCupon.current === firmaPedido) return;
+    firmaCupon.current = firmaPedido;
+    if (cuponAplicado) {
+      setCuponAplicado(null);
+      setCuponError('El pedido cambió: vuelve a aplicar el cupón.');
+    }
+  }, [firmaPedido, cuponAplicado]);
 
   // Mesa: el nombre es obligatorio (boleta, etiqueta y lista). Con cuenta sale de la cuenta; con personal,
   // del colaborador; sin cuenta se escribe. El teléfono es opcional y solo se pide sin cuenta.
@@ -3153,8 +3170,9 @@ export function ModalNuevoPedidoMesa({
                 )}
                 {cuponAplicado && (
                   <div style={{ fontSize: '12px', color: 'var(--cp-green)', fontWeight: 700 }}>
-                    Cupón {cuponAplicado.codigo} aplicado: - S/{' '}
-                    {cuponAplicado.descuento.toFixed(2)}
+                    {cuponAplicado.envioGratis && cuponAplicado.descuento === 0
+                      ? `Cupón ${cuponAplicado.codigo} aplicado: envío gratis (solo delivery)`
+                      : `Cupón ${cuponAplicado.codigo} aplicado: - S/ ${cuponAplicado.descuento.toFixed(2)}`}
                   </div>
                 )}
 
