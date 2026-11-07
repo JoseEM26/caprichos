@@ -5,7 +5,7 @@ import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
 import { hayAutorizacionSupervisor, limpiarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
-import { usePideCodigo } from '../../comun/usePideCodigo';
+import { useAnulaSinCodigo, usePideCodigo } from '../../comun/usePideCodigo';
 import '../cierre/pendientes-cierre.css';
 
 const MOTIVOS_COMUNES = [
@@ -58,7 +58,11 @@ export function ModalAnular({
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
   // Con un código aceptado hace menos de 5 min no se vuelve a pedir
   const [autorizado, setAutorizado] = useState<boolean>(() => hayAutorizacionSupervisor());
-  const pideCodigo = usePideCodigo();
+  // COCINA y MOZO anulan el pedido sin código (regla de su rol); anular un cobro sigue igual
+  const sinCodigoPorRol = useAnulaSinCodigo() && !esCobro;
+  const pideCodigoSesion = usePideCodigo();
+  const pideCodigo = pideCodigoSesion && !sinCodigoPorRol;
+  const pedidoCompleto = (completo || sinCodigoPorRol) && !esCobro;
 
   const validarCampos = (): boolean => {
     setErrorMensaje('');
@@ -217,9 +221,9 @@ export function ModalAnular({
             {esCobro
               ? `La anulación del cobro revierte el estado de pago del pedido a PENDIENTE y queda registrada en auditoría${pideCodigo ? ' con el PIN del supervisor' : ''}.`
               : `Un pedido anulado sale de cocina y reparto, y libera sus mesas. Requiere motivo de 5 o más caracteres${pideCodigo ? ' y el PIN de 6 dígitos de la supervisora' : ''}.`}
-            {completo && (
+            {pedidoCompleto && (
               <div style={{ marginTop: 6, fontWeight: 700 }}>
-                Se anula el pedido COMPLETO, con todas sus áreas (no solo la que ves en esta pantalla). Si ya estaba cobrado, su cobro también se anula y sale de la caja.
+                Se anula el pedido COMPLETO, con todas sus áreas (no solo la que ves en esta pantalla). Si ya estaba cobrado, su cobro también se anula y sale de la caja.{sinCodigoPorRol && ' No necesitas código de supervisor: queda registrado a tu nombre.'}
               </div>
             )}
             {tieneCobro && !esCobro && (
@@ -345,7 +349,7 @@ export function ModalAnular({
               ? `¿Anular el cobro de ${codigoPedido}?`
               : `¿Anular el pedido ${codigoPedido}?`
           }
-          mensaje={`${completo && !esCobro ? 'Se anulará el pedido COMPLETO, todas las áreas. ' : ''}Motivo: ${motivo.trim()}.${pideCodigo ? ' Esta acción requiere el PIN del supervisor ingresado.' : ''}`}
+          mensaje={`${pedidoCompleto ? 'Se anula el pedido COMPLETO, todas las áreas. ' : ''}Motivo: ${motivo.trim()}.${pideCodigo ? ' Esta acción requiere el PIN del supervisor ingresado.' : ''}`}
           textoSi="Sí, anular"
           peligro
           alConfirmar={ejecutarAnulacion}

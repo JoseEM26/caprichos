@@ -1,4 +1,4 @@
-import { esSoloMozo } from '../acceso/roles-usuario';
+import { anulaSinAprobacion, esSoloMozo } from '../acceso/roles-usuario';
 import { puedeDarCortesia, requiereCodigoCortesia } from '../cortesias/cortesia.tipos';
 import {
   Body,
@@ -126,9 +126,14 @@ export class PedidosAdminController {
   }
 
   @Post(':id/estado')
-  @Permiso('pedidos', 'cambiar_estado')
+  // El mozo solo trae pedidos/anular (no cambiar_estado): el servicio le deja anular únicamente
+  @Permiso([
+    { modulo: 'pedidos', accion: 'cambiar_estado' },
+    { modulo: 'pedidos', accion: 'anular' },
+  ])
   @RequiereCodigoSupervisor('pedidos/anular', {
-    condicion: (req) => req.body?.estado === 'ANULADO',
+    // COCINA y MOZO anulan sin código; el servicio valida que sea suyo y el estado
+    condicion: (req) => req.body?.estado === 'ANULADO' && !anulaSinAprobacion(req.usuario),
   })
   async cambiarEstado(
     @Param('id') id: string,

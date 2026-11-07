@@ -24,6 +24,28 @@ describe('requiereCodigo', () => {
   });
 });
 
+describe('anular pedido: COCINA y MOZO no escriben código (regla de su rol)', () => {
+  const botonConfirmar = () => screen.getByRole('button', { name: 'Confirmar anulación' });
+  const motivo = () => fireEvent.change(screen.getByLabelText(/Motivo detallado/), { target: { value: 'Cliente se fue' } });
+
+  for (const rol of ['COCINA', 'MOZO']) {
+    it(`${rol}: sin campo de código y se habilita solo con motivo`, () => {
+      sesion.rol = rol;
+      render(<ModalAnular pedidoId="1" codigoPedido="CP-1" alCerrar={() => {}} alAnularExitoso={() => {}} />);
+      expect(screen.queryByTestId('input-codigo-supervisor')).toBeNull();
+      expect(screen.getByText(/Se anula el pedido COMPLETO/)).toBeTruthy();
+      motivo();
+      expect(botonConfirmar()).not.toBeDisabled();
+    });
+  }
+
+  it('COCINA sí pide código al anular un COBRO (no cambia)', () => {
+    sesion.rol = 'COCINA';
+    render(<ModalAnular pedidoId="1" codigoPedido="CP-1" esCobro cobroId="9" alCerrar={() => {}} alAnularExitoso={() => {}} />);
+    expect(screen.getByTestId('input-codigo-supervisor')).toBeTruthy();
+  });
+});
+
 describe('vistas según el rol', () => {
   beforeEach(() => {
     sesion.rol = 'ADMIN';

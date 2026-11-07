@@ -255,7 +255,7 @@ export const MATRIZ: Record<string, string[]> = {
     'almacen/merma_producto',
     'pedidos/ver',
     'pedidos/cambiar_estado',
-    'pedidos/anular', // anula el pedido completo desde su comanda; el no-ADMIN lo autoriza con el código de supervisor
+    'pedidos/anular', // anula el pedido completo desde su comanda, sin código de supervisor (decisión del dueño)
     'cocina/ver',
     'cocina/despejar',
     'cocina/despachar',
@@ -288,6 +288,7 @@ export const MATRIZ: Record<string, string[]> = {
     'whatsapp_salientes/reenviar',
     'whatsapp_salientes/descartar',
     'pedidos/crear',
+    'pedidos/anular', // solo SUS pedidos en cola/preparando/listo y sin cobro, sin código de supervisor (decisión del dueño)
     'plano/ver',
     'mesas/ver',
     'mesas/abrir',

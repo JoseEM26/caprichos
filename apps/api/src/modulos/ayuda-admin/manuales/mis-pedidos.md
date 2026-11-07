@@ -36,6 +36,12 @@ Ver tambien: [[cocina]]
 Antes: [[plano]]
 Despues: [[caja]]
 
+## Como se hace: Anular un pedido tuyo
+1. En Lista, pulsa Ver detalle en el pedido y luego Anular pedido (solo sale si esta en cola, preparando o listo y sin pago registrado).
+2. Elige o escribe el motivo (al menos 5 caracteres). No se pide codigo de supervisor: anulas por regla de tu rol y queda registrado a tu nombre.
+3. Confirma con Si, anular. Se anula el pedido COMPLETO: se devuelven el stock y los puntos y se libera la mesa.
+4. Solo puedes anular pedidos que tomaste tu. Si ya tiene cobro o voucher aprobado, o ya fue entregado, pide a Caja o al supervisor que lo anule.
+
 ## Errores y dudas
 - El pedido digital no aparece en cocina hasta que Caja apruebe el voucher; ver [[caja]].
 - "Voucher bloqueado": Caja ya aprobo; todo cambio lo hace Caja.

@@ -699,20 +699,128 @@ describe('PedidosEstadoService', () => {
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
-    it('cocina sin permiso pedidos/anular recibe 403; con permiso y código de supervisor anula', async () => {
+    it('cocina sin permiso pedidos/anular recibe 403; con permiso anula SIN código y queda la marca de auditoría', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(enCola);
       prismaMock.rolPermiso.findFirst.mockResolvedValue(null);
       await expect(
-        service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cocinaAuth, '654321'),
+        service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cocinaAuth),
       ).rejects.toMatchObject({ response: { codigo: 'SIN_PERMISO' } });
 
       prismaMock.rolPermiso.findFirst.mockResolvedValue({ id: 1n });
       prismaMock.pedido.update.mockResolvedValue({ ...enCola, estado: 'ANULADO' });
-      const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cocinaAuth, '654321');
+      const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cocinaAuth);
       expect(res.estado).toBe('ANULADO');
+      expect(prismaMock.userAccount.findMany).not.toHaveBeenCalled();
       expect(prismaMock.pedido.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ anulado_por: 3n, anulacion_aprobada_por: 99n }) }),
+        expect.objectContaining({ data: expect.objectContaining({ anulado_por: 3n, anulacion_aprobada_por: 3n }) }),
       );
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'ANULAR',
+          conPinAdmin: false,
+          despues: expect.objectContaining({ sinAprobacionPorRol: true }),
+        }),
+      );
+    });
+
+    it('cocina anula con cobro vigente (anula el cobro con caja cuadrada) y sigue sin código', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(enCola);
+      prismaMock.rolPermiso.findFirst.mockResolvedValue({ id: 1n });
+      prismaMock.cobro.findFirst.mockResolvedValue({ id: 5n });
+      prismaMock.pedido.update.mockResolvedValue({ ...enCola, estado: 'ANULADO' });
+      await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cocinaAuth);
+      expect(cobrosMock.anularCobro).toHaveBeenCalled();
+    });
+
+    it('cocina no anula un ENTREGADO sin aprobación (409)', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...enCola, estado: 'ENTREGADO' });
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cocinaAuth)).rejects.toMatchObject({
+        response: { codigo: 'ANULAR_REQUIERE_APROBACION' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('anular el mozo SU pedido sin código de supervisor', () => {
+    const mozoAuth: UsuarioAutenticado = { partyId: 7n, rol: 'MOZO', debeCambiar: false };
+    const suyo = { id: 10n, codigo: 'CP-M010', modalidad: 'SALON', estado: 'COLA', canal: 'MOZO', party_id: 7n, pago_estado: 'PENDIENTE' };
+    const motivo = 'El cliente se fue de la mesa';
+
+    beforeEach(() => {
+      prismaMock.rolPermiso.findFirst.mockResolvedValue({ id: 1n });
+      prismaMock.voucherPago.findFirst.mockResolvedValue(null);
+      prismaMock.pedido.update.mockResolvedValue({ ...suyo, estado: 'ANULADO' });
+    });
+
+    it('anula el suyo sin código y deja la marca de auditoría', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(suyo);
+      const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, mozoAuth);
+      expect(res.estado).toBe('ANULADO');
+      expect(prismaMock.userAccount.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ anulacion_aprobada_por: 7n }) }),
+      );
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ despues: expect.objectContaining({ sinAprobacionPorRol: true }), conPinAdmin: false }),
+      );
+    });
+
+    it('el pedido de otro mozo -> 403 PEDIDO_AJENO', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...suyo, party_id: 8n });
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, mozoAuth)).rejects.toMatchObject({
+        response: { codigo: 'PEDIDO_AJENO' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('un pedido de otro canal (carta) aunque el party coincida -> 403', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...suyo, canal: 'CARTA' });
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, mozoAuth)).rejects.toMatchObject({
+        response: { codigo: 'PEDIDO_AJENO' },
+      });
+    });
+
+    it('entregado -> 409 ANULAR_REQUIERE_APROBACION', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...suyo, estado: 'ENTREGADO' });
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, mozoAuth)).rejects.toMatchObject({
+        response: { codigo: 'ANULAR_REQUIERE_APROBACION' },
+      });
+    });
+
+    it.each([
+      ['cobro vigente', () => prismaMock.cobro.findFirst.mockResolvedValue({ id: 5n })],
+      ['voucher aprobado', () => prismaMock.voucherPago.findFirst.mockResolvedValue({ id: 4n })],
+    ])('con %s -> 409 PEDIDO_COBRADO', async (_n, preparar) => {
+      prismaMock.pedido.findUnique.mockResolvedValue(suyo);
+      preparar();
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, mozoAuth)).rejects.toMatchObject({
+        response: { codigo: 'PEDIDO_COBRADO' },
+      });
+      expect(cobrosMock.anularCobro).not.toHaveBeenCalled();
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('sin motivo de 5 caracteres no anula (400)', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(suyo);
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'no' }, mozoAuth)).rejects.toMatchObject({
+        response: { codigo: 'MOTIVO_REQUERIDO' },
+      });
+    });
+
+    it('el mozo no puede cambiar a otros estados (solo anular): 403', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(suyo);
+      await expect(service.cambiarEstado(10n, { estado: 'ENTREGADO' }, mozoAuth)).rejects.toMatchObject({
+        response: { codigo: 'SIN_PERMISO' },
+      });
+    });
+
+    it('un cajero (también con rol extra MOZO) sigue necesitando código de supervisor', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...suyo, party_id: 2n });
+      const cajeroMozo: UsuarioAutenticado = { partyId: 2n, rol: 'CAJERO', roles: ['CAJERO', 'MOZO'], debeCambiar: false };
+      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cajeroMozo)).rejects.toMatchObject({
+        response: { codigo: 'CODIGO_INVALIDO' },
+      });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
   });
 

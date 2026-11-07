@@ -55,7 +55,7 @@ describe('Anular el pedido completo desde la comanda de cocina', () => {
 
     fireEvent.change(screen.getByLabelText(/Motivo detallado/), { target: { value: 'Cliente se fue' } });
     fireEvent.click(screen.getByRole('button', { name: /Confirmar anulación/ }));
-    expect(screen.getByText(/Se anulará el pedido COMPLETO, todas las áreas/)).toBeInTheDocument();
+    expect(screen.getByText(/Se anula el pedido COMPLETO, todas las áreas/)).toBeInTheDocument();
     expect(cambiar).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: /Sí, anular/ }));
@@ -63,17 +63,18 @@ describe('Anular el pedido completo desde la comanda de cocina', () => {
     expect(cambiar).toHaveBeenCalledWith('301', 'ANULADO', 'Cliente se fue', '');
   });
 
-  it('COCINA: pide el código del supervisor de 6 dígitos y lo envía', async () => {
+  it('COCINA: anula sin código de supervisor, avisa que es el pedido completo y confirma Sí/No', async () => {
     comoRol('COCINA');
     const cambiar = vi.spyOn(pedidosApi, 'cambiarEstado').mockResolvedValue({} as any);
     render(<ModalAnular pedidoId="301" codigoPedido="CP-301" completo alCerrar={vi.fn()} alAnularExitoso={vi.fn()} />);
 
+    expect(screen.queryByTestId('input-codigo-supervisor')).toBeNull();
+    expect(screen.getByText(/Se anula el pedido COMPLETO/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Motivo detallado/), { target: { value: 'Cliente se fue' } });
-    expect(screen.getByRole('button', { name: /Confirmar anulación/ })).toBeDisabled();
-    fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: /Confirmar anulación/ }));
+    expect(cambiar).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /Sí, anular/ }));
 
-    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('301', 'ANULADO', 'Cliente se fue', '123456'));
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('301', 'ANULADO', 'Cliente se fue', ''));
   });
 });

@@ -60,6 +60,19 @@ export function esSoloMozo(usuario: { rol: string; roles?: string[] }): boolean 
   return roles.includes('MOZO') && !roles.some((r) => (ROLES_ALCANCE_AMPLIO as readonly string[]).includes(r));
 }
 
+/**
+ * Anular un pedido sin código de supervisor (decisión del dueño): COCINA y MOZO lo hacen por regla de su rol.
+ * Solo vale si tiene alguno de esos roles y ningún rol de alcance amplio (ADMIN, CAJERO, SUPERVISOR): el más alto manda.
+ */
+export function anulaSinAprobacion(usuario: { rol: string; roles?: string[] } | undefined): boolean {
+  if (!usuario) return false;
+  const roles = usuario.roles ?? [usuario.rol];
+  return (
+    (roles.includes('COCINA') || roles.includes('MOZO')) &&
+    !roles.some((r) => (ROLES_ALCANCE_AMPLIO as readonly string[]).includes(r))
+  );
+}
+
 /** Rol con el que se aplican las reglas por rol: MOZO si es solo mozo; si no, el de alcance amplio que tenga (o el principal). */
 export function rolEfectivoMozo(usuario: { rol: string; roles?: string[] }): string {
   if (esSoloMozo(usuario)) return 'MOZO';

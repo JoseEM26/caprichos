@@ -25,6 +25,7 @@ import {
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
+import { anulaSinAprobacion, rolesDelUsuario } from '../acceso/roles-usuario';
 import {
   exigirPinNoBloqueado,
   limpiarIntentosPin,
@@ -952,8 +953,48 @@ export class PedidosEstadoService {
     const nuevoEstado = dto.estado.toUpperCase().trim();
     const ahora = new Date();
 
+    // COCINA y MOZO anulan sin código de supervisor por regla de su rol (decisión del dueño)
+    const sinAprobacion = anulaSinAprobacion(usuarioActual);
+    const roles = rolesDelUsuario(usuarioActual);
+    const esCocina = roles.includes('COCINA');
+
+    // El mozo (sin rol de cocina) solo puede anular: la ruta lo deja pasar por pedidos/anular, no por cambiar_estado
+    if (sinAprobacion && !esCocina && nuevoEstado !== 'ANULADO') {
+      throw new ForbiddenException({ codigo: 'SIN_PERMISO', mensaje: 'No tiene permiso para cambiar el estado de pedidos' });
+    }
+
     // 1. Manejo de Anulación (DT-61)
     if (nuevoEstado === 'ANULADO') {
+      if (sinAprobacion) {
+        // «Suyo»: el mozo solo anula lo que él tomó; cocina anula cualquier pedido de su cocina
+        if (!esCocina && !(pedido.canal === 'MOZO' && pedido.party_id != null && BigInt(pedido.party_id) === BigInt(usuarioActual.partyId))) {
+          throw new ForbiddenException({
+            codigo: 'PEDIDO_AJENO',
+            mensaje: 'Solo puedes anular los pedidos que tomaste tú',
+          });
+        }
+        // Sin aprobación solo hasta que sale de cocina; un entregado lo ve Caja, el ADMIN o el supervisor
+        if (!['COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior)) {
+          throw new ConflictException({
+            codigo: 'ANULAR_REQUIERE_APROBACION',
+            mensaje: `No se puede anular un pedido en estado ${estadoAnterior} sin aprobación: pide a Caja o al supervisor`,
+          });
+        }
+        if (!esCocina) {
+          const cobroVigente = await this.prisma.cobro.findFirst({ where: { pedido_id: pedido.id, anulado_en: null }, select: { id: true } });
+          const voucherAprobado = await this.prisma.voucherPago.findFirst({
+            where: { pedido_id: pedido.id, reemplazado_en: null, retirado: false, revisado_en: { not: null } },
+            select: { id: true },
+          });
+          if (cobroVigente || voucherAprobado || pedido.pago_estado === 'PAGADO') {
+            throw new ConflictException({
+              codigo: 'PEDIDO_COBRADO',
+              mensaje: 'Este pedido ya tiene un cobro o un voucher aprobado: pide a Caja o al supervisor que lo anule',
+            });
+          }
+        }
+      }
+
       // Estados desde los que se permite anular: COLA, PREPARANDO, LISTO; y ENTREGADO sin cobro vigente
       // (FT-CIE-02: un pedido que no se cobró no puede quedar pendiente y bloquear el cierre)
       const entregadoSinCobro = estadoAnterior === 'ENTREGADO';
@@ -981,7 +1022,7 @@ export class PedidosEstadoService {
       if (!entregadoSinCobro && usuarioActual.rol !== 'ADMIN') {
         const tienePermiso = await this.prisma.rolPermiso.findFirst({
           where: {
-            rol: usuarioActual.rol,
+            rol: { in: roles },
             permiso: {
               modulo: 'pedidos',
               accion: 'anular',
@@ -1008,7 +1049,7 @@ export class PedidosEstadoService {
 
       // Código de supervisor (6 dígitos, ADMIN activo). Un ADMIN anula un entregado sin cobro solo con motivo
       const conPin = !(entregadoSinCobro && usuarioActual.rol === 'ADMIN');
-      const aprobadoPor = !conPin
+      const aprobadoPor = !conPin || sinAprobacion
         ? usuarioActual.partyId
         : codigoVerificado
           ? usuarioActual.partyId
@@ -1076,10 +1117,10 @@ export class PedidosEstadoService {
         entidad: 'pedido',
         entidadId: pedido.id,
         antes: { estado: estadoAnterior },
-        despues: { estado: 'ANULADO', motivo },
-        motivo,
+        despues: { estado: 'ANULADO', motivo, ...(sinAprobacion ? { sinAprobacionPorRol: true, anuladoPorElMismoUsuario: true } : {}) },
+        motivo: sinAprobacion ? `${motivo} (anulado por el propio usuario, sin aprobación por regla de su rol)` : motivo,
         partyId: usuarioActual.partyId,
-        conPinAdmin: conPin,
+        conPinAdmin: conPin && !sinAprobacion,
         ip,
       });
 

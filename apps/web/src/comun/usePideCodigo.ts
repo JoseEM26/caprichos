@@ -1,5 +1,14 @@
 import { useSesion } from './sesion';
-import { requiereCodigo } from './autorizacionSupervisor';
+import { anulaPedidoSinCodigo, requiereCodigo } from './autorizacionSupervisor';
+
+/** true si el usuario anula pedidos sin código por su rol (COCINA, MOZO). Sin sesión: false. */
+export function useAnulaSinCodigo(): boolean {
+  try {
+    return anulaPedidoSinCodigo(useSesion().usuario);
+  } catch {
+    return false;
+  }
+}
 
 /** true si la vista debe mostrar el código del supervisor. Sin sesión (pruebas sueltas) lo pide, como antes. */
 export function usePideCodigo(): boolean {
