@@ -45,6 +45,7 @@ import {
   saborDisponible,
 } from './combo-disponibilidad.util';
 import { estaDisponible } from '../catalogo/catalogo.service';
+import { sincronizarAnfitrionCombo } from './combo-anfitrion';
 import { anfitrionBloqueadoPorPaso, opcionesSinStock } from '../stock/opcion-requiere';
 import {
   canalesPorDefecto,
@@ -387,6 +388,7 @@ export class OfertasService {
         },
       });
 
+      const preciosCombo: { tamanoValorId: bigint; precio: number }[] = [];
       const tamanosFinal = dto.tamanos ?? dto.combosPrecios;
       if (tipoFinal === 'COMBO' && Array.isArray(tamanosFinal)) {
         for (const t of tamanosFinal) {
@@ -425,6 +427,7 @@ export class OfertasService {
               precio: new Prisma.Decimal(t.precio),
             },
           });
+          preciosCombo.push({ tamanoValorId: tamanoId, precio: Number(t.precio) });
         }
       }
 
@@ -473,6 +476,22 @@ export class OfertasService {
         }
       }
 
+      // El combo se pide desde un producto anfitrión: se crea (o se enlaza) solo, el dueño no toca Productos
+      if (tipoFinal === 'COMBO' && !dto.alcanceProductoId) {
+        await sincronizarAnfitrionCombo(
+          tx,
+          {
+            id: oferta.id,
+            alcanceProductoId: oferta.alcance_producto_id,
+            nombre: oferta.nombre,
+            descripcion: oferta.descripcion,
+            imagenArchivoId: oferta.imagen_archivo_id,
+            oculto: !oferta.activo,
+          },
+          preciosCombo,
+        );
+      }
+
       return tx.oferta.findUnique({
         where: { id: oferta.id },
         include: {
@@ -518,7 +537,8 @@ export class OfertasService {
         const prodRepetido = await this.prisma.producto.findFirst({
           where: { nombre: { equals: nombreLimpio, mode: 'insensitive' } },
         });
-        if (prodRepetido) {
+        // Su propio producto anfitrión (se renombra junto con el combo) no cuenta como repetido
+        if (prodRepetido && prodRepetido.id !== ofertaExistente.alcance_producto_id) {
           throw new ConflictException({
             codigo: 'NOMBRE_REPETIDO_PRODUCTO',
             mensaje: 'El nombre de un combo no puede repetir el nombre de un producto existente',
@@ -647,8 +667,10 @@ export class OfertasService {
         data,
       });
 
+      let preciosCombo: { tamanoValorId: bigint; precio: number }[] | undefined;
       const tamanosFinal = dto.tamanos !== undefined ? dto.tamanos : dto.combosPrecios;
       if (tamanosFinal !== undefined) {
+        preciosCombo = [];
         await tx.comboPrecio.deleteMany({ where: { oferta_id: BigInt(id) } });
         for (const t of tamanosFinal) {
           let tamanoId: bigint = 1n;
@@ -686,6 +708,7 @@ export class OfertasService {
               precio: new Prisma.Decimal(t.precio),
             },
           });
+          preciosCombo.push({ tamanoValorId: tamanoId, precio: Number(t.precio) });
         }
       }
 
@@ -733,6 +756,28 @@ export class OfertasService {
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
         }
+      }
+
+      // Combo: su producto anfitrión se mantiene solo (nombre, foto, descripción y precio por tamaño que lleguen)
+      if ((dto.tipo === 'DESCUENTO_AUTOMATICO' ? 'DESCUENTO' : dto.tipo ?? ofertaExistente.tipo) === 'COMBO') {
+        const hostActual = dto.alcanceProductoId !== undefined ? (dto.alcanceProductoId ? BigInt(dto.alcanceProductoId) : null) : ofertaExistente.alcance_producto_id;
+        if (!hostActual && preciosCombo === undefined) {
+          const filas = await tx.comboPrecio.findMany({ where: { oferta_id: BigInt(id) } });
+          preciosCombo = filas.map((f) => ({ tamanoValorId: f.tamano_valor_id, precio: Number(f.precio) }));
+        }
+        await sincronizarAnfitrionCombo(
+          tx,
+          {
+            id: BigInt(id),
+            alcanceProductoId: hostActual,
+            nombre: dto.nombre !== undefined ? dto.nombre.trim() : ofertaExistente.nombre,
+            descripcion: dto.descripcion !== undefined ? dto.descripcion?.trim() || null : ofertaExistente.descripcion,
+            imagenArchivoId: dto.imagenArchivoId !== undefined ? (dto.imagenArchivoId ? BigInt(dto.imagenArchivoId) : null) : ofertaExistente.imagen_archivo_id,
+            oculto: dto.activo !== undefined ? !dto.activo : undefined,
+          },
+          preciosCombo,
+          { nombre: dto.nombre !== undefined, descripcion: dto.descripcion !== undefined, foto: dto.imagenArchivoId !== undefined },
+        );
       }
 
       return tx.oferta.findUnique({
@@ -797,6 +842,11 @@ export class OfertasService {
         combosParte: INCLUDE_PARTES,
       },
     });
+
+    // Combo apagado: su anfitrión sale de la carta (la tarjeta de oferta queda como no disponible); al encender, vuelve
+    if (actualizada.tipo === 'COMBO' && actualizada.alcance_producto_id) {
+      await this.prisma.producto.update({ where: { id: actualizada.alcance_producto_id }, data: { oculto: !activo } });
+    }
 
     await this.auditoriaService.registrar({
       categoria: 'CAMBIO',

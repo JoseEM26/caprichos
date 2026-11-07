@@ -21,6 +21,7 @@ import { EditorOpcionesTamanos } from './EditorOpcionesTamanos';
 import { EditarProductoModal } from './EditarProductoModal';
 import { Tip } from './ayudaOpciones';
 import { BotonVistaPrevia } from './VistaPreviaProducto';
+import { ocultarCombos } from './ocultarCombos';
 import { ESTADO_VACIO, EstadoOpciones, validarTamanos } from './editorOpcionesTipos';
 import { esSoloMozoUsuario, tieneRolUsuario } from '../../comun/rolesUsuario';
 import { textosOrigenAgotado } from './origenAgotado';
@@ -112,6 +113,7 @@ export function ProductosView() {
   const [categorias, setCategorias] = useState<CategoriaAdmin[]>([]);
   const [, setListas] = useState<ListaAdmin[]>([]);
   const [gruposGenerales, setGruposGenerales] = useState<GrupoOpcionItem[]>([]);
+  const [combosOcultos, setCombosOcultos] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -195,12 +197,14 @@ export function ProductosView() {
         catalogoApi.listarListas(),
         catalogoApi.listarGrupos(),
       ]);
-      setProductos(prods);
-      setCategorias(cats);
+      const visibles = ocultarCombos(prods, cats);
+      setCombosOcultos(visibles.combosOcultos);
+      setProductos(visibles.productos);
+      setCategorias(visibles.categorias);
       setListas(lsts);
       setGruposGenerales(grps);
-      if (cats.length > 0 && !npCategoriaId) {
-        setNpCategoriaId(cats[0].id);
+      if (visibles.categorias.length > 0 && !npCategoriaId) {
+        setNpCategoriaId(visibles.categorias[0].id);
       }
     } catch (err: any) {
       setError(err?.message || 'Error al cargar el catálogo');
@@ -612,6 +616,23 @@ export function ProductosView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {combosOcultos > 0 && (
+        <div
+          role="note"
+          data-testid="aviso-combos-en-ofertas"
+          style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: 12, padding: '10px 16px', fontSize: 13, color: 'var(--cp-soft)' }}
+        >
+          Los combos se editan en{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/admin/ofertas')}
+            style={{ background: 'none', border: 0, padding: 0, color: 'var(--cp-navy)', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+          >
+            Ofertas › Combos
+          </button>
+          , no aquí.
+        </div>
+      )}
       {/* 0. Recuadro de gestionar listas idéntico al mockup */}
       {puedeGestionarListas && (
         <div
