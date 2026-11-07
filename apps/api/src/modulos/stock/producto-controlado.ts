@@ -267,6 +267,104 @@ export async function descontarVentaProductos(
 }
 
 /**
+ * Ajusta lo vendido de un pedido ya creado (Editar pedido): `quitar` es lo que dejan las líneas quitadas o cambiadas y
+ * `agregar` lo que piden las líneas nuevas. Por cada producto (o sabor) afectado se devuelven los movimientos VENTA
+ * vigentes del pedido (con su ANULACION enlazada, para que anular el pedido después no devuelva dos veces) y se
+ * descuenta de nuevo el saldo que debe quedar. Si no alcanza: 409 STOCK_INSUFICIENTE y se deshace la transacción.
+ */
+export async function ajustarVentaProductos(
+  db: any,
+  pedidoId: bigint,
+  quitar: LineaVentaProducto[],
+  agregar: LineaVentaProducto[],
+  por: bigint,
+  ahora = new Date(),
+): Promise<{ agotados: bigint[]; saboresAgotados: bigint[] }> {
+  type Clave = { productoId: bigint; saborId: bigint | null; delta: number; nombre?: string };
+  const claves = new Map<string, Clave>();
+  const sumar = (lineas: LineaVentaProducto[], signo: 1 | -1) => {
+    for (const l of lineas) {
+      if (l.sabores && l.sabores.length > 0) {
+        for (const s of l.sabores) {
+          const k = `S:${s.saborId}`;
+          const c = claves.get(k) ?? { productoId: l.productoId, saborId: s.saborId, delta: 0, nombre: s.nombre };
+          c.delta += signo * s.cantidad;
+          claves.set(k, c);
+        }
+      } else {
+        const k = `P:${l.productoId}`;
+        const c = claves.get(k) ?? { productoId: l.productoId, saborId: null, delta: 0 };
+        c.delta += signo * l.cantidad;
+        claves.set(k, c);
+      }
+    }
+  };
+  sumar(quitar, -1);
+  sumar(agregar, 1);
+
+  const afectadas = [...claves.values()].filter((c) => c.delta !== 0);
+  if (afectadas.length === 0) return { agotados: [], saboresAgotados: [] };
+  const controlados = new Set<string>(
+    (
+      await db.producto.findMany({
+        where: { id: { in: [...new Set(afectadas.map((c) => c.productoId))] }, controla_stock: true },
+        select: { id: true },
+      })
+    ).map((p: any) => p.id.toString()),
+  );
+
+  const aDescontar: LineaVentaProducto[] = [];
+  const ordenadas = afectadas
+    .filter((c) => controlados.has(c.productoId.toString()))
+    .sort((a, b) => (a.productoId < b.productoId ? -1 : a.productoId > b.productoId ? 1 : 0));
+  for (const c of ordenadas) {
+    const vigentes = await db.movimientoStock.findMany({
+      where: { pedido_id: pedidoId, tipo: 'VENTA', producto_id: c.productoId, sabor_id: c.saborId, movimientosRevertidos: { none: {} } },
+    });
+    const vendido = vigentes.reduce((acc: number, m: any) => acc + Number(m.cantidad), 0);
+    const quedaDeVender = Math.max(0, vendido + c.delta);
+    for (const mov of vigentes) {
+      if (c.saborId) {
+        await db.stockSabor.upsert({
+          where: { sabor_id: c.saborId },
+          update: { cantidad: { increment: mov.cantidad } },
+          create: { sabor_id: c.saborId, cantidad: mov.cantidad },
+        });
+      } else {
+        const fila = await db.stock.findFirst({ where: { producto_id: c.productoId, lugar_id: mov.lugar_id } });
+        if (fila) await db.stock.update({ where: { id: fila.id }, data: { cantidad: { increment: mov.cantidad } } });
+        else await db.stock.create({ data: { producto_id: c.productoId, lugar_id: mov.lugar_id, cantidad: mov.cantidad } });
+      }
+      await db.movimientoStock.create({
+        data: {
+          tipo: 'ANULACION',
+          producto_id: c.productoId,
+          sabor_id: c.saborId,
+          lugar_id: mov.lugar_id,
+          cantidad: mov.cantidad,
+          pedido_id: pedidoId,
+          movimiento_anulado_id: mov.id,
+          por,
+          nota: `Edición · pedido ${pedidoId}`,
+        },
+      });
+    }
+    if (c.saborId) {
+      const saldo = await saldoSabor(db, c.saborId);
+      if (saldo > 0) await sincronizarAgotadoSabor(db, c.saborId, saldo, ahora, por);
+      if (quedaDeVender > 0) {
+        aDescontar.push({ productoId: c.productoId, cantidad: quedaDeVender, sabores: [{ saborId: c.saborId, nombre: c.nombre ?? '', cantidad: quedaDeVender }] });
+      }
+    } else {
+      const saldo = await saldoProducto(db, c.productoId);
+      if (saldo > 0) await sincronizarAgotadoProducto(db, c.productoId, saldo, ahora);
+      if (quedaDeVender > 0) aDescontar.push({ productoId: c.productoId, cantidad: quedaDeVender });
+    }
+  }
+  return descontarVentaProductos(db, pedidoId, aDescontar, por, ahora);
+}
+
+/**
  * Descuenta de un sabor (producto por sabor). Tope = saldo del sabor, haya o no apertura de hoy: si no alcanza
  * (0 incluido) responde 409 STOCK_INSUFICIENTE y no descuenta. Al llegar a 0 se agota ese sabor solo.
  * Devuelve 'AGOTADO' si esta venta lo dejó agotado.

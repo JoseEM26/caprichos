@@ -252,6 +252,7 @@ export function DespachoView({ puedeMarcar = true }: { puedeMarcar?: boolean }) 
   useEventos('pedido:nuevo', () => void cargar());
   useEventos('cocina:comanda', () => void cargar());
   useEventos('pedido:estado', () => void cargar());
+  useEventos('pedido:editado', () => void cargar());
   useTiempoReal(['pedido:progreso'], () => void cargar());
 
   const alternar = async (p: PedidoDespacho) => {

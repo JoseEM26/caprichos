@@ -46,6 +46,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pedidos', accion: 'crear' },
   { modulo: 'pedidos', accion: 'cambiar_estado' },
   { modulo: 'pedidos', accion: 'anular' },
+  // Editar productos y datos de un pedido aún sin cobrar (Caja): ADMIN, SUPERVISOR, CAJERO y MOZO, sin código de supervisor
+  { modulo: 'pedidos', accion: 'editar' },
   { modulo: 'zonas', accion: 'ver' },
   { modulo: 'zonas', accion: 'editar' },
   // Caja y Repartos (Ola 4)
@@ -224,6 +226,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/cambiar_estado',
     'pedidos/cambiar_ubicacion',
     'pedidos/validar_cambio_cobro',
+    'pedidos/editar',
     'cortesias/dar',
     'cortesias/ver',
     'caja/abrir',
@@ -288,6 +291,7 @@ export const MATRIZ: Record<string, string[]> = {
     'whatsapp_salientes/reenviar',
     'whatsapp_salientes/descartar',
     'pedidos/crear',
+    'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
     'pedidos/anular', // solo SUS pedidos en cola/preparando/listo y sin cobro, sin código de supervisor (decisión del dueño)
     'plano/ver',
     'mesas/ver',

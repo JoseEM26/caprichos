@@ -14,6 +14,13 @@ describe('iniciativas: todo el personal ve, crea y comenta; cambiar estado solo 
   });
 });
 
+describe('pedidos/editar (Editar pedido en Caja)', () => {
+  it('lo tienen ADMIN, SUPERVISOR, CAJERO y MOZO; cocina, almacén y reparto no', () => {
+    for (const r of ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO']) expect(MATRIZ[r]).toContain('pedidos/editar');
+    for (const r of ['COCINA', 'ALMACEN', 'REPARTIDOR']) expect(MATRIZ[r]).not.toContain('pedidos/editar');
+  });
+});
+
 describe('matriz de permisos del CAJERO (cie-fix, cambio 4)', () => {
   const cajero = MATRIZ.CAJERO;
 

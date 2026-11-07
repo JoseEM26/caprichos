@@ -63,6 +63,7 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
 
   useEventos('salon:mesa', cargar);
   useEventos('pedido:estado', cargar);
+  useEventos('pedido:editado', cargar);
   useEventos('cocina:comanda', cargar);
   useEventos('pedido:progreso', cargar);
   useEventos('plano:cambio', cargarPlano);

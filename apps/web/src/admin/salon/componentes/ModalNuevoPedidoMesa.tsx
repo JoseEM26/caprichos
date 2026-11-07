@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, useMemo } from 'react';
 import { useSalonSocket } from '../useSalonSocket';
+import { VigilaEdicionPedido } from './VigilaEdicionPedido';
 import { Confirmar } from '../../../comun/Confirmar';
 import { Cargando } from '../../../comun/Cargando';
 import { api } from '../../../comun/api';
@@ -25,7 +26,8 @@ import { useSesion } from '../../../comun/sesion';
 import { ModalCortesia } from '../../cortesias/ModalCortesia';
 import '../salon.css';
 import '../nuevo-pedido-mozo.css';
-import { pedidosApi } from '../../pedidos/pedidosApi';
+import { pedidosApi, type DatosEdicionPedido, type LineaEdicionPedido } from '../../pedidos/pedidosApi';
+import { PanelEdicionPedido } from './PanelEdicionPedido';
 import { leerSaborRechazado, leerStockInsuficiente, mensajeSaborRechazado, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
 import { comprobantesApi } from '../../comprobantes/comprobantesApi';
 import { ModalVoucherPedido } from '../ModalVoucherPedido';
@@ -77,6 +79,8 @@ export interface ModalNuevoPedidoMesaProps {
   puedeMesa?: boolean;
   /** Sin permiso de créditos del personal (creditos/ver), no se ofrece «Pedido del personal». Por defecto, sí. */
   puedePersonal?: boolean;
+  /** «Editar pedido»: abre el selector con las líneas del pedido y sus datos; guardar cambia el pedido en vez de crear uno */
+  edicion?: { datos: DatosEdicionPedido };
 }
 
 /** Permisos de cortesía sin romper si el componente se usa fuera del contexto de sesión (pruebas sueltas). */
@@ -111,6 +115,34 @@ export interface LineaPedidoMesa {
   /** Producto con stock: unidades que trae el tamaño (1/2 docena = 6) */
   unidadesTamano?: number;
   sabores?: { saborId: string; cantidad: number; nombre?: string }[];
+  /** Editar pedido: id de la línea guardada de la que viene (sin id = línea nueva) */
+  lineaId?: string;
+  /** Editar pedido: combo que solo se puede quitar o dejar */
+  bloqueada?: boolean;
+}
+
+/** Línea guardada de un pedido, convertida a la del selector (Editar pedido). */
+function aLineaMesa(l: LineaEdicionPedido): LineaPedidoMesa {
+  const unidadesMezcla = l.sabores.reduce((a, s) => a + s.cantidad, 0);
+  return {
+    id: `ed-${l.lineaId}`,
+    lineaId: l.lineaId,
+    bloqueada: l.bloqueada,
+    productoId: l.productoId ?? '0',
+    nombre: l.nombre,
+    tamanoId: l.tamanoId ?? undefined,
+    tamanoNombre: l.tamano ?? undefined,
+    cantidad: l.cantidad,
+    precioUnitario: l.precioUnitario,
+    precioTotal: l.subtotal,
+    opciones: l.opciones.filter((o) => o.id).map((o) => ({ id: String(o.id), nombre: o.nombre, precioExtra: o.precioExtra, disponible: true })),
+    nota: l.nota ?? undefined,
+    personas: l.personas.length > 0 ? l.personas : undefined,
+    ofertaId: l.ofertaId ?? undefined,
+    sabores: l.sabores.length > 0 ? l.sabores : undefined,
+    // con sabores la cantidad cambia el reparto: se cambia la línea completa (botón «Cambiar»)
+    unidadesPorMezcla: l.sabores.length > 0 ? unidadesMezcla : undefined,
+  };
 }
 
 /** Medio con el que paga el cliente de llevar o delivery (lo elige el mozo al registrar). */
@@ -174,6 +206,7 @@ export function ModalNuevoPedidoMesa({
   puedeForzarLiberacion = false,
   puedeMesa = true,
   puedePersonal = true,
+  edicion,
 }: ModalNuevoPedidoMesaProps) {
   const todasLasMesasIniciales = useMemo(() => {
     const list: string[] = [];
@@ -186,22 +219,40 @@ export function ModalNuevoPedidoMesa({
     return list;
   }, [mesaPreseleccionadaId, mesasPreseleccionadasIds]);
 
+  // Datos del cliente y la entrega con los que arranca el formulario: los del pedido que se repite o se edita
+  const pedidoBase = useMemo(
+    () =>
+      pedidoRepetir ??
+      (edicion
+        ? {
+            modalidad: edicion.datos.modalidad,
+            cliente_nombre: edicion.datos.cliente.nombre,
+            cliente_telefono: edicion.datos.cliente.telefono,
+            entrega_direccion: edicion.datos.entrega.direccion,
+            entrega_referencia: edicion.datos.entrega.referencia,
+            entrega_lat: edicion.datos.entrega.lat,
+            entrega_lng: edicion.datos.entrega.lng,
+          }
+        : null),
+    [pedidoRepetir, edicion],
+  );
+
   const modalidadInicial: 'local' | 'llevar' | 'delivery' = useMemo(() => {
-    if (pedidoRepetir) {
-      const m = (pedidoRepetir.modalidad || '').toUpperCase();
+    if (pedidoBase) {
+      const m = (pedidoBase.modalidad || '').toUpperCase();
       if (m === 'DELIVERY') return 'delivery';
       if (m === 'RECOGER' || m === 'LLEVAR') return 'llevar';
       return 'local';
     }
     return 'local';
-  }, [pedidoRepetir]);
+  }, [pedidoBase]);
 
   const idTituloDialogo = useId();
   const idEleccion = useId();
 
   // Pasos: 'modal' | 'staff' | 'floor' | 'plan' | 'cli' | 'items'
   const [paso, setPaso] = useState<'modal' | 'staff' | 'floor' | 'plan' | 'cli' | 'items'>(
-    pedidoRepetir
+    pedidoBase
       ? 'items'
       : todasLasMesasIniciales.length > 0
       ? 'items'
@@ -260,16 +311,16 @@ export function ModalNuevoPedidoMesa({
   }, []);
 
   // Datos cliente (para llevar o delivery)
-  const [cliNombre, setCliNombre] = useState(pedidoRepetir?.cliente_nombre || '');
-  const [cliTelefono, setCliTelefono] = useState(pedidoRepetir?.cliente_telefono || '');
-  const [cliDireccion, setCliDireccion] = useState(pedidoRepetir?.entrega_direccion || '');
-  const [cliReferencia, setCliReferencia] = useState(pedidoRepetir?.entrega_referencia || '');
+  const [cliNombre, setCliNombre] = useState(pedidoBase?.cliente_nombre || '');
+  const [cliTelefono, setCliTelefono] = useState(pedidoBase?.cliente_telefono || '');
+  const [cliDireccion, setCliDireccion] = useState(pedidoBase?.entrega_direccion || '');
+  const [cliReferencia, setCliReferencia] = useState(pedidoBase?.entrega_referencia || '');
   const [cliPagaCon, setCliPagaCon] = useState(
     pedidoRepetir?.paga_con ? String(pedidoRepetir.paga_con) : '',
   );
   const [cliPuntoMapa, setCliPuntoMapa] = useState<CoordenadaMapa | null>(
-    pedidoRepetir?.entrega_lat != null && pedidoRepetir?.entrega_lng != null
-      ? { lat: Number(pedidoRepetir.entrega_lat), lng: Number(pedidoRepetir.entrega_lng) }
+    pedidoBase?.entrega_lat != null && pedidoBase?.entrega_lng != null
+      ? { lat: Number(pedidoBase.entrega_lat), lng: Number(pedidoBase.entrega_lng) }
       : null,
   );
   const [zonaInfo, setZonaInfo] = useState<{
@@ -542,9 +593,31 @@ export function ModalNuevoPedidoMesa({
   }, []);
 
   // Carrito de líneas de pedido
-  const [lineas, setLineas] = useState<LineaPedidoMesa[]>([]);
+  const [lineas, setLineas] = useState<LineaPedidoMesa[]>(() => (edicion ? edicion.datos.lineas.map(aLineaMesa) : []));
   const { puede: puedeCortesia, esSupervisor: pideCodigoCortesia } = usePermisosCortesia();
   const [lineaCortesiaId, setLineaCortesiaId] = useState<string | null>(null);
+
+  // Editar pedido: versión que vio quien edita, conflicto con otra edición y quién más lo tiene abierto
+  const [versionEdicion, setVersionEdicion] = useState(edicion?.datos.version ?? 0);
+  const [conflictoEdicion, setConflictoEdicion] = useState(false);
+  const [editandoPor, setEditandoPor] = useState<string | null>(edicion?.datos.editandoPor?.nombre ?? null);
+  const [confirmarGuardar, setConfirmarGuardar] = useState(false);
+  // Línea que se está cambiando: se reemplaza al agregar la nueva y se conserva si se cierra la ventana
+  const [lineaEnCambio, setLineaEnCambio] = useState<string | null>(null);
+  const guardandoEdicion = useRef(false);
+  const idEdicion = edicion?.datos.id;
+
+  // Avisa a las demás pantallas que alguien edita este pedido (se repite cada minuto; vale 2) y lo libera al salir
+  useEffect(() => {
+    if (!idEdicion) return;
+    const avisar = (activo: boolean) => void Promise.resolve(pedidosApi.avisarEditando(idEdicion, activo)).catch(() => undefined);
+    avisar(true);
+    const cada = setInterval(() => avisar(true), 60_000);
+    return () => {
+      clearInterval(cada);
+      avisar(false);
+    };
+  }, [idEdicion]);
 
   // Si hay pedidoRepetir y ya cargó la carta, precargar líneas
   useEffect(() => {
@@ -782,6 +855,15 @@ export function ModalNuevoPedidoMesa({
     }
   };
 
+  // Editar pedido, «Cambiar»: las líneas nuevas ocupan el lugar de la que se estaba cambiando
+  const insertarEnLugar = (prev: LineaPedidoMesa[], nuevas: LineaPedidoMesa[]) => {
+    if (!lineaEnCambio) return [...prev, ...nuevas];
+    const i = prev.findIndex((l) => l.id === lineaEnCambio);
+    setLineaEnCambio(null);
+    if (i < 0) return [...prev, ...nuevas];
+    return [...prev.slice(0, i), ...nuevas, ...prev.slice(i + 1)];
+  };
+
   // Agregar producto desde VentanaOpcionesProducto
   const handleAgregarProductoConfigurado = (config: ProductoConfigurado) => {
     // Opciones distintas por bebida: las iguales van juntas en una línea y las diferentes en líneas aparte
@@ -809,7 +891,7 @@ export function ModalNuevoPedidoMesa({
           personas: g.map((u) => u.nombreVaso).filter(Boolean),
         };
       });
-      setLineas((prev) => [...prev, ...nuevas]);
+      setLineas((prev) => insertarEnLugar(prev, nuevas));
       return;
     }
     const nuevaLinea: LineaPedidoMesa = {
@@ -835,7 +917,7 @@ export function ModalNuevoPedidoMesa({
       personas: config.nombresBebidas ?? config.unidades.map((u) => u.nombreVaso).filter(Boolean),
     };
 
-    setLineas((prev) => [...prev, nuevaLinea]);
+    setLineas((prev) => insertarEnLugar(prev, [nuevaLinea]));
   };
 
   // Stepper de línea de carrito
@@ -886,7 +968,7 @@ export function ModalNuevoPedidoMesa({
     let vigente = true;
     Promise.resolve(
       api.post<{ descuentoTotal: number }>('/admin/ofertas/vista-previa', {
-        canal: canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO'),
+        canal: edicion?.datos.canal ?? canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO'),
         codigo: cuponAplicado?.codigo,
         lineas: aValidar.map((l) => ({
           productoId: l.productoId,
@@ -911,6 +993,8 @@ export function ModalNuevoPedidoMesa({
 
   const envioCalculado = useMemo(() => {
     if (modalidad !== 'delivery') return 0;
+    // Editar: mientras no se consulta la zona del punto, queda el envío que ya tenía el pedido
+    if (edicion && !zonaInfo) return edicion.datos.envio ?? 0;
     if (!zonaInfo || !zonaInfo.cubierto || zonaInfo.tarifa == null) return 0;
     return calcularEnvioFinal(
       subtotal,
@@ -1240,6 +1324,104 @@ export function ModalNuevoPedidoMesa({
     }
   };
 
+  // Editar pedido: lo que falta para poder guardar, en español simple (null = se puede guardar)
+  const telEdicion = cliTelefono.replace(/\D/g, '');
+  const errorGuardarEdicion = !edicion
+    ? null
+    : lineas.length === 0
+      ? 'El pedido debe tener al menos un producto.'
+      : cliNombre.trim().length < 2
+        ? 'Escribe el nombre del cliente (mínimo 2 letras).'
+        : telEdicion !== '' && !/^9\d{8}$/.test(telEdicion)
+          ? 'El celular debe tener 9 números y empezar con 9.'
+          : modalidad === 'delivery' && cliDireccion.trim().length < 5 && cliPuntoMapa === null
+            ? 'Escribe la dirección o marca el punto en el mapa.'
+            : null;
+
+  // Editar pedido: vuelve a leer el pedido. Con «reemplazarTodo» recarga también líneas y datos; si no, solo la versión.
+  const recargarEdicion = async (reemplazarTodo: boolean) => {
+    if (!edicion) return;
+    try {
+      const d = await pedidosApi.obtenerParaEditar(edicion.datos.id);
+      setVersionEdicion(d.version);
+      if (reemplazarTodo) {
+        setLineas(d.lineas.map(aLineaMesa));
+        setCliNombre(d.cliente.nombre ?? '');
+        setCliTelefono(d.cliente.telefono ?? '');
+        setCliDireccion(d.entrega.direccion ?? '');
+        setCliReferencia(d.entrega.referencia ?? '');
+        setCliPuntoMapa(d.entrega.lat != null && d.entrega.lng != null ? { lat: d.entrega.lat, lng: d.entrega.lng } : null);
+        setModalidad(d.modalidad === 'DELIVERY' ? 'delivery' : d.modalidad === 'RECOGER' ? 'llevar' : 'local');
+      }
+      setConflictoEdicion(false);
+      setErrorEnvio(null);
+    } catch (err: any) {
+      setErrorEnvio(err?.message || 'No se pudo volver a leer el pedido.');
+    }
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!edicion) return;
+    setEnviando(true);
+    setErrorEnvio(null);
+    guardandoEdicion.current = true;
+    try {
+      const payloadLineas = lineas.map((lin) => {
+        const personas = lin.unidades?.map((u) => u.persona || '').filter(Boolean);
+        return {
+          lineaId: lin.lineaId,
+          productoId: lin.productoId,
+          tamanoId: lin.tamanoId,
+          cantidad: lin.cantidad,
+          opciones: (lin.opciones || []).map((o) => o.id),
+          nota: lin.nota ?? '',
+          ofertaId: lin.ofertaId,
+          comboElecciones: lin.comboElecciones,
+          personas: personas && personas.length > 0 ? personas : lin.personas,
+          ...(lin.sabores ? { sabores: lin.sabores.map((x) => ({ saborId: x.saborId, cantidad: x.cantidad })) } : {}),
+        };
+      });
+      const ent = edicion.datos.entrega;
+      const mismoPunto = cliPuntoMapa !== null && cliPuntoMapa.lat === ent.lat && cliPuntoMapa.lng === ent.lng;
+      const res = await pedidosApi.guardarEdicion(edicion.datos.id, {
+        version: versionEdicion,
+        lineas: payloadLineas,
+        cliente: { nombre: cliNombre.trim(), telefono: /^9\d{8}$/.test(telEdicion) ? telEdicion : undefined },
+        modalidad: modalidad === 'local' ? 'MESA' : modalidad === 'delivery' ? 'DELIVERY' : 'RECOGER',
+        entrega:
+          modalidad === 'delivery'
+            ? {
+                direccion: cliDireccion.trim() || undefined,
+                referencia: cliReferencia.trim() || undefined,
+                lat: cliPuntoMapa?.lat,
+                lng: cliPuntoMapa?.lng,
+                origen: cliPuntoMapa ? (mismoPunto ? ((ent.origen as any) ?? 'MAPA') : 'MAPA') : 'ESCRITA',
+              }
+            : undefined,
+      });
+      setConfirmarGuardar(false);
+      alExitoPedido?.(res);
+      await alRefrescarMesas?.();
+      alCerrar();
+    } catch (err: any) {
+      setConfirmarGuardar(false);
+      if (err?.codigo === 'PEDIDO_MODIFICADO') {
+        setConflictoEdicion(true);
+        setErrorEnvio(null);
+      } else if (err?.codigo === 'STOCK_INSUFICIENTE' || err?.codigo === 'SABOR_AGOTADO') {
+        const sabor = leerSaborRechazado(err);
+        const datos = sabor ? null : leerStockInsuficiente(err);
+        const linea = lineas.find((l) => String(l.productoId) === (sabor?.productoId ?? datos?.productoId));
+        setErrorEnvio(sabor ? mensajeSaborRechazado(sabor, linea?.nombre) : datos ? mensajeStockInsuficiente(datos, linea?.nombre) : 'No hay stock suficiente para este cambio.');
+      } else {
+        setErrorEnvio(err?.message || 'No se pudo guardar el pedido.');
+      }
+    } finally {
+      guardandoEdicion.current = false;
+      setEnviando(false);
+    }
+  };
+
   // Cierra el flujo de un pedido digital (con voucher subido o dejado para después)
   const terminarPedidoDigital = async () => {
     const res = pedidoVoucher?.res;
@@ -1364,7 +1546,9 @@ export function ModalNuevoPedidoMesa({
               <button
                 type="button"
                 onClick={() => {
-                  if (paso === 'items') {
+                  if (edicion) {
+                    alCerrar();
+                  } else if (paso === 'items') {
                     setPaso(modalidad === 'local' ? 'plan' : 'cli');
                   } else if (paso === 'cli' || paso === 'plan') {
                     if (todasLasMesasIniciales.length > 0) {
@@ -1403,7 +1587,7 @@ export function ModalNuevoPedidoMesa({
                   color: 'var(--cp-navy)',
                 }}
               >
-                Nuevo pedido · {tituloPaso}
+                {edicion ? `Editar pedido ${edicion.datos.codigo}` : `Nuevo pedido · ${tituloPaso}`}
               </div>
             </div>
 
@@ -1427,6 +1611,26 @@ export function ModalNuevoPedidoMesa({
               ×
             </button>
           </div>
+
+          {edicion && (
+            <VigilaEdicionPedido
+              pedidoId={edicion.datos.id}
+              alOtroEdita={setEditandoPor}
+              alOtroGuardo={(version) => {
+                if (!guardandoEdicion.current && version > versionEdicion) setConflictoEdicion(true);
+              }}
+            />
+          )}
+          {/* Editar pedido: alguien más guardó este pedido; lo escrito aquí se conserva hasta que se elija */}
+          {edicion && conflictoEdicion && (
+            <div role="alert" style={{ background: '#FDECE8', border: '1.5px solid var(--cp-rust)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: 'var(--cp-rust)' }}>
+              <b>Alguien más cambió este pedido mientras lo editabas.</b> Lo que escribiste sigue aquí. Puedes ver la versión actual (se pierde lo que escribiste) o guardar lo tuyo encima de lo otro.
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="np-quitar" onClick={() => void recargarEdicion(true)}>Ver la versión actual</button>
+                <button type="button" className="np-quitar" onClick={() => void recargarEdicion(false)}>Guardar lo mío de todos modos</button>
+              </div>
+            </div>
+          )}
 
           {/* Error de envío global si hay */}
           {errorEnvio && (
@@ -2668,7 +2872,30 @@ export function ModalNuevoPedidoMesa({
                   <span>{carritoAbierto ? 'Cerrar' : 'Ver pedido'}</span>
                 </button>
 
+                {edicion && (
+                  <PanelEdicionPedido
+                    modalidadEditable={edicion.datos.modalidad !== 'MESA'}
+                    modalidad={modalidad}
+                    onModalidad={setModalidad}
+                    nombre={cliNombre}
+                    onNombre={setCliNombre}
+                    telefono={cliTelefono}
+                    onTelefono={setCliTelefono}
+                    direccion={cliDireccion}
+                    onDireccion={setCliDireccion}
+                    referencia={cliReferencia}
+                    onReferencia={setCliReferencia}
+                    punto={cliPuntoMapa}
+                    onPunto={setCliPuntoMapa}
+                    sede={sedeLocal}
+                    zona={zonaInfo?.zona ?? edicion.datos.entrega.zona}
+                    tieneVoucher={edicion.datos.tieneVoucher}
+                    editandoPor={editandoPor}
+                  />
+                )}
+
                 {/* Mesa y «Pide» en una fila de chips */}
+                {!edicion && (
                 <div className="np-chips">
                 {/* Cabecera del carrito: Mesa / Cambiar */}
                 <div className="np-chip-mesa">
@@ -3069,6 +3296,7 @@ export function ModalNuevoPedidoMesa({
                   </div>
                 )}
                 </div>
+                )}
 
                 {/* Lista de líneas */}
                 <div className="np-lineas">
@@ -3090,7 +3318,7 @@ export function ModalNuevoPedidoMesa({
                           <span className="np-qty">
                             <button
                               type="button"
-                              disabled={lin.unidadesPorMezcla !== undefined}
+                              disabled={lin.unidadesPorMezcla !== undefined || !!lin.bloqueada}
                               title={lin.unidadesPorMezcla !== undefined ? 'Con sabores: quita la línea y vuelve a agregarla para cambiar la cantidad' : undefined}
                               onClick={() => actualizarCantidadLinea(lin.id, -1)}
                             >
@@ -3099,7 +3327,7 @@ export function ModalNuevoPedidoMesa({
                             <span>{lin.cantidad}</span>
                             <button
                               type="button"
-                              disabled={lin.unidadesPorMezcla !== undefined}
+                              disabled={lin.unidadesPorMezcla !== undefined || !!lin.bloqueada}
                               title={lin.unidadesPorMezcla !== undefined ? 'Con sabores: quita la línea y vuelve a agregarla para cambiar la cantidad' : undefined}
                               onClick={() => actualizarCantidadLinea(lin.id, 1)}
                             >
@@ -3111,6 +3339,24 @@ export function ModalNuevoPedidoMesa({
                             {lin.tamanoNombre && <small> · {lin.tamanoNombre}</small>}
                           </span>
                           <span className="np-linea-precio">S/ {(lin.cortesia ? 0 : lin.precioTotal).toFixed(2)}</span>
+                          {edicion && !lin.bloqueada && (
+                            <button
+                              type="button"
+                              className="np-quitar"
+                              onClick={() => {
+                                // Reabre el producto para cambiar tamaño, opciones, sabores, nota o nombres; la línea sigue hasta que se agregue la nueva
+                                const prod = categorias.flatMap((c) => c.productos || []).find((x) => String(x.id) === String(lin.productoId));
+                                if (!prod) {
+                                  setErrorEnvio(`No se encontró «${lin.nombre}» en la carta. Quita la línea y agrega otro producto.`);
+                                  return;
+                                }
+                                setLineaEnCambio(lin.id);
+                                setProductoSeleccionado(prod);
+                              }}
+                            >
+                              Cambiar
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="np-quitar"
@@ -3119,7 +3365,12 @@ export function ModalNuevoPedidoMesa({
                             Quitar
                           </button>
                         </div>
-                        {puedeCortesia && !lin.ofertaId && !(lin.comboElecciones ?? []).length && (
+                        {lin.bloqueada && (
+                          <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
+                            Combo: para cambiarlo, quítalo y agrega otro.
+                          </div>
+                        )}
+                        {puedeCortesia && !edicion && !lin.ofertaId && !(lin.comboElecciones ?? []).length && (
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             {lin.cortesia ? (
                               <>
@@ -3174,6 +3425,7 @@ export function ModalNuevoPedidoMesa({
                 </div>
 
                 {/* Cupón: plegado detrás de un botón; se despliega al tocarlo */}
+                {!edicion && (<>
                 <button
                   type="button"
                   className="np-cupon-toggle"
@@ -3238,6 +3490,7 @@ export function ModalNuevoPedidoMesa({
                       : `Cupón ${cuponAplicado.codigo} aplicado: - S/ ${cuponAplicado.descuento.toFixed(2)}`}
                   </div>
                 )}
+                </>)}
 
                 {/* Totales */}
                 <div className="np-totales">
@@ -3284,6 +3537,7 @@ export function ModalNuevoPedidoMesa({
                   </div>
                 </div>
 
+                {!edicion && (<>
                 <div id="np-plan-pago">
                   <PlanPagoEditor
                     total={total}
@@ -3304,8 +3558,46 @@ export function ModalNuevoPedidoMesa({
                 <div id="np-comprobante" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <SelectorComprobante idPrefijo="np-comp" valor={valorComp} onChange={setValorComp} total={total} />
                 </div>
+                </>)}
+
+                {/* Editar pedido: resumen del nuevo total y botón para guardar (con confirmación) */}
+                {edicion && (
+                  <>
+                    <div style={{ fontSize: 13, color: 'var(--cp-navy)', display: 'flex', justifyContent: 'space-between' }} data-testid="resumen-edicion">
+                      <span>Total antes: S/ {edicion.datos.total.toFixed(2)}</span>
+                      <b>Total nuevo: S/ {total.toFixed(2)}</b>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--cp-soft)' }}>El servidor confirma el total final al guardar.</div>
+                    <button
+                      type="button"
+                      className="salon-pie-fijo np-enviar"
+                      onClick={() => {
+                        if (errorGuardarEdicion) {
+                          setErrorEnvio(errorGuardarEdicion);
+                          return;
+                        }
+                        setErrorEnvio(null);
+                        setConfirmarGuardar(true);
+                      }}
+                      style={{
+                        minHeight: '52px',
+                        border: 0,
+                        borderRadius: '12px',
+                        background: 'var(--cp-orange)',
+                        color: 'var(--cp-navy)',
+                        fontFamily: 'Montserrat, sans-serif',
+                        fontWeight: 800,
+                        fontSize: '15px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Guardar cambios · S/ {total.toFixed(2)}
+                    </button>
+                  </>
+                )}
 
                 {/* Botón Enviar a cocina / Registrar pedido: no se deshabilita; al tocarlo muestra qué falta */}
+                {!edicion && (<>
                 <button
                   type="button"
                   onClick={intentarEnviar}
@@ -3342,6 +3634,7 @@ export function ModalNuevoPedidoMesa({
                     {motivoNoEnviar}
                   </div>
                 )}
+                </>)}
               </div>
             </div>
           )}
@@ -3352,12 +3645,29 @@ export function ModalNuevoPedidoMesa({
       {productoSeleccionado && (
         <VentanaOpcionesProducto
           producto={productoConSaldoLibre(productoSeleccionado, lineas)}
-          alCerrar={() => setProductoSeleccionado(null)}
+          alCerrar={() => {
+            setProductoSeleccionado(null);
+            setLineaEnCambio(null);
+          }}
           alAgregar={handleAgregarProductoConfigurado}
           oferta={comboDeProducto(ofertasCombo, productoSeleccionado.id)}
           enCarrito={lineas
             .filter((l) => String(l.productoId) === String(productoSeleccionado.id))
             .reduce((acc, l) => acc + unidadesDeLinea(l), 0)}
+        />
+      )}
+
+      {/* Editar pedido: confirmación antes de guardar */}
+      {edicion && (
+        <Confirmar
+          abierto={confirmarGuardar}
+          titulo="¿Guardar los cambios del pedido?"
+          mensaje={`Se actualizará el pedido ${edicion.datos.codigo}: el total pasa de S/ ${edicion.datos.total.toFixed(2)} a S/ ${total.toFixed(2)}. Cocina y el stock se ajustan solos.`}
+          textoConfirmar="Sí, guardar cambios"
+          textoNo="No, revisar"
+          cargando={enviando}
+          alConfirmar={handleGuardarEdicion}
+          alCancelar={() => setConfirmarGuardar(false)}
         />
       )}
 

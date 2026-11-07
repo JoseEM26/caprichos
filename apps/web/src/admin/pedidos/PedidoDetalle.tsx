@@ -43,6 +43,10 @@ export interface PedidoDetalleProps {
   pedido: Pedido;
   alActualizar: () => void;
   alRepetir?: (pedido: Pedido) => void;
+  /** Abre el editor de productos y datos (solo para pedidos sin cobrar en cola, preparando o listo). */
+  alEditar?: (pedido: Pedido) => void;
+  /** Nombre de quien tiene abierto el editor de este pedido (llega por socket a la lista; vale 2 minutos). */
+  editandoPor?: string | null;
   /** Estado de la caja de hoy (lo pasa la lista). Con caja cerrada, un pedido sin cobrar lleva «Caja cerrada». */
   cajaAbierta?: boolean | null;
 }
@@ -83,7 +87,7 @@ function puedeCortesiaLinea(pedido: Pedido, it: LineaPedido): boolean {
   );
 }
 
-export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: PedidoDetalleProps) {
+export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, editandoPor, cajaAbierta }: PedidoDetalleProps) {
   const { tiene, usuario } = useSesion();
   // El SUPERVISOR presenta su código para dar una cortesía; ADMIN y Caja no
   const pideCodigoCortesia = usuario?.rol === 'SUPERVISOR';
@@ -150,6 +154,13 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
   const estaPagado = pag === 'PAGADO';
   const tienePagoCoordinado = Boolean(pedido.pago_coordinado_en) || pag === 'COORDINADO';
   const tieneCobroVigente = estaPagado || Boolean(pedido.cobro_vigente_id);
+  // Editar: con permiso, mientras no esté cobrado y el pedido esté en cola, preparando o listo
+  const puedeEditar =
+    !!alEditar &&
+    tiene('pedidos/editar') &&
+    ['COLA', 'PREPARANDO', 'LISTO'].includes(est) &&
+    !tieneCobroVigente &&
+    !pedido.cobroMozo;
   const esPorConfirmar =
     (est === 'COLA' || est === 'NUEVO') &&
     !estaPagado &&
@@ -1121,8 +1132,31 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, cajaAbierta }: 
           </button>
         )}
 
-        {/* 6. Repetir pedido y Anular pedido */}
+        {/* 6. Editar, repetir y anular pedido */}
+        {editandoPor && (
+          <div role="status" style={{ background: '#FFF4D6', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 700, color: 'var(--cp-navy, #0B2C3E)' }}>
+            {editandoPor} está editando este pedido.
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {puedeEditar && (
+            <button
+              type="button"
+              onClick={() => alEditar?.(pedido)}
+              style={{
+                flex: '1 1 140px',
+                minHeight: 44,
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                borderRadius: 12,
+                background: 'var(--cp-navy, #0B2C3E)',
+                color: 'var(--cp-cream, #FBF4EC)',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Editar pedido
+            </button>
+          )}
           <button
             type="button"
             onClick={() => alRepetir?.(pedido)}

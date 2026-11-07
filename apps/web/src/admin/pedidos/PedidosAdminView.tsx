@@ -3,7 +3,7 @@ import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos, useTiempoReal } from '../../comun/socket';
-import { pedidosApi, Pedido, RespuestaNoEntregados } from './pedidosApi';
+import { pedidosApi, Pedido, RespuestaNoEntregados, type DatosEdicionPedido } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
 import { BandejaPropuestasUbicacion } from './BandejaPropuestasUbicacion';
 import { PanelCambioCobro, useCambiosCobroPendientes } from './PanelCambioCobro';
@@ -208,6 +208,17 @@ export function PedidosAdminView() {
   const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false);
   const [cortesiaSeparadaAbierta, setCortesiaSeparadaAbierta] = useState(false);
   const [pedidoRepetir, setPedidoRepetir] = useState<Pedido | null>(null);
+  // Editar pedido: datos que trae el servidor (con su versión) y el aviso si no se puede abrir
+  const [edicionPedido, setEdicionPedido] = useState<DatosEdicionPedido | null>(null);
+  const [errorEditar, setErrorEditar] = useState<string | null>(null);
+  const abrirEditor = async (p: Pedido) => {
+    setErrorEditar(null);
+    try {
+      setEdicionPedido(await pedidosApi.obtenerParaEditar(p.id));
+    } catch (err: any) {
+      setErrorEditar(err?.message || 'No se pudo abrir el pedido para editarlo.');
+    }
+  };
   const [pisosSalon, setPisosSalon] = useState<PisoSalon[]>([]);
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
   const pedidoDesdeUrl = useRef<string | null>(new URLSearchParams(window.location.search).get('pedido'));
@@ -230,7 +241,7 @@ export function PedidosAdminView() {
   const [pedidosResaltados, setPedidosResaltados] = useState<Set<string>>(new Set());
 
   // Delivery no entregados (pestaña propia, con su contador)
-  const { tiene } = useSesion();
+  const { tiene, usuario } = useSesion();
   const puedeValidarCobro = tiene('pedidos/validar_cambio_cobro');
   const cambiosCobro = useCambiosCobroPendientes(puedeValidarCobro);
   const puedeLiquidar = tiene('repartos/liquidar');
@@ -379,6 +390,35 @@ export function PedidosAdminView() {
     );
     pedidosApi.obtenerPorId(idStr).then((pActualizado) => {
       setPedidos((prev) => prev.map((p) => (String(p.id) === idStr ? pActualizado : p)));
+    }).catch(() => {});
+  });
+
+  // «Ana está editando este pedido»: llega por socket y vale 2 minutos si no se repite; se libera al guardar o cerrar
+  const [editando, setEditando] = useState<Record<string, { nombre: string; hasta: number }>>({});
+  useEventos('pedido:editando', (d: { id: string | number; activo: boolean; partyId?: string; nombre?: string }) => {
+    const idStr = String(d.id);
+    setEditando((prev) => {
+      const { [idStr]: _quitar, ...resto } = prev;
+      if (!d.activo || String(d.partyId) === String(usuario?.partyId)) return resto;
+      return { ...resto, [idStr]: { nombre: d.nombre || 'Alguien', hasta: Date.now() + 2 * 60 * 1000 } };
+    });
+  });
+  useEffect(() => {
+    const proximo = Object.values(editando).reduce((m, e) => Math.min(m, e.hasta), Infinity);
+    if (proximo === Infinity) return;
+    const t = setTimeout(() => setEditando((prev) => Object.fromEntries(Object.entries(prev).filter(([, e]) => e.hasta > Date.now()))), Math.max(0, proximo - Date.now()) + 50);
+    return () => clearTimeout(t);
+  }, [editando]);
+
+  // Alguien editó un pedido (productos, datos o total): se vuelve a leer completo, igual que con el cambio de estado
+  useEventos('pedido:editado', (datos: { id: string | number }) => {
+    const idStr = String(datos.id);
+    setEditando((prev) => {
+      const { [idStr]: _quitar, ...resto } = prev;
+      return resto;
+    });
+    pedidosApi.obtenerPorId(idStr).then((pa) => {
+      setPedidos((prev) => prev.map((p) => (String(p.id) === idStr ? pa : p)));
     }).catch(() => {});
   });
 
@@ -898,6 +938,8 @@ export function PedidosAdminView() {
               setPedidoRepetir(p);
               setNuevoPedidoAbierto(true);
             }}
+            alEditar={(p) => void abrirEditor(p)}
+            editandoPor={editando[String(pedidoSeleccionado.id)]?.nombre ?? null}
           />
         )}
       </div>
@@ -908,6 +950,25 @@ export function PedidosAdminView() {
           setCortesiaSeparadaAbierta(false);
           cargarDatos();
           }}
+        />
+      )}
+
+      {errorEditar && (
+        <div role="alert" className="cj-aviso-editar" style={{ position: 'fixed', left: 16, right: 16, bottom: 16, zIndex: 70, background: '#FDECE8', border: '1.5px solid var(--cp-rust)', borderRadius: 12, padding: '10px 14px', fontSize: 14, fontWeight: 700, color: 'var(--cp-rust)', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <span>{errorEditar}</span>
+          <button type="button" onClick={() => setErrorEditar(null)} aria-label="Cerrar aviso" style={{ border: 0, background: 'transparent', fontWeight: 800, cursor: 'pointer' }}>×</button>
+        </div>
+      )}
+
+      {edicionPedido && (
+        <ModalNuevoPedidoMesa
+          abierto={true}
+          pasoInicial="modal"
+          pisos={pisosSalon}
+          edicion={{ datos: edicionPedido }}
+          alCerrar={() => setEdicionPedido(null)}
+          alExitoPedido={() => void cargarDatos()}
+          alRefrescarMesas={async () => void cargarDatos()}
         />
       )}
 

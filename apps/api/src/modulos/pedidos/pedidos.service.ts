@@ -23,7 +23,7 @@ import { calcularEnvioDelivery, PromoEnvioGratis } from '../ofertas/envio-gratis
 import { OfertasService } from '../ofertas/ofertas.service';
 import { ParteResueltaCombo } from '../ofertas/ofertas.tipos';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { CrearPedidoDto, EntregaDto } from './dto/crear-pedido.dto';
+import { CrearPedidoDto, EntregaDto, LineaPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
 import { RedisService } from '../../comun/redis/redis.service';
 import { textoParecePunto } from '../clientes/direcciones-cliente.service';
@@ -37,7 +37,7 @@ import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible, validarRuc } from '../comprobantes/comprobantes.util';
 import { leerConfigPropina } from '../propinas/propinas.service';
 import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
-import { controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
+import { LineaVentaProducto, controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
 import { RequisitoOpcion, lineasDeRequisitosOpcion, requisitosDeOpciones, requisitosFaltantes, saldosDeRequisitos } from '../stock/opcion-requiere';
 import { validarMotivoCortesia } from '../cortesias/cortesia.tipos';
 
@@ -247,181 +247,13 @@ export class PedidosService {
     return this.puntosParty.resolverOCrear(telefono);
   }
 
+
   /**
-   * Crea un nuevo pedido desde la carta virtual con validaciones completas y cálculo en el servidor.
+   * Valida las líneas de un pedido contra la carta (producto, tamaño, opciones, sabores, combos, stock de opciones)
+   * y calcula sus precios en el servidor. La usan la creación y la edición de pedidos.
    */
-  async crear(
-    dto: CrearPedidoDto,
-    idempotencyKey?: string,
-    origen?: OrigenPedido,
-  ) {
-    if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.trim().length === 0) {
-      throw new BadRequestException({
-        codigo: 'CLAVE_REQUERIDA',
-        mensaje: 'La cabecera Idempotency-Key es obligatoria para enviar un pedido',
-      });
-    }
-
-    const claveIdempotencia = idempotencyKey.trim();
-
-    // 1. Idempotencia: si ya existe un pedido con esa clave, se devuelve el pedido existente (RQ-PED-03-09)
-    const pedidoExistente = await this.prisma.pedido.findUnique({
-      where: { clave_idempotencia: claveIdempotencia },
-    });
-
-    if (pedidoExistente) {
-      return {
-        id: pedidoExistente.id.toString(),
-        codigo: pedidoExistente.codigo,
-        estado: pedidoExistente.estado,
-        seguimientoToken: generarTokenSeguimiento(pedidoExistente.id),
-        subtotal: Number(pedidoExistente.subtotal),
-        descuento: Number(pedidoExistente.descuento || 0),
-        envio: pedidoExistente.envio !== null ? Number(pedidoExistente.envio) : null,
-        total: Number(pedidoExistente.total),
-        mensaje:
-          origen?.canal === 'MOZO'
-            ? 'Pedido enviado a cocina'
-            : 'Un asesor te escribirá para coordinar el pago',
-      };
-    }
-
-    // 2. Comprobar que la carta esté abierta y sin pausa (omitido si es MOZO o se indica explícitamente)
-    const omitirCarta =
-      origen?.canal === 'MOZO' ||
-      origen?.canal === 'CAJA' ||
-      origen?.omitirChequeoCarta === true;
-    if (!omitirCarta) {
-      const estadoCarta = await this.localService.obtenerEstadoCarta();
-      if (!estadoCarta.abierta) {
-        throw new HttpException(
-          { codigo: 'CARTA_CERRADA', mensaje: estadoCarta.texto },
-          HttpStatus.CONFLICT,
-        );
-      }
-    }
-
-    // 3. Validar datos de cliente (opcional para pedidos de mozo/caja en panel admin)
-    const esMozo =
-      origen?.canal === 'MOZO' ||
-      origen?.canal === 'CAJA' ||
-      origen?.omitirChequeoCarta === true;
-    let clienteNombre: string | null = null;
-    let telefonoLimpio: string | null = null;
-    let cumpleCliente: Cumpleanos | null = null;
-    let direccionReutilizada: EntregaDto | null = null;
-    // Alta de cliente por celular desde la carta sin sesión: el party de puntos recibe el nombre
-    let altaPorCelular = false;
-
-    if (esMozo) {
-      clienteNombre =
-        dto.cliente?.nombre?.trim() ||
-        origen?.mesaNombre ||
-        (dto.mesa ? `Mesa ${dto.mesa}` : 'Mesa');
-      telefonoLimpio = dto.cliente?.telefono?.trim() || null;
-      if (telefonoLimpio && !/^9\d{8}$/.test(telefonoLimpio)) {
-        throw new BadRequestException({
-          codigo: 'TELEFONO_INVALIDO',
-          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
-        });
-      }
-    } else {
-      if (!dto.cliente?.nombre || dto.cliente.nombre.trim().length === 0) {
-        throw new BadRequestException({
-          codigo: 'CLIENTE_INVALIDO',
-          mensaje: 'El nombre del cliente es obligatorio',
-        });
-      }
-
-      telefonoLimpio = dto.cliente?.telefono?.trim() || null;
-      const celularValido = !!telefonoLimpio && /^9\d{8}$/.test(telefonoLimpio) && telefonoLimpio !== TELEFONO_PLACEHOLDER;
-      const esCartaSinSesion = (origen?.canal ?? 'CARTA') === 'CARTA' && !origen?.clientePartyId && !origen?.sinCuentaCliente;
-      if (esCartaSinSesion && !celularValido && !(await invitadoCartaPermitido(this.prisma))) {
-        throw new BadRequestException({
-          codigo: 'CELULAR_REQUERIDO',
-          mensaje: 'Escribe tu celular para hacer tu pedido y sumar puntos',
-        });
-      }
-      if (telefonoLimpio && !/^9\d{8}$/.test(telefonoLimpio)) {
-        throw new BadRequestException({
-          codigo: 'TELEFONO_INVALIDO',
-          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
-        });
-      }
-      if (!telefonoLimpio && !esCartaSinSesion) {
-        throw new BadRequestException({
-          codigo: 'TELEFONO_INVALIDO',
-          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
-        });
-      }
-      clienteNombre = dto.cliente.nombre.trim();
-      // Alta de cliente por celular desde la carta sin sesión: el nombre (2+ letras) es obligatorio.
-      // El cumpleaños no se pide aquí (solo al crear cuenta): el pedido sin cuenta no lo guarda.
-      if (esCartaSinSesion && celularValido) {
-        if (clienteNombre.length < 2) {
-          throw new BadRequestException({ codigo: 'NOMBRE_REQUERIDO', mensaje: 'Escribe tu nombre completo para sumar puntos con tu celular.' });
-        }
-        altaPorCelular = true;
-      }
-      // Quien pide con su cuenta puede completar su cumpleaños si aún no lo tiene
-      if ((origen?.canal ?? 'CARTA') === 'CARTA' && origen?.clientePartyId && dto.cliente?.cumpleanos) {
-        cumpleCliente = exigirCumpleanos(dto.cliente.cumpleanos);
-      }
-      // Sin sesión: la dirección del último pedido de ese celular la toma el servidor (nunca viaja al navegador)
-      if (esCartaSinSesion && dto.modalidad === 'DELIVERY' && dto.entrega?.reutilizarUltimaDireccion) {
-        const ultimo = celularValido ? await this.ultimoPedidoDeliveryDelCelular(telefonoLimpio!) : null;
-        if (!ultimo) {
-          throw new BadRequestException({
-            codigo: 'SIN_DIRECCION_ANTERIOR',
-            mensaje: 'No encontramos una dirección anterior con ese celular. Escribe tu dirección.',
-          });
-        }
-        direccionReutilizada = {
-          direccion: ultimo.entrega_direccion ?? undefined,
-          referencia: ultimo.entrega_referencia ?? undefined,
-          lat: ultimo.entrega_lat != null ? Number(ultimo.entrega_lat) : undefined,
-          lng: ultimo.entrega_lng != null ? Number(ultimo.entrega_lng) : undefined,
-          origen: (ultimo.entrega_origen as EntregaDto['origen']) ?? undefined,
-        } as EntregaDto;
-      }
-    }
-
-    // 4. Comprobante en todo canal: simple (por defecto, sin SUNAT), boleta o factura
-    const tipoElegido = dto.comprobante?.tipo ?? 'SIMPLE';
-    if (!esComprobanteElegible(tipoElegido)) {
-      throw new BadRequestException({
-        codigo: 'COMPROBANTE_INVALIDO',
-        mensaje: 'Elige comprobante simple, boleta o factura para tu pedido',
-      });
-    }
-    if (tipoElegido === 'FACTURA') {
-      const ruc = dto.comprobante?.ruc?.trim();
-      const razonSocial = dto.comprobante?.razonSocial?.trim();
-      if (!ruc || !validarRuc(ruc) || !razonSocial || razonSocial.length === 0) {
-        throw new BadRequestException({
-          codigo: 'FACTURA_DATOS_INCOMPLETOS',
-          mensaje: 'La factura exige RUC de 11 dígitos y razón social',
-        });
-      }
-    } else if (tipoElegido === 'BOLETA') {
-      const dni = dto.comprobante?.dni?.trim();
-      if (dni && !/^\d{8}$/.test(dni)) {
-        throw new BadRequestException({
-          codigo: 'DNI_INVALIDO',
-          mensaje: 'El DNI debe tener 8 dígitos numéricos',
-        });
-      }
-    }
-
-    // 5. Validar líneas del pedido y calcular precios en el servidor
-    if (!Array.isArray(dto.lineas) || dto.lineas.length === 0) {
-      throw new BadRequestException({
-        codigo: 'LINEAS_REQUERIDAS',
-        mensaje: 'El pedido debe contener al menos un producto',
-      });
-    }
-
-    const productoIds = dto.lineas.map((l) => BigInt(l.productoId));
+  async calcularLineasPedido(lineasDto: LineaPedidoDto[], clienteNombre: string | null, origen?: OrigenPedido) {
+    const productoIds = lineasDto.map((l) => BigInt(l.productoId));
     const productosDb = await this.prisma.producto.findMany({
       where: { id: { in: productoIds } },
       include: {
@@ -452,8 +284,8 @@ export class PedidosService {
     const lineasCalculadas: any[] = [];
     let subtotalCalculado = 0;
 
-    for (let i = 0; i < dto.lineas.length; i++) {
-      const l = dto.lineas[i];
+    for (let i = 0; i < lineasDto.length; i++) {
+      const l = lineasDto[i];
       const prodId = BigInt(l.productoId);
       const prodDb = productosDb.find((p) => p.id === prodId);
 
@@ -685,6 +517,314 @@ export class PedidosService {
         mensaje: 'Un pedido solo de cortesías no se cobra: regístralas por separado',
       });
     }
+    return { lineasCalculadas, subtotalCalculado };
+  }
+
+  /** Escribe las líneas calculadas (con sus opciones, sabores, hijas de combo y cortesías) dentro de la transacción del pedido. */
+  async escribirLineasPedido(
+    tx: Prisma.TransactionClient,
+    pedidoId: bigint,
+    lineasCalculadas: any[],
+    clienteNombre: string | null,
+    origen?: OrigenPedido,
+  ) {
+    // Crear líneas y opciones
+    for (const lin of lineasCalculadas) {
+      const lineaDb = await tx.pedidoLinea.create({
+        data: {
+          pedido_id: pedidoId,
+          producto_id: lin.contenedora ? null : lin.productoId,
+          oferta_id: lin.ofertaId ?? null,
+          nombre: lin.nombre,
+          tamano: lin.tamano,
+          cantidad: lin.cantidad,
+          precio_unit: new Prisma.Decimal(lin.precioUnitario),
+          subtotal: new Prisma.Decimal(lin.subtotal),
+          area_id: lin.areaId,
+          nombres_persona: lin.nombresPersona,
+          nota: lin.nota,
+          es_cortesia: !!lin.cortesia,
+          opciones: lin.opciones.map((o: any) => ({
+            id: o.id.toString(),
+            nombre: o.nombre,
+            precio_extra: o.precio_extra,
+            grupo: o.grupo_nombre,
+          })),
+        },
+      });
+
+      if (lin.cortesia) {
+        await tx.cortesia.create({
+          data: {
+            producto_id: lin.productoId,
+            cantidad: lin.cantidad,
+            valor_lista: new Prisma.Decimal(lin.cortesia.valorLista),
+            motivo: lin.cortesia.motivo,
+            nota: lin.cortesia.nota,
+            pedido_id: pedidoId,
+            pedido_linea_id: lineaDb.id,
+            dada_por_party_id: BigInt(origen!.usuarioPartyId!),
+            autorizada_por_party_id: origen?.supervisorCortesiaPartyId ? BigInt(origen.supervisorCortesiaPartyId) : null,
+          },
+        });
+      }
+
+      // Partes del combo: una línea hija por producto, sin cobro (el precio ya va en la madre)
+      for (const parte of lin.partesCombo) {
+        const esBebidaParte = esBebidaPorNombres(parte.categoriaNombre ?? undefined, parte.areaNombre ?? undefined);
+        const hija = await tx.pedidoLinea.create({
+          data: {
+            pedido_id: pedidoId,
+            producto_id: parte.productoId,
+            linea_combo_id: lineaDb.id,
+            nombre: parte.nombre,
+            cantidad: parte.cantidad,
+            tamano: parte.tamano ?? null,
+            precio_unit: new Prisma.Decimal(0),
+            subtotal: new Prisma.Decimal(0),
+            area_id: parte.areaId,
+            nombres_persona: esBebidaParte
+              ? Array.from({ length: parte.cantidad }, (_, u) => lin.personasEntrada[u]?.trim() || clienteNombre || 'Mesa')
+              : [],
+            nota: parte.nota,
+          },
+        });
+        // Producto por sabor de la parte: sus sabores siguen a la línea hija (igual que en una línea normal)
+        for (const sb of parte.sabores ?? []) {
+          await tx.pedidoLineaSabor.create({
+            data: { pedido_linea_id: hija.id, sabor_id: sb.saborId, sabor_nombre: sb.nombre, cantidad: sb.cantidad },
+          });
+        }
+      }
+
+      for (const op of lin.opciones) {
+        await tx.pedidoLineaOpcion.create({
+          data: {
+            pedido_linea_id: lineaDb.id,
+            opcion_id: op.id,
+            grupo_nombre: op.grupo_nombre,
+            opcion_nombre: op.nombre,
+            precio_unit: new Prisma.Decimal(op.precio_extra),
+            precio_extra: new Prisma.Decimal(op.precio_extra),
+          },
+        });
+      }
+
+      for (const sb of lin.sabores) {
+        await tx.pedidoLineaSabor.create({
+          data: {
+            pedido_linea_id: lineaDb.id,
+            sabor_id: sb.saborId,
+            sabor_nombre: sb.nombre,
+            cantidad: sb.cantidad,
+          },
+        });
+      }
+    }
+  }
+
+  /** Lo que consumen del stock las líneas calculadas: sus opciones ligadas a stock, el producto de cada línea y las partes de sus combos. */
+  async ventaDeLineas(db: any, lineasCalculadas: any[]): Promise<LineaVentaProducto[]> {
+    const ventaOpciones = await lineasDeRequisitosOpcion(db, lineasCalculadas.flatMap((l) => l.requisitosOpcion));
+    return [
+      ...ventaOpciones,
+      ...lineasCalculadas
+        .filter((l) => !l.contenedora)
+        .map((l) => ({ productoId: l.productoId, cantidad: l.cantidad * (l.unidadesTamano ?? 1), areaId: l.areaId, sabores: l.sabores })),
+      ...lineasCalculadas.flatMap((l) =>
+        l.partesCombo.map((p: ParteResueltaCombo) => ({
+          productoId: p.productoId,
+          // unidades que consume el tamaño de la parte (1/2 docena = 6), igual que la línea normal
+          cantidad: p.cantidad * (p.unidadesTamano ?? 1),
+          areaId: p.areaId,
+          sabores: p.sabores,
+        })),
+      ),
+    ];
+  }
+
+  /** Descuenta el stock de los productos que lo controlan (y de las opciones ligadas a stock) de las líneas calculadas. */
+  async descontarStockLineas(tx: Prisma.TransactionClient, pedidoId: bigint, por: bigint, lineasCalculadas: any[]) {
+    // Productos que controlan stock: se descuentan ya (todos los canales) y el tope corta el pedido entero
+    return descontarVentaProductos(tx, pedidoId, await this.ventaDeLineas(tx, lineasCalculadas), por);
+  }
+
+  /**
+   * Crea un nuevo pedido desde la carta virtual con validaciones completas y cálculo en el servidor.
+   */
+  async crear(
+    dto: CrearPedidoDto,
+    idempotencyKey?: string,
+    origen?: OrigenPedido,
+  ) {
+    if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.trim().length === 0) {
+      throw new BadRequestException({
+        codigo: 'CLAVE_REQUERIDA',
+        mensaje: 'La cabecera Idempotency-Key es obligatoria para enviar un pedido',
+      });
+    }
+
+    const claveIdempotencia = idempotencyKey.trim();
+
+    // 1. Idempotencia: si ya existe un pedido con esa clave, se devuelve el pedido existente (RQ-PED-03-09)
+    const pedidoExistente = await this.prisma.pedido.findUnique({
+      where: { clave_idempotencia: claveIdempotencia },
+    });
+
+    if (pedidoExistente) {
+      return {
+        id: pedidoExistente.id.toString(),
+        codigo: pedidoExistente.codigo,
+        estado: pedidoExistente.estado,
+        seguimientoToken: generarTokenSeguimiento(pedidoExistente.id),
+        subtotal: Number(pedidoExistente.subtotal),
+        descuento: Number(pedidoExistente.descuento || 0),
+        envio: pedidoExistente.envio !== null ? Number(pedidoExistente.envio) : null,
+        total: Number(pedidoExistente.total),
+        mensaje:
+          origen?.canal === 'MOZO'
+            ? 'Pedido enviado a cocina'
+            : 'Un asesor te escribirá para coordinar el pago',
+      };
+    }
+
+    // 2. Comprobar que la carta esté abierta y sin pausa (omitido si es MOZO o se indica explícitamente)
+    const omitirCarta =
+      origen?.canal === 'MOZO' ||
+      origen?.canal === 'CAJA' ||
+      origen?.omitirChequeoCarta === true;
+    if (!omitirCarta) {
+      const estadoCarta = await this.localService.obtenerEstadoCarta();
+      if (!estadoCarta.abierta) {
+        throw new HttpException(
+          { codigo: 'CARTA_CERRADA', mensaje: estadoCarta.texto },
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
+
+    // 3. Validar datos de cliente (opcional para pedidos de mozo/caja en panel admin)
+    const esMozo =
+      origen?.canal === 'MOZO' ||
+      origen?.canal === 'CAJA' ||
+      origen?.omitirChequeoCarta === true;
+    let clienteNombre: string | null = null;
+    let telefonoLimpio: string | null = null;
+    let cumpleCliente: Cumpleanos | null = null;
+    let direccionReutilizada: EntregaDto | null = null;
+    // Alta de cliente por celular desde la carta sin sesión: el party de puntos recibe el nombre
+    let altaPorCelular = false;
+
+    if (esMozo) {
+      clienteNombre =
+        dto.cliente?.nombre?.trim() ||
+        origen?.mesaNombre ||
+        (dto.mesa ? `Mesa ${dto.mesa}` : 'Mesa');
+      telefonoLimpio = dto.cliente?.telefono?.trim() || null;
+      if (telefonoLimpio && !/^9\d{8}$/.test(telefonoLimpio)) {
+        throw new BadRequestException({
+          codigo: 'TELEFONO_INVALIDO',
+          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+        });
+      }
+    } else {
+      if (!dto.cliente?.nombre || dto.cliente.nombre.trim().length === 0) {
+        throw new BadRequestException({
+          codigo: 'CLIENTE_INVALIDO',
+          mensaje: 'El nombre del cliente es obligatorio',
+        });
+      }
+
+      telefonoLimpio = dto.cliente?.telefono?.trim() || null;
+      const celularValido = !!telefonoLimpio && /^9\d{8}$/.test(telefonoLimpio) && telefonoLimpio !== TELEFONO_PLACEHOLDER;
+      const esCartaSinSesion = (origen?.canal ?? 'CARTA') === 'CARTA' && !origen?.clientePartyId && !origen?.sinCuentaCliente;
+      if (esCartaSinSesion && !celularValido && !(await invitadoCartaPermitido(this.prisma))) {
+        throw new BadRequestException({
+          codigo: 'CELULAR_REQUERIDO',
+          mensaje: 'Escribe tu celular para hacer tu pedido y sumar puntos',
+        });
+      }
+      if (telefonoLimpio && !/^9\d{8}$/.test(telefonoLimpio)) {
+        throw new BadRequestException({
+          codigo: 'TELEFONO_INVALIDO',
+          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+        });
+      }
+      if (!telefonoLimpio && !esCartaSinSesion) {
+        throw new BadRequestException({
+          codigo: 'TELEFONO_INVALIDO',
+          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+        });
+      }
+      clienteNombre = dto.cliente.nombre.trim();
+      // Alta de cliente por celular desde la carta sin sesión: el nombre (2+ letras) es obligatorio.
+      // El cumpleaños no se pide aquí (solo al crear cuenta): el pedido sin cuenta no lo guarda.
+      if (esCartaSinSesion && celularValido) {
+        if (clienteNombre.length < 2) {
+          throw new BadRequestException({ codigo: 'NOMBRE_REQUERIDO', mensaje: 'Escribe tu nombre completo para sumar puntos con tu celular.' });
+        }
+        altaPorCelular = true;
+      }
+      // Quien pide con su cuenta puede completar su cumpleaños si aún no lo tiene
+      if ((origen?.canal ?? 'CARTA') === 'CARTA' && origen?.clientePartyId && dto.cliente?.cumpleanos) {
+        cumpleCliente = exigirCumpleanos(dto.cliente.cumpleanos);
+      }
+      // Sin sesión: la dirección del último pedido de ese celular la toma el servidor (nunca viaja al navegador)
+      if (esCartaSinSesion && dto.modalidad === 'DELIVERY' && dto.entrega?.reutilizarUltimaDireccion) {
+        const ultimo = celularValido ? await this.ultimoPedidoDeliveryDelCelular(telefonoLimpio!) : null;
+        if (!ultimo) {
+          throw new BadRequestException({
+            codigo: 'SIN_DIRECCION_ANTERIOR',
+            mensaje: 'No encontramos una dirección anterior con ese celular. Escribe tu dirección.',
+          });
+        }
+        direccionReutilizada = {
+          direccion: ultimo.entrega_direccion ?? undefined,
+          referencia: ultimo.entrega_referencia ?? undefined,
+          lat: ultimo.entrega_lat != null ? Number(ultimo.entrega_lat) : undefined,
+          lng: ultimo.entrega_lng != null ? Number(ultimo.entrega_lng) : undefined,
+          origen: (ultimo.entrega_origen as EntregaDto['origen']) ?? undefined,
+        } as EntregaDto;
+      }
+    }
+
+    // 4. Comprobante en todo canal: simple (por defecto, sin SUNAT), boleta o factura
+    const tipoElegido = dto.comprobante?.tipo ?? 'SIMPLE';
+    if (!esComprobanteElegible(tipoElegido)) {
+      throw new BadRequestException({
+        codigo: 'COMPROBANTE_INVALIDO',
+        mensaje: 'Elige comprobante simple, boleta o factura para tu pedido',
+      });
+    }
+    if (tipoElegido === 'FACTURA') {
+      const ruc = dto.comprobante?.ruc?.trim();
+      const razonSocial = dto.comprobante?.razonSocial?.trim();
+      if (!ruc || !validarRuc(ruc) || !razonSocial || razonSocial.length === 0) {
+        throw new BadRequestException({
+          codigo: 'FACTURA_DATOS_INCOMPLETOS',
+          mensaje: 'La factura exige RUC de 11 dígitos y razón social',
+        });
+      }
+    } else if (tipoElegido === 'BOLETA') {
+      const dni = dto.comprobante?.dni?.trim();
+      if (dni && !/^\d{8}$/.test(dni)) {
+        throw new BadRequestException({
+          codigo: 'DNI_INVALIDO',
+          mensaje: 'El DNI debe tener 8 dígitos numéricos',
+        });
+      }
+    }
+
+    // 5. Validar líneas del pedido y calcular precios en el servidor
+    if (!Array.isArray(dto.lineas) || dto.lineas.length === 0) {
+      throw new BadRequestException({
+        codigo: 'LINEAS_REQUERIDAS',
+        mensaje: 'El pedido debe contener al menos un producto',
+      });
+    }
+
+    const { lineasCalculadas, subtotalCalculado } = await this.calcularLineasPedido(dto.lineas, clienteNombre, origen);
+
 
     // 5.0. Cliente con cuenta identificado (suma puntos, historial y direcciones)
     const clienteFinal = await this.clienteIdentificado(dto, origen);
@@ -985,122 +1125,10 @@ export class PedidosService {
         );
       }
 
-      // Crear líneas y opciones
-      for (const lin of lineasCalculadas) {
-        const lineaDb = await tx.pedidoLinea.create({
-          data: {
-            pedido_id: pedido.id,
-            producto_id: lin.contenedora ? null : lin.productoId,
-            oferta_id: lin.ofertaId ?? null,
-            nombre: lin.nombre,
-            tamano: lin.tamano,
-            cantidad: lin.cantidad,
-            precio_unit: new Prisma.Decimal(lin.precioUnitario),
-            subtotal: new Prisma.Decimal(lin.subtotal),
-            area_id: lin.areaId,
-            nombres_persona: lin.nombresPersona,
-            nota: lin.nota,
-            es_cortesia: !!lin.cortesia,
-            opciones: lin.opciones.map((o: any) => ({
-              id: o.id.toString(),
-              nombre: o.nombre,
-              precio_extra: o.precio_extra,
-              grupo: o.grupo_nombre,
-            })),
-          },
-        });
-
-        if (lin.cortesia) {
-          await tx.cortesia.create({
-            data: {
-              producto_id: lin.productoId,
-              cantidad: lin.cantidad,
-              valor_lista: new Prisma.Decimal(lin.cortesia.valorLista),
-              motivo: lin.cortesia.motivo,
-              nota: lin.cortesia.nota,
-              pedido_id: pedido.id,
-              pedido_linea_id: lineaDb.id,
-              dada_por_party_id: BigInt(origen!.usuarioPartyId!),
-              autorizada_por_party_id: origen?.supervisorCortesiaPartyId ? BigInt(origen.supervisorCortesiaPartyId) : null,
-            },
-          });
-        }
-
-        // Partes del combo: una línea hija por producto, sin cobro (el precio ya va en la madre)
-        for (const parte of lin.partesCombo) {
-          const esBebidaParte = esBebidaPorNombres(parte.categoriaNombre ?? undefined, parte.areaNombre ?? undefined);
-          const hija = await tx.pedidoLinea.create({
-            data: {
-              pedido_id: pedido.id,
-              producto_id: parte.productoId,
-              linea_combo_id: lineaDb.id,
-              nombre: parte.nombre,
-              cantidad: parte.cantidad,
-              tamano: parte.tamano ?? null,
-              precio_unit: new Prisma.Decimal(0),
-              subtotal: new Prisma.Decimal(0),
-              area_id: parte.areaId,
-              nombres_persona: esBebidaParte
-                ? Array.from({ length: parte.cantidad }, (_, u) => lin.personasEntrada[u]?.trim() || clienteNombre || 'Mesa')
-                : [],
-              nota: parte.nota,
-            },
-          });
-          // Producto por sabor de la parte: sus sabores siguen a la línea hija (igual que en una línea normal)
-          for (const sb of parte.sabores ?? []) {
-            await tx.pedidoLineaSabor.create({
-              data: { pedido_linea_id: hija.id, sabor_id: sb.saborId, sabor_nombre: sb.nombre, cantidad: sb.cantidad },
-            });
-          }
-        }
-
-        for (const op of lin.opciones) {
-          await tx.pedidoLineaOpcion.create({
-            data: {
-              pedido_linea_id: lineaDb.id,
-              opcion_id: op.id,
-              grupo_nombre: op.grupo_nombre,
-              opcion_nombre: op.nombre,
-              precio_unit: new Prisma.Decimal(op.precio_extra),
-              precio_extra: new Prisma.Decimal(op.precio_extra),
-            },
-          });
-        }
-
-        for (const sb of lin.sabores) {
-          await tx.pedidoLineaSabor.create({
-            data: {
-              pedido_linea_id: lineaDb.id,
-              sabor_id: sb.saborId,
-              sabor_nombre: sb.nombre,
-              cantidad: sb.cantidad,
-            },
-          });
-        }
-      }
+      await this.escribirLineasPedido(tx, pedido.id, lineasCalculadas, clienteNombre, origen);
 
       // Productos que controlan stock: se descuentan ya (todos los canales) y el tope corta el pedido entero
-      const ventaOpciones = await lineasDeRequisitosOpcion(tx, lineasCalculadas.flatMap((l) => l.requisitosOpcion));
-      const ventaProductos = await descontarVentaProductos(
-        tx,
-        pedido.id,
-        [
-          ...ventaOpciones,
-          ...lineasCalculadas
-            .filter((l) => !l.contenedora)
-            .map((l) => ({ productoId: l.productoId, cantidad: l.cantidad * (l.unidadesTamano ?? 1), areaId: l.areaId, sabores: l.sabores })),
-          ...lineasCalculadas.flatMap((l) =>
-            l.partesCombo.map((p: ParteResueltaCombo) => ({
-              productoId: p.productoId,
-              // unidades que consume el tamaño de la parte (1/2 docena = 6), igual que la línea normal
-              cantidad: p.cantidad * (p.unidadesTamano ?? 1),
-              areaId: p.areaId,
-              sabores: p.sabores,
-            })),
-          ),
-        ],
-        pedido.party_id ?? BigInt(1),
-      );
+      const ventaProductos = await this.descontarStockLineas(tx, pedido.id, pedido.party_id ?? BigInt(1), lineasCalculadas);
       agotadosPorVenta = ventaProductos.agotados;
       saboresAgotadosPorVenta = ventaProductos.saboresAgotados;
 

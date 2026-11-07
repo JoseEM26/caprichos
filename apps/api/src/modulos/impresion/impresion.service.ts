@@ -1321,6 +1321,82 @@ export class ImpresionService {
     };
   }
 
+  /** Etiquetas (general, por área y por vaso) del pedido tal como están hoy, con su clave estable y su contenido. */
+  private async etiquetasActualesDePedido(pedidoId: bigint) {
+    const pedido: any = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: {
+        lineas: { include: { area: true, producto: { include: { categoria: true } }, opcionesElegidas: true, sabores: true } },
+      },
+    });
+    if (!pedido) return null;
+    const lista: Array<{ tipo: string; clave: string; payload: any; areaId: bigint | null }> = [
+      { tipo: 'ETIQUETA_GENERAL', clave: CLAVE_GENERAL, payload: construirEtiquetaGeneral(pedido), areaId: null },
+    ];
+    for (const a of construirEtiquetasArea(pedido)) {
+      const areaId = pedido.lineas.find((l: any) => (l.area?.nombre || '').toUpperCase() === a.areaNombre)?.area_id ?? null;
+      lista.push({ tipo: 'ETIQUETA_AREA', clave: claveEtiquetaArea(a.areaNombre), payload: a, areaId });
+    }
+    for (const b of construirEtiquetasBebida(pedido)) {
+      lista.push({ tipo: 'ETIQUETA_BEBIDA', clave: claveEtiquetaBebida(b.bebidaIndex), payload: b, areaId: null });
+    }
+    return { pedido, lista };
+  }
+
+  /** Foto de las etiquetas del pedido (clave → contenido) para comparar después de editarlo. */
+  async capturarEtiquetas(pedidoIdInput: bigint | string | number): Promise<Map<string, string>> {
+    try {
+      const r = await this.etiquetasActualesDePedido(BigInt(pedidoIdInput));
+      return new Map((r?.lista ?? []).map((e) => [e.clave, JSON.stringify(e.payload)]));
+    } catch {
+      return new Map();
+    }
+  }
+
+  /**
+   * Tras editar un pedido: encola SOLO las etiquetas nuevas o cambiadas respecto de la foto de antes (las de líneas
+   * que no cambiaron no se reimprimen). Si al pedido todavía no se le encoló ninguna, no hace nada: se imprimirán
+   * completas al aceptarlo. Respeta las reglas de impresión y no duplica lo que ya está en cola. Nunca lanza error.
+   */
+  async encolarEtiquetasEditadas(pedidoIdInput: bigint | string | number, antes: Map<string, string>): Promise<number> {
+    try {
+      const pedidoId = BigInt(pedidoIdInput);
+      const yaTenia = (await this.prisma.printJob.count({ where: { pedido_id: pedidoId, tipo: { in: TIPOS_ETIQUETA } } })) > 0;
+      if (!yaTenia) return 0;
+      const r = await this.etiquetasActualesDePedido(pedidoId);
+      if (!r) return 0;
+      const cambiadas = r.lista.filter((e) => antes.get(e.clave) !== JSON.stringify(e.payload));
+      if (cambiadas.length === 0) return 0;
+      const reglas = await leerReglasImpresion(this.prisma);
+      const ctx = await this.contextoRuteo();
+      const enCola = await this.prisma.printJob.findMany({
+        where: { pedido_id: pedidoId, estado: { in: ESTADOS_EN_COLA } },
+        select: { tipo: true, payload: true },
+      });
+      const claveEnCola = new Set(enCola.map((j) => claveDeTrabajo(j)));
+      let n = 0;
+      for (const e of cambiadas) {
+        if (!aplicaSegunReglas(e.tipo, r.pedido.modalidad, reglas) || claveEnCola.has(e.clave)) continue;
+        await this.prisma.printJob.create({
+          data: {
+            pedido_id: pedidoId,
+            area_id: e.areaId,
+            destino_area_id: destinoDeTrabajo(e.tipo, e.areaId, ctx),
+            tipo: e.tipo,
+            payload: e.payload as any,
+            copia: true,
+            estado: 'PENDIENTE',
+          },
+        });
+        n += 1;
+      }
+      return n;
+    } catch (err: any) {
+      this.logger.error(`Error al encolar etiquetas editadas del pedido ${pedidoIdInput}: ${err.message}`, err.stack);
+      return 0;
+    }
+  }
+
   /**
    * Prueba de impresión: una etiqueta o un ticket de ejemplo, sin pedido real, por la cola normal.
    * No cuenta en pedidos ni dispara avisos (pedido_id NULL). Una cada 10 s por máquina.
