@@ -271,6 +271,62 @@ describe('AvisosPedidoService: puntos en los avisos de la carta', () => {
     });
   });
 
+  describe('plantillas de delivery con ubicación en RECIBIDO', () => {
+    const pedidoSinUbicar = (pago: 'EFECTIVO' | 'YAPE', extra: Record<string, unknown> = {}) => {
+      prisma.pedido.findUnique = jest.fn(async () => ({
+        id: BigInt(95), codigo: 'CP-095', cliente_nombre: 'Ana', cliente_telefono: '987654321', modalidad: 'DELIVERY', total: 20,
+        pago_metodo: pago, pago_preferido: pago, canal: 'CARTA', party_id: null, cliente_party_id: null, puntos_ganados: 0,
+        envio: null, entrega_lat: null, entrega_lng: null, zona_id: null,
+        lineas: [{ nombre: 'Dona', cantidad: 2 }], ...extra,
+      }));
+    };
+
+    beforeEach(() => {
+      parametrosPuntos.whatsapp_aviso_bienvenida_puntos_activo = 'no';
+      parametrosPuntos.whatsapp_plantilla_delivery_ubicacion_activa = 'si';
+    });
+
+    it('efectivo, sin ubicación e interruptor en «Sí»: plantilla de ubicación con respaldo a la vigente', async () => {
+      pedidoSinUbicar('EFECTIVO');
+      await servicio.avisar(95, 'RECIBIDO', {}, undefined);
+      const c = cargaEncolada();
+      expect(c.plantillaClave).toBe('CARTA_DELIVERY_UBICACION_EFECTIVO');
+      expect(c.variablesPlantilla).toEqual(['Ana', 'CP-095']);
+      expect(c.plantillaRespaldo).toEqual({ plantillaClave: 'CARTA_RECIBIDO_EFECTIVO', variablesPlantilla: ['Ana', 'CP-095'] });
+      // Con ventana abierta sale este texto libre, que ya pide la ubicación
+      expect(c.textoLibre).toContain('Envíanos tu ubicación');
+    });
+
+    it('pago digital, sin ubicación: plantilla digital con el medio y respaldo a la digital vigente', async () => {
+      pedidoSinUbicar('YAPE');
+      await servicio.avisar(95, 'RECIBIDO', {}, undefined);
+      const c = cargaEncolada();
+      expect(c.plantillaClave).toBe('CARTA_DELIVERY_UBICACION_DIGITAL');
+      expect(c.variablesPlantilla).toEqual(['Ana', 'CP-095', 'Yape']);
+      expect(c.plantillaRespaldo.plantillaClave).toBe('CARTA_RECIBIDO_DIGITAL');
+    });
+
+    it('interruptor en «No»: plantilla vigente y sin respaldo', async () => {
+      parametrosPuntos.whatsapp_plantilla_delivery_ubicacion_activa = 'no';
+      pedidoSinUbicar('EFECTIVO');
+      await servicio.avisar(95, 'RECIBIDO', {}, undefined);
+      expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_EFECTIVO');
+      expect(cargaEncolada().plantillaRespaldo).toBeUndefined();
+    });
+
+    it('con ubicación ya registrada: no usa la plantilla de ubicación', async () => {
+      pedidoSinUbicar('EFECTIVO', { entrega_lat: -12.1, entrega_lng: -77, zona_id: 3, envio: 5 });
+      await servicio.avisar(95, 'RECIBIDO', {}, undefined);
+      expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_EFECTIVO');
+    });
+
+    it('recojo: no usa la plantilla de ubicación', async () => {
+      pedidoSinUbicar('EFECTIVO', { modalidad: 'RECOJO' });
+      await servicio.avisar(95, 'RECIBIDO', {}, undefined);
+      expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_EFECTIVO');
+    });
+  });
+
   it('pedido sin cliente con cuenta o de invitado: sin línea de puntos', async () => {
     prisma.pedido.findUnique = jest.fn(async () => ({
       id: BigInt(91), codigo: 'CP-091', cliente_nombre: 'Ana', cliente_telefono: '987654321', modalidad: 'DELIVERY', total: 20,

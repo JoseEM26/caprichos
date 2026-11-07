@@ -155,6 +155,7 @@ export const CLAVES_TEXTO = [
   'whatsapp_aviso_encuesta_activo',
   'whatsapp_aviso_voucher_recordatorio_activo',
   'whatsapp_plantilla_recibido_seguimiento_activa',
+  'whatsapp_plantilla_delivery_ubicacion_activa',
   // Puntos y avisos de la carta: bienvenida al primer pedido, puntos al entregar y aviso de seguridad de la cuenta
   'whatsapp_aviso_bienvenida_puntos_activo',
   'whatsapp_aviso_puntos_ganados_activo',
@@ -294,6 +295,7 @@ export class ConfiguracionService {
         clave === 'notif_sonido_activo' ||
         clave === 'notif_marcar_todas_activo' ||
         clave === 'whatsapp_plantilla_recibido_seguimiento_activa' ||
+        clave === 'whatsapp_plantilla_delivery_ubicacion_activa' ||
         clave.startsWith('chatbot_funcion_') ||
         clave.startsWith('whatsapp_aviso_')
       ) {

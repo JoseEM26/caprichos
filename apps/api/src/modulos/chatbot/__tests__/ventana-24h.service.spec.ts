@@ -206,4 +206,47 @@ describe('Ventana24hService', () => {
     expect(mockMensajeria.enviarTexto).not.toHaveBeenCalled();
     expect(mockMensajeria.enviarPlantilla).not.toHaveBeenCalled();
   });
+
+  describe('plantilla de respaldo', () => {
+    const payload = {
+      textoLibre: 'x',
+      plantillaClave: 'CARTA_DELIVERY_UBICACION_EFECTIVO' as const,
+      variablesPlantilla: ['Ana', 'CP-1'],
+      plantillaRespaldo: { plantillaClave: 'CARTA_RECIBIDO_EFECTIVO' as const, variablesPlantilla: ['Ana', 'CP-1'] },
+    };
+    beforeEach(() => {
+      mockPrisma.clienteWhatsappConsentimiento.findUnique.mockResolvedValue(null);
+      mockPrisma.whatsappMensaje.findFirst.mockResolvedValue(null);
+    });
+
+    it('plantilla no aprobada: envía la de respaldo una sola vez', async () => {
+      mockMensajeria.enviarPlantilla
+        .mockResolvedValueOnce({ exito: false, estado: 'FALLIDO', errorCodigo: 'PLANTILLA_NO_APROBADA', errorDetalle: 'no aprobada' })
+        .mockResolvedValueOnce({ exito: true, estado: 'ENVIADO', waMessageId: 'wamid.resp' });
+      const r = await servicio.enviarMensajeNegocio('51987654321', payload);
+      expect(r.exito).toBe(true);
+      expect(mockMensajeria.enviarPlantilla).toHaveBeenCalledTimes(2);
+      expect(mockMensajeria.enviarPlantilla.mock.calls[0][1]).toBe('caprichos_pedido_delivery_ubicacion_efectivo');
+      expect(mockMensajeria.enviarPlantilla.mock.calls[1][1]).toBe('caprichos_pedido_recibido_efectivo');
+    });
+
+    it('plantilla principal enviada: no se manda la de respaldo', async () => {
+      await servicio.enviarMensajeNegocio('51987654321', payload);
+      expect(mockMensajeria.enviarPlantilla).toHaveBeenCalledTimes(1);
+    });
+
+    it('error que no es de plantilla (p. ej. número inválido): no se manda el respaldo', async () => {
+      mockMensajeria.enviarPlantilla.mockResolvedValue({ exito: false, estado: 'FALLIDO', errorCodigo: 'NUMERO_INVALIDO' });
+      const r = await servicio.enviarMensajeNegocio('51987654321', payload);
+      expect(r.exito).toBe(false);
+      expect(mockMensajeria.enviarPlantilla).toHaveBeenCalledTimes(1);
+    });
+
+    it('con ventana abierta sale el texto libre y no se usa plantilla', async () => {
+      mockPrisma.whatsappMensaje.findFirst.mockResolvedValue({ id: BigInt(1), creado_en: new Date() });
+      await servicio.enviarMensajeNegocio('51987654321', payload);
+      expect(mockMensajeria.enviarTexto).toHaveBeenCalledTimes(1);
+      expect(mockMensajeria.enviarPlantilla).not.toHaveBeenCalled();
+    });
+  });
 });
