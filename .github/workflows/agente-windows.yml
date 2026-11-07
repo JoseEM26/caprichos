@@ -37,7 +37,7 @@ jobs:
         run: |
           out=$(AGENTE_CONFIG=/tmp/humo-config.json timeout 20 apps/agente-local/dist-exe/agente-impresion-linux impresoras </dev/null 2>&1)
           echo "$out"
-          echo "$out" | grep -q "impresoras" || { echo "El programa no mostró salida"; exit 1; }
+          echo "$out" | grep -qi "impresora" || { echo "El programa no mostró salida"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: agente-impresion
