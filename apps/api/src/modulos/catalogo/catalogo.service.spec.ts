@@ -15,6 +15,7 @@ describe('CatalogoService', () => {
     prisma = {
       // Conteo de apertura del día (productos que controlan stock): sin aperturas en estos casos
       conteoApertura: { findMany: jest.fn().mockResolvedValue([]) },
+      agotado: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       opcionRequiere: { findMany: jest.fn().mockResolvedValue([]) },
       categoria: {
         findMany: jest.fn(),
@@ -440,7 +441,12 @@ describe('CatalogoService', () => {
 
       expect(prisma.producto.update).toHaveBeenCalledWith({
         where: { id: BigInt(15) },
-        data: { agotado_hasta: expect.any(Date) },
+        data: { agotado_hasta: expect.any(Date), agotado_origen: 'MANUAL' },
+      });
+      // Si había un agotado automático abierto, pasa a MANUAL (no vuelve solo)
+      expect(prisma.agotado.updateMany).toHaveBeenCalledWith({
+        where: { producto_id: BigInt(15), reactivado_en: null },
+        data: { origen: 'MANUAL' },
       });
 
       expect(auditoria.registrar).toHaveBeenCalledWith(
@@ -480,7 +486,7 @@ describe('CatalogoService', () => {
 
       expect(prisma.producto.update).toHaveBeenCalledWith({
         where: { id: BigInt(15) },
-        data: { agotado_hasta: null },
+        data: { agotado_hasta: null, agotado_origen: null },
       });
 
       expect(auditoria.registrar).toHaveBeenCalledWith(
@@ -717,6 +723,35 @@ describe('CatalogoService', () => {
       prisma.producto.findUnique.mockResolvedValue(actual);
       jest.spyOn(service, 'obtenerProductoPorId').mockResolvedValue({} as any);
       prisma.sabor = { updateMany: jest.fn(), upsert: jest.fn(), update: jest.fn(), findMany: jest.fn().mockResolvedValue([]) };
+    });
+
+    it('apagar «Controlar stock» (true -> false) limpia el agotado AUTOMATICO y respeta el MANUAL', async () => {
+      prisma.producto.findUnique.mockResolvedValue({ ...actual, controla_stock: true });
+      prisma.producto.updateMany = jest.fn();
+      prisma.agotado.updateMany = jest.fn();
+      await service.editarProducto(1, { controlaStock: false } as any);
+      expect(prisma.producto.updateMany).toHaveBeenCalledWith({
+        where: { id: BigInt(1), agotado_origen: 'AUTOMATICO' },
+        data: { agotado_hasta: null, agotado_origen: null },
+      });
+      expect(prisma.sabor.updateMany).toHaveBeenCalledWith({
+        where: { producto_id: BigInt(1), agotado_origen: 'AUTOMATICO' },
+        data: { agotado_hasta: null, agotado_origen: null },
+      });
+      // Nunca se limpia por una condición que incluya lo MANUAL
+      for (const c of [...prisma.producto.updateMany.mock.calls, ...prisma.sabor.updateMany.mock.calls]) {
+        expect(c[0].where.agotado_origen).toBe('AUTOMATICO');
+      }
+    });
+
+    it('no limpia agotados si Controlar stock ya estaba apagado o se mantiene encendido', async () => {
+      prisma.producto.updateMany = jest.fn();
+      prisma.agotado.updateMany = jest.fn();
+      prisma.producto.findUnique.mockResolvedValue({ ...actual, controla_stock: false });
+      await service.editarProducto(1, { controlaStock: false } as any);
+      prisma.producto.findUnique.mockResolvedValue({ ...actual, controla_stock: true });
+      await service.editarProducto(1, { controlaStock: true } as any);
+      expect(prisma.producto.updateMany).not.toHaveBeenCalled();
     });
 
     it('guarda controlaStock con el producto', async () => {

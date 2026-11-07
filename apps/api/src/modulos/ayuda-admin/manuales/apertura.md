@@ -19,7 +19,7 @@ sugerencias:
 ## Para que sirve
 Es el conteo diario de los productos que se acaban en el dia, como donas y galletas (productos terminados, distintos de los insumos de [[almacen]]). Cada manana se cuenta lo que quedo de ayer, se suma lo que se produjo hoy y se guarda. Con eso la carta, el bot de WhatsApp, el mozo y caja saben cuantos quedan: al vender se descuenta solo, al llegar a 0 el producto (o el sabor) se marca Agotado y, al final, la carta muestra "Quedan N" y "!Ultimos N!".
 
-Solo aparecen los productos que tienen marcada la casilla "Controlar stock de este producto" en [[productos]]. Si no hay ninguno, la pantalla dice "No hay productos con control de stock". El saldo nunca se reinicia a cero por si solo: es el tope de lo vendible, haya o no apertura de hoy.
+Solo aparecen los productos que tienen marcada la casilla "Controlar stock de este producto" en [[productos]]. Si no hay ninguno, la pantalla dice "No hay productos con control de stock". El saldo nunca se reinicia a cero por si solo: es el tope de lo vendible, haya o no apertura de hoy. Al guardar la apertura con saldo mayor a 0, un producto "Agotado por stock" vuelve a estar disponible; uno "Agotado a mano" (marcado desde Productos o Cocina) NO se reactiva: hay que ponerlo disponible a mano.
 
 ## Como se hace: Hacer el conteo de apertura
 1. Abre Compras y stock, Apertura del dia (o pulsa Contar ahora en la franja "Falta el conteo de apertura de hoy (N productos)" que sale arriba en Cocina).

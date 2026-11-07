@@ -7,6 +7,7 @@ import { Tip } from './ayudaOpciones';
 import type { CategoriaAdmin, ProductoAdmin, SaborItem } from './catalogoApi';
 import './editor-opciones.css';
 import './editar-producto.css';
+import { textosOrigenAgotado } from './origenAgotado';
 
 export interface EditarProductoModalProps {
   producto: ProductoAdmin;
@@ -117,6 +118,11 @@ export function EditarProductoModal(p: EditarProductoModalProps) {
     <>
       <section className="ep-sec" aria-label="Stock">
         <h3 className="ep-h">Stock</h3>
+        {p.producto.disponible === false && (
+          <div className="ep-estado" role="status" title={textosOrigenAgotado(p.producto.agotadoOrigen).ayuda}>
+            {textosOrigenAgotado(p.producto.agotadoOrigen).corto}
+          </div>
+        )}
         <div className="ep-ajuste">
           <label className="eo-interruptor">
             <input type="checkbox" checked={p.controlaStock} disabled={bloqueado}

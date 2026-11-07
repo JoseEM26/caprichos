@@ -130,6 +130,7 @@ export class AgotadosService {
     return registros.map((reg) => ({
       id: reg.id.toString(),
       tipo: reg.tipo,
+      origen: reg.origen === 'AUTOMATICO' ? 'AUTOMATICO' : 'MANUAL',
       alcance: reg.alcance,
       duracion: reg.alcance,
       productoId: reg.producto_id?.toString() ?? null,
@@ -186,7 +187,7 @@ export class AgotadosService {
         }
         await tx.producto.update({
           where: { id: entidadId },
-          data: { agotado_hasta: fechaAgotadoHasta },
+          data: { agotado_hasta: fechaAgotadoHasta, agotado_origen: 'MANUAL' },
         });
       } else if (dto.tipo === 'SABOR') {
         const sab = await tx.sabor.findUnique({ where: { id: entidadId } });
@@ -198,7 +199,7 @@ export class AgotadosService {
         }
         await tx.sabor.update({
           where: { id: entidadId },
-          data: { agotado_hasta: fechaAgotadoHasta },
+          data: { agotado_hasta: fechaAgotadoHasta, agotado_origen: 'MANUAL' },
         });
       } else if (dto.tipo === 'OPCION') {
         const opc = await tx.opcion.findUnique({ where: { id: entidadId } });
@@ -226,6 +227,7 @@ export class AgotadosService {
           hasta: fechaAgotadoHasta,
           reactivado_en: null,
           por: usuarioActual.partyId,
+          origen: 'MANUAL',
         },
       });
     });
@@ -299,12 +301,12 @@ export class AgotadosService {
       if (reg.tipo === 'PRODUCTO' && reg.producto_id) {
         await tx.producto.update({
           where: { id: reg.producto_id },
-          data: { agotado_hasta: null },
+          data: { agotado_hasta: null, agotado_origen: null },
         });
       } else if (reg.tipo === 'SABOR' && reg.sabor_id) {
         await tx.sabor.update({
           where: { id: reg.sabor_id },
-          data: { agotado_hasta: null },
+          data: { agotado_hasta: null, agotado_origen: null },
         });
       } else if (reg.tipo === 'OPCION' && reg.opcion_id) {
         await tx.opcion.update({

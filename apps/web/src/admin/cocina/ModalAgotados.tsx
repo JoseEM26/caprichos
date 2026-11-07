@@ -11,6 +11,7 @@ import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { EstadoError } from '../../comun/EstadoError';
 import { useSesion } from '../../comun/sesion';
 import { useTiempoReal } from '../../comun/socket';
+import { textosOrigenAgotado } from '../catalogo/origenAgotado';
 
 export interface ModalAgotadosProps {
   abierto: boolean;
@@ -645,6 +646,12 @@ export function ModalAgotados({ abierto, alCerrar }: ModalAgotadosProps) {
                                 >
                                   Agotado · {renderHoraRegreso(agotadoObj!)}
                                 </span>
+                                <span
+                                  style={{ fontSize: '12px', fontWeight: 600, color: 'var(--cp-soft)' }}
+                                  title={textosOrigenAgotado(agotadoObj!.origen).ayuda}
+                                >
+                                  {textosOrigenAgotado(agotadoObj!.origen).corto}
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -952,7 +959,8 @@ export function ModalAgotados({ abierto, alCerrar }: ModalAgotadosProps) {
                     }}
                   >
                     <span style={{ fontSize: '13px' }}>
-                      <b>{nom}</b> · {renderHoraRegreso(ag)}
+                      <b>{nom}</b> · {renderHoraRegreso(ag)} ·{' '}
+                      <span title={textosOrigenAgotado(ag.origen).ayuda}>{textosOrigenAgotado(ag.origen).corto}</span>
                     </span>
                     <button
                       type="button"

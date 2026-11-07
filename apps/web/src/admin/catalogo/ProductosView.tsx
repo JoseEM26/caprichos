@@ -23,6 +23,7 @@ import { Tip } from './ayudaOpciones';
 import { BotonVistaPrevia } from './VistaPreviaProducto';
 import { ESTADO_VACIO, EstadoOpciones, validarTamanos } from './editorOpcionesTipos';
 import { esSoloMozoUsuario, tieneRolUsuario } from '../../comun/rolesUsuario';
+import { textosOrigenAgotado } from './origenAgotado';
 
 const PPAGE = 24;
 
@@ -1014,6 +1015,11 @@ export function ProductosView() {
                 <span className={off ? 'pt-ins pt-ins--agotado' : 'pt-ins'}>
                   {off ? 'AGOTADO' : 'DISPONIBLE'}
                 </span>
+                {off && (
+                  <span className="pt-ins pt-ins--agotado" title={textosOrigenAgotado(p.agotadoOrigen).ayuda}>
+                    {textosOrigenAgotado(p.agotadoOrigen).corto}
+                  </span>
+                )}
                 {p.promociones && p.promociones.length > 0 && (
                   <span className="pt-ins pt-ins--promo">En promoción</span>
                 )}

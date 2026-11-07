@@ -17,6 +17,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
@@ -101,6 +102,8 @@ export interface CobroMozoVista {
 
 @Injectable()
 export class PedidosEstadoService {
+  private readonly logger = new Logger(PedidosEstadoService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
@@ -113,6 +116,59 @@ export class PedidosEstadoService {
     @Optional() private readonly impresionService?: ImpresionService,
     @Optional() private readonly avisos?: AvisosPedidoService,
   ) {}
+
+  /**
+   * Devuelve puntos y stock de un pedido anulado. Ambas operaciones son idempotentes (no devuelven dos veces).
+   * Cada una se reintenta 1 vez; si sigue fallando NO rompe la anulación: queda un log de error, una fila de
+   * auditoría y un aviso a Caja para que se revise a mano.
+   */
+  async devolverAlAnular(pedidoId: bigint, codigo: string | null | undefined, partyId?: bigint, ip?: string) {
+    const pasos: Array<[string, () => Promise<unknown> | undefined]> = [
+      ['los puntos', () => this.puntosService?.reversarPorPedido(pedidoId)],
+      ['el stock', () => this.stockService?.revertirPorPedido(pedidoId, undefined, partyId)],
+    ];
+    for (const [que, paso] of pasos) {
+      let error: unknown;
+      for (let intento = 0; intento < 2; intento++) {
+        try {
+          await paso();
+          error = undefined;
+          break;
+        } catch (e) {
+          error = e;
+        }
+      }
+      if (error === undefined) continue;
+
+      const detalle = error instanceof Error ? error.message : String(error);
+      const mensaje = `Anulado, pero no se pudo devolver ${que} del pedido ${codigo ?? pedidoId}: revisa.`;
+      this.logger.error(
+        JSON.stringify({ evento: 'ANULACION_DEVOLUCION_FALLIDA', pedidoId: pedidoId.toString(), pendiente: que, detalle }),
+      );
+      try {
+        await this.auditoria.registrar({
+          categoria: 'CAMBIO',
+          modulo: 'pedidos',
+          accion: 'ANULAR_DEVOLUCION_FALLIDA',
+          resultado: 'RECHAZADO',
+          entidad: 'pedido',
+          entidadId: pedidoId,
+          despues: { pendiente: que, detalle },
+          partyId,
+          ip,
+        });
+      } catch (e) {
+        this.logger.error(`No se pudo auditar la devolución fallida del pedido ${pedidoId}: ${String(e)}`);
+      }
+      try {
+        await this.prisma.notificacion.create({
+          data: { tipo: 'ANULACION_SIN_DEVOLUCION', rol_destino: 'CAJERO', titulo: 'Revisa una anulación', mensaje, enlace: '/admin/pedidos' },
+        });
+      } catch (e) {
+        this.logger.error(`No se pudo avisar a Caja de la devolución fallida del pedido ${pedidoId}: ${String(e)}`);
+      }
+    }
+  }
 
   private parsearId(id: bigint | string | number): bigint {
     try {
@@ -970,16 +1026,7 @@ export class PedidosEstadoService {
       });
 
       // un pedido anulado devuelve el stock y reversa los puntos si ya se había cobrado
-      for (const paso of [
-        () => this.puntosService?.reversarPorPedido(pedido.id),
-        () => this.stockService?.revertirPorPedido(pedido.id, undefined, usuarioActual?.partyId),
-      ]) {
-        try {
-          await paso();
-        } catch {
-          // idempotente
-        }
-      }
+      await this.devolverAlAnular(pedido.id, pedido.codigo, usuarioActual?.partyId, ip);
 
       // Insertar en historial
       await this.prisma.pedidoEstadoHistorial.create({

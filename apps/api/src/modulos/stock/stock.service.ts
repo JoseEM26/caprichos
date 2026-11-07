@@ -18,7 +18,7 @@ import { convertirAUnidadAlmacen, insumosDeLinea } from './receta.util';
 import { FECHA_HASTA_REACTIVAR } from '../cocina/cocina.util';
 import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-internos.service';
 import { controlAlmacenActivo } from './control-almacen';
-import { saldoSabor, sincronizarAgotadoSabor } from './producto-controlado';
+import { ORIGEN_AUTOMATICO, esAgotadoAutomatico, saldoSabor, sincronizarAgotadoSabor } from './producto-controlado';
 
 @Injectable()
 export class StockService {
@@ -897,51 +897,14 @@ export class StockService {
             }
           }
 
-          for (const prodId of prodsAgotar) {
-            await db.producto.update({
-              where: { id: prodId },
-              data: { agotado_hasta: FECHA_HASTA_REACTIVAR },
-            });
-
-            if (db.agotado?.create) {
-              await db.agotado.create({
-                data: {
-                  producto_id: prodId,
-                  tipo: 'PRODUCTO',
-                  alcance: 'HASTA_REACTIVAR',
-                  desde: ahora,
-                  hasta: FECHA_HASTA_REACTIVAR,
-                  por: BigInt(1),
-                  reactivado_en: null,
-                },
-              });
-            }
-          }
+          for (const prodId of prodsAgotar) await this.apagarProductoAutomatico(db, prodId, ahora);
         }
       }
 
       // Si algún producto terminado por tanda llegó a 0 o menos, apagarlo
       if (productosAgotadosDetectados.size > 0) {
         for (const prodIdStr of productosAgotadosDetectados) {
-          const prodId = BigInt(prodIdStr);
-          await db.producto.update({
-            where: { id: prodId },
-            data: { agotado_hasta: FECHA_HASTA_REACTIVAR },
-          });
-
-          if (db.agotado?.create) {
-            await db.agotado.create({
-              data: {
-                producto_id: prodId,
-                tipo: 'PRODUCTO',
-                alcance: 'HASTA_REACTIVAR',
-                desde: ahora,
-                hasta: FECHA_HASTA_REACTIVAR,
-                por: BigInt(1),
-                reactivado_en: null,
-              },
-            });
-          }
+          await this.apagarProductoAutomatico(db, BigInt(prodIdStr), ahora);
         }
       }
     }));
@@ -1160,9 +1123,37 @@ export class StockService {
   }
 
   /**
+   * Agotado AUTOMATICO por saldo 0 (insumo o producto terminado por tanda). Si ya está agotado (a mano o por
+   * stock) no se toca: un agotado MANUAL conserva su origen y no se duplica la fila de historial.
+   */
+  private async apagarProductoAutomatico(db: any, prodId: bigint, ahora: Date) {
+    const actual = await db.producto.findUnique?.({ where: { id: prodId }, select: { agotado_hasta: true } });
+    if (actual?.agotado_hasta && new Date(actual.agotado_hasta) > ahora) return;
+    await db.producto.update({
+      where: { id: prodId },
+      data: { agotado_hasta: FECHA_HASTA_REACTIVAR, agotado_origen: ORIGEN_AUTOMATICO },
+    });
+    if (db.agotado?.create) {
+      await db.agotado.create({
+        data: {
+          producto_id: prodId,
+          tipo: 'PRODUCTO',
+          alcance: 'HASTA_REACTIVAR',
+          desde: ahora,
+          hasta: FECHA_HASTA_REACTIVAR,
+          por: BigInt(1),
+          reactivado_en: null,
+          origen: ORIGEN_AUTOMATICO,
+        },
+      });
+    }
+  }
+
+  /**
    * FT-STK-01 / RN-CAP-041: Reactivación automática de productos cuando entra stock.
    * Si un producto o insumo estaba agotado y ahora tiene stock disponible (> 0),
-   * se limpia agotado_hasta y se cierra el registro de Agotado correspondiente.
+   * se limpia agotado_hasta y se cierra el registro de Agotado correspondiente. Solo el agotado AUTOMATICO:
+   * lo apagado a mano se queda hasta que alguien lo quite.
    */
   async verificarYReactivarAgotados(
     insumosIds: Array<bigint | string | number> = [],
@@ -1183,10 +1174,10 @@ export class StockService {
       const totalStock = stocks.reduce((acc: number, s: any) => acc + Number(s.cantidad), 0);
       if (totalStock > 0) {
         const prod = await db.producto?.findUnique?.({ where: { id: prodId } });
-        if (prod && prod.agotado_hasta && prod.agotado_hasta > ahora) {
+        if (prod && prod.agotado_hasta && prod.agotado_hasta > ahora && esAgotadoAutomatico(prod.agotado_origen)) {
           await db.producto?.update?.({
             where: { id: prodId },
-            data: { agotado_hasta: null },
+            data: { agotado_hasta: null, agotado_origen: null },
           });
           if (db.agotado?.updateMany) {
             await db.agotado.updateMany({
@@ -1220,7 +1211,7 @@ export class StockService {
 
       for (const prodId of prodsCandidatos) {
         const prod = await db.producto?.findUnique?.({ where: { id: prodId } });
-        if (prod && prod.agotado_hasta && prod.agotado_hasta > ahora) {
+        if (prod && prod.agotado_hasta && prod.agotado_hasta > ahora && esAgotadoAutomatico(prod.agotado_origen)) {
           // Verificar si TODOS los insumos requeridos por sus recetas tienen stock > 0
           const todasLineas = (await db.recetaLinea?.findMany?.({
             where: {
@@ -1247,7 +1238,7 @@ export class StockService {
           if (todosConStock) {
             await db.producto?.update?.({
               where: { id: prodId },
-              data: { agotado_hasta: null },
+              data: { agotado_hasta: null, agotado_origen: null },
             });
             if (db.agotado?.updateMany) {
               await db.agotado.updateMany({

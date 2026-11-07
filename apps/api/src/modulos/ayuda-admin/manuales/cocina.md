@@ -52,6 +52,7 @@ Ver tambien: [[mirest]]
 2. Buscar el plato en el catalogo de [[productos]] o el ingrediente en [[stock]].
 3. Elegir la duracion del agotado: Solo por el turno de hoy o Hasta que se reactive manualmente.
 4. Pulsar Confirmar agotado. El producto dejara de estar disponible para pedidos de inmediato.
+Lo que se marca asi es un agotado a mano: no vuelve solo al reponer stock ni al abrir el dia; se quita con Reactivar. En la lista Agotados ahora cada elemento dice "Agotado a mano (no vuelve solo)" o "Agotado por stock (vuelve al reponer)" (este ultimo lo marca el sistema cuando el saldo de un producto con stock llega a 0).
 Despues: [[productos]]
 Ver tambien: [[stock]]
 
