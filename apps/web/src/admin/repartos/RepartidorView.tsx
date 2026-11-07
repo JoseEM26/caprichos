@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSesion } from '../../comun/sesion';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { Confirmar } from '../../comun/Confirmar';
+import { LimiteError } from '../../comun/LimiteError';
 import { ErrorApi } from '../../comun/api';
 import { Icono } from '../../comun/Icono';
 import { ModalReportarFalla } from './ModalReportarFalla';
@@ -1422,6 +1423,7 @@ export function RepartidorView() {
             />
           )}
           {hoja.tipo === 'detalle' && !terminados.some((p) => p.id === hoja.id) && (
+            <LimiteError key={hoja.id}>
             <DetallePedido
               id={hoja.id}
               mio={pedidosActivos.find((p) => p.id === hoja.id)}
@@ -1442,6 +1444,7 @@ export function RepartidorView() {
                 setChatPedido({ id: p.id, codigo: p.codigo });
               }}
             />
+            </LimiteError>
           )}
           {hoja.tipo === 'hechos' && <HechosHoy hechos={hechosHoy} />}
           {hoja.tipo === 'falla' &&

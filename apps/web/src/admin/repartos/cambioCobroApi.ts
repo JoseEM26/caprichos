@@ -53,7 +53,9 @@ export const cambioCobroApi = {
   },
 
   /** Solicitud más reciente del pedido (cualquier estado) o null. */
-  vigente: (pedidoId: string) => api.get<SolicitudCambioCobro | null>(`/admin/repartos/${pedidoId}/cambio-cobro`),
+  // El API manda null como 200 sin cuerpo y el cliente lo vuelve {}: sin estado no hay solicitud
+  vigente: (pedidoId: string) =>
+    api.get<SolicitudCambioCobro | null>(`/admin/repartos/${pedidoId}/cambio-cobro`).then((s) => (s?.estado ? s : null)),
 
   pendientes: () => api.get<SolicitudPendienteCaja[]>('/admin/pedidos/cambio-cobro/pendientes'),
 

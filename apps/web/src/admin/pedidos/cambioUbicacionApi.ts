@@ -120,7 +120,8 @@ export const cambioUbicacionApi = {
 /** Repartidor: propone la ubicación real del cliente en un pedido suyo en curso. */
 export const propuestaUbicacionApi = {
   vigente(pedidoId: string): Promise<CambioUbicacion | null> {
-    return api.get(`/admin/repartos/${pedidoId}/ubicacion/propuesta`);
+    // null llega como {} (200 sin cuerpo): sin estado no hay propuesta
+    return api.get<CambioUbicacion | null>(`/admin/repartos/${pedidoId}/ubicacion/propuesta`).then((r) => (r?.estado ? r : null));
   },
 
   proponer(pedidoId: string, dto: { lat: number; lng: number; nota?: string }): Promise<CambioUbicacion> {

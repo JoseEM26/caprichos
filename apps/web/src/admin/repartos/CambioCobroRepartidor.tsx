@@ -28,7 +28,7 @@ export function useCambioCobro(pedidoId: string, activo = true) {
 
 /** Estado en vivo de la última solicitud de cambio de pago (pendiente, aprobada, rechazada o autorizada). */
 export function EstadoCambioCobro({ solicitud }: { solicitud: SolicitudCambioCobro | null }) {
-  if (!solicitud) return null;
+  if (!solicitud?.estado) return null;
   const color = solicitud.estado === 'RECHAZADA' ? 'var(--cp-rust)' : solicitud.estado === 'PENDIENTE' ? 'var(--cp-orange)' : 'var(--cp-green)';
   return (
     <div
