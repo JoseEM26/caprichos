@@ -252,6 +252,7 @@ export const MATRIZ: Record<string, string[]> = {
     'almacen/merma_producto',
     'pedidos/ver',
     'pedidos/cambiar_estado',
+    'pedidos/anular', // anula el pedido completo desde su comanda; el no-ADMIN lo autoriza con el código de supervisor
     'cocina/ver',
     'cocina/despejar',
     'cocina/despachar',

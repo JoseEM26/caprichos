@@ -21,10 +21,11 @@ import { UBICACION_PEDIDO_PUERTO } from '../chatbot/puerto/ubicacion-pedido.puer
 import { PropuestaUbicacionController } from './propuesta-ubicacion.controller';
 import { CambioCobroService } from './cambio-cobro.service';
 import { CambioCobroController } from './cambio-cobro.controller';
+import { CajaModule } from '../caja/caja.module';
 import { PagoPlanService } from '../pedidos/pago-plan.service';
 
 @Module({
-  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule],
+  imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule, CajaModule],
   controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController],
   providers: [
     PedidosEstadoService,

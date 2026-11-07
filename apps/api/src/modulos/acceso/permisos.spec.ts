@@ -57,8 +57,9 @@ describe('matriz de permisos de COCINA (coc-api)', () => {
     );
   });
 
-  it('no tiene caja, compras, usuarios, configuracion, clientes ni anular pedidos', () => {
-    const prohibidos = ['caja/', 'compras/', 'usuarios/', 'configuracion/', 'clientes/', 'pedidos/anular', 'repartos/'];
+  it('puede anular pedidos desde su comanda (con código de supervisor); no tiene caja, compras, usuarios, configuracion, clientes ni repartos', () => {
+    expect(cocina).toContain('pedidos/anular');
+    const prohibidos = ['caja/', 'compras/', 'usuarios/', 'configuracion/', 'clientes/', 'repartos/'];
     for (const prefijo of prohibidos) {
       expect(cocina.filter((p) => p.startsWith(prefijo))).toEqual([]);
     }

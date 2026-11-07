@@ -21,6 +21,8 @@ export interface ModalAnularProps {
   pedidoId: string | number;
   codigoPedido: string;
   esCobro?: boolean;
+  /** Desde la comanda de cocina: se anula el pedido completo (todas las áreas), no solo el área que se ve. */
+  completo?: boolean;
   cobroId?: string | number;
   /** Detalle del pedido para el encabezado (cliente, modalidad, estado, total, líneas). Opcional. */
   pedido?: Pedido | null;
@@ -43,6 +45,7 @@ export function ModalAnular({
   pedidoId,
   codigoPedido,
   esCobro = false,
+  completo = false,
   cobroId,
   pedido,
   alCerrar,
@@ -214,6 +217,11 @@ export function ModalAnular({
             {esCobro
               ? `La anulación del cobro revierte el estado de pago del pedido a PENDIENTE y queda registrada en auditoría${pideCodigo ? ' con el PIN del supervisor' : ''}.`
               : `Un pedido anulado sale de cocina y reparto, y libera sus mesas. Requiere motivo de 5 o más caracteres${pideCodigo ? ' y el PIN de 6 dígitos de la supervisora' : ''}.`}
+            {completo && (
+              <div style={{ marginTop: 6, fontWeight: 700 }}>
+                Se anula el pedido COMPLETO, con todas sus áreas (no solo la que ves en esta pantalla). Si ya estaba cobrado, su cobro también se anula y sale de la caja.
+              </div>
+            )}
             {tieneCobro && !esCobro && (
               <div style={{ marginTop: 6 }}>
                 Este pedido tiene un cobro registrado: al anularlo se devuelve su stock y se reversan sus puntos. Si ya está entregado con cobro vigente, el sistema no lo anula: primero hay que anular el cobro.
@@ -337,7 +345,7 @@ export function ModalAnular({
               ? `¿Anular el cobro de ${codigoPedido}?`
               : `¿Anular el pedido ${codigoPedido}?`
           }
-          mensaje={`Motivo: ${motivo.trim()}.${pideCodigo ? ' Esta acción requiere el PIN del supervisor ingresado.' : ''}`}
+          mensaje={`${completo && !esCobro ? 'Se anulará el pedido COMPLETO, todas las áreas. ' : ''}Motivo: ${motivo.trim()}.${pideCodigo ? ' Esta acción requiere el PIN del supervisor ingresado.' : ''}`}
           textoSi="Sí, anular"
           peligro
           alConfirmar={ejecutarAnulacion}

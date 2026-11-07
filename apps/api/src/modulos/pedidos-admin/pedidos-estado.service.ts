@@ -8,6 +8,7 @@ import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { CONFIG_ETA_DEFECTO, leerConfigEta } from '../repartos/eta-entrega';
 import { FILTRO_CANCELADO_NO_RECIBIR, PAGOS_DEVOLVIBLES, nombresDePartes, salidaDevolucion } from './devolucion-pedido.util';
 import { StockService } from '../stock/stock.service';
+import { CobrosService } from '../caja/cobros.service';
 import { ImpresionService } from '../impresion/impresion.service';
 import { SalonService } from '../salon/salon.service';
 import {
@@ -115,6 +116,7 @@ export class PedidosEstadoService {
     @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
     @Optional() private readonly impresionService?: ImpresionService,
     @Optional() private readonly avisos?: AvisosPedidoService,
+    @Optional() private readonly cobros?: CobrosService,
   ) {}
 
   /**
@@ -1013,6 +1015,31 @@ export class PedidosEstadoService {
           : (await this.verificarPinSupervisor(pinSupervisor, usuarioActual.partyId, ip, pedido.id))
               .party_id ?? usuarioActual.partyId;
 
+      // Un pedido cobrado y aún sin entregar: primero se anula su cobro (el mismo flujo de Caja: sale del arqueo
+      // y del cierre, devuelve puntos e insumos). Si la caja del cobro ya cerró, no se anula: queda para devolución.
+      if (!entregadoSinCobro) {
+        const cobroVigente = await this.prisma.cobro.findFirst({
+          where: { pedido_id: pedido.id, anulado_en: null },
+          select: { id: true },
+        });
+        if (cobroVigente) {
+          if (!this.cobros) {
+            throw new ConflictException({ codigo: 'PEDIDO_COBRADO', mensaje: 'El pedido tiene un cobro vigente. Anula primero el cobro.' });
+          }
+          try {
+            await this.cobros.anularCobro(cobroVigente.id, { motivo: `Pedido anulado: ${motivo}` }, undefined, usuarioActual, ip, true);
+          } catch (e: any) {
+            if (e?.getResponse?.()?.codigo === 'CAJA_CERRADA') {
+              throw new ConflictException({
+                codigo: 'PEDIDO_COBRADO_CAJA_CERRADA',
+                mensaje: 'El cobro de este pedido pertenece a una caja ya cerrada: no se puede anular. Registra la devolución al cliente.',
+              });
+            }
+            throw e;
+          }
+        }
+      }
+
       // Actualizar pedido a ANULADO
       const pedidoActualizado = await this.prisma.pedido.update({
         where: { id: pedido.id },
@@ -1068,6 +1095,13 @@ export class PedidosEstadoService {
         await this.salonService?.liberarMesasDePedido(pedido.id);
       } catch {
         // idempotente: se puede liberar a mano
+      }
+
+      // las etiquetas aún pendientes de este pedido ya no se imprimen
+      try {
+        await this.impresionService?.vencerTrabajosObsoletos();
+      } catch {
+        // también las vence el ciclo de impresión
       }
 
       return pedidoActualizado;

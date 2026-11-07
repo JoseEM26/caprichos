@@ -13,7 +13,7 @@ sugerencias:
   - Que significa el tiempo en colores de cada comanda
   - Que es el numero del dia (#7) de un pedido
   - Por que sale Falta el conteo de apertura de hoy
-  - Como hago que no me pregunte Si o No al despejar
+  - Como anulo un pedido que ya esta en cocina
 ---
 # Cocina
 
@@ -39,6 +39,14 @@ Ver tambien: [[pantallas]]
 2. Ubicar la comanda en la lista de despejadas de hoy.
 3. Pulsar el boton Devolver a cocina.
 4. La comanda volvera de inmediato a la pantalla activa conservando su tiempo transcurrido original.
+Ver tambien: [[caja]]
+
+## Como se hace: Anular un pedido que ya esta en cocina
+1. En la comanda, pulsar el boton rojo Anular pedido (solo lo ve quien tiene permiso para anular).
+2. Elegir o escribir el motivo (al menos 5 caracteres).
+3. Si eres Administrador no se pide ningun codigo: se autoriza solo y queda registrado a tu nombre. Si no, escribir el codigo de 6 digitos del supervisor (ver [[supervisor-codigo]]).
+4. Confirmar con Si, anular. Se anula el pedido COMPLETO: desaparece de todas las areas (aunque lo anules desde Bebidas), se devuelven el stock y los puntos, se cancelan las etiquetas por imprimir y se liberan sus mesas.
+5. Si el pedido ya estaba cobrado, su cobro tambien se anula por el mismo camino de [[caja]] y deja de contar en el arqueo y el cierre. Si la caja de ese cobro ya cerro, el sistema no deja anular: registra la devolucion al cliente.
 Ver tambien: [[caja]]
 
 ## Como se hace: Activar el modo de alta demanda

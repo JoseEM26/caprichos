@@ -19,6 +19,8 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { CobrosService } from '../caja/cobros.service';
+import { ImpresionService } from '../impresion/impresion.service';
 
 describe('PedidosEstadoService', () => {
   let service: PedidosEstadoService;
@@ -28,6 +30,8 @@ describe('PedidosEstadoService', () => {
   let auditoriaMock: any;
   let eventosGatewayMock: any;
   let salonMock: any;
+  let cobrosMock: any;
+  let impresionMock: any;
 
   const adminAuth: UsuarioAutenticado = {
     partyId: 1n,
@@ -106,6 +110,8 @@ describe('PedidosEstadoService', () => {
     eventosGatewayMock = {
       emitirAdmin: jest.fn(),
     };
+    cobrosMock = { anularCobro: jest.fn().mockResolvedValue({}) };
+    impresionMock = { vencerTrabajosObsoletos: jest.fn().mockResolvedValue(0) };
 
     const supervisorCodigoMock = {
       verificarYConsumirCodigo: jest.fn().mockImplementation(async (codigo: string | undefined, partyId?: any) => {
@@ -151,6 +157,8 @@ describe('PedidosEstadoService', () => {
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: SalonService, useValue: salonMock },
+        { provide: CobrosService, useValue: cobrosMock },
+        { provide: ImpresionService, useValue: impresionMock },
         { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
       ],
     }).compile();
@@ -651,6 +659,60 @@ describe('PedidosEstadoService', () => {
         codigo: 'CP-W001',
         estado: 'ANULADO',
       });
+    });
+  });
+
+  describe('anular desde cocina un pedido en curso (completo, caja cuadrada)', () => {
+    const enCola = { id: 10n, codigo: 'CP-K010', modalidad: 'RECOGER', estado: 'COLA' };
+    const motivo = 'Cliente se arrepintió';
+
+    it('sin cobro no toca la caja; vence las etiquetas pendientes y avisa a todas las pantallas', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(enCola);
+      prismaMock.pedido.update.mockResolvedValue({ ...enCola, estado: 'ANULADO' });
+
+      await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, adminAuth, undefined, undefined, true);
+
+      expect(cobrosMock.anularCobro).not.toHaveBeenCalled();
+      expect(impresionMock.vencerTrabajosObsoletos).toHaveBeenCalled();
+      expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('pedido:estado', expect.objectContaining({ estado: 'ANULADO' }));
+    });
+
+    it('con cobro vigente lo anula primero por el flujo de Caja (queda fuera del arqueo) y luego el pedido', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(enCola);
+      prismaMock.cobro.findFirst.mockResolvedValue({ id: 5n });
+      prismaMock.pedido.update.mockResolvedValue({ ...enCola, estado: 'ANULADO' });
+
+      await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, adminAuth, undefined, undefined, true);
+
+      expect(cobrosMock.anularCobro).toHaveBeenCalledWith(5n, { motivo: `Pedido anulado: ${motivo}` }, undefined, adminAuth, undefined, true);
+      expect(cobrosMock.anularCobro.mock.invocationCallOrder[0]).toBeLessThan(prismaMock.pedido.update.mock.invocationCallOrder[0]);
+    });
+
+    it('si la caja del cobro ya cerró no anula nada (409 PEDIDO_COBRADO_CAJA_CERRADA)', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(enCola);
+      prismaMock.cobro.findFirst.mockResolvedValue({ id: 5n });
+      cobrosMock.anularCobro.mockRejectedValue(new HttpException({ codigo: 'CAJA_CERRADA', mensaje: 'x' }, HttpStatus.CONFLICT));
+
+      await expect(
+        service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, adminAuth, undefined, undefined, true),
+      ).rejects.toMatchObject({ response: { codigo: 'PEDIDO_COBRADO_CAJA_CERRADA' } });
+      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('cocina sin permiso pedidos/anular recibe 403; con permiso y código de supervisor anula', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue(enCola);
+      prismaMock.rolPermiso.findFirst.mockResolvedValue(null);
+      await expect(
+        service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cocinaAuth, '654321'),
+      ).rejects.toMatchObject({ response: { codigo: 'SIN_PERMISO' } });
+
+      prismaMock.rolPermiso.findFirst.mockResolvedValue({ id: 1n });
+      prismaMock.pedido.update.mockResolvedValue({ ...enCola, estado: 'ANULADO' });
+      const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cocinaAuth, '654321');
+      expect(res.estado).toBe('ANULADO');
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ anulado_por: 3n, anulacion_aprobada_por: 99n }) }),
+      );
     });
   });
 

@@ -29,6 +29,7 @@ import {
   setSilenciado,
 } from './audioAlerta';
 import type { AjustesCocina } from './cocinaApi';
+import { ModalAnular } from '../pedidos/ModalAnular';
 import { ComandaTarjeta, SEGUNDOS_DESHACER } from './ComandaTarjeta';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
@@ -145,6 +146,8 @@ export function CocinaAdminView() {
   const puedeVer = tiene('cocina/ver');
   const puedeDespejar = tiene('cocina/despejar');
   const puedeDespachar = tiene('cocina/despachar');
+  const puedeAnular = tiene('pedidos/anular');
+  const [anulando, setAnulando] = useState<Comanda | null>(null);
 
   // Modo de pestañas: 'area' (Pantalla del área), 'hist' (Despejadas hoy)
   const [modo, setModo] = useState<ModoCocina>('area');
@@ -1065,6 +1068,7 @@ export function CocinaAdminView() {
                   puedeDespachar={puedeDespachar && enTodas}
                   alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                   alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
+                  alAnular={puedeAnular ? setAnulando : undefined}
                 />
               ))}
             </div>
@@ -1280,6 +1284,7 @@ export function CocinaAdminView() {
                       puedeDespachar={puedeDespachar && enTodas}
                       alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                       alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
+                  alAnular={puedeAnular ? setAnulando : undefined}
                     />
                   ))}
                 </div>
@@ -1287,6 +1292,20 @@ export function CocinaAdminView() {
             </div>
           </div>
         </div>
+      )}
+
+      {anulando && (
+        <ModalAnular
+          pedidoId={anulando.pedidoId}
+          codigoPedido={anulando.codigo}
+          completo
+          alCerrar={() => setAnulando(null)}
+          alAnularExitoso={() => {
+            setAnulando(null);
+            cargarAreas();
+            if (modo === 'area') cargarComandas(areaSeleccionada);
+          }}
+        />
       )}
 
       {/* Confirmación Sí/No de Despacho: irreversible */}
