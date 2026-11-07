@@ -18,7 +18,7 @@ function mapaBase(over: Partial<MapaImpresionDatos> = {}): MapaImpresionDatos {
       { deviceKeyId: CAJA, nombre: 'PC Caja', areaId: null, maquinas: ['ETIQUETERA', 'TICKETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }, { rol: 'TICKETERA', estado: 'lista' }], ultimoLatido: null, conectado: true },
       { deviceKeyId: '11', nombre: 'Etiquetera bar', areaId: '1', maquinas: ['ETIQUETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }, { rol: 'TICKETERA', estado: 'no_configurada' }], ultimoLatido: null, conectado: true },
     ],
-    reglas: { generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true, comandaAreaActivo: false },
+    reglas: { generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], areaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], bebidaModalidades: ['MESA', 'LOCAL', 'LLEVAR', 'RECOGER', 'DELIVERY'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true, comandaAreaActivo: false },
     ruteo: [
       { tipo: 'ETIQUETA_GENERAL', areaId: null, destinoAreaId: null, destinoEquipoId: CAJA, destinoNombre: 'PC Caja', activo: true },
       { tipo: 'ETIQUETA_BEBIDA', areaId: '1', destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Etiquetera bar', activo: true },

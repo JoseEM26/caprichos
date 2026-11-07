@@ -6,6 +6,10 @@
 export const CLAVES_CONFIG_IMPRESION = {
   /** Modalidades en las que sale el sticker general (resumen con total). */
   ETIQUETA_GENERAL_MODALIDADES: 'impresion_etiqueta_general_modalidades',
+  /** Modalidades en las que sale el sticker por área (decisión del dueño 07/11: llevar, recoger y delivery). */
+  ETIQUETA_AREA_MODALIDADES: 'impresion_etiqueta_area_modalidades',
+  /** Modalidades en las que sale el sticker por vaso (la PC de bebidas imprime solo delivery y recojo). */
+  ETIQUETA_BEBIDA_MODALIDADES: 'impresion_etiqueta_bebida_modalidades',
   /** Sticker por vaso de bebida: todos los pedidos con bebidas (salón, llevar, delivery). */
   ETIQUETA_BEBIDA_ACTIVO: 'impresion_etiqueta_bebida_activo',
   /** Sticker por área: uno por cada área con productos, salvo Bebidas (ya sale uno por vaso). Apagado por defecto hasta que el dueño lo confirme. */
@@ -26,6 +30,10 @@ export const MODALIDADES_SALON = ['MESA', 'LOCAL'] as const;
 
 export interface ReglasImpresion {
   generalModalidades: string[];
+  /** Modalidades del sticker por área. */
+  areaModalidades: string[];
+  /** Modalidades del sticker por vaso. */
+  bebidaModalidades: string[];
   bebidaActivo: boolean;
   areaActivo: boolean;
   comandaSalonActivo: boolean;
@@ -34,8 +42,10 @@ export interface ReglasImpresion {
 
 export const REGLAS_IMPRESION_DEFECTO: ReglasImpresion = {
   generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
+  areaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
+  bebidaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
   bebidaActivo: true,
-  areaActivo: false,
+  areaActivo: true,
   comandaSalonActivo: true,
   comandaAreaActivo: false,
 };

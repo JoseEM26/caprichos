@@ -134,7 +134,9 @@ export class ImpresoraUsb implements IDispositivoImpresora {
       if (err.code === 'ENOENT') {
         return {
           estado: 'desconectada',
-          detalle: `No encontrada (ruta ${this.rutaDispositivo})`,
+          detalle: this.identidad
+            ? `Impresora guardada no encontrada: ${this.identidad}`
+            : `No encontrada (ruta ${this.rutaDispositivo})`,
         };
       }
       if (err.code === 'EACCES' || err.code === 'EPERM') {

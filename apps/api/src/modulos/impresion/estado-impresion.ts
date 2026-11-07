@@ -1,8 +1,10 @@
 import {
   EstadoImpresora,
   EstadoMaquinaImpresion,
+  ImpresoraCandidata,
   ImpresoraReportada,
   RolImpresora,
+  SeleccionImpresoras,
 } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 
@@ -70,10 +72,36 @@ const MOTIVO_ESTADO: Record<string, string> = {
  * El latido guarda las máquinas en latido_detalle como JSON ({ detalle, impresoras }) para no tocar el
  * esquema; un latido viejo trae texto plano o nada.
  */
-export function empaquetarDetalleLatido(detalle?: string | null, impresoras?: ImpresoraReportada[]): string | null {
+export function empaquetarDetalleLatido(
+  detalle?: string | null,
+  impresoras?: ImpresoraReportada[],
+  candidatas?: ImpresoraCandidata[],
+): string | null {
   const d = detalle?.trim() || null;
-  if (!impresoras?.length) return d;
-  return JSON.stringify({ detalle: d, impresoras });
+  if (!impresoras?.length && !candidatas?.length) return d;
+  return JSON.stringify({ detalle: d, impresoras: impresoras ?? [], ...(candidatas ? { candidatas } : {}) });
+}
+
+/** Impresoras que el programa del local dice ver (vacío si es un programa viejo). */
+export function leerCandidatasLatido(detalle?: string | null): ImpresoraCandidata[] {
+  if (!detalle || !detalle.startsWith('{')) return [];
+  try {
+    const j = JSON.parse(detalle);
+    return Array.isArray(j.candidatas) ? j.candidatas : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Clave del parámetro donde se guarda lo elegido en el panel para un equipo (sin migración). */
+export const claveSeleccion = (deviceKeyId: bigint | string) => `impresion_seleccion_${deviceKeyId}`;
+
+export function leerSeleccion(valor: unknown): SeleccionImpresoras {
+  const v = (valor ?? {}) as Record<string, unknown>;
+  const r: SeleccionImpresoras = {};
+  if (typeof v.ETIQUETERA === 'string') r.ETIQUETERA = v.ETIQUETERA;
+  if (typeof v.TICKETERA === 'string') r.TICKETERA = v.TICKETERA;
+  return r;
 }
 
 export function leerImpresorasLatido(detalle?: string | null): ImpresoraReportada[] | null {
@@ -109,11 +137,12 @@ export function estadoPorRol(
   const una = (rol: RolImpresora): EstadoMaquinaImpresion => {
     const r = lista.find((x) => x.rol === rol);
     if (!r) {
-      return { conectada: false, estado: 'no_configurada', motivo: 'No está configurada en el programa del local' };
+      return { conectada: false, estado: 'no_configurada', motivo: 'Aún no elegiste la impresora de esta máquina: elige una de la lista' };
     }
-    if (r.estado === 'lista') return { conectada: true, estado: 'lista', motivo: null, ...(r.detalle ? { detalle: r.detalle } : {}) };
+    const id = { ...(r.id ? { impresoraId: r.id } : {}), ...(r.nombre ? { impresoraNombre: r.nombre } : {}) };
+    if (r.estado === 'lista') return { conectada: true, estado: 'lista', motivo: null, ...(r.detalle ? { detalle: r.detalle } : {}), ...id };
     const base = MOTIVO_ESTADO[r.estado] || 'Impresora con problema';
-    return { conectada: false, estado: r.estado, motivo: r.detalle && (r.estado === 'sin_permiso' || r.estado === 'desconectada') ? r.detalle : r.detalle && r.estado === 'error' ? `${base}: ${r.detalle}` : base };
+    return { conectada: false, estado: r.estado, motivo: r.detalle && (r.estado === 'sin_permiso' || r.estado === 'desconectada') ? r.detalle : r.detalle && r.estado === 'error' ? `${base}: ${r.detalle}` : base, ...id };
   };
   return { ETIQUETERA: una('ETIQUETERA'), TICKETERA: una('TICKETERA') };
 }

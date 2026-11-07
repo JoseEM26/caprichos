@@ -74,15 +74,19 @@ describe('aplicaSegunReglas (modalidad y activos)', () => {
     expect(aplicaSegunReglas('ETIQUETA_GENERAL', 'LOCAL', r)).toBe(false);
   });
 
-  it('el sticker por vaso va en todas las modalidades (salón incluido) mientras esté activo', () => {
-    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'MESA', r)).toBe(true);
+  it('el sticker por vaso sale por defecto solo en llevar, recoger y delivery (la PC de bebidas), y es editable', () => {
     expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'DELIVERY', r)).toBe(true);
-    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'MESA', { ...r, bebidaActivo: false })).toBe(false);
+    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'RECOGER', r)).toBe(true);
+    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'MESA', r)).toBe(false);
+    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'MESA', { ...r, bebidaModalidades: ['MESA'] })).toBe(true);
+    expect(aplicaSegunReglas('ETIQUETA_BEBIDA', 'DELIVERY', { ...r, bebidaActivo: false })).toBe(false);
   });
 
-  it('el sticker por área está apagado por defecto', () => {
+  it('el sticker por área sale por defecto en llevar, recoger y delivery, y es editable', () => {
+    expect(aplicaSegunReglas('ETIQUETA_AREA', 'DELIVERY', r)).toBe(true);
     expect(aplicaSegunReglas('ETIQUETA_AREA', 'MESA', r)).toBe(false);
-    expect(aplicaSegunReglas('ETIQUETA_AREA', 'MESA', { ...r, areaActivo: true })).toBe(true);
+    expect(aplicaSegunReglas('ETIQUETA_AREA', 'DELIVERY', { ...r, areaActivo: false })).toBe(false);
+    expect(aplicaSegunReglas('ETIQUETA_AREA', 'MESA', { ...r, areaModalidades: ['MESA'] })).toBe(true);
   });
 
   it('la comanda de salón solo es para mesa/local, nunca llevar ni delivery', () => {
@@ -105,7 +109,7 @@ describe('reglas desde parametro y cambios', () => {
       [CLAVES_CONFIG_IMPRESION.ETIQUETA_AREA_ACTIVO]: 'si',
     });
     expect(r.generalModalidades).toEqual(['DELIVERY']);
-    expect(r.areaActivo).toBe(false);
+    expect(r.areaActivo).toBe(true);
   });
 
   it('valoresDesdeCambio valida modalidades y booleanos', () => {

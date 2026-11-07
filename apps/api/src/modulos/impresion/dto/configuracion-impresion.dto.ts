@@ -10,6 +10,18 @@ export class ReglasImpresionDto {
   generalModalidades?: string[];
 
   @IsOptional()
+  @IsArray({ message: 'areaModalidades debe ser una lista' })
+  @ArrayUnique({ message: 'Hay modalidades repetidas' })
+  @IsIn(MODALIDADES_PEDIDO as unknown as string[], { each: true, message: 'Modalidad no válida' })
+  areaModalidades?: string[];
+
+  @IsOptional()
+  @IsArray({ message: 'bebidaModalidades debe ser una lista' })
+  @ArrayUnique({ message: 'Hay modalidades repetidas' })
+  @IsIn(MODALIDADES_PEDIDO as unknown as string[], { each: true, message: 'Modalidad no válida' })
+  bebidaModalidades?: string[];
+
+  @IsOptional()
   @IsBoolean({ message: 'bebidaActivo debe ser verdadero o falso' })
   bebidaActivo?: boolean;
 

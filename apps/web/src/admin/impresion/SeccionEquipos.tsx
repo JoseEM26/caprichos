@@ -4,6 +4,7 @@ import { useSesion } from '../../comun/sesion';
 import { Confirmar } from '../../comun/Confirmar';
 import { Cargando } from '../../comun/Cargando';
 import { impresionApi, LlaveAgenteAdmin } from './impresionApi';
+import { ImpresorasDelEquipo } from './ImpresorasDelEquipo';
 import { PanelInstalarPrograma } from './PanelInstalarPrograma';
 import { NOMBRE_MAQUINA, useEstadoMaquinas } from './useEstadoMaquinas';
 
@@ -256,6 +257,11 @@ export function SeccionEquipos() {
           );
         })}
       </div>
+
+      {/* Cada computadora con el programa: impresoras que ve, pruebas y «Usar esta impresora» (POR computadora) */}
+      {(estado?.equipos ?? []).map((eq) => (
+        <ImpresorasDelEquipo key={eq.deviceKeyId} equipo={eq} alCambiar={actualizar} />
+      ))}
 
       {/* Llaves de autenticación del agente (solo ADMIN crea o desactiva) */}
       <div

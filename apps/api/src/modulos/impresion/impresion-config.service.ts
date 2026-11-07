@@ -363,6 +363,8 @@ export class ImpresionConfigService {
 export function reglasDto(r: ReglasImpresion) {
   return {
     generalModalidades: r.generalModalidades,
+    areaModalidades: r.areaModalidades,
+    bebidaModalidades: r.bebidaModalidades,
     bebidaActivo: r.bebidaActivo,
     areaActivo: r.areaActivo,
     comandaSalonActivo: r.comandaSalonActivo,
@@ -373,8 +375,8 @@ export function reglasDto(r: ReglasImpresion) {
 function activoDelTipo(tipo: string, r: ReglasImpresion): boolean {
   switch (tipo) {
     case 'ETIQUETA_GENERAL': return r.generalModalidades.length > 0;
-    case 'ETIQUETA_AREA': return r.areaActivo;
-    case 'ETIQUETA_BEBIDA': return r.bebidaActivo;
+    case 'ETIQUETA_AREA': return r.areaActivo && r.areaModalidades.length > 0;
+    case 'ETIQUETA_BEBIDA': return r.bebidaActivo && r.bebidaModalidades.length > 0;
     case 'TICKET_COMANDA_SALON': return r.comandaSalonActivo;
     case 'TICKET_COMANDA_AREA': return r.comandaAreaActivo;
     default: return true;

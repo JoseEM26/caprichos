@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class TomarTrabajosDto {
   @IsOptional()
@@ -14,4 +14,9 @@ export class TomarTrabajosDto {
   @IsArray()
   @IsIn(['ETIQUETERA', 'TICKETERA'], { each: true })
   roles?: ('ETIQUETERA' | 'TICKETERA')[];
+
+  /** El programa sabe imprimir pruebas dirigidas a una impresora concreta: recibe también esas, aunque no haya máquina lista. */
+  @IsOptional()
+  @IsBoolean()
+  pruebas?: boolean;
 }

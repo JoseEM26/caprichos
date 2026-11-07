@@ -20,13 +20,25 @@ Gobierna qué se imprime (stickers de bebida y por área, comanda de salón), en
 
 ## Como se hace: encender o apagar lo que se imprime
 1. En Configuración del local abre "Impresión" y la sección "Mapa" ([Impresión](/admin/mirest?tab=impresion); enlace directo a la sección: /admin/mirest?tab=impresion&seccion=mapa).
-2. Enciende o apaga "Sticker de bebida", "Sticker por área" o "Comanda de salón" y confirma. El sticker por área viene apagado hasta que el dueño lo confirme.
+2. Enciende o apaga "Sticker de bebida", "Sticker por área" o "Comanda de salón" y confirma. Los stickers de bebida y por área salen por defecto en llevar, recoger y delivery; los botones "Sale en" lo cambian.
 3. El sticker de bebida sale por cada vaso en el equipo de Bebidas (o en Caja si no hay). La comanda de salón sale en la ticketera de Caja al aceptar un pedido de mesa o local; no sale para llevar ni delivery.
 
 ## Como se hace: conectar el programa de impresión a la PC de Caja
 1. Abre la sección "Equipos y estado" (/admin/mirest?tab=impresion&seccion=equipos).
 2. Descarga el programa de impresión (Windows o Linux) y vincúlalo con el código de un solo uso. Desde ahí eliges qué equipo es la etiquetera y cuál la ticketera.
 3. El estado dice si el programa está conectado (último latido) y si la impresora está lista, sin papel, desconectada o con error. Sin conexión, las etiquetas se acumulan como pendientes. "Actualizar" vuelve a consultar.
+
+## Como se hace: saber cuál impresora es cuál y dejarla fija
+1. En "Equipos y estado" aparece un bloque por cada computadora con el programa (Caja, Bebidas...). Cada una lista SUS impresoras reales, numeradas; no salen PDF, OneNote, Fax ni XPS.
+2. Pulsa "Probar TODAS": cada impresora imprime "Impresora N de M" en grande. Mira cuál sacó la hoja. También puedes usar "Imprimir prueba" en una sola.
+3. En la impresora correcta pulsa "Usar como etiquetera" o "Usar como ticketera" y confirma. Queda guardada en esa computadora: al apagar y encender, el programa se conecta SOLO a esa impresora, hasta que la cambies aquí.
+4. Si la guardada no está encendida, el estado dice "La impresora elegida no aparece (nombre)" y el programa la busca solo; nunca cambia a otra por su cuenta.
+5. El estado por máquina dice una de cuatro cosas: "El programa no está corriendo", "Aún no elegiste la impresora para este rol", "La impresora elegida no aparece (nombre)" o "Lista".
+6. Si una computadora está apagada, el panel avisa cuál falta y que sus trabajos esperan en cola (no se pierden).
+7. En la computadora también hay comandos (impresoras, probar-todas, usar etiquetera 3, estado, autoarranque activar); el panel los muestra para copiar. Guía: docs/operacion/GUIA-elegir-impresora-y-autoarranque.md.
+
+## Como se hace: repartir entre dos computadoras
+Por defecto la PC de Caja imprime el ticket de pago y la comanda, y para llevar, recoger y delivery el sticker general y los stickers por área. La segunda PC (asignada al área Bebidas con "Asignar equipo" en el Mapa) imprime solo los stickers de bebida de llevar, recoger y delivery. Qué pedidos saca cada sticker se cambia con los botones "Sale en" de cada regla en el Mapa.
 
 ## Como se hace: crear o desactivar una llave del agente
 1. En "Llaves de acceso del agente de impresión" escribe un nombre para reconocer la PC (por ejemplo "Agente PC Caja 1") y pulsa "Crear llave".
@@ -39,10 +51,11 @@ Gobierna qué se imprime (stickers de bebida y por área, comanda de salón), en
 3. Las pruebas de impresión imprimen una pieza marcada PRUEBA para comprobar la etiquetera y la ticketera; no hacen ningún pedido.
 
 ## Ajustes: Impresión
-- **Sticker de bebida**: Enciende o apaga el sticker que sale por cada vaso con bebida. Afecta a todos los pedidos que llevan bebidas y se imprime en el equipo que atiende Bebidas, o en Caja si no hay. Ejemplo: Apagado: los vasos ya no salen con sticker; el resto de tickets sigue igual. Permiso: configuracion/editar. [Sticker de bebida](/admin/mirest?tab=impresion&seccion=mapa&campo=mapa-impresion-bebida)
-- **Sticker por área**: Enciende o apaga un sticker por cada área con productos (Salados, Postres…), para que cada área lo reciba en su equipo. Bebidas no lleva este sticker: ya sale uno por cada vaso. Viene apagado hasta que el dueño lo confirme. Permiso: configuracion/editar. [Sticker por área](/admin/mirest?tab=impresion&seccion=mapa&campo=mapa-impresion-area)
+- **Sticker de bebida**: Enciende o apaga el sticker que sale por cada vaso con bebida. Por defecto sale en pedidos para llevar, recoger y delivery (no en mesa) y se imprime en la computadora asignada a Bebidas, o en Caja si no hay. Los botones «Sale en» eligen los tipos de pedido. Ejemplo: Apagado: los vasos ya no salen con sticker; el resto de tickets sigue igual. Permiso: configuracion/editar. [Sticker de bebida](/admin/mirest?tab=impresion&seccion=mapa&campo=mapa-impresion-bebida)
+- **Sticker por área**: Enciende o apaga un sticker por cada área con productos (Salados, Postres…), para que cada área lo reciba en su equipo. Bebidas no lleva este sticker: ya sale uno por cada vaso. Por defecto sale en llevar, recoger y delivery, en la computadora de Caja; los botones «Sale en» eligen los tipos de pedido. Permiso: configuracion/editar. [Sticker por área](/admin/mirest?tab=impresion&seccion=mapa&campo=mapa-impresion-area)
 - **Comanda de salón**: Enciende o apaga la comanda que sale en la ticketera de Caja al aceptar un pedido de mesa o local, con cada línea, tamaño, opciones y notas. No sale para llevar ni delivery. Permiso: configuracion/editar. [Comanda de salón](/admin/mirest?tab=impresion&seccion=mapa&campo=mapa-impresion-comanda)
 - **Estado del agente de impresión de la PC de Caja**: Dice si el programa de la PC de Caja está conectado (último latido) y si la impresora está lista, sin papel, desconectada o con error. Si está sin conexión, las etiquetas se acumulan como pendientes. [Estado del agente de impresión de la PC de Caja](/admin/mirest?tab=impresion&seccion=equipos&campo=impresion-agente)
+- **Impresoras de cada computadora: probar todas y elegir**: Por cada computadora con el programa (Caja, Bebidas...) lista sus impresoras reales, sin PDF ni OneNote. «Probar TODAS» imprime en cada una su número grande para saber cuál es cuál; «Usar como etiquetera/ticketera» la deja guardada en esa computadora: al encenderla se conecta sola a esa impresora hasta que la cambies aquí. Muestra también si el programa no corre, si falta elegir o si la elegida no aparece, y los comandos del programa para copiar. Ejemplo: Probar TODAS: la impresora que saque «Impresora 3 de 15» es la número 3; pulsa «Usar como etiquetera» en la 3. Permiso: configuracion/editar. [Impresoras de cada computadora: probar todas y elegir](/admin/mirest?tab=impresion&seccion=equipos&campo=impresion-impresoras-equipo)
 - **Instalar o vincular el programa de impresión**: Descarga el programa para la PC de Caja (Windows o Linux) y lo vincula con un código de un solo uso. Sirve también para elegir qué equipo es la etiquetera y cuál la ticketera. [Instalar o vincular el programa de impresión](/admin/mirest?tab=impresion&seccion=equipos&campo=impresion-instalar)
 - **Actualizar estado del agente y la cola**: Vuelve a consultar el estado del agente, de la impresora y de la cola de trabajos. No cambia ninguna configuración. [Actualizar estado del agente y la cola](/admin/mirest?tab=impresion&seccion=equipos&campo=impresion-actualizar)
 - **Llaves de acceso del agente de impresión**: Claves que autorizan a una PC a imprimir las etiquetas del local. Solo el Administrador las crea o desactiva. Desactivar una llave deja a esa PC sin imprimir hasta darle una nueva. Permiso: ADMIN. [Llaves de acceso del agente de impresión](/admin/mirest?tab=impresion&seccion=equipos&campo=impresion-llaves)
@@ -56,6 +69,8 @@ Gobierna qué se imprime (stickers de bebida y por área, comanda de salón), en
 ## Errores y dudas comunes
 - Las etiquetas no salen: revisa en "Equipos y estado" si el agente está conectado y la impresora lista; si no, se acumulan como pendientes.
 - Una etiqueta vieja no salió sola al reconectar: pasó el vencimiento ("Vencimiento de etiquetas no impresas") y quedó VENCIDA; se reimprime a mano.
+- El panel dice "El programa no está corriendo": abre el programa en esa computadora (o actívale el arranque automático con "autoarranque activar").
+- El panel dice "La impresora elegida no aparece": está apagada, desconectada o cambió de nombre; enciéndela, o elige otra con "Usar como...".
 - Perdí la llave: no se puede volver a ver; crea una nueva y desactiva la anterior.
 
 ## Quien puede hacerlo

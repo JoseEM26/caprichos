@@ -47,13 +47,13 @@ describe('Controladores de Impresión', () => {
     it('POST /tomar delega al servicio con el id del dispositivo del request', async () => {
       const req = { deviceKey: { id: 3n } };
       await agenteController.tomar({ max: 5 }, req);
-      expect(impresionServiceMock.tomarTrabajos).toHaveBeenCalledWith(5, 3n, undefined, null);
+      expect(impresionServiceMock.tomarTrabajos).toHaveBeenCalledWith(5, 3n, undefined, null, false);
     });
 
     it('POST /tomar pasa el área del equipo y sus roles (un equipo de área solo toma lo suyo)', async () => {
       const req = { deviceKey: { id: 4n, area_id: 2n } };
       await agenteController.tomar({ max: 5, roles: ['ETIQUETERA'] }, req);
-      expect(impresionServiceMock.tomarTrabajos).toHaveBeenCalledWith(5, 4n, ['ETIQUETERA'], 2n);
+      expect(impresionServiceMock.tomarTrabajos).toHaveBeenCalledWith(5, 4n, ['ETIQUETERA'], 2n, false);
     });
 
     it('POST /resultado delega al servicio', async () => {

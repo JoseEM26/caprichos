@@ -7,6 +7,22 @@ import type { IDispositivoImpresora } from '../impresora/dispositivo.interface';
 import { ErrorImpresora } from '../impresora/dispositivo.interface';
 import { generarBytesTrabajo } from '../tspl/generadorTspl';
 import { generarTicketEscPos, generarComandaSalonEscPos } from '../escpos/generadorTicket';
+import { generarPruebaEtiqueta, generarPruebaTicket } from '../pruebaImpresora';
+import { paraServidor } from '../candidatas';
+import type { CandidataLocal } from '../candidatas';
+
+/** Lo que el programa sabe de este equipo: qué impresoras ve y cómo guardar la elegida (desde el panel). */
+export interface EquipoLocal {
+  listar(): Promise<CandidataLocal[]>;
+  crear(candidata: CandidataLocal, rol: RolImpresora): IDispositivoImpresora;
+  /** Identificación estable de la impresora guardada para ese rol. */
+  idActual(rol: RolImpresora): string | undefined;
+  /** Guarda la elección en la configuración del programa (sobrevive a reinicios). */
+  guardar(rol: RolImpresora, candidata: CandidataLocal): void;
+}
+
+/** Con una impresora guardada que no aparece, se reintenta más seguido que el latido normal. */
+const REINTENTO_FALTANTE_MS = 5000;
 
 export interface OpcionesAgenteLocalServicio {
   config: ConfiguracionAgente;
@@ -17,12 +33,17 @@ export interface OpcionesAgenteLocalServicio {
   impresoras?: Partial<Record<RolImpresora, IDispositivoImpresora>>;
   logger?: (nivel: 'info' | 'warn' | 'error' | 'debug', mensaje: string) => void;
   temporizador?: (ms: number) => Promise<void>;
+  /** Habilita pruebas por impresora concreta y la elección desde el panel (sin él, el programa se comporta como antes). */
+  equipo?: EquipoLocal;
 }
 
 export class AgenteLocalServicio {
   private readonly config: ConfiguracionAgente;
   private readonly clienteApi: IClienteApiImpresion;
   private readonly impresora: IDispositivoImpresora;
+  private readonly equipo?: EquipoLocal;
+  private candidatas: CandidataLocal[] = [];
+  private algunaFalla = false;
   private readonly impresoras: Partial<Record<RolImpresora, IDispositivoImpresora>>;
   private readonly modoPorRol: boolean;
   /** Roles cuya impresora respondió lista en el último latido: solo esos toman trabajos. */
@@ -46,6 +67,7 @@ export class AgenteLocalServicio {
   constructor(opciones: OpcionesAgenteLocalServicio) {
     this.config = opciones.config;
     this.clienteApi = opciones.clienteApi;
+    this.equipo = opciones.equipo;
     this.modoPorRol = Boolean(opciones.impresoras);
     this.impresoras = opciones.impresoras ?? (opciones.impresora ? { ETIQUETERA: opciones.impresora } : {});
     this.impresora = (this.impresoras.ETIQUETERA ?? opciones.impresora) as IDispositivoImpresora;
@@ -89,8 +111,12 @@ export class AgenteLocalServicio {
     const ahora = Date.now();
 
     // 1. Emitir latido si corresponde
-    if (ahora - this.ultimoLatidoTs >= this.config.intervaloLatidoMs) {
+    const esperaLatido = this.algunaFalla
+      ? Math.min(this.config.intervaloLatidoMs, REINTENTO_FALTANTE_MS)
+      : this.config.intervaloLatidoMs;
+    if (ahora - this.ultimoLatidoTs >= esperaLatido) {
       try {
+        if (this.equipo) this.candidatas = await this.equipo.listar().catch(() => []);
         const reportadas: ImpresoraReportada[] = [];
         for (const rol of ['ETIQUETERA', 'TICKETERA'] as RolImpresora[]) {
           const dispositivo = this.impresoras[rol];
@@ -99,20 +125,25 @@ export class AgenteLocalServicio {
             estado: 'error' as EstadoImpresora,
             detalle: err.message as string | undefined,
           }));
-          reportadas.push({ rol, estado: e.estado, detalle: e.detalle });
+          const id = this.equipo?.idActual(rol);
+          const nombre = id ? this.candidatas.find((c) => c.id === id)?.nombre ?? id : undefined;
+          reportadas.push({ rol, estado: e.estado, detalle: e.detalle, ...(id ? { id, nombre } : {}) });
         }
+        this.algunaFalla = !!this.equipo && reportadas.some((r) => r.estado !== 'lista');
         this.estadosRol = reportadas;
         this.rolesListos = reportadas.filter((r) => r.estado === 'lista').map((r) => r.rol);
         const etiquetera = reportadas.find((r) => r.rol === 'ETIQUETERA') ?? reportadas[0];
         this.estadoImpresora = etiquetera ? etiquetera.estado : 'desconectada';
         this.detalleEstadoImpresora = etiquetera?.detalle;
 
-        await this.clienteApi.enviarLatido(
+        const respuesta = await this.clienteApi.enviarLatido(
           this.config.version,
           this.estadoImpresora,
           this.detalleEstadoImpresora,
-          ...(this.modoPorRol ? [reportadas] : [])
+          ...(this.modoPorRol ? [reportadas] : []),
+          ...(this.equipo ? [this.candidatas.map(paraServidor)] : [])
         );
+        if (this.equipo && respuesta?.seleccion) this.aplicarSeleccion(respuesta.seleccion);
         this.ultimoLatidoTs = ahora;
         this.logger(
           'debug',
@@ -138,9 +169,11 @@ export class AgenteLocalServicio {
     try {
       // Una máquina que falla o no está lista no toma trabajos: los suyos esperan en la cola del servidor
       trabajos = this.modoPorRol
-        ? this.rolesListos.length === 0
+        ? this.rolesListos.length === 0 && !this.equipo
           ? []
-          : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos)
+          : this.equipo
+            ? await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos, true)
+            : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos)
         : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote);
       // Conexión exitosa: restablecemos el multiplicador de espera
       this.factorEsperaRed = 1;
@@ -178,7 +211,24 @@ export class AgenteLocalServicio {
     );
 
     const rol: RolImpresora = rolDeTrabajo(trabajo.tipo);
+    // Prueba dirigida a una impresora concreta del equipo: no toca el estado de la máquina configurada
+    const dirigida = this.equipo ? (trabajo.payload as any)?.prueba?.impresoraId as string | undefined : undefined;
     try {
+      if (dirigida) {
+        const c = this.candidatas.find((x) => x.id === dirigida) ?? (await this.equipo!.listar().catch(() => [])).find((x) => x.id === dirigida);
+        if (!c) {
+          throw new ErrorImpresora(`Impresora no encontrada: ${(trabajo.payload as any)?.prueba?.nombre ?? dirigida}`, 'desconectada');
+        }
+        const marca = (trabajo.payload as any)?.prueba?.marca as string | undefined;
+        const bytes =
+          rol === 'TICKETERA'
+            ? generarPruebaTicket(c.nombre, rol, this.config.ticketColumnas, undefined, marca)
+            : generarPruebaEtiqueta(c.nombre, rol, this.config.etiqueta, undefined, marca);
+        await this.equipo!.crear(c, rol).escribir(bytes);
+        this.reportesPendientes.push(trabajo.id);
+        await this.vaciarReportes();
+        return;
+      }
       const dispositivo = this.impresoras[rol];
       if (!dispositivo) {
         throw new ErrorImpresora(`La ${rol.toLowerCase()} no está configurada en este equipo`, 'desconectada');
@@ -194,8 +244,10 @@ export class AgenteLocalServicio {
       const mensajeError = err.message || 'Error desconocido al imprimir';
 
       // Una máquina que falla deja de tomar trabajos hasta que el próximo latido la vea lista
-      this.rolesListos = this.rolesListos.filter((r) => r !== rol);
-      if (err instanceof ErrorImpresora) {
+      if (!dirigida) this.rolesListos = this.rolesListos.filter((r) => r !== rol);
+      if (dirigida) {
+        // no cambia el estado de la máquina configurada
+      } else if (err instanceof ErrorImpresora) {
         this.estadoImpresora = err.estado;
         this.detalleEstadoImpresora = err.message;
       } else {
@@ -251,6 +303,26 @@ export class AgenteLocalServicio {
         this.logger('warn', `No se pudo confirmar el trabajo ${id}; se reintenta en el próximo ciclo: ${err.message}`);
         return;
       }
+    }
+  }
+
+  /**
+   * Aplica lo elegido en el panel: solo si esa impresora está en el equipo; si no aparece, se queda con
+   * la guardada (nunca cambia a otra distinta por su cuenta) y lo avisa en el registro.
+   */
+  private aplicarSeleccion(seleccion: Partial<Record<RolImpresora, string>>): void {
+    for (const rol of ['ETIQUETERA', 'TICKETERA'] as RolImpresora[]) {
+      const id = seleccion[rol];
+      if (!id || id === this.equipo!.idActual(rol)) continue;
+      const c = this.candidatas.find((x) => x.id === id);
+      if (!c) {
+        this.logger('warn', `Impresora elegida para la ${rol.toLowerCase()} no encontrada: ${id}. Se sigue con la guardada.`);
+        continue;
+      }
+      this.equipo!.guardar(rol, c);
+      this.impresoras[rol] = this.equipo!.crear(c, rol);
+      this.ultimoLatidoTs = 0; // que el panel vea el cambio en el próximo ciclo
+      this.logger('info', `La ${rol.toLowerCase()} ahora es: ${c.nombre}`);
     }
   }
 

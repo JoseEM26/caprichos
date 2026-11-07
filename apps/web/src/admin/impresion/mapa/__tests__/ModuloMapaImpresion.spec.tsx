@@ -31,7 +31,7 @@ function mapa(over: Partial<MapaImpresionDatos> = {}): MapaImpresionDatos {
       { deviceKeyId: '10', nombre: 'PC Caja', areaId: null, maquinas: ['ETIQUETERA', 'TICKETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }, { rol: 'TICKETERA', estado: 'lista' }], ultimoLatido: null, conectado: true },
       { deviceKeyId: '11', nombre: 'Etiquetera bar', areaId: '1', maquinas: ['ETIQUETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'sin_papel' }, { rol: 'TICKETERA', estado: 'no_configurada' }], ultimoLatido: null, conectado: true },
     ],
-    reglas: { generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true, comandaAreaActivo: false },
+    reglas: { generalModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], areaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'], bebidaModalidades: ['MESA', 'LOCAL', 'LLEVAR', 'RECOGER', 'DELIVERY'], bebidaActivo: true, areaActivo: false, comandaSalonActivo: true, comandaAreaActivo: false },
     ruteo: [
       { tipo: 'ETIQUETA_GENERAL', areaId: null, destinoAreaId: null, destinoEquipoId: '10', destinoNombre: 'PC Caja', activo: true },
       { tipo: 'ETIQUETA_BEBIDA', areaId: '1', destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Etiquetera bar', activo: true },
@@ -177,10 +177,17 @@ describe('Mapa de impresión: leyenda, detalle y presión larga', () => {
   it('la regla de resumen muestra «Sale en:» con las modalidades completas', async () => {
     render(<MemoryRouter><ModuloMapaImpresion /></MemoryRouter>);
     await screen.findAllByText('Sticker de bebida');
-    expect(screen.getByText('Sale en:')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Salón' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: 'Para llevar' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Delivery' })).toHaveAttribute('aria-pressed', 'true');
+    // Tres reglas con «Sale en:»: resumen, sticker por área y sticker de bebida (la del resumen va primero)
+    expect(screen.getAllByText('Sale en:').length).toBe(3);
+    const resumen = screen.getByRole('group', { name: /resumen/i });
+    expect(within(resumen).getByRole('button', { name: 'Salón' })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(resumen).getByRole('button', { name: 'Para llevar' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(resumen).getByRole('button', { name: 'Delivery' })).toHaveAttribute('aria-pressed', 'true');
+    // El vaso de bebida del fixture sale en todas; el de área, en llevar y delivery
+    const bebida = screen.getByRole('group', { name: /sticker de bebida/i });
+    expect(within(bebida).getByRole('button', { name: 'Salón' })).toHaveAttribute('aria-pressed', 'true');
+    const area = screen.getByRole('group', { name: /sticker por área/i });
+    expect(within(area).getByRole('button', { name: 'Salón' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('mantener presionado 3 s abre el detalle; soltar antes no lo abre', async () => {

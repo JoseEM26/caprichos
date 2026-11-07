@@ -7,17 +7,20 @@ import type {
   PeticionLatido,
   RolImpresora,
   ImpresoraReportada,
+  ImpresoraCandidata,
+  RespuestaLatido,
 } from '@caprichos/compartido';
 
 export interface IClienteApiImpresion {
-  tomarTrabajos(max?: number, roles?: RolImpresora[]): Promise<TrabajoImpresion[]>;
+  tomarTrabajos(max?: number, roles?: RolImpresora[], pruebas?: boolean): Promise<TrabajoImpresion[]>;
   reportarResultado(id: string, ok: boolean, error?: string): Promise<void>;
   enviarLatido(
     version: string,
     impresora: EstadoImpresora,
     detalle?: string,
-    impresoras?: ImpresoraReportada[]
-  ): Promise<void>;
+    impresoras?: ImpresoraReportada[],
+    candidatas?: ImpresoraCandidata[]
+  ): Promise<RespuestaLatido | void>;
 }
 
 /** Canjea el código de vinculación (CODIGO o CODIGO@host) por la llave del agente. Sin llave previa. */
@@ -110,8 +113,8 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
     }
   }
 
-  async tomarTrabajos(max: number = 10, roles?: RolImpresora[]): Promise<TrabajoImpresion[]> {
-    const peticion: PeticionTomarTrabajos = roles ? { max, roles } : { max };
+  async tomarTrabajos(max: number = 10, roles?: RolImpresora[], pruebas?: boolean): Promise<TrabajoImpresion[]> {
+    const peticion: PeticionTomarTrabajos = { max, ...(roles ? { roles } : {}), ...(pruebas ? { pruebas } : {}) };
     const res = await this.ejecutarPeticion(
       '/api/agente-impresion/tomar',
       'POST',
@@ -153,9 +156,16 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
     version: string,
     impresora: EstadoImpresora,
     detalle?: string,
-    impresoras?: ImpresoraReportada[]
-  ): Promise<void> {
-    const peticion: PeticionLatido = { version, impresora, detalle, ...(impresoras ? { impresoras } : {}) };
+    impresoras?: ImpresoraReportada[],
+    candidatas?: ImpresoraCandidata[]
+  ): Promise<RespuestaLatido | void> {
+    const peticion: PeticionLatido = {
+      version,
+      impresora,
+      detalle,
+      ...(impresoras ? { impresoras } : {}),
+      ...(candidatas ? { candidatas } : {}),
+    };
     const res = await this.ejecutarPeticion(
       '/api/agente-impresion/latido',
       'POST',
@@ -166,5 +176,8 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
       const texto = await res.text().catch(() => '');
       throw new ErrorRespuestaApi(res.status, 'Error al enviar latido', texto);
     }
+    // Un servidor viejo responde 204 sin cuerpo: no hay selección que aplicar
+    if (res.status === 204) return undefined;
+    return (await res.json().catch(() => undefined)) as RespuestaLatido | undefined;
   }
 }

@@ -58,9 +58,9 @@ export function aplicaSegunReglas(tipo: string, modalidad: string, reglas: Regla
     case 'ETIQUETA_GENERAL':
       return reglas.generalModalidades.includes(modalidad);
     case 'ETIQUETA_BEBIDA':
-      return reglas.bebidaActivo;
+      return reglas.bebidaActivo && reglas.bebidaModalidades.includes(modalidad);
     case 'ETIQUETA_AREA':
-      return reglas.areaActivo;
+      return reglas.areaActivo && reglas.areaModalidades.includes(modalidad);
     case 'TICKET_COMANDA_SALON':
       return reglas.comandaSalonActivo && (MODALIDADES_SALON as readonly string[]).includes(modalidad);
     // Comanda por área: en cualquier modalidad (la cocina de cada área prepara también llevar y delivery).
