@@ -98,7 +98,7 @@ export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
   );
 }
 
-export type ClaveTabCaja = 'nuevo' | 'coord' | 'curso' | 'cerrado' | 'no_entregados';
+export type ClaveTabCaja = 'nuevo' | 'coord' | 'curso' | 'cerrado' | 'todos' | 'no_entregados';
 
 interface TabDef {
   id: Exclude<ClaveTabCaja, 'no_entregados'>;
@@ -162,6 +162,8 @@ const TABS_CAJA: TabDef[] = [
       return ['ENTREGADO', 'ANULADO', 'RECHAZADO'].includes(e);
     },
   },
+  // Todo junto: nuevos, en curso y cerrados (va al final para que el enlace a un pedido abra su pestaña propia)
+  { id: 'todos', n: 'Todos', filtro: () => true },
 ];
 
 const CANALES_OPCIONES = [
@@ -408,6 +410,7 @@ export function PedidosAdminView() {
       coord: 0,
       curso: 0,
       cerrado: 0,
+      todos: 0,
     };
     for (const t of TABS_CAJA) {
       res[t.id] = pedidos.filter(t.filtro).length;
