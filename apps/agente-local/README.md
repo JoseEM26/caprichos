@@ -106,7 +106,7 @@ Environment="AGENTE_KEY=tu_llave_de_dispositivo_secreta_aqui"
 Environment="IMPRESORA_RUTA=/dev/usb/lp0"
 Environment="INTERVALO_CONSULTA_MS=3000"
 Environment="INTERVALO_LATIDO_MS=20000"
-ExecStart=/usr/bin/node dist/index.js
+ExecStart=/usr/bin/node dist/entrada.js
 Restart=always
 RestartSec=5
 StandardOutput=journal

@@ -1,5 +1,3 @@
-import { main } from './cli';
-
 export {
   obtenerConfiguracion,
   VERSION_AGENTE,
@@ -55,11 +53,3 @@ export {
   ejecutarComandoProbar,
   ejecutarComandoVolcar,
 } from './cli';
-
-// Si se ejecuta directamente dist/index.js, corre el agente
-if (require.main === module) {
-  main().catch((err: any) => {
-    console.error('Error fatal:', err);
-    process.exit(1);
-  });
-}

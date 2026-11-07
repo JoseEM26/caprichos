@@ -9,6 +9,7 @@ import { ImpresoraRed, esDestinoRed, parsearDestinoRed } from './impresora/impre
 import type { IDispositivoImpresora } from './impresora/dispositivo.interface';
 import { ClienteApiImpresion, canjearCodigoVinculo } from './api/clienteApi';
 import { AgenteLocalServicio } from './agente/bucle';
+import { esperarEnter, describirError } from './arranque';
 import {
   generarTsplTrabajo,
   generarBytesTrabajo,
@@ -226,10 +227,22 @@ export async function ejecutarAsistente(
     logger('=== Programa de impresión de Caprichos ===');
     let { apiUrl, agenteKey } = actual;
     if (!agenteKey) {
-      const codigo = await ask('Pega el código de vinculación que te muestra Caprichos: ');
-      const r = await canjearCodigoVinculo(apiUrl || obtenerConfiguracion().apiUrl, codigo);
-      apiUrl = r.apiUrl;
-      agenteKey = r.llave;
+      logger('Abre Caprichos > Configuración > Impresión, pulsa para vincular este equipo y copia el código que aparece.');
+      let vacios = 0;
+      while (!agenteKey) {
+        const codigo = await ask('Pega aquí el código de vinculación y pulsa Enter (clic derecho pega en esta ventana): ');
+        if (!codigo) {
+          if (++vacios >= 5) throw new Error('No se escribió ningún código de vinculación.');
+          continue;
+        }
+        try {
+          const r = await canjearCodigoVinculo(apiUrl || obtenerConfiguracion().apiUrl, codigo);
+          apiUrl = r.apiUrl;
+          agenteKey = r.llave;
+        } catch (err: any) {
+          logger(`✖ No se pudo vincular: ${describirError(err)}. Revisa el código completo (incluye lo que va después de @) y tu internet, e inténtalo de nuevo.`);
+        }
+      }
       logger('Vinculado correctamente.');
     }
     const esWin = process.platform === 'win32';
@@ -333,11 +346,13 @@ export async function main(): Promise<void> {
 
   if (comando === 'probar') {
     const res = await ejecutarComandoProbar();
+    await esperarEnter();
     process.exit(res.exito ? 0 : 1);
   }
 
   if (comando === 'volcar') {
     await ejecutarComandoVolcar();
+    await esperarEnter();
     process.exit(0);
   }
 
@@ -349,18 +364,23 @@ export async function main(): Promise<void> {
       console.log(l.length ? 'Impresoras encontradas en este equipo:' : 'No hay impresoras USB en /dev/usb/lp*.');
       l.forEach((d, i) => console.log(`  ${i + 1}) ${describirImpresora(d)}`));
     }
+    await esperarEnter();
     process.exit(0);
   }
 
   if (comando === 'configurar' || comando === 'vincular') {
     await ejecutarAsistente();
+    await esperarEnter();
     process.exit(0);
   }
 
   // Sin configuración (primer uso, doble clic en el .exe): abre el asistente
   let archivo = leerArchivoConfiguracion();
-  if (!archivo.agenteKey && !process.env.AGENTE_KEY && process.stdin.isTTY) {
+  const sinLlave = !archivo.agenteKey && !process.env.AGENTE_KEY && !process.env.CAPRICHOS_AGENTE_KEY;
+  if (sinLlave && (process.stdin.isTTY || process.platform === 'win32')) {
     archivo = await ejecutarAsistente();
+  } else if (sinLlave) {
+    throw new Error('Este equipo aún no está vinculado. Ejecuta el programa con el comando "vincular" en una terminal.');
   }
 
   // Modo servicio (bucle continuo): una impresora por rol; IMPRESORA_RUTA sigue valiendo como etiquetera
@@ -387,11 +407,4 @@ export async function main(): Promise<void> {
   process.on('SIGTERM', finalizar);
 
   await agente.iniciar();
-}
-
-if (require.main === module) {
-  main().catch((err) => {
-    console.error('Error fatal en el agente:', err);
-    process.exit(1);
-  });
 }
