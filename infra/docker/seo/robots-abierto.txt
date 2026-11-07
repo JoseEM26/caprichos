@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /pantalla
+Disallow: /asistencia/
+Disallow: /seguimiento
+Disallow: /api/
+
+Sitemap: https://caprichos.pe/sitemap.xml

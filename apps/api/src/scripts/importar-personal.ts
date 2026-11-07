@@ -96,9 +96,16 @@ export interface FilaCsv {
   linea: number;
   nombre: string;
   rol: string;
+  /** Aviso cuando el archivo traía el rol eliminado Call Center. */
+  avisoRol?: string;
   /** Fila para el servicio; null si el formato de la línea no sirve. */
   fila: Record<string, unknown> | null;
   errorFormato?: string;
+}
+
+/** «Call Center» / CALLCENTER ya no existe: se importa como MOZO (y se avisa en el simulacro). */
+function mapearRolEliminado(rol: string): string {
+  return rol.replace(/\s+/g, '').toUpperCase() === 'CALLCENTER' ? 'MOZO' : rol;
 }
 
 /** Convierte el CSV en filas para el servicio. Error de cabecera = el archivo no se puede usar. */
@@ -115,7 +122,15 @@ export function filasDesdeCsv(texto: string): { filas: FilaCsv[]; error?: string
     const opt = (k: string, valor: string) => (valor ? { [k]: valor } : {});
     const activoTexto = r.activo?.toLowerCase() ?? '';
     const nombre = `${r.nombres} ${r.apellidos}`.trim();
-    const base = { linea: i + 2, nombre, rol: r.rol_principal ?? '' };
+    const rolPrincipal = mapearRolEliminado(r.rol_principal ?? '');
+    const extras = (r.roles_extra ?? '').split('|').map((x) => mapearRolEliminado(x.trim()).toUpperCase()).filter(Boolean);
+    const huboCallCenter = [r.rol_principal ?? '', ...(r.roles_extra ?? '').split('|')].some((x) => mapearRolEliminado(x) !== x);
+    const base = {
+      linea: i + 2,
+      nombre,
+      rol: rolPrincipal,
+      ...(huboCallCenter ? { avisoRol: 'el rol Call Center ya no existe: se asigna MOZO' } : {}),
+    };
     if (activoTexto && activoTexto !== 'si' && activoTexto !== 'no') {
       return { ...base, fila: null, errorFormato: 'activo debe ser si o no' };
     }
@@ -126,8 +141,9 @@ export function filasDesdeCsv(texto: string): { filas: FilaCsv[]; error?: string
         apellidos: r.apellidos,
         tipoDocumento: r.tipo_documento || 'DNI',
         documento: r.documento,
-        rol: r.rol_principal,
-        otrosRoles: (r.roles_extra ?? '').split('|').map((x) => x.trim().toUpperCase()).filter(Boolean),
+        rol: rolPrincipal,
+        // Si el rol viejo ya estaba como MOZO, no se repite
+        otrosRoles: extras.filter((x, k) => x !== rolPrincipal && extras.indexOf(x) === k),
         activo: activoTexto !== 'no',
         ...opt('celular', r.celular),
         ...opt('fechaNacimiento', r.fecha_nacimiento),
@@ -191,7 +207,8 @@ export async function ejecutarImportacion(
     cuenta[estado] = (cuenta[estado] ?? 0) + 1;
     const descripcion =
       estado === 'ERROR' ? `error: ${motivo ?? 'no se pudo revisar'}` : (etiqueta[estado] ?? estado.toLowerCase());
-    const aviso = avisos.length ? ` · aviso: ${avisos.join('; ')}` : '';
+    const todosAvisos = f.avisoRol ? [f.avisoRol, ...avisos] : avisos;
+    const aviso = todosAvisos.length ? ` · aviso: ${todosAvisos.join('; ')}` : '';
     salida(`fila ${f.linea}: ${descripcion} — ${f.nombre} (${f.rol || 'sin rol'})${aviso}`);
   }
 

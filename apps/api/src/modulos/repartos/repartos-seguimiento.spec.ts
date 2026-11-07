@@ -38,7 +38,7 @@ function montar(pedidos: any[] = [], cuentas: any[] = []) {
 describe('Seguimiento de repartos: permiso repartos/seguir', () => {
   it('lo tienen ADMIN, SUPERVISOR, CAJERO y MOZO, y nadie más', () => {
     for (const r of ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO']) expect(MATRIZ[r]).toContain('repartos/seguir');
-    for (const r of ['COCINA', 'ALMACEN', 'CALLCENTER', 'REPARTIDOR']) expect(MATRIZ[r]).not.toContain('repartos/seguir');
+    for (const r of ['COCINA', 'ALMACEN', 'REPARTIDOR']) expect(MATRIZ[r]).not.toContain('repartos/seguir');
   });
 
   it('el MOZO solo lee: ni tomar ni liquidar', () => {

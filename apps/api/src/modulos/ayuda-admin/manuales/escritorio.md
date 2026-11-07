@@ -3,7 +3,7 @@ modulo: escritorio
 titulo: Escritorio
 ruta: /admin
 permiso:
-roles: [ADMIN, CAJERO, COCINA, MOZO, CALLCENTER, ALMACEN, REPARTIDOR, SUPERVISOR]
+roles: [ADMIN, CAJERO, COCINA, MOZO, ALMACEN, REPARTIDOR, SUPERVISOR]
 relacionados: [caja, cocina, repartos, compras, informes, reservas, plano, notificaciones, supervisor-codigo]
 sugerencias:
   - Como cambio el periodo de fechas para ver las ventas

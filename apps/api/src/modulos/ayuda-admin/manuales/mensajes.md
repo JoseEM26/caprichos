@@ -3,7 +3,7 @@ modulo: mensajes
 titulo: Mensajes de WhatsApp
 ruta: /admin/mensajes
 permiso: mensajes/ver
-roles: [ADMIN, CALLCENTER]
+roles: [ADMIN, CAJERO, MOZO, SUPERVISOR]
 relacionados: [caja, reclamos, clientes, cocina, repartos, reservas]
 sugerencias:
   - Como respondo cuando un cliente pide hablar con una persona
@@ -16,7 +16,7 @@ sugerencias:
 # Mensajes de WhatsApp
 
 ## Para que sirve
-Bandeja de atencion para las conversaciones de WhatsApp del negocio. Permite al equipo de call center atender clientes cuando el chatbot requiere asistencia humana, validar capturas de pago para [[caja]], coordinar el envio de comandas a [[cocina]], registrar posibles [[reclamos]] y fidelizar a los [[clientes]].
+Bandeja de atencion para las conversaciones de WhatsApp del negocio. Permite al equipo de caja y salon (Cajero y Mozo) atender clientes cuando el chatbot requiere asistencia humana, validar capturas de pago para [[caja]], coordinar el envio de comandas a [[cocina]], registrar posibles [[reclamos]] y fidelizar a los [[clientes]].
 
 ## Como se hace: Atender un chat que requiere ayuda humana
 1. En la columna izquierda, revisar la pestana Por atender (chats con fondo naranja claro y etiqueta Requiere atencion).
@@ -102,7 +102,7 @@ Ver tambien: [[caja]]
 - Un pedido de la carta virtual con Yape, Plin o transferencia y celular deja su chat en Validar pago y urgente: el cliente recibe el aviso de que un asesor gestionara el voucher, y el chat aparece aqui para que lo atiendas.
 
 ## Quien puede hacerlo
-- Tienen acceso completo a los mensajes: Administrador y Call Center.
+- Tienen acceso completo a los mensajes: Administrador, Cajero, Mozo y Supervisor.
 - Los roles de Administrador y Cajero cuentan con el permiso vouchers/ver para visualizar la tarjeta de analisis del voucher y confirmar la aprobacion o rechazo.
 - Mozos, Cocina y Repartidores no tienen acceso a esta bandeja de mensajes.
 - Los avisos del pedido salen en orden (aceptado, listo, salida, llegada, entregado): si uno falla temporalmente, los siguientes del mismo pedido esperan a que se resuelva y no llegan antes.

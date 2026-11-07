@@ -3,7 +3,7 @@ modulo: clientes
 titulo: Clientes
 ruta: /admin/clientes
 permiso: clientes/ver
-roles: [ADMIN, CALLCENTER]
+roles: [ADMIN]
 relacionados: [caja, ofertas, mensajes, zonas, usuarios]
 sugerencias:
   - Como registro a un nuevo cliente en el sistema
@@ -66,5 +66,5 @@ Ver tambien: [[mensajes]]
 - Los clientes no tienen DNI guardado: el DNI solo queda en el comprobante o en el reclamo cuando la ley lo exige.
 
 ## Quien puede hacerlo
-- Administrador y Call Center tienen autorizacion para acceder al modulo de Clientes y editar informacion.
+- Solo el Administrador tiene autorizacion para acceder al modulo de Clientes y editar informacion.
 - El ajuste de puntos requiere rol de Administrador o personal expresamente facultado con el permiso correspondiente.

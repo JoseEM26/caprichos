@@ -19,7 +19,6 @@ const ROLES_DESTINO = [
   { clave: 'REPARTIDOR', nombre: 'Repartidor' },
   { clave: 'ALMACEN', nombre: 'Almacén' },
   { clave: 'PRODUCCION', nombre: 'Producción' },
-  { clave: 'CALLCENTER', nombre: 'Call center' },
 ];
 
 export function NuevoMensajeModal({ abierto, alCerrar, alGuardarExitoso }: Props) {

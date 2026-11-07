@@ -13,6 +13,8 @@ const PERMISOS_SUPERVISOR = [
   'vouchers/subir', 'vouchers/ver', 'plano/ver', 'reservas/ver', 'reservas/crear', 'reservas/editar',
   'iniciativas/ver', 'iniciativas/crear', 'iniciativas/comentar',
   'notificaciones/ver', 'notificaciones/marcar', 'supervisor/ver_codigo',
+  'mensajes/ver', 'mensajes/tomar', 'mensajes/enviar', 'mensajes/cerrar',
+  'whatsapp_salientes/ver', 'whatsapp_salientes/reenviar', 'whatsapp_salientes/descartar',
 ];
 
 // Misma regla que useSesion().tiene para un rol que no es ADMIN
@@ -26,7 +28,7 @@ describe('menú del SUPERVISOR', () => {
     const reservados = [
       'disenador', 'novedades', 'conocenos', 'destacadas', 'paleta', 'mirest', 'zonas',
       'usuarios', 'historial', 'informes', 'indicadores', 'mapa', 'pantallas', 'mascota',
-      'compras', 'almacen', 'stock', 'recetas', 'clientes', 'ofertas', 'creditos', 'reclamos', 'mensajes',
+      'compras', 'almacen', 'stock', 'recetas', 'clientes', 'ofertas', 'creditos', 'reclamos',
     ];
     const ve = visibles();
     for (const clave of reservados) {
@@ -36,7 +38,7 @@ describe('menú del SUPERVISOR', () => {
 
   it('ve caja, salón, cocina, cobros y la pantalla Código del supervisor', () => {
     const ve = visibles();
-    for (const clave of ['caja', 'cierre', 'cocina', 'repartos', 'reservas', 'plano', 'comprobantes', 'iniciativas', 'supervisor-codigo']) {
+    for (const clave of ['caja', 'cierre', 'cocina', 'repartos', 'reservas', 'plano', 'comprobantes', 'iniciativas', 'mensajes', 'supervisor-codigo']) {
       expect(ve, `debe ver ${clave}`).toContain(clave);
     }
     const codigo = MODULOS.find((m) => m.clave === 'supervisor-codigo');

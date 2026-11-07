@@ -50,6 +50,9 @@ RUN rm -rf /etc/nginx/conf.d/* /usr/share/nginx/html/*
 # Va en un archivo aparte: el heredoc dentro de RUN no funciona con el builder clásico de Docker.
 COPY infra/docker/nginx-caprichos.conf /etc/nginx/conf.d/caprichos.conf
 
+# robots.txt y sitemap por host (SEO: solo caprichos.pe se indexa)
+COPY infra/docker/seo /usr/share/nginx/seo
+
 # Copiar el paquete estático generado por Vite
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 # Aviso de «Versión de demostración» (lo sirve nginx en /demo; solo se usa en la demo)

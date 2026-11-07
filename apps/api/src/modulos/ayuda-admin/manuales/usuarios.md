@@ -23,7 +23,7 @@ Permite administrar las cuentas de acceso del personal de Caprichos (cajeros, mo
 ## Como se hace: registrar un nuevo usuario del personal
 1. En la pestaña "Personal", pulsa el botón "+ Nuevo usuario" en la esquina superior derecha.
 2. En la ventana "Crear usuario", completa los campos requeridos: nombres, apellidos, documento de identidad (DNI de 8 dígitos), correo electrónico de contacto y teléfono celular.
-3. En el campo "Rol", selecciona la función que desempeñará en el local: Administrador (ADMIN), Cajero (CAJERO), Cocina (COCINA), Mozo (MOZO), Call Center (CALLCENTER), Almacén (ALMACEN) o Repartidor (REPARTIDOR).
+3. En el campo "Rol", selecciona la función que desempeñará en el local: Administrador (ADMIN), Cajero (CAJERO), Cocina (COCINA), Mozo (MOZO), Almacén (ALMACEN) o Repartidor (REPARTIDOR).
 4. Pulsa el botón "Crear usuario".
 5. El sistema generará una contraseña inicial temporal. Cópiala y entrégasela de forma segura al colaborador; al iniciar sesión por primera vez se le solicitará cambiarla obligatoriamente.
 Despues: [[usuarios]]

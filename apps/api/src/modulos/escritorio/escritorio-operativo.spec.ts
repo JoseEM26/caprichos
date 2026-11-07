@@ -83,7 +83,7 @@ describe('Escritorio operativo del supervisor', () => {
   it('solo ADMIN y SUPERVISOR tienen el permiso del escritorio operativo', () => {
     expect(MATRIZ.SUPERVISOR).toContain('escritorio/operativo');
     expect(MATRIZ.ADMIN).toContain('escritorio/operativo');
-    for (const rol of ['CAJERO', 'MOZO', 'COCINA', 'CALLCENTER', 'ALMACEN', 'REPARTIDOR']) {
+    for (const rol of ['CAJERO', 'MOZO', 'COCINA', 'ALMACEN', 'REPARTIDOR']) {
       expect(MATRIZ[rol]).not.toContain('escritorio/operativo');
     }
   });

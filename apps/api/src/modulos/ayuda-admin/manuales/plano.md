@@ -3,7 +3,7 @@ modulo: plano
 titulo: Plano del local
 ruta: /admin/plano
 permiso: plano/ver
-roles: [ADMIN, MOZO, CALLCENTER, SUPERVISOR]
+roles: [ADMIN, MOZO, SUPERVISOR]
 relacionados: [caja, reservas, cocina, pantallas, cierre]
 sugerencias:
   - Como veo que mesas estan libres u ocupadas en cada piso
@@ -62,9 +62,9 @@ Ver tambien: [[cierre]]
 - Para pedidos de salon solo (los de delivery no cambian de mesa) y un pedido anulado no puede cambiar de mesa.
 - Si el voucher no se lee, el mozo toma otra foto. Si no hay foto, el mozo igual envía el cobro a Caja y Caja resuelve (foto o excepción con código del supervisor).
 - El mozo no ve el semáforo de confianza: por diseño, la vista del mozo sólo comprueba que la imagen sea legible para no demorar la atención en sala; la auditoría financiera se realiza en el arqueo de Cierre de caja.
-- No me aparecen los botones para agregar o mover mesas: solo los administradores con el permiso plano/editar pueden modificar la estructura física del salón; los mozos y call center solo tienen acceso en modo consulta y toma de pedidos.
+- No me aparecen los botones para agregar o mover mesas: solo los administradores con el permiso plano/editar pueden modificar la estructura física del salón; los mozos solo tienen acceso en modo consulta y toma de pedidos.
 - Una mesa sigue figurando ocupada cuando los clientes ya se fueron: la mesa se libera automáticamente al registrar el cobro final en caja, o manualmente si el cajero o mozo autorizado pulsa "Liberar o marcar mesa".
 
 ## Quien puede hacerlo
-- Pueden ver el plano, tomar comandas y cobrar mesas los roles Administrador (ADMIN), Mozo (MOZO) y Call Center (CALLCENTER). El rol Mozo cuenta con el permiso vouchers/subir para registrar las fotografías de comprobantes en sala.
+- Pueden ver el plano, tomar comandas y cobrar mesas los roles Administrador (ADMIN), Mozo (MOZO). El rol Mozo cuenta con el permiso vouchers/subir para registrar las fotografías de comprobantes en sala.
 - La edición de la cuadrícula, agregar o borrar mesas y cambiar pisos está reservada exclusivamente para el Administrador (ADMIN) mediante el permiso plano/editar.

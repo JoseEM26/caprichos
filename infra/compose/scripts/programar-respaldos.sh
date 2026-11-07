@@ -34,7 +34,7 @@ if [[ -n "${V[RESTIC_REPOSITORY]:-}" ]]; then
   [[ "${V[RESTIC_REPOSITORY]}" == s3:* ]] || { echo "ERROR: RESTIC_REPOSITORY debe empezar con s3:" >&2; exit 1; }
 fi
 for p in RESTIC_PASSWORD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY KUMA_PUSH_PROD KUMA_PUSH_DEMO; do
-  [[ "${V[$p]:-}" =~ ^[A-Za-z0-9:/._-]*$ ]] || { echo "ERROR: ${p} tiene caracteres no permitidos (solo letras, números y : / . _ -)." >&2; exit 1; }
+  [[ "${V[$p]:-}" =~ ^[A-Za-z0-9:/._+=-]*$ ]] || { echo "ERROR: ${p} tiene caracteres no permitidos (solo letras, números y : / . _ + = -)." >&2; exit 1; }
 done
 
 if [[ "$MODO" == "simulacro" ]]; then
@@ -76,7 +76,13 @@ if [[ -f /opt/caprichos/restic.env ]]; then
   if docker run --rm --env-file /opt/caprichos/restic.env restic/restic:0.17.3 snapshots >/dev/null 2>&1; then
     echo "Repositorio restic ya existe."
   else
-    docker run --rm --env-file /opt/caprichos/restic.env restic/restic:0.17.3 init 2>&1 | grep -vi "password\|key" | sed 's/^/  /' || true
+    # El error real de restic se muestra (sin él no se sabe si falla la llave, el bucket o la dirección),
+    # pero con los valores secretos tapados: se reemplazan por *** antes de imprimir.
+    SALIDA_INIT=$(docker run --rm --env-file /opt/caprichos/restic.env restic/restic:0.17.3 init 2>&1 || true)
+    for secreto in "${V[RESTIC_PASSWORD]:-}" "${V[AWS_ACCESS_KEY_ID]:-}" "${V[AWS_SECRET_ACCESS_KEY]:-}"; do
+      [[ -n "$secreto" ]] && SALIDA_INIT="${SALIDA_INIT//"$secreto"/***}"
+    done
+    printf '%s\n' "$SALIDA_INIT" | head -n 8 | cut -c1-300 | sed 's/^/  restic: /'
     docker run --rm --env-file /opt/caprichos/restic.env restic/restic:0.17.3 snapshots >/dev/null 2>&1 \
       && echo "Repositorio restic iniciado." || { echo "ERROR: no se pudo iniciar el repositorio restic (revise credenciales y bucket)." >&2; exit 1; }
   fi
