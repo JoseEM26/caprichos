@@ -434,7 +434,7 @@ describe('RepartidorView: pantalla toda mapa del repartidor', () => {
       await abrirDetalleMio();
 
       const btn = screen.getByTestId('btn-salir-101');
-      expect(btn).toHaveTextContent('Salir a reparto');
+      expect(btn).toHaveTextContent('Ya salió');
       fireEvent.click(btn);
       expect(spySalir).not.toHaveBeenCalled();
       fireEvent.click(screen.getByText('Sí, confirmar'));

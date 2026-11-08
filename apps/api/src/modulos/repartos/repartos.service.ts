@@ -1283,8 +1283,7 @@ export class RepartosService {
 
     // Se suma a la ruta en curso del repartidor (o abre una)
     await sumarARuta(this.prisma, partyId, [pedidoId], 'INDIVIDUAL', ahora);
-    // Aviso «ya asignamos a tu delivery»: sin transacción propia, nunca frena la toma
-    await this.avisos?.avisar(pedidoId, 'ASIGNADO');
+    // «Asignado» ya no se avisa al cliente: solo «Ya salió», «Ya llegó» y «Entregado»
 
     const pedido = await this.prisma.pedido.findUniqueOrThrow({
       where: { id: pedidoId },
@@ -1599,6 +1598,7 @@ export class RepartosService {
         data: {
           estado: 'ENTREGADO',
           entregado_en: ahora,
+          llego_en: pedido.llego_en ?? ahora,
         },
         include: {
           zona: true,
@@ -2622,7 +2622,6 @@ export class RepartosService {
     await sumarARuta(this.prisma, nuevoRepartidorPartyId, [pedidoId], 'INDIVIDUAL', ahora);
     // El cliente se entera del nuevo delivery: se borra la etapa para que el aviso salga otra vez con el nombre nuevo
     await this.prisma.mensajeReparto.deleteMany({ where: { pedido_id: pedidoId, numero: ETAPAS_AVISO.ASIGNADO.numero } });
-    await this.avisos?.avisar(pedidoId, 'ASIGNADO');
 
     await this.prisma.pedidoEstadoHistorial.create({
       data: {
@@ -3096,7 +3095,6 @@ export class RepartosService {
         entidad: 'pedido', entidadId: id, partyId, ip,
       });
     }
-    for (const id of nuevos) await this.avisos?.avisar(id, 'ASIGNADO');
     for (const f of filas.filter((x) => nuevos.includes(x.id))) {
       this.eventosGateway?.emitirAdmin('pedido:estado', {
         id: Number(f.id), codigo: f.codigo, estado: f.estado, repartidor_party_id: String(partyId),
@@ -3315,7 +3313,6 @@ export class RepartosService {
           entidad: 'pedido', entidadId: id, partyId: actor, ip, motivo: idOpcionLog(idOpcion, destino),
         });
       }
-      for (const id of nuevos) await this.avisos?.avisar(id, 'ASIGNADO');
       for (const f of filas.filter((x) => nuevos.includes(x.id))) {
         this.eventosGateway?.emitirAdmin('pedido:estado', {
           id: Number(f.id), codigo: f.codigo, estado: f.estado, repartidor_party_id: String(destino),

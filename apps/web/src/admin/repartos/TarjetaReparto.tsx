@@ -1,3 +1,4 @@
+import { enlaceLlamar } from './textoVisible';
 import { comoLista } from '../../comun/comoLista';
 import { useState } from 'react';
 import { Boton } from '../../comun/Boton';
@@ -132,10 +133,7 @@ export function TarjetaReparto({
       ? `https://waze.com/ul?ll=${pedido.lat},${pedido.lng}&navigate=yes`
       : mapsUrl;
 
-  const telDigitos = pedido.cliente_telefono
-    ? pedido.cliente_telefono.replace(/\D/g, '').slice(-9)
-    : null;
-  const telUrl = telDigitos ? `tel:${telDigitos}` : null;
+  const telUrl = enlaceLlamar(pedido.cliente_telefono);
 
   // Acciones con confirmación
   const pedirConfirmacion = (

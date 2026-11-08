@@ -144,6 +144,12 @@ describe('progresoDelPedido', () => {
     expect(res.etaMin).toBeUndefined();
   });
 
+  it('en camino con llego_en: «Tu repartidor llegó»; sin llego_en (pedido antiguo) sigue En camino', () => {
+    const base = { modalidad: 'DELIVERY', estado: 'EN_CAMINO', repartidor_party_id: 9n };
+    expect(progresoDelPedido(pedido({ ...base, llego_en: new Date() }))).toMatchObject({ etapa: 'LLEGO', etiqueta: 'Tu repartidor llegó', enCamino: true });
+    expect(progresoDelPedido(pedido(base)).etapa).toBe('EN_CAMINO');
+  });
+
   it('entregado: 100% y todas las áreas listas', () => {
     const res = progresoDelPedido(pedido({ modalidad: 'DELIVERY', estado: 'ENTREGADO' }));
     expect(res).toMatchObject({ etapa: 'ENTREGADO', etiqueta: 'Entregado', porcentaje: 100, enCamino: false });

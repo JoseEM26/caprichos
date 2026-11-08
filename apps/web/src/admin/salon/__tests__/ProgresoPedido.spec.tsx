@@ -58,7 +58,7 @@ describe('ProgresoPedido', () => {
 
     expect(screen.getByText('En camino, llega en unos 15 a 20 minutos')).toBeInTheDocument();
     const pasos = screen.getByRole('list', { name: 'Etapas del pedido' }).querySelectorAll('li');
-    expect(pasos).toHaveLength(5);
+    expect(pasos).toHaveLength(6);
     expect(pasos[3]).toHaveAttribute('aria-current', 'step');
     expect(pasos[3]).toHaveTextContent('En camino');
   });

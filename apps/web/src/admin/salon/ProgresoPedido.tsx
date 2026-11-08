@@ -7,7 +7,7 @@ import './progreso-pedido.css';
  * «compacto» para la tarjeta (etiqueta y barra); «completo» para el detalle (línea de tiempo y áreas).
  */
 
-const PASOS_DELIVERY = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Entregado'];
+const PASOS_DELIVERY = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Llegó', 'Entregado'];
 const PASOS_RECOGER = ['Recibido', 'Cocina', 'Listo', 'Entregado'];
 
 const TEXTO_AREA: Record<AreaProgreso['estado'], string> = {
@@ -29,6 +29,8 @@ function indiceActual(progreso: Progreso, pasos: string[]): number {
       return 2;
     case 'EN_CAMINO':
       return pasos.length === PASOS_DELIVERY.length ? 3 : 2;
+    case 'LLEGO':
+      return pasos.length === PASOS_DELIVERY.length ? 4 : 2;
     case 'ENTREGADO':
       return pasos.length - 1;
     default:
