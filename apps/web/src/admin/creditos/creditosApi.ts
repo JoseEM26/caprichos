@@ -15,6 +15,10 @@ export interface ConsumoItem {
   estadoPago?: 'PENDIENTE' | 'PAGADO';
   pagadoEn?: string | null;
   pagoModo?: 'CAJA' | 'PLANILLA' | null;
+  /** Medio con el que se cobró (EFECTIVO, YAPE… o PLANILLA) y quién cobró */
+  pagoMedio?: string | null;
+  pagoDetalle?: string | null;
+  cobradoPor?: string | null;
 }
 
 export interface CuentaCredito {
@@ -146,4 +150,9 @@ export async function saldarConsumos(consumoIds: string[], medio: string): Promi
 /** Cierre de periodo: descontado por planilla/sueldo, sin mover caja. */
 export async function marcarPlanilla(desde: string, hasta: string, motivo: string, partyId?: string): Promise<{ ok: boolean; cantidad: number; total: number }> {
   return api.post('/admin/creditos/planilla', { desde, hasta, motivo, partyId });
+}
+
+/** ADMIN: marca (Ya se le descontó) o desmarca a mano un consumo; queda auditado. */
+export async function marcarCobrado(consumoId: string, cobrado: boolean): Promise<{ ok: boolean; cobrado: boolean }> {
+  return api.post('/admin/creditos/marcar-cobrado', { consumoId, cobrado });
 }

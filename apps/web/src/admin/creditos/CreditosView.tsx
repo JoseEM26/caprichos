@@ -1,6 +1,6 @@
 import { useEffect, useState, useTransition } from 'react';
 import { useSesion } from '../../comun/sesion';
-import { BotonPagarAhora, BotonPlanilla, ResumenCuenta } from './AccionesCredito';
+import { BotonCobradoManual, BotonPagarAhora, BotonPlanilla, EstadoCobro, ResumenCuenta } from './AccionesCredito';
 import { Cargando } from '../../comun/Cargando';
 import {
   obtenerResumenCreditos,
@@ -11,6 +11,7 @@ import {
 export function CreditosView() {
   const { usuario, tiene } = useSesion() as any;
   const puedeSaldar = typeof tiene === 'function' ? Boolean(tiene('creditos/saldar')) : false;
+  const [filtroEstado, setFiltroEstado] = useState<'TODOS' | 'PENDIENTES' | 'COBRADOS'>('TODOS');
   const [marcados, setMarcados] = useState<Record<string, boolean>>({});
   const [version, setVersion] = useState(0);
   const alSaldar = () => {
@@ -450,6 +451,13 @@ export function CreditosView() {
                         gap: '4px',
                       }}
                     >
+                      <div role="group" aria-label="Filtrar consumos" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {([['PENDIENTES', 'Pendientes'], ['COBRADOS', 'Cobrados'], ['TODOS', 'Todos']] as const).map(([v, t]) => (
+                          <button key={v} type="button" aria-pressed={filtroEstado === v} onClick={() => setFiltroEstado(v)} style={{ minHeight: 44, padding: '0 12px', borderRadius: 9999, border: '1.5px solid var(--cp-line)', fontWeight: 700, background: filtroEstado === v ? 'var(--cp-orange)' : 'var(--cp-white)', color: 'var(--cp-navy)', cursor: 'pointer' }}>
+                            {t}
+                          </button>
+                        ))}
+                      </div>
                       <ResumenCuenta partyId={w.partyId} version={version} />
                       {puedeSaldar && (
                         <BotonPagarAhora
@@ -464,8 +472,13 @@ export function CreditosView() {
                         </div>
                       )}
 
+                      {w.tieneConsumo && (
+                        <div style={{ fontSize: 12, fontWeight: 700 }} data-testid="resumen-pendiente-cobrado">
+                          Pendiente: s/ {w.items.filter((i) => i.estadoPago !== 'PAGADO').reduce((a, i) => a + i.monto, 0).toFixed(2)} · Cobrado: s/ {w.items.filter((i) => i.estadoPago === 'PAGADO').reduce((a, i) => a + i.monto, 0).toFixed(2)}
+                        </div>
+                      )}
                       {w.tieneConsumo &&
-                        w.items.map((item) => (
+                        w.items.filter((i) => filtroEstado === 'TODOS' || (filtroEstado === 'COBRADOS') === (i.estadoPago === 'PAGADO')).map((item) => (
                           <div
                             key={item.id}
                             style={{
@@ -488,19 +501,7 @@ export function CreditosView() {
                                   />
                                 )}
                                 {item.fecha} · {item.pedidoCodigo}{' '}
-                                <span
-                                  data-estado-pago={item.estadoPago ?? 'PENDIENTE'}
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: 800,
-                                    padding: '2px 8px',
-                                    borderRadius: 9999,
-                                    background: item.estadoPago === 'PAGADO' ? '#E3F2E7' : '#FFF1CC',
-                                    color: item.estadoPago === 'PAGADO' ? '#2F7A45' : '#8A5A00',
-                                  }}
-                                >
-                                  {item.estadoPago === 'PAGADO' ? (item.pagoModo === 'PLANILLA' ? 'Pagado por planilla' : 'Pagado') : 'Pendiente de pago'}
-                                </span>
+                                <EstadoCobro item={item} />
                               </span>
                               <span style={{ fontWeight: 700 }}>{item.montoFormateado}</span>
                             </div>
@@ -509,6 +510,9 @@ export function CreditosView() {
                                 Con descuento del personal de s/ {item.descuento.toFixed(2)} · {item.estadoPago === 'PAGADO' ? 'ya pagado' : 'se paga en su cuenta (fin de semana o mes)'}
                               </div>
                             ) : null}
+                            {puedeSaldar && (
+                              <BotonCobradoManual consumoId={item.id} cobrado={item.estadoPago === 'PAGADO'} codigo={item.pedidoCodigo} alTerminar={alSaldar} />
+                            )}
                             {item.lineas.map((linea, idx) => (
                               <div
                                 key={idx}

@@ -13,6 +13,7 @@ import {
 import {
   ComprobantePedidoDto,
   LineaPedidoDto,
+  PagoPersonalDto,
   PagoPedidoDto,
 } from '../../pedidos/dto/crear-pedido.dto';
 
@@ -63,6 +64,11 @@ export class AbrirPedidoMesaDto {
   @IsOptional()
   @IsBoolean()
   esPersonal?: boolean;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PagoPersonalDto)
+  pagoPersonal?: PagoPersonalDto;
 
   /** Personas de la mesa: si viene, la capacidad de las mesas se valida como en reservas (confirmarCapacidad la permite). */
   @IsOptional()

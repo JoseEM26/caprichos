@@ -44,8 +44,41 @@ describe('Créditos: cuenta del trabajador, pagar ahora y planilla', () => {
     render(<CreditosView />);
     fireEvent.click(await screen.findByText('Jorge Salas'));
     expect(await screen.findByText('Debe esta semana: S/ 20.00 · Este mes: S/ 20.00')).toBeInTheDocument();
-    expect(screen.getByText('Pendiente de pago')).toBeInTheDocument();
-    expect(screen.getByText('Pagado')).toBeInTheDocument();
+    expect(screen.getByText('⏳ Pendiente')).toBeInTheDocument();
+    expect(screen.getByText('✓ Cobrado')).toBeInTheDocument();
+  });
+
+  it('el check Cobrado dice quién cobró y con qué medio; el filtro Pendientes/Cobrados/Todos recorta la lista', async () => {
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue(sesion(['creditos/ver']));
+    const conQuien = structuredClone(resumen);
+    Object.assign(conQuien.trabajadores[0].items[1], { pagadoEn: '2026-11-04T15:30:00.000Z', pagoMedio: 'EFECTIVO', cobradoPor: 'Luis Mozo' });
+    vi.spyOn(api, 'obtenerResumenCreditos').mockResolvedValue(conQuien);
+    render(<CreditosView />);
+    fireEvent.click(await screen.findByText('Jorge Salas'));
+    expect(screen.getByText(/cobró Luis Mozo · efectivo/)).toBeInTheDocument();
+    expect(screen.getByTestId('resumen-pendiente-cobrado')).toHaveTextContent('Pendiente: s/ 20.00 · Cobrado: s/ 10.00');
+    fireEvent.click(screen.getByRole('button', { name: 'Pendientes' }));
+    expect(screen.getByText(/CP-1/)).toBeInTheDocument();
+    expect(screen.queryByText(/CP-2/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cobrados' }));
+    expect(screen.queryByText(/CP-1/)).toBeNull();
+    expect(screen.getByText(/CP-2/)).toBeInTheDocument();
+  });
+
+  it('solo con creditos/saldar aparece «Ya se le descontó»; confirma Sí/No y llama a marcarCobrado', async () => {
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue(sesion(['creditos/ver']));
+    const { unmount } = render(<CreditosView />);
+    fireEvent.click(await screen.findByText('Jorge Salas'));
+    expect(screen.queryByRole('button', { name: /Ya se le descontó/ })).toBeNull();
+    unmount();
+    vi.spyOn(sesionModulo, 'useSesion').mockReturnValue(sesion(['creditos/ver', 'creditos/saldar']));
+    const marcar = vi.spyOn(api, 'marcarCobrado').mockResolvedValue({ ok: true, cobrado: true });
+    render(<CreditosView />);
+    fireEvent.click(await screen.findByText('Jorge Salas'));
+    fireEvent.click(screen.getByRole('button', { name: /Ya se le descontó CP-1/ }));
+    expect(marcar).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí' }));
+    await waitFor(() => expect(marcar).toHaveBeenCalledWith('1', true));
   });
 
   it('Pagar ahora: marca los pendientes, confirma Sí/No y salda en un solo pago', async () => {

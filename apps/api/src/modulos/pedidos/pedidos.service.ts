@@ -42,6 +42,7 @@ import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.
 import { StockService } from '../stock/stock.service';
 import { LineaVentaProducto, controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
 import { RequisitoOpcion, lineasDeRequisitosOpcion, requisitosDeOpciones, requisitosFaltantes, saldosDeRequisitos } from '../stock/opcion-requiere';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 import { validarMotivoCortesia } from '../cortesias/cortesia.tipos';
 
 /** Cortesía de una línea: solo con permiso cortesias/dar; sin oferta (la promoción ya tiene su precio). */
@@ -103,6 +104,9 @@ export interface OrigenPedido {
   /** WhatsApp: el cliente eligió no sumar puntos; no se busca ninguna cuenta por teléfono */
   sinCuentaCliente?: boolean;
   esPersonal?: boolean;
+  /** Pedido del personal: cargarlo a su crédito (por defecto) o cobrárselo ahora (admin, caja o mozo: creditos/cobrar_ahora). */
+  pagoPersonal?: { modo: 'CREDITO' | 'AHORA'; medio?: string; pagaCon?: number };
+  puedeCobrarAhora?: boolean;
   /** Quien da cortesías (permiso cortesias/dar). */
   puedeCortesia?: boolean;
   mesasIds?: (bigint | string | number)[];
@@ -135,6 +139,7 @@ export class PedidosService {
     @Optional() private readonly puntosParty?: PartyPuntosService,
     @Optional() private readonly redis?: RedisService,
     @Optional() private readonly stockService?: StockService,
+    @Optional() private readonly auditoria?: AuditoriaService,
   ) {}
 
   /** Último pedido de delivery con dirección de ese celular (carta sin sesión). Null si no hay. */
@@ -188,6 +193,31 @@ export class PedidosService {
    * Cliente con cuenta del pedido: celular (solo MOZO/CAJA), cuenta de la carta o teléfono de WhatsApp.
    * Null = invitado. Un clienteTelefono de carta o WhatsApp se ignora.
    */
+  /** «Pagar ahora» del personal: permiso, medio, paga con (efectivo, obligatorio) y caja abierta (efectivo y tarjeta). */
+  private async validarCobroAhoraPersonal(origen: OrigenPedido, total: number): Promise<{ medio: string; pagaCon: number }> {
+    if (!origen.puedeCobrarAhora || origen.usuarioPartyId === undefined) {
+      throw new ForbiddenException({ codigo: 'SIN_PERMISO_COBRAR_AHORA', mensaje: 'No tienes permiso para cobrarle al trabajador en el momento' });
+    }
+    const medio = String(origen.pagoPersonal?.medio ?? '').trim().toUpperCase();
+    if (!['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA'].includes(medio)) {
+      throw new BadRequestException({ codigo: 'MEDIO_REQUERIDO', mensaje: 'Elige con qué paga el trabajador' });
+    }
+    const pagaCon = Number(origen.pagoPersonal?.pagaCon ?? 0);
+    if (medio === 'EFECTIVO' && total > 0) {
+      if (!(pagaCon > 0)) {
+        throw new BadRequestException({ codigo: 'PAGA_CON_REQUERIDO', mensaje: 'Escribe con cuánto paga el trabajador (en efectivo)' });
+      }
+      if (pagaCon < total) {
+        throw new BadRequestException({ codigo: 'PAGA_CON_MENOR_AL_TOTAL', mensaje: `El monto con el que paga (S/ ${pagaCon}) no puede ser menor al total (S/ ${total})` });
+      }
+    }
+    if ((medio === 'EFECTIVO' || medio === 'TARJETA') && total > 0) {
+      const caja = await this.prisma.caja.findFirst({ where: { estado: 'ABIERTA' }, select: { id: true } });
+      if (!caja) throw new ConflictException({ codigo: 'CAJA_CERRADA', mensaje: 'Abre la caja para cobrar en efectivo o con tarjeta' });
+    }
+    return { medio, pagaCon };
+  }
+
   /**
    * Propina del pedido (monto en soles). Sin interruptor encendido para el canal, se ignora (0). Con
    * propina inválida o sobre el tope, rechaza. Sin propina no toca la configuración.
@@ -1092,6 +1122,9 @@ export class PedidosService {
       });
     }
 
+    // 8.1. Pedido del personal con «Pagar ahora»: permiso, medio, «con cuánto paga» (efectivo) y caja abierta, antes de crear nada
+    const cobroAhora = personal && origen?.pagoPersonal?.modo === 'AHORA' ? await this.validarCobroAhoraPersonal(origen, totalCalculado) : null;
+
     // 9. Comprobante (ya validado arriba) y creación en transacción
     const comprobanteTipo = tipoElegido;
     const comprobanteDoc =
@@ -1182,8 +1215,39 @@ export class PedidosService {
 
       // Lo consumido por el personal se acumula en su cuenta en la misma transacción (el total ya lleva su descuento)
       if (colaboradorId !== null) {
+        // «Pagar ahora»: el consumo nace COBRADO (quién, cuándo, medio) y, en efectivo, entra a la caja abierta; todo en esta
+        // transacción: si algo falla no queda pedido a medias
+        let movimientoCajaId: bigint | null = null;
+        if (cobroAhora) {
+          if (cobroAhora.medio === 'EFECTIVO' && totalCalculado > 0) {
+            const caja = await tx.caja.findFirst({ where: { estado: 'ABIERTA' } });
+            if (!caja) throw new ConflictException({ codigo: 'CAJA_CERRADA', mensaje: 'Abre la caja para recibir el pago en efectivo' });
+            const mov = await tx.movimientoCaja.create({
+              data: { caja_id: caja.id, tipo: 'INGRESO', monto: totalCalculado, motivo: `Pago de crédito del personal · ${pedido.codigo}`.slice(0, 250) },
+            });
+            movimientoCajaId = mov.id;
+          }
+        }
         await tx.consumoPersonal.create({
-          data: { party_id: colaboradorId, pedido_id: pedido.id, fecha: fechaDiaLima(), monto: new Prisma.Decimal(totalCalculado) },
+          data: {
+            party_id: colaboradorId,
+            pedido_id: pedido.id,
+            fecha: fechaDiaLima(),
+            monto: new Prisma.Decimal(totalCalculado),
+            ...(cobroAhora
+              ? {
+                  pagado_en: new Date(),
+                  pagado_por: mozoPartyId,
+                  pago_modo: 'CAJA',
+                  pago_medio: cobroAhora.medio,
+                  pago_motivo:
+                    cobroAhora.medio === 'EFECTIVO'
+                      ? `Cobrado al instante · paga con S/ ${cobroAhora.pagaCon.toFixed(2)} · vuelto S/ ${(cobroAhora.pagaCon - totalCalculado).toFixed(2)}`
+                      : 'Cobrado al instante',
+                  movimiento_caja_id: movimientoCajaId,
+                }
+              : {}),
+          },
         });
       }
 
@@ -1311,6 +1375,30 @@ export class PedidosService {
 
       return pedido;
     });
+
+    if (cobroAhora) {
+      try {
+        await this.auditoria?.registrar({
+          categoria: 'CAMBIO',
+          modulo: 'creditos',
+          accion: 'CREDITO_PERSONAL_COBRADO_AHORA',
+          resultado: 'OK',
+          entidad: 'pedido',
+          entidadId: pedidoCreado.id,
+          partyId: origen?.usuarioPartyId !== undefined ? BigInt(origen.usuarioPartyId) : undefined,
+          despues: {
+            cobradoPor: origen?.usuarioPartyId?.toString() ?? null,
+            trabajador: origen?.clientePartyId?.toString() ?? null,
+            pedido: pedidoCreado.codigo,
+            medio: cobroAhora.medio,
+            monto: totalFinal,
+            ...(cobroAhora.medio === 'EFECTIVO' ? { pagaCon: cobroAhora.pagaCon, vuelto: Number((cobroAhora.pagaCon - totalFinal).toFixed(2)) } : {}),
+          },
+        });
+      } catch {
+        // el cobro ya quedó registrado en el consumo (quién y cuándo); la auditoría no deshace el pedido
+      }
+    }
 
     // Pedido del personal: nace PAGADO y no pasa por el cobro de Caja (que es quien descuenta los insumos por receta).
     // Lo consumido sale del almacén igual; idempotente, y si falla no deshace el pedido.

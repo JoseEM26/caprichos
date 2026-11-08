@@ -20,6 +20,7 @@ import { PuntosService } from '../clientes/puntos.service';
 import { DireccionesClienteService } from '../clientes/direcciones-cliente.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { PagoPlanService } from './pago-plan.service';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
 
@@ -34,6 +35,7 @@ describe('PedidosService', () => {
   let direccionesMock: any;
   let partyPuntosMock: any;
   let redisMock: any;
+  let auditoriaMock: any;
 
   const mockProductoCafe = {
     id: 1n,
@@ -220,9 +222,12 @@ describe('PedidosService', () => {
 
     redisMock = { incr: jest.fn().mockResolvedValue(1), expire: jest.fn().mockResolvedValue(1) };
 
+    auditoriaMock = { registrar: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PedidosService,
+        { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: RedisService, useValue: { obtenerCliente: () => redisMock } },
         { provide: PartyPuntosService, useValue: partyPuntosMock },
         { provide: DireccionesClienteService, useValue: direccionesMock },
@@ -545,6 +550,70 @@ describe('PedidosService', () => {
         await expect(
           service.crear(dtoPersonal, 'idemp-personal-6', { ...origen, canal: 'CARTA' as const }),
         ).rejects.toMatchObject({ response: { codigo: 'CANAL_NO_PERMITIDO' } });
+      });
+
+      describe('«Pagar ahora» (creditos/cobrar_ahora)', () => {
+        const ahora = (medio: string, pagaCon?: number) => ({ ...origen, puedeCobrarAhora: true, pagoPersonal: { modo: 'AHORA' as const, medio, pagaCon } });
+        beforeEach(() => {
+          prismaMock.caja = { findFirst: jest.fn().mockResolvedValue({ id: 3n }) };
+          prismaMock.movimientoCaja = { create: jest.fn().mockResolvedValue({ id: 77n }) };
+        });
+
+        it('a crédito (por defecto): consumo Pendiente, sin movimiento de caja', async () => {
+          await service.crear(dtoPersonal, 'ahora-0', { ...origen, puedeCobrarAhora: true, pagoPersonal: { modo: 'CREDITO' } });
+          const c = prismaMock.consumoPersonal.create.mock.calls[0][0].data;
+          expect(c.pagado_en).toBeUndefined();
+          expect(prismaMock.movimientoCaja.create).not.toHaveBeenCalled();
+        });
+
+        it('efectivo: consumo COBRADO con quién cobró, ingreso a la caja abierta y auditoría', async () => {
+          await service.crear(dtoPersonal, 'ahora-1', ahora('EFECTIVO', 50));
+          const c = prismaMock.consumoPersonal.create.mock.calls[0][0].data;
+          expect(c.pagado_en).toBeInstanceOf(Date);
+          expect(c.pagado_por).toBe(5n);
+          expect(c.pago_medio).toBe('EFECTIVO');
+          expect(c.movimiento_caja_id).toBe(77n);
+          expect(c.pago_motivo).toContain('vuelto S/ 29.00');
+          expect(prismaMock.movimientoCaja.create.mock.calls[0][0].data).toMatchObject({ caja_id: 3n, tipo: 'INGRESO', monto: 21 });
+          expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+            expect.objectContaining({ accion: 'CREDITO_PERSONAL_COBRADO_AHORA', despues: expect.objectContaining({ cobradoPor: '5', trabajador: '9', medio: 'EFECTIVO', pagaCon: 50, vuelto: 29 }) }),
+          );
+        });
+
+        it('efectivo sin «con cuánto paga» o con menos del total: 400 y no se crea nada', async () => {
+          await expect(service.crear(dtoPersonal, 'ahora-2', ahora('EFECTIVO'))).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_REQUERIDO' } });
+          await expect(service.crear(dtoPersonal, 'ahora-3', ahora('EFECTIVO', 10))).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_MENOR_AL_TOTAL' } });
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        });
+
+        it('efectivo con caja cerrada: 409 y no se crea el pedido', async () => {
+          prismaMock.caja.findFirst.mockResolvedValue(null);
+          await expect(service.crear(dtoPersonal, 'ahora-4', ahora('EFECTIVO', 50))).rejects.toMatchObject({ response: { codigo: 'CAJA_CERRADA' } });
+          expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+        });
+
+        it('digital (Yape, Plin, Transferencia): sin caja ni movimiento; queda COBRADO con su medio', async () => {
+          prismaMock.caja.findFirst.mockResolvedValue(null);
+          for (const medio of ['YAPE', 'PLIN', 'TRANSFERENCIA']) {
+            prismaMock.consumoPersonal.create.mockClear();
+            await service.crear(dtoPersonal, `ahora-d-${medio}`, ahora(medio));
+            const c = prismaMock.consumoPersonal.create.mock.calls[0][0].data;
+            expect(c.pago_medio).toBe(medio);
+            expect(c.movimiento_caja_id).toBeNull();
+          }
+          expect(prismaMock.movimientoCaja.create).not.toHaveBeenCalled();
+        });
+
+        it('sin el permiso creditos/cobrar_ahora: 403; con medio inválido: 400', async () => {
+          await expect(service.crear(dtoPersonal, 'ahora-5', { ...ahora('EFECTIVO', 50), puedeCobrarAhora: false })).rejects.toMatchObject({ response: { codigo: 'SIN_PERMISO_COBRAR_AHORA' } });
+          await expect(service.crear(dtoPersonal, 'ahora-6', ahora('BITCOIN'))).rejects.toMatchObject({ response: { codigo: 'MEDIO_REQUERIDO' } });
+        });
+
+        it('atomicidad: si falla el ingreso a caja el error sale de la transacción (no se confirma pedido)', async () => {
+          prismaMock.movimientoCaja.create.mockRejectedValue(new Error('boom'));
+          await expect(service.crear(dtoPersonal, 'ahora-7', ahora('EFECTIVO', 50))).rejects.toThrow('boom');
+          expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+        });
       });
 
       it('un pedido normal no acumula nada ni cambia su cobro', async () => {

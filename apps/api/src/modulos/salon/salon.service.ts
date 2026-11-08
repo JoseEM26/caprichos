@@ -23,6 +23,7 @@ import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { descuentosDePedido, lineaDetalleTicket } from '../impresion/constructor-etiquetas';
 import { rolesDelUsuario } from '../acceso/roles-usuario';
 import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
+import { puedeCobrarAhoraPersonal } from '../creditos/descuento-personal';
 import { etiquetaMesasPedido, MAX_MESAS_PEDIDO, nombreUnaMesa, TEXTO_EN_ESPERA } from './mesas-pedido.util';
 
 @Injectable()
@@ -375,6 +376,8 @@ export class SalonService {
         usuarioPartyId: usuario?.partyId,
         clientePartyId: dto.colaboradorPartyId,
         esPersonal: dto.esPersonal,
+        pagoPersonal: dto.pagoPersonal,
+        puedeCobrarAhora: puedeCobrarAhoraPersonal(usuario),
         mesasIds,
         mesaNombre,
         omitirChequeoCarta: true,
