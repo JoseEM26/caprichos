@@ -2044,6 +2044,40 @@ describe('PedidosService', () => {
       await service.crear(pedidoBaseDto, 'idemp-celular-ok', { canal: 'CARTA' });
       expect(capturado.data.cliente_party_id).toBe(300n);
     });
+
+    describe('«Comer en el local» desde la carta', () => {
+      const dtoLocal = (cliente: any, extra: any = {}) =>
+        ({ ...pedidoBaseDto, modalidad: 'COMER_LOCAL', entrega: undefined, mesa: undefined, cliente, ...extra }) as any;
+
+      it('con nombre y celular: crea sin envío, sin zona, sin dirección y sin mesa', async () => {
+        const capturado = crearCapturado();
+        const res = await service.crear(dtoLocal({ nombre: 'Miguel', telefono: '987654321' }), 'idemp-local-ok', { canal: 'CARTA' });
+        expect(res.codigo).toBe('CP-W310');
+        expect(capturado.data.modalidad).toBe('COMER_LOCAL');
+        expect(Number(capturado.data.envio)).toBe(0);
+        expect(capturado.data.zona_id ?? null).toBeNull();
+        expect(capturado.data.entrega_direccion ?? null).toBeNull();
+        expect(capturado.data.mesa_nombre).toBeNull();
+        expect(capturado.data.cliente_nombre).toBe('Miguel');
+      });
+
+      it('con mesa en el cuerpo igual no ocupa mesa: mesa_nombre queda nulo', async () => {
+        const capturado = crearCapturado();
+        await service.crear(dtoLocal({ nombre: 'Miguel', telefono: '987654321' }, { mesa: '5' }), 'idemp-local-mesa', { canal: 'CARTA' });
+        expect(capturado.data.mesa_nombre).toBeNull();
+      });
+
+      it('sin nombre: 400 CLIENTE_NOMBRE_REQUERIDO', async () => {
+        const err = await service.crear(dtoLocal({ nombre: ' ', telefono: '987654321' }), 'idemp-local-n', { canal: 'CARTA' }).catch((e) => e);
+        expect(err.getResponse()).toMatchObject({ codigo: 'CLIENTE_NOMBRE_REQUERIDO' });
+      });
+
+      it('sin celular: 400 CELULAR_REQUERIDO', async () => {
+        const err = await service.crear(dtoLocal({ nombre: 'Miguel' }), 'idemp-local-c', { canal: 'CARTA' }).catch((e) => e);
+        expect(err.getResponse()).toMatchObject({ codigo: 'CELULAR_REQUERIDO' });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('productos que controlan stock al crear el pedido (todos los canales)', () => {

@@ -170,6 +170,8 @@ export class AvisosPedidoService {
       },
     });
     if (!pedido) return { estado: 'OMITIDO', motivo: 'PEDIDO_NO_ENCONTRADO' };
+    // «Comer en el local»: se le llama en voz alta por su nombre, nunca se avisa por WhatsApp que está listo
+    if (pedido.modalidad === 'COMER_LOCAL' && etapa === 'LISTO_RECOJO') return { estado: 'OMITIDO', motivo: 'COMER_EN_LOCAL' };
     if (pedido.modalidad !== 'DELIVERY' && !cfg.cualquierModalidad) return { estado: 'OMITIDO', motivo: 'NO_ES_DELIVERY' };
 
     // SALIDA: el tiempo prometido se calcula y guarda (eta_min/eta_max) aunque el aviso esté apagado

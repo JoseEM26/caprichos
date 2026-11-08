@@ -174,8 +174,8 @@ export class CrearPedidoDto {
   @IsNotEmpty({ message: 'Los datos del cliente son requeridos' })
   cliente!: ClienteDto;
 
-  @IsIn(['DELIVERY', 'RECOGER', 'MESA'], { message: 'Modalidad debe ser DELIVERY, RECOGER o MESA' })
-  modalidad!: 'DELIVERY' | 'RECOGER' | 'MESA';
+  @IsIn(['DELIVERY', 'RECOGER', 'MESA', 'COMER_LOCAL'], { message: 'Modalidad debe ser DELIVERY, RECOGER, MESA o COMER_LOCAL' })
+  modalidad!: 'DELIVERY' | 'RECOGER' | 'MESA' | 'COMER_LOCAL';
 
   @IsOptional()
   @ValidateNested()

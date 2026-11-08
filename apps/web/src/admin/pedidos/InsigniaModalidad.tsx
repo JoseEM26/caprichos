@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type ClaveModalidad = 'DELIVERY' | 'LLEVAR' | 'MESA' | 'LOCAL';
+export type ClaveModalidad = 'DELIVERY' | 'LLEVAR' | 'MESA' | 'LOCAL' | 'COMER_LOCAL';
 
 /** Normaliza: RECOGER y LLEVAR (datos antiguos) son «para llevar»; lo desconocido es en el local. */
 export function claveModalidad(m?: string | null): ClaveModalidad {
@@ -8,6 +8,7 @@ export function claveModalidad(m?: string | null): ClaveModalidad {
   if (mu === 'DELIVERY') return 'DELIVERY';
   if (mu === 'LLEVAR' || mu === 'RECOGER') return 'LLEVAR';
   if (mu === 'MESA') return 'MESA';
+  if (mu === 'COMER_LOCAL') return 'COMER_LOCAL';
   return 'LOCAL';
 }
 
@@ -16,6 +17,7 @@ const ESTILO: Record<ClaveModalidad, { texto: string; bg: string; fg: string }> 
   LLEVAR: { texto: 'PARA LLEVAR', bg: '#D99E39', fg: '#0B2C3E' },
   MESA: { texto: 'MESA', bg: '#0B2C3E', fg: '#FBF4EC' },
   LOCAL: { texto: 'EN EL LOCAL', bg: '#EDE1D1', fg: '#0B2C3E' },
+  COMER_LOCAL: { texto: 'COMER EN EL LOCAL', bg: '#2F7A45', fg: '#FFFFFF' },
 };
 
 /** «MESA 4» aunque el nombre ya venga como «Mesa 4»; sin nombre, solo «MESA». */
@@ -50,6 +52,13 @@ export function IconoModalidad({ modalidad, tamano = 24 }: { modalidad: ClaveMod
     MESA: (
       <>
         <path d="M4 7h16M6 7l-1 12M18 7l1 12M12 7v12" />
+      </>
+    ),
+    // plato con cubiertos
+    COMER_LOCAL: (
+      <>
+        <circle cx="12" cy="12" r="5" />
+        <path d="M3 4v6M5.5 4v6M3 7h2.5M4.2 10v10M20 4c-2 1-2.5 4-2.5 7h2.5v9" />
       </>
     ),
     // tienda / mostrador

@@ -187,7 +187,7 @@ export interface LineaCarrito {
   subtotal: number;
 }
 
-export type ModalidadEntrega = 'DELIVERY' | 'RECOGER';
+export type ModalidadEntrega = 'DELIVERY' | 'RECOGER' | 'COMER_LOCAL';
 export type TipoComprobante = 'SIMPLE' | 'BOLETA' | 'FACTURA';
 export type MetodoPago = 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA';
 

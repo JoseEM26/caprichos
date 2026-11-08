@@ -63,6 +63,7 @@ const ESTADO_VISTO: Record<string, { texto: string; bg: string; fg: string }> = 
 const MODALIDAD: Record<string, string> = {
   MESA: 'Mesa',
   LOCAL: 'Local',
+  COMER_LOCAL: 'Comer en el local',
   LLEVAR: 'Para llevar',
   RECOGER: 'Para llevar',
   DELIVERY: 'Delivery',

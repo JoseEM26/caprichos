@@ -80,8 +80,8 @@ export function cambioAlTocar(r: ReglasMapa, fila: ClaveFila, col: ColumnaId): P
 
 export const RECOMENDADO_CAPRICHOS: ReglasMapa = {
   generalModalidades: [],
-  areaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
-  bebidaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
+  areaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY', 'COMER_LOCAL'],
+  bebidaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY', 'COMER_LOCAL'],
   bebidaActivo: true,
   areaActivo: true,
   comandaSalonActivo: true,

@@ -37,7 +37,7 @@ export interface DatosEdicionPedido {
   codigo: string;
   version: number;
   estado: string;
-  modalidad: 'DELIVERY' | 'RECOGER' | 'MESA';
+  modalidad: 'DELIVERY' | 'RECOGER' | 'MESA' | 'COMER_LOCAL';
   canal: string;
   mesa?: string | null;
   cliente: { nombre: string | null; telefono: string | null };
@@ -67,7 +67,7 @@ export interface EdicionPedidoPayload {
     sabores?: { saborId: string | number; cantidad: number }[];
   }>;
   cliente?: { nombre: string; telefono?: string };
-  modalidad?: 'DELIVERY' | 'RECOGER' | 'MESA';
+  modalidad?: 'DELIVERY' | 'RECOGER' | 'MESA' | 'COMER_LOCAL';
   entrega?: { direccion?: string; referencia?: string; lat?: number; lng?: number; origen?: 'GPS' | 'ESCRITA' | 'MAPA' | 'WHATSAPP' | 'ENLACE' };
 }
 
@@ -512,7 +512,7 @@ export const pedidosApi = {
 
   async crearPedidoAdmin(
     dto: {
-      modalidad: 'DELIVERY' | 'RECOGER' | 'MESA';
+      modalidad: 'DELIVERY' | 'RECOGER' | 'MESA' | 'COMER_LOCAL';
       cliente: { nombre: string; telefono?: string };
       lineas: Array<{
         productoId: string | number;

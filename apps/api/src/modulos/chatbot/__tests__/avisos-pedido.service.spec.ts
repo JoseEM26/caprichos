@@ -48,6 +48,14 @@ describe('AvisosPedidoService (avisos de reparto al cliente, encolados en el out
     servicio = new AvisosPedidoService(prisma, outbox);
   });
 
+  it('«Comer en el local»: el aviso de recojo listo no se envía (se le llama por su nombre)', async () => {
+    pedido.modalidad = 'COMER_LOCAL';
+    const res = await servicio.avisar(77, 'LISTO_RECOJO');
+
+    expect(res).toEqual({ estado: 'OMITIDO', motivo: 'COMER_EN_LOCAL' });
+    expect(outbox.encolar).not.toHaveBeenCalled();
+  });
+
   it('encola el aviso con clave pedido-<id>-<ETAPA> y marca la etapa PENDIENTE, en la misma transacción', async () => {
     const res = await servicio.avisar(77, 'LLEGADA');
 

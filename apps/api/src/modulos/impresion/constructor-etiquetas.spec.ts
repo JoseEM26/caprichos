@@ -61,6 +61,16 @@ describe('Constructor server-side de etiquetas', () => {
     expect(general.printer).toBe('Etiquetera de caja');
   });
 
+  it('«Comer en el local»: pill propio y el nombre del cliente para llamarlo', () => {
+    const p = { ...pedidoMock, modalidad: 'COMER_LOCAL', mesa_nombre: null, cliente_nombre: 'Miguel' };
+    const general = construirEtiquetaGeneral(p);
+    expect(general.modalidadPill).toBe('COMER EN EL LOCAL');
+    expect(general.modalidad).toBe('Comer en el local');
+    expect(general.who).toBe('Miguel');
+    const vasos = construirEtiquetasBebida(p);
+    expect(vasos[0].who).toContain('Miguel');
+  });
+
   it('construye etiquetas por área agrupadas', () => {
     const areas = construirEtiquetasArea(pedidoMock);
     expect(areas).toHaveLength(2);

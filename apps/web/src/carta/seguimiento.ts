@@ -8,7 +8,7 @@ const MAXIMO = 20;
 export const INTERVALO_SEGUIMIENTO_MS = 15000;
 const DIAS_CONSERVADO_MS = 30 * 24 * 60 * 60 * 1000;
 const EVENTO_CAMBIO = 'caprichos:pedidos-cambio';
-const MODALIDADES: ModalidadEntrega[] = ['DELIVERY', 'RECOGER'];
+const MODALIDADES: ModalidadEntrega[] = ['DELIVERY', 'RECOGER', 'COMER_LOCAL'];
 
 export interface PedidoGuardado {
   codigo: string;

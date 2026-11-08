@@ -197,7 +197,7 @@ function TarjetaPedido({ fila, onElegir }: { fila: Fila; onElegir: () => void })
         </span>
       </div>
       <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
-        {formatearFecha(fila.creadoEn)} · {fila.modalidad === 'DELIVERY' ? 'Delivery' : 'Recojo en local'}
+        {formatearFecha(fila.creadoEn)} · {fila.modalidad === 'DELIVERY' ? 'Delivery' : fila.modalidad === 'COMER_LOCAL' ? 'Comer en el local' : 'Recojo en local'}
         {fila.total !== undefined && ` · S/ ${Number(fila.total).toFixed(2)}`}
       </div>
       <div role="img" aria-label={fila.anulado ? 'Pedido anulado' : `${hechos} de 4 pasos`} style={{ display: 'flex', gap: 4 }}>
@@ -236,7 +236,7 @@ function DetallePedido({ fila, onVolver }: { fila: Fila; onVolver: () => void })
     <>
       <BotonVolver onVolver={onVolver} />
       <div style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-        {formatearFecha(fila.creadoEn)} · {fila.modalidad === 'DELIVERY' ? 'Delivery' : 'Recojo en local'}
+        {formatearFecha(fila.creadoEn)} · {fila.modalidad === 'DELIVERY' ? 'Delivery' : fila.modalidad === 'COMER_LOCAL' ? 'Comer en el local' : 'Recojo en local'}
       </div>
       {estado?.anulado || fila.anulado ? (
         <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--cp-rust)' }}>Tu pedido fue anulado</p>

@@ -14,6 +14,7 @@ const VERDE = '#2F7A45';
 const MODALIDAD: Record<string, { texto: string; icono: string }> = {
   MESA: { texto: 'Mesa', icono: '🍽️' },
   LOCAL: { texto: 'Local', icono: '🍽️' },
+  COMER_LOCAL: { texto: 'Comer en el local', icono: '🍽️' },
   LLEVAR: { texto: 'Para llevar', icono: '🛍️' },
   RECOGER: { texto: 'Recoger', icono: '🛍️' },
   DELIVERY: { texto: 'Delivery', icono: '🛵' },

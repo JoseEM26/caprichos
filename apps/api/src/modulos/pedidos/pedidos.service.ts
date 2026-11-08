@@ -1013,7 +1013,7 @@ export class PedidosService {
         });
       }
     } else {
-      // RECOGER o MESA
+      // RECOGER, MESA o COMER_LOCAL
       envio = 0;
       zonaId = null;
       entregaOrigen = null;
@@ -1113,7 +1113,7 @@ export class PedidosService {
       }
 
       const mozoPartyId = origen?.usuarioPartyId ? BigInt(origen.usuarioPartyId) : null;
-      const mesaNombreFinal = origen?.mesaNombre || dto.mesa || null;
+      const mesaNombreFinal = dto.modalidad === 'COMER_LOCAL' ? null : origen?.mesaNombre || dto.mesa || null;
 
       const pedido = await tx.pedido.create({
         data: {

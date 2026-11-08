@@ -227,7 +227,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
   // el estado real de cada una se toma de print_job cuando llega.
   // El sticker general solo existe para llevar, recoger y delivery: en mesa no se ofrece ni se puede reimprimir.
   // La API dice cuáles aplican; mientras carga, se decide por la modalidad del pedido.
-  const esLlevar = ['DELIVERY', 'RECOGER', 'LLEVAR'].includes(String(pedido.modalidad || '').toUpperCase());
+  const esLlevar = ['DELIVERY', 'RECOGER', 'LLEVAR', 'COMER_LOCAL'].includes(String(pedido.modalidad || '').toUpperCase());
   const llevaGeneral = estado ? estado.etiquetas.some((e) => e.clave === 'GENERAL') : esLlevar;
   const base: EtiquetaEstado[] = [
     ...(llevaGeneral
