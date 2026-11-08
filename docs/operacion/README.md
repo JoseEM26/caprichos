@@ -35,7 +35,7 @@ Esta carpeta guarda los documentos que **no describen qué hace el sistema**, si
 | RB-CAP-004 | [Preparar un servidor nuevo](RB-CAP-004-preparar-un-servidor-nuevo.md) | draft |
 | RB-CAP-005 | [Rotar claves y responder a una filtración](RB-CAP-005-rotar-claves-y-responder-a-una-filtracion.md) | draft |
 | RB-CAP-005B | [Desplegar, actualizar y volver atrás con Docker Compose](RB-CAP-005-desplegar-actualizar-y-volver-atras-con-compose.md) | listo |
-| RB-CAP-006 | [Código rotativo del supervisor (TOTP)](RB-CAP-006-codigo-del-supervisor.md) | listo |
+| RB-CAP-006 | [Código rotativo del supervisor (TOTP), RETIRADO](RB-CAP-006-codigo-del-supervisor.md) | retirado |
 | RB-CAP-007 | [Configuración, conexión y operación del Chatbot de WhatsApp](RB-CAP-007-chatbot-whatsapp.md) | listo |
 | RB-CAP-008 | [Despliegue sin corte con docker-rollout y verificación continua con sonda](RB-CAP-008-despliegue-sin-corte-y-sonda.md) | draft |
 | CHK-CAP-001 | [Requisitos para subir a producción](CHK-CAP-001-requisitos-para-subir-a-produccion.md) | draft |

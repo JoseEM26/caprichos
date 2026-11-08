@@ -2,7 +2,7 @@
 id: RB-CAP-006
 tipo: runbook
 titulo: "Runbook: código del supervisor (TOTP rotativo), generación, rotación y contingencia"
-estado: draft
+estado: retirado
 producto: caprichos
 version: "1.0"
 owner: "José Ángel Espinoza"
@@ -13,6 +13,8 @@ tags: [runbook, seguridad, supervisor, totp, contingencia, operaciones]
 ---
 
 # RB-CAP-006 — Código del supervisor (TOTP rotativo): generación, rotación y contingencia
+
+> **RETIRADO.** Por decisión del dueño, la aprobación del supervisor se eliminó por completo: ninguna acción pide ya un código de 6 dígitos ni PIN. Las acciones quedan protegidas solo por su permiso normal y por la auditoría (quién y cuándo). La pantalla «Código del supervisor» y su API (`/admin/supervisor/*`) ya no existen. La tabla `supervisor_secreto` quedó huérfana (sin lectura ni escritura) y se puede borrar con una migración aparte. Este documento se conserva solo como historia.
 
 | Campo | Valor |
 |---|---|

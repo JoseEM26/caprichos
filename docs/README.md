@@ -55,7 +55,7 @@ La carpeta [`docs/operacion/`](operacion/) reune los runbooks paso a paso para l
 - **[RB-CAP-003: Atencion ante caida de un servicio](operacion/RB-CAP-003-un-servicio-se-cayo.md)**: Diagnostico rapido y recuperacion ante interrupciones de API, base de datos o proxy.
 - **[RB-CAP-004: Preparacion de servidor nuevo](operacion/RB-CAP-004-preparar-un-servidor-nuevo.md)**: Pasos de aprovisionamiento de una VPS desde cero.
 - **[RB-CAP-005: Desplegar, actualizar y volver atras con Compose](operacion/RB-CAP-005-desplegar-actualizar-y-volver-atras-con-compose.md)**: Ejecucion del despliegue en ambientes demo y produccion mediante scripts de operacion.
-- **[RB-CAP-006: Operacion del codigo rotativo del supervisor](operacion/RB-CAP-006-codigo-del-supervisor.md)**: Administracion de codigos dinamicos TOTP para aprobacion de operaciones protegidas.
+- **[RB-CAP-006: Codigo del supervisor (RETIRADO)](operacion/RB-CAP-006-codigo-del-supervisor.md)**: la aprobacion del supervisor se elimino; se conserva como historia.
 - **[RB-CAP-007: Operacion del chatbot de WhatsApp](operacion/RB-CAP-007-chatbot-whatsapp.md)**: Supervision del bot de pedidos, reservas, atencion de vouchers y horario comercial.
 - **[RB-CAP-008: Despliegue sin corte y verificacion con sonda](operacion/RB-CAP-008-despliegue-sin-corte-y-sonda.md)**: Procedimiento de despliegue con docker-rollout y monitoreo con sonda continua de salud.
 - **[RB-CAP-009: Activar y operar la lectura de vouchers con IA](operacion/RB-CAP-009-activar-y-operar-vouchers-ia.md)**: Guia de operacion para la lectura de comprobantes con OpenAI y revision en cierre.

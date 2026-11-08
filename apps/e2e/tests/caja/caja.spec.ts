@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { execSync } from 'child_process';
 import { PrismaClient, Prisma } from '@prisma/client';
 import {
   loginPorUi,
@@ -7,10 +6,7 @@ import {
   confirmarSiNo,
   obtenerStockInsumo,
   obtenerPrismaTest,
-  SUPERVISOR_PIN,
-  obtenerCodigoSupervisorVigente,
   PUERTO_API,
-  SLOT,
 } from '../../src';
 
 /**
@@ -19,39 +15,18 @@ import {
  *
  * Escenarios cubiertos:
  * 1. Apertura de caja, cobros mixto (efectivo y Yape), arqueo ciego y cierre que cuadra con verificación en BD.
- * 2. Anulación de un cobro con PIN de supervisor, conservación del registro, reposición de stock y reversión de pedido.
- * 3. Bloqueo de PIN tras 3 intentos fallidos con mensaje claro e impedimento de anular.
- * 4. Bloqueo de cierre por pedido entregado sin cobrar y resolución con motivo y PIN.
+ * 2. Anulación de un cobro con motivo (sin código de supervisor), conservación del registro, reposición de stock y reversión de pedido.
+ * 4. Bloqueo de cierre por pedido entregado sin cobrar y resolución con motivo.
  * 5. Pedido delivery exige repartidor asignado para poder pasar a estado ENTREGADO.
  * 6. Verificación de permisos: CAJERO no puede entrar a almacén ni configuración.
  */
 
 test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
   const apiBaseUrl = `http://127.0.0.1:${PUERTO_API}`;
-  const pinSupervisor = process.env.E2E_SUPERVISOR_PIN || SUPERVISOR_PIN;
   const prisma = obtenerPrismaTest();
-  const redisDb = 2 + SLOT;
-
-  // Helper para limpiar contadores de intentos y códigos consumidos en Redis
-  function limpiarRedisIntentos() {
-    try {
-      execSync(
-        `docker exec caprichos-redis-dev redis-cli -n ${redisDb} --scan --pattern "pin:supervisor:*" | xargs -r docker exec -i caprichos-redis-dev redis-cli -n ${redisDb} del`,
-        { stdio: ['ignore', 'ignore', 'ignore'] },
-      );
-      execSync(
-        `docker exec caprichos-redis-dev redis-cli -n ${redisDb} --scan --pattern "supervisor:codigo:*" | xargs -r docker exec -i caprichos-redis-dev redis-cli -n ${redisDb} del`,
-        { stdio: ['ignore', 'ignore', 'ignore'] },
-      );
-    } catch {
-      // Ignorar si no hay claves
-    }
-  }
 
   // Helper para dejar la base de datos en un estado limpio antes de cada prueba
   async function limpiarBaseDatosCaja() {
-    limpiarRedisIntentos();
-
     // 1. Eliminar cierres y cobros (TRUNCATE omite el trigger de inmutabilidad tg_cierre_caja_inmutable)
     await prisma.$executeRawUnsafe('TRUNCATE TABLE cierre_medio, cierre_caja CASCADE;');
     await prisma.conteoCierre.deleteMany();
@@ -126,10 +101,6 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
 
   test.beforeEach(async () => {
     await limpiarBaseDatosCaja();
-  });
-
-  test.afterEach(async () => {
-    limpiarRedisIntentos();
   });
 
   test('(1) Apertura de caja, cobros en efectivo y otro medio, arqueo ciego y cierre que cuadra con verificación en BD', async ({
@@ -310,7 +281,7 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     expect(Number(medioYape?.diferencia)).toBe(0);
   });
 
-  test('(2) Anulación de un cobro con PIN de supervisor, conservación de registro, reposición de stock y reversión del pedido', async () => {
+  test('(2) Anulación de un cobro con motivo y sin código, conservación de registro, reposición de stock y reversión del pedido', async () => {
     // 1. Abrir caja del día
     await abrirCajaHoy(100);
 
@@ -376,34 +347,12 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     const stockTrasCobro = await obtenerStockInsumo('Café en grano');
     expect(Number(stockTrasCobro)).toBeCloseTo(Number(stockInicial) - 0.018, 4);
 
-    // 5. Intentar anular el cobro SIN PIN de supervisor -> debe ser rechazado (403)
-    const resSinPin = await fetch(`${apiBaseUrl}/admin/caja/cobros/${cobroId}/anular`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sesionCajero.accessToken}`,
-      },
-      body: JSON.stringify({
-        motivo: 'Intento de anulacion sin pin supervisor',
-      }),
-    });
-    expect(resSinPin.status).toBe(403);
-
-    // Verificar que el cobro no se haya anulado
-    const cobroSinAnularDb = await prisma.cobro.findUnique({
-      where: { id: cobroId },
-    });
-    expect(cobroSinAnularDb?.anulado_en).toBeNull();
-
-    // 6. Anular el cobro CON el código de supervisor correcto
-    const codigoSupervisor = await obtenerCodigoSupervisorVigente(prisma);
+    // 5. Anular el cobro solo con el motivo: ya no hay código de supervisor
     const resConPin = await fetch(`${apiBaseUrl}/admin/caja/cobros/${cobroId}/anular`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${sesionCajero.accessToken}`,
-        'X-Codigo-Supervisor': codigoSupervisor,
-        'X-Pin-Supervisor': codigoSupervisor,
       },
       body: JSON.stringify({
         motivo: 'Cobro cobrado por duplicado por error del cajero',
@@ -432,105 +381,7 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     expect(pedidoRevertidoDb?.pago_estado).toBe('PENDIENTE');
   });
 
-  test('(3) Tres intentos fallidos de PIN de supervisor bloquean el PIN impidiendo la anulación', async ({
-    page,
-  }) => {
-    // 1. Abrir caja y crear pedido en estado COLA
-    await abrirCajaHoy(100);
-
-    const pedido = await prisma.pedido.create({
-      data: {
-        codigo: 'CP-E2E-PIN3',
-        canal: 'CAJA',
-        modalidad: 'LLEVAR',
-        estado: 'COLA',
-        cliente_nombre: 'Cliente Pin Fallido',
-        subtotal: new Prisma.Decimal(10.0),
-        total: new Prisma.Decimal(10.0),
-        pago_estado: 'PENDIENTE',
-      },
-    });
-
-    const sesionCajero = await loginPorApi('CAJERO');
-
-    const resCobro = await fetch(`${apiBaseUrl}/admin/caja/cobrar`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sesionCajero.accessToken}`,
-      },
-      body: JSON.stringify({
-        pedidoId: pedido.id.toString(),
-        pagos: [{ medio: 'EFECTIVO', monto: 10.0 }],
-      }),
-    });
-    const dataCobro = await resCobro.json();
-    const cobroId = BigInt(dataCobro.cobroId || dataCobro.id);
-
-    // 2. Realizar 3 intentos de anulación con PIN incorrecto ('000000')
-    for (let intento = 1; intento <= 3; intento++) {
-      const resIntento = await fetch(`${apiBaseUrl}/admin/caja/cobros/${cobroId}/anular`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sesionCajero.accessToken}`,
-          'X-Pin-Supervisor': '000000',
-        },
-        body: JSON.stringify({
-          motivo: `Intento fallido numero ${intento}`,
-        }),
-      });
-
-      expect(resIntento.status).toBe(403);
-      const dataIntento = await resIntento.json();
-      expect(['CODIGO_INVALIDO', 'PIN_INVALIDO']).toContain(dataIntento.codigo);
-    }
-
-    // 3. El 4to intento con el código CORRECTO de supervisor debe ser BLOQUEADO por Redis (CODIGO_BLOQUEADO)
-    const codigoSupervisor = await obtenerCodigoSupervisorVigente(prisma);
-    const resBloqueado = await fetch(`${apiBaseUrl}/admin/caja/cobros/${cobroId}/anular`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sesionCajero.accessToken}`,
-        'X-Codigo-Supervisor': codigoSupervisor,
-        'X-Pin-Supervisor': codigoSupervisor,
-      },
-      body: JSON.stringify({
-        motivo: 'Intento con codigo real estando bloqueado',
-      }),
-    });
-
-    expect(resBloqueado.status).toBe(403);
-    const dataBloqueado = await resBloqueado.json();
-    expect(['CODIGO_BLOQUEADO', 'PIN_BLOQUEADO']).toContain(dataBloqueado.codigo);
-    expect(dataBloqueado.mensaje).toMatch(/Demasiados intentos fallidos.*Espera 5 minutos/i);
-
-    // 4. Verificar que el cobro no se haya anulado en base de datos
-    const cobroDb = await prisma.cobro.findUnique({ where: { id: cobroId } });
-    expect(cobroDb?.anulado_en).toBeNull();
-
-    // 5. Verificar mensaje de error claro en la interfaz gráfica
-    // El cajero intenta usar el código de supervisor bloqueado en Cierre de caja
-    await loginPorUi(page, 'CAJERO');
-    await page.goto('/admin/cierre', { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Cerrar caja y cuadrar' }).click();
-
-    const modalCierre = page.getByRole('dialog', { name: 'Cerrar caja y cuadrar' });
-    await expect(modalCierre).toBeVisible();
-
-    // Intentar ver pedidos sin cobrar usando el código bloqueado
-    const inputPin = modalCierre.getByLabel(/Código del supervisor/i);
-    await inputPin.fill(codigoSupervisor);
-    await modalCierre.getByRole('button', { name: 'Ver pedidos' }).click();
-
-    // Debe mostrar claramente el mensaje de bloqueo por intentos
-    await expect(
-      modalCierre.getByText(/Demasiados intentos fallidos.*Espera 5 minutos/i),
-    ).toBeVisible({ timeout: 8000 });
-  });
-
-  test('(4) Cierre bloqueado por pedido entregado sin cobrar y resolución mediante anulación con motivo y PIN', async ({
+  test('(4) Cierre bloqueado por pedido entregado sin cobrar y resolución mediante anulación con motivo', async ({
     page,
   }) => {
     // 1. Abrir caja del día
@@ -563,12 +414,7 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     // 5. Verificar sección de pedidos sin cobrar que impiden el cierre
     await expect(modalCierre.getByText('Pedidos sin cobrar: impiden cerrar la caja')).toBeVisible();
 
-    // El cajero ingresa código de supervisor para desbloquear la vista de pendientes
-    const codSup1 = await obtenerCodigoSupervisorVigente(prisma);
-    const inputPinPendientes = modalCierre.getByLabel(/Código del supervisor/i);
-    await inputPinPendientes.fill(codSup1);
-    await modalCierre.getByRole('button', { name: 'Ver pedidos' }).click();
-
+    // El cajero ve la lista de pendientes directamente, sin ningún código
     // 6. Verificar que aparecen los botones "Cobrar ahora" y "Anular con motivo"
     await expect(modalCierre.getByText('CP-E2E-SIN-COBRO')).toBeVisible({ timeout: 8000 });
 
@@ -594,11 +440,7 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     await page.getByRole('button', { name: 'Cerrar caja y cuadrar' }).click();
     await expect(modalCierre).toBeVisible();
 
-    // Desbloquear pendientes con código de supervisor (limpiando consumo previo en Redis)
-    limpiarRedisIntentos();
-    const codSup2 = await obtenerCodigoSupervisorVigente(prisma);
-    await modalCierre.getByLabel(/Código del supervisor/i).fill(codSup2);
-    await modalCierre.getByRole('button', { name: 'Ver pedidos' }).click();
+    // Los pendientes se ven de entrada
     await expect(modalCierre.getByText('CP-E2E-SIN-COBRO')).toBeVisible({ timeout: 8000 });
 
     // 9. Resolver el pendiente: pulsar "Anular con motivo"
@@ -608,10 +450,7 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     const modalAnularPendiente = page.getByRole('dialog', { name: 'Anular pedido' });
     await expect(modalAnularPendiente).toBeVisible();
 
-    limpiarRedisIntentos();
-    const codSup3 = await obtenerCodigoSupervisorVigente(prisma);
     await modalAnularPendiente.locator('#anular-motivo').fill('Cliente no cancelo y se retiro del local');
-    await modalAnularPendiente.locator('#anular-pin').fill(codSup3);
 
     await modalAnularPendiente.getByRole('button', { name: 'Confirmar anulación' }).click();
     await confirmarSiNo(page, 'si');
@@ -755,7 +594,7 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     await expect(page.getByRole('heading', { name: 'Escritorio' })).toBeVisible({ timeout: 10000 });
   });
 
-  test('(7) Anulación de cobro desde el detalle del pedido por UI: cajero anula con PIN de supervisor, cobro conservado en BD, stock repuesto y pedido devuelto a PENDIENTE', async ({
+  test('(7) Anulación de cobro desde el detalle del pedido por UI: cajero anula con motivo y sin código, cobro conservado en BD, stock repuesto y pedido devuelto a PENDIENTE', async ({
     page,
   }) => {
     // 1. Abrir caja del día
@@ -841,10 +680,8 @@ test.describe('Suite E2E - Módulo de Caja y Cierres', () => {
     const modalAnular = page.getByRole('dialog', { name: /Anular cobro/i });
     await expect(modalAnular).toBeVisible();
 
-    // Ingresar motivo y código de supervisor
-    const codSupCobro = await obtenerCodigoSupervisorVigente(prisma);
+    // Ingresar solo el motivo
     await modalAnular.locator('#anular-motivo').fill('Anulación del cobro solicitada por el cliente en caja');
-    await modalAnular.locator('#anular-pin').fill(codSupCobro);
 
     await modalAnular.getByRole('button', { name: 'Confirmar anulación' }).click();
     await confirmarSiNo(page, 'si');

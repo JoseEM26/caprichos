@@ -1008,6 +1008,12 @@
       "modulo": "mensajes"
     },
     {
+      "id": "mensajes#marcar-un-chat-como-no-visto-y-leer-las-fechas",
+      "tipo": "tarea",
+      "etiqueta": "Marcar un chat como no visto y leer las fechas",
+      "modulo": "mensajes"
+    },
+    {
       "id": "mi-asistencia",
       "tipo": "modulo",
       "etiqueta": "Mi asistencia (mi-asistencia)",
@@ -1090,6 +1096,12 @@
       "id": "mis-pedidos#subir-cambiar-o-quitar-el-voucher-de-un-pedido",
       "tipo": "tarea",
       "etiqueta": "Subir, cambiar o quitar el voucher de un pedido",
+      "modulo": "mis-pedidos"
+    },
+    {
+      "id": "mis-pedidos#anular-un-pedido-tuyo",
+      "tipo": "tarea",
+      "etiqueta": "Anular un pedido tuyo",
       "modulo": "mis-pedidos"
     },
     {
@@ -1656,42 +1668,6 @@
       "modulo": "stock"
     },
     {
-      "id": "supervisor-codigo",
-      "tipo": "modulo",
-      "etiqueta": "Código del supervisor (supervisor-codigo)",
-      "modulo": "supervisor-codigo",
-      "ruta": "/admin/supervisor-codigo"
-    },
-    {
-      "id": "permiso:supervisor/ver_codigo",
-      "tipo": "permiso",
-      "etiqueta": "Permiso: supervisor/ver_codigo"
-    },
-    {
-      "id": "supervisor-codigo#consultar-y-dictar-el-codigo-al-personal",
-      "tipo": "tarea",
-      "etiqueta": "consultar y dictar el código al personal",
-      "modulo": "supervisor-codigo"
-    },
-    {
-      "id": "supervisor-codigo#generar-el-secreto-inicial-si-no-esta-configurado",
-      "tipo": "tarea",
-      "etiqueta": "generar el secreto inicial si no está configurado",
-      "modulo": "supervisor-codigo"
-    },
-    {
-      "id": "supervisor-codigo#rotar-el-secreto-del-local-por-seguridad",
-      "tipo": "tarea",
-      "etiqueta": "rotar el secreto del local por seguridad",
-      "modulo": "supervisor-codigo"
-    },
-    {
-      "id": "supervisor-codigo#usar-el-codigo-como-supervisor",
-      "tipo": "tarea",
-      "etiqueta": "Usar el codigo como Supervisor",
-      "modulo": "supervisor-codigo"
-    },
-    {
       "id": "usuarios",
       "tipo": "modulo",
       "etiqueta": "Usuarios (usuarios)",
@@ -1728,9 +1704,9 @@
       "modulo": "usuarios"
     },
     {
-      "id": "usuarios#restablecer-contrasena-o-asignar-pin",
+      "id": "usuarios#restablecer-contrasena",
       "tipo": "tarea",
-      "etiqueta": "restablecer contraseña o asignar PIN",
+      "etiqueta": "restablecer contraseña",
       "modulo": "usuarios"
     },
     {
@@ -2185,16 +2161,6 @@
     {
       "tipo": "relacionado_con",
       "origen": "almacen",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "supervisor-codigo",
-      "destino": "almacen"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "almacen",
       "destino": "apertura"
     },
     {
@@ -2268,16 +2234,6 @@
       "destino": "almacen"
     },
     {
-      "tipo": "requiere",
-      "origen": "almacen#registrar-una-merma-o-desperdicio-de-insumos",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "almacen",
-      "destino": "supervisor-codigo"
-    },
-    {
       "tipo": "ver_tambien",
       "origen": "almacen#registrar-una-merma-o-desperdicio-de-insumos",
       "destino": "informes"
@@ -2326,11 +2282,6 @@
       "tipo": "pertenece_a",
       "origen": "almacen#anular-un-movimiento-registrado-por-error",
       "destino": "almacen"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "almacen#anular-un-movimiento-registrado-por-error",
-      "destino": "supervisor-codigo"
     },
     {
       "tipo": "ver_tambien",
@@ -2785,16 +2736,6 @@
     {
       "tipo": "relacionado_con",
       "origen": "caja",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "supervisor-codigo",
-      "destino": "caja"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "caja",
       "destino": "mensajes"
     },
     {
@@ -2831,16 +2772,6 @@
       "tipo": "pertenece_a",
       "origen": "caja#abrir-la-caja-del-turno",
       "destino": "caja"
-    },
-    {
-      "tipo": "antes",
-      "origen": "caja#abrir-la-caja-del-turno",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "antes",
-      "origen": "caja",
-      "destino": "supervisor-codigo"
     },
     {
       "tipo": "despues",
@@ -2951,16 +2882,6 @@
       "tipo": "pertenece_a",
       "origen": "caja#anular-un-pedido-o-un-cobro",
       "destino": "caja"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "caja#anular-un-pedido-o-un-cobro",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "caja",
-      "destino": "supervisor-codigo"
     },
     {
       "tipo": "ver_tambien",
@@ -3120,16 +3041,6 @@
     {
       "tipo": "relacionado_con",
       "origen": "cierre",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "supervisor-codigo",
-      "destino": "cierre"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "cierre",
       "destino": "comprobantes"
     },
     {
@@ -3178,6 +3089,16 @@
       "destino": "cierre"
     },
     {
+      "tipo": "requiere",
+      "origen": "cierre#resolver-pendientes-de-cobro-antes-de-cerrar",
+      "destino": "caja"
+    },
+    {
+      "tipo": "requiere",
+      "origen": "cierre",
+      "destino": "caja"
+    },
+    {
       "tipo": "antes",
       "origen": "cierre#resolver-pendientes-de-cobro-antes-de-cerrar",
       "destino": "caja"
@@ -3276,26 +3197,6 @@
       "tipo": "pertenece_a",
       "origen": "cierre#proceder-cuando-la-caja-no-cuadra",
       "destino": "cierre"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "cierre#proceder-cuando-la-caja-no-cuadra",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "cierre",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "cierre#proceder-cuando-la-caja-no-cuadra",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "cierre",
-      "destino": "supervisor-codigo"
     },
     {
       "tipo": "pertenece_a",
@@ -3495,16 +3396,6 @@
     {
       "tipo": "relacionado_con",
       "origen": "cocina",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "supervisor-codigo",
-      "destino": "cocina"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "cocina",
       "destino": "productos"
     },
     {
@@ -3636,16 +3527,6 @@
       "tipo": "pertenece_a",
       "origen": "cocina#registrar-una-merma-de-cocina",
       "destino": "cocina"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "cocina#registrar-una-merma-de-cocina",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "cocina",
-      "destino": "supervisor-codigo"
     },
     {
       "tipo": "despues",
@@ -4405,16 +4286,6 @@
     {
       "tipo": "relacionado_con",
       "origen": "escritorio",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "supervisor-codigo",
-      "destino": "escritorio"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "escritorio",
       "destino": "stock"
     },
     {
@@ -4496,16 +4367,6 @@
       "tipo": "pertenece_a",
       "origen": "escritorio#usar-el-escritorio-del-supervisor",
       "destino": "escritorio"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "escritorio#usar-el-escritorio-del-supervisor",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "escritorio",
-      "destino": "supervisor-codigo"
     },
     {
       "tipo": "pertenece_a",
@@ -4535,16 +4396,6 @@
     {
       "tipo": "relacionado_con",
       "origen": "usuarios",
-      "destino": "historial"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "historial",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "supervisor-codigo",
       "destino": "historial"
     },
     {
@@ -5513,6 +5364,16 @@
       "destino": "mensajes"
     },
     {
+      "tipo": "pertenece_a",
+      "origen": "mensajes#marcar-un-chat-como-no-visto-y-leer-las-fechas",
+      "destino": "mensajes"
+    },
+    {
+      "tipo": "ver_tambien",
+      "origen": "mensajes#marcar-un-chat-como-no-visto-y-leer-las-fechas",
+      "destino": "caja"
+    },
+    {
       "tipo": "requiere_permiso",
       "origen": "mi-asistencia",
       "destino": "permiso:asistencia/marcar"
@@ -5655,16 +5516,6 @@
     {
       "tipo": "relacionado_con",
       "origen": "zonas",
-      "destino": "mirest"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "mirest",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "supervisor-codigo",
       "destino": "mirest"
     },
     {
@@ -5856,6 +5707,11 @@
       "tipo": "despues",
       "origen": "mis-pedidos",
       "destino": "caja"
+    },
+    {
+      "tipo": "pertenece_a",
+      "origen": "mis-pedidos#anular-un-pedido-tuyo",
+      "destino": "mis-pedidos"
     },
     {
       "tipo": "requiere_permiso",
@@ -7438,11 +7294,6 @@
       "destino": "stock"
     },
     {
-      "tipo": "relacionado_con",
-      "origen": "stock",
-      "destino": "supervisor-codigo"
-    },
-    {
       "tipo": "pertenece_a",
       "origen": "stock#supervisar-insumos-con-stock-bajo-o-critico",
       "destino": "stock"
@@ -7521,121 +7372,6 @@
       "tipo": "despues",
       "origen": "stock",
       "destino": "almacen"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "stock#registrar-un-ajuste-de-inventario-por-conteo",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "stock",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "requiere_permiso",
-      "origen": "supervisor-codigo",
-      "destino": "permiso:supervisor/ver_codigo"
-    },
-    {
-      "tipo": "puede_usar",
-      "origen": "rol:ADMIN",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "puede_usar",
-      "origen": "rol:SUPERVISOR",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "supervisor-codigo",
-      "destino": "usuarios"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "usuarios",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "supervisor-codigo",
-      "destino": "compras"
-    },
-    {
-      "tipo": "relacionado_con",
-      "origen": "compras",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "supervisor-codigo#consultar-y-dictar-el-codigo-al-personal",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "despues",
-      "origen": "supervisor-codigo#consultar-y-dictar-el-codigo-al-personal",
-      "destino": "caja"
-    },
-    {
-      "tipo": "despues",
-      "origen": "supervisor-codigo",
-      "destino": "caja"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "supervisor-codigo#consultar-y-dictar-el-codigo-al-personal",
-      "destino": "usuarios"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "supervisor-codigo",
-      "destino": "usuarios"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "supervisor-codigo#generar-el-secreto-inicial-si-no-esta-configurado",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "despues",
-      "origen": "supervisor-codigo#generar-el-secreto-inicial-si-no-esta-configurado",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "supervisor-codigo#generar-el-secreto-inicial-si-no-esta-configurado",
-      "destino": "historial"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "supervisor-codigo",
-      "destino": "historial"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "supervisor-codigo#rotar-el-secreto-del-local-por-seguridad",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "supervisor-codigo#rotar-el-secreto-del-local-por-seguridad",
-      "destino": "historial"
-    },
-    {
-      "tipo": "pertenece_a",
-      "origen": "supervisor-codigo#usar-el-codigo-como-supervisor",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "supervisor-codigo#usar-el-codigo-como-supervisor",
-      "destino": "escritorio"
-    },
-    {
-      "tipo": "ver_tambien",
-      "origen": "supervisor-codigo",
-      "destino": "escritorio"
     },
     {
       "tipo": "requiere_permiso",
@@ -7683,16 +7419,6 @@
       "destino": "usuarios"
     },
     {
-      "tipo": "requiere",
-      "origen": "usuarios#editar-datos-y-cambiar-el-rol-de-un-usuario",
-      "destino": "supervisor-codigo"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "usuarios",
-      "destino": "supervisor-codigo"
-    },
-    {
       "tipo": "ver_tambien",
       "origen": "usuarios#editar-datos-y-cambiar-el-rol-de-un-usuario",
       "destino": "historial"
@@ -7701,11 +7427,6 @@
       "tipo": "pertenece_a",
       "origen": "usuarios#desactivar-o-reactivar-un-usuario",
       "destino": "usuarios"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "usuarios#desactivar-o-reactivar-un-usuario",
-      "destino": "supervisor-codigo"
     },
     {
       "tipo": "ver_tambien",
@@ -7739,23 +7460,18 @@
     },
     {
       "tipo": "pertenece_a",
-      "origen": "usuarios#restablecer-contrasena-o-asignar-pin",
+      "origen": "usuarios#restablecer-contrasena",
       "destino": "usuarios"
     },
     {
       "tipo": "ver_tambien",
-      "origen": "usuarios#restablecer-contrasena-o-asignar-pin",
+      "origen": "usuarios#restablecer-contrasena",
       "destino": "usuarios"
     },
     {
       "tipo": "pertenece_a",
       "origen": "usuarios#dar-un-rol-temporal-por-ejemplo-supervisor-suplente",
       "destino": "usuarios"
-    },
-    {
-      "tipo": "requiere",
-      "origen": "usuarios#dar-un-rol-temporal-por-ejemplo-supervisor-suplente",
-      "destino": "supervisor-codigo"
     },
     {
       "tipo": "pertenece_a",

@@ -13,8 +13,6 @@ export const DNIS_POR_ROL: Record<RolPrueba, string> = {
   REPARTIDOR_2: '20000007',
 };
 
-export const SUPERVISOR_PIN = '123456';
-
 const CHARSET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz!@#$%&*';
 
 export function generarClaveSegura(): string {
