@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { impresionApi } from '../impresionApi';
 import { ImpresorasDelEquipo, haceCuanto } from '../ImpresorasDelEquipo';
+import { MemoryRouter } from 'react-router-dom';
 import { SeccionEquipos } from '../SeccionEquipos';
 
 vi.mock('../impresionApi', () => ({
@@ -108,7 +109,7 @@ describe('lista de PC: antiguas bajo un contador y limpieza', () => {
       eliminadas: [{ deviceKeyId: '5', nombre: 'Vieja', hostname: 'X', ipLocal: [], ultimoLatido: null, eliminadaEn: new Date().toISOString() }],
     });
     (impresionApi.limpiarEquiposAntiguos as any).mockResolvedValue({ ok: true, archivadas: 2 });
-    render(<SeccionEquipos />);
+    render(<MemoryRouter><SeccionEquipos /></MemoryRouter>);
     const antiguas = await screen.findByTestId('pcs-antiguas');
     expect(antiguas).toHaveTextContent('Antiguas (2) · Eliminadas (1)');
     // solo una PC activa fuera de «Antiguas»

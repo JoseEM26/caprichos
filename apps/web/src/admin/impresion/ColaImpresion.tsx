@@ -238,7 +238,7 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
             <div key={g.pedidoId ?? g.trabajoIds[0]} className="cola-grupo" data-testid="cola-grupo">
               <div className="cola-grupo-cab">
                 <strong>
-                  {g.esPrueba && <span className="cola-prueba-tag">Prueba</span> }
+                  {g.esPrueba && <span className="cola-prueba-tag">{g.esSimulacion ? 'Simulación' : 'Prueba'}</span> }
                   {g.pedidoCodigo} · {g.clienteNombre || 'Sin nombre'}
                 </strong>
                 <span>{g.cantidad} etiqueta(s) · {haceCuanto(g.masAntiguaEn)}</span>

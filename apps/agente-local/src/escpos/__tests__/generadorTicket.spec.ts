@@ -91,3 +91,13 @@ describe('generarComandaSalonEscPos', () => {
     expect(b.subarray(b.length - 4)).toEqual(Buffer.from([0x1d, 0x56, 0x42, 0x00]));
   });
 });
+
+describe('simulación de pedido', () => {
+  it('el ticket y la comanda de una simulación imprimen *** PRUEBA ***; uno normal no', () => {
+    const ticket = { ...base, simulacion: true } as TicketPagoDatos;
+    expect(generarTicketEscPos(ticket, 48).toString('latin1')).toContain('*** PRUEBA ***');
+    expect(generarTicketEscPos(base, 48).toString('latin1')).not.toContain('PRUEBA');
+    const comanda: any = { codigo: 'PRUEBA', mesa: null, lineas: [], simulacion: true };
+    expect(generarComandaSalonEscPos(comanda, 48).toString('latin1')).toContain('*** PRUEBA ***');
+  });
+});

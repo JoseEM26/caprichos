@@ -119,6 +119,8 @@ export interface EstadoMaquinaImpresion {
 
 export interface TicketPagoDatos {
   tipo?: 'TICKET_PAGO';
+  /** Simulación de pedido: el ticket imprime «*** PRUEBA ***». */
+  simulacion?: boolean;
   local: { nombre: string; razonSocial?: string | null; ruc?: string | null; direccion?: string | null };
   codigo: string;
   fecha: string;
@@ -259,6 +261,8 @@ export interface EtiquetaBebidaDatos {
 /** Comanda de salón: todas las líneas del pedido con tamaño, opciones y notas, para la cocina y el mozo. */
 export interface TicketComandaSalonDatos {
   tipo?: TipoTicketComanda;
+  /** Simulación de pedido: la comanda imprime «*** PRUEBA ***». */
+  simulacion?: boolean;
   codigo: string;
   /** Nombre de la mesa (salón); null si no hay. */
   mesa: string | null;

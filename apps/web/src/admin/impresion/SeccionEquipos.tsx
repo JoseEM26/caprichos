@@ -5,6 +5,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { Cargando } from '../../comun/Cargando';
 import { impresionApi, LlaveAgenteAdmin } from './impresionApi';
 import { ImpresorasDelEquipo, haceCuanto } from './ImpresorasDelEquipo';
+import { SimularPedido } from './SimularPedido';
 import { PanelInstalarPrograma } from './PanelInstalarPrograma';
 import { NOMBRE_MAQUINA, useEstadoMaquinas } from './useEstadoMaquinas';
 
@@ -167,6 +168,8 @@ export function SeccionEquipos() {
           </button>
         </div>
       </div>
+
+      <SimularPedido />
 
       <section aria-labelledby="equipos-agregar" style={tarjeta}>
         <h4 id="equipos-agregar" style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>

@@ -41,6 +41,7 @@ export function generarTicketEscPos(t: TicketPagoDatos, columnas: number = 48): 
   const partes: Buffer[] = [aWindows1252(`${ESC}@${ESC}t\x10`)]; // iniciar + página de códigos 1252
   let centrado = false;
   let texto: string[] = [];
+  if (t.simulacion) texto.push(`${ESC}a\x01${ESC}E\x01*** PRUEBA ***\n${ESC}E\x00${ESC}a\x00`);
   const volcar = () => {
     if (texto.length) partes.push(aWindows1252(texto.join('')));
     texto = [];
@@ -68,6 +69,7 @@ export function generarTicketEscPos(t: TicketPagoDatos, columnas: number = 48): 
  */
 export function generarComandaSalonEscPos(c: TicketComandaSalonDatos, columnas: number = 48): Buffer {
   const partes: string[] = [`${ESC}@${ESC}t\x10`];
+  if (c.simulacion) partes.push(`${ESC}a\x01${ESC}E\x01*** PRUEBA ***\n${ESC}E\x00${ESC}a\x00`);
   for (const l of lineasTicketComandaSalon(c, columnas)) {
     partes.push(l.negrita ? `${ESC}E\x01${l.texto}\n${ESC}E\x00` : `${l.texto}\n`);
   }

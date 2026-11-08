@@ -109,6 +109,14 @@ export class AdminImpresionController {
     return this.impresionService.descartarPedido(id, dto, req.usuario, this.ip(req));
   }
 
+  /** «Simular un pedido completo»: pedido ficticio por las mismas reglas que una venta (ADMIN o CAJERO). */
+  @Post('simular-pedido')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('pedidos', 'cambiar_estado')
+  async simularPedido(@Body() body: { modalidad?: string }, @Req() req: any) {
+    return this.impresionService.simularPedido(body?.modalidad ?? 'LLEVAR', req.usuario, this.ip(req));
+  }
+
   private ip(req: any): string | undefined {
     return (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
   }
