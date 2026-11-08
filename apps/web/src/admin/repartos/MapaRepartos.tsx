@@ -17,6 +17,8 @@ export interface PuntoRepartoMapa {
   orden?: number;   // 1, 2, 3 si forma parte de la ruta sugerida
   minutosEspera?: number;
   enReparto?: boolean; // ya tiene repartidor (en camino o asignado): pin con anillo
+  /** Color por estado (Despacho): pisa el color por espera. */
+  colorFase?: string;
 }
 
 interface EntradaEtiqueta {
@@ -68,13 +70,14 @@ function crearIconoPin(
   elegido = false,
   enReparto = false,
   resaltado = false,
+  colorFase?: string,
 ): L.DivIcon {
   const numStr = orden ? String(orden) : '';
   const clases = `cp-pin ${color} ${elegido ? 'elegido' : ''} ${enReparto ? 'en-reparto' : ''} ${resaltado ? 'resaltado' : ''}`.trim();
 
   return L.divIcon({
     className: clases,
-    html: `<span></span>${numStr ? `<strong class="cp-pin-num">${numStr}</strong>` : ''}`,
+    html: `<span${colorFase ? ` style="background:${colorFase}"` : ''}></span>${numStr ? `<strong class="cp-pin-num">${numStr}</strong>` : ''}`,
     iconSize: [26, 26],
     iconAnchor: [13, 26],
   });
@@ -209,7 +212,6 @@ export function MapaRepartos({
           const linea = L.polyline(r.coordenadasRuta, {
             color: r.color,
             weight: esActiva ? 5 : 3.5,
-            dashArray: esActiva ? undefined : '7, 6',
             lineJoin: 'round',
             lineCap: 'round',
             opacity: esActiva ? 1.0 : rutaActivaId ? 0.3 : 0.85,
@@ -236,7 +238,6 @@ export function MapaRepartos({
       const linea = L.polyline(rutaPuntos, {
         color: '#E67929',
         weight: 3.5,
-        dashArray: '8, 6',
         lineJoin: 'round',
         lineCap: 'round',
         opacity: 0.9,
@@ -276,7 +277,7 @@ export function MapaRepartos({
 
       const esElegido = p.id === seleccionadoId;
       const esResaltado = resaltadosIds?.includes(p.id) ?? false;
-      const icono = crearIconoPin(p.color, p.orden, esElegido, !!p.enReparto, esResaltado);
+      const icono = crearIconoPin(p.color, p.orden, esElegido, !!p.enReparto, esResaltado, p.colorFase);
 
       const marker = L.marker(pos, {
         icon: icono,

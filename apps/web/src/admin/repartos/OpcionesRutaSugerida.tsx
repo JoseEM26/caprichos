@@ -24,11 +24,12 @@ export interface OpcionesRutaSugeridaProps {
   alTomada?: () => void;
 }
 
-function Flecha({ rumbo, color }: { rumbo: number; color: string }) {
+/** Insignia con el número de pedidos de la ruta (sin flechas de dirección). */
+function Insignia({ n, color }: { n: number; color: string }) {
   return (
-    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true" style={{ transform: `rotate(${rumbo}deg)`, flex: 'none' }}>
-      <path d="M14 3 L22 22 L14 17 L6 22 Z" fill={color} />
-    </svg>
+    <span aria-hidden="true" style={{ flex: 'none', width: 28, height: 28, borderRadius: '50%', background: color, color: '#fff', fontWeight: 800, fontSize: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      {n}
+    </span>
   );
 }
 
@@ -98,7 +99,7 @@ export function OpcionesRutaSugerida({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Flecha rumbo={o.rumbo} color={color} />
+                <Insignia n={o.pedidos.length} color={color} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>Ruta hacia el {o.sector.toLowerCase()}</div>
                   <div style={{ fontSize: 13, color: 'var(--cp-soft, #5A6E78)' }}>

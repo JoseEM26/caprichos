@@ -28,3 +28,13 @@
 /* Mapa de zonas de reparto: mapa y panel lado a lado; en celular, uno debajo del otro */
 .zonas-mapa-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: 16px; align-items: start; }
 @media (max-width: 860px) { .zonas-mapa-layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* Despacho del admin: mapa y tarjetas en dos columnas (tablet/PC); en celular, mapa arriba y lista abajo */
+.despacho-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 12px; align-items: start; }
+.despacho-mapa { position: sticky; top: 8px; }
+.despacho-lista { display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 300px); min-height: 420px; overflow-y: auto; padding-right: 2px; }
+@media (max-width: 899px) {
+  .despacho-layout { grid-template-columns: minmax(0, 1fr); }
+  .despacho-mapa { position: static; }
+  .despacho-lista { max-height: none; min-height: 0; overflow: visible; }
+}
