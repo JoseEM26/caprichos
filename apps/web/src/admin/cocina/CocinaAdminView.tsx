@@ -29,7 +29,7 @@ import {
   setSilenciado,
 } from './audioAlerta';
 import type { AjustesCocina } from './cocinaApi';
-import { ModalAnular } from '../pedidos/ModalAnular';
+import { RejillaComandas } from './RejillaComandas';
 import { ComandaTarjeta, SEGUNDOS_DESHACER } from './ComandaTarjeta';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
@@ -148,8 +148,7 @@ export function CocinaAdminView() {
   const puedeDespejar = tiene('cocina/despejar');
   const puedeDespachar = tiene('cocina/despachar');
   const puedeVerDespacho = tiene('cocina/despacho');
-  const puedeAnular = tiene('pedidos/anular');
-  const [anulando, setAnulando] = useState<Comanda | null>(null);
+  const [fullDespacho, setFullDespacho] = useState(false);
 
   // Modo de pestañas: 'area' (Pantalla del área), 'hist' (Despejadas hoy)
   const [modo, setModo] = useState<ModoCocina>('area');
@@ -1072,16 +1071,7 @@ export function CocinaAdminView() {
               Sin pedidos para esta área.
             </div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-                gap: '16px',
-                width: '100%',
-                alignItems: 'stretch',
-                boxSizing: 'border-box',
-              }}
-            >
+            <RejillaComandas>
               {tarjetas.map((c) => (
                 <ComandaTarjeta
                   key={enTodas ? c.pedidoId : c.id}
@@ -1096,10 +1086,9 @@ export function CocinaAdminView() {
                   puedeDespachar={puedeDespachar && enTodas}
                   alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                   alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
-                  alAnular={puedeAnular ? setAnulando : undefined}
                 />
               ))}
-            </div>
+            </RejillaComandas>
           )}
         </div>
       )}
@@ -1191,8 +1180,8 @@ export function CocinaAdminView() {
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            padding: '16px',
-            gap: '14px',
+            padding: '10px',
+            gap: '8px',
             boxSizing: 'border-box',
           }}
         >
@@ -1209,7 +1198,7 @@ export function CocinaAdminView() {
               style={{
                 fontFamily: 'Montserrat, sans-serif',
                 fontWeight: 800,
-                fontSize: '24px',
+                fontSize: '20px',
                 letterSpacing: '0.05em',
               }}
             >
@@ -1224,7 +1213,10 @@ export function CocinaAdminView() {
                   <button
                     key={a.id}
                     type="button"
-                    onClick={() => seleccionarAreaMockup(a.id)}
+                    onClick={() => {
+                      setFullDespacho(false);
+                      seleccionarAreaMockup(a.id);
+                    }}
                     style={{
                       minHeight: '44px',
                       padding: '0 14px',
@@ -1241,6 +1233,28 @@ export function CocinaAdminView() {
                   </button>
                 );
               })}
+              {puedeVerDespacho && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={fullDespacho}
+                  data-testid="pantalla-completa-despacho"
+                  onClick={() => setFullDespacho((v) => !v)}
+                  style={{
+                    minHeight: '44px',
+                    padding: '0 14px',
+                    borderRadius: '9999px',
+                    border: '1.5px solid var(--cp-orange)',
+                    background: fullDespacho ? 'var(--cp-orange)' : 'transparent',
+                    color: fullDespacho ? 'var(--cp-navy)' : 'var(--cp-orange)',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Despacho
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setKFullAbierto(false)}
@@ -1276,6 +1290,10 @@ export function CocinaAdminView() {
                 gap: '12px',
               }}
             >
+              {fullDespacho && puedeVerDespacho ? (
+                <DespachoView puedeDespachar={puedeDespachar} puedeDevolver={tiene('cocina/devolver')} />
+              ) : (
+                <>
               <div
                 style={{
                   fontFamily: 'Montserrat, sans-serif',
@@ -1291,15 +1309,7 @@ export function CocinaAdminView() {
                   Sin pedidos para esta área.
                 </div>
               ) : (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-                    gap: '16px',
-                    width: '100%',
-                    alignItems: 'stretch',
-                  }}
-                >
+                <RejillaComandas>
                   {tarjetas.map((c) => (
                     <ComandaTarjeta
                       key={enTodas ? c.pedidoId : c.id}
@@ -1314,29 +1324,17 @@ export function CocinaAdminView() {
                       puedeDespachar={puedeDespachar && enTodas}
                       alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                       alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
-                  alAnular={puedeAnular ? setAnulando : undefined}
                     />
                   ))}
-                </div>
+                </RejillaComandas>
+              )}
+                </>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {anulando && (
-        <ModalAnular
-          pedidoId={anulando.pedidoId}
-          codigoPedido={anulando.codigo}
-          completo
-          alCerrar={() => setAnulando(null)}
-          alAnularExitoso={() => {
-            setAnulando(null);
-            cargarAreas();
-            if (modo === 'area') cargarComandas(areaSeleccionada);
-          }}
-        />
-      )}
 
       {/* Confirmación Sí/No de Despacho: irreversible */}
       <Confirmar

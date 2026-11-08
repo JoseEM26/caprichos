@@ -24,8 +24,6 @@ export interface ComandaTarjetaProps {
   alDespacharTodo?: (comanda: Comanda) => void;
   /** La última unidad acaba de despejar el área: la tarjeta queda en verde con «Deshacer» un rato. */
   alDeshacerSalida?: () => void;
-  /** Con permiso pedidos/anular: botón «Anular pedido». Anula el pedido completo, no solo esta área. */
-  alAnular?: (comanda: Comanda) => void;
 }
 
 /** Color por minutos con los umbrales por defecto (la tarjeta usa los del servidor). */
@@ -489,7 +487,7 @@ export function LineasComanda({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {areas.map((area) => (
         <div
           key={area.areaId}
@@ -535,7 +533,6 @@ export function ComandaTarjeta({
   alDespacharLinea,
   alDespacharTodo,
   alDeshacerSalida,
-  alAnular,
 }: ComandaTarjetaProps) {
   // Última línea que se completó: se puede deshacer unos segundos (vuelve a su cantidad anterior)
   const [deshacer, setDeshacer] = useState<{ linea: LineaComanda; previas: number } | null>(null);
@@ -573,11 +570,11 @@ export function ComandaTarjeta({
       style={{
         background: despejada ? '#F3F6F4' : 'var(--cp-white)',
         border: despejada ? `1.5px solid ${VERDE_LISTO}` : '1.5px solid var(--cp-line)',
-        borderRadius: '14px',
-        padding: '16px',
+        borderRadius: '12px',
+        padding: '10px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: '6px',
         fontFamily: 'Montserrat, system-ui, sans-serif',
         boxSizing: 'border-box',
         boxShadow: '0 2px 8px rgba(11, 44, 62, 0.05)',
@@ -757,10 +754,10 @@ export function ComandaTarjeta({
             background: '#FFF3C4',
             border: '2px solid #D99E39',
             borderRadius: '10px',
-            padding: '8px 10px',
+            padding: '4px 8px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '4px',
+            gap: '0',
           }}
         >
           <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--cp-navy)' }}>NOTA DEL CLIENTE</span>
@@ -815,7 +812,7 @@ export function ComandaTarjeta({
           disabled={despejando}
           onClick={() => onDespejar(comanda)}
           style={{
-            minHeight: '48px',
+            minHeight: '44px',
             border: 0,
             borderRadius: '12px',
             background: 'var(--cp-orange)',
@@ -823,32 +820,12 @@ export function ComandaTarjeta({
             fontWeight: 800,
             fontSize: '14px',
             cursor: 'pointer',
-            marginTop: 'auto',
-          }}
+            }}
         >
           Listo
         </button>
       )}
 
-      {alAnular && (
-        <button
-          type="button"
-          onClick={() => alAnular(comanda)}
-          style={{
-            minHeight: '44px',
-            border: '1.5px solid var(--cp-rust)',
-            borderRadius: '12px',
-            background: 'transparent',
-            color: 'var(--cp-rust)',
-            fontWeight: 800,
-            fontSize: '14px',
-            cursor: 'pointer',
-            marginTop: onDespejar && !despejada ? 0 : 'auto',
-          }}
-        >
-          Anular pedido
-        </button>
-      )}
     </div>
   );
 }
