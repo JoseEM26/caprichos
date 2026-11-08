@@ -101,11 +101,17 @@ export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
 }
 
 /** Grupo «Estado» del panel de Filtros: activos (por defecto), cerrados o los delivery no entregados. */
-export type GrupoEstadoCaja = 'act' | 'cer' | 'noent';
+export type GrupoEstadoCaja = 'act' | 'cer' | 'todos' | 'noent';
+
+/** Hoy y «pendientes de días anteriores» muestran lo activo; otro día o rango muestra todo (lo de ayer casi siempre ya está cerrado). */
+function estadoPorDefectoDeRango(r: RangoPedidos): GrupoEstadoCaja {
+  return r.modo === 'hoy' || r.modo === 'pendientes' ? 'act' : 'todos';
+}
 
 const ESTADO_OPCIONES = [
   { id: 'act', n: 'Activos' },
   { id: 'cer', n: 'Cerrados' },
+  { id: 'todos', n: 'Todos (activos y cerrados)' },
   { id: 'noent', n: 'No entregados' },
 ];
 
@@ -269,6 +275,8 @@ export function PedidosAdminView() {
   const cambiarRango = (nuevo: RangoPedidos) => {
     setRango(nuevo);
     setPaginaActual(1);
+    // Ayer o un rango anterior: casi todo está entregado, así que se ve TODO (activos y cerrados); hoy y «pendientes» siguen con activos
+    setGrupoEstado(estadoPorDefectoDeRango(nuevo));
   };
 
   const cambiarGrupoEstado = (g: GrupoEstadoCaja) => {
@@ -396,7 +404,7 @@ export function PedidosAdminView() {
   const base = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     return pedidos.filter((p) => {
-      if (grupoEstado === 'cer' ? !esCerrado(p) : esCerrado(p)) return false;
+      if (grupoEstado === 'cer' ? !esCerrado(p) : grupoEstado === 'act' && esCerrado(p)) return false;
       if (!enEtapaCaja(p, etapa)) return false;
 
       if (canalFiltro !== 'all') {
@@ -451,7 +459,8 @@ export function PedidosAdminView() {
   const hoy = hoyLima();
   const chips = useMemo(() => {
     const lista: { id: string; texto: string; quitar: () => void }[] = [];
-    if (grupoEstado !== 'act') lista.push({ id: 'estado', texto: ESTADO_OPCIONES.find((e) => e.id === grupoEstado)!.n, quitar: () => cambiarGrupoEstado('act') });
+    const estadoPorDefecto = estadoPorDefectoDeRango(rango);
+    if (grupoEstado !== estadoPorDefecto) lista.push({ id: 'estado', texto: ESTADO_OPCIONES.find((e) => e.id === grupoEstado)!.n, quitar: () => cambiarGrupoEstado(estadoPorDefecto) });
     if (etapa !== 'all') lista.push({ id: 'etapa', texto: ETAPA_OPCIONES.find((e) => e.id === etapa)!.n, quitar: () => { setEtapa('all'); setPaginaActual(1); } });
     if (rango.modo !== 'hoy') lista.push({ id: 'dia', texto: textoRango(rango, hoy), quitar: () => cambiarRango(rangoHoy(hoy)) });
     if (canalFiltro !== 'all') lista.push({ id: 'canal', texto: `Canal: ${CANALES_OPCIONES.find((c) => c.id === canalFiltro)?.n}`, quitar: () => { setCanalFiltro('all'); setPaginaActual(1); } });
@@ -671,10 +680,11 @@ export function PedidosAdminView() {
                 <FiltroCombo
                   etiqueta="Estado"
                   valor={grupoEstado}
-                  valorPorDefecto="act"
+                  valorPorDefecto={estadoPorDefectoDeRango(rango)}
                   opciones={[
                     { valor: 'act', etiqueta: 'Activos' },
                     { valor: 'cer', etiqueta: 'Cerrados' },
+                    { valor: 'todos', etiqueta: 'Todos (activos y cerrados)' },
                     { valor: 'noent', etiqueta: 'No entregados', cantidad: totalNoEntregados },
                   ]}
                   alCambiar={(v) => {

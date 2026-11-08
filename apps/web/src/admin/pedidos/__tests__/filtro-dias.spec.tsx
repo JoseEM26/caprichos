@@ -109,6 +109,29 @@ describe('Filtro de días en Pedidos y caja', () => {
     expect(llamadasLista()[2]).toEqual({ desde: HOY, hasta: HOY, limite: 100 });
   });
 
+  it('Ayer muestra también los pedidos ya entregados (no solo los activos)', async () => {
+    const entregadoAyer = {
+      id: '900', codigo: 'CP-W900', estado: 'ENTREGADO', modalidad: 'LLEVAR', canal: 'CARTA',
+      cliente_nombre: 'Rosa de Ayer', cliente_telefono: '987654321', total: 25, pago_estado: 'PAGADO',
+      creado_en: '2026-10-27T18:00:00Z', lineas: [{ id: '1', nombre: 'Brownie', cantidad: 1 }],
+    };
+    listar.mockImplementation(async (f: any) =>
+      f?.pendientes ? respuesta([], 0) : f?.desde === '2026-10-27' ? respuesta([entregadoAyer]) : respuesta([]),
+    );
+    render(<PedidosAdminView />);
+    await waitFor(() => expect(llamadasLista()).toHaveLength(1));
+
+    await abrirFiltros();
+    elegirPeriodo(/Ayer/);
+
+    expect(await screen.findByText('Rosa de Ayer')).toBeInTheDocument();
+    expect(screen.queryByText('No hay pedidos con estos filtros.')).not.toBeInTheDocument();
+
+    // Al volver a hoy se retoma el comportamiento de siempre (solo activos)
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a hoy' }));
+    await waitFor(() => expect(screen.queryByText('Rosa de Ayer')).not.toBeInTheDocument());
+  });
+
   it('Últimos 7 días envía de hace 6 días a hoy', async () => {
     render(<PedidosAdminView />);
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
