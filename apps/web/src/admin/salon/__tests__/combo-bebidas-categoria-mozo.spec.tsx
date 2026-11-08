@@ -34,7 +34,7 @@ describe('Mozo/caja: combo con bebidas por categoría', () => {
     render(<VentanaOpcionesProducto producto={producto} oferta={oferta} alCerrar={() => {}} alAgregar={alAgregar} />);
     expect(screen.queryByText(/Bebida 1 · Sabor/)).toBeNull();
     expect(screen.queryByRole('button', { name: /LATTE COFFE/ })).toBeNull();
-    const agregar = () => screen.getByRole('button', { name: /Agregar|Añadir/i });
+    const agregar = () => screen.getByRole('button', { name: /Agregar|Añadir|Falta elegir/i });
     expect(agregar()).toBeDisabled();
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 1' })).getByRole('button', { name: /FRAPPE OREO/ }));
     fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 2' })).getByRole('button', { name: /ICED COFFE/ }));

@@ -1169,6 +1169,28 @@ describe('PedidosService', () => {
         expect(Number(ventas[0].cantidad)).toBe(6);
       });
 
+      it('Dúo desde Caja/Mozo con dos bebidas: exactamente 2 líneas hijas de bebida, cada una con su etiqueta y sin exigir los grupos «Bebida N · Sabor» del anfitrión', async () => {
+        const bebida = (parteId: bigint, productoId: bigint, nombre: string) => ({ parteId, tipo: 'A_ELECCION', productoId, nombre, cantidad: 1, areaId: 1n, areaNombre: 'Barra', categoriaNombre: 'ICED', nota: 'Combo: Dúo' });
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValue({ nota: '', conBebidas: true, partes: [bebida(11n, 101n, 'ICED COFFE'), bebida(11n, 102n, 'LATTE COFFE')] });
+        const duoAnfitrion = {
+          ...mockProductoCafe,
+          grupos: [
+            ...mockProductoCafe.grupos,
+            ...['1', '2'].map((n, i) => ({ grupo_id: 90n + BigInt(i), grupo: { id: 90n + BigInt(i), nombre: `Bebida ${n} · Sabor`, obligatorio: true, minimo: 1, maximo: 1, activo: true, opciones: [] } })),
+          ],
+        };
+        prismaMock.producto.findMany.mockImplementation(({ where }: any) => Promise.resolve(where?.controla_stock ? [] : [duoAnfitrion]));
+        await service.crear(
+          { ...dtoCajita(), lineas: [{ ...dtoCajita().lineas[0], comboElecciones: [{ parteId: 11, productoId: 101 }, { parteId: 11, productoId: 102 }] }] },
+          'key-duo-caja',
+          { canal: 'MOZO' },
+        );
+        const hijas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data).filter((d: any) => d.linea_combo_id);
+        expect(hijas.map((h: any) => h.nombre)).toEqual(['ICED COFFE', 'LATTE COFFE']);
+        expect(hijas.every((h: any) => h.cantidad === 1 && h.nombres_persona.length === 1 && h.nombres_persona[0])).toBe(true);
+        expect(prismaMock.pedidoLineaOpcion.create).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ grupo_nombre: expect.stringMatching(/Bebida \d · Sabor/) }) }));
+      });
+
       it('producto por sabor en una parte: el sabor sigue a la línea hija y descuenta el saldo de ese sabor', async () => {
         ofertasServiceMock.resolverPartesCombo.mockResolvedValue({
           nota: '',

@@ -253,6 +253,16 @@ export function VentanaOpcionesProducto({
     return faltantes;
   }, [gruposVisibles, opcionesActuales]);
 
+  // Qué falta, en palabras: alimenta el botón («Falta elegir: Bebida 2»)
+  const faltaTexto = [
+    ...partesJug.flatMap((p) => {
+      const tot = p.cantidad * cantidad;
+      if (p.bebidas) return Array.from({ length: tot }, (_, i) => i).filter((i) => !(bebidas[p.parteId] ?? [])[i]).map((i) => `Bebida ${i + 1}`);
+      return totalElegido(elegido[p.parteId] ?? {}) !== tot ? [`Elige ${tot} opción(es)`] : [];
+    }),
+    ...gruposFaltantes,
+  ].join(' · ');
+
   const puedeAgregar =
     gruposFaltantes.length === 0 &&
     !comboAgotado &&
@@ -1070,7 +1080,9 @@ export function VentanaOpcionesProducto({
                     ? 'Elige los sabores'
                     : libre
                       ? `Agregar ${llevas} al pedido`
-                      : 'Agregar al pedido'}
+                      : !puedeAgregar && faltaTexto
+                        ? `Falta elegir: ${faltaTexto}`
+                        : 'Agregar al pedido'}
             </span>
             <span> · S/ {precioTotal.toFixed(2)}</span>
           </button>
