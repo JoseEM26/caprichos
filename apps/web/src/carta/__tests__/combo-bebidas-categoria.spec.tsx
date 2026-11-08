@@ -59,9 +59,10 @@ describe('Combo Dúo con bebidas por categoría', () => {
     expect(screen.getByRole('group', { name: 'Bebida 2' })).toBeInTheDocument();
     // Las bebidas del editor (Frappes + Iced + Calientes), no las 6 fijas del producto viejo
     expect(paso(1).getByRole('button', { name: /FRAPPE OREO/ })).toBeInTheDocument();
-    expect(paso(2).getByRole('button', { name: /CAPUCCINO/ })).toBeInTheDocument();
     expect(paso(1).queryByRole('button', { name: /LATTE COFFE/ })).toBeNull();
     expect(paso(1).getByRole('button', { name: /CAFE AGOTADO/ })).toBeDisabled();
+    fireEvent.click(within(screen.getByRole('group', { name: 'Bebida 2' })).getAllByRole('button')[0]); // abrir la tarjeta de la bebida 2
+    expect(paso(2).getByRole('button', { name: /CAPUCCINO/ })).toBeInTheDocument();
     // Los grupos duplicados no salen; las otras preguntas del anfitrión se mantienen
     expect(screen.queryByText('Bebida 1 · Sabor')).toBeNull();
     expect(screen.queryAllByText('Sabor')).toHaveLength(0);
@@ -105,7 +106,7 @@ describe('Combo Dúo con bebidas por categoría', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
     fireEvent.click(paso(1).getByRole('button', { name: /ICED COFFE/ }));
-    fireEvent.click(paso(2).getByRole('button', { name: /ICED COFFE/ }));
+    fireEvent.click(paso(2).getByRole('button', { name: /^ICED COFFE$/ }));
     fireEvent.click(botonAgregar());
     expect(agregarLinea.mock.calls[0][0].comboElecciones.filter((e: { parteId: string }) => e.parteId === '1')).toEqual([
       { parteId: '1', productoId: '102' },

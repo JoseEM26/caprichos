@@ -28,8 +28,9 @@ import {
   unirElecciones,
   usosDeSabor,
 } from './ReemplazoCombo';
-import { PasosBebidaCombo } from './PasosBebidaCombo';
-import { SelectorEleccionCombo } from './SelectorEleccionCombo';
+import { PasosBebidaCombo, etiquetaBebida } from './PasosBebidaCombo';
+import { SelectorEleccionCombo, resumenReparto } from './SelectorEleccionCombo';
+import './combo-armado.css';
 import { agruparUnidadesIguales } from './unidadesPorBebida';
 
 interface Props {
@@ -118,6 +119,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const [nota, setNota] = useState('');
   const [busquedas, setBusquedas] = useState<Record<string, string>>({});
   const [zoom, setZoom] = useState(false);
+  const [nombresAbierto, setNombresAbierto] = useState(false);
+  const [notaAbierta, setNotaAbierta] = useState(false);
   const [valorSabores, setValorSabores] = useState<Reparto>({});
 
   const esCombo = producto.grupos.some((g) => g.nombre.includes(' · '));
@@ -189,6 +192,44 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     }
   }
   const valido = !comboAgotado && faltantes.length === 0;
+
+  // Barra de progreso del armado: un paso por parte del combo (solo texto y estado; no cambia lo que se exige)
+  const pasos: { clave: string; texto: string; hecho: boolean | null; selector: string; seccion?: string }[] = [];
+  if (oferta && !comboAgotado) {
+    if (producto.tamanos.length > 0) pasos.push({ clave: 'tamano', texto: 'Tamaño', hecho: tamanoId !== null, selector: '[data-testid="paso-tamano"]' });
+    for (const g of gruposPaquetes(oferta)) pasos.push({ clave: `paq-${g.grupo}`, texto: g.grupo, hecho: !!paquetes[g.grupo], selector: '[data-testid="paquetes-combo"]' });
+    for (const p of partesRe) pasos.push({ clave: `alt-${p.parteId}`, texto: 'Alternativa', hecho: !!reemplazos[p.parteId], selector: '[data-testid="aviso-reemplazo-combo"]' });
+    const sueltasN = partesJug.filter((p) => !p.bebidas).length;
+    let nSuelta = 0;
+    for (const parte of partesJug) {
+      const total = parte.cantidad * cantidad;
+      if (parte.bebidas) {
+        for (let i = 0; i < total; i++) pasos.push({ clave: `beb-${parte.parteId}-${i}`, texto: `Bebida ${i + 1}`, hecho: !!(bebidas[parte.parteId] ?? [])[i], selector: `[data-testid="bebidas-combo-${parte.parteId}"] [aria-label="Bebida ${i + 1}"]` });
+      } else {
+        nSuelta += 1;
+        pasos.push({ clave: `el-${parte.parteId}`, texto: sueltasN > 1 ? `Complemento ${nSuelta}` : 'Complemento', hecho: totalElegido(elegido[parte.parteId] ?? {}) === total, selector: `[data-testid="eleccion-combo-${parte.parteId}"]` });
+      }
+    }
+    if (esCombo)
+      for (const k of secciones.claves) {
+        const gs = secciones.mapa[k];
+        pasos.push({ clave: `sec-${k}`, texto: k, hecho: gs.every((g) => (sel[g.id] ?? []).length >= g.minimo), selector: `[data-grupo="${gs[0].id}"]`, seccion: k });
+      }
+    if (nB > 0) pasos.push({ clave: 'nombres', texto: 'Nombres', hecho: nombres.some((n) => (n ?? '').trim()) ? true : null, selector: '[data-testid="nombre-envase"]' });
+  }
+  // Mini-resumen de lo armado: «Regular 12 oz · Frappe Oreo + Caramel · 1 Fresa + 1 Manjar»
+  const resumenCombo = oferta
+    ? [
+        producto.tamanos.length > 0 ? (tamano?.nombre ?? '') : '',
+        ...partesJug.map((parte) =>
+          parte.bebidas
+            ? (bebidas[parte.parteId] ?? []).slice(0, parte.cantidad * cantidad).filter(Boolean).map((c) => etiquetaBebida(parte, c)).join(' + ')
+            : resumenReparto(parte, elegido[parte.parteId] ?? {}, undefined, ' + '),
+        ),
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
 
   // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
   const info = inventario[String(producto.id)] ?? infoStockDe(producto);
@@ -269,13 +310,13 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
       : '';
 
   // Lleva al primer paso pendiente (abriéndolo si está plegado) y lo resalta un momento
-  const verFalta = () => {
-    const f = faltantes[0];
-    if (!f) return;
+  const irA = (f: { selector: string; seccion?: string }) => {
     if (f.seccion) setAbierta(f.seccion);
     setTimeout(() => {
       const el = document.querySelector<HTMLElement>(f.selector);
       if (!el) return;
+      // tarjeta plegable cerrada: se abre al llegar
+      if (el.matches('.ca-tarjeta,[data-plegable]')) el.querySelector<HTMLElement>('[aria-expanded="false"]')?.click();
       el.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
       const antes = el.style.boxShadow;
       el.style.boxShadow = '0 0 0 3px var(--cp-orange)';
@@ -283,6 +324,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         el.style.boxShadow = antes;
       }, 1800);
     }, 0);
+  };
+  const verFalta = () => {
+    if (faltantes[0]) irA(faltantes[0]);
   };
 
   const agregar = () => {
@@ -514,8 +558,33 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               </div>
             )}
 
+            {pasos.length >= 2 && (
+              <nav className="ca-progreso" aria-label="Pasos del combo" data-testid="progreso-combo">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <span style={{ ...titulo, fontWeight: 800, fontSize: 13 }}>Progreso del combo</span>
+                  <span aria-live="polite" style={{ fontWeight: 800, fontSize: 12, color: faltantes.length === 0 ? 'var(--cp-green)' : 'var(--cp-rust)' }}>
+                    {faltantes.length === 0 ? 'Todo listo ✓' : `Faltan ${faltantes.length}`}
+                  </span>
+                </div>
+                <div className="ca-pasos">
+                  {pasos.map((p, i) => (
+                    <button
+                      key={p.clave}
+                      type="button"
+                      className="ca-pchip"
+                      data-hecho={p.hecho === true ? 'si' : p.hecho === false ? 'no' : 'opc'}
+                      aria-label={`Paso ${i + 1}: ${p.texto}, ${p.hecho === true ? 'listo' : p.hecho === false ? 'pendiente' : 'opcional'}`}
+                      onClick={() => irA(p)}
+                    >
+                      {`${i + 1} ${p.texto} ${p.hecho === true ? '✓' : p.hecho === false ? '·' : '(opcional)'}`}
+                    </button>
+                  ))}
+                </div>
+              </nav>
+            )}
+
             {producto.tamanos.length > 0 && (
-              <div>
+              <div data-testid="paso-tamano">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ ...titulo, fontWeight: 700, fontSize: 15 }}>Tamaño</span>
                   <span style={{ fontSize: 11, fontWeight: 700, background: 'var(--cp-navy)', color: 'var(--cp-cream)', borderRadius: 9999, padding: '2px 10px' }}>OBLIGATORIO</span>
@@ -736,16 +805,29 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
             )}
 
             {nB > 0 && (
-              <div data-testid="nombre-envase" style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: '10px 12px', background: 'var(--cp-white)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ ...titulo, fontWeight: 800, fontSize: 14 }}>Nombre para el envase</div>
-                <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cp-soft)' }}>Para escribir tu nombre en el vaso.</div>
+              <div data-testid="nombre-envase" data-plegable="" className="ca-tarjeta">
+                <button type="button" className="ca-cab" aria-expanded={nombresAbierto} aria-controls="cuerpo-nombres-envase" onClick={() => setNombresAbierto((v) => !v)}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ ...titulo, display: 'block', fontWeight: 800, fontSize: 14 }}>Nombres para el vaso (opcional)</span>
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--cp-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {nombres.filter((n) => (n ?? '').trim()).join(' · ') || 'Máx. 14 letras se ven completas en el vaso'}
+                    </span>
+                  </span>
+                  <span aria-hidden="true" style={{ flex: 'none', fontSize: 16, color: 'var(--cp-soft)' }}>{nombresAbierto ? '▴' : '▾'}</span>
+                </button>
+                <div id="cuerpo-nombres-envase" className="ca-cuerpo" hidden={!nombresAbierto}>
+                <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cp-soft)' }}>Para escribir tu nombre en el vaso. Se ven completas hasta 14 letras.</div>
                 {Array.from({ length: cantidad * nB }, (_, i) => {
                   const g = gruposBebida[i % nB];
                   const bebida = g ? (g.opciones.find((o) => o.id === (sel[g.id] ?? [])[0])?.nombre ?? nombreCorto(g)) : (envases[i] ?? `Bebida ${i + 1}`);
                   return (
                     <label key={i} style={{ fontSize: 11, fontWeight: 700, display: 'block', color: 'var(--cp-soft)' }}>
-                      {`${bebida} · Nombre para el envase (opcional, máx. 14 letras se ven completas)`}
+                      <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                        <span>{`Bebida ${(i % nB) + 1} · ${bebida}`}</span>
+                        <span style={{ color: (nombres[i] ?? '').trim().length > 14 ? 'var(--cp-rust)' : 'var(--cp-soft)' }}>{`${(nombres[i] ?? '').trim().length}/14`}</span>
+                      </span>
                       <input
+                        aria-label={`${bebida} · Nombre para el envase (opcional, máx. 14 letras se ven completas)`}
                         type="text"
                         value={nombres[i] ?? ''}
                         onChange={(e) =>
@@ -763,6 +845,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                     </label>
                   );
                 })}
+                </div>
               </div>
             )}
 
@@ -816,8 +899,18 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               </div>
             )}
 
-            <div>
-              <label htmlFor="nota-producto" style={{ ...titulo, fontWeight: 700, fontSize: 15, display: 'block', marginBottom: 8 }}>
+            <div {...(nB > 0 ? { className: 'ca-tarjeta', 'data-plegable': '' } : {})}>
+              {nB > 0 && (
+                <button type="button" className="ca-cab" aria-expanded={notaAbierta} aria-controls="cuerpo-nota-combo" onClick={() => setNotaAbierta((v) => !v)}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ ...titulo, display: 'block', fontWeight: 800, fontSize: 14 }}>Nota para cocina (opcional)</span>
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--cp-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nota.trim() || 'Ej.: sin hielo, bien caliente'}</span>
+                  </span>
+                  <span aria-hidden="true" style={{ flex: 'none', fontSize: 16, color: 'var(--cp-soft)' }}>{notaAbierta ? '▴' : '▾'}</span>
+                </button>
+              )}
+              <div id="cuerpo-nota-combo" {...(nB > 0 ? { className: 'ca-cuerpo', hidden: !notaAbierta } : {})}>
+              <label htmlFor="nota-producto" style={{ ...titulo, fontWeight: 700, fontSize: 15, display: nB > 0 ? 'none' : 'block', marginBottom: 8 }}>
                 Nota para cocina (opcional)
               </label>
               <input
@@ -833,6 +926,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   {consejoHielo}
                 </div>
               )}
+              </div>
             </div>
           </div>
         </div>
@@ -852,6 +946,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                   {ayudaMezclas}
                 </div>
               )}
+              {resumenCombo && (
+                <div data-testid="resumen-combo" title={resumenCombo} style={{ flexBasis: '100%', fontSize: 12, fontWeight: 700, lineHeight: '16px', color: 'var(--cp-navy)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {`Tu combo: ${resumenCombo}`}
+                </div>
+              )}
               {!libre && (
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--cp-navy)', borderRadius: 12 }}>
                 <button onClick={() => setCantidad((c) => Math.max(1, c - 1))} aria-label="Menos" style={{ width: 44, height: 48, border: 0, background: 'transparent', color: 'var(--cp-navy)', fontSize: 22, fontWeight: 800 }}>
@@ -869,17 +968,20 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
               </div>
               )}
               {!soloLectura && !valido && !comboAgotado && faltantes.length > 0 && (
-                <button type="button" onClick={verFalta} style={{ flexBasis: '100%', minHeight: 44, border: '1.5px solid var(--cp-orange)', borderRadius: 12, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                <button type="button" onClick={verFalta} style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', minHeight: 44, border: '1.5px solid var(--cp-orange)', borderRadius: 12, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
                   Ver qué falta ({faltantes.length})
                 </button>
               )}
+              {/* con faltantes el botón no recibe el toque: el contenedor lleva al primer faltante */}
+              <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex' }} onClick={!soloLectura && !puedeAgregar && !comboAgotado && faltantes.length > 0 ? verFalta : undefined}>
               <button
                 onClick={soloLectura ? undefined : agregar}
                 disabled={soloLectura ? true : !puedeAgregar}
                 aria-label={soloLectura ? 'Vista previa deshabilitada' : undefined}
                 style={{
-                  flex: '1 1 200px',
+                  flex: 1,
                   minHeight: 52,
+                  pointerEvents: !soloLectura && !puedeAgregar && faltantes.length > 0 ? 'none' : undefined,
                   minWidth: 0,
                   border: 0,
                   borderRadius: 12,
@@ -911,8 +1013,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                             ? libre ? `Agregar ${llevas} al pedido` : 'Agregar al pedido'
                             : textoFalta}
                 </span>
-                <span>{fmt(totalPrecio)}</span>
+                <span style={{ flex: 'none', whiteSpace: 'nowrap' }}>{fmt(totalPrecio)}</span>
               </button>
+              </div>
             </div>
       </div>
 
