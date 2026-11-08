@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ChipCobroMozo } from '../PedidosAdminView';
 import { PedidoDetalle } from '../PedidoDetalle';
@@ -69,6 +69,7 @@ describe('PedidoDetalle: cobro del mozo en el encabezado', () => {
       </MemoryRouter>,
     );
     expect(screen.getByText(/Cobrado por mozo · Yape/)).toBeDefined();
+    fireEvent.click(screen.getByRole('tab', { name: 'Pago y voucher' }));
     expect(screen.getByText(/Mozo: Juan Mozo · a las \d/)).toBeDefined();
   });
 
@@ -90,6 +91,7 @@ describe('PedidoDetalle: rechazar el cobro del mozo solo con caja/cobrar', () =>
 
   it('con caja/cobrar muestra el botón y el recibido con el vuelto', () => {
     render(<MemoryRouter><PedidoDetalle pedido={pedidoConCobro} alActualizar={() => {}} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('tab', { name: 'Pago y voucher' }));
     expect(screen.getByRole('button', { name: 'Rechazar cobro del mozo' })).toBeInTheDocument();
     expect(screen.getByText(/Recibió S\/ 50\.00 · vuelto S\/ 18\.00/)).toBeInTheDocument();
   });

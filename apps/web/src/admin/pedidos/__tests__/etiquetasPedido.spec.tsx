@@ -347,7 +347,8 @@ describe('EtiquetasPedido (componente React)', () => {
       </MemoryRouter>,
     );
 
-    // Click en la pestaña 'Etiquetas'
+    // Imprimir abre el panel; ahí está la pestaña 'Etiquetas'
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir etiquetas y ticket' }));
     const tabEtiquetas = screen.getByRole('tab', { name: 'Etiquetas' });
     fireEvent.click(tabEtiquetas);
 

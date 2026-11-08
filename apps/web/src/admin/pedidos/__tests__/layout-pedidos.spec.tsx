@@ -62,12 +62,12 @@ function renderDetalle(pedido: Pedido = pedidoConProductos) {
   );
 }
 
-describe('Detalle del pedido: layout en tarjetas', () => {
+describe('Detalle del pedido: layout en capas y tarjetas', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('la pestaña Pedido muestra productos y resumen lado a lado en tarjetas', () => {
+  it('la capa Productos muestra productos y resumen lado a lado en tarjetas', () => {
     renderDetalle();
 
     const productos = screen.getByRole('region', { name: 'Productos del pedido' });
@@ -81,39 +81,44 @@ describe('Detalle del pedido: layout en tarjetas', () => {
     expect(within(resumen).queryByText('Envío')).not.toBeInTheDocument();
   });
 
-  it('la pestaña Cobro separa el estado del cobro y el total en dos tarjetas', () => {
+  it('la capa Pago y voucher separa el estado del cobro y el total en dos tarjetas', () => {
     renderDetalle();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Cobro' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Pago y voucher' }));
 
     expect(screen.getByRole('region', { name: 'Estado del cobro' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Total a cobrar' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Total a cobrar' })).toHaveTextContent('S/ 35.00');
   });
 
-  it('la pestaña Ticket de cocina muestra el ticket y su acción de reimpresión en tarjetas', () => {
+  it('el ticket de cocina y su reimpresión están en la ventana Imprimir', () => {
     renderDetalle();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Ticket de cocina' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir etiquetas y ticket' }));
 
     expect(screen.getByRole('region', { name: 'Ticket de cocina' })).toHaveTextContent('COMANDA CP-W004');
     expect(screen.getByRole('region', { name: 'Reimprimir el ticket' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reimprimir ticket' })).toBeInTheDocument();
   });
 
-  it('la pestaña Comprobante muestra la vista y la impresión en tarjetas', () => {
+  it('la vista del comprobante y su impresión están en la ventana Imprimir', () => {
     renderDetalle();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir etiquetas y ticket' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Comprobante' }));
 
     expect(screen.getByRole('region', { name: 'Vista del comprobante' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Imprimir el comprobante' })).toBeInTheDocument();
   });
 
-  it('las pestañas del detalle tienen al menos 44 px de alto para tocarlas', () => {
+  it('las capas y las pestañas de impresión tienen al menos 44 px de alto para tocarlas', () => {
     renderDetalle();
 
-    for (const tab of screen.getAllByRole('tab')) {
+    for (const capa of screen.getAllByRole('tab')) {
+      expect(capa.className).toContain('dp-capa');
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir etiquetas y ticket' }));
+    for (const tab of within(screen.getByRole('dialog', { name: 'Impresión del pedido' })).getAllByRole('tab')) {
       expect(tab.style.minHeight).toBe('44px');
     }
   });

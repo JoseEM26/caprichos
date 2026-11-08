@@ -21,6 +21,8 @@ export interface CuadriculaPlanoProps {
   modoDestino?: boolean;
   // Mantener presionada una mesa ocupada (2 s) llama a esto (vista previa de la mesa)
   alMantenerMesaSalon?: (mesa: MesaSalon) => void;
+  /** Mesas con anillo naranja y la etiqueta «Esta mesa» (detalle de un pedido). No cambia su color ni su selección. */
+  mesasResaltadasIds?: string[];
 }
 
 export const ESTILOS_ELEMENTOS: Record<
@@ -123,6 +125,7 @@ export function CuadriculaPlano({
   modoSalon = false,
   modoDestino = false,
   alMantenerMesaSalon,
+  mesasResaltadasIds = [],
 }: CuadriculaPlanoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mantener = useMantenerPresionado<MesaSalon>((mesa) => alMantenerMesaSalon?.(mesa), 2000);
@@ -415,6 +418,7 @@ export function CuadriculaPlano({
             bd = 'var(--cp-orange)';
           }
 
+          const resaltada = mesasResaltadasIds.includes(elem.id);
           const tieneReserva = esMesa && mesaSalon?.reserva;
           // Mantener 2 s una mesa ocupada abre su vista previa (la decide quien usa el croquis)
           const mantenible =
@@ -476,12 +480,14 @@ export function CuadriculaPlano({
                   ? 'crosshair'
                   : 'grab',
                 opacity: !elem.activo ? 0.45 : estaArrastrando ? 0.8 : 1,
-                boxShadow: estaSeleccionado
+                boxShadow: resaltada
+                  ? '0 0 0 4px var(--cp-orange), 0 4px 14px rgba(230, 121, 41, 0.45)'
+                  : estaSeleccionado
                   ? '0 0 0 2px var(--cp-orange)'
                   : estaArrastrando
                   ? '0 8px 16px rgba(11, 44, 62, 0.2)'
                   : 'none',
-                zIndex: estaArrastrando ? 20 : estaSeleccionado ? 10 : 1,
+                zIndex: estaArrastrando ? 20 : resaltada ? 12 : estaSeleccionado ? 10 : 1,
                 transition: estaArrastrando
                   ? 'none'
                   : 'left 0.1s ease, top 0.1s ease, box-shadow 0.15s ease',
@@ -502,6 +508,28 @@ export function CuadriculaPlano({
                     pointerEvents: 'none',
                   }}
                 />
+              )}
+
+              {resaltada && (
+                <span
+                  data-testid="etiqueta-mesa-resaltada"
+                  style={{
+                    position: 'absolute',
+                    top: '-13px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'var(--cp-orange)',
+                    color: 'var(--cp-navy)',
+                    borderRadius: '9999px',
+                    padding: '0 8px',
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  Esta mesa
+                </span>
               )}
 
               {/* Marca de reserva visual "R" */}
