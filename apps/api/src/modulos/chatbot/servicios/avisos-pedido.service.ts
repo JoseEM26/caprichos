@@ -9,6 +9,8 @@ import { urlPublicaCarta } from './carrusel.util';
 import { parametroActivoConDefecto, whatsappSimulado } from '../utilidades/modo-whatsapp.util';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
 import { calcularEtaEntrega, formatearEta, leerConfigEta } from '../../repartos/eta-entrega';
+import { mediosPagoPublicos } from '../../local/local.service';
+import { detalleDatosPago } from '../conversacion/flujos/pago/textos-pago';
 import { enlaceSeguimientoCarta } from '../../pedidos/seguimiento.tokens';
 
 /**
@@ -85,6 +87,8 @@ export interface DatosAviso {
   plantillaUbicacion?: boolean;
   /** RECIBIDO: productos, total, medio y estado del envío (se arma al avisar). */
   resumen?: ResumenRecibido | null;
+  /** RECIBIDO con pago digital: bloque «número, titular y monto» (se arma al avisar). */
+  datosPago?: string | null;
 }
 
 /**
@@ -197,6 +201,7 @@ export class AvisosPedidoService {
         plantillaSeguimiento: esParametroActivo(flagPlantilla?.valor),
         plantillaUbicacion: esParametroActivo((await db.parametro.findUnique({ where: { clave: 'whatsapp_plantilla_delivery_ubicacion_activa' } }))?.valor),
         resumen: await this.resumenRecibido(db, pedidoId),
+        datosPago: medio ? await this.bloqueDatosPago(db, pedido) : null,
       };
     }
     // Línea de puntos (bienvenida o puntos ganados): se decide aquí y el marcador «una sola vez» se escribe en encolar
@@ -251,6 +256,24 @@ export class AvisosPedidoService {
     if (!tx) this.outbox.despertar();
     this.logger.log(`Aviso ${etapa} del pedido ${pedido.codigo} encolado a ${enmascararTelefono(telefono)}`);
     return { estado: 'ENCOLADO' };
+  }
+
+  /** Monto, número o cuenta y titular del medio digital del pedido (mismos datos que ve la carta). */
+  private async bloqueDatosPago(
+    db: Prisma.TransactionClient | PrismaService,
+    pedido: { total: unknown; pago_metodo: string | null; pago_preferido: string | null; puntos_ganados?: unknown },
+  ): Promise<string | null> {
+    try {
+      const med = String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase();
+      const parametros = await db.parametro.findMany({
+        where: { clave: { in: ['local_pagos', 'voucher_titular_nombre', 'voucher_yape_numero', 'voucher_plin_numero'] } },
+      });
+      const tot = Number(pedido.total).toFixed(2);
+      return `${detalleDatosPago(med, { ...mediosPagoPublicos(parametros) }, tot)}\n• Monto: S/ ${tot}`;
+    } catch (err: any) {
+      this.logger.warn(`Datos de pago no incluidos en el aviso: ${err?.message}`);
+      return null;
+    }
   }
 
   /** Productos (sin las partes de un combo), total, medio de pago y estado del envío para el aviso de pedido recibido. */
@@ -409,7 +432,7 @@ export class AvisosPedidoService {
     switch (etapa) {
       case 'RECIBIDO':
         return medioDigital
-          ? TEXTOS_REPARTO.recibidoDigital(nombre, codigo, medioDigital, datos.enlaceSeguimiento, datos.resumen)
+          ? TEXTOS_REPARTO.recibidoDigital(nombre, codigo, medioDigital, datos.enlaceSeguimiento, datos.resumen, datos.datosPago)
           : TEXTOS_REPARTO.recibidoEfectivo(nombre, codigo, datos.enlaceSeguimiento, datos.plantillaSeguimiento, datos.resumen);
       case 'ACEPTADO':
         return TEXTOS_REPARTO.aceptado(nombre, codigo);

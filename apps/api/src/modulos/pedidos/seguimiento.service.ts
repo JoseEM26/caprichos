@@ -127,6 +127,8 @@ export interface SeguimientoPedido {
   progreso: ProgresoPedido;
   /** Pago con Yape, Plin o transferencia: la pantalla pide adjuntar la captura. Solo en obtener(). */
   pagoDigital?: boolean;
+  /** YAPE, PLIN o TRANSFERENCIA cuando `pagoDigital`: la carta muestra a quién pagar. */
+  medioPago?: string;
   /**
    * Tiempo que falta (aditivo). Antes de salir: estimado de la zona. En camino: lo prometido al salir
    * menos lo transcurrido. Null cuando el pedido ya está entregado o anulado.
@@ -264,7 +266,11 @@ export class SeguimientoService {
 
     const medioPreferido = String(pedido.pago_preferido ?? '').toUpperCase();
     const pagoDigital = MEDIOS_DIGITALES.includes(medioPreferido);
-    const base = { ...this.construir(pedido as PedidoSeguimiento, await this.contexto()), pagoDigital };
+    const base = {
+      ...this.construir(pedido as PedidoSeguimiento, await this.contexto()),
+      pagoDigital,
+      ...(pagoDigital ? { medioPago: medioPreferido } : {}),
+    };
     if (!pagoDigital) return base;
 
     // Vouchers vigentes del pedido (no reemplazados ni retirados), del más nuevo al más viejo

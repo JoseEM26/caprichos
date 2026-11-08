@@ -57,6 +57,8 @@ export interface EstadoSeguimiento {
   progreso?: ProgresoPedido;
   /** Yape, Plin o transferencia: la pantalla pide la captura del pago. */
   pagoDigital?: boolean;
+  /** YAPE, PLIN o TRANSFERENCIA cuando `pagoDigital`. */
+  medioPago?: string;
   /** Estado del voucher: solo con pago digital (en efectivo no viene). */
   voucher?: VoucherSeguimiento;
 }

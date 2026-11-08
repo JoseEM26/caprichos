@@ -47,6 +47,30 @@ export const COORDENADAS_LOCAL_DEFAULT = {
   lng: -76.963255,
 };
 
+/**
+ * Medios de pago activos con a quién pagar. Los parámetros voucher_* (los que valida Caja) mandan sobre local_pagos;
+ * sin ninguno vale lo de local_pagos o, en su defecto, PAGOS_DEFAULT. Solo número, cuenta y titular: nada más sale.
+ */
+export function mediosPagoPublicos(parametros: Array<{ clave: string; valor: unknown }>): Record<string, any> {
+  const valor = (clave: string) => parametros.find((p) => p.clave === clave)?.valor;
+  const texto = (clave: string) => {
+    const v = valor(clave);
+    return v == null ? '' : String(v).replace(/^"|"$/g, '').trim();
+  };
+  const pagos = (valor('local_pagos') as Record<string, any> | undefined) ?? PAGOS_DEFAULT;
+  const titularVoucher = texto('voucher_titular_nombre');
+  const numeroVoucher: Record<string, string> = { yape: texto('voucher_yape_numero'), plin: texto('voucher_plin_numero') };
+  const visibles: Record<string, any> = {};
+  for (const [clave, config] of Object.entries(pagos)) {
+    if (!(config as any)?.activo) continue;
+    const c: Record<string, any> = { ...(config as any) };
+    if (clave === 'yape' || clave === 'plin') c.numero = numeroVoucher[clave] || c.numero;
+    if (['yape', 'plin', 'transferencia'].includes(clave)) c.titular = titularVoucher || c.titular;
+    visibles[clave] = c;
+  }
+  return visibles;
+}
+
 @Injectable()
 export class LocalService {
   constructor(
@@ -289,6 +313,9 @@ export class LocalService {
               'propina_tope',
               'aviso_stock_quedan_desde',
               'aviso_stock_ultimas_desde',
+              'voucher_titular_nombre',
+              'voucher_yape_numero',
+              'voucher_plin_numero',
             ],
           },
         },
@@ -299,7 +326,6 @@ export class LocalService {
     ]);
 
     const datosParam = parametros.find((p) => p.clave === 'local_datos')?.valor as any;
-    const pagosParam = parametros.find((p) => p.clave === 'local_pagos')?.valor as any;
     const envioGratis = parametros.find((p) => p.clave === 'envio_gratis_monto')?.valor;
     const envioGratisModo = parametros.find((p) => p.clave === 'envio_gratis_modo')?.valor;
     const pedidoMinimo = parametros.find((p) => p.clave === 'pedido_minimo')?.valor;
@@ -311,15 +337,8 @@ export class LocalService {
     const invitadoPermitido = String(invitadoParam ?? '').toLowerCase().trim() === 'si';
 
     const datos = datosParam ?? DATOS_LOCAL_DEFAULT;
-    const pagos = pagosParam ?? PAGOS_DEFAULT;
-
     // Medios de pago visibles/activos
-    const mediosPagoVisibles: Record<string, any> = {};
-    for (const [clave, config] of Object.entries(pagos)) {
-      if ((config as any)?.activo) {
-        mediosPagoVisibles[clave] = config;
-      }
-    }
+    const mediosPagoVisibles = mediosPagoPublicos(parametros);
 
     const horarioFormateado = horarios.map((h) => ({
       dia_semana: h.dia_semana,
