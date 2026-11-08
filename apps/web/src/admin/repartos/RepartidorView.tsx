@@ -837,6 +837,8 @@ export function RepartidorView() {
     cargarDatos();
     sugeridas.recargar();
   });
+  // Datos del cliente corregidos (celular, dirección): el número nuevo aparece sin recargar
+  useEventos('pedido:editado', () => cargarDatos());
   // Respaldo: al reconectar, al volver a la pestaña y cada 60 s sin socket se vuelve a cargar (cocina despacha sin avisar a esta pantalla)
   useTiempoReal(['pedido:nuevo', 'pedido:progreso', 'cocina:comanda'], cargarDatos);
   useEventos('reparto:incidente', () => {

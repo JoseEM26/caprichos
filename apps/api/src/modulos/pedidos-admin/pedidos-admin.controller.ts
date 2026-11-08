@@ -24,6 +24,8 @@ import { CocinaQueryDto } from './dto/cocina-query.dto';
 import { MisPedidosQueryDto } from './dto/mis-pedidos-query.dto';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 import { UbicarPedidoService } from './ubicar-pedido.service';
+import { CorregirClienteService } from './corregir-cliente.service';
+import { CorregirClienteDto } from './dto/corregir-cliente.dto';
 import { PedidosService } from '../pedidos/pedidos.service';
 import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { ImpresionService } from '../impresion/impresion.service';
@@ -40,6 +42,7 @@ export class PedidosAdminController {
   constructor(
     private readonly pedidosEstadoService: PedidosEstadoService,
     private readonly ubicarPedidoService: UbicarPedidoService,
+    private readonly corregirCliente: CorregirClienteService,
     @Optional() private readonly pedidosService?: PedidosService,
     @Optional() private readonly impresionService?: ImpresionService,
     @Optional() private readonly vouchersService?: VouchersService,
@@ -203,6 +206,14 @@ export class PedidosAdminController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.pedidosEstadoService.registrarPago(id, dto, req.usuario, ip);
+  }
+
+  /** Corrige nombre, celular y (delivery) dirección/referencia; sin código de supervisor. */
+  @Patch(':id/cliente')
+  @Permiso('pedidos', 'corregir_cliente')
+  async corregirDatosCliente(@Param('id') id: string, @Body() dto: CorregirClienteDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.corregirCliente.corregir(id, dto, req.usuario, ip);
   }
 
   @Post(':id/ubicacion')

@@ -20,6 +20,7 @@ import { ModalCortesia } from '../cortesias/ModalCortesia';
 import { cortesiasApi } from '../cortesias/cortesiasApi';
 import { ModalRechazarCobroMozo } from './ModalRechazarCobroMozo';
 import { ModalUbicar } from './ModalUbicar';
+import { ModalCorregirCliente } from './ModalCorregirCliente';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { EtiquetasPedido } from './EtiquetasPedido';
@@ -102,6 +103,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   const [abrirCobrar, setAbrirCobrar] = useState(false);
   const [abrirAnular, setAbrirAnular] = useState(false);
   const [abrirUbicar, setAbrirUbicar] = useState(false);
+  const [abrirCorregirCliente, setAbrirCorregirCliente] = useState(false);
   const [abrirPrecuenta, setAbrirPrecuenta] = useState(false);
   const [abrirRechazarMozo, setAbrirRechazarMozo] = useState(false);
   const [abrirConfirmarPago, setAbrirConfirmarPago] = useState(false);
@@ -167,6 +169,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
     !pedido.cobroMozo;
   // Extra: con permiso y mientras el pedido no esté anulado ni rechazado (entregado o pagado sí)
   const puedeAgregarExtra = !!alAgregarExtra && tiene('pedidos/extra') && est !== 'ANULADO' && est !== 'RECHAZADO';
+  // Corregir datos del cliente: con permiso y en cualquier estado salvo anulado o rechazado (entregado o cobrado sí)
+  const puedeCorregirCliente = tiene('pedidos/corregir_cliente') && est !== 'ANULADO' && est !== 'RECHAZADO';
   const esPorConfirmar =
     (est === 'COLA' || est === 'NUEVO') &&
     !estaPagado &&
@@ -1197,6 +1201,24 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               Editar pedido
             </button>
           )}
+          {puedeCorregirCliente && (
+            <button
+              type="button"
+              onClick={() => setAbrirCorregirCliente(true)}
+              style={{
+                flex: '1 1 140px',
+                minHeight: 44,
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                borderRadius: 12,
+                background: 'transparent',
+                color: 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Corregir datos del cliente
+            </button>
+          )}
           {puedeAgregarExtra && (
             <button
               type="button"
@@ -1334,6 +1356,17 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
           subtotal={Number(pedido.subtotal)}
           descuento={Number(pedido.descuento || 0)}
           plan={pedido.planPago}
+        />
+      )}
+
+      {abrirCorregirCliente && (
+        <ModalCorregirCliente
+          pedido={pedido}
+          alCerrar={() => setAbrirCorregirCliente(false)}
+          alGuardar={() => {
+            setAbrirCorregirCliente(false);
+            alActualizar();
+          }}
         />
       )}
 
