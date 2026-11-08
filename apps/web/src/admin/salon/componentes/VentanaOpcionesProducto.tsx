@@ -53,6 +53,8 @@ export interface ProductoConfigurado {
   unidades: ConfiguracionUnidad[];
   /** Combo con bebidas: un nombre de envase por bebida (unidad 1: bebida 1, bebida 2...; vacío si no se escribe) */
   nombresBebidas?: string[];
+  /** Categoría del producto: de ella depende si se pide el nombre por vaso (solo bebidas). */
+  categoriaNombre?: string;
   /** Mezcla de sabores: unidades por media docena o docena y cuántas de cada sabor */
   unidadesPorMezcla?: number;
   sabores?: { saborId: string; cantidad: number; nombre?: string }[];
@@ -68,6 +70,8 @@ export interface VentanaOpcionesProductoProps {
   oferta?: OfertaItem | null;
   /** Unidades de este producto que ya van en el pedido (todas sus líneas): descuentan del saldo */
   enCarrito?: number;
+  /** Categoría del producto: de ella depende si se pide el nombre por vaso (solo bebidas). */
+  categoriaNombre?: string;
 }
 
 const recortar = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
@@ -78,6 +82,7 @@ export function VentanaOpcionesProducto({
   alAgregar,
   oferta = null,
   enCarrito = 0,
+  categoriaNombre,
 }: VentanaOpcionesProductoProps) {
   if (!producto) return null;
 
@@ -177,31 +182,13 @@ export function VentanaOpcionesProducto({
   const envases = bebidasElegidas(partesJug, elegido);
   const [nombresCombo, setNombresCombo] = useState<Record<number, string>>({});
 
-  // Categorías de bebidas
+  // Es bebida por su CATEGORÍA (igual que la carta): Frappes, Iced, Frozen, Calientes o «bebida».
+  // Antes también miraba el nombre del producto y «Torta de chocolate» pedía un nombre como si fuera un vaso.
   const esBebida = useMemo(() => {
     if (nB > 0) return false;
-    const cat = [
-      (producto as any).categoria?.nombre,
-      (producto as any).categoriaNombre,
-      (producto as any).categoriaId,
-      producto.nombre,
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    return (
-      cat.includes('frappe') ||
-      cat.includes('iced') ||
-      cat.includes('frozen') ||
-      cat.includes('caliente') ||
-      cat.includes('bebida') ||
-      cat.includes('café') ||
-      cat.includes('cafe') ||
-      cat.includes('jugo') ||
-      cat.includes('infusi') ||
-      cat.includes('chocolate')
-    );
-  }, [producto, nB]);
+    const cat = String(categoriaNombre ?? (producto as any).categoria?.nombre ?? (producto as any).categoriaNombre ?? '').toLowerCase();
+    return ['frappe', 'iced', 'frozen', 'caliente', 'bebida'].some((k) => cat.includes(k));
+  }, [producto, nB, categoriaNombre]);
 
   const precioBase = tamanoSeleccionado ? tamanoSeleccionado.precio : producto.precio || 0;
 

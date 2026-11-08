@@ -3456,6 +3456,7 @@ export function ModalNuevoPedidoMesa({
           }}
           alAgregar={handleAgregarProductoConfigurado}
           oferta={comboDeProducto(ofertasCombo, productoSeleccionado.id)}
+          categoriaNombre={categorias.find((c) => (c.productos || []).some((x) => String(x.id) === String(productoSeleccionado.id)))?.nombre}
           enCarrito={lineas
             .filter((l) => String(l.productoId) === String(productoSeleccionado.id))
             .reduce((acc, l) => acc + unidadesDeLinea(l), 0)}
