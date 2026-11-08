@@ -34,6 +34,7 @@ import { ChatResumen, DetalleConversacion, FiltroChat, FiltroPos, RespuestaRapid
 import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { ListaChats } from './ListaChats';
+import { filtrarPorDia, FiltroDia, ordenarCola } from './diasBandeja';
 import { CabeceraChat } from './CabeceraChat';
 import { FlujoMensajes } from './FlujoMensajes';
 import { BarraAccionPendiente } from './BarraAccionPendiente';
@@ -68,17 +69,29 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   const [soloBloqueados, setSoloBloqueados] = useState(false);
   const [modalDesbloqueo, setModalDesbloqueo] = useState(false);
 
-  const chatsOrdenados = useMemo(() => {
+  // Filtro por día (Lima): «Hoy» por defecto; solo se ofrece cuando la pestaña tiene chats de días anteriores
+  const [dia, setDia] = useState<FiltroDia>('hoy');
+  const [avisoAtendido, setAvisoAtendido] = useState<{ id: string; nombre: string } | null>(null);
+  const { chatsOrdenados, dias } = useMemo(() => {
     const base = soloBloqueados ? chats.filter((c) => c.bloqueoSpam?.activo) : chats;
-    if (filtro === 'atender') {
-      return [...base].sort((a, b) => {
-        const esperaA = typeof a.esperaMin === 'number' ? a.esperaMin : -1;
-        const esperaB = typeof b.esperaMin === 'number' ? b.esperaMin : -1;
-        return esperaB - esperaA;
-      });
+    const porDia = filtro === 'atender' || filtro === 'atendidos';
+    let diasInfo: { hoy: number; ayer: number; anteriores: number; total: number } | null = null;
+    let lista = base;
+    if (porDia) {
+      const hoy = filtrarPorDia(base, 'hoy').length;
+      if (base.length > hoy) {
+        diasInfo = { hoy, ayer: filtrarPorDia(base, 'ayer').length, anteriores: base.length - hoy, total: base.length };
+        lista = filtrarPorDia(base, dia);
+      }
     }
-    return base;
-  }, [chats, filtro, soloBloqueados]);
+    if (filtro === 'atender') lista = ordenarCola(lista);
+    return { chatsOrdenados: lista, dias: diasInfo };
+  }, [chats, filtro, soloBloqueados, dia]);
+  useEffect(() => {
+    if (!avisoAtendido) return;
+    const t = setTimeout(() => setAvisoAtendido(null), 7000);
+    return () => clearTimeout(t);
+  }, [avisoAtendido]);
   // Desde Pedidos (?telefono=) el chat del cliente se busca y se abre solo al cargar la lista
   const telefonoPendiente = React.useRef<string>(telefonoDeUrl());
   const [busqueda, setBusqueda] = useState(() => telefonoPendiente.current);
@@ -498,16 +511,14 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     });
   };
 
-  const handleMarcarAtendido = () => {
-    if (!detalle || !chatSeleccionadoId) return;
-    const id = chatSeleccionadoId;
-    const nombre = detalle.nombre;
+  /** Marca atendido en un toque (fila o chat abierto) y avisa con «Deshacer»; con pago por revisar o pedido sin cobrar pide confirmar. */
+  const atenderChat = (id: string, nombre: string) => {
     const archivar = async (confirmar: boolean) => {
       await marcarAtendido(id, confirmar);
-      await cargarDetalle(id);
+      setAvisoAtendido({ id, nombre });
+      if (id === chatSeleccionadoId) await cargarDetalle(id);
       await cargarLista(true);
     };
-    // Un clic archiva; con un pago por revisar o un pedido sin cobrar el servidor pide confirmar antes
     archivar(false).catch((err: any) => {
       if (err?.codigo === 'ATENDIDO_REQUIERE_CONFIRMAR') {
         setConfirmarAccion({
@@ -520,6 +531,21 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
         setPulirError(err?.message || 'No se pudo marcar como atendido');
       }
     });
+  };
+
+  const handleMarcarAtendido = () => {
+    if (detalle && chatSeleccionadoId) atenderChat(chatSeleccionadoId, detalle.nombre);
+  };
+
+  const volverDeFila = async (id: string) => {
+    try {
+      await volverPorAtender(id);
+      setAvisoAtendido((a) => (a?.id === id ? null : a));
+      if (id === chatSeleccionadoId) await cargarDetalle(id);
+      await cargarLista(true);
+    } catch (err: any) {
+      setPulirError(err?.message || 'No se pudo devolver el chat a Por atender');
+    }
   };
 
   const handleVolverPorAtender = async () => {
@@ -697,6 +723,11 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
           onToggleSoloBloqueados={() => setSoloBloqueados((v) => !v)}
           cargando={cargando}
           chats={chatsOrdenados}
+          dia={dia}
+          onDia={setDia}
+          dias={dias}
+          onAtendido={atenderChat}
+          onVolverPorAtender={(id) => void volverDeFila(id)}
           chatSeleccionadoId={chatSeleccionadoId}
           onSeleccionar={(id) => {
             abiertoPorPersona.current = id;
@@ -795,6 +826,14 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
       </div>
 
       {/* Modal Confirmar Acción */}
+      {avisoAtendido && (
+        <div className="msg-toast-atendido" role="status" data-testid="aviso-atendido">
+          <span>Marcado como atendido</span>
+          <button type="button" onClick={() => void volverDeFila(avisoAtendido.id)} aria-label={`Deshacer: ${avisoAtendido.nombre} vuelve a Por atender`}>
+            Deshacer
+          </button>
+        </div>
+      )}
       {confirmarAccion && (
         <Confirmar
           abierto={true}

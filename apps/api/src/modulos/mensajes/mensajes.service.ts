@@ -41,10 +41,10 @@ import {
 } from './utilidades/pos-chat.util';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
-export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos';
+export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos' | 'reprogramar';
 export type FiltroPos = 'faltan' | 'procesados';
 
-const GRUPOS: Record<Exclude<FiltroChat, 'todos' | 'novistos'>, EstadoChat[]> = {
+const GRUPOS: Record<Exclude<FiltroChat, 'todos' | 'novistos' | 'reprogramar'>, EstadoChat[]> = {
   atender: ['atencion', 'validar'],
   bot: ['bot', 'pausado'],
   atendidos: ['atendido'],
@@ -70,7 +70,7 @@ export function estadoDe(
   c: { estado: string; duenio: string; urgente: boolean; atendido_en?: Date | null },
   reabierto = false,
 ): EstadoChat {
-  // Archivado con «Atendido»: vuelve a «Por atender» cuando el cliente o el equipo escriben de nuevo
+  // Archivado con «Atendido»: vuelve a «Por atender» cuando el cliente escribe de nuevo
   if (c.atendido_en) return !reabierto ? 'atendido' : c.estado === 'VALIDAR_PAGO' ? 'validar' : 'atencion';
   if (c.estado === 'ATENDIDA') return 'atendido';
   if (c.estado === 'VALIDAR_PAGO') return 'validar';
@@ -262,6 +262,18 @@ export class MensajesService {
     return new Map(cuentas.map((u) => [u.id.toString(), nombreUsuario(u.party, 'otra persona')]));
   }
 
+  /**
+   * Celulares (últimos 9 dígitos) con un pedido que el cliente aceptó reprogramar y el admin aún no reenvió a reparto.
+   * OJO: el sistema NO guarda una fecha de reprogramación ni de entrega (ni «mañana»): solo este estado.
+   */
+  private async celularesPorReprogramar(): Promise<Set<string>> {
+    const filas = await this.prisma.mensajeReparto.findMany({
+      where: { numero: 5 /* pregunta de reprogramar (reprogramacion.service) */, estado: 'REPROGRAMAR', pedido: { estado: 'LISTO' } },
+      select: { pedido: { select: { cliente_telefono: true } } },
+    });
+    return new Set(filas.map((f) => ultimos9(f.pedido.cliente_telefono)).filter(Boolean));
+  }
+
   async listar(filtro: FiltroChat = 'todos', q = '', pos?: FiltroPos) {
     const todas = await this.prisma.conversacion.findMany({
       orderBy: { ultima_actividad: 'desc' },
@@ -270,6 +282,7 @@ export class MensajesService {
     const bloqueos = await this.bloqueosSpam(todas);
     const posMapa = await this.posDeChats(todas);
     const quienes = await this.nombresDe(todas.map((c) => c.atendido_por));
+    const porReprogramar = await this.celularesPorReprogramar();
     const hoy0 = inicioHoyLima();
     const filas = todas.map((c) => {
       const estado = estadoDe(c, reabiertoTrasAtendido(c.atendido_en, c.mensajes));
@@ -309,9 +322,12 @@ export class MensajesService {
         faltaProcesar: faltaProcesar(posChat, c.mensajes.some((m) => m.autor === 'CLIENTE' && m.en >= hoy0)),
         atendidoEn: estado === 'atendido' && c.atendido_en ? c.atendido_en.toISOString() : null,
         atendidoPor: estado === 'atendido' && c.atendido_por ? quienes.get(c.atendido_por.toString()) ?? null : null,
+        // Archivado y el cliente volvió a escribir: ya está en «Por atender» con este indicador
+        volvioAEscribir: !!c.atendido_en && estado !== 'atendido',
+        porReprogramar: porReprogramar.has(ultimos9(c.telefono)),
       };
     });
-    const cuenta = (g: Exclude<FiltroChat, 'todos' | 'novistos'>) => filas.filter((f) => GRUPOS[g].includes(f.estado)).length;
+    const cuenta = (g: Exclude<FiltroChat, 'todos' | 'novistos' | 'reprogramar'>) => filas.filter((f) => GRUPOS[g].includes(f.estado)).length;
     const termino = q.toLowerCase().trim();
     const digitos = termino.replace(/\D/g, '');
     const chats = filas.filter(
@@ -321,7 +337,9 @@ export class MensajesService {
           ? f.estado !== 'atendido'
           : filtro === 'novistos'
             ? sinVer(f)
-            : GRUPOS[filtro].includes(f.estado)) &&
+            : filtro === 'reprogramar'
+              ? f.porReprogramar
+              : GRUPOS[filtro].includes(f.estado)) &&
         (!pos || (pos === 'faltan' ? f.faltaProcesar : f.pos.estado !== 'SIN_PEDIDO')) &&
         (!termino ||
           f.nombre.toLowerCase().includes(termino) ||
@@ -343,6 +361,7 @@ export class MensajesService {
         bot: cuenta('bot'),
         atendidos: cuenta('atendidos'),
         sinVer: filas.filter(sinVer).length,
+        reprogramar: filas.filter((f) => f.porReprogramar).length,
         bloqueadosSpam: filas.filter((f) => f.bloqueoSpam?.activo).length,
         faltanProcesar: filas.filter((f) => f.faltaProcesar).length,
       },

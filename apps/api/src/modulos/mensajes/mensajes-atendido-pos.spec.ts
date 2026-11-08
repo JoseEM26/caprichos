@@ -26,7 +26,7 @@ const usuario = { partyId: 10n, rol: 'ADMIN', debeCambiar: false };
 const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 
 describe('Atendido: archivar y volver a Por atender', () => {
-  it('estadoDe: archivado hasta que cliente o equipo escriben; el bot no lo reabre', () => {
+  it('estadoDe: archivado hasta que el cliente escribe; ni el bot ni el equipo lo reabren', () => {
     const c = { estado: 'ABIERTA', duenio: 'BOT', urgente: false, atendido_en: hace(10) };
     expect(estadoDe(c, false)).toBe('atendido');
     expect(estadoDe(c, true)).toBe('atencion');
@@ -34,7 +34,7 @@ describe('Atendido: archivar y volver a Por atender', () => {
     const msgs = [msg('BOT', 5), msg('CLIENTE', 20)];
     expect(reabiertoTrasAtendido(c.atendido_en, msgs)).toBe(false);
     expect(reabiertoTrasAtendido(c.atendido_en, [msg('CLIENTE', 3)])).toBe(true);
-    expect(reabiertoTrasAtendido(c.atendido_en, [msg('PERSONA', 3)])).toBe(true);
+    expect(reabiertoTrasAtendido(c.atendido_en, [msg('PERSONA', 3)])).toBe(false);
   });
 
   describe('servicio', () => {
@@ -57,6 +57,7 @@ describe('Atendido: archivar y volver a Por atender', () => {
           update: jest.fn().mockResolvedValue({}),
         },
         pedido: { findMany: jest.fn().mockResolvedValue([]) },
+        mensajeReparto: { findMany: jest.fn().mockResolvedValue([]) },
         userAccount: {
           findMany: jest.fn().mockResolvedValue([{ id: 7n, party: { persona: { nombres: 'Ana', apellidos: 'Ruiz' } } }]),
           findUnique: jest.fn().mockResolvedValue({ id: 7n }),
@@ -79,6 +80,22 @@ describe('Atendido: archivar y volver a Por atender', () => {
       expect(por.chats.map((c) => c.id)).toEqual(['3']);
       expect(por.chats[0].sinLeer).toBe(1);
       expect(por.chats[0].atendidoEn).toBeNull();
+    });
+
+    it('el chat reabierto por el cliente marca «volvió a escribir»; si solo escribió el equipo sigue archivado', async () => {
+      chats[1] = base(2n, { atendido_en: hace(20), atendido_por: 7n, mensajes: [msg('PERSONA', 5), msg('BOT', 4), msg('CLIENTE', 60)] });
+      const todos = (await service.listar('todos')).chats;
+      expect(todos.find((c) => c.id === '3')).toMatchObject({ estado: 'atencion', volvioAEscribir: true });
+      expect(todos.find((c) => c.id === '1')!.volvioAEscribir).toBe(false);
+      expect((await service.listar('atendidos')).chats.map((c) => c.id)).toEqual(['2']);
+    });
+
+    it('filtro «reprogramar»: solo chats cuyo celular tiene un pedido por reprogramar; sin datos queda vacío', async () => {
+      expect((await service.listar('reprogramar')).chats).toEqual([]);
+      prisma.mensajeReparto.findMany.mockResolvedValue([{ pedido: { cliente_telefono: '999000001' } }]);
+      const r = await service.listar('reprogramar');
+      expect(r.chats.map((c) => c.id)).toEqual(['1']);
+      expect(r.conteos.reprogramar).toBe(1);
     });
 
     it('listar resuelve el punto de venta con UNA sola consulta de pedidos y filtra por faltan/procesados', async () => {

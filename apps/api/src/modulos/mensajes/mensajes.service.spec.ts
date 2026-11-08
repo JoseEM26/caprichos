@@ -176,6 +176,7 @@ describe('MensajesService', () => {
         }),
         update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 500n, ...data })),
       },
+      mensajeReparto: { findMany: jest.fn().mockResolvedValue([]) },
       pedido: {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue({
