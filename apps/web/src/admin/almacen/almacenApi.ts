@@ -216,7 +216,59 @@ export interface MermaProductoDto {
   nota?: string;
 }
 
+export type GrupoHistorial = 'subidas' | 'pedidos' | 'mermas' | 'ajustes';
+export interface EventoHistorial {
+  id: string;
+  categoria: string;
+  grupo: GrupoHistorial;
+  etiqueta: string;
+  cantidad: number;
+  saldoAntes: number;
+  saldoDespues: number;
+  fecha: string;
+  hora: string;
+  en: string;
+  sabor: string | null;
+  saborId: string | null;
+  por: string | null;
+  detalle: string | null;
+  origenRegistrado: boolean;
+  pedido?: {
+    id: string;
+    codigo: string;
+    estado: string;
+    modalidad: string;
+    cliente: string | null;
+    enlace: string;
+    anulado: boolean;
+    devuelto: number | null;
+  };
+}
+export interface HistorialProductoRespuesta {
+  producto: { id: string; nombre: string; sabores: Array<{ id: string; nombre: string }> };
+  desde: string;
+  hasta: string;
+  sabor: string | null;
+  resumen: { inicio: number; subido: number; vendido: number; mermas: number; ajustes: number; saldo: number; diferencia: number; cuadra: boolean };
+  existenciaActual: number;
+  truncado: boolean;
+  pagina: number;
+  porPagina: number;
+  total: number;
+  eventos: EventoHistorial[];
+}
+
 export const almacenApi = {
+  /** Historial de movimientos de un producto (y sus sabores) por día de Lima (permiso almacen/apertura). */
+  historialProducto: (
+    productoId: string,
+    f: { desde?: string; hasta?: string; sabor?: string; tipo?: string; pagina?: number } = {},
+  ) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (v !== undefined && v !== '') qs.append(k, String(v));
+    return api.get<HistorialProductoRespuesta>(`/admin/almacen/productos/${productoId}/historial${qs.size ? `?${qs}` : ''}`);
+  },
+
   /** Productos con control de stock propio y su conteo de apertura de hoy (permiso almacen/apertura). */
   obtenerApertura: () => api.get<AperturaDiaRespuesta>('/admin/almacen/apertura'),
 

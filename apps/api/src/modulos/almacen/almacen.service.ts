@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { historialProducto, type ConsultaHistorial } from './historial-producto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -361,6 +362,10 @@ export class AlmacenService {
       mensaje: `La merma de productos (${nombre}) se registra en Apertura del día`,
       enlace: '/admin/apertura',
     });
+  }
+
+  historialProducto(id: string, q: ConsultaHistorial) {
+    return historialProducto(this.prisma, id, q);
   }
 
   /** Mermas de productos terminados de hoy (todas las que salieron de Apertura), con motivo, quién y si ya se anularon. */

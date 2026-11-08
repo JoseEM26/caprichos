@@ -15,6 +15,7 @@ import { Icono } from '../../comun/Icono';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { ErrorApi } from '../../comun/api';
 import { MermaProductoBoton } from './MermaProductoBoton';
+import { HistorialProductoBoton } from './HistorialProductoBoton';
 import { ConfirmarMermasApertura, type MotivoElegido } from './ConfirmarMermasApertura';
 import { MermasHoyApertura } from './MermasHoyApertura';
 import { useRecargaEnVivo } from './useRecargaEnVivo';
@@ -555,13 +556,16 @@ export function AperturaDiaView() {
                         )}
                       </td>
                       <td data-label="Botar a merma" className="ap-celda-merma">
-                        <MermaProductoBoton
-                          compacto
-                          productoId={c.productoId}
-                          nombre={c.nombre}
-                          saldo={c.saldo}
-                          alRegistrar={() => void cargar(true)}
-                        />
+                        <div className="ap-acciones-fila">
+                          <MermaProductoBoton
+                            compacto
+                            productoId={c.productoId}
+                            nombre={c.nombre}
+                            saldo={c.saldo}
+                            alRegistrar={() => void cargar(true)}
+                          />
+                          <HistorialProductoBoton productoId={c.productoId} nombre={c.nombre} />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -629,14 +633,17 @@ export function AperturaDiaView() {
                               )}
                             </td>
                             <td data-label="Botar a merma" className="ap-celda-merma">
-                              <MermaProductoBoton
-                                compacto
-                                productoId={c.productoId}
-                                saborId={c.saborId}
-                                nombre={c.nombre}
-                                saldo={c.saldo}
-                                alRegistrar={() => void cargar(true)}
-                              />
+                              <div className="ap-acciones-fila">
+                                <MermaProductoBoton
+                                  compacto
+                                  productoId={c.productoId}
+                                  saborId={c.saborId}
+                                  nombre={c.nombre}
+                                  saldo={c.saldo}
+                                  alRegistrar={() => void cargar(true)}
+                                />
+                                <HistorialProductoBoton productoId={c.productoId} saborId={c.saborId} nombre={c.nombre} />
+                              </div>
                             </td>
                           </tr>
                         );
