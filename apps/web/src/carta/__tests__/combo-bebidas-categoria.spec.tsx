@@ -73,7 +73,7 @@ describe('Combo Dúo con bebidas por categoría', () => {
     abrir();
     expect(screen.getByText('Elige tu complemento')).toBeInTheDocument();
     expect(botonAgregar()).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '2 donas artesanales' }));
+    fireEvent.click(screen.getByRole('radio', { name: '2 donas artesanales' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
     expect(botonAgregar()).toBeDisabled(); // faltan las bebidas
@@ -101,7 +101,7 @@ describe('Combo Dúo con bebidas por categoría', () => {
   it('permite la misma bebida en los dos pasos', () => {
     agregarLinea.mockClear();
     abrir();
-    fireEvent.click(screen.getByRole('button', { name: '2 donas artesanales' }));
+    fireEvent.click(screen.getByRole('radio', { name: '2 donas artesanales' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar DONA' }));
     fireEvent.click(paso(1).getByRole('button', { name: /ICED COFFE/ }));

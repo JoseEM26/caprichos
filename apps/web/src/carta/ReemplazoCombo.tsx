@@ -1,3 +1,4 @@
+import { useState, type KeyboardEvent } from 'react';
 import type { AlternativaParteItem, ComboParteItem, OfertaItem, OpcionDetalleCombo } from '../admin/ofertas/ofertasApi';
 import { Reparto, totalElegido } from '../comun/saboresMezcla';
 
@@ -107,52 +108,95 @@ interface PropsPaquetes {
   onElegir: (grupo: string, paquete: string) => void;
 }
 
-/** «Elige tu complemento»: un botón por paquete; los que no se pueden armar por stock quedan bloqueados. */
+/** Nombre corto para el chip: sin aclaraciones entre paréntesis; el nombre completo va en title y en el resumen. */
+export const nombreCortoPaquete = (nombre: string): string => nombre.replace(/\s*\([^)]*\)/g, '').trim() || nombre;
+
+/** «Elige tu complemento»: una fila de chips (radiogroup, flechas); los que no se pueden armar por stock quedan bloqueados. */
 export function SelectorPaqueteCombo({ grupos, elegidos, onElegir }: PropsPaquetes) {
+  const [cambio, setCambio] = useState<string | null>(null);
   if (grupos.length === 0) return null;
   return (
-    <div data-testid="paquetes-combo" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {grupos.map((g) => (
-        <div
-          key={g.grupo}
-          role="group"
-          aria-label={`Elige tu ${g.grupo.toLowerCase()}`}
-          style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: 12, background: 'var(--cp-white)' }}
-        >
-          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8, color: 'var(--cp-navy)' }}>
-            {`Elige tu ${g.grupo.toLowerCase()}`}
+    <div data-testid="paquetes-combo" style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+      {grupos.map((g) => {
+        const etiqueta = `Elige tu ${g.grupo.toLowerCase()}`;
+        const elegido = elegidos[g.grupo];
+        const habilitados = g.paquetes.filter((x) => x.disponible);
+        const foco = habilitados.find((x) => x.nombre === elegido) ?? habilitados[0];
+        const mover = (e: KeyboardEvent<HTMLDivElement>) => {
+          const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+          if (!d || habilitados.length === 0) return;
+          e.preventDefault();
+          const i = habilitados.findIndex((x) => x.nombre === foco?.nombre);
+          const sig = habilitados[(i + d + habilitados.length) % habilitados.length];
+          elegir(g.grupo, sig.nombre);
+          const radios = e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]:not(:disabled)');
+          radios[(i + d + habilitados.length) % habilitados.length]?.focus();
+        };
+        const elegir = (grupo: string, nombre: string) => {
+          if (elegidos[grupo] === nombre) return;
+          setCambio(elegidos[grupo] ? grupo : null);
+          onElegir(grupo, nombre);
+        };
+        return (
+          <div key={g.grupo} style={{ minWidth: 0 }}>
+            <div id={`paq-${g.grupo}`} style={{ fontWeight: 800, fontSize: 14, marginBottom: 6, color: 'var(--cp-navy)' }}>
+              {etiqueta}
+              {g.paquetes.length > 6 && <span style={{ fontWeight: 500, fontSize: 12 }}> · desliza para ver más →</span>}
+            </div>
+            <div
+              role="radiogroup"
+              aria-labelledby={`paq-${g.grupo}`}
+              onKeyDown={mover}
+              style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollSnapType: 'x proximity', paddingBottom: 4, minWidth: 0 }}
+            >
+              {g.paquetes.map((pq) => {
+                const on = elegido === pq.nombre;
+                return (
+                  <button
+                    key={pq.nombre}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    aria-label={pq.disponible ? pq.nombre : `${pq.nombre}, agotado`}
+                    title={pq.nombre}
+                    disabled={!pq.disponible}
+                    tabIndex={foco?.nombre === pq.nombre ? 0 : -1}
+                    onClick={() => elegir(g.grupo, pq.nombre)}
+                    style={{
+                      flex: g.paquetes.length <= 2 ? '1 1 0' : '0 0 auto',
+                      scrollSnapAlign: 'start',
+                      minHeight: 44,
+                      maxWidth: 230,
+                      padding: '0 12px',
+                      borderRadius: 12,
+                      border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`,
+                      background: on ? 'var(--cp-orange)' : 'var(--cp-white)',
+                      color: 'var(--cp-navy)',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      opacity: pq.disponible ? 1 : 0.5,
+                      cursor: pq.disponible ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    {on && <span aria-hidden="true">✓ </span>}
+                    {nombreCortoPaquete(pq.nombre)}
+                    {!pq.disponible && <span style={{ fontSize: 11 }}> · Agotado</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {elegido && (
+              <div role="status" style={{ fontSize: 12, marginTop: 4, color: 'var(--cp-navy)' }}>
+                Elegiste: <strong>{elegido}</strong>
+                {cambio === g.grupo && <span style={{ opacity: 0.7 }}> · Cambiaste tu {g.grupo.toLowerCase()}</span>}
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {g.paquetes.map((pq) => {
-              const on = elegidos[g.grupo] === pq.nombre;
-              return (
-                <button
-                  key={pq.nombre}
-                  type="button"
-                  aria-pressed={on}
-                  disabled={!pq.disponible}
-                  onClick={() => onElegir(g.grupo, pq.nombre)}
-                  style={{
-                    minHeight: 44,
-                    padding: '0 14px',
-                    borderRadius: 12,
-                    border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`,
-                    background: on ? 'var(--cp-orange)' : 'var(--cp-white)',
-                    color: on ? '#FFFFFF' : 'var(--cp-navy)',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    opacity: pq.disponible ? 1 : 0.5,
-                    cursor: pq.disponible ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  {pq.nombre}
-                  {!pq.disponible ? ' · No hay stock' : ''}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

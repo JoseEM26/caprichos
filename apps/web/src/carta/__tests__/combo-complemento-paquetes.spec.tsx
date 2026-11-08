@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { VentanaProductoCarta } from '../VentanaProductoCarta';
 import { OfertaItem } from '../../admin/ofertas/ofertasApi';
 import { ProductoCarta } from '../tipos';
-import { faltaElegirPaquete, filtrarPaquetes, gruposPaquetes } from '../ReemplazoCombo';
+import { faltaElegirPaquete, filtrarPaquetes, gruposPaquetes, nombreCortoPaquete, SelectorPaqueteCombo } from '../ReemplazoCombo';
 
 const agregarLinea = vi.fn();
 const botonAgregar = () => screen.getByRole('button', { name: /Agregar al pedido|Falta elegir|Elige las opciones obligatorias/ });
@@ -60,7 +60,7 @@ describe('Combo con complemento (paquetes)', () => {
     // Aún no se ven las piezas de ningún paquete
     expect(screen.queryByRole('button', { name: 'Agregar Dona' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: '1 dona + 1 galleta' }));
+    fireEvent.click(screen.getByRole('radio', { name: '1 dona + 1 galleta' }));
     expect(botonAgregar()).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Agregar Dona' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar Galleta' }));
@@ -76,7 +76,7 @@ describe('Combo con complemento (paquetes)', () => {
   it('paquete fijo (carrot cake): se puede agregar sin más pasos y viaja con su producto', () => {
     agregarLinea.mockClear();
     render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={duo()} />);
-    fireEvent.click(screen.getByRole('button', { name: '1 carrot cake' }));
+    fireEvent.click(screen.getByRole('radio', { name: '1 carrot cake' }));
     expect(botonAgregar()).toBeEnabled();
     fireEvent.click(botonAgregar());
     expect(agregarLinea.mock.calls[0][0].comboElecciones).toEqual([{ parteId: '303', productoId: '50' }]);
@@ -84,6 +84,38 @@ describe('Combo con complemento (paquetes)', () => {
 
   it('un paquete sin stock queda bloqueado', () => {
     render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={duo(false)} />);
-    expect(screen.getByRole('button', { name: /1 carrot cake · No hay stock/ })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: /1 carrot cake, agotado/ })).toBeDisabled();
+  });
+
+  it('chips: radiogroup con N opciones, excluyentes, solo el elegido pinta sabores, cambio limpia y avisa', () => {
+    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={duo()} />);
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    expect(screen.getAllByRole('radio').every((r) => r.getAttribute('aria-checked') === 'false')).toBe(true);
+    fireEvent.click(screen.getByRole('radio', { name: '1 dona + 1 galleta' }));
+    expect(screen.getByRole('radio', { name: '1 dona + 1 galleta' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: '2 donas' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('button', { name: 'Agregar Galleta' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: '1 carrot cake' }));
+    expect(screen.queryByRole('button', { name: 'Agregar Galleta' })).toBeNull();
+    expect(screen.getByText(/Cambiaste tu complemento/)).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: '' }).textContent).toContain('1 carrot cake');
+  });
+
+  it('teclado: flechas mueven y eligen, saltando los agotados', () => {
+    render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={duo(false)} />);
+    fireEvent.keyDown(screen.getByRole('radio', { name: '2 donas' }), { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: '1 dona + 1 galleta' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.keyDown(screen.getByRole('radio', { name: '1 dona + 1 galleta' }), { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: '2 donas' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('Agotado', { exact: false })).toBeInTheDocument();
+  });
+
+  it('con 7+ combinaciones muestra el indicador de deslizar; el nombre corto quita los paréntesis', () => {
+    const grupos = [{ grupo: 'Complemento', paquetes: Array.from({ length: 7 }, (_, i) => ({ nombre: `P${i}`, disponible: true })) }];
+    render(<SelectorPaqueteCombo grupos={grupos} elegidos={{}} onElegir={() => {}} />);
+    expect(screen.getAllByRole('radio')).toHaveLength(7);
+    expect(screen.getByText(/desliza/)).toBeInTheDocument();
+    expect(nombreCortoPaquete('1 empanada (cualquier sabor)')).toBe('1 empanada');
   });
 });
