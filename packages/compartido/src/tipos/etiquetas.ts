@@ -167,6 +167,13 @@ export interface TicketPagoDatos {
   /** Nota de venta enviada por el mozo: nombre de quien cobró en mesa. */
   cobradoPorMozo?: string | null;
   /**
+   * Consumo del personal: ticket interno (nunca boleta/factura electrónica). `pagado` = el trabajador ya lo pagó en Caja;
+   * si no, queda cargado a su crédito y se paga en su cuenta semanal.
+   */
+  personal?: { trabajador?: string | null; pagado?: boolean } | null;
+  /** Cupón real y vigente del cliente para su próxima compra (solo si el dueño activó «Imprimir cupón en el ticket»). */
+  cuponSiguiente?: { codigo: string; descripcion?: string | null; vence?: string | null } | null;
+  /**
    * Tipo de comprobante que se imprime y los datos del cliente de ESE comprobante (nunca de su cuenta).
    * SIMPLE = ticket interno sin SUNAT; BOLETA y FACTURA muestran cliente, documento y desglose del IGV.
    * Sin este campo el ticket sale como antes.
@@ -272,8 +279,23 @@ export interface TicketComandaSalonDatos {
   canal: string;
   hora: string;
   fecha: string;
-  lineas: { cantidad: number; nombre: string; tamano?: string | null; opciones: string[]; nota?: string | null }[];
+  lineas: LineaComandaDatos[];
   nota?: string | null;
+}
+
+/**
+ * Línea de la comanda. `opciones` y `nota` son lo de siempre (un .exe viejo solo imprime esto). `detalles` sale de
+ * `detalleLinea` (sabores, opciones con su grupo, «Para», nota, cortesía) y, si viene, manda sobre `opciones`/`nota`;
+ * `partes` son las piezas de un combo con su propio tamaño, sabor y opciones.
+ */
+export interface LineaComandaDatos {
+  cantidad: number;
+  nombre: string;
+  tamano?: string | null;
+  opciones: string[];
+  nota?: string | null;
+  detalles?: string[];
+  partes?: LineaComandaDatos[];
 }
 
 export type PayloadEtiqueta =

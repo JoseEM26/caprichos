@@ -98,6 +98,10 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
     else if (t.comprobante?.numero) p(t.comprobante.numero, { centrado: true, negrita: true });
     p(linea);
   }
+  if (t.personal) {
+    p('CONSUMO DE PERSONAL', { centrado: true, negrita: true });
+    p(linea);
+  }
   p(`Pedido ${t.codigo}`);
   p(`${t.fecha} ${t.hora}`);
   if (d && d.tipo !== 'SIMPLE') {
@@ -139,7 +143,12 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
     if (a.tipo === 'SALDO') p(`Ajuste por cambio de dirección: +${soles(a.monto)}`);
     else p(`Devolución pendiente ${soles(a.monto)}`);
   }
-  if (t.pagos.length) {
+  if (t.personal) {
+    p('Pago:');
+    p(fila('  Crédito del personal', soles(t.total), c));
+    if (t.personal.trabajador) for (const r of envolver(`Trabajador: ${t.personal.trabajador}`, c)) p(r);
+    for (const r of envolver(t.personal.pagado ? 'Pagado ahora' : 'Cargado a su crédito: se paga en su cuenta semanal', c)) p(r, { negrita: true });
+  } else if (t.pagos.length) {
     p('Pago:');
     for (const x of t.pagos) {
       p(fila(`  ${x.medio}`, soles(x.monto), c));
@@ -166,6 +175,14 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
     if (t.comprobante.simulado) p(centrar('SIMULADO - SIN VALOR TRIBUTARIO', c), { centrado: true });
   }
   if (t.cobradoPorMozo) p(`Cobrado por mozo ${t.cobradoPorMozo}`);
+  // Cupón: solo si viene uno REAL y vigente (el servidor no lo manda mientras el interruptor esté apagado)
+  if (t.cuponSiguiente?.codigo) {
+    p(linea);
+    p(centrar('Tu cupón para tu próxima compra', c), { centrado: true, negrita: true });
+    p(centrar(t.cuponSiguiente.codigo, c), { centrado: true, negrita: true });
+    if (t.cuponSiguiente.descripcion) for (const r of envolver(t.cuponSiguiente.descripcion, c)) p(r, { centrado: true });
+    if (t.cuponSiguiente.vence) p(centrar(`Vence ${t.cuponSiguiente.vence}`, c), { centrado: true });
+  }
   p(linea);
   p(centrar('Gracias por tu visita', c));
   return o;
