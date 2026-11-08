@@ -9,8 +9,6 @@ export interface ModalCorregirClienteProps {
   alGuardar: () => void;
 }
 
-const CELULAR_VALIDO = /^9\d{8}$/;
-
 /** Mensaje en vivo del celular, o '' si está bien (o aún vacío sin tocar). */
 export function errorCelular(valor: string): string {
   if (!valor) return 'Escribe el celular del cliente.';

@@ -281,7 +281,7 @@ export class EjecutorConversacionService {
       return debeOmitirBienvenida({
         pedidosHoy,
         estadoConversacion: conversacion.estado,
-        ultimaIntervencionHumana: ultimaIntervencionHumana(personaEn, conversacion.tomado_en),
+        ultimaIntervencionHumana: ultimaIntervencionHumana(personaEn, conversacion.tomado_en, (conversacion as any).atendido_en),
         ultimoMensajeSaleEn: ult?.en ? new Date(ult.en) : null,
         reanudadoEn: (conversacion.flujo as any)?.reanudado_en,
       });
@@ -774,7 +774,7 @@ export class EjecutorConversacionService {
         orderBy: { en: 'desc' },
         select: { en: true },
       });
-      const intervencion = ultimaIntervencionHumana(ultimoMensajePersonaDia?.en, conversacion.tomado_en);
+      const intervencion = ultimaIntervencionHumana(ultimoMensajePersonaDia?.en, conversacion.tomado_en, (conversacion as any).atendido_en);
       if (botPausadoPorPersona(intervencion)) {
         this.logger.log(`Conversación ${conversacionId}: una persona intervino hoy; el bot se reanuda a las 00:01.`);
         await this.registrarSilencio(conversacion.id, 'Una persona atendió este chat hoy; el bot se reanuda a las 00:01.');

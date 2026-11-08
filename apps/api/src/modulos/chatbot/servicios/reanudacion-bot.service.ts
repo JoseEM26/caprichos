@@ -72,7 +72,7 @@ export class ReanudacionBotService implements OnModuleInit, OnModuleDestroy {
         orderBy: { en: 'desc' },
         select: { en: true },
       });
-      const intervencion = ultimaIntervencionHumana(ultimo?.en, c.tomado_en);
+      const intervencion = ultimaIntervencionHumana(ultimo?.en, c.tomado_en, (c as any).atendido_en);
       // Sin intervención humana (derivado por el bot y sin atender) o de hoy: se queda como está.
       if (!intervencion || ahora.getTime() < botPausadoHasta(intervencion).getTime()) continue;
       if (await this.liberarUna(c, ahora)) liberados++;
