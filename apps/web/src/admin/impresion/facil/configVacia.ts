@@ -10,6 +10,7 @@ export const CONFIG_VACIA: ConfigEquipoImpresion = {
   stickerGeneral: false,
   stickerAreas: [],
   stickerBebidaAreas: [],
+  stickerBebidaCategorias: null,
   tamanoGeneral: null,
   tamanoBebida: null,
   pausado: false,

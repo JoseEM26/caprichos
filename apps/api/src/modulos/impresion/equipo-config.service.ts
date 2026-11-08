@@ -17,6 +17,7 @@ import {
   areasParaRuteo,
   destinoDeTrabajo,
   equipoAcepta,
+  vasoDescartadoPorCategoria,
 } from './ruteo-impresion';
 import { aplicarCambio, configAFila, configDesdeComportamientoActual, configDesdeGeneral, filaAConfig } from './equipo-config';
 import { leerReglasImpresion } from './reglas-impresion';
@@ -129,6 +130,11 @@ export class EquipoConfigService {
       config,
       impresoras: leerSeleccion(sel?.valor),
       areas: areas.map((a) => ({ id: a.id.toString(), nombre: a.nombre })),
+      categorias: (await this.prisma.categoria.findMany({ where: { oculta: false }, select: { id: true, nombre: true, area_id: true }, orderBy: [{ orden: 'asc' }, { nombre: 'asc' }] })).map((c) => ({
+        id: c.id.toString(),
+        nombre: c.nombre,
+        areaId: c.area_id.toString(),
+      })),
       general: configDesdeGeneral(reglas, areas, bebidas),
     };
   }
@@ -137,7 +143,8 @@ export class EquipoConfigService {
   async guardar(idInput: string | number, cambio: Record<string, unknown>, usuario?: UsuarioAutenticado, ip?: string) {
     const e = await this.equipo(idInput);
     const [actual, areas] = await Promise.all([this.configDe(e.id), this.areasActivas()]);
-    const nueva = aplicarCambio(actual, cambio, new Set(areas.map((a) => a.id.toString())));
+    const cats = cambio.stickerBebidaCategorias !== undefined ? await this.prisma.categoria.findMany({ select: { id: true } }) : null;
+    const nueva = aplicarCambio(actual, cambio, new Set(areas.map((a) => a.id.toString())), cats ? new Set(cats.map((c) => c.id.toString())) : undefined);
     await this.persistir(e, actual, nueva, cambio, usuario, ip, 'CAMBIAR_CONFIG_EQUIPO_IMPRESION');
     return { ok: true, config: nueva };
   }
@@ -219,8 +226,15 @@ export class EquipoConfigService {
     for (const j of pend) {
       const areas = areasParaRuteo(j.tipo, j.area_id, ctx.areaBebidasId, (j.payload as any)?.areaId);
       const actual = j.destino_equipo_id !== null ? ctx.equipos.find((e) => e.id === j.destino_equipo_id) : undefined;
-      if (actual && equipoAcepta(actual.config, j.tipo, areas)) continue;
-      const nuevo = destinoDeTrabajo(j.tipo, areas, ctx);
+      const cat = (j.payload as any)?.categoriaId ?? null;
+      if (actual && equipoAcepta(actual.config, j.tipo, areas, cat)) continue;
+      // Un vaso cuya categoría se desmarcó en todas las PC que lo tomaban: no se imprime (ni queda pendiente)
+      if (j.tipo === 'ETIQUETA_BEBIDA' && vasoDescartadoPorCategoria(areas, cat, ctx)) {
+        await this.prisma.printJob.update({ where: { id: j.id }, data: { estado: 'DESCARTADO', error: 'Descartada: la categoría ya no lleva sticker de vaso' } });
+        n += 1;
+        continue;
+      }
+      const nuevo = destinoDeTrabajo(j.tipo, areas, ctx, cat);
       if ((nuevo?.id ?? null) === j.destino_equipo_id) continue;
       await this.prisma.printJob.update({
         where: { id: j.id },

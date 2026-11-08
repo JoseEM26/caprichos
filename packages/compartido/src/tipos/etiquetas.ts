@@ -97,6 +97,8 @@ export interface ConfigEquipoImpresion {
   stickerAreas: string[];
   /** Ids de las áreas cuyos vasos (sticker de bebida) salen aquí. */
   stickerBebidaAreas: string[];
+  /** Ids de las categorías de bebida cuyo vaso sale aquí; null = todas (como siempre). */
+  stickerBebidaCategorias: string[] | null;
   /** Tamaño propio del sticker general en esta PC; null = el general del local. */
   tamanoGeneral: TamanoEtiquetaPc | null;
   /** Tamaño propio del sticker de bebida en esta PC; null = el general del local. */
@@ -281,6 +283,8 @@ export interface EtiquetaBebidaDatos {
   hora: string;
   /** Área de la línea (id): decide en qué PC sale el vaso. */
   areaId?: string;
+  /** Categoría del producto (id): solo el servidor la usa para filtrar por PC; el programa de impresión la ignora. */
+  categoriaId?: string;
   /** Tamaño del sticker en mm; la API lo pone al entregar el trabajo al programa de impresión. Ausente: el de fábrica. */
   tamanoMm?: { anchoMm: number; altoMm: number; margenMm?: number };
 }

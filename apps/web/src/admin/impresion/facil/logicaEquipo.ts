@@ -17,7 +17,7 @@ export function haceCuanto(iso: string | null | undefined, ahora = Date.now()): 
 export const estaConectada = (e: Pick<EquipoEstadoImpresion, 'conectado'>) => e.conectado;
 
 /** Configuración de la PC tal como la ve el panel (una PC de un servidor viejo se trata como nueva). */
-export const configDe = (e: EquipoEstadoImpresion | undefined): ConfigEquipoImpresion => e?.config ?? CONFIG_VACIA;
+export const configDe = (e: EquipoEstadoImpresion | undefined): ConfigEquipoImpresion => (e?.config ? { ...CONFIG_VACIA, ...e.config } : CONFIG_VACIA);
 
 export const esNueva = (e: EquipoEstadoImpresion | undefined) => !!e && !configDe(e).configurado;
 
