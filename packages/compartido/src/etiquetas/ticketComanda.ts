@@ -1,4 +1,4 @@
-import type { TicketComandaSalonDatos } from '../tipos/etiquetas.js';
+import type { LineaComandaDatos, TicketComandaSalonDatos } from '../tipos/etiquetas.js';
 
 /** Renglón de la comanda de salón ya maquetado al ancho del papel (58 mm = 32 columnas, 80 mm = 48). */
 export interface LineaComanda {
@@ -51,12 +51,22 @@ export function lineasTicketComandaSalon(t: TicketComandaSalonDatos, columnas: n
   if (t.nota) bloque(`NOTA: ${t.nota}`, c, { negrita: true });
   p('-'.repeat(c));
 
-  for (const l of t.lineas) {
-    bloque(`${l.cantidad} x ${l.nombre}`, c, { negrita: true });
-    if (l.tamano) bloque(`Tamaño: ${l.tamano}`, c, {}, '  ');
-    for (const op of l.opciones) bloque(`- ${op}`, c, {}, '  ');
-    if (l.nota) bloque(`NOTA: ${l.nota}`, c, { negrita: true }, '  ');
-  }
+  // Una línea y, debajo, sus piezas (combo) con su propio tamaño, sabor y opciones. Todo parte por palabras con sangría.
+  const linea = (l: LineaComandaDatos, nivel: number) => {
+    const base = nivel === 0 ? '' : '  ';
+    bloque(`${l.cantidad} x ${l.nombre}`, c, { negrita: nivel === 0 }, nivel === 0 ? '' : '  - ');
+    const sang = nivel === 0 ? '  ' : '      ';
+    if (l.tamano) bloque(`Tamaño: ${l.tamano}`, c, {}, sang);
+    if (l.detalles) {
+      for (const d of l.detalles) bloque(d, c, {}, sang);
+    } else {
+      for (const op of l.opciones) bloque(`- ${op}`, c, {}, sang);
+      if (l.nota) bloque(`NOTA: ${l.nota}`, c, { negrita: true }, sang);
+    }
+    for (const parte of l.partes ?? []) linea(parte, nivel + 1);
+    return base;
+  };
+  for (const l of t.lineas) linea(l, 0);
   p('-'.repeat(c));
   return o;
 }

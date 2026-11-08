@@ -9,6 +9,8 @@ import {
   entradaDeLineaPedido,
   descuentosDePedido,
   TicketComandaSalonDatos,
+  LineaComandaDatos,
+  detalleLinea,
   esAreaBebidas,
   plusCodeParaMostrar,
 } from '@caprichos/compartido';
@@ -315,8 +317,24 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
  * Comanda de salón: TODAS las líneas del pedido (tamaño, opciones y notas), con mesa o cliente, hora y código.
  * La imprime la ticketera de Caja al aceptarse el pedido; no se usa para llevar ni delivery (lo filtra la regla).
  */
-export function construirTicketComandaSalon(pedido: any): TicketComandaSalonDatos {
-  const lineas: any[] = lineasDeCuenta(pedido.lineas || []);
+/** Línea de comanda con su detalle (`detalleLinea`: una sola fuente de verdad con el ticket de pago) y sus piezas de combo. */
+function lineaDeComanda(l: any, todas: any[]): LineaComandaDatos {
+  const entrada = entradaDeLineaPedido(l, todas);
+  const hijas = l.id == null ? [] : todas.filter((h) => h.linea_combo_id != null && String(h.linea_combo_id) === String(l.id));
+  return {
+    cantidad: Number(l.cantidad) || 1,
+    nombre: l.nombre,
+    tamano: l.tamano || null,
+    opciones: opcionesConSabores(l, (l.opcionesElegidas || l.opciones || []).map((o: any) => o.opcion_nombre || o.nombre || '').filter(Boolean)),
+    nota: l.nota || null,
+    detalles: detalleLinea({ ...entrada, partes: [] }).detalles,
+    ...(hijas.length > 0 ? { partes: hijas.map((h) => lineaDeComanda(h, todas)) } : {}),
+  };
+}
+
+export function construirTicketComandaSalon(pedido: any, lineasAMostrar?: any[]): TicketComandaSalonDatos {
+  const todas: any[] = pedido.lineas || [];
+  const lineas: any[] = lineasAMostrar ?? lineasDeCuenta(todas);
   const mesa = pedido.mesa_nombre ? String(pedido.mesa_nombre).trim() : null;
   return {
     tipo: 'TICKET_COMANDA_SALON',
@@ -326,26 +344,23 @@ export function construirTicketComandaSalon(pedido: any): TicketComandaSalonDato
     canal: canalLabel(pedido.canal),
     hora: formatearHora(pedido.creado_en),
     fecha: formatearFecha(pedido.creado_en),
-    lineas: lineas.map((l) => ({
-      cantidad: Number(l.cantidad) || 1,
-      nombre: l.nombre,
-      tamano: l.tamano || null,
-      opciones: opcionesConSabores(l, (l.opcionesElegidas || l.opciones || []).map((o: any) => o.opcion_nombre || o.nombre || '').filter(Boolean)),
-      nota: l.nota || null,
-    })),
+    lineas: lineas.map((l) => lineaDeComanda(l, todas)),
     nota: pedido.nota || null,
   };
 }
 
 /**
  * Comanda de un área: la misma hoja de salón con solo las líneas de esa área (areaId null = líneas sin área).
- * Reutiliza construirTicketComandaSalon; cambia el tipo y lleva el nombre del área en la cabecera.
+ * Las piezas de un combo cuyo área es esta salen como líneas propias (con su tamaño, sabor y opciones); el combo
+ * contenedor no, para no duplicar.
  */
 export function construirTicketComandaArea(pedido: any, areaId: bigint | null): TicketComandaSalonDatos {
-  const lineas: any[] = (pedido.lineas || []).filter((l: any) => String(l.area_id ?? null) === String(areaId));
+  const todas: any[] = pedido.lineas || [];
+  const contenedores = new Set(todas.filter((l) => l.linea_combo_id != null).map((l) => String(l.linea_combo_id)));
+  const lineas = todas.filter((l) => String(l.area_id ?? null) === String(areaId) && !(l.id != null && contenedores.has(String(l.id))));
   const nombre: string | null = lineas.find((l) => l.area?.nombre)?.area.nombre ?? null;
   return {
-    ...construirTicketComandaSalon({ ...pedido, lineas }),
+    ...construirTicketComandaSalon(pedido, lineas),
     tipo: 'TICKET_COMANDA_AREA',
     area: nombre ? String(nombre).toUpperCase() : null,
   };
@@ -371,6 +386,8 @@ export function construirTodasLasEtiquetas(pedido: any) {
 
 /** Clave estable de una etiqueta dentro del pedido (general, un área o un vaso). */
 export const CLAVE_GENERAL = 'GENERAL';
+/** Clave del ticket de pago dentro del estado de impresión del pedido. */
+export const CLAVE_TICKET = 'TICKET_PAGO';
 export const claveEtiquetaArea = (areaNombre: string) => `AREA:${areaNombre}`;
 export const claveEtiquetaBebida = (bebidaIndex: number) => `BEBIDA:${bebidaIndex}`;
 
@@ -378,6 +395,7 @@ export const claveEtiquetaBebida = (bebidaIndex: number) => `BEBIDA:${bebidaInde
 export function claveDeTrabajo(job: { tipo: string; payload: any }): string | null {
   const p = job.payload || {};
   if (job.tipo === 'ETIQUETA_GENERAL') return CLAVE_GENERAL;
+  if (job.tipo === 'TICKET_PAGO') return CLAVE_TICKET;
   if (job.tipo === 'ETIQUETA_AREA') return claveEtiquetaArea(String(p.areaNombre ?? ''));
   if (job.tipo === 'ETIQUETA_BEBIDA') return claveEtiquetaBebida(Number(p.bebidaIndex));
   return null;
@@ -404,12 +422,18 @@ export function construirTicketPago(
   comprobante?: any,
   ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null,
   igvPct?: number | null,
+  /** Cupón REAL y vigente del pedido; solo se pasa si el interruptor «Imprimir cupón en el ticket» está encendido. */
+  cupon?: { codigo: string; descripcion?: string | null; vence?: string | null } | null,
 ): TicketPagoDatos & { propina?: number; ajusteUbicacion?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } } {
   const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   const cobro = (pedido.cobros || []).find((c: any) => !c.anulado_en);
   const ahora = cobro?.en ?? new Date();
+  // Consumo del personal: ticket interno SIMPLE (nunca boleta/factura electrónica) con su leyenda
+  const esPersonal = Boolean(pedido.es_personal);
+  const persona = pedido.consumoPersonal?.party?.persona;
+  const nombreTrabajador = persona ? `${persona.nombres || ''} ${persona.apellidos || ''}`.trim() || null : null;
   // Diseño por tipo de comprobante: el del pedido (SIMPLE si no hay); BOLETA/FACTURA llevan los datos del cliente de ESE comprobante
-  const tipoDoc = pedido.comprobante_tipo === 'BOLETA' || pedido.comprobante_tipo === 'FACTURA' ? pedido.comprobante_tipo : 'SIMPLE';
+  const tipoDoc = !esPersonal && (pedido.comprobante_tipo === 'BOLETA' || pedido.comprobante_tipo === 'FACTURA') ? pedido.comprobante_tipo : 'SIMPLE';
   const esFactura = tipoDoc === 'FACTURA';
   const doc = texto(pedido.comprobante_doc) || texto(comprobante?.documento);
   const documento: NonNullable<TicketPagoDatos['documento']> =
@@ -458,7 +482,11 @@ export function construirTicketPago(
       vuelto: p.vuelto == null ? null : num(p.vuelto),
     })),
     plan: (pedido.planPago || []).map((p: any) => ({ medio: p.medio, monto: num(p.monto) })),
-    comprobante: comprobante
+    ...(esPersonal
+      ? { personal: { trabajador: nombreTrabajador || texto(pedido.cliente_nombre), pagado: Boolean(pedido.consumoPersonal?.pagado_en) } }
+      : {}),
+    ...(cupon?.codigo ? { cuponSiguiente: cupon } : {}),
+    comprobante: comprobante && !esPersonal
       ? {
           tipo: comprobante.tipo,
           numero: comprobante.numero_texto,

@@ -11,8 +11,9 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { cobroVigente } from '../caja/caja.calculo';
 import { FiltrarCreditosDto } from './dto/filtrar-creditos.dto';
 import { StockService } from '../stock/stock.service';
+import { ImpresionService } from '../impresion/impresion.service';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
-import { planDescuentoPersonalDePedido, validarColaborador } from './descuento-personal';
+import { fechaLima, planDescuentoPersonalDePedido, validarColaborador } from './descuento-personal';
 
 const NOMBRES_MESES = [
   'Enero',
@@ -35,6 +36,10 @@ function descuentoPersonalDe(pedido: any): number {
   return Number(d?.montoDescontado ?? pedido?.descuento ?? 0);
 }
 
+/** Medianoche UTC del día de calendario (así se guarda y se compara una columna DATE). */
+const diaUtc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m, d));
+const ddmm = (dt: Date) => `${String(dt.getUTCDate()).padStart(2, '0')}/${String(dt.getUTCMonth() + 1).padStart(2, '0')}`;
+
 export interface RangoFechas {
   inicio: Date;
   fin: Date;
@@ -48,6 +53,7 @@ export class CreditosService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly stockService?: StockService,
+    @Optional() private readonly impresion?: ImpresionService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -79,70 +85,41 @@ export class CreditosService {
   }
 
   /**
-   * Calcula el rango de fechas de una semana (Lunes 00:00:00 a Domingo 23:59:59).
+   * Semana de lunes a domingo (calendario de Lima). Las fechas son medianoche UTC del día: así se comparan
+   * contra la columna DATE sin que la zona del servidor cambie la semana.
    */
-  calcularRangoSemana(offsetSemanas: number = 0): RangoFechas {
-    const hoy = new Date();
-    const diaSemana = hoy.getDay(); // 0 = Domingo, 1 = Lunes...
-    const difLunes = diaSemana === 0 ? -6 : 1 - diaSemana;
-
-    const lunes = new Date(hoy);
-    lunes.setDate(hoy.getDate() + difLunes + offsetSemanas * 7);
-    lunes.setHours(0, 0, 0, 0);
-
-    const domingo = new Date(lunes);
-    domingo.setDate(lunes.getDate() + 6);
-    domingo.setHours(23, 59, 59, 999);
-
-    const fLunes = `${String(lunes.getDate()).padStart(2, '0')}/${String(lunes.getMonth() + 1).padStart(2, '0')}`;
-    const fDomingo = `${String(domingo.getDate()).padStart(2, '0')}/${String(domingo.getMonth() + 1).padStart(2, '0')}`;
-    const etiqueta = `Lun ${fLunes} – Dom ${fDomingo}`;
-
-    return { inicio: lunes, fin: domingo, etiqueta, navegable: true };
+  calcularRangoSemana(offsetSemanas: number = 0, ahora: Date = new Date()): RangoFechas {
+    const h = fechaLima(ahora);
+    const hoy = diaUtc(h.y, h.m, h.d);
+    const dia = hoy.getUTCDay(); // 0 = Domingo
+    const lunes = diaUtc(h.y, h.m, h.d + (dia === 0 ? -6 : 1 - dia) + offsetSemanas * 7);
+    const domingo = diaUtc(lunes.getUTCFullYear(), lunes.getUTCMonth(), lunes.getUTCDate() + 6);
+    return { inicio: lunes, fin: domingo, etiqueta: `Lun ${ddmm(lunes)} – Dom ${ddmm(domingo)}`, navegable: true };
   }
 
-  /**
-   * Calcula el rango de fechas de un mes.
-   */
-  calcularRangoMes(offsetMeses: number = 0): RangoFechas {
-    const hoy = new Date();
-    const anio = hoy.getFullYear();
-    const mes = hoy.getMonth() + offsetMeses;
-
-    const inicio = new Date(anio, mes, 1, 0, 0, 0, 0);
-    const fin = new Date(anio, mes + 1, 0, 23, 59, 59, 999);
-
-    const etiqueta = `${NOMBRES_MESES[inicio.getMonth()]} ${inicio.getFullYear()}`;
-    return { inicio, fin, etiqueta, navegable: true };
+  /** Mes calendario (Lima). */
+  calcularRangoMes(offsetMeses: number = 0, ahora: Date = new Date()): RangoFechas {
+    const h = fechaLima(ahora);
+    const inicio = diaUtc(h.y, h.m + offsetMeses, 1);
+    const fin = diaUtc(h.y, h.m + offsetMeses + 1, 0);
+    return { inicio, fin, etiqueta: `${NOMBRES_MESES[inicio.getUTCMonth()]} ${inicio.getUTCFullYear()}`, navegable: true };
   }
 
-  /**
-   * Calcula el rango de fechas personalizado.
-   */
+  /** Rango elegido por el usuario (fechas AAAA-MM-DD, inclusivas). */
   calcularRangoPersonalizado(desdeStr?: string, hastaStr?: string): RangoFechas {
-    const hoy = new Date();
-    let inicio: Date;
-    let fin: Date;
-
+    const h = fechaLima();
+    let inicio = diaUtc(h.y, h.m, 1);
+    let fin = diaUtc(h.y, h.m + 1, 0);
     if (desdeStr) {
       const [y, m, d] = desdeStr.split('-').map(Number);
-      inicio = new Date(y, m - 1, d, 0, 0, 0, 0);
-    } else {
-      inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0);
+      inicio = diaUtc(y, m - 1, d);
     }
-
     if (hastaStr) {
       const [y, m, d] = hastaStr.split('-').map(Number);
-      fin = new Date(y, m - 1, d, 23, 59, 59, 999);
-    } else {
-      fin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999);
+      fin = diaUtc(y, m - 1, d);
     }
-
-    const fDesde = `${String(inicio.getDate()).padStart(2, '0')}/${String(inicio.getMonth() + 1).padStart(2, '0')}/${inicio.getFullYear()}`;
-    const fHasta = `${String(fin.getDate()).padStart(2, '0')}/${String(fin.getMonth() + 1).padStart(2, '0')}/${fin.getFullYear()}`;
-    const etiqueta = `Del ${fDesde} al ${fHasta}`;
-
-    return { inicio, fin, etiqueta, navegable: false };
+    const largo = (dt: Date) => `${ddmm(dt)}/${dt.getUTCFullYear()}`;
+    return { inicio, fin, etiqueta: `Del ${largo(inicio)} al ${largo(fin)}`, navegable: false };
   }
 
   /**
@@ -288,6 +265,8 @@ export class CreditosService {
       await planDescuentoPersonalDePedido(this.prisma, pedido, parId);
 
     const ahora = new Date();
+    const hoyLima = fechaLima(ahora);
+    const fechaConsumo = diaUtc(hoyLima.y, hoyLima.m, hoyLima.d);
 
     // 4. Registrar en transacción
     const [consumo, pedidoActualizado] = await this.prisma.$transaction(async (tx) => {
@@ -295,7 +274,7 @@ export class CreditosService {
         data: {
           party_id: parId,
           pedido_id: pId,
-          fecha: ahora,
+          fecha: fechaConsumo,
           monto: montoNeto,
         },
       });
@@ -329,6 +308,15 @@ export class CreditosService {
         await this.stockService?.descontarPorPedido(pId);
       } catch {
         // se puede regularizar con el descuento por receta
+      }
+    }
+
+    // El pedido pasa a ser del personal sin Cobro: sale su ticket (idempotente; si ya salió al crearlo no se repite)
+    if (ajustarPedido) {
+      try {
+        await this.impresion?.encolarTicketPedido(pId);
+      } catch {
+        // se puede reimprimir desde el pedido
       }
     }
 
@@ -435,8 +423,7 @@ export class CreditosService {
       totalPeriodo += totalTrabajador;
 
       const itemsMapeados = consumos.map((item) => {
-        const d = new Date(item.fecha);
-        const fechaStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const fechaStr = ddmm(new Date(item.fecha));
         const codigo = item.pedido?.codigo || `P-${item.pedido_id}`;
 
         const lineasTexto: string[] = [];
@@ -459,6 +446,9 @@ export class CreditosService {
           montoFormateado: `s/ ${Number(item.monto).toFixed(2)}`,
           lineas: lineasTexto,
           descuento: descuentoPersonalDe(item.pedido),
+          estadoPago: item.pagado_en ? 'PAGADO' : 'PENDIENTE',
+          pagadoEn: item.pagado_en ? item.pagado_en.toISOString() : null,
+          pagoModo: item.pago_modo ?? null,
         };
       });
 
@@ -470,6 +460,8 @@ export class CreditosService {
         totalFormateado: `s/ ${totalTrabajador.toFixed(2)}`,
         tieneConsumo: totalTrabajador > 0,
         cantidadConsumos: consumos.length,
+        // Lo que sigue sin pagarse (se paga en su cuenta semanal/mensual)
+        pendiente: Number(consumos.filter((c) => !c.pagado_en).reduce((a, c) => a + Number(c.monto), 0).toFixed(2)),
         items: itemsMapeados,
       };
     });
@@ -500,6 +492,195 @@ export class CreditosService {
       },
       trabajadores: filasTrabajadores,
     };
+  }
+
+  private formatoConsumo(c: any) {
+    const lineas = lineasDeCuenta<any>(c.pedido?.lineas ?? []).map((l) => `${l.cantidad} × ${l.nombre}${l.tamano ? ` (${l.tamano})` : ''}`);
+    return {
+      id: c.id.toString(),
+      pedidoId: c.pedido_id.toString(),
+      pedidoCodigo: c.pedido?.codigo ?? `P-${c.pedido_id}`,
+      fecha: ddmm(new Date(c.fecha)),
+      fechaIso: new Date(c.fecha).toISOString(),
+      monto: Number(c.monto),
+      lineas,
+      descuento: descuentoPersonalDe(c.pedido),
+      estadoPago: c.pagado_en ? 'PAGADO' : 'PENDIENTE',
+      pagadoEn: c.pagado_en ? c.pagado_en.toISOString() : null,
+      pagoModo: c.pago_modo ?? null,
+    };
+  }
+
+  /**
+   * Cuenta del trabajador: lo que debe esta semana (lunes a domingo) y este mes (calendario, Lima), y la lista de sus
+   * consumos del mes, de la semana y todo lo que sigue pendiente (incluido lo anterior a este mes).
+   */
+  async obtenerCuenta(partyIdInput: string | number | bigint, ahora: Date = new Date()) {
+    const partyId = this.parsearId(partyIdInput);
+    const semana = this.calcularRangoSemana(0, ahora);
+    const mes = this.calcularRangoMes(0, ahora);
+    const desde = semana.inicio < mes.inicio ? semana.inicio : mes.inicio;
+    const consumos = await this.prisma.consumoPersonal.findMany({
+      where: {
+        party_id: partyId,
+        pedido: { estado: { notIn: ['ANULADO', 'RECHAZADO'] } },
+        OR: [{ fecha: { gte: desde } }, { pagado_en: null }],
+      },
+      include: { pedido: { include: { lineas: true } } },
+      orderBy: { fecha: 'desc' },
+    });
+    const suma = (lista: any[]) => Number(lista.reduce((a, c) => a + Number(c.monto), 0).toFixed(2));
+    const en = (r: RangoFechas) => consumos.filter((c) => c.fecha >= r.inicio && c.fecha <= r.fin);
+    const pend = (lista: any[]) => lista.filter((c) => !c.pagado_en);
+    const enSemana = en(semana);
+    const enMes = en(mes);
+    return {
+      partyId: partyId.toString(),
+      semana: { etiqueta: semana.etiqueta, total: suma(enSemana), debe: suma(pend(enSemana)) },
+      mes: { etiqueta: mes.etiqueta, total: suma(enMes), debe: suma(pend(enMes)) },
+      debeTotal: suma(pend(consumos)),
+      resumen: `Debe esta semana: S/ ${suma(pend(enSemana)).toFixed(2)} · Este mes: S/ ${suma(pend(enMes)).toFixed(2)}`,
+      consumos: consumos.map((c) => this.formatoConsumo(c)),
+    };
+  }
+
+  /**
+   * El trabajador paga en Caja consumos pendientes (uno o varios, de una misma persona). Efectivo: ingreso en la caja
+   * abierta con el motivo «Pago de crédito del personal»; digital (Yape, Plin, tarjeta…): se anota el medio y no mueve el efectivo.
+   * Todo o nada: si alguno ya estaba pagado responde 409 y no se toca nada (sin doble cobro).
+   */
+  async saldar(
+    dto: { consumoIds?: Array<string | number>; pedidoIds?: Array<string | number>; medio: string; motivo?: string },
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    let idsEntrada: Array<string | number | bigint> = dto.consumoIds ?? [];
+    if (dto.pedidoIds?.length) {
+      const porPedido = await this.prisma.consumoPersonal.findMany({
+        where: { pedido_id: { in: dto.pedidoIds.map((i) => this.parsearId(i)) } },
+        select: { id: true },
+      });
+      idsEntrada = [...idsEntrada, ...porPedido.map((c) => c.id)];
+    }
+    const ids = Array.from(new Set(idsEntrada.map((i) => this.parsearId(i).toString()))).map((i) => BigInt(i));
+    if (ids.length === 0) {
+      throw new BadRequestException({ codigo: 'SIN_CONSUMOS', mensaje: 'Elige al menos un consumo para pagar' });
+    }
+    const medio = String(dto.medio ?? '').trim().toUpperCase();
+    if (!medio) throw new BadRequestException({ codigo: 'MEDIO_REQUERIDO', mensaje: 'Elige con qué paga el trabajador' });
+    const consumos = await this.prisma.consumoPersonal.findMany({ where: { id: { in: ids } }, include: { pedido: true } });
+    if (consumos.length !== ids.length) {
+      throw new NotFoundException({ codigo: 'CONSUMO_NO_ENCONTRADO', mensaje: 'Alguno de los consumos no existe' });
+    }
+    if (consumos.some((c) => c.pagado_en)) {
+      throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Alguno de esos consumos ya estaba pagado' });
+    }
+    if (new Set(consumos.map((c) => c.party_id.toString())).size > 1) {
+      throw new BadRequestException({ codigo: 'VARIOS_TRABAJADORES', mensaje: 'Cada pago es de un solo trabajador' });
+    }
+    const total = Number(consumos.reduce((a, c) => a + Number(c.monto), 0).toFixed(2));
+    const partyId = consumos[0].party_id;
+    const persona = await this.prisma.person.findUnique({ where: { party_id: partyId } }).catch(() => null);
+    const nombre = persona ? `${persona.nombres || ''} ${persona.apellidos || ''}`.trim() : `trabajador ${partyId}`;
+    const codigos = consumos.map((c) => c.pedido?.codigo ?? `P-${c.pedido_id}`);
+    const ahora = new Date();
+    const cobrador = BigInt(usuario.partyId);
+
+    const movimientoId = await this.prisma.$transaction(async (tx) => {
+      let movId: bigint | null = null;
+      if (medio === 'EFECTIVO' && total > 0) {
+        const caja = await tx.caja.findFirst({ where: { estado: 'ABIERTA' } });
+        if (!caja) {
+          throw new ConflictException({ codigo: 'CAJA_CERRADA', mensaje: 'Abre la caja para recibir el pago en efectivo' });
+        }
+        const mov = await tx.movimientoCaja.create({
+          data: {
+            caja_id: caja.id,
+            tipo: 'INGRESO',
+            monto: total,
+            motivo: `Pago de crédito del personal · ${nombre} · ${codigos.join(', ')}`.slice(0, 250),
+          },
+        });
+        movId = mov.id;
+      }
+      const r = await tx.consumoPersonal.updateMany({
+        where: { id: { in: ids }, pagado_en: null },
+        data: {
+          pagado_en: ahora,
+          pagado_por: cobrador,
+          pago_modo: 'CAJA',
+          pago_medio: medio,
+          pago_motivo: dto.motivo?.trim() || 'Pago de crédito del personal',
+          movimiento_caja_id: movId,
+        },
+      });
+      // Otra persona lo pagó entre medio: se deshace todo (incluido el ingreso a caja)
+      if (r.count !== ids.length) {
+        throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Alguno de esos consumos ya estaba pagado' });
+      }
+      return movId;
+    });
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'creditos',
+      accion: 'SALDAR_CONSUMOS',
+      resultado: 'OK',
+      entidad: 'consumo_personal',
+      entidadId: ids[0],
+      partyId: cobrador,
+      despues: { consumos: ids.map(String), pedidos: codigos, total, medio, trabajador: nombre, movimientoCajaId: movimientoId?.toString() ?? null },
+      ip,
+    });
+
+    // Ticket de pago por cada pedido saldado (ahora dice «Pagado ahora»); si falla, el pago ya está registrado
+    for (const c of consumos) {
+      try {
+        await this.impresion?.reimprimirEtiqueta(c.pedido_id.toString(), { tipo: 'TICKET_PAGO' } as any, usuario, ip);
+      } catch {
+        // se puede reimprimir desde el pedido
+      }
+    }
+    return { ok: true, total, cantidad: ids.length, medio, movimientoCajaId: movimientoId?.toString() ?? null };
+  }
+
+  /**
+   * Cierre de periodo opcional: el descuento se hizo por planilla/sueldo. Marca como pagados los consumos pendientes
+   * del rango (de un trabajador o de todos) SIN mover caja. Exige motivo.
+   */
+  async marcarPeriodoPlanilla(
+    dto: { desde: string; hasta: string; partyId?: string | number; motivo: string },
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const motivo = String(dto.motivo ?? '').trim();
+    if (motivo.length < 3) {
+      throw new BadRequestException({ codigo: 'MOTIVO_REQUERIDO', mensaje: 'Escribe el motivo (por ejemplo: descontado en la planilla de la semana)' });
+    }
+    const rango = this.calcularRangoPersonalizado(dto.desde, dto.hasta);
+    const donde: any = { fecha: { gte: rango.inicio, lte: rango.fin }, pagado_en: null };
+    if (dto.partyId !== undefined && dto.partyId !== null && dto.partyId !== '') donde.party_id = this.parsearId(dto.partyId);
+    const pendientes = await this.prisma.consumoPersonal.findMany({ where: donde, select: { id: true, monto: true } });
+    if (pendientes.length === 0) {
+      throw new ConflictException({ codigo: 'NADA_PENDIENTE', mensaje: 'No hay consumos pendientes en ese periodo' });
+    }
+    const r = await this.prisma.consumoPersonal.updateMany({
+      where: { id: { in: pendientes.map((p) => p.id) }, pagado_en: null },
+      data: { pagado_en: new Date(), pagado_por: BigInt(usuario.partyId), pago_modo: 'PLANILLA', pago_medio: 'PLANILLA', pago_motivo: motivo },
+    });
+    const total = Number(pendientes.reduce((a, p) => a + Number(p.monto), 0).toFixed(2));
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'creditos',
+      accion: 'MARCAR_PLANILLA',
+      resultado: 'OK',
+      entidad: 'consumo_personal',
+      partyId: BigInt(usuario.partyId),
+      motivo,
+      despues: { periodo: rango.etiqueta, cantidad: r.count, total, partyId: dto.partyId ?? null },
+      ip,
+    });
+    return { ok: true, cantidad: r.count, total, periodo: rango.etiqueta };
   }
 
   /**

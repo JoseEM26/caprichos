@@ -4,6 +4,7 @@ import { SeccionEquipos } from './SeccionEquipos';
 import { SeccionColaPruebas } from './SeccionColaPruebas';
 import { ImpresionFacil } from './facil/ImpresionFacil';
 import { PrioridadTickets } from './PrioridadTickets';
+import { CuponEnTicket } from './CuponEnTicket';
 import { useSesion } from '../../comun/sesion';
 import { SECCIONES_AVANZADAS, saludEquipos, type SeccionImpresion } from './seccionesImpresion';
 import { useEstadoMaquinas } from './useEstadoMaquinas';
@@ -78,6 +79,7 @@ export function ModuloImpresion({
     return (
       <div className="imp-modulo">
         <PrioridadTickets puedeEditar={puedeEditar} />
+        <CuponEnTicket puedeEditar={puedeEditar} />
         <ImpresionFacil alVistaAvanzada={() => alCambiarSeccion('mapa')} />
       </div>
     );

@@ -194,11 +194,12 @@ export class PedidosAdminController {
   async reimprimirEtiquetas(
     @Param('id') id: string,
     @Body() dto: ReimprimirDto,
+    @Req() req?: any,
   ) {
     if (!this.impresionService) {
       return { ok: false, mensaje: 'Módulo de impresión no configurado' };
     }
-    return this.impresionService.reimprimirEtiqueta(id, dto);
+    return this.impresionService.reimprimirEtiqueta(id, dto, req?.usuario, req?.ip);
   }
 
   /** Estado de impresión de cada etiqueta del pedido (cola, impresa, fallida, vencida). */

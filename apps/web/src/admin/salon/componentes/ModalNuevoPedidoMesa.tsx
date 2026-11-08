@@ -97,6 +97,15 @@ export interface DatosPedidoOriginal {
   entrega_lng?: number | string | null;
 }
 
+/** ¿Puede cobrarle al trabajador en el momento? (sin romper fuera del contexto de sesión) */
+function usePuedeSaldarPersonal(): boolean {
+  try {
+    return Boolean(useSesion().tiene('creditos/saldar'));
+  } catch {
+    return false;
+  }
+}
+
 /** Permisos de cortesía sin romper si el componente se usa fuera del contexto de sesión (pruebas sueltas). */
 function usePermisosCortesia(): { puede: boolean } {
   try {
@@ -598,6 +607,10 @@ export function ModalNuevoPedidoMesa({
   // Carrito de líneas de pedido
   const [lineas, setLineas] = useState<LineaPedidoMesa[]>(() => (edicion ? edicion.datos.lineas.map(aLineaMesa) : []));
   const { puede: puedeCortesia } = usePermisosCortesia();
+  const puedeSaldarPersonal = usePuedeSaldarPersonal();
+  // Pedido del personal: se carga a su crédito (se paga en su cuenta) o paga en el momento
+  const [pagoPersonal, setPagoPersonal] = useState<'credito' | 'ahora'>('credito');
+  const [medioPersonal, setMedioPersonal] = useState('EFECTIVO');
   const [lineaCortesiaId, setLineaCortesiaId] = useState<string | null>(null);
 
   // Editar pedido: versión que vio quien edita, conflicto con otra edición y quién más lo tiene abierto
@@ -1304,6 +1317,14 @@ export function ModalNuevoPedidoMesa({
       }
 
       setConfirmarEnviar(false);
+      // Pedido del personal con «Pagar ahora»: se salda su consumo en Caja y no queda en su deuda
+      if (pideMode === 'personal' && pagoPersonal === 'ahora' && res?.id != null) {
+        try {
+          await api.post('/admin/creditos/saldar', { pedidoIds: [String(res.id)], medio: medioPersonal });
+        } catch {
+          // el pedido ya está hecho y queda en su crédito: se puede pagar después desde Créditos del personal
+        }
+      }
       // Parte digital del plan: el voucher es opcional; «Subir después» lo deja pendiente en Mis pedidos
       const medioDigital = medioDigitalDelPlan(planAhora);
       if (medioDigital && res?.id != null) {
@@ -3097,6 +3118,24 @@ export function ModalNuevoPedidoMesa({
 
                     {pideMode === 'personal' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div role="group" aria-label="¿Cómo lo paga?" data-testid="pago-personal" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                          <div style={{ fontWeight: 800 }}>¿Cómo lo paga?</div>
+                          <label style={{ display: 'flex', gap: 6, alignItems: 'center', minHeight: 32 }}>
+                            <input type="radio" name="pago-personal" checked={pagoPersonal === 'credito'} onChange={() => setPagoPersonal('credito')} />
+                            Cargar a su crédito (se paga fin de semana/mes)
+                          </label>
+                          {puedeSaldarPersonal && (
+                            <label style={{ display: 'flex', gap: 6, alignItems: 'center', minHeight: 32 }}>
+                              <input type="radio" name="pago-personal" checked={pagoPersonal === 'ahora'} onChange={() => setPagoPersonal('ahora')} />
+                              Pagar ahora
+                              {pagoPersonal === 'ahora' && (
+                                <select aria-label="Medio de pago" value={medioPersonal} onChange={(e) => setMedioPersonal(e.target.value)}>
+                                  {['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA'].map((m) => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                              )}
+                            </label>
+                          )}
+                        </div>
                         <input
                           type="search"
                           autoFocus

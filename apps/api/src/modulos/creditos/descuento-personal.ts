@@ -126,3 +126,19 @@ export async function planDescuentoPersonalDePedido(db: any, pedido: any, partyI
         : null,
   };
 }
+
+const ZONA = 'America/Lima';
+
+/** Fecha de calendario de Lima (año, mes 0-11, día) de un instante. */
+export function fechaLima(d: Date = new Date()): { y: number; m: number; d: number } {
+  const partes = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+  const v = (t: string) => Number(partes.find((x) => x.type === t)?.value);
+  return { y: v('year'), m: v('month') - 1, d: v('day') };
+}
+
+
+/** Día de hoy en Lima como valor para una columna DATE (medianoche UTC del día de calendario). */
+export function fechaDiaLima(ahora: Date = new Date()): Date {
+  const h = fechaLima(ahora);
+  return new Date(Date.UTC(h.y, h.m, h.d));
+}

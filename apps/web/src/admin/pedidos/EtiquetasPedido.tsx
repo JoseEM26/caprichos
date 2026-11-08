@@ -28,6 +28,15 @@ const ESTADO_ETIQUETA_VISUAL: Record<string, { texto: string; color: string; fon
   DESCONOCIDO: { texto: 'Estado no disponible', color: '#4A4A4A', fondo: '#ECECEC' },
 };
 
+/** El ticket de pago dice «Ticket impreso ✓» en vez de «Impresa». */
+const TEXTO_TICKET: Record<string, string> = {
+  IMPRESA: 'Ticket impreso ✓',
+  EN_COLA: 'Ticket en cola',
+  IMPRIMIENDO: 'Imprimiendo ticket',
+  FALLIDA: 'Ticket falló',
+  SIN_TRABAJO: 'Ticket sin imprimir',
+};
+
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' });
 
@@ -114,7 +123,10 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
     if (a.tipo === 'uno') {
       return {
         titulo: `¿Reimprimir ${a.etiqueta.titulo.toLowerCase()}?`,
-        mensaje: 'Solo esta etiqueta se envía de nuevo a la etiquetera de caja.',
+        mensaje:
+          a.etiqueta.tipo === 'TICKET_PAGO'
+            ? 'Se envía una copia del ticket de pago a la ticketera. No cobra nada ni emite comprobante.'
+            : 'Solo esta etiqueta se envía de nuevo a la etiquetera de caja.',
       };
     }
     if (a.tipo === 'todas') {
@@ -130,6 +142,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
   };
 
   const previaDe = (e: EtiquetaEstado) => {
+    if (e.tipo === 'TICKET_PAGO') return <TicketPagoPrevia datos={armarTicketPago(pedido)} sinCabecera />;
     if (e.tipo === 'ETIQUETA_GENERAL') return <EtiquetaGeneral datos={resumen.general} tamano={estado?.tamanos?.general} />;
     if (e.tipo === 'ETIQUETA_AREA') {
       const area = resumen.areas.find((a) => `AREA:${a.areaNombre}` === e.clave);
@@ -140,18 +153,19 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
   };
 
   const tarjeta = (e: EtiquetaEstado) => {
-    const visual = ESTADO_ETIQUETA_VISUAL[e.estado] || ESTADO_ETIQUETA_VISUAL.SIN_TRABAJO;
+    const base = ESTADO_ETIQUETA_VISUAL[e.estado] || ESTADO_ETIQUETA_VISUAL.SIN_TRABAJO;
+    const visual = e.tipo === 'TICKET_PAGO' ? { ...base, texto: TEXTO_TICKET[e.estado] ?? base.texto } : base;
     const enCola = e.estado === 'EN_COLA' || e.estado === 'IMPRIMIENDO';
     const cuando =
       e.estado === 'IMPRESA' && e.impresoEn
-        ? `Impresa a las ${hora(e.impresoEn)}`
+        ? `${e.tipo === 'TICKET_PAGO' ? 'Ticket impreso' : 'Impresa'} a las ${hora(e.impresoEn)}`
         : enCola && e.en
           ? `En cola desde las ${hora(e.en)}`
           : null;
     return (
       <article
         key={e.clave}
-        aria-label={`Etiqueta ${e.titulo}`}
+        aria-label={`${e.tipo === 'TICKET_PAGO' ? 'Ticket' : 'Etiqueta'} ${e.titulo}`}
         data-clave={e.clave}
         style={{
           display: 'flex',
@@ -253,6 +267,7 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
   const porClave = new Map((estado?.etiquetas ?? []).map((e) => [e.clave, e]));
   const etiquetas: EtiquetaEstado[] = base.map((b) => porClave.get(b.clave) ?? b);
   const grupo = (prefijo: string) => etiquetas.filter((e) => e.clave.startsWith(prefijo));
+  const ticket = porClave.get('TICKET_PAGO') ?? null;
   const r = estado?.resumen;
 
   return (
@@ -365,7 +380,17 @@ export function EtiquetasPedido({ pedido, onReimprimir }: EtiquetasPedidoProps) 
         'Este pedido no tiene bebidas.',
       )}
 
-      <TicketPagoPrevia datos={armarTicketPago(pedido)} />
+      {ticket ? (
+        seccion(
+          '4. Ticket de pago',
+          pedido.es_personal
+            ? 'Consumo del personal: sale solo en la ticketera al registrarse. Aquí se ve si salió y se puede reimprimir.'
+            : 'Sale en la ticketera al cobrar. Aquí se ve si salió y se puede reimprimir.',
+          [ticket],
+        )
+      ) : (
+        <TicketPagoPrevia datos={armarTicketPago(pedido)} />
+      )}
 
       {/* Reimpresión por grupo (se conserva): envía todas las de un tipo */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>

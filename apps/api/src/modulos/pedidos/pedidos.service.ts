@@ -1,4 +1,4 @@
-import { calcularDescuentoPersonal, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
+import { calcularDescuentoPersonal, fechaDiaLima, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
 import { DireccionesClienteService } from '../clientes/direcciones-cliente.service';
@@ -1170,7 +1170,7 @@ export class PedidosService {
       // Lo consumido por el personal se acumula en su cuenta en la misma transacción (el total ya lleva su descuento)
       if (colaboradorId !== null) {
         await tx.consumoPersonal.create({
-          data: { party_id: colaboradorId, pedido_id: pedido.id, fecha: new Date(), monto: new Prisma.Decimal(totalCalculado) },
+          data: { party_id: colaboradorId, pedido_id: pedido.id, fecha: fechaDiaLima(), monto: new Prisma.Decimal(totalCalculado) },
         });
       }
 

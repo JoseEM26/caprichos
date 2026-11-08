@@ -69,14 +69,14 @@ describe('CreditosService', () => {
   describe('rangos de fecha', () => {
     it('calcula rango de semana con lunes y domingo', () => {
       const rango = service.calcularRangoSemana(0);
-      expect(rango.inicio.getDay()).toBe(1); // Lunes
-      expect(rango.fin.getDay()).toBe(0); // Domingo
+      expect(rango.inicio.getUTCDay()).toBe(1); // Lunes
+      expect(rango.fin.getUTCDay()).toBe(0); // Domingo
       expect(rango.etiqueta).toMatch(/^Lun \d{2}\/\d{2} – Dom \d{2}\/\d{2}$/);
     });
 
     it('calcula rango de mes con primer y último día', () => {
       const rango = service.calcularRangoMes(0);
-      expect(rango.inicio.getDate()).toBe(1);
+      expect(rango.inicio.getUTCDate()).toBe(1);
       expect(rango.navegable).toBe(true);
     });
 

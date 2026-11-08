@@ -189,6 +189,8 @@ export const CLAVES_TEXTO = [
   'despacho_parcial_avisa',
   // Orden de salida de la cola de impresión: TICKETS_PRIMERO (por defecto) | ORDEN_LLEGADA
   'impresion_prioridad',
+  // Imprimir en el ticket de pago el cupón real y vigente del pedido (SI/NO; apagado por defecto)
+  'impresion_cupon_en_ticket',
   // Minutos de preparación por defecto (enteros 1–120) para productos sin datos de los últimos 30 días
   'cocina_minutos_preparacion_defecto',
   // Notificaciones: sonido y «Marcar todas leídas» (si/no), alcance del sonido

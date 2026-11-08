@@ -40,7 +40,7 @@ export type EstadoEtiqueta = 'EN_COLA' | 'IMPRIMIENDO' | 'IMPRESA' | 'FALLIDA' |
 export interface EtiquetaEstado {
   /** GENERAL, AREA:<nombre> o BEBIDA:<indice>: identifica la etiqueta dentro del pedido */
   clave: string;
-  tipo: 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA';
+  tipo: 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA' | 'TICKET_PAGO';
   titulo: string;
   detalle: string;
   estado: EstadoEtiqueta;
@@ -397,7 +397,7 @@ export const impresionApi = {
     pedidoId: string,
     clave: string,
   ): Promise<{ ok: boolean; mensaje: string; cantidad?: number; omitidas?: number }> => {
-    const tipo = clave.startsWith('AREA:') ? 'area' : clave.startsWith('BEBIDA:') ? 'bebida' : 'general';
+    const tipo = clave === 'TICKET_PAGO' ? 'ticket' : clave.startsWith('AREA:') ? 'area' : clave.startsWith('BEBIDA:') ? 'bebida' : 'general';
     return api.post(`/admin/pedidos/${pedidoId}/etiquetas/reimprimir`, { tipo, clave });
   },
 
