@@ -5,8 +5,6 @@ import { vouchersApi } from '../vouchers/vouchersApi';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 import { digitalesDelPlan, faltanCapturas } from './mediosPago';
 import { nombreMedio } from './planPago';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 import { textoConfirmaSinCaptura } from './mediosPago';
 
 export interface CapturasPlanDigitalProps {
@@ -100,26 +98,21 @@ export function CapturasPlanDigital({ pedidoId, planPago, alCambiar }: CapturasP
 const MOTIVO_MINIMO_SIN_VOUCHER = 5;
 const MOTIVO_CASILLA = 'sin captura confirmado';
 
-/** Excepción «sin voucher»: motivo escrito + código rotativo del supervisor (queda auditado). */
+/** Excepción «sin voucher»: motivo escrito (queda auditado). */
 export function ExcepcionSinVoucher({
   motivo,
   onMotivo,
-  pin,
-  onPin,
   alVolver,
   local,
   medio,
 }: {
   motivo: string;
   onMotivo: (v: string) => void;
-  pin: string;
-  onPin: (v: string) => void;
   alVolver: () => void;
-  /** Pedido del local: una sola casilla de consentimiento en vez de motivo y supervisor. */
+  /** Pedido del local: una sola casilla de consentimiento en vez del motivo. */
   local?: boolean;
   medio?: string | null;
 }) {
-  const pideCodigo = usePideCodigo();
   if (local) {
     // La casilla marcada se guarda como motivo no vacío (los modales ya piden motivo para habilitar el envío)
     return (
@@ -156,9 +149,7 @@ export function ExcepcionSinVoucher({
   return (
     <>
       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-        {pideCodigo
-          ? 'Cobro sin foto: solo con motivo escrito y el código del supervisor. Queda auditado.'
-          : 'Cobro sin foto: solo con motivo escrito. Queda auditado.'}
+        Cobro sin foto: solo con motivo escrito. Queda auditado.
       </div>
       <label htmlFor="motivo-sin-voucher" style={{ fontWeight: 700, fontSize: 13 }}>
         Motivo (mínimo {MOTIVO_MINIMO_SIN_VOUCHER} letras)
@@ -180,7 +171,6 @@ export function ExcepcionSinVoucher({
           fontFamily: 'inherit',
         }}
       />
-      {pideCodigo && <CampoCodigoSupervisor valor={pin} onChange={onPin} />}
       <button
         type="button"
         onClick={alVolver}

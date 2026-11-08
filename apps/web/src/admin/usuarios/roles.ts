@@ -53,5 +53,5 @@ export const ETIQUETAS_ROLES: Record<string, string> = {
   // Rol eliminado: solo para mostrar el nombre en historiales antiguos
   CALLCENTER: 'Call Center (rol eliminado)',
   ALMACEN: 'Almacén (Stock y compras)',
-  SUPERVISOR: 'Supervisor (Caja y salón, y ve el código de supervisor)',
+  SUPERVISOR: 'Supervisor (Caja y salón, sin administración)',
 };

@@ -1,5 +1,4 @@
 import type { PruebaEntregaFallida } from './PruebaEntregaFallida';
-import { marcarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
 import { api } from '../../comun/api';
 import type { PlanPagoItem } from './planPago';
 
@@ -360,16 +359,16 @@ export interface CobrarDto {
   pagos: PagoItem[];
   /** Foto del comprobante ya subida (POST /admin/vouchers). Queda enlazada al pedido. */
   voucherId?: string | number;
-  /** Cobro digital sin foto: motivo escrito y código rotativo del supervisor. */
-  sinVoucher?: { motivo: string; pinSupervisor?: string };
+  /** Cobro digital sin foto: motivo escrito (queda auditado). */
+  sinVoucher?: { motivo: string };
   /** Casilla única «ya hablé con el cliente y pagó» (pedido del local, sin captura). */
   confirmaSinCaptura?: boolean;
 }
 
-/** Excepción a la foto: la casilla del local viaja como confirmaSinCaptura; el resto, con motivo y supervisor. */
-function cuerpoSinVoucher(sv?: { motivo: string; pinSupervisor?: string; sinCaptura?: boolean }) {
+/** Excepción a la foto: la casilla del local viaja como confirmaSinCaptura; el resto, con motivo. */
+function cuerpoSinVoucher(sv?: { motivo: string; sinCaptura?: boolean }) {
   if (!sv) return {};
-  return sv.sinCaptura ? { confirmaSinCaptura: true } : { sinVoucher: { motivo: sv.motivo, pinSupervisor: sv.pinSupervisor } };
+  return sv.sinCaptura ? { confirmaSinCaptura: true } : { sinVoucher: { motivo: sv.motivo } };
 }
 
 export const pedidosApi = {
@@ -410,37 +409,16 @@ export const pedidosApi = {
     return api.get<SugerenciaDevolucion>(`/admin/pedidos/${id}/devolucion/sugerencia`);
   },
 
-  /** Devolución manual. El código del supervisor va solo si quien registra no es ADMIN ni SUPERVISOR. */
+  /** Devolución manual (queda auditada a nombre de quien la registra). */
   async registrarDevolucion(
     id: string | number,
     datos: { montoDevuelto: number; medio: string; codigoOperacion?: string; motivo?: string },
-    codigoSupervisor?: string,
   ): Promise<RegistroDevolucion> {
-    const headers: Record<string, string> = {};
-    if (codigoSupervisor) headers['X-Codigo-Supervisor'] = codigoSupervisor.trim();
-    const r = await api.post<RegistroDevolucion>(`/admin/pedidos/${id}/devolucion`, datos, { headers });
-    if (codigoSupervisor) marcarAutorizacionSupervisor();
-    return r;
+    return api.post<RegistroDevolucion>(`/admin/pedidos/${id}/devolucion`, datos);
   },
 
-  async cambiarEstado(
-    id: string | number,
-    estado: string,
-    motivo?: string,
-    pinSupervisor?: string,
-  ): Promise<Pedido> {
-    const headers: Record<string, string> = {};
-    if (pinSupervisor) {
-      headers['X-Codigo-Supervisor'] = pinSupervisor.trim();
-      headers['X-Pin-Supervisor'] = pinSupervisor.trim();
-    }
-    const r = await api.post<Pedido>(
-      `/admin/pedidos/${id}/estado`,
-      { estado, motivo },
-      { headers },
-    );
-    if (pinSupervisor) marcarAutorizacionSupervisor();
-    return r;
+  async cambiarEstado(id: string | number, estado: string, motivo?: string): Promise<Pedido> {
+    return api.post<Pedido>(`/admin/pedidos/${id}/estado`, { estado, motivo });
   },
 
   async ubicarPedido(
@@ -461,7 +439,7 @@ export const pedidosApi = {
     id: string | number,
     metodo: string,
     estado: 'COORDINADO' | 'PAGADO' = 'PAGADO',
-    sinVoucher?: { motivo: string; pinSupervisor?: string; sinCaptura?: boolean },
+    sinVoucher?: { motivo: string; sinCaptura?: boolean },
     codigosOperacion?: Array<{ medio: string; codigo: string }>,
   ): Promise<Pedido> {
     return api.post<Pedido>(`/admin/pedidos/${id}/pago`, {
@@ -549,15 +527,10 @@ export const pedidosApi = {
       canal?: 'MOZO' | 'CAJA';
     },
     idempotencyKey?: string,
-    /** Solo si hay líneas de cortesía y quien envía es SUPERVISOR: su código de 6 dígitos */
-    codigoSupervisor?: string,
   ): Promise<any> {
     const headers: Record<string, string> = {};
     if (idempotencyKey) {
       headers['Idempotency-Key'] = idempotencyKey;
-    }
-    if (codigoSupervisor) {
-      headers['x-codigo-supervisor'] = codigoSupervisor;
     }
     try {
       return await api.post('/admin/pedidos', dto, { headers });
@@ -574,10 +547,10 @@ export const pedidosApi = {
     }
   },
 
-  /** Pago digital sin foto útil: solo con motivo y código del supervisor (sinVoucher). */
+  /** Pago digital sin foto útil: solo con motivo (sinVoucher). */
   async marcarPagoCoordinado(
     id: string | number,
-    sinVoucher?: { motivo: string; pinSupervisor?: string; sinCaptura?: boolean },
+    sinVoucher?: { motivo: string; sinCaptura?: boolean },
   ): Promise<{ id: string; pago_estado: string }> {
     return api.post<{ id: string; pago_estado: string }>(
       `/admin/caja/pedidos/${id}/coordinado`,
@@ -589,9 +562,8 @@ export const pedidosApi = {
     return api.get<CajaActualRespuesta>('/admin/caja/actual');
   },
 
-  async abrirCaja(apertura: number, codigoSupervisor?: string): Promise<CajaInfo> {
-    const headers = codigoSupervisor ? { 'X-Codigo-Supervisor': codigoSupervisor.trim() } : undefined;
-    return api.post<CajaInfo>('/admin/caja/abrir', { apertura }, headers ? { headers } : undefined);
+  async abrirCaja(apertura: number): Promise<CajaInfo> {
+    return api.post<CajaInfo>('/admin/caja/abrir', { apertura });
   },
 
   async cobrar(dto: CobrarDto): Promise<any> {
@@ -603,15 +575,10 @@ export const pedidosApi = {
     return api.post<{ nota_anulada: string | null }>(`/admin/caja/pedidos/${id}/rechazar-cobro-mozo`, { motivo });
   },
 
-  async anularCobro(id: string | number, motivo: string, pinSupervisor: string): Promise<any> {
-    const headers: Record<string, string> = {
-      'X-Codigo-Supervisor': pinSupervisor.trim(),
-      'X-Pin-Supervisor': pinSupervisor.trim(),
-    };
+  async anularCobro(id: string | number, motivo: string): Promise<any> {
     return api.post<any>(
       `/admin/caja/cobros/${id}/anular`,
       { motivo },
-      { headers },
     );
   },
 

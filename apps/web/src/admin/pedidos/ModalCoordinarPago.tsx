@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { pedidosApi, PedidoPorCobrar } from './pedidosApi';
 import { ExcepcionSinVoucher } from './CapturasPlanDigital';
@@ -21,7 +19,7 @@ export interface ModalCoordinarPagoProps {
 
 /**
  * Marca el pago como coordinado. En un medio digital (Yape, Plin, transferencia) hace falta la foto
- * legible del comprobante o, en su defecto, el motivo y el código del supervisor.
+ * legible del comprobante o, en su defecto, el motivo.
  */
 export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualizarPedido }: ModalCoordinarPagoProps) {
   const sinUbicar = deliverySinUbicacion(pedido);
@@ -32,15 +30,13 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
   const [voucherListo, setVoucherListo] = useState<boolean>(false);
   const [sinVoucher, setSinVoucher] = useState<boolean>(false);
   const [motivo, setMotivo] = useState<string>('');
-  const [pinSupervisor, setPinSupervisor] = useState<string>('');
   const local = esPedidoLocal(pedido);
-  const pideCodigo = usePideCodigo() && !local;
   const [confirmando, setConfirmando] = useState<boolean>(false);
   const [enviando, setEnviando] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
   const excepcionLista =
-    sinVoucher && motivo.trim().length >= MOTIVO_MINIMO && (!pideCodigo || pinSupervisor.length === 6);
+    sinVoucher && motivo.trim().length >= MOTIVO_MINIMO;
   const usaExcepcion = Boolean(medioVoucher) && !voucherListo && sinVoucher;
   const listo = !sinUbicar && (!medioVoucher || voucherListo || excepcionLista);
 
@@ -51,7 +47,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
     try {
       await pedidosApi.marcarPagoCoordinado(
         pedido.id,
-        usaExcepcion ? { motivo: motivo.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined, ...(local ? { sinCaptura: true } : {}) } : undefined,
+        usaExcepcion ? { motivo: motivo.trim(), ...(local ? { sinCaptura: true } : {}) } : undefined,
       );
       alCoordinado();
     } catch (err: any) {
@@ -144,7 +140,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
                     cursor: 'pointer',
                   }}
                 >
-                  {local ? 'Sin captura: el cliente ya pagó' : 'No hay foto: marcar sin comprobante (con supervisor)'}
+                  {local ? 'Sin captura: el cliente ya pagó' : 'No hay foto: marcar sin comprobante'}
                 </button>
               </>
             )}
@@ -161,8 +157,6 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
                 medio={medioVoucher}
                 motivo={motivo}
                 onMotivo={setMotivo}
-                pin={pinSupervisor}
-                onPin={setPinSupervisor}
                 alVolver={() => {
                   setSinVoucher(false);
                   setMotivo('');
@@ -172,7 +166,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
             {sinVoucher && !voucherListo && !local && (
               <>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-                  Sin comprobante: solo con motivo escrito y el código del supervisor. Queda auditado.
+                  Sin comprobante: solo con motivo escrito. Queda auditado.
                 </div>
                 <label htmlFor="motivo-coordinar" style={{ fontWeight: 700, fontSize: 13 }}>
                   Motivo (mínimo {MOTIVO_MINIMO} letras)
@@ -193,13 +187,11 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
                     fontFamily: 'inherit',
                   }}
                 />
-                {pideCodigo && <CampoCodigoSupervisor valor={pinSupervisor} onChange={setPinSupervisor} />}
                 <button
                   type="button"
                   onClick={() => {
                     setSinVoucher(false);
                     setMotivo('');
-                    setPinSupervisor('');
                   }}
                   style={{
                     minHeight: 44,
@@ -278,8 +270,6 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
           usaExcepcion
             ? local
               ? 'Se marca pagado sin captura, con tu confirmación.'
-              : pideCodigo
-              ? 'Se marca sin comprobante, con el motivo y la autorización del supervisor.'
               : 'Se marca sin comprobante, con el motivo.'
             : 'El pago queda coordinado con el cliente.'
         }

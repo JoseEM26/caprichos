@@ -92,7 +92,7 @@ export function DarRolTemporalModal({ usuarioId, rolesActuales, abierto, alCerra
           Dar rol temporal
         </h2>
         <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
-          Sirve, por ejemplo, para que alguien apruebe con el código de supervisor cuando el titular no viene. Al vencer, deja de valer
+          Sirve, por ejemplo, para que alguien haga de supervisor cuando el titular no viene. Al vencer, deja de valer
           solo; el historial lo guarda.
         </div>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: 700, fontSize: '13px', color: 'var(--cp-navy)' }}>

@@ -35,7 +35,7 @@ export function ListaCorrecciones({ ajustes, titulo = 'Correcciones de esta caja
           </div>
           <div>Motivo: {a.motivo}</div>
           <div style={{ color: 'var(--cp-soft, #2C4C5D)' }}>
-            Hecha por {a.porNombre ?? 'sin dato'} · aprobada por {a.autorizadoPorNombre ?? 'sin dato'} · {horaLima(a.creadoEn)}
+            Hecha por {a.porNombre ?? 'sin dato'}{a.autorizadoPorNombre && a.autorizadoPorNombre !== a.porNombre ? ` · aprobada por ${a.autorizadoPorNombre}` : ''} · {horaLima(a.creadoEn)}
           </div>
         </div>
       ))}
@@ -47,17 +47,14 @@ interface DialogoCorregirMedioProps {
   medio: MedioAjustable;
   montoSistema: number;
   montoActual: number;
-  /** true para el cajero: pide el código de supervisor. ADMIN y SUPERVISOR no lo escriben. */
-  pideCodigo: boolean;
   alCerrar: () => void;
   alGuardado: (ajuste: AjusteMedio) => void;
 }
 
-/** Diálogo de excepción: monto nuevo, motivo obligatorio y autorización. */
-export function DialogoCorregirMedio({ medio, montoSistema, montoActual, pideCodigo, alCerrar, alGuardado }: DialogoCorregirMedioProps) {
+/** Diálogo de excepción: monto nuevo y motivo obligatorio (queda auditado a nombre de quien lo hace). */
+export function DialogoCorregirMedio({ medio, montoSistema, montoActual, alCerrar, alGuardado }: DialogoCorregirMedioProps) {
   const [monto, setMonto] = useState('');
   const [motivo, setMotivo] = useState('');
-  const [codigo, setCodigo] = useState('');
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const nombre = ETIQUETA_MEDIO[medio] ?? medio;
@@ -77,17 +74,10 @@ export function DialogoCorregirMedio({ medio, montoSistema, montoActual, pideCod
       setError(`Escribe el motivo del cambio (mínimo ${MOTIVO_MINIMO} caracteres).`);
       return;
     }
-    if (pideCodigo && !/^\d{6}$/.test(codigo.trim())) {
-      setError('Escribe el código de supervisor de 6 dígitos.');
-      return;
-    }
     setGuardando(true);
     setError('');
     try {
-      const ajuste = await cierreApi.registrarAjusteMedio(
-        { medio, montoNuevo: numero, motivo: motivo.trim() },
-        pideCodigo ? codigo.trim() : undefined,
-      );
+      const ajuste = await cierreApi.registrarAjusteMedio({ medio, montoNuevo: numero, motivo: motivo.trim() });
       alGuardado(ajuste);
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar la corrección.');
@@ -134,21 +124,6 @@ export function DialogoCorregirMedio({ medio, montoSistema, montoActual, pideCod
               style={{ width: '100%', boxSizing: 'border-box', borderRadius: 8, border: '1px solid var(--cp-line, #E3D6C6)', padding: 8, fontFamily: 'inherit' }}
             />
           </div>
-          {pideCodigo && (
-            <div>
-              <label htmlFor="corr-codigo" style={{ fontWeight: 700, fontSize: 13 }}>Código de supervisor</label>
-              <input
-                id="corr-codigo"
-                aria-label="Código de supervisor"
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
-                style={{ width: '100%', boxSizing: 'border-box', minHeight: 38, borderRadius: 8, border: '1px solid var(--cp-line, #E3D6C6)', padding: '0 8px' }}
-              />
-            </div>
-          )}
           {error && (
             <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
               {error}

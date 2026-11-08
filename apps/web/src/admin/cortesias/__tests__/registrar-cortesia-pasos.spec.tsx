@@ -115,7 +115,6 @@ describe('Cortesía en pasos', () => {
     await waitFor(() => expect(alRegistrar).toHaveBeenCalledWith('CP-W003'));
     expect(registrarSeparada).toHaveBeenCalledWith(
       { productoId: '1', tamanoId: '9', cantidad: 2, motivo: 'RECLAMO_CLIENTE', nota: 'se demoró', pedidoReferenciaId: '103' },
-      undefined,
     );
   });
 

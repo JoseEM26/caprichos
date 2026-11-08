@@ -10,8 +10,6 @@ import { ModalRegistrarMovimiento } from './ModalRegistrarMovimiento';
 import { ModalRegistrarProduccion } from './ModalRegistrarProduccion';
 import { ModalCerrarDia } from './ModalCerrarDia';
 import { Confirmar } from '../../comun/Confirmar';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 
 export const AlmacenView: React.FC = () => {
   const [movimientos, setMovimientos] = useState<MovimientoItem[]>([]);
@@ -31,8 +29,6 @@ export const AlmacenView: React.FC = () => {
   // Anulación
   const [movAnularId, setMovAnularId] = useState<string | null>(null);
   const [motivoAnular, setMotivoAnular] = useState('');
-  const [codigoSupervisorAnular, setCodigoSupervisorAnular] = useState('');
-  const pideCodigo = usePideCodigo();
   const [anulando, setAnulando] = useState(false);
   const [confirmarAnularAbierto, setConfirmarAnularAbierto] = useState(false);
 
@@ -107,10 +103,6 @@ export const AlmacenView: React.FC = () => {
       setMensajeError('Debe especificar el motivo de anulación.');
       return;
     }
-    if (pideCodigo && !/^\d{6}$/.test(codigoSupervisorAnular.trim())) {
-      setMensajeError('El código del supervisor debe ser de 6 dígitos numéricos.');
-      return;
-    }
     setConfirmarAnularAbierto(true);
   };
 
@@ -119,15 +111,10 @@ export const AlmacenView: React.FC = () => {
     try {
       setAnulando(true);
       setMensajeError('');
-      await almacenApi.anularMovimiento(
-        movAnularId,
-        motivoAnular.trim(),
-        codigoSupervisorAnular.trim(),
-      );
+      await almacenApi.anularMovimiento(movAnularId, motivoAnular.trim());
       setConfirmarAnularAbierto(false);
       setMovAnularId(null);
       setMotivoAnular('');
-      setCodigoSupervisorAnular('');
       setMensajeExito('Movimiento anulado e invertido en stock.');
       cargarDatos();
       setTimeout(() => setMensajeExito(''), 4000);
@@ -789,20 +776,12 @@ export const AlmacenView: React.FC = () => {
                         background: 'var(--cp-white)',
                       }}
                     />
-                    {pideCodigo && (
-                      <CampoCodigoSupervisor
-                        id="anular-movimiento-codigo"
-                        valor={codigoSupervisorAnular}
-                        onChange={setCodigoSupervisorAnular}
-                      />
-                    )}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                       <button
                         type="button"
                         onClick={() => {
                           setMovAnularId(null);
                           setMotivoAnular('');
-                          setCodigoSupervisorAnular('');
                         }}
                         style={{
                           border: 0,

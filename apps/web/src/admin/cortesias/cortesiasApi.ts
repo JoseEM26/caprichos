@@ -46,20 +46,15 @@ export interface ResumenInformeCortesias {
   }[];
 }
 
-/** Con el código de supervisor (solo el SUPERVISOR lo presenta): cabecera x-codigo-supervisor. */
-function cabeceras(codigo?: string): RequestInit | undefined {
-  return codigo ? { headers: { 'x-codigo-supervisor': codigo } } : undefined;
-}
-
 export const cortesiasApi = {
   /** Marca una línea de un pedido no cobrado como cortesía. */
-  darEnLinea(pedidoId: string, lineaId: string, datos: DatosCortesia, codigo?: string) {
-    return api.post(`/admin/pedidos/${pedidoId}/lineas/${lineaId}/cortesia`, datos, cabeceras(codigo));
+  darEnLinea(pedidoId: string, lineaId: string, datos: DatosCortesia) {
+    return api.post(`/admin/pedidos/${pedidoId}/lineas/${lineaId}/cortesia`, datos);
   },
 
   /** Cortesía por separado, con su pedido de referencia. */
-  registrarSeparada(datos: RegistrarCortesiaSeparada, codigo?: string) {
-    return api.post('/admin/cortesias', datos, cabeceras(codigo));
+  registrarSeparada(datos: RegistrarCortesiaSeparada) {
+    return api.post('/admin/cortesias', datos);
   },
 
   /** Informe y listado: rango de fechas (AAAA-MM-DD), motivo y producto opcionales. */

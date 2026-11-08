@@ -5,7 +5,6 @@ import { FotoAmpliable } from './FotoAmpliable';
 import { HistorialVoucher } from '../salon/HistorialVoucher';
 import { reducirImagenVoucher } from './reducirImagenVoucher';
 import { ErrorApi } from '../../comun/api';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 import { MotivoCambioVoucher, MOTIVO_MINIMO } from './MotivoCambioVoucher';
 import type { RespuestaSubirVoucher, RespuestaSubirVoucherMozo } from './tipos';
 
@@ -21,7 +20,7 @@ export interface SubirVoucherMozoProps {
     voucherId?: string | number;
   }) => void;
   bloqueado?: boolean;
-  /** Ofrece la salida sin foto (código del supervisor): Caja/Admin y el mozo en su cobro de mesa. */
+  /** Ofrece la salida sin foto (con motivo): Caja/Admin y el mozo en su cobro de mesa. */
   ofrecerExcepcion?: boolean;
   /** Pedido nuevo del mozo: el voucher se puede subir después (texto «Opcional ahora»). */
   opcional?: boolean;
@@ -52,7 +51,6 @@ export function SubirVoucherMozo({
   alQuitado,
   cambioDirecto = false,
 }: SubirVoucherMozoProps) {
-  const pideCodigo = usePideCodigo();
   // Id del voucher que acaba de subir: «Quitar voucher» lo retira (queda en el historial)
   const [ultimoVoucherId, setUltimoVoucherId] = useState<string | number | null>(null);
   const [confirmandoQuitar, setConfirmandoQuitar] = useState(false);
@@ -542,9 +540,7 @@ export function SubirVoucherMozo({
             }}
           >
             {ofrecerExcepcion
-              ? pideCodigo
-                ? 'No se lee o no hay foto: sube otra foto o pide el código al supervisor.'
-                : 'No se lee o no hay foto: sube otra foto o registra el cobro sin comprobante con motivo.'
+              ? 'No se lee o no hay foto: sube otra foto o registra el cobro sin comprobante con motivo.'
               : 'Este voucher no se lee bien. Vuelve a tomar la foto, por favor.'}
           </div>
           <button

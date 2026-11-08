@@ -144,8 +144,8 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
   },
   caja_monto_inicial: {
     grupo: 'caja', titulo: 'Monto inicial de la caja',
-    descripcion: 'Dinero con el que se abre la gaveta cada día. Al abrir caja, el campo sale con este monto. Solo el administrador lo cambia aquí; quien abre la caja con otro monto debe escribir el código del supervisor (el administrador y el supervisor no lo escriben, queda auditado quién lo aprobó).',
-    ejemplo: 'Con 150: Caja abre con S/ 150.00 sin pedir nada; si el cajero escribe 200, el sistema pide el código del supervisor.',
+    descripcion: 'Dinero con el que se abre la gaveta cada día. Al abrir caja, el campo sale con este monto. Solo el administrador lo cambia aquí; quien abre la caja puede escribir otro monto y queda auditado que fue distinto del oficial.',
+    ejemplo: 'Con 150: Caja abre con S/ 150.00; si el cajero escribe 200, abre con 200 y la auditoría lo marca como distinto del oficial.',
     efecto: 'Cambia la apertura de las cajas siguientes (la caja de hoy, si ya está abierta, no cambia). El esperado de efectivo del cierre parte del monto con el que realmente se abrió.',
     porDefecto: '0 (sin monto oficial)', unidad: 'soles (S/)', rango: '0 a 5000, máximo dos decimales', palabras: ['caja', 'apertura', 'monto inicial', 'fondo', 'gaveta', 'sencillo', 'abrir caja'], peligro: 'alto',
   },

@@ -1,5 +1,4 @@
 import { VoucherResumenChat, SemaforoVoucher } from './tipos';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 
 export interface TarjetaLecturaVoucherProps {
   voucher?: VoucherResumenChat | null;
@@ -51,7 +50,6 @@ export function TarjetaLecturaVoucher({
   pedido,
   puedeVer = true,
 }: TarjetaLecturaVoucherProps) {
-  const pideCodigo = usePideCodigo();
   // Solo con permiso vouchers/ver (CAJERO, ADMIN)
   if (!puedeVer || !voucher) {
     return null;
@@ -166,9 +164,7 @@ export function TarjetaLecturaVoucher({
             lineHeight: 1.4,
           }}
         >
-          {pideCodigo
-            ? 'No se lee: sube otra foto o confirma sin comprobante con código del supervisor.'
-            : 'No se lee: sube otra foto o confirma sin comprobante con motivo.'}
+          No se lee: sube otra foto o confirma sin comprobante con motivo.
         </div>
       )}
 

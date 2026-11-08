@@ -147,7 +147,7 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
   },
   caja_monto_inicial: {
     nombre: 'Monto inicial de la caja',
-    descripcion: 'Dinero con el que se abre la caja cada día. Solo el administrador lo cambia; otro monto al abrir pide código de supervisor.',
+    descripcion: 'Dinero con el que se abre la caja cada día. Solo el administrador lo cambia; abrir con otro monto queda auditado.',
     tipo: 'numero',
     sufijo: 'S/',
   },

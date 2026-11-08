@@ -33,7 +33,6 @@ import {
 } from './contenido';
 import { MascotaAdminView } from './mascota';
 import { ResenasView } from './resenas/ResenasView';
-import { CodigoSupervisorView } from './supervisor/CodigoSupervisorView';
 
 export type GrupoModulo =
   | 'Operación'
@@ -390,15 +389,6 @@ export const MODULOS: DefinicionModulo[] = [
     permisoMinimo: 'usuarios/ver',
     componente: UsuariosView,
     icono: 'usuarios',
-  },
-  {
-    clave: 'supervisor-codigo',
-    nombre: 'Código del supervisor',
-    grupo: 'Configuración',
-    ruta: '/admin/supervisor-codigo',
-    permisoMinimo: 'supervisor/ver_codigo',
-    componente: CodigoSupervisorView,
-    icono: 'seguridad',
   },
   {
     clave: 'historial',

@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { ErrorApi } from '../../comun/api';
-import { hayAutorizacionSupervisor, limpiarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
-import { useAnulaSinCodigo, usePideCodigo } from '../../comun/usePideCodigo';
+import { useAnulaConAlcanceLimitado } from '../../comun/useAnulaConAlcanceLimitado';
 import '../cierre/pendientes-cierre.css';
 
 const MOTIVOS_COMUNES = [
@@ -52,29 +50,18 @@ export function ModalAnular({
   alAnularExitoso,
 }: ModalAnularProps) {
   const [motivo, setMotivo] = useState<string>('');
-  const [codigo, setCodigo] = useState<string>('');
   const [errorMensaje, setErrorMensaje] = useState<string>('');
   const [enviando, setEnviando] = useState<boolean>(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState<boolean>(false);
-  // Con un código aceptado hace menos de 5 min no se vuelve a pedir
-  const [autorizado, setAutorizado] = useState<boolean>(() => hayAutorizacionSupervisor());
-  // COCINA y MOZO anulan el pedido sin código (regla de su rol); anular un cobro sigue igual
-  const sinCodigoPorRol = useAnulaSinCodigo() && !esCobro;
-  const pideCodigoSesion = usePideCodigo();
-  const pideCodigo = pideCodigoSesion && !sinCodigoPorRol;
-  const pedidoCompleto = (completo || sinCodigoPorRol) && !esCobro;
+  // COCINA y MOZO anulan el pedido completo con el alcance de su rol; anular un cobro es aparte
+  const alcanceLimitado = useAnulaConAlcanceLimitado() && !esCobro;
+  const pedidoCompleto = (completo || alcanceLimitado) && !esCobro;
 
   const validarCampos = (): boolean => {
     setErrorMensaje('');
     const motivoTrim = motivo.trim();
     if (motivoTrim.length < 5) {
       setErrorMensaje('El motivo es obligatorio y debe tener al menos 5 caracteres.');
-      return false;
-    }
-
-    const codigoTrim = codigo.trim();
-    if (pideCodigo && !autorizado && !/^\d{6}$/.test(codigoTrim)) {
-      setErrorMensaje('El código del supervisor debe ser de exactamente 6 dígitos numéricos.');
       return false;
     }
 
@@ -88,11 +75,8 @@ export function ModalAnular({
   };
 
   const ejecutarAnulacion = async () => {
-    const codigoParaEnviar = autorizado ? '' : codigo.trim();
     const motivoParaEnviar = motivo.trim();
 
-    // Regla de seguridad: el código no queda en el estado tras enviar
-    setCodigo('');
     setMostrarConfirmar(false);
     setEnviando(true);
     setErrorMensaje('');
@@ -111,31 +95,14 @@ export function ModalAnular({
       }
 
       if (esCobro && idCobro) {
-        await pedidosApi.anularCobro(idCobro, motivoParaEnviar, codigoParaEnviar);
+        await pedidosApi.anularCobro(idCobro, motivoParaEnviar);
       } else {
-        await pedidosApi.cambiarEstado(
-          pedidoId,
-          'ANULADO',
-          motivoParaEnviar,
-          codigoParaEnviar,
-        );
+        await pedidosApi.cambiarEstado(pedidoId, 'ANULADO', motivoParaEnviar);
       }
       alAnularExitoso();
     } catch (err: any) {
       if (err instanceof ErrorApi) {
-        if (autorizado && (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO')) {
-          limpiarAutorizacionSupervisor();
-          setAutorizado(false);
-          setErrorMensaje('La autorización del supervisor venció. Escribe el código del supervisor otra vez.');
-        } else if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
-          setErrorMensaje(err.message || 'Código del supervisor inválido. Pídelo nuevamente a la supervisora.');
-        } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
-          setErrorMensaje(err.message || 'Demasiados intentos con el código del supervisor. Espera 1 min o pide al administrador que lo desbloquee.');
-        } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
-          setErrorMensaje('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
-        } else {
-          setErrorMensaje(err.message || 'Error al anular');
-        }
+        setErrorMensaje(err.message || 'Error al anular');
       } else {
         setErrorMensaje(err?.message || 'Error al procesar la anulación');
       }
@@ -145,7 +112,6 @@ export function ModalAnular({
   };
 
   const manejarCerrar = () => {
-    setCodigo('');
     alCerrar();
   };
 
@@ -219,11 +185,11 @@ export function ModalAnular({
 
           <div className="ad-aviso" role="note">
             {esCobro
-              ? `La anulación del cobro revierte el estado de pago del pedido a PENDIENTE y queda registrada en auditoría${pideCodigo ? ' con el PIN del supervisor' : ''}.`
-              : `Un pedido anulado sale de cocina y reparto, y libera sus mesas. Requiere motivo de 5 o más caracteres${pideCodigo ? ' y el PIN de 6 dígitos de la supervisora' : ''}.`}
+              ? `La anulación del cobro revierte el estado de pago del pedido a PENDIENTE y queda registrada en auditoría a nombre de quien la anula.`
+              : `Un pedido anulado sale de cocina y reparto, y libera sus mesas. Requiere motivo de 5 o más caracteres.`}
             {pedidoCompleto && (
               <div style={{ marginTop: 6, fontWeight: 700 }}>
-                Se anula el pedido COMPLETO, con todas sus áreas (no solo la que ves en esta pantalla). Si ya estaba cobrado, su cobro también se anula y sale de la caja.{sinCodigoPorRol && ' No necesitas código de supervisor: queda registrado a tu nombre.'}
+                Se anula el pedido COMPLETO, con todas sus áreas (no solo la que ves en esta pantalla). Si ya estaba cobrado, su cobro también se anula y sale de la caja.{alcanceLimitado && ' Queda registrado a tu nombre.'}
               </div>
             )}
             {tieneCobro && !esCobro && (
@@ -295,24 +261,6 @@ export function ModalAnular({
             />
           </div>
 
-          {/* Código de supervisor (6 dígitos) */}
-          {!pideCodigo ? null : autorizado ? (
-            <div className="ad-aviso" role="note" data-testid="autorizacion-vigente">
-              Supervisor autorizado: no hace falta escribir el código otra vez (vale 5 minutos).
-            </div>
-          ) : (
-            <CampoCodigoSupervisor
-              id="anular-pin"
-              valor={codigo}
-              onChange={(v) => {
-                setCodigo(v);
-                setErrorMensaje('');
-              }}
-              etiqueta="Código del supervisor (6 dígitos)"
-              ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
-            />
-          )}
-
           {errorMensaje && (
             <div role="alert" className="ad-error">
               {errorMensaje}
@@ -332,7 +280,7 @@ export function ModalAnular({
           <Boton
             variante="peligro"
             cargando={enviando}
-            disabled={enviando || motivo.trim().length < 5 || (pideCodigo && !autorizado && codigo.length !== 6)}
+            disabled={enviando || motivo.trim().length < 5}
             onClick={iniciarAnulacion}
             style={{ minHeight: 44, borderRadius: 12, fontWeight: 800 }}
           >
@@ -349,7 +297,7 @@ export function ModalAnular({
               ? `¿Anular el cobro de ${codigoPedido}?`
               : `¿Anular el pedido ${codigoPedido}?`
           }
-          mensaje={`${pedidoCompleto ? 'Se anula el pedido COMPLETO, todas las áreas. ' : ''}Motivo: ${motivo.trim()}.${pideCodigo ? ' Esta acción requiere el PIN del supervisor ingresado.' : ''}`}
+          mensaje={`${pedidoCompleto ? 'Se anula el pedido COMPLETO, todas las áreas. ' : ''}Motivo: ${motivo.trim()}.`}
           textoSi="Sí, anular"
           peligro
           alConfirmar={ejecutarAnulacion}

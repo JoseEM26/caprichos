@@ -35,7 +35,7 @@ interface Props {
 
 /**
  * «Botar a merma» de un producto o de un sabor: cantidad, motivo y nota (obligatoria si es Otro).
- * Sin código de supervisor: Cocina la registra y queda auditada (quién y cuándo).
+ * Cocina la registra y queda auditada (quién y cuándo).
  */
 export function MermaProductoBoton({ productoId, saborId, nombre, saldo, alRegistrar, compacto = false }: Props) {
   const [abierto, setAbierto] = useState(false);

@@ -35,38 +35,29 @@ describe('ModalCaja: monto inicial oficial', () => {
     expect(screen.queryByTestId('input-codigo-supervisor')).toBeNull();
   });
 
-  it('no-admin con monto distinto: pide código y no abre sin él', () => {
+  it('con monto distinto del oficial no pide código: abre con ese monto (queda auditado)', async () => {
     render_();
     fireEvent.change(campoMonto(), { target: { value: '200' } });
-    expect(screen.getByTestId('input-codigo-supervisor')).toBeTruthy();
-    abrir();
-    expect(screen.getByText(/escribe el código del supervisor/)).toBeTruthy();
-    expect(pedidosApi.abrirCaja).not.toHaveBeenCalled();
-  });
-
-  it('no-admin con monto distinto y código de 6 dígitos: lo envía', async () => {
-    render_();
-    fireEvent.change(campoMonto(), { target: { value: '200' } });
-    fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
+    expect(screen.queryByTestId('input-codigo-supervisor')).toBeNull();
     abrir();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, abrir caja' }));
-    await waitFor(() => expect(pedidosApi.abrirCaja).toHaveBeenCalledWith(200, '123456'));
+    await waitFor(() => expect(pedidosApi.abrirCaja).toHaveBeenCalledWith(200));
   });
 
-  it('con el monto oficial exacto no se envía código', async () => {
+  it('con el monto oficial exacto abre sin código', async () => {
     render_();
     abrir();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, abrir caja' }));
-    await waitFor(() => expect(pedidosApi.abrirCaja).toHaveBeenCalledWith(150, undefined));
+    await waitFor(() => expect(pedidosApi.abrirCaja).toHaveBeenCalledWith(150));
   });
 
-  it('ADMIN cambia el monto sin ver ni escribir código', async () => {
+  it('ADMIN también cambia el monto sin código', async () => {
     sesion.rol = 'ADMIN';
     render_();
     fireEvent.change(campoMonto(), { target: { value: '300' } });
     expect(screen.queryByTestId('input-codigo-supervisor')).toBeNull();
     abrir();
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, abrir caja' }));
-    await waitFor(() => expect(pedidosApi.abrirCaja).toHaveBeenCalledWith(300, undefined));
+    await waitFor(() => expect(pedidosApi.abrirCaja).toHaveBeenCalledWith(300));
   });
 });

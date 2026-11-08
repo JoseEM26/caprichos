@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Boton } from '../../comun/Boton';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { MOTIVOS_CORTESIA, errorDatosCortesia, DatosCortesia } from './cortesiasApi';
 import '../cierre/pendientes-cierre.css';
 
@@ -8,23 +7,19 @@ export interface ModalCortesiaProps {
   titulo: string;
   /** Línea o producto que se regala, para que quede claro qué se marca. */
   resumen?: string;
-  /** El SUPERVISOR presenta su código de supervisor; Caja y ADMIN no. */
-  pideCodigo: boolean;
   /** Devuelve la promesa del guardado; si falla con ErrorApi se muestra su mensaje. */
-  alConfirmar: (datos: DatosCortesia, codigo?: string) => Promise<void>;
+  alConfirmar: (datos: DatosCortesia) => Promise<void>;
   alCerrar: () => void;
 }
 
-/** Motivo (obligatorio), nota (obligatoria con «Otro») y, si hace falta, código de supervisor. */
-export function ModalCortesia({ titulo, resumen, pideCodigo, alConfirmar, alCerrar }: ModalCortesiaProps) {
+/** Motivo (obligatorio) y nota (obligatoria con «Otro»). Sin código de supervisor: queda auditada. */
+export function ModalCortesia({ titulo, resumen, alConfirmar, alCerrar }: ModalCortesiaProps) {
   const [motivo, setMotivo] = useState('');
   const [nota, setNota] = useState('');
-  const [codigo, setCodigo] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const errorLocal = errorDatosCortesia(motivo, nota);
-  const codigoFaltante = pideCodigo && !/^\d{6}$/.test(codigo);
 
   const confirmar = async () => {
     const e = errorDatosCortesia(motivo, nota);
@@ -32,20 +27,12 @@ export function ModalCortesia({ titulo, resumen, pideCodigo, alConfirmar, alCerr
       setError(e);
       return;
     }
-    if (codigoFaltante) {
-      setError('Escribe el código de 6 dígitos del supervisor.');
-      return;
-    }
     setEnviando(true);
     setError(null);
     try {
-      await alConfirmar(
-        { motivo, nota: nota.trim() || undefined },
-        pideCodigo ? codigo : undefined,
-      );
+      await alConfirmar({ motivo, nota: nota.trim() || undefined });
     } catch (err) {
       setError((err as any)?.mensaje || (err as Error)?.message || 'No se pudo registrar la cortesía. Intenta de nuevo.');
-      if ((err as any)?.codigo === 'CODIGO_INVALIDO') setCodigo('');
     } finally {
       setEnviando(false);
     }
@@ -101,19 +88,6 @@ export function ModalCortesia({ titulo, resumen, pideCodigo, alConfirmar, alCerr
             />
           </label>
 
-          {pideCodigo && (
-            <CampoCodigoSupervisor
-              id="cortesia-codigo"
-              valor={codigo}
-              onChange={(v) => {
-                setCodigo(v);
-                setError(null);
-              }}
-              etiqueta="Código del supervisor (6 dígitos)"
-              ayuda="Lo ve el supervisor en su pantalla y cambia cada 30 segundos"
-            />
-          )}
-
           {error && (
             <div role="alert" style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>
               {error}
@@ -127,7 +101,7 @@ export function ModalCortesia({ titulo, resumen, pideCodigo, alConfirmar, alCerr
           <Boton
             variante="primario"
             cargando={enviando}
-            disabled={enviando || !!errorLocal || codigoFaltante}
+            disabled={enviando || !!errorLocal}
             onClick={confirmar}
           >
             Dar cortesía

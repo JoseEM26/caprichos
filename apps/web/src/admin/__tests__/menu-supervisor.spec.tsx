@@ -4,7 +4,7 @@ import { ETIQUETAS_ROLES } from '../usuarios/CrearUsuarioModal';
 import { ROLES_SISTEMA } from '@caprichos/compartido';
 
 // Permisos del SUPERVISOR tal como los devuelve la API (MATRIZ.SUPERVISOR en permisos.ts):
-// la unión de CAJERO y MOZO más supervisor/ver_codigo.
+// la unión de CAJERO y MOZO.
 const PERMISOS_SUPERVISOR = [
   'pedidos/ver', 'pedidos/crear', 'pedidos/cambiar_estado',
   'caja/abrir', 'caja/cobrar', 'caja/movimientos', 'caja/cerrar', 'caja/ver',
@@ -12,7 +12,7 @@ const PERMISOS_SUPERVISOR = [
   'mesas/ver', 'mesas/liberar', 'mesas/abrir', 'repartos/ver', 'repartos/liquidar',
   'vouchers/subir', 'vouchers/ver', 'plano/ver', 'reservas/ver', 'reservas/crear', 'reservas/editar',
   'iniciativas/ver', 'iniciativas/crear', 'iniciativas/comentar',
-  'notificaciones/ver', 'notificaciones/marcar', 'supervisor/ver_codigo',
+  'notificaciones/ver', 'notificaciones/marcar',
   'mensajes/ver', 'mensajes/tomar', 'mensajes/enviar', 'mensajes/cerrar',
   'whatsapp_salientes/ver', 'whatsapp_salientes/reenviar', 'whatsapp_salientes/descartar',
 ];
@@ -36,14 +36,13 @@ describe('menú del SUPERVISOR', () => {
     }
   });
 
-  it('ve caja, salón, cocina, cobros y la pantalla Código del supervisor', () => {
+  it('ve caja, salón, cocina y cobros; ya no existe la pantalla Código del supervisor', () => {
     const ve = visibles();
-    for (const clave of ['caja', 'cierre', 'cocina', 'repartos', 'reservas', 'plano', 'comprobantes', 'iniciativas', 'mensajes', 'supervisor-codigo']) {
+    for (const clave of ['caja', 'cierre', 'cocina', 'repartos', 'reservas', 'plano', 'comprobantes', 'iniciativas', 'mensajes']) {
       expect(ve, `debe ver ${clave}`).toContain(clave);
     }
-    const codigo = MODULOS.find((m) => m.clave === 'supervisor-codigo');
-    expect(codigo?.nombre).toBe('Código del supervisor');
-    expect(codigo?.grupo).toBe('Configuración');
+    expect(MODULOS.find((m) => m.clave === 'supervisor-codigo')).toBeUndefined();
+    expect(visibles()).not.toContain('supervisor-codigo');
   });
 
   it('Novedades, Conócenos y Destacadas se miran con el permiso que exige su API', () => {
@@ -57,6 +56,6 @@ describe('menú del SUPERVISOR', () => {
 describe('rol SUPERVISOR en el alta y edición de usuarios', () => {
   it('aparece en los roles del sistema con su descripción corta', () => {
     expect(Object.values(ROLES_SISTEMA)).toContain('SUPERVISOR');
-    expect(ETIQUETAS_ROLES.SUPERVISOR).toBe('Supervisor (Caja y salón, y ve el código de supervisor)');
+    expect(ETIQUETAS_ROLES.SUPERVISOR).toBe('Supervisor (Caja y salón, sin administración)');
   });
 });

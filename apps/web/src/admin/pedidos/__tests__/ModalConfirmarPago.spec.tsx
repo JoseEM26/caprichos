@@ -160,7 +160,7 @@ describe('ModalConfirmarPago', () => {
     expect(screen.queryByTestId('voucher-listo-confirmar')).toBeNull();
   });
 
-  describe('confirmar sin comprobante (excepción con supervisor)', () => {
+  describe('confirmar sin comprobante (excepción con motivo)', () => {
     const abrirSinComprobante = async () => {
       abrir(pedidoCarta());
       irAlPaso2();
@@ -175,7 +175,6 @@ describe('ModalConfirmarPago', () => {
     it('motivo corto bloquea la confirmación y no registra el pago', async () => {
       await abrirSinComprobante();
       fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'nop' } });
-      fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
       confirmarDesdePaso3();
 
       expect(screen.getByRole('alert').textContent).toMatch(/al menos 5 caracteres/);
@@ -183,19 +182,10 @@ describe('ModalConfirmarPago', () => {
       expect(pedidosApi.registrarPago).not.toHaveBeenCalled();
     });
 
-    it('código de supervisor vacío bloquea la confirmación y no registra el pago', async () => {
+    it('un motivo válido llama a registrarPago con sinVoucher, sin código de supervisor', async () => {
       await abrirSinComprobante();
       fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'El cliente no tenía señal' } });
-      confirmarDesdePaso3();
-
-      expect(screen.getByRole('alert').textContent).toMatch(/6 dígitos/);
-      expect(pedidosApi.registrarPago).not.toHaveBeenCalled();
-    });
-
-    it('motivo y código válidos llaman a registrarPago con sinVoucher', async () => {
-      await abrirSinComprobante();
-      fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'El cliente no tenía señal' } });
-      fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
+      expect(screen.queryByTestId('input-codigo-supervisor')).toBeNull();
       confirmarDesdePaso3();
       fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar' }));
 
@@ -204,7 +194,7 @@ describe('ModalConfirmarPago', () => {
         '77',
         'YAPE',
         'PAGADO',
-        { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
+        { motivo: 'El cliente no tenía señal' },
         undefined, // en la excepción sin comprobante no hay código de operación
       );
     });

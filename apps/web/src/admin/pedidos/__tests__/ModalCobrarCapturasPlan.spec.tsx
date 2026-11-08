@@ -57,7 +57,7 @@ describe('ModalCobrar con plan de 2 medios digitales', () => {
     await waitFor(() => expect(screen.getByTestId('captura-yape')).toHaveTextContent('captura subida'));
     expect(screen.getByTestId('captura-plin')).toHaveTextContent('falta');
 
-    // El botón se bloquea hasta cubrir cada medio digital (o usar la excepción con supervisor)
+    // El botón se bloquea hasta cubrir cada medio digital (o usar la excepción con motivo)
     expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
     expect(cobrar).not.toHaveBeenCalled();
   });
@@ -87,7 +87,7 @@ describe('ModalCobrar sin captura: una sola casilla en el local', () => {
     vi.restoreAllMocks();
   });
 
-  it('pedido de mozo sin fotos: casilla única (sin motivo ni supervisor) y el cobro viaja con confirmaSinCaptura', async () => {
+  it('pedido de mozo sin fotos: casilla única (sin motivo) y el cobro viaja con confirmaSinCaptura', async () => {
     vi.spyOn(vouchersApi, 'listarVouchers').mockResolvedValue([] as any);
     const cobrar = vi.fn().mockResolvedValue({});
     render(<ModalCobrar pedido={base} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={cobrar} />);

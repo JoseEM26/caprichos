@@ -131,13 +131,9 @@ export const salonApi = {
   misPedidos: (rango: RangoMisPedidos) =>
     api.get<RespuestaMisPedidos>(`/admin/pedidos/mis-pedidos?rango=${rango}`),
 
-  /** codigoSupervisor: solo si hay líneas de cortesía y quien envía es SUPERVISOR (6 dígitos) */
-  abrirPedidoMesa: (payload: AbrirPedidoMesaPayload, idempotencyKey: string, codigoSupervisor?: string) =>
+  abrirPedidoMesa: (payload: AbrirPedidoMesaPayload, idempotencyKey: string) =>
     api.post('/admin/salon/pedidos', payload, {
-      headers: {
-        'Idempotency-Key': idempotencyKey,
-        ...(codigoSupervisor ? { 'x-codigo-supervisor': codigoSupervisor } : {}),
-      },
+      headers: { 'Idempotency-Key': idempotencyKey },
     }),
 
   liberarMesaManual: (mesaId: string, motivo: string, forzar?: boolean) =>

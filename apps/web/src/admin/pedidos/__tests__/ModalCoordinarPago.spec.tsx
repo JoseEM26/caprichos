@@ -5,7 +5,7 @@ import { PedidoPorCobrar, pedidosApi } from '../pedidosApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 import * as reducirModulo from '../../vouchers/reducirImagenVoucher';
 
-// Pago coordinado de Caja: un medio digital exige la foto legible o la excepción con supervisor.
+// Pago coordinado de Caja: un medio digital exige la foto legible o la excepción con motivo.
 
 const pedidoYape: PedidoPorCobrar = {
   id: '20',
@@ -97,13 +97,13 @@ describe('ModalCoordinarPago', () => {
 
     subirFoto();
     expect(
-      await screen.findByText('No se lee o no hay foto: sube otra foto o pide el código al supervisor.'),
+      await screen.findByText('No se lee o no hay foto: sube otra foto o registra el cobro sin comprobante con motivo.'),
     ).toBeDefined();
     expect(screen.getByRole('button', { name: 'Marcar coordinado' })).toBeDisabled();
     expect(marcar).not.toHaveBeenCalled();
   });
 
-  it('foto ILEGIBLE seguida de la excepción con motivo y supervisor: marca con sinVoucher', async () => {
+  it('foto ILEGIBLE seguida de la excepción con motivo: marca con sinVoucher', async () => {
     vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue(lecturaIlegible as any);
     render(<ModalCoordinarPago pedido={pedidoYape} alCerrar={alCerrar} alCoordinado={alCoordinado} />);
 
@@ -112,15 +112,13 @@ describe('ModalCoordinarPago', () => {
 
     fireEvent.click(screen.getByTestId('btn-coordinar-sin-voucher'));
     fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: 'El cliente no tiene la captura' } });
-    const pin = document.querySelector('#codigo-supervisor-input') as HTMLInputElement;
-    fireEvent.change(pin, { target: { value: '123456' } });
+    expect(document.querySelector('#codigo-supervisor-input')).toBeNull();
     expect(screen.getByRole('button', { name: 'Marcar coordinado' })).not.toBeDisabled();
 
     await confirmar();
     await waitFor(() => expect(alCoordinado).toHaveBeenCalled());
     expect(marcar).toHaveBeenCalledWith('20', {
       motivo: 'El cliente no tiene la captura',
-      pinSupervisor: '123456',
     });
   });
 

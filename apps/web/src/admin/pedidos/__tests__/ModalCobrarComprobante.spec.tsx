@@ -6,7 +6,7 @@ import { vouchersApi } from '../../vouchers/vouchersApi';
 import * as reducirModulo from '../../vouchers/reducirImagenVoucher';
 
 // Caja: el cobro digital (Yape, Plin, transferencia) exige la foto del comprobante.
-// La IA solo informa; la excepción «sin voucher» pide motivo y código del supervisor.
+// La IA solo informa; la excepción «sin voucher» pide solo el motivo (sin código de supervisor).
 
 const pedido: Pedido = {
   id: '77',
@@ -156,14 +156,14 @@ describe('ModalCobrar: comprobante del pago digital', () => {
     fireEvent.change(input, { target: { files: [new File(['foto'], 'yape.jpg', { type: 'image/jpeg' })] } });
 
     expect(
-      await screen.findByText('No se lee o no hay foto: sube otra foto o pide el código al supervisor.'),
+      await screen.findByText('No se lee o no hay foto: sube otra foto o registra el cobro sin comprobante con motivo.'),
     ).toBeDefined();
     expect(screen.queryByTestId('voucher-guardado')).toBeNull();
     expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
     expect(cobrar).not.toHaveBeenCalled();
   });
 
-  it('con foto ILEGIBLE y luego la excepción con supervisor: cobra con sinVoucher y sin voucherId', async () => {
+  it('con foto ILEGIBLE y luego la excepción con motivo: cobra con sinVoucher y sin voucherId', async () => {
     vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue(lecturaIlegible as any);
     abrirYape();
 
@@ -174,29 +174,26 @@ describe('ModalCobrar: comprobante del pago digital', () => {
 
     fireEvent.click(screen.getByTestId('btn-sin-voucher'));
     fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'La foto salió borrosa' } });
-    const pin = document.querySelector('#codigo-supervisor-input') as HTMLInputElement;
-    fireEvent.change(pin, { target: { value: '123456' } });
+    expect(document.querySelector('#codigo-supervisor-input')).toBeNull();
     await confirmarCobro();
 
     await waitFor(() => {
       expect(cobrar).toHaveBeenCalledWith({
         pedidoId: '77',
         pagos: [{ medio: 'YAPE', monto: 35 }],
-        sinVoucher: { motivo: 'La foto salió borrosa', pinSupervisor: '123456' },
+        sinVoucher: { motivo: 'La foto salió borrosa' },
       });
     });
     expect(cobrar.mock.calls[0][0]).not.toHaveProperty('voucherId');
   });
 
-  it('sin foto con motivo y código del supervisor: cobra con sinVoucher y sin voucherId', async () => {
+  it('sin foto con motivo: cobra con sinVoucher y sin voucherId', async () => {
     abrirYape();
 
     fireEvent.click(screen.getByTestId('btn-sin-voucher'));
     fireEvent.change(screen.getByTestId('motivo-sin-voucher'), {
       target: { value: 'El POS del local no funcionaba' },
     });
-    const pin = document.querySelector('#codigo-supervisor-input') as HTMLInputElement;
-    fireEvent.change(pin, { target: { value: '123456' } });
 
     expect(screen.getByRole('button', { name: 'Registrar cobro' })).not.toBeDisabled();
     await confirmarCobro();
@@ -205,37 +202,21 @@ describe('ModalCobrar: comprobante del pago digital', () => {
       expect(cobrar).toHaveBeenCalledWith({
         pedidoId: '77',
         pagos: [{ medio: 'YAPE', monto: 35 }],
-        sinVoucher: { motivo: 'El POS del local no funcionaba', pinSupervisor: '123456' },
+        sinVoucher: { motivo: 'El POS del local no funcionaba' },
       });
     });
     expect(cobrar.mock.calls[0][0]).not.toHaveProperty('voucherId');
   });
 
-  it('motivo demasiado corto o PIN incompleto no habilitan el cobro sin foto', () => {
+  it('un motivo demasiado corto no habilita el cobro sin foto', () => {
     abrirYape();
     fireEvent.click(screen.getByTestId('btn-sin-voucher'));
 
     fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'abc' } });
-    const pin = document.querySelector('#codigo-supervisor-input') as HTMLInputElement;
-    fireEvent.change(pin, { target: { value: '123456' } });
     expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
 
     fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'Motivo suficiente' } });
-    fireEvent.change(pin, { target: { value: '12345' } });
-    expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
-  });
-
-  it('código de supervisor incorrecto: el servidor rechaza y Caja ve el motivo, sin cobrar', async () => {
-    cobrar.mockRejectedValueOnce(new Error('Código de supervisor inválido o no proporcionado'));
-    abrirYape();
-
-    fireEvent.click(screen.getByTestId('btn-sin-voucher'));
-    fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'Motivo suficiente' } });
-    const pin = document.querySelector('#codigo-supervisor-input') as HTMLInputElement;
-    fireEvent.change(pin, { target: { value: '000000' } });
-    await confirmarCobro();
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Código de supervisor inválido');
+    expect(screen.getByRole('button', { name: 'Registrar cobro' })).not.toBeDisabled();
   });
 
   it('volver a pedir la foto oculta la excepción y vuelve a exigir el comprobante', () => {

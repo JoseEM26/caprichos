@@ -25,7 +25,7 @@ interface Props {
   /** La caja abierta es de un día anterior al de hoy: se avisa y no se mezcla con la de hoy */
   diaAnterior?: boolean;
   cajero: string;
-  /** Solo la supervisora ve lo esperado (cierre ciego): para el cajero va null */
+  /** Solo el administrador y el supervisor ven lo esperado (cierre ciego): para el cajero va null */
   resumen: ResumenAdmin | null;
   totalCobrado: number;
   ingresos: number;

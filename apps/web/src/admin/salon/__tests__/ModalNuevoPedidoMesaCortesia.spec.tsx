@@ -85,20 +85,19 @@ describe('Cortesía en un pedido de mesa (local)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
-    const [payload, , codigo] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
+    const [payload, , codigo] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0] as unknown[] as [any, string, string | undefined];
     expect(payload.lineas[0].cortesia).toEqual({ motivo: 'RECLAMO_CLIENTE', nota: undefined });
     expect(codigo).toBeUndefined();
   });
 
-  it('SUPERVISOR: «Dar cortesía» espera su código de 6 dígitos y el envío lo manda en la cabecera', async () => {
+  it('SUPERVISOR: «Dar cortesía» sale con el motivo, sin código, y el envío no lleva ninguna cabecera de código', async () => {
     conSesion('SUPERVISOR', ['cortesias/dar']);
     await pedirCafeEnMesa();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Dar como cortesía' })[0]);
     fireEvent.click(screen.getByLabelText('Reclamo del cliente'));
+    expect(screen.queryByLabelText('Código del supervisor (6 dígitos)')).toBeNull();
     const confirmar = screen.getByRole('button', { name: 'Dar cortesía' });
-    expect(confirmar).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Código del supervisor (6 dígitos)'), { target: { value: '123456' } });
     expect(confirmar).toBeEnabled();
     fireEvent.click(confirmar);
 
@@ -107,7 +106,7 @@ describe('Cortesía en un pedido de mesa (local)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
 
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0][2]).toBe('123456');
+    expect(vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0]).toHaveLength(2);
   });
 
   it('MOZO (sin cortesias/dar) no ve la acción en la mesa', async () => {

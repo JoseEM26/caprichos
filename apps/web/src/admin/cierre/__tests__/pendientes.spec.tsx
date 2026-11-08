@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { PendientesCobroCierre } from '../PendientesCobroCierre';
-import { cierreApi, PendienteCobro } from '../cierreApi';
-import { ErrorApi } from '../../../comun/api';
+import type { PendienteCobro } from '../cierreApi';
 
 const pendiente: PendienteCobro = {
   id: 74,
@@ -15,11 +14,9 @@ const pendiente: PendienteCobro = {
   fecha: '2026-10-23T20:21:00.000Z',
 };
 
-function Host({ esAdmin, inicial = [] }: { esAdmin: boolean; inicial?: PendienteCobro[] }) {
+function Host({ inicial = [] }: { inicial?: PendienteCobro[] }) {
   const [lista, setLista] = useState<PendienteCobro[]>(inicial);
-  return (
-    <PendientesCobroCierre esAdmin={esAdmin} pendientes={lista} setPendientes={setLista} alCambiarTurno={vi.fn()} />
-  );
+  return <PendientesCobroCierre pendientes={lista} setPendientes={setLista} alCambiarTurno={vi.fn()} />;
 }
 
 describe('Caja y cierres: pedidos sin cobrar que impiden cerrar', () => {
@@ -27,51 +24,18 @@ describe('Caja y cierres: pedidos sin cobrar que impiden cerrar', () => {
     vi.clearAllMocks();
   });
 
-  it('el cajero no ve la lista sin el código de supervisor; con código correcto la ve y puede cobrar o anular', async () => {
-    const listar = vi.spyOn(cierreApi, 'listarPendientesDeCobro').mockResolvedValue([pendiente]);
-    render(<Host esAdmin={false} />);
+  it('quien cierra la caja ve la lista de entrada, sin ningún código, y puede cobrar o anular', () => {
+    render(<Host inicial={[pendiente]} />);
 
-    expect(screen.queryByText('CP-W062', { exact: false })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Código del supervisor/i), { target: { value: '123456' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ver pedidos' }));
-
-    await waitFor(() => expect(screen.getByText('CP-W062', { exact: false })).toBeInTheDocument());
-    expect(listar).toHaveBeenCalledWith('123456');
+    expect(screen.getByText('CP-W062', { exact: false })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Código del supervisor/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver pedidos' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cobrar ahora' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Anular con motivo' })).toBeInTheDocument();
   });
 
-  it('un código con menos de 6 dígitos no llama a la API', () => {
-    const listar = vi.spyOn(cierreApi, 'listarPendientesDeCobro');
-    render(<Host esAdmin={false} />);
-
-    fireEvent.change(screen.getByLabelText(/Código del supervisor/i), { target: { value: '123' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ver pedidos' }));
-
-    expect(listar).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('6 dígitos');
-  });
-
-  it('un código bloqueado muestra el mensaje del servidor y no deja ver la lista', async () => {
-    vi.spyOn(cierreApi, 'listarPendientesDeCobro').mockRejectedValue(
-      new ErrorApi('CODIGO_BLOQUEADO', 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.', 403),
-    );
-    render(<Host esAdmin={false} />);
-
-    fireEvent.change(screen.getByLabelText(/Código del supervisor/i), { target: { value: '654321' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Ver pedidos' }));
-
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Espera 5 minutos'));
-    expect(screen.queryByRole('button', { name: 'Cobrar ahora' })).not.toBeInTheDocument();
-  });
-
-  it('el admin ve de entrada los pedidos y el bloque desaparece cuando no queda ninguno', () => {
-    const { unmount } = render(<Host esAdmin inicial={[pendiente]} />);
-    expect(screen.getByText('CP-W062', { exact: false })).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Código del supervisor/i)).not.toBeInTheDocument();
-    unmount();
-
-    render(<Host esAdmin inicial={[]} />);
+  it('el bloque desaparece cuando no queda ninguno', () => {
+    render(<Host inicial={[]} />);
     expect(screen.queryByText(/Pedidos sin cobrar/)).not.toBeInTheDocument();
   });
 });

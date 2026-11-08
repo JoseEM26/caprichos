@@ -21,7 +21,7 @@ describe('errorDatosCortesia', () => {
 describe('ModalCortesia', () => {
   it('no deja confirmar sin motivo y no llama al guardado', () => {
     const alConfirmar = vi.fn(async () => {});
-    render(<ModalCortesia titulo="Dar como cortesía: Frappe" pideCodigo={false} alConfirmar={alConfirmar} alCerrar={() => {}} />);
+    render(<ModalCortesia titulo="Dar como cortesía: Frappe" alConfirmar={alConfirmar} alCerrar={() => {}} />);
     const boton = screen.getByRole('button', { name: 'Dar cortesía' }) as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
     expect(alConfirmar).not.toHaveBeenCalled();
@@ -29,7 +29,7 @@ describe('ModalCortesia', () => {
 
   it('con «Otro» y sin nota, el botón queda bloqueado; con nota, envía motivo y nota', async () => {
     const alConfirmar = vi.fn(async () => {});
-    render(<ModalCortesia titulo="Dar como cortesía: Frappe" pideCodigo={false} alConfirmar={alConfirmar} alCerrar={() => {}} />);
+    render(<ModalCortesia titulo="Dar como cortesía: Frappe" alConfirmar={alConfirmar} alCerrar={() => {}} />);
     fireEvent.click(screen.getByLabelText('Otro'));
     const boton = screen.getByRole('button', { name: 'Dar cortesía' }) as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
@@ -37,27 +37,26 @@ describe('ModalCortesia', () => {
     expect(boton.disabled).toBe(false);
     fireEvent.click(boton);
     await waitFor(() =>
-      expect(alConfirmar).toHaveBeenCalledWith({ motivo: 'OTRO', nota: 'Cliente de la esquina' }, undefined),
+      expect(alConfirmar).toHaveBeenCalledWith({ motivo: 'OTRO', nota: 'Cliente de la esquina' }),
     );
   });
 
-  it('el SUPERVISOR debe escribir un código de 6 dígitos antes de confirmar', async () => {
+  it('no pide ningún código de supervisor: con el motivo basta y se confirma', async () => {
     const alConfirmar = vi.fn(async () => {});
-    render(<ModalCortesia titulo="Dar como cortesía: Waffle" pideCodigo={true} alConfirmar={alConfirmar} alCerrar={() => {}} />);
+    render(<ModalCortesia titulo="Dar como cortesía: Waffle" alConfirmar={alConfirmar} alCerrar={() => {}} />);
     fireEvent.click(screen.getByLabelText('Reclamo del cliente'));
+    expect(screen.queryByLabelText('Código del supervisor (6 dígitos)')).toBeNull();
     const boton = screen.getByRole('button', { name: 'Dar cortesía' }) as HTMLButtonElement;
-    expect(boton.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText('Código del supervisor (6 dígitos)'), { target: { value: '123456' } });
     expect(boton.disabled).toBe(false);
     fireEvent.click(boton);
-    await waitFor(() => expect(alConfirmar).toHaveBeenCalledWith({ motivo: 'RECLAMO_CLIENTE', nota: undefined }, '123456'));
+    await waitFor(() => expect(alConfirmar).toHaveBeenCalledWith({ motivo: 'RECLAMO_CLIENTE', nota: undefined }));
   });
 
   it('muestra el mensaje del servidor si el guardado falla (p. ej. pedido cobrado)', async () => {
     const alConfirmar = vi.fn(async () => {
       throw Object.assign(new Error('x'), { codigo: 'PEDIDO_YA_COBRADO', mensaje: 'El pedido ya está cobrado: registra la cortesía por separado' });
     });
-    render(<ModalCortesia titulo="Dar como cortesía: Frappe" pideCodigo={false} alConfirmar={alConfirmar} alCerrar={() => {}} />);
+    render(<ModalCortesia titulo="Dar como cortesía: Frappe" alConfirmar={alConfirmar} alCerrar={() => {}} />);
     fireEvent.click(screen.getByLabelText('Degustación o promoción'));
     fireEvent.click(screen.getByRole('button', { name: 'Dar cortesía' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('El pedido ya está cobrado');

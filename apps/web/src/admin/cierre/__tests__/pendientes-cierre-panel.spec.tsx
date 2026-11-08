@@ -24,14 +24,12 @@ function pendiente(i: number, o: Partial<PendienteCobro> = {}): PendienteCobro {
 }
 
 function Host({
-  esAdmin = true,
   inicial = [],
   errorLista = false,
   alReintentar = vi.fn(),
   foco = null,
   fechaCaja,
 }: {
-  esAdmin?: boolean;
   inicial?: PendienteCobro[];
   errorLista?: boolean;
   alReintentar?: () => void;
@@ -41,7 +39,6 @@ function Host({
   const [lista, setLista] = useState<PendienteCobro[]>(inicial);
   return (
     <PendientesCobroCierre
-      esAdmin={esAdmin}
       pendientes={lista}
       setPendientes={setLista}
       alCambiarTurno={vi.fn()}
@@ -174,7 +171,7 @@ describe('Cierre: panel de pedidos pendientes escalable', () => {
     expect(screen.queryByRole('button', { name: /Ver más/ })).not.toBeInTheDocument();
   });
 
-  it('«Anular con motivo» abre el diálogo ordenado con el resumen y exige motivo y código', async () => {
+  it('«Anular con motivo» abre el diálogo ordenado con el resumen y exige solo el motivo (sin código de supervisor)', async () => {
     vi.spyOn(pedidosApi, 'obtenerPorId').mockResolvedValue({
       id: '1',
       codigo: 'CP-LIVE-01',
@@ -201,8 +198,7 @@ describe('Cierre: panel de pedidos pendientes escalable', () => {
     const confirmar = within(dialogo).getByRole('button', { name: 'Confirmar anulación' });
     expect(confirmar).toBeDisabled();
     fireEvent.change(within(dialogo).getByLabelText(/Motivo detallado/i), { target: { value: 'Cliente no contesta' } });
-    expect(confirmar).toBeDisabled();
-    fireEvent.change(within(dialogo).getByLabelText(/Código del supervisor/i), { target: { value: '123456' } });
+    expect(within(dialogo).queryByLabelText(/Código del supervisor/i)).not.toBeInTheDocument();
     expect(confirmar).toBeEnabled();
   });
 
@@ -219,10 +215,10 @@ describe('Cierre: panel de pedidos pendientes escalable', () => {
     expect(screen.getByText('Todo al día: no hay pedidos pendientes.')).toBeInTheDocument();
   });
 
-  it('el cajero sin código no ve la lista (regresión)', () => {
-    render(<Host esAdmin={false} inicial={[pendiente(1)]} />);
-    expect(screen.queryByText('CP-001')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ver pedidos' })).toBeInTheDocument();
+  it('el cajero también ve la lista de entrada: ya no pide código de supervisor', () => {
+    render(<Host inicial={[pendiente(1)]} />);
+    expect(screen.getByText('CP-001', { exact: false })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver pedidos' })).not.toBeInTheDocument();
   });
 
   it('un foco pedido desde el aviso abre el grupo indicado y enfoca el panel', async () => {

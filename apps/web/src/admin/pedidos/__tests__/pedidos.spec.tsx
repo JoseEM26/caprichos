@@ -13,7 +13,7 @@ vi.mock('../audioAlerta', () => ({
 }));
 
 
-// El ADMIN no ve el código del supervisor: estas pruebas de código se hacen como CAJERO.
+// Ya no hay código de supervisor: estas pruebas se hacen como CAJERO.
 const comoCajero = () => {
   const actual = vi.mocked(sesionModulo.useSesion)();
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ ...actual, usuario: { partyId: '3', nombres: 'Cajera', rol: 'CAJERO' } } as any);
@@ -318,12 +318,10 @@ describe('Ola F4: Pedidos y Caja', () => {
       />,
     );
 
-    // Ingresar motivo y código válido
+    // Ingresar solo el motivo: no hay campo de código de supervisor
     const inputMotivo = screen.getByLabelText(/Motivo detallado/i);
     fireEvent.change(inputMotivo, { target: { value: 'Cliente desistió de esperar' } });
-
-    const inputPin = screen.getByLabelText(/Código del supervisor/i);
-    fireEvent.change(inputPin, { target: { value: '123456' } });
+    expect(screen.queryByLabelText(/Código del supervisor/i)).toBeNull();
 
     const btnAnular = screen.getByRole('button', { name: /Confirmar anulación/i });
     fireEvent.click(btnAnular);
@@ -344,9 +342,9 @@ describe('Ola F4: Pedidos y Caja', () => {
     });
   });
 
-  it('4. El código no queda en el estado tras enviar la anulación', async () => {
+  it('4. La anulación se envía solo con el motivo, sin ningún código de supervisor', async () => {
     comoCajero();
-    vi.spyOn(pedidosApi, 'cambiarEstado').mockResolvedValue({} as any);
+    const cambiar = vi.spyOn(pedidosApi, 'cambiarEstado').mockResolvedValue({} as any);
 
     render(
       <ModalAnular
@@ -357,24 +355,11 @@ describe('Ola F4: Pedidos y Caja', () => {
       />,
     );
 
-    const inputMotivo = screen.getByLabelText(/Motivo detallado/i);
-    fireEvent.change(inputMotivo, { target: { value: 'Cliente no llegó a recoger' } });
+    fireEvent.change(screen.getByLabelText(/Motivo detallado/i), { target: { value: 'Cliente no llegó a recoger' } });
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar anulación/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Sí, anular/i }));
 
-    const inputPin = screen.getByLabelText(/Código del supervisor/i) as HTMLInputElement;
-    fireEvent.change(inputPin, { target: { value: '654321' } });
-    expect(inputPin.value).toBe('654321');
-
-    const btnAnular = screen.getByRole('button', { name: /Confirmar anulación/i });
-    fireEvent.click(btnAnular);
-
-    // Al confirmar en el diálogo
-    const btnSi = screen.getByRole('button', { name: /Sí, anular/i });
-    fireEvent.click(btnSi);
-
-    // Inmediatamente tras enviar, el campo del código queda en blanco (limpiado del estado)
-    await waitFor(() => {
-      expect(inputPin.value).toBe('');
-    });
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('10', 'ANULADO', 'Cliente no llegó a recoger'));
   });
 
   it('5. Pago mixto que no cuadra bloquea el envío', async () => {

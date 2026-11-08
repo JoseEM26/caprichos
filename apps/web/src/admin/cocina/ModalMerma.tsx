@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
 import { api } from '../../comun/api';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 
 export interface LineaMermaForm {
   id: string;
@@ -27,7 +25,7 @@ export interface ModalMermaProps {
     origen: string;
     destino: string;
     motivo: string;
-  }>, codigoSupervisor?: string) => Promise<void> | void;
+  }>) => Promise<void> | void;
 }
 
 export interface InsumoItem {
@@ -60,9 +58,6 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
   const [confirmando, setConfirmando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [mensajeError, setMensajeError] = useState('');
-  const [codigoSupervisor, setCodigoSupervisor] = useState('');
-  const [requiereSupervisor, setRequiereSupervisor] = useState(false);
-  const pideCodigo = usePideCodigo();
 
   useEffect(() => {
     if (!abierto) return;
@@ -70,8 +65,6 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
     let activo = true;
     setCargandoInsumos(true);
     setMensajeError('');
-    setCodigoSupervisor('');
-    setRequiereSupervisor(false);
 
     api
       .get<any[]>('/admin/stock/insumos')
@@ -242,14 +235,8 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
       });
 
       if (alGuardar) {
-        await alGuardar(lineasProcesadas, codigoSupervisor || undefined);
+        await alGuardar(lineasProcesadas);
       } else {
-        const headers: Record<string, string> = {};
-        if (codigoSupervisor) {
-          headers['X-Codigo-Supervisor'] = codigoSupervisor.trim();
-          headers['X-Pin-Supervisor'] = codigoSupervisor.trim();
-        }
-        const config = Object.keys(headers).length > 0 ? { headers } : undefined;
         // Enviar según si es 1 línea o múltiples
         if (lineasProcesadas.length === 1) {
           const l = lineasProcesadas[0];
@@ -263,7 +250,6 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
               destino: l.destino,
               motivo: l.motivo,
             },
-            config,
           );
         } else {
           await api.post(
@@ -277,7 +263,6 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
                 destino: l.destino,
               })),
             },
-            config,
           );
         }
       }
@@ -286,21 +271,7 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
       alCerrar();
     } catch (err: any) {
       setConfirmando(false);
-      const codigo = err?.response?.data?.codigo || err?.codigo;
-      const status = err?.response?.status || err?.status;
-      if (
-        pideCodigo &&
-        (status === 403 ||
-        status === 409 ||
-        codigo === 'REQUIERE_CODIGO_SUPERVISOR' ||
-        codigo === 'REQUIERE_SUPERVISOR' ||
-        err?.message?.toLowerCase().includes('supervisor'))
-      ) {
-        setRequiereSupervisor(true);
-        setMensajeError('Se requiere autorización del supervisor para registrar esta merma.');
-      } else {
-        setMensajeError(err?.response?.data?.mensaje || err?.message || 'Error al registrar merma.');
-      }
+      setMensajeError(err?.response?.data?.mensaje || err?.message || 'Error al registrar merma.');
     } finally {
       setGuardando(false);
     }
@@ -646,30 +617,6 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
         >
           <span>+ Agregar otra línea</span>
         </button>
-
-        {/* Campo Código del Supervisor si la API lo requiere */}
-        {requiereSupervisor && (
-          <div
-            style={{
-              padding: '14px',
-              borderRadius: '12px',
-              background: '#FFFBEB',
-              border: '1.5px solid #FCD34D',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-            }}
-          >
-            <CampoCodigoSupervisor
-              id="merma-codigo-supervisor"
-              valor={codigoSupervisor}
-              onChange={(v) => {
-                setCodigoSupervisor(v);
-                setMensajeError('');
-              }}
-            />
-          </div>
-        )}
 
         {/* Resumen al pie */}
         <div

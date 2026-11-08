@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Boton } from '../../comun/Boton';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
-import { useSesion } from '../../comun/sesion';
 import { catalogoApi, ProductoAdmin } from '../catalogo/catalogoApi';
 import type { Pedido } from '../pedidos/pedidosApi';
 import { SelectorProductoCortesia, productoAgotado } from './SelectorProductoCortesia';
@@ -28,11 +26,9 @@ export function pasoDeError(codigo?: string): number | null {
 
 /**
  * Cortesía por separado, en pasos: qué regalas, por qué y a qué pedido corresponde (puede ser de un día anterior).
- * Descuenta stock como una venta (lo hace el servidor). Lo ven Caja y ADMIN; el SUPERVISOR presenta su código.
+ * Descuenta stock como una venta (lo hace el servidor). Lo ven quienes tienen el permiso de cortesías (queda auditada).
  */
 export function RegistrarCortesiaModal({ alCerrar, alRegistrar }: RegistrarCortesiaModalProps) {
-  const { usuario } = useSesion();
-  const pideCodigo = usuario?.rol === 'SUPERVISOR';
 
   const [paso, setPaso] = useState(0);
   const [productos, setProductos] = useState<ProductoAdmin[]>([]);
@@ -44,7 +40,6 @@ export function RegistrarCortesiaModal({ alCerrar, alRegistrar }: RegistrarCorte
   const [motivo, setMotivo] = useState('');
   const [nota, setNota] = useState('');
   const [pedidoRef, setPedidoRef] = useState<Pedido | null>(null);
-  const [codigo, setCodigo] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,31 +95,24 @@ export function RegistrarCortesiaModal({ alCerrar, alRegistrar }: RegistrarCorte
         return setError(e);
       }
     }
-    if (pideCodigo && !/^\d{6}$/.test(codigo)) return setError('Escribe el código de 6 dígitos del supervisor.');
     if (!producto || !pedidoRef) return;
 
     setEnviando(true);
     setError(null);
     try {
-      await cortesiasApi.registrarSeparada(
-        {
-          productoId: producto.id,
-          ...(tamanoId ? { tamanoId } : {}),
-          ...(porSabor ? { saborId } : {}),
-          cantidad: Math.floor(Number(cantidad)),
-          motivo,
-          ...(nota.trim() ? { nota: nota.trim() } : {}),
-          pedidoReferenciaId: pedidoRef.id,
-        },
-        pideCodigo ? codigo : undefined,
-      );
+      await cortesiasApi.registrarSeparada({
+        productoId: producto.id,
+        ...(tamanoId ? { tamanoId } : {}),
+        ...(porSabor ? { saborId } : {}),
+        cantidad: Math.floor(Number(cantidad)),
+        motivo,
+        ...(nota.trim() ? { nota: nota.trim() } : {}),
+        pedidoReferenciaId: pedidoRef.id,
+      });
       alRegistrar(pedidoRef.codigo);
     } catch (err: any) {
-      if (err?.codigo === 'CODIGO_INVALIDO') setCodigo('');
-      else {
-        const p = pasoDeError(err?.codigo);
-        if (p !== null) setPaso(p);
-      }
+      const p = pasoDeError(err?.codigo);
+      if (p !== null) setPaso(p);
       setError(err?.mensaje || 'No se pudo registrar la cortesía.');
     } finally {
       setEnviando(false);
@@ -275,9 +263,6 @@ export function RegistrarCortesiaModal({ alCerrar, alRegistrar }: RegistrarCorte
                 <dt>Pedido</dt>
                 <dd>{pedidoRef.codigo}</dd>
               </dl>
-              {pideCodigo && (
-                <CampoCodigoSupervisor id="cortesia-separada-codigo" valor={codigo} onChange={(v) => setCodigo(v)} etiqueta="Código del supervisor (6 dígitos)" ayuda="Lo ve el supervisor en su pantalla y cambia cada 30 segundos" />
-              )}
             </>
           )}
 

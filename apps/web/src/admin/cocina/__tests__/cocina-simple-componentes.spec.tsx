@@ -12,7 +12,7 @@ import * as socketModulo from '../../../comun/socket';
 import type { InsumoExistenciaCocina } from '../cocinaTipos';
 
 
-// El ADMIN no ve el código del supervisor: estas pruebas de código se hacen como CAJERO.
+// Estas pruebas se hacen como CAJERO.
 const comoCajero = () => {
   const actual = vi.mocked(sesionModulo.useSesion)();
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ ...actual, usuario: { partyId: '3', nombres: 'Cajera', rol: 'CAJERO' } } as any);
@@ -291,40 +291,23 @@ describe('Pantalla de Cocina Simple e Intuitiva - Componentes', () => {
       });
     });
 
-    it('muestra error claro si la API responde que requiere autorización del supervisor', async () => {
+    it('una merma grande (50) se guarda sin pedir ningún código de supervisor', async () => {
       comoCajero();
-      const insumosMock = [
-        { id: '1', nombre: 'Leche entera', unidad: 'lt', stockActual: 10 },
-      ];
-      vi.spyOn(api, 'get').mockResolvedValue(insumosMock);
-      const errorSupervisor = {
-        response: {
-          status: 403,
-          data: {
-            codigo: 'REQUIERE_CODIGO_SUPERVISOR',
-            mensaje: 'Se requiere código rotativo del supervisor',
-          },
-        },
-      };
-      const alGuardarSpy = vi.fn().mockRejectedValue(errorSupervisor);
+      vi.spyOn(api, 'get').mockResolvedValue([{ id: '1', nombre: 'Leche entera', unidad: 'lt', stockActual: 10 }]);
+      const alGuardarSpy = vi.fn().mockResolvedValue(undefined);
 
       render(<ModalMerma abierto={true} alCerrar={vi.fn()} alGuardar={alGuardarSpy} />);
-
       await waitFor(() => {
         expect(screen.getByText('Línea 1')).toBeInTheDocument();
       });
 
-      const inputCant = screen.getByPlaceholderText('Ej. 1.5');
-      fireEvent.change(inputCant, { target: { value: '50' } });
-
+      fireEvent.change(screen.getByPlaceholderText('Ej. 1.5'), { target: { value: '50' } });
       fireEvent.click(screen.getByRole('button', { name: /^Registrar mermas$/i }));
       fireEvent.click(screen.getByRole('button', { name: /Sí, registrar mermas/i }));
 
-      await waitFor(() => {
-        expect(
-          screen.getByText('Se requiere autorización del supervisor para registrar esta merma.'),
-        ).toBeInTheDocument();
-      });
+      await waitFor(() => expect(alGuardarSpy).toHaveBeenCalledTimes(1));
+      expect(screen.queryByText(/autorización del supervisor/i)).toBeNull();
+      expect(screen.queryByLabelText(/Código del supervisor/i)).toBeNull();
     });
   });
 
