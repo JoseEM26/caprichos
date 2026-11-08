@@ -1,0 +1,203 @@
+/* Lista de espera de mesa (prefijo le-). Paleta Caprichos; botones de 44 px mínimo; tablet y celular primero. */
+.le {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--cp-line, #e3d6c6);
+  border-radius: 12px;
+  background: var(--cp-cream, #fbf4ec);
+}
+.le-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.le-titulo {
+  margin: 0;
+  font-family: Montserrat, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--cp-navy, #0b2c3e);
+}
+.le-contador {
+  display: inline-block;
+  min-width: 24px;
+  padding: 0 8px;
+  margin-left: 6px;
+  border-radius: 9999px;
+  background: var(--cp-navy, #0b2c3e);
+  color: var(--cp-cream, #fbf4ec);
+  font-size: 13px;
+  text-align: center;
+}
+.le-vacio,
+.le-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--cp-soft, #2c4c5d);
+}
+.le-error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cp-rust, #b2500f);
+}
+.le-enlace {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--cp-orange, #e67929);
+  font-weight: 800;
+  cursor: pointer;
+}
+.le-lista,
+.le-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.le-tarjeta {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--cp-line, #e3d6c6);
+  border-radius: 10px;
+  background: #fff;
+}
+.le-datos {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.le-nombre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: Montserrat, sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--cp-navy, #0b2c3e);
+  overflow-wrap: anywhere;
+}
+.le-primero {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--cp-gold, #d99e39);
+  color: var(--cp-navy, #0b2c3e);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.le-min {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: #fff;
+}
+.le-min--verde {
+  background: var(--cp-green, #2f7a45);
+}
+.le-min--oxido {
+  background: var(--cp-rust, #b2500f);
+}
+.le-min--rojo {
+  background: #b3261e;
+}
+.le-btn {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid var(--cp-navy, #0b2c3e);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cp-navy, #0b2c3e);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+}
+.le-btn--principal {
+  border-color: var(--cp-orange, #e67929);
+  background: var(--cp-orange, #e67929);
+}
+.le-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.le-aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--cp-navy, #0b2c3e);
+  color: var(--cp-cream, #fbf4ec);
+}
+.le-aviso-texto {
+  margin: 0;
+  font-size: 14px;
+}
+.le-aviso-acciones {
+  display: flex;
+  gap: 8px;
+}
+.le-aviso .le-btn:not(.le-btn--principal) {
+  border-color: var(--cp-cream, #fbf4ec);
+  color: var(--cp-cream, #fbf4ec);
+}
+.le-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(11, 44, 62, 0.55);
+}
+.le-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(720px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--cp-cream, #fbf4ec);
+}
+.le-modal-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.le-opcion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--cp-line, #e3d6c6);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+@media (max-width: 520px) {
+  .le-tarjeta {
+    grid-template-columns: 1fr auto;
+  }
+  .le-tarjeta .le-btn {
+    grid-column: 1 / -1;
+  }
+}

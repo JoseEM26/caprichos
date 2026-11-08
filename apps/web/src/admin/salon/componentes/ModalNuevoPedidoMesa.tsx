@@ -279,6 +279,8 @@ export function ModalNuevoPedidoMesa({
 
   // Modo en plano: 'one' (Tomar pedido) | 'join' (Juntar mesas) | 'free' (Liberar)
   const [modoPlano, setModoPlano] = useState<'one' | 'join' | 'free'>('one');
+  // Lista de espera: todas las mesas llenas; el pedido se crea sin mesa y se asigna después desde Salón
+  const [enEspera, setEnEspera] = useState(false);
 
   // Paso productos: cupón plegado y barra del pedido (celular) expandida o no
   const [cuponAbierto, setCuponAbierto] = useState(false);
@@ -286,6 +288,9 @@ export function ModalNuevoPedidoMesa({
 
   // Mesas seleccionadas
   const [mesasSeleccionadas, setMesasSeleccionadas] = useState<string[]>(todasLasMesasIniciales);
+  useEffect(() => {
+    if (mesasSeleccionadas.length > 0) setEnEspera(false);
+  }, [mesasSeleccionadas]);
 
   // Copia local de las mesas: el padre la pasa, pero no siempre la refresca. El modal la actualiza
   // con el socket (salon:mesa) y tras liberar o forzar, así el plano de adentro no queda con la mesa ocupada.
@@ -769,12 +774,19 @@ export function ModalNuevoPedidoMesa({
   // Nombres de mesas seleccionadas
   const textoMesas = useMemo(() => {
     if (extra) return extra.mesa_nombre || 'Sin mesa';
+    if (enEspera) return 'Lista de espera';
     if (mesasSeleccionadas.length === 0) return 'Sin mesa';
     return todasLasMesas
       .filter((m) => mesasSeleccionadas.includes(m.id))
       .map((m) => m.nombre || `Mesa ${m.numero}`)
       .join(' + ');
-  }, [mesasSeleccionadas, todasLasMesas]);
+  }, [mesasSeleccionadas, todasLasMesas, enEspera, extra]);
+
+  // Sin ninguna mesa libre: el botón de la lista de espera se destaca
+  const sinMesasLibres = useMemo(
+    () => todasLasMesas.filter((m) => m.activo !== false && m.estado !== 'OCUPADA').length === 0,
+    [todasLasMesas],
+  );
 
   // Asientos totales de mesas seleccionadas
   const asientosSeleccionados = useMemo(() => {
@@ -1082,6 +1094,9 @@ export function ModalNuevoPedidoMesa({
   const telefonoMesa = cliTelefono.replace(/\D/g, '');
   const celularReal = /^9\d{8}$/.test(telefonoMesa) && telefonoMesa !== '999999999';
   const telefonoMesaValido = pideMode === 'personal' ? telefonoMesa === '' || celularReal : celularReal;
+  // En la lista de espera el celular es obligatorio siempre (con cuenta sale de ella)
+  const telefonoEspera = (pideMode === 'cliente' ? (clienteEncontrado?.telefono ?? '') : telefonoMesa).replace(/\D/g, '');
+  const telefonoEsperaValido = /^9\d{8}$/.test(telefonoEspera) && telefonoEspera !== '999999999';
   const mensajeTelefonoMesa =
     telefonoMesa === ''
       ? 'Escribe el celular del cliente: 9 dígitos que empiecen con 9'
@@ -1100,11 +1115,17 @@ export function ModalNuevoPedidoMesa({
     erroresEnvio.push({ campo: 'productos', mensaje: 'Agrega al menos un producto para enviarlo.', foco: [] });
   if (pideMode === 'personal' && !staffElegido)
     erroresEnvio.push({ campo: 'personal', mensaje: 'Elige al trabajador al que se le carga el pedido.', foco: [] });
-  if (modalidad === 'local' && !extra && mesasSeleccionadas.length === 0)
+  if (modalidad === 'local' && !extra && !enEspera && mesasSeleccionadas.length === 0)
     erroresEnvio.push({ campo: 'mesa', mensaje: 'Elige una mesa para enviarlo.', foco: [] });
   if (modalidad === 'local' && !extra && errorNombreMesa)
     erroresEnvio.push({ campo: 'nombre', mensaje: errorNombreMesa, foco: ['#np-nombre-mesa'] });
-  if (modalidad === 'local' && !extra && pideMode !== 'cliente' && !telefonoMesaValido)
+  if (modalidad === 'local' && !extra && enEspera && !telefonoEsperaValido)
+    erroresEnvio.push({
+      campo: 'telefono',
+      mensaje: 'La lista de espera necesita el celular del cliente: 9 dígitos que empiecen con 9',
+      foco: ['#np-telefono-mesa'],
+    });
+  if (modalidad === 'local' && !extra && !enEspera && pideMode !== 'cliente' && !telefonoMesaValido)
     erroresEnvio.push({
       campo: 'telefono',
       mensaje: mensajeTelefonoMesa,
@@ -1157,7 +1178,7 @@ export function ModalNuevoPedidoMesa({
 
   // Enviar pedido a cocina o registrar pedido (Para llevar / Delivery)
   const handleEnviarPedido = async () => {
-    if (lineas.length === 0 || (!extra && modalidad === 'local' && mesasSeleccionadas.length === 0)) {
+    if (lineas.length === 0 || (!extra && modalidad === 'local' && !enEspera && mesasSeleccionadas.length === 0)) {
       setErrorEnvio('Debe seleccionar al menos un producto.');
       setConfirmarEnviar(false);
       return;
@@ -1208,7 +1229,8 @@ export function ModalNuevoPedidoMesa({
       } else if (modalidad === 'local') {
         res = await salonApi.abrirPedidoMesa(
           {
-            mesas: mesasSeleccionadas,
+            mesas: enEspera ? [] : mesasSeleccionadas,
+            ...(enEspera ? { enEsperaMesa: true } : {}),
             lineas: payloadLineas,
             nota: notaGeneral.trim() || undefined,
             reservaId: reservaIdPreseleccionada,
@@ -1227,8 +1249,9 @@ export function ModalNuevoPedidoMesa({
               plan: planAhora,
             },
             // Con cuenta el nombre y el teléfono salen de la cuenta; sin cuenta va el nombre que escribe el mozo
-            cliente:
-              pideMode === 'cliente'
+            cliente: enEspera
+              ? { nombre: nombreMesa, telefono: telefonoEspera }
+              : pideMode === 'cliente'
                 ? undefined
                 : {
                     nombre: nombreMesa,
@@ -1982,6 +2005,32 @@ export function ModalNuevoPedidoMesa({
           {/* ============================================================= */}
           {paso === 'plan' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Lista de espera: siempre a mano; destacada cuando no queda ninguna mesa libre */}
+              {!extra && (
+                <button
+                  type="button"
+                  data-testid="np-lista-espera"
+                  aria-label="Todas ocupadas, dejar en lista de espera"
+                  onClick={() => {
+                    setMesasSeleccionadas([]);
+                    setEnEspera(true);
+                    setPaso('items');
+                  }}
+                  style={{
+                    minHeight: '48px',
+                    padding: '0 16px',
+                    borderRadius: '12px',
+                    border: '1.5px solid var(--cp-rust)',
+                    background: sinMesasLibres ? 'var(--cp-rust)' : 'transparent',
+                    color: sinMesasLibres ? 'var(--cp-cream)' : 'var(--cp-rust)',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Todas ocupadas · Dejar en lista de espera
+                </button>
+              )}
               {/* Modos: Tomar pedido, Juntar mesas, Liberar */}
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)' }}>
@@ -2700,7 +2749,7 @@ export function ModalNuevoPedidoMesa({
                 <div className="np-chip-mesa">
                   <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)' }}>
                     {modalidad === 'local'
-                      ? `Mesa: ${textoMesas}`
+                      ? (enEspera ? 'En lista de espera de mesa' : `Mesa: ${textoMesas}`)
                       : `${modalidad === 'delivery' ? 'Delivery' : 'Para llevar'} · ${cliNombre || 'Cliente'}`}
                   </div>
                   <button
@@ -3485,7 +3534,7 @@ export function ModalNuevoPedidoMesa({
         }
         mensaje={
           modalidad === 'local'
-            ? `Se enviarán los productos para la mesa ${textoMesas}. Comenzará su preparación en cocina y se descontará el stock.${clientePideId && clienteEncontrado ? ` Pide ${clienteEncontrado.nombre}: el pedido suma sus puntos al cobrar.` : ''}`
+            ? `Se enviarán los productos ${enEspera ? 'a la lista de espera de mesa (se asigna la mesa cuando se libere una)' : `para la mesa ${textoMesas}`}. Comenzará su preparación en cocina y se descontará el stock.${clientePideId && clienteEncontrado ? ` Pide ${clienteEncontrado.nombre}: el pedido suma sus puntos al cobrar.` : ''}`
             : `Se registrará el pedido (${modalidad === 'delivery' ? 'Delivery' : 'Para llevar'}) a nombre de ${cliNombre || (clientePideId && clienteEncontrado ? clienteEncontrado.nombre : 'Cliente')} por S/ ${total.toFixed(2)}.`
         }
         textoConfirmar={modalidad === 'local' ? 'Sí, enviar comanda' : 'Sí, registrar'}

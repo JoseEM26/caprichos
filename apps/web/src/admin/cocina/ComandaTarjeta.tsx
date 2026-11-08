@@ -545,6 +545,7 @@ export function ComandaTarjeta({
   const formatoModalidad = () => {
     const mod = (comanda.modalidad || '').toUpperCase();
     if (mod === 'MESA' || mod === 'LOCAL') {
+      if (comanda.enEsperaMesa) return 'En espera de mesa';
       return comanda.mesa ? `En mesa · M${comanda.mesa}` : 'En mesa';
     }
     if (mod === 'DELIVERY') return 'Delivery';
@@ -555,7 +556,9 @@ export function ComandaTarjeta({
 
   const modalName = formatoModalidad();
   const canalTxt = comanda.canal ? `${comanda.canal}` : 'Web';
-  const whoTxt = comanda.mesa
+  const whoTxt = comanda.enEsperaMesa
+    ? 'En espera de mesa'
+    : comanda.mesa
     ? `M${comanda.mesa}`
     : comanda.modalidad === 'COMER_LOCAL' && comanda.cliente
     ? comanda.cliente

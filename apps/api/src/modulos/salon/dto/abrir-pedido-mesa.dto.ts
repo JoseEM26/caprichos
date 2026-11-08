@@ -1,6 +1,5 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsInt,
@@ -34,9 +33,15 @@ export class ClienteMesaDto {
 }
 
 export class AbrirPedidoMesaDto {
+  /** Al menos una mesa, salvo con enEsperaMesa (lista de espera: sin mesa). Lo valida SalonService. */
+  @IsOptional()
   @IsArray({ message: 'mesas debe ser una lista de IDs de mesas' })
-  @ArrayMinSize(1, { message: 'Debe seleccionar al menos una mesa' })
-  mesas!: (number | string)[];
+  mesas?: (number | string)[];
+
+  /** Lista de espera: el pedido nace sin mesa (cliente esperando afuera). Exige nombre y celular. */
+  @IsOptional()
+  @IsBoolean({ message: 'enEsperaMesa debe ser verdadero o falso' })
+  enEsperaMesa?: boolean;
 
   @IsArray({ message: 'Las líneas del pedido son requeridas' })
   @ValidateNested({ each: true })

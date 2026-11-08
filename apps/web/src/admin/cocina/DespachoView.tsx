@@ -28,7 +28,7 @@ export function detalleLinea(l: LineaComanda): string[] {
 
 /** Quién o dónde: mesa, cliente o ambos. */
 function destino(p: PedidoDespacho): string {
-  const mesa = p.modalidad === 'MESA' && p.mesa ? `Mesa ${p.mesa}` : '';
+  const mesa = p.enEsperaMesa ? 'En espera de mesa' : p.modalidad === 'MESA' && p.mesa ? `Mesa ${p.mesa}` : '';
   return [mesa, p.cliente].filter(Boolean).join(' · ');
 }
 
