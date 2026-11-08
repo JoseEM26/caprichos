@@ -6,12 +6,22 @@ export interface CandidataLocal extends ImpresoraCandidata {
   destino: string;
   /** Linux: MFG MDL|serie, estable aunque cambie el número de lpN. */
   identidad?: string;
+  /** Windows: puerto del spooler (USB001, LPT1, IP_...). Linux: la ruta del dispositivo. */
+  puerto?: string;
+  driver?: string;
+  /** Windows: estado del spooler (Normal, Offline...), con «sin conexión» si WorkOffline. */
+  estadoSpooler?: string;
+  /** Va conectada por USB (puerto USBxxx en Windows; /dev/usb/lpN en Linux). */
+  usb?: boolean;
 }
 
 export interface ImpresoraWindowsInfo {
   nombre: string;
   driver?: string;
   puerto?: string;
+  /** PrinterStatus de Get-Printer (Normal, Offline, PaperOut...). */
+  estado?: string;
+  workOffline?: boolean;
 }
 
 const NOMBRE_VIRTUAL = /pdf|onenote|fax|xps|document writer|print to file|imprimir (en|a) (archivo|pdf)|snagit|cutepdf|primopdf|dopdf|send to|enviar a|teams|anydesk/i;
@@ -54,6 +64,10 @@ export function candidatasDeWindows(lista: ImpresoraWindowsInfo[]): CandidataLoc
     destino: i.nombre,
     detalle: [i.driver, i.puerto && `puerto ${i.puerto}`].filter(Boolean).join(' · ') || undefined,
     sugerido: sugerirRol(`${i.nombre} ${i.driver ?? ''}`),
+    puerto: i.puerto,
+    driver: i.driver,
+    estadoSpooler: i.workOffline ? 'sin conexión' : i.estado,
+    usb: /^usb/i.test(i.puerto ?? ''),
   }));
 }
 
@@ -76,6 +90,8 @@ export function candidatasDeLinux(lista: ImpresoraLinuxInfo[]): CandidataLocal[]
       identidad: i.identidad,
       detalle: [i.destino, i.lenguaje].filter(Boolean).join(' · '),
       sugerido: i.sugerido ?? sugerirRol(i.modelo ?? ''),
+      puerto: i.destino,
+      usb: i.destino.startsWith('/dev/usb/'),
     };
   });
 }

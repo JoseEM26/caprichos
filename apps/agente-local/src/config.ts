@@ -81,7 +81,7 @@ export function obtenerConfiguracion(
     ? parseInt(env.INTERVALO_CONSULTA_MS, 10)
     : env.POLL_INTERVAL_MS
       ? parseInt(env.POLL_INTERVAL_MS, 10)
-      : 3000;
+      : 2000;
 
   const intervaloLatidoMs = env.INTERVALO_LATIDO_MS
     ? parseInt(env.INTERVALO_LATIDO_MS, 10)
@@ -91,7 +91,7 @@ export function obtenerConfiguracion(
 
   const maxTrabajosPorLote = env.MAX_TRABAJOS_LOTE
     ? Math.min(10, Math.max(1, parseInt(env.MAX_TRABAJOS_LOTE, 10)))
-    : 10;
+    : 4; // lotes cortos: un ticket de pago nuevo no espera a que salgan 10 stickers
 
   return {
     apiUrl,
@@ -101,9 +101,9 @@ export function obtenerConfiguracion(
     ticketera: env.TICKETERA || archivo.ticketera || undefined,
     etiqueta: formatoDesdeConfig(env, archivo.etiqueta),
     ticketColumnas: Number(env.TICKET_COLUMNAS || archivo.ticketColumnas) === 32 ? 32 : 48,
-    intervaloConsultaMs: isNaN(intervaloConsultaMs) ? 3000 : intervaloConsultaMs,
+    intervaloConsultaMs: isNaN(intervaloConsultaMs) ? 2000 : intervaloConsultaMs,
     intervaloLatidoMs: isNaN(intervaloLatidoMs) ? 20000 : intervaloLatidoMs,
-    maxTrabajosPorLote: isNaN(maxTrabajosPorLote) ? 10 : maxTrabajosPorLote,
+    maxTrabajosPorLote: isNaN(maxTrabajosPorLote) ? 4 : maxTrabajosPorLote,
     version: VERSION_AGENTE,
   };
 }

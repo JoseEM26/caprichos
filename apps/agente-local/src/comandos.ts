@@ -3,6 +3,7 @@ import type { ArchivoConfiguracion, ConfiguracionAgente } from './config';
 import type { CandidataLocal } from './candidatas';
 import { idGuardado } from './candidatas';
 import type { IDispositivoImpresora } from './impresora/dispositivo.interface';
+import { lineasDiagnostico } from './autoUsb';
 import { generarPruebaEtiqueta, generarPruebaTicket } from './pruebaImpresora';
 
 /** Lo que necesitan los comandos de terminal (todo inyectable para probarlos sin impresoras). */
@@ -173,4 +174,16 @@ export async function ejecutarMenu(
     else if (op === '7' && extra.alternarAutoarranque) d.log(await extra.alternarAutoarranque());
     else d.log('Opción no válida.');
   }
+}
+
+/** `diagnostico`: lista impresoras, puertos, driver y estado, y dice cuál elegiría el programa solo. */
+export async function comandoDiagnostico(d: DepsComandos, ruta?: string): Promise<void> {
+  const lista = await d.listar().catch((e: any) => {
+    d.log(`No pude leer las impresoras del equipo: ${e?.message ?? e}`);
+    return [] as CandidataLocal[];
+  });
+  const a = d.relear ? d.relear() : d.archivo;
+  d.log('=== Diagnóstico de impresoras ===');
+  lineasDiagnostico(lista, (rol) => (rol === 'ETIQUETERA' ? idGuardado(a.etiquetera, a.etiqueteraId) : idGuardado(a.ticketera, a.ticketeraId))).forEach((l) => d.log(l));
+  if (ruta) d.log(`Configuración: ${ruta}`);
 }

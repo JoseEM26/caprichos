@@ -40,7 +40,7 @@ describe('dos máquinas', () => {
       { rol: 'ETIQUETERA', estado: 'lista', detalle: undefined },
       { rol: 'TICKETERA', estado: 'lista', detalle: undefined },
     ]);
-    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(10, ['ETIQUETERA', 'TICKETERA']);
+    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(4, ['ETIQUETERA', 'TICKETERA']);
     expect(tk.obtenerTrabajosEscritos()).toHaveLength(1);
     expect(et.obtenerTrabajosEscritos()).toHaveLength(0);
     expect(cliente.reportarResultado).toHaveBeenCalledWith('1', true);
@@ -51,7 +51,7 @@ describe('dos máquinas', () => {
     tk.establecerEstado({ estado: 'desconectada', detalle: 'apagada' });
     const { cliente, agente } = montar(tk);
     await agente.ejecutarCiclo();
-    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(10, ['ETIQUETERA']);
+    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(4, ['ETIQUETERA']);
     expect(cliente.enviarLatido.mock.calls[0][3][1]).toMatchObject({ rol: 'TICKETERA', estado: 'desconectada' });
   });
 
@@ -131,13 +131,13 @@ describe('el mismo programa para todas las computadoras', () => {
   it('un equipo solo con ticketera toma solo trabajos de ticketera; no pide stickers', async () => {
     const { cliente, agente } = soloCon('TICKETERA');
     await agente.ejecutarCiclo();
-    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(10, ['TICKETERA']);
+    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(4, ['TICKETERA']);
   });
 
   it('un equipo solo con etiquetera toma solo stickers; no pide comandas ni tickets', async () => {
     const { cliente, agente } = soloCon('ETIQUETERA');
     await agente.ejecutarCiclo();
-    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(10, ['ETIQUETERA']);
+    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(4, ['ETIQUETERA']);
   });
 });
 

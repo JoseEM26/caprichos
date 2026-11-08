@@ -7,9 +7,9 @@ describe('config', () => {
     expect(config.apiUrl).toBe('http://localhost:3000');
     expect(config.agenteKey).toBe('');
     expect(config.impresoraRuta).toBe('/dev/usb/lp0');
-    expect(config.intervaloConsultaMs).toBe(3000);
+    expect(config.intervaloConsultaMs).toBe(2000);
     expect(config.intervaloLatidoMs).toBe(20000);
-    expect(config.maxTrabajosPorLote).toBe(10);
+    expect(config.maxTrabajosPorLote).toBe(4);
   });
 
   it('permite sobreescribir configuracion mediante variables de entorno', () => {
