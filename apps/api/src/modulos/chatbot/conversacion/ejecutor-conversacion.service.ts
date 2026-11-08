@@ -2091,6 +2091,22 @@ export class EjecutorConversacionService {
             await this.volverAlCarritoSinStock(conversacion.id, accion.carrito, err.response.mensaje, destinoEnvio, entradaRaw);
             continue;
           }
+          // Local cerrado (o en pausa) al confirmar: no se toma el pedido; se avisa el horario, sin escalar a una persona
+          if (err?.response?.codigo === 'CARTA_CERRADA') {
+            const texto = `${err.response.mensaje ?? 'Ahora no estamos recibiendo pedidos'} 🙏 Tu pedido no se envió; escríbenos de nuevo cuando estemos atendiendo.`;
+            let metaId: string | null = null;
+            if (destinoEnvio) {
+              const res = await this.mensajeria.enviarTexto(destinoEnvio, texto, {
+                conversacionId: conversacion.id,
+                replyToWaMessageId: entradaRaw.waMessageId,
+              });
+              metaId = (res as any)?.waMessageId || null;
+            }
+            await this.prisma.mensajeChat.create({
+              data: { conversacion_id: conversacion.id, direccion: 'SALE', autor: 'BOT', tipo: 'TEXTO', contenido: { texto } as any, meta_id: metaId },
+            });
+            continue;
+          }
           // Sabor agotado: se elige otro sabor de ese producto (lista); si ya no queda ninguno, vuelve al carrito
           if (err?.response?.codigo === 'SABOR_AGOTADO' && accion.carrito) {
             const volvio = await this.volverAlSaborAgotado(conversacion.id, accion.carrito, err.response, categoriasCarta, destinoEnvio, entradaRaw);

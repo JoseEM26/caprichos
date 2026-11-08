@@ -168,6 +168,14 @@ describe('PedidosService', () => {
         motivo: 'OK',
         texto: 'Abierto',
       }),
+      // mismo contrato que LocalService.exigirLocalAbierto: 409 CARTA_CERRADA si el estado no es abierto
+      exigirLocalAbierto: jest.fn().mockImplementation(async () => {
+        const e = await localServiceMock.obtenerEstadoCarta();
+        if (!e.abierta) {
+          throw new HttpException({ codigo: 'CARTA_CERRADA', mensaje: e.texto }, HttpStatus.CONFLICT);
+        }
+        return e;
+      }),
     };
 
     zonasServiceMock = {
@@ -887,6 +895,19 @@ describe('PedidosService', () => {
           }),
         );
       }
+    });
+
+    it.each([
+      ['WHATSAPP', { canal: 'WHATSAPP', telefonoRemitente: '987654321' }],
+      ['BOT', { canal: 'BOT', telefonoRemitente: '987654321' }],
+      ['CARTA con sesión', { canal: 'CARTA', clientePartyId: 5n }],
+      ['WHATSAPP con omitirChequeoCarta (se ignora)', { canal: 'WHATSAPP', omitirChequeoCarta: true }],
+    ])('8b. fuera de horario, canal %s -> 409 CARTA_CERRADA', async (_n, origen: any) => {
+      localServiceMock.obtenerEstadoCarta.mockResolvedValue({ abierta: false, motivo: 'HORARIO', texto: 'Abrimos hoy a las 14:00' });
+      await expect(service.crear(pedidoBaseDto, `idemp-cerrada-${_n}`, origen)).rejects.toMatchObject({
+        response: { codigo: 'CARTA_CERRADA', mensaje: 'Abrimos hoy a las 14:00' },
+      });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
     });
 
     it('9. el precio enviado por el cliente se ignora por completo', async () => {

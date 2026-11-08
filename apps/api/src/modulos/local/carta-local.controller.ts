@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Header } from '@nestjs/common';
 import { LocalService } from './local.service';
 
 /**
@@ -9,8 +9,9 @@ export class CartaLocalController {
   constructor(private readonly localService: LocalService) {}
 
   @Get('estado')
+  @Header('Cache-Control', 'no-store')
   async obtenerEstado() {
-    return this.localService.obtenerEstadoCarta();
+    return this.localService.obtenerEstadoCartaSeguro();
   }
 
   @Get('local')

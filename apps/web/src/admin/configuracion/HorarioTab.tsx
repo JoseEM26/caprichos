@@ -7,6 +7,7 @@ import { EstadoError } from '../../comun/EstadoError';
 import { Confirmar } from '../../comun/Confirmar';
 import { Insignia } from '../../comun/Insignia';
 import { AyudaBloque } from './AyudaBloque';
+import type { EstadoLocalCarta } from '../../carta/tipos';
 
 export interface HorarioDiaItem {
   dia_semana: number;
@@ -45,6 +46,25 @@ export function HorarioTab({ puedeEditar }: HorarioTabProps) {
   const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
   const [mensajeGuardado, setMensajeGuardado] = useState<string | null>(null);
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
+
+  // Estado real que ve el cliente ahora mismo (hora de Lima, lo calcula el servidor); se refresca solo
+  const [estadoAhora, setEstadoAhora] = useState<EstadoLocalCarta | null>(null);
+  const [estadoError, setEstadoError] = useState(false);
+  const leerEstadoAhora = async () => {
+    try {
+      setEstadoAhora(await api.get<EstadoLocalCarta>('/carta/estado'));
+      setEstadoError(false);
+    } catch {
+      setEstadoError(true);
+    }
+  };
+  const textoAhora = estadoError
+    ? 'Ahora: no se pudo verificar'
+    : !estadoAhora
+      ? 'Ahora: verificando...'
+      : estadoAhora.abierta
+        ? `Ahora: Abierto${estadoAhora.cierra ? ` hasta las ${estadoAhora.cierra}` : ''}`
+        : `Ahora: Cerrado · ${estadoAhora.texto}`;
 
   const cargarHorarios = async () => {
     setCargando(true);
@@ -85,6 +105,12 @@ export function HorarioTab({ puedeEditar }: HorarioTabProps) {
 
   useEffect(() => {
     cargarHorarios();
+  }, []);
+
+  useEffect(() => {
+    void leerEstadoAhora();
+    const t = setInterval(() => void leerEstadoAhora(), 30000);
+    return () => clearInterval(t);
   }, []);
 
   const hayCambios = useMemo(() => {
@@ -162,6 +188,7 @@ export function HorarioTab({ puedeEditar }: HorarioTabProps) {
       const horaStr = ahora.toLocaleTimeString('es-PE', { hour12: false });
       setMensajeGuardado(`Guardado a las ${horaStr}`);
       setConfirmarAbierto(false);
+      void leerEstadoAhora();
     } catch (err) {
       const msg =
         err instanceof ErrorApi
@@ -225,6 +252,12 @@ export function HorarioTab({ puedeEditar }: HorarioTabProps) {
             }}
           >
             Define los días y horas en que el restaurante recibe pedidos y reservas.
+          </p>
+          <p
+            data-testid="horario-estado-ahora"
+            style={{ fontSize: '13px', fontWeight: 800, margin: '6px 0 0 0', color: estadoAhora?.abierta ? 'var(--cp-green)' : 'var(--cp-rust)' }}
+          >
+            {textoAhora} <span style={{ fontWeight: 500, color: 'var(--cp-soft)' }}>(hora de Lima)</span>
           </p>
         </div>
 
