@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsNotEmpty, IsOptional, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsOptional, Min, ValidateNested } from 'class-validator';
 
 export class LineaDespachoDto {
   @IsNotEmpty({ message: 'La línea es requerida' })
@@ -17,4 +17,11 @@ export class DespacharDto {
   @ValidateNested({ each: true })
   @Type(() => LineaDespachoDto)
   lineas?: LineaDespachoDto[];
+}
+
+export class DespacharCompletoDto {
+  /** Despachar solo lo que ya está listo; el pedido sigue En despacho hasta completar. */
+  @IsOptional()
+  @IsBoolean()
+  parcial?: boolean;
 }

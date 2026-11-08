@@ -347,8 +347,8 @@ describe('ComandasService', () => {
     });
   });
 
-  describe('pedido de dos áreas: una despeja (sigue en COLA), la segunda lo deja LISTO', () => {
-    it('al completarse un pedido de MESA avisa al mozo; uno de DELIVERY no', async () => {
+  describe('pedido de dos áreas: al terminar todas queda En despacho (NO pasa solo a LISTO)', () => {
+    it('al despejar la última área no avisa al mozo ni cambia el estado: espera a Despacho', async () => {
       const probar = async (modalidad: string) => {
         const pedido = { id: 8n, codigo: 'CP-0008', estado: 'COLA', modalidad, pasa_cocina_en: new Date(), entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n };
         prisma.pedido.findUnique.mockResolvedValue(pedido);
@@ -358,13 +358,13 @@ describe('ComandasService', () => {
         await service.despejar(8n, 1n, mockUsuario);
       };
       await probar('MESA');
-      expect(salonMock.avisarListo).toHaveBeenCalledWith(8n);
-      salonMock.avisarListo.mockClear();
+      expect(salonMock.avisarListo).not.toHaveBeenCalled();
+      expect(prisma.pedido.update).not.toHaveBeenCalled();
       await probar('DELIVERY');
       expect(salonMock.avisarListo).not.toHaveBeenCalled();
     });
 
-    it('al despejar la primera área sigue en COLA, al despejar la segunda pasa a LISTO', async () => {
+    it('al despejar la primera área sigue en COLA; al despejar la segunda queda completo pero sigue en COLA (Despacho lo pasa a LISTO)', async () => {
       const pedidoMock = {
         id: 7n,
         codigo: 'CP-0007',
@@ -412,31 +412,9 @@ describe('ComandasService', () => {
       const res2 = await service.despejar(7n, 2n, mockUsuario);
 
       expect(res2.completo).toBe(true);
-      expect(prisma.pedido.update).toHaveBeenCalledWith({
-        where: { id: 7n },
-        data: expect.objectContaining({
-          estado: 'LISTO',
-        }),
-      });
-      expect(prisma.pedidoEstadoHistorial.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          pedido_id: 7n,
-          estado_anterior: 'COLA',
-          estado_nuevo: 'LISTO',
-        }),
-      });
-      expect(auditoria.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          modulo: 'pedidos',
-          accion: 'CAMBIAR_ESTADO',
-          despues: expect.objectContaining({ estado: 'LISTO' }),
-        }),
-      );
-      expect(eventosGateway.emitirAdmin).toHaveBeenCalledWith('pedido:estado', {
-        id: 7,
-        codigo: 'CP-0007',
-        estado: 'LISTO',
-      });
+      expect(prisma.pedido.update).not.toHaveBeenCalled();
+      expect(prisma.pedidoEstadoHistorial.create).not.toHaveBeenCalled();
+      expect(eventosGateway.emitirAdmin).not.toHaveBeenCalledWith('pedido:estado', expect.anything());
       expect(eventosGateway.emitirAdmin).toHaveBeenCalledWith('cocina:comanda', {
         pedidoId: 7,
         areaId: 2,

@@ -56,14 +56,22 @@ describe('DespachoService', () => {
     expect((await service.listar()).pedidos[0].completo).toBe(true);
   });
 
-  it('atendidos ocultos por defecto y visibles con el filtro; muestra quién', async () => {
+  it('por defecto solo lista pedidos En despacho (COLA/PREPARANDO); con el filtro suma los ya despachados', async () => {
     await service.listar();
-    expect(prisma.pedido.findMany.mock.calls[0][0].where.atendido_despacho_en).toBeNull();
-    expect(prisma.pedido.findMany.mock.calls[0][0].where.estado).toEqual({ notIn: ['ANULADO', 'RECHAZADO'] });
-    prisma.pedido.findMany.mockResolvedValue([pedido({ atendido_despacho_en: new Date(), atendido_despacho_por: 7n })]);
+    expect(prisma.pedido.findMany.mock.calls[0][0].where.estado).toEqual({ in: ['COLA', 'PREPARANDO'] });
+    prisma.pedido.findMany.mockResolvedValue([pedido({ estado: 'LISTO', listo_en: new Date() })]);
     const r = await service.listar(true);
-    expect(prisma.pedido.findMany.mock.calls[1][0].where).not.toHaveProperty('atendido_despacho_en');
-    expect(r.pedidos[0]).toMatchObject({ atendido: true, atendido_por: 'Luis P' });
+    expect(prisma.pedido.findMany.mock.calls[1][0].where.estado).toEqual({ notIn: ['ANULADO', 'RECHAZADO'] });
+    expect(r.pedidos[0]).toMatchObject({ despachado: true, estado: 'LISTO', atendido: true });
+  });
+
+  it('un área con todas sus líneas despachadas (despacho parcial) viene marcada despachada', async () => {
+    prisma.pedido.findMany.mockResolvedValue([
+      pedido({ lineas: [{ ...linea(10n, 1n, 'Pizza'), despachadas: 1 }, linea(11n, 2n, 'Jugo')] }),
+    ]);
+    const p = (await service.listar()).pedidos[0];
+    expect(p.areas.map((a) => [a.areaNombre, a.despachada])).toEqual([['Cocina', true], ['Bar', false]]);
+    expect(p.despachado).toBe(false);
   });
 
   it('marcar atendido guarda quién/cuándo, audita y avisa', async () => {

@@ -40,6 +40,9 @@ export const ETAPAS_AVISO: Record<
   REPROG_CANCELADA: { numero: 12, parametro: 'whatsapp_aviso_espera_activo' },
   REPROG_SIN_RESPUESTA: { numero: 13, parametro: 'whatsapp_aviso_espera_activo' },
   // Recordatorio del voucher de un pedido digital de la carta que aún no lo envió (una vez por pedido)
+  // Recojo / para llevar listo (Despacho): comparte el parámetro del aviso de recojo. Usa el numero 7 del LISTO:
+  // un pedido es delivery o recojo, así no hace falta ampliar el CHECK de mensaje_reparto con una migración.
+  LISTO_RECOJO: { numero: 7, parametro: 'whatsapp_aviso_recojo_activo', cualquierModalidad: true },
   VOUCHER_RECORDATORIO: { numero: 14, parametro: 'whatsapp_aviso_voucher_recordatorio_activo', cualquierModalidad: true },
 };
 
@@ -449,6 +452,8 @@ export class AvisosPedidoService {
         return TEXTOS_REPARTO.aceptado(nombre, codigo);
       case 'LISTO':
         return TEXTOS_REPARTO.listo(nombre, codigo);
+      case 'LISTO_RECOJO':
+        return TEXTOS_REPARTO.listoRecojo(nombre, codigo);
       case 'ASIGNADO':
         return TEXTOS_REPARTO.asignado(nombre, codigo, datos.repartidorNombre ?? 'nuestro repartidor');
       case 'SALIDA': {

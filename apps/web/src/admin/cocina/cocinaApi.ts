@@ -62,6 +62,17 @@ export async function despacharPedido(
 }
 
 /**
+ * Despacho: el LISTO final. Completo: todas las áreas listas → el pedido pasa a LISTO y se avisa por modalidad.
+ * `parcial`: despacha solo lo ya listo y deja el resto pendiente (el pedido sigue En despacho).
+ */
+export async function despacharCompleto(
+  pedidoId: string,
+  parcial = false,
+): Promise<{ ok: boolean; completo: boolean; parcial: boolean; estado: string }> {
+  return api.post(`/admin/cocina/despacho/${encodeURIComponent(pedidoId)}/completo`, { parcial });
+}
+
+/**
  * Ajustes de la pantalla que lee el personal (GET /admin/cocina/ajustes).
  * `confirmarDespejar` es el valor efectivo para quien consulta: su preferencia personal o, si no tiene, el general.
  */

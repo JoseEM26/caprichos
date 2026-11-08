@@ -112,6 +112,23 @@ describe('AvisosPedidoService (avisos de reparto al cliente, encolados en el out
     expect(prisma.mensajeReparto.create).not.toHaveBeenCalled();
   });
 
+  it('LISTO_RECOJO: un pedido de recoger recibe «ya está listo para recoger» con la plantilla de recojo', async () => {
+    pedido.modalidad = 'RECOGER';
+    const res = await servicio.avisar(77, 'LISTO_RECOJO');
+    expect(res.estado).toBe('ENCOLADO');
+    expect(outbox.encolar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clave: 'pedido-77-LISTO_RECOJO',
+        carga: expect.objectContaining({
+          plantillaClave: 'PEDIDO_LISTO_RECOJO',
+          variablesPlantilla: ['Marta', 'CP-077'],
+          textoLibre: expect.stringContaining('ya está listo para recoger'),
+        }),
+      }),
+      expect.anything(),
+    );
+  });
+
   it('pedido que no es delivery o sin teléfono: se omite sin encolar', async () => {
     pedido.modalidad = 'RECOJO';
     expect((await servicio.avisar(77, 'LLEGADA')).motivo).toBe('NO_ES_DELIVERY');
