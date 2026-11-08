@@ -705,7 +705,7 @@ describe('Módulo Salón (Ola F5: Plano, Pedido del mozo y Reservas)', () => {
     await waitFor(() => {
       expect(screen.getByRole('img', { name: 'Torta' })).toBeInTheDocument();
     });
-    expect((screen.getByRole('img', { name: 'Torta' }) as HTMLImageElement).style.objectFit).toBe('cover');
+    expect(screen.getByRole('img', { name: 'Torta' })).toHaveAttribute('decoding', 'async'); // object-fit: cover vive en nuevo-pedido-mozo.css
     // Sin foto: la tarjeta muestra iniciales, igual que la carta
     expect(screen.getByText('G', { exact: true })).toBeInTheDocument();
   });

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, useMemo } from 'react';
+import { useEffect, useId, useRef, useState, useMemo, useDeferredValue } from 'react';
 import { useSalonSocket } from '../useSalonSocket';
 import { VigilaEdicionPedido } from './VigilaEdicionPedido';
 import { Confirmar } from '../../../comun/Confirmar';
@@ -28,6 +28,7 @@ import '../salon.css';
 import '../nuevo-pedido-mozo.css';
 import { pedidosApi, type DatosEdicionPedido, type LineaEdicionPedido } from '../../pedidos/pedidosApi';
 import { PanelEdicionPedido } from './PanelEdicionPedido';
+import { BarraCategorias, TarjetaProducto } from './SelectorCartaTactil';
 import { leerSaborRechazado, leerStockInsuficiente, mensajeSaborRechazado, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
 import { comprobantesApi } from '../../comprobantes/comprobantesApi';
 import { ModalVoucherPedido } from '../ModalVoucherPedido';
@@ -1412,7 +1413,8 @@ export function ModalNuevoPedidoMesa({
     alCerrar();
   };
 
-  // Productos filtrados para la carta
+  // Productos filtrados para la carta (la búsqueda se difiere para no trabar el teclado)
+  const busquedaDif = useDeferredValue(busqueda);
   const productosFiltrados = useMemo(() => {
     let prods: ProductoCarta[] = [];
     if (categoriaActivaId === 'todas') {
@@ -1422,8 +1424,8 @@ export function ModalNuevoPedidoMesa({
       prods = cat?.productos || [];
     }
 
-    if (busqueda.trim()) {
-      const q = busqueda.toLowerCase().trim();
+    if (busquedaDif.trim()) {
+      const q = busquedaDif.toLowerCase().trim();
       prods = prods.filter(
         (p) =>
           p.nombre.toLowerCase().includes(q) ||
@@ -1431,7 +1433,7 @@ export function ModalNuevoPedidoMesa({
       );
     }
     return prods;
-  }, [categorias, categoriaActivaId, busqueda]);
+  }, [categorias, categoriaActivaId, busquedaDif]);
 
   // Título del modal según paso
   const tituloPaso = useMemo(() => {
@@ -2562,75 +2564,27 @@ export function ModalNuevoPedidoMesa({
             <div className="np-items">
               {/* IZQUIERDA: Catálogo de productos */}
               <div className="np-catalogo">
-                {/* Categorías en tira horizontal */}
-                <div className="np-categorias">
-                  <button
-                    type="button"
-                    onClick={() => setCategoriaActivaId('todas')}
-                    style={{
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy)',
-                      background:
-                        categoriaActivaId === 'todas' ? 'var(--cp-navy)' : 'transparent',
-                      color:
-                        categoriaActivaId === 'todas' ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Todos
-                  </button>
-                  {categorias.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setCategoriaActivaId(c.id)}
-                      style={{
-                        borderRadius: '9999px',
-                        border: '1.5px solid var(--cp-navy)',
-                        background:
-                          categoriaActivaId === c.id ? 'var(--cp-navy)' : 'transparent',
-                        color:
-                          categoriaActivaId === c.id ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {c.nombre}
-                    </button>
-                  ))}
-                </div>
+                {/* Categorías en tira horizontal (sticky) */}
+                <BarraCategorias
+                  categorias={categorias}
+                  activaId={categoriaActivaId}
+                  alElegir={setCategoriaActivaId}
+                />
 
                 {/* Buscador y toggle con/sin imagen */}
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="np-buscador">
                   <input
                     type="search"
+                    className="np-buscador-input"
+                    enterKeyHint="search"
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar producto"
-                    style={{
-                      flex: 1,
-                      minHeight: '44px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-line)',
-                      background: 'var(--cp-white)',
-                      padding: '0 16px',
-                      fontSize: '14px',
-                    }}
                   />
                   <button
                     type="button"
+                    className={conImagenes ? 'np-toggle-img np-toggle-img--on' : 'np-toggle-img'}
                     onClick={() => setConImagenes(!conImagenes)}
-                    style={{
-                      flex: 'none',
-                      minHeight: '40px',
-                      padding: '0 12px',
-                      borderRadius: '9999px',
-                      border: '1.5px solid var(--cp-navy)',
-                      background: conImagenes ? 'var(--cp-navy)' : 'transparent',
-                      color: conImagenes ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}
                   >
                     {conImagenes ? 'Con imagen' : 'Sin imagen'}
                   </button>
@@ -2646,60 +2600,12 @@ export function ModalNuevoPedidoMesa({
                 ) : (
                   <div className="np-grilla">
                     {productosFiltrados.map((p) => (
-                      <button
+                      <TarjetaProducto
                         key={p.id}
-                        type="button"
-                        onClick={() => setProductoSeleccionado(p)}
-                        className="np-producto"
-                      >
-                        {conImagenes && (
-                          <span className="np-producto-foto">
-                            {p.fotoUrl ? (
-                              <img
-                                src={p.fotoUrl}
-                                alt={p.nombre}
-                                loading="lazy"
-                                style={{
-                                  display: 'block',
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                }}
-                              />
-                            ) : (
-                              <span
-                                style={{
-                                  display: 'flex',
-                                  width: '100%',
-                                  height: '100%',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontFamily: 'Montserrat, sans-serif',
-                                  fontWeight: 800,
-                                  fontSize: '22px',
-                                  color: 'var(--cp-navy)',
-                                }}
-                              >
-                                {p.nombre
-                                  .split(' ')
-                                  .filter((w) => w.length > 2)
-                                  .slice(0, 2)
-                                  .map((w) => w[0]?.toUpperCase())
-                                  .join('')}
-                              </span>
-                            )}
-                          </span>
-                        )}
-                        <span className="np-producto-texto">
-                          <span className="np-producto-nombre">
-                            {p.nombre}
-                          </span>
-                          <span className="np-producto-precio">
-                            {(p.tamanos || []).length > 0 ? 'Desde ' : ''}S/{' '}
-                            {Number(p.precio || 0).toFixed(2)}
-                          </span>
-                        </span>
-                      </button>
+                        producto={p}
+                        conImagenes={conImagenes}
+                        alElegir={setProductoSeleccionado}
+                      />
                     ))}
                   </div>
                 )}
