@@ -219,7 +219,7 @@
   padding: 0 12px;
 }
 
-@media (min-width: 900px) {
+@container np (min-width: 860px) {
   .np-items {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(400px, 42%);
@@ -243,7 +243,7 @@
   }
 }
 
-@media (max-width: 899px) {
+@container np (max-width: 859px) {
   .np-carrito {
     border-top: 2px solid var(--cp-orange);
     gap: 8px;
@@ -449,6 +449,8 @@
 .np-cuerpo--items {
   overflow: hidden;
   gap: 0;
+  /* El ancho que cuenta es el del modal, no el de la pantalla: por eso @container y no @media */
+  container: np / inline-size;
 }
 
 .np-cuerpo--items > .np-items {
@@ -479,7 +481,7 @@
   box-shadow: 0 -8px 10px -6px rgba(11, 44, 62, 0.18);
 }
 
-@media (min-width: 900px) {
+@container np (min-width: 860px) {
   /* Tablet horizontal / PC: catálogo a la izquierda y pedido en panel lateral, cada uno con su scroll */
   .np-items {
     grid-template-rows: minmax(0, 1fr);
@@ -497,7 +499,7 @@
   }
 }
 
-@media (max-width: 899px) {
+@container np (max-width: 859px) {
   /* Tablet vertical / celular: el pedido es una hoja al pie del propio panel (sin position:fixed) */
   .np-items {
     gap: 8px;
@@ -505,15 +507,21 @@
 
   .np-catalogo {
     flex: 1 1 auto;
+    min-height: 140px;
     padding-bottom: 8px;
+  }
+
+  /* Campos del pedido (teléfono, nombre, pide, pago) en una sola columna */
+  .np-chips > * {
+    flex: 1 1 100%;
   }
 
   .np-carrito {
     position: relative;
     flex: 0 1 auto;
     z-index: 1;
-    max-height: 62%;
-    max-height: 62dvh;
+    max-height: 45%;
+    max-height: 45dvh;
     padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));
     border-radius: 16px;
     box-shadow: 0 -6px 18px rgba(11, 44, 62, 0.18);
@@ -641,11 +649,20 @@
 
 /* Tarjetas: 2 columnas por defecto (celular y tablet vertical), 1 en pantallas muy angostas */
 .np-grilla {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
 .np-producto {
+  display: flex;
+  min-width: 0;
+  background: var(--cp-white);
+  border: 1px solid var(--cp-line);
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  color: var(--cp-navy);
   min-height: 72px;
   border-radius: 12px;
   flex-direction: row;
@@ -663,9 +680,13 @@
 }
 
 .np-producto-foto {
+  display: block;
   flex: none;
   width: 72px;
   height: 72px;
+  max-width: 96px;
+  max-height: 96px;
+  background: var(--cp-gold);
   aspect-ratio: auto;
   border-radius: 10px;
   overflow: hidden;
@@ -691,6 +712,9 @@
 }
 
 .np-producto-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   flex: 1;
   padding: 0 4px;
   gap: 4px;
@@ -710,14 +734,14 @@
   color: var(--cp-navy);
 }
 
-@media (max-width: 359px) {
+@container np (max-width: 419px) {
   .np-grilla {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
 /* Tablet horizontal / escritorio: categorías en rejilla grande (sin scroll lateral) y 3 columnas */
-@media (min-width: 900px) {
+@container np (min-width: 860px) {
   .np-categorias {
     flex-wrap: wrap;
     overflow-x: visible;
@@ -743,8 +767,10 @@
 
   .np-producto-foto {
     width: 100%;
+    max-width: none;
     height: auto;
     aspect-ratio: 16 / 10;
+    max-height: 110px;
     border-radius: 0;
   }
 

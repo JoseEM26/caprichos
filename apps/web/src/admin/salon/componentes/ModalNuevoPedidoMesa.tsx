@@ -2658,7 +2658,7 @@ export function ModalNuevoPedidoMesa({
                     {lineas.reduce((suma, l) => suma + l.cantidad, 0)} productos · S/{' '}
                     {total.toFixed(2)}
                   </span>
-                  <span>{carritoAbierto ? 'Cerrar' : 'Ver pedido'}</span>
+                  <span>{carritoAbierto ? 'Cerrar' : 'Ver detalle del pedido'}</span>
                 </button>
 
                 {edicion && (
