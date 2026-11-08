@@ -45,7 +45,20 @@ export interface ResumenRecibido {
   envioPorConfirmar: boolean;
   /** Delivery con envío ya calculado (soles) */
   envio?: number | null;
+  /** Parte en efectivo que se cobra al recibir y con cuánto paga el cliente (para el vuelto). */
+  efectivo?: { aPagar: number; pagaCon?: number | null };
 }
+
+/** «Paga con S/ 50.00 · Vuelto S/ 18.25» o «Sin vuelto (paga exacto)»; vacío si no hay efectivo. */
+const bloqueEfectivo = (r: ResumenRecibido): string => {
+  const e = r.efectivo;
+  if (!e || !(e.aPagar > 0)) return '';
+  const base = `\n💵 Efectivo a pagar al recibir: S/ ${e.aPagar.toFixed(2)}`;
+  if (e.pagaCon != null && e.pagaCon > e.aPagar) {
+    return `${base}\n🪙 Pagas con S/ ${e.pagaCon.toFixed(2)} · te llevamos vuelto de S/ ${(Math.round((e.pagaCon - e.aPagar) * 100) / 100).toFixed(2)}`;
+  }
+  return `${base}\n🪙 Sin vuelto (pago exacto)`;
+};
 
 const bloqueResumen = (r: ResumenRecibido): string =>
   `\n\n🧾 Tu pedido:\n${r.lineas.map((l) => `• ${l}`).join('\n')}\n💰 Total: S/ ${r.total.toFixed(2)}${r.envioPorConfirmar ? ' (sin envío)' : ''}`;
@@ -172,7 +185,7 @@ export const TEXTOS_REPARTO = {
         ? { plantillaClave: 'CARTA_RECIBIDO_SEGUIMIENTO', variablesPlantilla: [nombre, codigo, enlace] }
         : { plantillaClave: 'CARTA_RECIBIDO_EFECTIVO', variablesPlantilla: [nombre, codigo] };
       return {
-        textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso.${bloqueResumen(resumen)}\n\n💵 Pago: ${resumen.medioPago}.${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`,
+        textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso.${bloqueResumen(resumen)}\n\n💵 Pago: ${resumen.medioPago}.${bloqueEfectivo(resumen)}${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`,
         ...plantilla,
       };
     }

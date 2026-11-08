@@ -30,3 +30,20 @@ describe('aviso «Recibimos tu pedido» con resumen', () => {
     expect(TEXTOS_REPARTO.recibidoDigital('A', 'CP-1', 'Yape', null).textoLibre).toContain('Tu pedido ya está en marcha');
   });
 });
+
+describe('aviso «Recibimos tu pedido» en efectivo: monto y vuelto', () => {
+  const base = { lineas: ['1 x Dona'], total: 31.75, medioPago: 'efectivo', envioPorConfirmar: false, envio: 4 };
+  it('con vuelto: cuánto paga y cuánto se le devuelve', () => {
+    const t = TEXTOS_REPARTO.recibidoEfectivo('A', 'CP-1', null, false, { ...base, efectivo: { aPagar: 31.75, pagaCon: 50 } }).textoLibre;
+    expect(t).toContain('Efectivo a pagar al recibir: S/ 31.75');
+    expect(t).toContain('Pagas con S/ 50.00 · te llevamos vuelto de S/ 18.25');
+  });
+  it('paga exacto o sin dato: sin vuelto', () => {
+    const t = TEXTOS_REPARTO.recibidoEfectivo('A', 'CP-1', null, false, { ...base, efectivo: { aPagar: 31.75, pagaCon: null } }).textoLibre;
+    expect(t).toContain('Sin vuelto (pago exacto)');
+  });
+  it('sin efectivo no agrega el bloque', () => {
+    const t = TEXTOS_REPARTO.recibidoEfectivo('A', 'CP-1', null, false, base).textoLibre;
+    expect(t).not.toContain('Efectivo a pagar');
+  });
+});
