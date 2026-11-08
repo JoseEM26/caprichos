@@ -7,7 +7,11 @@ import type { ArchivoConfiguracion } from './config';
 import { ImpresoraWindows, listarImpresorasWindows, listarImpresorasWindowsDetalle } from './impresora/impresoraWindows';
 import { candidatasDeLinux, candidatasDeWindows, idGuardado } from './candidatas';
 import type { CandidataLocal } from './candidatas';
-import { activarAutoarranque, autoarranqueActivo, desactivarAutoarranque } from './autoarranque';
+import { activarAutoarranque, autoarranqueActivo, desactivarAutoarranque, ejecutablePropio } from './autoarranque';
+import {
+  dirDatos, describirEstado, detenerEnMarcha, guardarEstado, pidEnMarcha, relanzarOculto,
+  rutaMarcaInicio, soltarBloqueo, tomarBloqueo, vigilarParada,
+} from './segundoPlano';
 import { generarPruebaEtiqueta, generarPruebaTicket } from './pruebaImpresora';
 import { ImpresoraUsb } from './impresora/impresoraUsb';
 import { ImpresoraRed, esDestinoRed, parsearDestinoRed } from './impresora/impresoraRed';
@@ -17,7 +21,7 @@ import { comandoDiagnostico, comandoEstado, comandoImpresoras, comandoProbarToda
 import type { DepsComandos } from './comandos';
 import { AgenteLocalServicio } from './agente/bucle';
 import type { EquipoLocal } from './agente/bucle';
-import { esperarEnter, describirError } from './arranque';
+import { esperarEnter, describirError, modo, redirigirConsolaALog, registrarLog, rutaArchivoLog } from './arranque';
 import {
   generarTsplTrabajo,
   generarBytesTrabajo,
@@ -472,8 +476,75 @@ export async function ejecutarAsistente(
   }
 }
 
+const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Instala el inicio automático UNA vez (idempotente); si luego se quita con --quitar-inicio, no se vuelve a poner solo. */
+export async function asegurarInicio(log: (m: string) => void = console.log, dir = dirDatos()): Promise<void> {
+  if (fs.existsSync(rutaMarcaInicio(dir)) || !ejecutablePropio()) return;
+  const r = (await autoarranqueActivo()) ? { ok: true, mensaje: '' } : await activarAutoarranque();
+  if (!r.ok) return log(`AVISO: ${r.mensaje} (puedes intentarlo con --instalar-inicio)`);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(rutaMarcaInicio(dir), new Date().toISOString());
+  if (r.mensaje) log(`✔ ${r.mensaje}`);
+}
+
+/** Comandos de control (`--estado`, `--detener`...). undefined = no es uno de ellos. */
+async function comandoControl(c: string | undefined): Promise<number | undefined> {
+  const dir = dirDatos();
+  switch (c) {
+    case '--estado':
+      console.log(describirEstado(dir));
+      return 0;
+    case '--detener': {
+      const r = await detenerEnMarcha(dir);
+      console.log(r === 'no-corria' ? 'El programa no estaba corriendo.' : 'Programa detenido. Para volver a prenderlo, ábrelo de nuevo (o reinicia la PC).');
+      return 0;
+    }
+    case '--reiniciar':
+      await detenerEnMarcha(dir);
+      relanzarOculto(['--segundo-plano']);
+      console.log('Programa reiniciado en segundo plano. Revisa con --estado.');
+      await dormir(1500);
+      return 0;
+    case '--ver-logs':
+      console.log(`Registro del programa: ${rutaArchivoLog()}`);
+      try {
+        console.log(fs.readFileSync(rutaArchivoLog(), 'utf-8').split('\n').slice(-40).join('\n'));
+      } catch {
+        console.log('(aún no hay registro)');
+      }
+      return 0;
+    case '--instalar-inicio': {
+      const r = await activarAutoarranque();
+      if (r.ok) {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(rutaMarcaInicio(dir), new Date().toISOString());
+      }
+      console.log(r.mensaje);
+      return r.ok ? 0 : 1;
+    }
+    case '--quitar-inicio': {
+      const r = await desactivarAutoarranque();
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(rutaMarcaInicio(dir), new Date().toISOString()); // que no se reinstale solo
+      console.log(r.mensaje);
+      return r.ok ? 0 : 1;
+    }
+  }
+  return undefined;
+}
+
 export async function main(): Promise<void> {
-  const comando = process.argv[2]?.trim().toLowerCase();
+  let comando = process.argv[2]?.trim().toLowerCase();
+  const segundoPlano = comando === '--segundo-plano';
+  const primerPlano = comando === '--primer-plano';
+  if (segundoPlano) {
+    modo.segundoPlano = true;
+    redirigirConsolaALog();
+  }
+  const codigoControl = await comandoControl(comando);
+  if (codigoControl !== undefined) process.exit(codigoControl);
+  if (comando === '--vincular') comando = 'vincular';
 
   if (comando === 'probar' && process.argv[3]) {
     const ok = await comandoProbarUna(depsComandos(), process.argv.slice(3).join(' '));
@@ -543,10 +614,28 @@ export async function main(): Promise<void> {
   // Sin configuración (primer uso, doble clic en el .exe): abre el asistente
   let archivo = leerArchivoConfiguracion();
   const sinLlave = !archivo.agenteKey && !process.env.AGENTE_KEY && !process.env.CAPRICHOS_AGENTE_KEY;
-  if (sinLlave && (process.stdin.isTTY || process.platform === 'win32')) {
+  if (sinLlave && !segundoPlano && (process.stdin.isTTY || process.platform === 'win32')) {
     archivo = await ejecutarAsistente();
   } else if (sinLlave) {
     throw new Error('Este equipo aún no está vinculado. Descarga el programa ya vinculado desde Caprichos › Configuración › Impresión (o ejecuta el programa con el comando "vincular" en una terminal).');
+  }
+
+  // Doble clic o terminal: deja el programa en segundo plano (sin ventana) y esta ventana se cierra
+  if (!segundoPlano && !primerPlano) {
+    await asegurarInicio();
+    if (pidEnMarcha()) {
+      console.log('El programa de impresión ya está funcionando en segundo plano. Revisa con --estado.');
+    } else {
+      relanzarOculto(['--segundo-plano']);
+      console.log('Listo: el programa de impresión quedó funcionando en segundo plano y arrancará solo al prender la PC.');
+      console.log('Puedes cerrar esta ventana. Para ver cómo va: --estado. Para detenerlo: --detener.');
+    }
+    await dormir(3000);
+    process.exit(0);
+  }
+  if (!tomarBloqueo()) {
+    console.log('El programa de impresión ya está funcionando (solo puede haber uno).');
+    process.exit(0);
   }
 
   // Modo servicio (bucle continuo): una impresora por rol; IMPRESORA_RUTA sigue valiendo como etiquetera
@@ -577,16 +666,26 @@ export async function main(): Promise<void> {
     clienteApi,
     impresoras,
     equipo: crearEquipoLocal(archivo),
+    alEstado: (e) => guardarEstado({ pid: process.pid, inicio: inicioProceso, ultimaConexionOk: e.ultimaConexionOk, ultimoError: e.ultimoError, necesitaVincular: e.necesitaVincular, roles: e.roles }),
   });
+  const inicioProceso = new Date().toISOString();
+  registrarLog(`Servicio iniciado (pid ${process.pid}, ${segundoPlano ? 'segundo plano' : 'primer plano'})`);
 
-  const finalizar = () => {
-    console.log('\nSeñal de terminación recibida. Deteniendo agente...');
+  // Cierre ordenado: termina el trabajo en curso (se imprime y se confirma), borra el bloqueo y sale
+  let cerrando = false;
+  const finalizar = async () => {
+    if (cerrando) return;
+    cerrando = true;
+    console.log('Cierre solicitado. Deteniendo el programa...');
     agente.detener();
+    await Promise.race([corrida, dormir(8000)]);
+    soltarBloqueo();
     process.exit(0);
   };
+  for (const senal of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const) process.on(senal, () => void finalizar());
+  vigilarParada(() => void finalizar());
 
-  process.on('SIGINT', finalizar);
-  process.on('SIGTERM', finalizar);
-
-  await agente.iniciar();
+  const corrida = agente.iniciar();
+  await corrida;
+  await finalizar();
 }
