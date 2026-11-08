@@ -12,7 +12,6 @@ import { SalonService } from '../../salon/salon.service';
 import { ComprobantesService } from '../../comprobantes/comprobantes.service';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
 import { CobrarDto, SinVoucherDto } from '../dto/cobrar.dto';
-import { SupervisorCodigoService } from '../../supervisor-codigo/supervisor-codigo.service';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { validate } from 'class-validator';
 
@@ -22,7 +21,6 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
   let redisClientMock: any;
   let redisServiceMock: any;
   let auditoriaMock: any;
-  let supervisorCodigoMock: any;
 
   const mozoUsuario: UsuarioAutenticado = {
     partyId: 10n,
@@ -68,17 +66,7 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
       registrar: jest.fn().mockResolvedValue(undefined),
     };
 
-    supervisorCodigoMock = {
-      verificarYConsumirCodigo: jest.fn(async (pin: string | undefined) => {
-        if (pin !== '123456') {
-          throw new HttpException(
-            { codigo: 'CODIGO_INVALIDO', mensaje: 'Código de supervisor inválido o no proporcionado' },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-        return { party_id: 99n, id: 1n, supervisorPartyId: 99n, supervisorId: 1n };
-      }),
-    };
+
 
     prismaMock = {
       caja: {
@@ -120,7 +108,6 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: RedisService, useValue: redisServiceMock },
         { provide: AuditoriaService, useValue: auditoriaMock },
-        { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
         { provide: EventosGateway, useValue: { emitirAdmin: jest.fn() } },
         { provide: SalonService, useValue: { liberarMesasDePedido: jest.fn() } },
         { provide: ComprobantesService, useValue: { emitirParaPedido: jest.fn(), firmarPorPedido: jest.fn(), transmitirEnSegundoPlano: jest.fn() } },
@@ -153,9 +140,8 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
     expect(res.id).toBe('500');
     expect(prismaMock.cobro.create).toHaveBeenCalled();
     expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-      expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', conPinAdmin: false }),
+      expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER' }),
     );
-    expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
   });
 
   it('un voucher ILEGIBLE no cuenta como comprobante pero tampoco frena: cobra sin captura', async () => {
@@ -170,20 +156,8 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
     expect(prismaMock.cobro.create).toHaveBeenCalled();
   });
 
-  it('un cliente viejo que manda motivo y código: ya no se verifica supervisor y el cobro sale igual', async () => {
-    prismaMock.voucherPago.findFirst.mockResolvedValue(null);
-
-    const res = await service.cobrar(
-      { ...dtoCobroDigitalYape, sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '000000' } } as any,
-      mozoUsuario,
-    );
-
-    expect(res.id).toBe('500');
-    expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
-  });
-
   it('el motivo corto (menos de 5 caracteres) lo rechaza la validación del DTO antes de llegar al cobro', async () => {
-    const dto = Object.assign(new SinVoucherDto(), { motivo: 'no', pinSupervisor: '123456' });
+    const dto = Object.assign(new SinVoucherDto(), { motivo: 'no' });
     const errores = await validate(dto);
 
     expect(errores.map((e) => e.property)).toContain('motivo');

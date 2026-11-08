@@ -2,7 +2,6 @@ import { ForbiddenException, ConflictException, BadRequestException } from '@nes
 import { UsuariosRolesService } from '../usuarios-roles.service';
 import { UsuariosActividadService, fechaCorta } from '../usuarios-actividad.service';
 import { rolesDeCuenta } from '../../acceso/roles-usuario';
-import { esOperadorSinCodigo } from '../../supervisor-codigo/supervisor-codigo.service';
 
 const ADMIN = { partyId: 1n, rol: 'ADMIN', debeCambiar: false, roles: ['ADMIN'] };
 const AHORA = new Date('2026-11-06T15:00:00.000Z');
@@ -37,17 +36,6 @@ describe('vigencia de roles extra', () => {
     expect(roles).toEqual(['CAJERO', 'SUPERVISOR']);
     const where = findMany.mock.calls[0][0].where;
     expect(where.OR).toEqual([{ vence_en: null }, { vence_en: { gt: expect.any(Date) } }]);
-  });
-
-  it('esOperadorSinCodigo: el SUPERVISOR temporal vigente queda exento; la consulta exige vigencia', async () => {
-    const findFirst = jest.fn().mockResolvedValue({ party_id: 30n, id: 10n, rol: 'CAJERO' });
-    const prisma: any = { userAccount: { findFirst } };
-    const r = await esOperadorSinCodigo(prisma, 30n);
-    expect(r).not.toBeNull();
-    const where = findFirst.mock.calls[0][0].where;
-    const extra = where.OR[1].rolesExtra.some;
-    expect(extra.rol).toBe('SUPERVISOR');
-    expect(extra.OR).toEqual([{ vence_en: null }, { vence_en: { gt: expect.any(Date) } }]);
   });
 });
 

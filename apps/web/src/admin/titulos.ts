@@ -41,5 +41,4 @@ export const TITULOS_VISTA: Record<string, { titulo: string; subtitulo: string }
   comprobantes: { titulo: 'Comprobantes', subtitulo: 'Notas de venta, boletas y facturas de los pedidos cobrados.' },
   reclamos: { titulo: 'Libro de reclamaciones', subtitulo: 'Reclamos y quejas de los clientes, con su plazo de respuesta.' },
   zonas: { titulo: 'Zonas de reparto', subtitulo: 'Tarifas y cobertura del delivery.' },
-  'supervisor-codigo': { titulo: 'Código del supervisor', subtitulo: 'Código rotativo para autorizaciones del local. Cambia cada 30 segundos.' },
 };

@@ -5,7 +5,6 @@ import {
   obtenerStockInsumo,
   obtenerStockProducto,
   obtenerPrismaTest,
-  limpiarRedisSupervisor,
 } from '../../src';
 import { Prisma } from '@prisma/client';
 
@@ -86,10 +85,6 @@ async function asegurarProveedorPrueba(prisma: any) {
 }
 
 test.describe('Suite E2E - Módulo de Compras y Producción', () => {
-  test.beforeEach(() => {
-    limpiarRedisSupervisor();
-  });
-
   test('(1) Compra rápida por UI sube stock en Almacén central con costo unitario y auditoría', async ({
     page,
   }) => {

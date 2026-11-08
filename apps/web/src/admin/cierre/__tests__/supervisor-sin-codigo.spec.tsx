@@ -5,7 +5,7 @@ import { cierreApi } from '../cierreApi';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
 
-// El SUPERVISOR no escribe código de supervisor: el servidor lo autoriza solo (igual que al ADMIN)
+// Ya no existe el código del supervisor: el SUPERVISOR cierra como el ADMIN, viendo el detalle del cuadre
 function usarSesion(rol: string) {
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
     usuario: { partyId: rol === 'SUPERVISOR' ? '3' : '2', nombres: 'Persona de prueba', rol },
@@ -22,7 +22,7 @@ function usarSesion(rol: string) {
   });
 }
 
-describe('cierre: el SUPERVISOR cierra sin código de supervisor', () => {
+describe('cierre: el SUPERVISOR cierra sin ningún código', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
@@ -44,7 +44,6 @@ describe('cierre: el SUPERVISOR cierra sin código de supervisor', () => {
     } as any);
     vi.spyOn(cierreApi, 'realizarArqueo').mockResolvedValue({ resultado: 'NO_CUADRA', intento: 1 } as any);
     vi.spyOn(cierreApi, 'cerrarCaja').mockResolvedValue({} as any);
-    vi.spyOn(cierreApi, 'verificarPinSupervisor');
   });
 
   async function llegarAlConteo() {
@@ -52,7 +51,7 @@ describe('cierre: el SUPERVISOR cierra sin código de supervisor', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Ya revisé: continuar al conteo' }));
   }
 
-  it('no muestra campo de código de la supervisora al contar y cerrar', async () => {
+  it('no muestra ningún campo de código al contar y cerrar', async () => {
     usarSesion('SUPERVISOR');
     render(<CierreView />);
     await llegarAlConteo();
@@ -62,7 +61,7 @@ describe('cierre: el SUPERVISOR cierra sin código de supervisor', () => {
     expect(screen.queryByLabelText(/Código del supervisor/i)).not.toBeInTheDocument();
   });
 
-  it('confirma el cierre con descuadre sin enviar código, y el servidor lo autoriza', async () => {
+  it('confirma el cierre con descuadre solo con la nota', async () => {
     usarSesion('SUPERVISOR');
     render(<CierreView />);
     await llegarAlConteo();
@@ -73,7 +72,6 @@ describe('cierre: el SUPERVISOR cierra sin código de supervisor', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Sí, continuar/ }));
 
     await waitFor(() => expect(cierreApi.cerrarCaja).toHaveBeenCalledTimes(1));
-    expect(cierreApi.cerrarCaja).toHaveBeenCalledWith(expect.objectContaining({ conteo: expect.any(Object) }), undefined);
-    expect(cierreApi.verificarPinSupervisor).not.toHaveBeenCalled();
+    expect(cierreApi.cerrarCaja).toHaveBeenCalledWith(expect.objectContaining({ conteo: expect.any(Object), nota: 'Faltante de turno' }));
   });
 });

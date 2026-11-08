@@ -5,9 +5,6 @@ import { ModalDevolucion } from '../ModalDevolucion';
 import type { NoEntregado, RespuestaNoEntregados, SugerenciaDevolucion } from '../pedidosApi';
 import { pedidosApi } from '../pedidosApi';
 
-const pideCodigo = vi.fn(() => false);
-vi.mock('../../../comun/usePideCodigo', () => ({ usePideCodigo: () => pideCodigo() }));
-
 vi.mock('../pedidosApi', async (importOriginal) => {
   const real: any = await importOriginal();
   return {
@@ -57,7 +54,6 @@ const campo = (texto: RegExp | string) => screen.getByLabelText(texto) as HTMLIn
 
 describe('ModalDevolucion', () => {
   beforeEach(() => {
-    pideCodigo.mockReturnValue(false);
     vi.mocked(pedidosApi.sugerenciaDevolucion).mockReset().mockResolvedValue(sugerencia());
     vi.mocked(pedidosApi.registrarDevolucion).mockReset().mockResolvedValue(registro as any);
   });
@@ -109,23 +105,17 @@ describe('ModalDevolucion', () => {
     expect(pedidosApi.registrarDevolucion).toHaveBeenCalledWith(
       '3',
       { montoDevuelto: 40, medio: 'EFECTIVO', motivo: 'Volvió a pedir, solo delivery' },
-      undefined,
     );
   });
 
-  it('a quien no es admin ni supervisor le pide el código de 6 dígitos y lo envía', async () => {
-    pideCodigo.mockReturnValue(true);
+  it('ningún rol escribe código de supervisor: registra con el monto sugerido', async () => {
     render(<ModalDevolucion pedido={pedido} alCerrar={() => {}} alRegistrar={() => {}} />);
     await screen.findByText('S/ 50.00');
 
-    fireEvent.click(screen.getByRole('button', { name: /Registrar devolución/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('6 dígitos');
-    expect(pedidosApi.registrarDevolucion).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
+    expect(screen.queryByTestId('input-codigo-supervisor')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Registrar devolución/ }));
     await waitFor(() =>
-      expect(pedidosApi.registrarDevolucion).toHaveBeenCalledWith('3', { montoDevuelto: 45, medio: 'EFECTIVO' }, '123456'),
+      expect(pedidosApi.registrarDevolucion).toHaveBeenCalledWith('3', { montoDevuelto: 45, medio: 'EFECTIVO' }),
     );
   });
 

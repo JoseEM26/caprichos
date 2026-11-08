@@ -29,7 +29,6 @@ export class CortesiasService {
   async registrarSeparada(
     dto: RegistrarCortesiaDto,
     usuario: UsuarioAutenticado,
-    supervisorPartyId?: bigint,
     ip?: string,
   ) {
     const { motivo, nota } = validarMotivoCortesia(dto.motivo, dto.nota);
@@ -87,7 +86,7 @@ export class CortesiasService {
           pedido_id: null,
           pedido_referencia_id: referencia.id,
           dada_por_party_id: porId,
-          autorizada_por_party_id: supervisorPartyId ?? null,
+          autorizada_por_party_id: null,
         },
       });
       await descontarVentaProductos(
@@ -124,7 +123,6 @@ export class CortesiasService {
     lineaIdRaw: string,
     dto: { motivo: string; nota?: string },
     usuario: UsuarioAutenticado,
-    supervisorPartyId?: bigint,
     ip?: string,
   ) {
     const { motivo, nota } = validarMotivoCortesia(dto.motivo, dto.nota);
@@ -198,7 +196,7 @@ export class CortesiasService {
           pedido_id: pedido.id,
           pedido_linea_id: linea.id,
           dada_por_party_id: porId,
-          autorizada_por_party_id: supervisorPartyId ?? null,
+          autorizada_por_party_id: null,
         },
       });
       await tx.pedido.update({

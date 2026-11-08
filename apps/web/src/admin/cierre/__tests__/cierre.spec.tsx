@@ -5,7 +5,6 @@ import { HistorialCierres } from '../HistorialCierres';
 import { CierreView } from '../CierreView';
 import { cierreApi } from '../cierreApi';
 import { pedidosApi } from '../../pedidos/pedidosApi';
-import { ErrorApi } from '../../../comun/api';
 import * as sesionModulo from '../../../comun/sesion';
 
 describe('Ola F5: Caja y Cierres', () => {
@@ -49,7 +48,7 @@ describe('Ola F5: Caja y Cierres', () => {
     expect(screen.queryByText(/esperado efectivo/i)).not.toBeInTheDocument();
   });
 
-  it('tras el tercer intento pide PIN', async () => {
+  it('tras el tercer intento ya no pide ningún código de supervisor', async () => {
     // Simulamos 3 intentos fallidos de arqueo
     vi.spyOn(cierreApi, 'realizarArqueo')
       .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 1 })
@@ -60,30 +59,30 @@ describe('Ola F5: Caja y Cierres', () => {
 
     const botonRevisar = screen.getByRole('button', { name: /revisar arqueo ciego/i });
 
-    // Intento 1: no debe pedir PIN todavía
+    // Intento 1
     fireEvent.click(botonRevisar);
     await waitFor(() => {
       expect(screen.getByText('Intento #1')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('seccion-pin-supervisor')).not.toBeInTheDocument();
 
-    // Intento 2: no debe pedir PIN todavía
+    // Intento 2
     fireEvent.click(botonRevisar);
     await waitFor(() => {
       expect(screen.getByText('Intento #2')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('seccion-pin-supervisor')).not.toBeInTheDocument();
 
-    // Intento 3: tras el tercer intento fallido, exige PIN del supervisor
+    // Intento 3: tampoco hay código de supervisor; el cierre solo pedirá la nota
     fireEvent.click(botonRevisar);
     await waitFor(() => {
       expect(screen.getByText('Intento #3')).toBeInTheDocument();
-      expect(screen.getByTestId('seccion-pin-supervisor')).toBeInTheDocument();
-      expect(screen.getByTestId('pin-supervisor-input')).toBeInTheDocument();
     });
+    expect(screen.queryByTestId('seccion-pin-supervisor')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pin-supervisor-input')).not.toBeInTheDocument();
   });
 
-  it('un arqueo que cuadra no suma: dos que no cuadraron y uno que cuadra no piden PIN', async () => {
+  it('un arqueo que cuadra no suma: dos que no cuadraron y uno que cuadra: sin código de supervisor', async () => {
     vi.spyOn(cierreApi, 'realizarArqueo')
       .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 1 })
       .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 2 })
@@ -100,43 +99,6 @@ describe('Ola F5: Caja y Cierres', () => {
     }
 
     expect(screen.queryByTestId('seccion-pin-supervisor')).not.toBeInTheDocument();
-  });
-
-  it('el PIN no queda en el estado', async () => {
-    vi.spyOn(cierreApi, 'realizarArqueo')
-      .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 1 })
-      .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 2 })
-      .mockResolvedValueOnce({ resultado: 'NO_CUADRA', intento: 3 })
-      .mockResolvedValue({ resultado: 'NO_CUADRA', intento: 4 });
-
-    render(<ArqueoCiegoForm />);
-
-    // Tres arqueos que no cuadran: a partir de ahí se pide el PIN del supervisor
-    const botonRevisar = screen.getByRole('button', { name: /revisar arqueo ciego/i });
-    for (const n of [1, 2, 3]) {
-      fireEvent.click(botonRevisar);
-      await waitFor(() => {
-        expect(screen.getByText(`Intento #${n}`)).toBeInTheDocument();
-      });
-    }
-
-    await waitFor(() => {
-      expect(screen.getByTestId('pin-supervisor-input')).toBeInTheDocument();
-    });
-
-    const inputPin = screen.getByTestId('pin-supervisor-input') as HTMLInputElement;
-
-    // El usuario ingresa un PIN
-    fireEvent.change(inputPin, { target: { value: '123456' } });
-    expect(inputPin.value).toBe('123456');
-
-    // Al volver a enviar o reintentar el arqueo
-    fireEvent.click(botonRevisar);
-
-    // El PIN no queda guardado en el estado: el campo vuelve a quedar vacío
-    await waitFor(() => {
-      expect(inputPin.value).toBe('');
-    });
   });
 
   it('el historial oculta el detalle por medio al no ADMIN', async () => {
@@ -404,9 +366,10 @@ describe('Ola F5: Caja y Cierres', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Revisar si cuadra' }));
 
     await waitFor(() =>
-      expect(arqueo).toHaveBeenCalledWith({ conteo: { '100': 3 }, medios: { yape: 0, plin: 0, transferencia: 0, tarjeta: 0 } }, undefined),
+      expect(arqueo).toHaveBeenCalledWith({ conteo: { '100': 3 }, medios: { yape: 0, plin: 0, transferencia: 0, tarjeta: 0 } }),
     );
-    expect(await screen.findByText(/No cuadra: la supervisora debe escribir su (código|PIN)/)).toBeInTheDocument();
+    expect(await screen.findByText(/No cuadra\. Cuenta de nuevo/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Código de la supervisora/i)).not.toBeInTheDocument();
     expect(esperado).not.toHaveBeenCalled();
     expect(screen.queryByText(/Sist\./)).not.toBeInTheDocument();
   });
@@ -422,28 +385,24 @@ describe('Ola F5: Caja y Cierres', () => {
     expect(screen.queryByRole('tab', { name: 'Historial de cierres' })).not.toBeInTheDocument();
   });
 
-  it('el PIN de la supervisora lo valida el servidor, no el navegador', async () => {
+  it('si no cuadra, el cajero sigue a ciegas: no hay campo de código ni detalle del cuadre', async () => {
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true, caja: { id: 7, estado: 'ABIERTA', apertura: 0 } } as any);
     vi.spyOn(pedidosApi, 'listarMovimientos').mockResolvedValue([]);
     vi.spyOn(pedidosApi, 'listar').mockResolvedValue({ items: [] } as any);
     vi.spyOn(cierreApi, 'listarRepartidoresPorLiquidar').mockResolvedValue([]);
+    vi.spyOn(cierreApi, 'listarPendientesDeCobro').mockResolvedValue([]);
     vi.spyOn(cierreApi, 'realizarArqueo').mockResolvedValue({ resultado: 'NO_CUADRA', intento: 1 });
-    const verificar = vi
-      .spyOn(cierreApi, 'verificarPinSupervisor')
-      .mockRejectedValue(new ErrorApi('CODIGO_INVALIDO', 'Código de supervisor inválido o no proporcionado', 403));
 
     render(<CierreView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Ya revisé: continuar al conteo' }));
     fireEvent.click(screen.getByRole('button', { name: 'Revisar si cuadra' }));
 
-    const pin = await screen.findByLabelText(/Código de la supervisora/i);
-    fireEvent.change(pin, { target: { value: '123456' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Verificar' }));
-
-    expect(await screen.findByText('Código de supervisor inválido o no proporcionado')).toBeInTheDocument();
-    expect(verificar).toHaveBeenCalledWith('123456');
+    expect(await screen.findByText(/No cuadra\. Cuenta de nuevo/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Código de la supervisora/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verificar' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('detalle-cuadre')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Nota explicativa/i)).toBeInTheDocument();
   });
 
   it('la fecha de la caja no cambia de día al mostrarla en Lima', async () => {

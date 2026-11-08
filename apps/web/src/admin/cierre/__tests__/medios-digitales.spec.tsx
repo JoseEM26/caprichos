@@ -118,7 +118,7 @@ describe('cierre: medios digitales calculados por el sistema', () => {
     expect(screen.queryByText('Efectivo esperado', { exact: true })).not.toBeInTheDocument();
   });
 
-  it('corregir: el motivo es obligatorio y el cajero pide el código de supervisor', async () => {
+  it('corregir: el motivo es obligatorio y el cajero no escribe ningún código', async () => {
     usarSesion('CAJERO');
     render(<CierreView />);
     await abrirConteo();
@@ -133,24 +133,17 @@ describe('cierre: medios digitales calculados por el sistema', () => {
     expect(await within(dialogo).findByRole('alert')).toHaveTextContent('mínimo 10 caracteres');
     expect(cierreApi.registrarAjusteMedio).not.toHaveBeenCalled();
 
+    expect(screen.queryByLabelText('Código de supervisor')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Motivo del cambio'), { target: { value: 'El voucher dice 210' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
-    expect(await screen.findByText('Escribe el código de supervisor de 6 dígitos.')).toBeInTheDocument();
-    expect(cierreApi.registrarAjusteMedio).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByLabelText('Código de supervisor'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
 
     await waitFor(() =>
-      expect(cierreApi.registrarAjusteMedio).toHaveBeenCalledWith(
-        { medio: 'YAPE', montoNuevo: 210, motivo: 'El voucher dice 210' },
-        '123456',
-      ),
+      expect(cierreApi.registrarAjusteMedio).toHaveBeenCalledWith({ medio: 'YAPE', montoNuevo: 210, motivo: 'El voucher dice 210' }),
     );
     expect(await screen.findByText('Corrección guardada: Yape ahora vale s/ 210.00.')).toBeInTheDocument();
   });
 
-  it('el ADMIN corrige sin escribir código', async () => {
+  it('el ADMIN corrige con motivo y sin código', async () => {
     usarSesion('ADMIN');
     render(<CierreView />);
     await abrirConteo();
@@ -164,7 +157,6 @@ describe('cierre: medios digitales calculados por el sistema', () => {
     await waitFor(() =>
       expect(cierreApi.registrarAjusteMedio).toHaveBeenCalledWith(
         { medio: 'TARJETA', montoNuevo: 90, motivo: 'Terminal cobró 90 real' },
-        undefined,
       ),
     );
   });

@@ -44,7 +44,6 @@ Ver tambien: [[almacen]]
 3. Especifica el motivo de la regularizacion (como ajuste por inventario general, error en compras o merma no asentada).
 4. Pulsa "Confirmar ajuste" para actualizar el saldo total del insumo.
 Despues: [[almacen]]
-Ver tambien: [[supervisor-codigo]]
 
 ## Errores y dudas comunes
 - Que indica cada color del semaforo: el verde senala existencias suficientes por encima del umbral de seguridad; el amarillo alerta que el producto esta cerca de agotarse; el rojo indica que las existencias cayeron por debajo del minimo requerido o llegaron a cero.

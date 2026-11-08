@@ -10,7 +10,6 @@ import { InformesController } from '../informes/informes.controller';
 import { ConfiguracionController } from '../configuracion/configuracion.controller';
 import { UsuariosController } from '../usuarios/usuarios.controller';
 import { ContenidoAdminController } from '../contenido/contenido.controller';
-import { SupervisorCodigoController } from '../supervisor-codigo/supervisor-codigo.controller';
 
 const uniones = (...roles: string[]) => [...new Set(roles.flatMap((r) => MATRIZ[r]))];
 
@@ -21,14 +20,14 @@ describe('rol SUPERVISOR: matriz de permisos', () => {
     expect(ROLES.map((r) => r.codigo)).toContain('SUPERVISOR');
   });
 
-  it('es exactamente la unión de CAJERO y MOZO, más supervisor/ver_codigo y su escritorio operativo', () => {
+  it('es exactamente la unión de CAJERO y MOZO, más su escritorio operativo', () => {
     // Excepción: almacen/apertura (conteo de apertura de productos) es de CAJERO pero no del supervisor
     // Sin dinero: tampoco cambia la ubicación de un delivery (pedidos/cambiar_ubicacion, aunque CAJERO lo tenga)
     const esperado = uniones('CAJERO', 'MOZO').filter((p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear');
-    expect([...supervisor].sort()).toEqual([...esperado, 'supervisor/ver_codigo', 'escritorio/operativo', 'iniciativas/cambiar_estado'].sort());
+    expect([...supervisor].sort()).toEqual([...esperado, 'escritorio/operativo', 'iniciativas/cambiar_estado'].sort());
   });
 
-  it('valida el cambio de forma de pago en la puerta (como Caja), sin código de supervisor', () => {
+  it('valida el cambio de forma de pago en la puerta (como Caja)', () => {
     expect(supervisor).toContain('pedidos/validar_cambio_cobro');
     expect(MATRIZ.CAJERO).toContain('pedidos/validar_cambio_cobro');
     expect(MATRIZ.REPARTIDOR).toContain('repartos/solicitar_cambio_cobro');
@@ -36,9 +35,10 @@ describe('rol SUPERVISOR: matriz de permisos', () => {
     expect(MATRIZ.MOZO).not.toContain('pedidos/validar_cambio_cobro');
   });
 
-  it('ve el código rotativo pero NO puede gestionarlo (generar, rotar, desbloquear)', () => {
-    expect(supervisor).toContain('supervisor/ver_codigo');
-    expect(supervisor).not.toContain('supervisor/gestionar_codigo');
+  it('ningún rol conserva los permisos del código del supervisor (retirados)', () => {
+    for (const r of Object.keys(MATRIZ)) {
+      expect(MATRIZ[r].filter((p) => p.startsWith('supervisor/'))).toEqual([]);
+    }
   });
 
   it('no tiene ningún permiso de administración ni de diseño, contenido, informes, ganancias o compras', () => {
@@ -50,13 +50,6 @@ describe('rol SUPERVISOR: matriz de permisos', () => {
     ];
     for (const prefijo of prohibidos) {
       expect(supervisor.filter((p) => p.startsWith(prefijo))).toEqual([]);
-    }
-  });
-
-  it('solo ADMIN tiene supervisor/gestionar_codigo', () => {
-    expect(MATRIZ.ADMIN).toContain('supervisor/gestionar_codigo');
-    for (const r of Object.keys(MATRIZ).filter((r) => r !== 'ADMIN')) {
-      expect(MATRIZ[r]).not.toContain('supervisor/gestionar_codigo');
     }
   });
 });
@@ -102,10 +95,6 @@ describe('rol SUPERVISOR: decisiones del guard por ruta real', () => {
     }
   }
 
-  it('SUPERVISOR puede ver el código rotativo', async () => {
-    expect(await entra('SUPERVISOR', SupervisorCodigoController, 'obtenerCodigo')).toBe(true);
-  });
-
   it.each([
     ['informes (resumen)', InformesController, 'obtenerResumen'],
     ['informes (indicadores)', InformesController, 'obtenerIndicadores'],
@@ -117,8 +106,6 @@ describe('rol SUPERVISOR: decisiones del guard por ruta real', () => {
     ['usuarios (crear)', UsuariosController, 'crear'],
     ['configuración (listar)', ConfiguracionController, 'listar'],
     ['configuración (editar)', ConfiguracionController, 'actualizarPausaAltaDemanda'],
-    ['gestionar código (rotar)', SupervisorCodigoController, 'rotarSecreto'],
-    ['gestionar código (desbloquear)', SupervisorCodigoController, 'desbloquear'],
   ])('SUPERVISOR no entra a %s (403)', async (_nombre, controlador, metodo) => {
     expect(await entra('SUPERVISOR', controlador, metodo)).toBe(false);
   });
@@ -128,7 +115,6 @@ describe('rol SUPERVISOR: decisiones del guard por ruta real', () => {
     expect(await entra('ADMIN', ContenidoAdminController, 'obtenerDiseno')).toBe(true);
     expect(await entra('ADMIN', UsuariosController, 'listar')).toBe(true);
     expect(await entra('ADMIN', ConfiguracionController, 'listar')).toBe(true);
-    expect(await entra('ADMIN', SupervisorCodigoController, 'rotarSecreto')).toBe(true);
   });
 
   it('SUPERVISOR entra a caja, salón y reservas, como el cajero y el mozo', async () => {

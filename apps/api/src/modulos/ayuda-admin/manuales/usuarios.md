@@ -4,11 +4,11 @@ titulo: Usuarios
 ruta: /admin/usuarios
 permiso: usuarios/ver
 roles: [ADMIN]
-relacionados: [supervisor-codigo, historial, creditos, asistencia, cocina, propinas, iniciativas]
+relacionados: [historial, creditos, asistencia, cocina, propinas, iniciativas]
 sugerencias:
   - ¿Cómo registro un nuevo empleado en el sistema?
   - ¿Cómo cambio el rol o cargo de un usuario?
-  - ¿Por qué me pide el código del supervisor al cambiar un rol o desactivar a alguien?
+  - ¿Quién puede cambiar un rol o desactivar a alguien?
   - ¿Cómo restablezco la contraseña de un usuario que no puede entrar?
   - ¿Cómo dejo a un suplente de supervisor por unos días?
   - ¿Dónde veo lo que hizo un usuario?
@@ -18,7 +18,7 @@ sugerencias:
 # Usuarios
 
 ## Para que sirve
-Permite administrar las cuentas de acceso del personal de Caprichos (cajeros, mozos, cocineros, repartidores, personal de almacén y administradores). Permite crear nuevos colaboradores, editar sus datos, asignarles roles con permisos específicos, desactivar cuentas inactivas, gestionar horarios, créditos del personal con [[creditos]], validar con [[supervisor-codigo]] y auditar cada cambio en [[historial]].
+Permite administrar las cuentas de acceso del personal de Caprichos (cajeros, mozos, cocineros, repartidores, personal de almacén y administradores). Permite crear nuevos colaboradores, editar sus datos, asignarles roles con permisos específicos, desactivar cuentas inactivas, gestionar horarios, créditos del personal con [[creditos]], y auditar cada cambio en [[historial]].
 
 ## Como se hace: registrar un nuevo usuario del personal
 1. En la pestaña "Personal", pulsa el botón "+ Nuevo usuario" en la esquina superior derecha.
@@ -34,16 +34,14 @@ Ver tambien: [[historial]]
 2. El editor tiene cinco pestañas: Datos (documento, nombres, apellidos, país, correo, foto y Cambiar contraseña), Roles (Rol principal, Roles temporales, otros roles, áreas de cocina y avisos de WhatsApp), Horario, Reemplazos e Historial. El botón "?" del encabezado explica cuáles se guardan juntas.
 3. Si cambias el campo "Rol" para otorgarle mayores o distintos accesos en el sistema, esta acción se considera crítica.
 4. Datos y Roles se guardan juntos con "Guardar cambios"; Horario y Reemplazos se guardan aparte con "Guardar horario y reemplazos". Si cierras con cambios sin guardar, el sistema pregunta "¿Cerrar sin guardar?" ("Sí, cerrar" o "No, seguir editando").
-5. Al pulsar "Guardar cambios", si entras como administrador solo confirmas con "Sí, confirmar". Otros roles deben pedir el código rotativo de 6 dígitos del supervisor (visible en el módulo [[supervisor-codigo]]) y luego pulsar "Sí, confirmar".
-Requiere: [[supervisor-codigo]]
+5. Al pulsar "Guardar cambios" confirmas con "Sí, confirmar". No se pide ningún código: el cambio queda auditado con quién lo hizo.
 Ver tambien: [[historial]]
 
 ## Como se hace: desactivar o reactivar un usuario
 1. Si un empleado ya no labora en el local o necesita una suspensión temporal, pulsa el botón "Desactivar" en su fila.
-2. Por motivos de seguridad y auditoría, el sistema abrirá una ventana de confirmación solicitando el código de 6 dígitos del supervisor.
-3. Digita el código rotativo vigente obtenido en [[supervisor-codigo]] y confirma con "Sí, desactivar". El usuario perderá acceso inmediato al sistema y figurará con la etiqueta "Inactivo".
+2. El sistema abrirá una ventana de confirmación; no pide ningún código.
+3. Confirma con "Sí, desactivar". El usuario perderá acceso inmediato al sistema y figurará con la etiqueta "Inactivo".
 4. Para rehabilitar a un colaborador desactivado, pulsa "Reactivar" y confirma la acción en la ventana emergente con "Sí, reactivar".
-Requiere: [[supervisor-codigo]]
 Ver tambien: [[historial]]
 
 ## Como se hace: recibir alertas por WhatsApp
@@ -53,19 +51,17 @@ Ver tambien: [[historial]]
 4. Las alertas son vouchers sin revisar, chats en espera, pedidos demorados y calificaciones bajas de la encuesta posventa. Cada administrador recibe su propio mensaje: WhatsApp no envia a grupos.
 Ver tambien: [[mensajes]], [[reclamos]]
 
-## Como se hace: restablecer contraseña o asignar PIN
+## Como se hace: restablecer contraseña
 1. Si un colaborador olvidó su contraseña, pulsa "Restablecer contraseña" en su fila. Aparecerá la ventana de confirmación "¿Restablecer contraseña de este usuario?". Confirma con "Sí, restablecer". El sistema generará una nueva clave provisoria para que pueda ingresar.
-2. Si el cajero o mozo requiere un PIN numérico rápido para autorizaciones en salón o caja, pulsa "Asignar PIN", escribe el código de 4 o 6 dígitos y confirma el guardado.
 Ver tambien: [[usuarios]]
 
 ## Como se hace: Dar un rol temporal (por ejemplo supervisor suplente)
 1. Abre Usuarios, pestana Personal, y pulsa Editar en la fila de la persona que reemplaza. En el editor busca la seccion Roles temporales ("Un rol extra con fecha de fin... Al vencer deja de valer solo"). Si no tiene, dice Ninguno.
 2. Pulsa Dar rol temporal. En la ventana elige el rol ("Elige un rol..."), escribe el motivo (por ejemplo "el supervisor titular no viene hoy") y, en "Hasta cuando (opcional)", la fecha y hora de fin. Pulsa Dar rol.
 3. Aparece "Rol X dado hasta la fecha indicada." (o "...sin fecha de fin."). En la lista se ve la insignia "Temporal · hasta dd/mm" o "sin fecha de fin".
-4. Un supervisor suplente vigente puede aprobar con el codigo de supervisor como el titular; al vencer deja de valer solo y ya no puede autorizar ni ver el codigo. Ver [[supervisor-codigo]].
+4. El suplente vigente tiene los permisos del rol Supervisor como el titular; al vencer deja de valer solo.
 5. Para retirarlo antes, pulsa Quitar junto al rol temporal y confirma.
 6. El historial de roles (Otorgado, Retirado, Vencido) no se puede borrar ni alterar: queda para auditar quien tuvo que permiso y cuando.
-Requiere: [[supervisor-codigo]]
 
 ## Como se hace: Dar varios roles permanentes a una persona
 1. En el editor (o al crear), en Otros roles (opcional), marca los roles adicionales. Los permisos de todos sus roles se unen.
@@ -92,7 +88,7 @@ Ver tambien: [[historial]]
 - "No se puede quitar el rol al ultimo administrador activo": debe quedar siempre un administrador.
 - El personal puede ver y crear Iniciativas: desde esta version todo el personal las ve, crea y comenta; cambiar estado es del Administrador y del Supervisor. Ver [[iniciativas]].
 - Para la participacion en el reparto de [[propinas]]: el Administrador no participa salvo excepcion fijada en Propinas.
-- ¿Por qué el sistema me pide código de supervisor al cambiar de rol o desactivar?: si entras como administrador no lo pide, porque tú eres quien autoriza. Para los demás roles, cambiar privilegios o revocar el acceso a un empleado son operaciones críticas y se exige el código rotativo TOTP para prevenir accesos no autorizados.
+- ¿Se pide un código de supervisor al cambiar de rol o desactivar?: no. Solo quien tiene el permiso de usuarios puede hacerlo, con confirmación Sí/No, y queda auditado con quién lo hizo.
 - Ver DNI completo: los números de documento se muestran enmascarados por privacidad. Al pulsar "Ver DNI", el sistema registra una entrada de auditoría con la fecha, hora y usuario que consultó el dato personal.
 - No puedo iniciar sesión con la contraseña temporal: asegúrate de no copiar espacios en blanco antes o después de los caracteres generados.
 

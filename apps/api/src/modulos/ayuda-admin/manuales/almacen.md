@@ -4,12 +4,12 @@ titulo: Almacén
 ruta: /admin/almacen
 permiso: stock/ver
 roles: [ADMIN, ALMACEN, COCINA]
-relacionados: [stock, compras, cocina, supervisor-codigo, apertura, productos]
+relacionados: [stock, compras, cocina, apertura, productos]
 sugerencias:
   - ¿Cómo traslado insumos del almacén a la cocina o barra?
   - ¿Cómo registro una merma de productos dañados o vencidos?
   - ¿Cómo anoto los productos que preparé hoy en producción?
-  - ¿Por qué el sistema me pide el código del supervisor al anular?
+  - ¿Quién puede anular un movimiento o una producción?
   - ¿Dónde cuento las donas y galletas del día?
 ---
 # Almacén
@@ -31,9 +31,7 @@ Ver tambien: [[almacen]]
 1. Pulsa el boton "Registrar movimiento".
 2. En tipo de movimiento, elige "Merma / Perdida".
 3. Selecciona la ubicacion donde se detecto el problema, el insumo afectado, la cantidad que se da de baja y el motivo detallado de la perdida (como fecha de vencimiento cumplida o rotura accidental).
-4. Si la cantidad de la merma es igual o superior a 10 unidades o kilogramos, el sistema solicitara de forma obligatoria el codigo del supervisor de 6 digitos generado en [[supervisor-codigo]].
-5. Pulsa "Confirmar merma" para descontar las unidades del inventario.
-Requiere: [[supervisor-codigo]]
+4. Pulsa "Confirmar merma" para descontar las unidades del inventario.
 Ver tambien: [[informes]]
 
 ## Como se hace: Registrar produccion elaborada (Hoy preparé)
@@ -48,9 +46,7 @@ Ver tambien: [[cocina]]
 ## Como se hace: Anular un movimiento registrado por error
 1. En la tabla de movimientos recientes, busca la fila del movimiento que deseas revertir y pulsa el boton "Anular".
 2. Escribe una explicacion clara en el campo de motivo de la anulacion.
-3. Ingresa el codigo del supervisor de 6 digitos numericos en la casilla de autorizacion proveniente de [[supervisor-codigo]].
-4. En el mensaje de confirmacion, pulsa "Confirmar" para que el sistema revierta los saldos de inventario de forma segura.
-Requiere: [[supervisor-codigo]]
+3. En el mensaje de confirmacion, pulsa "Confirmar" para que el sistema revierta los saldos de inventario de forma segura.
 Ver tambien: [[historial]]
 
 ## Como se hace: Realizar el cierre del dia de almacen
@@ -77,10 +73,10 @@ Ver tambien: [[compras]]
 Despues: [[apertura]]
 
 ## Errores y dudas comunes
-- Cuando se requiere el codigo del supervisor: el codigo de 6 digitos se exige siempre para anular cualquier movimiento previo, para anular tandas de produccion y para registrar mermas o ajustes grandes de 10 o mas unidades. El administrador no necesita codigo en ninguno de estos casos.
+- Anular un movimiento, una tanda de produccion o registrar una merma grande no pide ningun codigo: basta tener el permiso del modulo y escribir el motivo. Todo queda auditado con quien lo hizo y cuando.
 - Como atender pedidos de insumos enviados por cocina: en la seccion de pedidos internos, localiza el pedido pendiente y pulsa el boton "Marcar entregado" luego de despachar fisicamente los productos.
 
 ## Quien puede hacerlo
 - Administrador, Almacen y Cocina: tienen permisos para consultar movimientos, registrar traslados, elaborar pedidos internos y registrar producciones del dia.
-- Para anular movimientos, producciones o registrar mermas de 10 o mas unidades, se requiere validar adicionalmente el codigo de supervisor rotativo de 6 digitos (salvo para el administrador).
+- Anular movimientos, producciones o registrar mermas grandes no pide codigo adicional: queda auditado a nombre de quien lo hace.
 - Cajero, Mozo y Repartidor: no tienen acceso al modulo de almacen.

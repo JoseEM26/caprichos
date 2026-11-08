@@ -4,10 +4,8 @@ import { ModalAnular } from '../pedidos/ModalAnular';
 import { pedidosApi, Pedido } from '../pedidos/pedidosApi';
 import { cierreApi, PendienteCobro } from './cierreApi';
 import { ErrorApi } from '../../comun/api';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { EstadoError } from '../../comun/EstadoError';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 import './pendientes-cierre.css';
 
 /** Grupos que se pueden enfocar desde un aviso del cierre. «cola» y «antiguos» son filtros. */
@@ -19,7 +17,6 @@ export interface FocoPendientes {
 }
 
 export interface PendientesCobroCierreProps {
-  esAdmin: boolean;
   pendientes: PendienteCobro[];
   setPendientes: (lista: PendienteCobro[]) => void;
   alCambiarTurno: () => void;
@@ -133,11 +130,10 @@ export function AvisoBloqueoCierre({
 
 /**
  * Pedidos sin cobrar de cualquier día que impiden cerrar la caja (RN-CAP-079). Cada uno se cobra
- * en la caja que se cierra («Cobrar ahora») o se anula con motivo y PIN («Anular con motivo»). Un cajero
- * ve la lista solo con el PIN de supervisor.
+ * en la caja que se cierra («Cobrar ahora») o se anula con motivo («Anular con motivo»). La lista la ve
+ * todo el que cierra la caja, sin ningún código.
  */
 export function PendientesCobroCierre({
-  esAdmin,
   pendientes,
   setPendientes,
   alCambiarTurno,
@@ -146,9 +142,6 @@ export function PendientesCobroCierre({
   foco = null,
   fechaCaja,
 }: PendientesCobroCierreProps) {
-  const [codigo, setCodigo] = useState('');
-  const [desbloqueado, setDesbloqueado] = useState(false);
-  const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
   const [pedidoCobrar, setPedidoCobrar] = useState<Pedido | null>(null);
   const [pendienteAnular, setPendienteAnular] = useState<PendienteCobro | null>(null);
@@ -159,9 +152,6 @@ export function PendientesCobroCierre({
   const [visibles, setVisibles] = useState<Record<Grupo, number>>({ cobrar: PAGINA, coordinados: PAGINA });
   const seccionRef = useRef<HTMLElement>(null);
 
-  // ADMIN y SUPERVISOR no escriben código (el servidor los deja pasar): ven la lista de entrada
-  const pideCodigo = usePideCodigo();
-  const mostrarLista = esAdmin || !pideCodigo || desbloqueado;
   // Día de la caja que se cierra (no necesariamente hoy)
   const hoy = fechaCaja ?? diaLima(new Date());
 
@@ -181,7 +171,7 @@ export function PendientesCobroCierre({
 
   // Enfoque pedido desde un aviso del cierre: abre el grupo (o filtro) y hace scroll hasta el panel
   useEffect(() => {
-    if (!foco || !mostrarLista) return;
+    if (!foco) return;
     if (foco.grupo === 'cola' || foco.grupo === 'antiguos') {
       setChip(foco.grupo);
     } else {
@@ -195,37 +185,6 @@ export function PendientesCobroCierre({
     }
     // Solo reacciona a una nueva solicitud de enfoque
   }, [foco?.n]);
-
-  const verConCodigo = async () => {
-    if (!/^\d{6}$/.test(codigo.trim())) {
-      setError('El código del supervisor debe ser de exactamente 6 dígitos numéricos.');
-      return;
-    }
-    setCargando(true);
-    setError('');
-    try {
-      const lista = await cierreApi.listarPendientesDeCobro(codigo);
-      setPendientes(lista);
-      setDesbloqueado(true);
-    } catch (err: unknown) {
-      if (err instanceof ErrorApi) {
-        if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
-          setError('Código del supervisor inválido. Pídelo nuevamente a la supervisora.');
-        } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
-          setError(err.message || 'Demasiados intentos con el código del supervisor. Espera 1 min o pide al administrador que lo desbloquee.');
-        } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
-          setError('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError('No se pudo cargar la lista. Intenta de nuevo.');
-      }
-    } finally {
-      setCodigo('');
-      setCargando(false);
-    }
-  };
 
   const quitar = (id: number) => setPendientes(pendientes.filter((p) => p.id !== id));
 
@@ -285,41 +244,6 @@ export function PendientesCobroCierre({
       )}
     </section>
   );
-
-  if (!mostrarLista) {
-    return envolver(
-      <>
-        <div className="pdc-titulo">Pedidos sin cobrar: impiden cerrar la caja</div>
-        <div style={{ fontSize: 13 }}>
-          Ingresa el código del supervisor para ver los pedidos sin cobrar de cualquier día.
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-            <CampoCodigoSupervisor
-              id="codigo-supervisor-pendientes"
-              valor={codigo}
-              onChange={(v) => {
-                setCodigo(v);
-                setError('');
-              }}
-              error={error}
-              etiqueta="Código del supervisor (6 dígitos)"
-              ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
-            />
-          </div>
-          <button
-            type="button"
-            className="pdc-boton pdc-boton-oscuro"
-            onClick={verConCodigo}
-            disabled={cargando}
-            style={{ marginTop: 24 }}
-          >
-            {cargando ? 'Verificando…' : 'Ver pedidos'}
-          </button>
-        </div>
-      </>
-    );
-  }
 
   if (errorLista && pendientes.length === 0) {
     return envolver(

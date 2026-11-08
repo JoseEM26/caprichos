@@ -26,15 +26,13 @@ const NOMBRE_MEDIO_DIGITAL: Record<string, string> = {
 
 export interface SinVoucherEntrada {
   motivo: string;
-  pinSupervisor?: string;
 }
 
 export interface SinVoucherAutorizado {
   motivo: string;
-  supervisorPartyId: string;
   /** Medios digitales que se cobraron sin captura (vacío si no hizo falta la excepción). */
   faltan: string[];
-  /** true: salió por la casilla «ya hablé con el cliente y pagó» (local), sin motivo ni supervisor. */
+  /** true: salió por la casilla «ya hablé con el cliente y pagó» (local), sin motivo. */
   sinCaptura?: boolean;
 }
 
@@ -87,7 +85,7 @@ export async function mediosSinCaptura(
  * - Pedido con plan de 2 o más medios digitales: hace falta una captura útil por CADA uno (planPago).
  * - Si no, la regla de siempre: un voucher útil del pedido basta si alguno de los medios es digital.
  * Si falta, lanza VOUCHER_REQUERIDO con `faltan`, salvo que el rol pueda usar la excepción: entonces
- * verifica el código del supervisor y devuelve la autorización (con los medios que faltaron) para auditar.
+ * devuelve la excepción (motivo y medios que faltaron) para auditar.
  */
 export async function exigirComprobanteDigital(args: {
   db: ClienteVouchers;
@@ -100,7 +98,6 @@ export async function exigirComprobanteDigital(args: {
   confirmaSinCaptura?: boolean;
   pedidoLocal?: boolean;
   permiteExcepcion: boolean;
-  verificarPin: (pin: string | undefined) => Promise<{ party_id?: bigint; supervisorPartyId?: bigint }>;
 }): Promise<SinVoucherAutorizado | null> {
   const digitalesPlan = [
     ...new Set((args.planPago ?? []).map((f) => f.medio).filter((m) => (MEDIOS_DIGITALES_PLAN as readonly string[]).includes(m))),
@@ -121,5 +118,5 @@ export async function exigirComprobanteDigital(args: {
 
   // La captura del pago digital es opcional en todos los canales: nunca frena el cobro. Si falta, el cobro queda
   // auditado «sin captura» (quién lo confirmó) y la insignia lo informa; la foto se puede subir después.
-  return { motivo: MENSAJE_SIN_CAPTURA, supervisorPartyId: '', faltan, sinCaptura: true };
+  return { motivo: MENSAJE_SIN_CAPTURA, faltan, sinCaptura: true };
 }

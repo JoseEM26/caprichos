@@ -6,7 +6,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  Matches,
   Min,
   MinLength,
   ValidateNested,
@@ -30,17 +29,11 @@ export class PagoItemDto {
   recibido?: number;
 }
 
-/** Excepción a la foto del comprobante: solo Caja/Admin, con motivo escrito y código rotativo del supervisor. */
+/** Excepción a la foto del comprobante: solo con motivo escrito (queda auditada). */
 export class SinVoucherDto {
   @IsString({ message: 'El motivo debe ser texto' })
   @MinLength(5, { message: 'El motivo debe tener al menos 5 caracteres' })
   motivo!: string;
-
-  /** El ADMIN no lo envía; el servicio lo exige a los demás roles. */
-  @IsOptional()
-  @IsString({ message: 'El código del supervisor es requerido' })
-  @Matches(/^\d{6}$/, { message: 'El código del supervisor son 6 dígitos' })
-  pinSupervisor?: string;
 }
 
 export class CobrarDto {
@@ -57,7 +50,7 @@ export class CobrarDto {
   @IsOptional()
   voucherId?: string | number;
 
-  /** Cobro digital sin foto: solo con motivo y código de supervisor (queda auditado). */
+  /** Cobro digital sin foto: solo con motivo (queda auditado). */
   @IsOptional()
   @ValidateNested()
   @Type(() => SinVoucherDto)

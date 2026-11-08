@@ -51,4 +51,4 @@ Decide qué medios de pago ofrece Caprichos (efectivo, tarjeta con POS al entreg
 - Cambié el número y el voucher sale como dudoso: el número y el titular que compara la IA al leer vouchers se guardan aparte en [Lectura de vouchers con IA](/admin/mirest?tab=vouchers).
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría.

@@ -1,8 +1,4 @@
 import { useEffect, useId, useState } from 'react';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
-import { ErrorApi } from '../../comun/api';
-import { hayAutorizacionSupervisor, limpiarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 import { pedidosApi, type NoEntregado, type RegistroDevolucion, type SugerenciaDevolucion } from './pedidosApi';
 
 /** Medios en los que se devuelve. El efectivo sale de la caja de hoy; los digitales piden código de operación. */
@@ -56,11 +52,8 @@ export function ModalDevolucion({ pedido, alCerrar, alRegistrar }: ModalDevoluci
   const [medio, setMedio] = useState('EFECTIVO');
   const [codigoOperacion, setCodigoOperacion] = useState('');
   const [motivo, setMotivo] = useState('');
-  const [codigoSupervisor, setCodigoSupervisor] = useState('');
-  const [autorizado, setAutorizado] = useState<boolean>(() => hayAutorizacionSupervisor());
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
-  const pideCodigo = usePideCodigo();
 
   useEffect(() => {
     let vivo = true;
@@ -110,41 +103,18 @@ export function ModalDevolucion({ pedido, alCerrar, alRegistrar }: ModalDevoluci
       setError('Explica por qué devuelves otro monto (mínimo 10 letras).');
       return;
     }
-    const codigoSup = codigoSupervisor.trim();
-    if (pideCodigo && !autorizado && !/^\d{6}$/.test(codigoSup)) {
-      setError('El código del supervisor tiene 6 dígitos.');
-      return;
-    }
 
     setEnviando(true);
     try {
-      const resultado = await pedidosApi.registrarDevolucion(
-        pedido.id,
-        {
-          montoDevuelto: montoNum,
-          medio,
-          ...(esDigital ? { codigoOperacion: codigoOperacion.trim() } : {}),
-          ...(motivo.trim() ? { motivo: motivo.trim() } : {}),
-        },
-        pideCodigo && !autorizado ? codigoSup : undefined,
-      );
-      setCodigoSupervisor('');
+      const resultado = await pedidosApi.registrarDevolucion(pedido.id, {
+        montoDevuelto: montoNum,
+        medio,
+        ...(esDigital ? { codigoOperacion: codigoOperacion.trim() } : {}),
+        ...(motivo.trim() ? { motivo: motivo.trim() } : {}),
+      });
       alRegistrar(resultado);
     } catch (err: any) {
-      setCodigoSupervisor('');
-      if (err instanceof ErrorApi && (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO')) {
-        if (autorizado) {
-          limpiarAutorizacionSupervisor();
-          setAutorizado(false);
-          setError('La autorización del supervisor venció. Escribe el código otra vez.');
-        } else {
-          setError(err.message || 'Código del supervisor inválido. Pídelo nuevamente a la supervisora.');
-        }
-      } else if (err instanceof ErrorApi && err.codigo === 'CODIGO_BLOQUEADO') {
-        setError('Demasiados intentos con el código. Espera 1 minuto.');
-      } else {
-        setError(err?.message || 'No se pudo registrar la devolución');
-      }
+      setError(err?.message || 'No se pudo registrar la devolución');
     } finally {
       setEnviando(false);
     }
@@ -274,16 +244,6 @@ export function ModalDevolucion({ pedido, alCerrar, alRegistrar }: ModalDevoluci
                   style={{ ...estiloCampo, resize: 'vertical' }}
                 />
               </div>
-            )}
-
-            {pideCodigo && !autorizado && (
-              <CampoCodigoSupervisor
-                id={`${idTitulo}-supervisor`}
-                valor={codigoSupervisor}
-                onChange={setCodigoSupervisor}
-                etiqueta="Código de la supervisora (6 dígitos)"
-                ayuda="Lo ve la supervisora en su pantalla y cambia cada 30 segundos"
-              />
             )}
 
             {error && (

@@ -186,7 +186,7 @@ export const almacenApi = {
   registrarApertura: (items: ItemApertura[]) =>
     api.post<{ ok: true; registrados: number }>('/admin/almacen/apertura', { items }),
 
-  /** Botar a merma de un producto o sabor (permiso almacen/merma_producto). Sin código de supervisor. */
+  /** Botar a merma de un producto o sabor (permiso almacen/merma_producto). */
   mermaProducto: (dto: MermaProductoDto) =>
     api.post<{ ok: true; id: string; saldo: number }>('/admin/almacen/merma-producto', dto),
 
@@ -229,18 +229,8 @@ export const almacenApi = {
   registrarMovimiento: (dto: RegistrarMovimientoDto) =>
     api.post<MovimientoItem>('/admin/almacen/movimientos', dto),
 
-  anularMovimiento: (id: string, motivo: string, codigoSupervisor?: string) => {
-    const headers: Record<string, string> = {};
-    if (codigoSupervisor?.trim()) {
-      headers['x-codigo-supervisor'] = codigoSupervisor.trim();
-      headers['x-pin-supervisor'] = codigoSupervisor.trim();
-    }
-    return api.post<{ ok: boolean }>(
-      `/admin/almacen/movimientos/${id}/anular`,
-      { motivo },
-      { headers },
-    );
-  },
+  anularMovimiento: (id: string, motivo: string) =>
+    api.post<{ ok: boolean }>(`/admin/almacen/movimientos/${id}/anular`, { motivo }),
 
   listarRecetasProduccion: () =>
     api.get<RecetaProduccionItem[]>('/admin/almacen/produccion/recetas'),

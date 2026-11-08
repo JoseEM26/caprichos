@@ -1,17 +1,14 @@
 import { execSync } from 'child_process';
 import * as path from 'path';
-import * as crypto from 'crypto';
 import { PrismaClient, Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import {
   RolPrueba,
   DNIS_POR_ROL,
-  SUPERVISOR_PIN,
   generarClaveSegura,
   obtenerDbUrl,
   NOMBRE_DB,
 } from '../src/credenciales';
-import { derivarClaveCifrado } from '../src/supervisor-totp';
 
 // Importar roles y permisos oficiales del backend compilado
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- ruta dinamica al dist compilado del backend
@@ -22,7 +19,6 @@ const { ROLES, PERMISOS, MATRIZ } = require(
 export interface ResultadoSemilla {
   dbUrl: string;
   credenciales: Record<RolPrueba, { dni: string; clave: string }>;
-  supervisorPin: string;
 }
 
 export async function recrearBaseDatosTest(): Promise<string> {
@@ -514,8 +510,6 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
     });
 
     // 8. Usuarios de prueba por rol con contraseñas generadas al vuelo en memoria
-    const supervisorPinHash = await argon2.hash(SUPERVISOR_PIN, { type: argon2.argon2id });
-
     const rolesList: RolPrueba[] = [
       'ADMIN',
       'CAJERO',
@@ -569,7 +563,6 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
               hash,
               debe_cambiar: false,
               activo: true,
-              pin_hash: rol === 'ADMIN' ? supervisorPinHash : null,
             },
             create: {
               party_id: partyId,
@@ -577,7 +570,6 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
               hash,
               debe_cambiar: false,
               activo: true,
-              pin_hash: rol === 'ADMIN' ? supervisorPinHash : null,
             },
           });
         } else {
@@ -609,7 +601,6 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
               hash,
               debe_cambiar: false,
               activo: true,
-              pin_hash: rol === 'ADMIN' ? supervisorPinHash : null,
             },
           });
         }
@@ -660,34 +651,6 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
         ancho: 2,
         alto: 2,
         activo: true,
-      },
-    });
-
-    // 9. Sembrar secreto de supervisor determinístico en memoria sin escribir a disco
-    const claveDerivadaDet = derivarClaveCifrado();
-    const secretoDeterministic = Buffer.from('caprichos-sup-sec-01', 'utf-8'); // 20 bytes exactos
-    const ivBytes = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', claveDerivadaDet, ivBytes);
-    const cifrado = Buffer.concat([cipher.update(secretoDeterministic), cipher.final()]);
-    const tagBytes = cipher.getAuthTag();
-
-    const adminIdent = await prisma.partyIdentifier.findFirst({ where: { numero: DNIS_POR_ROL.ADMIN } });
-    const adminPartyId = adminIdent?.party_id || BigInt(1);
-
-    await prisma.supervisorSecreto.upsert({
-      where: { local_codigo: 'CAPRICHOS' },
-      update: {
-        secreto_cifrado: cifrado.toString('base64'),
-        iv: ivBytes.toString('base64'),
-        tag: tagBytes.toString('base64'),
-        actualizado_en: new Date(),
-      },
-      create: {
-        local_codigo: 'CAPRICHOS',
-        secreto_cifrado: cifrado.toString('base64'),
-        iv: ivBytes.toString('base64'),
-        tag: tagBytes.toString('base64'),
-        creado_por: adminPartyId,
       },
     });
 
@@ -886,12 +849,10 @@ export async function sembrarDatosPrueba(dbUrlTest?: string): Promise<ResultadoS
 
     // Exponer contraseñas al proceso en memoria
     process.env.E2E_PASSWORDS = JSON.stringify(mapaEnvClaves);
-    process.env.E2E_SUPERVISOR_PIN = SUPERVISOR_PIN;
 
     return {
       dbUrl,
       credenciales: credencialesGeneradas,
-      supervisorPin: SUPERVISOR_PIN,
     };
   } finally {
     await prisma.$disconnect();

@@ -27,7 +27,7 @@ const AVISO_CONTADOR = 'Consulta al contador por el comprobante';
 
 /**
  * Devolución manual de un pedido cancelado por no recibir que ya estaba pagado. Una por pedido,
- * nunca automática: la registra quien aprueba (con código de supervisor salvo ADMIN/SUPERVISOR).
+ * nunca automática: la registra quien aprueba (queda auditada a nombre de quien la registra).
  */
 @Injectable()
 export class DevolucionPedidoService {
@@ -94,7 +94,7 @@ export class DevolucionPedidoService {
   /**
    * Registra la devolución. Orden: validar; si es efectivo, exigir caja abierta hoy; dar de baja el
    * comprobante (fuera de la transacción, nunca la tumba); y en una transacción guardar la devolución
-   * y, si es efectivo, el egreso de caja. El ADMIN/SUPERVISOR o el código ya lo verificó el guard.
+   * y, si es efectivo, el egreso de caja.
    */
   async registrar(
     idRaw: string,

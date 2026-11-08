@@ -6,25 +6,15 @@ import {
   Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import * as argon2 from 'argon2';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
-import {
-  exigirPinNoBloqueado,
-  limpiarIntentosPin,
-  registrarFalloPin,
-} from '../../comun/redis/intentos-pin';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CobrosService } from '../caja/cobros.service';
 import { PuntosService } from '../clientes/puntos.service';
-import {
-  SupervisorCodigoService,
-  autorizarAdminSinCodigo,
-  esOperadorSinCodigo,
-} from '../supervisor-codigo/supervisor-codigo.service';
 import { CobrarDto } from '../caja/dto/cobrar.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
+import { rolesDelUsuario } from '../acceso/roles-usuario';
 import {
   ClienteCaja,
   MontosSistema,
@@ -57,7 +47,7 @@ import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-
  * Arqueos que NO cuadraron antes de exigir PIN de supervisor. Un arqueo que cuadra no suma.
  * Los intentos se numeran todos (incluidos los que cuadran); solo los NO_CUADRA cuentan para el PIN.
  */
-const ARQUEOS_NO_CUADRA_PARA_PIN = 3;
+const ARQUEOS_NO_CUADRA_PARA_NOTA = 3;
 
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
 function compararConSistema(
@@ -147,7 +137,6 @@ export class CierreService {
     private readonly auditoria: AuditoriaService,
     private readonly eventosGateway: EventosGateway,
     private readonly cobrosService: CobrosService,
-    @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
     @Optional() private readonly puntosService?: PuntosService,
   ) {}
 
@@ -257,46 +246,6 @@ export class CierreService {
       throw new NotFoundException('Caja no encontrada');
     }
     return this.montosCierre(this.prisma, caja);
-  }
-
-  /**
-   * Verifica el código rotativo de 6 dígitos del supervisor (RFC 6238 TOTP).
-   * 3 intentos fallidos consecutivos bloquean 1 minuto en Redis (FT-CAJ-02).
-   */
-  async verificarPinSupervisor(
-    pinSupervisor?: string,
-    partyIdOperador?: bigint,
-    ip?: string,
-    cajaId?: bigint,
-    _cliente?: any,
-    accion = 'cierre',
-  ): Promise<{ party_id?: bigint; id?: bigint }> {
-    if (this.supervisorCodigoService) {
-      return this.supervisorCodigoService.verificarYConsumirCodigo(
-        pinSupervisor,
-        partyIdOperador,
-        accion,
-        ip,
-        'caja',
-        cajaId,
-      );
-    }
-
-    // Mismo criterio que el servicio: el ADMIN no da código.
-    const admin = await autorizarAdminSinCodigo(this.prisma, this.auditoria, partyIdOperador, accion, ip, 'caja', cajaId);
-    if (admin) return { party_id: admin.party_id, id: admin.id };
-
-    const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
-    const redis = this.redisService.obtenerCliente();
-    await exigirPinNoBloqueado(redis, claveIntentos);
-    await registrarFalloPin(redis, claveIntentos);
-    throw new HttpException(
-      {
-        codigo: 'CODIGO_INVALIDO',
-        mensaje: 'Código de supervisor inválido o no proporcionado',
-      },
-      HttpStatus.FORBIDDEN,
-    );
   }
 
   /** Último ajuste aprobado de cada medio en la caja (el que vale). */
@@ -413,14 +362,13 @@ export class CierreService {
   }
 
   /**
-   * Corrige el monto de un medio digital de la caja abierta. Excepción, no camino normal: lo hace el
-   * ADMIN o el SUPERVISOR sin código (queda auditado a su nombre); el cajero necesita el código de supervisor.
+   * Corrige el monto de un medio digital de la caja abierta. Excepción, no camino normal: exige motivo
+   * y queda auditado a nombre de quien lo hace.
    * Solo se inserta un registro; el valor corregido es el que usa el arqueo y el cierre.
    */
   async registrarAjusteMedio(
     dto: AjusteMedioDto,
     usuario: UsuarioAutenticado,
-    pinSupervisor?: string,
     ip?: string,
   ) {
     const motivo = (dto.motivo ?? '').trim();
@@ -440,27 +388,8 @@ export class CierreService {
     const cajaAbierta = await this.obtenerCajaAbierta();
     const clave = CLAVE_DIGITAL[dto.medio];
 
-    const { fila, supervisorPartyId } = await this.prisma.$transaction(async (tx) => {
+    const { fila } = await this.prisma.$transaction(async (tx) => {
       const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
-
-      if (!pinSupervisor && !(await esOperadorSinCodigo(this.prisma, usuario.partyId))) {
-        throw new HttpException(
-          {
-            codigo: 'PIN_REQUERIDO',
-            mensaje: 'Corregir un monto digital requiere el código de supervisor.',
-          },
-          HttpStatus.FORBIDDEN,
-        );
-      }
-      const supervisor = await this.verificarPinSupervisor(
-        pinSupervisor,
-        usuario.partyId,
-        ip,
-        caja.id,
-        tx,
-        'cierre/ajustar_medio',
-      );
-      const autorizadoPor = supervisor.party_id ?? usuario.partyId;
 
       const montos = await this.montosCierre(tx, caja);
       const ajustes = await this.ajustesVigentes(tx, caja.id);
@@ -481,10 +410,10 @@ export class CierreService {
           monto_nuevo: enPesos(aCentimos(dto.montoNuevo)),
           motivo,
           por_party_id: usuario.partyId,
-          autorizado_por_party_id: autorizadoPor,
+          autorizado_por_party_id: usuario.partyId,
         },
       });
-      return { fila: creada, supervisorPartyId: autorizadoPor };
+      return { fila: creada };
     });
 
     await this.auditoria.registrar({
@@ -500,7 +429,7 @@ export class CierreService {
         montoSistema: Number(fila.monto_sistema),
         montoNuevo: Number(fila.monto_nuevo),
         motivo,
-        autorizadoPor: String(supervisorPartyId),
+        autorizadoPor: String(usuario.partyId),
       },
       motivo,
       partyId: usuario.partyId,
@@ -518,7 +447,6 @@ export class CierreService {
   async arqueo(
     dto: ArqueoDto,
     usuario: UsuarioAutenticado,
-    pinSupervisor?: string,
     ip?: string,
   ) {
     const cajaAbierta = await this.obtenerCajaAbierta();
@@ -532,24 +460,6 @@ export class CierreService {
       });
 
       const nuevoIntento = conteosPrevios + 1;
-
-      // Desde el cuarto intento exige PIN de supervisor, pero solo si los tres anteriores no cuadraron
-      const noCuadraPrevios = await tx.conteoCierre.count({
-        where: { caja_id: caja.id, resultado: 'NO_CUADRA' },
-      });
-      if (noCuadraPrevios >= ARQUEOS_NO_CUADRA_PARA_PIN) {
-        if (!pinSupervisor && !(await esOperadorSinCodigo(this.prisma, usuario.partyId))) {
-          throw new HttpException(
-            {
-              codigo: 'PIN_REQUERIDO',
-              mensaje:
-                'Se alcanzaron 3 arqueos que no cuadraron. Debe proceder al cierre con PIN de supervisor.',
-            },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-        await this.verificarPinSupervisor(pinSupervisor, usuario.partyId, ip, caja.id, tx);
-      }
 
       const montos = await this.montosCierre(tx, caja);
       const comparacion = compararConSistema(
@@ -603,12 +513,11 @@ export class CierreService {
    * Cierra la caja del día.
    * Crea cierre_caja (inmutable) y cierre_medio por medio.
    * Exige que no haya cobros en curso.
-   * Si no cuadra o tras 3 arqueos que no cuadraron, exige PIN de supervisor y notas.
+   * Si no cuadra o tras 3 arqueos que no cuadraron, exige una nota explicativa.
    */
   async cerrar(
     dto: CerrarCajaDto,
     usuario: UsuarioAutenticado,
-    pinSupervisor?: string,
     ip?: string,
   ) {
     const cajaAbierta = await this.obtenerCajaAbierta();
@@ -698,11 +607,9 @@ export class CierreService {
       const comparacion = compararConSistema(vistos, montos);
       const { resultado, cuadra } = comparacion;
 
-      let supervisorPartyId: bigint | null = null;
-
-      // Si no cuadra o ya hubo 3 arqueos que no cuadraron, se exige supervisor y notas
+      // Si no cuadra o ya hubo 3 arqueos que no cuadraron, se exige la nota explicativa
       const noCuadraPrevios = conteosCaja.filter((c) => c.resultado === 'NO_CUADRA').length;
-      if (!cuadra || noCuadraPrevios >= ARQUEOS_NO_CUADRA_PARA_PIN) {
+      if (!cuadra || noCuadraPrevios >= ARQUEOS_NO_CUADRA_PARA_NOTA) {
         if (!dto.nota || typeof dto.nota !== 'string' || dto.nota.trim().length < 3) {
           throw new HttpException(
             {
@@ -713,26 +620,6 @@ export class CierreService {
             HttpStatus.BAD_REQUEST,
           );
         }
-
-        if (!pinSupervisor && !(await esOperadorSinCodigo(this.prisma, usuario.partyId))) {
-          throw new HttpException(
-            {
-              codigo: 'PIN_REQUERIDO',
-              mensaje:
-                'El cierre no cuadra o se alcanzaron los intentos máximos: se requiere el PIN de supervisor.',
-            },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-
-        const supervisor = await this.verificarPinSupervisor(
-          pinSupervisor,
-          usuario.partyId,
-          ip,
-          caja.id,
-          tx,
-        );
-        supervisorPartyId = supervisor.party_id ?? null;
       }
 
       const mediosData = [
@@ -748,7 +635,6 @@ export class CierreService {
           caja_id: caja.id,
           conteo: conteo as any,
           resultado,
-          aprobado_por: supervisorPartyId,
           nota: dto.nota?.trim() ?? null,
         },
       });
@@ -774,10 +660,10 @@ export class CierreService {
         },
       });
 
-      return { caja, resultado, supervisorPartyId, mediosData };
+      return { caja, resultado, mediosData };
     });
 
-    const { caja, resultado, supervisorPartyId, mediosData } = cierre;
+    const { caja, resultado, mediosData } = cierre;
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -788,10 +674,8 @@ export class CierreService {
       entidadId: caja.id,
       despues: {
         resultado,
-        aprobado_por: supervisorPartyId ? String(supervisorPartyId) : null,
         nota: dto.nota?.trim() ?? null,
       },
-      conPinAdmin: supervisorPartyId !== null,
       partyId: usuario.partyId,
       ip,
     });
@@ -809,7 +693,6 @@ export class CierreService {
       cajaId: Number(caja.id),
       fecha: caja.fecha,
       resultado,
-      aprobadoPor: supervisorPartyId ? Number(supervisorPartyId) : null,
       nota: dto.nota?.trim() ?? null,
       // El cajero no ve el esperado ni la diferencia (DT-61)
       medios: usuario.rol === 'ADMIN' ? mediosData : undefined,
@@ -818,13 +701,16 @@ export class CierreService {
 
   /**
    * Montos esperados por el sistema y el turno (cobros y movimientos) de la caja ABIERTA, sea del día que sea.
-   * Solo ADMIN o con PIN de supervisora (cierre ciego para cajeros): sin eso no sale ningún monto.
+   * Solo ADMIN o SUPERVISOR (cierre ciego para cajeros): sin eso no sale ningún monto.
    */
-  async obtenerEsperado(usuario: UsuarioAutenticado, pinSupervisor?: string, ip?: string) {
+  async obtenerEsperado(usuario: UsuarioAutenticado) {
     const caja = await this.obtenerCajaAbierta();
-    // el administrador lo ve directo; otro rol solo con el PIN de la supervisora (RQ-CIE-02-05, HU-CAP-199)
-    if (usuario?.rol !== 'ADMIN') {
-      await this.verificarPinSupervisor(pinSupervisor, usuario?.partyId, ip, caja.id);
+    // ADMIN y SUPERVISOR lo ven directo; el cajero cierra a ciegas (RQ-CIE-02-05, HU-CAP-199)
+    if (!rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'SUPERVISOR')) {
+      throw new HttpException(
+        { codigo: 'ESPERADO_RESERVADO', mensaje: 'El monto esperado lo ve el administrador o el supervisor.' },
+        HttpStatus.FORBIDDEN,
+      );
     }
     const montos = await this.calcularMontosSistema(caja.id);
     // Mismos cobros y movimientos que la caja de hoy, pero de la caja que se cierra: totales y listas cuadran
@@ -1156,15 +1042,8 @@ export class CierreService {
 
   /**
    * Pedidos sin cobrar de cualquier día, los mismos que bloquean el cierre (RN-CAP-079).
-   * Solo admin o con PIN de supervisor válido.
    */
-  async listarPendientesDeCobro(
-    usuario: UsuarioAutenticado,
-    pinSupervisor?: string,
-    ip?: string,
-  ) {
-    await this.exigirAdminOPin(usuario, pinSupervisor, ip);
-
+  async listarPendientesDeCobro() {
     const pedidos = await this.prisma.pedido.findMany({
       where: {
         pago_estado: { in: ['PENDIENTE', 'COORDINADO'] },
@@ -1225,12 +1104,6 @@ export class CierreService {
       usuario,
       ip,
     );
-  }
-
-  /** Lo que pide la pantalla de cierre a un cajero: el PIN de supervisor, o ser admin. */
-  private async exigirAdminOPin(usuario: UsuarioAutenticado, pinSupervisor?: string, ip?: string) {
-    if (usuario?.rol === 'ADMIN') return;
-    await this.verificarPinSupervisor(pinSupervisor, usuario?.partyId, ip);
   }
 
   /**

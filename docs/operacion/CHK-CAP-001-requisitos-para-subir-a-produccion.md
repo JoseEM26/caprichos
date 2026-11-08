@@ -55,7 +55,6 @@ Lista única de todo lo que debe estar hecho **antes** de abrir el sistema a cli
 - [ ] Quitar las claves de ejemplo `123456` de los usuarios de la demo; en producción cada persona con su DNI y clave propia (`debeCambiar` activo).
 - [ ] Cambiar la clave del administrador local `11223344`; no reutilizar datos de la demo.
 - [ ] Rotar la llave SSH `ssh-key-2026-08-13.key` del bot antiguo y su contraseña; endurecer SSH y firewall de la VPS (RB-CAP-005 de rotación de claves).
-- [ ] Código del supervisor (TOTP) configurado por el administrador real.
 - [ ] Administradores con **número de WhatsApp confirmado** para recibir alertas (Usuarios, bloque «Alertas por WhatsApp»).
 - [ ] Revisar que ningún secreto esté en el repositorio (el hook `secret-scanner` debe pasar).
 

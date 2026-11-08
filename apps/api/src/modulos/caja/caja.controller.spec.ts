@@ -63,13 +63,12 @@ describe('CajaController', () => {
 
   it('abrirCaja delega a cajaService.abrirCaja con usuario e IP', async () => {
     const req = { usuario: mockUsuario, ip: '127.0.0.1' };
-    const res = await controller.abrirCaja({ apertura: 100 }, req, '123456');
+    const res = await controller.abrirCaja({ apertura: 100 }, req);
 
     expect(cajaServiceMock.abrirCaja).toHaveBeenCalledWith(
       { apertura: 100 },
       mockUsuario,
       '127.0.0.1',
-      '123456',
     );
     expect(res).toEqual({ id: '1', estado: 'ABIERTA' });
   });
@@ -95,20 +94,18 @@ describe('CajaController', () => {
     expect(res.pago_estado).toBe('PAGADO');
   });
 
-  it('anularCobro pasa el header X-Pin-Supervisor a cobrosService', async () => {
+  it('anularCobro delega a cobrosService sin ningún código', async () => {
     const req = {
       usuario: mockUsuario,
       ip: '127.0.0.1',
-      headers: { 'x-pin-supervisor': '123456' },
     };
     const dto = { motivo: 'Cliente desistió de la compra' };
 
-    await controller.anularCobro('10', dto, '123456', req);
+    await controller.anularCobro('10', dto, req);
 
     expect(cobrosServiceMock.anularCobro).toHaveBeenCalledWith(
       '10',
       dto,
-      '123456',
       mockUsuario,
       '127.0.0.1',
     );
@@ -151,7 +148,7 @@ describe('CajaController', () => {
 
   it('marcarCoordinado delega a cobrosService.marcarCoordinado con la excepción del cuerpo', async () => {
     const req = { usuario: mockUsuario, ip: '127.0.0.1' };
-    const dto = { sinVoucher: { motivo: 'Cliente sin señal', pinSupervisor: '123456' } };
+    const dto = { sinVoucher: { motivo: 'Cliente sin señal' } };
     await controller.marcarCoordinado('15', dto as any, req);
 
     expect(cobrosServiceMock.marcarCoordinado).toHaveBeenCalledWith('15', mockUsuario, '127.0.0.1', dto);

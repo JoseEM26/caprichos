@@ -98,19 +98,18 @@ export interface DatosPedidoOriginal {
 }
 
 /** Permisos de cortesía sin romper si el componente se usa fuera del contexto de sesión (pruebas sueltas). */
-function usePermisosCortesia(): { puede: boolean; esSupervisor: boolean } {
+function usePermisosCortesia(): { puede: boolean } {
   try {
-    const sesion = useSesion();
-    return { puede: sesion.tiene('cortesias/dar'), esSupervisor: sesion.usuario?.rol === 'SUPERVISOR' };
+    return { puede: useSesion().tiene('cortesias/dar') };
   } catch {
-    return { puede: false, esSupervisor: false };
+    return { puede: false };
   }
 }
 
 export interface LineaPedidoMesa {
   id: string;
-  /** Cortesía de la línea: sale a S/ 0. El código (solo el SUPERVISOR) viaja en la cabecera al enviar. */
-  cortesia?: { motivo: string; nota?: string; codigo?: string };
+  /** Cortesía de la línea: sale a S/ 0 (queda auditada). */
+  cortesia?: { motivo: string; nota?: string };
   productoId: string | number;
   nombre: string;
   tamanoId?: string | number;
@@ -593,7 +592,7 @@ export function ModalNuevoPedidoMesa({
 
   // Carrito de líneas de pedido
   const [lineas, setLineas] = useState<LineaPedidoMesa[]>(() => (edicion ? edicion.datos.lineas.map(aLineaMesa) : []));
-  const { puede: puedeCortesia, esSupervisor: pideCodigoCortesia } = usePermisosCortesia();
+  const { puede: puedeCortesia } = usePermisosCortesia();
   const [lineaCortesiaId, setLineaCortesiaId] = useState<string | null>(null);
 
   // Editar pedido: versión que vio quien edita, conflicto con otra edición y quién más lo tiene abierto
@@ -1189,10 +1188,6 @@ export function ModalNuevoPedidoMesa({
           ...(lin.cortesia ? { cortesia: { motivo: lin.cortesia.motivo, nota: lin.cortesia.nota } } : {}),
         };
       });
-      // El SUPERVISOR presenta su código al marcar la cortesía; viaja en la cabecera del envío
-      const codigoCortesia = lineas.find((l) => l.cortesia?.codigo)?.cortesia?.codigo;
-      // Solo se pasa si hay cortesía con código: el resto de los envíos no cambia
-      const cabeceraCortesia = codigoCortesia ? ([codigoCortesia] as const) : ([] as const);
 
       // desde Pedidos y caja el canal es CAJA; el mozo desde el salón sigue siendo MOZO
       const canalEnvio: 'MOZO' | 'CAJA' = canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO');
@@ -1241,7 +1236,6 @@ export function ModalNuevoPedidoMesa({
                   },
           },
           idempotencyKey,
-          codigoCortesia,
         );
       } else {
         const telDigitos = cliTelefono.replace(/\D/g, '');
@@ -1283,7 +1277,6 @@ export function ModalNuevoPedidoMesa({
             clientePartyId: clientePideId,
           },
           idempotencyKey,
-          ...cabeceraCortesia,
         );
       }
 
@@ -3206,10 +3199,9 @@ export function ModalNuevoPedidoMesa({
                           <ModalCortesia
                             titulo={`Dar como cortesía: ${lin.nombre}`}
                             resumen="La línea sale a S/ 0.00 al enviar el pedido."
-                            pideCodigo={pideCodigoCortesia}
                             alCerrar={() => setLineaCortesiaId(null)}
-                            alConfirmar={async (datos, codigo) => {
-                              setLineas((prev) => prev.map((x) => (x.id === lin.id ? { ...x, cortesia: { ...datos, codigo } } : x)));
+                            alConfirmar={async (datos) => {
+                              setLineas((prev) => prev.map((x) => (x.id === lin.id ? { ...x, cortesia: datos } : x)));
                               setLineaCortesiaId(null);
                             }}
                           />

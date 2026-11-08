@@ -3,16 +3,10 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
-  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
-import {
-  SupervisorCodigoService,
-  esOperadorSinCodigo,
-  autorizarAdminSinCodigo,
-} from '../supervisor-codigo/supervisor-codigo.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import {
   aCentimos,
@@ -69,7 +63,6 @@ export class CajaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
-    @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
   ) {}
 
   /** Monto inicial oficial (S/) de Configuración; 0 si no está definido o es inválido. */
@@ -77,46 +70,6 @@ export class CajaService {
     const p = await this.prisma.parametro.findUnique({ where: { clave: 'caja_monto_inicial' } });
     const n = Number(p?.valor);
     return Number.isFinite(n) && n >= 0 && esCentimosValidos(n) ? n : 0;
-  }
-
-  /** Devuelve el partyId de quien aprobó el monto distinto, o rechaza con 403. */
-  private async autorizarMontoDistinto(
-    usuario: any,
-    codigoSupervisor: string | undefined,
-    ip: string | undefined,
-    montoOficial: number,
-  ): Promise<string> {
-    const exento = await esOperadorSinCodigo(this.prisma, usuario?.partyId);
-    if (!exento && !codigoSupervisor?.trim()) {
-      throw new HttpException(
-        {
-          codigo: 'MONTO_INICIAL_REQUIERE_CODIGO',
-          mensaje: `El monto inicial oficial es S/ ${montoOficial.toFixed(2)}. Para abrir con otro monto, escribe el código del supervisor.`,
-        },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-    if (this.supervisorCodigoService) {
-      const r = await this.supervisorCodigoService.verificarYConsumirCodigo(
-        codigoSupervisor,
-        usuario?.partyId,
-        'caja/abrir_monto_distinto',
-        ip,
-        'caja',
-      );
-      return String(r.supervisorPartyId);
-    }
-    // Sin servicio de códigos (no pasa en producción): solo el ADMIN; cerrado ante el resto.
-    const admin = await autorizarAdminSinCodigo(
-      this.prisma, this.auditoria, usuario?.partyId, 'caja/abrir_monto_distinto', ip, 'caja', undefined, true,
-    );
-    if (!admin) {
-      throw new HttpException(
-        { codigo: 'CODIGO_INVALIDO', mensaje: 'Código de supervisor inválido o no proporcionado' },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-    return String(admin.party_id);
   }
 
   private parsearId(id: bigint | string | number): bigint {
@@ -143,7 +96,7 @@ export class CajaService {
    * Abre la caja del día con monto inicial en soles.
    * Solo permite una caja por día (409 CAJA_YA_ABIERTA).
    */
-  async abrirCaja(dto: AbrirCajaDto, usuario: any, ip?: string, codigoSupervisor?: string) {
+  async abrirCaja(dto: AbrirCajaDto, usuario: any, ip?: string) {
     const { fechaDate, fechaIso } = this.obtenerFechaHoyLima();
 
     const montoOficial = await this.obtenerMontoInicialOficial();
@@ -187,12 +140,6 @@ export class CajaService {
       throw errorAnterior;
     }
 
-    // Un monto distinto del oficial lo cambia solo el ADMIN (se autoriza solo) o con código de supervisor válido.
-    let aprobadoPor: string | null = null;
-    if (aCentimos(aperturaMonto) !== aCentimos(montoOficial)) {
-      aprobadoPor = await this.autorizarMontoDistinto(usuario, codigoSupervisor, ip, montoOficial);
-    }
-
     let caja;
     try {
       caja = await this.prisma.caja.create({
@@ -231,9 +178,8 @@ export class CajaService {
         apertura: Number(caja.apertura),
         estado: caja.estado,
         montoOficial,
-        distintoDelOficial: aprobadoPor !== null,
+        distintoDelOficial: aCentimos(aperturaMonto) !== aCentimos(montoOficial),
         abiertaPor: usuario?.partyId ? String(usuario.partyId) : null,
-        aprobadoPor,
       },
       ip,
     });

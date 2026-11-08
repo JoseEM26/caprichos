@@ -68,4 +68,4 @@ Pestaña de interruptores generales del local: pedir como invitado en la carta, 
 - No puedo cambiar el tiempo prometido aquí: se cambia en Parámetros del sistema.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría. Los interruptores de esta pestaña los cambia solo el Administrador.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría. Los interruptores de esta pestaña los cambia solo el Administrador.

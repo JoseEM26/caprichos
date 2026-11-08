@@ -15,7 +15,7 @@ export const ROLES: readonly DefinicionRol[] = [
   { codigo: 'MOZO', nombre: 'Mozo' },
   { codigo: 'ALMACEN', nombre: 'Almacén' },
   { codigo: 'REPARTIDOR', nombre: 'Repartidor' },
-  // Persona encargada del local: caja, salón y ve el código de supervisor. Sin administración.
+  // Persona encargada del local: caja, salón y escritorio operativo. Sin administración.
   { codigo: 'SUPERVISOR', nombre: 'Supervisor' },
   // Rol EXTRA para que cualquiera apoye en delivery (ver, seguir, tomar y entregar). A diferencia de REPARTIDOR sí se combina
   { codigo: 'APOYO_DELIVERY', nombre: 'Apoyo en delivery' },
@@ -23,6 +23,9 @@ export const ROLES: readonly DefinicionRol[] = [
 
 /** Roles retirados del sistema: el sincronizador les borra los permisos y nunca los recrea. */
 export const ROLES_ELIMINADOS: readonly string[] = ['CALLCENTER'];
+
+/** Permisos retirados (modulo/accion): el sincronizador los borra de la base y de todos los roles. */
+export const PERMISOS_RETIRADOS: readonly string[] = ['supervisor/ver_codigo', 'supervisor/gestionar_codigo'];
 
 export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'usuarios', accion: 'ver' },
@@ -48,10 +51,10 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pedidos', accion: 'crear' },
   { modulo: 'pedidos', accion: 'cambiar_estado' },
   { modulo: 'pedidos', accion: 'anular' },
-  // Editar productos y datos de un pedido aún sin cobrar (Caja): ADMIN, SUPERVISOR, CAJERO y MOZO, sin código de supervisor
+  // Editar productos y datos de un pedido aún sin cobrar (Caja): ADMIN, SUPERVISOR, CAJERO y MOZO
   { modulo: 'pedidos', accion: 'editar' },
   { modulo: 'pedidos', accion: 'corregir_cliente' },
-  // Agregar un pedido extra enlazado a uno ya hecho (con su propio pago y comprobante): ADMIN, SUPERVISOR, CAJERO y MOZO, sin código de supervisor
+  // Agregar un pedido extra enlazado a uno ya hecho (con su propio pago y comprobante): ADMIN, SUPERVISOR, CAJERO y MOZO
   { modulo: 'pedidos', accion: 'extra' },
   { modulo: 'zonas', accion: 'ver' },
   { modulo: 'zonas', accion: 'editar' },
@@ -70,13 +73,13 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Chat de WhatsApp de un pedido propio (solo texto, solo mientras el pedido siga vigente)
   { modulo: 'repartos', accion: 'chat' },
   { modulo: 'repartos', accion: 'liquidar' },
-  // Cambio de ubicación de un delivery: Caja aprueba/cambia (con dinero: sin supervisor); el repartidor propone
+  // Cambio de ubicación de un delivery: Caja aprueba/cambia; el repartidor propone
   { modulo: 'pedidos', accion: 'cambiar_ubicacion' },
   // Cortesías (venta a costo 0): libres para ADMIN, SUPERVISOR, CAJERO y MOZO (sin código); motivo obligatorio y queda auditada. Ver el informe: Caja y ADMIN
   { modulo: 'cortesias', accion: 'dar' },
   { modulo: 'cortesias', accion: 'ver' },
   { modulo: 'repartos', accion: 'proponer_ubicacion' },
-  // Cambio de forma de pago en la puerta: el repartidor solicita; Caja, Admin y Supervisor validan (sin código: no es anulación)
+  // Cambio de forma de pago en la puerta: el repartidor solicita; Caja, Admin y Supervisor validan
   { modulo: 'repartos', accion: 'solicitar_cambio_cobro' },
   { modulo: 'pedidos', accion: 'validar_cambio_cobro' },
   // Cocina, Stock y Recetas (Ola 5)
@@ -141,7 +144,7 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'almacen', accion: 'cierre' },
   // Conteo de apertura del día de los productos que controlan stock (donas, galletas)
   { modulo: 'almacen', accion: 'apertura' },
-  // Merma de producto terminado (sin código de supervisor): Cocina decide y queda auditada
+  // Merma de producto terminado: Cocina decide y queda auditada
   { modulo: 'almacen', accion: 'merma_producto' },
   { modulo: 'produccion', accion: 'ver' },
   { modulo: 'produccion', accion: 'crear' },
@@ -190,10 +193,6 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'pantallas', accion: 'desactivar' },
   // Escritorio operativo del supervisor: solo conteos y horarios, sin dinero
   { modulo: 'escritorio', accion: 'operativo' },
-  // Supervisor: código rotativo general (TOTP)
-  { modulo: 'supervisor', accion: 'ver_codigo' },
-  // Generar, rotar el secreto y desbloquear operadores: solo ADMIN
-  { modulo: 'supervisor', accion: 'gestionar_codigo' },
   // Vouchers y lectura IA (vch-api)
   { modulo: 'vouchers', accion: 'subir' },
   { modulo: 'vouchers', accion: 'ver' },
@@ -265,7 +264,7 @@ export const MATRIZ: Record<string, string[]> = {
     'almacen/merma_producto',
     'pedidos/ver',
     'pedidos/cambiar_estado',
-    'pedidos/anular', // anula el pedido completo desde su comanda, sin código de supervisor (decisión del dueño)
+    'pedidos/anular', // anula el pedido completo desde su comanda
     'cocina/ver',
     'cocina/despejar',
     'cocina/despachar',
@@ -382,13 +381,13 @@ for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR']) {
   MATRIZ[rol] = [...MATRIZ[rol], 'asistencia/marcar'];
 }
 
-// Supervisor: la unión de lo que tienen CAJERO y MOZO, más ver el código rotativo de 6 dígitos.
+// Supervisor: la unión de lo que tienen CAJERO y MOZO.
 // No recibe diseño de carta, Novedades, informes, usuarios, configuración ni compras (ver la tabla del informe).
 // Y su escritorio operativo (conteos, sin montos).
 // El conteo de apertura (almacen/apertura) no lo tiene el supervisor: sin administración de stock.
 // Iniciativas: cambiar el estado (NUEVA, EN_REVISION, HECHA, NO_POR_AHORA) lo tienen ADMIN y SUPERVISOR.
 MATRIZ.SUPERVISOR = [
-  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'supervisor/ver_codigo', 'escritorio/operativo', 'iniciativas/cambiar_estado']),
+  ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'iniciativas/cambiar_estado']),
 ].filter(
   // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni hace el conteo de apertura
   (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear',

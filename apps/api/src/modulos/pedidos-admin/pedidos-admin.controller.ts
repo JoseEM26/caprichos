@@ -1,5 +1,5 @@
-import { anulaSinAprobacion, esSoloMozo } from '../acceso/roles-usuario';
-import { puedeDarCortesia, requiereCodigoCortesia } from '../cortesias/cortesia.tipos';
+import { esSoloMozo } from '../acceso/roles-usuario';
+import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
 import {
   Body,
   Controller,
@@ -15,7 +15,6 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { PedidosEstadoService } from './pedidos-estado.service';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
@@ -52,11 +51,6 @@ export class PedidosAdminController {
 
   @Post()
   @Permiso('pedidos', 'crear')
-  // Una línea de cortesía: el SUPERVISOR presenta su código (Caja y ADMIN no)
-  @RequiereCodigoSupervisor('cortesias/dar', {
-    condicion: (req) => requiereCodigoCortesia(req) && (req.body?.lineas ?? []).some((l: any) => !!l?.cortesia),
-    exigeCodigoSupervisor: true,
-  })
   async crear(
     @Body() dto: CrearPedidoDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
@@ -74,7 +68,6 @@ export class PedidosAdminController {
       esPersonal: dto.esPersonal,
       omitirChequeoCarta: true,
       puedeCortesia: puedeDarCortesia(req.usuario),
-      supervisorCortesiaPartyId: req.supervisor?.supervisorPartyId ?? req.supervisor?.party_id,
     });
     if (res?.id && this.impresionService) {
       try {
@@ -134,31 +127,9 @@ export class PedidosAdminController {
     { modulo: 'pedidos', accion: 'cambiar_estado' },
     { modulo: 'pedidos', accion: 'anular' },
   ])
-  @RequiereCodigoSupervisor('pedidos/anular', {
-    // COCINA y MOZO anulan sin código; el servicio valida que sea suyo y el estado
-    condicion: (req) => req.body?.estado === 'ANULADO' && !anulaSinAprobacion(req.usuario),
-  })
-  async cambiarEstado(
-    @Param('id') id: string,
-    @Body() dto: CambiarEstadoDto,
-    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
-    @Req() req: any,
-    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
-  ) {
+  async cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    const codigo =
-      codigoSupervisor ||
-      pinSupervisor ||
-      req.headers?.['x-codigo-supervisor'] ||
-      req.headers?.['x-pin-supervisor'];
-    return this.pedidosEstadoService.cambiarEstado(
-      id,
-      dto,
-      req.usuario,
-      codigo,
-      ip,
-      ...(req.codigoSupervisorVerificado ? [true] : []),
-    );
+    return this.pedidosEstadoService.cambiarEstado(id, dto, req.usuario, ip);
   }
 
   /** Datos para la devolución de un pedido cancelado por no recibir y pagado (monto sugerido, medio, comprobante). */
@@ -168,17 +139,12 @@ export class PedidosAdminController {
     return this.devolucionPedido!.sugerencia(id);
   }
 
-  /**
-   * Registra la devolución manual. Aprueba la supervisora con su código; el ADMIN y el SUPERVISOR
-   * se autorizan solos (queda auditado a su nombre). El guard deja en req.supervisor quién autorizó.
-   */
+  /** Registra la devolución manual (motivo y monto validados; queda auditada a nombre de quien la registra). */
   @Post(':id/devolucion')
   @Permiso('pedidos', 'cambiar_estado')
-  @RequiereCodigoSupervisor('pedidos/devolucion')
   async registrarDevolucion(@Param('id') id: string, @Body() dto: RegistrarDevolucionDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    const autorizadoPor = req.supervisor?.party_id ?? req.usuario?.partyId;
-    return this.devolucionPedido!.registrar(id, dto, req.usuario, BigInt(autorizadoPor), ip);
+    return this.devolucionPedido!.registrar(id, dto, req.usuario, BigInt(req.usuario.partyId), ip);
   }
 
   /** Plan de pago que arma el mozo antes de subir cada captura (el servidor deriva el monto por medio). */
@@ -208,7 +174,7 @@ export class PedidosAdminController {
     return this.pedidosEstadoService.registrarPago(id, dto, req.usuario, ip);
   }
 
-  /** Corrige nombre, celular y (delivery) dirección/referencia; sin código de supervisor. */
+  /** Corrige nombre, celular y (delivery) dirección/referencia. */
   @Patch(':id/cliente')
   @Permiso('pedidos', 'corregir_cliente')
   async corregirDatosCliente(@Param('id') id: string, @Body() dto: CorregirClienteDto, @Req() req: any) {

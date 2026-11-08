@@ -98,9 +98,7 @@ function puedeCortesiaLinea(pedido: Pedido, it: LineaPedido): boolean {
 }
 
 export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgregarExtra, alAbrirPedido, editandoPor, cajaAbierta }: PedidoDetalleProps) {
-  const { tiene, usuario } = useSesion();
-  // El SUPERVISOR presenta su código para dar una cortesía; ADMIN y Caja no
-  const pideCodigoCortesia = usuario?.rol === 'SUPERVISOR';
+  const { tiene } = useSesion();
   const [lineaCortesia, setLineaCortesia] = useState<LineaPedido | null>(null);
   const [tab, setTab] = useState<TabDetalle>('pedido');
 
@@ -1300,10 +1298,9 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
         <ModalCortesia
           titulo={`Dar como cortesía: ${lineaCortesia.nombre}`}
           resumen={`Pedido ${pedido.codigo}. La línea pasa a S/ 0.00 y el total del pedido baja.`}
-          pideCodigo={pideCodigoCortesia}
           alCerrar={() => setLineaCortesia(null)}
-          alConfirmar={async (datos, codigo) => {
-            await cortesiasApi.darEnLinea(pedido.id, lineaCortesia.id, datos, codigo);
+          alConfirmar={async (datos) => {
+            await cortesiasApi.darEnLinea(pedido.id, lineaCortesia.id, datos);
             setLineaCortesia(null);
             alActualizar();
           }}

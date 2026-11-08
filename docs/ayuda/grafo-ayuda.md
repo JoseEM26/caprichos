@@ -9,12 +9,12 @@ pnpm --filter @caprichos/api ayuda:grafo
 
 ## Métricas del Grafo
 
-- **Nodos totales**: 354
-  - Módulos: 41
-  - Tareas (`## Como se hace`): 278
+- **Nodos totales**: 350
+  - Módulos: 40
+  - Tareas (`## Como se hace`): 276
   - Roles del sistema: 7
-  - Permisos requeridos: 28
-- **Aristas tipadas totales**: 1218
+  - Permisos requeridos: 27
+- **Aristas tipadas totales**: 1166
 
 ## Diagrama Mermaid de Módulos y Relaciones
 
@@ -58,7 +58,6 @@ flowchart TD
   repartos["Repartos (/admin/repartos)"]
   reservas["Reservas (/admin/reservas)"]
   stock["Stock y recetas (/admin/stock)"]
-  supervisor_codigo["Código del supervisor (/admin/supervisor-codigo)"]
   usuarios["Usuarios (/admin/usuarios)"]
   zonas["Zonas de reparto (/admin/zonas)"]
   almacen -->|relacionado_con| stock
@@ -67,8 +66,6 @@ flowchart TD
   compras -->|relacionado_con| almacen
   almacen -->|relacionado_con| cocina
   cocina -->|relacionado_con| almacen
-  almacen -->|relacionado_con| supervisor_codigo
-  supervisor_codigo -->|relacionado_con| almacen
   almacen -->|relacionado_con| apertura
   apertura -->|relacionado_con| almacen
   almacen -->|relacionado_con| productos
@@ -79,7 +76,6 @@ flowchart TD
   almacen -->|relacionado_con| cierre
   almacen -->|antes| stock
   almacen -->|despues| cocina
-  almacen -->|requiere| supervisor_codigo
   almacen -->|ver_tambien| informes
   almacen -->|antes| recetas
   almacen -->|despues| stock
@@ -132,8 +128,6 @@ flowchart TD
   repartos -->|relacionado_con| caja
   caja -->|relacionado_con| plano
   plano -->|relacionado_con| caja
-  caja -->|relacionado_con| supervisor_codigo
-  supervisor_codigo -->|relacionado_con| caja
   caja -->|relacionado_con| mensajes
   mensajes -->|relacionado_con| caja
   caja -->|relacionado_con| propinas
@@ -141,13 +135,11 @@ flowchart TD
   caja -->|relacionado_con| informes
   informes -->|relacionado_con| caja
   caja -->|relacionado_con| historial
-  caja -->|antes| supervisor_codigo
   caja -->|antes| cocina
   caja -->|despues| comprobantes
   caja -->|ver_tambien| cierre
   caja -->|antes| mensajes
   caja -->|despues| cocina
-  caja -->|requiere| supervisor_codigo
   caja -->|ver_tambien| historial
   caja -->|antes| plano
   caja -->|ver_tambien| repartos
@@ -156,8 +148,6 @@ flowchart TD
   caja -->|ver_tambien| mensajes
   cierre -->|relacionado_con| repartos
   repartos -->|relacionado_con| cierre
-  cierre -->|relacionado_con| supervisor_codigo
-  supervisor_codigo -->|relacionado_con| cierre
   cierre -->|relacionado_con| comprobantes
   comprobantes -->|relacionado_con| cierre
   cierre -->|relacionado_con| mensajes
@@ -167,6 +157,7 @@ flowchart TD
   cierre -->|relacionado_con| informes
   informes -->|relacionado_con| cierre
   cierre -->|relacionado_con| plano
+  cierre -->|requiere| caja
   cierre -->|antes| caja
   cierre -->|ver_tambien| caja
   cierre -->|antes| mensajes
@@ -174,8 +165,6 @@ flowchart TD
   cierre -->|ver_tambien| repartos
   cierre -->|despues| informes
   cierre -->|ver_tambien| comprobantes
-  cierre -->|requiere| supervisor_codigo
-  cierre -->|ver_tambien| supervisor_codigo
   cierre -->|ver_tambien| propinas
   clientes -->|relacionado_con| caja
   caja -->|relacionado_con| clientes
@@ -196,8 +185,6 @@ flowchart TD
   stock -->|relacionado_con| cocina
   cocina -->|relacionado_con| pantallas
   pantallas -->|relacionado_con| cocina
-  cocina -->|relacionado_con| supervisor_codigo
-  supervisor_codigo -->|relacionado_con| cocina
   cocina -->|relacionado_con| productos
   productos -->|relacionado_con| cocina
   cocina -->|relacionado_con| usuarios
@@ -211,7 +198,6 @@ flowchart TD
   cocina -->|ver_tambien| mirest
   cocina -->|despues| productos
   cocina -->|ver_tambien| stock
-  cocina -->|requiere| supervisor_codigo
   cocina -->|despues| almacen
   cocina -->|despues| apertura
   compras -->|relacionado_con| stock
@@ -277,8 +263,6 @@ flowchart TD
   plano -->|relacionado_con| escritorio
   escritorio -->|relacionado_con| notificaciones
   notificaciones -->|relacionado_con| escritorio
-  escritorio -->|relacionado_con| supervisor_codigo
-  supervisor_codigo -->|relacionado_con| escritorio
   escritorio -->|relacionado_con| stock
   escritorio -->|ver_tambien| informes
   escritorio -->|despues| compras
@@ -286,11 +270,8 @@ flowchart TD
   escritorio -->|ver_tambien| caja
   escritorio -->|ver_tambien| cocina
   escritorio -->|ver_tambien| repartos
-  escritorio -->|ver_tambien| supervisor_codigo
   historial -->|relacionado_con| usuarios
   usuarios -->|relacionado_con| historial
-  historial -->|relacionado_con| supervisor_codigo
-  supervisor_codigo -->|relacionado_con| historial
   historial -->|relacionado_con| caja
   historial -->|relacionado_con| cierre
   cierre -->|relacionado_con| historial
@@ -389,8 +370,6 @@ flowchart TD
   mi_asistencia -->|ver_tambien| propinas
   mirest -->|relacionado_con| zonas
   zonas -->|relacionado_con| mirest
-  mirest -->|relacionado_con| supervisor_codigo
-  supervisor_codigo -->|relacionado_con| mirest
   mirest -->|relacionado_con| cocina
   mirest -->|relacionado_con| historial
   historial -->|relacionado_con| mirest
@@ -543,26 +522,15 @@ flowchart TD
   reservas -->|ver_tambien| clientes
   reservas -->|antes| mensajes
   reservas -->|despues| caja
-  stock -->|relacionado_con| supervisor_codigo
   stock -->|despues| compras
   stock -->|ver_tambien| productos
   stock -->|despues| recetas
   stock -->|ver_tambien| compras
   stock -->|ver_tambien| almacen
   stock -->|despues| almacen
-  stock -->|ver_tambien| supervisor_codigo
-  supervisor_codigo -->|relacionado_con| usuarios
-  usuarios -->|relacionado_con| supervisor_codigo
-  supervisor_codigo -->|relacionado_con| compras
-  compras -->|relacionado_con| supervisor_codigo
-  supervisor_codigo -->|despues| caja
-  supervisor_codigo -->|ver_tambien| usuarios
-  supervisor_codigo -->|ver_tambien| historial
-  supervisor_codigo -->|ver_tambien| escritorio
   usuarios -->|relacionado_con| mensajes
   usuarios -->|relacionado_con| reclamos
   usuarios -->|ver_tambien| historial
-  usuarios -->|requiere| supervisor_codigo
   usuarios -->|ver_tambien| mensajes
   usuarios -->|ver_tambien| reclamos
   zonas -->|relacionado_con| caja
@@ -627,6 +595,5 @@ flowchart TD
 | `repartos` | Repartos | `/admin/repartos` |
 | `reservas` | Reservas | `/admin/reservas` |
 | `stock` | Stock y recetas | `/admin/stock` |
-| `supervisor-codigo` | Código del supervisor | `/admin/supervisor-codigo` |
 | `usuarios` | Usuarios | `/admin/usuarios` |
 | `zonas` | Zonas de reparto | `/admin/zonas` |

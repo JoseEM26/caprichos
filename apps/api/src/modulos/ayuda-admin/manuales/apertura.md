@@ -34,7 +34,7 @@ Despues: [[cocina]]
 ## Como se hace: Botar un producto a merma
 1. En la fila del producto o sabor, pulsa el icono Botar a merma (se desactiva si el saldo es 0).
 2. En el dialogo escribe cuantas botas (entero de 1 hasta el saldo), elige el motivo (Vencido, Danado, Se cayo u Otro) y una nota (obligatoria si el motivo es Otro).
-3. Pulsa Confirmar merma. Veras "Botado a merma: N. Quedan M.". No pide codigo del supervisor: Cocina lo registra y queda auditado con quien y cuando.
+3. Pulsa Confirmar merma. Veras "Botado a merma: N. Quedan M.". No pide ningun codigo: Cocina lo registra y queda auditado con quien y cuando.
 4. La merma de productos terminados es distinta de la merma de insumos: ver [[cocina]].
 
 ## Como se hace: Activar el control de stock de un producto

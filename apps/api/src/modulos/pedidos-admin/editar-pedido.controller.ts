@@ -6,7 +6,7 @@ import { EditandoPedidoDto, EditarPedidoDto } from './dto/editar-pedido.dto';
 
 /**
  * «Editar pedido» en Caja: productos y datos de un pedido sin cobrar. Permiso pedidos/editar (ADMIN, SUPERVISOR,
- * CAJERO y MOZO), sin código de supervisor; el mozo puede editar cualquier pedido, no solo los suyos.
+ * CAJERO y MOZO); el mozo puede editar cualquier pedido, no solo los suyos.
  */
 @Controller('admin/pedidos')
 @UseGuards(AccesoGuard)

@@ -53,14 +53,14 @@ Ver tambien: [[cierre]]
 
 ## Como se hace: Dar una cortesia en una mesa
 1. Con el pedido armado en el local (+ Pedido en mesa), en cada linea aparece Dar como cortesia. Eliges el motivo y la linea sale a S/ 0 ("Cortesia · vale S/ N"). Quitar cortesia la devuelve a su precio.
-2. Solo Caja, el Administrador y el Supervisor pueden darla (el Supervisor escribe el codigo de 6 digitos de su pantalla). El mozo no puede: debe pedirla a Caja. Detalle completo en [[caja]].
+2. Solo Caja, el Administrador y el Supervisor pueden darla, sin ningun codigo (queda auditada). El mozo no puede: debe pedirla a Caja. Detalle completo en [[caja]].
 
 ## Errores y dudas comunes
 - "La mesa N ya esta ocupada" (MESA_OCUPADA): otra persona abrio esa mesa; elige otra o libera la anterior.
 - "Un pedido puede ocupar hasta 6 mesas juntas" y "Una mesa aparece dos veces": revisa la seleccion.
 - "Esa mesa ya es de este pedido": ya estaba sumada.
 - Para pedidos de salon solo (los de delivery no cambian de mesa) y un pedido anulado no puede cambiar de mesa.
-- Si el voucher no se lee, el mozo toma otra foto. Si no hay foto, el mozo igual envía el cobro a Caja y Caja resuelve (foto o excepción con código del supervisor).
+- Si el voucher no se lee, el mozo toma otra foto. Si no hay foto, el mozo igual envía el cobro a Caja y Caja resuelve (foto o excepción con motivo).
 - El mozo no ve el semáforo de confianza: por diseño, la vista del mozo sólo comprueba que la imagen sea legible para no demorar la atención en sala; la auditoría financiera se realiza en el arqueo de Cierre de caja.
 - No me aparecen los botones para agregar o mover mesas: solo los administradores con el permiso plano/editar pueden modificar la estructura física del salón; los mozos solo tienen acceso en modo consulta y toma de pedidos.
 - Una mesa sigue figurando ocupada cuando los clientes ya se fueron: la mesa se libera automáticamente al registrar el cobro final en caja, o manualmente si el cajero o mozo autorizado pulsa "Liberar o marcar mesa".

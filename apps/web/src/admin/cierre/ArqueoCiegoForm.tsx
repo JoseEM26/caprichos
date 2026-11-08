@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Boton } from '../../comun/Boton';
 import { Confirmar } from '../../comun/Confirmar';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 import {
   cierreApi,
   DENOMINACIONES_LISTA,
@@ -40,11 +38,6 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
   // Resultado de arqueo
   const [resultadoArqueo, setResultadoArqueo] = useState<ArqueoRespuesta | null>(null);
   const [intentosFallidos, setIntentosFallidos] = useState<number>(0);
-  const [requierePin, setRequierePin] = useState<boolean>(false);
-
-  // PIN del supervisor (NUNCA guardado persistentemente, limpiado tras uso)
-  const [pinSupervisor, setPinSupervisor] = useState<string>('');
-  const pideCodigo = usePideCodigo();
 
   // Observación/nota de cierre
   const [nota, setNota] = useState<string>('');
@@ -93,44 +86,21 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
 
     try {
       const dto = prepararDatosArqueo();
-      const pinAEnviar = pinSupervisor.trim() || undefined;
 
-      const res = await cierreApi.realizarArqueo(dto, pinAEnviar);
+      const res = await cierreApi.realizarArqueo(dto);
       setResultadoArqueo(res);
 
+      // Solo los arqueos que no cuadran suman; un arqueo que cuadra no suma
       if (res.resultado === 'NO_CUADRA') {
-        // Solo los arqueos que no cuadran suman para el PIN; un arqueo que cuadra no suma
-        const nuevosIntentos = intentosFallidos + 1;
-        setIntentosFallidos(nuevosIntentos);
-        if (nuevosIntentos >= 3) {
-          setRequierePin(true);
-        }
-      } else {
-        // Cuadra
-        setRequierePin(false);
+        setIntentosFallidos(intentosFallidos + 1);
       }
     } catch (err: any) {
       if (err instanceof ErrorApi) {
-        if (err.codigo === 'PIN_REQUERIDO' || err.codigo === 'CODIGO_REQUERIDO') {
-          setRequierePin(true);
-          setErrorArqueo(
-            err.message || 'Se requiere el código de supervisor para continuar con el arqueo.',
-          );
-        } else if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
-          setErrorArqueo('Código de supervisor inválido. Pídelo a la supervisora.');
-        } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
-          setErrorArqueo(err.message || 'Demasiados intentos con el código del supervisor. Espera 1 min o pide al administrador que lo desbloquee.');
-        } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
-          setErrorArqueo('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
-        } else {
-          setErrorArqueo(err.message || 'Error al procesar el arqueo');
-        }
+        setErrorArqueo(err.message || 'Error al procesar el arqueo');
       } else {
         setErrorArqueo('Error inesperado al conectar con el servidor');
       }
     } finally {
-      // Limpiar el código del estado por seguridad tras el envío
-      setPinSupervisor('');
       setRevisando(false);
     }
   };
@@ -138,13 +108,9 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
   const handleIntentarCerrarCaja = () => {
     setErrorCierre(null);
 
-    // Si ya van 3 arqueos que no cuadraron o la API exige código, validar que el supervisor haya puesto código y nota >= 3
-    const exigePinSupervisor = intentosFallidos >= 3 || requierePin;
-    if (exigePinSupervisor) {
-      if (pideCodigo && !pinSupervisor.trim()) {
-        setErrorCierre('Se alcanzó el límite de intentos: se requiere el código de 6 dígitos del supervisor.');
-        return;
-      }
+    // Si el último arqueo no cuadró o ya van 3 que no cuadraron, se exige una nota de al menos 3 caracteres
+    const exigeNota = intentosFallidos >= 3 || resultadoArqueo?.resultado === 'NO_CUADRA';
+    if (exigeNota) {
       if (!nota.trim() || nota.trim().length < 3) {
         setErrorCierre('Se requiere una nota explicativa de al menos 3 caracteres para cerrar la caja con diferencias.');
         return;
@@ -160,34 +126,23 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
 
     try {
       const dto = prepararDatosArqueo();
-      const pinAEnviar = pinSupervisor.trim() || undefined;
 
-      const res = await cierreApi.cerrarCaja(
-        {
-          conteo: dto.conteo,
-          medios: dto.medios,
-          nota: nota.trim() || undefined,
-        },
-        pinAEnviar,
-      );
+      const res = await cierreApi.cerrarCaja({
+        conteo: dto.conteo,
+        medios: dto.medios,
+        nota: nota.trim() || undefined,
+      });
 
       setMostrarConfirmarCierre(false);
       setCierreExitoso(`Caja #${res.cajaId} cerrada exitosamente. Resultado: ${res.resultado}.`);
-      // Limpiar PIN
-      setPinSupervisor('');
       alCerrarCajaExitoso?.();
     } catch (err: any) {
       setMostrarConfirmarCierre(false);
-      // Limpiar PIN de inmediato si falla
-      setPinSupervisor('');
       if (err instanceof ErrorApi) {
         if (err.codigo === 'COBROS_EN_CURSO') {
           setErrorCierre(err.message || 'No se puede cerrar la caja: hay cobros en curso o por confirmar.');
         } else if (err.codigo === 'REPARTIDORES_SIN_LIQUIDAR') {
           setErrorCierre(err.message || 'No se puede cerrar la caja: falta liquidar repartidores.');
-        } else if (err.codigo === 'PIN_REQUERIDO' || err.codigo === 'PIN_INVALIDO') {
-          setRequierePin(true);
-          setErrorCierre(err.message || 'PIN de supervisor inválido o requerido.');
         } else {
           setErrorCierre(err.message || 'Error al cerrar la caja');
         }
@@ -585,42 +540,6 @@ export function ArqueoCiegoForm({ alCerrarCajaExitoso }: ArqueoCiegoFormProps) {
             </div>
           )}
         </div>
-
-        {/* Sección de Código de Supervisor (se muestra si van 3 arqueos que no cuadraron o si la API lo pide) */}
-        {pideCodigo && (requierePin || intentosFallidos >= 3) && (
-          <div
-            data-testid="seccion-pin-supervisor"
-            style={{
-              background: '#FFF6E3',
-              border: '1.5px solid var(--cp-gold)',
-              borderRadius: '14px',
-              padding: '14px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-            }}
-          >
-            <div>
-              <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--cp-navy)' }}>
-                Autorización de supervisor requerida
-              </span>
-              <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--cp-soft)' }}>
-                {intentosFallidos >= 3
-                  ? 'Se alcanzaron 3 arqueos que no cuadraron. Se exige código de supervisor para cerrar.'
-                  : 'Si el arqueo no cuadra, el cierre requiere código de supervisor y una nota explicativa.'}
-              </p>
-            </div>
-
-            <CampoCodigoSupervisor
-              id="pin-supervisor-input"
-              dataTestId="pin-supervisor-input"
-              valor={pinSupervisor}
-              onChange={setPinSupervisor}
-              etiqueta="Código del supervisor (6 dígitos)"
-              ayuda="Pídelo a la supervisora: lo ve en su pantalla y cambia cada 30 segundos"
-            />
-          </div>
-        )}
 
         {/* Paso 3: Observaciones y Cierre final */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

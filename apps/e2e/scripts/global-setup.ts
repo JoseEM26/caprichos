@@ -51,7 +51,6 @@ export default async function globalSetup(config: FullConfig) {
     process.env[`E2E_PASSWORD_${rol}`] = datos.clave;
   }
   process.env.E2E_PASSWORDS = JSON.stringify(mapaClaves);
-  process.env.E2E_SUPERVISOR_PIN = semilla.supervisorPin;
   process.env.API_BASE_URL = `http://127.0.0.1:${PUERTO_API}`;
   process.env.FRONT_BASE_URL = `http://127.0.0.1:${PUERTO_FRONT}`;
 

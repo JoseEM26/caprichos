@@ -1379,7 +1379,7 @@ export function CocinaAdminView() {
       <ModalMerma
         abierto={modalMermaAbierto}
         alCerrar={() => setModalMermaAbierto(false)}
-        alGuardar={async (lineas, codigoSupervisor) => {
+        alGuardar={async (lineas) => {
           try {
             if (lineas.length === 1) {
               const l = lineas[0];
@@ -1388,7 +1388,7 @@ export function CocinaAdminView() {
                 cantidad: l.cantidad,
                 origen: l.origen,
                 motivo: l.motivo,
-              }, codigoSupervisor);
+              });
               setMensajeAccion(`Merma registrada: ${l.cantidad} ${l.unidad} de ${l.insumoNombre}.`);
             } else {
               await registrarMermaMultiple({
@@ -1399,7 +1399,7 @@ export function CocinaAdminView() {
                   origen: l.origen,
                   destino: l.destino,
                 })),
-              }, codigoSupervisor);
+              });
               setMensajeAccion(`Merma múltiple registrada para ${lineas.length} líneas.`);
             }
           } catch (err: any) {

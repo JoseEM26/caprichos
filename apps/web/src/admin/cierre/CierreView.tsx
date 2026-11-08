@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useConfirmarAsync } from '../../comun/useConfirmarAsync';
 import { useSesion } from '../../comun/sesion';
-import { usePideCodigo } from '../../comun/usePideCodigo';
+import { useEsAdminOSupervisor } from '../../comun/useEsAdminOSupervisor';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
 import { HistorialCierres } from './HistorialCierres';
@@ -38,12 +38,11 @@ const hoyLima = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Americ
 
 export function CierreView() {
   const { usuario, tiene } = useSesion();
-  const pideCodigo = usePideCodigo();
   const { confirmar, dialogo } = useConfirmarAsync();
   const puedeVer = tiene('caja/ver') || tiene('caja/cerrar') || usuario?.rol === 'ADMIN' || tieneRolUsuario(usuario, 'CAJERO');
   const esAdmin = usuario?.rol === 'ADMIN';
-  // ADMIN y SUPERVISOR no escriben código: el servidor los autoriza solos (misma regla que requiereCodigo)
-  const sinCodigo = !pideCodigo;
+  // ADMIN y SUPERVISOR ven el esperado y la diferencia; el cajero cierra a ciegas (DT-61)
+  const veDetalle = useEsAdminOSupervisor();
 
   const [tabActiva, setTabActiva] = useState<TabCierre>('turno');
 
@@ -113,11 +112,8 @@ export function CierreView() {
   const [devolucionesTurno, setDevolucionesTurno] = useState<DevolucionTurno[]>([]);
   const [correccion, setCorreccion] = useState<{ medio: MedioAjustable; clave: ClaveDigital } | null>(null);
   const [obsCierre, setObsCierre] = useState('');
-  const [pinSupervisora, setPinSupervisora] = useState('');
   const [revisadoCuadra, setRevisadoCuadra] = useState<boolean | null>(null);
   const [arqueosNoCuadra, setArqueosNoCuadra] = useState(0);
-  const [requierePin, setRequierePin] = useState(false);
-  const [pinVerificado, setPinVerificado] = useState(false);
   const [msgCierreError, setMsgCierreError] = useState('');
   const [cerrandoCaja, setCerrandoCaja] = useState(false);
 
@@ -163,7 +159,7 @@ export function CierreView() {
       // 2. Esperado: lo piden el administrador y el supervisor. El cajero cuenta a ciegas (DT-61).
       // Con él llegan también los cobros y movimientos de la MISMA caja abierta (sea de hoy o no).
       let turnoDeCaja = false;
-      if (sinCodigo) {
+      if (veDetalle) {
         try {
           const esp = await cierreApi.obtenerEsperado();
           if (esp) {
@@ -211,23 +207,20 @@ export function CierreView() {
       // 4b. Medios digitales calculados por el sistema (sin efectivo ni esperado)
       await cargarDigitales();
 
-      // 5. Pedidos sin cobrar de cualquier día (los que bloquean el cierre; el admin y el supervisor los ven de entrada,
-      // el cajero los ve con el PIN de supervisor)
-      if (sinCodigo) {
-        try {
-          setPedidosAbiertos(await cierreApi.listarPendientesDeCobro());
-          setErrorPendientes(false);
-        } catch {
-          setPedidosAbiertos([]);
-          setErrorPendientes(true);
-        }
+      // 5. Pedidos sin cobrar de cualquier día (los que bloquean el cierre)
+      try {
+        setPedidosAbiertos(await cierreApi.listarPendientesDeCobro());
+        setErrorPendientes(false);
+      } catch {
+        setPedidosAbiertos([]);
+        setErrorPendientes(true);
       }
     } catch (err: any) {
       setErrorCarga(err?.message || 'Error al cargar los datos de caja y cierre');
     } finally {
       setCargando(false);
     }
-  }, [sinCodigo, cargarDigitales]);
+  }, [veDetalle, cargarDigitales]);
 
   useEffect(() => {
     cargarTurno();
@@ -288,10 +281,9 @@ export function CierreView() {
       ].map((f) => ({ ...f, dif: Math.round((f.contado - f.sistema) * 100) / 100 }))
     : [];
   const cuadraEnSistema = filasCuadre.length > 0 && filasCuadre.every((f) => Math.abs(f.dif) < 0.005);
-  // El admin ve la diferencia y la supervisora firma con su PIN; el cajero, si el arqueo no cuadra o ya van 3 arqueos que no cuadraron
-  const necesitaPin = sinCodigo ? !cuadraEnSistema : revisadoCuadra === false || arqueosNoCuadra >= 3 || requierePin;
-  // El administrador no escribe código (él mismo sería el aprobador); la nota sigue siendo obligatoria si no cuadra
-  const pideCodigoCierre = pideCodigo && necesitaPin;
+  // La nota explicativa es obligatoria si no cuadra: el admin y el supervisor ven la diferencia; el cajero, si el arqueo
+  // no cuadra o ya van 3 arqueos que no cuadraron
+  const necesitaNota = veDetalle ? !cuadraEnSistema : revisadoCuadra === false || arqueosNoCuadra >= 3;
 
   const armarConteo = () => {
     const conteo: Record<string, number> = {};
@@ -314,8 +306,6 @@ export function CierreView() {
   const alCorregirMedio = async (ajuste: AjusteMedio) => {
     setCorreccion(null);
     setRevisadoCuadra(null);
-    setRequierePin(false);
-    setPinVerificado(false);
     setMsgCierreError('');
     setCjMsg(`Corrección guardada: ${ETIQUETA_MEDIO[ajuste.medio] ?? ajuste.medio} ahora vale s/ ${ajuste.montoNuevo.toFixed(2)}.`);
     await cargarDigitales();
@@ -326,9 +316,6 @@ export function CierreView() {
   const abrirCierre = () => {
     setFaseCierre('verificar');
     setRevisadoCuadra(null);
-    setPinVerificado(false);
-    setPinSupervisora('');
-    setRequierePin(false);
     setMsgCierreError('');
     setAbrirModalCierre(true);
   };
@@ -458,56 +445,11 @@ export function CierreView() {
     setMsgCierreError('');
     setGuardando(true);
     try {
-      const res = await cierreApi.realizarArqueo(
-        { conteo: armarConteo(), medios: armarMedios() },
-        requierePin || arqueosNoCuadra >= 3 ? pinSupervisora : undefined,
-      );
+      const res = await cierreApi.realizarArqueo({ conteo: armarConteo(), medios: armarMedios() });
       setRevisadoCuadra(res.resultado === 'CUADRA');
       setArqueosNoCuadra(res.resultado === 'NO_CUADRA' ? arqueosNoCuadra + 1 : arqueosNoCuadra);
-      setRequierePin(false);
     } catch (err: any) {
-      if (err instanceof ErrorApi && err.codigo === 'PIN_REQUERIDO') {
-        setRequierePin(true);
-      }
       setMsgCierreError(errorDeServidor(err, 'No se pudo revisar el arqueo.'));
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  // El código lo valida el servidor; solo si lo acepta se muestra el detalle del cuadre
-  const handleVerificarPinSupervisora = async () => {
-    if (guardando) return;
-    const pin = pinSupervisora.trim();
-    if (!/^\d{6}$/.test(pin)) {
-      setMsgCierreError('El código de la supervisora tiene 6 dígitos.');
-      return;
-    }
-    setGuardando(true);
-    try {
-      const datos = await cierreApi.verificarPinSupervisor(pin);
-      setEsperado(datos);
-      // El turno que se verifica es el de la caja abierta que devuelve el servidor, con sus cobros y movimientos
-      setFechaTurno(String(datos.fecha).slice(0, 10));
-      setPedidosCobrados(datos.cobrados ?? []);
-      setMovimientos(datos.movimientos ?? []);
-      setPinVerificado(true);
-      setMsgCierreError('');
-    } catch (err: any) {
-      setPinVerificado(false);
-      if (err instanceof ErrorApi) {
-        if (err.codigo === 'CODIGO_INVALIDO' || err.codigo === 'PIN_INVALIDO') {
-          setMsgCierreError('Código de supervisor inválido o no proporcionado');
-        } else if (err.codigo === 'CODIGO_BLOQUEADO' || err.codigo === 'PIN_BLOQUEADO') {
-          setMsgCierreError(err.message || 'Demasiados intentos con el código del supervisor. Espera 1 min o pide al administrador que lo desbloquee.');
-        } else if (err.codigo === 'SUPERVISOR_SIN_CONFIGURAR') {
-          setMsgCierreError('El local aún no tiene configurado el código de supervisor. El administrador debe generarlo desde su pantalla.');
-        } else {
-          setMsgCierreError(errorDeServidor(err, 'No se pudo verificar el código de la supervisora.'));
-        }
-      } else {
-        setMsgCierreError(errorDeServidor(err, 'No se pudo verificar el código de la supervisora.'));
-      }
     } finally {
       setGuardando(false);
     }
@@ -524,19 +466,11 @@ export function CierreView() {
       setMsgCierreError('Hay efectivo de repartidores sin liquidar. Liquídalo antes de cerrar.');
       return;
     }
-    if (!sinCodigo && revisadoCuadra === null) {
+    if (!veDetalle && revisadoCuadra === null) {
       setMsgCierreError('Toca «Revisar» para saber si cuadra antes de cerrar.');
       return;
     }
-    if (necesitaPin) {
-      if (!sinCodigo && !pinVerificado) {
-        setMsgCierreError('No cuadra: la supervisora debe escribir su código para revisar el detalle y cerrar.');
-        return;
-      }
-      if (pideCodigoCierre && !pinSupervisora.trim()) {
-        setMsgCierreError('Escribe el código de la supervisora de 6 dígitos.');
-        return;
-      }
+    if (necesitaNota) {
       if (obsCierre.trim().length < 3) {
         setMsgCierreError('Escribe una nota de al menos 3 caracteres para cerrar con diferencias.');
         return;
@@ -545,7 +479,7 @@ export function CierreView() {
 
     // El cajero no ve la diferencia (cierre ciego): la pregunta es neutra
     let titulo = '¿Cerrar la caja?';
-    if (sinCodigo) {
+    if (veDetalle) {
       const difTot = Math.round((totalEfectivoContado - efectivoEsperado) * 100) / 100;
       const txtDif = Math.abs(difTot) < 0.005 ? 'cuadrada' : `con una diferencia de s/ ${Math.abs(difTot).toFixed(2)} ${difTot > 0 ? 'de sobrante' : 'de faltante'}`;
       titulo = `¿Cerrar la caja ${txtDif}?`;
@@ -558,28 +492,18 @@ export function CierreView() {
 
     setCerrandoCaja(true);
     try {
-      await cierreApi.cerrarCaja(
-        {
-          conteo: armarConteo(),
-          medios: armarMedios(),
-          nota: obsCierre.trim() || undefined,
-        },
-        pideCodigoCierre ? pinSupervisora.trim() : undefined,
-      );
+      await cierreApi.cerrarCaja({
+        conteo: armarConteo(),
+        medios: armarMedios(),
+        nota: obsCierre.trim() || undefined,
+      });
 
       setAbrirModalCierre(false);
       setCjMsg('Caja cerrada. El cierre quedó registrado en el historial inmutable.');
       setTabActiva('historial');
       setArqueosNoCuadra(0);
-      setRequierePin(false);
       cargarTurno();
     } catch (err: any) {
-      if (err instanceof ErrorApi && (err.codigo === 'PIN_REQUERIDO' || err.codigo === 'NOTA_REQUERIDA')) {
-        setRequierePin(true);
-      }
-      if (err instanceof ErrorApi && err.codigo === 'PIN_INVALIDO') {
-        setPinVerificado(false);
-      }
       setMsgCierreError(errorDeServidor(err, 'Error al cerrar la caja.'));
     } finally {
       setCerrandoCaja(false);
@@ -822,7 +746,7 @@ export function CierreView() {
                     color: 'var(--cp-navy, #0B2C3E)',
                   }}
                 >
-                  Cierre ciego (acta 03): los totales por medio de pago y el efectivo esperado solo los ve la supervisora. Al cerrar, cuenta y anota lo que hay; el sistema te dirá si cuadra.
+                  Cierre ciego (acta 03): los totales por medio de pago y el efectivo esperado solo los ven el administrador y el supervisor. Al cerrar, cuenta y anota lo que hay; el sistema te dirá si cuadra.
                 </div>
               )}
 
@@ -1592,7 +1516,6 @@ export function CierreView() {
                 pendientesCount={pedidosAbiertos.length}
                 pendientes={
                   <PendientesCobroCierre
-                    esAdmin={esAdmin}
                     pendientes={pedidosAbiertos}
                     setPendientes={setPedidosAbiertos}
                     alCambiarTurno={cargarTurno}
@@ -1774,7 +1697,7 @@ export function CierreView() {
                 </div>
 
                 {/* Botón Revisar si cuadra: solo para el cajero (ADMIN y SUPERVISOR no lo necesitan) */}
-                {!sinCodigo && (
+                {!veDetalle && (
                   <div>
                     <button
                       type="button"
@@ -1799,53 +1722,18 @@ export function CierreView() {
                         ¡Cuadra! Todo en orden.
                       </div>
                     )}
-                    {pideCodigo && (revisadoCuadra === false || requierePin) && !pinVerificado && (
+                    {revisadoCuadra === false && (
                       <div style={{ marginTop: 8, border: '1px solid var(--cp-rust, #B2500F)', background: '#FFF0ED', borderRadius: 10, padding: 10 }}>
                         <div style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: 13 }}>
-                          No cuadra: la supervisora debe escribir su código para revisar el detalle y cerrar.
-                        </div>
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
-                          <input
-                            type="password"
-                            inputMode="numeric"
-                            maxLength={6}
-                            aria-label="Código de la supervisora"
-                            placeholder="Código de la supervisora"
-                            value={pinSupervisora}
-                            onChange={(e) => setPinSupervisora(e.target.value.replace(/\D/g, ''))}
-                            style={{
-                              flex: 1,
-                              minHeight: 38,
-                              borderRadius: 8,
-                              border: '1px solid var(--cp-line, #E3D6C6)',
-                              padding: '0 10px',
-                            }}
-                          />
-                          <button
-                            type="button"
-                            disabled={guardando}
-                            onClick={handleVerificarPinSupervisora}
-                            style={{
-                              minHeight: 38,
-                              padding: '0 12px',
-                              borderRadius: 8,
-                              border: 0,
-                              background: 'var(--cp-navy, #0B2C3E)',
-                              color: 'var(--cp-cream, #FBF4EC)',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Verificar
-                          </button>
+                          No cuadra. Cuenta de nuevo; si sigue igual, escribe la nota explicativa para cerrar.
                         </div>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Detalle de comparación si es Admin o si el código fue validado */}
-                {(sinCodigo || pinVerificado) && filasCuadre.length > 0 && (
+                {/* Detalle de comparación: solo el administrador y el supervisor (el cajero cierra a ciegas) */}
+                {veDetalle && filasCuadre.length > 0 && (
                   <div
                     data-testid="detalle-cuadre"
                     style={{
@@ -1859,7 +1747,7 @@ export function CierreView() {
                     }}
                   >
                     <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 2 }}>
-                      {sinCodigo ? 'Resultado del cuadre' : 'Detalle (abierto con código del supervisor)'}
+                      Resultado del cuadre
                     </div>
                     {filasCuadre.map((f) => (
                       <div
@@ -1880,7 +1768,7 @@ export function CierreView() {
                 {/* Observaciones */}
                 <div>
                   <label htmlFor="cl-o" style={{ fontWeight: 700, fontSize: 13, display: 'block', marginBottom: 4 }}>
-                    {necesitaPin ? 'Nota explicativa (obligatoria, mínimo 3 caracteres)' : 'Observaciones (opcional)'}
+                    {necesitaNota ? 'Nota explicativa (obligatoria, mínimo 3 caracteres)' : 'Observaciones (opcional)'}
                   </label>
                   <textarea
                     id="cl-o"
@@ -1954,7 +1842,6 @@ export function CierreView() {
               medio={correccion.medio}
               montoSistema={digitales.medios[correccion.clave].sistema}
               montoActual={digitales.medios[correccion.clave].monto}
-              pideCodigo={pideCodigo}
               alCerrar={() => setCorreccion(null)}
               alGuardado={alCorregirMedio}
             />

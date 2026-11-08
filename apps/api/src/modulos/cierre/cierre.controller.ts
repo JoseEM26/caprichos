@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Param,
   Post,
   Query,
@@ -32,38 +31,24 @@ export class CierreController {
   @Permiso('caja', 'cerrar')
   async arqueo(
     @Body() dto: ArqueoDto,
-    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
     @Req() req: any,
-    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    const pin =
-      codigoSupervisor ||
-      pinSupervisor ||
-      req.headers?.['x-codigo-supervisor'] ||
-      req.headers?.['x-pin-supervisor'];
-    return this.cierreService.arqueo(dto, req.usuario, pin, ip);
+    return this.cierreService.arqueo(dto, req.usuario, ip);
   }
 
   /**
    * 2) Cierre: cierra la caja del día creando cierre_caja y cierre_medio.
-   * Exige que no haya cobros en curso. Si no cuadra, exige PIN de supervisor y nota.
+   * Exige que no haya cobros en curso. Si no cuadra, exige una nota.
    */
   @Post('cerrar')
   @Permiso('caja', 'cerrar')
   async cerrar(
     @Body() dto: CerrarCajaDto,
-    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
     @Req() req: any,
-    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    const pin =
-      codigoSupervisor ||
-      pinSupervisor ||
-      req.headers?.['x-codigo-supervisor'] ||
-      req.headers?.['x-pin-supervisor'];
-    return this.cierreService.cerrar(dto, req.usuario, pin, ip);
+    return this.cierreService.cerrar(dto, req.usuario, ip);
   }
 
   /**
@@ -91,43 +76,26 @@ export class CierreController {
   }
 
   /**
-   * Corrige un monto digital con motivo. ADMIN y SUPERVISOR sin código; el cajero con código de supervisor.
+   * Corrige un monto digital con motivo (queda auditado a nombre de quien lo hace).
    */
   @Post('ajustes-medio')
   @Permiso('caja', 'cerrar')
   async registrarAjusteMedio(
     @Body() dto: AjusteMedioDto,
-    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
     @Req() req: any,
-    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    const pin =
-      codigoSupervisor ||
-      pinSupervisor ||
-      req.headers?.['x-codigo-supervisor'] ||
-      req.headers?.['x-pin-supervisor'];
-    return this.cierreService.registrarAjusteMedio(dto, req.usuario, pin, ip);
+    return this.cierreService.registrarAjusteMedio(dto, req.usuario, ip);
   }
 
   /**
    * Montos esperados por el sistema antes de cerrar.
-   * Administrador directo; otro rol solo con el PIN de la supervisora (cabecera x-pin-supervisor o x-codigo-supervisor).
+   * Solo ADMIN o SUPERVISOR; el cajero cierra a ciegas.
    */
   @Get('esperado')
   @Permiso('caja', 'ver')
-  async obtenerEsperado(
-    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
-    @Req() req: any,
-    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
-  ) {
-    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    const pin =
-      codigoSupervisor ||
-      pinSupervisor ||
-      req.headers?.['x-codigo-supervisor'] ||
-      req.headers?.['x-pin-supervisor'];
-    return this.cierreService.obtenerEsperado(req.usuario, pin, ip);
+  async obtenerEsperado(@Req() req: any) {
+    return this.cierreService.obtenerEsperado(req.usuario);
   }
 
   /**
@@ -150,22 +118,12 @@ export class CierreController {
   }
 
   /**
-   * Pedidos sin cobrar de cualquier día que bloquean el cierre. Admin o PIN de supervisor.
+   * Pedidos sin cobrar de cualquier día que bloquean el cierre.
    */
   @Get('pendientes')
   @Permiso('caja', 'cerrar')
-  async pendientesDeCobro(
-    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
-    @Req() req: any,
-    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
-  ) {
-    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    const pin =
-      codigoSupervisor ||
-      pinSupervisor ||
-      req.headers?.['x-codigo-supervisor'] ||
-      req.headers?.['x-pin-supervisor'];
-    return this.cierreService.listarPendientesDeCobro(req.usuario, pin, ip);
+  async pendientesDeCobro() {
+    return this.cierreService.listarPendientesDeCobro();
   }
 
   /**

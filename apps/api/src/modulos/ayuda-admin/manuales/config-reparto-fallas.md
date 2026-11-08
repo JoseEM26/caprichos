@@ -65,4 +65,4 @@ Ajusta cómo se vigila y se cierra un delivery: los minutos de espera que pintan
 - Si el cliente no responde a tiempo, el pedido se cancela por falta de respuesta; si se llega al máximo de reprogramaciones, el pedido se cancela directo.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría.

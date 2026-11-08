@@ -555,18 +555,18 @@ describe('SalonService', () => {
       cliente: { nombre: 'Ana Ruiz' },
     };
 
-    it('CAJERO (con cortesias/dar) puede dar cortesía en mesa: el pedido recibe puedeCortesia y el supervisor que presentó código', async () => {
-      await service.abrirPedido({ ...dtoConCortesia, canal: 'CAJA' }, { partyId: 9n, rol: 'CAJERO', debeCambiar: false }, 'k-c1', 77n);
+    it('CAJERO (con cortesias/dar) puede dar cortesía en mesa: el pedido recibe puedeCortesia, sin código de supervisor', async () => {
+      await service.abrirPedido({ ...dtoConCortesia, canal: 'CAJA' }, { partyId: 9n, rol: 'CAJERO', debeCambiar: false }, 'k-c1');
 
       const [, , opciones] = pedidosServiceMock.crear.mock.calls[0];
-      expect(opciones).toMatchObject({ canal: 'CAJA', puedeCortesia: true, supervisorCortesiaPartyId: 77n });
+      expect(opciones).toMatchObject({ canal: 'CAJA', puedeCortesia: true });
     });
 
     it('ADMIN tambien puede dar cortesía en mesa (sin código de supervisor)', async () => {
       await service.abrirPedido(dtoConCortesia, { partyId: 1n, rol: 'ADMIN', debeCambiar: false }, 'k-a1');
 
       const [, , opciones] = pedidosServiceMock.crear.mock.calls[0];
-      expect(opciones).toMatchObject({ puedeCortesia: true, supervisorCortesiaPartyId: undefined });
+      expect(opciones).toMatchObject({ puedeCortesia: true });
     });
 
     it('MOZO tiene cortesias/dar (libre): el pedido de mesa llega con puedeCortesia', async () => {

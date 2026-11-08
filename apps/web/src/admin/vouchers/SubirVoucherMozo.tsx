@@ -20,7 +20,7 @@ export interface SubirVoucherMozoProps {
     voucherId?: string | number;
   }) => void;
   bloqueado?: boolean;
-  /** Ofrece la salida sin foto (código del supervisor): Caja/Admin y el mozo en su cobro de mesa. */
+  /** Ofrece la salida sin foto (con motivo): Caja/Admin y el mozo en su cobro de mesa. */
   ofrecerExcepcion?: boolean;
   /** Pedido nuevo del mozo: el voucher se puede subir después (texto «Opcional ahora»). */
   opcional?: boolean;

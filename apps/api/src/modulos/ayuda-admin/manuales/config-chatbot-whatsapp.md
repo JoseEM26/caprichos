@@ -115,4 +115,4 @@ Controla el chatbot de WhatsApp: qué funciones atiende (pedidos, cobro, reserva
 - La IA no responde: depende de que esté encendida, de la clave de OpenAI y de no haber llegado al tope mensual.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría.

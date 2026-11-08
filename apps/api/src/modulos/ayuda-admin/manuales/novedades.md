@@ -60,7 +60,6 @@ Ver tambien: [[historial]]
 ## Errores y dudas comunes
 - Mi novedad no se ve en la carta virtual: revisa que el interruptor esté activo y que la fecha actual esté dentro del rango de vigencia configurado. Si la fecha de inicio es futura, aparecerá como "Programada"; si ya pasó la fecha de fin, se marcará como "Vencida".
 - No veo los cambios reflejados: tras mover o editar novedades, es indispensable pulsar "Publicar en la carta" y confirmar con "Sí, publicar".
-- Código de supervisor: no es necesario ingresar código de supervisor para crear, modificar o publicar novedades.
 
 ## Quien puede hacerlo
 El módulo requiere el permiso catalogo/ver para acceder a la ruta, pero las operaciones de creación, edición, publicación y eliminación están reservadas exclusivamente para el rol Administrador (ADMIN). Otros roles como cajero, cocina o mozo no tienen autorización para modificar la publicidad de la carta.

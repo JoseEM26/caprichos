@@ -16,28 +16,16 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  HttpException,
-  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import * as argon2 from 'argon2';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
-import { anulaSinAprobacion, rolesDelUsuario } from '../acceso/roles-usuario';
-import {
-  exigirPinNoBloqueado,
-  limpiarIntentosPin,
-  registrarFalloPin,
-} from '../../comun/redis/intentos-pin';
+import { anulaConAlcanceLimitado, rolesDelUsuario } from '../acceso/roles-usuario';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
-import {
-  SupervisorCodigoService,
-  autorizarAdminSinCodigo,
-} from '../supervisor-codigo/supervisor-codigo.service';
 import { esPedidoLocalSinCaptura, exigirComprobanteDigital, mediosQueExigenCodigo, voucherCubreMedio } from '../caja/comprobante-pago.util';
 import { puedeCambiarVoucher, puedeSubirVoucher } from '../vouchers/regla-cambio-voucher';
 import { MEDIOS_CON_VOUCHER_CAJA } from '../vouchers/vouchers.service';
@@ -118,7 +106,6 @@ export class PedidosEstadoService {
     @Optional() private readonly salonService?: SalonService,
     @Optional() private readonly puntosService?: PuntosService,
     @Optional() private readonly stockService?: StockService,
-    @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
     @Optional() private readonly impresionService?: ImpresionService,
     @Optional() private readonly avisos?: AvisosPedidoService,
     @Optional() private readonly cobros?: CobrosService,
@@ -239,45 +226,6 @@ export class PedidosEstadoService {
     }
 
     return { minutosEspera, color, colorEspera: color };
-  }
-
-  /**
-   * Verifica el código rotativo de 6 dígitos del supervisor (RFC 6238 TOTP).
-   * 3 intentos fallidos consecutivos bloquean 1 minuto en Redis.
-   */
-  async verificarPinSupervisor(
-    pinSupervisor?: string,
-    partyIdOperador?: bigint,
-    ip?: string,
-    pedidoId?: bigint,
-    accion = 'pedidos/anular',
-  ): Promise<{ party_id?: bigint; id?: bigint; supervisorPartyId?: bigint }> {
-    if (this.supervisorCodigoService) {
-      return this.supervisorCodigoService.verificarYConsumirCodigo(
-        pinSupervisor,
-        partyIdOperador,
-        accion,
-        ip,
-        'pedido',
-        pedidoId,
-      );
-    }
-
-    // Mismo criterio que el servicio: el ADMIN no da código.
-    const admin = await autorizarAdminSinCodigo(this.prisma, this.auditoria, partyIdOperador, accion, ip, 'pedido', pedidoId);
-    if (admin) return { party_id: admin.party_id, id: admin.id, supervisorPartyId: admin.party_id };
-
-    const claveIntentos = `pin:supervisor:intentos:${partyIdOperador ?? 'general'}`;
-    const redis = this.redisService.obtenerCliente();
-    await exigirPinNoBloqueado(redis, claveIntentos);
-    await registrarFalloPin(redis, claveIntentos);
-    throw new HttpException(
-      {
-        codigo: 'CODIGO_INVALIDO',
-        mensaje: 'Código de supervisor inválido o no proporcionado',
-      },
-      HttpStatus.FORBIDDEN,
-    );
   }
 
   /**
@@ -929,15 +877,13 @@ export class PedidosEstadoService {
   }
 
   /**
-   * Cambia el estado de un pedido validando transiciones, permisos y PIN de supervisor para anulación (DT-58, DT-61).
+   * Cambia el estado de un pedido validando transiciones y permisos (la anulación exige motivo y queda auditada) (DT-58, DT-61).
    */
   async cambiarEstado(
     id: bigint | string | number,
     dto: CambiarEstadoDto,
     usuarioActual: UsuarioAutenticado,
-    pinSupervisor?: string,
     ip?: string,
-    codigoVerificado = false,
   ) {
     const pedidoId = this.parsearId(id);
     const pedido = await this.prisma.pedido.findUnique({
@@ -964,19 +910,19 @@ export class PedidosEstadoService {
     const nuevoEstado = dto.estado.toUpperCase().trim();
     const ahora = new Date();
 
-    // COCINA y MOZO anulan sin código de supervisor por regla de su rol (decisión del dueño)
-    const sinAprobacion = anulaSinAprobacion(usuarioActual);
+    // COCINA y MOZO solo anulan lo suyo y mientras no sale de cocina (alcance limitado por su rol)
+    const alcanceLimitado = anulaConAlcanceLimitado(usuarioActual);
     const roles = rolesDelUsuario(usuarioActual);
     const esCocina = roles.includes('COCINA');
 
     // El mozo (sin rol de cocina) solo puede anular: la ruta lo deja pasar por pedidos/anular, no por cambiar_estado
-    if (sinAprobacion && !esCocina && nuevoEstado !== 'ANULADO') {
+    if (alcanceLimitado && !esCocina && nuevoEstado !== 'ANULADO') {
       throw new ForbiddenException({ codigo: 'SIN_PERMISO', mensaje: 'No tiene permiso para cambiar el estado de pedidos' });
     }
 
     // 1. Manejo de Anulación (DT-61)
     if (nuevoEstado === 'ANULADO') {
-      if (sinAprobacion) {
+      if (alcanceLimitado) {
         // «Suyo»: el mozo solo anula lo que él tomó; cocina anula cualquier pedido de su cocina
         if (!esCocina && !(pedido.canal === 'MOZO' && pedido.party_id != null && BigInt(pedido.party_id) === BigInt(usuarioActual.partyId))) {
           throw new ForbiddenException({
@@ -1029,7 +975,7 @@ export class PedidosEstadoService {
         }
       }
 
-      // Validar permiso de anular (en un entregado sin cobro lo autoriza el PIN de supervisor)
+      // Validar permiso de anular (un entregado sin cobro también pasa por esta regla)
       if (!entregadoSinCobro && usuarioActual.rol !== 'ADMIN') {
         const tienePermiso = await this.prisma.rolPermiso.findFirst({
           where: {
@@ -1058,14 +1004,7 @@ export class PedidosEstadoService {
         });
       }
 
-      // Código de supervisor (6 dígitos, ADMIN activo). Un ADMIN anula un entregado sin cobro solo con motivo
-      const conPin = !(entregadoSinCobro && usuarioActual.rol === 'ADMIN');
-      const aprobadoPor = !conPin || sinAprobacion
-        ? usuarioActual.partyId
-        : codigoVerificado
-          ? usuarioActual.partyId
-          : (await this.verificarPinSupervisor(pinSupervisor, usuarioActual.partyId, ip, pedido.id))
-              .party_id ?? usuarioActual.partyId;
+      const aprobadoPor = usuarioActual.partyId;
 
       // Un pedido cobrado y aún sin entregar: primero se anula su cobro (el mismo flujo de Caja: sale del arqueo
       // y del cierre, devuelve puntos e insumos). Si la caja del cobro ya cerró, no se anula: queda para devolución.
@@ -1079,7 +1018,7 @@ export class PedidosEstadoService {
             throw new ConflictException({ codigo: 'PEDIDO_COBRADO', mensaje: 'El pedido tiene un cobro vigente. Anula primero el cobro.' });
           }
           try {
-            await this.cobros.anularCobro(cobroVigente.id, { motivo: `Pedido anulado: ${motivo}` }, undefined, usuarioActual, ip, true);
+            await this.cobros.anularCobro(cobroVigente.id, { motivo: `Pedido anulado: ${motivo}` }, usuarioActual, ip);
           } catch (e: any) {
             if (e?.getResponse?.()?.codigo === 'CAJA_CERRADA') {
               throw new ConflictException({
@@ -1128,10 +1067,9 @@ export class PedidosEstadoService {
         entidad: 'pedido',
         entidadId: pedido.id,
         antes: { estado: estadoAnterior },
-        despues: { estado: 'ANULADO', motivo, ...(sinAprobacion ? { sinAprobacionPorRol: true, anuladoPorElMismoUsuario: true } : {}) },
-        motivo: sinAprobacion ? `${motivo} (anulado por el propio usuario, sin aprobación por regla de su rol)` : motivo,
+        despues: { estado: 'ANULADO', motivo, ...(alcanceLimitado ? { alcanceLimitadoPorRol: true, anuladoPorElMismoUsuario: true } : {}) },
+        motivo: alcanceLimitado ? `${motivo} (anulado por el propio usuario, con el alcance de su rol)` : motivo,
         partyId: usuarioActual.partyId,
-        conPinAdmin: conPin && !sinAprobacion,
         ip,
       });
 
@@ -1348,12 +1286,10 @@ export class PedidosEstadoService {
       confirmaSinCaptura: dto.confirmaSinCaptura === true || pedido.cobro_mozo_en != null,
       pedidoLocal: esPedidoLocalSinCaptura(pedido),
       permiteExcepcion: true,
-      verificarPin: (pin) =>
-        this.verificarPinSupervisor(pin, usuarioActual.partyId, ip, pedido.id, 'pedidos/registrar_pago_sin_voucher'),
     });
 
     // Código de operación por cada medio digital (plan mixto: uno por parte digital; efectivo: ninguno)
-    // La excepción «confirmar sin comprobante» (motivo + supervisor) no tiene voucher del que sacar el código
+    // La excepción «confirmar sin comprobante» (con motivo) no tiene voucher del que sacar el código
     const codigosRequeridos = dto.sinVoucher || sinVoucherAutorizado?.sinCaptura ? [] : mediosQueExigenCodigo(metodoUpper, pedido.planPago);
     const codigosEntregados = new Map(
       (dto.codigosOperacion ?? []).map((c) => [String(c.medio).toUpperCase().trim(), String(c.codigo).trim()]),
@@ -1412,12 +1348,12 @@ export class PedidosEstadoService {
         pago_metodo: metodoUpper,
         pago_estado: estadoFinal,
         sin_voucher: sinVoucherAutorizado
-          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId || null, sin_captura: sinVoucherAutorizado.sinCaptura === true }
+          ? { motivo: sinVoucherAutorizado.motivo, sin_captura: sinVoucherAutorizado.sinCaptura === true }
           : null,
         codigos_operacion: codigosRequeridos.map((medio) => ({ medio, codigo: codigosEntregados.get(medio) })),
       },
       partyId: usuarioActual.partyId,
-      ...(sinVoucherAutorizado ? { conPinAdmin: !sinVoucherAutorizado.sinCaptura, motivo: sinVoucherAutorizado.motivo } : {}),
+      ...(sinVoucherAutorizado ? { motivo: sinVoucherAutorizado.motivo } : {}),
       ip,
     });
 

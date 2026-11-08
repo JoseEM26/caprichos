@@ -52,7 +52,7 @@ export type TipoAristaGrafo =
   | 'puede_usar'       // rol -> modulo
   | 'requiere_permiso' // modulo -> permiso
   | 'relacionado_con'  // modulo <-> modulo
-  | 'requiere'         // tarea o modulo -> modulo (e.g. supervisor-codigo)
+  | 'requiere'         // tarea o modulo -> modulo (e.g. caja)
   | 'antes'            // tarea o modulo -> modulo
   | 'despues'          // tarea o modulo -> modulo
   | 'ver_tambien';     // tarea o modulo -> modulo

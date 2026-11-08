@@ -10,14 +10,12 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
-import * as argon2 from 'argon2';
 import { PedidosEstadoService } from './pedidos-estado.service';
 import { SalonService } from '../salon/salon.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
-import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CobrosService } from '../caja/cobros.service';
 import { ImpresionService } from '../impresion/impresion.service';
@@ -113,42 +111,6 @@ describe('PedidosEstadoService', () => {
     cobrosMock = { anularCobro: jest.fn().mockResolvedValue({}) };
     impresionMock = { vencerTrabajosObsoletos: jest.fn().mockResolvedValue(0) };
 
-    const supervisorCodigoMock = {
-      verificarYConsumirCodigo: jest.fn().mockImplementation(async (codigo: string | undefined, partyId?: any) => {
-        const claveIntentos = `pin:supervisor:intentos:${partyId ?? 'general'}`;
-        let intentos;
-        try {
-          intentos = await redisClientMock.get(claveIntentos);
-        } catch {
-          throw new HttpException(
-            { codigo: 'PIN_NO_DISPONIBLE', mensaje: 'No se puede validar el código ahora, intenta en unos minutos' },
-            HttpStatus.SERVICE_UNAVAILABLE,
-          );
-        }
-        if (intentos && parseInt(intentos, 10) >= 3) {
-          throw new HttpException(
-            { codigo: 'CODIGO_BLOQUEADO', mensaje: 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.' },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-        if (!codigo || codigo !== '654321') {
-          await redisClientMock.incr(claveIntentos);
-          await auditoriaMock.registrar({
-            categoria: 'ACCESO',
-            modulo: 'pedidos',
-            accion: 'PIN_FALLIDO',
-            resultado: 'RECHAZADO',
-          });
-          throw new HttpException(
-            { codigo: 'CODIGO_INVALIDO', mensaje: 'Código de supervisor inválido o no proporcionado' },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-        await redisClientMock.del(claveIntentos);
-        return { party_id: 99n, id: 99n, valido: true };
-      }),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PedidosEstadoService,
@@ -159,7 +121,6 @@ describe('PedidosEstadoService', () => {
         { provide: SalonService, useValue: salonMock },
         { provide: CobrosService, useValue: cobrosMock },
         { provide: ImpresionService, useValue: impresionMock },
-        { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
       ],
     }).compile();
 
@@ -484,7 +445,7 @@ describe('PedidosEstadoService', () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
 
       await expect(
-        service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Cliente no contesta' }, adminAuth, '123456'),
+        service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Cliente no contesta' }, adminAuth),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -500,93 +461,13 @@ describe('PedidosEstadoService', () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
 
       await expect(
-        service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'mal' }, adminAuth, '123456'),
+        service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'mal' }, adminAuth),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('debe rechazar anulación sin PIN con 403 y auditar PIN_FALLIDO', async () => {
-      const pedidoMock = {
-        id: 10n,
-        codigo: 'CP-W001',
-        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
-        estado: 'COLA',
-      };
-      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
-
-      await expect(
-        service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Cliente canceló por WhatsApp' }, adminAuth, undefined),
-      ).rejects.toThrow(HttpException);
-
-      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          accion: 'PIN_FALLIDO',
-          resultado: 'RECHAZADO',
-        }),
-      );
-      expect(redisClientMock.incr).toHaveBeenCalled();
-    });
-
-    it('debe rechazar anulación con PIN incorrecto con 403 y auditar PIN_FALLIDO', async () => {
-      const pedidoMock = {
-        id: 10n,
-        codigo: 'CP-W001',
-        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
-        estado: 'COLA',
-      };
-      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
-      prismaMock.userAccount.findMany.mockResolvedValue([
-        {
-          id: 1n,
-          party_id: 1n,
-          rol: 'ADMIN',
-          activo: true,
-          pin_hash: await argon2.hash('654321'),
-        },
-      ]);
-
-      await expect(
-        service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Cliente canceló el pedido' }, adminAuth, '111111'),
-      ).rejects.toThrow(HttpException);
-
-      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          accion: 'PIN_FALLIDO',
-          resultado: 'RECHAZADO',
-        }),
-      );
-    });
-
-    it('3 pines malos bloquean 10 minutos en Redis', async () => {
-      redisClientMock.get.mockResolvedValue('3'); // Ya tiene 3 fallos
-
-      const pedidoMock = {
-        id: 10n,
-        codigo: 'CP-W001',
-        modalidad: 'DELIVERY', entrega_lat: -12.1, entrega_lng: -77, zona_id: 1n,
-        estado: 'COLA',
-      };
-      prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
-
-      try {
-        await service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Cliente canceló el pedido' }, adminAuth, '654321');
-        fail('Debió lanzar excepción');
-      } catch (err: any) {
-        expect(err.getStatus()).toBe(403);
-        expect(err.getResponse()).toEqual(
-          expect.objectContaining({
-            codigo: 'CODIGO_BLOQUEADO',
-          }),
-        );
-      }
-    });
-
     it('anular un pedido libera sus mesas y un fallo al liberar no deshace la anulación', async () => {
-      const supervisorHash = await argon2.hash('654321');
       const pedidoMock = { id: 10n, codigo: 'CP-M010', modalidad: 'MESA', estado: 'COLA' };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
-      prismaMock.userAccount.findMany.mockResolvedValue([
-        { id: 99n, party_id: 99n, rol: 'ADMIN', activo: true, pin_hash: supervisorHash },
-      ]);
       prismaMock.pedido.update.mockResolvedValue({ ...pedidoMock, estado: 'ANULADO' });
       salonMock.liberarMesasDePedido.mockRejectedValue(new Error('falló al liberar'));
 
@@ -594,17 +475,13 @@ describe('PedidosEstadoService', () => {
         10n,
         { estado: 'ANULADO', motivo: 'Cliente desistió de compra' },
         adminAuth,
-        '654321',
       );
 
       expect(res.estado).toBe('ANULADO');
       expect(salonMock.liberarMesasDePedido).toHaveBeenCalledWith(10n);
     });
 
-    it('anula exitosamente con PIN correcto de supervisor ADMIN', async () => {
-      const supervisorPin = '654321';
-      const supervisorHash = await argon2.hash(supervisorPin);
-
+    it('anula con motivo, sin ningún código, y audita a nombre de quien anula', async () => {
       const pedidoMock = {
         id: 10n,
         codigo: 'CP-W001',
@@ -612,19 +489,10 @@ describe('PedidosEstadoService', () => {
         estado: 'COLA',
       };
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoMock);
-      prismaMock.userAccount.findMany.mockResolvedValue([
-        {
-          id: 99n,
-          party_id: 99n,
-          rol: 'ADMIN',
-          activo: true,
-          pin_hash: supervisorHash,
-        },
-      ]);
       prismaMock.pedido.update.mockResolvedValue({
         ...pedidoMock,
         estado: 'ANULADO',
-        anulacion_aprobada_por: 99n,
+        anulacion_aprobada_por: adminAuth.partyId,
         motivo_anulacion: 'Cliente desistió de compra',
       });
 
@@ -632,17 +500,15 @@ describe('PedidosEstadoService', () => {
         10n,
         { estado: 'ANULADO', motivo: 'Cliente desistió de compra' },
         adminAuth,
-        supervisorPin,
       );
 
       expect(res.estado).toBe('ANULADO');
-      expect(redisClientMock.del).toHaveBeenCalled(); // Resetea contador
       expect(prismaMock.pedido.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 10n },
           data: expect.objectContaining({
             estado: 'ANULADO',
-            anulacion_aprobada_por: 99n,
+            anulado_por: adminAuth.partyId,
             motivo_anulacion: 'Cliente desistió de compra',
           }),
         }),
@@ -651,7 +517,8 @@ describe('PedidosEstadoService', () => {
         expect.objectContaining({
           accion: 'ANULAR',
           resultado: 'OK',
-          conPinAdmin: true,
+          partyId: adminAuth.partyId,
+          motivo: 'Cliente desistió de compra',
         }),
       );
       expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('pedido:estado', {
@@ -670,7 +537,7 @@ describe('PedidosEstadoService', () => {
       prismaMock.pedido.findUnique.mockResolvedValue(enCola);
       prismaMock.pedido.update.mockResolvedValue({ ...enCola, estado: 'ANULADO' });
 
-      await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, adminAuth, undefined, undefined, true);
+      await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, adminAuth);
 
       expect(cobrosMock.anularCobro).not.toHaveBeenCalled();
       expect(impresionMock.vencerTrabajosObsoletos).toHaveBeenCalled();
@@ -682,9 +549,9 @@ describe('PedidosEstadoService', () => {
       prismaMock.cobro.findFirst.mockResolvedValue({ id: 5n });
       prismaMock.pedido.update.mockResolvedValue({ ...enCola, estado: 'ANULADO' });
 
-      await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, adminAuth, undefined, undefined, true);
+      await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, adminAuth);
 
-      expect(cobrosMock.anularCobro).toHaveBeenCalledWith(5n, { motivo: `Pedido anulado: ${motivo}` }, undefined, adminAuth, undefined, true);
+      expect(cobrosMock.anularCobro).toHaveBeenCalledWith(5n, { motivo: `Pedido anulado: ${motivo}` }, adminAuth, undefined);
       expect(cobrosMock.anularCobro.mock.invocationCallOrder[0]).toBeLessThan(prismaMock.pedido.update.mock.invocationCallOrder[0]);
     });
 
@@ -694,12 +561,12 @@ describe('PedidosEstadoService', () => {
       cobrosMock.anularCobro.mockRejectedValue(new HttpException({ codigo: 'CAJA_CERRADA', mensaje: 'x' }, HttpStatus.CONFLICT));
 
       await expect(
-        service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, adminAuth, undefined, undefined, true),
+        service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, adminAuth),
       ).rejects.toMatchObject({ response: { codigo: 'PEDIDO_COBRADO_CAJA_CERRADA' } });
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
-    it('cocina sin permiso pedidos/anular recibe 403; con permiso anula SIN código y queda la marca de auditoría', async () => {
+    it('cocina sin permiso pedidos/anular recibe 403; con permiso anula y queda la marca de auditoría del alcance limitado', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(enCola);
       prismaMock.rolPermiso.findFirst.mockResolvedValue(null);
       await expect(
@@ -710,15 +577,13 @@ describe('PedidosEstadoService', () => {
       prismaMock.pedido.update.mockResolvedValue({ ...enCola, estado: 'ANULADO' });
       const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cocinaAuth);
       expect(res.estado).toBe('ANULADO');
-      expect(prismaMock.userAccount.findMany).not.toHaveBeenCalled();
       expect(prismaMock.pedido.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ anulado_por: 3n, anulacion_aprobada_por: 3n }) }),
       );
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
           accion: 'ANULAR',
-          conPinAdmin: false,
-          despues: expect.objectContaining({ sinAprobacionPorRol: true }),
+          despues: expect.objectContaining({ alcanceLimitadoPorRol: true }),
         }),
       );
     });
@@ -741,7 +606,7 @@ describe('PedidosEstadoService', () => {
     });
   });
 
-  describe('anular el mozo SU pedido sin código de supervisor', () => {
+  describe('anular el mozo SU pedido (alcance limitado)', () => {
     const mozoAuth: UsuarioAutenticado = { partyId: 7n, rol: 'MOZO', debeCambiar: false };
     const suyo = { id: 10n, codigo: 'CP-M010', modalidad: 'SALON', estado: 'COLA', canal: 'MOZO', party_id: 7n, pago_estado: 'PENDIENTE' };
     const motivo = 'El cliente se fue de la mesa';
@@ -756,12 +621,11 @@ describe('PedidosEstadoService', () => {
       prismaMock.pedido.findUnique.mockResolvedValue(suyo);
       const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, mozoAuth);
       expect(res.estado).toBe('ANULADO');
-      expect(prismaMock.userAccount.findMany).not.toHaveBeenCalled();
       expect(prismaMock.pedido.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ anulacion_aprobada_por: 7n }) }),
       );
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({ despues: expect.objectContaining({ sinAprobacionPorRol: true }), conPinAdmin: false }),
+        expect.objectContaining({ despues: expect.objectContaining({ alcanceLimitadoPorRol: true }) }),
       );
     });
 
@@ -814,39 +678,38 @@ describe('PedidosEstadoService', () => {
       });
     });
 
-    it('un cajero (también con rol extra MOZO) sigue necesitando código de supervisor', async () => {
+    it('un cajero (también con rol extra MOZO) tiene el alcance amplio del cajero: anula sin código', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue({ ...suyo, party_id: 2n });
       const cajeroMozo: UsuarioAutenticado = { partyId: 2n, rol: 'CAJERO', roles: ['CAJERO', 'MOZO'], debeCambiar: false };
-      await expect(service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cajeroMozo)).rejects.toMatchObject({
-        response: { codigo: 'CODIGO_INVALIDO' },
-      });
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+      const res = await service.cambiarEstado(10n, { estado: 'ANULADO', motivo }, cajeroMozo);
+      expect(res.estado).toBe('ANULADO');
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'ANULAR', partyId: 2n, despues: expect.not.objectContaining({ alcanceLimitadoPorRol: true }) }),
+      );
     });
   });
 
   describe('anulación de un entregado sin cobro (FT-CIE-02)', () => {
     const entregado = { id: 10n, codigo: 'CP-W062', modalidad: 'RECOGER', estado: 'ENTREGADO' };
 
-    it('con PIN de supervisor válido un cajero anula el entregado sin cobro; queda quién lo aprobó', async () => {
-      const supervisorHash = await argon2.hash('654321');
+    it('un cajero anula el entregado sin cobro con motivo, sin código; queda a su nombre', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(entregado);
-      prismaMock.userAccount.findMany.mockResolvedValue([
-        { id: 99n, party_id: 99n, rol: 'ADMIN', activo: true, pin_hash: supervisorHash },
-      ]);
       prismaMock.pedido.update.mockResolvedValue({ ...entregado, estado: 'ANULADO' });
 
       const res = await service.cambiarEstado(
         10n,
         { estado: 'ANULADO', motivo: 'Pedido entregado sin cobrar, error de caja' },
         cajeroAuth,
-        '654321',
       );
 
       expect(res.estado).toBe('ANULADO');
       expect(prismaMock.pedido.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ estado: 'ANULADO', anulacion_aprobada_por: 99n }),
+          data: expect.objectContaining({ estado: 'ANULADO', anulado_por: cajeroAuth.partyId, anulacion_aprobada_por: cajeroAuth.partyId }),
         }),
+      );
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'ANULAR', partyId: cajeroAuth.partyId }),
       );
     });
 
@@ -860,22 +723,12 @@ describe('PedidosEstadoService', () => {
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
-    it('un cajero sin PIN no lo anula (403 CODIGO_INVALIDO)', async () => {
-      prismaMock.pedido.findUnique.mockResolvedValue(entregado);
-
-      await expect(
-        service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Pedido entregado sin cobrar' }, cajeroAuth),
-      ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
-    });
-
-    it('un ADMIN lo anula solo con motivo, sin PIN, y queda como aprobado por él mismo', async () => {
+    it('un ADMIN lo anula solo con motivo y queda como aprobado por él mismo', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(entregado);
       prismaMock.pedido.update.mockResolvedValue({ ...entregado, estado: 'ANULADO' });
 
       await service.cambiarEstado(10n, { estado: 'ANULADO', motivo: 'Pedido entregado sin cobrar' }, adminAuth);
 
-      expect(prismaMock.userAccount.findMany).not.toHaveBeenCalled();
       expect(prismaMock.pedido.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ anulacion_aprobada_por: 1n }) }),
       );
@@ -1216,12 +1069,12 @@ describe('PedidosEstadoService', () => {
         );
       });
 
-      it('un cliente viejo que aún manda motivo y código: se registra sin supervisor y queda auditado «sin captura»', async () => {
+      it('sin voucher: se registra y queda auditado «sin captura»', async () => {
         prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
         const res = await service.registrarPago(
           10n,
-          { metodo: 'YAPE', estado: 'PAGADO', sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '000000' } },
+          { metodo: 'YAPE', estado: 'PAGADO', sinVoucher: { motivo: 'El cliente no tenía señal' } },
           cajeroAuth,
         );
 
@@ -1229,7 +1082,6 @@ describe('PedidosEstadoService', () => {
         expect(auditoriaMock.registrar).toHaveBeenCalledWith(
           expect.objectContaining({
             accion: 'REGISTRAR_PAGO_SIN_VOUCHER',
-            conPinAdmin: false,
             despues: expect.objectContaining({ sin_voucher: expect.objectContaining({ sin_captura: true }) }),
           }),
         );

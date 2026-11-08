@@ -40,4 +40,4 @@ Aquí se redactan los textos legales que lee el cliente en la carta virtual: Té
 - No encuentro dónde cambiar los minutos de la encuesta: esa espera y las demás reglas de la encuesta están en Parámetros del sistema, grupo "Encuesta posventa".
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría.

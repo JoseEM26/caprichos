@@ -263,6 +263,7 @@ export class UsuariosActividadService {
         case 'REINICIAR_DISPOSITIVO':
           texto = `${actor} reinició el celular vinculado a la asistencia de ${nombreAfectado}`;
           break;
+        // Registros antiguos: la aprobación del supervisor ya no existe, pero su historial se sigue mostrando
         case 'AUTORIZACION_SUPERVISOR': {
           tipo = 'acciones';
           const aprobador = String((a.despues as any)?.aprobadorPartyId ?? '');

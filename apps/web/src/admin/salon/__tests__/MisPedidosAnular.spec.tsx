@@ -45,7 +45,7 @@ describe('Mis pedidos: anular el pedido propio sin código', () => {
     fireEvent.change(screen.getByLabelText(/Motivo detallado/), { target: { value: 'El cliente se fue' } });
     fireEvent.click(screen.getByRole('button', { name: /Confirmar anulación/ }));
     fireEvent.click(screen.getByRole('button', { name: /Sí, anular/ }));
-    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('11', 'ANULADO', 'El cliente se fue', ''));
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('11', 'ANULADO', 'El cliente se fue'));
   });
 
   it('sin el permiso pedidos/anular no hay botón', async () => {

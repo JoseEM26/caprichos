@@ -1,13 +1,5 @@
 import { api } from '../../comun/api';
 import type { CobrarDto, CobroTurno, MovimientoCaja } from '../pedidos/pedidosApi';
-import { marcarAutorizacionSupervisor } from '../../comun/autorizacionSupervisor';
-
-/** Si el servidor aceptó un código, la autorización queda vigente 5 min. */
-const conAutorizacion = async <T>(p: Promise<T>, huboCodigo?: string): Promise<T> => {
-  const r = await p;
-  if (huboCodigo?.trim()) marcarAutorizacionSupervisor();
-  return r;
-};
 
 /** Pedido sin cobrar de cualquier día: bloquea el cierre hasta cobrarlo o anularlo (RN-CAP-079). */
 export interface PendienteCobro {
@@ -251,45 +243,12 @@ export const cierreApi = {
   obtenerEsperado: () =>
     api.get<MontosEsperados>('/admin/cierre/esperado'),
 
-  realizarArqueo: (dto: ArqueoDto, pinSupervisor?: string) => {
-    const headers: Record<string, string> = {};
-    if (pinSupervisor?.trim()) {
-      headers['x-codigo-supervisor'] = pinSupervisor.trim();
-      headers['x-pin-supervisor'] = pinSupervisor.trim();
-    }
-    return conAutorizacion(api.post<ArqueoRespuesta>('/admin/cierre/arqueo', dto, { headers }), pinSupervisor);
-  },
+  realizarArqueo: (dto: ArqueoDto) => api.post<ArqueoRespuesta>('/admin/cierre/arqueo', dto),
 
-  cerrarCaja: (dto: CerrarCajaDto, pinSupervisor?: string) => {
-    const headers: Record<string, string> = {};
-    if (pinSupervisor?.trim()) {
-      headers['x-codigo-supervisor'] = pinSupervisor.trim();
-      headers['x-pin-supervisor'] = pinSupervisor.trim();
-    }
-    return conAutorizacion(api.post<CierreCajaRespuesta>('/admin/cierre/cerrar', dto, { headers }), pinSupervisor);
-  },
+  cerrarCaja: (dto: CerrarCajaDto) => api.post<CierreCajaRespuesta>('/admin/cierre/cerrar', dto),
 
-  // El servidor valida el código/PIN de supervisora y solo entonces entrega el esperado.
-  verificarPinSupervisor: (pinSupervisor: string) =>
-    conAutorizacion(
-      api.get<MontosEsperados>('/admin/cierre/esperado', {
-        headers: {
-          'x-codigo-supervisor': pinSupervisor.trim(),
-          'x-pin-supervisor': pinSupervisor.trim(),
-        },
-      }),
-      pinSupervisor,
-    ),
-
-  // Solo admin o con el código de supervisor (el servidor lo exige).
-  listarPendientesDeCobro: (pinSupervisor?: string) => {
-    const headers: Record<string, string> = {};
-    if (pinSupervisor?.trim()) {
-      headers['x-codigo-supervisor'] = pinSupervisor.trim();
-      headers['x-pin-supervisor'] = pinSupervisor.trim();
-    }
-    return conAutorizacion(api.get<PendienteCobro[]>('/admin/cierre/pendientes', { headers }), pinSupervisor);
-  },
+  // Pedidos sin cobrar que bloquean el cierre: los ve todo el que cierra la caja.
+  listarPendientesDeCobro: () => api.get<PendienteCobro[]>('/admin/cierre/pendientes'),
 
   obtenerDigitales: () => api.get<DigitalesCaja>('/admin/cierre/digitales'),
 
@@ -297,15 +256,9 @@ export const cierreApi = {
 
   listarDevolucionesTurno: () => api.get<DevolucionTurno[]>('/admin/cierre/devoluciones'),
 
-  // ADMIN y SUPERVISOR sin código; el cajero con el código de supervisor (lo valida el servidor)
-  registrarAjusteMedio: (dto: { medio: MedioAjustable; montoNuevo: number; motivo: string }, pinSupervisor?: string) => {
-    const headers: Record<string, string> = {};
-    if (pinSupervisor?.trim()) {
-      headers['x-codigo-supervisor'] = pinSupervisor.trim();
-      headers['x-pin-supervisor'] = pinSupervisor.trim();
-    }
-    return conAutorizacion(api.post<AjusteMedio>('/admin/cierre/ajustes-medio', dto, { headers }), pinSupervisor);
-  },
+  // Corrección con motivo: queda auditada a nombre de quien la hace
+  registrarAjusteMedio: (dto: { medio: MedioAjustable; montoNuevo: number; motivo: string }) =>
+    api.post<AjusteMedio>('/admin/cierre/ajustes-medio', dto),
 
   cobrarPendiente: (id: string | number, dto: CobrarDto) =>
     api.post<unknown>(`/admin/cierre/pendientes/${id}/cobrar`, dto),

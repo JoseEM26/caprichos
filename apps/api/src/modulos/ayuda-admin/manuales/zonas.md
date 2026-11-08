@@ -65,7 +65,6 @@ Ver tambien: [[mapa]]
 ## Errores y dudas comunes
 - El cliente dice que el sistema rechaza su dirección: verifica si la zona donde reside está marcada como "Inactiva" o si su coordenada geográfica exacta queda fuera de los polígonos trazados.
 - Formato de polígono inválido: si el sistema muestra un error al guardar el polígono, revisa que el texto respete la sintaxis JSON con corchetes y comas correctas, y que contenga al menos tres pares de coordenadas numéricas.
-- Código de supervisor: la modificación de tarifas y polígonos de reparto no exige código de supervisor; solo requiere la confirmación Sí/No.
 
 ## Quien puede hacerlo
 El módulo requiere el permiso zonas/ver para visualizar la lista y zonas/editar para modificar precios o límites. En la configuración del sistema, ambos permisos corresponden exclusivamente al Administrador (ADMIN). Los cajeros, motorizados y personal de cocina no pueden alterar las tarifas de reparto.

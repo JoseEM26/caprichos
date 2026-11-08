@@ -695,7 +695,7 @@ export function estadoSaborCarta(
 /** Nota de los movimientos de producción que suma la apertura del día («Produje hoy»). */
 export const NOTA_PRODUCE_HOY = 'Produje hoy';
 
-/** Motivos de merma de producto terminado. Sin código de supervisor: queda auditada en movimiento_stock (quién y cuándo). */
+/** Motivos de merma de producto terminado. Queda auditada en movimiento_stock (quién y cuándo). */
 export const MOTIVOS_MERMA_PRODUCTO = ['VENCIDO', 'DANADO', 'SE_CAYO', 'OTRO'] as const;
 export type MotivoMermaProducto = (typeof MOTIVOS_MERMA_PRODUCTO)[number];
 export const ETIQUETA_MOTIVO_MERMA: Record<MotivoMermaProducto, string> = {
@@ -782,7 +782,7 @@ export async function registrarAperturaArrastre(
 
 /**
  * Merma de producto terminado (o de un sabor): descuenta del saldo y deja MERMA en movimiento_stock con quién y cuándo.
- * No mira el interruptor «Control de almacén» ni pide código de supervisor. Más que el saldo → 409 STOCK_INSUFICIENTE.
+ * No mira el interruptor «Control de almacén» ni pide ningún código. Más que el saldo → 409 STOCK_INSUFICIENTE.
  */
 export async function mermarProductoControlado(
   db: any,

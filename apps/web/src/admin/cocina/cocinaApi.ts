@@ -151,26 +151,16 @@ export async function registrarMermaIndividual(
     motivo: string;
     nota?: string;
   },
-  codigoSupervisor?: string,
 ): Promise<any> {
-  const headers: Record<string, string> = {};
-  if (codigoSupervisor) {
-    headers['X-Codigo-Supervisor'] = codigoSupervisor.trim();
-    headers['X-Pin-Supervisor'] = codigoSupervisor.trim();
-  }
-  return api.post(
-    '/admin/almacen/movimientos',
-    {
-      tipo: 'MERMA',
-      insumoId: dto.insumoId,
-      cantidad: dto.cantidad,
-      origen: dto.origen,
-      destino: `Merma · ${dto.motivo}`,
-      motivo: dto.motivo,
-      nota: dto.nota,
-    },
-    Object.keys(headers).length > 0 ? { headers } : undefined,
-  );
+  return api.post('/admin/almacen/movimientos', {
+    tipo: 'MERMA',
+    insumoId: dto.insumoId,
+    cantidad: dto.cantidad,
+    origen: dto.origen,
+    destino: `Merma · ${dto.motivo}`,
+    motivo: dto.motivo,
+    nota: dto.nota,
+  });
 }
 
 export async function registrarMermaMultiple(
@@ -183,18 +173,8 @@ export async function registrarMermaMultiple(
       destino: string;
     }[];
   },
-  codigoSupervisor?: string,
 ): Promise<any> {
-  const headers: Record<string, string> = {};
-  if (codigoSupervisor) {
-    headers['X-Codigo-Supervisor'] = codigoSupervisor.trim();
-    headers['X-Pin-Supervisor'] = codigoSupervisor.trim();
-  }
-  return api.post(
-    '/admin/almacen/movimientos-merma-multiple',
-    dto,
-    Object.keys(headers).length > 0 ? { headers } : undefined,
-  );
+  return api.post('/admin/almacen/movimientos-merma-multiple', dto);
 }
 
 export async function obtenerExistenciasParaPedir(): Promise<InsumoExistenciaCocina[]> {

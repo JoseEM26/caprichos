@@ -53,7 +53,7 @@ describe('Merma de producto terminado', () => {
     expect(errorMerma('5', 5, 'DANADO', '')).toBeNull();
   });
 
-  it('botar a merma: cantidad y motivo, sin código de supervisor, y recarga la pantalla', async () => {
+  it('botar a merma: cantidad y motivo, y recarga la pantalla', async () => {
     vi.spyOn(almacenApi, 'obtenerApertura').mockResolvedValue({ fecha: '2026-11-05', productos: [GALLETA] });
     const merma = vi.spyOn(almacenApi, 'mermaProducto').mockResolvedValue({ ok: true, id: '9', saldo: 8 });
     render(<AperturaDiaView />);

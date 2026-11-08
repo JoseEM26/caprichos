@@ -9,14 +9,9 @@ import {
   obtenerPrismaTest,
   obtenerDniRol,
   obtenerClaveRol,
-  obtenerCodigoSupervisorVigente,
-  limpiarRedisSupervisor,
 } from '../../src';
 
 test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
-  test.beforeEach(() => {
-    limpiarRedisSupervisor();
-  });
   test('(1) Ingreso de insumos va por Compras (compra rápida): Almacén no tiene Entrada y 409 en API', async ({
     page,
   }) => {
@@ -363,7 +358,6 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     });
     expect(ultimaProduccion).not.toBeNull();
 
-    const codigoSupervisorProd = await obtenerCodigoSupervisorVigente(prisma);
     const resAnularProd = await fetch(
       `${apiBaseUrl}/admin/almacen/produccion/${ultimaProduccion!.id}/anular`,
       {
@@ -371,7 +365,6 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${sesionAlmacen.accessToken}`,
-          'X-Codigo-Supervisor': codigoSupervisorProd,
         },
         body: JSON.stringify({
           motivo: 'Prueba de reversión por anulación',
@@ -440,13 +433,10 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     await expect(btnAnular).toBeVisible({ timeout: 5000 });
     await btnAnular.click();
 
-    // Rellenar motivo y código de supervisor en el formulario inline
+    // Rellenar el motivo en el formulario inline (sin código de supervisor)
     const inputMotivo = page.getByPlaceholder('Motivo de anulación...');
     await expect(inputMotivo).toBeVisible({ timeout: 5000 });
     await inputMotivo.fill('Error de pesaje en merma');
-
-    const codSupAlm = await obtenerCodigoSupervisorVigente(prisma);
-    await page.locator('#anular-movimiento-codigo').fill(codSupAlm);
 
     // Pulsar botón 'Confirmar' en la tarjeta
     const btnConfirmarInline = page.locator('div:has(> input[placeholder="Motivo de anulación..."])').getByRole('button', { name: 'Confirmar' });
@@ -503,8 +493,6 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
     expect(Number(await obtenerStockProducto('Torta de Chocolate', 'Salados'))).toBe(stockProdPrevio + 6);
 
     // Anular el movimiento del producto terminado
-    limpiarRedisSupervisor();
-    const codigoSupervisorMov = await obtenerCodigoSupervisorVigente(prisma);
     const resAnularProd = await fetch(
       `${apiBaseUrl}/admin/almacen/movimientos/${movProdManual.id}/anular`,
       {
@@ -512,7 +500,6 @@ test.describe('Suite E2E - Módulo de Almacén y Stock', () => {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${sesionAlmacen.accessToken}`,
-          'X-Codigo-Supervisor': codigoSupervisorMov,
         },
         body: JSON.stringify({
           motivo: 'Anulación de ingreso de producto terminado',

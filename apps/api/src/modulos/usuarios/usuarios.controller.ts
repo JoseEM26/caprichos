@@ -16,14 +16,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { UsuariosService } from './usuarios.service';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
 import { CambiarClaveUsuarioDto } from './dto/cambiar-clave-usuario.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
 import { ConfigurarHorarioDto } from './dto/horario.dto';
-import { AsignarPinDto } from './dto/asignar-pin.dto';
 import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.dto';
 import { DesactivarUsuarioDto } from './dto/desactivar-usuario.dto';
 import { ReactivarUsuarioDto } from './dto/reactivar-usuario.dto';
@@ -128,9 +126,6 @@ export class UsuariosController {
 
   @Patch(':id')
   @Permiso('usuarios', 'editar')
-  @RequiereCodigoSupervisor('usuarios/cambiar_rol', {
-    condicion: (req) => Boolean(req.body?.rol) || req.body?.otrosRoles !== undefined,
-  })
   async editar(
     @Param('id') id: string,
     @Body() dto: EditarUsuarioDto,
@@ -142,7 +137,6 @@ export class UsuariosController {
 
   @Post(':id/desactivar')
   @Permiso('usuarios', 'desactivar')
-  @RequiereCodigoSupervisor('usuarios/desactivar')
   async desactivar(@Param('id') id: string, @Body() dto: DesactivarUsuarioDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.usuariosService.desactivar(id, req.usuario, ip, dto ?? {});
@@ -200,17 +194,6 @@ export class UsuariosController {
   async quitarFoto(@Param('id') id: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.usuariosService.quitarFotoUsuario(id, req.usuario, ip);
-  }
-
-  @Post(':id/pin')
-  @Permiso('usuarios', 'editar')
-  async asignarPin(
-    @Param('id') id: string,
-    @Body() dto: AsignarPinDto,
-    @Req() req: any,
-  ) {
-    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.usuariosService.asignarPin(id, dto, req.usuario, ip);
   }
 
   @Get(':id/alertas-whatsapp')

@@ -4,7 +4,6 @@ import { ComandaTarjeta } from '../ComandaTarjeta';
 import { ModalAnular } from '../../pedidos/ModalAnular';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
-import { limpiarAutorizacionSupervisor } from '../../../comun/autorizacionSupervisor';
 import type { Comanda } from '../cocinaTipos';
 
 const comanda: Comanda = {
@@ -29,7 +28,6 @@ const comoRol = (rol: string) =>
 describe('Anular el pedido completo desde la comanda de cocina', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    limpiarAutorizacionSupervisor();
   });
 
   it('el botón «Anular pedido» solo sale si la vista da el permiso (alAnular)', () => {
@@ -44,7 +42,7 @@ describe('Anular el pedido completo desde la comanda de cocina', () => {
     expect(alAnular).toHaveBeenCalledWith(comanda);
   });
 
-  it('ADMIN: avisa que es el pedido completo, confirma Sí/No y no pide código', async () => {
+  it('ADMIN: avisa que es el pedido completo y confirma Sí/No', async () => {
     comoRol('ADMIN');
     const cambiar = vi.spyOn(pedidosApi, 'cambiarEstado').mockResolvedValue({} as any);
     const exito = vi.fn();
@@ -60,7 +58,7 @@ describe('Anular el pedido completo desde la comanda de cocina', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Sí, anular/ }));
     await waitFor(() => expect(exito).toHaveBeenCalled());
-    expect(cambiar).toHaveBeenCalledWith('301', 'ANULADO', 'Cliente se fue', '');
+    expect(cambiar).toHaveBeenCalledWith('301', 'ANULADO', 'Cliente se fue');
   });
 
   it('COCINA: anula sin código de supervisor, avisa que es el pedido completo y confirma Sí/No', async () => {
@@ -75,6 +73,6 @@ describe('Anular el pedido completo desde la comanda de cocina', () => {
     expect(cambiar).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /Sí, anular/ }));
 
-    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('301', 'ANULADO', 'Cliente se fue', ''));
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith('301', 'ANULADO', 'Cliente se fue'));
   });
 });

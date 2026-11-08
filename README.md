@@ -73,7 +73,6 @@ El panel web (`apps/web`) cuenta con 34 modulos operativos agrupados en cinco ar
 - **Configuracion del local**: Datos comerciales, horarios, cuentas de Yape/Plin y lectura de vouchers con IA.
 - **Zonas de reparto**: Poligonos geograficos, radios de atencion y tarifas por kilometro.
 - **Usuarios**: Administracion de cuentas, asignacion de roles y activacion de permisos.
-- **Codigo del supervisor**: Generador de codigos rotativos TOTP (30 s) para autorizaciones criticas.
 - **Historial de acciones**: Registro de auditoria inmutable de transacciones y cambios sensibles.
 - **Pantallas**: Configuracion de dispositivos de visualizacion para cocina, salon y sala de espera.
 - **Plano del local**: Disenador de cuadricula en 2D de mesas por piso y cobro en mesa con foto de voucher.
@@ -176,7 +175,7 @@ El sistema opera sobre una arquitectura en contenedores Docker disenada para dis
   - [RB-CAP-003: Atencion ante caida de un servicio](docs/operacion/RB-CAP-003-un-servicio-se-cayo.md)
   - [RB-CAP-004: Preparacion de servidor nuevo](docs/operacion/RB-CAP-004-preparar-un-servidor-nuevo.md)
   - [RB-CAP-005: Desplegar, actualizar y volver atras con Compose](docs/operacion/RB-CAP-005-desplegar-actualizar-y-volver-atras-con-compose.md)
-  - [RB-CAP-006: Operacion del codigo rotativo del supervisor](docs/operacion/RB-CAP-006-codigo-del-supervisor.md)
+  - [RB-CAP-006: Codigo del supervisor (RETIRADO)](docs/operacion/RB-CAP-006-codigo-del-supervisor.md)
   - [RB-CAP-007: Operacion del chatbot de WhatsApp](docs/operacion/RB-CAP-007-chatbot-whatsapp.md)
   - [RB-CAP-008: Despliegue sin corte y verificacion con sonda](docs/operacion/RB-CAP-008-despliegue-sin-corte-y-sonda.md)
   - [RB-CAP-009: Activar y operar la lectura de vouchers con IA](docs/operacion/RB-CAP-009-activar-y-operar-vouchers-ia.md)
