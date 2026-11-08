@@ -74,6 +74,20 @@ export class AlmacenController {
     return this.almacenService.listarMermasProductoHoy();
   }
 
+  /** Historial de movimientos de un producto terminado (y sus sabores) por día de Lima, con saldo corrido. */
+  @Get('productos/:id/historial')
+  @Permiso('almacen', 'apertura')
+  async historialProducto(
+    @Param('id') id: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+    @Query('sabor') sabor?: string,
+    @Query('tipo') tipo?: string,
+    @Query('pagina') pagina?: string,
+  ) {
+    return this.almacenService.historialProducto(id, { desde, hasta, sabor, tipo, pagina });
+  }
+
   @Post('apertura')
   @Permiso('almacen', 'apertura')
   async registrarApertura(@Body() dto: RegistrarAperturaDto, @Req() req: any) {
