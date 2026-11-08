@@ -165,7 +165,8 @@ describe('DespachoView (el LISTO final)', () => {
     const tarjeta = await screen.findByTestId('pedido-despacho-1');
     expect(listar).toHaveBeenLastCalledWith(true);
     expect(tarjeta).toHaveAttribute('data-despachado', 'true');
-    expect(tarjeta.style.opacity).toBe('0.55');
+    expect(tarjeta.style.opacity).toBe(''); // atenuado con fondo propio, sin opacidad (mantiene el contraste)
+    expect(tarjeta.style.background).toBe('rgb(239, 230, 216)');
     expect(screen.getByTestId('estado-pedido-1')).toHaveTextContent('DESPACHADO');
     expect(screen.queryByTestId('despachar-1')).not.toBeInTheDocument();
   });

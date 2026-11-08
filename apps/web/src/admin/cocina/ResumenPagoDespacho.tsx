@@ -18,7 +18,7 @@ export function etiquetaMedio(medio: string): string {
 
 type Tono = { texto: string; fondo: string; color: string; caja: string; borde: string };
 // Cada situación con su color propio, siempre con texto: pagado (verde), por cobrar (óxido), personal (dorado)
-const TONO = {
+export const TONO = {
   PAGADO: { texto: 'YA PAGADO', fondo: '#2F7A45', color: '#FFFFFF', caja: '#EAF6EC', borde: '#2F7A45' },
   COBRADO_MOZO: { texto: 'YA PAGADO · cobró el mozo', fondo: '#2F7A45', color: '#FFFFFF', caja: '#EAF6EC', borde: '#2F7A45' },
   POR_COBRAR: { texto: 'POR COBRAR', fondo: '#B2500F', color: '#FFFFFF', caja: '#FFF1DC', borde: '#B2500F' },
@@ -53,7 +53,7 @@ export function ResumenPagoDespacho({
     <section
       data-testid={`pago-despacho-${pedidoId}`}
       aria-label="Pago del pedido"
-      style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', borderRadius: '12px', border: `2px solid ${t.borde}`, background: t.caja, color: '#0B2C3E' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', borderRadius: '12px', minWidth: 0, overflowWrap: 'anywhere', border: `2px solid ${t.borde}`, background: t.caja, color: '#0B2C3E' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <span
