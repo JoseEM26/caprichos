@@ -62,25 +62,25 @@ describe('Administrador con un pedido asignado a sí mismo (panel de Repartos)',
     expect(esMiPedido({ repartidor_party_id: null }, '900')).toBe(false);
   });
 
-  it('LISTO asignado al admin: muestra "Salir a reparto" y "Reportar problema"', () => {
+  it('LISTO asignado al admin: muestra "Ya salió" y "Reportar problema"', () => {
     render(<TarjetaReparto pedido={pedidoBase()} esMio alActualizar={() => {}} />);
 
-    expect(screen.getByTestId('btn-salir-501')).toHaveTextContent('Salir a reparto');
+    expect(screen.getByTestId('btn-salir-501')).toHaveTextContent('Ya salió');
     expect(screen.getByTestId('btn-reportar-501')).toHaveTextContent('Reportar problema');
   });
 
-  it('EN_CAMINO asignado al admin: muestra "Llegué a destino" y "Reportar problema"', () => {
+  it('EN_CAMINO asignado al admin: muestra "Ya llegó" y "Reportar problema"', () => {
     render(<TarjetaReparto pedido={pedidoBase({ estado: 'EN_CAMINO', salio_en: new Date().toISOString() })} esMio alActualizar={() => {}} />);
 
-    expect(screen.getByTestId('btn-llegue-501')).toHaveTextContent('Llegué a destino');
+    expect(screen.getByTestId('btn-llegue-501')).toHaveTextContent('Ya llegó');
     expect(screen.queryByTestId('btn-entregar-501')).toBeNull();
   });
 
-  it('EN_CAMINO ya llegado: muestra "Entregar pedido" y "Reportar problema"', () => {
+  it('EN_CAMINO ya llegado: muestra "Cobrar y entregar" y "Reportar problema"', () => {
     render(<TarjetaReparto pedido={pedidoBase({ estado: 'EN_CAMINO', salio_en: new Date().toISOString(), llego_en: new Date().toISOString() })} esMio alActualizar={() => {}} />);
 
     expect(screen.queryByTestId('btn-llegue-501')).toBeNull();
-    expect(screen.getByTestId('btn-entregar-501')).toHaveTextContent('Entregar pedido');
+    expect(screen.getByTestId('btn-entregar-501')).toHaveTextContent('Cobrar y entregar');
     expect(screen.getByTestId('btn-reportar-501')).toBeInTheDocument();
   });
 
@@ -92,7 +92,7 @@ describe('Administrador con un pedido asignado a sí mismo (panel de Repartos)',
     expect(screen.queryByTestId('btn-entregar-501')).toBeNull();
   });
 
-  it('Salir a reparto pide confirmación Sí/No antes de llamar a la API', async () => {
+  it('Ya salió pide confirmación Sí/No antes de llamar a la API', async () => {
     const alActualizar = vi.fn();
     render(<TarjetaReparto pedido={pedidoBase()} esMio alActualizar={alActualizar} />);
 

@@ -172,8 +172,8 @@ describe('RepartosService', () => {
       const res = await service.tomarPedido('10', repartidor1);
 
       expect(res.id).toBe('10');
-      // Tomar avisa al cliente «ya asignamos a tu delivery» (antes no mandaba ningún aviso)
-      expect(avisosMock.avisar).toHaveBeenCalledWith(10n, 'ASIGNADO');
+      // Asignar ya no avisa al cliente: solo «Ya salió», «Ya llegó» y «Entregado»
+      expect(avisosMock.avisar).not.toHaveBeenCalled();
       expect(prismaMock.pedidoEstadoHistorial.create).toHaveBeenCalled();
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ accion: 'TOMAR', modulo: 'repartos' }),

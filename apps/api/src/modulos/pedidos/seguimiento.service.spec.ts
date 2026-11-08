@@ -74,7 +74,7 @@ describe('SeguimientoService', () => {
       expect(res.total).toBe(42.5);
       expect(res.terminado).toBe(false);
       expect(res.anulado).toBe(false);
-      expect(res.pasos.map((p) => p.clave)).toEqual(['recibido', 'cocina', 'camino', 'entregado']);
+      expect(res.pasos.map((p) => p.clave)).toEqual(['recibido', 'cocina', 'camino', 'llego', 'entregado']);
       expect(res.pasos[0]).toMatchObject({ hecho: true, actual: true, hora: '12:00' });
       expect(res.pasos[1]).toMatchObject({ hecho: false, actual: false, hora: null });
     });
@@ -94,8 +94,30 @@ describe('SeguimientoService', () => {
         [true, false, '12:05'],
         [true, true, '12:20'],
         [false, false, null],
+        [false, false, null],
       ]);
       expect(res.terminado).toBe(false);
+    });
+
+    it('DELIVERY EN_CAMINO con llego_en: «Llegó» es el paso actual con su hora', async () => {
+      conPedido(
+        pedidoBase({
+          estado: 'EN_CAMINO',
+          pasa_cocina_en: new Date('2026-10-23T17:05:00Z'),
+          despachado_en: new Date('2026-10-23T17:20:00Z'),
+          llego_en: new Date('2026-10-23T17:35:00Z'),
+        }),
+      );
+      const res = await service.obtener('CAP-0007', tokenValido());
+      expect(res.pasos.map((p) => [p.clave, p.hecho, p.actual])).toEqual([
+        ['recibido', true, false],
+        ['cocina', true, false],
+        ['camino', true, false],
+        ['llego', true, true],
+        ['entregado', false, false],
+      ]);
+      expect(res.pasos[3].hora).toBe('12:35');
+      expect(res.progreso.etapa).toBe('LLEGO');
     });
 
     it('DELIVERY ENTREGADO: todo hecho, el último es el actual y terminado', async () => {
@@ -111,8 +133,8 @@ describe('SeguimientoService', () => {
       expect(res.anulado).toBe(false);
       expect(res.estadoEtiqueta).toBe('Entregado');
       expect(res.pasos.every((p) => p.hecho)).toBe(true);
-      expect(res.pasos.map((p) => p.actual)).toEqual([false, false, false, true]);
-      expect(res.pasos[3].hora).toBe('12:40');
+      expect(res.pasos.map((p) => p.actual)).toEqual([false, false, false, false, true]);
+      expect(res.pasos[4].hora).toBe('12:40');
     });
 
     it('RECOGER en LISTO: usa "Listo para recoger" y no hay paso de camino', async () => {

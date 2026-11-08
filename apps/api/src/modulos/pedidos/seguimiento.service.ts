@@ -40,7 +40,7 @@ interface PasoDef {
   clave: string;
   etiqueta: string;
   rango: number;
-  campo: 'creado_en' | 'pasa_cocina_en' | 'listo_en' | 'despachado_en' | 'entregado_en';
+  campo: 'creado_en' | 'pasa_cocina_en' | 'listo_en' | 'despachado_en' | 'llego_en' | 'entregado_en';
   estadosHistorial: string[];
 }
 
@@ -78,6 +78,8 @@ const PASOS_POR_MODALIDAD: Record<Modalidad, PasoDef[]> = {
       campo: 'despachado_en',
       estadosHistorial: ['EN_CAMINO'],
     },
+    // «Llegó» depende de llego_en (no de un estado); un pedido entregado sin ese dato también lo da por hecho
+    { clave: 'llego', etiqueta: 'Tu repartidor llegó', rango: 3.5, campo: 'llego_en', estadosHistorial: [] },
     PASO_ENTREGADO,
   ],
   RECOGER: [
@@ -184,6 +186,7 @@ const SELECCION_SEGUIMIENTO = {
   pasa_cocina_en: true,
   listo_en: true,
   despachado_en: true,
+  llego_en: true,
   entregado_en: true,
   entregado_mesa_en: true,
   repartidor_party_id: true,
@@ -224,6 +227,7 @@ type PedidoSeguimiento = {
   pasa_cocina_en: Date | null;
   listo_en: Date | null;
   despachado_en: Date | null;
+  llego_en?: Date | null;
   entregado_en: Date | null;
   eta_min: number | null;
   eta_max: number | null;
@@ -440,7 +444,11 @@ export class SeguimientoService {
     const rangoEstado = anulado ? -1 : (RANGO_ESTADO[pedido.estado] ?? 0);
 
     const pasosDef = PASOS_POR_MODALIDAD[modalidad];
-    const hecho = pasosDef.map((paso) => paso === PASO_RECIBIDO || rangoEstado >= paso.rango);
+    const hecho = pasosDef.map(
+      (paso) =>
+        paso === PASO_RECIBIDO ||
+        (paso.campo === 'llego_en' ? rangoEstado >= 4 || (rangoEstado >= 3 && !!pedido.llego_en) : rangoEstado >= paso.rango),
+    );
     const ultimoHecho = hecho.lastIndexOf(true);
 
     const pasos: PasoSeguimiento[] = pasosDef.map((paso, i) => ({

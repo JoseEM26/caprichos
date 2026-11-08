@@ -82,8 +82,8 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
 
   const salir = (pedido: PedidoReparto) => {
     pedirConfirmacion(
-      '¿Marcar salida con el pedido?',
-      `El pedido ${pedido.codigo} pasará a estado EN CAMINO. Se registrará la hora de salida.`,
+      '¿Ya salió con el pedido?',
+      `Se registra la hora de salida del pedido ${pedido.codigo} y se avisa al cliente por WhatsApp con el tiempo estimado.`,
       async () => {
         try {
           setCargandoAccion(true);
@@ -102,14 +102,16 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
 
   const llegue = (pedido: PedidoReparto) => {
     pedirConfirmacion(
-      '¿Marcar que has llegado?',
-      `Se registrará que has llegado al destino del pedido ${pedido.codigo}.`,
+      '¿Ya llegó?',
+      `Se avisa al cliente que su repartidor llegó (pedido ${pedido.codigo}) y se abre el cobro y la entrega.`,
       async () => {
         try {
           setCargandoAccion(true);
           await repartosApi.llegue(pedido.id);
           cerrarConfirmacion();
           alActualizar();
+          // «Ya llegó» abre directo el cobro y la entrega: no hay un botón aparte de «Entregado»
+          entregar(pedido);
         } catch (err: any) {
           cerrarConfirmacion();
           setErrorAccion(err instanceof ErrorApi ? err.message : 'Error al marcar llegada');
@@ -120,15 +122,21 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
     );
   };
 
-  const entregar = (pedido: PedidoReparto) => {
+  function entregar(pedido: PedidoReparto) {
     const esEfectivoPendiente =
       pedido.cobro_pendiente_efectivo ||
       pedido.cobroPendienteEfectivo ||
       (pedido.pago_estado !== 'PAGADO' && pedido.pago_metodo === 'EFECTIVO');
 
+    const total = Number(pedido.total).toFixed(2);
+    const pagaCon = Number(pedido.paga_con ?? 0);
+    const vuelto = pagaCon > Number(pedido.total) ? ` Paga con S/ ${pagaCon.toFixed(2)}: lleva vuelto S/ ${(pagaCon - Number(pedido.total)).toFixed(2)}.` : '';
+    const pagoDigital = pedido.pago_estado !== 'PAGADO' && ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(String(pedido.pago_metodo).toUpperCase());
     const textoCobro = esEfectivoPendiente
-      ? ` Efectivo a rendir en caja: S/ ${Number(pedido.total).toFixed(2)} (no se cobra aquí, se liquida al cerrar turno).`
-      : ' Pedido ya pagado previamente.';
+      ? ` Cobra S/ ${total} en efectivo.${vuelto} Se rinde en caja al cerrar turno.`
+      : pagoDigital
+        ? ` Pago por ${String(pedido.pago_metodo)} de S/ ${total}: confirma que el cliente ya pagó.`
+        : ' Pedido ya pagado previamente.';
 
     pedirConfirmacion(
       '¿Confirmar entrega al cliente?',
@@ -147,7 +155,7 @@ export function useAccionesReparto({ alActualizar }: { alActualizar: () => void 
         }
       },
     );
-  };
+  }
 
   return {
     cargandoAccion,

@@ -166,6 +166,7 @@ export type EtapaProgreso =
   | 'PARCIAL'
   | 'LISTO'
   | 'EN_CAMINO'
+  | 'LLEGO'
   | 'ESPERANDO_CLIENTE'
   | 'ENTREGADO'
   | 'ANULADO';

@@ -24,12 +24,9 @@ export interface OpcionesRutaSugeridaProps {
   alTomada?: () => void;
 }
 
-function Flecha({ rumbo, color }: { rumbo: number; color: string }) {
-  return (
-    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true" style={{ transform: `rotate(${rumbo}deg)`, flex: 'none' }}>
-      <path d="M14 3 L22 22 L14 17 L6 22 Z" fill={color} />
-    </svg>
-  );
+/** Muestra solo el color de la ruta (sin flechas ni dirección): el orden de las paradas va numerado abajo. */
+function PuntoColor({ color }: { color: string }) {
+  return <span aria-hidden="true" style={{ width: 14, height: 14, borderRadius: '50%', background: color, flex: 'none' }} />;
 }
 
 export function OpcionesRutaSugerida({
@@ -98,7 +95,7 @@ export function OpcionesRutaSugerida({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Flecha rumbo={o.rumbo} color={color} />
+                <PuntoColor color={color} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>Ruta hacia el {o.sector.toLowerCase()}</div>
                   <div style={{ fontSize: 13, color: 'var(--cp-soft, #5A6E78)' }}>

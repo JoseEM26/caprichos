@@ -16,6 +16,7 @@ import { HojaInferior } from './HojaInferior';
 import { ChatPedidoReparto, chatVigente } from './ChatPedidoReparto';
 import { SaltarPedidoModal } from './SaltarPedidoModal';
 import { colorOpcion } from './OpcionesRutaSugerida';
+import { enlaceLlamar } from './textoVisible';
 import { HojaRutasSugeridas, ALTO_PLEGADA_PX, FRACCION_MEDIA, type AlturaRutas } from './HojaRutasSugeridas';
 import { useRutasSugeridas } from './useRutasSugeridas';
 import { useAccionesReparto } from './useAccionesReparto';
@@ -111,12 +112,12 @@ function esEfectivoPendiente(p: PedidoReparto): boolean {
 
 export function etapaDe(p: PedidoReparto): InfoEtapa {
   if (p.estado !== 'EN_CAMINO') {
-    return { id: 'salir', texto: 'Salir a reparto', fondo: 'var(--cp-orange)', color: 'var(--cp-white)' };
+    return { id: 'salir', texto: 'Ya salió', fondo: 'var(--cp-orange)', color: 'var(--cp-white)' };
   }
   if (!p.llego_en) {
-    return { id: 'llegue', texto: 'Llegué a destino', fondo: 'var(--cp-gold)', color: 'var(--cp-navy)' };
+    return { id: 'llegue', texto: 'Ya llegó', fondo: 'var(--cp-gold)', color: 'var(--cp-navy)' };
   }
-  return { id: 'entregar', texto: 'Entregar pedido', fondo: 'var(--cp-green)', color: 'var(--cp-white)' };
+  return { id: 'entregar', texto: 'Cobrar y entregar', fondo: 'var(--cp-green)', color: 'var(--cp-white)' };
 }
 
 /** Avisos en pantalla del repartidor: espera agotada en puerta y movilidades retiradas. */
@@ -362,10 +363,15 @@ function ContactoPedido({ pedido, alChatear }: { pedido: PedidoReparto; alChatea
       )}
       {telefono && (
         <div style={dosColumnas}>
-          <a href={`tel:${telefono}`} style={{ ...enlace, background: 'var(--cp-white)', border: '1.5px solid var(--cp-navy)', color: 'var(--cp-navy)' }}>
+          <a href={enlaceLlamar(telefono) ?? undefined} data-testid={`llamar-${pedido.id}`} style={{ ...enlace, background: 'var(--cp-white)', border: '1.5px solid var(--cp-navy)', color: 'var(--cp-navy)' }}>
             Llamar
           </a>
         </div>
+      )}
+      {telefono && (
+        <p style={{ margin: 0, fontSize: 11, color: 'var(--cp-soft)' }}>
+          ¿Te sale un selector al llamar? En el celular: Ajustes › Apps › Apps predeterminadas › Llamadas (o Teléfono), elige tu app de llamadas y toca «Siempre».
+        </p>
       )}
       {pedido.lat != null && pedido.lng != null && (
         <div style={dosColumnas}>
@@ -1078,7 +1084,7 @@ export function RepartidorView() {
 
   const tomarRuta = () => {
     if (miRuta.length === 0) return;
-    const codigos = miRuta.map((id) => codigosRef.current.get(id) ?? id).join(' → ');
+    const codigos = miRuta.map((id, i) => `${i + 1}. ${codigosRef.current.get(id) ?? id}`).join(', ');
     pedirConfirmacion(
       '¿Tomar esta ruta?',
       `Vas a tomar ${miRuta.length} ${miRuta.length === 1 ? 'pedido' : 'pedidos'} en este orden: ${codigos}.`,

@@ -12,6 +12,7 @@ export type EtapaProgreso =
   | 'PARCIAL'
   | 'LISTO'
   | 'EN_CAMINO'
+  | 'LLEGO'
   | 'ESPERANDO_CLIENTE'
   | 'ENTREGADO'
   | 'ANULADO';
@@ -56,6 +57,7 @@ export interface EntradaProgreso {
   entregado_mesa_en?: Date | null;
   repartidor_party_id?: unknown;
   despachado_en?: Date | null;
+  llego_en?: Date | null;
   eta_min?: number | null;
   eta_max?: number | null;
   creado_en?: Date | null;
@@ -122,6 +124,9 @@ export function progresoDelPedido(p: EntradaProgreso, ctx?: ContextoProgreso): P
       : null;
     const etiqueta = rango ? `En camino, llega en ${textoRango(rango.min, rango.max)}` : 'En camino';
     const areas = areasDePedido(p, true);
+    if (p.llego_en) {
+      return { etapa: 'LLEGO', etiqueta: 'Tu repartidor llegó', areas, listasDe: areas.length, totalAreas: areas.length, porcentaje: 100, enCamino: true };
+    }
     return {
       etapa: 'EN_CAMINO',
       etiqueta,

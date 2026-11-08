@@ -1,3 +1,4 @@
+import { enlaceLlamar } from './textoVisible';
 import { useState } from 'react';
 import { PedidoReparto } from './repartosApi';
 import { useAccionesReparto } from './useAccionesReparto';
@@ -53,7 +54,7 @@ export function ResumenPedidoReparto({
   const telDigitos = pedido.cliente_telefono
     ? pedido.cliente_telefono.replace(/\D/g, '').slice(-9)
     : null;
-  const telUrl = telDigitos ? `tel:${telDigitos}` : null;
+  const telUrl = enlaceLlamar(pedido.cliente_telefono);
   const waUrl = telDigitos ? `https://wa.me/51${telDigitos}` : null;
   const navUrl =
     pedido.lat != null && pedido.lng != null
@@ -99,8 +100,8 @@ export function ResumenPedidoReparto({
 
   const pasos = [
     { label: 'Tomado', hora: horaTomado, activo: !!horaTomado },
-    { label: 'En camino', hora: horaSalio, activo: !!horaSalio },
-    { label: 'Llegado', hora: horaLlego, activo: !!horaLlego },
+    { label: 'Salió', hora: horaSalio, activo: !!horaSalio },
+    { label: 'Llegó', hora: horaLlego, activo: !!horaLlego },
     { label: 'Entregado', hora: horaEntregado, activo: !!horaEntregado },
   ].filter((p) => p.activo);
 
