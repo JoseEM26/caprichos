@@ -59,12 +59,12 @@ describe('MisPedidosView: reglas del voucher en la tarjeta', () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-W021');
     const card = tarjeta('CP-W021');
-    expect(card.textContent).toContain('Voucher Plin: subido');
+    expect(card.textContent).toContain('Plin: captura subida');
     expect(card.textContent).toContain('Voucher bloqueado: Caja ya aprobó el pago de este pedido. Pide a Caja cualquier cambio.');
     expect(Array.from(card.querySelectorAll('button')).some((b) => b.textContent === 'Cambiar voucher')).toBe(false);
   });
 
-  it('muestra un voucher por medio: el que falta ofrece Subir voucher mientras el servidor lo permita', async () => {
+  it('muestra un voucher por medio: el que falta ofrece Subir captura (opcional) mientras el servidor lo permita', async () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue({
       pedidos: [
         pedido({
@@ -92,11 +92,11 @@ describe('MisPedidosView: reglas del voucher en la tarjeta', () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-W022');
     const card = tarjeta('CP-W022');
-    expect(card.textContent).toContain('Voucher Yape: subido');
-    expect(card.textContent).toContain('Voucher Plin: falta');
+    expect(card.textContent).toContain('Yape: captura subida');
+    expect(card.textContent).toContain('Plin: sin captura');
     const botones = Array.from(card.querySelectorAll('button')).map((b) => b.textContent);
     expect(botones).toContain('Cambiar voucher');
-    expect(botones).toContain('Subir voucher');
+    expect(botones).toContain('Subir captura (opcional)');
   });
 });
 
@@ -210,7 +210,7 @@ describe('MisPedidosView: nombre del cliente y filtro Falta captura', () => {
     expect(screen.getByText('CP-W021')).toBeDefined();
     expect(screen.queryByText('CP-W022')).toBeNull();
     expect(screen.queryByText('CP-W023')).toBeNull();
-    expect(screen.getByText('Falta captura (opcional)', { selector: '.mpv-insignia-falta' })).toBeDefined();
+    expect(screen.getByText(/Sin captura/, { selector: '.mpv-insignia-falta' })).toBeDefined();
     expect(screen.getByText('CP-W021').closest('li')!.className).toContain('mpv-card--falta');
   });
 });

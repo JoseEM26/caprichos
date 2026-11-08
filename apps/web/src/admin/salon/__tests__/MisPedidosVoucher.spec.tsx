@@ -70,14 +70,16 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
     vi.mocked(salonApi.misPedidos).mockResolvedValue(respuesta as any);
   });
 
-  it('el botón Subir voucher solo aparece en pagos digitales y no anulados', async () => {
+  it('el botón Subir captura (opcional) solo aparece en pagos digitales y no anulados', async () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-M012');
 
-    const botones = screen.getAllByRole('button', { name: 'Subir voucher' });
+    const botones = screen.getAllByRole('button', { name: 'Subir captura (opcional)' });
     expect(botones).toHaveLength(1);
-    expect(within(tarjetaDe('CP-M012')).getByRole('button', { name: 'Subir voucher' })).toBeInTheDocument();
-    expect(within(tarjetaDe('CP-M012')).getByText('Voucher Yape: falta')).toBeInTheDocument();
+    expect(within(tarjetaDe('CP-M012')).getByRole('button', { name: 'Subir captura (opcional)' })).toBeInTheDocument();
+    expect(within(tarjetaDe('CP-M012')).getByText(/Yape: sin captura/)).toBeInTheDocument();
+    expect(within(tarjetaDe('CP-M012')).getByText(/La captura es opcional: puedes subirla después/)).toBeInTheDocument();
+    expect(within(tarjetaDe('CP-M012')).getByText(/Sin captura/, { selector: '.mpv-insignia-falta' })).toBeInTheDocument();
     expect(within(tarjetaDe('CP-M011')).queryByText(/Voucher (Yape|Plin|Transferencia):/)).not.toBeInTheDocument();
     expect(within(tarjetaDe('CP-M010')).queryByText(/Voucher (Yape|Plin|Transferencia):/)).not.toBeInTheDocument();
   });
@@ -86,7 +88,7 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-M012');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Subir voucher' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Subir captura (opcional)' }));
 
     const dialogo = await screen.findByRole('dialog', { name: 'Voucher del pedido CP-M012' });
     expect(within(dialogo).getByText('Foto del voucher (YAPE)')).toBeInTheDocument();
@@ -96,7 +98,7 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
     vi.mocked(vouchersApi.subirVoucher).mockResolvedValue({ id: '7', legible: true } as any);
     render(<MisPedidosView />);
     await screen.findByText('CP-M012');
-    fireEvent.click(screen.getByRole('button', { name: 'Subir voucher' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Subir captura (opcional)' }));
 
     const input = await screen.findByTestId('input-voucher-archivo');
     fireEvent.change(input, {
@@ -116,7 +118,7 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
     } as any);
     render(<MisPedidosView />);
     await screen.findByText('CP-M012');
-    fireEvent.click(screen.getByRole('button', { name: 'Subir voucher' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Subir captura (opcional)' }));
 
     const input = await screen.findByTestId('input-voucher-archivo');
     fireEvent.change(input, {
@@ -139,7 +141,7 @@ describe('MisPedidosView: voucher de pedidos digitales', () => {
     } as any);
     render(<MisPedidosView />);
     await screen.findByText('CP-M012');
-    fireEvent.click(screen.getByRole('button', { name: 'Subir voucher' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Subir captura (opcional)' }));
 
     const input = await screen.findByTestId('input-voucher-archivo');
     fireEvent.change(input, {

@@ -164,7 +164,7 @@ export function TarjetaLecturaVoucher({
             lineHeight: 1.4,
           }}
         >
-          No se lee: sube otra foto o confirma sin comprobante con motivo.
+          No se lee: puedes subir otra foto o seguir sin captura (es opcional).
         </div>
       )}
 
