@@ -4,6 +4,7 @@ import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { api, ErrorApi } from '../../../comun/api';
+import { llenarPagaCon } from './ayudaPagaCon';
 
 vi.mock('../api', () => ({
   salonApi: { obtenerCarta: vi.fn(), obtenerPlano: vi.fn(), abrirPedidoMesa: vi.fn() },
@@ -92,6 +93,7 @@ describe('ModalNuevoPedidoMesa: cupón con el validador real', () => {
     await screen.findByText('Cupón VERANO10 aplicado: - S/ 2.00');
     const boleta = screen.queryByTestId('comprobante-BOLETA');
     if (boleta) fireEvent.click(boleta);
+    llenarPagaCon();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() =>

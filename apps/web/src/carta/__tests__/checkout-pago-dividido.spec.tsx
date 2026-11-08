@@ -134,4 +134,23 @@ describe('Checkout de la carta ▸ pago dividido', () => {
     expect((await screen.findAllByText(/El primer monto debe ser menor a S\/ 40\.00/)).length).toBeGreaterThan(0);
     expect(api.post).not.toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything());
   });
+  it('efectivo sin «paga con» no envía; «Pago exacto» lo llena y manda pagaCon', async () => {
+    vi.mocked(api.post).mockRejectedValue(new ErrorApi('TEST', 'cortado a propósito', 400));
+    abrirPedido();
+    await irAPago();
+    fireEvent.click(screen.getByRole('button', { name: /^EFECTIVO$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
+    expect((await screen.findAllByText(/Escribe con cuánto pagas en efectivo/)).length).toBeGreaterThan(0);
+    expect(api.post).not.toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything());
+
+    fireEvent.click(screen.getByRole('button', { name: /Pago exacto/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Enviar pedido/i }));
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/pedidos',
+        expect.objectContaining({ pago: expect.objectContaining({ metodo: 'EFECTIVO', pagaCon: 40 }) }),
+        expect.anything(),
+      ),
+    );
+  });
 });

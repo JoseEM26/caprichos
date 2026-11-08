@@ -422,7 +422,37 @@ describe('PedidosService', () => {
             ], { pagaCon: 10 }),
             'idemp-plan-3',
           ),
-        ).rejects.toMatchObject({ response: { codigo: 'PAGO_INSUFICIENTE' } });
+        ).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_MENOR_AL_TOTAL' } });
+      });
+
+      it('efectivo sin pagaCon: 400 PAGA_CON_REQUERIDO (carta, Caja, bot)', async () => {
+        await expect(
+          service.crear({ ...pedidoBaseDto, pago: { metodo: 'EFECTIVO' } }, 'idemp-pc-1'),
+        ).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_REQUERIDO' } });
+        await expect(
+          service.crear({ ...pedidoBaseDto, pago: { metodo: 'EFECTIVO' } }, 'idemp-pc-2', { canal: 'CAJA' }),
+        ).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_REQUERIDO' } });
+        await expect(
+          service.crear(conPlan([{ medio: 'EFECTIVO', monto: 13 }, { medio: 'YAPE', monto: 20 }]), 'idemp-pc-3'),
+        ).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_REQUERIDO' } });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('efectivo con pagaCon menor al total: 400; exacto: se crea', async () => {
+        await expect(
+          service.crear({ ...pedidoBaseDto, pago: { metodo: 'EFECTIVO', pagaCon: 1 } }, 'idemp-pc-4'),
+        ).rejects.toMatchObject({ response: { codigo: 'PAGA_CON_MENOR_AL_TOTAL' } });
+        await service.crear({ ...pedidoBaseDto, pago: { metodo: 'EFECTIVO', pagaCon: 33 } }, 'idemp-pc-5');
+        expect(prismaMock.pedido.create).toHaveBeenCalled();
+      });
+
+      it('mesa del personal en efectivo sin pagaCon: exenta (se pide al cobrar)', async () => {
+        await service.crear(
+          { ...pedidoBaseDto, modalidad: 'MESA', mesa: 'Mesa 1', pago: { metodo: 'EFECTIVO' } },
+          'idemp-pc-6',
+          { canal: 'MOZO', omitirChequeoCarta: true, mesaNombre: 'Mesa 1' },
+        );
+        expect(prismaMock.pedido.create).toHaveBeenCalled();
       });
 
       it('sin plan se comporta como antes: no crea renglones y usa pago.metodo', async () => {
@@ -518,7 +548,7 @@ describe('PedidosService', () => {
       });
 
       it('un pedido normal no acumula nada ni cambia su cobro', async () => {
-        await service.crear(dtoPersonal, 'idemp-personal-7', { canal: 'MOZO', usuarioPartyId: 5n });
+        await service.crear({ ...dtoPersonal, pago: { metodo: 'EFECTIVO', pagaCon: 100 } }, 'idemp-personal-7', { canal: 'MOZO', usuarioPartyId: 5n });
         const data = prismaMock.pedido.create.mock.calls[0][0].data;
         expect(data.pago_estado).toBe('PENDIENTE');
         expect(Number(data.descuento)).toBe(0);

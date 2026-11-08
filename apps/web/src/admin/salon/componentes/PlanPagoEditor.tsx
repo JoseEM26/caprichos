@@ -258,6 +258,25 @@ export function PlanPagoEditor({
               fontSize: '14px',
             }}
           />
+          {pagaConObligatorio && montoEf > 0 && (
+            <button
+              type="button"
+              onClick={() => onPagaCon(montoEf.toFixed(2))}
+              style={{
+                marginTop: '6px',
+                minHeight: ALTO_TOQUE,
+                borderRadius: '10px',
+                border: '1.5px solid var(--cp-line)',
+                background: 'var(--cp-white)',
+                fontWeight: 700,
+                fontSize: '13px',
+                padding: '0 12px',
+                cursor: 'pointer',
+              }}
+            >
+              Pago exacto (S/ {montoEf.toFixed(2)})
+            </button>
+          )}
           {vuelto !== null && (
             <div style={{ fontSize: '13px', fontWeight: 700, marginTop: '4px' }}>Vuelto S/ {vuelto.toFixed(2)}</div>
           )}

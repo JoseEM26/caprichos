@@ -4,6 +4,7 @@ import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
+import { llenarPagaCon } from './ayudaPagaCon';
 
 /** Elige boleta en el selector obligatorio (si el paso lo muestra y aún no hay elección). */
 const elegirBoleta = () => {
@@ -81,6 +82,7 @@ async function llegarAResumen(modalidad: 'Para llevar' | 'Delivery', alExitoPedi
 
 async function confirmarRegistro() {
   elegirBoleta();
+  llenarPagaCon();
   fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
   fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 }
@@ -119,6 +121,22 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     expect(within(grupo).getByRole('button', { name: 'Efectivo' })).toHaveAttribute('aria-pressed', 'true');
     // El campo «con cuánto paga» aparece con efectivo en llevar también (para el vuelto)
     expect(screen.getByText('¿Con cuánto paga?')).toBeInTheDocument();
+  });
+
+  it('en efectivo sin «con cuánto paga» no registra, avisa y «Pago exacto» llena el monto', async () => {
+    await llegarAResumen('Para llevar');
+    await screen.findByRole('group', { name: '¿Cómo paga?' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    expect(await screen.findByText(/Indica con cuánto paga/)).toBeInTheDocument();
+    expect(pedidosApi.crearPedidoAdmin).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Pago exacto/ }));
+    expect((document.querySelector('#plan-paga-con') as HTMLInputElement).value).toBe('8.50');
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
+    await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(pedidosApi.crearPedidoAdmin).mock.calls[0][0].pago).toMatchObject({ metodo: 'EFECTIVO', pagaCon: 8.5 });
   });
 
   it('en efectivo registra con metodo EFECTIVO y cierra como antes, sin voucher', async () => {
@@ -242,6 +260,7 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
     expect(screen.getByRole('alert')).toHaveTextContent('Sobra S/ 0.50');
     // El botón sigue activo; al tocarlo no abre la confirmación y deja el aviso del plan
     elegirBoleta();
+    llenarPagaCon();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     expect(screen.queryByRole('button', { name: 'Sí, registrar' })).toBeNull();
     expect(screen.getByRole('alert')).toHaveTextContent('Sobra S/ 0.50');

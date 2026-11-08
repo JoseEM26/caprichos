@@ -107,6 +107,18 @@ describe('Pagos del bot', () => {
       expect(r.nuevoEstado).toBe('PEDIDO_MONTO_EFECTIVO');
       expect(textos(r)).toContain('al menos de S/ 62.50');
     });
+    it.each(['hola', 'no sé', 'tengo sencillo', '???'])('«%s» (sin número): repregunta y no avanza', (txt) => {
+      const f = paso(flujoPago(), { buttonPayload: 'ped_pago_efectivo' }).nuevoFlujo;
+      const r = paso(f, { texto: txt, textoOriginal: txt });
+      expect(r.nuevoEstado).toBe('PEDIDO_MONTO_EFECTIVO');
+      expect(textos(r)).toContain('Necesito el monto con el que pagarás');
+      expect((r.nuevoFlujo.pedido as any).pago?.pagaCon).toBeUndefined();
+    });
+    it.each(['exacto', 'Justo', 'sin vuelto', 'lo exacto'])('«%s» se acepta como monto exacto', (txt) => {
+      const f = paso(flujoPago(), { buttonPayload: 'ped_pago_efectivo' }).nuevoFlujo;
+      const r = paso(f, { texto: txt, textoOriginal: txt });
+      expect((r.nuevoFlujo.pedido as any).pago).toEqual({ metodo: 'EFECTIVO', pagaCon: 62.5 });
+    });
     it.each(['70', 's/70', 'S/ 70.00', 's/. 70'])('acepta «%s»', (txt) => {
       const f = paso(flujoPago(), { buttonPayload: 'ped_pago_efectivo' }).nuevoFlujo;
       const r = paso(f, { texto: txt, textoOriginal: txt });

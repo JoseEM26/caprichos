@@ -58,6 +58,12 @@ export function mediosActivos(datosLocalPublicos: any): MedioPagoBot[] {
 export const MEDIOS_DIGITALES: MedioPagoBot[] = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 
 /** Monto escrito por el cliente: «50», «s/50», «S/ 50.00», «50,5». null si no es un número positivo. */
+/** «exacto», «justo», «sin vuelto», «lo exacto»… (sin número): paga el monto exacto. */
+export function esPagoExacto(texto: string): boolean {
+  const t = String(texto || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  return /^(lo |el |pago |pagare |pago el )?(exacto|justo|monto exacto|sin vuelto|sin cambio|cancelo exacto)\b/.test(t);
+}
+
 export function parsearMonto(texto: string): number | null {
   const limpio = String(texto || '').replace(/s\s*\/\.?/gi, '').replace(',', '.').replace(/[^\d.]/g, '');
   if (!limpio) return null;

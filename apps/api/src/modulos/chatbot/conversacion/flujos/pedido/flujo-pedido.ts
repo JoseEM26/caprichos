@@ -59,6 +59,7 @@ import {
   medioPrincipal,
   opcionesMedios,
   parsearMonto,
+  esPagoExacto,
   textoPago,
 } from './pago-bot.util';
 import { MedioPagoBot } from './tipos-pedido';
@@ -2056,7 +2057,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
     let monto: number | null;
     const m = /^ped_paga_(\d+)$/.exec(entrada.id || '');
-    if (entrada.id === 'ped_paga_exacto') monto = parte;
+    if (entrada.id === 'ped_paga_exacto' || esPagoExacto(entrada.textoOriginal)) monto = parte;
     else if (m) monto = Number(m[1]);
     else monto = parsearMonto(entrada.textoOriginal);
 
@@ -2066,7 +2067,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
         acciones: [
           {
             tipo: 'enviarBotones',
-            texto: TEXTOS_BOT.pedidoPagaConMenorQueTotal(parte),
+            texto: monto === null ? TEXTOS_BOT.pedidoPagaConSinMonto(parte) : TEXTOS_BOT.pedidoPagaConMenorQueTotal(parte),
             botones: botonesEfectivo(parte),
           },
         ],
@@ -2419,6 +2420,18 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
 
     // 11.2. Construir DTO de PedidosService.crear
     const { aCobrar: total } = calcularTotales(pedido, contexto.vistaPreviaPedido);
+
+    // Efectivo: «con cuánto pagas» es obligatorio. Red de seguridad: si por cualquier camino llegó sin monto
+    // (o menor a lo que se cobra en efectivo), se vuelve a preguntar en vez de crear el pedido.
+    const planEf = pedido.pago?.plan;
+    const parteEf = planEf?.length
+      ? (planEf.find((f) => f.medio === 'EFECTIVO')?.monto ?? 0)
+      : (pedido.pago?.metodo ?? 'EFECTIVO') === 'EFECTIVO'
+        ? total
+        : 0;
+    if (parteEf > 0 && !(typeof pedido.pago?.pagaCon === 'number' && pedido.pago.pagaCon >= parteEf)) {
+      return this.pedirMontoEfectivo(flujo, { ...pedido, pago: pedido.pago ?? { metodo: 'EFECTIVO' } }, parteEf);
+    }
 
     const clienteNombre =
       pedido.cliente?.nombre ||

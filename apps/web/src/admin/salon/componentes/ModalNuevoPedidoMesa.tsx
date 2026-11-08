@@ -1119,8 +1119,10 @@ export function ModalNuevoPedidoMesa({
   // al tocarlo se muestra el primer mensaje y el foco va a su campo (intentarEnviar).
   type ErrorEnvio = { campo: 'productos' | 'mesa' | 'personal' | 'nombre' | 'telefono' | 'plan' | 'pagaCon' | 'comprobante'; mensaje: string; foco: string[] };
   const errorComprobanteCaja = errorValorComprobante(valorComp);
+  // «Con cuánto paga» es obligatorio con efectivo, salvo mesa (se pide al cobrar en la precuenta) y pedido del personal
+  const pagaConExento = (extra ? extra.modalidad === 'MESA' : modalidad === 'local') || pideMode === 'personal';
   const errorPagaCon =
-    modalidad === 'delivery' && montoEfectivoAhora > 0 && pagaConValido() === undefined
+    !pagaConExento && montoEfectivoAhora > 0 && pagaConValido() === undefined
       ? `Indica con cuánto paga: debe ser S/ ${montoEfectivoAhora.toFixed(2)} o más`
       : null;
   const erroresEnvio: ErrorEnvio[] = [];
@@ -3460,7 +3462,7 @@ export function ModalNuevoPedidoMesa({
                     onChange={setFilasPlan}
                     pagaCon={cliPagaCon}
                     onPagaCon={setCliPagaCon}
-                    pagaConObligatorio={modalidad === 'delivery'}
+                    pagaConObligatorio={!pagaConExento}
                     pagaConInvalido={intentoEnvio && errorPagaCon !== null}
                   />
                   {intentoEnvio && errorPagaCon && (

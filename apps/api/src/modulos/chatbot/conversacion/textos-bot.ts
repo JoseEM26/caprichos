@@ -821,7 +821,11 @@ export const TEXTOS_BOT = {
     return '¿Con cuánto pagas? Escribe el monto o selecciona una opción.\nTe preparamos el vuelto 💵';
   },
 
-  pedidoPagaConMenorQueTotal: (total: number): string => {
+  pedidoPagaConSinMonto: (total: number): string => {
+    return `Necesito el monto con el que pagarás para preparar tu vuelto. Escribe un número (por ejemplo ${Math.ceil(total / 10) * 10}) o toca «Exacto» si pagas justo S/ ${total.toFixed(2)}.`;
+  },
+
+  pedidoPagaConMenorQueTotal:(total: number): string => {
     return `El monto debe ser al menos de S/ ${total.toFixed(2)}. ¿Con cuánto pagarás?`;
   },
 

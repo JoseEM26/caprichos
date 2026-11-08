@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
+import { llenarPagaCon } from './ayudaPagaCon';
 
 vi.mock('../api', () => ({
   salonApi: { obtenerCarta: vi.fn(), obtenerPlano: vi.fn(), abrirPedidoMesa: vi.fn() },
@@ -55,6 +56,8 @@ describe('Nuevo pedido en Caja: comprobante', () => {
     fireEvent.change(screen.getByLabelText('Razón social'), { target: { value: 'Acme SAC' } });
     fireEvent.change(screen.getByLabelText('Dirección fiscal (opcional)'), { target: { value: 'Av. Uno 123' } });
 
+    llenarPagaCon();
+
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 
@@ -72,6 +75,7 @@ describe('Nuevo pedido en Caja: comprobante', () => {
     const grupo = screen.getByRole('group', { name: 'Comprobante' });
     expect(within(grupo).getByTestId('comprobante-SIMPLE').getAttribute('aria-pressed')).toBe('true');
     expect(screen.queryByRole('button', { name: /Nota de venta|Sin elegir/ })).toBeNull();
+    llenarPagaCon();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
@@ -81,6 +85,7 @@ describe('Nuevo pedido en Caja: comprobante', () => {
   it('con boleta sin DNI manda solo el tipo BOLETA', async () => {
     await llegarAResumenLlevar();
     fireEvent.click(within(screen.getByRole('group', { name: 'Comprobante' })).getByTestId('comprobante-BOLETA'));
+    llenarPagaCon();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
     await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
@@ -92,6 +97,7 @@ describe('Nuevo pedido en Caja: comprobante', () => {
     fireEvent.click(screen.getByTestId('comprobante-FACTURA'));
     fireEvent.change(screen.getByLabelText('RUC'), { target: { value: '1234567890' } });
     expect(screen.getByText(/El RUC debe tener 11 dígitos/)).toBeTruthy();
+    llenarPagaCon();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     expect(screen.queryByRole('button', { name: 'Sí, registrar' })).toBeNull();
     expect(pedidosApi.crearPedidoAdmin).not.toHaveBeenCalled();
