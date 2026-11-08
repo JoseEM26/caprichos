@@ -303,6 +303,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
         who: `Para: ${clienteNombre}`,
         hora,
         ...(linea.area_id ? { areaId: String(linea.area_id) } : {}),
+        ...(linea.producto?.categoria_id ? { categoriaId: String(linea.producto.categoria_id) } : {}),
       });
     }
   });

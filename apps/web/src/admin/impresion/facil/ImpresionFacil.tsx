@@ -154,6 +154,8 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
               key={det.deviceKeyId}
               equipo={det}
               areas={mapa?.areas.map((a) => ({ id: a.id, nombre: a.nombre })) ?? []}
+              categorias={mapa?.categorias ?? []}
+              configsOtras={equiposOrdenados.filter((o) => o.deviceKeyId !== det.deviceKeyId).map((o) => o.config).filter((c): c is NonNullable<typeof c> => !!c)}
               tamanosLocal={estado?.tamanosLocal ?? { bebida: TAMANO_BEBIDA_DEFECTO, general: TAMANO_GENERAL_DEFECTO }}
               puedeEditar={puedeEditar}
               pendientes={det.pendientes}

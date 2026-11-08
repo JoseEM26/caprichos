@@ -71,6 +71,7 @@ import {
   aplicaSegunReglas,
   areasParaRuteo,
   destinoDeTrabajo,
+  vasoDescartadoPorCategoria,
   rolesDeConfig,
   tiposDeRoles,
 } from './ruteo-impresion';
@@ -1061,6 +1062,7 @@ export class ImpresionService {
       }
 
       const { general, areas, bebidas } = construirTodasLasEtiquetas(pedido);
+      await this.anotarCategorias(bebidas);
       const reglas = await leerReglasImpresion(this.prisma);
       const ctx = await this.contextoRuteo();
       // Solo el primer encolado del pedido avisa a Caja (los reintentos de la misma aceptación no repiten el aviso)
@@ -1069,6 +1071,7 @@ export class ImpresionService {
       // Cada trabajo se encola si la regla de su tipo y modalidad lo pide; su destino sale del ruteo (NULL = Caja)
       let cajas = 0;
       const encolar = async (tipo: string, clave: string, payload: any, areaId: bigint | null) => {
+        if (this.vasoOmitido(tipo, areaId, payload, ctx)) return; // categoría desmarcada en la PC: sin sticker de vaso
         const destino = this.destinoJob(tipo, areaId, payload, ctx);
         await this.prisma.printJob.upsert({
           where: { clave_idempotencia: clave },
@@ -1296,6 +1299,7 @@ export class ImpresionService {
     const areas = await this.prisma.areaCocina.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { id: 'asc' } });
     const pedido = construirPedidoSimulado(modalidad, areas);
     const { general, areas: etqAreas, bebidas } = construirTodasLasEtiquetas(pedido);
+    await this.anotarCategorias(bebidas);
     const reglas = await leerReglasImpresion(this.prisma);
     const ctx = await this.contextoRuteo();
     const local = await this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null);
@@ -1310,6 +1314,7 @@ export class ImpresionService {
     const sinReceptor: string[] = [];
     let total = 0;
     const encolar = async (tipo: string, etiqueta: string, payload: any, areaId: bigint | null) => {
+      if (this.vasoOmitido(tipo, areaId, payload, ctx)) return;
       const destino = this.destinoJob(tipo, areaId, payload, ctx);
       // Sin PC configurada que lo imprima: no se crea (una simulación no debe quedar esperando en cola)
       if (destino.destino_equipo_id === null) {
@@ -1562,10 +1567,13 @@ export class ImpresionService {
         });
       }
     }
-    const pedidas = dto.clave ? seleccion.filter((s) => s.clave === dto.clave) : seleccion;
+    const pedidas0 = dto.clave ? seleccion.filter((s) => s.clave === dto.clave) : seleccion;
+    await this.anotarCategorias(pedidas0.filter((s) => s.tipo === 'ETIQUETA_BEBIDA').map((s) => s.payload));
     // Por defecto se respetan las reglas (modalidad y activos); solo `forzar` las salta, a propósito
     const reglas = await leerReglasImpresion(this.prisma);
     const ctx = await this.contextoRuteo();
+    // Vasos de una categoría desmarcada en la PC: no se piden (no es error)
+    const pedidas = pedidas0.filter((s) => !this.vasoOmitido(s.tipo, s.areaId, s.payload, ctx));
     const aplicables = dto.forzar ? pedidas : pedidas.filter((s) => aplicaSegunReglas(s.tipo, pedido.modalidad, reglas));
     const noAplican = pedidas.length - aplicables.length;
 
@@ -1707,6 +1715,7 @@ export class ImpresionService {
     const reglas = await leerReglasImpresion(this.prisma);
     const ctx = await this.contextoRuteo();
     const { items, omitidos } = planReimpresion(pedido, dto.tipo, dto.sub ?? 'todos', reglas, ticket, marca);
+    await this.anotarCategorias(items.filter((i) => i.tipo === 'ETIQUETA_BEBIDA').map((i) => i.payload));
 
     const enCola = await this.prisma.printJob.findMany({
       where: { pedido_id: pedido.id, estado: { in: ESTADOS_EN_COLA } },
@@ -1727,6 +1736,7 @@ export class ImpresionService {
         yaEnCola.push({ tipo: it.tipo, etiqueta: it.etiqueta, motivo: 'Ya está en cola' });
         continue;
       }
+      if (this.vasoOmitido(it.tipo, it.areaId, it.payload, ctx)) continue; // categoría desmarcada: sin sticker de vaso, sin error
       const destino = this.destinoJob(it.tipo, it.areaId, it.payload, ctx);
       if (destino.destino_equipo_id === null) {
         // La comanda de un área sin PC propia no es un error: la del salón ya cubre al pedido
@@ -1833,7 +1843,9 @@ export class ImpresionService {
       const areaId = pedido.lineas.find((l: any) => (l.area?.nombre || '').toUpperCase() === a.areaNombre)?.area_id ?? null;
       lista.push({ tipo: 'ETIQUETA_AREA', clave: claveEtiquetaArea(a.areaNombre), payload: a, areaId });
     }
-    for (const b of construirEtiquetasBebida(pedido)) {
+    const vasos = construirEtiquetasBebida(pedido);
+    await this.anotarCategorias(vasos);
+    for (const b of vasos) {
       lista.push({ tipo: 'ETIQUETA_BEBIDA', clave: claveEtiquetaBebida(b.bebidaIndex), payload: b, areaId: null });
     }
     return { pedido, lista };
@@ -1873,6 +1885,7 @@ export class ImpresionService {
       let n = 0;
       for (const e of cambiadas) {
         if (!aplicaSegunReglas(e.tipo, r.pedido.modalidad, reglas) || claveEnCola.has(e.clave)) continue;
+        if (this.vasoOmitido(e.tipo, e.areaId, e.payload, ctx)) continue;
         await this.prisma.printJob.create({
           data: {
             pedido_id: pedidoId,
@@ -2110,7 +2123,11 @@ export class ImpresionService {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
     }
 
-    const { areas, bebidas } = construirTodasLasEtiquetas(pedido);
+    const { areas, bebidas: todasBebidas } = construirTodasLasEtiquetas(pedido);
+    await this.anotarCategorias(todasBebidas);
+    const ctxRuteo = await this.contextoRuteo();
+    // Los vasos de categorías desmarcadas no se esperan (no se encolan)
+    const bebidas = todasBebidas.filter((b) => !this.vasoOmitido('ETIQUETA_BEBIDA', null, b, ctxRuteo));
     const reglas = await leerReglasImpresion(this.prisma);
     const tamanos = await leerTamanosEtiqueta(this.prisma);
     const esperadas = [
@@ -2192,9 +2209,39 @@ export class ImpresionService {
     return this.equipos.contexto();
   }
 
+  /**
+   * Pone la categoría (id) a cada vaso que no la trae (las bebidas de un combo): se busca por el nombre del producto.
+   * Sin categoría conocida el vaso sale como siempre. Nunca lanza error.
+   */
+  private async anotarCategorias(bebidas: any[]): Promise<void> {
+    const faltan = bebidas.filter((b) => b && !b.categoriaId && b.bebidaNombre);
+    if (!faltan.length) return;
+    try {
+      const prods = await this.prisma.producto?.findMany({
+        where: { nombre: { in: [...new Set(faltan.map((b) => String(b.bebidaNombre)))] } },
+        select: { nombre: true, categoria_id: true },
+      });
+      const porNombre = new Map((prods ?? []).map((p: any) => [p.nombre, String(p.categoria_id)]));
+      for (const b of faltan) {
+        const c = porNombre.get(String(b.bebidaNombre));
+        if (c) b.categoriaId = c;
+      }
+    } catch (e: any) {
+      this.logger.debug(`No se pudo leer la categoría de las bebidas: ${e.message}`);
+    }
+  }
+
+  /** ¿Este vaso se omite porque su categoría está desmarcada en las PC que tomarían su área? (no se encola ni queda pendiente) */
+  private vasoOmitido(tipo: string, areaId: bigint | string | null, payload: any, ctx: ContextoRuteo): boolean {
+    return (
+      tipo === 'ETIQUETA_BEBIDA' &&
+      vasoDescartadoPorCategoria(areasParaRuteo(tipo, areaId, ctx.areaBebidasId, payload?.areaId), payload?.categoriaId ?? null, ctx)
+    );
+  }
+
   /** A qué PC va el trabajo según la configuración de cada una (null/null = nadie lo imprime todavía: espera con aviso). */
   private destinoJob(tipo: string, areaId: bigint | string | null, payload: any, ctx: ContextoRuteo) {
-    const d = destinoDeTrabajo(tipo, areasParaRuteo(tipo, areaId, ctx.areaBebidasId, payload?.areaId), ctx);
+    const d = destinoDeTrabajo(tipo, areasParaRuteo(tipo, areaId, ctx.areaBebidasId, payload?.areaId), ctx, payload?.categoriaId ?? null);
     return { destino_equipo_id: d?.id ?? null, destino_area_id: d?.areaId ?? null };
   }
 

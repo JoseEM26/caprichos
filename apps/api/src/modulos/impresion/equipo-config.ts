@@ -27,6 +27,8 @@ export function filaAConfig(f: any | null | undefined): ConfigEquipoImpresion {
     stickerGeneral: !!f.sticker_general,
     stickerAreas: ids(f.sticker_areas),
     stickerBebidaAreas: ids(f.sticker_bebida_areas),
+    // Sin migración: la lista de categorías vive en el JSON `tamanos` (ausente = todas)
+    stickerBebidaCategorias: Array.isArray(t.bebidaCategorias) ? t.bebidaCategorias.map(String) : null,
     tamanoGeneral: tamanoPcValido(t.general),
     tamanoBebida: tamanoPcValido(t.bebida),
     pausado: !!f.pausado,
@@ -47,7 +49,7 @@ export function configAFila(c: ConfigEquipoImpresion) {
     sticker_general: c.stickerGeneral,
     sticker_areas: c.stickerAreas as any,
     sticker_bebida_areas: c.stickerBebidaAreas as any,
-    tamanos: { general: c.tamanoGeneral ?? null, bebida: c.tamanoBebida ?? null } as any,
+    tamanos: { general: c.tamanoGeneral ?? null, bebida: c.tamanoBebida ?? null, bebidaCategorias: c.stickerBebidaCategorias ?? null } as any,
   };
 }
 
@@ -59,6 +61,7 @@ export function aplicarCambio(
   actual: ConfigEquipoImpresion,
   cambio: Record<string, unknown>,
   areasValidas: Set<string>,
+  categoriasValidas?: Set<string>,
 ): ConfigEquipoImpresion {
   const r: ConfigEquipoImpresion = { ...actual, configurado: true };
   for (const k of BOOLEANOS) {
@@ -73,6 +76,15 @@ export function aplicarCambio(
       throw new BadRequestException({ codigo: 'AREA_INVALIDA', mensaje: 'Hay un área que no existe o está inactiva' });
     }
     r[k] = [...new Set(v as string[])];
+  }
+  if (cambio.stickerBebidaCategorias !== undefined) {
+    const v = cambio.stickerBebidaCategorias;
+    if (v === null) r.stickerBebidaCategorias = null;
+    else if (Array.isArray(v) && v.every((x) => typeof x === 'string' && (!categoriasValidas || categoriasValidas.has(x)))) {
+      r.stickerBebidaCategorias = [...new Set(v as string[])];
+    } else {
+      throw new BadRequestException({ codigo: 'CATEGORIA_INVALIDA', mensaje: 'Hay una categoría de bebida que no existe' });
+    }
   }
   for (const k of ['tamanoGeneral', 'tamanoBebida'] as const) {
     if (cambio[k] === undefined) continue;

@@ -15,6 +15,7 @@ import { MUESTRA_BEBIDA, MUESTRA_GENERAL } from '../mapa/VistaPiezaEjemplo';
 import { impresionApi, type CambioConfigEquipo } from '../impresionApi';
 import './tarjeta-equipo.css';
 import { alternarArea, configDe, haceCuanto, mismaConfig } from './logicaEquipo';
+import { alternarCategoria, categoriasSinPc, categoriasVisibles, resumenVasos, soloFrias, type CategoriaSimple } from './logicaVasos';
 
 export interface AreaSimple {
   id: string;
@@ -24,6 +25,10 @@ export interface AreaSimple {
 interface Props {
   equipo: EquipoEstadoImpresion;
   areas: AreaSimple[];
+  /** Categorías de la carta para el filtro fino del vaso (sin ellas el bloque no aparece). */
+  categorias?: CategoriaSimple[];
+  /** Configuración guardada de las OTRAS PC (para avisar si una categoría no sale en ninguna). */
+  configsOtras?: ConfigEquipoImpresion[];
   /** Tamaño de los stickers del local: lo que hereda una PC sin tamaño propio. */
   tamanosLocal: { bebida: TamanoMm; general: TamanoMm };
   puedeEditar: boolean;
@@ -65,6 +70,41 @@ function Chips({ titulo, areas, marcadas, alAlternar, deshabilitado, id }: { tit
         ))}
       </div>
     </div>
+  );
+}
+
+/** «¿De qué bebidas? (opcional)»: casillas por categoría para que el sticker de vaso no se gaste en lo que no lo necesita (ej. las calientes). */
+function VasosCategorias({ id, cfg, categorias, configsOtras, deshabilitado, alCambiar }: { id: string; cfg: ConfigEquipoImpresion; categorias: CategoriaSimple[]; configsOtras: ConfigEquipoImpresion[]; deshabilitado?: boolean; alCambiar: (v: string[] | null) => void }) {
+  const visibles = categoriasVisibles(categorias, cfg.stickerBebidaAreas);
+  if (visibles.length === 0) return null;
+  const { si, no } = resumenVasos(cfg, visibles);
+  const sinPc = categoriasSinPc(categorias, [...configsOtras, cfg]);
+  return (
+    <details className="ie-vasos" data-testid={`vasos-${id}`} open={cfg.stickerBebidaCategorias != null}>
+      <summary>¿De qué bebidas? (opcional)</summary>
+      <p className="if-sub">Quita las que no necesitan sticker de vaso, por ejemplo las calientes, para no gastar etiquetas. La comanda y lo demás no cambian.</p>
+      <div className="ie-chips-lista" role="group" aria-label="Categorías de bebida con sticker">
+        {visibles.map((c) => {
+          const on = si.includes(c.nombre);
+          return (
+            <button key={c.id} type="button" className="ie-chip" aria-pressed={on} disabled={deshabilitado} data-testid={`vaso-cat-${id}-${c.id}`} onClick={() => alCambiar(alternarCategoria(cfg, visibles, c.id))}>
+              {on ? '✓ ' : ''}
+              {c.nombre}
+            </button>
+          );
+        })}
+      </div>
+      <div className="ie-chips-lista">
+        <button type="button" className="ie-atajo" disabled={deshabilitado} data-testid={`vasos-frias-${id}`} onClick={() => alCambiar(soloFrias(visibles))}>Solo frías</button>
+        <button type="button" className="ie-atajo" disabled={deshabilitado} data-testid={`vasos-todas-${id}`} onClick={() => alCambiar(null)}>Todas</button>
+      </div>
+      <p className="ie-vasos-res" data-testid={`vasos-resumen-${id}`}>
+        Se imprimirán stickers de: {si.length ? si.join(', ') : 'ninguna'}
+        {no.length > 0 && ` · No: ${no.join(', ')}`}
+      </p>
+      {si.length === 0 && <p role="alert" className="ie-vasos-aviso" data-testid={`vasos-aviso-${id}`}>Ojo: no marcaste ninguna. Esta PC no imprimirá ningún sticker de vaso.</p>}
+      {sinPc.length > 0 && <p className="ie-vasos-info" data-testid={`vasos-sinpc-${id}`}>{sinPc.join(', ')}: ninguna PC imprime su sticker (es solo un aviso, no bloquea nada).</p>}
+    </details>
   );
 }
 
@@ -166,7 +206,7 @@ export function EditorTamano({
  * Una PC con el programa de impresión: su estado, su red y, sobre todo, QUÉ HACE (cada PC manda).
  * Todo se gestiona desde aquí sin estar en el local; si la PC está sin conexión, lo guardado se aplica al reconectar.
  */
-export function TarjetaEquipo({ equipo, areas, tamanosLocal, puedeEditar, pendientes = 0, alRecargar, alAviso }: Props) {
+export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [], tamanosLocal, puedeEditar, pendientes = 0, alRecargar, alAviso }: Props) {
   const servidor = configDe(equipo);
   const nueva = !servidor.configurado;
   const seleccionServidor = {
@@ -370,6 +410,9 @@ export function TarjetaEquipo({ equipo, areas, tamanosLocal, puedeEditar, pendie
           <div className="ie-sub">
             <Chips id={`chips-sticker-area-${equipo.deviceKeyId}`} titulo="Sticker por área: elige las áreas" areas={areasSticker} marcadas={borrador.stickerAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ stickerAreas: alternarArea(borrador.stickerAreas, id) })} />
             <Chips id={`chips-sticker-bebida-${equipo.deviceKeyId}`} titulo="Sticker de bebida (un vaso, un sticker): elige las áreas" areas={areas} marcadas={borrador.stickerBebidaAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ stickerBebidaAreas: alternarArea(borrador.stickerBebidaAreas, id) })} />
+            {borrador.stickerBebidaAreas.length > 0 && (
+              <VasosCategorias id={equipo.deviceKeyId} cfg={borrador} categorias={categorias} configsOtras={configsOtras} deshabilitado={bloqueado} alCambiar={(v) => cambiar({ stickerBebidaCategorias: v })} />
+            )}
             <Interruptor id={`sw-general-${equipo.deviceKeyId}`} texto="Sticker general" ayuda="Un resumen del pedido (para llevar, recoger y delivery)" activo={borrador.stickerGeneral} deshabilitado={bloqueado} alCambiar={() => cambiar({ stickerGeneral: !borrador.stickerGeneral })} />
             {selector('ETIQUETERA')}
 

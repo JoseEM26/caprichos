@@ -62,6 +62,12 @@ export class ImpresionConfigService {
     ]);
     const ctx = await this.cfg.contexto();
     const ahora = Date.now();
+    // Categorías (de bebida y demás) para el filtro fino del sticker de vaso; el panel muestra las de las áreas marcadas
+    const categorias = ((await this.prisma.categoria?.findMany({ where: { oculta: false }, orderBy: [{ orden: 'asc' }, { nombre: 'asc' }], select: { id: true, nombre: true, area_id: true } })) ?? []).map((c) => ({
+      id: c.id.toString(),
+      nombre: c.nombre,
+      areaId: c.area_id.toString(),
+    }));
 
     const equiposDto = equipos.map((e) => {
       const estados = estadoPorRol(e, ahora);
@@ -123,6 +129,7 @@ export class ImpresionConfigService {
     return {
       duplicados: this.gruposDuplicados(equipos, areas),
       areas: areasDto,
+      categorias,
       equipos: equiposDto,
       reglas: reglasDto(reglas),
       ruteo,

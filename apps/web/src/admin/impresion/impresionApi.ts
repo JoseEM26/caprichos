@@ -193,6 +193,8 @@ export interface GrupoDuplicadoMapa {
 export interface MapaImpresionDatos {
   duplicados: GrupoDuplicadoMapa[];
   areas: AreaMapa[];
+  /** Categorías de la carta (para filtrar el sticker de vaso). Un servidor viejo no las manda. */
+  categorias?: Array<{ id: string; nombre: string; areaId: string }>;
   equipos: EquipoMapa[];
   reglas: ReglasMapa;
   ruteo: RuteoMapa[];

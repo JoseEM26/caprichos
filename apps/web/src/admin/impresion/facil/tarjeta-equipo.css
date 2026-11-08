@@ -61,3 +61,11 @@
 .ie-acciones { display: flex; flex-wrap: wrap; gap: 10px; border-top: 1.5px solid var(--cp-line, #E3D6C6); padding-top: 14px; }
 .ie-peligro { border-color: var(--cp-rust, #B2500F); color: var(--cp-rust, #B2500F); }
 .ie-pc .if-campo input { min-height: 44px; border-radius: 10px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: #fff; color: var(--cp-navy, #0B2C3E); font: inherit; padding: 0 10px; }
+
+.ie-vasos { border: 1.5px solid var(--cp-navy, #0B2C3E); border-radius: 12px; padding: 8px 12px; background: #fff; color: var(--cp-navy, #0B2C3E); }
+.ie-vasos > summary { min-height: 44px; display: flex; align-items: center; font-weight: 800; cursor: pointer; }
+.ie-atajo { min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1.5px dashed var(--cp-navy, #0B2C3E); background: #fff; color: var(--cp-navy, #0B2C3E); font: inherit; font-weight: 700; cursor: pointer; }
+.ie-atajo:focus-visible { outline: 3px solid var(--cp-orange, #E67929); outline-offset: 2px; }
+.ie-vasos-res { font-weight: 700; margin: 8px 0 0; }
+.ie-vasos-aviso { margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: #FFF1D6; color: #5A3A00; font-weight: 700; }
+.ie-vasos-info { margin: 6px 0 0; font-size: 14px; color: var(--cp-soft, #2C4C5D); }
