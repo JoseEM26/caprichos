@@ -44,7 +44,7 @@ function Comando({ texto }: { texto: string }) {
 }
 
 /** Instalar el programa del local (Windows o Linux): descarga, código de un solo uso y elegir las dos máquinas. */
-export function PanelInstalarPrograma({ alCerrar }: { alCerrar: () => void }) {
+export function PanelInstalarPrograma({ alCerrar, incrustado = false }: { alCerrar: () => void; incrustado?: boolean }) {
   const { usuario } = useSesion();
   const esAdmin = (usuario?.rol || '').toUpperCase() === 'ADMIN';
   const [codigo, setCodigo] = useState<string | null>(null);
@@ -82,12 +82,20 @@ export function PanelInstalarPrograma({ alCerrar }: { alCerrar: () => void }) {
   };
 
   return (
-    <div className="cola-fondo" style={{ zIndex: 6000 }} onClick={alCerrar}>
-      <div className="cola-panel" role="dialog" aria-modal="true" aria-label="Instalar programa de impresión" onClick={(e) => e.stopPropagation()}>
-        <div className="cola-cab">
-          <h2>Instalar programa de impresión</h2>
-          <button type="button" className="cola-btn" onClick={alCerrar}>Cerrar</button>
-        </div>
+    <div className={incrustado ? 'ci-incr' : 'cola-fondo'} style={incrustado ? undefined : { zIndex: 6000 }} onClick={incrustado ? undefined : alCerrar}>
+      <div
+        className={incrustado ? 'ci-incr-cuerpo' : 'cola-panel'}
+        role={incrustado ? 'region' : 'dialog'}
+        aria-modal={incrustado ? undefined : true}
+        aria-label="Instalar programa de impresión"
+        onClick={incrustado ? undefined : (e) => e.stopPropagation()}
+      >
+        {!incrustado && (
+          <div className="cola-cab">
+            <h2>Instalar programa de impresión</h2>
+            <button type="button" className="cola-btn" onClick={alCerrar}>Cerrar</button>
+          </div>
+        )}
         <p className="cola-ayuda">
           Se instala una vez en la PC donde están conectadas la etiquetera y la ticketera. El navegador no puede ver impresoras USB; este programa sí.
         </p>

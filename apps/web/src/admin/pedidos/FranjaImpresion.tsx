@@ -1,26 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { EstadoAdminImpresion } from '@caprichos/compartido';
 import { impresionApi } from '../impresion/impresionApi';
 import { useEventos } from '../../comun/socket';
-import { ColaImpresion } from '../impresion/ColaImpresion';
 import { IndicadoresMaquinas } from '../impresion/IndicadoresMaquinas';
-import { useEstadoMaquinas } from '../impresion/useEstadoMaquinas';
+import type { MaquinasImpresion } from '../impresion/useEstadoMaquinas';
 
 /**
- * Franja fija arriba de Pedidos y caja: aparece mientras haya etiquetas en cola y la
- * impresora de Caja no esté conectada o tenga un problema. Se oculta sola al reconectar.
+ * Chip de impresión de Pedidos y caja (un solo chip fino con panel Estado / Cola / Instalar).
+ * Si hay etiquetas en cola y falla una máquina el chip se pone ámbar con el número y el aviso
+ * va dentro del panel (vista Estado). Se revisa al entrar, cada 20 s y en vivo.
  */
 export function FranjaImpresion() {
   const [estado, setEstado] = useState<EstadoAdminImpresion | null>(null);
-  const [verCola, setVerCola] = useState(false);
-  const { maquinas } = useEstadoMaquinas();
 
   const cargar = useCallback(async () => {
     try {
       setEstado(await impresionApi.obtenerEstado());
     } catch {
-      // sin permiso o sin conexión: no se muestra la franja
+      // sin permiso o sin conexión: no se muestra el chip
       setEstado(null);
     }
   }, []);
@@ -34,70 +31,13 @@ export function FranjaImpresion() {
   useEventos('impresion:sin_conexion', cargar);
   useEventos('pedido:nuevo', cargar);
   useEventos('impresion:cola', cargar);
+  useEventos('impresion:estado', cargar);
 
-  const indicadores = <IndicadoresMaquinas maquinas={maquinas} alVerCola={() => setVerCola(true)} />;
-  const conProblema = estado ? estado.agente === 'sin_conexion' || estado.impresora !== 'lista' : false;
-  if (!estado || !(estado.pendientes > 0 && conProblema)) {
-    return (
-      <>
-        {indicadores}
-        {verCola && <ColaImpresion alCerrar={() => setVerCola(false)} />}
-      </>
-    );
-  }
+  if (!estado) return null;
+  // Respuesta sin detalle por máquina: se deduce del programa y la impresora de Caja
+  const lista = estado.agente === 'conectado' && estado.impresora === 'lista';
+  const deducida = { conectada: lista, estado: lista ? 'lista' : 'desconectada', motivo: null };
+  const maquinas = (estado.impresoras as MaquinasImpresion | undefined) ?? ({ ETIQUETERA: deducida, TICKETERA: deducida } as MaquinasImpresion);
 
-  const estiloBoton = {
-    minHeight: 44,
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '0 14px',
-    borderRadius: 10,
-    fontWeight: 800,
-    fontSize: 13,
-    whiteSpace: 'nowrap' as const,
-  };
-
-  return (
-    <>
-    {indicadores}
-    <div
-      role="alert"
-      data-testid="franja-impresion"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        flexWrap: 'wrap',
-        flex: '1 1 100%',
-        padding: '10px 14px',
-        borderRadius: 10,
-        background: '#FBE9DF',
-        borderLeft: '5px solid var(--cp-rust, #B2500F)',
-        color: 'var(--cp-navy, #0B2C3E)',
-      }}
-    >
-      <div style={{ fontSize: 13, lineHeight: '18px' }}>
-        <strong>Impresora sin conexión: {estado.pendientes} etiqueta(s) en cola.</strong>{' '}
-        Revisa que la PC de la etiquetera esté encendida con el programa de impresión abierto.
-      </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={() => setVerCola(true)}
-          style={{ ...estiloBoton, background: 'var(--cp-rust, #B2500F)', color: '#fff', border: 0, cursor: 'pointer' }}
-        >
-          Gestionar cola
-        </button>
-        <Link
-          to="/admin/configuracion?tab=impresion&seccion=equipos"
-          style={{ ...estiloBoton, background: 'var(--cp-navy, #0B2C3E)', color: 'var(--cp-cream, #FBF4EC)', textDecoration: 'none' }}
-        >
-          Ver impresión
-        </Link>
-      </div>
-    </div>
-    {verCola && <ColaImpresion alCerrar={() => { setVerCola(false); void cargar(); }} />}
-    </>
-  );
+  return <IndicadoresMaquinas maquinas={maquinas} pendientes={estado.pendientes ?? 0} estado={estado} alCambiarCola={cargar} />;
 }

@@ -50,7 +50,8 @@ export function haceCuanto(iso: string, ahora = Date.now()): string {
 const textoEstados = (g: GrupoCola) =>
   Object.entries(g.estados).map(([e, n]) => `${n} ${NOMBRE_ESTADO[e] || e.toLowerCase()}`).join(', ');
 
-export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
+/** `incrustado`: sin ventana propia ni cabecera, para vivir dentro del panel del chip de impresión. */
+export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () => void; incrustado?: boolean }) {
   const [filtro, setFiltro] = useState<FiltroCola>('pendientes');
   const [cola, setCola] = useState<RespuestaCola | null>(null);
   const [agente, setAgente] = useState<EstadoAdminImpresion | null>(null);
@@ -124,12 +125,20 @@ export function ColaImpresion({ alCerrar }: { alCerrar: () => void }) {
       : impresionApi.descartarPedido(g.pedidoId as string);
 
   return (
-    <div className="cola-fondo" onClick={alCerrar}>
-      <div className="cola-panel" role="dialog" aria-modal="true" aria-label="Cola de impresión" onClick={(e) => e.stopPropagation()}>
-        <div className="cola-cab">
-          <h2>Cola de impresión</h2>
-          <button type="button" className="cola-btn" onClick={alCerrar}>Cerrar</button>
-        </div>
+    <div className={incrustado ? 'ci-incr' : 'cola-fondo'} onClick={incrustado ? undefined : alCerrar}>
+      <div
+        className={incrustado ? 'ci-incr-cuerpo' : 'cola-panel'}
+        role={incrustado ? 'region' : 'dialog'}
+        aria-modal={incrustado ? undefined : true}
+        aria-label="Cola de impresión"
+        onClick={incrustado ? undefined : (e) => e.stopPropagation()}
+      >
+        {!incrustado && (
+          <div className="cola-cab">
+            <h2>Cola de impresión</h2>
+            <button type="button" className="cola-btn" onClick={alCerrar}>Cerrar</button>
+          </div>
+        )}
         <p className="cola-ayuda">Las etiquetas descartadas no se imprimen aunque la impresora vuelva; si las necesitas, usa Reimprimir.</p>
 
         {r && (

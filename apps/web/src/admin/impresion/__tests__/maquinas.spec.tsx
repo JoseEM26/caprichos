@@ -26,30 +26,29 @@ function Boton({ alContinuar }: { alContinuar: () => void }) {
 }
 
 describe('indicadores de máquinas', () => {
-  it('muestra estado y motivo de cada máquina y ofrece instalar si el programa no corre', () => {
+  it('un chip con un punto por máquina; el panel muestra estado, motivo e instalar', () => {
     render(<MemoryRouter><IndicadoresMaquinas maquinas={{ ETIQUETERA: caida, TICKETERA: caida } as any} /></MemoryRouter>);
-    expect(screen.getByTestId('indicador-etiquetera')).toHaveTextContent('Etiquetera');
-    expect(screen.getByTestId('indicador-ticketera')).toHaveTextContent('Ticketera');
-    // El detalle (motivo e instalar) se ve al pulsar el chip
+    expect(screen.getByTestId('punto-etiquetera')).toBeInTheDocument();
+    expect(screen.getByTestId('punto-ticketera')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Instalar programa de impresión' })).toBeNull();
-    fireEvent.click(screen.getByTestId('indicador-etiquetera'));
-    const detalle = screen.getByRole('region', { name: 'Estado de Etiquetera' });
-    expect(detalle).toHaveTextContent('Etiquetera: no conectada');
-    expect(detalle).toHaveTextContent('El programa del local no está corriendo');
+    fireEvent.click(screen.getByTestId('chip-impresion'));
+    const et = screen.getByTestId('maquina-etiquetera');
+    expect(et).toHaveTextContent('Etiquetera: sin conexión');
+    expect(et).toHaveTextContent('El programa del local no está corriendo');
     expect(screen.getByRole('button', { name: 'Instalar programa de impresión' })).toBeInTheDocument();
   });
 
   it('con ambas conectadas sigue ofreciendo instalar/descargar el programa', () => {
     render(<MemoryRouter><IndicadoresMaquinas maquinas={{ ETIQUETERA: ok, TICKETERA: ok } as any} /></MemoryRouter>);
-    fireEvent.click(screen.getByTestId('indicador-etiquetera'));
-    expect(screen.getByRole('region', { name: 'Estado de Etiquetera' })).toHaveTextContent('Etiquetera: conectada');
+    fireEvent.click(screen.getByTestId('chip-impresion'));
+    expect(screen.getByTestId('maquina-etiquetera')).toHaveTextContent('Etiquetera: conectada');
     expect(screen.getByRole('button', { name: 'Instalar programa de impresión' })).toBeInTheDocument();
   });
 
-  it('el panel de instalación muestra descarga, pasos y el código de un solo uso', async () => {
+  it('la vista Instalar muestra descarga, pasos y el código de un solo uso', async () => {
     vi.mocked(impresionApi.generarCodigoVinculo).mockResolvedValue({ codigo: 'ABCD2345@demo.caprichos.pe', expiraEn: '' });
     render(<MemoryRouter><IndicadoresMaquinas maquinas={{ ETIQUETERA: caida, TICKETERA: caida } as any} /></MemoryRouter>);
-    fireEvent.click(screen.getByTestId('indicador-etiquetera'));
+    fireEvent.click(screen.getByTestId('chip-impresion'));
     fireEvent.click(screen.getByRole('button', { name: 'Instalar programa de impresión' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Windows' }));
     expect(screen.getByRole('link', { name: /Descargar el programa de impresión para Windows/ })).toHaveAttribute('href', '/api/agente-impresion/descargar/windows');
