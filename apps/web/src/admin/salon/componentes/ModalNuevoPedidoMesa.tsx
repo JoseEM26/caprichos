@@ -3490,16 +3490,9 @@ export function ModalNuevoPedidoMesa({
                     fontFamily: 'Montserrat, sans-serif',
                     fontWeight: 800,
                     fontSize: '15px',
-                    opacity:
-                      lineas.length > 0 &&
-                      (modalidad !== 'local' || !!extra || mesasSeleccionadas.length > 0)
-                        ? 1
-                        : 0.5,
-                    cursor:
-                      lineas.length > 0 &&
-                      (modalidad !== 'local' || !!extra || mesasSeleccionadas.length > 0)
-                        ? 'pointer'
-                        : 'not-allowed',
+                    // Se ve apagado solo sin productos o sin mesa (en lista de espera no hay mesa que elegir)
+                    opacity: motivoNoEnviar ? 0.5 : 1,
+                    cursor: motivoNoEnviar ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {extra ? 'Registrar extra' : modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'} · S/{' '}

@@ -71,6 +71,36 @@ describe('Lista de espera de mesa', () => {
     });
   });
 
+  describe('crear en espera: pago y comprobante igual que un pedido de mesa', () => {
+    const crearConPago = async (extra: any) => {
+      pedidos.crear.mockImplementation(async (_dto: any, _k: any, origen: any) => {
+        await origen.enTransaccion(prisma, { id: 6n });
+        return { id: 6n, codigo: 'CP-M006' };
+      });
+      await service.abrirPedido({ ...base, cliente: { nombre: 'Lucía', telefono: '978456123' }, canal: 'CAJA', ...extra }, caja);
+      return pedidos.crear.mock.calls[0][0];
+    };
+    it.each([
+      ['efectivo', { pago: { metodo: 'EFECTIVO' } }],
+      ['yape', { pago: { metodo: 'YAPE' } }],
+      ['pago dividido', { pago: { metodo: 'EFECTIVO', plan: [{ metodo: 'EFECTIVO', monto: 5 }, { metodo: 'YAPE', monto: 9.5 }] } }],
+      ['boleta con DNI opcional vacío', { comprobante: { tipo: 'BOLETA' } }],
+      ['factura', { comprobante: { tipo: 'FACTURA', numeroDocumento: '20123456789', razonSocial: 'ACME SAC' } }],
+    ])('%s: no se rechaza y viaja tal cual a pedidos.crear sin mesa', async (_n, extra) => {
+      const dto = await crearConPago(extra);
+      expect(dto.mesa).toBe('En espera de mesa');
+      if ((extra as any).pago) expect(dto.pago).toEqual((extra as any).pago);
+      if ((extra as any).comprobante) expect(dto.comprobante).toEqual((extra as any).comprobante);
+      expect(prisma.pedidoMesa.create).not.toHaveBeenCalled();
+      expect(prisma.pedido.update.mock.calls[0][0].data.espera_mesa_desde).toBeInstanceOf(Date);
+    });
+    it('con cuenta de cliente (sin nombre escrito) sale de la cuenta y manda el celular', async () => {
+      pedidos.crear.mockImplementation(async (_d: any, _k: any, o: any) => { await o.enTransaccion(prisma, { id: 7n }); return { id: 7n }; });
+      await service.abrirPedido({ ...base, cliente: { nombre: 'Cuenta', telefono: '978456123' }, clientePartyId: '55' }, caja);
+      expect(pedidos.crear.mock.calls[0][0]).toMatchObject({ clientePartyId: '55', cliente: { telefono: '978456123' } });
+    });
+  });
+
   describe('listarEspera', () => {
     const fila = (id: bigint, min: number, tel = '987654321') => ({
       id, codigo: `CP-${id}`, estado: 'COLA', cliente_nombre: `C${id}`, cliente_telefono: tel,
