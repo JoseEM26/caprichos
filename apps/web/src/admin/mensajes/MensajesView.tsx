@@ -34,7 +34,7 @@ import { ChatResumen, DetalleConversacion, FiltroChat, FiltroPos, RespuestaRapid
 import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { ListaChats } from './ListaChats';
-import { filtrarPorDia, FiltroDia, ordenarCola } from './diasBandeja';
+import { diaDeChat, diaDelFiltro, filtrarPorDia, FiltroDia, ordenarCola } from './diasBandeja';
 import { CabeceraChat } from './CabeceraChat';
 import { FlujoMensajes } from './FlujoMensajes';
 import { BarraAccionPendiente } from './BarraAccionPendiente';
@@ -69,20 +69,25 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   const [soloBloqueados, setSoloBloqueados] = useState(false);
   const [modalDesbloqueo, setModalDesbloqueo] = useState(false);
 
-  // Filtro por día (Lima): «Hoy» por defecto; solo se ofrece cuando la pestaña tiene chats de días anteriores
+  // Filtro por día (Lima): «Hoy» por defecto. La elección se recuerda mientras la bandeja está abierta (no se guarda al recargar)
   const [dia, setDia] = useState<FiltroDia>('hoy');
   const [avisoAtendido, setAvisoAtendido] = useState<{ id: string; nombre: string } | null>(null);
   const { chatsOrdenados, dias } = useMemo(() => {
     const base = soloBloqueados ? chats.filter((c) => c.bloqueoSpam?.activo) : chats;
     const porDia = filtro === 'atender' || filtro === 'atendidos';
-    let diasInfo: { hoy: number; ayer: number; anteriores: number; total: number } | null = null;
+    let diasInfo: { hoy: number; ayer: number; manana: number; anteriores: number; total: number } | null = null;
     let lista = base;
     if (porDia) {
+      // siempre se ofrece el filtro por día en Por atender y Atendidos: Hoy muestra solo lo de hoy
       const hoy = filtrarPorDia(base, 'hoy').length;
-      if (base.length > hoy) {
-        diasInfo = { hoy, ayer: filtrarPorDia(base, 'ayer').length, anteriores: base.length - hoy, total: base.length };
-        lista = filtrarPorDia(base, dia);
-      }
+      diasInfo = {
+        hoy,
+        ayer: filtrarPorDia(base, 'ayer').length,
+        manana: filtrarPorDia(base, 'manana').length,
+        anteriores: filtrarPorDia(base, 'todos').filter((c) => diaDeChat(c) < diaDelFiltro('hoy')!).length,
+        total: base.length,
+      };
+      lista = filtrarPorDia(base, dia);
     }
     if (filtro === 'atender') lista = ordenarCola(lista);
     return { chatsOrdenados: lista, dias: diasInfo };

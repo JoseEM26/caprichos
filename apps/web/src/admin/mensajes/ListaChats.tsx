@@ -1,7 +1,7 @@
 import React from 'react';
 import { InsigniaBloqueoSpam } from './BloqueoSpam';
 import { horaListaChat } from './fechasChat';
-import { diaDeChat, encabezadoDia, FiltroDia } from './diasBandeja';
+import { diaDeChat, encabezadoDia, FiltroDia, textoVacioDia } from './diasBandeja';
 import { MenuFilaChat } from './MenuFilaChat';
 import { InsigniaPos } from './InsigniaPos';
 import { ChatResumen, EstadoChat, FiltroChat, FiltroPos, RespuestaListarChats } from './mensajesTipos';
@@ -40,7 +40,7 @@ export interface ListaChatsProps {
   /** Filtro por día (solo cuando la pestaña tiene chats de días anteriores). */
   dia?: FiltroDia;
   onDia?: (dia: FiltroDia) => void;
-  dias?: { hoy: number; ayer: number; anteriores: number; total: number } | null;
+  dias?: { hoy: number; ayer: number; manana: number; anteriores: number; total: number } | null;
 }
 
 /** Chip de estado de la lista. */
@@ -156,6 +156,7 @@ export function ListaChats({
             [
               ['hoy', 'Hoy', dias.hoy],
               ['ayer', 'Ayer', dias.ayer],
+              ['manana', 'Mañana', dias.manana],
               ['todos', 'Todos', dias.total],
             ] as const
           ).map(([id, label, n]) => (
@@ -215,7 +216,19 @@ export function ListaChats({
         <div className="msg-vacio">Cargando conversaciones...</div>
       ) : chats.length === 0 ? (
         <div className="msg-vacio" data-testid="vacio-lista">
-          {filtro === 'atender' && !busqueda ? 'Todo al día: no hay chats por atender.' : 'No hay conversaciones en esta pestaña.'}
+          {dias && onDia && dia !== 'todos' && dia !== 'hoy' && !busqueda
+            ? `${textoVacioDia(dia)}.`
+            : filtro === 'atender' && !busqueda
+              ? 'Todo al día: no hay chats por atender.'
+              : 'No hay conversaciones en esta pestaña.'}
+          {dias && onDia && dia !== 'hoy' && dia !== 'todos' && (
+            <>
+              {' '}
+              <button type="button" className="msg-link" data-testid="volver-hoy" onClick={() => onDia('hoy')}>
+                Volver a Hoy
+              </button>
+            </>
+          )}
           {dias && onDia && dia !== 'todos' && dias.total > 0 && (
             <>
               {' '}

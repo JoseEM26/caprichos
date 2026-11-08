@@ -499,3 +499,6 @@
 .ap-merma-fila-txt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .ap-merma-fila .ap-boton-texto { min-height: 44px; }
 .ap-merma-aviso { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--cp-rust); }
+
+.ap-envivo { color: var(--texto-suave, #6b6b6b); font-size: 0.8rem; margin-left: 8px; }
+.ap-aviso-cambio { display: block; color: #9a5b00; font-size: 0.75rem; margin-top: 2px; }
