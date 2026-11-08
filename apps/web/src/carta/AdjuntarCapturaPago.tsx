@@ -20,8 +20,9 @@ const NOMBRE_MEDIO: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANS
 /** Tarjeta «a quién pagar»: número o cuenta, titular y monto, con botón para copiar. */
 export function DatosParaPagar({ medio, total, local }: { medio: string; total?: number; local: DatosLocalCarta | null }) {
   const [copiado, setCopiado] = useState(false);
+  const [copiadoCci, setCopiadoCci] = useState(false);
   const info = local?.mediosPago?.[CLAVE_MEDIO[medio] ?? ''];
-  const destino = medio === 'TRANSFERENCIA' ? info?.cuenta : info?.numero;
+  const destino = medio === 'TRANSFERENCIA' ? info?.cuenta || info?.cci : info?.numero;
   if (!destino) return null;
   const monto = total != null ? `S/ ${Number(total).toFixed(2)}` : null;
   const copiar = async () => {
@@ -43,7 +44,18 @@ export function DatosParaPagar({ medio, total, local }: { medio: string; total?:
         {medio === 'TRANSFERENCIA' ? `Cuenta${info?.banco ? ` ${info.banco}` : ''}: ` : monto ? 'Yapea a: ' : 'Número: '}
         <strong style={{ fontSize: '18px' }}>{destino}</strong>
       </div>
-      {medio === 'TRANSFERENCIA' && info?.cci && <div style={{ fontSize: '13px' }}>CCI: <strong>{info.cci}</strong></div>}
+      {medio === 'TRANSFERENCIA' && info?.cci && info?.cuenta && (
+        <div style={{ fontSize: '14px', color: 'var(--cp-navy)' }}>
+          CCI: <strong style={{ fontSize: '16px' }}>{info.cci}</strong>{' '}
+          <button
+            type="button"
+            onClick={() => void navigator.clipboard?.writeText(String(info.cci)).then(() => setCopiadoCci(true)).catch(() => undefined)}
+            style={{ minHeight: '36px', marginLeft: '6px', padding: '0 10px', borderRadius: '8px', border: '1.5px solid var(--cp-navy)', background: 'transparent', fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)', cursor: 'pointer' }}
+          >
+            {copiadoCci ? 'Copiado' : 'Copiar CCI'}
+          </button>
+        </div>
+      )}
       {info?.titular && <div style={{ fontSize: '13px' }}>A nombre de <strong>{info.titular}</strong></div>}
       <button
         type="button"

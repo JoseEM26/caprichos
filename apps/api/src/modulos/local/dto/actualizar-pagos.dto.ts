@@ -5,13 +5,13 @@ export class ActualizarPagosDto {
   efectivo?: { activo: boolean };
 
   @IsOptional()
-  yape?: { activo: boolean; numero?: string };
+  yape?: { activo: boolean; numero?: string; titular?: string };
 
   @IsOptional()
-  plin?: { activo: boolean; numero?: string };
+  plin?: { activo: boolean; numero?: string; titular?: string };
 
   @IsOptional()
-  transferencia?: { activo: boolean; cuenta?: string; banco?: string };
+  transferencia?: { activo: boolean; cuenta?: string; cci?: string; banco?: string; titular?: string };
 
   @IsOptional()
   tarjeta?: { activo: boolean };

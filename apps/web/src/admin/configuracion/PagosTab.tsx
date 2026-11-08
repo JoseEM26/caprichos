@@ -12,17 +12,17 @@ import { propsAyuda } from './catalogo/propsAyuda';
 
 export interface PagosLocal {
   efectivo: { activo: boolean };
-  yape: { activo: boolean; numero?: string };
-  plin: { activo: boolean; numero?: string };
-  transferencia: { activo: boolean; cuenta?: string; banco?: string };
+  yape: { activo: boolean; numero?: string; titular?: string };
+  plin: { activo: boolean; numero?: string; titular?: string };
+  transferencia: { activo: boolean; cuenta?: string; cci?: string; banco?: string; titular?: string };
   tarjeta: { activo: boolean };
 }
 
 const PAGOS_DEFAULT: PagosLocal = {
   efectivo: { activo: true },
-  yape: { activo: true, numero: '' },
-  plin: { activo: true, numero: '' },
-  transferencia: { activo: true, cuenta: '', banco: '' },
+  yape: { activo: true, numero: '', titular: '' },
+  plin: { activo: true, numero: '', titular: '' },
+  transferencia: { activo: true, cuenta: '', cci: '', banco: '', titular: '' },
   tarjeta: { activo: true },
 };
 
@@ -47,12 +47,14 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
       const res = await api.get<PagosLocal>('/admin/local/pagos');
       const formateado: PagosLocal = {
         efectivo: { activo: res.efectivo?.activo ?? true },
-        yape: { activo: res.yape?.activo ?? true, numero: res.yape?.numero || '' },
-        plin: { activo: res.plin?.activo ?? true, numero: res.plin?.numero || '' },
+        yape: { activo: res.yape?.activo ?? true, numero: res.yape?.numero || '', titular: res.yape?.titular || '' },
+        plin: { activo: res.plin?.activo ?? true, numero: res.plin?.numero || '', titular: res.plin?.titular || '' },
         transferencia: {
           activo: res.transferencia?.activo ?? true,
           cuenta: res.transferencia?.cuenta || '',
+          cci: res.transferencia?.cci || '',
           banco: res.transferencia?.banco || '',
+          titular: res.transferencia?.titular || '',
         },
         tarjeta: { activo: res.tarjeta?.activo ?? true },
       };
@@ -86,12 +88,14 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
       const res = await api.put<PagosLocal>('/admin/local/pagos', pagos);
       const formateado: PagosLocal = {
         efectivo: { activo: res.efectivo?.activo ?? true },
-        yape: { activo: res.yape?.activo ?? true, numero: res.yape?.numero || '' },
-        plin: { activo: res.plin?.activo ?? true, numero: res.plin?.numero || '' },
+        yape: { activo: res.yape?.activo ?? true, numero: res.yape?.numero || '', titular: res.yape?.titular || '' },
+        plin: { activo: res.plin?.activo ?? true, numero: res.plin?.numero || '', titular: res.plin?.titular || '' },
         transferencia: {
           activo: res.transferencia?.activo ?? true,
           cuenta: res.transferencia?.cuenta || '',
+          cci: res.transferencia?.cci || '',
           banco: res.transferencia?.banco || '',
+          titular: res.transferencia?.titular || '',
         },
         tarjeta: { activo: res.tarjeta?.activo ?? true },
       };
@@ -388,6 +392,20 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
                 }}
               />
               </CampoAyuda>
+              <CampoAyuda id="pagos-yape-titular" etiqueta="Nombre del titular de Yape" cfgId="pagos-yape-titular" {...propsAyuda('pagos-yape-titular')}>
+              <Campo
+                value={pagos.yape.titular || ''}
+                placeholder="Ej: Maria Jose Morillo Ruiz"
+                disabled={!puedeEditar || guardando}
+                onChange={(e) => {
+                  setPagos({
+                    ...pagos,
+                    yape: { ...pagos.yape, titular: e.target.value },
+                  });
+                  setMensajeGuardado(null);
+                }}
+              />
+              </CampoAyuda>
             </div>
           )}
         </div>
@@ -458,6 +476,20 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
                   setPagos({
                     ...pagos,
                     plin: { ...pagos.plin, numero: e.target.value },
+                  });
+                  setMensajeGuardado(null);
+                }}
+              />
+              </CampoAyuda>
+              <CampoAyuda id="pagos-plin-titular" etiqueta="Nombre del titular de Plin" cfgId="pagos-plin-titular" {...propsAyuda('pagos-plin-titular')}>
+              <Campo
+                value={pagos.plin.titular || ''}
+                placeholder="Ej: Maria Jose Morillo Ruiz"
+                disabled={!puedeEditar || guardando}
+                onChange={(e) => {
+                  setPagos({
+                    ...pagos,
+                    plin: { ...pagos.plin, titular: e.target.value },
                   });
                   setMensajeGuardado(null);
                 }}
@@ -552,7 +584,7 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
               />
               </CampoAyuda>
 
-              <CampoAyuda id="pagos-cuenta-numero" etiqueta="Número de cuenta o CCI" cfgId="pagos-cuenta" {...propsAyuda('pagos-cuenta')}>
+              <CampoAyuda id="pagos-cuenta-numero" etiqueta="Número de cuenta bancaria" cfgId="pagos-cuenta" {...propsAyuda('pagos-cuenta')}>
               <Campo
                 value={pagos.transferencia.cuenta || ''}
                 placeholder="Ej: 191-12345678-0-12"
@@ -564,6 +596,34 @@ export function PagosTab({ puedeEditar }: PagosTabProps) {
                       ...pagos.transferencia,
                       cuenta: e.target.value,
                     },
+                  });
+                  setMensajeGuardado(null);
+                }}
+              />
+              </CampoAyuda>
+              <CampoAyuda id="pagos-cci-numero" etiqueta="CCI (código de cuenta interbancario)" cfgId="pagos-cci" {...propsAyuda('pagos-cci')}>
+              <Campo
+                value={pagos.transferencia.cci || ''}
+                placeholder="Ej: 002 191 000000000000 00"
+                disabled={!puedeEditar || guardando}
+                onChange={(e) => {
+                  setPagos({
+                    ...pagos,
+                    transferencia: { ...pagos.transferencia, cci: e.target.value },
+                  });
+                  setMensajeGuardado(null);
+                }}
+              />
+              </CampoAyuda>
+              <CampoAyuda id="pagos-transf-titular" etiqueta="Nombre del titular de la cuenta" cfgId="pagos-transf-titular" {...propsAyuda('pagos-transf-titular')}>
+              <Campo
+                value={pagos.transferencia.titular || ''}
+                placeholder="Ej: Maria Jose Morillo Ruiz"
+                disabled={!puedeEditar || guardando}
+                onChange={(e) => {
+                  setPagos({
+                    ...pagos,
+                    transferencia: { ...pagos.transferencia, titular: e.target.value },
                   });
                   setMensajeGuardado(null);
                 }}

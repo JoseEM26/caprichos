@@ -2500,7 +2500,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           tiempoEstimadoMin: tiempoMin,
           tiempoEstimadoMax: tiempoMax,
           esPagoDigital,
-          datosPagoTexto: this.formatearDatosPago(contexto.datosLocalPublicos?.mediosPagoVisibles, total),
+          datosPagoTexto: this.formatearDatosPago((contexto.datosLocalPublicos?.mediosPagoVisibles ?? contexto.datosLocalPublicos?.mediosPago), total),
         },
       ],
       nuevoFlujo: {
@@ -3225,21 +3225,20 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   // Helper: Formatear Datos de Pago Digital (Yape / Plin / Cuentas)
   // -------------------------------------------------------------------------
   private formatearDatosPago(pagosCfg: any = {}, total: number): string {
-    const yapeNum = pagosCfg.yape?.numero || '999 888 777';
-    const yapeTit = pagosCfg.yape?.titular || 'Caprichos';
-    const plinNum = pagosCfg.plin?.numero || '999 888 777';
-    const plinTit = pagosCfg.plin?.titular || 'Caprichos';
-    const bcpCuenta = pagosCfg.transferencia?.cuenta || '191-xxxxxx-0-xx';
-    const bcpCci = pagosCfg.transferencia?.cci || '002-191-xxxxxxxxxx';
-    const transfTit = pagosCfg.transferencia?.titular || 'Caprichos';
-
+    const cfg = pagosCfg ?? {};
+    const lineas: string[] = [];
+    // Solo los medios activos y con dato real: nunca números de relleno
+    if (cfg.yape?.numero) lineas.push(`• Yape: ${cfg.yape.numero}${cfg.yape.titular ? ` (${cfg.yape.titular})` : ''}`);
+    if (cfg.plin?.numero) lineas.push(`• Plin: ${cfg.plin.numero}${cfg.plin.titular ? ` (${cfg.plin.titular})` : ''}`);
+    if (cfg.transferencia?.cuenta || cfg.transferencia?.cci) {
+      const t = cfg.transferencia;
+      lineas.push(`• ${t.banco || 'Transferencia'}: ${t.cuenta || t.cci}`);
+      if (t.cci && t.cuenta) lineas.push(`• CCI: ${t.cci}`);
+      if (t.titular) lineas.push(`• Titular: ${t.titular}`);
+    }
     return (
       `📱 *Datos para realizar tu pago:*\n` +
-      `• Yape: ${yapeNum} (${yapeTit})\n` +
-      `• Plin: ${plinNum} (${plinTit})\n` +
-      `• BCP Soles: ${bcpCuenta}\n` +
-      `• CCI: ${bcpCci}\n` +
-      `• Titular: ${transfTit}\n` +
+      (lineas.length ? `${lineas.join('\n')}\n` : '') +
       `Monto a pagar: *S/ ${total.toFixed(2)}*`
     );
   }

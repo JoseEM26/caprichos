@@ -1500,7 +1500,7 @@ export class EjecutorConversacionService {
           const respuesta =
             `El total de tu pedido${pago.pedidoCodigo ? ` ${pago.pedidoCodigo}` : ''} es S/ ${total.toFixed(2)}.\n` +
             `Método de pago: ${medio}\n\n` +
-            `${detalleDatosPago(medio, contexto.datosLocalPublicos?.mediosPagoVisibles, total.toFixed(2))}\n\n` +
+            `${detalleDatosPago(medio, (contexto.datosLocalPublicos?.mediosPagoVisibles ?? contexto.datosLocalPublicos?.mediosPago), total.toFixed(2))}\n\n` +
             `Envíanos la captura de tu pago por este mismo chat 📎 y una persona de Caja la revisa.`;
           await this.mensajeria.enviarTexto(destinoEnvio, respuesta, {
             conversacionId: conversacion.id,

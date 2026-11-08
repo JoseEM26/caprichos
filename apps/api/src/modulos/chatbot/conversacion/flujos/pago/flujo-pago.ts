@@ -225,7 +225,7 @@ export class FlujoPagoSubFlujo implements SubFlujoConversacion {
       ) {
         const codigo = pagoActual.pedidoCodigo || contexto.pedidoActivo?.codigo || 'CP-0000';
         const total = pagoActual.monto || Number(contexto.pedidoActivo?.total || 0);
-        const datosPagos = contexto.datosLocalPublicos?.mediosPagoVisibles;
+        const datosPagos = (contexto.datosLocalPublicos?.mediosPagoVisibles ?? contexto.datosLocalPublicos?.mediosPago);
 
         const textoDatos = TEXTOS_PAGO.datosPagoMensaje({
           codigo,

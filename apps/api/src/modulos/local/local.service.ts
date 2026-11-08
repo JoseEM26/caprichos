@@ -65,7 +65,8 @@ export function mediosPagoPublicos(parametros: Array<{ clave: string; valor: unk
     if (!(config as any)?.activo) continue;
     const c: Record<string, any> = { ...(config as any) };
     if (clave === 'yape' || clave === 'plin') c.numero = numeroVoucher[clave] || c.numero;
-    if (['yape', 'plin', 'transferencia'].includes(clave)) c.titular = titularVoucher || c.titular;
+    // El titular que el dueño escribe junto a cada medio manda; sin él vale el titular general de los vouchers
+    if (['yape', 'plin', 'transferencia'].includes(clave)) c.titular = String(c.titular ?? '').trim() || titularVoucher;
     visibles[clave] = c;
   }
   return visibles;
@@ -368,6 +369,8 @@ export class LocalService {
       lng,
       horario: horarioFormateado,
       mediosPago: mediosPagoVisibles,
+      // Alias que lee el bot de WhatsApp (antes leía una clave que no existía y mostraba números de relleno)
+      mediosPagoVisibles,
       envioGratisDesde: typeof envioGratis === 'number' ? envioGratis : null,
       envioGratisModo: typeof envioGratisModo === 'string' ? envioGratisModo : 'mas_de',
       pedidoMinimo: typeof pedidoMinimo === 'number' ? pedidoMinimo : null,
