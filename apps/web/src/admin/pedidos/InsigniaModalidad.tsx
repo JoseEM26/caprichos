@@ -24,6 +24,7 @@ const ESTILO: Record<ClaveModalidad, { texto: string; bg: string; fg: string }> 
 export function textoMesa(nombre?: string | null): string {
   const n = String(nombre || '').trim();
   if (!n) return 'MESA';
+  if (/^en espera/i.test(n)) return n.toUpperCase();
   return /^mesa/i.test(n) ? n.toUpperCase() : `MESA ${n.toUpperCase()}`;
 }
 

@@ -39,7 +39,7 @@ function lineaModalidad(o: Pedido): string {
   const clave = claveModalidad(o.modalidad);
   if (clave === 'MESA') {
     const n = String(o.mesa_nombre || '').trim();
-    const mesa = !n ? 'Mesa' : /^mesa/i.test(n) ? n : `Mesa ${n}`;
+    const mesa = !n ? 'Mesa' : /^(mesa|en espera)/i.test(n) ? n : `Mesa ${n}`;
     return `En el local · ${mesa}`;
   }
   if (clave === 'DELIVERY') return o.zona?.nombre ? `A domicilio · ${o.zona.nombre}` : 'A domicilio';
