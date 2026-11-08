@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { plusCodeParaMostrar } from '@caprichos/compartido';
 import { TarjetaUbicacion } from '../TarjetaUbicacion';
 import { MapaUbicacion } from '../../../comun/mapa/MapaUbicacion';
 
@@ -56,6 +57,17 @@ describe('TarjetaUbicacion', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copiar coordenadas' }));
     await waitFor(() => expect(screen.getByText('Copiado')).toBeInTheDocument());
     expect(writeText).toHaveBeenCalledWith('-12.070100, -77.035500');
+  });
+
+  it('muestra el Código Plus y lo copia con «Copiar código»', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    render(<TarjetaUbicacion ubicacion={base} />);
+    const plus = plusCodeParaMostrar(base.lat, base.lng);
+    expect(plus).toMatch(/^[2-9CFGHJMPQRVWX]{4}\+[2-9CFGHJMPQRVWX]{2} Lima$/);
+    expect(screen.getByTestId('codigo-plus').textContent).toContain(`Código Plus: ${plus}`);
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar código' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(plus));
   });
 
   it('si el portapapeles falla lo dice', async () => {

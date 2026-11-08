@@ -4,6 +4,7 @@ import { PedidoReparto } from './repartosApi';
 import { useAccionesReparto } from './useAccionesReparto';
 import { Boton } from '../../comun/Boton';
 import { enlaceGoogleMaps } from '../../comun/mapa/leaflet';
+import { CodigoPlus } from '../../comun/mapa/CodigoPlus';
 import { clasificarEspera } from './calculoRuta';
 import { ModalReportarFalla } from './ModalReportarFalla';
 import { BotonEtapa, etapaDe } from './RepartidorView';
@@ -237,6 +238,8 @@ export function ResumenPedidoReparto({
           <span style={{ color: 'var(--cp-soft, #5A6E78)' }}> · Ref.: {pedido.referencia}</span>
         )}
       </div>
+
+      <CodigoPlus lat={pedido.lat} lng={pedido.lng} />
 
       {/* Nota de cobro en efectivo y vuelto a llevar */}
       {cashNote && (

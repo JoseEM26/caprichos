@@ -62,6 +62,8 @@ describe('UbicacionWhatsappPedidoService', () => {
       data: expect.objectContaining({ origen: 'WHATSAPP_CLIENTE', estado: 'PROPUESTA', fuera_de_zona: false, envio_nuevo: 6, zona_nueva_id: 2n }),
     });
     expect(prisma.notificacion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ titulo: expect.stringContaining('otra ubicación') }) });
+    // El aviso al equipo lleva el Código Plus del punto que mandó el cliente
+    expect(prisma.notificacion.create.mock.calls[0][0].data.mensaje).toMatch(/Código Plus: [2-9CFGHJMPQRVWX]{4}\+[2-9CFGHJMPQRVWX]{2} Lima/);
     expect(ventana.enviarMensajeNegocio.mock.calls[0][1].textoLibre).toContain('Caja la revisará');
   });
 

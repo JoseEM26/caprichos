@@ -40,6 +40,7 @@ import { anotarPagoEnFlujo } from './pago-para-persona.util';
 import { pedidoEsperandoVoucher } from './pedido-esperando-voucher.util';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { interpretarPuntajeEncuesta } from './encuesta-posventa.util';
+import { plusCodeDesdeTexto } from '@caprichos/compartido';
 import { ubicacionValida, UbicacionCliente } from './ubicacion-cliente.util';
 import { ModuleRef } from '@nestjs/core';
 import { UBICACION_PEDIDO_PUERTO, UbicacionPedidoPuerto } from '../puerto/ubicacion-pedido.puerto';
@@ -662,10 +663,14 @@ export class WhatsappWebhookService {
     }
 
     // Registrar mensaje en mensaje_chat del módulo de mensajes (la ubicación conserva sus coordenadas)
+    // Un Plus Code escrito en texto (completo, o corto con «Lima») también ubica; el motor sigue viendo solo el texto
+    const plusEscrito = !ubicacion && tipoRegistro === 'TEXTO' ? plusCodeDesdeTexto(texto) : null;
     const ubicacionGuardada: UbicacionCliente | null =
       ubicacion && ubicacionValida(ubicacion.latitud, ubicacion.longitud)
         ? { lat: ubicacion.latitud, lng: ubicacion.longitud, nombre: ubicacion.nombre, direccion: ubicacion.direccion }
-        : null;
+        : plusEscrito
+          ? { lat: plusEscrito.lat, lng: plusEscrito.lng, nombre: `Código Plus ${plusEscrito.codigo}` }
+          : null;
     const ubicacionChat = await this.prisma.mensajeChat
       .create({
         data: {

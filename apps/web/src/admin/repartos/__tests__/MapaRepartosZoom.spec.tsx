@@ -15,7 +15,7 @@ const mapa = vi.hoisted(() => {
 vi.mock('../../../comun/mapa/leaflet', () => {
   const capa = (): any => {
     const o: any = {};
-    for (const k of ['addTo', 'clearLayers', 'bindTooltip', 'unbindTooltip', 'openTooltip', 'on']) o[k] = () => o;
+    for (const k of ['addTo', 'clearLayers', 'bindPopup', 'bindTooltip', 'unbindTooltip', 'openTooltip', 'on']) o[k] = () => o;
     o.getElement = () => null;
     return o;
   };
