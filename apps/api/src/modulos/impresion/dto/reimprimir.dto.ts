@@ -27,6 +27,27 @@ export class ReimprimirDto {
   forzar?: boolean;
 }
 
+/** Reimpresión rápida de un pedido desde Caja: stickers y/o tickets, de cualquier pedido (también cerrado). */
+export class ReimprimirPedidoDto {
+  @IsIn(['todo', 'stickers', 'ticket_cocina', 'ticket_pago'], { message: 'Qué reimprimir: todo, stickers, ticket_cocina o ticket_pago' })
+  tipo!: 'todo' | 'stickers' | 'ticket_cocina' | 'ticket_pago';
+
+  /** Solo con tipo `stickers`: cuáles. Por defecto, todos. */
+  @IsOptional()
+  @IsIn(['todos', 'general', 'area', 'bebida'], { message: 'Stickers: todos, general, area o bebida' })
+  sub?: 'todos' | 'general' | 'area' | 'bebida';
+
+  /** Solo calcula y devuelve qué se imprimiría y dónde (para el «¿Seguro?»); no encola nada. */
+  @IsOptional()
+  @IsBoolean()
+  vista_previa?: boolean;
+
+  /** Pedido ANULADO o RECHAZADO: confirmación reforzada obligatoria para imprimir. */
+  @IsOptional()
+  @IsBoolean()
+  confirmar_anulado?: boolean;
+}
+
 /** Reimpresión desde la cola: lista de trabajos o un grupo de fallidos de una máquina. */
 export class ReimprimirTrabajosDto {
   @IsOptional()

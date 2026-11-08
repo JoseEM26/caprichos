@@ -85,6 +85,7 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
   const linea = '-'.repeat(c);
   const o: LineaTicket[] = [];
   const p = (texto: string, extra: Partial<LineaTicket> = {}) => o.push({ texto, ...extra });
+  if (t.marca) p(`*** ${t.marca} ***`, { centrado: true, negrita: true });
   p(t.local.nombre, { centrado: true, negrita: true });
   if (t.local.razonSocial) p(t.local.razonSocial, { centrado: true });
   if (t.local.ruc) p(`RUC ${t.local.ruc}`, { centrado: true });
