@@ -251,7 +251,7 @@ describe('Mapa de impresión: leyenda, detalle y presión larga', () => {
     expect(within(panel).getByText('Etiquetera bar')).toBeInTheDocument();
     expect(within(panel).getByText(/no está listo/)).toBeInTheDocument();
     expect(within(panel).getAllByText('EJEMPLO').length).toBeGreaterThan(0);
-    expect(within(panel).getByRole('img', { name: /Vista previa de la etiqueta de bebida/ })).toBeInTheDocument();
+    expect(within(panel).getAllByRole('img', { name: /Vista previa de la etiqueta de bebida/ })).toHaveLength(2); // ejemplo normal y con nombre largo
   });
 
   it('Esc cierra el panel y devuelve el foco al botón que lo abrió', async () => {
@@ -294,7 +294,7 @@ describe('Mapa de impresión: leyenda, detalle y presión larga', () => {
     await screen.findAllByText('Sticker de bebida');
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de Sticker de resumen' }));
     const panel = await screen.findByRole('dialog', { name: 'Detalle: Sticker de resumen' });
-    expect(within(panel).getByRole('img', { name: /Vista previa de la etiqueta general/ })).toBeInTheDocument();
+    expect(within(panel).getAllByRole('img', { name: /Vista previa de la etiqueta general/ })).toHaveLength(2);
     expect(within(panel).getByText(/Sale en: Para llevar · Delivery/)).toBeInTheDocument();
   });
 

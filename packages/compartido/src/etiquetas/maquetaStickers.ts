@@ -85,8 +85,16 @@ function lineas(L: Lienzo, y: number, r: { n: Nivel; lineas: string[] }, centrad
   return y;
 }
 
-/** Banda negra con texto blanco: la altura sale de la fuente. Devuelve la y donde termina. */
-function banda(L: Lienzo, y: number, fuenteIdeal: FuenteTspl, izq: string, derIdeal: string): number {
+/** Marca de la tienda en la banda superior. Con espacio suficiente (sticker de 60 mm o mas por lado) lleva tambien el logo. */
+const MARCA = 'CAPRICHOS';
+const LOGO_DOTS = 64;
+const conLogo = (L: Lienzo) => Math.min(L.W, L.H) >= 480;
+
+/**
+ * Banda negra superior con texto blanco: a la izquierda la marca (logo + CAPRICHOS) y a la derecha `derIdeal`.
+ * La altura sale de la fuente (o del logo). Devuelve la y donde termina.
+ */
+function banda(L: Lienzo, y: number, fuenteIdeal: FuenteTspl, derIdeal: string): number {
   // En un sticker angosto la letra baja de nivel hasta que el texto de la derecha ocupa media banda como mucho;
   // si aun asi no cabe, se recorta.
   const orden: FuenteTspl[] = ['5', '4', '3', '2'];
@@ -95,17 +103,56 @@ function banda(L: Lienzo, y: number, fuenteIdeal: FuenteTspl, izq: string, derId
     fuente = c;
     if (ancho_(derIdeal, [c, 1]) <= L.w * 0.5) break;
   }
-  const h = alto(fuente) + 14;
+  const logo = conLogo(L);
+  const h = Math.max(alto(fuente) + 14, logo ? LOGO_DOTS + 8 : 0);
   const n: Nivel = [fuente, 1];
   const der = truncar(derIdeal, charsEn(Math.floor(L.w * 0.5), n));
   const wDer = ancho_(der, n);
-  const t = truncar(izq, Math.max(1, charsEn(L.w - wDer - 16, n)));
-  texto(L, L.x0, y + 7, fuente, 1, t, true);
-  texto(L, L.x0 + L.w - wDer, y + 7, fuente, 1, der, true);
+  const xIzq = L.x0 + (logo ? LOGO_DOTS + 10 : 0);
+  const ty = y + Math.round((h - alto(fuente)) / 2);
+  if (logo) L.prim.push({ t: 'logo', x: L.x0, y: y + Math.round((h - LOGO_DOTS) / 2), lado: LOGO_DOTS, invertido: true });
+  texto(L, xIzq, ty, fuente, 1, truncar(MARCA, Math.max(1, charsEn(L.x0 + L.w - xIzq - wDer - 16, n))), true);
+  texto(L, L.x0 + L.w - wDer, ty, fuente, 1, der, true);
   // El REVERSE va despues del texto (asi lo invierte la impresora)
   const x = L.b + 3;
   inverso(L, x, y, L.W - 2 * x, h);
   return y + h;
+}
+
+/**
+ * Parte los datos (tamano, opciones, sabores...) en lineas corridas separadas por " · ". Si no caben en
+ * `maxLineas`, la ultima cierra con "+N mas" con los que quedaron fuera.
+ */
+export function lineasDeDatos(items: string[], chars: number, maxLineas: number): string[] {
+  const SEP = ' · ';
+  const lineas: string[] = [];
+  const cuantos: number[] = [];
+  let cur = '';
+  let k = 0;
+  for (const raw of items) {
+    const it = truncar(raw, chars);
+    if (cur && cur.length + SEP.length + it.length <= chars) {
+      cur += SEP + it;
+      k++;
+    } else {
+      if (cur) { lineas.push(cur); cuantos.push(k); }
+      cur = it;
+      k = 1;
+    }
+  }
+  if (cur) { lineas.push(cur); cuantos.push(k); }
+  if (lineas.length <= maxLineas) return lineas;
+  const salida = lineas.slice(0, maxLineas);
+  let ultimo = salida[maxLineas - 1].split(SEP);
+  let fuera = cuantos.slice(maxLineas).reduce((a, b) => a + b, 0);
+  const cola = (n: number) => ` +${n} más`;
+  while (ultimo.length > 1 && (ultimo.join(SEP) + cola(fuera)).length > chars) {
+    ultimo.pop();
+    fuera++;
+  }
+  if (ultimo.length === 1) ultimo = [truncar(ultimo[0], Math.max(1, chars - cola(fuera).length))];
+  salida[maxLineas - 1] = ultimo.join(SEP) + cola(fuera);
+  return salida;
 }
 
 /** Pie con linea fina: texto a la izquierda y a la derecha en fuente 2 (o la dada). Devuelve la y donde empieza el pie. */
@@ -122,37 +169,42 @@ function pie(L: Lienzo, izq: string, der: string, fuente: FuenteTspl = '2'): num
 
 // ---- BEBIDA ----
 
+/** Niveles del nombre del cliente (protagonista): de mas grande a mas chico. */
+const NIVELES_NOMBRE: Nivel[] = [['5', 3], ['5', 2], ['4', 2], ['5', 1], ['4', 1], ['3', 1], ['2', 1]];
+const alturaNivel = ([f, m]: Nivel) => alto(f) * m;
+
+const nombreCliente = (t: string | null | undefined) => (t || '').trim().toUpperCase().replace(/\s+/g, ' ') || 'CLIENTE';
+
 export function maquetarBebida(d: EtiquetaBebidaDatos, tam: { anchoMm?: number; altoMm?: number; margenMm?: number } = {}): Maqueta {
   const L = lienzo({ anchoMm: tam.anchoMm ?? TAMANO_BEBIDA_DEFECTO.anchoMm, altoMm: tam.altoMm ?? TAMANO_BEBIDA_DEFECTO.altoMm, margenMm: tam.margenMm });
-  // Cabecera: codigo del pedido (izq) e indice "1/3" (der)
-  let y = banda(L, L.b + 4, '4', d.codigo || 'PED-000', `BEBIDA ${d.bebidaIndex}/${d.totalBebidas}`) + 6;
-  // Pie: "Para: cliente" y hora
-  const finCuerpo = pie(L, d.who, d.hora) - 4;
+  // Cabecera: marca (logo + CAPRICHOS) e indice "BEBIDA 1/3" (der)
+  let y = banda(L, L.b + 4, L.H >= 560 ? '4' : '3', `BEBIDA ${d.bebidaIndex}/${d.totalBebidas}`) + 6;
+  // Pie: codigo del pedido y cliente (izq), hora (der)
+  const finCuerpo = pie(L, [d.codigo, d.who].filter(Boolean).join(' '), d.hora) - 4;
   const cuerpo = finCuerpo - y;
 
-  // Persona, lo mas grande posible (hasta 36 % del cuerpo)
-  const persona = (d.persona || 'Cliente').trim().toUpperCase().replace(/\s+/g, ' ');
-  const rp = encajar(persona, L.w, Math.round(cuerpo * 0.36), [['5', 3], ['5', 2], ['4', 2], ['5', 1], ['4', 1], ['3', 1], ['2', 1]], 2);
+  // Cliente: el protagonista, lo mas grande posible (hasta 52 % del cuerpo)
+  const rp = encajar(nombreCliente(d.persona), L.w, Math.round(cuerpo * 0.52), NIVELES_NOMBRE, 2);
   y = lineas(L, y, rp, true) + 2;
   barra(L, L.x0, y, L.w, 2);
   y += 6;
 
-  // Bebida con su tamano (hasta 34 % del cuerpo)
-  const nombre = `${(d.bebidaNombre || 'BEBIDA').trim().toUpperCase()}${d.tamano?.trim() ? ` - ${d.tamano.trim().toUpperCase()}` : ''}`.replace(/\s+/g, ' ');
-  const rb = encajar(nombre, L.w, Math.round(cuerpo * 0.34), [['5', 2], ['4', 2], ['5', 1], ['4', 1], ['3', 1], ['2', 1]], 3);
+  // Producto: una linea, nunca mas grande que el nombre
+  const tope = alturaNivel(rp.n);
+  const nivProd = ([['3', 1], ['2', 1]] as Nivel[]).filter((n) => alturaNivel(n) < tope);
+  const producto = (d.bebidaNombre || 'BEBIDA').trim().toUpperCase().replace(/\s+/g, ' ');
+  const rb = encajar(producto, L.w, Math.round(cuerpo * 0.2), nivProd.length ? nivProd : [['2', 1]], 1);
   y = lineas(L, y, rb, true) + 2;
 
-  // Opciones y "contiene" con lo que quede (letra 2; si sobra, recorta con ...)
-  const opciones = (d.opciones || []).filter(Boolean).join(', ');
-  const contiene = d.contiene && d.contiene.trim() && d.contiene.trim() !== opciones ? `CONTIENE: ${d.contiene.trim()}` : '';
-  const hMin = hLinea(['2', 1]);
-  if (opciones && finCuerpo - y >= alto('2')) {
-    const reserva = contiene ? hMin : 0;
-    const ro = encajar(opciones, L.w, Math.max(alto('2'), finCuerpo - y - reserva), [['3', 1], ['2', 1]]);
-    y = lineas(L, y, ro, false);
-  }
-  if (contiene && finCuerpo - y >= alto('2')) {
-    lineas(L, y, encajar(contiene, L.w, finCuerpo - y, [['2', 1]]), false);
+  // Tamano, opciones y "contiene": lineas corridas con " · " (max 2, con "+N mas"), letra pequena
+  const opciones = (d.opciones || []).filter(Boolean);
+  const contiene = d.contiene && d.contiene.trim() && d.contiene.trim() !== opciones.join(', ') ? `CONTIENE: ${d.contiene.trim()}` : '';
+  const datos = [d.tamano?.trim() ? d.tamano.trim().toUpperCase() : '', ...opciones, contiene].filter(Boolean);
+  const libre = finCuerpo - y;
+  if (datos.length && libre >= alto('2')) {
+    const n: Nivel = libre >= 2 * hLinea(['3', 1]) && alturaNivel(['3', 1]) < tope ? ['3', 1] : ['2', 1];
+    const max = Math.max(1, Math.min(2, Math.floor((libre + 2) / hLinea(n))));
+    lineas(L, y, { n, lineas: lineasDeDatos(datos, charsEn(L.w, n), max) }, true);
   }
   return { W: L.W, H: L.H, primitivas: L.prim };
 }
@@ -161,7 +213,6 @@ export function maquetarBebida(d: EtiquetaBebidaDatos, tam: { anchoMm?: number; 
 
 /** Niveles de la lista de productos, de mas legible a mas apretado: fuente, columnas. */
 const NIVELES_LISTA: Array<{ n: Nivel; cols: number }> = [
-  { n: ['4', 1], cols: 1 },
   { n: ['3', 1], cols: 1 },
   { n: ['3', 1], cols: 2 },
   { n: ['2', 1], cols: 1 },
@@ -179,25 +230,8 @@ function textoProducto(cantidad: number, nombre: string, tamano: string | null |
 
 export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number; altoMm?: number; margenMm?: number } = {}): Maqueta {
   const L = lienzo({ anchoMm: tam.anchoMm ?? TAMANO_GENERAL_DEFECTO.anchoMm, altoMm: tam.altoMm ?? TAMANO_GENERAL_DEFECTO.altoMm, margenMm: tam.margenMm });
-  // Cabecera: codigo gigante y hora
-  let y = banda(L, L.b + 4, '5', d.codigo || 'PED-000', d.hora) + 8;
-
-  // Modalidad en pill negra (izq) y canal - fecha (der)
-  const pillTxt = (d.modalidadPill || 'LOCAL').toUpperCase();
-  const nPill: Nivel = ['4', 1];
-  const pillTxtCortado = truncar(pillTxt, Math.max(4, charsEn(Math.round(L.w * 0.6) - 16, nPill)));
-  const wPill = ancho_(pillTxtCortado, nPill) + 16;
-  const hPill = alto('4') + 8;
-  texto(L, L.x0 + 8, y + 4, '4', 1, pillTxtCortado, true);
-  inverso(L, L.x0, y, wPill, hPill);
-  const canal = `GENERAL | ${d.canal} - ${d.fecha}`;
-  const nCanal: Nivel = ['3', 1];
-  const libreCanal = L.w - wPill - 14;
-  if (libreCanal >= 8 * ancho('3')) {
-    const t = truncar(canal, charsEn(libreCanal, nCanal));
-    texto(L, L.x0 + L.w - ancho_(t, nCanal), y + Math.round((hPill - alto('3')) / 2), '3', 1, t);
-  }
-  y += hPill + 8;
+  // Cabecera: marca (logo + CAPRICHOS) y codigo del pedido
+  let y = banda(L, L.b + 4, L.H >= 560 ? '4' : '3', d.codigo || 'PED-000') + 8;
 
   // Pie: unidades (izq) y total (der)
   const unidades = `${d.cantidadProductos} UNID.`;
@@ -214,11 +248,27 @@ export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number
     finCuerpo = top - 6;
   }
 
-  // Cliente (hasta 14 % del alto), lo mas grande que quepa
+  // Cliente: el protagonista (hasta 34 % del cuerpo), lo mas grande que quepa en 2 lineas
   const cuerpoTotal = finCuerpo - y;
-  const cliente = (d.who || 'Cliente').trim().toUpperCase().replace(/\s+/g, ' ');
-  const rc = encajar(cliente, L.w, Math.round(cuerpoTotal * 0.2), [['5', 2], ['5', 1], ['4', 1], ['3', 1], ['2', 1]], 2);
-  y = lineas(L, y, rc, true) + 2;
+  const rc = encajar(nombreCliente(d.who), L.w, Math.round(cuerpoTotal * 0.34), NIVELES_NOMBRE, 2);
+  y = lineas(L, y, rc, true) + 4;
+
+  // Modalidad (MESA 4, LLEVAR...) en pill negra, segundo protagonista; canal, fecha y hora a la derecha
+  const pillTxt = (d.modalidadPill || 'LOCAL').toUpperCase();
+  const nPill: Nivel = [L.H >= 700 ? '5' : L.H >= 400 ? '4' : '3', 1];
+  const pillTxtCortado = truncar(pillTxt, Math.max(4, charsEn(Math.round(L.w * 0.6) - 16, nPill)));
+  const wPill = ancho_(pillTxtCortado, nPill) + 16;
+  const hPill = alto(nPill[0]) + 8;
+  texto(L, L.x0 + 8, y + 4, nPill[0], 1, pillTxtCortado, true);
+  inverso(L, L.x0, y, wPill, hPill);
+  const canal = `${d.canal} - ${d.fecha} ${d.hora}`;
+  const nCanal: Nivel = ['3', 1];
+  const libreCanal = L.w - wPill - 14;
+  if (libreCanal >= 8 * ancho('3')) {
+    const t = truncar(canal, charsEn(libreCanal, nCanal));
+    texto(L, L.x0 + L.w - ancho_(t, nCanal), y + Math.round((hPill - alto('3')) / 2), '3', 1, t);
+  }
+  y += hPill + 8;
 
   // Delivery: direccion (hasta 2 lineas) y celular
   // Lo opcional solo se dibuja si queda sitio (en un sticker bajo, como 50 x 30, no se sale del borde)

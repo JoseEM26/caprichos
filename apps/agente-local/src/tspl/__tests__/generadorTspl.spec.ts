@@ -171,7 +171,8 @@ describe('generadorTspl', () => {
       expect(tspl).toContain('CAPPUCCINO');
       expect(tspl).toContain('12OZ');
       expect(tspl).toContain('Leche de avena');
-      expect(tspl).toContain('CONTIENE: Avena, canela, espresso doble');
+      expect(tspl).toContain('CAPRICHOS');
+      expect(tspl).toContain('+1 m\xe1s'); // con tantos datos, el ultimo se resume (max 2 lineas)
       expect(tspl).toContain('Para: Juan P');
       expect(tspl).toContain('15:30');
       expect(tspl).toContain('PRINT 1,1\r\n');

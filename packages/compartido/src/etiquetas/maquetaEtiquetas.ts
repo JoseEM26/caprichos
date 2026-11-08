@@ -119,7 +119,6 @@ function barrasRombos(y: number, anchoTotal: number, margenX: number): { x: numb
 const X0 = 38; // margen interior izquierdo
 const alto = (f: string) => FUENTES_TSPL[f].alto;
 const ancho = (f: string) => FUENTES_TSPL[f].ancho;
-const PILL_ALTO = 28;
 const LOGO_LADO_DOTS = 64;
 
 const lineas = (texto: string, w: number, font: string, max?: number) =>
@@ -160,12 +159,13 @@ function inicio(f: FormatoMaqueta, titulo: string, subtitulo: string): Contexto 
   return C;
 }
 
-function pill(C: Contexto, x: number, y: number, t: string): void {
-  texto(C, x + 8, y + 4, '2', 1, t, true);
-  inverso(C, x, y, medirAnchoTexto(t, '2') + 16, PILL_ALTO);
+function pill(C: Contexto, x: number, y: number, t: string, font = '2'): void {
+  texto(C, x + 8, y + 4, font, 1, t, true);
+  inverso(C, x, y, medirAnchoTexto(t, font) + 16, alto(font) + 8);
 }
 
-const pillDerecha = (C: Contexto, y: number, t: string) => pill(C, X0 + C.w - (medirAnchoTexto(t, '2') + 16), y, t);
+const pillDerecha = (C: Contexto, y: number, t: string, font = '2') =>
+  pill(C, X0 + C.w - (medirAnchoTexto(t, font) + 16), y, t, font);
 
 function pie(C: Contexto, izq: string, der: string): void {
   barra(C, 26, C.H - 62, C.W - 52, 2);
@@ -180,7 +180,7 @@ function pie(C: Contexto, izq: string, der: string): void {
 function nombreGrande(C: Contexto, y: number, nombre: string, grande: boolean): number {
   const n = (nombre || 'Cliente').trim().toUpperCase().replace(/\s+/g, ' ');
   const cand: [string, number][] = grande
-    ? [['4', 2], ['5', 1], ['4', 1], ['3', 1]]
+    ? [['5', 2], ['4', 2], ['5', 1], ['4', 1], ['3', 1], ['2', 1]]
     : [['5', 1], ['4', 1], ['3', 1], ['2', 1]];
   let elegido = cand[cand.length - 1];
   let ls = lineas(n, C.w, elegido[0], 2);
@@ -247,15 +247,18 @@ const topeSobreRecuadro = (C: Contexto, top: number | null) => (top === null ? C
 const salida = (C: Contexto): Maqueta => ({ W: C.W, H: C.H, primitivas: C.prim });
 
 export function maquetarArea(d: EtiquetaAreaDatos, f: FormatoMaqueta = {}): Maqueta {
-  const C = inicio(f, d.areaNombre || 'SALADOS', `STICKER AREA ${d.areaIndex || 1} de ${d.totalAreas || 1}`);
+  // Marca arriba (logo + CAPRICHOS); el area y su indice van en el subtitulo
+  const C = inicio(f, 'CAPRICHOS', `AREA ${d.areaIndex || 1} de ${d.totalAreas || 1} - ${d.areaNombre || 'SALADOS'}`);
   let y = 124;
   const pillTxt = (d.modalidadPill || 'SALON').toUpperCase();
-  pillDerecha(C, y, pillTxt);
-  texto(C, X0, y - 2, '4', 1, truncar(d.codigo || 'PED-000', Math.floor((C.w - medirAnchoTexto(pillTxt, '2') - 28) / 24)));
-  y += PILL_ALTO + 14;
+  // Modalidad (MESA 4, LLEVAR...) en fuente 4: segundo protagonista despues del nombre
+  const pillCortado = truncar(pillTxt, Math.floor((C.w * 0.6 - 16) / 24));
+  pillDerecha(C, y, pillCortado, '4');
+  texto(C, X0, y + 4, '3', 1, truncar(d.codigo || 'PED-000', Math.floor((C.w - medirAnchoTexto(pillCortado, '4') - 32) / 16)));
+  y += alto('4') + 8 + 14;
   rombos(C, y);
   y += 14;
-  y = nombreGrande(C, y, d.who, false) + 2;
+  y = nombreGrande(C, y, d.who, true) + 2;
   const ch = truncar(`${d.canal} - ${d.hora}`, Math.floor(C.w / 12));
   texto(C, centrar(X0, C.w, ch, '2'), y, '2', 1, ch);
   y += 30;

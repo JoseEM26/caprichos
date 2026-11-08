@@ -108,7 +108,7 @@ describe('sticker de bebida', () => {
 
   it('lleva codigo, indice 1/3, persona, bebida con tamano, opciones, cliente y hora', () => {
     const textos = verificarDentro(maquetarBebida(bebida())).join('|');
-    for (const esperado of ['CP-W999', '1/3', 'MARIA', 'CAPPUCCINO - 12OZ', 'Leche de avena, Sin azucar', 'Para: Juan', '21:59']) {
+    for (const esperado of ['CP-W999', '1/3', 'MARIA', 'CAPPUCCINO', '12OZ · Leche de avena · Sin azucar', 'Para: Juan', '21:59']) {
       expect(textos).toContain(esperado);
     }
   });
@@ -136,7 +136,7 @@ describe('sticker general', () => {
     // codigo, cliente y modalidad nunca se pierden
     expect(textos).toContain('CP-W999');
     expect(textos).toContain('DELIVERY');
-    expect(textos.join('|')).toContain('JOSE ESPINOZA');
+    expect(textos.join('|')).toMatch(/JOSE.*ESPINOZA/);
   });
 
   it.each(tamanos)('cabe en %o aunque sea muy distinto (40 lineas)', (t) => {
