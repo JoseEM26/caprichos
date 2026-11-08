@@ -802,3 +802,93 @@
 .cj2-orden-t { font-weight: 800; font-size: 13px; }
 .cj2-orden-op { min-height: 44px; padding: 8px 12px; text-align: left; border-radius: 10px; border: 1.5px solid var(--cp-sand, #EDE1D1); background: #fff; color: var(--cp-navy, #0B2C3E); font-weight: 700; cursor: pointer; }
 .cj2-orden-op[aria-pressed='true'] { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); border-color: var(--cp-navy, #0B2C3E); }
+
+/* ---- «Todo el día»: resumen, anulados y Cargar más ---- */
+.cj2-pastilla--todo[aria-pressed='true'] {
+  background: var(--cp-orange, #E67929);
+  border-color: var(--cp-navy, #0B2C3E);
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.cj2-resumen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+
+.cj2-resumen-t {
+  flex: 0 0 auto;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--cp-navy, #0B2C3E);
+  white-space: nowrap;
+}
+
+.cj2-res {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  background: var(--cp-white, #FFFFFF);
+  color: var(--cp-navy, #0B2C3E);
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cj2-res[aria-pressed='true'] {
+  background: var(--cp-navy, #0B2C3E);
+  color: var(--cp-cream, #FBF4EC);
+}
+
+.cj2-res strong {
+  font-weight: 900;
+}
+
+.cj2-res--cerrado {
+  border-color: var(--cp-rust, #B2500F);
+  color: var(--cp-rust, #B2500F);
+}
+
+.cj2-res--cerrado[aria-pressed='true'] {
+  background: var(--cp-rust, #B2500F);
+  color: #FFFFFF;
+}
+
+.cj2-ventas {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--cp-navy, #0B2C3E);
+  white-space: nowrap;
+}
+
+.cj2-card[data-estado='anulado'] {
+  background: #F6F0E8;
+  border-style: dashed;
+}
+
+.cj2-total--anulado {
+  text-decoration: line-through;
+}
+
+.cj2-nosuma {
+  text-decoration: none;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-rust, #B2500F);
+}
+
+.cj2-mas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}

@@ -160,11 +160,11 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
 
         <span className="cj2-pie-info">
           <span className="cj2-chips">
-            <span className="cj-pc-chip" data-testid="chip-estado" style={{ background: visual.bg, color: visual.fg, border: visual.clave === 'anulado' ? '1.5px solid var(--cp-rust, #B2500F)' : undefined }}>{visual.l}</span>
+            <span className="cj-pc-chip" data-testid="chip-estado" style={{ background: visual.bg, color: visual.fg, border: visual.clave === 'anulado' ? '1.5px solid var(--cp-rust, #B2500F)' : undefined }}>{visual.clave === 'anulado' ? visual.l.toUpperCase() : visual.l}</span>
             <span className={`cj-pc-chip cj-pc-pago-${pago.clase}`}>{pago.texto}</span>
             {o.total_con_extras != null && <span className="cj-pc-chip" data-testid="total-con-extras" style={{ background: '#FFF4D6', color: 'var(--cp-navy)' }}>Total con extras S/ {o.total_con_extras.toFixed(2)}</span>}
           </span>
-          <span className="cj2-total">S/ {Number(o.total || 0).toFixed(2)}</span>
+          <span className={`cj2-total${visual.clave === 'anulado' ? ' cj2-total--anulado' : ''}`}>S/ {Number(o.total || 0).toFixed(2)}{visual.clave === 'anulado' && <span className="cj2-nosuma"> no suma</span>}</span>
         </span>
       </button>
       <ReimprimirPedido pedido={o} variante="tarjeta" />

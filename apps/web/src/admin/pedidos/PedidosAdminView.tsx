@@ -24,6 +24,7 @@ import { FiltroDiasPedidos } from './FiltroDiasPedidos';
 import { RangoPedidos, hoyLima, parametrosDeRango, rangoHoy, textoRango } from './filtroDias';
 import { nombreMedio } from './planPago';
 import { ORDEN_POR_DEFECTO, OrdenTiempo, TEXTO_ORDEN, ordenInicial, ordenarPorTiempo, recordarOrden } from './ordenCaja';
+import { ContadorDia, enContador, filasDePedidos, resumirDia } from './resumenDia';
 import { TarjetaPedidoCaja } from './TarjetaPedidoCaja';
 import { VentanaDetalle } from './VentanaDetalle';
 import { useAccionesCaja } from './accionesCaja';
@@ -105,6 +106,19 @@ export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
 /** Grupo «Estado» del panel de Filtros: activos (por defecto), cerrados o los delivery no entregados. */
 export type GrupoEstadoCaja = 'act' | 'cer' | 'todos' | 'noent';
 
+/** Enlaces viejos: ?estado=todos o ?vista=todo abren la lista viendo todo (activos y cerrados). */
+function grupoInicialDeUrl(): GrupoEstadoCaja {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    return q.get('estado') === 'todos' || q.get('vista') === 'todo' ? 'todos' : 'act';
+  } catch {
+    return 'act';
+  }
+}
+
+/** Pedidos por página del API (máximo permitido); «Cargar más» pide la siguiente. */
+const LIMITE_PAGINA = 100;
+
 /** Hoy y «pendientes de días anteriores» muestran lo activo; otro día o rango muestra todo (lo de ayer casi siempre ya está cerrado). */
 function estadoPorDefectoDeRango(r: RangoPedidos): GrupoEstadoCaja {
   return r.modo === 'hoy' || r.modo === 'pendientes' ? 'act' : 'todos';
@@ -157,6 +171,20 @@ async function contarPendientesAnteriores(): Promise<number | null> {
   }
 }
 
+const TEXTO_CONTADOR: Record<ContadorDia, string> = {
+  entregados: 'Solo entregados',
+  anulados: 'Solo anulados',
+  rechazados: 'Solo rechazados',
+  porcobrar: 'Solo por cobrar',
+};
+
+/** Une pedidos nuevos a los que ya están, sin repetir ninguno. */
+function unirSinRepetir(actuales: Pedido[], nuevos: Pedido[]): Pedido[] {
+  const vistos = new Set(actuales.map((p) => String(p.id)));
+  const extra = nuevos.filter((p) => !vistos.has(String(p.id)) && vistos.add(String(p.id)));
+  return [...actuales, ...extra];
+}
+
 const Flecha = ({ der }: { der?: boolean }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d={der ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'} />
@@ -170,6 +198,14 @@ export function PedidosAdminView() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   // Día o rango que muestra la lista (por defecto hoy en Lima; no se recuerda entre visitas)
   const [rango, setRango] = useState<RangoPedidos>(() => rangoHoy());
+  // Paginación del servidor: páginas de 100 ya cargadas, cuántos pedidos tiene el filtro y el conteo agrupado
+  const paginasRef = useRef<number>(1);
+  const [totalDia, setTotalDia] = useState<number>(0);
+  const [resumenApi, setResumenApi] = useState<NonNullable<Awaited<ReturnType<typeof pedidosApi.listar>>['resumen']> | null>(null);
+  const [cargandoMas, setCargandoMas] = useState<boolean>(false);
+  const [errorMas, setErrorMas] = useState<string>('');
+  // Pedido abierto por ?pedido= que no está en la lista cargada (otro día, o más allá de lo cargado)
+  const [pedidoExterno, setPedidoExterno] = useState<Pedido | null>(null);
   const [pendientesAnteriores, setPendientesAnteriores] = useState<number>(0);
   const [nuevoPedidoAbierto, setNuevoPedidoAbierto] = useState(false);
   const [cortesiaSeparadaAbierta, setCortesiaSeparadaAbierta] = useState(false);
@@ -193,7 +229,9 @@ export function PedidosAdminView() {
 
   // Los cuatro filtros visibles y el grupo «Estado» del panel de Filtros
   const [filtro, setFiltro] = useState<FiltroCaja>('todo');
-  const [grupoEstado, setGrupoEstado] = useState<GrupoEstadoCaja>('act');
+  const [grupoEstado, setGrupoEstado] = useState<GrupoEstadoCaja>(grupoInicialDeUrl);
+  // Contador del resumen del día que filtra por un estado exacto (entregados, anulados, rechazados, por cobrar)
+  const [contador, setContador] = useState<ContadorDia | null>(null);
   const [etapa, setEtapa] = useState<EtapaCaja>('all');
 
   const [busqueda, setBusqueda] = useState<string>('');
@@ -244,11 +282,18 @@ export function PedidosAdminView() {
   const cargarDatos = useCallback(async () => {
     setErrorCarga('');
     try {
-      const [resPedidos, pendientes] = await Promise.all([
-        pedidosApi.listar({ ...parametrosDeRango(rango), limite: 100 }),
+      // Se vuelven a leer todas las páginas ya cargadas, para que un refresco no recorte lo que ya se ve
+      const [paginas, pendientes] = await Promise.all([
+        Promise.all(
+          Array.from({ length: Math.max(1, paginasRef.current) }, (_, i) =>
+            pedidosApi.listar({ ...parametrosDeRango(rango), limite: LIMITE_PAGINA, ...(i === 0 ? { resumen: true } : { pagina: i + 1 }) }),
+          ),
+        ),
         contarPendientesAnteriores(),
       ]);
-      setPedidos(resPedidos.items || []);
+      setPedidos(unirSinRepetir([], paginas.flatMap((r) => r.items || [])));
+      setTotalDia(paginas[0].total ?? 0);
+      setResumenApi(paginas[0].resumen ?? null);
       if (pendientes !== null) setPendientesAnteriores(pendientes);
     } catch (err: any) {
       setErrorCarga(err?.message || 'Error al cargar los pedidos');
@@ -265,7 +310,25 @@ export function PedidosAdminView() {
     void cargarNoEntregados();
   }, [cargarNoEntregados]);
 
+  // «Cargar más»: pide la página siguiente y la une a la lista sin repetir los que ya llegaron (por socket o por un corrimiento)
+  const cargarMas = async () => {
+    const siguiente = paginasRef.current + 1;
+    setCargandoMas(true);
+    setErrorMas('');
+    try {
+      const r = await pedidosApi.listar({ ...parametrosDeRango(rango), limite: LIMITE_PAGINA, pagina: siguiente });
+      paginasRef.current = siguiente;
+      setTotalDia(r.total ?? 0);
+      setPedidos((prev) => unirSinRepetir(prev, r.items || []));
+    } catch (err: any) {
+      setErrorMas(err?.message || 'No se pudieron cargar más pedidos');
+    } finally {
+      setCargandoMas(false);
+    }
+  };
+
   const cambiarRango = (nuevo: RangoPedidos) => {
+    paginasRef.current = 1;
     setRango(nuevo);
     setPaginaActual(1);
     // Ayer o un rango anterior: casi todo está entregado, así que se ve TODO (activos y cerrados); hoy y «pendientes» siguen con activos
@@ -284,10 +347,18 @@ export function PedidosAdminView() {
     if (cargando || deepLinkResuelto.current) return;
     deepLinkResuelto.current = true;
     const idUrl = new URLSearchParams(window.location.search).get('pedido');
-    const pedidoUrl = idUrl ? pedidos.find((p) => String(p.id) === idUrl) : undefined;
-    if (!pedidoUrl) return;
+    if (!idUrl) return;
+    const pedidoUrl = pedidos.find((p) => String(p.id) === idUrl);
+    if (!pedidoUrl) {
+      // No depende del filtro ni del día: se lee el pedido y se abre aunque esté anulado o entregado
+      pedidosApi.obtenerPorId(idUrl).then((p) => {
+        setPedidoExterno(p);
+        setPedidoSeleccionadoId(String(p.id));
+      }).catch(() => {});
+      return;
+    }
     // Un pedido cerrado vive en el grupo Cerrados; lo demás se ve en «Todo» (activos)
-    if (esCerrado(pedidoUrl)) setGrupoEstado('cer');
+    if (esCerrado(pedidoUrl)) setGrupoEstado((g) => (g === 'act' ? 'cer' : g));
     setPedidoSeleccionadoId(String(pedidoUrl.id));
     // El enlace se resuelve una sola vez (deepLinkResuelto), aunque cambien las dependencias
   }, [cargando, pedidos]);
@@ -398,6 +469,7 @@ export function PedidosAdminView() {
     const q = busqueda.trim().toLowerCase();
     return pedidos.filter((p) => {
       if (grupoEstado === 'cer' ? !esCerrado(p) : grupoEstado === 'act' && esCerrado(p)) return false;
+      if (contador && !enContador(p, contador)) return false;
       if (!enEtapaCaja(p, etapa)) return false;
 
       if (canalFiltro !== 'all') {
@@ -435,7 +507,7 @@ export function PedidosAdminView() {
 
       return true;
     });
-  }, [pedidos, grupoEstado, etapa, canalFiltro, modalidadFiltro, cobroFiltro, busqueda]);
+  }, [pedidos, grupoEstado, contador, etapa, canalFiltro, modalidadFiltro, cobroFiltro, busqueda]);
 
   const conteos = useMemo(() => {
     const r = {} as Record<FiltroCaja, number>;
@@ -458,6 +530,7 @@ export function PedidosAdminView() {
     const lista: { id: string; texto: string; quitar: () => void }[] = [];
     const estadoPorDefecto = estadoPorDefectoDeRango(rango);
     if (grupoEstado !== estadoPorDefecto) lista.push({ id: 'estado', texto: ESTADO_OPCIONES.find((e) => e.id === grupoEstado)!.n, quitar: () => cambiarGrupoEstado(estadoPorDefecto) });
+    if (contador) lista.push({ id: 'contador', texto: TEXTO_CONTADOR[contador], quitar: () => { setContador(null); setPaginaActual(1); } });
     if (etapa !== 'all') lista.push({ id: 'etapa', texto: ETAPA_OPCIONES.find((e) => e.id === etapa)!.n, quitar: () => { setEtapa('all'); setPaginaActual(1); } });
     if (rango.modo !== 'hoy') lista.push({ id: 'dia', texto: textoRango(rango, hoy), quitar: () => cambiarRango(rangoHoy(hoy)) });
     if (canalFiltro !== 'all') lista.push({ id: 'canal', texto: `Canal: ${CANALES_OPCIONES.find((c) => c.id === canalFiltro)?.n}`, quitar: () => { setCanalFiltro('all'); setPaginaActual(1); } });
@@ -466,10 +539,11 @@ export function PedidosAdminView() {
     return lista;
     // quitar usa solo setters estables; cambiarGrupoEstado/cambiarRango se recrean pero hacen lo mismo
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grupoEstado, etapa, rango, canalFiltro, modalidadFiltro, cobroFiltro, hoy]);
+  }, [grupoEstado, contador, etapa, rango, canalFiltro, modalidadFiltro, cobroFiltro, hoy]);
 
   const limpiarFiltros = () => {
     setGrupoEstado('act');
+    setContador(null);
     setEtapa('all');
     setCanalFiltro('all');
     setModalidadFiltro('all');
@@ -479,6 +553,44 @@ export function PedidosAdminView() {
     setPaginaActual(1);
     cambiarRango(rangoHoy(hoy));
   };
+
+  // «Todo el día»: todos los pedidos del día elegido, sin excluir ninguno (activos, pagados, por cobrar, entregados, anulados y rechazados).
+  // Quita estado, etapa, canal, modalidad, cobro, pastilla y búsqueda; el día lo decide el chip del rango (hoy; «pendientes» vuelve a hoy).
+  const verTodoElDia = () => {
+    if (rango.modo === 'pendientes') cambiarRango(rangoHoy(hoy));
+    setGrupoEstado('todos');
+    setContador(null);
+    setEtapa('all');
+    setCanalFiltro('all');
+    setModalidadFiltro('all');
+    setCobroFiltro('all');
+    setBusqueda('');
+    setFiltro('todo');
+    setPaginaActual(1);
+    setFcOpen(false);
+  };
+  const vistaTodo =
+    grupoEstado === 'todos' && !contador && etapa === 'all' && canalFiltro === 'all' && modalidadFiltro === 'all' &&
+    cobroFiltro === 'all' && filtro === 'todo' && !busqueda.trim() && rango.modo !== 'pendientes';
+
+  // El chip aparece en hoy; en ayer o un rango «todo» ya es lo normal y lo dice el chip del rango
+  const chipTodo = vistaTodo && rango.modo === 'hoy';
+
+  // Contador del resumen: Activos vuelve a la vista normal; los demás miran todos los estados y se quedan con ese; tocarlo otra vez lo quita
+  const elegirContador = (c: ContadorDia | 'activos') => {
+    setPaginaActual(1);
+    setFiltro('todo');
+    if (c === 'activos') { setContador(null); setGrupoEstado('act'); return; }
+    if (contador === c) { setContador(null); setGrupoEstado(estadoPorDefectoDeRango(rango)); return; }
+    setContador(c);
+    setGrupoEstado('todos');
+  };
+
+  // Resumen: con toda la lista cargada se cuenta lo que se ve (en vivo con el socket); si faltan páginas, el conteo agrupado del servidor
+  const resumen = useMemo(
+    () => (resumenApi && pedidos.length < totalDia ? resumirDia(resumenApi) : resumirDia(filasDePedidos(pedidos))),
+    [pedidos, totalDia, resumenApi],
+  );
 
   // Cerrar el panel de Filtros y el menú «Más» con un clic fuera o Escape
   const filaFiltrosRef = useRef<HTMLDivElement>(null);
@@ -519,8 +631,8 @@ export function PedidosAdminView() {
   const hasta = Math.min(paginaValida * pedidosPorPagina, pedidosFiltrados.length);
 
   const pedidoSeleccionado = useMemo(() => {
-    return pedidos.find((p) => String(p.id) === pedidoSeleccionadoId) || null;
-  }, [pedidos, pedidoSeleccionadoId]);
+    return pedidos.find((p) => String(p.id) === pedidoSeleccionadoId) || (pedidoExterno && String(pedidoExterno.id) === pedidoSeleccionadoId ? pedidoExterno : null);
+  }, [pedidos, pedidoSeleccionadoId, pedidoExterno]);
 
   const abrirNuevoPedido = async () => {
     try {
@@ -641,6 +753,11 @@ export function PedidosAdminView() {
             </button>
           ))}
         </nav>
+        <button type="button" className="cj2-pastilla cj2-pastilla--todo" aria-pressed={vistaTodo} onClick={verTodoElDia}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg>
+          Todo el día
+          {vistaTodo && <span aria-hidden="true">✓</span>}
+        </button>
         <label htmlFor="ord-q" style={{ position: 'absolute', left: -9999 }}>
           Buscar
         </label>
@@ -751,8 +868,13 @@ export function PedidosAdminView() {
     )}
 
     {/* Filtros activos: chips que se quitan con un toque */}
-    {(chips.length > 0 || orden !== ORDEN_POR_DEFECTO) && (
+    {(chips.length > 0 || orden !== ORDEN_POR_DEFECTO || chipTodo) && (
       <div className="cj2-activos" aria-label="Filtros activos">
+        {chipTodo && (
+          <button type="button" className="cj2-quitar" aria-label="Quitar Mostrando todo el día" onClick={limpiarFiltros}>
+            Mostrando: todo el día <span aria-hidden="true">✕</span>
+          </button>
+        )}
         {orden !== ORDEN_POR_DEFECTO && (
           <button type="button" className="cj2-quitar" aria-label="Quitar orden: más tiempo primero" onClick={() => cambiarOrden(ORDEN_POR_DEFECTO)}>
             <span aria-hidden="true">↑↓ </span>Orden: más tiempo primero <span aria-hidden="true">×</span>
@@ -783,6 +905,29 @@ export function PedidosAdminView() {
       </div>
     ) : (
       <>
+        {/* RESUMEN DEL DÍA: una fila; cada contador filtra por ese estado */}
+        <section className="cj2-resumen" aria-label="Resumen del día" data-testid="resumen-dia">
+          <span className="cj2-resumen-t">
+            {rango.modo === 'hoy' ? 'Total del día' : 'Total'}: {resumen.total} {resumen.total === 1 ? 'pedido' : 'pedidos'}
+          </span>
+          <button type="button" className="cj2-res" aria-pressed={grupoEstado === 'act' && !contador} onClick={() => elegirContador('activos')}>
+            Activos <strong>{resumen.activos}</strong>
+          </button>
+          <button type="button" className="cj2-res" aria-pressed={contador === 'entregados'} onClick={() => elegirContador('entregados')}>
+            Entregados <strong>{resumen.entregados}</strong>
+          </button>
+          <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'anulados'} onClick={() => elegirContador('anulados')}>
+            Anulados <strong>{resumen.anulados}</strong>
+          </button>
+          <button type="button" className="cj2-res cj2-res--cerrado" aria-pressed={contador === 'rechazados'} onClick={() => elegirContador('rechazados')}>
+            Rechazados <strong>{resumen.rechazados}</strong>
+          </button>
+          <button type="button" className="cj2-res" aria-pressed={contador === 'porcobrar'} onClick={() => elegirContador('porcobrar')}>
+            Por cobrar <strong>{resumen.porCobrar}</strong>
+          </button>
+          <span className="cj2-ventas">Ventas (sin anulados ni rechazados): S/ {resumen.ventas.toFixed(2)}</span>
+        </section>
+
         {/* TARJETAS */}
         <div className="cj2-lista">
           {pedidosPaginados.length === 0 ? (
@@ -819,6 +964,18 @@ export function PedidosAdminView() {
             </div>
           )}
         </div>
+
+        {totalDia > LIMITE_PAGINA && (
+          <div className="cj2-mas" data-testid="mas-pedidos">
+            <span>Mostrando {pedidos.length} de {totalDia}</span>
+            {pedidos.length < totalDia && (
+              <button type="button" className="cj2-btn" disabled={cargandoMas} onClick={() => void cargarMas()}>
+                {cargandoMas ? 'Cargando…' : 'Cargar más'}
+              </button>
+            )}
+            {errorMas && <span role="alert" style={{ color: 'var(--cp-rust, #B2500F)', fontWeight: 700 }}>{errorMas}</span>}
+          </div>
+        )}
 
         {/* PAGINACIÓN FINA */}
         <div className="cj2-pag">

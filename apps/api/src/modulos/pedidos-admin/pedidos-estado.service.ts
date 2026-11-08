@@ -288,13 +288,13 @@ export class PedidosEstadoService {
     const limite = Math.min(100, Math.max(1, Number(filtros.limite) || 20));
     const skip = (pagina - 1) * limite;
 
-    const [total, pedidos, umbrales] = await Promise.all([
+    const [total, pedidos, umbrales, grupos] = await Promise.all([
       this.prisma.pedido.count({ where }),
       this.prisma.pedido.findMany({
         where,
         skip,
         take: limite,
-        orderBy: { creado_en: 'desc' },
+        orderBy: [{ creado_en: 'desc' }, { id: 'desc' }], // id desempata: la paginación no pierde ni repite pedidos del mismo instante
         include: {
           lineas: {
             include: {
@@ -313,6 +313,9 @@ export class PedidosEstadoService {
         },
       }),
       this.obtenerUmbrales(),
+      filtros.resumen === '1'
+        ? this.prisma.pedido.groupBy({ by: ['estado', 'pago_estado'], where, _count: { _all: true }, _sum: { total: true } })
+        : Promise.resolve(null),
     ]);
 
     const ahora = new Date();
@@ -348,6 +351,14 @@ export class PedidosEstadoService {
       pagina,
       limite,
       items,
+      ...(grupos && {
+        resumen: grupos.map((g) => ({
+          estado: g.estado,
+          pago_estado: g.pago_estado,
+          n: g._count._all,
+          total: Number(g._sum.total ?? 0),
+        })),
+      }),
     };
   }
 
