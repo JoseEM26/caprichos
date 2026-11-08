@@ -264,6 +264,15 @@ describe('ConfiguracionService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('impresion_prioridad: acepta TICKETS_PRIMERO y ORDEN_LLEGADA (normaliza) y rechaza otros valores', async () => {
+      prismaMock.parametro.findUnique.mockResolvedValue(null);
+      prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);
+      const res = await service.actualizar('impresion_prioridad', ' orden_llegada ', adminAuth);
+      expect(res.valor).toBe('ORDEN_LLEGADA');
+      expect((await service.actualizar('impresion_prioridad', 'TICKETS_PRIMERO', adminAuth)).valor).toBe('TICKETS_PRIMERO');
+      await expect(service.actualizar('impresion_prioridad', 'AL_AZAR', adminAuth)).rejects.toThrow(BadRequestException);
+    });
+
     it('protección contra spam: acepta valores en rango y rechaza con 400 los de fuera', async () => {
       prismaMock.parametro.findUnique.mockResolvedValue(null);
       prismaMock.parametro.upsert.mockImplementation(async ({ create }: any) => create);

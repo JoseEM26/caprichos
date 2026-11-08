@@ -180,6 +180,8 @@ export const CLAVES_TEXTO = [
   'whatsapp_aviso_puntos_ganados_activo',
   'whatsapp_aviso_cuenta_activo',
   'cocina_confirmar_despejar',
+  // Orden de salida de la cola de impresión: TICKETS_PRIMERO (por defecto) | ORDEN_LLEGADA
+  'impresion_prioridad',
   // Minutos de preparación por defecto (enteros 1–120) para productos sin datos de los últimos 30 días
   'cocina_minutos_preparacion_defecto',
   // Notificaciones: sonido y «Marcar todas leídas» (si/no), alcance del sonido
@@ -363,6 +365,15 @@ export class ConfiguracionService {
           });
         }
         valor = alcance;
+      } else if (clave === 'impresion_prioridad') {
+        const modo = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
+        if (modo !== 'TICKETS_PRIMERO' && modo !== 'ORDEN_LLEGADA') {
+          throw new BadRequestException({
+            codigo: 'VALOR_INVALIDO',
+            mensaje: 'La prioridad debe ser TICKETS_PRIMERO u ORDEN_LLEGADA',
+          });
+        }
+        valor = modo;
       } else if (clave === 'reprog_recargo_modo') {
         // Mismos valores que MODOS_RECARGO_REPROG (repartos/recargo-reprogramacion.ts)
         const modo = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
