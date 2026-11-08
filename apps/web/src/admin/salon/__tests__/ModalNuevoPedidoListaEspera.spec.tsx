@@ -105,4 +105,32 @@ describe('Nuevo pedido en el local: lista de espera de mesa', () => {
     expect(payload.personas).toBe(3);
     expect(payload.cliente).toEqual({ nombre: 'Lucía', telefono: '987654321' });
   });
+
+  it('en lista de espera el botón se ve activo (no apagado) con productos, y sin celular dice qué falta bajo el botón', async () => {
+    await pedirEnEspera();
+    const boton = screen.getByRole('button', { name: 'Enviar directo a cocina' });
+    expect(boton.style.opacity).toBe('1');
+    expect(boton.style.cursor).toBe('pointer');
+    fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
+    fireEvent.click(boton);
+    expect(await screen.findByText(/Escribe el celular del cliente/)).toBeInTheDocument();
+    expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
+  });
+
+  it('desde Caja: elegir Lista de espera, completar y confirmar manda enEsperaMesa sin mesas', async () => {
+    render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisos as any} canal="CAJA" pasoInicial="modal" />);
+    fireEvent.click(screen.getByTestId('np-eleccion-lista-espera'));
+    fireEvent.click(await screen.findByText('Café Americano'));
+    fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Mario' } });
+    fireEvent.click(screen.getByText('Agregar al pedido'));
+    fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'sadasdas' } });
+    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '978456123' } });
+    const boton = screen.getByRole('button', { name: 'Enviar directo a cocina' });
+    expect(boton.style.opacity).toBe('1');
+    fireEvent.click(boton);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, enviar comanda' }));
+    await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalled());
+    const payload = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0][0] as any;
+    expect(payload).toMatchObject({ enEsperaMesa: true, mesas: [], cliente: { nombre: 'sadasdas', telefono: '978456123' } });
+  });
 });
