@@ -3,7 +3,7 @@ import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsNotEmpty, IsOptional, IsStrin
 export class ReimprimirDto {
   @IsNotEmpty({ message: 'El tipo de etiqueta es obligatorio' })
   @IsIn(
-    ['TODAS', 'general', 'area', 'bebida', 'ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA'],
+    ['TODAS', 'general', 'area', 'bebida', 'ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA', 'ticket', 'TICKET_PAGO'],
     {
       message: 'Tipo de etiqueta inválido (TODAS, general, area o bebida)',
     },

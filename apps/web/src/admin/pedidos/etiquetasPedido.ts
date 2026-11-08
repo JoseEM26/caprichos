@@ -319,7 +319,7 @@ export function armarTicketPago(pedido: Pedido, igvPct: number = 18): TicketPago
   const total = num(pedido.total);
   const plan = (pedido.planPago || []).map((p) => ({ medio: String(p.medio), monto: num(p.monto) }));
   // Mismo criterio que el servidor (construirTicketPago): el tipo de comprobante del pedido manda el diseño
-  const tipoDoc = pedido.comprobante_tipo === 'BOLETA' || pedido.comprobante_tipo === 'FACTURA' ? pedido.comprobante_tipo : 'SIMPLE';
+  const tipoDoc = !pedido.es_personal && (pedido.comprobante_tipo === 'BOLETA' || pedido.comprobante_tipo === 'FACTURA') ? pedido.comprobante_tipo : 'SIMPLE';
   const doc = pedido.comprobante_doc?.trim() || null;
   const documento: TicketPagoDatos['documento'] =
     tipoDoc === 'SIMPLE'
@@ -335,6 +335,8 @@ export function armarTicketPago(pedido: Pedido, igvPct: number = 18): TicketPago
   return {
     tipo: 'TICKET_PAGO',
     documento,
+    // Consumo del personal: ticket interno, cargado a su crédito (el servidor pone «Pagado ahora» si ya lo saldó)
+    ...(pedido.es_personal ? { personal: { trabajador: pedido.cliente_nombre || null, pagado: false } } : {}),
     local: { nombre: 'Caprichos' },
     codigo: pedido.codigo,
     fecha: formatearFecha(pedido.creado_en),

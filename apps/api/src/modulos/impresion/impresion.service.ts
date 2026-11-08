@@ -36,6 +36,8 @@ import {
 } from './dto';
 import {
   CLAVE_GENERAL,
+  CLAVE_TICKET,
+  formatearFecha,
   claveDeTrabajo,
   claveEtiquetaArea,
   claveEtiquetaBebida,
@@ -1106,6 +1108,9 @@ export class ImpresionService {
       if (!yaTenia && cajas > 0) {
         await this.avisarSiNoHayImpresora(pedido, cajas);
       }
+      // El pedido del personal nace PAGADO sin Cobro: nunca pasaría por «cobrar», que es lo que saca el ticket.
+      // Sale aquí (idempotente por clave: un solo ticket automático aunque se repita o se edite el pedido).
+      if (pedido.es_personal) await this.encolarTicketPedido(pedido.id);
     } catch (err: any) {
       // El encolado NUNCA bloquea ni hace fallar la aceptación del pedido
       this.logger.error(`Error en encolado de etiquetas para pedido ${pedidoIdInput}: ${err.message}`, err.stack);
@@ -1120,24 +1125,12 @@ export class ImpresionService {
   async encolarTicketPedido(pedidoIdInput: bigint | string | number): Promise<void> {
     try {
       const pedidoId = BigInt(pedidoIdInput);
-      const pedido: any = await this.prisma.pedido.findUnique({
-        where: { id: pedidoId },
-        include: {
-          lineas: { include: { opcionesElegidas: true, sabores: true, cortesia: true } },
-          planPago: { orderBy: { orden: 'asc' } },
-          cobros: { include: { pagos: true } },
-        },
-      });
-      if (!pedido) {
+      const armado = await this.armarTicketPedido(pedidoId);
+      if (!armado) {
         this.logger.warn(`No se encontró el pedido ${pedidoId} para encolar el ticket`);
         return;
       }
-      const [local, comprobante, ajuste] = await Promise.all([
-        this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null),
-        this.prisma.comprobante.findFirst({ where: { pedido_id: pedido.id, anulado_en: null } }).catch(() => null),
-        ajustesPendientesUbicacion(this.prisma, [pedido.id]).then((m) => m.get(String(pedido.id)) ?? null).catch(() => null),
-      ]);
-      const payload = construirTicketPago(pedido, (local?.valor as any) || {}, comprobante, ajuste, await this.igvPct());
+      const { pedido, payload } = armado;
       const clave = `${pedido.id}-TICKET_PAGO`;
       const destino = this.destinoJob('TICKET_PAGO', null, payload, await this.equipos.contexto());
       await this.prisma.printJob.upsert({
@@ -1159,6 +1152,54 @@ export class ImpresionService {
       }
     } catch (err: any) {
       this.logger.error(`Error al encolar el ticket del pedido ${pedidoIdInput}: ${err.message}`, err.stack);
+    }
+  }
+
+  /** Ticket de pago del pedido tal como está hoy (con o sin Cobro: el del personal no lo tiene). */
+  private async armarTicketPedido(pedidoId: bigint) {
+    const pedido: any = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: {
+        lineas: { include: { opcionesElegidas: true, sabores: true, cortesia: true } },
+        planPago: { orderBy: { orden: 'asc' } },
+        cobros: { include: { pagos: true } },
+        consumoPersonal: { include: { party: { include: { persona: true } } } },
+      },
+    });
+    if (!pedido) return null;
+    const [local, comprobante, ajuste] = await Promise.all([
+      this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null),
+      this.prisma.comprobante.findFirst({ where: { pedido_id: pedido.id, anulado_en: null } }).catch(() => null),
+      ajustesPendientesUbicacion(this.prisma, [pedido.id]).then((m) => m.get(String(pedido.id)) ?? null).catch(() => null),
+    ]);
+    const payload = construirTicketPago(pedido, (local?.valor as any) || {}, comprobante, ajuste, await this.igvPct(), await this.cuponParaTicket(pedido));
+    return { pedido, payload };
+  }
+
+  /**
+   * Cupón REAL para imprimir en el ticket: solo con el interruptor `impresion_cupon_en_ticket` en «Sí» y si el pedido
+   * generó un cupón emitido VIGENTE (no canjeado, no vencido) de un cupón activo. Sin eso: null y el ticket no lleva sección.
+   */
+  async cuponParaTicket(pedido: { id: bigint }): Promise<{ codigo: string; descripcion: string | null; vence: string | null } | null> {
+    try {
+      const flag = await this.prisma.parametro.findUnique({ where: { clave: 'impresion_cupon_en_ticket' } });
+      if (!['si', 'sí', 'true', '1'].includes(String(flag?.valor ?? '').trim().toLowerCase())) return null;
+      const ahora = new Date();
+      const emitido: any = await this.prisma.cuponEmitido.findFirst({
+        where: {
+          pedido_origen_id: pedido.id,
+          estado: 'VIGENTE',
+          anulado_en: null,
+          OR: [{ vence_en: null }, { vence_en: { gt: ahora } }],
+          cupon: { activo: true },
+        },
+        include: { cupon: true },
+        orderBy: { id: 'desc' },
+      });
+      if (!emitido) return null;
+      return { codigo: emitido.codigo, descripcion: emitido.cupon?.descripcion ?? null, vence: emitido.vence_en ? formatearFecha(emitido.vence_en) : null };
+    } catch {
+      return null;
     }
   }
 
@@ -1412,6 +1453,8 @@ export class ImpresionService {
   async reimprimirEtiqueta(
     pedidoIdInput: string | number,
     dto: ReimprimirDto,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
   ) {
     let pedidoId: bigint;
     try {
@@ -1446,6 +1489,10 @@ export class ImpresionService {
         codigo: 'PEDIDO_NO_ENCONTRADO',
         mensaje: 'Pedido no encontrado',
       });
+    }
+
+    if (['TICKET', 'TICKET_PAGO'].includes(dto.tipo.toUpperCase())) {
+      return this.reimprimirTicketPago(pedidoId, usuario, ip);
     }
 
     const tipoReq = dto.tipo.toUpperCase();
@@ -1539,6 +1586,48 @@ export class ImpresionService {
       noAplican,
       trabajoIds: trabajosCreados.map((t) => t.id.toString()),
     };
+  }
+
+  /**
+   * Reimprime el ticket de pago del pedido (copia nueva): no depende de que exista un Cobro, así sirve para el
+   * consumo del personal y para pedidos pasados que no imprimieron. Si ya hay uno en cola no se duplica.
+   */
+  private async reimprimirTicketPago(pedidoId: bigint, usuario?: UsuarioAutenticado, ip?: string) {
+    const armado = await this.armarTicketPedido(pedidoId);
+    if (!armado) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+    const { pedido, payload } = armado;
+    const yaEnCola = await this.prisma.printJob.count({
+      where: { pedido_id: pedido.id, tipo: 'TICKET_PAGO', estado: { in: ESTADOS_EN_COLA } },
+    });
+    if (yaEnCola > 0) {
+      return { ok: true, mensaje: 'El ticket ya está en cola de impresión', cantidad: 0, omitidas: 1, noAplican: 0, trabajoIds: [] };
+    }
+    const trabajo = await this.prisma.printJob.create({
+      data: {
+        pedido_id: pedido.id,
+        ...this.destinoJob('TICKET_PAGO', null, payload, await this.contextoRuteo()),
+        tipo: 'TICKET_PAGO',
+        payload: payload as any,
+        copia: true,
+        estado: 'PENDIENTE',
+      },
+    });
+    if (this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'REIMPRIMIR_TICKET_PEDIDO',
+        entidad: 'pedido',
+        entidadId: pedido.id,
+        partyId: usuario.partyId,
+        despues: { pedido: pedido.codigo, trabajoId: trabajo.id.toString(), personal: Boolean(pedido.es_personal) },
+        ip,
+      });
+    }
+    this.eventos?.emitirAdmin('impresion:cola', { pedidoId: pedido.id.toString(), tipo: 'TICKET_PAGO' });
+    return { ok: true, mensaje: 'Se encoló el ticket de pago para reimpresión', cantidad: 1, omitidas: 0, noAplican: 0, trabajoIds: [trabajo.id.toString()] };
   }
 
   /** Etiquetas (general, por área y por vaso) del pedido tal como están hoy, con su clave estable y su contenido. */
@@ -1865,6 +1954,15 @@ export class ImpresionService {
     for (const t of trabajos) {
       const clave = claveDeTrabajo(t);
       if (clave && !ultimoPorClave.has(clave)) ultimoPorClave.set(clave, t);
+    }
+    // El ticket de pago se muestra si el pedido es del personal (nunca pasa por Caja) o si ya tiene un trabajo de ticket
+    if (pedido.es_personal || ultimoPorClave.has(CLAVE_TICKET)) {
+      esperadas.push({
+        clave: CLAVE_TICKET,
+        tipo: 'TICKET_PAGO',
+        titulo: pedido.es_personal ? 'Ticket de consumo del personal' : 'Ticket de pago',
+        detalle: 'Ticketera de caja',
+      });
     }
 
     const etiquetas = esperadas.map((e) => {

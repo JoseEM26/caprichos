@@ -242,7 +242,9 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
 
   const totalNum = Number(pedido.total || 0);
   const hora = new Date(pedido.creado_en).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' });
-  const pagoChip = estaPagado
+  const pagoChip = pedido.es_personal
+    ? { t: 'Crédito del personal · se paga en su cuenta', bg: '#E3EEF8', fg: 'var(--cp-navy, #0B2C3E)' }
+    : estaPagado
     ? { t: 'Pagado', bg: 'var(--cp-greenbg, #DFF3E3)', fg: '#1F5C33' }
     : tienePagoCoordinado
       ? { t: 'Pago coordinado', bg: '#E3EEF8', fg: 'var(--cp-navy, #0B2C3E)' }
