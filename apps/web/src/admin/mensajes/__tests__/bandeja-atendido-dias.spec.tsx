@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEventos } from '../../../comun/socket';
 import { MensajesView } from '../MensajesView';
 import * as api from '../mensajesApi';
-import { diaDelFiltro, encabezadoDia, filtrarPorDia, ordenarCola } from '../diasBandeja';
+import { diaDelFiltro, encabezadoDia, filtrarPorDia, ordenarCola, textoVacioDia } from '../diasBandeja';
 
 vi.mock('../../../comun/socket', () => ({ useEventos: vi.fn() }));
 
@@ -29,6 +29,19 @@ describe('días de Lima en la bandeja', () => {
     expect(encabezadoDia('2026-11-07', AHORA)).toBe('Hoy');
     expect(encabezadoDia('2026-11-06', AHORA)).toBe('Ayer');
     expect(encabezadoDia('2026-11-03', AHORA)).toBe('Martes 3 de noviembre');
+  });
+
+  it('mañana y fechas futuras: el día siguiente de Lima, también al cruzar la medianoche UTC', () => {
+    const tarde: Date = new Date('2026-11-08T03:30:00Z'); // 22:30 del 7 en Lima, ya 8 en UTC
+    expect(diaDelFiltro('manana', tarde)).toBe('2026-11-08');
+    expect(diaDelFiltro('hoy', tarde)).toBe('2026-11-07');
+    const c: any = chat('1', { fecha: '2026-11-08T14:00:00Z' }); // 09:00 del 8 en Lima
+    expect(filtrarPorDia([c], 'manana', tarde)).toHaveLength(1);
+    expect(filtrarPorDia([c], 'hoy', tarde)).toHaveLength(0);
+    expect(filtrarPorDia([c], '2030-01-01', tarde)).toHaveLength(0); // futuro lejano: vacío
+    expect(encabezadoDia('2026-11-08', tarde)).toBe('Mañana');
+    expect(textoVacioDia('manana')).toBe('No hay mensajes para mañana');
+    expect(textoVacioDia('2026-11-03', AHORA)).toBe('No hay mensajes para el martes 3 de noviembre');
   });
 
   it('la cola ordena por día, luego urgente y luego el que más espera', () => {
@@ -88,6 +101,43 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
     expect(enLista().queryByText('Cliente 1')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Elegir fecha'), { target: { value: '2000-01-01' } });
     expect(await screen.findByTestId('vacio-lista')).toHaveTextContent('Ver todos los días (3)');
+  });
+
+  it('el selector de fecha no tiene tope: acepta mañana y días futuros con estado vacío y «Volver a Hoy»', async () => {
+    await irAPorAtender();
+    expect(await screen.findByLabelText('Elegir fecha')).not.toHaveAttribute('max');
+    fireEvent.change(screen.getByLabelText('Elegir fecha'), { target: { value: '2031-05-20' } });
+    const vacio = await screen.findByTestId('vacio-lista');
+    expect(vacio).toHaveTextContent('No hay mensajes para el');
+    expect(vacio).toHaveTextContent('20 may 2031');
+    fireEvent.click(within(vacio).getByTestId('volver-hoy'));
+    await waitFor(() => expect(enLista().getByText('Cliente 1')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Hoy: 1 chat' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('el chip «Mañana» filtra el día siguiente: sin datos, estado vacío amable; con un chat de mañana, lo muestra', async () => {
+    await irAPorAtender();
+    fireEvent.click(await screen.findByRole('button', { name: 'Mañana: 0 chats' }));
+    expect(await screen.findByTestId('vacio-lista')).toHaveTextContent('No hay mensajes para mañana');
+  });
+
+  it('con un chat de mañana, el chip «Mañana» lo muestra y Hoy no', async () => {
+    respuesta = { ...respuesta, chats: [chat('1'), chat('7', { fecha: new Date(Date.now() + 86400000).toISOString() })] };
+    await irAPorAtender();
+    fireEvent.click(await screen.findByRole('button', { name: 'Mañana: 1 chat' }));
+    expect(await screen.findByRole('list', { name: 'Conversaciones' }).then(() => enLista().getByText('Cliente 7'))).toBeInTheDocument();
+    expect(enLista().queryByText('Cliente 1')).not.toBeInTheDocument();
+    expect(screen.getByText('Mañana · 1')).toBeInTheDocument();
+  });
+
+  it('Hoy es solo hoy aunque no haya chats de otros días, y la elección de día sobrevive al cambiar de pestaña', async () => {
+    respuesta = { conteos: { ...respuesta.conteos }, chats: [chat('1')] };
+    await irAPorAtender();
+    expect(await screen.findByRole('button', { name: 'Hoy: 1 chat' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ayer: 0 chats' }));
+    expect(await screen.findByTestId('vacio-lista')).toHaveTextContent('No hay mensajes para ayer');
+    fireEvent.click(screen.getByRole('button', { name: /Atendidos/ }));
+    expect(screen.getByRole('button', { name: 'Ayer: 0 chats' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('el check marca atendido en un toque, con aviso y Deshacer', async () => {

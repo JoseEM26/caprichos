@@ -38,6 +38,7 @@ export function etiquetaDia(iso: string, ahora: Date = new Date()): string {
   const dif = diasEntre(diaLima(d), diaLima(ahora));
   if (dif === 0) return 'Hoy';
   if (dif === 1) return 'Ayer';
+  if (dif === -1) return 'Mañana';
   const p = partes(d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   if (p.year !== partes(ahora, { year: 'numeric' }).year) {
     const c = partes(d, { day: 'numeric', month: 'short', year: 'numeric' });
