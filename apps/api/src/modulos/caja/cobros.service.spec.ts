@@ -61,6 +61,7 @@ describe('CobrosService', () => {
       emitirParaPedido: jest.fn().mockResolvedValue({ id: '1' }),
       firmarPorPedido: jest.fn().mockResolvedValue(undefined),
       transmitirEnSegundoPlano: jest.fn(),
+      darDeBajaPorAnulacion: jest.fn().mockResolvedValue(null),
     };
     impresionMock = { encolarTicketPedido: jest.fn().mockResolvedValue(undefined) };
     eventosGatewayMock = {
@@ -926,6 +927,32 @@ describe('CobrosService', () => {
           motivo: 'Cliente solicitó cambio de medio de pago',
         }),
       );
+    });
+  });
+
+  describe('anularCobro da de baja la boleta/factura (H3)', () => {
+    const preparar = () => {
+      prismaMock.cobro.findUnique
+        .mockResolvedValueOnce({ caja_id: 10n })
+        .mockResolvedValueOnce({ id: 10n, pedido_id: 100n, anulado_en: null, caja: { estado: 'ABIERTA' }, pagos: [] });
+      prismaMock.pedido.update.mockResolvedValue({ id: 100n, pago_estado: 'PENDIENTE' });
+    };
+
+    it('pide la baja del comprobante del pedido y avisa a Caja', async () => {
+      preparar();
+      comprobantesMock.darDeBajaPorAnulacion.mockResolvedValue({ comprobante: 'B002-5', estado: 'PENDIENTE_BAJA' });
+      const res: any = await service.anularCobro('10', { motivo: 'Cliente cambió el pedido' }, cajeroUsuario);
+      expect(comprobantesMock.darDeBajaPorAnulacion).toHaveBeenCalledWith(100n, 'Cliente cambió el pedido', cajeroUsuario, undefined);
+      expect(res.aviso_comprobante).toContain('B002-5');
+      expect(res.aviso_comprobante).toContain('pendiente');
+    });
+
+    it('si la baja falla de forma inesperada, el cobro igual queda anulado', async () => {
+      preparar();
+      comprobantesMock.darDeBajaPorAnulacion.mockRejectedValue(new Error('boom'));
+      const res: any = await service.anularCobro('10', { motivo: 'Cliente cambió el pedido' }, cajeroUsuario);
+      expect(res.pago_estado).toBe('PENDIENTE');
+      expect(res.aviso_comprobante).toBeNull();
     });
   });
 

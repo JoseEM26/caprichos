@@ -74,3 +74,22 @@ export function sumarDevolucionesDigitales(
     tarjeta: enPesos(centimos.tarjeta),
   };
 }
+
+/**
+ * Pedidos pagados (confirmados o entregados ese día) que no tienen ningún cobro vigente: dinero que no pasó
+ * por «cobrar». Quedan fuera por diseño el crédito del personal y el total 0 (una cortesía solo baja el total).
+ */
+export function pagadosSinCobroDelDia(db: { pedido: { findMany: (args: any) => Promise<any[]> } }, enElDia: { gte: Date; lt: Date }) {
+  return db.pedido.findMany({
+    where: {
+      pago_estado: 'PAGADO',
+      estado: { not: 'ANULADO' },
+      es_personal: false,
+      total: { gt: 0 },
+      cobros: { none: { anulado_en: null } },
+      OR: [{ pago_coordinado_en: enElDia }, { entregado_en: enElDia }],
+    },
+    include: { planPago: true },
+    orderBy: { id: 'asc' },
+  });
+}

@@ -13,8 +13,9 @@ const RELACIONES: Record<string, [string, string]> = { cobros: ['cobro', 'pedido
 
 function coincide(db: Db, fila: Fila, where: any = {}): boolean {
   if (where.OR && !where.OR.some((w: any) => coincide(db, fila, w))) return false;
+  if (where.AND && !where.AND.every((w: any) => coincide(db, fila, w))) return false;
   for (const [k, cond] of Object.entries<any>(where)) {
-    if (k === 'OR') continue;
+    if (k === 'OR' || k === 'AND') continue;
     if (RELACIONES[k] && cond && typeof cond === 'object' && ('some' in cond || 'none' in cond)) {
       const [tabla, fk] = RELACIONES[k];
       const hijas = (db[tabla] as Fila[]).filter((h) => h[fk] === fila.id);
@@ -26,6 +27,7 @@ function coincide(db: Db, fila: Fila, where: any = {}): boolean {
     if (cond !== null && typeof cond === 'object' && !(cond instanceof Date) && !Array.isArray(cond)) {
       if ('in' in cond && !cond.in.some((x: any) => x === v)) return false;
       if ('lt' in cond && (v == null || !(v < cond.lt))) return false;
+      if ('gt' in cond && (v == null || !(v > cond.gt))) return false;
       if ('lte' in cond && (v == null || !(v <= cond.lte))) return false;
       if ('gte' in cond && (v == null || !(v >= cond.gte))) return false;
       if ('not' in cond && (cond.not === null ? v == null : v === cond.not)) return false;

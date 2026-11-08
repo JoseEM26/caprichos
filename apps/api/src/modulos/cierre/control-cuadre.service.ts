@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { aCentimos, enPesos } from '../caja/caja.calculo';
-import { rangoDiaCaja } from './cierre.util';
+import { pagadosSinCobroDelDia, rangoDiaCaja } from './cierre.util';
 
 const DIGITALES = ['YAPE', 'PLIN', 'TRANSFERENCIA', 'TARJETA'];
 
@@ -44,25 +44,14 @@ export class ControlCuadreService {
 
     // 2. Pedidos pagados que no tienen ningún cobro vigente (no pasaron por «cobrar» de Caja): su dinero digital no
     //    entra a ninguna caja; el efectivo de un delivery entra solo si el repartidor se liquidó.
-    const sinCobro = await this.prisma.pedido.findMany({
-      where: {
-        pago_estado: 'PAGADO',
-        estado: { not: 'ANULADO' },
-        es_personal: false,
-        total: { gt: 0 },
-        cobros: { none: { anulado_en: null } },
-        OR: [{ pago_coordinado_en: enElDia }, { entregado_en: enElDia }],
-      },
-      include: { planPago: true },
-      orderBy: { id: 'asc' },
-    });
-    const pagadosSinCobro = sinCobro.map((p) => {
+    const sinCobro = await pagadosSinCobroDelDia(this.prisma, enElDia);
+    const pagadosSinCobro = sinCobro.map((p: any) => {
       const plan = p.planPago ?? [];
       const digital = plan.length
-        ? plan.filter((f) => DIGITALES.includes(f.medio)).reduce((a, f) => a + aCentimos(f.monto), 0)
+        ? plan.filter((f: any) => DIGITALES.includes(f.medio)).reduce((a: number, f: any) => a + aCentimos(f.monto), 0)
         : DIGITALES.includes(String(p.pago_metodo)) ? aCentimos(p.total) : 0;
       const efectivo = plan.length
-        ? plan.filter((f) => f.medio === 'EFECTIVO').reduce((a, f) => a + aCentimos(f.monto), 0)
+        ? plan.filter((f: any) => f.medio === 'EFECTIVO').reduce((a: number, f: any) => a + aCentimos(f.monto), 0)
         : p.pago_metodo === 'EFECTIVO' ? aCentimos(p.total) : 0;
       return {
         pedido: p.codigo,
@@ -98,6 +87,12 @@ export class ControlCuadreService {
     });
     const comprobantesDeMas = comprobantes.filter((c) => !BAJA_HECHA.includes(c.baja_estado ?? ''));
 
+    // 4b. Bajas que SUNAT no recibió todavía (anulación de cobro o pedido con SUNAT sin respuesta): se reintentan solas
+    const bajasPendientes = await this.prisma.comprobante.findMany({
+      where: { baja_estado: 'PENDIENTE_BAJA' },
+      select: { numero_texto: true, pedido: { select: { codigo: true } } },
+    });
+
     // 5. Devoluciones del día y cierre de la caja del día (si ya cerró)
     const devoluciones = await this.prisma.devolucionPedido.findMany({
       where: { creado_en: enElDia },
@@ -121,6 +116,7 @@ export class ControlCuadreService {
     if (cobrosDescuadrados.length) alertas.push(`${cobrosDescuadrados.length} cobro(s) cuyos pagos no suman su total`);
     if (anulados.length) alertas.push(`${anulados.length} pedido(s) anulados con cobro vigente y sin devolución`);
     if (comprobantesDeMas.length) alertas.push(`${comprobantesDeMas.length} boleta(s)/factura(s) vigentes de pedidos anulados o sin cobro`);
+    if (bajasPendientes.length) alertas.push(`${bajasPendientes.length} boleta(s)/factura(s) con la baja pendiente de enviar a SUNAT (se reintenta sola)`);
     if (descuadresCierre.length) alertas.push(`El cierre de la caja registró descuadre en ${descuadresCierre.map((d) => d.medio).join(', ')}`);
 
     return {
@@ -143,6 +139,7 @@ export class ControlCuadreService {
         estadoPedido: c.pedido.estado,
         total: Number(c.pedido.total),
       })),
+      bajasPendientes: bajasPendientes.map((c) => ({ comprobante: c.numero_texto, pedido: c.pedido.codigo })),
       alertas,
       cuadra: alertas.length === 0,
     };

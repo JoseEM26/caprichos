@@ -739,6 +739,15 @@ export class CobrosService {
       }
     }
 
+    // La boleta/factura de ese cobro se da de baja (sin tumbar la anulación si SUNAT no responde: queda pendiente
+    // de baja y se reintenta). Un nuevo cobro del pedido emite otra, nunca reutiliza esta.
+    let comprobanteBaja: { comprobante: string; estado: string } | null = null;
+    try {
+      comprobanteBaja = (await this.comprobantesService?.darDeBajaPorAnulacion(cobro.pedido_id, dto.motivo, usuario, ip)) ?? null;
+    } catch {
+      // el control de cuadre señala la boleta vigente de un pedido sin cobro
+    }
+
     // 3. Auditar: quién pidió, quién aprobó con su PIN, motivo y los pagos anulados
     //    (el cobro anulado se conserva como fila; si el pedido se vuelve a cobrar, el nuevo cobro es otra fila)
     const pagosAnulados = cobro.pagos.map((p) => ({
@@ -767,6 +776,7 @@ export class CobrosService {
         anulado_por: usuario.partyId.toString(),
         motivo: dto.motivo.trim(),
         pago_estado: 'PENDIENTE',
+        comprobante_baja: comprobanteBaja,
       },
       ip,
     });
@@ -781,6 +791,13 @@ export class CobrosService {
       anulado_por: usuario.partyId.toString(),
       motivo_anulacion: dto.motivo.trim(),
       pago_estado: 'PENDIENTE',
+      comprobante_baja: comprobanteBaja,
+      // Caja ve qué pasó con la boleta/factura: baja hecha, anulada sin enviar o pendiente de reintento
+      aviso_comprobante: comprobanteBaja
+        ? comprobanteBaja.estado === 'PENDIENTE_BAJA'
+          ? `La baja de ${comprobanteBaja.comprobante} quedó pendiente: SUNAT no respondió y se reintenta sola.`
+          : `${comprobanteBaja.comprobante} se dio de baja (${comprobanteBaja.estado}).`
+        : null,
     };
   }
 

@@ -36,6 +36,7 @@ import { HistorialCierresDto } from './dto/historial.dto';
 import {
   ClaveDigitalCierre,
   calcularTotalConteo,
+  pagadosSinCobroDelDia,
   rangoDiaCaja,
   sumarDevolucionesDigitales,
 } from './cierre.util';
@@ -522,6 +523,7 @@ export class CierreService {
   ) {
     const cajaAbierta = await this.obtenerCajaAbierta();
 
+    let pagosSinCobro: string[] = [];
     const cierre = await this.prisma.$transaction(async (tx) => {
       const caja = await this.bloquearCajaAbierta(tx, cajaAbierta.id);
 
@@ -622,6 +624,23 @@ export class CierreService {
         }
       }
 
+      // Dinero pagado que no pasó por «cobrar» (confirmaciones de antes de esta versión): no se cierra a ciegas.
+      // No bloquea (Caja no tiene cómo cobrarlo de nuevo; lo regulariza el administrador con «conciliar-cobros»),
+      // pero exige la nota y deja los pedidos escritos en la auditoría del cierre.
+      const { inicio: dIni, fin: dFin } = rangoDiaCaja(new Date(caja.fecha));
+      const sinCobro = await pagadosSinCobroDelDia(tx, { gte: dIni, lt: dFin });
+      if (sinCobro.length > 0 && (!dto.nota || dto.nota.trim().length < 3)) {
+        throw new HttpException(
+          {
+            codigo: 'PAGOS_SIN_COBRO',
+            mensaje: `Hay ${sinCobro.length} pedido(s) pagados sin cobro en caja (${sinCobro.map((p: any) => p.codigo).join(', ')}). Su dinero no suma en este cierre: escribe una nota para cerrar y avisa al administrador.`,
+            pedidos: sinCobro.map((p: any) => ({ codigo: p.codigo, total: Number(p.total), medio: p.pago_metodo })),
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+      pagosSinCobro = sinCobro.map((p: any) => `${p.codigo} S/ ${Number(p.total).toFixed(2)} ${p.pago_metodo ?? ''}`.trim());
+
       const mediosData = [
         { medio: 'EFECTIVO', sistema: montos.esperadoEfectivo, visto: vistos.efectivo, diferencia: comparacion.difEfectivo },
         { medio: 'YAPE', sistema: montos.sistemaYape, visto: vistos.yape, diferencia: comparacion.difYape },
@@ -675,6 +694,7 @@ export class CierreService {
       despues: {
         resultado,
         nota: dto.nota?.trim() ?? null,
+        ...(pagosSinCobro.length ? { pagos_sin_cobro: pagosSinCobro } : {}),
       },
       partyId: usuario.partyId,
       ip,
@@ -991,6 +1011,29 @@ export class CierreService {
       // Si siguieran PENDIENTE o COORDINADO (p. ej. pago dividido con Yape validado y efectivo contraentrega)
       // bloquearían el cierre, y cobrarlos después contaría el efectivo dos veces.
       const pedidosIds = (info?.pedidos ?? []).map((p) => BigInt(p.id));
+      // Pago dividido (p. ej. Yape 38 + efectivo 2): el efectivo entra por esta liquidación y la parte digital, que
+      // ya validó Caja, se asienta como Cobro digital en esta caja. Sin él el pedido quedaría PAGADO con parte del
+      // dinero fuera de caja y ya no se podría cobrar. La liquidación no cambia (ver efectivoDelRepartidor).
+      const porAsentar = await tx.pedido.findMany({
+        where: { id: { in: pedidosIds }, pago_estado: { in: ['PENDIENTE', 'COORDINADO'] }, cobros: { none: { anulado_en: null } } },
+        include: { planPago: true },
+      });
+      for (const ped of porAsentar) {
+        const digitales = (ped.planPago ?? []).filter((f) => f.medio !== 'EFECTIVO' && aCentimos(f.monto) > 0);
+        if (digitales.length === 0) continue;
+        await tx.cobro.create({
+          data: {
+            pedido_id: ped.id,
+            caja_id: caja.id,
+            total: enPesos(digitales.reduce((a, f) => a + aCentimos(f.monto), 0)),
+            credito_personal: false,
+            cobrado_por: BigInt(usuario.partyId),
+            pagos: {
+              create: digitales.map((f) => ({ medio: String(f.medio).toUpperCase(), monto: enPesos(aCentimos(f.monto)), propina: 0 })),
+            },
+          },
+        });
+      }
       await tx.pedido.updateMany({
         where: { id: { in: pedidosIds }, pago_estado: { in: ['PENDIENTE', 'COORDINADO'] } },
         data: { pago_estado: 'PAGADO' },

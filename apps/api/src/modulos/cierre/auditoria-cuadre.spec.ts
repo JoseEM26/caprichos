@@ -91,6 +91,14 @@ describe('cuadre de caja: calcularMontosCaja', () => {
     expect(efectivoDelRepartidor({ ...contraEntrega, cobros: [{ anulado_en: null }] })).toBe(0);
   });
 
+  it('H2: el cobro digital asentado al liquidar (38 de 40) no le quita al repartidor su efectivo (2)', () => {
+    const plan = [{ medio: 'YAPE', monto: 38 }, { medio: 'EFECTIVO', monto: 2 }];
+    const base = { total: 40, pago_metodo: 'YAPE', planPago: plan };
+    expect(efectivoDelRepartidor({ ...base, cobros: [{ anulado_en: null, total: 38 }] })).toBe(200);
+    // un cobro completo (Caja cobró todo) sí lo saca de la liquidación
+    expect(efectivoDelRepartidor({ ...base, cobros: [{ anulado_en: null, total: 40 }] })).toBe(0);
+  });
+
   it('4. cambio de cobro Yape -> efectivo: el repartidor rinde el efectivo nuevo y el Yape original deja de contar', () => {
     const base = { total: 40, cobros: [] as any[] };
     expect(efectivoDelRepartidor({ ...base, pago_metodo: 'YAPE' })).toBe(0);
