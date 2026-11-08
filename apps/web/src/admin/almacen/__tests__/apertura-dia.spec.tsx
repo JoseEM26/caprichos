@@ -37,6 +37,23 @@ describe('Apertura del día (conteo de productos controlados)', () => {
     expect(screen.getByText(/05\/11\/2026/)).toBeInTheDocument();
   });
 
+  it('Total = saldo real de hoy (con ventas y lo ya producido) + lo que sumes ahora; no queda en 0 si se vendió producción de hoy', async () => {
+    // Ayer quedaron 2, hoy se produjeron 10 y se vendieron 5: saldo 7. La API propone «Quedaron» = max(0, 7 - 10) = 0.
+    vi.spyOn(almacenApi, 'obtenerApertura').mockResolvedValue({
+      fecha: '2026-11-05',
+      productos: [{ productoId: 'p1', nombre: 'DONA FRESA', areaNombre: 'Cocina', saldo: 7, quedaronAyer: 0, producidoHoy: 10, aperturaHoy: true, aperturaCantidad: 12 }],
+    });
+    render(<AperturaDiaView />);
+    await screen.findByText('DONA FRESA');
+    const total = () => screen.getByTestId('apertura-fila').querySelector('.ap-total')?.textContent;
+    expect(total()).toBe('7');
+    fireEvent.change(screen.getByLabelText('Produje hoy DONA FRESA'), { target: { value: '3' } });
+    expect(total()).toBe('10');
+    // Si se corrige lo contado, manda el conteo: 1 + lo producido hoy (10) + lo nuevo (3)
+    fireEvent.change(screen.getByLabelText('Quedaron de ayer DONA FRESA'), { target: { value: '1' } });
+    expect(total()).toBe('14');
+  });
+
   it('envía solo lo que falta o cambió, con el cuerpo correcto', async () => {
     const registrar = vi.spyOn(almacenApi, 'registrarApertura').mockResolvedValue({ ok: true, registrados: 1 });
     render(<AperturaDiaView />);

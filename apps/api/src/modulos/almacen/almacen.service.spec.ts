@@ -597,10 +597,10 @@ describe('AlmacenService', () => {
       expect(p).toMatchObject({ saldo: 4, aperturaHoy: true });
     });
 
-    it('GET: un producto oculto no entra a la apertura (la consulta excluye oculto)', async () => {
+    it('GET: un producto oculto no entra a la apertura (la consulta excluye oculto y los anfitriones de combo)', async () => {
       await service.obtenerApertura();
       expect(prisma.producto.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { controla_stock: true, oculto: false } }),
+        expect.objectContaining({ where: { controla_stock: true, oculto: false, ofertasAlcance: { none: { tipo: 'COMBO' } } } }),
       );
     });
 

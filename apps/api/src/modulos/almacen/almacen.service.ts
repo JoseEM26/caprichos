@@ -70,9 +70,10 @@ export class AlmacenService {
   // ==========================================
   async obtenerApertura() {
     const fecha = fechaLimaHoy();
-    // Un producto oculto no se cuenta ni aparece en la apertura (aunque tenga la casilla de control)
+    // Un producto oculto no se cuenta ni aparece en la apertura (aunque tenga la casilla de control).
+    // El anfitrión de un combo (Dúo, paquetes) tampoco: no lleva saldo propio, sus piezas descuentan su producto.
     const productos = await this.prisma.producto.findMany({
-      where: { controla_stock: true, oculto: false },
+      where: { controla_stock: true, oculto: false, ofertasAlcance: { none: { tipo: 'COMBO' } } },
       select: {
         id: true,
         nombre: true,
