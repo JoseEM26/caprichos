@@ -448,6 +448,61 @@ describe('ComandasService', () => {
     });
   });
 
+  describe('aviso de ingreso por área (cocina:ingreso)', () => {
+    it('emite NUEVO una vez por área que recibe comanda, con nombre y cliente', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 3n, codigo: 'CP-W113', estado: 'COLA', cliente_nombre: 'Ana',
+        lineas: [
+          { id: 31n, area_id: 1n, producto: null },
+          { id: 32n, area_id: 2n, producto: null },
+        ],
+        comandas: [],
+      });
+      prisma.comandaArea.create.mockResolvedValue({ id: 1 });
+      prisma.areaCocina.findMany.mockResolvedValue([{ id: 1n, nombre: 'Bebidas' }, { id: 2n, nombre: 'Salados' }]);
+
+      await service.sincronizarPedido(3n);
+
+      const llamadas = eventosGateway.emitirAdmin.mock.calls.filter((c: any) => c[0] === 'cocina:ingreso');
+      expect(llamadas.map((c: any) => c[1])).toEqual([
+        { pedidoId: 3, codigo: 'CP-W113', areaId: 1, areaNombre: 'Bebidas', cliente: 'Ana', tipo: 'NUEVO' },
+        { pedidoId: 3, codigo: 'CP-W113', areaId: 2, areaNombre: 'Salados', cliente: 'Ana', tipo: 'NUEVO' },
+      ]);
+    });
+
+    it('una sincronización idempotente (comandas ya creadas) no emite nada', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 3n, codigo: 'CP-W113', estado: 'COLA',
+        lineas: [{ id: 31n, area_id: 1n, producto: null }],
+        comandas: [{ area_id: 1n, estado: 'EN_COCINA' }],
+      });
+      await service.sincronizarPedido(3n);
+      expect(eventosGateway.emitirAdmin).not.toHaveBeenCalledWith('cocina:ingreso', expect.anything());
+    });
+
+    it('un área nueva en un pedido que ya tenía comandas sale como EXTRA', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: 3n, codigo: 'CP-W113', estado: 'PREPARANDO', cliente_nombre: null, numero_dia: 5,
+        lineas: [{ id: 31n, area_id: 1n, producto: null }, { id: 32n, area_id: 2n, producto: null }],
+        comandas: [{ area_id: 1n, estado: 'EN_COCINA' }],
+      });
+      prisma.comandaArea.create.mockResolvedValue({ id: 1 });
+      prisma.areaCocina.findMany.mockResolvedValue([{ id: 2n, nombre: 'Salados' }]);
+      await service.sincronizarPedido(3n);
+      expect(eventosGateway.emitirAdmin).toHaveBeenCalledWith('cocina:ingreso', expect.objectContaining({ areaId: 2, tipo: 'EXTRA' }));
+    });
+
+    it('devolver al área emite DEVUELTO; despejar no emite ingreso', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({ id: 9n, codigo: 'CP-0009', estado: 'PREPARANDO', cliente_nombre: 'Luis' });
+      prisma.comandaArea.findUnique.mockResolvedValue({ pedido_id: 9n, area_id: 1n, estado: 'DESPEJADA' });
+      prisma.areaCocina.findMany.mockResolvedValue([{ id: 1n, nombre: 'Bebidas' }]);
+      await service.devolver(9n, 1n, mockUsuario);
+      expect(eventosGateway.emitirAdmin).toHaveBeenCalledWith('cocina:ingreso', {
+        pedidoId: 9, codigo: 'CP-0009', areaId: 1, areaNombre: 'Bebidas', cliente: 'Luis', tipo: 'DEVUELTO',
+      });
+    });
+  });
+
   describe('devolver comanda', () => {
     it('vuelve la comanda a pendiente y si el pedido estaba LISTO regresa a COLA con historial y auditoría', async () => {
       const pedidoListo = {
