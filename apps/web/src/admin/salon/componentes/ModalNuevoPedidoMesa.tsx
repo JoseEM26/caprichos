@@ -981,6 +981,7 @@ export function ModalNuevoPedidoMesa({
   const claveDescuento = JSON.stringify([
     lineas.filter((l) => !l.cortesia).map((l) => [l.productoId, l.cantidad, l.precioTotal]),
     cuponAplicado?.codigo ?? null,
+    modalidad,
   ]);
   useEffect(() => {
     const aValidar = lineas.filter((l) => !l.cortesia);
@@ -993,6 +994,8 @@ export function ModalNuevoPedidoMesa({
       api.post<{ descuentoTotal: number }>('/admin/ofertas/vista-previa', {
         canal: edicion?.datos.canal ?? canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO'),
         codigo: cuponAplicado?.codigo,
+        // mesa/local = COMER_LOCAL: las promociones valen según el tipo de pedido
+        modalidad: modalidad === 'local' ? 'COMER_LOCAL' : modalidad === 'llevar' ? 'LLEVAR' : 'DELIVERY',
         lineas: aValidar.map((l) => ({
           productoId: l.productoId,
           cantidad: l.cantidad,

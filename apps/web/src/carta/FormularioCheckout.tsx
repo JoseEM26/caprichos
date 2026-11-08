@@ -46,6 +46,7 @@ function textoResumenEnvio(zona: string, tarifa: number, subtotal: number, regla
 }
 
 import { AvisoComerEnLocal } from './AvisoComerEnLocal';
+import { aplicaModalidad, NOMBRE_MODALIDAD } from './modalidadOferta';
 
 export function FormularioCheckout({
   estadoLocal,
@@ -213,7 +214,7 @@ export function FormularioCheckout({
 
   // lo que descontará el servidor (promociones automáticas y cupón), para mostrar el mismo total que se cobra
   const tieneSesion = Boolean(clienteCuenta);
-  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion]);
+  const clavePromos = JSON.stringify([lineas.map((l) => [l.productoId, l.cantidad, l.subtotal]), cuponAplicado?.codigo, tieneSesion, modalidad]);
   useEffect(() => {
     if (!checkoutAbierto || lineas.length === 0) return;
     let vigente = true;
@@ -221,6 +222,8 @@ export function FormularioCheckout({
       .post<{ descuentoTotal: number; montoCanjeable?: number; puntosEstimados?: number; puntosPorcentaje?: number; detalles: { tipo?: string; nombre: string; monto: number }[] }>('/carta/descuentos/vista-previa', {
         lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, subtotal: l.subtotal, precioUnitario: l.precioUnitario })),
         cuponCodigo: cuponAplicado?.codigo,
+        // Las promociones valen según el tipo de pedido: al cambiarlo se recalcula sin perder el carrito
+        modalidad,
       })
       .then((r) => vigente && setPromos({ total: Number(r?.descuentoTotal) || 0, canjeable: typeof r?.montoCanjeable === 'number' ? r.montoCanjeable : null, puntosEstimados: typeof r?.puntosEstimados === 'number' ? r.puntosEstimados : null, porcentaje: typeof r?.puntosPorcentaje === 'number' ? r.puntosPorcentaje : null, detalles: Array.isArray(r?.detalles) ? r.detalles : [] }))
       .catch(() => vigente && setPromos({ total: 0, canjeable: null, puntosEstimados: null, porcentaje: null, detalles: [] }));
@@ -228,6 +231,26 @@ export function FormularioCheckout({
       vigente = false;
     };
   }, [checkoutAbierto, clavePromos]);
+
+  // Combos del carrito que no valen para la modalidad elegida (se avisa; el servidor también los rechaza)
+  const [ofertasCarta, setOfertasCarta] = useState<OfertaItem[]>([]);
+  useEffect(() => {
+    if (!checkoutAbierto || !lineas.some((l) => l.ofertaId)) return;
+    let vigente = true;
+    api
+      .get<OfertaItem[]>('/carta/ofertas')
+      .then((r) => vigente && setOfertasCarta(Array.isArray(r) ? r : []))
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [checkoutAbierto, lineas.length]);
+  const ofertasNoAplican = lineas
+    .filter((l) => l.ofertaId)
+    .map((l) => ofertasCarta.find((o) => String(o.id) === String(l.ofertaId)))
+    .filter((o): o is OfertaItem => !!o && !aplicaModalidad(o.modalidades, modalidad))
+    .filter((o, i, arr) => arr.findIndex((x) => x.id === o.id) === i);
+  const sinModalidadOferta = ofertasNoAplican.length > 0;
 
   // Sin sesión: se avisa que la primera compra se aplica al iniciar sesión (la validación real es del servidor)
   useEffect(() => {
@@ -645,6 +668,11 @@ export function FormularioCheckout({
 
     if (estadoLocal && (!estadoLocal.abierta || estadoLocal.pausaAltaDemanda)) {
       setErrorEnvio('La carta se encuentra cerrada o en pausa: no se pueden enviar pedidos.');
+      return;
+    }
+
+    if (sinModalidadOferta) {
+      setErrorEnvio(`${ofertasNoAplican[0].nombre} no aplica para ${NOMBRE_MODALIDAD[modalidad]}. Cambia el tipo de pedido o quítala del carrito.`);
       return;
     }
 
@@ -2554,6 +2582,18 @@ export function FormularioCheckout({
                 </div>
               )}
 
+              {sinModalidadOferta && (
+                <div
+                  role="alert"
+                  data-testid="aviso-oferta-modalidad"
+                  style={{ backgroundColor: 'var(--cp-sand)', border: '1.5px solid var(--cp-rust)', borderRadius: '10px', padding: '8px 12px', fontSize: '13px', fontWeight: 700, lineHeight: '17px' }}
+                >
+                  {ofertasNoAplican.map((o) => (
+                    <div key={o.id}>{`Esta oferta no aplica para ${NOMBRE_MODALIDAD[modalidad]}: ${o.nombre}. Cambia el tipo de pedido o quítala del carrito.`}</div>
+                  ))}
+                </div>
+              )}
+
               {/* Mensaje de error del apartado o de la API */}
               {(errorPaso || errorEnvio) && (
                 <div
@@ -2624,24 +2664,24 @@ export function FormularioCheckout({
                 ) : (
                   <button
                     type="button"
-                    disabled={enviando || enviarBloqueadoPorStock}
+                    disabled={enviando || enviarBloqueadoPorStock || sinModalidadOferta}
                     onClick={() => void enviarPedido()}
                     style={{
                       flex: 1,
                       minHeight: '48px',
                       borderRadius: '12px',
                       border: 0,
-                      backgroundColor: enviando || enviarBloqueadoPorStock ? 'var(--cp-line)' : 'var(--cp-orange)',
-                      color: enviando || enviarBloqueadoPorStock ? 'var(--cp-soft)' : '#FFFFFF',
+                      backgroundColor: enviando || enviarBloqueadoPorStock || sinModalidadOferta ? 'var(--cp-line)' : 'var(--cp-orange)',
+                      color: enviando || enviarBloqueadoPorStock || sinModalidadOferta ? 'var(--cp-soft)' : '#FFFFFF',
                       fontFamily: 'var(--fuente-titulos)',
                       fontWeight: 800,
                       fontSize: '15px',
-                      cursor: enviando || enviarBloqueadoPorStock ? 'not-allowed' : 'pointer',
+                      cursor: enviando || enviarBloqueadoPorStock || sinModalidadOferta ? 'not-allowed' : 'pointer',
                     }}
                   >
                     {enviando
                       ? 'Enviando pedido...'
-                      : enviarBloqueadoPorStock
+                      : enviarBloqueadoPorStock || sinModalidadOferta
                         ? 'Ajusta tu pedido para enviar'
                         : `Enviar pedido · S/ ${aCobrar.toFixed(2)}`}
                   </button>

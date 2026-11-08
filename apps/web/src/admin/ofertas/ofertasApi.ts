@@ -110,6 +110,8 @@ export interface OfertaItem {
   fechaInicio?: string | null;
   fechaFin?: string | null;
   canales?: string[];
+  /** Tipos de pedido donde vale (COMER_LOCAL, LLEVAR, RECOGER, DELIVERY); vacío = todos */
+  modalidades?: string[];
   limiteUsos?: number | null;
   usosActuales?: number;
   noSumaBeneficios?: boolean;

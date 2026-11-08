@@ -1,6 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
-import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
+import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, errorModalidades, estadoDesdeOferta, modalidadesDesdeEstado } from './canalesPromo';
 import { useState, useEffect, useMemo } from 'react';
 import { OfertaItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -131,7 +131,7 @@ export function ModalLlevaPaga({
       setHoraHasta(ofertaAEditar.horaFin || ofertaAEditar.horaHasta || '');
       setFechaDesde(ofertaAEditar.fechaInicio ? ofertaAEditar.fechaInicio.slice(0, 10) : ofertaAEditar.fechaDesde ? ofertaAEditar.fechaDesde.slice(0, 10) : '');
       setFechaHasta(ofertaAEditar.fechaFin ? ofertaAEditar.fechaFin.slice(0, 10) : ofertaAEditar.fechaHasta ? ofertaAEditar.fechaHasta.slice(0, 10) : '');
-      setCanales(estadoDesdeCanales(ofertaAEditar.canales));
+      setCanales(estadoDesdeOferta(ofertaAEditar));
       setVisibleCarta(ofertaAEditar.visibleCarta !== false);
       setPestana('que');
       setVerErrores(false);
@@ -269,6 +269,7 @@ export function ModalLlevaPaga({
     if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de inicio debe ser antes de la hora final.';
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
     if (!canales.carta && !canales.local && !canales.bot) return ERROR_SIN_CANALES;
+    { const errMod = errorModalidades('LLEVA_PAGA', canales); if (errMod) return errMod; }
     return null;
   };
   const erroresPestanas = [
@@ -329,6 +330,7 @@ export function ModalLlevaPaga({
         fechaFin: fechaHasta || undefined,
         fechaHasta: fechaHasta || undefined,
         canales: canalesDesdeEstado(canales),
+        modalidades: modalidadesDesdeEstado(canales.modalidades),
         imagenArchivoId: fotoArchivoId,
         llevaPaga: {
           lleva: qLleva,
@@ -368,6 +370,7 @@ export function ModalLlevaPaga({
     fechaDesde: fechaDesde || null,
     fechaHasta: fechaHasta || null,
     canales: canalesDesdeEstado(canales),
+    modalidades: modalidadesDesdeEstado(canales.modalidades),
     activo: true,
   };
 

@@ -12,7 +12,7 @@ import { ModalCombo } from './ModalCombo';
 import { ModalLlevaPaga } from './ModalLlevaPaga';
 import { ModalDescuento } from './ModalDescuento';
 import { ModalEnvioGratis } from './ModalEnvioGratis';
-import { estadoDesdeCanales } from './canalesPromo';
+import { chipsModalidades, estadoDesdeCanales, incluyeModalidadFiltro, OPCIONES_FILTRO_MODALIDAD } from './canalesPromo';
 import { ModalCupon } from './ModalCupon';
 import { ModalHistorialCupones, HistorialMovimiento } from './ModalHistorialCupones';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -193,6 +193,19 @@ function formatearHora12(hStr?: string | null): string {
   return m === '00' ? `${h} ${ampm}` : `${h}:${m} ${ampm}`;
 }
 
+/** Chips «Comer aquí · Llevar · Recoger · Delivery» cuando la oferta no vale para todos los tipos de pedido. */
+function ChipsModalidad({ modalidades }: { modalidades?: string[] | null }) {
+  const chips = chipsModalidades(modalidades);
+  if (chips.length === 0) return null;
+  return (
+    <div data-testid="chips-modalidad" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+      {chips.map((c) => (
+        <span key={c} style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', backgroundColor: 'var(--cp-sand)', border: '1px solid var(--cp-line)' }}>{c}</span>
+      ))}
+    </div>
+  );
+}
+
 function formatearHorarioOferta(o: {
   dias?: number[] | null;
   diasSemana?: number[] | null;
@@ -356,6 +369,7 @@ export function OfertasAdminView() {
 
   const [cuponesEmitidosAbierto, setCuponesEmitidosAbierto] = useState(false);
   const [filtroEstadoEmitidos, setFiltroEstadoEmitidos] = useState('Todos');
+  const [filtroModalidad, setFiltroModalidad] = useState('Todos');
   const [busquedaEmitidos, setBusquedaEmitidos] = useState('');
 
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false);
@@ -442,8 +456,8 @@ export function OfertasAdminView() {
 
   // Filtros de ofertas
   const promociones = useMemo(
-    () => ofertas.filter((o) => o.tipo === 'COMBO' || o.tipo === 'LLEVA_PAGA'),
-    [ofertas],
+    () => ofertas.filter((o) => (o.tipo === 'COMBO' || o.tipo === 'LLEVA_PAGA') && incluyeModalidadFiltro(o.modalidades, filtroModalidad)),
+    [ofertas, filtroModalidad],
   );
 
   // Los combos tienen precio propio: no se descuentan ni entran a 2x1; se gestionan solo en Ofertas.
@@ -456,8 +470,8 @@ export function OfertasAdminView() {
 
   // Las promos de envío gratis viven en esta pestaña: se aplican solas, sin código, como los descuentos
   const descuentos = useMemo(
-    () => ofertas.filter((o) => o.tipo === 'DESCUENTO' || o.tipo === 'DESCUENTO_AUTOMATICO' || o.tipo === 'ENVIO_GRATIS'),
-    [ofertas],
+    () => ofertas.filter((o) => (o.tipo === 'DESCUENTO' || o.tipo === 'DESCUENTO_AUTOMATICO' || o.tipo === 'ENVIO_GRATIS') && incluyeModalidadFiltro(o.modalidades, filtroModalidad)),
+    [ofertas, filtroModalidad],
   );
 
   // Guardar reglas
@@ -846,6 +860,16 @@ export function OfertasAdminView() {
             </div>
           )}
 
+          <BarraFiltros>
+            <FiltroCombo
+              etiqueta="Tipo de pedido"
+              valor={filtroModalidad}
+              valorPorDefecto="Todos"
+              opciones={OPCIONES_FILTRO_MODALIDAD}
+              alCambiar={setFiltroModalidad}
+            />
+          </BarraFiltros>
+
           {/* Tarjetas de Promociones */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
             {promociones.map((pr) => {
@@ -979,6 +1003,7 @@ export function OfertasAdminView() {
                     </span>
                   </div>
 
+                  <ChipsModalidad modalidades={pr.modalidades} />
                   <div style={{ fontSize: '12px', lineHeight: '16px', color: 'var(--cp-soft)' }}>
                     {horarioTxt}
                   </div>
@@ -1122,6 +1147,16 @@ export function OfertasAdminView() {
             </div>
           )}
 
+          <BarraFiltros>
+            <FiltroCombo
+              etiqueta="Tipo de pedido"
+              valor={filtroModalidad}
+              valorPorDefecto="Todos"
+              opciones={OPCIONES_FILTRO_MODALIDAD}
+              alCambiar={setFiltroModalidad}
+            />
+          </BarraFiltros>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
             {descuentos.map((d) => {
               const esEnvio = d.tipo === 'ENVIO_GRATIS';
@@ -1247,6 +1282,7 @@ export function OfertasAdminView() {
                     </span>
                   </div>
 
+                  <ChipsModalidad modalidades={d.modalidades} />
                   <div style={{ fontSize: '12px', lineHeight: '16px', color: 'var(--cp-soft)' }}>
                     {horarioTxt}
                     <br />
