@@ -520,11 +520,17 @@
     position: relative;
     flex: 0 1 auto;
     z-index: 1;
-    max-height: 45%;
-    max-height: 45dvh;
+    max-height: 62%;
+    max-height: 62dvh;
     padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));
     border-radius: 16px;
     box-shadow: 0 -6px 18px rgba(11, 44, 62, 0.18);
+  }
+
+  /* Abierto, el detalle ocupa un poco más de la mitad de la pantalla para poder leerlo bien */
+  .np-carrito.np-carrito--abierto {
+    min-height: 55dvh;
+    overflow-y: auto;
   }
 
   .np-carrito:not(.np-carrito--abierto) {

@@ -41,6 +41,6 @@ describe('Selector táctil de productos', () => {
     expect(css).toMatch(/\.np-producto\s*\{\s*display:\s*flex/);
     expect(css).toMatch(/\.np-producto-foto\s*\{[^}]*display:\s*block[^}]*max-width:\s*96px[^}]*max-height:\s*96px/);
     expect(css).toMatch(/max-height:\s*110px/);
-    expect(css).toMatch(/max-height:\s*45dvh/);
+    expect(css).toMatch(/max-height:\s*62dvh/);
   });
 });
