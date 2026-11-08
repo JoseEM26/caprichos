@@ -17,6 +17,8 @@ export const ROLES: readonly DefinicionRol[] = [
   { codigo: 'REPARTIDOR', nombre: 'Repartidor' },
   // Persona encargada del local: caja, salón y ve el código de supervisor. Sin administración.
   { codigo: 'SUPERVISOR', nombre: 'Supervisor' },
+  // Rol EXTRA para que cualquiera apoye en delivery (ver, seguir, tomar y entregar). A diferencia de REPARTIDOR sí se combina
+  { codigo: 'APOYO_DELIVERY', nombre: 'Apoyo en delivery' },
 ] as const;
 
 /** Roles retirados del sistema: el sincronizador les borra los permisos y nunca los recrea. */
@@ -354,6 +356,21 @@ export const MATRIZ: Record<string, string[]> = {
     'iniciativas/ver',
     'iniciativas/crear',
     'iniciativas/comentar',
+    'notificaciones/ver',
+    'notificaciones/marcar',
+  ],
+  // Apoyo en delivery (rol extra): lo del repartidor más seguir. SIN repartos/liquidar: ese permiso también liquida
+  // el efectivo de los repartidores (cierre) y reasigna; es dinero y queda en Caja y ADMIN.
+  // No se combina con ADMIN (ya lo tiene todo) pero sí con cualquier otro rol, a diferencia de REPARTIDOR.
+  APOYO_DELIVERY: [
+    'repartos/ver',
+    'repartos/seguir',
+    'repartos/tomar',
+    'repartos/entregar',
+    'repartos/reportar',
+    'repartos/chat',
+    'repartos/proponer_ubicacion',
+    'repartos/solicitar_cambio_cobro',
     'notificaciones/ver',
     'notificaciones/marcar',
   ],

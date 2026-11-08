@@ -7,12 +7,13 @@ import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { UsuariosAreasController } from './usuarios-areas.controller';
 import { UsuariosAreasService } from './usuarios-areas.service';
 import { UsuariosRolesService } from './usuarios-roles.service';
+import { UsuariosRolesMasivoService } from './usuarios-roles-masivo.service';
 import { UsuariosActividadService } from './usuarios-actividad.service';
 
 @Module({
   imports: [forwardRef(() => AvisosInternosModule), ArchivosModule, AuditoriaModule],
   controllers: [UsuariosController, UsuariosAreasController],
-  providers: [UsuariosService, UsuariosAreasService, UsuariosRolesService, UsuariosActividadService],
+  providers: [UsuariosService, UsuariosAreasService, UsuariosRolesService, UsuariosRolesMasivoService, UsuariosActividadService],
   exports: [UsuariosService],
 })
 export class UsuariosModule {}

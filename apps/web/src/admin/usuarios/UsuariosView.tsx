@@ -3,6 +3,7 @@ import { useSesion } from '../../comun/sesion';
 import { api, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { Campo } from '../../comun/Campo';
+import { Boton } from '../../comun/Boton';
 import type { UsuarioItem, RespuestaListarUsuarios, PersonalHorario } from './tipos';
 import { DIAS, formatoHoras, horasTurno } from './horario';
 import { CrearUsuarioModal, ETIQUETAS_ROLES } from './CrearUsuarioModal';
@@ -10,6 +11,8 @@ import { EditarUsuarioModal } from './EditarUsuarioModal';
 import { ClaveInicialModal } from './ClaveInicialModal';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { fechaLimaCorta } from './rolesTemporalesApi';
+import { BarraSeleccion, ModalRolesMasivos } from './RolesMasivos';
+import type { ResultadoRolesMasivo } from './rolesMasivoApi';
 
 type PestanaUsuario = 'personal' | 'clientes' | 'horarios' | 'roles';
 
@@ -115,6 +118,43 @@ export function UsuariosView() {
   // DNI completo revelado
   const [dnisRevelados, setDnisRevelados] = useState<Record<string, string>>({});
   const [auditados, setAuditados] = useState<Record<string, boolean>>({});
+
+  // Selección para dar o quitar un rol a varios usuarios
+  const [seleccionando, setSeleccionando] = useState(false);
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  /** Cuántas cuentas activas hay en total cuando se eligió «todos» (null = no se eligió). */
+  const [todosActivos, setTodosActivos] = useState<number | null>(null);
+  const [accionMasiva, setAccionMasiva] = useState<{ accion: 'agregar' | 'quitar'; rolFijo?: string } | null>(null);
+  const puedeAsignarMasivo = esAdmin && puedeEditar;
+  const cantidadSeleccion = todosActivos ?? seleccion.size;
+
+  const cancelarSeleccion = () => {
+    setSeleccionando(false);
+    setSeleccion(new Set());
+    setTodosActivos(null);
+  };
+  const alternarSeleccion = (id: string) => {
+    setTodosActivos(null);
+    setSeleccion((prev) => {
+      const sig = new Set(prev);
+      if (sig.has(id)) sig.delete(id);
+      else sig.add(id);
+      return sig;
+    });
+  };
+  const contarActivos = async () => {
+    const r = await api.get<RespuestaListarUsuarios>('/admin/usuarios?activo=true&limite=1');
+    return r?.total ?? 0;
+  };
+  const seleccionarTodos = async () => {
+    setTodosActivos(await contarActivos());
+  };
+  const atajoDelivery = async () => {
+    setSeleccionando(true);
+    setSeleccion(new Set());
+    setTodosActivos(await contarActivos());
+    setAccionMasiva({ accion: 'agregar', rolFijo: 'APOYO_DELIVERY' });
+  };
 
   // Modales
   const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
@@ -575,6 +615,25 @@ export function UsuariosView() {
                 >
                   Limpiar filtros
                 </button>
+                {puedeAsignarMasivo && (
+                  <>
+                    <button
+                      type="button"
+                      aria-pressed={seleccionando}
+                      onClick={() => (seleccionando ? cancelarSeleccion() : setSeleccionando(true))}
+                      style={{ minHeight: '48px', padding: '0 18px', border: '1.5px solid var(--cp-navy)', borderRadius: '12px', background: seleccionando ? 'var(--cp-navy)' : 'transparent', color: seleccionando ? 'var(--cp-cream)' : 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      Selección
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void atajoDelivery()}
+                      style={{ minHeight: '48px', padding: '0 18px', border: '1.5px solid var(--cp-navy)', borderRadius: '12px', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      Dar acceso a Delivery a todos
+                    </button>
+                  </>
+                )}
                 {puedeCrear && (
                   <button
                     type="button"
@@ -756,6 +815,34 @@ export function UsuariosView() {
             </div>
           )}
 
+          {seleccionando && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', padding: '14px 16px', background: 'var(--cp-sand)', borderRadius: '14px' }}>
+              <strong>Modo selección</strong>
+              <Boton
+                variante="secundario"
+                onClick={() => {
+                  setTodosActivos(null);
+                  setSeleccion(new Set(usuarios.map((u) => u.id)));
+                }}
+              >
+                {`Seleccionar visibles (${usuarios.length})`}
+              </Boton>
+              <Boton variante="secundario" onClick={() => void seleccionarTodos()}>
+                Seleccionar todos los activos
+              </Boton>
+              <Boton
+                variante="texto"
+                onClick={() => {
+                  setSeleccion(new Set());
+                  setTodosActivos(null);
+                }}
+              >
+                Limpiar selección
+              </Boton>
+              {todosActivos !== null && <span style={{ fontWeight: 700 }}>Todos los activos: {todosActivos}</span>}
+            </div>
+          )}
+
           {/* Grilla de Tarjetas de Usuario (Diseño Mockup) */}
           <div
             style={{
@@ -791,6 +878,15 @@ export function UsuariosView() {
                 >
                   {/* Encabezado de la tarjeta */}
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    {seleccionando && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Seleccionar a ${u.nombres} ${u.apellidos}`}
+                        checked={todosActivos !== null ? u.activo : seleccion.has(u.id)}
+                        onChange={() => alternarSeleccion(u.id)}
+                        style={{ flex: 'none', width: '28px', height: '28px', cursor: 'pointer' }}
+                      />
+                    )}
                     <span
                       style={{
                         flex: 'none',
@@ -1484,6 +1580,28 @@ export function UsuariosView() {
           alCambiarRoles={() => void cargarUsuarios()}
         />
       )}
+
+      {seleccionando && cantidadSeleccion > 0 && !accionMasiva && (
+        <BarraSeleccion
+          cantidad={cantidadSeleccion}
+          alAnadir={() => setAccionMasiva({ accion: 'agregar' })}
+          alQuitar={() => setAccionMasiva({ accion: 'quitar' })}
+          alCancelar={cancelarSeleccion}
+        />
+      )}
+
+      <ModalRolesMasivos
+        abierto={!!accionMasiva}
+        accion={accionMasiva?.accion ?? 'agregar'}
+        rolFijo={accionMasiva?.rolFijo}
+        cantidad={cantidadSeleccion}
+        usuarioIds={todosActivos !== null ? 'todos' : [...seleccion]}
+        alCerrar={() => setAccionMasiva(null)}
+        alTerminar={(_r: ResultadoRolesMasivo) => {
+          cancelarSeleccion();
+          void cargarUsuarios();
+        }}
+      />
 
       {claveInicialTemporal && (
         <ClaveInicialModal
