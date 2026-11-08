@@ -47,14 +47,26 @@ export function normalizarTexto(texto: string): string {
     .trim();
 }
 
-export function estaDisponible(agotadoHasta: Date | string | null | undefined): boolean {
+/** Regreso de un agotado «hasta que lo reactive una persona». */
+export const AGOTADO_INDEFINIDO = new Date('9999-12-31T23:59:59Z');
+
+/** Único criterio de disponibilidad (carta, bot, Caja, mozo, combos, pedidos): sin fecha, o fecha ya vencida. */
+export function estaDisponible(agotadoHasta: Date | string | null | undefined, ahoraMs: number = Date.now()): boolean {
   if (!agotadoHasta) return true;
   if (typeof agotadoHasta === 'string' && agotadoHasta.toLowerCase() === 'infinity') {
     return false;
   }
   const fecha = new Date(agotadoHasta);
   if (isNaN(fecha.getTime())) return false;
-  return fecha.getTime() <= Date.now();
+  return fecha.getTime() <= ahoraMs;
+}
+
+/** Hora de regreso (ISO) de un agotado temporal; null si es indefinido o no hay agotado. */
+export function regresoAgotado(agotadoHasta: Date | string | null | undefined): string | null {
+  if (!agotadoHasta) return null;
+  const f = new Date(agotadoHasta);
+  if (isNaN(f.getTime()) || f.getFullYear() >= 9999) return null;
+  return f.toISOString();
 }
 
 export function obtenerFotoUrl(archivo?: { ruta: string } | null): string | null {
@@ -487,6 +499,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       disponible: estaDisponible(p.agotado_hasta) && !sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan),
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
       agotadoOrigen: origenAgotadoAdmin(p, sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan)),
+      agotadoMotivo: estaDisponible(p.agotado_hasta) ? null : p.agotado_motivo ?? null,
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
       controlaStock: p.controla_stock,
@@ -579,6 +592,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       disponible: estaDisponible(p.agotado_hasta) && !sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan),
       agotadoHasta: p.agotado_hasta ? p.agotado_hasta.toISOString() : null,
       agotadoOrigen: origenAgotadoAdmin(p, sinSaldoAdmin(p, estadoSabores, stockAdmin.quedan)),
+      agotadoMotivo: estaDisponible(p.agotado_hasta) ? null : p.agotado_motivo ?? null,
       noSumaBeneficios: p.no_suma_beneficios,
       resaltarOpcionMenosPedida: p.resaltar_opcion_menos_pedida,
       controlaStock: p.controla_stock,
@@ -1067,24 +1081,22 @@ export class CatalogoService implements OnApplicationBootstrap {
       });
     }
 
-    let fechaAgotado: Date;
-    if (dto && dto.agotadoHasta) {
-      if (dto.agotadoHasta === 'infinity') {
-        fechaAgotado = new Date('9999-12-31T23:59:59Z');
-      } else {
-        fechaAgotado = new Date(dto.agotadoHasta);
-        if (isNaN(fechaAgotado.getTime())) {
-          fechaAgotado = new Date('9999-12-31T23:59:59Z');
-        }
+    let fechaAgotado: Date = AGOTADO_INDEFINIDO;
+    if (dto?.agotadoHasta && dto.agotadoHasta !== 'infinity') {
+      fechaAgotado = new Date(dto.agotadoHasta);
+      if (isNaN(fechaAgotado.getTime()) || fechaAgotado.getTime() <= Date.now()) {
+        throw new BadRequestException({
+          codigo: 'TIEMPO_AGOTADO_INVALIDO',
+          mensaje: 'La hora de regreso debe ser una fecha futura',
+        });
       }
-    } else {
-      fechaAgotado = new Date('9999-12-31T23:59:59Z');
     }
+    const motivo = dto?.motivo?.trim() ? dto.motivo.trim().slice(0, 120) : null;
 
-    // Agotar desde el admin es MANUAL: no vuelve solo al reponer ni al abrir el día.
+    // Agotar desde el admin es MANUAL: no vuelve solo al reponer ni al abrir el día (sí a la hora de regreso, si la hay).
     await this.prisma.producto.update({
       where: { id: pId },
-      data: { agotado_hasta: fechaAgotado, agotado_origen: 'MANUAL' },
+      data: { agotado_hasta: fechaAgotado, agotado_origen: 'MANUAL', agotado_motivo: motivo },
     });
     await this.prisma.agotado.updateMany({
       where: { producto_id: pId, reactivado_en: null },
@@ -1099,10 +1111,11 @@ export class CatalogoService implements OnApplicationBootstrap {
       entidad: 'producto',
       entidadId: pId,
       antes: { agotado_hasta: actual.agotado_hasta },
-      despues: { agotado_hasta: fechaAgotado.toISOString() },
+      despues: { agotado_hasta: fechaAgotado.toISOString(), motivo },
       partyId: usuario?.partyId,
       ip,
     });
+    await this.emitirDisponibilidad();
 
     return {
       ok: true,
@@ -1110,6 +1123,60 @@ export class CatalogoService implements OnApplicationBootstrap {
       disponible: false,
       agotadoHasta: fechaAgotado.toISOString(),
     };
+  }
+
+  /** Avisa a Caja, Productos y Cocina (tiempo real) quién está agotado ahora. Nunca lanza. */
+  async emitirDisponibilidad(): Promise<void> {
+    try {
+      const ahora = new Date();
+      const [ps, ss, os] = await Promise.all([
+        this.prisma.producto.findMany({ where: { agotado_hasta: { gt: ahora } }, select: { id: true } }),
+        this.prisma.sabor.findMany({ where: { agotado_hasta: { gt: ahora } }, select: { id: true } }),
+        this.prisma.opcion.findMany({ where: { agotado_hasta: { gt: ahora } }, select: { id: true } }),
+      ]);
+      const productos = ps.map((x) => x.id.toString());
+      const sabores = ss.map((x) => x.id.toString());
+      const opciones = os.map((x) => x.id.toString());
+      this.eventosGateway?.emitirAdmin('carta:disponibilidad', {
+        productos, sabores, opciones, productoIds: productos, saborIds: sabores, opcionIds: opciones,
+      });
+    } catch {
+      /* ponytail: sin aviso en vivo, las pantallas se ponen al día en su próxima carga */
+    }
+  }
+
+  /**
+   * Quita el agotado de los productos cuya hora de regreso ya pasó (agotado_hasta ≤ ahora). La disponibilidad no
+   * depende de esto (se calcula al leer); solo deja limpios los datos, audita y avisa en vivo. Idempotente.
+   */
+  async reactivarVencidos(ahora: Date = new Date()): Promise<number> {
+    const vencidos = await this.prisma.producto.findMany({
+      where: { agotado_hasta: { not: null, lte: ahora } },
+      select: { id: true, agotado_hasta: true, agotado_motivo: true },
+    });
+    let n = 0;
+    for (const v of vencidos) {
+      // updateMany con la misma condición: si otra persona ya lo reactivó o lo volvió a agotar, no se pisa.
+      const r = await this.prisma.producto.updateMany({
+        where: { id: v.id, agotado_hasta: v.agotado_hasta },
+        data: { agotado_hasta: null, agotado_origen: null, agotado_motivo: null },
+      });
+      if (!r.count) continue;
+      n++;
+      await this.prisma.agotado.updateMany({ where: { producto_id: v.id, reactivado_en: null }, data: { reactivado_en: ahora } });
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'catalogo',
+        accion: 'REACTIVADO_AUTOMATICO',
+        resultado: 'OK',
+        entidad: 'producto',
+        entidadId: v.id,
+        antes: { agotado_hasta: v.agotado_hasta, motivo: v.agotado_motivo },
+        despues: { agotado_hasta: null },
+      });
+    }
+    if (n > 0) await this.emitirDisponibilidad();
+    return n;
   }
 
   async disponibilizarProducto(
@@ -1129,7 +1196,7 @@ export class CatalogoService implements OnApplicationBootstrap {
 
     await this.prisma.producto.update({
       where: { id: pId },
-      data: { agotado_hasta: null, agotado_origen: null },
+      data: { agotado_hasta: null, agotado_origen: null, agotado_motivo: null },
     });
     await this.prisma.agotado.updateMany({
       where: { producto_id: pId, reactivado_en: null },
@@ -1143,11 +1210,12 @@ export class CatalogoService implements OnApplicationBootstrap {
       resultado: 'OK',
       entidad: 'producto',
       entidadId: pId,
-      antes: { agotado_hasta: actual.agotado_hasta },
+      antes: { agotado_hasta: actual.agotado_hasta, motivo: actual.agotado_motivo },
       despues: { agotado_hasta: null },
       partyId: usuario?.partyId,
       ip,
     });
+    await this.emitirDisponibilidad();
 
     return {
       ok: true,

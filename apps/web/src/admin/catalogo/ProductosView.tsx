@@ -25,6 +25,11 @@ import { ocultarCombos } from './ocultarCombos';
 import { ESTADO_VACIO, EstadoOpciones, validarTamanos } from './editorOpcionesTipos';
 import { esSoloMozoUsuario, tieneRolUsuario } from '../../comun/rolesUsuario';
 import { textosOrigenAgotado } from './origenAgotado';
+import { AgotarProductoModal } from './AgotarProductoModal';
+import { useAhora } from '../pedidos/PastillaEspera';
+import { useTiempoReal } from '../../comun/socket';
+import { clienteFetch } from '../../comun/api';
+import { cronometroAgotado, esIndefinido, textoRestante, type HorarioDia } from '../../comun/agotadoTiempo';
 
 const PPAGE = 24;
 
@@ -130,6 +135,12 @@ export function ProductosView() {
 
   // Dropdowns en filtros
 
+  // Agotar con cronómetro
+  const ahora = useAhora();
+  const [agotando, setAgotando] = useState<{ producto: ProductoAdmin; cambio: boolean } | null>(null);
+  const [horario, setHorario] = useState<HorarioDia[] | null>(null);
+  const categoriasCrudas = useRef<CategoriaAdmin[]>([]);
+
   // Modales
   const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
   const [productoEnEdicion, setProductoEnEdicion] = useState<ProductoAdmin | null>(null);
@@ -197,6 +208,7 @@ export function ProductosView() {
         catalogoApi.listarListas(),
         catalogoApi.listarGrupos(),
       ]);
+      categoriasCrudas.current = cats;
       const visibles = ocultarCombos(prods, cats);
       setCombosOcultos(visibles.combosOcultos);
       setProductos(visibles.productos);
@@ -215,7 +227,17 @@ export function ProductosView() {
 
   useEffect(() => {
     cargarDatos();
+    // Horario del local: para «hasta el cierre de hoy» y «hasta mañana a la apertura»
+    clienteFetch<{ horario?: HorarioDia[] }>('/carta/local').then((l) => setHorario(l?.horario ?? null)).catch(() => setHorario(null));
   }, []);
+
+  // Alguien agotó o reactivó (o venció un cronómetro): se actualiza la lista sin parpadeo
+  useTiempoReal(['carta:disponibilidad'], () => {
+    catalogoApi
+      .listarProductos({ incluyeOcultos: true })
+      .then((prods) => setProductos(ocultarCombos(prods, categoriasCrudas.current).productos))
+      .catch(() => {});
+  });
 
   // Lista de nombres de categorías para las pestañas
   const categoriasPills = useMemo(() => {
@@ -323,6 +345,10 @@ export function ProductosView() {
   // Acciones sobre productos
   const toggleDisponibilidad = (p: ProductoAdmin) => {
     const nuevoEstado = !p.disponible;
+    if (!nuevoEstado) {
+      setAgotando({ producto: p, cambio: false });
+      return;
+    }
     setConfirmarProps({
       abierto: true,
       titulo: nuevoEstado
@@ -1041,10 +1067,25 @@ export function ProductosView() {
                 <span className={off ? 'pt-ins pt-ins--agotado' : 'pt-ins'}>
                   {off ? 'AGOTADO' : 'DISPONIBLE'}
                 </span>
-                {off && (
-                  <span className="pt-ins pt-ins--agotado" title={textosOrigenAgotado(p.agotadoOrigen).ayuda}>
-                    {textosOrigenAgotado(p.agotadoOrigen).corto}
-                  </span>
+                {off && (() => {
+                  const cron = p.agotadoOrigen === 'AUTOMATICO' ? null : cronometroAgotado(p.agotadoHasta, ahora);
+                  if (cron) {
+                    return (
+                      <span className="pt-ins pt-ins--agotado" data-testid="cronometro-agotado">
+                        Vuelve en {textoRestante(cron.minutos)} · {cron.hora}
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="pt-ins pt-ins--agotado" title={textosOrigenAgotado(p.agotadoOrigen).ayuda}>
+                      {p.agotadoOrigen !== 'AUTOMATICO' && esIndefinido(p.agotadoHasta)
+                        ? 'Hasta que lo reactives'
+                        : textosOrigenAgotado(p.agotadoOrigen).corto}
+                    </span>
+                  );
+                })()}
+                {off && p.agotadoMotivo && (
+                  <span className="pt-ins pt-ins--agotado" title="Motivo del agotado">{p.agotadoMotivo}</span>
                 )}
                 {p.promociones && p.promociones.length > 0 && (
                   <span className="pt-ins pt-ins--promo">En promoción</span>
@@ -1160,8 +1201,17 @@ export function ProductosView() {
                   onClick={() => toggleDisponibilidad(p)}
                   aria-label={`Cambiar disponibilidad de ${p.nombre}`}
                 >
-                  {off ? 'Marcar disponible' : 'Marcar agotado'}
+                  {off ? 'Reactivar ya' : 'Marcar agotado'}
                 </button>
+                {off && p.agotadoOrigen !== 'AUTOMATICO' && (
+                  <button
+                    className="pt-btn"
+                    onClick={() => setAgotando({ producto: p, cambio: true })}
+                    aria-label={`Cambiar tiempo de ${p.nombre}`}
+                  >
+                    Cambiar tiempo
+                  </button>
+                )}
                 {puedeEditar && (
                   <button
                     className="pt-btn"
@@ -1814,6 +1864,28 @@ export function ProductosView() {
       {/* =================================================================== */}
       {/* DIÁLOGO GENERAL DE CONFIRMACIÓN (SÍ / NO)                          */}
       {/* =================================================================== */}
+      {agotando && (
+        <AgotarProductoModal
+          nombre={agotando.producto.nombre}
+          cambio={agotando.cambio}
+          motivoInicial={agotando.cambio ? agotando.producto.agotadoMotivo : null}
+          horario={horario}
+          alCancelar={() => setAgotando(null)}
+          alConfirmar={async (hastaIso, motivo) => {
+            try {
+              await catalogoApi.agotarProducto(agotando.producto.id, {
+                alcance: 'INDEFINIDO',
+                ...(hastaIso ? { agotadoHasta: hastaIso } : {}),
+                ...(motivo ? { motivo } : {}),
+              });
+              setAgotando(null);
+              await cargarDatos();
+            } catch (err: any) {
+              alert(err?.message || 'No se pudo agotar el producto');
+            }
+          }}
+        />
+      )}
       <Confirmar
         abierto={confirmarProps.abierto}
         titulo={confirmarProps.titulo}

@@ -84,6 +84,8 @@ export interface ProductoAdmin {
   agotadoHasta?: string | null;
   /** Por qué está agotado: a mano (no vuelve solo) o por stock en 0 (vuelve al reponer); null si está disponible. */
   agotadoOrigen?: 'MANUAL' | 'AUTOMATICO' | null;
+  /** Motivo corto escrito al agotarlo a mano («se acabó la masa»). */
+  agotadoMotivo?: string | null;
   noSumaBeneficios: boolean;
   /** Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto. */
   resaltarOpcionMenosPedida?: boolean;
@@ -195,7 +197,7 @@ export const catalogoApi = {
 
   async agotarProducto(
     id: string,
-    data: { alcance?: 'HOY' | 'INDEFINIDO'; agotadoHasta?: string },
+    data: { alcance?: 'HOY' | 'INDEFINIDO'; agotadoHasta?: string; motivo?: string },
   ): Promise<{ ok: boolean; disponible: boolean; agotadoHasta: string | null }> {
     return api.post(`/admin/catalogo/productos/${id}/agotar`, data);
   },

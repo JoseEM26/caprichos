@@ -423,6 +423,8 @@ model Producto {
   agotado_hasta      DateTime?        @db.Timestamptz
   /// MANUAL (se quita solo a mano) | AUTOMATICO (saldo 0; vuelve al reponer/abrir). NULL con agotado_hasta = MANUAL.
   agotado_origen     String?
+  /// Motivo corto del agotado a mano («se acabó la masa»); se borra al reactivar
+  agotado_motivo     String?
   no_suma_beneficios Boolean          @default(false)
   // Cocina: resaltar la opción menos pedida (últimos 30 días) de cada grupo de este producto
   resaltar_opcion_menos_pedida Boolean @default(false)

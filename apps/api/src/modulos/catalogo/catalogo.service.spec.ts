@@ -441,7 +441,7 @@ describe('CatalogoService', () => {
 
       expect(prisma.producto.update).toHaveBeenCalledWith({
         where: { id: BigInt(15) },
-        data: { agotado_hasta: expect.any(Date), agotado_origen: 'MANUAL' },
+        data: { agotado_hasta: expect.any(Date), agotado_origen: 'MANUAL', agotado_motivo: null },
       });
       // Si había un agotado automático abierto, pasa a MANUAL (no vuelve solo)
       expect(prisma.agotado.updateMany).toHaveBeenCalledWith({
@@ -486,7 +486,7 @@ describe('CatalogoService', () => {
 
       expect(prisma.producto.update).toHaveBeenCalledWith({
         where: { id: BigInt(15) },
-        data: { agotado_hasta: null, agotado_origen: null },
+        data: { agotado_hasta: null, agotado_origen: null, agotado_motivo: null },
       });
 
       expect(auditoria.registrar).toHaveBeenCalledWith(

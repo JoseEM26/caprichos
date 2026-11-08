@@ -4,6 +4,7 @@ import { TextoEd } from './edicion';
 import { useEsMovil } from './useEsMovil';
 import { etiquetaQuedan, etiquetaUltimos, infoStockDe } from './stock';
 import { useUmbralesStock } from './umbralesStock';
+import { cronometroAgotado } from '../comun/agotadoTiempo';
 
 export interface InfoRankingProducto {
   puesto?: number;
@@ -48,6 +49,9 @@ export function TarjetaProducto({
     }
     return false;
   })();
+
+  // Agotado temporal: «vuelve a las 15:40» (los indefinidos no traen hora)
+  const regreso = estaAgotado ? cronometroAgotado(producto.agotadoHasta, Date.now()) : null;
 
   const iniciales = producto.nombre
     .split(' ')
@@ -183,7 +187,7 @@ export function TarjetaProducto({
                   letterSpacing: '0.06em',
                 }}
               >
-                AGOTADO
+                AGOTADO{regreso ? ` · VUELVE A LAS ${regreso.hora}` : ''}
               </span>
             )}
           </span>
