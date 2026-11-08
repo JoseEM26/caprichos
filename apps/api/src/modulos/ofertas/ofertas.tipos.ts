@@ -38,6 +38,10 @@ export interface ComboParteItem {
   /** Complemento a elegir: las partes con el mismo grupo se reparten en paquetes por nombre y el cliente elige UNO. Null = parte normal. */
   paqueteGrupo?: string | null;
   paqueteNombre?: string | null;
+  /** Sabores permitidos en la parte (id de sabor); vacío = todos. */
+  saboresIds?: string[];
+  /** Productos que no entran en la parte aunque su categoría sí. */
+  productosExcluidos?: string[];
   /** FIJO de un producto: tamaño elegido (producto_tamano) y su nombre; las unidades las usa el stock. */
   tamanoId?: string | null;
   tamanoNombre?: string | null;

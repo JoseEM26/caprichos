@@ -139,7 +139,12 @@ export const ESPECIFICACION: Record<string, Espec> = {
   combo_parte: {
     clave: ['oferta', 'tipo', 'cantidad', 'categorias', 'productos', 'paquete_nombre'],
     refs: { oferta: ref('oferta_id', 'oferta') },
-    listas: { categorias: ref('categorias', 'categoria'), productos: ref('productos', 'producto') },
+    listas: {
+      categorias: ref('categorias', 'categoria'),
+      productos: ref('productos', 'producto'),
+      sabores_ids: ref('sabores_ids', 'sabor'),
+      productos_excluidos_ids: ref('productos_excluidos_ids', 'producto'),
+    },
   },
   combo_parte_reemplazo: {
     clave: ['combo_parte', 'producto'],

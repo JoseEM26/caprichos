@@ -1644,6 +1644,10 @@ model ComboParte {
   /// reparten en paquetes por paquete_nombre («2 donas», «1 carrot cake»...); el cliente elige un paquete. Ambas null = parte normal.
   paquete_grupo  String?
   paquete_nombre String?
+  /// Sabores permitidos (sabor.id) en la parte; vacío = todos. Solo cuenta para productos por sabor.
+  sabores_ids    BigInt[] @default([])
+  /// Productos que NO entran en la parte aunque su categoría sí; vacío = ninguno.
+  productos_excluidos_ids BigInt[] @default([])
 
   oferta     Oferta   @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
   tamano     ProductoTamano? @relation(fields: [tamano_id], references: [id], onDelete: SetNull)

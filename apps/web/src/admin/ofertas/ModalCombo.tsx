@@ -1,13 +1,14 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
 import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ComboPrecioItem, ComboParteItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
 import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { AvisoErrorOferta, ConfirmarSalir, PieOferta, primeraConError, useCambiosSinGuardar, useCierreConConfirmacion } from './modalOfertaComun';
 import { PrevisualizacionCarta } from './PrevisualizacionCarta';
-import { AlternativasParte } from './AlternativasParte';
+import { EditorPartesCombo, ResumenPartesCombo } from './EditorPartesCombo';
+import { CategoriaEditor, ProductoEditor, errorDePartes, normalizarPartes, partesParaGuardar, bloquesDe, opcionesDeGrupo, perteneceACategoria, idsProductos, tipoDe } from './partesComboModelo';
 
 const DIAS = [
   ['lun', 'Lunes', 'Lun'],
@@ -37,71 +38,45 @@ interface ModalComboProps {
   comboAEditar?: OfertaItem | null;
   onCerrar: () => void;
   onGuardar: (datos: any) => Promise<void>;
-  productosDisponibles?: Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number; tamanos?: Array<{ id: string; nombre: string; precio?: number }> }>;
+  productosDisponibles?: ProductoEditor[];
   categoriasDisponibles?: string[];
   categorias?: Array<{ id: string; nombre: string; productos?: any[] }>;
 }
 
+type ProductoPrecio = { id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number };
+
+/** Suma de los precios sueltos de las partes. Un complemento a elegir cuenta una vez, con el promedio de sus opciones. */
 export function calcularSumaPreciosSueltos(
   partes: ComboParteItem[],
-  productos: Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number }>,
+  productos: ProductoPrecio[],
+  categorias: CategoriaEditor[] = [],
 ): number {
-  let total = 0;
-  for (const parte of partes) {
+  const precioDe = (id: unknown) => Number(productos.find((p) => String(p.id) === String(id))?.precio) || 0;
+  // Una categoría puede venir como id o como nombre (combos viejos)
+  const delasCategorias = (cats: unknown[]) =>
+    productos.filter((p) =>
+      cats.some((c) => {
+        const t = String(c).toLowerCase();
+        return p.categoriaId === String(c) || p.categoria?.toLowerCase() === t || categorias.some((k) => k.id === String(c) && perteneceACategoria(p, k));
+      }),
+    );
+  const sumaParte = (parte: ComboParteItem): number => {
     const cant = parte.cantidad || 1;
-    const tipo = parte.tipoParte || parte.tipo || 'A_ELECCION';
-
-    if (tipo === 'FIJO') {
-      const prods = (parte.productos || []).map((pr: any) =>
-        typeof pr === 'object' ? pr.productoId || pr.id : pr,
-      );
-      for (const pid of prods) {
-        const prod = productos.find((p) => String(p.id) === String(pid));
-        if (prod && prod.precio) {
-          total += Number(prod.precio) * cant;
-        }
-      }
-    } else if (tipo === 'OPCIONES') {
-      const opcs = parte.opciones || [];
-      if (opcs.length > 0) {
-        const preciosOpciones: number[] = [];
-        for (const opc of opcs) {
-          let sumaOpc = 0;
-          for (const it of opc.items || []) {
-            const itId = typeof it === 'object' ? it.productoId || it.id : it;
-            const prod = productos.find((p) => String(p.id) === String(itId));
-            if (prod && prod.precio) sumaOpc += Number(prod.precio);
-          }
-          if (sumaOpc > 0) preciosOpciones.push(sumaOpc);
-        }
-        if (preciosOpciones.length > 0) {
-          const prom = preciosOpciones.reduce((a, b) => a + b, 0) / preciosOpciones.length;
-          total += prom * cant;
-        }
-      }
+    const ids = idsProductos(parte);
+    if (tipoDe(parte) === 'FIJO') return ids.reduce((acc, id) => acc + precioDe(id) * cant, 0);
+    // Con productos marcados valen solo esos; si no, los de sus categorías (sin los quitados)
+    const quitados = parte.productosExcluidos ?? [];
+    const candidatos = ids.length > 0 ? ids.map(precioDe) : delasCategorias(parte.categorias ?? []).filter((p) => !quitados.includes(String(p.id))).map((p) => Number(p.precio) || 0);
+    const con = candidatos.filter((x) => x > 0);
+    return con.length > 0 ? (con.reduce((x, y) => x + y, 0) / con.length) * cant : 0;
+  };
+  let total = 0;
+  for (const bloque of bloquesDe(partes)) {
+    if (bloque.tipo === 'COMPLEMENTO') {
+      const sumas = opcionesDeGrupo(partes, bloque.grupo).map((o) => o.idxs.reduce((acc, i) => acc + sumaParte(partes[i]), 0)).filter((x) => x > 0);
+      if (sumas.length > 0) total += sumas.reduce((x, y) => x + y, 0) / sumas.length;
     } else {
-      // A_ELECCION
-      const prodsEnParte: number[] = [];
-      const idsProds = (parte.productos || []).map((pr: any) =>
-        typeof pr === 'object' ? pr.productoId || pr.id : pr,
-      );
-      if (idsProds.length > 0) {
-        for (const pid of idsProds) {
-          const prod = productos.find((p) => String(p.id) === String(pid));
-          if (prod && prod.precio) prodsEnParte.push(Number(prod.precio));
-        }
-      }
-      if (parte.categorias && parte.categorias.length > 0) {
-        const cats = parte.categorias.map((c: any) => String(c).toLowerCase());
-        const prodsDeCat = productos.filter((p) => p.categoria && cats.includes(p.categoria.toLowerCase()));
-        for (const prod of prodsDeCat) {
-          if (prod.precio) prodsEnParte.push(Number(prod.precio));
-        }
-      }
-      if (prodsEnParte.length > 0) {
-        const prom = prodsEnParte.reduce((a, b) => a + b, 0) / prodsEnParte.length;
-        total += prom * cant;
-      }
+      total += sumaParte(partes[bloque.idxs[0]]);
     }
   }
   return Math.round(total * 100) / 100;
@@ -133,7 +108,6 @@ export function ModalCombo({
 
   // Paso 2: Partes del combo
   const [partes, setPartes] = useState<ComboParteItem[]>([]);
-  const [parteAbiertaIndex, setParteAbiertaIndex] = useState<number | null>(0);
 
   // Paso 3: Cuánto vale (precios y condiciones)
   const [tamanos, setTamanos] = useState<ComboPrecioItem[]>([{ tamanoNombre: 'Regular', precio: 0 }]);
@@ -160,6 +134,14 @@ export function ModalCombo({
     }
     return CATEGORIAS_DEF.map((c, i) => ({ id: String(i + 1), nombre: c }));
   }, [categorias, categoriasDisponibles]);
+
+  // Para el editor de partes: las categorías con su id real (sin categorías de la carta, el nombre hace de id y el servidor lo resuelve)
+  const categoriasEditor: CategoriaEditor[] = useMemo(
+    () => (categorias.length > 0 ? listaCategorias : listaCategorias.map((c) => ({ id: c.nombre, nombre: c.nombre }))),
+    [categorias, listaCategorias],
+  );
+  const productosRef = useRef(productosDisponibles);
+  productosRef.current = productosDisponibles;
 
   // Inicializar o resetear formulario
   useEffect(() => {
@@ -189,18 +171,7 @@ export function ModalCombo({
 
       // Partes
       const partesLista = comboAEditar.combosParte || comboAEditar.combosPartes;
-      setPartes(
-        partesLista && partesLista.length > 0
-          ? partesLista.map((p) => ({
-              ...p,
-              nombre: p.nombre || (p.tipo === 'A_ELECCION' ? 'Bebida a elección' : 'Parte'),
-              tipoParte: p.tipoParte || (p.tipo === 'FIJO' ? 'FIJO' : 'A_ELECCION'),
-              cantidad: p.cantidad || 1,
-              alternativas: p.alternativas || [],
-              tamanoId: p.tamanoId ?? null,
-            }))
-          : [],
-      );
+      setPartes(partesLista && partesLista.length > 0 ? normalizarPartes(partesLista, categoriasEditor, productosRef.current) : []);
 
       // Días, horas, fechas
       const diasArr = comboAEditar.dias || comboAEditar.diasSemana;
@@ -216,7 +187,6 @@ export function ModalCombo({
       setPestana('datos');
       setVerErrores(false);
       setMensajeError('');
-      setParteAbiertaIndex(0);
     } else {
       // Valores por defecto para nuevo combo
       setNombre('');
@@ -237,9 +207,8 @@ export function ModalCombo({
       setPestana('datos');
       setVerErrores(false);
       setMensajeError('');
-      setParteAbiertaIndex(0);
     }
-  }, [comboAEditar, abierto, listaCategorias]);
+  }, [comboAEditar, abierto, listaCategorias, categoriasEditor]);
 
   // Esc cierra primero las confirmaciones abiertas (el modal queda bloqueado mientras tanto)
   useEffect(() => {
@@ -260,65 +229,6 @@ export function ModalCombo({
 
   const quitarTamano = (index: number) => {
     setTamanos((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // Acciones en partes
-  const agregarParte = (tipo: 'A_ELECCION' | 'FIJO' | 'OPCIONES') => {
-    const nuevaParte: ComboParteItem = {
-      nombre: tipo === 'A_ELECCION' ? 'Bebidas a elección' : tipo === 'FIJO' ? 'Complemento fijo' : 'Una de estas opciones',
-      tipoParte: tipo,
-      cantidad: tipo === 'A_ELECCION' ? 2 : 1,
-      categorias: tipo === 'A_ELECCION' ? [listaCategorias[0]?.nombre || 'Cafetería'] : [],
-      productos: [],
-      opciones: tipo === 'OPCIONES' ? [{ nombre: 'Opción 1', items: [] }] : undefined,
-    };
-    setPartes((prev) => [...prev, nuevaParte]);
-    setParteAbiertaIndex(partes.length);
-    setMensajeError('');
-  };
-
-  // Pieza de una alternativa de complemento (ej. «Complemento» › «2 donas»): una parte normal con grupo y alternativa
-  const agregarPiezaDeAlternativa = () => {
-    const grupo = partes.find((p) => p.paqueteGrupo)?.paqueteGrupo || 'Complemento';
-    setPartes((prev) => [
-      ...prev,
-      { nombre: 'Pieza del complemento', tipoParte: 'A_ELECCION', cantidad: 1, categorias: [], productos: [], paqueteGrupo: grupo, paqueteNombre: '' },
-    ]);
-    setParteAbiertaIndex(partes.length);
-    setMensajeError('');
-  };
-
-  const cambiarParte = (idx: number, cambio: Partial<ComboParteItem>) =>
-    setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, ...cambio } : p)));
-
-  const quitarParte = (index: number) => {
-    setPartes((prev) => prev.filter((_, i) => i !== index));
-    if (parteAbiertaIndex === index) setParteAbiertaIndex(null);
-  };
-
-  const moverParte = (index: number, dir: -1 | 1) => {
-    const nuevo = [...partes];
-    const target = index + dir;
-    if (target < 0 || target >= nuevo.length) return;
-    const temp = nuevo[index];
-    nuevo[index] = nuevo[target];
-    nuevo[target] = temp;
-    setPartes(nuevo);
-    setParteAbiertaIndex(target);
-  };
-
-  const toggleCategoriaEnParte = (parteIdx: number, cat: string) => {
-    setPartes((prev) =>
-      prev.map((p, i) => {
-        if (i !== parteIdx) return p;
-        const currentCats = p.categorias || [];
-        const nextCats = currentCats.includes(cat)
-          ? currentCats.filter((x) => x !== cat)
-          : [...currentCats, cat];
-        return { ...p, categorias: nextCats };
-      }),
-    );
-    setMensajeError('');
   };
 
   const toggleDia = (d: string) => {
@@ -344,8 +254,8 @@ export function ModalCombo({
 
   // Cálculo de suma de precios individuales y ahorro
   const sumaIndividuales = useMemo(() => {
-    return calcularSumaPreciosSueltos(partes, productosDisponibles);
-  }, [partes, productosDisponibles]);
+    return calcularSumaPreciosSueltos(partes, productosDisponibles, categoriasEditor);
+  }, [partes, productosDisponibles, categoriasEditor]);
 
   const precioBaseCombo = Number(tamanos[0]?.precio) || 0;
   const ahorroCalculado = sumaIndividuales > 0 && precioBaseCombo > 0 ? sumaIndividuales - precioBaseCombo : 0;
@@ -361,32 +271,7 @@ export function ModalCombo({
     if (tamanos.length === 0 || tamanos.some((t) => !t.tamanoNombre.trim() || !(Number(t.precio) > 0))) return 'Cada tamaño debe tener un nombre y un precio mayor a 0.';
     return null;
   };
-  const errorPartes = (): string | null => {
-    if (partes.length === 0) return 'Agrega al menos una parte al combo.';
-    const alternativasPorGrupo = new Map<string, Set<string>>();
-    for (let i = 0; i < partes.length; i++) {
-      const p = partes[i];
-      if (!p.nombre || !p.nombre.trim()) return `La parte ${i + 1} debe tener un nombre.`;
-      const grupoP = (p.paqueteGrupo ?? '').trim();
-      const altP = (p.paqueteNombre ?? '').trim();
-      if ((grupoP || altP) && !(grupoP && altP)) {
-        return `La parte "${p.nombre}" necesita el nombre del complemento y el de su alternativa (o déjalos vacíos).`;
-      }
-      if (grupoP) alternativasPorGrupo.set(grupoP, (alternativasPorGrupo.get(grupoP) ?? new Set()).add(altP));
-      const tipoP = p.tipoParte || p.tipo || 'A_ELECCION';
-      if (tipoP === 'FIJO') {
-        if ((p.productos || []).length === 0) return `La parte "${p.nombre}" debe tener al menos un producto seleccionado.`;
-      } else if (tipoP === 'OPCIONES') {
-        if ((p.opciones || []).length === 0) return `La parte "${p.nombre}" debe tener al menos una opción configurada.`;
-      } else if ((p.categorias || []).length === 0 && (p.productos || []).length === 0) {
-        return `La parte "${p.nombre}" debe tener al menos una categoría o producto seleccionado.`;
-      }
-    }
-    for (const [grupo, alts] of alternativasPorGrupo) {
-      if (alts.size < 2) return `El complemento "${grupo}" necesita al menos 2 alternativas para que el cliente pueda elegir.`;
-    }
-    return null;
-  };
+  const errorPartes = (): string | null => errorDePartes(partes, categoriasEditor);
   const errorCuando = (): string | null => {
     if ((horaDesde && !horaHasta) || (!horaDesde && horaHasta)) return 'Escribe las dos horas (desde y hasta) o déjalas vacías.';
     if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de inicio debe ser antes de la hora final.';
@@ -436,6 +321,7 @@ export function ModalCombo({
 
       const catObj = listaCategorias.find((c) => c.id === categoriaId);
 
+      const partesGuardar = partesParaGuardar(partes, categoriasEditor, productosDisponibles);
       const payload = {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || undefined,
@@ -466,32 +352,8 @@ export function ModalCombo({
           tamanoNombre: t.tamanoNombre.trim(),
           precio: Number(t.precio),
         })),
-        partes: partes.map((p, idx) => ({
-          nombre: (p.nombre ?? '').trim(),
-          tipo: (p.tipoParte === 'OPCIONES' || p.tipoParte === 'UNA_DE' ? 'A_ELECCION' : p.tipoParte || p.tipo || 'A_ELECCION') as any,
-          tipoParte: p.tipoParte,
-          cantidad: p.cantidad || 1,
-          categorias: (p.categorias || []).map((c: any) => String(c)),
-          productos: (p.productos || []).map((pr: any) => String(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
-          alternativas: (p.alternativas || []).map((a) => ({ productoId: String(a.id), cantidad: a.cantidad || 1 })),
-          tamanoId: p.tamanoId || null,
-          paqueteGrupo: (p.paqueteGrupo ?? '').trim() || null,
-          paqueteNombre: (p.paqueteNombre ?? '').trim() || null,
-          orden: idx + 1,
-        })),
-        combosPartes: partes.map((p, idx) => ({
-          nombre: (p.nombre ?? '').trim(),
-          tipo: (p.tipoParte === 'OPCIONES' || p.tipoParte === 'UNA_DE' ? 'A_ELECCION' : p.tipoParte || p.tipo || 'A_ELECCION') as any,
-          tipoParte: p.tipoParte,
-          cantidad: p.cantidad || 1,
-          categorias: (p.categorias || []).map((c: any) => String(c)),
-          productos: (p.productos || []).map((pr: any) => String(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
-          alternativas: (p.alternativas || []).map((a) => ({ productoId: String(a.id), cantidad: a.cantidad || 1 })),
-          tamanoId: p.tamanoId || null,
-          paqueteGrupo: (p.paqueteGrupo ?? '').trim() || null,
-          paqueteNombre: (p.paqueteNombre ?? '').trim() || null,
-          orden: idx + 1,
-        })),
+        partes: partesGuardar,
+        combosPartes: partesGuardar,
       };
 
       await onGuardar(payload);
@@ -502,6 +364,9 @@ export function ModalCombo({
       setGuardando(false);
     }
   };
+
+  // La vista previa reconoce las categorías por nombre
+  const partesVista = partes.map((p) => ({ ...p, categorias: (p.categorias ?? []).map((id) => categoriasEditor.find((c) => c.id === id)?.nombre ?? id) }));
 
   // Oferta armada en vivo para PrevisualizacionCarta
   const ofertaEnVivo: Partial<OfertaItem> = {
@@ -515,8 +380,8 @@ export function ModalCombo({
     categoriaNombre: listaCategorias.find((c) => c.id === categoriaId)?.nombre,
     combosPrecio: tamanos,
     combosPrecios: tamanos,
-    combosParte: partes,
-    combosPartes: partes,
+    combosParte: partesVista,
+    combosPartes: partesVista,
     dias: dias.map((code) => DIAS.findIndex((x) => x[0] === code) + 1),
     horaDesde: horaDesde || null,
     horaHasta: horaHasta || null,
@@ -921,539 +786,8 @@ export function ModalCombo({
 </>
           ) },
           { id: 'partes', etiqueta: 'Partes y alternativas', ...marca('partes'), contenido: (
-          <div
-            data-testid="paso-2-combo"
-            style={{
-              backgroundColor: 'var(--cp-white)',
-              border: '1px solid var(--cp-line)',
-              borderRadius: '14px',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-            }}
-          >
-            <div style={{ fontSize: '13px', color: 'var(--cp-soft)', marginTop: '-8px' }}>
-              Arma las partes del combo con lenguaje claro. Al venderse, cada producto se descuenta individualmente de stock. Del combo se puede comprar cada producto suelto; vendido suelto sí suma puntos.
-            </div>
-
-            {/* Guía didáctica con ejemplos escritos */}
-            <div
-              style={{
-                backgroundColor: 'var(--cp-sand)',
-                borderRadius: '12px',
-                padding: '12px 14px',
-                fontSize: '13px',
-                lineHeight: '18px',
-                color: 'var(--cp-navy)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-              }}
-            >
-              <div style={{ fontWeight: 800 }}>Elige cómo se armará cada parte:</div>
-              <ul style={{ margin: 0, paddingLeft: '18px' }}>
-                <li><strong>2 bebidas a elección:</strong> el cliente escoge entre las categorías seleccionadas (ej. Frappes, Iced o Calientes).</li>
-                <li><strong>1 complemento fijo:</strong> un producto específico e invariable (ej. 1 Croissant de Jamón y Queso).</li>
-                <li><strong>Complemento con alternativas:</strong> el cliente elige UNA entre varias combinaciones (ej. «2 donas», «1 dona + 1 galleta», «1 carrot cake»). Cada pieza es una parte con el mismo complemento y el nombre de su alternativa.</li>
-                <li><strong>Una de estas opciones:</strong> el cliente escoge una alternativa armada (ej. porción de torta o dona artesanal).</li>
-              </ul>
-            </div>
-
-            {/* Lista de partes agregadas */}
-            {partes.length === 0 ? (
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: '24px',
-                  backgroundColor: 'var(--cp-cream)',
-                  borderRadius: '12px',
-                  border: '1.5px dashed var(--cp-line)',
-                  color: 'var(--cp-soft)',
-                  fontSize: '14px',
-                }}
-              >
-                Todavía no has agregado partes a este combo. Usa los botones de abajo para agregar la primera parte.
-              </div>
-            ) : (
-              partes.map((sl, idx) => {
-                const isOpen = parteAbiertaIndex === idx;
-                const tipoParte = sl.tipoParte || sl.tipo || 'A_ELECCION';
-
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      border: '1.5px solid var(--cp-navy)',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      backgroundColor: 'var(--cp-white)',
-                    }}
-                  >
-                    {/* Barra cabecera de la parte */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '10px 12px',
-                        backgroundColor: 'var(--cp-sand)',
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '13px',
-                          backgroundColor: 'var(--cp-navy)',
-                          color: 'var(--cp-cream)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 800,
-                          fontSize: '13px',
-                          flex: 'none',
-                        }}
-                      >
-                        {idx + 1}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setParteAbiertaIndex(isOpen ? null : idx)}
-                        aria-expanded={isOpen}
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          textAlign: 'left',
-                          border: 0,
-                          backgroundColor: 'transparent',
-                          color: 'var(--cp-navy)',
-                          padding: 0,
-                          fontFamily: 'inherit',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <div style={{ fontWeight: 800, fontSize: '14px', lineHeight: '18px' }}>
-                          {sl.nombre || 'Parte sin nombre'} {isOpen ? '▲' : '▼'}
-                        </div>
-                        {sl.paqueteGrupo && (
-                          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-orange)', lineHeight: '16px' }}>
-                            {`${sl.paqueteGrupo} › ${sl.paqueteNombre?.trim() || 'sin nombre de alternativa'}`}
-                          </div>
-                        )}
-                        <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
-                          {tipoParte === 'A_ELECCION'
-                            ? `${sl.cantidad} a elección de (${(sl.categorias || []).join(', ') || 'sin categoría'})`
-                            : tipoParte === 'FIJO'
-                            ? `${sl.cantidad} × producto fijo (${(sl.productos || []).length} seleccionado)`
-                            : `1 de ${(sl.opciones || []).length} opciones`}
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moverParte(idx, -1)}
-                        aria-label="Subir orden"
-                        title="Subir"
-                        disabled={idx === 0}
-                        style={{
-                          width: '34px',
-                          height: '34px',
-                          borderRadius: '17px',
-                          border: '1.5px solid var(--cp-navy)',
-                          backgroundColor: 'transparent',
-                          fontWeight: 800,
-                          cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                          opacity: idx === 0 ? 0.4 : 1,
-                        }}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moverParte(idx, 1)}
-                        aria-label="Bajar orden"
-                        title="Bajar"
-                        disabled={idx === partes.length - 1}
-                        style={{
-                          width: '34px',
-                          height: '34px',
-                          borderRadius: '17px',
-                          border: '1.5px solid var(--cp-navy)',
-                          backgroundColor: 'transparent',
-                          fontWeight: 800,
-                          cursor: idx === partes.length - 1 ? 'not-allowed' : 'pointer',
-                          opacity: idx === partes.length - 1 ? 0.4 : 1,
-                        }}
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => quitarParte(idx)}
-                        aria-label="Quitar esta parte"
-                        title="Quitar"
-                        style={{
-                          width: '34px',
-                          height: '34px',
-                          borderRadius: '17px',
-                          border: '1.5px solid var(--cp-rust)',
-                          backgroundColor: 'transparent',
-                          color: 'var(--cp-rust)',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-
-                    {/* Detalle expandido de la parte */}
-                    {isOpen && (
-                      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                          <div style={{ flex: '1 1 200px' }}>
-                            <label style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                              Nombre de la parte
-                            </label>
-                            <input
-                              type="text"
-                              value={sl.nombre}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, nombre: val } : p)));
-                              }}
-                              placeholder="Ej.: 2 bebidas a elección, 1 complemento"
-                              style={{
-                                width: '100%',
-                                boxSizing: 'border-box',
-                                minHeight: '40px',
-                                borderRadius: '8px',
-                                border: '1.5px solid var(--cp-line)',
-                                padding: '0 10px',
-                                fontSize: '14px',
-                              }}
-                            />
-                          </div>
-
-                          <div style={{ width: '120px' }}>
-                            <label style={{ fontWeight: 700, fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                              Cantidad
-                            </label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={10}
-                              value={sl.cantidad || 1}
-                              onChange={(e) => {
-                                const val = Math.max(1, parseInt(e.target.value) || 1);
-                                setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, cantidad: val } : p)));
-                              }}
-                              style={{
-                                width: '100%',
-                                boxSizing: 'border-box',
-                                minHeight: '40px',
-                                borderRadius: '8px',
-                                border: '1.5px solid var(--cp-line)',
-                                padding: '0 10px',
-                                fontSize: '14px',
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Complemento con alternativas: varias partes con el mismo complemento y distinta alternativa = el cliente elige UNA alternativa */}
-                        <div
-                          data-testid={`complemento-parte-${idx}`}
-                          style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '10px', borderRadius: '8px', backgroundColor: 'var(--cp-cream)' }}
-                        >
-                          <div style={{ flex: '1 1 100%', fontSize: '12px', color: 'var(--cp-soft)' }}>
-                            Solo si esta parte es una pieza de un complemento con alternativas (el cliente elige UNA): escribe el nombre del
-                            complemento y la alternativa a la que pertenece. Si no, déjalo vacío.
-                          </div>
-                          <label style={{ flex: '1 1 160px', fontWeight: 700, fontSize: '13px' }}>
-                            Complemento
-                            <input
-                              type="text"
-                              value={sl.paqueteGrupo ?? ''}
-                              onChange={(e) => cambiarParte(idx, { paqueteGrupo: e.target.value })}
-                              placeholder="Ej.: Complemento"
-                              style={{ width: '100%', boxSizing: 'border-box', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 10px', fontSize: '14px', fontWeight: 400 }}
-                            />
-                          </label>
-                          <label style={{ flex: '1 1 200px', fontWeight: 700, fontSize: '13px' }}>
-                            Alternativa
-                            <input
-                              type="text"
-                              value={sl.paqueteNombre ?? ''}
-                              onChange={(e) => cambiarParte(idx, { paqueteNombre: e.target.value })}
-                              placeholder="Ej.: 2 donas, 1 carrot cake"
-                              style={{ width: '100%', boxSizing: 'border-box', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 10px', fontSize: '14px', fontWeight: 400 }}
-                            />
-                          </label>
-                        </div>
-
-                        {/* Configuración según tipo */}
-                        {tipoParte === 'A_ELECCION' && (
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>
-                              Categorías donde el cliente puede elegir:
-                            </div>
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {listaCategorias.map((cat) => {
-                                const seleccionada = (sl.categorias || []).includes(cat.nombre);
-                                return (
-                                  <button
-                                    key={cat.id}
-                                    type="button"
-                                    onClick={() => toggleCategoriaEnParte(idx, cat.nombre)}
-                                    aria-pressed={seleccionada}
-                                    style={{
-                                      minHeight: '34px',
-                                      padding: '0 12px',
-                                      borderRadius: '9999px',
-                                      border: '1.5px solid var(--cp-navy)',
-                                      backgroundColor: seleccionada ? 'var(--cp-navy)' : 'transparent',
-                                      color: seleccionada ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                                      fontWeight: 700,
-                                      fontSize: '12px',
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    {seleccionada ? '✓ ' : '+ '}
-                                    {cat.nombre}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            <span style={{ fontSize: '12px', color: 'var(--cp-soft)', display: 'block', marginTop: '6px' }}>
-                              Ejemplo: si marcas Frappes e Iced, el cliente podrá elegir {sl.cantidad} productos de esas categorías.
-                            </span>
-                          </div>
-                        )}
-
-                        {tipoParte === 'FIJO' && (
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>
-                              Producto fijo del combo:
-                            </div>
-                            <select
-                              value={sl.productos?.[0] ? String(typeof sl.productos[0] === 'object' ? sl.productos[0].id || sl.productos[0].productoId : sl.productos[0]) : ''}
-                              onChange={(e) => {
-                                const prodId = e.target.value;
-                                setPartes((prev) =>
-                                  prev.map((p, i) =>
-                                    i === idx
-                                      ? { ...p, productos: prodId ? [prodId] : [], tamanoId: null, alternativas: (p.alternativas || []).filter((a) => String(a.id) !== prodId) }
-                                      : p,
-                                  ),
-                                );
-                              }}
-                              style={{
-                                width: '100%',
-                                boxSizing: 'border-box',
-                                minHeight: '40px',
-                                borderRadius: '8px',
-                                border: '1.5px solid var(--cp-line)',
-                                padding: '0 10px',
-                                fontSize: '14px',
-                              }}
-                            >
-                              <option value="">Selecciona un producto del catálogo...</option>
-                              {productosDisponibles.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.nombre} {p.precio ? `(s/ ${p.precio.toFixed(2)})` : ''}
-                                </option>
-                              ))}
-                            </select>
-                            <span style={{ fontSize: '12px', color: 'var(--cp-soft)', display: 'block', marginTop: '6px' }}>
-                              Ejemplo: Este producto vendrá siempre incluido en el combo de manera fija.
-                            </span>
-                          </div>
-                        )}
-
-                        {tipoParte === 'FIJO' && (() => {
-                          const prodFijo = productosDisponibles.find((x) => String(x.id) === String(sl.productos?.[0] ?? ''));
-                          const tamanosFijo = prodFijo?.tamanos ?? [];
-                          if (tamanosFijo.length === 0) return null;
-                          return (
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>Tamaño del producto fijo:</div>
-                              <select
-                                aria-label="Tamaño del producto fijo"
-                                value={sl.tamanoId ?? ''}
-                                onChange={(e) => {
-                                  const valor = e.target.value || null;
-                                  setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, tamanoId: valor } : p)));
-                                }}
-                                style={{ width: '100%', boxSizing: 'border-box', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 10px', fontSize: '14px' }}
-                              >
-                                <option value="">Sin tamaño</option>
-                                {tamanosFijo.map((t) => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.nombre}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          );
-                        })()}
-
-                        {tipoParte !== 'OPCIONES' && (
-                          <AlternativasParte
-                            principalId={tipoParte === 'FIJO' ? String(sl.productos?.[0] ?? '') : undefined}
-                            alternativas={sl.alternativas || []}
-                            productos={productosDisponibles}
-                            onCambiar={(alts) => setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, alternativas: alts } : p)))}
-                          />
-                        )}
-
-                        {tipoParte === 'OPCIONES' && (
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>
-                              Productos de esta opción:
-                            </div>
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {productosDisponibles.slice(0, 8).map((p) => {
-                                const sel = (sl.productos || []).some((x: any) => String(typeof x === 'object' ? x.id || x.productoId : x) === String(p.id));
-                                return (
-                                  <button
-                                    key={p.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setPartes((prev) =>
-                                        prev.map((item, i) => {
-                                          if (i !== idx) return item;
-                                          const actual = (item.productos || []).map((x: any) => String(typeof x === 'object' ? x.id || x.productoId : x));
-                                          const next = actual.includes(String(p.id))
-                                            ? actual.filter((x) => x !== String(p.id))
-                                            : [...actual, String(p.id)];
-                                          return { ...item, productos: next };
-                                        }),
-                                      );
-                                    }}
-                                    style={{
-                                      minHeight: '32px',
-                                      padding: '0 10px',
-                                      borderRadius: '8px',
-                                      border: '1.5px solid var(--cp-navy)',
-                                      backgroundColor: sel ? 'var(--cp-navy)' : 'transparent',
-                                      color: sel ? 'var(--cp-cream)' : 'var(--cp-navy)',
-                                      fontSize: '12px',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    {sel ? '✓ ' : '+ '}
-                                    {p.nombre}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-
-            {/* Botones para agregar partes */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', paddingTop: '8px' }}>
-              <button
-                type="button"
-                onClick={() => agregarParte('A_ELECCION')}
-                style={{
-                  minHeight: '40px',
-                  padding: '0 14px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-navy)',
-                  backgroundColor: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                + 2 bebidas a elección
-              </button>
-              <button
-                type="button"
-                onClick={() => agregarParte('FIJO')}
-                style={{
-                  minHeight: '40px',
-                  padding: '0 14px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-navy)',
-                  backgroundColor: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                + 1 complemento fijo
-              </button>
-              <button
-                type="button"
-                onClick={() => agregarParte('OPCIONES')}
-                style={{
-                  minHeight: '40px',
-                  padding: '0 14px',
-                  borderRadius: '10px',
-                  border: '1.5px dashed var(--cp-navy)',
-                  backgroundColor: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                + Una de estas opciones
-              </button>
-              <button
-                type="button"
-                onClick={agregarPiezaDeAlternativa}
-                style={{
-                  minHeight: '40px',
-                  padding: '0 14px',
-                  borderRadius: '10px',
-                  border: '1.5px solid var(--cp-orange)',
-                  backgroundColor: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                + Pieza de un complemento con alternativas
-              </button>
-            </div>
-
-            {/* Resumen de lo que verá el cliente en cada complemento */}
-            {partes.some((p) => p.paqueteGrupo) && (
-              <div data-testid="resumen-complemento" style={{ backgroundColor: 'var(--cp-sand)', borderRadius: '12px', padding: '12px 14px', fontSize: '13px', color: 'var(--cp-navy)' }}>
-                {[...new Set(partes.map((p) => p.paqueteGrupo).filter(Boolean))].map((grupo) => {
-                  const alternativas = [...new Set(partes.filter((p) => p.paqueteGrupo === grupo).map((p) => (p.paqueteNombre ?? '').trim()))];
-                  return (
-                    <div key={grupo as string} style={{ marginBottom: 6 }}>
-                      <strong>{`El cliente elige UNA alternativa de «${grupo}»:`}</strong>
-                      <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
-                        {alternativas.map((alt) => (
-                          <li key={alt}>
-                            {`${alt || '(sin nombre)'}: `}
-                            {partes
-                              .filter((p) => p.paqueteGrupo === grupo && (p.paqueteNombre ?? '').trim() === alt)
-                              .map((p) => `${p.cantidad || 1} × ${p.nombre}`)
-                              .join(' + ')}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          <div data-testid="paso-2-combo" className="mo-tarjeta">
+            <EditorPartesCombo partes={partes} onCambiar={(p) => { setPartes(p); setMensajeError(''); }} productos={productosDisponibles} categorias={categoriasEditor} />
           </div>
           ) },
           { id: 'cuando', etiqueta: 'Cuándo y dónde', ...marca('cuando'), contenido: (
@@ -1564,7 +898,6 @@ export function ModalCombo({
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', fontSize: '13px' }}>
                 <div><strong>Nombre:</strong> {nombre}</div>
                 <div><strong>Categoría:</strong> {listaCategorias.find((c) => c.id === categoriaId)?.nombre || 'COMBOS'}</div>
-                <div><strong>Partes:</strong> {partes.map((p) => `${p.cantidad} × ${p.nombre}`).join(', ')}</div>
                 <div><strong>Precio base:</strong> S/ {precioBaseCombo.toFixed(2)}</div>
                 {ahorroCalculado > 0 && (
                   <div style={{ color: '#166534', fontWeight: 800 }}>
@@ -1577,6 +910,11 @@ export function ModalCombo({
                   </div>
                 )}
               </div>
+            </div>
+
+            <div style={{ backgroundColor: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '14px 16px' }}>
+              <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)', marginBottom: '8px' }}>Lo que verá el cliente</div>
+              <ResumenPartesCombo partes={partes} productos={productosDisponibles} categorias={categoriasEditor} />
             </div>
 
             {/* Preview interactivo en la carta abajo */}
