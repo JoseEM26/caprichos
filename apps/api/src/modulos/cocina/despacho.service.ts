@@ -5,6 +5,7 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
 import { ComandasService, lineasDeArea } from './comandas.service';
+import { estadoAreasDePedido } from './areas-pedido';
 import { obtenerInicioDiaLima } from './cocina.util';
 import { resumenPagoDespacho } from './resumen-pago-despacho';
 
@@ -63,17 +64,11 @@ export class DespachoService {
     const nombreDe = new Map(personas.map((x) => [x.party_id.toString(), [x.nombres, x.apellidos].filter(Boolean).join(' ')]));
 
     const lista = pedidos.map((p) => {
-      const areas = p.comandas
-        .map((c) => ({
-          areaId: c.area_id.toString(),
-          areaNombre: c.area?.nombre ?? '',
-          listo: c.estado === 'DESPEJADA',
-          lineas: lineasDeArea(p.lineas, c.area_id),
-        }))
-        // «despachada»: lo de esa área ya salió en un despacho parcial (todas sus líneas despachadas)
-        .map((a) => ({ ...a, despachada: a.lineas.length > 0 && a.lineas.every((l) => l.despachadas >= l.cantidad) }))
-        .filter((a) => a.lineas.length > 0)
-        .sort((x, y) => Number(BigInt(x.areaId) - BigInt(y.areaId)));
+      const estado = estadoAreasDePedido(p.comandas, p.lineas);
+      const areas = estado.areas.map(({ nLineas: _n, ...a }) => ({
+        ...a,
+        lineas: lineasDeArea(p.lineas, BigInt(a.areaId)),
+      }));
       const mesa = (p as any).mesa ?? (p.modalidad === 'MESA' ? ((p as any).mesa_numero ?? p.entrega_referencia ?? null) : null);
       const delivery = p.modalidad === 'DELIVERY';
       return {
@@ -95,7 +90,7 @@ export class DespachoService {
         pago: resumenPagoDespacho(p),
         areas,
         // Completo = todas sus áreas listas
-        completo: areas.length > 0 && areas.every((a) => a.listo),
+        completo: estado.completo,
         estado: p.estado,
         despachado: !EN_DESPACHO.includes(p.estado),
         despachado_en: EN_DESPACHO.includes(p.estado) ? null : (p.listo_en ?? null),

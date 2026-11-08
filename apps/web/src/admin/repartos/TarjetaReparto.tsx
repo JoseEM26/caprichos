@@ -14,6 +14,7 @@ import { InsigniaCambioCobro } from '../pedidos/PanelCambioCobro';
 import { ModalResolverFalla } from './ModalResolverFalla';
 import { ErrorApi } from '../../comun/api';
 import { clasificarEspera } from './calculoRuta';
+import { CocinaCheck } from './CocinaCheck';
 
 /** Texto del botón de reenvío: muestra el mismo monto que se cobra (0 = sin costo). */
 export function etiquetaReprogramar(recargo: number | null | undefined): string {
@@ -387,6 +388,9 @@ export function TarjetaReparto({
             </div>
           </div>
         </div>
+
+        {/* Check de áreas de cocina: qué está listo y qué falta (informativo) */}
+        <CocinaCheck pedido={pedido} />
 
         {/* Cliente y botones de contacto rápido */}
         <div
