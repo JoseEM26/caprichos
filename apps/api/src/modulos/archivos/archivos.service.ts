@@ -17,6 +17,16 @@ const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const TIPOS_IMAGEN = ['image/jpeg', 'image/png', 'image/webp'];
 const TIPOS_PRIVADO = [...TIPOS_IMAGEN, 'application/pdf'];
 
+/** Notas de voz y audios de WhatsApp (Meta entrega las notas de voz como audio/ogg con códec opus). */
+export const MAX_AUDIO_BYTES = 16 * 1024 * 1024; // 16 MB
+export const EXTENSION_AUDIO: Record<string, string> = {
+  'audio/ogg': '.ogg',
+  'audio/mpeg': '.mp3',
+  'audio/mp4': '.m4a',
+  'audio/amr': '.amr',
+  'audio/aac': '.aac',
+};
+
 @Injectable()
 export class ArchivosService {
   private readonly logger = new Logger(ArchivosService.name);
@@ -142,6 +152,51 @@ export class ArchivosService {
       id: archivo.id.toString(),
       url,
     };
+  }
+
+  /**
+   * Guarda un audio de WhatsApp en la carpeta privada (nunca se sirve sin permiso: ver GET admin/archivos/:id).
+   * Valida tipo y tamaño; el MIME debe venir sin parámetros (audio/ogg, no «audio/ogg; codecs=opus»).
+   */
+  async subirAudio(buffer: Buffer, mimeType: string): Promise<ArchivoSubidoDto> {
+    const ext = EXTENSION_AUDIO[mimeType];
+    if (!ext) {
+      throw new HttpException(
+        { codigo: 'TIPO_NO_PERMITIDO', mensaje: `Tipo de audio no permitido: ${mimeType}` },
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+      );
+    }
+    if (!buffer?.length || buffer.length > MAX_AUDIO_BYTES) {
+      throw new HttpException(
+        { codigo: 'ARCHIVO_GRANDE', mensaje: 'El audio está vacío o excede 16 MB' },
+        HttpStatus.PAYLOAD_TOO_LARGE,
+      );
+    }
+    const now = new Date();
+    const rutaRelativa = `privado/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${crypto.randomUUID()}${ext}`;
+    const rutaAbsoluta = path.resolve(this.getUploadsDir(), rutaRelativa);
+    fs.mkdirSync(path.dirname(rutaAbsoluta), { recursive: true });
+    fs.writeFileSync(rutaAbsoluta, buffer);
+    const archivo = await this.prisma.archivo.create({
+      data: { ruta: rutaRelativa, tipo_mime: mimeType, bytes: buffer.length, privado: true },
+    });
+    return { id: archivo.id.toString(), url: `/admin/archivos/${archivo.id.toString()}` };
+  }
+
+  /** Borra el archivo físico y su fila (retención/baja Ley 29733). Nunca lanza: si la fila sigue referenciada, solo borra el archivo. */
+  async eliminarArchivo(id: string | bigint): Promise<boolean> {
+    try {
+      const archivoId = typeof id === 'bigint' ? id : BigInt(id);
+      const archivo = await this.prisma.archivo.findUnique({ where: { id: archivoId } });
+      if (!archivo) return false;
+      const rutaAbsoluta = path.resolve(this.getUploadsDir(), archivo.ruta);
+      if (fs.existsSync(rutaAbsoluta)) fs.unlinkSync(rutaAbsoluta);
+      await this.prisma.archivo.delete({ where: { id: archivoId } }).catch(() => undefined);
+      return true;
+    } catch (err: any) {
+      this.logger.warn(`No se pudo eliminar el archivo ${String(id)}: ${err?.message}`);
+      return false;
+    }
   }
 
   /**

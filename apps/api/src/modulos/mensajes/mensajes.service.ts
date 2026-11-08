@@ -463,6 +463,8 @@ export class MensajesService {
               ? String(contenido.archivoId || (c.flujo as any)?.pago?.comprobanteArchivoId || '') || null
               : null,
           texto: textoDe(m),
+          // Nota de voz guardada: se escucha con GET /admin/archivos/:id (siempre la escucha una persona)
+          audioId: m.tipo === 'AUDIO' && contenido.audio?.archivoId ? String(contenido.audio.archivoId) : null,
           ubicacion: contenido.ubicacion ?? null,
           hora: hora(m.en),
           fecha: m.en.toISOString(),

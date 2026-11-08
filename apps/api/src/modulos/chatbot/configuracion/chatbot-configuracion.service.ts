@@ -10,6 +10,7 @@ import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { VALOR_BLOQUEO_REINCIDENTE } from './bloqueo-spam.util';
 import { RedisService } from '../../../comun/redis/redis.service';
 import { AuditoriaService } from '../../auditoria/auditoria.service';
+import { ArchivosService } from '../../archivos/archivos.service';
 import { UsuarioAutenticado } from '../../acceso/acceso.tipos';
 import {
   enmascararTelefono,
@@ -49,7 +50,18 @@ export class ChatbotConfiguracionService {
     private readonly redisService: RedisService,
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly archivos?: ArchivosService,
   ) {}
+
+  /** Borra los archivos de audio de notas de voz de los mensajes dados (dato personal, Ley 29733). Devuelve cuántos borró. */
+  private async borrarAudios(mensajes: Array<{ contenido: unknown }>): Promise<number> {
+    let borrados = 0;
+    for (const m of mensajes ?? []) {
+      const id = (m.contenido as any)?.audio?.archivoId;
+      if (id && this.archivos && (await this.archivos.eliminarArchivo(String(id)))) borrados++;
+    }
+    return borrados;
+  }
 
   /**
    * Obtiene la configuración completa del chatbot: textos, funciones, anti-spam y privacidad.
@@ -413,6 +425,7 @@ export class ChatbotConfiguracionService {
       if (contenidoObj.texto === textoAnonimizado) {
         continue; // Ya anonimizado previamente
       }
+      await this.borrarAudios([msg]); // audio y transcripción: se borran junto con el contenido
 
       await this.prisma.mensajeChat.update({
         where: { id: msg.id },
@@ -619,6 +632,9 @@ export class ChatbotConfiguracionService {
         },
       });
 
+      await this.borrarAudios(
+        await this.prisma.mensajeChat.findMany({ where: { conversacion_id: conversacion.id }, select: { contenido: true } }),
+      );
       const actualizados = await this.prisma.mensajeChat.updateMany({
         where: { conversacion_id: conversacion.id },
         data: {

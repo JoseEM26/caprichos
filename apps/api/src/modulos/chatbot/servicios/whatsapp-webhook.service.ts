@@ -62,6 +62,12 @@ import {
 } from '../utilidades/no-compatibles.util';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
+/** Notas de voz y audios: hasta 16 MB (Meta entrega las notas de voz como audio/ogg; codecs=opus). */
+export const MAX_AUDIO_BYTES = 16 * 1024 * 1024;
+export const TIPOS_AUDIO_PERMITIDOS = ['audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/amr', 'audio/aac'];
+/** Una persona escucha siempre las notas de voz: el bot no las interpreta, avisa una vez y pasa el chat. */
+export const TEXTO_NOTA_DE_VOZ = 'Recibí tu nota de voz 🎧; una persona del equipo la va a escuchar y te responde en breve';
+export const MOTIVO_DERIVACION_NOTA_DE_VOZ = 'NOTA_DE_VOZ';
 export const TIPOS_MEDIA_PERMITIDOS = [
   'image/jpeg',
   'image/png',
@@ -283,16 +289,18 @@ export class WhatsappWebhookService {
   /**
    * Descarga segura de archivo adjunto (imagen o PDF de voucher) desde WhatsApp Cloud API.
    */
-  private async descargarMediaSegura(
+  async descargarMediaSegura(
     mediaId: string,
     mimeType: string,
+    opciones: { tipos?: string[]; maxBytes?: number } = {},
   ): Promise<Buffer | null> {
     if (!this.waToken) {
       this.logger.warn('Sin WHATSAPP_TOKEN para descargar archivo adjunto.');
       return null;
     }
 
-    if (!TIPOS_MEDIA_PERMITIDOS.includes(mimeType)) {
+    const maxBytes = opciones.maxBytes ?? MAX_MEDIA_BYTES;
+    if (!(opciones.tipos ?? TIPOS_MEDIA_PERMITIDOS).includes(mimeType)) {
       this.logger.warn(`Tipo de medio no permitido: ${mimeType}`);
       return null;
     }
@@ -321,10 +329,15 @@ export class WhatsappWebhookService {
         return null;
       }
 
+      // Si el servidor ya declara un tamaño mayor al permitido, ni se descarga
+      if (Number(resDownload.headers?.get?.('content-length')) > maxBytes) {
+        this.logger.warn('Media excede tamaño máximo (según cabecera)');
+        return null;
+      }
       const arrayBuffer = await resDownload.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      if (buffer.length > MAX_MEDIA_BYTES) {
+      if (buffer.length > maxBytes) {
         this.logger.warn(`Media excede tamaño máximo (${buffer.length} bytes)`);
         return null;
       }
@@ -413,6 +426,8 @@ export class WhatsappWebhookService {
     let tipoRegistro = 'TEXTO';
     let imagenBuffer: Buffer | null = null;
     let imagenMime = '';
+    // Nota de voz / audio: se guarda en privado (se escucha en Mensajes) 
+    let audioGuardado: { archivoId: string; mime: string } | null = null;
     let ubicacion: { latitud: number; longitud: number; nombre?: string; direccion?: string } | undefined;
     const clasificacion: ClasificacionMensajeEntrante = clasificarMensajeEntrante(msg);
     const esNoCompatible = clasificacion.clase === 'NO_COMPATIBLE';
@@ -459,9 +474,12 @@ export class WhatsappWebhookService {
       const emoji = String(msg.reaction?.emoji || '').trim();
       texto = emoji ? `Reaccionó con ${emoji}` : 'Quitó su reacción';
     } else {
-      // NO_COMPATIBLE (audio, video, sticker, documento...): no se descarga ni se pasa al motor.
+      // NO_COMPATIBLE (video, sticker, documento...): no se descarga ni se pasa al motor.
       tipoRegistro = 'OTRO';
       texto = clasificacion.etiqueta;
+      if (tipo === 'audio' && msg.audio?.id) {
+        audioGuardado = await this.guardarAudio(msg.audio.id, String(msg.audio.mime_type || 'audio/ogg'));
+      }
     }
 
     // Asociar a conversación existente o crearla de forma defensiva
@@ -662,7 +680,8 @@ export class WhatsappWebhookService {
           contenido: archivoMensajeId
             ? { texto, archivoId: archivoMensajeId }
             : esNoCompatible
-              ? { texto, clase: clasificacion.clase, subtipo: clasificacion.subtipo, etiqueta: clasificacion.etiqueta, waMessageId: waMessageId || null }
+              ? { texto, clase: audioGuardado ? 'NOTA_DE_VOZ' : clasificacion.clase, subtipo: clasificacion.subtipo, etiqueta: clasificacion.etiqueta, waMessageId: waMessageId || null,
+                  ...(audioGuardado ? { audio: { archivoId: audioGuardado.archivoId, mime: audioGuardado.mime } } : {}) }
               : ubicacionGuardada
                 ? { texto, ubicacion: ubicacionGuardada }
                 : { texto },
@@ -699,6 +718,11 @@ export class WhatsappWebhookService {
 
     // Audio, video, sticker, documento, etc.: no avanzan el flujo ni cuentan como calificación, reprogramación o voucher.
     // El bot avisa y repite el paso (ver atenderNoCompatible).
+    // Nota de voz: el bot no la interpreta; una persona la escucha (aviso único al cliente, chat a persona y campana).
+    if (tipo === 'audio') {
+      await this.atenderNotaDeVoz(conversacion, identificador, telefonoNorm, telHash, waMessageId);
+      return true;
+    }
     if (esNoCompatible) {
       await this.atenderNoCompatible({
         conversacion,
@@ -899,6 +923,95 @@ export class WhatsappWebhookService {
       this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacionId.toString() });
     } catch (err: any) {
       this.logger.warn(`No se pudo obtener la dirección de la ubicación: ${err?.message}`);
+    }
+  }
+
+  /** Descarga y guarda en privado un audio del cliente. Devuelve null si falla algo (el mensaje igual queda en el chat). */
+  private async guardarAudio(
+    mediaId: string,
+    mimeCrudo: string,
+  ): Promise<{ archivoId: string; mime: string } | null> {
+    // Meta manda «audio/ogg; codecs=opus»: se valida y guarda el tipo base
+    const mime = mimeCrudo.split(';')[0].trim().toLowerCase();
+    const buffer = await this.descargarMediaSegura(mediaId, mime, { tipos: TIPOS_AUDIO_PERMITIDOS, maxBytes: MAX_AUDIO_BYTES });
+    if (!buffer) return null;
+    try {
+      const sub = await this.archivosService.subirAudio(buffer, mime);
+      return { archivoId: sub.id, mime };
+    } catch (err: any) {
+      this.logger.warn(`No se pudo guardar el audio del chat: ${err.message}`);
+      return null;
+    }
+  }
+
+  /** El chat es del bot: sin persona, sin «Atención persona», sin validar pago y sin Atendido. */
+  private botAtiendeAudio(conversacion: any): boolean {
+    const flujo = (conversacion.flujo as Record<string, any>) || {};
+    return (
+      conversacion.duenio === 'BOT' &&
+      conversacion.tomado_por == null &&
+      flujo.estado !== 'ATENCION_PERSONA' &&
+      conversacion.estado !== 'VALIDAR_PAGO' &&
+      conversacion.estado !== 'ATENDIDA' &&
+      !conversacion.atendido_en
+    );
+  }
+
+  /**
+   * Nota de voz del cliente (ya guardada en el chat). Siempre avisa al equipo por la campana (Admin y Caja, también con un pago
+   * por revisar). Si el chat era del bot: responde UNA vez y lo pasa a una persona (urgente, Por atender). Si estaba en
+   * Atendido: vuelve a Por atender sin responder. Si ya lo llevaba una persona o está en Validar pago: solo la notificación.
+   * Nunca lanza.
+   */
+  private async atenderNotaDeVoz(
+    conversacion: any,
+    identificador: string,
+    telefonoNorm: string | null,
+    telHash: string,
+    waMessageId?: string,
+  ): Promise<void> {
+    try {
+      const bot = this.botAtiendeAudio(conversacion);
+      const atendido = conversacion.estado === 'ATENDIDA' || Boolean(conversacion.atendido_en);
+      if (bot || atendido) {
+        await this.prisma.conversacion.update({
+          where: { id: conversacion.id },
+          data: {
+            duenio: 'PERSONA',
+            urgente: true,
+            estado: !conversacion.estado || conversacion.estado === 'ATENDIDA' ? 'ABIERTA' : conversacion.estado,
+            motivo_derivacion: MOTIVO_DERIVACION_NOTA_DE_VOZ,
+            ultima_actividad: new Date(),
+          },
+        });
+      }
+
+      const titulo = `Nota de voz de ${obtenerNombreMostrar(conversacion)}: hay que escucharla`;
+      const notif = await this.prisma.notificacion.create({
+        data: {
+          tipo: 'ATENCION_WHATSAPP',
+          rol_destino: null,
+          titulo,
+          mensaje: 'El cliente envió una nota de voz. El bot no la interpreta: escúchala en el chat y respóndele.',
+          enlace: telefonoNorm ? `/admin/mensajes?telefono=${telefonoNorm.replace(/\D/g, '')}` : '/admin/mensajes',
+        },
+      });
+      this.eventos?.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo });
+
+      // Aviso al cliente solo si el chat era del bot (consentimiento vigente y sin bloqueo por spam)
+      if (!bot || !this.outbox) return;
+      const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({ where: { telefono_hash: telHash } });
+      if ((consentimiento && !consentimiento.acepta) || (await this.spamBloqueado(identificador))) return;
+      await this.outbox.encolar({
+        telefono: identificador,
+        tipo: 'TEXTO',
+        clave: `nota-de-voz-${waMessageId || `${identificador}-${Date.now()}`}`,
+        origen: ORIGEN_NO_COMPATIBLE,
+        carga: { textoLibre: TEXTO_NOTA_DE_VOZ, autor: 'BOT', nombre: obtenerNombreMostrar(conversacion), etapa: 'NOTA_DE_VOZ' },
+      });
+      this.outbox.despertar();
+    } catch (err: any) {
+      this.logger.warn(`No se pudo atender una nota de voz: ${err.message}`);
     }
   }
 
