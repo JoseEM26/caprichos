@@ -24,4 +24,12 @@ describe('layout del modal Nuevo pedido', () => {
     expect(css).not.toMatch(/\.np-carrito\s*\{[^}]*position:\s*fixed/);
     expect(css).toMatch(/\.np-carrito > \.np-enviar\s*\{[^}]*position:\s*sticky/);
   });
+
+  it('el resumen no aplasta sus bloques, las líneas hacen wrap y los botones de cantidad son redondos de 44 px', () => {
+    expect(css).toMatch(/\.np-carrito > \*\s*\{[^}]*flex-shrink:\s*0/);
+    expect(css).toMatch(/\.np-linea-fila\s*\{[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/\.np-linea-nombre\s*\{[^}]*overflow-wrap:\s*anywhere/);
+    expect(css).toMatch(/\.np-qty button\s*\{[^}]*width:\s*44px[^}]*height:\s*44px[^}]*border-radius:\s*50%/);
+    expect(tsx).toContain('np-enviar');
+  });
 });
