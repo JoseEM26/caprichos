@@ -3,7 +3,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
-import { digitalesDelPlan, medioDigitalVoucher, mediosQueExigenCodigo, mismoMedio } from './mediosPago';
+import { digitalesDelPlan, esDeliveryContraEntrega, medioDigitalVoucher, mediosQueExigenCodigo, mismoMedio } from './mediosPago';
 import { CapturasPlanDigital } from './CapturasPlanDigital';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
@@ -27,7 +27,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
   const [contactado, setContactado] = useState(false);
   // Pasos: 1 Cliente · 2 Pago y comprobante · 3 Revisar y confirmar (los tres quedan montados: no se pierde lo subido al volver)
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
-  const [medio, setMedio] = useState<string>(pedido.pago_metodo || pedido.pago_preferido || 'Yape');
+  // Delivery en efectivo/tarjeta: se cobra al entregar, no se pide pago ni voucher (sin paso 2)
+  const contraEntrega = esDeliveryContraEntrega(pedido);
+  const [medio, setMedio] = useState<string>(pedido.pago_metodo || pedido.pago_preferido || (contraEntrega ? 'Efectivo' : 'Yape'));
   const [montoPagaCon, setMontoPagaCon] = useState(pedido.paga_con ? String(pedido.paga_con) : '');
   // Código de operación por medio (MAYÚSCULAS). Sin entrada, el campo muestra el que leyó la IA del voucher.
   const [codigos, setCodigos] = useState<Record<string, string>>({});
@@ -110,7 +112,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
         await pedidosApi.cambiarEstado(
           pedido.id,
           'COLA',
-          'Confirmado con cliente y pago verificado',
+          contraEntrega ? 'Confirmado con cliente; delivery se cobra al entregar' : 'Confirmado con cliente y pago verificado',
         );
       }
       setConfirmandoSiNo(false);
@@ -129,12 +131,12 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
       return;
     }
     setMsg('');
-    setPaso((p) => (p < 3 ? ((p + 1) as 1 | 2 | 3) : p));
+    setPaso((p) => (p < 3 ? ((contraEntrega ? 3 : p + 1) as 1 | 2 | 3) : p));
   };
 
   const PASOS: Array<{ n: 1 | 2 | 3; titulo: string }> = [
     { n: 1, titulo: 'Cliente' },
-    { n: 2, titulo: 'Pago y comprobante' },
+    ...(contraEntrega ? [] : [{ n: 2 as const, titulo: 'Pago y comprobante' }]),
     { n: 3, titulo: 'Revisar y confirmar' },
   ];
 
@@ -173,7 +175,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Confirmar pedido y pago"
+        aria-label={contraEntrega ? 'Confirmar pedido' : 'Confirmar pedido y pago'}
         style={{
           position: 'fixed',
           zIndex: 60,
@@ -213,7 +215,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
             />
           )}
           <ol data-testid="pasos-confirmar" style={{ display: 'flex', gap: 8, listStyle: 'none', margin: 0, padding: 0, flexWrap: 'wrap' }}>
-            {PASOS.map((p) => {
+            {PASOS.map((p, i) => {
               const activo = paso === p.n;
               const hecho = paso > p.n;
               const permitido = p.n === 1 || contactado;
@@ -246,7 +248,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
                     }}
                   >
                     <span style={{ width: 24, height: 24, borderRadius: 12, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, background: activo ? 'var(--cp-orange, #E67929)' : hecho ? 'var(--cp-green, #2F7A45)' : 'var(--cp-sand, #F1E6D6)', color: activo ? 'var(--cp-navy, #0B2C3E)' : hecho ? '#fff' : 'var(--cp-navy, #0B2C3E)' }}>
-                      {hecho ? '✓' : p.n}
+                      {hecho ? '✓' : i + 1}
                     </span>
                     {p.titulo}
                   </button>
@@ -477,7 +479,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
                 type="button"
                 onClick={() => {
                   setMsg('');
-                  setPaso((p) => (p > 1 ? ((p - 1) as 1 | 2 | 3) : p));
+                  setPaso((p) => (p > 1 ? ((contraEntrega ? 1 : p - 1) as 1 | 2 | 3) : p));
                 }}
                 style={{ flex: '1 1 140px', minHeight: 52, border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 12, background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 800, cursor: 'pointer' }}
               >
@@ -510,7 +512,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
       <Confirmar
         abierto={confirmandoSiNo}
         titulo={`¿Confirmar el pedido ${pedido.codigo} y enviarlo a cocina?`}
-        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.${excepcionSinVoucher ? ' Se registra pagado sin captura.' : ''}`}
+        mensaje={contraEntrega ? 'El pedido pasará a las pantallas de cocina. El pago queda pendiente: se cobra en presencial al entregar.' : `Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.${excepcionSinVoucher ? ' Se registra pagado sin captura.' : ''}`}
         textoConfirmar="Sí, confirmar"
         textoNo="No"
         cargando={enviando}

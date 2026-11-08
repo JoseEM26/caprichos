@@ -15,6 +15,17 @@ export function medioDigitalVoucher(medio: string | null | undefined): MedioDigi
   return MEDIOS_DIGITALES_VOUCHER.find((m) => m === up) ?? null;
 }
 
+/** Delivery que se cobra en presencial al entregar (efectivo o tarjeta, o sin medio): confirmarlo no pide pago ni voucher. */
+export function esDeliveryContraEntrega(p: {
+  modalidad?: string | null;
+  pago_metodo?: string | null;
+  pago_preferido?: string | null;
+  planPago?: ReadonlyArray<{ medio: string }> | null;
+}): boolean {
+  if ((p.modalidad || '').toUpperCase() !== 'DELIVERY') return false;
+  return !medioDigitalVoucher(p.pago_metodo || p.pago_preferido) && digitalesDelPlan(p.planPago).length === 0;
+}
+
 /** Medios digitales del plan (pago dividido), sin repetir y en su orden. Vacío si el plan no tiene digitales. */
 export function digitalesDelPlan(planPago: ReadonlyArray<{ medio: string }> | null | undefined): MedioDigitalVoucher[] {
   const medios: MedioDigitalVoucher[] = [];

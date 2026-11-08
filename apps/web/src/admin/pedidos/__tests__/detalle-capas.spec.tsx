@@ -276,6 +276,19 @@ describe('Barra de acciones fija', () => {
   });
 });
 
+describe('delivery por confirmar se cobra al entregar', () => {
+  it('efectivo: el botón es «Confirmar pedido» y el aviso dice que no bloquea', () => {
+    renderizar(pedido({ modalidad: 'DELIVERY', estado: 'NUEVO', canal: 'CARTA', pago_preferido: 'EFECTIVO', paga_con: 50 }));
+    expect(screen.getByRole('button', { name: 'Confirmar pedido' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar pedido y pago' })).toBeNull();
+  });
+
+  it('digital: se mantiene «Confirmar pedido y pago»', () => {
+    renderizar(pedido({ modalidad: 'DELIVERY', estado: 'NUEVO', canal: 'CARTA', pago_preferido: 'YAPE' }));
+    expect(screen.getByRole('button', { name: 'Confirmar pedido y pago' })).toBeInTheDocument();
+  });
+});
+
 describe('Croquis del pedido de mesa', () => {
   const pisos = {
     pisos: [

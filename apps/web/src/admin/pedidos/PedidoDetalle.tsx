@@ -14,6 +14,7 @@ import { ModalUbicar } from './ModalUbicar';
 import { ModalCorregirCliente } from './ModalCorregirCliente';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
+import { esDeliveryContraEntrega } from './mediosPago';
 import { InsigniaModalidad } from './InsigniaModalidad';
 import { InsigniaMesa } from './InsigniaMesa';
 import { esCerrado } from './estadosCaja';
@@ -169,6 +170,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
     !estaPagado &&
     !tienePagoCoordinado &&
     !esMesa;
+  const contraEntrega = esPorConfirmar && esDeliveryContraEntrega(pedido);
   const esPagoPorCoordinar =
     !esMesa &&
     !estaPagado &&
@@ -392,7 +394,9 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
             <>
               {esPorConfirmar && (
                 <div className="dp-sec" style={{ fontSize: 14, lineHeight: '19px', color: 'var(--cp-soft, #2C4C5D)' }}>
-                  Pedido fuera del local: ya está en cocina, no espera el pago. Habla con el cliente por WhatsApp y confirma el pago cuando lo haga; pídele la captura con amabilidad (es opcional y se puede subir después).
+                  {contraEntrega
+                    ? 'Delivery: se cobra en presencial al entregar; no bloquea. Confirma el pedido tras hablar con el cliente y el repartidor cobra al entregar.'
+                    : 'Pedido fuera del local: ya está en cocina, no espera el pago. Habla con el cliente por WhatsApp y confirma el pago cuando lo haga; pídele la captura con amabilidad (es opcional y se puede subir después).'}
                 </div>
               )}
               {panelCoordinar}
@@ -461,7 +465,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                   disabled={sinUbicar}
                   title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
                 >
-                  Confirmar pedido y pago
+                  {contraEntrega ? 'Confirmar pedido' : 'Confirmar pedido y pago'}
                 </button>
               )}
               {puedeCobrar && (

@@ -281,4 +281,27 @@ describe('ModalConfirmarPago', () => {
       expect(screen.getAllByTestId(/^input-codigo-operacion-/)).toHaveLength(1);
     });
   });
+
+  describe('delivery contra entrega (efectivo/tarjeta)', () => {
+    const deliv = (extra: Partial<Pedido> = {}): Pedido =>
+      pedidoCarta({ modalidad: 'DELIVERY', pago_preferido: 'EFECTIVO', paga_con: 50, entrega_lat: -12, entrega_lng: -77, zona: { id: '1', nombre: 'Z', precio: 5 }, ...extra } as Partial<Pedido>);
+
+    it('sin paso de pago ni voucher: confirma COORDINADO sin excepción y pasa a COLA', async () => {
+      abrir(deliv());
+      expect(screen.getByRole('dialog', { name: 'Confirmar pedido' })).toBeTruthy();
+      expect(screen.queryByText('Pago y comprobante')).toBeNull();
+      marcarContacto();
+      siguiente();
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar' }));
+      await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
+      expect(pedidosApi.registrarPago).toHaveBeenCalledWith('77', 'EFECTIVO', 'COORDINADO', undefined, undefined);
+      expect(pedidosApi.cambiarEstado).toHaveBeenCalledWith('77', 'COLA', expect.any(String));
+    });
+
+    it('delivery digital mantiene el paso de pago', () => {
+      abrir(deliv({ pago_preferido: 'YAPE' }));
+      expect(screen.getByText('Pago y comprobante')).toBeTruthy();
+    });
+  });
 });
