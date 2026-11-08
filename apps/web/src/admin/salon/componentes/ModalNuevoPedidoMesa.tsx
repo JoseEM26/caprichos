@@ -1,3 +1,4 @@
+import { PagoPersonalBloque, errorPagaConPersonal, textoPagoPersonal } from './PagoPersonalBloque';
 import { useEffect, useId, useRef, useState, useMemo, useDeferredValue } from 'react';
 import { useSalonSocket } from '../useSalonSocket';
 import { VigilaEdicionPedido } from './VigilaEdicionPedido';
@@ -97,10 +98,10 @@ export interface DatosPedidoOriginal {
   entrega_lng?: number | string | null;
 }
 
-/** ¿Puede cobrarle al trabajador en el momento? (sin romper fuera del contexto de sesión) */
+/** ¿Puede cobrarle al trabajador en el momento (creditos/cobrar_ahora: ADMIN, Caja y Mozo)? (sin romper fuera del contexto de sesión) */
 function usePuedeSaldarPersonal(): boolean {
   try {
-    return Boolean(useSesion().tiene('creditos/saldar'));
+    return Boolean(useSesion().tiene('creditos/cobrar_ahora'));
   } catch {
     return false;
   }
@@ -1121,6 +1122,9 @@ export function ModalNuevoPedidoMesa({
   const errorComprobanteCaja = errorValorComprobante(valorComp);
   // «Con cuánto paga» es obligatorio con efectivo, salvo mesa (se pide al cobrar en la precuenta) y pedido del personal
   const pagaConExento = (extra ? extra.modalidad === 'MESA' : modalidad === 'local') || pideMode === 'personal';
+  const personalPide = pideMode === 'personal' && !extra;
+  // Pedido del personal: su propio bloque de pago reemplaza al genérico (plan, medios, con cuánto paga)
+  const errorPagaConPers = personalPide ? errorPagaConPersonal(pagoPersonal, medioPersonal, total, cliPagaCon) : null;
   const errorPagaCon =
     !pagaConExento && montoEfectivoAhora > 0 && pagaConValido() === undefined
       ? `Indica con cuánto paga: debe ser S/ ${montoEfectivoAhora.toFixed(2)} o más`
@@ -1146,9 +1150,10 @@ export function ModalNuevoPedidoMesa({
       mensaje: mensajeTelefonoMesa,
       foco: ['#np-telefono-mesa'],
     });
-  if (errorPlanAhora)
+  if (errorPlanAhora && !personalPide)
     erroresEnvio.push({ campo: 'plan', mensaje: errorPlanAhora, foco: ['#np-plan-pago input', '#np-plan-pago button'] });
   if (errorPagaCon) erroresEnvio.push({ campo: 'pagaCon', mensaje: errorPagaCon, foco: ['#plan-paga-con'] });
+  if (errorPagaConPers) erroresEnvio.push({ campo: 'pagaCon', mensaje: errorPagaConPers, foco: ['#personal-paga-con'] });
   if (errorComprobanteCaja)
     erroresEnvio.push({
       campo: 'comprobante',
@@ -1255,6 +1260,9 @@ export function ModalNuevoPedidoMesa({
             personas: personasNum,
             ...(capacidadAceptada ? { confirmarCapacidad: true } : {}),
             esPersonal: pideMode === 'personal',
+            ...(personalPide
+              ? { pagoPersonal: { modo: pagoPersonal === 'ahora' ? 'AHORA' : 'CREDITO', ...(pagoPersonal === 'ahora' ? { medio: medioPersonal, pagaCon: medioPersonal === 'EFECTIVO' ? Number(cliPagaCon) : undefined } : {}) } }
+              : {}),
             colaboradorPartyId: staffElegido?.partyId,
             clientePartyId: clientePideId,
             comprobante: aComprobanteAlta(valorComp),
@@ -1307,6 +1315,9 @@ export function ModalNuevoPedidoMesa({
             nota: notaGeneral.trim() || undefined,
             cuponCodigo: cuponAplicado?.codigo,
             esPersonal: pideMode === 'personal',
+            ...(personalPide
+              ? { pagoPersonal: { modo: pagoPersonal === 'ahora' ? 'AHORA' : 'CREDITO', ...(pagoPersonal === 'ahora' ? { medio: medioPersonal, pagaCon: medioPersonal === 'EFECTIVO' ? Number(cliPagaCon) : undefined } : {}) } }
+              : {}),
             colaboradorPartyId: staffElegido?.partyId,
             canal: canalEnvio,
             comprobante: aComprobanteAlta(valorComp),
@@ -1319,14 +1330,6 @@ export function ModalNuevoPedidoMesa({
       }
 
       setConfirmarEnviar(false);
-      // Pedido del personal con «Pagar ahora»: se salda su consumo en Caja y no queda en su deuda
-      if (pideMode === 'personal' && pagoPersonal === 'ahora' && res?.id != null) {
-        try {
-          await api.post('/admin/creditos/saldar', { pedidoIds: [String(res.id)], medio: medioPersonal });
-        } catch {
-          // el pedido ya está hecho y queda en su crédito: se puede pagar después desde Créditos del personal
-        }
-      }
       // Parte digital del plan: el voucher es opcional; «Subir después» lo deja pendiente en Mis pedidos
       const medioDigital = medioDigitalDelPlan(planAhora);
       if (medioDigital && res?.id != null) {
@@ -3120,24 +3123,6 @@ export function ModalNuevoPedidoMesa({
 
                     {pideMode === 'personal' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <div role="group" aria-label="¿Cómo lo paga?" data-testid="pago-personal" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-                          <div style={{ fontWeight: 800 }}>¿Cómo lo paga?</div>
-                          <label style={{ display: 'flex', gap: 6, alignItems: 'center', minHeight: 32 }}>
-                            <input type="radio" name="pago-personal" checked={pagoPersonal === 'credito'} onChange={() => setPagoPersonal('credito')} />
-                            Cargar a su crédito (se paga fin de semana/mes)
-                          </label>
-                          {puedeSaldarPersonal && (
-                            <label style={{ display: 'flex', gap: 6, alignItems: 'center', minHeight: 32 }}>
-                              <input type="radio" name="pago-personal" checked={pagoPersonal === 'ahora'} onChange={() => setPagoPersonal('ahora')} />
-                              Pagar ahora
-                              {pagoPersonal === 'ahora' && (
-                                <select aria-label="Medio de pago" value={medioPersonal} onChange={(e) => setMedioPersonal(e.target.value)}>
-                                  {['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA'].map((m) => <option key={m} value={m}>{m}</option>)}
-                                </select>
-                              )}
-                            </label>
-                          )}
-                        </div>
                         <input
                           type="search"
                           autoFocus
@@ -3455,6 +3440,20 @@ export function ModalNuevoPedidoMesa({
                 </div>
 
                 {!edicion && (<>
+                {personalPide ? (
+                  <PagoPersonalBloque
+                    modo={pagoPersonal}
+                    onModo={setPagoPersonal}
+                    medio={medioPersonal}
+                    onMedio={setMedioPersonal}
+                    total={total}
+                    pagaCon={cliPagaCon}
+                    onPagaCon={setCliPagaCon}
+                    puedeCobrarAhora={puedeSaldarPersonal}
+                    error={errorPagaConPers}
+                    mostrarError={intentoEnvio}
+                  />
+                ) : (
                 <div id="np-plan-pago">
                   <PlanPagoEditor
                     total={total}
@@ -3471,6 +3470,7 @@ export function ModalNuevoPedidoMesa({
                     </span>
                   )}
                 </div>
+                )}
 
                 <div id="np-comprobante" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <SelectorComprobante idPrefijo="np-comp" valor={valorComp} onChange={setValorComp} total={total} />
@@ -3538,6 +3538,7 @@ export function ModalNuevoPedidoMesa({
                 >
                   {extra ? 'Registrar extra' : modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'} · S/{' '}
                   {total.toFixed(2)}
+                  {personalPide ? ` · ${textoPagoPersonal(pagoPersonal, medioPersonal)}` : ''}
                 </button>
                 {motivoNoEnviar && (
                   <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)', textAlign: 'center' }}>
