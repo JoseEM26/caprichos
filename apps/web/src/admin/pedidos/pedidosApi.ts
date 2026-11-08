@@ -243,6 +243,8 @@ export interface FiltrosListarPedidos {
   hasta?: string;
   /** Solo días anteriores en curso o con pago pendiente (ignora desde/hasta) */
   pendientes?: boolean;
+  /** Pide también el conteo agrupado por estado y cobro de todo el filtro */
+  resumen?: boolean;
 }
 
 /** Pregunta de reprogramar tras el retiro: esperando, dijo sí/no, sin respuesta, tope o sin pregunta. */
@@ -303,6 +305,8 @@ export interface RespuestaListarPedidos {
   pagina: number;
   limite: number;
   items: Pedido[];
+  /** Solo con resumen=1: una fila por estado y estado de pago */
+  resumen?: { estado: string; pago_estado: string | null; n: number; total: number }[];
 }
 
 export interface CajaInfo {
@@ -420,6 +424,7 @@ export const pedidosApi = {
     if (filtros.desde) params.append('desde', filtros.desde);
     if (filtros.hasta) params.append('hasta', filtros.hasta);
     if (filtros.pendientes) params.append('pendientes', '1');
+    if (filtros.resumen) params.append('resumen', '1');
 
     const query = params.toString();
     const ruta = query ? `/admin/pedidos?${query}` : '/admin/pedidos';

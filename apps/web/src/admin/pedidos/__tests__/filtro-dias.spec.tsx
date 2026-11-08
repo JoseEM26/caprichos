@@ -80,7 +80,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     render(<PedidosAdminView />);
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
-    expect(llamadasLista()[0]).toEqual({ desde: HOY, hasta: HOY, limite: 100 });
+    expect(llamadasLista()[0]).toEqual({ desde: HOY, hasta: HOY, limite: 100, resumen: true });
     await abrirFiltros();
     expect(screen.getByRole('button', { name: 'Mostrar: Hoy' })).toBeInTheDocument();
     expect(screen.getByText(/Mostrando:/)).toHaveTextContent('hoy, 28 oct');
@@ -100,13 +100,13 @@ describe('Filtro de días en Pedidos y caja', () => {
     elegirPeriodo(/Ayer/);
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(2));
-    expect(llamadasLista()[1]).toEqual({ desde: '2026-10-27', hasta: '2026-10-27', limite: 100 });
+    expect(llamadasLista()[1]).toEqual({ desde: '2026-10-27', hasta: '2026-10-27', limite: 100, resumen: true });
     expect(screen.getByText(/Mostrando:/)).toHaveTextContent('ayer, 27 oct');
     expect(await screen.findByText('No hay pedidos en ese rango.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Volver a hoy' }));
     await waitFor(() => expect(llamadasLista()).toHaveLength(3));
-    expect(llamadasLista()[2]).toEqual({ desde: HOY, hasta: HOY, limite: 100 });
+    expect(llamadasLista()[2]).toEqual({ desde: HOY, hasta: HOY, limite: 100, resumen: true });
   });
 
   it('Ayer muestra también los pedidos ya entregados (no solo los activos)', async () => {
@@ -140,7 +140,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     elegirPeriodo(/Últimos 7 días/);
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(2));
-    expect(llamadasLista()[1]).toEqual({ desde: '2026-10-22', hasta: HOY, limite: 100 });
+    expect(llamadasLista()[1]).toEqual({ desde: '2026-10-22', hasta: HOY, limite: 100, resumen: true });
   });
 
   it('un rango válido elegido en las fechas se envía al servidor', async () => {
@@ -154,7 +154,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ver estos días' }));
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(2));
-    expect(llamadasLista()[1]).toEqual({ desde: '2026-10-20', hasta: '2026-10-25', limite: 100 });
+    expect(llamadasLista()[1]).toEqual({ desde: '2026-10-20', hasta: '2026-10-25', limite: 100, resumen: true });
     expect(screen.getByText(/Mostrando:/)).toHaveTextContent('20 oct – 25 oct');
   });
 
@@ -192,7 +192,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     fireEvent.click(opcion);
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(2));
-    expect(llamadasLista()[1]).toEqual({ pendientes: true, limite: 100 });
+    expect(llamadasLista()[1]).toEqual({ pendientes: true, limite: 100, resumen: true });
     expect(screen.getByRole('button', { name: 'Mostrar: Pendientes de días anteriores' })).toBeInTheDocument();
     expect(screen.getByText(/Mostrando:/)).toHaveTextContent('pendientes de días anteriores');
   });
