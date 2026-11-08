@@ -13,6 +13,10 @@ import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from
 import {
   AvisoAlternativasCombo,
   eleccionesCombo,
+  faltaElegirPaquete,
+  filtrarPaquetes,
+  gruposPaquetes,
+  SelectorPaqueteCombo,
   faltaElegirJuguetes,
   faltaElegirReemplazo,
   notaReemplazos,
@@ -97,12 +101,15 @@ export function VentanaOpcionesProducto({
   const [avisoNombres, setAvisoNombres] = useState(false);
 
   // Combo: reemplazos de partes fijas agotadas
-  const partesRe = useMemo(() => partesConAlternativas(oferta), [oferta]);
+  // Complemento con paquetes: se elige UNO y el armado usa solo las piezas de ese paquete
+  const [paquetes, setPaquetes] = useState<Record<string, string>>({});
+  const ofertaCombo = useMemo(() => filtrarPaquetes(oferta, paquetes), [oferta, paquetes]);
+  const partesRe = useMemo(() => partesConAlternativas(ofertaCombo), [ofertaCombo]);
   // Sin alternativa elegida al inicio: el cliente la escoge (no se asigna sola)
   const [reemplazos, setReemplazos] = useState<Record<string, string>>({});
   const comboAgotado = oferta?.disponible === false;
   // Partes A_ELECCION con lista (juguetes): cuántas de cada opción; el total depende de la cantidad del combo
-  const partesJug = useMemo(() => partesEleccion(oferta, reemplazos), [oferta, reemplazos]);
+  const partesJug = useMemo(() => partesEleccion(ofertaCombo, reemplazos), [ofertaCombo, reemplazos]);
   const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
 
   // Nota de cocina
@@ -248,6 +255,7 @@ export function VentanaOpcionesProducto({
     gruposFaltantes.length === 0 &&
     !comboAgotado &&
     (tope === null || (tope > 0 && cantidad <= tope)) &&
+    !faltaElegirPaquete(oferta, paquetes) &&
     !faltaElegirReemplazo(partesRe, reemplazos) &&
     !faltaElegirJuguetes(partesJug, juguetes, cantidad) &&
     saboresListos;
@@ -285,7 +293,7 @@ export function VentanaOpcionesProducto({
       }
     }
 
-    const elecciones = eleccionesCombo(oferta, reemplazos, juguetes);
+    const elecciones = eleccionesCombo(ofertaCombo, reemplazos, juguetes);
     alAgregar({
       producto,
       ...(saborMode
@@ -788,7 +796,18 @@ export function VentanaOpcionesProducto({
             Agotado
           </div>
         )}
-        {!comboAgotado && <ResumenPartesFijas oferta={oferta} />}
+        {!comboAgotado && <ResumenPartesFijas oferta={ofertaCombo} />}
+        {!comboAgotado && (
+          <SelectorPaqueteCombo
+            grupos={gruposPaquetes(oferta)}
+            elegidos={paquetes}
+            onElegir={(grupo, paquete) => {
+              setPaquetes((prev) => ({ ...prev, [grupo]: paquete }));
+              setJuguetes({});
+              setReemplazos({});
+            }}
+          />
+        )}
         <AvisoAlternativasCombo
           partes={comboAgotado ? [] : partesRe}
           elegidos={reemplazos}

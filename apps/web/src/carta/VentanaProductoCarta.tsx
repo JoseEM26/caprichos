@@ -14,6 +14,10 @@ import type { OfertaItem } from '../admin/ofertas/ofertasApi';
 import {
   AvisoAlternativasCombo,
   eleccionesCombo,
+  faltaElegirPaquete,
+  filtrarPaquetes,
+  gruposPaquetes,
+  SelectorPaqueteCombo,
   faltaElegirJuguetes,
   faltaElegirReemplazo,
   notaReemplazos,
@@ -71,18 +75,21 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     }
     return inicial;
   });
-  const partesRe = useMemo(() => partesConAlternativas(oferta), [oferta]);
+  // Complemento con paquetes: el cliente elige UNO y el resto del armado usa solo las piezas de ese paquete
+  const [paquetes, setPaquetes] = useState<Record<string, string>>({});
+  const ofertaCombo = useMemo(() => filtrarPaquetes(oferta, paquetes), [oferta, paquetes]);
+  const partesRe = useMemo(() => partesConAlternativas(ofertaCombo), [ofertaCombo]);
   // Sin alternativa elegida al inicio: el cliente la escoge (no se asigna sola)
   const [reemplazos, setReemplazos] = useState<Record<string, string>>({});
   const comboAgotado = oferta?.disponible === false;
   // Partes A_ELECCION con lista (juguetes): cuántas de cada opción; el total depende de la cantidad del combo
-  const partesJug = useMemo(() => partesEleccion(oferta, reemplazos), [oferta, reemplazos]);
+  const partesJug = useMemo(() => partesEleccion(ofertaCombo, reemplazos), [ofertaCombo, reemplazos]);
   const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
   const [cantidad, setCantidad] = useState(1);
   // Opciones distintas por bebida: con cantidad 2 o más cada vaso puede llevar su propia elección
   const [porBebida, setPorBebida] = useState(false);
   const [selUnidad, setSelUnidad] = useState<Record<number, Record<string, string[]>>>({});
-  const elecciones = eleccionesCombo(oferta, reemplazos, juguetes);
+  const elecciones = eleccionesCombo(ofertaCombo, reemplazos, juguetes);
   // Saldo por sabor ya comprometido (este combo y el carrito): el + de cada sabor no lo supera
   const usosSabor = usosDeSabor(lineas, juguetes);
   const [nombres, setNombres] = useState<string[]>([]);
@@ -134,7 +141,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const gruposOk = activoPorBebida ? Array.from({ length: cantidad }, (_, i) => i).every(bebidaCompleta) : gruposCarta.every((g) => (sel[g.id] ?? []).length >= g.minimo);
   const valido =
     !faltaElegirJuguetes(partesJug, juguetes, cantidad) &&
-    !comboAgotado && !faltaElegirReemplazo(partesRe, reemplazos) && gruposOk;
+    !comboAgotado && !faltaElegirPaquete(oferta, paquetes) && !faltaElegirReemplazo(partesRe, reemplazos) && gruposOk;
 
   // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
   const info = inventario[String(producto.id)] ?? infoStockDe(producto);
@@ -478,7 +485,19 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 Agotado
               </div>
             )}
-            {!comboAgotado && <ResumenPartesFijas oferta={oferta} />}
+            {!comboAgotado && <ResumenPartesFijas oferta={ofertaCombo} />}
+            {!comboAgotado && (
+              <SelectorPaqueteCombo
+                grupos={gruposPaquetes(oferta)}
+                elegidos={paquetes}
+                onElegir={(grupo, paquete) => {
+                  setPaquetes((prev) => ({ ...prev, [grupo]: paquete }));
+                  // Lo elegido en las piezas de otro paquete ya no vale
+                  setJuguetes({});
+                  setReemplazos({});
+                }}
+              />
+            )}
             <AvisoAlternativasCombo
               partes={comboAgotado ? [] : partesRe}
               elegidos={reemplazos}

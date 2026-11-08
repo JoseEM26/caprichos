@@ -39,6 +39,9 @@ export interface ComboParteItem {
   disponible?: boolean;
   opcionesDisponibles?: string[];
   principalNombre?: string;
+  /** Complemento a elegir: las partes con el mismo grupo se reparten en paquetes (por nombre) y se elige UNO. Null = parte normal. */
+  paqueteGrupo?: string | null;
+  paqueteNombre?: string | null;
   /** FIJO de un producto: tamaño (producto_tamano) elegido y su nombre; vacío = sin tamaño */
   tamanoId?: string | null;
   tamanoNombre?: string | null;

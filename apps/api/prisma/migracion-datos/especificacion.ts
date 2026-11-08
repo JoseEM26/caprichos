@@ -137,7 +137,7 @@ export const ESPECIFICACION: Record<string, Espec> = {
     refs: { oferta: ref('oferta_id', 'oferta'), tamano_valor: ref('tamano_valor_id', 'lista_valor') },
   },
   combo_parte: {
-    clave: ['oferta', 'tipo', 'cantidad', 'categorias', 'productos'],
+    clave: ['oferta', 'tipo', 'cantidad', 'categorias', 'productos', 'paquete_nombre'],
     refs: { oferta: ref('oferta_id', 'oferta') },
     listas: { categorias: ref('categorias', 'categoria'), productos: ref('productos', 'producto') },
   },

@@ -35,6 +35,9 @@ export interface ComboParteItem {
   alternativas?: AlternativaParteItem[];
   /** Calculado en tiempo real: el original no alcanza y hay alguna alternativa con stock. */
   alternativasActivas?: boolean;
+  /** Complemento a elegir: las partes con el mismo grupo se reparten en paquetes por nombre y el cliente elige UNO. Null = parte normal. */
+  paqueteGrupo?: string | null;
+  paqueteNombre?: string | null;
   /** FIJO de un producto: tamaño elegido (producto_tamano) y su nombre; las unidades las usa el stock. */
   tamanoId?: string | null;
   tamanoNombre?: string | null;

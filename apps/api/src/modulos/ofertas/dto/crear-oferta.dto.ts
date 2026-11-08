@@ -94,6 +94,15 @@ export class ComboParteDto {
   /** Tamaño (producto_tamano) de la parte FIJO de un producto. Null o vacío = sin tamaño. */
   @IsOptional()
   tamanoId?: string | number | null;
+
+  /** Paquetes (complemento a elegir): las partes con el mismo grupo se agrupan por nombre de paquete y el cliente elige UNO. Ambos o ninguno. */
+  @IsOptional()
+  @IsString()
+  paqueteGrupo?: string | null;
+
+  @IsOptional()
+  @IsString()
+  paqueteNombre?: string | null;
 }
 
 export class CrearOfertaDto {

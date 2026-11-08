@@ -313,6 +313,125 @@ describe('OfertasService', () => {
       });
     });
 
+    describe('resolverPartesCombo: complemento con paquetes (elige UNO)', () => {
+      const parte = (id: bigint, tipo: string, cantidad: number, categorias: bigint[], productos: bigint[], paquete: string) => ({
+        id, tipo, cantidad, categorias, productos, reemplazos: [], paquete_grupo: 'Complemento', paquete_nombre: paquete,
+      });
+      const prodDb = (id: bigint, nombre: string, cat: bigint, area: bigint, areaNombre: string, agotado: Date | null = null) => ({
+        id, nombre, categoria_id: cat, oculto: false, agotado_hasta: agotado,
+        categoria: { nombre: `CAT${cat}`, area_id: area, area: { nombre: areaNombre } },
+      });
+      const duo = (carrotAgotado = false, donasAgotadas = false) => {
+        prismaMock.oferta.findUnique.mockResolvedValue({
+          id: 9n, tipo: 'COMBO', nombre: 'DUO COMPARTIR', dias: [], canales: [], creado_en: new Date(), combosPrecio: [],
+          combosParte: [
+            parte(300n, 'A_ELECCION', 2, [8n], [], '2 donas'),
+            parte(301n, 'A_ELECCION', 1, [8n], [], '1 dona + 1 galleta'),
+            parte(302n, 'A_ELECCION', 1, [], [41n], '1 dona + 1 galleta'),
+            parte(303n, 'FIJO', 1, [], [50n], '1 carrot cake'),
+          ],
+        });
+        const futuro = new Date(Date.now() + 3600000);
+        prismaMock.producto.findMany.mockResolvedValue([
+          prodDb(40n, 'Dona', 8n, 4n, 'Panadería', donasAgotadas ? futuro : null),
+          prodDb(41n, 'Galleta choco chips', 9n, 5n, 'Postres'),
+          prodDb(50n, 'Carrot cake', 10n, 6n, 'Pasteles', carrotAgotado ? futuro : null),
+        ]);
+      };
+
+      it('2 donas: una línea hija con las 2 donas, en su área y con el nombre del paquete en la nota', async () => {
+        duo();
+        const res = await service.resolverPartesCombo(9, [{ parteId: '300', productoId: '40' }, { parteId: '300', productoId: '40' }]);
+        expect(res.partes).toEqual([
+          expect.objectContaining({ parteId: 300n, productoId: 40n, cantidad: 2, areaId: 4n, nota: '2 donas · Combo: DUO COMPARTIR' }),
+        ]);
+      });
+
+      it('1 dona + 1 galleta: dos líneas hijas, cada una en el área de su producto', async () => {
+        duo();
+        const res = await service.resolverPartesCombo(9, [{ parteId: '301', productoId: '40' }, { parteId: '302', productoId: '41' }]);
+        expect(res.partes.map((p) => [p.productoId, p.cantidad, p.areaId])).toEqual([
+          [40n, 1, 4n],
+          [41n, 1, 5n],
+        ]);
+      });
+
+      it('1 carrot cake (pieza fija): una línea hija en el área de pasteles', async () => {
+        duo();
+        const res = await service.resolverPartesCombo(9, [{ parteId: '303', productoId: '50' }]);
+        expect(res.partes).toEqual([expect.objectContaining({ tipo: 'FIJO', productoId: 50n, cantidad: 1, areaId: 6n })]);
+      });
+
+      it('sin elegir complemento rechaza con 400 COMBO_ELECCION_INCOMPLETA', async () => {
+        duo();
+        await expect(service.resolverPartesCombo(9, [])).rejects.toMatchObject({ response: { codigo: 'COMBO_ELECCION_INCOMPLETA' }, status: 400 });
+      });
+
+      it('elecciones de dos paquetes distintos: 400 COMBO_PARTE_NO_PERMITIDA', async () => {
+        duo();
+        await expect(
+          service.resolverPartesCombo(9, [
+            { parteId: '300', productoId: '40' }, { parteId: '300', productoId: '40' }, { parteId: '303', productoId: '50' },
+          ]),
+        ).rejects.toMatchObject({ response: { codigo: 'COMBO_PARTE_NO_PERMITIDA' }, status: 400 });
+      });
+
+      it('paquete incompleto (1 dona de «2 donas»): 400 COMBO_ELECCION_INCOMPLETA', async () => {
+        duo();
+        await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '40' }])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_ELECCION_INCOMPLETA' },
+        });
+      });
+
+      it('paquete de «1 dona + 1 galleta» con solo la dona: 400 (la galleta no se omite)', async () => {
+        duo();
+        await expect(service.resolverPartesCombo(9, [{ parteId: '301', productoId: '40' }])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_ELECCION_INCOMPLETA' },
+        });
+      });
+
+      it('un producto de otro paquete no vale en la pieza elegida: 400 COMBO_PARTE_NO_PERMITIDA', async () => {
+        duo();
+        await expect(service.resolverPartesCombo(9, [{ parteId: '303', productoId: '40' }])).rejects.toMatchObject({
+          response: { codigo: 'COMBO_PARTE_NO_DISPONIBLE' },
+        });
+      });
+
+      it('el combo sigue disponible aunque un paquete se agote, y la carta ve qué paquete no se puede armar', async () => {
+        duo(true);
+        const oferta = await service.obtenerOfertaPorId(9);
+        expect(oferta.disponible).toBe(true);
+        const carrot = oferta.combosParte!.find((p) => p.id === '303')!;
+        expect(carrot.disponible).toBe(false);
+        expect(carrot.paqueteNombre).toBe('1 carrot cake');
+        const donas = oferta.combosParte!.find((p) => p.id === '300')!;
+        expect(donas.disponible).toBe(true);
+        // pieza por categoría: sus productos visibles son las opciones
+        expect(donas.opcionesDetalle).toEqual([expect.objectContaining({ id: '40', nombre: 'Dona' })]);
+      });
+
+      it('rechaza elegir el paquete agotado con 409', async () => {
+        duo(true);
+        await expect(service.resolverPartesCombo(9, [{ parteId: '303', productoId: '50' }])).rejects.toMatchObject({ status: 409 });
+      });
+
+      it('sin ningún paquete armable el combo queda agotado con motivo', async () => {
+        duo(true, true);
+        const oferta = await service.obtenerOfertaPorId(9);
+        expect(oferta.disponible).toBe(false);
+        expect(oferta.motivoAgotado).toContain('complemento');
+      });
+
+      it('paqueteDeParte exige grupo y nombre juntos y solo piezas FIJO o A_ELECCION', () => {
+        const f = (t: string, p: any) => () => (service as any).paqueteDeParte(t, p);
+        expect(f('FIJO', {})()).toEqual({ paquete_grupo: null, paquete_nombre: null });
+        expect(f('FIJO', { paqueteGrupo: ' Complemento ', paqueteNombre: '1 carrot cake' })()).toEqual({ paquete_grupo: 'Complemento', paquete_nombre: '1 carrot cake' });
+        expect(f('FIJO', { paqueteGrupo: 'Complemento' })).toThrow(BadRequestException);
+        expect(f('A_ELECCION', { paqueteNombre: 'x' })).toThrow(BadRequestException);
+        expect(f('UNA_DE', { paqueteGrupo: 'C', paqueteNombre: 'x' })).toThrow(BadRequestException);
+      });
+    });
+
     describe('resolverPartesCombo: elecciones A_ELECCION con lista de productos (juguetes)', () => {
       const cajita = (agotadoBurbujas: boolean) => {
         const ahora = Date.now();

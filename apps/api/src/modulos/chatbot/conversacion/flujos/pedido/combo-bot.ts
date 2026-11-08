@@ -17,7 +17,7 @@ const norm = (t?: string | null): string =>
 
 /**
  * Combo que el bot puede vender de un producto anfitrión (el «Combo Dúo» de la carta): activo, con la casilla
- * «WhatsApp (bot)», vigente hoy (días, hora, límite de usos) y armable con el stock de ahora.
+ * «WhatsApp (bot)», vigente hoy (días, hora, límite de usos) y armable con el stock de ahora. Sin paquetes de complemento.
  */
 export function comboVendibleBot(ofertas: any[] | undefined, productoId: string): any | null {
   return (
@@ -28,7 +28,9 @@ export function comboVendibleBot(ofertas: any[] | undefined, productoId: string)
         o.vigenteAhora !== false &&
         o.disponible !== false &&
         String(o.alcanceProductoId ?? '') === String(productoId) &&
-        ofertaIncluyeCanal(o.canales, 'BOT'),
+        ofertaIncluyeCanal(o.canales, 'BOT') &&
+        // Combo con complemento a elegir (paquetes): se pide por la carta, el bot no lo arma
+        !(o.combosParte ?? []).some((p: any) => !!p.paqueteGrupo),
     ) ?? null
   );
 }
