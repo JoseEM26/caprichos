@@ -1,3 +1,4 @@
+import { calcularDescuentoPersonal, resolverPctPersonal, validarColaborador } from '../creditos/descuento-personal';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 import { PuntosService } from '../clientes/puntos.service';
 import { DireccionesClienteService } from '../clientes/direcciones-cliente.service';
@@ -874,7 +875,49 @@ export class PedidosService {
       clienteConSesion: canalPedido === 'CARTA' && !!origen?.clientePartyId,
     });
 
-    const descuentoAplicado = desgloseDescuento.descuentoTotal;
+    // Pedido del personal (mozo/caja): lleva el descuento del personal desde que se crea, sobre lo elegible,
+    // y su total queda a cargo del trabajador (se acumula en Créditos del personal, no se cobra en caja)
+    let colaboradorId: bigint | null = null;
+    let descuentoPersonal = 0;
+    let pctPersonal = 0;
+    if (origen?.esPersonal) {
+      if (canalPedido !== 'MOZO' && canalPedido !== 'CAJA') {
+        throw new BadRequestException({
+          codigo: 'CANAL_NO_PERMITIDO',
+          mensaje: 'Por la carta virtual no se consume crédito del personal',
+        });
+      }
+      if (!origen.clientePartyId) {
+        throw new BadRequestException({
+          codigo: 'COLABORADOR_REQUERIDO',
+          mensaje: 'Elige al trabajador al que se le carga el pedido del personal',
+        });
+      }
+      colaboradorId = BigInt(origen.clientePartyId);
+      await validarColaborador(this.prisma, colaboradorId);
+      pctPersonal = await resolverPctPersonal(this.prisma, colaboradorId);
+      descuentoPersonal = calcularDescuentoPersonal(
+        lineasCalculadas
+          .filter((lin) => !lin.cortesia)
+          .map((lin) => ({
+            productoId: lin.productoId,
+            nombre: lin.nombre,
+            subtotal: lin.subtotal,
+            noSumaBeneficios: lin.noSumaBeneficios,
+            enPromocion: Boolean(lin.ofertaId) || Boolean(lin.contenedora) || (lin.partesCombo?.length ?? 0) > 0,
+          })),
+        desgloseDescuento.detalles as any,
+        pctPersonal,
+      );
+    }
+    const personal = colaboradorId !== null;
+    const descuentoAplicado = Number((desgloseDescuento.descuentoTotal + descuentoPersonal).toFixed(2));
+    const detallesDescuento: any[] = [
+      ...(desgloseDescuento.detalles as any[]),
+      ...(descuentoPersonal > 0
+        ? [{ tipo: 'PERSONAL', nombre: `Descuento del personal ${pctPersonal}%`, descuentoTipo: 'PORCENTAJE', descuentoValor: pctPersonal, montoDescontado: descuentoPersonal }]
+        : []),
+    ];
 
     // Cupón de envío gratis: solo delivery (en pickup o mesa el cliente debe quitarlo)
     if (desgloseDescuento.envioGratisCupon && dto.modalidad !== 'DELIVERY') {
@@ -1021,10 +1064,11 @@ export class PedidosService {
     const aCobrar = Number((totalCalculado + propinaPedido).toFixed(2));
 
     // 8. Validación de pago (con plan: el efectivo se compara contra su parte, no contra el total)
-    const planPago = this.pagoPlan.validar(dto.pago.plan, aCobrar);
+    // el pedido del personal no se cobra en caja: ni plan de pago ni vuelto
+    const planPago = personal ? null : this.pagoPlan.validar(dto.pago.plan, aCobrar);
     const montoEfectivo = planPago
       ? this.pagoPlan.montoEfectivo(planPago)
-      : dto.pago.metodo === 'EFECTIVO'
+      : dto.pago.metodo === 'EFECTIVO' && !personal
         ? aCobrar
         : 0;
     if (dto.pago.pagaCon !== undefined && montoEfectivo > 0 && Number(dto.pago.pagaCon) < montoEfectivo) {
@@ -1090,8 +1134,8 @@ export class PedidosService {
           entrega_lng: entrega?.lng != null ? new Prisma.Decimal(entrega.lng) : null,
           entrega_origen: entregaOrigen,
           zona_id: zonaId,
-          pago_metodo: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
-          pago_estado: 'PENDIENTE',
+          pago_metodo: personal ? 'CREDITO_PERSONAL' : planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
+          pago_estado: personal ? 'PAGADO' : 'PENDIENTE',
           pago_preferido: planPago ? this.pagoPlan.pagoPrincipal(planPago) : dto.pago.metodo,
           paga_con:
             dto.pago.pagaCon != null && montoEfectivo > 0 ? new Prisma.Decimal(dto.pago.pagaCon) : null,
@@ -1105,14 +1149,14 @@ export class PedidosService {
             : (lineasCalculadas.find((l) => l.ofertaId)?.ofertaId ?? null),
           cupon_id: desgloseDescuento.cuponId ? BigInt(desgloseDescuento.cuponId) : null,
           cupon_emitido_id: desgloseDescuento.cuponEmitidoId ? BigInt(desgloseDescuento.cuponEmitidoId) : null,
-          descuento_detalle: desgloseDescuento.detalles.length > 0 ? (desgloseDescuento.detalles as any) : undefined,
+          descuento_detalle: detallesDescuento.length > 0 ? (detallesDescuento as any) : undefined,
           comprobante_tipo: comprobanteTipo,
           comprobante_doc: comprobanteDoc,
           comprobante_razon: comprobanteRazon,
           comprobante_direccion: comprobanteTipo === 'FACTURA' ? dto.comprobante?.direccion?.trim() || null : null,
           nota: dto.nota?.trim() || null,
           pedido_origen_id: origen?.pedidoOrigenId !== undefined ? BigInt(origen.pedidoOrigenId) : null,
-          es_personal: Boolean(origen?.esPersonal),
+          es_personal: personal,
           clave_idempotencia: claveIdempotencia,
           pasa_cocina_en: new Date(),
         },
@@ -1120,6 +1164,13 @@ export class PedidosService {
 
       if (planPago) {
         await this.pagoPlan.guardar(tx, pedido.id, planPago);
+      }
+
+      // Lo consumido por el personal se acumula en su cuenta en la misma transacción (el total ya lleva su descuento)
+      if (colaboradorId !== null) {
+        await tx.consumoPersonal.create({
+          data: { party_id: colaboradorId, pedido_id: pedido.id, fecha: new Date(), monto: new Prisma.Decimal(totalCalculado) },
+        });
       }
 
       // Dirección de delivery del cliente con cuenta: se guarda o se suma un uso (misma transacción)

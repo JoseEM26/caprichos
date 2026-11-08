@@ -1087,7 +1087,7 @@ export function ModalNuevoPedidoMesa({
 
   // Todo lo que bloquea «Enviar» en el paso de productos, en orden de revisión. El botón no se deshabilita:
   // al tocarlo se muestra el primer mensaje y el foco va a su campo (intentarEnviar).
-  type ErrorEnvio = { campo: 'productos' | 'mesa' | 'nombre' | 'telefono' | 'plan' | 'pagaCon' | 'comprobante'; mensaje: string; foco: string[] };
+  type ErrorEnvio = { campo: 'productos' | 'mesa' | 'personal' | 'nombre' | 'telefono' | 'plan' | 'pagaCon' | 'comprobante'; mensaje: string; foco: string[] };
   const errorComprobanteCaja = errorValorComprobante(valorComp);
   const errorPagaCon =
     modalidad === 'delivery' && montoEfectivoAhora > 0 && pagaConValido() === undefined
@@ -1096,6 +1096,8 @@ export function ModalNuevoPedidoMesa({
   const erroresEnvio: ErrorEnvio[] = [];
   if (lineas.length === 0)
     erroresEnvio.push({ campo: 'productos', mensaje: 'Agrega al menos un producto para enviarlo.', foco: [] });
+  if (pideMode === 'personal' && !staffElegido)
+    erroresEnvio.push({ campo: 'personal', mensaje: 'Elige al trabajador al que se le carga el pedido.', foco: [] });
   if (modalidad === 'local' && !extra && mesasSeleccionadas.length === 0)
     erroresEnvio.push({ campo: 'mesa', mensaje: 'Elige una mesa para enviarlo.', foco: [] });
   if (modalidad === 'local' && !extra && errorNombreMesa)

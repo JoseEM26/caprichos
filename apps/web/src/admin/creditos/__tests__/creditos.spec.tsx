@@ -56,6 +56,7 @@ describe('CreditosView', () => {
             monto: 26.4,
             montoFormateado: 's/ 26.40',
             lineas: ['1 × Frappe lúcuma (Grande)', '1 × Brownie'],
+            descuento: 8.8,
           },
         ],
       },
@@ -112,6 +113,8 @@ describe('CreditosView', () => {
 
     expect(screen.getByText('12/10 · CP-P06')).toBeInTheDocument();
     expect(screen.getByText('• 1 × Frappe lúcuma (Grande)')).toBeInTheDocument();
+    // el descuento del personal que ya lleva el pedido y que queda por cobrar
+    expect(screen.getByText(/descuento del personal de s\/ 8\.80 · por cobrar a fin del período/)).toBeInTheDocument();
   });
 
   it('un trabajador sin consumo muestra "No consumió nada este mes."', async () => {

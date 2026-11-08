@@ -192,6 +192,64 @@ describe('CreditosService', () => {
       );
     });
 
+    const partyPersonal = { id: BigInt(9), persona: { nombres: 'Marta', apellidos: 'Gómez' }, usuario: { activo: true }, roles: [] };
+
+    it('un pedido del personal que ya trae su 25 % no lo repite ni toca el pedido: el consumo es su total', async () => {
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: BigInt(10), codigo: 'CP-W010', total: '21.00', descuento: '7.00', estado: 'COLA', canal: 'MOZO',
+        pago_estado: 'PAGADO', es_personal: true, consumoPersonal: null, cobros: [],
+        descuento_detalle: [{ tipo: 'PERSONAL', montoDescontado: 7, descuentoValor: 25 }],
+        lineas: [{ nombre: 'Café', subtotal: '28.00', precio_unit: '14', cantidad: 2, oferta_id: null, linea_combo_id: null }],
+      });
+      prisma.party.findUnique.mockResolvedValue(partyPersonal);
+      const crearConsumo = jest.fn().mockResolvedValue({ id: BigInt(1), monto: 21, fecha: new Date() });
+      const actualizar = jest.fn().mockResolvedValue({ id: BigInt(10), codigo: 'P-0010' });
+      prisma.$transaction.mockImplementation((cb: any) => cb({ consumoPersonal: { create: crearConsumo }, pedido: { update: actualizar } }));
+
+      const res = await service.registrarConsumo(10, 9);
+
+      expect(crearConsumo.mock.calls[0][0].data.monto).toBe(21);
+      expect(actualizar.mock.calls[0][0].data).not.toHaveProperty('descuento');
+      expect(actualizar.mock.calls[0][0].data).not.toHaveProperty('total');
+      expect(res.descuento).toBe(7);
+    });
+
+    it('suma el descuento del personal al que ya tenía el pedido en vez de pisarlo y deja el detalle', async () => {
+      prisma.parametro.findUnique.mockResolvedValue({ valor: 25 });
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: BigInt(10), codigo: 'P-0010', total: '23.00', descuento: '5.00', estado: 'COLA', canal: 'MOZO',
+        pago_estado: 'PENDIENTE', consumoPersonal: null, cobros: [], descuento_detalle: [],
+        lineas: [{ nombre: 'Café', subtotal: '20.00', precio_unit: '20', cantidad: 1, oferta_id: null, linea_combo_id: null }],
+      });
+      prisma.party.findUnique.mockResolvedValue(partyPersonal);
+      const actualizar = jest.fn().mockResolvedValue({ id: BigInt(10), codigo: 'P-0010' });
+      prisma.$transaction.mockImplementation((cb: any) =>
+        cb({ consumoPersonal: { create: jest.fn().mockResolvedValue({ id: BigInt(1), monto: 18, fecha: new Date() }) }, pedido: { update: actualizar } }),
+      );
+      await service.registrarConsumo(10, 9);
+      const data = actualizar.mock.calls[0][0].data;
+      expect(data.descuento).toBe(10);
+      expect(data.total).toBe(18);
+      expect(data.descuento_detalle).toEqual([expect.objectContaining({ tipo: 'PERSONAL', montoDescontado: 5 })]);
+      expect(data).not.toHaveProperty('party_id');
+    });
+
+    it('con ajustarPedido=false solo acumula el consumo: el pedido no se actualiza', async () => {
+      prisma.parametro.findUnique.mockResolvedValue({ valor: 25 });
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: BigInt(10), codigo: 'P-0010', total: '20.00', descuento: '0', estado: 'COLA', canal: 'MOZO',
+        pago_estado: 'PAGADO', es_personal: true, consumoPersonal: null, cobros: [], descuento_detalle: [],
+        lineas: [{ nombre: 'Café', subtotal: '20.00', precio_unit: '20', cantidad: 1, oferta_id: null, linea_combo_id: null }],
+      });
+      prisma.party.findUnique.mockResolvedValue(partyPersonal);
+      const crearConsumo = jest.fn().mockResolvedValue({ id: BigInt(1), monto: 15, fecha: new Date() });
+      const actualizar = jest.fn().mockResolvedValue({ id: BigInt(10), codigo: 'P-0010' });
+      prisma.$transaction.mockImplementation((cb: any) => cb({ consumoPersonal: { create: crearConsumo }, pedido: { update: actualizar } }));
+      await service.registrarConsumo(10, 9, undefined, undefined, false);
+      expect(crearConsumo.mock.calls[0][0].data.monto).toBe(15);
+      expect(actualizar).not.toHaveBeenCalled();
+    });
+
     it('falla con 404 si el pedido no existe', async () => {
       prisma.pedido.findUnique.mockResolvedValue(null);
       await expect(service.registrarConsumo(99, 1)).rejects.toThrow(NotFoundException);
@@ -217,6 +275,19 @@ describe('CreditosService', () => {
       });
 
       await expect(service.registrarConsumo(10, 5)).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('anulación', () => {
+    it('el resumen deja fuera los consumos de pedidos anulados o rechazados', async () => {
+      prisma.parametro.findUnique.mockResolvedValue({ valor: 25 });
+      prisma.userAccount.findMany.mockResolvedValue([]);
+      prisma.partyRole.findMany.mockResolvedValue([]);
+      prisma.consumoPersonal.findMany.mockResolvedValue([]);
+      await service.obtenerResumen({});
+      expect(prisma.consumoPersonal.findMany.mock.calls[0][0].where.pedido).toEqual({
+        estado: { notIn: ['ANULADO', 'RECHAZADO'] },
+      });
     });
   });
 

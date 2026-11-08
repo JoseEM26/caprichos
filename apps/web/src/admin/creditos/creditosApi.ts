@@ -9,6 +9,8 @@ export interface ConsumoItem {
   monto: number;
   montoFormateado: string;
   lineas: string[];
+  /** Descuento del personal que ya lleva el pedido (S/) */
+  descuento?: number;
 }
 
 export interface TrabajadorCredito {

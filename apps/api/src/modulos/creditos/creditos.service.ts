@@ -10,6 +10,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { cobroVigente } from '../caja/caja.calculo';
 import { FiltrarCreditosDto } from './dto/filtrar-creditos.dto';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { planDescuentoPersonalDePedido, validarColaborador } from './descuento-personal';
 
 const NOMBRES_MESES = [
   'Enero',
@@ -25,6 +26,12 @@ const NOMBRES_MESES = [
   'Noviembre',
   'Diciembre',
 ];
+
+/** Descuento del personal que lleva el pedido: el de su detalle o, en pedidos viejos, el descuento total. */
+function descuentoPersonalDe(pedido: any): number {
+  const d = Array.isArray(pedido?.descuento_detalle) ? pedido.descuento_detalle.find((x: any) => x?.tipo === 'PERSONAL') : null;
+  return Number(d?.montoDescontado ?? pedido?.descuento ?? 0);
+}
 
 export interface RangoFechas {
   inicio: Date;
@@ -216,6 +223,8 @@ export class CreditosService {
     partyId: string | bigint | number,
     usuarioActual?: UsuarioAutenticado,
     ip?: string,
+    /** false = solo acumula el consumo; el total y el descuento del pedido no se tocan (regularización) */
+    ajustarPedido = true,
   ) {
     const pId = this.parsearId(pedidoId);
     const parId = this.parsearId(partyId);
@@ -238,7 +247,8 @@ export class CreditosService {
     }
 
     // un pedido ya cobrado en caja no se carga también a crédito (dos cobros del mismo pedido)
-    if (pedido.pago_estado === 'PAGADO' || cobroVigente(pedido.cobros)) {
+    // (el pedido del personal sí: su «cobro» es a crédito, no entra dinero a caja)
+    if (!pedido.es_personal && (pedido.pago_estado === 'PAGADO' || cobroVigente(pedido.cobros))) {
       throw new ConflictException({
         codigo: 'YA_COBRADO',
         mensaje: 'El pedido ya fue cobrado',
@@ -267,68 +277,12 @@ export class CreditosService {
       });
     }
 
-    // 2. Validar que el colaborador exista y esté activo
-    const party = await this.prisma.party.findUnique({
-      where: { id: parId },
-      include: {
-        persona: true,
-        usuario: true,
-        roles: {
-          include: { employee_detail: true },
-        },
-      },
-    });
+    // 2. Validar que el colaborador exista, esté activo y sea personal (RQ-USR-03-08)
+    const party = await validarColaborador(this.prisma, parId);
 
-    if (!party) {
-      throw new NotFoundException({
-        codigo: 'COLABORADOR_NO_ENCONTRADO',
-        mensaje: 'El colaborador no existe en el sistema',
-      });
-    }
-
-    const tieneCuentaActiva = party.usuario?.activo ?? true;
-    if (!tieneCuentaActiva) {
-      throw new BadRequestException({
-        codigo: 'COLABORADOR_DESACTIVADO',
-        mensaje: 'El colaborador se encuentra desactivado',
-      });
-    }
-
-    // RQ-USR-03-08: el crédito es solo para el personal (con cuenta o con rol de empleado), no para clientes
-    const esPersonal = Boolean(party.usuario) || Boolean(party.roles?.some((r) => r.employee_detail));
-    if (!esPersonal) {
-      throw new BadRequestException({
-        codigo: 'NO_ES_PERSONAL',
-        mensaje: 'El crédito del personal solo se da a trabajadores del local',
-      });
-    }
-
-    // 3. Calcular el descuento del personal
-    const pctConfigurado = await this.obtenerPorcentajeDescuento();
-    const rolEmpleado = party.roles?.find((r) => r.employee_detail);
-    const pct = rolEmpleado?.employee_detail?.descuento_pct
-      ? Number(rolEmpleado.employee_detail.descuento_pct)
-      : pctConfigurado;
-
-    let subtotalElegible = 0;
-    const regexExcluidos = /combo|promoci[oó]n|docena/i;
-
-    for (const linea of pedido.lineas) {
-      const esCombo = linea.oferta_id !== null || linea.linea_combo_id !== null;
-      const esExcluidoPorNombre = regexExcluidos.test(linea.nombre);
-      const sub = Number(linea.subtotal ?? (Number(linea.precio_unit) * linea.cantidad));
-
-      if (!esCombo && !esExcluidoPorNombre) {
-        subtotalElegible += sub;
-      }
-    }
-
-    if (pedido.lineas.length === 0) {
-      subtotalElegible = Number(pedido.total);
-    }
-
-    const descuentoCalculado = Math.round(subtotalElegible * (pct / 100) * 100) / 100;
-    const montoNeto = Math.max(0, Math.round((Number(pedido.total) - descuentoCalculado) * 100) / 100);
+    // 3. Descuento del personal. Si el pedido ya lo trae (se aplicó al crearlo), no se vuelve a calcular
+    const { yaTraeDescuento, descuento: descuentoCalculado, montoNeto, nuevosDetalles } =
+      await planDescuentoPersonalDePedido(this.prisma, pedido, parId);
 
     const ahora = new Date();
 
@@ -343,15 +297,22 @@ export class CreditosService {
         },
       });
 
+      if (!ajustarPedido) return [nuevoConsumo, pedido] as const;
+
       const pActualizado = await tx.pedido.update({
         where: { id: pId },
         data: {
-          party_id: parId,
           es_personal: true,
           pago_metodo: 'CREDITO_PERSONAL',
           pago_estado: 'PAGADO',
-          descuento: descuentoCalculado,
-          total: montoNeto,
+          // el descuento del personal se SUMA al que ya tenga el pedido (no lo pisa)
+          ...(yaTraeDescuento
+            ? {}
+            : {
+                descuento: Number((Number(pedido.descuento ?? 0) + descuentoCalculado).toFixed(2)),
+                total: montoNeto,
+                ...(nuevosDetalles ? { descuento_detalle: nuevosDetalles } : {}),
+              }),
         },
       });
 
@@ -419,6 +380,8 @@ export class CreditosService {
             gte: rango.inicio,
             lte: rango.fin,
           },
+          // un pedido anulado o rechazado no se le cobra al trabajador
+          pedido: { estado: { notIn: ['ANULADO', 'RECHAZADO'] } },
         },
         include: {
           party: {
@@ -482,6 +445,7 @@ export class CreditosService {
           monto: Number(item.monto),
           montoFormateado: `s/ ${Number(item.monto).toFixed(2)}`,
           lineas: lineasTexto,
+          descuento: descuentoPersonalDe(item.pedido),
         };
       });
 
