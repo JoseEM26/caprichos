@@ -99,11 +99,29 @@ describe('CodigoRegistroService', () => {
     expect(outbox.encolar.mock.calls.length).toBe(enviadosAntes);
   });
 
-  it('verificar: código correcto deja el celular verificado; exigirVerificado lo consume una sola vez', async () => {
+  it('verificar: código correcto deja el celular verificado; exigirVerificado no lo gasta y consumirVerificado sí', async () => {
     await service.solicitar('912345678');
     await service.verificar('912345678', codigoEnviado());
     await expect(service.exigirVerificado('912345678')).resolves.toBeUndefined();
+    await expect(service.exigirVerificado('+51 912 345 678')).resolves.toBeUndefined();
+    await service.consumirVerificado('912345678');
     await expect(service.exigirVerificado('912345678')).rejects.toMatchObject({ response: { codigo: 'CELULAR_NO_VERIFICADO' } });
+  });
+
+  it('verificar dos veces seguidas (doble toque): la segunda no falla ni exige otro código', async () => {
+    await service.solicitar('912345678');
+    const cod = codigoEnviado();
+    await expect(service.verificar('912345678', cod)).resolves.toEqual({ ok: true });
+    await expect(service.verificar('912345678', cod)).resolves.toEqual({ ok: true });
+  });
+
+  it('un código usado no sirve para otro celular ni, ya gastado y sin verificación previa, de nuevo', async () => {
+    await service.solicitar('912345678');
+    const cod = codigoEnviado();
+    await expect(service.verificar('987654321', cod)).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
+    await service.verificar('912345678', cod);
+    await service.consumirVerificado('912345678');
+    await expect(service.verificar('912345678', cod)).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
   });
 
   it('verificar con código equivocado no deja el celular verificado', async () => {

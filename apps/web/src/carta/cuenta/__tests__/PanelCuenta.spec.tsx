@@ -305,8 +305,7 @@ describe('PanelCuenta ▸ crear cuenta en 2 pasos e invitado', () => {
     escribir('Tu cumpleaños, para saludarte', '1990-05-10');
     escribir('Correo personal (opcional)', 'ana@ejemplo.com');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Atrás' }));
-    expect(screen.getByText('Paso 2 de 3')).toBeInTheDocument();
+    // Atrás desde «Tus datos» vuelve al celular: el código ya se gastó, no hay nada que reescribir en el paso 2
     fireEvent.click(screen.getByRole('button', { name: 'Atrás' }));
     expect(screen.getByText('Paso 1 de 3')).toBeInTheDocument();
     expect(screen.getByLabelText('Celular')).toHaveValue('912345678');

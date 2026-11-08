@@ -10,6 +10,8 @@ import {
   MODO_WHATSAPP_ENTRANTE,
   RespuestaVerificacionWhatsapp,
   EstadoVerificacion,
+  MARCA_TTL_SEG,
+  claveMarcaVerificacion,
   estadoVerificacion,
   iniciarVerificacion,
   modoVerificacion,
@@ -165,17 +167,27 @@ export class CodigoRegistroService {
    */
   async verificar(telefono: string, codigo: string): Promise<{ ok: true }> {
     const tel = this.celular(telefono);
-    await this.consumir(telefono, codigo);
+    try {
+      await this.consumir(telefono, codigo);
+    } catch (err) {
+      // Reintento o doble toque: si el celular ya quedó verificado hace un momento, el segundo aviso no lo rompe
+      if (await this.exigirVerificado(telefono).then(() => true, () => false)) return { ok: true };
+      throw err;
+    }
     const redis = this.redisService.obtenerCliente();
     try {
-      await redis.set(`cliente:reg:ok:${tel}`, '1', 'EX', REGISTRO_TTL_SEG);
+      await redis.set(claveMarcaVerificacion('REGISTRO', tel!), '1', 'EX', MARCA_TTL_SEG);
     } catch {
       throw new BadRequestException({ codigo: 'CODIGO_INVALIDO', mensaje: 'El código no es correcto o ya venció. Pide uno nuevo.' });
     }
     return { ok: true };
   }
 
-  /** Registro: el celular debe haber pasado por verificar() hace poco. La marca se consume. */
+  /**
+   * Registro: el celular debe haber pasado por verificar() hace poco. NO consume la marca: si crear la cuenta
+   * falla por otra causa (DNI repetido, red) la persona reintenta sin tener que verificar otra vez.
+   * Al terminar bien, el registro llama a consumirVerificado().
+   */
   async exigirVerificado(telefono: string): Promise<void> {
     const tel = this.celular(telefono);
     const noVerificado = () =>
@@ -187,12 +199,20 @@ export class CodigoRegistroService {
     const redis = this.redisService.obtenerCliente();
     let marca: string | null = null;
     try {
-      marca = await redis.get(`cliente:reg:ok:${tel}`);
-      if (marca) await redis.del(`cliente:reg:ok:${tel}`);
+      marca = await redis.get(claveMarcaVerificacion('REGISTRO', tel));
     } catch {
       throw noVerificado();
     }
     if (!marca) throw noVerificado();
+  }
+
+  /** Cuenta creada: la marca ya no sirve (un solo uso). */
+  async consumirVerificado(telefono: string): Promise<void> {
+    const tel = this.celular(telefono);
+    if (!tel) return;
+    try {
+      await this.redisService.obtenerCliente().del(claveMarcaVerificacion('REGISTRO', tel));
+    } catch { /* expira por TTL */ }
   }
 
   /** Valida y consume el código de registro. Error genérico: no revela si el código existe o venció. */

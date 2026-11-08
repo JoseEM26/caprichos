@@ -233,6 +233,7 @@ describe('Registro en modo WHATSAPP_ENTRANTE', () => {
     const r: any = await servicio.solicitar('987654321');
     await atenderMensajeVerificacion(redis, SECRETO, `Mi código: ${r.token}`, TEL_CLIENTE);
     await expect(servicio.exigirVerificado('987654321')).resolves.toBeUndefined();
+    await servicio.consumirVerificado('987654321');
     await expect(servicio.exigirVerificado('987654321')).rejects.toThrow();
   });
 });
@@ -284,6 +285,27 @@ describe('Recuperar contraseña en modo WHATSAPP_ENTRANTE', () => {
   it('confirmar sin marca falla con el mismo error de código inválido', async () => {
     const err = await servicio.confirmar({ telefono: '987654321', contrasenaNueva: 'otra-clave-nueva-1' }).catch((e) => e);
     expect(err.getResponse().codigo).toBe('CODIGO_INVALIDO');
+  });
+
+  it('celular verificado que solo tiene puntos (sin cuenta): SIN_CUENTA, no «código incorrecto», y la verificación sirve para crear la cuenta', async () => {
+    const r: any = await servicio.solicitar('+51 987 654 321');
+    await atenderMensajeVerificacion(redis, SECRETO, `Mi código: ${r.token}`, TEL_CLIENTE);
+    const err = await servicio.confirmar({ telefono: '987 654 321', contrasenaNueva: 'otra-clave-nueva-1' }).catch((e) => e);
+    expect(err.getResponse().codigo).toBe('SIN_CUENTA');
+    expect(prisma.customerAccount.update).not.toHaveBeenCalled();
+    expect(redis.datos.get('cliente:reg:ok:987654321')).toBe('1');
+    expect(redis.datos.has('cliente:rec:ok:987654321')).toBe(false);
+  });
+
+  it('si el cambio falla antes de terminar, la marca sigue para reintentar (contraseña corta no la gasta)', async () => {
+    clientes.cuentaPorCelular.mockResolvedValue({ id: 1n, party_id: 100n });
+    const r: any = await servicio.solicitar('987654321');
+    await atenderMensajeVerificacion(redis, SECRETO, `Mi código: ${r.token}`, TEL_CLIENTE);
+    await expect(servicio.confirmar({ telefono: '987654321', contrasenaNueva: 'corta' })).rejects.toBeDefined();
+    expect(redis.datos.get('cliente:rec:ok:987654321')).toBe('1');
+    await expect(servicio.confirmar({ telefono: '987654321', contrasenaNueva: 'otra-clave-nueva-1' })).resolves.toEqual({ ok: true });
+    // solo cambia hash/telefono/fecha: no toca party, puntos ni direcciones
+    expect(Object.keys(prisma.customerAccount.update.mock.calls[0][0].data).sort()).toEqual(['clave_cambiada_en', 'hash', 'telefono']);
   });
 });
 

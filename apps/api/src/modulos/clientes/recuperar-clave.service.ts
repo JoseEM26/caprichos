@@ -14,6 +14,7 @@ import { REGISTRO_MAX_SOLICITUDES_IP_HORA, demasiadosCodigos } from './codigo-re
 import {
   MODO_WHATSAPP_ENTRANTE,
   RespuestaVerificacionWhatsapp,
+  MARCA_TTL_SEG,
   claveMarcaVerificacion,
   iniciarVerificacion,
   modoVerificacion,
@@ -163,8 +164,8 @@ export class RecuperarClaveService {
     if (entrante) {
       let marca: string | null = null;
       try {
+        // Solo se mira: la marca se gasta al cambiar la contraseña (o al pasar a crear cuenta), no antes
         marca = await redis.get(claveMarcaVerificacion('RECUPERAR', tel));
-        if (marca) await redis.del(claveMarcaVerificacion('RECUPERAR', tel));
       } catch {
         throw invalido();
       }
@@ -190,7 +191,18 @@ export class RecuperarClaveService {
     }
 
     const cuenta = await this.clientes.cuentaPorCelular(tel);
-    if (!cuenta) throw invalido();
+    if (!cuenta) {
+      // Celular verificado pero sin cuenta (p. ej. solo acumuló puntos al pedir): la prueba del celular vale para
+      // crear la cuenta, que se vincula al mismo party y conserva sus puntos. No se dice «código incorrecto».
+      try {
+        await redis.set(claveMarcaVerificacion('REGISTRO', tel), '1', 'EX', MARCA_TTL_SEG);
+        await redis.del(claveCod, claveInt, claveMarcaVerificacion('RECUPERAR', tel));
+      } catch { /* sin Redis se vuelve a verificar al crear la cuenta */ }
+      throw new BadRequestException({
+        codigo: 'SIN_CUENTA',
+        mensaje: 'Ese celular aún no tiene cuenta. Créala ahora: tus puntos se conservan.',
+      });
+    }
 
     const hash = await argon2.hash(dto.contrasenaNueva);
     // clave_cambiada_en deja sin efecto las sesiones anteriores; el código se consume
@@ -199,7 +211,7 @@ export class RecuperarClaveService {
       data: { hash, telefono: tel, clave_cambiada_en: new Date() },
     });
     try {
-      await redis.del(claveCod, claveInt, `bloqueo:cliente:${tel}`);
+      await redis.del(claveCod, claveInt, claveMarcaVerificacion('RECUPERAR', tel), `bloqueo:cliente:${tel}`);
     } catch { /* limpiar bloqueos en Redis es best-effort; expiran por TTL */ }
     await this.avisoCuenta.avisar(cuenta.party_id, tel, 'CLAVE_CAMBIADA');
 
