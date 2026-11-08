@@ -9,6 +9,7 @@ import { Confirmar } from "../../comun/Confirmar";
 import { useSesion } from "../../comun/sesion";
 import type { UsuarioItem } from "./tipos";
 import { SelectorOtrosRoles } from "./SelectorOtrosRoles";
+import { SeccionPermisosExtra } from "./SeccionPermisosExtra";
 import { HistorialLaboral } from "./HistorialLaboral";
 import {
   ETIQUETAS_ROLES,
@@ -703,7 +704,11 @@ export function EditarUsuarioModal({
         }}
         error={errores.otrosRoles}
         deshabilitado={guardando || !esAdmin}
+        motivoDeshabilitado={!esAdmin ? "Solo un administrador puede cambiar roles" : undefined}
       />
+      {usuario && (
+        <SeccionPermisosExtra usuarioId={usuario.id} puedeEditar={esAdmin} />
+      )}
       {rolEsCocina && areasDisponibles.length > 0 && (
         <SeccionAreasCocina
           disponibles={areasDisponibles}

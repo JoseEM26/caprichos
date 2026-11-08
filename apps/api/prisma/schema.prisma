@@ -140,6 +140,23 @@ model UserAccountRol {
   @@map("user_account_rol")
 }
 
+/// Permiso EXTRA por persona (modulo/accion del catálogo), aditivo a los de sus roles. vence_en NULL = hasta que el ADMIN lo quite.
+model UserAccountPermiso {
+  user_account_id BigInt
+  modulo          String      @db.VarChar(40)
+  accion          String      @db.VarChar(40)
+  /// Party del ADMIN que lo otorgó.
+  otorgado_por    BigInt?
+  otorgado_en     DateTime    @default(now()) @db.Timestamptz
+  vence_en        DateTime?   @db.Timestamptz
+  nota            String?
+  cuenta          UserAccount @relation(fields: [user_account_id], references: [id], onDelete: Cascade)
+
+  @@id([user_account_id, modulo, accion])
+  @@index([user_account_id], map: "ix_user_account_permiso_cuenta")
+  @@map("user_account_permiso")
+}
+
 /// Historial permanente e inmutable de los roles extra: otorgado, retirado o vencido.
 model UserAccountRolHistorial {
   id              BigInt      @id @default(autoincrement())
@@ -208,6 +225,7 @@ model UserAccount {
   r                     Rol                    @relation(fields: [rol], references: [codigo])
   rolesExtra            UserAccountRol[]
   rolesHistorial        UserAccountRolHistorial[]
+  permisosExtra         UserAccountPermiso[]
   areasCocina           UserAccountArea[]
   iniciativasCreadas    Iniciativa[]           @relation("IniciativasCreadas")
   iniciativasCambiadas  Iniciativa[]           @relation("IniciativasCambiadas")

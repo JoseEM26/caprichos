@@ -11,7 +11,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CambiarContrasenaDto, IngresarDto } from './auth.dto';
-import { permisosDeRoles, rolesDeCuenta, TIPOS_DOCUMENTO } from './roles-usuario';
+import { permisosDeCuenta, rolesDeCuenta, TIPOS_DOCUMENTO } from './roles-usuario';
 
 export function enmascararDni(dni: string): string {
   if (!dni || dni.length < 4) {
@@ -81,7 +81,7 @@ export class AuthService {
       rol: cuenta.rol,
       roles,
       debeCambiar: cuenta.debe_cambiar,
-      permisos: await permisosDeRoles(this.prisma, roles),
+      permisos: await permisosDeCuenta(this.prisma, cuenta.id, roles),
     };
   }
 

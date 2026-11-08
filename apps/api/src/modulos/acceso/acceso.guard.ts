@@ -12,7 +12,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CLAVE_PERMISO, CLAVE_SOLO_CAMBIO_CLAVE } from './permiso.decorator';
 import { UsuarioAutenticado } from './acceso.tipos';
-import { rolesDeCuenta } from './roles-usuario';
+import { permisosExtraVigentes, rolesDeCuenta } from './roles-usuario';
 
 @Injectable()
 export class AccesoGuard implements CanActivate {
@@ -127,7 +127,14 @@ export class AccesoGuard implements CanActivate {
         },
       });
 
+      // Permiso extra por persona (aditivo, con vencimiento): solo se consulta si los roles no alcanzan
+      let porExtra = false;
       if (!rolPermiso) {
+        const extras = await permisosExtraVigentes(this.prisma, userAccount.id);
+        porExtra = lista.some((p) => extras.includes(`${p.modulo}/${p.accion}`));
+      }
+
+      if (!rolPermiso && !porExtra) {
         const ip = (req.ip || req.headers['x-forwarded-for']) as string | undefined;
         const dispositivo = req.headers['user-agent'] as string | undefined;
 
