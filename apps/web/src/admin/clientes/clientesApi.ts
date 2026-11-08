@@ -10,6 +10,8 @@ export interface FiltrosClientes {
   tipo?: string;
   estado?: string;
   creditoPersonal?: string;
+  verificacion?: 'verificados' | 'sin_verificar' | 'todos';
+  gastaPuntos?: boolean;
   pagina?: number;
   limite?: number;
 }
@@ -19,6 +21,7 @@ export interface RespuestaListaClientes {
   total: number;
   pagina: number;
   paginas: number;
+  contadores?: { verificados: number; sinVerificar: number; gastanPuntos: number };
 }
 
 export interface RegistrarClienteMostradorDto {
@@ -57,6 +60,8 @@ export async function listarClientes(filtros: FiltrosClientes = {}): Promise<Res
   if (filtros.creditoPersonal && filtros.creditoPersonal !== 'Todos') {
     params.set('creditoPersonal', filtros.creditoPersonal === 'Sí' ? 'true' : 'false');
   }
+  if (filtros.verificacion && filtros.verificacion !== 'todos') params.set('verificacion', filtros.verificacion);
+  if (filtros.gastaPuntos) params.set('gastaPuntos', 'si');
   if (filtros.pagina) params.set('pagina', String(filtros.pagina));
   if (filtros.limite) params.set('limite', String(filtros.limite));
 

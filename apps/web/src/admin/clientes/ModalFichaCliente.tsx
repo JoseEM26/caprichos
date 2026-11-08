@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InsigniaGasta, InsigniaVerificacion } from './InsigniasVerificacion';
 import type { ClienteItem, FichaCliente, MovimientoPuntosItem } from './tipos';
 import { obtenerFichaCliente, listarHistorialPuntos } from './clientesApi';
 import { ModalAjustarPuntos } from './ModalAjustarPuntos';
@@ -47,6 +48,7 @@ export function ModalFichaCliente({
   const info = `${cliente.tipo}${ficha?.ruc ? ` · RUC ${ficha.ruc}` : ''}${ficha?.telefono ? ` · Cel. ${ficha.telefono}` : ''} · ${saldoPuntos.toFixed(2)} puntos · ${pedidosCount} pedidos`;
 
   const pedidos = ficha?.pedidos || [];
+  const verif = ficha && ficha.verificado !== undefined ? ficha : cliente;
 
   return (
     <>
@@ -105,6 +107,11 @@ export function ModalFichaCliente({
           >
             ×
           </button>
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <InsigniaVerificacion cliente={verif} />
+          <InsigniaGasta cliente={{ ...verif, puedeGastarPuntos: verif.puedeGastarPuntos && saldoPuntos > 0 }} saldo={saldoPuntos} />
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>

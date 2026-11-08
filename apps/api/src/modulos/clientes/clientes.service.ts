@@ -25,6 +25,7 @@ import { normalizarCelularPeru } from '../usuarios/alertas-whatsapp.util';
 import { CELULAR_OTRA_PERSONA, partyDeCelular } from './celular-party.util';
 import { enmascararTelefono } from '../chatbot/utilidades/enmascarar.util';
 import { exigirCumpleanos, formatearCumpleanos, parsearCumpleanos } from './cumpleanos.util';
+import { estadoVerificacionCliente } from './estado-verificacion-cliente';
 import { explicarPedidosPorId } from './explicar-puntos-pedidos';
 import type { ExplicacionPuntos } from './explicar-puntos-pedido';
 import {
@@ -70,6 +71,18 @@ export function dniOpcional(raw?: string | null): string | null {
 export function celular9De(raw?: string | null): string | null {
   const n = normalizarCelularPeru(raw);
   return n.valido ? n.celular9! : null;
+}
+
+/** Lo que el admin ve de la verificación (sin el hash). */
+function camposVerificacion(v: ReturnType<typeof estadoVerificacionCliente>) {
+  return {
+    verificado: v.verificado,
+    verificadoEn: v.verificadoEn ? v.verificadoEn.toISOString() : null,
+    estadoVerificacion: v.estado,
+    razonSinVerificar: v.razon,
+    tieneContrasena: v.tieneContrasena,
+    puedeGastarPuntos: v.puedeGastarPuntos,
+  };
 }
 
 /** Contraseña de cuenta de cliente: 8 a 128 caracteres. */
@@ -771,12 +784,20 @@ export class ClientesService {
       tipo?: string;
       estado?: string;
       creditoPersonal?: string;
+      verificacion?: 'verificados' | 'sin_verificar' | 'todos';
+      gastaPuntos?: 'si';
       pagina?: number;
       limite?: number;
     },
     usuarioAutenticado: any,
     ip?: string,
-  ): Promise<{ items: ClienteAdminListItem[]; total: number; pagina: number; paginas: number }> {
+  ): Promise<{
+    items: ClienteAdminListItem[];
+    total: number;
+    pagina: number;
+    paginas: number;
+    contadores: { verificados: number; sinVerificar: number; gastanPuntos: number };
+  }> {
     const q = filtros.q?.trim().toLowerCase();
     // Obtener todas las partes que tienen rol CLIENTE
     const roles = await this.prisma.partyRole.findMany({
@@ -807,6 +828,9 @@ export class ClientesService {
             usuario: {
               select: { rol: true },
             },
+            // Verificación: una sola consulta con el listado (sin N+1). El hash no sale de aquí: solo se mira si existe.
+            cuentaCliente: { select: { hash: true, activo: true, clave_cambiada_en: true } },
+            consentimientos: { where: { canal: { in: ['CARTA', 'CAJA'] } }, select: { canal: true, aceptado_en: true } },
           },
         },
         customer_detail: true,
@@ -837,6 +861,16 @@ export class ClientesService {
       const envioFijo = detalle?.envio_tipo === 'FIJO' && detalle.envio_valor ? Number(detalle.envio_valor) : null;
       const descEnvio = detalle?.envio_tipo === 'PORCENTAJE' && detalle.envio_valor ? Number(detalle.envio_valor) : null;
 
+      const cuenta = p.cuentaCliente;
+      const verif = estadoVerificacionCliente({
+        tieneContrasena: Boolean(cuenta?.hash),
+        cuentaActiva: Boolean(cuenta?.activo) && r.hasta === null && p.estado === 'ACTIVO',
+        saldo: puntos,
+        consentimientosCarta: p.consentimientos.filter((c: any) => c.canal === 'CARTA').map((c: any) => c.aceptado_en),
+        creadoEnMostrador: p.consentimientos.some((c: any) => c.canal === 'CAJA'),
+        claveCambiadaEn: cuenta?.clave_cambiada_en ?? null,
+      });
+
       return {
         id: p.id.toString(),
         nombre: p.persona?.nombres || 'Sin nombre',
@@ -850,6 +884,7 @@ export class ClientesService {
         envioFijo,
         descuentoEnvio: descEnvio,
         activo: r.hasta === null && p.estado === 'ACTIVO',
+        ...camposVerificacion(verif),
       };
     });
 
@@ -868,6 +903,16 @@ export class ClientesService {
       );
     }
 
+    // Los contadores respetan los demás filtros (tipo, búsqueda...), no los de verificación
+    const contadores = {
+      verificados: items.filter((it) => it.verificado).length,
+      sinVerificar: items.filter((it) => !it.verificado).length,
+      gastanPuntos: items.filter((it) => it.puedeGastarPuntos).length,
+    };
+    if (filtros.verificacion === 'verificados') items = items.filter((it) => it.verificado);
+    else if (filtros.verificacion === 'sin_verificar') items = items.filter((it) => !it.verificado);
+    if (filtros.gastaPuntos === 'si') items = items.filter((it) => it.puedeGastarPuntos);
+
     const total = items.length;
     const limite = Math.max(1, filtros.limite || 6);
     const pagina = Math.max(1, filtros.pagina || 1);
@@ -880,6 +925,7 @@ export class ClientesService {
       total,
       pagina,
       paginas,
+      contadores,
     };
   }
 
@@ -895,6 +941,8 @@ export class ClientesService {
         documentos: { where: { tipo: 'RUC' } },
         contactos: true,
         roles: { where: { rol: 'CLIENTE' }, include: { customer_detail: true } },
+        cuentaCliente: { select: { hash: true, activo: true, clave_cambiada_en: true } },
+        consentimientos: { where: { canal: { in: ['CARTA', 'CAJA'] } }, select: { canal: true, aceptado_en: true } },
       },
     });
 
@@ -943,8 +991,18 @@ export class ClientesService {
     const puntosPedidos = await explicarPedidosPorId(this.prisma, pedidos.map((p) => p.id)).catch(() => new Map<string, ExplicacionPuntos>());
     const tel = party.contactos.find((c) => c.tipo === 'TELEFONO' || c.tipo === 'WHATSAPP')?.valor || '—';
     const correo = party.persona?.correo || party.contactos.find((c) => c.tipo === 'CORREO')?.valor || 'sin correo';
+    const rolCliente = party.roles[0];
+    const verif = estadoVerificacionCliente({
+      tieneContrasena: Boolean(party.cuentaCliente?.hash),
+      cuentaActiva: Boolean(party.cuentaCliente?.activo) && (rolCliente ? rolCliente.hasta === null : false) && party.estado === 'ACTIVO',
+      saldo: puntos,
+      consentimientosCarta: party.consentimientos.filter((c) => c.canal === 'CARTA').map((c) => c.aceptado_en),
+      creadoEnMostrador: party.consentimientos.some((c) => c.canal === 'CAJA'),
+      claveCambiadaEn: party.cuentaCliente?.clave_cambiada_en ?? null,
+    });
 
     return {
+      ...camposVerificacion(verif),
       id: party.id.toString(),
       nombre: party.persona?.nombres || 'Sin nombre',
       ruc: ruc ? (esAdmin ? ruc : enmascararDoc(ruc)) : null,

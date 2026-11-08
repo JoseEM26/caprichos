@@ -60,6 +60,12 @@ export interface ClienteAdminListItem {
   envioFijo: number | null;
   descuentoEnvio: number | null;
   activo: boolean;
+  verificado: boolean;
+  verificadoEn: string | null;
+  estadoVerificacion: 'VERIFICADO' | 'SIN_VERIFICAR' | 'ANTIGUA';
+  razonSinVerificar: 'MOSTRADOR' | 'SIN_CONTRASENA' | null;
+  tieneContrasena: boolean;
+  puedeGastarPuntos: boolean;
 }
 
 export interface RegistrarMostradorDto {

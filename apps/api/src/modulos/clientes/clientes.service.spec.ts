@@ -163,6 +163,8 @@ describe('ClientesService', () => {
         contactos: [{ tipo: 'TELEFONO', valor: tel }],
         pedidos: [],
         pedidosComoCliente: [],
+        cuentaCliente: null as any,
+        consentimientos: [] as any[],
       },
     });
 
@@ -213,6 +215,42 @@ describe('ClientesService', () => {
       });
     });
 
+    describe('verificación del celular', () => {
+      const nov = new Date('2026-11-05T12:00:00Z');
+      const con = (id: number, nombre: string, party: any, puntos = 5) => {
+        const r = rol(id, nombre, `9000000${id}0`);
+        return { ...r, customer_detail: { ...r.customer_detail, puntos }, party: { ...r.party, ...party } };
+      };
+      beforeEach(() => {
+        prismaMock.partyRole.findMany = jest.fn().mockResolvedValue([
+          con(1, 'Verificada', { cuentaCliente: { hash: 'x', activo: true, clave_cambiada_en: null }, consentimientos: [{ canal: 'CARTA', aceptado_en: nov }] }),
+          con(2, 'Mostrador', { cuentaCliente: { hash: null, activo: true, clave_cambiada_en: null }, consentimientos: [{ canal: 'CAJA', aceptado_en: nov }] }),
+          con(3, 'SinSaldo', { cuentaCliente: { hash: 'x', activo: true, clave_cambiada_en: nov }, consentimientos: [] }, 0),
+          con(4, 'Antigua', { cuentaCliente: { hash: 'x', activo: true, clave_cambiada_en: null }, consentimientos: [] }),
+        ]);
+      });
+
+      it('devuelve los campos de verificación sin el hash y los contadores', async () => {
+        const res = await service.listarAdmin({ limite: 50 }, { rol: 'ADMIN' });
+        const por = Object.fromEntries(res.items.map((i) => [i.nombre, i]));
+        expect(por.Verificada).toMatchObject({ verificado: true, verificadoEn: nov.toISOString(), tieneContrasena: true, puedeGastarPuntos: true });
+        expect(por.Mostrador).toMatchObject({ verificado: false, razonSinVerificar: 'MOSTRADOR', puedeGastarPuntos: false });
+        expect(por.SinSaldo).toMatchObject({ verificado: true, puedeGastarPuntos: false });
+        expect(por.Antigua).toMatchObject({ verificado: false, estadoVerificacion: 'ANTIGUA', puedeGastarPuntos: true });
+        expect(JSON.stringify(res)).not.toContain('"hash"');
+        expect(res.contadores).toEqual({ verificados: 2, sinVerificar: 2, gastanPuntos: 2 });
+      });
+
+      it('filtra por verificados, sin verificar y gastaPuntos, sobre la misma consulta', async () => {
+        const nombres = async (f: any) => (await service.listarAdmin({ limite: 50, ...f }, { rol: 'ADMIN' })).items.map((i) => i.nombre);
+        expect(await nombres({ verificacion: 'verificados' })).toEqual(['Verificada', 'SinSaldo']);
+        expect(await nombres({ verificacion: 'sin_verificar' })).toEqual(['Mostrador', 'Antigua']);
+        expect(await nombres({ verificacion: 'todos' })).toHaveLength(4);
+        expect(await nombres({ gastaPuntos: 'si' })).toEqual(['Verificada', 'Antigua']);
+        expect(await nombres({ verificacion: 'verificados', gastaPuntos: 'si' })).toEqual(['Verificada']);
+      });
+    });
+
     it('sin coincidencias devuelve lista vacía', async () => {
       const res = await service.listarAdmin({ q: '99999999' }, { rol: 'MOZO' });
       expect(res.items).toEqual([]);
@@ -227,6 +265,9 @@ describe('ClientesService', () => {
         documentos: [],
         contactos: [],
         roles: [],
+        estado: 'ACTIVO',
+        cuentaCliente: { hash: 'x', activo: true, clave_cambiada_en: new Date('2026-11-05T12:00:00Z') },
+        consentimientos: [],
       });
       prismaMock.pedido = {
         findMany: jest.fn().mockResolvedValue([
@@ -253,6 +294,9 @@ describe('ClientesService', () => {
       expect(prismaMock.pedido.aggregate.mock.calls[0][0].where).toMatchObject({ pago_estado: 'PAGADO' });
       expect(ficha.pedidosPagados).toBe(2);
       expect(ficha.totalGastado).toBe(45.5);
+      expect(ficha).toMatchObject({ verificado: true, verificadoEn: '2026-11-05T12:00:00.000Z', tieneContrasena: true });
+      expect(ficha).toHaveProperty('puedeGastarPuntos');
+      expect(JSON.stringify(ficha)).not.toContain('"hash"');
       expect(ficha.pedidos[0]).toMatchObject({ id: 'CP-077', pago: 'Cobrado', total: 's/ 25.50' });
     });
   });
