@@ -29,6 +29,7 @@ import {
   CrearLlaveDto,
   DescartarDto,
   LatidoDto,
+  InfoEquipoLatidoDto,
   ReimprimirDto,
   ResultadoTrabajoDto,
   VaciarColaDto,
@@ -50,6 +51,8 @@ import {
   construirTicketComandaArea,
   areasDeLineas,
 } from './constructor-etiquetas';
+import { MODALIDADES_SIMULACION, ModalidadSimulacion, construirPedidoSimulado } from './simulacion-pedido';
+import { clasificarEquipos } from './identidad-equipo';
 import {
   claveSeleccion,
   agenteConectado,
@@ -342,6 +345,15 @@ export class ImpresionService {
       // sin estado previo: se emite el evento igual
     }
     const estadoAntes = JSON.stringify(estadoPorRol(antes));
+    // Primer latido de una llave nueva: si es una PC ya conocida hereda su configuración (y la llave vieja se desactiva)
+    if (antes && !antes.ultimo_latido && dto.equipo) {
+      await this.equipos.reconocerYReutilizar(deviceKeyId, {
+        uid: dto.equipo.equipoUid,
+        hostname: dto.equipo.hostname,
+        sistema: dto.equipo.sistema,
+        ipLocal: dto.equipo.ipLocal,
+      });
+    }
     // Primero la config: una PC que late por primera vez queda «nueva, falta configurar»; una que ya imprimía se convierte
     const cfg = await this.equipos.configDe(deviceKeyId);
     const volvio = !agenteConectado(antes?.ultimo_latido);
@@ -357,6 +369,7 @@ export class ImpresionService {
           ? {
               latido_hostname: dto.equipo.hostname?.slice(0, 120) ?? null,
               latido_sistema: dto.equipo.sistema?.slice(0, 120) ?? null,
+              ...(dto.equipo.equipoUid ? { equipo_uid: dto.equipo.equipoUid.slice(0, 80) } : {}),
               latido_ip_local: dto.equipo.ipLocal?.length ? dto.equipo.ipLocal.slice(0, 8).join(',') : null,
             }
           : {}),
@@ -424,20 +437,43 @@ export class ImpresionService {
       candidatas: conectado ? leerCandidatasLatido(agente?.latido_detalle) : [],
       seleccion: agente ? await this.leerSeleccionAgente(agente.id) : {},
       equipos: await this.estadoPorEquipo(ahora),
+      eliminadas: await this.equiposArchivados(),
       sinReceptor: await this.equipos.contarSinReceptor(),
       tamanosLocal: await leerTamanosEtiqueta(this.prisma),
     };
+  }
+
+  /** PC eliminadas desde el panel o reemplazadas por una nueva vinculación: solo para consultar. */
+  private async equiposArchivados() {
+    try {
+      const l = await this.prisma.deviceKey.findMany({
+        where: { tipo: 'AGENTE', archivada_en: { not: null } },
+        orderBy: { archivada_en: 'desc' },
+        take: 20,
+      });
+      return l.map((e) => ({
+        deviceKeyId: e.id.toString(),
+        nombre: e.nombre,
+        hostname: e.latido_hostname ?? null,
+        ipLocal: e.latido_ip_local ? String(e.latido_ip_local).split(',').filter(Boolean) : [],
+        ultimoLatido: e.ultimo_latido ? new Date(e.ultimo_latido).toISOString() : null,
+        eliminadaEn: (e.eliminada_en ?? e.archivada_en)?.toISOString() ?? null,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   /** Estado de cada computadora vinculada: el panel avisa cuál falta y cuánto espera en su cola. */
   private async estadoPorEquipo(ahora: number): Promise<EquipoEstadoImpresion[]> {
     try {
       const equipos = await this.prisma.deviceKey.findMany({
-        where: { tipo: 'AGENTE', activo: true },
+        where: { tipo: 'AGENTE', activo: true, archivada_en: null },
         orderBy: { id: 'asc' },
-        include: { area: { select: { nombre: true } } },
+        include: { area: { select: { nombre: true } }, configImpresion: true },
       } as any);
       const ctx = await this.equipos.contexto();
+      const clas = clasificarEquipos(equipos as any[], ahora);
       return await Promise.all(
         (equipos as any[]).map(async (e) => {
           const conectado = agenteConectado(e.ultimo_latido, ahora);
@@ -460,6 +496,12 @@ export class ImpresionService {
             hostname: e.latido_hostname ?? null,
             sistema: e.latido_sistema ?? null,
             version: e.latido_version ?? null,
+            antigua: clas.get(e.id)?.antigua ?? false,
+            repetidaDe: (() => {
+              const r = clas.get(e.id)?.repetidaDe;
+              const o = r ? (equipos as any[]).find((x) => x.id === r) : undefined;
+              return o ? { deviceKeyId: o.id.toString(), nombre: o.nombre } : null;
+            })(),
           };
         }),
       );
@@ -768,14 +810,16 @@ export class ImpresionService {
     for (const t of trabajos) {
       // Cada prueba va en su propio grupo (no tiene pedido)
       const esPrueba = t.pedido_id === null;
+      const esSimulacion = esPrueba && Boolean((t.payload as any)?.simulacion);
       const k = esPrueba ? `prueba-${t.id}` : t.pedido_id!.toString();
       let g = grupos.get(k);
       if (!g) {
         g = {
           pedidoId: esPrueba ? null : k,
           esPrueba,
+          esSimulacion,
           pedidoCodigo: esPrueba ? 'PRUEBA' : (t.pedido?.codigo || ''),
-          clienteNombre: esPrueba ? 'Prueba de impresión' : (t.pedido?.cliente_nombre || ''),
+          clienteNombre: esSimulacion ? 'Simulación de pedido' : esPrueba ? 'Prueba de impresión' : (t.pedido?.cliente_nombre || ''),
           cantidad: 0,
           estados: {} as Record<string, number>,
           masAntiguaEn: t.en,
@@ -1176,6 +1220,116 @@ export class ImpresionService {
     }
   }
 
+
+  /**
+   * «Simular un pedido completo»: un pedido FICTICIO (solo en memoria, sin fila en `pedido`, ni cobro, ni stock) pasa por
+   * los MISMOS constructores y reglas que una venta real y se encola a las PC según su configuración. Solo ADMIN o CAJERO.
+   * Las PC sin configurar no reciben nada (se explica cuáles y por qué).
+   */
+  async simularPedido(modalidadInput: unknown, usuario?: UsuarioAutenticado, ip?: string) {
+    this.exigirRolDescartar(usuario);
+    const modalidad = (typeof modalidadInput === 'string' ? modalidadInput : 'LLEVAR') as ModalidadSimulacion;
+    if (!MODALIDADES_SIMULACION.includes(modalidad)) {
+      throw new BadRequestException({ codigo: 'MODALIDAD_INVALIDA', mensaje: 'Elige En mesa, Para llevar, Delivery o Comer en el local' });
+    }
+    const areas = await this.prisma.areaCocina.findMany({ where: { activo: true }, select: { id: true, nombre: true }, orderBy: { id: 'asc' } });
+    const pedido = construirPedidoSimulado(modalidad, areas);
+    const { general, areas: etqAreas, bebidas } = construirTodasLasEtiquetas(pedido);
+    const reglas = await leerReglasImpresion(this.prisma);
+    const ctx = await this.contextoRuteo();
+    const local = await this.prisma.parametro.findUnique({ where: { clave: 'local_datos' } }).catch(() => null);
+    const pcs = await this.prisma.deviceKey.findMany({
+      where: { tipo: 'AGENTE', activo: true, archivada_en: null, codigo_vinculo: null },
+      select: { id: true, nombre: true },
+      orderBy: { id: 'asc' },
+    });
+    const nombrePc = (id: bigint | null) => pcs.find((x) => x.id === id)?.nombre ?? 'Caja';
+
+    const enviados = new Map<string, { equipoId: string; equipo: string; maquina: string; trabajos: string[] }>();
+    const sinReceptor: string[] = [];
+    let total = 0;
+    const encolar = async (tipo: string, etiqueta: string, payload: any, areaId: bigint | null) => {
+      const destino = this.destinoJob(tipo, areaId, payload, ctx);
+      // Sin PC configurada que lo imprima: no se crea (una simulación no debe quedar esperando en cola)
+      if (destino.destino_equipo_id === null) {
+        sinReceptor.push(etiqueta);
+        return;
+      }
+      await this.prisma.printJob.create({
+        data: {
+          pedido_id: null,
+          area_id: areaId,
+          ...destino,
+          tipo,
+          payload: { ...payload, simulacion: true } as any,
+          copia: false,
+          estado: 'PENDIENTE',
+        },
+      });
+      total += 1;
+      const maquina = tipo.startsWith('ETIQUETA') ? 'Etiquetera' : 'Ticketera';
+      const clave = `${destino.destino_equipo_id}-${maquina}`;
+      const g = enviados.get(clave) ?? { equipoId: String(destino.destino_equipo_id), equipo: nombrePc(destino.destino_equipo_id), maquina, trabajos: [] };
+      g.trabajos.push(etiqueta);
+      enviados.set(clave, g);
+    };
+
+    if (aplicaSegunReglas('ETIQUETA_GENERAL', modalidad, reglas)) await encolar('ETIQUETA_GENERAL', 'resumen', general, null);
+    if (aplicaSegunReglas('ETIQUETA_AREA', modalidad, reglas)) {
+      for (const a of etqAreas) {
+        const areaId = pedido.lineas.find((l: any) => (l.area?.nombre || '').toUpperCase() === a.areaNombre)?.area_id ?? null;
+        await encolar('ETIQUETA_AREA', `área ${a.areaNombre}`, a, areaId);
+      }
+    }
+    if (aplicaSegunReglas('ETIQUETA_BEBIDA', modalidad, reglas)) {
+      for (const b of bebidas) await encolar('ETIQUETA_BEBIDA', 'bebida', b, null);
+    }
+    if (aplicaSegunReglas('TICKET_COMANDA_SALON', modalidad, reglas)) {
+      await encolar('TICKET_COMANDA_SALON', 'comanda', construirTicketComandaSalon(pedido), null);
+    }
+    if (aplicaSegunReglas('TICKET_COMANDA_AREA', modalidad, reglas)) {
+      for (const areaId of areasDeLineas(pedido)) {
+        const nombre = areas.find((a) => a.id === areaId)?.nombre ?? 'sin área';
+        await encolar('TICKET_COMANDA_AREA', `comanda ${nombre}`, construirTicketComandaArea(pedido, areaId), areaId);
+      }
+    }
+    await encolar('TICKET_PAGO', 'boleta', construirTicketPago(pedido, (local?.valor as any) || {}, null, null, await this.igvPct()), null);
+
+    // PC que no recibieron nada y por qué
+    const recibieron = new Set([...enviados.values()].map((g) => g.equipoId));
+    const noRecibieron = ctx.equipos
+      .filter((e) => !recibieron.has(String(e.id)))
+      .map((e) => ({
+        equipoId: String(e.id),
+        equipo: nombrePc(e.id),
+        motivo: !e.config.configurado
+          ? 'sin configurar'
+          : e.config.pausado
+            ? 'en pausa'
+            : !e.config.etiquetera && !e.config.ticketera
+              ? 'sin ninguna máquina encendida'
+              : 'ninguna regla le asigna nada con esta modalidad',
+      }));
+    const enviadosLista = [...enviados.values()].map((g) => ({ ...g, cantidad: g.trabajos.length }));
+    const avisoSinReceptor = sinReceptor.length ? ` Sin PC que lo imprima: ${sinReceptor.join(', ')}.` : '';
+    const mensaje = total
+      ? `Se enviaron ${total} trabajos: ${enviadosLista.map((g) => `${g.maquina} de ${g.equipo}: ${g.cantidad} (${g.trabajos.join(', ')})`).join(' · ')}.${avisoSinReceptor}`
+      : `No se envió nada: ninguna PC está configurada para imprimir esto.${avisoSinReceptor}`;
+    if (this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'SIMULAR_PEDIDO',
+        entidad: 'print_job',
+        partyId: usuario.partyId,
+        despues: { modalidad, trabajos: total, noRecibieron: noRecibieron.map((n) => `${n.equipo}: ${n.motivo}`), sinReceptor },
+        ip,
+      });
+    }
+    this.eventos?.emitirAdmin('impresion:cola', { simulacion: true });
+    return { ok: true, modalidad, total, enviados: enviadosLista, noRecibieron, sinReceptor, mensaje };
+  }
+
   /**
    * Código de vinculación de un solo uso (15 min) para instalar el programa del local sin pasar
    * secretos por pantalla. Crea un agente inactivo que espera el código; `host` se añade tras la @.
@@ -1214,7 +1368,7 @@ export class ImpresionService {
   }
 
   /** El programa del local canjea el código por su llave (se muestra una sola vez). */
-  async vincularAgente(codigoCrudo: string): Promise<{ llave: string }> {
+  async vincularAgente(codigoCrudo: string, equipo?: InfoEquipoLatidoDto): Promise<{ llave: string }> {
     const codigo = (codigoCrudo || '').split('@')[0].trim().toUpperCase();
     const pendiente = codigo
       ? await this.prisma.deviceKey.findFirst({ where: { tipo: 'AGENTE', codigo_vinculo: codigo, activo: false } })
@@ -1234,8 +1388,21 @@ export class ImpresionService {
         codigo_vinculo: null,
         codigo_expira_en: null,
         ultima_conexion: new Date(),
+        ...(equipo?.equipoUid ? { equipo_uid: equipo.equipoUid.slice(0, 80) } : {}),
+        ...(equipo?.hostname ? { latido_hostname: equipo.hostname.slice(0, 120) } : {}),
+        ...(equipo?.sistema ? { latido_sistema: equipo.sistema.slice(0, 120) } : {}),
+        ...(equipo?.ipLocal?.length ? { latido_ip_local: equipo.ipLocal.slice(0, 8).join(',') } : {}),
       },
     });
+    // El programa nuevo dice quién es ya al canjear: si la PC era conocida, hereda su configuración sin pasos extra
+    if (equipo?.equipoUid || (equipo?.hostname && equipo?.sistema)) {
+      await this.equipos.reconocerYReutilizar(pendiente.id, {
+        uid: equipo.equipoUid,
+        hostname: equipo.hostname,
+        sistema: equipo.sistema,
+        ipLocal: equipo.ipLocal,
+      });
+    }
     return { llave };
   }
 

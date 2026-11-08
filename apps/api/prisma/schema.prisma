@@ -2313,11 +2313,22 @@ model DeviceKey {
   latido_ip_publica  String?
   latido_hostname    String?
   latido_sistema     String?
+  /// Identidad estable de la PC (hash que informa el programa): reconoce la misma PC al volver a vincularla
+  equipo_uid         String?
+  /// PC antigua archivada (soft-delete auditado: no se borra historial)
+  archivada_en       DateTime?   @db.Timestamptz
+  /// El dueño eliminó la PC desde el panel (soft-delete auditado)
+  eliminada_en       DateTime?   @db.Timestamptz
+  /// Llave de la PC que la reemplazó al volver a vincularse
+  reemplazada_por    BigInt?
+  /// El dueño confirmó que NO es la misma PC que otra con igual nombre
+  distinta_confirmada Boolean    @default(false)
 
   area             AreaCocina? @relation(fields: [area_id], references: [id])
   printJobs        PrintJob[]
   configImpresion  EquipoImpresionConfig?
 
+  @@index([equipo_uid], map: "device_key_equipo_uid_idx")
   @@map("device_key")
 }
 

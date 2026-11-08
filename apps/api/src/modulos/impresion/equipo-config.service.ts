@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import {
   AREA_BEBIDAS,
   ConfigEquipoImpresion,
@@ -20,9 +20,11 @@ import {
 } from './ruteo-impresion';
 import { aplicarCambio, configAFila, configDesdeComportamientoActual, configDesdeGeneral, filaAConfig } from './equipo-config';
 import { leerReglasImpresion } from './reglas-impresion';
+import { FilaEquipo, IdentidadEquipo, clasificarEquipos, claveHost, reconocerEquipo } from './identidad-equipo';
 import { construirEtiquetaBebidaPrueba, construirEtiquetaPrueba } from './constructor-etiquetas';
 
 const ESPERA_PRUEBA_MS = 10 * 1000;
+const claveIgual = (a: FilaEquipo, b: FilaEquipo) => claveHost(a.latido_hostname, a.latido_sistema) === claveHost(b.latido_hostname, b.latido_sistema);
 
 /**
  * Configuración de impresión POR computadora: qué imprime cada PC (cada PC manda), su ruteo en vivo y los cambios
@@ -228,6 +230,210 @@ export class EquipoConfigService {
     }
     if (n > 0) this.eventos?.emitirAdmin('impresion:cola', { reubicados: n });
     return n;
+  }
+
+
+  // ───────────── Identidad de la PC: reutilizar su configuración al volver a vincularla ─────────────
+
+  /**
+   * Una llave nueva acaba de vincularse (canje o primer latido): si es una PC ya conocida (por uid o por nombre+sistema)
+   * hereda su configuración y la llave vieja queda desactivada. PC realmente nueva o caso ambiguo: no toca nada (queda
+   * «nueva, falta configurar» y el panel pregunta si es la misma).
+   */
+  async reconocerYReutilizar(nuevoId: bigint, ident: IdentidadEquipo): Promise<{ reutilizada: boolean; ambiguo: boolean; deId?: string }> {
+    try {
+      const nuevo = await this.prisma.deviceKey.findUnique({ where: { id: nuevoId }, include: { configImpresion: true } });
+      if (!nuevo || nuevo.tipo !== 'AGENTE') return { reutilizada: false, ambiguo: false };
+      const info: IdentidadEquipo = { ...ident, uid: ident.uid || nuevo.equipo_uid };
+      if (ident.uid && ident.uid !== nuevo.equipo_uid) {
+        await this.prisma.deviceKey.update({ where: { id: nuevoId }, data: { equipo_uid: ident.uid.slice(0, 80) } });
+      }
+      const candidatas = (await this.prisma.deviceKey.findMany({
+        where: { tipo: 'AGENTE', id: { not: nuevoId }, codigo_vinculo: null, reemplazada_por: null, ultimo_latido: { not: null } },
+        include: { configImpresion: true },
+      })) as FilaEquipo[];
+      const r = reconocerEquipo(info, candidatas);
+      if (!r.base) return { reutilizada: false, ambiguo: r.ambiguo };
+      // Ambigua: hereda la configuración pero NO se desactiva a la otra (podría ser una PC distinta encendida)
+      await this.traspasar(r.base.id, nuevoId, r.otros.map((o) => o.id), `reconocida por ${r.por}${r.ambiguo ? ' (posible duplicado)' : ''}`, undefined, undefined, !r.ambiguo);
+      return { reutilizada: true, ambiguo: r.ambiguo, deId: r.base.id.toString() };
+    } catch (err: any) {
+      this.logger.warn(`No se pudo reconocer la PC ${nuevoId}: ${err.message}`);
+      return { reutilizada: false, ambiguo: false };
+    }
+  }
+
+  /**
+   * Pasa la configuración de la PC vieja (`desdeId`) a la llave nueva (`haciaId`) y archiva la vieja (y `otros`).
+   * La nueva conserva la suya si ya estaba configurada. Reapunta lo que esperaba en cola. Todo en una transacción.
+   */
+  async traspasar(desdeId: bigint, haciaId: bigint, otros: bigint[], motivo: string, usuario?: UsuarioAutenticado, ip?: string, archivar = true) {
+    const viejos = [desdeId, ...otros];
+    const ahora = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const [desde, hacia] = await Promise.all([
+        tx.deviceKey.findUnique({ where: { id: desdeId }, include: { configImpresion: true } }),
+        tx.deviceKey.findUnique({ where: { id: haciaId }, include: { configImpresion: true } }),
+      ]);
+      if (!desde || !hacia) throw new NotFoundException({ codigo: 'EQUIPO_NO_ENCONTRADO', mensaje: 'Esa computadora ya no existe' });
+      const datos: Record<string, unknown> = {};
+      if (desde.configImpresion && !hacia.configImpresion?.configurado) {
+        const { device_key_id: _omitir, ...cfg } = desde.configImpresion;
+        await tx.equipoImpresionConfig.upsert({
+          where: { device_key_id: haciaId },
+          create: { device_key_id: haciaId, ...(cfg as any) },
+          update: cfg as any,
+        });
+        const sel = await tx.parametro.findUnique({ where: { clave: claveSeleccion(desdeId) } });
+        if (sel) {
+          await tx.parametro.upsert({
+            where: { clave: claveSeleccion(haciaId) },
+            create: { clave: claveSeleccion(haciaId), valor: sel.valor as any },
+            update: { valor: sel.valor as any },
+          });
+        }
+        if (desde.nombre && desde.nombre !== 'Programa del local') datos.nombre = desde.nombre;
+        if (desde.area_id) datos.area_id = desde.area_id;
+      } else if (hacia.nombre === 'Programa del local' && desde.nombre !== 'Programa del local') {
+        datos.nombre = desde.nombre;
+      }
+      if (!hacia.equipo_uid && desde.equipo_uid) datos.equipo_uid = desde.equipo_uid;
+      if (Object.keys(datos).length) await tx.deviceKey.update({ where: { id: haciaId }, data: datos as any });
+      if (!archivar) return;
+      await tx.printJob.updateMany({
+        where: { destino_equipo_id: { in: viejos }, estado: 'PENDIENTE' },
+        data: { destino_equipo_id: haciaId, ...(desde.area_id ? { destino_area_id: desde.area_id } : {}) },
+      });
+      await tx.deviceKey.updateMany({
+        where: { id: { in: viejos } },
+        data: { activo: false, archivada_en: ahora, reemplazada_por: haciaId },
+      });
+    });
+    if (!archivar) return;
+    await this.auditoria?.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'impresion',
+      accion: 'EQUIPO_IMPRESION_REEMPLAZADO',
+      entidad: 'device_key',
+      entidadId: haciaId,
+      partyId: usuario?.partyId,
+      despues: { reemplazadas: viejos.map(String), motivo: `reemplazada por nueva vinculación (${motivo})` },
+      ip,
+    });
+    this.eventos?.emitirAdmin('impresion:estado', { equipoId: haciaId.toString() });
+  }
+
+  /**
+   * «Eliminar PC»: soft-delete auditado. La PC y su llave quedan inactivas y archivadas (nada se borra), lo pendiente a
+   * ella se descarta («PC eliminada») y su llave deja de entrar (401). Si la misma PC se vincula otra vez, se reconoce
+   * y hereda su configuración. Solo ADMIN o CAJERO.
+   */
+  async eliminar(idInput: string | number, motivoInput: unknown, usuario?: UsuarioAutenticado, ip?: string) {
+    const roles = (usuario?.roles ?? [usuario?.rol ?? '']).map((r) => String(r || '').toUpperCase());
+    if (!roles.some((r) => r === 'ADMIN' || r === 'CAJERO')) {
+      throw new ForbiddenException({ codigo: 'SIN_PERMISO_ELIMINAR_PC', mensaje: 'Solo Caja o un administrador pueden eliminar una PC' });
+    }
+    const id = this.parseId(idInput);
+    const e = await this.prisma.deviceKey.findUnique({ where: { id } });
+    if (!e || e.tipo !== 'AGENTE' || e.eliminada_en) {
+      throw new NotFoundException({ codigo: 'EQUIPO_NO_ENCONTRADO', mensaje: 'Esa computadora ya no está en la lista' });
+    }
+    const motivo = typeof motivoInput === 'string' ? motivoInput.trim().slice(0, 200) : '';
+    const ahora = new Date();
+    const descartados = await this.prisma.$transaction(async (tx) => {
+      await tx.deviceKey.update({ where: { id }, data: { activo: false, archivada_en: e.archivada_en ?? ahora, eliminada_en: ahora } });
+      const r = await tx.printJob.updateMany({
+        where: { destino_equipo_id: id, estado: { in: ['PENDIENTE', 'IMPRIMIENDO'] } },
+        data: { estado: 'DESCARTADO', error: 'Descartada: PC eliminada' },
+      });
+      return r.count;
+    });
+    await this.auditoria?.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'impresion',
+      accion: 'ELIMINAR_PC',
+      entidad: 'device_key',
+      entidadId: id,
+      partyId: usuario?.partyId,
+      motivo: motivo || undefined,
+      antes: { nombre: e.nombre, hostname: e.latido_hostname, sistema: e.latido_sistema, ipLocal: e.latido_ip_local },
+      despues: { eliminada: true, trabajosDescartados: descartados },
+      ip,
+    });
+    // Lo que esperaba a una PC que sí sigue activa y lo acepta se reubica; el resto queda en espera
+    await this.reasignarPendientes().catch(() => 0);
+    this.eventos?.emitirAdmin('impresion:estado', {});
+    return { ok: true, descartados };
+  }
+
+  /** «Sí, es la misma»: traspasa la configuración de `otraId` a esta PC y archiva la otra (auditado). */
+  async fusionar(idInput: string | number, otraInput: unknown, usuario?: UsuarioAutenticado, ip?: string) {
+    const id = this.parseId(idInput);
+    const otra = this.parseId(otraInput as any);
+    if (id === otra) throw new BadRequestException({ codigo: 'MISMA_PC', mensaje: 'Elige otra computadora' });
+    await this.equipo(id.toString());
+    const o = await this.prisma.deviceKey.findUnique({ where: { id: otra } });
+    if (!o || o.tipo !== 'AGENTE') throw new NotFoundException({ codigo: 'EQUIPO_NO_ENCONTRADO', mensaje: 'Esa computadora ya no existe' });
+    await this.traspasar(otra, id, [], 'confirmado por el dueño', usuario, ip);
+    await this.reasignarPendientes().catch(() => 0);
+    return { ok: true };
+  }
+
+  /** «No, es otra PC»: deja de preguntar por estas dos. */
+  async noEsLaMisma(idInput: string | number, otraInput: unknown, usuario?: UsuarioAutenticado, ip?: string) {
+    const ids = [this.parseId(idInput), this.parseId(otraInput as any)];
+    await this.prisma.deviceKey.updateMany({ where: { id: { in: ids }, tipo: 'AGENTE' }, data: { distinta_confirmada: true } });
+    await this.auditoria?.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'impresion',
+      accion: 'EQUIPO_IMPRESION_CONFIRMADO_DISTINTO',
+      entidad: 'device_key',
+      entidadId: ids[0],
+      partyId: usuario?.partyId,
+      despues: { equipos: ids.map(String) },
+      ip,
+    });
+    this.eventos?.emitirAdmin('impresion:estado', {});
+    return { ok: true };
+  }
+
+  /**
+   * «Limpiar PCs antiguas»: archiva (soft-delete: nada se borra) las PC apagadas con otra más nueva del mismo nombre y las
+   * desactivadas. Si la más nueva aún no está configurada, hereda la configuración de la anterior. Exige motivo.
+   */
+  async limpiarAntiguas(motivoInput: unknown, usuario?: UsuarioAutenticado, ip?: string) {
+    const motivo = typeof motivoInput === 'string' ? motivoInput.trim().slice(0, 200) : '';
+    if (motivo.length < 3) throw new BadRequestException({ codigo: 'MOTIVO_OBLIGATORIO', mensaje: 'Escribe el motivo de la limpieza' });
+    const filas = (await this.prisma.deviceKey.findMany({
+      where: { tipo: 'AGENTE', archivada_en: null, codigo_vinculo: null },
+      include: { configImpresion: true },
+    })) as FilaEquipo[];
+    const clas = clasificarEquipos(filas);
+    const antiguas = filas.filter((f) => clas.get(f.id)?.antigua);
+    const t = (f: FilaEquipo) => (f.ultimo_latido ? new Date(f.ultimo_latido).getTime() : 0);
+    // Cada antigua activa se traspasa a la más nueva de su nombre (si esa aún no estaba configurada) y se archiva
+    for (const a of antiguas.filter((x) => x.activo).sort((x, y) => t(y) - t(x))) {
+      const actual = filas
+        .filter((f) => f !== a && !clas.get(f.id)?.antigua && claveIgual(f, a))
+        .sort((x, y) => t(y) - t(x))[0];
+      if (actual) await this.traspasar(a.id, actual.id, [], `limpieza: ${motivo}`, usuario, ip);
+    }
+    const restantes = await this.prisma.deviceKey.updateMany({
+      where: { id: { in: antiguas.map((a) => a.id) }, archivada_en: null },
+      data: { activo: false, archivada_en: new Date() },
+    });
+    await this.auditoria?.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'impresion',
+      accion: 'LIMPIAR_EQUIPOS_IMPRESION_ANTIGUOS',
+      entidad: 'device_key',
+      partyId: usuario?.partyId,
+      despues: { archivadas: antiguas.map((a) => a.id.toString()), motivo, restantes: restantes.count },
+      ip,
+    });
+    await this.reasignarPendientes().catch(() => 0);
+    this.eventos?.emitirAdmin('impresion:estado', {});
+    return { ok: true, archivadas: antiguas.length };
   }
 
   /** Trabajos reales esperando sin PC que los imprima (para el aviso «ningún equipo imprime esto»). */

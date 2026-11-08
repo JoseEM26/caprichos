@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Param, Post, Res } from '@nestjs/common';
 import * as fs from 'fs';
+import { VincularAgenteDto } from './dto/latido.dto';
 import { ImpresionService } from './impresion.service';
 
 /** Archivos que sube el pipeline al volumen de la API, por sistema. */
@@ -36,7 +37,7 @@ export class DescargaAgenteController {
 
   @Post('vincular')
   @HttpCode(HttpStatus.OK)
-  vincular(@Body() body: { codigo?: string }) {
-    return this.impresionService.vincularAgente(body?.codigo || '');
+  vincular(@Body() body: VincularAgenteDto) {
+    return this.impresionService.vincularAgente(body?.codigo || '', body?.equipo);
   }
 }

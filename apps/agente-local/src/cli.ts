@@ -15,7 +15,7 @@ import type { IDispositivoImpresora } from './impresora/dispositivo.interface';
 import { ClienteApiImpresion, canjearCodigoVinculo } from './api/clienteApi';
 import { comandoDiagnostico, comandoEstado, comandoImpresoras, comandoProbarTodas, comandoProbarUna, comandoUsar, ejecutarMenu } from './comandos';
 import type { DepsComandos } from './comandos';
-import { AgenteLocalServicio } from './agente/bucle';
+import { AgenteLocalServicio, leerInfoEquipo } from './agente/bucle';
 import type { EquipoLocal } from './agente/bucle';
 import { esperarEnter, describirError } from './arranque';
 import {
@@ -347,7 +347,7 @@ export async function ejecutarAsistente(
           continue;
         }
         try {
-          const r = await canjearCodigoVinculo(apiUrl || obtenerConfiguracion().apiUrl, codigo);
+          const r = await canjearCodigoVinculo(apiUrl || obtenerConfiguracion().apiUrl, codigo, fetch, leerInfoEquipo());
           apiUrl = r.apiUrl;
           agenteKey = r.llave;
         } catch (err: any) {
@@ -558,7 +558,7 @@ export async function main(): Promise<void> {
       leer: () => leerArchivoConfiguracion(),
       interactivo,
       preguntar: (t) => (rlRevincular ? preguntar(rlRevincular, t) : Promise.resolve('')),
-      canjear: (codigo) => canjearCodigoVinculo(config.apiUrl, codigo),
+      canjear: (codigo) => canjearCodigoVinculo(config.apiUrl, codigo, fetch, leerInfoEquipo()),
       guardar: (u, k) => guardarVinculo(u, k),
       log: (m) => console.log(m),
     },

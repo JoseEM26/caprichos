@@ -13,6 +13,38 @@ export class EquipoConfigController {
     return (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
   }
 
+  /** «Limpiar PCs antiguas»: archiva (no borra) las apagadas y repetidas. Exige motivo. */
+  @Post('limpiar-antiguas')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('configuracion', 'editar')
+  async limpiarAntiguas(@Body() body: { motivo?: string }, @Req() req: any) {
+    return this.equipos.limpiarAntiguas(body?.motivo, req.usuario, this.ip(req));
+  }
+
+  /** «Eliminar PC» (soft-delete auditado; ADMIN o CAJERO). */
+  @Post(':id/eliminar')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('pedidos', 'cambiar_estado')
+  async eliminar(@Param('id') id: string, @Body() body: { motivo?: string }, @Req() req: any) {
+    return this.equipos.eliminar(id, body?.motivo, req.usuario, this.ip(req));
+  }
+
+  /** «Sí, es la misma»: esta PC hereda la configuración de `otraId` y la otra se archiva. */
+  @Post(':id/fusionar')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('configuracion', 'editar')
+  async fusionar(@Param('id') id: string, @Body() body: { otraId?: string }, @Req() req: any) {
+    return this.equipos.fusionar(id, body?.otraId, req.usuario, this.ip(req));
+  }
+
+  /** «No, es otra PC». */
+  @Post(':id/no-es-la-misma')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('configuracion', 'editar')
+  async noEsLaMisma(@Param('id') id: string, @Body() body: { otraId?: string }, @Req() req: any) {
+    return this.equipos.noEsLaMisma(id, body?.otraId, req.usuario, this.ip(req));
+  }
+
   @Get(':id/config')
   @Permiso('configuracion', 'ver')
   async obtener(@Param('id') id: string) {

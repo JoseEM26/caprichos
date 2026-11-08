@@ -72,6 +72,8 @@ export interface GrupoCola {
   /** NULL en las pruebas de impresión: cada prueba es su propio grupo. */
   pedidoId: string | null;
   esPrueba: boolean;
+  /** Trabajo de «Simular un pedido completo». */
+  esSimulacion?: boolean;
   pedidoCodigo: string;
   clienteNombre: string;
   cantidad: number;
@@ -120,6 +122,15 @@ export interface RespuestaCrearLlave {
 }
 
 /** Contrato de GET /admin/impresion/mapa (ver apps/api/src/modulos/impresion/impresion-config.service.ts). */
+export interface ResultadoSimulacion {
+  ok: boolean;
+  total: number;
+  enviados: Array<{ equipoId: string; equipo: string; maquina: string; cantidad: number; trabajos: string[] }>;
+  noRecibieron: Array<{ equipoId: string; equipo: string; motivo: string }>;
+  sinReceptor: string[];
+  mensaje: string;
+}
+
 export type RolEquipoMapa = 'ETIQUETERA' | 'TICKETERA';
 export type EstadoRolMapa = 'lista' | 'sin_papel' | 'desconectada' | 'sin_permiso' | 'error' | 'no_configurada' | 'sin_programa';
 
@@ -319,6 +330,31 @@ export const impresionApi = {
   /** Qué imprime una PC (cambio parcial: nombre, máquinas, interruptores, áreas, tamaños, impresoras, pausa). La deja «configurada». */
   guardarConfigEquipo: async (equipoId: string, cambio: CambioConfigEquipo): Promise<{ ok: boolean; config: ConfigEquipoImpresion }> => {
     return api.put(`/admin/impresion/equipos/${equipoId}/config`, cambio);
+  },
+
+  /** «Simular un pedido completo»: pedido ficticio por las mismas reglas que una venta. */
+  simularPedido: async (modalidad: string): Promise<ResultadoSimulacion> => {
+    return api.post('/admin/impresion/simular-pedido', { modalidad });
+  },
+
+  /** «Sí, es la misma»: esta PC hereda la configuración de `otraId` y la otra se archiva. */
+  fusionarEquipo: async (equipoId: string, otraId: string): Promise<{ ok: boolean }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/fusionar`, { otraId });
+  },
+
+  /** «No, es otra PC»: deja de preguntar. */
+  noEsLaMisma: async (equipoId: string, otraId: string): Promise<{ ok: boolean }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/no-es-la-misma`, { otraId });
+  },
+
+  /** «Eliminar PC»: soft-delete auditado; lo pendiente a esa PC se descarta. */
+  eliminarEquipo: async (equipoId: string, motivo?: string): Promise<{ ok: boolean; descartados: number }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/eliminar`, { motivo: motivo || undefined });
+  },
+
+  /** «Limpiar PCs antiguas»: archiva (no borra) las apagadas y repetidas. El motivo es obligatorio. */
+  limpiarEquiposAntiguos: async (motivo: string): Promise<{ ok: boolean; archivadas: number }> => {
+    return api.post('/admin/impresion/equipos/limpiar-antiguas', { motivo });
   },
 
   /** «Usar lo general»: rellena la PC con las reglas del local. */

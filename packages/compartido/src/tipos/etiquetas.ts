@@ -54,6 +54,8 @@ export interface InfoEquipoLatido {
   sistema?: string;
   /** Direcciones IPv4 de la red local (interfaces no internas). */
   ipLocal?: string[];
+  /** Identificador estable de la PC (hash, nunca el dato crudo): permite reconocerla al volver a vincularla. */
+  equipoUid?: string;
 }
 
 /** Impresora elegida por rol en Configuración › Impresión (identificación estable). */
@@ -117,6 +119,8 @@ export interface EstadoMaquinaImpresion {
 
 export interface TicketPagoDatos {
   tipo?: 'TICKET_PAGO';
+  /** Simulación de pedido: el ticket imprime «*** PRUEBA ***». */
+  simulacion?: boolean;
   local: { nombre: string; razonSocial?: string | null; ruc?: string | null; direccion?: string | null };
   codigo: string;
   fecha: string;
@@ -257,6 +261,8 @@ export interface EtiquetaBebidaDatos {
 /** Comanda de salón: todas las líneas del pedido con tamaño, opciones y notas, para la cocina y el mozo. */
 export interface TicketComandaSalonDatos {
   tipo?: TipoTicketComanda;
+  /** Simulación de pedido: la comanda imprime «*** PRUEBA ***». */
+  simulacion?: boolean;
   codigo: string;
   /** Nombre de la mesa (salón); null si no hay. */
   mesa: string | null;
@@ -345,6 +351,10 @@ export interface EquipoEstadoImpresion {
   hostname?: string | null;
   sistema?: string | null;
   version?: string | null;
+  /** PC apagada con otra más nueva del mismo nombre: el panel la guarda en «Antiguas». */
+  antigua?: boolean;
+  /** Otra PC con la que se confunde: «¿es la misma que ...?» */
+  repetidaDe?: { deviceKeyId: string; nombre: string } | null;
 }
 
 export interface EstadoAdminImpresion {
@@ -357,6 +367,8 @@ export interface EstadoAdminImpresion {
   impresoras?: Record<RolImpresora, EstadoMaquinaImpresion>;
   /** Cada computadora vinculada por separado (las pruebas y la impresora fija son POR computadora). */
   equipos?: EquipoEstadoImpresion[];
+  /** PC eliminadas o reemplazadas (solo consulta; las últimas 20). */
+  eliminadas?: { deviceKeyId: string; nombre: string; hostname: string | null; ipLocal: string[]; ultimoLatido: string | null; eliminadaEn: string | null }[];
   /** Impresoras detectadas en el equipo del local (vacío si el programa es viejo o no está). */
   candidatas?: ImpresoraCandidata[];
   /** Lo elegido en el panel por rol (puede no haberse aplicado aún). */
