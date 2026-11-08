@@ -67,6 +67,13 @@ export class AlmacenController {
     return this.almacenService.obtenerApertura();
   }
 
+  /** Mermas de productos terminados de hoy (las que salen de Apertura), con su motivo. Se anulan con movimientos/:id/anular. */
+  @Get('apertura/mermas')
+  @Permiso('almacen', 'apertura')
+  async mermasAperturaHoy() {
+    return this.almacenService.listarMermasProductoHoy();
+  }
+
   @Post('apertura')
   @Permiso('almacen', 'apertura')
   async registrarApertura(@Body() dto: RegistrarAperturaDto, @Req() req: any) {

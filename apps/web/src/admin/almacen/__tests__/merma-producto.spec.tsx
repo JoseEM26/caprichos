@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AperturaDiaView } from '../AperturaDiaView';
@@ -48,7 +49,7 @@ describe('Merma de producto terminado', () => {
   it('valida la cantidad (entero de 1 hasta el saldo) y la nota del motivo Otro', () => {
     expect(errorMerma('0', 5, 'VENCIDO', '')).toMatch(/entero de 1 o más/);
     expect(errorMerma('6', 5, 'VENCIDO', '')).toBe('Solo hay 5. No puedes botar más de lo que hay.');
-    expect(errorMerma('2', 5, 'OTRO', '  ')).toBe('Si el motivo es Otro, escribe una nota.');
+    expect(errorMerma('2', 5, 'OTRO', '  ')).toBe('Si el motivo es Otro, escribe una nota de al menos 5 letras.');
     expect(errorMerma('2', 5, 'OTRO', 'Cayó al piso')).toBeNull();
     expect(errorMerma('5', 5, 'DANADO', '')).toBeNull();
   });
@@ -78,7 +79,7 @@ describe('Merma de producto terminado', () => {
     fireEvent.change(screen.getByLabelText('Cantidad a botar de GALLETA'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Motivo de la merma de GALLETA'), { target: { value: 'OTRO' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar merma' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Si el motivo es Otro, escribe una nota.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Si el motivo es Otro, escribe una nota de al menos 5 letras.');
     expect(merma).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText('Nota de la merma de GALLETA'), { target: { value: 'Se cayó la bandeja' } });
@@ -88,7 +89,7 @@ describe('Merma de producto terminado', () => {
     );
   });
 
-  it('el cierre del día muestra el desglose por sabor y bota por sabor; los sabores no van al conteo por producto', async () => {
+  it('el cierre del día muestra el desglose por sabor y enlaza a Apertura para botar; los sabores no van al conteo por producto', async () => {
     vi.spyOn(almacenApi, 'obtenerProductosCierreDia').mockResolvedValue([
       {
         productoId: 'd1',
@@ -103,11 +104,17 @@ describe('Merma de producto terminado', () => {
       { insumoId: 'i1', nombre: 'Pan de molde', sistema: 3, unidad: 'u' },
     ]);
     const cerrar = vi.spyOn(almacenApi, 'cerrarDia').mockResolvedValue({ ok: true });
-    render(<ModalCerrarDia abierto alCerrar={() => {}} alGuardar={() => {}} />);
+    render(
+      <MemoryRouter>
+        <ModalCerrarDia abierto alCerrar={() => {}} alGuardar={() => {}} />
+      </MemoryRouter>,
+    );
 
     expect(await screen.findAllByTestId('cierre-sabor')).toHaveLength(2);
     expect(screen.getByText('Fresa:')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Botar a merma DONA · Oreo' })).toBeInTheDocument();
+    // La merma de productos ya no se bota aquí: se redirige a Apertura del día
+    expect(screen.queryByRole('button', { name: 'Botar a merma DONA · Oreo' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'Ir a Apertura del día' })[0]).toHaveAttribute('href', '/admin/apertura');
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar cierre del día' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar cierre' }));

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { almacenApi, ProductoCierreDiaItem, CierreDiaDto } from './almacenApi';
 import { Confirmar } from '../../comun/Confirmar';
-import { MermaProductoBoton } from './MermaProductoBoton';
+import { Link } from 'react-router-dom';
+import './apertura-dia.css';
 
 interface ModalCerrarDiaProps {
   abierto: boolean;
@@ -219,7 +220,7 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
           <>
           {porSabor.length > 0 && (
             <section aria-label="Productos por sabor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--cp-navy)' }}>Por sabor: lo que sobra se bota a merma por sabor</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--cp-navy)' }}>Por sabor: su merma se registra en Apertura del día</div>
               {porSabor.map((p) => (
                 <div key={`prod-sab-${p.productoId}`} style={{ background: 'var(--cp-cream)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -231,13 +232,12 @@ export const ModalCerrarDia: React.FC<ModalCerrarDiaProps> = ({
                       <div style={{ fontSize: 13 }}>
                         {sb.nombre}: <b>{sb.sistema}</b>
                       </div>
-                      <MermaProductoBoton
-                        productoId={p.productoId!}
-                        saborId={sb.saborId}
-                        nombre={`${p.nombre} · ${sb.nombre}`}
-                        saldo={sb.sistema}
-                        alRegistrar={cargarProductos}
-                      />
+                      <span className="ap-merma-aviso">
+                        La merma de productos se registra en Apertura del día.
+                        <Link to="/admin/apertura" onClick={alCerrar} style={{ color: 'var(--cp-rust)', fontWeight: 800, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+                          Ir a Apertura del día
+                        </Link>
+                      </span>
                     </div>
                   ))}
                 </div>

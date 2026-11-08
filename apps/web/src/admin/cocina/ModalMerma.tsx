@@ -198,7 +198,7 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
     for (let i = 0; i < lineas.length; i++) {
       const l = lineas[i];
       if (!l.insumoId) {
-        setMensajeError(`Línea ${i + 1}: Selecciona un insumo o producto.`);
+        setMensajeError(`Línea ${i + 1}: Selecciona un insumo.`);
         return;
       }
       const q = parseFloat(l.cantidad.replace(',', '.'));
@@ -342,7 +342,16 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
                 lineHeight: '18px',
               }}
             >
-              Registra pérdidas de insumos o productos por caída, vencimiento, mala preparación u otro motivo.
+              Registra pérdidas de insumos por caída, vencimiento, mala preparación u otro motivo.
+            </div>
+            <div
+              data-testid="aviso-merma-productos"
+              style={{ fontSize: '13px', marginTop: '6px', fontWeight: 700, color: 'var(--cp-rust, #B5492F)' }}
+            >
+              La merma de productos (donas, galletas, tajadas) se registra en Apertura del día.{' '}
+              <a href="/admin/apertura" style={{ color: 'inherit', textDecoration: 'underline', display: 'inline-block', minHeight: 44, lineHeight: '44px' }}>
+                Ir a Apertura del día
+              </a>
             </div>
           </div>
           <button
@@ -454,7 +463,7 @@ export function ModalMerma({ abierto, alCerrar, alGuardar }: ModalMermaProps) {
                     htmlFor={`insumo-${linea.id}`}
                     style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)' }}
                   >
-                    Insumo o producto
+                    Insumo
                   </label>
                   <select
                     id={`insumo-${linea.id}`}

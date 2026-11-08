@@ -55,7 +55,7 @@ describe('Apertura del día (conteo de productos controlados)', () => {
   });
 
   it('envía solo lo que falta o cambió, con el cuerpo correcto', async () => {
-    const registrar = vi.spyOn(almacenApi, 'registrarApertura').mockResolvedValue({ ok: true, registrados: 1 });
+    const registrar = vi.spyOn(almacenApi, 'registrarApertura').mockResolvedValue({ ok: true, registrados: 1, mermas: 0 });
     render(<AperturaDiaView />);
     await screen.findByText('DONA CHOCOLATE');
 
@@ -75,28 +75,35 @@ describe('Apertura del día (conteo de productos controlados)', () => {
     expect(screen.getByLabelText('Quedaron de ayer DONA CHOCOLATE')).toHaveValue(9);
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (2)' }));
+    // Quitar uno es una merma: pide motivo antes de guardar
+    fireEvent.change(await screen.findByLabelText('Mismo motivo para todos'), { target: { value: 'SE_CAYO' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar merma y guardar' }));
     await waitFor(() =>
       expect(registrar).toHaveBeenCalledWith([
-        { productoId: 'd1', cantidad: 9, produccion: 0 },
+        { productoId: 'd1', cantidad: 9, produccion: 0, saldoEsperado: 10, motivo: 'SE_CAYO' },
         { productoId: 'g1', cantidad: 7, produccion: 0 },
       ]),
     );
   });
 
-  it('una diferencia de más de la mitad del saldo pide confirmación Sí/No antes de guardar', async () => {
-    const registrar = vi.spyOn(almacenApi, 'registrarApertura').mockResolvedValue({ ok: true, registrados: 1 });
+  it('bajar el conteo pide confirmación Sí/No con el motivo de la merma antes de guardar', async () => {
+    const registrar = vi.spyOn(almacenApi, 'registrarApertura').mockResolvedValue({ ok: true, registrados: 1, mermas: 1 });
     render(<AperturaDiaView />);
     await screen.findByText('DONA CHOCOLATE');
     fireEvent.change(screen.getByLabelText('Quedaron de ayer DONA CHOCOLATE'), { target: { value: '2' } });
+    expect(screen.getByText('Merma: −8')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (1)' }));
 
-    expect(screen.getByText(/¿Guardar una diferencia grande\?/)).toBeInTheDocument();
+    expect(screen.getByText(/¿Registrar 8 unidades como merma\?/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'No, revisar' }));
     expect(registrar).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (1)' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, guardar' }));
-    await waitFor(() => expect(registrar).toHaveBeenCalledWith([{ productoId: 'd1', cantidad: 2, produccion: 0 }]));
+    fireEvent.change(screen.getByLabelText('Motivo de la merma de DONA CHOCOLATE'), { target: { value: 'VENCIDO' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar merma y guardar' }));
+    await waitFor(() =>
+      expect(registrar).toHaveBeenCalledWith([{ productoId: 'd1', cantidad: 2, produccion: 0, saldoEsperado: 10, motivo: 'VENCIDO' }]),
+    );
   });
 
   it('un número no válido bloquea el guardado', async () => {

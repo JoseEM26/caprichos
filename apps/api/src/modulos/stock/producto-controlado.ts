@@ -696,14 +696,30 @@ export function estadoSaborCarta(
 export const NOTA_PRODUCE_HOY = 'Produje hoy';
 
 /** Motivos de merma de producto terminado. Queda auditada en movimiento_stock (quién y cuándo). */
-export const MOTIVOS_MERMA_PRODUCTO = ['VENCIDO', 'DANADO', 'SE_CAYO', 'OTRO'] as const;
+export const MOTIVOS_MERMA_PRODUCTO = [
+  'SE_CAYO',
+  'VENCIDO',
+  'DANADO',
+  'ERROR_COCINA',
+  'DEGUSTACION',
+  'CONSUMO_PERSONAL',
+  'CONTEO',
+  'OTRO',
+] as const;
 export type MotivoMermaProducto = (typeof MOTIVOS_MERMA_PRODUCTO)[number];
 export const ETIQUETA_MOTIVO_MERMA: Record<MotivoMermaProducto, string> = {
+  SE_CAYO: 'Se cayó o se rompió',
   VENCIDO: 'Vencido',
-  DANADO: 'Dañado',
-  SE_CAYO: 'Se cayó',
+  DANADO: 'Mal estado o dañado',
+  ERROR_COCINA: 'Error de cocina o preparación',
+  DEGUSTACION: 'Degustación o cortesía interna',
+  CONSUMO_PERSONAL: 'Consumo del personal',
+  CONTEO: 'Conteo o ajuste',
   OTRO: 'Otro',
 };
+/** El motivo «Otro» exige una nota de al menos 5 letras. */
+export const NOTA_OTRO_MINIMA = 5;
+export const notaOtroValida = (nota?: string | null) => (nota?.trim().length ?? 0) >= NOTA_OTRO_MINIMA;
 
 /** Lo producido hoy (suma de «Produje hoy») de un producto entero o de un sabor. */
 export async function producidoHoyDe(db: any, productoId: bigint, saborId: bigint | null, fecha: string = fechaLimaHoy()) {
@@ -735,20 +751,63 @@ export async function registrarAperturaArrastre(
     por: bigint;
     ahora: Date;
     fecha: string;
+    /** Si viene, una BAJA del saldo se registra como MERMA con motivo (obligatorio) en vez de AJUSTE. */
+    merma?: { motivo?: MotivoMermaProducto; nota?: string | null; saldoEsperado?: number; nombre: string; saborNombre?: string | null };
   },
-) {
+): Promise<{ merma?: { cantidad: number; motivo: MotivoMermaProducto; movimientoId: bigint } }> {
+  // Fila(s) de saldo bloqueadas hasta el final: dos guardados a la vez se turnan y el segundo ya ve el saldo nuevo
+  if (c.merma && typeof db.$queryRaw === 'function') {
+    if (c.saborId) await db.$queryRaw`SELECT id FROM stock_sabor WHERE sabor_id = ${c.saborId} FOR UPDATE`;
+    else await db.$queryRaw`SELECT id FROM stock WHERE producto_id = ${c.productoId} FOR UPDATE`;
+  }
   const previa = await producidoHoyDe(db, c.productoId, c.saborId, c.fecha);
   // La pantalla propone «Quedaron de ayer» = saldo − producido de hoy, con piso 0. Si hoy se vendió más que lo de ayer
   // (se vendió producción de hoy) ese 0 no es un conteo: es «sin cambios». Así guardar no devuelve lo ya vendido.
   const saldoActual = c.saborId ? await saldoSabor(db, c.saborId) : await saldoProducto(db, c.productoId);
   const sinCambios = c.quedaron === Math.max(0, saldoActual - previa);
   const objetivo = sinCambios ? saldoActual : c.quedaron + previa;
+  let mermado: { cantidad: number; motivo: MotivoMermaProducto; movimientoId: bigint } | undefined;
+  if (c.merma && objetivo < saldoActual) {
+    const { motivo, nota, saldoEsperado, nombre, saborNombre } = c.merma;
+    if (!motivo) {
+      throw new BadRequestException({
+        codigo: 'MOTIVO_OBLIGATORIO',
+        mensaje: `Bajaste ${nombre}${saborNombre ? ` · ${saborNombre}` : ''}: indica por qué (motivo de la merma)`,
+      });
+    }
+    if (motivo === 'OTRO' && !notaOtroValida(nota)) {
+      throw new BadRequestException({ codigo: 'NOTA_OBLIGATORIA', mensaje: `Si el motivo es Otro, escribe una nota de al menos ${NOTA_OTRO_MINIMA} letras` });
+    }
+    if (saldoEsperado !== undefined && saldoEsperado !== saldoActual) {
+      throw new ConflictException({
+        codigo: 'CONTEO_DESACTUALIZADO',
+        mensaje: `El stock de ${nombre}${saborNombre ? ` · ${saborNombre}` : ''} cambió mientras contabas (ahora ${saldoActual}). Recarga la pantalla y vuelve a contar.`,
+        quedan: saldoActual,
+      });
+    }
+    const cantidad = saldoActual - objetivo;
+    const r = await mermarProductoControlado(db, {
+      productoId: c.productoId,
+      nombre,
+      saborId: c.saborId,
+      saborNombre,
+      cantidad,
+      motivo,
+      nota,
+      areaId: c.areaId,
+      por: c.por,
+      ahora: c.ahora,
+      fecha: c.fecha,
+    });
+    mermado = { cantidad, motivo, movimientoId: r.movimientoId };
+  }
   if (c.saborId) await fijarAperturaSabor(db, c.productoId, c.saborId, objetivo, c.areaId, c.por, c.ahora, c.fecha);
   else await fijarAperturaProducto(db, c.productoId, objetivo, c.areaId, c.por, c.ahora, c.fecha);
-  if (c.produccion <= 0) return;
+  const resultado = mermado ? { merma: mermado } : {};
+  if (c.produccion <= 0) return resultado;
 
   const lugarId = await lugarDelProducto(db, c.productoId, c.areaId);
-  if (!lugarId) return;
+  if (!lugarId) return resultado;
   const cantidad = new Prisma.Decimal(c.produccion);
   if (c.saborId) {
     await db.stockSabor.upsert({
@@ -778,6 +837,7 @@ export async function registrarAperturaArrastre(
   });
   if (c.saborId) await sincronizarAgotadoSabor(db, c.saborId, await saldoSabor(db, c.saborId), c.ahora, c.por);
   else await sincronizarAgotadoProducto(db, c.productoId, await saldoProducto(db, c.productoId), c.ahora);
+  return resultado;
 }
 
 /**

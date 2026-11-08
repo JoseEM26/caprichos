@@ -1040,12 +1040,13 @@ export class InformesService {
       case 'mermas': {
         const mermas = await this.prisma.movimientoStock.findMany({
           where: { tipo: 'MERMA' },
-          include: { insumo: true, lugar: true },
+          include: { insumo: true, lugar: true, producto: { select: { nombre: true } }, sabor: { select: { nombre: true } } },
           orderBy: { en: 'desc' },
         });
+        // Incluye las mermas de productos terminados que salen de Apertura del día (con su motivo en la nota)
         const rows = mermas.map((m) => [
           new Date(m.en).toLocaleDateString('es-PE'),
-          m.insumo?.nombre || 'Insumo',
+          m.insumo?.nombre || (m.producto ? `${m.producto.nombre}${m.sabor ? ` · ${m.sabor.nombre}` : ''}` : 'Insumo'),
           `${Number(m.cantidad)} ${m.insumo?.unidad_almacen || 'u.'}`,
           m.lugar?.nombre || 'Salados',
           m.nota || 'Desecho de producción',
@@ -1060,9 +1061,9 @@ export class InformesService {
           filtrosActivosTexto,
           kpis: [
             { n: 'Registros de merma', v: String(mermas.length) },
-            { n: 'Insumos afectados', v: String(new Set(mermas.map((m) => m.insumo_id)).size) },
+            { n: 'Ítems afectados', v: String(new Set(mermas.map((m) => `${m.insumo_id ?? ''}/${m.producto_id ?? ''}/${m.sabor_id ?? ''}`)).size) },
           ],
-          cols: ['Fecha', 'Insumo', 'Cantidad', 'Origen', 'Motivo', 'Código'],
+          cols: ['Fecha', 'Insumo o producto', 'Cantidad', 'Origen', 'Motivo', 'Código'],
           rows,
         };
       }

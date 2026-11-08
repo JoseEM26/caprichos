@@ -164,11 +164,49 @@ export function productoPendienteApertura(p: AperturaProductoItem): boolean {
  * Una línea del envío: el producto entero o uno de sus sabores.
  * `cantidad` = lo que quedó de ayer (contado); `produccion` = lo que se produjo hoy (se suma).
  */
-export type ItemApertura =
-  | { productoId: string; cantidad: number; produccion?: number }
-  | { productoId: string; saborId: string; cantidad: number; produccion?: number };
+export type ItemApertura = { productoId: string; saborId?: string; cantidad: number; produccion?: number } & {
+  /** Si la cantidad BAJA el saldo: el saldo que la pantalla vio, el motivo de la merma y su nota (obligatoria si es Otro). */
+  saldoEsperado?: number;
+  motivo?: MotivoMermaProducto;
+  nota?: string;
+};
 
-export type MotivoMermaProducto = 'VENCIDO' | 'DANADO' | 'SE_CAYO' | 'OTRO';
+export type MotivoMermaProducto =
+  | 'SE_CAYO'
+  | 'VENCIDO'
+  | 'DANADO'
+  | 'ERROR_COCINA'
+  | 'DEGUSTACION'
+  | 'CONSUMO_PERSONAL'
+  | 'CONTEO'
+  | 'OTRO';
+
+/** Mismos motivos y orden que el servidor (stock/producto-controlado.ts). */
+export const MOTIVOS_MERMA: Array<{ valor: MotivoMermaProducto; etiqueta: string }> = [
+  { valor: 'SE_CAYO', etiqueta: 'Se cayó o se rompió' },
+  { valor: 'VENCIDO', etiqueta: 'Vencido' },
+  { valor: 'DANADO', etiqueta: 'Mal estado o dañado' },
+  { valor: 'ERROR_COCINA', etiqueta: 'Error de cocina o preparación' },
+  { valor: 'DEGUSTACION', etiqueta: 'Degustación o cortesía interna' },
+  { valor: 'CONSUMO_PERSONAL', etiqueta: 'Consumo del personal' },
+  { valor: 'CONTEO', etiqueta: 'Conteo o ajuste' },
+  { valor: 'OTRO', etiqueta: 'Otro (con nota)' },
+];
+
+/** El motivo «Otro» exige una nota de al menos 5 letras. */
+export const notaOtroValida = (nota?: string) => (nota?.trim().length ?? 0) >= 5;
+
+export interface MermaHoy {
+  id: string;
+  producto: string;
+  sabor: string | null;
+  cantidad: number;
+  motivo: string;
+  nota: string | null;
+  en: string;
+  por: string | null;
+  anulada: boolean;
+}
 
 export interface MermaProductoDto {
   productoId: string;
@@ -184,7 +222,11 @@ export const almacenApi = {
 
   /** Registra el conteo de apertura de hoy; solo las líneas enviadas (producto o sabor). */
   registrarApertura: (items: ItemApertura[]) =>
-    api.post<{ ok: true; registrados: number }>('/admin/almacen/apertura', { items }),
+    api.post<{ ok: true; registrados: number; mermas?: number }>('/admin/almacen/apertura', { items }),
+
+  /** Mermas de productos de hoy (las que salen de Apertura), con motivo, hora y quién. */
+  mermasHoy: () => api.get<{ fecha: string; mermas: MermaHoy[] }>('/admin/almacen/apertura/mermas'),
+
 
   /** Botar a merma de un producto o sabor (permiso almacen/merma_producto). */
   mermaProducto: (dto: MermaProductoDto) =>

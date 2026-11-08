@@ -256,3 +256,79 @@ describe('Merma desde el servicio de almacén (con el control de almacén apagad
     ).rejects.toMatchObject({ response: { codigo: 'SABOR_REQUERIDO' } });
   });
 });
+
+describe('Apertura: bajar el conteo = MERMA con motivo', () => {
+  const m = { nombre: 'Dona', saborNombre: 'Fresa' as string | null };
+  const base = { productoId: DONA, saborId: FRESA, produccion: 0, areaId: null, por: 5n, ahora: AHORA, fecha: HOY };
+  const dbDos = () => fakeDb({ stockSabor: { [String(FRESA)]: 10, [String(OREO)]: 6 } });
+  const saldoFresa = (db: Row) => Number(db.stockSabor.filas.find((f: Row) => f.sabor_id === FRESA).cantidad);
+
+  it('Fresa 10 a 7 con motivo: MERMA de 3 con motivo, quién y saldo 7 (Oreo no se toca)', async () => {
+    const db = dbDos();
+    const r = await registrarAperturaArrastre(db, { ...base, quedaron: 7, merma: { ...m, motivo: 'SE_CAYO', saldoEsperado: 10 } });
+    expect(saldoFresa(db)).toBe(7);
+    expect(r.merma).toMatchObject({ cantidad: 3, motivo: 'SE_CAYO' });
+    const movs = db.movimientoStock.filas;
+    expect(movs).toHaveLength(1);
+    expect(movs[0]).toMatchObject({ tipo: 'MERMA', nota: 'Merma · Se cayó o se rompió' });
+    expect(Number(movs[0].cantidad)).toBe(-3);
+    expect(String(movs[0].sabor_id)).toBe(String(FRESA));
+    expect(String(movs[0].por)).toBe('5');
+    expect(Number(db.conteoApertura.filas[0].cantidad)).toBe(7);
+    expect(Number(db.stockSabor.filas.find((f: Row) => f.sabor_id === OREO).cantidad)).toBe(6);
+  });
+
+  it('aumentar no pide motivo ni genera merma', async () => {
+    const db = dbDos();
+    const r = await registrarAperturaArrastre(db, { ...base, quedaron: 12, merma: { ...m } });
+    expect(saldoFresa(db)).toBe(12);
+    expect(r.merma).toBeUndefined();
+    expect(db.movimientoStock.filas.some((x: Row) => x.tipo === 'MERMA')).toBe(false);
+  });
+
+  it('sin motivo: 400 MOTIVO_OBLIGATORIO y el saldo no cambia', async () => {
+    const db = dbDos();
+    await expect(registrarAperturaArrastre(db, { ...base, quedaron: 7, merma: { ...m } })).rejects.toMatchObject({
+      response: { codigo: 'MOTIVO_OBLIGATORIO' },
+    });
+    expect(saldoFresa(db)).toBe(10);
+    expect(db.movimientoStock.filas).toHaveLength(0);
+  });
+
+  it('motivo Otro con nota corta: 400; con 5 letras o más pasa', async () => {
+    const db = dbDos();
+    await expect(
+      registrarAperturaArrastre(db, { ...base, quedaron: 7, merma: { ...m, motivo: 'OTRO', nota: 'abc' } }),
+    ).rejects.toMatchObject({ response: { codigo: 'NOTA_OBLIGATORIA' } });
+    await registrarAperturaArrastre(db, { ...base, quedaron: 7, merma: { ...m, motivo: 'OTRO', nota: 'Se quemó' } });
+    expect(db.movimientoStock.filas[0].nota).toBe('Merma · Otro · Se quemó');
+  });
+
+  it('el saldo cambió mientras contaba: 409 CONTEO_DESACTUALIZADO sin tocar nada', async () => {
+    const db = dbDos();
+    db.stockSabor.filas[0].cantidad = 9; // se vendió una
+    await expect(
+      registrarAperturaArrastre(db, { ...base, quedaron: 7, merma: { ...m, motivo: 'VENCIDO', saldoEsperado: 10 } }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(saldoFresa(db)).toBe(9);
+    expect(db.movimientoStock.filas).toHaveLength(0);
+  });
+
+  it('doble clic: el mismo conteo enviado otra vez no resta dos veces', async () => {
+    const db = dbDos();
+    const c = { ...base, quedaron: 7, merma: { ...m, motivo: 'SE_CAYO' as const } };
+    await registrarAperturaArrastre(db, c);
+    await registrarAperturaArrastre(db, c);
+    expect(saldoFresa(db)).toBe(7);
+    expect(db.movimientoStock.filas.filter((x: Row) => x.tipo === 'MERMA')).toHaveLength(1);
+  });
+
+  it('producto sin sabores: baja a 0 con merma y no queda negativo', async () => {
+    const db = fakeDb({ stock: 10 });
+    const r = await registrarAperturaArrastre(db, {
+      ...base, saborId: null, quedaron: 0, merma: { nombre: 'Dona', motivo: 'VENCIDO' },
+    });
+    expect(r.merma?.cantidad).toBe(10);
+    expect(saldoDona(db)).toBe(0);
+  });
+});
