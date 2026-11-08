@@ -60,6 +60,7 @@ describe('acciones antes protegidas por el código del supervisor: ahora solo po
       findUnique: jest.fn(async () => ({ party_id: 7n, rol: rolActual, activo: true, debe_cambiar: false })),
     },
     userAccountRol: { findMany: jest.fn().mockResolvedValue([]) },
+    userAccountPermiso: { findMany: jest.fn().mockResolvedValue([]) },
     rolPermiso: {
       findFirst: jest.fn(async ({ where }: any) => {
         const claves = where.OR.map((c: any) => `${c.permiso.modulo}/${c.permiso.accion}`);

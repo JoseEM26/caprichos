@@ -28,6 +28,8 @@ import { ReactivarUsuarioDto } from './dto/reactivar-usuario.dto';
 import { EditarPeriodoDto } from './dto/editar-periodo.dto';
 import { OtorgarRolExtraDto } from './dto/rol-temporal.dto';
 import { UsuariosRolesService } from './usuarios-roles.service';
+import { UsuariosPermisosService } from './usuarios-permisos.service';
+import { PermisosExtraDto } from './dto/permisos-extra.dto';
 import { UsuariosRolesMasivoService } from './usuarios-roles-masivo.service';
 import { RolesMasivoDto } from './dto/roles-masivo.dto';
 import { UsuariosActividadService } from './usuarios-actividad.service';
@@ -38,6 +40,7 @@ export class UsuariosController {
   constructor(
     private readonly usuariosService: UsuariosService,
     private readonly rolesService: UsuariosRolesService,
+    private readonly permisosService: UsuariosPermisosService,
     private readonly rolesMasivoService: UsuariosRolesMasivoService,
     private readonly actividadService: UsuariosActividadService,
   ) {}
@@ -64,6 +67,21 @@ export class UsuariosController {
   async retirarRol(@Param('id') id: string, @Param('rol') rol: string, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.rolesService.retirar(id, rol, req.usuario, ip);
+  }
+
+  /** Roles, permisos extra y permisos efectivos de una persona, por módulo en lenguaje llano. */
+  @Get(':id/permisos')
+  @Permiso('usuarios', 'ver')
+  async permisos(@Param('id') id: string) {
+    return this.permisosService.obtener(id);
+  }
+
+  /** Reemplaza los permisos extra de la persona (aditivos a sus roles). Solo ADMIN; auditado. */
+  @Put(':id/permisos-extra')
+  @Permiso('usuarios', 'editar')
+  async reemplazarPermisosExtra(@Param('id') id: string, @Body() dto: PermisosExtraDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.permisosService.reemplazar(id, dto, req.usuario, ip);
   }
 
   /** Línea de tiempo de una persona: cambios de su cuenta, roles, horario, asistencia y lo que hizo. Solo ADMIN. */

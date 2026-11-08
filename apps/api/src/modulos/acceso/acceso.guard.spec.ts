@@ -52,6 +52,9 @@ describe('AccesoGuard', () => {
       userAccountRol: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      userAccountPermiso: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     auditoriaService = {

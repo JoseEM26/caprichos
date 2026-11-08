@@ -29,6 +29,8 @@ const TIPO_POR_ACCION: Record<string, string> = {
   QUITAR_FOTO: 'datos',
   VER_DNI: 'datos',
   CAMBIAR_ROLES: 'roles',
+  PERMISO_EXTRA_OTORGADO: 'roles',
+  PERMISO_EXTRA_REVOCADO: 'roles',
   EDITAR_HORARIO: 'horario',
   PERIODO_EDITAR: 'horario',
   DESACTIVAR: 'estado',
@@ -226,6 +228,12 @@ export class UsuariosActividadService {
           break;
         case 'CAMBIAR_ROLES':
           texto = `${actor} cambió los roles de ${nombreAfectado}: ${listaRoles(an.roles)} → ${listaRoles(d.roles)}`;
+          break;
+        case 'PERMISO_EXTRA_OTORGADO':
+          texto = `${actor} dio a ${nombreAfectado} el permiso extra ${d.permiso}${d.venceEn ? ` hasta el ${String(d.venceEn).slice(0, 10)}` : ''}${d.nota ? ` (${d.nota})` : ''}`;
+          break;
+        case 'PERMISO_EXTRA_REVOCADO':
+          texto = `${actor} quitó a ${nombreAfectado} el permiso extra ${an.permiso}`;
           break;
         case 'EDITAR_HORARIO':
           texto = `${actor} cambió el horario de trabajo y almuerzo de ${nombreAfectado}`;

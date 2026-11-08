@@ -63,6 +63,9 @@ describe('AuthService', () => {
       userAccountRol: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      userAccountPermiso: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     jwtService = {
@@ -618,6 +621,17 @@ describe('AuthService', () => {
       expect(prisma.rolPermiso.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { rol: { in: ['COCINA'] } } }),
       );
+    });
+
+    it('los permisos extra vigentes se suman a los del rol al refrescar la sesión', async () => {
+      prisma.userAccount.findUnique.mockResolvedValue({ id: 3n, party_id: 7n, rol: 'COCINA', debe_cambiar: false, party: { persona: { nombres: 'Luis' } } });
+      prisma.rolPermiso.findMany.mockResolvedValue([{ permiso: { modulo: 'cocina', accion: 'ver' } }]);
+      prisma.userAccountPermiso.findMany.mockResolvedValue([{ modulo: 'creditos', accion: 'ver' }]);
+      const r = await service.yo(7n);
+      expect(r.permisos).toEqual(['cocina/ver', 'creditos/ver']);
+      // revocado: la próxima lectura ya no lo trae
+      prisma.userAccountPermiso.findMany.mockResolvedValue([]);
+      expect((await service.yo(7n)).permisos).toEqual(['cocina/ver']);
     });
 
     it('cuenta que ya no existe -> 401 USUARIO_NO_ENCONTRADO', async () => {

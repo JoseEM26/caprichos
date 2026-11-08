@@ -51,6 +51,21 @@ export async function permisosDeRoles(prisma: PrismaService, roles: string[]): P
   return [...new Set(filas.map((f) => `${f.permiso.modulo}/${f.permiso.accion}`))].sort();
 }
 
+/** Permisos extra vigentes de la cuenta (modulo/accion): los vencidos no cuentan. */
+export async function permisosExtraVigentes(prisma: PrismaService, userAccountId: bigint): Promise<string[]> {
+  const filas = await prisma.userAccountPermiso.findMany({
+    where: { user_account_id: userAccountId, OR: vigenciaRolExtra() },
+    select: { modulo: true, accion: true },
+  });
+  return filas.map((f) => `${f.modulo}/${f.accion}`);
+}
+
+/** Permisos efectivos de una cuenta = unión(permisos de sus roles) ∪ permisos extra vigentes. Única fuente de `usuario.permisos`. */
+export async function permisosDeCuenta(prisma: PrismaService, userAccountId: bigint, roles: string[]): Promise<string[]> {
+  const [deRoles, extras] = await Promise.all([permisosDeRoles(prisma, roles), permisosExtraVigentes(prisma, userAccountId)]);
+  return [...new Set([...deRoles, ...extras])].sort();
+}
+
 /** Roles de alcance amplio: si la cuenta tiene uno, manda sobre la restricción de «solo mis pedidos» del mozo. */
 export const ROLES_ALCANCE_AMPLIO = ['ADMIN', 'CAJERO', 'SUPERVISOR'] as const;
 
