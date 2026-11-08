@@ -140,10 +140,10 @@ export const salonApi = {
       },
     }),
 
-  liberarMesaManual: (mesaId: string, motivo: string, forzar?: boolean) =>
+  liberarMesaManual: (mesaId: string, motivo?: string, forzar?: boolean) =>
     api.post<{ ok: boolean; mensaje: string }>(
       `/admin/salon/mesas/${mesaId}/liberar`,
-      { motivo, ...(forzar ? { forzar: true } : {}) },
+      { ...(motivo ? { motivo } : {}), ...(forzar ? { forzar: true } : {}) },
     ),
 
   /** Pasa el pedido de mesa a otra mesa libre (409 MESA_OCUPADA si no lo está). Con desdeMesaId mueve solo esa mesa. */

@@ -469,7 +469,7 @@ export class SalonService {
 
   /**
    * 3) POST /admin/salon/mesas/:id/liberar (mesas/liberar) { motivo }
-   * Libera a mano la mesa (pedido_mesa.abierta = false) con motivo obligatorio de >= 5 caracteres.
+   * Libera a mano la mesa (pedido_mesa.abierta = false) (motivo opcional).
    * Si el pedido sigue en cocina (COLA/PREPARANDO) retorna 409 PEDIDO_EN_COCINA.
    */
   async liberarMesaManual(
@@ -491,15 +491,10 @@ export class SalonService {
       });
     }
 
-    if (!dto?.motivo || dto.motivo.trim().length < 5) {
-      throw new BadRequestException({
-        codigo: 'MOTIVO_INVALIDO',
-        mensaje: 'El motivo es obligatorio y debe tener al menos 5 caracteres',
-      });
-    }
+    const motivo = dto?.motivo?.trim() || undefined;
 
-    if (dto.forzar === true) {
-      return this.forzarLiberacionMesa(mesaId, dto.motivo.trim(), usuario, ip);
+    if (dto?.forzar === true) {
+      return this.forzarLiberacionMesa(mesaId, motivo, usuario, ip);
     }
 
     const pedidoMesa = await this.prisma.pedidoMesa.findFirst({
@@ -530,7 +525,13 @@ export class SalonService {
       resultado: 'OK',
       entidad: 'elemento_plano',
       entidadId: mesaId,
-      motivo: dto.motivo.trim(),
+      motivo,
+      antes: {
+        mesaId: mesaId.toString(),
+        estado: pedidoMesa ? 'OCUPADA' : 'LIBRE',
+        pedidoId: pedidoMesa?.pedido_id?.toString() || null,
+        estadoPedido: pedidoMesa?.pedido?.estado ?? null,
+      },
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
       despues: {
@@ -556,7 +557,7 @@ export class SalonService {
    */
   private async forzarLiberacionMesa(
     mesaId: bigint,
-    motivo: string,
+    motivo: string | undefined,
     usuario?: UsuarioAutenticado,
     ip?: string,
   ) {
@@ -578,6 +579,10 @@ export class SalonService {
       entidad: 'elemento_plano',
       entidadId: mesaId,
       motivo,
+      antes: {
+        mesaId: mesaId.toString(),
+        estado: abiertas.length ? 'OCUPADA' : 'LIBRE',
+      },
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
       despues: {

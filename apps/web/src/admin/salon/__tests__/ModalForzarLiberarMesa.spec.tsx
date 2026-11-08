@@ -38,37 +38,30 @@ describe('ModalForzarLiberarMesa', () => {
     expect(screen.getByText('Libera solo la mesa; el pedido no se anula ni se cobra.')).toBeTruthy();
   });
 
-  it('exige un motivo de al menos 5 caracteres antes de confirmar', () => {
+  it('no pide motivo: el botón está activo desde el inicio', () => {
     render(<ModalForzarLiberarMesa mesa={mesa} alCerrar={vi.fn()} alForzar={vi.fn()} />);
-    const boton = screen.getByRole('button', { name: 'Forzar liberación' }) as HTMLButtonElement;
-    expect(boton.disabled).toBe(true);
-
-    fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: 'abc' } });
-    expect(boton.disabled).toBe(true);
-
-    fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: 'Mesa trabada' } });
-    expect(boton.disabled).toBe(false);
+    expect(screen.queryByLabelText(/Motivo/)).toBeNull();
+    expect((screen.getByRole('button', { name: 'Liberar mesa' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('pide confirmacion Si/No; No vuelve sin liberar; Si llama a alForzar con el motivo', async () => {
+  it('pide confirmacion Si/No; No vuelve sin liberar; Si llama a alForzar', async () => {
     const alForzar = vi.fn().mockResolvedValue(undefined);
     const alCerrar = vi.fn();
     render(<ModalForzarLiberarMesa mesa={mesa} alCerrar={alCerrar} alForzar={alForzar} />);
 
-    fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: '  Mesa trabada  ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Forzar liberación' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Liberar mesa' }));
 
-    expect(screen.getByRole('dialog', { name: '¿Forzar la liberación de la mesa?' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: '¿Liberar la mesa?' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'No, volver' }));
     expect(alForzar).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog', { name: '¿Forzar la liberación de la mesa?' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: '¿Liberar la mesa?' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Forzar liberación' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Liberar mesa' }));
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Sí, forzar liberación' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Sí, liberar mesa' }));
     });
 
-    expect(alForzar).toHaveBeenCalledWith('5', 'Mesa trabada');
+    expect(alForzar).toHaveBeenCalledWith('5');
     // El cierre lo decide el padre (alForzar) tras el exito
     expect(alCerrar).not.toHaveBeenCalled();
   });
@@ -78,10 +71,9 @@ describe('ModalForzarLiberarMesa', () => {
     const alCerrar = vi.fn();
     render(<ModalForzarLiberarMesa mesa={mesa} alCerrar={alCerrar} alForzar={alForzar} />);
 
-    fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: 'Mesa trabada' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Forzar liberación' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Liberar mesa' }));
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Sí, forzar liberación' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Sí, liberar mesa' }));
     });
 
     expect(screen.getByRole('alert').textContent).toContain('Servidor caído');
@@ -160,8 +152,8 @@ describe('salonApi.liberarMesaManual', () => {
     const post = api.post as any;
     post.mockClear();
 
-    await salonApi.liberarMesaManual('5', 'Mesa trabada', true);
-    expect(post).toHaveBeenLastCalledWith('/admin/salon/mesas/5/liberar', { motivo: 'Mesa trabada', forzar: true });
+    await salonApi.liberarMesaManual('5', undefined, true);
+    expect(post).toHaveBeenLastCalledWith('/admin/salon/mesas/5/liberar', { forzar: true });
 
     await salonApi.liberarMesaManual('5', 'Limpieza terminada');
     expect(post).toHaveBeenLastCalledWith('/admin/salon/mesas/5/liberar', { motivo: 'Limpieza terminada' });

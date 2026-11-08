@@ -18,7 +18,6 @@ import type { OfertaItem } from '../../ofertas/ofertasApi';
 import { VentanaOpcionesProducto, ProductoConfigurado } from './VentanaOpcionesProducto';
 import { unidadesDeLinea } from '../../../carta/stock';
 import { agruparUnidadesIguales } from '../../../carta/unidadesPorBebida';
-import { ModalLiberarMesa } from './ModalLiberarMesa';
 import { VistaPreviaMesa } from './VistaPreviaMesa';
 import { calcularEnvioFinal, reglaEnvioGratis } from '@caprichos/compartido';
 import { salonApi } from '../api';
@@ -456,7 +455,7 @@ export function ModalNuevoPedidoMesa({
   // y lleva el foco al campo (ver intentarContinuarCli). Hace falta celular válido y nombre de 2+ letras.
   // Delivery: hace falta dirección (escrita o en el mapa), venga de la libreta o sea nueva.
   const errorDatosCli =
-    !/^9\d{8}$/.test(telCli)
+    !/^9\d{8}$/.test(telCli) || telCli === '999999999'
       ? { mensaje: 'Escribe el celular del cliente: 9 dígitos que empiecen con 9', foco: ['#cli-cel'] }
       : cliNombre.trim().length < 2
         ? { mensaje: 'Escribe el nombre del cliente (mínimo 2 letras)', foco: ['#cli-nombre'] }
@@ -705,8 +704,6 @@ export function ModalNuevoPedidoMesa({
     res: any;
   } | null>(null);
 
-  // Modal Liberar mesa
-  const [mesaParaLiberar, setMesaParaLiberar] = useState<MesaSalon | null>(null);
   // Mesa ocupada mantenida 2 s: vista previa (forzar liberación solo ahí, con permiso mesas/liberar)
   const [vistaPreviaId, setVistaPreviaId] = useState<string | null>(null);
 
@@ -1069,7 +1066,8 @@ export function ModalNuevoPedidoMesa({
   }, [firmaPedido, cuponAplicado]);
 
   // Mesa: el nombre es obligatorio (boleta, etiqueta y lista). Con cuenta sale de la cuenta; con personal,
-  // del colaborador; sin cuenta se escribe. El teléfono es opcional y solo se pide sin cuenta.
+  // del colaborador; sin cuenta se escribe. El celular es obligatorio sin cuenta (con cuenta sale de ella; el
+  // personal usa la ficha del trabajador y aquí es opcional).
   const nombreMesaDeCuenta = pideMode === 'cliente' && clienteEncontrado ? clienteEncontrado.nombre : null;
   const nombreMesaDeStaff = pideMode === 'personal' && staffElegido ? staffElegido.nombre : null;
   const nombreMesaFijo = nombreMesaDeCuenta ?? nombreMesaDeStaff;
@@ -1083,7 +1081,12 @@ export function ModalNuevoPedidoMesa({
         ? null
         : 'Escribe el nombre del cliente (mínimo 2 letras)';
   const telefonoMesa = cliTelefono.replace(/\D/g, '');
-  const telefonoMesaValido = telefonoMesa === '' || /^9\d{8}$/.test(telefonoMesa);
+  const celularReal = /^9\d{8}$/.test(telefonoMesa) && telefonoMesa !== '999999999';
+  const telefonoMesaValido = pideMode === 'personal' ? telefonoMesa === '' || celularReal : celularReal;
+  const mensajeTelefonoMesa =
+    telefonoMesa === ''
+      ? 'Escribe el celular del cliente: 9 dígitos que empiecen con 9'
+      : 'El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real';
 
   // Todo lo que bloquea «Enviar» en el paso de productos, en orden de revisión. El botón no se deshabilita:
   // al tocarlo se muestra el primer mensaje y el foco va a su campo (intentarEnviar).
@@ -1105,7 +1108,7 @@ export function ModalNuevoPedidoMesa({
   if (modalidad === 'local' && !extra && pideMode !== 'cliente' && !telefonoMesaValido)
     erroresEnvio.push({
       campo: 'telefono',
-      mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+      mensaje: mensajeTelefonoMesa,
       foco: ['#np-telefono-mesa'],
     });
   if (errorPlanAhora)
@@ -1242,7 +1245,8 @@ export function ModalNuevoPedidoMesa({
         );
       } else {
         const telDigitos = cliTelefono.replace(/\D/g, '');
-        const telefonoFinal = /^9\d{8}$/.test(telDigitos) ? telDigitos : '999999999';
+        // Sin celular real no se manda nada (el personal usa la ficha del trabajador); nunca el relleno 999999999
+        const telefonoFinal = /^9\d{8}$/.test(telDigitos) && telDigitos !== '999999999' ? telDigitos : undefined;
         res = await pedidosApi.crearPedidoAdmin(
           {
             modalidad: modalidad === 'delivery' ? 'DELIVERY' : 'RECOGER',
@@ -1911,7 +1915,7 @@ export function ModalNuevoPedidoMesa({
                       onClick={() => {
                         setModalidad('llevar');
                         setCliNombre(`${staffElegido.nombre} (personal)`);
-                        setCliTelefono('999999999');
+                        setCliTelefono('');
                         setPaso('items');
                       }}
                       style={{
@@ -2722,13 +2726,13 @@ export function ModalNuevoPedidoMesa({
                   </button>
                 </div>
 
-                {/* Mesa: nombre obligatorio para la boleta, la etiqueta y la lista; teléfono opcional */}
+                {/* Mesa: nombre y celular obligatorios (boleta, etiqueta, lista y puntos) */}
                 {modalidad === 'local' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {pideMode !== 'cliente' && (
                       <>
                         <label htmlFor="np-telefono-mesa" style={{ fontWeight: 700, fontSize: '12px', color: 'var(--cp-navy)' }}>
-                          Teléfono (opcional)
+                          {pideMode === 'personal' ? 'Teléfono (opcional)' : 'Celular del cliente *'}
                         </label>
                         <input
                           id="np-telefono-mesa"
@@ -2737,29 +2741,29 @@ export function ModalNuevoPedidoMesa({
                           value={cliTelefono}
                           onChange={(e) => setCliTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
                           placeholder="9 dígitos"
-                          aria-invalid={!telefonoMesaValido}
+                          aria-invalid={!telefonoMesaValido && (telefonoMesa !== '' || intentoEnvio)}
                           style={{
                             width: '100%',
                             boxSizing: 'border-box',
                             minHeight: '40px',
                             borderRadius: '10px',
-                            border: `1.5px solid ${telefonoMesaValido ? 'var(--cp-line)' : 'var(--cp-rust)'}`,
+                            border: `1.5px solid ${telefonoMesaValido || (telefonoMesa === '' && !intentoEnvio) ? 'var(--cp-line)' : 'var(--cp-rust)'}`,
                             background: 'var(--cp-white)',
                             padding: '0 12px',
                             fontSize: '14px',
                           }}
                         />
-                        {telefonoMesaValido ? (
+                        {telefonoMesaValido || (telefonoMesa === '' && !intentoEnvio) ? (
                           cuenta || buscandoCuenta || errorCuenta ? (
                             avisoCuentaCelular
                           ) : (
                             <span style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
-                              Si lo escribes le enviamos una encuesta por WhatsApp al terminar
+                              Le enviamos una encuesta por WhatsApp al terminar
                             </span>
                           )
                         ) : (
                           <span role="alert" style={{ fontSize: '11px', color: 'var(--cp-rust)', fontWeight: 700 }}>
-                            El teléfono debe tener 9 dígitos y empezar con 9
+                            {mensajeTelefonoMesa}
                           </span>
                         )}
                       </>
@@ -2811,7 +2815,7 @@ export function ModalNuevoPedidoMesa({
                         ? `${staffElegido.nombre} (personal · descuento al cobrar a crédito)`
                         : pideMode === 'cliente' && clienteEncontrado
                         ? `Cliente: ${clienteEncontrado.nombre} (${clienteEncontrado.puntos} pts)`
-                        : 'Sin cuenta'}
+                        : 'Cliente nuevo'}
                     </span>
                     <button
                       type="button"
@@ -2880,7 +2884,7 @@ export function ModalNuevoPedidoMesa({
                     </div>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                       {[
-                        { id: 'anon', n: 'Sin cuenta' },
+                        { id: 'anon', n: 'Cliente nuevo' },
                         { id: 'cliente', n: 'Cliente con cuenta (celular)' },
                         { id: 'personal', n: 'Personal' },
                       ].map((m) => {
@@ -3520,21 +3524,6 @@ export function ModalNuevoPedidoMesa({
           pedido={pedidoVoucher.pedido}
           alCerrar={terminarPedidoDigital}
           alSubirDespues={terminarPedidoDigital}
-        />
-      )}
-
-      {/* Modal Liberar Mesa si se activa en modo free */}
-      {mesaParaLiberar && (
-        <ModalLiberarMesa
-          abierto={true}
-          mesa={mesaParaLiberar}
-          alCerrar={() => setMesaParaLiberar(null)}
-          alLiberar={async (_mesaId: string, motivo: string) => {
-            await salonApi.liberarMesaManual(mesaParaLiberar.id, motivo);
-            setMesaParaLiberar(null);
-            await refrescarMesas();
-            await alRefrescarMesas?.();
-          }}
         />
       )}
 

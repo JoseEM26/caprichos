@@ -1943,7 +1943,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     }
 
     const rawTel = entrada.textoOriginal.replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
-    const esValido = /^9\d{8}$/.test(rawTel);
+    const esValido = /^9\d{8}$/.test(rawTel) && rawTel !== '999999999';
 
     if (!esValido) {
       return {
@@ -2429,7 +2429,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const clienteTelefono =
       pedido.cliente?.telefono ||
       contexto.telefonoCliente ||
-      '999999999';
+      '';
 
     const dto: any = {
       cliente: {

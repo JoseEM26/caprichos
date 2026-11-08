@@ -1259,7 +1259,7 @@ describe('PedidosService', () => {
     });
 
     describe('origen MOZO', () => {
-      it('crea pedido con canal MOZO, omite chequeo de carta cerrada y no exige cliente ni teléfono', async () => {
+      it('crea pedido con canal MOZO, omite chequeo de carta cerrada y guarda nombre y celular del cliente', async () => {
         // Carta cerrada
         localServiceMock.obtenerEstadoCarta.mockResolvedValue({
           abierta: false,
@@ -1272,6 +1272,7 @@ describe('PedidosService', () => {
           lineas: pedidoBaseDto.lineas,
           pago: { metodo: 'EFECTIVO' },
           comprobante: { tipo: 'BOLETA' },
+          cliente: { nombre: 'Ana Ruiz', telefono: '987654321' },
         };
 
         let pedidoCreadoData: any = null;
@@ -1305,8 +1306,8 @@ describe('PedidosService', () => {
         expect(pedidoCreadoData.canal).toBe('MOZO');
         expect(pedidoCreadoData.party_id).toBe(55n);
         expect(pedidoCreadoData.mesa_nombre).toBe('Mesa 3');
-        expect(pedidoCreadoData.cliente_nombre).toBe('Mesa 3');
-        expect(pedidoCreadoData.cliente_telefono).toBeNull();
+        expect(pedidoCreadoData.cliente_nombre).toBe('Ana Ruiz');
+        expect(pedidoCreadoData.cliente_telefono).toBe('987654321');
       });
 
       it('acepta un medio digital (YAPE, PLIN, TRANSFERENCIA) para llevar desde el canal MOZO', async () => {
@@ -1801,7 +1802,7 @@ describe('PedidosService', () => {
         .catch((e) => e);
       expect(err.getResponse()).toEqual({
         codigo: 'CELULAR_REQUERIDO',
-        mensaje: 'Escribe tu celular para hacer tu pedido y sumar puntos',
+        mensaje: 'El celular es obligatorio: 9 dígitos que empiecen con 9 (no vale 999999999)',
       });
       expect(prismaMock.pedido.create).not.toHaveBeenCalled();
     });
@@ -1936,11 +1937,11 @@ describe('PedidosService', () => {
       });
     });
 
-    it('CELULAR_REQUERIDO: el placeholder 999999999 cuenta como sin celular', async () => {
+    it('el relleno 999999999 ya no vale como celular', async () => {
       const err = await service
         .crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana', telefono: '999999999' } } as any, 'idemp-celular-relleno', { canal: 'CARTA' })
         .catch((e) => e);
-      expect(err.getResponse()).toMatchObject({ codigo: 'CELULAR_REQUERIDO' });
+      expect(err.getResponse()).toMatchObject({ codigo: 'TELEFONO_INVALIDO' });
     });
 
     it('invitado apagado (valor «no») también exige celular', async () => {
@@ -1951,13 +1952,61 @@ describe('PedidosService', () => {
       expect(err.getResponse()).toMatchObject({ codigo: 'CELULAR_REQUERIDO' });
     });
 
-    it('invitado encendido: pide sin celular, queda como invitado (sin party de puntos)', async () => {
+    it('invitado encendido ya no existe: sin celular sigue siendo 400', async () => {
       conParametro('carta_invitado_activo', 'si');
-      const capturado = crearCapturado();
-      await service.crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana' } } as any, 'idemp-invitado-on', { canal: 'CARTA' });
-      expect(partyPuntosMock.resolverOCrear).not.toHaveBeenCalled();
-      expect(capturado.data.cliente_party_id).toBeNull();
-      expect(capturado.data.cliente_telefono).toBeNull();
+      const err = await service
+        .crear({ ...pedidoBaseDto, cliente: { nombre: 'Ana' } } as any, 'idemp-invitado-on', { canal: 'CARTA' })
+        .catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ codigo: 'CELULAR_REQUERIDO' });
+      expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+    });
+
+    describe('nombre y celular obligatorios en todos los canales', () => {
+      const dtoMozo = (cliente: any, extra: any = {}) => ({ ...pedidoBaseDto, modalidad: 'MESA', entrega: undefined, cliente, ...extra }) as any;
+      const canales: [string, any][] = [
+        ['CARTA', { canal: 'CARTA' }],
+        ['WHATSAPP', { canal: 'WHATSAPP', telefonoRemitente: '987654321' }],
+        ['MOZO', { canal: 'MOZO', mesaNombre: 'Mesa 2' }],
+        ['CAJA', { canal: 'CAJA', mesaNombre: 'Mesa 2' }],
+      ];
+      it.each(canales)('%s: sin nombre -> 400 CLIENTE_NOMBRE_REQUERIDO', async (_n, origen) => {
+        const err = await service.crear(dtoMozo({ nombre: ' ', telefono: '987654321' }), 'idemp-n-' + _n, origen).catch((e) => e);
+        expect(err.getResponse()).toMatchObject({ codigo: 'CLIENTE_NOMBRE_REQUERIDO' });
+      });
+      it.each(canales)('%s: sin celular -> 400 CELULAR_REQUERIDO', async (_n, origen) => {
+        const err = await service.crear(dtoMozo({ nombre: 'Ana' }), 'idemp-c-' + _n, origen).catch((e) => e);
+        expect(err.getResponse()).toMatchObject({ codigo: 'CELULAR_REQUERIDO' });
+      });
+      it.each(canales)('%s: con 999999999 -> 400 TELEFONO_INVALIDO', async (_n, origen) => {
+        const err = await service.crear(dtoMozo({ nombre: 'Ana', telefono: '999999999' }), 'idemp-p-' + _n, origen).catch((e) => e);
+        expect(err.getResponse()).toMatchObject({ codigo: 'TELEFONO_INVALIDO' });
+      });
+      it.each(canales)('%s: con nombre y celular válidos pasa', async (_n, origen) => {
+        crearCapturado();
+        const res = await service.crear(dtoMozo({ nombre: 'Ana', telefono: '987654321' }), 'idemp-ok-' + _n, origen);
+        expect(res.codigo).toBe('CP-W310');
+      });
+      it('MOZO con cuenta por celular (clienteTelefono): no pide nombre aparte', async () => {
+        crearCapturado();
+        direccionesMock.datosCuentaActiva.mockResolvedValueOnce({ nombre: 'Rosa Diaz', telefono: '912345678' });
+        const res = await service.crear(dtoMozo(undefined, { clienteTelefono: '912345678' }), 'idemp-cuenta', { canal: 'MOZO', mesaNombre: 'Mesa 2' });
+        expect(res.codigo).toBe('CP-W310');
+      });
+      it('pedido del personal no exige celular (usa la ficha del trabajador)', async () => {
+        crearCapturado();
+        const err = await service
+          .crear(dtoMozo({ nombre: 'Luis' }), 'idemp-personal', { canal: 'MOZO', esPersonal: true, clientePartyId: 55n, mesaNombre: 'Mesa 2' })
+          .catch((e) => e);
+        expect(err?.getResponse?.()?.codigo).not.toBe('CELULAR_REQUERIDO');
+        expect(err?.getResponse?.()?.codigo).not.toBe('CLIENTE_NOMBRE_REQUERIDO');
+      });
+      it('pedido extra hereda los datos del original: no se revalidan', async () => {
+        crearCapturado();
+        const err = await service
+          .crear(dtoMozo({ nombre: 'Ana' }), 'idemp-extra', { canal: 'MOZO', pedidoOrigenId: 9n, mesaNombre: 'Mesa 2' })
+          .catch((e) => e);
+        expect(err?.getResponse?.()?.codigo).not.toBe('CELULAR_REQUERIDO');
+      });
     });
 
     it('invitado apagado con celular válido: pide y suma puntos', async () => {

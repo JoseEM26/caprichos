@@ -306,6 +306,7 @@ describe('¿Quién pide? con cliente de cuenta en el pedido enviado', () => {
     fireEvent.change(await screen.findByPlaceholderText('Ej.: Lucía o Mesa 4'), { target: { value: 'Lucía' } });
     fireEvent.click(screen.getByText('Agregar al pedido'));
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía Pérez' } });
+    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
     elegirBoleta();
     fireEvent.click(screen.getByRole('button', { name: 'Enviar directo a cocina' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));

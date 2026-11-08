@@ -456,7 +456,7 @@ export function VistaPreviaMesa({
             )}
             {puedeForzar && (
               <Boton variante="peligro" onClick={() => setForzando(true)}>
-                Forzar liberación
+                Liberar mesa
               </Boton>
             )}
             <Boton variante="texto" onClick={alCerrar}>
@@ -498,8 +498,8 @@ export function VistaPreviaMesa({
         <ModalForzarLiberarMesa
           mesa={mesa}
           alCerrar={() => setForzando(false)}
-          alForzar={async (mesaId, motivo) => {
-            await salonApi.liberarMesaManual(mesaId, motivo, true);
+          alForzar={async (mesaId) => {
+            await salonApi.liberarMesaManual(mesaId, undefined, true);
             setForzando(false);
             alCerrar();
             alCambiar();

@@ -6,13 +6,10 @@ import { MesaSalon } from '../tipos';
 export interface ModalForzarLiberarMesaProps {
   mesa: MesaSalon | null;
   alCerrar: () => void;
-  alForzar: (mesaId: string, motivo: string) => Promise<void>;
+  alForzar: (mesaId: string) => Promise<void>;
 }
 
-const MOTIVO_MINIMO = 5;
-
 export function ModalForzarLiberarMesa({ mesa, alCerrar, alForzar }: ModalForzarLiberarMesaProps) {
-  const [motivo, setMotivo] = useState('');
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,18 +17,16 @@ export function ModalForzarLiberarMesa({ mesa, alCerrar, alForzar }: ModalForzar
   if (!mesa) return null;
 
   const nombreMesa = mesa.nombre || `Mesa ${mesa.numero}`;
-  const motivoValido = motivo.trim().length >= MOTIVO_MINIMO;
 
   const ejecutar = async () => {
     setCargando(true);
     setError(null);
     try {
-      await alForzar(mesa.id, motivo.trim());
+      await alForzar(mesa.id);
       setConfirmarAbierto(false);
-      setMotivo('');
     } catch (err: any) {
       setConfirmarAbierto(false);
-      setError(err?.message || 'No se pudo forzar la liberación de la mesa.');
+      setError(err?.message || 'No se pudo liberar la mesa.');
     } finally {
       setCargando(false);
     }
@@ -57,7 +52,7 @@ export function ModalForzarLiberarMesa({ mesa, alCerrar, alForzar }: ModalForzar
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={`Forzar liberación de ${nombreMesa}`}
+          aria-label={`Liberar ${nombreMesa}`}
           className="salon-panel"
           style={{
             width: '100%',
@@ -87,7 +82,7 @@ export function ModalForzarLiberarMesa({ mesa, alCerrar, alForzar }: ModalForzar
                 color: 'var(--cp-navy)',
               }}
             >
-              Forzar liberación
+              Liberar mesa
             </h2>
             <div style={{ fontSize: '13px', color: 'var(--cp-soft)', marginTop: '2px' }}>
               {nombreMesa}
@@ -125,39 +120,6 @@ export function ModalForzarLiberarMesa({ mesa, alCerrar, alForzar }: ModalForzar
               Libera solo la mesa; el pedido no se anula ni se cobra.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label
-                htmlFor="motivo-forzar-liberacion"
-                style={{ fontWeight: 700, fontSize: '13px', color: 'var(--cp-navy)' }}
-              >
-                Motivo (mínimo {MOTIVO_MINIMO} caracteres)
-              </label>
-              <textarea
-                id="motivo-forzar-liberacion"
-                value={motivo}
-                onChange={(e) => {
-                  setMotivo(e.target.value);
-                  setError(null);
-                }}
-                placeholder="Ej.: La mesa quedó trabada tras cobrar en caja."
-                rows={3}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  borderRadius: '12px',
-                  border: '1.5px solid var(--cp-line)',
-                  background: 'var(--cp-white)',
-                  color: 'var(--cp-navy)',
-                  padding: '10px 12px',
-                  fontSize: '14px',
-                  outline: 'none',
-                }}
-              />
-              <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                Se registrará en la auditoría con tu usuario.
-              </span>
-            </div>
-
             {error && (
               <div
                 role="alert"
@@ -193,10 +155,10 @@ export function ModalForzarLiberarMesa({ mesa, alCerrar, alForzar }: ModalForzar
             <Boton
               type="button"
               variante="peligro"
-              disabled={!motivoValido || cargando}
+              disabled={cargando}
               onClick={() => setConfirmarAbierto(true)}
             >
-              Forzar liberación
+              Liberar mesa
             </Boton>
           </div>
         </div>
@@ -204,9 +166,9 @@ export function ModalForzarLiberarMesa({ mesa, alCerrar, alForzar }: ModalForzar
 
       <Confirmar
         abierto={confirmarAbierto}
-        titulo="¿Forzar la liberación de la mesa?"
-        mensaje={`Se liberará ${nombreMesa} aunque el pedido siga activo. El pedido no se anula ni se cobra. Quedará registrado en la auditoría.`}
-        textoSi="Sí, forzar liberación"
+        titulo="¿Liberar la mesa?"
+        mensaje={`Se liberará ${nombreMesa} aunque el pedido siga activo. El pedido no se anula ni se cobra. Queda registrado en la auditoría con tu usuario.`}
+        textoSi="Sí, liberar mesa"
         textoNo="No, volver"
         peligro
         cargando={cargando}

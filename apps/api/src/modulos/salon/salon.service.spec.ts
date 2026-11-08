@@ -578,23 +578,29 @@ describe('SalonService', () => {
   });
 
   describe('3. Liberar mesa manual (liberarMesaManual)', () => {
-    it('liberar sin motivo o con menos de 5 caracteres -> 400 MOTIVO_INVALIDO', async () => {
-      prismaMock.elementoPlano.findUnique.mockResolvedValue({
-        id: 7n,
-        tipo: 'MESA',
+    it('liberar sin motivo funciona: libera, audita con estado anterior y sin motivo', async () => {
+      prismaMock.elementoPlano.findUnique.mockResolvedValue({ id: 7n, tipo: 'MESA' });
+      prismaMock.pedidoMesa.findFirst.mockResolvedValue({
+        id: 20n,
+        abierta: true,
+        pedido_id: 50n,
+        pedido: { id: 50n, estado: 'LISTO' },
       });
 
-      await expect(service.liberarMesaManual(7, { motivo: '' })).rejects.toThrow(BadRequestException);
-      await expect(service.liberarMesaManual(7, { motivo: 'abc' })).rejects.toThrow(BadRequestException);
+      const res = await service.liberarMesaManual(7, {});
 
-      try {
-        await service.liberarMesaManual(7, { motivo: '1234' });
-      } catch (err: any) {
-        expect(err.getResponse()).toEqual({
-          codigo: 'MOTIVO_INVALIDO',
-          mensaje: 'El motivo es obligatorio y debe tener al menos 5 caracteres',
-        });
-      }
+      expect(res.ok).toBe(true);
+      expect(prismaMock.pedidoMesa.update).toHaveBeenCalledWith({
+        where: { id: 20n },
+        data: { abierta: false },
+      });
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'LIBERAR_MANUAL',
+          motivo: undefined,
+          antes: expect.objectContaining({ estado: 'OCUPADA', estadoPedido: 'LISTO' }),
+        }),
+      );
     });
 
     it('liberar con pedido en cocina (COLA/PREPARANDO) -> 409 PEDIDO_EN_COCINA', async () => {
@@ -704,14 +710,23 @@ describe('SalonService', () => {
       });
     });
 
-    it('forzar=true con motivo corto sigue rechazando con 400 MOTIVO_INVALIDO', async () => {
+    it('forzar=true sin motivo libera y audita con el estado anterior', async () => {
       prismaMock.elementoPlano.findUnique.mockResolvedValue({ id: 7n, tipo: 'MESA' });
+      prismaMock.pedidoMesa.findMany.mockResolvedValue([
+        { id: 20n, pedido_id: 50n, abierta: true, pedido: { id: 50n, estado: 'LISTO' } },
+      ]);
 
-      await expect(
-        service.liberarMesaManual(7, { motivo: 'abc', forzar: true }),
-      ).rejects.toThrow(BadRequestException);
-      expect(prismaMock.pedidoMesa.updateMany).not.toHaveBeenCalled();
-      expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+      const res = await service.liberarMesaManual(7, { forzar: true });
+
+      expect(res.ok).toBe(true);
+      expect(prismaMock.pedidoMesa.updateMany).toHaveBeenCalled();
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'LIBERAR_FORZADO',
+          motivo: undefined,
+          antes: expect.objectContaining({ estado: 'OCUPADA' }),
+        }),
+      );
     });
 
     it('sin forzar, un pedido en cocina sigue dando 409 y no libera ni audita', async () => {
