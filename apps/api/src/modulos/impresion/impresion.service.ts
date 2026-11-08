@@ -1078,7 +1078,7 @@ export class ImpresionService {
       const pedido: any = await this.prisma.pedido.findUnique({
         where: { id: pedidoId },
         include: {
-          lineas: true,
+          lineas: { include: { opcionesElegidas: true, sabores: true, cortesia: true } },
           planPago: { orderBy: { orden: 'asc' } },
           cobros: { include: { pagos: true } },
         },
@@ -1137,7 +1137,10 @@ export class ImpresionService {
     datos: { pagos: Array<{ medio: string; monto: number }>; recibido: number | null; mozo: string | null },
   ): Promise<void> {
     const pedidoId = BigInt(pedidoIdInput);
-    const pedido: any = await this.prisma.pedido.findUnique({ where: { id: pedidoId }, include: { lineas: true } });
+    const pedido: any = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: { lineas: { include: { opcionesElegidas: true, sabores: true, cortesia: true } } },
+    });
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
     }

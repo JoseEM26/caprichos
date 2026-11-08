@@ -1,4 +1,5 @@
 import type { TicketPagoDatos } from '../tipos/etiquetas.js';
+import { detalleLinea, resumenAntesDelTotal, type DetalleLinea } from './detalleLinea.js';
 
 /** Una linea del ticket de pago ya maquetada al ancho del papel (58 mm = 32 columnas, 80 mm = 48). */
 export interface LineaTicket {
@@ -41,6 +42,40 @@ function envolver(texto: string, cols: number): string[] {
   return out;
 }
 
+/** Como `fila`, pero si el texto no cabe sigue en renglones aparte (sin cortar palabras): el monto va en el primero. */
+function filaEnvuelta(izq: string, der: string, cols: number): string[] {
+  const max = Math.max(1, cols - der.length - 1);
+  const [primero = '', ...resto] = envolver(izq, max);
+  return [fila(primero, der, cols), ...resto];
+}
+
+/** Etiqueta larga en renglones y el monto al final, en el último renglón (descuentos con nombre largo). */
+function filaMontoAlFinal(izq: string, der: string, cols: number): string[] {
+  const rs = envolver(izq, cols);
+  const ultimo = rs.pop() ?? '';
+  return ultimo.length + 1 + der.length <= cols ? [...rs, fila(ultimo, der, cols)] : [...rs, ultimo, fila('', der, cols)];
+}
+
+/** Renglones con sangría fija y continuación alineada bajo el texto (no bajo el guion). */
+function conSangria(texto: string, cols: number, sangria: string, continuacion = sangria): string[] {
+  return envolver(texto, Math.max(1, cols - sangria.length)).map((r, i) => `${i === 0 ? sangria : continuacion}${r}`);
+}
+
+/** Una línea del pedido: producto y subtotal, luego su detalle sangrado y, si es combo, sus piezas. */
+function lineasDeDetalle(d: DetalleLinea, cols: number, esParte = false): string[] {
+  const out: string[] = [];
+  if (esParte) {
+    out.push(...conSangria(`${d.cantidad} x ${d.titulo}`, cols, '  - ', '    '));
+  } else {
+    out.push(...filaEnvuelta(`${d.cantidad} x ${d.titulo}`, soles(d.subtotal), cols));
+    if (d.precioUnit != null && d.cantidad > 1 && !d.cortesia) out.push(...conSangria(`${d.cantidad} x ${soles(d.precioUnit)}`, cols, '  '));
+  }
+  const sang = esParte ? '      ' : '  ';
+  for (const r of d.detalles) out.push(...conSangria(r, cols, sang));
+  for (const parte of d.partes) out.push(...lineasDeDetalle(parte, cols, true));
+  return out;
+}
+
 const centrar = (t: string, cols: number) =>
   t.length >= cols ? t.slice(0, cols) : ' '.repeat(Math.floor((cols - t.length) / 2)) + t;
 
@@ -72,17 +107,22 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
       for (const r of envolver(`Razón social: ${d.clienteNombre ?? ''}`, c)) p(r);
       if (d.direccion) for (const r of envolver(`Dirección: ${d.direccion}`, c)) p(r);
     } else {
-      p(`Cliente: ${d.clienteNombre || 'VARIOS'}`);
+      for (const r of envolver(`Cliente: ${d.clienteNombre || 'VARIOS'}`, c)) p(r);
       if (d.docNumero) p(`${d.docTipo ?? 'DNI'}: ${d.docNumero}`);
     }
-    if (t.who) p(`Atendido: ${t.who}`);
-  } else if (t.who) p(`Cliente: ${t.who}`);
-  if (t.modalidad) p(`Modalidad: ${t.modalidad}`);
+    if (t.who) for (const r of envolver(`Atendido: ${t.who}`, c)) p(r);
+  } else if (t.who) for (const r of envolver(`Cliente: ${t.who}`, c)) p(r);
+  if (t.modalidad) for (const r of envolver(`Modalidad: ${t.modalidad}`, c)) p(r);
+  if (t.entrega) for (const r of envolver(`Entrega: ${t.entrega}`, c)) p(r);
+  if (t.clienteTelefono) p(`Celular: ${t.clienteTelefono}`);
   p(linea);
-  for (const l of t.lineas) {
-    p(fila(`${l.cantidad} x ${l.nombre}${l.tamano ? ` (${l.tamano})` : ''}`, soles(l.subtotal), c));
+  for (const l of t.lineas) for (const r of lineasDeDetalle(detalleLinea(l), c)) p(r);
+  if (t.notaPedido?.trim()) for (const r of envolver(`Nota del pedido: ${t.notaPedido.trim()}`, c)) p(r);
+  p(linea);
+  // Subtotal, descuentos desglosados (promoción, cupón, personal, puntos) y envío
+  for (const x of resumenAntesDelTotal(t)) {
+    for (const r of filaMontoAlFinal(x.etiqueta, `${x.resta ? '-' : ''}${soles(x.monto)}`, c)) p(r);
   }
-  p(linea);
   if (d && d.tipo !== 'SIMPLE' && d.igvPct != null && d.igvPct >= 0) {
     // Desglose: el total ya incluye el IGV
     const base = Math.round((t.total / (1 + d.igvPct / 100)) * 100) / 100;
@@ -109,6 +149,12 @@ export function lineasTicketPago(t: TicketPagoDatos, columnas: number = 48): Lin
   } else if (t.plan?.length) {
     p('Pago dividido:');
     for (const x of t.plan) p(fila(`  ${x.medio}`, soles(x.monto), c));
+  }
+  // Efectivo: con cuánto paga y vuelto, si el cobro aún no los trae
+  if (t.pagaCon != null && !t.pagos.some((x) => x.recibido != null)) {
+    const efectivo = (t.pagos.length ? t.pagos : t.plan ?? []).filter((x) => x.medio === 'EFECTIVO').reduce((a, x) => a + x.monto, 0);
+    p(fila('Paga con', soles(t.pagaCon), c));
+    if (efectivo > 0 && t.pagaCon >= efectivo) p(fila('Vuelto', soles(Math.round((t.pagaCon - efectivo) * 100) / 100), c));
   }
   if (t.comprobante) {
     p(linea);

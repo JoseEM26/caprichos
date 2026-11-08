@@ -6,6 +6,8 @@ import {
   EtiquetaAreaLinea,
   EtiquetaBebidaDatos,
   TicketPagoDatos,
+  entradaDeLineaPedido,
+  descuentosDePedido,
   TicketComandaSalonDatos,
   esAreaBebidas,
 } from '@caprichos/compartido';
@@ -377,6 +379,16 @@ export function claveDeTrabajo(job: { tipo: string; payload: any }): string | nu
 
 const num = (v: unknown): number => Math.round(Number(v ?? 0) * 100) / 100;
 
+/** Detalle de línea y descuentos: una sola función compartida con la precuenta y la vista previa (packages/compartido). */
+export const lineaDetalleTicket = entradaDeLineaPedido;
+export { descuentosDePedido };
+
+/** Celular con solo los 3 últimos dígitos a la vista. */
+const enmascarar = (tel: unknown): string | null => {
+  const d = String(tel ?? '').replace(/\D/g, '');
+  return d.length >= 4 ? `${'*'.repeat(d.length - 3)}${d.slice(-3)}` : null;
+};
+
 /** Ticket/voucher de pago para la ticketera térmica; el agente lo maquetea a 58 u 80 mm. */
 // ponytail: el tipo `propina` y `ajusteUbicacion` ya están en packages/compartido/src; el dist publicado puede ir
 // atrasado, así que se declaran aquí en la intersección para no depender del orden de construcción.
@@ -419,12 +431,15 @@ export function construirTicketPago(
     hora: formatearHora(ahora),
     who: pedido.cliente_nombre || '',
     modalidad: pedido.modalidad || '',
-    lineas: (pedido.lineas || []).map((l: any) => ({
-      cantidad: l.cantidad,
-      nombre: l.es_cortesia ? `${l.nombre} · Cortesía` : l.nombre,
-      tamano: l.tamano ?? null,
-      subtotal: num(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
-    })),
+    // Solo las líneas madre: las piezas de un combo cuelgan de su combo con su sabor y tamaño
+    lineas: lineasDeCuenta<any>(pedido.lineas || []).map((l) => lineaDetalleTicket(l, pedido.lineas || [])),
+    ...(pedido.subtotal != null ? { subtotal: num(pedido.subtotal) } : {}),
+    descuentos: descuentosDePedido(pedido),
+    ...(num(pedido.envio) > 0 ? { envio: num(pedido.envio) } : {}),
+    notaPedido: texto(pedido.nota),
+    entrega: pedido.mesa_nombre ? `Mesa ${String(pedido.mesa_nombre).replace(/^mesa\s*/i, '')}` : texto(pedido.entrega_direccion),
+    clienteTelefono: enmascarar(pedido.cliente_telefono),
+    pagaCon: pedido.paga_con == null ? null : num(pedido.paga_con),
     // total = venta (comprobante). La propina va en su propia línea; el pago por medio es venta + propina (lo entregado)
     total: num(pedido.total),
     propina: num(pedido.propina ?? 0),

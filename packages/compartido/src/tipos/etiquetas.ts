@@ -1,4 +1,5 @@
 import type { TamanoEtiquetaPc } from '../constantes/tamanoPc.js';
+import type { LineaDetalleEntrada, DescuentoTicket } from '../etiquetas/detalleLinea.js';
 
 export type TipoEtiqueta = 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA';
 
@@ -122,7 +123,21 @@ export interface TicketPagoDatos {
   hora: string;
   who: string;
   modalidad: string;
-  lineas: { cantidad: number; nombre: string; tamano?: string | null; subtotal: number }[];
+  /** Detalle opcional por línea (sabores, opciones, nota, combo, cortesía): un ticket antiguo sin ellos sale igual que antes. */
+  lineas: LineaDetalleEntrada[];
+  /** Subtotal de productos antes de descuentos y envío. */
+  subtotal?: number;
+  /** Descuentos desglosados (promoción, cupón, personal, puntos) con su monto. */
+  descuentos?: DescuentoTicket[];
+  envio?: number;
+  /** Nota general del pedido. */
+  notaPedido?: string | null;
+  /** Mesa o dirección de entrega, ya en texto. */
+  entrega?: string | null;
+  /** Celular del cliente (ya enmascarado si corresponde). */
+  clienteTelefono?: string | null;
+  /** Con cuánto paga el cliente en efectivo. */
+  pagaCon?: number | null;
   /** Venta (sin propina): es la base del comprobante */
   total: number;
   /** Propina aparte de la venta: línea propia en el ticket interno; no entra al comprobante */

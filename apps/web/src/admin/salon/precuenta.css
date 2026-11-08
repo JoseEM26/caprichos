@@ -330,3 +330,28 @@
     overflow: visible;
   }
 }
+
+/* Detalle de la línea: piezas de combo sangradas, cortesía y nota general */
+.pc-partes {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid #D9E2E7;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pc-parte {
+  grid-template-columns: 0 minmax(0, 1fr);
+  gap: 0;
+  font-size: 13px;
+}
+.pc-cortesia {
+  font-weight: 700;
+  color: #2C4C5D;
+}
+.pc-nota-pedido {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #6B7C86;
+}

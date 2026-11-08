@@ -24,6 +24,7 @@ describe('la maqueta compartida imprime lo mismo que antes', () => {
     });
   }
 
+  // Huellas renovadas: el nombre largo ahora sigue en otro renglón en vez de cortarse (ticket detallado)
   it('ticket ESC/POS de 48 y 32 columnas', () => {
     const t = {
       local: { nombre: 'Caprichos', razonSocial: 'X SAC', ruc: '2012345', direccion: 'Av. Siempre Viva 123' },
@@ -31,6 +32,6 @@ describe('la maqueta compartida imprime lo mismo que antes', () => {
       lineas: [{ cantidad: 2, nombre: 'Frappe Oreo con nombre muy largo para cortar', tamano: '16oz', subtotal: 36 }, { cantidad: 1, nombre: 'Club', subtotal: 22 }],
       total: 58, pagos: [{ medio: 'EFECTIVO', monto: 58, recibido: 100, vuelto: 42 }], comprobante: { tipo: 'BOLETA', numero: 'B001-1' },
     };
-    expect([huella(generarTicketEscPos(t, 48)), huella(generarTicketEscPos(t, 32))]).toEqual(['784ea02d88171fee', 'c40ee3add64b9e1c']);
+    expect([huella(generarTicketEscPos(t, 48)), huella(generarTicketEscPos(t, 32))]).toEqual(['4cf35ae951cd7560', 'f7ce86aba00efb98']);
   });
 });

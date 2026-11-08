@@ -19,6 +19,7 @@ import { tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { progresoDelPedido, ProgresoPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { descuentosDePedido, lineaDetalleTicket } from '../impresion/constructor-etiquetas';
 import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
 import { etiquetaMesasPedido, MAX_MESAS_PEDIDO, nombreUnaMesa } from './mesas-pedido.util';
 
@@ -69,6 +70,7 @@ export class SalonService {
                       include: {
                         opcionesElegidas: true,
                         sabores: true,
+                        cortesia: true,
                         producto: { select: { categoria: { select: { area_id: true } } } },
                       },
                     },
@@ -115,7 +117,12 @@ export class SalonService {
               creadoEn: Date;
               total?: number;
               progreso: ProgresoPedido;
-              lineas?: Array<{ cantidad: number; nombre: string; detalle: string; opciones: string[] }>;
+              lineas?: Array<{ cantidad: number; nombre: string; detalle: string; opciones: string[]; entrada?: unknown; precio?: number }>;
+              /** Para la precuenta detallada: descuentos desglosados, subtotal, envío y nota general */
+              descuentos?: unknown[];
+              subtotal?: number;
+              envio?: number;
+              nota?: string | null;
               /** Mesa principal del pedido (la que lleva su nombre) y su orden entre las mesas juntas */
               esPrincipal: boolean;
               orden: number;
@@ -156,7 +163,14 @@ export class SalonService {
                   nombre: l.nombre,
                   detalle: l.tamano ? `${l.tamano}${l.nota ? ` · ${l.nota}` : ''}` : (l.nota || ''),
                   opciones: (l.opcionesElegidas || []).map((o: any) => o.opcion_nombre),
+                  precio: l.subtotal == null ? undefined : Number(l.subtotal),
+                  // Mismo detalle que el ticket de pago (sabores, opciones, nombre por vaso, nota, combo, cortesía)
+                  entrada: lineaDetalleTicket(l, (ped as any).lineas || []),
                 })),
+                descuentos: descuentosDePedido(ped),
+                subtotal: ped.subtotal == null ? undefined : Number(ped.subtotal),
+                envio: ped.envio == null ? undefined : Number(ped.envio),
+                nota: (ped as any).nota?.trim() || null,
               };
             }
 

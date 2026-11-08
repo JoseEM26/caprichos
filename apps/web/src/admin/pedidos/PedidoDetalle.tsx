@@ -38,6 +38,8 @@ import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
 import { SeccionUbicacionPedido } from './SeccionUbicacionPedido';
 import { InsigniaNumeroDia } from './InsigniaNumeroDia';
 import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
+import { descuentosDePedido } from '@caprichos/compartido';
+import { lineasPrecuenta } from './precuentaDetalle';
 import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
 
 export interface PedidoDetalleProps {
@@ -1344,14 +1346,10 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
           }}
           alCerrar={() => setAbrirPrecuenta(false)}
           mesa={pedido.mesa_nombre || ''}
-          lineas={(pedido.lineas || []).map((l) => ({
-            cantidad: l.cantidad,
-            nombre: l.nombre,
-            detalle: [l.tamano, ...(l.opciones || l.opcionesElegidas || []).map((o) => o.opcion_nombre || o.nombre)]
-              .filter(Boolean)
-              .join(' · '),
-            precio: Number(l.subtotal),
-          }))}
+          lineas={lineasPrecuenta(pedido)}
+          descuentos={descuentosDePedido(pedido)}
+          envio={Number(pedido.envio || 0)}
+          notaPedido={pedido.nota}
           total={Number(pedido.total)}
           subtotal={Number(pedido.subtotal)}
           descuento={Number(pedido.descuento || 0)}

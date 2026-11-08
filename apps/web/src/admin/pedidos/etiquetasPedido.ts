@@ -1,4 +1,5 @@
-import { esAreaBebidas, type TicketPagoDatos } from '@caprichos/compartido';
+import { descuentosDePedido, entradaDeLineaPedido, esAreaBebidas, type TicketPagoDatos } from '@caprichos/compartido';
+import { lineasDeCuenta } from './precuentaDetalle';
 import { Pedido, LineaPedido } from './pedidosApi';
 import { canalLabel, modLabel } from './PedidosAdminView';
 
@@ -339,12 +340,14 @@ export function armarTicketPago(pedido: Pedido, igvPct: number = 18): TicketPago
     hora: formatearHora(pedido.creado_en),
     who: pedido.cliente_nombre || '',
     modalidad: pedido.modalidad || '',
-    lineas: (pedido.lineas || []).map((l) => ({
-      cantidad: l.cantidad,
-      nombre: l.nombre,
-      tamano: l.tamano || null,
-      subtotal: num(l.subtotal ?? Number(l.precio_unit) * l.cantidad),
-    })),
+    // Mismo detalle que el ticket impreso (sabores, opciones, nota, combo, cortesía)
+    lineas: lineasDeCuenta(pedido.lineas || []).map((l) => entradaDeLineaPedido(l, pedido.lineas || [])),
+    subtotal: num(pedido.subtotal),
+    descuentos: descuentosDePedido(pedido),
+    ...(num(pedido.envio) > 0 ? { envio: num(pedido.envio) } : {}),
+    notaPedido: pedido.nota?.trim() || null,
+    entrega: pedido.mesa_nombre ? `Mesa ${String(pedido.mesa_nombre).replace(/^mesa\s*/i, '')}` : pedido.entrega_direccion?.trim() || null,
+    pagaCon: pedido.paga_con == null ? null : num(pedido.paga_con),
     total,
     pagos: !plan.length && pedido.pago_metodo ? [{ medio: String(pedido.pago_metodo), monto: total }] : [],
     plan,

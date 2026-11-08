@@ -289,3 +289,54 @@ describe('construirTicketPago: documento por tipo de comprobante', () => {
     expect(construirTicketPago({ ...base, cliente_nombre: '', comprobante_tipo: 'BOLETA' }, {}, undefined, null, 18).documento?.docNumero).toBeNull();
   });
 });
+
+describe('construirTicketPago: detalle de cada línea y descuentos', () => {
+  const pedido = {
+    codigo: 'P-9',
+    subtotal: 70,
+    descuento: 8,
+    descuento_detalle: [
+      { tipo: 'PROMO', nombre: 'Promo Dúo', montoDescontado: 5 },
+      { tipo: 'PERSONAL', nombre: 'Descuento del personal 25%', montoDescontado: 3 },
+    ],
+    puntos_canjeados: 2,
+    envio: 4,
+    total: 64,
+    nota: 'Sin cubiertos',
+    mesa_nombre: 'Mesa 4',
+    cliente_telefono: '987654321',
+    cobros: [],
+    lineas: [
+      {
+        id: 1n, cantidad: 2, nombre: 'Dona', tamano: 'Caja x6', precio_unit: 20, subtotal: 40, nota: 'sin hielo', nombres_persona: ['Luis'],
+        sabores: [{ sabor_nombre: 'Fresa', cantidad: 3 }, { sabor_nombre: 'Oreo', cantidad: 3 }],
+        opcionesElegidas: [{ grupo_nombre: 'Leche', opcion_nombre: 'Avena', precio_extra: 2 }],
+      },
+      { id: 2n, cantidad: 1, nombre: 'Combo', precio_unit: 30, subtotal: 30, linea_combo_id: null },
+      { id: 3n, cantidad: 1, nombre: 'Frappe', tamano: 'Mediano', precio_unit: 0, subtotal: 0, linea_combo_id: 2n, sabor: 'Moka' },
+      { id: 4n, cantidad: 1, nombre: 'Galleta', precio_unit: 0, subtotal: 0, es_cortesia: true, cortesia: { valor_lista: 6 } },
+    ],
+  };
+  it('lleva sabores, opciones, nota, combo con piezas y cortesía; las piezas no salen como líneas sueltas', () => {
+    const t = construirTicketPago(pedido, {}, undefined, null, null);
+    expect(t.lineas.map((l) => l.nombre)).toEqual(['Dona', 'Combo', 'Galleta']);
+    expect(t.lineas[0]).toMatchObject({ sabores: [{ sabor: 'Fresa', cantidad: 3 }, { sabor: 'Oreo', cantidad: 3 }], nota: 'sin hielo', nombresPersona: ['Luis'] });
+    expect(t.lineas[0].opciones).toEqual([{ grupo: 'Leche', nombre: 'Avena', extra: 2 }]);
+    expect(t.lineas[1].partes?.[0]).toMatchObject({ nombre: 'Frappe', sabor: 'Moka' });
+    expect(t.lineas[2].cortesia).toEqual({ valorLista: 6 });
+  });
+  it('desglosa descuentos, puntos, envío, nota, mesa y celular enmascarado', () => {
+    const t = construirTicketPago(pedido, {}, undefined, null, null);
+    expect(t.descuentos).toEqual([
+      { tipo: 'PROMO', nombre: 'Promo Dúo', monto: 5 },
+      { tipo: 'PERSONAL', nombre: 'Descuento del personal 25%', monto: 3 },
+      { tipo: 'PUNTOS', nombre: 'Puntos canjeados (2)', monto: 2 },
+    ]);
+    expect(t).toMatchObject({ subtotal: 70, envio: 4, notaPedido: 'Sin cubiertos', entrega: 'Mesa 4', clienteTelefono: '******321' });
+  });
+  it('un pedido sin esos datos sale sin romper', () => {
+    const t = construirTicketPago({ codigo: 'P-1', total: 5, lineas: [{ cantidad: 1, nombre: 'Café', subtotal: 5 }], cobros: [] }, {}, undefined, null, null);
+    expect(t.descuentos).toEqual([]);
+    expect(t.lineas[0].nombre).toBe('Café');
+  });
+});

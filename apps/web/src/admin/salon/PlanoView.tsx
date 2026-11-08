@@ -1900,6 +1900,10 @@ export function PlanoView() {
           }}
           mesa={mesaParaCuenta.nombre || `Mesa ${mesaParaCuenta.numero}`}
           lineas={mesaParaCuenta.pedido.lineas || []}
+          descuentos={mesaParaCuenta.pedido.descuentos}
+          subtotal={mesaParaCuenta.pedido.subtotal}
+          envio={mesaParaCuenta.pedido.envio}
+          notaPedido={mesaParaCuenta.pedido.nota}
           total={Number(mesaParaCuenta.pedido.total || 0)}
           mozo={mesaParaCuenta.pedido.mozo}
           pedidoId={mesaParaCuenta.pedido.id}

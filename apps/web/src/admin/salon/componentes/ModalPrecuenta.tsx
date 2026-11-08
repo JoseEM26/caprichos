@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { detalleLinea, resumenAntesDelTotal, type DescuentoTicket, type DetalleLinea, type LineaDetalleEntrada } from '@caprichos/compartido';
 import '../salon.css';
 import '../precuenta.css';
 import { Confirmar } from '../../../comun/Confirmar';
@@ -34,6 +35,38 @@ export interface LineaPrecuenta {
   detalle: string;
   /** Subtotal de la línea en soles. Si falta, la fila no muestra precio. */
   precio?: number;
+  /** Detalle completo (sabores, opciones, nombre por vaso, nota, combo, cortesía): mismo que imprime el ticket. Sin él sale `detalle`. */
+  entrada?: LineaDetalleEntrada;
+}
+
+/** Línea con su detalle en gris y, si es combo, sus piezas sangradas. Misma función que el ticket impreso. */
+function LineaDetallada({ d, parte = false }: { d: DetalleLinea; parte?: boolean }) {
+  return (
+    <>
+      <span className="pc-cant">{parte ? '' : d.cantidad}</span>
+      <span className="pc-nombre">
+        <span>{parte ? `${d.cantidad} x ${d.titulo}` : d.titulo}</span>
+        {d.precioUnit != null && d.cantidad > 1 && !d.cortesia && !parte && (
+          <span className="pc-detalle">{`${d.cantidad} x ${soles(d.precioUnit)}`}</span>
+        )}
+        {d.detalles.map((t, i) => (
+          <span key={i} className={`pc-detalle${t.startsWith('CORTESÍA') ? ' pc-cortesia' : ''}`}>
+            {t}
+          </span>
+        ))}
+        {d.partes.length > 0 && (
+          <ul className="pc-partes" aria-label="Piezas del combo">
+            {d.partes.map((p, i) => (
+              <li key={i} className="pc-linea pc-parte">
+                <LineaDetallada d={p} parte />
+              </li>
+            ))}
+          </ul>
+        )}
+      </span>
+      {!parte && <span className="pc-precio">{soles(d.subtotal)}</span>}
+    </>
+  );
 }
 
 export interface ModalPrecuentaProps {
@@ -44,6 +77,11 @@ export interface ModalPrecuentaProps {
   total: number;
   subtotal?: number;
   descuento?: number;
+  /** Descuentos desglosados (promoción, cupón, personal, puntos); sin ellos sale el `descuento` en una sola fila. */
+  descuentos?: DescuentoTicket[];
+  envio?: number;
+  /** Nota general del pedido. */
+  notaPedido?: string | null;
   /** Pago dividido ya guardado: se precarga en el editor de Enviar a Caja y se muestra en el desglose. */
   plan?: Array<{ medio: string; monto: number | string }>;
   mozo?: string | null;
@@ -103,6 +141,9 @@ export function ModalPrecuenta({
   total,
   subtotal,
   descuento = 0,
+  descuentos,
+  envio,
+  notaPedido,
   plan,
   mozo,
   copias = 0,
@@ -255,28 +296,49 @@ export function ModalPrecuenta({
             <ul className="pc-lineas" aria-label="Productos">
               {lineas.map((l, i) => (
                 <li key={i} className="pc-linea">
-                  <span className="pc-cant">{l.cantidad}</span>
-                  <span className="pc-nombre">
-                    <span>{l.nombre}</span>
-                    {l.detalle && <span className="pc-detalle">{l.detalle}</span>}
-                  </span>
-                  {l.precio !== undefined && <span className="pc-precio">{soles(l.precio)}</span>}
+                  {l.entrada ? (
+                    <LineaDetallada d={detalleLinea(l.entrada)} />
+                  ) : (
+                    <>
+                      <span className="pc-cant">{l.cantidad}</span>
+                      <span className="pc-nombre">
+                        <span>{l.nombre}</span>
+                        {l.detalle && <span className="pc-detalle">{l.detalle}</span>}
+                      </span>
+                      {l.precio !== undefined && <span className="pc-precio">{soles(l.precio)}</span>}
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
+            {notaPedido?.trim() && <p className="pc-nota-pedido">Nota del pedido: {notaPedido.trim()}</p>}
 
             <div className="pc-totales">
-              {subtotal !== undefined && (
-                <div className="pc-fila">
-                  <span>Subtotal</span>
-                  <span>{soles(subtotal)}</span>
-                </div>
-              )}
-              {Number(descuento) > 0 && (
-                <div className="pc-fila">
-                  <span>Descuento</span>
-                  <span>- {soles(descuento)}</span>
-                </div>
+              {descuentos !== undefined ? (
+                resumenAntesDelTotal({ subtotal, descuentos, envio }).map((x, i) => (
+                  <div key={i} className="pc-fila">
+                    <span>{x.etiqueta}</span>
+                    <span>
+                      {x.resta ? '- ' : ''}
+                      {soles(x.monto)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <>
+                  {subtotal !== undefined && (
+                    <div className="pc-fila">
+                      <span>Subtotal</span>
+                      <span>{soles(subtotal)}</span>
+                    </div>
+                  )}
+                  {Number(descuento) > 0 && (
+                    <div className="pc-fila">
+                      <span>Descuento</span>
+                      <span>- {soles(descuento)}</span>
+                    </div>
+                  )}
+                </>
               )}
               <div className="pc-total">
                 <span>TOTAL</span>

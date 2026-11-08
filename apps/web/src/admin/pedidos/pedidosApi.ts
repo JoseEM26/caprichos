@@ -92,6 +92,9 @@ export interface LineaPedido {
   subtotal: string | number;
   nota?: string | null;
   nombres_persona?: string[] | null;
+  sabor?: string | null;
+  /** Reparto por sabor (mezcla) */
+  sabores?: Array<{ saborId?: string; nombre?: string; sabor_nombre?: string; cantidad: number }>;
   opciones?: LineaPedidoOpcion[];
   opcionesElegidas?: LineaPedidoOpcion[];
   area?: {
@@ -179,6 +182,9 @@ export interface Pedido {
   puntos?: { estado: 'SUMADO' | 'PENDIENTE_DE_COBRO' | 'NO_SUMA'; puntos?: number; estimado?: number; motivo?: string; texto: string } | null;
   subtotal: string | number;
   descuento: string | number;
+  /** Promociones, cupón y descuento del personal aplicados (con su monto) */
+  descuento_detalle?: unknown;
+  puntos_canjeados?: string | number | null;
   envio?: string | number | null;
   total: string | number;
   comprobante_tipo?: string | null;

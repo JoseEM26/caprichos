@@ -165,6 +165,10 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
           }}
           mesa={nombreMesaSalon(cuenta)}
           lineas={cuenta.pedido.lineas || []}
+          descuentos={cuenta.pedido.descuentos}
+          subtotal={cuenta.pedido.subtotal}
+          envio={cuenta.pedido.envio}
+          notaPedido={cuenta.pedido.nota}
           total={Number(cuenta.pedido.total || 0)}
           mozo={cuenta.pedido.mozo}
           pedidoId={cuenta.pedido.id}

@@ -1,3 +1,4 @@
+import type { DescuentoTicket, LineaDetalleEntrada } from '@caprichos/compartido';
 export type TipoElemento =
   | 'MESA'
   | 'PARED'
@@ -73,7 +74,12 @@ export interface MesaSalon {
     orden?: number;
     /** Cocina y entrega en vivo (misma función que «Mis pedidos») */
     progreso?: ProgresoPedido;
-    lineas?: Array<{ cantidad: number; nombre: string; detalle: string; opciones?: string[] }>;
+    lineas?: Array<{ cantidad: number; nombre: string; detalle: string; opciones?: string[]; precio?: number; entrada?: LineaDetalleEntrada }>;
+    /** Precuenta detallada: descuentos desglosados, subtotal, envío y nota general */
+    descuentos?: DescuentoTicket[];
+    subtotal?: number;
+    envio?: number;
+    nota?: string | null;
   } | null;
   pedidoCodigo?: string | null;
   mozo?: string | null;
