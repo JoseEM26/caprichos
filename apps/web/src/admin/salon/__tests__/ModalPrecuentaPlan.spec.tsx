@@ -93,15 +93,15 @@ describe('ModalPrecuenta - pago en mesa con plan (un medio o dividido)', () => {
     expect(screen.queryByText(/Voucher Efectivo/)).toBeNull();
   });
 
-  it('pago dividido con Yape sin foto subida: Enviar a Caja queda bloqueado y pide la foto', () => {
+  it('pago dividido con Yape sin foto subida: Enviar a Caja sigue habilitado (la foto es opcional) y avisa que falta', () => {
     render(<ModalPrecuenta {...propsBase} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Agregar otro medio de pago' }));
     fireEvent.change(screen.getByLabelText('Monto en Yape'), { target: { value: '12' } });
     llenarPagaCon();
 
-    expect(botonEnviar()).toBeDisabled();
-    expect(screen.getByText(/Falta la foto de Yape/)).toBeInTheDocument();
+    expect(botonEnviar()).not.toBeDisabled();
+    expect(screen.getByText(/Falta la foto de Yape \(opcional\)/)).toBeInTheDocument();
   });
 
   it('segundo medio sin monto: bloquea Enviar a Caja y pide el monto', () => {

@@ -43,7 +43,7 @@ const FILTROS: Array<{ valor: FiltroEstado; etiqueta: string }> = [
   { valor: 'todos', etiqueta: 'Todos' },
   { valor: 'enCurso', etiqueta: 'En curso' },
   { valor: 'entregados', etiqueta: 'Entregados' },
-  { valor: 'faltaVoucher', etiqueta: 'Falta voucher' },
+  { valor: 'faltaVoucher', etiqueta: 'Falta captura' },
 ];
 
 const ESTADOS_EN_CURSO = ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO'];
@@ -345,7 +345,7 @@ export function MisPedidosView() {
                         · {p.clienteNombre}
                       </span>
                     )}
-                    {faltanVoucher(p) && <span className="mpv-insignia-falta">Falta voucher</span>}
+                    {faltanVoucher(p) && <span className="mpv-insignia-falta">Falta captura (opcional)</span>}
                     <span className="mp-estado" style={{ background: est.bg, color: est.fg }}>
                       {est.texto}
                     </span>

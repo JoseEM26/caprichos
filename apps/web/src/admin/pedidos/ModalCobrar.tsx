@@ -11,10 +11,9 @@ import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import type { RespuestaSubirVoucherAdmin, VoucherExtraido } from '../vouchers/tipos';
-import { digitalesDelPlan, esPedidoLocal, medioDigitalVoucher, mismoMedio } from './mediosPago';
-import { CapturasPlanDigital, ExcepcionSinVoucher } from './CapturasPlanDigital';
+import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
+import { CapturasPlanDigital } from './CapturasPlanDigital';
 import { nombreMedio } from './planPago';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 
 const MEDIOS_PAGO = [
   'Efectivo',
@@ -24,7 +23,6 @@ const MEDIOS_PAGO = [
   'Transferencia',
 ] as const;
 
-const MOTIVO_MINIMO = 5;
 
 
 export interface ModalCobrarProps {
@@ -81,15 +79,6 @@ export function ModalCobrar({
   const [voucher, setVoucher] = useState<{ id: string | number } | null>(null);
   const [lectura, setLectura] = useState<RespuestaSubirVoucherAdmin | null>(null);
   const [fotoArchivoId, setFotoArchivoId] = useState<string | number | null>(null);
-  // La última foto no se lee: no cuenta como comprobante (pide otra o la excepción)
-  const [ilegible, setIlegible] = useState<boolean>(false);
-  // Excepción «Registrar sin voucher»: motivo escrito + código rotativo del supervisor
-  const [sinVoucher, setSinVoucher] = useState<boolean>(false);
-  const [motivoSinVoucher, setMotivoSinVoucher] = useState<string>('');
-  const [pinSupervisor, setPinSupervisor] = useState<string>('');
-  const local = esPedidoLocal(pedido);
-  // En el local no hay supervisor: una sola casilla de consentimiento
-  const pideCodigo = usePideCodigo() && !local;
 
   // Pago dividido con 2 o más medios digitales: una captura por medio (CapturasPlanDigital), como el servidor
   const mediosPlanDigital = digitalesDelPlan(pedido.planPago);
@@ -108,8 +97,7 @@ export function ModalCobrar({
         const recientes = [...items].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
         const legible = recientes.find((v) => v.semaforo !== 'ILEGIBLE');
         if (!legible) {
-          // Solo hay fotos ilegibles: no cuentan como comprobante, Caja pide otra
-          setIlegible(true);
+          // Solo hay fotos ilegibles: no cuentan como comprobante (se puede cobrar sin captura)
           return;
         }
         setVoucher({ id: legible.id });
@@ -137,13 +125,7 @@ export function ModalCobrar({
     .map((p) => medioDigitalVoucher(p.medio))
     .find((m) => m !== null) ?? undefined;
   const hayDigital = medioDigital !== undefined;
-  const excepcionLista =
-    sinVoucher &&
-    motivoSinVoucher.trim().length >= MOTIVO_MINIMO &&
-    (!pideCodigo || pinSupervisor.length === 6);
-  const comprobanteListo = multiples
-    ? faltanCapturas.length === 0 || excepcionLista
-    : !hayDigital || voucher !== null || excepcionLista;
+  // La captura es opcional: nunca frena el cobro (sin ella queda «Pagado sin captura»)
 
   // Calcular suma actual de los pagos
   const sumaPagos = useMemo(() => {
@@ -215,17 +197,6 @@ export function ModalCobrar({
       return false;
     }
 
-    if (!comprobanteListo) {
-      setErrorMensaje(
-        multiples
-          ? `Falta la captura de ${faltanCapturas.map(nombreMedio).join(', ')}. Súbela, o registra el cobro sin voucher con motivo${pideCodigo ? ' y código del supervisor' : ''}.`
-          : ilegible
-            ? `No se lee: sube otra foto o confirma sin comprobante${pideCodigo ? ' con código del supervisor' : ''}.`
-            : `Falta la foto del comprobante del pago digital. Súbela, o registra el cobro sin voucher con motivo${pideCodigo ? ' y código del supervisor' : ''}.`,
-      );
-      return false;
-    }
-
     return true;
   };
 
@@ -251,22 +222,16 @@ export function ModalCobrar({
       return item;
     });
 
-    // Con foto, va el voucherId; sin foto (excepción), el motivo y el código del supervisor
-    // Pago dividido: las capturas ya van enlazadas al pedido; solo la excepción viaja en el cobro
-    const sinVoucherPayload: Partial<CobrarDto> = local
-      ? { confirmaSinCaptura: true }
-      : { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined } };
+    // Con foto, va el voucherId; sin foto el cobro sale igual y el servidor lo audita «sin captura»
     const comprobante: Partial<CobrarDto> = multiples
-      ? faltanCapturas.length > 0 && sinVoucher
-        ? sinVoucherPayload
+      ? faltanCapturas.length > 0
+        ? { confirmaSinCaptura: true }
         : {}
       : !hayDigital
         ? {}
         : voucher
           ? { voucherId: voucher.id }
-          : sinVoucher
-            ? sinVoucherPayload
-            : {};
+          : { confirmaSinCaptura: true };
 
     try {
       await cobrar({
@@ -579,7 +544,7 @@ export function ModalCobrar({
           </button>
         )}
 
-        {/* Pago dividido con 2 o más medios digitales: una captura por cada uno (el servidor exige cada una) */}
+        {/* Pago dividido con 2 o más medios digitales: una captura por cada uno (opcional) */}
         {multiples && (
           <div
             data-testid="seccion-comprobante-cobro"
@@ -595,44 +560,15 @@ export function ModalCobrar({
           >
             <div style={{ fontWeight: 800, fontSize: 14 }}>Comprobantes de los pagos digitales</div>
             <CapturasPlanDigital pedidoId={pedido.id} planPago={pedido.planPago ?? []} alCambiar={setFaltanCapturas} />
-            {faltanCapturas.length > 0 && !sinVoucher && (
-              <button
-                type="button"
-                data-testid="btn-sin-voucher"
-                onClick={() => setSinVoucher(true)}
-                style={{
-                  minHeight: 44,
-                  border: '1.5px dashed var(--cp-rust, #B2500F)',
-                  borderRadius: 10,
-                  background: 'transparent',
-                  color: 'var(--cp-rust, #B2500F)',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                {local ? 'Sin captura: el cliente ya pagó' : 'No hay foto: registrar sin voucher (con supervisor)'}
-              </button>
-            )}
-            {sinVoucher && faltanCapturas.length > 0 && (
-              <ExcepcionSinVoucher
-                local={local}
-                medio={faltanCapturas.join('+')}
-                motivo={motivoSinVoucher}
-                onMotivo={setMotivoSinVoucher}
-                pin={pinSupervisor}
-                onPin={setPinSupervisor}
-                alVolver={() => {
-                  setSinVoucher(false);
-                  setMotivoSinVoucher('');
-                  setPinSupervisor('');
-                }}
-              />
+            {faltanCapturas.length > 0 && (
+              <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+                La captura es opcional: puedes cobrar sin ella y queda «Pagado sin captura». Se puede subir después.
+              </div>
             )}
           </div>
         )}
 
-        {/* Comprobante del pago digital: la foto es obligatoria; la lectura de la IA solo informa */}
+        {/* Comprobante del pago digital: la foto es opcional; la lectura de la IA solo informa */}
         {!multiples && hayDigital && medioDigital && (
           <div
             data-testid="seccion-comprobante-cobro"
@@ -647,10 +583,10 @@ export function ModalCobrar({
             }}
           >
             <div style={{ fontWeight: 800, fontSize: 14 }}>
-              Comprobante del pago digital ({medioDigital})
+              Comprobante del pago digital ({medioDigital}, opcional)
             </div>
 
-            {!voucher && !sinVoucher && (
+            {!voucher && (
               <>
                 <SubirVoucherMozo
                   pedidoId={pedido.id}
@@ -658,30 +594,15 @@ export function ModalCobrar({
                   ofrecerExcepcion
                   alVoucherValido={(info) => {
                     // Solo una foto legible queda como comprobante del cobro
-                    setIlegible(!info.legible);
                     if (info.legible) setVoucher({ id: info.id });
                   }}
                   alRespuesta={(r) => {
                     if ('semaforo' in r) setLectura(r);
                   }}
                 />
-                <button
-                  type="button"
-                  data-testid="btn-sin-voucher"
-                  onClick={() => setSinVoucher(true)}
-                  style={{
-                    minHeight: 44,
-                    border: '1.5px dashed var(--cp-rust, #B2500F)',
-                    borderRadius: 10,
-                    background: 'transparent',
-                    color: 'var(--cp-rust, #B2500F)',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {local ? 'Sin captura: el cliente ya pagó' : 'No hay foto: registrar sin voucher (con supervisor)'}
-                </button>
+                <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+                  La captura es opcional: puedes cobrar sin ella y queda «Pagado sin captura». Se puede subir después.
+                </div>
               </>
             )}
 
@@ -714,8 +635,7 @@ export function ModalCobrar({
                     setVoucher(null);
                     setLectura(null);
                     setFotoArchivoId(null);
-                    setIlegible(false);
-                  }}
+                                      }}
                   style={{
                     minHeight: 44,
                     border: '1.5px solid var(--cp-navy, #0B2C3E)',
@@ -732,21 +652,6 @@ export function ModalCobrar({
               </>
             )}
 
-            {sinVoucher && !voucher && (
-              <ExcepcionSinVoucher
-                local={local}
-                medio={medioDigital}
-                motivo={motivoSinVoucher}
-                onMotivo={setMotivoSinVoucher}
-                pin={pinSupervisor}
-                onPin={setPinSupervisor}
-                alVolver={() => {
-                  setSinVoucher(false);
-                  setMotivoSinVoucher('');
-                  setPinSupervisor('');
-                }}
-              />
-            )}
           </div>
         )}
 
@@ -799,7 +704,7 @@ export function ModalCobrar({
           <Boton
             variante="primario"
             cargando={enviando}
-            disabled={!cuadra || enviando || !comprobanteListo || sinUbicar}
+            disabled={!cuadra || enviando || sinUbicar}
             title={sinUbicar ? MENSAJE_DELIVERY_SIN_UBICACION : undefined}
             onClick={iniciarCobro}
             style={{

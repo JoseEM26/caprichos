@@ -683,14 +683,8 @@ export class PedidosEstadoService {
       pedidos = await this.prisma.pedido.findMany({
         where: {
           estado: { in: ['COLA', 'PREPARANDO'] },
-          // Pago digital (Yape, Plin, transferencia) sin validar: no pasa a cocina hasta aprobar el voucher o coordinar el pago
+          // El pago digital sin captura NO frena a cocina (la captura es opcional y se puede subir después).
           NOT: [
-            {
-              pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
-              pago_estado: 'PENDIENTE',
-              pago_coordinado_en: null,
-              modalidad: { not: 'MESA' },
-            },
             // Delivery sin ubicación (punto o zona): sin envío calculado no pasa a cocina
             { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
           ],
@@ -1336,8 +1330,8 @@ export class PedidosEstadoService {
     // Confirmar un pago (COORDINADO o PAGADO) exige caja abierta; el pedido en sí no depende de la caja
     await exigirCajaAbiertaHoy(this.prisma);
 
-    // Pago digital (Yape, Plin, transferencia): exige un voucher útil (un ILEGIBLE no cuenta) o la excepción
-    // con código del supervisor. Misma regla que el cobro y el pago coordinado (comprobante-pago.util).
+    // Pago digital (Yape, Plin, transferencia): el voucher útil (un ILEGIBLE no cuenta) es OPCIONAL; sin él queda «sin captura».
+    // Misma regla que el cobro y el pago coordinado (comprobante-pago.util).
     const sinVoucherAutorizado = await exigirComprobanteDigital({
       db: this.prisma,
       pedidoId: pedido.id,

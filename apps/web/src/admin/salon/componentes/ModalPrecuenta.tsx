@@ -168,9 +168,9 @@ export function ModalPrecuenta({
   const hayDigital = digitalesPlan.length > 0;
   const faltanVouchers = digitalesPlan.filter((f) => legibles[f.medio] !== true).map((f) => nombreMedio(f.medio));
   const voucherOk = hayDigital && faltanVouchers.length === 0;
-  // La tarjeta sigue pidiendo la copia del POS: la casilla solo cubre los medios digitales
+  // La foto es opcional en todos los medios: la casilla solo deja el registro de que el personal ya habló con el cliente
   const faltanMedios = digitalesPlan.filter((f) => legibles[f.medio] !== true);
-  const puedeSinCaptura = faltanMedios.length > 0 && faltanMedios.every((f) => f.medio !== 'TARJETA');
+  const puedeSinCaptura = faltanMedios.length > 0;
   const sinCapturaValida = puedeSinCaptura && sinCaptura;
   // Efectivo: con cuánto paga (obligatorio si hay efectivo) y el vuelto que sale de ahí
   const efectivoPlan = montoEfectivoPlan(planEnvio);
@@ -184,8 +184,8 @@ export function ModalPrecuenta({
   // Comprobante: la API valida otra vez; esto evita enviar datos que ya se sabe que no sirven
   const tipoComp: TipoComprobanteSel | null = valorComp.tipo;
   const errorComprobante = errorValorComprobante(valorComp)?.mensaje ?? null;
-  // Con parte digital o tarjeta, la foto de cada medio tiene que estar subida y leerse antes de enviar (lo exige el servidor)
-  const listoParaEnviar = planListo && errorPagaCon === null && errorComprobante === null && (!hayDigital || voucherOk || sinCapturaValida);
+  // La foto de cada medio digital o tarjeta es opcional: sin ella igual se envía a Caja («Pagado sin captura»)
+  const listoParaEnviar = planListo && errorPagaCon === null && errorComprobante === null;
   const subidoAntes = (medio: string) => (vpm ?? []).some((v) => v.medio === medio && v.subido);
   // El plan se guarda antes de cada captura: el servidor compara contra el monto de ese medio
   const guardarPlan = async () => {
@@ -384,7 +384,7 @@ export function ModalPrecuenta({
 
                 {hayDigital && !voucherOk && (
                   <div className="pc-nota-envio">
-                    Falta la foto de {faltanVouchers.join(', ')}: súbela antes de enviar a Caja, o marca que el cliente ya pagó.
+                    Falta la foto de {faltanVouchers.join(', ')} (opcional): puedes enviar a Caja sin ella y subirla después. Pídesela al cliente con amabilidad.
                   </div>
                 )}
                 {puedeSinCaptura && !enviado && (

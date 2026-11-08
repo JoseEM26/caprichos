@@ -396,6 +396,59 @@ describe('RepartosService', () => {
     });
   });
 
+  describe('3.b Voucher opcional: el delivery sale y entrega con el pago pendiente', () => {
+    const digitalPendiente = {
+      modalidad: 'DELIVERY',
+      repartidor_party_id: 101n,
+      pago_estado: 'PENDIENTE',
+      pago_metodo: 'YAPE',
+      pago_preferido: 'YAPE',
+      total: new Prisma.Decimal(45),
+      creado_en: new Date(),
+      zona: null,
+    };
+
+    it('salir con Yape pendiente y SIN voucher: pasa a EN_CAMINO (la captura no frena la salida)', async () => {
+      const pedido = { ...digitalPendiente, id: 50n, codigo: 'CP-0150', estado: 'LISTO' };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedido);
+      prismaMock.pedido.update.mockResolvedValue({ ...pedido, estado: 'EN_CAMINO', salio_en: new Date() });
+
+      const res = await service.salir('50', repartidor1);
+
+      expect(res.estado).toBe('EN_CAMINO');
+    });
+
+    it('entregar con Yape pendiente y SIN voucher: ENTREGADO, sigue por cobrar (PENDIENTE) y no hay efectivo que rendir', async () => {
+      const pedido = { ...digitalPendiente, id: 51n, codigo: 'CP-0151', estado: 'EN_CAMINO', planPago: [] };
+      prismaMock.solicitudCambioCobro = { findFirst: jest.fn().mockResolvedValue(null) };
+      prismaMock.pedido.findUnique.mockResolvedValue(pedido);
+      prismaMock.pedido.update.mockResolvedValue({ ...pedido, estado: 'ENTREGADO', entregado_en: new Date() });
+
+      const res = await service.entregar('51', repartidor1);
+
+      expect(res.estado).toBe('ENTREGADO');
+      expect(res.pago_estado).toBe('PENDIENTE');
+      expect(res.por_rendir_efectivo).toBe(0);
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ estado: 'ENTREGADO' }) }),
+      );
+    });
+
+    it('«proximos»: un delivery con Yape sin voucher ya figura EN_COCINA, nunca «por validar»', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([
+        {
+          id: 52n, codigo: 'CP-0152', cliente_nombre: 'Ana', entrega_lat: new Prisma.Decimal(-12.1), entrega_lng: new Prisma.Decimal(-77.0),
+          zona: { codigo: 'Z1' }, estado: 'COLA', pago_estado: 'PENDIENTE', pago_metodo: 'YAPE', pago_preferido: 'YAPE',
+          creado_en: new Date(), lineas: [],
+        },
+      ]);
+
+      const res = await service.listarProximos();
+
+      expect(res[0]).toMatchObject({ codigo: 'CP-0152', estado: 'EN_COCINA' });
+    });
+  });
+
   describe('4. Avisos de reparto 1-2-3 (DT-60 / DT-74)', () => {
     it('consultar mensajes es solo lectura: no crea el aviso 3 (lo decide el planificador por tiempo)', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue({ id: 40n });

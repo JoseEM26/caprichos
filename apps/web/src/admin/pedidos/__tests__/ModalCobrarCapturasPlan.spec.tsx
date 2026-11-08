@@ -49,17 +49,20 @@ describe('ModalCobrar con plan de 2 medios digitales', () => {
     vi.restoreAllMocks();
   });
 
-  it('muestra una fila por medio: la captura de Yape está, la de Plin falta, y bloquea el cobro', async () => {
+  it('muestra una fila por medio: la captura de Yape está, la de Plin falta, y NO bloquea el cobro (opcional)', async () => {
     vi.spyOn(vouchersApi, 'listarVouchers').mockResolvedValue([voucher('1', 'YAPE')] as any);
-    const cobrar = vi.fn();
+    const cobrar = vi.fn().mockResolvedValue({});
     render(<ModalCobrar pedido={base} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={cobrar} />);
 
     await waitFor(() => expect(screen.getByTestId('captura-yape')).toHaveTextContent('captura subida'));
     expect(screen.getByTestId('captura-plin')).toHaveTextContent('falta');
 
-    // El botón se bloquea hasta cubrir cada medio digital (o usar la excepción con supervisor)
-    expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
-    expect(cobrar).not.toHaveBeenCalled();
+    // La captura es opcional: el botón queda habilitado y el cobro sale como «sin captura»
+    expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cobrar' }, { timeout: 5000 }));
+    await waitFor(() => expect(cobrar).toHaveBeenCalled());
+    expect(cobrar.mock.calls[0][0].confirmaSinCaptura).toBe(true);
   });
 
   it('con una captura por medio, el cobro sale sin voucherId ni excepción (ya van enlazadas)', async () => {
@@ -82,23 +85,21 @@ describe('ModalCobrar con plan de 2 medios digitales', () => {
   });
 });
 
-describe('ModalCobrar sin captura: una sola casilla en el local', () => {
+describe('ModalCobrar sin captura (opcional en todos los canales)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('pedido de mozo sin fotos: casilla única (sin motivo ni supervisor) y el cobro viaja con confirmaSinCaptura', async () => {
+  it('pedido de mozo sin fotos: cobra sin casilla, sin motivo ni supervisor; viaja confirmaSinCaptura', async () => {
     vi.spyOn(vouchersApi, 'listarVouchers').mockResolvedValue([] as any);
     const cobrar = vi.fn().mockResolvedValue({});
     render(<ModalCobrar pedido={base} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={cobrar} />);
 
-    fireEvent.click(await screen.findByTestId('btn-sin-voucher'));
+    await screen.findByTestId('seccion-comprobante-cobro');
     expect(screen.queryByTestId('motivo-sin-voucher')).toBeNull();
-    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
-    expect(screen.getByText('Confirmo que ya hablé con el cliente y pagó con Yape + Plin (sin captura)')).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeEnabled();
 
-    fireEvent.click(screen.getByTestId('casilla-sin-captura'));
     fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Cobrar' }, { timeout: 5000 }));
 
@@ -108,13 +109,14 @@ describe('ModalCobrar sin captura: una sola casilla en el local', () => {
     expect(dto.sinVoucher).toBeUndefined();
   });
 
-  it('delivery o carta: sigue pidiendo motivo (y no hay casilla)', async () => {
+  it('delivery: también cobra sin captura, sin motivo ni código de supervisor', async () => {
     vi.spyOn(vouchersApi, 'listarVouchers').mockResolvedValue([] as any);
+    const cobrar = vi.fn().mockResolvedValue({});
     render(
-      <ModalCobrar pedido={{ ...base, canal: 'CARTA', modalidad: 'DELIVERY' }} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={vi.fn()} />,
+      <ModalCobrar pedido={{ ...base, canal: 'CARTA', modalidad: 'DELIVERY' }} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={cobrar} />,
     );
-    fireEvent.click(await screen.findByTestId('btn-sin-voucher'));
-    expect(screen.getByTestId('motivo-sin-voucher')).toBeDefined();
-    expect(screen.queryByTestId('casilla-sin-captura')).toBeNull();
+    await screen.findByTestId('seccion-comprobante-cobro');
+    expect(screen.queryByTestId('motivo-sin-voucher')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeEnabled();
   });
 });

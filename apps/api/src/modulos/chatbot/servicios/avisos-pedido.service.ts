@@ -7,7 +7,7 @@ import { EtapaAvisoReparto, ResumenRecibido, TEXTOS_REPARTO, PayloadAvisoReparto
 import { partyClienteDelPedido } from '../../clientes/cliente-del-pedido';
 import { urlPublicaCarta } from './carrusel.util';
 import { parametroActivoConDefecto, whatsappSimulado } from '../utilidades/modo-whatsapp.util';
-import { marcarPagoParaPersona } from './pago-para-persona.util';
+import { anotarPagoEnFlujo } from './pago-para-persona.util';
 import { calcularEtaEntrega, formatearEta, leerConfigEta } from '../../repartos/eta-entrega';
 import { montoDigitalDePlan } from '../../pedidos/pago-plan.service';
 import { mediosPagoPublicos } from '../../local/local.service';
@@ -250,7 +250,7 @@ export class AvisosPedidoService {
     if (!nuevo) return { estado: 'YA_ENVIADO' };
 
     if (medio) {
-      // Pago digital: la conversación pasa a una persona de Caja (aunque el envío falle)
+      // Pago digital: se anota el pedido en la conversación (la captura es opcional: el bot NO pasa a VALIDAR_PAGO)
       await this.marcarParaPersona(telefono, pedido, nombre);
     }
 
@@ -414,7 +414,7 @@ export class AvisosPedidoService {
     return base;
   }
 
-  /** Mismo efecto que un voucher recibido por WhatsApp: la conversación queda para una persona (VALIDAR_PAGO, urgente). */
+  /** Anota el pedido que espera captura en la conversación, sin tomar el chat: si el cliente manda la foto se enlaza. */
   private async marcarParaPersona(
     telefono: string,
     pedido: { id: bigint; codigo: string; total: unknown; pago_metodo: string | null; pago_preferido: string | null },
@@ -427,7 +427,7 @@ export class AvisosPedidoService {
         create: { telefono, nombre_contacto: nombre },
         select: { id: true, flujo: true },
       });
-      await marcarPagoParaPersona(this.prisma, conversacion, pedido);
+      await anotarPagoEnFlujo(this.prisma, conversacion, pedido);
     } catch (err: any) {
       this.logger.error(`No se pudo dejar el pedido ${pedido.codigo} para revisión de pago: ${err?.message}`, err?.stack);
     }

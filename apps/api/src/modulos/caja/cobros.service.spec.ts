@@ -746,12 +746,19 @@ describe('CobrosService', () => {
     const sinFoto = () => prismaMock.voucherPago.findFirst.mockResolvedValue(null);
     const pagoYape = [{ medio: 'YAPE', monto: 50 }];
 
-    it('cobro digital sin foto ni excepción -> 400 VOUCHER_REQUERIDO y no cobra', async () => {
+    it('cobro digital sin foto ni casilla: la captura es opcional, cobra y audita «sin captura»', async () => {
       sinFoto();
-      await expect(service.cobrar({ pedidoId: '100', pagos: pagoYape }, cajeroUsuario)).rejects.toMatchObject({
-        response: { codigo: 'VOUCHER_REQUERIDO' },
-      });
-      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+      const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape }, cajeroUsuario);
+      expect(res.id).toBe('77');
+      expect(prismaMock.cobro.create).toHaveBeenCalled();
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accion: 'COBRAR_SIN_VOUCHER',
+          conPinAdmin: false,
+          despues: expect.objectContaining({ sin_voucher: expect.objectContaining({ sin_captura: true }) }),
+        }),
+      );
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
     });
 
     it('cobro en efectivo sin foto sigue permitido', async () => {
@@ -785,21 +792,25 @@ describe('CobrosService', () => {
         expect(res.id).toBe('77');
       });
 
-      it('sin casilla ni mozo: sigue exigiendo la foto', async () => {
+      it('sin casilla ni mozo: cobra igual (la casilla es solo un registro opcional)', async () => {
         sinFoto();
         prismaMock.pedido.findUnique.mockResolvedValue({ ...local });
-        await expect(service.cobrar({ pedidoId: '100', pagos: pagoYape } as any, cajeroUsuario)).rejects.toMatchObject({
-          response: { codigo: 'VOUCHER_REQUERIDO' },
-        });
+        const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape } as any, cajeroUsuario);
+        expect(res.id).toBe('77');
       });
 
-      it('delivery o carta: la casilla no sirve y se exige la foto', async () => {
+      it('delivery ya entregado (Yape que se cobra después): Caja cobra sin foto y el cierre no se descuadra (queda PAGADO con su medio)', async () => {
         sinFoto();
-        prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock, canal: 'CARTA', modalidad: 'RECOGER' });
-        await expect(
-          service.cobrar({ pedidoId: '100', pagos: pagoYape, confirmaSinCaptura: true } as any, cajeroUsuario),
-        ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_REQUERIDO' } });
-        expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+        prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoMock, canal: 'CARTA', modalidad: 'DELIVERY', estado: 'ENTREGADO', entrega_lat: 1, entrega_lng: 1, zona_id: 1n });
+        const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape } as any, cajeroUsuario);
+        expect(res.id).toBe('77');
+        // El cierre suma por el renglón del cobro (medio y monto), no por la foto: sin captura entra igual a YAPE
+        const data = prismaMock.cobro.create.mock.calls.at(-1)![0].data;
+        expect(data.pagos.create).toEqual([expect.objectContaining({ medio: 'YAPE', monto: expect.anything() })]);
+        expect(Number(data.pagos.create[0].monto)).toBe(50);
+        expect(prismaMock.pedido.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ pago_estado: 'PAGADO', pago_metodo: 'YAPE' }) }),
+        );
       });
     });
 
@@ -828,107 +839,33 @@ describe('CobrosService', () => {
       ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_NO_ENCONTRADO' } });
     });
 
-    it('sin foto con motivo y PIN de supervisor correcto -> cobra y audita COBRAR_SIN_VOUCHER', async () => {
+    it('un cliente viejo con motivo y PIN: ya no se verifica supervisor y el cobro sale igual', async () => {
       sinFoto();
       const res = await service.cobrar(
-        {
-          pedidoId: '100',
-          pagos: pagoYape,
-          sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
-        } as any,
+        { pedidoId: '100', pagos: pagoYape, sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '000000' } } as any,
         cajeroUsuario,
         '10.0.0.1',
       );
-
       expect(res.id).toBe('77');
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
-        '123456',
-        2n,
-        'caja/cobrar_sin_voucher',
-        '10.0.0.1',
-        'cobro',
-        undefined,
-      );
-      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          accion: 'COBRAR_SIN_VOUCHER',
-          motivo: 'El cliente no tenía señal',
-          conPinAdmin: true,
-          despues: expect.objectContaining({
-            sin_voucher: expect.objectContaining({ motivo: 'El cliente no tenía señal' }),
-          }),
-        }),
-      );
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', conPinAdmin: false }));
     });
 
-    it('sin foto con PIN de supervisor incorrecto -> 403 y no cobra', async () => {
-      sinFoto();
-      await expect(
-        service.cobrar(
-          { pedidoId: '100', pagos: pagoYape, sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' } } as any,
-          cajeroUsuario,
-        ),
-      ).rejects.toMatchObject({ status: HttpStatus.FORBIDDEN });
-      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
-    });
-
-    it('un voucher ILEGIBLE no cuenta como comprobante: sin otra foto -> 400 VOUCHER_REQUERIDO', async () => {
-      // La búsqueda del comprobante excluye ILEGIBLE: lo que devuelve es null
+    it('un voucher ILEGIBLE no cuenta como comprobante y tampoco frena el cobro', async () => {
       prismaMock.voucherPago.findFirst.mockResolvedValue(null);
-      await expect(service.cobrar({ pedidoId: '100', pagos: pagoYape }, cajeroUsuario)).rejects.toMatchObject({
-        response: { codigo: 'VOUCHER_REQUERIDO' },
-      });
+      const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape }, cajeroUsuario);
+      expect(res.id).toBe('77');
       expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { pedido_id: 100n, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } } }),
       );
-      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
     });
 
-    it('un voucher ILEGIBLE puede seguir con la excepción del supervisor (motivo y PIN) y queda auditado', async () => {
-      prismaMock.voucherPago.findFirst.mockResolvedValue(null);
-      const res = await service.cobrar(
-        {
-          pedidoId: '100',
-          pagos: pagoYape,
-          sinVoucher: { motivo: 'La foto salió borrosa', pinSupervisor: '123456' },
-        } as any,
-        cajeroUsuario,
-      );
-      expect(res.id).toBe('77');
-      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', conPinAdmin: true }),
-      );
-    });
-
-    it('MOZO sin foto ni excepción -> 400 VOUCHER_REQUERIDO, sin consultar parámetros', async () => {
+    it('MOZO sin foto cobra igual, sin consultar parámetros, y audita con su partyId', async () => {
       sinFoto();
-      await expect(service.cobrar({ pedidoId: '100', pagos: pagoYape }, mozoUsuario)).rejects.toMatchObject({
-        response: { codigo: 'VOUCHER_REQUERIDO' },
-      });
+      const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape }, mozoUsuario);
+      expect(res.id).toBe('77');
       expect(prismaMock.parametro.findUnique).not.toHaveBeenCalled();
-      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
-    });
-
-    it('MOZO sin foto con motivo y código del supervisor válidos -> cobra y audita COBRAR_SIN_VOUCHER con su partyId', async () => {
-      sinFoto();
-      const res = await service.cobrar(
-        {
-          pedidoId: '100',
-          pagos: pagoYape,
-          sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
-        } as any,
-        mozoUsuario,
-      );
-
-      expect(res.id).toBe('77');
-      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          accion: 'COBRAR_SIN_VOUCHER',
-          partyId: 3n,
-          motivo: 'El cliente no tenía señal',
-          conPinAdmin: true,
-        }),
-      );
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', partyId: 3n }));
     });
   });
 
@@ -1304,15 +1241,13 @@ describe('CobrosService', () => {
       prismaMock.pedido.update.mockResolvedValue(coordinado);
     });
 
-    it('medio YAPE sin voucher útil -> 400 VOUCHER_REQUERIDO y no marca', async () => {
+    it('medio YAPE sin voucher: marca COORDINADO igual y audita «sin captura»', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('YAPE'));
       sinFoto();
 
-      await expect(service.marcarCoordinado('20', cajeroUsuario)).rejects.toMatchObject({
-        response: { codigo: 'VOUCHER_REQUERIDO' },
-      });
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
-      expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+      const res = await service.marcarCoordinado('20', cajeroUsuario);
+      expect(res.pago_estado).toBe('COORDINADO');
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'MARCAR_COORDINADO_SIN_VOUCHER', conPinAdmin: false }));
     });
 
     it('medio YAPE con voucher útil enlazado -> marca COORDINADO', async () => {
@@ -1329,68 +1264,20 @@ describe('CobrosService', () => {
       );
     });
 
-    it('voucher solo ILEGIBLE (excluido por la búsqueda) -> 400 VOUCHER_REQUERIDO', async () => {
+    it('voucher solo ILEGIBLE (excluido por la búsqueda): marca igual, sin supervisor', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('PLIN'));
       sinFoto();
 
-      await expect(service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', {})).rejects.toMatchObject({
-        response: { codigo: 'VOUCHER_REQUERIDO' },
-      });
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
-    });
-
-    it('sin voucher con motivo y PIN de supervisor correcto -> marca y audita con el motivo', async () => {
-      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('TRANSFERENCIA'));
-      sinFoto();
-
-      const res = await service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', {
-        sinVoucher: { motivo: 'El cliente no tiene la foto', pinSupervisor: '123456' },
-      } as any);
-
+      const res = await service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', {});
       expect(res.pago_estado).toBe('COORDINADO');
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
-        '123456',
-        2n,
-        'caja/coordinado_sin_voucher',
-        '10.0.0.1',
-        'cobro',
-        undefined,
-      );
-      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          accion: 'MARCAR_COORDINADO_SIN_VOUCHER',
-          conPinAdmin: true,
-          motivo: 'El cliente no tiene la foto',
-          despues: expect.objectContaining({
-            sin_voucher: expect.objectContaining({ motivo: 'El cliente no tiene la foto' }),
-          }),
-        }),
-      );
+      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
     });
 
-    it('pedido del local con la casilla: marca COORDINADO sin foto ni supervisor; en delivery no vale', async () => {
-      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoPendiente('YAPE'), canal: 'CAJA', modalidad: 'RECOGER' });
+    it('delivery sin voucher (repartidor ya en la puerta): marca COORDINADO igual', async () => {
+      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoPendiente('YAPE'), canal: 'CARTA', modalidad: 'DELIVERY', entrega_lat: 1, entrega_lng: 1, zona_id: 1n });
       sinFoto();
       const res = await service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', { confirmaSinCaptura: true } as any);
       expect(res.pago_estado).toBe('COORDINADO');
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
-
-      prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoPendiente('YAPE'), canal: 'CARTA', modalidad: 'RECOGER' });
-      await expect(
-        service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', { confirmaSinCaptura: true } as any),
-      ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_REQUERIDO' } });
-    });
-
-    it('sin voucher con PIN de supervisor incorrecto -> 403 y no marca', async () => {
-      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('YAPE'));
-      sinFoto();
-
-      await expect(
-        service.marcarCoordinado('20', cajeroUsuario, undefined, {
-          sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' },
-        } as any),
-      ).rejects.toMatchObject({ status: HttpStatus.FORBIDDEN });
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
     it('medio EFECTIVO o TARJETA no pide voucher', async () => {
@@ -1405,13 +1292,12 @@ describe('CobrosService', () => {
       expect(prismaMock.pedido.update).toHaveBeenCalledTimes(2);
     });
 
-    it('si no hay medio preferido usa pago_metodo para decidir si exige voucher', async () => {
+    it('si no hay medio preferido usa pago_metodo y marca sin captura sin bloquear', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente(null, 'YAPE'));
       sinFoto();
 
-      await expect(service.marcarCoordinado('20', cajeroUsuario)).rejects.toMatchObject({
-        response: { codigo: 'VOUCHER_REQUERIDO' },
-      });
+      const res = await service.marcarCoordinado('20', cajeroUsuario);
+      expect(res.pago_estado).toBe('COORDINADO');
     });
   });
 

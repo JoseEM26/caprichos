@@ -914,7 +914,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
         {esPorConfirmar && (
           <>
             <div style={{ fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft, #2C4C5D)' }}>
-              Pedido fuera del local: aún no pasa a cocina. Habla con el cliente por WhatsApp, confirma el pago y sube el comprobante. Recién entonces va a las pantallas.
+              Pedido fuera del local: ya está en cocina, no espera el pago. Habla con el cliente por WhatsApp y confirma el pago cuando lo haga; pídele la captura con amabilidad (es opcional y se puede subir después).
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button

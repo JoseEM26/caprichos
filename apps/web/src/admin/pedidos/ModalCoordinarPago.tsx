@@ -1,15 +1,10 @@
 import { useState } from 'react';
 import { Confirmar } from '../../comun/Confirmar';
-import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { pedidosApi, PedidoPorCobrar } from './pedidosApi';
-import { ExcepcionSinVoucher } from './CapturasPlanDigital';
-import { esPedidoLocal, medioDigitalVoucher } from './mediosPago';
+import { medioDigitalVoucher } from './mediosPago';
 import { AvisoDeliverySinUbicacion } from './AvisoDeliverySinUbicacion';
 import { MENSAJE_DELIVERY_SIN_UBICACION, deliverySinUbicacion } from './ubicacionDelivery';
-
-const MOTIVO_MINIMO = 5;
 
 export interface ModalCoordinarPagoProps {
   pedido: PedidoPorCobrar;
@@ -20,8 +15,8 @@ export interface ModalCoordinarPagoProps {
 }
 
 /**
- * Marca el pago como coordinado. En un medio digital (Yape, Plin, transferencia) hace falta la foto
- * legible del comprobante o, en su defecto, el motivo y el código del supervisor.
+ * Marca el pago como coordinado. En un medio digital (Yape, Plin, transferencia) la foto del comprobante es
+ * opcional: sin ella queda «Pagado sin captura» y se puede subir después.
  */
 export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualizarPedido }: ModalCoordinarPagoProps) {
   const sinUbicar = deliverySinUbicacion(pedido);
@@ -30,19 +25,12 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
 
   // Solo una foto legible cuenta; el aviso «No se lee» lo muestra SubirVoucherMozo (ofrecerExcepcion)
   const [voucherListo, setVoucherListo] = useState<boolean>(false);
-  const [sinVoucher, setSinVoucher] = useState<boolean>(false);
-  const [motivo, setMotivo] = useState<string>('');
-  const [pinSupervisor, setPinSupervisor] = useState<string>('');
-  const local = esPedidoLocal(pedido);
-  const pideCodigo = usePideCodigo() && !local;
   const [confirmando, setConfirmando] = useState<boolean>(false);
   const [enviando, setEnviando] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
-  const excepcionLista =
-    sinVoucher && motivo.trim().length >= MOTIVO_MINIMO && (!pideCodigo || pinSupervisor.length === 6);
-  const usaExcepcion = Boolean(medioVoucher) && !voucherListo && sinVoucher;
-  const listo = !sinUbicar && (!medioVoucher || voucherListo || excepcionLista);
+  const usaExcepcion = Boolean(medioVoucher) && !voucherListo;
+  const listo = !sinUbicar;
 
   const ejecutar = async () => {
     setConfirmando(false);
@@ -51,7 +39,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
     try {
       await pedidosApi.marcarPagoCoordinado(
         pedido.id,
-        usaExcepcion ? { motivo: motivo.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined, ...(local ? { sinCaptura: true } : {}) } : undefined,
+        usaExcepcion ? { motivo: 'sin captura', sinCaptura: true } : undefined,
       );
       alCoordinado();
     } catch (err: any) {
@@ -119,9 +107,9 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
               gap: 10,
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: 14 }}>Comprobante del pago digital ({medioVoucher})</div>
+            <div style={{ fontWeight: 800, fontSize: 14 }}>Comprobante del pago digital ({medioVoucher}, opcional)</div>
 
-            {!voucherListo && !sinVoucher && (
+            {!voucherListo && (
               <>
                 <SubirVoucherMozo
                   pedidoId={pedido.id}
@@ -129,23 +117,9 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
                   ofrecerExcepcion
                   alVoucherValido={(info) => setVoucherListo(info.legible)}
                 />
-                <button
-                  type="button"
-                  data-testid="btn-coordinar-sin-voucher"
-                  onClick={() => setSinVoucher(true)}
-                  style={{
-                    minHeight: 44,
-                    border: '1.5px dashed var(--cp-rust, #B2500F)',
-                    borderRadius: 10,
-                    background: 'transparent',
-                    color: 'var(--cp-rust, #B2500F)',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {local ? 'Sin captura: el cliente ya pagó' : 'No hay foto: marcar sin comprobante (con supervisor)'}
-                </button>
+                <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+                  Puedes marcarlo sin la captura: queda «Pagado sin captura». Pídesela al cliente con amabilidad.
+                </div>
               </>
             )}
 
@@ -155,67 +129,6 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
               </div>
             )}
 
-            {sinVoucher && !voucherListo && local && (
-              <ExcepcionSinVoucher
-                local
-                medio={medioVoucher}
-                motivo={motivo}
-                onMotivo={setMotivo}
-                pin={pinSupervisor}
-                onPin={setPinSupervisor}
-                alVolver={() => {
-                  setSinVoucher(false);
-                  setMotivo('');
-                }}
-              />
-            )}
-            {sinVoucher && !voucherListo && !local && (
-              <>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-                  Sin comprobante: solo con motivo escrito y el código del supervisor. Queda auditado.
-                </div>
-                <label htmlFor="motivo-coordinar" style={{ fontWeight: 700, fontSize: 13 }}>
-                  Motivo (mínimo {MOTIVO_MINIMO} letras)
-                </label>
-                <textarea
-                  id="motivo-coordinar"
-                  rows={2}
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    borderRadius: 10,
-                    border: '1.5px solid var(--cp-line, #E3D6C6)',
-                    background: 'var(--cp-white, #FFFFFF)',
-                    padding: 10,
-                    fontSize: 14,
-                    fontFamily: 'inherit',
-                  }}
-                />
-                {pideCodigo && <CampoCodigoSupervisor valor={pinSupervisor} onChange={setPinSupervisor} />}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSinVoucher(false);
-                    setMotivo('');
-                    setPinSupervisor('');
-                  }}
-                  style={{
-                    minHeight: 44,
-                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                    borderRadius: 10,
-                    background: 'transparent',
-                    color: 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Volver a pedir la foto
-                </button>
-              </>
-            )}
           </div>
         ) : (
           <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
@@ -275,13 +188,7 @@ export function ModalCoordinarPago({ pedido, alCerrar, alCoordinado, alActualiza
         abierto={confirmando}
         titulo={`¿Marcar coordinado el pago de ${pedido.codigo}?`}
         mensaje={
-          usaExcepcion
-            ? local
-              ? 'Se marca pagado sin captura, con tu confirmación.'
-              : pideCodigo
-              ? 'Se marca sin comprobante, con el motivo y la autorización del supervisor.'
-              : 'Se marca sin comprobante, con el motivo.'
-            : 'El pago queda coordinado con el cliente.'
+          usaExcepcion ? 'Se marca pagado sin captura.' : 'El pago queda coordinado con el cliente.'
         }
         textoSi="Sí, marcar"
         textoNo="No"

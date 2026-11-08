@@ -125,17 +125,8 @@ export class CambioCobroService {
       throw new BadRequestException({ codigo: 'SIN_CAMBIO', mensaje: 'La forma de pago elegida es la misma que ya tiene el pedido' });
     }
 
-    // Captura obligatoria por cada medio digital (voucher siempre obligatorio); la tarjeta no la exige
+    // La captura de cada medio digital es opcional: se sube si el cliente ya la tiene; si no, se pide después
     const digitales = mediosDigitalesDelPedido(planNuevo, null, total);
-    for (const d of digitales) {
-      if (!capturas[d.medio]?.buffer) {
-        throw new BadRequestException({
-          codigo: 'CAPTURA_REQUERIDA',
-          mensaje: `Sube la captura del pago por ${d.medio === 'TRANSFERENCIA' ? 'transferencia' : d.medio} (S/ ${d.monto.toFixed(2)})`,
-          medio: d.medio,
-        });
-      }
-    }
 
     const montoEfectivo = efectivoDelPedido(planNuevo, null, total);
     let pagaCon: number | null = null;
@@ -164,6 +155,7 @@ export class CambioCobroService {
       });
     };
     for (const d of digitales) {
+      if (!capturas[d.medio]?.buffer) continue;
       const r: any = await this.vouchers.subirYProcesar(
         capturas[d.medio],
         {
@@ -178,13 +170,10 @@ export class CambioCobroService {
       );
       const vid = BigInt(r.id);
       voucherIds.push(vid);
+      // Una captura ilegible no cuenta: se retira y la solicitud sigue sin ella (la captura es opcional)
       if (r.legible === false) {
-        await retirar(voucherIds, 'Captura ilegible en cambio de cobro');
-        throw new BadRequestException({
-          codigo: 'CAPTURA_ILEGIBLE',
-          mensaje: `La captura de ${d.medio} no se lee bien. Toma otra foto, por favor.`,
-          medio: d.medio,
-        });
+        await retirar([vid], 'Captura ilegible en cambio de cobro');
+        voucherIds.pop();
       }
     }
 

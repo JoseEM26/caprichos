@@ -74,7 +74,7 @@ export function getBadge(p: Pedido) {
   }
 }
 
-/** Chip «Cobrado por mozo · Yape»; en naranja y «falta voucher» si el medio digital no tiene foto legible. */
+/** Chip «Cobrado por mozo · Yape»; en naranja y «falta captura (opcional)» si el medio digital no tiene foto legible. */
 export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
   if (!cobro) return null;
   const alerta = cobro.faltaVoucher;
@@ -112,7 +112,7 @@ export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
     >
       Cobrado por mozo · {cobro.medio.split('+').map(nombreMedio).join(' + ')}
       {cobro.pide && <> · pide {cobro.pide === 'FACTURA' ? 'Factura' : 'Boleta'}</>}
-      {alerta && <strong> · falta voucher</strong>}
+      {alerta && <strong> · falta captura (opcional)</strong>}
     </span>
   );
 }

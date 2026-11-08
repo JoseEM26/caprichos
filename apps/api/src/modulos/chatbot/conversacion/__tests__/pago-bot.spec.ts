@@ -202,5 +202,17 @@ describe('Pagos del bot', () => {
       expect(t).toContain('• Yape: S/ 30.00');
       expect(t).toContain('• Plin: S/ 20.00');
     });
+
+    it('con Yape/Plin el pedido ya va a cocina: la captura se pide con amabilidad y es opcional', () => {
+      const unico = TEXTOS_BOT.pedidoConfirmadoExito({ codigo: 'CP-2', tiempoMin: 25, tiempoMax: 35, esPagoDigital: true });
+      const dividido = TEXTOS_BOT.pedidoConfirmadoExito({
+        codigo: 'CP-3', tiempoMin: 25, tiempoMax: 35, esPagoDigital: true, capturas: [{ medio: 'YAPE', monto: 30 }],
+      });
+      for (const t of [unico, dividido]) {
+        expect(t).toContain('ya está en cocina');
+        expect(t).toContain('(opcional)');
+        expect(t).not.toMatch(/apenas validemos|Pasa a cocina/);
+      }
+    });
   });
 });

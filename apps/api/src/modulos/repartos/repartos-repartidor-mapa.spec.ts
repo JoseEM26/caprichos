@@ -65,7 +65,7 @@ describe('listarProximos', () => {
     const r = await service.listarProximos(rep(9n));
     expect(r.map((x) => [x.codigo, x.estado, x.estadoTexto])).toEqual([
       ['A', 'EN_COCINA', 'En cocina'],
-      ['B', 'POR_VALIDAR', 'Por validar pago'],
+      ['B', 'EN_COCINA', 'En cocina'], // Yape sin voucher: igual va a cocina
     ]);
     expect(Object.keys(r[0]).sort()).toEqual(
       ['cantidadProductos', 'clienteNombre', 'codigo', 'creadoEn', 'estado', 'estadoTexto', 'id', 'lat', 'lng', 'minutosEspera', 'zona'],

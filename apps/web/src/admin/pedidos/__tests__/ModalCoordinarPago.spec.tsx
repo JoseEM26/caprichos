@@ -5,7 +5,7 @@ import { PedidoPorCobrar, pedidosApi } from '../pedidosApi';
 import { vouchersApi } from '../../vouchers/vouchersApi';
 import * as reducirModulo from '../../vouchers/reducirImagenVoucher';
 
-// Pago coordinado de Caja: un medio digital exige la foto legible o la excepción con supervisor.
+// Pago coordinado de Caja: la foto del medio digital es opcional; sin ella queda «Pagado sin captura».
 
 const pedidoYape: PedidoPorCobrar = {
   id: '20',
@@ -70,12 +70,15 @@ describe('ModalCoordinarPago', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, marcar' }));
   };
 
-  it('medio digital sin foto: no deja marcar coordinado', () => {
+  it('medio digital sin foto: deja marcar coordinado y viaja «sin captura» (sin motivo ni supervisor)', async () => {
     render(<ModalCoordinarPago pedido={pedidoYape} alCerrar={alCerrar} alCoordinado={alCoordinado} />);
 
-    expect(screen.getByTestId('seccion-coordinar-comprobante').textContent).toMatch(/Comprobante del pago digital \(YAPE\)/);
-    expect(screen.getByRole('button', { name: 'Marcar coordinado' })).toBeDisabled();
-    expect(marcar).not.toHaveBeenCalled();
+    expect(screen.getByTestId('seccion-coordinar-comprobante').textContent).toMatch(/Comprobante del pago digital \(YAPE, opcional\)/);
+    expect(screen.getByRole('button', { name: 'Marcar coordinado' })).not.toBeDisabled();
+
+    await confirmar();
+    await waitFor(() => expect(alCoordinado).toHaveBeenCalled());
+    expect(marcar).toHaveBeenCalledWith('20', { motivo: 'sin captura', sinCaptura: true });
   });
 
   it('con foto legible: marca coordinado sin excepción', async () => {
@@ -91,37 +94,17 @@ describe('ModalCoordinarPago', () => {
     expect(marcar).toHaveBeenCalledWith('20', undefined);
   });
 
-  it('foto ILEGIBLE: no cuenta, pide otra foto o la excepción y no deja marcar', async () => {
+  it('foto ILEGIBLE: no cuenta como comprobante y tampoco frena: marca «sin captura»', async () => {
     vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue(lecturaIlegible as any);
     render(<ModalCoordinarPago pedido={pedidoYape} alCerrar={alCerrar} alCoordinado={alCoordinado} />);
 
     subirFoto();
-    expect(
-      await screen.findByText('No se lee o no hay foto: sube otra foto o pide el código al supervisor.'),
-    ).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Marcar coordinado' })).toBeDisabled();
-    expect(marcar).not.toHaveBeenCalled();
-  });
-
-  it('foto ILEGIBLE seguida de la excepción con motivo y supervisor: marca con sinVoucher', async () => {
-    vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue(lecturaIlegible as any);
-    render(<ModalCoordinarPago pedido={pedidoYape} alCerrar={alCerrar} alCoordinado={alCoordinado} />);
-
-    subirFoto();
-    await screen.findByText(/No se lee o no hay foto: sube otra foto/);
-
-    fireEvent.click(screen.getByTestId('btn-coordinar-sin-voucher'));
-    fireEvent.change(screen.getByLabelText(/Motivo/), { target: { value: 'El cliente no tiene la captura' } });
-    const pin = document.querySelector('#codigo-supervisor-input') as HTMLInputElement;
-    fireEvent.change(pin, { target: { value: '123456' } });
+    expect(await screen.findByText('No se lee: puedes subir otra foto o seguir sin captura (es opcional).')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Marcar coordinado' })).not.toBeDisabled();
 
     await confirmar();
     await waitFor(() => expect(alCoordinado).toHaveBeenCalled());
-    expect(marcar).toHaveBeenCalledWith('20', {
-      motivo: 'El cliente no tiene la captura',
-      pinSupervisor: '123456',
-    });
+    expect(marcar).toHaveBeenCalledWith('20', { motivo: 'sin captura', sinCaptura: true });
   });
 
   it('efectivo no pide comprobante y marca coordinado directo tras confirmar', async () => {

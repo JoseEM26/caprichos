@@ -163,6 +163,26 @@ describe('Comprobante de WhatsApp: siempre se guarda y se analiza', () => {
     expect(prisma.$voucherRows[0]).toMatchObject({ pedido_id: 50n, archivo_id: 900n, origen: 'WHATSAPP', semaforo: expect.any(String) });
   });
 
+  it('captura opcional: el voucher se enlaza al pedido y avisa a Caja, pero NO toma el chat (sin VALIDAR_PAGO, PERSONA ni urgente)', async () => {
+    pedidoPorTelefono = { id: 50n, codigo: 'CP-50', total: 35, pago_preferido: 'YAPE', pago_metodo: null, estado: 'COLA' };
+
+    await webhook.procesarPayload(payloadImagen('51987654321'));
+    await flush();
+
+    expect(prisma.notificacion.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tipo: 'COMPROBANTE_RECIBIDO', rol_destino: 'CAJERO' }),
+    });
+    const actualizaciones = prisma.conversacion.update.mock.calls.map((c: any) => c[0].data);
+    // El pedido queda anotado en el flujo para enlazar capturas futuras...
+    expect(actualizaciones.some((d: any) => d.flujo?.pago?.pedidoId === '50')).toBe(true);
+    // ...pero ninguna actualización pasa el chat a una persona ni lo marca urgente
+    for (const d of actualizaciones) {
+      expect(d.estado).not.toBe('VALIDAR_PAGO');
+      expect(d.duenio).not.toBe('PERSONA');
+      expect(d.urgente).not.toBe(true);
+    }
+  });
+
   it('voucher ligado a un pedido: acuse por el outbox al cliente y el motor no contesta esa foto', async () => {
     pedidoPorTelefono = { id: 50n, codigo: 'CP-50', total: 35, pago_preferido: 'YAPE', pago_metodo: null, estado: 'COLA' };
     const outbox = { encolar: jest.fn().mockResolvedValue({}), despertar: jest.fn() };

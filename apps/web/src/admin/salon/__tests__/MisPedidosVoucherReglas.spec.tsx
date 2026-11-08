@@ -136,7 +136,7 @@ describe('MisPedidosView: quitar voucher desde la tarjeta', () => {
   });
 });
 
-describe('MisPedidosView: nombre del cliente y filtro Falta voucher', () => {
+describe('MisPedidosView: nombre del cliente y filtro Falta captura', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(salonApi.obtenerMesas).mockResolvedValue({ pisos: [] });
@@ -198,19 +198,19 @@ describe('MisPedidosView: nombre del cliente y filtro Falta voucher', () => {
     expect(nombre.getAttribute('title')).toBe('Ana López');
   });
 
-  it('la opción Falta voucher del combo Estado cuenta los no anulados sin voucher vigente y filtra solo esos', async () => {
+  it('la opción Falta captura del combo Estado cuenta los no anulados sin voucher vigente y filtra solo esos', async () => {
     render(<MisPedidosView />);
     await screen.findByText('CP-W021');
-    // El filtro Estado es un combo; la opción «Falta voucher» lleva la cantidad
+    // El filtro Estado es un combo; la opción «Falta captura» lleva la cantidad
     fireEvent.click(screen.getByRole('button', { name: 'Estado: Todos' }));
-    expect(screen.getByRole('option', { name: /Falta voucher/ })).toHaveTextContent('1');
-    fireEvent.click(screen.getByRole('option', { name: /Falta voucher/ }));
-    expect(screen.getByRole('button', { name: 'Estado: Falta voucher' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Falta captura/ })).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('option', { name: /Falta captura/ }));
+    expect(screen.getByRole('button', { name: 'Estado: Falta captura' })).toBeInTheDocument();
 
     expect(screen.getByText('CP-W021')).toBeDefined();
     expect(screen.queryByText('CP-W022')).toBeNull();
     expect(screen.queryByText('CP-W023')).toBeNull();
-    expect(screen.getByText('Falta voucher', { selector: '.mpv-insignia-falta' })).toBeDefined();
+    expect(screen.getByText('Falta captura (opcional)', { selector: '.mpv-insignia-falta' })).toBeDefined();
     expect(screen.getByText('CP-W021').closest('li')!.className).toContain('mpv-card--falta');
   });
 });

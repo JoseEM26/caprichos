@@ -166,14 +166,16 @@ describe('Textos de pago digital', () => {
   it('el aviso pide la foto del voucher por el mismo chat y mantiene el nombre', () => {
     const t = TEXTOS_REPARTO.recibidoDigital('José Ángel', 'CP-W005', 'Yape');
     expect(t.textoLibre).toContain('José Ángel');
-    expect(t.textoLibre).toContain('foto de tu voucher por aquí mismo');
-    expect(t.textoLibre).toContain('asesor te escribirá');
+    expect(t.textoLibre).toContain('ya está en marcha');
+    expect(t.textoLibre).toContain('foto de tu pago por Yape');
+    expect(t.textoLibre).toContain('opcional');
     expect(t.plantillaClave).toBe('CARTA_RECIBIDO_DIGITAL');
   });
 
   it('el recordatorio usa su propia plantilla con nombre y pedido', () => {
     const t = TEXTOS_REPARTO.voucherRecordatorio('Ana', 'CP-W005');
-    expect(t.textoLibre).toContain('Seguimos en la espera de tu voucher');
+    expect(t.textoLibre).toContain('sigue en marcha');
+    expect(t.textoLibre).toContain('es opcional');
     expect(t.textoLibre).toContain('asesor');
     expect(t.plantillaClave).toBe('CARTA_VOUCHER_RECORDATORIO');
     expect(t.variablesPlantilla).toEqual(['Ana', 'CP-W005']);

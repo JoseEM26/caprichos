@@ -36,7 +36,7 @@ import { VouchersService } from '../../vouchers/vouchers.service';
 import { EjecutorConversacionService } from '../conversacion/ejecutor-conversacion.service';
 import { ReprogramacionService } from './reprogramacion.service';
 import { AvisosInternosService } from '../avisos-internos/avisos-internos.service';
-import { marcarPagoParaPersona } from './pago-para-persona.util';
+import { anotarPagoEnFlujo } from './pago-para-persona.util';
 import { pedidoEsperandoVoucher } from './pedido-esperando-voucher.util';
 import { OutboxWhatsappService } from './outbox-whatsapp.service';
 import { interpretarPuntajeEncuesta } from './encuesta-posventa.util';
@@ -1204,13 +1204,14 @@ export class WhatsappWebhookService {
 
       const archivoSubido = await this.archivosService.subirArchivo(fileMock, true);
 
-      // Enlazar captura a la conversación y al pedido (estado VALIDAR_PAGO)
+      // Enlazar captura a la conversación y al pedido. El chat NO se toma (la captura es opcional): el bot sigue
+      // atendiendo y Caja recibe el aviso de campana para revisarla sin urgencia.
       if (conversacion?.id) {
         const flujoActual = (conversacion.flujo as any) || {};
         const pagoPrev = flujoActual.pago || {};
         const capturasEnviadas = (pagoPrev.capturasEnviadas || 0) + 1;
 
-        await marcarPagoParaPersona(this.prisma, conversacion, pedido, {
+        await anotarPagoEnFlujo(this.prisma, conversacion, pedido, {
           comprobanteArchivoId: archivoSubido.id,
           capturasEnviadas,
           timestampUltimoVoucher: Date.now(),

@@ -35,6 +35,8 @@ describe('aviso de pedido recibido con pago digital', () => {
 
   it('sin datos de pago el texto sale como antes', () => {
     const t = TEXTOS_REPARTO.recibidoDigital('Ana', 'CP-W040', 'Yape', null, resumen).textoLibre;
-    expect(t).toContain('Pago por Yape: envíanos por aquí mismo la captura');
+    expect(t).toContain('Pago por Yape: tu pedido ya está en marcha');
+    expect(t).toContain('envíanos por aquí mismo la captura (foto) de tu pago');
+    expect(t).toContain('(opcional)');
   });
 });

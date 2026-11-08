@@ -108,13 +108,13 @@ describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => 
     expect(screen.queryByText(/CONFIABLE|OBSERVADO|RARO|semáforo/i)).toBeNull();
   });
 
-  it('Yape sin foto: UNA casilla «ya hablé con el cliente y pagó»; marcada habilita el envío con confirmaSinCaptura', async () => {
+  it('Yape sin foto: el envío está habilitado sin marcar nada; la casilla única es solo un registro opcional (confirmaSinCaptura)', async () => {
     const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
     render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
 
     fireEvent.click(screen.getByText('Yape'));
-    // Sin foto y sin casilla no se puede enviar; hay una sola casilla, con el texto acordado
-    expect(screen.getByTestId('btn-enviar-caja')).toBeDisabled();
+    // Sin foto y sin casilla igual se puede enviar; hay una sola casilla, con el texto acordado
+    expect(screen.getByTestId('btn-enviar-caja')).not.toBeDisabled();
     expect(screen.getAllByRole('checkbox')).toHaveLength(1);
     expect(screen.getByText('Confirmo que ya hablé con el cliente y pagó con Yape (sin captura)')).toBeDefined();
 
