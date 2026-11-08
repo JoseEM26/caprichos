@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { api } from '../../../comun/api';
@@ -65,9 +65,21 @@ describe('Nuevo pedido en el local: lista de espera de mesa', () => {
     vi.mocked(api.get).mockResolvedValue({ items: [] } as any);
   });
 
-  it('el botón «Todas ocupadas · Dejar en lista de espera» está siempre visible', () => {
+  it('«Dejar en lista de espera» está siempre visible, también con mesas libres', () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisos as any} canal="MOZO" />);
-    expect(screen.getByRole('button', { name: 'Todas ocupadas, dejar en lista de espera' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dejar en lista de espera' })).toHaveTextContent('No queda mesa libre');
+    cleanup();
+    const libres = [{ ...pisos[0], mesas: [{ ...pisos[0].mesas[0], estado: 'LIBRE' }, pisos[0].mesas[1]] }];
+    render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={libres as any} canal="MOZO" />);
+    expect(screen.getByRole('button', { name: 'Dejar en lista de espera' })).toHaveTextContent('Dejar en lista de espera (sin mesa todavía)');
+  });
+
+  it('desde Caja, «¿Qué vas a hacer?» ofrece Elegir mesa ahora y Lista de espera, sin importar las mesas', async () => {
+    const libres = [{ ...pisos[0], mesas: [{ ...pisos[0].mesas[0], estado: 'LIBRE' }, pisos[0].mesas[1]] }];
+    render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={libres as any} canal="CAJA" pasoInicial="modal" />);
+    expect(screen.getByText('Elegir mesa ahora')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('np-eleccion-lista-espera'));
+    expect(await screen.findByText('Café Americano')).toBeInTheDocument();
   });
 
   it('sin celular no envía y avisa que el celular es obligatorio', async () => {

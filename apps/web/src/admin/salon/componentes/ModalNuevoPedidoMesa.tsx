@@ -1715,7 +1715,32 @@ export function ModalNuevoPedidoMesa({
                       </span>
                       <span className="np-eleccion-texto">
                         <span className="np-eleccion-nombre">En el local (mesa)</span>
-                        <span className="np-eleccion-desc">Elige el piso y la mesa</span>
+                        <span className="np-eleccion-desc">Elegir mesa ahora</span>
+                      </span>
+                      <span className="np-eleccion-flecha" aria-hidden="true">›</span>
+                    </button>
+                  )}
+                  {puedeMesa && (
+                    <button
+                      type="button"
+                      className="np-eleccion-tarjeta"
+                      data-testid="np-eleccion-lista-espera"
+                      onClick={() => {
+                        setModalidad('local');
+                        setMesasSeleccionadas([]);
+                        setEnEspera(true);
+                        setPaso('items');
+                      }}
+                    >
+                      <span className="np-eleccion-icono" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="8" />
+                          <path d="M12 8v4l3 2" />
+                        </svg>
+                      </span>
+                      <span className="np-eleccion-texto">
+                        <span className="np-eleccion-nombre">Lista de espera</span>
+                        <span className="np-eleccion-desc">Sin mesa todavía; se asigna después</span>
                       </span>
                       <span className="np-eleccion-flecha" aria-hidden="true">›</span>
                     </button>
@@ -2010,7 +2035,7 @@ export function ModalNuevoPedidoMesa({
                 <button
                   type="button"
                   data-testid="np-lista-espera"
-                  aria-label="Todas ocupadas, dejar en lista de espera"
+                  aria-label="Dejar en lista de espera"
                   onClick={() => {
                     setMesasSeleccionadas([]);
                     setEnEspera(true);
@@ -2020,15 +2045,15 @@ export function ModalNuevoPedidoMesa({
                     minHeight: '48px',
                     padding: '0 16px',
                     borderRadius: '12px',
-                    border: '1.5px solid var(--cp-rust)',
-                    background: sinMesasLibres ? 'var(--cp-rust)' : 'transparent',
-                    color: sinMesasLibres ? 'var(--cp-cream)' : 'var(--cp-rust)',
+                    border: `1.5px solid ${sinMesasLibres ? 'var(--cp-rust)' : 'var(--cp-navy)'}`,
+                    background: sinMesasLibres ? 'var(--cp-rust)' : 'var(--cp-white)',
+                    color: sinMesasLibres ? 'var(--cp-cream)' : 'var(--cp-navy)',
                     fontWeight: 800,
-                    fontSize: '14px',
+                    fontSize: '15px',
                     cursor: 'pointer',
                   }}
                 >
-                  Todas ocupadas · Dejar en lista de espera
+                  {sinMesasLibres ? 'No queda mesa libre · Dejar en lista de espera' : 'Dejar en lista de espera (sin mesa todavía)'}
                 </button>
               )}
               {/* Modos: Tomar pedido, Juntar mesas, Liberar */}

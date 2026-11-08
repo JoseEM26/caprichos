@@ -666,6 +666,8 @@ model Pedido {
   /// Lista de espera de mesa: desde cuándo espera un pedido de mesa sin mesa asignada (null = ya tiene mesa o no aplica)
   espera_mesa_desde      DateTime?               @db.Timestamptz
   espera_personas        Int?
+  /// Mesa de la que lo sacaron para dar su lugar a otro de la lista (ej. «Mesa 4»); null = esperó desde el inicio
+  espera_desplazado_de   String?
   entregado_mesa_en      DateTime?               @db.Timestamptz
   // Cobro por mozo (envío a Caja): cuándo, medio(s) con que lo cobró y el mozo; null si no se envió
   cobro_mozo_en          DateTime?               @db.Timestamp(3)

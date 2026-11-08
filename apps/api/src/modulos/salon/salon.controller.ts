@@ -61,7 +61,7 @@ export class SalonController {
   @Permiso('mesas', 'abrir')
   async asignarEspera(@Param('pedidoId') pedidoId: string, @Body() dto: CambiarMesaDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    return this.salonService.asignarEspera(pedidoId, dto.mesaId, req.usuario, ip);
+    return this.salonService.asignarEspera(pedidoId, dto.mesaId, req.usuario, ip, dto.forzarOcupada === true);
   }
 
   /**

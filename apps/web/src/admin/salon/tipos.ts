@@ -279,6 +279,8 @@ export interface PedidoEnEspera {
   /** Hora de llegada a la lista (ISO): el minuto de espera se calcula con ella. */
   desde: string;
   minutos: number;
+  /** «Mesa 4»: de dónde lo movieron para dar su lugar a otro; null = esperó desde el inicio. */
+  movidoDesde?: string | null;
 }
 
 export interface RespuestaEspera {

@@ -1491,6 +1491,26 @@ export function PlanoView() {
                   >
                     Cobrar mesa (enviar a Caja)
                   </button>
+                  {espera.total > 0 && (
+                    <button
+                      type="button"
+                      data-testid="btn-espera-en-ocupada"
+                      onClick={() => setEsperaMesaId(String(elementoSeleccionado.id))}
+                      style={{
+                        flex: 1,
+                        minHeight: '44px',
+                        borderRadius: '10px',
+                        border: '1.5px solid var(--cp-rust)',
+                        background: 'transparent',
+                        color: 'var(--cp-rust)',
+                        fontWeight: 800,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Asignar pedido de la lista de espera aquí ({espera.total})
+                    </button>
+                  )}
                 </div>
               )}
 

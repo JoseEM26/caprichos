@@ -110,4 +110,72 @@ describe('Lista de espera de mesa', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, asignar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('La mesa 4 ya está ocupada');
   });
+
+  describe('mesa ocupada: confirmación fuerte', () => {
+    const ocupada = {
+      id: 'm5', pisoId: '1', tipo: 'MESA', numero: 5, nombre: null, asientos: 4, x: 5, y: 1, ancho: 2, alto: 2, activo: true, estado: 'OCUPADA',
+      pedido: { id: '9', codigo: 'CP-9', mozo: null, cliente: 'Rosa' },
+    };
+    const pisosOc = [{ ...pisos[0], mesas: [pisos[0].mesas[0], ocupada] }] as any;
+    function PanelOc() {
+      const espera = useListaEspera();
+      return <ListaEsperaMesa espera={espera} pisos={pisosOc} mesaOfrecida="m5" />;
+    }
+
+    it('muestra nombres y código, Enter no confirma, No cancela y no llama al API', async () => {
+      vi.mocked(salonApi.listarEspera).mockResolvedValue({ total: 1, items: [pedido('1', 'Miguel', 9)] } as any);
+      render(<PanelOc />);
+      await screen.findByText('Sentar en Mesa 5');
+      fireEvent.click(screen.getAllByText('Miguel')[1].closest('button')!);
+      const dlg = await screen.findByTestId('le-confirmar-ocupada');
+      expect(screen.getByText('Esta mesa está ocupada')).toBeInTheDocument();
+      expect(dlg).toHaveTextContent('el pedido de Rosa (CP-9) pasará a la LISTA DE ESPERA y Miguel ocupará la mesa');
+      expect(dlg).toHaveTextContent('No se pierde ningún pedido, solo cambia la mesa.');
+      expect(screen.getByRole('button', { name: 'No' })).toHaveFocus();
+      fireEvent.keyDown(dlg, { key: 'Enter' });
+      fireEvent.keyDown(document, { key: 'Enter' });
+      expect(salonApi.asignarEspera).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'No' }));
+      expect(screen.queryByTestId('le-confirmar-ocupada')).not.toBeInTheDocument();
+      expect(salonApi.asignarEspera).not.toHaveBeenCalled();
+    });
+
+    it('«Sí, mover a la lista de espera y asignar» envía forzarOcupada', async () => {
+      vi.mocked(salonApi.listarEspera).mockResolvedValue({ total: 1, items: [pedido('1', 'Miguel', 9)] } as any);
+      vi.mocked(salonApi.asignarEspera).mockResolvedValue({ ok: true } as any);
+      render(<PanelOc />);
+      await screen.findByText('Sentar en Mesa 5');
+      fireEvent.click(screen.getAllByText('Miguel')[1].closest('button')!);
+      fireEvent.click(await screen.findByRole('button', { name: 'Sí, mover a la lista de espera y asignar' }));
+      await waitFor(() => expect(salonApi.asignarEspera).toHaveBeenCalledWith('1', 'm5', true));
+    });
+
+    it('error 409 (pedido cobrado) muestra el mensaje y cierra la confirmación', async () => {
+      vi.mocked(salonApi.listarEspera).mockResolvedValue({ total: 1, items: [pedido('1', 'Miguel', 9)] } as any);
+      vi.mocked(salonApi.asignarEspera).mockRejectedValue(new Error('El pedido CP-9 ya está cobrado o finalizado'));
+      render(<PanelOc />);
+      await screen.findByText('Sentar en Mesa 5');
+      fireEvent.click(screen.getAllByText('Miguel')[1].closest('button')!);
+      fireEvent.click(await screen.findByRole('button', { name: 'Sí, mover a la lista de espera y asignar' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('ya está cobrado o finalizado');
+      expect(screen.queryByTestId('le-confirmar-ocupada')).not.toBeInTheDocument();
+    });
+
+    it('desde el selector «Asignar mesa» se puede tocar una mesa ocupada', async () => {
+      vi.mocked(salonApi.listarEspera).mockResolvedValue({ total: 1, items: [pedido('1', 'Miguel', 9)] } as any);
+      function PanelSel() {
+        const espera = useListaEspera();
+        return <ListaEsperaMesa espera={espera} pisos={pisosOc} />;
+      }
+      render(<PanelSel />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Asignar mesa a Miguel' }));
+      expect(await screen.findByTestId('selector-mesas-croquis')).toBeInTheDocument();
+    });
+  });
+
+  it('marca «Movido desde Mesa N» en el pedido desplazado', async () => {
+    vi.mocked(salonApi.listarEspera).mockResolvedValue({ total: 1, items: [{ ...pedido('1', 'Rosa', 9), movidoDesde: 'Mesa 4' }] } as any);
+    render(<Panel />);
+    expect(await screen.findByText('Movido desde Mesa 4')).toBeInTheDocument();
+  });
 });

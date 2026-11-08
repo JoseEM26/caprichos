@@ -35,6 +35,8 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
   const [nuevoEnId, setNuevoEnId] = useState<string | null>(null);
   // Mesa libre tocada con lista de espera: elegir entre pedido nuevo o uno de la lista
   const [decidirMesaId, setDecidirMesaId] = useState<string | null>(null);
+  // Mesa ocupada tocada con lista de espera: ver su cuenta o darle la mesa a alguien de la lista
+  const [decidirOcupadaId, setDecidirOcupadaId] = useState<string | null>(null);
   const [ofrecidaId, setOfrecidaId] = useState<string | null>(null);
   const espera = useListaEspera();
 
@@ -109,7 +111,10 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
   const tocarMesa = (mesa: MesaSalon) => {
     if (sumar.tocarMesa(mesa)) return;
     if (cambio.tocarMesa(mesa)) return;
-    if (mesa.estado === 'OCUPADA' && mesa.pedido) setCuentaId(mesa.id);
+    if (mesa.estado === 'OCUPADA' && mesa.pedido) {
+      if (espera.total > 0) setDecidirOcupadaId(mesa.id);
+      else setCuentaId(mesa.id);
+    }
     else if (mesa.estado === 'LIBRE') {
       if (espera.total > 0) setDecidirMesaId(mesa.id);
       else setNuevoEnId(mesa.id);
@@ -142,6 +147,37 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
         mesaOfrecida={ofrecidaId}
         alCerrarOferta={() => setOfrecidaId(null)}
       />
+
+      {decidirOcupadaId && (
+        <div className="le-fondo" role="dialog" aria-modal="true" aria-label="¿Qué hacer con la mesa ocupada?">
+          <div className="le-modal">
+            <h3 className="le-titulo">{buscarMesa(decidirOcupadaId) ? nombreMesaSalon(buscarMesa(decidirOcupadaId)!) : 'La mesa'} está ocupada</h3>
+            <button
+              type="button"
+              className="le-btn le-btn--principal"
+              onClick={() => {
+                setCuentaId(decidirOcupadaId);
+                setDecidirOcupadaId(null);
+              }}
+            >
+              Ver su cuenta
+            </button>
+            <button
+              type="button"
+              className="le-btn"
+              onClick={() => {
+                setOfrecidaId(decidirOcupadaId);
+                setDecidirOcupadaId(null);
+              }}
+            >
+              Asignar pedido de la lista de espera aquí ({espera.total})
+            </button>
+            <button type="button" className="le-btn" onClick={() => setDecidirOcupadaId(null)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {decidirMesaId && (
         <div className="le-fondo" role="dialog" aria-modal="true" aria-label="¿Qué hacer con la mesa libre?">

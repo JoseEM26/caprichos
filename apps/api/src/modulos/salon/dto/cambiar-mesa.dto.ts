@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CambiarMesaDto {
   @IsString({ message: 'mesaId debe ser un texto' })
@@ -10,4 +10,9 @@ export class CambiarMesaDto {
   @IsOptional()
   @Matches(/^\d+$/, { message: 'desdeMesaId debe ser un id numérico' })
   desdeMesaId?: string;
+
+  /** Solo lista de espera: permite tomar una mesa ocupada (el pedido que la ocupa pasa a la lista). */
+  @IsOptional()
+  @IsBoolean()
+  forzarOcupada?: boolean;
 }

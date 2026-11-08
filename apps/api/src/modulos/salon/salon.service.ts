@@ -3,6 +3,7 @@ import { ReservasService } from '../reservas/reservas.service';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -512,6 +513,8 @@ export class SalonService {
         estado: true,
         cliente_nombre: true,
         cliente_telefono: true,
+        espera_desplazado_de: true,
+        creado_en: true,
         espera_mesa_desde: true,
         espera_personas: true,
         total: true,
@@ -519,7 +522,13 @@ export class SalonService {
       },
     });
     const ahora = Date.now();
-    const items = filas.map((p) => {
+    // Orden: primero los desplazados de una mesa (ya esperaron antes), por hora de desplazamiento; luego los demás FIFO
+    const ordenadas = [...filas].sort((a, b) => {
+      const da = a.espera_desplazado_de ? 0 : 1;
+      const db = b.espera_desplazado_de ? 0 : 1;
+      return da - db || a.espera_mesa_desde!.getTime() - b.espera_mesa_desde!.getTime() || Number(a.id - b.id);
+    });
+    const items = ordenadas.map((p) => {
       const tel = String(p.cliente_telefono ?? '').replace(/\D/g, '');
       return {
         pedidoId: p.id.toString(),
@@ -531,6 +540,8 @@ export class SalonService {
         productos: p.lineas.reduce((a, l) => a + Number(l.cantidad ?? 0), 0),
         total: Number(p.total),
         desde: p.espera_mesa_desde!.toISOString(),
+        movidoDesde: p.espera_desplazado_de ?? null,
+        pedidoDesde: p.creado_en.toISOString(),
         minutos: Math.max(0, Math.floor((ahora - p.espera_mesa_desde!.getTime()) / 60000)),
       };
     });
@@ -546,6 +557,7 @@ export class SalonService {
     mesaId: string | number,
     usuario?: UsuarioAutenticado,
     ip?: string,
+    forzarOcupada = false,
   ) {
     const pId = BigInt(pedidoId);
     const destinoId = parseIdMesa(mesaId);
@@ -572,14 +584,44 @@ export class SalonService {
     const nombreDestino = nombreUnaMesa(destino);
     const ocupadaError = () =>
       new ConflictException({ codigo: 'MESA_OCUPADA', mensaje: `La mesa ${destino.numero ?? destino.nombre ?? destino.id} ya está ocupada` });
-    if (await this.prisma.pedidoMesa.findFirst({ where: { mesa_id: destinoId, abierta: true } })) throw ocupadaError();
+    const ocupante = await this.prisma.pedidoMesa.findFirst({ where: { mesa_id: destinoId, abierta: true } });
+    if (ocupante && !forzarOcupada) throw ocupadaError();
+    if (ocupante) await this.exigirPermisoQuitarMesa(usuario);
 
+    let desplazado: { id: bigint; codigo: string; nombre: string | null; quedaEnEspera: boolean } | null = null;
+    const noMovible = (codigo: string) =>
+      new ConflictException({
+        codigo: 'PEDIDO_NO_MOVIBLE',
+        mensaje: `El pedido ${codigo} ya está cobrado o finalizado: no se puede mover a la lista de espera`,
+      });
     try {
       await this.prisma.$transaction(async (tx) => {
+        if (forzarOcupada) {
+          // Dentro de la transacción: quién ocupa la mesa AHORA (pudo cambiar desde la lectura de arriba)
+          const filaOcupada = await tx.pedidoMesa.findFirst({ where: { mesa_id: destinoId, abierta: true }, include: { pedido: true } });
+          if (filaOcupada?.pedido) {
+            const ped = filaOcupada.pedido;
+            if (!['COLA', 'PREPARANDO', 'LISTO', 'ENTREGADO'].includes(ped.estado) || ped.pago_estado === 'PAGADO') throw noMovible(ped.codigo);
+            const cobroVigente = await tx.cobro.findFirst({ where: { pedido_id: ped.id, anulado_en: null }, select: { id: true } });
+            if (cobroVigente) throw noMovible(ped.codigo);
+            const cerrada = await tx.pedidoMesa.updateMany({ where: { id: filaOcupada.id, abierta: true }, data: { abierta: false } });
+            if (cerrada.count === 0) throw ocupadaError();
+            const quedan = await tx.pedidoMesa.count({ where: { pedido_id: ped.id, abierta: true } });
+            if (quedan === 0) {
+              await tx.pedido.update({
+                where: { id: ped.id },
+                data: { espera_mesa_desde: new Date(), espera_desplazado_de: nombreDestino, mesa_nombre: TEXTO_EN_ESPERA },
+              });
+            } else {
+              await this.refrescarMesasPedido(tx, ped.id);
+            }
+            desplazado = { id: ped.id, codigo: ped.codigo, nombre: ped.cliente_nombre ?? null, quedaEnEspera: quedan === 0 };
+          }
+        }
         // Condicional: dos mozos asignando el mismo pedido a la vez, solo uno gana
         const tomado = await tx.pedido.updateMany({
           where: { id: pId, espera_mesa_desde: { not: null }, estado: { not: 'ANULADO' } },
-          data: { espera_mesa_desde: null, espera_personas: null, mesa_nombre: nombreDestino },
+          data: { espera_mesa_desde: null, espera_personas: null, espera_desplazado_de: null, mesa_nombre: nombreDestino },
         });
         if (tomado.count === 0) {
           throw new ConflictException({ codigo: 'PEDIDO_NO_EN_ESPERA', mensaje: 'Este pedido ya no está en la lista de espera' });
@@ -592,6 +634,7 @@ export class SalonService {
       if (error?.code === 'P2002' || (error?.message && error.message.includes('ux_mesa_un_pedido_abierto'))) throw ocupadaError();
       throw error;
     }
+    const salio = desplazado as { id: bigint; codigo: string; nombre: string | null; quedaEnEspera: boolean } | null;
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -603,8 +646,28 @@ export class SalonService {
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
       antes: { enEspera: true, esperaDesde: pedido.espera_mesa_desde.toISOString() },
-      despues: { mesaId: destinoId.toString(), mesa: nombreDestino },
+      despues: {
+        mesaId: destinoId.toString(),
+        mesa: nombreDestino,
+        ...(salio ? { desplazado: { pedidoId: salio.id.toString(), codigo: salio.codigo, nombre: salio.nombre, deMesa: nombreDestino, aListaEspera: salio.quedaEnEspera } } : {}),
+      },
     });
+    if (salio) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'mesas',
+        accion: 'DESPLAZAR_A_ESPERA',
+        resultado: 'OK',
+        entidad: 'pedido',
+        entidadId: salio.id,
+        partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+        ip,
+        antes: { mesaId: destinoId.toString(), mesa: nombreDestino },
+        despues: { aListaEspera: salio.quedaEnEspera, ocupaAhora: { pedidoId: pId.toString(), codigo: pedido.codigo, nombre: pedido.cliente_nombre } },
+      });
+      if (salio.quedaEnEspera) this.eventosGateway.emitirAdmin('salon:espera', { pedidoId: salio.id.toString(), accion: 'ENTRA' });
+      this.emitirCambioMesas(salio.id, salio.codigo);
+    }
 
     this.eventosGateway.emitirAdmin('salon:mesa', { mesaId: destinoId.toString(), estado: 'OCUPADA' });
     this.eventosGateway.emitirAdmin('salon:espera', { pedidoId: pId.toString(), accion: 'SALE' });
@@ -617,7 +680,20 @@ export class SalonService {
       codigo: pedido.codigo,
       mesaId: destinoId.toString(),
       mesa: nombreDestino,
+      desplazado: salio ? { pedidoId: salio.id.toString(), codigo: salio.codigo, aListaEspera: salio.quedaEnEspera } : null,
     };
+  }
+
+  /** Quitarle la mesa a otro pedido exige el permiso de liberar mesas (ADMIN pasa). */
+  private async exigirPermisoQuitarMesa(usuario?: UsuarioAutenticado) {
+    const roles = rolesDelUsuario(usuario);
+    if (roles.includes('ADMIN')) return;
+    const ok = await this.prisma.rolPermiso.findFirst({
+      where: { rol: { in: roles }, permiso: { modulo: 'mesas', accion: 'liberar' } },
+    });
+    if (!ok) {
+      throw new ForbiddenException({ codigo: 'SIN_PERMISO', mensaje: 'No tienes permiso para quitarle la mesa a otro pedido' });
+    }
   }
 
   /**

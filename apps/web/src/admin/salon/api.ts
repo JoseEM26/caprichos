@@ -144,10 +144,10 @@ export const salonApi = {
   listarEspera: () => api.get<RespuestaEspera>('/admin/salon/espera'),
 
   /** El pedido de la lista pasa a la mesa libre elegida. */
-  asignarEspera: (pedidoId: string, mesaId: string) =>
+  asignarEspera: (pedidoId: string, mesaId: string, forzarOcupada?: boolean) =>
     api.post<{ ok: boolean; pedidoId: string; codigo: string; mesaId: string; mesa: string }>(
       `/admin/salon/espera/${pedidoId}/asignar`,
-      { mesaId },
+      forzarOcupada ? { mesaId, forzarOcupada: true } : { mesaId },
     ),
 
   liberarMesaManual: (mesaId: string, motivo?: string, forzar?: boolean) =>

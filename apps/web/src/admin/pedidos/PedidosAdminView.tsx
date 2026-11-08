@@ -10,6 +10,7 @@ import { PanelCambioCobro, useCambiosCobroPendientes } from './PanelCambioCobro'
 import { PanelNoEntregados } from './PanelNoEntregados';
 import { useSesion } from '../../comun/sesion';
 import { ModalNuevoPedidoMesa } from '../salon/componentes/ModalNuevoPedidoMesa';
+import { AccesoListaEsperaCaja } from '../salon/componentes/AccesoListaEsperaCaja';
 import { RegistrarCortesiaModal } from '../cortesias/RegistrarCortesiaModal';
 import { salonApi } from '../salon/api';
 import type { PisoSalon } from '../salon/tipos';
@@ -585,6 +586,7 @@ export function PedidosAdminView() {
           Registrar cortesía
         </button>
       )}
+      <AccesoListaEsperaCaja />
       <button type="button" className="cj2-btn cj2-btn--nuevo cj2-btn--nuevo-cab cj-nuevo" onClick={abrirNuevoPedido}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         Nuevo pedido

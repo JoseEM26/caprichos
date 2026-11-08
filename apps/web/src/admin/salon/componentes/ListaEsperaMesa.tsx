@@ -108,6 +108,9 @@ export function ListaEsperaMesa({ espera, pisos, planos, alAsignado, mesaOfrecid
     () => Object.fromEntries(mesas.filter((m) => m.estado === 'OCUPADA').map((m) => [m.id, { nombre: m.pedido?.codigo ?? null }])),
     [mesas],
   );
+  // Mesa ocupada elegida: pide la confirmación fuerte (el pedido que la ocupa pasa a la lista de espera)
+  const mesaConfirmar = confirmar ? mesaPorId(confirmar.mesaId) : null;
+  const ocupadaConfirmar = mesaConfirmar?.estado === 'OCUPADA' ? mesaConfirmar : null;
 
   const primero = items[0] ?? null;
   const mesaAviso = aviso ? mesaPorId(aviso.mesaId) : null;
@@ -125,7 +128,8 @@ export function ListaEsperaMesa({ espera, pisos, planos, alAsignado, mesaOfrecid
     setEnviando(true);
     setErrorAsignar(null);
     try {
-      await salonApi.asignarEspera(confirmar.pedido.pedidoId, confirmar.mesaId);
+      if (ocupadaConfirmar) await salonApi.asignarEspera(confirmar.pedido.pedidoId, confirmar.mesaId, true);
+      else await salonApi.asignarEspera(confirmar.pedido.pedidoId, confirmar.mesaId);
       cerrarTodo();
       descartarAviso();
       alCerrarOferta?.();
@@ -195,6 +199,7 @@ export function ListaEsperaMesa({ espera, pisos, planos, alAsignado, mesaOfrecid
                   <span className="le-nombre">
                     {i === 0 && <span className="le-primero">Sigue</span>}
                     {p.nombre || 'Cliente'}
+                    {p.movidoDesde && <span className="le-movido">Movido desde {p.movidoDesde}</span>}
                   </span>
                   <span className="le-meta">
                     {p.personas ? `${p.personas} pers. · ` : ''}
@@ -233,7 +238,7 @@ export function ListaEsperaMesa({ espera, pisos, planos, alAsignado, mesaOfrecid
         <div className="le-fondo" role="dialog" aria-modal="true" aria-label={`Elige la mesa para ${elegir.nombre || 'el cliente'}`}>
           <div className="le-modal">
             <h3 className="le-titulo">Mesa para {elegir.nombre || 'el cliente'}</h3>
-            <p className="le-meta">Toca una mesa libre del croquis.</p>
+            <p className="le-meta">Toca una mesa libre. Si eliges una ocupada, su pedido pasa a la lista de espera (te pediremos confirmar).</p>
             {errorAsignar && (
               <p className="le-error" role="alert">
                 {errorAsignar}
@@ -246,7 +251,7 @@ export function ListaEsperaMesa({ espera, pisos, planos, alAsignado, mesaOfrecid
               onCambio={(ids) => setSeleccion(ids.slice(-1))}
               personas={elegir.personas ?? undefined}
               ocupadas={ocupadas}
-              alTocarOcupada={() => setErrorAsignar('Esa mesa está ocupada. Elige una libre.')}
+              alTocarOcupada={(m) => setConfirmar({ pedido: elegir, mesaId: m.id })}
             />
             <div className="le-modal-acciones">
               <button type="button" className="le-btn" onClick={cerrarTodo}>
@@ -314,20 +319,49 @@ export function ListaEsperaMesa({ espera, pisos, planos, alAsignado, mesaOfrecid
         </div>
       )}
 
-      <Confirmar
-        abierto={confirmar !== null}
-        titulo="¿Asignar esta mesa?"
-        mensaje={
-          confirmar
-            ? `${textoPedido(confirmar.pedido)} pasa a ${mesaPorId(confirmar.mesaId) ? nombreMesa(mesaPorId(confirmar.mesaId)!) : 'la mesa elegida'}. La mesa queda ocupada con su pedido.`
-            : ''
-        }
-        textoConfirmar="Sí, asignar"
-        textoNo="No"
-        cargando={enviando}
-        alConfirmar={asignar}
-        alCancelar={() => setConfirmar(null)}
-      />
+      {confirmar && !ocupadaConfirmar && (
+        <Confirmar
+          abierto
+          titulo="¿Asignar esta mesa?"
+          mensaje={`${textoPedido(confirmar.pedido)} pasa a ${mesaConfirmar ? nombreMesa(mesaConfirmar) : 'la mesa elegida'}. La mesa queda ocupada con su pedido.`}
+          textoConfirmar="Sí, asignar"
+          textoNo="No"
+          cargando={enviando}
+          alConfirmar={asignar}
+          alCancelar={() => setConfirmar(null)}
+        />
+      )}
+
+      {/* Mesa ocupada: confirmación fuerte. El foco empieza en «No»; Enter no confirma, solo pulsar «Sí» a propósito. */}
+      {confirmar && ocupadaConfirmar && (
+        <div className="le-fondo le-fondo--fuerte" role="alertdialog" aria-modal="true" aria-label="Esta mesa está ocupada">
+          <div className="le-modal le-modal--fuerte" data-testid="le-confirmar-ocupada">
+            <h3 className="le-titulo le-titulo--fuerte">Esta mesa está ocupada</h3>
+            <p className="le-texto">
+              {nombreMesa(ocupadaConfirmar)} la ocupa hoy <strong>{ocupadaConfirmar.pedido?.cliente || 'otro cliente'}</strong>
+              {ocupadaConfirmar.pedido?.codigo ? ` (${ocupadaConfirmar.pedido.codigo})` : ''}.
+            </p>
+            <p className="le-texto">
+              Si continúas, el pedido de <strong>{ocupadaConfirmar.pedido?.cliente || 'otro cliente'}</strong> (
+              {ocupadaConfirmar.pedido?.codigo ?? 'sin código'}) pasará a la <strong>LISTA DE ESPERA</strong> y{' '}
+              <strong>{confirmar.pedido.nombre || 'el cliente'}</strong> ocupará la mesa. No se pierde ningún pedido, solo cambia la mesa.
+            </p>
+            <div className="le-modal-acciones">
+              <button type="button" className="le-btn le-btn--grande" autoFocus disabled={enviando} onClick={() => setConfirmar(null)}>
+                No
+              </button>
+              <button
+                type="button"
+                className="le-btn le-btn--grande le-btn--peligro"
+                disabled={enviando}
+                onClick={() => void asignar()}
+              >
+                Sí, mover a la lista de espera y asignar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
