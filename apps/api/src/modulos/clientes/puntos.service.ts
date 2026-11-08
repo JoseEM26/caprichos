@@ -3,17 +3,37 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { partyClienteDelPedido } from './cliente-del-pedido';
+import { PartyPuntosService } from './party-puntos.service';
+
+export interface OpcionesAcumular {
+  /** true = calcula sin escribir nada (simulacro de la reconstrucción) */
+  simular?: boolean;
+  /** Texto del movimiento (por defecto «Puntos por pedido CÓDIGO») */
+  motivo?: string;
+}
+
+export interface ResultadoAcumular {
+  puntos: number;
+  sumados: boolean;
+  /** Por qué no sumó */
+  motivoNo?: 'YA_SUMADO' | 'SIN_CELULAR' | 'CUPON' | 'SIN_CUENTA_CLIENTE' | 'SIN_PUNTOS';
+  partyId?: bigint | null;
+  /** simulacro: el celular todavía no tiene party y se crearía al aplicar */
+  partyNuevo?: boolean;
+}
 
 @Injectable()
 export class PuntosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    @Optional() private readonly puntosParty?: PartyPuntosService,
   ) {}
 
   /**
@@ -74,10 +94,11 @@ export class PuntosService {
    * Acumula el 5% (o porcentaje configurado) de lo pagado en productos sin descuento al cobrar un pedido. Los puntos no vencen.
    * Totalmente IDEMPOTENTE: si ya se sumó para este pedido, devuelve el registro existente sin duplicar.
    */
-  async acumularPorPedido(pedidoId: bigint | string): Promise<{ puntos: number; sumados: boolean }> {
+  async acumularPorPedido(pedidoId: bigint | string, opts: OpcionesAcumular = {}): Promise<ResultadoAcumular> {
     const pId = BigInt(pedidoId);
+    const simular = opts.simular === true;
 
-    // 1. Verificar si ya existe movimiento SUMA para este pedido (Idempotencia)
+    // 1. Verificar si ya existe movimiento SUMA para este pedido (Idempotencia; además la BD tiene único (pedido_id, tipo))
     const movExistente = await this.prisma.movimientoPuntos.findFirst({
       where: {
         pedido_id: pId,
@@ -86,7 +107,7 @@ export class PuntosService {
     });
 
     if (movExistente) {
-      return { puntos: Number(movExistente.puntos), sumados: false };
+      return { puntos: Number(movExistente.puntos), sumados: false, motivoNo: 'YA_SUMADO' };
     }
 
     // 2. Obtener el pedido con sus datos
@@ -101,29 +122,41 @@ export class PuntosService {
       });
     }
 
-    // Cliente con cuenta del pedido; invitado (o pedido de mozo sin cliente identificado) no acumula (RQ-CLI-02-03)
-    const partyCliente = partyClienteDelPedido(pedido);
+    // Cliente del pedido; si no quedó ligado (pedido sin cuenta, de otro canal o anterior a «puntos por celular»),
+    // el celular válido del pedido manda: se reutiliza o se crea su party de puntos.
+    let partyCliente = partyClienteDelPedido(pedido);
+    let ligadoPorCelular = false;
+    let partyNuevo = false;
     if (!partyCliente) {
-      return { puntos: 0, sumados: false };
+      if (!this.puntosParty || !pedido.cliente_telefono) return { puntos: 0, sumados: false, motivoNo: 'SIN_CELULAR' };
+      if (simular) {
+        const c = await this.puntosParty.consultar(pedido.cliente_telefono);
+        if (!c.valido) return { puntos: 0, sumados: false, motivoNo: 'SIN_CELULAR' };
+        partyCliente = c.partyId;
+        partyNuevo = c.partyId === null;
+      } else {
+        partyCliente = await this.puntosParty.resolverOCrear(pedido.cliente_telefono);
+        if (!partyCliente) return { puntos: 0, sumados: false, motivoNo: 'SIN_CELULAR' };
+      }
+      ligadoPorCelular = true;
     }
 
     // Si usó cupón, no suma puntos (DT-56, RQ-CLI-02-02)
     if (pedido.cupon_id || pedido.cupon_emitido_id) {
-      return { puntos: 0, sumados: false };
+      return { puntos: 0, sumados: false, motivoNo: 'CUPON', partyId: partyCliente };
     }
 
-    // Verificar si el cliente tiene cuenta o rol CLIENTE
-    const rolCliente = await this.prisma.partyRole.findFirst({
-      where: {
-        party_id: partyCliente,
-        rol: 'CLIENTE',
-        hasta: null,
-      },
-      include: { customer_detail: true },
-    });
-
-    if (!rolCliente) {
-      return { puntos: 0, sumados: false };
+    // Rol CLIENTE vigente. Quien nunca fue cliente lo recibe (cuenta sin verificar); a quien se le dio de baja, no.
+    let rolCliente = partyCliente ? await this.rolClienteVigente(partyCliente) : null;
+    if (partyCliente && !rolCliente) {
+      const baja = await this.prisma.partyRole.findFirst({ where: { party_id: partyCliente, rol: 'CLIENTE' }, select: { id: true } });
+      if (baja || !this.puntosParty) {
+        return { puntos: 0, sumados: false, motivoNo: 'SIN_CUENTA_CLIENTE', partyId: partyCliente };
+      }
+      if (!simular) {
+        await this.puntosParty.asegurarRolCliente(partyCliente);
+        rolCliente = await this.rolClienteVigente(partyCliente);
+      }
     }
 
     // 3. Obtener el porcentaje configurado (por defecto 5%)
@@ -146,26 +179,28 @@ export class PuntosService {
 
     const puntosCalculados = Math.round((baseCalculo * (porcentaje / 100)) * 100) / 100;
     if (puntosCalculados <= 0) {
-      return { puntos: 0, sumados: false };
+      return { puntos: 0, sumados: false, motivoNo: 'SIN_PUNTOS', partyId: partyCliente };
     }
+    if (simular) return { puntos: puntosCalculados, sumados: false, partyId: partyCliente, partyNuevo };
 
     // 5. Transacción atómica: insertar movimiento y actualizar saldos
+    try {
     await this.prisma.$transaction(async (tx) => {
       // Movimiento inmutable
       await tx.movimientoPuntos.create({
         data: {
-          party_id: partyCliente,
+          party_id: partyCliente!,
           pedido_id: pId,
           tipo: 'SUMA',
           puntos: puntosCalculados,
-          motivo: `Puntos por pedido ${pedido.codigo}`,
+          motivo: opts.motivo ?? `Puntos por pedido ${pedido.codigo}`,
         },
       });
 
       // Actualizar saldo rápido en customer_detail
-      if (rolCliente.customer_detail) {
+      if (rolCliente!.customer_detail) {
         await tx.customerDetail.update({
-          where: { party_role_id: rolCliente.id },
+          where: { party_role_id: rolCliente!.id },
           data: {
             puntos: {
               increment: puntosCalculados,
@@ -175,20 +210,32 @@ export class PuntosService {
       } else {
         await tx.customerDetail.create({
           data: {
-            party_role_id: rolCliente.id,
+            party_role_id: rolCliente!.id,
             puntos: puntosCalculados,
           },
         });
       }
 
-      // Actualizar pedido
+      // Actualizar pedido (y ligarlo al cliente del celular para que se pueda reversar y verlo en su historial)
       await tx.pedido.update({
         where: { id: pId },
-        data: { puntos_ganados: puntosCalculados },
+        data: { puntos_ganados: puntosCalculados, ...(ligadoPorCelular && !pedido.cliente_party_id ? { cliente_party_id: partyCliente } : {}) },
       });
     });
+    } catch (err: any) {
+      // Carrera con otro cobro del mismo pedido: el único (pedido_id, tipo) ya lo sumó
+      if (err?.code === 'P2002') return { puntos: 0, sumados: false, motivoNo: 'YA_SUMADO', partyId: partyCliente };
+      throw err;
+    }
 
-    return { puntos: puntosCalculados, sumados: true };
+    return { puntos: puntosCalculados, sumados: true, partyId: partyCliente };
+  }
+
+  private rolClienteVigente(partyId: bigint) {
+    return this.prisma.partyRole.findFirst({
+      where: { party_id: partyId, rol: 'CLIENTE', hasta: null },
+      include: { customer_detail: true },
+    });
   }
 
   /**

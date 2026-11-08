@@ -13,6 +13,12 @@ function celular9(raw: string | null | undefined): string | null {
   return n.valido ? (n.celular9 ?? null) : null;
 }
 
+/** Celular de 9 dígitos válido para sumar puntos (no el relleno 999999999), o null. */
+export function celularValido(raw: string | null | undefined): string | null {
+  const tel = celular9(raw);
+  return tel && tel !== TELEFONO_PLACEHOLDER ? tel : null;
+}
+
 /**
  * Cliente que acumula puntos solo con su celular (sin nombre real, sin contraseña, sin cuenta).
  * Canjear puntos sigue exigiendo cuenta completa: eso lo valida PedidosService.
@@ -26,8 +32,8 @@ export class PartyPuntosService {
    * Null si el celular no es válido, es el relleno 999999999 o su cuenta está desactivada.
    */
   async resolverOCrear(telefono: string | null | undefined): Promise<bigint | null> {
-    const tel = celular9(telefono);
-    if (!tel || tel === TELEFONO_PLACEHOLDER) return null;
+    const tel = celularValido(telefono);
+    if (!tel) return null;
 
     const existente = await this.buscar(tel);
     if (existente === 'INACTIVA') return null;
@@ -41,6 +47,18 @@ export class PartyPuntosService {
       const otra = await this.buscar(tel);
       return otra === 'INACTIVA' ? null : otra;
     }
+  }
+
+  /**
+   * Como resolverOCrear pero sin crear nada (simulacros). `valido` dice si el celular sirve para sumar;
+   * `partyId` es null si todavía no hay party (se crearía) o la cuenta está desactivada.
+   */
+  async consultar(telefono: string | null | undefined): Promise<{ valido: boolean; celular9: string | null; partyId: bigint | null }> {
+    const tel = celularValido(telefono);
+    if (!tel) return { valido: false, celular9: null, partyId: null };
+    const existente = await this.buscar(tel);
+    if (existente === 'INACTIVA') return { valido: false, celular9: tel, partyId: null };
+    return { valido: true, celular9: tel, partyId: existente };
   }
 
   /**
@@ -106,7 +124,7 @@ export class PartyPuntosService {
   }
 
   /** Rol CLIENTE vigente con customer_detail (puntos 0) para un party que ya existe. */
-  private async asegurarRolCliente(partyId: bigint): Promise<void> {
+  async asegurarRolCliente(partyId: bigint): Promise<void> {
     const rol = await this.prisma.partyRole.findFirst({
       where: { party_id: partyId, rol: 'CLIENTE', hasta: null },
       include: { customer_detail: true },
