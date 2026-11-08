@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { Pedido } from './pedidosApi';
-import { IconoModalidad, IconoCanal, claveCanal, claveModalidad, textoMesa } from './InsigniaModalidad';
+import { IconoModalidad, IconoCanal, claveCanal, claveModalidad, textoMesa, type ClaveModalidad } from './InsigniaModalidad';
 import { deliverySinUbicacion } from './ubicacionDelivery';
 import { canalLabel, ChipCobroMozo } from './PedidosAdminView';
 import { InsigniaDireccionEditada } from './InsigniaDireccionEditada';
@@ -34,18 +34,16 @@ function chipPago(o: Pedido): { texto: string; clase: string } {
   return { texto: 'Por cobrar', clase: 'pend' };
 }
 
-/** «En el local · Mesa 4», «A domicilio · Zona 2» o «Para llevar». */
-function lineaModalidad(o: Pedido): string {
+const ROTULO: Record<ClaveModalidad, string> = {
+  DELIVERY: 'DELIVERY', LLEVAR: 'PARA LLEVAR', MESA: 'MESA', COMER_LOCAL: 'COMER EN EL LOCAL', LOCAL: 'EN EL LOCAL',
+};
+
+/** Rótulo de la insignia («MESA 4», «DELIVERY») y detalle secundario (la zona del delivery). */
+function textoInsignia(o: Pedido): { rotulo: string; detalle: string | null } {
   const clave = claveModalidad(o.modalidad);
-  if (clave === 'MESA') {
-    const n = String(o.mesa_nombre || '').trim();
-    const mesa = !n ? 'Mesa' : /^(mesa|en espera)/i.test(n) ? n : `Mesa ${n}`;
-    return `En el local · ${mesa}`;
-  }
-  if (clave === 'DELIVERY') return o.zona?.nombre ? `A domicilio · ${o.zona.nombre}` : 'A domicilio';
-  if (clave === 'LLEVAR') return 'Para llevar';
-  if (clave === 'COMER_LOCAL') return 'Comer en el local';
-  return 'En el local';
+  if (clave === 'MESA') return { rotulo: textoMesa(o.mesa_nombre), detalle: null };
+  if (clave === 'DELIVERY') return { rotulo: ROTULO.DELIVERY, detalle: o.zona?.nombre || null };
+  return { rotulo: ROTULO[clave], detalle: null };
 }
 
 export interface TarjetaPedidoCajaProps {
@@ -73,6 +71,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
   const pago = chipPago(o);
   const canal = claveCanal(o.canal, o.codigo);
   const clave = claveModalidad(o.modalidad);
+  const insignia = textoInsignia(o);
   const cerrado = esCerrado(o);
   const lineas = o.lineas || [];
   const itemsTexto = lineas.map((l) => `${l.cantidad}× ${l.nombre}`);
@@ -114,8 +113,9 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
 
         <span className="cj2-mod">
           <span className="cj2-mod-texto" data-modalidad={clave}>
-            <IconoModalidad modalidad={clave} tamano={16} />
-            {lineaModalidad(o)}
+            <span className="cj2-mod-ico"><IconoModalidad modalidad={clave} tamano={22} /></span>
+            <span className="cj2-mod-txt">{insignia.rotulo}</span>
+            {insignia.detalle && <span className="cj2-mod-det">· {insignia.detalle}</span>}
           </span>
           <span className="cj2-canal" data-canal={canal}>
             <IconoCanal clave={canal} />

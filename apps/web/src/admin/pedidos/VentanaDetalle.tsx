@@ -56,7 +56,7 @@ export function VentanaDetalle({ titulo, alCerrar, children }: VentanaDetallePro
         onKeyDown={onKeyDown}
       >
         <div className="vd-asa" aria-hidden="true" />
-        <button type="button" className="vd-cerrar" aria-label="Cerrar detalle" onClick={alCerrar}>
+        <button type="button" className="vd-cerrar" aria-label="Cerrar detalle del pedido" onClick={alCerrar}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>

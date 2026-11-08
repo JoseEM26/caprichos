@@ -87,9 +87,10 @@
   max-height: none;
 }
 
-/* Deja libre la X de cierre */
-.vd-cuerpo .cj-head {
-  padding-right: 64px;
+/* Deja libre la X de cierre: el total del detalle queda siempre a su izquierda, nunca debajo */
+.vd-cuerpo .cj-head,
+.vd-cuerpo .dp-cab {
+  padding-right: 68px;
 }
 
 @media (min-width: 1100px) {

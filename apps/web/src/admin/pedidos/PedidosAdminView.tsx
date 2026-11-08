@@ -1,3 +1,4 @@
+import { useCuadricula } from './paginacionCaja';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
@@ -155,22 +156,6 @@ async function contarPendientesAnteriores(): Promise<number | null> {
   }
 }
 
-/** Tarjetas por página según el ancho: 12 en PC (4 columnas), 8 en tablet, 6 en celular. */
-function tarjetasPorPagina(): number {
-  const w = typeof window === 'undefined' ? 1024 : window.innerWidth;
-  return w >= 1280 ? 12 : w >= 700 ? 8 : 6;
-}
-
-function usePorPagina(): number {
-  const [n, setN] = useState(tarjetasPorPagina);
-  useEffect(() => {
-    const f = () => setN(tarjetasPorPagina());
-    window.addEventListener('resize', f);
-    return () => window.removeEventListener('resize', f);
-  }, []);
-  return n;
-}
-
 const Flecha = ({ der }: { der?: boolean }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d={der ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'} />
@@ -219,7 +204,7 @@ export function PedidosAdminView() {
 
   // Paginación
   const [paginaActual, setPaginaActual] = useState<number>(1);
-  const pedidosPorPagina = usePorPagina();
+  const { columnas, porPagina: pedidosPorPagina } = useCuadricula();
 
   // Alerta sonora y visual
   const [pedidosResaltados, setPedidosResaltados] = useState<Set<string>>(new Set());
@@ -514,6 +499,10 @@ export function PedidosAdminView() {
     const inicio = (paginaValida - 1) * pedidosPorPagina;
     return pedidosFiltrados.slice(inicio, inicio + pedidosPorPagina);
   }, [pedidosFiltrados, paginaValida, pedidosPorPagina]);
+  // Si la página guardada quedó fuera de rango (menos pedidos o pantalla más grande), se reajusta de verdad
+  useEffect(() => {
+    setPaginaActual((p) => (p > totalPaginas ? totalPaginas : p));
+  }, [totalPaginas]);
   const desde = pedidosFiltrados.length === 0 ? 0 : (paginaValida - 1) * pedidosPorPagina + 1;
   const hasta = Math.min(paginaValida * pedidosPorPagina, pedidosFiltrados.length);
 
@@ -787,7 +776,7 @@ export function PedidosAdminView() {
               )}
             </div>
           ) : (
-            <div className="cj2-cuadricula">
+            <div className="cj2-cuadricula" data-columnas={columnas} style={{ ['--cj2-cols' as string]: columnas }}>
               {pedidosPaginados.map((o) => (
                 <TarjetaPedidoCaja
                   key={o.id}
@@ -811,6 +800,11 @@ export function PedidosAdminView() {
             {pedidosFiltrados.length === 0 ? '0 pedidos' : `${desde}–${hasta} de ${pedidosFiltrados.length}`}
           </span>
           <div className="cj2-pag-flechas">
+            {totalPaginas >= 5 && (
+              <button type="button" className="cj2-btn cj2-pag-extremo" aria-label="Primera página" disabled={paginaValida <= 1} onClick={() => setPaginaActual(1)}>
+                Primera
+              </button>
+            )}
             <button
               type="button"
               className="cj2-btn cj2-btn--ico"
@@ -820,7 +814,23 @@ export function PedidosAdminView() {
             >
               <Flecha />
             </button>
-            <span className="cj2-pag-n">{paginaValida}/{totalPaginas}</span>
+            {totalPaginas >= 5 ? (
+              <label className="cj2-pag-ir">
+                <select
+                  className="cj2-pag-select"
+                  aria-label="Ir a la página"
+                  value={paginaValida}
+                  onChange={(e) => setPaginaActual(Number(e.target.value))}
+                >
+                  {Array.from({ length: totalPaginas }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>{i + 1}</option>
+                  ))}
+                </select>
+                <span>/ {totalPaginas}</span>
+              </label>
+            ) : (
+              <span className="cj2-pag-n">{paginaValida}/{totalPaginas}</span>
+            )}
             <button
               type="button"
               className="cj2-btn cj2-btn--ico"
@@ -830,6 +840,11 @@ export function PedidosAdminView() {
             >
               <Flecha der />
             </button>
+            {totalPaginas >= 5 && (
+              <button type="button" className="cj2-btn cj2-pag-extremo" aria-label="Última página" disabled={paginaValida >= totalPaginas} onClick={() => setPaginaActual(totalPaginas)}>
+                Última
+              </button>
+            )}
           </div>
         </div>
       </>
