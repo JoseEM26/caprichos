@@ -168,7 +168,7 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
 
       // Precio por tamaño cargado (Datos)
       expect(screen.getByDisplayValue('22')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('Personal')).toBeInTheDocument();
+      expect(screen.getByText('Personal')).toBeInTheDocument();
 
       // Partes cargadas
       irA(/Partes y alternativas/);

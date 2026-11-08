@@ -15,7 +15,7 @@ export interface ProductoEditor {
   precio?: number;
   fotoUrl?: string | null;
   sabores?: Array<{ id: string; nombre: string }>;
-  tamanos?: Array<{ id: string; nombre: string; precio?: number }>;
+  tamanos?: Array<{ id: string; nombre: string; precio?: number; valorId?: string }>;
 }
 export interface CategoriaEditor {
   id: string;

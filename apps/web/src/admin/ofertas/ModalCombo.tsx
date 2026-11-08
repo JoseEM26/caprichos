@@ -10,6 +10,9 @@ import { PrevisualizacionCarta } from './PrevisualizacionCarta';
 import { EditorPartesCombo, ResumenPartesCombo } from './EditorPartesCombo';
 import { CategoriaEditor, ProductoEditor, errorDePartes, normalizarPartes, partesParaGuardar, bloquesDe, opcionesDeGrupo, perteneceACategoria, idsProductos, tipoDe } from './partesComboModelo';
 
+import { catalogoApi } from '../catalogo/catalogoApi';
+import { mezclarTamanos, tamanosHeredados, tamanosVigentes } from './tamanosCombo';
+
 const DIAS = [
   ['lun', 'Lunes', 'Lun'],
   ['mar', 'Martes', 'Mar'],
@@ -81,6 +84,18 @@ export function calcularSumaPreciosSueltos(
   }
   return Math.round(total * 100) / 100;
 }
+
+const estiloBotonTamano: React.CSSProperties = {
+  minHeight: '36px',
+  padding: '0 14px',
+  borderRadius: '8px',
+  border: '1.5px dashed var(--cp-navy)',
+  backgroundColor: 'transparent',
+  color: 'var(--cp-navy)',
+  fontWeight: 700,
+  fontSize: '12px',
+  cursor: 'pointer',
+};
 
 // Referencia estable: un [] nuevo en cada render reiniciaría el formulario sin parar.
 const SIN_CATEGORIAS: never[] = [];
@@ -165,7 +180,7 @@ export function ModalCombo({
       const preciosLista = comboAEditar.combosPrecio || comboAEditar.combosPrecios;
       setTamanos(
         preciosLista && preciosLista.length > 0
-          ? preciosLista.map((t) => ({ ...t, precio: Number(t.precio) || 0 }))
+          ? preciosLista.map((t) => ({ ...t, precio: Number(t.precio) || 0, activo: true }))
           : [{ tamanoNombre: 'Regular', precio: comboAEditar.descuentoValor || 0 }],
       );
 
@@ -222,9 +237,27 @@ export function ModalCombo({
     return () => window.removeEventListener('keydown', alTeclear);
   }, [abierto, confirmarQuitarFoto, confirmarGuardar]);
 
+  // Tamaños heredados de las bebidas del combo (valores reales de la lista TAMANO)
+  const heredados = useMemo(() => tamanosHeredados(partes, productosDisponibles, categoriasEditor), [partes, productosDisponibles, categoriasEditor]);
+  const [valoresTamano, setValoresTamano] = useState<Array<{ id: string; nombre: string }>>([]);
+  useEffect(() => {
+    if (!abierto) return;
+    // Sin lista (sin permiso o sin red) solo se pierde el botón «+ Tamaño» de la lista: queda el nombre escrito a mano
+    void Promise.resolve(catalogoApi.listarListas?.())
+      .then((ls) => setValoresTamano((ls ?? []).find((l) => l.codigo === 'TAMANO')?.valores.filter((v) => v.activo).map((v) => ({ id: String(v.id), nombre: v.nombre })) ?? []))
+      .catch(() => {});
+  }, [abierto]);
+  // Al armar las bebidas aparecen sus tamaños (en combo nuevo listos para poner precio; en uno ya guardado, apagados)
+  useEffect(() => {
+    if (!abierto) return;
+    setTamanos((prev) => mezclarTamanos(prev, heredados, !comboAEditar));
+  }, [abierto, heredados, comboAEditar]);
+
   // Acciones en tamaños
-  const agregarTamano = () => {
-    setTamanos((prev) => [...prev, { tamanoNombre: '', precio: 0 }]);
+  const traerTamanos = () => setTamanos((prev) => mezclarTamanos(prev, heredados, true));
+  const agregarTamano = (valorId?: string) => {
+    const v = valoresTamano.find((x) => x.id === valorId);
+    setTamanos((prev) => [...prev, v ? { tamanoValorId: v.id, tamanoNombre: v.nombre, precio: 0, activo: true } : { tamanoNombre: '', precio: 0, activo: true }]);
   };
 
   const quitarTamano = (index: number) => {
@@ -257,7 +290,8 @@ export function ModalCombo({
     return calcularSumaPreciosSueltos(partes, productosDisponibles, categoriasEditor);
   }, [partes, productosDisponibles, categoriasEditor]);
 
-  const precioBaseCombo = Number(tamanos[0]?.precio) || 0;
+  const vigentes = tamanosVigentes(tamanos);
+  const precioBaseCombo = Number(vigentes[0]?.precio) || 0;
   const ahorroCalculado = sumaIndividuales > 0 && precioBaseCombo > 0 ? sumaIndividuales - precioBaseCombo : 0;
   const porcentajeAhorro = sumaIndividuales > 0 && ahorroCalculado > 0 ? Math.round((ahorroCalculado / sumaIndividuales) * 100) : 0;
   const esMasCaroQueSueltos = sumaIndividuales > 0 && precioBaseCombo > sumaIndividuales;
@@ -268,7 +302,8 @@ export function ModalCombo({
   // Errores pendientes por pestaña (sin efectos): null = la pestaña está bien.
   const errorDatos = (): string | null => {
     if (!nombre.trim()) return 'Escribe el nombre del combo.';
-    if (tamanos.length === 0 || tamanos.some((t) => !t.tamanoNombre.trim() || !(Number(t.precio) > 0))) return 'Cada tamaño debe tener un nombre y un precio mayor a 0.';
+    if (vigentes.length === 0) return 'Pon el precio del combo en al menos un tamaño.';
+    if (vigentes.some((t) => !t.tamanoNombre.trim())) return 'Cada tamaño con precio necesita un nombre.';
     return null;
   };
   const errorPartes = (): string | null => errorDePartes(partes, categoriasEditor);
@@ -288,7 +323,7 @@ export function ModalCombo({
     const hay = verErrores && !!erroresPestanas.find((e) => e.id === id)?.error;
     return hay ? { insignia: '!', insigniaError: true } : {};
   };
-  const firma = JSON.stringify([nombre, descripcion, categoriaId, fotoArchivoId, partes, tamanos, dias, horaDesde, horaHasta, fechaDesde, fechaHasta, canales, visibleCarta]);
+  const firma = JSON.stringify([nombre, descripcion, categoriaId, fotoArchivoId, partes, vigentes, dias, horaDesde, horaHasta, fechaDesde, fechaHasta, canales, visibleCarta]);
   const sucio = useCambiosSinGuardar(abierto, firma);
   const { cerrar, confirmando, setConfirmando } = useCierreConConfirmacion(sucio, onCerrar);
 
@@ -344,11 +379,13 @@ export function ModalCombo({
         activo: comboAEditar ? comboAEditar.activo : true,
         ...(comboAEditar ? { visibleCarta } : {}),
         imagenArchivoId: fotoArchivoId,
-        tamanos: tamanos.map((t) => ({
+        tamanos: vigentes.map((t) => ({
+          ...(t.tamanoValorId ? { tamanoValorId: t.tamanoValorId } : {}),
           tamanoNombre: t.tamanoNombre.trim(),
           precio: Number(t.precio),
         })),
-        combosPrecios: tamanos.map((t) => ({
+        combosPrecios: vigentes.map((t) => ({
+          ...(t.tamanoValorId ? { tamanoValorId: t.tamanoValorId } : {}),
           tamanoNombre: t.tamanoNombre.trim(),
           precio: Number(t.precio),
         })),
@@ -378,8 +415,8 @@ export function ModalCombo({
     imagenArchivoId: fotoArchivoId,
     alcanceCategoriaId: categoriaId,
     categoriaNombre: listaCategorias.find((c) => c.id === categoriaId)?.nombre,
-    combosPrecio: tamanos,
-    combosPrecios: tamanos,
+    combosPrecio: vigentes,
+    combosPrecios: vigentes,
     combosParte: partesVista,
     combosPartes: partesVista,
     dias: dias.map((code) => DIAS.findIndex((x) => x[0] === code) + 1),
@@ -616,29 +653,50 @@ export function ModalCombo({
             {/* Lista de precios por tamaño */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ fontWeight: 700, fontSize: '13px' }}>
-                Precios del combo por tamaño *
+                Tamaños del combo *
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                Salen de las bebidas del combo. Pon el precio de cada tamaño; sin precio o apagado, ese tamaño no se ofrece.
               </div>
 
               {tamanos.map((t, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div key={t.tamanoValorId ?? `manual-${idx}`} data-testid="fila-tamano-combo" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
-                    type="text"
-                    value={t.tamanoNombre}
+                    type="checkbox"
+                    checked={t.activo !== false}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      setTamanos((prev) => prev.map((item, i) => (i === idx ? { ...item, tamanoNombre: val } : item)));
+                      const val = e.target.checked;
+                      setTamanos((prev) => prev.map((item, i) => (i === idx ? { ...item, activo: val } : item)));
                     }}
-                    placeholder="Tamaño, ej.: Regular, Grande"
-                    aria-label="Nombre del tamaño"
-                    style={{
-                      flex: 2,
-                      minHeight: '42px',
-                      borderRadius: '8px',
-                      border: '1.5px solid var(--cp-line)',
-                      padding: '0 12px',
-                      fontSize: '14px',
-                    }}
+                    aria-label={`Ofrecer ${t.tamanoNombre || 'tamaño'}`}
                   />
+                  {t.tamanoValorId ? (
+                    <div style={{ flex: 2, fontSize: '14px', fontWeight: 600, opacity: t.activo === false ? 0.55 : 1 }}>
+                      {t.tamanoNombre}
+                      {heredados.length > 0 && !heredados.some((h) => h.valorId === t.tamanoValorId && h.enTodas) && heredados.some((h) => h.valorId === t.tamanoValorId) && (
+                        <span style={{ display: 'block', fontSize: '11px', fontWeight: 400, color: 'var(--cp-soft)' }}>No todas las bebidas lo tienen</span>
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={t.tamanoNombre}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTamanos((prev) => prev.map((item, i) => (i === idx ? { ...item, tamanoNombre: val } : item)));
+                      }}
+                      placeholder="Tamaño, ej.: Regular, Grande"
+                      aria-label="Nombre del tamaño"
+                      style={{
+                        flex: 2,
+                        minHeight: '42px',
+                        borderRadius: '8px',
+                        border: '1.5px solid var(--cp-line)',
+                        padding: '0 12px',
+                        fontSize: '14px',
+                      }}
+                    />
+                  )}
                   <div style={{ position: 'relative', flex: 1 }}>
                     <span style={{ position: 'absolute', left: '10px', top: '12px', fontSize: '14px', fontWeight: 700, color: 'var(--cp-soft)' }}>
                       S/
@@ -666,7 +724,7 @@ export function ModalCombo({
                       }}
                     />
                   </div>
-                  {tamanos.length > 1 && (
+                  {tamanos.length > 1 && !heredados.some((h) => h.valorId === t.tamanoValorId) && (
                     <button
                       type="button"
                       onClick={() => quitarTamano(idx)}
@@ -688,25 +746,34 @@ export function ModalCombo({
                 </div>
               ))}
 
-              <button
-                type="button"
-                onClick={agregarTamano}
-                style={{
-                  alignSelf: 'flex-start',
-                  minHeight: '36px',
-                  padding: '0 14px',
-                  borderRadius: '8px',
-                  border: '1.5px dashed var(--cp-navy)',
-                  backgroundColor: 'transparent',
-                  color: 'var(--cp-navy)',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  marginTop: '4px',
-                }}
-              >
-                + Agregar otro tamaño
-              </button>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                {heredados.length > 0 && (
+                  <button type="button" onClick={traerTamanos} style={estiloBotonTamano}>
+                    Traer tamaños de las bebidas
+                  </button>
+                )}
+                {valoresTamano.length > 0 ? (
+                  <select
+                    aria-label="+ Tamaño"
+                    value=""
+                    onChange={(e) => e.target.value && agregarTamano(e.target.value)}
+                    style={estiloBotonTamano}
+                  >
+                    <option value="">+ Tamaño</option>
+                    {valoresTamano
+                      .filter((v) => !tamanos.some((t) => t.tamanoValorId === v.id))
+                      .map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.nombre}
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <button type="button" onClick={() => agregarTamano()} style={estiloBotonTamano}>
+                    + Tamaño
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* COMPARACIÓN AUTOMÁTICA CONTRA PRECIOS SUELTOS */}
@@ -737,7 +804,7 @@ export function ModalCombo({
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--cp-navy)' }}>
-                  Precio del combo ({tamanos[0]?.tamanoNombre || 'Regular'}):
+                  Precio del combo ({vigentes[0]?.tamanoNombre || 'Regular'}):
                 </span>
                 <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--cp-rust)' }}>
                   S/ {precioBaseCombo.toFixed(2)}
