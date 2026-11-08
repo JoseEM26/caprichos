@@ -649,16 +649,15 @@ describe('AlmacenService', () => {
         service.mermaMultiple({ lineas: [{ insumoId: 50, cantidad: 2, origen: 'Salados', destino: 'Desecho' }] } as any, mockUsuario),
       ).rejects.toMatchObject({ response: { codigo: 'SABOR_REQUERIDO' } });
 
-      await service.mermaMultiple(
-        { lineas: [{ insumoId: 50, cantidad: 2, origen: 'Salados', destino: 'Desecho', saborId: 11 }] } as any,
-        mockUsuario,
-      );
-      expect(prisma.stockSabor.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { sabor_id: 11n } }),
-      );
-      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ tipo: 'MERMA', sabor_id: 11n }) }),
-      );
+      // La merma de productos ya no sale de aquí: se registra en Apertura del día
+      await expect(
+        service.mermaMultiple(
+          { lineas: [{ insumoId: 50, cantidad: 2, origen: 'Salados', destino: 'Desecho', saborId: 11 }] } as any,
+          mockUsuario,
+        ),
+      ).rejects.toMatchObject({ response: { codigo: 'MERMA_PRODUCTO_EN_APERTURA', enlace: '/admin/apertura' } });
+      expect(prisma.stockSabor.update).not.toHaveBeenCalled();
+      expect(prisma.movimientoStock.create).not.toHaveBeenCalled();
     });
   });
 
@@ -752,45 +751,16 @@ describe('AlmacenService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('soporta mermar productos terminados con stock (RN-CAP-115)', async () => {
+    it('un producto terminado ya no se mera aquí: 409 «se registra en Apertura del día»', async () => {
       prisma.insumo.findUnique.mockResolvedValue(null);
-      prisma.producto.findUnique.mockResolvedValue({
-        id: 50n,
-        nombre: 'Galletas de Avena',
-      });
+      prisma.producto.findUnique.mockResolvedValue({ id: 50n, nombre: 'Galletas de Avena' });
       prisma.lugarStock.findUnique.mockResolvedValue({ id: 11n, nombre: 'Salados' });
-      prisma.stock.findFirst.mockResolvedValue({
-        id: 70n,
-        producto_id: 50n,
-        lugar_id: 11n,
-        cantidad: new Prisma.Decimal('12.00'),
+      await expect(
+        service.mermaMultiple({ lineas: [{ insumoId: 50, cantidad: 4, origen: 'Salados', destino: 'Personal' }] }, mockUsuario),
+      ).rejects.toMatchObject({
+        response: { codigo: 'MERMA_PRODUCTO_EN_APERTURA', mensaje: expect.stringContaining('Apertura del día') },
       });
-      prisma.movimientoStock.create.mockResolvedValue({ id: 301n });
-
-      const res = await service.mermaMultiple(
-        {
-          lineas: [
-            {
-              insumoId: 50,
-              cantidad: 4,
-              origen: 'Salados',
-              destino: 'Personal',
-            },
-          ],
-        },
-        mockUsuario,
-      );
-
-      expect(res.ok).toBe(true);
-      expect(prisma.movimientoStock.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            tipo: 'MERMA',
-            producto_id: 50n,
-            cantidad: new Prisma.Decimal(-4),
-          }),
-        }),
-      );
+      expect(prisma.movimientoStock.create).not.toHaveBeenCalled();
     });
   });
 

@@ -15,6 +15,8 @@ import { Icono } from '../../comun/Icono';
 import { Insignia, type VarianteInsignia } from '../../comun/Insignia';
 import { ErrorApi } from '../../comun/api';
 import { MermaProductoBoton } from './MermaProductoBoton';
+import { ConfirmarMermasApertura, type MotivoElegido } from './ConfirmarMermasApertura';
+import { MermasHoyApertura } from './MermasHoyApertura';
 import './apertura-dia.css';
 
 /** Un cambio de más de la mitad del saldo (o cualquier cantidad si el saldo es 0) pide confirmación. */
@@ -115,6 +117,9 @@ export function AperturaDiaView() {
   const [produccion, setProduccion] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
   const [confirmarAbierto, setConfirmarAbierto] = useState(false);
+  const [mermasAbierto, setMermasAbierto] = useState(false);
+  const [motivos, setMotivos] = useState<Record<string, MotivoElegido>>({});
+  const [recargaMermas, setRecargaMermas] = useState(0);
   const [exito, setExito] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
@@ -160,6 +165,13 @@ export function AperturaDiaView() {
   const totalDe = (c: Casilla) =>
     (quedaronDe(c) === c.quedaronAyer ? c.saldo : quedaronDe(c) + c.producidoHoy) + producidoDe(c);
 
+  /** Cuánto BAJA el saldo con lo escrito (la API calcula igual): eso se registra como merma. */
+  const mermaDe = (c: Casilla) => {
+    const q = leerCantidad(valorDe(c.clave));
+    if (q === null || q === c.quedaronAyer) return 0;
+    return Math.max(0, c.saldo - (q + c.producidoHoy));
+  };
+
   const aEnviar: Array<{ c: Casilla; cantidad: number; produccionHoy: number }> = [];
   const invalidos: string[] = [];
   for (const c of casillas) {
@@ -168,6 +180,7 @@ export function AperturaDiaView() {
     if (cantidad === null || produccionHoy === null) invalidos.push(c.clave);
     else if (!c.aperturaHoy || cantidad !== c.quedaronAyer || produccionHoy > 0) aEnviar.push({ c, cantidad, produccionHoy });
   }
+  const mermas = aEnviar.filter((x) => mermaDe(x.c) > 0);
   const grandes = aEnviar.filter((x) => x.cantidad !== x.c.quedaronAyer && esGrande(x.c.quedaronAyer, x.cantidad));
 
   const cambiarValor = (clave: string, texto: string) => {
@@ -189,6 +202,7 @@ export function AperturaDiaView() {
 
   const enviar = async () => {
     setConfirmarAbierto(false);
+    setMermasAbierto(false);
     if (aEnviar.length === 0) {
       setExito(null);
       setError('No hay cambios que guardar. Todos los productos ya tienen su apertura de hoy.');
@@ -197,16 +211,28 @@ export function AperturaDiaView() {
     setGuardando(true);
     setError(null);
     try {
-      const items: ItemApertura[] = aEnviar.map(({ c, cantidad, produccionHoy }) =>
-        c.saborId
-          ? { productoId: c.productoId, saborId: c.saborId, cantidad, produccion: produccionHoy }
-          : { productoId: c.productoId, cantidad, produccion: produccionHoy },
-      );
+      const items: ItemApertura[] = aEnviar.map(({ c, cantidad, produccionHoy }) => {
+        const item: ItemApertura = { productoId: c.productoId, cantidad, produccion: produccionHoy };
+        if (c.saborId) item.saborId = c.saborId;
+        if (mermaDe(c) > 0) {
+          const m = motivos[c.clave];
+          item.saldoEsperado = c.saldo;
+          item.motivo = m?.motivo || undefined;
+          if (m?.motivo === 'OTRO') item.nota = m.nota.trim();
+        }
+        return item;
+      });
       const res = await almacenApi.registrarApertura(items);
-      setExito(`Apertura guardada: ${res.registrados} ${res.registrados === 1 ? 'producto' : 'productos'}.`);
+      const conMerma = res.mermas ? ` ${res.mermas} ${res.mermas === 1 ? 'merma registrada' : 'mermas registradas'}.` : '';
+      setExito(`Apertura guardada: ${res.registrados} ${res.registrados === 1 ? 'producto' : 'productos'}.${conMerma}`);
+      setMotivos({});
+      setRecargaMermas((n) => n + 1);
       await cargar();
     } catch (err) {
-      setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar la apertura. Revisa la conexión e intenta de nuevo.');
+      const msg = err instanceof ErrorApi ? err.message : 'No se pudo guardar la apertura. Revisa la conexión e intenta de nuevo.';
+      // El stock cambió mientras contaba: se recarga para que cuente de nuevo con el saldo real
+      if (err instanceof ErrorApi && err.codigo === 'CONTEO_DESACTUALIZADO') await cargar();
+      setError(msg);
     } finally {
       setGuardando(false);
     }
@@ -221,6 +247,10 @@ export function AperturaDiaView() {
     }
     if (aEnviar.length === 0) {
       setError('No hay cambios que guardar. Todos los productos ya tienen su apertura de hoy.');
+      return;
+    }
+    if (mermas.length > 0) {
+      setMermasAbierto(true);
       return;
     }
     if (grandes.length > 0) {
@@ -301,6 +331,7 @@ export function AperturaDiaView() {
             Escribe un número entero de 0 o más.
           </span>
         )}
+        {mermaDe(c) > 0 && <span className="ap-merma-chip">Merma: −{mermaDe(c)}</span>}
       </>
     );
   };
@@ -570,6 +601,19 @@ export function AperturaDiaView() {
         </Boton>
         <div className="ap-pie-nota">Se guardan los productos y sabores que cambiaste y los que aún no tienen apertura hoy.</div>
       </div>
+
+      <MermasHoyApertura recarga={recargaMermas} />
+
+      {mermasAbierto && (
+        <ConfirmarMermasApertura
+          lineas={mermas.map((x) => ({ clave: x.c.clave, nombre: x.c.nombre, cantidad: mermaDe(x.c) }))}
+          motivos={motivos}
+          alCambiar={setMotivos}
+          alConfirmar={() => void enviar()}
+          alCancelar={() => setMermasAbierto(false)}
+          guardando={guardando}
+        />
+      )}
 
       <Confirmar
         abierto={confirmarAbierto}

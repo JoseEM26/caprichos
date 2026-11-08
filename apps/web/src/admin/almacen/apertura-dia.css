@@ -458,3 +458,44 @@
     width: 96px;
   }
 }
+
+/* ── Merma por bajar el conteo ──────────────────────────────────────────── */
+
+.ap-merma-chip {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgb(253, 236, 232);
+  color: var(--cp-rust);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ap-modal--ancho { width: min(520px, calc(100% - 24px)); }
+.ap-modal-titulo { margin: 0 0 6px; font-size: 17px; color: var(--cp-navy); }
+.ap-modal-texto { margin: 0 0 10px; font-size: 13px; color: var(--cp-soft); }
+.ap-modal-comun { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--cp-navy); margin-bottom: 10px; }
+.ap-modal-lista { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ap-modal-item { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--cp-line); padding-top: 8px; }
+.ap-modal-item-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--cp-navy); }
+.ap-modal select,
+.ap-modal input[type='text'] {
+  min-height: 44px; box-sizing: border-box; border-radius: 8px; border: 1.5px solid var(--cp-navy);
+  background: var(--cp-white); color: var(--cp-navy); padding: 0 8px; font-size: 15px; font-weight: 600;
+}
+.ap-modal-botones { display: flex; gap: 8px; flex-wrap: wrap; }
+.ap-modal-no {
+  min-height: 44px; padding: 0 16px; border-radius: 9999px; border: 1.5px solid var(--cp-navy);
+  background: transparent; color: var(--cp-navy); font-weight: 800; font-size: 13px; cursor: pointer;
+}
+
+.ap-mermas-hoy { margin-top: 18px; }
+.ap-mermas-titulo { margin: 0 0 8px; font-size: 16px; color: var(--cp-navy); }
+.ap-mermas-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ap-merma-fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 10px; font-size: 13px; }
+.ap-merma-fila--anulada { opacity: 0.55; text-decoration: line-through; }
+.ap-merma-fila-txt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.ap-merma-fila .ap-boton-texto { min-height: 44px; }
+.ap-merma-aviso { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--cp-rust); }

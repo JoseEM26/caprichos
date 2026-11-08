@@ -98,23 +98,24 @@ describe('Apertura del día por sabor', () => {
     );
   });
 
-  it('una diferencia grande en un sabor pide confirmación Sí/No con el nombre del sabor', async () => {
+  it('bajar un sabor pide confirmación Sí/No con el nombre del sabor y su motivo', async () => {
     cargarCon([DONA]);
-    const registrar = vi.spyOn(almacenApi, 'registrarApertura').mockResolvedValue({ ok: true, registrados: 2 });
+    const registrar = vi.spyOn(almacenApi, 'registrarApertura').mockResolvedValue({ ok: true, registrados: 2, mermas: 1 });
     render(<AperturaDiaView />);
     await screen.findByText('DONA');
     fireEvent.change(screen.getByLabelText('Quedaron de ayer DONA · Chocolate'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (2)' }));
 
-    expect(await screen.findByText(/DONA · Chocolate \(saldo 5, ahora 1\)/)).toBeInTheDocument();
+    expect(await screen.findByLabelText('Motivo de la merma de DONA · Chocolate')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'No, revisar' }));
     expect(registrar).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar apertura (2)' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Sí, guardar' }));
+    fireEvent.change(screen.getByLabelText('Motivo de la merma de DONA · Chocolate'), { target: { value: 'SE_CAYO' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar merma y guardar' }));
     await waitFor(() =>
       expect(registrar).toHaveBeenCalledWith([
-        { productoId: 'd1', saborId: 's1', cantidad: 1, produccion: 0 },
+        { productoId: 'd1', saborId: 's1', cantidad: 1, produccion: 0, saldoEsperado: 5, motivo: 'SE_CAYO' },
         { productoId: 'd1', saborId: 's2', cantidad: 4, produccion: 0 },
       ]),
     );

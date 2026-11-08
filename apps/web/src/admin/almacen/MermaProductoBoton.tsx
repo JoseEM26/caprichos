@@ -1,23 +1,18 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { almacenApi, type MotivoMermaProducto } from './almacenApi';
+import { almacenApi, MOTIVOS_MERMA, notaOtroValida, type MotivoMermaProducto } from './almacenApi';
 import { Boton } from '../../comun/Boton';
 import { Icono } from '../../comun/Icono';
 import { ErrorApi } from '../../comun/api';
 import './apertura-dia.css';
 
-export const MOTIVOS_MERMA: Array<{ valor: MotivoMermaProducto; etiqueta: string }> = [
-  { valor: 'VENCIDO', etiqueta: 'Vencido' },
-  { valor: 'DANADO', etiqueta: 'Dañado' },
-  { valor: 'SE_CAYO', etiqueta: 'Se cayó' },
-  { valor: 'OTRO', etiqueta: 'Otro' },
-];
+export { MOTIVOS_MERMA };
 
 /** Error de la merma antes de enviarla, o null si está bien. La cantidad es un entero de 1 hasta el saldo. */
 export function errorMerma(cantidadTexto: string, saldo: number, motivo: MotivoMermaProducto, nota: string): string | null {
   const t = cantidadTexto.trim();
   if (!/^\d+$/.test(t) || Number(t) < 1) return 'Escribe cuántas botas (un número entero de 1 o más).';
   if (Number(t) > saldo) return `Solo hay ${saldo}. No puedes botar más de lo que hay.`;
-  if (motivo === 'OTRO' && !nota.trim()) return 'Si el motivo es Otro, escribe una nota.';
+  if (motivo === 'OTRO' && !notaOtroValida(nota)) return 'Si el motivo es Otro, escribe una nota de al menos 5 letras.';
   return null;
 }
 
@@ -41,7 +36,7 @@ export function MermaProductoBoton({ productoId, saborId, nombre, saldo, alRegis
   const [abierto, setAbierto] = useState(false);
   const cantidadRef = useRef<HTMLInputElement>(null);
   const [cantidad, setCantidad] = useState('');
-  const [motivo, setMotivo] = useState<MotivoMermaProducto>('VENCIDO');
+  const [motivo, setMotivo] = useState<MotivoMermaProducto>('SE_CAYO');
   const [nota, setNota] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +46,7 @@ export function MermaProductoBoton({ productoId, saborId, nombre, saldo, alRegis
     setAbierto(false);
     setCantidad('');
     setNota('');
-    setMotivo('VENCIDO');
+    setMotivo('SE_CAYO');
     setError(null);
   };
 

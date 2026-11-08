@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { MOTIVOS_MERMA_PRODUCTO, type MotivoMermaProducto } from '../../stock/producto-controlado';
 
 export class LineaAperturaDto {
   @IsNotEmpty({ message: 'El producto es obligatorio' })
@@ -21,6 +22,21 @@ export class LineaAperturaDto {
   @IsInt({ message: 'Lo producido debe ser un número entero' })
   @Min(0, { message: 'Lo producido no puede ser negativo' })
   produccion?: number;
+
+  /** Saldo que la pantalla tenía al contar. Si bajó la cantidad y el saldo real ya es otro → 409 CONTEO_DESACTUALIZADO. */
+  @IsOptional()
+  @IsInt()
+  saldoEsperado?: number;
+
+  /** Motivo de la merma cuando el conteo BAJA el saldo (obligatorio en ese caso; si falta → 400 MOTIVO_OBLIGATORIO). */
+  @IsOptional()
+  @IsIn(MOTIVOS_MERMA_PRODUCTO as readonly string[], { message: 'Motivo de merma no válido' })
+  motivo?: MotivoMermaProducto;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: 'La nota no puede pasar de 200 caracteres' })
+  nota?: string;
 }
 
 export class RegistrarAperturaDto {

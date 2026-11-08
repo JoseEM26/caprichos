@@ -22,6 +22,8 @@ import {
   controlaPorSabor,
   fechaLimaHoy,
   mermarProductoControlado,
+  NOTA_OTRO_MINIMA,
+  notaOtroValida,
   registrarAperturaArrastre,
   sincronizarAgotadoSabor,
   saldoSabor,
@@ -222,10 +224,12 @@ export class AlmacenService {
       }
     }
 
+    const mermas: Array<{ productoId: string; saborId: string | null; cantidad: number; motivo: string; movimientoId: string }> = [];
     await this.prisma.$transaction(async (tx) => {
       for (const item of dto.items) {
         const prod = productos.find((p) => p.id === this.parsearId(item.productoId, 'producto'))!;
-        await registrarAperturaArrastre(tx, {
+        const sabor = item.saborId ? prod.sabores.find((sb) => sb.id === this.parsearId(item.saborId!, 'sabor')) : undefined;
+        const r = await registrarAperturaArrastre(tx, {
           productoId: prod.id,
           saborId: item.saborId ? this.parsearId(item.saborId, 'sabor') : null,
           quedaron: item.cantidad,
@@ -234,7 +238,23 @@ export class AlmacenService {
           por: usuario.partyId,
           ahora: new Date(),
           fecha,
+          merma: {
+            motivo: item.motivo,
+            nota: item.nota,
+            saldoEsperado: item.saldoEsperado,
+            nombre: prod.nombre,
+            saborNombre: sabor?.nombre ?? null,
+          },
         });
+        if (r.merma) {
+          mermas.push({
+            productoId: item.productoId,
+            saborId: item.saborId ?? null,
+            cantidad: r.merma.cantidad,
+            motivo: r.merma.motivo,
+            movimientoId: r.merma.movimientoId.toString(),
+          });
+        }
       }
       await this.auditoria.registrar(
         {
@@ -243,7 +263,7 @@ export class AlmacenService {
           accion: 'REGISTRAR_APERTURA',
           entidad: 'conteo_apertura',
           partyId: usuario.partyId,
-          despues: { fecha, productos: dto.items.length },
+          despues: { fecha, productos: dto.items.length, mermas },
           ip,
         },
         tx,
@@ -254,7 +274,7 @@ export class AlmacenService {
     if (typeof this.stockService?.verificarYReactivarAgotados === 'function') {
       await this.stockService.verificarYReactivarAgotados([], ids);
     }
-    return { ok: true, registrados: dto.items.length };
+    return { ok: true, registrados: dto.items.length, mermas: mermas.length };
   }
 
   // ==========================================
@@ -290,8 +310,8 @@ export class AlmacenService {
     if (dto.saborId && !sabor) {
       throw new BadRequestException({ codigo: 'SABORES_INVALIDOS', mensaje: `El sabor no pertenece a ${prod.nombre} o no está activo` });
     }
-    if (dto.motivo === 'OTRO' && !dto.nota?.trim()) {
-      throw new BadRequestException({ codigo: 'NOTA_OBLIGATORIA', mensaje: 'Si el motivo es Otro, escribe una nota' });
+    if (dto.motivo === 'OTRO' && !notaOtroValida(dto.nota)) {
+      throw new BadRequestException({ codigo: 'NOTA_OBLIGATORIA', mensaje: `Si el motivo es Otro, escribe una nota de al menos ${NOTA_OTRO_MINIMA} letras` });
     }
 
     const fecha = fechaLimaHoy();
@@ -333,6 +353,55 @@ export class AlmacenService {
 
     this.eventosGateway?.emitirAdmin('stock:cambio', {});
     return { ok: true, id: resultado.movimientoId.toString(), saldo: resultado.saldo };
+  }
+
+  private mermaProductoEnApertura(nombre: string) {
+    return new ConflictException({
+      codigo: 'MERMA_PRODUCTO_EN_APERTURA',
+      mensaje: `La merma de productos (${nombre}) se registra en Apertura del día`,
+      enlace: '/admin/apertura',
+    });
+  }
+
+  /** Mermas de productos terminados de hoy (todas las que salieron de Apertura), con motivo, quién y si ya se anularon. */
+  async listarMermasProductoHoy() {
+    const desde = new Date(`${fechaLimaHoy()}T05:00:00.000Z`); // medianoche de Lima
+    const movs = await this.prisma.movimientoStock.findMany({
+      where: { tipo: 'MERMA', producto_id: { not: null }, en: { gte: desde } },
+      include: { producto: { select: { nombre: true } }, sabor: { select: { nombre: true } } },
+      orderBy: { en: 'desc' },
+    });
+    const anuladas = movs.length
+      ? await this.prisma.movimientoStock.findMany({
+          where: { movimiento_anulado_id: { in: movs.map((m) => m.id) } },
+          select: { movimiento_anulado_id: true },
+        })
+      : [];
+    const idsAnulados = new Set(anuladas.map((a) => a.movimiento_anulado_id!.toString()));
+    const personas = await this.prisma.person.findMany({
+      where: { party_id: { in: [...new Set(movs.map((m) => m.por))] } },
+      select: { party_id: true, nombres: true, apellidos: true },
+    });
+    const quien = new Map(personas.map((p) => [p.party_id.toString(), `${p.nombres} ${p.apellidos ?? ''}`.trim()]));
+    return {
+      fecha: fechaLimaHoy(),
+      mermas: movs
+        .filter((m) => Number(m.cantidad) < 0)
+        .map((m) => {
+          const [, motivo, ...nota] = (m.nota ?? '').split(' · ');
+          return {
+            id: m.id.toString(),
+            producto: m.producto?.nombre ?? '',
+            sabor: m.sabor?.nombre ?? null,
+            cantidad: Math.abs(Number(m.cantidad)),
+            motivo: motivo ?? m.nota ?? '',
+            nota: nota.join(' · ') || null,
+            en: m.en.toISOString(),
+            por: quien.get(m.por.toString()) ?? null,
+            anulada: idsAnulados.has(m.id.toString()),
+          };
+        }),
+    };
   }
 
   // ==========================================
@@ -748,6 +817,9 @@ export class AlmacenService {
         const esMermaReparto =
           Boolean(linea.origen?.toLowerCase().includes('reparto')) ||
           Boolean(linea.destino?.toLowerCase().includes('reparto'));
+
+        // La merma de un producto (no insumo) solo se registra en Apertura del día (la de reparto es informativa y sigue igual)
+        if (producto && !esMermaReparto) throw this.mermaProductoEnApertura(nombre);
 
         if (saborMerma && !esMermaReparto) {
           const saldo = await saldoSabor(tx, saborMerma.id);
@@ -1482,6 +1554,8 @@ export class AlmacenService {
             });
           } else if (fila.productoId) {
             const prodId = this.parsearId(fila.productoId, 'producto');
+            const pc = await tx.producto.findUnique({ where: { id: prodId }, select: { nombre: true, controla_stock: true } });
+            if (pc?.controla_stock) throw this.mermaProductoEnApertura(pc.nombre);
             await tx.stock.updateMany({
               where: { producto_id: prodId, lugar_id: cocinaLugar.id },
               data: { cantidad: { decrement: new Prisma.Decimal(bot) } },
