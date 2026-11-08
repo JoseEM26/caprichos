@@ -25,9 +25,9 @@ import {
 } from './cocinaApi';
 import {
   estaSilenciado,
-  reproducirCampanaCocina,
   setSilenciado,
 } from './audioAlerta';
+import { BannerIngresoCocina, ControlSonidoCocina, MarcoNuevo, useIngresoCocina } from './AvisoIngresoCocina';
 import type { AjustesCocina } from './cocinaApi';
 import { RejillaComandas } from './RejillaComandas';
 import { ComandaTarjeta, SEGUNDOS_DESHACER } from './ComandaTarjeta';
@@ -326,8 +326,11 @@ export function CocinaAdminView() {
   }, []);
 
   // Socket.IO
+  // Timbre y aviso por área: solo con la lista de comandas a la vista (no en Despacho ni Historial)
+  const { avisos, descartar, bloqueado, activar } = useIngresoCocina(areaSeleccionada, modo === 'area');
+  const idsNuevos = new Set(avisos.map((a) => String(a.pedidoId)));
+
   useEventos('pedido:nuevo', () => {
-    reproducirCampanaCocina();
     cargarAreas();
     if (modo === 'area') cargarComandas(areaSeleccionada);
   });
@@ -716,6 +719,8 @@ export function CocinaAdminView() {
         </div>
       )}
 
+      {!kFullAbierto && <BannerIngresoCocina avisos={avisos} onDescartar={descartar} />}
+
       {/* 3. Mensaje de retroalimentación de acción */}
       {mensajeAccion && (
         <div
@@ -890,6 +895,8 @@ export function CocinaAdminView() {
             }}
           />
         </button>
+
+        <ControlSonidoCocina bloqueado={bloqueado} onActivar={activar} />
 
         {/* Preferencia personal de cada cocinero: si está marcada, Despejar pide Sí o No */}
         <label
@@ -1073,6 +1080,7 @@ export function CocinaAdminView() {
           ) : (
             <RejillaComandas>
               {tarjetas.map((c) => (
+                <MarcoNuevo activo={idsNuevos.has(String(c.pedidoId))}>
                 <ComandaTarjeta
                   key={enTodas ? c.pedidoId : c.id}
                   comanda={c}
@@ -1087,6 +1095,7 @@ export function CocinaAdminView() {
                   alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                   alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
                 />
+                </MarcoNuevo>
               ))}
             </RejillaComandas>
           )}
@@ -1185,6 +1194,7 @@ export function CocinaAdminView() {
             boxSizing: 'border-box',
           }}
         >
+          <BannerIngresoCocina avisos={avisos} onDescartar={descartar} />
           <div
             style={{
               display: 'flex',
@@ -1311,6 +1321,7 @@ export function CocinaAdminView() {
               ) : (
                 <RejillaComandas>
                   {tarjetas.map((c) => (
+                    <MarcoNuevo activo={idsNuevos.has(String(c.pedidoId))}>
                     <ComandaTarjeta
                       key={enTodas ? c.pedidoId : c.id}
                       comanda={c}
@@ -1325,6 +1336,7 @@ export function CocinaAdminView() {
                       alDespacharLinea={enTodas ? pedirDespachoLinea.bind(null, c) : undefined}
                       alDespacharTodo={enTodas ? pedirDespachoTodo : undefined}
                     />
+                    </MarcoNuevo>
                   ))}
                 </RejillaComandas>
               )}

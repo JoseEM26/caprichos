@@ -242,7 +242,36 @@ export class ComandasService {
       }
     }
 
+    // Aviso por área para el sonido de Cocina: solo al crear comandas (ingreso real), no en cada cambio
+    await this.avisarIngreso(pId, areasACrear, esPrimeraVez ? 'NUEVO' : 'EXTRA');
+
     return areasACrear.length;
+  }
+
+  /**
+   * Emite `cocina:ingreso` por cada área que recibe el pedido (NUEVO, EXTRA o DEVUELTO).
+   * Es el ÚNICO evento que hace sonar la campana de Cocina; nunca bloquea el flujo.
+   */
+  private async avisarIngreso(pId: bigint, areaIds: bigint[], tipo: 'NUEVO' | 'EXTRA' | 'DEVUELTO'): Promise<void> {
+    if (!this.eventosGateway || areaIds.length === 0) return;
+    try {
+      const [pedido, areas] = await Promise.all([
+        this.prisma.pedido.findUnique({ where: { id: pId }, select: { codigo: true, cliente_nombre: true } }),
+        this.prisma.areaCocina.findMany({ where: { id: { in: areaIds } }, select: { id: true, nombre: true } }),
+      ]);
+      for (const a of areas) {
+        this.eventosGateway.emitirAdmin('cocina:ingreso', {
+          pedidoId: Number(pId),
+          codigo: pedido?.codigo ?? '',
+          areaId: Number(a.id),
+          areaNombre: a.nombre,
+          cliente: pedido?.cliente_nombre ?? null,
+          tipo,
+        });
+      }
+    } catch {
+      // el aviso es accesorio
+    }
   }
 
   /**
@@ -1300,6 +1329,7 @@ export class ComandasService {
       areaId: Number(aId),
       completo: false,
     });
+    await this.avisarIngreso(pId, [aId], 'DEVUELTO');
 
     return {
       ok: true,
