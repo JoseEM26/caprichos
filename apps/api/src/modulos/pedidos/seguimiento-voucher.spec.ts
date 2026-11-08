@@ -128,6 +128,23 @@ describe('SeguimientoService: estado del voucher', () => {
       expect(r.voucher?.estado).toBe('EN_REVISION');
     });
 
+    it('pago dividido Yape 38 + efectivo 2: la carta muestra solo S/ 38 por yapear y S/ 2 al recibir', async () => {
+      conPedido({
+        pago_preferido: 'YAPE',
+        total: { toString: () => '40.00' },
+        planPago: [{ medio: 'YAPE', monto: '38.00' }, { medio: 'EFECTIVO', monto: '2.00' }],
+      });
+      const r = await service.obtener('CAP-0007', token());
+      expect(r.montoDigital).toBe(38);
+      expect(r.montoContraentrega).toBe(2);
+    });
+
+    it('sin plan no manda montos: la carta usa el total de siempre', async () => {
+      conPedido({});
+      const r = await service.obtener('CAP-0007', token());
+      expect(r.montoDigital).toBeUndefined();
+    });
+
     it('pago digital verificado: VERIFICADO', async () => {
       conPedido({ pago_estado: 'PAGADO' });
       const r = await service.obtener('CAP-0007', token());

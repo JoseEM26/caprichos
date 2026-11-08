@@ -1,7 +1,7 @@
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
 import { PuntosService } from '../clientes/puntos.service';
-import { mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
+import { MEDIOS_DIGITALES_PLAN, mediosDigitalesDelPedido, montoDigitalDePlan } from '../pedidos/pago-plan.service';
 import { totalCobrable } from '../propinas/propinas.util';
 import { progresoDelPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
@@ -1360,11 +1360,15 @@ export class PedidosEstadoService {
     }
 
     const ahora = new Date();
+    // Pago dividido con parte en efectivo o tarjeta: validar la parte digital no cobra el resto. El pedido queda
+    // COORDINADO (falta cobrar contraentrega o en Caja) y pasa a PAGADO cuando entra ese efectivo.
+    const restoPorCobrar = (pedido.planPago ?? []).some((f) => !MEDIOS_DIGITALES_PLAN.includes(f.medio as never));
+    const estadoFinal = dto.estado === 'PAGADO' && restoPorCobrar ? 'COORDINADO' : dto.estado;
     const pedidoActualizado = await this.prisma.pedido.update({
       where: { id: pedido.id },
       data: {
         pago_metodo: metodoUpper,
-        pago_estado: dto.estado,
+        pago_estado: estadoFinal,
         pago_coordinado_en: ahora,
         pago_coordinado_por: usuarioActual.partyId,
       },
@@ -1398,7 +1402,7 @@ export class PedidosEstadoService {
       antes: { pago_metodo: pedido.pago_metodo, pago_estado: pedido.pago_estado },
       despues: {
         pago_metodo: metodoUpper,
-        pago_estado: dto.estado,
+        pago_estado: estadoFinal,
         sin_voucher: sinVoucherAutorizado
           ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId }
           : null,
@@ -1422,7 +1426,7 @@ export class PedidosEstadoService {
 
     // PAGADO por aquí (p. ej. el repartidor cobra) nunca pasa por Caja → cobrar, así que suma aquí
     // los puntos del cliente; es idempotente y, si falla, no deshace el pago
-    if (dto.estado === 'PAGADO') {
+    if (estadoFinal === 'PAGADO') {
       try {
         await this.impresionService?.encolarTicketPedido(pedido.id);
       } catch {

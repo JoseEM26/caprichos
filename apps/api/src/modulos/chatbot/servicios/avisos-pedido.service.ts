@@ -9,6 +9,7 @@ import { urlPublicaCarta } from './carrusel.util';
 import { parametroActivoConDefecto, whatsappSimulado } from '../utilidades/modo-whatsapp.util';
 import { marcarPagoParaPersona } from './pago-para-persona.util';
 import { calcularEtaEntrega, formatearEta, leerConfigEta } from '../../repartos/eta-entrega';
+import { montoDigitalDePlan } from '../../pedidos/pago-plan.service';
 import { mediosPagoPublicos } from '../../local/local.service';
 import { detalleDatosPago } from '../conversacion/flujos/pago/textos-pago';
 import { enlaceSeguimientoCarta } from '../../pedidos/seguimiento.tokens';
@@ -201,7 +202,7 @@ export class AvisosPedidoService {
         plantillaSeguimiento: esParametroActivo(flagPlantilla?.valor),
         plantillaUbicacion: esParametroActivo((await db.parametro.findUnique({ where: { clave: 'whatsapp_plantilla_delivery_ubicacion_activa' } }))?.valor),
         resumen: await this.resumenRecibido(db, pedidoId),
-        datosPago: medio ? await this.bloqueDatosPago(db, pedido) : null,
+        datosPago: medio ? await this.bloqueDatosPago(db, pedidoId, pedido) : null,
       };
     }
     // Línea de puntos (bienvenida o puntos ganados): se decide aquí y el marcador «una sola vez» se escribe en encolar
@@ -261,6 +262,7 @@ export class AvisosPedidoService {
   /** Monto, número o cuenta y titular del medio digital del pedido (mismos datos que ve la carta). */
   private async bloqueDatosPago(
     db: Prisma.TransactionClient | PrismaService,
+    pedidoId: bigint,
     pedido: { total: unknown; pago_metodo: string | null; pago_preferido: string | null; puntos_ganados?: unknown },
   ): Promise<string | null> {
     try {
@@ -268,8 +270,17 @@ export class AvisosPedidoService {
       const parametros = await db.parametro.findMany({
         where: { clave: { in: ['local_pagos', 'voucher_titular_nombre', 'voucher_yape_numero', 'voucher_plin_numero'] } },
       });
-      const tot = Number(pedido.total).toFixed(2);
-      return `${detalleDatosPago(med, { ...mediosPagoPublicos(parametros) }, tot)}\n• Monto: S/ ${tot}`;
+      // Pago dividido: solo la parte digital se yapea; el resto se paga al recibir
+      const plan = (await db.pedidoPagoPlan.findMany({ where: { pedido_id: pedidoId }, select: { medio: true, monto: true } })).map((f) => ({
+        medio: f.medio,
+        monto: Number(f.monto),
+      }));
+      const digital = plan.length > 0 ? montoDigitalDePlan(plan) : 0;
+      const montoNum = digital > 0 ? digital : Number(pedido.total);
+      const tot = montoNum.toFixed(2);
+      const resto = digital > 0 ? Math.round((plan.reduce((a, f) => a + f.monto, 0) - digital) * 100) / 100 : 0;
+      const lineaResto = resto > 0 ? `\n• Los S/ ${resto.toFixed(2)} restantes los pagas al recibir tu pedido` : '';
+      return `${detalleDatosPago(med, { ...mediosPagoPublicos(parametros) }, tot)}\n• Monto: S/ ${tot}${lineaResto}`;
     } catch (err: any) {
       this.logger.warn(`Datos de pago no incluidos en el aviso: ${err?.message}`);
       return null;

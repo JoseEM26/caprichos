@@ -65,6 +65,11 @@ describe('caja.calculo', () => {
     expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [{ anulado_en: null }], planPago: plan })).toBe(0);
   });
 
+  it('Yape parcial S/ 38 + S/ 2 en efectivo contraentrega: el repartidor rinde solo los S/ 2', () => {
+    const plan = [{ medio: 'YAPE', monto: 38 }, { medio: 'EFECTIVO', monto: 2 }];
+    expect(efectivoDelRepartidor({ total: 40, pago_metodo: 'YAPE', cobros: [], planPago: plan })).toBe(200);
+  });
+
   it('delivery cobrado en caja cuenta en la caja y el contra entrega solo al liquidarse, sin duplicar', async () => {
     const cliente: any = {
       pedido: {

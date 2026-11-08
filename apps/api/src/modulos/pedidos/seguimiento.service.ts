@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
+import { mediosDigitalesDelPedido, montoDigitalDePlan } from './pago-plan.service';
 import { obtenerFechaHoraLima } from '../local/local.util';
 import { generarTokenSeguimiento, verificarTokenSeguimiento } from './seguimiento.tokens';
 import { ContextoProgreso, progresoDelPedido, ProgresoPedido } from './progreso-pedido';
@@ -129,6 +130,10 @@ export interface SeguimientoPedido {
   pagoDigital?: boolean;
   /** YAPE, PLIN o TRANSFERENCIA cuando `pagoDigital`: la carta muestra a quién pagar. */
   medioPago?: string;
+  /** Pago dividido: lo que se paga por el medio digital (venta + propina). Sin plan no viene y vale el total. */
+  montoDigital?: number;
+  /** Pago dividido: lo que falta pagar contraentrega o en caja (efectivo o tarjeta). */
+  montoContraentrega?: number;
   /**
    * Tiempo que falta (aditivo). Antes de salir: estimado de la zona. En camino: lo prometido al salir
    * menos lo transcurrido. Null cuando el pedido ya está entregado o anulado.
@@ -254,7 +259,12 @@ export class SeguimientoService {
   async obtener(codigo: string, token: string | undefined): Promise<SeguimientoPedido> {
     const pedido = await this.prisma.pedido.findUnique({
       where: { codigo },
-      select: { ...SELECCION_SEGUIMIENTO, pago_preferido: true, pago_estado: true },
+      select: {
+        ...SELECCION_SEGUIMIENTO,
+        pago_preferido: true,
+        pago_estado: true,
+        planPago: { select: { medio: true, monto: true }, orderBy: { orden: 'asc' as const } },
+      },
     });
 
     if (!pedido || !verificarTokenSeguimiento(pedido.id, token)) {
@@ -266,10 +276,18 @@ export class SeguimientoService {
 
     const medioPreferido = String(pedido.pago_preferido ?? '').toUpperCase();
     const pagoDigital = MEDIOS_DIGITALES.includes(medioPreferido);
+    // Pago dividido: la tarjeta «Paga con Yape» muestra solo la parte digital; el resto se paga al recibir
+    const plan = (pedido.planPago ?? []).map((f) => ({ medio: f.medio, monto: Number(f.monto) }));
+    const digitales = mediosDigitalesDelPedido(plan, null, 0);
+    const montoDigital = digitales.length > 0 ? montoDigitalDePlan(plan) : null;
+    const totalCobrable = Math.round((Number(pedido.total) + Number(pedido.propina ?? 0)) * 100) / 100;
     const base = {
       ...this.construir(pedido as PedidoSeguimiento, await this.contexto()),
       pagoDigital,
       ...(pagoDigital ? { medioPago: medioPreferido } : {}),
+      ...(pagoDigital && montoDigital !== null
+        ? { montoDigital, montoContraentrega: Math.round((totalCobrable - montoDigital) * 100) / 100 }
+        : {}),
     };
     if (!pagoDigital) return base;
 

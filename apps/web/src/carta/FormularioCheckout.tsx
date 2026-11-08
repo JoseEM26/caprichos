@@ -21,6 +21,7 @@ import { excesosDeStock, lineasSaborIncompletas, mensajeSaborQuedan, saborRechaz
 import { AjusteSaboresLinea } from './AjusteSaboresLinea';
 import { SelectorDireccionesCliente } from './SelectorDireccionesCliente';
 import { useEsMovil } from './useEsMovil';
+import { armarPlanCarta, medioPrincipalCarta } from './pagoDividido';
 import {
   ConsultaEnvioRespuesta,
   DatosLocalCarta,
@@ -127,6 +128,10 @@ export function FormularioCheckout({
   // Medio de pago
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('YAPE');
   const [pagaCon, setPagaCon] = useState('');
+  // Pago dividido: dos medios; el primero lleva el monto y el segundo, el resto
+  const [dividirPago, setDividirPago] = useState(false);
+  const [monto1Texto, setMonto1Texto] = useState('');
+  const [medio2, setMedio2] = useState<MetodoPago | null>(null);
   // Propina opcional (solo si Configuración la enciende para la carta). Va aparte de la venta.
   const [propinaTexto, setPropinaTexto] = useState('');
   const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
@@ -457,6 +462,17 @@ export function FormularioCheckout({
   const propinaInvalida = propinaActiva && propinaLimpia !== '' && (!propinaFormatoOk || propinaNum > topePropina);
   // Lo que paga el cliente: venta + propina (el comprobante y los puntos usan solo la venta)
   const aCobrar = Number((totalCalculado + propinaCobrable).toFixed(2));
+  // Pago dividido: plan válido (o null) y parte en efectivo (lo que cubre «Paga con»)
+  const planDividido = dividirPago
+    ? armarPlanCarta(metodoPago, monto1Texto, medio2, aCobrar)
+    : ({ plan: null, error: null } as const);
+  const efectivoParte = planDividido.plan
+    ? (planDividido.plan.find((f) => f.medio === 'EFECTIVO')?.monto ?? 0)
+    : dividirPago
+      ? 0
+      : metodoPago === 'EFECTIVO'
+        ? aCobrar
+        : 0;
   const faltanteMinimo =
     modalidad === 'DELIVERY' && minimoDelivery > 0 && subtotal < minimoDelivery
       ? Number((minimoDelivery - subtotal).toFixed(2))
@@ -524,10 +540,12 @@ export function FormularioCheckout({
       return `La propina debe ser un monto entre S/ 0 y S/ ${topePropina.toFixed(2)}, con hasta 2 decimales`;
     }
 
-    if (metodoPago === 'EFECTIVO' && pagaCon.trim()) {
+    if (dividirPago && planDividido.error) return planDividido.error;
+
+    if (efectivoParte > 0 && pagaCon.trim()) {
       const pagaConNum = Number(pagaCon);
-      if (isNaN(pagaConNum) || pagaConNum < aCobrar) {
-        return `El monto con el que pagas (S/ ${pagaCon}) no puede ser menor a lo que pagas (S/ ${aCobrar.toFixed(2)})`;
+      if (isNaN(pagaConNum) || pagaConNum < efectivoParte) {
+        return `El monto con el que pagas (S/ ${pagaCon}) no puede ser menor a lo que pagas en efectivo (S/ ${efectivoParte.toFixed(2)})`;
       }
     }
 
@@ -715,9 +733,9 @@ export function FormularioCheckout({
           : undefined,
       lineas: lineasDto,
       pago: {
-        metodo: metodoPago,
-        pagaCon:
-          metodoPago === 'EFECTIVO' && pagaCon.trim() ? Number(pagaCon) : undefined,
+        metodo: planDividido.plan ? medioPrincipalCarta(planDividido.plan) : metodoPago,
+        pagaCon: efectivoParte > 0 && pagaCon.trim() ? Number(pagaCon) : undefined,
+        ...(planDividido.plan ? { plan: planDividido.plan } : {}),
       },
       comprobante: {
         tipo: tipoComprobante,
@@ -1924,6 +1942,61 @@ export function FormularioCheckout({
                       )}
                     </div>
 
+                    {/* Pago dividido: dos medios (p. ej. Yape S/ 38 y el resto en efectivo al recibir) */}
+                    <button
+                      type="button"
+                      data-testid="alternar-pago-dividido"
+                      aria-pressed={dividirPago}
+                      onClick={() => {
+                        setDividirPago((v) => !v);
+                        setMedio2(null);
+                        setMonto1Texto('');
+                      }}
+                      style={{ minHeight: '44px', borderRadius: '10px', border: '1.5px dashed var(--cp-navy)', background: 'transparent', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                    >
+                      {dividirPago ? 'Pagar con un solo medio' : 'Pagar con 2 medios'}
+                    </button>
+
+                    {dividirPago && (
+                      <div data-testid="pago-dividido" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label htmlFor="f-monto1" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>
+                          ¿Cuánto pagas con {metodoPago}? (S/)
+                        </label>
+                        <input
+                          id="f-monto1"
+                          type="number"
+                          step="0.10"
+                          min="0.01"
+                          value={monto1Texto}
+                          onChange={(e) => setMonto1Texto(e.target.value)}
+                          placeholder={`Menor a ${aCobrar.toFixed(2)}`}
+                          style={{ width: '100%', minHeight: '44px', borderRadius: '10px', border: '1.5px solid var(--cp-line)', backgroundColor: 'var(--cp-cream)', color: 'var(--cp-navy)', padding: '0 12px', fontSize: '14px' }}
+                        />
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-soft)' }}>El resto lo pagas con</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {(['YAPE', 'PLIN', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] as MetodoPago[])
+                            .filter((m) => m !== metodoPago)
+                            .filter((m) => m === 'EFECTIVO' || m === 'TARJETA' || mediosPagoDisponibles[m.toLowerCase()]?.activo !== false)
+                            .map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setMedio2(m)}
+                                aria-pressed={medio2 === m}
+                                style={{ minHeight: '44px', padding: '0 14px', borderRadius: '10px', border: medio2 === m ? '2px solid var(--cp-orange)' : '1.5px solid var(--cp-line)', backgroundColor: medio2 === m ? 'var(--cp-sand)' : 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 700, fontSize: '13px' }}
+                              >
+                                {m}
+                              </button>
+                            ))}
+                        </div>
+                        <div role="status" style={{ fontSize: '13px', fontWeight: 700, color: planDividido.error ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>
+                          {planDividido.plan
+                            ? planDividido.plan.map((f) => `${f.medio} S/ ${f.monto.toFixed(2)}`).join(' + ')
+                            : planDividido.error}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Datos copiables del medio de pago */}
                     {(metodoPago === 'YAPE' || metodoPago === 'PLIN') && (
                       <div
@@ -2042,7 +2115,7 @@ export function FormularioCheckout({
                       </div>
                     )}
 
-                    {metodoPago === 'EFECTIVO' && (
+                    {efectivoParte > 0 && (
                       <div>
                         <label
                           htmlFor="f-paga-con"
@@ -2054,16 +2127,16 @@ export function FormularioCheckout({
                             marginBottom: '4px',
                           }}
                         >
-                          Paga con (monto en soles)
+                          Paga con (monto en soles){planDividido.plan ? ` · efectivo S/ ${efectivoParte.toFixed(2)}` : ''}
                         </label>
                         <input
                           id="f-paga-con"
                           type="number"
                           step="0.10"
-                          min={aCobrar}
+                          min={efectivoParte}
                           value={pagaCon}
                           onChange={(e) => setPagaCon(e.target.value)}
-                          placeholder={`Ej.: ${Math.ceil(aCobrar / 10) * 10}`}
+                          placeholder={`Ej.: ${Math.ceil(efectivoParte / 10) * 10}`}
                           style={{
                             width: '100%',
                             minHeight: '44px',
