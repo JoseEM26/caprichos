@@ -270,17 +270,21 @@ export class ClientesService {
 
     // Party sin cuenta que ya tiene ese celular (p. ej. identificado antes por WhatsApp): se vincula
     let partyId: bigint | null = cuenta?.party_id ?? null;
+    let esPersonal = false;
     if (!partyId) {
       const suelto = await this.prisma.contactMechanism.findFirst({
         where: {
           tipo: { in: ['TELEFONO', 'WHATSAPP'] },
           valor: { in: [tel, `51${tel}`] },
           activo: true,
-          party: { tipo: 'PERSONA', estado: 'ACTIVO', usuario: { is: null }, cuentaCliente: { is: null } },
+          // Mismo criterio que PartyPuntosService: el party que acumula los puntos (incluido el de un integrante
+          // del personal) es el que se vincula; si no, el celular chocaría con él y los puntos quedarían aparte.
+          party: { tipo: 'PERSONA', estado: 'ACTIVO', cuentaCliente: { is: null } },
         },
-        select: { party_id: true },
+        select: { party_id: true, party: { select: { usuario: { select: { party_id: true } } } } },
       });
       partyId = suelto?.party_id ?? null;
+      esPersonal = Boolean(suelto?.party?.usuario);
     }
 
     const hashPw = await argon2.hash(dto.contrasena);
@@ -294,7 +298,8 @@ export class ClientesService {
             await tx.person.update({
               where: { party_id: id },
               data: {
-                nombres: dto.nombre.trim(),
+                // El nombre de un integrante del personal no se pisa con el que escribe en la carta
+                ...(esPersonal ? {} : { nombres: dto.nombre.trim() }),
                 correo: correo ?? persona.correo,
                 ...(cumple ? { cumple_dia: cumple.dia, cumple_mes: cumple.mes } : {}),
               },
@@ -340,6 +345,7 @@ export class ClientesService {
       throw err;
     }
 
+    await this.codigoRegistro.consumirVerificado(tel);
     const token = await this.generarTokenCliente(partyId!);
     const cliente = await this.yo(partyId!);
     await this.avisoCuenta.avisar(partyId!, tel, 'CREADA');

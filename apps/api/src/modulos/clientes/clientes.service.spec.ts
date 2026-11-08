@@ -117,7 +117,7 @@ describe('ClientesService', () => {
       obtenerSaldo: jest.fn().mockResolvedValue(10),
     };
 
-    codigoRegistroMock = { consumir: jest.fn().mockResolvedValue(undefined), exigirVerificado: jest.fn().mockResolvedValue(undefined) };
+    codigoRegistroMock = { consumir: jest.fn().mockResolvedValue(undefined), exigirVerificado: jest.fn().mockResolvedValue(undefined), consumirVerificado: jest.fn().mockResolvedValue(undefined) };
     avisoCuentaMock = { avisar: jest.fn().mockResolvedValue(undefined) };
 
     archivosMock = {
@@ -438,6 +438,47 @@ describe('ClientesService', () => {
       expect(prismaMock.party.create).not.toHaveBeenCalled();
       expect(prismaMock.person.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ party_id: 88n }) }));
       expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { party_id: 88n } }));
+    });
+
+    it('party con 120 puntos (acumulados por celular): se vincula el MISMO party, sin party nuevo ni tocar sus puntos', async () => {
+      ficha();
+      prismaMock.contactMechanism.findFirst
+        .mockResolvedValueOnce(null) // cuentaPorCelular
+        .mockResolvedValueOnce({ party_id: 88n, party: { usuario: null } })
+        .mockResolvedValue(null);
+      prismaMock.person.findUnique.mockResolvedValue({ party_id: 88n, nombres: 'Cliente', correo: null });
+      prismaMock.partyRole.findFirst.mockResolvedValue({ id: 6n, customer_detail: { party_role_id: 6n, puntos: 120 } });
+
+      await service.registro({ ...dtoOk, telefono: '+51 912 345 678' });
+
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
+      expect(prismaMock.partyRole.create).not.toHaveBeenCalled();
+      expect(prismaMock.customerDetail.create).not.toHaveBeenCalled();
+      expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { party_id: 88n } }));
+      expect(codigoRegistroMock.consumirVerificado).toHaveBeenCalledWith('912345678');
+    });
+
+    it('party de un integrante del personal con puntos: se vincula y no se pisa su nombre', async () => {
+      ficha();
+      prismaMock.contactMechanism.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ party_id: 90n, party: { usuario: { party_id: 90n } } })
+        .mockResolvedValue(null);
+      prismaMock.person.findUnique.mockResolvedValue({ party_id: 90n, nombres: 'Rosa Quispe', correo: null });
+      prismaMock.partyRole.findFirst.mockResolvedValue({ id: 7n, customer_detail: { party_role_id: 7n } });
+
+      await service.registro(dtoOk);
+
+      expect(prismaMock.party.create).not.toHaveBeenCalled();
+      expect(prismaMock.person.update.mock.calls[0][0].data.nombres).toBeUndefined();
+      expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { party_id: 90n } }));
+    });
+
+    it('si crear la cuenta falla, la verificación del celular NO se gasta (puede reintentar)', async () => {
+      ficha();
+      prismaMock.$transaction.mockRejectedValueOnce(new Error('boom'));
+      await expect(service.registro(dtoOk)).rejects.toThrow('boom');
+      expect(codigoRegistroMock.consumirVerificado).not.toHaveBeenCalled();
     });
 
     it('sin celular verificado no crea ni vincula nada (CELULAR_NO_VERIFICADO se propaga)', async () => {

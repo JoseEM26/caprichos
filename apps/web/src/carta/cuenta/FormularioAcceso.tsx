@@ -89,9 +89,10 @@ function CampoClave({ id, etiquetaTexto, valor, alCambiar, nueva }: { id: string
           {ver ? 'Ocultar' : 'Mostrar'}
         </button>
       </div>
-      {nueva && valor && (
+      {nueva && (
         <div style={ayuda} role="status">
-          Fortaleza: <b>{['débil', 'media', 'buena'][fortaleza(valor)]}</b> (mínimo 8 caracteres)
+          Mínimo 8 caracteres; mejor si mezclas letras y números.
+          {valor && <> Fortaleza: <b>{['débil', 'media', 'buena'][fortaleza(valor)]}</b></>}
         </div>
       )}
     </div>
@@ -193,6 +194,23 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
     } catch (err) {
       const codigo = codigoDe(err);
       setCuentaExistente(codigo === 'CUENTA_EXISTENTE');
+      if (codigo === 'SIN_CUENTA') {
+        // Recuperar un celular sin cuenta (solo tenía puntos): el celular ya quedó verificado, se sigue a crearla
+        setModo('new');
+        setPaso(3);
+        setVerifWa(null);
+        setVerificadoWa(false);
+        setCodigo('');
+        setContrasena('');
+        setMensaje(mensajeDe(err, 'Ese celular aún no tiene cuenta. Créala ahora: tus puntos se conservan.'));
+        return;
+      }
+      if (codigo === 'CELULAR_NO_VERIFICADO') {
+        // La verificación venció (o se usó): se vuelve al paso del celular en vez de dejar el formulario atascado
+        setPaso(1);
+        setMensaje('Tu verificación venció. Confirma tu celular otra vez para crear la cuenta.');
+        return;
+      }
       setMensaje(
         codigo === 'TELEFONO_REGISTRADO'
           ? 'Ese celular ya tiene cuenta: ingresa o recupera tu contraseña.'
@@ -448,7 +466,7 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
 
       <div style={{ display: 'flex', gap: 8 }}>
         {(paso2 || paso3) && (
-          <button type="button" onClick={() => { setPaso(paso3 ? 2 : 1); setMensaje(''); }} style={{ ...botonSecundario, flex: '0 0 96px' }}>Atrás</button>
+          <button type="button" onClick={() => { setPaso(1); setVerifWa(null); setMensaje(''); }} style={{ ...botonSecundario, flex: '0 0 96px' }}>Atrás</button>
         )}
         {/* En WHATSAPP_ENTRANTE el paso de celular avanza solo al llegar el mensaje: no hay botón que pulsar */}
         {!(paso2 && verifWa) && (
@@ -462,7 +480,10 @@ export function FormularioAcceso({ alSeguirInvitado, invitadoPermitido = false }
         )}
       </div>
       {(modo === 'rec1' || modo === 'rec2') && (
-        <button type="button" onClick={() => ir('in')} style={botonSecundario}>Volver a ingresar</button>
+        <>
+          <button type="button" onClick={() => ir('in')} style={botonSecundario}>Volver a ingresar</button>
+          <button type="button" onClick={() => ir('new')} style={{ ...enlace, alignSelf: 'center' }}>¿No tienes cuenta? Crear cuenta (tus puntos se conservan)</button>
+        </>
       )}
       {invitadoPermitido && (
         <>

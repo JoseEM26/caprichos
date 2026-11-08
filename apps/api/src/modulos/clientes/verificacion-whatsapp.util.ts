@@ -30,6 +30,8 @@ export const CLAVE_MODO_VERIFICACION = 'verificacion_celular_modo';
 export const CLAVE_NUMERO_VERIFICACION = 'verificacion_whatsapp_numero';
 
 export const TOKEN_TTL_SEG = 600; // vence a los 10 minutos
+/** La marca «celular verificado» dura más que el token: da tiempo a llenar el formulario de datos. */
+export const MARCA_TTL_SEG = 1800;
 export const TOKEN_MAX_INTENTOS = 5; // mensajes con otro celular antes de invalidar el token
 /** 8 caracteres sin 0, 1, I, L, O (se confunden al leerlos). 31^8 combinaciones. */
 export const TOKEN_ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -189,6 +191,6 @@ export async function atenderMensajeVerificacion(
   // Mismo celular que pidió el token: si ya estaba verificado, se responde lo mismo sin volver a marcar.
   if (estado === 'V') return RESPUESTA_VERIFICADO;
   await redis.set(clave, `${tel9}|${proposito}|V`, 'EX', TOKEN_TTL_SEG);
-  await redis.set(claveMarcaVerificacion(proposito as PropositoVerificacion, tel9), '1', 'EX', TOKEN_TTL_SEG);
+  await redis.set(claveMarcaVerificacion(proposito as PropositoVerificacion, tel9), '1', 'EX', MARCA_TTL_SEG);
   return RESPUESTA_VERIFICADO;
 }
