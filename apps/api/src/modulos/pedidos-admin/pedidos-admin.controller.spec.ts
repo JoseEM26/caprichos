@@ -83,14 +83,13 @@ describe('PedidosAdminController', () => {
     expect(res.codigo).toBe('CP-W001');
   });
 
-  it('POST /admin/pedidos/:id/estado debe llamar a service.cambiarEstado con PIN', async () => {
+  it('POST /admin/pedidos/:id/estado debe llamar a service.cambiarEstado sin ningún código', async () => {
     service.cambiarEstado.mockResolvedValue({ id: 10n, estado: 'ANULADO' });
     const reqMock: any = { usuario: { partyId: 1n, rol: 'ADMIN' }, ip: '127.0.0.1' };
 
     const res = await controller.cambiarEstado(
       '10',
       { estado: 'ANULADO', motivo: 'Cliente desistió' },
-      '654321',
       reqMock,
     );
 
@@ -98,7 +97,6 @@ describe('PedidosAdminController', () => {
       '10',
       { estado: 'ANULADO', motivo: 'Cliente desistió' },
       reqMock.usuario,
-      '654321',
       '127.0.0.1',
     );
     expect(res.estado).toBe('ANULADO');

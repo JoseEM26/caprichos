@@ -3,8 +3,7 @@ import { exigirComprobanteDigital } from '../comprobante-pago.util';
 
 describe('exigirComprobanteDigital con plan de pago', () => {
   const pedidoId = 100n;
-  const verificarPin = jest.fn(async () => ({ supervisorPartyId: 7n }));
-  const sinVoucher = { motivo: 'El cliente mostró el yape en el celular', pinSupervisor: '123456' };
+  const sinVoucher = { motivo: 'El cliente mostró el yape en el celular' };
 
   const dbCon = (vouchers: Array<{ medio: string | null }>) => ({
     voucherPago: {
@@ -12,8 +11,6 @@ describe('exigirComprobanteDigital con plan de pago', () => {
       findMany: jest.fn(async () => vouchers),
     },
   });
-
-  beforeEach(() => verificarPin.mockClear());
 
   const planYapePlin = [{ medio: 'YAPE' }, { medio: 'PLIN' }, { medio: 'EFECTIVO' }];
 
@@ -25,7 +22,6 @@ describe('exigirComprobanteDigital con plan de pago', () => {
       medios: ['YAPE', 'PLIN', 'EFECTIVO'],
       planPago: planYapePlin,
       permiteExcepcion: true,
-      verificarPin,
     }).catch((e) => e);
 
     expect(err).toBeInstanceOf(BadRequestException);
@@ -42,7 +38,6 @@ describe('exigirComprobanteDigital con plan de pago', () => {
         medios: ['YAPE', 'PLIN'],
         planPago: planYapePlin,
         permiteExcepcion: true,
-        verificarPin,
       }),
     ).resolves.toBeNull();
   });
@@ -56,12 +51,11 @@ describe('exigirComprobanteDigital con plan de pago', () => {
         medios: ['YAPE', 'PLIN'],
         planPago: planYapePlin,
         permiteExcepcion: true,
-        verificarPin,
       }),
     ).resolves.toBeNull();
   });
 
-  it('la excepción con supervisor autoriza solo los medios que faltan', async () => {
+  it('la excepción con motivo cubre solo los medios que faltan', async () => {
     const db = dbCon([{ medio: 'YAPE' }]);
     const auth = await exigirComprobanteDigital({
       db: db as any,
@@ -70,11 +64,9 @@ describe('exigirComprobanteDigital con plan de pago', () => {
       planPago: planYapePlin,
       sinVoucher,
       permiteExcepcion: true,
-      verificarPin,
     });
 
-    expect(verificarPin).toHaveBeenCalledWith('123456');
-    expect(auth).toEqual({ motivo: sinVoucher.motivo, supervisorPartyId: '7', faltan: ['PLIN'] });
+    expect(auth).toEqual({ motivo: sinVoucher.motivo, faltan: ['PLIN'] });
   });
 
   it('plan con un solo medio digital: se mantiene la regla de siempre (un voucher basta)', async () => {
@@ -86,7 +78,6 @@ describe('exigirComprobanteDigital con plan de pago', () => {
         medios: ['YAPE', 'EFECTIVO'],
         planPago: [{ medio: 'YAPE' }, { medio: 'EFECTIVO' }],
         permiteExcepcion: true,
-        verificarPin,
       }),
     ).resolves.toBeNull();
     expect(db.voucherPago.findMany).not.toHaveBeenCalled();
@@ -99,7 +90,6 @@ describe('exigirComprobanteDigital con plan de pago', () => {
       pedidoId,
       medios: ['YAPE'],
       permiteExcepcion: false,
-      verificarPin,
     }).catch((e) => e);
     expect(err.getResponse()).toMatchObject({ codigo: 'VOUCHER_REQUERIDO', faltan: ['YAPE'] });
   });

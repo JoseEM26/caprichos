@@ -52,4 +52,4 @@ Ver tambien: [[zonas]]
 - El pedido mínimo rechaza pedidos: si el cliente no llega al monto, el pedido se rechaza con el aviso del mínimo.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría. Para las zonas, ver o cambiar requiere zonas/ver o zonas/editar, también exclusivos del Administrador.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría. Para las zonas, ver o cambiar requiere zonas/ver o zonas/editar, también exclusivos del Administrador.

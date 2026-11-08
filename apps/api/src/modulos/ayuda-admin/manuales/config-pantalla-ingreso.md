@@ -48,4 +48,4 @@ Personaliza la pantalla donde el personal inicia sesión en el panel: hasta 5 fo
 - La frase no se guarda: no puede pasar de 80 caracteres ni contener < o >.
 
 ## Quien puede hacerlo
-Solo el Administrador: las imágenes y la frase de la pantalla de ingreso requieren el permiso configuracion/editar. El administrador no escribe código de supervisor.
+Solo el Administrador: las imágenes y la frase de la pantalla de ingreso requieren el permiso configuracion/editar.

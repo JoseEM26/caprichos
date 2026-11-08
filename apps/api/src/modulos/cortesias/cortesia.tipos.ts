@@ -22,11 +22,6 @@ export function puedeDarCortesia(usuario: { rol: string; roles?: string[] } | un
   return rolesDelUsuario(usuario).some((r) => (MATRIZ[r] ?? []).includes('cortesias/dar'));
 }
 
-/** El SUPERVISOR (principal) da la cortesía con su código; ADMIN y CAJERO no. */
-export function requiereCodigoCortesia(req: any): boolean {
-  return req?.usuario?.rol === 'SUPERVISOR';
-}
-
 /** Valida motivo y nota. Lanza 400 si el motivo no está en la lista o si «Otro» no trae nota. */
 export function validarMotivoCortesia(motivo: unknown, nota: unknown): { motivo: MotivoCortesia; nota: string | null } {
   const m = MOTIVOS_CORTESIA.find((x) => x.codigo === motivo);

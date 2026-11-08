@@ -4,7 +4,7 @@ titulo: Caja y cierres
 ruta: /admin/cierre
 permiso: caja/ver
 roles: [ADMIN, CAJERO, SUPERVISOR]
-relacionados: [caja, repartos, supervisor-codigo, comprobantes, mensajes, propinas, informes]
+relacionados: [caja, repartos, comprobantes, mensajes, propinas, informes]
 sugerencias:
   - Como realizo el arqueo ciego al terminar el turno
   - Como audito los vouchers digitales de Yape y Plin antes del cierre
@@ -22,7 +22,8 @@ Gestion del cierre formal de la caja diaria y cambio de turno. Implementa el pro
 ## Como se hace: Resolver pendientes de cobro antes de cerrar
 1. En la pestana Cierre actual, revisar la seccion 1: Pedidos pendientes de cobro.
 2. Si aparecen pedidos en la lista, la caja no podra cerrarse por regla del sistema.
-3. Para cada pedido pendiente, pulsar Ir a cobrar en [[caja]] o proceder a anularlo con autorizacion de [[supervisor-codigo]] si fue cancelado o desistido.
+3. Para cada pedido pendiente, pulsar Ir a cobrar en [[caja]] o proceder a anularlo si fue cancelado o desistido.
+Requiere: [[caja]]
 Antes: [[caja]]
 Ver tambien: [[caja]]
 
@@ -55,10 +56,8 @@ Ver tambien: [[comprobantes]]
 ## Como se hace: Proceder cuando la caja no cuadra
 1. Si los montos declarados difieren de las ventas registradas, la pantalla muestra el aviso No cuadra y solicita un segundo conteo fisico.
 2. Volver a contar el dinero y corregir las cantidades ingresadas.
-3. Si la diferencia persiste tras el reconteo, la pantalla exigira el Codigo del supervisor de 6 digitos generado en [[supervisor-codigo]] y una Nota explicativa obligatoria. Si entras como administrador no pide el codigo, solo la nota.
-4. Ingresar el codigo del supervisor, redactar el motivo de la diferencia y pulsar Cerrar con aprobacion de supervisor.
-Requiere: [[supervisor-codigo]]
-Ver tambien: [[supervisor-codigo]]
+3. Si la diferencia persiste tras el reconteo, la pantalla exige una Nota explicativa obligatoria. No se pide ningun codigo de supervisor.
+4. Redactar el motivo de la diferencia y pulsar Cerrar caja. El cierre queda auditado con quien lo hizo.
 
 ## Como se hace: Entender las propinas, cortesias y ajustes en el cierre
 1. Propinas del dia: si hubo propinas, el cierre muestra el bloque Propinas del dia con el total, el efectivo y lo digital. Van aparte de la venta: no son ingreso ni salen en comprobantes. En el efectivo esperado aparece la linea "+ Propinas en efectivo (van aparte de la venta)". Los medios digitales (Yape, Plin, transferencia, tarjeta) ya incluyen la parte de propina digital, pero no se suman al total vendido: el cierre lo aclara. Las devoluciones del dia ya estan descontadas. Ver [[propinas]].
@@ -76,4 +75,4 @@ Ver tambien: [[propinas]]
 
 ## Quien puede hacerlo
 - Administrador, Cajero y Supervisor (permiso caja/ver) tienen acceso al modulo de cierres y a la auditoria de vouchers digitales con el permiso vouchers/ver.
-- Cerrar una caja con descuadre o diferencia requiere la intervencion de un supervisor con su codigo rotativo de 6 digitos. El administrador cierra sin codigo (solo escribe la nota).
+- Cerrar una caja con descuadre o diferencia solo exige escribir la nota explicativa; no hay codigo de supervisor.

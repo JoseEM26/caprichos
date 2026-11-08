@@ -4,7 +4,7 @@ titulo: Cocina
 ruta: /admin/cocina
 permiso: cocina/ver
 roles: [ADMIN, CAJERO, COCINA]
-relacionados: [caja, almacen, stock, pantallas, supervisor-codigo, apertura, productos, usuarios]
+relacionados: [caja, almacen, stock, pantallas, apertura, productos, usuarios]
 sugerencias:
   - Como despejo una comanda que ya prepare
   - Como pongo en pausa la cocina por alta demanda
@@ -44,7 +44,7 @@ Ver tambien: [[caja]]
 ## Como se hace: Anular un pedido que ya esta en cocina
 1. En la comanda, pulsar el boton rojo Anular pedido (solo lo ve quien tiene permiso para anular).
 2. Elegir o escribir el motivo (al menos 5 caracteres).
-3. Cocina no escribe codigo de supervisor: se autoriza solo y queda registrado a tu nombre. Solo pedidos en cola, preparando o listos.
+3. No se pide codigo: anulas por tu rol y queda registrado a tu nombre. Solo pedidos en cola, preparando o listos.
 4. Confirmar con Si, anular. Se anula el pedido COMPLETO: desaparece de todas las areas (aunque lo anules desde Bebidas), se devuelven el stock y los puntos, se cancelan las etiquetas por imprimir y se liberan sus mesas.
 5. Si el pedido ya estaba cobrado, su cobro tambien se anula por el mismo camino de [[caja]] y deja de contar en el arqueo y el cierre. Si la caja de ese cobro ya cerro, el sistema no deja anular: registra la devolucion al cliente.
 Ver tambien: [[caja]]
@@ -68,8 +68,7 @@ Ver tambien: [[stock]]
 1. Pulsar el boton Registrar mermas en la barra superior (por caida, vencimiento, mala preparacion o calibracion; sirve para productos o insumos).
 2. Seleccionar el insumo afectado registrado en [[stock]], ingresar la cantidad y unidad de medida.
 3. Elegir el motivo: Se cayo, Vencido, Mal preparado u Otro (especificando detalle).
-4. Pulsar Registrar merma. Si el insumo o cantidad requiere autorizacion, el sistema solicitara el Codigo del supervisor de 6 digitos obtenido en [[supervisor-codigo]] antes de confirmar (el administrador no lo necesita).
-Requiere: [[supervisor-codigo]]
+4. Pulsar Registrar merma. No se pide ningun codigo: la merma queda auditada con quien y cuando.
 Despues: [[almacen]]
 Ver tambien: [[stock]]
 

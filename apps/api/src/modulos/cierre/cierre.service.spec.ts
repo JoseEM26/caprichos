@@ -2,7 +2,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
-import * as argon2 from 'argon2';
 import { CierreService } from './cierre.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
@@ -10,7 +9,6 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CobrosService } from '../caja/cobros.service';
-import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { ArqueoDto } from './dto/arqueo.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 
@@ -26,7 +24,6 @@ describe('CierreService', () => {
   let redisMock: any;
   let redisServiceMock: any;
   let auditoriaMock: any;
-  let supervisorCodigoMock: any;
   let eventosGatewayMock: any;
 
   const mockUsuarioCajero: UsuarioAutenticado = {
@@ -242,43 +239,6 @@ describe('CierreService', () => {
       $transaction: jest.fn().mockImplementation(async (cb) => cb(prismaMock)),
     };
 
-    supervisorCodigoMock = {
-      verificarYConsumirCodigo: jest.fn().mockImplementation(async (codigo: string | undefined, partyId?: any) => {
-        const claveIntentos = `pin:supervisor:intentos:${partyId ?? 'general'}`;
-        let intentos;
-        try {
-          intentos = await redisMock.get(claveIntentos);
-        } catch {
-          throw new HttpException(
-            { codigo: 'PIN_NO_DISPONIBLE', mensaje: 'No se puede validar el código ahora, intenta en unos minutos' },
-            HttpStatus.SERVICE_UNAVAILABLE,
-          );
-        }
-        if (intentos && parseInt(intentos, 10) >= 3) {
-          throw new HttpException(
-            { codigo: 'CODIGO_BLOQUEADO', mensaje: 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.' },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-        if (!codigo || (codigo !== '654321' && codigo !== '123456')) {
-          await redisMock.incr(claveIntentos);
-          await redisMock.expire(claveIntentos, 5 * 60);
-          await auditoriaMock.registrar({
-            categoria: 'ACCESO',
-            modulo: 'cierre',
-            accion: 'PIN_FALLIDO',
-            resultado: 'RECHAZADO',
-          });
-          throw new HttpException(
-            { codigo: 'CODIGO_INVALIDO', mensaje: 'Código de supervisor inválido o no proporcionado' },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-        await redisMock.del(claveIntentos);
-        return { party_id: 99n, id: 99n, valido: true };
-      }),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CierreService,
@@ -287,7 +247,6 @@ describe('CierreService', () => {
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
         { provide: CobrosService, useValue: { cobrarEnCierre: jest.fn() } },
-        { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
       ],
     }).compile();
 
@@ -390,47 +349,32 @@ describe('CierreService', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 3. 3er intento exige PIN de supervisor
+  // 3. Cierre descuadrado: sin código de supervisor, con nota y auditado
   // -------------------------------------------------------------------------
-  describe('3. 3er intento exige PIN', () => {
-    it('rechaza cerrar caja descuadrada sin PIN de supervisor', async () => {
-      // Conteo que no cuadra
+  describe('3. cierre descuadrado sin código de supervisor', () => {
+    it('cierra caja descuadrada con nota, sin ningún código, y queda auditado a nombre de quien cierra', async () => {
       const dtoCerrar: CerrarCajaDto = {
         conteo: { '200': 1 }, // 200 vs 355 esperado
-        medios: { yape: 200 },
+        medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 },
         nota: 'Faltante de turno tarde',
       };
 
-      await expect(
-        service.cerrar(dtoCerrar, mockUsuarioCajero, undefined),
-      ).rejects.toThrow(HttpException);
+      const res = await service.cerrar(dtoCerrar, mockUsuarioCajero);
 
-      try {
-        await service.cerrar(dtoCerrar, mockUsuarioCajero, undefined);
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(HttpStatus.FORBIDDEN);
-        expect(e.getResponse().codigo).toBe('PIN_REQUERIDO');
-      }
+      expect(res.resultado).toBe('NO_CUADRA');
+      expect(res.nota).toBe('Faltante de turno tarde');
+      expect(prismaMock.cierreCaja.create).toHaveBeenCalled();
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ modulo: 'cierre', accion: 'CERRAR_CAJA', partyId: mockUsuarioCajero.partyId }),
+      );
     });
 
-    it('tras 3 arqueos que no cuadraron, exige PIN de supervisor para el cuarto intento o el cierre', async () => {
+    it('tras 3 arqueos que no cuadraron, el cuarto arqueo ya no pide PIN', async () => {
       prismaMock.conteoCierre.count.mockResolvedValue(3);
 
-      const dtoArqueo: ArqueoDto = {
-        conteo: { '200': 1 },
-        medios: { yape: 200 },
-      };
+      const resultado = await service.arqueo({ conteo: { '200': 1 }, medios: { yape: 200 } }, mockUsuarioCajero);
 
-      await expect(
-        service.arqueo(dtoArqueo, mockUsuarioCajero, undefined),
-      ).rejects.toThrow(HttpException);
-
-      try {
-        await service.arqueo(dtoArqueo, mockUsuarioCajero, undefined);
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(HttpStatus.FORBIDDEN);
-        expect(e.getResponse().codigo).toBe('PIN_REQUERIDO');
-      }
+      expect(resultado).toEqual({ resultado: 'NO_CUADRA', intento: 4 });
     });
 
     it('un arqueo que cuadra no suma: con 3 intentos previos y solo 1 que no cuadró, el cuarto no pide PIN', async () => {
@@ -449,21 +393,6 @@ describe('CierreService', () => {
       expect(resultado).toEqual({ resultado: 'CUADRA', intento: 4 });
     });
 
-    it('con 3 arqueos que no cuadraron aunque haya más intentos en total, el cuarto exige PIN', async () => {
-      prismaMock.conteoCierre.count.mockImplementation(async ({ where }: any) =>
-        where.resultado === 'NO_CUADRA' ? 3 : 5,
-      );
-
-      const dtoArqueo: ArqueoDto = {
-        conteo: { '200': 1 },
-        medios: { yape: 200 },
-      };
-
-      await expect(service.arqueo(dtoArqueo, mockUsuarioCajero, undefined)).rejects.toMatchObject({
-        response: { codigo: 'PIN_REQUERIDO' },
-      });
-    });
-
     it('en el cierre tampoco cuentan los arqueos que cuadraron: con 3 que cuadraron y 1 que no, no pide PIN', async () => {
       const cuadra = { conteo: { '200': 1, '100': 1, '50': 1, '5': 1 }, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } };
       prismaMock.conteoCierre.findMany.mockResolvedValue([
@@ -478,71 +407,9 @@ describe('CierreService', () => {
         medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 },
       };
 
-      // Cuadra con el sistema: el cierre no exige PIN de supervisor (puede fallar por otra causa del mock, no por el PIN)
+      // Cuadra con el sistema: el cierre no exige PIN de supervisor (puede fallar por otra causa del mock)
       const error = await service.cerrar(dtoCerrar, mockUsuarioCajero, undefined).catch((e) => e);
-      expect(error?.getResponse?.()?.codigo).not.toBe('PIN_REQUERIDO');
-    });
-
-    it('bloquea por 5 minutos en Redis tras 3 pines erróneos y audita PIN_FALLIDO', async () => {
-      const pinHashAdmin = await argon2.hash('654321');
-      prismaMock.userAccount.findMany.mockResolvedValue([
-        { id: 1n, party_id: 1n, rol: 'ADMIN', pin_hash: pinHashAdmin, activo: true },
-      ]);
-
-      // Intento con PIN inválido '111111'
-      await expect(
-        service.verificarPinSupervisor('111111', 101n, '127.0.0.1', 10n),
-      ).rejects.toThrow(HttpException);
-
-      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          categoria: 'ACCESO',
-          modulo: 'cierre',
-          accion: 'PIN_FALLIDO',
-          resultado: 'RECHAZADO',
-        }),
-      );
-
-      // Si Redis ya tiene 3 fallos acumulados
-      redisMock.get.mockResolvedValue('3');
-      await expect(
-        service.verificarPinSupervisor('654321', 101n, '127.0.0.1', 10n),
-      ).rejects.toThrow(HttpException);
-
-      try {
-        await service.verificarPinSupervisor('654321', 101n, '127.0.0.1', 10n);
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(HttpStatus.FORBIDDEN);
-        expect(e.getResponse().codigo).toBe('CODIGO_BLOQUEADO');
-      }
-    });
-
-    it('con PIN de supervisor válido de 6 dígitos permite cerrar caja descuadrada', async () => {
-      const pinCorrecto = '123456';
-      const pinHash = await argon2.hash(pinCorrecto);
-
-      prismaMock.userAccount.findMany.mockResolvedValue([
-        { id: 99n, party_id: 99n, rol: 'ADMIN', pin_hash: pinHash, activo: true },
-      ]);
-
-      const dtoCerrar: CerrarCajaDto = {
-        conteo: { '200': 1 }, // 200 en efectivo vs 355
-        medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 },
-        nota: 'Diferencia autorizada por supervisor',
-      };
-
-      const res = await service.cerrar(dtoCerrar, mockUsuarioCajero, pinCorrecto);
-
-      expect(res.resultado).toBe('NO_CUADRA');
-      expect(res.aprobadoPor).toBe(99);
-      expect(res.nota).toBe('Diferencia autorizada por supervisor');
-      expect(prismaMock.cierreCaja.create).toHaveBeenCalled();
-      expect(prismaMock.caja.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 10n },
-          data: expect.objectContaining({ estado: 'CERRADA' }),
-        }),
-      );
+      expect(error?.getResponse?.()?.codigo).toBeUndefined();
     });
   });
 
@@ -566,11 +433,6 @@ describe('CierreService', () => {
   // -------------------------------------------------------------------------
   describe('5. diferencias por medio', () => {
     it('guarda y muestra diferencias individuales por medio (efectivo, yape, plin, transferencia, tarjeta) en el detalle', async () => {
-      const pinHash = await argon2.hash('654321');
-      prismaMock.userAccount.findMany.mockResolvedValue([
-        { id: 2n, party_id: 2n, rol: 'ADMIN', pin_hash: pinHash, activo: true },
-      ]);
-
       // Esperado:
       // Efectivo = 355 -> Visto = 350 -> Dif = -5.00
       // Yape = 200 -> Visto = 210 -> Dif = +10.00
@@ -594,7 +456,7 @@ describe('CierreService', () => {
         { id: 2n, caja_id: 10n, medio: 'TARJETA', monto_sistema: 100, monto_anterior: 100, monto_nuevo: 90, motivo: 'Terminal cobró 90 real', por_party_id: 101n, autorizado_por_party_id: 2n, creado_en: new Date() },
       ]);
 
-      const resCerrar = await service.cerrar(dtoCerrar, mockUsuarioCajero, '654321');
+      const resCerrar = await service.cerrar(dtoCerrar, mockUsuarioCajero);
 
       // El cajero no recibe el esperado ni la diferencia (DT-61)
       expect(resCerrar.medios).toBeUndefined();
@@ -809,17 +671,13 @@ describe('CierreService', () => {
   // 8. Montos esperados del sistema (solo ADMIN)
   // -------------------------------------------------------------------------
   describe('8. montos esperados en vivo', () => {
-    it('el cajero solo ve el esperado con un PIN de supervisor válido; el ADMIN lo ve directo', async () => {
-      // CAJERO sin PIN o con PIN errado es rechazado con 403
-      prismaMock.userAccount.findMany.mockResolvedValue([
-        { id: 1n, party_id: 1n, rol: 'ADMIN', pin_hash: await argon2.hash('654321'), activo: true },
-      ]);
-      await expect(service.obtenerEsperado(mockUsuarioCajero)).rejects.toThrow(HttpException);
-      await expect(service.obtenerEsperado(mockUsuarioCajero, '111111')).rejects.toThrow(HttpException);
-
-      // CAJERO con el PIN correcto de la supervisora recibe el detalle
-      const conPin = await service.obtenerEsperado(mockUsuarioCajero, '654321');
-      expect(conPin.cajaId).toBe(10);
+    it('el cajero no ve el esperado (cierre ciego); el ADMIN y el SUPERVISOR lo ven directo', async () => {
+      await expect(service.obtenerEsperado(mockUsuarioCajero)).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        response: { codigo: 'ESPERADO_RESERVADO' },
+      });
+      const sup = await service.obtenerEsperado(mockUsuarioSupervisor);
+      expect(sup.cajaId).toBe(10);
 
       // ADMIN recibe totales en vivo
       const esperado = await service.obtenerEsperado(mockUsuarioAdmin);
@@ -885,7 +743,7 @@ describe('CierreService', () => {
       expect(esperado.movimientos.map((m) => m.motivo)).toEqual(['Sencillo inicial extra', 'Compra de hielo']);
     });
 
-    it('el cajero sin PIN no recibe cobros ni movimientos (cierre ciego, DT-61)', async () => {
+    it('el cajero no recibe cobros ni movimientos (cierre ciego, DT-61)', async () => {
       await expect(service.obtenerEsperado(mockUsuarioCajero)).rejects.toThrow(HttpException);
       expect(prismaMock.cobro.findMany).not.toHaveBeenCalled();
       expect(prismaMock.movimientoCaja.findMany).not.toHaveBeenCalled();
@@ -935,11 +793,11 @@ describe('CierreService', () => {
       };
 
       await expect(
-        service.cerrar(dtoSinNota, mockUsuarioCajero, '123456'),
+        service.cerrar(dtoSinNota, mockUsuarioCajero),
       ).rejects.toThrow(HttpException);
 
       try {
-        await service.cerrar(dtoSinNota, mockUsuarioCajero, '123456');
+        await service.cerrar(dtoSinNota, mockUsuarioCajero);
       } catch (e: any) {
         expect(e.getStatus()).toBe(HttpStatus.BAD_REQUEST);
         expect(e.getResponse().codigo).toBe('NOTA_REQUERIDA');
@@ -1096,19 +954,9 @@ describe('CierreService', () => {
       ).rejects.toMatchObject({ response: { codigo: 'SIN_EFECTIVO_PENDIENTE' } });
     });
 
-    it('bloquea el PIN de supervisor 5 minutos tras 3 fallos (300 s en Redis)', async () => {
-      prismaMock.userAccount.findMany.mockResolvedValue([]);
-      await expect(
-        service.verificarPinSupervisor('000000', 101n, '127.0.0.1', 10n),
-      ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
-      expect(redisMock.expire).toHaveBeenCalledWith(expect.any(String), 5 * 60);
-    });
-
-    it('pedidos sin cobrar: el cajero sin PIN de supervisor no los ve (CODIGO_INVALIDO)', async () => {
-      await expect(service.listarPendientesDeCobro(mockUsuarioCajero)).rejects.toMatchObject({
-        response: { codigo: 'CODIGO_INVALIDO' },
-      });
-      expect(prismaMock.pedido.findMany).not.toHaveBeenCalled();
+    it('pedidos sin cobrar: el cajero también los ve (ya no pide código de supervisor)', async () => {
+      prismaMock.pedido.findMany.mockResolvedValue([]);
+      await expect(service.listarPendientesDeCobro()).resolves.toEqual([]);
     });
 
     it('pedidos sin cobrar: el admin los ve de cualquier día, sin anulados ni cobrados', async () => {
@@ -1116,7 +964,7 @@ describe('CierreService', () => {
         { id: 74n, codigo: 'CP-W062', canal: 'CARTA', modalidad: 'RECOGER', estado: 'ENTREGADO', total: 42, creado_en: new Date('2026-10-23T20:21:00Z'), pago_estado: 'COORDINADO', cliente_nombre: '  Rosa Pérez ', cliente_telefono: '999888777' },
       ]);
 
-      const lista = await service.listarPendientesDeCobro(mockUsuarioAdmin);
+      const lista = await service.listarPendientesDeCobro();
 
       expect(lista).toEqual([
         expect.objectContaining({ id: 74, codigo: 'CP-W062', total: 42, estado: 'ENTREGADO', pagoEstado: 'COORDINADO', clienteNombre: 'Rosa Pérez' }),
@@ -1134,80 +982,6 @@ describe('CierreService', () => {
       );
     });
   });
-  // -------------------------------------------------------------------------
-  // 12. SUPERVISOR se autoriza sin PIN, como el ADMIN (misma regla que verificarYConsumirCodigo)
-  // -------------------------------------------------------------------------
-  describe('12. SUPERVISOR cierra sin PIN', () => {
-    const conteoDescuadrado = { conteo: { '200': 1 }, medios: { yape: 200 }, nota: 'Faltante de turno' } as CerrarCajaDto;
-    const conteoCuadra: CerrarCajaDto = {
-      conteo: { '200': 1, '100': 1, '50': 1, '5': 1 },
-      medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 },
-    };
-
-    beforeEach(() => {
-      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
-        where.party_id === 102n ? { party_id: 102n, id: 30n, rol: 'SUPERVISOR' } : null,
-      );
-    });
-
-    it('con descuadre cierra sin PIN: el servicio de supervisor lo autoriza (y audita) sin código', async () => {
-      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({
-        party_id: 102n,
-        id: 30n,
-        supervisorPartyId: 102n,
-        supervisorId: 30n,
-      });
-
-      const error = await service.cerrar(conteoDescuadrado, mockUsuarioSupervisor, undefined).catch((e) => e);
-
-      expect(error?.response?.codigo).not.toBe('PIN_REQUERIDO');
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
-        undefined,
-        102n,
-        'cierre',
-        undefined,
-        'caja',
-        10n,
-      );
-    });
-
-    it('sin descuadre no pide nada de supervisor', async () => {
-      const error = await service.cerrar(conteoCuadra, mockUsuarioSupervisor, undefined).catch((e) => e);
-
-      expect(error?.response?.codigo).not.toBe('PIN_REQUERIDO');
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
-    });
-
-    it('el arqueo del cuarto intento tampoco le pide PIN', async () => {
-      prismaMock.conteoCierre.count.mockResolvedValue(3);
-      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({
-        party_id: 102n,
-        id: 30n,
-        supervisorPartyId: 102n,
-        supervisorId: 30n,
-      });
-
-      const error = await service.arqueo({ conteo: { '200': 1 }, medios: { yape: 200 } }, mockUsuarioSupervisor, undefined).catch((e) => e);
-
-      expect(error?.response?.codigo).not.toBe('PIN_REQUERIDO');
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
-        undefined,
-        102n,
-        'cierre',
-        undefined,
-        'caja',
-        10n,
-      );
-    });
-
-    it('el cajero sigue necesitando PIN: se rechaza antes de verificar nada', async () => {
-      await expect(service.cerrar(conteoDescuadrado, mockUsuarioCajero, undefined)).rejects.toMatchObject({
-        response: { codigo: 'PIN_REQUERIDO' },
-      });
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
-    });
-  });
-
   // -------------------------------------------------------------------------
   // 13. Medios digitales calculados y correcciones con motivo
   // -------------------------------------------------------------------------
@@ -1244,18 +1018,10 @@ describe('CierreService', () => {
       expect(res.medios.yape).toMatchObject({ monto: 210, sistema: 200, corregido: true });
     });
 
-    it('el cajero sin código de supervisor no puede corregir un monto (PIN_REQUERIDO, nada se guarda)', async () => {
-      await expect(
-        service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 210, motivo: motivoValido }, mockUsuarioCajero, undefined),
-      ).rejects.toMatchObject({ response: { codigo: 'PIN_REQUERIDO' }, status: HttpStatus.FORBIDDEN });
-      expect(prismaMock.cierreAjusteMedio.create).not.toHaveBeenCalled();
-    });
-
-    it('el cajero con código de supervisor válido corrige, y el registro queda con quién lo hizo y quién autorizó', async () => {
+    it('el cajero corrige un monto con motivo, sin código: queda con quién lo hizo y auditado', async () => {
       const res = await service.registrarAjusteMedio(
         { medio: 'YAPE', montoNuevo: 210, motivo: motivoValido },
         mockUsuarioCajero,
-        '123456',
         '10.0.0.5',
       );
 
@@ -1268,46 +1034,13 @@ describe('CierreService', () => {
           monto_nuevo: 210,
           motivo: motivoValido,
           por_party_id: 101n,
-          autorizado_por_party_id: 99n,
+          autorizado_por_party_id: 101n,
         }),
       });
       expect(res).toMatchObject({ medio: 'YAPE', montoNuevo: 210, montoAnterior: 200 });
-    });
-
-    it('el cajero con código de supervisor inválido no corrige', async () => {
-      await expect(
-        service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 210, motivo: motivoValido }, mockUsuarioCajero, '000000'),
-      ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
-      expect(prismaMock.cierreAjusteMedio.create).not.toHaveBeenCalled();
-    });
-
-    it('el ADMIN corrige sin código y queda auditado a su nombre', async () => {
-      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
-        where.party_id === 1n ? { party_id: 1n, id: 1n, rol: 'ADMIN' } : null,
-      );
-      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({ party_id: 1n, id: 1n, supervisorPartyId: 1n, supervisorId: 1n });
-
-      await service.registrarAjusteMedio({ medio: 'TARJETA', montoNuevo: 90, motivo: 'Terminal cobró 90 real' }, mockUsuarioAdmin, undefined);
-
-      expect(prismaMock.cierreAjusteMedio.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ por_party_id: 1n, autorizado_por_party_id: 1n, medio: 'TARJETA' }),
-      });
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({ categoria: 'CAMBIO', modulo: 'cierre', accion: 'AJUSTE_MEDIO_DIGITAL', entidad: 'cierre_ajuste_medio', partyId: 1n }),
+        expect.objectContaining({ modulo: 'cierre', accion: 'AJUSTE_MEDIO_DIGITAL', partyId: 101n }),
       );
-    });
-
-    it('el SUPERVISOR corrige sin código, con su nombre como autorizador', async () => {
-      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
-        where.party_id === 102n ? { party_id: 102n, id: 30n, rol: 'SUPERVISOR' } : null,
-      );
-      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({ party_id: 102n, id: 30n, supervisorPartyId: 102n, supervisorId: 30n });
-
-      await service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 210, motivo: motivoValido }, mockUsuarioSupervisor, undefined);
-
-      expect(prismaMock.cierreAjusteMedio.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ por_party_id: 102n, autorizado_por_party_id: 102n }),
-      });
     });
 
     it('rechaza un motivo corto (menos de 10 caracteres sin contar espacios)', async () => {
@@ -1318,13 +1051,9 @@ describe('CierreService', () => {
     });
 
     it('rechaza un monto con más de dos decimales y un monto igual al que ya vale', async () => {
-      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
-        where.party_id === 102n ? { party_id: 102n, id: 30n, rol: 'SUPERVISOR' } : null,
-      );
       await expect(
         service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 210.555, motivo: motivoValido }, mockUsuarioSupervisor, undefined),
       ).rejects.toMatchObject({ response: { codigo: 'MONTO_INVALIDO' } });
-      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({ party_id: 102n, id: 30n, supervisorPartyId: 102n, supervisorId: 30n });
       await expect(
         service.registrarAjusteMedio({ medio: 'YAPE', montoNuevo: 200, motivo: motivoValido }, mockUsuarioSupervisor, undefined),
       ).rejects.toMatchObject({ response: { codigo: 'AJUSTE_SIN_CAMBIO' } });
@@ -1346,11 +1075,7 @@ describe('CierreService', () => {
 
     it('cierre con el monto corregido sí pasa: el medio queda visto con el valor ajustado y el resultado sigue NO_CUADRA', async () => {
       prismaMock.cierreAjusteMedio.findMany.mockResolvedValue([ajusteYape]);
-      // Con diferencia el cierre exige nota y código de supervisora: el ADMIN lo autoriza sin código
-      prismaMock.userAccount.findFirst.mockImplementation(async ({ where }: any) =>
-        where.party_id === 1n ? { party_id: 1n, id: 1n, rol: 'ADMIN' } : null,
-      );
-      supervisorCodigoMock.verificarYConsumirCodigo.mockResolvedValueOnce({ party_id: 1n, id: 1n, supervisorPartyId: 1n, supervisorId: 1n });
+      // Con diferencia el cierre exige nota (sin código de supervisor)
       const dto: CerrarCajaDto = {
         conteo: { '200': 1, '100': 1, '50': 1, '5': 1 },
         medios: { yape: 210, plin: 0, transferencia: 50, tarjeta: 100 },
@@ -1499,7 +1224,6 @@ describe('CierreService', () => {
         service.cerrar(
           { conteo: { '200': 1, '100': 1, '50': 1, '5': 1 }, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } } as CerrarCajaDto,
           mockUsuarioCajero,
-          '654321',
         ),
       ).rejects.toMatchObject({ response: { codigo: 'AJUSTE_REQUERIDO' } });
     });

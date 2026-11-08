@@ -37,4 +37,4 @@ Permite que el cliente deje una propina al pedir. Se enciende por canal (carta v
 - La propina no aparece en el comprobante: es normal, va aparte de la venta.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría.

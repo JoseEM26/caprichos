@@ -33,7 +33,6 @@ describe('CierreController', () => {
   const mockReq = {
     usuario: mockUsuario,
     ip: '127.0.0.1',
-    headers: { 'x-pin-supervisor': '123456' },
   };
 
   beforeEach(async () => {
@@ -68,32 +67,30 @@ describe('CierreController', () => {
       conteo: { '200': 1 },
       medios: { yape: 50 },
     };
-    const res = await controller.arqueo(dto as any, '123456', mockReq);
+    const res = await controller.arqueo(dto as any, mockReq);
     expect(res).toEqual({ resultado: 'CUADRA', intento: 1 });
     expect(serviceMock.arqueo).toHaveBeenCalledWith(
       dto,
       mockUsuario,
-      '123456',
       '127.0.0.1',
     );
   });
 
   it('POST /admin/cierre/cerrar delega a service.cerrar', async () => {
     const dto = { nota: 'Cierre ok' };
-    const res = await controller.cerrar(dto, '123456', mockReq);
+    const res = await controller.cerrar(dto, mockReq);
     expect(res).toEqual({ cajaId: 10, resultado: 'CUADRA' });
     expect(serviceMock.cerrar).toHaveBeenCalledWith(
       dto,
       mockUsuario,
-      '123456',
       '127.0.0.1',
     );
   });
 
   it('GET /admin/cierre/esperado delega a service.obtenerEsperado', async () => {
-    const res = await controller.obtenerEsperado('654321', mockReq);
+    const res = await controller.obtenerEsperado(mockReq);
     expect(res).toEqual({ cajaId: 10, efectivoEsperado: 355.0 });
-    expect(serviceMock.obtenerEsperado).toHaveBeenCalledWith(mockUsuario, '654321', '127.0.0.1');
+    expect(serviceMock.obtenerEsperado).toHaveBeenCalledWith(mockUsuario);
   });
 
   it('GET /admin/cierre/historial delega a service.historial', async () => {

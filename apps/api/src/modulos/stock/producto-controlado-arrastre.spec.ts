@@ -207,7 +207,7 @@ describe('Merma de producto terminado (producto-controlado)', () => {
   });
 });
 
-describe('Merma desde el servicio de almacén (sin supervisor, con el control de almacén apagado)', () => {
+describe('Merma desde el servicio de almacén (con el control de almacén apagado)', () => {
   const usuario = { partyId: 5n, rol: 'COCINA', debeCambiar: false } as any;
 
   /** Servicio con prisma en memoria; el parámetro stock_control_activo está apagado (no existe) y se vigila. */
@@ -220,15 +220,14 @@ describe('Merma desde el servicio de almacén (sin supervisor, con el control de
       $transaction: async (cb: (tx: any) => any) => cb({ ...db, parametro }),
     };
     const auditoria = { registrar: jest.fn(async () => ({})) };
-    const supervisor = { verificar: jest.fn() };
     const eventos = { emitirAdmin: jest.fn() };
-    const service = new AlmacenService(prisma, auditoria as any, eventos as any, undefined, supervisor as any);
-    return { service, parametro, auditoria, supervisor };
+    const service = new AlmacenService(prisma, auditoria as any, eventos as any);
+    return { service, parametro, auditoria };
   }
 
   it('registra la merma sin código de supervisor, sin consultar el interruptor y con auditoría', async () => {
     const db = fakeDb({ stock: 8 });
-    const { service, parametro, auditoria, supervisor } = servicioCon(db);
+    const { service, parametro, auditoria } = servicioCon(db);
     const r = await service.registrarMermaProducto(
       { productoId: String(DONA), cantidad: 5, motivo: 'SE_CAYO' } as any,
       usuario,
@@ -236,7 +235,6 @@ describe('Merma desde el servicio de almacén (sin supervisor, con el control de
     );
     expect(r.saldo).toBe(3);
     expect(parametro.findUnique).not.toHaveBeenCalled();
-    expect(supervisor.verificar).not.toHaveBeenCalled();
     expect(auditoria.registrar).toHaveBeenCalledWith(
       expect.objectContaining({ accion: 'MERMA_PRODUCTO', partyId: 5n, ip: '10.0.0.1' }),
       expect.anything(),

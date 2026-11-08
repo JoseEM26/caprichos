@@ -57,7 +57,7 @@ describe('AyudaGrafoService (Grafo de Conocimiento de Documentación - Ola J)', 
   });
 
   describe('2. Recuperación de contexto con 1 salto en el grafo', () => {
-    it('consulta "como anulo un pedido ya cobrado" trae la tarea de anular de caja y supervisor-codigo por 1 salto', () => {
+    it('consulta "como anulo un pedido ya cobrado" trae la tarea de anular de caja y el historial por 1 salto', () => {
       const resultado = grafoService.recuperarContexto(
         'como anulo un pedido ya cobrado',
         undefined,
@@ -72,20 +72,18 @@ describe('AyudaGrafoService (Grafo de Conocimiento de Documentación - Ola J)', 
       // 2. Módulo principal es caja
       expect(resultado.moduloPrincipal?.clave).toBe('caja');
 
-      // 3. 1 salto por el grafo incorpora supervisor-codigo por relación requiere / antes
+      // 3. 1 salto por el grafo incorpora el historial por relación ver también
       const vecinosClaves = resultado.vecinos.map((v) => v.clave);
-      expect(vecinosClaves).toContain('supervisor-codigo');
+      expect(vecinosClaves).toContain('historial');
 
-      // 4. El texto ensamblado contiene la mención del flujo conectado a supervisor-codigo
-      expect(resultado.contextoTexto).toContain('supervisor-codigo');
-      expect(
-        resultado.relacionesFormateadas.some((r) => r.includes('supervisor-codigo')),
-      ).toBe(true);
+      // 4. Ya no existe el módulo del código del supervisor ni se menciona en el contexto
+      expect(vecinosClaves).not.toContain('supervisor-codigo');
+      expect(resultado.contextoTexto).not.toContain('supervisor-codigo');
 
-      // 5. Los enlaces sugeridos incluyen tanto caja como supervisor-codigo
+      // 5. Los enlaces sugeridos incluyen caja y no la ruta del código del supervisor
       const rutasEnlaces = resultado.enlacesSugeridos.map((e) => e.ruta);
       expect(rutasEnlaces).toContain('/admin/caja');
-      expect(rutasEnlaces).toContain('/admin/supervisor-codigo');
+      expect(rutasEnlaces).not.toContain('/admin/supervisor-codigo');
     });
 
     it('un rol sin permiso NO recibe nodos ni relaciones de módulos que no puede ver (aislamiento de roles)', () => {
@@ -103,11 +101,9 @@ describe('AyudaGrafoService (Grafo de Conocimiento de Documentación - Ola J)', 
       const vecinosCajero = resultadoCajero.vecinos.map((v) => v.clave);
       expect(vecinosCajero).not.toContain('usuarios');
       expect(vecinosCajero).not.toContain('indicadores');
-      expect(vecinosCajero).not.toContain('supervisor-codigo');
 
       // Tampoco en el texto de contexto expandido
       expect(resultadoCajero.contextoTexto).not.toContain('/admin/usuarios');
-      expect(resultadoCajero.contextoTexto).not.toContain('/admin/supervisor-codigo');
     });
 
     it('respeta el presupuesto de caracteres (<= 6000 chars)', () => {

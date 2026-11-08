@@ -48,7 +48,6 @@ Ver tambien: [[mirest]]
 ## Errores y dudas comunes
 - Los colores no cambiaron en la carta web: los cambios quedan guardados como borrador interno hasta que se pulsa "Publicar cambios" y se confirma la ventana emergente.
 - El texto casi no se nota: revisa la advertencia de contraste. Asegúrate de que el color de texto ("ink" o "soft") mantenga suficiente diferencia de tono con el fondo ("bg" o "card").
-- Código de supervisor: no se requiere código de supervisor en este módulo.
 
 ## Quien puede hacerlo
 El acceso y la configuración de la paleta de colores requieren el permiso local/ver y están reservados exclusivamente para el Administrador (ADMIN). Los demás roles no pueden ver ni modificar la combinación cromática del local.

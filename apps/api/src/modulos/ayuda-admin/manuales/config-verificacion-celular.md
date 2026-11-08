@@ -39,4 +39,4 @@ Define cómo comprueba el cliente que su celular es suyo al crear una cuenta o r
 - El cliente no recibe el código en el modo CODIGO_PLANTILLA: las plantillas de Meta aún no están aprobadas; vuelve a WHATSAPP_ENTRANTE.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría.

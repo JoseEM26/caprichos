@@ -1,4 +1,4 @@
-import { MATRIZ, ROLES, ROLES_ELIMINADOS } from './permisos';
+import { MATRIZ, PERMISOS, ROLES, ROLES_ELIMINADOS } from './permisos';
 
 describe('iniciativas: todo el personal ve, crea y comenta; cambiar estado solo ADMIN y SUPERVISOR', () => {
   const roles = ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO', 'COCINA', 'ALMACEN', 'REPARTIDOR'];
@@ -97,14 +97,13 @@ describe('matriz de permisos de COCINA (coc-api)', () => {
   });
 });
 
-describe('permiso supervisor/ver_codigo', () => {
-  it('ADMIN y SUPERVISOR ven el código; ningún otro rol lo tiene', () => {
-    expect(MATRIZ.ADMIN).toContain('supervisor/ver_codigo');
-    expect(MATRIZ.SUPERVISOR).toContain('supervisor/ver_codigo');
-    const otrosRoles = ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR'];
-    for (const r of otrosRoles) {
+describe('código del supervisor eliminado', () => {
+  it('ningún rol conserva supervisor/ver_codigo ni supervisor/gestionar_codigo, y ya no existen como permisos', () => {
+    for (const r of Object.keys(MATRIZ)) {
       expect(MATRIZ[r]).not.toContain('supervisor/ver_codigo');
+      expect(MATRIZ[r]).not.toContain('supervisor/gestionar_codigo');
     }
+    expect(PERMISOS.some((p) => p.modulo === 'supervisor')).toBe(false);
   });
 });
 

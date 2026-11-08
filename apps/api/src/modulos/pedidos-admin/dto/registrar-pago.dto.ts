@@ -24,7 +24,7 @@ export class RegistrarPagoDto {
   })
   estado!: 'COORDINADO' | 'PAGADO';
 
-  /** Excepción a la foto del comprobante (Yape, Plin, transferencia): motivo y código del supervisor. */
+  /** Excepción a la foto del comprobante (Yape, Plin, transferencia): motivo. */
   @IsOptional()
   @ValidateNested()
   @Type(() => SinVoucherDto)

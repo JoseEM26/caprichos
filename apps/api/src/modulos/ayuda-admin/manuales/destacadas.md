@@ -50,7 +50,6 @@ Ver tambien: [[historial]]
 ## Errores y dudas comunes
 - Un círculo no aparece en la carta virtual: un círculo solo es visible para el público si está activo, no está archivado y contiene al menos una fotografía cargada. Revisa el contador de resumen en la parte superior.
 - Orden de los círculos: puedes arrastrar los círculos horizontalmente en la barra superior para definir cuál aparece primero ante el cliente.
-- Código de supervisor: este módulo no requiere código de supervisor para ninguna de sus acciones.
 
 ## Quien puede hacerlo
 El acceso a la ruta requiere permiso catalogo/ver, pero la gestión completa de las historias destacadas (crear, editar fotos, archivar, publicar y eliminar) está restringida al rol Administrador (ADMIN).

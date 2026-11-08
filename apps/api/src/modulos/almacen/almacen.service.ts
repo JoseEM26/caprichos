@@ -27,7 +27,6 @@ import {
   saldoSabor,
 } from '../stock/producto-controlado';
 import { StockService } from '../stock/stock.service';
-import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 
 @Injectable()
 export class AlmacenService {
@@ -36,7 +35,6 @@ export class AlmacenService {
     private readonly auditoria: AuditoriaService,
     @Optional() private readonly eventosGateway?: EventosGateway,
     @Optional() private readonly stockService?: StockService,
-    @Optional() private readonly supervisorCodigoService?: SupervisorCodigoService,
   ) {}
 
   private parsearId(id: bigint | string | number, entidad = 'entidad'): bigint {
@@ -262,7 +260,7 @@ export class AlmacenService {
   // ==========================================
   // MERMA DE PRODUCTO TERMINADO (sabor o producto)
   // ==========================================
-  /** Sin código de supervisor y sin mirar «Control de almacén»: la audita movimiento_stock (por y en) y auditoria. */
+  /** Sin mirar «Control de almacén»: la audita movimiento_stock (por y en) y auditoria. */
   async registrarMermaProducto(dto: MermaProductoDto, usuario: UsuarioAutenticado, ip?: string) {
     const productoId = this.parsearId(dto.productoId, 'producto');
     const prod = await this.prisma.producto.findUnique({
@@ -506,7 +504,6 @@ export class AlmacenService {
     dto: MovimientoAlmacenDto,
     usuario?: UsuarioAutenticado,
     ip?: string,
-    pinSupervisor?: string,
   ) {
     if (dto.tipo === 'ENTRADA') {
       throw new ConflictException({
@@ -552,24 +549,6 @@ export class AlmacenService {
           codigo: 'STOCK_INSUFICIENTE',
           mensaje: `Solo hay ${stockDisponible} ${insumo.unidad_almacen} de ${insumo.nombre} en ${origenLugar.nombre}.`,
         });
-      }
-    }
-
-    // Merma o ajuste grande (>= 10 unidades/kg) requiere código de supervisor
-    if (
-      (dto.tipo === 'MERMA' || dto.tipo === 'AJUSTE') &&
-      cantidadNum >= 10 &&
-      !esMermaReparto
-    ) {
-      if (this.supervisorCodigoService) {
-        await this.supervisorCodigoService.verificarYConsumirCodigo(
-          pinSupervisor,
-          usuario?.partyId,
-          'almacen/merma_grande',
-          ip,
-          'insumo',
-          insumoId,
-        );
       }
     }
 

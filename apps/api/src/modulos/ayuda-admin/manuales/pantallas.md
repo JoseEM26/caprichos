@@ -45,7 +45,6 @@ Ver tambien: [[cocina]]
 ## Errores y dudas comunes
 - La televisión no muestra pedidos: verifica que la pantalla figure como "Activa" y con estado de conexión en verde. Si aparece desconectada, comprueba la conexión a Internet o red Wi-Fi de la TV.
 - Código no válido: los códigos de 6 caracteres que muestra la TV tienen un tiempo de expiración. Si tardaste en ingresarlo, actualiza la página de la TV para generar un nuevo código e inténtalo nuevamente.
-- Código de supervisor: vincular, activar o editar pantallas de TV no solicita código de supervisor; se valida únicamente con la confirmación Sí/No.
 
 ## Quien puede hacerlo
 El módulo Pantallas requiere el permiso pantallas/ver y está restringido al rol Administrador (ADMIN), quien tiene permisos para pantallas/vincular y pantallas/desactivar. El personal de cocina utiliza las pantallas para visualizar las comandas, pero no tiene acceso para vincular ni reasignar estaciones desde este panel.

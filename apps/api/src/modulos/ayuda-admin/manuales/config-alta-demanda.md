@@ -50,4 +50,4 @@ Cuando la cocina está congestionada, suma minutos extra al tiempo de entrega qu
 - El estado actual muestra quién activó y cuándo (hora de Lima): solo informa.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría. Activar o cambiar la alta demanda requiere el permiso cocina/demanda, que también tiene el personal de Cocina desde la pantalla de Cocina.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría. Activar o cambiar la alta demanda requiere el permiso cocina/demanda, que también tiene el personal de Cocina desde la pantalla de Cocina.

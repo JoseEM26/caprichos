@@ -71,7 +71,7 @@ describe('CortesiasService.registrarSeparada', () => {
       producto: { findUnique: jest.fn(async () => producto) },
     });
     const svc = new CortesiasService(prisma, auditoria as any);
-    const r = await svc.registrarSeparada({ productoId: '10', cantidad: 3, motivo: 'DEGUSTACION_PROMOCION', pedidoReferenciaId: '900' } as any, usuario, 42n);
+    const r = await svc.registrarSeparada({ productoId: '10', cantidad: 3, motivo: 'DEGUSTACION_PROMOCION', pedidoReferenciaId: '900' } as any, usuario);
 
     expect(prisma.cortesia.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -79,7 +79,7 @@ describe('CortesiasService.registrarSeparada', () => {
         pedido_referencia_id: 900n,
         cantidad: 3,
         valor_lista: 36,
-        autorizada_por_party_id: 42n,
+        autorizada_por_party_id: null,
       }),
     });
     // Descuenta 3 unidades del producto, con pedido nulo y tipo CORTESIA

@@ -11,7 +11,6 @@ import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { SalonService } from '../../salon/salon.service';
 import { ComprobantesService } from '../../comprobantes/comprobantes.service';
-import { SupervisorCodigoService } from '../../supervisor-codigo/supervisor-codigo.service';
 
 describe('CobrosService.rechazarCobroMozo', () => {
   let service: CobrosService;
@@ -46,7 +45,6 @@ describe('CobrosService.rechazarCobroMozo', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: RedisService, useValue: { obtenerCliente: jest.fn() } },
         { provide: AuditoriaService, useValue: auditoriaMock },
-        { provide: SupervisorCodigoService, useValue: {} },
         { provide: EventosGateway, useValue: { emitirAdmin: jest.fn() } },
         { provide: SalonService, useValue: { liberarMesasDePedido: jest.fn() } },
         { provide: ComprobantesService, useValue: { emitirParaPedido: jest.fn() } },

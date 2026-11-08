@@ -36,4 +36,4 @@ Dos ajustes generales de la pantalla de [[cocina]]: si despejar una comanda pide
 - Un cocinero dice que a él sí le pregunta: lo personalizó en su pantalla de Cocina; el valor del local vale para quien no lo cambió.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría. Solo el administrador cambia el valor general y queda auditado.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría. Solo el administrador cambia el valor general y queda auditado.

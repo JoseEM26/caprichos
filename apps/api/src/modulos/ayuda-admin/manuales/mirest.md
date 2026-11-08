@@ -4,7 +4,7 @@ titulo: Configuración del local
 ruta: /admin/mirest
 permiso: local/ver
 roles: [ADMIN]
-relacionados: [zonas, supervisor-codigo, cocina, historial, caja, asistencia, pantallas, usuarios]
+relacionados: [zonas, cocina, historial, caja, asistencia, pantallas, usuarios]
 sugerencias:
   - ¿Dónde cambio el horario de atención del local?
   - ¿Dónde configuro Yape, Plin y los medios de pago?
@@ -25,7 +25,7 @@ Es el centro de los ajustes del negocio: datos del local, horario, medios de pag
 ## Como se hace: guardar cambios en Configuración
 1. En las pestañas de datos (Datos del local, Ubicación, Contacto, Redes, Empresa, Textos) edita y pulsa "Guardar cambios"; confirma con "Sí, guardar" en "¿Guardar la configuración del local?". "Descartar" devuelve los últimos datos guardados.
 2. Las demás pestañas (Horario, Pagos, Reparto, Chatbot, Parámetros…) tienen su propio botón de guardar y su propio "Sí/No". Los cambios rigen para pedidos nuevos; los ya creados no se tocan.
-3. Como administrador no escribes código de supervisor: el sistema te autoriza y el cambio queda en el historial ([[historial]]).
+3. El cambio queda en el historial ([[historial]]).
 
 ## Como se hace: saber en qué sección está cada cosa
 1. Revisa la lista "Donde se configura cada cosa" de este manual: dice el problema y la sección exacta con su enlace directo.
@@ -96,4 +96,4 @@ Es el centro de los ajustes del negocio: datos del local, horario, medios de pag
 - Cortesías y correo no se configuran en esta pantalla.
 
 ## Quien puede hacerlo
-El acceso a Configuración del local requiere el permiso local/ver y corresponde al Administrador (ADMIN). Cambiar los datos requiere local/editar o configuracion/editar, también del Administrador. La alta demanda puede activarla además el personal de Cocina desde su pantalla (permiso cocina/demanda). El administrador no escribe código de supervisor.
+El acceso a Configuración del local requiere el permiso local/ver y corresponde al Administrador (ADMIN). Cambiar los datos requiere local/editar o configuracion/editar, también del Administrador. La alta demanda puede activarla además el personal de Cocina desde su pantalla (permiso cocina/demanda).

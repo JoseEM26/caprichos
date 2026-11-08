@@ -100,4 +100,4 @@ Al final de la pantalla, "Vista avanzada" abre el mapa dibujado, "Equipos y esta
 - Perdí la llave: no se puede volver a ver; crea una nueva y desactiva la anterior.
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría. Cambiar qué se imprime requiere configuracion/editar; crear llaves, solo ADMIN.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría. Cambiar qué se imprime requiere configuracion/editar; crear llaves, solo ADMIN.

@@ -24,7 +24,6 @@ const DICCIONARIO_SINONIMOS: Record<string, string[]> = {
   editar: ['modificar', 'cambiar', 'actualizar', 'edita', 'cambia'],
   eliminar: ['borrar', 'desactivar', 'baja', 'elimina'],
   diferencia: ['cuadre', 'faltante', 'sobrante', 'descuadre'],
-  supervisor: ['codigo', 'totp', 'autorizacion', 'pin'],
 };
 
 /** Palabras que no distinguen un ajuste de otro al buscar «¿dónde cambio…?». */

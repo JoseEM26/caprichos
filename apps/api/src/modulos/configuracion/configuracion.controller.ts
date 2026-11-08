@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { ConfiguracionService } from './configuracion.service';
 import { ActualizarParametroDto } from './dto/actualizar-parametro.dto';
 import { PausaAltaDemandaDto } from './dto/pausa-alta-demanda.dto';
@@ -27,7 +26,6 @@ export class ConfiguracionController {
 
   @Put('pausa-alta-demanda')
   @Permiso('configuracion', 'editar')
-  @RequiereCodigoSupervisor('configuracion/pausa_alta_demanda')
   async actualizarPausaAltaDemanda(
     @Body() dto: PausaAltaDemandaDto,
     @Req() req: any,
@@ -38,10 +36,6 @@ export class ConfiguracionController {
 
   @Put(':clave')
   @Permiso('configuracion', 'editar')
-  @RequiereCodigoSupervisor('configuracion/editar_parametro_sensible', {
-    condicion: (req) =>
-      ['permisos_roles', 'permisos', 'roles', 'tiempos_alerta'].includes(req.params?.clave),
-  })
   async actualizar(
     @Param('clave') clave: string,
     @Body() dto: ActualizarParametroDto,

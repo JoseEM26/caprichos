@@ -396,19 +396,6 @@ describe('UsuariosService', () => {
     });
   });
 
-  describe('asignarPin (deprecado)', () => {
-    it('responde 410 GONE PIN_DEPRECADO indicando que el PIN fijo fue retirado', async () => {
-      await expect(
-        service.asignarPin(1n, { pin: '123456' }, adminAuth),
-      ).rejects.toMatchObject({
-        status: HttpStatus.GONE,
-        response: expect.objectContaining({
-          codigo: 'PIN_DEPRECADO',
-        }),
-      });
-    });
-  });
-
   describe('listar', () => {
     it('lista usuarios paginados con DNI enmascarado', async () => {
       prismaMock.userAccount.count.mockResolvedValue(1);

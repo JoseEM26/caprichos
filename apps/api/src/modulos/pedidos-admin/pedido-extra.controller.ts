@@ -4,7 +4,7 @@ import { Permiso } from '../acceso/permiso.decorator';
 import { PedidoExtraService } from './pedido-extra.service';
 import { ExtraPedidoDto } from './dto/extra-pedido.dto';
 
-/** «Agregar extra» a un pedido ya hecho. Permiso pedidos/extra (ADMIN, SUPERVISOR, CAJERO y MOZO), sin código de supervisor. */
+/** «Agregar extra» a un pedido ya hecho. Permiso pedidos/extra (ADMIN, SUPERVISOR, CAJERO y MOZO). */
 @Controller('admin/pedidos')
 @UseGuards(AccesoGuard)
 export class PedidoExtraController {

@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Param,
   Post,
   Req,
@@ -10,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { CajaService } from './caja.service';
 import { CobrosService } from './cobros.service';
 import { AbrirCajaDto } from './dto/abrir-caja.dto';
@@ -31,14 +29,9 @@ export class CajaController {
 
   @Post('abrir')
   @Permiso('caja', 'abrir')
-  async abrirCaja(
-    @Body() dto: AbrirCajaDto,
-    @Req() req: any,
-    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
-  ) {
+  async abrirCaja(@Body() dto: AbrirCajaDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    // El código solo se exige si el monto difiere del oficial: lo decide el servicio, no un decorador fijo.
-    return this.cajaService.abrirCaja(dto, req.usuario, ip, codigoSupervisor);
+    return this.cajaService.abrirCaja(dto, req.usuario, ip);
   }
 
   @Get('actual')
@@ -66,29 +59,9 @@ export class CajaController {
 
   @Post('cobros/:id/anular')
   @Permiso('caja', 'cobrar')
-  @RequiereCodigoSupervisor('caja/anular_cobro')
-  async anularCobro(
-    @Param('id') id: string,
-    @Body() dto: AnularCobroDto,
-    @Headers('x-pin-supervisor') pinSupervisor: string | undefined,
-    @Req() req: any,
-    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
-  ) {
+  async anularCobro(@Param('id') id: string, @Body() dto: AnularCobroDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
-    const pin =
-      codigoSupervisor ||
-      pinSupervisor ||
-      req.headers?.['x-codigo-supervisor'] ||
-      req.headers?.['x-pin-supervisor'] ||
-      req.headers?.['X-Pin-Supervisor'];
-    return this.cobrosService.anularCobro(
-      id,
-      dto,
-      pin,
-      req.usuario,
-      ip,
-      ...(req.codigoSupervisorVerificado ? [true] : []),
-    );
+    return this.cobrosService.anularCobro(id, dto, req.usuario, ip);
   }
 
   @Post('movimientos')
@@ -106,7 +79,6 @@ export class CajaController {
 
   @Post('movimientos/:id/anular')
   @Permiso('caja', 'movimientos')
-  @RequiereCodigoSupervisor('caja/anular_movimiento')
   async anularMovimiento(
     @Param('id') id: string,
     @Body() dto: AnularMovimientoDto,

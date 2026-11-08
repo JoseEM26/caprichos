@@ -1,8 +1,6 @@
 import {
   ConflictException,
   ForbiddenException,
-  HttpException,
-  HttpStatus,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -42,7 +40,6 @@ import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { EditarUsuarioDto } from './dto/editar-usuario.dto';
 import { CambiarClaveUsuarioDto } from './dto/cambiar-clave-usuario.dto';
 import { FiltrarUsuariosDto } from './dto/filtrar-usuarios.dto';
-import { AsignarPinDto } from './dto/asignar-pin.dto';
 import { ConfigurarAlertasWhatsappDto } from './dto/configurar-alertas-whatsapp.dto';
 import { ConfigurarHorarioDto } from './dto/horario.dto';
 import { deHora, guardarHorarioTx } from './horario.util';
@@ -1464,26 +1461,6 @@ export class UsuariosService {
       claveInicial,
       mensaje: 'Contraseña restablecida exitosamente',
     };
-  }
-
-  /**
-   * DEPRECADO: El PIN fijo de supervisor ha sido retirado en favor del código rotativo TOTP (RFC 6238).
-   * La columna user_account.pin_hash se preserva en base de datos pero este endpoint responde 410 GONE.
-   */
-  async asignarPin(
-    _id: bigint | string | number,
-    _dto: AsignarPinDto,
-    _usuarioActual?: UsuarioAutenticado,
-    _ip?: string,
-  ) {
-    throw new HttpException(
-      {
-        codigo: 'PIN_DEPRECADO',
-        mensaje:
-          'El PIN fijo de supervisor ha sido retirado. Ahora se utiliza el código rotativo general del supervisor.',
-      },
-      HttpStatus.GONE,
-    );
   }
 
   /**

@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { puedeDarCortesia, requiereCodigoCortesia, validarMotivoCortesia, MOTIVOS_CORTESIA } from '../cortesia.tipos';
+import { puedeDarCortesia, validarMotivoCortesia, MOTIVOS_CORTESIA } from '../cortesia.tipos';
 
 describe('cortesia.tipos', () => {
   it('lista fija de motivos, con Otro al final', () => {
@@ -32,9 +32,4 @@ describe('cortesia.tipos', () => {
     expect(puedeDarCortesia({ rol: 'REPARTIDOR' })).toBe(false);
   });
 
-  it('solo el SUPERVISOR presenta código; Caja y ADMIN no', () => {
-    expect(requiereCodigoCortesia({ usuario: { rol: 'SUPERVISOR' } })).toBe(true);
-    expect(requiereCodigoCortesia({ usuario: { rol: 'CAJERO' } })).toBe(false);
-    expect(requiereCodigoCortesia({ usuario: { rol: 'ADMIN' } })).toBe(false);
-  });
 });

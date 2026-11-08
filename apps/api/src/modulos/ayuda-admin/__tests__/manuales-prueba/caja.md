@@ -4,7 +4,7 @@ titulo: Pedidos y caja
 ruta: /admin/caja
 permiso: caja/ver
 roles: [ADMIN, CAJERO]
-relacionados: [cierre, cocina, comprobantes, supervisor-codigo]
+relacionados: [cierre, cocina, comprobantes, historial]
 sugerencias:
   - ¿Cómo anulo un pedido?
   - ¿Cómo registro un cobro?
@@ -19,9 +19,9 @@ Permite gestionar todos los pedidos del día, atender cobranzas por diferentes m
 ## Como se hace: Anular un pedido
 1. Entra a Pedidos y abre el pedido que necesitas anular.
 2. Pulsa el botón Anular y selecciona el motivo de la anulación.
-3. Si el pedido ya fue cobrado previamente, el sistema te solicitará el código del supervisor generado en [[supervisor-codigo]].
+3. Si el pedido ya fue cobrado previamente, el sistema anula también su cobro y lo deja en el [[historial]].
 4. Confirma la acción pulsando Sí en el cuadro de diálogo.
-Requiere: [[supervisor-codigo]]
+Requiere: [[historial]]
 Despues: [[comprobantes]]
 Ver tambien: [[cierre]]
 
@@ -40,7 +40,7 @@ Ver tambien: [[cierre]]
 Antes: [[cierre]]
 
 ## Errores y dudas comunes
-Si un pedido ya está cobrado y entregado, no se puede anular sin la autorización del supervisor. Si el sistema no registra el cobro, comprueba tu conexión antes de reintentar.
+Si un pedido ya está cobrado y entregado, se anula primero su cobro. Si el sistema no registra el cobro, comprueba tu conexión antes de reintentar.
 
 ## Quien puede hacerlo
 Pueden utilizar este módulo el Administrador y el Cajero. Los mozos o cocineros no tienen acceso a la cobranza ni al cierre de caja.

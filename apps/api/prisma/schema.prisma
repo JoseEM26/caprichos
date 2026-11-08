@@ -2391,6 +2391,8 @@ model UsoExterno {
   @@map("uso_externo")
 }
 
+// HUÉRFANA desde que se eliminó la aprobación del supervisor: el código ya no la lee ni la escribe.
+// Se puede borrar en una migración aparte (DROP TABLE) cuando el dueño lo confirme.
 model SupervisorSecreto {
   id              BigInt   @id @default(autoincrement())
   local_codigo    String   @unique @default("CAPRICHOS")

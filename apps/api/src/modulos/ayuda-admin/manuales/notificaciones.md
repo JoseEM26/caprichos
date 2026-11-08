@@ -58,7 +58,6 @@ Ver tambien: [[reservas]]
 ## Errores y dudas comunes
 - Las alertas desaparecen solas: las notificaciones operativas de pedidos demorados o mensajes pendientes se resuelven y retiran automáticamente cuando el pedido cambia de estado o el mensaje es atendido por el personal.
 - Actualización en vivo: la pantalla está conectada a sockets en tiempo real; no es necesario recargar el navegador para ver nuevos avisos.
-- Código de supervisor: no se requiere código de supervisor para consultar ni gestionar notificaciones.
 
 ## Quien puede hacerlo
 El módulo de Notificaciones cuenta con una amplia cobertura en el equipo y está disponible mediante el permiso notificaciones/ver para los roles Administrador (ADMIN), Cocina (COCINA), Mozo (MOZO), Almacén (ALMACEN) y Repartidor (REPARTIDOR). Cada colaborador visualiza las alertas relevantes para su puesto operativo.

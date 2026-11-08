@@ -4,7 +4,7 @@ titulo: Escritorio
 ruta: /admin
 permiso:
 roles: [ADMIN, CAJERO, COCINA, MOZO, ALMACEN, REPARTIDOR, SUPERVISOR]
-relacionados: [caja, cocina, repartos, compras, informes, reservas, plano, notificaciones, supervisor-codigo]
+relacionados: [caja, cocina, repartos, compras, informes, reservas, plano, notificaciones]
 sugerencias:
   - Como cambio el periodo de fechas para ver las ventas
   - Donde veo si algun insumo se esta quedando sin stock
@@ -43,8 +43,6 @@ Ver tambien: [[caja]], [[cocina]], [[repartos]]
 3. Reservas de hoy: "Reservas para hoy", que abre [[reservas]].
 4. Salon y caja: "Mesas ocupadas de N" y "Mesas libres" (abren el [[plano]]) y "Caja de hoy" con su estado: Abierta, Cerrada o Sin abrir hoy.
 5. Avisos: cuantos avisos sin leer tienes; abre [[notificaciones]]. El Supervisor recibe los avisos de caja.
-6. Para dictar el codigo de autorizacion usa Codigo del supervisor ([[supervisor-codigo]]).
-Ver tambien: [[supervisor-codigo]]
 
 ## Como se hace: Entender de donde salen las cifras
 1. Mirar el rango de fechas que aparece arriba de las tarjetas: por defecto son los ultimos 30 dias.

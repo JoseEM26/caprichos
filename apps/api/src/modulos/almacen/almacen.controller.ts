@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Param,
   Post,
   Query,
@@ -11,7 +10,6 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
-import { RequiereCodigoSupervisor } from '../supervisor-codigo/requiere-codigo-supervisor.decorator';
 import { AlmacenService } from './almacen.service';
 import { MovimientoAlmacenDto } from './dto/movimiento-almacen.dto';
 import { MermaMultipleDto } from './dto/merma-multiple.dto';
@@ -22,7 +20,6 @@ import { CrearPedidoInternoDto } from './dto/crear-pedido-interno.dto';
 import { RegistrarAperturaDto } from './dto/registrar-apertura.dto';
 import { MermaProductoDto } from './dto/merma-producto.dto';
 
-export const UMBRAL_MERMA_GRANDE = 10;
 
 @Controller('admin/almacen')
 @UseGuards(AccesoGuard)
@@ -38,39 +35,18 @@ export class AlmacenController {
 
   @Post('movimientos')
   @Permiso('almacen', 'movimientos')
-  async registrarMovimiento(
-    @Body() dto: MovimientoAlmacenDto,
-    @Req() req: any,
-    @Headers('x-codigo-supervisor') codigoSupervisor?: string,
-    @Headers('x-pin-supervisor') pinSupervisor?: string,
-  ) {
-    const pin =
-      codigoSupervisor ||
-      pinSupervisor ||
-      req.headers?.['x-codigo-supervisor'] ||
-      req.headers?.['x-pin-supervisor'];
-    return this.almacenService.registrarMovimiento(dto, req.usuario, req.ip, pin);
+  async registrarMovimiento(@Body() dto: MovimientoAlmacenDto, @Req() req: any) {
+    return this.almacenService.registrarMovimiento(dto, req.usuario, req.ip);
   }
 
   @Post('movimientos-merma-multiple')
   @Permiso('almacen', 'movimientos')
-  @RequiereCodigoSupervisor('almacen/merma_multiple_grande', {
-    condicion: (req) => {
-      const items = Array.isArray(req.body?.items) ? req.body.items : [];
-      const total = items.reduce(
-        (sum: number, it: any) => sum + Math.abs(Number(it?.cantidad ?? 0)),
-        0,
-      );
-      return total >= UMBRAL_MERMA_GRANDE;
-    },
-  })
   async mermaMultiple(@Body() dto: MermaMultipleDto, @Req() req: any) {
     return this.almacenService.mermaMultiple(dto, req.usuario, req.ip);
   }
 
   @Post('movimientos/:id/anular')
   @Permiso('almacen', 'movimientos')
-  @RequiereCodigoSupervisor('almacen/anular_movimiento')
   async anularMovimiento(
     @Param('id') id: string,
     @Body('motivo') motivo: string,
@@ -97,7 +73,7 @@ export class AlmacenController {
     return this.almacenService.registrarApertura(dto, req.usuario, req.ip);
   }
 
-  /** Merma de producto terminado (sabor o producto). Sin código de supervisor: Cocina la registra y queda auditada. */
+  /** Merma de producto terminado (sabor o producto). Cocina la registra y queda auditada. */
   @Post('merma-producto')
   @Permiso('almacen', 'merma_producto')
   async mermaProducto(@Body() dto: MermaProductoDto, @Req() req: any) {
@@ -122,7 +98,6 @@ export class AlmacenController {
 
   @Post('produccion/:id/anular')
   @Permiso('produccion', 'anular')
-  @RequiereCodigoSupervisor('almacen/anular_produccion')
   async anularProduccion(
     @Param('id') id: string,
     @Body('motivo') motivo: string,

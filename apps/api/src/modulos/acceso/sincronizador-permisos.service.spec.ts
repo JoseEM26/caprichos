@@ -18,6 +18,7 @@ describe('SincronizadorPermisosService', () => {
       permiso: {
         findMany: jest.fn().mockResolvedValueOnce(permisos).mockResolvedValue(permisosConId),
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       rolPermiso: {
         findMany: jest.fn().mockResolvedValue(vinculos),
@@ -66,6 +67,18 @@ describe('SincronizadorPermisosService', () => {
     await servicio.sincronizar();
     expect(prisma.rolPermiso.deleteMany).toHaveBeenCalledWith({ where: { rol: { in: ['CALLCENTER'] } } });
     expect(prisma.rolPermiso.createMany).not.toHaveBeenCalled();
+  });
+
+  it('retira los permisos del código del supervisor de los roles y de la tabla', async () => {
+    const { prisma, servicio } = armar(permisosConId, vinculosDeMatriz());
+    await servicio.sincronizar();
+    const retirados = [
+      { modulo: 'supervisor', accion: 'ver_codigo' },
+      { modulo: 'supervisor', accion: 'gestionar_codigo' },
+    ];
+    expect(prisma.rolPermiso.deleteMany).toHaveBeenCalledWith({ where: { permiso: { OR: retirados } } });
+    expect(prisma.permiso.deleteMany).toHaveBeenCalledWith({ where: { OR: retirados } });
+    expect(PERMISOS.some((p) => p.modulo === 'supervisor')).toBe(false);
   });
 
   it('un fallo de base al arrancar no tumba la API', async () => {

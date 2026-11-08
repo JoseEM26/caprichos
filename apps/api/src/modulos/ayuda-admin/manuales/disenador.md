@@ -89,7 +89,6 @@ Ver tambien: [[historial]]
 ## Errores y dudas comunes
 - Mis cambios no aparecen en la carta web: mientras veas la insignia "Borrador sin publicar", tus cambios solo están en la vista previa del diseñador. Debes presionar "Publicar cambios" y confirmar con "Sí, publicar".
 - Un producto no se ve en la carta virtual: comprueba que no tenga activo el botón "Mostrar", lo que indicaría que actualmente está oculto para el público.
-- No se pide código de supervisor en este módulo: las publicaciones y descartes se validan únicamente mediante la confirmación de Sí o No.
 
 ## Quien puede hacerlo
 Solo los usuarios con el rol Administrador (ADMIN) pueden ingresar a este módulo, realizar modificaciones en el borrador y publicar cambios en la carta virtual. Los demás roles (cajero, cocina, mozo, repartidor y almacén) no tienen acceso a esta pantalla.

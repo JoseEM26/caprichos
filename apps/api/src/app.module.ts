@@ -43,7 +43,6 @@ import { MensajesModule } from './modulos/mensajes/mensajes.module';
 import { PantallasModule } from './modulos/pantallas/pantallas.module';
 import { AsistenciaModule } from './modulos/asistencia/asistencia.module';
 import { ContenidoModule } from './modulos/contenido/contenido.module';
-import { SupervisorCodigoModule } from './modulos/supervisor-codigo/supervisor-codigo.module';
 import { ChatbotModule } from './modulos/chatbot/chatbot.module';
 import { ImpresionModule } from './modulos/impresion/impresion.module';
 import { AyudaAdminModule } from './modulos/ayuda-admin/ayuda-admin.module';
@@ -58,7 +57,6 @@ import { ResenasModule } from './modulos/resenas/resenas.module';
       validate: validarEntorno,
     }),
     ComunModule,
-    SupervisorCodigoModule,
     SaludModule,
     VersionModule,
     AuditoriaModule,

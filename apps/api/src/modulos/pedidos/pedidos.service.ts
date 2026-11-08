@@ -102,9 +102,8 @@ export interface OrigenPedido {
   /** WhatsApp: el cliente eligió no sumar puntos; no se busca ninguna cuenta por teléfono */
   sinCuentaCliente?: boolean;
   esPersonal?: boolean;
-  /** Quien da cortesías (permiso cortesias/dar) y el supervisor que presentó su código, si lo hubo. */
+  /** Quien da cortesías (permiso cortesias/dar). */
   puedeCortesia?: boolean;
-  supervisorCortesiaPartyId?: bigint | string | number;
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
   omitirChequeoCarta?: boolean;
@@ -572,7 +571,7 @@ export class PedidosService {
             pedido_id: pedidoId,
             pedido_linea_id: lineaDb.id,
             dada_por_party_id: BigInt(origen!.usuarioPartyId!),
-            autorizada_por_party_id: origen?.supervisorCortesiaPartyId ? BigInt(origen.supervisorCortesiaPartyId) : null,
+            autorizada_por_party_id: null,
           },
         });
       }

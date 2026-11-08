@@ -6,7 +6,6 @@ jest.mock('../comprobantes/comprobantes.service', () => ({ ComprobantesService: 
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import * as argon2 from 'argon2';
 import { CobrosService } from './cobros.service';
 import { SalonService } from '../salon/salon.service';
 import { ComprobantesService } from '../comprobantes/comprobantes.service';
@@ -14,7 +13,6 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
-import { SupervisorCodigoService } from '../supervisor-codigo/supervisor-codigo.service';
 import { ImpresionService } from '../impresion/impresion.service';
 
 describe('CobrosService', () => {
@@ -27,7 +25,6 @@ describe('CobrosService', () => {
   let salonMock: any;
   let comprobantesMock: any;
   let impresionMock: any;
-  let supervisorCodigoMock: any;
 
   const cajeroUsuario = {
     id: 2n,
@@ -116,41 +113,6 @@ describe('CobrosService', () => {
       }),
     };
 
-    supervisorCodigoMock = {
-      verificarYConsumirCodigo: jest.fn().mockImplementation(async (codigo: string | undefined, partyId?: any) => {
-        const claveIntentos = `pin:supervisor:intentos:${partyId ?? 'general'}`;
-        let intentos;
-        try {
-          intentos = await redisClientMock.get(claveIntentos);
-        } catch {
-          throw new HttpException(
-            { codigo: 'PIN_NO_DISPONIBLE', mensaje: 'No se puede validar el código ahora, intenta en unos minutos' },
-            HttpStatus.SERVICE_UNAVAILABLE,
-          );
-        }
-        if (intentos && parseInt(intentos, 10) >= 3) {
-          throw new HttpException(
-            { codigo: 'CODIGO_BLOQUEADO', mensaje: 'Demasiados intentos fallidos de código de supervisor. Espera 5 minutos.' },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-        if (!codigo || codigo !== '123456') {
-          await auditoriaMock.registrar({
-            categoria: 'ACCESO',
-            modulo: 'caja',
-            accion: 'CODIGO_FALLIDO',
-            resultado: 'RECHAZADO',
-          });
-          throw new HttpException(
-            { codigo: 'CODIGO_INVALIDO', mensaje: 'Código de supervisor inválido o no proporcionado' },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-        await redisClientMock.del(claveIntentos);
-        return { party_id: 1n, id: 1n, valido: true };
-      }),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CobrosService,
@@ -161,7 +123,6 @@ describe('CobrosService', () => {
         { provide: SalonService, useValue: salonMock },
         { provide: ComprobantesService, useValue: comprobantesMock },
         { provide: ImpresionService, useValue: impresionMock },
-        { provide: SupervisorCodigoService, useValue: supervisorCodigoMock },
       ],
     }).compile();
 
@@ -763,17 +724,15 @@ describe('CobrosService', () => {
     describe('casilla «ya hablé con el cliente y pagó» (sin captura)', () => {
       const local = { ...pedidoMock, canal: 'MOZO', modalidad: 'MESA' };
 
-      it('pedido del local + casilla marcada en Caja: cobra sin foto ni supervisor y audita sin_captura', async () => {
+      it('pedido del local + casilla marcada en Caja: cobra sin foto y audita sin_captura', async () => {
         sinFoto();
         prismaMock.pedido.findUnique.mockResolvedValue({ ...local });
         const res = await service.cobrar({ pedidoId: '100', pagos: pagoYape, confirmaSinCaptura: true } as any, cajeroUsuario);
 
         expect(res.id).toBe('77');
-        expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
         expect(auditoriaMock.registrar).toHaveBeenCalledWith(
           expect.objectContaining({
-            conPinAdmin: false,
-            despues: expect.objectContaining({ sin_voucher: expect.objectContaining({ sin_captura: true, aprobado_por: null }) }),
+            despues: expect.objectContaining({ sin_voucher: expect.objectContaining({ sin_captura: true }) }),
           }),
         );
       });
@@ -828,48 +787,28 @@ describe('CobrosService', () => {
       ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_NO_ENCONTRADO' } });
     });
 
-    it('sin foto con motivo y PIN de supervisor correcto -> cobra y audita COBRAR_SIN_VOUCHER', async () => {
+    it('sin foto con motivo escrito -> cobra y audita COBRAR_SIN_VOUCHER', async () => {
       sinFoto();
       const res = await service.cobrar(
         {
           pedidoId: '100',
           pagos: pagoYape,
-          sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
+          sinVoucher: { motivo: 'El cliente no tenía señal' },
         } as any,
         cajeroUsuario,
         '10.0.0.1',
       );
 
       expect(res.id).toBe('77');
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
-        '123456',
-        2n,
-        'caja/cobrar_sin_voucher',
-        '10.0.0.1',
-        'cobro',
-        undefined,
-      );
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
           accion: 'COBRAR_SIN_VOUCHER',
           motivo: 'El cliente no tenía señal',
-          conPinAdmin: true,
           despues: expect.objectContaining({
             sin_voucher: expect.objectContaining({ motivo: 'El cliente no tenía señal' }),
           }),
         }),
       );
-    });
-
-    it('sin foto con PIN de supervisor incorrecto -> 403 y no cobra', async () => {
-      sinFoto();
-      await expect(
-        service.cobrar(
-          { pedidoId: '100', pagos: pagoYape, sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' } } as any,
-          cajeroUsuario,
-        ),
-      ).rejects.toMatchObject({ status: HttpStatus.FORBIDDEN });
-      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
     });
 
     it('un voucher ILEGIBLE no cuenta como comprobante: sin otra foto -> 400 VOUCHER_REQUERIDO', async () => {
@@ -884,19 +823,19 @@ describe('CobrosService', () => {
       expect(prismaMock.cobro.create).not.toHaveBeenCalled();
     });
 
-    it('un voucher ILEGIBLE puede seguir con la excepción del supervisor (motivo y PIN) y queda auditado', async () => {
+    it('un voucher ILEGIBLE puede seguir con la excepción (motivo) y queda auditado', async () => {
       prismaMock.voucherPago.findFirst.mockResolvedValue(null);
       const res = await service.cobrar(
         {
           pedidoId: '100',
           pagos: pagoYape,
-          sinVoucher: { motivo: 'La foto salió borrosa', pinSupervisor: '123456' },
+          sinVoucher: { motivo: 'La foto salió borrosa' },
         } as any,
         cajeroUsuario,
       );
       expect(res.id).toBe('77');
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', conPinAdmin: true }),
+        expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', motivo: 'La foto salió borrosa' }),
       );
     });
 
@@ -909,13 +848,13 @@ describe('CobrosService', () => {
       expect(prismaMock.cobro.create).not.toHaveBeenCalled();
     });
 
-    it('MOZO sin foto con motivo y código del supervisor válidos -> cobra y audita COBRAR_SIN_VOUCHER con su partyId', async () => {
+    it('MOZO sin foto con motivo escrito -> cobra y audita COBRAR_SIN_VOUCHER con su partyId', async () => {
       sinFoto();
       const res = await service.cobrar(
         {
           pedidoId: '100',
           pagos: pagoYape,
-          sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
+          sinVoucher: { motivo: 'El cliente no tenía señal' },
         } as any,
         mozoUsuario,
       );
@@ -926,95 +865,17 @@ describe('CobrosService', () => {
           accion: 'COBRAR_SIN_VOUCHER',
           partyId: 3n,
           motivo: 'El cliente no tenía señal',
-          conPinAdmin: true,
         }),
       );
     });
   });
 
   describe('anularCobro', () => {
-    let pinSupervisorHash: string;
-
-    beforeAll(async () => {
-      pinSupervisorHash = await argon2.hash('123456');
-    });
-
-    beforeEach(() => {
-      prismaMock.userAccount.findMany.mockResolvedValue([
-        {
-          id: 1n,
-          party_id: 1n,
-          rol: 'ADMIN',
-          activo: true,
-          pin_hash: pinSupervisorHash,
-        },
-      ]);
-    });
-
-    it('anular sin pin -> 403 CODIGO_INVALIDO y audita CODIGO_FALLIDO', async () => {
-      await expect(
-        service.anularCobro(
-          '10',
-          { motivo: 'Error en cobro del pedido' },
-          undefined,
-          cajeroUsuario,
-        ),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          response: expect.objectContaining({ codigo: 'CODIGO_INVALIDO' }),
-          status: HttpStatus.FORBIDDEN,
-        }),
-      );
-
-      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({
-          modulo: 'caja',
-          accion: expect.stringMatching(/CODIGO_FALLIDO|PIN_FALLIDO/),
-          resultado: 'RECHAZADO',
-        }),
-      );
-    });
-
-    it('anular con pin incorrecto -> 403 CODIGO_INVALIDO', async () => {
-      await expect(
-        service.anularCobro(
-          '10',
-          { motivo: 'Error en cobro del pedido' },
-          '999999',
-          cajeroUsuario,
-        ),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          response: expect.objectContaining({ codigo: 'CODIGO_INVALIDO' }),
-          status: HttpStatus.FORBIDDEN,
-        }),
-      );
-    });
-
-    it('3 fallos de PIN bloquean 5 min en Redis -> 403 CODIGO_BLOQUEADO', async () => {
-      redisClientMock.get.mockResolvedValue('3');
-
-      await expect(
-        service.anularCobro(
-          '10',
-          { motivo: 'Error en cobro del pedido' },
-          '123456',
-          cajeroUsuario,
-        ),
-      ).rejects.toThrow(
-        expect.objectContaining({
-          response: expect.objectContaining({ codigo: 'CODIGO_BLOQUEADO' }),
-          status: HttpStatus.FORBIDDEN,
-        }),
-      );
-    });
-
     it('motivo menor a 5 caracteres -> 400 MOTIVO_REQUERIDO', async () => {
       await expect(
         service.anularCobro(
           '10',
           { motivo: 'err' },
-          '123456',
           cajeroUsuario,
         ),
       ).rejects.toThrow(
@@ -1031,7 +892,6 @@ describe('CobrosService', () => {
         service.anularCobro(
           '999',
           { motivo: 'Error al digitar comprobante' },
-          '123456',
           cajeroUsuario,
         ),
       ).rejects.toThrow(
@@ -1054,7 +914,6 @@ describe('CobrosService', () => {
         service.anularCobro(
           '10',
           { motivo: 'Error al digitar comprobante' },
-          '123456',
           cajeroUsuario,
         ),
       ).rejects.toThrow(
@@ -1077,7 +936,6 @@ describe('CobrosService', () => {
         service.anularCobro(
           '10',
           { motivo: 'Segundo intento de anulacion' },
-          '123456',
           cajeroUsuario,
         ),
       ).rejects.toThrow(
@@ -1088,7 +946,7 @@ describe('CobrosService', () => {
       );
     });
 
-    it('anula exitosamente con PIN supervisor, revierte pedido a PENDIENTE y audita', async () => {
+    it('anula exitosamente sin ningún código, revierte pedido a PENDIENTE y audita a nombre de quien anula', async () => {
       prismaMock.cobro.findUnique
         .mockResolvedValueOnce({ caja_id: 10n })
         .mockResolvedValueOnce({
@@ -1108,7 +966,6 @@ describe('CobrosService', () => {
       const res = await service.anularCobro(
         '10',
         { motivo: 'Cliente solicitó cambio de medio de pago' },
-        '123456',
         cajeroUsuario,
       );
 
@@ -1116,14 +973,13 @@ describe('CobrosService', () => {
       expect(res.pago_estado).toBe('PENDIENTE');
       expect(res.motivo_anulacion).toBe('Cliente solicitó cambio de medio de pago');
       expect(eventosGatewayMock.emitirAdmin).toHaveBeenCalledWith('pedido:pago', { id: '100', pago_estado: 'PENDIENTE', cambio: 'anulado' });
-      expect(redisClientMock.del).toHaveBeenCalled();
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
           modulo: 'caja',
           accion: 'ANULAR_COBRO',
           resultado: 'OK',
-          conPinAdmin: true,
-          despues: expect.objectContaining({ aprobado_por: '1' }),
+          partyId: cajeroUsuario.partyId,
+          motivo: 'Cliente solicitó cambio de medio de pago',
         }),
       );
     });
@@ -1339,27 +1195,18 @@ describe('CobrosService', () => {
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
-    it('sin voucher con motivo y PIN de supervisor correcto -> marca y audita con el motivo', async () => {
+    it('sin voucher con motivo escrito -> marca y audita con el motivo', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('TRANSFERENCIA'));
       sinFoto();
 
       const res = await service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', {
-        sinVoucher: { motivo: 'El cliente no tiene la foto', pinSupervisor: '123456' },
+        sinVoucher: { motivo: 'El cliente no tiene la foto' },
       } as any);
 
       expect(res.pago_estado).toBe('COORDINADO');
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
-        '123456',
-        2n,
-        'caja/coordinado_sin_voucher',
-        '10.0.0.1',
-        'cobro',
-        undefined,
-      );
       expect(auditoriaMock.registrar).toHaveBeenCalledWith(
         expect.objectContaining({
           accion: 'MARCAR_COORDINADO_SIN_VOUCHER',
-          conPinAdmin: true,
           motivo: 'El cliente no tiene la foto',
           despues: expect.objectContaining({
             sin_voucher: expect.objectContaining({ motivo: 'El cliente no tiene la foto' }),
@@ -1368,29 +1215,16 @@ describe('CobrosService', () => {
       );
     });
 
-    it('pedido del local con la casilla: marca COORDINADO sin foto ni supervisor; en delivery no vale', async () => {
+    it('pedido del local con la casilla: marca COORDINADO sin foto; en delivery no vale', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoPendiente('YAPE'), canal: 'CAJA', modalidad: 'RECOGER' });
       sinFoto();
       const res = await service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', { confirmaSinCaptura: true } as any);
       expect(res.pago_estado).toBe('COORDINADO');
-      expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
 
       prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoPendiente('YAPE'), canal: 'CARTA', modalidad: 'RECOGER' });
       await expect(
         service.marcarCoordinado('20', cajeroUsuario, '10.0.0.1', { confirmaSinCaptura: true } as any),
       ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_REQUERIDO' } });
-    });
-
-    it('sin voucher con PIN de supervisor incorrecto -> 403 y no marca', async () => {
-      prismaMock.pedido.findUnique.mockResolvedValue(pedidoPendiente('YAPE'));
-      sinFoto();
-
-      await expect(
-        service.marcarCoordinado('20', cajeroUsuario, undefined, {
-          sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' },
-        } as any),
-      ).rejects.toMatchObject({ status: HttpStatus.FORBIDDEN });
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
     });
 
     it('medio EFECTIVO o TARJETA no pide voucher', async () => {
@@ -1444,18 +1278,6 @@ describe('CobrosService', () => {
       await expect(
         service.cobrar({ pedidoId: '100', pagos: [{ medio: 'EFECTIVO', monto: 0.1 }, { medio: 'YAPE', monto: 0.2 }] }, cajeroUsuario),
       ).resolves.toMatchObject({ pago_estado: 'PAGADO' });
-    });
-  });
-
-  describe('PIN de supervisor sin Redis', () => {
-    it('con Redis caído no anula aunque el PIN sea correcto: 503 PIN_NO_DISPONIBLE', async () => {
-      redisClientMock.get.mockRejectedValue(new Error('ECONNREFUSED'));
-      prismaMock.cobro.findUnique.mockResolvedValue({ caja_id: 10n });
-
-      await expect(
-        service.anularCobro('5', { motivo: 'Cobro duplicado de prueba' }, '123456', adminUsuario),
-      ).rejects.toMatchObject({ status: HttpStatus.SERVICE_UNAVAILABLE, response: { codigo: 'PIN_NO_DISPONIBLE' } });
-      expect(prismaMock.userAccount.findMany).not.toHaveBeenCalled();
     });
   });
 

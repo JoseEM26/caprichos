@@ -4,7 +4,7 @@ titulo: Historial de acciones
 ruta: /admin/historial
 permiso: auditoria/ver
 roles: [ADMIN]
-relacionados: [usuarios, supervisor-codigo, caja, cierre, informes]
+relacionados: [usuarios, caja, cierre, informes]
 sugerencias:
   - ¿Cómo sé quién anuló un pedido o modificó un precio?
   - ¿Cómo busco las acciones realizadas en una fecha o por un usuario?
@@ -14,7 +14,7 @@ sugerencias:
 # Historial de acciones
 
 ## Para que sirve
-Muestra la bitácora inmutable de auditoría de Caprichos. Registra cada acción relevante ejecutada en el sistema (inicios de sesión, cobros en [[caja]], cierres de turno en [[cierre]], autorizaciones de [[supervisor-codigo]], cambios en [[usuarios]] y datos para [[informes]]) junto con el usuario responsable, fecha, hora, IP y resultado.
+Muestra la bitácora inmutable de auditoría de Caprichos. Registra cada acción relevante ejecutada en el sistema (inicios de sesión, cobros en [[caja]], cierres de turno en [[cierre]], anulaciones, cambios en [[usuarios]] y datos para [[informes]]) junto con el usuario responsable, fecha, hora, IP y resultado.
 
 ## Como se hace: buscar y filtrar registros de auditoría
 1. En la parte superior de la pantalla, utiliza el campo "Buscar" para encontrar palabras clave como un código de pedido, el nombre de un empleado o una acción concreta.
@@ -43,7 +43,6 @@ Ver tambien: [[historial]]
 ## Errores y dudas comunes
 - No puedo editar ni borrar un registro: los registros de auditoría son inmutables por diseño de seguridad y ley; nadie, ni siquiera el administrador, puede modificar o eliminar entradas del historial.
 - Un pedido fue anulado y no sé quién fue: filtra por el módulo "pedidos" o "caja" y busca la palabra "anular"; allí verás el identificador del usuario que realizó la anulación y la hora exacta.
-- Código de supervisor: esta pantalla es de consulta e integridad, por lo que no solicita código de supervisor.
 
 ## Quien puede hacerlo
 El acceso al Historial de acciones requiere el permiso auditoria/ver y está restringido de forma exclusiva al Administrador (ADMIN). Los cajeros, cocineros, mozos y repartidores no tienen acceso a la bitácora de auditoría.

@@ -49,7 +49,7 @@ Es la lista de ajustes finos del local: tiempos, envío gratis y pedido mínimo,
 - **Pedido mínimo** (pedido_minimo): Monto mínimo de productos para que el sistema acepte un pedido nuevo. Si el cliente no llega, el pedido se rechaza con el aviso del monto mínimo. Ejemplo: Con 25: un pedido de S/ 20 en productos no se acepta; uno de S/ 25 sí. Riesgo alto: toca dinero o deja de atender clientes. [Pedido mínimo](/admin/mirest?tab=parametros&campo=parametros-pedido-minimo)
 
 ## Ajustes: Caja
-- **Monto inicial de la caja** (caja_monto_inicial): Dinero con el que se abre la gaveta cada día; la apertura sale con este monto. Solo el administrador lo cambia aquí; otro monto al abrir pide el código del supervisor. Ejemplo: Con 150: Caja abre con S/ 150.00 sin pedir nada; si el cajero escribe 200, el sistema pide el código del supervisor. Riesgo alto: toca dinero o deja de atender clientes. [Monto inicial de la caja](/admin/mirest?tab=parametros&campo=parametros-caja-monto-inicial)
+- **Monto inicial de la caja** (caja_monto_inicial): Dinero con el que se abre la gaveta cada día; la apertura sale con este monto. Solo el administrador lo cambia aquí; el cajero puede abrir con otro monto y queda auditado. Ejemplo: Con 150: Caja abre con S/ 150.00; si el cajero escribe 200, abre con 200 y la auditoría marca que fue distinto del oficial. Riesgo alto: toca dinero o deja de atender clientes. [Monto inicial de la caja](/admin/mirest?tab=parametros&campo=parametros-caja-monto-inicial)
 
 ## Ajustes: Puntos, personal y reservas
 - **Porcentaje de puntos para el cliente** (puntos_porcentaje): Qué porcentaje del consumo se convierte en puntos de fidelidad para el cliente con cuenta. Cuenta solo productos sin descuento ni promoción, sin envío y sin lo pagado con puntos. Ejemplo: Con 5 %: un pedido de S/ 40 elegible suma 2 puntos. Riesgo alto: toca dinero o deja de atender clientes. [Porcentaje de puntos para el cliente](/admin/mirest?tab=parametros&campo=parametros-puntos-porcentaje)
@@ -149,4 +149,4 @@ Es la lista de ajustes finos del local: tiempos, envío gratis y pedido mínimo,
 - Un valor fuera de rango muestra el rango permitido en el mensaje de error (por ejemplo, la tolerancia de reservas es de 1 a 180 minutos).
 
 ## Quien puede hacerlo
-Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El administrador no escribe código de supervisor: el sistema lo autoriza solo y el cambio queda en el historial de auditoría.
+Solo el Administrador (ADMIN): entrar a Configuración del local exige el permiso local/ver y para cambiar datos, local/editar o configuracion/editar, que solo tiene el rol ADMIN. El cambio queda en el historial de auditoría.

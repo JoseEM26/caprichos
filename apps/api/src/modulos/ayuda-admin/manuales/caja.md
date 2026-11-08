@@ -4,7 +4,7 @@ titulo: Pedidos y caja
 ruta: /admin/caja
 permiso: caja/ver
 roles: [ADMIN, CAJERO, SUPERVISOR]
-relacionados: [cierre, cocina, comprobantes, repartos, plano, supervisor-codigo, mensajes, propinas, informes, apertura]
+relacionados: [cierre, cocina, comprobantes, repartos, plano, mensajes, propinas, informes, apertura]
 sugerencias:
   - Como abro la caja al iniciar mi turno
   - Como cobro un pedido y registro el vuelto
@@ -23,9 +23,8 @@ Modulo central para la recepcion, seguimiento y cobro de pedidos en salon, para 
 ## Como se hace: Abrir la caja del turno
 1. En la barra superior, pulsar el boton Abrir caja.
 2. En el campo Monto inicial en soles ya aparece el monto oficial que configura el administrador (Configuracion > Parametros del sistema > Caja > Monto inicial de la caja). Si es el correcto, no se toca.
-3. Si hay que abrir con otro monto: el administrador lo escribe sin pedir nada (queda auditado). El cajero escribe el monto y el sistema pide el codigo del supervisor (6 digitos, lo ve la supervisora en su pantalla). El supervisor tampoco lo escribe: se autoriza solo y queda registrado.
-4. Pulsar el boton Abrir caja ahora. El estado de la barra superior cambiara a Caja abierta. Si el codigo es incorrecto o falta, la caja no se abre y el sistema avisa.
-Antes: [[supervisor-codigo]]
+3. Si hay que abrir con otro monto, se escribe el nuevo monto: no se pide ningun codigo y la auditoria marca que fue distinto del oficial.
+4. Pulsar el boton Abrir caja ahora. El estado de la barra superior cambiara a Caja abierta.
 Despues: [[caja]]
 
 ## Como se hace: Regla de caja abierta
@@ -56,10 +55,10 @@ Ver tambien: [[cierre]]
 
 ## Como se hace: Adjuntar la foto del comprobante al cobrar
 1. Al elegir Yape, Plin o Transferencia aparece la seccion Comprobante del pago digital. Tomar la foto del voucher con la camara o subir el archivo; la imagen se reduce en el navegador y se guarda como archivo privado, como prueba.
-2. Al terminar la subida, la pantalla muestra la lectura de la IA: semaforo, motivos y datos extraidos (monto, operacion, billetera, titular y fecha) comparados con el total. La lectura es informativa y la decision es de la persona de caja, pero una foto que la IA marca como ILEGIBLE no cuenta como comprobante: la pantalla avisa "No se lee: sube otra foto o confirma sin comprobante con codigo del supervisor" (el administrador no necesita codigo: solo el motivo).
+2. Al terminar la subida, la pantalla muestra la lectura de la IA: semaforo, motivos y datos extraidos (monto, operacion, billetera, titular y fecha) comparados con el total. La lectura es informativa y la decision es de la persona de caja, pero una foto que la IA marca como ILEGIBLE no cuenta como comprobante: la pantalla avisa "No se lee: sube otra foto o confirma sin comprobante" (con el motivo).
 3. Con la foto guardada, el boton Registrar cobro queda activo. Confirmar con Cobrar.
-4. Excepcion: si de verdad no hay foto, o la foto no se lee, pulsar No hay foto: registrar sin voucher (con supervisor). Escribir el motivo (minimo 5 letras) e ingresar el codigo de 6 digitos del supervisor (el administrador no lo escribe: solo el motivo). La excepcion queda auditada con el motivo y quien la aprobo. El mozo no tiene esta excepcion: si no hay foto legible, la deja pendiente y Caja decide.
-5. Pago coordinado: en Pedidos por coordinar, Marcar coordinado con Yape, Plin o Transferencia pide la misma foto (o la excepcion con supervisor). Efectivo y tarjeta se marcan sin foto. Sí, marcar confirma la accion.
+4. Excepcion: si de verdad no hay foto, o la foto no se lee, pulsar No hay foto: registrar sin voucher. Escribir el motivo (minimo 5 letras); no se pide codigo. La excepcion queda auditada con el motivo y quien la registro. El mozo no tiene esta excepcion: si no hay foto legible, la deja pendiente y Caja decide.
+5. Pago coordinado: en Pedidos por coordinar, Marcar coordinado con Yape, Plin o Transferencia pide la misma foto (o la excepcion con motivo). Efectivo y tarjeta se marcan sin foto. Sí, marcar confirma la accion.
 6. La seccion Comprobantes muestra todas las fotos asociadas a la cuenta (de mozo, caja, WhatsApp o la carta), con su lectura. Pulsa la foto para verla en grande.
 7. Si el mozo ya subio la foto del voucher de una mesa, el cobro la muestra al abrir Registrar cobro: se cobra con esa foto (con su semaforo) sin subir otra. Si no sirve, pulsa Subir otra foto.
 8. Cobro de mesa enviado por el mozo: la campana avisa "Voucher del mozo por revisar" o "Pago en efectivo del mozo" y el enlace abre el pedido directamente. El mozo no cobra: Caja revisa la foto y registra el cobro.
@@ -80,10 +79,8 @@ Ver tambien: [[cierre]]
 ## Como se hace: Anular un pedido o un cobro
 1. Abrir el pedido que se desea anular y pulsar el boton Anular pedido (o Anular cobro si ya fue cobrado).
 2. Seleccionar uno de los motivos rapidos (Cliente no recibio, Pedido duplicado, El cliente desistio, Error al digitar, Falta un insumo, No contesta) o escribir el motivo con al menos 5 caracteres.
-3. En el campo Codigo del supervisor, ingresar el codigo rotativo de 6 digitos obtenido en [[supervisor-codigo]].
-4. Pulsar el boton Continuar.
-5. En la ventana de confirmacion con la pregunta ¿Confirmas anular el pedido?, pulsar Si, anular.
-Requiere: [[supervisor-codigo]]
+3. Pulsar el boton Continuar. No se pide ningun codigo de supervisor.
+4. En la ventana de confirmacion con la pregunta ¿Confirmas anular el pedido?, pulsar Si, anular.
 Ver tambien: [[historial]]
 
 ## Como se hace: Crear un pedido directo en mesa o mostrador
@@ -124,8 +121,8 @@ Una cortesia es una venta a costo 0: no suma ingresos, no sale en comprobantes (
 4. Por separado: si el pedido ya esta cobrado, tiene descuento o es una cortesia aparte, pulsa Registrar cortesia (cabecera de Pedidos y caja). Se abre un asistente de 3 pasos, con Siguiente y Atras:
    - Paso 1, "Que regalas?": escribe en "Escribe para buscar un producto" o filtra por las categorias (chips); los agotados salen marcados Agotado y se ve "Quedan N". Elige el producto y, si lo pide, el Tamano o el Sabor, y la Cantidad (minimo 1). Avisos: "Elige el producto.", "Elige el tamano del producto.", "Elige el sabor que se regala.", "La cantidad minima es 1.".
    - Paso 2, "Por que?": elige el Motivo (obligatorio) y la Nota (obligatoria si es Otro).
-   - Paso 3, "A que pedido corresponde?": el pedido de referencia es obligatorio. Al hacer clic en el campo aparecen los 12 pedidos mas recientes; filtra escribiendo "Busca por codigo (CP-...), cliente o mesa". Cada fila muestra codigo, quien, estado y total; el icono del ojito abre el detalle del pedido para confirmar que es el correcto. Si no hay: "No encontramos pedidos con ese dato.". Debajo aparece el Resumen (Regalas, Motivo, Pedido). Si eres Supervisor, escribe tambien tu codigo de 6 digitos. Pulsa Registrar cortesia.
-5. Quien la da: Caja y Administrador la dan directo. El Supervisor escribe ademas el codigo de 6 digitos de su pantalla ("Codigo del supervisor (6 digitos)"), que cambia cada 30 segundos; queda registrado quien la dio y quien la autorizo. El mozo no puede dar cortesias: la pide a Caja.
+   - Paso 3, "A que pedido corresponde?": el pedido de referencia es obligatorio. Al hacer clic en el campo aparecen los 12 pedidos mas recientes; filtra escribiendo "Busca por codigo (CP-...), cliente o mesa". Cada fila muestra codigo, quien, estado y total; el icono del ojito abre el detalle del pedido para confirmar que es el correcto. Si no hay: "No encontramos pedidos con ese dato.". Debajo aparece el Resumen (Regalas, Motivo, Pedido). Pulsa Registrar cortesia.
+5. Quien la da: Caja, Administrador y Supervisor la dan directo, sin ningun codigo; queda registrado quien la dio. El mozo no puede dar cortesias: la pide a Caja.
 6. No se pueden marcar como cortesia las lineas de combos o promociones.
 7. Informe: en Informes, reporte Cortesias (por motivo, por producto y por quien la dio, con valor de lista).
 Ver tambien: [[informes]]
@@ -145,7 +142,7 @@ Ver tambien: [[repartos]]
 3. Aprobar: el pedido pasa al medio nuevo (el plan de pago se reescribe), la captura queda validada y el repartidor recibe el aviso. El pedido sigue sin cobrarse hasta que registres el cobro como siempre.
 4. Rechazar (motivo opcional): el pedido sigue con el medio original, las capturas del intento quedan retiradas en el historial y el repartidor cobra como estaba.
 5. Autorizar entrega sin validar (motivo obligatorio, minimo 5 caracteres): el repartidor puede entregar aunque no puedas validar la captura todavia (por ejemplo, la app del banco no abre). El medio nuevo se aplica, la captura queda pendiente de revision y todo queda auditado con tu nombre y el motivo.
-6. Mientras la solicitud esta pendiente el repartidor no puede marcar Entregado. Ninguna decision pide codigo de supervisor: validar un pago no es anular.
+6. Mientras la solicitud esta pendiente el repartidor no puede marcar Entregado. Ninguna decision pide codigo: validar un pago no es anular.
 7. Efecto en el dinero: el efectivo por rendir del repartidor y el cierre cuentan el medio final. Efectivo a Yape: ese pedido ya no es efectivo por rendir. Yape a efectivo: se suma a lo que el repartidor debe liquidar. Pago mixto: solo la parte en efectivo. El total del pedido nunca cambia.
 8. El historial de solicitudes no se edita ni se borra.
 Ver tambien: [[repartos]]
@@ -164,9 +161,8 @@ Ver tambien: [[repartos]], [[mensajes]]
 
 ## Errores y dudas comunes
 - Un pedido con pago digital (Yape o Plin) no aparecera en cocina hasta que su comprobante sea aprobado; si la cocina reclama que no ve el pedido, verifique si el voucher sigue pendiente de aprobacion en el modulo de Mensajes.
-- Si al anular se ingresa un codigo de supervisor incorrecto o vencido, aparece el mensaje: Codigo del supervisor invalido. Pídelo nuevamente a la supervisora.
-- Si el boton Registrar cobro no se activa con Yape o Plin, falta la foto del comprobante: subela, o usa la excepcion con motivo y codigo del supervisor.
-- Una foto que la IA marca como ilegible no cuenta como comprobante: pide otra foto al cliente o usa la excepcion con supervisor. Una foto marcada como raro se guarda y se cobra; revisela con el cliente si hay dudas.
+- Si el boton Registrar cobro no se activa con Yape o Plin, falta la foto del comprobante: subela, o usa la excepcion con motivo.
+- Una foto que la IA marca como ilegible no cuenta como comprobante: pide otra foto al cliente o usa la excepcion con motivo. Una foto marcada como raro se guarda y se cobra; revisela con el cliente si hay dudas.
 - Si un cliente escribe por WhatsApp con una imagen y no ves el comprobante en la ficha, revisa el chat en Mensajes: la foto queda guardada aunque aun no exista la cuenta.
 - No se puede cerrar la caja al finalizar el dia si existen pedidos pendientes de cobro; deben cobrarse o anularse primero.
 - Si no puedes cobrar o aprobar un pago y aparece "La caja está cerrada", abre la caja del dia en Caja y cierres.
@@ -176,6 +172,6 @@ Ver tambien: [[repartos]], [[mensajes]]
 
 ## Quien puede hacerlo
 - Pueden ingresar y operar en Pedidos y caja: Administrador y Cajero.
-- El Supervisor ve Pedidos y caja y puede dar cortesias con su codigo, pero no cambia la ubicacion de pedidos. Si valida los cambios de forma de pago pedidos por el repartidor (pedidos/validar_cambio_cobro), igual que el Cajero y el Administrador, sin codigo. Los demas roles (Cocina, Mozo, Repartidor, Almacen) no tienen acceso a esta pantalla.
-- La anulacion de pedidos y cobros requiere la autorizacion con el codigo de supervisor de 6 digitos, salvo para el administrador, que anula sin codigo. Cocina y Mozo anulan un pedido sin codigo desde su propia pantalla (el mozo solo el que el tomo, en cola, preparando o listo y sin cobro ni voucher aprobado); un pedido ya cobrado o entregado sigue necesitando a Caja, al administrador o al supervisor.
-- Errores de cortesia: "El pedido ya esta cobrado: registra la cortesia por separado", "El pedido tiene descuento: registra la cortesia por separado", "El pedido ya tiene comprobante", "Esta linea ya es cortesia", "Las lineas de combo o de promocion no se pueden marcar como cortesia", "Un pedido solo de cortesias no se puede cobrar: registra la cortesia por separado", "La cortesia deja el plan de pago por debajo de cero: rehaz el plan de pago" y, para el supervisor, CODIGO_INVALIDO (el codigo vencio o esta mal: pide el actual).
+- El Supervisor ve Pedidos y caja y puede dar cortesias, pero no cambia la ubicacion de pedidos. Si valida los cambios de forma de pago pedidos por el repartidor (pedidos/validar_cambio_cobro), igual que el Cajero y el Administrador, sin codigo. Los demas roles (Cocina, Mozo, Repartidor, Almacen) no tienen acceso a esta pantalla.
+- La anulacion de pedidos y cobros ya no pide codigo de supervisor: la hace quien tiene el permiso, con motivo, y queda auditada. Cocina y Mozo anulan un pedido desde su propia pantalla (el mozo solo el que el tomo, en cola, preparando o listo y sin cobro ni voucher aprobado); un pedido ya cobrado o entregado sigue necesitando a Caja, al administrador o al supervisor.
+- Errores de cortesia: "El pedido ya esta cobrado: registra la cortesia por separado", "El pedido tiene descuento: registra la cortesia por separado", "El pedido ya tiene comprobante", "Esta linea ya es cortesia", "Las lineas de combo o de promocion no se pueden marcar como cortesia", "Un pedido solo de cortesias no se puede cobrar: registra la cortesia por separado", "La cortesia deja el plan de pago por debajo de cero: rehaz el plan de pago".
