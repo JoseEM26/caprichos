@@ -5,6 +5,7 @@ import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { ErrorApi } from '../../../comun/api';
 import { leerStockInsuficiente, mensajeStockInsuficiente } from '../../pedidos/stockInsuficiente';
+import { llenarPagaCon } from './ayudaPagaCon';
 
 vi.mock('../api', () => ({
   salonApi: { obtenerCarta: vi.fn(), obtenerPlano: vi.fn(), abrirPedidoMesa: vi.fn() },
@@ -60,6 +61,7 @@ describe('Nuevo pedido: STOCK_INSUFICIENTE al registrar', () => {
       }),
     );
     await llegarAResumenLlevar(alCerrar);
+    llenarPagaCon();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 

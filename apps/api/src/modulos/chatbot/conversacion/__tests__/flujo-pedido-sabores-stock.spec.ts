@@ -132,7 +132,7 @@ describe('Flujo de Pedido: productos con stock por sabor', () => {
           estadoInterno: 'PEDIDO_RESUMEN_CONFIRMAR',
           modalidad: 'RECOGER',
           cliente: { nombre: 'Carlos Test', telefono: '987654321' },
-          pago: { metodo: 'EFECTIVO', pagaCon: 50 },
+          pago: { metodo: 'EFECTIVO', pagaCon: 100 },
           comprobante: { tipo: 'NINGUNO' },
           items: [
             {
@@ -161,6 +161,42 @@ describe('Flujo de Pedido: productos con stock por sabor', () => {
       expect(accionCrear.dto.lineas[0].tamanoId).toBe('tam_doc');
       expect(accionCrear.dto.lineas[0].cantidad).toBe(2);
       expect(accionCrear.dto.lineas[0].sabores).toEqual([{ saborId: 'sab_fresa', cantidad: 24 }]);
+    });
+
+    it('efectivo sin «con cuánto pagas»: no crea el pedido y vuelve a preguntar el monto', () => {
+      const flujoResumen: FlujoConversacion = {
+        version: 2,
+        estado: 'PEDIDO_RESUMEN_CONFIRMAR',
+        repreguntasFallidas: 0,
+        pedido: {
+          estadoInterno: 'PEDIDO_RESUMEN_CONFIRMAR',
+          modalidad: 'RECOGER',
+          cliente: { nombre: 'Carlos Test', telefono: '987654321' },
+          pago: { metodo: 'EFECTIVO', pagaCon: undefined },
+          comprobante: { tipo: 'NINGUNO' },
+          items: [
+            {
+              lineaId: 'lin_1',
+              productoId: 'prod_dona',
+              productoNombre: 'Dona',
+              categoriaId: 'cat_donas',
+              categoriaNombre: 'Donas',
+              tamanoId: 'tam_doc',
+              tamanoNombre: 'Docena',
+              cantidad: 2,
+              precioUnitario: 34,
+              subtotal: 68,
+              opciones: [],
+              sabores: [{ saborId: 'sab_fresa', nombre: 'Fresa', cantidad: 24 }],
+              noSumaBeneficios: false,
+            },
+          ],
+        },
+      };
+
+      const res = transicionarEstado(flujoResumen, normalizarEntrada({ buttonPayload: 'ped_confirmar_si' }), contexto());
+      expect(res.acciones.find((a) => a.tipo === 'crearPedido')).toBeUndefined();
+      expect(res.nuevoEstado).toBe('PEDIDO_MONTO_EFECTIVO');
     });
   });
 

@@ -6,6 +6,7 @@ import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { ErrorApi } from '../../../comun/api';
 import type { ProductoCarta } from '../../../carta/tipos';
+import { llenarPagaCon } from './ayudaPagaCon';
 
 vi.mock('../api', () => ({
   salonApi: { obtenerCarta: vi.fn(), obtenerPlano: vi.fn(), abrirPedidoMesa: vi.fn() },
@@ -108,6 +109,7 @@ describe('Nuevo pedido de mozo con sabores', () => {
 
   it('la línea viaja con sabores y su cantidad por sabor', async () => {
     await llegarAResumenLlevar();
+    llenarPagaCon();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 
@@ -131,6 +133,7 @@ describe('Nuevo pedido de mozo con sabores', () => {
       }),
     );
     await llegarAResumenLlevar(alCerrar);
+    llenarPagaCon();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(screen.getByRole('button', { name: 'Sí, registrar' }));
 

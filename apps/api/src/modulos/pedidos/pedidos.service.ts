@@ -1072,9 +1072,19 @@ export class PedidosService {
       : dto.pago.metodo === 'EFECTIVO' && !personal
         ? aCobrar
         : 0;
+    // «Con cuánto paga» es OBLIGATORIO con efectivo en cualquier canal (carta, Caja, WhatsApp, bot, extra).
+    // Exentos: pedido del personal y cortesía total (montoEfectivo = 0), y la MESA abierta por el personal
+    // (mozo/caja): no sabe el billete al abrir y lo pide al cobrar en la precuenta. Pagar exacto = escribir el monto exacto.
+    const mesaDelPersonal = dto.modalidad === 'MESA' && (origen?.canal === 'MOZO' || origen?.canal === 'CAJA');
+    if (montoEfectivo > 0 && !mesaDelPersonal && (dto.pago.pagaCon === undefined || dto.pago.pagaCon === null || !(Number(dto.pago.pagaCon) > 0))) {
+      throw new BadRequestException({
+        codigo: 'PAGA_CON_REQUERIDO',
+        mensaje: 'Escribe con cuánto paga el cliente (en efectivo)',
+      });
+    }
     if (dto.pago.pagaCon !== undefined && montoEfectivo > 0 && Number(dto.pago.pagaCon) < montoEfectivo) {
       throw new BadRequestException({
-        codigo: 'PAGO_INSUFICIENTE',
+        codigo: 'PAGA_CON_MENOR_AL_TOTAL',
         mensaje: `El monto con el que paga (S/ ${dto.pago.pagaCon}) no puede ser menor a ${planPago ? 'la parte en efectivo' : 'el total'} (S/ ${montoEfectivo})`,
       });
     }

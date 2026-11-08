@@ -540,7 +540,8 @@ export function FormularioCheckout({
 
     if (dividirPago && planDividido.error) return planDividido.error;
 
-    if (efectivoParte > 0 && pagaCon.trim()) {
+    if (efectivoParte > 0) {
+      if (!pagaCon.trim()) return 'Escribe con cuánto pagas en efectivo (si pagas justo, toca «Pago exacto»)';
       const pagaConNum = Number(pagaCon);
       if (isNaN(pagaConNum) || pagaConNum < efectivoParte) {
         return `El monto con el que pagas (S/ ${pagaCon}) no puede ser menor a lo que pagas en efectivo (S/ ${efectivoParte.toFixed(2)})`;
@@ -2145,7 +2146,7 @@ export function FormularioCheckout({
                             marginBottom: '4px',
                           }}
                         >
-                          Paga con (monto en soles){planDividido.plan ? ` · efectivo S/ ${efectivoParte.toFixed(2)}` : ''}
+                          Paga con (monto en soles, obligatorio){planDividido.plan ? ` · efectivo S/ ${efectivoParte.toFixed(2)}` : ''}
                         </label>
                         <input
                           id="f-paga-con"
@@ -2154,6 +2155,7 @@ export function FormularioCheckout({
                           min={efectivoParte}
                           value={pagaCon}
                           onChange={(e) => setPagaCon(e.target.value)}
+                          aria-required="true"
                           placeholder={`Ej.: ${Math.ceil(efectivoParte / 10) * 10}`}
                           style={{
                             width: '100%',
@@ -2166,6 +2168,24 @@ export function FormularioCheckout({
                             fontSize: '14px',
                           }}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setPagaCon(efectivoParte.toFixed(2))}
+                          style={{
+                            marginTop: '6px',
+                            minHeight: '36px',
+                            borderRadius: '10px',
+                            border: '1.5px solid var(--cp-line)',
+                            background: 'var(--cp-white)',
+                            color: 'var(--cp-navy)',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            padding: '0 12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Pago exacto (S/ {efectivoParte.toFixed(2)})
+                        </button>
                       </div>
                     )}
 

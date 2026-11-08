@@ -4,6 +4,7 @@ import { ModalNuevoPedidoMesa } from '../componentes/ModalNuevoPedidoMesa';
 import { salonApi } from '../api';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import { api } from '../../../comun/api';
+import { llenarPagaCon } from './ayudaPagaCon';
 
 /** Elige boleta en el selector obligatorio (si el paso lo muestra y aún no hay elección). */
 const elegirBoleta = () => {
@@ -114,6 +115,7 @@ async function registrarCafe() {
   const pagaCon = await screen.findByPlaceholderText(/Mínimo S\/|Obligatorio/).catch(() => null);
   if (pagaCon) fireEvent.change(pagaCon, { target: { value: '50' } });
   elegirBoleta();
+  llenarPagaCon();
   fireEvent.click(await screen.findByRole('button', { name: 'Registrar pedido' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
   await waitFor(() => expect(pedidosApi.crearPedidoAdmin).toHaveBeenCalledTimes(1));
@@ -302,6 +304,8 @@ describe('ModalNuevoPedidoMesa: cliente con cuenta por celular en delivery y par
     fireEvent.click(await screen.findByRole('button', { name: /Luis Quispe/ }));
 
     elegirBoleta();
+
+    llenarPagaCon();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar pedido' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar' }));
