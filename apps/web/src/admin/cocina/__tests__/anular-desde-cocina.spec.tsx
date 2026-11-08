@@ -30,16 +30,9 @@ describe('Anular el pedido completo desde la comanda de cocina', () => {
     vi.restoreAllMocks();
   });
 
-  it('el botón «Anular pedido» solo sale si la vista da el permiso (alAnular)', () => {
-    const { rerender } = render(<ComandaTarjeta comanda={comanda} onDespejar={() => {}} />);
-    expect(screen.queryByRole('button', { name: 'Anular pedido' })).toBeNull();
-
-    const alAnular = vi.fn();
-    rerender(<ComandaTarjeta comanda={comanda} onDespejar={() => {}} alAnular={alAnular} />);
-    const boton = screen.getByRole('button', { name: 'Anular pedido' });
-    expect(boton.style.minHeight).toBe('44px');
-    fireEvent.click(boton);
-    expect(alAnular).toHaveBeenCalledWith(comanda);
+  it('la tarjeta de cocina ya no ofrece anular el pedido (solo Caja o Administrador)', () => {
+    render(<ComandaTarjeta comanda={comanda} onDespejar={() => {}} />);
+    expect(screen.queryByRole('button', { name: /Anular/ })).toBeNull();
   });
 
   it('ADMIN: avisa que es el pedido completo y confirma Sí/No', async () => {
