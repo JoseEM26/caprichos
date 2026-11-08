@@ -64,6 +64,7 @@ export function iniciarCombo(oferta: any): ComboEnConfiguracionBot {
     elecciones: [],
     fijas: fijasDe(oferta),
     unidades: 1,
+    ocultaGruposBebida: (oferta.combosParte ?? []).some((p: any) => p.bebidas === true && (p.opcionesDetalle ?? []).length > 0),
   };
 }
 
@@ -90,7 +91,7 @@ function categoriaDe(categorias: any[], productoId?: string): string {
 /**
  * Pasos de elección según lo que el servidor dice hoy (mismos datos que la ventana de la carta):
  * parte con plan B activo (alternativas con stock) y partes con lista de productos (juguetes, donas).
- * Las partes por categoría (bebidas del Dúo) son los grupos del producto anfitrión y no son un paso aquí.
+ * Las bebidas por categorías (`bebidas`) también son un paso; los grupos «Bebida N · Sabor» del anfitrión se omiten.
  * False si alguna parte quedó sin opciones que se puedan elegir.
  */
 export function armarPasosCombo(combo: ComboEnConfiguracionBot, oferta: any, unidades: number, categorias: any[]): boolean {
@@ -110,7 +111,8 @@ export function armarPasosCombo(combo: ComboEnConfiguracionBot, oferta: any, uni
       pasos.push({
         parteId,
         tipo: 'ELECCION',
-        etiqueta: categoriaDe(categorias, (p.opcionesDetalle as any[])[0]?.id && String((p.opcionesDetalle as any[])[0].id)),
+        // Bebidas por categorías (Frappes + Iced + Calientes): una sola etiqueta, no la de la primera categoría
+        etiqueta: p.bebidas === true ? 'bebida' : categoriaDe(categorias, (p.opcionesDetalle as any[])[0]?.id && String((p.opcionesDetalle as any[])[0].id)),
         total: Number(p.cantidad) * unidades,
         hechos: 0,
         opciones,

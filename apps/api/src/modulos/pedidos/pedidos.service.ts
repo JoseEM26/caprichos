@@ -22,6 +22,7 @@ import { ZonasService } from '../zonas/zonas.service';
 import { calcularEnvioDelivery, PromoEnvioGratis } from '../ofertas/envio-gratis-promo';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { ParteResueltaCombo } from '../ofertas/ofertas.tipos';
+import { esGrupoBebidaDuplicado } from '../ofertas/combo-grupos.util';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { CrearPedidoDto, EntregaDto, LineaPedidoDto } from './dto/crear-pedido.dto';
 import { generarTokenSeguimiento } from './seguimiento.tokens';
@@ -416,8 +417,15 @@ export class PedidosService {
         }
       }
 
+      // Combo: la parte FIJO debe ser el principal o un reemplazo disponible (409 si no); las A_ELECCION, lo elegido.
+      // Cada parte sale en su propia línea hija (cocina y stock); la madre sigue llevando el precio del combo.
+      const combo = l.ofertaId
+        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA')
+        : { nota: '', partes: [] };
       // Validar reglas por cada grupo (obligatorio, mínimo, máximo)
       for (const grupo of gruposActivos) {
+        // Combo con bebidas por categoría: las bebidas se eligen en esa parte; los grupos «Bebida N · Sabor» del anfitrión no se exigen
+        if (combo.conBebidas && esGrupoBebidaDuplicado(grupo.nombre)) continue;
         const opcionesDeEsteGrupo = opcionesElegidasInfo.filter(
           (o) => o.grupo_id === grupo.id,
         );
@@ -476,11 +484,6 @@ export class PedidosService {
         }
       }
 
-      // Combo: la parte FIJO debe ser el principal o un reemplazo disponible (409 si no); las A_ELECCION, lo elegido.
-      // Cada parte sale en su propia línea hija (cocina y stock); la madre sigue llevando el precio del combo.
-      const combo = l.ofertaId
-        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA')
-        : { nota: '', partes: [] };
       const contenedora = combo.partes.length > 0;
 
       lineasCalculadas.push({
@@ -572,6 +575,8 @@ export class PedidosService {
       }
 
       // Partes del combo: una línea hija por producto, sin cobro (el precio ya va en la madre)
+      // Los nombres de envase se reparten en orden entre las bebidas del combo (Bebida 1, Bebida 2...)
+      let nombreSiguiente = 0;
       for (const parte of lin.partesCombo) {
         const esBebidaParte = esBebidaPorNombres(parte.categoriaNombre ?? undefined, parte.areaNombre ?? undefined);
         const hija = await tx.pedidoLinea.create({
@@ -586,11 +591,12 @@ export class PedidosService {
             subtotal: new Prisma.Decimal(0),
             area_id: parte.areaId,
             nombres_persona: esBebidaParte
-              ? Array.from({ length: parte.cantidad }, (_, u) => lin.personasEntrada[u]?.trim() || clienteNombre || 'Mesa')
+              ? Array.from({ length: parte.cantidad }, (_, u) => lin.personasEntrada[nombreSiguiente + u]?.trim() || clienteNombre || 'Mesa')
               : [],
             nota: parte.nota,
           },
         });
+        if (esBebidaParte) nombreSiguiente += parte.cantidad;
         // Producto por sabor de la parte: sus sabores siguen a la línea hija (igual que en una línea normal)
         for (const sb of parte.sabores ?? []) {
           await tx.pedidoLineaSabor.create({

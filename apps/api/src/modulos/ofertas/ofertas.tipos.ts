@@ -17,6 +17,8 @@ export interface OpcionDetalleCombo {
   disponible: boolean;
   /** Bloqueada por saldo 0 (producto o sabores), no por agotado a mano. */
   sinStock?: boolean;
+  /** Foto del producto (bebidas por categorías). */
+  fotoUrl?: string;
   sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
 }
 
@@ -52,6 +54,8 @@ export interface ComboParteItem {
   principalNombre?: string;
   /** A_ELECCION con lista de productos: cada opción y si se puede elegir ahora (sin saldo = no). */
   opcionesDetalle?: OpcionDetalleCombo[];
+  /** Calculado: parte de bebidas por categorías (el cliente elige «Bebida 1..N»); sus opciones van en `opcionesDetalle`. */
+  bebidas?: boolean;
 }
 
 export interface OfertaItem {
@@ -213,4 +217,6 @@ export interface ResolucionCombo {
   /** Nota de la línea madre (reemplazos del combo), como antes. */
   nota: string;
   partes: ParteResueltaCombo[];
+  /** El combo tiene una parte de bebidas por categorías: los grupos «Bebida N · Sabor» del anfitrión no se exigen. */
+  conBebidas?: boolean;
 }

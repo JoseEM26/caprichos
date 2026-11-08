@@ -96,6 +96,8 @@ export interface ComboEnConfiguracionBot {
   elecciones: EleccionComboBot[];
   /** Partes con producto fijo que viajan solas (parte y producto). */
   fijas: { parteId: string; productoId: string; nombre: string }[];
+  /** El combo trae sus bebidas por categoría como pasos: los grupos «Bebida N · Sabor» del producto no se preguntan. */
+  ocultaGruposBebida?: boolean;
   /** Combos que lleva la línea: cada alternativa o lista pide cantidad × unidades elecciones. */
   unidades: number;
   /** Se pidió ya elegir las partes (evita repetir el paso al volver del nombre de envase). */

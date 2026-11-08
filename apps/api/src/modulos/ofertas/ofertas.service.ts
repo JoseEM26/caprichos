@@ -40,13 +40,14 @@ import {
   admiteProducto,
   calcularDisponibilidadCombo,
   conSaboresDeParte,
+  esParteBebidas,
   parteArmable,
   productoDisponible,
   productosDeParte,
   ProductoDisp,
   saborDisponible,
 } from './combo-disponibilidad.util';
-import { estaDisponible } from '../catalogo/catalogo.service';
+import { estaDisponible, obtenerFotoUrl } from '../catalogo/catalogo.service';
 import { sincronizarAnfitrionCombo } from './combo-anfitrion';
 import { anfitrionBloqueadoPorPaso, opcionesSinStock } from '../stock/opcion-requiere';
 import {
@@ -166,7 +167,7 @@ function detalleOpcion(id: string, productos: ProductoDisp[]): OpcionDetalleComb
   const disponible = !!f && productoDisponible(f);
   // Bloqueada solo por saldo (no por ocultar ni agotar a mano): la carta dice «No hay stock»
   const sinStock = !disponible && !!f && !f.oculto && estaDisponible(f.agotadoHasta) && !!f.controlaStock;
-  return { id, nombre: f?.nombre ?? '', disponible, ...(sinStock ? { sinStock } : {}), ...(sabores ? { sabores } : {}) };
+  return { id, nombre: f?.nombre ?? '', disponible, ...(sinStock ? { sinStock } : {}), ...(sabores ? { sabores } : {}), ...(f?.fotoUrl ? { fotoUrl: f.fotoUrl } : {}) };
 }
 
 const INCLUDE_PARTES = {
@@ -2189,7 +2190,10 @@ export class OfertasService {
       [...p.productos, ...p.alternativas.map((a) => a.id)].forEach((x) => ids.add(String(x)));
       elecciones.filter((e) => String(e.parteId) === p.id).forEach((e) => ids.add(String(e.productoId)));
       // Con alternativas, el original se mira por sus categorías: hay que cargar esos productos también
-      if (p.alternativas.length > 0 || p.paqueteGrupo) p.categorias.forEach((c) => cats.add(String(c)));
+      // y una parte de bebidas por categorías (A_ELECCION sin lista) necesita ver los productos de sus categorías
+      if (p.alternativas.length > 0 || p.paqueteGrupo || (p.tipo === 'A_ELECCION' && p.productos.length === 0)) {
+        p.categorias.forEach((c) => cats.add(String(c)));
+      }
     }
     const filas = ids.size || cats.size
       ? await this.prisma.producto.findMany({
@@ -2349,8 +2353,8 @@ export class OfertasService {
       }
       const requeridas = parte.cantidad * unidades;
       if (picks.length === 0) {
-        // Con lista de productos (juguetes) es obligatoria; por categoría (bebidas del Dúo) no genera líneas
-        if (parte.productos.length > 0 || parte.paqueteGrupo) {
+        // Con lista de productos (juguetes), paquete o bebidas por categoría es obligatoria; otra parte por categoría no genera líneas
+        if (parte.productos.length > 0 || parte.paqueteGrupo || esParteBebidas(parte, disp)) {
           throw new BadRequestException({
             codigo: 'COMBO_ELECCION_INCOMPLETA',
             mensaje: `Elige ${requeridas} opción(es) para ${oferta.nombre}`,
@@ -2422,7 +2426,11 @@ export class OfertasService {
       });
     }
 
-    return { nota: cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '', partes };
+    return {
+      nota: cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '',
+      partes,
+      conBebidas: partesOferta.some((p) => esParteBebidas(p, disp)),
+    };
   }
 
   /** Ids numéricos de una lista de entrada (sabores, excluidos): sin repetir y sin valores raros. */
@@ -2582,12 +2590,24 @@ export class OfertasService {
     }
     const filas = await this.prisma.producto.findMany({
       where: { OR: [{ id: { in: [...ids] } }, { categoria_id: { in: [...cats] } }] },
-      select: { id: true, nombre: true, categoria_id: true, oculto: true, agotado_hasta: true, ...SELECT_STOCK_COMBO },
+      select: {
+        id: true,
+        nombre: true,
+        categoria_id: true,
+        oculto: true,
+        agotado_hasta: true,
+        categoria: { select: { nombre: true, area: { select: { nombre: true } } } },
+        foto_archivo: { select: { ruta: true } },
+        ...SELECT_STOCK_COMBO,
+      },
     });
     const productos: ProductoDisp[] = filas.map((f: any) => ({
       id: f.id.toString(),
       nombre: f.nombre,
       categoriaId: f.categoria_id.toString(),
+      categoriaNombre: f.categoria?.nombre ?? null,
+      areaNombre: f.categoria?.area?.nombre ?? null,
+      fotoUrl: obtenerFotoUrl(f.foto_archivo),
       oculto: f.oculto,
       agotadoHasta: f.agotado_hasta,
       ...stockDeProducto(f),
@@ -2633,6 +2653,11 @@ export class OfertasService {
             .map((id) => deLaParte.find((x) => x.id === id))
             .filter((x): x is ProductoDisp => !!x)
             .map((x) => detalleOpcion(x.id, deLaParte));
+        } else if (p.tipo === 'A_ELECCION' && esParteBebidas({ ...p, alternativas: [] }, productos)) {
+          // Bebidas por categorías («Bebida 1..N»): los productos visibles de esas categorías (sin los excluidos); los agotados salen bloqueados
+          const deLaParte = productosDeParte({ ...p, alternativas: [] }, productos).filter((x) => !x.oculto);
+          p.bebidas = true;
+          p.opcionesDetalle = deLaParte.map((x) => detalleOpcion(x.id, deLaParte));
         } else if (p.tipo === 'A_ELECCION' && p.paqueteGrupo) {
           // Pieza de un complemento por categorías (p. ej. «Donas»): sus productos visibles son las opciones
           const deLaParte = productosDeParte({ ...p, alternativas: [] }, productos).filter((x) => !x.oculto);

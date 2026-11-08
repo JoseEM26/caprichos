@@ -169,6 +169,8 @@ export interface ParteEleccion {
   /** Opciones por combo: el servidor exige cantidad × unidades elegidas. */
   cantidad: number;
   opciones: OpcionDetalleCombo[];
+  /** Bebidas por categorías: se eligen en pasos «Bebida 1..N» (una por paso), no con contadores. */
+  bebidas?: boolean;
 }
 
 /**
@@ -176,6 +178,52 @@ export interface ParteEleccion {
  * «productoId|saborId» (cada unidad lleva su sabor, como en la mezcla de sabores de la carta).
  */
 export const claveSabor = (productoId: string, saborId: string): string => `${productoId}|${saborId}`;
+
+/** Reparto (clave → unidades) de una lista ordenada de claves; los huecos («») no cuentan. */
+export const repartoDeLista = (lista: string[]): Reparto => {
+  const r: Reparto = {};
+  for (const c of lista) if (c) r[c] = (r[c] ?? 0) + 1;
+  return r;
+};
+
+/**
+ * Lo elegido en todas las partes: contadores (juguetes, donas) y, en las partes de bebidas, la lista de pasos «Bebida N»
+ * convertida a reparto (recortada al total vigente).
+ */
+export function unirElecciones(
+  partes: ParteEleccion[],
+  juguetes: Record<string, Reparto>,
+  bebidas: Record<string, string[]>,
+  unidades: number,
+): Record<string, Reparto> {
+  const unido = { ...juguetes };
+  for (const p of partes) if (p.bebidas) unido[p.parteId] = repartoDeLista((bebidas[p.parteId] ?? []).slice(0, p.cantidad * unidades));
+  return unido;
+}
+
+/** Nombre de cada bebida elegida en el orden en que viaja al servidor (agrupadas por producto): para el nombre del envase. */
+export function bebidasElegidas(partes: ParteEleccion[], elegido: Record<string, Reparto>): string[] {
+  return partes
+    .filter((p) => p.bebidas)
+    .flatMap((p) =>
+      Object.entries(elegido[p.parteId] ?? {}).flatMap(([clave, n]) => {
+        const nombre = p.opciones.find((o) => o.id === clave.split('|')[0])?.nombre ?? 'Bebida';
+        return Array.from({ length: n }, () => nombre);
+      }),
+    );
+}
+
+/** Los grupos de opciones del anfitrión que repiten la bebida («Bebida 1 · Sabor») se ocultan si el combo tiene bebidas por categorías. */
+export const esGrupoBebidaDuplicado = (nombre: string): boolean => {
+  const n = nombre.trim();
+  if (!/^bebida/i.test(n)) return false;
+  const corto = n.includes(' · ') ? n.split(' · ').slice(1).join(' · ').trim() : '';
+  return corto === '' || /^(sabor|bebida)/i.test(corto);
+};
+
+/** El combo ofrece sus bebidas por categorías (pasos «Bebida 1..N»). */
+export const comboConBebidas = (oferta: OfertaItem | null | undefined): boolean =>
+  (oferta?.combosParte ?? []).some((p) => p.bebidas === true && (p.opcionesDetalle ?? []).length > 0);
 
 /** Alternativa elegida para una parte, si la hay (solo cuando el original no alcanza). */
 function alternativaElegida(p: ComboParteItem, elegidos: Record<string, string>): AlternativaParteItem | undefined {
@@ -196,7 +244,7 @@ export function partesEleccion(oferta: OfertaItem | null, elegidos: Record<strin
       return alt ? [{ parteId, cantidad: alt.cantidad, opciones: [alt] }] : [];
     }
     if ((p.tipo ?? p.tipoParte) === 'A_ELECCION' && (p.opcionesDetalle ?? []).length > 0) {
-      return [{ parteId, cantidad: p.cantidad, opciones: p.opcionesDetalle ?? [] }];
+      return [{ parteId, cantidad: p.cantidad, opciones: p.opcionesDetalle ?? [], ...(p.bebidas ? { bebidas: true } : {}) }];
     }
     return [];
   });

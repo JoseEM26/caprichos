@@ -1,5 +1,7 @@
 import { estaDisponible } from '../catalogo/catalogo.service';
 
+export { esGrupoBebidaDuplicado } from './combo-grupos.util';
+
 /** Sabor de un producto por sabor, con su saldo (stock_sabor). */
 export interface SaborDisp {
   id: string;
@@ -14,6 +16,11 @@ export interface ProductoDisp {
   id: string;
   nombre: string;
   categoriaId: string;
+  /** Nombre de la categoría y del área (para saber si es una bebida). */
+  categoriaNombre?: string | null;
+  areaNombre?: string | null;
+  /** Foto del producto (para mostrar la opción en la carta). */
+  fotoUrl?: string | null;
   oculto: boolean;
   agotadoHasta: Date | string | null;
   /** Controla stock (producto terminado): con saldo 0 la elección queda bloqueada. */
@@ -99,6 +106,31 @@ export function unidadesDisponibles(p: ProductoDisp | undefined): number {
     return (p.sabores ?? []).filter(saborDisponible).reduce((acc, s) => acc + Math.floor(s.saldo), 0);
   }
   return Math.max(0, Math.floor(p.saldo ?? 0));
+}
+
+/** Bebida por el nombre de su categoría o de su área (misma regla de la carta y de las etiquetas del vaso). */
+export function esBebidaPorNombres(categoria?: string | null, area?: string | null): boolean {
+  const cat = (categoria || '').toUpperCase();
+  const are = (area || '').toUpperCase();
+  return (
+    cat.includes('FRAPPE') ||
+    cat.includes('ICED') ||
+    cat.includes('FROZEN') ||
+    cat.includes('CALIENTE') ||
+    cat.includes('BEBIDA') ||
+    are.includes('BARRA') ||
+    are.includes('BEBIDA')
+  );
+}
+
+/**
+ * Parte de BEBIDAS por categorías: A_ELECCION sin lista de productos ni paquete, con categorías, y todos los productos
+ * de esas categorías son bebidas. El cliente elige `cantidad` bebidas («Bebida 1..N») entre los productos de esas categorías.
+ */
+export function esParteBebidas(parte: ParteDisp, productos: ProductoDisp[]): boolean {
+  if (parte.tipo !== 'A_ELECCION' || parte.productos.length > 0 || parte.paqueteGrupo || parte.categorias.length === 0) return false;
+  const deLasCategorias = productos.filter((p) => parte.categorias.includes(p.categoriaId));
+  return deLasCategorias.length > 0 && deLasCategorias.every((p) => esBebidaPorNombres(p.categoriaNombre, p.areaNombre));
 }
 
 /**

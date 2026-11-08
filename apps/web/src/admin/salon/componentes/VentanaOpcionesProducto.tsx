@@ -12,7 +12,10 @@ import { SelectorSaboresMezcla } from '../../../comun/SelectorSaboresMezcla';
 import { Reparto, aArreglo, faltanUnidades, recortarAlTope, repartoValido } from '../../../comun/saboresMezcla';
 import {
   AvisoAlternativasCombo,
+  bebidasElegidas,
+  comboConBebidas,
   eleccionesCombo,
+  esGrupoBebidaDuplicado,
   faltaElegirPaquete,
   filtrarPaquetes,
   gruposPaquetes,
@@ -24,8 +27,10 @@ import {
   partesEleccion,
   ResumenPartesFijas,
   repartoAlternativa,
+  unirElecciones,
   usosDeSabor,
 } from '../../../carta/ReemplazoCombo';
+import { PasosBebidaCombo } from '../../../carta/PasosBebidaCombo';
 import { SelectorEleccionCombo } from '../../../carta/SelectorEleccionCombo';
 import { useUmbralesStock } from '../../../carta/umbralesStock';
 import { etiquetaUltimos, infoStockDe, topeAgregable, topeTamano } from '../../../carta/stock';
@@ -111,6 +116,8 @@ export function VentanaOpcionesProducto({
   // Partes A_ELECCION con lista (juguetes): cuántas de cada opción; el total depende de la cantidad del combo
   const partesJug = useMemo(() => partesEleccion(ofertaCombo, reemplazos), [ofertaCombo, reemplazos]);
   const [juguetes, setJuguetes] = useState<Record<string, Reparto>>({});
+  // Partes de bebidas: la bebida elegida en cada paso «Bebida N» (clave del producto; '' = sin elegir)
+  const [bebidas, setBebidas] = useState<Record<string, string[]>>({});
 
   // Nota de cocina
   const [notaCocina, setNotaCocina] = useState('');
@@ -120,8 +127,12 @@ export function VentanaOpcionesProducto({
   const saborMode = producto.saboresConStock === true;
   // Con stock por sabor, los grupos obligatorios heredados («Sabor» de empanadas) no se muestran ni se exigen
   const gruposVisibles = useMemo(
-    () => (saborMode ? (producto.grupos || []).filter((g) => !(g.obligatorio || (g.minimo && g.minimo > 0))) : producto.grupos || []),
-    [producto, saborMode],
+    () => {
+      // Un combo con bebidas por categoría las pide en pasos «Bebida 1..N»: los grupos del anfitrión que repiten ese rol se ocultan
+      const grupos = comboConBebidas(oferta) ? (producto.grupos || []).filter((g) => !esGrupoBebidaDuplicado(g.nombre)) : producto.grupos || [];
+      return saborMode ? grupos.filter((g) => !(g.obligatorio || (g.minimo && g.minimo > 0))) : grupos;
+    },
+    [producto, saborMode, oferta],
   );
   const unidadesMezcla = tamanoSeleccionado?.unidades ?? 1;
   // Unidades sueltas (sin tamano o tamano de 1): se reparte lo que se quiera entre los sabores y la cantidad es la suma
@@ -156,15 +167,19 @@ export function VentanaOpcionesProducto({
 
   // Bebidas del combo (grupos «Bebida 1 · Bebida»): cada una lleva su nombre de envase, opcional
   const gruposBebida = useMemo(
-    () => (producto.grupos || []).filter((g) => g.nombre.includes(' · ') && /^bebida/i.test(g.nombre.split(' · ')[1].trim())),
-    [producto],
+    () => gruposVisibles.filter((g) => g.nombre.includes(' · ') && /^bebida/i.test(g.nombre.split(' · ')[1].trim())),
+    [gruposVisibles],
   );
-  const nB = gruposBebida.length;
+  // Lo elegido en todas las partes (contadores y pasos de bebidas)
+  const elegido = unirElecciones(partesJug, juguetes, bebidas, cantidad);
+  // Sin esos grupos, cada paso de la parte de bebidas es una bebida con su envase
+  const nB = gruposBebida.length || partesJug.filter((p) => p.bebidas).reduce((a, p) => a + p.cantidad, 0);
+  const envases = bebidasElegidas(partesJug, elegido);
   const [nombresCombo, setNombresCombo] = useState<Record<number, string>>({});
 
   // Categorías de bebidas
   const esBebida = useMemo(() => {
-    if (gruposBebida.length > 0) return false;
+    if (nB > 0) return false;
     const cat = [
       (producto as any).categoria?.nombre,
       (producto as any).categoriaNombre,
@@ -186,7 +201,7 @@ export function VentanaOpcionesProducto({
       cat.includes('infusi') ||
       cat.includes('chocolate')
     );
-  }, [producto, gruposBebida]);
+  }, [producto, nB]);
 
   const precioBase = tamanoSeleccionado ? tamanoSeleccionado.precio : producto.precio || 0;
 
@@ -257,7 +272,7 @@ export function VentanaOpcionesProducto({
     (tope === null || (tope > 0 && cantidad <= tope)) &&
     !faltaElegirPaquete(oferta, paquetes) &&
     !faltaElegirReemplazo(partesRe, reemplazos) &&
-    !faltaElegirJuguetes(partesJug, juguetes, cantidad) &&
+    !faltaElegirJuguetes(partesJug, elegido, cantidad) &&
     saboresListos;
 
   // En las bebidas el nombre de quien la toma es obligatorio: va en la etiqueta del vaso
@@ -293,7 +308,7 @@ export function VentanaOpcionesProducto({
       }
     }
 
-    const elecciones = eleccionesCombo(ofertaCombo, reemplazos, juguetes);
+    const elecciones = eleccionesCombo(ofertaCombo, reemplazos, elegido);
     alAgregar({
       producto,
       ...(saborMode
@@ -644,7 +659,9 @@ export function VentanaOpcionesProducto({
             {Array.from({ length: cantidad * nB }, (_, i) => {
               const g = gruposBebida[i % nB];
               const elegidas = opcionesPorUnidad[personalizarPorUnidad ? Math.floor(i / nB) : 0] || [];
-              const bebida = g.opciones.find((o) => elegidas.some((e) => e.id === o.id))?.nombre ?? g.nombre.split(' · ')[1];
+              const bebida = g
+                ? (g.opciones.find((o) => elegidas.some((e) => e.id === o.id))?.nombre ?? g.nombre.split(' · ')[1])
+                : (envases[i] ?? `Bebida ${i + 1}`);
               return (
                 <label key={i} style={{ fontSize: '12px', fontWeight: 700, display: 'block', color: 'var(--cp-soft)' }}>
                   {`${bebida} · Nombre para el envase (opcional, máx. 14 letras se ven completas)`}
@@ -817,16 +834,27 @@ export function VentanaOpcionesProducto({
           }}
         />
         {!comboAgotado &&
-          partesJug.map((parte) => (
+          partesJug.map((parte) =>
+            parte.bebidas ? (
+              <PasosBebidaCombo
+                key={parte.parteId}
+                parte={parte}
+                unidades={cantidad}
+                valor={bebidas[parte.parteId] ?? []}
+                onCambio={(v) => setBebidas((prev) => ({ ...prev, [parte.parteId]: v }))}
+                usos={usosDeSabor([], elegido)}
+              />
+            ) : (
             <SelectorEleccionCombo
               key={parte.parteId}
               parte={parte}
               unidades={cantidad}
               valor={juguetes[parte.parteId] ?? {}}
               onCambio={(v) => setJuguetes((prev) => ({ ...prev, [parte.parteId]: v }))}
-              usos={usosDeSabor([], juguetes)}
+              usos={usosDeSabor([], elegido)}
             />
-          ))}
+            ),
+          )}
 
         {/* Nota para cocina */}
         <div>

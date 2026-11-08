@@ -61,6 +61,7 @@ import {
   textoPago,
 } from './pago-bot.util';
 import { MedioPagoBot } from './tipos-pedido';
+import { esGrupoBebidaDuplicado } from '../../../../ofertas/combo-grupos.util';
 import { celularPuntosEnmascarado } from '../../../utilidades/enmascarar.util';
 
 const PALABRAS_PEDIDO = [
@@ -148,8 +149,8 @@ function productoAgotado(p: any): boolean {
  * Grupos de opciones que el bot pregunta. Con stock por sabor se omiten los obligatorios heredados
  * («Sabor» de empanadas): no se preguntan ni se exigen.
  */
-function gruposDePregunta(prod: any): any[] {
-  const grupos = prod?.grupos || [];
+function gruposDePregunta(prod: any, ocultaGruposBebida = false): any[] {
+  const grupos = (prod?.grupos || []).filter((g: any) => !(ocultaGruposBebida && esGrupoBebidaDuplicado(String(g.nombre ?? ''))));
   return prod?.saboresConStock === true ? grupos.filter((g: any) => !(g.obligatorio || g.minimo > 0)) : grupos;
 }
 
@@ -1080,7 +1081,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const categorias = contexto.categoriasCarta || [];
     const cat = categorias.find((c) => String(c.id) === config.categoriaId);
     const prod = (cat?.productos || []).find((p: any) => String(p.id) === config.productoId);
-    const grupos = gruposDePregunta(prod);
+    const grupos = gruposDePregunta(prod, config.combo?.ocultaGruposBebida);
     const grupoActual = grupos[config.grupoIndexActual];
 
     if (!grupoActual) {
@@ -2920,7 +2921,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     const config = pedido.itemEnConfiguracion;
     if (!config) return this.mostrarCategorias(flujo, pedido, contexto);
 
-    const grupos = gruposDePregunta(prod);
+    const grupos = gruposDePregunta(prod, config.combo?.ocultaGruposBebida);
 
     // Si aún quedan grupos de opciones por responder
     if (config.grupoIndexActual < grupos.length) {

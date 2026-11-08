@@ -13,6 +13,8 @@ export interface OpcionDetalleCombo {
   disponible: boolean;
   /** Bloqueada por saldo 0 (se muestra «No hay stock») */
   sinStock?: boolean;
+  /** Foto del producto (bebidas por categorías). */
+  fotoUrl?: string;
   sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
 }
 
@@ -56,6 +58,8 @@ export interface ComboParteItem {
   tamanoUnidades?: number;
   /** A_ELECCION con lista (juguetes, donas): cada opción y si se puede elegir ahora. */
   opcionesDetalle?: OpcionDetalleCombo[];
+  /** Parte de bebidas por categorías: el cliente elige «Bebida 1..N» entre `opcionesDetalle`. */
+  bebidas?: boolean;
 }
 
 export interface LlevaPagaConfig {
