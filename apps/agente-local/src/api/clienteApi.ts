@@ -29,14 +29,16 @@ export interface IClienteApiImpresion {
 export async function canjearCodigoVinculo(
   apiUrlPorDefecto: string,
   codigoCrudo: string,
-  fetchFn: typeof fetch = fetch
+  fetchFn: typeof fetch = fetch,
+  /** Datos de esta PC (uid estable, nombre, sistema, red) para que el servidor la reconozca y reutilice su configuración. */
+  equipo?: InfoEquipoLatido
 ): Promise<{ apiUrl: string; llave: string }> {
   const [codigo, host] = codigoCrudo.trim().split('@');
   const apiUrl = host ? `https://${host.replace(/^https?:\/\//, '').replace(/\/+$/, '')}` : apiUrlPorDefecto;
   const res = await fetchFn(`${apiUrl}/api/agente-impresion/vincular`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ codigo }),
+    body: JSON.stringify({ codigo, ...(equipo ? { equipo } : {}) }),
   });
   if (!res.ok) {
     const cuerpo: any = await res.json().catch(() => ({}));

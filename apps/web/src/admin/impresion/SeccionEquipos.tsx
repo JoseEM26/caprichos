@@ -4,7 +4,7 @@ import { useSesion } from '../../comun/sesion';
 import { Confirmar } from '../../comun/Confirmar';
 import { Cargando } from '../../comun/Cargando';
 import { impresionApi, LlaveAgenteAdmin } from './impresionApi';
-import { ImpresorasDelEquipo } from './ImpresorasDelEquipo';
+import { ImpresorasDelEquipo, haceCuanto } from './ImpresorasDelEquipo';
 import { PanelInstalarPrograma } from './PanelInstalarPrograma';
 import { NOMBRE_MAQUINA, useEstadoMaquinas } from './useEstadoMaquinas';
 
@@ -31,6 +31,8 @@ export function SeccionEquipos() {
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [estado, setEstado] = useState<EstadoAdminImpresion | null>(null);
   const [instalar, setInstalar] = useState<boolean>(false);
+  const [limpiando, setLimpiando] = useState<boolean>(false);
+  const [motivoLimpieza, setMotivoLimpieza] = useState<string>('');
 
   // Gestión de llaves
   const [llaves, setLlaves] = useState<LlaveAgenteAdmin[]>([]);
@@ -99,6 +101,19 @@ export function SeccionEquipos() {
       setError(err?.message || 'Error al desactivar la llave');
     } finally {
       setDesactivando(false);
+    }
+  };
+
+  const handleLimpiar = async () => {
+    try {
+      const r = await impresionApi.limpiarEquiposAntiguos(motivoLimpieza.trim());
+      setMensajeExito(`Se archivaron ${r.archivadas} PC antiguas. Nada se borró.`);
+      setLimpiando(false);
+      setMotivoLimpieza('');
+      await cargarDatos();
+    } catch (err: any) {
+      setLimpiando(false);
+      setError(err?.message || 'No se pudieron limpiar las PC antiguas');
     }
   };
 
@@ -259,9 +274,68 @@ export function SeccionEquipos() {
       </div>
 
       {/* Cada computadora con el programa: impresoras que ve, pruebas y «Usar esta impresora» (POR computadora) */}
-      {(estado?.equipos ?? []).map((eq) => (
+      {(estado?.equipos ?? []).filter((eq) => !eq.antigua).map((eq) => (
         <ImpresorasDelEquipo key={eq.deviceKeyId} equipo={eq} alCambiar={actualizar} />
       ))}
+
+      {(() => {
+        const antiguas = (estado?.equipos ?? []).filter((eq) => eq.antigua);
+        const eliminadas = estado?.eliminadas ?? [];
+        if (!antiguas.length && !eliminadas.length) return null;
+        return (
+          <details data-testid="pcs-antiguas" style={tarjeta}>
+            <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 800, color: 'var(--cp-navy, #0B2C3E)' }}>
+              Antiguas ({antiguas.length}) · Eliminadas ({eliminadas.length})
+            </summary>
+            {antiguas.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ margin: 0, fontSize: 13 }}>
+                  PC apagadas que ya tienen otra más nueva con el mismo nombre. «Limpiar» las archiva (no borra nada) y la nueva hereda su configuración.
+                </p>
+                <div>
+                  <button
+                    type="button"
+                    aria-label="Limpiar PCs antiguas"
+                    style={{ minHeight: 44, padding: '0 14px', borderRadius: 8, border: '1.5px solid var(--cp-rust, #B2500F)', background: 'transparent', color: 'var(--cp-rust, #B2500F)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+                    onClick={() => setLimpiando(true)}
+                  >
+                    Limpiar PCs antiguas
+                  </button>
+                </div>
+                {antiguas.map((eq) => (
+                  <ImpresorasDelEquipo key={eq.deviceKeyId} equipo={eq} alCambiar={actualizar} />
+                ))}
+              </div>
+            )}
+            {eliminadas.length > 0 && (
+              <ul data-testid="pcs-eliminadas" style={{ margin: 0, paddingLeft: 18, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {eliminadas.map((e) => (
+                  <li key={e.deviceKeyId}>
+                    {e.nombre} · {e.hostname ?? 'sin nombre'} · {e.ipLocal.join(', ') || 'sin IP'} · último latido {haceCuanto(e.ultimoLatido)} · archivada {haceCuanto(e.eliminadaEn)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </details>
+        );
+      })()}
+
+      <Confirmar
+        abierto={limpiando}
+        titulo="¿Limpiar las PC antiguas?"
+        mensaje="Se archivan las PC apagadas que tienen otra más nueva con el mismo nombre. No se borra ningún historial; si la PC vuelve a vincularse, se reconoce."
+        textoSi="Sí, limpiar"
+        textoNo="No"
+        peligro
+        deshabilitarConfirmar={motivoLimpieza.trim().length < 3}
+        alConfirmar={handleLimpiar}
+        alCancelar={() => setLimpiando(false)}
+      >
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
+          Motivo (obligatorio)
+          <input aria-label="Motivo de la limpieza" value={motivoLimpieza} maxLength={200} onChange={(e) => setMotivoLimpieza(e.target.value)} style={{ minHeight: 44, padding: '0 10px', borderRadius: 8, border: '1px solid var(--cp-line, #E3D6C6)' }} />
+        </label>
+      </Confirmar>
 
       {/* Llaves de autenticación del agente (solo ADMIN crea o desactiva) */}
       <div

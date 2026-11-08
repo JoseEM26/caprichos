@@ -79,6 +79,25 @@ export class InfoEquipoLatidoDto {
   @ArrayMaxSize(8)
   @IsString({ each: true })
   ipLocal?: string[];
+
+  /** Identificador estable de la PC (hash): la reconoce al volver a vincularse. Aditivo: los programas viejos no lo mandan. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  equipoUid?: string;
+}
+
+/** Canje del código de vinculación; `equipo` es aditivo (programas viejos solo mandan el código). */
+export class VincularAgenteDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  codigo?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => InfoEquipoLatidoDto)
+  equipo?: InfoEquipoLatidoDto;
 }
 
 export class LatidoDto {

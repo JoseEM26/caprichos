@@ -40,6 +40,16 @@ export function textoEstadoMaquina(m: EstadoMaquinaImpresion | undefined): { tex
 type Resultado = { tipo: 'proceso' | 'ok' | 'error'; texto: string };
 const COLOR: Record<Resultado['tipo'], string> = { proceso: 'var(--cp-navy, #0B2C3E)', ok: 'var(--cp-green, #2F7A45)', error: 'var(--cp-rust, #B2500F)' };
 
+/** «hace 5 min» / «hace 2 d» a partir del último latido. */
+export function haceCuanto(iso: string | null | undefined, ahora = Date.now()): string {
+  if (!iso) return 'nunca';
+  const s = Math.max(0, Math.round((ahora - new Date(iso).getTime()) / 1000));
+  if (s < 90) return 'hace unos segundos';
+  if (s < 5400) return `hace ${Math.round(s / 60)} min`;
+  if (s < 129600) return `hace ${Math.round(s / 3600)} h`;
+  return `hace ${Math.round(s / 86400)} d`;
+}
+
 const boton = {
   minHeight: 44,
   padding: '0 12px',
@@ -62,6 +72,10 @@ export function ImpresorasDelEquipo({ equipo, alCambiar }: { equipo: EquipoEstad
   const [confirmarTodas, setConfirmarTodas] = useState(false);
   const [elegir, setElegir] = useState<{ rol: RolImpresora; c: ImpresoraCandidata } | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [eliminando, setEliminando] = useState(false);
+  const [motivo, setMotivo] = useState('');
+  const [fusionando, setFusionando] = useState(false);
+  const [editandoNombre, setEditandoNombre] = useState<string | null>(null);
   const vivo = useRef(true);
   useEffect(() => {
     vivo.current = true;
@@ -127,6 +141,42 @@ export function ImpresorasDelEquipo({ equipo, alCambiar }: { equipo: EquipoEstad
     }
   };
 
+  const eliminar = async () => {
+    try {
+      const r = await impresionApi.eliminarEquipo(equipo.deviceKeyId, motivo.trim());
+      setEliminando(false);
+      setGeneral({ tipo: 'ok', texto: `PC eliminada.${r.descartados ? ` Se descartaron ${r.descartados} trabajos pendientes.` : ''}` });
+      alCambiar?.();
+    } catch (err: any) {
+      setEliminando(false);
+      setGeneral({ tipo: 'error', texto: err?.message || 'No se pudo eliminar la PC' });
+    }
+  };
+
+  const decidirRepetida = async (esLaMisma: boolean) => {
+    if (!equipo.repetidaDe) return;
+    setFusionando(false);
+    try {
+      if (esLaMisma) await impresionApi.fusionarEquipo(equipo.deviceKeyId, equipo.repetidaDe.deviceKeyId);
+      else await impresionApi.noEsLaMisma(equipo.deviceKeyId, equipo.repetidaDe.deviceKeyId);
+      alCambiar?.();
+    } catch (err: any) {
+      setGeneral({ tipo: 'error', texto: err?.message || 'No se pudo guardar tu respuesta' });
+    }
+  };
+
+  const guardarNombre = async () => {
+    const n = (editandoNombre ?? '').trim();
+    setEditandoNombre(null);
+    if (!n || n === equipo.nombre) return;
+    try {
+      await impresionApi.guardarConfigEquipo(equipo.deviceKeyId, { nombre: n } as any);
+      alCambiar?.();
+    } catch (err: any) {
+      setGeneral({ tipo: 'error', texto: err?.message || 'No se pudo guardar el nombre' });
+    }
+  };
+
   const copiar = async (texto: string) => {
     try {
       await navigator.clipboard.writeText(texto);
@@ -156,6 +206,42 @@ export function ImpresorasDelEquipo({ equipo, alCambiar }: { equipo: EquipoEstad
           {equipo.conectado ? 'Programa conectado' : 'Programa sin conexión'}
         </span>
       </div>
+
+      <div data-testid={`datos-${equipo.deviceKeyId}`} style={{ fontSize: 12, color: 'var(--cp-soft, #2C4C5D)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        {editandoNombre === null ? (
+          <button type="button" aria-label={`Cambiar el nombre de ${equipo.nombre}`} style={{ ...boton, minHeight: 44, fontSize: 12 }} onClick={() => setEditandoNombre(equipo.nombre)}>
+            Poner nombre (Caja, Cocina...)
+          </button>
+        ) : (
+          <span style={{ display: 'inline-flex', gap: 6 }}>
+            <input aria-label="Nombre de la PC" value={editandoNombre} maxLength={60} onChange={(e) => setEditandoNombre(e.target.value)} style={{ minHeight: 44, padding: '0 10px', borderRadius: 8, border: '1px solid var(--cp-line, #E3D6C6)' }} />
+            <button type="button" style={boton} onClick={() => void guardarNombre()}>
+              Guardar nombre
+            </button>
+          </span>
+        )}
+        <span>PC: <strong>{equipo.hostname ?? 'sin nombre'}</strong></span>
+        <span>{equipo.sistema ?? 'sistema desconocido'}</span>
+        <span>IP: {equipo.ipLocal?.length ? equipo.ipLocal.join(', ') : 'sin dato'}</span>
+        <span>Último latido: {haceCuanto(equipo.ultimoLatido)}</span>
+        <strong style={{ color: equipo.config?.configurado ? COLOR.ok : COLOR.error }}>
+          {equipo.config?.configurado ? 'Configurada' : 'Nueva: falta configurar'}
+        </strong>
+      </div>
+
+      {equipo.repetidaDe && (
+        <div role="alert" data-testid={`repetida-${equipo.deviceKeyId}`} style={{ border: '1.5px solid var(--cp-orange, #E67929)', borderRadius: 10, padding: 10, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <strong>Esta PC parece repetida: ¿es la misma que {equipo.repetidaDe.nombre}?</strong>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" style={{ ...boton, background: 'var(--cp-navy, #0B2C3E)', color: 'var(--cp-cream, #FBF4EC)' }} onClick={() => setFusionando(true)}>
+              Sí, es la misma
+            </button>
+            <button type="button" style={boton} onClick={() => void decidirRepetida(false)}>
+              No, es otra PC
+            </button>
+          </div>
+        </div>
+      )}
 
       {!equipo.conectado && (
         <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: COLOR.error }}>
@@ -259,6 +345,41 @@ export function ImpresorasDelEquipo({ equipo, alCambiar }: { equipo: EquipoEstad
         <small>Guía completa: docs/operacion/GUIA-elegir-impresora-y-autoarranque.md</small>
       </details>
 
+      <div>
+        <button
+          type="button"
+          aria-label={`Eliminar PC ${equipo.nombre}`}
+          style={{ ...boton, borderColor: 'var(--cp-rust, #B2500F)', color: 'var(--cp-rust, #B2500F)' }}
+          onClick={() => setEliminando(true)}
+        >
+          Eliminar PC
+        </button>
+      </div>
+
+      <Confirmar
+        abierto={fusionando}
+        titulo={`¿${equipo.nombre} es la misma PC que ${equipo.repetidaDe?.nombre ?? ''}?`}
+        mensaje="Esta PC hereda la configuración de la otra y la otra queda archivada. Nada se borra."
+        textoSi="Sí, es la misma"
+        textoNo="No"
+        alConfirmar={() => decidirRepetida(true)}
+        alCancelar={() => setFusionando(false)}
+      />
+      <Confirmar
+        abierto={eliminando}
+        titulo={`¿Eliminar la PC «${equipo.nombre}»?`}
+        mensaje={`PC: ${equipo.hostname ?? 'sin nombre'} · IP: ${equipo.ipLocal?.join(', ') || 'sin dato'} · Último latido: ${haceCuanto(equipo.ultimoLatido)}. Esta PC dejará de imprimir y su vinculación se desactiva. Sus trabajos pendientes se descartan.`}
+        textoSi="Sí, eliminar"
+        textoNo="No"
+        peligro
+        alConfirmar={eliminar}
+        alCancelar={() => setEliminando(false)}
+      >
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
+          Motivo (opcional)
+          <input aria-label="Motivo para eliminar la PC" value={motivo} maxLength={200} onChange={(e) => setMotivo(e.target.value)} style={{ minHeight: 44, padding: '0 10px', borderRadius: 8, border: '1px solid var(--cp-line, #E3D6C6)' }} />
+        </label>
+      </Confirmar>
       <Confirmar
         abierto={confirmarTodas}
         titulo={`¿Probar las ${candidatas.length} impresoras?`}

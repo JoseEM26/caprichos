@@ -321,6 +321,26 @@ export const impresionApi = {
     return api.put(`/admin/impresion/equipos/${equipoId}/config`, cambio);
   },
 
+  /** «Sí, es la misma»: esta PC hereda la configuración de `otraId` y la otra se archiva. */
+  fusionarEquipo: async (equipoId: string, otraId: string): Promise<{ ok: boolean }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/fusionar`, { otraId });
+  },
+
+  /** «No, es otra PC»: deja de preguntar. */
+  noEsLaMisma: async (equipoId: string, otraId: string): Promise<{ ok: boolean }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/no-es-la-misma`, { otraId });
+  },
+
+  /** «Eliminar PC»: soft-delete auditado; lo pendiente a esa PC se descarta. */
+  eliminarEquipo: async (equipoId: string, motivo?: string): Promise<{ ok: boolean; descartados: number }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/eliminar`, { motivo: motivo || undefined });
+  },
+
+  /** «Limpiar PCs antiguas»: archiva (no borra) las apagadas y repetidas. El motivo es obligatorio. */
+  limpiarEquiposAntiguos: async (motivo: string): Promise<{ ok: boolean; archivadas: number }> => {
+    return api.post('/admin/impresion/equipos/limpiar-antiguas', { motivo });
+  },
+
   /** «Usar lo general»: rellena la PC con las reglas del local. */
   usarGeneralEquipo: async (equipoId: string): Promise<{ ok: boolean; config: ConfigEquipoImpresion }> => {
     return api.post(`/admin/impresion/equipos/${equipoId}/usar-general`, {});

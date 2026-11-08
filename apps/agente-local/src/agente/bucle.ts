@@ -11,6 +11,7 @@ import { generarTicketEscPos, generarComandaSalonEscPos } from '../escpos/genera
 import { generarPruebaEtiqueta, generarPruebaTicket } from '../pruebaImpresora';
 import { paraServidor } from '../candidatas';
 import type { CandidataLocal } from '../candidatas';
+import { equipoUidEstable } from '../identidadEquipo';
 import { decidirAutomatica, mensajeConexion, NOMBRE_ROL_AUTO } from '../autoUsb';
 
 /** Lo que el programa sabe de este equipo: qué impresoras ve y cómo guardar la elegida (desde el panel). */
@@ -37,7 +38,7 @@ export function leerInfoEquipo(): InfoEquipoLatido {
   for (const lista of Object.values(os.networkInterfaces())) {
     for (const i of lista ?? []) if (i.family === 'IPv4' && !i.internal) ipLocal.push(i.address);
   }
-  return { hostname: os.hostname(), sistema: `${process.platform} ${os.release()}`, ipLocal };
+  return { hostname: os.hostname(), sistema: `${process.platform} ${os.release()}`, ipLocal, equipoUid: equipoUidEstable() };
 }
 
 export interface OpcionesAgenteLocalServicio {

@@ -13,6 +13,8 @@ export interface ArchivoConfiguracion {
   agenteKey?: string;
   /** Última llave tomada del config.json que viene junto al .exe (para no pisar un vínculo más nuevo). */
   llaveDeExe?: string;
+  /** UUID de esta PC (solo si el sistema no da un id de máquina): se genera una vez y se conserva. */
+  equipoUid?: string;
   etiquetera?: string;
   ticketera?: string;
   /** Identidad (MFG MDL|serie) de la impresora de cada rol: sobrevive a que /dev/usb/lpN cambie de número. */

@@ -29,6 +29,7 @@ import {
   CrearLlaveDto,
   DescartarDto,
   LatidoDto,
+  InfoEquipoLatidoDto,
   ReimprimirDto,
   ResultadoTrabajoDto,
   VaciarColaDto,
@@ -50,6 +51,7 @@ import {
   construirTicketComandaArea,
   areasDeLineas,
 } from './constructor-etiquetas';
+import { clasificarEquipos } from './identidad-equipo';
 import {
   claveSeleccion,
   agenteConectado,
@@ -342,6 +344,15 @@ export class ImpresionService {
       // sin estado previo: se emite el evento igual
     }
     const estadoAntes = JSON.stringify(estadoPorRol(antes));
+    // Primer latido de una llave nueva: si es una PC ya conocida hereda su configuración (y la llave vieja se desactiva)
+    if (antes && !antes.ultimo_latido && dto.equipo) {
+      await this.equipos.reconocerYReutilizar(deviceKeyId, {
+        uid: dto.equipo.equipoUid,
+        hostname: dto.equipo.hostname,
+        sistema: dto.equipo.sistema,
+        ipLocal: dto.equipo.ipLocal,
+      });
+    }
     // Primero la config: una PC que late por primera vez queda «nueva, falta configurar»; una que ya imprimía se convierte
     const cfg = await this.equipos.configDe(deviceKeyId);
     const volvio = !agenteConectado(antes?.ultimo_latido);
@@ -357,6 +368,7 @@ export class ImpresionService {
           ? {
               latido_hostname: dto.equipo.hostname?.slice(0, 120) ?? null,
               latido_sistema: dto.equipo.sistema?.slice(0, 120) ?? null,
+              ...(dto.equipo.equipoUid ? { equipo_uid: dto.equipo.equipoUid.slice(0, 80) } : {}),
               latido_ip_local: dto.equipo.ipLocal?.length ? dto.equipo.ipLocal.slice(0, 8).join(',') : null,
             }
           : {}),
@@ -424,20 +436,43 @@ export class ImpresionService {
       candidatas: conectado ? leerCandidatasLatido(agente?.latido_detalle) : [],
       seleccion: agente ? await this.leerSeleccionAgente(agente.id) : {},
       equipos: await this.estadoPorEquipo(ahora),
+      eliminadas: await this.equiposArchivados(),
       sinReceptor: await this.equipos.contarSinReceptor(),
       tamanosLocal: await leerTamanosEtiqueta(this.prisma),
     };
+  }
+
+  /** PC eliminadas desde el panel o reemplazadas por una nueva vinculación: solo para consultar. */
+  private async equiposArchivados() {
+    try {
+      const l = await this.prisma.deviceKey.findMany({
+        where: { tipo: 'AGENTE', archivada_en: { not: null } },
+        orderBy: { archivada_en: 'desc' },
+        take: 20,
+      });
+      return l.map((e) => ({
+        deviceKeyId: e.id.toString(),
+        nombre: e.nombre,
+        hostname: e.latido_hostname ?? null,
+        ipLocal: e.latido_ip_local ? String(e.latido_ip_local).split(',').filter(Boolean) : [],
+        ultimoLatido: e.ultimo_latido ? new Date(e.ultimo_latido).toISOString() : null,
+        eliminadaEn: (e.eliminada_en ?? e.archivada_en)?.toISOString() ?? null,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   /** Estado de cada computadora vinculada: el panel avisa cuál falta y cuánto espera en su cola. */
   private async estadoPorEquipo(ahora: number): Promise<EquipoEstadoImpresion[]> {
     try {
       const equipos = await this.prisma.deviceKey.findMany({
-        where: { tipo: 'AGENTE', activo: true },
+        where: { tipo: 'AGENTE', activo: true, archivada_en: null },
         orderBy: { id: 'asc' },
-        include: { area: { select: { nombre: true } } },
+        include: { area: { select: { nombre: true } }, configImpresion: true },
       } as any);
       const ctx = await this.equipos.contexto();
+      const clas = clasificarEquipos(equipos as any[], ahora);
       return await Promise.all(
         (equipos as any[]).map(async (e) => {
           const conectado = agenteConectado(e.ultimo_latido, ahora);
@@ -460,6 +495,12 @@ export class ImpresionService {
             hostname: e.latido_hostname ?? null,
             sistema: e.latido_sistema ?? null,
             version: e.latido_version ?? null,
+            antigua: clas.get(e.id)?.antigua ?? false,
+            repetidaDe: (() => {
+              const r = clas.get(e.id)?.repetidaDe;
+              const o = r ? (equipos as any[]).find((x) => x.id === r) : undefined;
+              return o ? { deviceKeyId: o.id.toString(), nombre: o.nombre } : null;
+            })(),
           };
         }),
       );
@@ -1214,7 +1255,7 @@ export class ImpresionService {
   }
 
   /** El programa del local canjea el código por su llave (se muestra una sola vez). */
-  async vincularAgente(codigoCrudo: string): Promise<{ llave: string }> {
+  async vincularAgente(codigoCrudo: string, equipo?: InfoEquipoLatidoDto): Promise<{ llave: string }> {
     const codigo = (codigoCrudo || '').split('@')[0].trim().toUpperCase();
     const pendiente = codigo
       ? await this.prisma.deviceKey.findFirst({ where: { tipo: 'AGENTE', codigo_vinculo: codigo, activo: false } })
@@ -1234,8 +1275,21 @@ export class ImpresionService {
         codigo_vinculo: null,
         codigo_expira_en: null,
         ultima_conexion: new Date(),
+        ...(equipo?.equipoUid ? { equipo_uid: equipo.equipoUid.slice(0, 80) } : {}),
+        ...(equipo?.hostname ? { latido_hostname: equipo.hostname.slice(0, 120) } : {}),
+        ...(equipo?.sistema ? { latido_sistema: equipo.sistema.slice(0, 120) } : {}),
+        ...(equipo?.ipLocal?.length ? { latido_ip_local: equipo.ipLocal.slice(0, 8).join(',') } : {}),
       },
     });
+    // El programa nuevo dice quién es ya al canjear: si la PC era conocida, hereda su configuración sin pasos extra
+    if (equipo?.equipoUid || (equipo?.hostname && equipo?.sistema)) {
+      await this.equipos.reconocerYReutilizar(pendiente.id, {
+        uid: equipo.equipoUid,
+        hostname: equipo.hostname,
+        sistema: equipo.sistema,
+        ipLocal: equipo.ipLocal,
+      });
+    }
     return { llave };
   }
 
