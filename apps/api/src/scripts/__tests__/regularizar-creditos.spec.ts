@@ -1,3 +1,5 @@
+// El servicio de créditos arrastra (por el descuento de stock) el gateway de socket, que importa @nestjs/jwt (ESM): se simula como en otros specs
+jest.mock('@nestjs/jwt', () => ({ JwtService: jest.fn().mockImplementation(() => ({ signAsync: jest.fn(), verifyAsync: jest.fn() })) }));
 import { enmascarar, leerOpciones, regularizarCreditos } from '../regularizar-creditos';
 
 describe('regularizar-creditos', () => {
