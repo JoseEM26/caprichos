@@ -157,7 +157,12 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
         </div>
         {pedido.modalidad === 'COMER_LOCAL' && !anulado && !estado?.terminado && (
           <p data-testid="texto-comer-local" style={{ margin: '8px 0 0', fontSize: '15px', fontWeight: 800, color: 'var(--cp-navy)' }}>
-            Estamos preparando tu pedido{pedido.nombre ? `, ${pedido.nombre}` : ''}. Te llamaremos cuando esté listo.
+            {estado?.ubicacion === 'ASIGNADA' && estado.mesa
+              ? `Tu mesa es la ${estado.mesa}`
+              : estado?.ubicacion === 'EN_ESPERA'
+                ? `Estamos buscando tu mesa: te llamaremos${pedido.nombre ? `, ${pedido.nombre}` : ''}`
+                : `Estamos preparando tu pedido${pedido.nombre ? `, ${pedido.nombre}` : ''}. Te llamaremos por tu nombre`}
+            .
           </p>
         )}
         <p

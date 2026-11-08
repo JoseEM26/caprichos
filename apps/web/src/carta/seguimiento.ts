@@ -47,6 +47,9 @@ export interface EstadoSeguimiento {
   estado: string;
   estadoEtiqueta: string;
   modalidad: ModalidadEntrega;
+  /** Solo «Comer en el local»: dónde está el pedido para el cliente (aditivo). */
+  ubicacion?: 'SIN_MESA' | 'EN_ESPERA' | 'ASIGNADA';
+  mesa?: string;
   total: number;
   /** Propina aparte de la venta (0 o ausente = sin propina) */
   propina?: number;

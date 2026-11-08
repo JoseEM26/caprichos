@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Confirmar } from '../../comun/Confirmar';
 import { useSesion } from '../../comun/sesion';
+import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
 import { LineaPedido, Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
@@ -446,6 +447,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               )}
             </div>
           )}
+          <AccionesComerLocal pedido={pedido} alCambio={alActualizar} />
           <div className="dp-acciones-fila">
             <div className="dp-primarias">
               {esPorConfirmar && (

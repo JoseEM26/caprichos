@@ -788,6 +788,7 @@ export function PedidosAdminView() {
                   alSeleccionar={(id) => setPedidoSeleccionadoId(String(id))}
                   accion={accionDe(o)}
                   alAccion={ejecutarAccion}
+                  alComerLocal={() => void cargarDatos()}
                 />
               ))}
             </div>

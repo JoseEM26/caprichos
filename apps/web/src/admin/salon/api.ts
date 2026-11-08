@@ -150,6 +150,20 @@ export const salonApi = {
       forzarOcupada ? { mesaId, forzarOcupada: true } : { mesaId },
     ),
 
+  /** Autogestión «Comer en el local»: Caja lo sienta en una mesa (libre, u ocupada con forzarOcupada). */
+  asignarComerLocal: (pedidoId: string, mesaId: string, forzarOcupada?: boolean) =>
+    api.post<{ ok: boolean; pedidoId: string; codigo: string; mesaId: string; mesa: string }>(
+      `/admin/salon/comer-local/${pedidoId}/asignar`,
+      forzarOcupada ? { mesaId, forzarOcupada: true } : { mesaId },
+    ),
+
+  /** Autogestión «Comer en el local»: Caja lo manda a la lista de espera de mesa. */
+  comerLocalAEspera: (pedidoId: string, personas?: number) =>
+    api.post<{ ok: boolean; pedidoId: string; codigo: string }>(
+      `/admin/salon/comer-local/${pedidoId}/a-espera`,
+      personas ? { personas } : {},
+    ),
+
   liberarMesaManual: (mesaId: string, motivo?: string, forzar?: boolean) =>
     api.post<{ ok: boolean; mensaje: string }>(
       `/admin/salon/mesas/${mesaId}/liberar`,

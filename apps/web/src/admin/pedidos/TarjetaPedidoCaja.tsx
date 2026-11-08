@@ -8,6 +8,7 @@ import { InsigniaCambioCobro } from './PanelCambioCobro';
 import { EtiquetaCajaCerrada } from './BannerCajaCerrada';
 import { ESTILO_ESPERA, esCerrado, estadoVisual, nivelEspera } from './estadosCaja';
 import type { AccionCaja } from './accionesCaja';
+import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
 
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' });
@@ -56,6 +57,8 @@ export interface TarjetaPedidoCajaProps {
   /** Botón grande del pie (confirmar pago, preparar, listo…); null en los cerrados */
   accion?: AccionCaja | null;
   alAccion?: (pedido: Pedido, accion: AccionCaja) => void;
+  /** Refresca la lista tras asignar mesa o mandar a la lista de espera (pedidos «Comer en el local»). */
+  alComerLocal?: () => void;
   /** Para pruebas: instante actual en ms. */
   ahora?: number;
 }
@@ -65,7 +68,7 @@ export interface TarjetaPedidoCajaProps {
  * y un botón grande con la acción siguiente. El botón de abrir el detalle y el de acción son hermanos (no se anidan).
  */
 export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
-  pedido: o, seleccionado, resaltado, cajaCerradaEspera, cambioCobroPendiente, alSeleccionar, accion, alAccion, ahora,
+  pedido: o, seleccionado, resaltado, cajaCerradaEspera, cambioCobroPendiente, alSeleccionar, accion, alAccion, alComerLocal, ahora,
 }: TarjetaPedidoCajaProps) {
   const visual = estadoVisual(o);
   const pago = chipPago(o);
@@ -173,6 +176,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
       ) : (
         <div aria-hidden="true" style={{ height: 6 }} />
       )}
+      {String(o.modalidad).toUpperCase() === 'COMER_LOCAL' && <AccionesComerLocal pedido={o} alCambio={alComerLocal} compacto />}
     </div>
   );
 });
