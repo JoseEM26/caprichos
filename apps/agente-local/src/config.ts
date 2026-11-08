@@ -11,6 +11,8 @@ export interface DestinoImpresora {
 export interface ArchivoConfiguracion {
   apiUrl?: string;
   agenteKey?: string;
+  /** Última llave tomada del config.json que viene junto al .exe (para no pisar un vínculo más nuevo). */
+  llaveDeExe?: string;
   etiquetera?: string;
   ticketera?: string;
   /** Identidad (MFG MDL|serie) de la impresora de cada rol: sobrevive a que /dev/usb/lpN cambie de número. */

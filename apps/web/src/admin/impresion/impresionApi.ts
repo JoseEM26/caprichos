@@ -1,4 +1,4 @@
-import { api } from '../../comun/api';
+import { api, getTokenAcceso } from '../../comun/api';
 import { EstadoAdminImpresion, EstadoImpresora, RolImpresora } from '@caprichos/compartido';
 
 export interface TrabajoImpresionAdmin {
@@ -229,6 +229,23 @@ export const impresionApi = {
   /** Código de un solo uso (15 min) para vincular el programa del local; solo ADMIN. */
   generarCodigoVinculo: async (): Promise<{ codigo: string; expiraEn: string }> => {
     return api.post('/admin/impresion/codigo-vinculo', {});
+  },
+
+  /** Crea el equipo y descarga el ZIP con el programa ya vinculado (lleva una llave secreta); solo ADMIN. */
+  descargarProgramaVinculado: async (nombre?: string): Promise<Blob> => {
+    const token = getTokenAcceso();
+    const res = await fetch('/admin/impresion/equipos/descarga-vinculada', {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(nombre?.trim() ? { nombre: nombre.trim() } : {}),
+    });
+    if (!res.ok) {
+      const cuerpo: any = await res.json().catch(() => ({}));
+      throw new Error(cuerpo?.mensaje || `No se pudo preparar la descarga (HTTP ${res.status})`);
+    }
+    return res.blob();
   },
 
   obtenerEstado: async (): Promise<EstadoAdminImpresion> => {

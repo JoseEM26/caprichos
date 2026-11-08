@@ -50,7 +50,27 @@ export function PanelInstalarPrograma({ alCerrar }: { alCerrar: () => void }) {
   const [codigo, setCodigo] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [sistema, setSistema] = useState<Sistema>(sistemaDetectado);
+  const [nombrePc, setNombrePc] = useState('');
+  const [descargando, setDescargando] = useState(false);
   const origen = window.location.origin;
+
+  const descargarVinculado = async () => {
+    setError('');
+    setDescargando(true);
+    try {
+      const blob = await impresionApi.descargarProgramaVinculado(nombrePc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'programa-impresion-caprichos.zip';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e: any) {
+      setError(e?.message || 'No se pudo descargar el programa');
+    } finally {
+      setDescargando(false);
+    }
+  };
 
   const generar = async () => {
     setError('');
@@ -79,6 +99,30 @@ export function PanelInstalarPrograma({ alCerrar }: { alCerrar: () => void }) {
             </button>
           ))}
         </div>
+        {sistema === 'windows' && esAdmin && (
+          <div style={{ border: '2px solid #0003', borderRadius: 10, padding: 12, margin: '8px 0' }}>
+            <label style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>
+              Nombre de la PC (opcional, ej. Caja, Bebidas)
+              <input value={nombrePc} onChange={(e) => setNombrePc(e.target.value)} maxLength={60}
+                style={{ display: 'block', width: '100%', marginTop: 4, padding: 8 }} />
+            </label>
+            <button type="button" className="cola-btn" disabled={descargando} onClick={descargarVinculado}
+              style={{ width: '100%', fontSize: 16, fontWeight: 800, padding: '12px 8px' }}>
+              {descargando ? 'Preparando...' : 'Descargar el programa ya vinculado (esta PC)'}
+            </button>
+            <ol style={{ lineHeight: '22px', fontSize: 14, paddingLeft: 20, margin: '8px 0 0' }}>
+              <li>Descomprime la carpeta.</li>
+              <li>Doble clic en agente-impresion-windows.exe.</li>
+              <li>Listo.</li>
+            </ol>
+            <p className="cola-ayuda" style={{ margin: '6px 0 0' }}>
+              Cuidado: la carpeta lleva una llave secreta de esta PC. No la compartas ni la envíes por WhatsApp o correo.
+            </p>
+            <p className="cola-ayuda" style={{ margin: '6px 0 0' }}>
+              Si prefieres el método anterior, usa el código de vinculación de abajo.
+            </p>
+          </div>
+        )}
         {sistema === 'windows' ? (
           <ol style={{ lineHeight: '24px', fontSize: 14, paddingLeft: 20 }}>
             <li>
