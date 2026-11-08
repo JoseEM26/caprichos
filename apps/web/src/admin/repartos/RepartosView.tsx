@@ -20,11 +20,13 @@ import { repartosApi, PedidoReparto, PedidoSeguimiento, PanelRepartidores as Dat
 import { PanelRepartidores } from './PanelRepartidores';
 import { RepartidorView } from './RepartidorView';
 import { RutasAdmin } from './RutasAdmin';
+import { DespachoAdmin } from './DespachoAdmin';
 import { ContadoresDeliveryChips, useContadoresDelivery } from './ContadoresDelivery';
 
-type Vista = 'panel' | 'todos' | 'mapa' | 'rutas';
+type Vista = 'despacho' | 'panel' | 'todos' | 'mapa' | 'rutas';
 
 const PESTANAS: Array<{ clave: Vista; texto: string }> = [
+  { clave: 'despacho', texto: 'Despacho' },
   { clave: 'panel', texto: 'Repartidores' },
   { clave: 'todos', texto: 'Todos los pedidos' },
   { clave: 'mapa', texto: 'Mapa' },
@@ -47,13 +49,15 @@ function SeguimientoRepartosView() {
   const puedeLiquidar = tiene('repartos/liquidar');
 
   const vistaUrl = searchParams.get('vista');
-  const vista: Vista = vistaUrl === 'todos' || vistaUrl === 'lista' || vistaUrl === 'mios' ? 'todos' : vistaUrl === 'mapa' ? 'mapa' : vistaUrl === 'rutas' ? 'rutas' : 'panel';
+  const vista: Vista = vistaUrl === 'todos' || vistaUrl === 'lista' || vistaUrl === 'mios' ? 'todos' : vistaUrl === 'mapa' ? 'mapa' : vistaUrl === 'rutas' ? 'rutas' : vistaUrl === 'panel' ? 'panel' : 'despacho';
 
   const [config, setConfig] = useState<ConfigReparto>(CONFIG_REPARTO_DEFECTO);
   const [zonasGeo, setZonasGeo] = useState<ZonaGeoItem[]>(ZONAS_GEO_DEFECTO);
   const [panel, setPanel] = useState<DatosPanel | null>(null);
   const [pedidos, setPedidos] = useState<PedidoSeguimiento[]>([]);
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
+  // En «Despacho» tocar un pin o tarjeta solo resalta; el detalle y cobro se abre aparte
+  const [detalleId, setDetalleId] = useState<string | null>(null);
   const [soltando, setSoltando] = useState<PedidoReparto | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,14 +99,15 @@ function SeguimientoRepartosView() {
   useTiempoReal(['reparto:rutas', 'pedido:nuevo', 'pedido:pago'], () => cargarDatos());
 
   const pedidoSeleccionado = useMemo(() => {
-    if (!pedidoSeleccionadoId) return null;
+    const id = vista === 'despacho' ? detalleId : pedidoSeleccionadoId;
+    if (!id) return null;
     return (
-      pedidos.find((p) => p.id === pedidoSeleccionadoId) ||
-      panel?.sin_tomar.find((p) => p.id === pedidoSeleccionadoId) ||
-      panel?.repartidores.flatMap((r) => r.pedidos).find((p) => p.id === pedidoSeleccionadoId) ||
+      pedidos.find((p) => p.id === id) ||
+      panel?.sin_tomar.find((p) => p.id === id) ||
+      panel?.repartidores.flatMap((r) => r.pedidos).find((p) => p.id === id) ||
       null
     );
-  }, [pedidoSeleccionadoId, pedidos, panel]);
+  }, [vista, detalleId, pedidoSeleccionadoId, pedidos, panel]);
 
   const vivos = useMemo(() => pedidos.filter((p) => p.seccion === 'ESPERANDO' || p.seccion === 'EN_CAMINO'), [pedidos]);
 
@@ -132,6 +137,7 @@ function SeguimientoRepartosView() {
 
   const cambiarVista = (v: Vista) => {
     setPedidoSeleccionadoId(null);
+    setDetalleId(null);
     setSearchParams({ vista: v });
   };
 
@@ -153,7 +159,7 @@ function SeguimientoRepartosView() {
         esDisponible={pedidoSeleccionado.estado === 'LISTO' && !pedidoSeleccionado.repartidor_party_id && !pedidoSeleccionado.motivo_falla}
         puedeTomar={puedeTomar}
         alSoltar={puedeSoltar ? setSoltando : undefined}
-        alCerrar={() => setPedidoSeleccionadoId(null)}
+        alCerrar={() => (vista === 'despacho' ? setDetalleId(null) : setPedidoSeleccionadoId(null))}
         alActualizar={cargarDatos}
         acciones={acciones}
       />
@@ -190,7 +196,7 @@ function SeguimientoRepartosView() {
         ))}
       </div>
 
-      <ContadoresDeliveryChips datos={contadores} />
+      {vista !== 'despacho' && <ContadoresDeliveryChips datos={contadores} />}
 
       <div
         role="status"
@@ -209,6 +215,18 @@ function SeguimientoRepartosView() {
         </div>
       ) : error ? (
         <EstadoError mensaje={error} alReintentar={cargarDatos} />
+      ) : vista === 'despacho' ? (
+        <DespachoAdmin
+          pedidos={pedidos}
+          repartidores={panel?.repartidores ?? []}
+          config={config}
+          zonas={zonasGeo}
+          puedeAsignar={puedeSoltar}
+          seleccionadoId={pedidoSeleccionadoId}
+          alSeleccionar={setPedidoSeleccionadoId}
+          alAbrirDetalle={setDetalleId}
+          alActualizar={cargarDatos}
+        />
       ) : vista === 'panel' ? (
         panel ? (
           <PanelRepartidores panel={panel} config={config} alAbrir={setPedidoSeleccionadoId} />
@@ -243,6 +261,7 @@ function SeguimientoRepartosView() {
           alTerminar={() => {
             setSoltando(null);
             setPedidoSeleccionadoId(null);
+            setDetalleId(null);
             cargarDatos();
           }}
         />

@@ -60,16 +60,16 @@ afterEach(() => vi.restoreAllMocks());
 describe('Seguimiento de repartos', () => {
   it('ya no hay selector «Ver como» ni Repartidor 1/2/3; las pestañas son las nuevas', async () => {
     sesion('CAJERO', ['repartos/seguir', 'repartos/liquidar']);
-    montar();
+    montar('panel');
     await screen.findByLabelText('Repartidor Ana Paz');
     expect(screen.queryByText(/Ver como/)).toBeNull();
     expect(screen.queryByText(/Repartidor [123]$/)).toBeNull();
-    for (const t of ['Repartidores', 'Todos los pedidos', 'Mapa', 'Rutas']) expect(screen.getByRole('button', { name: t })).toBeTruthy();
+    for (const t of ['Despacho', 'Repartidores', 'Todos los pedidos', 'Mapa', 'Rutas']) expect(screen.getByRole('button', { name: t })).toBeTruthy();
   });
 
   it('el repartidor libre dice «Libre · Sin pedidos» y el filtro lista repartidores reales', async () => {
     sesion('MOZO', ['repartos/seguir']);
-    montar();
+    montar('panel');
     const libre = await screen.findByLabelText('Repartidor Beto Libre');
     expect(within(libre).getByText('Libre · Sin pedidos')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Repartidor: Todos/ }));
