@@ -298,7 +298,8 @@ export class AvisosPedidoService {
       where: { id: pedidoId },
       select: {
         modalidad: true, total: true, envio: true, entrega_lat: true, entrega_lng: true, zona_id: true,
-        pago_metodo: true, pago_preferido: true,
+        pago_metodo: true, pago_preferido: true, paga_con: true,
+        planPago: { select: { medio: true, monto: true } },
         lineas: { where: { linea_combo_id: null }, orderBy: { id: 'asc' }, select: { nombre: true, cantidad: true } },
       },
     });
@@ -307,7 +308,11 @@ export class AvisosPedidoService {
     const nombresMedio: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'transferencia', EFECTIVO: 'efectivo', TARJETA: 'tarjeta' };
     const delivery = p.modalidad === 'DELIVERY';
     const sinUbicar = delivery && (p.entrega_lat == null || p.entrega_lng == null || p.zona_id == null);
+    // Efectivo a cobrar al recibir: la parte en efectivo del plan, o todo el total si paga solo en efectivo
+    const planEfectivo = (p.planPago ?? []).filter((f) => String(f.medio).toUpperCase() === 'EFECTIVO').reduce((a, f) => a + Number(f.monto), 0);
+    const aPagarEfectivo = planEfectivo > 0 ? planEfectivo : metodo === 'EFECTIVO' && !(p.planPago ?? []).length ? Number(p.total) : 0;
     return {
+      efectivo: aPagarEfectivo > 0 ? { aPagar: aPagarEfectivo, pagaCon: p.paga_con != null ? Number(p.paga_con) : null } : undefined,
       lineas: p.lineas.map((l) => `${l.cantidad} x ${l.nombre}`),
       total: Number(p.total),
       medioPago: nombresMedio[metodo] ?? (metodo ? metodo.toLowerCase() : 'por coordinar'),
