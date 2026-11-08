@@ -1,6 +1,7 @@
 import { descuentosDePedido } from '@caprichos/compartido';
 import { InsigniaCortesia } from './HistorialAuditoria';
 import type { LineaPedido, Pedido } from './pedidosApi';
+import { itemsCaja, type ItemCaja } from './detalleCaja';
 
 const soles = (n: unknown) => `S/ ${Number(n || 0).toFixed(2)}`;
 
@@ -18,12 +19,15 @@ export function puedeCortesiaLinea(pedido: Pedido, it: LineaPedido): boolean {
   );
 }
 
-/** «2× Chocolate, 1× Fresa»; con un solo sabor, solo su nombre. */
-function textoSabores(it: LineaPedido): string {
-  const lista = (it.sabores ?? []).map((s) => ({ nombre: s.nombre || s.sabor_nombre || '', cantidad: s.cantidad })).filter((s) => s.nombre);
-  if (lista.length === 0) return it.sabor ? String(it.sabor) : '';
-  if (lista.length === 1) return lista[0].nombre;
-  return lista.map((s) => `${s.cantidad}× ${s.nombre}`).join(', ');
+/** Tamaño, opciones, sabores, para quién y nota de una línea (texto con colores explícitos, números tabulares). */
+function DetalleItem({ x }: { x: ItemCaja }) {
+  return (
+    <>
+      {x.detalle && <div data-testid="linea-detalle" style={{ fontSize: 15, fontWeight: 600, color: '#2C4C5D', fontVariantNumeric: 'tabular-nums' }}>{x.detalle}</div>}
+      {x.sabores && <div className="dp-linea-sabores" data-testid="linea-sabores" style={{ color: '#0B2C3E', fontVariantNumeric: 'tabular-nums' }}>Sabores: {x.sabores}</div>}
+      {x.nota && <div className="dp-nota" data-testid="linea-nota" style={{ color: '#0B2C3E' }}>Nota: {x.nota}</div>}
+    </>
+  );
 }
 
 export interface CapaProductosProps {
@@ -36,7 +40,9 @@ export interface CapaProductosProps {
 /** Capa 1: cada línea como tarjeta grande y, al lado (PC) o debajo (celular), el resumen con el total. */
 export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPedido }: CapaProductosProps) {
   const estaPagado = String(pedido.pago_estado || '').toUpperCase() === 'PAGADO';
-  const lineas = pedido.lineas ?? [];
+  const todas = pedido.lineas ?? [];
+  const lineas = todas.filter((l) => l.linea_combo_id == null);
+  const items = itemsCaja(todas);
   const descuentos = descuentosDePedido(pedido);
   const extras = pedido.extras ?? [];
   return (
@@ -45,28 +51,23 @@ export function CapaProductos({ pedido, puedeDarCortesia, alCortesia, alAbrirPed
         <h3 className="dp-sec-titulo">Productos ({lineas.length})</h3>
         {lineas.length === 0 && <div style={{ fontSize: 14, color: 'var(--cp-soft, #2C4C5D)' }}>Sin líneas detalladas.</div>}
         {lineas.map((it, idx) => {
-          const opciones = it.opcionesElegidas || it.opciones || [];
-          const sabores = textoSabores(it);
+          const x = items[idx];
           return (
             <div key={it.id ?? idx} className="dp-linea" data-testid="linea-pedido">
               <div className="dp-linea-cant">{it.cantidad}×</div>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div className="dp-linea-nombre">{it.nombre}</div>
-                {(it.tamano || opciones.length > 0 || it.es_cortesia) && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {it.tamano && <span className="dp-opc dp-opc-tam">{it.tamano}</span>}
-                    {opciones.map((o, oi) => (
-                      <span key={oi} className="dp-opc">
-                        + {o.opcion_nombre || o.nombre}
-                      </span>
+                <DetalleItem x={x} />
+                {x.partes.length > 0 && (
+                  <ul data-testid="partes-combo" aria-label="Piezas del combo" style={{ margin: 0, padding: '0 0 0 12px', listStyle: 'none', borderLeft: '3px solid #E3D6C6', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {x.partes.map((p) => (
+                      <li key={p.id} data-testid="parte-combo">
+                        <div style={{ fontWeight: 800, color: '#0B2C3E' }}>→ {p.cantidad}× {p.nombre}</div>
+                        <DetalleItem x={p} />
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
-                {sabores && <div className="dp-linea-sabores">Sabores: {sabores}</div>}
-                {it.nombres_persona && it.nombres_persona.length > 0 && (
-                  <div style={{ fontSize: 14, color: 'var(--cp-soft, #2C4C5D)' }}>Para: {it.nombres_persona.join(', ')}</div>
-                )}
-                {it.nota && <div className="dp-nota">Nota: {it.nota}</div>}
               </div>
               <div className="dp-linea-precio">
                 <span>{soles(it.subtotal)}</span>

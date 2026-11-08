@@ -11,6 +11,7 @@ import { EtiquetaCajaCerrada } from './BannerCajaCerrada';
 import { esCerrado, estadoVisual } from './estadosCaja';
 import type { AccionCaja } from './accionesCaja';
 import { ReimprimirPedido } from './ReimprimirPedido';
+import { itemsCaja, textoDetalle, MAX_PRODUCTOS_TARJETA, type ItemCaja } from './detalleCaja';
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
 
 const hora = (iso: string) =>
@@ -47,6 +48,20 @@ function textoInsignia(o: Pedido): { rotulo: string; detalle: string | null } {
   return { rotulo: ROTULO[clave], detalle: null };
 }
 
+function ProductoTarjeta({ it }: { it: ItemCaja }) {
+  const texto = textoDetalle(it);
+  return (
+    <span className="cj2-prod" data-testid="producto-tarjeta">
+      <span className="cj2-prod-nombre">{it.cantidad}× {it.nombre}</span>
+      {texto && <span className="cj2-prod-det" data-testid="producto-detalle">{texto}</span>}
+      {it.nota && <span className="cj2-prod-nota">Nota: {it.nota}</span>}
+      {it.partes.map((p) => (
+        <span key={p.id} className="cj2-prod-parte" data-testid="producto-parte">→ {p.nombre}{textoDetalle(p) ? ` · ${textoDetalle(p)}` : ''}</span>
+      ))}
+    </span>
+  );
+}
+
 export interface TarjetaPedidoCajaProps {
   pedido: Pedido;
   seleccionado: boolean;
@@ -79,7 +94,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
   const conMesa = !!o.mesa_nombre?.trim() && (clave === 'MESA' || /^en espera/i.test(o.mesa_nombre));
   const nombreCompleto = o.cliente_nombre?.trim() || 'Cliente';
   const lineas = o.lineas || [];
-  const itemsTexto = lineas.map((l) => `${l.cantidad}× ${l.nombre}`);
+  const items = itemsCaja(lineas);
   const esDelivery = clave === 'DELIVERY';
   const sinUbicacion = esDelivery && deliverySinUbicacion(o);
   const lugar = esDelivery ? (sinUbicacion ? 'Falta la ubicación' : o.entrega_direccion || null) : null;
@@ -125,12 +140,12 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
           </span>
         )}
 
-        <span className="cj2-prods" title={itemsTexto.join(', ')}>
-          {itemsTexto.length === 0 && <span>1 producto</span>}
-          {itemsTexto.slice(0, 3).map((t, i) => (
-            <span key={i}>{t}</span>
+        <span className="cj2-prods" data-testid="productos-tarjeta">
+          {items.length === 0 && <span className="cj2-prod-nombre">1 producto</span>}
+          {items.slice(0, MAX_PRODUCTOS_TARJETA).map((it) => (
+            <ProductoTarjeta key={it.id} it={it} />
           ))}
-          {itemsTexto.length > 3 && <span className="cj2-mas">+{itemsTexto.length - 3} más</span>}
+          {items.length > MAX_PRODUCTOS_TARJETA && <span className="cj2-mas">+{items.length - MAX_PRODUCTOS_TARJETA} más · Ver detalle</span>}
         </span>
 
         {(cajaCerradaEspera || o.pedido_origen || o.cobroMozo || o.ubicacion_editada_en || cambioCobroPendiente) && (

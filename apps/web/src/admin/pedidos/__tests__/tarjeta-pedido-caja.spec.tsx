@@ -118,11 +118,11 @@ describe('TarjetaPedidoCaja', () => {
     expect(r.container.querySelector('.cj2-espera')).toHaveAttribute('data-nivel', 'neutro');
   });
 
-  it('muestra hasta 3 productos y «+N más»', () => {
+  it('muestra hasta 4 productos y «+N más»', () => {
     pintar({ lineas: [1, 2, 3, 4, 5].map((n) => ({ cantidad: n, nombre: `Prod ${n}` })) } as unknown as Partial<Pedido>);
-    expect(screen.getByText('3× Prod 3')).toBeInTheDocument();
-    expect(screen.queryByText('4× Prod 4')).not.toBeInTheDocument();
-    expect(screen.getByText('+2 más')).toBeInTheDocument();
+    expect(screen.getByText('4× Prod 4')).toBeInTheDocument();
+    expect(screen.queryByText('5× Prod 5')).not.toBeInTheDocument();
+    expect(screen.getByText('+1 más · Ver detalle')).toBeInTheDocument();
   });
 
   it('conserva los chips: EXTRA de, total con extras y dirección editada', () => {

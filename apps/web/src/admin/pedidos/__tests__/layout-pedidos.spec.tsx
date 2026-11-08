@@ -73,7 +73,7 @@ describe('Detalle del pedido: layout en capas y tarjetas', () => {
     const productos = screen.getByRole('region', { name: 'Productos del pedido' });
     const resumen = screen.getByRole('region', { name: 'Resumen del pedido' });
     expect(within(productos).getByText('Café filtro')).toBeInTheDocument();
-    expect(within(productos).getByText('+ Leche de almendra')).toBeInTheDocument();
+    expect(within(productos).getByText('Leche de almendra', { exact: false })).toBeInTheDocument();
     expect(within(resumen).getByText('Resumen y cobro')).toBeInTheDocument();
     expect(within(resumen).getByText('Subtotal')).toBeInTheDocument();
     expect(within(resumen).getByText('Descuento')).toBeInTheDocument();
