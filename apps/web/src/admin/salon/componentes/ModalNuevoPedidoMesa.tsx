@@ -827,7 +827,7 @@ export function ModalNuevoPedidoMesa({
   const handleClicMesa = (mesa: MesaSalon) => {
     if (modoPlano === 'free') {
       if (mesa.estado === 'OCUPADA') {
-        setMesaParaLiberar(mesa);
+        setAvisoMesa(`${mesa.nombre || `Mesa ${mesa.numero}`} está ocupada. Para liberarla, mantén presionada la mesa en el plano del salón.`);
       }
       return;
     }

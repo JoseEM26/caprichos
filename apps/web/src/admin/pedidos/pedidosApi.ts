@@ -513,7 +513,7 @@ export const pedidosApi = {
   async crearPedidoAdmin(
     dto: {
       modalidad: 'DELIVERY' | 'RECOGER' | 'MESA';
-      cliente: { nombre: string; telefono: string };
+      cliente: { nombre: string; telefono?: string };
       lineas: Array<{
         productoId: string | number;
         tamanoId?: string | number;
