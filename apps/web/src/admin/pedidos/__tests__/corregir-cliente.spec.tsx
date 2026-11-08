@@ -24,7 +24,12 @@ beforeEach(() => {
 });
 
 describe('Corregir datos del cliente ▸ botón', () => {
-  const ver = (p: Pedido) => render(<MemoryRouter><PedidoDetalle pedido={p} alActualizar={() => {}} /></MemoryRouter>);
+  // El botón vive en la capa «Cliente y entrega»
+  const ver = (p: Pedido) => {
+    const r = render(<MemoryRouter><PedidoDetalle pedido={p} alActualizar={() => {}} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('tab', { name: 'Cliente y entrega' }));
+    return r;
+  };
   it('con permiso aparece, también en un pedido entregado y cobrado, y abre el modal', () => {
     ver(pedido());
     fireEvent.click(screen.getByRole('button', { name: 'Corregir datos del cliente' }));

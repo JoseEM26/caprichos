@@ -131,6 +131,8 @@ describe('Pestañas de Pedido visibles en cualquier estado', () => {
         <PedidoDetalle pedido={{ ...pedido, estado } as Pedido} alActualizar={() => {}} />
       </MemoryRouter>,
     );
+    // Imprimir abre ticket, etiquetas y comprobante; las etiquetas se ven en cualquier estado
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir etiquetas y ticket' }));
     expect(screen.getByRole('tab', { name: 'Etiquetas' })).toBeInTheDocument();
   });
 });

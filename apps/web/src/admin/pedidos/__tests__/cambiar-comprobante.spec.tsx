@@ -38,14 +38,14 @@ const pedido = (extra: Partial<Pedido> = {}) =>
     ...extra,
   }) as unknown as Pedido;
 
-/** El comprobante vive en la pestaña Cobro. */
+/** El comprobante vive en la capa «Pago y voucher». */
 const renderizar = (p: Pedido) => {
   const r = render(
     <MemoryRouter>
       <PedidoDetalle pedido={p} alActualizar={vi.fn()} cajaAbierta={true} />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole('tab', { name: 'Cobro' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Pago y voucher' }));
   return r;
 };
 
