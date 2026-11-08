@@ -39,7 +39,7 @@ const duo = (conBandera: boolean): OfertaItem =>
 const abrir = (p: ProductoCarta, o: OfertaItem | null, movil = true) =>
   render(<VentanaProductoCarta producto={p} esBebida={false} onCerrar={() => {}} oferta={o} esMovilPreview={movil} />);
 
-const botonAgregar = () => screen.getByTestId('barra-agregar').querySelector(':scope > button:last-of-type') as HTMLButtonElement;
+const botonAgregar = () => Array.from(screen.getByTestId('barra-agregar').querySelectorAll('button')).at(-1) as HTMLButtonElement;
 
 describe('Dúo en celular', () => {
   it('con la parte de bebidas marcada no hay doble interfaz: solo los pasos «Bebida N» y el botón se habilita al completarlos', () => {
@@ -49,7 +49,7 @@ describe('Dúo en celular', () => {
     expect(botonAgregar().disabled).toBe(true);
     expect(botonAgregar().textContent).toMatch(/Falta elegir: Bebida 1 · Bebida 2/);
     fireEvent.click(screen.getAllByRole('button', { name: /ICED COFFE/ })[0]);
-    fireEvent.click(screen.getAllByRole('button', { name: /CAPUCCINO/ })[1]);
+    fireEvent.click(screen.getAllByRole('button', { name: /CAPUCCINO/ })[0]);
     expect(botonAgregar().disabled).toBe(false);
     fireEvent.click(botonAgregar());
     expect(agregarLinea).toHaveBeenCalledTimes(1);

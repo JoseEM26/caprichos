@@ -17,6 +17,8 @@ export interface OpcionDetalleCombo {
   sinStock?: boolean;
   /** Foto del producto (bebidas por categorías). */
   fotoUrl?: string;
+  /** Categoría del producto (si el servidor la envía): habilita los chips de categoría en las bebidas del combo. */
+  categoria?: string;
   sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
 }
 
