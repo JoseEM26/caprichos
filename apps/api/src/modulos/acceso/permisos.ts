@@ -157,6 +157,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'creditos', accion: 'exportar' },
   // Saldar consumos del personal (pagar en Caja o marcar descontado por planilla)
   { modulo: 'creditos', accion: 'saldar' },
+  // Cobrarle al trabajador en el momento (Nuevo pedido del personal, «Pagar ahora»): ADMIN, CAJERO y MOZO; queda quién cobró
+  { modulo: 'creditos', accion: 'cobrar_ahora' },
   // Iniciativas del equipo (FT-INI-01)
   { modulo: 'iniciativas', accion: 'ver' },
   { modulo: 'iniciativas', accion: 'crear' },
@@ -240,6 +242,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/extra',
     'cortesias/dar',
     'cortesias/ver',
+    'creditos/cobrar_ahora',
     'caja/abrir',
     'caja/cobrar',
     'caja/movimientos',
@@ -305,6 +308,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
     'pedidos/extra', // agrega un extra a cualquier pedido vigente, con su propio pago y comprobante
     'cortesias/dar', // libre: cualquier pedido sin cobrar; queda auditada con quién y por qué (decisión del dueño)
+    'creditos/cobrar_ahora', // cobra al trabajador en el momento (pedido del personal); queda quién cobró
     'plano/ver',
     'mesas/ver',
     'mesas/abrir',
@@ -392,8 +396,8 @@ for (const rol of ['CAJERO', 'COCINA', 'MOZO', 'ALMACEN', 'REPARTIDOR']) {
 MATRIZ.SUPERVISOR = [
   ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'iniciativas/cambiar_estado']),
 ].filter(
-  // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni hace el conteo de apertura
+  // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni cobra al personal al instante, ni hace el conteo de apertura
   // Tampoco anula pedidos: solo CAJERO y ADMIN (decisión del dueño, a confirmar)
-  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'pedidos/anular',
+  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'pedidos/anular' && p !== 'creditos/cobrar_ahora',
 );
 

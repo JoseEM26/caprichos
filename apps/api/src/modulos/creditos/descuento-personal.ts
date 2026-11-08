@@ -1,4 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { MATRIZ } from '../acceso/permisos';
+import { rolesDelUsuario } from '../acceso/roles-usuario';
 import { montoElegiblePuntos } from '../ofertas/puntos-elegibles.util';
 
 /** Líneas que por su nombre ya son un paquete o promoción (regla vigente de registrarConsumo). */
@@ -141,4 +143,9 @@ export function fechaLima(d: Date = new Date()): { y: number; m: number; d: numb
 export function fechaDiaLima(ahora: Date = new Date()): Date {
   const h = fechaLima(ahora);
   return new Date(Date.UTC(h.y, h.m, h.d));
+}
+
+/** Quién puede cobrarle al trabajador en el momento (creditos/cobrar_ahora): ADMIN, CAJERO y MOZO. */
+export function puedeCobrarAhoraPersonal(usuario: { rol: string; roles?: string[] } | undefined): boolean {
+  return rolesDelUsuario(usuario).some((r) => (MATRIZ[r] ?? []).includes('creditos/cobrar_ahora'));
 }

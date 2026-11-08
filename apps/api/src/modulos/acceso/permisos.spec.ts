@@ -172,3 +172,15 @@ describe('pedidos/corregir_cliente (Corregir datos del cliente)', () => {
     for (const r of ['COCINA', 'ALMACEN', 'REPARTIDOR']) expect(MATRIZ[r]).not.toContain('pedidos/corregir_cliente');
   });
 });
+
+describe('creditos/cobrar_ahora: cobrar al trabajador en el momento', () => {
+  it('lo tienen ADMIN, CAJERO y MOZO; creditos/saldar y creditos/ver siguen solo del ADMIN', () => {
+    for (const [rol, claves] of Object.entries(MATRIZ)) {
+      expect(claves.includes('creditos/cobrar_ahora')).toBe(['ADMIN', 'CAJERO', 'MOZO'].includes(rol));
+      if (rol !== 'ADMIN') {
+        expect(claves).not.toContain('creditos/saldar');
+        expect(claves).not.toContain('creditos/ver');
+      }
+    }
+  });
+});

@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class SaldarConsumosDto {
   @IsOptional()
@@ -36,4 +36,16 @@ export class MarcarPlanillaDto {
   @IsString()
   @IsNotEmpty({ message: 'El motivo es obligatorio' })
   motivo!: string;
+}
+
+export class MarcarCobradoDto {
+  @IsNotEmpty()
+  consumoId!: string | number;
+
+  @IsBoolean()
+  cobrado!: boolean;
+
+  @IsOptional()
+  @IsString()
+  motivo?: string;
 }

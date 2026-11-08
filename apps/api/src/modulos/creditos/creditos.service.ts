@@ -396,6 +396,8 @@ export class CreditosService {
       }),
     ]);
 
+    const nombresCobradores = await this.nombresDeCobradores(consumosEnRango);
+
     // Agrupar consumos por partyId
     const consumosPorParty = new Map<string, any[]>();
     for (const c of consumosEnRango) {
@@ -446,9 +448,7 @@ export class CreditosService {
           montoFormateado: `s/ ${Number(item.monto).toFixed(2)}`,
           lineas: lineasTexto,
           descuento: descuentoPersonalDe(item.pedido),
-          estadoPago: item.pagado_en ? 'PAGADO' : 'PENDIENTE',
-          pagadoEn: item.pagado_en ? item.pagado_en.toISOString() : null,
-          pagoModo: item.pago_modo ?? null,
+          ...this.datosCobro(item, nombresCobradores),
         };
       });
 
@@ -494,7 +494,29 @@ export class CreditosService {
     };
   }
 
-  private formatoConsumo(c: any) {
+  /** Nombres de quienes cobraron (pagado_por) para mostrar «cobró: X» sin una consulta por consumo. */
+  private async nombresDeCobradores(consumos: any[]): Promise<Map<string, string>> {
+    const ids = Array.from(new Set(consumos.map((c) => c.pagado_por).filter((x) => x != null).map((x) => x.toString()))).map((x) => BigInt(x));
+    const mapa = new Map<string, string>();
+    if (ids.length === 0) return mapa;
+    const personas = await this.prisma.person.findMany({ where: { party_id: { in: ids } } }).catch(() => []);
+    for (const p of personas) mapa.set(p.party_id.toString(), `${p.nombres || ''} ${p.apellidos || ''}`.trim());
+    return mapa;
+  }
+
+  /** Campos del check «Cobrado / Pendiente» de un consumo (los mismos en el resumen y en la cuenta). */
+  private datosCobro(c: any, nombres: Map<string, string>) {
+    return {
+      estadoPago: c.pagado_en ? 'PAGADO' : 'PENDIENTE',
+      pagadoEn: c.pagado_en ? c.pagado_en.toISOString() : null,
+      pagoModo: c.pago_modo ?? null,
+      pagoMedio: c.pago_medio ?? null,
+      pagoDetalle: c.pago_motivo ?? null,
+      cobradoPor: c.pagado_por != null ? (nombres.get(c.pagado_por.toString()) ?? `Usuario ${c.pagado_por}`) : null,
+    };
+  }
+
+  private formatoConsumo(c: any, nombres: Map<string, string> = new Map()) {
     const lineas = lineasDeCuenta<any>(c.pedido?.lineas ?? []).map((l) => `${l.cantidad} × ${l.nombre}${l.tamano ? ` (${l.tamano})` : ''}`);
     return {
       id: c.id.toString(),
@@ -505,9 +527,7 @@ export class CreditosService {
       monto: Number(c.monto),
       lineas,
       descuento: descuentoPersonalDe(c.pedido),
-      estadoPago: c.pagado_en ? 'PAGADO' : 'PENDIENTE',
-      pagadoEn: c.pagado_en ? c.pagado_en.toISOString() : null,
-      pagoModo: c.pago_modo ?? null,
+      ...this.datosCobro(c, nombres),
     };
   }
 
@@ -529,6 +549,7 @@ export class CreditosService {
       include: { pedido: { include: { lineas: true } } },
       orderBy: { fecha: 'desc' },
     });
+    const nombresCobradores = await this.nombresDeCobradores(consumos);
     const suma = (lista: any[]) => Number(lista.reduce((a, c) => a + Number(c.monto), 0).toFixed(2));
     const en = (r: RangoFechas) => consumos.filter((c) => c.fecha >= r.inicio && c.fecha <= r.fin);
     const pend = (lista: any[]) => lista.filter((c) => !c.pagado_en);
@@ -540,7 +561,7 @@ export class CreditosService {
       mes: { etiqueta: mes.etiqueta, total: suma(enMes), debe: suma(pend(enMes)) },
       debeTotal: suma(pend(consumos)),
       resumen: `Debe esta semana: S/ ${suma(pend(enSemana)).toFixed(2)} · Este mes: S/ ${suma(pend(enMes)).toFixed(2)}`,
-      consumos: consumos.map((c) => this.formatoConsumo(c)),
+      consumos: consumos.map((c) => this.formatoConsumo(c, nombresCobradores)),
     };
   }
 
@@ -642,6 +663,49 @@ export class CreditosService {
       }
     }
     return { ok: true, total, cantidad: ids.length, medio, movimientoCajaId: movimientoId?.toString() ?? null };
+  }
+
+  /**
+   * Marcar / desmarcar a mano un consumo como «Ya se le descontó» (solo ADMIN). Marcar no mueve caja. Desmarcar lo devuelve
+   * a Pendiente, salvo un cobro en efectivo ya registrado en caja (ese se corrige con un movimiento de caja). Todo auditado.
+   */
+  async marcarCobrado(dto: { consumoId: string | number; cobrado: boolean; motivo?: string }, usuario: UsuarioAutenticado, ip?: string) {
+    const id = this.parsearId(dto.consumoId);
+    const c = await this.prisma.consumoPersonal.findUnique({ where: { id }, include: { pedido: true } });
+    if (!c) throw new NotFoundException({ codigo: 'CONSUMO_NO_ENCONTRADO', mensaje: 'El consumo no existe' });
+    const por = BigInt(usuario.partyId);
+    if (dto.cobrado) {
+      if (c.pagado_en) throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Ese consumo ya estaba cobrado' });
+      const r = await this.prisma.consumoPersonal.updateMany({
+        where: { id, pagado_en: null },
+        data: { pagado_en: new Date(), pagado_por: por, pago_modo: 'PLANILLA', pago_medio: 'PLANILLA', pago_motivo: dto.motivo?.trim() || 'Ya se le descontó (marcado a mano)' },
+      });
+      if (r.count !== 1) throw new ConflictException({ codigo: 'YA_PAGADO', mensaje: 'Ese consumo ya estaba cobrado' });
+    } else {
+      if (!c.pagado_en) throw new ConflictException({ codigo: 'YA_PENDIENTE', mensaje: 'Ese consumo ya está pendiente' });
+      if (c.movimiento_caja_id != null) {
+        throw new ConflictException({
+          codigo: 'COBRO_EN_CAJA',
+          mensaje: 'Ese cobro entró a la caja en efectivo; no se desmarca desde aquí (corrígelo con un movimiento de caja)',
+        });
+      }
+      await this.prisma.consumoPersonal.update({
+        where: { id },
+        data: { pagado_en: null, pagado_por: null, pago_modo: null, pago_medio: null, pago_motivo: null, movimiento_caja_id: null },
+      });
+    }
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'creditos',
+      accion: dto.cobrado ? 'MARCAR_COBRADO' : 'DESMARCAR_COBRADO',
+      resultado: 'OK',
+      entidad: 'consumo_personal',
+      entidadId: id,
+      partyId: por,
+      despues: { consumo: id.toString(), pedido: c.pedido?.codigo ?? null, monto: Number(c.monto), cobrado: dto.cobrado },
+      ip,
+    });
+    return { ok: true, cobrado: dto.cobrado };
   }
 
   /**

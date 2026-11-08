@@ -16,6 +16,22 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+/** Pedido del personal: a su crédito (por defecto) o «Pagar ahora» con medio y, en efectivo, con cuánto paga. */
+export class PagoPersonalDto {
+  @IsIn(['CREDITO', 'AHORA'])
+  modo!: 'CREDITO' | 'AHORA';
+
+  @IsOptional()
+  @IsString()
+  medio?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  pagaCon?: number;
+}
+
 export class ClienteDto {
   @IsString({ message: 'El nombre del cliente debe ser un texto' })
   @IsNotEmpty({ message: 'El nombre del cliente es requerido' })
@@ -226,6 +242,11 @@ export class CrearPedidoDto {
   @IsOptional()
   @IsBoolean()
   esPersonal?: boolean;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PagoPersonalDto)
+  pagoPersonal?: PagoPersonalDto;
 
   @IsOptional()
   colaboradorPartyId?: number | string;

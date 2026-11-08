@@ -14,7 +14,7 @@ import { Permiso } from '../acceso/permiso.decorator';
 import { CreditosService } from './creditos.service';
 import { FiltrarCreditosDto } from './dto/filtrar-creditos.dto';
 import { RegistrarConsumoDto } from './dto/registrar-consumo.dto';
-import { MarcarPlanillaDto, SaldarConsumosDto } from './dto/saldar-consumos.dto';
+import { MarcarCobradoDto, MarcarPlanillaDto, SaldarConsumosDto } from './dto/saldar-consumos.dto';
 
 @Controller('admin/creditos')
 @UseGuards(AccesoGuard)
@@ -62,6 +62,12 @@ export class CreditosController {
   @Permiso('creditos', 'saldar')
   async saldar(@Body() dto: SaldarConsumosDto, @Req() req: any) {
     return this.creditosService.saldar(dto, req.usuario, req.ip || req.headers?.['x-forwarded-for']);
+  }
+
+  @Post('marcar-cobrado')
+  @Permiso('creditos', 'saldar')
+  async marcarCobrado(@Body() dto: MarcarCobradoDto, @Req() req: any) {
+    return this.creditosService.marcarCobrado(dto, req.usuario, req.ip || req.headers?.['x-forwarded-for']);
   }
 
   @Post('planilla')

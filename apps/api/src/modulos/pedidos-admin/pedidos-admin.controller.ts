@@ -1,5 +1,6 @@
 import { esSoloMozo } from '../acceso/roles-usuario';
 import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
+import { puedeCobrarAhoraPersonal } from '../creditos/descuento-personal';
 import {
   Body,
   Controller,
@@ -66,6 +67,8 @@ export class PedidosAdminController {
       usuarioPartyId: req.usuario?.partyId,
       clientePartyId: dto.colaboradorPartyId,
       esPersonal: dto.esPersonal,
+      pagoPersonal: dto.pagoPersonal,
+      puedeCobrarAhora: puedeCobrarAhoraPersonal(req.usuario),
       omitirChequeoCarta: true,
       puedeCortesia: puedeDarCortesia(req.usuario),
     });
