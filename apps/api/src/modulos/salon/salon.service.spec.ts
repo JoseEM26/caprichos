@@ -830,6 +830,18 @@ describe('SalonService', () => {
         mozoPartyId: '88',
       });
     });
+
+    it('deja un aviso en la campana del mozo: «Mesa N lista para llevar»', async () => {
+      prismaMock.notificacion = { create: jest.fn().mockResolvedValue({ id: 5n }) };
+      prismaMock.pedido.findUnique.mockResolvedValue({
+        id: 401n, codigo: 'CP-W016', modalidad: 'MESA', party_id: 88n,
+        mesas: [{ mesa_id: 1n, mesa: { numero: 4 } }], historial: [],
+      });
+      await service.avisarListo(401);
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'MESA_LISTA', party_destino: 88n, titulo: 'Mesa 4 lista para llevar' }),
+      });
+    });
   });
 
   describe('Nombre corto del cliente en la mesa (clienteNombre)', () => {

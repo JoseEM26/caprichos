@@ -181,6 +181,8 @@ export const CLAVES_TEXTO = [
   'whatsapp_aviso_puntos_ganados_activo',
   'whatsapp_aviso_cuenta_activo',
   'cocina_confirmar_despejar',
+  // Despacho parcial: si avisa (mozo o cliente) al despachar solo lo ya listo; por defecto No
+  'despacho_parcial_avisa',
   // Orden de salida de la cola de impresión: TICKETS_PRIMERO (por defecto) | ORDEN_LLEGADA
   'impresion_prioridad',
   // Minutos de preparación por defecto (enteros 1–120) para productos sin datos de los últimos 30 días
@@ -336,6 +338,7 @@ export class ConfiguracionService {
         clave === 'reserva_web_activa' ||
         clave === 'chatbot_avisos_equipo_activo' ||
         clave === 'cocina_confirmar_despejar' ||
+        clave === 'despacho_parcial_avisa' ||
         clave === 'notif_sonido_activo' ||
         clave === 'notif_marcar_todas_activo' ||
         clave === 'whatsapp_plantilla_recibido_seguimiento_activa' ||

@@ -80,6 +80,16 @@ describe('CocinaController', () => {
     controller = module.get<CocinaController>(CocinaController);
   });
 
+  it('POST despacho/:pedidoId/completo exige cocina/despachar y delega con parcial', async () => {
+    comandasService.despacharCompleto = jest.fn().mockResolvedValue({ ok: true });
+    expect(Reflect.getMetadata('permiso', CocinaController.prototype.despacharCompleto)).toEqual({ modulo: 'cocina', accion: 'despachar' });
+    const req = { usuario: { partyId: 1n } };
+    await controller.despacharCompleto('10', { parcial: true }, req);
+    expect(comandasService.despacharCompleto).toHaveBeenCalledWith('10', true, req.usuario, undefined);
+    await controller.despacharCompleto('10', {}, req);
+    expect(comandasService.despacharCompleto).toHaveBeenLastCalledWith('10', false, req.usuario, undefined);
+  });
+
   it('debe estar definido', () => {
     expect(controller).toBeDefined();
   });

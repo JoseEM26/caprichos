@@ -8,11 +8,14 @@ import { ComandasService, lineasDeArea } from './comandas.service';
 import { obtenerInicioDiaLima } from './cocina.util';
 
 const FUERA = ['ANULADO', 'RECHAZADO'];
+/** Pedidos que esperan a Despacho: cocina ya los tiene en curso y aún no pasan a LISTO. */
+const EN_DESPACHO = ['COLA', 'PREPARANDO'];
 
 /**
- * Pantalla «Despacho» de Cocina: pedidos vigentes del día COMPLETOS (todas las áreas juntas)
- * para que el despachador junte lo de cada área y entregue el pedido entero.
- * «Atendido» es una marca propia (no cambia el estado del pedido): pedido.atendido_despacho_en/_por.
+ * Pantalla «Despacho» de Cocina: el LISTO final. Lista los pedidos del día que esperan a Despacho
+ * (estado COLA/PREPARANDO, cada área con su semáforo); `despachados=true` suma los que ya pasaron a LISTO
+ * o salieron. «Despachado» = el pedido ya no está en COLA/PREPARANDO (lo confirma comandasService.despacharCompleto).
+ * La marca vieja «atendido» (atendido_despacho_*) sigue en el API por compatibilidad y ya no la usa la pantalla.
  */
 @Injectable()
 export class DespachoService {
@@ -30,10 +33,9 @@ export class DespachoService {
     const pedidos = await this.prisma.pedido.findMany({
       where: {
         creado_en: { gte: obtenerInicioDiaLima(ahora) },
-        estado: { notIn: FUERA },
+        estado: incluirAtendidos ? { notIn: FUERA } : { in: EN_DESPACHO },
         comandas: { some: {} },
         NOT: { ...DELIVERY_SIN_UBICACION_WHERE, OR: [...DELIVERY_SIN_UBICACION_WHERE.OR] },
-        ...(incluirAtendidos ? {} : { atendido_despacho_en: null }),
       },
       include: {
         comandas: { include: { area: true } },
@@ -66,6 +68,8 @@ export class DespachoService {
           listo: c.estado === 'DESPEJADA',
           lineas: lineasDeArea(p.lineas, c.area_id),
         }))
+        // «despachada»: lo de esa área ya salió en un despacho parcial (todas sus líneas despachadas)
+        .map((a) => ({ ...a, despachada: a.lineas.length > 0 && a.lineas.every((l) => l.despachadas >= l.cantidad) }))
         .filter((a) => a.lineas.length > 0)
         .sort((x, y) => Number(BigInt(x.areaId) - BigInt(y.areaId)));
       const mesa = (p as any).mesa ?? (p.modalidad === 'MESA' ? ((p as any).mesa_numero ?? p.entrega_referencia ?? null) : null);
@@ -86,8 +90,12 @@ export class DespachoService {
         areas,
         // Completo = todas sus áreas listas
         completo: areas.length > 0 && areas.every((a) => a.listo),
-        atendido: p.atendido_despacho_en !== null,
-        atendido_en: p.atendido_despacho_en,
+        estado: p.estado,
+        despachado: !EN_DESPACHO.includes(p.estado),
+        despachado_en: EN_DESPACHO.includes(p.estado) ? null : (p.listo_en ?? null),
+        // compat con la pantalla anterior: «atendido» = ya despachado
+        atendido: !EN_DESPACHO.includes(p.estado),
+        atendido_en: EN_DESPACHO.includes(p.estado) ? null : (p.listo_en ?? null),
         atendido_por: p.atendido_despacho_por ? (nombreDe.get(p.atendido_despacho_por.toString()) ?? null) : null,
       };
     });

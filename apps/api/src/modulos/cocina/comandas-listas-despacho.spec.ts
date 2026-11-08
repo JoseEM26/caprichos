@@ -108,7 +108,7 @@ describe('ComandasService: listo por producto y despacho', () => {
       await expect(service.marcarListas(10n, 1, usuario)).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it('completar todas las líneas del área la despeja; el pedido pasa a LISTO si era COLA', async () => {
+    it('completar todas las líneas del área la despeja; el pedido sigue en COLA esperando a Despacho', async () => {
       prisma.pedidoLinea.findUnique.mockResolvedValue(lineaBd(1, 0));
       prisma.pedido.findUnique.mockResolvedValue({ id: 1n, codigo: 'A-1', estado: 'COLA', pasa_cocina_en: null });
       prisma.comandaArea.findUnique.mockResolvedValue({ estado: 'EN_COCINA' });
@@ -123,9 +123,7 @@ describe('ComandasService: listo por producto y despacho', () => {
       const res = await service.marcarListas(10n, 1, usuario);
 
       expect(res.despejada).toBe(true);
-      expect(prisma.pedido.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ estado: 'LISTO' }) }),
-      );
+      expect(prisma.pedido.update).not.toHaveBeenCalled();
     });
 
     describe('deshacer un despeje (15 s, mismo usuario)', () => {
@@ -322,5 +320,114 @@ describe('ComandasService: listo por producto y despacho', () => {
     for (const rol of ['COCINA', 'MOZO', 'SUPERVISOR', 'ADMIN']) {
       expect(MATRIZ[rol]).toContain('cocina/despachar');
     }
+  });
+});
+
+describe('ComandasService: Despacho es el LISTO final (despacharCompleto)', () => {
+  let service: ComandasService;
+  let prisma: any;
+  let eventos: any;
+  let salon: any;
+  let avisos: any;
+
+  const comanda = (area: bigint, estado: string, nombre = 'Área') => ({ area_id: area, estado, area: { nombre } });
+  const pedido = (extra: any = {}) => ({
+    id: 1n,
+    codigo: 'CP-1',
+    estado: 'PREPARANDO',
+    modalidad: 'MESA',
+    pasa_cocina_en: null,
+    comandas: [comanda(5n, 'DESPEJADA', 'Bebidas'), comanda(6n, 'DESPEJADA', 'Salados')],
+    lineas: [linea(10n, 2, 2, 0, 5n), linea(11n, 1, 1, 0, 6n)],
+    ...extra,
+  });
+
+  beforeEach(() => {
+    prisma = {
+      $transaction: jest.fn(async (fn: any) => fn(prisma)),
+      parametro: { findUnique: jest.fn().mockResolvedValue(null) },
+      pedido: { findUnique: jest.fn(), update: jest.fn() },
+      pedidoLinea: { update: jest.fn() },
+      pedidoEstadoHistorial: { create: jest.fn() },
+    };
+    eventos = { emitirAdmin: jest.fn() };
+    salon = { avisarListo: jest.fn() };
+    avisos = { avisar: jest.fn().mockResolvedValue({ estado: 'ENCOLADO' }), despertar: jest.fn() };
+    service = new ComandasService(prisma, { registrar: jest.fn() } as any, eventos, undefined, salon, avisos);
+  });
+
+  it('completo: pasa a LISTO, deja todo despachado y avisa al mozo (mesa)', async () => {
+    prisma.pedido.findUnique.mockResolvedValue(pedido());
+    const r = await service.despacharCompleto(1n, false, usuario);
+    expect(r).toMatchObject({ completo: true, estado: 'LISTO' });
+    expect(prisma.pedido.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ estado: 'LISTO' }) }));
+    expect(prisma.pedidoLinea.update).toHaveBeenCalledTimes(2);
+    expect(salon.avisarListo).toHaveBeenCalledWith(1n);
+    expect(avisos.avisar).not.toHaveBeenCalled();
+    expect(eventos.emitirAdmin).toHaveBeenCalledWith('pedido:estado', expect.objectContaining({ estado: 'LISTO' }));
+  });
+
+  it('delivery: queda LISTO (listo para salir) con el aviso de listo y sin aviso al mozo', async () => {
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ modalidad: 'DELIVERY', entrega_lat: -12, entrega_lng: -77, zona_id: 1n }));
+    await service.despacharCompleto(1n, false, usuario);
+    expect(avisos.avisar).toHaveBeenCalledWith(1n, 'LISTO', {}, expect.anything());
+    expect(salon.avisarListo).not.toHaveBeenCalled();
+  });
+
+  it.each(['RECOGER', 'LLEVAR'])('%s: avisa al cliente que ya puede recoger', async (modalidad) => {
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ modalidad }));
+    await service.despacharCompleto(1n, false, usuario);
+    expect(avisos.avisar).toHaveBeenCalledWith(1n, 'LISTO_RECOJO', {}, expect.anything());
+    expect(salon.avisarListo).not.toHaveBeenCalled();
+  });
+
+  it('sin parcial y con un área pendiente: 409 y no cambia nada', async () => {
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ comandas: [comanda(5n, 'DESPEJADA', 'Bebidas'), comanda(6n, 'EN_COCINA', 'Salados')] }));
+    await expect(service.despacharCompleto(1n, false, usuario)).rejects.toThrow(ConflictException);
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
+    expect(salon.avisarListo).not.toHaveBeenCalled();
+  });
+
+  it('parcial: despacha solo lo listo, el pedido sigue En despacho y NO avisa (parámetro apagado)', async () => {
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ comandas: [comanda(5n, 'DESPEJADA', 'Bebidas'), comanda(6n, 'EN_COCINA', 'Salados')] }));
+    const r = await service.despacharCompleto(1n, true, usuario);
+    expect(r).toMatchObject({ completo: false, parcial: true, estado: 'PREPARANDO', avisado: false });
+    expect(prisma.pedidoLinea.update).toHaveBeenCalledTimes(1);
+    expect(prisma.pedidoLinea.update.mock.calls[0][0].where).toEqual({ id: 10n });
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
+    expect(salon.avisarListo).not.toHaveBeenCalled();
+  });
+
+  it('parcial con despacho_parcial_avisa en «si»: avisa al mozo pero el pedido no pasa a LISTO', async () => {
+    prisma.parametro.findUnique.mockResolvedValue({ valor: 'si' });
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ comandas: [comanda(5n, 'DESPEJADA'), comanda(6n, 'EN_COCINA')] }));
+    const r = await service.despacharCompleto(1n, true, usuario);
+    expect(r).toMatchObject({ avisado: true, estado: 'PREPARANDO' });
+    expect(salon.avisarListo).toHaveBeenCalled();
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
+  });
+
+  it('sin ninguna área lista no hay nada que despachar (ni parcial)', async () => {
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ comandas: [comanda(5n, 'EN_COCINA'), comanda(6n, 'EN_COCINA')] }));
+    await expect(service.despacharCompleto(1n, true, usuario)).rejects.toThrow(ConflictException);
+  });
+
+  it('pedido antiguo ya LISTO o ENTREGADO: respuesta idempotente, sin avisos ni cambios', async () => {
+    for (const estado of ['LISTO', 'ENTREGADO']) {
+      prisma.pedido.findUnique.mockResolvedValue(pedido({ estado }));
+      const r = await service.despacharCompleto(1n, false, usuario);
+      expect(r).toMatchObject({ yaDespachado: true, estado });
+    }
+    expect(prisma.pedido.update).not.toHaveBeenCalled();
+    expect(avisos.avisar).not.toHaveBeenCalled();
+  });
+
+  it('pedido anulado: 409', async () => {
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ estado: 'ANULADO' }));
+    await expect(service.despacharCompleto(1n, false, usuario)).rejects.toThrow(ConflictException);
+  });
+
+  it('el rol de cocina tiene el permiso cocina/despachar', () => {
+    expect(JSON.stringify(MATRIZ)).toContain('cocina/despachar');
   });
 });

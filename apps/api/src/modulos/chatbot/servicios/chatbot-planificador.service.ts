@@ -306,6 +306,8 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
             estado: 'LISTO',
             listo_en: { gte: new Date(ahora.getTime() - VENTANA_REVISION_MS) },
             cliente_telefono: { not: null },
+            // Despacho ya lo avisó (etapa LISTO_RECOJO, numero 7)
+            mensajesReparto: { none: { numero: 7 } },
           },
           select: { id: true, codigo: true, cliente_nombre: true, cliente_telefono: true },
         });

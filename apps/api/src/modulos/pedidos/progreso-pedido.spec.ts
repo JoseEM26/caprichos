@@ -110,8 +110,13 @@ describe('progresoDelPedido', () => {
     expect(con).toMatchObject({ etapa: 'LISTO', etiqueta: 'Listo, esperando salida del repartidor' });
   });
 
-  it('todas las áreas despejadas aunque el pedido aún diga COLA: queda listo según la modalidad', () => {
+  it('todas las áreas despejadas pero sin despachar: sigue en cocina al 100 % (Despacho lo pasa a LISTO)', () => {
     const res = progresoDelPedido(pedido({ modalidad: 'RECOGER', bebidas: 'DESPEJADA', salados: 'DESPEJADA' }));
+    expect(res).toMatchObject({ etapa: 'EN_COCINA', porcentaje: 100, listasDe: 2, totalAreas: 2 });
+  });
+
+  it('despachado (LISTO): recojo espera al cliente', () => {
+    const res = progresoDelPedido(pedido({ modalidad: 'RECOGER', estado: 'LISTO', bebidas: 'DESPEJADA', salados: 'DESPEJADA' }));
     expect(res).toMatchObject({ etapa: 'ESPERANDO_CLIENTE', porcentaje: 100 });
   });
 

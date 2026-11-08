@@ -1109,6 +1109,21 @@ export class SalonService {
       mesas,
       mozoPartyId,
     });
+
+    // Campana del mozo que tomó el pedido (o de todos los mozos si no se sabe quién): «Mesa N lista para llevar»
+    try {
+      const notif = await this.prisma.notificacion.create({
+        data: {
+          tipo: 'MESA_LISTA',
+          ...(mozoPartyId ? { party_destino: BigInt(mozoPartyId) } : { rol_destino: 'MOZO' }),
+          titulo: `${mesas.length > 1 ? 'Mesas' : 'Mesa'} ${mesas.join(', ')} lista para llevar`,
+          mensaje: `El pedido ${pedido.codigo} ya fue despachado desde cocina: llévalo a la mesa.`,
+        },
+      });
+      this.eventosGateway.emitirAdmin('notificaciones:nueva', { id: notif.id.toString(), titulo: 'Mesa lista para llevar' });
+    } catch {
+      // la campana es informativa: el aviso en pantalla ya salió
+    }
   }
 }
 

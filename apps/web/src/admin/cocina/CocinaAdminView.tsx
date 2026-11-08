@@ -1104,7 +1104,7 @@ export function CocinaAdminView() {
         </div>
       )}
 
-      {modo === 'despacho' && puedeVerDespacho && <DespachoView />}
+      {modo === 'despacho' && puedeVerDespacho && <DespachoView puedeDespachar={puedeDespachar} puedeDevolver={tiene('cocina/devolver')} />}
 
       {modo === 'hist' && (
         <HistorialView

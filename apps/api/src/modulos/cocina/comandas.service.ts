@@ -9,6 +9,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -28,6 +29,8 @@ import { asignarNumeroDia } from './numero-dia';
 export interface DescuentoPedidoHook {
   descontarPedido(pedidoId: bigint | string | number): Promise<any> | any;
 }
+
+const esAfirmativo = (v: unknown) => v === true || ['si', 'sí', 'true', '1'].includes(String(v).toLowerCase());
 
 /** Área de cocina de una línea: la propia del producto, o la de su categoría. */
 function areaDeLineaPedido(l: { area_id: bigint | null; producto?: { categoria?: { area_id: bigint | null } | null } | null }): bigint | null {
@@ -599,63 +602,8 @@ export class ComandasService {
       todasComandas.length > 0 &&
       todasComandas.every((c) => (c.area_id === aId ? true : c.estado === 'DESPEJADA'));
 
-    // Idempotente: si Caja ya pasó el pedido a LISTO o ENTREGADO, no se regresa ni se repite historial/avisos
-    if (completo && ESTADOS_PARA_LISTO.includes(pedido.estado)) {
-      // Transición del pedido a LISTO (con historial, auditoría y evento socket)
-      await this.prisma.$transaction(async (tx) => {
-        await tx.pedido.update({
-          where: { id: pId },
-          data: {
-            estado: 'LISTO',
-            listo_en: ahora,
-            pasa_cocina_en: pedido.pasa_cocina_en ?? ahora,
-          },
-        });
-        await tx.pedidoEstadoHistorial.create({
-          data: {
-            pedido_id: pId,
-            estado_anterior: pedido.estado,
-            estado_nuevo: 'LISTO',
-            motivo: 'Todas las áreas de cocina despejadas',
-            por_party_id: usuarioActual.partyId,
-            en: ahora,
-          },
-        });
-        // el cliente delivery recibe el aviso de que su pedido está listo (idempotente, misma transacción)
-        await this.avisos?.avisar(pId, 'LISTO', {}, tx);
-      });
-      this.avisos?.despertar();
-
-      await this.auditoria.registrar({
-        categoria: 'CAMBIO',
-        modulo: 'pedidos',
-        accion: 'CAMBIAR_ESTADO',
-        resultado: 'OK',
-        entidad: 'pedido',
-        entidadId: pId,
-        antes: { estado: pedido.estado },
-        despues: { estado: 'LISTO', motivo: 'Todas las áreas despejadas' },
-        motivo: 'Todas las áreas despejadas',
-        partyId: usuarioActual.partyId,
-        ip,
-      });
-
-      this.eventosGateway?.emitirAdmin('pedido:estado', {
-        id: Number(pedido.id),
-        codigo: pedido.codigo,
-        estado: 'LISTO',
-      });
-
-
-      // el mozo que tomó el pedido de mesa recibe el aviso de que está listo (RQ-SAL-02-10)
-      if (pedido.modalidad === 'MESA') {
-        try {
-          await this.salonService?.avisarListo(pedido.id);
-        } catch {
-          // el aviso es informativo
-        }
-      }
-    }
+    // Con todas las áreas despejadas el pedido NO pasa solo a LISTO: queda «En despacho» y Despacho
+    // (despacharCompleto) es quien lo confirma y dispara los avisos.
 
     // Auditoría de despeje de comanda
     await this.auditoria.registrar({
@@ -685,6 +633,159 @@ export class ComandasService {
       estado: 'DESPEJADA',
       completo,
     };
+  }
+
+  /**
+   * Pasa el pedido a LISTO (con historial, auditoría, socket) y avisa según la modalidad:
+   * delivery → «listo» al cliente y queda para el repartidor; recoger/llevar → «ya puedes recoger» por
+   * WhatsApp; mesa → aviso al mozo (campana «Mesa N lista para llevar»). Idempotente: solo desde COLA/PREPARANDO.
+   */
+  private async pasarALista(
+    pedido: { id: bigint; codigo: string; estado: string; modalidad: string; pasa_cocina_en: Date | null },
+    motivo: string,
+    usuarioActual: UsuarioAutenticado,
+    ahora: Date,
+    ip?: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<boolean> {
+    if (!ESTADOS_PARA_LISTO.includes(pedido.estado)) return false;
+    const pId = pedido.id;
+    const hacer = async (t: Prisma.TransactionClient) => {
+      await t.pedido.update({
+        where: { id: pId },
+        data: { estado: 'LISTO', listo_en: ahora, pasa_cocina_en: pedido.pasa_cocina_en ?? ahora },
+      });
+      await t.pedidoEstadoHistorial.create({
+        data: { pedido_id: pId, estado_anterior: pedido.estado, estado_nuevo: 'LISTO', motivo, por_party_id: usuarioActual.partyId, en: ahora },
+      });
+      if (pedido.modalidad === 'DELIVERY') await this.avisos?.avisar(pId, 'LISTO', {}, t);
+      else if (pedido.modalidad !== 'MESA') await this.avisos?.avisar(pId, 'LISTO_RECOJO', {}, t);
+    };
+    if (tx) await hacer(tx);
+    else await this.prisma.$transaction(hacer);
+    return true;
+  }
+
+  /** Efectos posteriores al commit de pasarALista: despertar el outbox, auditar y avisar por socket. */
+  private async avisarListo(
+    pedido: { id: bigint; codigo: string; estado: string; modalidad: string },
+    motivo: string,
+    usuarioActual: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    this.avisos?.despertar();
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'pedidos',
+      accion: 'CAMBIAR_ESTADO',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pedido.id,
+      antes: { estado: pedido.estado },
+      despues: { estado: 'LISTO', motivo },
+      motivo,
+      partyId: usuarioActual.partyId,
+      ip,
+    });
+    this.eventosGateway?.emitirAdmin('pedido:estado', { id: Number(pedido.id), codigo: pedido.codigo, estado: 'LISTO' });
+    // el mozo que tomó el pedido de mesa recibe el aviso de que está listo (RQ-SAL-02-10)
+    if (pedido.modalidad === 'MESA') {
+      try {
+        await this.salonService?.avisarListo(pedido.id);
+      } catch {
+        // el aviso es informativo
+      }
+    }
+  }
+
+  /**
+   * POST /admin/cocina/despacho/:pedidoId/completo { parcial? }
+   * Despacho es el LISTO final. Sin `parcial`: exige todas las áreas despejadas, deja todas las líneas
+   * despachadas y pasa el pedido a LISTO con el aviso de su modalidad. Con `parcial`: despacha solo las áreas
+   * ya listas (el pedido sigue «En despacho»); avisa únicamente si el parámetro despacho_parcial_avisa está en «Sí».
+   * Pedidos que ya salieron de cocina (LISTO o posterior) no se tocan: responde ya despachado.
+   */
+  async despacharCompleto(
+    pedidoId: bigint | string | number,
+    parcial: boolean,
+    usuarioActual: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const pId = this.parsearId(pedidoId, 'pedido');
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id: pId },
+      include: { comandas: { include: { area: true } }, lineas: { select: { id: true, cantidad: true, listas: true, despachadas: true, area_id: true, producto: { select: { categoria: { select: { area_id: true } } } } } } },
+    });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+    if (ESTADOS_FUERA_DE_COCINA.includes(pedido.estado)) {
+      throw new ConflictException({ codigo: 'ESTADO_INVALIDO', mensaje: `No se puede despachar un pedido en estado ${pedido.estado}` });
+    }
+    if (!ESTADOS_PARA_LISTO.includes(pedido.estado)) {
+      return { ok: true, pedidoId: pId.toString(), completo: true, parcial: false, estado: pedido.estado, yaDespachado: true };
+    }
+    exigirDeliveryUbicado(pedido);
+
+    const listas = pedido.comandas.filter((c) => c.estado === 'DESPEJADA');
+    const faltan = pedido.comandas.filter((c) => c.estado !== 'DESPEJADA');
+    if (listas.length === 0) {
+      throw new ConflictException({ codigo: 'NADA_LISTO_PARA_DESPACHAR', mensaje: 'Todavía no hay ningún área lista para despachar' });
+    }
+    if (faltan.length > 0 && !parcial) {
+      throw new ConflictException({
+        codigo: 'FALTAN_AREAS',
+        mensaje: `Falta que terminen: ${faltan.map((c) => c.area?.nombre ?? 'un área').join(', ')}`,
+      });
+    }
+
+    const ahora = new Date();
+    const areasListas = new Set(listas.map((c) => c.area_id.toString()));
+    const lineasADespachar = pedido.lineas.filter((l) => {
+      const a = areaDeLineaPedido(l);
+      return a !== null && areasListas.has(a.toString()) && l.despachadas < l.cantidad;
+    });
+
+    if (faltan.length > 0) {
+      // Despacho parcial: lo listo sale, el pedido sigue En despacho
+      await this.prisma.$transaction(async (tx) => {
+        for (const l of lineasADespachar) {
+          await tx.pedidoLinea.update({ where: { id: l.id }, data: { despachadas: l.cantidad, despachado_en: ahora } });
+        }
+      });
+      const flag = await this.prisma.parametro.findUnique({ where: { clave: 'despacho_parcial_avisa' } });
+      const avisa = esAfirmativo(flag?.valor);
+      if (avisa) {
+        if (pedido.modalidad === 'MESA') {
+          try { await this.salonService?.avisarListo(pId); } catch { /* informativo */ }
+        } else if (pedido.modalidad !== 'DELIVERY') {
+          await this.avisos?.avisar(pId, 'LISTO_RECOJO');
+        }
+      }
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO', modulo: 'cocina', accion: 'DESPACHAR_PARCIAL', resultado: 'OK', entidad: 'pedido', entidadId: pId,
+        despues: { areas: listas.map((c) => c.area?.nombre), pendientes: faltan.map((c) => c.area?.nombre), avisa },
+        partyId: usuarioActual.partyId, ip,
+      });
+      this.eventosGateway?.emitirAdmin('pedido:progreso', { id: Number(pId), codigo: pedido.codigo });
+      this.eventosGateway?.emitirAdmin('cocina:comanda', { pedidoId: Number(pId), areaId: null, completo: false });
+      return { ok: true, pedidoId: pId.toString(), completo: false, parcial: true, estado: pedido.estado, avisado: avisa };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const l of lineasADespachar) {
+        await tx.pedidoLinea.update({ where: { id: l.id }, data: { despachadas: l.cantidad, despachado_en: ahora } });
+      }
+      await this.pasarALista(pedido, 'Despacho: todo completo', usuarioActual, ahora, ip, tx);
+    });
+    await this.avisarListo(pedido, 'Despacho: todo completo', usuarioActual, ip);
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO', modulo: 'cocina', accion: 'DESPACHAR_COMPLETO', resultado: 'OK', entidad: 'pedido', entidadId: pId,
+      despues: { estado: 'LISTO', modalidad: pedido.modalidad }, partyId: usuarioActual.partyId, ip,
+    });
+    this.eventosGateway?.emitirAdmin('pedido:progreso', { id: Number(pId), codigo: pedido.codigo });
+    this.eventosGateway?.emitirAdmin('cocina:comanda', { pedidoId: Number(pId), areaId: null, completo: true });
+    return { ok: true, pedidoId: pId.toString(), completo: true, parcial: false, estado: 'LISTO' };
   }
 
   /** Marca completas (listas = cantidad) las líneas de un área: al despejarla, todo lo suyo sale. */
@@ -1130,6 +1231,11 @@ export class ComandasService {
         devuelta_por: usuarioActual.partyId,
       },
     });
+
+    // Lo que ya se había despachado de esa área vuelve a quedar pendiente de despacho
+    for (const l of (await this.lineasDeCocina(pId)).filter((x) => areaDeLineaPedido(x) === aId && x.despachadas > 0)) {
+      await this.prisma.pedidoLinea.update({ where: { id: l.id }, data: { despachadas: 0, despachado_en: null } });
+    }
 
     // Si el pedido estaba en LISTO, regresar a COLA
     if (pedido.estado === 'LISTO') {

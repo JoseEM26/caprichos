@@ -7,6 +7,7 @@
 export type EtapaAvisoReparto =
   | 'ACEPTADO'
   | 'LISTO'
+  | 'LISTO_RECOJO'
   | 'ASIGNADO'
   | 'SALIDA'
   | 'LLEGADA'
@@ -66,6 +67,13 @@ export const TEXTOS_REPARTO = {
   listo: (nombre: string, codigo: string): PayloadAvisoReparto => ({
     textoLibre: `¡Hola ${nombre}! 🎉 Tu pedido ${codigo} ya está listo. Pronto sale con nuestro repartidor. 🛵`,
     plantillaClave: 'DELIVERY_LISTO',
+    variablesPlantilla: [nombre, codigo],
+  }),
+
+  /** Despacho confirmó el pedido de recojo o para llevar: el cliente ya puede pasar (plantilla caprichos_pedido_listo_recojo). */
+  listoRecojo: (nombre: string, codigo: string): PayloadAvisoReparto => ({
+    textoLibre: `¡Hola ${nombre}! 🥳 Tu pedido ${codigo} ya está listo para recoger en nuestro local. ¡Te esperamos con gusto! 😊`,
+    plantillaClave: 'PEDIDO_LISTO_RECOJO',
     variablesPlantilla: [nombre, codigo],
   }),
 

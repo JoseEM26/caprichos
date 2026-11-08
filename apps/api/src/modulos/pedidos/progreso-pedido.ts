@@ -139,11 +139,23 @@ export function progresoDelPedido(p: EntradaProgreso, ctx?: ContextoProgreso): P
     };
   }
 
-  // Cocina ya terminó: el pedido pasó a LISTO a mano, o todas sus áreas despejaron
+  // Listo es el aviso final de Despacho: con todas las áreas despejadas el pedido espera a Despacho
+  // (sigue «en cocina», 100 %) y recién al despacharlo pasa a LISTO.
   const areas = areasDePedido(p, p.estado === 'LISTO');
   const listas = areas.filter((a) => a.estado === 'LISTA').length;
   const total = areas.length;
-  const cocinaTerminada = p.estado === 'LISTO' || (total > 0 && listas === total);
+  const cocinaTerminada = p.estado === 'LISTO';
+  if (!cocinaTerminada && total > 0 && listas === total) {
+    return {
+      areas,
+      listasDe: total,
+      totalAreas: total,
+      porcentaje: 100,
+      enCamino: false,
+      etapa: 'EN_COCINA',
+      etiqueta: 'Armando tu pedido para entregarlo',
+    };
+  }
 
   if (cocinaTerminada) {
     const base = { areas, listasDe: total, totalAreas: total, porcentaje: 100, enCamino: false };

@@ -191,6 +191,8 @@ export interface AreaDespacho {
   areaId: string;
   areaNombre: string;
   listo: boolean;
+  /** Lo de esta área ya salió en un despacho parcial. */
+  despachada?: boolean;
   lineas: LineaComanda[];
 }
 
@@ -210,6 +212,11 @@ export interface PedidoDespacho {
   areas: AreaDespacho[];
   /** Todas sus áreas están listas. */
   completo: boolean;
+  /** COLA o PREPARANDO mientras espera a Despacho; LISTO o posterior una vez despachado. */
+  estado?: string;
+  /** Ya pasó a LISTO (o salió): solo se ve con «Ver despachados». */
+  despachado?: boolean;
+  despachado_en?: string | null;
   atendido: boolean;
   atendido_en: string | null;
   atendido_por: string | null;

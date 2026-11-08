@@ -23,7 +23,7 @@ import { AgotarDto } from './dto/agotar.dto';
 import { AltaDemandaDto } from './dto/alta-demanda.dto';
 import { MarcarListasDto } from './dto/marcar-listas.dto';
 import { AtendidoDto } from './dto/atendido.dto';
-import { DespacharDto } from './dto/despachar.dto';
+import { DespacharDto, DespacharCompletoDto } from './dto/despachar.dto';
 import { MisAjustesCocinaDto } from './dto/mis-ajustes-cocina.dto';
 import { AjustesPersonalesCocinaService } from './ajustes-personales.service';
 import { PrismaService } from '../../comun/prisma/prisma.service';
@@ -84,6 +84,14 @@ export class CocinaController {
   @Permiso('cocina', 'despacho')
   async listarDespacho(@Query('atendidos') atendidos?: string) {
     return this.despacho.listar(atendidos === 'true' || atendidos === '1');
+  }
+
+  /** Despacho confirma el pedido: LISTO + aviso por modalidad. `parcial` despacha solo las áreas ya listas. */
+  @Post('despacho/:pedidoId/completo')
+  @Permiso('cocina', 'despachar')
+  async despacharCompleto(@Param('pedidoId') pedidoId: string, @Body() dto: DespacharCompletoDto, @Req() req: any) {
+    const ip = req.ip;
+    return this.comandasService.despacharCompleto(pedidoId, dto.parcial === true, req.usuario, ip);
   }
 
   @Post('despacho/:pedidoId/atendido')
