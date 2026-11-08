@@ -161,6 +161,6 @@ describe('Pedidos y caja: tarjetas y ventana de detalle', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Pedido CP-W004 de Rosa/ }));
     const ventana = await screen.findByRole('dialog', { name: 'Detalle del pedido CP-W004' });
     expect(ventana).toHaveAttribute('aria-modal', 'true');
-    expect(within(ventana).getByRole('tab', { name: 'Cobro' })).toBeInTheDocument();
+    expect(within(ventana).getByRole('tab', { name: 'Pago y voucher' })).toBeInTheDocument();
   });
 });
