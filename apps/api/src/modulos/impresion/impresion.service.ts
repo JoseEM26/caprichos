@@ -59,17 +59,19 @@ import {
   leerSeleccion,
   estadoPorRol,
   leerParametroNumerico,
-  rolesDeclarados,
 } from './estado-impresion';
 import {
-  CONTEXTO_RUTEO_VACIO,
   ContextoRuteo,
   aplicaSegunReglas,
+  areasParaRuteo,
   destinoDeTrabajo,
+  rolesDeConfig,
   tiposDeRoles,
 } from './ruteo-impresion';
+import { EquipoConfigService } from './equipo-config.service';
 import { leerReglasImpresion, leerTamanosEtiqueta, leerTicketsPrimero, ordenarPorPrioridad } from './reglas-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
+import { tamanoEfectivo } from '@caprichos/compartido';
 import { ajustesPendientesUbicacion } from '../pedidos-admin/cambio-ubicacion.util';
 
 /** Estados de print_job que cuentan como "en cola" para el admin y para no reencolar dos veces. */
@@ -123,12 +125,16 @@ const INCLUDE_LINEAS_PEDIDO = {
 @Injectable()
 export class ImpresionService {
   private readonly logger = new Logger(ImpresionService.name);
+  /** Configuración por computadora (cada PC manda): ruteo, tomar y latido leen de aquí. */
+  private readonly equipos: EquipoConfigService;
 
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly auditoria?: AuditoriaService,
     @Optional() private readonly eventos?: EventosGateway,
-  ) {}
+  ) {
+    this.equipos = new EquipoConfigService(prisma, auditoria, eventos);
+  }
 
   /**
    * Toma de forma atómica (FOR UPDATE SKIP LOCKED) los trabajos PENDIENTE más antiguos.
@@ -139,12 +145,17 @@ export class ImpresionService {
     max = 10,
     deviceKeyId?: bigint,
     roles?: RolImpresora[],
-    areaId: bigint | null = null,
+    _areaIdObsoleto: bigint | null = null,
     pruebas = false,
   ): Promise<RespuestaTomarTrabajos> {
-    // Con roles, solo los trabajos de las máquinas que el agente puede imprimir ahora; el resto espera en cola.
-    // Por área: un equipo de área solo toma lo suyo (destino_area_id); Caja (areaId null) toma lo de destino NULL.
-    const tipos = roles ? tiposDeRoles(roles) : null;
+    // Cada PC toma SOLO lo que se le asignó (destino_equipo_id) y solo si está configurada, no en pausa y el trabajo
+    // es de una máquina que tiene encendida. Las pruebas (sin pedido) salen siempre en la máquina que las pidió.
+    const cfg = deviceKeyId !== undefined ? await this.equipos.configDe(deviceKeyId) : null;
+    const rolesAgente: RolImpresora[] = roles ?? ['ETIQUETERA', 'TICKETERA'];
+    const tiposAgente = tiposDeRoles(rolesAgente);
+    const tiposConfig =
+      cfg && cfg.configurado && !cfg.pausado ? tiposDeRoles(rolesAgente.filter((r) => rolesDeConfig(cfg).includes(r))) : [];
+    const equipoId = deviceKeyId ?? null;
     const limite = Math.min(Math.max(1, max || 10), 10);
 
     await this.vencerTrabajosObsoletos().catch((err: any) =>
@@ -175,21 +186,13 @@ export class ImpresionService {
       let ids: bigint[] = [];
 
       try {
-        const filas: Array<{ id: bigint }> = tipos
-          ? await tx.$queryRaw`
+        const filas: Array<{ id: bigint }> = await tx.$queryRaw`
           SELECT id FROM "print_job"
           WHERE estado = 'PENDIENTE'
-            AND destino_area_id IS NOT DISTINCT FROM ${areaId}::bigint
-            AND (tipo = ANY(${tipos}::text[])
+            AND destino_equipo_id IS NOT DISTINCT FROM ${equipoId}::bigint
+            AND ((pedido_id IS NOT NULL AND tipo = ANY(${tiposConfig}::text[]))
+              OR (pedido_id IS NULL AND tipo = ANY(${tiposAgente}::text[]))
               OR (${pruebas}::boolean AND pedido_id IS NULL AND payload->'prueba'->>'impresoraId' IS NOT NULL))
-          ORDER BY (CASE WHEN ${ticketsPrimero}::boolean AND tipo LIKE 'TICKET%' THEN 0 ELSE 1 END), id ASC
-          LIMIT ${limite}
-          FOR UPDATE SKIP LOCKED
-        `
-          : await tx.$queryRaw`
-          SELECT id FROM "print_job"
-          WHERE estado = 'PENDIENTE'
-            AND destino_area_id IS NOT DISTINCT FROM ${areaId}::bigint
           ORDER BY (CASE WHEN ${ticketsPrimero}::boolean AND tipo LIKE 'TICKET%' THEN 0 ELSE 1 END), id ASC
           LIMIT ${limite}
           FOR UPDATE SKIP LOCKED
@@ -201,16 +204,11 @@ export class ImpresionService {
         const filas = await tx.printJob.findMany({
           where: {
             estado: 'PENDIENTE',
-            destino_area_id: areaId,
-            ...(tipos
-              ? {
-                  OR: [
-                    { tipo: { in: tipos } },
-                    // ponytail: respaldo sin SQL crudo; acepta cualquier prueba sin pedido (la consulta real filtra por payload.prueba)
-                    ...(pruebas ? [{ pedido_id: null }] : []),
-                  ],
-                }
-              : {}),
+            destino_equipo_id: equipoId,
+            OR: [
+              { pedido_id: { not: null }, tipo: { in: tiposConfig } },
+              { pedido_id: null, tipo: { in: tiposAgente } },
+            ],
           },
           orderBy: { id: 'asc' },
           take: limite,
@@ -245,12 +243,19 @@ export class ImpresionService {
       const tamanos = actualizados.some((t) => t.tipo === 'ETIQUETA_GENERAL' || t.tipo === 'ETIQUETA_BEBIDA')
         ? await leerTamanosEtiqueta(this.prisma)
         : null;
-      const conTamano = (t: (typeof actualizados)[number]) =>
-        tamanos && t.tipo === 'ETIQUETA_GENERAL'
-          ? { ...(t.payload as any), tamanoMm: tamanos.general }
-          : tamanos && t.tipo === 'ETIQUETA_BEBIDA'
-            ? { ...(t.payload as any), tamanoMm: tamanos.bebida }
-            : (t.payload as any);
+      // El tamaño propio de la PC reemplaza al general del local solo en ella; sin valor propio, hereda el general.
+      // Una prueba «con este tamaño» ya trae el suyo.
+      const medida = (propio: unknown, general: { anchoMm: number; altoMm: number }) => {
+        const m = tamanoEfectivo(propio, general);
+        return { anchoMm: m.anchoMm, altoMm: m.altoMm, ...(m.margenMm ? { margenMm: m.margenMm } : {}) };
+      };
+      const conTamano = (t: (typeof actualizados)[number]) => {
+        const p = t.payload as any;
+        if (!tamanos || p?.tamanoMm) return p;
+        if (t.tipo === 'ETIQUETA_GENERAL') return { ...p, tamanoMm: medida(cfg?.tamanoGeneral, tamanos.general) };
+        if (t.tipo === 'ETIQUETA_BEBIDA') return { ...p, tamanoMm: medida(cfg?.tamanoBebida, tamanos.bebida) };
+        return p;
+      };
 
       return {
         trabajos: actualizados.map((t) => ({
@@ -329,7 +334,7 @@ export class ImpresionService {
   /**
    * Guarda el latido periódico del agente en su DeviceKey.
    */
-  async registrarLatido(dto: LatidoDto, deviceKeyId: bigint): Promise<RespuestaLatido> {
+  async registrarLatido(dto: LatidoDto, deviceKeyId: bigint, ipPublica?: string): Promise<RespuestaLatido> {
     let antes: any = null;
     try {
       antes = await this.prisma.deviceKey.findUnique({ where: { id: deviceKeyId } });
@@ -337,6 +342,9 @@ export class ImpresionService {
       // sin estado previo: se emite el evento igual
     }
     const estadoAntes = JSON.stringify(estadoPorRol(antes));
+    // Primero la config: una PC que late por primera vez queda «nueva, falta configurar»; una que ya imprimía se convierte
+    const cfg = await this.equipos.configDe(deviceKeyId);
+    const volvio = !agenteConectado(antes?.ultimo_latido);
     await this.prisma.deviceKey.update({
       where: { id: deviceKeyId },
       data: {
@@ -345,6 +353,14 @@ export class ImpresionService {
         latido_impresora: dto.impresora,
         latido_detalle: empaquetarDetalleLatido(dto.detalle, dto.impresoras, dto.candidatas),
         ultima_conexion: new Date(),
+        ...(dto.equipo
+          ? {
+              latido_hostname: dto.equipo.hostname?.slice(0, 120) ?? null,
+              latido_sistema: dto.equipo.sistema?.slice(0, 120) ?? null,
+              latido_ip_local: dto.equipo.ipLocal?.length ? dto.equipo.ipLocal.slice(0, 8).join(',') : null,
+            }
+          : {}),
+        ...(ipPublica ? { latido_ip_publica: String(ipPublica).split(',')[0].trim().replace(/^::ffff:/, '').slice(0, 64) } : {}),
       },
     });
     // Si cambió el estado de alguna máquina, las pantallas lo ven en vivo
@@ -354,12 +370,24 @@ export class ImpresionService {
       latido_detalle: empaquetarDetalleLatido(dto.detalle, dto.impresoras, dto.candidatas),
     };
     const impresoras = estadoPorRol(ahora);
-    if (JSON.stringify(impresoras) !== estadoAntes) {
-      this.eventos?.emitirAdmin('impresion:estado', { impresoras });
+    if (JSON.stringify(impresoras) !== estadoAntes || volvio || !antes) {
+      this.eventos?.emitirAdmin('impresion:estado', { impresoras, equipoId: deviceKeyId.toString() });
     }
-    // Lo que el dueño eligió en el panel viaja en la respuesta; un programa viejo la ignora
+    // Lo que no tenía PC (por ejemplo, porque aún no estaba configurada) se reubica en cuanto hay quien lo imprima
+    if ((await this.equipos.contarSinReceptor()) > 0) {
+      await this.equipos.reasignarPendientes().catch((err: any) => this.logger.warn(`No se pudo reubicar la cola: ${err.message}`));
+    }
+    // Lo que el dueño eligió y configuró para ESTA PC viaja en la respuesta; un programa viejo la ignora
     const seleccion = await this.leerSeleccionAgente(deviceKeyId);
-    return Object.keys(seleccion).length ? { seleccion } : {};
+    const equipo = {
+      ticketera: cfg.ticketera,
+      etiquetera: cfg.etiquetera,
+      pausado: cfg.pausado,
+      configurado: cfg.configurado,
+      tamanoGeneral: cfg.tamanoGeneral ?? null,
+      tamanoBebida: cfg.tamanoBebida ?? null,
+    };
+    return { ...(Object.keys(seleccion).length ? { seleccion } : {}), equipo };
   }
 
   /**
@@ -396,6 +424,8 @@ export class ImpresionService {
       candidatas: conectado ? leerCandidatasLatido(agente?.latido_detalle) : [],
       seleccion: agente ? await this.leerSeleccionAgente(agente.id) : {},
       equipos: await this.estadoPorEquipo(ahora),
+      sinReceptor: await this.equipos.contarSinReceptor(),
+      tamanosLocal: await leerTamanosEtiqueta(this.prisma),
     };
   }
 
@@ -407,6 +437,7 @@ export class ImpresionService {
         orderBy: { id: 'asc' },
         include: { area: { select: { nombre: true } } },
       } as any);
+      const ctx = await this.equipos.contexto();
       return await Promise.all(
         (equipos as any[]).map(async (e) => {
           const conectado = agenteConectado(e.ultimo_latido, ahora);
@@ -420,8 +451,15 @@ export class ImpresionService {
             candidatas: conectado ? leerCandidatasLatido(e.latido_detalle) : [],
             seleccion: await this.leerSeleccionAgente(e.id),
             pendientes: await this.prisma.printJob.count({
-              where: { estado: { in: ['PENDIENTE', 'IMPRIMIENDO'] }, destino_area_id: e.area_id ?? null },
+              where: { estado: { in: ['PENDIENTE', 'IMPRIMIENDO'] }, destino_equipo_id: e.id },
             }),
+            config: ctx.equipos.find((x) => x.id === e.id)?.config,
+            ultimoLatido: e.ultimo_latido ? new Date(e.ultimo_latido).toISOString() : null,
+            ipLocal: e.latido_ip_local ? String(e.latido_ip_local).split(',').filter(Boolean) : [],
+            ipPublica: e.latido_ip_publica ?? null,
+            hostname: e.latido_hostname ?? null,
+            sistema: e.latido_sistema ?? null,
+            version: e.latido_version ?? null,
           };
         }),
       );
@@ -661,6 +699,7 @@ export class ImpresionService {
             pedido_id: o.pedido_id,
             area_id: o.area_id,
             destino_area_id: o.destino_area_id,
+            destino_equipo_id: o.destino_equipo_id,
             tipo: o.tipo,
             payload: o.payload as any,
             copia: true,
@@ -963,13 +1002,13 @@ export class ImpresionService {
       // Cada trabajo se encola si la regla de su tipo y modalidad lo pide; su destino sale del ruteo (NULL = Caja)
       let cajas = 0;
       const encolar = async (tipo: string, clave: string, payload: any, areaId: bigint | null) => {
-        const destino = destinoDeTrabajo(tipo, areaId, ctx);
+        const destino = this.destinoJob(tipo, areaId, payload, ctx);
         await this.prisma.printJob.upsert({
           where: { clave_idempotencia: clave },
           create: {
             pedido_id: pedido.id,
             area_id: areaId,
-            destino_area_id: destino,
+            ...destino,
             tipo,
             clave_idempotencia: clave,
             payload: payload as any,
@@ -978,7 +1017,7 @@ export class ImpresionService {
           },
           update: {}, // No sobreescribir si ya existe
         }).catch((e) => this.logger.debug(`${tipo} ya existe: ${e.message}`));
-        if (destino === null) cajas += 1;
+        if (destino.destino_equipo_id === null || destino.destino_area_id === null) cajas += 1;
       };
 
       if (aplicaSegunReglas('ETIQUETA_GENERAL', pedido.modalidad, reglas)) {
@@ -1055,10 +1094,12 @@ export class ImpresionService {
       ]);
       const payload = construirTicketPago(pedido, (local?.valor as any) || {}, comprobante, ajuste, await this.igvPct());
       const clave = `${pedido.id}-TICKET_PAGO`;
+      const destino = this.destinoJob('TICKET_PAGO', null, payload, await this.equipos.contexto());
       await this.prisma.printJob.upsert({
         where: { clave_idempotencia: clave },
         create: {
           pedido_id: pedido.id,
+          ...destino,
           tipo: 'TICKET_PAGO',
           clave_idempotencia: clave,
           payload: payload as any,
@@ -1111,10 +1152,12 @@ export class ImpresionService {
       await this.igvPct(),
     );
     const clave = `${pedido.id}-NOTA_MOZO-${comprobante.id}`;
+    const destino = this.destinoJob('TICKET_PAGO', null, payload, await this.equipos.contexto());
     await this.prisma.printJob.upsert({
       where: { clave_idempotencia: clave },
       create: {
         pedido_id: pedido.id,
+        ...destino,
         tipo: 'TICKET_PAGO',
         clave_idempotencia: clave,
         payload: payload as any,
@@ -1302,7 +1345,7 @@ export class ImpresionService {
           data: {
             pedido_id: pedido.id,
             area_id: s.areaId,
-            destino_area_id: destinoDeTrabajo(s.tipo, s.areaId, ctx),
+            ...this.destinoJob(s.tipo, s.areaId, s.payload, ctx),
             tipo: s.tipo,
             payload: s.payload as any,
             copia: true,
@@ -1387,7 +1430,7 @@ export class ImpresionService {
           data: {
             pedido_id: pedidoId,
             area_id: e.areaId,
-            destino_area_id: destinoDeTrabajo(e.tipo, e.areaId, ctx),
+            ...this.destinoJob(e.tipo, e.areaId, e.payload, ctx),
             tipo: e.tipo,
             payload: e.payload as any,
             copia: true,
@@ -1411,6 +1454,7 @@ export class ImpresionService {
     // Prueba dirigida a UNA impresora del equipo (para saber cuál es cuál): solo si el programa informó su lista
     let dirigida: { impresoraId: string; nombre: string } | null = null;
     let areaDestino: bigint | null = null;
+    let equipoDestino: { id: bigint; areaId: bigint | null } | null = null;
     if (impresoraId) {
       const { agente, candidatas } = await this.agenteConectadoConCandidatas(equipoId);
       const c = candidatas.find((x) => x.id === impresoraId);
@@ -1422,6 +1466,9 @@ export class ImpresionService {
       }
       dirigida = { impresoraId: c.id, nombre: c.nombre };
       areaDestino = agente.area_id ?? null;
+      equipoDestino = { id: agente.id, areaId: agente.area_id ?? null };
+    } else {
+      equipoDestino = await this.equipoDePrueba(rol, equipoId);
     }
     const reciente = await this.prisma.printJob.findFirst({
       where: {
@@ -1455,7 +1502,8 @@ export class ImpresionService {
         } as any,
         copia: false,
         estado: 'PENDIENTE',
-        ...(dirigida ? { destino_area_id: areaDestino } : {}),
+        destino_area_id: dirigida ? areaDestino : (equipoDestino?.areaId ?? null),
+        destino_equipo_id: equipoDestino?.id ?? null,
       },
     });
 
@@ -1482,6 +1530,22 @@ export class ImpresionService {
     };
   }
 
+  /** PC que recibe una prueba sin impresora elegida: la pedida, o una conectada con esa máquina encendida (Caja si no hay). */
+  private async equipoDePrueba(rol: RolImpresora, equipoId?: string): Promise<{ id: bigint; areaId: bigint | null } | null> {
+    let id: bigint | undefined;
+    try {
+      id = equipoId ? BigInt(equipoId) : undefined;
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Equipo no válido' });
+    }
+    const ctx = await this.equipos.contexto();
+    const orden = [...ctx.equipos].sort((a, b) => Number(b.conectado) - Number(a.conectado) || (a.id < b.id ? -1 : 1));
+    const e = id !== undefined
+      ? orden.find((x) => x.id === id)
+      : (orden.find((x) => rolesDeConfig(x.config).includes(rol)) ?? orden.find((x) => x.areaId === null) ?? orden[0]);
+    return e ? { id: e.id, areaId: e.areaId } : null;
+  }
+
   /**
    * «Probar TODAS»: una hoja en cada impresora real que ve el programa, con «Impresora N de M» grande,
    * para saber cuál es cuál. El número sigue el orden de la lista que muestra el panel y el programa.
@@ -1490,7 +1554,7 @@ export class ImpresionService {
   async encolarPruebaTodas(usuario?: UsuarioAutenticado, ip?: string, equipoId?: string) {
     const { agente, candidatas } = await this.agenteConectadoConCandidatas(equipoId);
     const reciente = await this.prisma.printJob.findFirst({
-      where: { pedido_id: null, en: { gt: new Date(Date.now() - ESPERA_PRUEBA_MS) }, destino_area_id: agente.area_id ?? null },
+      where: { pedido_id: null, en: { gt: new Date(Date.now() - ESPERA_PRUEBA_MS) }, destino_equipo_id: agente.id },
       select: { id: true },
     });
     if (reciente) {
@@ -1517,6 +1581,7 @@ export class ImpresionService {
             copia: false,
             estado: 'PENDIENTE',
             destino_area_id: agente.area_id ?? null,
+            destino_equipo_id: agente.id,
           },
         });
         trabajos.push({ trabajoId: t.id.toString(), impresoraId: c.id, rol });
@@ -1666,26 +1731,15 @@ export class ImpresionService {
     };
   }
 
-  /** Equipos de área activos con sus roles declarados y el id del área de bebidas (por nombre). Sin datos: todo a Caja. */
-  private async contextoRuteo(): Promise<ContextoRuteo> {
-    try {
-      const [equipos, bebidas] = await Promise.all([
-        this.prisma.deviceKey.findMany({
-          where: { tipo: 'AGENTE', activo: true, area_id: { not: null } },
-          select: { area_id: true, latido_impresora: true, latido_detalle: true },
-        }),
-        this.prisma.areaCocina.findMany({ where: { nombre: AREA_BEBIDAS, activo: true }, select: { id: true } }),
-      ]);
-      return {
-        equipos: (equipos ?? [])
-          .filter((e) => e.area_id !== null)
-          .map((e) => ({ areaId: e.area_id as bigint, roles: rolesDeclarados(e) })),
-        areaBebidasId: bebidas?.[0]?.id ?? null,
-      };
-    } catch (err: any) {
-      this.logger.warn(`No se pudo leer el ruteo de impresión, todo sale en Caja: ${err.message}`);
-      return CONTEXTO_RUTEO_VACIO;
-    }
+  /** PC activas con su configuración y el área de bebidas. Sin datos: ningún equipo imprime y el trabajo espera en cola. */
+  private contextoRuteo(): Promise<ContextoRuteo> {
+    return this.equipos.contexto();
+  }
+
+  /** A qué PC va el trabajo según la configuración de cada una (null/null = nadie lo imprime todavía: espera con aviso). */
+  private destinoJob(tipo: string, areaId: bigint | string | null, payload: any, ctx: ContextoRuteo) {
+    const d = destinoDeTrabajo(tipo, areasParaRuteo(tipo, areaId, ctx.areaBebidasId, payload?.areaId), ctx);
+    return { destino_equipo_id: d?.id ?? null, destino_area_id: d?.areaId ?? null };
   }
 
   /**

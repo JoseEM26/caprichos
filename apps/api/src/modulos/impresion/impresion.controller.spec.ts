@@ -51,10 +51,10 @@ describe('Controladores de Impresión', () => {
       expect(impresionServiceMock.tomarTrabajos).toHaveBeenCalledWith(5, 3n, undefined, null, false);
     });
 
-    it('POST /tomar pasa el área del equipo y sus roles (un equipo de área solo toma lo suyo)', async () => {
+    it('POST /tomar pasa el id del equipo y sus roles (cada PC toma lo que su configuración le asigna)', async () => {
       const req = { deviceKey: { id: 4n, area_id: 2n } };
       await agenteController.tomar({ max: 5, roles: ['ETIQUETERA'] }, req);
-      expect(impresionServiceMock.tomarTrabajos).toHaveBeenCalledWith(5, 4n, ['ETIQUETERA'], 2n, false);
+      expect(impresionServiceMock.tomarTrabajos).toHaveBeenCalledWith(5, 4n, ['ETIQUETERA'], null, false);
     });
 
     it('POST /resultado delega al servicio', async () => {
@@ -63,14 +63,16 @@ describe('Controladores de Impresión', () => {
     });
 
     it('POST /latido delega al servicio', async () => {
-      const req = { deviceKey: { id: 3n } };
+      const req = { deviceKey: { id: 3n }, headers: { 'x-forwarded-for': '200.1.2.3' } };
       await agenteController.registrarLatido(
         { version: '1.0', impresora: 'lista' },
         req,
       );
+      // Pasa también la IP pública que ve el servidor
       expect(impresionServiceMock.registrarLatido).toHaveBeenCalledWith(
         { version: '1.0', impresora: 'lista' },
         3n,
+        '200.1.2.3',
       );
     });
   });

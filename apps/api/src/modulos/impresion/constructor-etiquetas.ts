@@ -259,6 +259,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
             contiene: extras.length > 0 ? extras.join(', ') : null,
             who: `Para: ${clienteNombre}`,
             hora,
+            ...(linea.area_id ? { areaId: String(linea.area_id) } : {}),
           });
         });
       }
@@ -288,6 +289,7 @@ export function construirEtiquetasBebida(pedido: any): EtiquetaBebidaDatos[] {
         contiene,
         who: `Para: ${clienteNombre}`,
         hora,
+        ...(linea.area_id ? { areaId: String(linea.area_id) } : {}),
       });
     }
   });
@@ -501,6 +503,23 @@ export function construirEtiquetaPrueba(local: any, quien: string, ahora = new D
     productos: [{ cantidad: 1, nombre: 'Linea de ejemplo', tamano: null }],
     nota: 'PRUEBA - no es un pedido',
     printer: 'Etiquetera de caja',
+  };
+}
+
+/** Sticker de bebida de ejemplo para «Imprimir prueba con este tamaño». */
+export function construirEtiquetaBebidaPrueba(quien: string, ahora = new Date()): EtiquetaBebidaDatos {
+  return {
+    tipo: 'ETIQUETA_BEBIDA',
+    bebidaIndex: 1,
+    totalBebidas: 1,
+    codigo: 'PRUEBA',
+    persona: quien,
+    bebidaNombre: 'Cappuccino',
+    tamano: '12oz',
+    opciones: ['Leche de avena', 'Sin azucar'],
+    contiene: 'PRUEBA - no es un pedido',
+    who: 'Para: prueba',
+    hora: formatearHora(ahora),
   };
 }
 

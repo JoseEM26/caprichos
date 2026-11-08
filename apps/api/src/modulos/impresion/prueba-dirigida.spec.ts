@@ -95,13 +95,15 @@ describe('pruebas dirigidas y elección de impresora', () => {
       { version: '1', impresora: 'lista', impresoras: [{ rol: 'ETIQUETERA', estado: 'lista', id: 'x', nombre: 'X' }], candidatas: candidatas as any },
       5n,
     );
-    expect(r).toEqual({ seleccion: { ETIQUETERA: 'x' } });
+    expect(r).toMatchObject({ seleccion: { ETIQUETERA: 'x' } });
     const guardado = prisma.deviceKey.update.mock.calls[0][0].data.latido_detalle;
     expect(leerCandidatasLatido(guardado)).toHaveLength(2);
   });
 
-  it('un latido sin elección responde vacío (programas viejos no se ven afectados)', async () => {
-    expect(await service.registrarLatido({ version: '1', impresora: 'lista' }, 5n)).toEqual({});
+  it('un latido sin elección solo trae la configuración de la PC (una PC sin configurar no imprime)', async () => {
+    expect(await service.registrarLatido({ version: '1', impresora: 'lista' }, 5n)).toEqual({
+      equipo: { ticketera: false, etiquetera: false, pausado: false, configurado: false, tamanoGeneral: null, tamanoBebida: null },
+    });
   });
 
   it('una prueba dirigida que falla pasa a FALLIDO de inmediato con su motivo (no se reintenta sola)', async () => {

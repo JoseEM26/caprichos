@@ -8,14 +8,15 @@ describe('reglas iniciales de impresión (decisión del dueño)', () => {
       aplicaSegunReglas(t, modalidad, REGLAS_IMPRESION_DEFECTO),
     );
 
-  it('en el local: solo la comanda de salón, ningún sticker', () => {
-    expect(sale('MESA')).toEqual(['TICKET_COMANDA_SALON']);
-    expect(sale('LOCAL')).toEqual(['TICKET_COMANDA_SALON']);
+  // Desde «cada PC manda» las reglas solo dicen CUÁNDO; qué sale lo decide cada PC (el sticker general nace apagado en las PC)
+  it('en el local: comanda de salón y de área, ningún sticker', () => {
+    expect(sale('MESA')).toEqual(['TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA']);
+    expect(sale('LOCAL')).toEqual(['TICKET_COMANDA_SALON', 'TICKET_COMANDA_AREA']);
   });
 
-  it('para llevar, recoger y delivery: sticker por área y de bebida, sin comanda ni sticker general', () => {
+  it('para llevar, recoger y delivery: stickers, sin comanda de salón', () => {
     for (const m of ['LLEVAR', 'RECOGER', 'DELIVERY']) {
-      expect(sale(m)).toEqual(['ETIQUETA_AREA', 'ETIQUETA_BEBIDA']);
+      expect(sale(m)).toEqual(['ETIQUETA_GENERAL', 'ETIQUETA_AREA', 'ETIQUETA_BEBIDA', 'TICKET_COMANDA_AREA']);
     }
   });
 });

@@ -8,6 +8,7 @@ import type {
   RolImpresora,
   ImpresoraReportada,
   ImpresoraCandidata,
+  InfoEquipoLatido,
   RespuestaLatido,
 } from '@caprichos/compartido';
 
@@ -19,7 +20,8 @@ export interface IClienteApiImpresion {
     impresora: EstadoImpresora,
     detalle?: string,
     impresoras?: ImpresoraReportada[],
-    candidatas?: ImpresoraCandidata[]
+    candidatas?: ImpresoraCandidata[],
+    equipo?: InfoEquipoLatido
   ): Promise<RespuestaLatido | void>;
 }
 
@@ -175,7 +177,8 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
     impresora: EstadoImpresora,
     detalle?: string,
     impresoras?: ImpresoraReportada[],
-    candidatas?: ImpresoraCandidata[]
+    candidatas?: ImpresoraCandidata[],
+    equipo?: InfoEquipoLatido
   ): Promise<RespuestaLatido | void> {
     const peticion: PeticionLatido = {
       version,
@@ -183,6 +186,7 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
       detalle,
       ...(impresoras ? { impresoras } : {}),
       ...(candidatas ? { candidatas } : {}),
+      ...(equipo ? { equipo } : {}),
     };
     const res = await this.ejecutarPeticion(
       '/api/agente-impresion/latido',

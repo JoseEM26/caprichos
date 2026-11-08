@@ -4,7 +4,8 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { agenteConectado, estadoPorRol, rolesDeclarados } from './estado-impresion';
-import { ContextoRuteo, destinoDeTrabajo, tiposDeRoles } from './ruteo-impresion';
+import { areasParaRuteo, destinoDeTrabajo } from './ruteo-impresion';
+import { EquipoConfigService } from './equipo-config.service';
 import { CLAVES_REGLAS, leerReglasImpresion, valoresDesdeCambio } from './reglas-impresion';
 
 const ROLES_IMPRESORA: RolImpresora[] = ['ETIQUETERA', 'TICKETERA'];
@@ -36,26 +37,20 @@ const TIPOS_RUTEO = [
  */
 @Injectable()
 export class ImpresionConfigService {
+  private readonly cfg: EquipoConfigService;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
-  ) {}
+  ) {
+    this.cfg = new EquipoConfigService(prisma);
+  }
 
   private async equiposActivos() {
     return this.prisma.deviceKey.findMany({
       where: { tipo: 'AGENTE', activo: true },
       orderBy: { id: 'asc' },
     });
-  }
-
-  private async contexto(equipos: Awaited<ReturnType<ImpresionConfigService['equiposActivos']>>): Promise<ContextoRuteo> {
-    const bebidas = await this.prisma.areaCocina.findFirst({ where: { nombre: AREA_BEBIDAS, activo: true }, select: { id: true } });
-    return {
-      equipos: equipos
-        .filter((e) => e.area_id !== null)
-        .map((e) => ({ areaId: e.area_id as bigint, roles: rolesDeclarados(e) })),
-      areaBebidasId: bebidas?.id ?? null,
-    };
   }
 
   /** Mapa completo: áreas, equipos (con su estado por máquina), reglas, ruteo efectivo y cola por equipo. */
@@ -65,7 +60,7 @@ export class ImpresionConfigService {
       this.equiposActivos(),
       leerReglasImpresion(this.prisma),
     ]);
-    const ctx = await this.contexto(equipos);
+    const ctx = await this.cfg.contexto();
     const ahora = Date.now();
 
     const equiposDto = equipos.map((e) => {
@@ -98,14 +93,15 @@ export class ImpresionConfigService {
 
     /** Dónde sale cada tipo: el equipo de su área si lo tiene, o Caja (sin área). */
     const ruteoDe = (tipo: string, areaId: bigint | null) => {
-      const destino = destinoDeTrabajo(tipo, areaId, ctx);
-      const equipo = equipoDe(destino, rolDeTrabajo(tipo));
+      // Cada PC manda: el destino es la PC cuya configuración imprime este tipo (y área)
+      const d = destinoDeTrabajo(tipo, areasParaRuteo(tipo, areaId, ctx.areaBebidasId), ctx);
+      const equipo = d ? equipos.find((e) => e.id === d.id) : null;
       return {
         tipo,
         areaId: areaId ? areaId.toString() : null,
-        destinoAreaId: destino ? destino.toString() : null,
+        destinoAreaId: d?.areaId ? d.areaId.toString() : null,
         destinoEquipoId: equipo ? equipo.id.toString() : null,
-        destinoNombre: destino !== null ? (equipo?.nombre ?? nombreArea(destino) ?? 'Área') : 'Caja',
+        destinoNombre: equipo?.nombre ?? 'Ninguna PC lo imprime',
         activo: activoDelTipo(tipo, reglas),
       };
     };
@@ -119,12 +115,7 @@ export class ImpresionConfigService {
 
     const colaPendientePorEquipo = await Promise.all(
       equipos.map(async (e) => {
-        const tipos = tiposDeRoles(rolesDeclarados(e));
-        const pendientes = tipos.length === 0
-          ? 0
-          : await this.prisma.printJob.count({
-              where: { estado: 'PENDIENTE', destino_area_id: e.area_id, tipo: { in: tipos } },
-            });
+        const pendientes = await this.prisma.printJob.count({ where: { estado: 'PENDIENTE', destino_equipo_id: e.id } });
         return { deviceKeyId: e.id.toString(), pendientes };
       }),
     );

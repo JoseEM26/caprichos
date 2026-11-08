@@ -1,3 +1,5 @@
+import type { TamanoEtiquetaPc } from '../constantes/tamanoPc.js';
+
 export type TipoEtiqueta = 'ETIQUETA_GENERAL' | 'ETIQUETA_AREA' | 'ETIQUETA_BEBIDA';
 
 /** Comandas por pedido para la ticketera: la de salón (Caja, al aceptarse) y la de cada área (su ticketera, o Caja). */
@@ -35,6 +37,22 @@ export interface ImpresoraCandidata {
   detalle?: string;
   /** Por su lenguaje o nombre parece de este tipo. */
   sugerido?: RolImpresora;
+  /** Puerto del spooler o ruta del dispositivo (USB001, /dev/usb/lp0, tcp://...). */
+  puerto?: string;
+  driver?: string;
+  /** Estado que informa el sistema (Normal, sin conexión...). */
+  estado?: string;
+  usb?: boolean;
+}
+
+/** Datos de la computadora que el programa informa en cada latido. */
+export interface InfoEquipoLatido {
+  /** Nombre de la computadora (hostname). */
+  hostname?: string;
+  /** Sistema operativo (ej. win32 10.0.19045). */
+  sistema?: string;
+  /** Direcciones IPv4 de la red local (interfaces no internas). */
+  ipLocal?: string[];
 }
 
 /** Impresora elegida por rol en Configuración › Impresión (identificación estable). */
@@ -43,6 +61,45 @@ export type SeleccionImpresoras = Partial<Record<RolImpresora, string>>;
 /** Respuesta del latido: lo que el dueño eligió en el panel (programas viejos la ignoran). */
 export interface RespuestaLatido {
   seleccion?: SeleccionImpresoras;
+  /** Lo que el dueño configuró para ESTA computadora (el programa la aplica sin reiniciar). */
+  equipo?: ConfigEquipoParaAgente;
+}
+
+/** Lo que el programa necesita saber de su configuración: qué máquinas usar y si está en pausa. */
+export interface ConfigEquipoParaAgente {
+  ticketera: boolean;
+  etiquetera: boolean;
+  pausado: boolean;
+  configurado: boolean;
+  tamanoGeneral?: TamanoEtiquetaPc | null;
+  tamanoBebida?: TamanoEtiquetaPc | null;
+}
+
+/**
+ * Configuración de impresión de UNA computadora (cada PC manda). Una PC nueva llega con todo apagado y
+ * `configurado = false`: no imprime nada hasta que el dueño guarda por primera vez.
+ */
+export interface ConfigEquipoImpresion {
+  ticketera: boolean;
+  etiquetera: boolean;
+  /** Ticket / voucher de pago. */
+  ticketPago: boolean;
+  /** Comanda completa de salón. */
+  comandaSalon: boolean;
+  /** Ids de las áreas cuya comanda sale aquí. */
+  comandaAreas: string[];
+  /** Sticker general (resumen del pedido). */
+  stickerGeneral: boolean;
+  /** Ids de las áreas cuyo sticker por área sale aquí. */
+  stickerAreas: string[];
+  /** Ids de las áreas cuyos vasos (sticker de bebida) salen aquí. */
+  stickerBebidaAreas: string[];
+  /** Tamaño propio del sticker general en esta PC; null = el general del local. */
+  tamanoGeneral: TamanoEtiquetaPc | null;
+  /** Tamaño propio del sticker de bebida en esta PC; null = el general del local. */
+  tamanoBebida: TamanoEtiquetaPc | null;
+  pausado: boolean;
+  configurado: boolean;
 }
 
 /** Estado de una máquina tal como lo ve el admin (con el motivo si no está bien). */
@@ -133,7 +190,7 @@ export interface EtiquetaGeneralDatos {
   direccion?: string | null;
   telefono?: string | null;
   /** Tamaño del sticker en mm; la API lo pone al entregar el trabajo al programa de impresión. Ausente: el de fábrica. */
-  tamanoMm?: { anchoMm: number; altoMm: number };
+  tamanoMm?: { anchoMm: number; altoMm: number; margenMm?: number };
   printer: string;
 }
 
@@ -174,8 +231,10 @@ export interface EtiquetaBebidaDatos {
   contiene?: string | null;
   who: string;
   hora: string;
+  /** Área de la línea (id): decide en qué PC sale el vaso. */
+  areaId?: string;
   /** Tamaño del sticker en mm; la API lo pone al entregar el trabajo al programa de impresión. Ausente: el de fábrica. */
-  tamanoMm?: { anchoMm: number; altoMm: number };
+  tamanoMm?: { anchoMm: number; altoMm: number; margenMm?: number };
 }
 
 /** Comanda de salón: todas las líneas del pedido con tamaño, opciones y notas, para la cocina y el mozo. */
@@ -243,6 +302,8 @@ export interface PeticionLatido {
   impresoras?: ImpresoraReportada[];
   /** Impresoras que ve el equipo (aditivo: los programas viejos no la mandan). */
   candidatas?: ImpresoraCandidata[];
+  /** Nombre, sistema y red de la computadora (aditivo). */
+  equipo?: InfoEquipoLatido;
 }
 
 /** Una computadora con el programa vinculado (Caja, Bebidas...), con su propia llave, impresoras y elección. */
@@ -258,6 +319,15 @@ export interface EquipoEstadoImpresion {
   seleccion: SeleccionImpresoras;
   /** Trabajos esperando a ESTA computadora (si está apagada, no se pierden: esperan aquí). */
   pendientes: number;
+  /** Ver el módulo de configuración por PC (aditivo). */
+  config?: ConfigEquipoImpresion;
+  /** Hace cuántos segundos latió por última vez (null = nunca). */
+  ultimoLatido?: string | null;
+  ipLocal?: string[];
+  ipPublica?: string | null;
+  hostname?: string | null;
+  sistema?: string | null;
+  version?: string | null;
 }
 
 export interface EstadoAdminImpresion {
@@ -274,4 +344,8 @@ export interface EstadoAdminImpresion {
   candidatas?: ImpresoraCandidata[];
   /** Lo elegido en el panel por rol (puede no haberse aplicado aún). */
   seleccion?: SeleccionImpresoras;
+  /** Trabajos esperando que alguna PC los imprima: ninguna está configurada para recibirlos. */
+  sinReceptor?: number;
+  /** Tamaño de los stickers del local: lo que hereda una PC sin tamaño propio. */
+  tamanosLocal?: { bebida: { anchoMm: number; altoMm: number }; general: { anchoMm: number; altoMm: number } };
 }

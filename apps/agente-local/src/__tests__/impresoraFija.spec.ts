@@ -57,9 +57,12 @@ describe('lista de impresoras candidatas', () => {
     expect(c.map((x) => x.id)).toEqual(['TSC 4B|1', '/dev/usb/lp1', '/dev/usb/lp2']);
   });
 
-  it('al servidor no viaja la ruta ni la identidad interna', () => {
+  it('al servidor viaja lo que el panel muestra (puerto, driver, estado) y no la identidad interna ni el destino', () => {
     const c = candidatasDeWindows(win)[0];
-    expect(Object.keys(paraServidor(c)).sort()).toEqual(['detalle', 'id', 'nombre', 'sugerido']);
+    const claves = Object.keys(paraServidor(c));
+    expect(claves).toEqual(expect.arrayContaining(['id', 'nombre', 'detalle', 'sugerido']));
+    expect(claves).not.toContain('destino');
+    expect(claves).not.toContain('identidad');
   });
 
   it('idGuardado usa la identidad si existe', () => {

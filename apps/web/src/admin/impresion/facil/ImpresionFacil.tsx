@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { EquipoEstadoImpresion, EstadoAdminImpresion, RolImpresora } from '@caprichos/compartido';
+import { TAMANO_BEBIDA_DEFECTO, TAMANO_GENERAL_DEFECTO, type EstadoAdminImpresion, type RolImpresora } from '@caprichos/compartido';
 import { useSesion } from '../../../comun/sesion';
 import { useEventos } from '../../../comun/socket';
 import { Cargando } from '../../../comun/Cargando';
 import { Confirmar } from '../../../comun/Confirmar';
-import { ErrorApi } from '../../../comun/api';
-import { impresionApi, type EquipoMapa, type MapaImpresionDatos, type ReglasMapa, type TrabajoImpresionAdmin } from '../impresionApi';
+import { impresionApi, type MapaImpresionDatos, type ReglasMapa, type TrabajoImpresionAdmin } from '../impresionApi';
 import { ListaTrabajos, type PestanaMaquina } from '../ListaTrabajos';
 import { ColaImpresion } from '../ColaImpresion';
-import { ImpresorasDelEquipo } from '../ImpresorasDelEquipo';
 import { PanelInstalarPrograma } from '../PanelInstalarPrograma';
+import { TarjetaEquipo } from './TarjetaEquipo';
+import { esNueva, ordenarEquipos } from './logicaEquipo';
 import { VistaPieza } from '../mapa/VistaPiezaEjemplo';
 import {
   ATAJOS,
@@ -18,21 +18,18 @@ import {
   cambioAlTocar,
   celdaExiste,
   celdaMarcada,
-  estadoDePC,
   filasVisibles,
   fraseSaleEn,
-  lineasDePC,
   type ClaveFila,
   type ColumnaId,
 } from './logicaFacil';
 import '../mapa/mapa-impresion.css';
 import './impresion-facil.css';
 
-const NOMBRE_LUZ = { verde: 'Lista', ambar: 'Atención', rojo: 'Revisar' } as const;
-
 /**
  * Configuración › Impresión en 3 pasos: tus computadoras, qué se imprime y probar.
- * Las reglas son UNA para todo el local; cada computadora solo dice qué impresoras tiene y de qué área se encarga.
+ * Cada computadora se configura por separado (qué imprime, de qué áreas, con qué tamaño); las reglas del local solo
+ * son el punto de partida sugerido («Usar lo general») y el CUÁNDO (en mesa, llevar, delivery).
  */
 export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => void }) {
   const { tiene, usuario } = useSesion();
@@ -47,7 +44,6 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [instalar, setInstalar] = useState(false);
-  const [confirmarReemplazo, setConfirmarReemplazo] = useState<{ equipoId: string; areaId: string | null; texto: string } | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -89,29 +85,14 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
     }
   };
 
-  const cambiarArea = async (equipoId: string, areaId: string | null, reemplazar = false) => {
-    if (!mapa) return;
-    const nombreArea = areaId === null ? 'Caja' : mapa.areas.find((a) => a.id === areaId)?.nombre ?? 'el área';
-    const pc = mapa.equipos.find((e) => e.deviceKeyId === equipoId)?.nombre ?? 'La computadora';
-    try {
-      const r = reemplazar ? await impresionApi.asignarAreaEquipo(equipoId, areaId, true) : await impresionApi.asignarAreaEquipo(equipoId, areaId);
-      setAviso({ tipo: 'ok', texto: [`${pc} ahora imprime lo de ${nombreArea}.`, ...r.avisos].join(' ') });
-      await cargar();
-    } catch (err: any) {
-      const ocupada = err instanceof ErrorApi && err.codigo === 'AREA_OCUPADA' ? (err.detalles as any)?.ocupadoPor : null;
-      if (ocupada) {
-        setConfirmarReemplazo({
-          equipoId,
-          areaId,
-          texto: `${nombreArea} ya la atiende «${ocupada.nombre}». Si sigues, «${ocupada.nombre}» deja de imprimir y «${pc}» ocupa su lugar.`,
-        });
-        return;
-      }
-      setAviso({ tipo: 'error', texto: `No se guardó el cambio. ${err?.message ?? ''}`.trim() });
-    }
-  };
-
   const avisos = useMemo(() => (mapa ? avisosDeArmado(mapa) : []), [mapa]);
+  const detalles = estado?.equipos ?? [];
+  const equiposOrdenados = useMemo(
+    () => ordenarEquipos(detalles, (id) => detalles.find((d) => d.deviceKeyId === id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [estado],
+  );
+  const nuevas = detalles.filter((d) => esNueva(d));
 
   if (cargando && !mapa) return <Cargando mensaje="Consultando tus computadoras de impresión..." />;
 
@@ -120,16 +101,28 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
       <section className="if-como" aria-labelledby="if-como-t" data-cfg-id="impresion-como-funciona" tabIndex={-1}>
         <h3 id="if-como-t">Cómo funciona</h3>
         <ul>
-          <li>Las reglas (qué se imprime) son UNA sola para todo el local.</li>
-          <li>Cada computadora solo dice qué impresoras tiene y de qué se encarga.</li>
+          <li>Cada computadora se configura por separado: tú decides si tiene ticketera, etiquetera o las dos, y qué imprime de cada área.</li>
+          <li>Una PC nueva no imprime nada hasta que la configures.</li>
           <li>Si una PC está apagada, sus papeles esperan y salen al encenderla.</li>
-          <li>Si un área no tiene PC, sale en Caja.</li>
+          <li>Si ninguna PC imprime algo, ese papel espera en la cola y te avisamos aquí.</li>
         </ul>
       </section>
 
       {error && (
         <div role="alert" className="if-alerta if-alerta--rojo">
           {error}
+        </div>
+      )}
+      {nuevas.length > 0 && (
+        <div role="alert" className="if-alerta if-alerta--rojo" data-testid="aviso-nuevas">
+          {nuevas.length === 1
+            ? `«${nuevas[0].nombre}» es nueva y falta configurar: no imprime nada hasta que elijas qué hará.`
+            : `Hay ${nuevas.length} computadoras nuevas por configurar: no imprimen nada hasta que elijas qué hará cada una.`}
+        </div>
+      )}
+      {(estado?.sinReceptor ?? 0) > 0 && (
+        <div role="alert" className="if-alerta if-alerta--rojo" data-testid="aviso-sin-receptor">
+          Ninguna PC imprime {estado!.sinReceptor === 1 ? 'un papel que está esperando' : `${estado!.sinReceptor} papeles que están esperando`}. Configura una PC para que los reciba y saldrán solos.
         </div>
       )}
       {avisos.length > 0 && (
@@ -153,19 +146,19 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
         <h3 id="if-p1">
           <span className="if-num" aria-hidden="true">1</span> Tus computadoras
         </h3>
-        <p className="if-sub">Cada computadora con el programa de impresión. Elige sus impresoras y de qué se encarga.</p>
-        {mapa && mapa.equipos.length === 0 && <p className="if-vacio">Todavía no hay ninguna computadora. Pulsa «Agregar otra computadora».</p>}
-        <div className="if-pcs">
-          {mapa?.equipos.map((eq) => (
-            <TarjetaPC
-              key={eq.deviceKeyId}
-              eq={eq}
-              detalle={estado?.equipos?.find((x) => x.deviceKeyId === eq.deviceKeyId)}
-              mapa={mapa}
+        <p className="if-sub">Cada computadora con el programa de impresión aparece aquí sola. Elige qué hace cada una; puedes hacerlo sin estar en el local.</p>
+        {equiposOrdenados.length === 0 && <p className="if-vacio">Todavía no hay ninguna computadora. Pulsa «Agregar otra computadora».</p>}
+        <div className="if-pcs ie-pcs">
+          {equiposOrdenados.map((det) => (
+            <TarjetaEquipo
+              key={det.deviceKeyId}
+              equipo={det}
+              areas={mapa?.areas.map((a) => ({ id: a.id, nombre: a.nombre })) ?? []}
+              tamanosLocal={estado?.tamanosLocal ?? { bebida: TAMANO_BEBIDA_DEFECTO, general: TAMANO_GENERAL_DEFECTO }}
               puedeEditar={puedeEditar}
-              pendientes={mapa.colaPendientePorEquipo.find((c) => c.deviceKeyId === eq.deviceKeyId)?.pendientes ?? 0}
-              alElegirArea={(areaId) => void cambiarArea(eq.deviceKeyId, areaId)}
+              pendientes={det.pendientes}
               alRecargar={() => void cargar()}
+              alAviso={(tipo, texto) => setAviso({ tipo, texto })}
             />
           ))}
         </div>
@@ -188,91 +181,7 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
       </p>
 
       {instalar && <PanelInstalarPrograma alCerrar={() => setInstalar(false)} />}
-      <Confirmar
-        abierto={!!confirmarReemplazo}
-        titulo="Reemplazar la computadora de esa área"
-        mensaje={confirmarReemplazo?.texto ?? ''}
-        textoSi="Sí, reemplazar"
-        textoNo="No"
-        alConfirmar={() => {
-          const c = confirmarReemplazo;
-          setConfirmarReemplazo(null);
-          if (c) void cambiarArea(c.equipoId, c.areaId, true);
-        }}
-        alCancelar={() => setConfirmarReemplazo(null)}
-      />
     </div>
-  );
-}
-
-function TarjetaPC({
-  eq,
-  detalle,
-  mapa,
-  puedeEditar,
-  pendientes,
-  alElegirArea,
-  alRecargar,
-}: {
-  eq: EquipoMapa;
-  detalle?: EquipoEstadoImpresion;
-  mapa: MapaImpresionDatos;
-  puedeEditar: boolean;
-  pendientes: number;
-  alElegirArea: (areaId: string | null) => void;
-  alRecargar: () => void;
-}) {
-  const [cambiando, setCambiando] = useState(false);
-  const nombres = {
-    TICKETERA: detalle?.impresoras?.TICKETERA?.impresoraNombre,
-    ETIQUETERA: detalle?.impresoras?.ETIQUETERA?.impresoraNombre,
-  };
-  const est = estadoDePC(eq, pendientes);
-  const lineas = lineasDePC(eq, nombres);
-  return (
-    <article className="if-pc" data-testid={`pc-${eq.deviceKeyId}`} aria-label={eq.nombre}>
-      <header className="if-pc-cab">
-        <h4>{eq.nombre}</h4>
-        <span className={`if-luz if-luz--${est.luz}`} data-testid={`luz-${eq.deviceKeyId}`} data-nivel={est.luz}>
-          <span className="if-luz-punto" aria-hidden="true" />
-          {NOMBRE_LUZ[est.luz]}
-        </span>
-      </header>
-      <p className="if-pc-estado" data-testid={`estado-pc-${eq.deviceKeyId}`}>
-        {est.texto}
-      </p>
-      <ul className="if-pc-impresoras">
-        {lineas.map((l) => (
-          <li key={l.rol} className={`if-imp if-imp--${l.nivel}`}>
-            {l.texto}
-          </li>
-        ))}
-      </ul>
-      <label className="if-campo">
-        <span>Esta PC imprime lo de:</span>
-        <select
-          data-testid={`area-${eq.deviceKeyId}`}
-          value={eq.areaId ?? ''}
-          disabled={!puedeEditar}
-          onChange={(e) => alElegirArea(e.target.value === '' ? null : e.target.value)}
-        >
-          <option value="">Caja</option>
-          {mapa.areas.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
-      </label>
-      {detalle && (
-        <>
-          <button type="button" className="if-sec" aria-expanded={cambiando} onClick={() => setCambiando((v) => !v)}>
-            {cambiando ? 'Cerrar' : 'Cambiar impresoras'}
-          </button>
-          {cambiando && <ImpresorasDelEquipo equipo={detalle} alCambiar={alRecargar} />}
-        </>
-      )}
-    </article>
   );
 }
 
@@ -294,9 +203,9 @@ function PasoQueSeImprime({
   return (
     <section className="if-paso" aria-labelledby="if-p2" data-testid="paso-2" data-cfg-id="impresion-paso-que-se-imprime" tabIndex={-1}>
       <h3 id="if-p2">
-        <span className="if-num" aria-hidden="true">2</span> Qué se imprime
+        <span className="if-num" aria-hidden="true">2</span> Reglas generales del local
       </h3>
-      <p className="if-sub">Marca con ✓ lo que quieres que salga en cada tipo de pedido. Vale para todo el local.</p>
+      <p className="if-sub">Las reglas del local: sirven de punto de partida para una PC nueva («Usar lo general») y dicen en qué tipo de pedido sale cada cosa. Lo que imprime cada PC lo decide su propia tarjeta de arriba.</p>
 
       <div className="if-atajos" role="group" aria-label="Atajos">
         {ATAJOS.map((a) => (

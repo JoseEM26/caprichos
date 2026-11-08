@@ -1,4 +1,5 @@
 import { api, getTokenAcceso } from '../../comun/api';
+import type { ConfigEquipoImpresion, TamanoEtiquetaPc } from '@caprichos/compartido';
 import { EstadoAdminImpresion, EstadoImpresora, RolImpresora } from '@caprichos/compartido';
 
 export interface TrabajoImpresionAdmin {
@@ -187,6 +188,12 @@ export interface MapaImpresionDatos {
   colaPendientePorEquipo: Array<{ deviceKeyId: string; pendientes: number }>;
 }
 
+/** Cambio parcial de la configuración de una PC; null en un tamaño = hereda el del local. */
+export type CambioConfigEquipo = Partial<Omit<ConfigEquipoImpresion, 'configurado'>> & {
+  nombre?: string;
+  impresoras?: Partial<Record<RolImpresora, string | null>>;
+};
+
 export interface RespuestaAsignarArea {
   ok: boolean;
   areaId: string | null;
@@ -307,6 +314,25 @@ export const impresionApi = {
   /** Copia nueva (misma máquina) de uno o varios trabajos, o de todos los fallidos de una máquina. */
   reimprimirTrabajos: async (body: { ids?: string[]; grupo?: 'STICKERS_FALLIDOS' | 'TICKETS_FALLIDOS' }): Promise<RespuestaReimpresion> => {
     return api.post('/admin/impresion/cola/reimprimir', body);
+  },
+
+  /** Qué imprime una PC (cambio parcial: nombre, máquinas, interruptores, áreas, tamaños, impresoras, pausa). La deja «configurada». */
+  guardarConfigEquipo: async (equipoId: string, cambio: CambioConfigEquipo): Promise<{ ok: boolean; config: ConfigEquipoImpresion }> => {
+    return api.put(`/admin/impresion/equipos/${equipoId}/config`, cambio);
+  },
+
+  /** «Usar lo general»: rellena la PC con las reglas del local. */
+  usarGeneralEquipo: async (equipoId: string): Promise<{ ok: boolean; config: ConfigEquipoImpresion }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/usar-general`, {});
+  },
+
+  /** «Imprimir prueba con este tamaño»: sticker de ejemplo (general o de bebida) en esa PC. */
+  pruebaEtiquetaEquipo: async (
+    equipoId: string,
+    tipo: 'general' | 'bebida',
+    tamano?: TamanoEtiquetaPc | null,
+  ): Promise<{ ok: boolean; trabajoId: string; mensaje: string }> => {
+    return api.post(`/admin/impresion/equipos/${equipoId}/prueba-etiqueta`, { tipo, ...(tamano ? { tamano } : {}) });
   },
 
   reintentarTrabajo: async (id: string): Promise<{ ok: boolean; mensaje: string }> => {

@@ -19,8 +19,13 @@ export {
   TAMANO_ETIQUETA_MAX_MM,
   medidaEtiquetaValida,
   tamanosDesdeValores,
+  PRESETS_TAMANO_ETIQUETA,
+  MARGEN_ETIQUETA_MAX_MM,
+  tamanoPcValido,
+  aplicarOrientacion,
+  tamanoEfectivo,
 } from './constantes/index.js';
-export type { TamanoMm, TamanosEtiqueta } from './constantes/index.js';
+export type { TamanoMm, TamanosEtiqueta, TamanoEtiquetaPc, OrientacionEtiqueta } from './constantes/index.js';
 export type { ReglasImpresion } from './constantes/index.js';
 export type { RolSistema } from './constantes/index.js';
 export * from './tipos/index.js';

@@ -24,9 +24,8 @@ export class AgenteImpresionController {
   @HttpCode(HttpStatus.OK)
   async tomar(@Body() dto: TomarTrabajosDto, @Req() req: any) {
     const deviceKeyId = req.deviceKey?.id ? BigInt(req.deviceKey.id) : undefined;
-    // El equipo toma solo lo de su área (área NULL = Caja)
-    const areaId = req.deviceKey?.area_id ? BigInt(req.deviceKey.area_id) : null;
-    return this.impresionService.tomarTrabajos(dto.max, deviceKeyId, dto.roles, areaId, dto.pruebas === true);
+    // Cada PC toma solo lo que su configuración le asigna
+    return this.impresionService.tomarTrabajos(dto.max, deviceKeyId, dto.roles, null, dto.pruebas === true);
   }
 
   @Post('resultado')
@@ -40,6 +39,7 @@ export class AgenteImpresionController {
   async registrarLatido(@Body() dto: LatidoDto, @Req() req: any) {
     const deviceKeyId = req.deviceKey?.id ? BigInt(req.deviceKey.id) : undefined;
     // Responde con lo elegido en el panel ({ seleccion }); los programas viejos aceptan 200 igual que 204
-    return deviceKeyId ? this.impresionService.registrarLatido(dto, deviceKeyId) : {};
+    const ipPublica = (req.headers?.['x-forwarded-for'] as string | undefined) || req.ip;
+    return deviceKeyId ? this.impresionService.registrarLatido(dto, deviceKeyId, ipPublica) : {};
   }
 }

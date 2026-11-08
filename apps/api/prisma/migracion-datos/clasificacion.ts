@@ -60,7 +60,7 @@ const NO_MIGRAR_POR_MOTIVO: Array<[string, string[]]> = [
     'traslado', 'pedido_interno', 'produccion', 'conteo_apertura',
   ]],
   ['seguridad y llaves: secretos, llaves de dispositivos y colas de impresión', [
-    'supervisor_secreto', 'device_key', 'print_job', 'sesion',
+    'supervisor_secreto', 'device_key', 'equipo_impresion_config', 'print_job', 'sesion',
   ]],
   ['asistencia del personal: marcas, selfies, dispositivos y consentimientos (datos personales e historial de la base de origen)', [
     'asistencia_marca', 'asistencia_selfie', 'asistencia_dispositivo', 'asistencia_consentimiento',
@@ -88,7 +88,7 @@ export const NO_MIGRAR: Record<string, string> = Object.fromEntries(
 
 /** Tablas que jamás pueden estar en MIGRAR (la prueba jest lo verifica). */
 export const TABLAS_SENSIBLES: string[] = [
-  'sesion', 'supervisor_secreto', 'device_key', 'print_job', 'auditoria', 'voucher_pago',
+  'sesion', 'supervisor_secreto', 'device_key', 'equipo_impresion_config', 'print_job', 'auditoria', 'voucher_pago',
   'comprobante', 'comprobante_archivo', 'sunat_resumen', 'secuencia_comprobante', 'customer_account', 'customer_detail', 'consent',
   'contact_mechanism', 'cliente_direccion', 'conversacion', 'mensaje_chat', 'whatsapp_mensaje',
   'saliente_whatsapp', 'notificacion', 'cobro', 'caja', 'cierre_caja', 'cierre_ajuste_medio', 'devolucion_pedido', 'pedido', 'reserva',

@@ -7,6 +7,8 @@ import { AgenteImpresionController } from './agente-impresion.controller';
 import { AdminImpresionController } from './admin-impresion.controller';
 import { ImpresionConfigController } from './impresion-config.controller';
 import { ImpresionConfigService } from './impresion-config.service';
+import { EquipoConfigController } from './equipo-config.controller';
+import { EquipoConfigService } from './equipo-config.service';
 import { DescargaAgenteController } from './descarga-agente.controller';
 import { AgenteImpresionGuard } from './agente-impresion.guard';
 
@@ -19,12 +21,14 @@ import { AgenteImpresionGuard } from './agente-impresion.guard';
     AgenteImpresionController,
     AdminImpresionController,
     ImpresionConfigController,
+    EquipoConfigController,
     DescargaAgenteController,
   ],
   providers: [
     PrismaService,
     ImpresionService,
     ImpresionConfigService,
+    EquipoConfigService,
     AgenteImpresionGuard,
   ],
   exports: [ImpresionService],

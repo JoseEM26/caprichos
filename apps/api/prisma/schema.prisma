@@ -2303,9 +2303,15 @@ model DeviceKey {
   latido_version   String?
   latido_impresora String?
   latido_detalle   String?
+  /// Datos de la computadora informados en el latido (IP de la red local separadas por coma, IP pública vista por el servidor, nombre y sistema)
+  latido_ip_local    String?
+  latido_ip_publica  String?
+  latido_hostname    String?
+  latido_sistema     String?
 
   area             AreaCocina? @relation(fields: [area_id], references: [id])
   printJobs        PrintJob[]
+  configImpresion  EquipoImpresionConfig?
 
   @@map("device_key")
 }
@@ -2329,6 +2335,8 @@ model PrintJob {
   device_key_id       BigInt?
   /// Área del equipo que imprime (sticker por área). NULL = Caja (la etiquetera y ticketera de Caja).
   destino_area_id     BigInt?
+  /// Computadora que imprime este trabajo según su configuración. NULL = ninguna PC lo imprime todavía (espera en cola).
+  destino_equipo_id   BigInt?
 
   pedido              Pedido?     @relation(fields: [pedido_id], references: [id])
   area                AreaCocina? @relation(fields: [area_id], references: [id])
@@ -2336,7 +2344,30 @@ model PrintJob {
   deviceKey           DeviceKey?  @relation(fields: [device_key_id], references: [id])
 
   @@index([destino_area_id, estado])
+  @@index([destino_equipo_id, estado])
   @@map("print_job")
+}
+
+/// Qué imprime cada computadora (cada PC manda). Una PC nueva: todo apagado y configurado = false (no recibe trabajos).
+model EquipoImpresionConfig {
+  device_key_id        BigInt    @id
+  configurado          Boolean   @default(false)
+  pausado              Boolean   @default(false)
+  ticketera            Boolean   @default(false)
+  etiquetera           Boolean   @default(false)
+  ticket_pago          Boolean   @default(false)
+  comanda_salon        Boolean   @default(false)
+  comanda_areas        Json      @default("[]")
+  sticker_general      Boolean   @default(false)
+  sticker_areas        Json      @default("[]")
+  sticker_bebida_areas Json      @default("[]")
+  tamanos              Json      @default("{}")
+  actualizado_en       DateTime  @default(now()) @db.Timestamptz
+  actualizado_por      BigInt?
+
+  deviceKey            DeviceKey @relation(fields: [device_key_id], references: [id], onDelete: Cascade)
+
+  @@map("equipo_impresion_config")
 }
 
 model SalienteWhatsapp {
