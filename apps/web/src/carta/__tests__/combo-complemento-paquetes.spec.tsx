@@ -6,7 +6,7 @@ import { ProductoCarta } from '../tipos';
 import { faltaElegirPaquete, filtrarPaquetes, gruposPaquetes } from '../ReemplazoCombo';
 
 const agregarLinea = vi.fn();
-const botonAgregar = () => screen.getByRole('button', { name: /Agregar al pedido|Elige las opciones obligatorias/ });
+const botonAgregar = () => screen.getByRole('button', { name: /Agregar al pedido|Falta elegir|Elige las opciones obligatorias/ });
 vi.mock('../CarritoContext', () => ({
   useCarrito: () => ({ abrirModalProducto: vi.fn(), agregarLinea, cantidadTotal: 0, subtotal: 0, lineas: [], inventario: {} }),
 }));

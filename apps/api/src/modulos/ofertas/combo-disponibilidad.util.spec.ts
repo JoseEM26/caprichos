@@ -1,6 +1,6 @@
 jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 
-import { calcularDisponibilidadCombo, ParteDisp, ProductoDisp, productoDisponible, SaborDisp, unidadesDisponibles } from './combo-disponibilidad.util';
+import { calcularDisponibilidadCombo, esParteBebidas, ParteDisp, ProductoDisp, productoDisponible, SaborDisp, unidadesDisponibles } from './combo-disponibilidad.util';
 
 const futuro = new Date(Date.now() + 3600_000);
 const prod = (id: string, extra: Partial<ProductoDisp> = {}): ProductoDisp => ({
@@ -135,5 +135,20 @@ describe('calcularDisponibilidadCombo', () => {
   it('unidadesDisponibles: sin control de stock es ilimitado; por sabor suma los sabores activos', () => {
     expect(unidadesDisponibles(prod('1'))).toBe(Infinity);
     expect(unidadesDisponibles(prod('1', { controlaStock: true, sabores: [{ id: 'a', nombre: 'A', activo: true, agotadoHasta: null, saldo: 2 }, { id: 'b', nombre: 'B', activo: false, agotadoHasta: null, saldo: 5 }] }))).toBe(2);
+  });
+});
+
+describe('esParteBebidas con lista de productos (Dúo con bebidas marcadas)', () => {
+  const parte = (productos: string[], categorias: string[] = []): ParteDisp => ({ tipo: 'A_ELECCION', cantidad: 2, categorias, productos, alternativas: [] });
+  const bebida = (id: string) => prod(id, { categoriaNombre: 'ICED' });
+  const comida = (id: string) => prod(id, { categoriaNombre: 'DONAS' });
+  it('la lista manda: todas bebidas es parte de bebidas', () => {
+    expect(esParteBebidas(parte(['1', '2']), [bebida('1'), bebida('2'), comida('3')])).toBe(true);
+  });
+  it('una lista con algo que no es bebida sigue siendo contadores', () => {
+    expect(esParteBebidas(parte(['1', '3']), [bebida('1'), comida('3')])).toBe(false);
+  });
+  it('sin lista ni categorías no es de bebidas', () => {
+    expect(esParteBebidas(parte([]), [bebida('1')])).toBe(false);
   });
 });

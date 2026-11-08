@@ -86,11 +86,11 @@ describe('opciones por bebida en la carta', () => {
     abrir(refresco([sinDefecto, topping]));
     mas(1);
     // todas iguales sin elegir: bloqueado
-    expect(screen.getByRole('button', { name: /Elige las opciones obligatorias/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Falta elegir/ })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Elegir por bebida' }));
     fireEvent.click(opcion(1, 'Azúcar'));
     // la Bebida 2 hereda la común (vacía): sigue bloqueado hasta elegirla
-    expect(screen.getByRole('button', { name: /Elige las opciones obligatorias/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Falta elegir/ })).toBeDisabled();
     fireEvent.click(opcion(2, 'Stevia'));
     expect(boton()).toBeEnabled();
   });

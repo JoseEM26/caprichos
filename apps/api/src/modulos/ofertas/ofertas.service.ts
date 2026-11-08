@@ -2612,7 +2612,9 @@ export class OfertasService {
           });
         }
         if (p.tipo === 'A_ELECCION' && p.productos.length > 0) {
-          // Lista explícita (p. ej. juguetes): cada opción con su nombre y si se puede elegir ahora
+          // Lista explícita (p. ej. juguetes o las bebidas de un Dúo): cada opción con su nombre y si se puede elegir ahora;
+          // si todas son bebidas, la parte se arma en pasos «Bebida 1..N»
+          if (esParteBebidas({ ...p, alternativas: [] }, productos)) p.bebidas = true;
           const deLaParte = productosDeParte({ ...p, alternativas: [] }, productos);
           p.opcionesDetalle = p.productos
             .map((id) => deLaParte.find((x) => x.id === id))

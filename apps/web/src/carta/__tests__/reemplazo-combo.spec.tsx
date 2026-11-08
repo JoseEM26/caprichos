@@ -50,7 +50,7 @@ describe('Combo con alternativas en la carta (si no hay stock, elige)', () => {
     agregarLinea.mockClear();
     render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['7', '8'], true)} />);
     expect(screen.getByText('Sin stock de Club Sandwich: elige una alternativa (mismo precio)')).toBeInTheDocument();
-    const agregar = screen.getByRole('button', { name: /Elige las opciones obligatorias/i });
+    const agregar = screen.getByRole('button', { name: /Falta elegir: Alternativa de/i });
     expect(agregar).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Empanada' }));
     fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/i }));
@@ -79,7 +79,7 @@ describe('Combo con alternativas en la carta (si no hay stock, elige)', () => {
       { id: '9', nombre: 'QUEQUE', cantidad: 1, disponible: true, sabores: [{ id: '601', nombre: 'Marmoleado', disponible: true, saldo: 4 }] },
     ];
     render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={oferta} />);
-    expect(screen.getByRole('button', { name: /Elige las opciones obligatorias/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Falta elegir: Alternativa de/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'QUEQUE' }));
     fireEvent.click(screen.getByRole('button', { name: 'Agregar QUEQUE · Marmoleado' }));
     fireEvent.click(screen.getByRole('button', { name: /Agregar al pedido/i }));
@@ -100,7 +100,7 @@ describe('Combo con alternativas en la carta (si no hay stock, elige)', () => {
   it('con alternativa activa, el cliente escoge; no viene preseleccionada aunque solo quede una', () => {
     render(<VentanaProductoCarta producto={producto} esBebida={false} onCerrar={() => {}} oferta={combo(true, ['7'], true)} />);
     expect(screen.getByRole('button', { name: 'Empanada' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: /Elige las opciones obligatorias/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Falta elegir: Alternativa de/i })).toBeDisabled();
   });
 
   it('combo agotado: la tarjeta dice Agotado y no tiene botón de agregar', () => {
