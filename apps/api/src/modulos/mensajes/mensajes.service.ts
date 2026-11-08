@@ -27,6 +27,7 @@ import { leerBloqueosSpam } from '../chatbot/configuracion/bloqueo-spam.util';
 import { MOTIVO_BLOQUEO_SPAM } from '../chatbot/configuracion/chatbot-configuracion.service';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { ArchivosService } from '../archivos/archivos.service';
+import sharp from 'sharp';
 import {
   PosChat,
   faltaProcesar,
@@ -77,11 +78,36 @@ export function estadoDe(
 
 const MAX_IMAGEN_BYTES = 5 * 1024 * 1024;
 
-/** Tipo real por los primeros bytes (no por lo que diga el navegador): solo JPG y PNG. */
-export function tipoImagenReal(b: Buffer): 'image/jpeg' | 'image/png' | null {
+export const MAX_IMAGEN_SUBIDA_BYTES = 16 * 1024 * 1024;
+
+/** Tipo real por los primeros bytes (no por lo que diga el navegador): JPG, PNG y WebP. */
+export function tipoImagenReal(b: Buffer): 'image/jpeg' | 'image/png' | 'image/webp' | null {
+  if (b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
   if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
   if (b.length > 7 && b[0] === 0x89 && b.toString('latin1', 1, 4) === 'PNG') return 'image/png';
   return null;
+}
+
+/**
+ * WhatsApp solo acepta JPG/PNG de hasta 5 MB: WebP y lo que pasa del límite se pasa a JPEG
+ * (máx. 2048 px, calidad bajando hasta caber). JPG/PNG que ya cumplen se envían tal cual.
+ */
+export async function prepararImagenWhatsApp(bytes: Buffer, tipo: string): Promise<{ buffer: Buffer; mimetype: string }> {
+  if (tipo !== 'image/webp' && bytes.length <= MAX_IMAGEN_BYTES) return { buffer: bytes, mimetype: tipo };
+  try {
+    for (const [lado, calidad] of [[2048, 85], [2048, 70], [1600, 60], [1200, 50]]) {
+      const out = await sharp(bytes)
+        .rotate()
+        .flatten({ background: '#ffffff' })
+        .resize({ width: lado, height: lado, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: calidad })
+        .toBuffer();
+      if (out.length <= MAX_IMAGEN_BYTES) return { buffer: out, mimetype: 'image/jpeg' };
+    }
+  } catch {
+    // imagen corrupta: cae al mismo mensaje de error
+  }
+  throw error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, 'IMAGEN_TIPO', 'No se pudo preparar la foto: prueba con otra imagen JPG o PNG');
 }
 
 const textoDe = (m: { tipo: string; contenido: any }): string => {
@@ -584,7 +610,7 @@ export class MensajesService {
     return { id: m.id };
   }
 
-  /** Foto del equipo al cliente: JPG o PNG de hasta 5 MB, con subtítulo opcional. Misma ventana de 24 h que el texto. */
+  /** Foto del equipo al cliente: JPG, PNG o WebP (se comprime a ≤5 MB), con subtítulo opcional. Misma ventana de 24 h que el texto. */
   async enviarImagen(
     id: string,
     archivo: { buffer?: Buffer; mimetype?: string; size?: number } | undefined,
@@ -594,12 +620,12 @@ export class MensajesService {
   ) {
     const bytes = archivo?.buffer;
     if (!archivo || !bytes?.length) throw error(HttpStatus.BAD_REQUEST, 'IMAGEN_REQUERIDA', 'Elige una foto para enviar');
-    if (bytes.length > MAX_IMAGEN_BYTES) {
-      throw error(HttpStatus.PAYLOAD_TOO_LARGE, 'IMAGEN_GRANDE', 'La foto pesa más de 5 MB');
+    if (bytes.length > MAX_IMAGEN_SUBIDA_BYTES) {
+      throw error(HttpStatus.PAYLOAD_TOO_LARGE, 'IMAGEN_GRANDE', 'La foto pesa más de 16 MB');
     }
-    const tipo = tipoImagenReal(bytes);
-    if (!tipo || tipo !== archivo.mimetype) {
-      throw error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, 'IMAGEN_TIPO', 'Solo se pueden enviar fotos JPG o PNG');
+    const tipoOriginal = tipoImagenReal(bytes);
+    if (!tipoOriginal || tipoOriginal !== archivo.mimetype) {
+      throw error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, 'IMAGEN_TIPO', 'Solo se pueden enviar fotos JPG, PNG o WebP');
     }
     const pie = String(subtitulo ?? '').trim().slice(0, 1024);
 
@@ -623,9 +649,14 @@ export class MensajesService {
       );
     }
 
-    // Copia privada para ver la miniatura en el chat (misma ruta que las fotos del cliente)
-    const guardado = await this.archivos.subirArchivo(archivo as Express.Multer.File, true);
-    const m = await this.gateway.enviarImagen(c.id, c.telefono, bytes, tipo, pie, 'PERSONA', String(guardado.id), c.phone_number_id ?? undefined);
+    // Se prepara (WebP/pesadas a JPEG) antes de guardar: la copia privada es la misma que se envía
+    const listo = await prepararImagenWhatsApp(bytes, tipoOriginal);
+    const tipo = listo.mimetype;
+    const guardado = await this.archivos.subirArchivo(
+      { ...(archivo as Express.Multer.File), buffer: listo.buffer, mimetype: tipo, size: listo.buffer.length },
+      true,
+    );
+    const m = await this.gateway.enviarImagen(c.id, c.telefono, listo.buffer, tipo, pie, 'PERSONA', String(guardado.id), c.phone_number_id ?? undefined);
     await this.tocar(c.id, { duenio: 'PERSONA', urgente: false, estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado });
     await this.auditar(usuario, 'ENVIAR_IMAGEN', c.id, { mensajeId: m.id, estado: m.estado }, ip);
 

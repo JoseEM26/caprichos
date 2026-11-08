@@ -133,12 +133,12 @@ describe('CuadroEscribir: emojis y fotos', () => {
     const entrada = screen.getByTestId('entrada-foto');
 
     fireEvent.change(entrada, { target: { files: [new File(['x'], 'a.gif', { type: 'image/gif' })] } });
-    expect(await screen.findByText('Solo se pueden enviar fotos JPG o PNG.')).toBeInTheDocument();
+    expect(await screen.findByText('Solo se pueden enviar fotos JPG, PNG o WebP.')).toBeInTheDocument();
 
     const grande = new File(['x'], 'g.jpg', { type: 'image/jpeg' });
-    Object.defineProperty(grande, 'size', { value: 6 * 1024 * 1024 });
+    Object.defineProperty(grande, 'size', { value: 17 * 1024 * 1024 });
     fireEvent.change(entrada, { target: { files: [grande] } });
-    expect(await screen.findByText(/pesa más de 5 MB/)).toBeInTheDocument();
+    expect(await screen.findByText(/pesa más de 16 MB/)).toBeInTheDocument();
 
     const buena = new File(['x'], 'ok.png', { type: 'image/png' });
     fireEvent.change(entrada, { target: { files: [buena] } });

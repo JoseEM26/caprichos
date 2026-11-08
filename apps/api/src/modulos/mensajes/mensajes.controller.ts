@@ -62,7 +62,7 @@ export class MensajesController {
 
   @Post('conversaciones/:id/enviar-imagen')
   @Permiso('mensajes', 'enviar')
-  @UseInterceptors(FileInterceptor('imagen', { limits: { fileSize: 5 * 1024 * 1024 + 1 } }))
+  @UseInterceptors(FileInterceptor('imagen', { limits: { fileSize: 16 * 1024 * 1024 + 1 } }))
   enviarImagen(
     @Param('id') id: string,
     @UploadedFile() imagen: Express.Multer.File,

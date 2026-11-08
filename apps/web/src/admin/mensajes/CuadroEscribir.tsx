@@ -3,8 +3,10 @@ import { insertarEnCursor } from './emojis';
 import { DetalleConversacion, RespuestaRapida } from './mensajesTipos';
 import { SelectorEmojis } from './SelectorEmojis';
 
-export const MAX_FOTO_BYTES = 5 * 1024 * 1024;
-export const TIPOS_FOTO = ['image/jpeg', 'image/png'];
+/** El servidor comprime a ≤5 MB (límite de WhatsApp); aquí solo se corta lo absurdo. */
+export const MAX_FOTO_BYTES = 16 * 1024 * 1024;
+export const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp'];
+export const MOTIVO_VENTANA = 'Pasaron más de 24 h: solo se pueden enviar plantillas';
 
 
 export interface CuadroEscribirProps {
@@ -66,15 +68,36 @@ export function CuadroEscribir({
     }, 0);
   };
 
-  const elegirFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const archivo = e.target.files?.[0];
-    e.target.value = '';
-    if (!archivo) return;
-    if (!TIPOS_FOTO.includes(archivo.type)) return setErrorFoto('Solo se pueden enviar fotos JPG o PNG.');
-    if (archivo.size > MAX_FOTO_BYTES) return setErrorFoto('La foto pesa más de 5 MB. Elige una más liviana.');
+  const fotoBloqueada = detalle.ventanaAbierta === false;
+
+  const aceptarFoto = (archivo: File | undefined) => {
+    if (!archivo || !onEnviarImagen || fotoBloqueada || detalle.ocupado) return;
+    if (!TIPOS_FOTO.includes(archivo.type)) return setErrorFoto('Solo se pueden enviar fotos JPG, PNG o WebP.');
+    if (archivo.size > MAX_FOTO_BYTES) return setErrorFoto('La foto pesa más de 16 MB. Elige una más liviana.');
     setErrorFoto(null);
     setSubtitulo('');
     setFoto({ archivo, url: URL.createObjectURL(archivo) });
+  };
+
+  const elegirFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+    aceptarFoto(archivo);
+  };
+
+  // Ctrl+V con una imagen en el portapapeles (el texto pegado sigue normal)
+  const pegar = (e: React.ClipboardEvent) => {
+    const archivo = Array.from(e.clipboardData?.files ?? []).find((f) => f.type.startsWith('image/'));
+    if (!archivo) return;
+    e.preventDefault();
+    aceptarFoto(archivo);
+  };
+
+  const soltar = (e: React.DragEvent) => {
+    const archivo = Array.from(e.dataTransfer?.files ?? []).find((f) => f.type.startsWith('image/'));
+    if (!archivo) return;
+    e.preventDefault();
+    aceptarFoto(archivo);
   };
 
   const enviarFoto = async () => {
@@ -92,7 +115,13 @@ export function CuadroEscribir({
 
   const sinIdentificador = !detalle.telefono || !detalle.telefono.trim();
   return (
-    <div className="msg-componer">
+    <div
+      className="msg-componer"
+      onDragOver={(e) => {
+        if (onEnviarImagen && e.dataTransfer?.types?.includes('Files')) e.preventDefault();
+      }}
+      onDrop={soltar}
+    >
       {mensajeCopiado && (
         <div className="msg-copiado" role="status">
           {mensajeCopiado}
@@ -136,6 +165,12 @@ export function CuadroEscribir({
         </div>
       )}
 
+      {onEnviarImagen && fotoBloqueada && (
+        <div role="status" className="msg-error" data-testid="motivo-foto">
+          {MOTIVO_VENTANA}
+        </div>
+      )}
+
       {foto && (
         <div className="msg-foto-previa" role="group" aria-label="Vista previa de la foto">
           <img src={foto.url} alt="Foto que se va a enviar" />
@@ -168,13 +203,13 @@ export function CuadroEscribir({
         <div className="msg-escribir">
           {onEnviarImagen && (
             <>
-              <input ref={archivoRef} type="file" accept="image/jpeg,image/png" hidden data-testid="entrada-foto" onChange={elegirFoto} />
+              <input ref={archivoRef} type="file" accept="image/jpeg,image/png,image/webp" hidden data-testid="entrada-foto" onChange={elegirFoto} />
               <button
                 type="button"
                 className="msg-icono-btn"
-                aria-label="Adjuntar una foto"
-                title="Adjuntar foto (JPG o PNG, hasta 5 MB)"
-                disabled={detalle.ocupado}
+                aria-label="Adjuntar foto"
+                title={fotoBloqueada ? MOTIVO_VENTANA : 'Adjuntar foto (JPG, PNG o WebP). También puedes pegarla o arrastrarla'}
+                disabled={detalle.ocupado || fotoBloqueada}
                 onClick={() => archivoRef.current?.click()}
               >
                 <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
@@ -186,6 +221,7 @@ export function CuadroEscribir({
                     strokeLinecap="round"
                   />
                 </svg>
+                <span className="msg-icono-txt">Foto</span>
               </button>
             </>
           )}
@@ -205,6 +241,7 @@ export function CuadroEscribir({
           </div>
           <textarea
             ref={cajaRef}
+            onPaste={pegar}
             rows={1}
             placeholder="Escribe un mensaje"
             title="Enter envía · Shift+Enter baja a otra línea"

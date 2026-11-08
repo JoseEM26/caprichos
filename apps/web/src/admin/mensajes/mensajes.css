@@ -977,6 +977,9 @@
   align-items: center;
   justify-content: center;
 }
+.msg-icono-btn:has(.msg-icono-txt) { width: auto; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 6px; }
+.msg-icono-txt { font-size: 14px; font-weight: 600; }
+@media (max-width: 700px) { .msg-icono-txt { display: none; } }
 .msg-icono-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .msg-foto-previa {
   display: flex;

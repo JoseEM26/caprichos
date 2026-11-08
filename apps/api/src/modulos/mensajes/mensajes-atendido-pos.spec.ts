@@ -7,6 +7,9 @@ jest.mock('@nestjs/jwt', () => ({
 
 import { MensajesService, estadoDe, tipoImagenReal } from './mensajes.service';
 import { faltaProcesar, resolverPos, reabiertoTrasAtendido } from './utilidades/pos-chat.util';
+import sharp from 'sharp';
+import { CLAVE_PERMISO } from '../acceso/permiso.decorator';
+import { MensajesController } from './mensajes.controller';
 import { WhatsAppMetaGateway } from './whatsapp-meta.gateway';
 
 const ahora = Date.now();
@@ -179,8 +182,11 @@ describe('Enviar imagen desde el admin', () => {
     const gif = Buffer.from('GIF89a....');
     await expect(service.enviarImagen('1', { buffer: gif, mimetype: 'image/jpeg' }, '', usuario)).rejects.toMatchObject({ response: { codigo: 'IMAGEN_TIPO' } });
     await expect(service.enviarImagen('1', { buffer: JPG, mimetype: 'image/png' }, '', usuario)).rejects.toMatchObject({ response: { codigo: 'IMAGEN_TIPO' } });
-    const grande = Buffer.concat([JPG, Buffer.alloc(5 * 1024 * 1024)]);
-    await expect(service.enviarImagen('1', { buffer: grande, mimetype: 'image/jpeg' }, '', usuario)).rejects.toMatchObject({ response: { codigo: 'IMAGEN_GRANDE' } });
+    const enorme = Buffer.concat([JPG, Buffer.alloc(16 * 1024 * 1024)]);
+    await expect(service.enviarImagen('1', { buffer: enorme, mimetype: 'image/jpeg' }, '', usuario)).rejects.toMatchObject({ response: { codigo: 'IMAGEN_GRANDE' } });
+    // más de 5 MB pero basura (no se puede comprimir): error claro, nada se envía
+    const basura = Buffer.concat([JPG, Buffer.alloc(6 * 1024 * 1024)]);
+    await expect(service.enviarImagen('1', { buffer: basura, mimetype: 'image/jpeg' }, '', usuario)).rejects.toMatchObject({ response: { codigo: 'IMAGEN_TIPO' } });
     await expect(service.enviarImagen('1', undefined, '', usuario)).rejects.toMatchObject({ response: { codigo: 'IMAGEN_REQUERIDA' } });
     expect(gateway.enviarImagen).not.toHaveBeenCalled();
     expect(tipoImagenReal(JPG)).toBe('image/jpeg');
@@ -198,6 +204,57 @@ describe('Enviar imagen desde el admin', () => {
       response: { codigo: 'VENTANA_CERRADA', plantillaReapertura: 'caprichos_reabrir_conversacion' },
     });
     expect(gateway.enviarImagen).not.toHaveBeenCalled();
+  });
+});
+
+describe('Enviar imagen: conversión, compresión, falla de Meta y permiso', () => {
+  const c = base(1n, { phone_number_id: 'PN1' });
+  const armar = (gateway: any, archivos: any) => {
+    const prisma = {
+      conversacion: { findUnique: jest.fn().mockResolvedValue(c), update: jest.fn().mockResolvedValue({}) },
+      userAccount: { findUnique: jest.fn().mockResolvedValue({ id: 7n }) },
+    };
+    return new MensajesService(prisma as any, { registrar: jest.fn() } as any, gateway, { emitirAdmin: jest.fn() } as any,
+      { esVentanaAbierta: jest.fn().mockResolvedValue(true) } as any, undefined, archivos);
+  };
+
+  it('WebP se convierte a JPEG; esa copia es la que se guarda y envía', async () => {
+    const webp = await sharp({ create: { width: 40, height: 40, channels: 3, background: '#f00' } }).webp().toBuffer();
+    expect(tipoImagenReal(webp)).toBe('image/webp');
+    const gateway = { enviarImagen: jest.fn().mockResolvedValue({ id: '1', estado: 'ENVIADO' }) };
+    const archivos = { subirArchivo: jest.fn().mockResolvedValue({ id: 5 }) };
+    await armar(gateway, archivos).enviarImagen('1', { buffer: webp, mimetype: 'image/webp' }, '', usuario);
+    const [, , enviado, mime] = gateway.enviarImagen.mock.calls[0];
+    expect(mime).toBe('image/jpeg');
+    expect(tipoImagenReal(enviado)).toBe('image/jpeg');
+    expect(archivos.subirArchivo.mock.calls[0][0]).toMatchObject({ mimetype: 'image/jpeg', buffer: enviado });
+  });
+
+  it('una foto de más de 5 MB se comprime bajo el límite; la que ya cumple va tal cual', async () => {
+    const ruido = Buffer.alloc(2000 * 2000 * 3);
+    for (let i = 0; i < ruido.length; i++) ruido[i] = (i * 2654435761) >>> 24;
+    const pesada = await sharp(ruido, { raw: { width: 2000, height: 2000, channels: 3 } }).png({ compressionLevel: 0 }).toBuffer();
+    expect(pesada.length).toBeGreaterThan(5 * 1024 * 1024);
+    const gateway = { enviarImagen: jest.fn().mockResolvedValue({ id: '1', estado: 'ENVIADO' }) };
+    const svc = armar(gateway, { subirArchivo: jest.fn().mockResolvedValue({ id: 5 }) });
+    await svc.enviarImagen('1', { buffer: pesada, mimetype: 'image/png' }, '', usuario);
+    expect(gateway.enviarImagen.mock.calls[0][2].length).toBeLessThanOrEqual(5 * 1024 * 1024);
+    expect(gateway.enviarImagen.mock.calls[0][3]).toBe('image/jpeg');
+    await svc.enviarImagen('1', { buffer: JPG, mimetype: 'image/jpeg' }, '', usuario);
+    expect(gateway.enviarImagen.mock.calls[1][2]).toBe(JPG);
+  }, 30000);
+
+  it('si Meta falla responde 400 con el id del mensaje FALLIDO', async () => {
+    const gateway = { enviarImagen: jest.fn().mockResolvedValue({ id: '9', estado: 'FALLIDO', errorCodigo: 'SUBIDA_MEDIA', errorDetalle: 'Meta no aceptó la foto' }) };
+    await expect(armar(gateway, { subirArchivo: jest.fn().mockResolvedValue({ id: 5 }) })
+      .enviarImagen('1', { buffer: JPG, mimetype: 'image/jpeg' }, '', usuario)).rejects.toMatchObject({
+      status: 400, response: { codigo: 'SUBIDA_MEDIA', mensajeId: '9' },
+    });
+  });
+
+  it('la ruta exige mensajes/enviar y acepta hasta 16 MB (el guard global responde 403 sin permiso)', () => {
+    const permiso = Reflect.getMetadata(CLAVE_PERMISO, MensajesController.prototype.enviarImagen);
+    expect(permiso).toEqual({ modulo: 'mensajes', accion: 'enviar' });
   });
 });
 

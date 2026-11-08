@@ -65,7 +65,7 @@ export async function volverPorAtender(id: string): Promise<{ ok: boolean }> {
   return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/volver-por-atender`, {});
 }
 
-/** Foto del equipo al cliente (JPG o PNG, hasta 5 MB) con subtítulo opcional. */
+/** Foto del equipo al cliente (JPG, PNG o WebP; el servidor la comprime a ≤5 MB) con subtítulo opcional. */
 export async function enviarImagenChat(id: string, archivo: File, subtitulo = ''): Promise<{ id: string }> {
   const fd = new FormData();
   fd.append('imagen', archivo, archivo.name);
