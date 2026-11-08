@@ -46,7 +46,7 @@ import { CobrarDto } from './dto/cobrar.dto';
 import { AnularCobroDto } from './dto/anular-cobro.dto';
 import { RechazarCobroMozoDto } from './dto/rechazar-cobro-mozo.dto';
 import { MarcarCoordinadoDto } from './dto/marcar-coordinado.dto';
-import { exigirComprobanteDigital } from './comprobante-pago.util';
+import { esPedidoLocalSinCaptura, exigirComprobanteDigital } from './comprobante-pago.util';
 
 /** Bloqueo de PIN de supervisor tras 3 fallos seguidos (FT-CAJ-02, RQ-CAJ-02-12). */
 
@@ -405,6 +405,9 @@ export class CobrosService {
         medios: dto.pagos.map((p) => p.medio),
         planPago: pedido.planPago,
         sinVoucher: dto.sinVoucher,
+        // Casilla única: la marca Caja ahora o ya la dio el mozo al enviar a Caja (cobro_mozo_en)
+        confirmaSinCaptura: dto.confirmaSinCaptura === true || pedido.cobro_mozo_en != null,
+        pedidoLocal: esPedidoLocalSinCaptura(pedido),
         permiteExcepcion: true,
         verificarPin: (pin) =>
           this.verificarPinSupervisor(pin, usuario?.partyId, ip, undefined, 'caja/cobrar_sin_voucher'),
@@ -532,7 +535,7 @@ export class CobrosService {
       entidadId: cobro.id,
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ...(sinVoucherAutorizado
-        ? { conPinAdmin: true, motivo: sinVoucherAutorizado.motivo }
+        ? { conPinAdmin: !sinVoucherAutorizado.sinCaptura, motivo: sinVoucherAutorizado.motivo }
         : {}),
       despues: {
         cobro_id: cobro.id.toString(),
@@ -542,7 +545,7 @@ export class CobrosService {
         pago_metodo: pagoMetodo,
         cobrado_durante_cierre: enCierre,
         sin_voucher: sinVoucherAutorizado
-          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId }
+          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId || null, sin_captura: sinVoucherAutorizado.sinCaptura === true }
           : null,
         pagos: cobro.pagos.map((p) => ({
           medio: p.medio,
@@ -954,6 +957,8 @@ export class CobrosService {
       medios: [pedido.pago_preferido || pedido.pago_metodo],
       planPago: pedido.planPago,
       sinVoucher: dto?.sinVoucher,
+      confirmaSinCaptura: dto?.confirmaSinCaptura === true || pedido.cobro_mozo_en != null,
+      pedidoLocal: esPedidoLocalSinCaptura(pedido),
       permiteExcepcion: true,
       verificarPin: (pin) =>
         this.verificarPinSupervisor(pin, usuario?.partyId, ip, undefined, 'caja/coordinado_sin_voucher'),
@@ -979,7 +984,7 @@ export class CobrosService {
       entidad: 'pedido',
       entidadId: pedido.id,
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
-      ...(sinVoucherAutorizado ? { conPinAdmin: true, motivo: sinVoucherAutorizado.motivo } : {}),
+      ...(sinVoucherAutorizado ? { conPinAdmin: !sinVoucherAutorizado.sinCaptura, motivo: sinVoucherAutorizado.motivo } : {}),
       antes: {
         pago_estado: pedido.pago_estado,
       },
@@ -987,7 +992,7 @@ export class CobrosService {
         pago_estado: 'COORDINADO',
         pago_coordinado_en: ahora.toISOString(),
         sin_voucher: sinVoucherAutorizado
-          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId }
+          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId || null, sin_captura: sinVoucherAutorizado.sinCaptura === true }
           : null,
       },
       ip,

@@ -78,6 +78,25 @@ export function getBadge(p: Pedido) {
 export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
   if (!cobro) return null;
   const alerta = cobro.faltaVoucher;
+  if (cobro.sinCaptura) {
+    return (
+      <span
+        data-testid="insignia-sin-captura"
+        style={{
+          alignSelf: 'flex-start',
+          fontSize: 12,
+          fontWeight: 700,
+          borderRadius: 9999,
+          padding: '2px 10px',
+          background: '#FFF4D6',
+          color: '#8A5A00',
+          border: '1.5px solid #E0A526',
+        }}
+      >
+        Pagado sin captura · confirmó {cobro.mozo || 'el mozo'} · {cobro.medio.split('+').map(nombreMedio).join(' + ')}
+      </span>
+    );
+  }
   return (
     <span
       style={{
@@ -185,6 +204,7 @@ const COBRO_OPCIONES = [
   { id: 'all', n: 'Todos' },
   { id: 'paid', n: 'Cobrado' },
   { id: 'unpaid', n: 'Pendiente' },
+  { id: 'sincaptura', n: 'Sin captura' },
 ];
 
 /** Conteo ligero de pendientes de días anteriores; si falla no tumba la carga de la lista. */
@@ -328,6 +348,7 @@ export function PedidosAdminView() {
         const pag = String(p.pago_estado).toUpperCase() === 'PAGADO';
         if (cobroFiltro === 'paid' && !pag) return false;
         if (cobroFiltro === 'unpaid' && pag) return false;
+        if (cobroFiltro === 'sincaptura' && !p.cobroMozo?.sinCaptura) return false;
       }
       if (q) {
         const cod = String(p.codigo || '').toLowerCase();
@@ -510,6 +531,7 @@ export function PedidosAdminView() {
         const pag = String(p.pago_estado).toUpperCase() === 'PAGADO';
         if (cobroFiltro === 'paid' && !pag) return false;
         if (cobroFiltro === 'unpaid' && pag) return false;
+        if (cobroFiltro === 'sincaptura' && !p.cobroMozo?.sinCaptura) return false;
       }
 
       if (q) {

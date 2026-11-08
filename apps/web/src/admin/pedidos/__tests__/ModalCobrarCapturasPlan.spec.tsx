@@ -71,12 +71,50 @@ describe('ModalCobrar con plan de 2 medios digitales', () => {
     render(<ModalCobrar pedido={base} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={cobrar} />);
 
     await waitFor(() => expect(screen.getByTestId('captura-plin')).toHaveTextContent('captura subida'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Cobrar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cobrar' }, { timeout: 5000 }));
 
     await waitFor(() => expect(cobrar).toHaveBeenCalled());
     const dto = cobrar.mock.calls[0][0];
     expect(dto.voucherId).toBeUndefined();
     expect(dto.sinVoucher).toBeUndefined();
+  });
+});
+
+describe('ModalCobrar sin captura: una sola casilla en el local', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('pedido de mozo sin fotos: casilla única (sin motivo ni supervisor) y el cobro viaja con confirmaSinCaptura', async () => {
+    vi.spyOn(vouchersApi, 'listarVouchers').mockResolvedValue([] as any);
+    const cobrar = vi.fn().mockResolvedValue({});
+    render(<ModalCobrar pedido={base} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={cobrar} />);
+
+    fireEvent.click(await screen.findByTestId('btn-sin-voucher'));
+    expect(screen.queryByTestId('motivo-sin-voucher')).toBeNull();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.getByText('Confirmo que ya hablé con el cliente y pagó con Yape + Plin (sin captura)')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Registrar cobro' })).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('casilla-sin-captura'));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar cobro' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cobrar' }, { timeout: 5000 }));
+
+    await waitFor(() => expect(cobrar).toHaveBeenCalled());
+    const dto = cobrar.mock.calls[0][0];
+    expect(dto.confirmaSinCaptura).toBe(true);
+    expect(dto.sinVoucher).toBeUndefined();
+  });
+
+  it('delivery o carta: sigue pidiendo motivo (y no hay casilla)', async () => {
+    vi.spyOn(vouchersApi, 'listarVouchers').mockResolvedValue([] as any);
+    render(
+      <ModalCobrar pedido={{ ...base, canal: 'CARTA', modalidad: 'DELIVERY' }} alCerrar={vi.fn()} alCobrarExitoso={vi.fn()} cobrar={vi.fn()} />,
+    );
+    fireEvent.click(await screen.findByTestId('btn-sin-voucher'));
+    expect(screen.getByTestId('motivo-sin-voucher')).toBeDefined();
+    expect(screen.queryByTestId('casilla-sin-captura')).toBeNull();
   });
 });

@@ -162,6 +162,8 @@ export interface Pedido {
     medio: string;
     mozo: string | null;
     faltaVoucher: boolean;
+    /** El mozo confirmó que el cliente ya pagó sin captura (Caja no exige voucher) */
+    sinCaptura?: boolean;
     /** Efectivo que recibió el mozo (Pagó con) y el vuelto; null si no hubo efectivo */
     recibido?: number | null;
     vuelto?: number | null;
@@ -360,6 +362,14 @@ export interface CobrarDto {
   voucherId?: string | number;
   /** Cobro digital sin foto: motivo escrito y código rotativo del supervisor. */
   sinVoucher?: { motivo: string; pinSupervisor?: string };
+  /** Casilla única «ya hablé con el cliente y pagó» (pedido del local, sin captura). */
+  confirmaSinCaptura?: boolean;
+}
+
+/** Excepción a la foto: la casilla del local viaja como confirmaSinCaptura; el resto, con motivo y supervisor. */
+function cuerpoSinVoucher(sv?: { motivo: string; pinSupervisor?: string; sinCaptura?: boolean }) {
+  if (!sv) return {};
+  return sv.sinCaptura ? { confirmaSinCaptura: true } : { sinVoucher: { motivo: sv.motivo, pinSupervisor: sv.pinSupervisor } };
 }
 
 export const pedidosApi = {
@@ -451,13 +461,13 @@ export const pedidosApi = {
     id: string | number,
     metodo: string,
     estado: 'COORDINADO' | 'PAGADO' = 'PAGADO',
-    sinVoucher?: { motivo: string; pinSupervisor?: string },
+    sinVoucher?: { motivo: string; pinSupervisor?: string; sinCaptura?: boolean },
     codigosOperacion?: Array<{ medio: string; codigo: string }>,
   ): Promise<Pedido> {
     return api.post<Pedido>(`/admin/pedidos/${id}/pago`, {
       metodo,
       estado,
-      ...(sinVoucher ? { sinVoucher } : {}),
+      ...cuerpoSinVoucher(sinVoucher),
       ...(codigosOperacion?.length ? { codigosOperacion } : {}),
     });
   },
@@ -567,11 +577,11 @@ export const pedidosApi = {
   /** Pago digital sin foto útil: solo con motivo y código del supervisor (sinVoucher). */
   async marcarPagoCoordinado(
     id: string | number,
-    sinVoucher?: { motivo: string; pinSupervisor?: string },
+    sinVoucher?: { motivo: string; pinSupervisor?: string; sinCaptura?: boolean },
   ): Promise<{ id: string; pago_estado: string }> {
     return api.post<{ id: string; pago_estado: string }>(
       `/admin/caja/pedidos/${id}/coordinado`,
-      sinVoucher ? { sinVoucher } : {},
+      cuerpoSinVoucher(sinVoucher),
     );
   },
 

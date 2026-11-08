@@ -1,4 +1,4 @@
-import { IsOptional, ValidateNested } from 'class-validator';
+import { IsBoolean, IsOptional, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SinVoucherDto } from './cobrar.dto';
 
@@ -8,4 +8,8 @@ export class MarcarCoordinadoDto {
   @ValidateNested()
   @Type(() => SinVoucherDto)
   sinVoucher?: SinVoucherDto;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmaSinCaptura?: boolean;
 }

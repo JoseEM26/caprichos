@@ -37,7 +37,7 @@ import {
   SupervisorCodigoService,
   autorizarAdminSinCodigo,
 } from '../supervisor-codigo/supervisor-codigo.service';
-import { exigirComprobanteDigital, mediosQueExigenCodigo, voucherCubreMedio } from '../caja/comprobante-pago.util';
+import { esPedidoLocalSinCaptura, exigirComprobanteDigital, mediosQueExigenCodigo, voucherCubreMedio } from '../caja/comprobante-pago.util';
 import { puedeCambiarVoucher, puedeSubirVoucher } from '../vouchers/regla-cambio-voucher';
 import { MEDIOS_CON_VOUCHER_CAJA } from '../vouchers/vouchers.service';
 import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
@@ -96,6 +96,8 @@ export interface CobroMozoVista {
   medio: string;
   mozo: string | null;
   faltaVoucher: boolean;
+  /** Mozo confirmó que el cliente ya pagó (Yape/Plin/transferencia) sin captura: Caja no exige voucher. */
+  sinCaptura: boolean;
   /** Efectivo que el mozo recibió (Pagó con S/); null si no hubo efectivo o no lo escribió. */
   recibido: number | null;
   vuelto: number | null;
@@ -802,6 +804,8 @@ export class PedidosEstadoService {
       }
       const medios = p.cobro_mozo_medio.split('+');
       const conVouch = medios.some((m) => (MEDIOS_CON_VOUCHER_CAJA as readonly string[]).includes(m));
+      const digital = medios.some((m) => ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(m));
+      const sinCaptura = digital && !pedidosConVoucher.has(String(p.id));
       const recibido = p.cobro_mozo_recibido != null ? Number(p.cobro_mozo_recibido) : null;
       const vuelto =
         recibido != null ? Math.round((recibido - (efectivoDe.get(String(p.id)) ?? 0)) * 100) / 100 : null;
@@ -810,7 +814,8 @@ export class PedidosEstadoService {
         en: p.cobro_mozo_en,
         medio: p.cobro_mozo_medio,
         mozo: p.cobro_mozo_party_id != null ? nombreMozo.get(String(p.cobro_mozo_party_id)) || null : null,
-        faltaVoucher: conVouch && !pedidosConVoucher.has(String(p.id)),
+        faltaVoucher: conVouch && !pedidosConVoucher.has(String(p.id)) && !sinCaptura,
+        sinCaptura,
         recibido,
         vuelto,
         pide: tipo === 'BOLETA' || tipo === 'FACTURA' ? tipo : null,
@@ -1339,6 +1344,8 @@ export class PedidosEstadoService {
       medios: [metodoUpper],
       planPago: pedido.planPago,
       sinVoucher: dto.sinVoucher,
+      confirmaSinCaptura: dto.confirmaSinCaptura === true || pedido.cobro_mozo_en != null,
+      pedidoLocal: esPedidoLocalSinCaptura(pedido),
       permiteExcepcion: true,
       verificarPin: (pin) =>
         this.verificarPinSupervisor(pin, usuarioActual.partyId, ip, pedido.id, 'pedidos/registrar_pago_sin_voucher'),
@@ -1346,7 +1353,7 @@ export class PedidosEstadoService {
 
     // Código de operación por cada medio digital (plan mixto: uno por parte digital; efectivo: ninguno)
     // La excepción «confirmar sin comprobante» (motivo + supervisor) no tiene voucher del que sacar el código
-    const codigosRequeridos = dto.sinVoucher ? [] : mediosQueExigenCodigo(metodoUpper, pedido.planPago);
+    const codigosRequeridos = dto.sinVoucher || sinVoucherAutorizado?.sinCaptura ? [] : mediosQueExigenCodigo(metodoUpper, pedido.planPago);
     const codigosEntregados = new Map(
       (dto.codigosOperacion ?? []).map((c) => [String(c.medio).toUpperCase().trim(), String(c.codigo).trim()]),
     );
@@ -1404,12 +1411,12 @@ export class PedidosEstadoService {
         pago_metodo: metodoUpper,
         pago_estado: estadoFinal,
         sin_voucher: sinVoucherAutorizado
-          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId }
+          ? { motivo: sinVoucherAutorizado.motivo, aprobado_por: sinVoucherAutorizado.supervisorPartyId || null, sin_captura: sinVoucherAutorizado.sinCaptura === true }
           : null,
         codigos_operacion: codigosRequeridos.map((medio) => ({ medio, codigo: codigosEntregados.get(medio) })),
       },
       partyId: usuarioActual.partyId,
-      ...(sinVoucherAutorizado ? { conPinAdmin: true, motivo: sinVoucherAutorizado.motivo } : {}),
+      ...(sinVoucherAutorizado ? { conPinAdmin: !sinVoucherAutorizado.sinCaptura, motivo: sinVoucherAutorizado.motivo } : {}),
       ip,
     });
 

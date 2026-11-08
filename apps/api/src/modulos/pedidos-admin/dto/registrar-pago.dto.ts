@@ -1,4 +1,4 @@
-import { IsArray, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SinVoucherDto } from '../../caja/dto/cobrar.dto';
 
@@ -29,6 +29,11 @@ export class RegistrarPagoDto {
   @ValidateNested()
   @Type(() => SinVoucherDto)
   sinVoucher?: SinVoucherDto;
+
+  /** Casilla «ya hablé con el cliente y pagó» (local, sin captura). */
+  @IsOptional()
+  @IsBoolean()
+  confirmaSinCaptura?: boolean;
 
   /** Obligatorio por cada medio digital (Yape, Plin, transferencia, tarjeta) y ninguno en efectivo. */
   @IsOptional()

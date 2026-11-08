@@ -9,6 +9,8 @@ import type { PlanPagoItem } from '../pedidos/planPago';
 /** Lo que el mozo elige al enviar a Caja: efectivo con el que paga y comprobante (boleta o factura, obligatorio). */
 export interface EnvioCajaExtra {
   recibido?: number;
+  /** Casilla única «ya hablé con el cliente y pagó» (sin captura) */
+  confirmaSinCaptura?: boolean;
   comprobante?: { tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA'; doc?: string; razon?: string; direccion?: string };
 }
 
@@ -146,6 +148,7 @@ export const vouchersApi = {
       ...(plan ? { plan } : {}),
       ...(extra?.recibido !== undefined ? { recibido: extra.recibido } : {}),
       ...(extra?.comprobante ? { comprobante: extra.comprobante } : {}),
+      ...(extra?.confirmaSinCaptura ? { confirmaSinCaptura: true } : {}),
     });
   },
 

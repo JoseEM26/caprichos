@@ -549,9 +549,12 @@ export class ChatbotPlanificadorService implements OnModuleInit, OnModuleDestroy
           pago_metodo: true,
           pago_preferido: true,
           cliente_telefono: true,
+          cobro_mozo_en: true,
         },
       });
       if (!pedido || pedido.estado === 'ANULADO' || pedido.pago_estado !== 'PENDIENTE') continue;
+      // Pagado sin captura: el personal ya confirmó con el cliente, no se le recuerda el voucher
+      if (pedido.cobro_mozo_en) continue;
       const medio = String(pedido.pago_preferido || pedido.pago_metodo || '').toUpperCase();
       if (!['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(medio)) continue;
 

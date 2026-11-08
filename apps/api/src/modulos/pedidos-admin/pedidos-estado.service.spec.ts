@@ -1372,12 +1372,12 @@ describe('PedidosEstadoService', () => {
       ]);
     });
 
-    it('lista: digital sin voucher legible lleva faltaVoucher, mozo y hora', async () => {
+    it('lista: digital sin voucher legible lleva sinCaptura (el mozo confirmó), mozo y hora', async () => {
       prismaMock.pedido.findMany.mockResolvedValue([pedidoBase]);
 
       const res = await service.listar({}, cajeroAuth);
 
-      expect(res.items[0].cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: true, recibido: null, vuelto: null, pide: null });
+      expect(res.items[0].cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: false, sinCaptura: true, recibido: null, vuelto: null, pide: null });
     });
 
     it('lista: con voucher vigente y legible no falta voucher; un ILEGIBLE no cuenta (filtro en la consulta)', async () => {
@@ -1387,6 +1387,7 @@ describe('PedidosEstadoService', () => {
       const res = await service.listar({}, cajeroAuth);
 
       expect(res.items[0].cobroMozo?.faltaVoucher).toBe(false);
+      expect(res.items[0].cobroMozo?.sinCaptura).toBe(false);
       expect(prismaMock.voucherPago.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { pedido_id: { in: [10n] }, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
@@ -1402,7 +1403,7 @@ describe('PedidosEstadoService', () => {
 
       const res = await service.listar({}, cajeroAuth);
 
-      expect(res.items[0].cobroMozo).toMatchObject({ medio: 'EFECTIVO+YAPE', faltaVoucher: true });
+      expect(res.items[0].cobroMozo).toMatchObject({ medio: 'EFECTIVO+YAPE', faltaVoucher: false, sinCaptura: true });
       expect(res.items[1].cobroMozo).toMatchObject({ medio: 'EFECTIVO', faltaVoucher: false });
     });
 
@@ -1428,7 +1429,7 @@ describe('PedidosEstadoService', () => {
     it('detalle: entrega cobroMozo con mozo y falta de voucher; null si ya está PAGADO', async () => {
       prismaMock.pedido.findUnique.mockResolvedValue(pedidoBase);
       const pendiente = await service.obtenerPorId(10n, cajeroAuth);
-      expect(pendiente.cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: true, recibido: null, vuelto: null, pide: null });
+      expect(pendiente.cobroMozo).toEqual({ en: horaCobro, medio: 'YAPE', mozo: 'Juan Mozo', faltaVoucher: false, sinCaptura: true, recibido: null, vuelto: null, pide: null });
 
       prismaMock.pedido.findUnique.mockResolvedValue({ ...pedidoBase, pago_estado: 'PAGADO' });
       const pagado = await service.obtenerPorId(10n, cajeroAuth);

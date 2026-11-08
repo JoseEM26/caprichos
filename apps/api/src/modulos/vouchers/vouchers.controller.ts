@@ -107,6 +107,7 @@ export class VouchersController {
     @Body('plan') planRaw: any,
     @Body('recibido') recibidoRaw: any,
     @Body('comprobante') comprobanteRaw: any,
+    @Body('confirmaSinCaptura') confirmaRaw: any,
     @Req() req: any,
   ) {
     const pedidoId = pedidoIdRaw ? String(pedidoIdRaw).trim() : '';
@@ -118,6 +119,7 @@ export class VouchersController {
       planRaw ?? undefined,
       {
         recibido: recibidoRaw ?? undefined,
+        confirmaSinCaptura: confirmaRaw === true,
         comprobante: comprobanteRaw && typeof comprobanteRaw === 'object' ? comprobanteRaw : undefined,
       },
     );

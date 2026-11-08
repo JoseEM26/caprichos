@@ -18,6 +18,7 @@ import {
   type MedioPlan,
 } from '../../pedidos/planPago';
 import { PlanPagoEditor } from './PlanPagoEditor';
+import { textoConfirmaSinCaptura } from '../../pedidos/mediosPago';
 import {
   SelectorComprobante,
   aPayloadComprobante,
@@ -151,6 +152,8 @@ export function ModalPrecuenta({
   const [enviando, setEnviando] = useState<boolean>(false);
   const [enviado, setEnviado] = useState<boolean>(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+  // Casilla única: «ya hablé con el cliente y pagó» sustituye a la foto de Yape/Plin/transferencia
+  const [sinCaptura, setSinCaptura] = useState<boolean>(false);
 
   if (!abierto) return null;
 
@@ -165,6 +168,10 @@ export function ModalPrecuenta({
   const hayDigital = digitalesPlan.length > 0;
   const faltanVouchers = digitalesPlan.filter((f) => legibles[f.medio] !== true).map((f) => nombreMedio(f.medio));
   const voucherOk = hayDigital && faltanVouchers.length === 0;
+  // La tarjeta sigue pidiendo la copia del POS: la casilla solo cubre los medios digitales
+  const faltanMedios = digitalesPlan.filter((f) => legibles[f.medio] !== true);
+  const puedeSinCaptura = faltanMedios.length > 0 && faltanMedios.every((f) => f.medio !== 'TARJETA');
+  const sinCapturaValida = puedeSinCaptura && sinCaptura;
   // Efectivo: con cuánto paga (obligatorio si hay efectivo) y el vuelto que sale de ahí
   const efectivoPlan = montoEfectivoPlan(planEnvio);
   const pagaConNum = Number(pagaCon);
@@ -178,7 +185,7 @@ export function ModalPrecuenta({
   const tipoComp: TipoComprobanteSel | null = valorComp.tipo;
   const errorComprobante = errorValorComprobante(valorComp)?.mensaje ?? null;
   // Con parte digital o tarjeta, la foto de cada medio tiene que estar subida y leerse antes de enviar (lo exige el servidor)
-  const listoParaEnviar = planListo && errorPagaCon === null && errorComprobante === null && (!hayDigital || voucherOk);
+  const listoParaEnviar = planListo && errorPagaCon === null && errorComprobante === null && (!hayDigital || voucherOk || sinCapturaValida);
   const subidoAntes = (medio: string) => (vpm ?? []).some((v) => v.medio === medio && v.subido);
   // El plan se guarda antes de cada captura: el servidor compara contra el monto de ese medio
   const guardarPlan = async () => {
@@ -205,6 +212,7 @@ export function ModalPrecuenta({
     const extra: EnvioCajaExtra = {
       ...(efectivoPlan > 0 ? { recibido: pagaConNum } : {}),
       comprobante: aPayloadComprobante(valorComp),
+      ...(sinCapturaValida ? { confirmaSinCaptura: true } : {}),
     };
     try {
       setEnviando(true);
@@ -375,7 +383,21 @@ export function ModalPrecuenta({
                 )}
 
                 {hayDigital && !voucherOk && (
-                  <div className="pc-nota-envio">Falta la foto de {faltanVouchers.join(', ')}: súbela antes de enviar a Caja.</div>
+                  <div className="pc-nota-envio">
+                    Falta la foto de {faltanVouchers.join(', ')}: súbela antes de enviar a Caja, o marca que el cliente ya pagó.
+                  </div>
+                )}
+                {puedeSinCaptura && !enviado && (
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontWeight: 700 }}>
+                    <input
+                      type="checkbox"
+                      data-testid="casilla-sin-captura"
+                      checked={sinCaptura}
+                      onChange={(e) => setSinCaptura(e.target.checked)}
+                      style={{ marginTop: 3 }}
+                    />
+                    {textoConfirmaSinCaptura(faltanMedios.map((f) => f.medio).join(' + '))}
+                  </label>
                 )}
                 {voucherOk && digitalesPlan.every((f) => subidoAntes(f.medio)) && (
                   <div className="pc-nota-envio">Caja revisará los vouchers ya subidos.</div>
