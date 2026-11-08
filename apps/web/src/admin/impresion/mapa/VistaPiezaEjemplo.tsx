@@ -3,6 +3,7 @@ import {
   lineasTicketComandaSalon,
   type EtiquetaAreaDatos,
   type EtiquetaBebidaDatos,
+  PAGOS_EJEMPLO,
   type EtiquetaGeneralDatos,
   type TicketComandaSalonDatos,
   type TicketPagoDatos,
@@ -30,8 +31,17 @@ const GENERAL: EtiquetaGeneralDatos = {
   ],
   nota: null,
   total: 38.5,
+  pago: PAGOS_EJEMPLO.digital,
   printer: 'PC Caja',
 };
+
+/** Variantes del bloque PAGO del sticker de despacho (la primera es el GENERAL de arriba: ya pagado digital). */
+const VARIANTES_PAGO = [
+  { clave: 'efectivoVuelto', datos: { ...GENERAL, pago: PAGOS_EJEMPLO.efectivoVuelto } },
+  { clave: 'dividido', datos: { ...GENERAL, pago: PAGOS_EJEMPLO.dividido } },
+  { clave: 'personal', datos: { ...GENERAL, pago: PAGOS_EJEMPLO.personal, total: 21 } },
+  { clave: 'deliveryContraEntrega', datos: { ...GENERAL, modalidad: 'DELIVERY', modalidadPill: 'DELIVERY', direccion: 'Av. Larga 123, Comas', telefono: '987 654 321', pago: PAGOS_EJEMPLO.deliveryContraEntrega } },
+];
 const AREA: EtiquetaAreaDatos = {
   areaNombre: 'SALADOS',
   areaIndex: 1,
@@ -143,6 +153,7 @@ export function VistaPieza({ clave }: { clave: ClavePieza }) {
       {clave === 'AREA' && <EtiquetaArea datos={AREA} />}
       {clave === 'BEBIDA' && <EtiquetaBebida datos={{ ...BEBIDA, persona: NOMBRE_LARGO }} />}
       {clave === 'RESUMEN' && <EtiquetaGeneral datos={{ ...GENERAL, who: NOMBRE_LARGO }} />}
+      {clave === 'RESUMEN' && VARIANTES_PAGO.map((v) => <EtiquetaGeneral key={v.clave} datos={v.datos} />)}
       {clave === 'AREA' && <EtiquetaArea datos={{ ...AREA, who: NOMBRE_LARGO }} />}
       {clave === 'COMANDA' && <ComandaEjemplo datos={COMANDA} />}
       {clave === 'COMANDA_AREA' && <ComandaEjemplo datos={COMANDA_AREA} />}

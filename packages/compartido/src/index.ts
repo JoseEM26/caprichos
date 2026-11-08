@@ -71,6 +71,9 @@ export {
 } from './etiquetas/maquetaEtiquetas.js';
 export { maquetarGeneral, maquetarBebida, maquetarEtiqueta, lineasDeDatos } from './etiquetas/maquetaStickers.js';
 export type { FuenteTspl, Primitiva, Maqueta, FormatoMaqueta } from './etiquetas/maquetaEtiquetas.js';
+export { calcularPagoPedido } from './etiquetas/pagoPedido.js';
+export { PAGOS_EJEMPLO } from './etiquetas/pagosEjemplo.js';
+export type { EntradaPagoPedido } from './etiquetas/pagoPedido.js';
 export { lineasTicketPago } from './etiquetas/ticketPago.js';
 export { detalleLinea, entradaDeLineaPedido, descuentosDePedido, resumenAntesDelTotal, solesTexto } from './etiquetas/detalleLinea.js';
 export type { LineaDetalleEntrada, DetalleLinea, DescuentoTicket } from './etiquetas/detalleLinea.js';

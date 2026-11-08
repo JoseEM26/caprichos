@@ -1,4 +1,4 @@
-import type { EtiquetaAreaDatos, EtiquetaBebidaDatos, EtiquetaGeneralDatos, TipoEtiqueta } from '../tipos/etiquetas.js';
+import type { EtiquetaAreaDatos, EtiquetaBebidaDatos, EtiquetaGeneralDatos, PagoEtiqueta, TipoEtiqueta } from '../tipos/etiquetas.js';
 import { TAMANO_BEBIDA_DEFECTO, TAMANO_GENERAL_DEFECTO } from '../constantes/tamanosEtiqueta.js';
 import {
   FUENTES_TSPL,
@@ -228,6 +228,105 @@ function textoProducto(cantidad: number, nombre: string, tamano: string | null |
   return `${pre}${truncar(nombre, espacio)}${post}`;
 }
 
+// ---- BLOQUE DE PAGO (sticker de despacho) ----
+
+const solesS = (n: number) => `S/ ${Number(n).toFixed(2)}`;
+const NOMBRE_MEDIO: Record<string, string> = { CREDITO_PERSONAL: 'CRÉDITO DEL PERSONAL' };
+const medioTxt = (m: string) => NOMBRE_MEDIO[m] ?? m.replace(/_/g, ' ').toUpperCase();
+
+/** Textos del pago, ya decididos (los mismos nombres que la pantalla de Despacho). */
+function textosPago(pg: PagoEtiqueta) {
+  const personal = pg.esPersonal;
+  const base = personal ? ['CONSUMO DEL PERSONAL · a su crédito', 'CONSUMO PERSONAL', 'PERSONAL'] : pg.estado === 'PAGADO' ? ['YA PAGADO'] : pg.estado === 'COBRADO_MOZO' ? ['YA PAGADO · cobró el mozo', 'YA PAGADO'] : pg.cobrarAlEntregar != null ? [`COBRAR AL ENTREGAR: ${solesS(pg.cobrarAlEntregar)}`, `COBRAR ${solesS(pg.cobrarAlEntregar)}`] : ['POR COBRAR'];
+  // Version mas corta: lleva el total pegado (solo si el banner no lo trae ya)
+  const corto = pg.cobrarAlEntregar != null && !personal ? [base[base.length - 1]] : [`${base[base.length - 1]} ${solesS(pg.total)}`];
+  const medios = personal ? [{ medio: 'CREDITO_PERSONAL', monto: pg.total }] : pg.medios;
+  let vuelto = '';
+  if (!personal && pg.efectivo > 0) {
+    vuelto = pg.recibido == null ? 'Paga con: no indicó cuánto' : pg.llevaVuelto ? `Paga con ${solesS(pg.recibido)} · Vuelto ${solesS(pg.vuelto ?? 0)}` : 'Sin vuelto (paga exacto)';
+  }
+  const extras = [pg.descuento > 0 ? `Desc. -${solesS(pg.descuento)}` : '', pg.propina > 0 ? `Propina ${solesS(pg.propina)}` : ''].filter(Boolean).join(' · ');
+  return { base, corto, medios, vuelto, extras };
+}
+
+/** Banner invertido: el primer texto (el mas completo) y su fuente (4 y luego 3) que cabe en `w`; si ninguno, el ultimo recortado. */
+function elegirBanner(cands: string[], w: number): { t: string; f: FuenteTspl } {
+  for (const t of cands) for (const f of ['4', '3'] as FuenteTspl[]) if (ancho_(t, [f, 1]) <= w) return { t, f };
+  return { t: truncar(cands[cands.length - 1], charsEn(w, ['3', 1])), f: '3' };
+}
+
+const GAP = 4;
+/**
+ * Dibuja el recuadro PAGO con su borde inferior en `fin`; devuelve la y donde empieza el recuadro (0 si no cabe ni el
+ * nivel minimo). Niveles de mas a menos detalle: completo (titulo, medios, vuelto, total) -> sin titulo y con los medios
+ * en una linea -> solo el banner con el total. Se elige el primero que cabe en `maxAlto`.
+ */
+function bloquePago(L: Lienzo, pg: PagoEtiqueta, fin: number, maxAlto: number): number {
+  const T = textosPago(pg);
+  const wIn = L.w - 12;
+  const x = L.x0 + 6;
+  const hTxt = (f: string) => alto(f) + 2;
+  type Fila = { alto: number; dibujar: (y: number) => void };
+  const banner = (cands: string[]): Fila => {
+    const b = elegirBanner(cands, wIn - 12);
+    const h = alto(b.f) + 10;
+    return {
+      alto: h,
+      dibujar: (y) => {
+        texto(L, x + Math.floor((wIn - ancho_(b.t, [b.f, 1])) / 2), y + 5, b.f, 1, b.t, true);
+        inverso(L, x, y, wIn, h);
+      },
+    };
+  };
+  const par = (izq: string, der: string, f: FuenteTspl, fDer: FuenteTspl = f): Fila => ({
+    alto: hTxt(fDer),
+    dibujar: (y) => {
+      const wD = ancho_(der, [fDer, 1]);
+      texto(L, x, y + alto(fDer) - alto(f), f, 1, truncar(izq, Math.max(1, charsEn(wIn - wD - 12, [f, 1]))));
+      texto(L, x + wIn - wD, y, fDer, 1, der);
+    },
+  });
+  const linea = (t: string, f: FuenteTspl = '3'): Fila => ({ alto: hTxt(f), dibujar: (y) => texto(L, x, y, f, 1, truncar(t, charsEn(wIn, [f, 1]))) });
+  const total = (): Fila => ({
+    alto: hTxt('4') + 4,
+    dibujar: (y) => {
+      barra(L, x, y, wIn, 2);
+      const m = solesS(pg.total);
+      texto(L, x, y + 6 + alto('4') - alto('3'), '3', 1, 'TOTAL');
+      texto(L, x + wIn - ancho_(m, ['4', 1]), y + 6, '4', 1, m);
+    },
+  });
+  const titulo = (): Fila => ({
+    alto: hTxt('3'),
+    dibujar: (y) => {
+      texto(L, x, y, '3', 1, 'PAGO');
+      if (T.extras) {
+        const e = truncar(T.extras, charsEn(wIn - 5 * ancho('3') - 16, ['2', 1]));
+        texto(L, x + wIn - ancho_(e, ['2', 1]), y + 2, '2', 1, e);
+      }
+    },
+  });
+  const unMedio = T.medios.map((m) => medioTxt(m.medio)).join(' + ') + (T.medios.length > 1 ? '' : '');
+  const niveles: Fila[][] = [
+    [titulo(), banner(T.base), ...T.medios.map((m) => par(medioTxt(m.medio), solesS(m.monto), '3')), ...(T.vuelto ? [linea(T.vuelto)] : []), total()],
+    [banner(T.base), ...(T.medios.length ? [linea(T.medios.length > 1 ? T.medios.map((m) => `${medioTxt(m.medio)} ${m.monto.toFixed(2)}`).join(' + ') : `${unMedio} ${solesS(T.medios[0].monto)}`)] : []), ...(T.vuelto ? [linea(T.vuelto, '2')] : []), total()],
+    ...(T.vuelto ? [[banner(T.corto), linea(T.vuelto, '2')]] : []),
+    [banner(T.corto)],
+  ];
+  const altoDe = (fs: Fila[]) => fs.reduce((a, r) => a + r.alto, 0) + GAP * (fs.length - 1) + 8;
+  const elegido = niveles.find((fs) => altoDe(fs) <= maxAlto) ?? niveles[niveles.length - 1];
+  const h = altoDe(elegido);
+  if (h > fin - L.b) return 0;
+  const top = fin - h;
+  L.prim.push({ t: 'caja', x1: L.x0, y1: top, x2: L.x0 + L.w, y2: fin, grosor: 2, radio: 4 });
+  let y = top + 4;
+  for (const r of elegido) {
+    r.dibujar(y);
+    y += r.alto + GAP;
+  }
+  return top;
+}
+
 export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number; altoMm?: number; margenMm?: number } = {}): Maqueta {
   const L = lienzo({ anchoMm: tam.anchoMm ?? TAMANO_GENERAL_DEFECTO.anchoMm, altoMm: tam.altoMm ?? TAMANO_GENERAL_DEFECTO.altoMm, margenMm: tam.margenMm });
   // Cabecera: marca (logo + CAPRICHOS) y codigo del pedido
@@ -235,7 +334,8 @@ export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number
 
   // Pie: unidades (izq) y total (der)
   const unidades = `${d.cantidadProductos} UNID.`;
-  const total = d.total != null ? `S/ ${Number(d.total).toFixed(2)}` : '';
+  // Con bloque de pago el total ya sale ahi (en grande): el pie no lo repite
+  const total = d.total != null && !d.pago ? `S/ ${Number(d.total).toFixed(2)}` : '';
   let finCuerpo = pie(L, unidades, total, '4') - 4;
 
   // Nota, si hay, justo sobre el pie (hasta 2 lineas)
@@ -246,6 +346,12 @@ export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number
     L.prim.push({ t: 'caja', x1: L.x0, y1: top, x2: L.x0 + L.w, y2: finCuerpo, grosor: 2, radio: 4 });
     rn.lineas.forEach((l, i) => texto(L, L.x0 + 6, top + 4 + i * hLinea(['2', 1]), '2', 1, l));
     finCuerpo = top - 6;
+  }
+
+  // Recuadro PAGO (prioridad sobre la lista de productos): hasta 55 % del cuerpo; el nombre y el pago nunca se recortan antes
+  if (d.pago) {
+    const top = bloquePago(L, d.pago, finCuerpo, Math.floor((finCuerpo - y) * 0.55));
+    if (top > 0) finCuerpo = top - 6;
   }
 
   // Cliente: el protagonista (hasta 34 % del cuerpo), lo mas grande que quepa en 2 lineas

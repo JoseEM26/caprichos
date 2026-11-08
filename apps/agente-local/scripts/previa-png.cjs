@@ -90,6 +90,20 @@ const L = {
   fs.mkdirSync(salida, { recursive: true });
   // DATOS_JSON=<archivo> {general, area, bebida}: usa esos datos (p. ej. los del panel) en vez de las muestras
   const D = process.env.DATOS_JSON ? JSON.parse(fs.readFileSync(process.env.DATOS_JSON, 'utf8')) : null;
+  // PAGO_VARIANTES=1 [TAM_MM=76x38]: el sticker general con cada uno de los 5 pagos de ejemplo
+  if (process.env.PAGO_VARIANTES) {
+    const { PAGOS_EJEMPLO } = require('@caprichos/compartido');
+    const tam = process.env.TAM_MM ? process.env.TAM_MM.split('x').map(Number) : null;
+    for (const [k, pago] of Object.entries(PAGOS_EJEMPLO)) {
+      const base = { ...muestras.muestraEtiquetaGeneral, total: pago.total, pago, ...(tam ? { tamanoMm: { anchoMm: tam[0], altoMm: tam[1] } } : {}) };
+      const d = k === 'deliveryContraEntrega' ? { ...base, modalidadPill: 'DELIVERY', direccion: 'Av. Larga 123, Comas', telefono: '987654321' } : base;
+      const r = await render(generarTsplTrabajo('ETIQUETA_GENERAL', d, false, { orientacion, giro }), 2);
+      const ruta = path.join(salida, `pago-${process.env.TAM_MM || 'def'}-${k}.png`);
+      fs.writeFileSync(ruta, r.fisico);
+      console.log(ruta);
+    }
+    return;
+  }
   for (const [tipo, datos, nombre] of [
     ['ETIQUETA_GENERAL', D ? D.general : largos ? L.general : muestras.muestraEtiquetaGeneral, 'general'],
     ['ETIQUETA_AREA', D ? D.area : largos ? L.area : muestras.muestraEtiquetaArea, 'area'],

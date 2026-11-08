@@ -294,7 +294,7 @@ describe('Mapa de impresión: leyenda, detalle y presión larga', () => {
     await screen.findAllByText('Sticker de bebida');
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de Sticker de resumen' }));
     const panel = await screen.findByRole('dialog', { name: 'Detalle: Sticker de resumen' });
-    expect(within(panel).getAllByRole('img', { name: /Vista previa de la etiqueta general/ })).toHaveLength(2);
+    expect(within(panel).getAllByRole('img', { name: /Vista previa de la etiqueta general/ })).toHaveLength(6);
     expect(within(panel).getByText(/Sale en: Para llevar · Delivery/)).toBeInTheDocument();
   });
 

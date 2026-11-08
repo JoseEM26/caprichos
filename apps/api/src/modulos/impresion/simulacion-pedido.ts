@@ -110,6 +110,9 @@ export function construirPedidoSimulado(
     total,
     propina: 0,
     paga_con: 100,
+    // Coherente con el cobro de abajo: delivery sale por cobrar en efectivo (contra entrega); lo demas ya pagado
+    pago_metodo: 'EFECTIVO',
+    pago_estado: modalidad === 'DELIVERY' ? 'PENDIENTE' : 'PAGADO',
     comprobante_tipo: 'BOLETA',
     cobros: [{ en: ahora, anulado_en: null, pagos: [{ medio: 'EFECTIVO', monto: total, recibido: 100, vuelto: 100 - total }] }],
     planPago: [],
