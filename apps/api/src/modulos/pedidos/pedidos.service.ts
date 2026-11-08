@@ -106,6 +106,8 @@ export interface OrigenPedido {
   mesasIds?: (bigint | string | number)[];
   mesaNombre?: string;
   omitirChequeoCarta?: boolean;
+  /** Pedido extra: id del pedido original al que se enlaza. El envío del extra siempre es 0 (ya se cobró en el original). */
+  pedidoOrigenId?: bigint | string | number;
   enTransaccion?: (tx: Prisma.TransactionClient, pedido: any) => Promise<void>;
 }
 
@@ -967,6 +969,9 @@ export class PedidosService {
       entregaOrigen = null;
     }
 
+    // Pedido extra: el envío ya se cobró en el original
+    if (origen?.pedidoOrigenId !== undefined) envio = 0;
+
     // canje de puntos (DT-55): solo con cuenta, sin cupón y hasta el monto de los productos
     const puntosCanje = Number(Number(dto.puntosCanje || 0).toFixed(2));
     if (puntosCanje > 0) {
@@ -1098,6 +1103,7 @@ export class PedidosService {
           comprobante_razon: comprobanteRazon,
           comprobante_direccion: comprobanteTipo === 'FACTURA' ? dto.comprobante?.direccion?.trim() || null : null,
           nota: dto.nota?.trim() || null,
+          pedido_origen_id: origen?.pedidoOrigenId !== undefined ? BigInt(origen.pedidoOrigenId) : null,
           es_personal: Boolean(origen?.esPersonal),
           clave_idempotencia: claveIdempotencia,
           pasa_cocina_en: new Date(),
@@ -1139,7 +1145,9 @@ export class PedidosService {
           estado_anterior: null,
           estado_nuevo: 'COLA',
           motivo:
-            origen?.canal === 'MOZO'
+            origen?.pedidoOrigenId !== undefined
+              ? 'Pedido extra enlazado a otro pedido'
+              : origen?.canal === 'MOZO'
               ? 'Pedido abierto por el mozo'
               : origen?.canal === 'WHATSAPP' || origen?.canal === 'BOT'
                 ? 'Pedido creado desde WhatsApp'

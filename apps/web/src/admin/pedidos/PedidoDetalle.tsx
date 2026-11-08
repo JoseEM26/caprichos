@@ -45,6 +45,10 @@ export interface PedidoDetalleProps {
   alRepetir?: (pedido: Pedido) => void;
   /** Abre el editor de productos y datos (solo para pedidos sin cobrar en cola, preparando o listo). */
   alEditar?: (pedido: Pedido) => void;
+  /** Abre el modal en modo «extra»: pedido nuevo enlazado a este (permiso pedidos/extra). */
+  alAgregarExtra?: (pedido: Pedido) => void;
+  /** Abre otro pedido (enlaces de «Extras» y «EXTRA de …»). */
+  alAbrirPedido?: (id: string) => void;
   /** Nombre de quien tiene abierto el editor de este pedido (llega por socket a la lista; vale 2 minutos). */
   editandoPor?: string | null;
   /** Estado de la caja de hoy (lo pasa la lista). Con caja cerrada, un pedido sin cobrar lleva «Caja cerrada». */
@@ -87,7 +91,7 @@ function puedeCortesiaLinea(pedido: Pedido, it: LineaPedido): boolean {
   );
 }
 
-export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, editandoPor, cajaAbierta }: PedidoDetalleProps) {
+export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgregarExtra, alAbrirPedido, editandoPor, cajaAbierta }: PedidoDetalleProps) {
   const { tiene, usuario } = useSesion();
   // El SUPERVISOR presenta su código para dar una cortesía; ADMIN y Caja no
   const pideCodigoCortesia = usuario?.rol === 'SUPERVISOR';
@@ -161,6 +165,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, edita
     ['COLA', 'PREPARANDO', 'LISTO'].includes(est) &&
     !tieneCobroVigente &&
     !pedido.cobroMozo;
+  // Extra: con permiso y mientras el pedido no esté anulado ni rechazado (entregado o pagado sí)
+  const puedeAgregarExtra = !!alAgregarExtra && tiene('pedidos/extra') && est !== 'ANULADO' && est !== 'RECHAZADO';
   const esPorConfirmar =
     (est === 'COLA' || est === 'NUEVO') &&
     !estaPagado &&
@@ -273,6 +279,40 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, edita
           </span>
           {esperaCajaCerrada(pedido, cajaAbierta ?? null) && <EtiquetaCajaCerrada />}
         </div>
+
+        {pedido.pedido_origen && (
+          <button
+            type="button"
+            data-testid="insignia-extra"
+            onClick={() => alAbrirPedido?.(pedido.pedido_origen!.id)}
+            style={{ alignSelf: 'flex-start', border: 0, borderRadius: 999, padding: '4px 12px', background: '#FFF4D6', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+          >
+            EXTRA de {pedido.pedido_origen.codigo}
+          </button>
+        )}
+
+        {(pedido.extras?.length ?? 0) > 0 && (
+          <div data-testid="lista-extras" style={{ display: 'flex', flexDirection: 'column', gap: 6, background: '#FFF9EC', borderRadius: 12, padding: '10px 12px' }}>
+            <strong style={{ fontSize: 14 }}>Extras</strong>
+            {pedido.extras!.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => alAbrirPedido?.(e.id)}
+                style={{ display: 'flex', justifyContent: 'space-between', gap: 8, border: 0, background: 'transparent', padding: 0, fontSize: 14, cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span style={{ fontWeight: 700 }}>{e.codigo} · {e.estado}{e.pago_estado ? ` · ${e.pago_estado}` : ''}</span>
+                <span style={{ fontWeight: 800 }}>S/ {Number(e.total).toFixed(2)}</span>
+              </button>
+            ))}
+            {pedido.total_con_extras != null && (
+              <div data-testid="total-con-extras" style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 15, borderTop: '1px solid rgba(0,0,0,.12)', paddingTop: 6 }}>
+                <span>Total con extras</span>
+                <span>S/ {pedido.total_con_extras.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {pedido.cobroMozo && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
@@ -1155,6 +1195,24 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, edita
               }}
             >
               Editar pedido
+            </button>
+          )}
+          {puedeAgregarExtra && (
+            <button
+              type="button"
+              onClick={() => alAgregarExtra?.(pedido)}
+              style={{
+                flex: '1 1 140px',
+                minHeight: 44,
+                border: '1.5px solid var(--cp-orange, #E67929)',
+                borderRadius: 12,
+                background: 'var(--cp-orange, #E67929)',
+                color: 'var(--cp-navy, #0B2C3E)',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Agregar extra
             </button>
           )}
           <button

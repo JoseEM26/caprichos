@@ -74,6 +74,8 @@ export interface Comanda {
   despejada?: boolean;
   /** Número del día en cocina (referencial). null en pedidos anteriores a la función. */
   numeroDia?: number | null;
+  /** Pedido extra: código del pedido original («EXTRA de CP-W045») */
+  extraDe?: string | null;
   /** Hora del servidor al responder (ISO): el navegador cuenta el tiempo con su desfase. */
   ahoraServidor?: string;
   /** Umbrales de color vigentes en el servidor. */

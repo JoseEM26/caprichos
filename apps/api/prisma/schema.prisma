@@ -679,7 +679,11 @@ model Pedido {
   propina                Decimal                @default(0) @db.Decimal(12, 2)
   // Control de versión optimista de «Editar pedido»: sube 1 con cada edición; guardar con una versión vieja da 409 PEDIDO_MODIFICADO
   version                Int                    @default(0)
+  // «Pedido extra»: pedido nuevo enlazado al original (mismo cliente y modalidad, envío 0, pago y comprobante propios)
+  pedido_origen_id       BigInt?
 
+  pedidoOrigen           Pedido?                 @relation("PedidoExtra", fields: [pedido_origen_id], references: [id], onDelete: SetNull)
+  extras                 Pedido[]                @relation("PedidoExtra")
   party                 Party?                  @relation("ClientePedido", fields: [party_id], references: [id])
   repartidor             Party?                  @relation("RepartidorPedido", fields: [repartidor_party_id], references: [id])
   rutaReparto            RutaReparto?            @relation(fields: [ruta_reparto_id], references: [id])
@@ -719,6 +723,7 @@ model Pedido {
 
   @@index([cliente_party_id], map: "pedido_cliente_party_id_idx")
   @@index([ruta_reparto_id], map: "pedido_ruta_reparto_id_idx")
+  @@index([pedido_origen_id], map: "pedido_pedido_origen_id_idx")
   @@unique([fecha_dia, numero_dia], map: "pedido_fecha_dia_numero_dia_key")
   @@map("pedido")
 }

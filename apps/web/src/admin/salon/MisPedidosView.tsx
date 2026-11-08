@@ -133,6 +133,8 @@ export function MisPedidosView() {
   const [errorQuitar, setErrorQuitar] = useState<string | null>(null);
   const [voucherPedido, setVoucherPedido] = useState<{ pedido: MiPedido; medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number } | null>(null);
   const [anulando, setAnulando] = useState<MiPedido | null>(null);
+  // Agregar extra: pedido original; el modal abre en modo «extra» (cliente y mesa o dirección bloqueados)
+  const [extraDe, setExtraDe] = useState<MiPedido | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
   const [pestana, setPestanaState] = useState<Pestana>(pestanaGuardada);
   const [itemsAbiertos, setItemsAbiertos] = useState<Set<string>>(() => new Set());
@@ -428,6 +430,11 @@ export function MisPedidosView() {
                       <HistorialVoucher pedidoId={p.id} total={p.historialVouchers ?? 0} />
                     )}
                     {/* El servidor decide (suyo, en cocina, sin cobro ni voucher aprobado); aquí solo no se ofrece lo evidente */}
+                    {tiene('pedidos/extra') && p.estado !== 'ANULADO' && p.estado !== 'RECHAZADO' && (
+                      <button type="button" className="mpv-boton" onClick={() => setExtraDe(p)}>
+                        Agregar extra
+                      </button>
+                    )}
                     {tiene('pedidos/anular') && ['COLA', 'PREPARANDO', 'LISTO'].includes(p.estado) && p.pagoEstado !== 'PAGADO' && (
                       <button type="button" className="mpv-boton" onClick={() => setAnulando(p)}>
                         Anular pedido
@@ -492,6 +499,18 @@ export function MisPedidosView() {
           puedePersonal={tiene('creditos/ver')}
           pisos={pisos}
           alCerrar={() => setModalAbierto(false)}
+          alExitoPedido={() => void cargar()}
+        />
+      )}
+
+      {extraDe && (
+        <ModalNuevoPedidoMesa
+          abierto={true}
+          pasoInicial="modal"
+          canal="MOZO"
+          pisos={pisos}
+          extra={{ id: extraDe.id, codigo: extraDe.codigo, modalidad: extraDe.modalidad, mesa_nombre: extraDe.mesaNombre, cliente_nombre: extraDe.clienteNombre }}
+          alCerrar={() => setExtraDe(null)}
           alExitoPedido={() => void cargar()}
         />
       )}

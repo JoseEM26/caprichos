@@ -613,6 +613,11 @@ export function ComandaTarjeta({
             >
               {comanda.ticket || comanda.codigo}
             </span>
+            {comanda.extraDe && (
+              <span data-testid="comanda-extra" style={{ fontSize: '11px', fontWeight: 800, color: 'var(--cp-rust)' }}>
+                EXTRA de {comanda.extraDe}
+              </span>
+            )}
           </span>
         ) : (
           <span
@@ -625,6 +630,11 @@ export function ComandaTarjeta({
             }}
           >
             {comanda.ticket || comanda.codigo}
+            {comanda.extraDe && (
+              <span data-testid="comanda-extra" style={{ marginLeft: 6, fontSize: '11px', fontWeight: 800, color: 'var(--cp-rust)' }}>
+                EXTRA de {comanda.extraDe}
+              </span>
+            )}
           </span>
         )}
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>

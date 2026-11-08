@@ -79,6 +79,22 @@ export interface ModalNuevoPedidoMesaProps {
   puedePersonal?: boolean;
   /** «Editar pedido»: abre el selector con las líneas del pedido y sus datos; guardar cambia el pedido en vez de crear uno */
   edicion?: { datos: DatosEdicionPedido };
+  /** «Agregar extra»: pedido nuevo enlazado a este; cliente, modalidad y mesa o dirección vienen bloqueados (solo productos, pago y comprobante) */
+  extra?: DatosPedidoOriginal;
+}
+
+/** Datos del pedido original que hereda un extra (los da el detalle del pedido). */
+export interface DatosPedidoOriginal {
+  id: string;
+  codigo: string;
+  modalidad: string;
+  mesa_nombre?: string | null;
+  cliente_nombre?: string | null;
+  cliente_telefono?: string | null;
+  entrega_direccion?: string | null;
+  entrega_referencia?: string | null;
+  entrega_lat?: number | string | null;
+  entrega_lng?: number | string | null;
 }
 
 /** Permisos de cortesía sin romper si el componente se usa fuera del contexto de sesión (pruebas sueltas). */
@@ -205,6 +221,7 @@ export function ModalNuevoPedidoMesa({
   puedeMesa = true,
   puedePersonal = true,
   edicion,
+  extra,
 }: ModalNuevoPedidoMesaProps) {
   const todasLasMesasIniciales = useMemo(() => {
     const list: string[] = [];
@@ -221,6 +238,7 @@ export function ModalNuevoPedidoMesa({
   const pedidoBase = useMemo(
     () =>
       pedidoRepetir ??
+      extra ??
       (edicion
         ? {
             modalidad: edicion.datos.modalidad,
@@ -232,7 +250,7 @@ export function ModalNuevoPedidoMesa({
             entrega_lng: edicion.datos.entrega.lng,
           }
         : null),
-    [pedidoRepetir, edicion],
+    [pedidoRepetir, edicion, extra],
   );
 
   const modalidadInicial: 'local' | 'llevar' | 'delivery' = useMemo(() => {
@@ -753,6 +771,7 @@ export function ModalNuevoPedidoMesa({
 
   // Nombres de mesas seleccionadas
   const textoMesas = useMemo(() => {
+    if (extra) return extra.mesa_nombre || 'Sin mesa';
     if (mesasSeleccionadas.length === 0) return 'Sin mesa';
     return todasLasMesas
       .filter((m) => mesasSeleccionadas.includes(m.id))
@@ -973,7 +992,8 @@ export function ModalNuevoPedidoMesa({
   }, [descuentoServidor, cuponAplicado]);
 
   const envioCalculado = useMemo(() => {
-    if (modalidad !== 'delivery') return 0;
+    // Extra: el envío ya se cobró en el pedido original
+    if (extra || modalidad !== 'delivery') return 0;
     // Editar: mientras no se consulta la zona del punto, queda el envío que ya tenía el pedido
     if (edicion && !zonaInfo) return edicion.datos.envio ?? 0;
     if (!zonaInfo || !zonaInfo.cubierto || zonaInfo.tarifa == null) return 0;
@@ -1075,11 +1095,11 @@ export function ModalNuevoPedidoMesa({
   const erroresEnvio: ErrorEnvio[] = [];
   if (lineas.length === 0)
     erroresEnvio.push({ campo: 'productos', mensaje: 'Agrega al menos un producto para enviarlo.', foco: [] });
-  if (modalidad === 'local' && mesasSeleccionadas.length === 0)
+  if (modalidad === 'local' && !extra && mesasSeleccionadas.length === 0)
     erroresEnvio.push({ campo: 'mesa', mensaje: 'Elige una mesa para enviarlo.', foco: [] });
-  if (modalidad === 'local' && errorNombreMesa)
+  if (modalidad === 'local' && !extra && errorNombreMesa)
     erroresEnvio.push({ campo: 'nombre', mensaje: errorNombreMesa, foco: ['#np-nombre-mesa'] });
-  if (modalidad === 'local' && pideMode !== 'cliente' && !telefonoMesaValido)
+  if (modalidad === 'local' && !extra && pideMode !== 'cliente' && !telefonoMesaValido)
     erroresEnvio.push({
       campo: 'telefono',
       mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
@@ -1115,7 +1135,7 @@ export function ModalNuevoPedidoMesa({
       return;
     }
     // Personas de más frente a los asientos: se avisa y el local lo confirma (el servidor lo exige igual)
-    if (modalidad === 'local' && asientosFaltan > 0 && !capacidadAceptada) {
+    if (!extra && modalidad === 'local' && asientosFaltan > 0 && !capacidadAceptada) {
       setAvisoCapacidad(true);
       return;
     }
@@ -1132,7 +1152,7 @@ export function ModalNuevoPedidoMesa({
 
   // Enviar pedido a cocina o registrar pedido (Para llevar / Delivery)
   const handleEnviarPedido = async () => {
-    if (lineas.length === 0 || (modalidad === 'local' && mesasSeleccionadas.length === 0)) {
+    if (lineas.length === 0 || (!extra && modalidad === 'local' && mesasSeleccionadas.length === 0)) {
       setErrorEnvio('Debe seleccionar al menos un producto.');
       setConfirmarEnviar(false);
       return;
@@ -1172,7 +1192,19 @@ export function ModalNuevoPedidoMesa({
       const canalEnvio: 'MOZO' | 'CAJA' = canalProp ?? (pasoInicial === 'modal' ? 'CAJA' : 'MOZO');
       let res: any;
 
-      if (modalidad === 'local') {
+      if (extra) {
+        // Solo productos, pago y comprobante propios: el servidor hereda cliente, modalidad, mesa o dirección y pone el envío en 0
+        res = await pedidosApi.crearExtra(
+          extra.id,
+          {
+            lineas: payloadLineas,
+            nota: notaGeneral.trim() || undefined,
+            comprobante: aComprobanteAlta(valorComp),
+            pago: { metodo: metodoPrincipalAhora, pagaCon: pagaConValido(), plan: planAhora },
+          },
+          idempotencyKey,
+        );
+      } else if (modalidad === 'local') {
         res = await salonApi.abrirPedidoMesa(
           {
             mesas: mesasSeleccionadas,
@@ -1566,7 +1598,7 @@ export function ModalNuevoPedidoMesa({
                   color: 'var(--cp-navy)',
                 }}
               >
-                {edicion ? `Editar pedido ${edicion.datos.codigo}` : `Nuevo pedido · ${tituloPaso}`}
+                {edicion ? `Editar pedido ${edicion.datos.codigo}` : extra ? `Agregar extra a ${extra.codigo}` : `Nuevo pedido · ${tituloPaso}`}
               </div>
             </div>
 
@@ -2745,8 +2777,19 @@ export function ModalNuevoPedidoMesa({
                   />
                 )}
 
+                {extra && (
+                  <div className="np-chip-mesa" data-testid="extra-bloqueado">
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)' }}>
+                      EXTRA de {extra.codigo} · {extra.modalidad === 'MESA' ? textoMesas : extra.modalidad === 'DELIVERY' ? 'Delivery' : 'Para llevar'} · {extra.cliente_nombre || 'Cliente'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>
+                      Es un pedido aparte, con su propio pago y comprobante{extra.modalidad === 'DELIVERY' ? '. No se vuelve a cobrar el envío.' : '.'}
+                    </div>
+                  </div>
+                )}
+
                 {/* Mesa y «Pide» en una fila de chips */}
-                {!edicion && (
+                {!edicion && !extra && (
                 <div className="np-chips">
                 {/* Cabecera del carrito: Mesa / Cambiar */}
                 <div className="np-chip-mesa">
@@ -3225,7 +3268,7 @@ export function ModalNuevoPedidoMesa({
                             Combo: para cambiarlo, quítalo y agrega otro.
                           </div>
                         )}
-                        {puedeCortesia && !edicion && !lin.ofertaId && !(lin.comboElecciones ?? []).length && (
+                        {puedeCortesia && !edicion && !extra && !lin.ofertaId && !(lin.comboElecciones ?? []).length && (
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             {lin.cortesia ? (
                               <>
@@ -3280,7 +3323,7 @@ export function ModalNuevoPedidoMesa({
                 </div>
 
                 {/* Cupón: plegado detrás de un botón; se despliega al tocarlo */}
-                {!edicion && (<>
+                {!edicion && !extra && (<>
                 <button
                   type="button"
                   className="np-cupon-toggle"
@@ -3458,7 +3501,7 @@ export function ModalNuevoPedidoMesa({
                   onClick={intentarEnviar}
                   className="salon-pie-fijo np-enviar"
                   aria-label={
-                    modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'
+                    extra ? 'Registrar extra' : modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'
                   }
                   style={{
                     minHeight: '52px',
@@ -3471,17 +3514,17 @@ export function ModalNuevoPedidoMesa({
                     fontSize: '15px',
                     opacity:
                       lineas.length > 0 &&
-                      (modalidad !== 'local' || mesasSeleccionadas.length > 0)
+                      (modalidad !== 'local' || !!extra || mesasSeleccionadas.length > 0)
                         ? 1
                         : 0.5,
                     cursor:
                       lineas.length > 0 &&
-                      (modalidad !== 'local' || mesasSeleccionadas.length > 0)
+                      (modalidad !== 'local' || !!extra || mesasSeleccionadas.length > 0)
                         ? 'pointer'
                         : 'not-allowed',
                   }}
                 >
-                  {modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'} · S/{' '}
+                  {extra ? 'Registrar extra' : modalidad === 'local' ? 'Enviar directo a cocina' : 'Registrar pedido'} · S/{' '}
                   {total.toFixed(2)}
                 </button>
                 {motivoNoEnviar && (
