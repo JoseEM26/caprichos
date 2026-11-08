@@ -14,6 +14,13 @@ describe('iniciativas: todo el personal ve, crea y comenta; cambiar estado solo 
   });
 });
 
+describe('pedidos/extra (Agregar extra a un pedido)', () => {
+  it('lo tienen ADMIN, SUPERVISOR, CAJERO y MOZO; nadie más', () => {
+    for (const r of ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO']) expect(MATRIZ[r]).toContain('pedidos/extra');
+    for (const r of ['COCINA', 'ALMACEN', 'REPARTIDOR']) expect(MATRIZ[r]).not.toContain('pedidos/extra');
+  });
+});
+
 describe('pedidos/editar (Editar pedido en Caja)', () => {
   it('lo tienen ADMIN, SUPERVISOR, CAJERO y MOZO; cocina, almacén y reparto no', () => {
     for (const r of ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO']) expect(MATRIZ[r]).toContain('pedidos/editar');

@@ -26,10 +26,12 @@ import { PagoPlanService } from '../pedidos/pago-plan.service';
 import { OfertasModule } from '../ofertas/ofertas.module';
 import { EditarPedidoService } from './editar-pedido.service';
 import { EditarPedidoController } from './editar-pedido.controller';
+import { PedidoExtraService } from './pedido-extra.service';
+import { PedidoExtraController } from './pedido-extra.controller';
 
 @Module({
   imports: [SalonModule, ZonasModule, ClientesModule, StockModule, PedidosModule, ImpresionModule, ChatbotModule, VouchersModule, ComprobantesModule, CajaModule, OfertasModule],
-  controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController, EditarPedidoController],
+  controllers: [PedidosAdminController, CambioUbicacionController, PropuestaUbicacionController, CambioCobroController, EditarPedidoController, PedidoExtraController],
   providers: [
     PedidosEstadoService,
     UbicarPedidoService,
@@ -39,6 +41,7 @@ import { EditarPedidoController } from './editar-pedido.controller';
     PropuestaUbicacionService,
     CambioCobroService,
     EditarPedidoService,
+    PedidoExtraService,
     // Sin estado ni dependencias; PedidosModule no lo exporta
     PagoPlanService,
     UbicacionWhatsappPedidoService,

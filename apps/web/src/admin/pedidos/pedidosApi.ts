@@ -116,6 +116,14 @@ export interface HistorialEstado {
   en: string;
 }
 
+export interface ResumenExtra {
+  id: string;
+  codigo: string;
+  estado: string;
+  pago_estado: string | null;
+  total: number;
+}
+
 export interface Pedido {
   id: string;
   codigo: string;
@@ -142,6 +150,12 @@ export interface Pedido {
   ubicacion_editada_en?: string | null;
   /** Saldo por cobrar o devolución pendiente por el cambio de ubicación (solo si aplica) */
   ajusteUbicacionPendiente?: { tipo: 'SALDO' | 'DEVOLUCION'; monto: number } | null;
+  /** «Pedido extra»: el pedido original al que se enlaza (null si es un pedido normal) */
+  pedido_origen?: { id: string; codigo: string } | null;
+  /** Extras de este pedido (pedidos aparte, con su propio pago y comprobante) */
+  extras?: ResumenExtra[];
+  /** Total del pedido más sus extras vigentes; null si no tiene extras */
+  total_con_extras?: number | null;
   /** Cobro por mozo (envío a Caja): null si no lo envió o el pedido ya está PAGADO */
   cobroMozo?: {
     en: string;
@@ -444,6 +458,21 @@ export const pedidosApi = {
   /** «Editar pedido»: datos del pedido (líneas con su selección, cliente, entrega) y su versión. 409 si ya no se puede editar. */
   async obtenerParaEditar(id: string | number): Promise<DatosEdicionPedido> {
     return api.get<DatosEdicionPedido>(`/admin/pedidos/${id}/editar`);
+  },
+
+  /** «Agregar extra»: crea un pedido enlazado a este (hereda cliente, modalidad, mesa o dirección; sin envío). */
+  async crearExtra(
+    id: string | number,
+    dto: {
+      lineas: unknown[];
+      pago: { metodo: 'EFECTIVO' | 'YAPE' | 'PLIN' | 'TARJETA' | 'TRANSFERENCIA'; pagaCon?: number; plan?: PlanPagoItem[] };
+      comprobante?: { tipo: 'SIMPLE' | 'BOLETA' | 'FACTURA'; dni?: string; ruc?: string; razonSocial?: string; direccion?: string };
+      nota?: string;
+    },
+    idempotencyKey?: string,
+  ): Promise<any> {
+    const headers: Record<string, string> = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {};
+    return api.post(`/admin/pedidos/${id}/extra`, dto, { headers });
   },
 
   /** Guarda la edición. 409 PEDIDO_MODIFICADO si alguien lo cambió antes (version vieja). */

@@ -211,6 +211,8 @@ export function PedidosAdminView() {
   // Editar pedido: datos que trae el servidor (con su versión) y el aviso si no se puede abrir
   const [edicionPedido, setEdicionPedido] = useState<DatosEdicionPedido | null>(null);
   const [errorEditar, setErrorEditar] = useState<string | null>(null);
+  // Agregar extra: pedido original sobre el que se abre el modal en modo «extra»
+  const [pedidoExtra, setPedidoExtra] = useState<Pedido | null>(null);
   const abrirEditor = async (p: Pedido) => {
     setErrorEditar(null);
     try {
@@ -381,6 +383,9 @@ export function PedidosAdminView() {
   useEventos('reparto:incidente', () => {
     void cargarNoEntregados();
   });
+
+  // Otra terminal agregó un extra: la lista del original (extras y total con extras) se vuelve a leer
+  useEventos('pedido:extra', () => void cargarDatos());
 
   useEventos('pedido:estado', (datos: { id: string | number; estado?: string }) => {
     const idStr = String(datos.id);
@@ -939,6 +944,8 @@ export function PedidosAdminView() {
               setNuevoPedidoAbierto(true);
             }}
             alEditar={(p) => void abrirEditor(p)}
+            alAgregarExtra={(p) => setPedidoExtra(p)}
+            alAbrirPedido={(id) => setPedidoSeleccionadoId(String(id))}
             editandoPor={editando[String(pedidoSeleccionado.id)]?.nombre ?? null}
           />
         )}
@@ -958,6 +965,18 @@ export function PedidosAdminView() {
           <span>{errorEditar}</span>
           <button type="button" onClick={() => setErrorEditar(null)} aria-label="Cerrar aviso" style={{ border: 0, background: 'transparent', fontWeight: 800, cursor: 'pointer' }}>×</button>
         </div>
+      )}
+
+      {pedidoExtra && (
+        <ModalNuevoPedidoMesa
+          abierto={true}
+          pasoInicial="modal"
+          pisos={pisosSalon}
+          extra={pedidoExtra}
+          alCerrar={() => setPedidoExtra(null)}
+          alExitoPedido={() => void cargarDatos()}
+          alRefrescarMesas={async () => void cargarDatos()}
+        />
       )}
 
       {edicionPedido && (

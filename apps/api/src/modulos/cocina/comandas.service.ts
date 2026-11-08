@@ -398,6 +398,8 @@ export class ComandasService {
       include: {
         pedido: {
           include: {
+            // «EXTRA de CP-W045»: pedido extra enlazado a otro
+            pedidoOrigen: { select: { codigo: true } },
             comandas: {
               include: {
                 area: true,
@@ -468,6 +470,7 @@ export class ComandasService {
         modalidad: p.modalidad,
         cliente: p.cliente_nombre ?? null,
         mesa,
+        extraDe: (p as any).pedidoOrigen?.codigo ?? null,
         nota: p.nota ?? null,
         minutos,
         minutosEspera: minutos,

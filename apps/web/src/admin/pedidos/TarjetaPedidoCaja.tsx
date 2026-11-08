@@ -81,6 +81,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
           </span>
         )}
         {cajaCerradaEspera && <EtiquetaCajaCerrada />}
+        {o.pedido_origen && <span className="cj-pc-chip" data-testid="insignia-extra" style={{ background: '#FFF4D6', color: 'var(--cp-navy)' }}>EXTRA de {o.pedido_origen.codigo}</span>}
       </div>
       {lugar && (
         <div className="cj-pc-lugar" style={sinUbicacion ? { color: 'var(--cp-rust, #B2500F)', fontWeight: 700 } : undefined}>
@@ -94,6 +95,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
         <span className="cj-pc-chip" style={{ background: badge.bg, color: badge.fg }}>{badge.l}</span>
         <span className={`cj-pc-chip cj-pc-pago-${pago.clase}`}>{pago.texto}</span>
         <span className="cj-pc-total">S/ {Number(o.total || 0).toFixed(2)}</span>
+        {o.total_con_extras != null && <span className="cj-pc-chip" data-testid="total-con-extras" style={{ background: '#FFF4D6', color: 'var(--cp-navy)' }}>Total con extras S/ {o.total_con_extras.toFixed(2)}</span>}
       </div>
       <div className="cj-pc-items" title={itemsTexto}>{itemsTexto || '1 producto'}</div>
     </button>

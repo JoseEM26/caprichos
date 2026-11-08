@@ -44,6 +44,7 @@ import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import { SELECT_PRUEBA_INCIDENTE, construirPruebaEntrega } from '../repartos/prueba-entrega';
+import { INCLUIR_EXTRAS, resumenExtras } from './extras-pedido.util';
 import { FiltrarPedidosDto } from './dto/filtrar-pedidos.dto';
 import { RangoMisPedidos } from './dto/mis-pedidos-query.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
@@ -357,6 +358,7 @@ export class PedidosEstadoService {
             select: { id: true },
             take: 1,
           },
+          ...INCLUIR_EXTRAS,
         },
       }),
       this.obtenerUmbrales(),
@@ -379,6 +381,7 @@ export class PedidosEstadoService {
 
       return {
         ...p,
+        ...resumenExtras(p),
         cobro_vigente_id: cobroVigenteId,
         cobroMozo: cobrosMozo.get(String(p.id)) ?? null,
         ajusteUbicacionPendiente: ajustes.get(String(p.id)) ?? null,
@@ -844,6 +847,7 @@ export class PedidosEstadoService {
           select: { id: true },
           take: 1,
         },
+        ...INCLUIR_EXTRAS,
         // Última prueba de entrega fallida (cliente no salió con llegada registrada)
         incidentes: {
           where: { motivo: 'NO_CONTESTA', llego_en: { not: null } },
@@ -903,6 +907,7 @@ export class PedidosEstadoService {
     const { incidentes, ...pedidoSinIncidentes } = pedido;
     return {
       ...pedidoSinIncidentes,
+      ...resumenExtras(pedido),
       ajusteUbicacionPendiente,
       prueba_entrega: await construirPruebaEntrega(this.prisma, incidentes?.[0]),
       puntos,

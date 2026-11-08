@@ -271,6 +271,48 @@ describe('PedidosService', () => {
       );
     });
 
+    describe('pedido extra (pedidoOrigenId)', () => {
+      it('delivery con zona: envío 0 (no vuelve a cobrar), total = subtotal y queda enlazado al original', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 102n, codigo: 'CP-W003', estado: 'COLA', subtotal: 28.0, envio: 0, total: 28.0 });
+
+        const res = await service.crear(pedidoBaseDto, 'idemp-extra', { canal: 'CAJA', pedidoOrigenId: 100n });
+
+        expect(res.envio).toBe(0);
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(Number(data.envio)).toBe(0);
+        expect(Number(data.total)).toBe(28);
+        expect(data.pedido_origen_id).toBe(100n);
+        expect(data.canal).toBe('CAJA');
+      });
+
+      it('sin pedidoOrigenId el pedido no se enlaza a nadie', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 103n, codigo: 'CP-W004', estado: 'COLA', subtotal: 28.0, envio: 5.0, total: 33.0 });
+        await service.crear(pedidoBaseDto, 'idemp-normal', { canal: 'CAJA' });
+        expect(prismaMock.pedido.create.mock.calls.at(-1)[0].data.pedido_origen_id).toBeNull();
+      });
+    });
+
+    describe('pedido extra (pedidoOrigenId)', () => {
+      it('delivery con zona: envío 0 (no vuelve a cobrar), total = subtotal y queda enlazado al original', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 102n, codigo: 'CP-W003', estado: 'COLA', subtotal: 28.0, envio: 0, total: 28.0 });
+
+        const res = await service.crear(pedidoBaseDto, 'idemp-extra', { canal: 'CAJA', pedidoOrigenId: 100n });
+
+        expect(res.envio).toBe(0);
+        const data = prismaMock.pedido.create.mock.calls.at(-1)[0].data;
+        expect(Number(data.envio)).toBe(0);
+        expect(Number(data.total)).toBe(28);
+        expect(data.pedido_origen_id).toBe(100n);
+        expect(data.canal).toBe('CAJA');
+      });
+
+      it('sin pedidoOrigenId el pedido no se enlaza a nadie', async () => {
+        prismaMock.pedido.create.mockResolvedValue({ id: 103n, codigo: 'CP-W004', estado: 'COLA', subtotal: 28.0, envio: 5.0, total: 33.0 });
+        await service.crear(pedidoBaseDto, 'idemp-normal', { canal: 'CAJA' });
+        expect(prismaMock.pedido.create.mock.calls.at(-1)[0].data.pedido_origen_id).toBeNull();
+      });
+    });
+
     describe('delivery sin punto en el mapa (esperando ubicación)', () => {
       it('con dirección y referencia es válido: sin zona ni envío, el total no suma envío', async () => {
         prismaMock.pedido.create.mockResolvedValue({ id: 101n, codigo: 'CP-W002', estado: 'COLA', subtotal: 28.0, envio: null, total: 28.0 });
