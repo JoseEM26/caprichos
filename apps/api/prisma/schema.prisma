@@ -1640,6 +1640,10 @@ model ComboParte {
   productos  BigInt[]
   /// Tamaño de la parte FIJO de un solo producto (producto_tamano del producto); sin tamaño, null
   tamano_id  BigInt?
+  /// Alternativas excluyentes («elige UNO de estos paquetes»): las partes con el mismo paquete_grupo (p. ej. «Complemento») se
+  /// reparten en paquetes por paquete_nombre («2 donas», «1 carrot cake»...); el cliente elige un paquete. Ambas null = parte normal.
+  paquete_grupo  String?
+  paquete_nombre String?
 
   oferta     Oferta   @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
   tamano     ProductoTamano? @relation(fields: [tamano_id], references: [id], onDelete: SetNull)

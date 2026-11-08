@@ -38,6 +38,9 @@ export interface ParteDisp {
   productos: string[];
   /** Alternativas en orden («si no hay stock, elige»). Cualquier tipo de parte. */
   alternativas: AlternativaDisp[];
+  /** Complemento a elegir: las partes con el mismo grupo se agrupan por paquete y basta con que UN paquete se pueda armar. */
+  paqueteGrupo?: string | null;
+  paqueteNombre?: string | null;
 }
 
 export interface AlternativaDisponibilidad {
@@ -129,14 +132,16 @@ export function calcularDisponibilidadCombo(partes: ParteDisp[], productos: Prod
     // Alternativas solo cuando falta saldo para el original; la parte queda disponible con el original o con una alternativa
     const alternativasActivas = !armable && altDisponible;
     const originalOk = productosDeParte(parte, productos).some((p) => productoDisponible(p));
-    const disponible = originalOk || altDisponible;
+    // Pieza de un paquete: debe alcanzar para su cantidad completa (un paquete de «2 donas» no se arma con 1)
+    const enPaquete = !!parte.paqueteGrupo;
+    const disponible = enPaquete ? armable || altDisponible : originalOk || altDisponible;
     const altIds = alternativas.filter((a) => a.disponible).map((a) => a.id);
 
     if (parte.tipo === 'FIJO') {
       const principal = parte.productos[0];
       const principalOk = !!principal && productoDisponible(porId.get(principal));
       const opciones = principalOk ? [principal] : altIds;
-      if (!disponible) motivos.push(nombre(principal ?? ''));
+      if (!disponible && !enPaquete) motivos.push(nombre(principal ?? ''));
       return {
         disponible,
         opcionesDisponibles: opciones,
@@ -146,14 +151,31 @@ export function calcularDisponibilidadCombo(partes: ParteDisp[], productos: Prod
         alternativasActivas,
       };
     }
-    if (!disponible) {
+    if (!disponible && !enPaquete) {
       motivos.push(parte.tipo === 'UNA_DE' ? 'una de las opciones' : 'las bebidas a elegir');
     }
     return { disponible, opcionesDisponibles: [], principalDisponible: null, armable, alternativas, alternativasActivas };
   });
 
+  // Cada grupo de paquetes necesita al menos un paquete con todas sus piezas disponibles
+  const grupos = new Map<string, Map<string, boolean>>();
+  partes.forEach((parte, i) => {
+    if (!parte.paqueteGrupo) return;
+    const paquetes = grupos.get(parte.paqueteGrupo) ?? new Map<string, boolean>();
+    const nombrePaquete = parte.paqueteNombre ?? '';
+    paquetes.set(nombrePaquete, (paquetes.get(nombrePaquete) ?? true) && resultado[i].disponible);
+    grupos.set(parte.paqueteGrupo, paquetes);
+  });
+  let gruposOk = true;
+  for (const [grupo, paquetes] of grupos) {
+    if (![...paquetes.values()].some(Boolean)) {
+      gruposOk = false;
+      motivos.push(`el complemento «${grupo}»`);
+    }
+  }
+
   return {
-    disponible: resultado.every((r) => r.disponible),
+    disponible: gruposOk && resultado.every((r, i) => r.disponible || !!partes[i].paqueteGrupo),
     motivoAgotado: motivos.length ? `Falta ${motivos.join(' y ')}` : null,
     partes: resultado,
   };

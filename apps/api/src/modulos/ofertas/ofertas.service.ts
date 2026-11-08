@@ -470,6 +470,7 @@ export class OfertasService {
               categorias: catIds,
               productos: prodIds,
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
+              ...this.paqueteDeParte(tipoParte, p),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
@@ -752,6 +753,7 @@ export class OfertasService {
               categorias: catIds,
               productos: prodIds,
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
+              ...this.paqueteDeParte(tipoParte, p),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
@@ -2157,14 +2159,31 @@ export class OfertasService {
       new ConflictException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje });
     if (oferta.disponible === false) throw noDisponible(`${oferta.nombre} está agotado: ${oferta.motivoAgotado ?? ''}`.trim());
 
-    const partesOferta = (oferta.combosParte ?? []).map((p) => ({ ...p, alternativas: p.alternativas ?? [] }));
+    const partesTodas = (oferta.combosParte ?? []).map((p) => ({ ...p, alternativas: p.alternativas ?? [] }));
+    // Complemento a elegir: de cada grupo vale el ÚNICO paquete con elecciones; las piezas de los otros no cuentan
+    const paquetesElegidos = new Map<string, string>();
+    for (const grupo of new Set(partesTodas.map((p) => p.paqueteGrupo).filter((g): g is string => !!g))) {
+      const conEleccion = new Set(
+        partesTodas
+          .filter((p) => p.paqueteGrupo === grupo && elecciones.some((e) => String(e.parteId) === p.id))
+          .map((p) => p.paqueteNombre ?? ''),
+      );
+      if (conEleccion.size === 0) {
+        throw new BadRequestException({ codigo: 'COMBO_ELECCION_INCOMPLETA', mensaje: `Elige tu ${grupo.toLowerCase()} para ${oferta.nombre}` });
+      }
+      if (conEleccion.size > 1) {
+        throw new BadRequestException({ codigo: 'COMBO_PARTE_NO_PERMITIDA', mensaje: `Elige una sola opción de ${grupo.toLowerCase()} para ${oferta.nombre}` });
+      }
+      paquetesElegidos.set(grupo, [...conEleccion][0]);
+    }
+    const partesOferta = partesTodas.filter((p) => !p.paqueteGrupo || paquetesElegidos.get(p.paqueteGrupo) === (p.paqueteNombre ?? ''));
     const ids = new Set<string>();
     const cats = new Set<string>();
     for (const p of partesOferta) {
       [...p.productos, ...p.alternativas.map((a) => a.id)].forEach((x) => ids.add(String(x)));
       elecciones.filter((e) => String(e.parteId) === p.id).forEach((e) => ids.add(String(e.productoId)));
       // Con alternativas, el original se mira por sus categorías: hay que cargar esos productos también
-      if (p.alternativas.length > 0) p.categorias.forEach((c) => cats.add(String(c)));
+      if (p.alternativas.length > 0 || p.paqueteGrupo) p.categorias.forEach((c) => cats.add(String(c)));
     }
     const filas = ids.size || cats.size
       ? await this.prisma.producto.findMany({
@@ -2306,7 +2325,7 @@ export class OfertasService {
         throw noDisponible(`${nombreDe(principal)} se acaba de agotar; elige otro reemplazo`);
       }
       partes.push({
-        ...parteResuelta(oferta.nombre, parte.id!, 'FIJO', principal, parte.cantidad * unidades, null, info),
+        ...parteResuelta(oferta.nombre, parte.id!, 'FIJO', principal, parte.cantidad * unidades, parte.paqueteNombre ?? null, info),
         // Tamaño de la parte (solo el principal; una alternativa sale sin tamaño)
         ...(parte.tamanoId ? { tamano: parte.tamanoNombre ?? null, unidadesTamano: parte.tamanoUnidades ?? 1 } : {}),
       });
@@ -2321,7 +2340,7 @@ export class OfertasService {
       const requeridas = parte.cantidad * unidades;
       if (picks.length === 0) {
         // Con lista de productos (juguetes) es obligatoria; por categoría (bebidas del Dúo) no genera líneas
-        if (parte.productos.length > 0) {
+        if (parte.productos.length > 0 || parte.paqueteGrupo) {
           throw new BadRequestException({
             codigo: 'COMBO_ELECCION_INCOMPLETA',
             mensaje: `Elige ${requeridas} opción(es) para ${oferta.nombre}`,
@@ -2340,7 +2359,7 @@ export class OfertasService {
         picks,
         (prod) => parte.productos.includes(prod.id) || parte.categorias.includes(prod.categoriaId),
         'A_ELECCION',
-        null,
+        parte.paqueteNombre ?? null,
       );
     }
 
@@ -2393,6 +2412,26 @@ export class OfertasService {
     }
 
     return { nota: cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '', partes };
+  }
+
+  /**
+   * Paquete de una parte (complemento a elegir): grupo y nombre juntos o ninguno; solo partes FIJO o A_ELECCION
+   * (las UNA_DE no se resuelven al pedir). Sin paquete devuelve null en ambos.
+   */
+  private paqueteDeParte(
+    tipo: string,
+    p: { paqueteGrupo?: string | null; paqueteNombre?: string | null },
+  ): { paquete_grupo: string | null; paquete_nombre: string | null } {
+    const grupo = (p.paqueteGrupo ?? '').trim();
+    const nombre = (p.paqueteNombre ?? '').trim();
+    if (!grupo && !nombre) return { paquete_grupo: null, paquete_nombre: null };
+    if (!grupo || !nombre || (tipo !== 'FIJO' && tipo !== 'A_ELECCION')) {
+      throw new BadRequestException({
+        codigo: 'COMBO_PAQUETE_INVALIDO',
+        mensaje: 'Cada pieza de un complemento necesita el nombre del complemento y el de su alternativa, y ser un producto fijo o una elección',
+      });
+    }
+    return { paquete_grupo: grupo, paquete_nombre: nombre };
   }
 
   /**
@@ -2573,6 +2612,11 @@ export class OfertasService {
         if (p.tipo === 'A_ELECCION' && p.productos.length > 0) {
           // Lista explícita (p. ej. juguetes): cada opción con su nombre y si se puede elegir ahora
           p.opcionesDetalle = p.productos.map((id) => detalleOpcion(id, productos));
+        } else if (p.tipo === 'A_ELECCION' && p.paqueteGrupo) {
+          // Pieza de un complemento por categorías (p. ej. «Donas»): sus productos visibles son las opciones
+          p.opcionesDetalle = productos
+            .filter((x) => p.categorias.includes(x.categoriaId) && !x.oculto)
+            .map((x) => detalleOpcion(x.id, productos));
         }
       });
     }
@@ -2702,6 +2746,8 @@ export class OfertasService {
             cantidad: cp.cantidad,
             categorias: (cp.categorias || []).map((c: any) => c.toString()),
             productos: (cp.productos || []).map((p: any) => p.toString()),
+            paqueteGrupo: cp.paquete_grupo ?? null,
+            paqueteNombre: cp.paquete_nombre ?? null,
             tamanoId: cp.tamano ? cp.tamano.id.toString() : null,
             tamanoNombre: cp.tamano?.tamano_valor?.nombre ?? null,
             tamanoUnidades: cp.tamano?.unidades ?? 1,

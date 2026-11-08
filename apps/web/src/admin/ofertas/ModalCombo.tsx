@@ -277,6 +277,20 @@ export function ModalCombo({
     setMensajeError('');
   };
 
+  // Pieza de una alternativa de complemento (ej. «Complemento» › «2 donas»): una parte normal con grupo y alternativa
+  const agregarPiezaDeAlternativa = () => {
+    const grupo = partes.find((p) => p.paqueteGrupo)?.paqueteGrupo || 'Complemento';
+    setPartes((prev) => [
+      ...prev,
+      { nombre: 'Pieza del complemento', tipoParte: 'A_ELECCION', cantidad: 1, categorias: [], productos: [], paqueteGrupo: grupo, paqueteNombre: '' },
+    ]);
+    setParteAbiertaIndex(partes.length);
+    setMensajeError('');
+  };
+
+  const cambiarParte = (idx: number, cambio: Partial<ComboParteItem>) =>
+    setPartes((prev) => prev.map((p, i) => (i === idx ? { ...p, ...cambio } : p)));
+
   const quitarParte = (index: number) => {
     setPartes((prev) => prev.filter((_, i) => i !== index));
     if (parteAbiertaIndex === index) setParteAbiertaIndex(null);
@@ -349,9 +363,16 @@ export function ModalCombo({
   };
   const errorPartes = (): string | null => {
     if (partes.length === 0) return 'Agrega al menos una parte al combo.';
+    const alternativasPorGrupo = new Map<string, Set<string>>();
     for (let i = 0; i < partes.length; i++) {
       const p = partes[i];
       if (!p.nombre || !p.nombre.trim()) return `La parte ${i + 1} debe tener un nombre.`;
+      const grupoP = (p.paqueteGrupo ?? '').trim();
+      const altP = (p.paqueteNombre ?? '').trim();
+      if ((grupoP || altP) && !(grupoP && altP)) {
+        return `La parte "${p.nombre}" necesita el nombre del complemento y el de su alternativa (o déjalos vacíos).`;
+      }
+      if (grupoP) alternativasPorGrupo.set(grupoP, (alternativasPorGrupo.get(grupoP) ?? new Set()).add(altP));
       const tipoP = p.tipoParte || p.tipo || 'A_ELECCION';
       if (tipoP === 'FIJO') {
         if ((p.productos || []).length === 0) return `La parte "${p.nombre}" debe tener al menos un producto seleccionado.`;
@@ -360,6 +381,9 @@ export function ModalCombo({
       } else if ((p.categorias || []).length === 0 && (p.productos || []).length === 0) {
         return `La parte "${p.nombre}" debe tener al menos una categoría o producto seleccionado.`;
       }
+    }
+    for (const [grupo, alts] of alternativasPorGrupo) {
+      if (alts.size < 2) return `El complemento "${grupo}" necesita al menos 2 alternativas para que el cliente pueda elegir.`;
     }
     return null;
   };
@@ -451,6 +475,8 @@ export function ModalCombo({
           productos: (p.productos || []).map((pr: any) => String(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
           alternativas: (p.alternativas || []).map((a) => ({ productoId: String(a.id), cantidad: a.cantidad || 1 })),
           tamanoId: p.tamanoId || null,
+          paqueteGrupo: (p.paqueteGrupo ?? '').trim() || null,
+          paqueteNombre: (p.paqueteNombre ?? '').trim() || null,
           orden: idx + 1,
         })),
         combosPartes: partes.map((p, idx) => ({
@@ -462,6 +488,8 @@ export function ModalCombo({
           productos: (p.productos || []).map((pr: any) => String(typeof pr === 'object' ? pr.productoId || pr.id : pr)),
           alternativas: (p.alternativas || []).map((a) => ({ productoId: String(a.id), cantidad: a.cantidad || 1 })),
           tamanoId: p.tamanoId || null,
+          paqueteGrupo: (p.paqueteGrupo ?? '').trim() || null,
+          paqueteNombre: (p.paqueteNombre ?? '').trim() || null,
           orden: idx + 1,
         })),
       };
@@ -927,6 +955,7 @@ export function ModalCombo({
               <ul style={{ margin: 0, paddingLeft: '18px' }}>
                 <li><strong>2 bebidas a elección:</strong> el cliente escoge entre las categorías seleccionadas (ej. Frappes, Iced o Calientes).</li>
                 <li><strong>1 complemento fijo:</strong> un producto específico e invariable (ej. 1 Croissant de Jamón y Queso).</li>
+                <li><strong>Complemento con alternativas:</strong> el cliente elige UNA entre varias combinaciones (ej. «2 donas», «1 dona + 1 galleta», «1 carrot cake»). Cada pieza es una parte con el mismo complemento y el nombre de su alternativa.</li>
                 <li><strong>Una de estas opciones:</strong> el cliente escoge una alternativa armada (ej. porción de torta o dona artesanal).</li>
               </ul>
             </div>
@@ -1007,6 +1036,11 @@ export function ModalCombo({
                         <div style={{ fontWeight: 800, fontSize: '14px', lineHeight: '18px' }}>
                           {sl.nombre || 'Parte sin nombre'} {isOpen ? '▲' : '▼'}
                         </div>
+                        {sl.paqueteGrupo && (
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cp-orange)', lineHeight: '16px' }}>
+                            {`${sl.paqueteGrupo} › ${sl.paqueteNombre?.trim() || 'sin nombre de alternativa'}`}
+                          </div>
+                        )}
                         <div style={{ fontSize: '12px', color: 'var(--cp-soft)', lineHeight: '16px' }}>
                           {tipoParte === 'A_ELECCION'
                             ? `${sl.cantidad} a elección de (${(sl.categorias || []).join(', ') || 'sin categoría'})`
@@ -1125,6 +1159,37 @@ export function ModalCombo({
                               }}
                             />
                           </div>
+                        </div>
+
+                        {/* Complemento con alternativas: varias partes con el mismo complemento y distinta alternativa = el cliente elige UNA alternativa */}
+                        <div
+                          data-testid={`complemento-parte-${idx}`}
+                          style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '10px', borderRadius: '8px', backgroundColor: 'var(--cp-cream)' }}
+                        >
+                          <div style={{ flex: '1 1 100%', fontSize: '12px', color: 'var(--cp-soft)' }}>
+                            Solo si esta parte es una pieza de un complemento con alternativas (el cliente elige UNA): escribe el nombre del
+                            complemento y la alternativa a la que pertenece. Si no, déjalo vacío.
+                          </div>
+                          <label style={{ flex: '1 1 160px', fontWeight: 700, fontSize: '13px' }}>
+                            Complemento
+                            <input
+                              type="text"
+                              value={sl.paqueteGrupo ?? ''}
+                              onChange={(e) => cambiarParte(idx, { paqueteGrupo: e.target.value })}
+                              placeholder="Ej.: Complemento"
+                              style={{ width: '100%', boxSizing: 'border-box', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 10px', fontSize: '14px', fontWeight: 400 }}
+                            />
+                          </label>
+                          <label style={{ flex: '1 1 200px', fontWeight: 700, fontSize: '13px' }}>
+                            Alternativa
+                            <input
+                              type="text"
+                              value={sl.paqueteNombre ?? ''}
+                              onChange={(e) => cambiarParte(idx, { paqueteNombre: e.target.value })}
+                              placeholder="Ej.: 2 donas, 1 carrot cake"
+                              style={{ width: '100%', boxSizing: 'border-box', minHeight: '40px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 10px', fontSize: '14px', fontWeight: 400 }}
+                            />
+                          </label>
                         </div>
 
                         {/* Configuración según tipo */}
@@ -1346,7 +1411,49 @@ export function ModalCombo({
               >
                 + Una de estas opciones
               </button>
+              <button
+                type="button"
+                onClick={agregarPiezaDeAlternativa}
+                style={{
+                  minHeight: '40px',
+                  padding: '0 14px',
+                  borderRadius: '10px',
+                  border: '1.5px solid var(--cp-orange)',
+                  backgroundColor: 'var(--cp-white)',
+                  color: 'var(--cp-navy)',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                + Pieza de un complemento con alternativas
+              </button>
             </div>
+
+            {/* Resumen de lo que verá el cliente en cada complemento */}
+            {partes.some((p) => p.paqueteGrupo) && (
+              <div data-testid="resumen-complemento" style={{ backgroundColor: 'var(--cp-sand)', borderRadius: '12px', padding: '12px 14px', fontSize: '13px', color: 'var(--cp-navy)' }}>
+                {[...new Set(partes.map((p) => p.paqueteGrupo).filter(Boolean))].map((grupo) => {
+                  const alternativas = [...new Set(partes.filter((p) => p.paqueteGrupo === grupo).map((p) => (p.paqueteNombre ?? '').trim()))];
+                  return (
+                    <div key={grupo as string} style={{ marginBottom: 6 }}>
+                      <strong>{`El cliente elige UNA alternativa de «${grupo}»:`}</strong>
+                      <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
+                        {alternativas.map((alt) => (
+                          <li key={alt}>
+                            {`${alt || '(sin nombre)'}: `}
+                            {partes
+                              .filter((p) => p.paqueteGrupo === grupo && (p.paqueteNombre ?? '').trim() === alt)
+                              .map((p) => `${p.cantidad || 1} × ${p.nombre}`)
+                              .join(' + ')}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
           ) },
           { id: 'cuando', etiqueta: 'Cuándo y dónde', ...marca('cuando'), contenido: (

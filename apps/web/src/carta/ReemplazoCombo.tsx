@@ -64,6 +64,99 @@ export function repartoAlternativa(alt: AlternativaParteItem): Reparto {
   return alt.sabores && alt.sabores.length > 0 ? {} : { [alt.id]: alt.cantidad };
 }
 
+/** Un complemento con alternativas («Complemento»): cada paquete es una combinación de piezas y el cliente elige UNO. */
+export interface GrupoPaquetes {
+  grupo: string;
+  paquetes: { nombre: string; disponible: boolean }[];
+}
+
+/** Grupos de paquetes del combo en el orden en que se armaron; un paquete está disponible si todas sus piezas lo están. */
+export function gruposPaquetes(oferta: OfertaItem | null): GrupoPaquetes[] {
+  const grupos: GrupoPaquetes[] = [];
+  for (const p of oferta?.combosParte ?? []) {
+    if (!p.paqueteGrupo) continue;
+    const nombre = p.paqueteNombre ?? '';
+    let g = grupos.find((x) => x.grupo === p.paqueteGrupo);
+    if (!g) {
+      g = { grupo: p.paqueteGrupo, paquetes: [] };
+      grupos.push(g);
+    }
+    const ya = g.paquetes.find((x) => x.nombre === nombre);
+    if (ya) ya.disponible = ya.disponible && p.disponible !== false;
+    else g.paquetes.push({ nombre, disponible: p.disponible !== false });
+  }
+  return grupos;
+}
+
+/** La oferta solo con las partes normales y las del paquete elegido de cada grupo: el resto del armado la usa tal cual. */
+export function filtrarPaquetes(oferta: OfertaItem | null, elegidos: Record<string, string>): OfertaItem | null {
+  if (!oferta || !(oferta.combosParte ?? []).some((p) => p.paqueteGrupo)) return oferta;
+  return {
+    ...oferta,
+    combosParte: (oferta.combosParte ?? []).filter((p) => !p.paqueteGrupo || elegidos[p.paqueteGrupo] === p.paqueteNombre),
+  };
+}
+
+/** Hay un grupo de paquetes sin paquete elegido. */
+export const faltaElegirPaquete = (oferta: OfertaItem | null, elegidos: Record<string, string>): boolean =>
+  gruposPaquetes(oferta).some((g) => !elegidos[g.grupo]);
+
+interface PropsPaquetes {
+  grupos: GrupoPaquetes[];
+  elegidos: Record<string, string>;
+  onElegir: (grupo: string, paquete: string) => void;
+}
+
+/** «Elige tu complemento»: un botón por paquete; los que no se pueden armar por stock quedan bloqueados. */
+export function SelectorPaqueteCombo({ grupos, elegidos, onElegir }: PropsPaquetes) {
+  if (grupos.length === 0) return null;
+  return (
+    <div data-testid="paquetes-combo" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {grupos.map((g) => (
+        <div
+          key={g.grupo}
+          role="group"
+          aria-label={`Elige tu ${g.grupo.toLowerCase()}`}
+          style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: 12, background: 'var(--cp-white)' }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8, color: 'var(--cp-navy)' }}>
+            {`Elige tu ${g.grupo.toLowerCase()}`}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {g.paquetes.map((pq) => {
+              const on = elegidos[g.grupo] === pq.nombre;
+              return (
+                <button
+                  key={pq.nombre}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={!pq.disponible}
+                  onClick={() => onElegir(g.grupo, pq.nombre)}
+                  style={{
+                    minHeight: 44,
+                    padding: '0 14px',
+                    borderRadius: 12,
+                    border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`,
+                    background: on ? 'var(--cp-orange)' : 'var(--cp-white)',
+                    color: on ? '#FFFFFF' : 'var(--cp-navy)',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    opacity: pq.disponible ? 1 : 0.5,
+                    cursor: pq.disponible ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  {pq.nombre}
+                  {!pq.disponible ? ' · No hay stock' : ''}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export interface ComboEleccion {
   parteId: string;
   productoId: string;
