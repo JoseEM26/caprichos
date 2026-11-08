@@ -39,6 +39,7 @@ export class OfertasController {
       dto.codigo?.trim() ? dto.codigo.trim().toUpperCase() : undefined,
       null,
       dto.canal === 'MOZO' ? 'MOZO' : 'CAJA',
+      dto.modalidad,
     );
   }
 
@@ -48,8 +49,9 @@ export class OfertasController {
     @Query('tipo') tipo?: string,
     @Query('soloActivas') soloActivas?: string,
     @Query('canal') canal?: string,
+    @Query('modalidad') modalidad?: string,
   ) {
-    return this.ofertasService.listarOfertas(tipo, soloActivas === 'true', canal);
+    return this.ofertasService.listarOfertas(tipo, soloActivas === 'true', canal, false, modalidad);
   }
 
   @Post()

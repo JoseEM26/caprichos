@@ -346,7 +346,7 @@ export class EditarPedidoService {
       throw new BadRequestException({ codigo: 'NOMBRE_REQUERIDO', mensaje: 'Escribe el nombre del cliente (mínimo 2 letras)' });
     }
     const calculo = nuevasDto.length > 0
-      ? await this.pedidos.calcularLineasPedido(nuevasDto, clienteNombre, { canal: pedido.canal as any })
+      ? await this.pedidos.calcularLineasPedido(nuevasDto, clienteNombre, { canal: pedido.canal as any }, pedido.modalidad)
       : { lineasCalculadas: [] as any[], subtotalCalculado: 0 };
     const lineasNuevas = calculo.lineasCalculadas;
     const subtotal = redondear(
@@ -375,6 +375,7 @@ export class EditarPedidoService {
       subtotal,
       lineas: lineasDescuento,
       canal: pedido.canal,
+      modalidad: pedido.modalidad,
       cuponCodigo: undefined,
       clientePartyId: pedido.cliente_party_id,
       clienteConSesion: pedido.canal === 'CARTA' && !!pedido.party_id,

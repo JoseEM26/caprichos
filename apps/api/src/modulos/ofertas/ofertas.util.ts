@@ -128,6 +128,29 @@ export function ofertaIncluyeCanal(canales: string[] | null | undefined, canal: 
   return norm.some((c) => alias.includes(c));
 }
 
+/** Tipo de pedido al que puede limitarse una oferta (vacío = todos). Un pedido RECOGER/LLEVAR cuenta como «llevar». */
+export type ModalidadOferta = 'COMER_LOCAL' | 'LLEVAR' | 'RECOGER' | 'DELIVERY';
+export const MODALIDADES_OFERTA: ModalidadOferta[] = ['COMER_LOCAL', 'LLEVAR', 'RECOGER', 'DELIVERY'];
+
+/** Modalidad del pedido (MESA, COMER_LOCAL, RECOGER, RECOJO, LLEVAR, DELIVERY) a la de oferta; undefined si no se conoce. */
+export function modalidadOferta(modalidad?: string | null): ModalidadOferta | undefined {
+  const m = (modalidad ?? '').toUpperCase();
+  if (m === 'MESA' || m === 'COMER_LOCAL' || m === 'LOCAL') return 'COMER_LOCAL';
+  if (m === 'LLEVAR') return 'LLEVAR';
+  if (m === 'RECOGER' || m === 'RECOJO') return 'RECOGER';
+  if (m === 'DELIVERY') return 'DELIVERY';
+  return undefined;
+}
+
+/** Vacío = todas. Sin modalidad conocida no se descarta nada. Llevar y recoger son lo mismo para el cliente: valen entre sí. */
+export function ofertaIncluyeModalidad(modalidades: string[] | null | undefined, modalidad?: string | null): boolean {
+  const norm = (modalidades ?? []).map((x) => x.toUpperCase());
+  const m = modalidadOferta(modalidad);
+  if (norm.length === 0 || !m) return true;
+  if (m === 'LLEVAR' || m === 'RECOGER') return norm.includes('LLEVAR') || norm.includes('RECOGER');
+  return norm.includes(m);
+}
+
 /** Alta de oferta nueva: carta y local siempre; WhatsApp en los tipos que el bot aplica o arma (combos incluidos; cupones no). */
 export const TIPOS_OFERTA_BOT_APLICA = ['DESCUENTO', 'LLEVA_PAGA', 'ENVIO_GRATIS', 'COMBO'] as const;
 export function canalesPorDefecto(tipo: string): string[] {
@@ -151,11 +174,13 @@ export function estaVigente(
     fecha_desde?: Date | string | null;
     fecha_hasta?: Date | string | null;
     canales?: string[] | null;
+    modalidades?: string[] | null;
     limite_usos?: number | null;
     usos_actuales?: number | null;
   },
   canal?: string,
   ahora?: Date,
+  modalidad?: string | null,
 ): boolean {
   if (!oferta.activo) return false;
 
@@ -171,6 +196,9 @@ export function estaVigente(
 
   // Canal: UNA sola regla para carta, local (caja/mozo) y bot. «TODOS» no incluye WhatsApp: solo cuenta BOT explícito.
   if (canal && !ofertaIncluyeCanal(oferta.canales, canalOferta(canal))) return false;
+
+  // Modalidad del pedido (comer en el local, llevar, recoger, delivery): vacío en la oferta = todas
+  if (!ofertaIncluyeModalidad(oferta.modalidades, modalidad)) return false;
 
   // Validar días de la semana
   if (oferta.dias && oferta.dias.length > 0 && oferta.dias.length < 7) {
@@ -208,6 +236,14 @@ export function estaVigente(
   }
 
   return true;
+}
+
+/** UNA sola función de aplicabilidad: activa, usos, canal, modalidad, días, horas y fechas. */
+export function ofertaAplicaA(
+  oferta: Parameters<typeof estaVigente>[0],
+  ctx: { canal?: string; modalidad?: string | null; fecha?: Date } = {},
+): boolean {
+  return estaVigente(oferta, ctx.canal, ctx.fecha, ctx.modalidad);
 }
 
 /**

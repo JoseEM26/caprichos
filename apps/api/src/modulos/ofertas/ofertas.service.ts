@@ -56,6 +56,8 @@ import {
   canalOferta,
   estaVigente,
   ofertaIncluyeCanal,
+  ofertaAplicaA,
+  ofertaIncluyeModalidad,
   formatearFecha,
   formatearHora,
   categoriasAlcance,
@@ -197,7 +199,7 @@ export class OfertasService {
    * `paraCarta`: lo que pinta la carta virtual. Activas, y las desactivadas que el dueño dejó
    * «Mostrar como No disponible» (visible_carta). Las desactivadas con visible_carta=false no salen.
    */
-  async listarOfertas(tipo?: string, soloActivas = false, canal?: string, paraCarta = false): Promise<OfertaItem[]> {
+  async listarOfertas(tipo?: string, soloActivas = false, canal?: string, paraCarta = false, modalidad?: string): Promise<OfertaItem[]> {
     const where: Prisma.OfertaWhereInput = {};
 
     if (tipo) {
@@ -224,7 +226,9 @@ export class OfertasService {
       },
     });
 
-    let items = ofertasDb.map((o) => this.mapearOferta(o, canal));
+    let items = ofertasDb.map((o) => this.mapearOferta(o, canal, modalidad));
+    // Con modalidad conocida (caja, mozo, carta ya elegida) solo salen las ofertas que valen para ella
+    if (modalidad) items = items.filter((o) => ofertaIncluyeModalidad(o.modalidades, modalidad));
     // Bot de WhatsApp: solo lista lo que vale por WhatsApp (casilla «WhatsApp (bot)»); no ofrece lo que hoy no se puede armar
     const esBot = !!canal && canalOferta(canal) === 'BOT';
     if (esBot) items = items.filter((o) => ofertaIncluyeCanal(o.canales, 'BOT'));
@@ -355,6 +359,7 @@ export class OfertasService {
     const fechaHastaDate = fechaHastaStr ? new Date(`${fechaHastaStr.slice(0, 10)}T00:00:00.000Z`) : null;
     const soloPrimeraCompra = dto.soloPrimeraCompra ?? false;
     this.validarPrimeraCompra({ tipo: tipoFinal, soloPrimeraCompra, fechaDesde: fechaDesdeDate, fechaHasta: fechaHastaDate });
+    this.validarModalidadesEnvio(tipoFinal, dto.modalidades);
 
     const creada = await this.prisma.$transaction(async (tx) => {
       const oferta = await tx.oferta.create({
@@ -382,6 +387,7 @@ export class OfertasService {
           // La primera compra solo se canjea en la carta web
           // Por defecto no vale por WhatsApp (casilla desmarcada); el envío gratis sí sale marcado
           canales: soloPrimeraCompra ? ['CARTA'] : dto.canales ?? canalesPorDefecto(tipoFinal),
+          modalidades: dto.modalidades ?? [],
           limite_usos: dto.limiteUsos ?? null,
           no_suma_beneficios: dto.noSumaBeneficios ?? false,
           mostrar_en_saludo_bot: dto.mostrarEnSaludoBot ?? false,
@@ -605,6 +611,8 @@ export class OfertasService {
       data.fecha_hasta = fechaHastaActualizar ? new Date(`${fechaHastaActualizar.slice(0, 10)}T00:00:00.000Z`) : null;
     }
     if (dto.canales !== undefined) data.canales = dto.canales ?? [];
+    if (dto.modalidades !== undefined) data.modalidades = dto.modalidades ?? [];
+    this.validarModalidadesEnvio(ofertaExistente.tipo, (data.modalidades as string[] | undefined) ?? ofertaExistente.modalidades);
     if (dto.limiteUsos !== undefined) data.limite_usos = dto.limiteUsos;
     if (dto.noSumaBeneficios !== undefined) data.no_suma_beneficios = dto.noSumaBeneficios;
     if (dto.mostrarEnSaludoBot !== undefined) data.mostrar_en_saludo_bot = dto.mostrarEnSaludoBot;
@@ -1723,6 +1731,7 @@ export class OfertasService {
     cuponCodigo?: string,
     clientePartyId?: string | null,
     canal: string = 'CARTA',
+    modalidad?: string,
   ): Promise<{ descuentoTotal: number; montoCanjeable: number; puntosEstimados: number; puntosPorcentaje: number; detalles: { tipo: string; nombre: string; monto: number }[]; envioGratisCupon: boolean }> {
     const param = await Promise.resolve().then(() => this.prisma.parametro.findUnique({ where: { clave: 'puntos_porcentaje' } })).catch(() => null);
     const puntosPorcentaje = param && param.valor !== null && param.valor !== undefined ? Number(param.valor) : 5;
@@ -1749,6 +1758,7 @@ export class OfertasService {
       subtotal,
       lineas: lineasCalc,
       canal,
+      modalidad,
       cuponCodigo: cuponCodigo || null,
       clientePartyId: clientePartyId || null,
       // igual que al crear el pedido: la primera compra solo cuenta con sesión en la carta
@@ -1778,6 +1788,8 @@ export class OfertasService {
       noSumaBeneficios?: boolean;
     }>;
     canal: string;
+    /** MESA/COMER_LOCAL, RECOGER/LLEVAR o DELIVERY; sin ella no se filtra por modalidad */
+    modalidad?: string | null;
     cuponCodigo?: string | null;
     clientePartyId?: bigint | string | number | null;
     /** true solo si el cliente tiene sesión iniciada en la carta (cuenta con celular verificado) */
@@ -1808,7 +1820,7 @@ export class OfertasService {
       include: { categoria: true, producto: true },
     });
 
-    const descuentosVigentes = descuentosCandidatos.filter((d) => estaVigente(d, canal, ahora));
+    const descuentosVigentes = descuentosCandidatos.filter((d) => ofertaAplicaA(d, { canal, fecha: ahora, modalidad: params.modalidad }));
 
     // Primera compra: solo sobre líneas que no estén en otra promoción automática vigente (no se acumulan)
     const promosAutomaticas = descuentosVigentes.filter((d) => !d.solo_primera_compra);
@@ -2104,12 +2116,16 @@ export class OfertasService {
     canal?: string,
     /** Tamaño del combo pedido (valor de la lista TAMANO): cada producto de las partes usa SU tamaño equivalente. */
     tamanoValorId?: bigint | string | number | null,
+    modalidad?: string | null,
   ): Promise<ResolucionCombo> {
     const oferta = await this.obtenerOfertaPorId(ofertaId);
     if (oferta.tipo !== 'COMBO') return { nota: '', partes: [] };
     // Misma regla de canal que el resto de ofertas: con la casilla del canal apagada, el id no sirve
     if (canal && !ofertaIncluyeCanal(oferta.canales, canalOferta(canal))) {
       throw new BadRequestException({ codigo: 'OFERTA_NO_APLICA_CANAL', mensaje: `${oferta.nombre} no está disponible en este canal` });
+    }
+    if (modalidad && !ofertaIncluyeModalidad(oferta.modalidades, modalidad)) {
+      throw new BadRequestException({ codigo: 'OFERTA_NO_APLICA_MODALIDAD', mensaje: `${oferta.nombre} no vale para este tipo de pedido` });
     }
     const noDisponible = (mensaje: string) =>
       new ConflictException({ codigo: 'COMBO_PARTE_NO_DISPONIBLE', mensaje });
@@ -2636,6 +2652,13 @@ export class OfertasService {
   }
 
   /** Reglas de la promoción de primera compra: solo descuentos, solo carta web y como máximo un mes de vigencia. */
+  /** El envío gratis solo existe en delivery: si se limita por modalidad, Delivery tiene que estar. */
+  private validarModalidadesEnvio(tipo: string, modalidades?: string[] | null): void {
+    if (tipo === 'ENVIO_GRATIS' && modalidades?.length && !modalidades.includes('DELIVERY')) {
+      throw new BadRequestException({ codigo: 'ENVIO_GRATIS_SIN_DELIVERY', mensaje: 'El envío gratis solo vale en delivery: marca Delivery' });
+    }
+  }
+
   private validarPrimeraCompra(o: { tipo: string; soloPrimeraCompra: boolean; fechaDesde: Date | null; fechaHasta: Date | null }): void {
     if (!o.soloPrimeraCompra) return;
     if (o.tipo !== 'DESCUENTO') {
@@ -2706,7 +2729,7 @@ export class OfertasService {
     return { titulo: oferta.nombre, texto, enlaceCarta: origen.replace(/\/$/, '') };
   }
 
-  private mapearOferta(o: any, canal?: string): OfertaItem {
+  private mapearOferta(o: any, canal?: string, modalidad?: string): OfertaItem {
     return {
       id: o.id.toString(),
       tipo: o.tipo,
@@ -2726,6 +2749,7 @@ export class OfertasService {
       fechaDesde: formatearFecha(o.fecha_desde),
       fechaHasta: formatearFecha(o.fecha_hasta),
       canales: o.canales || [],
+      modalidades: o.modalidades || [],
       limiteUsos: o.limite_usos,
       usosActuales: o.usos_actuales,
       noSumaBeneficios: o.no_suma_beneficios,
@@ -2737,7 +2761,7 @@ export class OfertasService {
       creadoEn: o.creado_en.toISOString(),
       categoriaNombre: o.categoria?.nombre || null,
       productoNombre: o.producto?.nombre || null,
-      vigenteAhora: estaVigente(o, canal),
+      vigenteAhora: ofertaAplicaA(o, { canal, modalidad }),
       imagenArchivoId: o.imagen_archivo_id ? o.imagen_archivo_id.toString() : null,
       imagenUrl: o.imagen_archivo
         ? o.imagen_archivo.ruta.startsWith('http')
