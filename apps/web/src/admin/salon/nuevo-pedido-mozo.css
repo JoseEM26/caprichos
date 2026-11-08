@@ -89,17 +89,17 @@
 
 .np-linea-fila {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px 6px;
   min-width: 0;
 }
 
 .np-linea-nombre {
-  flex: 1 1 auto;
+  flex: 1 1 120px;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-weight: 800;
   font-size: 13px;
 }
@@ -124,9 +124,11 @@
 }
 
 .np-qty button {
-  width: 32px;
-  height: 32px;
-  border-radius: 16px;
+  /* 44 px táctil y redondo: el min-height de 44 de salon.css deformaba el botón de 32 px en un óvalo */
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   border: 1.5px solid var(--cp-navy);
   background: transparent;
   font-weight: 800;
@@ -158,9 +160,7 @@
 .np-linea-nota {
   font-size: 12px;
   color: var(--cp-soft);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .np-cupon-fila {
@@ -798,4 +798,41 @@
   .np-producto:active {
     transform: none;
   }
+}
+
+/* ---- Resumen del pedido: nada se aplasta ni se monta ----
+   Causa de la distorsión: el carrito es una columna flex con altura acotada y overflow; sus hijos
+   (sobre todo .np-lineas, con min-height:0) se encogían a 0 y las líneas se dibujaban encima del
+   cupón y los totales. Cada bloque conserva su altura y el carrito hace el scroll. */
+.np-carrito > * {
+  flex-shrink: 0;
+}
+
+.np-lineas {
+  flex: none;
+  min-height: auto;
+}
+
+.np-chips > * {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.np-chips > .np-chip-mesa,
+.np-chips > .np-chip-pide,
+.np-chips > div,
+.np-chips > .np-pide-abierto {
+  flex: 1 1 100%;
+}
+
+.np-carrito input:not([type='checkbox']):not([type='radio']),
+.np-carrito select,
+.np-carrito textarea {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.np-carrito {
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
 }
