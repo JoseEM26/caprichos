@@ -14,7 +14,10 @@ import { ModalUbicar } from './ModalUbicar';
 import { ModalCorregirCliente } from './ModalCorregirCliente';
 import { ModalPrecuenta } from '../salon/componentes/ModalPrecuenta';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
-import { InsigniaModalidad, textoMesa } from './InsigniaModalidad';
+import { InsigniaModalidad } from './InsigniaModalidad';
+import { InsigniaMesa } from './InsigniaMesa';
+import { esCerrado } from './estadosCaja';
+import { PastillaEspera } from './PastillaEspera';
 import { canalLabel, modLabel, getBadge, ChipCobroMozo } from './PedidosAdminView';
 import { EtiquetaCajaCerrada, esperaCajaCerrada } from './BannerCajaCerrada';
 import {
@@ -317,17 +320,15 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
           <div className="dp-cab-fila">
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                <h2 className="dp-nombre">
-                  {esMesa && pedido.mesa_nombre && <span className="dp-nombre-mesa">{textoMesa(pedido.mesa_nombre)} · </span>}
-                  {pedido.cliente_nombre?.trim() || 'Cliente'}
-                </h2>
+                {pedido.mesa_nombre && (esMesa || /^en espera/i.test(pedido.mesa_nombre)) && <InsigniaMesa mesaNombre={pedido.mesa_nombre} grande />}
+                <h2 className="dp-nombre">{pedido.cliente_nombre?.trim() || 'Cliente'}</h2>
                 <InsigniaModalidad modalidad={pedido.modalidad} mesaNombre={pedido.mesa_nombre} />
               </div>
               <div className="dp-meta">
-                <strong>{pedido.codigo}</strong> · {canalLabel(pedido.canal)} · {modLabel(pedido.modalidad)} · {hora}
-                {pedido.minutosEspera != null ? ` · ${pedido.minutosEspera} min` : ''}
+                <span className="dp-codigo">{pedido.codigo}</span> · {canalLabel(pedido.canal)} · {modLabel(pedido.modalidad)} · {hora}
               </div>
             </div>
+            <PastillaEspera creadoEn={pedido.creado_en} cerrado={esCerrado(pedido)} />
             <div className="dp-total-cab" aria-label="Total del pedido">
               S/ {totalNum.toFixed(2)}
             </div>

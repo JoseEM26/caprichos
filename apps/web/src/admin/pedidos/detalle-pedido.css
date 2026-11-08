@@ -24,12 +24,12 @@
 .dp-cab-fila > :first-child { flex: 1 1 0; min-width: 0; }
 .dp-cab-fila > .dp-total-cab { flex: none; }
 .dp-nombre {
-  margin: 0; font-family: Montserrat, sans-serif; font-weight: 900; font-size: 22px; line-height: 1.15;
+  margin: 0; font-family: Montserrat, sans-serif; font-weight: 900; font-size: 26px; line-height: 1.15;
   overflow-wrap: anywhere;
 }
 .dp-nombre-mesa { color: var(--cp-rust, #B2500F); }
 .dp-meta { font-size: 14px; font-weight: 600; color: var(--cp-soft, #2C4C5D); }
-.dp-meta strong { color: var(--cp-navy, #0B2C3E); }
+.dp-codigo { font-size: 12.5px; font-weight: 600; color: var(--cp-soft, #2C4C5D); user-select: all; }
 .dp-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .dp-chip {
   display: inline-flex; align-items: center; font-size: 12px; font-weight: 800; line-height: 1.2;

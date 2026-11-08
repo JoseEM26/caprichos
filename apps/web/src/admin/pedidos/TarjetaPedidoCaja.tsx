@@ -1,28 +1,25 @@
 import { memo } from 'react';
 import type { Pedido } from './pedidosApi';
+import { InsigniaMesa } from './InsigniaMesa';
+import { PastillaEspera } from './PastillaEspera';
 import { IconoModalidad, IconoCanal, claveCanal, claveModalidad, textoMesa, type ClaveModalidad } from './InsigniaModalidad';
 import { deliverySinUbicacion } from './ubicacionDelivery';
 import { canalLabel, ChipCobroMozo } from './PedidosAdminView';
 import { InsigniaDireccionEditada } from './InsigniaDireccionEditada';
 import { InsigniaCambioCobro } from './PanelCambioCobro';
 import { EtiquetaCajaCerrada } from './BannerCajaCerrada';
-import { ESTILO_ESPERA, esCerrado, estadoVisual, nivelEspera } from './estadosCaja';
+import { esCerrado, estadoVisual } from './estadosCaja';
 import type { AccionCaja } from './accionesCaja';
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
 
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' });
-const fechaCorta = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', timeZone: 'America/Lima' });
 
-/** Nombre grande; en mesa, «Mesa 4 · Ana» con la mesa destacada. */
-export function NombreCliente({ pedido }: { pedido: Pick<Pedido, 'cliente_nombre' | 'modalidad' | 'mesa_nombre'> }) {
+/** Nombre del cliente (es lo único que se acorta); la mesa va en su propia insignia. */
+export function NombreCliente({ pedido }: { pedido: Pick<Pedido, 'cliente_nombre'> }) {
   const nombre = pedido.cliente_nombre?.trim() || 'Cliente';
-  const mesa = String(pedido.modalidad).toUpperCase() === 'MESA' && pedido.mesa_nombre ? textoMesa(pedido.mesa_nombre) : null;
-  const titulo = mesa ? `${mesa} · ${nombre}` : nombre;
   return (
-    <h3 className="cj-pc-nombre" title={titulo}>
-      {mesa && <span className="cj-pc-mesa">{mesa} · </span>}
+    <h3 className="cj-pc-nombre cj2-nombre" title={nombre}>
       {nombre}
     </h3>
   );
@@ -42,7 +39,7 @@ const ROTULO: Record<ClaveModalidad, string> = {
 /** Rótulo de la insignia («MESA 4», «DELIVERY») y detalle secundario (la zona del delivery). */
 function textoInsignia(o: Pedido): { rotulo: string; detalle: string | null } {
   const clave = claveModalidad(o.modalidad);
-  if (clave === 'MESA') return { rotulo: textoMesa(o.mesa_nombre), detalle: null };
+  if (clave === 'MESA') return { rotulo: ROTULO.MESA, detalle: null };
   if (clave === 'DELIVERY') return { rotulo: ROTULO.DELIVERY, detalle: o.zona?.nombre || null };
   return { rotulo: ROTULO[clave], detalle: null };
 }
@@ -76,15 +73,13 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
   const clave = claveModalidad(o.modalidad);
   const insignia = textoInsignia(o);
   const cerrado = esCerrado(o);
+  const conMesa = !!o.mesa_nombre?.trim() && (clave === 'MESA' || /^en espera/i.test(o.mesa_nombre));
+  const nombreCompleto = o.cliente_nombre?.trim() || 'Cliente';
   const lineas = o.lineas || [];
   const itemsTexto = lineas.map((l) => `${l.cantidad}× ${l.nombre}`);
   const esDelivery = clave === 'DELIVERY';
-  const espera = o.creado_en ? Math.max(0, Math.floor(((ahora ?? Date.now()) - new Date(o.creado_en).getTime()) / 60000)) : null;
-  const colorEspera = ESTILO_ESPERA[nivelEspera(espera, cerrado)];
   const sinUbicacion = esDelivery && deliverySinUbicacion(o);
   const lugar = esDelivery ? (sinUbicacion ? 'Falta la ubicación' : o.entrega_direccion || null) : null;
-  // Cerrados y pedidos de días anteriores: la hora (con la fecha si no es de hoy); los demás, los minutos de espera
-  const textoEspera = !o.creado_en ? null : cerrado || (espera ?? 0) >= 600 ? `${(espera ?? 0) >= 600 ? `${fechaCorta(o.creado_en)} ` : ''}${hora(o.creado_en)}` : `${espera} min`;
 
   return (
     <div
@@ -96,22 +91,14 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
         type="button"
         onClick={() => alSeleccionar(o.id)}
         className="cj2-abrir"
-        aria-label={`Pedido ${o.codigo} de ${o.cliente_nombre?.trim() || 'Cliente'}`}
+        aria-label={conMesa ? `Pedido ${o.codigo}, ${textoMesa(o.mesa_nombre)}, de ${nombreCompleto}` : `Pedido ${o.codigo} de ${nombreCompleto}`}
       >
         <span className="cj2-top">
           <span className="cj2-ident">
-            <span className="cj2-cod">{o.codigo}</span>
+            {conMesa && <InsigniaMesa mesaNombre={o.mesa_nombre} grande />}
             <NombreCliente pedido={o} />
           </span>
-          {textoEspera && (
-            <span className="cj2-espera" data-nivel={nivelEspera(espera, cerrado)} style={{ background: colorEspera.bg, color: colorEspera.fg }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3 2" />
-              </svg>
-              {textoEspera}
-            </span>
-          )}
+          <PastillaEspera creadoEn={o.creado_en} cerrado={cerrado} ahora={ahora} />
         </span>
 
         <span className="cj2-mod">
@@ -121,6 +108,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
             {insignia.detalle && <span className="cj2-mod-det">· {insignia.detalle}</span>}
           </span>
           <span className="cj2-canal" data-canal={canal}>
+            <span className="cj2-cod cj2-codigo">{o.codigo}</span> ·{' '}
             <IconoCanal clave={canal} />
             {canalLabel(canal === 'WHATSAPP' ? 'WHATSAPP' : o.canal)}
             {o.creado_en && ` · ${hora(o.creado_en)}`}
