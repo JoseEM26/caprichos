@@ -74,37 +74,162 @@ export function ListaChats({
 }: ListaChatsProps) {
   const pendientes = conteos.atender;
   const sinVerTotal = conteos.sinVer ?? 0;
+  const [panelAbierto, setPanelAbierto] = React.useState(false);
+  const cabRef = React.useRef<HTMLDivElement>(null);
+  const botonFiltrosRef = React.useRef<HTMLButtonElement>(null);
+  const hayDias = Boolean(dias && onDia);
+  const diaActivo = hayDias && dia !== 'hoy';
+  const posActivo = Boolean(onPos) && pos !== null;
+  const nFiltros = (diaActivo ? 1 : 0) + (posActivo ? 1 : 0);
+  const textoDia = (d: FiltroDia) =>
+    d === 'hoy' ? 'Hoy' : d === 'ayer' ? 'Ayer' : d === 'manana' ? 'Mañana' : d === 'todos' ? 'Todos' : d.split('-').reverse().join('/');
+  const textoPos = pos === 'faltan' ? 'faltan procesar' : 'ya procesados';
+
+  // Cierra con Escape (devuelve el foco al botón) y al tocar fuera del encabezado.
+  React.useEffect(() => {
+    if (!panelAbierto) return;
+    const alTeclado = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPanelAbierto(false);
+        botonFiltrosRef.current?.focus();
+      }
+    };
+    const alTocar = (e: Event) => {
+      if (cabRef.current && !cabRef.current.contains(e.target as Node)) setPanelAbierto(false);
+    };
+    document.addEventListener('keydown', alTeclado);
+    document.addEventListener('mousedown', alTocar);
+    document.addEventListener('touchstart', alTocar);
+    return () => {
+      document.removeEventListener('keydown', alTeclado);
+      document.removeEventListener('mousedown', alTocar);
+      document.removeEventListener('touchstart', alTocar);
+    };
+  }, [panelAbierto]);
+
+  const limpiarFiltros = () => {
+    if (onDia) onDia('hoy');
+    if (onPos) onPos(null);
+  };
+  const hayFiltros = hayDias || Boolean(onPos);
+
   return (
     <aside className="msg-lista" aria-label="Lista de chats">
-      <div className="msg-lhead">
-        <div className="msg-lhead-fila">
-          <h2 className="msg-title">Chats</h2>
-          {controles}
-        </div>
-        <span className="msg-sub">
-          {pendientes === 0 ? 'Todo al día' : `${pendientes} por atender`}
-          {sinVerTotal > 0 && (
-            <>
-              {' · '}
-              <span className="msg-sin-ver-total" data-testid="total-sin-ver" role="status">
-                {sinVerTotal} sin ver
-              </span>
-            </>
+      <div className="msg-cab" ref={cabRef} data-testid="cabecera-compacta">
+        <div className="msg-cab-fila">
+          <h2 className="msg-title msg-solo-lectores">Chats</h2>
+          <div className="msg-cab-controles">{controles}</div>
+          {hayFiltros && (
+            <button
+              ref={botonFiltrosRef}
+              type="button"
+              className="msg-filtros-btn"
+              data-testid="boton-filtros"
+              aria-expanded={panelAbierto}
+              aria-controls="msg-panel-filtros"
+              aria-label={nFiltros > 0 ? `Filtros, ${nFiltros} ${nFiltros === 1 ? 'activo' : 'activos'}` : 'Filtros'}
+              onClick={() => setPanelAbierto((v) => !v)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 6h16M7 12h10M10 18h4" />
+              </svg>
+              <span>Filtros</span>
+              {nFiltros > 0 && (
+                <span className="msg-filtros-badge" data-testid="badge-filtros" aria-hidden="true">
+                  {nFiltros}
+                </span>
+              )}
+            </button>
           )}
-        </span>
+        </div>
+
+        <div className="msg-buscar">
+          <input
+            type="text"
+            placeholder="Buscar un chat o un celular"
+            aria-label="Buscar un chat"
+            value={busqueda}
+            onChange={(e) => onBuscar(e.target.value)}
+          />
+          <span className="msg-sub" data-al-dia={pendientes === 0 ? '1' : '0'}>
+            <span className="msg-punto" aria-hidden="true" />
+            {pendientes === 0 ? 'Todo al día' : `${pendientes} por atender`}
+            {sinVerTotal > 0 && (
+              <>
+                {' · '}
+                <span className="msg-sin-ver-total" data-testid="total-sin-ver" role="status">
+                  {sinVerTotal} sin ver
+                </span>
+              </>
+            )}
+          </span>
+        </div>
+
+        {panelAbierto && hayFiltros && (
+          <div className="msg-panel-filtros" id="msg-panel-filtros" role="group" aria-label="Filtros de la bandeja" data-testid="panel-filtros">
+            {dias && onDia && (
+              <section className="msg-panel-sec">
+                <h3>Día</h3>
+                <div className="msg-panel-chips" role="group" aria-label="Filtrar por día">
+                  {(
+                    [
+                      ['hoy', 'Hoy', dias.hoy],
+                      ['ayer', 'Ayer', dias.ayer],
+                      ['manana', 'Mañana', dias.manana],
+                      ['todos', 'Todos', dias.total],
+                    ] as const
+                  ).map(([id, label, n]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className="msg-tab msg-tab-dia"
+                      aria-pressed={dia === id}
+                      aria-label={`${label}: ${n} ${n === 1 ? 'chat' : 'chats'}`}
+                      onClick={() => onDia(id)}
+                    >
+                      {label} <b>{n}</b>
+                    </button>
+                  ))}
+                  <input
+                    type="date"
+                    className="msg-dia-fecha"
+                    aria-label="Elegir fecha"
+                    title="Elegir fecha"
+                    value={/^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : ''}
+                    onChange={(e) => onDia(e.target.value || 'todos')}
+                  />
+                </div>
+              </section>
+            )}
+            {onPos && (
+              <section className="msg-panel-sec">
+                <h3>Punto de venta</h3>
+                <div className="msg-panel-chips" role="group" aria-label="Punto de venta">
+                  {([
+                    ['faltan', `Faltan procesar${conteos.faltanProcesar ? ` (${conteos.faltanProcesar})` : ''}`],
+                    ['procesados', 'Ya procesados'],
+                  ] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className="msg-tab"
+                      aria-pressed={pos === id}
+                      onClick={() => onPos(pos === id ? null : id)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+            <button type="button" className="msg-link msg-limpiar" data-testid="limpiar-filtros" onClick={limpiarFiltros}>
+              Limpiar filtros
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="msg-buscar">
-        <input
-          type="text"
-          placeholder="Buscar un chat o un celular"
-          aria-label="Buscar un chat"
-          value={busqueda}
-          onChange={(e) => onBuscar(e.target.value)}
-        />
-      </div>
-
-      <div className="msg-tabs">
+      <div className="msg-tabs" role="group" aria-label="Filtrar chats" data-testid="pestanas">
         {[
           { id: 'todos', label: 'Todos', count: conteos.todos },
           { id: 'atender', label: 'Por atender', count: conteos.atender },
@@ -120,13 +245,9 @@ export function ListaChats({
             <button
               key={tab.id}
               type="button"
-              className="msg-tab"
+              className="msg-tab msg-tab-principal"
               aria-pressed={activa}
-              style={{
-                background: activa ? '#D9FDD3' : '#FFFFFF',
-                color: activa ? '#00402F' : '#33434B',
-                borderColor: activa ? '#00594A' : '#C9D2D8',
-              }}
+              data-pendiente={tab.id === 'atender' && tab.count > 0 ? '1' : '0'}
               onClick={() => onFiltro(tab.id as FiltroChat)}
             >
               {tab.label} <b>{tab.count}</b>
@@ -136,13 +257,9 @@ export function ListaChats({
         {((conteos.bloqueadosSpam ?? 0) > 0 || soloBloqueados) && (
           <button
             type="button"
-            className="msg-tab"
+            className="msg-tab msg-tab-principal msg-tab-spam"
             aria-pressed={soloBloqueados}
             data-testid="filtro-bloqueados-spam"
-            style={{
-              background: soloBloqueados ? '#FFE0A3' : '#FFFFFF',
-              color: soloBloqueados ? '#5C3700' : '#33434B',
-            }}
             onClick={onToggleSoloBloqueados}
           >
             Bloqueados por spam ({conteos.bloqueadosSpam})
@@ -150,66 +267,24 @@ export function ListaChats({
         )}
       </div>
 
-      {dias && onDia && (
-        <div className="msg-dias" role="group" aria-label="Filtrar por día">
-          {(
-            [
-              ['hoy', 'Hoy', dias.hoy],
-              ['ayer', 'Ayer', dias.ayer],
-              ['manana', 'Mañana', dias.manana],
-              ['todos', 'Todos', dias.total],
-            ] as const
-          ).map(([id, label, n]) => (
-            <button
-              key={id}
-              type="button"
-              className="msg-tab msg-tab-dia"
-              aria-pressed={dia === id}
-              aria-label={`${label}: ${n} ${n === 1 ? 'chat' : 'chats'}`}
-              onClick={() => onDia(id)}
-            >
-              {label} <b>{n}</b>
+      {(diaActivo || posActivo) && (
+        <div className="msg-activos" data-testid="filtros-activos" aria-label="Filtros activos">
+          {diaActivo && (
+            <button type="button" className="msg-chip-activo" aria-label={`Quitar filtro Día: ${textoDia(dia)}`} onClick={() => onDia?.('hoy')}>
+              Día: {textoDia(dia)} <span aria-hidden="true">✕</span>
             </button>
-          ))}
-          <input
-            type="date"
-            className="msg-dia-fecha"
-            aria-label="Elegir fecha"
-            title="Elegir fecha"
-            value={/^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : ''}
-            onChange={(e) => onDia(e.target.value || 'todos')}
-          />
+          )}
+          {posActivo && (
+            <button type="button" className="msg-chip-activo" aria-label={`Quitar filtro POS: ${textoPos}`} onClick={() => onPos?.(null)}>
+              POS: {textoPos} <span aria-hidden="true">✕</span>
+            </button>
+          )}
         </div>
       )}
       {dias && onDia && dia === 'hoy' && dias.anteriores > 0 && (
         <button type="button" className="msg-aviso-anteriores" data-testid="aviso-anteriores" onClick={() => onDia('todos')}>
           {dias.anteriores} de días anteriores {filtro === 'atendidos' ? 'archivados' : 'sin atender'} · Ver
         </button>
-      )}
-
-      {onPos && (
-        <div className="msg-pos-filtros" role="group" aria-label="Punto de venta">
-          <span>Punto de venta:</span>
-          {([
-            ['faltan', `Faltan procesar${conteos.faltanProcesar ? ` (${conteos.faltanProcesar})` : ''}`],
-            ['procesados', 'Ya procesados'],
-          ] as const).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className="msg-tab"
-              aria-pressed={pos === id}
-              style={{
-                background: pos === id ? '#D9FDD3' : '#FFFFFF',
-                color: pos === id ? '#00402F' : '#33434B',
-                borderColor: pos === id ? '#00594A' : '#C9D2D8',
-              }}
-              onClick={() => onPos(pos === id ? null : id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       )}
 
       {cargando ? (

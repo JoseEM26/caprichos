@@ -7,6 +7,13 @@ import { buscarEmojis, CATEGORIAS_EMOJI, insertarEnCursor } from '../emojis';
 import { ListaChats } from '../ListaChats';
 import { BurbujaMensaje } from '../BurbujaMensaje';
 
+/** Los filtros de día y de punto de venta viven en el panel plegable «Filtros»: se abre solo si está cerrado. */
+export async function abrirFiltros() {
+  const b = await screen.findByTestId('boton-filtros');
+  if (b.getAttribute('aria-expanded') !== 'true') fireEvent.click(b);
+}
+
+
 vi.mock('../../../comun/socket', () => ({ useEventos: vi.fn() }));
 
 const chat = {
@@ -72,11 +79,12 @@ describe('Atendido y punto de venta en la pantalla', () => {
     expect(enCabecera).toHaveAttribute('href', '/admin/caja?pedido=70');
     expect(screen.getByTestId('pos-1')).toHaveTextContent('Sin pedido');
 
+    await abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: /Faltan procesar \(1\)/ }));
     await waitFor(() => expect(api.listarConversaciones).toHaveBeenLastCalledWith('todos', '', 'faltan'));
   });
 
-  it('ListaChats lista «Ya procesados» y devuelve el filtro elegido', () => {
+  it('ListaChats lista «Ya procesados» y devuelve el filtro elegido', async () => {
     const onPos = vi.fn();
     render(
       <ListaChats
@@ -85,6 +93,7 @@ describe('Atendido y punto de venta en la pantalla', () => {
         chatSeleccionadoId={null} onSeleccionar={() => {}}
       />,
     );
+    await abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: 'Ya procesados' }));
     expect(onPos).toHaveBeenCalledWith('procesados');
   });
