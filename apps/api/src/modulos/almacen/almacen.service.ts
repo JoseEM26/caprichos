@@ -866,6 +866,14 @@ export class AlmacenService {
     const deltaInverso = new Prisma.Decimal(movOriginal.cantidad).negated();
 
     const resultado = await this.prisma.$transaction(async (tx) => {
+      // Dos anulaciones a la vez del mismo movimiento se turnan: la segunda ya ve la anulación de la primera
+      if (typeof tx.$queryRaw === 'function') await tx.$queryRaw`SELECT id FROM movimiento_stock WHERE id = ${movId} FOR UPDATE`;
+      if (await tx.movimientoStock.findFirst({ where: { movimiento_anulado_id: movId }, select: { id: true } })) {
+        throw new BadRequestException({
+          codigo: 'MOVIMIENTO_YA_ANULADO',
+          mensaje: 'Este movimiento ya fue anulado anteriormente',
+        });
+      }
       if (movOriginal.insumo_id) {
         await tx.stock.updateMany({
           where: {
@@ -873,6 +881,13 @@ export class AlmacenService {
             lugar_id: movOriginal.lugar_id,
           },
           data: { cantidad: { increment: deltaInverso } },
+        });
+      } else if (movOriginal.sabor_id) {
+        // Merma o producción de un sabor: el saldo vive en el sabor, no en la fila de stock del producto
+        await tx.stockSabor.upsert({
+          where: { sabor_id: movOriginal.sabor_id },
+          update: { cantidad: { increment: deltaInverso } },
+          create: { sabor_id: movOriginal.sabor_id, cantidad: deltaInverso },
         });
       } else if (movOriginal.producto_id) {
         await tx.stock.updateMany({
@@ -889,6 +904,7 @@ export class AlmacenService {
           tipo: 'ANULACION',
           insumo_id: movOriginal.insumo_id,
           producto_id: movOriginal.producto_id,
+          sabor_id: movOriginal.sabor_id,
           lugar_id: movOriginal.lugar_id,
           cantidad: deltaInverso,
           movimiento_anulado_id: movId,
@@ -918,6 +934,11 @@ export class AlmacenService {
       productoId: movOriginal.producto_id?.toString(),
       lugarId: movOriginal.lugar_id.toString(),
     });
+
+    if (movOriginal.sabor_id && deltaInverso.greaterThan(0)) {
+      const saldo = await saldoSabor(this.prisma, movOriginal.sabor_id);
+      if (saldo > 0) await sincronizarAgotadoSabor(this.prisma, movOriginal.sabor_id, saldo, new Date(), usuario ? usuario.partyId : BigInt(1));
+    }
 
     if (deltaInverso.greaterThan(0) && typeof this.stockService?.verificarYReactivarAgotados === 'function') {
       await this.stockService.verificarYReactivarAgotados(
@@ -1245,13 +1266,14 @@ export class AlmacenService {
     const cocinaLugar = await this.obtenerLugarPorNombre('Salados');
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.produccion.update({
-        where: { id: prodId },
-        data: {
-          anulado_en: new Date(),
-          motivo_anulacion: motivo,
-        },
+      // Marca atómica: dos anulaciones a la vez no devuelven los insumos dos veces
+      const marcada = await tx.produccion.updateMany({
+        where: { id: prodId, anulado_en: null },
+        data: { anulado_en: new Date(), motivo_anulacion: motivo },
       });
+      if (marcada.count === 0) {
+        throw new BadRequestException({ codigo: 'PRODUCCION_YA_ANULADA', mensaje: 'Esta producción ya fue anulada' });
+      }
 
       // Si la producción fue de un sabor, se quita de ese sabor (lo que dejó la alta en el movimiento)
       const altaSabor = await tx.movimientoStock.findFirst({
@@ -1286,9 +1308,9 @@ export class AlmacenService {
       for (const lin of prod.receta.lineas) {
         const necPorTanda = Number(lin.cantidad);
         const rinde = Number(prod.receta.rinde) > 0 ? Number(prod.receta.rinde) : 1;
-        const cantDevolver = Number(prod.tandas) > 0
-          ? Number(prod.tandas) * necPorTanda
-          : (Number(prod.unidades) / rinde) * necPorTanda;
+        // Lo mismo que consumió registrarProduccion: (unidades / rinde) × cantidad por tanda. Con «tandas» distintas de
+        // unidades/rinde (rendimiento real) devolver tandas × cantidad inflaba el stock de insumos.
+        const cantDevolver = (Number(prod.unidades) / rinde) * necPorTanda;
 
         await tx.stock.updateMany({
           where: { insumo_id: lin.insumo_id, lugar_id: cocinaLugar.id },

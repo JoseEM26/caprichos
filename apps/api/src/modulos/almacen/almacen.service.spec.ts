@@ -104,6 +104,7 @@ describe('AlmacenService', () => {
         create: jest.fn().mockResolvedValue({ id: 99n, documento: 'PROD-0001' }),
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       producto: {
         findUnique: jest.fn(),

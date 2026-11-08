@@ -2,6 +2,8 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../../comun/socket/eventos.gateway';
 import { AvisosPedidoService } from './avisos-pedido.service';
+import { StockService } from '../../stock/stock.service';
+import { PuntosService } from '../../clientes/puntos.service';
 import { EtapaAvisoReparto } from '../conversacion/textos-reparto';
 
 /**
@@ -72,6 +74,8 @@ export class ReprogramacionService {
     private readonly prisma: PrismaService,
     private readonly avisos: AvisosPedidoService,
     @Optional() private readonly eventos?: EventosGateway,
+    @Optional() private readonly stockService?: StockService,
+    @Optional() private readonly puntosService?: PuntosService,
   ) {}
 
   /** Pregunta de reprogramar enviada al cliente que sigue sin respuesta, para su último pedido retirado. */
@@ -173,6 +177,17 @@ export class ReprogramacionService {
       return true;
     });
     if (!ok) return false;
+    // Pedido anulado: vuelve su stock y se reversan sus puntos (idempotentes; si fallan no deshacen la cancelación)
+    for (const [que, paso] of [
+      ['los puntos', () => this.puntosService?.reversarPorPedido(pedidoId)],
+      ['el stock', () => this.stockService?.revertirPorPedido(pedidoId)],
+    ] as Array<[string, () => Promise<unknown> | undefined]>) {
+      try {
+        await paso();
+      } catch (e) {
+        this.logger.error(`Pedido ${pedidoId} anulado por reprogramación, pero no se pudo devolver ${que}: ${String(e)}`);
+      }
+    }
     this.avisos.despertar();
 
     const pedido = await this.prisma.pedido.findUnique({

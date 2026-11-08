@@ -38,6 +38,7 @@ import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible, validarRuc } from '../comprobantes/comprobantes.util';
 import { leerConfigPropina } from '../propinas/propinas.service';
 import { normalizarPropina, propinaActivaParaCanal } from '../propinas/propinas.util';
+import { StockService } from '../stock/stock.service';
 import { LineaVentaProducto, controlaPorSabor, descontarVentaProductos, validarSaboresLinea } from '../stock/producto-controlado';
 import { RequisitoOpcion, lineasDeRequisitosOpcion, requisitosDeOpciones, requisitosFaltantes, saldosDeRequisitos } from '../stock/opcion-requiere';
 import { validarMotivoCortesia } from '../cortesias/cortesia.tipos';
@@ -132,6 +133,7 @@ export class PedidosService {
     @Optional() private readonly direcciones?: DireccionesClienteService,
     @Optional() private readonly puntosParty?: PartyPuntosService,
     @Optional() private readonly redis?: RedisService,
+    @Optional() private readonly stockService?: StockService,
   ) {}
 
   /** Último pedido de delivery con dirección de ese celular (carta sin sesión). Null si no hay. */
@@ -1296,6 +1298,16 @@ export class PedidosService {
 
       return pedido;
     });
+
+    // Pedido del personal: nace PAGADO y no pasa por el cobro de Caja (que es quien descuenta los insumos por receta).
+    // Lo consumido sale del almacén igual; idempotente, y si falla no deshace el pedido.
+    if (personal) {
+      try {
+        await this.stockService?.descontarPorPedido(pedidoCreado.id);
+      } catch {
+        // el consumo del personal se puede regularizar con el descuento por receta
+      }
+    }
 
     // Productos que esta venta dejó agotados: aviso al equipo y carta al día (fuera de la transacción)
     if (agotadosPorVenta.length > 0 || saboresAgotadosPorVenta.length > 0) {

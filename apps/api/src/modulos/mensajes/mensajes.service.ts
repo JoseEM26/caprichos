@@ -1,7 +1,7 @@
 import { textoTiempoPedido } from '../repartos/eta-entrega';
 import { exigirDeliveryUbicado } from '../pedidos/delivery-ubicacion.util';
 import { pedidoEsperandoVoucher } from '../chatbot/servicios/pedido-esperando-voucher.util';
-import { HttpException, HttpStatus, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { RedisService } from '../../comun/redis/redis.service';
@@ -27,6 +27,8 @@ import { leerBloqueosSpam } from '../chatbot/configuracion/bloqueo-spam.util';
 import { MOTIVO_BLOQUEO_SPAM } from '../chatbot/configuracion/chatbot-configuracion.service';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { ArchivosService } from '../archivos/archivos.service';
+import { StockService } from '../stock/stock.service';
+import { PuntosService } from '../clientes/puntos.service';
 import sharp from 'sharp';
 import {
   PosChat,
@@ -123,6 +125,8 @@ const nombreUsuario = (p: any, fallback: string): string =>
  */
 @Injectable()
 export class MensajesService {
+  private readonly logger = new Logger(MensajesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
@@ -131,6 +135,8 @@ export class MensajesService {
     @Optional() private readonly ventana24hService?: Ventana24hService,
     @Optional() private readonly redisService?: RedisService,
     @Optional() private readonly archivos?: ArchivosService,
+    @Optional() private readonly stockService?: StockService,
+    @Optional() private readonly puntosService?: PuntosService,
   ) {}
 
   /** Límite de 20 mensajes por minuto por usuario para evitar abusos (Redis). */
@@ -1316,6 +1322,8 @@ export class MensajesService {
           motivo_anulacion: solicitud.detalle || 'Cancelado por el cliente desde WhatsApp',
         },
       });
+      // Un pedido anulado devuelve su stock y reversa sus puntos (idempotentes). Antes quedaba vendido para siempre.
+      await this.devolverAlCancelar(pedidoId);
 
       await this.prisma.solicitudCambio.update({
         where: { id: solicitud.id },
@@ -1343,6 +1351,20 @@ export class MensajesService {
 
     this.eventos?.emitirAdmin('mensajes:actualizado', { id: c.id.toString() });
     return { ok: true };
+  }
+
+  /** Devuelve stock y puntos del pedido cancelado; si algo falla no deshace la cancelación (queda en el log para revisar). */
+  private async devolverAlCancelar(pedidoId: bigint) {
+    for (const [que, paso] of [
+      ['los puntos', () => this.puntosService?.reversarPorPedido(pedidoId)],
+      ['el stock', () => this.stockService?.revertirPorPedido(pedidoId)],
+    ] as Array<[string, () => Promise<unknown> | undefined]>) {
+      try {
+        await paso();
+      } catch (e) {
+        this.logger.error(`Cancelado por WhatsApp, pero no se pudo devolver ${que} del pedido ${pedidoId}: ${String(e)}`);
+      }
+    }
   }
 
   /**

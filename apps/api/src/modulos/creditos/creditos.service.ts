@@ -3,12 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { cobroVigente } from '../caja/caja.calculo';
 import { FiltrarCreditosDto } from './dto/filtrar-creditos.dto';
+import { StockService } from '../stock/stock.service';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { planDescuentoPersonalDePedido, validarColaborador } from './descuento-personal';
 
@@ -45,6 +47,7 @@ export class CreditosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    @Optional() private readonly stockService?: StockService,
   ) {}
 
   private parsearId(id: bigint | string | number): bigint {
@@ -318,6 +321,16 @@ export class CreditosService {
 
       return [nuevoConsumo, pActualizado];
     });
+
+    // Pasa a PAGADO sin cobro de Caja (que es quien descuenta los insumos por receta): se descuentan aquí.
+    // Idempotente (si ya se cobró no repite) y, si falla, no deshace el consumo.
+    if (ajustarPedido) {
+      try {
+        await this.stockService?.descontarPorPedido(pId);
+      } catch {
+        // se puede regularizar con el descuento por receta
+      }
+    }
 
     // 5. Auditar la acción (DT-49, RQ-USR-03-03)
     await this.auditoria.registrar({
