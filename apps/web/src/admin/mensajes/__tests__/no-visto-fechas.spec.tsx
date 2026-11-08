@@ -4,6 +4,13 @@ import { etiquetaDia, fechaCompletaChat, horaDeChat, horaListaChat } from '../fe
 import { MensajesView } from '../MensajesView';
 import * as api from '../mensajesApi';
 
+/** Los filtros de día y de punto de venta viven en el panel plegable «Filtros»: se abre solo si está cerrado. */
+export async function abrirFiltros() {
+  const b = await screen.findByTestId('boton-filtros');
+  if (b.getAttribute('aria-expanded') !== 'true') fireEvent.click(b);
+}
+
+
 vi.mock('../../../comun/socket', () => ({ useEventos: vi.fn() }));
 
 // Hoy 7 nov 2026 a las 10:37 en Lima (15:37 UTC)
@@ -70,6 +77,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
   it('muestra el contador «N sin ver», las insignias con texto y el filtro No vistos', async () => {
     render(<MensajesView />);
     // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     expect(await screen.findByTestId('total-sin-ver')).toHaveTextContent('2 sin ver');
     expect(screen.getByTestId('sin-leer-c2')).toHaveAttribute('aria-label', '2 mensajes sin ver');
@@ -83,6 +91,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
   it('abrir la lista no marca visto; abrir el chat sí', async () => {
     render(<MensajesView />);
     // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByTestId('total-sin-ver');
     expect(api.marcarChatVisto).not.toHaveBeenCalled();
@@ -93,6 +102,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
   it('«Marcar como no visto» desde el menú de la fila llama a la API y recarga la lista', async () => {
     render(<MensajesView />);
     // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByTestId('total-sin-ver');
     const antes = (api.listarConversaciones as any).mock.calls.length;
@@ -105,6 +115,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
   it('un chat sin ver ofrece «Marcar como visto» en su menú', async () => {
     render(<MensajesView />);
     // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByTestId('total-sin-ver');
     fireEvent.click(screen.getByTitle('Más opciones del chat de Cliente c3'));
@@ -115,6 +126,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
   it('el botón del detalle marca como no visto el chat abierto', async () => {
     render(<MensajesView />);
     // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     fireEvent.click(await screen.findByTestId('btn-no-visto-detalle'));
     await waitFor(() => expect(api.marcarChatNoVisto).toHaveBeenCalledWith('c1'));
@@ -123,6 +135,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
   it('el detalle separa por día y cada hora lleva la fecha completa', async () => {
     render(<MensajesView />);
     // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByText('mismo dia');
     const seps = screen.getAllByTestId('separador-dia');
@@ -138,6 +151,7 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
   it('en la lista, hoy muestra hora y un chat de hace 30 días muestra su fecha', async () => {
     render(<MensajesView />);
     // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByTestId('total-sin-ver');
     const fila = screen.getByText('Cliente c2').closest('button')!;

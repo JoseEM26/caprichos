@@ -5,6 +5,13 @@ import { MensajesView } from '../MensajesView';
 import * as api from '../mensajesApi';
 import { diaDelFiltro, encabezadoDia, filtrarPorDia, ordenarCola, textoVacioDia } from '../diasBandeja';
 
+/** Los filtros de día y de punto de venta viven en el panel plegable «Filtros»: se abre solo si está cerrado. */
+export async function abrirFiltros() {
+  const b = await screen.findByTestId('boton-filtros');
+  if (b.getAttribute('aria-expanded') !== 'true') fireEvent.click(b);
+}
+
+
 vi.mock('../../../comun/socket', () => ({ useEventos: vi.fn() }));
 
 const AHORA = new Date('2026-11-07T15:37:00Z'); // 10:37 en Lima
@@ -85,7 +92,9 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
     await waitFor(() => expect(enLista().queryByText('Cliente 2')).not.toBeInTheDocument());
     expect(enLista().getByText('Cliente 1')).toBeInTheDocument();
     expect(screen.getByTestId('aviso-anteriores')).toHaveTextContent('2 de días anteriores sin atender');
+    await abrirFiltros();
     expect(screen.getByRole('button', { name: 'Hoy: 1 chat' })).toHaveAttribute('aria-pressed', 'true');
+    await abrirFiltros();
     expect(screen.getByRole('button', { name: 'Ayer: 1 chat' })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('aviso-anteriores'));
     expect(await screen.findByRole('list', { name: 'Conversaciones' }).then(() => enLista().getByText('Cliente 2'))).toBeInTheDocument();
@@ -99,36 +108,45 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
     await waitFor(() => expect(enLista().getByText('Cliente 1')).toBeInTheDocument());
     expect(enLista().queryByText('Cliente 2')).not.toBeInTheDocument();
     expect(enLista().queryByText('Cliente 3')).not.toBeInTheDocument();
+    await abrirFiltros();
     expect(screen.getByRole('button', { name: 'Hoy: 1 chat' })).toHaveAttribute('aria-pressed', 'true');
+    await abrirFiltros();
     expect(screen.getByRole('button', { name: 'Mañana: 0 chats' })).toBeInTheDocument();
     expect(screen.getByTestId('aviso-anteriores')).toBeInTheDocument();
+    await abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: 'Ayer: 1 chat' }));
     expect(await screen.findByText('Cliente 2')).toBeInTheDocument();
   });
 
   it('el filtro «Ayer» y el selector de fecha acotan la lista', async () => {
     await irAPorAtender();
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: 'Ayer: 1 chat' }));
     expect(await screen.findByRole('list', { name: 'Conversaciones' }).then(() => enLista().getByText('Cliente 2'))).toBeInTheDocument();
     expect(enLista().queryByText('Cliente 1')).not.toBeInTheDocument();
+    await abrirFiltros();
     fireEvent.change(screen.getByLabelText('Elegir fecha'), { target: { value: '2000-01-01' } });
     expect(await screen.findByTestId('vacio-lista')).toHaveTextContent('Ver todos los días (3)');
   });
 
   it('el selector de fecha no tiene tope: acepta mañana y días futuros con estado vacío y «Volver a Hoy»', async () => {
     await irAPorAtender();
+    await abrirFiltros();
     expect(await screen.findByLabelText('Elegir fecha')).not.toHaveAttribute('max');
+    await abrirFiltros();
     fireEvent.change(screen.getByLabelText('Elegir fecha'), { target: { value: '2031-05-20' } });
     const vacio = await screen.findByTestId('vacio-lista');
     expect(vacio).toHaveTextContent('No hay mensajes para el');
     expect(vacio).toHaveTextContent('20 may 2031');
     fireEvent.click(within(vacio).getByTestId('volver-hoy'));
     await waitFor(() => expect(enLista().getByText('Cliente 1')).toBeInTheDocument());
+    await abrirFiltros();
     expect(screen.getByRole('button', { name: 'Hoy: 1 chat' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('el chip «Mañana» filtra el día siguiente: sin datos, estado vacío amable; con un chat de mañana, lo muestra', async () => {
     await irAPorAtender();
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: 'Mañana: 0 chats' }));
     expect(await screen.findByTestId('vacio-lista')).toHaveTextContent('No hay mensajes para mañana');
   });
@@ -136,6 +154,7 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
   it('con un chat de mañana, el chip «Mañana» lo muestra y Hoy no', async () => {
     respuesta = { ...respuesta, chats: [chat('1'), chat('7', { fecha: new Date(Date.now() + 86400000).toISOString() })] };
     await irAPorAtender();
+    await abrirFiltros();
     fireEvent.click(await screen.findByRole('button', { name: 'Mañana: 1 chat' }));
     expect(await screen.findByRole('list', { name: 'Conversaciones' }).then(() => enLista().getByText('Cliente 7'))).toBeInTheDocument();
     expect(enLista().queryByText('Cliente 1')).not.toBeInTheDocument();
@@ -145,10 +164,13 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
   it('Hoy es solo hoy aunque no haya chats de otros días, y la elección de día sobrevive al cambiar de pestaña', async () => {
     respuesta = { conteos: { ...respuesta.conteos }, chats: [chat('1')] };
     await irAPorAtender();
+    await abrirFiltros();
     expect(await screen.findByRole('button', { name: 'Hoy: 1 chat' })).toBeInTheDocument();
+    await abrirFiltros();
     fireEvent.click(screen.getByRole('button', { name: 'Ayer: 0 chats' }));
     expect(await screen.findByTestId('vacio-lista')).toHaveTextContent('No hay mensajes para ayer');
     fireEvent.click(screen.getByRole('button', { name: /Atendidos/ }));
+    await abrirFiltros();
     expect(screen.getByRole('button', { name: 'Ayer: 0 chats' })).toHaveAttribute('aria-pressed', 'true');
   });
 
