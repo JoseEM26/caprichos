@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import type { EstadoAdminImpresion, RolImpresora } from '@caprichos/compartido';
 import { MaquinasImpresion, NOMBRE_MAQUINA, maquinasConProblema, programaApagado } from './useEstadoMaquinas';
@@ -32,6 +33,9 @@ export function IndicadoresMaquinas({
   const [vista, setVista] = useState<Vista>('estado');
   const adentro = useRef(false);
   const idPanel = useId();
+  const chipRef = useRef<HTMLButtonElement>(null);
+  // En PC el panel se ancla (position: fixed) bajo el chip; va en un portal fuera del menú y del contenido para que nada lo tape
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
 
   const cerrar = () => {
     setAbierto(false);
@@ -70,12 +74,15 @@ export function IndicadoresMaquinas({
   const alternar = () => {
     if (abierto) return cerrar();
     setVista('estado');
+    const r = chipRef.current?.getBoundingClientRect();
+    setPos(r && window.innerWidth >= 768 ? { top: Math.round(r.bottom + 6), right: Math.max(8, Math.round(window.innerWidth - r.right)) } : null);
     setAbierto(true);
   };
 
   return (
     <div className="ci-raiz" data-testid="indicadores-maquinas" onMouseDown={() => { adentro.current = true; }}>
       <button
+        ref={chipRef}
         type="button"
         className={`ci-chip ci-${tono}`}
         data-testid="chip-impresion"
@@ -100,10 +107,17 @@ export function IndicadoresMaquinas({
         {textoCola && <span className="ci-num" data-testid="chip-cola">{textoCola}</span>}
       </button>
 
-      {abierto && (
+      {abierto && createPortal(
         <>
           <div className="ci-velo" aria-hidden="true" onClick={cerrar} />
-          <div id={idPanel} className="ci-panel" role="dialog" aria-label="Impresión" data-testid="panel-impresion">
+          <div
+            id={idPanel}
+            className="ci-panel"
+            role="dialog"
+            aria-label="Impresión"
+            data-testid="panel-impresion"
+            style={pos ? { top: pos.top, right: pos.right, maxHeight: `calc(100vh - ${pos.top + 12}px)` } : undefined}
+          >
             <div className="ci-cab">
               <div role="tablist" aria-label="Vistas de impresión" className="ci-tabs">
                 {VISTAS.map(([v, t]) => (
@@ -171,7 +185,8 @@ export function IndicadoresMaquinas({
               </div>
             )}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   );

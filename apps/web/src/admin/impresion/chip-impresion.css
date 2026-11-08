@@ -9,7 +9,7 @@
 .ci-punto-mal { background: var(--cp-rust, #B2500F); }
 .ci-num { font-weight: 800; }
 .ci-velo { display: none; }
-.ci-panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; width: min(420px, calc(100vw - 32px)); max-height: min(78vh, 640px); overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #fff); box-shadow: 0 8px 24px rgba(11, 44, 62, 0.15); font-size: 13px; color: var(--cp-navy, #0B2C3E); }
+.ci-panel { position: fixed; top: 64px; right: 8px; z-index: 3500; width: min(420px, calc(100vw - 32px)); max-height: min(78vh, 640px); overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #fff); box-shadow: 0 8px 24px rgba(11, 44, 62, 0.15); font-size: 13px; color: var(--cp-navy, #0B2C3E); }
 .ci-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ci-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .ci-tab { min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--cp-line, #E3D6C6); background: transparent; color: var(--cp-navy, #0B2C3E); font-weight: 700; font-size: 13px; cursor: pointer; }
@@ -28,6 +28,6 @@
 @media (max-width: 767px) {
   .ci-etq { display: none; }
   .ci-raiz { position: static; }
-  .ci-velo { display: block; position: fixed; inset: 0; z-index: 59; background: rgba(11, 44, 62, 0.55); }
+  .ci-velo { display: block; position: fixed; inset: 0; z-index: 3499; background: rgba(11, 44, 62, 0.55); }
   .ci-panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100%; max-height: 90vh; border-radius: 18px 18px 0 0; border-width: 0; padding: 16px; }
 }
