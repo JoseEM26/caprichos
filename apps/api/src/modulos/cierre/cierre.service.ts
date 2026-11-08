@@ -1008,6 +1008,8 @@ export class CierreService {
       } catch {
         // sin puntos no se detiene la liquidación
       }
+      // el pedido no pasó por el cobro de Caja: sus insumos por receta se descuentan aquí (idempotente)
+      await this.cobrosService.descontarInsumosSinCobro(id);
     }
 
     const diferencia = enPesos(entregado - esperado);

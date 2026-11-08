@@ -286,17 +286,11 @@ describe('ComprasService', () => {
           },
         ],
       });
-      prisma.lugarStock.findFirst.mockResolvedValue({ id: 10n, nombre: 'Almacén Principal' });
-      prisma.stock.findFirst.mockResolvedValue({
-        id: 1n,
-        insumo_id: 2n,
-        lugar_id: 10n,
-        cantidad: new Prisma.Decimal('15.00'),
-      });
-      prisma.compra.update.mockResolvedValue({
-        id: 10n,
-        estado: 'ANULADA',
-      });
+      prisma.compra.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      prisma.stock.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      prisma.movimientoStock.findMany = jest.fn().mockResolvedValue([
+        { insumo_id: 2n, lugar_id: 10n, tipo: 'ENTRADA', cantidad: new Prisma.Decimal('5') },
+      ]);
 
       const res = await service.anularCompra(10, { motivo: 'Error en factura del proveedor' }, mockUsuario);
 
@@ -309,14 +303,33 @@ describe('ComprasService', () => {
           }),
         }),
       );
-      expect(prisma.compra.update).toHaveBeenCalledWith(
+      expect(prisma.compra.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 10n },
+          where: { id: 10n, anulada_en: null },
           data: expect.objectContaining({
             motivo_anulacion: 'Error en factura del proveedor',
           }),
         }),
       );
+    });
+
+    it('quita del stock EXACTAMENTE lo que entró (compra en unidad de almacén con factor 25) y no dos veces', async () => {
+      prisma.compra.findUnique.mockResolvedValue({
+        id: 11n,
+        lineas: [{ insumo_id: 2n, cantidad_compra: new Prisma.Decimal('50'), insumo: { id: 2n, factor_compra: new Prisma.Decimal('25') } }],
+      });
+      prisma.compra.updateMany = jest.fn().mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+      prisma.stock.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      prisma.movimientoStock.findMany = jest.fn().mockResolvedValue([
+        { insumo_id: 2n, lugar_id: 10n, tipo: 'ENTRADA', cantidad: new Prisma.Decimal('50') }, // entró 50 kg, no 1250
+      ]);
+      await service.anularCompra(11, { motivo: 'Error en la compra' }, mockUsuario);
+      const dec = prisma.stock.updateMany.mock.calls[0][0].data.cantidad.decrement;
+      expect(Number(dec)).toBe(50);
+      await expect(service.anularCompra(11, { motivo: 'Error en la compra' }, mockUsuario)).rejects.toMatchObject({
+        response: { codigo: 'COMPRA_YA_ANULADA' },
+      });
+      expect(prisma.stock.updateMany).toHaveBeenCalledTimes(1);
     });
   });
 

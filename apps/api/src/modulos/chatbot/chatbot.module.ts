@@ -29,6 +29,7 @@ import { ReprogramacionService } from './servicios/reprogramacion.service';
 import { OutboxWhatsappService } from './servicios/outbox-whatsapp.service';
 import { AdminWhatsappSalientesController } from './controladores/admin-whatsapp-salientes.controller';
 import { UbicacionWhatsappController } from './controladores/ubicacion-whatsapp.controller';
+import { StockModule } from '../stock/stock.module';
 import { DireccionesModule } from '../direcciones/direcciones.module';
 import { AccesoModule } from '../acceso/acceso.module';
 import { RecordatorioReservasTarea } from './servicios/recordatorio-reservas.tarea';
@@ -54,6 +55,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     ChatbotIaModule,
     ChatbotConfiguracionModule,
     forwardRef(() => AvisosInternosModule),
+    forwardRef(() => StockModule),
     forwardRef(() => VouchersModule),
     AccesoModule,
     DireccionesModule,

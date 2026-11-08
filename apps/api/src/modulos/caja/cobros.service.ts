@@ -620,6 +620,18 @@ export class CobrosService {
   }
 
   /**
+   * Descuenta por receta un pedido que se cobró SIN pasar por Caja (el repartidor cobró el contra entrega y se liquidó).
+   * Es el mismo descuento del cobro: idempotente, y si falla no deshace nada.
+   */
+  async descontarInsumosSinCobro(pedidoId: bigint) {
+    try {
+      await this.stockService?.descontarPorPedido(pedidoId);
+    } catch {
+      // se puede reintentar
+    }
+  }
+
+  /**
    * Anula un cobro con motivo (queda auditado a nombre de quien lo anula).
    * Exige que el cobro pertenezca a una caja abierta.
    * Regresa el pedido a pago_estado = 'PENDIENTE'.

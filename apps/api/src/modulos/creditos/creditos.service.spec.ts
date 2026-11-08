@@ -1,3 +1,4 @@
+jest.mock('../../comun/socket/eventos.gateway', () => ({ EventosGateway: class {} }));
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CreditosService } from './creditos.service';
@@ -193,6 +194,25 @@ describe('CreditosService', () => {
     });
 
     const partyPersonal = { id: BigInt(9), persona: { nombres: 'Marta', apellidos: 'Gómez' }, usuario: { activo: true }, roles: [] };
+
+    it('un pedido que pasa a PAGADO por crédito (sin cobro de Caja) descuenta sus insumos por receta', async () => {
+      const stock = { descontarPorPedido: jest.fn().mockResolvedValue({ ok: true }) };
+      const svc = new CreditosService(prisma as any, auditoria as any, stock as any);
+      prisma.parametro.findUnique.mockResolvedValue({ valor: 25 });
+      prisma.pedido.findUnique.mockResolvedValue({
+        id: BigInt(10), codigo: 'P-0010', total: '8.00', subtotal: '8.00', estado: 'COLA', canal: 'MOZO', consumoPersonal: null, cobros: [],
+        lineas: [{ nombre: 'Café', subtotal: '8.00', precio_unit: '8.00', cantidad: 1, oferta_id: null, linea_combo_id: null }],
+      });
+      prisma.party.findUnique.mockResolvedValue(partyPersonal);
+      prisma.$transaction.mockImplementation((cb: any) =>
+        cb({
+          consumoPersonal: { create: jest.fn().mockResolvedValue({ id: BigInt(1), monto: 6, fecha: new Date() }) },
+          pedido: { update: jest.fn().mockResolvedValue({ id: BigInt(10), codigo: 'P-0010' }) },
+        }),
+      );
+      await svc.registrarConsumo(10, 9, usuarioAdmin);
+      expect(stock.descontarPorPedido).toHaveBeenCalledWith(BigInt(10));
+    });
 
     it('un pedido del personal que ya trae su 25 % no lo repite ni toca el pedido: el consumo es su total', async () => {
       prisma.pedido.findUnique.mockResolvedValue({

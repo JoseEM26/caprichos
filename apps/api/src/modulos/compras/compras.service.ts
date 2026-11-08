@@ -1169,41 +1169,38 @@ export class ComprasService {
       });
     }
 
-    const almacenLugar = await this.prisma.lugarStock.findFirst({
-      where: { tipo: 'ALMACEN' },
-    });
-
     await this.prisma.$transaction(async (tx) => {
-      await tx.compra.update({
-        where: { id: compraId },
-        data: {
-          anulada_en: new Date(),
-          motivo_anulacion: dto.motivo,
-        },
+      // Marca atómica: dos anulaciones a la vez no devuelven dos veces
+      const marcada = await tx.compra.updateMany({
+        where: { id: compraId, anulada_en: null },
+        data: { anulada_en: new Date(), motivo_anulacion: dto.motivo },
       });
+      if (marcada.count === 0) {
+        throw new BadRequestException({ codigo: 'COMPRA_YA_ANULADA', mensaje: 'La compra ya fue anulada anteriormente' });
+      }
 
-      if (almacenLugar) {
-        for (const linea of compra.lineas) {
-          const factorCompra = Number(linea.insumo.factor_compra) || 1;
-          const cantidadAlmacen = Number(linea.cantidad_compra) * factorCompra;
+      // Se quita EXACTAMENTE lo que entró (el movimiento ENTRADA ya está en unidad de almacén). Recalcular con
+      // cantidad_compra × factor quitaba de más cuando la compra se registró en unidad de almacén.
+      const entradas = await tx.movimientoStock.findMany({
+        where: { compra_id: compraId, tipo: 'ENTRADA', insumo_id: { not: null } },
+      });
+      for (const ent of entradas) {
+        await tx.stock.updateMany({
+          where: { insumo_id: ent.insumo_id!, lugar_id: ent.lugar_id },
+          data: { cantidad: { decrement: ent.cantidad } },
+        });
 
-          await tx.stock.updateMany({
-            where: { insumo_id: linea.insumo_id, lugar_id: almacenLugar.id },
-            data: { cantidad: { decrement: new Prisma.Decimal(cantidadAlmacen) } },
-          });
-
-          await tx.movimientoStock.create({
-            data: {
-              tipo: 'ANULACION',
-              insumo_id: linea.insumo_id,
-              lugar_id: almacenLugar.id,
-              cantidad: new Prisma.Decimal(-cantidadAlmacen),
-              compra_id: compraId,
-              nota: `Anulación compra: ${dto.motivo}`,
-              por: usuario ? usuario.partyId : BigInt(1),
-            },
-          });
-        }
+        await tx.movimientoStock.create({
+          data: {
+            tipo: 'ANULACION',
+            insumo_id: ent.insumo_id,
+            lugar_id: ent.lugar_id,
+            cantidad: ent.cantidad.negated(),
+            compra_id: compraId,
+            nota: `Anulación compra: ${dto.motivo}`,
+            por: usuario ? usuario.partyId : BigInt(1),
+          },
+        });
       }
     });
 

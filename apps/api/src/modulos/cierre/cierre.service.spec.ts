@@ -246,7 +246,7 @@ describe('CierreService', () => {
         { provide: RedisService, useValue: redisServiceMock },
         { provide: AuditoriaService, useValue: auditoriaMock },
         { provide: EventosGateway, useValue: eventosGatewayMock },
-        { provide: CobrosService, useValue: { cobrarEnCierre: jest.fn() } },
+        { provide: CobrosService, useValue: { cobrarEnCierre: jest.fn(), descontarInsumosSinCobro: jest.fn() } },
       ],
     }).compile();
 

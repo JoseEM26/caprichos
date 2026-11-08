@@ -11,6 +11,7 @@ import { ClientesModule } from '../clientes/clientes.module';
 import { AvisosInternosModule } from '../chatbot/avisos-internos/avisos-internos.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
+import { StockModule } from '../stock/stock.module';
 import { ComprobantesModule } from '../comprobantes/comprobantes.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { ComprobantesModule } from '../comprobantes/comprobantes.module';
     ComprobantesModule,
     forwardRef(() => AvisosInternosModule),
     forwardRef(() => ChatbotModule),
+    forwardRef(() => StockModule),
   ],
   controllers: [PedidosController, SeguimientoController],
   providers: [PedidosService, SeguimientoService, PagoPlanService],
