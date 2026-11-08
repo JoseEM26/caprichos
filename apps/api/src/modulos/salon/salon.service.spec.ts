@@ -569,8 +569,15 @@ describe('SalonService', () => {
       expect(opciones).toMatchObject({ puedeCortesia: true, supervisorCortesiaPartyId: undefined });
     });
 
-    it('MOZO no tiene cortesias/dar: el pedido de mesa llega sin puedeCortesia (la creación responde 403)', async () => {
+    it('MOZO tiene cortesias/dar (libre): el pedido de mesa llega con puedeCortesia', async () => {
       await service.abrirPedido(dtoConCortesia, { partyId: 10n, rol: 'MOZO', debeCambiar: false }, 'k-m1');
+
+      const [, , opciones] = pedidosServiceMock.crear.mock.calls[0];
+      expect(opciones.puedeCortesia).toBe(true);
+    });
+
+    it('COCINA no tiene cortesias/dar: llega sin puedeCortesia (la creación responde 403)', async () => {
+      await service.abrirPedido(dtoConCortesia, { partyId: 10n, rol: 'COCINA', debeCambiar: false }, 'k-m2');
 
       const [, , opciones] = pedidosServiceMock.crear.mock.calls[0];
       expect(opciones.puedeCortesia).toBe(false);
