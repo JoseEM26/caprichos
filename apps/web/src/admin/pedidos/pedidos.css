@@ -277,3 +277,15 @@
   .cj-pc-nombre { font-size: 18px; }
   .cj-modalidad { justify-content: center; width: 100%; }
 }
+
+/* Insignia de la mesa: navy sobre cream, jamás recortada; lo largo baja a otra línea */
+.ins-mesa {
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; align-self: flex-start;
+  flex-shrink: 0; max-width: 100%; box-sizing: border-box;
+  padding: 3px 10px; border-radius: 10px; background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC);
+  font-family: Montserrat, sans-serif; line-height: 1.1;
+}
+.ins-mesa-num { font-weight: 900; font-size: 15px; letter-spacing: 0.03em; white-space: nowrap; flex-shrink: 0; }
+.ins-mesa--grande .ins-mesa-num { font-size: 22px; }
+.ins-mesa-resto { font-weight: 700; font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
+.ins-mesa--espera .ins-mesa-num { white-space: normal; font-size: 14px; }

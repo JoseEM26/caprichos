@@ -71,11 +71,20 @@ const renderizar = (p: Pedido, props: Record<string, unknown> = {}) =>
   );
 
 describe('PedidoDetalle en 3 capas', () => {
+  it('la cabecera muestra la mesa completa en su insignia, aparte del nombre', () => {
+    renderizar(pedido({ mesa_nombre: 'Mesa 12 - Terraza', cliente_nombre: 'María de los Ángeles Fernández de la Cruz' }));
+    const ins = screen.getAllByTestId('insignia-mesa')[0];
+    expect(ins).toHaveTextContent('MESA 12');
+    expect(ins).toHaveTextContent('TERRAZA');
+    expect(screen.getByRole('heading', { level: 2, name: 'María de los Ángeles Fernández de la Cruz' })).toBeInTheDocument();
+  });
+
   it('muestra la cabecera y tres capas numeradas; cambia de capa y empieza en Productos', () => {
     renderizar(pedido());
-    expect(screen.getByRole('heading', { name: /MESA 3 ·\s*José/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'José' })).toBeInTheDocument();
+    expect(screen.getAllByTestId('insignia-mesa')[0]).toHaveTextContent('MESA 3');
     expect(screen.getByText('CP-W100')).toBeInTheDocument();
-    expect(screen.getByText(/12 min/)).toBeInTheDocument();
+    expect(screen.getByRole('timer')).toBeInTheDocument();
     const capas = screen.getAllByRole('tab');
     expect(capas.map((c) => c.getAttribute('aria-label'))).toEqual(['Productos', 'Pago y voucher', 'Cliente y entrega']);
     expect(capas[0]).toHaveAttribute('aria-selected', 'true');

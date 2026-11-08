@@ -363,7 +363,6 @@
 
 @media (min-width: 1600px) {
   .cj2-cuadricula { gap: 16px; }
-  .cj2-cod { font-size: 23px; }
   .cj2-total { font-size: 22px; }
   .cj2-accion { min-height: 50px; font-size: 15px; }
 }
@@ -435,32 +434,41 @@
 .cj2-cod {
   font-family: Montserrat, sans-serif;
   font-weight: 900;
-  font-size: 21px;
-  line-height: 1.15;
-  color: var(--cp-navy, #0B2C3E);
+  font-size: 12.5px;
+  line-height: 1.2;
+  color: var(--cp-soft, #2C4C5D);
 }
 
 .cj2-card .cj-pc-nombre {
   font-family: Inter, sans-serif;
   font-weight: 700;
-  font-size: 15px;
-  line-height: 1.25;
+  font-size: 22px;
+  line-height: 1.2;
   margin-top: 2px;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
 }
+.cj2-ident { gap: 3px; }
+.cj2-ident > .ins-mesa { margin-top: 2px; }
 
 .cj2-espera {
   flex: none;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  border-radius: 9999px;
-  padding: 3px 11px;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.35;
+  gap: 1px;
+  border-radius: 14px;
+  padding: 4px 12px;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.2;
   white-space: nowrap;
 }
+.cj2-espera-hora { display: inline-flex; align-items: center; gap: 6px; }
+.cj2-espera-rotulo { font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.cj2-espera[data-nivel='rojo'] { animation: cj2-latido 1.6s ease-in-out infinite; }
+@keyframes cj2-latido { 50% { box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.25); } }
+@media (prefers-reduced-motion: reduce) { .cj2-espera[data-nivel='rojo'] { animation: none; } }
+@media (min-width: 1600px) { .cj2-card .cj-pc-nombre { font-size: 26px; } }
 
 .cj2-mod {
   display: flex;
@@ -508,16 +516,16 @@
 }
 
 .cj2-mod-txt {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .cj2-mod-det {
   font-weight: 700;
   letter-spacing: 0;
   color: var(--cp-soft, #2C4C5D);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .cj2-mod-texto[data-modalidad='DELIVERY'] { --mod: #B2500F; --mod-bg: #FCE9D8; }
@@ -538,7 +546,8 @@
   gap: 4px;
   font-size: 13px;
   font-weight: 600;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .cj2-lugar {

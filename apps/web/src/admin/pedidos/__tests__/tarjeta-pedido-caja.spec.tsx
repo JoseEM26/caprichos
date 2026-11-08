@@ -46,8 +46,9 @@ describe('TarjetaPedidoCaja', () => {
 
   it('mesa con nombre: «MESA 4» y «MESA 4 · Ana» en el nombre', () => {
     const { container } = pintar({ modalidad: 'MESA', mesa_nombre: '4', cliente_nombre: 'Ana' });
-    expect(container.querySelector('[data-modalidad="MESA"]')).toHaveTextContent('MESA 4');
-    expect(screen.getByRole('heading')).toHaveTextContent('MESA 4 · Ana');
+    expect(container.querySelector('[data-modalidad="MESA"]')).toHaveTextContent('MESA');
+    expect(screen.getByTestId('insignia-mesa')).toHaveTextContent('MESA 4');
+    expect(screen.getByRole('heading')).toHaveTextContent('Ana');
   });
 
   it('delivery con zona: «DELIVERY · zona» y la dirección debajo', () => {
@@ -111,7 +112,7 @@ describe('TarjetaPedidoCaja', () => {
   ])('espera %s (%i min) es %s; en cerrados es neutra', (creado, min, nivel) => {
     const { container, unmount } = pintar({ creado_en: creado });
     expect(container.querySelector('.cj2-espera')).toHaveAttribute('data-nivel', nivel);
-    expect(screen.getByText(`${min} min`)).toBeInTheDocument();
+    expect(screen.getByRole('timer')).toHaveTextContent(min >= 60 ? '1 h 12' : `${min} min`);
     unmount();
     const r = pintar({ creado_en: creado, estado: 'ENTREGADO' });
     expect(r.container.querySelector('.cj2-espera')).toHaveAttribute('data-nivel', 'neutro');

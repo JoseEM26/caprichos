@@ -120,7 +120,7 @@ describe('Insignia de modalidad de la tarjeta', () => {
   it.each([
     [{ modalidad: 'DELIVERY' }, 'DELIVERY'],
     [{ modalidad: 'LLEVAR' }, 'PARA LLEVAR'],
-    [{ modalidad: 'MESA', mesa_nombre: '4' }, 'MESA 4'],
+    [{ modalidad: 'MESA', mesa_nombre: '4' }, 'MESA'],
     [{ modalidad: 'COMER_LOCAL' }, 'COMER EN EL LOCAL'],
   ])('%j: icono propio en círculo y texto «%s», fuera de la barra de estado', (p, texto) => {
     const { container } = pintar(p as Partial<Pedido>);
