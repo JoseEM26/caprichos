@@ -57,16 +57,24 @@ export class ErrorRespuestaApi extends Error {
     mensaje: string,
     public readonly cuerpo?: string
   ) {
-    super(`API respondió con estado HTTP ${status}: ${mensaje}`);
+    super(
+      status === 401
+        ? 'Este equipo ya no está vinculado: descarga el programa de nuevo desde Caprichos › Configuración › Impresión'
+        : `API respondió con estado HTTP ${status}: ${mensaje}`
+    );
     this.name = 'ErrorRespuestaApi';
   }
 }
 
+/** Se llama cuando el servidor rechaza la llave (401): devuelve un vínculo nuevo (releído o recién canjeado) o undefined. */
+export type AlRechazarLlave = () => Promise<{ apiUrl?: string; agenteKey: string } | undefined>;
+
 export class ClienteApiImpresion implements IClienteApiImpresion {
   constructor(
-    private readonly apiUrl: string,
-    private readonly agenteKey: string,
-    private readonly timeoutMs: number = 8000
+    private apiUrl: string,
+    private agenteKey: string,
+    private readonly timeoutMs: number = 8000,
+    private readonly alRechazar?: AlRechazarLlave
   ) {}
 
   private obtenerCabeceras(): Record<string, string> {
@@ -80,7 +88,17 @@ export class ClienteApiImpresion implements IClienteApiImpresion {
     return cabeceras;
   }
 
-  private async ejecutarPeticion(
+  private async ejecutarPeticion(ruta: string, metodo: string, cuerpo?: unknown): Promise<Response> {
+    const res = await this.enviar(ruta, metodo, cuerpo);
+    if (res.status !== 401 || !this.alRechazar) return res;
+    const nuevo = await this.alRechazar().catch(() => undefined);
+    if (!nuevo || (nuevo.agenteKey === this.agenteKey && (!nuevo.apiUrl || nuevo.apiUrl === this.apiUrl))) return res;
+    this.agenteKey = nuevo.agenteKey;
+    if (nuevo.apiUrl) this.apiUrl = nuevo.apiUrl;
+    return this.enviar(ruta, metodo, cuerpo);
+  }
+
+  private async enviar(
     ruta: string,
     metodo: string,
     cuerpo?: unknown

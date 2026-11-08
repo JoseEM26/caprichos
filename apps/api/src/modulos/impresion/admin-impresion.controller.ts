@@ -9,9 +9,14 @@ import {
   Patch,
   Post,
   Query,
+  NotFoundException,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import * as fs from 'fs';
+import { PROGRAMAS } from './descarga-agente.controller';
+import { escribirZip } from './zip-agente';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { ImpresionService } from './impresion.service';
@@ -164,6 +169,51 @@ export class AdminImpresionController {
     const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '').split(',')[0].trim();
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.impresionService.generarCodigoVinculoAgente(host, req.usuario, ip);
+  }
+
+  /**
+   * Descarga el programa ya vinculado: crea el equipo (llave nueva) y entrega un ZIP con el .exe,
+   * su config.json y un LEEME. Mismo permiso que «vincular equipo». La llave no se registra en logs ni auditoría.
+   */
+  @Post('equipos/descarga-vinculada')
+  @HttpCode(HttpStatus.OK)
+  @Permiso('usuarios', 'crear')
+  async descargaVinculada(@Body() dto: CrearLlaveDto, @Req() req: any, @Res() res: any) {
+    if (req.usuario?.rol !== 'ADMIN') {
+      throw new ForbiddenException({
+        codigo: 'SOLO_ADMIN',
+        mensaje: 'Solo los administradores pueden vincular el programa de impresión',
+      });
+    }
+    const programa = PROGRAMAS.windows;
+    if (!fs.existsSync(programa.ruta())) {
+      throw new NotFoundException({
+        codigo: 'PROGRAMA_NO_PUBLICADO',
+        mensaje: 'El programa de impresión para Windows aún no está publicado en este servidor.',
+      });
+    }
+    const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '').split(',')[0].trim();
+    const proto = String(req.headers?.['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    const nombre = dto?.nombre?.trim() || 'Programa del local';
+    const llave = await this.impresionService.crearLlaveAgente({ nombre }, req.usuario, ip);
+    const config = JSON.stringify({ apiUrl: `${proto}://${host}`, agenteKey: llave.llave }, null, 2);
+    const leeme = [
+      'Programa de impresión de Caprichos (ya vinculado a este local).',
+      '1) Descomprime esta carpeta en la PC de la impresora (por ejemplo en Documentos).',
+      '2) Haz doble clic en agente-impresion-windows.exe y elige tus impresoras.',
+      'config.json lleva una llave secreta de esta PC: no compartas ni reenvíes la carpeta.',
+    ].join('\r\n');
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': 'attachment; filename="programa-impresion-caprichos.zip"',
+      'Cache-Control': 'no-store',
+    });
+    await escribirZip(res, [
+      { nombre: programa.nombre, ruta: programa.ruta() },
+      { nombre: 'config.json', contenido: config },
+      { nombre: 'LEEME.txt', contenido: leeme },
+    ]);
   }
 
   @Get('llaves')

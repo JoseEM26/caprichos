@@ -187,10 +187,11 @@ export class AgenteLocalServicio {
           `Latido enviado. Estado impresora: ${this.estadoImpresora}`
         );
       } catch (err: any) {
-        this.logger(
-          'warn',
-          `No se pudo enviar latido al servidor: ${err.message}`
-        );
+        if (err instanceof ErrorRespuestaApi && err.status === 401) {
+          this.ultimoLatidoTs = ahora; // sin vínculo válido: no martillar, vuelve a probar en el próximo intervalo
+        } else {
+          this.logger('warn', `No se pudo enviar latido al servidor: ${err.message}`);
+        }
       }
     }
 
@@ -215,10 +216,10 @@ export class AgenteLocalServicio {
       // Conexión exitosa: restablecemos el multiplicador de espera
       this.factorEsperaRed = 1;
     } catch (err: any) {
-      this.logger(
-        'warn',
-        `Fallo al tomar trabajos (reintentando con espera creciente): ${err.message}`
-      );
+      // 401: el aviso claro ya salió una vez (revinculacion.ts); aquí solo se espera más
+      if (!(err instanceof ErrorRespuestaApi && err.status === 401)) {
+        this.logger('warn', `Fallo al tomar trabajos (reintentando con espera creciente): ${err.message}`);
+      }
       // Incremento exponencial de backoff limitado a 30s
       this.factorEsperaRed = Math.min(10, this.factorEsperaRed * 1.5);
       return { trabajosProcesados: 0, errorRed: true };

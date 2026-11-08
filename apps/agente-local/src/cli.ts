@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
+import { crearReenlace } from './revinculacion';
 import { obtenerConfiguracion, rutaArchivoConfiguracion } from './config';
 import type { ArchivoConfiguracion } from './config';
 import { ImpresoraWindows, listarImpresorasWindows, listarImpresorasWindowsDetalle } from './impresora/impresoraWindows';
@@ -277,7 +278,41 @@ async function abrirMenu(): Promise<void> {
   }
 }
 
+/** config.json que trae el ZIP «programa ya vinculado», junto al .exe (solo si corre empaquetado). */
+export function rutaConfigJuntoExe(execPath = process.execPath, empaquetado = Boolean((process as any).pkg)): string | undefined {
+  return empaquetado ? path.join(path.dirname(execPath), 'config.json') : undefined;
+}
+
+/** Si junto al .exe hay un config.json con llave nueva, la copia a la configuración normal (conserva impresoras). */
+export function migrarConfigJuntoExe(ruta: string, rutaExe: string | undefined): void {
+  if (!rutaExe || path.resolve(rutaExe) === path.resolve(ruta)) return;
+  try {
+    const junto = JSON.parse(fs.readFileSync(rutaExe, 'utf-8')) as ArchivoConfiguracion;
+    if (!junto.agenteKey) return;
+    let actual: ArchivoConfiguracion = {};
+    try {
+      actual = JSON.parse(fs.readFileSync(ruta, 'utf-8'));
+    } catch {
+      /* aún no existe */
+    }
+    if (actual.llaveDeExe === junto.agenteKey) return;
+    const nuevo = { ...actual, apiUrl: junto.apiUrl ?? actual.apiUrl, agenteKey: junto.agenteKey, llaveDeExe: junto.agenteKey };
+    fs.mkdirSync(path.dirname(ruta), { recursive: true });
+    fs.writeFileSync(ruta, JSON.stringify(nuevo, null, 2), { mode: 0o600 });
+  } catch {
+    /* sin config junto al .exe o ilegible: se usa la normal */
+  }
+}
+
+/** Guarda un vínculo nuevo (tras volver a vincular) conservando las impresoras elegidas. */
+export function guardarVinculo(apiUrl: string, agenteKey: string, ruta = rutaArchivoConfiguracion()): void {
+  const nuevo = { ...leerArchivoConfiguracion(ruta), apiUrl, agenteKey };
+  fs.mkdirSync(path.dirname(ruta), { recursive: true });
+  fs.writeFileSync(ruta, JSON.stringify(nuevo, null, 2), { mode: 0o600 });
+}
+
 export function leerArchivoConfiguracion(ruta = rutaArchivoConfiguracion()): ArchivoConfiguracion {
+  if (ruta === rutaArchivoConfiguracion()) migrarConfigJuntoExe(ruta, rutaConfigJuntoExe());
   try {
     return JSON.parse(fs.readFileSync(ruta, 'utf-8'));
   } catch {
@@ -302,7 +337,8 @@ export async function ejecutarAsistente(
     logger('=== Programa de impresión de Caprichos ===');
     let { apiUrl, agenteKey } = actual;
     if (!agenteKey) {
-      logger('Abre Caprichos > Configuración > Impresión, pulsa para vincular este equipo y copia el código que aparece.');
+      logger('Lo más fácil: descarga el programa ya vinculado desde Caprichos › Configuración › Impresión.');
+      logger('O abre esa pantalla, pulsa para vincular este equipo y copia el código que aparece.');
       let vacios = 0;
       while (!agenteKey) {
         const codigo = await ask('Pega aquí el código de vinculación y pulsa Enter (clic derecho pega en esta ventana): ');
@@ -510,12 +546,25 @@ export async function main(): Promise<void> {
   if (sinLlave && (process.stdin.isTTY || process.platform === 'win32')) {
     archivo = await ejecutarAsistente();
   } else if (sinLlave) {
-    throw new Error('Este equipo aún no está vinculado. Ejecuta el programa con el comando "vincular" en una terminal.');
+    throw new Error('Este equipo aún no está vinculado. Descarga el programa ya vinculado desde Caprichos › Configuración › Impresión (o ejecuta el programa con el comando "vincular" en una terminal).');
   }
 
   // Modo servicio (bucle continuo): una impresora por rol; IMPRESORA_RUTA sigue valiendo como etiquetera
   const config = obtenerConfiguracion(process.env, archivo);
-  const clienteApi = new ClienteApiImpresion(config.apiUrl, config.agenteKey);
+  const interactivo = Boolean(process.stdin.isTTY);
+  const rlRevincular = interactivo ? readline.createInterface({ input: process.stdin, output: process.stdout }) : null;
+  const reenlace = crearReenlace(
+    {
+      leer: () => leerArchivoConfiguracion(),
+      interactivo,
+      preguntar: (t) => (rlRevincular ? preguntar(rlRevincular, t) : Promise.resolve('')),
+      canjear: (codigo) => canjearCodigoVinculo(config.apiUrl, codigo),
+      guardar: (u, k) => guardarVinculo(u, k),
+      log: (m) => console.log(m),
+    },
+    config.agenteKey
+  );
+  const clienteApi = new ClienteApiImpresion(config.apiUrl, config.agenteKey, undefined, reenlace);
   const impresoras: Partial<Record<'ETIQUETERA' | 'TICKETERA', IDispositivoImpresora>> = {};
   // Sin elegir nada: en Windows no se inventa una ruta Linux (el panel pide elegir de la lista); en Linux sigue valiendo IMPRESORA_RUTA
   const rutaPorDefecto = process.platform === 'win32' && !process.env.IMPRESORA_RUTA && !process.env.PRINTER_PATH ? undefined : config.impresoraRuta;
