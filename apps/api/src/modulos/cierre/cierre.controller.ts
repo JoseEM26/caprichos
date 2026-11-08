@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   Body,
+  ForbiddenException,
   Controller,
   Get,
   Param,
@@ -11,6 +13,8 @@ import {
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { CierreService } from './cierre.service';
+import { ControlCuadreService } from './control-cuadre.service';
+import { rolesDelUsuario } from '../acceso/roles-usuario';
 import { AjusteMedioDto } from './dto/ajuste-medio.dto';
 import { ArqueoDto } from './dto/arqueo.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
@@ -21,7 +25,10 @@ import { CobrarDto } from '../caja/dto/cobrar.dto';
 @Controller('admin/cierre')
 @UseGuards(AccesoGuard)
 export class CierreController {
-  constructor(private readonly cierreService: CierreService) {}
+  constructor(
+    private readonly cierreService: CierreService,
+    private readonly controlCuadre: ControlCuadreService,
+  ) {}
 
   /**
    * 1) Arqueo ciego: registra el conteo físico por billetes, monedas y medios digitales.
@@ -96,6 +103,22 @@ export class CierreController {
   @Permiso('caja', 'ver')
   async obtenerEsperado(@Req() req: any) {
     return this.cierreService.obtenerEsperado(req.usuario);
+  }
+
+  /**
+   * Control de cuadre del día (solo lectura, ADMIN o SUPERVISOR): cobrado por medio, dinero pagado sin cobro en caja,
+   * cobros mal sumados, anulados sin devolver y comprobantes de más. `fecha` = YYYY-MM-DD de Lima.
+   */
+  @Get('control-cuadre')
+  @Permiso('caja', 'ver')
+  async controlDeCuadre(@Query('fecha') fecha: string, @Req() req: any) {
+    if (!rolesDelUsuario(req.usuario).some((r) => r === 'ADMIN' || r === 'SUPERVISOR')) {
+      throw new ForbiddenException({ codigo: 'CONTROL_RESERVADO', mensaje: 'El control de cuadre lo ve el administrador o el supervisor.' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha ?? '')) {
+      throw new BadRequestException({ codigo: 'FECHA_INVALIDA', mensaje: 'La fecha va como AAAA-MM-DD' });
+    }
+    return this.controlCuadre.controlar(fecha);
   }
 
   /**
