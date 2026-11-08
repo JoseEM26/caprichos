@@ -429,6 +429,95 @@ describe('PedidosService', () => {
       });
     });
 
+    describe('pedido del personal', () => {
+      // Recoger en local: subtotal 28 (2 x 14) sin envío
+      const dtoPersonal: CrearPedidoDto = {
+        ...pedidoBaseDto,
+        modalidad: 'RECOGER',
+        entrega: undefined,
+        pago: { metodo: 'EFECTIVO' },
+        comprobante: undefined,
+      };
+      const origen = { canal: 'MOZO' as const, usuarioPartyId: 5n, clientePartyId: 9n, esPersonal: true };
+
+      beforeEach(() => {
+        prismaMock.party = {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 9n, persona: { nombres: 'Kevin', apellidos: 'Rosales' }, usuario: { activo: true }, roles: [],
+          }),
+        };
+        prismaMock.partyRole.findFirst = jest.fn().mockResolvedValue(null);
+        prismaMock.consumoPersonal = { create: jest.fn().mockResolvedValue({ id: 1n }) };
+        prismaMock.pedido.create.mockImplementation(async ({ data }: any) => ({
+          id: 100n, codigo: 'CP-W001', estado: 'COLA', subtotal: data.subtotal, descuento: data.descuento, envio: data.envio, total: data.total,
+        }));
+      });
+
+      it('aplica el 25 % al crear: total con descuento, pagado a crédito y consumo acumulado en la cuenta del trabajador', async () => {
+        const res = await service.crear(dtoPersonal, 'idemp-personal-1', origen);
+
+        const data = prismaMock.pedido.create.mock.calls[0][0].data;
+        expect(Number(data.descuento)).toBe(7);
+        expect(Number(data.total)).toBe(21);
+        expect(data.es_personal).toBe(true);
+        expect(data.pago_metodo).toBe('CREDITO_PERSONAL');
+        expect(data.pago_estado).toBe('PAGADO');
+        expect(data.descuento_detalle).toEqual([expect.objectContaining({ tipo: 'PERSONAL', montoDescontado: 7, descuentoValor: 25 })]);
+        expect(res.total).toBe(21);
+        expect(prismaMock.consumoPersonal.create).toHaveBeenCalledTimes(1);
+        const c = prismaMock.consumoPersonal.create.mock.calls[0][0].data;
+        expect(c.party_id).toBe(9n);
+        expect(c.pedido_id).toBe(100n);
+        expect(Number(c.monto)).toBe(21);
+      });
+
+      it('respeta el porcentaje configurado en el local', async () => {
+        prismaMock.parametro.findUnique.mockImplementation(({ where }: any) =>
+          Promise.resolve(where.clave === 'descuento_personal_pct' ? { valor: 20 } : where.clave === 'pedido_minimo' ? { valor: 0 } : null),
+        );
+        await service.crear(dtoPersonal, 'idemp-personal-2', origen);
+        expect(Number(prismaMock.pedido.create.mock.calls[0][0].data.descuento)).toBe(5.6);
+      });
+
+      it('lo que ya tiene descuento de otra promoción no recibe además el del personal', async () => {
+        ofertasServiceMock.calcularDescuentosParaPedido.mockResolvedValue({
+          descuentoTotal: 5, ofertaId: null, cuponId: null, cuponEmitidoId: null,
+          detalles: [{ tipo: 'DESCUENTO', nombre: '2x', montoDescontado: 5, lineasAfectadas: [{ productoId: '1', cantidad: 2, subtotal: 28, descuento: 5 }] }],
+        });
+        await service.crear(dtoPersonal, 'idemp-personal-3', origen);
+        expect(Number(prismaMock.pedido.create.mock.calls[0][0].data.descuento)).toBe(5);
+        expect(prismaMock.pedido.create.mock.calls[0][0].data.descuento_detalle).toHaveLength(1);
+      });
+
+      it('sin trabajador elegido rechaza con COLABORADOR_REQUERIDO y no crea el pedido', async () => {
+        await expect(
+          service.crear(dtoPersonal, 'idemp-personal-4', { ...origen, clientePartyId: undefined }),
+        ).rejects.toMatchObject({ response: { codigo: 'COLABORADOR_REQUERIDO' } });
+        expect(prismaMock.pedido.create).not.toHaveBeenCalled();
+      });
+
+      it('un cliente (sin cuenta ni rol de empleado) no puede ser el trabajador', async () => {
+        prismaMock.party.findUnique.mockResolvedValue({ id: 9n, persona: null, usuario: null, roles: [] });
+        await expect(service.crear(dtoPersonal, 'idemp-personal-5', origen)).rejects.toMatchObject({
+          response: { codigo: 'NO_ES_PERSONAL' },
+        });
+      });
+
+      it('por la carta no hay pedido del personal', async () => {
+        await expect(
+          service.crear(dtoPersonal, 'idemp-personal-6', { ...origen, canal: 'CARTA' as const }),
+        ).rejects.toMatchObject({ response: { codigo: 'CANAL_NO_PERMITIDO' } });
+      });
+
+      it('un pedido normal no acumula nada ni cambia su cobro', async () => {
+        await service.crear(dtoPersonal, 'idemp-personal-7', { canal: 'MOZO', usuarioPartyId: 5n });
+        const data = prismaMock.pedido.create.mock.calls[0][0].data;
+        expect(data.pago_estado).toBe('PENDIENTE');
+        expect(Number(data.descuento)).toBe(0);
+        expect(prismaMock.consumoPersonal.create).not.toHaveBeenCalled();
+      });
+    });
+
     it('2. envío gratis cuando subtotal supera envio_gratis_monto (modo estrictamente mayor)', async () => {
       // 6 unidades de 14 = 84 (> 70)
       const pedidoDto: CrearPedidoDto = {

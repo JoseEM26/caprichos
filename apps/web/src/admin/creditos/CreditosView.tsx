@@ -461,6 +461,11 @@ export function CreditosView() {
                               </span>
                               <span style={{ fontWeight: 700 }}>{item.montoFormateado}</span>
                             </div>
+                            {item.descuento ? (
+                              <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
+                                Con descuento del personal de s/ {item.descuento.toFixed(2)} · por cobrar a fin del período
+                              </div>
+                            ) : null}
                             {item.lineas.map((linea, idx) => (
                               <div
                                 key={idx}

@@ -51,6 +51,7 @@ on:
           - programar-respaldos
           - importar-datos-produccion
           - importar-personal
+          - regularizar-creditos
       paquete:
         description: 'Solo importar-datos-produccion: carpeta del paquete exportado (fecha, p. ej. 20261030_120000, o ruta dentro de /opt/caprichos/respaldos/datos-empresa)'
         required: false
@@ -103,6 +104,21 @@ on:
         required: false
         default: false
         type: boolean
+      aplicar_creditos:
+        description: 'Solo regularizar-creditos: false = simulacro (no escribe, por defecto); true = registra el consumo del personal que quedó sin acumular'
+        required: false
+        default: false
+        type: boolean
+      dias_creditos:
+        description: 'Solo regularizar-creditos: cuántos días hacia atrás revisar (por defecto 60)'
+        required: false
+        default: '60'
+        type: string
+      ajustar_descuento_creditos:
+        description: 'Solo regularizar-creditos con aplicar: true = además deja esos pedidos con el descuento del personal aplicado (cambia su total; apagado por defecto)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -138,6 +154,7 @@ jobs:
           IN_DNI: ${{ github.event.inputs.dni_admin }}
           IN_CONSULTA: ${{ github.event.inputs.consulta_resenas }}
           IN_REPETIR: ${{ github.event.inputs.repetir_resenas }}
+          IN_DIAS_CRED: ${{ github.event.inputs.dias_creditos }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
@@ -323,6 +340,19 @@ jobs:
             ACCION="importar-personal"
             if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
               echo "::error::importar-personal en demo se lanza desde la rama preprod."
+              exit 1
+            fi
+          fi
+
+          # Regularizar créditos del personal (script de consola de la API): manual; simulacro por defecto; prod exige PRODUCCION + tag
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$IN_ACCION" = "regularizar-creditos" ]; then
+            ACCION="regularizar-creditos"
+            if [ "$IN_AMBIENTE" = "demo" ] && [ "$REF_NAME" != "preprod" ]; then
+              echo "::error::regularizar-creditos en demo se lanza desde la rama preprod."
+              exit 1
+            fi
+            if [[ ! "${IN_DIAS_CRED:-60}" =~ ^[0-9]{1,4}$ ]] || [ "${IN_DIAS_CRED:-60}" -lt 1 ]; then
+              echo "::error::dias_creditos debe ser un número entre 1 y 9999."
               exit 1
             fi
           fi
@@ -1460,6 +1490,89 @@ jobs:
             echo ""
             echo '```'
             tail -n 200 personal-importacion.log 2>/dev/null || echo "(sin salida: revise el log del paso anterior)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave del ejecutor
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Regulariza el crédito del personal: registra el consumo de los pedidos del personal que quedaron sin acumular. Simulacro por defecto.
+  regularizar-creditos:
+    name: Regularizar créditos del personal (script de consola)
+    needs: validar-y-determinar
+    if: needs.validar-y-determinar.outputs.accion == 'regularizar-creditos'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ needs.validar-y-determinar.outputs.ambiente }}
+    concurrency:
+      group: regularizar-creditos
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts del commit o del tag validado)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validar-y-determinar.outputs.ref }}
+          sparse-checkout: infra/compose
+
+      - name: Configurar llave y huella SSH (sin StrictHostKeyChecking=no)
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          for v in SSH_KEY SSH_HOST SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto $v en GitHub (Settings > Secrets and variables > Actions)."
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sincronizar scripts en el VPS
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -e
+          SSH="ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes ${SSH_USER:-deploy}@${SSH_HOST}"
+          tar -czf - -C infra/compose scripts | $SSH 'mkdir -p /opt/caprichos && tar -xzf - -C /opt/caprichos && chmod +x /opt/caprichos/scripts/*'
+
+      - name: Regularizar créditos (salida del script tal cual; nombres enmascarados)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          AMBIENTE: ${{ needs.validar-y-determinar.outputs.ambiente }}
+          APLICAR: ${{ github.event.inputs.aplicar_creditos }}
+          AJUSTAR: ${{ github.event.inputs.ajustar_descuento_creditos }}
+          DIAS: ${{ github.event.inputs.dias_creditos }}
+        run: |
+          set -o pipefail
+          if [ "$APLICAR" = "true" ]; then SI_NO=si; else SI_NO=no; fi
+          if [ "$AJUSTAR" = "true" ]; then AJ=si; else AJ=no; fi
+          if [ "$AMBIENTE" = "prod" ] && [ "$SI_NO" = "si" ]; then
+            echo "::warning::Se registran consumos reales en PRODUCCIÓN."
+          fi
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${SSH_USER:-deploy}@${SSH_HOST}" \
+            "/opt/caprichos/scripts/regularizar-creditos.sh '${AMBIENTE}' '${SI_NO}' '${DIAS:-60}' '${AJ}'" 2>&1 | tee creditos-regularizacion.log
+
+      - name: Resumen (salida del script)
+        if: always()
+        run: |
+          {
+            echo "## Regularizar créditos del personal (${{ needs.validar-y-determinar.outputs.ambiente }})"
+            echo ""
+            echo "Modo: ${{ github.event.inputs.aplicar_creditos == 'true' && 'APLICAR (registra consumos)' || 'simulacro (no escribe)' }}"
+            echo ""
+            echo '```'
+            tail -n 200 creditos-regularizacion.log 2>/dev/null || echo "(sin salida: revise el log del paso anterior)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
