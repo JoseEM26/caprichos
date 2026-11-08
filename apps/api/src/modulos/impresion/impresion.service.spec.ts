@@ -101,6 +101,31 @@ describe('ImpresionService', () => {
       });
     });
 
+    it('entrega el ticket de pago antes que los stickers aunque llegara después (TICKETS_PRIMERO por defecto)', async () => {
+      prismaMock.$queryRaw.mockResolvedValue([{ id: 12n }, { id: 10n }, { id: 11n }]);
+      prismaMock.printJob.findMany.mockResolvedValue([
+        { id: 10n, tipo: 'ETIQUETA_GENERAL', payload: {}, copia: false, intentos: 0 },
+        { id: 11n, tipo: 'ETIQUETA_BEBIDA', payload: {}, copia: false, intentos: 0 },
+        { id: 12n, tipo: 'TICKET_PAGO', payload: {}, copia: false, intentos: 0 },
+      ]);
+      const res = await service.tomarTrabajos(5, 5n);
+      expect(res.trabajos.map((t) => t.id)).toEqual(['12', '10', '11']);
+      // la consulta recibe el modo para ordenar en la base
+      expect(prismaMock.$queryRaw.mock.calls.at(-1).slice(1)).toContain(true);
+    });
+
+    it('con ORDEN_LLEGADA sale por antigüedad, sin priorizar tickets', async () => {
+      prismaMock.parametro.findUnique = jest.fn().mockResolvedValue({ clave: 'impresion_prioridad', valor: 'ORDEN_LLEGADA' });
+      prismaMock.$queryRaw.mockResolvedValue([{ id: 10n }, { id: 12n }]);
+      prismaMock.printJob.findMany.mockResolvedValue([
+        { id: 10n, tipo: 'ETIQUETA_GENERAL', payload: {}, copia: false, intentos: 0 },
+        { id: 12n, tipo: 'TICKET_PAGO', payload: {}, copia: false, intentos: 0 },
+      ]);
+      const res = await service.tomarTrabajos(5, 5n);
+      expect(res.trabajos.map((t) => t.id)).toEqual(['10', '12']);
+      expect(prismaMock.$queryRaw.mock.calls.at(-1).slice(1)).toContain(false);
+    });
+
     it('limita el maximo de trabajos a 10 aunque se pida mas', async () => {
       prismaMock.$queryRaw.mockResolvedValue([]);
       await service.tomarTrabajos(50, 1n);

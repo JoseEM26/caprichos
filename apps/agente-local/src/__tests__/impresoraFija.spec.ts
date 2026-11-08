@@ -143,7 +143,7 @@ describe('bucle con elección y pruebas por impresora', () => {
     et.establecerEstado({ estado: 'desconectada', detalle: 'Impresora guardada no encontrada: A' });
     await agente.ejecutarCiclo();
     expect(cliente.enviarLatido.mock.calls[0][3][0]).toMatchObject({ estado: 'desconectada', detalle: 'Impresora guardada no encontrada: A' });
-    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(10, [], true);
+    expect(cliente.tomarTrabajos).toHaveBeenCalledWith(4, [], true);
   });
 
   it('imprime una prueba dirigida en ESA impresora con su nombre, aunque la máquina no esté lista, y confirma', async () => {

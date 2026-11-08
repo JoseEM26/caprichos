@@ -68,7 +68,7 @@ import {
   destinoDeTrabajo,
   tiposDeRoles,
 } from './ruteo-impresion';
-import { leerReglasImpresion, leerTamanosEtiqueta } from './reglas-impresion';
+import { leerReglasImpresion, leerTamanosEtiqueta, leerTicketsPrimero, ordenarPorPrioridad } from './reglas-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { ajustesPendientesUbicacion } from '../pedidos-admin/cambio-ubicacion.util';
 
@@ -167,6 +167,9 @@ export class ImpresionService {
       this.logger.warn(`Error recuperando trabajos huérfanos: ${err.message}`);
     }
 
+    // Tickets de pago y comandas primero (por defecto): un voucher no espera detrás de una fila de stickers
+    const ticketsPrimero = await leerTicketsPrimero(this.prisma);
+
     // 2. Selección atómica con SKIP LOCKED
     return this.prisma.$transaction(async (tx) => {
       let ids: bigint[] = [];
@@ -179,7 +182,7 @@ export class ImpresionService {
             AND destino_area_id IS NOT DISTINCT FROM ${areaId}::bigint
             AND (tipo = ANY(${tipos}::text[])
               OR (${pruebas}::boolean AND pedido_id IS NULL AND payload->'prueba'->>'impresoraId' IS NOT NULL))
-          ORDER BY id ASC
+          ORDER BY (CASE WHEN ${ticketsPrimero}::boolean AND tipo LIKE 'TICKET%' THEN 0 ELSE 1 END), id ASC
           LIMIT ${limite}
           FOR UPDATE SKIP LOCKED
         `
@@ -187,7 +190,7 @@ export class ImpresionService {
           SELECT id FROM "print_job"
           WHERE estado = 'PENDIENTE'
             AND destino_area_id IS NOT DISTINCT FROM ${areaId}::bigint
-          ORDER BY id ASC
+          ORDER BY (CASE WHEN ${ticketsPrimero}::boolean AND tipo LIKE 'TICKET%' THEN 0 ELSE 1 END), id ASC
           LIMIT ${limite}
           FOR UPDATE SKIP LOCKED
         `;
@@ -230,10 +233,13 @@ export class ImpresionService {
         },
       });
 
-      const actualizados = await tx.printJob.findMany({
-        where: { id: { in: ids } },
-        orderBy: { id: 'asc' },
-      });
+      const actualizados = ordenarPorPrioridad(
+        await tx.printJob.findMany({
+          where: { id: { in: ids } },
+          orderBy: { id: 'asc' },
+        }),
+        ticketsPrimero,
+      );
 
       // El tamaño del sticker se lee al entregar: un trabajo que esperaba en cola sale con la medida vigente
       const tamanos = actualizados.some((t) => t.tipo === 'ETIQUETA_GENERAL' || t.tipo === 'ETIQUETA_BEBIDA')

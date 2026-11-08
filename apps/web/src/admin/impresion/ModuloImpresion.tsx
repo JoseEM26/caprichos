@@ -3,6 +3,8 @@ import { ModuloMapaImpresion } from './mapa/ModuloMapaImpresion';
 import { SeccionEquipos } from './SeccionEquipos';
 import { SeccionColaPruebas } from './SeccionColaPruebas';
 import { ImpresionFacil } from './facil/ImpresionFacil';
+import { PrioridadTickets } from './PrioridadTickets';
+import { useSesion } from '../../comun/sesion';
 import { SECCIONES_AVANZADAS, saludEquipos, type SeccionImpresion } from './seccionesImpresion';
 import { useEstadoMaquinas } from './useEstadoMaquinas';
 import './modulo-impresion.css';
@@ -51,6 +53,8 @@ export function ModuloImpresion({
   alCambiarSeccion: (s: SeccionImpresion) => void;
 }) {
   const botones = useRef<Partial<Record<SeccionAvanzada, HTMLButtonElement | null>>>({});
+  const { tiene, usuario } = useSesion();
+  const puedeEditar = (usuario?.rol || '').toUpperCase() === 'ADMIN' || tiene('configuracion/editar');
 
   const elegir = (s: SeccionAvanzada, conFoco: boolean) => {
     alCambiarSeccion(s);
@@ -73,6 +77,7 @@ export function ModuloImpresion({
   if (seccion === 'facil') {
     return (
       <div className="imp-modulo">
+        <PrioridadTickets puedeEditar={puedeEditar} />
         <ImpresionFacil alVistaAvanzada={() => alCambiarSeccion('mapa')} />
       </div>
     );

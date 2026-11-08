@@ -10,6 +10,7 @@ import { generarTicketEscPos, generarComandaSalonEscPos } from '../escpos/genera
 import { generarPruebaEtiqueta, generarPruebaTicket } from '../pruebaImpresora';
 import { paraServidor } from '../candidatas';
 import type { CandidataLocal } from '../candidatas';
+import { decidirAutomatica, mensajeConexion, NOMBRE_ROL_AUTO } from '../autoUsb';
 
 /** Lo que el programa sabe de este equipo: qué impresoras ve y cómo guardar la elegida (desde el panel). */
 export interface EquipoLocal {
@@ -23,6 +24,11 @@ export interface EquipoLocal {
 
 /** Con una impresora guardada que no aparece, se reintenta más seguido que el latido normal. */
 const REINTENTO_FALTANTE_MS = 5000;
+/** Sin impresora USB para un rol: se vuelve a buscar (hot-plug) como mucho cada 30 s. */
+const REESCANEO_SIN_IMPRESORA_MS = 30000;
+/** Tras imprimir algo, se consulta cada 1 s durante este tiempo (para que el ticket de pago salga enseguida). */
+const VENTANA_ACTIVIDAD_MS = 60000;
+const ESPERA_ACTIVA_MS = 1000;
 
 export interface OpcionesAgenteLocalServicio {
   config: ConfiguracionAgente;
@@ -59,6 +65,9 @@ export class AgenteLocalServicio {
   private readonly temporizador: (ms: number) => Promise<void>;
 
   private corriendo: boolean = false;
+  private ultimaActividadTs = 0;
+  /** Roles de los que ya se avisó «no encuentro impresora USB» (para no repetirlo cada escaneo). */
+  private avisoSinUsb = new Set<RolImpresora>();
   private ultimoLatidoTs: number = 0;
   private factorEsperaRed: number = 1;
   private estadoImpresora: EstadoImpresora = 'lista';
@@ -87,10 +96,32 @@ export class AgenteLocalServicio {
   }
 
   obtenerEsperaActualMs(): number {
-    return Math.min(
-      30000,
-      Math.round(this.config.intervaloConsultaMs * this.factorEsperaRed)
-    );
+    const base = Date.now() - this.ultimaActividadTs < VENTANA_ACTIVIDAD_MS
+      ? Math.min(this.config.intervaloConsultaMs, ESPERA_ACTIVA_MS)
+      : this.config.intervaloConsultaMs;
+    return Math.min(30000, Math.round(base * this.factorEsperaRed));
+  }
+
+  /** Conecta solo la ticketera/etiquetera USB de cada rol sin impresora válida (ver autoUsb.ts). */
+  private autoConectar(): void {
+    const equipo = this.equipo!;
+    const decisiones = decidirAutomatica(this.candidatas, (r) => equipo.idActual(r));
+    for (const d of decisiones) {
+      try {
+        equipo.guardar(d.rol, d.candidata);
+        this.impresoras[d.rol] = equipo.crear(d.candidata, d.rol);
+        this.avisoSinUsb.delete(d.rol);
+        this.logger('info', mensajeConexion(d));
+      } catch (err: any) {
+        this.logger('warn', `No pude conectar la ${NOMBRE_ROL_AUTO[d.rol]} ${d.candidata.nombre}: ${err.message}`);
+      }
+    }
+    if (this.candidatas.length === 0) return;
+    for (const rol of ['TICKETERA', 'ETIQUETERA'] as RolImpresora[]) {
+      if (this.impresoras[rol] || this.avisoSinUsb.has(rol)) continue;
+      this.avisoSinUsb.add(rol);
+      this.logger('info', `Aún no veo una ${NOMBRE_ROL_AUTO[rol]} por USB. Sigo buscando cada 30 segundos.`);
+    }
   }
 
   forzarTiempoUltimoLatido(ts: number): void {
@@ -111,12 +142,18 @@ export class AgenteLocalServicio {
     const ahora = Date.now();
 
     // 1. Emitir latido si corresponde
+    const faltaRol = !!this.equipo && !(this.impresoras.TICKETERA && this.impresoras.ETIQUETERA);
     const esperaLatido = this.algunaFalla
       ? Math.min(this.config.intervaloLatidoMs, REINTENTO_FALTANTE_MS)
-      : this.config.intervaloLatidoMs;
+      : faltaRol
+        ? Math.min(this.config.intervaloLatidoMs, REESCANEO_SIN_IMPRESORA_MS)
+        : this.config.intervaloLatidoMs;
     if (ahora - this.ultimoLatidoTs >= esperaLatido) {
       try {
-        if (this.equipo) this.candidatas = await this.equipo.listar().catch(() => []);
+        if (this.equipo) {
+          this.candidatas = await this.equipo.listar().catch(() => []);
+          this.autoConectar();
+        }
         const reportadas: ImpresoraReportada[] = [];
         for (const rol of ['ETIQUETERA', 'TICKETERA'] as RolImpresora[]) {
           const dispositivo = this.impresoras[rol];
@@ -197,6 +234,7 @@ export class AgenteLocalServicio {
     for (const trabajo of trabajos) {
       await this.procesarTrabajo(trabajo);
     }
+    this.ultimaActividadTs = Date.now();
 
     return { trabajosProcesados: trabajos.length, errorRed: false };
   }

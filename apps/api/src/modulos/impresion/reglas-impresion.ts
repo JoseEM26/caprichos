@@ -100,6 +100,26 @@ export function valoresDesdeCambio(cambio: Partial<{
   return out;
 }
 
+/** Orden de salida de la cola (parametro `impresion_prioridad`): tickets de pago y comandas antes que los stickers, o solo por llegada. */
+export const PRIORIDADES_IMPRESION = ['TICKETS_PRIMERO', 'ORDEN_LLEGADA'] as const;
+export type PrioridadImpresion = (typeof PRIORIDADES_IMPRESION)[number];
+
+/** Sin configurar, o con cualquier valor inválido o un fallo al leer, se imprimen primero los tickets. */
+export async function leerTicketsPrimero(prisma: PrismaService): Promise<boolean> {
+  try {
+    const fila = await prisma.parametro.findUnique({ where: { clave: 'impresion_prioridad' } });
+    return String(fila?.valor ?? '').toUpperCase() !== 'ORDEN_LLEGADA';
+  } catch {
+    return true;
+  }
+}
+
+/** Tickets (TICKET_*) primero si se pide; dentro de cada grupo, el más antiguo (id menor) primero. */
+export function ordenarPorPrioridad<T extends { id: bigint; tipo: string }>(trabajos: T[], ticketsPrimero: boolean): T[] {
+  const grupo = (t: T) => (ticketsPrimero && t.tipo.startsWith('TICKET_') ? 0 : 1);
+  return [...trabajos].sort((a, b) => grupo(a) - grupo(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
 /** Tamaño de los stickers de bebida y general (mm) desde `parametro`; sin configurar o inválido, el de fábrica. */
 export async function leerTamanosEtiqueta(prisma: PrismaService): Promise<TamanosEtiqueta> {
   try {

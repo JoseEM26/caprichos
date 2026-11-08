@@ -12,7 +12,7 @@ import { ImpresoraUsb } from './impresora/impresoraUsb';
 import { ImpresoraRed, esDestinoRed, parsearDestinoRed } from './impresora/impresoraRed';
 import type { IDispositivoImpresora } from './impresora/dispositivo.interface';
 import { ClienteApiImpresion, canjearCodigoVinculo } from './api/clienteApi';
-import { comandoEstado, comandoImpresoras, comandoProbarTodas, comandoProbarUna, comandoUsar, ejecutarMenu } from './comandos';
+import { comandoDiagnostico, comandoEstado, comandoImpresoras, comandoProbarTodas, comandoProbarUna, comandoUsar, ejecutarMenu } from './comandos';
 import type { DepsComandos } from './comandos';
 import { AgenteLocalServicio } from './agente/bucle';
 import type { EquipoLocal } from './agente/bucle';
@@ -456,6 +456,11 @@ export async function main(): Promise<void> {
   }
   if (comando === 'estado') {
     await comandoEstado(depsComandos(), rutaArchivoConfiguracion());
+    await esperarEnter();
+    process.exit(0);
+  }
+  if (comando === 'diagnostico' || comando === 'diagnóstico') {
+    await comandoDiagnostico(depsComandos(), rutaArchivoConfiguracion());
     await esperarEnter();
     process.exit(0);
   }
