@@ -31,6 +31,7 @@ import {
   LatidoDto,
   InfoEquipoLatidoDto,
   ReimprimirDto,
+  ReimprimirPedidoDto,
   ResultadoTrabajoDto,
   VaciarColaDto,
 } from './dto';
@@ -73,6 +74,14 @@ import {
   rolesDeConfig,
   tiposDeRoles,
 } from './ruteo-impresion';
+import {
+  ESTADOS_NO_VIGENTES,
+  ItemReimpresion,
+  MARCA_PRECUENTA,
+  OmitidoReimpresion,
+  claveDeJob,
+  planReimpresion,
+} from './reimpresion-pedido';
 import { EquipoConfigService } from './equipo-config.service';
 import { leerReglasImpresion, leerTamanosEtiqueta, leerTicketsPrimero, ordenarPorPrioridad } from './reglas-impresion';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
@@ -102,6 +111,16 @@ const ROLES_DESCARTAR = ['ADMIN', 'CAJERO'];
 /** Tope de papeles por pedido de reimpresión y de copias esperando en cola (anti doble clic y anti avalancha). */
 const MAX_REIMPRESION_JUNTA = 30;
 const MAX_COPIAS_EN_COLA = 60;
+/** Reimpresiones rápidas por pedido y minuto (anti doble clic y anti abuso). */
+const MAX_REIMPRESIONES_POR_MINUTO = 5;
+
+/** Por qué ninguna PC imprime un papel: sin PC vinculada, sin configurar, en pausa o sin ese papel encendido. */
+function motivoSinPc(ctx: ContextoRuteo): string {
+  if (!ctx.equipos.length) return 'No hay ninguna PC vinculada para imprimir';
+  if (ctx.equipos.every((e) => !e.config.configurado)) return 'La PC está sin configurar: elige qué imprime en el Mapa de impresión';
+  if (ctx.equipos.every((e) => e.config.pausado || !e.config.configurado)) return 'La PC está en pausa';
+  return 'Ninguna PC tiene encendido este papel en el Mapa de impresión';
+}
 
 const FILTROS_COLA: Record<string, string> = {
   pendientes: 'PENDIENTE',
@@ -1628,6 +1647,171 @@ export class ImpresionService {
     }
     this.eventos?.emitirAdmin('impresion:cola', { pedidoId: pedido.id.toString(), tipo: 'TICKET_PAGO' });
     return { ok: true, mensaje: 'Se encoló el ticket de pago para reimpresión', cantidad: 1, omitidas: 0, noAplican: 0, trabajoIds: [trabajo.id.toString()] };
+  }
+
+  /** Reimpresiones pedidas por pedido en el último minuto (en memoria; ponytail: por instancia, suficiente con un solo API). */
+  private readonly reimpresionesRecientes = new Map<string, number[]>();
+
+  /**
+   * Reimpresión rápida de un pedido (stickers y/o tickets): copias nuevas (copia=true) con los mismos constructores
+   * y el mismo ruteo por PC que una venta real. Sirve para cualquier pedido, también entregado, anulado o sin cobrar:
+   * no pide Cobro ni emite nada a SUNAT (el ticket reimprime la representación que ya existe). Con `vista_previa`
+   * solo devuelve qué saldría y a qué PC, sin encolar. Pedido ANULADO/RECHAZADO: exige `confirmar_anulado` y marca
+   * «ANULADO» en los tickets (los stickers salen sin marca: la etiqueta no tiene dónde llevarla; la UI lo avisa).
+   */
+  async reimprimirPedido(pedidoIdInput: string | number, dto: ReimprimirPedidoDto, usuario?: UsuarioAutenticado, ip?: string) {
+    let pedidoId: bigint;
+    try {
+      pedidoId = BigInt(pedidoIdInput);
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador de pedido no válido' });
+    }
+    const pedido: any = await this.prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: {
+        lineas: { include: { area: true, producto: { include: { categoria: true } }, opcionesElegidas: true, sabores: true } },
+      },
+    });
+    if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+
+    const noVigente = ESTADOS_NO_VIGENTES.includes(pedido.estado);
+    const vistaPrevia = Boolean(dto.vista_previa);
+    if (!vistaPrevia) {
+      if (noVigente && !dto.confirmar_anulado) {
+        throw new BadRequestException({
+          codigo: 'ANULADO_REQUIERE_CONFIRMACION',
+          mensaje: `El pedido está ${pedido.estado === 'ANULADO' ? 'anulado' : 'rechazado'}. Confirma que quieres reimprimirlo.`,
+        });
+      }
+      const ahora = Date.now();
+      const k = pedido.id.toString();
+      const recientes = (this.reimpresionesRecientes.get(k) ?? []).filter((t) => ahora - t < 60_000);
+      if (recientes.length >= MAX_REIMPRESIONES_POR_MINUTO) {
+        throw new HttpException(
+          { codigo: 'MUCHAS_REIMPRESIONES', mensaje: `Ya reimprimiste este pedido ${MAX_REIMPRESIONES_POR_MINUTO} veces en el último minuto. Espera un momento.` },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      this.reimpresionesRecientes.set(k, [...recientes, ahora]);
+    }
+
+    // Ticket de pago: con Cobro reimprime lo ya emitido; sin Cobro sale como pre-cuenta; anulado lleva su marca
+    const armado = await this.armarTicketPedido(pedidoId);
+    const sinCobro = !armado?.pedido.cobros?.some((c: any) => !c.anulado_en);
+    const marca = noVigente ? 'ANULADO' : null;
+    const ticket = armado
+      ? { ...armado.payload, ...(marca ? { marca } : sinCobro && !pedido.es_personal ? { marca: MARCA_PRECUENTA } : {}) }
+      : null;
+    const reglas = await leerReglasImpresion(this.prisma);
+    const ctx = await this.contextoRuteo();
+    const { items, omitidos } = planReimpresion(pedido, dto.tipo, dto.sub ?? 'todos', reglas, ticket, marca);
+
+    const enCola = await this.prisma.printJob.findMany({
+      where: { pedido_id: pedido.id, estado: { in: ESTADOS_EN_COLA } },
+      select: { tipo: true, payload: true },
+    });
+    const clavesEnCola = new Set(enCola.map((j) => claveDeJob(j)));
+
+    // Destino por PC: sin PC que lo imprima se omite con motivo; PC sin conexión se envía con advertencia
+    const nombres = new Map<string, string>(
+      ((await this.prisma.deviceKey.findMany({ where: { id: { in: ctx.equipos.map((e) => e.id) } }, select: { id: true, nombre: true } })) ?? []).map(
+        (d: any) => [d.id.toString(), d.nombre],
+      ),
+    );
+    const yaEnCola: OmitidoReimpresion[] = [];
+    const aEncolar: Array<ItemReimpresion & { destino: ReturnType<ImpresionService['destinoJob']>; equipo: string | null; conectado: boolean }> = [];
+    for (const it of items) {
+      if (clavesEnCola.has(it.clave)) {
+        yaEnCola.push({ tipo: it.tipo, etiqueta: it.etiqueta, motivo: 'Ya está en cola' });
+        continue;
+      }
+      const destino = this.destinoJob(it.tipo, it.areaId, it.payload, ctx);
+      if (destino.destino_equipo_id === null) {
+        // La comanda de un área sin PC propia no es un error: la del salón ya cubre al pedido
+        if (it.tipo === 'TICKET_COMANDA_AREA') continue;
+        omitidos.push({ tipo: it.tipo, etiqueta: it.etiqueta, motivo: motivoSinPc(ctx) });
+        continue;
+      }
+      const eq = ctx.equipos.find((e) => e.id === destino.destino_equipo_id);
+      aEncolar.push({ ...it, destino, equipo: nombres.get(String(destino.destino_equipo_id)) ?? `PC ${destino.destino_equipo_id}`, conectado: Boolean(eq?.conectado) });
+    }
+    if (!vistaPrevia && aEncolar.length) {
+      const enColaCopias = await this.prisma.printJob.count({ where: { copia: true, estado: { in: ESTADOS_EN_COLA } } });
+      if (enColaCopias + aEncolar.length > MAX_COPIAS_EN_COLA) {
+        throw new HttpException(
+          { codigo: 'MUCHAS_COPIAS_EN_COLA', mensaje: 'Ya hay muchas copias esperando salir. Espera a que se impriman.' },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    let trabajoIds: string[] = [];
+    if (!vistaPrevia && aEncolar.length) {
+      const creados = await this.prisma.$transaction(
+        aEncolar.map((it) =>
+          this.prisma.printJob.create({
+            data: {
+              pedido_id: pedido.id,
+              area_id: it.areaId,
+              ...it.destino,
+              tipo: it.tipo,
+              payload: it.payload as any,
+              copia: true,
+              estado: 'PENDIENTE',
+            },
+          }),
+        ),
+      );
+      trabajoIds = creados.map((c: any) => c.id.toString());
+    }
+
+    const rolDe = (tipo: string) => (tipo.startsWith('ETIQUETA') ? 'ETIQUETERA' : 'TICKETERA');
+    const esSticker = (tipo: string) => tipo.startsWith('ETIQUETA');
+    const porMaquina = new Map<string, { equipoId: string; equipo: string; rol: string; stickers: number; tickets: number; conectado: boolean }>();
+    for (const it of aEncolar) {
+      const key = `${it.destino.destino_equipo_id}-${rolDe(it.tipo)}`;
+      const m = porMaquina.get(key) ?? { equipoId: String(it.destino.destino_equipo_id), equipo: it.equipo ?? '', rol: rolDe(it.tipo), stickers: 0, tickets: 0, conectado: it.conectado };
+      if (esSticker(it.tipo)) m.stickers += 1;
+      else m.tickets += 1;
+      porMaquina.set(key, m);
+    }
+    const stickers = aEncolar.filter((i) => esSticker(i.tipo)).length;
+    const tickets = aEncolar.length - stickers;
+    const resultado = {
+      ok: true,
+      vistaPrevia,
+      pedido: { id: pedido.id.toString(), codigo: pedido.codigo, estado: pedido.estado, anulado: noVigente },
+      exigeConfirmacionAnulado: noVigente,
+      marca: ticket?.marca ?? marca,
+      stickers,
+      tickets,
+      cantidad: aEncolar.length,
+      porMaquina: [...porMaquina.values()],
+      papeles: aEncolar.map((i) => ({ tipo: i.tipo, etiqueta: i.etiqueta, equipoId: String(i.destino.destino_equipo_id), equipo: i.equipo, rol: rolDe(i.tipo), conectado: i.conectado })),
+      omitidos,
+      yaEnCola,
+      trabajoIds,
+      mensaje: aEncolar.length
+        ? `${vistaPrevia ? 'Se reimprimirían' : 'Se enviaron'} ${stickers} sticker(s) y ${tickets} ticket(s)`
+        : yaEnCola.length && !omitidos.length
+          ? 'Ya está en cola'
+          : 'No se envió nada: revisa los motivos',
+    };
+
+    if (!vistaPrevia && this.auditoria && usuario) {
+      await this.auditoria.registrar({
+        categoria: 'CAMBIO',
+        modulo: 'impresion',
+        accion: 'REIMPRIMIR_PEDIDO',
+        entidad: 'pedido',
+        entidadId: pedido.id,
+        partyId: usuario.partyId,
+        despues: { pedido: pedido.codigo, tipo: dto.tipo, sub: dto.sub ?? null, estadoPedido: pedido.estado, stickers, tickets, omitidos: omitidos.length, yaEnCola: yaEnCola.length, trabajoIds },
+        ip,
+      });
+    }
+    if (!vistaPrevia && aEncolar.length) this.eventos?.emitirAdmin('impresion:cola', { pedidoId: pedido.id.toString(), tipo: 'REIMPRESION' });
+    return resultado;
   }
 
   /** Etiquetas (general, por área y por vaso) del pedido tal como están hoy, con su clave estable y su contenido. */

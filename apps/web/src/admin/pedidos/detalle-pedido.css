@@ -179,3 +179,16 @@
   .dp-nombre { font-size: 20px; }
   .dp-total-cab { font-size: 22px; }
 }
+
+/* Reimpresión rápida: menú, aviso de resultado y botón de la tarjeta */
+.rp-menu { width: min(420px, 100%); background: var(--cp-cream, #FBF4EC); border-radius: 20px; box-shadow: 0 20px 50px rgba(11, 44, 62, 0.4); overflow: hidden; }
+.rp-lista { list-style: none; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.rp-opcion { width: 100%; min-height: 48px; text-align: left; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--cp-navy, #0B2C3E); background: var(--cp-white, #fff); color: var(--cp-navy, #0B2C3E); font-weight: 800; font-size: 15px; cursor: pointer; }
+.rp-opcion:disabled { opacity: 0.6; cursor: wait; }
+.rp-estado { margin: 0; padding: 0 14px 12px; font-size: 13px; }
+.rp-aviso { position: fixed; z-index: 120; left: 12px; right: 12px; bottom: 12px; max-width: 560px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; padding: 12px 14px; border-radius: 14px; background: var(--cp-white, #fff); box-shadow: 0 10px 30px rgba(11, 44, 62, 0.35); font-size: 14px; line-height: 20px; }
+.rp-aviso--ok { border: 2px solid #2E7D32; }
+.rp-aviso--mal { border: 2px solid var(--cp-rust, #B2500F); }
+.rp-aviso a { display: inline-block; margin-top: 4px; font-weight: 800; color: var(--cp-navy, #0B2C3E); }
+.cj2-reimprimir { position: absolute; top: 14px; right: 6px; z-index: 2; min-width: 44px; min-height: 44px; border-radius: 12px; border: 1.5px solid var(--cp-line, #E3D6C6); background: var(--cp-white, #fff); color: var(--cp-navy, #0B2C3E); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.cj2-reimprimir:disabled { opacity: 0.6; cursor: wait; }

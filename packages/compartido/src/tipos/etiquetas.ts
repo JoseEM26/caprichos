@@ -119,6 +119,8 @@ export interface EstadoMaquinaImpresion {
 
 export interface TicketPagoDatos {
   tipo?: 'TICKET_PAGO';
+  /** Reimpresión: rótulo grande arriba («ANULADO», «PRE-CUENTA / PENDIENTE DE PAGO»). Un .exe viejo no lo imprime. */
+  marca?: string | null;
   /** Simulación de pedido: el ticket imprime «*** PRUEBA ***». */
   simulacion?: boolean;
   local: { nombre: string; razonSocial?: string | null; ruc?: string | null; direccion?: string | null };
@@ -268,6 +270,8 @@ export interface EtiquetaBebidaDatos {
 /** Comanda de salón: todas las líneas del pedido con tamaño, opciones y notas, para la cocina y el mozo. */
 export interface TicketComandaSalonDatos {
   tipo?: TipoTicketComanda;
+  /** Reimpresión de un pedido anulado: rótulo «ANULADO» arriba. */
+  marca?: string | null;
   /** Simulación de pedido: la comanda imprime «*** PRUEBA ***». */
   simulacion?: boolean;
   codigo: string;

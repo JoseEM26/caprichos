@@ -28,7 +28,7 @@ import { CorregirClienteDto } from './dto/corregir-cliente.dto';
 import { PedidosService } from '../pedidos/pedidos.service';
 import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { ImpresionService } from '../impresion/impresion.service';
-import { ReimprimirDto } from '../impresion/dto/reimprimir.dto';
+import { ReimprimirDto, ReimprimirPedidoDto } from '../impresion/dto/reimprimir.dto';
 import { VouchersService } from '../vouchers/vouchers.service';
 import { PedidoComprobanteService } from './pedido-comprobante.service';
 import { CambiarComprobanteDto } from './dto/cambiar-comprobante.dto';
@@ -200,6 +200,16 @@ export class PedidosAdminController {
       return { ok: false, mensaje: 'Módulo de impresión no configurado' };
     }
     return this.impresionService.reimprimirEtiqueta(id, dto, req?.usuario, req?.ip);
+  }
+
+  /** Reimpresión rápida (todo, stickers, ticket de cocina o de pago) de cualquier pedido; `vista_previa` solo calcula. */
+  @Post(':id/reimprimir')
+  @Permiso('pedidos', 'cambiar_estado')
+  async reimprimirPedido(@Param('id') id: string, @Body() dto: ReimprimirPedidoDto, @Req() req?: any) {
+    if (!this.impresionService) {
+      return { ok: false, mensaje: 'Módulo de impresión no configurado' };
+    }
+    return this.impresionService.reimprimirPedido(id, dto, req?.usuario, req?.ip);
   }
 
   /** Estado de impresión de cada etiqueta del pedido (cola, impresa, fallida, vencida). */

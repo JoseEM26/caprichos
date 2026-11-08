@@ -388,6 +388,11 @@ export const impresionApi = {
     });
   },
 
+  /** Reimpresión rápida (todo, stickers, ticket de cocina o de pago). Con `vista_previa` solo calcula qué saldría y dónde. */
+  reimprimirPedido: async (pedidoId: string | number, body: PeticionReimpresionPedido): Promise<ResultadoReimpresionPedido> => {
+    return api.post(`/admin/pedidos/${pedidoId}/reimprimir`, body);
+  },
+
   obtenerEtiquetasPedido: async (pedidoId: string): Promise<EstadoEtiquetasPedido> => {
     return api.get<EstadoEtiquetasPedido>(`/admin/pedidos/${pedidoId}/etiquetas-estado`);
   },
@@ -436,3 +441,35 @@ export const impresionApi = {
     return api.patch<{ ok: boolean; mensaje: string }>(`/admin/impresion/llaves/${id}/desactivar`);
   },
 };
+
+export type TipoReimpresionPedido = 'todo' | 'stickers' | 'ticket_cocina' | 'ticket_pago';
+export interface PeticionReimpresionPedido {
+  tipo: TipoReimpresionPedido;
+  sub?: 'todos' | 'general' | 'area' | 'bebida';
+  vista_previa?: boolean;
+  confirmar_anulado?: boolean;
+}
+export interface PapelReimpresion {
+  tipo: string;
+  etiqueta: string;
+  equipoId: string;
+  equipo: string;
+  rol: 'ETIQUETERA' | 'TICKETERA';
+  conectado: boolean;
+}
+export interface ResultadoReimpresionPedido {
+  ok: boolean;
+  vistaPrevia: boolean;
+  pedido: { id: string; codigo: string; estado: string; anulado: boolean };
+  exigeConfirmacionAnulado: boolean;
+  marca: string | null;
+  stickers: number;
+  tickets: number;
+  cantidad: number;
+  porMaquina: Array<{ equipoId: string; equipo: string; rol: 'ETIQUETERA' | 'TICKETERA'; stickers: number; tickets: number; conectado: boolean }>;
+  papeles: PapelReimpresion[];
+  omitidos: Array<{ tipo: string; etiqueta: string; motivo: string }>;
+  yaEnCola: Array<{ tipo: string; etiqueta: string; motivo: string }>;
+  trabajoIds: string[];
+  mensaje: string;
+}

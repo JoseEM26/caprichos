@@ -38,6 +38,7 @@ import { CapaProductos } from './CapaProductos';
 import { CapaPago } from './CapaPago';
 import { CapaEntrega } from './CapaEntrega';
 import { PanelImpresion } from './PanelImpresion';
+import { ReimprimirPedido } from './ReimprimirPedido';
 import './detalle-pedido.css';
 
 export interface PedidoDetalleProps {
@@ -536,6 +537,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               <BotonIcono n="repetir" texto="Repetir" etiqueta="Repetir este pedido" alClic={() => alRepetir?.(pedido)} />
               {esMesa && <BotonIcono n="precuenta" texto="Precuenta" etiqueta="Sacar precuenta (el cajero cobra)" alClic={() => setAbrirPrecuenta(true)} />}
               <BotonIcono n="imprimir" texto="Imprimir" etiqueta="Imprimir etiquetas y ticket" alClic={() => setAbrirImpresion(true)} />
+              <ReimprimirPedido pedido={pedido} variante="detalle" />
               {est !== 'ANULADO' && (
                 <BotonIcono
                   n="anular"

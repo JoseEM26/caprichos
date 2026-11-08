@@ -205,7 +205,7 @@ describe('Ola F4: Pedidos y Caja', () => {
     expect(screen.getByText('CP-006')).toBeInTheDocument();
     expect(screen.queryByText('CP-001')).not.toBeInTheDocument();
     // Sin botón de acción en los cerrados
-    expect(screen.queryByRole('button', { name: /CP-005$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^(?!Reimprimir).*CP-005$/ })).not.toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Estado de los pedidos' })).toHaveTextContent('Todo2');
 
     fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro Cerrados' }));
