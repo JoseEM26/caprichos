@@ -17,7 +17,7 @@ describe('PanelInstalarPrograma', () => {
     expect(screen.getAllByTestId('comando')[0]).toHaveTextContent(esperado);
     expect(screen.getByText('sudo usermod -aG lp $USER')).toBeInTheDocument();
     expect(screen.getByText('~/caprichos-impresion configurar')).toBeInTheDocument();
-    expect(screen.getByText('journalctl --user -u caprichos-impresion -f')).toBeInTheDocument();
+    expect(screen.getByText('~/caprichos-impresion --estado')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: 'Copiar' })[0]);
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(esperado));
   });
@@ -40,5 +40,6 @@ describe('PanelInstalarPrograma', () => {
     expect(impresionApi.descargarProgramaVinculado).toHaveBeenCalledWith('Caja');
     expect(screen.getByText(/llave secreta/)).toBeInTheDocument();
     expect(screen.getByText('Descomprime la carpeta.')).toBeInTheDocument();
+    expect(screen.getByText(/queda funcionando en segundo plano/)).toBeInTheDocument();
   });
 });

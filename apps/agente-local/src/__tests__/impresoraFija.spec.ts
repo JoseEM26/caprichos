@@ -196,11 +196,11 @@ describe('arranque automático (con funciones simuladas; sin probar en Windows r
     const ejecutar = vi.fn().mockResolvedValue('');
     const r = await activarAutoarranque({ plataforma: 'win32', ejecutable: 'C:\\Caprichos\\agente.exe', ejecutar });
     expect(r.ok).toBe(true);
-    expect(ejecutar).toHaveBeenCalledWith(['add', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', 'CaprichosImpresion', '/t', 'REG_SZ', '/d', '"C:\\Caprichos\\agente.exe"', '/f']);
+    expect(ejecutar).toHaveBeenCalledWith(['add', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', 'CaprichosImpresion', '/t', 'REG_SZ', '/d', '"C:\\Caprichos\\agente.exe" --segundo-plano', '/f']);
   });
-  it('no activa fuera de Windows ni ejecutando con node', async () => {
+  it('no activa en otros sistemas ni ejecutando con node', async () => {
     const ejecutar = vi.fn();
-    expect((await activarAutoarranque({ plataforma: 'linux', ejecutable: 'x', ejecutar })).ok).toBe(false);
+    expect((await activarAutoarranque({ plataforma: 'darwin', ejecutable: 'x', ejecutar })).ok).toBe(false);
     expect((await activarAutoarranque({ plataforma: 'win32', ejecutable: undefined, ejecutar })).mensaje).toContain('.exe');
     expect(ejecutar).not.toHaveBeenCalled();
   });

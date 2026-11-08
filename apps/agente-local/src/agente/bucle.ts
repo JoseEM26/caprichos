@@ -27,7 +27,12 @@ export interface EquipoLocal {
 /** Con una impresora guardada que no aparece, se reintenta más seguido que el latido normal. */
 const REINTENTO_FALTANTE_MS = 5000;
 /** Sin impresora USB para un rol: se vuelve a buscar (hot-plug) como mucho cada 30 s. */
-const REESCANEO_SIN_IMPRESORA_MS = 30000;
+const REESCANEO_SIN_IMPRESORA_MS = 15000;
+/** Espera con red caída: 2 s, 4, 8... hasta 60 s (sin límite de reintentos). */
+const ESPERA_RED_BASE_MS = 2000;
+const ESPERA_RED_TOPE_MS = 60000;
+/** Llave rechazada (PC eliminada o llave desactivada): se sigue vivo pero sin martillar al servidor. */
+const ESPERA_SIN_VINCULO_MS = 5 * 60 * 1000;
 /** Tras imprimir algo, se consulta cada 1 s durante este tiempo (para que el ticket de pago salga enseguida). */
 const VENTANA_ACTIVIDAD_MS = 60000;
 const ESPERA_ACTIVA_MS = 1000;
@@ -54,6 +59,8 @@ export interface OpcionesAgenteLocalServicio {
   infoEquipo?: () => InfoEquipoLatido;
   /** Habilita pruebas por impresora concreta y la elección desde el panel (sin él, el programa se comporta como antes). */
   equipo?: EquipoLocal;
+  /** Se llama tras cada latido/ciclo con lo que sabe de la conexión (para el archivo de estado). */
+  alEstado?: (e: ReturnType<AgenteLocalServicio['obtenerEstadoConexion']>) => void;
 }
 
 export class AgenteLocalServicio {
@@ -61,6 +68,7 @@ export class AgenteLocalServicio {
   private readonly clienteApi: IClienteApiImpresion;
   private readonly impresora: IDispositivoImpresora;
   private readonly equipo?: EquipoLocal;
+  private readonly alEstado?: OpcionesAgenteLocalServicio['alEstado'];
   private readonly infoEquipo: () => InfoEquipoLatido;
   /** Lo que el dueño configuró para esta PC (llega en cada latido y se aplica sin reiniciar). */
   private configEquipo?: ConfigEquipoParaAgente;
@@ -85,7 +93,12 @@ export class AgenteLocalServicio {
   /** Roles de los que ya se avisó «no encuentro impresora USB» (para no repetirlo cada escaneo). */
   private avisoSinUsb = new Set<RolImpresora>();
   private ultimoLatidoTs: number = 0;
-  private factorEsperaRed: number = 1;
+  private fallosRed = 0;
+  private necesitaVincular = false;
+  private ultimaConexionOk?: string;
+  private ultimoError?: string;
+  private despertar!: () => void;
+  private readonly señalDespertar = new Promise<void>((r) => (this.despertar = r));
   private estadoImpresora: EstadoImpresora = 'lista';
   private detalleEstadoImpresora?: string;
 
@@ -93,6 +106,7 @@ export class AgenteLocalServicio {
     this.config = opciones.config;
     this.clienteApi = opciones.clienteApi;
     this.equipo = opciones.equipo;
+    this.alEstado = opciones.alEstado;
     this.infoEquipo = opciones.infoEquipo ?? leerInfoEquipo;
     this.modoPorRol = Boolean(opciones.impresoras);
     this.impresoras = opciones.impresoras ?? (opciones.impresora ? { ETIQUETERA: opciones.impresora } : {});
@@ -108,6 +122,19 @@ export class AgenteLocalServicio {
       ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
+  /** Para `--estado`: lo último que se sabe de la conexión con el servidor. */
+  obtenerEstadoConexion(): { ultimaConexionOk?: string; ultimoError?: string; necesitaVincular: boolean; roles: ImpresoraReportada[] } {
+    return { ultimaConexionOk: this.ultimaConexionOk, ultimoError: this.ultimoError, necesitaVincular: this.necesitaVincular, roles: this.estadosRol };
+  }
+
+  private anotarEstado(): void {
+    try {
+      this.alEstado?.(this.obtenerEstadoConexion());
+    } catch {
+      /* el archivo de estado no debe afectar a la impresión */
+    }
+  }
+
   obtenerEstadoImpresora(): EstadoImpresora {
     return this.estadoImpresora;
   }
@@ -116,7 +143,9 @@ export class AgenteLocalServicio {
     const base = Date.now() - this.ultimaActividadTs < VENTANA_ACTIVIDAD_MS
       ? Math.min(this.config.intervaloConsultaMs, ESPERA_ACTIVA_MS)
       : this.config.intervaloConsultaMs;
-    return Math.min(30000, Math.round(base * this.factorEsperaRed));
+    if (this.necesitaVincular) return ESPERA_SIN_VINCULO_MS;
+    if (this.fallosRed === 0) return base;
+    return Math.min(ESPERA_RED_TOPE_MS, Math.max(base, ESPERA_RED_BASE_MS * 2 ** (this.fallosRed - 1)));
   }
 
   /** Conecta solo la ticketera/etiquetera USB de cada rol sin impresora válida (ver autoUsb.ts). */
@@ -249,6 +278,11 @@ export class AgenteLocalServicio {
         if (this.equipo && respuesta?.equipo) this.aplicarConfigEquipo(respuesta.equipo);
         if (this.equipo && respuesta?.seleccion) this.aplicarSeleccion(respuesta.seleccion);
         this.ultimoLatidoTs = ahora;
+        this.ultimaConexionOk = new Date().toISOString();
+        this.ultimoError = undefined;
+        if (this.necesitaVincular) this.logger('info', 'El servidor volvió a aceptar este equipo.');
+        this.necesitaVincular = false;
+        this.anotarEstado();
         this.logger(
           'debug',
           `Latido enviado. Estado impresora: ${this.estadoImpresora}`
@@ -256,7 +290,10 @@ export class AgenteLocalServicio {
       } catch (err: any) {
         if (err instanceof ErrorRespuestaApi && err.status === 401) {
           this.ultimoLatidoTs = ahora; // sin vínculo válido: no martillar, vuelve a probar en el próximo intervalo
+          this.marcarSinVinculo();
         } else {
+          this.ultimoError = err.message;
+          this.anotarEstado();
           this.logger('warn', `No se pudo enviar latido al servidor: ${err.message}`);
         }
       }
@@ -265,7 +302,7 @@ export class AgenteLocalServicio {
     // 2. Confirmar lo impreso antes de tomar nada nuevo (si no, el servidor podría devolver a la cola un trabajo ya impreso)
     await this.vaciarReportes();
     if (this.reportesPendientes.length > 0) {
-      this.factorEsperaRed = Math.min(10, this.factorEsperaRed * 1.5);
+      this.fallosRed++;
       return { trabajosProcesados: 0, errorRed: true };
     }
 
@@ -280,15 +317,19 @@ export class AgenteLocalServicio {
             ? await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos, true)
             : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote, this.rolesListos)
         : await this.clienteApi.tomarTrabajos(this.config.maxTrabajosPorLote);
-      // Conexión exitosa: restablecemos el multiplicador de espera
-      this.factorEsperaRed = 1;
+      // Conexión exitosa: restablecemos la espera
+      this.fallosRed = 0;
+      this.necesitaVincular = false;
     } catch (err: any) {
       // 401: el aviso claro ya salió una vez (revinculacion.ts); aquí solo se espera más
-      if (!(err instanceof ErrorRespuestaApi && err.status === 401)) {
+      if (err instanceof ErrorRespuestaApi && err.status === 401) {
+        this.marcarSinVinculo();
+      } else {
+        this.fallosRed++;
+        this.ultimoError = err.message;
         this.logger('warn', `Fallo al tomar trabajos (reintentando con espera creciente): ${err.message}`);
       }
-      // Incremento exponencial de backoff limitado a 30s
-      this.factorEsperaRed = Math.min(10, this.factorEsperaRed * 1.5);
+      this.anotarEstado();
       return { trabajosProcesados: 0, errorRed: true };
     }
 
@@ -305,6 +346,16 @@ export class AgenteLocalServicio {
     this.ultimaActividadTs = Date.now();
 
     return { trabajosProcesados: trabajos.length, errorRed: false };
+  }
+
+  /** 401: la llave ya no vale. Sigue vivo, espera 5 min entre intentos y lo deja dicho en el log y en el estado. */
+  private marcarSinVinculo(): void {
+    if (!this.necesitaVincular) {
+      this.logger('error', 'El servidor rechazó la llave de este equipo (LLAVE_INVALIDA): necesita vincularse de nuevo. Sigo vivo y reintento cada 5 minutos.');
+    }
+    this.necesitaVincular = true;
+    this.ultimoError = 'necesita vincularse de nuevo';
+    this.anotarEstado();
   }
 
   /**
@@ -451,7 +502,7 @@ export class AgenteLocalServicio {
     while (this.corriendo) {
       await this.ejecutarCiclo();
       const esperaMs = this.obtenerEsperaActualMs();
-      await this.temporizador(esperaMs);
+      await Promise.race([this.temporizador(esperaMs), this.señalDespertar]);
     }
 
     this.logger('info', 'Agente Local de Impresión detenido ordenadamente');
@@ -462,5 +513,6 @@ export class AgenteLocalServicio {
    */
   detener(): void {
     this.corriendo = false;
+    this.despertar();
   }
 }

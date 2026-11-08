@@ -13,7 +13,12 @@ export const COMANDOS_PROGRAMA: Array<{ comando: string; para: string }> = [
   { comando: 'usar etiquetera 3', para: 'Deja la impresora 3 como etiquetera (stickers), guardada para siempre' },
   { comando: 'usar ticketera 5', para: 'Deja la impresora 5 como ticketera (voucher), guardada para siempre' },
   { comando: 'estado', para: 'Muestra qué impresora tiene guardada cada rol y si aparece' },
-  { comando: 'autoarranque activar', para: 'Que el programa abra solo al encender la computadora (desactivar para quitarlo)' },
+  { comando: '--estado', para: 'Dice si el programa está corriendo en segundo plano y cuándo se conectó por última vez' },
+  { comando: '--detener', para: 'Detiene el programa (para volver a prenderlo, ábrelo de nuevo)' },
+  { comando: '--reiniciar', para: 'Lo detiene y lo vuelve a prender en segundo plano' },
+  { comando: '--ver-logs', para: 'Muestra el registro del programa, para diagnosticar sin ventana' },
+  { comando: '--instalar-inicio', para: 'Que el programa arranque solo al prender la PC (se instala solo la primera vez)' },
+  { comando: '--quitar-inicio', para: 'Que ya no arranque solo' },
   { comando: 'menu', para: 'Menú con números, sin recordar comandos' },
 ];
 

@@ -13,18 +13,6 @@ function sistemaDetectado(): Sistema {
   return /linux/i.test(plataforma) && !/android/i.test(navigator.userAgent) ? 'linux' : 'windows';
 }
 
-const UNIDAD_SYSTEMD = `[Unit]
-Description=Caprichos - programa de impresion
-After=network-online.target
-
-[Service]
-ExecStart=%h/caprichos-impresion
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=default.target`;
-
 /** Bloque de comando con botón Copiar. */
 function Comando({ texto }: { texto: string }) {
   const [copiado, setCopiado] = useState(false);
@@ -120,9 +108,12 @@ export function PanelInstalarPrograma({ alCerrar, incrustado = false }: { alCerr
             </button>
             <ol style={{ lineHeight: '22px', fontSize: 14, paddingLeft: 20, margin: '8px 0 0' }}>
               <li>Descomprime la carpeta.</li>
-              <li>Doble clic en agente-impresion-windows.exe.</li>
-              <li>Listo.</li>
+              <li>Doble clic, una sola vez, en agente-impresion-windows.exe.</li>
+              <li>Listo: queda funcionando en segundo plano, sin ventana, y arranca solo cada vez que prendas la PC. No hay que dejar nada abierto.</li>
             </ol>
+            <p className="cola-ayuda" style={{ margin: '6px 0 0' }}>
+              Para ver si está funcionando: abre una ventana de comandos en esa carpeta y escribe <code>agente-impresion-windows.exe --estado</code>. Para detenerlo: <code>--detener</code>.
+            </p>
             <p className="cola-ayuda" style={{ margin: '6px 0 0' }}>
               Cuidado: la carpeta lleva una llave secreta de esta PC. No la compartas ni la envíes por WhatsApp o correo.
             </p>
@@ -152,6 +143,9 @@ export function PanelInstalarPrograma({ alCerrar, incrustado = false }: { alCerr
             </div>
             </li>
             <li>Elige cuál es la etiquetera y cuál la ticketera.</li>
+            <li>
+              Listo: el programa pasa solo a segundo plano (sin ventana) y arranca cada vez que prendas la PC. Para verlo: <code>agente-impresion-windows.exe --estado</code>; para detenerlo: <code>--detener</code>.
+            </li>
           </ol>
         ) : (
           <ol style={{ lineHeight: '24px', fontSize: 14, paddingLeft: 20 }}>
@@ -179,12 +173,10 @@ export function PanelInstalarPrograma({ alCerrar, incrustado = false }: { alCerr
               <Comando texto="~/caprichos-impresion configurar" />
             </li>
             <li>
-              Arranque automático. Crea el servicio:
-              <Comando texto={`mkdir -p ~/.config/systemd/user && cat > ~/.config/systemd/user/caprichos-impresion.service <<'EOF'\n${UNIDAD_SYSTEMD}\nEOF`} />
-              Actívalo:
-              <Comando texto="systemctl --user daemon-reload && systemctl --user enable --now caprichos-impresion && loginctl enable-linger $USER" />
-              Ver registros:
-              <Comando texto="journalctl --user -u caprichos-impresion -f" />
+              Listo: queda en segundo plano y arranca solo cada vez que inicies sesión en esa PC (no hay que dejar la terminal abierta). Ver cómo va:
+              <Comando texto="~/caprichos-impresion --estado" />
+              Detenerlo, ver el registro o quitar el arranque automático:
+              <Comando texto="~/caprichos-impresion --detener   # también --ver-logs, --quitar-inicio" />
             </li>
           </ol>
         )}
