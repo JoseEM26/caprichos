@@ -628,13 +628,13 @@ describe('Checkout por apartados y mapa a pantalla completa (Mejoras 1 y 2)', ()
     // Con invitado pero sin nombre
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    expect(screen.getByText('El nombre es obligatorio')).toBeInTheDocument();
+    expect(screen.getByText('Escribe tu nombre (mínimo 2 letras)')).toBeInTheDocument();
 
     // Con teléfono inválido
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Mateo' } });
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '12345' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    expect(screen.getByText('El teléfono debe tener 9 dígitos y empezar con 9')).toBeInTheDocument();
+    expect(screen.getByText('El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real')).toBeInTheDocument();
 
     // Corregir teléfono y avanzar a Paso 2 en Delivery sin dirección
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });

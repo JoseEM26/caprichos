@@ -114,7 +114,7 @@ describe('Pedido con la cuenta iniciada', () => {
 
     // con el campo vacío no avanza
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    expect(screen.getByText('El teléfono debe tener 9 dígitos y empezar con 9')).toBeInTheDocument();
+    expect(screen.getByText('Escribe tu celular: 9 dígitos que empiecen con 9')).toBeInTheDocument();
 
     fireEvent.change(campo, { target: { value: '912345678' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
