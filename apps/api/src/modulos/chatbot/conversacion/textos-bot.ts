@@ -1,5 +1,6 @@
 import { BotonAccion, FilaLista } from '../puerto/whatsapp-mensajeria.puerto';
 import { DatosHorarioLocal } from './tipos-conversacion';
+import { armarBienvenida, interpolar, NOMBRE_LOCAL_BOT, OpcionesBienvenida } from './bienvenida.util';
 
 /**
  * Catálogo centralizado de textos y botones del bot de WhatsApp para Caprichos.
@@ -269,45 +270,22 @@ export const TEXTOS_BOT = {
     nombre?: string | null,
     datosLocal?: DatosHorarioLocal | null,
     textoPersonalizado?: string | null,
+    extra?: OpcionesBienvenida,
   ): string => {
-    const nombreLimpio = String(nombre || '').trim();
-    let saludoBase = textoPersonalizado ? textoPersonalizado.trim() : '';
-
-    if (!saludoBase) {
-      saludoBase = nombreLimpio
-        ? `¡Hola, ${nombreLimpio}! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te ayudo?`
-        : '¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te ayudo?';
-    } else if (saludoBase.includes('{nombre}')) {
-      saludoBase = saludoBase.replace('{nombre}', nombreLimpio || 'cliente');
-    }
-
-    if (datosLocal?.pausaAltaDemanda) {
-      const motivo = datosLocal.motivoPausa || 'alta demanda de pedidos';
-      return `${saludoBase}\n\nPor el momento no estamos recibiendo pedidos (${motivo}). Un asesor te atiende por este chat.`;
-    }
-
-    if (datosLocal && !datosLocal.abierta) {
-      const abreTexto = datosLocal.abre
-        ? ` Abrimos hoy a las ${datosLocal.abre}.`
-        : ' Abrimos en nuestro próximo horario regular.';
-      return `${saludoBase}\n\nAhora estamos cerrados.${abreTexto} No tomamos pedidos fuera de horario; escríbenos cuando abramos.`;
-    }
-
-    if (datosLocal?.altaDemandaMinutosExtra && datosLocal.altaDemandaMinutosExtra > 0) {
-      const tiempoBase = 25 + datosLocal.altaDemandaMinutosExtra;
-      return `${saludoBase}\n\nHoy tenemos muchos pedidos: la entrega está tardando unos ${tiempoBase} minutos.`;
-    }
-
-    return saludoBase;
+    // Fuente única (bienvenida.util): saludo + promociones vigentes + «más descuento en la carta virtual»
+    const textos = { ...(extra?.textos ?? {}) } as Record<string, string>;
+    if (textoPersonalizado?.trim()) textos.chatbot_texto_bienvenida = textoPersonalizado;
+    return armarBienvenida(nombre, datosLocal, { ...extra, textos });
   },
 
   /**
    * Mensaje de despedida cuando el cliente agradece o se despide.
    */
   despedida: (textoPersonalizado?: string | null): string => {
-    return (
+    return interpolar(
       textoPersonalizado?.trim() ||
-      'Gracias por comunicarte con Caprichos ☕. ¡Esperamos verte pronto! 🧁'
+      'Gracias por comunicarte con Caprichos ☕. ¡Esperamos verte pronto! 🧁',
+      { local: NOMBRE_LOCAL_BOT },
     );
   },
 
@@ -367,9 +345,10 @@ export const TEXTOS_BOT = {
    * Pase a persona (mockup línea 141).
    */
   pasarAPersona: (textoPersonalizado?: string | null): string => {
-    return (
+    return interpolar(
       textoPersonalizado?.trim() ||
-      'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.'
+      'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.',
+      { local: NOMBRE_LOCAL_BOT },
     );
   },
 
@@ -377,9 +356,10 @@ export const TEXTOS_BOT = {
    * Primera repregunta cuando no se entiende el mensaje (mockup línea 305).
    */
   noEntiendoRepregunta: (textoPersonalizado?: string | null): string => {
-    return (
+    return interpolar(
       textoPersonalizado?.trim() ||
-      'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.'
+      'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.',
+      { local: NOMBRE_LOCAL_BOT },
     );
   },
 
@@ -387,9 +367,10 @@ export const TEXTOS_BOT = {
    * Derivación automática tras no entender por segunda vez (mockup línea 304).
    */
   noEntiendoDerivacion: (textoPersonalizado?: string | null): string => {
-    return (
+    return interpolar(
       textoPersonalizado?.trim() ||
-      'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.'
+      'No logro entender bien tu mensaje, mejor te paso con una persona del equipo para ayudarte.',
+      { local: NOMBRE_LOCAL_BOT },
     );
   },
 

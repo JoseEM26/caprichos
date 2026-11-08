@@ -66,11 +66,17 @@ describe('Bot con menú (decisión del dueño)', () => {
       expect(r.nuevoEstado).toBe('MENU');
     });
 
-    it('el saludo es corto: una línea que invita a la carta virtual, sin promociones ni puntos', () => {
+    it('el saludo trae la frase de más descuento con el enlace de la carta virtual, sin producto del mes ni puntos', () => {
       const texto: string = (ejecutar({ texto: 'Hola' }).acciones[0] as any).texto;
       expect(texto).toContain('Soy Capri');
-      expect(texto.endsWith(`💛 Mira nuestra carta virtual: ${URL_CARTA}`)).toBe(true);
-      expect(texto).not.toMatch(/CAPRICHOS DEL MES|promo|puntos|descuento|🎁/i);
+      expect(texto).toContain('MÁS DESCUENTO');
+      expect(texto).toContain(`CARTA VIRTUAL*: ${URL_CARTA}`);
+      expect(texto).not.toMatch(/CAPRICHOS DEL MES|puntos|🎁/i);
+    });
+
+    it('con promociones vigentes en el contexto, las lista en la bienvenida', () => {
+      const texto: string = (ejecutar({ texto: 'Hola' }, { ...contextoBase(), promosBienvenida: ['• Dúo — S/ 37'] }).acciones[0] as any).texto;
+      expect(texto).toContain('🔥 Hoy tenemos:\n• Dúo — S/ 37');
     });
 
     it('el primer contacto (INICIO) con texto sin intención también saluda', () => {

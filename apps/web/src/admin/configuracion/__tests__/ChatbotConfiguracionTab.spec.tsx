@@ -29,6 +29,10 @@ const CONFIG_API_REAL_FIXTURE: ConfiguracionBotRespuesta = {
     chatbot_texto_aviso_stock: '🍩 {aviso}',
     chatbot_texto_combo_intro: 'Vamos a armar tu *{combo}* 💛\n{incluye}',
     chatbot_texto_combo_plan_b: 'Hoy no hay {faltante} 😅 ¿Lo cambiamos por {alternativas}?',
+    chatbot_texto_promos_encabezado: 'Hoy tenemos:',
+    chatbot_texto_mas_descuento: 'Hay MÁS DESCUENTO en nuestra CARTA VIRTUAL: {link_carta}',
+    chatbot_promos_mostrar: 'si',
+    chatbot_promos_max: '3',
   },
   textosDefecto: {
     chatbot_texto_bienvenida:
@@ -49,6 +53,10 @@ const CONFIG_API_REAL_FIXTURE: ConfiguracionBotRespuesta = {
     chatbot_texto_aviso_stock: '🍩 {aviso}',
     chatbot_texto_combo_intro: 'Vamos a armar tu *{combo}* 💛\n{incluye}',
     chatbot_texto_combo_plan_b: 'Hoy no hay {faltante} 😅 ¿Lo cambiamos por {alternativas}?',
+    chatbot_texto_promos_encabezado: 'Hoy tenemos:',
+    chatbot_texto_mas_descuento: 'Hay MÁS DESCUENTO en nuestra CARTA VIRTUAL: {link_carta}',
+    chatbot_promos_mostrar: 'si',
+    chatbot_promos_max: '3',
   },
   funciones: {
     pedido: true,
@@ -297,7 +305,7 @@ describe('ChatbotConfiguracionTab (Ola 4, Agente I: Configuración y Seguridad d
       expect(screen.getByLabelText('Mensaje de bienvenida')).toBeInTheDocument();
     });
 
-    const botonRestablecer = screen.getAllByText('Restablecer por defecto')[0];
+    const botonRestablecer = screen.getAllByText('Restaurar texto original')[0];
     expect(botonRestablecer).not.toBeDisabled();
 
     fireEvent.click(botonRestablecer);

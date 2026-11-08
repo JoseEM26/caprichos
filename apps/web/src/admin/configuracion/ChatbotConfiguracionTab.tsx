@@ -9,11 +9,16 @@ import { TarjetaProteccionSpam } from './TarjetaProteccionSpam';
 import { TarjetaConsumoWhatsapp } from './TarjetaConsumoWhatsapp';
 import { CampoConfig } from './CampoConfig';
 import { CampoAyuda } from './AyudaCampo';
+import { PROMOS_MUESTRA, VARIABLES_MENSAJE, validarMensaje, vistaPreviaMensaje } from './mensajesBot';
 
 export const LIMITE_WHATSAPP_CUERPO = 1024;
 
 export type ClaveTextoBot =
   | 'chatbot_texto_bienvenida'
+  | 'chatbot_texto_promos_encabezado'
+  | 'chatbot_texto_mas_descuento'
+  | 'chatbot_promos_mostrar'
+  | 'chatbot_promos_max'
   | 'chatbot_texto_despedida'
   | 'chatbot_texto_pase_persona'
   | 'chatbot_texto_fuera_horario'
@@ -27,6 +32,10 @@ export type ClaveTextoBot =
 
 export const CLAVES_TEXTOS_BOT: ClaveTextoBot[] = [
   'chatbot_texto_bienvenida',
+  'chatbot_texto_promos_encabezado',
+  'chatbot_texto_mas_descuento',
+  'chatbot_promos_mostrar',
+  'chatbot_promos_max',
   'chatbot_texto_despedida',
   'chatbot_texto_pase_persona',
   'chatbot_texto_fuera_horario',
@@ -161,9 +170,31 @@ export const META_TEXTOS: Record<
 > = {
   chatbot_texto_bienvenida: {
     titulo: 'Mensaje de bienvenida',
-    descripcion: 'Saludo inicial del bot con opciones de carta, delivery y atención.',
-    efecto: 'Lo ve cada cliente que escribe o pide el menú; va antes de la lista de opciones. Si lo cambias, cambia el primer mensaje que todos reciben.',
-    ejemplo: 'Hola, soy Capri de Caprichos. ¿En qué te ayudo hoy?',
+    descripcion: 'Saludo inicial del bot. Usa {nombre}, {local} y {link_carta}; {promociones} pone la lista de promociones donde quieras (si no la usas, va debajo del saludo).',
+    efecto: 'Lo ve cada cliente que escribe por primera vez o pide el menú; va antes de la lista de opciones. No se repite en la misma conversación del día ni tras un pedido.',
+    ejemplo: '¡Hola {nombre}! Soy Capri, la asistente de {local}. ¿En qué te ayudo?',
+  },
+  chatbot_texto_promos_encabezado: {
+    titulo: 'Encabezado de las promociones',
+    descripcion: 'Línea que abre la lista de promociones vigentes dentro de la bienvenida.',
+    efecto: 'Lo ve el cliente justo encima de las promociones de hoy. Si no hay ninguna vigente, no sale ni el encabezado.',
+    ejemplo: 'Hoy tenemos:',
+  },
+  chatbot_texto_mas_descuento: {
+    titulo: 'Frase de más descuento en la carta virtual',
+    descripcion: 'Invita a entrar a la carta virtual, donde están todos los descuentos. Usa {link_carta} para el enlace público de la carta.',
+    efecto: 'Cierra la bienvenida cuando el local está abierto. Con el local cerrado no se muestra, para no invitar a pedir.',
+    ejemplo: 'Hay MÁS DESCUENTO en nuestra CARTA VIRTUAL: {link_carta}',
+  },
+  chatbot_promos_mostrar: {
+    titulo: 'Mostrar promociones vigentes en la bienvenida',
+    descripcion: 'Si está en Sí, la bienvenida lista las promociones que valen ahora mismo en la carta virtual.',
+    efecto: 'En No, la bienvenida sale solo con el saludo y la frase de la carta virtual. Las promociones se toman solas de Ofertas.',
+  },
+  chatbot_promos_max: {
+    titulo: 'Cuántas promociones mostrar',
+    descripcion: 'Tope de promociones en la bienvenida (de 1 a 5). Se eligen por prioridad y, a igual prioridad, por mayor descuento.',
+    efecto: 'Más promociones alargan el mensaje; si no entra en el límite de WhatsApp, se quitan las últimas.',
   },
   chatbot_texto_despedida: {
     titulo: 'Mensaje de despedida',
@@ -179,8 +210,8 @@ export const META_TEXTOS: Record<
   },
   chatbot_texto_fuera_horario: {
     titulo: 'Fuera de horario',
-    descripcion: 'Mensaje enviado cuando el cliente escribe fuera del horario de atención.',
-    efecto: 'Aviso: hoy el bot no lee este texto; con el local cerrado envía su aviso fijo con el horario. Guardarlo no cambia lo que recibe el cliente.',
+    descripcion: 'Parte de la bienvenida cuando el local está cerrado. Usa {apertura} («Abrimos hoy a las 14:00.»), {hora_apertura} y {horario}.',
+    efecto: 'Lo recibe el cliente que escribe con el local cerrado: le dice cuándo abrimos y no lo invita a pedir.',
     ejemplo: 'Estamos cerrados, abrimos a las 10 a. m.',
   },
   chatbot_texto_no_entiendo: {
@@ -232,8 +263,15 @@ const CLAVES_TEXTOS_ATENCION: ClaveTextoBot[] = [
   'chatbot_texto_fuera_horario',
   'chatbot_texto_no_entiendo_derivacion',
 ];
+const CLAVES_TEXTOS_BIENVENIDA: ClaveTextoBot[] = [
+  'chatbot_texto_bienvenida',
+  'chatbot_promos_mostrar',
+  'chatbot_promos_max',
+  'chatbot_texto_promos_encabezado',
+  'chatbot_texto_mas_descuento',
+];
 const CLAVES_TEXTOS_GENERALES: ClaveTextoBot[] = CLAVES_TEXTOS_BOT.filter(
-  (k) => !CLAVES_TEXTOS_ATENCION.includes(k),
+  (k) => !CLAVES_TEXTOS_ATENCION.includes(k) && !CLAVES_TEXTOS_BIENVENIDA.includes(k),
 );
 
 /** id del catálogo de un texto: chatbot_texto_pase_persona -> chatbot-texto-pase-persona */
@@ -266,6 +304,10 @@ function GrupoConfig({ titulo, descripcion, abierto = false, testid, children }:
 
 const TEXTOS_DEFECTO_BASE: TextosBotState = {
   chatbot_texto_bienvenida: '',
+  chatbot_texto_promos_encabezado: '🔥 Hoy tenemos:',
+  chatbot_texto_mas_descuento: '💛 Hay *MÁS DESCUENTO* en nuestra *CARTA VIRTUAL*: {link_carta}',
+  chatbot_promos_mostrar: 'si',
+  chatbot_promos_max: '3',
   chatbot_texto_despedida: '',
   chatbot_texto_pase_persona: '',
   chatbot_texto_fuera_horario: '',
@@ -358,6 +400,7 @@ function ChatbotConfiguracionVista({
     diasRetencion: 90,
   });
   const [consumoIa, setConsumoIa] = useState<ConsumoIaState | null>(null);
+  const [promosVigentes, setPromosVigentes] = useState<string[]>([]);
 
   // Privacidad ARCO
   const [identificadorArco, setIdentificadorArco] = useState('');
@@ -372,10 +415,15 @@ function ChatbotConfiguracionVista({
     setCargando(true);
     setErrorCarga(null);
     try {
-      const [dataConfigRes, dataIaRes] = await Promise.allSettled([
+      const [dataConfigRes, dataIaRes, dataPromosRes] = await Promise.allSettled([
         api.get<ConfiguracionBotRespuesta>('/admin/chatbot/configuracion'),
         api.get<ConsumoIaState>('/admin/configuracion/ia-consumo'),
+        api.get<{ lineas?: string[] }>('/admin/chatbot/configuracion/promos-vigentes'),
       ]);
+      // Solo para la vista previa: si falla, se usan promociones de muestra
+      if (dataPromosRes.status === 'fulfilled' && Array.isArray(dataPromosRes.value?.lineas)) {
+        setPromosVigentes(dataPromosRes.value.lineas);
+      }
 
       if (dataConfigRes.status === 'fulfilled' && dataConfigRes.value) {
         const data = dataConfigRes.value;
@@ -542,6 +590,27 @@ function ChatbotConfiguracionVista({
             const excedeLimite = caracteres > LIMITE_WHATSAPP_CUERPO;
             const textoOriginal = textosDefecto[key] ?? '';
             const esDiferenteDeDefecto = valorActual !== textoOriginal;
+            const esAjuste = key === 'chatbot_promos_mostrar' || key === 'chatbot_promos_max';
+            const errorValidacion = validarMensaje(key, valorActual);
+            const variables = VARIABLES_MENSAJE[key] ?? [];
+            const insertarVariable = (v: string) => {
+              const el = document.getElementById(`texto-bot-${key}`) as HTMLTextAreaElement | null;
+              const pos = el?.selectionStart ?? valorActual.length;
+              const fin = el?.selectionEnd ?? pos;
+              const nuevo = `${valorActual.slice(0, pos)}{${v}}${valorActual.slice(fin)}`;
+              setTextos((prev) => ({ ...prev, [key]: nuevo }));
+            };
+            const estiloCampo = {
+              width: '100%',
+              boxSizing: 'border-box' as const,
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: `1.5px solid ${excedeLimite || errorValidacion ? 'var(--cp-rust)' : 'var(--cp-line)'}`,
+              background: !puedeEditar ? 'var(--cp-sand)' : 'var(--cp-white)',
+              fontSize: '13px',
+              fontFamily: 'inherit',
+              color: 'var(--cp-navy)',
+            };
 
             return (
               <div
@@ -566,6 +635,26 @@ function ChatbotConfiguracionVista({
                   rango={`hasta ${LIMITE_WHATSAPP_CUERPO}`}
                   cfgId={idCatalogoTexto(key)}
                 >
+                  {esAjuste ? (
+                    <select
+                      aria-label={meta.titulo}
+                      value={valorActual}
+                      disabled={!puedeEditar || accionEnCurso}
+                      onChange={(e) => setTextos((prev) => ({ ...prev, [key]: e.target.value }))}
+                      style={estiloCampo}
+                    >
+                      {key === 'chatbot_promos_mostrar' ? (
+                        <>
+                          <option value="si">Sí, mostrarlas</option>
+                          <option value="no">No mostrarlas</option>
+                        </>
+                      ) : (
+                        [1, 2, 3, 4, 5].map((n) => (
+                          <option key={n} value={String(n)}>{n}</option>
+                        ))
+                      )}
+                    </select>
+                  ) : (
                   <textarea
                     aria-label={meta.titulo}
                     rows={4}
@@ -578,22 +667,11 @@ function ChatbotConfiguracionVista({
                         [key]: nuevo,
                       }));
                     }}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: `1.5px solid ${
-                        excedeLimite ? 'var(--cp-rust)' : 'var(--cp-line)'
-                      }`,
-                      background: !puedeEditar ? 'var(--cp-sand)' : 'var(--cp-white)',
-                      fontSize: '13px',
-                      fontFamily: 'inherit',
-                      color: 'var(--cp-navy)',
-                      resize: 'vertical',
-                    }}
+                    style={{ ...estiloCampo, resize: 'vertical' }}
                   />
+                  )}
                 </CampoAyuda>
+                {!esAjuste && (
                 <span
                   style={{
                     fontSize: '12px',
@@ -603,6 +681,44 @@ function ChatbotConfiguracionVista({
                 >
                   {caracteres} / {LIMITE_WHATSAPP_CUERPO} caracteres
                 </span>
+                )}
+
+                {variables.length > 0 && (
+                  <div data-testid={`variables-${key}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Variables:</span>
+                    {variables.map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        title={`Insertar {${v}} donde está el cursor`}
+                        disabled={!puedeEditar || accionEnCurso}
+                        onClick={() => insertarVariable(v)}
+                        style={{ minHeight: '32px', padding: '2px 10px', borderRadius: '999px', border: '1px solid var(--cp-line)', background: 'var(--cp-cream)', color: 'var(--cp-navy)', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        {`{${v}}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {errorValidacion && (
+                  <div role="alert" style={{ fontSize: '12px', color: 'var(--cp-rust)', fontWeight: 600 }}>
+                    {errorValidacion}
+                  </div>
+                )}
+
+                {!errorValidacion && !excedeLimite && (
+                  <div data-testid={`vista-previa-${key}`}>
+                    <div style={{ fontSize: '11px', color: 'var(--cp-soft)', marginBottom: '4px' }}>
+                      Vista previa en WhatsApp (datos de ejemplo{promosVigentes.length ? ' y promociones vigentes reales' : ''})
+                    </div>
+                    <div
+                      style={{ background: '#DCF8C6', color: '#111', borderRadius: '10px 10px 10px 2px', padding: '8px 12px', fontSize: '13px', whiteSpace: 'pre-wrap', maxWidth: '420px', wordBreak: 'break-word' }}
+                    >
+                      {vistaPreviaMensaje(key, textos, promosVigentes.length ? promosVigentes : PROMOS_MUESTRA)}
+                    </div>
+                  </div>
+                )}
 
                 {excedeLimite && (
                   <div
@@ -637,14 +753,14 @@ function ChatbotConfiguracionVista({
                       });
                     }}
                   >
-                    Restablecer por defecto
+                    Restaurar texto original
                   </Boton>
 
                   <Boton
                     type="button"
                     variante="primario"
                     tamano="pequeno"
-                    deshabilitado={!puedeEditar || accionEnCurso || excedeLimite}
+                    deshabilitado={!puedeEditar || accionEnCurso || excedeLimite || !!errorValidacion}
                     onClick={() => {
                       setModal({
                         tipo: 'guardar_texto',
@@ -894,6 +1010,29 @@ function ChatbotConfiguracionVista({
         </div>
       </div>
 
+      </GrupoConfig>
+
+      <GrupoConfig
+        testid="grupo-bienvenida"
+        titulo="Bienvenida y promociones"
+        descripcion="El primer mensaje del bot: saludo, promociones vigentes de la carta y la frase de más descuento."
+      >
+      <div
+        data-testid="seccion-bienvenida"
+        style={{ background: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '16px' }}
+      >
+        <div>
+          <h3 style={{ fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)', margin: 0 }}>
+            Mensaje de bienvenida del bot
+          </h3>
+          <p style={{ fontSize: '12px', color: 'var(--cp-soft)', margin: '3px 0 0 0' }}>
+            Las promociones salen solas de Ofertas: las activas y vigentes ahora en la carta virtual. Con el local cerrado el bot avisa la hora de apertura y no invita a pedir.
+          </p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {CLAVES_TEXTOS_BIENVENIDA.map(renderTextoBot)}
+        </div>
+      </div>
       </GrupoConfig>
 
       <GrupoConfig

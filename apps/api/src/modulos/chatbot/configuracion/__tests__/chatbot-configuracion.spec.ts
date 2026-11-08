@@ -555,6 +555,10 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
       // 2. Claves de textos exactas (10 claves reales)
       const clavesTextosEsperadas = [
         'chatbot_texto_bienvenida',
+        'chatbot_texto_promos_encabezado',
+        'chatbot_texto_mas_descuento',
+        'chatbot_promos_mostrar',
+        'chatbot_promos_max',
         'chatbot_texto_despedida',
         'chatbot_texto_pase_persona',
         'chatbot_texto_fuera_horario',
@@ -609,6 +613,60 @@ describe('ChatbotConfiguracionService y Controller (Ola 4, Agente I)', () => {
       expect(errores(2, 100)).toEqual(['maxPorMinuto']);
       expect(errores(10, 9)).toEqual(['maxPorHora']);
       expect(errores(10, 601)).toEqual(['maxPorHora']);
+    });
+  });
+
+  describe('Mensajes del bot: variables, promociones y caché', () => {
+    beforeEach(() => {
+      prisma.parametro.findMany.mockResolvedValue([]);
+      prisma.parametro.upsert.mockResolvedValue({});
+    });
+
+    it('rechaza variables desconocidas y acepta las del mensaje', async () => {
+      await expect(service.actualizarTextos({ chatbot_texto_bienvenida: 'Hola {cliente}' }, mockUsuario as any)).rejects.toMatchObject({
+        response: { codigo: 'VARIABLE_DESCONOCIDA' },
+      });
+      await expect(
+        service.actualizarTextos({ chatbot_texto_despedida: 'Chau {nombre}' }, mockUsuario as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await service.actualizarTextos({ chatbot_texto_bienvenida: 'Hola {nombre} de {local} {promociones} {link_carta}' }, mockUsuario as any);
+      expect(prisma.parametro.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('valida «mostrar promociones» (si/no) y el tope (1 a 5)', async () => {
+      await expect(service.actualizarTextos({ chatbot_promos_mostrar: 'quizás' }, mockUsuario as any)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.actualizarTextos({ chatbot_promos_max: '9' }, mockUsuario as any)).rejects.toBeInstanceOf(BadRequestException);
+      await service.actualizarTextos({ chatbot_promos_mostrar: 'no', chatbot_promos_max: '5' }, mockUsuario as any);
+      expect(prisma.parametro.upsert).toHaveBeenCalledTimes(2);
+    });
+
+    it('restablecer devuelve el texto de fábrica de las claves nuevas', async () => {
+      prisma.parametro.findUnique.mockResolvedValue({ valor: 'otro' });
+      const r = await service.restablecerTexto('chatbot_texto_mas_descuento', mockUsuario as any);
+      expect(r.valor).toBe(TEXTOS_BOT_DEFECTO.chatbot_texto_mas_descuento);
+      expect(r.valor).toContain('MÁS DESCUENTO');
+    });
+
+    it('obtenerTextosBot usa caché y se invalida al guardar', async () => {
+      await service.obtenerTextosBot();
+      await service.obtenerTextosBot();
+      expect(prisma.parametro.findMany).toHaveBeenCalledTimes(1);
+      await service.actualizarTextos({ chatbot_texto_despedida: 'Chau' }, mockUsuario as any);
+      prisma.parametro.findMany.mockClear();
+      await service.obtenerTextosBot();
+      expect(prisma.parametro.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('el endpoint de promociones vigentes devuelve solo las vigentes de la carta', async () => {
+      const ofertasService: any = {
+        listarOfertas: jest.fn().mockResolvedValue([
+          { nombre: 'Vigente', activo: true, vigenteAhora: true, visibleCarta: true, tipo: 'DESCUENTO', descuentoTipo: 'PORCENTAJE', descuentoValor: 10 },
+          { nombre: 'Vencida', activo: true, vigenteAhora: false, visibleCarta: true, tipo: 'DESCUENTO', descuentoValor: 50 },
+        ]),
+      };
+      const c = new ChatbotConfiguracionController(service, ofertasService);
+      expect(await c.promosVigentes()).toEqual({ lineas: ['• Vigente — 10 % de descuento'] });
+      expect(ofertasService.listarOfertas).toHaveBeenCalledWith(undefined, true, 'CARTA', true);
     });
   });
 });
