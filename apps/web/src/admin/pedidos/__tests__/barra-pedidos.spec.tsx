@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import { PedidosAdminView } from '../PedidosAdminView';
 import { pedidosApi } from '../pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
@@ -30,15 +30,33 @@ describe('Barra de Pedidos y caja', () => {
     vi.restoreAllMocks();
   });
 
-  it('«Mostrar» y «Ver pedidos» están en la misma barra, lado a lado', async () => {
+  it('la barra trae los 4 filtros, el buscador, Filtros y «Nuevo pedido» (más el botón flotante)', async () => {
     render(<PedidosAdminView />);
 
-    const mostrar = await screen.findByRole('button', { name: /^Mostrar: / });
-    const verPedidos = screen.getByRole('button', { name: /^Ver pedidos: / });
-    const barra = mostrar.closest('.cj-barra');
+    const nuevo = await screen.findByRole('button', { name: 'Nuevo pedido' });
+    const filtros = screen.getByRole('navigation', { name: 'Estado de los pedidos' });
+    expect(within(filtros).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Todo0',
+      'En preparación0',
+      'Listos0',
+      'A domicilio0',
+    ]);
+    expect(screen.getByRole('searchbox')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Filtros/ })).toBeInTheDocument();
+    expect(nuevo).toHaveClass('cj2-btn--nuevo');
+    // Celular: botón flotante redondo con nombre accesible (la cabecera oculta el suyo con CSS)
+    expect(screen.getByRole('button', { name: 'Agregar nuevo pedido' })).toHaveClass('cj2-fab');
+    // Los combos viejos ya no están a la vista
+    expect(screen.queryByRole('button', { name: /^Ver pedidos: / })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Mostrar: / })).not.toBeInTheDocument();
+  });
 
-    expect(barra).not.toBeNull();
-    expect(barra).toContainElement(verPedidos);
-    expect(barra).toContainElement(screen.getByRole('button', { name: 'Nuevo pedido' }));
+  it('«Registrar cortesía» es secundario y en celular también está dentro de «Más acciones»', async () => {
+    render(<PedidosAdminView />);
+
+    await screen.findByRole('button', { name: 'Nuevo pedido' });
+    expect(screen.getAllByRole('button', { name: 'Registrar cortesía' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Más acciones' }));
+    expect(within(screen.getByRole('menu', { name: 'Más acciones' })).getByRole('menuitem', { name: 'Registrar cortesía' })).toBeInTheDocument();
   });
 });

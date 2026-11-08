@@ -119,7 +119,7 @@ describe('Detalle del pedido: layout en tarjetas', () => {
   });
 });
 
-describe('Pedidos y caja: estructura de dos columnas', () => {
+describe('Pedidos y caja: tarjetas y ventana de detalle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({
@@ -145,13 +145,17 @@ describe('Pedidos y caja: estructura de dos columnas', () => {
     vi.spyOn(pedidosApi, 'listarNoEntregados').mockResolvedValue({ reprogramar: [], cancelados: [], total: 0 });
   });
 
-  it('renderiza la lista a la izquierda y el detalle a la derecha sin errores', async () => {
+  it('renderiza tarjetas a todo el ancho y el detalle solo se abre en una ventana', async () => {
     const { container } = render(<PedidosAdminView />);
 
-    expect(await screen.findByRole('button', { name: 'Ver pedidos: Por confirmar' })).toBeInTheDocument();
-    const grid = container.querySelector('.cj-grid');
-    expect(grid).not.toBeNull();
-    expect(grid!.querySelector('.cj-left')).not.toBeNull();
-    expect(grid!.querySelector('.cj-right')).not.toBeNull();
+    expect(await screen.findByRole('navigation', { name: 'Estado de los pedidos' })).toBeInTheDocument();
+    expect(container.querySelector('.cj2-cuadricula')).not.toBeNull();
+    expect(container.querySelector('.cj-left')).toBeNull();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Pedido CP-W004 de Rosa/ }));
+    const ventana = await screen.findByRole('dialog', { name: 'Detalle del pedido CP-W004' });
+    expect(ventana).toHaveAttribute('aria-modal', 'true');
+    expect(within(ventana).getByRole('tab', { name: 'Cobro' })).toBeInTheDocument();
   });
 });

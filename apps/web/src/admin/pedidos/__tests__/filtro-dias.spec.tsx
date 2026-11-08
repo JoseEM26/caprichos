@@ -60,6 +60,12 @@ describe('Filtro de días en Pedidos y caja', () => {
     vi.restoreAllMocks();
   });
 
+  /** El día vive dentro del panel de Filtros: se abre si está cerrado */
+  const abrirFiltros = async () => {
+    const boton = await screen.findByRole('button', { name: /^Filtros/ });
+    if (boton.getAttribute('aria-expanded') !== 'true') fireEvent.click(boton);
+  };
+
   /** Abre el combo «Mostrar» y elige una opción */
   const elegirPeriodo = (opcion: RegExp) => {
     fireEvent.click(screen.getByRole('button', { name: /^Mostrar: / }));
@@ -75,6 +81,7 @@ describe('Filtro de días en Pedidos y caja', () => {
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
     expect(llamadasLista()[0]).toEqual({ desde: HOY, hasta: HOY, limite: 100 });
+    await abrirFiltros();
     expect(screen.getByRole('button', { name: 'Mostrar: Hoy' })).toBeInTheDocument();
     expect(screen.getByText(/Mostrando:/)).toHaveTextContent('hoy, 28 oct');
     expect(screen.queryByRole('button', { name: 'Volver a hoy' })).not.toBeInTheDocument();
@@ -89,6 +96,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     render(<PedidosAdminView />);
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
 
+    await abrirFiltros();
     elegirPeriodo(/Ayer/);
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(2));
@@ -105,6 +113,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     render(<PedidosAdminView />);
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
 
+    await abrirFiltros();
     elegirPeriodo(/Últimos 7 días/);
 
     await waitFor(() => expect(llamadasLista()).toHaveLength(2));
@@ -115,6 +124,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     render(<PedidosAdminView />);
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
 
+    await abrirFiltros();
     elegirPeriodo(/Elegir día \/ rango/);
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-10-20' } });
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-10-25' } });
@@ -129,6 +139,7 @@ describe('Filtro de días en Pedidos y caja', () => {
     render(<PedidosAdminView />);
     await waitFor(() => expect(llamadasLista()).toHaveLength(1));
 
+    await abrirFiltros();
     elegirPeriodo(/Elegir día \/ rango/);
 
     // Desde posterior a hasta
@@ -149,7 +160,7 @@ describe('Filtro de días en Pedidos y caja', () => {
   it('pendientes de días anteriores: el aviso cuenta y al tocarlo lista solo esos', async () => {
     render(<PedidosAdminView />);
 
-    await screen.findByRole('button', { name: /^Mostrar: / });
+    await abrirFiltros();
     expect(listar).toHaveBeenCalledWith({ pendientes: true, limite: 1 });
 
     fireEvent.click(screen.getByRole('button', { name: /^Mostrar: / }));
