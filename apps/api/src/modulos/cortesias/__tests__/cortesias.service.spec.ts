@@ -43,7 +43,7 @@ describe('CortesiasService.registrarSeparada', () => {
     const prisma = crearPrisma();
     const svc = new CortesiasService(prisma, auditoria as any);
     await expect(
-      svc.registrarSeparada({ productoId: '10', cantidad: 1, motivo: 'RECLAMO_CLIENTE', pedidoReferenciaId: '900' } as any, usuario),
+      svc.registrarSeparada({ productoId: '10', cantidad: 1, motivo: 'ERROR_COCINA', pedidoReferenciaId: '900' } as any, usuario),
     ).rejects.toMatchObject({ response: { codigo: 'PEDIDO_REFERENCIA_NO_ENCONTRADO' } });
     expect(prisma.cortesia.create).not.toHaveBeenCalled();
   });
@@ -71,7 +71,7 @@ describe('CortesiasService.registrarSeparada', () => {
       producto: { findUnique: jest.fn(async () => producto) },
     });
     const svc = new CortesiasService(prisma, auditoria as any);
-    const r = await svc.registrarSeparada({ productoId: '10', cantidad: 3, motivo: 'DEGUSTACION_PROMOCION', pedidoReferenciaId: '900' } as any, usuario, 42n);
+    const r = await svc.registrarSeparada({ productoId: '10', cantidad: 3, motivo: 'PRUEBA', pedidoReferenciaId: '900' } as any, usuario, 42n);
 
     expect(prisma.cortesia.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -118,7 +118,7 @@ describe('CortesiasService.darEnLinea', () => {
   it('pedido ya cobrado: 409 PEDIDO_YA_COBRADO', async () => {
     const prisma = crearPrisma({ pedido: { findUnique: jest.fn(async () => pedidoBase({ pago_estado: 'PAGADO' })), update: jest.fn() } });
     const svc = new CortesiasService(prisma, auditoria as any);
-    await expect(svc.darEnLinea('1', '100', { motivo: 'RECLAMO_CLIENTE' }, usuario)).rejects.toMatchObject({
+    await expect(svc.darEnLinea('1', '100', { motivo: 'ERROR_COCINA' }, usuario)).rejects.toMatchObject({
       response: { codigo: 'PEDIDO_YA_COBRADO' },
     });
   });
@@ -126,7 +126,7 @@ describe('CortesiasService.darEnLinea', () => {
   it('línea a S/ 0: baja el subtotal y el total en el valor de lista, sin tocar la otra línea', async () => {
     const prisma = crearPrisma({ pedido: { findUnique: jest.fn(async () => pedidoBase()), update: jest.fn() } });
     const svc = new CortesiasService(prisma, auditoria as any);
-    const r = await svc.darEnLinea('1', '100', { motivo: 'RECLAMO_CLIENTE' }, usuario);
+    const r = await svc.darEnLinea('1', '100', { motivo: 'ERROR_COCINA' }, usuario);
 
     expect(prisma.pedidoLinea.update).toHaveBeenCalledWith({
       where: { id: 100n },
@@ -136,12 +136,32 @@ describe('CortesiasService.darEnLinea', () => {
     expect(r).toMatchObject({ subtotal: 10, total: 10, valorLista: 20 });
   });
 
+  it('audita quién la dio y por qué: cortesía con su autor y el motivo, y registro de auditoría del pedido', async () => {
+    const prisma = crearPrisma({ pedido: { findUnique: jest.fn(async () => pedidoBase()), update: jest.fn() } });
+    const svc = new CortesiasService(prisma, auditoria as any);
+    await svc.darEnLinea('1', '100', { motivo: 'CUMPLEANOS', nota: ' mesa 4 ' }, usuario);
+
+    expect(prisma.cortesia.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ motivo: 'CUMPLEANOS', nota: 'mesa 4', pedido_id: 1n, pedido_linea_id: 100n, dada_por_party_id: 5n, valor_lista: 20 }),
+    });
+    expect(auditoria.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ modulo: 'cortesias', accion: 'DAR_EN_PEDIDO', entidad: 'pedido', entidadId: 1n, partyId: 5n, despues: expect.objectContaining({ motivo: 'CUMPLEANOS', nota: 'mesa 4' }) }),
+      expect.anything(),
+    );
+  });
+
+  it('un pedido anulado no admite cortesía', async () => {
+    const prisma = crearPrisma({ pedido: { findUnique: jest.fn(async () => pedidoBase({ estado: 'ANULADO' })), update: jest.fn() } });
+    const svc = new CortesiasService(prisma, auditoria as any);
+    await expect(svc.darEnLinea('1', '100', { motivo: 'PRUEBA' }, usuario)).rejects.toMatchObject({ response: { codigo: 'PEDIDO_NO_VIGENTE' } });
+  });
+
   it('una línea ya cortesía no se vuelve a marcar', async () => {
     const base = pedidoBase();
     base.lineas[0].es_cortesia = true;
     const prisma = crearPrisma({ pedido: { findUnique: jest.fn(async () => base), update: jest.fn() } });
     const svc = new CortesiasService(prisma, auditoria as any);
-    await expect(svc.darEnLinea('1', '100', { motivo: 'RECLAMO_CLIENTE' }, usuario)).rejects.toBeInstanceOf(ConflictException);
+    await expect(svc.darEnLinea('1', '100', { motivo: 'ERROR_COCINA' }, usuario)).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('una línea de combo o de oferta no se marca', async () => {
@@ -149,7 +169,7 @@ describe('CortesiasService.darEnLinea', () => {
     base.lineas[0].oferta_id = 5n;
     const prisma = crearPrisma({ pedido: { findUnique: jest.fn(async () => base), update: jest.fn() } });
     const svc = new CortesiasService(prisma, auditoria as any);
-    await expect(svc.darEnLinea('1', '100', { motivo: 'RECLAMO_CLIENTE' }, usuario)).rejects.toMatchObject({
+    await expect(svc.darEnLinea('1', '100', { motivo: 'ERROR_COCINA' }, usuario)).rejects.toMatchObject({
       response: { codigo: 'LINEA_EN_OFERTA' },
     });
   });
@@ -157,6 +177,6 @@ describe('CortesiasService.darEnLinea', () => {
   it('línea inexistente en el pedido: 404', async () => {
     const prisma = crearPrisma({ pedido: { findUnique: jest.fn(async () => pedidoBase()), update: jest.fn() } });
     const svc = new CortesiasService(prisma, auditoria as any);
-    await expect(svc.darEnLinea('1', '999', { motivo: 'RECLAMO_CLIENTE' }, usuario)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.darEnLinea('1', '999', { motivo: 'ERROR_COCINA' }, usuario)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

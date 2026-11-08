@@ -551,7 +551,7 @@ describe('SalonService', () => {
 
     const dtoConCortesia: any = {
       mesas: [6],
-      lineas: [{ productoId: 1, cantidad: 1, cortesia: { motivo: 'RECLAMO_CLIENTE' } }],
+      lineas: [{ productoId: 1, cantidad: 1, cortesia: { motivo: 'ERROR_COCINA' } }],
       cliente: { nombre: 'Ana Ruiz' },
     };
 

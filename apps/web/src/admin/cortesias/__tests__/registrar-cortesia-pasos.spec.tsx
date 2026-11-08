@@ -79,7 +79,7 @@ describe('Cortesía en pasos', () => {
     fireEvent.click(screen.getByRole('option', { name: /Dona/ }));
     fireEvent.click(screen.getByRole('button', { name: /Fresa/ }));
     clic('Siguiente');
-    fireEvent.click(screen.getByLabelText('Reclamo del cliente'));
+    fireEvent.click(screen.getByLabelText('Error de cocina'));
     clic('Siguiente');
     const combo = screen.getByRole('combobox', { name: 'Pedido de referencia' });
     fireEvent.focus(combo);
@@ -105,7 +105,7 @@ describe('Cortesía en pasos', () => {
     fireEvent.change(screen.getByLabelText('Tamaño'), { target: { value: '9' } });
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '2' } });
     clic('Siguiente');
-    fireEvent.click(screen.getByLabelText('Reclamo del cliente'));
+    fireEvent.click(screen.getByLabelText('Error de cocina'));
     fireEvent.change(screen.getByLabelText('Nota'), { target: { value: ' se demoró ' } });
     clic('Siguiente');
     fireEvent.focus(screen.getByRole('combobox'));
@@ -114,7 +114,7 @@ describe('Cortesía en pasos', () => {
     clic('Registrar cortesía');
     await waitFor(() => expect(alRegistrar).toHaveBeenCalledWith('CP-W003'));
     expect(registrarSeparada).toHaveBeenCalledWith(
-      { productoId: '1', tamanoId: '9', cantidad: 2, motivo: 'RECLAMO_CLIENTE', nota: 'se demoró', pedidoReferenciaId: '103' },
+      { productoId: '1', tamanoId: '9', cantidad: 2, motivo: 'ERROR_COCINA', nota: 'se demoró', pedidoReferenciaId: '103' },
       undefined,
     );
   });
@@ -125,7 +125,7 @@ describe('Cortesía en pasos', () => {
     fireEvent.click(screen.getByRole('option', { name: /Frappe Oreo/ }));
     fireEvent.change(screen.getByLabelText('Tamaño'), { target: { value: '9' } });
     clic('Siguiente');
-    fireEvent.click(screen.getByLabelText('Degustación o promoción'));
+    fireEvent.click(screen.getByLabelText('Prueba'));
     clic('Siguiente');
     fireEvent.focus(screen.getByRole('combobox'));
     fireEvent.click(await screen.findByRole('option', { name: /CP-W001/ }));
