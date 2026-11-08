@@ -79,6 +79,7 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
   const sumar = useSumarMesas(() => void cargar());
   const { tiene } = useSesion();
   const puedeAbrirMesas = tiene('mesas/abrir');
+  const [extraMesa, setExtraMesa] = useState<MesaSalon | null>(null);
 
   const pisoActual = pisos.find((p) => p.id === pisoId) ?? pisos[0];
   const mesas: MesaSalon[] = pisoActual?.mesas ?? [];
@@ -283,7 +284,20 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
             setVistaId(null);
             if (m.pedido) sumar.iniciar({ pedidoId: m.pedido.id, codigo: m.pedido.codigo, mesa: m, mesasEnPedido: mesasDelPedidoDe(m).length });
           }}
+          alAgregarExtra={tiene('pedidos/extra') ? (m) => { setVistaId(null); setExtraMesa(m); } : undefined}
           alCambiar={() => void cargar()}
+        />
+      )}
+
+      {extraMesa?.pedido && (
+        <ModalNuevoPedidoMesa
+          abierto
+          pasoInicial="modal"
+          canal="MOZO"
+          pisos={pisos}
+          extra={{ id: extraMesa.pedido.id, codigo: extraMesa.pedido.codigo, modalidad: 'MESA', mesa_nombre: nombreMesaSalon(extraMesa), cliente_nombre: extraMesa.pedido.cliente }}
+          alCerrar={() => setExtraMesa(null)}
+          alExitoPedido={() => void cargar()}
         />
       )}
 

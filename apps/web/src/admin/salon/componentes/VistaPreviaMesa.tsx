@@ -27,6 +27,8 @@ export interface VistaPreviaMesaProps {
   mesasDelPedido?: MesaSalon[];
   /** Pasa el pedido a modo «sumar mesas» en el croquis (lo arma el padre) */
   alAgregarMesa?: (mesa: MesaSalon) => void;
+  /** Permiso pedidos/extra: lo da el padre; abre «Agregar extra» al pedido de la mesa */
+  alAgregarExtra?: (mesa: MesaSalon) => void;
 }
 
 /** Orden de las mesas de un pedido igual que el servidor: la principal primero, luego por orden. */
@@ -83,6 +85,7 @@ export function VistaPreviaMesa({
   puedeAbrirMesas = false,
   mesasDelPedido,
   alAgregarMesa,
+  alAgregarExtra,
 }: VistaPreviaMesaProps) {
   const [forzando, setForzando] = useState(false);
   // «Quitar mesa»: primero se elige cuál (lista), después Sí/No
@@ -437,6 +440,11 @@ export function VistaPreviaMesa({
             {alCambiarMesa && (
               <Boton variante="secundario" onClick={() => alCambiarMesa(mesa)} disabled={!pedido}>
                 Cambiar de mesa
+              </Boton>
+            )}
+            {alAgregarExtra && pedido && pedido.estado !== 'ANULADO' && pedido.estado !== 'RECHAZADO' && (
+              <Boton variante="secundario" onClick={() => alAgregarExtra(mesa)}>
+                Agregar extra
               </Boton>
             )}
             {puedeAbrirMesas && alAgregarMesa && (

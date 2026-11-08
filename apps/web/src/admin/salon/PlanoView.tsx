@@ -10,7 +10,7 @@ import { useSalonSocket } from './useSalonSocket';
 import { ListaEsperaMesa, useListaEspera } from './componentes/ListaEsperaMesa';
 import { useMantenerPresionado } from './useMantenerPresionado';
 import { VistaPreviaMesa } from './componentes/VistaPreviaMesa';
-import { useCambioDeMesa, useSumarMesas } from './componentes/CambioDeMesa';
+import { nombreMesaSalon, useCambioDeMesa, useSumarMesas } from './componentes/CambioDeMesa';
 import { salonApi } from './api';
 import './salon.css';
 
@@ -33,6 +33,7 @@ export function PlanoView() {
   const puedeVer = tiene('plano/ver');
   const puedeEditar = tiene('plano/editar');
   const puedeForzar = tiene('mesas/liberar');
+  const [extraMesa, setExtraMesa] = useState<MesaSalon | null>(null);
 
   // Pisos del plano
   const [pisos, setPisos] = useState<PisoPlano[]>([]);
@@ -2001,7 +2002,20 @@ export function PlanoView() {
             setVistaPreviaId(null);
             if (m.pedido) sumar.iniciar({ pedidoId: m.pedido.id, codigo: m.pedido.codigo, mesa: m, mesasEnPedido: mesasDelPedidoDe(m).length });
           }}
+          alAgregarExtra={tiene('pedidos/extra') ? (m) => { setVistaPreviaId(null); setExtraMesa(m); } : undefined}
           alCambiar={() => void cargarDatos()}
+        />
+      )}
+
+      {extraMesa?.pedido && (
+        <ModalNuevoPedidoMesa
+          abierto
+          pasoInicial="modal"
+          canal="CAJA"
+          pisos={pisosSalon}
+          extra={{ id: extraMesa.pedido.id, codigo: extraMesa.pedido.codigo, modalidad: 'MESA', mesa_nombre: nombreMesaSalon(extraMesa), cliente_nombre: extraMesa.pedido.cliente }}
+          alCerrar={() => setExtraMesa(null)}
+          alExitoPedido={() => void cargarDatos()}
         />
       )}
     </div>
