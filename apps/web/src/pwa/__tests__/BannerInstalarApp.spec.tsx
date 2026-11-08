@@ -123,7 +123,8 @@ describe('BannerInstalarApp', () => {
     expect(screen.getByRole('button', { name: 'Instalar app' })).toBeDefined();
   });
 
-  it('compacto abre la ventana para elegir app (carta, panel o asistencia)', async () => {
+  it('compacto abre la ventana para elegir app (panel o asistencia, en el área administrativa)', async () => {
+    window.history.pushState({}, '', '/admin/pedidos');
     ponerUserAgent(UA_IPHONE);
     const { BannerInstalarApp } = await cargarBanner();
     render(<BannerInstalarApp compacto />);
@@ -131,6 +132,7 @@ describe('BannerInstalarApp', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Instalar app' }));
     expect(screen.getByText('Panel administrativo')).toBeDefined();
     expect(screen.getByText('Asistencia (marcar entrada y salida)')).toBeDefined();
+    window.history.pushState({}, '', '/');
   });
 
   it('si sessionStorage lanza, el aviso igual aparece y el cierre no rompe', async () => {

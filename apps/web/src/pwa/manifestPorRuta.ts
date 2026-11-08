@@ -13,10 +13,21 @@ export const APPS_PWA: Record<AppPwa, { manifest: string; inicio: string; nombre
 
 export const esRutaAdmin = (ruta: string): boolean => ruta === '/admin' || ruta.startsWith('/admin/');
 
-/** App que corresponde a la ruta; `?instalar=carta|admin|asistencia` manda sobre la ruta. */
+/** Apps que se pueden ofrecer en esa ruta: la carta pública solo ofrece la carta; el panel, la administrativa y la asistencia. */
+export function appsDeArea(ruta: string = window.location.pathname): AppPwa[] {
+  return esRutaAdmin(ruta) ? ['admin', 'asistencia'] : ['carta'];
+}
+
+/** `?instalar=` solo vale si esa app corresponde al área de la ruta (en la carta, `?instalar=admin` se ignora). */
+export function appPedidaValida(search: string, ruta: string = window.location.pathname): AppPwa | null {
+  const pedida = new URLSearchParams(search).get('instalar') as AppPwa | null;
+  return pedida && appsDeArea(ruta).includes(pedida) ? pedida : null;
+}
+
+/** App que corresponde a la ruta; `?instalar=` manda sobre la ruta pero solo dentro de su área. */
 export function appDeRuta(ruta: string = window.location.pathname, search: string = window.location.search): AppPwa {
-  const pedida = new URLSearchParams(search).get('instalar');
-  if (pedida === 'carta' || pedida === 'admin' || pedida === 'asistencia') return pedida;
+  const pedida = appPedidaValida(search, ruta);
+  if (pedida) return pedida;
   if (ruta === '/admin/mi-asistencia' || ruta.startsWith('/admin/mi-asistencia/')) return 'asistencia';
   return esRutaAdmin(ruta) ? 'admin' : 'carta';
 }

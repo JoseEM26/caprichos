@@ -8,10 +8,10 @@ import {
   suscribirInstalar,
   urlInstalarApp,
 } from './instalar';
-import { appDeRuta, type AppPwa } from './manifestPorRuta';
+import { appDeRuta, appsDeArea, type AppPwa } from './manifestPorRuta';
 
 const TARJETAS: { app: AppPwa; titulo: string; frase: string }[] = [
-  { app: 'carta', titulo: 'Carta virtual (para clientes)', frase: 'Se abre directo en la carta para pedir.' },
+  { app: 'carta', titulo: 'Caprichos (carta para pedir)', frase: 'Se abre directo en la carta para pedir.' },
   { app: 'admin', titulo: 'Panel administrativo', frase: 'Se abre directo en el panel: pedidos, caja y cocina.' },
   { app: 'asistencia', titulo: 'Asistencia (marcar entrada y salida)', frase: 'Se abre directo para marcar tu entrada, almuerzo y salida.' },
 ];
@@ -36,9 +36,9 @@ const mensajeActualizar = {
 } as const;
 
 /**
- * Las tres apps que se pueden instalar (carta, panel y asistencia), una tarjeta cada una. Un aviso de instalar del navegador
- * solo instala la app de la página donde se cargó, así que las otras dos se abren en una pestaña nueva con ?instalar=...
- * (esa pestaña carga su propio manifest y ofrece instalar). Las tres pueden estar instaladas a la vez.
+ * Apps que se pueden instalar según el área: en la carta pública solo la carta; en el panel, la administrativa y la de asistencia. Un aviso de instalar del navegador
+ * solo instala la app de la página donde se cargó, así que la otra se abre en una pestaña nueva con ?instalar=...
+ * (esa pestaña carga su propio manifest y ofrece instalar). Pueden estar instaladas a la vez.
  */
 export function ElegirAppInstalar({ instrucciones }: { instrucciones: ReactNode }) {
   const [, actualizar] = useReducer((n: number) => n + 1, 0);
@@ -77,7 +77,7 @@ export function ElegirAppInstalar({ instrucciones }: { instrucciones: ReactNode 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {TARJETAS.map(({ app, titulo, frase }) => {
+        {TARJETAS.filter((t) => appsDeArea().includes(t.app)).map(({ app, titulo, frase }) => {
           const ya = instaladas.includes(app);
           return (
             <li
