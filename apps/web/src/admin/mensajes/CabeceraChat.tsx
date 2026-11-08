@@ -1,4 +1,6 @@
 import { InsigniaBloqueoSpam } from './BloqueoSpam';
+import { horaListaChat } from './fechasChat';
+import { InsigniaPos } from './InsigniaPos';
 import { DetalleConversacion } from './mensajesTipos';
 import { MenuChat, MenuChatProps } from './MenuChat';
 import { ESTADOS_BG, ESTADOS_LABEL, esUsuarioWhatsApp, formatearNumeroReceptor, obtenerColorAvatar, obtenerIniciales } from './utilidadesChat';
@@ -9,11 +11,13 @@ export interface CabeceraChatProps {
   onVolver: () => void;
   onAbrirDetalles: () => void;
   onDesbloquear: () => void;
+  onAtendido?: () => void;
+  onVolverPorAtender?: () => void;
   acciones: Omit<MenuChatProps, 'detalle'>;
 }
 
 /** Cabecera de una línea: nombre, teléfono, 2-3 chips de estado y el menú «⋯» con lo secundario. */
-export function CabeceraChat({ detalle, puedeDesbloquear, onVolver, onAbrirDetalles, onDesbloquear, acciones }: CabeceraChatProps) {
+export function CabeceraChat({ detalle, puedeDesbloquear, onVolver, onAbrirDetalles, onDesbloquear, onAtendido, onVolverPorAtender, acciones }: CabeceraChatProps) {
   const etiqueta = detalle.urgente ? `Urgente · ${ESTADOS_LABEL[detalle.estado]}` : ESTADOS_LABEL[detalle.estado];
   const textoDueno = detalle.dueno ? (detalle.esMio ? 'Lo atiendes tú' : `Lo atiende ${detalle.dueno}`) : 'Chat libre';
 
@@ -42,6 +46,13 @@ export function CabeceraChat({ detalle, puedeDesbloquear, onVolver, onAbrirDetal
           {etiqueta}
         </span>
         <span className="msg-chip">{textoDueno}</span>
+        <InsigniaPos pos={detalle.pos} id={`detalle-${detalle.id}`} enlace />
+        {detalle.estado === 'atendido' && detalle.atendidoPor && (
+          <span className="msg-chip" data-testid="atendido-por-detalle">
+            Atendido por {detalle.atendidoPor}
+            {detalle.atendidoEn ? ` · ${horaListaChat(detalle.atendidoEn)}` : ''}
+          </span>
+        )}
         <InsigniaBloqueoSpam bloqueo={detalle.bloqueoSpam} id={`detalle-${detalle.id}`} />
         {detalle.bloqueoSpam?.activo && puedeDesbloquear && (
           <button
@@ -54,6 +65,17 @@ export function CabeceraChat({ detalle, puedeDesbloquear, onVolver, onAbrirDetal
           </button>
         )}
       </div>
+      {detalle.estado === 'atendido'
+        ? onVolverPorAtender && (
+            <button type="button" className="msg-btn msg-btn-atendido" data-testid="btn-volver-por-atender" onClick={onVolverPorAtender}>
+              Volver a Por atender
+            </button>
+          )
+        : onAtendido && (
+            <button type="button" className="msg-btn msg-btn-atendido" data-testid="btn-atendido" onClick={onAtendido}>
+              Atendido
+            </button>
+          )}
       <button type="button" className="msg-btn msg-detalles" onClick={onAbrirDetalles} aria-label="Ver pedido y acciones">
         Detalles
       </button>

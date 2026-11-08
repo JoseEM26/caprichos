@@ -2,7 +2,8 @@ import React from 'react';
 import { InsigniaBloqueoSpam } from './BloqueoSpam';
 import { horaListaChat } from './fechasChat';
 import { MenuFilaChat } from './MenuFilaChat';
-import { ChatResumen, EstadoChat, FiltroChat, RespuestaListarChats } from './mensajesTipos';
+import { InsigniaPos } from './InsigniaPos';
+import { ChatResumen, EstadoChat, FiltroChat, FiltroPos, RespuestaListarChats } from './mensajesTipos';
 import {
   ESTADOS_BG,
   ESTADOS_LABEL,
@@ -20,6 +21,9 @@ export interface ListaChatsProps {
   onBuscar: (texto: string) => void;
   filtro: FiltroChat;
   onFiltro: (filtro: FiltroChat) => void;
+  /** Filtro del punto de venta (opcional): faltan procesar / ya procesados. */
+  pos?: FiltroPos | null;
+  onPos?: (pos: FiltroPos | null) => void;
   soloBloqueados: boolean;
   onToggleSoloBloqueados: () => void;
   cargando: boolean;
@@ -43,6 +47,8 @@ export function ListaChats({
   onBuscar,
   filtro,
   onFiltro,
+  pos = null,
+  onPos,
   soloBloqueados,
   onToggleSoloBloqueados,
   cargando,
@@ -127,6 +133,31 @@ export function ListaChats({
         )}
       </div>
 
+      {onPos && (
+        <div className="msg-pos-filtros" role="group" aria-label="Punto de venta">
+          <span>Punto de venta:</span>
+          {([
+            ['faltan', `Faltan procesar${conteos.faltanProcesar ? ` (${conteos.faltanProcesar})` : ''}`],
+            ['procesados', 'Ya procesados'],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className="msg-tab"
+              aria-pressed={pos === id}
+              style={{
+                background: pos === id ? '#D9FDD3' : '#FFFFFF',
+                color: pos === id ? '#00402F' : '#33434B',
+                borderColor: pos === id ? '#00594A' : '#C9D2D8',
+              }}
+              onClick={() => onPos(pos === id ? null : id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {cargando ? (
         <div className="msg-vacio">Cargando conversaciones...</div>
       ) : chats.length === 0 ? (
@@ -184,6 +215,13 @@ export function ListaChats({
                       {esUsuarioWhatsApp(c) && (
                         <span className="msg-chip" style={{ background: '#E0F2FE', borderColor: '#BAE6FD', color: '#0C4A6E' }}>
                           Usuario de WhatsApp
+                        </span>
+                      )}
+                      <InsigniaPos pos={c.pos} id={c.id} />
+                      {c.estado === 'atendido' && c.atendidoPor && (
+                        <span className="msg-chip" data-testid={`atendido-por-${c.id}`}>
+                          Atendido por {c.atendidoPor}
+                          {c.atendidoEn ? ` · ${horaListaChat(c.atendidoEn)}` : ''}
                         </span>
                       )}
                       <InsigniaBloqueoSpam bloqueo={c.bloqueoSpam} id={c.id} />

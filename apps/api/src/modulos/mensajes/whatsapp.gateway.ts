@@ -39,6 +39,18 @@ export interface WhatsAppGateway {
     autor?: 'BOT' | 'PERSONA',
   ): Promise<MensajeEnviado>;
 
+  /** Sube la foto a la Media API y la envía con su id; guarda el mensaje saliente con la miniatura (archivoId). */
+  enviarImagen?(
+    conversacionId: bigint,
+    telefono: string,
+    imagen: Buffer,
+    mime: string,
+    subtitulo: string,
+    autor: 'BOT' | 'PERSONA',
+    archivoId: string,
+    phoneNumberId?: string,
+  ): Promise<MensajeEnviado>;
+
   estaConectado?(): { conectado: boolean; modo: 'meta' | 'simulado'; razon?: string };
 }
 

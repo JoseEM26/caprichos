@@ -26,9 +26,20 @@ import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { leerBloqueosSpam } from '../chatbot/configuracion/bloqueo-spam.util';
 import { MOTIVO_BLOQUEO_SPAM } from '../chatbot/configuracion/chatbot-configuracion.service';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { ArchivosService } from '../archivos/archivos.service';
+import {
+  PosChat,
+  faltaProcesar,
+  inicioHoyLima,
+  pedidoLigadoDelFlujo,
+  reabiertoTrasAtendido,
+  resolverPos,
+  ultimos9,
+} from './utilidades/pos-chat.util';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos';
+export type FiltroPos = 'faltan' | 'procesados';
 
 const GRUPOS: Record<Exclude<FiltroChat, 'todos' | 'novistos'>, EstadoChat[]> = {
   atender: ['atencion', 'validar'],
@@ -52,11 +63,25 @@ const hora = (d: Date) =>
 const sinVer = (f: { sinLeer: number; marcadoNoVisto: boolean }) => f.sinLeer > 0 || f.marcadoNoVisto;
 
 /** Estado que ve la consola, derivado de las columnas de `conversacion` (la tabla no tiene «pausado»). */
-export function estadoDe(c: { estado: string; duenio: string; urgente: boolean }): EstadoChat {
+export function estadoDe(
+  c: { estado: string; duenio: string; urgente: boolean; atendido_en?: Date | null },
+  reabierto = false,
+): EstadoChat {
+  // Archivado con «Atendido»: vuelve a «Por atender» cuando el cliente o el equipo escriben de nuevo
+  if (c.atendido_en) return !reabierto ? 'atendido' : c.estado === 'VALIDAR_PAGO' ? 'validar' : 'atencion';
   if (c.estado === 'ATENDIDA') return 'atendido';
   if (c.estado === 'VALIDAR_PAGO') return 'validar';
   if (c.urgente) return 'atencion';
   return c.duenio === 'PERSONA' ? 'pausado' : 'bot';
+}
+
+const MAX_IMAGEN_BYTES = 5 * 1024 * 1024;
+
+/** Tipo real por los primeros bytes (no por lo que diga el navegador): solo JPG y PNG. */
+export function tipoImagenReal(b: Buffer): 'image/jpeg' | 'image/png' | null {
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length > 7 && b[0] === 0x89 && b.toString('latin1', 1, 4) === 'PNG') return 'image/png';
+  return null;
 }
 
 const textoDe = (m: { tipo: string; contenido: any }): string => {
@@ -79,6 +104,7 @@ export class MensajesService {
     @Optional() private readonly eventos?: EventosGateway,
     @Optional() private readonly ventana24hService?: Ventana24hService,
     @Optional() private readonly redisService?: RedisService,
+    @Optional() private readonly archivos?: ArchivosService,
   ) {}
 
   /** Límite de 20 mensajes por minuto por usuario para evitar abusos (Redis). */
@@ -177,15 +203,46 @@ export class MensajesService {
     return mapa;
   }
 
-  async listar(filtro: FiltroChat = 'todos', q = '') {
+  /** Pedidos que pueden ligarse a estos chats, en UNA consulta: los de hoy con celular y los ligados por el flujo. */
+  private async posDeChats(chats: { id: bigint; telefono: string; flujo?: unknown }[]): Promise<Map<bigint, PosChat>> {
+    const ligados = chats.map((c) => pedidoLigadoDelFlujo(c.flujo)).filter((x): x is bigint => x != null);
+    const pedidos = await this.prisma.pedido.findMany({
+      where: {
+        es_personal: false,
+        OR: [
+          { creado_en: { gte: inicioHoyLima() }, cliente_telefono: { not: null } },
+          ...(ligados.length ? [{ id: { in: ligados } }] : []),
+        ],
+      },
+      select: { id: true, codigo: true, estado: true, pago_estado: true, cliente_telefono: true, creado_en: true },
+    });
+    return resolverPos(chats, pedidos);
+  }
+
+  /** Nombres de quienes archivaron chats, en UNA consulta. */
+  private async nombresDe(ids: (bigint | null)[]): Promise<Map<string, string>> {
+    const unicos = [...new Set(ids.filter((x): x is bigint => x != null))];
+    if (!unicos.length) return new Map();
+    const cuentas = await this.prisma.userAccount.findMany({
+      where: { id: { in: unicos } },
+      include: { party: { include: { persona: true } } },
+    });
+    return new Map(cuentas.map((u) => [u.id.toString(), nombreUsuario(u.party, 'otra persona')]));
+  }
+
+  async listar(filtro: FiltroChat = 'todos', q = '', pos?: FiltroPos) {
     const todas = await this.prisma.conversacion.findMany({
       orderBy: { ultima_actividad: 'desc' },
       include: { ...this.incluir, mensajes: { orderBy: { en: 'desc' }, take: 20 } },
     });
     const bloqueos = await this.bloqueosSpam(todas);
+    const posMapa = await this.posDeChats(todas);
+    const quienes = await this.nombresDe(todas.map((c) => c.atendido_por));
+    const hoy0 = inicioHoyLima();
     const filas = todas.map((c) => {
-      const estado = estadoDe(c);
+      const estado = estadoDe(c, reabiertoTrasAtendido(c.atendido_en, c.mensajes));
       const ult = c.mensajes[0];
+      const posChat = posMapa.get(c.id) as PosChat;
       let sinLeer = 0;
       if (estado === 'atencion' || estado === 'validar') {
         for (const m of c.mensajes) {
@@ -216,6 +273,10 @@ export class MensajesService {
             ? Math.max(0, Math.floor((Date.now() - new Date(ult.en).getTime()) / 60000))
             : null,
         bloqueoSpam: bloqueos?.get(c.telefono) ?? null,
+        pos: posChat,
+        faltaProcesar: faltaProcesar(posChat, c.mensajes.some((m) => m.autor === 'CLIENTE' && m.en >= hoy0)),
+        atendidoEn: estado === 'atendido' && c.atendido_en ? c.atendido_en.toISOString() : null,
+        atendidoPor: estado === 'atendido' && c.atendido_por ? quienes.get(c.atendido_por.toString()) ?? null : null,
       };
     });
     const cuenta = (g: Exclude<FiltroChat, 'todos' | 'novistos'>) => filas.filter((f) => GRUPOS[g].includes(f.estado)).length;
@@ -223,8 +284,13 @@ export class MensajesService {
     const digitos = termino.replace(/\D/g, '');
     const chats = filas.filter(
       (f) =>
-        (filtro === 'todos' ||
-          (filtro === 'novistos' ? sinVer(f) : GRUPOS[filtro].includes(f.estado))) &&
+        // «Todos» no trae los archivados: esos viven en «Atendidos» hasta que alguien vuelva a escribir
+        (filtro === 'todos'
+          ? f.estado !== 'atendido'
+          : filtro === 'novistos'
+            ? sinVer(f)
+            : GRUPOS[filtro].includes(f.estado)) &&
+        (!pos || (pos === 'faltan' ? f.faltaProcesar : f.pos.estado !== 'SIN_PEDIDO')) &&
         (!termino ||
           f.nombre.toLowerCase().includes(termino) ||
           (f.nombre_contacto && f.nombre_contacto.toLowerCase().includes(termino)) ||
@@ -240,12 +306,13 @@ export class MensajesService {
     }
     return {
       conteos: {
-        todos: filas.length,
+        todos: filas.filter((f) => f.estado !== 'atendido').length,
         atender: cuenta('atender'),
         bot: cuenta('bot'),
         atendidos: cuenta('atendidos'),
         sinVer: filas.filter(sinVer).length,
         bloqueadosSpam: filas.filter((f) => f.bloqueoSpam?.activo).length,
+        faltanProcesar: filas.filter((f) => f.faltaProcesar).length,
       },
       chats,
     };
@@ -276,7 +343,9 @@ export class MensajesService {
       }
     }
 
-    const estado = estadoDe(c);
+    const estado = estadoDe(c, reabiertoTrasAtendido(c.atendido_en, mensajes));
+    const pos = (await this.posDeChats([c])).get(c.id) as PosChat;
+    const quienes = await this.nombresDe([c.atendido_por]);
     // El chat guarda 51XXXXXXXXX y el pedido puede traer solo los 9 dígitos: se compara por los últimos 9
     const ultimos9 = String(c.telefono || '').replace(/\D/g, '').slice(-9);
     const condicion: any[] = [{ cliente_telefono: c.telefono }];
@@ -360,6 +429,9 @@ export class MensajesService {
       estado,
       urgente: c.urgente,
       marcadoNoVisto: c.marcado_no_visto,
+      pos,
+      atendidoEn: estado === 'atendido' && c.atendido_en ? c.atendido_en.toISOString() : null,
+      atendidoPor: estado === 'atendido' && c.atendido_por ? quienes.get(c.atendido_por.toString()) ?? null : null,
       dueno: this.dueno(c),
       esMio: !!c.tomado_por && c.tomado_por === yo,
       ocupado: !!c.tomado_por && c.tomado_por !== yo,
@@ -399,7 +471,8 @@ export class MensajesService {
           errorDetalle: esAdmin ? tecnico?.original ?? null : null,
           metaCodigo: esAdmin ? tecnico?.codigoMeta ?? null : null,
           motivoFallo,
-          puedeReintentar: estadoMsg === 'FALLIDO' ? !esErrorVentana24h(errorCodigo, errorDetalle) : undefined,
+          puedeReintentar:
+            estadoMsg === 'FALLIDO' ? m.tipo !== 'IMAGEN' && !esErrorVentana24h(errorCodigo, errorDetalle) : undefined,
         };
       }),
       pedido: pedido
@@ -506,6 +579,60 @@ export class MensajesService {
       );
     }
 
+    return { id: m.id };
+  }
+
+  /** Foto del equipo al cliente: JPG o PNG de hasta 5 MB, con subtítulo opcional. Misma ventana de 24 h que el texto. */
+  async enviarImagen(
+    id: string,
+    archivo: { buffer?: Buffer; mimetype?: string; size?: number } | undefined,
+    subtitulo: string | undefined,
+    usuario: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const bytes = archivo?.buffer;
+    if (!archivo || !bytes?.length) throw error(HttpStatus.BAD_REQUEST, 'IMAGEN_REQUERIDA', 'Elige una foto para enviar');
+    if (bytes.length > MAX_IMAGEN_BYTES) {
+      throw error(HttpStatus.PAYLOAD_TOO_LARGE, 'IMAGEN_GRANDE', 'La foto pesa más de 5 MB');
+    }
+    const tipo = tipoImagenReal(bytes);
+    if (!tipo || tipo !== archivo.mimetype) {
+      throw error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, 'IMAGEN_TIPO', 'Solo se pueden enviar fotos JPG o PNG');
+    }
+    const pie = String(subtitulo ?? '').trim().slice(0, 1024);
+
+    const c = await this.cargar(id);
+    await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para escribir.');
+    if (!this.tieneIdentificador(c)) {
+      throw error(HttpStatus.CONFLICT, 'CONTACTO_SIN_IDENTIFICADOR', 'Este contacto no tiene ningun identificador: no se puede responder');
+    }
+    if (!this.gateway.enviarImagen || !this.archivos) {
+      throw error(HttpStatus.NOT_IMPLEMENTED, 'IMAGEN_NO_DISPONIBLE', 'Este canal no permite enviar fotos');
+    }
+    await this.verificarLimiteTasaUsuario(usuario.partyId);
+    if (this.ventana24hService && !(await this.ventana24hService.esVentanaAbierta(c.telefono, c.id))) {
+      throw new HttpException(
+        {
+          codigo: 'VENTANA_CERRADA',
+          mensaje: 'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada',
+          plantillaReapertura: 'caprichos_reabrir_conversacion',
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    // Copia privada para ver la miniatura en el chat (misma ruta que las fotos del cliente)
+    const guardado = await this.archivos.subirArchivo(archivo as Express.Multer.File, true);
+    const m = await this.gateway.enviarImagen(c.id, c.telefono, bytes, tipo, pie, 'PERSONA', String(guardado.id), c.phone_number_id ?? undefined);
+    await this.tocar(c.id, { duenio: 'PERSONA', urgente: false, estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado });
+    await this.auditar(usuario, 'ENVIAR_IMAGEN', c.id, { mensajeId: m.id, estado: m.estado }, ip);
+
+    if (m.estado === 'FALLIDO') {
+      throw new HttpException(
+        { codigo: m.errorCodigo || 'ENVIO_FALLIDO', mensaje: mapearErrorWhatsApp(m.errorCodigo, m.errorDetalle), mensajeId: m.id },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     return { id: m.id };
   }
 
@@ -700,7 +827,7 @@ export class MensajesService {
   async soltar(id: string, usuario: UsuarioAutenticado, ip?: string) {
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Solo quien lo atiende puede soltarlo.');
-    await this.tocar(c.id, { duenio: 'BOT', tomado_por: null, tomado_en: null, urgente: false, flujo: flujoLiberadoParaBot(c.flujo) as any });
+    await this.tocar(c.id, { duenio: 'BOT', tomado_por: null, tomado_en: null, urgente: false, atendido_en: null, atendido_por: null, flujo: flujoLiberadoParaBot(c.flujo) as any });
     await this.auditar(usuario, 'SOLTAR', c.id, undefined, ip);
     try {
       await this.gateway.enviarTexto(c.id, c.telefono, TEXTOS_CAMBIOS.botRetomaAtencion(), 'BOT');
@@ -719,7 +846,7 @@ export class MensajesService {
 
   async reanudar(id: string, usuario: UsuarioAutenticado, ip?: string) {
     const c = await this.cargar(id);
-    await this.tocar(c.id, { duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null, flujo: flujoLiberadoParaBot(c.flujo) as any });
+    await this.tocar(c.id, { duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null, atendido_en: null, atendido_por: null, flujo: flujoLiberadoParaBot(c.flujo) as any });
     await this.auditar(usuario, 'REANUDAR_BOT', c.id, undefined, ip);
     try {
       await this.gateway.enviarTexto(c.id, c.telefono, TEXTOS_CAMBIOS.botRetomaAtencion(), 'BOT');
@@ -746,16 +873,48 @@ export class MensajesService {
     return { ok: true };
   }
 
-  async marcarAtendido(id: string, usuario: UsuarioAutenticado, ip?: string) {
+  /**
+   * «Atendido»: archiva el chat hasta que el cliente o el equipo vuelvan a escribir. NO toca duenio ni tomado_por
+   * (el bot lo retoma a las 00:01 de Lima del día siguiente a partir de `atendido_en`; eso lo hace otro módulo).
+   * Con un pago por revisar o un pedido sin cobrar pide confirmar (`confirmar`).
+   */
+  async marcarAtendido(id: string, usuario: UsuarioAutenticado, ip?: string, confirmar = false) {
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para cerrarlo.');
-    await this.tocar(c.id, { estado: 'ATENDIDA', duenio: 'BOT', urgente: false, tomado_por: null, tomado_en: null, flujo: flujoLiberadoParaBot(c.flujo) as any });
-    await this.auditar(usuario, 'MARCAR_ATENDIDO', c.id, undefined, ip);
-    try {
-      await this.gateway.enviarTexto(c.id, c.telefono, TEXTOS_CAMBIOS.botRetomaAtencion(), 'BOT');
-    } catch {
-      // opcional
+    if (!confirmar) {
+      const pos = (await this.posDeChats([c])).get(c.id);
+      if (c.estado === 'VALIDAR_PAGO' || pos?.estado === 'SIN_COBRAR') {
+        throw error(
+          HttpStatus.CONFLICT,
+          'ATENDIDO_REQUIERE_CONFIRMAR',
+          c.estado === 'VALIDAR_PAGO'
+            ? 'Este chat tiene un pago por revisar. ¿Archivarlo de todos modos?'
+            : `El pedido ${pos?.codigo} de este chat aún no está cobrado. ¿Archivarlo de todos modos?`,
+        );
+      }
     }
+    const ahora = new Date();
+    await this.tocar(c.id, {
+      atendido_en: ahora,
+      atendido_por: await this.yo(usuario),
+      urgente: false,
+      visto_en: ahora,
+      marcado_no_visto: false,
+    });
+    await this.auditar(usuario, 'MARCAR_ATENDIDO', c.id, undefined, ip);
+    return { ok: true };
+  }
+
+  /** Saca el chat de «Atendidos» y lo devuelve a «Por atender» (queda como atención requerida). */
+  async volverPorAtender(id: string, usuario: UsuarioAutenticado, ip?: string) {
+    const c = await this.cargar(id);
+    await this.tocar(c.id, {
+      atendido_en: null,
+      atendido_por: null,
+      urgente: true,
+      estado: c.estado === 'ATENDIDA' ? 'ABIERTA' : c.estado,
+    });
+    await this.auditar(usuario, 'VOLVER_POR_ATENDER', c.id, undefined, ip);
     return { ok: true };
   }
 

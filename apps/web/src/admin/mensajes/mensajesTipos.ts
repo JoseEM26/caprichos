@@ -2,6 +2,14 @@ import type { UbicacionChat } from './TarjetaUbicacion';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
 export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos';
+export type FiltroPos = 'faltan' | 'procesados';
+
+/** Qué tan procesado está el chat en el punto de venta. */
+export interface PosChat {
+  estado: 'REGISTRADO' | 'SIN_COBRAR' | 'SIN_PEDIDO';
+  codigo: string | null;
+  pedidoId: string | null;
+}
 
 export interface MensajeItem {
   id: string;
@@ -52,6 +60,11 @@ export interface ChatResumen {
   /** Minutos que el último mensaje del cliente lleva sin respuesta (sin persona que lo tomó); null si ya se respondió. */
   sinRespuestaMin?: number | null;
   bloqueoSpam?: BloqueoSpam | null;
+  pos?: PosChat;
+  faltaProcesar?: boolean;
+  /** Solo en «Atendidos»: cuándo (ISO) y quién lo archivó. */
+  atendidoEn?: string | null;
+  atendidoPor?: string | null;
 }
 
 export interface DetallePedidoChat {
@@ -100,6 +113,9 @@ export interface DetalleConversacion {
   estado: EstadoChat;
   urgente: boolean;
   marcadoNoVisto?: boolean;
+  pos?: PosChat;
+  atendidoEn?: string | null;
+  atendidoPor?: string | null;
   dueno: string | null;
   esMio: boolean;
   ocupado: boolean;
@@ -133,6 +149,7 @@ export interface RespuestaListarChats {
     atendidos: number;
     sinVer?: number;
     bloqueadosSpam?: number;
+    faltanProcesar?: number;
   };
   chats: ChatResumen[];
 }
