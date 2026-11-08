@@ -1,3 +1,4 @@
+import { RejillaComandas } from './RejillaComandas';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useEventos, useTiempoReal } from '../../comun/socket';
@@ -235,7 +236,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(380px, 100%), 1fr))', gap: '18px' }}>
+      <RejillaComandas anchoColumna={340}>
         {visibles.map((p) => {
           const m = MODALIDAD[p.modalidad] ?? { texto: p.modalidad, icono: '📦' };
           const faltan = p.areas.filter((a) => !a.listo);
@@ -251,11 +252,11 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '14px',
-                padding: '18px',
-                borderRadius: '18px',
+                gap: '8px',
+                padding: '12px',
+                borderRadius: '14px',
                 background: 'var(--cp-white, #fff)',
-                border: `4px solid ${p.completo && !p.despachado ? VERDE : 'var(--cp-line, #E3D6C6)'}`,
+                border: `3px solid ${p.completo && !p.despachado ? VERDE : 'var(--cp-line, #E3D6C6)'}`,
                 opacity: p.despachado ? 0.55 : 1,
               }}
             >
@@ -294,14 +295,14 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
               <Areas p={p} puedeDevolver={puedeDespachar && puedeDevolver} alDevolver={(pe, area) => setPendiente({ tipo: 'devolver', p: pe, area })} ocupado={trabajando} />
 
               {!p.despachado && puedeDespachar && (
-                <footer style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto' }}>
+                <footer style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <button
                     type="button"
                     data-testid={`despachar-${p.pedidoId}`}
                     disabled={!p.completo || trabajando}
                     onClick={() => void despacharTodo(p)}
                     style={{
-                      minHeight: '64px',
+                      minHeight: '52px',
                       borderRadius: '14px',
                       border: 'none',
                       background: p.completo ? VERDE : 'var(--cp-line, #E3D6C6)',
@@ -333,7 +334,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
             </article>
           );
         })}
-      </div>
+      </RejillaComandas>
 
       <Confirmar
         abierto={!!pendiente}

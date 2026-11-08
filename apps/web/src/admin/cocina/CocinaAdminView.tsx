@@ -30,6 +30,7 @@ import {
 } from './audioAlerta';
 import type { AjustesCocina } from './cocinaApi';
 import { ModalAnular } from '../pedidos/ModalAnular';
+import { RejillaComandas } from './RejillaComandas';
 import { ComandaTarjeta, SEGUNDOS_DESHACER } from './ComandaTarjeta';
 import { ModalAgotados } from './ModalAgotados';
 import { ModalMerma } from './ModalMerma';
@@ -1072,16 +1073,7 @@ export function CocinaAdminView() {
               Sin pedidos para esta área.
             </div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-                gap: '16px',
-                width: '100%',
-                alignItems: 'stretch',
-                boxSizing: 'border-box',
-              }}
-            >
+            <RejillaComandas>
               {tarjetas.map((c) => (
                 <ComandaTarjeta
                   key={enTodas ? c.pedidoId : c.id}
@@ -1099,7 +1091,7 @@ export function CocinaAdminView() {
                   alAnular={puedeAnular ? setAnulando : undefined}
                 />
               ))}
-            </div>
+            </RejillaComandas>
           )}
         </div>
       )}
@@ -1291,15 +1283,7 @@ export function CocinaAdminView() {
                   Sin pedidos para esta área.
                 </div>
               ) : (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-                    gap: '16px',
-                    width: '100%',
-                    alignItems: 'stretch',
-                  }}
-                >
+                <RejillaComandas>
                   {tarjetas.map((c) => (
                     <ComandaTarjeta
                       key={enTodas ? c.pedidoId : c.id}
@@ -1317,7 +1301,7 @@ export function CocinaAdminView() {
                   alAnular={puedeAnular ? setAnulando : undefined}
                     />
                   ))}
-                </div>
+                </RejillaComandas>
               )}
             </div>
           </div>
