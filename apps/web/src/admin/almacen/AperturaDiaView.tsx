@@ -153,6 +153,12 @@ export function AperturaDiaView() {
   const produccionDe = (clave: string) => produccion[clave] ?? '0';
   const quedaronDe = (c: Casilla) => leerCantidad(valorDe(c.clave)) ?? 0;
   const producidoDe = (c: Casilla) => leerCantidad(produccionDe(c.clave)) ?? 0;
+  /**
+   * Saldo que quedará al guardar (el mismo que calcula la API). Sin tocar «Quedaron de ayer» es el saldo real de hoy
+   * (ya lleva ventas y lo producido antes) más lo que se suma ahora; si se corrige, es lo contado más lo producido hoy.
+   */
+  const totalDe = (c: Casilla) =>
+    (quedaronDe(c) === c.quedaronAyer ? c.saldo : quedaronDe(c) + c.producidoHoy) + producidoDe(c);
 
   const aEnviar: Array<{ c: Casilla; cantidad: number; produccionHoy: number }> = [];
   const invalidos: string[] = [];
@@ -419,7 +425,7 @@ export function AperturaDiaView() {
               </tr>
               {g.productos.map((p) => {
                 const delProducto = casillas.filter((c) => c.productoId === p.productoId);
-                const total = delProducto.reduce((suma, c) => suma + quedaronDe(c) + producidoDe(c), 0);
+                const total = delProducto.reduce((suma, c) => suma + totalDe(c), 0);
                 const conError = delProducto.some((c) => invalidos.includes(c.clave));
 
                 if (!tieneSabores(p)) {
@@ -488,7 +494,7 @@ export function AperturaDiaView() {
                     </tr>
                     {abierto &&
                       saboresVis.map((c) => {
-                        const totalSabor = quedaronDe(c) + producidoDe(c);
+                        const totalSabor = totalDe(c);
                         const atenuado = !c.aperturaHoy && totalSabor === 0;
                         const estado = estadoDe(c.aperturaHoy, totalSabor);
                         return (

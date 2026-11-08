@@ -313,6 +313,40 @@ export async function ajustarVentaProductos(
     ).map((p: any) => p.id.toString()),
   );
 
+  // Opciones tipo «2 Donas» (sin sabor) se reparten entre sabores con el saldo de CADA momento: al quitar la línea el
+  // reparto de hoy puede no ser el de cuando se vendió. Lo que sobra por quitar de un sabor que no tenía tanto se
+  // quita de los otros sabores del mismo producto que este pedido sí vendió (si no, esas unidades nunca volverían).
+  for (const productoId of new Set(afectadas.filter((c) => c.saborId && controlados.has(c.productoId.toString())).map((c) => c.productoId))) {
+    const delProducto = afectadas.filter((c) => c.productoId === productoId && c.saborId);
+    const vend = new Map<string, number>();
+    for (const m of await db.movimientoStock.findMany({
+      where: { pedido_id: pedidoId, tipo: 'VENTA', producto_id: productoId, sabor_id: { not: null }, movimientosRevertidos: { none: {} } },
+      select: { sabor_id: true, cantidad: true },
+    })) {
+      vend.set(m.sabor_id.toString(), (vend.get(m.sabor_id.toString()) ?? 0) + Number(m.cantidad));
+    }
+    let falta = 0;
+    for (const c of delProducto) falta += Math.max(0, -(((vend.get(c.saborId!.toString()) ?? 0) + c.delta)));
+    if (falta === 0) continue;
+    for (const c of delProducto) {
+      const v = vend.get(c.saborId!.toString()) ?? 0;
+      if (v + c.delta < 0) c.delta = -v;
+    }
+    for (const [sid, v] of [...vend].sort((x, y) => (BigInt(x[0]) < BigInt(y[0]) ? -1 : 1))) {
+      if (falta <= 0) break;
+      const propio = delProducto.find((c) => c.saborId!.toString() === sid);
+      const quedaria = v + (propio?.delta ?? 0);
+      const quita = Math.min(falta, Math.max(0, Math.min(v, quedaria)));
+      if (quita <= 0) continue;
+      falta -= quita;
+      if (propio) propio.delta -= quita;
+      else {
+        const sab = await db.sabor.findUnique({ where: { id: BigInt(sid) }, select: { nombre: true } });
+        afectadas.push({ productoId, saborId: BigInt(sid), delta: -quita, nombre: sab?.nombre });
+      }
+    }
+  }
+
   const aDescontar: LineaVentaProducto[] = [];
   const ordenadas = afectadas
     .filter((c) => controlados.has(c.productoId.toString()))
@@ -704,7 +738,11 @@ export async function registrarAperturaArrastre(
   },
 ) {
   const previa = await producidoHoyDe(db, c.productoId, c.saborId, c.fecha);
-  const objetivo = c.quedaron + previa;
+  // La pantalla propone «Quedaron de ayer» = saldo − producido de hoy, con piso 0. Si hoy se vendió más que lo de ayer
+  // (se vendió producción de hoy) ese 0 no es un conteo: es «sin cambios». Así guardar no devuelve lo ya vendido.
+  const saldoActual = c.saborId ? await saldoSabor(db, c.saborId) : await saldoProducto(db, c.productoId);
+  const sinCambios = c.quedaron === Math.max(0, saldoActual - previa);
+  const objetivo = sinCambios ? saldoActual : c.quedaron + previa;
   if (c.saborId) await fijarAperturaSabor(db, c.productoId, c.saborId, objetivo, c.areaId, c.por, c.ahora, c.fecha);
   else await fijarAperturaProducto(db, c.productoId, objetivo, c.areaId, c.por, c.ahora, c.fecha);
   if (c.produccion <= 0) return;

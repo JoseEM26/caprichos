@@ -135,6 +135,18 @@ describe('Apertura con arrastre (producto-controlado)', () => {
     expect(Number(db.conteoApertura.filas[0].cantidad)).toBe(13);
   });
 
+  it('si se vendió más que lo de ayer, la pantalla propone 0 («sin cambios»): guardar solo suma lo nuevo y no devuelve lo vendido', async () => {
+    const db = fakeDb({ stock: 2 });
+    await registrarAperturaArrastre(db, { productoId: DONA, saborId: null, quedaron: 2, produccion: 10, areaId: null, por: 1n, ahora: AHORA, fecha: HOY });
+    db.stock.filas[0].cantidad = Number(db.stock.filas[0].cantidad) - 5; // se vendieron 5 → saldo 7 (producido hoy 10)
+    // «Quedaron de ayer» propuesto = max(0, 7 - 10) = 0
+    await registrarAperturaArrastre(db, { productoId: DONA, saborId: null, quedaron: 0, produccion: 3, areaId: null, por: 1n, ahora: AHORA, fecha: HOY });
+    expect(saldoDona(db)).toBe(10); // 7 + 3 (antes quedaba en 13)
+    // Si el usuario SÍ escribe otro conteo, ese conteo manda
+    await registrarAperturaArrastre(db, { productoId: DONA, saborId: null, quedaron: 1, produccion: 0, areaId: null, por: 1n, ahora: AHORA, fecha: HOY });
+    expect(saldoDona(db)).toBe(14); // 1 + 13 producidos hoy
+  });
+
   it('si se contó distinto ayer, corrige el saldo a lo contado (AJUSTE) sin reiniciar', async () => {
     const db = fakeDb({ stock: 4 });
     await registrarAperturaArrastre(db, {

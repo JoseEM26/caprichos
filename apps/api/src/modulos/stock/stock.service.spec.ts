@@ -774,7 +774,12 @@ describe('StockService', () => {
       prisma.movimientoStock.findMany.mockResolvedValueOnce([]);
       await service.revertirPorPedido('100', undefined, undefined, { soloInsumos: true });
       expect(prisma.movimientoStock.findMany).toHaveBeenCalledWith({
-        where: { pedido_id: 100n, tipo: 'VENTA', movimientosRevertidos: { none: {} }, insumo_id: { not: null } },
+        where: {
+          pedido_id: 100n,
+          tipo: 'VENTA',
+          movimientosRevertidos: { none: {} },
+          OR: [{ insumo_id: { not: null } }, { producto: { controla_stock: false } }],
+        },
       });
     });
   });

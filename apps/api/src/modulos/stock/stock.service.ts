@@ -564,6 +564,16 @@ export class StockService {
     };
   }
 
+  /** Corre `fn` en la transacción externa si la hay; si no, abre una propia. */
+  private enTransaccion<T>(txExterno: any, fn: (db: any) => Promise<T>): Promise<T> {
+    return txExterno ? fn(txExterno) : this.prisma.$transaction((tx: any) => fn(tx));
+  }
+
+  /** Bloquea la fila del pedido hasta el final de la transacción (serializa cobros y anulaciones del mismo pedido). */
+  private async bloquearPedido(db: any, pedidoId: bigint) {
+    if (typeof db.$queryRaw === 'function') await db.$queryRaw`SELECT id FROM pedido WHERE id = ${pedidoId} FOR UPDATE`;
+  }
+
   /**
    * FT-STK-03: Método público idempotent que descuenta por receta al COBRAR.
    * Si ya existen movimientos de tipo 'VENTA' para ese pedido, devuelve sin duplicar.
@@ -589,6 +599,8 @@ export class StockService {
         pedido_id: id,
         tipo: 'VENTA',
         OR: [{ insumo_id: { not: null } }, { producto: { controla_stock: false } }],
+        // Un cobro anulado devolvió sus insumos: al cobrar de nuevo se descuentan otra vez
+        movimientosRevertidos: { none: {} },
       },
     });
 
@@ -639,8 +651,24 @@ export class StockService {
     const alertasNegativo: Array<{ insumoId?: string; productoId?: string; lugarId: string; nombre: string; saldo: number }> = [];
     const alertasBajo: Array<{ insumoId?: string; lugarId: string; nombre: string; saldo: number }> = [];
 
-    await (txExterno ? Promise.resolve() : this.prisma.$transaction(async (tx: any) => {
+    let yaDescontadoEnTx = false;
+    await this.enTransaccion(txExterno, async (tx: any) => {
       const db = txExterno || tx;
+
+      // Dos cobros a la vez del mismo pedido: el segundo espera al primero y ve sus movimientos (no duplica insumos)
+      await this.bloquearPedido(db, id);
+      const repetida = await db.movimientoStock.findFirst({
+        where: {
+          pedido_id: id,
+          tipo: 'VENTA',
+          OR: [{ insumo_id: { not: null } }, { producto: { controla_stock: false } }],
+          movimientosRevertidos: { none: {} },
+        },
+      });
+      if (repetida) {
+        yaDescontadoEnTx = true;
+        return;
+      }
 
       const controladosCobro = new Set<string>(
         (
@@ -907,7 +935,8 @@ export class StockService {
           await this.apagarProductoAutomatico(db, BigInt(prodIdStr), ahora);
         }
       }
-    }));
+    });
+    if (yaDescontadoEnTx) return { ok: true, yaDescontado: true };
 
     // Emitir eventos en vivo fuera de la transacción
     if (this.eventosGateway) {
@@ -996,29 +1025,29 @@ export class StockService {
     const runner = txExterno || this.prisma;
     const porId = porUsuarioId ? this.parsearId(porUsuarioId, 'usuario') : BigInt(1);
 
-    // Buscar movimientos VENTA de este pedido que todavía no se revirtieron (idempotente por movimiento).
-    // soloInsumos: al anular solo el cobro, los productos que controlan stock siguen vendidos (el pedido sigue vivo).
-    const ventas = await runner.movimientoStock.findMany({
-      where: {
-        pedido_id: id,
-        tipo: 'VENTA',
-        movimientosRevertidos: { none: {} },
-        ...(opciones.soloInsumos ? { insumo_id: { not: null } } : {}),
-      },
-    });
-
-    if (ventas.length === 0) {
-      return { ok: true, movimientosRevertidos: 0 };
-    }
-
     const insumosRevertidos: bigint[] = [];
     const productosRevertidos: bigint[] = [];
     const saboresRevertidos: bigint[] = [];
 
-    await (txExterno ? Promise.resolve() : this.prisma.$transaction(async (tx: any) => {
-      const db = txExterno || tx;
+    // Todo en una transacción (la externa si la hay). El pedido se bloquea primero: dos anulaciones a la vez se
+    // turnan y la segunda ya no encuentra ventas sin revertir (nunca se devuelve dos veces).
+    const ventas: any[] = await this.enTransaccion(txExterno, async (db: any) => {
+      await this.bloquearPedido(db, id);
+      // Movimientos VENTA de este pedido que todavía no se revirtieron (idempotente por movimiento).
+      // soloInsumos: al anular solo el cobro vuelven los insumos y los productos sin control de saldo (se descontaron
+      // al cobrar); los productos que controlan stock siguen vendidos (el pedido sigue vivo).
+      const pendientes = await db.movimientoStock.findMany({
+        where: {
+          pedido_id: id,
+          tipo: 'VENTA',
+          movimientosRevertidos: { none: {} },
+          ...(opciones.soloInsumos
+            ? { OR: [{ insumo_id: { not: null } }, { producto: { controla_stock: false } }] }
+            : {}),
+        },
+      });
 
-      for (const mov of ventas) {
+      for (const mov of pendientes) {
         if (!mov.insumo_id && !mov.producto_id) continue;
 
         if (mov.insumo_id) {
@@ -1093,7 +1122,10 @@ export class StockService {
           },
         });
       }
-    }));
+      return pendientes;
+    });
+
+    if (ventas.length === 0) return { ok: true, movimientosRevertidos: 0 };
 
     // Reactivar disponibilidad si corresponde (insumo o producto repuesto)
     await this.verificarYReactivarAgotados(insumosRevertidos, productosRevertidos);
