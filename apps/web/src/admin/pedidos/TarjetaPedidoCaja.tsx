@@ -44,6 +44,7 @@ function lineaModalidad(o: Pedido): string {
   }
   if (clave === 'DELIVERY') return o.zona?.nombre ? `A domicilio · ${o.zona.nombre}` : 'A domicilio';
   if (clave === 'LLEVAR') return 'Para llevar';
+  if (clave === 'COMER_LOCAL') return 'Comer en el local';
   return 'En el local';
 }
 

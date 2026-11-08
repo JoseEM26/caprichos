@@ -52,6 +52,7 @@ export function modLabel(m?: string | null) {
   if (mu === 'DELIVERY') return 'Delivery';
   if (mu === 'LLEVAR' || mu === 'RECOGER') return 'Para llevar';
   if (mu === 'MESA') return 'En mesa';
+  if (mu === 'COMER_LOCAL') return 'Comer en el local';
   return m;
 }
 
@@ -127,6 +128,7 @@ const MODALIDADES_OPCIONES = [
   { id: 'DELIVERY', n: 'Delivery' },
   { id: 'LLEVAR', n: 'Para llevar' },
   { id: 'MESA', n: 'En mesa' },
+  { id: 'COMER_LOCAL', n: 'Comer en el local' },
 ];
 
 const COBRO_OPCIONES = [
