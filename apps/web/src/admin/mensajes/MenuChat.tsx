@@ -8,7 +8,6 @@ export interface MenuChatProps {
   onTogglePausaBot: () => void;
   onTomarChat: () => void;
   onSoltarChat: () => void;
-  onMarcarAtendido: () => void;
   onCopiarProductos: () => void;
   onCopiarCelular: () => void;
 }
@@ -20,7 +19,6 @@ export function MenuChat({
   onTogglePausaBot,
   onTomarChat,
   onSoltarChat,
-  onMarcarAtendido,
   onCopiarProductos,
   onCopiarCelular,
 }: MenuChatProps) {
@@ -69,11 +67,6 @@ export function MenuChat({
             >
               {detalle.esMio ? 'Soltar el chat' : 'Tomar el chat'}
             </button>
-            {detalle.estado !== 'atendido' && (
-              <button type="button" role="menuitem" className="msg-menu-item" onClick={elegir(onMarcarAtendido)}>
-                Marcar atendido
-              </button>
-            )}
             <button type="button" role="menuitem" className="msg-menu-item" onClick={elegir(onCopiarProductos)}>
               Copiar solo productos
             </button>

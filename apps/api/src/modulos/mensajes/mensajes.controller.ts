@@ -7,12 +7,17 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import {
   EditarNombreContactoDto,
+  AtendidoDto,
+  ImagenDto,
   ListarConversacionesDto,
   RechazarCambioDto,
   RechazarPagoDto,
@@ -34,7 +39,7 @@ export class MensajesController {
   @Get('conversaciones')
   @Permiso('mensajes', 'ver')
   listar(@Query() f: ListarConversacionesDto) {
-    return this.mensajes.listar(f.filtro, f.q);
+    return this.mensajes.listar(f.filtro, f.q, f.pos);
   }
 
   @Get('respuestas-rapidas')
@@ -53,6 +58,18 @@ export class MensajesController {
   @Permiso('mensajes', 'enviar')
   enviar(@Param('id') id: string, @Body() dto: TextoDto, @Req() req: any) {
     return this.mensajes.enviar(id, dto.texto, req.usuario, ipDe(req));
+  }
+
+  @Post('conversaciones/:id/enviar-imagen')
+  @Permiso('mensajes', 'enviar')
+  @UseInterceptors(FileInterceptor('imagen', { limits: { fileSize: 5 * 1024 * 1024 + 1 } }))
+  enviarImagen(
+    @Param('id') id: string,
+    @UploadedFile() imagen: Express.Multer.File,
+    @Body() dto: ImagenDto,
+    @Req() req: any,
+  ) {
+    return this.mensajes.enviarImagen(id, imagen, dto?.subtitulo, req.usuario, ipDe(req));
   }
 
   @Post('conversaciones/:id/reabrir-plantilla')
@@ -116,8 +133,14 @@ export class MensajesController {
 
   @Post('conversaciones/:id/atendido')
   @Permiso('mensajes', 'cerrar')
-  atendido(@Param('id') id: string, @Req() req: any) {
-    return this.mensajes.marcarAtendido(id, req.usuario, ipDe(req));
+  atendido(@Param('id') id: string, @Body() dto: AtendidoDto, @Req() req: any) {
+    return this.mensajes.marcarAtendido(id, req.usuario, ipDe(req), !!dto?.confirmar);
+  }
+
+  @Post('conversaciones/:id/volver-por-atender')
+  @Permiso('mensajes', 'cerrar')
+  volverPorAtender(@Param('id') id: string, @Req() req: any) {
+    return this.mensajes.volverPorAtender(id, req.usuario, ipDe(req));
   }
 
   @Post('conversaciones/:id/aprobar-pago')

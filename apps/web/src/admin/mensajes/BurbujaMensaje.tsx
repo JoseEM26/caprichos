@@ -22,7 +22,7 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
       )}
       {m.imagen && (
         <div className="msg-foto">
-          <FotoAmpliable archivoId={m.imagenId} alt="Foto enviada por el cliente" alturaMaxima={160} />
+          <FotoAmpliable archivoId={m.imagenId} alt={esCliente ? 'Foto enviada por el cliente' : 'Foto enviada al cliente'} alturaMaxima={160} />
         </div>
       )}
       {m.ubicacion ? <TarjetaUbicacion ubicacion={m.ubicacion} /> : m.texto && <div className="msg-texto">{m.texto}</div>}

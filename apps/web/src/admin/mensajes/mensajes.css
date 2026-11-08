@@ -962,3 +962,61 @@
   min-height: 44px;
   margin: 4px 10px 0;
 }
+
+/* Adjuntar foto, emojis y chips del punto de venta */
+.msg-icono-btn {
+  flex: none;
+  width: 40px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: #54656F;
+  font-size: 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.msg-icono-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.msg-foto-previa {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 8px 12px 0;
+  padding: 8px;
+  border: 1px solid #C9D2D8;
+  border-radius: 10px;
+  background: #F7F9FA;
+}
+.msg-foto-previa img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex: none; }
+.msg-foto-previa-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.msg-foto-previa-cuerpo input { min-height: 40px; box-sizing: border-box; padding: 0 10px; border: 1px solid #C9D2D8; border-radius: 8px; font-family: inherit; }
+.msg-emojis {
+  position: absolute;
+  bottom: 50px;
+  left: 0;
+  z-index: 30;
+  width: 300px;
+  max-width: 86vw;
+  padding: 8px;
+  background: #FFFFFF;
+  border: 1px solid #C9D2D8;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.msg-emojis-buscar { width: 100%; box-sizing: border-box; min-height: 38px; padding: 0 10px; border: 1px solid #C9D2D8; border-radius: 8px; font-family: inherit; }
+.msg-emojis-cats { display: flex; gap: 2px; margin: 6px 0; }
+.msg-emojis-cat { flex: 1; min-height: 36px; border: 0; border-radius: 8px; background: transparent; font-size: 18px; cursor: pointer; }
+.msg-emojis-cat[aria-selected='true'] { background: #D9FDD3; }
+.msg-emojis-grilla { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 180px; overflow-y: auto; margin-top: 6px; }
+.msg-emoji { min-height: 34px; border: 0; background: transparent; font-size: 21px; border-radius: 6px; cursor: pointer; }
+.msg-emoji:hover, .msg-emoji:focus-visible { background: #EEF2F4; }
+.msg-emojis-vacio { grid-column: 1 / -1; padding: 12px 4px; color: #54656F; font-size: 13px; }
+.msg-chip-pos { font-weight: 700; text-decoration: none; }
+.msg-chip-pos[data-pos='REGISTRADO'] { background: #D9FDD3; border-color: #00594A; color: #00402F; }
+.msg-chip-pos[data-pos='SIN_COBRAR'] { background: #FFE0A3; border-color: #C58A00; color: #5C3700; }
+.msg-chip-pos[data-pos='SIN_PEDIDO'] { background: #EEF2F4; color: #33434B; }
+.msg-pos-filtros { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 12px 8px; align-items: center; }
+.msg-pos-filtros > span { font-size: 12px; font-weight: 700; color: #54656F; }
+.msg-btn-atendido { white-space: nowrap; }
+.msg-texto, .msg-vista { word-break: break-word; }

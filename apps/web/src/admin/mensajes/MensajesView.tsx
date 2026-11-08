@@ -10,6 +10,8 @@ import {
   listarConversaciones,
   listarRespuestasRapidas,
   marcarAtendido,
+  enviarImagenChat,
+  volverPorAtender,
   marcarChatNoVisto,
   marcarChatVisto,
   obtenerDetalleConversacion,
@@ -28,7 +30,7 @@ import { useSesion } from '../../comun/sesion';
 import { ModalDesbloquearSpam } from './BloqueoSpam';
 import { salientesApi } from './salientesApi';
 import { SalientesWhatsApp } from './SalientesWhatsApp';
-import { ChatResumen, DetalleConversacion, FiltroChat, RespuestaRapida } from './mensajesTipos';
+import { ChatResumen, DetalleConversacion, FiltroChat, FiltroPos, RespuestaRapida } from './mensajesTipos';
 import { BannerCajaCerrada } from '../pedidos/BannerCajaCerrada';
 import { tieneRolUsuario } from '../../comun/rolesUsuario';
 import { ListaChats } from './ListaChats';
@@ -62,6 +64,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   const [chats, setChats] = useState<ChatResumen[]>([]);
   const [conteos, setConteos] = useState({ todos: 0, atender: 0, bot: 0, atendidos: 0, sinVer: 0, bloqueadosSpam: 0 });
   const [filtro, setFiltro] = useState<FiltroChat>('todos');
+  const [filtroPos, setFiltroPos] = useState<FiltroPos | null>(null);
   const [soloBloqueados, setSoloBloqueados] = useState(false);
   const [modalDesbloqueo, setModalDesbloqueo] = useState(false);
 
@@ -186,7 +189,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   // Cargar lista de conversaciones
   const cargarLista = useCallback(async (mantenerSeleccion = true) => {
     try {
-      const res = await listarConversaciones(filtro, busqueda);
+      const res = await (filtroPos ? listarConversaciones(filtro, busqueda, filtroPos) : listarConversaciones(filtro, busqueda));
       setChats(res.chats);
       setConteos({ bloqueadosSpam: 0, sinVer: 0, ...res.conteos });
 
@@ -214,7 +217,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     } finally {
       setCargando(false);
     }
-  }, [filtro, busqueda]);
+  }, [filtro, busqueda, filtroPos]);
 
   // Chat que la persona abrió ella misma: solo ese se da por visto (el que se abre solo al cargar la lista, no)
   const abiertoPorPersona = React.useRef<string | null>(null);
@@ -372,6 +375,27 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     });
   };
 
+  const ofrecerReabrirConPlantilla = (chatId: string) => {
+    setConfirmarAccion({
+      titulo: '¿Reabrir conversación con plantilla?',
+      mensaje:
+        'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada. ¿Deseas enviar la plantilla de reapertura?',
+      textoSi: 'Sí, reabrir',
+      accion: async () => {
+        try {
+          await reabrirConversacionPlantilla(chatId);
+          setTextoMensaje('');
+          setTextoPulido(null);
+          setPulirError(null);
+          await cargarDetalle(chatId);
+          await cargarLista(true);
+        } catch (e: any) {
+          setPulirError(e?.message || 'Error al enviar la plantilla');
+        }
+      },
+    });
+  };
+
   const handleEnviarMensaje = async (textoAEnviar?: string) => {
     const txt = (textoAEnviar !== undefined ? textoAEnviar : textoMensaje).trim();
     if (!txt || !chatSeleccionadoId || enviando) return;
@@ -386,28 +410,25 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     } catch (err: any) {
       setPulirError(err?.message || 'Error al enviar mensaje');
       await cargarDetalle(chatSeleccionadoId);
-      if (err?.codigo === 'VENTANA_CERRADA' || err?.message?.includes('24 horas')) {
-        setConfirmarAccion({
-          titulo: '¿Reabrir conversación con plantilla?',
-          mensaje:
-            'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada. ¿Deseas enviar la plantilla de reapertura?',
-          textoSi: 'Sí, reabrir',
-          accion: async () => {
-            try {
-              await reabrirConversacionPlantilla(chatSeleccionadoId);
-              setTextoMensaje('');
-              setTextoPulido(null);
-              setPulirError(null);
-              await cargarDetalle(chatSeleccionadoId);
-              await cargarLista(true);
-            } catch (e: any) {
-              setPulirError(e?.message || 'Error al enviar la plantilla');
-            }
-          },
-        });
-      }
+      if (err?.codigo === 'VENTANA_CERRADA' || err?.message?.includes('24 horas')) ofrecerReabrirConPlantilla(chatSeleccionadoId);
     } finally {
       setEnviando(false);
+    }
+  };
+
+  /** Foto al cliente. Si la ventana de 24 h está cerrada ofrece el mismo diálogo de plantilla que el texto. */
+  const handleEnviarImagen = async (archivo: File, subtitulo: string) => {
+    if (!chatSeleccionadoId) return;
+    try {
+      await enviarImagenChat(chatSeleccionadoId, archivo, subtitulo);
+      setPulirError(null);
+      await cargarDetalle(chatSeleccionadoId);
+      await cargarLista(true);
+    } catch (err: any) {
+      setPulirError(err?.message || 'No se pudo enviar la foto');
+      await cargarDetalle(chatSeleccionadoId);
+      if (err?.codigo === 'VENTANA_CERRADA' || err?.message?.includes('24 horas')) ofrecerReabrirConPlantilla(chatSeleccionadoId);
+      throw err;
     }
   };
 
@@ -479,16 +500,37 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
 
   const handleMarcarAtendido = () => {
     if (!detalle || !chatSeleccionadoId) return;
-    setConfirmarAccion({
-      titulo: `¿Marcar el chat de ${detalle.nombre} como atendido?`,
-      mensaje: 'Sale de la lista de pendientes y el bot puede volver a responder.',
-      textoSi: 'Sí, marcar atendido',
-      accion: async () => {
-        await marcarAtendido(chatSeleccionadoId);
-        await cargarDetalle(chatSeleccionadoId);
-        await cargarLista(true);
-      },
+    const id = chatSeleccionadoId;
+    const nombre = detalle.nombre;
+    const archivar = async (confirmar: boolean) => {
+      await marcarAtendido(id, confirmar);
+      await cargarDetalle(id);
+      await cargarLista(true);
+    };
+    // Un clic archiva; con un pago por revisar o un pedido sin cobrar el servidor pide confirmar antes
+    archivar(false).catch((err: any) => {
+      if (err?.codigo === 'ATENDIDO_REQUIERE_CONFIRMAR') {
+        setConfirmarAccion({
+          titulo: `¿Archivar el chat de ${nombre} como atendido?`,
+          mensaje: err.message || 'Tiene un pago por revisar o un pedido sin cobrar.',
+          textoSi: 'Sí, archivar',
+          accion: () => archivar(true),
+        });
+      } else {
+        setPulirError(err?.message || 'No se pudo marcar como atendido');
+      }
     });
+  };
+
+  const handleVolverPorAtender = async () => {
+    if (!chatSeleccionadoId) return;
+    try {
+      await volverPorAtender(chatSeleccionadoId);
+      await cargarDetalle(chatSeleccionadoId);
+      await cargarLista(true);
+    } catch (err: any) {
+      setPulirError(err?.message || 'No se pudo devolver el chat a Por atender');
+    }
   };
 
   const handleAprobarPago = () => {
@@ -609,7 +651,6 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
     onTogglePausaBot: handleTogglePausaBot,
     onTomarChat: () => handleTomarChat(false),
     onSoltarChat: handleSoltarChat,
-    onMarcarAtendido: handleMarcarAtendido,
     onCopiarProductos: handleCopiarProductos,
     onCopiarCelular: handleCopiarCelular,
   };
@@ -650,6 +691,8 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
           onBuscar={setBusqueda}
           filtro={filtro}
           onFiltro={setFiltro}
+          pos={filtroPos}
+          onPos={setFiltroPos}
           soloBloqueados={soloBloqueados}
           onToggleSoloBloqueados={() => setSoloBloqueados((v) => !v)}
           cargando={cargando}
@@ -683,6 +726,8 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 onVolver={() => setChatAbiertoMovil(false)}
                 onAbrirDetalles={() => setPanelAbierto(true)}
                 onDesbloquear={() => setModalDesbloqueo(true)}
+                onAtendido={handleMarcarAtendido}
+                onVolverPorAtender={handleVolverPorAtender}
                 acciones={acciones}
               />
               <button
@@ -726,6 +771,7 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
                 }}
                 onDejarPulido={() => setTextoPulido(null)}
                 onEnviar={() => handleEnviarMensaje()}
+                onEnviarImagen={handleEnviarImagen}
               />
             </>
           )}

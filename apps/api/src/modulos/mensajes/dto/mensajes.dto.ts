@@ -18,6 +18,23 @@ export class ListarConversacionesDto {
   @IsOptional()
   @IsString()
   q?: string;
+
+  @IsOptional()
+  @IsIn(['faltan', 'procesados'])
+  pos?: 'faltan' | 'procesados';
+}
+
+export class AtendidoDto {
+  @IsOptional()
+  @IsBoolean()
+  confirmar?: boolean;
+}
+
+export class ImagenDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(1024, { message: 'El subtítulo es demasiado largo' })
+  subtitulo?: string;
 }
 
 export class TextoDto {

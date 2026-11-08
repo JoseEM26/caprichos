@@ -2060,9 +2060,12 @@ model Conversacion {
   visto_en           DateTime?          @db.Timestamptz
   /// Marca manual «No visto» (como WhatsApp): compartida por todo el equipo hasta abrir el chat o «Marcar como visto»
   marcado_no_visto   Boolean            @default(false)
+  /// Cuándo y quién (user_account.id) lo archivó con «Atendido». Contrato para la reanudación del bot a las 00:01 de Lima.
+  atendido_en        DateTime?          @db.Timestamptz
+  atendido_por       BigInt?
 
   party              Party?           @relation(fields: [party_id], references: [id])
-  tomadoPorUsuario   UserAccount?       @relation(fields: [tomado_por], references: [id])
+  tomadoPorUsuario  UserAccount?       @relation(fields: [tomado_por], references: [id])
   mensajes           MensajeChat[]
   solicitudesReserva SolicitudReserva[]
   solicitudesCambio  SolicitudCambio[]
@@ -2070,6 +2073,7 @@ model Conversacion {
   ia_consumos        IaConsumo[]
   vouchers           VoucherPago[]
 
+  @@index([atendido_en])
   @@map("conversacion")
 }
 

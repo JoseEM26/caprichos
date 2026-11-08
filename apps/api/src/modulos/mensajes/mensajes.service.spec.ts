@@ -177,6 +177,7 @@ describe('MensajesService', () => {
         update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 500n, ...data })),
       },
       pedido: {
+        findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue({
           id: 50n,
           codigo: 'CP-0002',

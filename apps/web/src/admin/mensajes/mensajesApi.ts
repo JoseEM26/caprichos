@@ -1,7 +1,8 @@
-import { api } from '../../comun/api';
+import { api, clienteFetch } from '../../comun/api';
 import {
   DetalleConversacion,
   FiltroChat,
+  FiltroPos,
   RespuestaListarChats,
   RespuestaRapida,
 } from './mensajesTipos';
@@ -9,10 +10,12 @@ import {
 export async function listarConversaciones(
   filtro: FiltroChat = 'todos',
   q = '',
+  pos?: FiltroPos,
 ): Promise<RespuestaListarChats> {
   const params = new URLSearchParams();
   if (filtro !== 'todos') params.set('filtro', filtro);
   if (q.trim()) params.set('q', q.trim());
+  if (pos) params.set('pos', pos);
   const qs = params.toString();
   return api.get<RespuestaListarChats>(`/admin/mensajes/conversaciones${qs ? `?${qs}` : ''}`);
 }
@@ -53,8 +56,21 @@ export async function reanudarBot(id: string): Promise<{ ok: boolean }> {
   return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/reanudar`, {});
 }
 
-export async function marcarAtendido(id: string): Promise<{ ok: boolean }> {
-  return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/atendido`, {});
+/** Archiva el chat en «Atendidos». Con un pago por revisar el servidor responde ATENDIDO_REQUIERE_CONFIRMAR. */
+export async function marcarAtendido(id: string, confirmar = false): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/atendido`, confirmar ? { confirmar: true } : {});
+}
+
+export async function volverPorAtender(id: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>(`/admin/mensajes/conversaciones/${id}/volver-por-atender`, {});
+}
+
+/** Foto del equipo al cliente (JPG o PNG, hasta 5 MB) con subtítulo opcional. */
+export async function enviarImagenChat(id: string, archivo: File, subtitulo = ''): Promise<{ id: string }> {
+  const fd = new FormData();
+  fd.append('imagen', archivo, archivo.name);
+  if (subtitulo) fd.append('subtitulo', subtitulo);
+  return clienteFetch<{ id: string }>(`/admin/mensajes/conversaciones/${id}/enviar-imagen`, { method: 'POST', body: fd });
 }
 
 export async function marcarChatVisto(id: string): Promise<{ ok: boolean }> {

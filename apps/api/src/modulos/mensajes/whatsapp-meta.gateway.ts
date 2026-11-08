@@ -176,4 +176,59 @@ export class WhatsAppMetaGateway implements WhatsAppGateway {
       whatsappMensajeId,
     };
   }
+
+  async enviarImagen(
+    conversacionId: bigint,
+    telefono: string,
+    imagen: Buffer,
+    mime: string,
+    subtitulo: string,
+    autor: 'BOT' | 'PERSONA',
+    archivoId: string,
+    phoneNumberId?: string,
+  ): Promise<MensajeEnviado> {
+    const estadoConexion = this.mensajeria.estaConectado();
+    const opciones = { conversacionId, ...(phoneNumberId ? { phoneNumberId } : {}) };
+
+    // Meta: la foto se sube primero y se envía por media id; el simulado no sube nada
+    let referencia: string | null = 'simulado';
+    if (estadoConexion.modo === 'meta') {
+      referencia = (await this.mensajeria.subirMedia?.(imagen, mime, phoneNumberId)) ?? null;
+    }
+    const resultado = referencia
+      ? await this.mensajeria.enviarImagen(telefono, referencia, subtitulo || undefined, opciones)
+      : ({ exito: false, estado: 'FALLIDO', errorCodigo: 'SUBIDA_MEDIA', errorDetalle: 'Meta no aceptó la foto' } as const);
+
+    const whatsappMensajeId = 'id' in resultado && resultado.id ? BigInt(resultado.id) : null;
+    const metaId = ('waMessageId' in resultado && resultado.waMessageId) || null;
+    const m = await this.prisma.mensajeChat.create({
+      data: {
+        conversacion_id: conversacionId,
+        direccion: 'SALE',
+        autor,
+        tipo: 'IMAGEN',
+        contenido: {
+          texto: subtitulo,
+          archivoId,
+          ...(resultado.errorDetalle ? { errorDetalle: resultado.errorDetalle } : {}),
+          ...(resultado.errorCodigo ? { errorCodigo: resultado.errorCodigo } : {}),
+          estado: resultado.estado,
+        },
+        meta_id: metaId,
+        whatsapp_mensaje_id: whatsappMensajeId,
+      },
+    });
+    return {
+      id: m.id.toString(),
+      autor,
+      texto: subtitulo,
+      en: m.en,
+      metaId,
+      estado: resultado.estado,
+      errorCodigo: resultado.errorCodigo || null,
+      errorDetalle: resultado.errorDetalle || null,
+      modo: estadoConexion.modo,
+      whatsappMensajeId,
+    };
+  }
 }

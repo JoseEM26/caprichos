@@ -744,11 +744,11 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
   private static readonly VIDA_MEDIA_MS = 25 * 24 * 3600 * 1000;
 
   /** Sube un JPEG a la Media API de Meta y devuelve el media id (null si falla). */
-  async subirMedia(jpg: Buffer, phoneNumberId?: string): Promise<string | null> {
+  async subirMedia(jpg: Buffer, mime = 'image/jpeg', phoneNumberId?: string): Promise<string | null> {
     const form = new FormData();
     form.append('messaging_product', 'whatsapp');
-    form.append('type', 'image/jpeg');
-    form.append('file', new Blob([new Uint8Array(jpg)], { type: 'image/jpeg' }), 'imagen.jpg');
+    form.append('type', mime);
+    form.append('file', new Blob([new Uint8Array(jpg)], { type: mime }), mime === 'image/png' ? 'imagen.png' : 'imagen.jpg');
     try {
       const r = await fetch(`https://graph.facebook.com/${this.apiVersion}/${this.phoneDe({ phoneNumberId })}/media`, {
         method: 'POST',
@@ -779,7 +779,7 @@ export class WhatsAppMetaAdaptador implements WhatsAppMensajeriaPuerto {
       const clave = `wa_media:${productoId}:${createHash('sha1').update(jpg).digest('hex')}${sufijo}`;
       const previo: any = (await this.prisma.parametro.findUnique({ where: { clave } }))?.valor;
       if (previo?.mediaId && Date.now() - Number(previo.en) < WhatsAppMetaAdaptador.VIDA_MEDIA_MS) return previo.mediaId;
-      const mediaId = await this.subirMedia(jpg, phoneNumberId);
+      const mediaId = await this.subirMedia(jpg, 'image/jpeg', phoneNumberId);
       if (mediaId) {
         const valor = { mediaId, en: Date.now() };
         await this.prisma.parametro.upsert({ where: { clave }, create: { clave, valor }, update: { valor } });
