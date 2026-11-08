@@ -11,8 +11,16 @@ import type { AreaDespacho, LineaComanda, PedidoDespacho, UmbralesCocina } from 
 import { ResumenPagoDespacho } from './ResumenPagoDespacho';
 
 const VERDE = '#2F7A45';
+const NAVY = '#0B2C3E';
+/** Fondo de la tarjeta: claro y fijo, así el texto nunca hereda un color claro del contenedor (pantalla completa es oscura). */
+export const FONDO_TARJETA = '#FFFDF9';
+export const FONDO_TARJETA_DESPACHADO = '#EFE6D8';
+/** Color de franja izquierda por modalidad (es el mismo fondo de su insignia). */
+export const colorModalidad = (modalidad: string) => (MODALIDAD[modalidad] ?? { fondo: '#2C4C5D' }).fondo;
+
+const clamp2: CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' };
 // Cada modalidad con su propio color (texto siempre con contraste ≥ 4.5:1)
-const MODALIDAD: Record<string, { texto: string; icono: string; fondo: string; color: string }> = {
+export const MODALIDAD: Record<string, { texto: string; icono: string; fondo: string; color: string }> = {
   MESA: { texto: 'En mesa', icono: '🍽️', fondo: '#0B2C3E', color: '#FBF4EC' },
   LOCAL: { texto: 'En el local', icono: '🍽️', fondo: '#0B2C3E', color: '#FBF4EC' },
   COMER_LOCAL: { texto: 'Comer en el local', icono: '🍽️', fondo: '#2F7A45', color: '#FFFFFF' },
@@ -38,7 +46,7 @@ const boton = (activo: boolean): CSSProperties => ({
   padding: '0 18px',
   borderRadius: '12px',
   border: '1.5px solid var(--cp-navy)',
-  background: activo ? 'var(--cp-navy)' : 'transparent',
+  background: activo ? 'var(--cp-navy)' : FONDO_TARJETA,
   color: activo ? 'var(--cp-cream)' : 'var(--cp-navy)',
   fontWeight: 800,
   fontSize: '15px',
@@ -47,9 +55,9 @@ const boton = (activo: boolean): CSSProperties => ({
 
 /** Semáforo de un área: lista (verde), ya salió (gris) o falta (ámbar). Siempre con texto, no solo color. */
 function estadoArea(a: AreaDespacho): { texto: string; icono: string; fondo: string; color: string } {
-  if (a.despachada) return { texto: 'Ya salió', icono: '📦', fondo: 'var(--cp-sand, #EDE1D1)', color: 'var(--cp-navy)' };
+  if (a.despachada) return { texto: 'Ya salió', icono: '📦', fondo: '#D9CBB5', color: NAVY };
   if (a.listo) return { texto: 'Lista', icono: '✓', fondo: VERDE, color: '#fff' };
-  return { texto: 'Falta', icono: '⏳', fondo: 'var(--cp-orange, #E67929)', color: 'var(--cp-navy)' };
+  return { texto: 'Falta', icono: '⏳', fondo: '#E67929', color: NAVY };
 }
 
 function Areas({
@@ -64,7 +72,7 @@ function Areas({
   ocupado: boolean;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    <div data-testid={`areas-${p.pedidoId}`} style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '380px', overflowY: 'auto', overflowX: 'hidden', paddingRight: '4px', overflowWrap: 'anywhere' }}>
       {p.areas.map((a) => {
         const e = estadoArea(a);
         return (
@@ -73,10 +81,10 @@ function Areas({
             data-testid={`area-${p.pedidoId}-${a.areaId}`}
             data-listo={a.listo}
             aria-label={`Área ${a.areaNombre}`}
-            style={{ borderLeft: `6px solid ${a.despachada ? 'var(--cp-line, #E3D6C6)' : a.listo ? VERDE : 'var(--cp-orange, #E67929)'}`, paddingLeft: '12px' }}
+            style={{ borderLeft: `6px solid ${a.despachada ? 'var(--cp-line, #E3D6C6)' : a.listo ? VERDE : '#E67929'}`, paddingLeft: '12px' }}
           >
             <header style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-              <strong style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '18px', textTransform: 'uppercase' }}>{a.areaNombre}</strong>
+              <strong style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '18px', textTransform: 'uppercase', color: NAVY }}>{a.areaNombre}</strong>
               <span
                 data-testid={`estado-area-${p.pedidoId}-${a.areaId}`}
                 style={{ fontWeight: 800, fontSize: '14px', padding: '3px 12px', borderRadius: '9999px', background: e.fondo, color: e.color }}
@@ -90,13 +98,13 @@ function Areas({
                   data-testid={`devolver-${p.pedidoId}-${a.areaId}`}
                   disabled={ocupado}
                   onClick={() => alDevolver(p, a)}
-                  style={{ ...boton(false), marginLeft: 'auto', minHeight: '48px', fontSize: '14px', borderColor: 'var(--cp-rust)', color: 'var(--cp-rust)' }}
+                  style={{ ...boton(false), marginLeft: 'auto', minHeight: '48px', fontSize: '14px', borderColor: '#B2500F', color: '#B2500F' }}
                 >
                   Devolver al área
                 </button>
               )}
             </header>
-            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '18px', lineHeight: 1.35 }}>
+            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '18px', lineHeight: 1.35, color: NAVY }}>
               {a.lineas.map((l) => (
                 <li key={l.id} style={{ marginBottom: '6px' }}>
                   <strong>{l.cantidad}×</strong> {l.nombre}
@@ -105,9 +113,9 @@ function Areas({
                       {textoSabores(l)}
                     </div>
                   )}
-                  {detalleLinea(l).length > 0 && <div style={{ fontSize: '14px', color: 'var(--cp-soft)' }}>{detalleLinea(l).join(' · ')}</div>}
+                  {detalleLinea(l).length > 0 && <div style={{ fontSize: '14px', color: '#2C4C5D' }}>{detalleLinea(l).join(' · ')}</div>}
                   {l.nota && (
-                    <div style={{ fontSize: '14px', fontWeight: 700, background: '#FFF3C4', display: 'inline-block', padding: '0 6px', borderRadius: '4px' }}>{l.nota}</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, background: '#FFF3C4', color: NAVY, display: 'inline-block', padding: '0 6px', borderRadius: '4px' }}>{l.nota}</div>
                   )}
                 </li>
               ))}
@@ -203,13 +211,13 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
 
   return (
     <div data-testid="vista-despacho" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0, fontFamily: 'Montserrat, sans-serif', fontSize: '22px' }}>Despacho</h2>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', padding: '8px 12px', borderRadius: '14px', background: FONDO_TARJETA, color: NAVY }}>
+        <h2 style={{ margin: 0, color: NAVY, fontFamily: 'Montserrat, sans-serif', fontSize: '22px' }}>Despacho</h2>
         <span data-testid="contador-en-despacho" style={{ fontWeight: 800, fontSize: '15px', padding: '4px 14px', borderRadius: '9999px', background: 'var(--cp-navy)', color: 'var(--cp-cream)' }}>
           {enDespacho.length} en despacho
         </span>
         {listosParaSalir > 0 && (
-          <span style={{ fontWeight: 800, fontSize: '15px', color: VERDE }}>{listosParaSalir} completos para despachar</span>
+          <span style={{ fontWeight: 800, fontSize: '15px', padding: '4px 14px', borderRadius: '9999px', background: '#EAF6EC', color: '#1F5C32', border: `2px solid ${VERDE}` }}>{listosParaSalir} completos para despachar</span>
         )}
         <span style={{ marginLeft: 'auto', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button
@@ -230,10 +238,10 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
         </span>
       </div>
 
-      {error && <div role="alert" style={{ color: 'var(--cp-rust)', fontWeight: 700, fontSize: '16px' }}>{error}</div>}
-      {cargando && <div role="status">Cargando pedidos…</div>}
+      {error && <div role="alert" style={{ color: '#8A3D0B', background: FONDO_TARJETA, padding: '8px 12px', borderRadius: '10px', fontWeight: 700, fontSize: '16px' }}>{error}</div>}
+      {cargando && <div role="status" style={{ alignSelf: 'flex-start', padding: '6px 14px', borderRadius: '10px', background: FONDO_TARJETA, color: NAVY, fontWeight: 700 }}>Cargando pedidos…</div>}
       {!cargando && visibles.length === 0 && !error && (
-        <div data-testid="despacho-vacio" style={{ padding: '24px', textAlign: 'center', color: 'var(--cp-soft)', fontSize: '18px' }}>
+        <div data-testid="despacho-vacio" style={{ padding: '24px', textAlign: 'center', color: NAVY, background: FONDO_TARJETA, borderRadius: '14px', fontSize: '18px' }}>
           No hay pedidos por despachar.
         </div>
       )}
@@ -257,16 +265,22 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                 gap: '8px',
                 padding: '12px',
                 borderRadius: '14px',
-                background: 'var(--cp-white, #fff)',
-                border: `3px solid ${p.completo && !p.despachado ? VERDE : 'var(--cp-line, #E3D6C6)'}`,
-                opacity: p.despachado ? 0.55 : 1,
+                boxSizing: 'border-box',
+                width: '100%',
+                minWidth: 0,
+                maxWidth: '100%',
+                overflowWrap: 'anywhere',
+                background: p.despachado ? FONDO_TARJETA_DESPACHADO : FONDO_TARJETA,
+                color: NAVY,
+                border: `2px solid ${p.completo && !p.despachado ? VERDE : '#E3D6C6'}`,
+                borderLeft: `10px solid ${m.fondo}`,
               }}
             >
-              <header style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <strong style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '26px' }}>{p.codigo}</strong>
+              <header style={{ display: 'flex', alignItems: 'center', columnGap: '8px', rowGap: '4px', flexWrap: 'wrap' }}>
+                <strong data-testid={`codigo-${p.pedidoId}`} style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '18px', fontWeight: 900, color: NAVY, overflowWrap: 'anywhere' }}>{p.codigo}</strong>
                 <span
                   data-testid={`modalidad-${p.pedidoId}`}
-                  style={{ fontWeight: 800, fontSize: '15px', padding: '3px 12px', borderRadius: '9999px', background: m.fondo, color: m.color }}
+                  style={{ fontWeight: 800, fontSize: '14px', padding: '3px 10px', borderRadius: '9999px', whiteSpace: 'nowrap', background: m.fondo, color: m.color }}
                 >
                   <span aria-hidden="true">{m.icono} </span>
                   {m.texto}
@@ -281,11 +295,11 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                 )}
                 <TiempoEspera desde={p.creado_en} minutosRespaldo={p.minutos} umbrales={umbrales} style={{ marginLeft: 'auto', fontSize: '16px' }} />
               </header>
-              <div style={{ fontSize: '19px', fontWeight: 700 }}>{destino(p) || 'Sin nombre'}</div>
+              <div data-testid={`nombre-${p.pedidoId}`} title={destino(p) || 'Sin nombre'} style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '24px', fontWeight: 900, lineHeight: 1.15, color: NAVY, ...clamp2 }}>{destino(p) || 'Sin nombre'}</div>
               {p.modalidad === 'DELIVERY' && (p.direccion || p.referencia) && (
-                <div style={{ fontSize: '15px', color: 'var(--cp-soft)' }}>{[p.direccion, p.referencia].filter(Boolean).join(' · ')}</div>
+                <div style={{ fontSize: '15px', color: '#2C4C5D', overflowWrap: 'anywhere' }}>{[p.direccion, p.referencia].filter(Boolean).join(' · ')}</div>
               )}
-              {p.nota && <div style={{ fontSize: '15px', fontWeight: 700, background: '#FFF3C4', padding: '4px 8px', borderRadius: '6px' }}>Nota: {p.nota}</div>}
+              {p.nota && <div style={{ fontSize: '15px', fontWeight: 700, background: '#FFF3C4', color: NAVY, padding: '4px 8px', borderRadius: '6px' }}>Nota: {p.nota}</div>}
               {p.pago && <ResumenPagoDespacho pedidoId={p.pedidoId} pago={p.pago} esPersonal={p.esPersonal} telefono={p.modalidad === 'DELIVERY' ? p.telefono : null} />}
               <span
                 data-testid={`estado-pedido-${p.pedidoId}`}
@@ -295,8 +309,8 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                   fontSize: '15px',
                   padding: '4px 14px',
                   borderRadius: '9999px',
-                  background: p.despachado ? 'var(--cp-sand, #EDE1D1)' : p.completo ? VERDE : 'var(--cp-orange, #E67929)',
-                  color: p.despachado || !p.completo ? 'var(--cp-navy)' : '#fff',
+                  background: p.despachado ? '#D9CBB5' : p.completo ? VERDE : '#E67929',
+                  color: p.despachado || !p.completo ? NAVY : '#fff',
                 }}
               >
                 {p.despachado ? 'DESPACHADO' : p.completo ? 'COMPLETO' : `Faltan ${faltan.length} de ${p.areas.length}`}
@@ -315,8 +329,8 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                       minHeight: '52px',
                       borderRadius: '14px',
                       border: 'none',
-                      background: p.completo ? VERDE : 'var(--cp-line, #E3D6C6)',
-                      color: p.completo ? '#fff' : 'var(--cp-soft)',
+                      background: p.completo ? VERDE : '#E3D6C6',
+                      color: p.completo ? '#fff' : '#2C4C5D',
                       fontFamily: 'Montserrat, sans-serif',
                       fontWeight: 900,
                       fontSize: '20px',
@@ -326,7 +340,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                     Todo completo · despachar
                   </button>
                   {!p.completo && (
-                    <div style={{ fontSize: '14px', color: 'var(--cp-soft)' }}>Falta: {faltan.map((a) => a.areaNombre).join(', ')}</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#2C4C5D' }}>Falta: {faltan.map((a) => a.areaNombre).join(', ')}</div>
                   )}
                   {!p.completo && algoListo && (
                     <button
