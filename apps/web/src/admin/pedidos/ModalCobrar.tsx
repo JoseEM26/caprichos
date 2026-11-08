@@ -13,7 +13,6 @@ import { vouchersApi } from '../vouchers/vouchersApi';
 import type { RespuestaSubirVoucherAdmin, VoucherExtraido } from '../vouchers/tipos';
 import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
 import { CapturasPlanDigital } from './CapturasPlanDigital';
-import { nombreMedio } from './planPago';
 
 const MEDIOS_PAGO = [
   'Efectivo',
