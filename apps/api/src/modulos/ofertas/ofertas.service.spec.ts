@@ -900,8 +900,8 @@ describe('OfertasService', () => {
         id: 1, cupones_por_comprobante: 5, cupon_con_descuento: false, promo_con_descuento: false, texto_pie: 'Pie',
       });
       prismaMock.pedido.findUnique.mockResolvedValueOnce({ canal: 'MOZO' });
-      const ayer = new Date(Date.now() - 24 * 3600 * 1000);
-      const hace10 = new Date(Date.now() - 10 * 24 * 3600 * 1000);
+      const ayer = new Date(Date.now() - 3 * 24 * 3600 * 1000); // 3 días: a prueba del cambio de día UTC/Lima
+      const hace10 = new Date(Date.now() - 12 * 24 * 3600 * 1000);
       prismaMock.cupon.findMany.mockResolvedValueOnce([
         // vencido: su fecha_hasta ya pasó
         { id: 20n, codigo_base: 'VENCIDO', dias_validez: 15, canales: ['CARTA', 'CAJA'], fecha_desde: hace10, fecha_hasta: ayer, dias: [], hora_desde: null, hora_hasta: null },
