@@ -4,7 +4,8 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 const UA_ESCRITORIO = 'Mozilla/5.0 (X11; Linux x86_64) Chrome/120';
 const UA_IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148';
 const NOMBRE_BOTON = 'Instalar app';
-const TITULO = '¿Qué app quieres instalar?';
+const TITULO = 'Instala Caprichos';
+const TITULO_ADMIN = '¿Qué app quieres instalar?';
 
 function ponerUserAgent(ua: string) {
   Object.defineProperty(window.navigator, 'userAgent', { value: ua, configurable: true });
@@ -92,9 +93,11 @@ describe('BotonInstalarApp (cabecera de la carta)', () => {
 
     const dialogo = screen.getByRole('dialog', { name: TITULO });
     expect(dialogo.getAttribute('aria-modal')).toBe('true');
-    expect(screen.getByText('Carta virtual (para clientes)')).toBeDefined();
-    expect(screen.getByText('Panel administrativo')).toBeDefined();
-    expect(screen.getByText('Asistencia (marcar entrada y salida)')).toBeDefined();
+    expect(screen.getByText('Caprichos (carta para pedir)')).toBeDefined();
+    // en la carta pública NUNCA se ofrece la app administrativa ni la de asistencia
+    expect(document.body.querySelector('[data-app="admin"]')).toBeNull();
+    expect(document.body.querySelector('[data-app="asistencia"]')).toBeNull();
+    expect(dialogo.textContent).not.toMatch(/administrativ|asistencia|admin/i);
     expect(screen.getByRole('button', { name: 'Cerrar' }).style.width).toBe('44px');
   });
 
@@ -143,19 +146,37 @@ describe('BotonInstalarApp (cabecera de la carta)', () => {
     expect(evento.prompt).toHaveBeenCalledTimes(1);
   });
 
-  it('«Instalar» de otra app abre su ruta en pestaña nueva con ?instalar= (un aviso solo instala la app de su manifest)', async () => {
+  it('en el panel: ofrece administrativa y asistencia (no la carta); la otra se abre en pestaña nueva con ?instalar=', async () => {
+    window.history.pushState({}, '', '/admin/pedidos');
     const { BotonInstalarApp } = await cargarBoton();
     const abrir = vi.spyOn(window, 'open').mockReturnValue(null);
     render(<BotonInstalarApp />);
     const evento = dispararInstalable();
     fireEvent.click(screen.getByRole('button', { name: NOMBRE_BOTON }));
+    expect(screen.getByRole('dialog', { name: TITULO_ADMIN })).toBeDefined();
+    expect(document.body.querySelector('[data-app="carta"]')).toBeNull();
 
-    fireEvent.click(tarjeta('admin').getByRole('button', { name: 'Instalar' }));
     fireEvent.click(tarjeta('asistencia').getByRole('button', { name: 'Instalar' }));
-    expect(abrir).toHaveBeenNthCalledWith(1, '/admin/?instalar=admin', '_blank', 'noopener');
-    expect(abrir).toHaveBeenNthCalledWith(2, '/admin/mi-asistencia?instalar=asistencia', '_blank', 'noopener');
+    expect(abrir).toHaveBeenCalledWith('/admin/mi-asistencia?instalar=asistencia', '_blank', 'noopener');
     expect(evento.prompt).not.toHaveBeenCalled();
+    fireEvent.click(tarjeta('admin').getByRole('button', { name: 'Instalar' }));
+    await act(async () => {});
+    expect(evento.prompt).toHaveBeenCalledTimes(1);
     abrir.mockRestore();
+    window.history.pushState({}, '', '/');
+  });
+
+  it('un aviso capturado en el panel no sirve para instalar desde la carta (al cambiar de área se descarta)', async () => {
+    window.history.pushState({}, '', '/admin/pedidos');
+    vi.resetModules();
+    const pwa = await import('../instalar');
+    pwa.iniciarCapturaInstalar();
+    const evento = dispararInstalable();
+    expect(pwa.appDelAvisoNativo()).toBe('admin');
+    window.history.pushState({}, '', '/');
+    expect(pwa.tieneAvisoNativo()).toBe(false);
+    expect(await pwa.instalar()).toBe('no-disponible');
+    expect(evento.prompt).not.toHaveBeenCalled();
   });
 
   it('ya instalada: dice «Ya instalada» y «Reinstalar / actualizar» explica cómo sobrescribir y busca la actualización', async () => {
@@ -171,7 +192,6 @@ describe('BotonInstalarApp (cabecera de la carta)', () => {
     await act(async () => {});
 
     expect(tarjeta('carta').getByText('Ya instalada')).toBeDefined();
-    expect(tarjeta('admin').getByRole('button', { name: 'Instalar' })).toBeDefined();
     fireEvent.click(tarjeta('carta').getByRole('button', { name: 'Reinstalar / actualizar' }));
     await act(async () => {});
     expect(tarjeta('carta').getByText(/Para sobrescribirla/)).toBeDefined();
@@ -215,12 +235,24 @@ describe('BotonInstalarApp (cabecera de la carta)', () => {
     pwa.iniciarCapturaInstalar();
     const { AutoInstalar } = await import('../AutoInstalar');
     render(<AutoInstalar />);
-    expect(screen.getByRole('dialog', { name: TITULO })).toBeDefined();
+    expect(screen.getByRole('dialog', { name: TITULO_ADMIN })).toBeDefined();
     expect(document.body.querySelector('[data-app="admin"]')?.getAttribute('style')).toContain('2px solid');
     // si el aviso llega, se intenta abrir solo; sin toque del usuario el navegador lo rechaza y el botón sigue sirviendo
     const evento = dispararInstalable();
     await act(async () => {});
     expect(evento.prompt).toHaveBeenCalled();
+    window.history.pushState({}, '', '/');
+  });
+
+  it('?instalar=admin en la carta pública se ignora: sigue siendo la app de la carta', async () => {
+    window.history.pushState({}, '', '/?instalar=admin');
+    vi.resetModules();
+    const pwa = await import('../instalar');
+    pwa.iniciarCapturaInstalar();
+    expect(pwa.appSolicitada()).toBeNull();
+    const { AutoInstalar } = await import('../AutoInstalar');
+    const { container } = render(<AutoInstalar />);
+    expect(container).toBeEmptyDOMElement();
     window.history.pushState({}, '', '/');
   });
 });

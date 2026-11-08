@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Icono } from '../comun/Icono';
 import { esIos, estaInstalada, suscribirInstalar } from './instalar';
 import { ElegirAppInstalar } from './ElegirAppInstalar';
+import { esRutaAdmin } from './manifestPorRuta';
 
 // objetivo táctil mínimo de 44 px
 const TACTIL = 44;
@@ -138,7 +139,7 @@ function Instrucciones() {
 }
 
 /**
- * Botón «Instalar app» y su ventana para elegir QUÉ app instalar (carta, panel o asistencia). Se ve mientras la app no esté
+ * Botón «Instalar app» y su ventana para elegir QUÉ app instalar (según el área). Se ve mientras la app no esté
  * instalada; con `siempre` se ve también ya instalada (panel del local: ahí sirve para reinstalar o buscar cambios).
  * `abrirInicial` + `sinBoton` abren solo la ventana (pestaña abierta con ?instalar=...).
  */
@@ -277,10 +278,12 @@ export function BotonInstalarApp({ siempre = false, abrirInicial = false, sinBot
                   <Trazo paths={PATH_TELEFONO} tamano={28} />
                 </span>
                 <h2 id="instalar-app-titulo" style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 19, lineHeight: '24px', paddingRight: 28 }}>
-                  ¿Qué app quieres instalar?
+                  {esRutaAdmin(window.location.pathname) ? '¿Qué app quieres instalar?' : 'Instala Caprichos'}
                 </h2>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--cp-soft)' }}>
-                  Puedes tener las tres a la vez. Cada una se abre directo en lo suyo.
+                  {esRutaAdmin(window.location.pathname)
+                    ? 'Puedes tener las dos a la vez. Cada una se abre directo en lo suyo.'
+                    : 'Así pides más rápido, desde tu pantalla de inicio.'}
                 </p>
               </div>
 

@@ -6,7 +6,7 @@ type EventoInstalar = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
-import { APPS_PWA, appDeRuta, type AppPwa } from './manifestPorRuta';
+import { APPS_PWA, appDeRuta, appPedidaValida, type AppPwa } from './manifestPorRuta';
 
 const CLAVE_DESCARTE = 'caprichos.pwa.instalar.descartado';
 
@@ -25,8 +25,7 @@ const avisar = () => oyentes.forEach((fn) => fn());
 export function iniciarCapturaInstalar(): void {
   if (capturaIniciada || typeof window === 'undefined') return;
   capturaIniciada = true;
-  const pedida = new URLSearchParams(window.location.search).get('instalar');
-  appPedida = pedida === 'carta' || pedida === 'admin' || pedida === 'asistencia' ? pedida : null;
+  appPedida = appPedidaValida(window.location.search);
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     diferido = e as EventoInstalar;
@@ -84,11 +83,13 @@ export function puedeInstalar(): boolean {
 
 /** true si el navegador da el aviso de instalar (no iOS); false si solo cabe la guía. */
 export function tieneAvisoNativo(): boolean {
-  return diferido !== null;
+  return appDelAvisoNativo() !== null;
 }
 
 /** Lanza el aviso del navegador. Devuelve 'no-disponible' si no hay evento (iOS o navegador sin soporte). */
 export async function instalar(): Promise<'aceptada' | 'descartada' | 'no-disponible'> {
+  // El aviso lo armó el manifest de otra área (p. ej. se cargó en el panel y se navegó a la carta): se descarta, no se usa
+  if (diferido && appDelAviso !== appDeRuta()) diferido = null;
   if (!diferido) return 'no-disponible';
   const evento = diferido;
   diferido = null;
@@ -112,7 +113,7 @@ export function suscribirInstalar(cb: () => void): () => void {
 
 /** App que el navegador instalaría con el aviso guardado (null si no hay aviso). */
 export function appDelAvisoNativo(): AppPwa | null {
-  return diferido ? appDelAviso : null;
+  return diferido && appDelAviso === appDeRuta() ? appDelAviso : null;
 }
 
 /** App pedida con ?instalar= al abrir esta pestaña. */

@@ -7,7 +7,9 @@
       // ofrecería instalar la carta aunque se esté en el panel. Mismo mapa que src/pwa/manifestPorRuta.ts.
       (function () {
         var p = location.pathname, q = new URLSearchParams(location.search).get('instalar');
-        var a = q === 'carta' || q === 'admin' || q === 'asistencia' ? q
+        var adm = p === '/admin' || p.indexOf('/admin/') === 0;
+        // ?instalar= solo vale dentro de su área: en la carta pública nunca se enlaza un manifest del panel
+        var a = (adm ? (q === 'admin' || q === 'asistencia') : q === 'carta') ? q
           : p === '/admin/mi-asistencia' || p.indexOf('/admin/mi-asistencia/') === 0 ? 'asistencia'
           : p === '/admin' || p.indexOf('/admin/') === 0 ? 'admin' : 'carta';
         var l = document.createElement('link');

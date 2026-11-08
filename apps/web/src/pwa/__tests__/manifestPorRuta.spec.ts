@@ -25,6 +25,8 @@ describe('manifest por ruta', () => {
     expect(appDeRuta('/admin/mi-asistencia', '')).toBe('asistencia');
     expect(appDeRuta('/admin/', '?instalar=asistencia')).toBe('asistencia');
     expect(appDeRuta('/admin/', '?instalar=otra')).toBe('admin');
+    expect(appDeRuta('/', '?instalar=admin')).toBe('carta');
+    expect(appDeRuta('/admin/', '?instalar=carta')).toBe('admin');
   });
 
   it('el link rel=manifest cambia según la ruta', () => {
@@ -34,8 +36,11 @@ describe('manifest por ruta', () => {
     expect(document.querySelector('link[rel="manifest"]')?.getAttribute('href')).toBe('/manifest-asistencia.webmanifest');
     ajustarManifestPorRuta('/', '');
     expect(document.querySelector('link[rel="manifest"]')?.getAttribute('href')).toBe('/manifest.webmanifest');
+    // en la carta, ?instalar=admin / asistencia no cambia el manifest (nunca se enlaza uno administrativo)
     ajustarManifestPorRuta('/', '?instalar=admin');
-    expect(document.querySelector('link[rel="manifest"]')?.getAttribute('href')).toBe('/manifest-admin.webmanifest');
+    expect(document.querySelector('link[rel="manifest"]')?.getAttribute('href')).toBe('/manifest.webmanifest');
+    ajustarManifestPorRuta('/mis-pedidos', '?instalar=asistencia');
+    expect(document.querySelector('link[rel="manifest"]')?.getAttribute('href')).toBe('/manifest.webmanifest');
   });
 
   it('el script de index.html pone el manifest dentro del <head>, antes de que el navegador lo pida', () => {
@@ -43,6 +48,7 @@ describe('manifest por ruta', () => {
     expect(html).toContain("'/manifest.webmanifest'");
     expect(html).toContain("'/manifest-' + a + '.webmanifest'");
     expect(html).toContain('/admin/mi-asistencia');
+    expect(html).toContain("adm ? (q === 'admin' || q === 'asistencia') : q === 'carta'");
     expect(html.indexOf('/manifest-')).toBeLessThan(html.indexOf('</head>'));
   });
 
@@ -61,6 +67,9 @@ describe('manifest por ruta', () => {
       '/admin/',
       'Caprichos Asistencia',
     ]);
+    // el manifest público (carta) no filtra nada administrativo
+    const publico = vite.slice(vite.indexOf('manifest: {'), vite.indexOf('injectManifest: {'));
+    expect(publico).not.toMatch(/admin|asistencia/i);
     expect(new Set(['/', admin.id, asistencia.id]).size).toBe(3);
     for (const m of [admin, asistencia]) expect(m.start_url.startsWith(m.scope)).toBe(true);
     expect(APPS_PWA.admin.manifest).toBe('/manifest-admin.webmanifest');
