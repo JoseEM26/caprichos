@@ -17,12 +17,9 @@ import {
   comboConBebidas,
   eleccionesCombo,
   esGrupoBebidaDuplicado,
-  faltaElegirPaquete,
   filtrarPaquetes,
   gruposPaquetes,
   SelectorPaqueteCombo,
-  faltaElegirJuguetes,
-  faltaElegirReemplazo,
   notaReemplazos,
   partesConAlternativas,
   partesEleccion,
@@ -49,10 +46,23 @@ interface Props {
 const fmt = (n: number): string => `S/ ${n.toFixed(2)}`;
 const recortar = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
 
+interface Faltante {
+  texto: string;
+  /** Dónde se elige (para llevar al cliente ahí) */
+  selector: string;
+  /** Paso del combo que hay que abrir para verlo */
+  seccion?: string;
+}
+
 const titulo: CSSProperties = { fontFamily: 'var(--fuente-titulos)' };
 
+/** Pasos (claves de sección) en orden de aparición. */
+const secciones0 = (gs: GrupoOpcionesCarta[]): string[] => Array.from(new Set(gs.filter((g) => g.nombre.includes(' · ')).map((g) => g.nombre.split(' · ')[0])));
+
 /** Un grupo es "de combo" cuando su nombre es «Bebida 1 · Bebida» (paso · tipo). */
-const claveSeccion = (g: GrupoOpcionesCarta): string => (g.nombre.includes(' · ') ? g.nombre.split(' · ')[0] : g.id);
+// Un grupo suelto del anfitrión (sin « · ») se titula con su nombre; nunca con su id (salía un paso llamado «8»).
+const tituloPaso = (nombre: string): string => (/^\s*\d*\s*$/.test(nombre) ? 'Complemento' : nombre.trim());
+const claveSeccion = (g: GrupoOpcionesCarta): string => (g.nombre.includes(' · ') ? g.nombre.split(' · ')[0] : tituloPaso(g.nombre));
 const nombreCorto = (g: GrupoOpcionesCarta): string => (g.nombre.includes(' · ') ? g.nombre.split(' · ')[1] : g.nombre);
 
 /**
@@ -112,7 +122,13 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
 
   const esCombo = producto.grupos.some((g) => g.nombre.includes(' · '));
   // bebidas del combo (grupos «Bebida 1 · Bebida»): cada una lleva su nombre para el envase
-  const gruposBebida = esCombo ? gruposCarta.filter((g) => g.nombre.includes(' · ') && /^bebida/i.test(nombreCorto(g))) : [];
+  // (el paso se reconoce por «Bebida N · ...»; antes solo valía «Bebida 1 · Bebida» y con «Bebida 1 · Sabor» el campo de nombre desaparecía)
+  const gruposBebida = esCombo
+    ? secciones0(gruposCarta).flatMap((k) => {
+        const gs = gruposCarta.filter((g) => g.nombre.includes(' · ') && claveSeccion(g) === k);
+        return /^bebida/i.test(k) ? [gs.find((g) => esGrupoBebidaDuplicado(g.nombre)) ?? gs[0]] : [];
+      })
+    : [];
   // Sin esos grupos, cada paso de la parte de bebidas es una bebida con su envase
   const nB = gruposBebida.length || partesJug.filter((p) => p.bebidas).reduce((a, p) => a + p.cantidad, 0);
   const envases = bebidasElegidas(partesJug, elegido);
@@ -151,10 +167,28 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
   const unidadesBebida = activoPorBebida ? Array.from({ length: cantidad }, (_, i) => elegidasDe(selDe(i))) : [];
   const totalPrecio = activoPorBebida ? Number(unidadesBebida.reduce((a, ops) => a + precioDe(ops), 0).toFixed(2)) : Number((unitario * cantidad).toFixed(2));
   const bebidaCompleta = (i: number) => gruposCarta.every((g) => (selDe(i)[g.id] ?? []).length >= g.minimo);
-  const gruposOk = activoPorBebida ? Array.from({ length: cantidad }, (_, i) => i).every(bebidaCompleta) : gruposCarta.every((g) => (sel[g.id] ?? []).length >= g.minimo);
-  const valido =
-    !faltaElegirJuguetes(partesJug, elegido, cantidad) &&
-    !comboAgotado && !faltaElegirPaquete(oferta, paquetes) && !faltaElegirReemplazo(partesRe, reemplazos) && gruposOk;
+  // Todo lo que falta, con el lugar donde se elige: una sola lista alimenta el botón, «Ver qué falta» y la validación
+  const faltantes: Faltante[] = [];
+  for (const g of gruposPaquetes(oferta)) if (!paquetes[g.grupo]) faltantes.push({ texto: `Elige tu ${g.grupo.toLowerCase()}`, selector: '[data-testid="paquetes-combo"]' });
+  for (const p of partesRe) if (!reemplazos[p.parteId]) faltantes.push({ texto: `Alternativa de ${p.faltanteNombre}`, selector: '[data-testid="aviso-reemplazo-combo"]' });
+  for (const parte of partesJug) {
+    const total = parte.cantidad * cantidad;
+    if (parte.bebidas) {
+      for (let i = 0; i < total; i++) if (!(bebidas[parte.parteId] ?? [])[i]) faltantes.push({ texto: `Bebida ${i + 1}`, selector: `[data-testid="bebidas-combo-${parte.parteId}"] [aria-label="Bebida ${i + 1}"]` });
+    } else {
+      const n = totalElegido(elegido[parte.parteId] ?? {});
+      if (n !== total) faltantes.push({ texto: n > total ? `Quita ${n - total} opción(es)` : `Elige ${total - n} opción(es)`, selector: `[data-testid="eleccion-combo-${parte.parteId}"]` });
+    }
+  }
+  const unidadesGrupos = activoPorBebida ? Array.from({ length: cantidad }, (_, i) => i) : [-1];
+  for (const i of unidadesGrupos) {
+    for (const g of gruposCarta) {
+      if (((i < 0 ? sel : selDe(i))[g.id] ?? []).length >= g.minimo) continue;
+      const nombreG = g.nombre.includes(' · ') ? `${claveSeccion(g)} · ${nombreCorto(g)}` : tituloPaso(g.nombre);
+      faltantes.push({ texto: i < 0 ? nombreG : `Bebida ${i + 1} · ${nombreG}`, selector: i < 0 ? `[data-grupo="${g.id}"]` : `[aria-label="Bebida ${i + 1}"]`, seccion: esCombo ? claveSeccion(g) : undefined });
+    }
+  }
+  const valido = !comboAgotado && faltantes.length === 0;
 
   // Stock: el saldo lo comparten todas las líneas del mismo producto que ya están en el carrito
   const info = inventario[String(producto.id)] ?? infoStockDe(producto);
@@ -226,11 +260,30 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     setSelUnidad(Object.fromEntries(Array.from({ length: cantidad }, (_, i) => [i, base])));
   };
 
+  const textoFalta = faltantes.length === 0 ? 'Elige las opciones obligatorias' : `Falta elegir: ${faltantes.slice(0, 2).map((f) => f.texto).join(' · ')}${faltantes.length > 2 ? ` +${faltantes.length - 2} más` : ''}`;
+
   const consejoHielo = /poco hielo|menos hielo/i.test(nota)
     ? 'Con poco hielo el vaso queda con menos volumen de bebida.'
     : /no tan helado|menos helado|sin tanto hielo/i.test(nota)
       ? 'Si lo pides menos helado, la bebida quedará más aguada.'
       : '';
+
+  // Lleva al primer paso pendiente (abriéndolo si está plegado) y lo resalta un momento
+  const verFalta = () => {
+    const f = faltantes[0];
+    if (!f) return;
+    if (f.seccion) setAbierta(f.seccion);
+    setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(f.selector);
+      if (!el) return;
+      el.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+      const antes = el.style.boxShadow;
+      el.style.boxShadow = '0 0 0 3px var(--cp-orange)';
+      setTimeout(() => {
+        el.style.boxShadow = antes;
+      }, 1800);
+    }, 0);
+  };
 
   const agregar = () => {
     if (!puedeAgregar) return;
@@ -343,8 +396,8 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
     const f = filtrar(g, selX, clave);
     const obligatorio = g.minimo >= 1;
     return (
-      <div key={clave}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+      <div key={clave} data-grupo={g.id}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
           <span style={{ ...titulo, fontWeight: 800, fontSize: 14, letterSpacing: '0.01em' }}>{g.nombre}</span>
           <span style={{ fontSize: 11, fontWeight: 700, background: obligatorio ? 'var(--cp-navy)' : 'transparent', color: obligatorio ? 'var(--cp-cream)' : 'var(--cp-soft)', borderRadius: 9999, padding: '2px 10px', border: `1px solid ${obligatorio ? 'var(--cp-navy)' : 'var(--cp-soft)'}` }}>
             {etiquetaGrupo(g)}
@@ -363,7 +416,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 aria-pressed={on}
                 aria-label={bebida === undefined ? undefined : `Bebida ${bebida + 1}, ${g.nombre}: ${o.nombre}`}
                 disabled={agotada && !on}
-                style={{ minHeight: 44, borderRadius: 9999, border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '0 14px 0 10px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', fontSize: 13, opacity: agotada ? 0.5 : 1, cursor: agotada && !on ? 'not-allowed' : 'pointer' }}
+                style={{ minHeight: 44, maxWidth: '100%', borderRadius: 22, border: `2px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: 'var(--cp-white)', color: 'var(--cp-navy)', padding: '6px 14px 6px 10px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', fontSize: 13, lineHeight: '17px', opacity: agotada ? 0.5 : 1, cursor: agotada && !on ? 'not-allowed' : 'pointer' }}
               >
                 <span style={{ width: 16, height: 16, borderRadius: g.maximo === 1 ? 10 : 6, border: '2px solid var(--cp-navy)', background: on ? 'var(--cp-orange)' : 'transparent', flex: 'none' }} />
                 <span style={{ fontWeight: 600 }}>{o.nombre}</span>
@@ -386,22 +439,33 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
         role="dialog"
         aria-modal="true"
         aria-label={`Detalles de ${producto.nombre}`}
+        data-movil={movil ? 'si' : 'no'}
         style={{
           position: 'fixed',
           zIndex: 40,
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 'min(620px, calc(100% - 24px))',
-          maxHeight: 'calc(100% - 24px)',
-          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
           background: 'var(--cp-cream)',
-          borderRadius: 20,
           boxShadow: '0 20px 50px rgba(11,44,62,0.4)',
+          // celular: hoja que sube desde abajo (95 % de alto); PC: ventana centrada como siempre
+          ...(movil
+            ? { left: 0, right: 0, bottom: 0, height: '95%', borderRadius: '20px 20px 0 0' }
+            : { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(620px, calc(100% - 24px))', maxHeight: 'calc(100% - 24px)', borderRadius: 20 }),
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {movil && (
+          <div data-testid="cabecera-ventana" style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px 8px 16px', background: 'var(--cp-white)', borderBottom: '1px solid var(--cp-line)' }}>
+            <span style={{ ...titulo, flex: 1, minWidth: 0, fontWeight: 800, fontSize: 16, lineHeight: '20px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{producto.nombre}</span>
+            <span style={{ ...titulo, flex: 'none', fontWeight: 800, fontSize: 16, color: 'var(--cp-rust)' }}>{fmt(unitario)}</span>
+            <button onClick={onCerrar} aria-label="Cerrar ventana de producto" style={{ flex: 'none', width: 44, height: 44, borderRadius: 22, border: '1.5px solid var(--cp-navy)', background: 'var(--cp-white)', color: 'var(--cp-navy)', fontSize: 20, fontWeight: 800 }}>
+              ×
+            </button>
+          </div>
+        )}
+        <div data-testid="cuerpo-ventana" style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div style={{ position: 'relative', flex: 'none', background: 'var(--cp-white)' }}>
+            {!movil && (
             <button
               onClick={onCerrar}
               aria-label="Cerrar ventana de producto"
@@ -409,12 +473,13 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
             >
               ×
             </button>
+            )}
             {producto.fotoUrl ? (
               <button
                 type="button"
                 onClick={() => setZoom(true)}
                 aria-label={`Ampliar la foto de ${producto.nombre}`}
-                style={{ position: 'relative', width: '100%', height: movil ? 210 : 280, border: 0, padding: 0, background: 'var(--cp-sand)', cursor: 'zoom-in', display: 'block', overflow: 'hidden' }}
+                style={{ position: 'relative', width: '100%', height: movil ? 180 : 280, border: 0, padding: 0, background: 'var(--cp-sand)', cursor: 'zoom-in', display: 'block', overflow: 'hidden' }}
               >
                 <img src={producto.fotoUrl} alt="" aria-hidden="true" style={{ position: 'absolute', left: '-10%', top: '-10%', width: '120%', height: '120%', objectFit: 'cover', filter: 'blur(22px)', opacity: 0.55 }} />
                 <img src={producto.fotoUrl} alt={producto.nombre} style={{ position: 'relative', height: '100%', maxWidth: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: '0 auto' }} />
@@ -432,14 +497,16 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
             )}
           </div>
 
-          <div style={{ flex: 'none', minWidth: 0, padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ flex: 'none', minWidth: 0, padding: movil ? '14px 16px 20px' : '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
               <div style={{ ...titulo, fontWeight: 800, fontSize: 24, lineHeight: '30px' }}>{producto.nombre}</div>
               {producto.descripcion && <div style={{ fontSize: 13, color: 'var(--cp-soft)', marginTop: 4 }}>{producto.descripcion}</div>}
             </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ ...titulo, fontWeight: 800, fontSize: 26, color: 'var(--cp-rust)' }}>{fmt(unitario)}</span>
-            </div>
+            {!movil && (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ ...titulo, fontWeight: 800, fontSize: 26, color: 'var(--cp-rust)' }}>{fmt(unitario)}</span>
+              </div>
+            )}
 
             {franjaUltimos && (
               <div data-testid="ultimos-ventana" style={{ ...titulo, alignSelf: 'flex-start', background: 'var(--cp-rust)', color: '#FFFFFF', fontWeight: 800, fontSize: 13, borderRadius: 9999, padding: '4px 14px' }}>
@@ -582,7 +649,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                           {gs.map((g) => {
                             const f = filtrar(g);
                             return (
-                              <div key={g.id}>
+                              <div key={g.id} data-grupo={g.id}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                                   <span style={{ fontWeight: 700, fontSize: 13 }}>{nombreCorto(g)}</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--cp-soft)' }}>
@@ -601,7 +668,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                                         onClick={() => alternar(g, o.id)}
                                         aria-pressed={on}
                                         disabled={agotada && !on}
-                                        style={{ minHeight: 40, padding: '0 12px', borderRadius: 9999, border: `1.5px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: on ? 'rgba(230,121,41,0.16)' : 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 600, fontSize: 13, opacity: agotada ? 0.5 : 1, cursor: agotada && !on ? 'not-allowed' : 'pointer' }}
+                                        style={{ minHeight: 44, maxWidth: '100%', padding: '6px 12px', borderRadius: 16, textAlign: 'left', lineHeight: '17px', border: `1.5px solid ${on ? 'var(--cp-orange)' : 'var(--cp-line)'}`, background: on ? 'rgba(230,121,41,0.16)' : 'var(--cp-white)', color: 'var(--cp-navy)', fontWeight: 600, fontSize: 13, opacity: agotada ? 0.5 : 1, cursor: agotada && !on ? 'not-allowed' : 'pointer' }}
                                       >
                                         {on ? '✓ ' : ''}
                                         {o.nombre}
@@ -669,8 +736,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
             )}
 
             {nB > 0 && (
-              <div style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: '10px 12px', background: 'var(--cp-white)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div data-testid="nombre-envase" style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: '10px 12px', background: 'var(--cp-white)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ ...titulo, fontWeight: 800, fontSize: 14 }}>Nombre para el envase</div>
+                <div style={{ fontSize: 12, lineHeight: '16px', color: 'var(--cp-soft)' }}>Para escribir tu nombre en el vaso.</div>
                 {Array.from({ length: cantidad * nB }, (_, i) => {
                   const g = gruposBebida[i % nB];
                   const bebida = g ? (g.opciones.find((o) => o.id === (sel[g.id] ?? [])[0])?.nombre ?? nombreCorto(g)) : (envases[i] ?? `Bebida ${i + 1}`);
@@ -766,8 +834,9 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 </div>
               )}
             </div>
-
-            <div style={{ position: 'sticky', bottom: 0, zIndex: 1, margin: '0 -24px -24px', padding: '12px 24px 16px', background: 'var(--cp-cream)', borderTop: '1px solid var(--cp-line)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          </div>
+        </div>
+        <div data-testid="barra-agregar" style={{ flex: 'none', padding: movil ? '10px 16px calc(12px + env(safe-area-inset-bottom, 0px))' : '12px 24px 16px', background: 'var(--cp-cream)', borderTop: '1px solid var(--cp-line)', boxShadow: '0 -4px 12px rgba(11,44,62,0.08)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               {ayudaStock && (
                 <div role="status" style={{ flexBasis: '100%', fontSize: 12, fontWeight: 700, lineHeight: '17px', color: enTope ? 'var(--cp-rust)' : 'var(--cp-navy)' }}>
                   {ayudaStock}
@@ -799,6 +868,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 </button>
               </div>
               )}
+              {!soloLectura && !valido && !comboAgotado && faltantes.length > 0 && (
+                <button type="button" onClick={verFalta} style={{ flexBasis: '100%', minHeight: 44, border: '1.5px solid var(--cp-orange)', borderRadius: 12, background: 'var(--cp-white)', color: 'var(--cp-rust)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                  Ver qué falta ({faltantes.length})
+                </button>
+              )}
               <button
                 onClick={soloLectura ? undefined : agregar}
                 disabled={soloLectura ? true : !puedeAgregar}
@@ -806,6 +880,7 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                 style={{
                   flex: '1 1 200px',
                   minHeight: 52,
+                  minWidth: 0,
                   border: 0,
                   borderRadius: 12,
                   background: soloLectura ? 'var(--cp-sand)' : puedeAgregar ? 'var(--cp-orange)' : 'var(--cp-line)',
@@ -834,13 +909,11 @@ export function VentanaProductoCarta({ producto, esBebida, onCerrar, soloLectura
                           ? 'Elige los sabores'
                           : valido
                             ? libre ? `Agregar ${llevas} al pedido` : 'Agregar al pedido'
-                            : 'Elige las opciones obligatorias'}
+                            : textoFalta}
                 </span>
                 <span>{fmt(totalPrecio)}</span>
               </button>
             </div>
-          </div>
-        </div>
       </div>
 
       {zoom && producto.fotoUrl && (

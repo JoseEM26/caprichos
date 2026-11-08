@@ -57,11 +57,11 @@ export function SelectorEleccionCombo({ parte, unidades, valor, onCambio, deshab
         paddingLeft: indentada ? 12 : 0,
       }}
     >
-      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--cp-navy)' }}>
+      <span style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 14, lineHeight: '18px', color: 'var(--cp-navy)' }}>
         {etiqueta}
         {aviso && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--cp-rust)' }}>{aviso}</span>}
       </span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
         <button
           type="button"
           aria-label={`Quitar ${etiqueta}`}

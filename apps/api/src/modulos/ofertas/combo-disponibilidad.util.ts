@@ -124,13 +124,17 @@ export function esBebidaPorNombres(categoria?: string | null, area?: string | nu
 }
 
 /**
- * Parte de BEBIDAS por categorías: A_ELECCION sin lista de productos ni paquete, con categorías, y todos los productos
- * de esas categorías son bebidas. El cliente elige `cantidad` bebidas («Bebida 1..N») entre los productos de esas categorías.
+ * Parte de BEBIDAS: A_ELECCION sin paquete cuyas opciones son todas bebidas. Las opciones vienen de la lista de productos
+ * (si el dueño marcó productos, esos mandan) o, sin lista, de las categorías. El cliente elige `cantidad` bebidas
+ * («Bebida 1..N») entre ellas.
  */
 export function esParteBebidas(parte: ParteDisp, productos: ProductoDisp[]): boolean {
-  if (parte.tipo !== 'A_ELECCION' || parte.productos.length > 0 || parte.paqueteGrupo || parte.categorias.length === 0) return false;
-  const deLasCategorias = productos.filter((p) => parte.categorias.includes(p.categoriaId));
-  return deLasCategorias.length > 0 && deLasCategorias.every((p) => esBebidaPorNombres(p.categoriaNombre, p.areaNombre));
+  if (parte.tipo !== 'A_ELECCION' || parte.paqueteGrupo) return false;
+  const candidatas = productos.filter((p) =>
+    parte.productos.length > 0 ? parte.productos.includes(p.id) : parte.categorias.includes(p.categoriaId),
+  );
+  if (parte.productos.length === 0 && parte.categorias.length === 0) return false;
+  return candidatas.length > 0 && candidatas.every((p) => esBebidaPorNombres(p.categoriaNombre, p.areaNombre));
 }
 
 /**
