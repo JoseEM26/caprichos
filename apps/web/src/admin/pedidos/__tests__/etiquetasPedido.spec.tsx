@@ -262,7 +262,8 @@ describe('EtiquetasPedido (componente React)', () => {
     const svgs = screen.getAllByRole('img', { name: /Vista previa de la etiqueta/ });
     expect(svgs.length).toBeGreaterThan(0);
     expect(svgs[0]).toHaveAttribute('data-maqueta', '800x800');
-    expect(svgs[0]).toHaveTextContent('JOSE ESPINOZA');
+    expect(svgs[0]).toHaveTextContent(/CAPRICHOS/); // marca arriba
+    expect(svgs[0]).toHaveTextContent(/JOSE\s*ESPINOZA/); // el nombre puede ir en 2 renglones
 
     // 4. "Sale en" correcto para Barra y Cocina (el sticker general ya no lo lleva: su pie es unidades y total)
     expect(screen.getByText(/Sale en: Etiquetera de barra/i)).toBeInTheDocument();

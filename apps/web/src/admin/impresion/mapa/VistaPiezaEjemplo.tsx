@@ -130,6 +130,9 @@ function ComandaEjemplo({ datos }: { datos: TicketComandaSalonDatos }) {
   );
 }
 
+/** Mismo ejemplo con un nombre de cliente muy largo: se reparte en 2 lineas mas chicas, sin cortarse. */
+const NOMBRE_LARGO = 'MARIA ELENA GUADALUPE DEL CARMEN DE LOS SANTOS PEREZ';
+
 /** Vista previa grande de la pieza, marcada EJEMPLO. */
 export function VistaPieza({ clave }: { clave: ClavePieza }) {
   return (
@@ -138,6 +141,9 @@ export function VistaPieza({ clave }: { clave: ClavePieza }) {
       {clave === 'BEBIDA' && <EtiquetaBebida datos={BEBIDA} />}
       {clave === 'RESUMEN' && <EtiquetaGeneral datos={GENERAL} />}
       {clave === 'AREA' && <EtiquetaArea datos={AREA} />}
+      {clave === 'BEBIDA' && <EtiquetaBebida datos={{ ...BEBIDA, persona: NOMBRE_LARGO }} />}
+      {clave === 'RESUMEN' && <EtiquetaGeneral datos={{ ...GENERAL, who: NOMBRE_LARGO }} />}
+      {clave === 'AREA' && <EtiquetaArea datos={{ ...AREA, who: NOMBRE_LARGO }} />}
       {clave === 'COMANDA' && <ComandaEjemplo datos={COMANDA} />}
       {clave === 'COMANDA_AREA' && <ComandaEjemplo datos={COMANDA_AREA} />}
       {clave === 'PAGO' && <TicketPagoPrevia datos={PAGO} sinCabecera />}

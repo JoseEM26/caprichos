@@ -69,7 +69,7 @@ export {
   ajustarLineas,
   maquetarArea,
 } from './etiquetas/maquetaEtiquetas.js';
-export { maquetarGeneral, maquetarBebida, maquetarEtiqueta } from './etiquetas/maquetaStickers.js';
+export { maquetarGeneral, maquetarBebida, maquetarEtiqueta, lineasDeDatos } from './etiquetas/maquetaStickers.js';
 export type { FuenteTspl, Primitiva, Maqueta, FormatoMaqueta } from './etiquetas/maquetaEtiquetas.js';
 export { lineasTicketPago } from './etiquetas/ticketPago.js';
 export { detalleLinea, entradaDeLineaPedido, descuentosDePedido, resumenAntesDelTotal, solesTexto } from './etiquetas/detalleLinea.js';
