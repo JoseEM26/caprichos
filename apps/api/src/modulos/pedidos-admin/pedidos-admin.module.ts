@@ -27,6 +27,7 @@ import { OfertasModule } from '../ofertas/ofertas.module';
 import { EditarPedidoService } from './editar-pedido.service';
 import { EditarPedidoController } from './editar-pedido.controller';
 import { PedidoExtraService } from './pedido-extra.service';
+import { CorregirClienteService } from './corregir-cliente.service';
 import { PedidoExtraController } from './pedido-extra.controller';
 
 @Module({
@@ -35,6 +36,7 @@ import { PedidoExtraController } from './pedido-extra.controller';
   providers: [
     PedidosEstadoService,
     UbicarPedidoService,
+    CorregirClienteService,
     PedidoComprobanteService,
     DevolucionPedidoService,
     CambioUbicacionService,

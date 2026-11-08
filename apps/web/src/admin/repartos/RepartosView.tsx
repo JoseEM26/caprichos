@@ -90,6 +90,7 @@ function SeguimientoRepartosView() {
 
   // Tiempo real: los mismos eventos y sondeo de siempre
   useEventos('pedido:estado', () => cargarDatos());
+  useEventos('pedido:editado', () => cargarDatos());
   useEventos('reparto:incidente', () => cargarDatos());
   useTiempoReal(['reparto:rutas', 'pedido:nuevo', 'pedido:pago'], () => cargarDatos());
 

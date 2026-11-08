@@ -440,6 +440,13 @@ export const pedidosApi = {
     return api.post(`/admin/pedidos/${id}/ubicacion`, dto);
   },
 
+  async corregirCliente(
+    id: string | number,
+    dto: { nombre: string; telefono: string; direccion?: string; referencia?: string; motivo?: string },
+  ): Promise<{ avisosPendientes: number; numeroDeCuenta: string | null }> {
+    return api.patch(`/admin/pedidos/${id}/cliente`, dto);
+  },
+
   async registrarPago(
     id: string | number,
     metodo: string,

@@ -162,3 +162,10 @@ describe('permiso de la pantalla Despacho (cocina/despacho)', () => {
     expect(MATRIZ[rol] ?? []).not.toContain('cocina/despacho');
   });
 });
+
+describe('pedidos/corregir_cliente (Corregir datos del cliente)', () => {
+  it('lo tienen ADMIN, SUPERVISOR, CAJERO y MOZO; cocina, almacén y reparto no', () => {
+    for (const r of ['ADMIN', 'SUPERVISOR', 'CAJERO', 'MOZO']) expect(MATRIZ[r]).toContain('pedidos/corregir_cliente');
+    for (const r of ['COCINA', 'ALMACEN', 'REPARTIDOR']) expect(MATRIZ[r]).not.toContain('pedidos/corregir_cliente');
+  });
+});
