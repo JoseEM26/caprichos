@@ -1,7 +1,8 @@
 import { IsArray, IsInt, IsIn, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
-import { MOTIVOS_CORTESIA } from '../cortesia.tipos';
+import { MOTIVOS_CORTESIA, MOTIVOS_CORTESIA_ANTERIORES } from '../cortesia.tipos';
 
 const CODIGOS_MOTIVO = MOTIVOS_CORTESIA.map((m) => m.codigo);
+const CODIGOS_FILTRO = [...CODIGOS_MOTIVO, ...MOTIVOS_CORTESIA_ANTERIORES.map((m) => m.codigo)];
 
 /** Cortesía por separado: sin pedido propio; el pedido de referencia es obligatorio. */
 export class RegistrarCortesiaDto {
@@ -54,7 +55,7 @@ export class FiltroCortesiasDto {
   hasta?: string;
 
   @IsOptional()
-  @IsIn(CODIGOS_MOTIVO)
+  @IsIn(CODIGOS_FILTRO)
   motivo?: string;
 
   @IsOptional()

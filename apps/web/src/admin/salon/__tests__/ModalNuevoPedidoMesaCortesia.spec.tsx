@@ -77,7 +77,7 @@ describe('Cortesía en un pedido de mesa (local)', () => {
     await pedirCafeEnMesa();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Dar como cortesía' })[0]);
-    fireEvent.click(screen.getByLabelText('Reclamo del cliente'));
+    fireEvent.click(screen.getByLabelText('Error de cocina'));
     fireEvent.click(screen.getByRole('button', { name: 'Dar cortesía' }));
 
     expect(screen.getByText(/Cortesía · vale S\/ 8\.50/)).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('Cortesía en un pedido de mesa (local)', () => {
 
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
     const [payload, , codigo] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
-    expect(payload.lineas[0].cortesia).toEqual({ motivo: 'RECLAMO_CLIENTE', nota: undefined });
+    expect(payload.lineas[0].cortesia).toEqual({ motivo: 'ERROR_COCINA', nota: undefined });
     expect(codigo).toBeUndefined();
   });
 
@@ -96,7 +96,7 @@ describe('Cortesía en un pedido de mesa (local)', () => {
     await pedirCafeEnMesa();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Dar como cortesía' })[0]);
-    fireEvent.click(screen.getByLabelText('Reclamo del cliente'));
+    fireEvent.click(screen.getByLabelText('Error de cocina'));
     const confirmar = screen.getByRole('button', { name: 'Dar cortesía' });
     expect(confirmar).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Código del supervisor (6 dígitos)'), { target: { value: '123456' } });

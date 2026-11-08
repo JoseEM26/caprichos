@@ -1345,7 +1345,7 @@ describe('PedidosService', () => {
       const dto: any = {
         ...pedidoBaseDto,
         modalidad: 'RECOGER',
-        lineas: [{ ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'RECLAMO_CLIENTE' } }],
+        lineas: [{ ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'ERROR_COCINA' } }],
       };
       await expect(service.crear(dto, 'idemp-cort-403', { canal: 'MOZO', usuarioPartyId: 55n })).rejects.toMatchObject({
         status: 403,
@@ -1373,7 +1373,7 @@ describe('PedidosService', () => {
       const dto: any = {
         ...pedidoBaseDto,
         modalidad: 'RECOGER',
-        lineas: [pedidoBaseDto.lineas[0], { ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'DEGUSTACION_PROMOCION' } }],
+        lineas: [pedidoBaseDto.lineas[0], { ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'PRUEBA' } }],
       };
       const res = await service.crear(dto, 'idemp-cort-ok', { canal: 'CAJA', usuarioPartyId: 55n, puedeCortesia: true, omitirChequeoCarta: true });
 
@@ -1383,17 +1383,26 @@ describe('PedidosService', () => {
       expect(lineasData[1]).toMatchObject({ es_cortesia: true });
       expect(Number(lineasData[1].precio_unit)).toBe(0);
       expect(Number(lineasData[1].subtotal)).toBe(0);
-      expect(cortesiasData[0]).toMatchObject({ motivo: 'DEGUSTACION_PROMOCION', pedido_id: 500n, dada_por_party_id: 55n });
+      expect(cortesiasData[0]).toMatchObject({ motivo: 'PRUEBA', pedido_id: 500n, dada_por_party_id: 55n });
       expect(Number(cortesiasData[0].valor_lista)).toBe(28);
     });
   });
 
+  describe('stock de la cortesía', () => {
+    it('la línea gratis descuenta stock igual que una venta (solo cambia el precio)', async () => {
+      const venta = await service.ventaDeLineas({}, [
+        { productoId: 10n, cantidad: 2, unidadesTamano: 1, areaId: 3n, sabores: [], contenedora: false, partesCombo: [], requisitosOpcion: [], cortesia: { motivo: 'PRUEBA', valorLista: 24 } },
+      ]);
+      expect(venta).toEqual([{ productoId: 10n, cantidad: 2, areaId: 3n, sabores: [] }]);
+    });
+  });
+
   describe('cortesía en un pedido de mesa (local)', () => {
-    it('sin permiso cortesias/dar en mesa responde 403 SIN_PERMISO_CORTESIA (el mozo)', async () => {
+    it('sin permiso cortesias/dar en mesa responde 403 SIN_PERMISO_CORTESIA (quien no tenga el permiso)', async () => {
       const dto: any = {
         ...pedidoBaseDto,
         modalidad: 'MESA',
-        lineas: [{ ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'RECLAMO_CLIENTE' } }],
+        lineas: [{ ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'ERROR_COCINA' } }],
       };
       await expect(
         service.crear(dto, 'idemp-cort-mesa-403', { canal: 'MOZO', usuarioPartyId: 55n, mesasIds: [6n], mesaNombre: 'Mesa 6' }),
@@ -1419,7 +1428,7 @@ describe('PedidosService', () => {
       const dto: any = {
         ...pedidoBaseDto,
         modalidad: 'MESA',
-        lineas: [pedidoBaseDto.lineas[0], { ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'DEGUSTACION_PROMOCION' } }],
+        lineas: [pedidoBaseDto.lineas[0], { ...pedidoBaseDto.lineas[0], cortesia: { motivo: 'PRUEBA' } }],
       };
       const res = await service.crear(dto, 'idemp-cort-mesa-ok', {
         canal: 'CAJA',
@@ -1434,7 +1443,7 @@ describe('PedidosService', () => {
       expect(Number(pedidoData.total)).toBe(28);
       expect(lineasData[1]).toMatchObject({ es_cortesia: true });
       expect(Number(lineasData[1].subtotal)).toBe(0);
-      expect(cortesiasData[0]).toMatchObject({ motivo: 'DEGUSTACION_PROMOCION', pedido_id: 501n, dada_por_party_id: 55n });
+      expect(cortesiasData[0]).toMatchObject({ motivo: 'PRUEBA', pedido_id: 501n, dada_por_party_id: 55n });
     });
   });
 

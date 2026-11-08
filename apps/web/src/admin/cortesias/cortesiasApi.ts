@@ -1,11 +1,11 @@
 import { api } from '../../comun/api';
 
-/** Motivos fijos de la cortesía (lista cerrada por el dueño). Mismo orden que el servidor. */
+/** Motivos de la cortesía (lista corta para auditar). Mismo orden que el servidor. */
 export const MOTIVOS_CORTESIA = [
-  { codigo: 'COMPENSACION_ERROR_DEMORA', etiqueta: 'Compensación por error o demora' },
-  { codigo: 'CUMPLEANOS_CLIENTE_FRECUENTE', etiqueta: 'Cumpleaños o cliente frecuente' },
-  { codigo: 'DEGUSTACION_PROMOCION', etiqueta: 'Degustación o promoción' },
-  { codigo: 'RECLAMO_CLIENTE', etiqueta: 'Reclamo del cliente' },
+  { codigo: 'CUMPLEANOS', etiqueta: 'Cumpleaños' },
+  { codigo: 'CLIENTE_FRECUENTE', etiqueta: 'Cliente frecuente' },
+  { codigo: 'ERROR_COCINA', etiqueta: 'Error de cocina' },
+  { codigo: 'PRUEBA', etiqueta: 'Prueba' },
   { codigo: 'OTRO', etiqueta: 'Otro' },
 ] as const;
 

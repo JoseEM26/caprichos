@@ -1,3 +1,4 @@
+import { cargarAuditoriaPedido } from './auditoria-pedido';
 import { explicarPedidosPorId } from '../clientes/explicar-puntos-pedidos';
 import { exigirDeliveryUbicado, DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
 import { PuntosService } from '../clientes/puntos.service';
@@ -903,9 +904,15 @@ export class PedidosEstadoService {
     const cobroMozo = (await this.cobrosMozoDe([pedido])).get(String(pedido.id)) ?? null;
     const ajusteUbicacionPendiente = (await ajustesPendientesUbicacion(this.prisma, [pedido.id])).get(String(pedido.id)) ?? null;
 
+    // Quién hizo qué: una sola línea de tiempo del pedido y la ficha de cada cortesía (en vez de auditoría por producto)
+    const { eventos: eventosPedido, cortesiaPorLinea } = await cargarAuditoriaPedido(this.prisma, pedido.id, pedido.historial as any).catch(
+      () => ({ eventos: [], cortesiaPorLinea: new Map<string, any>() }),
+    );
     const { incidentes, ...pedidoSinIncidentes } = pedido;
     return {
       ...pedidoSinIncidentes,
+      lineas: pedido.lineas.map((l: any) => (l.es_cortesia ? { ...l, cortesia: cortesiaPorLinea.get(String(l.id)) ?? l.cortesia } : l)),
+      eventos: eventosPedido,
       ...resumenExtras(pedido),
       ajusteUbicacionPendiente,
       prueba_entrega: await construirPruebaEntrega(this.prisma, incidentes?.[0]),

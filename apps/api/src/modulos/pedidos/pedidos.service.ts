@@ -510,10 +510,9 @@ export class PedidosService {
         partesCombo: combo.partes,
         opciones: opcionesElegidasInfo,
         sabores: saboresLinea,
-        // Cortesía: no toca el stock de las opciones. Si una parte de combo ya descuenta ese producto, no se cuenta dos veces.
-        requisitosOpcion: cortesiaLinea
-          ? []
-          : requisitosStockLinea.filter((r) => !combo.partes.some((p: ParteResueltaCombo) => String(p.productoId) === r.productoId)),
+        // La cortesía también consume lo que lleva (producto y opciones ligadas a stock): solo cambia el precio.
+        // Si una parte de combo ya descuenta ese producto, no se cuenta dos veces.
+        requisitosOpcion: requisitosStockLinea.filter((r) => !combo.partes.some((p: ParteResueltaCombo) => String(p.productoId) === r.productoId)),
       });
     }
 

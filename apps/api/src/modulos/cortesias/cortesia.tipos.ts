@@ -2,22 +2,30 @@ import { MATRIZ } from '../acceso/permisos';
 import { rolesDelUsuario } from '../acceso/roles-usuario';
 import { BadRequestException } from '@nestjs/common';
 
-/** Motivos fijos de la cortesía (Kevin Rosales). El último exige nota. */
+/** Motivos de la cortesía (lista corta para auditar). El último exige nota. */
 export const MOTIVOS_CORTESIA = [
+  { codigo: 'CUMPLEANOS', etiqueta: 'Cumpleaños' },
+  { codigo: 'CLIENTE_FRECUENTE', etiqueta: 'Cliente frecuente' },
+  { codigo: 'ERROR_COCINA', etiqueta: 'Error de cocina' },
+  { codigo: 'PRUEBA', etiqueta: 'Prueba' },
+  { codigo: 'OTRO', etiqueta: 'Otro' },
+] as const;
+
+/** Motivos de la lista anterior: ya no se eligen, pero las cortesías viejas los conservan y se siguen mostrando y filtrando. */
+export const MOTIVOS_CORTESIA_ANTERIORES = [
   { codigo: 'COMPENSACION_ERROR_DEMORA', etiqueta: 'Compensación por error o demora' },
   { codigo: 'CUMPLEANOS_CLIENTE_FRECUENTE', etiqueta: 'Cumpleaños o cliente frecuente' },
   { codigo: 'DEGUSTACION_PROMOCION', etiqueta: 'Degustación o promoción' },
   { codigo: 'RECLAMO_CLIENTE', etiqueta: 'Reclamo del cliente' },
-  { codigo: 'OTRO', etiqueta: 'Otro' },
 ] as const;
 
 export type MotivoCortesia = (typeof MOTIVOS_CORTESIA)[number]['codigo'];
 
 export function etiquetaMotivo(codigo: string): string {
-  return MOTIVOS_CORTESIA.find((m) => m.codigo === codigo)?.etiqueta ?? codigo;
+  return [...MOTIVOS_CORTESIA, ...MOTIVOS_CORTESIA_ANTERIORES].find((m) => m.codigo === codigo)?.etiqueta ?? codigo;
 }
 
-/** Quién puede dar cortesías según la matriz de permisos (cortesias/dar): Caja, ADMIN y SUPERVISOR. */
+/** Quién puede dar cortesías según la matriz de permisos (cortesias/dar): ADMIN, SUPERVISOR, Caja y Mozo; es libre, queda auditada. */
 export function puedeDarCortesia(usuario: { rol: string; roles?: string[] } | undefined): boolean {
   return rolesDelUsuario(usuario).some((r) => (MATRIZ[r] ?? []).includes('cortesias/dar'));
 }

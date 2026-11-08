@@ -82,6 +82,28 @@ export interface LineaPedidoOpcion {
   nombre_persona?: string | null;
 }
 
+/** Quién dio la cortesía, cuándo y por qué (se ve al tocar el ⓘ de la insignia). */
+export interface FichaCortesia {
+  valor_lista: string | number;
+  motivo?: string;
+  motivo_etiqueta?: string;
+  nota?: string | null;
+  dada_por?: string | null;
+  creado_en?: string;
+}
+
+export type TipoEventoPedido = 'cortesia' | 'edicion' | 'cobro' | 'anulacion' | 'estado' | 'otro';
+
+/** Evento de la línea de tiempo del pedido (historial y auditoría). */
+export interface EventoPedido {
+  id: string;
+  tipo: TipoEventoPedido;
+  titulo: string;
+  detalle: string | null;
+  en: string;
+  por: string | null;
+}
+
 export interface LineaPedido {
   id: string;
   pedido_id?: string;
@@ -103,7 +125,7 @@ export interface LineaPedido {
   } | null;
   /** Cortesía: la línea sale a S/ 0 y su valor de lista va en cortesia.valor_lista */
   es_cortesia?: boolean;
-  cortesia?: { valor_lista: string | number } | null;
+  cortesia?: FichaCortesia | null;
   producto_id?: string | null;
   oferta_id?: string | null;
   linea_combo_id?: string | null;
@@ -202,6 +224,8 @@ export interface Pedido {
   colorEspera?: ColorEspera;
   lineas?: LineaPedido[];
   historial?: HistorialEstado[];
+  /** Línea de tiempo ya armada por el servidor: estados, cortesías, ediciones, cobros y anulaciones */
+  eventos?: EventoPedido[];
   zona?: {
     id: string;
     nombre: string;

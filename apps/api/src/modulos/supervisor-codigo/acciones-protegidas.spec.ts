@@ -83,7 +83,7 @@ describe('Acciones Protegidas por Código de Supervisor (DT-61 / RFC 6238)', () 
   });
 
   describe('Cortesía en un pedido de mesa (SalonController.abrirPedido)', () => {
-    const conCortesia = { mesas: [6], lineas: [{ productoId: 1, cantidad: 1, cortesia: { motivo: 'RECLAMO_CLIENTE' } }] };
+    const conCortesia = { mesas: [6], lineas: [{ productoId: 1, cantidad: 1, cortesia: { motivo: 'ERROR_COCINA' } }] };
 
     it('SUPERVISOR que da una cortesía en mesa sin código responde 403 CODIGO_INVALIDO', async () => {
       const ctx = mockContext(SalonController.prototype.abrirPedido, {

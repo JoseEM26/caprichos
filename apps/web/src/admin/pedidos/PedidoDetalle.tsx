@@ -16,6 +16,7 @@ import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
 import { PruebaEntregaFallida } from './PruebaEntregaFallida';
 import { ModalAnular } from './ModalAnular';
+import { HistorialAuditoria, InsigniaCortesia } from './HistorialAuditoria';
 import { ModalCortesia } from '../cortesias/ModalCortesia';
 import { cortesiasApi } from '../cortesias/cortesiasApi';
 import { ModalRechazarCobroMozo } from './ModalRechazarCobroMozo';
@@ -90,6 +91,8 @@ function puedeCortesiaLinea(pedido: Pedido, it: LineaPedido): boolean {
     !it.linea_combo_id &&
     !it.oferta_id &&
     pedido.pago_estado !== 'PAGADO' &&
+    pedido.estado !== 'ANULADO' &&
+    pedido.estado !== 'RECHAZADO' &&
     Number(pedido.descuento || 0) === 0
   );
 }
@@ -479,6 +482,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
       <div className="cj-scroll cj-detalle-cuerpo" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* TAB: PEDIDO */}
         {tab === 'pedido' && (
+          <>
           <div className="cj-dos">
             <section className="cj-card" aria-label="Productos del pedido">
               <div className="cj-card-titulo">Productos</div>
@@ -507,11 +511,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                     </span>
                     <span style={{ fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'right' }}>
                       S/ {Number(it.subtotal || 0).toFixed(2)}
-                      {it.es_cortesia && (
-                        <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>
-                          Cortesía · vale S/ {Number(it.cortesia?.valor_lista ?? 0).toFixed(2)}
-                        </span>
-                      )}
+                      {it.es_cortesia && <InsigniaCortesia cortesia={it.cortesia} />}
                       {puedeCortesiaLinea(pedido, it) && tiene('cortesias/dar') && (
                         <button
                           type="button"
@@ -560,6 +560,8 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
               )}
             </section>
           </div>
+          <HistorialAuditoria eventos={pedido.eventos} />
+          </>
         )}
 
         {/* TAB: COBRO */}

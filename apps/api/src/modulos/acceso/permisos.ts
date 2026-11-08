@@ -72,7 +72,7 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   { modulo: 'repartos', accion: 'liquidar' },
   // Cambio de ubicación de un delivery: Caja aprueba/cambia (con dinero: sin supervisor); el repartidor propone
   { modulo: 'pedidos', accion: 'cambiar_ubicacion' },
-  // Cortesías (venta a costo 0): Caja y ADMIN la dan; el SUPERVISOR con su código. Ver: Caja y ADMIN
+  // Cortesías (venta a costo 0): libres para ADMIN, SUPERVISOR, CAJERO y MOZO (sin código); motivo obligatorio y queda auditada. Ver el informe: Caja y ADMIN
   { modulo: 'cortesias', accion: 'dar' },
   { modulo: 'cortesias', accion: 'ver' },
   { modulo: 'repartos', accion: 'proponer_ubicacion' },
@@ -302,6 +302,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
     'pedidos/extra', // agrega un extra a cualquier pedido vigente, con su propio pago y comprobante
     'pedidos/anular', // solo SUS pedidos en cola/preparando/listo y sin cobro, sin código de supervisor (decisión del dueño)
+    'cortesias/dar', // libre: cualquier pedido sin cobrar; queda auditada con quién y por qué (decisión del dueño)
     'plano/ver',
     'mesas/ver',
     'mesas/abrir',
