@@ -6,6 +6,7 @@ import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { DELIVERY_SIN_UBICACION_WHERE } from '../pedidos/delivery-ubicacion.util';
 import { ComandasService, lineasDeArea } from './comandas.service';
 import { obtenerInicioDiaLima } from './cocina.util';
+import { resumenPagoDespacho } from './resumen-pago-despacho';
 
 const FUERA = ['ANULADO', 'RECHAZADO'];
 /** Pedidos que esperan a Despacho: cocina ya los tiene en curso y aún no pasan a LISTO. */
@@ -39,6 +40,7 @@ export class DespachoService {
       },
       include: {
         comandas: { include: { area: true } },
+        planPago: true,
         lineas: {
           include: {
             area: true,
@@ -87,6 +89,8 @@ export class DespachoService {
         direccion: delivery ? (p.entrega_direccion ?? null) : null,
         referencia: delivery ? (p.entrega_referencia ?? null) : null,
         telefono: delivery ? (p.cliente_telefono ?? null) : null,
+        canal: p.canal,
+        pago: resumenPagoDespacho(p),
         areas,
         // Completo = todas sus áreas listas
         completo: areas.length > 0 && areas.every((a) => a.listo),

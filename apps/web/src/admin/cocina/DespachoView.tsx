@@ -7,6 +7,7 @@ import { estaSilenciado, reproducirCampanaCocina, setSilenciado } from './audioA
 import { TiempoEspera } from './TiempoEspera';
 import { textoSabores } from './cocinaTipos';
 import type { AreaDespacho, LineaComanda, PedidoDespacho, UmbralesCocina } from './cocinaTipos';
+import { ResumenPagoDespacho } from './ResumenPagoDespacho';
 
 const VERDE = '#2F7A45';
 const MODALIDAD: Record<string, { texto: string; icono: string }> = {
@@ -274,6 +275,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                 <div style={{ fontSize: '15px', color: 'var(--cp-soft)' }}>{[p.direccion, p.referencia].filter(Boolean).join(' · ')}</div>
               )}
               {p.nota && <div style={{ fontSize: '15px', fontWeight: 700, background: '#FFF3C4', padding: '4px 8px', borderRadius: '6px' }}>Nota: {p.nota}</div>}
+              {p.pago && <ResumenPagoDespacho pedidoId={p.pedidoId} pago={p.pago} telefono={p.modalidad === 'DELIVERY' ? p.telefono : null} />}
               <span
                 data-testid={`estado-pedido-${p.pedidoId}`}
                 style={{

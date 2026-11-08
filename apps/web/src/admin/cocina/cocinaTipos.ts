@@ -197,6 +197,19 @@ export interface AreaDespacho {
 }
 
 /** Pedido completo (todas las áreas juntas) de la pantalla Despacho. */
+export interface PagoDespacho {
+  estado: 'PAGADO' | 'COBRADO_MOZO' | 'POR_COBRAR';
+  medios: Array<{ medio: string; monto: number }>;
+  total: number;
+  descuento: number;
+  propina: number;
+  efectivo: number;
+  recibido: number | null;
+  vuelto: number | null;
+  /** true: lleva vuelto · false: sin vuelto · null: paga en efectivo y no se sabe con cuánto. */
+  llevaVuelto: boolean | null;
+}
+
 export interface PedidoDespacho {
   pedidoId: string;
   codigo: string;
@@ -209,6 +222,9 @@ export interface PedidoDespacho {
   direccion: string | null;
   referencia: string | null;
   telefono: string | null;
+  canal?: string;
+  /** Cómo se paga: medios, estado del cobro y vuelto (sin datos de contacto). */
+  pago?: PagoDespacho;
   areas: AreaDespacho[];
   /** Todas sus áreas están listas. */
   completo: boolean;
