@@ -31,7 +31,7 @@ const botonInstalar: CSSProperties = {
  */
 export function BannerInstalarApp({ compacto = false }: { compacto?: boolean }) {
   const [, actualizar] = useReducer((n: number) => n + 1, 0);
-  const [guiaAbierta, setGuiaAbierta] = useState(false);
+  const [, setGuiaAbierta] = useState(false);
 
   useEffect(() => suscribirInstalar(actualizar), []);
 

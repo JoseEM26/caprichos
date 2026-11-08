@@ -332,7 +332,11 @@ export function PedidosAdminView() {
       if (q) {
         const cod = String(p.codigo || '').toLowerCase();
         const cli = String(p.cliente_nombre || '').toLowerCase();
-        if (!cod.includes(q) && !cli.includes(q)) return false;
+        // Por celular: se comparan solo dígitos (con o sin +51, espacios o guiones)
+        const qDig = q.replace(/\D/g, '');
+        const tel = String(p.cliente_telefono || '').replace(/\D/g, '');
+        const porCelular = qDig.length >= 3 && tel.includes(qDig.replace(/^51(?=9\d{8}$)/, ''));
+        if (!cod.includes(q) && !cli.includes(q) && !porCelular) return false;
       }
       return true;
     });
@@ -515,7 +519,11 @@ export function PedidosAdminView() {
       if (q) {
         const cod = String(p.codigo || '').toLowerCase();
         const cli = String(p.cliente_nombre || '').toLowerCase();
-        if (!cod.includes(q) && !cli.includes(q)) return false;
+        // Por celular: se comparan solo dígitos (con o sin +51, espacios o guiones)
+        const qDig = q.replace(/\D/g, '');
+        const tel = String(p.cliente_telefono || '').replace(/\D/g, '');
+        const porCelular = qDig.length >= 3 && tel.includes(qDig.replace(/^51(?=9\d{8}$)/, ''));
+        if (!cod.includes(q) && !cli.includes(q) && !porCelular) return false;
       }
 
       return true;
@@ -684,7 +692,7 @@ export function PedidosAdminView() {
                 setBusqueda(e.target.value);
                 setPaginaActual(1);
               }}
-              placeholder="Buscar por código o cliente"
+              placeholder="Buscar por código, cliente o celular"
               style={{
                 flex: '1 1 180px',
                 minWidth: 0,
