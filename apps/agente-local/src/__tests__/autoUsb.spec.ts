@@ -125,6 +125,34 @@ describe('bucle: conexión automática y hot-plug', () => {
     expect(cliente.enviarLatido.mock.calls.at(-1)[3].map((r: any) => r.rol).sort()).toEqual(['ETIQUETERA', 'TICKETERA']);
   });
 
+  it('al conectarse sola imprime una hoja de prueba en cada impresora (una sola vez)', async () => {
+    const hojas: Buffer[] = [];
+    const logs: string[] = [];
+    const equipo: EquipoLocal = {
+      listar: async () => taller(),
+      crear: () => ({ escribir: async (b: Buffer) => { hojas.push(b); }, verificarEstado: async () => 'lista' } as any),
+      idActual: () => undefined,
+      guardar: () => undefined,
+    };
+    const cliente: any = {
+      tomarTrabajos: vi.fn().mockResolvedValue([]),
+      reportarResultado: vi.fn().mockResolvedValue(undefined),
+      enviarLatido: vi.fn().mockResolvedValue({}),
+    };
+    const agente = new AgenteLocalServicio({
+      config: { ...obtenerConfiguracion({}), intervaloLatidoMs: 0 },
+      clienteApi: cliente,
+      impresoras: {},
+      equipo,
+      logger: (n, m) => logs.push(`${n}: ${m}`),
+    });
+    await agente.ejecutarCiclo();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(hojas).toHaveLength(2);
+    expect(hojas.some((b) => b.toString('latin1').includes('CONECTADA'))).toBe(true);
+    expect(logs.some((l) => l.includes('Imprimí una hoja de prueba en la ticketera'))).toBe(true);
+  });
+
   it('avisa una sola vez que no ve impresora USB aunque haya otras impresoras', async () => {
     const solo = candidatasDeWindows([{ nombre: 'HP LaserJet', puerto: 'IP_1' }]);
     const { agente, logs } = montar(() => solo);

@@ -112,6 +112,7 @@ export class AgenteLocalServicio {
         this.impresoras[d.rol] = equipo.crear(d.candidata, d.rol);
         this.avisoSinUsb.delete(d.rol);
         this.logger('info', mensajeConexion(d));
+        this.imprimirPruebaDeConexion(d.rol, d.candidata);
       } catch (err: any) {
         this.logger('warn', `No pude conectar la ${NOMBRE_ROL_AUTO[d.rol]} ${d.candidata.nombre}: ${err.message}`);
       }
@@ -122,6 +123,21 @@ export class AgenteLocalServicio {
       this.avisoSinUsb.add(rol);
       this.logger('info', `Aún no veo una ${NOMBRE_ROL_AUTO[rol]} por USB. Sigo buscando cada 30 segundos.`);
     }
+  }
+
+  /** Al conectarse sola a una impresora, imprime una hoja corta: así se ve que funciona (sin esperar un pedido). */
+  private imprimirPruebaDeConexion(rol: RolImpresora, candidata: CandidataLocal): void {
+    const dispositivo = this.impresoras[rol];
+    if (!dispositivo) return;
+    const marca = 'CONECTADA';
+    const bytes =
+      rol === 'TICKETERA'
+        ? generarPruebaTicket(candidata.nombre, rol, this.config.ticketColumnas, undefined, marca)
+        : generarPruebaEtiqueta(candidata.nombre, rol, this.config.etiqueta, undefined, marca);
+    void dispositivo
+      .escribir(bytes)
+      .then(() => this.logger('info', `Imprimí una hoja de prueba en la ${NOMBRE_ROL_AUTO[rol]} ${candidata.nombre}.`))
+      .catch((err: any) => this.logger('warn', `No pude imprimir la hoja de prueba en ${candidata.nombre}: ${err?.message ?? err}`));
   }
 
   forzarTiempoUltimoLatido(ts: number): void {
