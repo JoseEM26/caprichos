@@ -23,6 +23,7 @@ import './caja-lista.css';
 import { FiltroDiasPedidos } from './FiltroDiasPedidos';
 import { RangoPedidos, hoyLima, parametrosDeRango, rangoHoy, textoRango } from './filtroDias';
 import { nombreMedio } from './planPago';
+import { ORDEN_POR_DEFECTO, OrdenTiempo, TEXTO_ORDEN, ordenInicial, ordenarPorTiempo, recordarOrden } from './ordenCaja';
 import { TarjetaPedidoCaja } from './TarjetaPedidoCaja';
 import { VentanaDetalle } from './VentanaDetalle';
 import { useAccionesCaja } from './accionesCaja';
@@ -201,6 +202,13 @@ export function PedidosAdminView() {
   const [canalFiltro, setCanalFiltro] = useState<string>('all');
   const [modalidadFiltro, setModalidadFiltro] = useState<string>('all');
   const [cobroFiltro, setCobroFiltro] = useState<string>('all');
+  // Sentido por tiempo: «Limpiar filtros» no lo borra (es preferencia de vista; se quita con su propio chip)
+  const [orden, setOrdenState] = useState<OrdenTiempo>(() => ordenInicial());
+  const cambiarOrden = (o: OrdenTiempo) => {
+    setOrdenState(o);
+    recordarOrden(o);
+    setPaginaActual(1);
+  };
 
   // Paginación
   const [paginaActual, setPaginaActual] = useState<number>(1);
@@ -435,7 +443,11 @@ export function PedidosAdminView() {
     return r;
   }, [base]);
 
-  const pedidosFiltrados = useMemo(() => base.filter((p) => enFiltroCaja(p, filtro)), [base, filtro]);
+  // Primero se ordena y luego se reparte por páginas/columnas
+  const pedidosFiltrados = useMemo(
+    () => ordenarPorTiempo(base.filter((p) => enFiltroCaja(p, filtro)), orden),
+    [base, filtro, orden],
+  );
 
   // Atajos: lo que necesita atención no queda escondido
   const porConfirmar = useMemo(() => pedidos.filter(esPorConfirmar).length, [pedidos]);
@@ -719,6 +731,14 @@ export function PedidosAdminView() {
                   }}
                 />
               </BarraFiltros>
+              <div className="cj2-orden" role="group" aria-label="Orden por tiempo">
+                <span className="cj2-orden-t">Orden por tiempo</span>
+                {(['mas', 'menos'] as const).map((o) => (
+                  <button key={o} type="button" className="cj2-orden-op" aria-pressed={orden === o} onClick={() => cambiarOrden(o)}>
+                    {TEXTO_ORDEN[o]}
+                  </button>
+                ))}
+              </div>
               {chips.length > 0 && (
                 <button type="button" className="cj2-limpiar" style={{ alignSelf: 'flex-start' }} onClick={limpiarFiltros}>
                   Limpiar filtros
@@ -731,14 +751,19 @@ export function PedidosAdminView() {
     )}
 
     {/* Filtros activos: chips que se quitan con un toque */}
-    {chips.length > 0 && (
+    {(chips.length > 0 || orden !== ORDEN_POR_DEFECTO) && (
       <div className="cj2-activos" aria-label="Filtros activos">
+        {orden !== ORDEN_POR_DEFECTO && (
+          <button type="button" className="cj2-quitar" aria-label="Quitar orden: más tiempo primero" onClick={() => cambiarOrden(ORDEN_POR_DEFECTO)}>
+            <span aria-hidden="true">↑↓ </span>Orden: más tiempo primero <span aria-hidden="true">×</span>
+          </button>
+        )}
         {chips.map((c) => (
           <button key={c.id} type="button" className="cj2-quitar" aria-label={`Quitar filtro ${c.texto}`} onClick={c.quitar}>
             {c.texto} <span aria-hidden="true">×</span>
           </button>
         ))}
-        <button type="button" className="cj2-limpiar" onClick={limpiarFiltros}>Limpiar filtros</button>
+        {chips.length > 0 && <button type="button" className="cj2-limpiar" onClick={limpiarFiltros}>Limpiar filtros</button>}
       </div>
     )}
 

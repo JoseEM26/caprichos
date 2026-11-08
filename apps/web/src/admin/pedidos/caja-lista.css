@@ -755,3 +755,9 @@
     transform: none;
   }
 }
+
+/* Orden por tiempo (panel Filtros) */
+.cj2-orden { display: flex; flex-direction: column; gap: 6px; }
+.cj2-orden-t { font-weight: 800; font-size: 13px; }
+.cj2-orden-op { min-height: 44px; padding: 8px 12px; text-align: left; border-radius: 10px; border: 1.5px solid var(--cp-sand, #EDE1D1); background: #fff; color: var(--cp-navy, #0B2C3E); font-weight: 700; cursor: pointer; }
+.cj2-orden-op[aria-pressed='true'] { background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); border-color: var(--cp-navy, #0B2C3E); }
