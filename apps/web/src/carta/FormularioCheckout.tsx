@@ -792,7 +792,7 @@ export function FormularioCheckout({
         } else if (err.codigo === 'COMBO_PARTE_NO_DISPONIBLE') {
           setErrorEnvio(`${err.message} Tu carrito sigue igual: quita el combo y vuelve a agregarlo para elegir otro reemplazo.`);
         } else if (err.codigo === 'CARTA_CERRADA') {
-          setErrorEnvio('La carta se encuentra cerrada. No es posible enviar pedidos ahora.');
+          setErrorEnvio(`${err.message || 'La carta se encuentra cerrada'}. No es posible enviar pedidos ahora.`);
         } else if (err.codigo === 'FUERA_DE_COBERTURA') {
           setErrorEnvio('La dirección indicada está fuera de nuestra zona de cobertura.');
         } else if (err.codigo === 'CELULAR_REQUERIDO') {

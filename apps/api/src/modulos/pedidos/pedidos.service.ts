@@ -696,19 +696,13 @@ export class PedidosService {
       };
     }
 
-    // 2. Comprobar que la carta esté abierta y sin pausa (omitido si es MOZO o se indica explícitamente)
+    // 2. Horario: el guard único. Solo el personal (Mozo/Caja o pedido del panel) puede saltarlo;
+    // carta, WhatsApp, bot e IA jamás, aunque alguien pase omitirChequeoCarta.
+    const canalCliente = !origen?.canal || origen.canal === 'CARTA' || origen.canal === 'WHATSAPP' || origen.canal === 'BOT';
     const omitirCarta =
-      origen?.canal === 'MOZO' ||
-      origen?.canal === 'CAJA' ||
-      origen?.omitirChequeoCarta === true;
+      !canalCliente && (origen?.canal === 'MOZO' || origen?.canal === 'CAJA' || origen?.omitirChequeoCarta === true);
     if (!omitirCarta) {
-      const estadoCarta = await this.localService.obtenerEstadoCarta();
-      if (!estadoCarta.abierta) {
-        throw new HttpException(
-          { codigo: 'CARTA_CERRADA', mensaje: estadoCarta.texto },
-          HttpStatus.CONFLICT,
-        );
-      }
+      await this.localService.exigirLocalAbierto();
     }
 
     // 3. Validar datos de cliente (opcional para pedidos de mozo/caja en panel admin)

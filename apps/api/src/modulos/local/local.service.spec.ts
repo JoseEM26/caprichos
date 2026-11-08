@@ -268,7 +268,99 @@ describe('LocalService', () => {
     });
   });
 
+  describe('horario: matriz de apertura (Lima)', () => {
+    const fila = (dia: number, extra: any = {}) => ({
+      dia_semana: dia, cerrado: false, abre: horaToDate('14:00'), cierra: horaToDate('22:00'), ...extra,
+    });
+    // martes 2026-10-20 (Lima = UTC-5)
+    const lima = (hhmm: string, fecha = '2026-10-20') => new Date(`${fecha}T${hhmm}:00.000-05:00`);
+    const prepara = (horario: any, especial: any = null, pausa = false) => {
+      prismaMock.parametro.findMany.mockResolvedValue(pausa ? [{ clave: 'pausa_alta_demanda', valor: { activa: true } }] : []);
+      prismaMock.fechaEspecial.findUnique.mockResolvedValue(especial);
+      prismaMock.horarioDia.findUnique.mockResolvedValue(horario);
+    };
+
+    it.each([
+      ['11:00', false, 'Abrimos hoy a las 14:00'],
+      ['13:59', false, 'Abrimos hoy a las 14:00'],
+      ['14:00', true, 'Abierto'],
+      ['21:59', true, 'Abierto'],
+      ['22:00', false, 'Cerrado por hoy'],
+      ['00:00', false, 'Abrimos hoy a las 14:00'],
+    ])('14:00-22:00 a las %s -> abierta=%s', async (hora, abierta, texto) => {
+      prepara(fila(2));
+      const r = await service.obtenerEstadoCarta(lima(hora));
+      expect(r.abierta).toBe(abierta);
+      expect(r.texto).toBe(texto);
+      if (!abierta) expect(r.motivo).toBe('HORARIO');
+    });
+
+    it('domingo (dia 7) usa su fila, no la del lunes', async () => {
+      prismaMock.parametro.findMany.mockResolvedValue([]);
+      prismaMock.fechaEspecial.findUnique.mockResolvedValue(null);
+      prismaMock.horarioDia.findUnique.mockImplementation(async ({ where }: any) => fila(where.dia_semana));
+      await service.obtenerEstadoCarta(lima('11:00', '2026-10-25')); // domingo
+      expect(prismaMock.horarioDia.findUnique).toHaveBeenCalledWith({ where: { dia_semana: 7 } });
+    });
+
+    it('día sin fila -> cerrado', async () => {
+      prepara(null);
+      expect((await service.obtenerEstadoCarta(lima('15:00'))).abierta).toBe(false);
+    });
+
+    it('fila cerrada -> cerrado aunque la hora esté dentro', async () => {
+      prepara(fila(2, { cerrado: true }));
+      expect((await service.obtenerEstadoCarta(lima('15:00'))).abierta).toBe(false);
+    });
+
+    it('fila abierta pero sin horas -> cerrado', async () => {
+      prepara(fila(2, { abre: null }));
+      expect((await service.obtenerEstadoCarta(lima('15:00'))).abierta).toBe(false);
+    });
+
+    it('fecha especial con otro horario manda sobre el día', async () => {
+      prepara(fila(2), { cerrado: false, abre: horaToDate('16:00'), cierra: horaToDate('20:00'), motivo: 'x' });
+      expect((await service.obtenerEstadoCarta(lima('15:00'))).texto).toBe('Abrimos hoy a las 16:00');
+      expect((await service.obtenerEstadoCarta(lima('17:00'))).abierta).toBe(true);
+    });
+
+    it('fecha especial cerrada -> cerrado todo el día', async () => {
+      prepara(fila(2), { cerrado: true, abre: null, cierra: null, motivo: 'Feriado' });
+      const r = await service.obtenerEstadoCarta(lima('15:00'));
+      expect(r.abierta).toBe(false);
+      expect(r.motivo).toBe('FECHA_ESPECIAL');
+    });
+
+    it('pausa activa -> cerrado dentro de horario', async () => {
+      prepara(fila(2), null, true);
+      expect((await service.obtenerEstadoCarta(lima('15:00'))).motivo).toBe('PAUSA');
+    });
+
+    it('exigirLocalAbierto: a las 11:00 con apertura 14:00 -> 409 CARTA_CERRADA «Abrimos hoy a las 14:00»', async () => {
+      prepara(fila(2));
+      await expect(service.exigirLocalAbierto(lima('11:00'))).rejects.toMatchObject({
+        status: 409,
+        response: { codigo: 'CARTA_CERRADA', mensaje: 'Abrimos hoy a las 14:00' },
+      });
+      await expect(service.exigirLocalAbierto(lima('14:00'))).resolves.toMatchObject({ abierta: true });
+    });
+
+    it('fallo al leer el horario -> CERRADO (fallo seguro), nunca abierto', async () => {
+      prismaMock.parametro.findMany.mockRejectedValue(new Error('BD caída'));
+      expect((await service.obtenerEstadoCartaSeguro(lima('15:00'))).abierta).toBe(false);
+      await expect(service.exigirLocalAbierto(lima('15:00'))).rejects.toMatchObject({ response: { codigo: 'CARTA_CERRADA' } });
+    });
+  });
+
   describe('actualizarHorarioAdmin', () => {
+    it('rechaza una semana incompleta o con días repetidos (los 7 siempre)', async () => {
+      const uno = [{ dia_semana: 2, cerrado: false, abre: '14:00', cierra: '22:00' }];
+      await expect(service.actualizarHorarioAdmin(uno, adminAuth)).rejects.toThrow(BadRequestException);
+      const repetidos = [1, 1, 3, 4, 5, 6, 7].map((d) => ({ dia_semana: d, cerrado: true }));
+      await expect(service.actualizarHorarioAdmin(repetidos as any, adminAuth)).rejects.toThrow(BadRequestException);
+      expect(prismaMock.horarioDia.upsert).not.toHaveBeenCalled();
+    });
+
     it('horario con abre >= cierra -> 400', async () => {
       await expect(
         service.actualizarHorarioAdmin(
@@ -311,7 +403,7 @@ describe('LocalService', () => {
 
       const diasValidos = [
         { dia_semana: 1, cerrado: true, abre: null, cierra: null },
-        { dia_semana: 2, cerrado: false, abre: '14:00', cierra: '22:00' },
+        ...[2, 3, 4, 5, 6, 7].map((d) => ({ dia_semana: d, cerrado: false, abre: '14:00', cierra: '22:00' })),
       ];
 
       await service.actualizarHorarioAdmin(diasValidos, adminAuth, '127.0.0.1');

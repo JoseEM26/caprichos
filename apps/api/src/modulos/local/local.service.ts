@@ -1,6 +1,9 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { umbralesAvisoStock } from '@caprichos/compartido';
@@ -74,10 +77,47 @@ export function mediosPagoPublicos(parametros: Array<{ clave: string; valor: unk
 
 @Injectable()
 export class LocalService {
+  private readonly logger = new Logger(LocalService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
   ) {}
+
+  /**
+   * Estado de la carta a prueba de fallos: si no se puede leer el horario (BD caída, datos corruptos)
+   * la carta se da por CERRADA y el error queda en el log. Nunca se asume abierto.
+   */
+  async obtenerEstadoCartaSeguro(ahora: Date = new Date()) {
+    try {
+      return await this.obtenerEstadoCarta(ahora);
+    } catch (err: any) {
+      this.logger.error(`No se pudo leer el horario del local; se toma como CERRADO: ${err?.message}`, err?.stack);
+      return {
+        abierta: false,
+        motivo: 'HORARIO' as const,
+        texto: 'No pudimos verificar el horario. Intenta en unos minutos',
+        abre: null,
+        cierra: null,
+        pausaAltaDemanda: false,
+        tiempoPrometidoMin: null,
+        altaDemandaMin: 0,
+        cartaAvisoEntrada: false,
+      };
+    }
+  }
+
+  /**
+   * Guard único de los pedidos de clientes (carta web y WhatsApp/bot/IA): 409 CARTA_CERRADA si el local
+   * está fuera de horario, en pausa, en fecha especial cerrada o si el horario no se pudo leer.
+   */
+  async exigirLocalAbierto(ahora: Date = new Date()) {
+    const estado = await this.obtenerEstadoCartaSeguro(ahora);
+    if (!estado.abierta) {
+      throw new HttpException({ codigo: 'CARTA_CERRADA', mensaje: estado.texto }, HttpStatus.CONFLICT);
+    }
+    return estado;
+  }
 
   /**
    * Obtiene el estado público de apertura de la carta virtual.
@@ -415,8 +455,24 @@ export class LocalService {
     }
 
     // Validar que cada día tenga abre < cierra si no está cerrado
+    // Los 7 días siempre se guardan juntos (un día sin fila quedaría «Cerrado hoy» sin que el dueño lo vea)
+    const vistos = new Set(dias.map((d) => d?.dia_semana));
+    if (dias.length !== 7 || vistos.size !== 7 || [1, 2, 3, 4, 5, 6, 7].some((n) => !vistos.has(n))) {
+      throw new BadRequestException({
+        codigo: 'HORARIO_INVALIDO',
+        mensaje: 'El horario debe traer los 7 días de la semana (1 = lunes ... 7 = domingo), sin repetir',
+      });
+    }
+    const horaValida = (h: unknown) => typeof h === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(h);
+
     for (const d of dias) {
       if (!d.cerrado) {
+        if (!horaValida(d.abre) || !horaValida(d.cierra)) {
+          throw new BadRequestException({
+            codigo: 'HORARIO_INVALIDO',
+            mensaje: `El día ${d.dia_semana} necesita horas de apertura y cierre con formato HH:mm`,
+          });
+        }
         if (!d.abre || !d.cierra) {
           throw new BadRequestException({
             codigo: 'HORARIO_INVALIDO',

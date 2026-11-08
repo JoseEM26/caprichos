@@ -171,6 +171,18 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
     if (!vistaPrevia) cargarDatos();
   }, []);
 
+  // El estado de apertura se vuelve a pedir al servidor cada 30 s y al volver a la pestaña:
+  // a la hora de abrir la carta se abre sola y a la de cerrar se cierra, sin recargar.
+  useEffect(() => {
+    if (vistaPrevia) return;
+    const refrescar = () =>
+      api.get<EstadoLocalCarta>('/carta/estado').then(setEstadoLocal).catch(() => undefined);
+    const t = setInterval(refrescar, 30000);
+    const alVolver = () => { if (document.visibilityState === 'visible') void refrescar(); };
+    document.addEventListener('visibilitychange', alVolver);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver); };
+  }, []);
+
   // Vista previa: los datos llegan del diseñador (borrador) y se actualizan al cambiar cualquier control
   useEffect(() => {
     if (!vistaPrevia) return;
