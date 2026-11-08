@@ -83,7 +83,7 @@ describe('TarjetaPedidoCaja', () => {
       />,
     );
     expect(screen.getByText('Pagado')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button'));
+    fireEvent.click(screen.getByRole('button', { name: /^Pedido / }));
     expect(alSeleccionar).toHaveBeenCalledWith('1');
   });
 

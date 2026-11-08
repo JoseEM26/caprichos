@@ -419,6 +419,7 @@
 }
 
 .cj2-top {
+  padding-right: 50px; /* deja sitio al botón Reimprimir de la esquina */
   display: flex;
   justify-content: space-between;
   align-items: flex-start;

@@ -10,6 +10,7 @@ import { InsigniaCambioCobro } from './PanelCambioCobro';
 import { EtiquetaCajaCerrada } from './BannerCajaCerrada';
 import { esCerrado, estadoVisual } from './estadosCaja';
 import type { AccionCaja } from './accionesCaja';
+import { ReimprimirPedido } from './ReimprimirPedido';
 import { AccionesComerLocal } from '../salon/componentes/AccionesComerLocal';
 
 const hora = (iso: string) =>
@@ -85,6 +86,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
 
   return (
     <div
+      style={{ position: 'relative' }}
       className={`cj2-card ${resaltado ? 'cj-resaltado' : ''} ${seleccionado ? 'cj2-card--sel' : ''}`}
       data-estado={visual.clave}
     >
@@ -150,6 +152,7 @@ export const TarjetaPedidoCaja = memo(function TarjetaPedidoCaja({
           <span className="cj2-total">S/ {Number(o.total || 0).toFixed(2)}</span>
         </span>
       </button>
+      <ReimprimirPedido pedido={o} variante="tarjeta" />
       {accion ? (
         <div className="cj2-accion-caja">
           <button
