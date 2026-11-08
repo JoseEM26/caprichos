@@ -1242,7 +1242,10 @@ export class PedidosEstadoService {
     }
 
     // Confirmar un pago (COORDINADO o PAGADO) exige caja abierta; el pedido en sí no depende de la caja
-    await exigirCajaAbiertaHoy(this.prisma);
+    // Excepción: delivery en efectivo/tarjeta solo COORDINADO (se cobra al entregar): no entra dinero a caja, no la exige
+    const coordinaContraEntrega =
+      pedido.modalidad === 'DELIVERY' && dto.estado === 'COORDINADO' && ['EFECTIVO', 'TARJETA'].includes(metodoUpper);
+    if (!coordinaContraEntrega) await exigirCajaAbiertaHoy(this.prisma);
 
     // Pago digital (Yape, Plin, transferencia): el voucher útil (un ILEGIBLE no cuenta) es OPCIONAL; sin él queda «sin captura».
     // Misma regla que el cobro y el pago coordinado (comprobante-pago.util).

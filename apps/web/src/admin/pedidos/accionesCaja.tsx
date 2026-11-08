@@ -6,6 +6,7 @@ import { salonApi } from '../salon/api';
 import { pedidosApi, type Pedido } from './pedidosApi';
 import { ModalConfirmarPago } from './ModalConfirmarPago';
 import { ModalCobrar } from './ModalCobrar';
+import { esDeliveryContraEntrega } from './mediosPago';
 import { deliverySinUbicacion } from './ubicacionDelivery';
 import { esCerrado, esPorConfirmar, estadoVisual } from './estadosCaja';
 
@@ -42,7 +43,7 @@ export function accionDePedido(p: Pedido, tiene: (permiso: string) => boolean): 
     return { tipo: 'detalle', texto: 'UBICAR', bg: '#FFF1C9', fg: '#0B2C3E' };
   }
   if (esPorConfirmar(p)) {
-    return { tipo: 'confirmar_pago', texto: 'CONFIRMAR PAGO', bg: '#E67929', fg: '#0B2C3E' };
+    return { tipo: 'confirmar_pago', texto: esDeliveryContraEntrega(p) ? 'CONFIRMAR PEDIDO' : 'CONFIRMAR PAGO', bg: '#E67929', fg: '#0B2C3E' };
   }
   // Para llevar o mesa, ya listo y sin cobrar: lo que falta es cobrar (el delivery se cobra con el reparto)
   if (est === 'LISTO' && mod !== 'DELIVERY' && !pagado && !coordinado && tiene('caja/cobrar')) {

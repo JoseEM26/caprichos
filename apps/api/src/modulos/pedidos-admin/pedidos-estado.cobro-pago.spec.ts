@@ -71,6 +71,14 @@ describe('registrarPago PAGADO crea el Cobro', () => {
     expect(prisma.pedido.update).not.toHaveBeenCalled();
   });
 
+  it('delivery en efectivo solo COORDINADO: no exige caja abierta ni crea Cobro (se cobra al entregar)', async () => {
+    prisma.caja.findUnique.mockResolvedValue({ estado: 'CERRADA' });
+    prisma.pedido.findUnique.mockResolvedValue(pedido({ modalidad: 'DELIVERY', entrega_lat: 1, entrega_lng: 1, zona_id: 1, envio: 5 }));
+    await service.registrarPago(10n, { metodo: 'EFECTIVO', estado: 'COORDINADO' } as any, cajero);
+    expect(cobros.cobrar).not.toHaveBeenCalled();
+    expect(prisma.pedido.update.mock.calls[0][0].data).toMatchObject({ pago_metodo: 'EFECTIVO', pago_estado: 'COORDINADO' });
+  });
+
   it('si el cobro falla (p. ej. comprobante sin datos) el pedido no queda pagado', async () => {
     cobros.cobrar.mockRejectedValue(Object.assign(new Error('x'), { response: { codigo: 'COMPROBANTE_DATOS_FALTANTES' } }));
     await expect(confirmar()).rejects.toBeDefined();

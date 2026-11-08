@@ -93,9 +93,16 @@ describe('delivery sin ubicación (Caja)', () => {
     render(<ModalConfirmarPago pedido={ubicado} alCerrar={vi.fn()} alConfirmarExitoso={vi.fn()} />);
     expect(screen.queryByText(MENSAJE_DELIVERY_SIN_UBICACION)).toBeNull();
     fireEvent.click(screen.getByRole('checkbox', { name: /Ya hablé con el cliente/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    // delivery en efectivo: sin paso de pago, Cliente -> Revisar
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
     expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('delivery en efectivo sin ubicación: sigue bloqueado aunque no haya paso de pago', () => {
+    render(<ModalConfirmarPago pedido={delivery({ pago_preferido: 'EFECTIVO' })} alCerrar={vi.fn()} alConfirmarExitoso={vi.fn()} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Ya hablé con el cliente/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect((screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('«Cobrar»: delivery sin ubicación no se cobra desde la ventana', () => {
