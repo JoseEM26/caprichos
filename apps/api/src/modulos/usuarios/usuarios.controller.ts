@@ -30,6 +30,8 @@ import { ReactivarUsuarioDto } from './dto/reactivar-usuario.dto';
 import { EditarPeriodoDto } from './dto/editar-periodo.dto';
 import { OtorgarRolExtraDto } from './dto/rol-temporal.dto';
 import { UsuariosRolesService } from './usuarios-roles.service';
+import { UsuariosRolesMasivoService } from './usuarios-roles-masivo.service';
+import { RolesMasivoDto } from './dto/roles-masivo.dto';
 import { UsuariosActividadService } from './usuarios-actividad.service';
 
 @Controller('admin/usuarios')
@@ -38,8 +40,17 @@ export class UsuariosController {
   constructor(
     private readonly usuariosService: UsuariosService,
     private readonly rolesService: UsuariosRolesService,
+    private readonly rolesMasivoService: UsuariosRolesMasivoService,
     private readonly actividadService: UsuariosActividadService,
   ) {}
+
+  /** Agrega o quita un rol EXTRA a varios usuarios (o a todos). Solo ADMIN; reporta quién se omitió y por qué. */
+  @Post('roles-masivo')
+  @Permiso('usuarios', 'editar')
+  async rolesMasivo(@Body() dto: RolesMasivoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.rolesMasivoService.aplicar(dto, req.usuario, ip);
+  }
 
   /** Da un rol extra (temporal si trae fecha de fin). Solo ADMIN; queda en el historial de roles. */
   @Post(':id/roles-extra')

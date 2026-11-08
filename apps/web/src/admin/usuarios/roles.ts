@@ -7,7 +7,24 @@ export const ROLES_ASIGNABLES: string[] = [
   'ALMACEN',
   'REPARTIDOR',
   'SUPERVISOR',
+  'APOYO_DELIVERY',
 ];
+
+/** Qué podrá hacer quien reciba el rol (espejo en lenguaje llano de MATRIZ del servidor). */
+export const VISTA_PREVIA_ROL: Record<string, string[]> = {
+  APOYO_DELIVERY: [
+    'Ver el módulo Delivery y seguir qué entrega cada repartidor',
+    'Tomar pedidos y rutas de reparto',
+    'Salir, llegar y entregar los pedidos que tomó',
+    'Reportar incidencias, chatear con el cliente y proponer ubicación o cambio de cobro',
+    'No liquida efectivo ni reasigna repartidores (eso sigue en Caja y Administración)',
+  ],
+  CAJERO: ['Ventas y cobros en caja', 'Pedidos, comprobantes y mesas', 'Mensajes de WhatsApp'],
+  MOZO: ['Mesas y pedidos del salón', 'Reservas', 'Mensajes de WhatsApp'],
+  COCINA: ['Comandas y preparación', 'Stock y recetas de cocina'],
+  ALMACEN: ['Almacén, stock y compras'],
+  SUPERVISOR: ['Todo lo de Cajero y Mozo', 'Ve el código de supervisor', 'Escritorio operativo sin montos'],
+};
 
 /** Estos roles no se combinan con ningún otro (espejo de las reglas del servidor). */
 export const ROLES_EXCLUSIVOS = ['ADMIN', 'REPARTIDOR'];
@@ -54,4 +71,5 @@ export const ETIQUETAS_ROLES: Record<string, string> = {
   CALLCENTER: 'Call Center (rol eliminado)',
   ALMACEN: 'Almacén (Stock y compras)',
   SUPERVISOR: 'Supervisor (Caja y salón, y ve el código de supervisor)',
+  APOYO_DELIVERY: 'Apoyo en delivery (Toma y entrega pedidos)',
 };
