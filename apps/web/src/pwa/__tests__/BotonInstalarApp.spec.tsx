@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 const UA_ESCRITORIO = 'Mozilla/5.0 (X11; Linux x86_64) Chrome/120';
 const UA_IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148';
 const NOMBRE_BOTON = 'Instalar app';
-const TITULO = 'Instala Caprichos en tu celular o computadora';
+const TITULO = '¿Qué app quieres instalar?';
 
 function ponerUserAgent(ua: string) {
   Object.defineProperty(window.navigator, 'userAgent', { value: ua, configurable: true });
@@ -92,9 +92,9 @@ describe('BotonInstalarApp (cabecera de la carta)', () => {
 
     const dialogo = screen.getByRole('dialog', { name: TITULO });
     expect(dialogo.getAttribute('aria-modal')).toBe('true');
-    expect(screen.getByText('Se abre con un toque desde tu pantalla de inicio.')).toBeDefined();
-    expect(screen.getByText('Pantalla completa, sin la barra del navegador.')).toBeDefined();
-    expect(screen.getByText('Se actualiza sola, con la carta y las promociones de hoy.')).toBeDefined();
+    expect(screen.getByText('Carta virtual (para clientes)')).toBeDefined();
+    expect(screen.getByText('Panel administrativo')).toBeDefined();
+    expect(screen.getByText('Asistencia (marcar entrada y salida)')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Cerrar' }).style.width).toBe('44px');
   });
 
@@ -130,50 +130,97 @@ describe('BotonInstalarApp (cabecera de la carta)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('con prompt disponible muestra «Instalar ahora» y lo lanza', async () => {
+  const tarjeta = (app: string) => within(document.body.querySelector(`[data-app="${app}"]`) as HTMLElement);
+
+  it('con prompt disponible, «Instalar» de la app activa (carta) lanza el aviso del navegador', async () => {
     const { BotonInstalarApp } = await cargarBoton();
     render(<BotonInstalarApp />);
     const evento = dispararInstalable('dismissed');
     fireEvent.click(screen.getByRole('button', { name: NOMBRE_BOTON }));
 
-    expect(screen.queryByText(/Abre el menú/)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Instalar ahora' }));
+    fireEvent.click(tarjeta('carta').getByRole('button', { name: 'Instalar' }));
     await act(async () => {});
     expect(evento.prompt).toHaveBeenCalledTimes(1);
   });
 
-  it('si el cliente acepta el aviso, el diálogo se cierra', async () => {
+  it('«Instalar» de otra app abre su ruta en pestaña nueva con ?instalar= (un aviso solo instala la app de su manifest)', async () => {
     const { BotonInstalarApp } = await cargarBoton();
+    const abrir = vi.spyOn(window, 'open').mockReturnValue(null);
     render(<BotonInstalarApp />);
-    dispararInstalable('accepted');
+    const evento = dispararInstalable();
     fireEvent.click(screen.getByRole('button', { name: NOMBRE_BOTON }));
-    fireEvent.click(screen.getByRole('button', { name: 'Instalar ahora' }));
-    await act(async () => {});
-    expect(screen.queryByRole('dialog')).toBeNull();
+
+    fireEvent.click(tarjeta('admin').getByRole('button', { name: 'Instalar' }));
+    fireEvent.click(tarjeta('asistencia').getByRole('button', { name: 'Instalar' }));
+    expect(abrir).toHaveBeenNthCalledWith(1, '/admin/?instalar=admin', '_blank', 'noopener');
+    expect(abrir).toHaveBeenNthCalledWith(2, '/admin/mi-asistencia?instalar=asistencia', '_blank', 'noopener');
+    expect(evento.prompt).not.toHaveBeenCalled();
+    abrir.mockRestore();
   });
 
-  it('en iPhone muestra los pasos con Compartir y la nota de Safari, sin «Instalar ahora»', async () => {
+  it('ya instalada: dice «Ya instalada» y «Reinstalar / actualizar» explica cómo sobrescribir y busca la actualización', async () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
+    const update = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'serviceWorker', {
+      value: { getRegistration: vi.fn().mockResolvedValue({ update, waiting: null, installing: null }) },
+      configurable: true,
+    });
+    const { BotonInstalarApp } = await cargarBoton();
+    render(<BotonInstalarApp siempre />);
+    fireEvent.click(screen.getByRole('button', { name: NOMBRE_BOTON }));
+    await act(async () => {});
+
+    expect(tarjeta('carta').getByText('Ya instalada')).toBeDefined();
+    expect(tarjeta('admin').getByRole('button', { name: 'Instalar' })).toBeDefined();
+    fireEvent.click(tarjeta('carta').getByRole('button', { name: 'Reinstalar / actualizar' }));
+    await act(async () => {});
+    expect(tarjeta('carta').getByText(/Para sobrescribirla/)).toBeDefined();
+    expect(update).toHaveBeenCalled();
+    expect(screen.getByText('Ya tienes lo último.')).toBeDefined();
+  });
+
+  it('«Buscar actualización» está a la vista', async () => {
+    const { BotonInstalarApp } = await cargarBoton();
+    render(<BotonInstalarApp />);
+    fireEvent.click(screen.getByRole('button', { name: NOMBRE_BOTON }));
+    expect(screen.getByRole('button', { name: 'Buscar actualización' })).toBeDefined();
+  });
+
+  it('en iPhone, «Instalar» de la app activa muestra los pasos con Compartir y la nota de Safari', async () => {
     ponerUserAgent(UA_IPHONE);
     const { BotonInstalarApp } = await cargarBoton();
     render(<BotonInstalarApp />);
     fireEvent.click(screen.getByRole('button', { name: NOMBRE_BOTON }));
+    fireEvent.click(tarjeta('carta').getByRole('button', { name: 'Instalar' }));
 
-    const pasos = screen.getAllByRole('listitem');
-    expect(pasos.length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText(/Compartir/)).toBeDefined();
     expect(screen.getByText(/Añadir a pantalla de inicio/)).toBeDefined();
     expect(screen.getByText(/Abre esta página en Safari/)).toBeDefined();
-    expect(screen.queryByRole('button', { name: 'Instalar ahora' })).toBeNull();
   });
 
-  it('sin prompt (Android/escritorio) muestra los pasos manuales y la nota de WhatsApp', async () => {
+  it('sin prompt (Android/escritorio) «Instalar» muestra los pasos manuales y la nota de WhatsApp', async () => {
     const { BotonInstalarApp } = await cargarBoton();
     render(<BotonInstalarApp />);
     fireEvent.click(screen.getByRole('button', { name: NOMBRE_BOTON }));
+    fireEvent.click(tarjeta('carta').getByRole('button', { name: 'Instalar' }));
 
     expect(screen.getByText(/Abre el menú/)).toBeDefined();
-    expect(screen.getByText(/«Instalar app»/)).toBeDefined();
     expect(screen.getByText(/Si usas el navegador dentro de WhatsApp o Facebook, ábrelo en Chrome/)).toBeDefined();
-    expect(screen.queryByRole('button', { name: 'Instalar ahora' })).toBeNull();
+  });
+
+  it('abierta con ?instalar=admin (AutoInstalar) abre sola la ventana con esa tarjeta marcada', async () => {
+    window.history.pushState({}, '', '/admin/?instalar=admin');
+    vi.resetModules();
+    const pwa = await import('../instalar');
+    pwa.iniciarCapturaInstalar();
+    const { AutoInstalar } = await import('../AutoInstalar');
+    render(<AutoInstalar />);
+    expect(screen.getByRole('dialog', { name: TITULO })).toBeDefined();
+    expect(document.body.querySelector('[data-app="admin"]')?.getAttribute('style')).toContain('2px solid');
+    // si el aviso llega, se intenta abrir solo; sin toque del usuario el navegador lo rechaza y el botón sigue sirviendo
+    const evento = dispararInstalable();
+    await act(async () => {});
+    expect(evento.prompt).toHaveBeenCalled();
+    window.history.pushState({}, '', '/');
   });
 });

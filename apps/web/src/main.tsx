@@ -4,6 +4,7 @@ import App from './App';
 import { registerSW } from 'virtual:pwa-register';
 import { iniciarCapturaInstalar } from './pwa/instalar';
 import { ajustarManifestPorRuta } from './pwa/manifestPorRuta';
+import { AutoInstalar } from './pwa/AutoInstalar';
 import './index.css';
 
 // Registra el service worker; con autoUpdate la página se recarga sola al entrar un despliegue nuevo
@@ -12,11 +13,12 @@ registerSW({ immediate: true });
 // El evento de instalar llega al cargar; hay que escucharlo antes de que cualquier pantalla lo necesite
 iniciarCapturaInstalar();
 
-// Si se abre el panel (/admin), la app instalable es la del panel y no la de la carta
+// El manifest ya lo fija un script de index.html según la ruta; aquí se reasegura (y respeta ?instalar=)
 ajustarManifestPorRuta();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
+    <AutoInstalar />
   </React.StrictMode>,
 );

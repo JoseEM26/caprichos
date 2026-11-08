@@ -1,7 +1,8 @@
 import { useEffect, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icono } from '../comun/Icono';
-import { esIos, estaInstalada, instalar, suscribirInstalar, tieneAvisoNativo } from './instalar';
+import { esIos, estaInstalada, suscribirInstalar } from './instalar';
+import { ElegirAppInstalar } from './ElegirAppInstalar';
 
 // objetivo táctil mínimo de 44 px
 const TACTIL = 44;
@@ -10,8 +11,6 @@ const ANCHO_ANGOSTO = 480;
 // trazos propios (el set de Icono es del admin y no trae teléfono ni compartir)
 const PATH_DESCARGA = ['M12 3v12', 'M7 10l5 5 5-5', 'M5 21h14'];
 const PATH_TELEFONO = ['M7 2h10v20H7z', 'M11 18h2'];
-const PATH_PANTALLA = ['M4 9V4h5', 'M20 9V4h-5', 'M4 15v5h5', 'M20 15v5h-5'];
-const PATH_ACTUALIZA = ['M21 12a9 9 0 1 1-2.6-6.3', 'M21 3v6h-6'];
 const PATH_COMPARTIR = ['M12 3v12', 'M8 7l4-4 4 4', 'M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7'];
 
 function Trazo({ paths, tamano = 22 }: { paths: string[]; tamano?: number }) {
@@ -35,12 +34,6 @@ function Trazo({ paths, tamano = 22 }: { paths: string[]; tamano?: number }) {
   );
 }
 
-const VENTAJAS: { paths: string[]; texto: string }[] = [
-  { paths: PATH_TELEFONO, texto: 'Se abre con un toque desde tu pantalla de inicio.' },
-  { paths: PATH_PANTALLA, texto: 'Pantalla completa, sin la barra del navegador.' },
-  { paths: PATH_ACTUALIZA, texto: 'Se actualiza sola, con la carta y las promociones de hoy.' },
-];
-
 const estiloBotonCabecera: CSSProperties = {
   flex: 'none',
   minHeight: TACTIL,
@@ -56,18 +49,6 @@ const estiloBotonCabecera: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 6,
-};
-
-const estiloBotonPrincipal: CSSProperties = {
-  width: '100%',
-  minHeight: 52,
-  border: 0,
-  borderRadius: 12,
-  background: 'var(--cp-orange)',
-  color: 'var(--cp-navy)',
-  fontFamily: 'var(--fuente-titulos)',
-  fontWeight: 800,
-  fontSize: 16,
 };
 
 const estiloBotonSecundario: CSSProperties = {
@@ -157,12 +138,13 @@ function Instrucciones() {
 }
 
 /**
- * Botón «Instalar app» de la cabecera de la carta y su explicación. Se ve mientras la app no esté instalada,
- * tenga o no el navegador el aviso de instalar: sin aviso, la explicación trae los pasos manuales.
+ * Botón «Instalar app» y su ventana para elegir QUÉ app instalar (carta, panel o asistencia). Se ve mientras la app no esté
+ * instalada; con `siempre` se ve también ya instalada (panel del local: ahí sirve para reinstalar o buscar cambios).
+ * `abrirInicial` + `sinBoton` abren solo la ventana (pestaña abierta con ?instalar=...).
  */
-export function BotonInstalarApp() {
+export function BotonInstalarApp({ siempre = false, abrirInicial = false, sinBoton = false }: { siempre?: boolean; abrirInicial?: boolean; sinBoton?: boolean } = {}) {
   const [, actualizar] = useReducer((n: number) => n + 1, 0);
-  const [abierto, setAbierto] = useState(false);
+  const [abierto, setAbierto] = useState(abrirInicial);
   const [angosto, setAngosto] = useState(() => typeof window !== 'undefined' && window.innerWidth <= ANCHO_ANGOSTO);
   const disparador = useRef<HTMLButtonElement>(null);
   const dialogo = useRef<HTMLDivElement>(null);
@@ -205,19 +187,11 @@ export function BotonInstalarApp() {
     };
   }, [abierto]);
 
-  if (estaInstalada()) return null;
-
-  const nativo = tieneAvisoNativo();
-
-  // Con el aviso del navegador, «Instalar ahora» lo lanza y cierra solo si el cliente acepta.
-  const instalarAhora = async () => {
-    const resultado = await instalar();
-    if (resultado === 'aceptada') setAbierto(false);
-  };
+  if (!siempre && !abrirInicial && estaInstalada()) return null;
 
   return (
     <>
-      <button
+      {!sinBoton && <button
         ref={disparador}
         type="button"
         onClick={() => setAbierto(true)}
@@ -228,7 +202,7 @@ export function BotonInstalarApp() {
       >
         <Trazo paths={PATH_DESCARGA} tamano={20} />
         {!angosto && <span>Instalar app</span>}
-      </button>
+      </button>}
 
       {abierto &&
         typeof document !== 'undefined' &&
@@ -303,34 +277,14 @@ export function BotonInstalarApp() {
                   <Trazo paths={PATH_TELEFONO} tamano={28} />
                 </span>
                 <h2 id="instalar-app-titulo" style={{ margin: 0, fontFamily: 'var(--fuente-titulos)', fontWeight: 800, fontSize: 19, lineHeight: '24px', paddingRight: 28 }}>
-                  Instala Caprichos en tu celular o computadora
+                  ¿Qué app quieres instalar?
                 </h2>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--cp-soft)' }}>
-                  Pide más rápido, sin buscar el enlace y sin ir a una tienda de apps.
+                  Puedes tener las tres a la vez. Cada una se abre directo en lo suyo.
                 </p>
               </div>
 
-              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {VENTAJAS.map((v) => (
-                  <li
-                    key={v.texto}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'var(--cp-sand)', fontSize: 14, lineHeight: '20px' }}
-                  >
-                    <span style={{ flex: 'none', color: 'var(--cp-orange)' }}>
-                      <Trazo paths={v.paths} tamano={24} />
-                    </span>
-                    <span>{v.texto}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {nativo ? (
-                <button type="button" onClick={instalarAhora} style={estiloBotonPrincipal}>
-                  Instalar ahora
-                </button>
-              ) : (
-                <Instrucciones />
-              )}
+              <ElegirAppInstalar instrucciones={<Instrucciones />} />
 
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <button type="button" onClick={() => setAbierto(false)} style={estiloBotonSecundario}>

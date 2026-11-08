@@ -6,9 +6,15 @@ type EventoInstalar = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
+import { APPS_PWA, appDeRuta, type AppPwa } from './manifestPorRuta';
+
 const CLAVE_DESCARTE = 'caprichos.pwa.instalar.descartado';
 
 let diferido: EventoInstalar | null = null;
+// App a la que pertenece el aviso guardado: Chrome lo arma con el manifest que había al cargar, y solo instala esa app
+let appDelAviso: AppPwa | null = null;
+// App pedida con ?instalar=... al abrir esta pestaña (el router puede quitar luego el parámetro, por eso se lee al arrancar)
+let appPedida: AppPwa | null = null;
 let instalada = false;
 let capturaIniciada = false;
 const oyentes = new Set<() => void>();
@@ -19,10 +25,15 @@ const avisar = () => oyentes.forEach((fn) => fn());
 export function iniciarCapturaInstalar(): void {
   if (capturaIniciada || typeof window === 'undefined') return;
   capturaIniciada = true;
+  const pedida = new URLSearchParams(window.location.search).get('instalar');
+  appPedida = pedida === 'carta' || pedida === 'admin' || pedida === 'asistencia' ? pedida : null;
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     diferido = e as EventoInstalar;
+    appDelAviso = appDeRuta();
     avisar();
+    // Chrome solo deja abrir el aviso tras un toque; si esta pestaña no lo tiene, instalar() falla sin ruido y queda el botón
+    if (appPedida) void instalar();
   });
   window.addEventListener('appinstalled', () => {
     diferido = null;
@@ -81,7 +92,12 @@ export async function instalar(): Promise<'aceptada' | 'descartada' | 'no-dispon
   if (!diferido) return 'no-disponible';
   const evento = diferido;
   diferido = null;
-  await evento.prompt();
+  try {
+    await evento.prompt();
+  } catch {
+    diferido = evento; // sin toque del usuario el navegador lo rechaza: se conserva para el botón
+    return 'no-disponible';
+  }
   const { outcome } = await evento.userChoice;
   avisar();
   return outcome === 'accepted' ? 'aceptada' : 'descartada';
@@ -92,4 +108,51 @@ export function suscribirInstalar(cb: () => void): () => void {
   return () => {
     oyentes.delete(cb);
   };
+}
+
+/** App que el navegador instalaría con el aviso guardado (null si no hay aviso). */
+export function appDelAvisoNativo(): AppPwa | null {
+  return diferido ? appDelAviso : null;
+}
+
+/** App pedida con ?instalar= al abrir esta pestaña. */
+export function appSolicitada(): AppPwa | null {
+  return appPedida;
+}
+
+/** Apps ya instaladas en este equipo: la que corre en modo app y las que el navegador reporte (getInstalledRelatedApps). */
+export async function appsInstaladas(): Promise<AppPwa[]> {
+  const encontradas = new Set<AppPwa>();
+  if (estaInstalada()) encontradas.add(appDeRuta());
+  try {
+    const nav = navigator as Navigator & { getInstalledRelatedApps?: () => Promise<{ url?: string }[]> };
+    const lista = (await nav.getInstalledRelatedApps?.()) ?? [];
+    for (const app of Object.keys(APPS_PWA) as AppPwa[]) {
+      if (lista.some((r) => r.url?.endsWith(APPS_PWA[app].manifest))) encontradas.add(app);
+    }
+  } catch {
+    // navegador sin soporte: solo cuenta la detección por modo app
+  }
+  return [...encontradas];
+}
+
+/**
+ * Busca una versión nueva de la app y la aplica. 'actualizando' = hay cambios y la página se recarga sola;
+ * 'al-dia' = ya tiene lo último; 'no-disponible' = el navegador no tiene service worker.
+ */
+export async function buscarActualizacion(): Promise<'actualizando' | 'al-dia' | 'no-disponible'> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return 'no-disponible';
+  const registro = await navigator.serviceWorker.getRegistration();
+  if (!registro) return 'no-disponible';
+  await registro.update();
+  const nuevo = registro.waiting ?? registro.installing;
+  if (!nuevo) return 'al-dia';
+  nuevo.postMessage({ type: 'SKIP_WAITING' });
+  window.setTimeout(() => window.location.reload(), 1500); // el sw nuevo toma el control y recarga; esto cubre si no lo hace
+  return 'actualizando';
+}
+
+/** Ruta a abrir en una pestaña nueva para instalar esa app con su propio manifest. */
+export function urlInstalarApp(app: AppPwa): string {
+  return `${APPS_PWA[app].inicio}${APPS_PWA[app].inicio.includes('?') ? '&' : '?'}instalar=${app}`;
 }

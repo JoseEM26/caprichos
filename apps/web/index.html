@@ -2,6 +2,20 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Pone el manifest de la app que corresponde a la ruta ANTES de que el navegador lo pida: si se cambiara después, Chrome
+      // ofrecería instalar la carta aunque se esté en el panel. Mismo mapa que src/pwa/manifestPorRuta.ts.
+      (function () {
+        var p = location.pathname, q = new URLSearchParams(location.search).get('instalar');
+        var a = q === 'carta' || q === 'admin' || q === 'asistencia' ? q
+          : p === '/admin/mi-asistencia' || p.indexOf('/admin/mi-asistencia/') === 0 ? 'asistencia'
+          : p === '/admin' || p.indexOf('/admin/') === 0 ? 'admin' : 'carta';
+        var l = document.createElement('link');
+        l.rel = 'manifest';
+        l.href = a === 'carta' ? '/manifest.webmanifest' : '/manifest-' + a + '.webmanifest';
+        document.head.appendChild(l);
+      })();
+    </script>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

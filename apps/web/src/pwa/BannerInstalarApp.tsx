@@ -35,9 +35,11 @@ export function BannerInstalarApp({ compacto = false }: { compacto?: boolean }) 
 
   useEffect(() => suscribirInstalar(actualizar), []);
 
-  if (!puedeInstalar()) return null;
-  if (!compacto && estaDescartado()) return null;
+  // Panel del local: siempre el botón que abre la ventana para elegir app (también sirve para reinstalar o buscar cambios)
+  if (compacto) return <BotonInstalarApp siempre />;
 
+  if (!puedeInstalar()) return null;
+  if (estaDescartado()) return null;
   const ios = !tieneAvisoNativo() && esIos();
   // Sin aviso del navegador y sin iOS (otro equipo, aviso ya usado o descartado): el botón abre los pasos manuales
   const manual = !tieneAvisoNativo() && !ios;
@@ -49,23 +51,6 @@ export function BannerInstalarApp({ compacto = false }: { compacto?: boolean }) 
     }
     await instalar();
   };
-
-  if (compacto && manual) return <BotonInstalarApp />;
-
-  if (compacto) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" onClick={pulsar} aria-expanded={ios ? guiaAbierta : undefined} style={{ ...botonInstalar, background: 'var(--cp-white)', color: 'var(--cp-navy)', border: '1.5px solid var(--cp-navy)' }}>
-          Instalar app
-        </button>
-        {ios && guiaAbierta && (
-          <span role="status" style={{ fontSize: 13, color: 'var(--cp-soft)' }}>
-            {GUIA_IOS}
-          </span>
-        )}
-      </div>
-    );
-  }
 
   return (
     <section

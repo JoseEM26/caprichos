@@ -99,6 +99,9 @@ describe('BannerInstalarApp', () => {
     dispararInstalable();
     expect(screen.queryByRole('region')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Instalar app' })).toBeNull();
+    // el panel del local sí conserva el botón: sirve para reinstalar o buscar actualización
+    render(<BannerInstalarApp compacto />);
+    expect(screen.getByRole('button', { name: 'Instalar app' })).toBeDefined();
   });
 
   it('en iPhone muestra la guía Compartir > Añadir a pantalla de inicio, sin botón Instalar', async () => {
@@ -120,15 +123,14 @@ describe('BannerInstalarApp', () => {
     expect(screen.getByRole('button', { name: 'Instalar app' })).toBeDefined();
   });
 
-  it('compacto en iPhone abre y cierra la guía al tocar el botón', async () => {
+  it('compacto abre la ventana para elegir app (carta, panel o asistencia)', async () => {
     ponerUserAgent(UA_IPHONE);
     const { BannerInstalarApp } = await cargarBanner();
     render(<BannerInstalarApp compacto />);
 
-    const boton = screen.getByRole('button', { name: 'Instalar app' });
-    expect(screen.queryByText(/Añadir a pantalla de inicio/)).toBeNull();
-    fireEvent.click(boton);
-    expect(screen.getByText(/Añadir a pantalla de inicio/)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Instalar app' }));
+    expect(screen.getByText('Panel administrativo')).toBeDefined();
+    expect(screen.getByText('Asistencia (marcar entrada y salida)')).toBeDefined();
   });
 
   it('si sessionStorage lanza, el aviso igual aparece y el cierre no rompe', async () => {

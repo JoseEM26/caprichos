@@ -16,3 +16,8 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
+
+// «Buscar actualización» del panel de instalación pide aplicar ya la versión en espera
+self.addEventListener('message', (event) => {
+  if ((event.data as { type?: string } | null)?.type === 'SKIP_WAITING') void self.skipWaiting();
+});

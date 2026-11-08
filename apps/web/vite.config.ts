@@ -61,6 +61,7 @@ export default defineConfig({
         short_name: 'Caprichos',
         description: 'Carta, pedidos y panel del local Caprichos',
         lang: 'es',
+        id: '/',
         start_url: '/',
         scope: '/',
         display: 'standalone',
@@ -71,6 +72,7 @@ export default defineConfig({
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        related_applications: [{ platform: 'webapp', url: '/manifest.webmanifest' }],
       },
       injectManifest: {
         // Solo la cáscara de la app: nada de datos de negocio (precios, pedidos, caja) entra en la caché
