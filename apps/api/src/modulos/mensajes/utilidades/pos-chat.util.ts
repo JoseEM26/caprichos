@@ -70,8 +70,8 @@ export function resolverPos(
 export const faltaProcesar = (pos: PosChat, clienteEscribioHoy: boolean): boolean =>
   pos.estado === 'SIN_PEDIDO' && clienteEscribioHoy;
 
-/** Una chat es «reabierto» si tras archivarlo escribió el cliente o el equipo (el bot no cuenta). */
+/** Un chat archivado se «reabre» solo cuando el CLIENTE escribe de nuevo (ni el bot ni el equipo lo reabren). */
 export const reabiertoTrasAtendido = (
   atendidoEn: Date | null | undefined,
   mensajes: { autor: string; en: Date }[],
-): boolean => !!atendidoEn && mensajes.some((m) => (m.autor === 'CLIENTE' || m.autor === 'PERSONA') && m.en > atendidoEn);
+): boolean => !!atendidoEn && mensajes.some((m) => m.autor === 'CLIENTE' && m.en > atendidoEn);

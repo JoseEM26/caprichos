@@ -1,6 +1,7 @@
 import React from 'react';
 import { InsigniaBloqueoSpam } from './BloqueoSpam';
 import { horaListaChat } from './fechasChat';
+import { diaDeChat, encabezadoDia, FiltroDia } from './diasBandeja';
 import { MenuFilaChat } from './MenuFilaChat';
 import { InsigniaPos } from './InsigniaPos';
 import { ChatResumen, EstadoChat, FiltroChat, FiltroPos, RespuestaListarChats } from './mensajesTipos';
@@ -32,6 +33,14 @@ export interface ListaChatsProps {
   onSeleccionar: (id: string) => void;
   onMarcarNoVisto?: (id: string) => void;
   onMarcarVisto?: (id: string) => void;
+  /** Check de cada fila: marca el chat como atendido sin abrirlo. */
+  onAtendido?: (id: string, nombre: string) => void;
+  /** En «Atendidos», el mismo botón devuelve el chat a «Por atender». */
+  onVolverPorAtender?: (id: string, nombre: string) => void;
+  /** Filtro por día (solo cuando la pestaña tiene chats de días anteriores). */
+  dia?: FiltroDia;
+  onDia?: (dia: FiltroDia) => void;
+  dias?: { hoy: number; ayer: number; anteriores: number; total: number } | null;
 }
 
 /** Chip de estado de la lista. */
@@ -57,6 +66,11 @@ export function ListaChats({
   onSeleccionar,
   onMarcarNoVisto,
   onMarcarVisto,
+  onAtendido,
+  onVolverPorAtender,
+  dia = 'todos',
+  onDia,
+  dias = null,
 }: ListaChatsProps) {
   const pendientes = conteos.atender;
   const sinVerTotal = conteos.sinVer ?? 0;
@@ -97,6 +111,9 @@ export function ListaChats({
           { id: 'bot', label: 'Con el bot', count: conteos.bot },
           { id: 'novistos', label: 'No vistos', count: conteos.sinVer ?? 0 },
           { id: 'atendidos', label: 'Atendidos', count: conteos.atendidos },
+          ...((conteos.reprogramar ?? 0) > 0 || filtro === 'reprogramar'
+            ? [{ id: 'reprogramar', label: 'Por reprogramar', count: conteos.reprogramar ?? 0 }]
+            : []),
         ].map((tab) => {
           const activa = filtro === tab.id;
           return (
@@ -133,6 +150,42 @@ export function ListaChats({
         )}
       </div>
 
+      {dias && onDia && (
+        <div className="msg-dias" role="group" aria-label="Filtrar por día">
+          {(
+            [
+              ['hoy', 'Hoy', dias.hoy],
+              ['ayer', 'Ayer', dias.ayer],
+              ['todos', 'Todos', dias.total],
+            ] as const
+          ).map(([id, label, n]) => (
+            <button
+              key={id}
+              type="button"
+              className="msg-tab msg-tab-dia"
+              aria-pressed={dia === id}
+              aria-label={`${label}: ${n} ${n === 1 ? 'chat' : 'chats'}`}
+              onClick={() => onDia(id)}
+            >
+              {label} <b>{n}</b>
+            </button>
+          ))}
+          <input
+            type="date"
+            className="msg-dia-fecha"
+            aria-label="Elegir fecha"
+            title="Elegir fecha"
+            value={/^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : ''}
+            onChange={(e) => onDia(e.target.value || 'todos')}
+          />
+        </div>
+      )}
+      {dias && onDia && dia === 'hoy' && dias.anteriores > 0 && (
+        <button type="button" className="msg-aviso-anteriores" data-testid="aviso-anteriores" onClick={() => onDia('todos')}>
+          {dias.anteriores} de días anteriores {filtro === 'atendidos' ? 'archivados' : 'sin atender'} · Ver
+        </button>
+      )}
+
       {onPos && (
         <div className="msg-pos-filtros" role="group" aria-label="Punto de venta">
           <span>Punto de venta:</span>
@@ -161,15 +214,33 @@ export function ListaChats({
       {cargando ? (
         <div className="msg-vacio">Cargando conversaciones...</div>
       ) : chats.length === 0 ? (
-        <div className="msg-vacio">No hay conversaciones en esta pestaña.</div>
+        <div className="msg-vacio" data-testid="vacio-lista">
+          {filtro === 'atender' && !busqueda ? 'Todo al día: no hay chats por atender.' : 'No hay conversaciones en esta pestaña.'}
+          {dias && onDia && dia !== 'todos' && dias.total > 0 && (
+            <>
+              {' '}
+              <button type="button" className="msg-link" onClick={() => onDia('todos')}>
+                Ver todos los días ({dias.total})
+              </button>
+            </>
+          )}
+        </div>
       ) : (
         <ul className="msg-filas" aria-label="Conversaciones">
-          {chats.map((c) => {
+          {chats.map((c, i) => {
+            const diaFila = dias ? diaDeChat(c) : '';
+            const nuevoDia = dias && (i === 0 || diaDeChat(chats[i - 1]) !== diaFila);
             const seleccionado = c.id === chatSeleccionadoId;
             const espera = typeof c.esperaMin === 'number' ? obtenerEstiloEspera(c.esperaMin) : null;
             const sinVer = c.sinLeer > 0 || Boolean(c.marcadoNoVisto);
             return (
-              <li key={c.id} className="msg-li-fila">
+              <React.Fragment key={c.id}>
+              {nuevoDia && (
+                <li className="msg-encabezado-dia" role="presentation" data-testid={`dia-${diaFila}`}>
+                  {encabezadoDia(diaFila)} · {chats.filter((x) => diaDeChat(x) === diaFila).length}
+                </li>
+              )}
+              <li className="msg-li-fila">
                 <button
                   type="button"
                   className="msg-fila"
@@ -217,6 +288,16 @@ export function ListaChats({
                           Usuario de WhatsApp
                         </span>
                       )}
+                      {c.volvioAEscribir && (
+                        <span className="msg-chip msg-chip-no-visto" data-testid={`volvio-${c.id}`}>
+                          Volvió a escribir
+                        </span>
+                      )}
+                      {c.porReprogramar && (
+                        <span className="msg-chip" data-testid={`reprogramar-${c.id}`}>
+                          Entrega por reprogramar
+                        </span>
+                      )}
                       <InsigniaPos pos={c.pos} id={c.id} />
                       {c.estado === 'atendido' && c.atendidoPor && (
                         <span className="msg-chip" data-testid={`atendido-por-${c.id}`}>
@@ -247,6 +328,33 @@ export function ListaChats({
                     </span>
                   </span>
                 </button>
+                {c.estado === 'atendido' ? (
+                  onVolverPorAtender && (
+                    <button
+                      type="button"
+                      className="msg-check msg-check-hecho"
+                      aria-label="Volver a Por atender"
+                      title={`Volver a Por atender el chat de ${c.nombre}`}
+                      data-testid={`check-${c.id}`}
+                      onClick={() => onVolverPorAtender(c.id, c.nombre)}
+                    >
+                      <span aria-hidden="true">✓</span>
+                    </button>
+                  )
+                ) : (
+                  onAtendido && (
+                    <button
+                      type="button"
+                      className="msg-check"
+                      aria-label="Marcar como atendido"
+                      title={`Marcar como atendido el chat de ${c.nombre}`}
+                      data-testid={`check-${c.id}`}
+                      onClick={() => onAtendido(c.id, c.nombre)}
+                    >
+                      <span aria-hidden="true">✓</span>
+                    </button>
+                  )
+                )}
                 {onMarcarNoVisto && onMarcarVisto && (
                   <MenuFilaChat
                     nombre={c.nombre}
@@ -256,6 +364,7 @@ export function ListaChats({
                   />
                 )}
               </li>
+              </React.Fragment>
             );
           })}
         </ul>

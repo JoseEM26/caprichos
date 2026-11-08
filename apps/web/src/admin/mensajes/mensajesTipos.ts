@@ -1,7 +1,7 @@
 import type { UbicacionChat } from './TarjetaUbicacion';
 
 export type EstadoChat = 'bot' | 'atencion' | 'validar' | 'atendido' | 'pausado';
-export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos';
+export type FiltroChat = 'todos' | 'atender' | 'bot' | 'atendidos' | 'novistos' | 'reprogramar';
 export type FiltroPos = 'faltan' | 'procesados';
 
 /** Qué tan procesado está el chat en el punto de venta. */
@@ -67,6 +67,10 @@ export interface ChatResumen {
   /** Solo en «Atendidos»: cuándo (ISO) y quién lo archivó. */
   atendidoEn?: string | null;
   atendidoPor?: string | null;
+  /** Estaba archivado y el cliente escribió de nuevo: ya está en «Por atender». */
+  volvioAEscribir?: boolean;
+  /** El cliente aceptó reprogramar la entrega y falta reenviarla a reparto (el sistema no guarda fecha). */
+  porReprogramar?: boolean;
 }
 
 export interface DetallePedidoChat {
@@ -152,6 +156,7 @@ export interface RespuestaListarChats {
     sinVer?: number;
     bloqueadosSpam?: number;
     faltanProcesar?: number;
+    reprogramar?: number;
   };
   chats: ChatResumen[];
 }

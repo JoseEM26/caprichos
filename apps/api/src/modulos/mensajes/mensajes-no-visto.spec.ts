@@ -45,6 +45,7 @@ describe('MensajesService · chats no vistos', () => {
         update: jest.fn().mockResolvedValue({}),
       },
       pedido: { findMany: jest.fn().mockResolvedValue([]) },
+      mensajeReparto: { findMany: jest.fn().mockResolvedValue([]) },
     };
     auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
     eventos = { emitirAdmin: jest.fn() };

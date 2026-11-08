@@ -1030,3 +1030,36 @@
 .msg-audio audio { height: 40px; flex: 1; min-width: 0; max-width: 100%; }
 .msg-audio-vel { min-height: 36px; min-width: 44px; padding: 0 8px; font-size: 13px; font-weight: 700; }
 .msg-audio-estado, .msg-audio-descarga { font-size: 12px; color: #4A5A63; }
+
+/* Check de atendido, filtros de día y avisos de la bandeja */
+.msg-check {
+  position: absolute; right: 6px; top: 6px; width: 44px; height: 44px; border-radius: 50%;
+  border: 2px solid #2F7A45; background: #FFFFFF; color: #2F7A45; font-size: 20px; font-weight: 800; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.msg-check span { opacity: 0.35; }
+.msg-check:hover span, .msg-check:focus-visible span { opacity: 1; }
+.msg-check:hover { background: #E7F3EA; }
+.msg-check-hecho { background: #2F7A45; color: #FFFFFF; }
+.msg-check-hecho span { opacity: 1; }
+.msg-check-hecho:hover { background: #B2500F; border-color: #B2500F; }
+.msg-check:focus-visible, .msg-tab:focus-visible, .msg-dia-fecha:focus-visible, .msg-aviso-anteriores:focus-visible {
+  outline: 3px solid #D99E39; outline-offset: 2px;
+}
+.msg-dias { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding: 0 12px 8px; align-items: center; }
+.msg-dia-fecha { flex: none; min-height: 36px; border: 1px solid #E3D6C6; border-radius: 999px; padding: 0 10px; font-size: 13px; background: #FBF4EC; color: #0B2C3E; }
+.msg-tab-dia[aria-pressed='true'] { background: #0B2C3E !important; color: #FBF4EC !important; border-color: #0B2C3E !important; }
+.msg-aviso-anteriores {
+  display: block; width: calc(100% - 24px); margin: 0 12px 8px; min-height: 40px; padding: 6px 12px; text-align: left;
+  border: 1px solid #D99E39; border-radius: 10px; background: #FBF4EC; color: #B2500F; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.msg-encabezado-dia {
+  list-style: none; position: sticky; top: 0; z-index: 1; padding: 4px 14px; background: #FBF4EC; color: #2C4C5D;
+  border-bottom: 1px solid #E3D6C6; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.msg-link { border: 0; background: none; color: #B2500F; font-weight: 700; text-decoration: underline; cursor: pointer; min-height: 36px; }
+.msg-toast-atendido {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 12px;
+  background: #0B2C3E; color: #FBF4EC; padding: 10px 14px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.3); max-width: calc(100vw - 32px);
+}
+.msg-toast-atendido button { min-height: 44px; padding: 0 12px; border: 0; background: none; color: #D99E39; font-weight: 800; cursor: pointer; text-decoration: underline; }
