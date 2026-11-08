@@ -27,6 +27,8 @@ export function NombreCliente({ pedido }: { pedido: Pick<Pedido, 'cliente_nombre
 
 function chipPago(o: Pedido): { texto: string; clase: string } {
   const pag = String(o.pago_estado || '').toUpperCase();
+  // Consumo del personal: se carga al crédito del trabajador, no se cobra en caja
+  if (o.es_personal) return { texto: 'Crédito del personal', clase: 'info' };
   if (pag === 'PAGADO') return { texto: 'Pagado', clase: 'ok' };
   if (pag === 'COORDINADO') return { texto: 'Pago coordinado', clase: 'info' };
   return { texto: 'Por cobrar', clase: 'pend' };
