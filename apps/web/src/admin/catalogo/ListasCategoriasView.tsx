@@ -10,6 +10,7 @@ import {
   GrupoOpcionItem,
   ProductoAdmin,
 } from './catalogoApi';
+import { ocultarCombos } from './ocultarCombos';
 import { listarAreasCocina } from '../cocina/cocinaApi';
 import type { AreaCocina } from '../cocina/cocinaTipos';
 
@@ -106,11 +107,13 @@ export function ListasCategoriasView() {
         catalogoApi.listarGrupos(),
         catalogoApi.listarProductos({ incluyeOcultos: true }),
       ]);
-      setCategoriasCarta(cats);
+      // Los combos viven en Ofertas › Combos: su categoría interna y sus productos no se editan aquí
+      const sinCombos = ocultarCombos(prods, cats);
+      setCategoriasCarta(sinCombos.categorias);
       listarAreasCocina().then(setAreasCocina).catch(() => setAreasCocina([]));
       setListas(lsts);
       setGrupos(grps);
-      setProductos(prods);
+      setProductos(sinCombos.productos);
     } catch (err: any) {
       setError(err?.message || 'Error al cargar listas y categorías');
     } finally {
