@@ -4,6 +4,7 @@ import { ZonaGeoItem, ZONAS_GEO_DEFECTO } from './zonasGeo';
 import { COORDENADAS_TIENDA_DEFECTO, RutaSugeridaSector } from './calculoRuta';
 import type { ColorEspera } from './repartosApi';
 import { planificarEtiquetas, nombreEtiqueta, anchoTexto, ModoEtiqueta } from './etiquetasMapa';
+import { plusCodeDe } from '../../comun/mapa/CodigoPlus';
 import { claveConjuntoMapa } from './ajusteVistaMapa';
 
 export interface PuntoRepartoMapa {
@@ -283,6 +284,10 @@ export function MapaRepartos({
         icon: icono,
         zIndexOffset: esElegido ? 1500 : (p.orden ? 1000 - p.orden : 500),
       });
+
+      // Al tocar el pin: código del pedido y Código Plus (ayuda a ubicar la casa); la etiqueta fija sigue sin coordenadas
+      const plus = plusCodeDe(p.lat, p.lng);
+      if (plus) marker.bindPopup(`${p.codigo} · Código Plus: ${plus}`);
 
       // Solo nombre del cliente y código del pedido (sin coordenadas ni datos técnicos)
       const nombre = nombreEtiqueta(p.etiqueta);

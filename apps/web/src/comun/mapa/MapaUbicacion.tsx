@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
+import { plusCodeDe } from './CodigoPlus';
 import { L, ATRIBUCION, CENTRO_DEFECTO, URL_TESELAS, iconoPin, iconoTienda } from './leaflet';
 
 export interface Punto {
@@ -151,6 +152,10 @@ export function MapaUbicacion({
     } else {
       pin.current.setLatLng(pos);
     }
+    // Mapas de solo lectura (chat, antes/después): al tocar el pin sale su Código Plus
+    const plus = soloLectura ? plusCodeDe(punto.lat, punto.lng) : null;
+    if (plus) pin.current.bindPopup(`Código Plus: ${plus}`);
+    else pin.current.unbindPopup();
     if (!m.getBounds().contains(pos)) {
       m.setView(pos, Math.max(m.getZoom(), 16));
     }

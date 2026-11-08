@@ -3,6 +3,7 @@ import { Boton } from '../../comun/Boton';
 import { ErrorApi } from '../../comun/api';
 import { useSesion } from '../../comun/sesion';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
+import { CodigoPlus } from '../../comun/mapa/CodigoPlus';
 import { ModalCambiarUbicacion } from './ModalCambiarUbicacion';
 import { InsigniaDireccionEditada } from './InsigniaDireccionEditada';
 import { CambioUbicacion, HistorialUbicacion, ORIGEN_CAMBIO, cambioUbicacionApi, textoAjuste, textoDifEnvio, textoDistancia } from './cambioUbicacionApi';
@@ -102,6 +103,8 @@ export function SeccionUbicacionPedido({ pedidoId, codigo, estado, lat, lng, dir
           </Boton>
         )}
       </div>
+
+      <CodigoPlus lat={lat} lng={lng} />
 
       {propuesta && (
         <div role="region" aria-label="Cambio propuesto" style={{ background: '#fff', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>

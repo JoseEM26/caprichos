@@ -8,6 +8,7 @@ import {
   TicketPagoDatos,
   TicketComandaSalonDatos,
   esAreaBebidas,
+  plusCodeParaMostrar,
 } from '@caprichos/compartido';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
@@ -159,7 +160,11 @@ export function construirEtiquetaGeneral(pedido: any): EtiquetaGeneralDatos {
     total: pedido.total != null ? Number(pedido.total) : null,
     // Solo delivery: el repartidor lleva dirección y celular en el sticker
     ...(String(pedido.modalidad || '').toUpperCase() === 'DELIVERY'
-      ? { direccion: pedido.entrega_direccion?.trim() || null, telefono: pedido.cliente_telefono?.trim() || null }
+      ? {
+          direccion: pedido.entrega_direccion?.trim() || null,
+          telefono: pedido.cliente_telefono?.trim() || null,
+          plus: pedido.entrega_lat != null && pedido.entrega_lng != null ? plusCodeParaMostrar(Number(pedido.entrega_lat), Number(pedido.entrega_lng)) : null,
+        }
       : {}),
     printer: 'Etiquetera de caja',
   };

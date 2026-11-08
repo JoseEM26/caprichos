@@ -85,3 +85,15 @@ export {
   avisoSabor,
 } from './utilidades/avisos-stock.js';
 export type { UmbralesAvisoStock, AvisoStock } from './utilidades/avisos-stock.js';
+export {
+  codificarPlusCode,
+  decodificarPlusCode,
+  recuperarPlusCode,
+  plusCodeCorto,
+  plusCodeParaMostrar,
+  plusCodeDesdeTexto,
+  esPlusCodeValido,
+  esPlusCodeCompleto,
+  esPlusCodeCorto,
+} from './utilidades/plus-code.js';
+export type { AreaPlusCode } from './utilidades/plus-code.js';

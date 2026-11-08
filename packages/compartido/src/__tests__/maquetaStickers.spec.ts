@@ -169,6 +169,12 @@ describe('sticker general', () => {
     expect(sin.some((t) => t.startsWith('DIR:') || t.startsWith('TEL:'))).toBe(false);
   });
 
+  it('delivery con coordenadas imprime la linea PLUS dentro del ancho; sin ellas no', () => {
+    const con = verificarDentro(maquetarGeneral(general(2, { direccion: 'Jr. Union 45', telefono: '999888777', plus: '7P7J+2X Lima' })));
+    expect(con).toContain('PLUS: 7P7J+2X Lima');
+    expect(verificarDentro(maquetarGeneral(general(2, { telefono: '999888777' }))).some((t) => t.startsWith('PLUS:'))).toBe(false);
+  });
+
   it('nombre de cliente largo se reparte o se recorta, pero cabe', () => {
     const m = maquetarGeneral(general(2, { who: 'MARIA ELENA GUADALUPE DEL CARMEN DE LOS SANTOS PEREZ' }));
     verificarDentro(m);

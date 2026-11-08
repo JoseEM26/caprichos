@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
+import { CodigoPlus } from '../../comun/mapa/CodigoPlus';
 
 /** Ubicación que el cliente mandó por WhatsApp (mensaje_chat.contenido.ubicacion). */
 export interface UbicacionChat {
@@ -59,6 +60,7 @@ export function TarjetaUbicacion({ ubicacion }: { ubicacion: UbicacionChat }) {
         <div style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>Aprox.: {ubicacion.direccionAprox}</div>
       )}
       <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>{coordenadas}</div>
+      <CodigoPlus lat={ubicacion.lat} lng={ubicacion.lng} estiloBoton={BOTON} />
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
         <a
           href={`https://www.google.com/maps?q=${ubicacion.lat},${ubicacion.lng}`}

@@ -1,3 +1,4 @@
+import { CodigoPlus } from '../../comun/mapa/CodigoPlus';
 import { enlaceLlamar } from './textoVisible';
 import { comoLista } from '../../comun/comoLista';
 import { useState } from 'react';
@@ -456,6 +457,7 @@ export function TarjetaReparto({
               </div>
             )}
           </div>
+          <CodigoPlus lat={pedido.lat} lng={pedido.lng} />
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <a

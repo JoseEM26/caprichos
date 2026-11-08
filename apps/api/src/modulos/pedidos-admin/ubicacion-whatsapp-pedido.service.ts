@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { plusCodeParaMostrar } from '@caprichos/compartido';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -163,12 +164,12 @@ export class UbicacionWhatsappPedidoService implements UbicacionPedidoPuerto {
       entidadId: p.id,
       despues: { lat: punto.lat, lng: punto.lng, origen: 'WHATSAPP_CLIENTE', guardada },
     });
-    await this.avisarCaja(p.codigo, fueraDeZona);
+    await this.avisarCaja(p.codigo, fueraDeZona, punto);
     this.eventosGateway?.emitirAdmin('ubicacion:propuesta', { pedidoId: String(p.id), estado: 'PROPUESTA' });
     await this.responder(telefono, fueraDeZona ? textoUbicacionFueraDeZona(p.codigo) : textoUbicacionPropuesta(p.codigo), p.id);
   }
 
-  private async avisarCaja(codigo: string, fueraDeZona: boolean) {
+  private async avisarCaja(codigo: string, fueraDeZona: boolean, punto: { lat: number; lng: number }) {
     const titulo = fueraDeZona ? `Ubicación fuera de zona en ${codigo}` : `El cliente envió otra ubicación en ${codigo}`;
     try {
       const n = await this.prisma.notificacion.create({
@@ -176,9 +177,11 @@ export class UbicacionWhatsappPedidoService implements UbicacionPedidoPuerto {
           tipo: 'UBICACION_PROPUESTA',
           rol_destino: 'CAJERO',
           titulo,
-          mensaje: fueraDeZona
-            ? 'La ubicación del cliente está fuera de la zona de reparto: revísala en el pedido.'
-            : '¿Usarla? Revisa el mapa y el envío en el pedido (Usar o Descartar).',
+          mensaje:
+            (fueraDeZona
+              ? 'La ubicación del cliente está fuera de la zona de reparto: revísala en el pedido.'
+              : '¿Usarla? Revisa el mapa y el envío en el pedido (Usar o Descartar).') +
+            ` Código Plus: ${plusCodeParaMostrar(punto.lat, punto.lng)}`,
           enlace: '/admin/caja',
         },
       });

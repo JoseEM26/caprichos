@@ -5,6 +5,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WhatsappWebhookService } from '../servicios/whatsapp-webhook.service';
 import { UbicacionWhatsappController } from '../controladores/ubicacion-whatsapp.controller';
+import { codificarPlusCode } from '@caprichos/compartido';
 import { ubicacionValida } from '../servicios/ubicacion-cliente.util';
 
 const TEL = '51987654321';
@@ -95,6 +96,22 @@ describe('Ubicación del cliente en el webhook', () => {
     await tick();
     expect(prisma.mensajeChat.update).not.toHaveBeenCalled();
     expect(contenidoGuardado.ubicacion).toEqual({ lat: -12.0701, lng: -77.0355 });
+  });
+
+  it('un Plus Code escrito en texto se guarda como ubicación; un código corto sin localidad se ignora', async () => {
+    const texto = (body: string) => ({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { contacts: [{ wa_id: TEL, profile: { name: 'Ana' } }], messages: [{ id: 'wamid.T1', from: TEL, type: 'text', text: { body } }] } }] }],
+    });
+    const cod = codificarPlusCode(-12.0701, -77.0355);
+    await webhook.procesarPayload(texto(`Mi ubicación: ${cod.slice(4)} Lima`));
+    const u = prisma.mensajeChat.create.mock.calls[0][0].data.contenido.ubicacion;
+    expect(u.lat).toBeCloseTo(-12.0701, 3);
+    expect(u.lng).toBeCloseTo(-77.0355, 3);
+    expect(u.nombre).toBe(`Código Plus ${cod}`);
+    prisma.mensajeChat.create.mockClear();
+    await webhook.procesarPayload(texto(`Mi ubicación: ${cod.slice(4)}`));
+    expect(prisma.mensajeChat.create.mock.calls[0][0].data.contenido).toEqual({ texto: `Mi ubicación: ${cod.slice(4)}` });
   });
 
   it('con coordenadas inválidas no agrega el objeto ubicación', async () => {

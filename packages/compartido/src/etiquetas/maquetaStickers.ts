@@ -231,6 +231,10 @@ export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number
   if (tel && finCuerpo - y >= hLinea(['3', 1])) {
     y = lineas(L, y, encajar(`TEL: ${tel}`, L.w, hLinea(['3', 1]), [['3', 1], ['2', 1]], 1), false);
   }
+  const plus = d.plus?.trim();
+  if (plus && finCuerpo - y >= hLinea(['3', 1])) {
+    y = lineas(L, y, encajar(`PLUS: ${plus}`, L.w, hLinea(['3', 1]), [['3', 1], ['2', 1]], 1), false);
+  }
   barra(L, L.x0, y + 2, L.w, 2);
   y += 8;
 

@@ -6,6 +6,7 @@ import { MapaUbicacion } from '../../comun/mapa/MapaUbicacion';
 import type { Punto } from '../../comun/mapa/MapaUbicacion';
 import { SEDE_DEFECTO, cargarSede } from '../../comun/mapa/sedeDefecto';
 import { BuscadorDireccion } from '../../comun/mapa/BuscadorDireccion';
+import { CodigoPlus } from '../../comun/mapa/CodigoPlus';
 import { pedidosApi } from './pedidosApi';
 
 export interface ModalUbicarProps {
@@ -103,6 +104,7 @@ export function ModalUbicar({ pedidoId, codigoPedido, direccionInicial, puntoIni
         <div style={{ fontSize: 11, color: 'var(--cp-soft, #2C4C5D)' }}>
           El icono de la tienda es la sede (Caprichos).
         </div>
+        <CodigoPlus lat={punto?.lat} lng={punto?.lng} />
 
         <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--cp-soft, #2C4C5D)' }}>
           Dirección

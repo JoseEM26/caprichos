@@ -189,6 +189,8 @@ export interface EtiquetaGeneralDatos {
   /** Solo delivery: dirección de entrega y celular del cliente (van en el sticker para el repartidor). */
   direccion?: string | null;
   telefono?: string | null;
+  /** Delivery con coordenadas: Plus Code corto («7P7J+2X Lima») para ubicar al cliente */
+  plus?: string | null;
   /** Tamaño del sticker en mm; la API lo pone al entregar el trabajo al programa de impresión. Ausente: el de fábrica. */
   tamanoMm?: { anchoMm: number; altoMm: number; margenMm?: number };
   printer: string;
