@@ -12,6 +12,7 @@ import { calcularEtaEntrega, formatearEta, leerConfigEta } from '../../repartos/
 import { montoDigitalDePlan } from '../../pedidos/pago-plan.service';
 import { mediosPagoPublicos } from '../../local/local.service';
 import { detalleDatosPago } from '../conversacion/flujos/pago/textos-pago';
+import { extraerOpciones } from '../../comprobantes/comprobantes.util';
 import { enlaceSeguimientoCarta } from '../../pedidos/seguimiento.tokens';
 
 /**
@@ -292,15 +293,25 @@ export class AvisosPedidoService {
     }
   }
 
-  /** Productos (sin las partes de un combo), total, medio de pago y estado del envío para el aviso de pedido recibido. */
+  /** Todos los datos del aviso «Recibimos tu pedido» en una sola consulta del pedido (+ una de parámetros). */
   private async resumenRecibido(db: Prisma.TransactionClient | PrismaService, pedidoId: bigint): Promise<ResumenRecibido | null> {
     const p = await db.pedido.findUnique({
       where: { id: pedidoId },
       select: {
-        modalidad: true, total: true, envio: true, entrega_lat: true, entrega_lng: true, zona_id: true,
+        modalidad: true, total: true, subtotal: true, descuento: true, descuento_detalle: true, propina: true, envio: true,
+        entrega_lat: true, entrega_lng: true, zona_id: true, entrega_direccion: true, entrega_referencia: true, mesa_nombre: true,
+        cliente_nombre: true, cliente_telefono: true, pago_estado: true,
+        comprobante_tipo: true, comprobante_doc: true, comprobante_razon: true, eta_min: true, eta_max: true,
         pago_metodo: true, pago_preferido: true, paga_con: true,
-        planPago: { select: { medio: true, monto: true } },
-        lineas: { where: { linea_combo_id: null }, orderBy: { id: 'asc' }, select: { nombre: true, cantidad: true } },
+        planPago: { select: { medio: true, monto: true }, orderBy: { orden: 'asc' } },
+        lineas: {
+          orderBy: { id: 'asc' },
+          select: {
+            id: true, linea_combo_id: true, nombre: true, cantidad: true, tamano: true, sabor: true, nota: true, opciones: true,
+            opcionesElegidas: { select: { opcion_nombre: true, grupo_nombre: true }, orderBy: { id: 'asc' } },
+            sabores: { select: { sabor_nombre: true, cantidad: true }, orderBy: { id: 'asc' } },
+          },
+        },
       },
     });
     if (!p || !Array.isArray(p.lineas) || p.lineas.length === 0) return null;
@@ -308,16 +319,69 @@ export class AvisosPedidoService {
     const nombresMedio: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'transferencia', EFECTIVO: 'efectivo', TARJETA: 'tarjeta' };
     const delivery = p.modalidad === 'DELIVERY';
     const sinUbicar = delivery && (p.entrega_lat == null || p.entrega_lng == null || p.zona_id == null);
+    const plan = (p.planPago ?? []).map((f) => ({ medio: String(f.medio).toUpperCase(), monto: Number(f.monto) }));
     // Efectivo a cobrar al recibir: la parte en efectivo del plan, o todo el total si paga solo en efectivo
-    const planEfectivo = (p.planPago ?? []).filter((f) => String(f.medio).toUpperCase() === 'EFECTIVO').reduce((a, f) => a + Number(f.monto), 0);
-    const aPagarEfectivo = planEfectivo > 0 ? planEfectivo : metodo === 'EFECTIVO' && !(p.planPago ?? []).length ? Number(p.total) : 0;
+    const planEfectivo = plan.filter((f) => f.medio === 'EFECTIVO').reduce((a, f) => a + f.monto, 0);
+    const aPagarEfectivo = planEfectivo > 0 ? planEfectivo : metodo === 'EFECTIVO' && !plan.length ? Number(p.total) : 0;
+
+    // Productos con su detalle; las partes de un combo van bajo su combo con sangría
+    const detalleLinea = (l: (typeof p.lineas)[number]): string => {
+      const opciones = l.opcionesElegidas?.length ? l.opcionesElegidas.map((o) => o.opcion_nombre) : extraerOpciones(l).map((o) => o.nombre);
+      const sabores = l.sabores?.length ? l.sabores.map((x) => (x.cantidad > 1 ? `${x.cantidad} ${x.sabor_nombre}` : x.sabor_nombre)) : l.sabor ? [l.sabor] : [];
+      const extras = [l.tamano, ...sabores, ...opciones].filter((x): x is string => !!x && String(x).trim() !== '');
+      return `${l.cantidad} x ${l.nombre}${extras.length ? ` (${extras.join(', ')})` : ''}${l.nota ? `\n   📝 ${l.nota}` : ''}`;
+    };
+    const partes = new Map<string, string[]>();
+    for (const l of p.lineas) {
+      if (l.linea_combo_id == null) continue;
+      const k = String(l.linea_combo_id);
+      partes.set(k, [...(partes.get(k) ?? []), `   ◦ ${l.cantidad} x ${l.nombre}${[l.tamano, l.sabor].filter(Boolean).length ? ` (${[l.tamano, l.sabor].filter(Boolean).join(', ')})` : ''}`]);
+    }
+    const lineas = p.lineas
+      .filter((l) => l.linea_combo_id == null)
+      .map((l) => [detalleLinea(l), ...(partes.get(String(l.id)) ?? [])].join('\n'));
+
+    // Dirección del local y tiempo prometido: si no se leen, el aviso sale sin esas líneas
+    let parametros: Array<{ clave: string; valor: unknown }> = [];
+    try {
+      parametros = await db.parametro.findMany({ where: { clave: { in: ['local_datos', 'tiempo_prometido_min'] } } });
+    } catch (err: any) {
+      this.logger.warn(`Local y tiempo prometido no incluidos en el aviso: ${err?.message}`);
+    }
+    const param = (clave: string) => parametros.find((x) => x.clave === clave)?.valor as any;
+    const localDireccion = typeof param('local_datos')?.direccion === 'string' ? param('local_datos').direccion.trim() : '';
+    const prometido = Number(param('tiempo_prometido_min'));
+    const tiempoEstimado = p.eta_min != null
+      ? p.eta_max != null && p.eta_max !== p.eta_min ? `${p.eta_min} a ${p.eta_max}` : String(p.eta_min)
+      : prometido > 0 && (delivery || p.modalidad === 'RECOJO' || p.modalidad === 'LLEVAR') ? String(prometido) : null;
+    const detalles: any[] = Array.isArray(p.descuento_detalle) ? p.descuento_detalle : p.descuento_detalle ? [p.descuento_detalle] : [];
+    const descuentoNombre = detalles.map((d) => d?.nombre ?? d?.codigo).filter((x) => typeof x === 'string' && x.trim()).join(', ');
+
     return {
       efectivo: aPagarEfectivo > 0 ? { aPagar: aPagarEfectivo, pagaCon: p.paga_con != null ? Number(p.paga_con) : null } : undefined,
-      lineas: p.lineas.map((l) => `${l.cantidad} x ${l.nombre}`),
+      lineas,
       total: Number(p.total),
       medioPago: nombresMedio[metodo] ?? (metodo ? metodo.toLowerCase() : 'por coordinar'),
       envioPorConfirmar: sinUbicar,
       envio: delivery && !sinUbicar && p.envio != null ? Number(p.envio) : null,
+      modalidad: p.modalidad,
+      direccion: p.entrega_direccion?.trim() || null,
+      referencia: p.entrega_referencia?.trim() || null,
+      localDireccion: localDireccion || null,
+      mesa: p.mesa_nombre?.trim() || null,
+      clienteNombre: p.cliente_nombre?.trim() || null,
+      clienteTelefono: p.cliente_telefono?.trim() || null,
+      subtotal: p.subtotal != null ? Number(p.subtotal) : null,
+      descuento: Number(p.descuento ?? 0),
+      descuentoNombre: descuentoNombre || null,
+      propina: Number(p.propina ?? 0),
+      pagos: plan.length > 1 ? plan : undefined,
+      conTarjeta: plan.some((f) => f.medio === 'TARJETA') || (metodo === 'TARJETA' && !plan.length),
+      pagoEstado: p.pago_estado,
+      comprobanteTipo: p.comprobante_tipo,
+      comprobanteDoc: p.comprobante_doc,
+      comprobanteRazon: p.comprobante_razon,
+      tiempoEstimado,
     };
   }
 

@@ -371,6 +371,57 @@ describe('AvisosPedidoService: puntos en los avisos de la carta', () => {
     });
   });
 
+  describe('resumen completo de «Recibimos tu pedido»', () => {
+    const completo = (extra: Record<string, unknown> = {}) => ({
+      id: BigInt(99), codigo: 'CP-W099', cliente_nombre: 'Alejandro', cliente_telefono: '987654321', modalidad: 'RECOJO', canal: 'CARTA',
+      party_id: null, cliente_party_id: null, puntos_ganados: 0, total: 28, subtotal: 30, descuento: 2, descuento_detalle: [{ nombre: '2x1 Frappés' }], propina: 0,
+      envio: null, entrega_lat: null, entrega_lng: null, zona_id: null, mesa_nombre: null, entrega_direccion: null, entrega_referencia: null,
+      pago_metodo: 'EFECTIVO', pago_preferido: 'EFECTIVO', paga_con: 50, pago_estado: 'PENDIENTE', planPago: [],
+      comprobante_tipo: 'BOLETA', comprobante_doc: null, comprobante_razon: null, eta_min: null, eta_max: null,
+      lineas: [
+        { id: BigInt(1), linea_combo_id: null, nombre: 'COMBO DÚO', cantidad: 1, tamano: 'Grande', sabor: null, nota: 'sin azúcar', opciones: [], opcionesElegidas: [{ opcion_nombre: 'Leche de almendra' }], sabores: [] },
+        { id: BigInt(2), linea_combo_id: BigInt(1), nombre: 'Frappé', cantidad: 1, tamano: null, sabor: 'Caramelo', nota: null, opciones: [], opcionesElegidas: [], sabores: [] },
+        { id: BigInt(3), linea_combo_id: null, nombre: 'Dona', cantidad: 2, tamano: null, sabor: null, nota: null, opciones: [], opcionesElegidas: [], sabores: [] },
+      ],
+      ...extra,
+    });
+
+    beforeEach(() => {
+      parametrosPuntos.whatsapp_aviso_bienvenida_puntos_activo = 'no';
+      prisma.parametro.findMany = jest.fn(async () => [
+        { clave: 'local_datos', valor: { direccion: 'Av. Los Cedros 456' } },
+        { clave: 'tiempo_prometido_min', valor: 25 },
+      ]);
+    });
+
+    it('recoger con efectivo: una sola lectura del pedido para el resumen y todos los datos', async () => {
+      prisma.pedido.findUnique = jest.fn(async () => completo());
+      await servicio.avisar(99, 'RECIBIDO', {}, undefined);
+      const t = cargaEncolada().textoLibre as string;
+      expect(t).toContain('Recibimos tu pedido *CP-W099*');
+      expect(t).toContain('🏪 Recoger en el local\n📍 Recoges en: Av. Los Cedros 456');
+      expect(t).toContain('• 1 x COMBO DÚO (Grande, Leche de almendra)\n   📝 sin azúcar\n   ◦ 1 x Frappé (Caramelo)\n• 2 x Dona');
+      expect(t).toContain('Descuento (2x1 Frappés): -S/ 2.00');
+      expect(t).toContain('Pagas con S/ 50.00 · vuelto S/ 22.00');
+      expect(t).toContain('🧾 Comprobante: Boleta');
+      expect(t).toContain('⏱️ Tiempo estimado: 25 minutos');
+      expect(t).not.toMatch(/undefined|null|\n{3,}/);
+      // Pedido (resumen) + cabecera del aviso: sin consultas por línea
+      expect(prisma.pedido.findUnique).toHaveBeenCalledTimes(2);
+      expect(cargaEncolada().plantillaClave).toBe('CARTA_RECIBIDO_EFECTIVO');
+      expect(cargaEncolada().variablesPlantilla).toEqual(['Alejandro', 'CP-W099']);
+    });
+
+    it('sin la dirección del local, recoger no inventa una', async () => {
+      prisma.parametro.findMany = jest.fn(async () => []);
+      prisma.pedido.findUnique = jest.fn(async () => completo());
+      await servicio.avisar(99, 'RECIBIDO', {}, undefined);
+      const t = cargaEncolada().textoLibre as string;
+      expect(t).not.toContain('Recoges en');
+      expect(t).not.toContain('Tiempo estimado');
+    });
+  });
+
   it('pedido sin cliente con cuenta o de invitado: sin línea de puntos', async () => {
     prisma.pedido.findUnique = jest.fn(async () => ({
       id: BigInt(91), codigo: 'CP-091', cliente_nombre: 'Ana', cliente_telefono: '987654321', modalidad: 'DELIVERY', total: 20,
