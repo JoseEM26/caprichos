@@ -432,6 +432,73 @@ describe('OfertasService', () => {
       });
     });
 
+    describe('partes finas: productos concretos, excluidos y sabores específicos', () => {
+      const sabor = (id: bigint, nombre: string, cantidad: number) => ({
+        id, nombre, activo: true, agotado_hasta: null, stockSabor: { cantidad },
+      });
+      const prod = (id: bigint, nombre: string, cat: bigint, sabores: any[] = []) => ({
+        id, nombre, categoria_id: cat, oculto: false, agotado_hasta: null,
+        categoria: { nombre: `CAT${cat}`, area_id: 4n, area: { nombre: 'Panadería' } },
+        controla_stock: sabores.length > 0, stocks: [], sabores,
+      });
+      const combo = (extra: Record<string, any>) => {
+        prismaMock.oferta.findUnique.mockResolvedValue({
+          id: 9n, tipo: 'COMBO', nombre: 'DUO', dias: [], canales: [], creado_en: new Date(), combosPrecio: [],
+          combosParte: [{
+            id: 300n, tipo: 'A_ELECCION', cantidad: 1, categorias: [8n], productos: [], reemplazos: [],
+            paquete_grupo: 'Complemento', paquete_nombre: '1 dona', sabores_ids: [], productos_excluidos_ids: [], ...extra,
+          }],
+        });
+        prismaMock.producto.findMany.mockResolvedValue([
+          prod(40n, 'Dona clásica', 8n, [sabor(1n, 'Oreo', 5), sabor(2n, 'Fresa', 5)]),
+          prod(42n, 'Dona rellena', 8n, [sabor(3n, 'Manjar', 5)]),
+        ]);
+      };
+
+      it('con productos marcados valen SOLO esos aunque haya categoría', async () => {
+        combo({ productos: [40n] });
+        await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '42', saborId: '3' }])).rejects.toMatchObject({ response: { codigo: 'COMBO_PARTE_NO_PERMITIDA' } });
+        const ok = await service.resolverPartesCombo(9, [{ parteId: '300', productoId: '40', saborId: '1' }]);
+        expect(ok.partes).toHaveLength(1);
+      });
+
+      it('sin productos marcados vale toda la categoría (combos antiguos)', async () => {
+        combo({});
+        const ok = await service.resolverPartesCombo(9, [{ parteId: '300', productoId: '42', saborId: '3' }]);
+        expect(ok.partes[0].productoId).toBe(42n);
+      });
+
+      it('un producto excluido no se puede elegir aunque su categoría sí', async () => {
+        combo({ productos_excluidos_ids: [42n] });
+        await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '42', saborId: '3' }])).rejects.toMatchObject({ response: { codigo: 'COMBO_PARTE_NO_PERMITIDA' } });
+      });
+
+      it('sabores específicos: solo esos se aceptan y la carta solo ve esos', async () => {
+        combo({ sabores_ids: [1n] });
+        await expect(service.resolverPartesCombo(9, [{ parteId: '300', productoId: '40', saborId: '2' }])).rejects.toMatchObject({ response: { codigo: 'SABORES_INVALIDOS' } });
+        const ok = await service.resolverPartesCombo(9, [{ parteId: '300', productoId: '40', saborId: '1' }]);
+        expect(ok.partes[0].sabores).toEqual([expect.objectContaining({ saborId: 1n, cantidad: 1 })]);
+        const oferta = await service.obtenerOfertaPorId(9);
+        const opciones = oferta.combosParte![0].opcionesDetalle!;
+        // «Dona rellena» no tiene ninguno de los sabores permitidos: ni aparece
+        expect(opciones.map((o) => o.id)).toEqual(['40']);
+        expect(opciones[0].sabores!.map((s) => s.nombre)).toEqual(['Oreo']);
+      });
+
+      it('sabores específicos: si el permitido se agotó, la pieza no se puede armar', async () => {
+        combo({ sabores_ids: [1n], productos: [40n] });
+        prismaMock.producto.findMany.mockResolvedValue([prod(40n, 'Dona clásica', 8n, [sabor(1n, 'Oreo', 0), sabor(2n, 'Fresa', 5)])]);
+        const oferta = await service.obtenerOfertaPorId(9);
+        expect(oferta.combosParte![0].disponible).toBe(false);
+        expect(oferta.disponible).toBe(false);
+      });
+
+      it('al guardar persiste sabores y excluidos sin repetir ni valores raros', () => {
+        expect((service as any).idsNumericos(['2', 2, 'x', '3'])).toEqual([2n, 3n]);
+        expect((service as any).idsNumericos(undefined)).toEqual([]);
+      });
+    });
+
     describe('resolverPartesCombo: elecciones A_ELECCION con lista de productos (juguetes)', () => {
       const cajita = (agotadoBurbujas: boolean) => {
         const ahora = Date.now();

@@ -103,6 +103,16 @@ export class ComboParteDto {
   @IsOptional()
   @IsString()
   paqueteNombre?: string | null;
+
+  /** Sabores permitidos en la parte (ids de sabor); vacío = todos. */
+  @IsOptional()
+  @IsArray({ message: 'saboresIds debe ser un arreglo' })
+  saboresIds?: (string | number)[];
+
+  /** Productos que no entran en la parte aunque su categoría sí. */
+  @IsOptional()
+  @IsArray({ message: 'productosExcluidos debe ser un arreglo' })
+  productosExcluidos?: (string | number)[];
 }
 
 export class CrearOfertaDto {

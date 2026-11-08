@@ -37,7 +37,9 @@ import {
   ResolucionCombo,
 } from './ofertas.tipos';
 import {
+  admiteProducto,
   calcularDisponibilidadCombo,
+  conSaboresDeParte,
   parteArmable,
   productoDisponible,
   productosDeParte,
@@ -469,6 +471,8 @@ export class OfertasService {
               cantidad: p.cantidad || 1,
               categorias: catIds,
               productos: prodIds,
+              sabores_ids: this.idsNumericos(p.saboresIds),
+              productos_excluidos_ids: this.idsNumericos(p.productosExcluidos),
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
               ...this.paqueteDeParte(tipoParte, p),
             },
@@ -752,6 +756,8 @@ export class OfertasService {
               cantidad: p.cantidad || 1,
               categorias: catIds,
               productos: prodIds,
+              sabores_ids: this.idsNumericos(p.saboresIds),
+              productos_excluidos_ids: this.idsNumericos(p.productosExcluidos),
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
               ...this.paqueteDeParte(tipoParte, p),
             },
@@ -2246,12 +2252,16 @@ export class OfertasService {
       permitido: (prod: InfoProductoCombo) => boolean,
       tipo: 'FIJO' | 'A_ELECCION',
       cambio: string | null,
+      acotarSabores = false,
     ) => {
       const porProducto = new Map<string, { n: number; sabores: Map<string, number> }>();
       for (const pk of picks) {
         const id = String(pk.productoId);
-        const prod = info.get(id);
-        if (!prod || !permitido(prod)) {
+        const completo = info.get(id);
+        // Parte con sabores acotados: el producto solo muestra los sabores permitidos (y sin ninguno no es opción)
+        const prod = completo && acotarSabores ? conSaboresDeParte(parte, completo) : completo;
+        const sinSaboresPermitidos = !!completo && !!prod && (completo.sabores ?? []).length > 0 && (prod.sabores ?? []).length === 0;
+        if (!prod || sinSaboresPermitidos || !permitido(prod)) {
           throw new BadRequestException({
             codigo: 'COMBO_PARTE_NO_PERMITIDA',
             mensaje: `${prod?.nombre ?? 'El producto elegido'} no es una opción de ${oferta.nombre}`,
@@ -2357,9 +2367,10 @@ export class OfertasService {
       acumular(
         parte,
         picks,
-        (prod) => parte.productos.includes(prod.id) || parte.categorias.includes(prod.categoriaId),
+        (prod) => admiteProducto(parte, prod),
         'A_ELECCION',
         parte.paqueteNombre ?? null,
+        true,
       );
     }
 
@@ -2412,6 +2423,12 @@ export class OfertasService {
     }
 
     return { nota: cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '', partes };
+  }
+
+  /** Ids numéricos de una lista de entrada (sabores, excluidos): sin repetir y sin valores raros. */
+  private idsNumericos(lista?: (string | number)[] | null): bigint[] {
+    const ids = (lista ?? []).map(String).filter((x) => /^\d+$/.test(x));
+    return [...new Set(ids)].map((x) => BigInt(x));
   }
 
   /**
@@ -2611,12 +2628,15 @@ export class OfertasService {
         }
         if (p.tipo === 'A_ELECCION' && p.productos.length > 0) {
           // Lista explícita (p. ej. juguetes): cada opción con su nombre y si se puede elegir ahora
-          p.opcionesDetalle = p.productos.map((id) => detalleOpcion(id, productos));
+          const deLaParte = productosDeParte({ ...p, alternativas: [] }, productos);
+          p.opcionesDetalle = p.productos
+            .map((id) => deLaParte.find((x) => x.id === id))
+            .filter((x): x is ProductoDisp => !!x)
+            .map((x) => detalleOpcion(x.id, deLaParte));
         } else if (p.tipo === 'A_ELECCION' && p.paqueteGrupo) {
           // Pieza de un complemento por categorías (p. ej. «Donas»): sus productos visibles son las opciones
-          p.opcionesDetalle = productos
-            .filter((x) => p.categorias.includes(x.categoriaId) && !x.oculto)
-            .map((x) => detalleOpcion(x.id, productos));
+          const deLaParte = productosDeParte({ ...p, alternativas: [] }, productos).filter((x) => !x.oculto);
+          p.opcionesDetalle = deLaParte.map((x) => detalleOpcion(x.id, deLaParte));
         }
       });
     }
@@ -2748,6 +2768,8 @@ export class OfertasService {
             productos: (cp.productos || []).map((p: any) => p.toString()),
             paqueteGrupo: cp.paquete_grupo ?? null,
             paqueteNombre: cp.paquete_nombre ?? null,
+            saboresIds: (cp.sabores_ids || []).map((x: any) => x.toString()),
+            productosExcluidos: (cp.productos_excluidos_ids || []).map((x: any) => x.toString()),
             tamanoId: cp.tamano ? cp.tamano.id.toString() : null,
             tamanoNombre: cp.tamano?.tamano_valor?.nombre ?? null,
             tamanoUnidades: cp.tamano?.unidades ?? 1,

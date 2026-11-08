@@ -41,6 +41,10 @@ export interface ParteDisp {
   /** Complemento a elegir: las partes con el mismo grupo se agrupan por paquete y basta con que UN paquete se pueda armar. */
   paqueteGrupo?: string | null;
   paqueteNombre?: string | null;
+  /** Sabores permitidos en la parte (id de sabor); vacío o ausente = todos. */
+  saboresIds?: string[];
+  /** Productos que no entran aunque su categoría sí; vacío o ausente = ninguno. */
+  productosExcluidos?: string[];
 }
 
 export interface AlternativaDisponibilidad {
@@ -97,11 +101,32 @@ export function unidadesDisponibles(p: ProductoDisp | undefined): number {
   return Math.max(0, Math.floor(p.saldo ?? 0));
 }
 
-/** Productos que pueden cubrir la parte original: FIJO el principal; UNA_DE sus productos; A_ELECCION los de sus categorías o lista. */
+/**
+ * ¿El producto es opción de la parte? FIJO: el principal; UNA_DE: su lista; A_ELECCION: sin los excluidos y, si hay productos
+ * marcados, SOLO esos (la lista manda); sin productos marcados, los de sus categorías.
+ */
+export function admiteProducto(parte: ParteDisp, p: Pick<ProductoDisp, 'id' | 'categoriaId'>): boolean {
+  if (parte.tipo === 'FIJO') return p.id === parte.productos[0];
+  if (parte.tipo === 'UNA_DE') return parte.productos.includes(p.id);
+  if ((parte.productosExcluidos ?? []).includes(p.id)) return false;
+  return parte.productos.length > 0 ? parte.productos.includes(p.id) : parte.categorias.includes(p.categoriaId);
+}
+
+/** El producto tal como lo ve la parte: con sabores acotados, solo esos (vacío = todos). Sin sabores no cambia. */
+export function conSaboresDeParte<T extends ProductoDisp>(parte: Pick<ParteDisp, 'saboresIds'>, p: T): T {
+  const permitidos = parte.saboresIds ?? [];
+  if (permitidos.length === 0 || !(p.sabores ?? []).length) return p;
+  return { ...p, sabores: p.sabores!.filter((s) => permitidos.includes(s.id)) };
+}
+
+/** Productos que pueden cubrir la parte original (ver admiteProducto), con los sabores que la parte permite. */
 export function productosDeParte(parte: ParteDisp, productos: ProductoDisp[]): ProductoDisp[] {
-  if (parte.tipo === 'FIJO') return productos.filter((p) => p.id === parte.productos[0]);
-  if (parte.tipo === 'UNA_DE') return productos.filter((p) => parte.productos.includes(p.id));
-  return productos.filter((p) => parte.categorias.includes(p.categoriaId) || parte.productos.includes(p.id));
+  return productos.flatMap((p) => {
+    if (!admiteProducto(parte, p)) return [];
+    const v = conSaboresDeParte(parte, p);
+    // Con sabores acotados, un producto sin ninguno de los sabores permitidos no es opción
+    return (p.sabores ?? []).length > 0 && (v.sabores ?? []).length === 0 ? [] : [v];
+  });
 }
 
 /** El original alcanza: entre sus productos hay unidades para la cantidad de la parte (por unidad de combo). */

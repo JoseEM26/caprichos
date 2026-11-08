@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { AlternativasParte } from '../AlternativasParte';
 import { ModalCombo } from '../ModalCombo';
 import { AlternativaParteItem, OfertaItem } from '../ofertasApi';
@@ -71,7 +71,7 @@ describe('Alternativas de una parte (si no hay stock, elige)', () => {
     render(<ModalCombo abierto comboAEditar={combo} onCerrar={() => {}} onGuardar={async (d) => { guardado = d; }} productosDisponibles={productos} categorias={[]} />);
     fireEvent.click(screen.getByRole('tab', { name: /Partes y alternativas/ }));
     expect(await screen.findByText('Si no hay stock, el cliente podrá elegir:')).toBeInTheDocument();
-    expect(screen.getByText('Empanada')).toBeInTheDocument();
+    expect(within(screen.getByTestId('alternativas-parte')).getByText('Empanada')).toBeInTheDocument();
     expect(screen.getByLabelText('Cantidad de Empanada')).toHaveValue(2);
     fireEvent.click(screen.getByTestId('btn-guardar-combo'));
     fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }));

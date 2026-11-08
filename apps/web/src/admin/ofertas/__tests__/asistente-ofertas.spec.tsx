@@ -55,10 +55,11 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
       fireEvent.change(screen.getByLabelText(/Nombre del combo \*/i), { target: { value: 'Combo Desayuno Dulce' } });
       fireEvent.change(screen.getByLabelText(/Descripción corta/i), { target: { value: 'Frappé y Waffle para iniciar el día' } });
 
-      // Partes: agregar una "+ 2 bebidas a elección"
+      // Partes: «+ Agregar» > Bebidas, y se marca la categoría con un toque (sin escribir nada)
       irA(/Partes y alternativas/);
-      fireEvent.click(screen.getByRole('button', { name: /\+ 2 bebidas a elección/i }));
-      fireEvent.change(screen.getByDisplayValue('Bebidas a elección'), { target: { value: 'Bebidas del Desayuno' } });
+      fireEvent.click(screen.getByRole('button', { name: '+ Agregar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Agregar bebidas' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Frappes' }));
 
       // Volver a Datos: lo escrito se conserva
       irA(/^Datos/);
@@ -67,7 +68,7 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
 
       // Y la parte sigue ahí
       irA(/Partes y alternativas/);
-      expect(screen.getByDisplayValue('Bebidas del Desayuno')).toBeInTheDocument();
+      expect(screen.getByText('Elige 2 · Frappes')).toBeInTheDocument();
 
       // Precio del tamaño (Datos)
       irA(/^Datos/);
@@ -111,9 +112,9 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
       irA(/Partes y alternativas/);
 
       // Partes: agregar un complemento fijo con Frappé Clásico (S/ 12)
-      fireEvent.click(screen.getByRole('button', { name: /\+ 1 complemento fijo/i }));
-      const selectProducto = screen.getByRole('combobox');
-      fireEvent.change(selectProducto, { target: { value: '1' } }); // Frappé Clásico S/ 12
+      fireEvent.click(screen.getByRole('button', { name: '+ Agregar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Agregar producto fijo' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Frappé Clásico' })); // S/ 12
 
       // Volver a Datos (precio por tamaño)
       irA(/^Datos/);
@@ -171,7 +172,7 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
 
       // Partes cargadas
       irA(/Partes y alternativas/);
-      expect(await screen.findByDisplayValue('2 Bebidas')).toBeInTheDocument();
+      expect(await screen.findByText('Elige 2 · Frappes')).toBeInTheDocument();
     });
   });
 
