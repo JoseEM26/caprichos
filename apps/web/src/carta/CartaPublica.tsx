@@ -957,7 +957,8 @@ function ContenidoCartaPublica({ vistaPrevia, paginaInicial }: { vistaPrevia?: V
             (categorias.find((c) => c.productos.some((p) => p.id === productoEnModal.id))?.nombre ?? '').toUpperCase(),
           )}
           onCerrar={cerrarModalProducto}
-          oferta={comboDeProducto(ofertas, productoEnModal.id)}
+          // El combo se arma desde su producto aunque «visible en la carta» esté apagado (ese interruptor solo controla el banner de promos)
+          oferta={comboDeProducto(ofertasBase, productoEnModal.id)}
         />
       )}
 
