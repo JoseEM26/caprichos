@@ -277,6 +277,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           : quedanProducto;
         const tamanos = (p.tamanos || []).map((t) => ({
           id: t.id.toString(),
+          tamanoValorId: (t.tamano_valor_id ?? t.tamano_valor?.id)?.toString() ?? null,
           nombre: t.tamano_valor?.nombre || '',
           precio: Number(Number(t.precio).toFixed(2)),
           unidades: t.unidades,

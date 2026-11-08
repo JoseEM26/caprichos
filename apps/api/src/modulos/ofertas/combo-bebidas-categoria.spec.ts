@@ -34,10 +34,11 @@ describe('Combo con bebidas por categoría (Bebida 1..N)', () => {
     id, nombre, categoria_id: cat, oculto: false, agotado_hasta: null, controla_stock: false, stocks: [], sabores: [],
     categoria: { nombre: catNombre, area_id: 1n, area: { nombre: catNombre === 'Donas' ? 'Panadería' : 'Barra' } }, ...extra,
   });
+  const tam = (valor: bigint, nombre: string) => ({ tamano_valor_id: valor, unidades: 1, tamano_valor: { nombre } });
   const productos = [
-    prod(101n, 'FRAPPE OREO', 4n, 'Frappes'),
+    prod(101n, 'FRAPPE OREO', 4n, 'Frappes', { tamanos: [tam(1n, 'Regular 12 oz'), tam(2n, 'Grande 16 oz'), tam(3n, 'Extra 21 oz')] }),
     prod(102n, 'ICED COFFE', 6n, 'Iced'),
-    prod(103n, 'CAPUCCINO', 1n, 'Calientes'),
+    prod(103n, 'CAPUCCINO', 1n, 'Calientes', { tamanos: [tam(1n, 'Regular 12 oz'), tam(2n, 'Grande 16 oz')] }),
     prod(104n, 'FROZEN FRESA', 5n, 'Frozen'),
     prod(105n, 'CAFÉ OCULTO', 1n, 'Calientes', { oculto: true }),
     prod(17n, 'DONA', 8n, 'Donas'),
@@ -91,6 +92,21 @@ describe('Combo con bebidas por categoría (Bebida 1..N)', () => {
     const res = await service.resolverPartesCombo(4, [el('1', '101'), el('1', '103'), el('2', '17'), el('2', '17')]);
     expect(res.conBebidas).toBe(true);
     expect(res.partes.filter((p) => p.parteId === 1n).map((p) => [p.productoId, p.cantidad])).toEqual([[101n, 1], [103n, 1]]);
+  });
+
+  it('pedido en Grande: cada bebida hija lleva SU tamaño Grande (y sin tamaño de combo no lleva ninguno)', async () => {
+    const elecs = [el('1', '101'), el('1', '103'), el('2', '17'), el('2', '17')];
+    const grande = await service.resolverPartesCombo(4, elecs, 1, undefined, 2n);
+    expect(grande.partes.filter((p) => p.parteId === 1n).map((p) => [p.productoId, p.tamano, p.unidadesTamano])).toEqual([
+      [101n, 'Grande 16 oz', 1],
+      [103n, 'Grande 16 oz', 1],
+    ]);
+    expect(grande.partes.find((p) => p.productoId === 17n)?.tamano).toBeUndefined();
+    // Extra: solo el frappé lo tiene; el capuccino queda sin tamaño en vez de inventar uno
+    const extra = await service.resolverPartesCombo(4, elecs, 1, undefined, '3');
+    expect(extra.partes.filter((p) => p.parteId === 1n).map((p) => [p.productoId, p.tamano ?? null])).toEqual([[101n, 'Extra 21 oz'], [103n, null]]);
+    const sin = await service.resolverPartesCombo(4, elecs);
+    expect(sin.partes.every((p) => p.tamano === undefined)).toBe(true);
   });
 
   it('rechaza una bebida fuera de las categorías (Frozen) y un producto oculto', async () => {

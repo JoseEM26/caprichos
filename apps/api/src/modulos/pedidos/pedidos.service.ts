@@ -316,6 +316,7 @@ export class PedidosService {
       let precioBase = 0;
       let tamanoNombre: string | null = null;
       let unidadesTamano = 1;
+      let tamanoValorIdLinea: bigint | null = null;
 
       if (prodDb.tamanos.length > 0) {
         if (!l.tamanoId) {
@@ -335,6 +336,7 @@ export class PedidosService {
         precioBase = Number(tamDb.precio);
         tamanoNombre = tamDb.tamano_valor?.nombre || `Tamaño ${tamDb.id}`;
         unidadesTamano = tamDb.unidades ?? 1;
+        tamanoValorIdLinea = tamDb.tamano_valor_id;
       } else {
         precioBase = Number(prodDb.precio);
       }
@@ -420,7 +422,7 @@ export class PedidosService {
       // Combo: la parte FIJO debe ser el principal o un reemplazo disponible (409 si no); las A_ELECCION, lo elegido.
       // Cada parte sale en su propia línea hija (cocina y stock); la madre sigue llevando el precio del combo.
       const combo = l.ofertaId
-        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA')
+        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA', tamanoValorIdLinea)
         : { nota: '', partes: [] };
       // Validar reglas por cada grupo (obligatorio, mínimo, máximo)
       for (const grupo of gruposActivos) {

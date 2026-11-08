@@ -334,7 +334,7 @@ export function OfertasAdminView() {
 
   // Catálogo para autocompletar y partes
   const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string; productos: any[] }>>([]);
-  const [productos, setProductos] = useState<Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number; noSumaBeneficios?: boolean; fotoUrl?: string | null; sabores?: Array<{ id: string; nombre: string }>; tamanos?: Array<{ id: string; nombre: string; precio?: number }> }>>([]);
+  const [productos, setProductos] = useState<Array<{ id: string; nombre: string; categoriaId?: string; categoria?: string; precio?: number; noSumaBeneficios?: boolean; fotoUrl?: string | null; sabores?: Array<{ id: string; nombre: string }>; tamanos?: Array<{ id: string; nombre: string; precio?: number; valorId?: string }> }>>([]);
   const [, setCargando] = useState(false);
 
   // Estados de ayuda y modales
@@ -421,7 +421,7 @@ export function OfertasAdminView() {
                 noSumaBeneficios: Boolean(p.noSumaBeneficios),
                 fotoUrl: p.fotoUrl ?? null,
                 sabores: (p.sabores || []).map((x: any) => ({ id: String(x.id), nombre: x.nombre })),
-                tamanos: (p.tamanos || []).map((t: any) => ({ id: String(t.id), nombre: t.nombre, precio: t.precio })),
+                tamanos: (p.tamanos || []).map((t: any) => ({ id: String(t.id), nombre: t.nombre, precio: t.precio, valorId: t.tamanoValorId ? String(t.tamanoValorId) : undefined })),
               });
             });
           });

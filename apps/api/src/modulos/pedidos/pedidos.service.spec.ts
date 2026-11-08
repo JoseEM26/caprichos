@@ -980,7 +980,7 @@ describe('PedidosService', () => {
         ofertasServiceMock.resolverPartesCombo.mockResolvedValueOnce({ nota: 'Combo Dúo · Empanada (en lugar de Club Sandwich)', partes: [] });
         prismaMock.pedido.create.mockResolvedValue({ id: 120n, codigo: 'CP-W120', estado: 'COLA', subtotal: 28, envio: 5, total: 33 });
         await service.crear(dtoCombo(), 'idemp-combo-ok');
-        expect(ofertasServiceMock.resolverPartesCombo).toHaveBeenCalledWith(3, [{ parteId: 100, productoId: 7 }], 2, 'CARTA');
+        expect(ofertasServiceMock.resolverPartesCombo).toHaveBeenCalledWith(3, [{ parteId: 100, productoId: 7 }], 2, 'CARTA', expect.anything());
         expect(prismaMock.pedidoLinea.create.mock.calls[0][0].data.nota).toBe(
           'Combo Dúo · Empanada (en lugar de Club Sandwich) · Sin azúcar',
         );
@@ -1038,7 +1038,7 @@ describe('PedidosService', () => {
 
       it('desde WhatsApp (bot) el combo se resuelve con el canal WHATSAPP y crea las mismas líneas hijas', async () => {
         await service.crear(dtoCajita(), 'key-cajita-bot', { canal: 'WHATSAPP', telefonoRemitente: '987654321', telefonoPuntos: '987654321' });
-        expect(ofertasServiceMock.resolverPartesCombo).toHaveBeenCalledWith(9, dtoCajita().lineas[0].comboElecciones, 1, 'WHATSAPP');
+        expect(ofertasServiceMock.resolverPartesCombo).toHaveBeenCalledWith(9, dtoCajita().lineas[0].comboElecciones, 1, 'WHATSAPP', 100n);
         const creadas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);
         expect(creadas).toHaveLength(3);
         expect(creadas[2]).toMatchObject({ producto_id: 20n, linea_combo_id: 50n, nombre: 'Burbujas', cantidad: 2 });

@@ -49,6 +49,7 @@ import {
 } from './combo-disponibilidad.util';
 import { estaDisponible, obtenerFotoUrl } from '../catalogo/catalogo.service';
 import { sincronizarAnfitrionCombo } from './combo-anfitrion';
+import { resolverTamanoValorId } from './combo-tamanos';
 import { anfitrionBloqueadoPorPaso, opcionesSinStock } from '../stock/opcion-requiere';
 import {
   canalesPorDefecto,
@@ -395,34 +396,7 @@ export class OfertasService {
       const tamanosFinal = dto.tamanos ?? dto.combosPrecios;
       if (tipoFinal === 'COMBO' && Array.isArray(tamanosFinal)) {
         for (const t of tamanosFinal) {
-          let tamanoId: bigint = 1n;
-          if (t.tamanoValorId) {
-            tamanoId = BigInt(t.tamanoValorId);
-          } else {
-            let tv = await tx.listaValor.findFirst({
-              where: { nombre: { contains: t.tamanoNombre || 'Regular', mode: 'insensitive' } },
-            });
-            if (!tv) {
-              tv = await tx.listaValor.findFirst();
-              if (!tv) {
-                let lista = await tx.lista.findFirst({ where: { codigo: 'TAMANOS' } });
-                if (!lista) {
-                  lista = await tx.lista.create({
-                    data: { codigo: 'TAMANOS', nombre: 'Tamaños' },
-                  });
-                }
-                tv = await tx.listaValor.create({
-                  data: {
-                    lista_id: lista.id,
-                    nombre: t.tamanoNombre || 'Único',
-                    orden: 1,
-                    activo: true,
-                  },
-                });
-              }
-            }
-            tamanoId = tv.id;
-          }
+          const tamanoId = await resolverTamanoValorId(tx, t);
           await tx.comboPrecio.create({
             data: {
               oferta_id: oferta.id,
@@ -679,34 +653,7 @@ export class OfertasService {
         preciosCombo = [];
         await tx.comboPrecio.deleteMany({ where: { oferta_id: BigInt(id) } });
         for (const t of tamanosFinal) {
-          let tamanoId: bigint = 1n;
-          if (t.tamanoValorId) {
-            tamanoId = BigInt(t.tamanoValorId);
-          } else {
-            let tv = await tx.listaValor.findFirst({
-              where: { nombre: { contains: t.tamanoNombre || 'Regular', mode: 'insensitive' } },
-            });
-            if (!tv) {
-              tv = await tx.listaValor.findFirst();
-              if (!tv) {
-                let lista = await tx.lista.findFirst({ where: { codigo: 'TAMANOS' } });
-                if (!lista) {
-                  lista = await tx.lista.create({
-                    data: { codigo: 'TAMANOS', nombre: 'Tamaños' },
-                  });
-                }
-                tv = await tx.listaValor.create({
-                  data: {
-                    lista_id: lista.id,
-                    nombre: t.tamanoNombre || 'Único',
-                    orden: 1,
-                    activo: true,
-                  },
-                });
-              }
-            }
-            tamanoId = tv.id;
-          }
+          const tamanoId = await resolverTamanoValorId(tx, t);
           await tx.comboPrecio.create({
             data: {
               oferta_id: BigInt(id),
@@ -2155,6 +2102,8 @@ export class OfertasService {
     elecciones: { parteId: string | number; productoId: string | number; saborId?: string | number }[],
     unidades = 1,
     canal?: string,
+    /** Tamaño del combo pedido (valor de la lista TAMANO): cada producto de las partes usa SU tamaño equivalente. */
+    tamanoValorId?: bigint | string | number | null,
   ): Promise<ResolucionCombo> {
     const oferta = await this.obtenerOfertaPorId(ofertaId);
     if (oferta.tipo !== 'COMBO') return { nota: '', partes: [] };
@@ -2210,10 +2159,19 @@ export class OfertasService {
             oculto: true,
             agotado_hasta: true,
             categoria: { select: { nombre: true, area_id: true, area: { select: { nombre: true } } } },
+            tamanos: { where: { activo: true }, select: { tamano_valor_id: true, unidades: true, tamano_valor: { select: { nombre: true } } } },
             ...SELECT_STOCK_COMBO,
           },
         })
       : [];
+    // Tamaño equivalente por producto: el del valor del combo pedido, si el producto lo tiene
+    const tamanoEquivalente = new Map<string, { nombre: string; unidades: number }>();
+    if (tamanoValorId !== undefined && tamanoValorId !== null && tamanoValorId !== '') {
+      for (const f of filas as any[]) {
+        const t = (f.tamanos ?? []).find((x: any) => String(x.tamano_valor_id) === String(tamanoValorId));
+        if (t) tamanoEquivalente.set(f.id.toString(), { nombre: t.tamano_valor?.nombre ?? '', unidades: t.unidades ?? 1 });
+      }
+    }
     const info = new Map<string, InfoProductoCombo>(
       filas.map((f: any) => [
         f.id.toString(),
@@ -2232,6 +2190,10 @@ export class OfertasService {
     );
     const disp: ProductoDisp[] = [...info.values()];
     const nombreDe = (id: string) => info.get(id)?.nombre ?? 'El producto elegido';
+    const tamanoPorCombo = (productoId: string) => {
+      const t = tamanoEquivalente.get(productoId);
+      return t ? { tamano: t.nombre, unidadesTamano: t.unidades } : {};
+    };
 
     // Una alternativa es un producto de la lista de la parte que no es de su original (principal o categorías)
     const esAlternativa = (parte: (typeof partesOferta)[number], id: string) =>
@@ -2341,7 +2303,9 @@ export class OfertasService {
       partes.push({
         ...parteResuelta(oferta.nombre, parte.id!, 'FIJO', principal, parte.cantidad * unidades, parte.paqueteNombre ?? null, info),
         // Tamaño de la parte (solo el principal; una alternativa sale sin tamaño)
-        ...(parte.tamanoId ? { tamano: parte.tamanoNombre ?? null, unidadesTamano: parte.tamanoUnidades ?? 1 } : {}),
+        ...(parte.tamanoId
+          ? { tamano: parte.tamanoNombre ?? null, unidadesTamano: parte.tamanoUnidades ?? 1 }
+          : tamanoPorCombo(principal)),
       });
     }
 
@@ -2422,6 +2386,7 @@ export class OfertasService {
       }));
       partes.push({
         ...parteResuelta(oferta.nombre, x.parteId, x.tipo, x.productoId, x.n, x.cambio, info),
+        ...tamanoPorCombo(x.productoId),
         ...(sabores.length ? { sabores } : {}),
       });
     }

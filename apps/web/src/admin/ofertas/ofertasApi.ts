@@ -4,6 +4,8 @@ export interface ComboPrecioItem {
   tamanoValorId?: string;
   tamanoNombre: string;
   precio: number;
+  /** Solo en el editor: apagado = el tamaño no se ofrece. */
+  activo?: boolean;
 }
 
 /** Opción de una parte con lista (juguetes, donas) o alternativa: si se puede elegir ahora y, por sabor, cada sabor con su saldo. */
