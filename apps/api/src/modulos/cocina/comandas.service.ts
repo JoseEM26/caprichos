@@ -473,6 +473,8 @@ export class ComandasService {
         modalidad: p.modalidad,
         cliente: p.cliente_nombre ?? null,
         mesa,
+        // Lista de espera: pedido de mesa que todavía no tiene mesa
+        enEsperaMesa: Boolean((p as any).espera_mesa_desde),
         extraDe: (p as any).pedidoOrigen?.codigo ?? null,
         nota: p.nota ?? null,
         minutos,
@@ -1397,6 +1399,8 @@ export class ComandasService {
         modalidad: p.modalidad,
         cliente: p.cliente_nombre ?? null,
         mesa,
+        // Lista de espera: pedido de mesa que todavía no tiene mesa
+        enEsperaMesa: Boolean((p as any).espera_mesa_desde),
         numeroDia: p.numero_dia ?? null,
         llego_en: llegoEn,
         despejada_en: despejadaEn,

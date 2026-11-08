@@ -61,6 +61,8 @@ export interface Comanda {
   modalidad: string;
   cliente?: string | null;
   mesa?: string | null;
+  /** Lista de espera de mesa: el pedido aún no tiene mesa. */
+  enEsperaMesa?: boolean;
   mozo?: string | null;
   nota?: string | null;
   minutos: number;
@@ -96,6 +98,8 @@ export interface HistorialComanda {
   canal: string;
   modalidad: string;
   mesa?: string | null;
+  /** Lista de espera de mesa: el pedido aún no tiene mesa. */
+  enEsperaMesa?: boolean;
   llego_en: string | null;
   despejada_en: string | null;
   despejada_por?: string | null;
@@ -216,6 +220,8 @@ export interface PedidoDespacho {
   modalidad: string;
   cliente: string | null;
   mesa: string | null;
+  /** Lista de espera de mesa: el pedido aún no tiene mesa. */
+  enEsperaMesa?: boolean;
   nota: string | null;
   creado_en: string;
   minutos: number;

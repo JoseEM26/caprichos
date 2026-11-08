@@ -116,7 +116,7 @@ export function modLabel(m?: string | null): string {
 export function obtenerModalidadPill(pedido: any): string {
   if (pedido.mesa_nombre) {
     const mesa = String(pedido.mesa_nombre).trim().toUpperCase();
-    return mesa.startsWith('MESA') ? mesa : `MESA ${mesa}`;
+    return mesa.startsWith('MESA') || mesa.startsWith('EN ESPERA') ? mesa : `MESA ${mesa}`;
   }
   return modLabel(pedido.modalidad).toUpperCase();
 }
@@ -127,7 +127,7 @@ export function obtenerNombreCliente(pedido: any): string {
   }
   if (pedido.mesa_nombre) {
     const mesa = String(pedido.mesa_nombre).trim().toUpperCase();
-    return mesa.startsWith('MESA') ? mesa : `Mesa ${pedido.mesa_nombre}`;
+    return mesa.startsWith('MESA') || mesa.startsWith('EN ESPERA') ? mesa : `Mesa ${pedido.mesa_nombre}`;
   }
   return 'Cliente';
 }
@@ -442,7 +442,7 @@ export function construirTicketPago(
     descuentos: descuentosDePedido(pedido),
     ...(num(pedido.envio) > 0 ? { envio: num(pedido.envio) } : {}),
     notaPedido: texto(pedido.nota),
-    entrega: pedido.mesa_nombre ? `Mesa ${String(pedido.mesa_nombre).replace(/^mesa\s*/i, '')}` : texto(pedido.entrega_direccion),
+    entrega: pedido.mesa_nombre ? (/^en espera/i.test(String(pedido.mesa_nombre)) ? String(pedido.mesa_nombre) : `Mesa ${String(pedido.mesa_nombre).replace(/^mesa\s*/i, '')}`) : texto(pedido.entrega_direccion),
     clienteTelefono: enmascarar(pedido.cliente_telefono),
     pagaCon: pedido.paga_con == null ? null : num(pedido.paga_con),
     // total = venta (comprobante). La propina va en su propia línea; el pago por medio es venta + propina (lo entregado)

@@ -49,6 +49,21 @@ export class SalonController {
     return this.salonService.abrirPedido(dto, req.usuario, clave);
   }
 
+  /** GET /admin/salon/espera (mesas/ver): lista de espera de mesa, FIFO. */
+  @Get('espera')
+  @Permiso('mesas', 'ver')
+  async listarEspera(@Req() req: any) {
+    return this.salonService.listarEspera(req.usuario);
+  }
+
+  /** POST /admin/salon/espera/:pedidoId/asignar (mesas/abrir) { mesaId }: el pedido pasa a la mesa libre. */
+  @Post('espera/:pedidoId/asignar')
+  @Permiso('mesas', 'abrir')
+  async asignarEspera(@Param('pedidoId') pedidoId: string, @Body() dto: CambiarMesaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.salonService.asignarEspera(pedidoId, dto.mesaId, req.usuario, ip);
+  }
+
   /**
    * 3) POST /admin/salon/mesas/:id/liberar (mesas/liberar)
    * Libera a mano la mesa con motivo obligatorio >= 5 caracteres.

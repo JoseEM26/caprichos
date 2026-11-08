@@ -20,8 +20,9 @@ import { progresoDelPedido, ProgresoPedido } from '../pedidos/progreso-pedido';
 import { tiemposPreparacion } from '../cocina/tiempo-preparacion';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 import { descuentosDePedido, lineaDetalleTicket } from '../impresion/constructor-etiquetas';
+import { rolesDelUsuario } from '../acceso/roles-usuario';
 import { puedeDarCortesia } from '../cortesias/cortesia.tipos';
-import { etiquetaMesasPedido, MAX_MESAS_PEDIDO, nombreUnaMesa } from './mesas-pedido.util';
+import { etiquetaMesasPedido, MAX_MESAS_PEDIDO, nombreUnaMesa, TEXTO_EN_ESPERA } from './mesas-pedido.util';
 
 @Injectable()
 export class SalonService {
@@ -239,21 +240,41 @@ export class SalonService {
     usuario?: UsuarioAutenticado,
     idempotencyKeyHeader?: string,
   ) {
-    if (!dto.mesas || dto.mesas.length === 0) {
+    // Lista de espera: pedido de mesa sin mesa todavía (el cliente espera afuera); se asigna después.
+    const enEspera = dto.enEsperaMesa === true;
+    if (enEspera) {
+      const nombreEspera = (dto.cliente?.nombre ?? dto.clienteNombre ?? '').trim();
+      if (nombreEspera.length < 2) {
+        throw new BadRequestException({
+          codigo: 'CLIENTE_NOMBRE_REQUERIDO',
+          mensaje: 'Escribe el nombre del cliente (mínimo 2 caracteres) para la lista de espera',
+        });
+      }
+      const celEspera = (dto.cliente?.telefono ?? dto.clienteTelefono ?? '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
+      if (!/^9\d{8}$/.test(celEspera)) {
+        throw new BadRequestException({
+          codigo: 'TELEFONO_REQUERIDO',
+          mensaje: 'El celular es obligatorio en la lista de espera: 9 dígitos y empieza con 9',
+        });
+      }
+      dto.mesas = [];
+      dto.cliente = { nombre: nombreEspera, telefono: celEspera };
+    }
+    if (!enEspera && (!dto.mesas || dto.mesas.length === 0)) {
       throw new BadRequestException({
         codigo: 'MESAS_REQUERIDAS',
         mensaje: 'Debe especificar al menos una mesa para abrir el pedido',
       });
     }
 
-    if (dto.mesas.length > MAX_MESAS_PEDIDO) {
+    if (dto.mesas!.length > MAX_MESAS_PEDIDO) {
       throw new BadRequestException({
         codigo: 'MESAS_LIMITE',
         mensaje: `Un pedido puede ocupar hasta ${MAX_MESAS_PEDIDO} mesas juntas`,
       });
     }
 
-    const mesasIds = dto.mesas.map((m) => parseIdMesa(m));
+    const mesasIds = dto.mesas!.map((m) => parseIdMesa(m));
     if (new Set(mesasIds.map((id) => id.toString())).size !== mesasIds.length) {
       throw new BadRequestException({
         codigo: 'MESA_REPETIDA',
@@ -298,10 +319,10 @@ export class SalonService {
 
     // La primera mesa elegida es la principal (da el nombre al pedido)
     const mesasOrdenadas = mesasIds.map((id) => mesasDb.find((m) => m.id === id)!);
-    const mesaNombre = etiquetaMesasPedido(mesasOrdenadas);
+    const mesaNombre = enEspera ? TEXTO_EN_ESPERA : etiquetaMesasPedido(mesasOrdenadas);
 
     // Con personas (sentar una reserva o el mozo lo indica) la capacidad se valida igual que en reservas
-    if (dto.personas !== undefined && this.reservasService) {
+    if (!enEspera && dto.personas !== undefined && this.reservasService) {
       await this.reservasService.validarMesasYAsientos(mesasIds, dto.personas, dto.confirmarCapacidad === true);
     }
 
@@ -359,6 +380,13 @@ export class SalonService {
         // Cortesías en mesa: mismo permiso cortesias/dar que en Pedidos (Caja y ADMIN; el MOZO no)
         puedeCortesia: puedeDarCortesia(usuario),
         enTransaccion: async (tx, pedido) => {
+          if (enEspera) {
+            await tx.pedido.update({
+              where: { id: pedido.id },
+              data: { espera_mesa_desde: new Date(), espera_personas: dto.personas ?? null },
+            });
+            return;
+          }
           // 1. Doble chequeo dentro de la transacción
           for (const mesa of mesasDb) {
             const abierta = await tx.pedidoMesa.findFirst({
@@ -420,6 +448,11 @@ export class SalonService {
       }
     }
 
+    if (enEspera) {
+      this.eventosGateway.emitirAdmin('salon:espera', { pedidoId: resultadoPedido.id?.toString(), accion: 'ENTRA' });
+      return { ...resultadoPedido, mesas: [], enEsperaMesa: true, aviso: null };
+    }
+
     // Emitir eventos 'salon:mesa' { mesaId, estado: 'OCUPADA' } para cada mesa abierta
     for (const mesa of mesasDb) {
       this.eventosGateway.emitirAdmin('salon:mesa', {
@@ -461,6 +494,129 @@ export class SalonService {
         nombre: m.nombre,
       })),
       aviso: avisoReserva,
+    };
+  }
+
+  /**
+   * GET /admin/salon/espera (mesas/ver): pedidos de mesa que esperan mesa, el que llegó primero va primero (FIFO).
+   * El celular va completo solo para Caja y Administrador; el resto lo ve con los 3 últimos dígitos.
+   */
+  async listarEspera(usuario?: UsuarioAutenticado) {
+    const verCompleto = rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'CAJERO');
+    const filas = await this.prisma.pedido.findMany({
+      where: { modalidad: 'MESA', espera_mesa_desde: { not: null }, estado: { not: 'ANULADO' } },
+      orderBy: [{ espera_mesa_desde: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        codigo: true,
+        estado: true,
+        cliente_nombre: true,
+        cliente_telefono: true,
+        espera_mesa_desde: true,
+        espera_personas: true,
+        total: true,
+        lineas: { select: { cantidad: true } },
+      },
+    });
+    const ahora = Date.now();
+    const items = filas.map((p) => {
+      const tel = String(p.cliente_telefono ?? '').replace(/\D/g, '');
+      return {
+        pedidoId: p.id.toString(),
+        codigo: p.codigo,
+        estado: p.estado,
+        nombre: p.cliente_nombre,
+        celular: verCompleto ? tel || null : tel.length >= 4 ? `${'*'.repeat(tel.length - 3)}${tel.slice(-3)}` : null,
+        personas: p.espera_personas,
+        productos: p.lineas.reduce((a, l) => a + Number(l.cantidad ?? 0), 0),
+        total: Number(p.total),
+        desde: p.espera_mesa_desde!.toISOString(),
+        minutos: Math.max(0, Math.floor((ahora - p.espera_mesa_desde!.getTime()) / 60000)),
+      };
+    });
+    return { total: items.length, items };
+  }
+
+  /**
+   * POST /admin/salon/espera/:pedidoId/asignar (mesas/abrir) { mesaId }
+   * El pedido de la lista pasa a estar dentro de la mesa LIBRE elegida. No reimprime nada.
+   */
+  async asignarEspera(
+    pedidoId: string | number | bigint,
+    mesaId: string | number,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ) {
+    const pId = BigInt(pedidoId);
+    const destinoId = parseIdMesa(mesaId);
+    const pedido = await this.prisma.pedido.findUnique({ where: { id: pId } });
+    if (!pedido) {
+      throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    }
+    if (pedido.estado === 'ANULADO' || !pedido.espera_mesa_desde) {
+      throw new ConflictException({
+        codigo: 'PEDIDO_NO_EN_ESPERA',
+        mensaje: 'Este pedido ya no está en la lista de espera (se asignó a una mesa o se anuló)',
+      });
+    }
+    const destino = await this.prisma.elementoPlano.findUnique({ where: { id: destinoId } });
+    if (!destino || destino.tipo !== 'MESA') {
+      throw new NotFoundException({ codigo: 'MESA_NO_ENCONTRADA', mensaje: 'Mesa no encontrada' });
+    }
+    if (!destino.activo) {
+      throw new BadRequestException({
+        codigo: 'MESA_INACTIVA',
+        mensaje: `La mesa ${destino.numero ?? destino.nombre ?? destino.id} no está activa`,
+      });
+    }
+    const nombreDestino = nombreUnaMesa(destino);
+    const ocupadaError = () =>
+      new ConflictException({ codigo: 'MESA_OCUPADA', mensaje: `La mesa ${destino.numero ?? destino.nombre ?? destino.id} ya está ocupada` });
+    if (await this.prisma.pedidoMesa.findFirst({ where: { mesa_id: destinoId, abierta: true } })) throw ocupadaError();
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Condicional: dos mozos asignando el mismo pedido a la vez, solo uno gana
+        const tomado = await tx.pedido.updateMany({
+          where: { id: pId, espera_mesa_desde: { not: null }, estado: { not: 'ANULADO' } },
+          data: { espera_mesa_desde: null, espera_personas: null, mesa_nombre: nombreDestino },
+        });
+        if (tomado.count === 0) {
+          throw new ConflictException({ codigo: 'PEDIDO_NO_EN_ESPERA', mensaje: 'Este pedido ya no está en la lista de espera' });
+        }
+        await tx.pedidoMesa.create({
+          data: { pedido_id: pId, mesa_id: destinoId, mesa_nombre: nombreDestino, abierta: true, principal: true, orden: 1 },
+        });
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002' || (error?.message && error.message.includes('ux_mesa_un_pedido_abierto'))) throw ocupadaError();
+      throw error;
+    }
+
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'mesas',
+      accion: 'ASIGNAR_MESA_ESPERA',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pId,
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+      antes: { enEspera: true, esperaDesde: pedido.espera_mesa_desde.toISOString() },
+      despues: { mesaId: destinoId.toString(), mesa: nombreDestino },
+    });
+
+    this.eventosGateway.emitirAdmin('salon:mesa', { mesaId: destinoId.toString(), estado: 'OCUPADA' });
+    this.eventosGateway.emitirAdmin('salon:espera', { pedidoId: pId.toString(), accion: 'SALE' });
+    // Cocina, Despacho, Caja y «Mis pedidos» refrescan el nombre de mesa
+    this.emitirCambioMesas(pId, pedido.codigo);
+
+    return {
+      ok: true,
+      pedidoId: pId.toString(),
+      codigo: pedido.codigo,
+      mesaId: destinoId.toString(),
+      mesa: nombreDestino,
     };
   }
 

@@ -265,3 +265,23 @@ export interface RespuestaMisPedidos {
   pedidos: MiPedido[];
   resumen: { cantidad: number; total: number; enCurso: number; entregados: number };
 }
+
+/** Un pedido de mesa que espera mesa (GET /admin/salon/espera). El celular viene enmascarado según el rol. */
+export interface PedidoEnEspera {
+  pedidoId: string;
+  codigo: string;
+  estado: string;
+  nombre: string | null;
+  celular: string | null;
+  personas: number | null;
+  productos: number;
+  total: number;
+  /** Hora de llegada a la lista (ISO): el minuto de espera se calcula con ella. */
+  desde: string;
+  minutos: number;
+}
+
+export interface RespuestaEspera {
+  total: number;
+  items: PedidoEnEspera[];
+}

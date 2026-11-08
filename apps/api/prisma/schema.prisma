@@ -663,6 +663,9 @@ model Pedido {
   ruta_reparto_id        BigInt?
   // Salón (Ola 6)
   mesa_nombre            String?
+  /// Lista de espera de mesa: desde cuándo espera un pedido de mesa sin mesa asignada (null = ya tiene mesa o no aplica)
+  espera_mesa_desde      DateTime?               @db.Timestamptz
+  espera_personas        Int?
   entregado_mesa_en      DateTime?               @db.Timestamptz
   // Cobro por mozo (envío a Caja): cuándo, medio(s) con que lo cobró y el mozo; null si no se envió
   cobro_mozo_en          DateTime?               @db.Timestamp(3)

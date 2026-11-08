@@ -8,6 +8,7 @@ import {
   PisoSalon,
   RangoMisPedidos,
   Reserva,
+  RespuestaEspera,
   RespuestaMisPedidos,
 } from './tipos';
 
@@ -40,7 +41,10 @@ export interface ActualizarPisoPayload {
 }
 
 export interface AbrirPedidoMesaPayload {
+  /** Con enEsperaMesa va vacía: el pedido entra a la lista de espera y se asigna después. */
   mesas: string[];
+  /** Lista de espera: pedido de mesa sin mesa todavía (exige cliente.nombre y cliente.telefono). */
+  enEsperaMesa?: boolean;
   lineas: Array<{
     productoId: string | number;
     tamanoId?: string | number;
@@ -135,6 +139,16 @@ export const salonApi = {
     api.post('/admin/salon/pedidos', payload, {
       headers: { 'Idempotency-Key': idempotencyKey },
     }),
+
+  /** Lista de espera de mesa (FIFO): pedidos de mesa que aún no tienen mesa. */
+  listarEspera: () => api.get<RespuestaEspera>('/admin/salon/espera'),
+
+  /** El pedido de la lista pasa a la mesa libre elegida. */
+  asignarEspera: (pedidoId: string, mesaId: string) =>
+    api.post<{ ok: boolean; pedidoId: string; codigo: string; mesaId: string; mesa: string }>(
+      `/admin/salon/espera/${pedidoId}/asignar`,
+      { mesaId },
+    ),
 
   liberarMesaManual: (mesaId: string, motivo?: string, forzar?: boolean) =>
     api.post<{ ok: boolean; mensaje: string }>(

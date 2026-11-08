@@ -82,6 +82,7 @@ export class DespachoService {
         modalidad: p.modalidad,
         cliente: p.cliente_nombre ?? null,
         mesa,
+        enEsperaMesa: Boolean((p as any).espera_mesa_desde),
         nota: p.nota ?? null,
         creado_en: p.creado_en,
         minutos: Math.max(0, Math.floor((ahora.getTime() - new Date(p.creado_en).getTime()) / 60000)),

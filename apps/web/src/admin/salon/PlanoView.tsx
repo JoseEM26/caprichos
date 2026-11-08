@@ -7,6 +7,7 @@ import { ElementoPlano, MesaSalon, PisoPlano, PisoSalon } from './tipos';
 import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ModalPrecuenta } from './componentes/ModalPrecuenta';
 import { useSalonSocket } from './useSalonSocket';
+import { ListaEsperaMesa, useListaEspera } from './componentes/ListaEsperaMesa';
 import { useMantenerPresionado } from './useMantenerPresionado';
 import { VistaPreviaMesa } from './componentes/VistaPreviaMesa';
 import { useCambioDeMesa, useSumarMesas } from './componentes/CambioDeMesa';
@@ -54,6 +55,9 @@ export function PlanoView() {
 
   // Modales adicionales
   const [modalNuevoPedidoAbierto, setModalNuevoPedidoAbierto] = useState(false);
+  // Lista de espera de mesa y mesa libre a la que se le ofrece un pedido de la lista
+  const espera = useListaEspera();
+  const [esperaMesaId, setEsperaMesaId] = useState<string | null>(null);
   // Cuenta de una mesa ocupada: el mozo la envía a Caja (no la cobra)
   const [mesaParaCuenta, setMesaParaCuenta] = useState<MesaSalon | null>(null);
   // Mesa ocupada mantenida presionada 2 s -> vista previa (ahí viven cuenta, cambio de mesa y forzar liberación)
@@ -843,6 +847,14 @@ export function PlanoView() {
             </span>
           </div>
 
+          <ListaEsperaMesa
+            espera={espera}
+            pisos={pisosSalon}
+            planos={pisos}
+            alAsignado={() => void cargarDatos()}
+            mesaOfrecida={esperaMesaId}
+            alCerrarOferta={() => setEsperaMesaId(null)}
+          />
           {cambio.ui}
           {sumar.ui}
           {/* Contenedor del plano con aspecto exacto del mockup */}
@@ -1505,6 +1517,25 @@ export function PlanoView() {
                   >
                     Tomar pedido en esta mesa
                   </button>
+                  {espera.total > 0 && mesaSalonSeleccionada?.estado === 'LIBRE' && (
+                    <button
+                      type="button"
+                      onClick={() => setEsperaMesaId(String(elementoSeleccionado.id))}
+                      style={{
+                        flex: 1,
+                        minHeight: '44px',
+                        borderRadius: '10px',
+                        border: '1.5px solid var(--cp-navy)',
+                        background: 'transparent',
+                        color: 'var(--cp-navy)',
+                        fontWeight: 800,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Asignar pedido de la lista de espera ({espera.total})
+                    </button>
+                  )}
                 </div>
               )}
             </div>

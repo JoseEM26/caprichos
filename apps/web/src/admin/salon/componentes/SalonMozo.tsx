@@ -7,6 +7,7 @@ import { CuadriculaPlano } from './CuadriculaPlano';
 import { ModalNuevoPedidoMesa } from './ModalNuevoPedidoMesa';
 import { ModalPrecuenta } from './ModalPrecuenta';
 import { VistaPreviaMesa } from './VistaPreviaMesa';
+import { ListaEsperaMesa, useListaEspera } from './ListaEsperaMesa';
 import { nombreMesaSalon, useCambioDeMesa, useSumarMesas } from './CambioDeMesa';
 import { useSesion } from '../../../comun/sesion';
 
@@ -32,6 +33,10 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
   const [cuentaId, setCuentaId] = useState<string | null>(null);
   const [vistaId, setVistaId] = useState<string | null>(null);
   const [nuevoEnId, setNuevoEnId] = useState<string | null>(null);
+  // Mesa libre tocada con lista de espera: elegir entre pedido nuevo o uno de la lista
+  const [decidirMesaId, setDecidirMesaId] = useState<string | null>(null);
+  const [ofrecidaId, setOfrecidaId] = useState<string | null>(null);
+  const espera = useListaEspera();
 
   const cargar = useCallback(async () => {
     try {
@@ -105,7 +110,10 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
     if (sumar.tocarMesa(mesa)) return;
     if (cambio.tocarMesa(mesa)) return;
     if (mesa.estado === 'OCUPADA' && mesa.pedido) setCuentaId(mesa.id);
-    else if (mesa.estado === 'LIBRE') setNuevoEnId(mesa.id);
+    else if (mesa.estado === 'LIBRE') {
+      if (espera.total > 0) setDecidirMesaId(mesa.id);
+      else setNuevoEnId(mesa.id);
+    }
   };
 
   return (
@@ -123,6 +131,46 @@ export function SalonMozo({ puedeForzar, puedeDespachar = false }: SalonMozoProp
               {p.nombre}
             </button>
           ))}
+        </div>
+      )}
+
+      <ListaEsperaMesa
+        espera={espera}
+        pisos={pisos}
+        planos={planos}
+        alAsignado={() => void cargar()}
+        mesaOfrecida={ofrecidaId}
+        alCerrarOferta={() => setOfrecidaId(null)}
+      />
+
+      {decidirMesaId && (
+        <div className="le-fondo" role="dialog" aria-modal="true" aria-label="¿Qué hacer con la mesa libre?">
+          <div className="le-modal">
+            <h3 className="le-titulo">{buscarMesa(decidirMesaId) ? nombreMesaSalon(buscarMesa(decidirMesaId)!) : 'La mesa'} está libre</h3>
+            <button
+              type="button"
+              className="le-btn le-btn--principal"
+              onClick={() => {
+                setOfrecidaId(decidirMesaId);
+                setDecidirMesaId(null);
+              }}
+            >
+              Asignar pedido de la lista de espera ({espera.total})
+            </button>
+            <button
+              type="button"
+              className="le-btn"
+              onClick={() => {
+                setNuevoEnId(decidirMesaId);
+                setDecidirMesaId(null);
+              }}
+            >
+              Tomar pedido nuevo
+            </button>
+            <button type="button" className="le-btn" onClick={() => setDecidirMesaId(null)}>
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 

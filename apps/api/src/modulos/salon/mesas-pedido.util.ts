@@ -17,3 +17,6 @@ export function etiquetaMesasPedido(mesas: Array<{ numero?: number | null; nombr
 export function nombreUnaMesa(m: { id: bigint; numero?: number | null; nombre?: string | null }): string {
   return m.numero ? `Mesa ${m.numero}` : m.nombre || `Mesa ${m.id}`;
 }
+
+/** Texto de mesa (pedido.mesa_nombre) mientras el pedido está en la lista de espera: cocina, despacho y tickets lo muestran tal cual. */
+export const TEXTO_EN_ESPERA = 'En espera de mesa';
