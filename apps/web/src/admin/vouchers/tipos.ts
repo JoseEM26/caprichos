@@ -50,6 +50,17 @@ export type RespuestaSubirVoucher =
 export interface VoucherPagoItem {
   id: string | number;
   pedidoId?: string | number | null;
+  /** Datos del pedido enlazado (opcionales: un voucher huérfano no los trae). */
+  pedidoCodigo?: string | null;
+  pedidoTotal?: string | number | null;
+  pedidoEstado?: string | null;
+  pedidoPagoEstado?: string | null;
+  pedidoModalidad?: string | null;
+  clienteNombre?: string | null;
+  /** Del pedido o, si no hay pedido, de la conversación de WhatsApp. */
+  clienteTelefono?: string | null;
+  /** «Nombre I.» de quien lo subió (mozo o Caja). */
+  subidoPorNombre?: string | null;
   conversacionId?: string | number | null;
   mensajeId?: string | number | null;
   archivoId: string | number;

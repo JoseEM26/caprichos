@@ -570,10 +570,16 @@ export class VouchersService {
             total: true,
             cliente_nombre: true,
             cliente_telefono: true,
+            estado: true,
+            pago_estado: true,
+            modalidad: true,
           },
         },
+        // Voucher huérfano (llegó por chat sin pedido): el teléfono sale de la conversación
+        conversacion: { select: { telefono: true } },
       },
     });
+    const nombresSubio = await this.nombresCortos(vouchers.filter((v) => v.subido_por).map((v) => v.subido_por as bigint));
 
     // Contar cuántos faltan revisar si se consulta por fecha
     let faltanRevisar = 0;
@@ -597,7 +603,11 @@ export class VouchersService {
       pedidoCodigo: v.pedido?.codigo || null,
       pedidoTotal: v.pedido?.total ? v.pedido.total.toString() : null,
       clienteNombre: v.pedido?.cliente_nombre || null,
-      clienteTelefono: v.pedido?.cliente_telefono || null,
+      clienteTelefono: v.pedido?.cliente_telefono || v.conversacion?.telefono || null,
+      pedidoEstado: v.pedido?.estado ?? null,
+      pedidoPagoEstado: v.pedido?.pago_estado ?? null,
+      pedidoModalidad: v.pedido?.modalidad ?? null,
+      subidoPorNombre: v.subido_por ? nombresSubio.get(v.subido_por.toString()) || null : null,
       conversacionId: v.conversacion_id ? v.conversacion_id.toString() : null,
       mensajeId: v.mensaje_id ? v.mensaje_id.toString() : null,
       archivoId: v.archivo_id.toString(),

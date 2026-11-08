@@ -5,6 +5,9 @@ import { VoucherPagoItem, SemaforoVoucher } from './tipos';
 import { obtenerBlobAutenticado, ErrorApi } from '../../comun/api';
 import { Confirmar } from '../../comun/Confirmar';
 import { Cargando } from '../../comun/Cargando';
+import { useSesion } from '../../comun/sesion';
+import { ultimos9Digitos } from '../mensajes/BotonAbrirChatCliente';
+import { ReasignarVoucherBoton } from './ReasignarVoucherBoton';
 
 export interface SeccionVouchersCierreProps {
   fecha?: string;
@@ -116,6 +119,92 @@ function MiniaturaVoucher({ archivoId }: { archivoId: string | number }) {
   );
 }
 
+const fmtHoraLima = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false });
+
+/** Canal por el que llegó el voucher, en texto claro. */
+export function etiquetaCanal(v: VoucherPagoItem): string {
+  const d = new Date(v.creadoEn);
+  const hora = Number.isNaN(d.getTime()) ? '' : ` ${fmtHoraLima.format(d)}`;
+  switch (v.origen) {
+    case 'WHATSAPP':
+      return `Llegó por WhatsApp${hora}`;
+    case 'CARTA':
+      return `Subido en la carta${hora}`;
+    case 'MOZO':
+      return `Subido por ${v.subidoPorNombre || 'el mozo'}${hora}`;
+    case 'CAJA':
+      return `Subido en Caja por ${v.subidoPorNombre || 'Caja'}${hora}`;
+    default:
+      return `Origen ${v.origen}${hora}`;
+  }
+}
+
+const ENLACE: React.CSSProperties = {
+  minHeight: '44px',
+  boxSizing: 'border-box',
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '0 12px',
+  borderRadius: '8px',
+  fontWeight: 700,
+  fontSize: '12.5px',
+  textDecoration: 'none',
+  border: '1.5px solid var(--cp-navy, #0B2C3E)',
+  background: 'var(--cp-white, #FFFFFF)',
+  color: 'var(--cp-navy, #0B2C3E)',
+};
+
+function LineaPedido({ v, grupo }: { v: VoucherPagoItem; grupo?: number }) {
+  const total = v.pedidoTotal != null && v.pedidoTotal !== '' ? Number(v.pedidoTotal) : null;
+  const medio = v.medio || v.extraido?.medioDetectado || null;
+  return (
+    <div
+      data-testid={`origen-pedido-${v.id}`}
+      style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', overflowWrap: 'anywhere' }}
+    >
+      <span style={{ fontSize: '13px', color: 'var(--cp-navy, #0B2C3E)' }}>
+        Pedido <strong>{v.pedidoCodigo || `#${v.pedidoId}`}</strong>
+        {grupo && grupo > 1 ? ` · ${grupo} vouchers` : ''}
+        {v.clienteNombre ? ` · ${v.clienteNombre}` : ''}
+        {total != null && !Number.isNaN(total) ? ` · Total S/ ${total.toFixed(2)}` : ''}
+        {medio && !(grupo && grupo > 1) ? ` · ${medio}` : ''}
+      </span>
+      <a href={`/admin/caja?pedido=${v.pedidoId}`} style={ENLACE} aria-label={`Abrir pedido ${v.pedidoCodigo || v.pedidoId}`}>
+        Abrir pedido
+      </a>
+    </div>
+  );
+}
+
+function BotonVerChat({ v, puede }: { v: VoucherPagoItem; puede: boolean }) {
+  const digitos = ultimos9Digitos(v.clienteTelefono);
+  const llegoPorChat = v.origen === 'WHATSAPP' || v.conversacionId != null;
+  if (!puede || !digitos || !llegoPorChat) return null;
+  return (
+    <a
+      href={`/admin/mensajes?telefono=${digitos}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ ...ENLACE, borderColor: 'var(--cp-green, #2F7A45)', color: 'var(--cp-green, #2F7A45)' }}
+      aria-label={`Ver chat de WhatsApp de ${v.clienteNombre || 'el cliente'}`}
+    >
+      💬 Ver chat
+    </a>
+  );
+}
+
+type Filtro = 'todos' | 'huerfanos';
+
+/** Agrupa por pedido (pago dividido); los huérfanos van sueltos. Conserva el orden de llegada. */
+function agruparPorPedido(lista: VoucherPagoItem[]): VoucherPagoItem[][] {
+  const grupos = new Map<string, VoucherPagoItem[]>();
+  for (const v of lista) {
+    const k = v.pedidoId != null ? `p${v.pedidoId}` : `v${v.id}`;
+    grupos.set(k, [...(grupos.get(k) ?? []), v]);
+  }
+  return [...grupos.values()];
+}
+
 export function SeccionVouchersCierre({
   fecha,
   puedeVer = true,
@@ -123,6 +212,16 @@ export function SeccionVouchersCierre({
   const [vouchers, setVouchers] = useState<VoucherPagoItem[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [filtro, setFiltro] = useState<Filtro>('todos');
+  const [busqueda, setBusqueda] = useState('');
+  let puedeChat = false;
+  try {
+    const sesion = useSesion();
+    puedeChat = Boolean(sesion?.tiene?.('mensajes/ver')) || sesion?.usuario?.rol === 'ADMIN';
+  } catch {
+    puedeChat = false;
+  }
 
   // Modal Confirmar Sí/No
   const [voucherAMarcar, setVoucherAMarcar] = useState<VoucherPagoItem | null>(null);
@@ -166,6 +265,14 @@ export function SeccionVouchersCierre({
   }
 
   const pendientesCount = vouchers.filter((v) => !v.revisadoEn).length;
+  const huerfanos = vouchers.filter((v) => v.pedidoId == null).length;
+  const q = busqueda.trim().toLowerCase();
+  const visibles = vouchers.filter(
+    (v) =>
+      (filtro === 'todos' || v.pedidoId == null) &&
+      (!q || `${v.pedidoCodigo ?? ''} ${v.clienteNombre ?? ''}`.toLowerCase().includes(q)),
+  );
+  const grupos = agruparPorPedido(visibles);
 
   const handleConfirmarRevisado = async () => {
     if (!voucherAMarcar) return;
@@ -300,6 +407,60 @@ export function SeccionVouchersCierre({
 
       {/* Lista de vouchers del día */}
       {!cargando && vouchers.length > 0 && (
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {([
+            ['todos', `Todos (${vouchers.length})`],
+            ['huerfanos', `Sin pedido asignado (${huerfanos})`],
+          ] as Array<[Filtro, string]>).map(([k, txt]) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={filtro === k}
+              onClick={() => setFiltro(k)}
+              style={{
+                minHeight: '44px',
+                padding: '0 14px',
+                borderRadius: '9999px',
+                fontWeight: 700,
+                fontSize: '12.5px',
+                cursor: 'pointer',
+                border: '1.5px solid var(--cp-navy, #0B2C3E)',
+                background: filtro === k ? 'var(--cp-navy, #0B2C3E)' : 'var(--cp-white, #FFFFFF)',
+                color: filtro === k ? '#FFFFFF' : 'var(--cp-navy, #0B2C3E)',
+              }}
+            >
+              {txt}
+            </button>
+          ))}
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por pedido o cliente"
+            aria-label="Buscar voucher por código de pedido o nombre del cliente"
+            style={{
+              flex: 1,
+              minWidth: '180px',
+              minHeight: '44px',
+              boxSizing: 'border-box',
+              padding: '0 12px',
+              borderRadius: '8px',
+              border: '1.5px solid var(--cp-line, #E3D6C6)',
+              color: 'var(--cp-navy, #0B2C3E)',
+              background: 'var(--cp-white, #FFFFFF)',
+              fontSize: '14px',
+            }}
+          />
+        </div>
+      )}
+
+      {!cargando && vouchers.length > 0 && visibles.length === 0 && (
+        <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: 'var(--cp-soft, #2C4C5D)' }}>
+          Ningún voucher coincide con el filtro.
+        </div>
+      )}
+
+      {!cargando && visibles.length > 0 && (
         <div
           style={{
             display: 'flex',
@@ -307,11 +468,23 @@ export function SeccionVouchersCierre({
             gap: '8px',
           }}
         >
-          {vouchers.map((v) => {
+          {grupos.map((g) => (
+            <div
+              key={g[0].id}
+              data-testid={g.length > 1 ? `grupo-pedido-${g[0].pedidoId}` : undefined}
+              style={
+                g.length > 1
+                  ? { display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', borderRadius: '12px', border: '1.5px solid var(--cp-soft, #2C4C5D)' }
+                  : { display: 'contents' }
+              }
+            >
+              {g.length > 1 && <LineaPedido v={g[0]} grupo={g.length} />}
+              {g.map((v) => {
             const sem = v.semaforo in CONFIG_SEMAFORO ? v.semaforo : 'SIN_LECTURA';
             const cfg = CONFIG_SEMAFORO[sem];
             const extraido = v.extraido;
             const estaRevisado = Boolean(v.revisadoEn);
+            const huerfano = v.pedidoId == null;
 
             return (
               <div
@@ -333,7 +506,28 @@ export function SeccionVouchersCierre({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '220px', flex: 1 }}>
                   <MiniaturaVoucher archivoId={v.archivoId} />
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0, overflowWrap: 'anywhere' }}>
+                    {huerfano ? (
+                      <div
+                        data-testid={`sin-pedido-${v.id}`}
+                        style={{
+                          background: '#FFF9E6',
+                          border: '1.5px solid var(--cp-rust, #B2500F)',
+                          color: 'var(--cp-rust, #B2500F)',
+                          borderRadius: '8px',
+                          padding: '4px 8px',
+                          fontWeight: 800,
+                          fontSize: '12.5px',
+                        }}
+                      >
+                        Sin pedido asignado
+                      </div>
+                    ) : g.length === 1 ? (
+                      <LineaPedido v={v} />
+                    ) : null}
+                    <div style={{ fontSize: '12px', color: 'var(--cp-soft, #2C4C5D)', fontWeight: 600 }} data-testid={`canal-${v.id}`}>
+                      {etiquetaCanal(v)}
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span
                         style={{
@@ -385,6 +579,8 @@ export function SeccionVouchersCierre({
                     flexWrap: 'wrap',
                   }}
                 >
+                  <BotonVerChat v={v} puede={puedeChat} />
+                  {huerfano && <ReasignarVoucherBoton voucherId={v.id} onReasignado={cargarVouchers} />}
                   <span
                     style={{
                       padding: '3px 10px',
@@ -437,6 +633,8 @@ export function SeccionVouchersCierre({
               </div>
             );
           })}
+            </div>
+          ))}
         </div>
       )}
 
