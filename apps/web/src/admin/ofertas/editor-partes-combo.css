@@ -60,3 +60,23 @@
 .epc-resumen-linea { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--cp-cream, #FBF4EC); }
 .epc-resumen-linea ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
 .epc-resumen-linea li { margin: 2px 0; }
+
+/* Editor guiado: frases, selector unificado, tarjeta incompleta, ayuda y reemplazo escondido */
+.epc-frase { font-weight: 700; font-size: 15px; }
+.epc-num { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: 11px; background: var(--cp-navy, #0B2C3E); color: var(--cp-cream, #FBF4EC); font-size: 12px; margin-right: 4px; }
+.epc-incompleta { border-color: var(--cp-rust, #B3412E); border-width: 2.5px; }
+.epc-incompleta .epc-tarjeta-cab { background: #FBE3DD; }
+.epc-falta { padding: 0 14px 6px; }
+.epc-ayuda { flex-basis: 100%; margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--cp-cream, #FBF4EC); font-size: 13px; }
+.epc-ayuda-boton { font-size: 16px; }
+.epc-tarjeta-cab { flex-wrap: wrap; }
+.epc-titulo-edicion { flex: 1; min-width: 220px; }
+.epc-selector { max-height: 240px; }
+.epc-cat { border-style: dashed; }
+.epc-check { min-height: 44px; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.epc-check input { width: 22px; height: 22px; }
+.epc-enlace { font-weight: 600 !important; text-decoration: underline; color: var(--cp-soft, #6B7A86); }
+.epc-queve { font-weight: 700; color: var(--cp-navy, #0B2C3E); }
+.epc-reemplazo { border-top: 1px dashed var(--cp-line, #E3D6C6); padding-top: 4px; }
+.epc-reemplazo > summary { color: var(--cp-soft, #6B7A86); }
+.epc-vacio p { margin: 0 0 10px; }

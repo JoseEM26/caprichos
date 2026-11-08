@@ -132,13 +132,13 @@ export function tituloPieza(p: Parte, categorias: CategoriaEditor[], productos: 
   else if (cats.length > 0) {
     const nombres = cats.map((n) => (cant === 1 ? singular(n) : n).toLowerCase()).join(' o ');
     etiqueta = marcados.length > 1 ? `${nombres} (a elección entre ${marcados.length})` : nombres;
-  } else if (marcados.length > 1) etiqueta = `a elección entre ${marcados.length} productos`;
+  } else if (marcados.length > 1) etiqueta = marcados.length <= 3 ? marcados.map((n) => n.toLowerCase()).join(' o ') : `a elección entre ${marcados.length} productos`;
   return etiqueta ? `${cant} ${etiqueta}` : '';
 }
 
 export function tituloOpcion(piezas: Parte[], categorias: CategoriaEditor[], productos: ProductoEditor[]): string {
   const t = piezas.map((p) => tituloPieza(p, categorias, productos)).filter(Boolean);
-  return t.length ? t.join(' + ') : 'Opción nueva';
+  return t.length ? t.join(' + ') : 'Combinación sin completar';
 }
 
 /**
@@ -162,11 +162,21 @@ export function retitular(partes: Parte[], categorias: CategoriaEditor[], produc
   return out;
 }
 
-export function nombreDeBloque(p: Parte, categorias: CategoriaEditor[]): string {
-  const cats = (p.categorias ?? []).map((id) => categorias.find((c) => c.id === id)?.nombre).filter((n): n is string => !!n);
-  if (idsProductos(p).length > 0) return 'A elección';
-  // Recién agregada (sin categorías) es «Bebidas»; con categorías, solo si todas son de bebidas
-  return cats.every((n) => BEBIDAS.includes(n.toUpperCase())) ? 'Bebidas' : 'A elección';
+/** «a, b o c» */
+export const listaO = (n: string[]) => (n.length < 2 ? n.join('') : `${n.slice(0, -1).join(', ')} o ${n[n.length - 1]}`);
+
+/** Nombres de lo que puede elegir el cliente en una parte: los productos marcados (mandan) o las categorías. */
+export function nombresQueElige(p: Parte, categorias: CategoriaEditor[], productos: ProductoEditor[]): string[] {
+  if (idsProductos(p).length > 0) return idsProductos(p).map((id) => productos.find((x) => x.id === id)?.nombre).filter((n): n is string => !!n);
+  return (p.categorias ?? []).map((id) => categorias.find((c) => c.id === id)?.nombre).filter((n): n is string => !!n);
+}
+
+/** Título de la tarjeta «El cliente elige entre varias cosas»: el que escribió el dueño o «Elige 2: Donas o Galleta». */
+export function nombreDeBloque(p: Parte, categorias: CategoriaEditor[], productos: ProductoEditor[] = []): string {
+  if (p.nombreManual && p.nombre?.trim()) return p.nombre.trim();
+  const nombres = nombresQueElige(p, categorias, productos);
+  const cant = p.cantidad || 1;
+  return nombres.length ? `Elige ${cant}: ${listaO(nombres)}` : `Elige ${cant} (falta elegir qué)`;
 }
 
 // ---------- Piezas nuevas ----------
@@ -177,12 +187,12 @@ export const piezaVacia = (grupo: string, nombre: string, pieza: 'CATEGORIA' | '
 });
 
 export const nuevaEleccion = (cantidad = 2): Parte => ({
-  nombre: 'Bebidas', tipoParte: 'A_ELECCION', cantidad, categorias: [], productos: [], alternativas: [], saboresIds: [], productosExcluidos: [],
+  nombre: 'Elige 2', tipoParte: 'A_ELECCION', cantidad, categorias: [], productos: [], alternativas: [], saboresIds: [], productosExcluidos: [],
   tamanoId: null, pieza: 'CATEGORIA', uid: nuevoUid(),
 });
 
 export const nuevoFijo = (): Parte => ({
-  nombre: 'Producto fijo', tipoParte: 'FIJO', cantidad: 1, categorias: [], productos: [], alternativas: [], saboresIds: [], productosExcluidos: [],
+  nombre: 'Siempre incluido', tipoParte: 'FIJO', cantidad: 1, categorias: [], productos: [], alternativas: [], saboresIds: [], productosExcluidos: [],
   tamanoId: null, pieza: 'PRODUCTO', uid: nuevoUid(),
 });
 
@@ -194,15 +204,28 @@ export function piezasDePlantilla(plantilla: PlantillaOpcion, grupo: string, nom
   return [piezaVacia(grupo, nombre, 'PRODUCTO')];
 }
 
-/** Nombre de una opción nueva que no choca con ninguno del complemento (se reemplaza solo por el título automático). */
+/** Nombre de una combinación nueva que no choca con ninguno del complemento (se reemplaza solo por el título automático). */
 export const nombreTemporal = (partes: Parte[], grupo: string): string => {
   const usados = new Set(opcionesDeGrupo(partes, grupo).map((o) => o.nombre));
   let n = 1;
-  while (usados.has(`Opción nueva ${n}`)) n++;
-  return `Opción nueva ${n}`;
+  while (usados.has(`Combinación sin completar ${n}`)) n++;
+  return `Combinación sin completar ${n}`;
 };
 
 // ---------- Cambios de producto y sabores ----------
+
+/**
+ * Lo que puede elegir el cliente, de un solo selector: categorías completas O productos sueltos (si hay productos solo
+ * valen esos, así que no se mezclan). Con `fijoSiUnico`, un único producto sin sabores pasa a ser «siempre incluido».
+ */
+export function conSeleccion(p: Parte, cats: string[], prods: string[], productos: ProductoEditor[], fijoSiUnico = false): Parte {
+  const unico = fijoSiUnico && cats.length === 0 && prods.length === 1 ? productos.find((x) => x.id === prods[0]) : undefined;
+  const fijo = !!unico && (unico.sabores ?? []).length === 0;
+  return {
+    ...p, categorias: cats, productos: prods, saboresIds: [], tamanoId: null, tipoParte: fijo ? 'FIJO' : 'A_ELECCION',
+    productosExcluidos: prods.length > 0 ? [] : p.productosExcluidos ?? [], pieza: cats.length === 0 && prods.length > 0 ? 'PRODUCTO' : 'CATEGORIA',
+  };
+}
 
 /** ¿La pieza está sin completar? (sin categoría ni producto) */
 export const piezaVaciaDeDatos = (p: Parte): boolean =>
@@ -225,24 +248,27 @@ export function saboresDeLaParte(p: Parte, productos: ProductoEditor[], categori
 
 const sinNombreAmable = (n: string) => `«${n}»`;
 
+/** Lo que le falta a una tarjeta (en palabras simples) o null si está completa. `n` es su número, como lo ve el dueño. */
+export function faltaEnBloque(partes: Parte[], b: Bloque, n: number): string | null {
+  if (b.tipo === 'COMPLEMENTO') {
+    const opciones = opcionesDeGrupo(partes, b.grupo);
+    for (const o of opciones) {
+      if (o.idxs.some((i) => piezaVaciaDeDatos(partes[i]))) return `Te falta elegir qué lleva la combinación ${sinNombreAmable(o.nombre)} en la tarjeta ${n}.`;
+    }
+    if (opciones.length < 2) return `A la tarjeta ${n} le falta al menos una combinación más, para que el cliente pueda elegir.`;
+    return null;
+  }
+  if (!piezaVaciaDeDatos(partes[b.idxs[0]])) return null;
+  return b.tipo === 'FIJO' ? `Te falta elegir el producto de la tarjeta ${n}.` : `Te falta elegir qué puede escoger el cliente en la tarjeta ${n}.`;
+}
+
 /** Primer problema del editor en palabras simples, o null si todo está bien. */
-export function errorDePartes(partes: Parte[], categorias: CategoriaEditor[]): string | null {
+export function errorDePartes(partes: Parte[], _categorias?: CategoriaEditor[]): string | null {
   if (partes.length === 0) return 'Agrega qué lleva el combo: toca «+ Agregar».';
   const bloques = bloquesDe(partes);
-  for (const b of bloques) {
-    if (b.tipo === 'COMPLEMENTO') {
-      const opciones = opcionesDeGrupo(partes, b.grupo);
-      for (const o of opciones) {
-        if (o.idxs.some((i) => piezaVaciaDeDatos(partes[i]))) {
-          return `En la opción ${sinNombreAmable(o.nombre)} hay una pieza sin completar: elige una categoría o un producto, o quita la opción.`;
-        }
-      }
-      if (opciones.length < 2) return `Al complemento ${sinNombreAmable(b.grupo)} le falta al menos una opción más, para que el cliente pueda elegir.`;
-    } else if (piezaVaciaDeDatos(partes[b.idxs[0]])) {
-      return b.tipo === 'FIJO'
-        ? 'Al producto fijo le falta elegir el producto.'
-        : `A ${sinNombreAmable(nombreDeBloque(partes[b.idxs[0]], categorias))} le falta elegir al menos una categoría o un producto.`;
-    }
+  for (let k = 0; k < bloques.length; k++) {
+    const m = faltaEnBloque(partes, bloques[k], k + 1);
+    if (m) return m;
   }
   return null;
 }
@@ -268,7 +294,7 @@ export function resumenParaCliente(partes: Parte[], categorias: CategoriaEditor[
   return bloquesDe(partes).map((b): LineaResumen => {
     if (b.tipo === 'COMPLEMENTO') {
       return {
-        clave: b.clave, icono: 'complemento', titulo: `Elige tu ${b.grupo.toLowerCase()}`, avisos: [],
+        clave: b.clave, icono: 'complemento', titulo: 'Elige una combinación', avisos: [],
         opciones: opcionesDeGrupo(partes, b.grupo).map((o) => {
           const piezas = o.idxs.map((i) => partes[i]);
           const sab = piezas.map((p) => textoSabores(p, productos, categorias)).filter(Boolean);
@@ -288,12 +314,17 @@ export function resumenParaCliente(partes: Parte[], categorias: CategoriaEditor[
     const nombres = idsProductos(p).length > 0
       ? productosDeLaParte(p, productos, categorias).map((x) => x.nombre)
       : (p.categorias ?? []).map((id) => categorias.find((c) => c.id === id)?.nombre).filter((n): n is string => !!n);
-    const que = nombreDeBloque(p, categorias) === 'Bebidas' ? (cant === 1 ? 'bebida' : 'bebidas') : cant === 1 ? 'opción' : 'opciones';
     const sab = textoSabores(p, productos, categorias);
     const quitados = (p.productosExcluidos ?? []).length;
+    const soloBebidas = idsProductos(p).length === 0 && nombres.length > 0 && nombres.every((n) => BEBIDAS.includes(n.toUpperCase()));
+    const que = soloBebidas
+      ? `${cant} ${cant === 1 ? 'bebida' : 'bebidas'} (${nombres.join(', ')})`
+      : nombres.length
+        ? `${cant}: ${listaO(nombres.map((n) => n.toLowerCase()))}${cant > 1 && nombres.length > 1 ? ' (cualquier combinación)' : ''}`
+        : `${cant}`;
     return {
       clave: b.clave, icono: 'bebida', opciones: [],
-      titulo: `Elige ${cant} ${que}${nombres.length ? ` (${nombres.join(', ')})` : ''}${quitados ? `, sin ${quitados} producto${quitados === 1 ? '' : 's'}` : ''}${sab ? ` · ${sab}` : ''}`,
+      titulo: `Elige ${que}${quitados ? `, sin ${quitados} producto${quitados === 1 ? '' : 's'}` : ''}${sab ? ` · ${sab}` : ''}`,
       avisos: aviso(p),
     };
   });
@@ -303,7 +334,7 @@ export function resumenParaCliente(partes: Parte[], categorias: CategoriaEditor[
 export function partesParaGuardar(partes: Parte[], categorias: CategoriaEditor[], productos: ProductoEditor[]) {
   return partes.map((p, idx) => {
     const tipo = tipoDe(p) === 'FIJO' ? 'FIJO' : 'A_ELECCION';
-    const nombre = (p.paqueteGrupo ? p.paqueteNombre : '') || tituloPieza(p, categorias, productos) || p.nombre || 'Parte';
+    const nombre = (p.paqueteGrupo ? p.paqueteNombre : p.nombreManual ? p.nombre : '') || tituloPieza(p, categorias, productos) || p.nombre || 'Parte';
     return {
       nombre: nombre.trim(),
       tipo: tipo as 'FIJO' | 'A_ELECCION',

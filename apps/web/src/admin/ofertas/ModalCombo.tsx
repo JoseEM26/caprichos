@@ -787,7 +787,7 @@ export function ModalCombo({
           ) },
           { id: 'partes', etiqueta: 'Partes y alternativas', ...marca('partes'), contenido: (
           <div data-testid="paso-2-combo" className="mo-tarjeta">
-            <EditorPartesCombo partes={partes} onCambiar={(p) => { setPartes(p); setMensajeError(''); }} productos={productosDisponibles} categorias={categoriasEditor} />
+            <EditorPartesCombo partes={partes} onCambiar={(p) => { setPartes(p); setMensajeError(''); }} productos={productosDisponibles} categorias={categoriasEditor} mostrarErrores={verErrores} />
           </div>
           ) },
           { id: 'cuando', etiqueta: 'Cuándo y dónde', ...marca('cuando'), contenido: (
@@ -913,8 +913,9 @@ export function ModalCombo({
             </div>
 
             <div style={{ backgroundColor: 'var(--cp-white)', border: '1px solid var(--cp-line)', borderRadius: '14px', padding: '14px 16px' }}>
-              <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)', marginBottom: '8px' }}>Lo que verá el cliente</div>
+              <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)', marginBottom: '8px' }}>El cliente verá:</div>
               <ResumenPartesCombo partes={partes} productos={productosDisponibles} categorias={categoriasEditor} />
+              {errorPartes() && <p className="epc-error" role="alert" data-testid="aviso-partes">{errorPartes()}</p>}
             </div>
 
             {/* Preview interactivo en la carta abajo */}

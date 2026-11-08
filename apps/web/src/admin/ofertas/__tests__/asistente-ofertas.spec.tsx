@@ -58,8 +58,8 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
       // Partes: «+ Agregar» > Bebidas, y se marca la categoría con un toque (sin escribir nada)
       irA(/Partes y alternativas/);
       fireEvent.click(screen.getByRole('button', { name: '+ Agregar' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Agregar bebidas' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Frappes' }));
+      fireEvent.click(screen.getByRole('button', { name: 'El cliente elige entre varias cosas' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Frappes — todos' }));
 
       // Volver a Datos: lo escrito se conserva
       irA(/^Datos/);
@@ -68,7 +68,7 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
 
       // Y la parte sigue ahí
       irA(/Partes y alternativas/);
-      expect(screen.getByText('Elige 2 · Frappes')).toBeInTheDocument();
+      expect(screen.getByText('Elige 2: Frappes')).toBeInTheDocument();
 
       // Precio del tamaño (Datos)
       irA(/^Datos/);
@@ -113,7 +113,7 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
 
       // Partes: agregar un complemento fijo con Frappé Clásico (S/ 12)
       fireEvent.click(screen.getByRole('button', { name: '+ Agregar' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Agregar producto fijo' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Siempre incluido' }));
       fireEvent.click(screen.getByRole('button', { name: 'Frappé Clásico' })); // S/ 12
 
       // Volver a Datos (precio por tamaño)
@@ -172,7 +172,7 @@ describe('Modales de Ofertas con pestañas y Previsualización', () => {
 
       // Partes cargadas
       irA(/Partes y alternativas/);
-      expect(await screen.findByText('Elige 2 · Frappes')).toBeInTheDocument();
+      expect(await screen.findByText('Elige 2: Frappes')).toBeInTheDocument();
     });
   });
 
