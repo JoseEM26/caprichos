@@ -15,6 +15,10 @@ import {
   bebidasElegidas,
   comboConBebidas,
   eleccionesCombo,
+  ParteOpcionalTarjeta,
+  partesOpcionales,
+  llevadasOpcional,
+  recargoOpcionales,
   esGrupoBebidaDuplicado,
   faltaElegirPaquete,
   filtrarPaquetes,
@@ -117,6 +121,8 @@ export function VentanaOpcionesProducto({
   const partesRe = useMemo(() => partesConAlternativas(ofertaCombo), [ofertaCombo]);
   // Sin alternativa elegida al inicio: el cliente la escoge (no se asigna sola)
   const [reemplazos, setReemplazos] = useState<Record<string, string>>({});
+  // Partes opcionales (papas): cuántas lleva el cliente; sin tocar, lo marcado por defecto
+  const [opcionales, setOpcionales] = useState<Record<string, number>>({});
   const comboAgotado = oferta?.disponible === false;
   // Partes A_ELECCION con lista (juguetes): cuántas de cada opción; el total depende de la cantidad del combo
   const partesJug = useMemo(() => partesEleccion(ofertaCombo, reemplazos), [ofertaCombo, reemplazos]);
@@ -190,7 +196,8 @@ export function VentanaOpcionesProducto({
     return ['frappe', 'iced', 'frozen', 'caliente', 'bebida'].some((k) => cat.includes(k));
   }, [producto, nB, categoriaNombre]);
 
-  const precioBase = tamanoSeleccionado ? tamanoSeleccionado.precio : producto.precio || 0;
+  // Los extras de las partes opcionales suman al precio del combo (el servidor los recalcula)
+  const precioBase = (tamanoSeleccionado ? tamanoSeleccionado.precio : producto.precio || 0) + recargoOpcionales(ofertaCombo, opcionales);
 
   // Obtener opciones de la unidad actual
   const opcionesActuales = opcionesPorUnidad[personalizarPorUnidad ? unidadActualIdx : 0] || [];
@@ -305,7 +312,7 @@ export function VentanaOpcionesProducto({
       }
     }
 
-    const elecciones = eleccionesCombo(ofertaCombo, reemplazos, elegido);
+    const elecciones = eleccionesCombo(ofertaCombo, reemplazos, elegido, opcionales);
     alAgregar({
       producto,
       ...(saborMode
@@ -811,6 +818,10 @@ export function VentanaOpcionesProducto({
           </div>
         )}
         {!comboAgotado && <ResumenPartesFijas oferta={ofertaCombo} />}
+        {!comboAgotado &&
+          partesOpcionales(ofertaCombo).map((o) => (
+            <ParteOpcionalTarjeta key={o.parteId} parte={o} valor={llevadasOpcional(o, opcionales)} onCambio={(n) => setOpcionales((prev) => ({ ...prev, [o.parteId]: n }))} />
+          ))}
         {!comboAgotado && (
           <SelectorPaqueteCombo
             grupos={gruposPaquetes(oferta)}

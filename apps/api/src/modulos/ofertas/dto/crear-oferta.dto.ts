@@ -113,6 +113,30 @@ export class ComboParteDto {
   @IsOptional()
   @IsArray({ message: 'productosExcluidos debe ser un arreglo' })
   productosExcluidos?: (string | number)[];
+
+  /** Parte FIJO opcional (el cliente puede quitarla o pedir extras). */
+  @IsOptional()
+  @IsBoolean()
+  opcional?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0, { message: 'El mínimo no puede ser negativo' })
+  cantidadMin?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1, { message: 'El máximo debe ser al menos 1' })
+  cantidadMax?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  incluidaPorDefecto?: boolean;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'El precio del extra debe ser un número' })
+  @Min(0, { message: 'El precio del extra no puede ser negativo' })
+  precioExtra?: number | null;
 }
 
 export class CrearOfertaDto {

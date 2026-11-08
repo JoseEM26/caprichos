@@ -191,6 +191,9 @@ export const nuevaEleccion = (cantidad = 2): Parte => ({
   tamanoId: null, pieza: 'CATEGORIA', uid: nuevoUid(),
 });
 
+/** Parte «Opcional»: un FIJO que el cliente puede quitar o aumentar (papas: incluida 1, hasta 3, extra S/ 6.00). */
+export const nuevoOpcional = (): Parte => ({ ...nuevoFijo(), nombre: 'Opcional', opcional: true, cantidadMin: 0, cantidadMax: null, incluidaPorDefecto: true, precioExtra: null });
+
 export const nuevoFijo = (): Parte => ({
   nombre: 'Siempre incluido', tipoParte: 'FIJO', cantidad: 1, categorias: [], productos: [], alternativas: [], saboresIds: [], productosExcluidos: [],
   tamanoId: null, pieza: 'PRODUCTO', uid: nuevoUid(),
@@ -258,7 +261,14 @@ export function faltaEnBloque(partes: Parte[], b: Bloque, n: number): string | n
     if (opciones.length < 2) return `A la tarjeta ${n} le falta al menos una combinación más, para que el cliente pueda elegir.`;
     return null;
   }
-  if (!piezaVaciaDeDatos(partes[b.idxs[0]])) return null;
+  const parte = partes[b.idxs[0]];
+  if (b.tipo === 'FIJO' && parte.opcional) {
+    if (piezaVaciaDeDatos(parte)) return `Te falta elegir el producto de la tarjeta ${n}.`;
+    if ((parte.cantidadMax ?? parte.cantidad ?? 1) < (parte.cantidad || 1)) return `En la tarjeta ${n}, el máximo que puede llevar no puede ser menor que las incluidas en el precio.`;
+    if (parte.precioExtra != null && !(Number(parte.precioExtra) >= 0)) return `En la tarjeta ${n}, el precio de cada extra no puede ser negativo.`;
+    return null;
+  }
+  if (!piezaVaciaDeDatos(parte)) return null;
   return b.tipo === 'FIJO' ? `Te falta elegir el producto de la tarjeta ${n}.` : `Te falta elegir qué puede escoger el cliente en la tarjeta ${n}.`;
 }
 
@@ -309,7 +319,14 @@ export function resumenParaCliente(partes: Parte[], categorias: CategoriaEditor[
     if (b.tipo === 'FIJO') {
       const prod = productos.find((x) => x.id === idsProductos(p)[0]);
       const tam = prod?.tamanos?.find((t) => t.id === p.tamanoId)?.nombre;
-      return { clave: b.clave, icono: 'fijo', titulo: `Incluye ${cant} ${(prod?.nombre ?? 'producto sin elegir').toLowerCase()}${tam ? ` (${tam})` : ''}`, opciones: [], avisos: aviso(p) };
+      const nom = (prod?.nombre ?? 'producto sin elegir').toLowerCase();
+      if (p.opcional) {
+        const max = p.cantidadMax ?? cant;
+        const extra = Number(p.precioExtra) > 0 ? ` · extra S/ ${Number(p.precioExtra).toFixed(2)}${max > cant ? ` hasta ${max}` : ''}` : max > cant ? ` · hasta ${max}` : '';
+        const defecto = p.incluidaPorDefecto === false ? ' · sin marcar' : '';
+        return { clave: b.clave, icono: 'fijo', titulo: `${nom[0]?.toUpperCase() ?? ''}${nom.slice(1)}: incluida ${cant}${tam ? ` (${tam})` : ''} · se puede quitar${extra}${defecto}`, opciones: [], avisos: aviso(p) };
+      }
+      return { clave: b.clave, icono: 'fijo', titulo: `Incluye ${cant} ${nom}${tam ? ` (${tam})` : ''}`, opciones: [], avisos: aviso(p) };
     }
     const nombres = idsProductos(p).length > 0
       ? productosDeLaParte(p, productos, categorias).map((x) => x.nombre)
@@ -348,6 +365,15 @@ export function partesParaGuardar(partes: Parte[], categorias: CategoriaEditor[]
       paqueteNombre: (p.paqueteNombre ?? '').trim() || null,
       saboresIds: (p.saboresIds ?? []).map(String),
       productosExcluidos: (p.productosExcluidos ?? []).map(String),
+      ...(tipo === 'FIJO' && p.opcional
+        ? {
+            opcional: true,
+            cantidadMin: p.cantidadMin ?? 0,
+            cantidadMax: p.cantidadMax ?? null,
+            incluidaPorDefecto: p.incluidaPorDefecto ?? true,
+            precioExtra: p.precioExtra ?? null,
+          }
+        : { opcional: false }),
       orden: idx + 1,
     };
   });

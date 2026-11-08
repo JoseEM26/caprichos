@@ -208,6 +208,10 @@ export function construirEtiquetasArea(pedido: any): EtiquetaAreaDatos[] {
       const opciones = opcionesConSabores(l, (l.opcionesElegidas || l.opciones || [])
         .map((o: any) => o.opcion_nombre || o.nombre || '')
         .filter(Boolean));
+      // Pieza de combo con parte opcional: el sticker no imprime la nota, así que «SIN …» y «EXTRA +n» van como opción
+      if (l.linea_combo_id != null) {
+        opciones.push(...String(l.nota || '').split(' · ').filter((t) => /^(SIN |EXTRA \+)/.test(t)));
+      }
       return {
         cantidad: Number(l.cantidad) || 1,
         nombre: l.nombre,

@@ -46,10 +46,14 @@ export function productosComboNoBot(combosActivos: any[], ofertasBot: any[]): st
 const nombreConTamano = (p: any): string =>
   p.tamanoNombre ? `${p.principalNombre} · ${p.tamanoNombre}` : String(p.principalNombre);
 
-/** Partes con su producto fijo y sin plan B activo: viajan solas («Incluye: Club Sándwich»). */
+/**
+ * Partes con su producto fijo y sin plan B activo: viajan solas («Incluye: Club Sándwich»).
+ * ponytail: las partes opcionales (papas) van con su valor por defecto (incluida o no, sin extras); la pregunta «Sí / No / Extra»
+ * del bot es un paso nuevo del flujo y queda para después.
+ */
 function fijasDe(oferta: any): ComboEnConfiguracionBot['fijas'] {
   return (oferta.combosParte ?? [])
-    .filter((p: any) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.alternativasActivas !== true && p.productos?.[0] !== undefined)
+    .filter((p: any) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.alternativasActivas !== true && p.productos?.[0] !== undefined && !(p.opcional === true && p.incluidaPorDefecto === false))
     .map((p: any) => ({ parteId: String(p.id), productoId: String(p.productos[0]), nombre: nombreConTamano({ ...p, principalNombre: p.principalNombre || '' }) }))
     .filter((f: any) => f.nombre.trim() !== '');
 }
