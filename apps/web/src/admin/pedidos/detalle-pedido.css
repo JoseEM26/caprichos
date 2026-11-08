@@ -21,6 +21,8 @@
   gap: 6px;
 }
 .dp-cab-fila { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dp-cab-fila > :first-child { flex: 1 1 0; min-width: 0; }
+.dp-cab-fila > .dp-total-cab { flex: none; }
 .dp-nombre {
   margin: 0; font-family: Montserrat, sans-serif; font-weight: 900; font-size: 22px; line-height: 1.15;
   overflow-wrap: anywhere;
@@ -175,5 +177,5 @@
   .dp-btxt { display: none; }
   .dp-ico { min-width: 48px; padding: 0; }
   .dp-nombre { font-size: 20px; }
-  .dp-total-cab { font-size: 20px; }
+  .dp-total-cab { font-size: 22px; }
 }

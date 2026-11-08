@@ -336,21 +336,36 @@
 
 .cj2-cuadricula {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  /* las columnas las fija PedidosAdminView (--cj2-cols) con el mismo número que usa para calcular la página */
+  grid-template-columns: repeat(var(--cj2-cols, 1), minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
 }
 
-@media (min-width: 700px) {
-  .cj2-cuadricula {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+/* PC y monitores grandes: alto fijo = pantalla; solo las tarjetas se desplazan y el pie de paginación queda siempre a la vista */
+@media (min-width: 1100px) {
+  .cj2 {
+    height: calc(100vh - 196px);
+    min-height: 520px;
+  }
+
+  .cj2-lista {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 2px 2px 6px;
+  }
+
+  .cj2-pag {
+    flex: none;
+    position: static;
   }
 }
 
-@media (min-width: 1280px) {
-  .cj2-cuadricula {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+@media (min-width: 1600px) {
+  .cj2-cuadricula { gap: 16px; }
+  .cj2-cod { font-size: 23px; }
+  .cj2-total { font-size: 22px; }
+  .cj2-accion { min-height: 50px; font-size: 15px; }
 }
 
 .cj2-vacio {
@@ -457,11 +472,64 @@
   color: var(--cp-soft, #2C4C5D);
 }
 
+/* Insignia de modalidad: ícono en círculo de color + texto; relleno claro propio, distinta de la barra de estado */
 .cj2-mod-texto {
+  --mod: var(--cp-navy, #0B2C3E);
+  --mod-bg: #EDE1D1;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
+  min-height: 36px;
+  padding: 3px 12px 3px 4px;
+  box-sizing: border-box;
+  border-radius: 9999px;
+  border: 1.5px solid var(--mod);
+  background: var(--mod-bg);
+  color: var(--cp-navy, #0B2C3E);
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.cj2-mod-ico {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mod);
+  color: #FFFFFF;
+}
+
+.cj2-mod-txt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cj2-mod-det {
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--cp-soft, #2C4C5D);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cj2-mod-texto[data-modalidad='DELIVERY'] { --mod: #B2500F; --mod-bg: #FCE9D8; }
+.cj2-mod-texto[data-modalidad='LLEVAR'] { --mod: #8A5F0E; --mod-bg: #FBEFCF; }
+.cj2-mod-texto[data-modalidad='MESA'] { --mod: #0B2C3E; --mod-bg: #E4EDF2; }
+.cj2-mod-texto[data-modalidad='COMER_LOCAL'] { --mod: #2F7A45; --mod-bg: #E3F2E7; }
+.cj2-mod-texto[data-modalidad='LOCAL'] { --mod: #2C4C5D; --mod-bg: #EDE1D1; }
+
+@media (min-width: 1600px) {
+  .cj2-mod-texto { min-height: 40px; font-size: 14px; }
+  .cj2-mod-ico { width: 34px; height: 34px; }
+  .cj2-canal { font-size: 14px; }
 }
 
 .cj2-canal {
@@ -586,6 +654,32 @@
 .cj2-pag-flechas button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.cj2-pag-extremo {
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.cj2-pag-ir {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--cp-navy, #0B2C3E);
+}
+
+.cj2-pag-select {
+  min-height: 44px;
+  min-width: 64px;
+  border: 1.5px solid var(--cp-navy, #0B2C3E);
+  border-radius: 12px;
+  background: var(--cp-white, #FFFFFF);
+  color: var(--cp-navy, #0B2C3E);
+  font-weight: 800;
+  font-size: 15px;
+  padding: 0 8px;
 }
 
 .cj2-pag-n {

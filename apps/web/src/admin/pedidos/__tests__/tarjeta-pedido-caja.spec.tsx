@@ -31,11 +31,12 @@ describe('TarjetaPedidoCaja', () => {
   });
 
   it.each([
-    ['DELIVERY', 'A domicilio', 'DELIVERY'],
-    ['RECOGER', 'Para llevar', 'LLEVAR'],
-    ['LLEVAR', 'Para llevar', 'LLEVAR'],
-    ['LOCAL', 'En el local', 'LOCAL'],
-    ['MESA', 'En el local · Mesa', 'MESA'],
+    ['DELIVERY', 'DELIVERY', 'DELIVERY'],
+    ['RECOGER', 'PARA LLEVAR', 'LLEVAR'],
+    ['LLEVAR', 'PARA LLEVAR', 'LLEVAR'],
+    ['LOCAL', 'EN EL LOCAL', 'LOCAL'],
+    ['COMER_LOCAL', 'COMER EN EL LOCAL', 'COMER_LOCAL'],
+    ['MESA', 'MESA', 'MESA'],
   ])('modalidad %s: línea con texto «%s» e ícono decorativo', (modalidad, texto, clave) => {
     const { container } = pintar({ modalidad });
     const ins = container.querySelector(`[data-modalidad="${clave}"]`)!;
@@ -43,15 +44,15 @@ describe('TarjetaPedidoCaja', () => {
     expect(ins.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
   });
 
-  it('mesa con nombre: «En el local · Mesa 4» y «MESA 4 · Ana» en el nombre', () => {
+  it('mesa con nombre: «MESA 4» y «MESA 4 · Ana» en el nombre', () => {
     const { container } = pintar({ modalidad: 'MESA', mesa_nombre: '4', cliente_nombre: 'Ana' });
-    expect(container.querySelector('[data-modalidad="MESA"]')).toHaveTextContent('En el local · Mesa 4');
+    expect(container.querySelector('[data-modalidad="MESA"]')).toHaveTextContent('MESA 4');
     expect(screen.getByRole('heading')).toHaveTextContent('MESA 4 · Ana');
   });
 
-  it('delivery con zona: «A domicilio · zona» y la dirección debajo', () => {
+  it('delivery con zona: «DELIVERY · zona» y la dirección debajo', () => {
     const { container } = pintar({ modalidad: 'DELIVERY', zona: { nombre: 'Zona 2' }, entrega_direccion: 'Av. Los Olivos 245', entrega_lat: 1, entrega_lng: 2 } as Partial<Pedido>);
-    expect(container.querySelector('[data-modalidad="DELIVERY"]')).toHaveTextContent('A domicilio · Zona 2');
+    expect(container.querySelector('[data-modalidad="DELIVERY"]')).toHaveTextContent(/DELIVERY.*Zona 2/);
     expect(screen.getByText('Av. Los Olivos 245')).toBeInTheDocument();
   });
 

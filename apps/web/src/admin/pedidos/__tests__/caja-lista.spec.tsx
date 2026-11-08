@@ -145,7 +145,7 @@ describe('Lista de Caja: tarjetas, ventana y paginación', () => {
     let ventana = await screen.findByRole('dialog', { name: 'Detalle del pedido CP-007' });
     expect(ventana).toHaveAttribute('aria-modal', 'true');
 
-    fireEvent.click(within(ventana).getByRole('button', { name: 'Cerrar detalle' }));
+    fireEvent.click(within(ventana).getByRole('button', { name: 'Cerrar detalle del pedido' }));
     expect(screen.queryByRole('dialog', { name: /Detalle/ })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Pedido CP-007/ }));
