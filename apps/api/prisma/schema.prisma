@@ -1673,6 +1673,15 @@ model ComboParte {
   sabores_ids    BigInt[] @default([])
   /// Productos que NO entran en la parte aunque su categoría sí; vacío = ninguno.
   productos_excluidos_ids BigInt[] @default([])
+  /// Parte FIJO opcional: el cliente puede no llevarla o pedir extras. `cantidad` = unidades incluidas en el precio del combo.
+  opcional            Boolean  @default(false)
+  /// Mínimo y máximo de unidades que puede llevar el cliente (null = 0 / `cantidad`).
+  cantidad_min        Int      @default(0)
+  cantidad_max        Int?
+  /// En la carta aparece con las unidades incluidas (true) o en 0 (false).
+  incluida_por_defecto Boolean @default(true)
+  /// Cobro por cada unidad por encima de las incluidas; null = sin cobro extra.
+  precio_extra        Decimal? @db.Decimal(12, 2)
 
   oferta     Oferta   @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
   tamano     ProductoTamano? @relation(fields: [tamano_id], references: [id], onDelete: SetNull)

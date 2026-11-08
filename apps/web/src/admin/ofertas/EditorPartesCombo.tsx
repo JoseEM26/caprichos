@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AlternativasParte } from './AlternativasParte';
 import {
   CategoriaEditor, Parte, ProductoEditor, GRUPO_POR_DEFECTO, PlantillaOpcion, aplanar, bloquesDe, conSeleccion, faltaEnBloque, gruposDe, idsProductos,
-  nombreDeBloque, nombresQueElige, nombreTemporal, nuevaEleccion, nuevoFijo, opcionesDeGrupo, perteneceACategoria, piezaVacia, piezasDePlantilla,
+  nombreDeBloque, nombresQueElige, nombreTemporal, nuevaEleccion, nuevoFijo, nuevoOpcional, opcionesDeGrupo, perteneceACategoria, piezaVacia, piezasDePlantilla,
   resumenParaCliente, retitular, saboresDeLaParte, tipoDe,
 } from './partesComboModelo';
 import './editor-partes-combo.css';
@@ -238,6 +238,7 @@ function Tarjeta({ numero, icono, titulo, tipo, abierta, onAbrir, alSubir, alBaj
 const AYUDAS = {
   eleccion: 'El cliente escoge algunas cosas de una lista que tú armas. Por ejemplo «2 bebidas» o «2 donas o galletas». Puedes marcar categorías completas o productos sueltos.',
   fijo: 'Un producto que siempre viene incluido en el combo, sin que el cliente elija. Por ejemplo «1 papas nativas».',
+  opcional: 'El cliente decide si la lleva o cuántas. Ej.: papas nativas: incluida 1, puede quitarla o pedir hasta 2 extra por S/ 6.00 cada una.',
   combinacion: 'El cliente escoge UNA combinación de las que armes. Por ejemplo «2 donas» o «1 carrot cake». Necesitas al menos dos combinaciones.',
 };
 
@@ -262,10 +263,11 @@ export function EditorPartesCombo({ partes, onCambiar, productos, categorias, mo
   const parche = (i: number, cambio: Partial<Parte>) => poner(partes.map((p, j) => (j === i ? { ...p, ...cambio } : p)));
   const bloques = bloquesDe(partes);
 
-  const agregar = (que: 'ELECCION' | 'COMPLEMENTO' | 'FIJO') => {
+  const agregar = (que: 'ELECCION' | 'COMPLEMENTO' | 'FIJO' | 'OPCIONAL') => {
     setAgregando(false);
     if (que === 'ELECCION') poner([...partes, nuevaEleccion()]);
     else if (que === 'FIJO') poner([...partes, nuevoFijo()]);
+    else if (que === 'OPCIONAL') poner([...partes, nuevoOpcional()]);
     else {
       const existentes = gruposDe(partes);
       let grupo = GRUPO_POR_DEFECTO;
@@ -474,11 +476,29 @@ export function EditorPartesCombo({ partes, onCambiar, productos, categorias, mo
           const prod = productos.find((x) => x.id === prodId);
           return (
             <Tarjeta
-              key={b.clave} {...comun} icono="📌" titulo={`Siempre incluido: ${prod ? `${p.cantidad || 1} ${prod.nombre.toLowerCase()}` : 'falta elegir el producto'}`} etiquetaQuitar={`Quitar la tarjeta ${k + 1}`}
-              tipo="Siempre incluido" ayuda={AYUDAS.fijo}
+              key={b.clave} {...comun} icono="📌" titulo={`${p.opcional ? 'Opcional' : 'Siempre incluido'}: ${prod ? `${p.cantidad || 1} ${prod.nombre.toLowerCase()}` : 'falta elegir el producto'}`} etiquetaQuitar={`Quitar la tarjeta ${k + 1}`}
+              tipo={p.opcional ? 'Opcional' : 'Siempre incluido'} ayuda={p.opcional ? AYUDAS.opcional : AYUDAS.fijo}
               hijos={(
                 <>
-                  <div className="epc-fila"><span className="epc-etiqueta">¿Cuántos lleva?</span><Cuantas valor={p.cantidad || 1} etiqueta="Cantidad del producto fijo" onCambio={(n) => parche(i, { cantidad: n })} /></div>
+                  <div className="epc-fila"><span className="epc-etiqueta">{p.opcional ? 'Incluidas en el precio' : '¿Cuántos lleva?'}</span><Cuantas valor={p.cantidad || 1} etiqueta="Cantidad del producto fijo" onCambio={(n) => parche(i, { cantidad: n })} /></div>
+                  <label className="epc-etiqueta epc-fila">
+                    <input type="checkbox" checked={!!p.opcional} onChange={(e) => parche(i, e.target.checked ? { opcional: true, cantidadMin: 0, cantidadMax: null, incluidaPorDefecto: true, precioExtra: null } : { opcional: false, cantidadMin: 0, cantidadMax: null, incluidaPorDefecto: true, precioExtra: null })} />
+                    El cliente puede quitarla (opcional)
+                  </label>
+                  {p.opcional && (
+                    <div className="epc-fila" style={{ flexWrap: 'wrap', gap: 12 }}>
+                      <label className="epc-etiqueta">Máximo que puede llevar
+                        <input type="number" min={1} step={1} className="epc-select" aria-label="Máximo que puede llevar" value={p.cantidadMax ?? p.cantidad ?? 1} onChange={(e) => parche(i, { cantidadMax: e.target.value === '' ? null : Math.floor(Number(e.target.value)) })} />
+                      </label>
+                      <label className="epc-etiqueta">Precio por cada extra: S/
+                        <input type="number" min={0} step="0.01" className="epc-select" aria-label="Precio por cada extra" placeholder="sin cobro" value={p.precioExtra ?? ''} onChange={(e) => parche(i, { precioExtra: e.target.value === '' ? null : Number(e.target.value) })} />
+                      </label>
+                      <label className="epc-etiqueta epc-fila">
+                        <input type="checkbox" checked={p.incluidaPorDefecto !== false} onChange={(e) => parche(i, { incluidaPorDefecto: e.target.checked })} />
+                        Aparece marcada por defecto
+                      </label>
+                    </div>
+                  )}
                   <div className="epc-etiqueta">{prod ? `Producto: ${prod.nombre}` : '¿Qué producto es? Siempre viene incluido.'}</div>
                   <ListaProductos
                     productos={productos} marcados={prodId ? [prodId] : []} unico etiqueta="Productos del catálogo" vacio="Todavía no hay productos en la carta."
@@ -534,6 +554,9 @@ export function EditorPartesCombo({ partes, onCambiar, productos, categorias, mo
           </button>
           <button type="button" className="epc-tipo" aria-label="Siempre incluido" onClick={() => agregar('FIJO')}>
             <span className="epc-icono" aria-hidden="true">📌</span><strong>Siempre incluido</strong><small>Ej.: «1 papas nativas», viene sin elegir</small>
+          </button>
+          <button type="button" className="epc-tipo" aria-label="Opcional" onClick={() => agregar('OPCIONAL')}>
+            <span className="epc-icono" aria-hidden="true">➕</span><strong>Opcional</strong><small>Ej.: papas: las quita o pide extra</small>
           </button>
           <button type="button" className="epc-tipo" aria-label="El cliente elige UNA combinación" onClick={() => agregar('COMPLEMENTO')}>
             <span className="epc-icono" aria-hidden="true">🍩</span><strong>El cliente elige UNA combinación</strong><small>Ej.: «2 donas» o «1 carrot cake»</small>

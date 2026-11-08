@@ -52,6 +52,13 @@ export interface ComboParteItem {
   saboresIds?: string[];
   /** Productos que no entran en la parte aunque su categoría sí. */
   productosExcluidos?: string[];
+  /** Parte FIJO opcional: el cliente puede quitarla o pedir extras. `cantidad` = incluidas; lleva de cantidadMin a cantidadMax (null = incluidas). */
+  opcional?: boolean;
+  cantidadMin?: number;
+  cantidadMax?: number | null;
+  incluidaPorDefecto?: boolean;
+  /** Cobro por cada unidad por encima de las incluidas; null = sin cobro. */
+  precioExtra?: number | null;
   /** Solo del editor (no viaja al servidor): tipo de pieza de un complemento y si su título lo escribió el dueño. */
   pieza?: 'CATEGORIA' | 'PRODUCTO';
   nombreManual?: boolean;

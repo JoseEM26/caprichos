@@ -46,6 +46,15 @@ export interface ComboParteItem {
   saboresIds?: string[];
   /** Productos que no entran en la parte aunque su categoría sí. */
   productosExcluidos?: string[];
+  /**
+   * Parte FIJO opcional: el cliente puede quitarla o pedir extras. `cantidad` = unidades incluidas en el precio;
+   * puede llevar de `cantidadMin` (0) a `cantidadMax` (null = `cantidad`); cada unidad sobre las incluidas cobra `precioExtra`.
+   */
+  opcional?: boolean;
+  cantidadMin?: number;
+  cantidadMax?: number | null;
+  incluidaPorDefecto?: boolean;
+  precioExtra?: number | null;
   /** FIJO de un producto: tamaño elegido (producto_tamano) y su nombre; las unidades las usa el stock. */
   tamanoId?: string | null;
   tamanoNombre?: string | null;
@@ -206,8 +215,10 @@ export interface ParteResueltaCombo {
   areaId: bigint | null;
   areaNombre: string | null;
   categoriaNombre: string | null;
-  /** Texto para la comanda: el cambio de reemplazo y «Combo: …». */
+  /** Texto para la comanda: el cambio de reemplazo, «EXTRA +n», «SIN …» y «Combo: …». */
   nota: string;
+  /** Parte opcional: unidades por encima de las incluidas (por todo el pedido de combos), para el marcador EXTRA. */
+  extras?: number;
   /** Tamaño de la parte (nombre, p. ej. «Regular 12 oz») y sus unidades: van a la línea hija y al stock. */
   tamano?: string | null;
   unidadesTamano?: number;
@@ -221,4 +232,6 @@ export interface ResolucionCombo {
   partes: ParteResueltaCombo[];
   /** El combo tiene una parte de bebidas por categorías: los grupos «Bebida N · Sabor» del anfitrión no se exigen. */
   conBebidas?: boolean;
+  /** Cobro extra por cada combo pedido (partes opcionales sobre lo incluido): se suma al precio unitario de la línea. */
+  recargoPorCombo?: number;
 }

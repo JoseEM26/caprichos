@@ -455,7 +455,7 @@ export class PedidosService {
 
       // Combo: la parte FIJO debe ser el principal o un reemplazo disponible (409 si no); las A_ELECCION, lo elegido.
       // Cada parte sale en su propia línea hija (cocina y stock); la madre sigue llevando el precio del combo.
-      const combo = l.ofertaId
+      const combo: { nota: string; partes: ParteResueltaCombo[]; conBebidas?: boolean; recargoPorCombo?: number } = l.ofertaId
         ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA', tamanoValorIdLinea)
         : { nota: '', partes: [] };
       // Validar reglas por cada grupo (obligatorio, mínimo, máximo)
@@ -492,7 +492,7 @@ export class PedidosService {
       const sumaExtras = opcionesElegidasInfo.reduce(
         (acc, op) => acc + op.precio_extra,
         0,
-      );
+      ) + (combo.recargoPorCombo ?? 0); // extras de partes opcionales del combo, recalculados aquí
       const precioUnitarioLista = Number((precioBase + sumaExtras).toFixed(2));
       const valorListaLinea = Number((precioUnitarioLista * cantidad).toFixed(2));
       // Cortesía (venta a costo 0): la línea sale a S/ 0; su valor de lista queda guardado (no suma al pedido)

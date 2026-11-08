@@ -450,6 +450,7 @@ export class OfertasService {
               productos_excluidos_ids: this.idsNumericos(p.productosExcluidos),
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
               ...this.paqueteDeParte(tipoParte, p),
+              ...this.opcionalDeParte(tipoParte, p),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
@@ -708,6 +709,7 @@ export class OfertasService {
               productos_excluidos_ids: this.idsNumericos(p.productosExcluidos),
               tamano_id: await this.tamanoDeParte(tx, tipoParte, prodIds, p.tamanoId),
               ...this.paqueteDeParte(tipoParte, p),
+              ...this.opcionalDeParte(tipoParte, p),
             },
           });
           await this.guardarAlternativas(tx, parteCreada.id, prodIds, p.alternativas);
@@ -2099,7 +2101,7 @@ export class OfertasService {
    */
   async resolverPartesCombo(
     ofertaId: bigint | string | number,
-    elecciones: { parteId: string | number; productoId: string | number; saborId?: string | number }[],
+    elecciones: { parteId: string | number; productoId: string | number; saborId?: string | number; cantidad?: number }[],
     unidades = 1,
     canal?: string,
     /** Tamaño del combo pedido (valor de la lista TAMANO): cada producto de las partes usa SU tamaño equivalente. */
@@ -2210,6 +2212,9 @@ export class OfertasService {
     }[] = [];
     const cambios: string[] = [];
     const partes: ParteResueltaCombo[] = [];
+    // Partes opcionales que el cliente quitó («SIN papas») y cobro por extras sobre lo incluido
+    const sin: string[] = [];
+    let recargoPorCombo = 0;
 
     // Cada unidad elegida se valida (permitida, con stock, con sabor si lo tiene) y se acumula por producto
     const acumular = (
@@ -2282,6 +2287,24 @@ export class OfertasService {
 
     for (const parte of partesOferta.filter((p) => p.tipo === 'FIJO')) {
       const picks = elecciones.filter((e) => String(e.parteId) === parte.id);
+      // Parte opcional: cuántas unidades lleva el cliente (0..máx); el servidor valida y recalcula el cobro extra
+      let llevadas = parte.cantidad;
+      if (parte.opcional) {
+        const min = parte.cantidadMin ?? 0;
+        const max = parte.cantidadMax ?? parte.cantidad;
+        const crudo = picks[0]?.cantidad;
+        llevadas = crudo === undefined || crudo === null ? (parte.incluidaPorDefecto === false ? 0 : parte.cantidad) : Number(crudo);
+        if (!Number.isInteger(llevadas) || llevadas < min || llevadas > max) {
+          throw new BadRequestException({
+            codigo: 'COMBO_CANTIDAD_INVALIDA',
+            mensaje: `${nombreDe(parte.productos[0])} en ${oferta.nombre}: elige entre ${min} y ${max}`,
+          });
+        }
+        if (llevadas === 0) {
+          sin.push(nombreDe(parte.productos[0]));
+          continue;
+        }
+      }
       if (picks.some((pk) => esAlternativa(parte, String(pk.productoId)))) {
         resolverAlternativa(parte, picks);
         continue;
@@ -2291,7 +2314,7 @@ export class OfertasService {
       if (elegido !== undefined && elegido !== principal) {
         throw noDisponible(`${nombreDe(elegido)} no es una opción de ${oferta.nombre}`);
       }
-      if (!parteArmable(parte, disp, unidades)) {
+      if (!parteArmable({ ...parte, cantidad: llevadas }, disp, unidades)) {
         if (elegido === undefined) {
           throw new BadRequestException({
             codigo: 'COMBO_ELECCION_INCOMPLETA',
@@ -2300,8 +2323,11 @@ export class OfertasService {
         }
         throw noDisponible(`${nombreDe(principal)} se acaba de agotar; elige otro reemplazo`);
       }
+      const extra = parte.opcional ? Math.max(0, llevadas - parte.cantidad) : 0;
+      recargoPorCombo += extra * (parte.precioExtra ?? 0);
       partes.push({
-        ...parteResuelta(oferta.nombre, parte.id!, 'FIJO', principal, parte.cantidad * unidades, parte.paqueteNombre ?? null, info),
+        ...parteResuelta(oferta.nombre, parte.id!, 'FIJO', principal, llevadas * unidades, [parte.paqueteNombre, extra > 0 ? `EXTRA +${extra * unidades}` : null].filter(Boolean).join(' · ') || null, info),
+        ...(extra > 0 ? { extras: extra * unidades } : {}),
         // Tamaño de la parte (solo el principal; una alternativa sale sin tamaño)
         ...(parte.tamanoId
           ? { tamano: parte.tamanoNombre ?? null, unidadesTamano: parte.tamanoUnidades ?? 1 }
@@ -2391,10 +2417,43 @@ export class OfertasService {
       });
     }
 
+    // Cocina lo ve en cada pieza y en la línea del combo: «SIN papas nativas · Combo: Dúo»
+    if (sin.length) {
+      const marca = sin.map((n) => `SIN ${n}`).join(' · ');
+      for (const pt of partes) pt.nota = `${marca} · ${pt.nota}`;
+      cambios.push(marca);
+    }
     return {
       nota: cambios.length ? `${oferta.nombre} · ${cambios.join(' · ')}` : '',
       partes,
       conBebidas: partesOferta.some((p) => esParteBebidas(p, disp)),
+      ...(recargoPorCombo > 0 ? { recargoPorCombo: Number(recargoPorCombo.toFixed(2)) } : {}),
+    };
+  }
+
+  /**
+   * Parte opcional (solo FIJO): `cantidad` = incluidas en el precio; mínimo ≤ incluidas ≤ máximo; el extra no es negativo.
+   * Sin opcional, todo queda en sus valores neutros (la parte se comporta como siempre).
+   */
+  private opcionalDeParte(
+    tipo: string,
+    p: { cantidad?: number; opcional?: boolean; cantidadMin?: number; cantidadMax?: number | null; incluidaPorDefecto?: boolean; precioExtra?: number | null },
+  ) {
+    if (!p.opcional) return { opcional: false, cantidad_min: 0, cantidad_max: null, incluida_por_defecto: true, precio_extra: null };
+    const invalido = (mensaje: string) => new BadRequestException({ codigo: 'COMBO_OPCIONAL_INVALIDO', mensaje });
+    if (tipo !== 'FIJO') throw invalido('Solo una parte «Siempre incluido» puede ser opcional');
+    const incluidas = p.cantidad || 1;
+    const min = p.cantidadMin ?? 0;
+    const max = p.cantidadMax ?? null;
+    if (min < 0 || min > incluidas) throw invalido('El mínimo no puede superar las unidades incluidas');
+    if (max !== null && max < incluidas) throw invalido('El máximo no puede ser menor que las unidades incluidas');
+    if (p.precioExtra != null && p.precioExtra < 0) throw invalido('El precio de cada extra no puede ser negativo');
+    return {
+      opcional: true,
+      cantidad_min: min,
+      cantidad_max: max,
+      incluida_por_defecto: p.incluidaPorDefecto ?? true,
+      precio_extra: p.precioExtra != null ? new Prisma.Decimal(p.precioExtra) : null,
     };
   }
 
@@ -2762,6 +2821,11 @@ export class OfertasService {
             paqueteNombre: cp.paquete_nombre ?? null,
             saboresIds: (cp.sabores_ids || []).map((x: any) => x.toString()),
             productosExcluidos: (cp.productos_excluidos_ids || []).map((x: any) => x.toString()),
+            opcional: !!cp.opcional,
+            cantidadMin: cp.cantidad_min ?? 0,
+            cantidadMax: cp.cantidad_max ?? null,
+            incluidaPorDefecto: cp.incluida_por_defecto ?? true,
+            precioExtra: cp.precio_extra != null ? Number(cp.precio_extra) : null,
             tamanoId: cp.tamano ? cp.tamano.id.toString() : null,
             tamanoNombre: cp.tamano?.tamano_valor?.nombre ?? null,
             tamanoUnidades: cp.tamano?.unidades ?? 1,

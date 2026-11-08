@@ -52,6 +52,8 @@ export interface ParteDisp {
   saboresIds?: string[];
   /** Productos que no entran aunque su categoría sí; vacío o ausente = ninguno. */
   productosExcluidos?: string[];
+  /** Parte opcional: el cliente puede no llevarla, así que su falta de stock no agota el combo. */
+  opcional?: boolean;
 }
 
 export interface AlternativaDisponibilidad {
@@ -195,7 +197,7 @@ export function calcularDisponibilidadCombo(partes: ParteDisp[], productos: Prod
     const originalOk = productosDeParte(parte, productos).some((p) => productoDisponible(p));
     // Pieza de un paquete: debe alcanzar para su cantidad completa (un paquete de «2 donas» no se arma con 1)
     const enPaquete = !!parte.paqueteGrupo;
-    const disponible = enPaquete ? armable || altDisponible : originalOk || altDisponible;
+    const disponible = parte.opcional ? true : enPaquete ? armable || altDisponible : originalOk || altDisponible;
     const altIds = alternativas.filter((a) => a.disponible).map((a) => a.id);
 
     if (parte.tipo === 'FIJO') {

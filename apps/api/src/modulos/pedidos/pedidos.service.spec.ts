@@ -1273,6 +1273,31 @@ describe('PedidosService', () => {
         expect(prismaMock.pedido.create).not.toHaveBeenCalled();
       });
 
+      it('parte opcional: el extra suma al precio de la madre (servidor), la hija guarda la cantidad real y se descuenta solo lo entregado', async () => {
+        await service.crear(dtoCajita(), 'key-cajita-sin-extra', { canal: 'MOZO' });
+        const base = Number(prismaMock.pedidoLinea.create.mock.calls[0][0].data.precio_unit);
+        prismaMock.pedidoLinea.create.mockClear();
+        prismaMock.movimientoStock.create.mockClear();
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValue({
+          nota: '', recargoPorCombo: 6, partes: [partesCajita[0], { ...partesCajita[1], cantidad: 3, extras: 1, nota: 'EXTRA +1 · Combo: Cajita' }],
+        });
+        await service.crear(dtoCajita(), 'key-cajita-con-extra', { canal: 'MOZO' });
+        const creadas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);
+        expect(Number(creadas[0].precio_unit)).toBeCloseTo(base + 6, 2);
+        expect(creadas[2]).toMatchObject({ cantidad: 3, nota: 'EXTRA +1 · Combo: Cajita' });
+        const ventas = prismaMock.movimientoStock.create.mock.calls.map((c: any) => c[0].data);
+        expect(Number(ventas[0].cantidad)).toBe(3);
+      });
+
+      it('parte opcional quitada: no hay línea hija ni descuento de stock de esa parte', async () => {
+        ofertasServiceMock.resolverPartesCombo.mockResolvedValue({ nota: 'Cajita · SIN Burbujas', partes: [{ ...partesCajita[0], nota: 'SIN Burbujas · Combo: Cajita' }] });
+        await service.crear(dtoCajita(), 'key-cajita-quitada', { canal: 'MOZO' });
+        const creadas = prismaMock.pedidoLinea.create.mock.calls.map((c: any) => c[0].data);
+        expect(creadas).toHaveLength(2);
+        expect(creadas.some((c: any) => c.producto_id === 20n)).toBe(false);
+        expect(prismaMock.movimientoStock.create).not.toHaveBeenCalled();
+      });
+
       it('una parte con tamaño descuenta cantidad × unidades del tamaño', async () => {
         ofertasServiceMock.resolverPartesCombo.mockResolvedValue({ nota: '', partes: [{ ...partesCajita[1], unidadesTamano: 3 }] });
         await service.crear(dtoCajita(), 'key-cajita-unidades', { canal: 'MOZO' });

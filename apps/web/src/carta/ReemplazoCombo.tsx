@@ -20,7 +20,7 @@ export interface ParteConAlternativas {
 export function partesFijasResumen(oferta: OfertaItem | null): string[] {
   if (!oferta) return [];
   return (oferta.combosParte ?? [])
-    .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.alternativasActivas !== true && !!p.principalNombre)
+    .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.alternativasActivas !== true && !!p.principalNombre && p.opcional !== true)
     .map((p) => (p.tamanoNombre ? `${p.principalNombre} · ${p.tamanoNombre}` : (p.principalNombre as string)));
 }
 
@@ -204,6 +204,8 @@ export function SelectorPaqueteCombo({ grupos, elegidos, onElegir }: PropsPaquet
 export interface ComboEleccion {
   parteId: string;
   productoId: string;
+  /** Solo partes opcionales: unidades que lleva (0 = sin ella). */
+  cantidad?: number;
   saborId?: string;
 }
 
@@ -299,11 +301,16 @@ export function eleccionesCombo(
   oferta: OfertaItem | null,
   elegidos: Record<string, string>,
   juguetes: Record<string, Reparto> = {},
+  opcionales: Record<string, number> = {},
 ): ComboEleccion[] {
   if (!oferta) return [];
+  const deOpcional = new Map(partesOpcionales(oferta).map((o) => [o.parteId, o]));
   const fijas = (oferta.combosParte ?? [])
     .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.productos?.[0] !== undefined && p.alternativasActivas !== true)
-    .map((p) => ({ parteId: String(p.id), productoId: String(p.productos![0]) }));
+    .map((p) => {
+      const op = deOpcional.get(String(p.id));
+      return { parteId: String(p.id), productoId: String(p.productos![0]), ...(op ? { cantidad: llevadasOpcional(op, opcionales) } : {}) };
+    });
   const eleccion = partesEleccion(oferta, elegidos).flatMap((parte) =>
     Object.entries(juguetes[parte.parteId] ?? {}).flatMap(([clave, n]) => {
       const [productoId, saborId] = clave.split('|');
@@ -409,6 +416,80 @@ export function AvisoAlternativasCombo({ partes, elegidos, onElegir }: Props) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Partes opcionales del combo (papas: incluida 1, se puede quitar, extra S/ 6.00): el cliente decide cuántas lleva. */
+export interface ParteOpcionalCombo {
+  parteId: string;
+  nombre: string;
+  incluidas: number;
+  min: number;
+  max: number;
+  precioExtra: number;
+  porDefecto: number;
+}
+
+export function partesOpcionales(oferta: OfertaItem | null): ParteOpcionalCombo[] {
+  if (!oferta) return [];
+  return (oferta.combosParte ?? [])
+    .filter((p) => (p.tipo ?? p.tipoParte) === 'FIJO' && p.opcional === true && p.alternativasActivas !== true && p.productos?.[0] !== undefined)
+    .map((p) => {
+      const incluidas = p.cantidad || 1;
+      return {
+        parteId: String(p.id),
+        nombre: p.principalNombre ?? '',
+        incluidas,
+        min: p.cantidadMin ?? 0,
+        max: p.cantidadMax ?? incluidas,
+        precioExtra: Number(p.precioExtra) > 0 ? Number(p.precioExtra) : 0,
+        porDefecto: p.incluidaPorDefecto === false ? 0 : incluidas,
+      };
+    });
+}
+
+/** Cuántas unidades lleva el cliente de la parte opcional (lo que eligió o, si no tocó nada, lo marcado por defecto). */
+export const llevadasOpcional = (p: ParteOpcionalCombo, elegidas: Record<string, number>): number => elegidas[p.parteId] ?? p.porDefecto;
+
+/** Cobro por combo de los extras (unidades sobre las incluidas × precio del extra); el servidor lo recalcula. */
+export function recargoOpcionales(oferta: OfertaItem | null, elegidas: Record<string, number>): number {
+  const total = partesOpcionales(oferta).reduce((a, p) => a + Math.max(0, llevadasOpcional(p, elegidas) - p.incluidas) * p.precioExtra, 0);
+  return Math.round(total * 100) / 100;
+}
+
+/** Tarjeta compacta de una parte opcional: «Papas nativas · ✓ Incluida» con − n +; avisa «Sin papas» y el cobro de cada extra. */
+export function ParteOpcionalTarjeta({ parte, valor, onCambio, deshabilitar = false }: { parte: ParteOpcionalCombo; valor: number; onCambio: (n: number) => void; deshabilitar?: boolean }) {
+  const extras = Math.max(0, valor - parte.incluidas);
+  const estado = valor === 0 ? '' : extras > 0 ? `✓ Incluida + ${extras} extra` : '✓ Incluida';
+  const boton = (texto: string, etiqueta: string, desactivado: boolean, n: number) => (
+    <button
+      type="button"
+      aria-label={`${etiqueta}: ${parte.nombre}`}
+      disabled={deshabilitar || desactivado}
+      onClick={() => onCambio(n)}
+      style={{ width: 36, height: 36, borderRadius: 999, border: '1.5px solid var(--cp-line)', background: 'var(--cp-white)', fontWeight: 800, fontSize: 18, color: 'var(--cp-navy)' }}
+    >
+      {texto}
+    </button>
+  );
+  return (
+    <div data-testid={`parte-opcional-${parte.parteId}`} role="group" aria-label={`${parte.nombre}, opcional`} style={{ border: '1.5px solid var(--cp-line)', borderRadius: 14, padding: '10px 12px', background: 'var(--cp-white)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>
+          {parte.nombre}
+          {estado && <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--cp-orange)', marginLeft: 8 }}>{estado}</span>}
+        </div>
+        {valor === 0 && <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>Sin {parte.nombre.toLowerCase()}</div>}
+        {parte.precioExtra > 0 && parte.max > parte.incluidas && (
+          <div style={{ fontSize: 12, color: 'var(--cp-soft)' }}>+ S/ {parte.precioExtra.toFixed(2)} por cada extra{extras > 0 ? ` (extra S/ ${(extras * parte.precioExtra).toFixed(2)})` : ''}</div>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {boton('−', 'Quitar uno', valor <= parte.min, valor - 1)}
+        <output aria-label={`Cantidad de ${parte.nombre}`} style={{ minWidth: 18, textAlign: 'center', fontWeight: 800 }}>{valor}</output>
+        {boton('+', 'Agregar uno', valor >= parte.max, valor + 1)}
+      </div>
     </div>
   );
 }
