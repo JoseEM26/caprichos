@@ -155,6 +155,8 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
   // Crédito del personal (FT-USR-03)
   { modulo: 'creditos', accion: 'ver' },
   { modulo: 'creditos', accion: 'exportar' },
+  // Saldar consumos del personal (pagar en Caja o marcar descontado por planilla)
+  { modulo: 'creditos', accion: 'saldar' },
   // Iniciativas del equipo (FT-INI-01)
   { modulo: 'iniciativas', accion: 'ver' },
   { modulo: 'iniciativas', accion: 'crear' },

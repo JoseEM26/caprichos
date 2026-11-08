@@ -1998,6 +1998,13 @@ model ConsumoPersonal {
   pedido_id BigInt   @unique
   monto     Decimal  @db.Decimal(12, 2)
   creado_en DateTime @default(now()) @db.Timestamptz
+  // Estado de pago: sin pagado_en = pendiente (se paga en su cuenta semanal/mensual); con él, saldado
+  pagado_en          DateTime? @db.Timestamptz
+  pagado_por         BigInt?
+  pago_modo          String?   // CAJA (lo pagó el trabajador en Caja) | PLANILLA (descontado por sueldo, sin mover caja)
+  pago_medio         String?
+  pago_motivo        String?
+  movimiento_caja_id BigInt?
 
   party     Party    @relation(fields: [party_id], references: [id])
   pedido    Pedido   @relation(fields: [pedido_id], references: [id])

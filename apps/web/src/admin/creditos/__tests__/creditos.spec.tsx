@@ -114,7 +114,7 @@ describe('CreditosView', () => {
     expect(screen.getByText('12/10 · CP-P06')).toBeInTheDocument();
     expect(screen.getByText('• 1 × Frappe lúcuma (Grande)')).toBeInTheDocument();
     // el descuento del personal que ya lleva el pedido y que queda por cobrar
-    expect(screen.getByText(/descuento del personal de s\/ 8\.80 · por cobrar a fin del período/)).toBeInTheDocument();
+    expect(screen.getByText(/descuento del personal de s\/ 8\.80 · se paga en su cuenta/)).toBeInTheDocument();
   });
 
   it('un trabajador sin consumo muestra "No consumió nada este mes."', async () => {

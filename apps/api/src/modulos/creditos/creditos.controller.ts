@@ -14,6 +14,7 @@ import { Permiso } from '../acceso/permiso.decorator';
 import { CreditosService } from './creditos.service';
 import { FiltrarCreditosDto } from './dto/filtrar-creditos.dto';
 import { RegistrarConsumoDto } from './dto/registrar-consumo.dto';
+import { MarcarPlanillaDto, SaldarConsumosDto } from './dto/saldar-consumos.dto';
 
 @Controller('admin/creditos')
 @UseGuards(AccesoGuard)
@@ -49,6 +50,24 @@ export class CreditosController {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
     res.send(contenidoCsv);
+  }
+
+  @Get('cuenta')
+  @Permiso('creditos', 'ver')
+  async cuenta(@Query('partyId') partyId: string) {
+    return this.creditosService.obtenerCuenta(partyId);
+  }
+
+  @Post('saldar')
+  @Permiso('creditos', 'saldar')
+  async saldar(@Body() dto: SaldarConsumosDto, @Req() req: any) {
+    return this.creditosService.saldar(dto, req.usuario, req.ip || req.headers?.['x-forwarded-for']);
+  }
+
+  @Post('planilla')
+  @Permiso('creditos', 'saldar')
+  async planilla(@Body() dto: MarcarPlanillaDto, @Req() req: any) {
+    return this.creditosService.marcarPeriodoPlanilla(dto, req.usuario, req.ip || req.headers?.['x-forwarded-for']);
   }
 
   @Post('consumo')

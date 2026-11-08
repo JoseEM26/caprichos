@@ -1,5 +1,6 @@
 import { useEffect, useState, useTransition } from 'react';
 import { useSesion } from '../../comun/sesion';
+import { BotonPagarAhora, BotonPlanilla, ResumenCuenta } from './AccionesCredito';
 import { Cargando } from '../../comun/Cargando';
 import {
   obtenerResumenCreditos,
@@ -8,7 +9,15 @@ import {
 } from './creditosApi';
 
 export function CreditosView() {
-  const { usuario } = useSesion();
+  const { usuario, tiene } = useSesion() as any;
+  const puedeSaldar = typeof tiene === 'function' ? Boolean(tiene('creditos/saldar')) : false;
+  const [marcados, setMarcados] = useState<Record<string, boolean>>({});
+  const [version, setVersion] = useState(0);
+  const alSaldar = () => {
+    setMarcados({});
+    setVersion((v) => v + 1);
+    void cargarDatos();
+  };
   const [, startTransition] = useTransition();
 
   const [periodoTipo, setPeriodoTipo] = useState<'semana' | 'mes' | 'rango'>('semana');
@@ -360,8 +369,12 @@ export function CreditosView() {
           </div>
 
           <div style={{ fontSize: '12px', lineHeight: '17px', color: 'var(--cp-soft)' }}>
-            Es lo que el trabajador consumió con su usuario en el período, ya con su descuento. Como el pago es semanal, por defecto se ve la semana (lunes a domingo); el descuento se hace fuera del sistema.
+            Es lo que el trabajador consumió con su usuario en el período, ya con su descuento. Como el pago es semanal, por defecto se ve la semana (lunes a domingo); lo que cada trabajador debe queda como pendiente hasta que pague en Caja o se marque como descontado por planilla.
           </div>
+
+          {puedeSaldar && resumen && (
+            <BotonPlanilla desde={resumen.periodo.desde} hasta={resumen.periodo.hasta} etiqueta={resumen.periodo.etiqueta} alTerminar={alSaldar} />
+          )}
 
           {cargando && <Cargando mensaje="Cargando consumos del personal…" />}
 
@@ -437,6 +450,14 @@ export function CreditosView() {
                         gap: '4px',
                       }}
                     >
+                      <ResumenCuenta partyId={w.partyId} version={version} />
+                      {puedeSaldar && (
+                        <BotonPagarAhora
+                          consumoIds={w.items.filter((i) => marcados[i.id] && i.estadoPago === 'PENDIENTE').map((i) => i.id)}
+                          total={w.items.filter((i) => marcados[i.id] && i.estadoPago === 'PENDIENTE').reduce((a, i) => a + i.monto, 0)}
+                          alTerminar={alSaldar}
+                        />
+                      )}
                       {!w.tieneConsumo && (
                         <div style={{ fontSize: '13px', color: 'var(--cp-soft)' }}>
                           No consumió nada este mes.
@@ -457,13 +478,35 @@ export function CreditosView() {
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '13px' }}>
                               <span style={{ fontWeight: 700 }}>
-                                {item.fecha} · {item.pedidoCodigo}
+                                {puedeSaldar && item.estadoPago === 'PENDIENTE' && (
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`Marcar ${item.pedidoCodigo} para pagar`}
+                                    checked={!!marcados[item.id]}
+                                    onChange={(e) => setMarcados((m) => ({ ...m, [item.id]: e.target.checked }))}
+                                    style={{ marginRight: 8 }}
+                                  />
+                                )}
+                                {item.fecha} · {item.pedidoCodigo}{' '}
+                                <span
+                                  data-estado-pago={item.estadoPago ?? 'PENDIENTE'}
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    padding: '2px 8px',
+                                    borderRadius: 9999,
+                                    background: item.estadoPago === 'PAGADO' ? '#E3F2E7' : '#FFF1CC',
+                                    color: item.estadoPago === 'PAGADO' ? '#2F7A45' : '#8A5A00',
+                                  }}
+                                >
+                                  {item.estadoPago === 'PAGADO' ? (item.pagoModo === 'PLANILLA' ? 'Pagado por planilla' : 'Pagado') : 'Pendiente de pago'}
+                                </span>
                               </span>
                               <span style={{ fontWeight: 700 }}>{item.montoFormateado}</span>
                             </div>
                             {item.descuento ? (
                               <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
-                                Con descuento del personal de s/ {item.descuento.toFixed(2)} · por cobrar a fin del período
+                                Con descuento del personal de s/ {item.descuento.toFixed(2)} · {item.estadoPago === 'PAGADO' ? 'ya pagado' : 'se paga en su cuenta (fin de semana o mes)'}
                               </div>
                             ) : null}
                             {item.lineas.map((linea, idx) => (

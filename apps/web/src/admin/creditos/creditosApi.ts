@@ -11,6 +11,20 @@ export interface ConsumoItem {
   lineas: string[];
   /** Descuento del personal que ya lleva el pedido (S/) */
   descuento?: number;
+  /** PENDIENTE = se paga en su cuenta semanal/mensual; PAGADO = ya saldado (en Caja o por planilla) */
+  estadoPago?: 'PENDIENTE' | 'PAGADO';
+  pagadoEn?: string | null;
+  pagoModo?: 'CAJA' | 'PLANILLA' | null;
+}
+
+export interface CuentaCredito {
+  partyId: string;
+  semana: { etiqueta: string; total: number; debe: number };
+  mes: { etiqueta: string; total: number; debe: number };
+  debeTotal: number;
+  /** «Debe esta semana: S/ X · Este mes: S/ Y» */
+  resumen: string;
+  consumos: ConsumoItem[];
 }
 
 export interface TrabajadorCredito {
@@ -21,6 +35,8 @@ export interface TrabajadorCredito {
   totalFormateado: string;
   tieneConsumo: boolean;
   cantidadConsumos: number;
+  /** Lo que sigue sin pagarse (S/) */
+  pendiente?: number;
   items: ConsumoItem[];
 }
 
@@ -116,4 +132,18 @@ export async function exportarCreditos(
   const blob = await res.blob();
 
   return { blob, nombreArchivo };
+}
+
+export async function obtenerCuentaCredito(partyId: string): Promise<CuentaCredito> {
+  return api.get<CuentaCredito>(`/admin/creditos/cuenta?partyId=${encodeURIComponent(partyId)}`);
+}
+
+/** El trabajador paga en Caja uno o varios consumos pendientes (un solo ingreso por el total). */
+export async function saldarConsumos(consumoIds: string[], medio: string): Promise<{ ok: boolean; total: number; cantidad: number }> {
+  return api.post('/admin/creditos/saldar', { consumoIds, medio });
+}
+
+/** Cierre de periodo: descontado por planilla/sueldo, sin mover caja. */
+export async function marcarPlanilla(desde: string, hasta: string, motivo: string, partyId?: string): Promise<{ ok: boolean; cantidad: number; total: number }> {
+  return api.post('/admin/creditos/planilla', { desde, hasta, motivo, partyId });
 }
