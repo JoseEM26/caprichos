@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Cargando } from '../../comun/Cargando';
 import { EstadoError } from '../../comun/EstadoError';
-import { FiltroCombo } from '../../comun/FiltroCombo';
+import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 import { useEventos, useTiempoReal } from '../../comun/socket';
 import { pedidosApi, Pedido, RespuestaNoEntregados, type DatosEdicionPedido } from './pedidosApi';
 import { PedidoDetalle } from './PedidoDetalle';
@@ -17,10 +17,24 @@ import { reproducirCampana } from './audioAlerta';
 import { FranjaImpresion } from './FranjaImpresion';
 import { BannerCajaCerrada, esperaCajaCerrada, useEstadoCajaHoy } from './BannerCajaCerrada';
 import './pedidos.css';
+import './caja-lista.css';
 import { FiltroDiasPedidos } from './FiltroDiasPedidos';
-import { RangoPedidos, parametrosDeRango, rangoHoy } from './filtroDias';
+import { RangoPedidos, hoyLima, parametrosDeRango, rangoHoy, textoRango } from './filtroDias';
 import { nombreMedio } from './planPago';
 import { TarjetaPedidoCaja } from './TarjetaPedidoCaja';
+import { VentanaDetalle } from './VentanaDetalle';
+import { useAccionesCaja } from './accionesCaja';
+import {
+  EtapaCaja,
+  FILTROS_CAJA,
+  FiltroCaja,
+  enEtapaCaja,
+  enFiltroCaja,
+  esCerrado,
+  esPorConfirmar,
+} from './estadosCaja';
+
+export { getBadge } from './estadosCaja';
 
 export function canalLabel(c?: string | null) {
   if (!c) return 'Web';
@@ -39,39 +53,6 @@ export function modLabel(m?: string | null) {
   if (mu === 'LLEVAR' || mu === 'RECOGER') return 'Para llevar';
   if (mu === 'MESA') return 'En mesa';
   return m;
-}
-
-export function getBadge(p: Pedido) {
-  const est = String(p.estado || '').toUpperCase();
-  const pag = String(p.pago_estado || '').toUpperCase();
-  const mod = String(p.modalidad || '').toUpperCase();
-  const tieneCoordinado = Boolean(p.pago_coordinado_en) || pag === 'COORDINADO';
-  const esPorConfirmar =
-    (est === 'COLA' || est === 'NUEVO') &&
-    pag !== 'PAGADO' &&
-    !tieneCoordinado &&
-    mod !== 'MESA';
-  if (esPorConfirmar) {
-    return { l: 'Por confirmar', bg: 'var(--cp-orange, #E67929)', fg: 'var(--cp-navy, #0B2C3E)' };
-  }
-  switch (est) {
-    case 'COLA':
-      return { l: 'En cocina · nuevo', bg: 'var(--cp-gold, #F5C84B)', fg: 'var(--cp-navy, #0B2C3E)' };
-    case 'PREPARANDO':
-      return { l: 'Preparando', bg: 'var(--cp-gold, #F5C84B)', fg: 'var(--cp-navy, #0B2C3E)' };
-    case 'LISTO':
-      return { l: 'Listo', bg: 'var(--cp-navy, #0B2C3E)', fg: 'var(--cp-cream, #FBF4EC)' };
-    case 'EN_CAMINO':
-    case 'RUTA':
-      return { l: 'En camino', bg: 'var(--cp-soft, #2C4C5D)', fg: 'var(--cp-cream, #FBF4EC)' };
-    case 'ENTREGADO':
-      return { l: 'Entregado', bg: 'var(--cp-line, #E3D6C6)', fg: 'var(--cp-navy, #0B2C3E)' };
-    case 'ANULADO':
-    case 'RECHAZADO':
-      return { l: 'Rechazado', bg: 'var(--cp-white, #FFFFFF)', fg: 'var(--cp-rust, #B2500F)' };
-    default:
-      return { l: p.estado, bg: 'var(--cp-sand, #EDE1D1)', fg: 'var(--cp-navy, #0B2C3E)' };
-  }
 }
 
 /** Chip «Cobrado por mozo · Yape»; en naranja y «falta captura (opcional)» si el medio digital no tiene foto legible. */
@@ -117,72 +98,20 @@ export function ChipCobroMozo({ cobro }: { cobro?: Pedido['cobroMozo'] }) {
   );
 }
 
-export type ClaveTabCaja = 'nuevo' | 'coord' | 'curso' | 'cerrado' | 'todos' | 'no_entregados';
+/** Grupo «Estado» del panel de Filtros: activos (por defecto), cerrados o los delivery no entregados. */
+export type GrupoEstadoCaja = 'act' | 'cer' | 'noent';
 
-interface TabDef {
-  id: Exclude<ClaveTabCaja, 'no_entregados'>;
-  n: string;
-  filtro: (p: Pedido) => boolean;
-}
+const ESTADO_OPCIONES = [
+  { id: 'act', n: 'Activos' },
+  { id: 'cer', n: 'Cerrados' },
+  { id: 'noent', n: 'No entregados' },
+];
 
-const TABS_CAJA: TabDef[] = [
-  {
-    id: 'nuevo',
-    n: 'Por confirmar',
-    filtro: (p) => {
-      const e = String(p.estado || '').toUpperCase();
-      const pag = String(p.pago_estado || '').toUpperCase();
-      const mod = String(p.modalidad || '').toUpperCase();
-      const tieneCoordinado = Boolean(p.pago_coordinado_en) || pag === 'COORDINADO';
-      return (e === 'COLA' || e === 'NUEVO') && pag !== 'PAGADO' && !tieneCoordinado && mod !== 'MESA';
-    },
-  },
-  {
-    id: 'coord',
-    n: 'Pago por coordinar',
-    filtro: (p) => {
-      const e = String(p.estado || '').toUpperCase();
-      const pag = String(p.pago_estado || '').toUpperCase();
-      const mod = String(p.modalidad || '').toUpperCase();
-      const tieneCoordinado = Boolean(p.pago_coordinado_en) || pag === 'COORDINADO';
-      return (
-        mod !== 'MESA' &&
-        pag !== 'PAGADO' &&
-        !tieneCoordinado &&
-        e !== 'ANULADO' &&
-        e !== 'RECHAZADO' &&
-        e !== 'ENTREGADO' &&
-        e !== 'COLA' &&
-        e !== 'NUEVO'
-      );
-    },
-  },
-  {
-    id: 'curso',
-    n: 'En curso',
-    filtro: (p) => {
-      const e = String(p.estado || '').toUpperCase();
-      const pag = String(p.pago_estado || '').toUpperCase();
-      const mod = String(p.modalidad || '').toUpperCase();
-      const tieneCoordinado = Boolean(p.pago_coordinado_en) || pag === 'COORDINADO';
-      const esNuevoPorConfirmar =
-        (e === 'COLA' || e === 'NUEVO') && pag !== 'PAGADO' && !tieneCoordinado && mod !== 'MESA';
-      return (
-        ['COLA', 'PREPARANDO', 'LISTO', 'EN_CAMINO', 'RUTA', 'PREP'].includes(e) &&
-        !esNuevoPorConfirmar
-      );
-    },
-  },
-  {
-    id: 'cerrado',
-    n: 'Cerrados',
-    filtro: (p) => {
-      const e = String(p.estado || '').toUpperCase();
-      return ['ENTREGADO', 'ANULADO', 'RECHAZADO'].includes(e);
-    },
-  },
-  // Todo junto: nuevos, en curso y cerrados (va al final para que el enlace a un pedido abra su pestaña propia)
-  { id: 'todos', n: 'Todos', filtro: () => true },
+const ETAPA_OPCIONES = [
+  { id: 'all', n: 'Todas' },
+  { id: 'confirmar', n: 'Por confirmar' },
+  { id: 'cola', n: 'Sin empezar' },
+  { id: 'coord', n: 'Pago por coordinar' },
 ];
 
 const CANALES_OPCIONES = [
@@ -217,6 +146,28 @@ async function contarPendientesAnteriores(): Promise<number | null> {
   }
 }
 
+/** Tarjetas por página según el ancho: 12 en PC (4 columnas), 8 en tablet, 6 en celular. */
+function tarjetasPorPagina(): number {
+  const w = typeof window === 'undefined' ? 1024 : window.innerWidth;
+  return w >= 1280 ? 12 : w >= 700 ? 8 : 6;
+}
+
+function usePorPagina(): number {
+  const [n, setN] = useState(tarjetasPorPagina);
+  useEffect(() => {
+    const f = () => setN(tarjetasPorPagina());
+    window.addEventListener('resize', f);
+    return () => window.removeEventListener('resize', f);
+  }, []);
+  return n;
+}
+
+const Flecha = ({ der }: { der?: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={der ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'} />
+  </svg>
+);
+
 export function PedidosAdminView() {
   const [cargando, setCargando] = useState<boolean>(true);
   const [errorCarga, setErrorCarga] = useState<string>('');
@@ -242,27 +193,29 @@ export function PedidosAdminView() {
     }
   };
   const [pisosSalon, setPisosSalon] = useState<PisoSalon[]>([]);
+  // Pedido abierto en la ventana de detalle (null = cerrada)
   const [pedidoSeleccionadoId, setPedidoSeleccionadoId] = useState<string | null>(null);
-  const pedidoDesdeUrl = useRef<string | null>(new URLSearchParams(window.location.search).get('pedido'));
 
-  // Pestaña activa del mockup: Por confirmar | Pago por coordinar | En curso | Cerrados
-  const [tabActiva, setTabActiva] = useState<ClaveTabCaja>('nuevo');
+  // Los cuatro filtros visibles y el grupo «Estado» del panel de Filtros
+  const [filtro, setFiltro] = useState<FiltroCaja>('todo');
+  const [grupoEstado, setGrupoEstado] = useState<GrupoEstadoCaja>('act');
+  const [etapa, setEtapa] = useState<EtapaCaja>('all');
 
-  // Filtros
   const [busqueda, setBusqueda] = useState<string>('');
   const [fcOpen, setFcOpen] = useState<boolean>(false);
+  const [masAbierto, setMasAbierto] = useState<boolean>(false);
   const [canalFiltro, setCanalFiltro] = useState<string>('all');
   const [modalidadFiltro, setModalidadFiltro] = useState<string>('all');
   const [cobroFiltro, setCobroFiltro] = useState<string>('all');
 
   // Paginación
   const [paginaActual, setPaginaActual] = useState<number>(1);
-  const pedidosPorPagina = 4; // Mockup usa OPAGE = 4
+  const pedidosPorPagina = usePorPagina();
 
   // Alerta sonora y visual
   const [pedidosResaltados, setPedidosResaltados] = useState<Set<string>>(new Set());
 
-  // Delivery no entregados (pestaña propia, con su contador)
+  // Delivery no entregados (con su contador)
   const { tiene, usuario } = useSesion();
   const puedeValidarCobro = tiene('pedidos/validar_cambio_cobro');
   const cambiosCobro = useCambiosCobroPendientes(puedeValidarCobro);
@@ -315,56 +268,13 @@ export function PedidosAdminView() {
     setPaginaActual(1);
   };
 
-  const cambiarTab = (nuevaTab: ClaveTabCaja) => {
-    setTabActiva(nuevaTab);
+  const cambiarGrupoEstado = (g: GrupoEstadoCaja) => {
+    setGrupoEstado(g);
     setPaginaActual(1);
-    if (nuevaTab === 'no_entregados') {
-      void cargarNoEntregados();
-      setPedidoSeleccionadoId(null);
-      return;
-    }
-    const tabDef = TABS_CAJA.find((t) => t.id === nuevaTab);
-    const filtro = tabDef ? tabDef.filtro : () => true;
-    const q = busqueda.trim().toLowerCase();
-    const nuevosFiltrados = pedidos.filter((p) => {
-      if (!filtro(p)) return false;
-      if (canalFiltro !== 'all') {
-        const cu = String(p.canal).toUpperCase();
-        if (canalFiltro === 'BOT' || canalFiltro === 'WHATSAPP') {
-          if (cu !== 'BOT' && cu !== 'WHATSAPP') return false;
-        } else if (cu !== canalFiltro) {
-          return false;
-        }
-      }
-      if (modalidadFiltro !== 'all') {
-        const modP = String(p.modalidad).toUpperCase();
-        if (modalidadFiltro === 'LLEVAR') {
-          if (modP !== 'LLEVAR' && modP !== 'RECOGER') return false;
-        } else if (modP !== modalidadFiltro) {
-          return false;
-        }
-      }
-      if (cobroFiltro !== 'all') {
-        const pag = String(p.pago_estado).toUpperCase() === 'PAGADO';
-        if (cobroFiltro === 'paid' && !pag) return false;
-        if (cobroFiltro === 'unpaid' && pag) return false;
-        if (cobroFiltro === 'sincaptura' && !p.cobroMozo?.sinCaptura) return false;
-      }
-      if (q) {
-        const cod = String(p.codigo || '').toLowerCase();
-        const cli = String(p.cliente_nombre || '').toLowerCase();
-        // Por celular: se comparan solo dígitos (con o sin +51, espacios o guiones)
-        const qDig = q.replace(/\D/g, '');
-        const tel = String(p.cliente_telefono || '').replace(/\D/g, '');
-        const porCelular = qDig.length >= 3 && tel.includes(qDig.replace(/^51(?=9\d{8}$)/, ''));
-        if (!cod.includes(q) && !cli.includes(q) && !porCelular) return false;
-      }
-      return true;
-    });
-    setPedidoSeleccionadoId(nuevosFiltrados[0]?.id || null);
+    if (g === 'noent') void cargarNoEntregados();
   };
 
-  // Enlace de la campana (/admin/caja?pedido=ID): abre ese pedido en su pestaña, una sola vez
+  // Enlace de la campana (/admin/caja?pedido=ID): abre ese pedido en su ventana, una sola vez
   const deepLinkResuelto = useRef(false);
   useEffect(() => {
     if (cargando || deepLinkResuelto.current) return;
@@ -372,8 +282,8 @@ export function PedidosAdminView() {
     const idUrl = new URLSearchParams(window.location.search).get('pedido');
     const pedidoUrl = idUrl ? pedidos.find((p) => String(p.id) === idUrl) : undefined;
     if (!pedidoUrl) return;
-    const tab = TABS_CAJA.find((t) => t.filtro(pedidoUrl));
-    if (tab) cambiarTab(tab.id);
+    // Un pedido cerrado vive en el grupo Cerrados; lo demás se ve en «Todo» (activos)
+    if (esCerrado(pedidoUrl)) setGrupoEstado('cer');
     setPedidoSeleccionadoId(String(pedidoUrl.id));
     // El enlace se resuelve una sola vez (deepLinkResuelto), aunque cambien las dependencias
   }, [cargando, pedidos]);
@@ -398,7 +308,6 @@ export function PedidosAdminView() {
         }
         return [nuevoPedido, ...prev];
       });
-      setPedidoSeleccionadoId((prev) => prev || idStr);
     }).catch(() => {
       cargarDatos();
     });
@@ -464,7 +373,7 @@ export function PedidosAdminView() {
   });
 
   // Tiempo real de Caja: voucher/plan, cobros, cierre y respaldo (reconexión, volver a la pestaña, sondeo sin socket).
-  // Recarga en silencio: no toca la selección, el scroll ni el modal abierto.
+  // Recarga en silencio: no toca la ventana abierta ni el scroll.
   useTiempoReal(
     ['vouchers:actualizado', 'pedido:pago', 'caja:cerrada', 'comprobante:cambio', 'reparto:incidente'],
     () => {
@@ -473,47 +382,19 @@ export function PedidosAdminView() {
     },
   );
 
-  // Conteo de pestañas
-  const conteosTabs = useMemo(() => {
-    const res: Record<Exclude<ClaveTabCaja, 'no_entregados'>, number> = {
-      nuevo: 0,
-      coord: 0,
-      curso: 0,
-      cerrado: 0,
-      todos: 0,
-    };
-    for (const t of TABS_CAJA) {
-      res[t.id] = pedidos.filter(t.filtro).length;
-    }
-    return res;
-  }, [pedidos]);
+  // Botón grande de cada tarjeta: mismas acciones, modales y endpoints que el detalle
+  const abrirDetalle = (p: Pedido) => setPedidoSeleccionadoId(String(p.id));
+  const { accionDe, ejecutar: ejecutarAccion, dialogos: dialogosAcciones } = useAccionesCaja({
+    alActualizar: cargarDatos,
+    abrirDetalle,
+  });
 
-  // Filtros activos
-  const fcCount = (canalFiltro !== 'all' ? 1 : 0) + (modalidadFiltro !== 'all' ? 1 : 0) + (cobroFiltro !== 'all' ? 1 : 0);
-  const fcSummary = useMemo(() => {
-    const partes: string[] = [];
-    if (canalFiltro !== 'all') {
-      partes.push(`Canal: ${CANALES_OPCIONES.find((c) => c.id === canalFiltro)?.n}`);
-    }
-    if (modalidadFiltro !== 'all') {
-      partes.push(`Modalidad: ${MODALIDADES_OPCIONES.find((m) => m.id === modalidadFiltro)?.n}`);
-    }
-    if (cobroFiltro !== 'all') {
-      partes.push(`Cobro: ${COBRO_OPCIONES.find((c) => c.id === cobroFiltro)?.n}`);
-    }
-    return partes.join(' · ');
-  }, [canalFiltro, modalidadFiltro, cobroFiltro]);
-
-  // Lista filtrada
-  const pedidosFiltrados = useMemo(() => {
-    // La pestaña No entregados no usa esta lista: su panel lee la consulta propia
-    if (tabActiva === 'no_entregados') return [];
-    const tabDef = TABS_CAJA.find((t) => t.id === tabActiva);
-    const filtroTab = tabDef ? tabDef.filtro : () => true;
+  // Todo lo que filtra salvo las pastillas: estado (activos/cerrados), etapa, canal, modalidad, cobro y búsqueda
+  const base = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-
     return pedidos.filter((p) => {
-      if (!filtroTab(p)) return false;
+      if (grupoEstado === 'cer' ? !esCerrado(p) : esCerrado(p)) return false;
+      if (!enEtapaCaja(p, etapa)) return false;
 
       if (canalFiltro !== 'all') {
         const cu = String(p.canal).toUpperCase();
@@ -550,46 +431,93 @@ export function PedidosAdminView() {
 
       return true;
     });
-  }, [pedidos, tabActiva, canalFiltro, modalidadFiltro, cobroFiltro, busqueda]);
+  }, [pedidos, grupoEstado, etapa, canalFiltro, modalidadFiltro, cobroFiltro, busqueda]);
 
-  // Sincronización automática del pedido seleccionado con la lista visible:
-  // Al abrir, o cuando cambian los filtros/búsqueda, si el pedido seleccionado
-  // no está en la lista visible, se selecciona el primero (o null si la lista está vacía).
+  const conteos = useMemo(() => {
+    const r = {} as Record<FiltroCaja, number>;
+    for (const f of FILTROS_CAJA) r[f.id] = base.filter((p) => enFiltroCaja(p, f.id)).length;
+    return r;
+  }, [base]);
+
+  const pedidosFiltrados = useMemo(() => base.filter((p) => enFiltroCaja(p, filtro)), [base, filtro]);
+
+  // Atajos: lo que necesita atención no queda escondido
+  const porConfirmar = useMemo(() => pedidos.filter(esPorConfirmar).length, [pedidos]);
+
+  // Filtros activos del panel (chips removibles arriba)
+  const hoy = hoyLima();
+  const chips = useMemo(() => {
+    const lista: { id: string; texto: string; quitar: () => void }[] = [];
+    if (grupoEstado !== 'act') lista.push({ id: 'estado', texto: ESTADO_OPCIONES.find((e) => e.id === grupoEstado)!.n, quitar: () => cambiarGrupoEstado('act') });
+    if (etapa !== 'all') lista.push({ id: 'etapa', texto: ETAPA_OPCIONES.find((e) => e.id === etapa)!.n, quitar: () => { setEtapa('all'); setPaginaActual(1); } });
+    if (rango.modo !== 'hoy') lista.push({ id: 'dia', texto: textoRango(rango, hoy), quitar: () => cambiarRango(rangoHoy(hoy)) });
+    if (canalFiltro !== 'all') lista.push({ id: 'canal', texto: `Canal: ${CANALES_OPCIONES.find((c) => c.id === canalFiltro)?.n}`, quitar: () => { setCanalFiltro('all'); setPaginaActual(1); } });
+    if (modalidadFiltro !== 'all') lista.push({ id: 'mod', texto: `Modalidad: ${MODALIDADES_OPCIONES.find((m) => m.id === modalidadFiltro)?.n}`, quitar: () => { setModalidadFiltro('all'); setPaginaActual(1); } });
+    if (cobroFiltro !== 'all') lista.push({ id: 'cobro', texto: `Cobro: ${COBRO_OPCIONES.find((c) => c.id === cobroFiltro)?.n}`, quitar: () => { setCobroFiltro('all'); setPaginaActual(1); } });
+    return lista;
+    // quitar usa solo setters estables; cambiarGrupoEstado/cambiarRango se recrean pero hacen lo mismo
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grupoEstado, etapa, rango, canalFiltro, modalidadFiltro, cobroFiltro, hoy]);
+
+  const limpiarFiltros = () => {
+    setGrupoEstado('act');
+    setEtapa('all');
+    setCanalFiltro('all');
+    setModalidadFiltro('all');
+    setCobroFiltro('all');
+    setBusqueda('');
+    setFiltro('todo');
+    setPaginaActual(1);
+    cambiarRango(rangoHoy(hoy));
+  };
+
+  // Cerrar el panel de Filtros y el menú «Más» con un clic fuera o Escape
+  const filaFiltrosRef = useRef<HTMLDivElement>(null);
+  const masRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (pedidosFiltrados.length === 0) {
-      if (pedidoSeleccionadoId !== null) {
-        setPedidoSeleccionadoId(null);
+    if (!fcOpen && !masAbierto) return;
+    const fuera = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (fcOpen && filaFiltrosRef.current && !filaFiltrosRef.current.contains(t)) setFcOpen(false);
+      if (masAbierto && masRef.current && !masRef.current.contains(t)) setMasAbierto(false);
+    };
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setFcOpen(false);
+        setMasAbierto(false);
       }
-      return;
-    }
+    };
+    document.addEventListener('mousedown', fuera);
+    document.addEventListener('keydown', tecla);
+    return () => {
+      document.removeEventListener('mousedown', fuera);
+      document.removeEventListener('keydown', tecla);
+    };
+  }, [fcOpen, masAbierto]);
 
-    // Enlace desde una notificacion (/admin/caja?pedido=<id>): se selecciona ese pedido una vez
-    const pedidoDeEnlace = pedidoDesdeUrl.current;
-    if (pedidoDeEnlace && pedidosFiltrados.some((p) => String(p.id) === pedidoDeEnlace)) {
-      pedidoDesdeUrl.current = null;
-      setPedidoSeleccionadoId(pedidoDeEnlace);
-      return;
-    }
-
-    const estaEnListaVisible = pedidosFiltrados.some(
-      (p) => String(p.id) === String(pedidoSeleccionadoId),
-    );
-    if (!estaEnListaVisible) {
-      setPedidoSeleccionadoId(pedidosFiltrados[0].id);
-    }
-  }, [pedidosFiltrados, pedidoSeleccionadoId]);
-
-  // Paginación
+  // Paginación fina: «1–12 de 18» con flechas
   const totalPaginas = Math.max(1, Math.ceil(pedidosFiltrados.length / pedidosPorPagina));
   const paginaValida = Math.min(paginaActual, totalPaginas);
   const pedidosPaginados = useMemo(() => {
     const inicio = (paginaValida - 1) * pedidosPorPagina;
     return pedidosFiltrados.slice(inicio, inicio + pedidosPorPagina);
   }, [pedidosFiltrados, paginaValida, pedidosPorPagina]);
+  const desde = pedidosFiltrados.length === 0 ? 0 : (paginaValida - 1) * pedidosPorPagina + 1;
+  const hasta = Math.min(paginaValida * pedidosPorPagina, pedidosFiltrados.length);
 
   const pedidoSeleccionado = useMemo(() => {
-    return pedidos.find((p) => p.id === pedidoSeleccionadoId) || null;
+    return pedidos.find((p) => String(p.id) === pedidoSeleccionadoId) || null;
   }, [pedidos, pedidoSeleccionadoId]);
+
+  const abrirNuevoPedido = async () => {
+    try {
+      const r = await salonApi.obtenerMesas();
+      setPisosSalon(r.pisos || []);
+    } catch {
+      setPisosSalon([]);
+    }
+    setNuevoPedidoAbierto(true);
+  };
 
   if (cargando) {
     return <Cargando mensaje="Cargando pedidos..." />;
@@ -609,193 +537,157 @@ export function PedidosAdminView() {
     );
   }
 
+  const enNoEntregados = grupoEstado === 'noent';
+  const totalNoEntregados = noEntregados?.total ?? 0;
+  const puedeCortesia = tiene('cortesias/dar');
+
   return (
-    <div>
-    {/* Caja cerrada e impresoras: una sola línea de chips, sin ocupar la pantalla */}
-    <div className="cj-estado">
-      <BannerCajaCerrada compacto />
-      <FranjaImpresion />
-    </div>
+    <div className="cj2">
     {tiene('pedidos/cambiar_ubicacion') && <BandejaPropuestasUbicacion alAplicar={cargarDatos} />}
     {puedeValidarCobro && <PanelCambioCobro pendientes={cambiosCobro.pendientes} alResolver={() => { cambiosCobro.recargar(); cargarDatos(); }} />}
-    <div className="cj-grid">
-      {/* PANEL IZQUIERDO */}
-      <div className="cj-left">
-        <div className="cj-head cj-cabecera">
-          {/* Fila 1: día, vista, atajos y Nuevo pedido (en PC van lado a lado) */}
-          <div className="cj-barra">
-            {/* Día o rango de la lista (hoy por defecto); no cambia la caja del día */}
-            <FiltroDiasPedidos rango={rango} pendientesAnteriores={pendientesAnteriores} alCambiar={cambiarRango} />
 
-            {/* Vista de la lista: un combo con la cantidad de cada grupo (antes 5 pestañas) */}
-            <div className="cj-barra-vista">
-              <FiltroCombo
-                etiqueta="Ver pedidos"
-                valor={tabActiva}
-                valorPorDefecto="nuevo"
-                opciones={[
-                  ...TABS_CAJA.map((t) => ({ valor: t.id, etiqueta: t.n, cantidad: conteosTabs[t.id] })),
-                  { valor: 'no_entregados', etiqueta: 'No entregados', cantidad: noEntregados?.total ?? 0 },
-                ]}
-                alCambiar={(v) => cambiarTab(v as ClaveTabCaja)}
-              />
-            </div>
-            {/* Atajo visible: lo que necesita atención no queda escondido dentro del combo */}
-            {TABS_CAJA.filter((t) => t.id !== tabActiva && t.id === 'nuevo' && conteosTabs[t.id] > 0).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => cambiarTab(t.id)}
-                style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: '1.5px solid var(--cp-orange, #E67929)', background: 'var(--cp-cream, #FBF4EC)', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-              >
-                {conteosTabs[t.id]} por confirmar
-              </button>
-            ))}
-            {tabActiva !== 'no_entregados' && (noEntregados?.total ?? 0) > 0 && (
-              <button
-                type="button"
-                onClick={() => cambiarTab('no_entregados')}
-                style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: '1.5px solid var(--cp-rust, #B2500F)', background: 'transparent', color: 'var(--cp-rust, #B2500F)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-              >
-                {noEntregados?.total} no {noEntregados?.total === 1 ? 'entregado' : 'entregados'}
-              </button>
-            )}
+    {/* Cabecera compacta: caja cerrada e impresoras, atajos y acciones en una sola línea */}
+    <div className="cj2-cab">
+      <div className="cj-estado" style={{ margin: 0 }}>
+        <BannerCajaCerrada compacto />
+        <FranjaImpresion />
+      </div>
+      <span className="cj2-cab-vacio" />
 
-            {tiene('cortesias/dar') && (
-              <button
-                type="button"
-                onClick={() => setCortesiaSeparadaAbierta(true)}
-                style={{ minHeight: 44, padding: '0 14px', borderRadius: 9999, border: '1.5px solid var(--cp-navy, #0B2C3E)', background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontFamily: 'Montserrat, sans-serif', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
-              >
+      {!enNoEntregados && totalNoEntregados > 0 && (
+        <button type="button" className="cj2-atajo cj2-atajo--rust" onClick={() => cambiarGrupoEstado('noent')}>
+          {totalNoEntregados} no {totalNoEntregados === 1 ? 'entregado' : 'entregados'}
+        </button>
+      )}
+      {etapa !== 'confirmar' && grupoEstado === 'act' && porConfirmar > 0 && (
+        <button
+          type="button"
+          className="cj2-atajo"
+          onClick={() => { setEtapa('confirmar'); setFiltro('todo'); setPaginaActual(1); }}
+        >
+          {porConfirmar} por confirmar
+        </button>
+      )}
+      {pendientesAnteriores > 0 && rango.modo !== 'pendientes' && (
+        <button
+          type="button"
+          className="cj2-atajo"
+          onClick={() => cambiarRango({ modo: 'pendientes', desde: '', hasta: '' })}
+        >
+          {pendientesAnteriores} de días anteriores
+        </button>
+      )}
+
+      {puedeCortesia && (
+        <button type="button" className="cj2-btn cj2-btn--cortesia-cab" onClick={() => setCortesiaSeparadaAbierta(true)}>
+          Registrar cortesía
+        </button>
+      )}
+      <button type="button" className="cj2-btn cj2-btn--nuevo cj2-btn--nuevo-cab cj-nuevo" onClick={abrirNuevoPedido}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        Nuevo pedido
+      </button>
+      {puedeCortesia && (
+        <div className="cj2-mas-menu cj2-mas-menu--cel" ref={masRef}>
+          <button
+            type="button"
+            className="cj2-btn cj2-btn--ico"
+            aria-label="Más acciones"
+            aria-expanded={masAbierto}
+            onClick={() => setMasAbierto((a) => !a)}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+          </button>
+          {masAbierto && (
+            <div className="cj2-menu" role="menu" aria-label="Más acciones">
+              <button type="button" role="menuitem" onClick={() => { setMasAbierto(false); setCortesiaSeparadaAbierta(true); }}>
                 Registrar cortesía
               </button>
-            )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
 
+    {/* Los cuatro filtros visibles, buscador y panel de Filtros */}
+    {!enNoEntregados && (
+      <div className="cj2-fila" ref={filaFiltrosRef}>
+        <nav aria-label="Estado de los pedidos" className="cj2-pastillas">
+          {FILTROS_CAJA.map((f) => (
             <button
+              key={f.id}
               type="button"
-              className="cj-nuevo"
-              onClick={async () => {
-                try {
-                  const r = await salonApi.obtenerMesas();
-                  setPisosSalon(r.pisos || []);
-                } catch {
-                  setPisosSalon([]);
-                }
-                setNuevoPedidoAbierto(true);
-              }}
-              style={{
-                minHeight: 44,
-                padding: '0 18px',
-                border: 0,
-                borderRadius: 12,
-                background: 'var(--cp-orange, #E67929)',
-                color: 'var(--cp-navy, #0B2C3E)',
-                fontFamily: 'Montserrat, sans-serif',
-                fontWeight: 800,
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
+              className="cj2-pastilla"
+              aria-pressed={filtro === f.id}
+              onClick={() => { setFiltro(f.id); setPaginaActual(1); }}
             >
-              Nuevo pedido
+              {f.punto && <span aria-hidden="true" className="cj2-punto" style={{ background: f.punto, boxShadow: filtro === f.id ? '0 0 0 2px #FBF4EC' : undefined }} />}
+              {f.n}
+              <span className="cj2-cuenta" data-testid={`cuenta-${f.id}`}>{conteos[f.id]}</span>
             </button>
-          </div>
+          ))}
+        </nav>
+        <label htmlFor="ord-q" style={{ position: 'absolute', left: -9999 }}>
+          Buscar
+        </label>
+        <input
+          id="ord-q"
+          type="search"
+          className="cj2-buscar"
+          value={busqueda}
+          onChange={(e) => {
+            setBusqueda(e.target.value);
+            setPaginaActual(1);
+          }}
+          placeholder="Buscar por código, cliente o celular"
+        />
+        <button
+          type="button"
+          className="cj2-btn"
+          onClick={() => setFcOpen(!fcOpen)}
+          aria-expanded={fcOpen}
+          style={{ background: fcOpen ? 'var(--cp-navy, #0B2C3E)' : undefined, color: fcOpen ? 'var(--cp-cream, #FBF4EC)' : undefined }}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 6h16M7 12h10M10 18h4" />
+          </svg>
+          Filtros
+          {chips.length > 0 && <span className="cj2-n-filtros">{chips.length}</span>}
+        </button>
 
-          {/* Fila 2: buscador y filtros (no aplican a No entregados) */}
-          {tabActiva !== 'no_entregados' && (
-          <div className="cj-barra">
-            <label htmlFor="ord-q" style={{ position: 'absolute', left: -9999 }}>
-              Buscar
-            </label>
-            <input
-              id="ord-q"
-              type="search"
-              value={busqueda}
-              onChange={(e) => {
-                setBusqueda(e.target.value);
-                setPaginaActual(1);
-              }}
-              placeholder="Buscar por código, cliente o celular"
-              style={{
-                flex: '1 1 180px',
-                minWidth: 0,
-                boxSizing: 'border-box',
-                minHeight: 44,
-                borderRadius: 9999,
-                border: '1.5px solid var(--cp-line, #E3D6C6)',
-                background: 'var(--cp-cream, #FBF4EC)',
-                color: 'var(--cp-navy, #0B2C3E)',
-                padding: '0 14px',
-                fontSize: 14,
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setFcOpen(!fcOpen)}
-              aria-expanded={fcOpen}
-              style={{
-                flex: 'none',
-                minHeight: 44,
-                padding: '0 12px',
-                borderRadius: 9999,
-                border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                background: fcOpen ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                color: fcOpen ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-                fontWeight: 700,
-                fontSize: 13,
-                display: 'inline-flex',
-                gap: 6,
-                alignItems: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M3 5h18l-7 8v6l-4 2v-8z" />
-              </svg>
-              Filtros
-              {fcCount > 0 && (
-                <span
-                  style={{
-                    minWidth: 20,
-                    height: 20,
-                    boxSizing: 'border-box',
-                    borderRadius: 10,
-                    background: 'var(--cp-orange, #E67929)',
-                    color: 'var(--cp-navy, #0B2C3E)',
-                    fontSize: 12,
-                    fontWeight: 800,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '0 5px',
-                  }}
-                >
-                  {fcCount}
-                </span>
-              )}
-            </button>
-            <span style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-              {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? 'pedido' : 'pedidos'}
-            </span>
-
-            {fcSummary && (
-              <div style={{ flex: '1 1 100%', fontSize: 12, lineHeight: '17px', color: 'var(--cp-soft, #2C4C5D)' }}>
-                <b>Filtrando:</b> {fcSummary}
+        {fcOpen && (
+          <>
+            <div className="cj2-panel-fondo" onClick={() => setFcOpen(false)} />
+            <div className="cj2-panel" role="group" aria-label="Filtros">
+              <div className="cj2-panel-cab">
+                <span>Filtros</span>
+                <button type="button" className="cj2-btn" onClick={() => setFcOpen(false)}>Listo</button>
               </div>
-            )}
-
-            {/* Filtros desplegables: Canal, Modalidad y Cobro en una segunda fila pegada */}
-            {fcOpen && (
-              <div className="cj-barra-filtros">
+              <BarraFiltros>
+                <FiltroCombo
+                  etiqueta="Estado"
+                  valor={grupoEstado}
+                  valorPorDefecto="act"
+                  opciones={[
+                    { valor: 'act', etiqueta: 'Activos' },
+                    { valor: 'cer', etiqueta: 'Cerrados' },
+                    { valor: 'noent', etiqueta: 'No entregados', cantidad: totalNoEntregados },
+                  ]}
+                  alCambiar={(v) => {
+                    cambiarGrupoEstado(v as GrupoEstadoCaja);
+                    if (v === 'noent') setFcOpen(false);
+                  }}
+                />
+                <FiltroCombo
+                  etiqueta="Etapa"
+                  valor={etapa}
+                  opciones={ETAPA_OPCIONES.map((e) => ({ valor: e.id, etiqueta: e.n }))}
+                  alCambiar={(v) => {
+                    setEtapa(v as EtapaCaja);
+                    setPaginaActual(1);
+                  }}
+                />
+                <FiltroDiasPedidos rango={rango} pendientesAnteriores={pendientesAnteriores} alCambiar={cambiarRango} />
                 <FiltroCombo
                   etiqueta="Canal"
                   valor={canalFiltro}
@@ -823,148 +715,124 @@ export function PedidosAdminView() {
                     setPaginaActual(1);
                   }}
                 />
-              </div>
-            )}
-          </div>
-          )}
-        </div>
+              </BarraFiltros>
+              {chips.length > 0 && (
+                <button type="button" className="cj2-limpiar" style={{ alignSelf: 'flex-start' }} onClick={limpiarFiltros}>
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    )}
 
-        {tabActiva === 'no_entregados' ? (
-          <div className="cj-scroll" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--cp-navy, #0B2C3E)' }}>
-              Pedidos de delivery que no llegaron al cliente: el repartidor se retiró por espera agotada.
-            </p>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: '18px', color: 'var(--cp-soft, #2C4C5D)' }}>
-              Revisa a la derecha los que el cliente acepta reprogramar y los que quedaron cancelados.
-            </p>
-          </div>
-        ) : (
-        /* LISTA DE PEDIDOS */
-        <div className="cj-scroll" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    {/* Filtros activos: chips que se quitan con un toque */}
+    {chips.length > 0 && (
+      <div className="cj2-activos" aria-label="Filtros activos">
+        {chips.map((c) => (
+          <button key={c.id} type="button" className="cj2-quitar" aria-label={`Quitar filtro ${c.texto}`} onClick={c.quitar}>
+            {c.texto} <span aria-hidden="true">×</span>
+          </button>
+        ))}
+        <button type="button" className="cj2-limpiar" onClick={limpiarFiltros}>Limpiar filtros</button>
+      </div>
+    )}
+
+    {enNoEntregados ? (
+      <div className="cj-right cj2-noentregados">
+        <PanelNoEntregados
+          datos={noEntregados}
+          cargando={cargandoNoEntregados}
+          error={errorNoEntregados}
+          puedeLiquidar={puedeLiquidar}
+          puedeDevolver={tiene('pedidos/cambiar_estado')}
+          alActualizar={() => {
+            void cargarNoEntregados();
+            void cargarDatos();
+          }}
+        />
+      </div>
+    ) : (
+      <>
+        {/* TARJETAS */}
+        <div className="cj2-lista">
           {pedidosPaginados.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--cp-soft, #2C4C5D)', fontSize: 13 }}>
-              {pedidos.length > 0
-                ? 'No hay pedidos en esta pestaña.'
-                : rango.modo === 'hoy'
-                  ? 'No hay pedidos hoy.'
-                  : rango.modo === 'pendientes'
-                    ? 'No hay pedidos pendientes de días anteriores.'
-                    : 'No hay pedidos en ese rango.'}
+            <div className="cj2-vacio">
+              {pedidos.length > 0 ? (
+                <>
+                  <div>No hay pedidos con estos filtros.</div>
+                  <button type="button" className="cj2-btn" style={{ marginTop: 12 }} onClick={limpiarFiltros}>Limpiar filtros</button>
+                </>
+              ) : rango.modo === 'hoy' ? (
+                'No hay pedidos hoy.'
+              ) : rango.modo === 'pendientes' ? (
+                'No hay pedidos pendientes de días anteriores.'
+              ) : (
+                'No hay pedidos en ese rango.'
+              )}
             </div>
           ) : (
-            pedidosPaginados.map((o) => {
-              return (
+            <div className="cj2-cuadricula">
+              {pedidosPaginados.map((o) => (
                 <TarjetaPedidoCaja
                   key={o.id}
                   pedido={o}
-                  seleccionado={pedidoSeleccionadoId === o.id}
+                  seleccionado={pedidoSeleccionadoId === String(o.id)}
                   resaltado={pedidosResaltados.has(String(o.id))}
                   cajaCerradaEspera={esperaCajaCerrada(o, cajaAbierta)}
                   cambioCobroPendiente={cambiosCobro.pendientes.some((c) => c.pedidoId === String(o.id))}
-                  alSeleccionar={setPedidoSeleccionadoId}
+                  alSeleccionar={(id) => setPedidoSeleccionadoId(String(id))}
+                  accion={accionDe(o)}
+                  alAccion={ejecutarAccion}
                 />
-              );
-            })
-          )}
-        </div>
-        )}
-
-        {/* PIE CON PAGINACIÓN */}
-        <div className="cj-foot">
-          {totalPaginas > 1 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
-              <button
-                type="button"
-                disabled={paginaValida <= 1}
-                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
-                style={{
-                  minHeight: 44,
-                  padding: '0 12px',
-                  borderRadius: 12,
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  background: 'transparent',
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  fontWeight: 700,
-                  opacity: paginaValida <= 1 ? 0.4 : 1,
-                  cursor: paginaValida <= 1 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                ← Anterior
-              </button>
-              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => setPaginaActual(num)}
-                  aria-label={`Página ${num}`}
-                  style={{
-                    minWidth: 44,
-                    minHeight: 44,
-                    borderRadius: 12,
-                    border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                    background: paginaValida === num ? 'var(--cp-navy, #0B2C3E)' : 'transparent',
-                    color: paginaValida === num ? 'var(--cp-cream, #FBF4EC)' : 'var(--cp-navy, #0B2C3E)',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {num}
-                </button>
               ))}
-              <button
-                type="button"
-                disabled={paginaValida >= totalPaginas}
-                onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
-                style={{
-                  minHeight: 44,
-                  padding: '0 12px',
-                  borderRadius: 12,
-                  border: '1.5px solid var(--cp-navy, #0B2C3E)',
-                  background: 'transparent',
-                  color: 'var(--cp-navy, #0B2C3E)',
-                  fontWeight: 700,
-                  opacity: paginaValida >= totalPaginas ? 0.4 : 1,
-                  cursor: paginaValida >= totalPaginas ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Siguiente →
-              </button>
             </div>
           )}
         </div>
-      </div>
 
-      {/* PANEL DERECHO */}
-      <div className="cj-right">
-        {tabActiva === 'no_entregados' ? (
-          <PanelNoEntregados
-            datos={noEntregados}
-            cargando={cargandoNoEntregados}
-            error={errorNoEntregados}
-            puedeLiquidar={puedeLiquidar}
-            puedeDevolver={tiene('pedidos/cambiar_estado')}
-            alActualizar={() => {
-              void cargarNoEntregados();
-              void cargarDatos();
-            }}
-          />
-        ) : !pedidoSeleccionado ? (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 24,
-              textAlign: 'center',
-              color: 'var(--cp-soft, #2C4C5D)',
-              fontSize: 14,
-              lineHeight: '21px',
-            }}
-          >
-            Elige un pedido de la lista para ver su detalle, cobrarlo o imprimir sus comprobantes.
+        {/* PAGINACIÓN FINA */}
+        <div className="cj2-pag">
+          <span className="cj2-pag-rango" data-testid="rango-pagina">
+            {pedidosFiltrados.length === 0 ? '0 pedidos' : `${desde}–${hasta} de ${pedidosFiltrados.length}`}
+          </span>
+          <div className="cj2-pag-flechas">
+            <button
+              type="button"
+              className="cj2-btn cj2-btn--ico"
+              aria-label="Página anterior"
+              disabled={paginaValida <= 1}
+              onClick={() => setPaginaActual((p) => Math.max(1, Math.min(p, totalPaginas) - 1))}
+            >
+              <Flecha />
+            </button>
+            <span className="cj2-pag-n">{paginaValida}/{totalPaginas}</span>
+            <button
+              type="button"
+              className="cj2-btn cj2-btn--ico"
+              aria-label="Página siguiente"
+              disabled={paginaValida >= totalPaginas}
+              onClick={() => setPaginaActual((p) => Math.min(totalPaginas, Math.min(p, totalPaginas) + 1))}
+            >
+              <Flecha der />
+            </button>
           </div>
-        ) : (
+        </div>
+      </>
+    )}
+
+    {/* Botón flotante Nuevo pedido (solo celular; el de la cabecera se oculta allí) */}
+    <button type="button" className="cj2-fab" aria-label="Agregar nuevo pedido" onClick={abrirNuevoPedido}>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+    </button>
+
+    {/* VENTANA DEL DETALLE: modal en PC, hoja inferior en tablet y celular */}
+    {pedidoSeleccionado && (
+      <VentanaDetalle
+        titulo={`Detalle del pedido ${pedidoSeleccionado.codigo}`}
+        alCerrar={() => setPedidoSeleccionadoId(null)}
+      >
+        <div className="cj-right">
           <PedidoDetalle
             pedido={pedidoSeleccionado}
             cajaAbierta={cajaAbierta}
@@ -978,70 +846,73 @@ export function PedidosAdminView() {
             alAbrirPedido={(id) => setPedidoSeleccionadoId(String(id))}
             editandoPor={editando[String(pedidoSeleccionado.id)]?.nombre ?? null}
           />
-        )}
-      </div>
-      {cortesiaSeparadaAbierta && (
-        <RegistrarCortesiaModal
-          alCerrar={() => setCortesiaSeparadaAbierta(false)}
-          alRegistrar={() => {
+        </div>
+      </VentanaDetalle>
+    )}
+
+    {dialogosAcciones}
+
+    {cortesiaSeparadaAbierta && (
+      <RegistrarCortesiaModal
+        alCerrar={() => setCortesiaSeparadaAbierta(false)}
+        alRegistrar={() => {
           setCortesiaSeparadaAbierta(false);
           cargarDatos();
-          }}
-        />
-      )}
+        }}
+      />
+    )}
 
-      {errorEditar && (
-        <div role="alert" className="cj-aviso-editar" style={{ position: 'fixed', left: 16, right: 16, bottom: 16, zIndex: 70, background: '#FDECE8', border: '1.5px solid var(--cp-rust)', borderRadius: 12, padding: '10px 14px', fontSize: 14, fontWeight: 700, color: 'var(--cp-rust)', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-          <span>{errorEditar}</span>
-          <button type="button" onClick={() => setErrorEditar(null)} aria-label="Cerrar aviso" style={{ border: 0, background: 'transparent', fontWeight: 800, cursor: 'pointer' }}>×</button>
-        </div>
-      )}
+    {errorEditar && (
+      <div role="alert" className="cj-aviso-editar" style={{ position: 'fixed', left: 16, right: 16, bottom: 16, zIndex: 70, background: '#FDECE8', border: '1.5px solid var(--cp-rust)', borderRadius: 12, padding: '10px 14px', fontSize: 14, fontWeight: 700, color: 'var(--cp-rust)', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <span>{errorEditar}</span>
+        <button type="button" onClick={() => setErrorEditar(null)} aria-label="Cerrar aviso" style={{ border: 0, background: 'transparent', fontWeight: 800, cursor: 'pointer' }}>×</button>
+      </div>
+    )}
 
-      {pedidoExtra && (
-        <ModalNuevoPedidoMesa
-          abierto={true}
-          pasoInicial="modal"
-          pisos={pisosSalon}
-          extra={pedidoExtra}
-          alCerrar={() => setPedidoExtra(null)}
-          alExitoPedido={() => void cargarDatos()}
-          alRefrescarMesas={async () => void cargarDatos()}
-        />
-      )}
+    {pedidoExtra && (
+      <ModalNuevoPedidoMesa
+        abierto={true}
+        pasoInicial="modal"
+        pisos={pisosSalon}
+        extra={pedidoExtra}
+        alCerrar={() => setPedidoExtra(null)}
+        alExitoPedido={() => void cargarDatos()}
+        alRefrescarMesas={async () => void cargarDatos()}
+      />
+    )}
 
-      {edicionPedido && (
-        <ModalNuevoPedidoMesa
-          abierto={true}
-          pasoInicial="modal"
-          pisos={pisosSalon}
-          edicion={{ datos: edicionPedido }}
-          alCerrar={() => setEdicionPedido(null)}
-          alExitoPedido={() => void cargarDatos()}
-          alRefrescarMesas={async () => void cargarDatos()}
-        />
-      )}
+    {edicionPedido && (
+      <ModalNuevoPedidoMesa
+        abierto={true}
+        pasoInicial="modal"
+        pisos={pisosSalon}
+        edicion={{ datos: edicionPedido }}
+        alCerrar={() => setEdicionPedido(null)}
+        alExitoPedido={() => void cargarDatos()}
+        alRefrescarMesas={async () => void cargarDatos()}
+      />
+    )}
 
-      {nuevoPedidoAbierto && (
-        <ModalNuevoPedidoMesa
-          abierto={true}
-          puedeForzarLiberacion={tiene('mesas/liberar')}
-          pasoInicial="modal"
-          pisos={pisosSalon}
-          pedidoRepetir={pedidoRepetir}
-          alCerrar={() => {
-            setNuevoPedidoAbierto(false);
-            setPedidoRepetir(null);
-          }}
-          alExitoPedido={(res) => {
-            if (res?.id) {
-              setPedidoSeleccionadoId(String(res.id));
-            }
-            void cargarDatos();
-          }}
-          alRefrescarMesas={async () => void cargarDatos()}
-        />
-      )}
-    </div>
+    {nuevoPedidoAbierto && (
+      <ModalNuevoPedidoMesa
+        abierto={true}
+        puedeForzarLiberacion={tiene('mesas/liberar')}
+        pasoInicial="modal"
+        pisos={pisosSalon}
+        pedidoRepetir={pedidoRepetir}
+        alCerrar={() => {
+          setNuevoPedidoAbierto(false);
+          setPedidoRepetir(null);
+        }}
+        alExitoPedido={(res) => {
+          if (res?.id) {
+            setPedidoSeleccionadoId(String(res.id));
+          }
+          void cargarDatos();
+        }}
+        alRefrescarMesas={async () => void cargarDatos()}
+      />
+    )}
     </div>
   );
 }

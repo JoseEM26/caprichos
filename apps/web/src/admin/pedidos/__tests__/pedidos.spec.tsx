@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { PedidosAdminView } from '../PedidosAdminView';
 import { ModalCobrar } from '../ModalCobrar';
 import { ModalAnular } from '../ModalAnular';
@@ -18,13 +18,6 @@ const comoCajero = () => {
   const actual = vi.mocked(sesionModulo.useSesion)();
   vi.spyOn(sesionModulo, 'useSesion').mockReturnValue({ ...actual, usuario: { partyId: '3', nombres: 'Cajera', rol: 'CAJERO' } } as any);
 };
-
-// La vista de la lista ahora es un combo «Ver pedidos»: lo abre y devuelve la opción buscada
-async function opcionVer(nombre: RegExp) {
-  const boton = await screen.findByRole('button', { name: /^Ver pedidos:/ });
-  if (boton.getAttribute('aria-expanded') !== 'true') fireEvent.click(boton);
-  return screen.getByRole('option', { name: nombre });
-}
 
 describe('Ola F4: Pedidos y Caja', () => {
   const socketCallbacks: Record<string, ((datos: any) => void)[]> = {};
@@ -154,7 +147,7 @@ describe('Ola F4: Pedidos y Caja', () => {
     },
   ];
 
-  it('1. Pestañas y conteos se calculan y muestran correctamente', async () => {
+  it('1. Los 4 filtros y sus contadores se calculan y filtran la lista', async () => {
     vi.spyOn(pedidosApi, 'listar').mockResolvedValue({
       total: pedidosPrueba.length,
       pagina: 1,
@@ -162,47 +155,62 @@ describe('Ola F4: Pedidos y Caja', () => {
       items: pedidosPrueba,
     });
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({
-      caja: {
-        id: '1',
-        fecha: '2026-10-21',
-        apertura: 50,
-        estado: 'ABIERTA',
-        abierta_por: '1',
-        cerrada_por: null,
-        cerrada_en: null,
-      },
+      caja: null,
       abierta: true,
-      totalesPorMedio: { EFECTIVO: 30 },
-      resumen: {
-        apertura: 50,
-        cobrosEfectivo: 30,
-        vueltosEfectivo: 0,
-        ingresos: 0,
-        egresos: 0,
-      },
-      efectivoEsperado: 80,
+      totalesPorMedio: {},
+      resumen: { apertura: 0, cobrosEfectivo: 0, vueltosEfectivo: 0, ingresos: 0, egresos: 0 },
+      efectivoEsperado: 0,
     });
 
     render(<PedidosAdminView />);
 
-    await waitFor(async () => {
-      expect(await opcionVer(/^Por confirmar\s*1$/i)).toBeInTheDocument();
-    });
+    const filtros = await screen.findByRole('navigation', { name: 'Estado de los pedidos' });
+    // Activos: CP-001 (por confirmar, delivery), CP-002 (preparando), CP-003 (listo), CP-004 (en camino, delivery)
+    expect(within(filtros).getByRole('button', { name: /^Todo/ })).toHaveTextContent('Todo4');
+    expect(within(filtros).getByRole('button', { name: /^En preparación/ })).toHaveTextContent('En preparación1');
+    expect(within(filtros).getByRole('button', { name: /^Listos/ })).toHaveTextContent('Listos1');
+    expect(within(filtros).getByRole('button', { name: /^A domicilio/ })).toHaveTextContent('A domicilio2');
+    // Los cerrados no se mezclan en «Todo»
+    expect(screen.queryByText('CP-005')).not.toBeInTheDocument();
+    expect(screen.queryByText('CP-006')).not.toBeInTheDocument();
+    expect(screen.getByText('CP-001')).toBeInTheDocument();
 
-    // Verificar conteos en cada pestaña del mockup:
-    // Por confirmar: 1 (CP-001)
-    expect(screen.getByRole('option', { name: /^Por confirmar\s*1$/i })).toBeInTheDocument();
-    // Pago por coordinar: 0
-    expect(screen.getByRole('option', { name: /^Pago por coordinar\s*0$/i })).toBeInTheDocument();
-    // En curso: 3 (CP-002 PREPARANDO + CP-003 LISTO + CP-004 EN_CAMINO)
-    expect(screen.getByRole('option', { name: /^En curso\s*3$/i })).toBeInTheDocument();
-    // Cerrados: 2 (CP-005 ENTREGADO + CP-006 ANULADO)
-    expect(screen.getByRole('option', { name: /^Cerrados\s*2$/i })).toBeInTheDocument();
-
-    // Cambiar a pestaña En curso y verificar que selecciona automáticamente CP-002 y ya no muestra CP-001
-    fireEvent.click(screen.getByRole('option', { name: /^En curso\s*3$/i }));
-    expect(screen.getAllByText('CP-002').length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(within(filtros).getByRole('button', { name: /^En preparación/ }));
+    expect(screen.getByText('CP-002')).toBeInTheDocument();
     expect(screen.queryByText('CP-001')).not.toBeInTheDocument();
+
+    fireEvent.click(within(filtros).getByRole('button', { name: /^A domicilio/ }));
+    expect(screen.getByText('CP-001')).toBeInTheDocument();
+    expect(screen.getByText('CP-004')).toBeInTheDocument();
+    expect(screen.queryByText('CP-003')).not.toBeInTheDocument();
+  });
+
+  it('1b. Los cerrados salen del grupo Estado de Filtros, con su chip removible', async () => {
+    vi.spyOn(pedidosApi, 'listar').mockResolvedValue({
+      total: pedidosPrueba.length,
+      pagina: 1,
+      limite: 100,
+      items: pedidosPrueba,
+    });
+    vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({ abierta: true } as any);
+
+    render(<PedidosAdminView />);
+    await screen.findByText('CP-001');
+
+    fireEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Estado:/ }));
+    fireEvent.click(screen.getByRole('option', { name: /^Cerrados/ }));
+
+    expect(screen.getByText('CP-005')).toBeInTheDocument();
+    expect(screen.getByText('CP-006')).toBeInTheDocument();
+    expect(screen.queryByText('CP-001')).not.toBeInTheDocument();
+    // Sin botón de acción en los cerrados
+    expect(screen.queryByRole('button', { name: /CP-005$/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Estado de los pedidos' })).toHaveTextContent('Todo2');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro Cerrados' }));
+    expect(screen.getByText('CP-001')).toBeInTheDocument();
+    expect(screen.queryByText('CP-005')).not.toBeInTheDocument();
   });
 
   it('2. El pedido nuevo llegado por socket aparece sin recargar la página', async () => {

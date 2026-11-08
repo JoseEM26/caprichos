@@ -88,10 +88,12 @@ function montarVista(permisoLiquidar: boolean) {
   vi.spyOn(pedidosApi, 'obtenerPorId').mockResolvedValue(pedidoEnCurso);
 }
 
-// La vista de la lista ahora es un combo «Ver pedidos»: lo abre y devuelve la opción buscada
+// «No entregados» y «Cerrados» viven en el grupo Estado del panel Filtros: se abre y devuelve la opción buscada
 async function opcionVer(nombre: RegExp) {
-  const boton = await screen.findByRole('button', { name: /^Ver pedidos:/ });
-  if (boton.getAttribute('aria-expanded') !== 'true') fireEvent.click(boton);
+  const filtros = await screen.findByRole('button', { name: /^Filtros/ });
+  if (filtros.getAttribute('aria-expanded') !== 'true') fireEvent.click(filtros);
+  const combo = screen.getByRole('button', { name: /^Estado:/ });
+  if (combo.getAttribute('aria-expanded') !== 'true') fireEvent.click(combo);
   return screen.getByRole('option', { name: nombre });
 }
 
@@ -126,7 +128,7 @@ describe('Pedidos y caja: pestaña No entregados', () => {
     expect(within(panel).getByTestId('no-entregado-CP-R01')).toBeInTheDocument();
     expect(within(panel).getByTestId('revisar-devolucion-CP-R02')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reprogramar / Reenviar a reparto' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ver pedidos: No entregados' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Quitar filtro No entregados' })).toBeInTheDocument();
   });
 
   it('sin permiso repartos/liquidar la pestaña funciona pero no aparece el botón de reenvío', async () => {
@@ -147,7 +149,7 @@ describe('Pedidos y caja: pestaña No entregados', () => {
     fireEvent.click(await opcionVer(/^No entregados/));
     await screen.findByTestId('panel-no-entregados');
 
-    fireEvent.click(await opcionVer(/^En curso\s*1$/));
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtro No entregados' }));
     await waitFor(() => expect(screen.queryByTestId('panel-no-entregados')).not.toBeInTheDocument());
     expect(screen.getAllByText('CP-001').length).toBeGreaterThan(0);
   });
@@ -158,7 +160,6 @@ describe('Pedidos y caja: pestaña No entregados', () => {
     render(<PedidosAdminView />);
 
     expect(await opcionVer(/^No entregados\s*0$/)).toBeInTheDocument();
-    fireEvent.click(await opcionVer(/^En curso\s*1$/));
     expect(screen.getAllByText('CP-001').length).toBeGreaterThan(0);
   });
 });
