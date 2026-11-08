@@ -60,6 +60,22 @@ describe('Vista previa de un pedido con varias mesas: agregar y quitar mesa', ()
     expect(screen.queryByRole('button', { name: 'Quitar mesa' })).toBeNull();
   });
 
+  it('«Agregar extra» aparece solo con el permiso (lo da el padre) y en pedido vigente; no hay anular ni cortesía', () => {
+    const alExtra = vi.fn();
+    const m = mesa('m1', 1, 'OCUPADA', { esPrincipal: true, orden: 1 });
+    const { unmount } = render(<VistaPreviaMesa mesa={m} puedeForzar={false} alCerrar={vi.fn()} alCambiar={vi.fn()} alAgregarExtra={alExtra} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar extra' }));
+    expect(alExtra).toHaveBeenCalledWith(m);
+    expect(screen.queryByRole('button', { name: /anular|cortes/i })).toBeNull();
+    unmount();
+    const anulada = mesa('m1', 1, 'OCUPADA', { estado: 'ANULADO' });
+    const r2 = render(<VistaPreviaMesa mesa={anulada} puedeForzar={false} alCerrar={vi.fn()} alCambiar={vi.fn()} alAgregarExtra={alExtra} />);
+    expect(screen.queryByRole('button', { name: 'Agregar extra' })).toBeNull();
+    r2.unmount();
+    render(<VistaPreviaMesa mesa={m} puedeForzar={false} alCerrar={vi.fn()} alCambiar={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Agregar extra' })).toBeNull();
+  });
+
   it('«Quitar mesa» con una sola mesa no deja quitarla', () => {
     const sola = mesa('m1', 1, 'OCUPADA', { esPrincipal: true, orden: 1 });
     render(<VistaPreviaMesa mesa={sola} puedeForzar={false} alCerrar={vi.fn()} alCambiar={vi.fn()} puedeAbrirMesas mesasDelPedido={[sola]} />);

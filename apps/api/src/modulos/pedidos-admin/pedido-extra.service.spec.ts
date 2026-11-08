@@ -57,6 +57,15 @@ describe('PedidoExtraService', () => {
     expect(origen).toMatchObject({ canal: 'MOZO', mesaNombre: 'Mesa 3' });
   });
 
+  it('mozo+cajero (unión) crea con canal CAJA; el mozo solo, MOZO; la auditoría guarda el rol efectivo', async () => {
+    await servicio.crearExtra('100', dto, { partyId: 7n, rol: 'MOZO', roles: ['MOZO', 'CAJERO'] } as any);
+    expect(pedidos.crear.mock.calls[0][2]).toMatchObject({ canal: 'CAJA' });
+    expect(auditoria.registrar.mock.calls[0][0].despues).toMatchObject({ rol: 'CAJERO' });
+    await servicio.crearExtra('100', dto, mozo);
+    expect(pedidos.crear.mock.calls[1][2]).toMatchObject({ canal: 'MOZO' });
+    expect(auditoria.registrar.mock.calls[1][0]).toMatchObject({ partyId: 8n, despues: expect.objectContaining({ rol: 'MOZO' }) });
+  });
+
   it('audita AGREGAR_EXTRA sobre el original', async () => {
     await servicio.crearExtra('100', dto, cajero, undefined, '1.2.3.4');
     expect(auditoria.registrar).toHaveBeenCalledWith(

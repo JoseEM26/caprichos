@@ -3,7 +3,7 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { esSoloMozo } from '../acceso/roles-usuario';
+import { esSoloMozo, rolEfectivoMozo } from '../acceso/roles-usuario';
 import { PedidosService } from '../pedidos/pedidos.service';
 import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
 import { ImpresionService } from '../impresion/impresion.service';
@@ -88,7 +88,7 @@ export class PedidoExtraService {
       resultado: 'OK',
       entidad: 'pedido',
       entidadId: raiz.id,
-      despues: { extraId: res.id, extraCodigo: res.codigo, total: res.total, origen: raiz.codigo },
+      despues: { extraId: res.id, extraCodigo: res.codigo, total: res.total, origen: raiz.codigo, rol: usuario ? rolEfectivoMozo(usuario) : undefined },
       partyId: usuario?.partyId,
       ip,
     });
