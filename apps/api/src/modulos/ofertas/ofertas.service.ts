@@ -168,7 +168,7 @@ function detalleOpcion(id: string, productos: ProductoDisp[]): OpcionDetalleComb
   const disponible = !!f && productoDisponible(f);
   // Bloqueada solo por saldo (no por ocultar ni agotar a mano): la carta dice «No hay stock»
   const sinStock = !disponible && !!f && !f.oculto && estaDisponible(f.agotadoHasta) && !!f.controlaStock;
-  return { id, nombre: f?.nombre ?? '', disponible, ...(sinStock ? { sinStock } : {}), ...(sabores ? { sabores } : {}), ...(f?.fotoUrl ? { fotoUrl: f.fotoUrl } : {}) };
+  return { id, nombre: f?.nombre ?? '', disponible, ...(sinStock ? { sinStock } : {}), ...(sabores ? { sabores } : {}), ...(f?.fotoUrl ? { fotoUrl: f.fotoUrl } : {}), ...(f?.categoriaNombre ? { categoria: f.categoriaNombre } : {}) };
 }
 
 const INCLUDE_PARTES = {

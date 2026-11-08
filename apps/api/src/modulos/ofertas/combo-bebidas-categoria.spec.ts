@@ -78,6 +78,14 @@ describe('Combo con bebidas por categoría (Bebida 1..N)', () => {
     expect((bebidas.opcionesDetalle ?? []).map((o) => o.nombre)).toEqual(['FRAPPE OREO', 'ICED COFFE', 'CAPUCCINO']);
   });
 
+  it('cada opción de bebida trae el nombre de su categoría (la carta arma chips Frappes / Iced / Calientes)', async () => {
+    const [oferta] = await service.listarOfertas('COMBO');
+    const bebidas = oferta.combosParte!.find((p) => p.id === '1')!;
+    const categorias = (bebidas.opcionesDetalle ?? []).map((o) => o.categoria);
+    expect(categorias.every((c) => typeof c === 'string' && c.length > 0)).toBe(true);
+    expect(new Set(categorias).size).toBeGreaterThanOrEqual(2);
+  });
+
   it('conserva el complemento con paquetes y no marca sus piezas como bebidas', async () => {
     const [oferta] = await service.listarOfertas('COMBO');
     const piezas = oferta.combosParte!.filter((p) => p.paqueteGrupo);

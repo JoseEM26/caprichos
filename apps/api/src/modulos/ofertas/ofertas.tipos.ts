@@ -19,6 +19,8 @@ export interface OpcionDetalleCombo {
   sinStock?: boolean;
   /** Foto del producto (bebidas por categorías). */
   fotoUrl?: string;
+  /** Nombre de la categoría del producto: la carta arma chips (Frappes, Iced...) cuando hay dos o más. */
+  categoria?: string;
   sabores?: { id: string; nombre: string; disponible: boolean; saldo: number }[];
 }
 
