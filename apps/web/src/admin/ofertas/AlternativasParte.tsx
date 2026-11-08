@@ -29,7 +29,7 @@ const boton = {
   cursor: 'pointer',
 } as const;
 
-/** Alternativas de una parte del combo: si no hay stock, el cliente elige una (mismo precio del combo). */
+/** Reemplazos de una parte del combo: solo si no queda stock de lo principal, el cliente elige uno (mismo precio del combo). */
 export function AlternativasParte({ principalId, alternativas, productos, onCambiar }: Props) {
   const [q, setQ] = useState('');
   const [aQuitar, setAQuitar] = useState<number | null>(null);
@@ -53,14 +53,14 @@ export function AlternativasParte({ principalId, alternativas, productos, onCamb
 
   return (
     <div data-testid="alternativas-parte" style={{ marginTop: '14px' }}>
-      <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>Si no hay stock, el cliente podrá elegir:</div>
+      <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>Reemplazo si se agota</div>
       <span style={{ fontSize: '12px', color: 'var(--cp-soft)', display: 'block', marginBottom: '8px' }}>
-        Se ofrecen solo cuando el complemento no alcanza. Mismo precio del combo; las agotadas salen bloqueadas. Si no hay ninguna con stock, el combo se muestra agotado.
+        Solo se ofrece cuando no queda stock de lo de arriba. No es una opción más para elegir: es un reemplazo de emergencia, al mismo precio del combo. Si tampoco hay stock de los reemplazos, el combo se muestra agotado.
       </span>
 
       {alternativas.map((a, i) => (
         <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
-          <strong style={{ minWidth: '64px', fontSize: '13px' }}>Opción {i + 1}</strong>
+          <strong style={{ minWidth: '64px', fontSize: '13px' }}>Reemplazo {i + 1}</strong>
           <span style={{ flex: 1, fontSize: '14px', minWidth: '120px' }}>{a.nombre || `Producto ${a.id}`}</span>
           <label style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             Cantidad
@@ -96,8 +96,8 @@ export function AlternativasParte({ principalId, alternativas, productos, onCamb
         type="search"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Buscar un producto para agregar como opción..."
-        aria-label="Buscar alternativa"
+        placeholder="Buscar el producto que lo reemplaza…"
+        aria-label="Buscar reemplazo"
         style={{ width: '100%', boxSizing: 'border-box', minHeight: '44px', borderRadius: '8px', border: '1.5px solid var(--cp-line)', padding: '0 10px', fontSize: '14px' }}
       />
       {resultados.map((p) => (
@@ -115,8 +115,8 @@ export function AlternativasParte({ principalId, alternativas, productos, onCamb
       ))}
 
       {aQuitar !== null && (
-        <div role="alertdialog" aria-label="Quitar opción" style={{ marginTop: '8px', fontSize: '13px' }}>
-          ¿Quitar {alternativas[aQuitar]?.nombre || 'esta opción'} de las alternativas?{' '}
+        <div role="alertdialog" aria-label="Quitar reemplazo" style={{ marginTop: '8px', fontSize: '13px' }}>
+          ¿Quitar {alternativas[aQuitar]?.nombre || 'este reemplazo'} de los reemplazos?{' '}
           <button
             type="button"
             style={boton}

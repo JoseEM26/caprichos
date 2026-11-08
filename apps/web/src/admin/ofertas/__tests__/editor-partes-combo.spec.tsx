@@ -35,35 +35,40 @@ function Contenedor({ inicial = [] as Parte[], alCambiar }: { inicial?: Parte[];
 }
 
 const toque = (nombre: string | RegExp) => fireEvent.click(screen.getByRole('button', { name: nombre }));
+const marcar = (nombre: string | RegExp, en: HTMLElement | null = null) => fireEvent.click((en ? within(en) : screen).getByRole('checkbox', { name: nombre }));
 const guardado = (partes: Parte[]) => partesParaGuardar(partes, categorias, productos);
+/** Las listas «Qué puede elegir» de lo que lleva la combinación abierta (una por cada cosa que lleva). */
+const selectoresDe = (titulo: string | RegExp) => within(screen.getByRole('list', { name: titulo })).getAllByRole('list', { name: /Qué puede elegir/ });
+const nueva = /Lo que lleva Combinación sin completar/;
 
 describe('Editor de partes del combo: todo por toques', () => {
-  it('arma el Dúo completo (2 bebidas + complemento con 3 opciones por plantillas) sin escribir nada', () => {
+  it('arma el Dúo completo (2 bebidas + una combinación con 4 opciones por plantillas) sin escribir nada', () => {
     let ultimo: Parte[] = [];
     render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
     expect(screen.getByText('¿Qué lleva el combo?')).toBeInTheDocument();
 
-    // Bebidas: tipo, categorías (varias) y listo; 2 por defecto
+    // Bebidas: tipo, categorías completas (varias) y listo; 2 por defecto
     toque('+ Agregar');
-    toque('Agregar bebidas');
-    for (const c of ['Frappes', 'Iced', 'Calientes']) toque(c);
+    toque('El cliente elige entre varias cosas');
+    for (const c of ['Frappes', 'Iced', 'Calientes']) marcar(`${c} — todos`);
+    expect(screen.getByText('Elige 2: Frappes, Iced o Calientes')).toBeInTheDocument();
 
-    // Complemento: la primera opción ya viene como «2 de la misma categoría»; se elige Donas
+    // «El cliente elige UNA combinación»: la primera ya viene como «2 de lo mismo»; se elige Donas
     toque('+ Agregar');
-    toque('Agregar complemento a elegir');
-    fireEvent.click(within(screen.getByRole('group', { name: 'Categoría de la pieza' })).getByRole('button', { name: 'Donas' }));
+    toque('El cliente elige UNA combinación');
+    marcar('Donas — todos', selectoresDe(nueva)[0]);
     expect(screen.getByText('2 donas')).toBeInTheDocument();
 
-    // «1 + 1 de dos categorías»: dona + galleta
-    toque('1 + 1 de dos categorías');
-    const cats = screen.getAllByRole('group', { name: 'Categoría de la pieza' });
-    fireEvent.click(within(cats[0]).getByRole('button', { name: 'Donas' }));
-    fireEvent.click(within(cats[1]).getByRole('button', { name: 'Galletas' }));
+    // «1 de cada una de 2 cosas»: dona + galleta
+    toque('1 de cada una de 2 cosas');
+    const [uno, dos] = selectoresDe(nueva);
+    marcar('Donas — todos', uno);
+    marcar('Galletas — todos', dos);
     expect(screen.getByText('1 dona + 1 galleta')).toBeInTheDocument();
 
-    // «1 producto fijo»: carrot cake
-    toque('1 producto fijo');
-    toque('Carrot cake');
+    // «1 solo producto»: carrot cake
+    toque('1 solo producto');
+    marcar('Carrot cake', selectoresDe(nueva)[0]);
     expect(screen.getByText('1 carrot cake')).toBeInTheDocument();
 
     const g = guardado(ultimo);
@@ -81,91 +86,183 @@ describe('Editor de partes del combo: todo por toques', () => {
     expect(errorDePartes(ultimo, categorias)).toBeNull();
   });
 
-  it('el título automático se puede cambiar con el lápiz y volver a automático', () => {
+  it('«2 de donas o galleta» se arma en 4 toques y el título sale solo, legible', () => {
+    let ultimo: Parte[] = [];
+    render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
+    toque('+ Agregar'); // 1
+    toque('El cliente elige entre varias cosas'); // 2
+    marcar('Dona'); // 3
+    marcar('Galleta 1'); // 4
+    expect(screen.getByText('Elige 2: Dona o Galleta 1')).toBeInTheDocument();
+    expect(screen.getByText('Podrá elegir cualquiera de: Dona, Galleta 1')).toBeInTheDocument();
+    expect(guardado(ultimo)[0]).toMatchObject({ tipo: 'A_ELECCION', cantidad: 2, categorias: [], productos: ['40', '100'] });
+    expect(errorDePartes(ultimo, categorias)).toBeNull();
+  });
+
+  it('el título de la tarjeta se cambia con el lápiz (nunca es obligatorio) y vuelve a automático', () => {
     let ultimo: Parte[] = [];
     render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
     toque('+ Agregar');
-    toque('Agregar complemento a elegir');
-    fireEvent.click(within(screen.getByRole('group', { name: 'Categoría de la pieza' })).getByRole('button', { name: 'Donas' }));
-    toque('Cambiar el nombre de 2 donas');
-    fireEvent.change(screen.getByLabelText('Nombre de la opción'), { target: { value: 'Dúo de donas' } });
+    toque('El cliente elige entre varias cosas');
+    marcar('Dona');
+    toque('Cambiar el título de la tarjeta 1');
+    fireEvent.change(screen.getByLabelText('Título de la tarjeta'), { target: { value: 'Dulce a elegir' } });
+    toque('Listo');
+    expect(screen.getByText('Dulce a elegir')).toBeInTheDocument();
+    expect(guardado(ultimo)[0].nombre).toBe('Dulce a elegir');
+    toque('Cambiar el título de la tarjeta 1');
+    toque('Título automático');
+    expect(screen.getByText('Elige 2: Dona')).toBeInTheDocument();
+  });
+
+  it('el título de una combinación se puede cambiar con el lápiz y volver a automático', () => {
+    let ultimo: Parte[] = [];
+    render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
+    toque('+ Agregar');
+    toque('El cliente elige UNA combinación');
+    marcar('Donas — todos');
+    toque('Cambiar el título de 2 donas');
+    fireEvent.change(screen.getByLabelText('Título de la combinación'), { target: { value: 'Dúo de donas' } });
     toque('Listo');
     expect(screen.getByText('Dúo de donas')).toBeInTheDocument();
     // Con nombre propio, cambiar la cantidad no lo pisa
-    fireEvent.click(screen.getByRole('button', { name: 'Más: Cantidad de esta pieza' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Más: Cantidad que lleva' }));
     expect(guardado(ultimo)[0]).toMatchObject({ paqueteNombre: 'Dúo de donas', cantidad: 3 });
-    toque('Cambiar el nombre de Dúo de donas');
-    toque('Nombre automático');
+    toque('Cambiar el título de Dúo de donas');
+    toque('Título automático');
     expect(screen.getByText('3 donas')).toBeInTheDocument();
   });
 
-  it('sabores específicos: Todos o elegir específicos con chips que se apagan y encienden', () => {
+  it('combinaciones: «Combinación 1», «Combinación 2», «+ Combinación» y «+ Añadir otra cosa a esta combinación»', () => {
     let ultimo: Parte[] = [];
     render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
     toque('+ Agregar');
-    toque('Agregar complemento a elegir');
-    fireEvent.click(within(screen.getByRole('group', { name: 'Categoría de la pieza' })).getByRole('button', { name: 'Donas' }));
+    toque('El cliente elige UNA combinación');
+    expect(screen.getByText('Combinación 1')).toBeInTheDocument();
+    expect(screen.getByText(/Agrega al menos otra combinación/)).toBeInTheDocument();
+    marcar('Donas — todos');
+    toque('+ Combinación');
+    expect(screen.getByText('Combinación 2')).toBeInTheDocument();
+    marcar('Donas — todos', selectoresDe(nueva)[0]);
+    // En la segunda: «+ Añadir otra cosa» para «1 dona + 1 galleta»
+    toque('+ Añadir otra cosa a esta combinación');
+    const [a, b] = selectoresDe(/Lo que lleva 1 dona/);
+    marcar('Galletas — todos', b);
+    expect(a).toBeTruthy();
+    expect(opcionesDeGrupo(ultimo, 'Complemento').map((o) => o.nombre)).toEqual(['2 donas', '1 dona + 1 galleta']);
+  });
+
+  it('sabores específicos: casilla «Elegir sabores específicos» con chips que se apagan y encienden', () => {
+    let ultimo: Parte[] = [];
+    render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
+    toque('+ Agregar');
+    toque('El cliente elige UNA combinación');
+    expect(screen.queryByRole('checkbox', { name: 'Elegir sabores específicos' })).toBeNull(); // sin producto con sabores aún
+    marcar('Donas — todos');
     expect(guardado(ultimo)[0].saboresIds).toEqual([]);
 
-    toque('Elegir específicos');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Elegir sabores específicos' }));
     toque(/Fresa/); // se apaga
     expect(guardado(ultimo)[0].saboresIds).toEqual(['21', '23']);
     toque(/Manjar/); // se apaga; queda solo Oreo
     expect(screen.getByRole('button', { name: /Oreo/ })).toBeDisabled(); // siempre queda uno
     toque(/Fresa/);
     expect(guardado(ultimo)[0].saboresIds).toEqual(['21', '22']);
-    toque('Todos los sabores');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Elegir sabores específicos' }));
     expect(guardado(ultimo)[0].saboresIds).toEqual([]);
   });
 
-  it('productos concretos: sin tope de 8, y con productos marcados la pieza guarda la categoría y solo esos', () => {
+  it('productos sueltos: sin tope de 8, buscables, y una categoría completa no se mezcla con productos', () => {
     let ultimo: Parte[] = [];
     render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
     toque('+ Agregar');
-    toque('Agregar complemento a elegir');
-    fireEvent.click(within(screen.getByRole('group', { name: 'Categoría de la pieza' })).getByRole('button', { name: 'Galletas' }));
-    const lista = screen.getByRole('list', { name: 'Productos concretos' });
-    expect(within(lista).getAllByRole('button')).toHaveLength(12);
-    fireEvent.change(screen.getByLabelText('Buscar: Productos concretos'), { target: { value: 'galleta 12' } });
-    toque('Galleta 12');
-    const p = guardado(ultimo)[0];
-    expect(p).toMatchObject({ categorias: ['9'], productos: ['111'], paqueteNombre: '2 galleta 12' });
+    toque('El cliente elige entre varias cosas');
+    const lista = screen.getByRole('list', { name: /Qué puede elegir/ });
+    expect(within(lista).getAllByRole('checkbox').length).toBeGreaterThanOrEqual(12 + 7);
+    marcar('Galletas — todos');
+    expect(guardado(ultimo)[0]).toMatchObject({ categorias: ['9'], productos: [] });
+    fireEvent.change(screen.getByLabelText(/Buscar categoría o producto/), { target: { value: 'galleta 12' } });
+    marcar('Galleta 12');
+    // Marcar un producto desmarca la categoría completa: valen solo los productos
+    expect(guardado(ultimo)[0]).toMatchObject({ categorias: [], productos: ['111'], nombre: '2 galleta 12' });
+    expect(screen.getByRole('button', { name: 'Quitar Galleta 12' })).toBeInTheDocument();
   });
 
-  it('quitar productos de las bebidas: los marcados se guardan como excluidos', () => {
+  it('«Excluir alguno»: los productos marcados se guardan como excluidos', () => {
     let ultimo: Parte[] = [];
     render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
     toque('+ Agregar');
-    toque('Agregar bebidas');
-    toque('Frappes');
-    toque('Iced');
-    const quitar = screen.getByRole('list', { name: 'Productos a quitar' });
+    toque('El cliente elige entre varias cosas');
+    expect(screen.queryByText('Excluir alguno (ej. sin Frozen)')).toBeNull();
+    marcar('Frappes — todos');
+    marcar('Iced — todos');
+    fireEvent.click(screen.getByText('Excluir alguno (ej. sin Frozen)'));
+    const quitar = screen.getByRole('list', { name: 'Productos a excluir' });
     fireEvent.click(within(quitar).getByRole('button', { name: 'Iced Latte' }));
     expect(guardado(ultimo)[0]).toMatchObject({ categorias: ['2', '3'], productosExcluidos: ['61'], productos: [] });
   });
 
-  it('avisa en palabras simples cuando falta algo y no deja un complemento con una sola opción', () => {
-    let ultimo: Parte[] = [];
-    render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
+  it('el reemplazo si se agota queda escondido en «Más opciones» y no se confunde con elegir', () => {
+    render(<Contenedor />);
     toque('+ Agregar');
-    toque('Agregar bebidas');
-    expect(errorDePartes(ultimo, categorias)).toBe('A «Bebidas» le falta elegir al menos una categoría o un producto.');
-    toque('Frappes');
-    toque('+ Agregar');
-    toque('Agregar complemento a elegir');
-    expect(errorDePartes(ultimo, categorias)).toMatch(/hay una pieza sin completar/);
-    fireEvent.click(within(screen.getByRole('group', { name: 'Categoría de la pieza' })).getByRole('button', { name: 'Donas' }));
-    expect(errorDePartes(ultimo, categorias)).toMatch(/le falta al menos una opción más/);
+    toque('El cliente elige entre varias cosas');
+    const mas = screen.getByText(/Más opciones/).closest('details')!;
+    expect(mas).not.toHaveAttribute('open');
+    expect(within(mas).getByText('Reemplazo si se agota')).toBeInTheDocument();
+    expect(within(mas).getByText(/Solo se ofrece cuando no queda stock de lo de arriba/)).toBeInTheDocument();
+    expect(screen.queryByText(/Si no hay stock, el cliente podrá elegir/)).toBeNull();
   });
 
-  it('dos opciones con el mismo título automático no se funden: la segunda lleva (2)', () => {
+  it('avisa en palabras simples cuando falta algo y no deja una combinación con una sola opción', () => {
     let ultimo: Parte[] = [];
     render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
     toque('+ Agregar');
-    toque('Agregar complemento a elegir');
-    fireEvent.click(within(screen.getByRole('group', { name: 'Categoría de la pieza' })).getByRole('button', { name: 'Donas' }));
-    toque('2 de la misma categoría');
-    fireEvent.click(within(screen.getByRole('group', { name: 'Categoría de la pieza' })).getByRole('button', { name: 'Donas' }));
+    toque('El cliente elige entre varias cosas');
+    expect(errorDePartes(ultimo, categorias)).toBe('Te falta elegir qué puede escoger el cliente en la tarjeta 1.');
+    marcar('Frappes — todos');
+    toque('+ Agregar');
+    toque('El cliente elige UNA combinación');
+    expect(errorDePartes(ultimo, categorias)).toMatch(/Te falta elegir qué lleva la combinación .* en la tarjeta 2/);
+    marcar('Donas — todos', selectoresDe(nueva)[0]);
+    expect(errorDePartes(ultimo, categorias)).toBe('A la tarjeta 2 le falta al menos una combinación más, para que el cliente pueda elegir.');
+  });
+
+  it('con «mostrarErrores» marca en rojo la tarjeta incompleta, dice qué falta y lleva el foco ahí', () => {
+    const vacia: Parte[] = normalizarPartes([{ tipo: 'A_ELECCION', cantidad: 2, categorias: ['2'], productos: [] }, { tipo: 'A_ELECCION', cantidad: 1, categorias: [], productos: [] }], categorias, productos);
+    render(<EditorPartesCombo partes={vacia} productos={productos} categorias={categorias} onCambiar={() => {}} mostrarErrores />);
+    expect(screen.getByTestId('bloque-0')).not.toHaveAttribute('data-incompleta');
+    const roja = screen.getByTestId('bloque-1');
+    expect(roja).toHaveAttribute('data-incompleta', 'true');
+    expect(within(roja).getByRole('alert')).toHaveTextContent('Te falta elegir qué puede escoger el cliente en la tarjeta 2.');
+    expect(within(roja).getByRole('button', { name: /Elige 1/ })).toHaveFocus();
+  });
+
+  it('«Ver ejemplo: Dúo Compartir» carga 2 bebidas + 2 de donas o galletas, editable', () => {
+    let ultimo: Parte[] = [];
+    render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
+    toque('Ver ejemplo: Dúo Compartir');
+    expect(screen.queryByText('Ver ejemplo: Dúo Compartir')).toBeNull();
+    expect(guardado(ultimo).map((p) => [p.cantidad, p.categorias])).toEqual([[2, ['2', '3', '4', '5']], [2, ['8', '9']]]);
+    expect(errorDePartes(ultimo, categorias)).toBeNull();
+    expect(screen.getByText('Elige 2: Donas o Galletas')).toBeInTheDocument();
+  });
+
+  it('cada tarjeta tiene un «?» con una ayuda corta', () => {
+    render(<Contenedor />);
+    toque('+ Agregar');
+    toque('Siempre incluido');
+    toque(/Ayuda/);
+    expect(screen.getByRole('note')).toHaveTextContent(/siempre viene incluido/);
+  });
+
+  it('dos combinaciones con el mismo título automático no se funden: la segunda lleva (2)', () => {
+    let ultimo: Parte[] = [];
+    render(<Contenedor alCambiar={(p) => (ultimo = p)} />);
+    toque('+ Agregar');
+    toque('El cliente elige UNA combinación');
+    marcar('Donas — todos');
+    toque('2 de lo mismo');
+    marcar('Donas — todos', selectoresDe(nueva)[0]);
     expect(opcionesDeGrupo(ultimo, 'Complemento').map((o) => o.nombre)).toEqual(['2 donas', '2 donas (2)']);
   });
 });
@@ -193,8 +290,8 @@ describe('Combos que ya existen', () => {
       ['2 donas', 1], ['2 galletas choco chips', 1], ['1 dona + 1 galleta', 2], ['1 carrot cake', 1], ['1 keke marmoleado', 1],
     ]);
     render(<Contenedor inicial={normales} />);
-    expect(screen.getByText('Elige 2 · Frappes, Iced, Calientes')).toBeInTheDocument();
-    expect(screen.getByText('El cliente elige UNA de 5 opciones')).toBeInTheDocument();
+    expect(screen.getByText('Elige 2: Frappes, Iced o Calientes')).toBeInTheDocument();
+    expect(screen.getByText('5 combinaciones para elegir')).toBeInTheDocument();
     expect(screen.getByText('Hoy no hay stock')).toBeInTheDocument();
     const g = guardado(normales);
     expect(g.map((p) => [p.tipo, p.cantidad, p.categorias, p.productos, p.paqueteGrupo, p.paqueteNombre, p.saboresIds, p.productosExcluidos])).toEqual(
@@ -220,7 +317,7 @@ describe('Combos que ya existen', () => {
     } as unknown as OfertaItem;
     render(<ModalCombo abierto comboAEditar={combo} onCerrar={() => {}} onGuardar={async (d) => { enviado = d; }} productosDisponibles={productos} categorias={categorias.map((c) => ({ ...c, productos: [] }))} />);
     fireEvent.click(screen.getByRole('tab', { name: /Partes y alternativas/ }));
-    expect(screen.getByText('El cliente elige UNA de 5 opciones')).toBeInTheDocument();
+    expect(screen.getByText('5 combinaciones para elegir')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('btn-guardar-combo'));
     fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }));
     expect(enviado.partes).toHaveLength(7);
@@ -235,15 +332,21 @@ describe('Resumen para el cliente', () => {
     normales[1] = { ...normales[1], saboresIds: ['21', '22'] };
     const lineas = resumenParaCliente(normales, categorias, productos);
     expect(lineas[0].titulo).toBe('Elige 2 bebidas (Frappes, Iced, Calientes)');
-    expect(lineas[1].titulo).toBe('Elige tu complemento');
+    expect(lineas[1].titulo).toBe('Elige una combinación');
     expect(lineas[1].opciones.map((o) => o.texto)).toEqual([
       '2 donas (solo Oreo, Fresa)', '2 galletas choco chips (cualquier sabor)', '1 dona + 1 galleta (cualquier sabor)', '1 carrot cake', '1 keke marmoleado',
     ]);
     expect(lineas[1].opciones[3].avisos).toEqual(['Hoy no hay stock']);
 
     render(<ResumenPartesCombo partes={normales} productos={productos} categorias={categorias} />);
-    expect(screen.getByText('Elige tu complemento')).toBeInTheDocument();
+    expect(screen.getByText('1) Elige 2 bebidas (Frappes, Iced, Calientes)')).toBeInTheDocument();
+    expect(screen.getByText('2) Elige una combinación')).toBeInTheDocument();
     expect(screen.getByText('Hoy no hay stock')).toBeInTheDocument();
+  });
+
+  it('elegir entre productos sueltos se dice en lenguaje claro, con «cualquier combinación»', () => {
+    const p: Parte[] = [{ tipo: 'A_ELECCION', cantidad: 2, categorias: [], productos: ['40', '100'] }];
+    expect(resumenParaCliente(p, categorias, productos)[0].titulo).toBe('Elige 2: dona o galleta 1 (cualquier combinación) · cualquier sabor');
   });
 
   it('avisa de una pieza que quedó vacía', () => {

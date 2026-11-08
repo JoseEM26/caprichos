@@ -25,9 +25,9 @@ function Contenedor({ inicial = [] as AlternativaParteItem[] }) {
 describe('Alternativas de una parte (si no hay stock, elige)', () => {
   it('agrega, no ofrece el principal ni duplicados, cambia cantidad, ordena y quita con confirmación Sí/No', () => {
     render(<Contenedor />);
-    expect(screen.getByText('Si no hay stock, el cliente podrá elegir:')).toBeInTheDocument();
+    expect(screen.getByText('Reemplazo si se agota')).toBeInTheDocument();
 
-    const buscador = screen.getByLabelText('Buscar alternativa');
+    const buscador = screen.getByLabelText('Buscar reemplazo');
     fireEvent.change(buscador, { target: { value: 'club' } });
     expect(screen.queryByRole('button', { name: /Agregar Club Sandwich/ })).toBeNull();
 
@@ -36,8 +36,8 @@ describe('Alternativas de una parte (si no hay stock, elige)', () => {
     fireEvent.change(buscador, { target: { value: 'crois' } });
     fireEvent.click(screen.getByRole('button', { name: 'Agregar Croissant' }));
     expect(screen.getByTestId('orden').textContent).toBe('7x1,8x1');
-    expect(screen.getByText('Opción 1')).toBeInTheDocument();
-    expect(screen.getByText('Opción 2')).toBeInTheDocument();
+    expect(screen.getByText('Reemplazo 1')).toBeInTheDocument();
+    expect(screen.getByText('Reemplazo 2')).toBeInTheDocument();
 
     fireEvent.change(buscador, { target: { value: 'empa' } });
     expect(screen.queryByRole('button', { name: 'Agregar Empanada' })).toBeNull();
@@ -70,7 +70,7 @@ describe('Alternativas de una parte (si no hay stock, elige)', () => {
     } as unknown as OfertaItem;
     render(<ModalCombo abierto comboAEditar={combo} onCerrar={() => {}} onGuardar={async (d) => { guardado = d; }} productosDisponibles={productos} categorias={[]} />);
     fireEvent.click(screen.getByRole('tab', { name: /Partes y alternativas/ }));
-    expect(await screen.findByText('Si no hay stock, el cliente podrá elegir:')).toBeInTheDocument();
+    expect(await screen.findByText('Reemplazo si se agota')).toBeInTheDocument();
     expect(within(screen.getByTestId('alternativas-parte')).getByText('Empanada')).toBeInTheDocument();
     expect(screen.getByLabelText('Cantidad de Empanada')).toHaveValue(2);
     fireEvent.click(screen.getByTestId('btn-guardar-combo'));
@@ -89,6 +89,6 @@ describe('Alternativas de una parte (si no hay stock, elige)', () => {
     } as unknown as OfertaItem;
     render(<ModalCombo abierto comboAEditar={combo} onCerrar={() => {}} onGuardar={async () => {}} productosDisponibles={productos} categorias={[]} />);
     fireEvent.click(screen.getByRole('tab', { name: /Partes y alternativas/ }));
-    expect(await screen.findByText('Si no hay stock, el cliente podrá elegir:')).toBeInTheDocument();
+    expect(await screen.findByText('Reemplazo si se agota')).toBeInTheDocument();
   });
 });
