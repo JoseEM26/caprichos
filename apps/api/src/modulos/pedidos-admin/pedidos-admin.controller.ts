@@ -25,6 +25,8 @@ import { MisPedidosQueryDto } from './dto/mis-pedidos-query.dto';
 import { UbicarPedidoDto } from './dto/ubicar-pedido.dto';
 import { UbicarPedidoService } from './ubicar-pedido.service';
 import { CorregirClienteService } from './corregir-cliente.service';
+import { ReabrirPedidoService } from './reabrir-pedido.service';
+import { ReabrirPedidoDto } from './dto/reabrir-pedido.dto';
 import { CorregirClienteDto } from './dto/corregir-cliente.dto';
 import { PedidosService } from '../pedidos/pedidos.service';
 import { CrearPedidoDto } from '../pedidos/dto/crear-pedido.dto';
@@ -44,6 +46,7 @@ export class PedidosAdminController {
     private readonly ubicarPedidoService: UbicarPedidoService,
     private readonly corregirCliente: CorregirClienteService,
     @Optional() private readonly pedidosService?: PedidosService,
+    @Optional() private readonly reabrirPedido?: ReabrirPedidoService,
     @Optional() private readonly impresionService?: ImpresionService,
     @Optional() private readonly vouchersService?: VouchersService,
     @Optional() private readonly pedidoComprobante?: PedidoComprobanteService,
@@ -133,6 +136,14 @@ export class PedidosAdminController {
   async cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.pedidosEstadoService.cambiarEstado(id, dto, req.usuario, ip);
+  }
+
+  /** «Volver atrás» de un pedido entregado por error (solo Caja y Administrador: mismo permiso que anular). */
+  @Post(':id/reabrir')
+  @Permiso('pedidos', 'anular')
+  async reabrir(@Param('id') id: string, @Body() dto: ReabrirPedidoDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.reabrirPedido!.reabrir(id, dto?.motivo, req.usuario, ip);
   }
 
   /** Datos para la devolución de un pedido cancelado por no recibir y pagado (monto sugerido, medio, comprobante). */
