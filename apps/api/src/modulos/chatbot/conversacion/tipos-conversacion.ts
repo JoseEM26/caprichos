@@ -396,6 +396,8 @@ export interface ContextoConversacion {
   };
   /** Textos configurados/personalizados del bot de WhatsApp (Ola 4, Agente I) */
   textosPersonalizados?: Record<string, string>;
+  /** Promociones vigentes ahora para la carta, ya como líneas «• nombre — beneficio» (para la bienvenida). */
+  promosBienvenida?: string[];
   /** Modo asistido activo: conversación en ATENCION_PERSONA sin respuesta humana */
   modoAsistido?: boolean;
   /** Indica si un humano habló recientemente (< 3 min) en una conversación en ATENCION_PERSONA */

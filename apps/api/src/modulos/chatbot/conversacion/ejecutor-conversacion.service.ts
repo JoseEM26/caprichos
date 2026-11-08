@@ -22,6 +22,7 @@ import { EstadoCarritoPedido } from './flujos/pedido/tipos-pedido';
 import { CODIGOS_COMBO_RECHAZADO, carritoTrasComboRechazado, carritoTrasSaborAgotado } from './flujos/pedido/flujo-pedido';
 import { productosComboNoBot } from './flujos/pedido/combo-bot';
 import { ofertasFueraDeWhatsapp } from '../utilidades/ofertas-canal.util';
+import { ajustesPromos, lineasPromosVigentes } from './bienvenida.util';
 import { TEXTOS_RESERVA } from './textos-reserva';
 import { TEXTOS_IA, BOTONES_IA_ESTANDAR, BOTONES_IA_CON_PEDIDO } from './textos-ia';
 import {
@@ -267,6 +268,24 @@ export class EjecutorConversacionService {
       // sin historial se usa ultima_actividad
     }
     return ref ? (Date.now() - ref.getTime()) / 60000 : 0;
+  }
+
+  private cachePromos: { en: number; lineas: string[] } | null = null;
+
+  /** Líneas de promociones vigentes para la bienvenida; caché de 60 s para no recalcular en cada mensaje. */
+  private async promosParaBienvenida(textos?: Record<string, string>): Promise<string[]> {
+    const { mostrar, max } = ajustesPromos(textos);
+    if (!mostrar || !this.ofertasService) return [];
+    try {
+      if (!this.cachePromos || Date.now() - this.cachePromos.en > 60_000) {
+        const ofertas = await this.ofertasService.listarOfertas(undefined, true, 'CARTA', true);
+        this.cachePromos = { en: Date.now(), lineas: lineasPromosVigentes(ofertas, 5) };
+      }
+      return this.cachePromos.lineas.slice(0, max);
+    } catch (err: any) {
+      this.logger.warn(`Sin promociones para la bienvenida: ${err.message}`);
+      return [];
+    }
   }
 
   /** Regla del dueño: la bienvenida con menú solo en el primer contacto o tras días sin hablar (ver debeOmitirBienvenida). */
@@ -1230,6 +1249,9 @@ export class EjecutorConversacionService {
       }
     }
 
+    // Promociones vigentes para la bienvenida (las de la carta; falla cerrada: sin promociones)
+    const promosBienvenida = await this.promosParaBienvenida(textosPersonalizados);
+
     // Vista previa del pedido en curso con las reglas del servidor (promo BOT y envío): el total del bot sale de aquí
     let vistaPreviaPedido: VistaPreviaPedidoBot | null = null;
     const pedidoEnCurso = flujoPrevio?.pedido as EstadoCarritoPedido | undefined;
@@ -1282,6 +1304,7 @@ export class EjecutorConversacionService {
       chatbotIaActivo,
       funcionesActivas,
       textosPersonalizados,
+      promosBienvenida,
       modoAsistido: esModoAsistido && esEsperaCumplida,
       asistidoEsperaMin,
       minutosSinHumano,

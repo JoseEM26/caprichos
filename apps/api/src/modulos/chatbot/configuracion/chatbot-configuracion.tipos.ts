@@ -24,8 +24,17 @@ export const LIMITE_CUERPO_TEXTO = 1024;
  * Conservan los emojis oficiales del mockup para WhatsApp.
  */
 export const TEXTOS_BOT_DEFECTO = {
-  chatbot_texto_bienvenida:
-    'CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te puedo ayudar hoy? 🧁',
+  chatbot_texto_bienvenida: '¡Hola {nombre}! ☕ Soy Capri, la asistente de {local}. ¿En qué te ayudo?',
+
+  chatbot_texto_promos_encabezado: '🔥 Hoy tenemos:',
+
+  chatbot_texto_mas_descuento: '💛 Hay *MÁS DESCUENTO* en nuestra *CARTA VIRTUAL*: {link_carta}',
+
+  /** 'si' / 'no': muestra el bloque de promociones vigentes en la bienvenida. */
+  chatbot_promos_mostrar: 'si',
+
+  /** Cuántas promociones salen en la bienvenida (1 a 5). */
+  chatbot_promos_max: '3',
 
   chatbot_texto_despedida:
     'Gracias por comunicarte con Caprichos ☕. ¡Esperamos verte pronto! 🧁',
@@ -34,7 +43,7 @@ export const TEXTOS_BOT_DEFECTO = {
     'Te paso con alguien del equipo. Ya les avisé con tu nombre y tu número; en unos minutos te escriben.',
 
   chatbot_texto_fuera_horario:
-    'Ahora estamos cerrados. Nuestro horario: {horario}. No tomamos pedidos fuera de horario; escríbenos cuando abramos.',
+    'Ahora estamos cerrados. {apertura} No tomamos pedidos fuera de horario; escríbenos cuando abramos.',
 
   chatbot_texto_no_entiendo:
     'No estoy seguro de haber entendido. ¿Qué necesitas? Puedes elegir una opción o escribirme de otra forma.',
@@ -56,8 +65,35 @@ export const TEXTOS_BOT_DEFECTO = {
 
 export type ClaveTextoBot = keyof typeof TEXTOS_BOT_DEFECTO;
 
+/** Bienvenida de fábrica anterior (traía el «producto del mes»): si quedó guardada, se trata como «sin personalizar». */
+export const BIENVENIDA_ANTIGUA_PRODUCTO_DEL_MES =
+  'CAPRICHOS DEL MES · Frappe Maracuyá Tropical 🍓\n\n¡Hola! ☕ Soy Capri, la asistente de Caprichos. ¿En qué te puedo ayudar hoy? 🧁';
+
+/** Variables permitidas por mensaje: cualquier otra {variable} se rechaza al guardar. */
+export const VARIABLES_TEXTO_BOT: Record<ClaveTextoBot, string[]> = {
+  chatbot_texto_bienvenida: ['nombre', 'local', 'link_carta', 'promociones'],
+  chatbot_texto_promos_encabezado: ['local'],
+  chatbot_texto_mas_descuento: ['link_carta', 'local'],
+  chatbot_promos_mostrar: [],
+  chatbot_promos_max: [],
+  chatbot_texto_despedida: ['local'],
+  chatbot_texto_pase_persona: ['local'],
+  chatbot_texto_fuera_horario: ['horario', 'hora_apertura', 'apertura', 'local', 'link_carta'],
+  chatbot_texto_no_entiendo: ['local'],
+  chatbot_texto_no_entiendo_derivacion: ['local'],
+  chatbot_texto_indicacion_pago: [],
+  chatbot_texto_envio_gratis: ['promo'],
+  chatbot_texto_aviso_stock: ['aviso'],
+  chatbot_texto_combo_intro: ['combo', 'incluye'],
+  chatbot_texto_combo_plan_b: ['faltante', 'alternativas'],
+};
+
 export const CLAVES_TEXTOS_BOT: ClaveTextoBot[] = [
   'chatbot_texto_bienvenida',
+  'chatbot_texto_promos_encabezado',
+  'chatbot_texto_mas_descuento',
+  'chatbot_promos_mostrar',
+  'chatbot_promos_max',
   'chatbot_texto_despedida',
   'chatbot_texto_pase_persona',
   'chatbot_texto_fuera_horario',

@@ -78,11 +78,11 @@ describe('Límites estrictos de WhatsApp y Configuración del Bot (Ola 4, Agente
       expect(TEXTOS_BOT_DEFECTO.chatbot_texto_despedida).toContain('☕');
       expect(TEXTOS_ANTI_SPAM.avisoExceso()).toContain('☕');
 
-      // 🍓 Fresa en bienvenida
-      expect(TEXTOS_BOT_DEFECTO.chatbot_texto_bienvenida).toContain('🍓');
+      // La bienvenida ya no trae el «producto del mes» (🍓)
+      expect(TEXTOS_BOT_DEFECTO.chatbot_texto_bienvenida).not.toContain('🍓');
+      expect(TEXTOS_BOT_DEFECTO.chatbot_texto_bienvenida).not.toMatch(/DEL MES/i);
 
-      // 🧁 Cupcake / postre en bienvenida, despedida y pausas
-      expect(TEXTOS_BOT_DEFECTO.chatbot_texto_bienvenida).toContain('🧁');
+      // 🧁 Cupcake / postre en despedida y pausas
       expect(TEXTOS_BOT_DEFECTO.chatbot_texto_despedida).toContain('🧁');
       expect(TEXTOS_FUNCIONES_DESACTIVADAS.pedido).toContain('🧁');
       expect(TEXTOS_FUNCIONES_DESACTIVADAS.reservas).toContain('🧁');

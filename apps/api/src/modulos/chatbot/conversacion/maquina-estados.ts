@@ -1639,11 +1639,11 @@ export function transicionarEstado(
       acciones: [
         {
           tipo: 'enviarLista',
-          texto: TEXTOS_BOT.saludoBienvenida(
-            contexto.nombreCliente,
-            contexto.datosLocal,
-            contexto.textosPersonalizados?.chatbot_texto_bienvenida,
-          ),
+          texto: TEXTOS_BOT.saludoBienvenida(contexto.nombreCliente, contexto.datosLocal, null, {
+            textos: contexto.textosPersonalizados,
+            promos: contexto.promosBienvenida,
+            linkCarta: contexto.cartaUrlPublica || 'https://caprichos.pe',
+          }),
           botonTexto: BOTON_LISTA_MENU,
           tituloSeccion: TITULO_SECCION_MENU,
           filas: filasMenu,
@@ -1907,10 +1907,12 @@ function transicionarSoloMenus(
   });
 
   const saludo = () => {
-    const cuerpo = [
-      TEXTOS_BOT.saludoBienvenida(contexto.nombreCliente, contexto.datosLocal, contexto.textosPersonalizados?.chatbot_texto_bienvenida),
-      TEXTOS_SOLO_MENUS.lineaCartaSaludo(url),
-    ].join('\n\n');
+    // Misma bienvenida que el menú principal (fuente única): saludo + promociones vigentes + carta virtual
+    const cuerpo = TEXTOS_BOT.saludoBienvenida(contexto.nombreCliente, contexto.datosLocal, null, {
+      textos: contexto.textosPersonalizados,
+      promos: contexto.promosBienvenida,
+      linkCarta: url,
+    });
     return respuesta([
       { tipo: 'enviarLista', texto: cuerpo, botonTexto: BOTON_LISTA_MENU, tituloSeccion: TITULO_SECCION_MENU, filas: FILAS_MENU_PRINCIPAL },
     ]);

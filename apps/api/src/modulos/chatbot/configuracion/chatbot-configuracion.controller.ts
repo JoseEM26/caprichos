@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Optional,
   Post,
   Put,
   Query,
@@ -10,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { AccesoGuard } from '../../acceso/acceso.guard';
 import { Permiso } from '../../acceso/permiso.decorator';
+import { OfertasService } from '../../ofertas/ofertas.service';
+import { lineasPromosVigentes } from '../conversacion/bienvenida.util';
 import { ChatbotConfiguracionService } from './chatbot-configuracion.service';
 import {
   ActualizarAntiSpamDto,
@@ -26,7 +29,16 @@ import {
 export class ChatbotConfiguracionController {
   constructor(
     private readonly configuracionService: ChatbotConfiguracionService,
+    @Optional() private readonly ofertasService?: OfertasService,
   ) {}
+
+  /** Promociones vigentes ahora para la carta, tal como saldrían en la bienvenida (para la vista previa). */
+  @Get('promos-vigentes')
+  @Permiso('configuracion', 'ver')
+  async promosVigentes() {
+    const ofertas = (await this.ofertasService?.listarOfertas(undefined, true, 'CARTA', true)) ?? [];
+    return { lineas: lineasPromosVigentes(ofertas, 5) };
+  }
 
   /**
    * Obtiene la configuración consolidada del chatbot.

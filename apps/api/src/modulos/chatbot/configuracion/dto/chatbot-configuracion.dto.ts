@@ -19,6 +19,24 @@ export class ActualizarTextosBotDto {
   chatbot_texto_bienvenida?: string;
 
   @IsOptional()
+  @IsString({ message: 'El encabezado de promociones debe ser una cadena' })
+  @MaxLength(200, { message: 'El encabezado de promociones no puede exceder 200 caracteres' })
+  chatbot_texto_promos_encabezado?: string;
+
+  @IsOptional()
+  @IsString({ message: 'La frase de más descuento debe ser una cadena' })
+  @MaxLength(300, { message: 'La frase de más descuento no puede exceder 300 caracteres' })
+  chatbot_texto_mas_descuento?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Mostrar promociones debe ser si o no' })
+  chatbot_promos_mostrar?: string;
+
+  @IsOptional()
+  @IsString({ message: 'El tope de promociones debe ser un número' })
+  chatbot_promos_max?: string;
+
+  @IsOptional()
   @IsString({ message: 'El texto de despedida debe ser una cadena' })
   @MaxLength(LIMITE_CUERPO_TEXTO, {
     message: `El texto de despedida no puede exceder ${LIMITE_CUERPO_TEXTO} caracteres de WhatsApp`,

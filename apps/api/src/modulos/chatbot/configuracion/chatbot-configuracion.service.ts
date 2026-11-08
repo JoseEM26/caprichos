@@ -29,6 +29,7 @@ import {
   PrivacidadParametros,
   TEXTOS_ANTI_SPAM,
   TEXTOS_BOT_DEFECTO,
+  VARIABLES_TEXTO_BOT,
   ChatbotConfiguracionCompleta,
 } from './chatbot-configuracion.tipos';
 import {
@@ -147,6 +148,8 @@ export class ChatbotConfiguracionService {
         });
       }
 
+      this.validarVariablesYValor(clave, textoLimpio);
+
       if (textoLimpio.length > LIMITE_CUERPO_TEXTO) {
         throw new BadRequestException({
           codigo: 'TEXTO_EXCEDE_LIMITE_WHATSAPP',
@@ -167,6 +170,7 @@ export class ChatbotConfiguracionService {
       });
     }
 
+    this.cacheTextos = null;
     const despues = await this.obtenerConfiguracion();
 
     await this.auditoria.registrar({
@@ -211,6 +215,7 @@ export class ChatbotConfiguracionService {
       update: { valor: valorPorDefecto },
       create: { clave, valor: valorPorDefecto },
     });
+    this.cacheTextos = null;
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -882,8 +887,31 @@ export class ChatbotConfiguracionService {
    * Devuelve los textos vigentes del bot para interpolación en el motor conversacional.
    */
   async obtenerTextosBot(): Promise<Record<ClaveTextoBot, string>> {
+    // Caché corta (60 s); se vacía al guardar o restablecer. Si falla la lectura, el llamador cae a los defectos.
+    if (this.cacheTextos && Date.now() - this.cacheTextos.en < 60_000) return this.cacheTextos.textos;
     const config = await this.obtenerConfiguracion();
+    this.cacheTextos = { en: Date.now(), textos: config.textos };
     return config.textos;
+  }
+
+  private cacheTextos: { en: number; textos: Record<ClaveTextoBot, string> } | null = null;
+
+  /** Rechaza {variables} que el mensaje no admite y valores inválidos de los dos ajustes de promociones. */
+  private validarVariablesYValor(clave: ClaveTextoBot, texto: string): void {
+    if (clave === 'chatbot_promos_mostrar' && !['si', 'no'].includes(texto)) {
+      throw new BadRequestException({ codigo: 'VALOR_INVALIDO', mensaje: "«Mostrar promociones» solo admite 'si' o 'no'" });
+    }
+    if (clave === 'chatbot_promos_max' && !/^[1-5]$/.test(texto)) {
+      throw new BadRequestException({ codigo: 'VALOR_INVALIDO', mensaje: 'El tope de promociones debe ser un número de 1 a 5' });
+    }
+    const permitidas = VARIABLES_TEXTO_BOT[clave] ?? [];
+    const desconocidas = [...texto.matchAll(/\{([^{}]*)\}/g)].map((m) => m[1]).filter((v) => !permitidas.includes(v));
+    if (desconocidas.length > 0) {
+      throw new BadRequestException({
+        codigo: 'VARIABLE_DESCONOCIDA',
+        mensaje: `El texto '${clave}' usa variables que no admite: ${[...new Set(desconocidas)].map((v) => `{${v}}`).join(', ')}. Permitidas: ${permitidas.map((v) => `{${v}}`).join(', ') || 'ninguna'}`,
+      });
+    }
   }
 
   /**
