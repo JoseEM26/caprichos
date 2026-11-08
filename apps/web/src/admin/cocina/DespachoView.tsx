@@ -12,6 +12,12 @@ import { ResumenPagoDespacho } from './ResumenPagoDespacho';
 
 const VERDE = '#2F7A45';
 const NAVY = '#0B2C3E';
+/** Colores explícitos del texto de la tarjeta de Despacho (nunca heredados del contenedor oscuro). */
+export const OXIDO = '#B2500F';
+export const SUAVE = '#2C4C5D';
+export const DIVISOR = '#E3D6C6';
+export const AVISO_FONDO = '#FFE08A';
+export const AVISO_BORDE = '#D99E39';
 /** Fondo de la tarjeta: claro y fijo, así el texto nunca hereda un color claro del contenedor (pantalla completa es oscura). */
 export const FONDO_TARJETA = '#FFFDF9';
 export const FONDO_TARJETA_DESPACHADO = '#EFE6D8';
@@ -84,7 +90,7 @@ function Areas({
             style={{ borderLeft: `6px solid ${a.despachada ? 'var(--cp-line, #E3D6C6)' : a.listo ? VERDE : '#E67929'}`, paddingLeft: '12px' }}
           >
             <header style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-              <strong style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '18px', textTransform: 'uppercase', color: NAVY }}>{a.areaNombre}</strong>
+              <strong style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '18px', fontWeight: 900, letterSpacing: '0.02em', textTransform: 'uppercase', color: NAVY }}>{a.areaNombre}</strong>
               <span
                 data-testid={`estado-area-${p.pedidoId}-${a.areaId}`}
                 style={{ fontWeight: 800, fontSize: '14px', padding: '3px 12px', borderRadius: '9999px', background: e.fondo, color: e.color }}
@@ -98,25 +104,28 @@ function Areas({
                   data-testid={`devolver-${p.pedidoId}-${a.areaId}`}
                   disabled={ocupado}
                   onClick={() => alDevolver(p, a)}
-                  style={{ ...boton(false), marginLeft: 'auto', minHeight: '48px', fontSize: '14px', borderColor: '#B2500F', color: '#B2500F' }}
+                  style={{ ...boton(false), marginLeft: 'auto', minHeight: '48px', fontSize: '14px', borderColor: OXIDO, color: OXIDO }}
                 >
                   Devolver al área
                 </button>
               )}
             </header>
-            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '18px', lineHeight: 1.35, color: NAVY }}>
+            <ul data-testid={`lineas-${p.pedidoId}-${a.areaId}`} style={{ margin: 0, padding: 0, listStyle: 'none', color: NAVY }}>
               {a.lineas.map((l) => (
-                <li key={l.id} style={{ marginBottom: '6px' }}>
-                  <strong>{l.cantidad}×</strong> {l.nombre}
-                  {textoSabores(l) && (
-                    <div data-testid="linea-sabores" style={{ fontSize: '16px', fontWeight: 800, color: 'var(--cp-navy)' }}>
-                      {textoSabores(l)}
-                    </div>
-                  )}
-                  {detalleLinea(l).length > 0 && <div style={{ fontSize: '14px', color: '#2C4C5D' }}>{detalleLinea(l).join(' · ')}</div>}
-                  {l.nota && (
-                    <div style={{ fontSize: '14px', fontWeight: 700, background: '#FFF3C4', color: NAVY, display: 'inline-block', padding: '0 6px', borderRadius: '4px' }}>{l.nota}</div>
-                  )}
+                <li key={l.id} data-testid="linea-despacho" style={{ display: 'flex', gap: '8px', alignItems: 'baseline', padding: '8px 0', borderTop: `1px solid ${DIVISOR}`, color: NAVY, fontVariantNumeric: 'tabular-nums' }}>
+                  <span data-testid="linea-cantidad" style={{ flex: 'none', minWidth: '34px', fontSize: '18px', fontWeight: 900, color: OXIDO }}>{l.cantidad}×</span>
+                  <div style={{ minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>
+                    <div data-testid="linea-nombre" style={{ fontSize: '17px', fontWeight: 800, lineHeight: 1.25, color: NAVY }}>{l.nombre}</div>
+                    {textoSabores(l) && (
+                      <div data-testid="linea-sabores" style={{ fontSize: '16px', fontWeight: 800, color: NAVY }}>
+                        {textoSabores(l)}
+                      </div>
+                    )}
+                    {detalleLinea(l).length > 0 && <div data-testid="linea-detalle" style={{ fontSize: '14px', fontWeight: 600, color: SUAVE }}>{detalleLinea(l).join(' · ')}</div>}
+                    {l.nota && (
+                      <div data-testid="linea-nota" style={{ fontSize: '14px', fontWeight: 800, background: AVISO_FONDO, color: NAVY, border: `1px solid ${AVISO_BORDE}`, display: 'inline-block', padding: '1px 8px', marginTop: '2px', borderRadius: '6px' }}>Nota: {l.nota}</div>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
