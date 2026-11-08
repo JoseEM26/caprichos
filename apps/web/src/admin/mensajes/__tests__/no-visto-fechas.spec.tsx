@@ -69,6 +69,8 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
 
   it('muestra el contador «N sin ver», las insignias con texto y el filtro No vistos', async () => {
     render(<MensajesView />);
+    // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     expect(await screen.findByTestId('total-sin-ver')).toHaveTextContent('2 sin ver');
     expect(screen.getByTestId('sin-leer-c2')).toHaveAttribute('aria-label', '2 mensajes sin ver');
     expect(screen.getByTestId('no-visto-c3')).toHaveTextContent('No visto');
@@ -80,6 +82,8 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
 
   it('abrir la lista no marca visto; abrir el chat sí', async () => {
     render(<MensajesView />);
+    // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByTestId('total-sin-ver');
     expect(api.marcarChatVisto).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Cliente c3'));
@@ -88,6 +92,8 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
 
   it('«Marcar como no visto» desde el menú de la fila llama a la API y recarga la lista', async () => {
     render(<MensajesView />);
+    // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByTestId('total-sin-ver');
     const antes = (api.listarConversaciones as any).mock.calls.length;
     fireEvent.click(screen.getByTitle('Más opciones del chat de Cliente c1'));
@@ -98,6 +104,8 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
 
   it('un chat sin ver ofrece «Marcar como visto» en su menú', async () => {
     render(<MensajesView />);
+    // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByTestId('total-sin-ver');
     fireEvent.click(screen.getByTitle('Más opciones del chat de Cliente c3'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Marcar como visto' }));
@@ -106,12 +114,16 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
 
   it('el botón del detalle marca como no visto el chat abierto', async () => {
     render(<MensajesView />);
+    // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     fireEvent.click(await screen.findByTestId('btn-no-visto-detalle'));
     await waitFor(() => expect(api.marcarChatNoVisto).toHaveBeenCalledWith('c1'));
   });
 
   it('el detalle separa por día y cada hora lleva la fecha completa', async () => {
     render(<MensajesView />);
+    // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByText('mismo dia');
     const seps = screen.getAllByTestId('separador-dia');
     expect(seps).toHaveLength(2);
@@ -125,6 +137,8 @@ describe('Mensajes: no vistos y fechas en pantalla', () => {
 
   it('en la lista, hoy muestra hora y un chat de hace 30 días muestra su fecha', async () => {
     render(<MensajesView />);
+    // la bandeja abre en «Hoy»; estas pruebas necesitan ver chats de días anteriores
+    fireEvent.click(await screen.findByRole('button', { name: /^Todos: \d+ chats?$/ }));
     await screen.findByTestId('total-sin-ver');
     const fila = screen.getByText('Cliente c2').closest('button')!;
     expect(fila.textContent).toMatch(/\d{2}\/\d{2}\/\d{2}/);

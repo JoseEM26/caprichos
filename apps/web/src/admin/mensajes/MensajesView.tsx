@@ -74,11 +74,11 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   const [avisoAtendido, setAvisoAtendido] = useState<{ id: string; nombre: string } | null>(null);
   const { chatsOrdenados, dias } = useMemo(() => {
     const base = soloBloqueados ? chats.filter((c) => c.bloqueoSpam?.activo) : chats;
-    const porDia = filtro === 'atender' || filtro === 'atendidos';
+    const porDia = filtro !== 'reprogramar';
     let diasInfo: { hoy: number; ayer: number; manana: number; anteriores: number; total: number } | null = null;
     let lista = base;
     if (porDia) {
-      // siempre se ofrece el filtro por día en Por atender y Atendidos: Hoy muestra solo lo de hoy
+      // el filtro por día va en todas las pestañas (menos Por reprogramar): Hoy muestra solo lo de hoy
       const hoy = filtrarPorDia(base, 'hoy').length;
       diasInfo = {
         hoy,

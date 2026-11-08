@@ -94,6 +94,18 @@ describe('Mensajes: check de atendido, categorías y filtros', () => {
     expect(screen.getByText('Ayer · 1')).toBeInTheDocument();
   });
 
+  it('la pestaña Todos (la que se abre por defecto) ya filtra por día: Hoy muestra solo lo de hoy y avisa de los anteriores', async () => {
+    render(<MensajesView />);
+    await waitFor(() => expect(enLista().getByText('Cliente 1')).toBeInTheDocument());
+    expect(enLista().queryByText('Cliente 2')).not.toBeInTheDocument();
+    expect(enLista().queryByText('Cliente 3')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hoy: 1 chat' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Mañana: 0 chats' })).toBeInTheDocument();
+    expect(screen.getByTestId('aviso-anteriores')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ayer: 1 chat' }));
+    expect(await screen.findByText('Cliente 2')).toBeInTheDocument();
+  });
+
   it('el filtro «Ayer» y el selector de fecha acotan la lista', async () => {
     await irAPorAtender();
     fireEvent.click(await screen.findByRole('button', { name: 'Ayer: 1 chat' }));
