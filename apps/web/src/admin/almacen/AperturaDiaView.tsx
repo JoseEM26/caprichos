@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import {
   almacenApi,
   AperturaDiaRespuesta,
@@ -17,6 +17,7 @@ import { ErrorApi } from '../../comun/api';
 import { MermaProductoBoton } from './MermaProductoBoton';
 import { ConfirmarMermasApertura, type MotivoElegido } from './ConfirmarMermasApertura';
 import { MermasHoyApertura } from './MermasHoyApertura';
+import { useRecargaEnVivo } from './useRecargaEnVivo';
 import './apertura-dia.css';
 
 /** Un cambio de más de la mitad del saldo (o cualquier cantidad si el saldo es 0) pide confirmación. */
@@ -95,6 +96,9 @@ function casillasDe(productos: AperturaProductoItem[]): Casilla[] {
   );
 }
 
+const horaLima = (d: Date) =>
+  d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' });
+
 const tieneSabores = (p: AperturaProductoItem) => !!p.sabores && p.sabores.length > 0;
 
 /** Chip de estado: «Falta contar» (ámbar), «Agotado» (rojo) o «Contado hoy» (verde). */
@@ -127,30 +131,93 @@ export function AperturaDiaView() {
   /** Productos con sabores desplegados. Por defecto, plegados salvo que falte contar algo. */
   const [desplegados, setDesplegados] = useState<Record<string, boolean>>({});
 
-  const cargar = useCallback(async () => {
-    setCargando(true);
-    setErrorCarga(null);
+  /** Saldo/«esperado» por casilla de la última carga: sirve para saber qué filas toca la persona y cuáles cambiaron en servidor. */
+  const baseRef = useRef<Record<string, Casilla>>({});
+  const valoresRef = useRef(valores);
+  valoresRef.current = valores;
+  const produccionRef = useRef(produccion);
+  produccionRef.current = produccion;
+  const guardandoRef = useRef(false);
+  guardandoRef.current = guardando;
+  const secuencia = useRef(0);
+  const [cambiadas, setCambiadas] = useState<Record<string, { antes: number; ahora: number }>>({});
+  const [ultimaCarga, setUltimaCarga] = useState<Date | null>(null);
+  const [fallaEnVivo, setFallaEnVivo] = useState(false);
+
+  /** `silencioso`: refresca saldos sin spinner y conserva lo que la persona escribió y lo plegado. */
+  const cargar = useCallback(async (silencioso = false) => {
+    if (silencioso && guardandoRef.current) return;
+    const mia = ++secuencia.current;
+    if (!silencioso) {
+      setCargando(true);
+      setErrorCarga(null);
+    }
     try {
       const res = await almacenApi.obtenerApertura();
-      setDatos(res);
+      if (mia !== secuencia.current) return; // llegó una respuesta más nueva
       const cs = casillasDe(res.productos);
-      setValores(Object.fromEntries(cs.map((c) => [c.clave, String(c.quedaronAyer)])));
-      setProduccion(Object.fromEntries(cs.map((c) => [c.clave, '0'])));
+      const previas = baseRef.current;
+      const nuevosValores: Record<string, string> = {};
+      const nuevaProduccion: Record<string, string> = {};
+      const avisos: Record<string, { antes: number; ahora: number }> = {};
+      const editadas = new Set<string>();
+      for (const c of cs) {
+        const pre = previas[c.clave];
+        const v = valoresRef.current[c.clave];
+        const p = produccionRef.current[c.clave];
+        const editada =
+          silencioso && !!pre && ((v !== undefined && v !== String(pre.quedaronAyer)) || (p !== undefined && p !== '0'));
+        if (editada) {
+          editadas.add(c.clave);
+          nuevosValores[c.clave] = v ?? String(c.quedaronAyer);
+          nuevaProduccion[c.clave] = p ?? '0';
+          if (pre.saldo !== c.saldo || pre.quedaronAyer !== c.quedaronAyer || pre.producidoHoy !== c.producidoHoy) {
+            avisos[c.clave] = { antes: pre.saldo, ahora: c.saldo };
+          }
+        } else {
+          nuevosValores[c.clave] = String(c.quedaronAyer);
+          nuevaProduccion[c.clave] = '0';
+        }
+      }
+      baseRef.current = Object.fromEntries(cs.map((c) => [c.clave, c]));
+      setDatos(res);
+      setValores(nuevosValores);
+      setProduccion(nuevaProduccion);
+      setCambiadas((prev) => {
+        const sig: Record<string, { antes: number; ahora: number }> = {};
+        for (const k of editadas) {
+          const nuevo = avisos[k];
+          const viejo = prev[k];
+          // «antes» es el saldo contra el que la persona empezó a contar: el guardado lo manda como esperado
+          if (nuevo || viejo) sig[k] = { antes: viejo?.antes ?? nuevo.antes, ahora: nuevo?.ahora ?? viejo.ahora };
+        }
+        return sig;
+      });
       const porDefecto = Object.fromEntries(
         res.productos.filter(tieneSabores).map((p) => [p.productoId, productoPendienteApertura(p)]),
       );
       // Lo que el usuario ya plegó o desplegó se conserva al recargar
       setDesplegados((previo) => ({ ...porDefecto, ...previo }));
+      setUltimaCarga(new Date());
+      setFallaEnVivo(false);
     } catch (err) {
-      setErrorCarga(err instanceof ErrorApi ? err.message : 'No se pudo cargar la apertura del día.');
+      if (mia !== secuencia.current) return;
+      if (silencioso) setFallaEnVivo(true);
+      else setErrorCarga(err instanceof ErrorApi ? err.message : 'No se pudo cargar la apertura del día.');
     } finally {
-      setCargando(false);
+      if (!silencioso && mia === secuencia.current) setCargando(false);
     }
   }, []);
 
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  const recargaEnVivo = useCallback(() => {
+    void cargar(true);
+    setRecargaMermas((n) => n + 1);
+  }, [cargar]);
+  const socketConectado = useRecargaEnVivo(recargaEnVivo);
 
   const productos = datos?.productos ?? [];
   const casillas = casillasDe(productos);
@@ -216,7 +283,8 @@ export function AperturaDiaView() {
         if (c.saborId) item.saborId = c.saborId;
         if (mermaDe(c) > 0) {
           const m = motivos[c.clave];
-          item.saldoEsperado = c.saldo;
+          // si el stock cambió mientras contaba, se manda el saldo contra el que contó: la API lo rechaza y recuenta
+          item.saldoEsperado = cambiadas[c.clave]?.antes ?? c.saldo;
           item.motivo = m?.motivo || undefined;
           if (m?.motivo === 'OTRO') item.nota = m.nota.trim();
         }
@@ -332,6 +400,11 @@ export function AperturaDiaView() {
           </span>
         )}
         {mermaDe(c) > 0 && <span className="ap-merma-chip">Merma: −{mermaDe(c)}</span>}
+        {cambiadas[c.clave] && (
+          <span className="ap-aviso-cambio" data-testid="aviso-cambio">
+            Cambió el stock mientras contabas: ahora {cambiadas[c.clave].ahora}
+          </span>
+        )}
       </>
     );
   };
@@ -397,6 +470,10 @@ export function AperturaDiaView() {
       <div className="ap-cabecera">
         <div className="ap-fecha">
           <b>Día {fechaDMA(datos!.fecha)}</b>
+          <small className="ap-envivo" data-testid="indicador-en-vivo">
+            {fallaEnVivo ? 'Sin conexión con el servidor' : socketConectado ? 'En vivo' : 'Reconectando…'}
+            {ultimaCarga ? ` · actualizado ${horaLima(ultimaCarga)}` : ''}
+          </small>
           <div className="ap-chips">
             <Insignia variante="neutro">
               {totalProductos} {totalProductos === 1 ? 'producto' : 'productos'}
@@ -483,7 +560,7 @@ export function AperturaDiaView() {
                           productoId={c.productoId}
                           nombre={c.nombre}
                           saldo={c.saldo}
-                          alRegistrar={() => void cargar()}
+                          alRegistrar={() => void cargar(true)}
                         />
                       </td>
                     </tr>
@@ -514,6 +591,9 @@ export function AperturaDiaView() {
                           <span>
                             <span className="ap-nombre">{p.nombre}</span>
                             <span className="ap-saldo">{delProducto.length} sabores</span>
+                            {delProducto.some((c) => cambiadas[c.clave]) && (
+                              <span className="ap-aviso-cambio">Cambió el stock de un sabor mientras contabas</span>
+                            )}
                           </span>
                         </button>
                       </td>
@@ -555,7 +635,7 @@ export function AperturaDiaView() {
                                 saborId={c.saborId}
                                 nombre={c.nombre}
                                 saldo={c.saldo}
-                                alRegistrar={() => void cargar()}
+                                alRegistrar={() => void cargar(true)}
                               />
                             </td>
                           </tr>

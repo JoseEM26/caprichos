@@ -27,7 +27,7 @@ export function MermasHoyApertura({ recarga = 0 }: { recarga?: number }) {
     try {
       setMermas((await almacenApi.mermasHoy()).mermas);
     } catch {
-      setMermas(null);
+      // una recarga en silencio que falla no esconde la lista que ya se veía
     }
   }, []);
 
