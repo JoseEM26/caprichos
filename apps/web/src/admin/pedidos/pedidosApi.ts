@@ -217,6 +217,8 @@ export interface Pedido {
   es_personal?: boolean;
   pago_coordinado_en?: string | null;
   entregado_mesa_en?: string | null;
+  entregado_en?: string | null;
+  despachado_en?: string | null;
   creado_en: string;
   minutosEspera?: number;
   color?: ColorEspera;
@@ -449,6 +451,11 @@ export const pedidosApi = {
 
   async cambiarEstado(id: string | number, estado: string, motivo?: string): Promise<Pedido> {
     return api.post<Pedido>(`/admin/pedidos/${id}/estado`, { estado, motivo });
+  },
+
+  /** «Volver atrás» un pedido entregado por error (solo Caja y Administrador; motivo obligatorio). */
+  async reabrir(id: string | number, motivo: string): Promise<Pedido> {
+    return api.post<Pedido>(`/admin/pedidos/${id}/reabrir`, { motivo });
   },
 
   async ubicarPedido(

@@ -7,6 +7,8 @@ import { LineaPedido, Pedido, pedidosApi } from './pedidosApi';
 import { ModalCobrar } from './ModalCobrar';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { ModalAnular } from './ModalAnular';
+import { ModalVolverAtras } from './ModalVolverAtras';
+import { fechaLima } from '../../comun/agotadoTiempo';
 import { ModalCortesia } from '../cortesias/ModalCortesia';
 import { cortesiasApi } from '../cortesias/cortesiasApi';
 import { ModalRechazarCobroMozo } from './ModalRechazarCobroMozo';
@@ -103,6 +105,7 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   // Modales
   const [abrirCobrar, setAbrirCobrar] = useState(false);
   const [abrirAnular, setAbrirAnular] = useState(false);
+  const [abrirVolverAtras, setAbrirVolverAtras] = useState(false);
   const [abrirUbicar, setAbrirUbicar] = useState(false);
   const [abrirCorregirCliente, setAbrirCorregirCliente] = useState(false);
   const [abrirPrecuenta, setAbrirPrecuenta] = useState(false);
@@ -185,6 +188,14 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
   const sinRepartidor = pedido.modalidad === 'DELIVERY' && !pedido.repartidor_party_id;
   // Delivery sin punto o sin zona: no se confirma, cobra ni pasa a cocina hasta ubicarlo (el servidor lo rechaza igual)
   const sinUbicar = deliverySinUbicacion(pedido) && !['ANULADO', 'RECHAZADO', 'ENTREGADO'].includes(String(pedido.estado || '').toUpperCase());
+  // Volver atrás: solo Caja y Administrador, un pedido entregado; deshabilitado con el motivo si ya no aplica (el servidor lo valida igual)
+  const puedeVolverAtras = est === 'ENTREGADO' && tiene('pedidos/anular');
+  const motivoNoVolverAtras =
+    cajaAbierta === false
+      ? 'Ya cerró la caja del día'
+      : pedido.entregado_en && fechaLima(new Date(pedido.entregado_en).getTime()) !== fechaLima(Date.now())
+        ? 'Solo se vuelve atrás un pedido entregado hoy'
+        : null;
   const puedeCobrar = !esPorConfirmar && !estaPagado && est !== 'ANULADO';
 
   const handleAbrirAnular = async () => {
@@ -496,6 +507,26 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
                   Entregar al cliente y cerrar
                 </button>
               )}
+              {puedeVolverAtras && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <button
+                    type="button"
+                    className="dp-ico"
+                    style={{ minHeight: 44 }}
+                    aria-label={`Volver atrás el pedido ${pedido.codigo}`}
+                    disabled={procesando || !!motivoNoVolverAtras}
+                    onClick={() => setAbrirVolverAtras(true)}
+                  >
+                    ↩ Volver atrás
+                  </button>
+                  {motivoNoVolverAtras && <span style={{ fontSize: 12, fontWeight: 700, color: '#B2500F' }}>{motivoNoVolverAtras}</span>}
+                </div>
+              )}
+              {(est === 'ANULADO' || est === 'RECHAZADO') && (
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#2C4C5D' }}>
+                  Un pedido anulado no se puede reabrir: crea uno nuevo (botón Repetir).
+                </span>
+              )}
               {esMesa && (est === 'PREPARANDO' || (est === 'LISTO' && !pedido.entregado_mesa_en)) && (
                 <button
                   type="button"
@@ -587,6 +618,18 @@ export function PedidoDetalle({ pedido, alActualizar, alRepetir, alEditar, alAgr
           alConfirmar={async (datos) => {
             await cortesiasApi.darEnLinea(pedido.id, lineaCortesia.id, datos);
             setLineaCortesia(null);
+            alActualizar();
+          }}
+        />
+      )}
+
+      {abrirVolverAtras && (
+        <ModalVolverAtras
+          pedido={pedido}
+          alCerrar={() => setAbrirVolverAtras(false)}
+          alExito={(estado) => {
+            setAbrirVolverAtras(false);
+            setMensajeExito(`${pedido.codigo} volvió a ${estado === 'EN_CAMINO' ? 'EN CAMINO' : estado}`);
             alActualizar();
           }}
         />

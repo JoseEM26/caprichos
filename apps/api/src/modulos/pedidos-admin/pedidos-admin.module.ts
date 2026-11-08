@@ -28,6 +28,7 @@ import { EditarPedidoService } from './editar-pedido.service';
 import { EditarPedidoController } from './editar-pedido.controller';
 import { PedidoExtraService } from './pedido-extra.service';
 import { CorregirClienteService } from './corregir-cliente.service';
+import { ReabrirPedidoService } from './reabrir-pedido.service';
 import { PedidoExtraController } from './pedido-extra.controller';
 
 @Module({
@@ -37,6 +38,7 @@ import { PedidoExtraController } from './pedido-extra.controller';
     PedidosEstadoService,
     UbicarPedidoService,
     CorregirClienteService,
+    ReabrirPedidoService,
     PedidoComprobanteService,
     DevolucionPedidoService,
     CambioUbicacionService,
