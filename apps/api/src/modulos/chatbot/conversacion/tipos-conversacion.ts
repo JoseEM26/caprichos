@@ -349,6 +349,8 @@ export interface ContextoConversacion {
   errorServicio?: boolean;
   limiteConsultasExcedido?: boolean;
   pedidosHoyTelefono?: number;
+  /** true: no mandar la bienvenida con menú (pedido de hoy, atendido, persona hoy o se habló hace menos de 24 h). */
+  sinBienvenida?: boolean;
   minutosInactividad?: number;
   inactividadExpirada?: boolean;
   /** Total del pedido en curso con las reglas del servidor (descuento de promo con casilla BOT y envío). Null sin pedido. */

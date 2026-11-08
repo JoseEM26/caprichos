@@ -33,6 +33,7 @@ import { DireccionesModule } from '../direcciones/direcciones.module';
 import { AccesoModule } from '../acceso/acceso.module';
 import { RecordatorioReservasTarea } from './servicios/recordatorio-reservas.tarea';
 import { TareaRecordatorioPagoService } from './servicios/tarea-recordatorio-pago.service';
+import { ReanudacionBotService } from './servicios/reanudacion-bot.service';
 import { QuejasWhatsappService } from './servicios/quejas-whatsapp.service';
 import { WHATSAPP_MENSAJERIA_PUERTO } from './puerto/whatsapp-mensajeria.puerto';
 import { EjecutorConversacionService } from './conversacion/ejecutor-conversacion.service';
@@ -72,6 +73,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     VigilanteSinRespuestaService,
     RecordatorioReservasTarea,
     TareaRecordatorioPagoService,
+    ReanudacionBotService,
     QuejasWhatsappService,
     EjecutorConversacionService,
     ColaWebhookService,
@@ -86,6 +88,7 @@ import { ColaWebhookService } from './servicios/cola-webhook.service';
     ChatbotPlanificadorService,
     RecordatorioReservasTarea,
     TareaRecordatorioPagoService,
+    ReanudacionBotService,
     QuejasWhatsappService,
     WhatsappWebhookService,
     EjecutorConversacionService,

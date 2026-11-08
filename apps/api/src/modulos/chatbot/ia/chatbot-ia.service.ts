@@ -19,6 +19,10 @@ import { TEXTOS_IA } from '../conversacion/textos-ia';
 /**
  * Patrones típicos de inyección de prompt para defensa activa en profundidad.
  */
+/** Temas delicados: la IA no los resuelve, pasan directo a una persona (también avisa a Caja). */
+export const PATRON_DELICADO =
+  /\b(reclam\w*|queja|devoluci[oó]n|devuelv\w*|reembols\w*|descuento|rebaja|anul\w+|cancel\w+\s+(?:mi\s+)?pedido|me\s+cobraron\s+(?:de\s+)?m[aá]s|cobro\s+(?:doble|indebido)|pagu[eé]\s+y\s+no|estafa|intoxic\w*|me\s+cay[oó]\s+mal)\b/i;
+
 const PATRONES_INYECCION = [
   /ignora\s+(?:todas\s+las\s+)?instrucciones/i,
   /ignore\s+(?:all\s+)?instructions/i,
@@ -55,6 +59,15 @@ export class ChatbotIaService {
   async estaDisponible(): Promise<boolean> {
     const estado = await this.consumoService.puedeUsarIa();
     return estado.permitido;
+  }
+
+  /** Conversación libre: activa por defecto cuando la IA está encendida; 'chatbot_modo_libre' = no la apaga. */
+  private async estaModoLibre(): Promise<boolean> {
+    try {
+      return (await this.consumoService.estaModoLibre?.()) ?? false;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -161,9 +174,36 @@ export class ChatbotIaService {
 
     // 5. Preparar prompt de sistema y mensajes con enmascaramiento estricto de privacidad
     const nombreLimpio = extraerPrimerNombre(primerNombre);
-    const promptSistema = construirPromptSistema(nombreLimpio);
+    const modoLibre = await this.estaModoLibre();
+
+    // 4.b Modo libre: lo delicado va directo a una persona, sin gastar tokens
+    if (modoLibre && PATRON_DELICADO.test(textoUsuario)) {
+      await this.consumoService.registrarConsumo({
+        conversacionId,
+        modelo: this.modelo,
+        tokensEntrada: 0,
+        tokensSalida: 0,
+        herramientasUsadas: ['pasarAPersona'],
+        resultado: 'DERIVADO_PERSONA',
+      });
+      return {
+        exito: true,
+        respuestaTexto: TEXTOS_IA.temaDelicadoPersona(),
+        confianza: 1,
+        necesitaDerivar: true,
+        quierePedir: false,
+        herramientasUsadas: ['pasarAPersona'],
+        tokensEntrada: 0,
+        tokensSalida: 0,
+        costoUsdEstimado: 0,
+        resultadoRegistro: 'DERIVADO_PERSONA',
+        motivoDerivacion: 'TEMA_DELICADO',
+      };
+    }
+
+    const promptSistema = construirPromptSistema(nombreLimpio, modoLibre);
     const textoUsuarioEnmascarado = enmascararDatosSensibles(textoUsuario);
-    const historialEnmascarado = prepararHistorialPrivado(historialReciente || [], 6);
+    const historialEnmascarado = prepararHistorialPrivado(historialReciente || [], modoLibre ? 15 : 6);
 
     const mensajes: MensajeOpenAI[] = [
       { role: 'system', content: promptSistema },
@@ -181,7 +221,9 @@ export class ChatbotIaService {
 
     // 6. Bucle de ejecución con OpenAI (máximo 3 llamadas a herramientas)
     let vueltasHerramientas = 0;
-    const MAX_VUELTAS_HERRAMIENTAS = 3;
+    const MAX_VUELTAS_HERRAMIENTAS = modoLibre ? 4 : 3;
+    const MAX_HERRAMIENTAS_POR_TURNO = modoLibre ? 5 : 3;
+    let motivoPasarAPersona: string | undefined;
 
     try {
       while (vueltasHerramientas < MAX_VUELTAS_HERRAMIENTAS) {
@@ -205,7 +247,7 @@ export class ChatbotIaService {
           mensajes.push(mensajeAsistente);
           vueltasHerramientas++;
 
-          for (const llamada of mensajeAsistente.tool_calls.slice(0, 3)) {
+          for (const llamada of mensajeAsistente.tool_calls.slice(0, MAX_HERRAMIENTAS_POR_TURNO)) {
             const nombreFuncion = llamada.function.name;
             herramientasUsadas.push(nombreFuncion);
 
@@ -227,6 +269,9 @@ export class ChatbotIaService {
 
             if (resultadoHerramienta.necesitaDerivar || resultadoHerramienta.alertaAlergia) {
               necesitaDerivar = true;
+            }
+            if (nombreFuncion === 'pasarAPersona') {
+              motivoPasarAPersona = String(resultadoHerramienta.resultado?.motivo || 'IA_PASA_A_PERSONA');
             }
 
             const prods =
@@ -255,7 +300,7 @@ export class ChatbotIaService {
         let textoFinal = (mensajeAsistente.content || '').trim();
 
         // Enforce max 600 caracteres y máx 3 párrafos
-        textoFinal = this.recortarRespuesta(textoFinal, 600, 3);
+        textoFinal = modoLibre ? this.recortarRespuesta(textoFinal, 900, 4) : this.recortarRespuesta(textoFinal, 600, 3);
 
         // Detectar si el usuario quiere pedir
         if (
@@ -305,6 +350,7 @@ export class ChatbotIaService {
           tokensSalida: tokensSalidaTotal,
           costoUsdEstimado: costoUsd,
           resultadoRegistro: necesitaDerivar ? 'DERIVADO_PERSONA' : 'EXITO',
+          motivoDerivacion: motivoPasarAPersona,
           productoConcreto,
           productosConsultados,
         };

@@ -58,6 +58,11 @@ export const TEXTOS_IA = {
   /**
    * Mensaje de falla cerrada cuando OpenAI arroja un error técnico o timeout.
    */
+  /** Tema delicado (reclamo, devolución, descuento, anulación): lo ve una persona. */
+  temaDelicadoPersona: (): string => {
+    return 'Lamento mucho eso 🙏\nLo vamos a ver con cuidado: te paso con una persona de nuestro equipo para que te ayude.';
+  },
+
   errorConsulta: (): string => {
     return 'Estoy teniendo un problema para ver eso, te paso con una persona.';
   },

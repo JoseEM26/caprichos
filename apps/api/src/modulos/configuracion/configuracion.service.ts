@@ -143,6 +143,7 @@ export const CLAVES_TEXTO = [
   'privacidad_texto',
   'chatbot_activo',
   'chatbot_ia_activo',
+  'chatbot_modo_libre',
   'chatbot_pago_recordatorio_activo',
   'chatbot_avisos_equipo_activo',
   'reserva_web_activa',
@@ -330,6 +331,7 @@ export class ConfiguracionService {
         clave === 'carta_invitado_activo' ||
         clave === 'chatbot_activo' ||
         clave === 'chatbot_ia_activo' ||
+        clave === 'chatbot_modo_libre' ||
         clave === 'voucher_ia_activo' ||
         clave === 'reserva_web_activa' ||
         clave === 'chatbot_avisos_equipo_activo' ||
