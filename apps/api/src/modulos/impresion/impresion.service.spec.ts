@@ -602,11 +602,11 @@ describe('ImpresionService', () => {
     const caja: any = { rol: 'CAJERO', partyId: 7n };
     const motivo = 'Impresora apagada todo el dia';
 
-    it('vacía solo las pendientes antiguas (no las IMPRIMIENDO) y audita el conteo', async () => {
+    it('vacía las antiguas pendientes, imprimiéndose y fallidas, y audita el conteo', async () => {
       prismaMock.printJob.updateMany.mockResolvedValue({ count: 12 });
       const res = await service.vaciarCola({ alcance: 'ANTIGUAS', minutos: 30, motivo }, caja, '1.1.1.1');
       const arg = prismaMock.printJob.updateMany.mock.calls[0][0];
-      expect(arg.where.estado).toBe('PENDIENTE');
+      expect(arg.where.estado).toEqual({ in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] });
       expect(arg.where.en.lt).toBeInstanceOf(Date);
       expect(arg.data.estado).toBe('DESCARTADO');
       expect(res.descartadas).toBe(12);
@@ -619,7 +619,7 @@ describe('ImpresionService', () => {
       prismaMock.printJob.updateMany.mockResolvedValue({ count: 3 });
       await service.vaciarCola({ alcance: 'TODAS', pedido_id: '55', motivo }, { rol: 'ADMIN', partyId: 1n } as any);
       const { where } = prismaMock.printJob.updateMany.mock.calls[0][0];
-      expect(where).toEqual({ estado: 'PENDIENTE', pedido_id: 55n });
+      expect(where).toEqual({ estado: { in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] }, pedido_id: 55n });
     });
 
     it('exige motivo de al menos 5 caracteres', async () => {
@@ -632,10 +632,10 @@ describe('ImpresionService', () => {
       await expect(service.descartarPedido('1', {}, { rol: 'MOZO', partyId: 1n } as any)).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it('descartar un trabajo y un pedido marca DESCARTADO solo PENDIENTE/FALLIDO', async () => {
+    it('descartar un trabajo y un pedido marca DESCARTADO lo pendiente, lo que se imprime y lo fallido', async () => {
       prismaMock.printJob.updateMany.mockResolvedValue({ count: 1 });
       await service.descartarTrabajo('9', {}, caja);
-      expect(prismaMock.printJob.updateMany.mock.calls[0][0].where).toEqual({ id: 9n, estado: { in: ['PENDIENTE', 'FALLIDO'] } });
+      expect(prismaMock.printJob.updateMany.mock.calls[0][0].where).toEqual({ id: 9n, estado: { in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] } });
       await service.descartarPedido('4', { motivo: 'Pedido ya entregado' }, caja);
       expect(prismaMock.printJob.updateMany.mock.calls[1][0].where.pedido_id).toBe(4n);
       expect(prismaMock.printJob.updateMany.mock.calls[1][0].data.error).toContain('Pedido ya entregado');

@@ -760,7 +760,7 @@ export class ImpresionService {
       }),
       this.prisma.printJob.groupBy({ by: ['estado'], _count: { _all: true } }),
       this.prisma.printJob.count({
-        where: { estado: 'PENDIENTE', en: { lt: new Date(Date.now() - mins * 60 * 1000) } },
+        where: { estado: { in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] }, en: { lt: new Date(Date.now() - mins * 60 * 1000) } },
       }),
     ]);
 
@@ -826,7 +826,7 @@ export class ImpresionService {
     }
   }
 
-  /** Marca DESCARTADO (nada se borra) y audita con el conteo. Solo toca lo que el agente aún no tomó. */
+  /** Marca DESCARTADO (nada se borra) y audita con el conteo. Incluye lo que el agente ya tomó: al reportar su resultado no se devuelve a la cola. */
   private async descartar(
     where: any,
     motivo: string,
@@ -870,7 +870,8 @@ export class ImpresionService {
         mensaje: 'Escribe el motivo (al menos 5 caracteres)',
       });
     }
-    const where: any = { estado: 'PENDIENTE' };
+    // Vaciar es vaciar: también lo que el programa ya tomó (IMPRIMIENDO, que a los 2 min volvería a PENDIENTE) y lo fallido
+    const where: any = { estado: { in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] } };
     if (dto.alcance === 'ANTIGUAS') {
       const mins = dto.minutos && dto.minutos > 0 ? dto.minutos : 30;
       where.en = { lt: new Date(Date.now() - mins * 60 * 1000) };
@@ -899,7 +900,7 @@ export class ImpresionService {
     }
     const motivo = dto?.motivo?.trim() || 'Descartada desde la cola de impresión';
     return this.descartar(
-      { id: bigId, estado: { in: ['PENDIENTE', 'FALLIDO'] } },
+      { id: bigId, estado: { in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] } },
       motivo, 'DESCARTAR_TRABAJO', { trabajoId: bigId.toString() }, usuario, ip,
     );
   }
@@ -914,7 +915,7 @@ export class ImpresionService {
     }
     const motivo = dto?.motivo?.trim() || 'Descartada desde la cola de impresión';
     return this.descartar(
-      { pedido_id: pedidoId, estado: { in: ['PENDIENTE', 'FALLIDO'] } },
+      { pedido_id: pedidoId, estado: { in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] } },
       motivo, 'DESCARTAR_PEDIDO', { pedidoId: pedidoId.toString() }, usuario, ip,
     );
   }

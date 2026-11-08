@@ -96,7 +96,8 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
   useEventos('impresion:sin_conexion', cargar);
 
   const r = cola?.resumen;
-  const aDescartar = r ? (alcance === 'ANTIGUAS' ? r.pendientesAntiguas : r.pendientes) : 0;
+  // Vaciar descarta también lo que el programa ya tomó (imprimiendo) y lo fallido
+  const aDescartar = r ? (alcance === 'ANTIGUAS' ? r.pendientesAntiguas : r.pendientes + (r.enCurso ?? 0) + (r.fallidos ?? 0)) : 0;
   const motivoOk = motivo.trim().length >= 5;
 
   const ejecutar = async (accion: () => Promise<{ mensaje: string }>, alTerminar: () => void) => {
@@ -158,7 +159,7 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
 
         {aviso && <div role="status" className="cola-ayuda" style={{ fontWeight: 700 }}>{aviso}</div>}
 
-        {r && r.pendientes > 0 && !vaciando && (
+        {r && (r.pendientes + (r.enCurso ?? 0) + (r.fallidos ?? 0)) > 0 && !vaciando && (
           <button type="button" className="cola-btn peligro" onClick={() => setVaciando(true)}>
             Vaciar cola
           </button>
@@ -173,7 +174,7 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
             </label>
             <label>
               <input type="radio" name="alcance" checked={alcance === 'TODAS'} onChange={() => setAlcance('TODAS')} />
-              Todas las pendientes
+              Todo lo pendiente, imprimiéndose y fallido
             </label>
             <label htmlFor="cola-motivo" style={{ minHeight: 0 }}>Motivo (obligatorio, mínimo 5 letras)</label>
             <textarea id="cola-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
