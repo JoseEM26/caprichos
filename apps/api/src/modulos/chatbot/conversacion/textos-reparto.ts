@@ -146,9 +146,9 @@ export const TEXTOS_REPARTO = {
    * Pedido de la carta virtual con pago digital: el asesor gestiona el voucher por este chat. `medio` es Yape, Plin o transferencia.
    * El enlace de seguimiento va en el texto libre (ventana abierta). La plantilla no cambia: no tiene la variable.
    */
-  recibidoDigital: (nombre: string, codigo: string, medio: string, enlace?: string | null, resumen?: ResumenRecibido | null): PayloadAvisoReparto => ({
+  recibidoDigital: (nombre: string, codigo: string, medio: string, enlace?: string | null, resumen?: ResumenRecibido | null, datosPago?: string | null): PayloadAvisoReparto => ({
     textoLibre: resumen
-      ? `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉${bloqueResumen(resumen)}\n\n💳 Pago por ${medio}: envíanos por aquí mismo la captura (foto) de tu pago 📸 y un asesor la revisará para confirmar tu pedido. 🙏${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`
+      ? `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉${bloqueResumen(resumen)}\n\n💳 Pago por ${medio}:${datosPago ? `\n${datosPago}\n` : ' '}envíanos por aquí mismo la captura (foto) de tu pago 📸 y un asesor la revisará para confirmar tu pedido. 🙏${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`
       : `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉 En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por ${medio}. Mientras tanto, por favor envíanos la foto de tu voucher por aquí mismo 📸 🙏${enlace ? ` Sigue tu pedido aquí: ${enlace}` : ''}`,
     plantillaClave: 'CARTA_RECIBIDO_DIGITAL',
     variablesPlantilla: [nombre, codigo, medio],
