@@ -33,6 +33,7 @@ import { AvisosInternosService } from '../chatbot/avisos-internos/avisos-interno
 import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service';
 import { TELEFONO_PLACEHOLDER, tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { PagoPlanService } from './pago-plan.service';
+import { regresoAgotado } from '../catalogo/catalogo.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible, validarRuc } from '../comprobantes/comprobantes.util';
@@ -306,6 +307,8 @@ export class PedidosService {
           {
             codigo: 'PRODUCTO_AGOTADO',
             mensaje: `El producto ${prodDb.nombre} se encuentra agotado`,
+            // Hora de regreso (ISO) si es temporal; null si hay que reactivarlo a mano
+            volverA: regresoAgotado(prodDb.agotado_hasta),
           },
           HttpStatus.CONFLICT,
         );

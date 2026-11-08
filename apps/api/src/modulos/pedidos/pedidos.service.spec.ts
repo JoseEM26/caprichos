@@ -740,9 +740,21 @@ describe('PedidosService', () => {
           expect.objectContaining({
             codigo: 'PRODUCTO_AGOTADO',
             mensaje: expect.stringContaining('Americano'),
+            volverA: prodAgotado.agotado_hasta.toISOString(),
           }),
         );
       }
+    });
+
+    it('4b. agotado indefinido -> volverA null; agotado ya vencido -> se puede pedir', async () => {
+      prismaMock.producto.findMany.mockResolvedValue([{ ...mockProductoCafe, agotado_hasta: new Date('9999-12-31T23:59:59Z') }]);
+      await expect(service.crear(pedidoBaseDto, 'idemp-prod-indef')).rejects.toMatchObject({
+        response: expect.objectContaining({ codigo: 'PRODUCTO_AGOTADO', volverA: null }),
+      });
+      prismaMock.producto.findMany.mockResolvedValue([{ ...mockProductoCafe, agotado_hasta: new Date(Date.now() - 1000) }]);
+      // Vencido: ya no es PRODUCTO_AGOTADO (el éxito completo lo cubren las pruebas del camino feliz)
+      const r = await service.crear(pedidoBaseDto, 'idemp-prod-vencido').catch((e) => e);
+      expect(r?.response?.codigo).not.toBe('PRODUCTO_AGOTADO');
     });
 
     it('5. grupo obligatorio incompleto -> 400 OPCIONES_INVALIDAS con el grupo', async () => {
