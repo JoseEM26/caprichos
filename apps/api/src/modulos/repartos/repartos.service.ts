@@ -2669,12 +2669,9 @@ export class RepartosService {
     };
   }
 
-  /** Por validar = pago digital pendiente aún en cola (falta aprobar el voucher); el resto está en cocina. */
-  private estadoProximo(p: { estado: string; pago_estado: string | null; pago_metodo: string | null; pago_preferido: string | null }) {
-    const digital = [p.pago_metodo, p.pago_preferido].some((m) => m != null && ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(m));
-    return p.estado === 'COLA' && p.pago_estado === 'PENDIENTE' && digital
-      ? ({ estado: 'POR_VALIDAR', estadoTexto: 'Por validar pago' } as const)
-      : ({ estado: 'EN_COCINA', estadoTexto: 'En cocina' } as const);
+  /** Sin voucher el pedido igual va a cocina (la captura es opcional): ya no hay «por validar». */
+  private estadoProximo(_p: { estado: string; pago_estado: string | null; pago_metodo: string | null; pago_preferido: string | null }) {
+    return { estado: 'EN_COCINA', estadoTexto: 'En cocina' } as const;
   }
 
   /**

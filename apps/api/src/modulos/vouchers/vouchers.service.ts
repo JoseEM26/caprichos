@@ -16,7 +16,6 @@ import { PrismaService } from '../../comun/prisma/prisma.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { mismoCliente, pedidoAceptaVoucher, ultimos9 } from './voucher-reasignacion.util';
 import { puedeCambiarVoucher, puedeSubirVoucher } from './regla-cambio-voucher';
-import { esPedidoLocalSinCaptura } from '../caja/comprobante-pago.util';
 import { ArchivosService } from '../archivos/archivos.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
@@ -754,28 +753,18 @@ export class VouchersService {
       });
       if (!foto) sinFoto.push(medio);
     }
-    // Casilla única: en pedidos del local vale en lugar de la foto de Yape/Plin/transferencia (la tarjeta sigue pidiendo la copia del POS)
-    const sinCaptura =
-      sinFoto.length > 0 &&
-      opciones.confirmaSinCaptura === true &&
-      esPedidoLocalSinCaptura(pedido) &&
-      sinFoto.every((m) => m !== 'TARJETA');
-    if (sinFoto.length > 0 && !sinCaptura) {
-      const digitalFalta = sinFoto.some((m) => m !== 'TARJETA');
-      throw new BadRequestException({
-        codigo: 'VOUCHER_REQUERIDO',
-        faltan: sinFoto,
-        mensaje: digitalFalta
-          ? 'Sube la foto del pago (Yape/Plin/transferencia) o marca que ya hablaste con el cliente y pagó (sin captura) antes de enviar a Caja'
-          : 'Falta la foto de la copia del POS. Súbela y luego envía a Caja.',
-      });
-    }
+    // La foto es opcional en todos los canales y medios: sin ella el envío igual sale a Caja («Pagado sin captura»)
+    // y la captura se puede subir después. La casilla solo deja el registro de quién lo confirmó.
+    const sinCaptura = sinFoto.length > 0;
 
     const aviso = sinCaptura
       ? {
           tipo: 'PAGO_SIN_CAPTURA_MOZO',
-          titulo: 'Pagado sin captura',
-          mensaje: `El mozo confirma que el cliente ya pagó el pedido ${pedido.codigo} (${desglose ?? medioNormalizado}) sin captura. Cuadra con el Excel al cierre.`,
+          titulo: opciones.confirmaSinCaptura === true ? 'Pagado sin captura' : 'Falta captura (opcional)',
+          mensaje:
+            opciones.confirmaSinCaptura === true
+              ? `El mozo confirma que el cliente ya pagó el pedido ${pedido.codigo} (${desglose ?? medioNormalizado}) sin captura. Cuadra con el Excel al cierre.`
+              : `El mozo envía el pedido ${pedido.codigo} (${desglose ?? medioNormalizado}) sin captura todavía. No es urgente: se le puede pedir con amabilidad o confirmar el pago en Caja.`,
         }
       : conVoucher
       ? {

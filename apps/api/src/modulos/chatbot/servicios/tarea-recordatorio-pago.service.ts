@@ -110,7 +110,7 @@ export class TareaRecordatorioPagoService {
         where: {
           pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
           pago_estado: 'PENDIENTE',
-          estado: { notIn: ['ANULADO'] },
+          estado: { notIn: ['ANULADO', 'ENTREGADO'] },
           creado_en: { gte: hace24h },
         },
         select: {
@@ -154,7 +154,7 @@ export class TareaRecordatorioPagoService {
           }
 
           if (!yaEnviado) {
-            // Verificar si el cliente ya subió comprobante (conversación en VALIDAR_PAGO)
+            // Verificar si el cliente ya mandó la captura (voucher enlazado al pedido) o la conversación sigue en VALIDAR_PAGO
             const conv = await this.prisma.conversacion.findFirst({
               where: {
                 OR: [
@@ -167,8 +167,12 @@ export class TareaRecordatorioPagoService {
 
             const estadoConv = conv?.estado;
             const estadoFlujoPago = (conv?.flujo as any)?.pago?.estadoInterno;
+            const voucherEnlazado = await this.prisma.voucherPago.findFirst({
+              where: { pedido_id: p.id, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
+              select: { id: true },
+            });
             const tieneCapturaEnRevision =
-              estadoConv === 'VALIDAR_PAGO' || estadoFlujoPago === 'VALIDAR_PAGO';
+              Boolean(voucherEnlazado) || estadoConv === 'VALIDAR_PAGO' || estadoFlujoPago === 'VALIDAR_PAGO';
 
             // Solo enviar si el cliente aún no ha enviado la captura
             if (!tieneCapturaEnRevision) {
@@ -208,8 +212,12 @@ export class TareaRecordatorioPagoService {
           }
         }
 
-        // 2. EVALUAR ALERTA DE EXPIRACIÓN A CAJA (NO ANULA SOLO)
-        if (params.expiraMin > 0 && transcurridoMin >= params.expiraMin) {
+        // 2. AVISO SUAVE A CAJA: falta la captura (opcional; no anula ni frena el pedido)
+        const capturaYaEnlazada = await this.prisma.voucherPago.findFirst({
+          where: { pedido_id: p.id, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } },
+          select: { id: true },
+        });
+        if (!capturaYaEnlazada && params.expiraMin > 0 && transcurridoMin >= params.expiraMin) {
           const redisKeyExpira = `chatbot:pago:expira_alerta:${p.id}`;
           let yaAlertado = false;
 
@@ -223,8 +231,8 @@ export class TareaRecordatorioPagoService {
           }
 
           if (!yaAlertado) {
-            const tituloNotif = `Pago pendiente por expirar: ${p.codigo}`;
-            const mensajeNotif = `El pedido ${p.codigo} lleva más de ${params.expiraMin} minutos sin comprobante de pago. Caja debe decidir si contactar al cliente o anular.`;
+            const tituloNotif = `Falta captura (opcional): ${p.codigo}`;
+            const mensajeNotif = `El pedido ${p.codigo} lleva ${params.expiraMin} minutos sin captura del pago. No es urgente ni frena el pedido: pídela con amabilidad o confirma el pago en Caja.`;
 
             try {
               const notif = await this.prisma.notificacion.create({

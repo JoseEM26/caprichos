@@ -119,27 +119,7 @@ export async function exigirComprobanteDigital(args: {
   }
   if (faltan.length === 0) return null;
 
-  if (args.confirmaSinCaptura && args.pedidoLocal) {
-    return { motivo: MENSAJE_SIN_CAPTURA, supervisorPartyId: '', faltan, sinCaptura: true };
-  }
-
-  if (!args.permiteExcepcion || !args.sinVoucher) {
-    const nombres = faltan.map((m) => NOMBRE_MEDIO_DIGITAL[m] ?? m).join(', ');
-    const cabecera =
-      faltan.length === 1 ? `Falta la captura de ${nombres}` : `Faltan las capturas de ${nombres}`;
-    throw new BadRequestException({
-      codigo: 'VOUCHER_REQUERIDO',
-      faltan,
-      mensaje: args.permiteExcepcion
-        ? `${cabecera}. Sube la foto, o marca que ya hablaste con el cliente y pagó (sin captura).`
-        : `${cabecera}. Sube la foto del voucher para cobrar.`,
-    });
-  }
-
-  const sup = await args.verificarPin(args.sinVoucher.pinSupervisor);
-  return {
-    motivo: args.sinVoucher.motivo.trim(),
-    supervisorPartyId: String(sup?.supervisorPartyId ?? sup?.party_id ?? ''),
-    faltan,
-  };
+  // La captura del pago digital es opcional en todos los canales: nunca frena el cobro. Si falta, el cobro queda
+  // auditado «sin captura» (quién lo confirmó) y la insignia lo informa; la foto se puede subir después.
+  return { motivo: MENSAJE_SIN_CAPTURA, supervisorPartyId: '', faltan, sinCaptura: true };
 }

@@ -1271,21 +1271,9 @@ export function transicionarEstado(
 
     // Pedido activo encontrado y verificado
     const pedido = contexto.pedidoActivo;
-    let st = String(pedido?.estado || 'COLA').toLowerCase();
-    if (
-      pedido?.pago_metodo &&
-      ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(pedido.pago_metodo) &&
-      pedido.pago_estado === 'PENDIENTE'
-    ) {
-      if (
-        flujo.estado === 'PAGO_VALIDANDO' ||
-        (flujo.pago as any)?.estadoInterno === 'VALIDAR_PAGO'
-      ) {
-        st = 'validando_pago';
-      } else {
-        st = 'esperando_pago';
-      }
-    }
+    const st = String(pedido?.estado || 'COLA').toLowerCase();
+    // La captura del pago es opcional: se informa siempre el estado real del pedido (cocina, listo, en camino...),
+    // nunca «esperando pago» ni «captura en revisión».
     const esEnRuta = st === 'en_camino' || st === 'ruta';
 
     // Manejo de sub-intenciones sobre el pedido activo:

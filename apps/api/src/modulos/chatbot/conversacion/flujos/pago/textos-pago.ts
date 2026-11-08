@@ -105,11 +105,11 @@ export const TEXTOS_PAGO = {
     const med = (info.metodo || 'YAPE').toUpperCase();
     const detalle = detalleDatosPago(med, info.datosLocalPagos, tot);
 
-    return `Listo. Recibimos tu pedido ${cod}; pasa a cocina apenas validemos tu pago.\nTotal a pagar: S/ ${tot}\nMétodo de pago: ${med}\n\n${detalle}\n\nPor favor envíanos la captura de tu comprobante por aquí 📎 para verificar tu pago.`;
+    return `Listo. Recibimos tu pedido ${cod}; ya está en cocina 👩‍🍳.\nTotal a pagar: S/ ${tot}\nMétodo de pago: ${med}\n\n${detalle}\n\nCuando puedas, mándanos la captura de tu comprobante por aquí 📎 (opcional); sirve para que Caja verifique tu pago.`;
   },
 
   voucherRecibido: (): string => {
-    return 'Recibimos tu captura, una persona de Caja la está revisando 👩‍💻. En breve te confirmamos.';
+    return 'Recibimos tu captura, una persona de Caja la revisa 👩‍💻. Gracias.';
   },
 
   recordarEnviarImagen: (): string => {
@@ -142,7 +142,7 @@ export const TEXTOS_PAGO = {
     medio: string,
   ): string => {
     const tot = Number(total).toFixed(2);
-    return `Hola ${nombre}, te recordamos que tenemos pendiente la captura de tu pago de S/ ${tot} por ${medio} para tu pedido ${codigo}. Si ya lo hiciste, envíanos la captura por aquí 📎.`;
+    return `Hola ${nombre}, tu pedido ${codigo} sigue en marcha. Si ya pagaste los S/ ${tot} por ${medio}, mándanos la captura por aquí cuando puedas 📎 (es opcional).`;
   },
 
   confirmarEfectivo: (total: number, pagaCon?: number, modalidad?: string): string => {

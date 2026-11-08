@@ -1068,7 +1068,7 @@ describe('PedidosEstadoService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    describe('pago digital exige voucher (Yape, Plin, transferencia)', () => {
+    describe('pago digital: el voucher es opcional (Yape, Plin, transferencia)', () => {
       const pedidoSinPagar = { id: 10n, codigo: 'CP-W001', pago_metodo: null, pago_estado: 'PENDIENTE', estado: 'COLA' };
 
       beforeEach(() => {
@@ -1076,20 +1076,24 @@ describe('PedidosEstadoService', () => {
         prismaMock.pedido.update.mockResolvedValue({ ...pedidoSinPagar, pago_metodo: 'YAPE', pago_estado: 'PAGADO' });
       });
 
-      it('YAPE sin ningún voucher -> 400 VOUCHER_REQUERIDO, no registra ni cambia el estado', async () => {
+      it('YAPE sin ningún voucher: registra igual y audita «sin captura» (sin código de operación)', async () => {
         prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
-        await expect(
-          service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO' }, cajeroAuth),
-        ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_REQUERIDO' } });
-        expect(prismaMock.pedido.update).not.toHaveBeenCalled();
-        expect(auditoriaMock.registrar).not.toHaveBeenCalled();
+        const res = await service.registrarPago(10n, { metodo: 'YAPE', estado: 'PAGADO' }, cajeroAuth);
+
+        expect(res.pago_estado).toBe('PAGADO');
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+          expect.objectContaining({
+            accion: 'REGISTRAR_PAGO_SIN_VOUCHER',
+            despues: expect.objectContaining({ sin_voucher: expect.objectContaining({ sin_captura: true }) }),
+          }),
+        );
       });
 
       it('busca solo vouchers no ILEGIBLE del pedido', async () => {
         prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
-        await expect(service.registrarPago(10n, { metodo: 'PLIN', estado: 'PAGADO' }, cajeroAuth)).rejects.toThrow();
+        await service.registrarPago(10n, { metodo: 'PLIN', estado: 'PAGADO' }, cajeroAuth);
         expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({ where: { pedido_id: 10n, reemplazado_en: null, semaforo: { not: 'ILEGIBLE' } } }),
         );
@@ -1106,14 +1110,13 @@ describe('PedidosEstadoService', () => {
         expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'REGISTRAR_PAGO' }));
       });
 
-      it('solo un voucher ILEGIBLE -> 400 VOUCHER_REQUERIDO (no cuenta como comprobante)', async () => {
-        // La consulta excluye ILEGIBLE: sin voucher útil, vuelve el error
+      it('solo un voucher ILEGIBLE no cuenta como comprobante pero tampoco frena el registro', async () => {
+        // La consulta excluye ILEGIBLE: sin voucher útil, queda «sin captura»
         prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
-        await expect(
-          service.registrarPago(10n, { metodo: 'TRANSFERENCIA', estado: 'PAGADO' }, cajeroAuth),
-        ).rejects.toMatchObject({ response: { codigo: 'VOUCHER_REQUERIDO' } });
-        expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+        const res = await service.registrarPago(10n, { metodo: 'TRANSFERENCIA', estado: 'PAGADO' }, cajeroAuth);
+        expect(res.pago_estado).toBe('PAGADO');
+        expect(prismaMock.pedido.update).toHaveBeenCalled();
       });
 
       it('EFECTIVO y TARJETA no piden voucher ni código de operación', async () => {
@@ -1213,17 +1216,12 @@ describe('PedidosEstadoService', () => {
         );
       });
 
-      it('excepción con código de supervisor válido -> registra y audita con el motivo', async () => {
+      it('un cliente viejo que aún manda motivo y código: se registra sin supervisor y queda auditado «sin captura»', async () => {
         prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
         const res = await service.registrarPago(
           10n,
-          {
-            metodo: 'YAPE',
-            estado: 'PAGADO',
-            sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '654321' },
-            codigosOperacion: [{ medio: 'YAPE', codigo: '777001' }],
-          },
+          { metodo: 'YAPE', estado: 'PAGADO', sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '000000' } },
           cajeroAuth,
         );
 
@@ -1231,33 +1229,11 @@ describe('PedidosEstadoService', () => {
         expect(auditoriaMock.registrar).toHaveBeenCalledWith(
           expect.objectContaining({
             accion: 'REGISTRAR_PAGO_SIN_VOUCHER',
-            conPinAdmin: true,
-            motivo: 'El cliente no tenía señal',
-            despues: expect.objectContaining({
-              sin_voucher: expect.objectContaining({ motivo: 'El cliente no tenía señal' }),
-            }),
+            conPinAdmin: false,
+            despues: expect.objectContaining({ sin_voucher: expect.objectContaining({ sin_captura: true }) }),
           }),
         );
       });
-
-      it('excepción con código de supervisor inválido -> error y no registra el pago', async () => {
-        prismaMock.voucherPago.findFirst.mockResolvedValue(null);
-
-        await expect(
-          service.registrarPago(
-            10n,
-            {
-              metodo: 'YAPE',
-              estado: 'PAGADO',
-              sinVoucher: { motivo: 'Motivo válido', pinSupervisor: '000000' },
-              codigosOperacion: [{ medio: 'YAPE', codigo: '777001' }],
-            },
-            cajeroAuth,
-          ),
-        ).rejects.toMatchObject({ response: { codigo: 'CODIGO_INVALIDO' } });
-        expect(prismaMock.pedido.update).not.toHaveBeenCalled();
-      });
-
     });
   });
 
@@ -1274,13 +1250,8 @@ describe('PedidosEstadoService', () => {
         expect.objectContaining({
           where: {
             estado: { in: ['COLA', 'PREPARANDO'] },
+            // El pago digital sin captura NO frena a cocina: solo el delivery sin ubicación queda fuera
             NOT: [
-              {
-                pago_metodo: { in: ['YAPE', 'PLIN', 'TRANSFERENCIA'] },
-                pago_estado: 'PENDIENTE',
-                pago_coordinado_en: null,
-                modalidad: { not: 'MESA' },
-              },
               { modalidad: 'DELIVERY', OR: [{ entrega_lat: null }, { entrega_lng: null }, { zona_id: null }] },
             ],
           },
@@ -1290,6 +1261,23 @@ describe('PedidosEstadoService', () => {
       expect(res).toHaveLength(2);
       expect(res[0].codigo).toBe('CP-W001');
       expect(res[1].codigo).toBe('CP-W002');
+    });
+
+    it('un pedido de carta con Yape SIN voucher ni aprobación aparece en cocina (la captura es opcional)', async () => {
+      const yapeSinVoucher = {
+        id: 9n, codigo: 'CP-W009', estado: 'COLA', canal: 'CARTA', modalidad: 'RECOGER',
+        pago_metodo: 'YAPE', pago_estado: 'PENDIENTE', pago_coordinado_en: null,
+        creado_en: new Date('2026-10-21T14:00:00Z'), lineas: [],
+      };
+      prismaMock.pedido.findMany.mockResolvedValue([yapeSinVoucher]);
+
+      const res = await service.listarCocina(false, cocinaAuth);
+
+      expect(res.map((p) => p.codigo)).toEqual(['CP-W009']);
+      // La consulta ya no excluye por medio digital pendiente
+      const donde = (prismaMock.pedido.findMany.mock.calls.at(-1)![0] as any).where;
+      expect(JSON.stringify(donde)).not.toContain('pago_metodo');
+      expect(JSON.stringify(donde)).not.toContain('pago_coordinado_en');
     });
 
     it('devuelve en cada línea el nombre que el cliente puso a cada bebida (nombres_persona)', async () => {

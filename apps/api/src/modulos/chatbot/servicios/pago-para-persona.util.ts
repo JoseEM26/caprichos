@@ -41,3 +41,40 @@ export async function marcarPagoParaPersona(
     },
   });
 }
+
+/**
+ * Anota en la conversación el pedido que espera captura SIN tomar el chat: la captura es opcional, así que el
+ * bot sigue atendiendo (no pasa a VALIDAR_PAGO, ni a PERSONA, ni urgente). Si el cliente manda la foto después,
+ * se enlaza a este pedido. Mantiene el estado y el dueño que ya tenía la conversación.
+ */
+export async function anotarPagoEnFlujo(
+  prisma: PrismaService,
+  conversacion: { id: bigint; flujo?: unknown },
+  pedido: {
+    id: bigint;
+    codigo: string;
+    total?: unknown;
+    pago_preferido?: string | null;
+    pago_metodo?: string | null;
+  },
+  extraPago: Record<string, unknown> = {},
+): Promise<void> {
+  const flujoActual = (conversacion.flujo as any) || {};
+  const pagoPrev = flujoActual.pago || {};
+  await prisma.conversacion.update({
+    where: { id: conversacion.id },
+    data: {
+      flujo: {
+        ...flujoActual,
+        pago: {
+          ...pagoPrev,
+          pedidoId: pedido.id.toString(),
+          pedidoCodigo: pedido.codigo,
+          medio: pedido.pago_preferido || pedido.pago_metodo,
+          monto: Number(pedido.total || 0),
+          ...extraPago,
+        },
+      },
+    },
+  });
+}

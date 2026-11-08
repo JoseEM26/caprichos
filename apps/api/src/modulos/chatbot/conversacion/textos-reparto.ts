@@ -143,13 +143,13 @@ export const TEXTOS_REPARTO = {
   }),
 
   /**
-   * Pedido de la carta virtual con pago digital: el asesor gestiona el voucher por este chat. `medio` es Yape, Plin o transferencia.
+   * Pedido de la carta virtual con pago digital: el pedido va a cocina sin esperar el voucher (opcional). `medio` es Yape, Plin o transferencia.
    * El enlace de seguimiento va en el texto libre (ventana abierta). La plantilla no cambia: no tiene la variable.
    */
   recibidoDigital: (nombre: string, codigo: string, medio: string, enlace?: string | null, resumen?: ResumenRecibido | null, datosPago?: string | null): PayloadAvisoReparto => ({
     textoLibre: resumen
-      ? `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉${bloqueResumen(resumen)}\n\n💳 Pago por ${medio}:${datosPago ? `\n${datosPago}\n` : ' '}envíanos por aquí mismo la captura (foto) de tu pago 📸 y un asesor la revisará para confirmar tu pedido. 🙏${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`
-      : `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉 En unos momentos un asesor te escribirá por este chat para revisar el voucher de tu pago por ${medio}. Mientras tanto, por favor envíanos la foto de tu voucher por aquí mismo 📸 🙏${enlace ? ` Sigue tu pedido aquí: ${enlace}` : ''}`,
+      ? `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉${bloqueResumen(resumen)}\n\n💳 Pago por ${medio}:${datosPago ? `\n${datosPago}\n` : ' '}tu pedido ya está en marcha. Cuando puedas, envíanos por aquí mismo la captura (foto) de tu pago 📸 (opcional) y un asesor la revisará. 🙏${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`
+      : `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉 Tu pedido ya está en marcha. Cuando puedas, envíanos por aquí mismo la foto de tu pago por ${medio} 📸 (opcional) 🙏${enlace ? ` Sigue tu pedido aquí: ${enlace}` : ''}`,
     plantillaClave: 'CARTA_RECIBIDO_DIGITAL',
     variablesPlantilla: [nombre, codigo, medio],
   }),
@@ -184,7 +184,7 @@ export const TEXTOS_REPARTO = {
 
   /** Recordatorio a los pocos minutos si el pedido digital sigue sin voucher (una sola vez por pedido). */
   voucherRecordatorio: (nombre: string, codigo: string): PayloadAvisoReparto => ({
-    textoLibre: `¡Hola ${nombre}! 🙏 Seguimos en la espera de tu voucher del pedido ${codigo}. En cuanto lo recibamos, nuestro equipo lo revisa enseguida. Mientras tanto puedes ver la carta o escribir *asesor* si necesitas ayuda. 😊`,
+    textoLibre: `¡Hola ${nombre}! 🙏 Tu pedido ${codigo} sigue en marcha. Si ya pagaste, mándanos la captura de tu voucher cuando puedas (es opcional; no frena tu pedido). Escribe *asesor* si necesitas ayuda. 😊`,
     plantillaClave: 'CARTA_VOUCHER_RECORDATORIO',
     variablesPlantilla: [nombre, codigo],
   }),

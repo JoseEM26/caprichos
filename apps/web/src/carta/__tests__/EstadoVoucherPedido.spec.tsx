@@ -8,7 +8,7 @@ describe('EstadoVoucherPedido (seguimiento)', () => {
     render(<EstadoVoucherPedido voucher={{ estado: 'SIN_VOUCHER', medio: 'YAPE', actualizadoEn: null }} />);
     expect(screen.getByRole('status')).toBeDefined();
     expect(
-      screen.getByText('Aún no recibimos tu voucher. Envíalo por WhatsApp para que revisemos tu pago'),
+      screen.getByText('Tu pedido ya está en marcha. Cuando puedas, sube tu captura de pago (opcional) o envíala por WhatsApp'),
     ).toBeDefined();
   });
 

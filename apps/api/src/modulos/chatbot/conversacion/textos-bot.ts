@@ -981,8 +981,8 @@ export const TEXTOS_BOT = {
       const nombre = (m: string) => ({ YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia' } as Record<string, string>)[m] ?? m;
       const lista = capturas.map((c) => `• ${nombre(c.medio)}: S/ ${c.monto.toFixed(2)}`).join('\n');
       return (
-        `Listo. Recibimos tu pedido ${codigo}. Pasa a cocina apenas validemos tu pago.\n` +
-        `Envíanos una captura por cada medio digital, indicando de cuál es:\n${lista}\n` +
+        `Listo. Tu pedido ${codigo} ya está en cocina 👩‍🍳. Te llega de ${tiempoMin} a ${tiempoMax} minutos.\n` +
+        `Cuando puedas, mándanos una captura por cada medio digital, indicando de cuál es (opcional):\n${lista}\n` +
         `Una persona del equipo las revisa y te avisa por este chat.` +
         datosBloque
       );
@@ -990,8 +990,8 @@ export const TEXTOS_BOT = {
 
     if (esPagoDigital) {
       return (
-        `Listo. Recibimos tu pedido ${codigo}. Pasa a cocina apenas validemos tu pago.\n` +
-        `Envíanos aquí la captura de tu comprobante (Yape, Plin o transferencia). Una persona del equipo la revisa y te avisa por este chat.` +
+        `Listo. Tu pedido ${codigo} ya está en cocina 👩‍🍳. Te llega de ${tiempoMin} a ${tiempoMax} minutos.\n` +
+        `Mándanos la captura de tu Yape, Plin o transferencia cuando puedas (opcional). Una persona del equipo la revisa y te avisa por este chat.` +
         datosBloque
       );
     }

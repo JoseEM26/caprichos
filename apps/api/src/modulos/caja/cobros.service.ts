@@ -950,7 +950,7 @@ export class CobrosService {
     // Coordinar (aprobar) el pago digital exige caja abierta
     await exigirCajaAbiertaHoy(this.prisma);
 
-    // Medio digital del pedido: exige voucher útil (no ILEGIBLE) o excepción con código del supervisor.
+    // Medio digital del pedido: el voucher útil (no ILEGIBLE) es opcional; sin él queda auditado «sin captura».
     const sinVoucherAutorizado = await exigirComprobanteDigital({
       db: this.prisma,
       pedidoId: pedido.id,

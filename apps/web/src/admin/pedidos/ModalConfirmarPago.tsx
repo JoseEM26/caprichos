@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { usePideCodigo } from '../../comun/usePideCodigo';
 import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
-import { digitalesDelPlan, esPedidoLocal, medioDigitalVoucher, mediosQueExigenCodigo, mismoMedio } from './mediosPago';
-import { CapturasPlanDigital, ExcepcionSinVoucher } from './CapturasPlanDigital';
+import { digitalesDelPlan, medioDigitalVoucher, mediosQueExigenCodigo, mismoMedio } from './mediosPago';
+import { CapturasPlanDigital } from './CapturasPlanDigital';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
 import { BotonAbrirChatCliente } from '../mensajes/BotonAbrirChatCliente';
@@ -22,7 +21,6 @@ export interface ModalConfirmarPagoProps {
 
 const MEDIOS_PC = ['Yape', 'Plin', 'Efectivo', 'Tarjeta', 'Transferencia'] as const;
 
-const MOTIVO_MINIMO = 5;
 
 export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alActualizarPedido }: ModalConfirmarPagoProps) {
   const { pedir: pedirImpresion, dialogo: dialogoImpresion } = useConfirmarImpresion();
@@ -39,13 +37,6 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
   const [msg, setMsg] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [confirmandoSiNo, setConfirmandoSiNo] = useState(false);
-  // Excepción «Confirmar sin comprobante»: motivo escrito + código rotativo del supervisor
-  const [sinVoucher, setSinVoucher] = useState(false);
-  const [motivoSinVoucher, setMotivoSinVoucher] = useState('');
-  const [pinSupervisor, setPinSupervisor] = useState('');
-  const local = esPedidoLocal(pedido);
-  // En el local no hay supervisor: una sola casilla de consentimiento
-  const pideCodigo = usePideCodigo() && !local;
 
   const esEfectivo = mismoMedio(medio, 'Efectivo');
   const esTarjeta = mismoMedio(medio, 'Tarjeta');
@@ -62,7 +53,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
     : voucherSubido !== null || vouchersPedido.some((v) => v.semaforo !== 'ILEGIBLE');
   // Medios que piden código: digitales del plan y el medio elegido (el efectivo nunca)
   // En la excepción «confirmar sin comprobante» no hay voucher del que sacar el código
-  const enExcepcion = (esDigital || multiples) && !comprobanteListo && sinVoucher;
+  const enExcepcion = (esDigital || multiples) && !comprobanteListo;
   const codigosRequeridos = enExcepcion ? [] : mediosQueExigenCodigo(medio, pedido.planPago);
   // Lectura de la IA del voucher vigente de ese medio (el más reciente que no sea ilegible)
   const codigoLeido = (m: string): string => {
@@ -90,21 +81,6 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
       setMsg(MENSAJE_DELIVERY_SIN_UBICACION);
       return;
     }
-    if ((esDigital || multiples) && !comprobanteListo) {
-      setPaso(2);
-      if (!sinVoucher) {
-        setMsg('Sube el comprobante del pago para continuar.');
-        return;
-      }
-      if (motivoSinVoucher.trim().length < MOTIVO_MINIMO) {
-        setMsg(local ? 'Marca la casilla: ya hablaste con el cliente y pagó' : `El motivo debe tener al menos ${MOTIVO_MINIMO} caracteres`);
-        return;
-      }
-      if (pideCodigo && pinSupervisor.length !== 6) {
-        setMsg('El código del supervisor son 6 dígitos');
-        return;
-      }
-    }
     if (codigosFaltan.length > 0) {
       setPaso(3);
       setMsg('Escribe el código de operación que ves en el voucher.');
@@ -114,11 +90,8 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
     setConfirmandoSiNo(true);
   };
 
-  // Solo viaja la excepción si el pago digital sigue sin comprobante útil
-  const excepcionSinVoucher =
-    (esDigital || multiples) && !comprobanteListo && sinVoucher
-      ? { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined, ...(local ? { sinCaptura: true } : {}) }
-      : undefined;
+  // La captura es opcional: sin comprobante útil el pago se confirma igual y queda auditado «sin captura»
+  const excepcionSinVoucher = (esDigital || multiples) && !comprobanteListo ? { motivo: 'sin captura', sinCaptura: true } : undefined;
 
   const ejecutarConfirmacion = async () => {
     setEnviando(true);
@@ -373,9 +346,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
               alCargar={setVouchersPedido}
             />
 
-            {esDigital && !multiples && !comprobanteListo && medioVoucher && !sinVoucher && (
+            {esDigital && !multiples && !comprobanteListo && medioVoucher && (
               <div style={tarjeta}>
-                <div style={subtitulo}>Comprobante del pago (obligatorio)</div>
+                <div style={subtitulo}>Comprobante del pago (opcional)</div>
                 {/* Mismo camino que el cobro en caja: la foto se guarda como voucher del pedido y la IA solo informa */}
                 <SubirVoucherMozo
                   key={medioVoucher}
@@ -386,34 +359,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
                     if (info.legible) setVoucherSubido(info.id);
                   }}
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSinVoucher(true);
-                    setMsg('');
-                  }}
-                  style={{ minHeight: 44, border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 10, background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start', padding: '0 14px' }}
-                >
-                  Confirmar sin comprobante
-                </button>
-              </div>
-            )}
-            {esDigital && !multiples && !comprobanteListo && medioVoucher && sinVoucher && (
-              <div style={tarjeta}>
-                <ExcepcionSinVoucher
-                  local={local}
-                  medio={medioVoucher ?? mediosPlanDigital[0]}
-                  motivo={motivoSinVoucher}
-                  onMotivo={setMotivoSinVoucher}
-                  pin={pinSupervisor}
-                  onPin={setPinSupervisor}
-                  alVolver={() => {
-                    setSinVoucher(false);
-                    setMotivoSinVoucher('');
-                    setPinSupervisor('');
-                    setMsg('');
-                  }}
-                />
+                <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+                  Puedes confirmar sin la captura: queda «Pagado sin captura». Pídesela al cliente con amabilidad; se puede subir después.
+                </div>
               </div>
             )}
             {esDigital && comprobanteListo && !multiples && (
@@ -425,35 +373,12 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
             {/* Pago dividido con 2 o más medios digitales: una captura por cada uno (el servidor exige cada una) */}
             {multiples && (
               <div style={tarjeta}>
-                <div style={subtitulo}>Comprobantes de los pagos digitales</div>
+                <div style={subtitulo}>Comprobantes de los pagos digitales (opcional)</div>
                 <CapturasPlanDigital pedidoId={pedido.id} planPago={pedido.planPago ?? []} alCambiar={setFaltanCapturas} />
-                {!comprobanteListo && !sinVoucher && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSinVoucher(true);
-                      setMsg('');
-                    }}
-                    style={{ minHeight: 44, border: '1.5px solid var(--cp-navy, #0B2C3E)', borderRadius: 10, background: 'transparent', color: 'var(--cp-navy, #0B2C3E)', fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start', padding: '0 14px' }}
-                  >
-                    Confirmar sin comprobante
-                  </button>
-                )}
-                {!comprobanteListo && sinVoucher && (
-                  <ExcepcionSinVoucher
-                  local={local}
-                  medio={medioVoucher ?? mediosPlanDigital[0]}
-                    motivo={motivoSinVoucher}
-                    onMotivo={setMotivoSinVoucher}
-                    pin={pinSupervisor}
-                    onPin={setPinSupervisor}
-                    alVolver={() => {
-                      setSinVoucher(false);
-                      setMotivoSinVoucher('');
-                      setPinSupervisor('');
-                      setMsg('');
-                    }}
-                  />
+                {!comprobanteListo && (
+                  <div style={{ fontSize: 13, color: 'var(--cp-soft, #2C4C5D)' }}>
+                    Puedes confirmar sin todas las capturas: queda «Pagado sin captura». Se pueden subir después.
+                  </div>
                 )}
                 {comprobanteListo && (
                   <div data-testid="voucher-listo-confirmar" style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-green, #2F7A45)' }}>
@@ -478,14 +403,12 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
                 <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Medio de pago</dt>
                 <dd style={{ margin: 0, fontWeight: 700 }}>{medio}</dd>
                 <dt style={{ color: 'var(--cp-soft, #2C4C5D)' }}>Comprobante</dt>
-                <dd style={{ margin: 0, fontWeight: 700, color: !(esDigital || multiples) || comprobanteListo ? 'var(--cp-green, #2F7A45)' : sinVoucher ? 'var(--cp-orange, #E67929)' : 'var(--cp-rust, #B2500F)' }}>
+                <dd style={{ margin: 0, fontWeight: 700, color: !(esDigital || multiples) || comprobanteListo ? 'var(--cp-green, #2F7A45)' : 'var(--cp-orange, #E67929)' }}>
                   {!(esDigital || multiples)
                     ? 'No hace falta (se cobra al entregar o recoger)'
                     : comprobanteListo
                       ? 'Listo'
-                      : sinVoucher
-                        ? 'Sin comprobante, con motivo y supervisor'
-                        : 'Falta subirlo (paso 2)'}
+                      : 'Sin captura (opcional)'}
                 </dd>
               </dl>
             </div>
@@ -587,7 +510,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
       <Confirmar
         abierto={confirmandoSiNo}
         titulo={`¿Confirmar el pedido ${pedido.codigo} y enviarlo a cocina?`}
-        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.${excepcionSinVoucher ? (local ? ' Se registra pagado sin captura, con tu confirmación.' : pideCodigo ? ' Se registra sin comprobante, con el motivo y la autorización del supervisor.' : ' Se registra sin comprobante, con el motivo.') : ''}`}
+        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.${excepcionSinVoucher ? ' Se registra pagado sin captura.' : ''}`}
         textoConfirmar="Sí, confirmar"
         textoNo="No"
         cargando={enviando}

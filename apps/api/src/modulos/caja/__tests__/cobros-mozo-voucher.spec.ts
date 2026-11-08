@@ -145,78 +145,41 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
     pagos: [{ medio: 'EFECTIVO', monto: 50.0, recibido: 50.0 }],
   };
 
-  it('exige voucher subido cuando el MOZO cobra con Yape (siempre obligatorio)', async () => {
-    // Sin voucher
+  it('el MOZO cobra con Yape SIN voucher: la captura es opcional, cobra y audita «sin captura»', async () => {
     prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
-    await expect(service.cobrar(dtoCobroDigitalYape, mozoUsuario)).rejects.toMatchObject({
-      response: {
-        codigo: 'VOUCHER_REQUERIDO',
-      },
-    });
+    const res = await service.cobrar(dtoCobroDigitalYape, mozoUsuario);
+
+    expect(res.id).toBe('500');
+    expect(prismaMock.cobro.create).toHaveBeenCalled();
+    expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER', conPinAdmin: false }),
+    );
+    expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
   });
 
-  it('un voucher ILEGIBLE no cuenta para el MOZO: la consulta lo excluye y cobrar con Plin pide otra foto', async () => {
-    // La búsqueda excluye ILEGIBLE: sin otro voucher útil, no hay comprobante
+  it('un voucher ILEGIBLE no cuenta como comprobante pero tampoco frena: cobra sin captura', async () => {
     prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
-    await expect(service.cobrar(dtoCobroDigitalPlin, mozoUsuario)).rejects.toMatchObject({
-      response: { codigo: 'VOUCHER_REQUERIDO' },
-    });
+    const res = await service.cobrar(dtoCobroDigitalPlin, mozoUsuario);
+
+    expect(res.id).toBe('500');
     expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ semaforo: { not: 'ILEGIBLE' } }) }),
     );
-    expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    expect(prismaMock.cobro.create).toHaveBeenCalled();
   });
 
-  it('el MOZO sin foto cobra con excepción: motivo y código del supervisor válidos -> cobra y audita con su partyId', async () => {
+  it('un cliente viejo que manda motivo y código: ya no se verifica supervisor y el cobro sale igual', async () => {
     prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
     const res = await service.cobrar(
-      {
-        ...dtoCobroDigitalYape,
-        sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
-      } as any,
+      { ...dtoCobroDigitalYape, sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '000000' } } as any,
       mozoUsuario,
-      '10.0.0.7',
     );
 
     expect(res.id).toBe('500');
-    expect(supervisorCodigoMock.verificarYConsumirCodigo).toHaveBeenCalledWith(
-      '123456',
-      10n,
-      'caja/cobrar_sin_voucher',
-      '10.0.0.7',
-      'cobro',
-      undefined,
-    );
-    expect(auditoriaMock.registrar).toHaveBeenCalledWith(
-      expect.objectContaining({
-        accion: 'COBRAR_SIN_VOUCHER',
-        partyId: 10n,
-        motivo: 'El cliente no tenía señal',
-        conPinAdmin: true,
-      }),
-    );
-  });
-
-  it('el MOZO con código de supervisor inválido no cobra y no audita COBRAR_SIN_VOUCHER', async () => {
-    prismaMock.voucherPago.findFirst.mockResolvedValue(null);
-
-    await expect(
-      service.cobrar(
-        {
-          ...dtoCobroDigitalYape,
-          sinVoucher: { motivo: 'El cliente no tenía señal', pinSupervisor: '000000' },
-        } as any,
-        mozoUsuario,
-      ),
-    ).rejects.toMatchObject({ status: 403, response: { codigo: 'CODIGO_INVALIDO' } });
-
-    expect(prismaMock.cobro.create).not.toHaveBeenCalled();
-    expect(auditoriaMock.registrar).not.toHaveBeenCalledWith(
-      expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER' }),
-    );
+    expect(supervisorCodigoMock.verificarYConsumirCodigo).not.toHaveBeenCalled();
   });
 
   it('el motivo corto (menos de 5 caracteres) lo rechaza la validación del DTO antes de llegar al cobro', async () => {
@@ -248,13 +211,12 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
     expect(res.id).toBe('500');
   });
 
-  it('el CAJERO también necesita la foto para cobrar con Yape (sin foto -> VOUCHER_REQUERIDO)', async () => {
-    // Sin voucher subido: Caja tampoco cobra un digital sin comprobante
+  it('el CAJERO cobra con Yape sin foto: queda auditado «sin captura»', async () => {
     prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
-    await expect(service.cobrar(dtoCobroDigitalYape, cajeroUsuario)).rejects.toMatchObject({
-      response: { codigo: 'VOUCHER_REQUERIDO' },
-    });
+    const res = await service.cobrar(dtoCobroDigitalYape, cajeroUsuario);
+    expect(res.id).toBe('500');
+    expect(auditoriaMock.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'COBRAR_SIN_VOUCHER' }));
   });
 
   it('el CAJERO cobra con Yape si ya hay foto del pedido', async () => {
@@ -264,16 +226,12 @@ describe('CobrosService - Exigencia de voucher para el MOZO (vch-api)', () => {
     expect(res.id).toBe('500');
   });
 
-  it('el parámetro voucher_mozo_obligatorio ya no tiene efecto: aunque diga false, el MOZO sigue exigido', async () => {
-    prismaMock.parametro.findUnique.mockResolvedValue({
-      clave: 'voucher_mozo_obligatorio',
-      valor: false,
-    });
+  it('el parámetro voucher_mozo_obligatorio no tiene efecto: ni obligatorio ni consultado', async () => {
+    prismaMock.parametro.findUnique.mockResolvedValue({ clave: 'voucher_mozo_obligatorio', valor: true });
     prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
-    await expect(service.cobrar(dtoCobroDigitalYape, mozoUsuario)).rejects.toMatchObject({
-      response: { codigo: 'VOUCHER_REQUERIDO' },
-    });
+    const res = await service.cobrar(dtoCobroDigitalYape, mozoUsuario);
+    expect(res.id).toBe('500');
     expect(prismaMock.parametro.findUnique).not.toHaveBeenCalled();
   });
 });

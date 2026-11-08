@@ -27,6 +27,6 @@ describe('aviso «Recibimos tu pedido» con resumen', () => {
   });
 
   it('sin resumen mantiene el texto de siempre', () => {
-    expect(TEXTOS_REPARTO.recibidoDigital('A', 'CP-1', 'Yape', null).textoLibre).toContain('En unos momentos un asesor');
+    expect(TEXTOS_REPARTO.recibidoDigital('A', 'CP-1', 'Yape', null).textoLibre).toContain('Tu pedido ya está en marcha');
   });
 });

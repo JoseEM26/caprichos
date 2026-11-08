@@ -201,7 +201,17 @@ export function CobroDetallado({ cobro, nota }: { cobro: NonNullable<ResumenRepa
           ))}
         </ul>
       ) : (
-        cobro.plan.some((f) => ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio)) && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-orange)' }}>Sin captura todavía</div>
+        !pagado &&
+        cobro.plan.some((f) => ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio)) && (
+          <div style={{ fontSize: 13 }}>
+            <strong>Pago pendiente</strong>
+            {cobro.plan
+              .filter((f) => ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio))
+              .map((f) => ` · ${soles(f.monto)} por ${f.medio === 'TRANSFERENCIA' ? 'transferencia' : f.medio === 'YAPE' ? 'Yape' : 'Plin'}`)
+              .join('')}
+            . Sin captura todavía (opcional): pídesela con amabilidad; no frena la entrega.
+          </div>
+        )
       )}
       {cobro.cortesias.length > 0 && (
         <div style={{ fontSize: 13 }}>

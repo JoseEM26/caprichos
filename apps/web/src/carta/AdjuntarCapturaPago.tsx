@@ -69,13 +69,13 @@ export function DatosParaPagar({ medio, total, local, restoAlRecibir }: { medio:
       >
         {copiado ? 'Copiado' : medio === 'TRANSFERENCIA' ? 'Copiar cuenta' : 'Copiar número'}
       </button>
-      <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Luego sube la captura aquí o envíala por WhatsApp.</div>
+      <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>Sube tu captura aquí o por WhatsApp (opcional).</div>
     </div>
   );
 }
 
 /**
- * Captura del pago desde la pantalla de seguimiento. Opcional: el pedido ya está «por validar»
+ * Captura del pago desde la pantalla de seguimiento. Opcional: el pedido ya está en cocina
  * y el equipo revisa la captura. La respuesta no muestra semáforo ni datos extraídos.
  */
 export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total, restoAlRecibir }: AdjuntarCapturaPagoProps) {
@@ -129,7 +129,7 @@ export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total, 
     >
       {medio && <DatosParaPagar medio={medio} total={total} local={local} restoAlRecibir={restoAlRecibir} />}
       <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>
-        Envía la captura de tu pago
+        Envía la captura de tu pago (opcional)
       </div>
       <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
         Así lo validamos más rápido. Si no la envías ahora, también puedes mandarla por WhatsApp.

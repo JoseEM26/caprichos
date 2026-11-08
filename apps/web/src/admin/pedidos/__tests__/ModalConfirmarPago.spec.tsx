@@ -92,15 +92,19 @@ describe('ModalConfirmarPago', () => {
     expect(await screen.findByText('Foto del voucher (YAPE)')).toBeDefined();
   });
 
-  it('digital sin voucher bloquea la confirmación y no registra el pago', async () => {
+  it('digital sin voucher NO bloquea: confirma, queda «sin captura» y va a cocina (sin código de operación)', async () => {
     abrir(pedidoCarta());
-    irAlPaso3();
-    escribirCodigo('YAPE', '123456');
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
+    await confirmar();
 
-    expect(screen.getByRole('alert').textContent).toMatch(/Sube el comprobante del pago/);
-    expect(screen.queryByRole('button', { name: 'Sí, confirmar' })).toBeNull();
-    expect(pedidosApi.registrarPago).not.toHaveBeenCalled();
+    await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
+    expect(pedidosApi.registrarPago).toHaveBeenCalledWith(
+      '77',
+      'YAPE',
+      'PAGADO',
+      { motivo: 'sin captura', sinCaptura: true },
+      undefined,
+    );
+    expect(screen.queryByTestId('motivo-sin-voucher')).toBeNull();
   });
 
   it('la foto se sube por la API de vouchers (pedido y medio) y luego muestra el semáforo', async () => {
@@ -152,62 +156,12 @@ describe('ModalConfirmarPago', () => {
     expect(pedidosApi.cambiarEstado).toHaveBeenCalledWith('77', 'COLA', expect.any(String));
   });
 
-  it('un voucher solo ILEGIBLE no cuenta como comprobante: vuelve a pedir la foto', async () => {
+  it('un voucher solo ILEGIBLE no cuenta como comprobante: vuelve a ofrecer la foto (opcional)', async () => {
     vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([voucher('ILEGIBLE')]);
     abrir(pedidoCarta());
 
     expect(await screen.findByTestId('input-voucher-archivo')).toBeDefined();
     expect(screen.queryByTestId('voucher-listo-confirmar')).toBeNull();
-  });
-
-  describe('confirmar sin comprobante (excepción con supervisor)', () => {
-    const abrirSinComprobante = async () => {
-      abrir(pedidoCarta());
-      irAlPaso2();
-      fireEvent.click(await screen.findByRole('button', { name: 'Confirmar sin comprobante' }));
-    };
-    /** Con la excepción llena en el paso 2, se pasa al 3 y se pulsa Confirmar. */
-    const confirmarDesdePaso3 = () => {
-      siguiente();
-      fireEvent.click(screen.getByRole('button', { name: 'Confirmar y enviar a cocina' }));
-    };
-
-    it('motivo corto bloquea la confirmación y no registra el pago', async () => {
-      await abrirSinComprobante();
-      fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'nop' } });
-      fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
-      confirmarDesdePaso3();
-
-      expect(screen.getByRole('alert').textContent).toMatch(/al menos 5 caracteres/);
-      expect(screen.queryByRole('button', { name: 'Sí, confirmar' })).toBeNull();
-      expect(pedidosApi.registrarPago).not.toHaveBeenCalled();
-    });
-
-    it('código de supervisor vacío bloquea la confirmación y no registra el pago', async () => {
-      await abrirSinComprobante();
-      fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'El cliente no tenía señal' } });
-      confirmarDesdePaso3();
-
-      expect(screen.getByRole('alert').textContent).toMatch(/6 dígitos/);
-      expect(pedidosApi.registrarPago).not.toHaveBeenCalled();
-    });
-
-    it('motivo y código válidos llaman a registrarPago con sinVoucher', async () => {
-      await abrirSinComprobante();
-      fireEvent.change(screen.getByTestId('motivo-sin-voucher'), { target: { value: 'El cliente no tenía señal' } });
-      fireEvent.change(screen.getByTestId('input-codigo-supervisor'), { target: { value: '123456' } });
-      confirmarDesdePaso3();
-      fireEvent.click(await screen.findByRole('button', { name: 'Sí, confirmar' }));
-
-      await waitFor(() => expect(alConfirmarExitoso).toHaveBeenCalled());
-      expect(pedidosApi.registrarPago).toHaveBeenCalledWith(
-        '77',
-        'YAPE',
-        'PAGADO',
-        { motivo: 'El cliente no tenía señal', pinSupervisor: '123456' },
-        undefined, // en la excepción sin comprobante no hay código de operación
-      );
-    });
   });
 
   it('tiene tres pasos: Siguiente exige haber hablado con el cliente y Atrás conserva lo hecho', async () => {
@@ -263,7 +217,7 @@ describe('ModalConfirmarPago', () => {
     });
 
     it('sin lectura de la IA el campo va vacío, bloquea Confirmar y pide escribirlo', async () => {
-      vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([voucher('ILEGIBLE', '21', null)]);
+      vi.mocked(vouchersApi.listarVouchers).mockResolvedValue([voucher('CONFIABLE', '21', null)]);
       abrir(pedidoCarta());
       irAlPaso3();
 

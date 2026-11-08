@@ -44,15 +44,15 @@ describe('ChipCobroMozo (Caja y Pedidos)', () => {
   it('digital con voucher: «Cobrado por mozo · Yape» sin aviso', () => {
     render(<ChipCobroMozo cobro={{ en: '2026-10-30T20:00:00.000Z', medio: 'YAPE', mozo: 'Juan', faltaVoucher: false }} />);
     expect(screen.getByText('Cobrado por mozo · Yape')).toBeDefined();
-    expect(screen.queryByText(/falta voucher/)).toBeNull();
+    expect(screen.queryByText(/falta captura/)).toBeNull();
   });
 
-  it('plan con efectivo y Yape sin voucher: nombres legibles y «falta voucher» en color de advertencia', () => {
+  it('plan con efectivo y Yape sin voucher: nombres legibles y «falta captura (opcional)» en color de advertencia', () => {
     render(
       <ChipCobroMozo cobro={{ en: '2026-10-30T20:00:00.000Z', medio: 'EFECTIVO+YAPE', mozo: 'Juan', faltaVoucher: true }} />,
     );
     const chip = screen.getByText(/Cobrado por mozo · Efectivo \+ Yape/);
-    expect(chip.textContent).toContain('falta voucher');
+    expect(chip.textContent).toContain('falta captura (opcional)');
     expect(chip.style.color).toBe('var(--cp-rust, #B2500F)');
   });
 });

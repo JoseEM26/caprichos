@@ -121,7 +121,7 @@ describe('AvisosPedidoService (avisos de reparto al cliente, encolados en el out
     expect(outbox.encolar).not.toHaveBeenCalled();
   });
 
-  it('pago digital en RECIBIDO: pasa la conversación a una persona y encola el aviso de voucher', async () => {
+  it('pago digital en RECIBIDO: encola el aviso y anota el pedido en el chat SIN tomarlo (captura opcional: sin VALIDAR_PAGO ni urgente)', async () => {
     pedido.pago_metodo = 'YAPE';
     pedido.pago_preferido = 'YAPE';
     const res = await servicio.avisar(77, 'RECIBIDO');
@@ -131,6 +131,11 @@ describe('AvisosPedidoService (avisos de reparto al cliente, encolados en el out
       expect.objectContaining({ carga: expect.objectContaining({ etapa: 'RECIBIDO' }) }),
       expect.anything(),
     );
+    const data = prisma.conversacion.update.mock.calls[0][0].data;
+    expect(data.flujo.pago).toMatchObject({ pedidoId: '77' });
+    expect(data.estado).toBeUndefined();
+    expect(data.duenio).toBeUndefined();
+    expect(data.urgente).toBeUndefined();
   });
 
   it('retiro: el texto dice el monto exacto antes del SÍ/NO', async () => {

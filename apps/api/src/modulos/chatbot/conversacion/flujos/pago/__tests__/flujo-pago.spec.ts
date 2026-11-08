@@ -472,6 +472,8 @@ describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
         conversacion: {
           findFirst: jest.fn(),
         },
+        // Sin captura enlazada por defecto (la captura es opcional)
+        voucherPago: { findFirst: jest.fn().mockResolvedValue(null) },
         notificacion: {
           create: jest.fn().mockResolvedValue({ id: 888n }),
         },
@@ -566,12 +568,35 @@ describe('Flujo de Pago por WhatsApp (FT-BOT-02, HU-CAP-130..132, 139)', () => {
           data: expect.objectContaining({
             tipo: 'ATENCION_WHATSAPP',
             rol_destino: 'CAJERO',
-            titulo: 'Pago pendiente por expirar: CP-0152',
+            titulo: 'Falta captura (opcional): CP-0152',
           }),
         }),
       );
       // Verificación estricta: NO se llama a update con ANULADO
       expect(mockPrisma.pedido.update).not.toHaveBeenCalled();
+    });
+
+    it('si el cliente ya mandó la captura (voucher enlazado) no hay recordatorio ni aviso a Caja', async () => {
+      const ahora = new Date();
+      mockPrisma.pedido.findMany.mockResolvedValue([
+        {
+          id: 503n, codigo: 'CP-0153', cliente_nombre: 'Rosa', cliente_telefono: '911111111', total: 20,
+          pago_metodo: 'YAPE', creado_en: new Date(ahora.getTime() - 40 * 60 * 1000),
+        },
+      ]);
+      mockPrisma.conversacion.findFirst.mockResolvedValue({ id: 99n, estado: 'ABIERTA', flujo: {} });
+      mockPrisma.voucherPago.findFirst.mockResolvedValue({ id: 5n });
+
+      const ciclo = await tareaService.ejecutarCiclo(ahora);
+
+      expect(ciclo.recordatoriosEnviados).toBe(0);
+      expect(ciclo.alertasCajaEnviadas).toBe(0);
+    });
+
+    it('el recordatorio es amable y opcional: no dice que el pedido espera el pago', () => {
+      const t = TEXTOS_PAGO.pagoRecordatorioCliente('Ana', 'CP-1', 20, 'YAPE');
+      expect(t).toContain('es opcional');
+      expect(t).not.toMatch(/pasa a cocina apenas|esperando/i);
     });
   });
 

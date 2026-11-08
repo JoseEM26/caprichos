@@ -654,16 +654,15 @@ describe('VouchersService', () => {
       expect(res.semaforo).toBeUndefined();
     });
 
-    it('digital sin foto vigente: 400 VOUCHER_REQUERIDO con el mensaje de la foto, y no avisa ni guarda el plan', async () => {
-      await expect(service.enviarACaja('50', 'PLIN', mozoUsuario)).rejects.toMatchObject({
-        response: {
-          codigo: 'VOUCHER_REQUERIDO',
-          faltan: ['PLIN'],
-          mensaje: 'Sube la foto del pago (Yape/Plin/transferencia) o marca que ya hablaste con el cliente y pagó (sin captura) antes de enviar a Caja',
-        },
+    it('digital sin foto vigente: el envío a Caja sale igual con el aviso suave «Falta captura (opcional)»', async () => {
+      await expect(service.enviarACaja('50', 'PLIN', mozoUsuario)).resolves.toEqual({ ok: true });
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'PAGO_SIN_CAPTURA_MOZO', titulo: 'Falta captura (opcional)', rol_destino: 'CAJERO' }),
       });
-      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+      expect(prismaMock.pedido.update).toHaveBeenCalledWith({
+        where: { id: 50n },
+        data: expect.objectContaining({ cobro_mozo_medio: 'PLIN' }),
+      });
     });
 
     describe('casilla única «ya hablé con el cliente y pagó» (sin captura)', () => {
@@ -693,12 +692,12 @@ describe('VouchersService', () => {
         );
       });
 
-      it('sin foto y sin confirmación: sigue rechazando con VOUCHER_REQUERIDO', async () => {
+      it('sin foto y sin confirmación: pasa igual (la casilla es solo un registro opcional)', async () => {
         pedidoLocal();
-        await expect(service.enviarACaja('50', 'PLIN', mozoUsuario, undefined, undefined, { confirmaSinCaptura: false })).rejects.toMatchObject({
-          response: { codigo: 'VOUCHER_REQUERIDO' },
+        await expect(service.enviarACaja('50', 'PLIN', mozoUsuario, undefined, undefined, { confirmaSinCaptura: false })).resolves.toEqual({ ok: true });
+        expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ tipo: 'PAGO_SIN_CAPTURA_MOZO', titulo: 'Falta captura (opcional)' }),
         });
-        expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
       });
 
       it('con foto no hace falta la casilla y no queda marcado como sin captura', async () => {
@@ -708,32 +707,30 @@ describe('VouchersService', () => {
         expect(prismaMock.notificacion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ tipo: 'VOUCHER_PENDIENTE_MOZO' }) });
       });
 
-      it('pedido que no es del local (carta/delivery): la confirmación no vale', async () => {
+      it('pedido de carta/delivery: también pasa sin foto', async () => {
         pedidoLocal({ canal: 'CARTA', modalidad: 'DELIVERY' });
-        await expect(service.enviarACaja('50', 'YAPE', mozoUsuario, undefined, undefined, { confirmaSinCaptura: true })).rejects.toMatchObject({
-          response: { codigo: 'VOUCHER_REQUERIDO' },
-        });
+        await expect(service.enviarACaja('50', 'YAPE', mozoUsuario, undefined, undefined, {})).resolves.toEqual({ ok: true });
       });
 
-      it('tarjeta: la copia del POS sigue siendo obligatoria aunque marque la casilla', async () => {
+      it('tarjeta sin la copia del POS: también pasa (la foto es opcional en todos los medios)', async () => {
         pedidoLocal();
-        await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario, undefined, undefined, { confirmaSinCaptura: true })).rejects.toMatchObject({
-          response: { codigo: 'VOUCHER_REQUERIDO', faltan: ['TARJETA'] },
-        });
+        await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario, undefined, undefined, {})).resolves.toEqual({ ok: true });
       });
     });
 
-    it('digital con foto ILEGIBLE: no cuenta como foto; 400 y no avisa', async () => {
+    it('digital con foto ILEGIBLE: no cuenta como foto, pero el envío sale igual «sin captura»', async () => {
       // La consulta filtra semaforo != ILEGIBLE: sin resultado no hay foto vigente
       prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
-      await expect(service.enviarACaja('50', 'PLIN', mozoUsuario)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.enviarACaja('50', 'PLIN', mozoUsuario)).resolves.toEqual({ ok: true });
       expect(prismaMock.voucherPago.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ semaforo: { not: 'ILEGIBLE' }, reemplazado_en: null }),
         }),
       );
-      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'PAGO_SIN_CAPTURA_MOZO' }),
+      });
     });
 
     it('pedido ya cobrado: no avisa a Caja', async () => {
@@ -748,10 +745,11 @@ describe('VouchersService', () => {
       expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
     });
 
-    it('TARJETA sin foto de la copia del POS: 400 VOUCHER_REQUERIDO y no avisa', async () => {
-      await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario)).rejects.toThrow(BadRequestException);
-      expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
-      expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    it('TARJETA sin foto de la copia del POS: avisa a Caja sin captura (opcional)', async () => {
+      await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario)).resolves.toEqual({ ok: true });
+      expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ tipo: 'PAGO_SIN_CAPTURA_MOZO' }),
+      });
     });
 
     it('TARJETA con la foto del POS vigente: avisa con voucher, no como efectivo', async () => {

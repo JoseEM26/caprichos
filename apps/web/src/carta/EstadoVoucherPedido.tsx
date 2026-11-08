@@ -23,7 +23,7 @@ export function textoEstadoVoucher(voucher: VoucherSeguimiento): string {
   const medio = voucher.medio ? MEDIO_NOMBRE[voucher.medio] ?? voucher.medio : null;
   switch (voucher.estado) {
     case 'SIN_VOUCHER':
-      return 'Aún no recibimos tu voucher. Envíalo por WhatsApp para que revisemos tu pago';
+      return 'Tu pedido ya está en marcha. Cuando puedas, sube tu captura de pago (opcional) o envíala por WhatsApp';
     case 'EN_REVISION':
       return 'Recibimos tu voucher y lo estamos revisando';
     case 'VERIFICADO': {

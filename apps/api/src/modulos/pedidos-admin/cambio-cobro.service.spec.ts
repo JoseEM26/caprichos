@@ -90,11 +90,16 @@ describe('CambioCobroService (cambio de forma de pago en la puerta)', () => {
       expect(tx.pedido.update).not.toHaveBeenCalled();
     });
 
-    it('con parte digital exige la captura de cada medio digital (voucher siempre obligatorio)', async () => {
+    it('la captura de cada medio digital es opcional: «ya yapeó» sin foto queda PENDIENTE y solo sube la que haya', async () => {
       const mixto = plan([{ medio: 'EFECTIVO', monto: 10 }, { medio: 'YAPE', monto: 20 }, { medio: 'PLIN', monto: 10 }]);
-      await expect(service.solicitar('7', { plan: mixto }, { YAPE: captura }, repartidor)).rejects.toMatchObject({ response: { codigo: 'CAPTURA_REQUERIDA', medio: 'PLIN' } });
+      await expect(service.solicitar('7', { plan: mixto }, { YAPE: captura }, repartidor)).resolves.toMatchObject({ estado: 'PENDIENTE' });
+      // Solo la de Yape se sube; la de Plin queda para después
+      expect(vouchers.subirYProcesar).toHaveBeenCalledTimes(1);
+      expect(vouchers.subirYProcesar.mock.calls[0][1]).toMatchObject({ medio: 'YAPE' });
+      vouchers.subirYProcesar.mockClear();
+      await expect(service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, {}, repartidor)).resolves.toMatchObject({ estado: 'PENDIENTE' });
       expect(vouchers.subirYProcesar).not.toHaveBeenCalled();
-      await expect(service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, {}, repartidor)).rejects.toMatchObject({ response: { codigo: 'CAPTURA_REQUERIDA' } });
+      expect(prisma.solicitudCambioCobro.create.mock.calls.at(-1)[0].data.voucher_ids).toEqual([]);
     });
 
     it('efectivo → tarjeta no pide captura; el plan debe cuadrar con el total', async () => {
@@ -106,11 +111,11 @@ describe('CambioCobroService (cambio de forma de pago en la puerta)', () => {
       await expect(service.solicitar('7', { plan: plan([{ medio: 'EFECTIVO', monto: 40 }]) }, {}, repartidor)).rejects.toMatchObject({ response: { codigo: 'SIN_CAMBIO' } });
     });
 
-    it('una captura ilegible no cuenta: se retira y se pide otra', async () => {
+    it('una captura ilegible no cuenta: se retira y la solicitud sigue sin ella (la captura es opcional)', async () => {
       vouchers.subirYProcesar.mockResolvedValue({ id: '11', legible: false });
-      await expect(service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, { YAPE: captura }, repartidor)).rejects.toMatchObject({ response: { codigo: 'CAPTURA_ILEGIBLE' } });
+      await expect(service.solicitar('7', { plan: plan([{ medio: 'YAPE', monto: 40 }]) }, { YAPE: captura }, repartidor)).resolves.toMatchObject({ estado: 'PENDIENTE' });
       expect(prisma.voucherPago.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: { in: [11n] } }, data: { retirado: true } });
-      expect(prisma.solicitudCambioCobro.create).not.toHaveBeenCalled();
+      expect(prisma.solicitudCambioCobro.create.mock.calls[0][0].data.voucher_ids).toEqual([]);
     });
 
     it('con una solicitud pendiente no se acepta otra (409), ni por la carrera del índice único', async () => {
