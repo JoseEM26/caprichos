@@ -15,6 +15,7 @@ import { SalonService } from './salon.service';
 import { AbrirPedidoMesaDto } from './dto/abrir-pedido-mesa.dto';
 import { LiberarMesaDto } from './dto/liberar-mesa.dto';
 import { CambiarMesaDto } from './dto/cambiar-mesa.dto';
+import { PersonasEsperaDto } from './dto/personas-espera.dto';
 import { AgregarMesasDto } from './dto/agregar-mesas.dto';
 
 @Controller('admin/salon')
@@ -62,6 +63,22 @@ export class SalonController {
   async asignarEspera(@Param('pedidoId') pedidoId: string, @Body() dto: CambiarMesaDto, @Req() req: any) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.salonService.asignarEspera(pedidoId, dto.mesaId, req.usuario, ip, dto.forzarOcupada === true);
+  }
+
+  /** Autogestión «Comer en el local»: Caja lo sienta en una mesa (libre, u ocupada con forzarOcupada). */
+  @Post('comer-local/:pedidoId/asignar')
+  @Permiso('mesas', 'abrir')
+  async asignarComerLocal(@Param('pedidoId') pedidoId: string, @Body() dto: CambiarMesaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.salonService.asignarEspera(pedidoId, dto.mesaId, req.usuario, ip, dto.forzarOcupada === true, true);
+  }
+
+  /** Autogestión «Comer en el local»: Caja lo manda a la lista de espera de mesa (local lleno). */
+  @Post('comer-local/:pedidoId/a-espera')
+  @Permiso('mesas', 'abrir')
+  async comerLocalAEspera(@Param('pedidoId') pedidoId: string, @Body() dto: PersonasEsperaDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.salonService.mandarComerLocalAEspera(pedidoId, dto.personas, req.usuario, ip);
   }
 
   /**

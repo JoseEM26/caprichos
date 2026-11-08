@@ -133,6 +133,12 @@ export interface SeguimientoPedido {
   estado: string;
   estadoEtiqueta: string;
   modalidad: Modalidad;
+  /**
+   * Solo «Comer en el local» de la carta: SIN_MESA (se llama por nombre), EN_ESPERA (Caja busca mesa) o
+   * ASIGNADA (con `mesa`). La mesa no es dato personal. Aditivo.
+   */
+  ubicacion?: 'SIN_MESA' | 'EN_ESPERA' | 'ASIGNADA';
+  mesa?: string;
   total: number;
   propina?: number;
   terminado: boolean;
@@ -192,6 +198,9 @@ const SELECCION_SEGUIMIENTO = {
   codigo: true,
   estado: true,
   modalidad: true,
+  canal: true,
+  mesa_nombre: true,
+  espera_mesa_desde: true,
   total: true,
   propina: true,
   creado_en: true,
@@ -233,6 +242,9 @@ type PedidoSeguimiento = {
   codigo: string;
   estado: string;
   modalidad: string;
+  canal?: string | null;
+  mesa_nombre?: string | null;
+  espera_mesa_desde?: Date | null;
   total: { toString(): string };
   propina?: { toString(): string } | null;
   creado_en: Date;
@@ -451,7 +463,9 @@ export class SeguimientoService {
   }
 
   private construir(pedido: PedidoSeguimiento, ctx: ContextoTiempo): SeguimientoPedido {
-    const modalidad = (pedido.modalidad in PASOS_POR_MODALIDAD ? pedido.modalidad : 'RECOGER') as Modalidad;
+    // Comer en el local que Caja convirtió a MESA (canal CARTA: los de mozo/caja nacen MESA con otro canal)
+    const autogestion = pedido.modalidad === 'COMER_LOCAL' || (pedido.modalidad === 'MESA' && pedido.canal === 'CARTA');
+    const modalidad = (autogestion ? 'COMER_LOCAL' : pedido.modalidad in PASOS_POR_MODALIDAD ? pedido.modalidad : 'RECOGER') as Modalidad;
     const anulado = pedido.estado === 'ANULADO';
     const rangoEstado = anulado ? -1 : (RANGO_ESTADO[pedido.estado] ?? 0);
 
@@ -476,6 +490,13 @@ export class SeguimientoService {
       estado: pedido.estado,
       estadoEtiqueta: ETIQUETA_ESTADO[pedido.estado] ?? pedido.estado,
       modalidad,
+      ...(autogestion
+        ? pedido.modalidad === 'COMER_LOCAL'
+          ? { ubicacion: 'SIN_MESA' as const }
+          : pedido.espera_mesa_desde
+            ? { ubicacion: 'EN_ESPERA' as const }
+            : { ubicacion: 'ASIGNADA' as const, mesa: pedido.mesa_nombre ?? undefined }
+        : {}),
       total: Number(pedido.total.toString()),
       // Propina aparte de la venta (0 = sin propina)
       propina: Number(pedido.propina?.toString() ?? 0),

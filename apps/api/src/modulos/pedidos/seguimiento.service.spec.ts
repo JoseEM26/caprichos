@@ -276,4 +276,31 @@ describe('SeguimientoService', () => {
       expect(json).not.toContain('llego_en');
     });
   });
+
+  describe('Comer en el local: ubicación para el cliente', () => {
+    const obtener = async (extra: Record<string, unknown>) => {
+      conPedido(pedidoBase({ modalidad: 'COMER_LOCAL', canal: 'CARTA', ...extra }));
+      return service.obtener('CAP-0007', tokenValido());
+    };
+    it('sin mesa ni lista: SIN_MESA', async () => {
+      const r: any = await obtener({});
+      expect(r).toMatchObject({ modalidad: 'COMER_LOCAL', ubicacion: 'SIN_MESA' });
+      expect(r.mesa).toBeUndefined();
+    });
+    it('en lista de espera (ya MESA, canal CARTA): EN_ESPERA y sigue siendo comer en el local', async () => {
+      const r: any = await obtener({ modalidad: 'MESA', mesa_nombre: 'En espera de mesa', espera_mesa_desde: new Date() });
+      expect(r).toMatchObject({ modalidad: 'COMER_LOCAL', ubicacion: 'EN_ESPERA' });
+      expect(r.pasos.map((p: any) => p.clave)).toEqual(['recibido', 'cocina', 'listo', 'entregado']);
+    });
+    it('con mesa: ASIGNADA con la mesa y sin datos personales', async () => {
+      const r: any = await obtener({ modalidad: 'MESA', mesa_nombre: 'Mesa 4' });
+      expect(r).toMatchObject({ ubicacion: 'ASIGNADA', mesa: 'Mesa 4' });
+      expect(JSON.stringify(r)).not.toMatch(/Nombre Privado|999000111/);
+    });
+    it('un pedido de mozo (MESA, canal MOZO) no cambia', async () => {
+      const r: any = await obtener({ modalidad: 'MESA', canal: 'MOZO', mesa_nombre: 'Mesa 2' });
+      expect(r.modalidad).toBe('MESA');
+      expect(r.ubicacion).toBeUndefined();
+    });
+  });
 });

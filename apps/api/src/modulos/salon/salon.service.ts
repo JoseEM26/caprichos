@@ -558,6 +558,8 @@ export class SalonService {
     usuario?: UsuarioAutenticado,
     ip?: string,
     forzarOcupada = false,
+    /** Pedido COMER_LOCAL de la carta que Caja sienta directo: se convierte a MESA dentro de la misma transacción. */
+    comerLocal = false,
   ) {
     const pId = BigInt(pedidoId);
     const destinoId = parseIdMesa(mesaId);
@@ -565,7 +567,8 @@ export class SalonService {
     if (!pedido) {
       throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
     }
-    if (pedido.estado === 'ANULADO' || !pedido.espera_mesa_desde) {
+    if (comerLocal) this.exigirComerLocalMovible(pedido);
+    else if (pedido.estado === 'ANULADO' || !pedido.espera_mesa_desde) {
       throw new ConflictException({
         codigo: 'PEDIDO_NO_EN_ESPERA',
         mensaje: 'Este pedido ya no está en la lista de espera (se asignó a una mesa o se anuló)',
@@ -618,6 +621,7 @@ export class SalonService {
             desplazado = { id: ped.id, codigo: ped.codigo, nombre: ped.cliente_nombre ?? null, quedaEnEspera: quedan === 0 };
           }
         }
+        if (comerLocal) await this.convertirComerLocalAMesa(tx, pId, {});
         // Condicional: dos mozos asignando el mismo pedido a la vez, solo uno gana
         const tomado = await tx.pedido.updateMany({
           where: { id: pId, espera_mesa_desde: { not: null }, estado: { not: 'ANULADO' } },
@@ -639,13 +643,15 @@ export class SalonService {
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
       modulo: 'mesas',
-      accion: 'ASIGNAR_MESA_ESPERA',
+      accion: comerLocal ? 'ASIGNAR_MESA_COMER_LOCAL' : 'ASIGNAR_MESA_ESPERA',
       resultado: 'OK',
       entidad: 'pedido',
       entidadId: pId,
       partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
       ip,
-      antes: { enEspera: true, esperaDesde: pedido.espera_mesa_desde.toISOString() },
+      antes: comerLocal
+        ? { modalidad: 'COMER_LOCAL', origen: 'AUTOGESTION_CARTA' }
+        : { enEspera: true, esperaDesde: pedido.espera_mesa_desde!.toISOString() },
       despues: {
         mesaId: destinoId.toString(),
         mesa: nombreDestino,
@@ -682,6 +688,76 @@ export class SalonService {
       mesa: nombreDestino,
       desplazado: salio ? { pedidoId: salio.id.toString(), codigo: salio.codigo, aListaEspera: salio.quedaEnEspera } : null,
     };
+  }
+
+  /** Comer local movible: solo COMER_LOCAL, vivo (COLA/PREPARANDO/LISTO) y sin cobrar. */
+  private exigirComerLocalMovible(pedido: { modalidad: string; estado: string; pago_estado: string | null; codigo: string }) {
+    if (pedido.modalidad !== 'COMER_LOCAL') {
+      throw new ConflictException({
+        codigo: 'PEDIDO_NO_COMER_LOCAL',
+        mensaje: 'Este pedido ya no es de «Comer en el local» sin mesa (ya tiene mesa, está en espera o es de otra modalidad)',
+      });
+    }
+    if (!['COLA', 'PREPARANDO', 'LISTO'].includes(pedido.estado) || pedido.pago_estado === 'PAGADO') {
+      throw new ConflictException({
+        codigo: 'PEDIDO_NO_MOVIBLE',
+        mensaje: `El pedido ${pedido.codigo} está anulado, entregado, cobrado o finalizado: no se puede asignar mesa ni mandar a la lista`,
+      });
+    }
+  }
+
+  /**
+   * COMER_LOCAL -> MESA (conserva canal CARTA) dentro de la transacción; el updateMany condicional
+   * hace que de dos cajeros solo uno gane. Deja el pedido «en espera» para que lo tome la asignación común.
+   */
+  private async convertirComerLocalAMesa(
+    tx: Prisma.TransactionClient,
+    pId: bigint,
+    datos: { personas?: number | null },
+  ) {
+    const fresco = await tx.pedido.findUnique({ where: { id: pId }, select: { modalidad: true, estado: true, pago_estado: true, codigo: true } });
+    if (!fresco) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    this.exigirComerLocalMovible(fresco);
+    const cobro = await tx.cobro.findFirst({ where: { pedido_id: pId, anulado_en: null }, select: { id: true } });
+    if (cobro) this.exigirComerLocalMovible({ ...fresco, pago_estado: 'PAGADO' });
+    const r = await tx.pedido.updateMany({
+      where: { id: pId, modalidad: 'COMER_LOCAL', estado: fresco.estado },
+      data: {
+        modalidad: 'MESA',
+        mesa_nombre: TEXTO_EN_ESPERA,
+        espera_mesa_desde: new Date(),
+        espera_personas: datos.personas ?? null,
+      },
+    });
+    if (r.count === 0) this.exigirComerLocalMovible({ ...fresco, modalidad: 'OTRA' });
+  }
+
+  /**
+   * POST /admin/salon/comer-local/:pedidoId/a-espera (mesas/abrir) { personas? }
+   * Caja manda un pedido de autogestión a la lista de espera de mesa (local lleno). Sigue su flujo en cocina.
+   * No reimprime: la etiqueta ya impresa dice «Comer en el local»; si hace falta, se reimprime a mano.
+   */
+  async mandarComerLocalAEspera(pedidoId: string | number | bigint, personas: number | undefined, usuario?: UsuarioAutenticado, ip?: string) {
+    const pId = BigInt(pedidoId);
+    const pedido = await this.prisma.pedido.findUnique({ where: { id: pId } });
+    if (!pedido) throw new NotFoundException({ codigo: 'PEDIDO_NO_ENCONTRADO', mensaje: 'Pedido no encontrado' });
+    this.exigirComerLocalMovible(pedido);
+    await this.prisma.$transaction((tx) => this.convertirComerLocalAMesa(tx, pId, { personas }));
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'mesas',
+      accion: 'COMER_LOCAL_A_ESPERA',
+      resultado: 'OK',
+      entidad: 'pedido',
+      entidadId: pId,
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+      antes: { modalidad: 'COMER_LOCAL', origen: 'AUTOGESTION_CARTA' },
+      despues: { modalidad: 'MESA', enEspera: true, personas: personas ?? null },
+    });
+    this.eventosGateway.emitirAdmin('salon:espera', { pedidoId: pId.toString(), accion: 'ENTRA' });
+    this.emitirCambioMesas(pId, pedido.codigo);
+    return { ok: true, pedidoId: pId.toString(), codigo: pedido.codigo, enEsperaMesa: true };
   }
 
   /** Quitarle la mesa a otro pedido exige el permiso de liberar mesas (ADMIN pasa). */
