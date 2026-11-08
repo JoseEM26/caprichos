@@ -344,7 +344,7 @@ export function MisPedidosView() {
                         · {p.clienteNombre}
                       </span>
                     )}
-                    {faltanVoucher(p) && <span className="mpv-insignia-falta">Falta captura (opcional)</span>}
+                    {faltanVoucher(p) && <span className="mpv-insignia-falta" title="El pago digital no necesita captura; puedes subirla después">ⓘ Sin captura</span>}
                     <span className="mp-estado" style={{ background: est.bg, color: est.fg }}>
                       {est.texto}
                     </span>
@@ -449,7 +449,7 @@ export function MisPedidosView() {
                     {mediosVoucher(p).map((m) => (
                       <div className="mpv-fila" key={m.medio}>
                         <span className={`mpv-badge ${m.subido ? 'mpv-badge--ok' : 'mpv-badge--falta'}`}>
-                          Voucher {nombreMedioPlan(m.medio)}: {m.subido ? 'subido' : 'falta'}
+                          {m.subido ? '' : 'ⓘ '}{nombreMedioPlan(m.medio)}: {m.subido ? 'captura subida' : 'sin captura'}
                         </span>
                         {m.subido && p.puedeCambiarVoucher && (
                           <button type="button" className="mpv-boton" onClick={() => setVoucherPedido({ pedido: p, medio: m.medio, monto: m.monto })}>
@@ -463,11 +463,14 @@ export function MisPedidosView() {
                         )}
                         {!m.subido && p.puedeSubirVoucher && (
                           <button type="button" className="mpv-boton" onClick={() => setVoucherPedido({ pedido: p, medio: m.medio, monto: m.monto })}>
-                            Subir voucher
+                            Subir captura (opcional)
                           </button>
                         )}
                       </div>
                     ))}
+                    {mediosVoucher(p).some((m) => !m.subido) && p.puedeSubirVoucher && (
+                      <p className="mpv-ayuda">La captura es opcional: puedes subirla después.</p>
+                    )}
                     {mediosVoucher(p).some((m) => m.subido) && p.puedeCambiarVoucher === false && (
                       <p className="mpv-ayuda">Voucher bloqueado: Caja ya aprobó el pago de este pedido. Pide a Caja cualquier cambio.</p>
                     )}

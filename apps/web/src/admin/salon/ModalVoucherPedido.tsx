@@ -65,7 +65,7 @@ export function ModalVoucherPedido({
         <div className="mpv-cuerpo">
           {monto != null && (
             <p className="mpv-ayuda">
-              Voucher de {nombreMedio} por S/ {monto.toFixed(2)}
+              Captura de {nombreMedio} por S/ {monto.toFixed(2)} (opcional: puedes subirla después)
             </p>
           )}
           <SubirVoucherMozo

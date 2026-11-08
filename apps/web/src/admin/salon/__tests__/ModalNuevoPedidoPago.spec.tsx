@@ -243,7 +243,7 @@ describe('ModalNuevoPedidoMesa: medio de pago del mozo en llevar y delivery', ()
       expect.any(String),
     );
     const dialogo = await screen.findByRole('dialog', { name: 'Voucher del pedido CP-W009' });
-    expect(within(dialogo).getByText('Voucher de Yape por S/ 5.00')).toBeInTheDocument();
+    expect(within(dialogo).getByText(/Captura de Yape por S\/ 5.00/)).toBeInTheDocument();
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Subir después' }));
     await waitFor(() => expect(alCerrar).toHaveBeenCalledTimes(1));
     expect(alExitoPedido).toHaveBeenCalledWith(pedidoCreado);
