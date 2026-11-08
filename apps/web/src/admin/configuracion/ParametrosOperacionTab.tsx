@@ -439,11 +439,6 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Capri conversa con más libertad (carta, pedido, promos, pagos) y pasa a una persona lo delicado. Requiere la IA encendida.',
     tipo: 'sino',
   },
-  chatbot_transcribir_audios: {
-    nombre: 'Chatbot: transcribir notas de voz con IA',
-    descripcion: 'La IA transcribe las notas de voz de los clientes para que el equipo las lea y el bot las entienda. Requiere la IA encendida.',
-    tipo: 'sino',
-  },
   chatbot_ia_tope_mensual_usd: {
     nombre: 'Chatbot: Tope mensual de gasto en IA (USD)',
     descripcion: 'Límite máximo en dólares por mes calendario para consumo de OpenAI. Al alcanzarse, la IA se apaga y alerta a Caja.',

@@ -3,7 +3,6 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import { MODELOS_TRANSCRIPCION } from '../chatbot/ia/transcripcion-modelos';
 import {
   CLAVES_TAMANO_ETIQUETA,
   TAMANO_ETIQUETA_MAX_MM,
@@ -145,8 +144,6 @@ export const CLAVES_TEXTO = [
   'chatbot_activo',
   'chatbot_ia_activo',
   'chatbot_modo_libre',
-  'chatbot_transcribir_audios',
-  'chatbot_transcripcion_modelo',
   'chatbot_pago_recordatorio_activo',
   'chatbot_avisos_equipo_activo',
   'reserva_web_activa',
@@ -335,7 +332,6 @@ export class ConfiguracionService {
         clave === 'chatbot_activo' ||
         clave === 'chatbot_ia_activo' ||
         clave === 'chatbot_modo_libre' ||
-        clave === 'chatbot_transcribir_audios' ||
         clave === 'voucher_ia_activo' ||
         clave === 'reserva_web_activa' ||
         clave === 'chatbot_avisos_equipo_activo' ||
@@ -362,15 +358,6 @@ export class ConfiguracionService {
           });
         }
         valor = valNorm;
-      } else if (clave === 'chatbot_transcripcion_modelo') {
-        const modelo = typeof valor === 'string' ? valor.trim().toLowerCase() : '';
-        if (!(MODELOS_TRANSCRIPCION as readonly string[]).includes(modelo)) {
-          throw new BadRequestException({
-            codigo: 'VALOR_INVALIDO',
-            mensaje: `El modelo debe ser uno de: ${MODELOS_TRANSCRIPCION.join(', ')}`,
-          });
-        }
-        valor = modelo;
       } else if (clave === 'notif_sonido_alcance') {
         const alcance = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
         if (!(ALCANCES_SONIDO_NOTIF as readonly string[]).includes(alcance)) {

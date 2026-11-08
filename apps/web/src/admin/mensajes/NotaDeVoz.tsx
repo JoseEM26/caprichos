@@ -5,15 +5,14 @@ const VELOCIDADES = [1, 1.5, 2];
 
 export interface NotaDeVozProps {
   audioId: string;
-  transcripcion?: string | null;
 }
 
 /**
  * Nota de voz del cliente: reproductor compacto (se carga con la sesión del equipo, nunca por enlace público),
- * velocidad 1x/1.5x/2x y, debajo, la transcripción con IA. Si el navegador no puede reproducirla
+ * velocidad 1x/1.5x/2x y descarga. Si el navegador no puede reproducirla
  * (p. ej. Safari sin soporte de ogg/opus) queda el enlace «Descargar audio».
  */
-export function NotaDeVoz({ audioId, transcripcion }: NotaDeVozProps) {
+export function NotaDeVoz({ audioId }: NotaDeVozProps) {
   const [url, setUrl] = useState('');
   const [fallo, setFallo] = useState(false);
   const [velocidad, setVelocidad] = useState(1);
@@ -65,12 +64,6 @@ export function NotaDeVoz({ audioId, transcripcion }: NotaDeVozProps) {
         <a className="msg-audio-descarga" href={url} download={`nota-de-voz-${audioId}`}>
           Descargar audio
         </a>
-      )}
-      {transcripcion && (
-        <div className="msg-audio-transcripcion">
-          <em data-testid="transcripcion-audio">{transcripcion}</em>
-          <span className="msg-audio-etiqueta">Transcrito con IA</span>
-        </div>
       )}
     </div>
   );

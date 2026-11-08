@@ -1021,10 +1021,9 @@
 .msg-btn-atendido { white-space: nowrap; }
 .msg-texto, .msg-vista { word-break: break-word; }
 
-/* Nota de voz del cliente (reproductor + transcripción con IA) */
+/* Nota de voz del cliente (reproductor) */
 .msg-audio { display: flex; flex-direction: column; gap: 4px; min-width: 220px; max-width: 100%; }
 .msg-audio-fila { display: flex; align-items: center; gap: 6px; }
 .msg-audio audio { height: 40px; flex: 1; min-width: 0; max-width: 100%; }
 .msg-audio-vel { min-height: 36px; min-width: 44px; padding: 0 8px; font-size: 13px; font-weight: 700; }
-.msg-audio-estado, .msg-audio-descarga, .msg-audio-etiqueta { font-size: 12px; color: #4A5A63; }
-.msg-audio-transcripcion { display: flex; flex-direction: column; gap: 2px; word-break: break-word; }
+.msg-audio-estado, .msg-audio-descarga { font-size: 12px; color: #4A5A63; }

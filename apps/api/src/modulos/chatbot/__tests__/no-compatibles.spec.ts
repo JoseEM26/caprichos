@@ -9,13 +9,14 @@ import { clasificarMensajeEntrante } from '../utilidades/clasificar-mensaje-entr
 import { armarTextoRepeticion, textoAvisoNoCompatible } from '../utilidades/no-compatibles.util';
 
 const TEL = '51987654321';
-const AVISO_AUDIO = 'Por ahora no puedo escuchar audios';
+const AVISO_VIDEO = 'No puedo ver videos';
 
 const payload = (msg: Record<string, unknown>) => ({
   object: 'whatsapp_business_account',
   entry: [{ changes: [{ value: { contacts: [{ wa_id: TEL, profile: { name: 'Ana' } }], messages: [{ id: 'wamid.X1', from: TEL, ...msg }] } }] }],
 });
 
+const video = { type: 'video', video: { id: 'v-1' } };
 const audio = { type: 'audio', audio: { voice: true, mime_type: 'audio/ogg; codecs=opus', id: 'm-1' } };
 
 describe('clasificarMensajeEntrante', () => {
@@ -109,12 +110,12 @@ describe('Mensajes no compatibles en el webhook', () => {
     ['referencia', 'PEDIDO_REFERENCIA', [], '¿Cuál es la referencia de tu casa?'],
     ['voucher', 'PAGO_ESPERANDO_VOUCHER', [], 'Envíame la captura del pago'],
     ['encuesta', 'ENCUESTA', [{ id: 'enc_5', titulo: '5 estrellas' }], '¿Cómo calificarías tu pedido?'],
-  ])('audio durante el paso de %s', (_nombre, estadoFlujo, botones, prompt) => {
+  ])('video durante el paso de %s', (_nombre, estadoFlujo, botones, prompt) => {
     it('no avanza el flujo, no guarda dato y repite el paso', async () => {
       conv.flujo = { nombre_perfil_wa: 'Ana', estado: estadoFlujo, repreguntasFallidas: 0 };
       mensajesSalientes = [{ contenido: { texto: prompt, botones } }];
 
-      await webhook.procesarPayload(payload(audio));
+      await webhook.procesarPayload(payload(video));
 
       expect(motor.procesarMensajeEntrante).not.toHaveBeenCalled();
       expect(conv.flujo.estado).toBe(estadoFlujo);
@@ -123,7 +124,7 @@ describe('Mensajes no compatibles en el webhook', () => {
       const enviado = encolados()[0];
       expect(enviado.origen).toBe('NO_COMPATIBLE');
       expect(enviado.telefono).toBe(TEL);
-      expect(enviado.carga.textoLibre).toContain(AVISO_AUDIO);
+      expect(enviado.carga.textoLibre).toContain(AVISO_VIDEO);
       expect(enviado.carga.textoLibre).toContain(prompt);
       expect(outbox.despertar).toHaveBeenCalled();
     });
@@ -131,26 +132,26 @@ describe('Mensajes no compatibles en el webhook', () => {
 
   it('si el último mensaje del bot tenía botones o lista, el aviso sale INTERACTIVO con las opciones reales', async () => {
     mensajesSalientes = [{ contenido: { texto: '¿Qué hacemos?', botones: [{ id: 'ped_x', titulo: 'Elegir' }] } }];
-    await webhook.procesarPayload(payload(audio));
+    await webhook.procesarPayload(payload(video));
     expect(encolados()[0].tipo).toBe('INTERACTIVO');
     expect(encolados()[0].carga.interactivo.botones).toEqual([{ id: 'ped_x', titulo: 'Elegir' }]);
-    expect(encolados()[0].carga.interactivo.cuerpo).toContain(AVISO_AUDIO);
+    expect(encolados()[0].carga.interactivo.cuerpo).toContain(AVISO_VIDEO);
 
     outbox.encolar.mockClear();
     ultimoAviso = null;
     mensajesSalientes = [{ contenido: { texto: 'Menú', botonTexto: 'Ver', filas: [{ id: 'f1', titulo: 'Pollo' }] } }];
-    await webhook.procesarPayload({ ...payload(audio), entry: [{ changes: [{ value: { contacts: [{ wa_id: TEL }], messages: [{ id: 'wamid.X2', from: TEL, ...audio }] } }] }] });
+    await webhook.procesarPayload({ ...payload(video), entry: [{ changes: [{ value: { contacts: [{ wa_id: TEL }], messages: [{ id: 'wamid.X2', from: TEL, ...video }] } }] }] });
     expect(encolados()[0].carga.interactivo.lista.secciones[0].filas).toEqual([{ id: 'f1', titulo: 'Pollo' }]);
   });
 
-  it('registra el audio en mensaje_chat con su tipo y el id de WhatsApp', async () => {
-    await webhook.procesarPayload(payload(audio));
+  it('registra el video en mensaje_chat con su tipo y el id de WhatsApp', async () => {
+    await webhook.procesarPayload(payload(video));
     expect(prisma.mensajeChat.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         direccion: 'ENTRA',
-        tipo: 'AUDIO',
+        tipo: 'VIDEO',
         meta_id: 'wamid.X1',
-        contenido: expect.objectContaining({ clase: 'NO_COMPATIBLE', etiqueta: 'Nota de voz', waMessageId: 'wamid.X1' }),
+        contenido: expect.objectContaining({ clase: 'NO_COMPATIBLE', etiqueta: 'Video', waMessageId: 'wamid.X1' }),
       }),
     });
   });
@@ -179,7 +180,7 @@ describe('Mensajes no compatibles en el webhook', () => {
 
   it('como mucho un aviso cada 2 minutos por conversación', async () => {
     ultimoAviso = { id: 9n };
-    await webhook.procesarPayload(payload(audio));
+    await webhook.procesarPayload(payload(video));
     expect(prisma.salienteWhatsapp.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ telefono_destino: TEL, origen: 'NO_COMPATIBLE', creado_en: { gte: expect.any(Date) } }),
     }));
@@ -188,26 +189,26 @@ describe('Mensajes no compatibles en el webhook', () => {
 
   it('chat tomado por una persona: no responde, solo registra', async () => {
     conv.tomado_por = 5n;
-    await webhook.procesarPayload(payload(audio));
+    await webhook.procesarPayload(payload(video));
     expect(outbox.encolar).not.toHaveBeenCalled();
     expect(prisma.mensajeChat.create).toHaveBeenCalled();
   });
 
   it('chat en manos de persona (dueño PERSONA): no responde', async () => {
     conv.duenio = 'PERSONA';
-    await webhook.procesarPayload(payload(audio));
+    await webhook.procesarPayload(payload(video));
     expect(outbox.encolar).not.toHaveBeenCalled();
   });
 
   it('consentimiento revocado: no responde', async () => {
     consentimiento = { acepta: false };
-    await webhook.procesarPayload(payload(audio));
+    await webhook.procesarPayload(payload(video));
     expect(outbox.encolar).not.toHaveBeenCalled();
   });
 
   it('tres no compatibles seguidos: derivan a una persona y dejan de avisar', async () => {
     mensajesEntrantes = [{ contenido: { clase: 'NO_COMPATIBLE' } }, { contenido: { clase: 'NO_COMPATIBLE' } }, { contenido: { clase: 'NO_COMPATIBLE' } }];
-    await webhook.procesarPayload(payload(audio));
+    await webhook.procesarPayload(payload(video));
 
     expect(prisma.conversacion.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ duenio: 'PERSONA', motivo_derivacion: 'MEDIOS_NO_COMPATIBLES' }),
@@ -219,20 +220,20 @@ describe('Mensajes no compatibles en el webhook', () => {
 
     // Después de la derivación el bot calla
     outbox.encolar.mockClear();
-    await webhook.procesarPayload(payload({ ...audio, id: 'wamid.X2' }));
+    await webhook.procesarPayload(payload({ ...video, id: 'wamid.X2' }));
     expect(outbox.encolar).not.toHaveBeenCalled();
   });
 
   it('dos no compatibles seguidos no derivan', async () => {
     mensajesEntrantes = [{ contenido: { clase: 'NO_COMPATIBLE' } }, { contenido: { clase: 'NO_COMPATIBLE' } }, { contenido: { texto: 'hola' } }];
-    await webhook.procesarPayload(payload(audio));
+    await webhook.procesarPayload(payload(video));
     expect(prisma.notificacion.create).not.toHaveBeenCalled();
     expect(prisma.conversacion.update).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ duenio: 'PERSONA' }) }));
   });
 
   it('un fallo de la cola no tumba el webhook', async () => {
     outbox.encolar.mockRejectedValueOnce(new Error('bd caída'));
-    await expect(webhook.procesarPayload(payload(audio))).resolves.toBeDefined();
+    await expect(webhook.procesarPayload(payload(video))).resolves.toBeDefined();
   });
 
   it('un texto normal sigue yendo al motor', async () => {

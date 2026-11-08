@@ -40,7 +40,7 @@ export const GRUPOS_PARAMETROS: GrupoParametros[] = [
   { id: 'encuesta', titulo: 'Encuesta posventa', claves: ['encuesta_espera_min', 'encuesta_puntaje_queja', 'encuesta_ventana_dias'] },
   { id: 'avisos', titulo: 'Avisos automáticos por WhatsApp al cliente', claves: ['chatbot_activo', 'whatsapp_aviso_recibido_activo', 'whatsapp_aviso_pago_confirmado_activo', 'whatsapp_aviso_listo_activo', 'whatsapp_aviso_recojo_activo', 'whatsapp_aviso_asignado_activo', 'whatsapp_aviso_salida_activo', 'whatsapp_aviso_llegada_activo', 'whatsapp_aviso_espera_activo', 'whatsapp_aviso_entregado_activo', 'whatsapp_aviso_encuesta_activo', 'whatsapp_aviso_voucher_recordatorio_activo', 'whatsapp_plantilla_recibido_seguimiento_activa', 'whatsapp_plantilla_delivery_ubicacion_activa', 'whatsapp_aviso_bienvenida_puntos_activo', 'whatsapp_aviso_puntos_ganados_activo', 'whatsapp_aviso_cuenta_activo'] },
   { id: 'pago', titulo: 'Pagos digitales por el chat', claves: ['chatbot_pago_recordatorio_activo', 'chatbot_pago_recordatorio_min', 'chatbot_pago_expira_min'] },
-  { id: 'ia', titulo: 'Inteligencia artificial', claves: ['chatbot_ia_activo', 'chatbot_modo_libre', 'chatbot_transcribir_audios', 'chatbot_ia_tope_mensual_usd', 'chatbot_ia_max_por_hora_telefono', 'ayuda_ia_activo'] },
+  { id: 'ia', titulo: 'Inteligencia artificial', claves: ['chatbot_ia_activo', 'chatbot_modo_libre', 'chatbot_ia_tope_mensual_usd', 'chatbot_ia_max_por_hora_telefono', 'ayuda_ia_activo'] },
   { id: 'alertas', titulo: 'Alertas internas y modo asistido', claves: ['alerta_voucher_min_1', 'alerta_voucher_min_2', 'espera_cliente_aviso_min', 'chat_tomado_liberar_min', 'alerta_pedido_sin_confirmar_min', 'asistido_espera_min'] },
   { id: 'impresion', titulo: 'Etiquetas e impresión', claves: ['impresion_alerta_min', 'impresion_vence_min', 'impresion_etiqueta_bebida_ancho_mm', 'impresion_etiqueta_bebida_alto_mm', 'impresion_etiqueta_general_ancho_mm', 'impresion_etiqueta_general_alto_mm'] },
 ];
@@ -491,13 +491,6 @@ export const AYUDA_PARAMETROS: Record<string, AyudaParametro> = {
     ejemplo: 'En «Sí», un cliente pregunta «¿qué me recomiendas para compartir?» y la IA sugiere con precios reales; si dice «quiero reclamar», pasa a una persona.',
     efecto: 'En «No» la IA solo responde dudas puntuales con respuestas cortas. Solo funciona si la IA del chatbot está en «Sí».',
     porDefecto: 'Sí', rango: SI_NO, palabras: ['ia', 'conversacion libre', 'bot', 'capri', 'modo libre', 'inteligencia artificial'], peligro: 'medio',
-  },
-  chatbot_transcribir_audios: {
-    grupo: 'ia', titulo: 'Transcribir notas de voz con IA',
-    descripcion: 'Cuando un cliente manda una nota de voz por WhatsApp, la IA la transcribe: el equipo la lee debajo del audio y el bot la entiende como si fuera un mensaje escrito. La nota siempre se guarda y se puede escuchar en Mensajes.',
-    ejemplo: 'En «Sí», el cliente graba «quiero dos donas para hoy» y Capri responde como si lo hubiera escrito.',
-    efecto: 'En «No» las notas de voz solo se guardan y se escuchan; el bot pide que escriban. Solo transcribe con la IA del chatbot en «Sí»; cada audio cuenta en el gasto de IA.',
-    porDefecto: 'Sí', rango: SI_NO, palabras: ['audio', 'nota de voz', 'voz', 'transcribir', 'whisper', 'ia', 'whatsapp'], peligro: 'medio',
   },
   chatbot_ia_tope_mensual_usd: {
     grupo: 'ia', titulo: 'Tope mensual de gasto en IA',

@@ -27,7 +27,7 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
         </div>
       )}
       {m.audioId ? (
-        <NotaDeVoz audioId={m.audioId} transcripcion={m.transcripcion} />
+        <NotaDeVoz audioId={m.audioId} />
       ) : m.ubicacion ? <TarjetaUbicacion ubicacion={m.ubicacion} /> : m.texto && <div className="msg-texto">{m.texto}</div>}
       <div className="msg-pie">
         <span
