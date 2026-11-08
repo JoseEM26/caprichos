@@ -9,7 +9,8 @@ export function ocultarCombos(productos: ProductoAdmin[], categorias: CategoriaA
   const idsCategoriasCombo = new Set(
     categorias
       .filter((c) => {
-        if (c.nombre.trim().toLowerCase() === 'combos') return true;
+        // Solo se oculta una categoría cuando TODOS sus productos son anfitriones de un combo real:
+        // un producto común (p. ej. un «Dúo» que aún no es combo de Ofertas) debe seguir visible para poder editarlo.
         const suyos = productos.filter((p) => p.categoriaId === c.id);
         return suyos.length > 0 && suyos.every((p) => p.esAnfitrionCombo === true);
       })

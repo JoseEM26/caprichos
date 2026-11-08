@@ -19,4 +19,9 @@ describe('ocultarCombos', () => {
     expect(r.productos.map((p) => p.id)).toEqual(['1']);
     expect(r.categorias).toHaveLength(1);
   });
+  it('un producto común dentro de la categoría Combos (p. ej. el Dúo viejo) NO se oculta', () => {
+    const r = ocultarCombos([prod('1', '20'), prod('2', '20', true)], [cat('20', 'Combos')]);
+    expect(r.productos.map((p) => p.id)).toEqual(['1']);
+    expect(r.categorias.map((c) => c.id)).toEqual(['20']);
+  });
 });
