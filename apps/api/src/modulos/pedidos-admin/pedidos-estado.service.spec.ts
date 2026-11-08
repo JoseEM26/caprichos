@@ -856,6 +856,21 @@ describe('PedidosEstadoService', () => {
         );
       });
 
+      // AUDITORÍA DE CUADRE H1 (dinero que no entra a caja): confirmar un pago digital como PAGADO no crea ningún
+      // cobro, así que ese Yape/Plin nunca suma en el cierre. Si algún día se corrige, esta prueba debe cambiar.
+      it('H1: YAPE PAGADO no crea cobro en caja (el dinero queda fuera del cierre; lo señala el control de cuadre)', async () => {
+        prismaMock.cobro.create = jest.fn();
+        await service.registrarPago(
+          10n,
+          { metodo: 'YAPE', estado: 'PAGADO', codigosOperacion: [{ medio: 'YAPE', codigo: '123456' }] },
+          cajeroAuth,
+        );
+        expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+        expect(prismaMock.pedido.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ pago_estado: 'PAGADO', pago_metodo: 'YAPE' }) }),
+        );
+      });
+
       it('busca solo vouchers no ILEGIBLE del pedido', async () => {
         prismaMock.voucherPago.findFirst.mockResolvedValue(null);
 
