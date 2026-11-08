@@ -434,6 +434,11 @@ export const META_PARAMETROS: Record<string, MetaParametro> = {
     descripcion: 'Habilita la IA (OpenAI) para resolver dudas de la carta, promociones, horarios y recomendaciones en WhatsApp con solo lectura.',
     tipo: 'sino',
   },
+  chatbot_modo_libre: {
+    nombre: 'Chatbot: conversación libre con la IA',
+    descripcion: 'Capri conversa con más libertad (carta, pedido, promos, pagos) y pasa a una persona lo delicado. Requiere la IA encendida.',
+    tipo: 'sino',
+  },
   chatbot_ia_tope_mensual_usd: {
     nombre: 'Chatbot: Tope mensual de gasto en IA (USD)',
     descripcion: 'Límite máximo en dólares por mes calendario para consumo de OpenAI. Al alcanzarse, la IA se apaga y alerta a Caja.',

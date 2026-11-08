@@ -46,6 +46,7 @@ describe('ChatbotIaService (Ola 3, Agente G - IA para dudas con OpenAI)', () => 
       parametro: {
         findUnique: jest.fn().mockImplementation(({ where }: any) => {
           if (where.clave === 'chatbot_ia_activo') return Promise.resolve({ valor: 'si' });
+          if (where.clave === 'chatbot_modo_libre') return Promise.resolve({ valor: 'no' }); // limites del modo anterior
           if (where.clave === 'chatbot_ia_tope_mensual_usd') return Promise.resolve({ valor: 20 });
           if (where.clave === 'chatbot_ia_max_por_hora_telefono') return Promise.resolve({ valor: 10 });
           if (where.clave === 'local_pagos') {

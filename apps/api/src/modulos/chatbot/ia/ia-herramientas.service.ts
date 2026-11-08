@@ -9,6 +9,7 @@ import { ZonasService } from '../../zonas/zonas.service';
 import { HerramientaIaDefinicion } from './tipos-ia';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 import { lineasDeCuenta } from '../../pedidos/lineas-combo.util';
+import { detalleDatosPago } from '../conversacion/flujos/pago/textos-pago';
 
 /**
  * Servicio de herramientas de SOLO LECTURA (function calling) para OpenAI.
@@ -110,7 +111,7 @@ export class IaHerramientasService {
         function: {
           name: 'estadoDePedido',
           description:
-            'Consulta el estado de un pedido del cliente actual mediante su código (ej: CP-0110). Solo consulta pedidos que pertenezcan estrictamente al número del cliente.',
+            'Consulta el estado de un pedido del cliente actual. Con el código (ej: CP-0110) busca ese pedido; sin código devuelve su último pedido. Solo consulta pedidos que pertenezcan estrictamente al número del cliente.',
           parameters: {
             type: 'object',
             properties: {
@@ -119,7 +120,21 @@ export class IaHerramientasService {
                 description: 'Código del pedido a consultar (ej: "CP-0110").',
               },
             },
-            required: ['codigo'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'pasarAPersona',
+          description:
+            'Pasa la conversación a una persona del equipo y avisa a Caja. ÚSALA SIEMPRE ante reclamos, devoluciones, descuentos, anulaciones o cambios de pedido, pagos dudosos, alergias o salud, o cuando el cliente pida hablar con alguien o tú no tengas el dato confirmado.',
+          parameters: {
+            type: 'object',
+            properties: {
+              motivo: { type: 'string', description: 'Motivo breve (ej: "reclamo por pedido frío").' },
+            },
+            required: ['motivo'],
           },
         },
       },
@@ -178,6 +193,16 @@ export class IaHerramientasService {
               args.codigo,
               contextoSeguridad.telefonoCliente,
             ),
+          };
+
+        case 'pasarAPersona':
+          return {
+            resultado: {
+              derivado: true,
+              motivo: String(args.motivo || 'Solicitud del cliente').slice(0, 200),
+              instruccion: 'Dile al cliente con calidez que una persona del equipo lo atenderá. No prometas tiempos.',
+            },
+            necesitaDerivar: true,
           };
 
         case 'recomendarProductos': {
@@ -422,7 +447,23 @@ export class IaHerramientasService {
 
     const configPagos = (paramPagos?.valor as any) || {};
 
+    // Número y titular reales (los mismos que recibe el cliente al pagar un pedido)
+    let datosParaPagar: Record<string, string> | undefined;
+    try {
+      const pub = await (this.localService as any)?.obtenerDatosPublicosLocal?.();
+      const vis = pub?.mediosPagoVisibles;
+      if (vis) {
+        datosParaPagar = {};
+        if (vis.yape?.numero) datosParaPagar.yape = detalleDatosPago('YAPE', vis, '0');
+        if (vis.plin?.numero) datosParaPagar.plin = detalleDatosPago('PLIN', vis, '0');
+        if (vis.transferencia?.cuenta) datosParaPagar.transferencia = detalleDatosPago('TRANSFERENCIA', vis, '0');
+      }
+    } catch {
+      datosParaPagar = undefined;
+    }
+
     return {
+      datosParaPagar,
       mediosDisponibles: [
         {
           metodo: 'Yape / Plin',
@@ -452,22 +493,26 @@ export class IaHerramientasService {
    * Si el pedido pertenece a otro número, se rechaza para proteger la privacidad.
    */
   async estadoDePedido(codigo: string, telefonoCliente?: string | null) {
-    if (!codigo) {
+    const telBusqueda = normalizarTelefono(telefonoCliente || '');
+    if (!codigo && !telBusqueda) {
       return { encontrado: false, mensaje: 'Debes proporcionar un código de pedido válido (ej: CP-0110).' };
     }
 
-    const codigoNorm = codigo.trim().toUpperCase();
-    const pedido = await this.prisma.pedido.findUnique({
-      where: { codigo: codigoNorm },
-      include: {
-        lineas: true,
-      },
-    });
+    const codigoNorm = (codigo || '').trim().toUpperCase();
+    const pedido = codigoNorm
+      ? await this.prisma.pedido.findUnique({ where: { codigo: codigoNorm }, include: { lineas: true } })
+      : await this.prisma.pedido.findFirst({
+          where: { cliente_telefono: { endsWith: telBusqueda.slice(-9) } },
+          orderBy: { creado_en: 'desc' },
+          include: { lineas: true },
+        });
 
     if (!pedido) {
       return {
         encontrado: false,
-        mensaje: `No encontramos ningún pedido registrado con el código ${codigoNorm}.`,
+        mensaje: codigoNorm
+          ? `No encontramos ningún pedido registrado con el código ${codigoNorm}.`
+          : 'No encontramos pedidos recientes con este número de WhatsApp.',
       };
     }
 
@@ -479,7 +524,7 @@ export class IaHerramientasService {
       // Seguridad: rechazar sin filtrar datos de otra persona
       return {
         encontrado: false,
-        mensaje: `El pedido ${codigoNorm} no corresponde al número de WhatsApp que realiza la consulta.`,
+        mensaje: `El pedido ${pedido.codigo} no corresponde al número de WhatsApp que realiza la consulta.`,
       };
     }
 
@@ -495,6 +540,10 @@ export class IaHerramientasService {
       total: Number(pedido.total),
       creado_en: pedido.creado_en.toISOString(),
       productos,
+      tiempoEstimadoMin:
+        (pedido as any).eta_min != null
+          ? { desde: (pedido as any).eta_min, hasta: (pedido as any).eta_max ?? (pedido as any).eta_min }
+          : null,
       mensaje: `Pedido ${pedido.codigo} en estado ${pedido.estado}.`,
     };
   }

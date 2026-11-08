@@ -7,6 +7,10 @@ import { calcularCostoEstimadoUsd } from './ia-precios.config';
 import { ResumenConsumoIaMes } from './tipos-ia';
 import { normalizarTelefono } from '../utilidades/enmascarar.util';
 
+/** Defaults (x5 respecto al diseno anterior): el dueno priorizo un bot mas funcional sobre el costo. */
+export const TOPE_MENSUAL_USD_DEFECTO = 100;
+export const MAX_POR_HORA_DEFECTO = 50;
+
 @Injectable()
 export class IaConsumoService {
   private readonly logger = new Logger(IaConsumoService.name);
@@ -36,6 +40,20 @@ export class IaConsumoService {
   }
 
   /**
+   * Conversación libre con IA ('chatbot_modo_libre'): por defecto 'si'; solo 'no' la apaga.
+   * Solo tiene efecto con la IA encendida (chatbot_ia_activo).
+   */
+  async estaModoLibre(): Promise<boolean> {
+    try {
+      const p = await this.prisma.parametro.findUnique({ where: { clave: 'chatbot_modo_libre' } });
+      if (!p || p.valor === null || p.valor === undefined) return true;
+      return !(p.valor === false || String(p.valor).toLowerCase().trim() === 'no');
+    } catch {
+      return true;
+    }
+  }
+
+  /**
    * Obtiene el valor del parámetro 'ayuda_ia_activo' (boolean, por defecto false).
    */
   async estaParametroAyudaIaActivo(): Promise<boolean> {
@@ -53,34 +71,34 @@ export class IaConsumoService {
   }
 
   /**
-   * Obtiene el tope mensual configurado en USD (por defecto 20).
+   * Obtiene el tope mensual configurado en USD (por defecto 100).
    */
   async obtenerTopeMensualUsd(): Promise<number> {
     try {
       const p = await this.prisma.parametro.findUnique({
         where: { clave: 'chatbot_ia_tope_mensual_usd' },
       });
-      if (!p || p.valor === null || p.valor === undefined) return 20;
+      if (!p || p.valor === null || p.valor === undefined) return TOPE_MENSUAL_USD_DEFECTO;
       const n = Number(p.valor);
-      return isNaN(n) || n <= 0 ? 20 : n;
+      return isNaN(n) || n <= 0 ? TOPE_MENSUAL_USD_DEFECTO : n;
     } catch {
-      return 20;
+      return TOPE_MENSUAL_USD_DEFECTO;
     }
   }
 
   /**
-   * Obtiene el límite de consultas por hora por teléfono (por defecto 10).
+   * Obtiene el límite de consultas por hora por teléfono (por defecto 50).
    */
   async obtenerMaxPorHoraTelefono(): Promise<number> {
     try {
       const p = await this.prisma.parametro.findUnique({
         where: { clave: 'chatbot_ia_max_por_hora_telefono' },
       });
-      if (!p || p.valor === null || p.valor === undefined) return 10;
+      if (!p || p.valor === null || p.valor === undefined) return MAX_POR_HORA_DEFECTO;
       const n = Number(p.valor);
-      return isNaN(n) || n <= 0 ? 10 : n;
+      return isNaN(n) || n <= 0 ? MAX_POR_HORA_DEFECTO : n;
     } catch {
-      return 10;
+      return MAX_POR_HORA_DEFECTO;
     }
   }
 

@@ -59,6 +59,9 @@ import { obtenerFechaHoraLima } from '../../local/local.util';
 import { DireccionesClienteService } from '../../clientes/direcciones-cliente.service';
 import { OutboxWhatsappService } from '../servicios/outbox-whatsapp.service';
 import { topePedidosSinPagarAlcanzado, textoTopePedidosSinPagar } from '../servicios/tope-pedidos-sin-pagar.util';
+import { ReanudacionBotService } from '../servicios/reanudacion-bot.service';
+import { botPausadoPorPersona, debeOmitirBienvenida, ultimaIntervencionHumana } from './reanudacion-bot.util';
+import { flujoLiberadoParaBot } from './flujo-liberado.util';
 import {
   leerExpiraPagoMin,
   motivoSalidaValidarPago,
@@ -102,6 +105,7 @@ export class EjecutorConversacionService {
     @Optional() private readonly outbox?: OutboxWhatsappService,
     @Optional() private readonly puntosService?: PuntosService,
     @Optional() @Inject(CUENTA_CLIENTE_BOT_PUERTO) private readonly clientesService?: CuentaClienteBotPuerto,
+    @Optional() private readonly reanudacionBot?: ReanudacionBotService,
   ) {}
 
   /**
@@ -263,6 +267,27 @@ export class EjecutorConversacionService {
       // sin historial se usa ultima_actividad
     }
     return ref ? (Date.now() - ref.getTime()) / 60000 : 0;
+  }
+
+  /** Regla del dueño: la bienvenida con menú solo en el primer contacto o tras días sin hablar (ver debeOmitirBienvenida). */
+  private async omitirBienvenida(conversacion: any, pedidosHoy: number, personaEn?: Date | null): Promise<boolean> {
+    try {
+      if (typeof this.prisma.mensajeChat?.findFirst !== 'function') return false;
+      const ult = await this.prisma.mensajeChat.findFirst({
+        where: { conversacion_id: conversacion.id, direccion: 'SALE', tipo: { not: 'SISTEMA' } },
+        orderBy: { en: 'desc' },
+        select: { en: true },
+      });
+      return debeOmitirBienvenida({
+        pedidosHoy,
+        estadoConversacion: conversacion.estado,
+        ultimaIntervencionHumana: ultimaIntervencionHumana(personaEn, conversacion.tomado_en),
+        ultimoMensajeSaleEn: ult?.en ? new Date(ult.en) : null,
+        reanudadoEn: (conversacion.flujo as any)?.reanudado_en,
+      });
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -735,10 +760,34 @@ export class EjecutorConversacionService {
       flujoPrevio = res.flujo;
       if (res.saludoEnviado) return true;
     }
-    const enManosDePersona =
+    let enManosDePersona =
       conversacion.duenio !== 'BOT' ||
       conversacion.tomado_por !== null ||
       flujoPrevio?.estado === 'ATENCION_PERSONA';
+
+    // Reanudación 00:01: si una persona intervino hoy (hora de Lima), el bot calla todo el día aunque el cliente escriba;
+    // si fue un día anterior, el chat vuelve al bot (por si el cron de las 00:01 no alcanzó a liberarlo).
+    let ultimoMensajePersonaDia: { en: Date } | null = null;
+    if (enManosDePersona && !esValidarPago && typeof this.prisma.mensajeChat?.findFirst === 'function') {
+      ultimoMensajePersonaDia = await this.prisma.mensajeChat.findFirst({
+        where: { conversacion_id: conversacion.id, direccion: 'SALE', autor: 'PERSONA' },
+        orderBy: { en: 'desc' },
+        select: { en: true },
+      });
+      const intervencion = ultimaIntervencionHumana(ultimoMensajePersonaDia?.en, conversacion.tomado_en);
+      if (botPausadoPorPersona(intervencion)) {
+        this.logger.log(`Conversación ${conversacionId}: una persona intervino hoy; el bot se reanuda a las 00:01.`);
+        await this.registrarSilencio(conversacion.id, 'Una persona atendió este chat hoy; el bot se reanuda a las 00:01.');
+        return false;
+      }
+      if (intervencion && this.reanudacionBot && (await this.reanudacionBot.liberarUna(conversacion as any))) {
+        enManosDePersona = false;
+        flujoPrevio = flujoLiberadoParaBot(flujoPrevio) as any;
+        (conversacion as any).flujo = flujoPrevio;
+        conversacion.duenio = 'BOT';
+        conversacion.tomado_por = null;
+      }
+    }
 
     let esModoAsistido = false;
     let asistidoEsperaMin = 3;
@@ -1221,6 +1270,7 @@ export class EjecutorConversacionService {
       errorServicio,
       limiteConsultasExcedido,
       pedidosHoyTelefono,
+      sinBienvenida: await this.omitirBienvenida(conversacion, pedidosHoyTelefono, ultimoMensajePersonaDia?.en),
       minutosInactividad,
       inactividadExpirada,
       resultadoEnvio,
@@ -2283,11 +2333,11 @@ export class EjecutorConversacionService {
 
         if (this.chatbotIaService) {
           try {
-            // Historial corto (últimos 6 mensajes)
+            // Historial reciente (últimos 15 mensajes); el servicio de IA recorta a 6 si el modo libre está apagado
             const ultimosMensajes = await this.prisma.mensajeChat.findMany({
               where: { conversacion_id: conversacion.id },
               orderBy: { en: 'desc' },
-              take: 6,
+              take: 15,
             });
             const historial = ultimosMensajes.reverse().map((m) => ({
               autor: m.autor,

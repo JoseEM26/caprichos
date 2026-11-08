@@ -1928,6 +1928,15 @@ function transicionarSoloMenus(
     ]);
   };
 
+  const saludoCorto = () => {
+    const ped = contexto.pedidoActivo;
+    const nombre = contexto.nombreCliente && contexto.nombreCliente !== 'Cliente' ? ` ${String(contexto.nombreCliente).split(/\s+/)[0]}` : '';
+    const lineaPedido = ped?.codigo ? ` Tu pedido ${ped.codigo} sigue su curso.` : '';
+    return respuesta([
+      { tipo: 'enviarBotones', texto: `¡Hola de nuevo${nombre}! 😊${lineaPedido}\nAquí sigo por si necesitas algo más.`, botones: [BOTON_VOLVER_MENU] },
+    ]);
+  };
+
   // 0. Pedido en curso que lleva más de 30 minutos sin respuesta: se descarta el carrito y se vuelve al menú
   if (contexto.inactividadExpirada && enPedido) {
     return {
@@ -1935,6 +1944,11 @@ function transicionarSoloMenus(
       acciones: [{ tipo: 'enviarBotones', texto: TEXTOS_BOT.pedidoExpiradoInactividad(), botones: BOTONES_MENU_PRINCIPAL }],
       nuevoFlujo: { ...flujo, estado: 'MENU', pedido: null, repreguntasFallidas: 0 },
     };
+  }
+
+  // Con conversación reciente, pedido de hoy o chat atendido, un «hola»/«gracias» no vuelve a abrir la bienvenida con menú
+  if (contexto.sinBienvenida && !enPedido && !enPago && !esId('menu', 'btn_menu', 'volver_menu', 'inicio') && !['menu', 'comenzar', 'opciones', '0'].includes(texto) && (esSaludoPuro(texto) || flujo.estado === 'INICIO')) {
+    return saludoCorto();
   }
 
   // Saludo y regreso al menú (fuera de un pedido o pago en curso: ahí lo atiende el flujo de pedido)
