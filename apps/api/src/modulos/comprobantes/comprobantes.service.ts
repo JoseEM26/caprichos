@@ -680,7 +680,11 @@ export class ComprobantesService {
       where: {
         facturacion_estado: 'PENDIENTE_ENVIO',
         tipo: { in: TIPOS_ELECTRONICOS },
-        OR: [{ proximo_intento_en: null }, { proximo_intento_en: { lte: ahora } }],
+        // el anulado sin haber salido no se envía; si ya hubo intento (SUNAT pudo recibirlo) sale para poder darlo de baja
+        AND: [
+          { OR: [{ proximo_intento_en: null }, { proximo_intento_en: { lte: ahora } }] },
+          { OR: [{ anulado_en: null }, { facturacion_intentos: { gt: 0 } }] },
+        ],
       },
       orderBy: { creado_en: 'asc' },
       take: 20,
@@ -693,6 +697,7 @@ export class ComprobantesService {
         this.logger.error(`Reenvío del comprobante ${p.id}: ${e?.message ?? e}`);
       }
     }
+    await this.reintentarBajasPendientes();
     await this.recuperarConstancias();
     return { revisados: pendientes.length };
   }
@@ -1032,6 +1037,78 @@ export class ComprobantesService {
       ip,
     });
     return this.serializarComprobante(actualizado);
+  }
+
+  /**
+   * Baja de la boleta/factura vigente de un pedido cuyo cobro se anula (o cuyo pedido se anula). NUNCA lanza:
+   * la anulación del cobro no depende de SUNAT.
+   * - Nunca salió a SUNAT (pendiente sin intentos o rechazada): se anula aquí y no se envía.
+   * - Ya aceptada o reportada: comunicación de baja; si SUNAT no responde queda baja_estado PENDIENTE_BAJA y
+   *   el barrido de reintentos la repite (reintentarBajasPendientes).
+   * En todos los casos el comprobante queda con anulado_en: un nuevo cobro emite otro, nunca reutiliza este.
+   */
+  async darDeBajaPorAnulacion(
+    pedidoIdRaw: bigint | string | number,
+    motivoRaw: string,
+    usuario?: UsuarioAutenticado,
+    ip?: string,
+  ): Promise<{ comprobante: string; estado: string } | null> {
+    const pedidoId = this.parsearId(pedidoIdRaw, 'pedido');
+    const c = await this.prisma.comprobante.findFirst({
+      where: { pedido_id: pedidoId, anulado_en: null, tipo: { in: TIPOS_ELECTRONICOS } },
+    });
+    if (!c) return null;
+    const motivo = (motivoRaw || '').trim().length >= 5 ? motivoRaw.trim() : 'Cobro anulado en caja';
+    const sinSalir = c.facturacion_estado === 'RECHAZADO' || (c.facturacion_estado === 'PENDIENTE_ENVIO' && !((c.facturacion_intentos ?? 0) > 0));
+    let estado: string;
+    if (sinSalir) {
+      estado = 'ANULADO_SIN_ENVIAR';
+    } else {
+      try {
+        const r = await this.anularElectronico(c.id, motivo, usuario, ip);
+        estado = r.baja_estado ?? 'ACEPTADA';
+      } catch (e: any) {
+        estado = 'PENDIENTE_BAJA';
+        this.logger.warn(`Baja del comprobante ${c.id} pendiente: ${e?.message ?? e}`);
+        await this.prisma.comprobante
+          .update({ where: { id: c.id }, data: { baja_estado: estado, baja_motivo: motivo, baja_en: new Date() } })
+          .catch(() => undefined);
+      }
+    }
+    const ahora = new Date();
+    await this.prisma.comprobante.update({ where: { id: c.id }, data: { anulado_en: ahora, anulado_motivo: motivo } });
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'comprobantes',
+      accion: 'BAJA_POR_ANULACION',
+      resultado: 'OK',
+      entidad: 'comprobante',
+      entidadId: c.id,
+      motivo,
+      antes: { facturacion_estado: c.facturacion_estado, baja_estado: c.baja_estado ?? null },
+      despues: { numero_texto: c.numero_texto, estado },
+      partyId: usuario?.partyId ? BigInt(usuario.partyId) : undefined,
+      ip,
+    });
+    return { comprobante: c.numero_texto, estado };
+  }
+
+  /** Repite las bajas que SUNAT no recibió (PENDIENTE_BAJA). Una pasada del barrido; nunca lanza. */
+  async reintentarBajasPendientes(): Promise<number> {
+    const filas = await this.prisma.comprobante.findMany({
+      where: { baja_estado: 'PENDIENTE_BAJA', facturacion_estado: { in: ['EMITIDO_SUNAT', 'PENDIENTE_RESUMEN'] } },
+      orderBy: { baja_en: 'asc' },
+      take: 10,
+      select: { id: true, baja_motivo: true },
+    });
+    for (const f of filas) {
+      try {
+        await this.anularElectronico(f.id, f.baja_motivo ?? 'Cobro anulado en caja');
+      } catch (e: any) {
+        this.logger.warn(`Reintento de baja del comprobante ${f.id}: ${e?.message ?? e}`);
+      }
+    }
+    return filas.length;
   }
 
   /** Lista de BOLETA/FACTURA ya enviadas (aceptadas, rechazadas o pendientes), más recientes primero. */

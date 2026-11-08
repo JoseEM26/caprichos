@@ -202,11 +202,14 @@ export function cobroVigente<T extends { anulado_en: Date | null }>(
 export function efectivoDelRepartidor(p: {
   total: unknown;
   pago_metodo: string | null;
-  cobros: { anulado_en: Date | null }[];
+  cobros: { anulado_en: Date | null; total?: unknown }[];
   /** Plan de pago (pago dividido o cambio de cobro aprobado en la puerta): cuenta solo su renglón EFECTIVO */
   planPago?: { medio: string; monto: unknown }[] | null;
 }): number {
-  if (cobroVigente(p.cobros)) return 0;
+  const cobro = cobroVigente(p.cobros);
+  // Un cobro que cubre menos que el pedido es solo la parte digital que se asentó al liquidar al repartidor:
+  // su efectivo sigue siendo del repartidor (así la liquidación no cambia al asentar ese cobro)
+  if (cobro && !(cobro.total != null && aCentimos(cobro.total) < aCentimos(p.total))) return 0;
   if (p.planPago && p.planPago.length > 0) {
     return p.planPago.filter((f) => f.medio === 'EFECTIVO').reduce((acc, f) => acc + aCentimos(f.monto), 0);
   }

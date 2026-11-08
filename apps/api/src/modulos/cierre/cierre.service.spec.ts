@@ -641,6 +641,71 @@ describe('CierreService', () => {
     });
   });
 
+  describe('H2: plan dividido en delivery asienta la parte digital como Cobro al liquidar', () => {
+    const repartidor = [
+      {
+        repartidorPartyId: '55',
+        nombre: 'Marcos Ruta',
+        pedidos: [{ id: 510, codigo: 'CP-W110', total: 2, entregadoEn: new Date() }],
+        cobradoCentimos: 200,
+        liquidadoCentimos: 0,
+        pendienteCentimos: 200,
+      },
+    ];
+
+    it('Yape 38 + efectivo 2: crea el Cobro digital (38) en la caja abierta y el efectivo entra por la liquidación', async () => {
+      jest.spyOn(service as any, 'repartidoresConEfectivo').mockResolvedValue(repartidor);
+      prismaMock.cobro.create = jest.fn().mockResolvedValue({ id: 1n });
+      prismaMock.pedido.findMany.mockResolvedValue([
+        { id: 510n, planPago: [{ medio: 'YAPE', monto: 38 }, { medio: 'EFECTIVO', monto: 2 }] },
+      ]);
+
+      await service.liquidarRepartidor({ repartidorPartyId: 55, entregado: 2 }, mockUsuarioCajero);
+
+      expect(prismaMock.cobro.create).toHaveBeenCalledTimes(1);
+      const data = prismaMock.cobro.create.mock.calls[0][0].data;
+      expect(data.pedido_id).toBe(510n);
+      expect(data.caja_id).toBe(10n);
+      expect(data.total).toBe(38);
+      expect(data.pagos.create).toEqual([{ medio: 'YAPE', monto: 38, propina: 0 }]);
+      // el efectivo (2) sigue entrando por la liquidación, no por el cobro
+      expect(prismaMock.liquidacion.create.mock.calls[0][0].data.entregado).toBe(2);
+      expect(prismaMock.pedido.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { pago_estado: 'PAGADO' } }));
+    });
+
+    it('un pedido solo en efectivo no crea ningún cobro', async () => {
+      jest.spyOn(service as any, 'repartidoresConEfectivo').mockResolvedValue(repartidor);
+      prismaMock.cobro.create = jest.fn();
+      prismaMock.pedido.findMany.mockResolvedValue([{ id: 510n, planPago: [] }]);
+      await service.liquidarRepartidor({ repartidorPartyId: 55, entregado: 2 }, mockUsuarioCajero);
+      expect(prismaMock.cobro.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('H1: el cierre no se hace a ciegas con pagos sin cobro', () => {
+    const dto: any = { conteo: { '200': 1, '100': 1, '50': 1, '5': 1 }, medios: { yape: 200, plin: 0, transferencia: 50, tarjeta: 100 } };
+    const sinCobro = { codigo: 'CP-9', total: 45.5, pago_metodo: 'YAPE', planPago: [] };
+    // la consulta de pagados sin cobro se reconoce por su filtro; el resto (reparto) no devuelve nada
+    const conSinCobro = () =>
+      prismaMock.pedido.findMany.mockImplementation(async (a: any) => (a?.where?.pago_estado === 'PAGADO' ? [sinCobro] : []));
+
+    it('con pedidos PAGADO sin cobro del día y sin nota responde 409 PAGOS_SIN_COBRO con la lista y no cierra', async () => {
+      conSinCobro();
+      await expect(service.cerrar(dto, mockUsuarioCajero)).rejects.toMatchObject({
+        response: { codigo: 'PAGOS_SIN_COBRO', pedidos: [{ codigo: 'CP-9', total: 45.5, medio: 'YAPE' }] },
+      });
+      expect(prismaMock.cierreCaja.create).not.toHaveBeenCalled();
+    });
+
+    it('con nota cierra y deja los pedidos en la auditoría del cierre', async () => {
+      conSinCobro();
+      await service.cerrar({ ...dto, nota: 'Yape confirmado antes de la corrección' }, mockUsuarioCajero);
+      expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'CERRAR_CAJA', despues: expect.objectContaining({ pagos_sin_cobro: ['CP-9 S/ 45.50 YAPE'] }) }),
+      );
+    });
+  });
+
   // -------------------------------------------------------------------------
   // 7. Cobros en curso impiden cerrar la caja
   // -------------------------------------------------------------------------

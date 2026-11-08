@@ -29,7 +29,7 @@ import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { esPedidoLocalSinCaptura, exigirComprobanteDigital, mediosQueExigenCodigo, voucherCubreMedio } from '../caja/comprobante-pago.util';
 import { puedeCambiarVoucher, puedeSubirVoucher } from '../vouchers/regla-cambio-voucher';
 import { MEDIOS_CON_VOUCHER_CAJA } from '../vouchers/vouchers.service';
-import { exigirCajaAbiertaHoy } from '../caja/caja.calculo';
+import { aCentimos, enPesos, exigirCajaAbiertaHoy } from '../caja/caja.calculo';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
 import { enmascararDni } from '../usuarios/usuarios.util';
 import { SELECT_PRUEBA_INCIDENTE, construirPruebaEntrega } from '../repartos/prueba-entrega';
@@ -1212,7 +1212,7 @@ export class PedidosEstadoService {
     const pedidoId = this.parsearId(id);
     const pedido = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
-      include: { planPago: true },
+      include: { planPago: true, cobros: { where: { anulado_en: null }, take: 1 } },
     });
 
     if (!pedido) {
@@ -1277,11 +1277,42 @@ export class PedidosEstadoService {
     // COORDINADO (falta cobrar contraentrega o en Caja) y pasa a PAGADO cuando entra ese efectivo.
     const restoPorCobrar = (pedido.planPago ?? []).some((f) => !MEDIOS_DIGITALES_PLAN.includes(f.medio as never));
     const estadoFinal = dto.estado === 'PAGADO' && restoPorCobrar ? 'COORDINADO' : dto.estado;
+    // PAGADO nunca deja el dinero fuera de caja: el pago pasa por el mismo cobro que usa Caja (Cobro en la caja de
+    // hoy, comprobante, ticket, puntos). Quedan fuera, por diseño: el crédito del personal, el total 0,
+    // lo ya cobrado (una cortesía solo baja el total) y el efectivo contra entrega de un delivery (entra por la liquidación del repartidor).
+    const plan = pedido.planPago ?? [];
+    const contraEntrega =
+      pedido.modalidad === 'DELIVERY' && (plan.length ? plan.some((f) => f.medio === 'EFECTIVO') : metodoUpper === 'EFECTIVO');
+    const debeCobrarse =
+      estadoFinal === 'PAGADO' &&
+      !!this.cobros &&
+      !pedido.es_personal &&
+      Number(pedido.total) > 0 &&
+      pedido.pago_estado !== 'PAGADO' &&
+      !(pedido.cobros ?? []).length &&
+      !contraEntrega;
+    if (debeCobrarse) {
+      // Lo que entrega el cliente: la venta (plan guardado o un solo renglón con el método) más la propina del pedido
+      const renglones = plan.length
+        ? plan.map((f) => ({ medio: String(f.medio), monto: aCentimos(f.monto) }))
+        : [{ medio: metodoUpper, monto: aCentimos(pedido.total) }];
+      renglones[0].monto += aCentimos(pedido.propina ?? 0);
+      await this.cobros!.cobrar(
+        {
+          pedidoId: pedido.id.toString(),
+          pagos: renglones.map((r) => ({ medio: r.medio, monto: enPesos(r.monto) })),
+          sinVoucher: dto.sinVoucher,
+          confirmaSinCaptura: dto.confirmaSinCaptura,
+        } as any,
+        usuarioActual,
+        ip,
+      );
+    }
     const pedidoActualizado = await this.prisma.pedido.update({
       where: { id: pedido.id },
       data: {
-        pago_metodo: metodoUpper,
-        pago_estado: estadoFinal,
+        // con cobro, el medio y el estado ya los dejó el cobro (MIXTO si hay más de un medio)
+        ...(debeCobrarse ? {} : { pago_metodo: metodoUpper, pago_estado: estadoFinal }),
         pago_coordinado_en: ahora,
         pago_coordinado_por: usuarioActual.partyId,
       },
