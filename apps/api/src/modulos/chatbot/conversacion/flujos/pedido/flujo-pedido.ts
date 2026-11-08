@@ -51,6 +51,7 @@ import {
   BOTONES_PEDIDO_TELEFONO,
 } from '../../textos-bot';
 import {
+  MEDIOS_DIGITALES,
   NOMBRE_MEDIO,
   botonesEfectivo,
   calcularTotales,
@@ -302,6 +303,8 @@ export function carritoTrasComboRechazado(
     ],
   };
 }
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
 
 export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   readonly nombre = 'pedido';
@@ -2488,6 +2491,11 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
       ? planPago.some((f) => ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(f.medio))
       : ['YAPE', 'PLIN', 'TRANSFERENCIA'].includes(pedido.pago?.metodo || '');
 
+    // Pago dividido: solo se pide yapear la parte digital; el resto se paga al recibir
+    const montoDigital = planPago?.length
+      ? r2(planPago.filter((f) => MEDIOS_DIGITALES.includes(f.medio)).reduce((a, f) => a + f.monto, 0))
+      : total;
+
     // Despachar acción transaccional para PedidosService
     return {
       nuevoEstado: 'MENU',
@@ -2500,7 +2508,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
           tiempoEstimadoMin: tiempoMin,
           tiempoEstimadoMax: tiempoMax,
           esPagoDigital,
-          datosPagoTexto: this.formatearDatosPago((contexto.datosLocalPublicos?.mediosPagoVisibles ?? contexto.datosLocalPublicos?.mediosPago), total),
+          datosPagoTexto: this.formatearDatosPago((contexto.datosLocalPublicos?.mediosPagoVisibles ?? contexto.datosLocalPublicos?.mediosPago), montoDigital, r2(total - montoDigital)),
         },
       ],
       nuevoFlujo: {
@@ -3224,7 +3232,7 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
   // -------------------------------------------------------------------------
   // Helper: Formatear Datos de Pago Digital (Yape / Plin / Cuentas)
   // -------------------------------------------------------------------------
-  private formatearDatosPago(pagosCfg: any = {}, total: number): string {
+  private formatearDatosPago(pagosCfg: any = {}, total: number, restoAlRecibir = 0): string {
     const cfg = pagosCfg ?? {};
     const lineas: string[] = [];
     // Solo los medios activos y con dato real: nunca números de relleno
@@ -3239,7 +3247,8 @@ export class FlujoPedidoSubFlujo implements SubFlujoConversacion {
     return (
       `📱 *Datos para realizar tu pago:*\n` +
       (lineas.length ? `${lineas.join('\n')}\n` : '') +
-      `Monto a pagar: *S/ ${total.toFixed(2)}*`
+      `Monto a pagar: *S/ ${total.toFixed(2)}*` +
+      (restoAlRecibir > 0 ? `\nLos S/ ${restoAlRecibir.toFixed(2)} restantes los pagas al recibir tu pedido.` : '')
     );
   }
 

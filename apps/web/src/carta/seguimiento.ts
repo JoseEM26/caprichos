@@ -59,6 +59,10 @@ export interface EstadoSeguimiento {
   pagoDigital?: boolean;
   /** YAPE, PLIN o TRANSFERENCIA cuando `pagoDigital`. */
   medioPago?: string;
+  /** Pago dividido: solo lo que se paga por el medio digital (venta + propina). */
+  montoDigital?: number;
+  /** Pago dividido: lo que falta pagar al recibir o en caja. */
+  montoContraentrega?: number;
   /** Estado del voucher: solo con pago digital (en efectivo no viene). */
   voucher?: VoucherSeguimiento;
 }

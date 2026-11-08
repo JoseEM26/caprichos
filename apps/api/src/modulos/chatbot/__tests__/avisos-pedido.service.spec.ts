@@ -271,6 +271,20 @@ describe('AvisosPedidoService: puntos en los avisos de la carta', () => {
     });
   });
 
+  it('pago dividido Yape 38 + efectivo 2: el aviso pide yapear S/ 38.00 (no 40) y anota los S/ 2.00 al recibir', async () => {
+    prisma.pedido.findUnique = jest.fn(async () => ({
+      id: BigInt(93), codigo: 'CP-093', cliente_nombre: 'Ana', cliente_telefono: '987654321', modalidad: 'DELIVERY', total: 40, lineas: [{ nombre: 'Dona', cantidad: 2 }], envio: 5, entrega_lat: -12.1, entrega_lng: -77, zona_id: 3,
+      pago_metodo: 'YAPE', pago_preferido: 'YAPE', canal: 'CARTA', party_id: null, cliente_party_id: null, puntos_ganados: 0,
+    }));
+    prisma.parametro.findMany = jest.fn(async () => [{ clave: 'voucher_yape_numero', valor: '977503006' }]);
+    prisma.pedidoPagoPlan = { findMany: jest.fn(async () => [{ medio: 'YAPE', monto: 38 }, { medio: 'EFECTIVO', monto: 2 }]) };
+    await servicio.avisar(93, 'RECIBIDO', {}, undefined);
+    const texto = cargaEncolada().textoLibre as string;
+    expect(texto).toContain('Monto: S/ 38.00');
+    expect(texto).not.toContain('Monto: S/ 40.00');
+    expect(texto).toContain('S/ 2.00 restantes');
+  });
+
   describe('plantillas de delivery con ubicación en RECIBIDO', () => {
     const pedidoSinUbicar = (pago: 'EFECTIVO' | 'YAPE', extra: Record<string, unknown> = {}) => {
       prisma.pedido.findUnique = jest.fn(async () => ({

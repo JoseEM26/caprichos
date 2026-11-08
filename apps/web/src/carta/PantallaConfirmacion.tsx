@@ -268,7 +268,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
       )}
 
       {estado && !estado.anulado && !estado.terminado && (
-        <AdjuntarCapturaPago codigo={pedido.codigo} token={pedido.token ?? ''} pagoDigital={Boolean(estado.pagoDigital)} medio={estado.medioPago} total={total} />
+        <AdjuntarCapturaPago codigo={pedido.codigo} token={pedido.token ?? ''} pagoDigital={Boolean(estado.pagoDigital)} medio={estado.medioPago} total={estado.montoDigital ?? total} restoAlRecibir={estado.montoContraentrega} />
       )}
 
       {otros.length > 0 && (

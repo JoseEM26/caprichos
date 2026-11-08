@@ -1102,10 +1102,11 @@ export class CierreService {
       });
 
       // Ese efectivo ya entró a caja por la liquidación: sus pedidos dejan de estar pendientes de cobro.
-      // Si siguieran PENDIENTE bloquearían el cierre, y cobrarlos después contaría el efectivo dos veces.
+      // Si siguieran PENDIENTE o COORDINADO (p. ej. pago dividido con Yape validado y efectivo contraentrega)
+      // bloquearían el cierre, y cobrarlos después contaría el efectivo dos veces.
       const pedidosIds = (info?.pedidos ?? []).map((p) => BigInt(p.id));
       await tx.pedido.updateMany({
-        where: { id: { in: pedidosIds }, pago_estado: 'PENDIENTE' },
+        where: { id: { in: pedidosIds }, pago_estado: { in: ['PENDIENTE', 'COORDINADO'] } },
         data: { pago_estado: 'PAGADO' },
       });
 

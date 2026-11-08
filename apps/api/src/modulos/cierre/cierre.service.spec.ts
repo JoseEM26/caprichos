@@ -773,7 +773,7 @@ describe('CierreService', () => {
       await service.liquidarRepartidor({ repartidorPartyId: 55, entregado: 60 }, mockUsuarioCajero);
 
       expect(prismaMock.pedido.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: [502n] }, pago_estado: 'PENDIENTE' },
+        where: { id: { in: [502n] }, pago_estado: { in: ['PENDIENTE', 'COORDINADO'] } },
         data: { pago_estado: 'PAGADO' },
       });
     });

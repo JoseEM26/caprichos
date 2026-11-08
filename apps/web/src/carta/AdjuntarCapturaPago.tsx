@@ -12,13 +12,15 @@ export interface AdjuntarCapturaPagoProps {
   medio?: string;
   /** Lo que debe pagar el cliente (venta más propina). */
   total?: number;
+  /** Pago dividido: lo que falta pagar al recibir; `total` es entonces solo la parte digital. */
+  restoAlRecibir?: number;
 }
 
 const CLAVE_MEDIO: Record<string, string> = { YAPE: 'yape', PLIN: 'plin', TRANSFERENCIA: 'transferencia' };
 const NOMBRE_MEDIO: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'transferencia' };
 
 /** Tarjeta «a quién pagar»: número o cuenta, titular y monto, con botón para copiar. */
-export function DatosParaPagar({ medio, total, local }: { medio: string; total?: number; local: DatosLocalCarta | null }) {
+export function DatosParaPagar({ medio, total, local, restoAlRecibir }: { medio: string; total?: number; local: DatosLocalCarta | null; restoAlRecibir?: number }) {
   const [copiado, setCopiado] = useState(false);
   const [copiadoCci, setCopiadoCci] = useState(false);
   const info = local?.mediosPago?.[CLAVE_MEDIO[medio] ?? ''];
@@ -40,6 +42,9 @@ export function DatosParaPagar({ medio, total, local }: { medio: string; total?:
     >
       <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--cp-navy)' }}>Paga con {NOMBRE_MEDIO[medio] ?? medio}</div>
       {monto && <div style={{ fontWeight: 800, fontSize: '22px', color: 'var(--cp-rust)' }}>{monto}</div>}
+      {restoAlRecibir != null && restoAlRecibir > 0 && (
+        <div style={{ fontSize: '13px', color: 'var(--cp-navy)' }}>Los S/ {Number(restoAlRecibir).toFixed(2)} restantes los pagas al recibir tu pedido.</div>
+      )}
       <div style={{ fontSize: '14px', color: 'var(--cp-navy)' }}>
         {medio === 'TRANSFERENCIA' ? `Cuenta${info?.banco ? ` ${info.banco}` : ''}: ` : monto ? 'Yapea a: ' : 'Número: '}
         <strong style={{ fontSize: '18px' }}>{destino}</strong>
@@ -73,7 +78,7 @@ export function DatosParaPagar({ medio, total, local }: { medio: string; total?:
  * Captura del pago desde la pantalla de seguimiento. Opcional: el pedido ya está «por validar»
  * y el equipo revisa la captura. La respuesta no muestra semáforo ni datos extraídos.
  */
-export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total }: AdjuntarCapturaPagoProps) {
+export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total, restoAlRecibir }: AdjuntarCapturaPagoProps) {
   const [estado, setEstado] = useState<'inicial' | 'subiendo' | 'recibida' | 'error'>('inicial');
   const [mensaje, setMensaje] = useState<string>('');
   const [local, setLocal] = useState<DatosLocalCarta | null>(null);
@@ -122,7 +127,7 @@ export function AdjuntarCapturaPago({ codigo, token, pagoDigital, medio, total }
         gap: '8px',
       }}
     >
-      {medio && <DatosParaPagar medio={medio} total={total} local={local} />}
+      {medio && <DatosParaPagar medio={medio} total={total} local={local} restoAlRecibir={restoAlRecibir} />}
       <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--cp-navy)' }}>
         Envía la captura de tu pago
       </div>

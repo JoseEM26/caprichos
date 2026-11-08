@@ -158,6 +158,21 @@ describe('Pagos del bot', () => {
       expect(accion.dto.pago.plan.filter((f: any) => f.medio !== 'EFECTIVO' && f.medio !== 'TARJETA')).toHaveLength(1);
     });
 
+    it('Yape parcial S/ 60.50 + S/ 2 en efectivo al recibir: acepta, y pide yapear solo S/ 60.50', () => {
+      let r = iniciar();
+      r = paso(r.nuevoFlujo, { texto: '60.50', textoOriginal: '60.50' });
+      expect(r.nuevoEstado).toBe('PEDIDO_PAGO_DIV_MEDIO2');
+      expect(textos(r)).toContain('Te quedan S/ 2.00');
+      r = paso(r.nuevoFlujo, { listRowId: 'ped_pago_efectivo' });
+      r = paso(r.nuevoFlujo, { buttonPayload: 'ped_paga_exacto' });
+      expect(textos(r)).toContain('Yape S/ 60.50 + Efectivo S/ 2.00');
+      const accion: any = paso(r.nuevoFlujo, { buttonPayload: 'ped_confirmar' }).acciones.find((a: any) => a.tipo === 'crearPedido');
+      expect(accion.dto.pago.plan).toEqual([{ medio: 'YAPE', monto: 60.5 }, { medio: 'EFECTIVO', monto: 2 }]);
+      expect(accion.datosPagoTexto).toContain('Monto a pagar: *S/ 60.50*');
+      expect(accion.datosPagoTexto).not.toContain('62.50');
+      expect(accion.datosPagoTexto).toContain('S/ 2.00 restantes');
+    });
+
     it('monto mayor o igual al total, cero o texto: lo rechaza y vuelve a preguntar', () => {
       const f = iniciar().nuevoFlujo;
       for (const txt of ['62.50', '100', '0', 'abc']) {
