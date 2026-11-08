@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
-import { MATRIZ, PERMISOS, PERMISOS_RETIRADOS, ROLES_ELIMINADOS } from './permisos';
+import { MATRIZ, PERMISOS, PERMISOS_RETIRADOS, ROLES_ANULAN_PEDIDOS, ROLES_ELIMINADOS } from './permisos';
 
 /**
  * Al arrancar, asegura que la base tenga TODOS los permisos del código y que cada rol tenga los que
@@ -33,6 +33,11 @@ export class SincronizadorPermisosService implements OnModuleInit {
     });
     await this.prisma.rolPermiso.deleteMany({ where: { permiso: { OR: retirados } } });
     await this.prisma.permiso.deleteMany({ where: { OR: retirados } });
+
+    // Anular pedidos es solo de Caja y Administrador: se quita el vínculo viejo a COCINA, MOZO, SUPERVISOR y demás
+    await this.prisma.rolPermiso.deleteMany({
+      where: { permiso: { modulo: 'pedidos', accion: 'anular' }, rol: { notIn: [...ROLES_ANULAN_PEDIDOS] } },
+    });
 
     const existentes = await this.prisma.permiso.findMany({ select: { id: true, modulo: true, accion: true } });
     const claves = new Set(existentes.map((p) => `${p.modulo}/${p.accion}`));

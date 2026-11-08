@@ -77,7 +77,7 @@ Despues: [[cocina]]
 Ver tambien: [[cierre]]
 
 ## Como se hace: Anular un pedido o un cobro
-1. Abrir el pedido que se desea anular y pulsar el boton Anular pedido (o Anular cobro si ya fue cobrado).
+1. Solo Caja o el Administrador anulan pedidos (ni cocina, ni mozo, ni supervisor). Abrir el pedido que se desea anular y pulsar el boton Anular pedido (o Anular cobro si ya fue cobrado).
 2. Seleccionar uno de los motivos rapidos (Cliente no recibio, Pedido duplicado, El cliente desistio, Error al digitar, Falta un insumo, No contesta) o escribir el motivo con al menos 5 caracteres.
 3. Pulsar el boton Continuar. No se pide ningun codigo de supervisor.
 4. En la ventana de confirmacion con la pregunta ¿Confirmas anular el pedido?, pulsar Si, anular.

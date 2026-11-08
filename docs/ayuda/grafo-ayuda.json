@@ -36,6 +36,11 @@
       "etiqueta": "Rol: SUPERVISOR"
     },
     {
+      "id": "rol:APOYO_DELIVERY",
+      "tipo": "rol",
+      "etiqueta": "Rol: APOYO_DELIVERY"
+    },
+    {
       "id": "almacen",
       "tipo": "modulo",
       "etiqueta": "Almacén (almacen)",
@@ -427,9 +432,9 @@
       "modulo": "cocina"
     },
     {
-      "id": "cocina#anular-un-pedido-que-ya-esta-en-cocina",
+      "id": "cocina#pedir-que-anulen-un-pedido-que-ya-esta-en-cocina",
       "tipo": "tarea",
-      "etiqueta": "Anular un pedido que ya esta en cocina",
+      "etiqueta": "Pedir que anulen un pedido que ya esta en cocina",
       "modulo": "cocina"
     },
     {
@@ -1099,9 +1104,9 @@
       "modulo": "mis-pedidos"
     },
     {
-      "id": "mis-pedidos#anular-un-pedido-tuyo",
+      "id": "mis-pedidos#pedir-que-anulen-un-pedido-tuyo",
       "tipo": "tarea",
-      "etiqueta": "Anular un pedido tuyo",
+      "etiqueta": "Pedir que anulen un pedido tuyo",
       "modulo": "mis-pedidos"
     },
     {
@@ -3475,12 +3480,12 @@
     },
     {
       "tipo": "pertenece_a",
-      "origen": "cocina#anular-un-pedido-que-ya-esta-en-cocina",
+      "origen": "cocina#pedir-que-anulen-un-pedido-que-ya-esta-en-cocina",
       "destino": "cocina"
     },
     {
       "tipo": "ver_tambien",
-      "origen": "cocina#anular-un-pedido-que-ya-esta-en-cocina",
+      "origen": "cocina#pedir-que-anulen-un-pedido-que-ya-esta-en-cocina",
       "destino": "caja"
     },
     {
@@ -5710,7 +5715,7 @@
     },
     {
       "tipo": "pertenece_a",
-      "origen": "mis-pedidos#anular-un-pedido-tuyo",
+      "origen": "mis-pedidos#pedir-que-anulen-un-pedido-tuyo",
       "destino": "mis-pedidos"
     },
     {

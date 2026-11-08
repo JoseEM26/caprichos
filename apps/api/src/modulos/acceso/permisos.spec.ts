@@ -37,18 +37,22 @@ describe('matriz de permisos del CAJERO (cie-fix, cambio 4)', () => {
     );
   });
 
-  it('no tiene compras, clientes, configuración, usuarios, stock, informes ni anulación de pedidos', () => {
-    const prohibidos = ['compras/', 'clientes/', 'configuracion/', 'usuarios/', 'stock/', 'informes/', 'pedidos/anular'];
+  it('no tiene compras, clientes, configuración, usuarios, stock, informes ', () => {
+    const prohibidos = ['compras/', 'clientes/', 'configuracion/', 'usuarios/', 'stock/', 'informes/'];
     for (const prefijo of prohibidos) {
       expect(cajero.filter((p) => p.startsWith(prefijo))).toEqual([]);
     }
   });
 });
 
-describe('MOZO anula SUS pedidos sin código (decisión del dueño)', () => {
-  it('MOZO y COCINA tienen pedidos/anular; el MOZO no tiene pedidos/cambiar_estado', () => {
-    expect(MATRIZ.MOZO).toContain('pedidos/anular');
-    expect(MATRIZ.COCINA).toContain('pedidos/anular');
+describe('anular pedidos: solo CAJERO y ADMIN (decisión del dueño)', () => {
+  it('ADMIN y CAJERO tienen pedidos/anular; ningún otro rol lo tiene', () => {
+    for (const [rol, claves] of Object.entries(MATRIZ)) {
+      expect(claves.includes('pedidos/anular')).toBe(rol === 'ADMIN' || rol === 'CAJERO');
+    }
+  });
+
+  it('el MOZO no tiene pedidos/cambiar_estado', () => {
     expect(MATRIZ.MOZO).not.toContain('pedidos/cambiar_estado');
   });
 });
@@ -79,8 +83,8 @@ describe('matriz de permisos de COCINA (coc-api)', () => {
     );
   });
 
-  it('puede anular pedidos desde su comanda (sin código de supervisor); no tiene caja, compras, usuarios, configuracion, clientes ni repartos', () => {
-    expect(cocina).toContain('pedidos/anular');
+  it('no anula pedidos (solo Caja o Administrador); no tiene caja, compras, usuarios, configuracion, clientes ni repartos', () => {
+    expect(cocina).not.toContain('pedidos/anular');
     const prohibidos = ['caja/', 'compras/', 'usuarios/', 'configuracion/', 'clientes/', 'repartos/'];
     for (const prefijo of prohibidos) {
       expect(cocina.filter((p) => p.startsWith(prefijo))).toEqual([]);

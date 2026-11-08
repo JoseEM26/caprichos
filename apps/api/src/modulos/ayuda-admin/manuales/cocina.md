@@ -13,7 +13,7 @@ sugerencias:
   - Que significa el tiempo en colores de cada comanda
   - Como despacho un pedido completo con todas sus areas
   - Por que sale Falta el conteo de apertura de hoy
-  - Como anulo un pedido que ya esta en cocina
+  - Como pido que anulen un pedido que ya esta en cocina
 ---
 # Cocina
 
@@ -41,12 +41,9 @@ Ver tambien: [[pantallas]]
 4. La comanda volvera de inmediato a la pantalla activa conservando su tiempo transcurrido original.
 Ver tambien: [[caja]]
 
-## Como se hace: Anular un pedido que ya esta en cocina
-1. En la comanda, pulsar el boton rojo Anular pedido (solo lo ve quien tiene permiso para anular).
-2. Elegir o escribir el motivo (al menos 5 caracteres).
-3. No se pide codigo: anulas por tu rol y queda registrado a tu nombre. Solo pedidos en cola, preparando o listos.
-4. Confirmar con Si, anular. Se anula el pedido COMPLETO: desaparece de todas las areas (aunque lo anules desde Bebidas), se devuelven el stock y los puntos, se cancelan las etiquetas por imprimir y se liberan sus mesas.
-5. Si el pedido ya estaba cobrado, su cobro tambien se anula por el mismo camino de [[caja]] y deja de contar en el arqueo y el cierre. Si la caja de ese cobro ya cerro, el sistema no deja anular: registra la devolucion al cliente.
+## Como se hace: Pedir que anulen un pedido que ya esta en cocina
+1. Cocina no anula pedidos: solo Caja o el Administrador pueden hacerlo (decision del dueno).
+2. Si un pedido no se debe preparar, avisa a Caja; ella lo anula desde el detalle del pedido, con motivo, y el pedido desaparece de todas las areas de cocina.
 Ver tambien: [[caja]]
 
 ## Como se hace: Activar el modo de alta demanda
