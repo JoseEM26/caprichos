@@ -573,16 +573,57 @@
   min-width: 0;
 }
 
+.cj2-prods {
+  max-height: 300px;
+  overflow: hidden;
+  color: #0B2C3E;
+  font-variant-numeric: tabular-nums;
+}
+
 .cj2-prods > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.cj2-prods > .cj2-prod {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.cj2-prod-nombre {
+  font-weight: 800;
+  color: #0B2C3E;
+}
+
+.cj2-prod-det,
+.cj2-prod-parte {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2C4C5D;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cj2-prod-parte {
+  padding-left: 10px;
+}
+
+.cj2-prod-nota {
+  font-size: 14px;
+  font-weight: 800;
+  color: #B2500F;
+}
+
 .cj2-mas {
   font-size: 13.5px;
   font-weight: 800;
-  color: var(--cp-soft, #2C4C5D);
+  color: #2C4C5D;
 }
 
 .cj2-avisos {

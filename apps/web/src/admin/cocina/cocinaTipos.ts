@@ -20,6 +20,12 @@ export function textoSabores(l: { sabor?: string | null; sabores?: Array<{ nombr
   return reparto || l.sabor || null;
 }
 
+/** Tamaño, opciones y personas de la línea, en texto corrido. ÚNICA regla: Despacho y Caja la usan. */
+export function detalleLinea(l: Pick<LineaComanda, 'tamano' | 'opciones' | 'personas'>): string[] {
+  const opciones = (l.opciones || []).map((o) => (typeof o === 'string' ? o : (o?.nombre ?? ''))).filter(Boolean);
+  return [l.tamano, ...opciones, ...(l.personas || []).map((p) => `Para ${p}`)].filter((x): x is string => Boolean(x));
+}
+
 export interface LineaComanda {
   /** Id de la línea del pedido: lo que se marca como lista o se despacha. */
   id: string;

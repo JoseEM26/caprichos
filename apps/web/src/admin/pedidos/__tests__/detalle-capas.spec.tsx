@@ -112,9 +112,8 @@ describe('PedidoDetalle en 3 capas', () => {
     );
     const linea = screen.getByTestId('linea-pedido');
     expect(within(linea).getByText('Dona clásica')).toBeInTheDocument();
-    expect(within(linea).getByText('Caja x6')).toBeInTheDocument();
-    expect(within(linea).getByText('Sabores: 4× Chocolate, 2× Fresa')).toBeInTheDocument();
-    expect(within(linea).getByText('+ Leche de almendra')).toBeInTheDocument();
+    expect(within(linea).getByTestId('linea-detalle')).toHaveTextContent('Caja x6 · Leche de almendra');
+    expect(within(linea).getByText('Sabores: 4 Chocolate · 2 Fresa')).toBeInTheDocument();
     expect(within(linea).getByText('Nota: sin azúcar')).toBeInTheDocument();
     const resumen = screen.getByRole('region', { name: 'Resumen del pedido' });
     expect(within(resumen).getByText('Descuento · Promo dona')).toBeInTheDocument();

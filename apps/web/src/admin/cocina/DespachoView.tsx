@@ -6,8 +6,8 @@ import { Confirmar } from '../../comun/Confirmar';
 import { despacharCompleto, devolverComanda, listarDespacho } from './cocinaApi';
 import { estaSilenciado, reproducirCampanaCocina, setSilenciado } from './audioAlerta';
 import { TiempoEspera } from './TiempoEspera';
-import { textoSabores } from './cocinaTipos';
-import type { AreaDespacho, LineaComanda, PedidoDespacho, UmbralesCocina } from './cocinaTipos';
+import { detalleLinea, textoSabores } from './cocinaTipos';
+import type { AreaDespacho, PedidoDespacho, UmbralesCocina } from './cocinaTipos';
 import { ResumenPagoDespacho } from './ResumenPagoDespacho';
 
 const VERDE = '#2F7A45';
@@ -35,11 +35,7 @@ export const MODALIDAD: Record<string, { texto: string; icono: string; fondo: st
   DELIVERY: { texto: 'Delivery', icono: '🛵', fondo: '#B2500F', color: '#FFFFFF' },
 };
 
-/** Tamaño, opciones y personas de la línea, en texto corrido. */
-export function detalleLinea(l: LineaComanda): string[] {
-  const opciones = (l.opciones || []).map((o) => (typeof o === 'string' ? o : (o?.nombre ?? ''))).filter(Boolean);
-  return [l.tamano, ...opciones, ...(l.personas || []).map((p) => `Para ${p}`)].filter((x): x is string => Boolean(x));
-}
+export { detalleLinea };
 
 /** Quién o dónde: mesa, cliente o ambos. */
 function destino(p: PedidoDespacho): string {
