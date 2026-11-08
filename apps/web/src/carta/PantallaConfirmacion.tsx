@@ -155,6 +155,11 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
         >
           Recibimos tu pedido #{pedido.codigo}
         </div>
+        {pedido.modalidad === 'COMER_LOCAL' && !anulado && !estado?.terminado && (
+          <p data-testid="texto-comer-local" style={{ margin: '8px 0 0', fontSize: '15px', fontWeight: 800, color: 'var(--cp-navy)' }}>
+            Estamos preparando tu pedido{pedido.nombre ? `, ${pedido.nombre}` : ''}. Te llamaremos cuando esté listo.
+          </p>
+        )}
         <p
           style={{
             margin: '8px 0 0',
@@ -184,7 +189,7 @@ function TarjetaSeguimiento({ pedido, creacion, otros, onElegir, onCerrar }: Tar
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span>Modalidad</span>
           <span style={{ fontWeight: 700 }}>
-            {pedido.modalidad === 'DELIVERY' ? 'Delivery' : 'Recojo en local'}
+            {pedido.modalidad === 'DELIVERY' ? 'Delivery' : pedido.modalidad === 'COMER_LOCAL' ? 'Comer en el local' : 'Recojo en local'}
           </span>
         </div>
 

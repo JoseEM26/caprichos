@@ -22,11 +22,11 @@ export const CLAVES_CONFIG_IMPRESION = {
   VENCE_MIN: 'impresion_vence_min',
 } as const;
 
-/** Modalidades reales del pedido: DELIVERY, RECOGER y MESA las escribe la API; LLEVAR existe en datos antiguos; LOCAL es el valor de respaldo de informes. */
-export const MODALIDADES_PEDIDO = ['MESA', 'LOCAL', 'LLEVAR', 'RECOGER', 'DELIVERY'] as const;
+/** Modalidades reales del pedido: DELIVERY, RECOGER y MESA las escribe la API; COMER_LOCAL es «Comer en el local» (cliente que pide desde la carta estando en el local, sin mesa: se le llama por su nombre); LLEVAR existe en datos antiguos; LOCAL es el valor de respaldo de informes. */
+export const MODALIDADES_PEDIDO = ['MESA', 'LOCAL', 'LLEVAR', 'RECOGER', 'DELIVERY', 'COMER_LOCAL'] as const;
 
 /** Modalidades de salón (pedido en mesa o en el local): reciben la comanda de salón. */
-export const MODALIDADES_SALON = ['MESA', 'LOCAL'] as const;
+export const MODALIDADES_SALON = ['MESA', 'LOCAL', 'COMER_LOCAL'] as const;
 
 export interface ReglasImpresion {
   generalModalidades: string[];
@@ -42,8 +42,8 @@ export interface ReglasImpresion {
 
 export const REGLAS_IMPRESION_DEFECTO: ReglasImpresion = {
   generalModalidades: [], // apagado por decisión del dueño (07/11/2026); se reactiva en el Mapa de impresión
-  areaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
-  bebidaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY'],
+  areaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY', 'COMER_LOCAL'],
+  bebidaModalidades: ['LLEVAR', 'RECOGER', 'DELIVERY', 'COMER_LOCAL'],
   bebidaActivo: true,
   areaActivo: true,
   comandaSalonActivo: true,

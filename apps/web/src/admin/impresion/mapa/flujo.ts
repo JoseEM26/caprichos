@@ -1,7 +1,7 @@
 import { MODALIDADES_SALON } from '@caprichos/compartido';
 import type { EquipoMapa, EstadoRolMapa, MapaImpresionDatos, RolEquipoMapa, RuteoMapa } from '../impresionApi';
 
-export type Modalidad = 'MESA' | 'LOCAL' | 'LLEVAR' | 'RECOGER' | 'DELIVERY';
+export type Modalidad = 'MESA' | 'LOCAL' | 'LLEVAR' | 'RECOGER' | 'DELIVERY' | 'COMER_LOCAL';
 export interface Escenario {
   modalidad: Modalidad;
   conBebidas: boolean;
@@ -52,6 +52,7 @@ const NOMBRE_MODALIDAD: Record<Modalidad, string> = {
   LOCAL: 'Salón',
   LLEVAR: 'Para llevar',
   RECOGER: 'Para recoger',
+  COMER_LOCAL: 'Comer en el local',
   DELIVERY: 'Delivery',
 };
 

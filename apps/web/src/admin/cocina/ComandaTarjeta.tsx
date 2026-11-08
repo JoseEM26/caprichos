@@ -551,6 +551,7 @@ export function ComandaTarjeta({
       return comanda.mesa ? `En mesa · M${comanda.mesa}` : 'En mesa';
     }
     if (mod === 'DELIVERY') return 'Delivery';
+    if (mod === 'COMER_LOCAL') return 'Comer en el local';
     if (mod === 'RECOGER' || mod === 'LLEVAR') return 'Para llevar';
     return comanda.modalidad || 'Para llevar';
   };
@@ -559,6 +560,8 @@ export function ComandaTarjeta({
   const canalTxt = comanda.canal ? `${comanda.canal}` : 'Web';
   const whoTxt = comanda.mesa
     ? `M${comanda.mesa}`
+    : comanda.modalidad === 'COMER_LOCAL' && comanda.cliente
+    ? comanda.cliente
     : comanda.mozo
     ? `mozo ${comanda.mozo}`
     : 'Cliente de mostrador';

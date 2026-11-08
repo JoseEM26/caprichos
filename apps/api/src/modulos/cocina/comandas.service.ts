@@ -38,7 +38,7 @@ function areaDeLineaPedido(l: { area_id: bigint | null; producto?: { categoria?:
 }
 
 /** Modalidades que se despachan por producto (delivery sigue su flujo de reparto). */
-const MODALIDADES_DESPACHO = ['MESA', 'RECOGER', 'LLEVAR'];
+const MODALIDADES_DESPACHO = ['MESA', 'RECOGER', 'LLEVAR', 'COMER_LOCAL'];
 /**
  * La cocina ve un pedido mientras no esté anulado o rechazado. Que Caja lo pase a LISTO o ENTREGADO
  * no lo quita de cocina: solo la comanda despejada o despachada sale.

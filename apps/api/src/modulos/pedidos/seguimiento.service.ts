@@ -16,7 +16,7 @@ import {
 /** Medios que requieren captura del comprobante (mismo criterio que Caja). */
 const MEDIOS_DIGITALES = ['YAPE', 'PLIN', 'TRANSFERENCIA'];
 
-type Modalidad = 'DELIVERY' | 'RECOGER' | 'MESA';
+type Modalidad = 'DELIVERY' | 'RECOGER' | 'MESA' | 'COMER_LOCAL';
 
 // Rango de cada estado del flujo: COLA < PREPARANDO < LISTO < EN_CAMINO < ENTREGADO
 const RANGO_ESTADO: Record<string, number> = {
@@ -100,6 +100,18 @@ const PASOS_POR_MODALIDAD: Record<Modalidad, PasoDef[]> = {
     {
       clave: 'listo',
       etiqueta: 'Listo para recoger',
+      rango: 2,
+      campo: 'listo_en',
+      estadosHistorial: ['LISTO'],
+    },
+    PASO_ENTREGADO,
+  ],
+  COMER_LOCAL: [
+    PASO_RECIBIDO,
+    PASO_COCINA,
+    {
+      clave: 'listo',
+      etiqueta: 'Listo: te llamaremos por tu nombre',
       rango: 2,
       campo: 'listo_en',
       estadosHistorial: ['LISTO'],

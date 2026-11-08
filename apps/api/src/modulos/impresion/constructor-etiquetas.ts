@@ -110,6 +110,7 @@ export function modLabel(m?: string | null): string {
   if (mu === 'DELIVERY') return 'Delivery';
   if (mu === 'LLEVAR' || mu === 'RECOGER') return 'Para llevar';
   if (mu === 'MESA') return 'En mesa';
+  if (mu === 'COMER_LOCAL') return 'Comer en el local';
   return m;
 }
 

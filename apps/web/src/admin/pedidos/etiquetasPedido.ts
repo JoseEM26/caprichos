@@ -63,6 +63,7 @@ export function obtenerModalidadPill(pedido: Pedido): string {
     const mesa = pedido.mesa_nombre.trim().toUpperCase();
     return mesa.startsWith('MESA') ? mesa : `MESA ${mesa}`;
   }
+  if (pedido.modalidad === 'COMER_LOCAL') return 'COMER EN EL LOCAL';
   return modLabel(pedido.modalidad).toUpperCase();
 }
 

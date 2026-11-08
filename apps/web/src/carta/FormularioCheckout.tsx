@@ -45,6 +45,8 @@ function textoResumenEnvio(zona: string, tarifa: number, subtotal: number, regla
   return `${base} (gratis por tu compra ${regla.modo === 'desde' ? 'desde' : 'sobre'} S/ ${regla.monto})`;
 }
 
+import { AvisoComerEnLocal } from './AvisoComerEnLocal';
+
 export function FormularioCheckout({
   estadoLocal,
   datosLocal,
@@ -1119,6 +1121,25 @@ export function FormularioCheckout({
                         Recoger en el local
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      data-testid="modalidad-comer-local"
+                      onClick={() => setModalidad('COMER_LOCAL')}
+                      style={{
+                        marginTop: '8px',
+                        width: '100%',
+                        minHeight: '44px',
+                        borderRadius: '10px',
+                        border: modalidad === 'COMER_LOCAL' ? '2px solid var(--cp-orange)' : '1.5px solid var(--cp-line)',
+                        backgroundColor: modalidad === 'COMER_LOCAL' ? 'var(--cp-sand)' : 'var(--cp-white)',
+                        color: 'var(--cp-navy)',
+                        fontWeight: 800,
+                        fontSize: '14px',
+                      }}
+                    >
+                      <span aria-hidden="true">🍽️ </span>Comer en el local
+                    </button>
+                    {modalidad === 'COMER_LOCAL' && <AvisoComerEnLocal nombre={nombre} />}
                   </div>
 
                   {/* Acceso (cuenta o invitado) */}
@@ -1656,6 +1677,9 @@ export function FormularioCheckout({
                     </div>
                     )}
                     </>
+                  ) : modalidad === 'COMER_LOCAL' ? (
+                    /* Comer en el local: sin mesa, sin croquis, sin dirección; se le llama por su nombre */
+                    <AvisoComerEnLocal nombre={nombre} />
                   ) : (
                     /* Modalidad RECOGER: tienda en mapa pequeño de solo lectura con su dirección */
                     <div
