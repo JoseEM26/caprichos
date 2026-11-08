@@ -4,7 +4,7 @@ import { Confirmar } from '../../comun/Confirmar';
 import { pedidosApi, Pedido } from './pedidosApi';
 import { SubirVoucherMozo } from '../vouchers/SubirVoucherMozo';
 import { SeccionVouchersPedido } from './SeccionVouchersPedido';
-import { digitalesDelPlan, medioDigitalVoucher, mediosQueExigenCodigo, mismoMedio } from './mediosPago';
+import { digitalesDelPlan, esPedidoLocal, medioDigitalVoucher, mediosQueExigenCodigo, mismoMedio } from './mediosPago';
 import { CapturasPlanDigital, ExcepcionSinVoucher } from './CapturasPlanDigital';
 import type { VoucherPagoItem } from '../vouchers/tipos';
 import { useConfirmarImpresion } from '../impresion/useConfirmarImpresion';
@@ -43,7 +43,9 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
   const [sinVoucher, setSinVoucher] = useState(false);
   const [motivoSinVoucher, setMotivoSinVoucher] = useState('');
   const [pinSupervisor, setPinSupervisor] = useState('');
-  const pideCodigo = usePideCodigo();
+  const local = esPedidoLocal(pedido);
+  // En el local no hay supervisor: una sola casilla de consentimiento
+  const pideCodigo = usePideCodigo() && !local;
 
   const esEfectivo = mismoMedio(medio, 'Efectivo');
   const esTarjeta = mismoMedio(medio, 'Tarjeta');
@@ -95,7 +97,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
         return;
       }
       if (motivoSinVoucher.trim().length < MOTIVO_MINIMO) {
-        setMsg(`El motivo debe tener al menos ${MOTIVO_MINIMO} caracteres`);
+        setMsg(local ? 'Marca la casilla: ya hablaste con el cliente y pagó' : `El motivo debe tener al menos ${MOTIVO_MINIMO} caracteres`);
         return;
       }
       if (pideCodigo && pinSupervisor.length !== 6) {
@@ -115,7 +117,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
   // Solo viaja la excepción si el pago digital sigue sin comprobante útil
   const excepcionSinVoucher =
     (esDigital || multiples) && !comprobanteListo && sinVoucher
-      ? { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined }
+      ? { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined, ...(local ? { sinCaptura: true } : {}) }
       : undefined;
 
   const ejecutarConfirmacion = async () => {
@@ -399,6 +401,8 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
             {esDigital && !multiples && !comprobanteListo && medioVoucher && sinVoucher && (
               <div style={tarjeta}>
                 <ExcepcionSinVoucher
+                  local={local}
+                  medio={medioVoucher ?? mediosPlanDigital[0]}
                   motivo={motivoSinVoucher}
                   onMotivo={setMotivoSinVoucher}
                   pin={pinSupervisor}
@@ -437,6 +441,8 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
                 )}
                 {!comprobanteListo && sinVoucher && (
                   <ExcepcionSinVoucher
+                  local={local}
+                  medio={medioVoucher ?? mediosPlanDigital[0]}
                     motivo={motivoSinVoucher}
                     onMotivo={setMotivoSinVoucher}
                     pin={pinSupervisor}
@@ -581,7 +587,7 @@ export function ModalConfirmarPago({ pedido, alCerrar, alConfirmarExitoso, alAct
       <Confirmar
         abierto={confirmandoSiNo}
         titulo={`¿Confirmar el pedido ${pedido.codigo} y enviarlo a cocina?`}
-        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.${excepcionSinVoucher ? (pideCodigo ? ' Se registra sin comprobante, con el motivo y la autorización del supervisor.' : ' Se registra sin comprobante, con el motivo.') : ''}`}
+        mensaje={`Se registrará el medio de pago (${medio}) y el pedido pasará a las pantallas de cocina.${excepcionSinVoucher ? (local ? ' Se registra pagado sin captura, con tu confirmación.' : pideCodigo ? ' Se registra sin comprobante, con el motivo y la autorización del supervisor.' : ' Se registra sin comprobante, con el motivo.') : ''}`}
         textoConfirmar="Sí, confirmar"
         textoNo="No"
         cargando={enviando}

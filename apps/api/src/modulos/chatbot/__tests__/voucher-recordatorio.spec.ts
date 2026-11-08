@@ -98,6 +98,12 @@ describe('Recordatorio de voucher (pedido digital sin comprobante)', () => {
     expect(avisos.avisar).not.toHaveBeenCalled();
   });
 
+  it('no sale si el personal confirmó el pago sin captura (cobro_mozo_en)', async () => {
+    const { planificador, avisos } = construir({ pedido: { cobro_mozo_en: new Date() } });
+    expect(await planificador.avisarFaltaVoucher(AHORA)).toBe(0);
+    expect(avisos.avisar).not.toHaveBeenCalled();
+  });
+
   it('no sale si el pedido ya está pagado', async () => {
     const { planificador, avisos } = construir({ pedido: { pago_estado: 'COORDINADO' } });
     expect(await planificador.avisarFaltaVoucher(AHORA)).toBe(0);

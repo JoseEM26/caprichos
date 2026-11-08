@@ -7,6 +7,7 @@ import { digitalesDelPlan, faltanCapturas } from './mediosPago';
 import { nombreMedio } from './planPago';
 import { CampoCodigoSupervisor } from '../../comun/CampoCodigoSupervisor';
 import { usePideCodigo } from '../../comun/usePideCodigo';
+import { textoConfirmaSinCaptura } from './mediosPago';
 
 export interface CapturasPlanDigitalProps {
   pedidoId: string | number;
@@ -97,6 +98,7 @@ export function CapturasPlanDigital({ pedidoId, planPago, alCambiar }: CapturasP
 }
 
 const MOTIVO_MINIMO_SIN_VOUCHER = 5;
+const MOTIVO_CASILLA = 'sin captura confirmado';
 
 /** Excepción «sin voucher»: motivo escrito + código rotativo del supervisor (queda auditado). */
 export function ExcepcionSinVoucher({
@@ -105,14 +107,52 @@ export function ExcepcionSinVoucher({
   pin,
   onPin,
   alVolver,
+  local,
+  medio,
 }: {
   motivo: string;
   onMotivo: (v: string) => void;
   pin: string;
   onPin: (v: string) => void;
   alVolver: () => void;
+  /** Pedido del local: una sola casilla de consentimiento en vez de motivo y supervisor. */
+  local?: boolean;
+  medio?: string | null;
 }) {
   const pideCodigo = usePideCodigo();
+  if (local) {
+    // La casilla marcada se guarda como motivo no vacío (los modales ya piden motivo para habilitar el envío)
+    return (
+      <>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14, fontWeight: 700 }}>
+          <input
+            type="checkbox"
+            data-testid="casilla-sin-captura"
+            checked={motivo !== ''}
+            onChange={(e) => onMotivo(e.target.checked ? MOTIVO_CASILLA : '')}
+            style={{ marginTop: 3 }}
+          />
+          {textoConfirmaSinCaptura(medio)}
+        </label>
+        <button
+          type="button"
+          onClick={alVolver}
+          style={{
+            minHeight: 44,
+            border: '1.5px solid var(--cp-navy, #0B2C3E)',
+            borderRadius: 10,
+            background: 'transparent',
+            color: 'var(--cp-navy, #0B2C3E)',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Volver a pedir la foto
+        </button>
+      </>
+    );
+  }
   return (
     <>
       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cp-rust, #B2500F)' }}>

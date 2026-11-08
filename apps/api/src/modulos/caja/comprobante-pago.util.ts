@@ -34,6 +34,20 @@ export interface SinVoucherAutorizado {
   supervisorPartyId: string;
   /** Medios digitales que se cobraron sin captura (vacío si no hizo falta la excepción). */
   faltan: string[];
+  /** true: salió por la casilla «ya hablé con el cliente y pagó» (local), sin motivo ni supervisor. */
+  sinCaptura?: boolean;
+}
+
+/** Pedido del local (mozo o caja, no delivery): el único que puede pasar sin captura con la casilla de confirmación. */
+export function esPedidoLocalSinCaptura(p: { canal?: string | null; modalidad?: string | null }): boolean {
+  return ['MOZO', 'CAJA'].includes(String(p.canal ?? '')) && String(p.modalidad ?? '') !== 'DELIVERY';
+}
+
+export const MENSAJE_SIN_CAPTURA = 'Pagado sin captura: confirmado por el personal (el cliente ya pagó)';
+
+/** Texto de la casilla única, igual en la web. */
+export function textoConfirmaSinCaptura(medio: string): string {
+  return `Confirmo que ya hablé con el cliente y pagó con ${NOMBRE_MEDIO_DIGITAL[medio] ?? medio} (sin captura)`;
 }
 
 type ClienteVouchers = Pick<Prisma.TransactionClient, 'voucherPago'>;
@@ -82,6 +96,9 @@ export async function exigirComprobanteDigital(args: {
   /** Plan de pago del pedido (solo se lee el medio). */
   planPago?: ReadonlyArray<{ medio: string }> | null;
   sinVoucher?: SinVoucherEntrada;
+  /** Casilla «ya hablé con el cliente y pagó»: solo vale si `pedidoLocal` (mozo/caja, no delivery). */
+  confirmaSinCaptura?: boolean;
+  pedidoLocal?: boolean;
   permiteExcepcion: boolean;
   verificarPin: (pin: string | undefined) => Promise<{ party_id?: bigint; supervisorPartyId?: bigint }>;
 }): Promise<SinVoucherAutorizado | null> {
@@ -102,6 +119,10 @@ export async function exigirComprobanteDigital(args: {
   }
   if (faltan.length === 0) return null;
 
+  if (args.confirmaSinCaptura && args.pedidoLocal) {
+    return { motivo: MENSAJE_SIN_CAPTURA, supervisorPartyId: '', faltan, sinCaptura: true };
+  }
+
   if (!args.permiteExcepcion || !args.sinVoucher) {
     const nombres = faltan.map((m) => NOMBRE_MEDIO_DIGITAL[m] ?? m).join(', ');
     const cabecera =
@@ -110,7 +131,7 @@ export async function exigirComprobanteDigital(args: {
       codigo: 'VOUCHER_REQUERIDO',
       faltan,
       mensaje: args.permiteExcepcion
-        ? `${cabecera}. Sube la foto, o registra el pago sin voucher con motivo y código del supervisor.`
+        ? `${cabecera}. Sube la foto, o marca que ya hablaste con el cliente y pagó (sin captura).`
         : `${cabecera}. Sube la foto del voucher para cobrar.`,
     });
   }

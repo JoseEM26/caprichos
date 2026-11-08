@@ -11,7 +11,7 @@ import { TarjetaLecturaVoucher } from '../vouchers/TarjetaLecturaVoucher';
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import type { RespuestaSubirVoucherAdmin, VoucherExtraido } from '../vouchers/tipos';
-import { digitalesDelPlan, medioDigitalVoucher, mismoMedio } from './mediosPago';
+import { digitalesDelPlan, esPedidoLocal, medioDigitalVoucher, mismoMedio } from './mediosPago';
 import { CapturasPlanDigital, ExcepcionSinVoucher } from './CapturasPlanDigital';
 import { nombreMedio } from './planPago';
 import { usePideCodigo } from '../../comun/usePideCodigo';
@@ -87,7 +87,9 @@ export function ModalCobrar({
   const [sinVoucher, setSinVoucher] = useState<boolean>(false);
   const [motivoSinVoucher, setMotivoSinVoucher] = useState<string>('');
   const [pinSupervisor, setPinSupervisor] = useState<string>('');
-  const pideCodigo = usePideCodigo();
+  const local = esPedidoLocal(pedido);
+  // En el local no hay supervisor: una sola casilla de consentimiento
+  const pideCodigo = usePideCodigo() && !local;
 
   // Pago dividido con 2 o más medios digitales: una captura por medio (CapturasPlanDigital), como el servidor
   const mediosPlanDigital = digitalesDelPlan(pedido.planPago);
@@ -251,16 +253,19 @@ export function ModalCobrar({
 
     // Con foto, va el voucherId; sin foto (excepción), el motivo y el código del supervisor
     // Pago dividido: las capturas ya van enlazadas al pedido; solo la excepción viaja en el cobro
+    const sinVoucherPayload: Partial<CobrarDto> = local
+      ? { confirmaSinCaptura: true }
+      : { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined } };
     const comprobante: Partial<CobrarDto> = multiples
       ? faltanCapturas.length > 0 && sinVoucher
-        ? { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined } }
+        ? sinVoucherPayload
         : {}
       : !hayDigital
         ? {}
         : voucher
           ? { voucherId: voucher.id }
           : sinVoucher
-            ? { sinVoucher: { motivo: motivoSinVoucher.trim(), pinSupervisor: pideCodigo ? pinSupervisor : undefined } }
+            ? sinVoucherPayload
             : {};
 
     try {
@@ -606,11 +611,13 @@ export function ModalCobrar({
                   cursor: 'pointer',
                 }}
               >
-                No hay foto: registrar sin voucher (con supervisor)
+                {local ? 'Sin captura: el cliente ya pagó' : 'No hay foto: registrar sin voucher (con supervisor)'}
               </button>
             )}
             {sinVoucher && faltanCapturas.length > 0 && (
               <ExcepcionSinVoucher
+                local={local}
+                medio={faltanCapturas.join('+')}
                 motivo={motivoSinVoucher}
                 onMotivo={setMotivoSinVoucher}
                 pin={pinSupervisor}
@@ -673,7 +680,7 @@ export function ModalCobrar({
                     cursor: 'pointer',
                   }}
                 >
-                  No hay foto: registrar sin voucher (con supervisor)
+                  {local ? 'Sin captura: el cliente ya pagó' : 'No hay foto: registrar sin voucher (con supervisor)'}
                 </button>
               </>
             )}
@@ -727,6 +734,8 @@ export function ModalCobrar({
 
             {sinVoucher && !voucher && (
               <ExcepcionSinVoucher
+                local={local}
+                medio={medioDigital}
                 motivo={motivoSinVoucher}
                 onMotivo={setMotivoSinVoucher}
                 pin={pinSupervisor}

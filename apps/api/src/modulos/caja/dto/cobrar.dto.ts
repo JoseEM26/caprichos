@@ -1,5 +1,6 @@
 import {
   ArrayMinSize,
+  IsBoolean,
   IsArray,
   IsNotEmpty,
   IsNumber,
@@ -61,4 +62,9 @@ export class CobrarDto {
   @ValidateNested()
   @Type(() => SinVoucherDto)
   sinVoucher?: SinVoucherDto;
+
+  /** Casilla «ya hablé con el cliente y pagó» (local, sin captura): sin motivo ni supervisor. */
+  @IsOptional()
+  @IsBoolean()
+  confirmaSinCaptura?: boolean;
 }

@@ -49,3 +49,20 @@ export function faltanCapturas(
     (m) => !vouchers.some((v) => v.semaforo !== 'ILEGIBLE' && (v.medio == null || mismoMedio(v.medio, m))),
   );
 }
+
+/** Pedido del local (mozo o caja, no delivery): puede pasar sin captura con la casilla «ya hablé con el cliente y pagó». */
+export function esPedidoLocal(p: { canal?: string | null; modalidad?: string | null }): boolean {
+  return ['MOZO', 'CAJA'].includes(String(p.canal ?? '').toUpperCase()) && String(p.modalidad ?? '').toUpperCase() !== 'DELIVERY';
+}
+
+/** Texto de la casilla única de consentimiento (igual que el servidor). */
+export function textoConfirmaSinCaptura(medio: string | null | undefined): string {
+  const nombres: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia' };
+  const texto = (medio ?? '')
+    .split('+')
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((x) => nombres[x.toUpperCase()] ?? x)
+    .join(' + ');
+  return `Confirmo que ya hablé con el cliente y pagó con ${texto || 'el medio digital'} (sin captura)`;
+}

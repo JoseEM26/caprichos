@@ -659,11 +659,68 @@ describe('VouchersService', () => {
         response: {
           codigo: 'VOUCHER_REQUERIDO',
           faltan: ['PLIN'],
-          mensaje: 'Sube la foto del pago (Yape/Plin/transferencia) antes de enviar a Caja',
+          mensaje: 'Sube la foto del pago (Yape/Plin/transferencia) o marca que ya hablaste con el cliente y pagó (sin captura) antes de enviar a Caja',
         },
       });
       expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
       expect(prismaMock.pedido.update).not.toHaveBeenCalled();
+    });
+
+    describe('casilla única «ya hablé con el cliente y pagó» (sin captura)', () => {
+      const pedidoLocal = (extra: Record<string, unknown> = {}) =>
+        prismaMock.pedido.findUnique.mockResolvedValue({
+          id: 50n, codigo: 'PED-50', total: 35.0, pago_preferido: 'YAPE', comprobante_tipo: 'BOLETA', comprobante_doc: null,
+          canal: 'MOZO', modalidad: 'MESA', ...extra,
+        });
+
+      it('mesa del mozo sin foto + confirmación: pasa, avisa a Caja y deja auditado quién la dio', async () => {
+        pedidoLocal();
+        const res = await service.enviarACaja('50', 'PLIN', mozoUsuario, '10.0.0.3', undefined, { confirmaSinCaptura: true });
+
+        expect(res).toEqual({ ok: true });
+        expect(prismaMock.notificacion.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ tipo: 'PAGO_SIN_CAPTURA_MOZO', titulo: 'Pagado sin captura' }),
+        });
+        expect(prismaMock.pedido.update).toHaveBeenCalledWith({
+          where: { id: 50n },
+          data: expect.objectContaining({ cobro_mozo_medio: 'PLIN', cobro_mozo_party_id: 101n }),
+        });
+        expect(auditoriaMock.registrar).toHaveBeenCalledWith(
+          expect.objectContaining({
+            accion: 'ENVIADO_CAJA',
+            despues: expect.objectContaining({ sin_captura: expect.objectContaining({ medios: ['PLIN'], confirmo: '101' }) }),
+          }),
+        );
+      });
+
+      it('sin foto y sin confirmación: sigue rechazando con VOUCHER_REQUERIDO', async () => {
+        pedidoLocal();
+        await expect(service.enviarACaja('50', 'PLIN', mozoUsuario, undefined, undefined, { confirmaSinCaptura: false })).rejects.toMatchObject({
+          response: { codigo: 'VOUCHER_REQUERIDO' },
+        });
+        expect(prismaMock.notificacion.create).not.toHaveBeenCalled();
+      });
+
+      it('con foto no hace falta la casilla y no queda marcado como sin captura', async () => {
+        pedidoLocal();
+        prismaMock.voucherPago.findFirst.mockResolvedValue({ id: 1n });
+        await service.enviarACaja('50', 'PLIN', mozoUsuario, undefined, undefined, { confirmaSinCaptura: true });
+        expect(prismaMock.notificacion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ tipo: 'VOUCHER_PENDIENTE_MOZO' }) });
+      });
+
+      it('pedido que no es del local (carta/delivery): la confirmación no vale', async () => {
+        pedidoLocal({ canal: 'CARTA', modalidad: 'DELIVERY' });
+        await expect(service.enviarACaja('50', 'YAPE', mozoUsuario, undefined, undefined, { confirmaSinCaptura: true })).rejects.toMatchObject({
+          response: { codigo: 'VOUCHER_REQUERIDO' },
+        });
+      });
+
+      it('tarjeta: la copia del POS sigue siendo obligatoria aunque marque la casilla', async () => {
+        pedidoLocal();
+        await expect(service.enviarACaja('50', 'TARJETA', mozoUsuario, undefined, undefined, { confirmaSinCaptura: true })).rejects.toMatchObject({
+          response: { codigo: 'VOUCHER_REQUERIDO', faltan: ['TARJETA'] },
+        });
+      });
     });
 
     it('digital con foto ILEGIBLE: no cuenta como foto; 400 y no avisa', async () => {

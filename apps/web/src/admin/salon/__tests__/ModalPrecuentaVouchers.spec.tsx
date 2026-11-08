@@ -108,6 +108,53 @@ describe('ModalPrecuenta - el mozo envía el cobro a Caja (no lo cobra)', () => 
     expect(screen.queryByText(/CONFIABLE|OBSERVADO|RARO|semáforo/i)).toBeNull();
   });
 
+  it('Yape sin foto: UNA casilla «ya hablé con el cliente y pagó»; marcada habilita el envío con confirmaSinCaptura', async () => {
+    const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
+
+    fireEvent.click(screen.getByText('Yape'));
+    // Sin foto y sin casilla no se puede enviar; hay una sola casilla, con el texto acordado
+    expect(screen.getByTestId('btn-enviar-caja')).toBeDisabled();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.getByText('Confirmo que ya hablé con el cliente y pagó con Yape (sin captura)')).toBeDefined();
+
+    fireEvent.click(screen.getByTestId('casilla-sin-captura'));
+    expect(screen.getByTestId('btn-enviar-caja')).not.toBeDisabled();
+    elegirYPedirConfirmacion();
+
+    await waitFor(() => {
+      expect(enviar).toHaveBeenCalledWith(
+        'P-20',
+        'YAPE',
+        [{ medio: 'YAPE', monto: 32 }],
+        expect.objectContaining({ confirmaSinCaptura: true }),
+      );
+    });
+  });
+
+  it('Yape con foto legible: no pide la casilla ni envía confirmaSinCaptura', async () => {
+    vi.spyOn(reducirModulo, 'reducirImagenVoucher').mockImplementation(async (archivo) => archivo);
+    vi.spyOn(vouchersApi, 'subirVoucher').mockResolvedValue({ id: 'vch-1', legible: true });
+    const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
+
+    fireEvent.click(screen.getByText('Yape'));
+    fireEvent.change(screen.getByTestId('input-voucher-archivo'), {
+      target: { files: [new File(['v'], 'voucher.jpg', { type: 'image/jpeg' })] },
+    });
+    await waitFor(() => expect(screen.getByText('Foto del voucher lista para confirmar')).toBeDefined());
+
+    expect(screen.queryByTestId('casilla-sin-captura')).toBeNull();
+    elegirYPedirConfirmacion();
+    await waitFor(() => expect(enviar).toHaveBeenCalled());
+    expect(enviar.mock.calls[0][3]).not.toHaveProperty('confirmaSinCaptura');
+  });
+
+  it('efectivo: no hay casilla de sin captura', () => {
+    render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
+    expect(screen.queryByTestId('casilla-sin-captura')).toBeNull();
+  });
+
   it('confirmación No no envía nada a Caja', async () => {
     const enviar = vi.spyOn(vouchersApi, 'enviarACaja').mockResolvedValue({ ok: true });
     render(<ModalPrecuenta {...propsBase} pedidoId="P-20" />);
