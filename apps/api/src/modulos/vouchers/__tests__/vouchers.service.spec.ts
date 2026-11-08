@@ -511,6 +511,38 @@ describe('VouchersService', () => {
       expect(res.vouchers[0].id).toBe('1');
       expect(res.faltanRevisar).toBe(1);
     });
+
+    it('listar trae pedido, cliente y conversación en UNA consulta; huérfano toma el teléfono del chat', async () => {
+      prismaMock.person = { findMany: jest.fn().mockResolvedValue([{ party_id: 101n, nombres: 'Juan', apellidos: 'Mozo' }]) };
+      const base = {
+        archivo_id: 10n, origen: 'MOZO', medio: 'YAPE', semaforo: 'CONFIABLE', motivos: [],
+        revisado_en: null, creado_en: new Date('2026-10-27T10:00:00Z'), mensaje_id: null,
+      };
+      prismaMock.voucherPago.findMany.mockResolvedValue([
+        {
+          ...base, id: 1n, pedido_id: 50n, conversacion_id: null, subido_por: 101n,
+          pedido: { id: 50n, codigo: 'CP-W095', total: 31.75, cliente_nombre: 'Gerardo', cliente_telefono: '987654321',
+            estado: 'ENTREGADO', pago_estado: 'PENDIENTE', modalidad: 'DELIVERY' },
+          conversacion: null,
+        },
+        {
+          ...base, id: 2n, origen: 'WHATSAPP', pedido_id: null, conversacion_id: 7n, subido_por: null,
+          pedido: null, conversacion: { telefono: '912345678' },
+        },
+      ]);
+      const res = await service.listar({});
+      expect(prismaMock.voucherPago.findMany).toHaveBeenCalledTimes(1);
+      const arg = prismaMock.voucherPago.findMany.mock.calls[0][0];
+      expect(arg.include.pedido.select).toMatchObject({ codigo: true, estado: true, pago_estado: true, modalidad: true });
+      expect(arg.include.conversacion).toEqual({ select: { telefono: true } });
+      expect(res.vouchers[0]).toMatchObject({
+        pedidoCodigo: 'CP-W095', clienteNombre: 'Gerardo', pedidoTotal: '31.75', pedidoModalidad: 'DELIVERY',
+        clienteTelefono: '987654321', subidoPorNombre: 'Juan M.',
+      });
+      expect(res.vouchers[1]).toMatchObject({
+        pedidoId: null, pedidoCodigo: null, clienteTelefono: '912345678', conversacionId: '7', subidoPorNombre: null,
+      });
+    });
   });
 
   describe('Todo voucher queda guardado (origen, sin pedido, IA sin lectura)', () => {
