@@ -11,13 +11,14 @@ import type { AreaDespacho, LineaComanda, PedidoDespacho, UmbralesCocina } from 
 import { ResumenPagoDespacho } from './ResumenPagoDespacho';
 
 const VERDE = '#2F7A45';
-const MODALIDAD: Record<string, { texto: string; icono: string }> = {
-  MESA: { texto: 'Mesa', icono: '🍽️' },
-  LOCAL: { texto: 'Local', icono: '🍽️' },
-  COMER_LOCAL: { texto: 'Comer en el local', icono: '🍽️' },
-  LLEVAR: { texto: 'Para llevar', icono: '🛍️' },
-  RECOGER: { texto: 'Recoger', icono: '🛍️' },
-  DELIVERY: { texto: 'Delivery', icono: '🛵' },
+// Cada modalidad con su propio color (texto siempre con contraste ≥ 4.5:1)
+const MODALIDAD: Record<string, { texto: string; icono: string; fondo: string; color: string }> = {
+  MESA: { texto: 'En mesa', icono: '🍽️', fondo: '#0B2C3E', color: '#FBF4EC' },
+  LOCAL: { texto: 'En el local', icono: '🍽️', fondo: '#0B2C3E', color: '#FBF4EC' },
+  COMER_LOCAL: { texto: 'Comer en el local', icono: '🍽️', fondo: '#2F7A45', color: '#FFFFFF' },
+  LLEVAR: { texto: 'Para llevar', icono: '🛍️', fondo: '#D99E39', color: '#0B2C3E' },
+  RECOGER: { texto: 'Recoger', icono: '🛍️', fondo: '#D99E39', color: '#0B2C3E' },
+  DELIVERY: { texto: 'Delivery', icono: '🛵', fondo: '#B2500F', color: '#FFFFFF' },
 };
 
 /** Tamaño, opciones y personas de la línea, en texto corrido. */
@@ -239,7 +240,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
 
       <RejillaComandas anchoColumna={340}>
         {visibles.map((p) => {
-          const m = MODALIDAD[p.modalidad] ?? { texto: p.modalidad, icono: '📦' };
+          const m = MODALIDAD[p.modalidad] ?? { texto: p.modalidad, icono: '📦', fondo: '#2C4C5D', color: '#FFFFFF' };
           const faltan = p.areas.filter((a) => !a.listo);
           const algoListo = p.areas.some((a) => a.listo && !a.despachada);
           const trabajando = ocupado === p.pedidoId;
@@ -265,11 +266,19 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                 <strong style={{ fontFamily: 'Montserrat, sans-serif', fontSize: '26px' }}>{p.codigo}</strong>
                 <span
                   data-testid={`modalidad-${p.pedidoId}`}
-                  style={{ fontWeight: 800, fontSize: '15px', padding: '3px 12px', borderRadius: '9999px', background: 'var(--cp-navy)', color: 'var(--cp-cream)' }}
+                  style={{ fontWeight: 800, fontSize: '15px', padding: '3px 12px', borderRadius: '9999px', background: m.fondo, color: m.color }}
                 >
                   <span aria-hidden="true">{m.icono} </span>
                   {m.texto}
                 </span>
+                {p.esPersonal && (
+                  <span
+                    data-testid={`personal-${p.pedidoId}`}
+                    style={{ fontWeight: 800, fontSize: '15px', padding: '3px 12px', borderRadius: '9999px', background: '#fff', border: '2px solid #0B2C3E', color: '#0B2C3E' }}
+                  >
+                    👤 PERSONAL
+                  </span>
+                )}
                 <TiempoEspera desde={p.creado_en} minutosRespaldo={p.minutos} umbrales={umbrales} style={{ marginLeft: 'auto', fontSize: '16px' }} />
               </header>
               <div style={{ fontSize: '19px', fontWeight: 700 }}>{destino(p) || 'Sin nombre'}</div>
@@ -277,7 +286,7 @@ export function DespachoView({ puedeDespachar = true, puedeDevolver = true }: { 
                 <div style={{ fontSize: '15px', color: 'var(--cp-soft)' }}>{[p.direccion, p.referencia].filter(Boolean).join(' · ')}</div>
               )}
               {p.nota && <div style={{ fontSize: '15px', fontWeight: 700, background: '#FFF3C4', padding: '4px 8px', borderRadius: '6px' }}>Nota: {p.nota}</div>}
-              {p.pago && <ResumenPagoDespacho pedidoId={p.pedidoId} pago={p.pago} telefono={p.modalidad === 'DELIVERY' ? p.telefono : null} />}
+              {p.pago && <ResumenPagoDespacho pedidoId={p.pedidoId} pago={p.pago} esPersonal={p.esPersonal} telefono={p.modalidad === 'DELIVERY' ? p.telefono : null} />}
               <span
                 data-testid={`estado-pedido-${p.pedidoId}`}
                 style={{

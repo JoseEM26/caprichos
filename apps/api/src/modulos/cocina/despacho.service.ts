@@ -91,6 +91,7 @@ export class DespachoService {
         referencia: delivery ? (p.entrega_referencia ?? null) : null,
         telefono: delivery ? (p.cliente_telefono ?? null) : null,
         canal: p.canal,
+        esPersonal: Boolean((p as any).es_personal),
         pago: resumenPagoDespacho(p),
         areas,
         // Completo = todas sus áreas listas

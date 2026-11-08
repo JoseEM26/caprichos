@@ -229,6 +229,8 @@ export interface PedidoDespacho {
   referencia: string | null;
   telefono: string | null;
   canal?: string;
+  /** Consumo del personal (descuento y crédito del trabajador): no se cobra en caja. */
+  esPersonal?: boolean;
   /** Cómo se paga: medios, estado del cobro y vuelto (sin datos de contacto). */
   pago?: PagoDespacho;
   areas: AreaDespacho[];

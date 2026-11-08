@@ -68,7 +68,7 @@ describe('DespachoView (el LISTO final)', () => {
     const tarjeta = await screen.findByTestId('pedido-despacho-1');
     expect(within(tarjeta).getByText('CP-001')).toBeInTheDocument();
     expect(within(tarjeta).getByText('Mesa 4 · Ana')).toBeInTheDocument();
-    expect(screen.getByTestId('modalidad-1')).toHaveTextContent('🍽️ Mesa');
+    expect(screen.getByTestId('modalidad-1')).toHaveTextContent('🍽️ En mesa');
     expect(within(screen.getByTestId('area-1-1')).getByText('Waffle', { exact: false })).toBeInTheDocument();
     expect(screen.getByTestId('estado-area-1-1')).toHaveTextContent('Lista');
     expect(screen.getByTestId('estado-area-1-2')).toHaveTextContent('Falta');
