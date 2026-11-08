@@ -30,13 +30,13 @@ describe('aviso de pedido recibido con pago digital', () => {
     expect(t).toContain('977503006');
     expect(t).toContain('Maria Perez');
     expect(t).toContain('S/ 27.00');
-    expect(t.indexOf('977503006')).toBeLessThan(t.indexOf('envíanos por aquí mismo la captura'));
+    expect(t.indexOf('977503006')).toBeLessThan(t.indexOf('Envíanos la captura'));
   });
 
   it('sin datos de pago el texto sale como antes', () => {
     const t = TEXTOS_REPARTO.recibidoDigital('Ana', 'CP-W040', 'Yape', null, resumen).textoLibre;
-    expect(t).toContain('Pago por Yape: tu pedido ya está en marcha');
-    expect(t).toContain('envíanos por aquí mismo la captura (foto) de tu pago');
-    expect(t).toContain('(opcional)');
+    expect(t).toContain('📲 Pagas por Yape');
+    expect(t).not.toContain('ya está en marcha');
+    expect(t).toContain('Envíanos la captura de tu pago por aquí cuando puedas (opcional)');
   });
 });

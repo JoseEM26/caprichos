@@ -36,8 +36,9 @@ export const BOTONES_REPROGRAMACION = [
   { id: 'reprogramar_no', titulo: 'No, cancelar' },
 ];
 
-/** Resumen del pedido para el aviso «Recibimos tu pedido» (productos, total y estado del envío). */
+/** Resumen del pedido para el aviso «Recibimos tu pedido». Todo lo opcional se omite si falta. */
 export interface ResumenRecibido {
+  /** Una entrada por producto; un combo lleva sus partes en líneas siguientes con sangría. */
   lineas: string[];
   total: number;
   medioPago: string;
@@ -47,28 +48,151 @@ export interface ResumenRecibido {
   envio?: number | null;
   /** Parte en efectivo que se cobra al recibir y con cuánto paga el cliente (para el vuelto). */
   efectivo?: { aPagar: number; pagaCon?: number | null };
+  /** DELIVERY | RECOJO | LLEVAR | MESA | COMER_LOCAL */
+  modalidad?: string | null;
+  direccion?: string | null;
+  referencia?: string | null;
+  /** Dirección del local (recoger / para llevar) */
+  localDireccion?: string | null;
+  mesa?: string | null;
+  clienteNombre?: string | null;
+  clienteTelefono?: string | null;
+  subtotal?: number | null;
+  descuento?: number | null;
+  /** Nombre de la oferta o cupón que dio el descuento */
+  descuentoNombre?: string | null;
+  propina?: number | null;
+  /** Pago dividido: monto por medio (solo se muestra con 2 o más). */
+  pagos?: { medio: string; monto: number }[];
+  /** Hay parte (o todo) en tarjeta: se cobra con POS al recibir. */
+  conTarjeta?: boolean;
+  /** PAGADO | PENDIENTE (otros valores no se muestran) */
+  pagoEstado?: string | null;
+  comprobanteTipo?: string | null;
+  comprobanteDoc?: string | null;
+  comprobanteRazon?: string | null;
+  /** Rango o minutos ya formateado, ej. «25 a 30» */
+  tiempoEstimado?: string | null;
 }
 
-/** «Paga con S/ 50.00 · Vuelto S/ 18.25» o «Sin vuelto (paga exacto)»; vacío si no hay efectivo. */
-const bloqueEfectivo = (r: ResumenRecibido): string => {
+/** Contexto del aviso para armar el resumen completo. */
+export interface ContextoResumenRecibido {
+  nombre: string;
+  codigo: string;
+  /** Yape / Plin / transferencia cuando hay parte digital; null si no */
+  medioDigital?: string | null;
+  /** Bloque número/cuenta/titular/monto del medio digital */
+  datosPago?: string | null;
+  enlace?: string | null;
+}
+
+const soles = (n: number): string => `S/ ${n.toFixed(2)}`;
+/** Margen bajo los 4096 de WhatsApp para lo que se anexa después (puntos de bienvenida). */
+const LIMITE_TEXTO_RECIBIDO = 3700;
+
+/** «Pagas en efectivo al recibir: S/ 31.75» + vuelto o «Sin vuelto»; vacío si no hay efectivo. */
+const bloqueEfectivo = (r: ResumenRecibido): string[] => {
   const e = r.efectivo;
-  if (!e || !(e.aPagar > 0)) return '';
-  const base = `\n💵 Efectivo a pagar al recibir: S/ ${e.aPagar.toFixed(2)}`;
+  if (!e || !(e.aPagar > 0)) return [];
+  const base = `💵 Pagas en efectivo al recibir: ${soles(e.aPagar)}`;
   if (e.pagaCon != null && e.pagaCon > e.aPagar) {
-    return `${base}\n🪙 Pagas con S/ ${e.pagaCon.toFixed(2)} · te llevamos vuelto de S/ ${(Math.round((e.pagaCon - e.aPagar) * 100) / 100).toFixed(2)}`;
+    return [base, `🪙 Pagas con ${soles(e.pagaCon)} · vuelto ${soles(Math.round((e.pagaCon - e.aPagar) * 100) / 100)}`];
   }
-  return `${base}\n🪙 Sin vuelto (pago exacto)`;
+  return [base, '🪙 Sin vuelto (pago exacto)'];
 };
 
-const bloqueResumen = (r: ResumenRecibido): string =>
-  `\n\n🧾 Tu pedido:\n${r.lineas.map((l) => `• ${l}`).join('\n')}\n💰 Total: S/ ${r.total.toFixed(2)}${r.envioPorConfirmar ? ' (sin envío)' : ''}`;
+const TIPO_PEDIDO: Record<string, string> = {
+  DELIVERY: '🛵 Delivery',
+  RECOJO: '🏪 Recoger en el local',
+  LLEVAR: '🥡 Para llevar',
+  MESA: '🍽️ En mesa',
+  COMER_LOCAL: '🍽️ Comer en el local',
+};
 
-const bloqueEnvio = (r: ResumenRecibido): string => {
+const NOMBRE_MEDIO: Record<string, string> = { YAPE: 'Yape', PLIN: 'Plin', TRANSFERENCIA: 'Transferencia', EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta' };
+
+const sinVacios = (xs: (string | null | undefined | false)[]): string[] => xs.filter((x): x is string => !!x && x.trim() !== '');
+
+/**
+ * Texto completo de «Recibimos tu pedido» (datos ya leídos del pedido): función pura que devuelve las
+ * secciones en orden; el aviso las une con una línea en blanco. Lo que falta se omite sin dejar huecos.
+ */
+export function construirResumenRecibido(r: ResumenRecibido, c: ContextoResumenRecibido): string[] {
+  const secciones: string[] = [];
+  const digital = !!c.medioDigital;
+  secciones.push(`¡Hola ${c.nombre}! 😊\nRecibimos tu pedido *${c.codigo}*, ¡muchas gracias! 🎉`);
+
+  // Tipo de pedido y dónde se entrega
+  const tipo = r.modalidad ? TIPO_PEDIDO[r.modalidad] : null;
+  const entrega: string[] = [];
+  if (r.modalidad === 'DELIVERY') {
+    if (r.direccion) entrega.push(`📍 ${r.direccion}`);
+    if (r.referencia) entrega.push(`🔖 Referencia: ${r.referencia}`);
+  } else if (r.modalidad === 'RECOJO' || r.modalidad === 'LLEVAR') {
+    if (r.localDireccion) entrega.push(`📍 Recoges en: ${r.localDireccion}`);
+  } else if ((r.modalidad === 'MESA' || r.modalidad === 'COMER_LOCAL') && r.mesa) {
+    entrega.push(`🪑 ${r.mesa}`);
+  }
+  const cabecera = sinVacios([tipo, ...entrega]);
+  if (cabecera.length > 0) secciones.push(['*Tipo de pedido*', ...cabecera].join('\n'));
   if (r.envioPorConfirmar) {
-    return '\n\n🛵 Envío por confirmar: se calcula al recibir tu ubicación.\n📍 Envíanos tu ubicación: toca el clip 📎 → Ubicación → Enviar tu ubicación actual.';
+    secciones.push('📍 *Falta tu ubicación*\nEnvíanos tu ubicación: toca el clip 📎 → Ubicación → Enviar tu ubicación actual. Con ella calculamos tu envío.');
   }
-  return r.envio != null ? `\n\n🛵 Envío: ${r.envio === 0 ? 'gratis' : `S/ ${r.envio.toFixed(2)}`}.` : '';
-};
+
+  // Cliente
+  const cliente = sinVacios([r.clienteNombre, r.clienteTelefono ? `📱 ${r.clienteTelefono}` : null]);
+  if (cliente.length > 0) secciones.push(`👤 ${cliente.join(' · ')}`);
+
+  // Resumen de pago (el total y el pago nunca se recortan)
+  const totales: string[] = ['*Resumen de pago*'];
+  if (r.subtotal != null) totales.push(`Subtotal: ${soles(r.subtotal)}`);
+  if (r.descuento != null && r.descuento > 0) totales.push(`Descuento${r.descuentoNombre ? ` (${r.descuentoNombre})` : ''}: -${soles(r.descuento)}`);
+  if (r.envioPorConfirmar) totales.push('Envío: por confirmar');
+  else if (r.envio != null) totales.push(`Envío: ${r.envio === 0 ? 'gratis' : soles(r.envio)}`);
+  if (r.propina != null && r.propina > 0) totales.push(`Propina: ${soles(r.propina)} (aparte del total)`);
+  totales.push(`*TOTAL: ${soles(r.total)}*${r.envioPorConfirmar ? ' + envío por confirmar' : ''}`);
+
+  const dividido = (r.pagos?.length ?? 0) > 1;
+  const pago: string[] = ['*Cómo pagas*'];
+  if (dividido) r.pagos!.forEach((p) => pago.push(`• ${NOMBRE_MEDIO[String(p.medio).toUpperCase()] ?? p.medio}: ${soles(p.monto)}`));
+  const ef = bloqueEfectivo(r);
+  pago.push(...ef);
+  if (r.conTarjeta) pago.push('💳 Pagas con tarjeta (POS) al recibir');
+  if (digital && !dividido) pago.push(c.datosPago || `📲 Pagas por ${c.medioDigital}`);
+  if (!digital && ef.length === 0 && !r.conTarjeta && !dividido) pago.push(`💳 ${r.medioPago.charAt(0).toUpperCase()}${r.medioPago.slice(1)}`);
+  const estado = String(r.pagoEstado ?? '').toUpperCase();
+  if (estado === 'PAGADO') pago.push('✅ Pago recibido');
+  else if (digital && estado === 'PENDIENTE') pago.push('⏳ Pago pendiente');
+  else if (!digital && estado === 'PENDIENTE' && (ef.length > 0 || r.conTarjeta)) pago.push('Se cobra al recibir');
+
+  const comprobante = r.comprobanteTipo === 'BOLETA'
+    ? '🧾 Comprobante: Boleta'
+    : r.comprobanteTipo === 'FACTURA'
+      ? `🧾 Comprobante: Factura${r.comprobanteDoc ? ` a RUC ${r.comprobanteDoc}` : ''}${r.comprobanteRazon ? ` (${r.comprobanteRazon})` : ''}`
+      : null;
+
+  const cola: string[] = [totales.join('\n'), pago.join('\n')];
+  if (digital && dividido && c.datosPago) cola.push(`*Datos para tu pago por ${c.medioDigital}*\n${c.datosPago}`);
+  if (digital) cola.push('📸 Envíanos la captura de tu pago por aquí cuando puedas (opcional). Un asesor la revisará. 🙏');
+  if (comprobante) cola.push(comprobante);
+  if (r.tiempoEstimado) cola.push(`⏱️ Tiempo estimado: ${r.tiempoEstimado} minutos`);
+  if (c.enlace) cola.push(`Sigue tu pedido aquí: ${c.enlace}`);
+
+  // Productos: si el pedido es enorme se recorta la lista, nunca el total ni el pago
+  const armarProductos = (n: number): string => {
+    const items = r.lineas.slice(0, n).map((l) => `• ${l}`);
+    const resto = r.lineas.length - n;
+    if (resto > 0) items.push(`• y ${resto} producto${resto === 1 ? '' : 's'} más`);
+    return ['*Tu pedido*', ...items].join('\n');
+  };
+  const fijo = [...secciones, ...cola].join('\n\n').length;
+  let n = r.lineas.length;
+  while (n > 1 && fijo + 2 + armarProductos(n).length > LIMITE_TEXTO_RECIBIDO) n--;
+  if (r.lineas.length > 0) secciones.push(armarProductos(n));
+  return [...secciones, ...cola];
+}
+
+export const textoResumenRecibido = (r: ResumenRecibido, c: ContextoResumenRecibido): string => construirResumenRecibido(r, c).join('\n\n');
 
 export const TEXTOS_REPARTO = {
   aceptado: (nombre: string, codigo: string): PayloadAvisoReparto => ({
@@ -169,7 +293,7 @@ export const TEXTOS_REPARTO = {
    */
   recibidoDigital: (nombre: string, codigo: string, medio: string, enlace?: string | null, resumen?: ResumenRecibido | null, datosPago?: string | null): PayloadAvisoReparto => ({
     textoLibre: resumen
-      ? `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉${bloqueResumen(resumen)}\n\n💳 Pago por ${medio}:${datosPago ? `\n${datosPago}\n` : ' '}tu pedido ya está en marcha. Cuando puedas, envíanos por aquí mismo la captura (foto) de tu pago 📸 (opcional) y un asesor la revisará. 🙏${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`
+      ? textoResumenRecibido(resumen, { nombre, codigo, medioDigital: medio, datosPago, enlace })
       : `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡muchas gracias! 🎉 Tu pedido ya está en marcha. Cuando puedas, envíanos por aquí mismo la foto de tu pago por ${medio} 📸 (opcional) 🙏${enlace ? ` Sigue tu pedido aquí: ${enlace}` : ''}`,
     plantillaClave: 'CARTA_RECIBIDO_DIGITAL',
     variablesPlantilla: [nombre, codigo, medio],
@@ -185,7 +309,7 @@ export const TEXTOS_REPARTO = {
         ? { plantillaClave: 'CARTA_RECIBIDO_SEGUIMIENTO', variablesPlantilla: [nombre, codigo, enlace] }
         : { plantillaClave: 'CARTA_RECIBIDO_EFECTIVO', variablesPlantilla: [nombre, codigo] };
       return {
-        textoLibre: `¡Hola ${nombre}! 😊 Recibimos tu pedido ${codigo}, ¡gracias por tu compra! Ya está en proceso.${bloqueResumen(resumen)}\n\n💵 Pago: ${resumen.medioPago}.${bloqueEfectivo(resumen)}${bloqueEnvio(resumen)}${enlace ? `\n\nSigue tu pedido aquí: ${enlace}` : ''}`,
+        textoLibre: textoResumenRecibido(resumen, { nombre, codigo, enlace }),
         ...plantilla,
       };
     }
@@ -232,7 +356,8 @@ export function conBienvenidaPuntos(
   enlace: string,
   efectivo: boolean,
 ): PayloadAvisoReparto {
-  const textoLibre = `${base.textoLibre} Ya sumas puntos con este número. Ve tus puntos aquí: ${enlace}`;
+  const sep = base.textoLibre.includes('\n\n') ? '\n\n' : ' ';
+  const textoLibre = `${base.textoLibre}${sep}Ya sumas puntos con este número. Ve tus puntos aquí: ${enlace}`;
   if (efectivo) {
     return { textoLibre, plantillaClave: 'CARTA_RECIBIDO_BIENVENIDA_PUNTOS', variablesPlantilla: [nombre, codigo, enlace] };
   }
