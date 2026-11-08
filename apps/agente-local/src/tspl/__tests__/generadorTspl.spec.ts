@@ -7,6 +7,8 @@ import {
   generarBytesTrabajo,
 } from '../generadorTspl';
 import { FUENTES_TSPL } from '../tipografia';
+import { PAGOS_EJEMPLO } from '@caprichos/compartido';
+import { muestraEtiquetaGeneral } from '../../datosMuestra';
 import type {
   EtiquetaGeneralDatos,
   EtiquetaAreaDatos,
@@ -243,5 +245,16 @@ describe('generadorTspl', () => {
       expect(c).toContain('GAP 2 mm,0 mm\r\n');
       expect(c).toContain('DIRECTION 0\r\n');
     });
+  });
+});
+
+describe('sticker de despacho con bloque de pago', () => {
+  it('con `pago` dibuja el recuadro; sin `pago` (servidor viejo) sale el sticker de siempre', () => {
+    const sin = generarTsplTrabajo('ETIQUETA_GENERAL', muestraEtiquetaGeneral, false);
+    const con = generarTsplTrabajo('ETIQUETA_GENERAL', { ...muestraEtiquetaGeneral, pago: PAGOS_EJEMPLO.deliveryContraEntrega }, false);
+    expect(sin).not.toContain('"PAGO"');
+    expect(con).toContain('"PAGO"');
+    expect(con).toContain('COBRAR AL ENTREGAR: S/ 38.50');
+    expect(generarTsplTrabajo('ETIQUETA_GENERAL', { ...muestraEtiquetaGeneral, pago: null }, false)).toBe(sin);
   });
 });

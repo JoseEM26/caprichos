@@ -1020,6 +1020,7 @@ export class ImpresionService {
       const pedido: any = await this.prisma.pedido.findUnique({
         where: { id: pedidoId },
         include: {
+          planPago: { orderBy: { orden: 'asc' } },
           lineas: {
             include: {
               area: true,
@@ -1469,6 +1470,7 @@ export class ImpresionService {
     const pedido: any = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
       include: {
+        planPago: { orderBy: { orden: 'asc' } },
         lineas: {
           include: {
             area: true,
@@ -1635,6 +1637,7 @@ export class ImpresionService {
     const pedido: any = await this.prisma.pedido.findUnique({
       where: { id: pedidoId },
       include: {
+        planPago: { orderBy: { orden: 'asc' } },
         lineas: { include: { area: true, producto: { include: { categoria: true } }, opcionesElegidas: true, sabores: true } },
       },
     });

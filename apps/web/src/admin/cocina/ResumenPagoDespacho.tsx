@@ -64,6 +64,11 @@ export function ResumenPagoDespacho({
         </span>
         <strong style={{ fontSize: '20px', fontFamily: 'Montserrat, sans-serif' }}>{soles(pago.total)}</strong>
       </div>
+      {pago.cobrarAlEntregar != null && !personal && (
+        <div data-testid={`cobrar-entregar-${pedidoId}`} style={{ padding: '6px 10px', borderRadius: '8px', background: '#0B2C3E', color: '#fff', fontWeight: 900, fontSize: '16px' }}>
+          COBRAR AL ENTREGAR: {soles(pago.cobrarAlEntregar)} (efectivo)
+        </div>
+      )}
       {pago.medios.map((m) => (
         <div key={m.medio} style={fila}>
           <span>{etiquetaMedio(m.medio)}</span>

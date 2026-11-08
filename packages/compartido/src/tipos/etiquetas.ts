@@ -198,6 +198,22 @@ export interface EtiquetaGeneralProducto {
   tamano?: string | null;
 }
 
+/** Bloque de pago del sticker de despacho y de la pantalla de Despacho (lo calcula `calcularPagoPedido`). */
+export interface PagoEtiqueta {
+  estado: 'PAGADO' | 'COBRADO_MOZO' | 'POR_COBRAR';
+  medios: Array<{ medio: string; monto: number }>;
+  total: number;
+  descuento: number;
+  propina: number;
+  efectivo: number;
+  recibido: number | null;
+  vuelto: number | null;
+  llevaVuelto: boolean | null;
+  esPersonal: boolean;
+  /** Delivery sin pagar: efectivo que el repartidor cobra al entregar. */
+  cobrarAlEntregar: number | null;
+}
+
 export interface EtiquetaGeneralDatos {
   tipo?: 'ETIQUETA_GENERAL';
   codigo: string;
@@ -217,6 +233,8 @@ export interface EtiquetaGeneralDatos {
   telefono?: string | null;
   /** Delivery con coordenadas: Plus Code corto («7P7J+2X Lima») para ubicar al cliente */
   plus?: string | null;
+  /** Pago vigente al armar el trabajo (opcional: un programa viejo lo ignora y dibuja el sticker anterior). */
+  pago?: PagoEtiqueta | null;
   /** Tamaño del sticker en mm; la API lo pone al entregar el trabajo al programa de impresión. Ausente: el de fábrica. */
   tamanoMm?: { anchoMm: number; altoMm: number; margenMm?: number };
   printer: string;

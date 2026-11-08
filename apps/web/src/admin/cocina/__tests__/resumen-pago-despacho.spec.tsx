@@ -16,6 +16,12 @@ describe('ResumenPagoDespacho', () => {
     expect(screen.getByTestId('vuelto-2').textContent).toContain('NO lleva vuelto');
     expect(screen.getByText('987654321')).toBeTruthy();
   });
+  it('delivery sin pagar: banner COBRAR AL ENTREGAR igual que el sticker; el personal no cobra', () => {
+    render(<ResumenPagoDespacho pedidoId="4" pago={{ ...pago, cobrarAlEntregar: 40 }} />);
+    expect(screen.getByTestId('cobrar-entregar-4').textContent).toContain('COBRAR AL ENTREGAR: S/ 40.00');
+    render(<ResumenPagoDespacho pedidoId="5" pago={{ ...pago, cobrarAlEntregar: 40 }} esPersonal />);
+    expect(screen.queryByTestId('cobrar-entregar-5')).toBeNull();
+  });
   it('efectivo sin dato: avisa que no indicó', () => {
     render(<ResumenPagoDespacho pedidoId="3" pago={{ ...pago, llevaVuelto: null, vuelto: null, recibido: null }} />);
     expect(screen.getByTestId('vuelto-3').textContent).toContain('no indicó');

@@ -212,6 +212,8 @@ export interface PagoDespacho {
   vuelto: number | null;
   /** true: lleva vuelto · false: sin vuelto · null: paga en efectivo y no se sabe con cuánto. */
   llevaVuelto: boolean | null;
+  /** Delivery sin pagar: efectivo que el repartidor cobra al entregar. */
+  cobrarAlEntregar?: number | null;
 }
 
 export interface PedidoDespacho {

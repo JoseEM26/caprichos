@@ -13,6 +13,7 @@ import {
   detalleLinea,
   esAreaBebidas,
   plusCodeParaMostrar,
+  calcularPagoPedido,
 } from '@caprichos/compartido';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
 
@@ -171,6 +172,8 @@ export function construirEtiquetaGeneral(pedido: any): EtiquetaGeneralDatos {
           plus: pedido.entrega_lat != null && pedido.entrega_lng != null ? plusCodeParaMostrar(Number(pedido.entrega_lat), Number(pedido.entrega_lng)) : null,
         }
       : {}),
+    // Pago vigente al armar el trabajo (con planPago, medio, vuelto, personal y delivery contra entrega)
+    pago: pedido.total != null ? calcularPagoPedido(pedido) : null,
     printer: 'Etiquetera de caja',
   };
 }
