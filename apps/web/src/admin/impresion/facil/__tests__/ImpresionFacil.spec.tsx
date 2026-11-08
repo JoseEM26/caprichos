@@ -31,7 +31,15 @@ function mapa(over: Partial<MapaImpresionDatos> = {}): MapaImpresionDatos {
   };
 }
 
-const estado = (): any => ({ agente: 'conectado', impresora: 'lista', pendientes: 0, fallidos: 0, equipos: [] });
+const CFG_OK = { ticketera: true, etiquetera: true, ticketPago: true, comandaSalon: true, comandaAreas: [], stickerGeneral: false, stickerAreas: ['2'], stickerBebidaAreas: [], tamanoGeneral: null, tamanoBebida: null, pausado: false, configurado: true };
+const CFG_NUEVA = { ...CFG_OK, ticketera: false, etiquetera: false, ticketPago: false, comandaSalon: false, stickerAreas: [], configurado: false };
+const equipo = (id: string, nombre: string, over: any = {}): any => ({
+  deviceKeyId: id, nombre, areaId: null, areaNombre: null, conectado: true, impresoras: {}, candidatas: [], seleccion: {}, pendientes: 0,
+  config: CFG_OK, ultimoLatido: new Date().toISOString(), ipLocal: ['192.168.1.20'], ipPublica: '200.1.1.1', version: '0.1.0', hostname: 'CAJA', sistema: 'win32', ...over,
+});
+let equiposEstado: any[] = [];
+let extraEstado: any = {};
+const estado = (): any => ({ agente: 'conectado', impresora: 'lista', pendientes: 0, fallidos: 0, equipos: equiposEstado, ...extraEstado });
 
 function montar(opciones: { editar?: boolean; trabajos?: any[] } = {}) {
   const editar = opciones.editar ?? true;
@@ -47,45 +55,42 @@ function montar(opciones: { editar?: boolean; trabajos?: any[] } = {}) {
 }
 
 describe('Impresión en 3 pasos', () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    equiposEstado = [];
+    extraEstado = {};
+  });
   afterEach(() => vi.restoreAllMocks());
 
   it('muestra «Cómo funciona» y los tres pasos numerados', async () => {
     vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
     montar();
     expect(await screen.findByText('Cómo funciona')).toBeInTheDocument();
-    expect(screen.getByText(/UNA sola para todo el local/)).toBeInTheDocument();
+    expect(screen.getByText(/se configura por separado/)).toBeInTheDocument();
     for (const id of ['paso-1', 'paso-2', 'paso-3']) expect(screen.getByTestId(id)).toBeInTheDocument();
     expect(within(screen.getByTestId('paso-1')).getByText('Tus computadoras')).toBeInTheDocument();
-    expect(within(screen.getByTestId('paso-2')).getByText('Qué se imprime')).toBeInTheDocument();
+    expect(within(screen.getByTestId('paso-2')).getByText('Reglas generales del local')).toBeInTheDocument();
     expect(within(screen.getByTestId('paso-3')).getByText('Probar')).toBeInTheDocument();
     expect(screen.queryByTestId('aviso-armado')).toBeNull();
   });
 
-  it('cada PC muestra su estado en una frase y su luz', async () => {
-    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(
-      mapa({
-        equipos: [
-          { deviceKeyId: '10', nombre: 'PC Caja', areaId: null, maquinas: ['ETIQUETERA', 'TICKETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }, { rol: 'TICKETERA', estado: 'no_configurada' }], ultimoLatido: null, conectado: true },
-          { deviceKeyId: '11', nombre: 'PC Bebidas', areaId: '1', maquinas: ['ETIQUETERA'], roles: [{ rol: 'ETIQUETERA', estado: 'lista' }], ultimoLatido: null, conectado: false },
-        ],
-        colaPendientePorEquipo: [{ deviceKeyId: '11', pendientes: 3 }],
-      }),
-    );
+  it('lista las PC vinculadas, con la nueva arriba de todo, su insignia y un aviso en la pantalla', async () => {
+    vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
+    equiposEstado = [equipo('10', 'PC Caja'), equipo('12', 'PC recién vinculada', { config: CFG_NUEVA, ultimoLatido: null, conectado: false })];
     montar();
-    expect(await screen.findByTestId('estado-pc-10')).toHaveTextContent('No elegiste impresora de tickets');
-    expect(screen.getByTestId('luz-10')).toHaveAttribute('data-nivel', 'ambar');
-    expect(screen.getByTestId('estado-pc-11')).toHaveTextContent('El programa no está abierto en esta PC');
-    expect(screen.getByTestId('estado-pc-11')).toHaveTextContent('3 papeles esperan');
-    expect(screen.getByTestId('luz-11')).toHaveAttribute('data-nivel', 'rojo');
+    const tarjetas = await screen.findAllByRole('article');
+    expect(tarjetas.map((t) => t.getAttribute('aria-label'))).toEqual(['PC recién vinculada', 'PC Caja']);
+    expect(screen.getByTestId('nueva-12')).toHaveTextContent('Nueva · falta configurar');
+    expect(screen.queryByTestId('nueva-10')).toBeNull();
+    expect(screen.getByTestId('aviso-nuevas')).toHaveTextContent('recién vinculada');
   });
 
-  it('el selector «Esta PC imprime lo de» manda el área elegida', async () => {
+  it('avisa cuando hay papeles que ninguna PC imprime', async () => {
     vi.spyOn(impresionApi, 'obtenerMapa').mockResolvedValue(mapa());
-    const asignar = vi.spyOn(impresionApi, 'asignarAreaEquipo').mockResolvedValue({ ok: true, areaId: '2', avisos: [] });
+    equiposEstado = [equipo('10', 'PC Caja')];
+    extraEstado = { sinReceptor: 3 };
     montar();
-    fireEvent.change(await screen.findByTestId('area-10'), { target: { value: '2' } });
-    await waitFor(() => expect(asignar).toHaveBeenCalledWith('10', '2'));
+    expect(await screen.findByTestId('aviso-sin-receptor')).toHaveTextContent('Ninguna PC imprime 3 papeles');
   });
 
   it('la tabla marca lo recomendado y tocar una casilla guarda solo ese cambio', async () => {

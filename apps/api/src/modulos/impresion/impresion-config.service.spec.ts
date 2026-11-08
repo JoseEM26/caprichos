@@ -42,6 +42,7 @@ describe('ImpresionConfigService', () => {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       printJob: { count: jest.fn().mockResolvedValue(3) },
+      equipoImpresionConfig: { create: jest.fn().mockResolvedValue({}) },
     };
     auditoria = { registrar: jest.fn().mockResolvedValue(undefined) };
     service = new ImpresionConfigService(prisma, auditoria);
@@ -68,8 +69,8 @@ describe('ImpresionConfigService', () => {
     it('el sticker general sale en Caja; el de vaso va a Bebidas si tiene etiquetera; el de área, como diga la regla', async () => {
       const m = await service.obtenerMapa();
       const general = m.ruteo.find((r) => r.tipo === 'ETIQUETA_GENERAL')!;
-      // Apagado de fábrica (decisión del dueño 07/11): sigue ruteado a Caja, pero inactivo
-      expect(general).toMatchObject({ destinoAreaId: null, destinoNombre: 'Caja', activo: false });
+      // Apagado de fábrica (decisión del dueño 07/11): ninguna PC lo imprime (la conversión de lo que ya hacían lo deja apagado)
+      expect(general).toMatchObject({ destinoAreaId: null, destinoEquipoId: null, destinoNombre: 'Ninguna PC lo imprime', activo: false });
       const vaso = m.ruteo.find((r) => r.tipo === 'ETIQUETA_BEBIDA')!;
       expect(vaso).toMatchObject({ destinoAreaId: '1', destinoEquipoId: '11', destinoNombre: 'Barra' });
       const area = m.ruteo.filter((r) => r.tipo === 'ETIQUETA_AREA');

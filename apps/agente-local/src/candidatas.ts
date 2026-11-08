@@ -98,7 +98,16 @@ export function candidatasDeLinux(lista: ImpresoraLinuxInfo[]): CandidataLocal[]
 
 /** Lo que viaja al servidor: sin datos internos. */
 export function paraServidor(c: CandidataLocal): ImpresoraCandidata {
-  return { id: c.id, nombre: c.nombre, ...(c.detalle ? { detalle: c.detalle } : {}), ...(c.sugerido ? { sugerido: c.sugerido } : {}) };
+  return {
+    id: c.id,
+    nombre: c.nombre,
+    ...(c.detalle ? { detalle: c.detalle } : {}),
+    ...(c.sugerido ? { sugerido: c.sugerido } : {}),
+    ...(c.puerto ? { puerto: c.puerto } : {}),
+    ...(c.driver ? { driver: c.driver } : {}),
+    ...(c.estadoSpooler ? { estado: c.estadoSpooler } : {}),
+    ...(c.usb !== undefined ? { usb: c.usb } : {}),
+  };
 }
 
 /** Identificación estable de lo guardado en la configuración (identidad en Linux; si no, el destino). */

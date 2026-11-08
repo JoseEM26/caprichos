@@ -30,6 +30,8 @@ interface Lienzo {
   W: number;
   H: number;
   prim: Primitiva[];
+  /** Margen extra por la configuración de la PC (dots), ya sumado a b. */
+  extra: number;
   /** Distancia del marco al borde. */
   b: number;
   /** Margen interior izquierdo y ancho util. */
@@ -37,15 +39,16 @@ interface Lienzo {
   w: number;
 }
 
-function lienzo(tam: { anchoMm: number; altoMm: number }): Lienzo {
+function lienzo(tam: { anchoMm: number; altoMm: number; margenMm?: number }): Lienzo {
   const W = Math.round(tam.anchoMm * MM_A_DOTS);
   const H = Math.round(tam.altoMm * MM_A_DOTS);
   const prim: Primitiva[] = [];
   // Marco unico; el margen crece un poco con el sticker (el cabezal no imprime pegado al borde)
-  const b = Math.max(4, Math.round(Math.min(W, H) / 60));
+  const bBase = Math.max(4, Math.round(Math.min(W, H) / 60));
+  const b = Math.max(bBase, Math.round((tam.margenMm ?? 0) * MM_A_DOTS));
   prim.push({ t: 'caja', x1: b, y1: b, x2: W - b, y2: H - b, grosor: 3, radio: 8 });
   const x0 = b + 10;
-  return { W, H, prim, b, x0, w: W - 2 * x0 };
+  return { W, H, prim, b, extra: b - bBase, x0, w: W - 2 * x0 };
 }
 
 const texto = (L: Lienzo, x: number, y: number, fuente: FuenteTspl, m: number, t: string, invertido = false) => {
@@ -83,9 +86,18 @@ function lineas(L: Lienzo, y: number, r: { n: Nivel; lineas: string[] }, centrad
 }
 
 /** Banda negra con texto blanco: la altura sale de la fuente. Devuelve la y donde termina. */
-function banda(L: Lienzo, y: number, fuente: FuenteTspl, izq: string, der: string): number {
+function banda(L: Lienzo, y: number, fuenteIdeal: FuenteTspl, izq: string, derIdeal: string): number {
+  // En un sticker angosto la letra baja de nivel hasta que el texto de la derecha ocupa media banda como mucho;
+  // si aun asi no cabe, se recorta.
+  const orden: FuenteTspl[] = ['5', '4', '3', '2'];
+  let fuente: FuenteTspl = fuenteIdeal;
+  for (const c of orden.slice(orden.indexOf(fuenteIdeal))) {
+    fuente = c;
+    if (ancho_(derIdeal, [c, 1]) <= L.w * 0.5) break;
+  }
   const h = alto(fuente) + 14;
   const n: Nivel = [fuente, 1];
+  const der = truncar(derIdeal, charsEn(Math.floor(L.w * 0.5), n));
   const wDer = ancho_(der, n);
   const t = truncar(izq, Math.max(1, charsEn(L.w - wDer - 16, n)));
   texto(L, L.x0, y + 7, fuente, 1, t, true);
@@ -99,7 +111,7 @@ function banda(L: Lienzo, y: number, fuente: FuenteTspl, izq: string, der: strin
 /** Pie con linea fina: texto a la izquierda y a la derecha en fuente 2 (o la dada). Devuelve la y donde empieza el pie. */
 function pie(L: Lienzo, izq: string, der: string, fuente: FuenteTspl = '2'): number {
   const h = alto(fuente);
-  const y = L.H - 10 - h - 4;
+  const y = L.H - 10 - L.extra - h - 4;
   const n: Nivel = [fuente, 1];
   const wDer = ancho_(der, n);
   barra(L, L.x0 - 6, y - 6, L.w + 12, 2);
@@ -110,8 +122,8 @@ function pie(L: Lienzo, izq: string, der: string, fuente: FuenteTspl = '2'): num
 
 // ---- BEBIDA ----
 
-export function maquetarBebida(d: EtiquetaBebidaDatos, tam: { anchoMm?: number; altoMm?: number } = {}): Maqueta {
-  const L = lienzo({ anchoMm: tam.anchoMm ?? TAMANO_BEBIDA_DEFECTO.anchoMm, altoMm: tam.altoMm ?? TAMANO_BEBIDA_DEFECTO.altoMm });
+export function maquetarBebida(d: EtiquetaBebidaDatos, tam: { anchoMm?: number; altoMm?: number; margenMm?: number } = {}): Maqueta {
+  const L = lienzo({ anchoMm: tam.anchoMm ?? TAMANO_BEBIDA_DEFECTO.anchoMm, altoMm: tam.altoMm ?? TAMANO_BEBIDA_DEFECTO.altoMm, margenMm: tam.margenMm });
   // Cabecera: codigo del pedido (izq) e indice "1/3" (der)
   let y = banda(L, L.b + 4, '4', d.codigo || 'PED-000', `BEBIDA ${d.bebidaIndex}/${d.totalBebidas}`) + 6;
   // Pie: "Para: cliente" y hora
@@ -165,8 +177,8 @@ function textoProducto(cantidad: number, nombre: string, tamano: string | null |
   return `${pre}${truncar(nombre, espacio)}${post}`;
 }
 
-export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number; altoMm?: number } = {}): Maqueta {
-  const L = lienzo({ anchoMm: tam.anchoMm ?? TAMANO_GENERAL_DEFECTO.anchoMm, altoMm: tam.altoMm ?? TAMANO_GENERAL_DEFECTO.altoMm });
+export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number; altoMm?: number; margenMm?: number } = {}): Maqueta {
+  const L = lienzo({ anchoMm: tam.anchoMm ?? TAMANO_GENERAL_DEFECTO.anchoMm, altoMm: tam.altoMm ?? TAMANO_GENERAL_DEFECTO.altoMm, margenMm: tam.margenMm });
   // Cabecera: codigo gigante y hora
   let y = banda(L, L.b + 4, '5', d.codigo || 'PED-000', d.hora) + 8;
 
@@ -209,14 +221,15 @@ export function maquetarGeneral(d: EtiquetaGeneralDatos, tam: { anchoMm?: number
   y = lineas(L, y, rc, true) + 2;
 
   // Delivery: direccion (hasta 2 lineas) y celular
+  // Lo opcional solo se dibuja si queda sitio (en un sticker bajo, como 50 x 30, no se sale del borde)
   const dir = d.direccion?.trim();
-  if (dir) {
-    const rd = encajar(`DIR: ${dir}`, L.w, 2 * hLinea(['3', 1]), [['3', 1], ['2', 1]], 2);
+  if (dir && finCuerpo - y >= hLinea(['2', 1])) {
+    const rd = encajar(`DIR: ${dir}`, L.w, Math.min(2 * hLinea(['3', 1]), finCuerpo - y), [['3', 1], ['2', 1]], 2);
     y = lineas(L, y, rd, false);
   }
   const tel = d.telefono?.trim();
-  if (tel) {
-    y = lineas(L, y, { n: ['3', 1], lineas: [`TEL: ${tel}`] }, false);
+  if (tel && finCuerpo - y >= hLinea(['3', 1])) {
+    y = lineas(L, y, encajar(`TEL: ${tel}`, L.w, hLinea(['3', 1]), [['3', 1], ['2', 1]], 1), false);
   }
   barra(L, L.x0, y + 2, L.w, 2);
   y += 8;

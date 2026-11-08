@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { EstadoImpresora, RolImpresora } from '@caprichos/compartido';
 
 export class ImpresoraLatidoDto {
@@ -42,6 +42,43 @@ export class CandidataLatidoDto {
   @IsOptional()
   @IsIn(['ETIQUETERA', 'TICKETERA'])
   sugerido?: RolImpresora;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  puerto?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  driver?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  estado?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  usb?: boolean;
+}
+
+export class InfoEquipoLatidoDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  hostname?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  sistema?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsString({ each: true })
+  ipLocal?: string[];
 }
 
 export class LatidoDto {
@@ -72,4 +109,10 @@ export class LatidoDto {
   @ValidateNested({ each: true })
   @Type(() => CandidataLatidoDto)
   candidatas?: CandidataLatidoDto[];
+
+  /** Nombre, sistema y red de la computadora (aditivo). */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => InfoEquipoLatidoDto)
+  equipo?: InfoEquipoLatidoDto;
 }

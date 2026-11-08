@@ -1,5 +1,6 @@
-import { rolDeTrabajo } from '@caprichos/compartido';
-import type { EstadoImpresora, ImpresoraReportada, RolImpresora, TrabajoImpresion } from '@caprichos/compartido';
+import * as os from 'os';
+import { rolDeTrabajo, tamanoEfectivo, TAMANO_BEBIDA_DEFECTO, TAMANO_GENERAL_DEFECTO } from '@caprichos/compartido';
+import type { ConfigEquipoParaAgente, EstadoImpresora, ImpresoraReportada, InfoEquipoLatido, RolImpresora, TrabajoImpresion } from '@caprichos/compartido';
 import type { ConfiguracionAgente } from '../config';
 import { ErrorRespuestaApi } from '../api/clienteApi';
 import type { IClienteApiImpresion } from '../api/clienteApi';
@@ -30,6 +31,15 @@ const REESCANEO_SIN_IMPRESORA_MS = 30000;
 const VENTANA_ACTIVIDAD_MS = 60000;
 const ESPERA_ACTIVA_MS = 1000;
 
+/** Nombre, sistema y direcciones de red de esta computadora (interfaces no internas, solo IPv4). */
+export function leerInfoEquipo(): InfoEquipoLatido {
+  const ipLocal: string[] = [];
+  for (const lista of Object.values(os.networkInterfaces())) {
+    for (const i of lista ?? []) if (i.family === 'IPv4' && !i.internal) ipLocal.push(i.address);
+  }
+  return { hostname: os.hostname(), sistema: `${process.platform} ${os.release()}`, ipLocal };
+}
+
 export interface OpcionesAgenteLocalServicio {
   config: ConfiguracionAgente;
   clienteApi: IClienteApiImpresion;
@@ -39,6 +49,8 @@ export interface OpcionesAgenteLocalServicio {
   impresoras?: Partial<Record<RolImpresora, IDispositivoImpresora>>;
   logger?: (nivel: 'info' | 'warn' | 'error' | 'debug', mensaje: string) => void;
   temporizador?: (ms: number) => Promise<void>;
+  /** Datos de la computadora para el latido (por defecto, los reales; se inyecta en las pruebas). */
+  infoEquipo?: () => InfoEquipoLatido;
   /** Habilita pruebas por impresora concreta y la elección desde el panel (sin él, el programa se comporta como antes). */
   equipo?: EquipoLocal;
 }
@@ -48,6 +60,9 @@ export class AgenteLocalServicio {
   private readonly clienteApi: IClienteApiImpresion;
   private readonly impresora: IDispositivoImpresora;
   private readonly equipo?: EquipoLocal;
+  private readonly infoEquipo: () => InfoEquipoLatido;
+  /** Lo que el dueño configuró para esta PC (llega en cada latido y se aplica sin reiniciar). */
+  private configEquipo?: ConfigEquipoParaAgente;
   private candidatas: CandidataLocal[] = [];
   private algunaFalla = false;
   private readonly impresoras: Partial<Record<RolImpresora, IDispositivoImpresora>>;
@@ -77,6 +92,7 @@ export class AgenteLocalServicio {
     this.config = opciones.config;
     this.clienteApi = opciones.clienteApi;
     this.equipo = opciones.equipo;
+    this.infoEquipo = opciones.infoEquipo ?? leerInfoEquipo;
     this.modoPorRol = Boolean(opciones.impresoras);
     this.impresoras = opciones.impresoras ?? (opciones.impresora ? { ETIQUETERA: opciones.impresora } : {});
     this.impresora = (this.impresoras.ETIQUETERA ?? opciones.impresora) as IDispositivoImpresora;
@@ -107,6 +123,8 @@ export class AgenteLocalServicio {
     const equipo = this.equipo!;
     const decisiones = decidirAutomatica(this.candidatas, (r) => equipo.idActual(r));
     for (const d of decisiones) {
+      // Con la PC ya configurada, una máquina apagada en el panel no se conecta sola
+      if (!this.rolHabilitado(d.rol)) continue;
       try {
         equipo.guardar(d.rol, d.candidata);
         this.impresoras[d.rol] = equipo.crear(d.candidata, d.rol);
@@ -119,10 +137,41 @@ export class AgenteLocalServicio {
     }
     if (this.candidatas.length === 0) return;
     for (const rol of ['TICKETERA', 'ETIQUETERA'] as RolImpresora[]) {
-      if (this.impresoras[rol] || this.avisoSinUsb.has(rol)) continue;
+      if (this.impresoras[rol] || this.avisoSinUsb.has(rol) || !this.rolHabilitado(rol)) continue;
       this.avisoSinUsb.add(rol);
       this.logger('info', `Aún no veo una ${NOMBRE_ROL_AUTO[rol]} por USB. Sigo buscando cada 30 segundos.`);
     }
+  }
+
+  /** Una PC sin configurar (o de un servidor viejo) usa todas sus máquinas; ya configurada, solo las encendidas en el panel. */
+  private rolHabilitado(rol: RolImpresora): boolean {
+    const c = this.configEquipo;
+    if (!c || !c.configurado) return true;
+    return rol === 'TICKETERA' ? c.ticketera : c.etiquetera;
+  }
+
+  /** Aplica la configuración del latido y lo avisa en el registro solo cuando cambia. */
+  private aplicarConfigEquipo(c: ConfigEquipoParaAgente): void {
+    const antes = JSON.stringify(this.configEquipo ?? null);
+    this.configEquipo = c;
+    if (JSON.stringify(c) === antes) return;
+    this.logger(
+      'info',
+      !c.configurado
+        ? 'Esta PC aún no está configurada en Caprichos: no imprime pedidos hasta que la configures en el panel.'
+        : `Configuración de esta PC actualizada: ticketera ${c.ticketera ? 'sí' : 'no'}, etiquetera ${c.etiquetera ? 'sí' : 'no'}${c.pausado ? ' (en pausa)' : ''}.`,
+    );
+    this.ultimoLatidoTs = 0; // que el panel vea la máquina nueva en el próximo ciclo
+  }
+
+  /** Sticker sin tamaño en el trabajo: el propio de esta PC o el de fábrica (el servidor ya lo manda normalmente). */
+  private conTamanoLocal(trabajo: TrabajoImpresion): TrabajoImpresion {
+    const p = trabajo.payload as any;
+    const c = this.configEquipo;
+    if (!c || p?.tamanoMm) return trabajo;
+    if (trabajo.tipo === 'ETIQUETA_GENERAL') return { ...trabajo, payload: { ...p, tamanoMm: tamanoEfectivo(c.tamanoGeneral, TAMANO_GENERAL_DEFECTO) } };
+    if (trabajo.tipo === 'ETIQUETA_BEBIDA') return { ...trabajo, payload: { ...p, tamanoMm: tamanoEfectivo(c.tamanoBebida, TAMANO_BEBIDA_DEFECTO) } };
+    return trabajo;
   }
 
   /** Al conectarse sola a una impresora, imprime una hoja corta: así se ve que funciona (sin esperar un pedido). */
@@ -184,18 +233,19 @@ export class AgenteLocalServicio {
         }
         this.algunaFalla = !!this.equipo && reportadas.some((r) => r.estado !== 'lista');
         this.estadosRol = reportadas;
-        this.rolesListos = reportadas.filter((r) => r.estado === 'lista').map((r) => r.rol);
+        this.rolesListos = reportadas.filter((r) => r.estado === 'lista' && this.rolHabilitado(r.rol)).map((r) => r.rol);
         const etiquetera = reportadas.find((r) => r.rol === 'ETIQUETERA') ?? reportadas[0];
         this.estadoImpresora = etiquetera ? etiquetera.estado : 'desconectada';
         this.detalleEstadoImpresora = etiquetera?.detalle;
 
-        const respuesta = await this.clienteApi.enviarLatido(
-          this.config.version,
-          this.estadoImpresora,
-          this.detalleEstadoImpresora,
-          ...(this.modoPorRol ? [reportadas] : []),
-          ...(this.equipo ? [this.candidatas.map(paraServidor)] : [])
-        );
+        const args: Parameters<IClienteApiImpresion['enviarLatido']> = [this.config.version, this.estadoImpresora, this.detalleEstadoImpresora];
+        if (this.modoPorRol || this.equipo) args[3] = reportadas;
+        if (this.equipo) {
+          args[4] = this.candidatas.map(paraServidor);
+          args[5] = this.infoEquipo();
+        }
+        const respuesta = await this.clienteApi.enviarLatido(...args);
+        if (this.equipo && respuesta?.equipo) this.aplicarConfigEquipo(respuesta.equipo);
         if (this.equipo && respuesta?.seleccion) this.aplicarSeleccion(respuesta.seleccion);
         this.ultimoLatidoTs = ahora;
         this.logger(
@@ -259,7 +309,8 @@ export class AgenteLocalServicio {
   /**
    * Procesa un trabajo individual: genera TSPL, escribe al dispositivo y reporta resultado.
    */
-  private async procesarTrabajo(trabajo: TrabajoImpresion): Promise<void> {
+  private async procesarTrabajo(trabajoRecibido: TrabajoImpresion): Promise<void> {
+    const trabajo = this.conTamanoLocal(trabajoRecibido);
     this.logger(
       'info',
       `Imprimiendo trabajo ${trabajo.id} (tipo: ${trabajo.tipo}, copia: ${trabajo.copia})`

@@ -107,10 +107,11 @@ export function EtiquetaSvg({ maqueta, etiqueta }: { maqueta: Maqueta; etiqueta:
 export interface TamanoPrevia {
   anchoMm?: number;
   altoMm?: number;
+  margenMm?: number;
 }
 
 export function EtiquetaGeneral({ datos, tamano }: { datos: EtiquetaGeneralDatos; tamano?: TamanoPrevia }) {
-  const m = useMemo(() => maquetarEtiqueta('ETIQUETA_GENERAL', datos, tamano), [datos, tamano?.anchoMm, tamano?.altoMm]);
+  const m = useMemo(() => maquetarEtiqueta('ETIQUETA_GENERAL', datos, tamano), [datos, tamano?.anchoMm, tamano?.altoMm, tamano?.margenMm]);
   return <EtiquetaSvg maqueta={m} etiqueta="general" />;
 }
 
@@ -120,7 +121,7 @@ export function EtiquetaArea({ datos }: { datos: EtiquetaAreaDatos }) {
 }
 
 export function EtiquetaBebida({ datos, tamano }: { datos: EtiquetaBebidaDatos; tamano?: TamanoPrevia }) {
-  const m = useMemo(() => maquetarEtiqueta('ETIQUETA_BEBIDA', datos, tamano), [datos, tamano?.anchoMm, tamano?.altoMm]);
+  const m = useMemo(() => maquetarEtiqueta('ETIQUETA_BEBIDA', datos, tamano), [datos, tamano?.anchoMm, tamano?.altoMm, tamano?.margenMm]);
   return <EtiquetaSvg maqueta={m} etiqueta={`de bebida ${datos.bebidaIndex}`} />;
 }
 

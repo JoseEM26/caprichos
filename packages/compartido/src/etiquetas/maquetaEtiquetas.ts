@@ -33,6 +33,7 @@ export interface Maqueta {
 export interface FormatoMaqueta {
   anchoMm?: number;
   altoMm?: number;
+  margenMm?: number;
 }
 
 export const MM_A_DOTS = 8;

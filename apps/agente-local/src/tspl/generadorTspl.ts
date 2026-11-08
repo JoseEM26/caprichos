@@ -1,4 +1,4 @@
-import { maquetarEtiqueta, medidaEtiquetaValida, TAMANO_BEBIDA_DEFECTO, TAMANO_GENERAL_DEFECTO } from '@caprichos/compartido';
+import { maquetarEtiqueta, tamanoPcValido, TAMANO_BEBIDA_DEFECTO, TAMANO_GENERAL_DEFECTO } from '@caprichos/compartido';
 import type {
   TipoEtiqueta,
   PayloadEtiqueta,
@@ -141,9 +141,10 @@ function generarSticker(
   opciones?: OpcionesGeneradorTspl,
 ): string {
   const defecto = tipo === 'ETIQUETA_GENERAL' ? TAMANO_GENERAL_DEFECTO : TAMANO_BEBIDA_DEFECTO;
-  const t = datos.tamanoMm;
-  const tam = t && medidaEtiquetaValida(t.anchoMm) && medidaEtiquetaValida(t.altoMm) ? t : defecto;
-  const m = maquetarEtiqueta(tipo, datos, tam);
+  // El tamaño llega por PC (con décimas, como 101,6 x 63,5, y margen); si no es válido, el de fábrica
+  const propio = tamanoPcValido(datos.tamanoMm);
+  const tam = propio ?? defecto;
+  const m = maquetarEtiqueta(tipo, datos, { anchoMm: tam.anchoMm, altoMm: tam.altoMm, margenMm: propio?.margenMm });
   const f = resolverFormato({ ...opciones?.formato, orientacion: 'horizontal', anchoMm: tam.anchoMm, altoMm: tam.altoMm });
   return comandosInicio(f) + primitivasATspl(m.primitivas, m.W, m.H, 0) + `PRINT 1,${opciones?.copias ?? 1}\r\n`;
 }
