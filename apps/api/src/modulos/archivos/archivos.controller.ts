@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import { AccesoGuard } from '../acceso/acceso.guard';
 import { Permiso } from '../acceso/permiso.decorator';
 import { ArchivosService } from './archivos.service';
+import { interpretarRango } from './rango-http.util';
 
 @Controller()
 export class ArchivosController {
@@ -76,6 +77,22 @@ export class ArchivosController {
     );
 
     res.setHeader('Content-Type', tipoMime);
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'private, no-store');
+    // Range: permite adelantar un audio sin bajarlo entero
+    const rango = interpretarRango(req.headers?.range as string | undefined, bytes);
+    if (rango === 'invalido') {
+      res.status(416).setHeader('Content-Range', `bytes */${bytes}`);
+      res.end();
+      return;
+    }
+    if (rango) {
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${rango.inicio}-${rango.fin}/${bytes}`);
+      res.setHeader('Content-Length', rango.fin - rango.inicio + 1);
+      fs.createReadStream(rutaAbsoluta, { start: rango.inicio, end: rango.fin }).pipe(res);
+      return;
+    }
     res.setHeader('Content-Length', bytes);
     fs.createReadStream(rutaAbsoluta).pipe(res);
   }

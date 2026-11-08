@@ -1,6 +1,7 @@
 import { FotoAmpliable } from '../vouchers/FotoAmpliable';
 import { fechaCompletaChat } from './fechasChat';
 import { MensajeItem } from './mensajesTipos';
+import { NotaDeVoz } from './NotaDeVoz';
 import { TarjetaUbicacion } from './TarjetaUbicacion';
 
 export interface BurbujaMensajeProps {
@@ -25,7 +26,9 @@ export function BurbujaMensaje({ mensaje: m, onReintentar }: BurbujaMensajeProps
           <FotoAmpliable archivoId={m.imagenId} alt={esCliente ? 'Foto enviada por el cliente' : 'Foto enviada al cliente'} alturaMaxima={160} />
         </div>
       )}
-      {m.ubicacion ? <TarjetaUbicacion ubicacion={m.ubicacion} /> : m.texto && <div className="msg-texto">{m.texto}</div>}
+      {m.audioId ? (
+        <NotaDeVoz audioId={m.audioId} transcripcion={m.transcripcion} />
+      ) : m.ubicacion ? <TarjetaUbicacion ubicacion={m.ubicacion} /> : m.texto && <div className="msg-texto">{m.texto}</div>}
       <div className="msg-pie">
         <span
           data-testid="hora-mensaje"

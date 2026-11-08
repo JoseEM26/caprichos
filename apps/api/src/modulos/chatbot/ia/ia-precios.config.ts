@@ -22,6 +22,29 @@ export const TABLA_PRECIOS_OPENAI: Record<string, ModeloPrecioConfig> = {
     esEstimado: true,
     nota: 'Tarifa estimada estándar para gpt-4o; verificar en openai.com/pricing',
   },
+  // Transcripción de audio: se mide en «tokens de audio» (~10 por segundo; si la API no los informa, se estiman por duración).
+  // 0.003 USD/min = 5 USD por millón a 10 tokens/s; whisper-1 cuesta 0.006 USD/min = 10 USD por millón.
+  'gpt-4o-mini-transcribe': {
+    nombre: 'gpt-4o-mini-transcribe',
+    costoPorMillonTokensEntradaUsd: 5.0,
+    costoPorMillonTokensSalidaUsd: 5.0,
+    esEstimado: true,
+    nota: 'Tarifa estimada (~0.003 USD por minuto de audio); verificar en openai.com/pricing',
+  },
+  'gpt-4o-transcribe': {
+    nombre: 'gpt-4o-transcribe',
+    costoPorMillonTokensEntradaUsd: 10.0,
+    costoPorMillonTokensSalidaUsd: 10.0,
+    esEstimado: true,
+    nota: 'Tarifa estimada (~0.006 USD por minuto de audio); verificar en openai.com/pricing',
+  },
+  'whisper-1': {
+    nombre: 'whisper-1',
+    costoPorMillonTokensEntradaUsd: 10.0,
+    costoPorMillonTokensSalidaUsd: 0,
+    esEstimado: true,
+    nota: 'Tarifa estimada (0.006 USD por minuto de audio); verificar en openai.com/pricing',
+  },
   'gpt-3.5-turbo': {
     nombre: 'gpt-3.5-turbo',
     costoPorMillonTokensEntradaUsd: 0.50, // $0.50 por 1M tokens de entrada (estimado)

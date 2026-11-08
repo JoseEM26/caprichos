@@ -33,6 +33,8 @@ export interface EntradaRawInput {
   textoOriginal?: string | null;
   tipo?: string | null;
   ubicacion?: UbicacionEntrada;
+  /** Marca interna: el texto viene de una nota de voz transcrita (el bot responde como a un texto). */
+  desdeAudio?: boolean;
 }
 
 /**

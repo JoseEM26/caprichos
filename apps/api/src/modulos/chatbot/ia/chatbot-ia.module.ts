@@ -8,6 +8,7 @@ import { IaHerramientasService } from './ia-herramientas.service';
 import { IaConsumoService } from './ia-consumo.service';
 import { ChatbotIaService } from './chatbot-ia.service';
 import { IaConsumoController } from './ia-consumo.controller';
+import { TranscripcionAudioService } from './transcripcion-audio.service';
 
 @Module({
   imports: [
@@ -22,11 +23,13 @@ import { IaConsumoController } from './ia-consumo.controller';
     IaHerramientasService,
     IaConsumoService,
     ChatbotIaService,
+    TranscripcionAudioService,
   ],
   exports: [
     IaHerramientasService,
     IaConsumoService,
     ChatbotIaService,
+    TranscripcionAudioService,
   ],
 })
 export class ChatbotIaModule {}

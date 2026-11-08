@@ -1,3 +1,4 @@
+import { TranscripcionAudioService, ResultadoTranscripcion } from '../ia/transcripcion-audio.service';
 import { ejecutarEnSerie } from '../utilidades/candado-serie.util';
 import { interactivoDesdeContenido } from './interactivo.util';
 import {
@@ -62,6 +63,11 @@ import {
 } from '../utilidades/no-compatibles.util';
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024; // 5 MB
+/** Notas de voz y audios: hasta 16 MB (Meta entrega las notas de voz como audio/ogg; codecs=opus). */
+export const MAX_AUDIO_BYTES = 16 * 1024 * 1024;
+export const TIPOS_AUDIO_PERMITIDOS = ['audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/amr', 'audio/aac'];
+export const TEXTO_AUDIO_NO_ENTENDIDO = 'No pude escuchar bien tu audio 🎧 ¿me lo escribes o te paso con una persona?';
+export const TEXTO_AUDIO_DERIVADO = 'No logré escuchar tu audio 🎧 Te paso con una persona del equipo para ayudarte 💛';
 export const TIPOS_MEDIA_PERMITIDOS = [
   'image/jpeg',
   'image/png',
@@ -102,6 +108,7 @@ export class WhatsappWebhookService {
     @Optional() private readonly redis?: RedisService,
     @Optional() private readonly direcciones?: DireccionesService,
     @Optional() private readonly moduleRef?: ModuleRef,
+    @Optional() private readonly transcripcion?: TranscripcionAudioService,
   ) {
     this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN', '').trim();
     this.appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET', '').trim();
@@ -283,16 +290,18 @@ export class WhatsappWebhookService {
   /**
    * Descarga segura de archivo adjunto (imagen o PDF de voucher) desde WhatsApp Cloud API.
    */
-  private async descargarMediaSegura(
+  async descargarMediaSegura(
     mediaId: string,
     mimeType: string,
+    opciones: { tipos?: string[]; maxBytes?: number } = {},
   ): Promise<Buffer | null> {
     if (!this.waToken) {
       this.logger.warn('Sin WHATSAPP_TOKEN para descargar archivo adjunto.');
       return null;
     }
 
-    if (!TIPOS_MEDIA_PERMITIDOS.includes(mimeType)) {
+    const maxBytes = opciones.maxBytes ?? MAX_MEDIA_BYTES;
+    if (!(opciones.tipos ?? TIPOS_MEDIA_PERMITIDOS).includes(mimeType)) {
       this.logger.warn(`Tipo de medio no permitido: ${mimeType}`);
       return null;
     }
@@ -321,10 +330,15 @@ export class WhatsappWebhookService {
         return null;
       }
 
+      // Si el servidor ya declara un tamaño mayor al permitido, ni se descarga
+      if (Number(resDownload.headers?.get?.('content-length')) > maxBytes) {
+        this.logger.warn('Media excede tamaño máximo (según cabecera)');
+        return null;
+      }
       const arrayBuffer = await resDownload.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      if (buffer.length > MAX_MEDIA_BYTES) {
+      if (buffer.length > maxBytes) {
         this.logger.warn(`Media excede tamaño máximo (${buffer.length} bytes)`);
         return null;
       }
@@ -413,6 +427,8 @@ export class WhatsappWebhookService {
     let tipoRegistro = 'TEXTO';
     let imagenBuffer: Buffer | null = null;
     let imagenMime = '';
+    // Nota de voz / audio: se guarda en privado (se escucha en Mensajes) y se transcribe
+    let audioGuardado: { archivoId: string; mime: string; buffer: Buffer } | null = null;
     let ubicacion: { latitud: number; longitud: number; nombre?: string; direccion?: string } | undefined;
     const clasificacion: ClasificacionMensajeEntrante = clasificarMensajeEntrante(msg);
     const esNoCompatible = clasificacion.clase === 'NO_COMPATIBLE';
@@ -459,9 +475,12 @@ export class WhatsappWebhookService {
       const emoji = String(msg.reaction?.emoji || '').trim();
       texto = emoji ? `Reaccionó con ${emoji}` : 'Quitó su reacción';
     } else {
-      // NO_COMPATIBLE (audio, video, sticker, documento...): no se descarga ni se pasa al motor.
+      // NO_COMPATIBLE (video, sticker, documento...): no se descarga ni se pasa al motor.
       tipoRegistro = 'OTRO';
       texto = clasificacion.etiqueta;
+      if (tipo === 'audio' && msg.audio?.id) {
+        audioGuardado = await this.guardarAudio(msg.audio.id, String(msg.audio.mime_type || 'audio/ogg'));
+      }
     }
 
     // Asociar a conversación existente o crearla de forma defensiva
@@ -513,6 +532,21 @@ export class WhatsappWebhookService {
         data: dataUpdate,
       });
     }
+
+    // Transcripción del audio (OpenAI). intentado=false: IA apagada o sin soporte, el audio solo se guarda y se escucha.
+    let transcripcionAudio: ResultadoTranscripcion = { intentado: false, texto: null };
+    if (audioGuardado && this.transcripcion) {
+      transcripcionAudio = await this.transcripcion
+        .transcribir(audioGuardado.buffer, audioGuardado.mime, conversacion.id)
+        .catch(() => ({ intentado: true, texto: null }));
+    }
+    const claseAudio = !audioGuardado
+      ? null
+      : !transcripcionAudio.intentado
+        ? 'NO_COMPATIBLE'
+        : transcripcionAudio.texto
+          ? 'AUDIO'
+          : 'AUDIO_SIN_ENTENDER';
 
     // 1. Detección de consentimiento Ley 29733 (BAJA / STOP / NO MAS / ALTA)
     const textoNorm = texto.toLowerCase().trim();
@@ -662,7 +696,9 @@ export class WhatsappWebhookService {
           contenido: archivoMensajeId
             ? { texto, archivoId: archivoMensajeId }
             : esNoCompatible
-              ? { texto, clase: clasificacion.clase, subtipo: clasificacion.subtipo, etiqueta: clasificacion.etiqueta, waMessageId: waMessageId || null }
+              ? { texto, clase: claseAudio ?? clasificacion.clase, subtipo: clasificacion.subtipo, etiqueta: clasificacion.etiqueta, waMessageId: waMessageId || null,
+                  ...(audioGuardado ? { audio: { archivoId: audioGuardado.archivoId, mime: audioGuardado.mime } } : {}),
+                  ...(transcripcionAudio.texto ? { transcripcion: transcripcionAudio.texto, transcritoConIa: true } : {}) }
               : ubicacionGuardada
                 ? { texto, ubicacion: ubicacionGuardada }
                 : { texto },
@@ -699,7 +735,19 @@ export class WhatsappWebhookService {
 
     // Audio, video, sticker, documento, etc.: no avanzan el flujo ni cuentan como calificación, reprogramación o voucher.
     // El bot avisa y repite el paso (ver atenderNoCompatible).
-    if (esNoCompatible) {
+    // Audio entendido: si el chat es del bot, el texto transcrito sigue el camino de un mensaje escrito (más abajo).
+    // Si lo atiende una persona, solo queda guardado y transcrito para que el equipo lo lea.
+    let textoMotor: string | null = null;
+    if (claseAudio === 'AUDIO') {
+      if (this.botAtiendeAudio(conversacion) && !(await this.audioBloqueado(identificador, telHash))) {
+        textoMotor = transcripcionAudio.texto;
+      } else {
+        return true;
+      }
+    } else if (claseAudio === 'AUDIO_SIN_ENTENDER') {
+      await this.atenderAudioSinEntender(conversacion, identificador, telefonoNorm, telHash, waMessageId);
+      return true;
+    } else if (esNoCompatible) {
       await this.atenderNoCompatible({
         conversacion,
         clasificacion,
@@ -755,7 +803,7 @@ export class WhatsappWebhookService {
     const encuestaAtendida = await this.procesarPosibleEncuesta(
       telHash,
       telMask,
-      texto,
+      textoMotor ?? texto,
       buttonPayload,
       telefonoNorm,
       conversacion,
@@ -766,7 +814,7 @@ export class WhatsappWebhookService {
     let reprogramacionAtendida = false;
     if (telefonoNorm && this.reprogramacion) {
       try {
-        reprogramacionAtendida = await this.reprogramacion.procesarRespuesta(telefonoNorm, texto, buttonPayload);
+        reprogramacionAtendida = await this.reprogramacion.procesarRespuesta(telefonoNorm, textoMotor ?? texto, buttonPayload);
       } catch (err: any) {
         this.logger.error(`Error al procesar respuesta de reprogramación: ${err.message}`, err.stack);
       }
@@ -814,10 +862,12 @@ export class WhatsappWebhookService {
       if (!consentimientoRevocado) {
         try {
           await this.motorConversacion.procesarMensajeEntrante(conversacion.id, {
-            texto,
+            texto: textoMotor ?? texto,
+            // Marca interna: el texto vino de una nota de voz transcrita
+            ...(textoMotor ? { desdeAudio: true } : {}),
             buttonPayload,
             listReplyId: msg.interactive?.type === 'list_reply' ? msg.interactive.list_reply.id : undefined,
-            tipo,
+            tipo: textoMotor ? 'text' : tipo,
             waMessageId,
             telefono: telefonoNorm || undefined,
             telMask,
@@ -899,6 +949,84 @@ export class WhatsappWebhookService {
       this.eventos?.emitirAdmin('mensajes:actualizado', { id: conversacionId.toString() });
     } catch (err: any) {
       this.logger.warn(`No se pudo obtener la dirección de la ubicación: ${err?.message}`);
+    }
+  }
+
+  /** Descarga y guarda en privado un audio del cliente. Devuelve null si falla algo (el mensaje igual queda en el chat). */
+  private async guardarAudio(
+    mediaId: string,
+    mimeCrudo: string,
+  ): Promise<{ archivoId: string; mime: string; buffer: Buffer } | null> {
+    // Meta manda «audio/ogg; codecs=opus»: se valida y guarda el tipo base
+    const mime = mimeCrudo.split(';')[0].trim().toLowerCase();
+    const buffer = await this.descargarMediaSegura(mediaId, mime, { tipos: TIPOS_AUDIO_PERMITIDOS, maxBytes: MAX_AUDIO_BYTES });
+    if (!buffer) return null;
+    try {
+      const sub = await this.archivosService.subirAudio(buffer, mime);
+      return { archivoId: sub.id, mime, buffer };
+    } catch (err: any) {
+      this.logger.warn(`No se pudo guardar el audio del chat: ${err.message}`);
+      return null;
+    }
+  }
+
+  /** El chat es del bot: sin persona, sin «Atención persona», sin validar pago y sin derivación. */
+  private botAtiendeAudio(conversacion: any): boolean {
+    const flujo = (conversacion.flujo as Record<string, any>) || {};
+    return (
+      conversacion.duenio === 'BOT' &&
+      conversacion.tomado_por == null &&
+      flujo.estado !== 'ATENCION_PERSONA' &&
+      conversacion.estado !== 'VALIDAR_PAGO' &&
+      conversacion.estado !== 'ATENDIDA'
+    );
+  }
+
+  /** Consentimiento revocado o bloqueo por spam vigente: el bot no contesta (el mensaje ya quedó en el chat). */
+  private async audioBloqueado(identificador: string, telHash: string): Promise<boolean> {
+    const consentimiento = await this.prisma.clienteWhatsappConsentimiento.findUnique({ where: { telefono_hash: telHash } });
+    if (consentimiento && !consentimiento.acepta) return true;
+    return this.spamBloqueado(identificador);
+  }
+
+  /**
+   * Audio que no se pudo transcribir (falla o vacío). Si el chat es del bot: la primera vez pide amablemente que lo escriban;
+   * si el audio anterior del cliente tampoco se entendió, deriva a una persona. Nunca lanza.
+   */
+  private async atenderAudioSinEntender(
+    conversacion: any,
+    identificador: string,
+    telefonoNorm: string | null,
+    telHash: string,
+    waMessageId?: string,
+  ): Promise<void> {
+    try {
+      if (!this.botAtiendeAudio(conversacion) || (await this.audioBloqueado(identificador, telHash))) return;
+      // El mensaje actual ya está guardado: el anterior del cliente es el segundo de la lista
+      const previos = await this.prisma.mensajeChat.findMany({
+        where: { conversacion_id: conversacion.id, direccion: 'ENTRA' },
+        orderBy: { id: 'desc' },
+        take: 2,
+        select: { contenido: true },
+      });
+      const segundoSeguido = (previos[1]?.contenido as any)?.clase === 'AUDIO_SIN_ENTENDER';
+      if (segundoSeguido) await this.derivarNoCompatibles(conversacion, telefonoNorm, 'El cliente envió dos audios seguidos que no se pudieron entender. Conviene escucharlos en el chat y atenderlo.');
+      if (!this.outbox) return;
+      await this.outbox.encolar({
+        telefono: identificador,
+        tipo: 'TEXTO',
+        clave: `audio-sin-entender-${waMessageId || `${identificador}-${Date.now()}`}`,
+        origen: ORIGEN_NO_COMPATIBLE,
+        carga: {
+          textoLibre: segundoSeguido ? TEXTO_AUDIO_DERIVADO : TEXTO_AUDIO_NO_ENTENDIDO,
+          autor: 'BOT',
+          nombre: obtenerNombreMostrar(conversacion),
+          etapa: 'AUDIO_SIN_ENTENDER',
+        },
+      });
+      this.outbox.despertar();
+    } catch (err: any) {
+      this.logger.warn(`No se pudo atender un audio sin entender: ${err.message}`);
     }
   }
 
@@ -1035,7 +1163,7 @@ export class WhatsappWebhookService {
   }
 
   /** Deriva a una persona (mismo patrón que la acción pasarAPersona del motor): dueño PERSONA, campana al equipo. */
-  private async derivarNoCompatibles(conversacion: any, telefonoNorm: string | null): Promise<void> {
+  private async derivarNoCompatibles(conversacion: any, telefonoNorm: string | null, mensajeAviso?: string): Promise<void> {
     await this.prisma.conversacion.update({
       where: { id: conversacion.id },
       data: {
@@ -1053,7 +1181,7 @@ export class WhatsappWebhookService {
         tipo: 'ATENCION_WHATSAPP',
         rol_destino: null,
         titulo,
-        mensaje: `El cliente envió ${LIMITE_NO_COMPATIBLES_SEGUIDOS} mensajes seguidos que el bot no puede leer (audios, videos u otros). Conviene atenderlo por el chat.`,
+        mensaje: mensajeAviso ?? `El cliente envió ${LIMITE_NO_COMPATIBLES_SEGUIDOS} mensajes seguidos que el bot no puede leer (audios, videos u otros). Conviene atenderlo por el chat.`,
         enlace: telefonoNorm ? `/admin/mensajes?telefono=${telefonoNorm.replace(/\D/g, '')}` : '/admin/mensajes',
       },
     });

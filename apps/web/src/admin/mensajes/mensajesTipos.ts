@@ -17,6 +17,9 @@ export interface MensajeItem {
   saliente: boolean;
   imagen: boolean;
   imagenId?: string | null;
+  /** Nota de voz del cliente (archivo privado) y su transcripción con IA. */
+  audioId?: string | null;
+  transcripcion?: string | null;
   texto: string;
   ubicacion?: UbicacionChat | null;
   hora: string;
