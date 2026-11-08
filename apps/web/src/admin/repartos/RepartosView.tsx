@@ -96,7 +96,7 @@ function SeguimientoRepartosView() {
   useEventos('pedido:estado', () => cargarDatos());
   useEventos('pedido:editado', () => cargarDatos());
   useEventos('reparto:incidente', () => cargarDatos());
-  useTiempoReal(['reparto:rutas', 'pedido:nuevo', 'pedido:pago'], () => cargarDatos());
+  useTiempoReal(['reparto:rutas', 'pedido:nuevo', 'pedido:pago', 'pedido:progreso', 'cocina:comanda'], () => cargarDatos());
 
   const pedidoSeleccionado = useMemo(() => {
     const id = vista === 'despacho' ? detalleId : pedidoSeleccionadoId;

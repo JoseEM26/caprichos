@@ -5,7 +5,21 @@ import { ZonaGeoItem, ZONAS_GEO_DEFECTO } from './zonasGeo';
 
 export type ColorEspera = 'verde' | 'amarillo' | 'naranja' | 'rojo';
 
+/** Estado de un área de cocina en un pedido (solo nombre y estado). */
+export interface AreaCocinaReparto {
+  areaId: string;
+  areaNombre: string;
+  listo: boolean;
+  /** Lo de esa área ya salió en un despacho parcial. */
+  despachada: boolean;
+}
+
 export interface PedidoReparto {
+  /** Check «Cocina»: áreas que participan y cuáles ya están listas. */
+  areas?: AreaCocinaReparto[];
+  areasListas?: number;
+  areasTotal?: number;
+  completo?: boolean;
   id: string;
   codigo: string;
   /** Último cambio de ubicación (ISO); null si la dirección es la original */

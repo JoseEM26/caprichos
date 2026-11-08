@@ -4,6 +4,7 @@ import { MapaRepartos, PuntoRepartoMapa } from './MapaRepartos';
 import { ZonaGeoItem } from './zonasGeo';
 import { ConfigReparto } from './calculoRuta';
 import { repartosApi, PedidoSeguimiento, RepartidorPanel } from './repartosApi';
+import { CocinaCheck } from './CocinaCheck';
 import { contarDespacho, FASES, pedidosDespacho, PedidoDespacho, ResumenDespacho, rutaDespacho } from './despachoModelo';
 import { nombreClienteVisible } from './textoVisible';
 import { useEsMovil } from '../../carta/useEsMovil';
@@ -94,6 +95,8 @@ export function TarjetaDespacho({
           </span>
         </span>
       </button>
+
+      <CocinaCheck pedido={p} />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         {puedeAsignar && d.fase !== 'cocina' ? (

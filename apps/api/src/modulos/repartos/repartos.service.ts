@@ -34,8 +34,18 @@ import {
 } from './rutas-reparto';
 import { FiltrarRutasDto } from './dto/filtrar-rutas.dto';
 
+/** Campos mínimos de las líneas: cuenta de productos y a qué área de cocina va cada una. */
+const LINEAS_AREAS = {
+  cantidad: true,
+  despachadas: true,
+  area_id: true,
+  producto: { select: { categoria: { select: { area_id: true } } } },
+} satisfies Prisma.PedidoLineaSelect;
+
 /** Plan de pago y solicitud de cambio de cobro pendiente: lo que formatearPedidoReparto necesita para el cobro real. */
 const INCLUDE_COBRO = {
+  // Estado por área de cocina (solo nombre y estado) para el check «Cocina» del delivery
+  comandas: { select: { area_id: true, estado: true, area: { select: { nombre: true } } } },
   planPago: { select: { medio: true, monto: true, orden: true }, orderBy: { orden: 'asc' } },
   solicitudesCambioCobro: { where: { estado: 'PENDIENTE' }, take: 1 },
 } satisfies Prisma.PedidoInclude;
@@ -55,6 +65,7 @@ import {
   NUMERO_PREGUNTA_REPROG,
 } from '../chatbot/servicios/reprogramacion.service';
 import { lineasDeCuenta } from '../pedidos/lineas-combo.util';
+import { estadoAreasDePedido } from '../cocina/areas-pedido';
 import { efectivoDelPedido } from '../pedidos/pago-plan.service';
 
 export type ColorEsperaReparto = 'VERDE' | 'RETRASADO' | 'TARDE' | 'MUY_TARDE';
@@ -335,7 +346,18 @@ export class RepartosService {
         : null;
     const esperaAgotada = esperaMin != null && esperaMin >= config.esperaMaxMin;
 
+    // Check «Cocina»: áreas que participan y cuáles ya están listas (solo si la consulta trajo comandas)
+    const cocina = Array.isArray(p.comandas) ? estadoAreasDePedido(p.comandas, p.lineas ?? []) : null;
+
     return {
+      ...(cocina
+        ? {
+            areas: cocina.areas.map(({ nLineas: _n, ...a }) => a),
+            areasListas: cocina.areasListas,
+            areasTotal: cocina.areasTotal,
+            completo: cocina.completo,
+          }
+        : {}),
       espera_min: esperaMin,
       espera_max_min: config.esperaMaxMin,
       espera_agotada: esperaAgotada,
@@ -402,7 +424,7 @@ export class RepartosService {
       },
       include: {
         zona: true,
-        lineas: { select: { cantidad: true } },
+        lineas: { select: LINEAS_AREAS },
         ...INCLUDE_COBRO,
         mensajesReparto: { where: { numero: NUMERO_PREGUNTA_REPROG, estado: ESTADO_REPROG.REPROGRAMADO }, select: { numero: true } },
       },
@@ -475,7 +497,7 @@ export class RepartosService {
       },
       include: {
         zona: true,
-        lineas: { select: { cantidad: true } },
+        lineas: { select: LINEAS_AREAS },
         ...INCLUDE_COBRO,
       },
       orderBy: { creado_en: 'asc' },
@@ -492,7 +514,7 @@ export class RepartosService {
       },
       include: {
         zona: true,
-        lineas: { select: { cantidad: true } },
+        lineas: { select: LINEAS_AREAS },
         ...INCLUDE_COBRO,
       },
       orderBy: { creado_en: 'asc' },
@@ -603,7 +625,7 @@ export class RepartosService {
       where: { ruta_reparto_id: { in: rutaIds } },
       include: {
         zona: true,
-        lineas: { select: { cantidad: true } },
+        lineas: { select: LINEAS_AREAS },
         ...INCLUDE_COBRO,
         incidentes: { orderBy: { en: 'desc' }, take: 1, select: { en: true } },
       },
@@ -748,7 +770,7 @@ export class RepartosService {
       where,
       include: {
         zona: true,
-        lineas: { select: { cantidad: true } },
+        lineas: { select: LINEAS_AREAS },
         ...INCLUDE_COBRO,
         repartidor: {
           include: {
@@ -1153,7 +1175,7 @@ export class RepartosService {
       },
       include: {
         zona: true,
-        lineas: { select: { cantidad: true } },
+        lineas: { select: LINEAS_AREAS },
         ...INCLUDE_COBRO,
         repartidor: { include: { persona: true } },
       },
@@ -1289,7 +1311,7 @@ export class RepartosService {
       where: { id: pedidoId },
       include: {
         zona: true,
-        lineas: { select: { cantidad: true } },
+        lineas: { select: LINEAS_AREAS },
         ...INCLUDE_COBRO,
       },
     });
@@ -1381,7 +1403,7 @@ export class RepartosService {
         },
         include: {
           zona: true,
-          lineas: { select: { cantidad: true } },
+          lineas: { select: LINEAS_AREAS },
           ...INCLUDE_COBRO,
         },
       });
@@ -1474,7 +1496,7 @@ export class RepartosService {
         },
         include: {
           zona: true,
-          lineas: { select: { cantidad: true } },
+          lineas: { select: LINEAS_AREAS },
           ...INCLUDE_COBRO,
         },
       });
@@ -1602,7 +1624,7 @@ export class RepartosService {
         },
         include: {
           zona: true,
-          lineas: { select: { cantidad: true } },
+          lineas: { select: LINEAS_AREAS },
           ...INCLUDE_COBRO,
         },
       });
@@ -2370,7 +2392,7 @@ export class RepartosService {
               where: { id: { in: tomadosIds } },
               include: {
                 zona: true,
-                lineas: { select: { cantidad: true } },
+                lineas: { select: LINEAS_AREAS },
                 ...INCLUDE_COBRO,
               },
             })
