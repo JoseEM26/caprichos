@@ -287,7 +287,7 @@ export class PedidosService {
    * Valida las líneas de un pedido contra la carta (producto, tamaño, opciones, sabores, combos, stock de opciones)
    * y calcula sus precios en el servidor. La usan la creación y la edición de pedidos.
    */
-  async calcularLineasPedido(lineasDto: LineaPedidoDto[], clienteNombre: string | null, origen?: OrigenPedido) {
+  async calcularLineasPedido(lineasDto: LineaPedidoDto[], clienteNombre: string | null, origen?: OrigenPedido, modalidad?: string) {
     const productoIds = lineasDto.map((l) => BigInt(l.productoId));
     const productosDb = await this.prisma.producto.findMany({
       where: { id: { in: productoIds } },
@@ -456,7 +456,7 @@ export class PedidosService {
       // Combo: la parte FIJO debe ser el principal o un reemplazo disponible (409 si no); las A_ELECCION, lo elegido.
       // Cada parte sale en su propia línea hija (cocina y stock); la madre sigue llevando el precio del combo.
       const combo: { nota: string; partes: ParteResueltaCombo[]; conBebidas?: boolean; recargoPorCombo?: number } = l.ofertaId
-        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA', tamanoValorIdLinea)
+        ? await this.ofertasService.resolverPartesCombo(l.ofertaId, l.comboElecciones ?? [], cantidad, origen?.canal || 'CARTA', tamanoValorIdLinea, modalidad)
         : { nota: '', partes: [] };
       // Validar reglas por cada grupo (obligatorio, mínimo, máximo)
       for (const grupo of gruposActivos) {
@@ -849,7 +849,7 @@ export class PedidosService {
       });
     }
 
-    const { lineasCalculadas, subtotalCalculado } = await this.calcularLineasPedido(dto.lineas, clienteNombre, origen);
+    const { lineasCalculadas, subtotalCalculado } = await this.calcularLineasPedido(dto.lineas, clienteNombre, origen, dto.modalidad);
 
 
     // 5.0. Cliente con cuenta identificado (suma puntos, historial y direcciones)
@@ -903,6 +903,7 @@ export class PedidosService {
         noSumaBeneficios: lin.noSumaBeneficios,
       })),
       canal: canalPedido,
+      modalidad: dto.modalidad,
       cuponCodigo: dto.cuponCodigo,
       clientePartyId: clienteFinal,
       // Solo la carta con sesión iniciada (no WhatsApp, mozo ni celular suelto)
@@ -1017,6 +1018,7 @@ export class PedidosService {
           subtotal: subtotalCalculado,
           tarifaZona: zonaDetectada.tarifa,
           canal: canalPedido,
+          modalidad: 'DELIVERY',
           envioGratisCupon: desgloseDescuento.envioGratisCupon,
         });
         envio = calculoEnvio.envio;

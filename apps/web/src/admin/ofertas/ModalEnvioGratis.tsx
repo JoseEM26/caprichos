@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ModalConPestanas } from '../../comun/ModalConPestanas';
 import { AvisoErrorOferta, ConfirmarSalir, PieOferta, primeraConError, useCambiosSinGuardar, useCierreConConfirmacion } from './modalOfertaComun';
 import { OfertaItem } from './ofertasApi';
-import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
+import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, errorModalidades, estadoDesdeOferta, modalidadesDesdeEstado } from './canalesPromo';
 
 const DIAS = [
   ['lun', 'Lun'],
@@ -54,7 +54,7 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
       setHoraHasta(ofertaAEditar.horaHasta || '');
       setFechaDesde(ofertaAEditar.fechaDesde ? ofertaAEditar.fechaDesde.slice(0, 10) : '');
       setFechaHasta(ofertaAEditar.fechaHasta ? ofertaAEditar.fechaHasta.slice(0, 10) : '');
-      setCanales(estadoDesdeCanales(ofertaAEditar.canales));
+      setCanales(estadoDesdeOferta(ofertaAEditar));
       setCompraMinima(ofertaAEditar.compraMinima ? String(ofertaAEditar.compraMinima) : '');
       setLimiteUsos(ofertaAEditar.limiteUsos ? String(ofertaAEditar.limiteUsos) : '');
       setOrden(String(ofertaAEditar.orden ?? 0));
@@ -84,6 +84,7 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
     if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de fin debe ser después de la hora de inicio.';
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
     if (!canales.carta && !canales.local && !canales.bot) return ERROR_SIN_CANALES;
+    { const errMod = errorModalidades('ENVIO_GRATIS', canales); if (errMod) return errMod; }
     return null;
   };
   const erroresPestanas = [
@@ -133,6 +134,7 @@ export function ModalEnvioGratis({ abierto, ofertaAEditar, onCerrar, onGuardar }
         fechaHasta: fechaHasta || null,
         fechaFin: fechaHasta || null,
         canales: canalesDesdeEstado(canales),
+        modalidades: modalidadesDesdeEstado(canales.modalidades),
         compraMinima: compraMinima.trim() ? minima : null,
         limiteUsos: limiteUsos.trim() ? parseInt(limiteUsos, 10) : null,
         orden: parseInt(orden, 10) || 0,

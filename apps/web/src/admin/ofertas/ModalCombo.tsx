@@ -1,6 +1,6 @@
 import { IndicadorSubida } from '../../comun/IndicadorSubida';
 import { useSubidaArchivo } from '../../comun/useSubidaArchivo';
-import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, estadoDesdeCanales } from './canalesPromo';
+import { CanalesEstado, ERROR_SIN_CANALES, SelectorCanales, SelectorVisibleCarta, canalesDesdeEstado, canalesPorDefecto, errorModalidades, estadoDesdeOferta, resumenAplica, modalidadesDesdeEstado } from './canalesPromo';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { OfertaItem, ComboPrecioItem, ComboParteItem, ofertasApi } from './ofertasApi';
 import { ModalConfirmacion } from './ModalConfirmacion';
@@ -197,7 +197,7 @@ export function ModalCombo({
       const fHasta = comboAEditar.fechaHasta || comboAEditar.fechaFin;
       setFechaDesde(fDesde ? fDesde.slice(0, 10) : '');
       setFechaHasta(fHasta ? fHasta.slice(0, 10) : '');
-      setCanales(estadoDesdeCanales(comboAEditar.canales));
+      setCanales(estadoDesdeOferta(comboAEditar));
       setVisibleCarta(comboAEditar.visibleCarta !== false);
       setPestana('datos');
       setVerErrores(false);
@@ -312,6 +312,7 @@ export function ModalCombo({
     if (horaDesde && horaHasta && horaDesde >= horaHasta) return 'La hora de inicio debe ser antes de la hora final.';
     if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) return 'La fecha de inicio no puede ser después de la final.';
     if (!canales.carta && !canales.local && !canales.bot) return ERROR_SIN_CANALES;
+    { const errMod = errorModalidades('COMBO', canales); if (errMod) return errMod; }
     return null;
   };
   const erroresPestanas = [
@@ -376,6 +377,7 @@ export function ModalCombo({
         fechaHasta: fechaHasta || undefined,
         fechaFin: fechaHasta || undefined,
         canales: canalesDesdeEstado(canales),
+        modalidades: modalidadesDesdeEstado(canales.modalidades),
         activo: comboAEditar ? comboAEditar.activo : true,
         ...(comboAEditar ? { visibleCarta } : {}),
         imagenArchivoId: fotoArchivoId,
@@ -425,6 +427,7 @@ export function ModalCombo({
     fechaDesde: fechaDesde || null,
     fechaHasta: fechaHasta || null,
     canales: canalesDesdeEstado(canales),
+    modalidades: modalidadesDesdeEstado(canales.modalidades),
     activo: true,
   };
 
@@ -966,6 +969,7 @@ export function ModalCombo({
                 <div><strong>Nombre:</strong> {nombre}</div>
                 <div><strong>Categoría:</strong> {listaCategorias.find((c) => c.id === categoriaId)?.nombre || 'COMBOS'}</div>
                 <div><strong>Precio base:</strong> S/ {precioBaseCombo.toFixed(2)}</div>
+                <div data-testid="resumen-aplica-combo" style={{ gridColumn: '1 / -1' }}>{resumenAplica(canales)}</div>
                 {ahorroCalculado > 0 && (
                   <div style={{ color: '#166534', fontWeight: 800 }}>
                     Ahorro cliente: S/ {ahorroCalculado.toFixed(2)} ({porcentajeAhorro} %)

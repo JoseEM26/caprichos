@@ -20,13 +20,14 @@ export async function promoEnvioGratisVigente(
   prisma: PrismaService,
   canalPedido: string,
   ahora: Date = new Date(),
+  modalidad: string = 'DELIVERY', // el envío solo existe en delivery
 ): Promise<PromoEnvioGratis | null> {
   const canal = canalOfertaParaEnvio(canalPedido);
   const candidatas = await prisma.oferta.findMany({
     where: { tipo: 'ENVIO_GRATIS', activo: true },
     orderBy: [{ orden: 'asc' }, { id: 'asc' }],
   });
-  const oferta = candidatas.find((o) => estaVigente(o, canal, ahora));
+  const oferta = candidatas.find((o) => estaVigente(o, canal, ahora, modalidad));
   if (!oferta) return null;
   return {
     id: oferta.id.toString(),
@@ -48,11 +49,11 @@ export function aplicaPromoEnvio(promo: PromoEnvioGratis | null, subtotal: numbe
  */
 export async function calcularEnvioDelivery(
   prisma: PrismaService,
-  params: { subtotal: number; tarifaZona: number; canal: string; ahora?: Date; envioGratisCupon?: boolean },
+  params: { subtotal: number; tarifaZona: number; canal: string; ahora?: Date; envioGratisCupon?: boolean; modalidad?: string },
 ): Promise<{ envio: number; promo: PromoEnvioGratis | null }> {
   // Cupón de envío gratis canjeado en el pedido: gana sobre la promo y sobre el monto (se cuenta su uso aparte)
   if (params.envioGratisCupon) return { envio: 0, promo: null };
-  const promo = await promoEnvioGratisVigente(prisma, params.canal, params.ahora);
+  const promo = await promoEnvioGratisVigente(prisma, params.canal, params.ahora, params.modalidad);
   if (aplicaPromoEnvio(promo, params.subtotal)) return { envio: 0, promo };
   const regla: ReglaEnvioGratis = await leerReglaEnvioGratis(prisma);
   return { envio: calcularEnvioFinal(params.subtotal, params.tarifaZona, regla), promo: null };

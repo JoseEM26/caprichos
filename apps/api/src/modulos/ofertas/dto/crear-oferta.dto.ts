@@ -229,6 +229,12 @@ export class CrearOfertaDto {
   @IsArray()
   canales?: string[];
 
+  /** Tipos de pedido donde vale; vacío = todos */
+  @IsOptional()
+  @IsArray()
+  @IsIn(['COMER_LOCAL', 'LLEVAR', 'RECOGER', 'DELIVERY'], { each: true, message: 'Modalidad no válida' })
+  modalidades?: string[];
+
   @IsOptional()
   @IsInt()
   @Min(1)

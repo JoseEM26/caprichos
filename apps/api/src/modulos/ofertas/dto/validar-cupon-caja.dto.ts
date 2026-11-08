@@ -42,6 +42,10 @@ export class VistaPreviaDescuentosCajaDto {
   @IsIn(['CAJA', 'MOZO'])
   canal?: 'CAJA' | 'MOZO';
 
+  @IsOptional()
+  @IsString()
+  modalidad?: string;
+
   @IsArray({ message: 'Agrega productos al pedido' })
   @ArrayMinSize(1, { message: 'Agrega productos al pedido' })
   @ValidateNested({ each: true })

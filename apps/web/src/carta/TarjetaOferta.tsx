@@ -4,6 +4,7 @@ import { CategoriaCarta, ProductoCarta } from './tipos';
 import { useCarrito } from './CarritoContext';
 import { TextoEd } from './edicion';
 import { useEsMovil } from './useEsMovil';
+import { etiquetaModalidades } from './modalidadOferta';
 import { textoEnvioGratisHasta } from '../comun/envioGratis';
 
 interface TarjetaOfertaProps {
@@ -99,6 +100,8 @@ export function TarjetaOferta({
   // Desactivada (visible_carta = «Mostrar como No disponible»), o armable solo con productos sin saldo: no se puede pedir
   const noDisponible = oferta.activo === false || (oferta.tipo === 'COMBO' && oferta.sinStock === true);
   const sinPedir = agotado || noDisponible;
+  // Restringida a un tipo de pedido: se dice cuál (el cliente elige comer aquí, recoger o delivery al pedir)
+  const soloModalidad = etiquetaModalidades(oferta.modalidades);
 
   const cardDir = movil ? 'row' : 'column';
   const imgW = movil ? '100px' : '100%';
@@ -307,6 +310,14 @@ export function TarjetaOferta({
           >
             {textoBadge}
           </span>
+          {soloModalidad && (
+            <span
+              data-testid="etiqueta-modalidad"
+              style={{ fontSize: '11px', fontWeight: 700, background: 'var(--cp-sand)', color: 'var(--cp-navy)', borderRadius: '9999px', padding: '2px 8px' }}
+            >
+              {soloModalidad}
+            </span>
+          )}
           {noDisponible ? (
             <span
               data-testid="insignia-no-disponible"

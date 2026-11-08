@@ -1619,6 +1619,8 @@ model Oferta {
   fecha_desde          DateTime?      @db.Date
   fecha_hasta          DateTime?      @db.Date
   canales              String[]       @default(["CARTA", "ADMIN", "BOT"])
+  // Tipos de pedido donde vale: COMER_LOCAL | LLEVAR | RECOGER | DELIVERY. Vacío = todos
+  modalidades          String[]       @default([])
   limite_usos          Int?
   usos_actuales        Int            @default(0)
   no_suma_beneficios   Boolean        @default(false)

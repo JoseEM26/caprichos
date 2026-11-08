@@ -45,6 +45,7 @@ describe('ModalNuevoPedidoMesa: promoción automática del local', () => {
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/admin/ofertas/vista-previa', {
         canal: 'CAJA',
+        modalidad: 'LLEVAR',
         codigo: undefined,
         lineas: [{ productoId: 'prod-1', cantidad: 1, subtotal: 20, precioUnitario: 20 }],
       }),
