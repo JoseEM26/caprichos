@@ -34,7 +34,6 @@ import { AvisosPedidoService } from '../chatbot/servicios/avisos-pedido.service'
 import { TELEFONO_PLACEHOLDER, tieneTelefonoReal } from '../chatbot/utilidades/enmascarar.util';
 import { PagoPlanService } from './pago-plan.service';
 import { PartyPuntosService } from '../clientes/party-puntos.service';
-import { invitadoCartaPermitido } from '../clientes/invitado-carta';
 import { Cumpleanos, exigirCumpleanos } from '../clientes/cumpleanos.util';
 import { esComprobanteElegible, validarRuc } from '../comprobantes/comprobantes.util';
 import { leerConfigPropina } from '../propinas/propinas.service';
@@ -732,39 +731,28 @@ export class PedidosService {
         origen?.mesaNombre ||
         (dto.mesa ? `Mesa ${dto.mesa}` : 'Mesa');
       telefonoLimpio = dto.cliente?.telefono?.trim() || null;
-      if (telefonoLimpio && !/^9\d{8}$/.test(telefonoLimpio)) {
+      if (telefonoLimpio && (!/^9\d{8}$/.test(telefonoLimpio) || telefonoLimpio === TELEFONO_PLACEHOLDER)) {
         throw new BadRequestException({
           codigo: 'TELEFONO_INVALIDO',
-          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+          mensaje: 'El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real',
         });
       }
     } else {
-      if (!dto.cliente?.nombre || dto.cliente.nombre.trim().length === 0) {
+      // Nombre (2+ letras) y celular real (9 dígitos que empiezan con 9) obligatorios en carta, WhatsApp y bot
+      if (!dto.cliente?.nombre || dto.cliente.nombre.trim().length < 2) {
         throw new BadRequestException({
-          codigo: 'CLIENTE_INVALIDO',
-          mensaje: 'El nombre del cliente es obligatorio',
+          codigo: 'CLIENTE_NOMBRE_REQUERIDO',
+          mensaje: 'Escribe el nombre del cliente (mínimo 2 letras)',
         });
       }
 
       telefonoLimpio = dto.cliente?.telefono?.trim() || null;
       const celularValido = !!telefonoLimpio && /^9\d{8}$/.test(telefonoLimpio) && telefonoLimpio !== TELEFONO_PLACEHOLDER;
       const esCartaSinSesion = (origen?.canal ?? 'CARTA') === 'CARTA' && !origen?.clientePartyId && !origen?.sinCuentaCliente;
-      if (esCartaSinSesion && !celularValido && !(await invitadoCartaPermitido(this.prisma))) {
+      if (!celularValido) {
         throw new BadRequestException({
-          codigo: 'CELULAR_REQUERIDO',
-          mensaje: 'Escribe tu celular para hacer tu pedido y sumar puntos',
-        });
-      }
-      if (telefonoLimpio && !/^9\d{8}$/.test(telefonoLimpio)) {
-        throw new BadRequestException({
-          codigo: 'TELEFONO_INVALIDO',
-          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
-        });
-      }
-      if (!telefonoLimpio && !esCartaSinSesion) {
-        throw new BadRequestException({
-          codigo: 'TELEFONO_INVALIDO',
-          mensaje: 'El teléfono debe tener 9 dígitos y empezar con 9',
+          codigo: telefonoLimpio ? 'TELEFONO_INVALIDO' : 'CELULAR_REQUERIDO',
+          mensaje: 'El celular es obligatorio: 9 dígitos que empiecen con 9 (no vale 999999999)',
         });
       }
       clienteNombre = dto.cliente.nombre.trim();
@@ -847,11 +835,30 @@ export class PedidosService {
       });
     }
     // Cliente con cuenta de mozo/caja: si el pedido no trae nombre o teléfono propios, se toman de su cuenta
+    let nombreDeCuenta = '';
     if (esMozo && clienteFinal && this.direcciones) {
       const cuenta = await this.direcciones.datosCuentaActiva(clienteFinal);
       if (cuenta) {
         if (!dto.cliente?.nombre?.trim()) clienteNombre = cuenta.nombre;
+        nombreDeCuenta = cuenta.nombre ?? '';
         telefonoLimpio = telefonoLimpio || cuenta.telefono;
+      }
+    }
+    // Mozo y caja (mesa, llevar, delivery): nombre y celular reales siempre. Excepciones: pedido del personal
+    // (el cliente es el trabajador, su celular sale de su ficha) y pedido extra (hereda los datos del original).
+    if (esMozo && !origen?.esPersonal && origen?.pedidoOrigenId == null) {
+      telefonoLimpio = telefonoLimpio || dto.clienteTelefono || null;
+      if ((dto.cliente?.nombre?.trim() || nombreDeCuenta.trim()).length < 2) {
+        throw new BadRequestException({
+          codigo: 'CLIENTE_NOMBRE_REQUERIDO',
+          mensaje: 'Escribe el nombre del cliente (mínimo 2 letras)',
+        });
+      }
+      if (!telefonoLimpio || !/^9\d{8}$/.test(telefonoLimpio) || telefonoLimpio === TELEFONO_PLACEHOLDER) {
+        throw new BadRequestException({
+          codigo: telefonoLimpio ? 'TELEFONO_INVALIDO' : 'CELULAR_REQUERIDO',
+          mensaje: 'El celular es obligatorio: 9 dígitos que empiecen con 9 (no vale 999999999)',
+        });
       }
     }
 

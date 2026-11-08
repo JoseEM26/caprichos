@@ -87,6 +87,7 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     fireEvent.change(nombre, { target: { value: 'Lucía' } });
     expect(screen.queryByText('Escribe el nombre del cliente (mínimo 2 letras)')).toBeNull();
     expect(nombre).toHaveAttribute('aria-invalid', 'false');
+    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '987654321' } });
 
     elegirBoleta();
 
@@ -94,23 +95,24 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
     await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
     const [payload] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
-    expect(payload.cliente).toEqual({ nombre: 'Lucía', telefono: undefined });
+    expect(payload.cliente).toEqual({ nombre: 'Lucía', telefono: '987654321' });
   });
 
-  it('envía el nombre sin teléfono cuando el teléfono está vacío (no se manda relleno)', async () => {
+  it('sin celular bloquea el envío con aviso claro, y 999999999 tampoco vale', async () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
     await agregarCafe();
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
-    expect(screen.getByText('Si lo escribes le enviamos una encuesta por WhatsApp al terminar')).toBeInTheDocument();
-
     elegirBoleta();
 
     fireEvent.click(botonEnviar());
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, enviar comanda' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el celular del cliente: 9 dígitos que empiecen con 9');
+    expect(screen.queryByRole('button', { name: 'Sí, enviar comanda' })).toBeNull();
+    expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(salonApi.abrirPedidoMesa).toHaveBeenCalledTimes(1));
-    const [payload] = vi.mocked(salonApi.abrirPedidoMesa).mock.calls[0];
-    expect(payload.cliente).toEqual({ nombre: 'Lucía', telefono: undefined });
+    fireEvent.change(screen.getByLabelText('Celular del cliente *'), { target: { value: '999999999' } });
+    fireEvent.click(botonEnviar());
+    expect(screen.queryByRole('button', { name: 'Sí, enviar comanda' })).toBeNull();
+    expect(salonApi.abrirPedidoMesa).not.toHaveBeenCalled();
   });
 
   it('un teléfono inválido bloquea el envío; uno de 9 dígitos que empieza en 9 se envía', async () => {
@@ -118,16 +120,16 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     await agregarCafe();
     fireEvent.change(screen.getByLabelText('Nombre del cliente *'), { target: { value: 'Lucía' } });
 
-    const tel = screen.getByLabelText('Teléfono (opcional)');
+    const tel = screen.getByLabelText('Celular del cliente *');
     fireEvent.change(tel, { target: { value: '12345' } });
-    expect(screen.getByText('El teléfono debe tener 9 dígitos y empezar con 9')).toBeInTheDocument();
+    expect(screen.getByText('El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real')).toBeInTheDocument();
     elegirBoleta();
     fireEvent.click(botonEnviar());
     expect(tel).toHaveFocus();
     expect(screen.queryByRole('button', { name: 'Sí, enviar comanda' })).toBeNull();
 
     fireEvent.change(tel, { target: { value: '987654321' } });
-    expect(screen.queryByText('El teléfono debe tener 9 dígitos y empezar con 9')).toBeNull();
+    expect(screen.queryByText('El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real')).toBeNull();
     elegirBoleta();
     fireEvent.click(botonEnviar());
     elegirBoleta();
@@ -158,7 +160,7 @@ describe('Pedido de mesa: nombre obligatorio y teléfono opcional', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Ana Pérez/ }));
 
     expect(screen.queryByLabelText('Nombre del cliente *')).toBeNull();
-    expect(screen.queryByLabelText('Teléfono (opcional)')).toBeNull();
+    expect(screen.queryByLabelText('Celular del cliente *')).toBeNull();
     expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
     expect(botonEnviar().disabled).toBe(false);
 
@@ -189,7 +191,7 @@ describe('Pedido de mesa: celular primero con autocompletado del nombre', () => 
   it('el celular va antes del nombre y al escribir 9 dígitos rellena el nombre (editable), con una sola búsqueda', async () => {
     render(<ModalNuevoPedidoMesa abierto={true} alCerrar={vi.fn()} pisos={pisoConMesa} pasoInicial="modal" mesasPreseleccionadasIds={['m1']} />);
     await agregarCafe();
-    const tel = await screen.findByLabelText('Teléfono (opcional)');
+    const tel = await screen.findByLabelText('Celular del cliente *');
     const nombre = screen.getByLabelText('Nombre del cliente *') as HTMLInputElement;
     expect(tel.compareDocumentPosition(nombre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 

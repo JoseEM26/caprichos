@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  MinLength,
   ValidateIf,
   Min,
   ValidateNested,
@@ -18,12 +19,14 @@ import {
 export class ClienteDto {
   @IsString({ message: 'El nombre del cliente debe ser un texto' })
   @IsNotEmpty({ message: 'El nombre del cliente es requerido' })
+  @MinLength(2, { message: 'El nombre del cliente debe tener al menos 2 letras' })
   nombre!: string;
 
   /** Opcional en la carta cuando se pide como invitado (el servicio exige el celular si el invitado está apagado). */
   @ValidateIf((o: ClienteDto) => !!o.telefono)
   @IsString({ message: 'El teléfono debe ser un texto' })
   @Matches(/^9\d{8}$/, { message: 'El teléfono debe tener 9 dígitos y empezar con 9' })
+  @Matches(/^(?!999999999$)/, { message: 'El teléfono 999999999 no es un número real' })
   telefono?: string;
 
   /** Cumpleaños (YYYY-MM-DD o DD/MM). Solo lo guarda quien pide con su cuenta; el pedido sin cuenta lo ignora. */
@@ -234,6 +237,7 @@ export class CrearPedidoDto {
   /** Celular (9 dígitos) de un cliente con cuenta (solo lo usa el mozo/caja; en carta y WhatsApp se ignora). Sin cuenta: invitado. */
   @IsOptional()
   @Matches(/^9\d{8}$/, { message: 'El celular debe tener 9 dígitos y empezar con 9' })
+  @Matches(/^(?!999999999$)/, { message: 'El celular 999999999 no es un número real' })
   clienteTelefono?: string;
 
   /** Id del party de un cliente con cuenta (lo da el buscador de clientes). Solo MOZO/CAJA; con clienteTelefono gana el celular. */

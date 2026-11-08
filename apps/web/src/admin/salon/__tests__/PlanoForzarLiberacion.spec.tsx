@@ -63,7 +63,7 @@ describe('Plano del local: mantener 2 s una mesa ocupada abre la vista previa', 
     vi.useRealTimers();
   });
 
-  it('con mesas/liberar, mantener 2 s la mesa ocupada abre la vista previa con su pedido y Forzar liberación', async () => {
+  it('con mesas/liberar, mantener 2 s la mesa ocupada abre la vista previa con su pedido y Liberar mesa', async () => {
     const mesa = await montarConMesaOcupada(['plano/ver', 'mesas/liberar']);
 
     vi.useFakeTimers();
@@ -76,7 +76,7 @@ describe('Plano del local: mantener 2 s una mesa ocupada abre la vista previa', 
 
     const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
     expect(vista.textContent).toContain('Pedido P-0050');
-    expect(within(vista).getByRole('button', { name: 'Forzar liberación' })).toBeTruthy();
+    expect(within(vista).getByRole('button', { name: 'Liberar mesa' })).toBeTruthy();
     expect(within(vista).getByRole('button', { name: 'Cambiar de mesa' })).toBeTruthy();
     expect(within(vista).getByRole('button', { name: 'Ver cuenta y cobrar' })).toBeTruthy();
   });
@@ -94,7 +94,7 @@ describe('Plano del local: mantener 2 s una mesa ocupada abre la vista previa', 
     expect(screen.queryByRole('dialog', { name: /Vista previa de/ })).toBeNull();
   });
 
-  it('sin mesas/liberar la vista previa abre, pero no ofrece Forzar liberación', async () => {
+  it('sin mesas/liberar la vista previa abre, pero no ofrece Liberar mesa', async () => {
     const mesa = await montarConMesaOcupada(['plano/ver']);
 
     vi.useFakeTimers();
@@ -104,10 +104,10 @@ describe('Plano del local: mantener 2 s una mesa ocupada abre la vista previa', 
     vi.useRealTimers();
 
     const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
-    expect(within(vista).queryByRole('button', { name: 'Forzar liberación' })).toBeNull();
+    expect(within(vista).queryByRole('button', { name: 'Liberar mesa' })).toBeNull();
   });
 
-  it('desde la vista previa: Forzar liberación pide motivo y Sí, y llama a liberarMesaManual con forzar=true', async () => {
+  it('desde la vista previa: Liberar mesa pide solo confirmación Sí/No, sin motivo, y llama a liberarMesaManual con forzar=true', async () => {
     const mesa = await montarConMesaOcupada(['plano/ver', 'mesas/liberar']);
 
     vi.useFakeTimers();
@@ -117,17 +117,16 @@ describe('Plano del local: mantener 2 s una mesa ocupada abre la vista previa', 
     vi.useRealTimers();
 
     const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
-    fireEvent.click(within(vista).getByRole('button', { name: 'Forzar liberación' }));
+    fireEvent.click(within(vista).getByRole('button', { name: 'Liberar mesa' }));
 
-    const modal = await screen.findByRole('dialog', { name: /Forzar liberación de Mesa 1/ });
+    const modal = await screen.findByRole('dialog', { name: /Liberar Mesa 1/ });
     expect(modal.textContent).toContain('Pedido P-0050');
     expect(modal.textContent).toContain('Libera solo la mesa; el pedido no se anula ni se cobra.');
-    fireEvent.change(within(modal).getByLabelText(/Motivo/), { target: { value: 'Mesa trabada tras cobro' } });
-    fireEvent.click(within(modal).getByRole('button', { name: 'Forzar liberación' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, forzar liberación' }));
+    fireEvent.click(within(modal).getByRole('button', { name: 'Liberar mesa' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, liberar mesa' }));
 
     await waitFor(() =>
-      expect(salonApi.liberarMesaManual).toHaveBeenCalledWith('5', 'Mesa trabada tras cobro', true),
+      expect(salonApi.liberarMesaManual).toHaveBeenCalledWith('5', undefined, true),
     );
   });
 });

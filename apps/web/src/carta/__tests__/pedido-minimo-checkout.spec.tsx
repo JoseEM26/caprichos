@@ -75,6 +75,7 @@ function abrirPedido(pedidoMinimo: number | null) {
   fireEvent.click(screen.getByText('Abrir pedido'));
   fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
   fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
+  fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
 }
 
 const pedidosEnviados = () => vi.mocked(api.post).mock.calls.filter((c) => c[0] === '/pedidos');

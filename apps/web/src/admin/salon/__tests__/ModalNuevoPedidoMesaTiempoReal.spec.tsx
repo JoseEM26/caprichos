@@ -90,7 +90,7 @@ describe('ModalNuevoPedidoMesa: el plano de adentro se actualiza en tiempo real'
     expect(salonApi.obtenerMesas).toHaveBeenCalled();
   });
 
-  it('sin permiso mesas/liberar, mantener 2 s abre la vista previa pero sin Forzar liberación', async () => {
+  it('sin permiso mesas/liberar, mantener 2 s abre la vista previa pero sin Liberar mesa', async () => {
     vi.useFakeTimers();
     vi.mocked(salonApi.obtenerMesas).mockResolvedValue({ pisos: [pisoCon(mesaOcupada)] } as any);
     render(
@@ -109,7 +109,7 @@ describe('ModalNuevoPedidoMesa: el plano de adentro se actualiza en tiempo real'
     vi.useRealTimers();
 
     const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
-    expect(within(vista).queryByRole('button', { name: 'Forzar liberación' })).toBeNull();
+    expect(within(vista).queryByRole('button', { name: 'Liberar mesa' })).toBeNull();
     expect(within(vista).queryByRole('button', { name: 'Ver cuenta y cobrar' })).toBeNull();
     expect(within(vista).queryByRole('button', { name: 'Cambiar de mesa' })).toBeNull();
   });
@@ -129,14 +129,13 @@ describe('ModalNuevoPedidoMesa: el plano de adentro se actualiza en tiempo real'
 
     // Mantener 2 s abre la vista previa; forzar sale de ahí
     const vista = await screen.findByRole('dialog', { name: 'Vista previa de Mesa 1' });
-    fireEvent.click(within(vista).getByRole('button', { name: 'Forzar liberación' }));
-    const modal = await screen.findByRole('dialog', { name: /Forzar liberación de Mesa 1/ });
-    fireEvent.change(within(modal).getByLabelText(/Motivo/), { target: { value: 'Mesa trabada tras cobro' } });
-    fireEvent.click(within(modal).getByRole('button', { name: 'Forzar liberación' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, forzar liberación' }));
+    fireEvent.click(within(vista).getByRole('button', { name: 'Liberar mesa' }));
+    const modal = await screen.findByRole('dialog', { name: /Liberar Mesa 1/ });
+    fireEvent.click(within(modal).getByRole('button', { name: 'Liberar mesa' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, liberar mesa' }));
 
     await waitFor(() =>
-      expect(salonApi.liberarMesaManual).toHaveBeenCalledWith('5', 'Mesa trabada tras cobro', true),
+      expect(salonApi.liberarMesaManual).toHaveBeenCalledWith('5', undefined, true),
     );
     await waitFor(() => expect(textoMesa()).not.toContain('Ana'));
   });

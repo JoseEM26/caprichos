@@ -484,19 +484,15 @@ export function FormularioCheckout({
     if (!clienteCuenta && !comoInvitado && invitadoPermitido) {
       return 'Elige si ingresas con tu cuenta o continúas como invitado';
     }
-    if (!nombre.trim()) {
-      return 'El nombre es obligatorio';
+    // Nombre (2+ letras) y celular real son obligatorios siempre, con o sin cuenta
+    if (nombre.trim().length < 2) {
+      return 'Escribe tu nombre (mínimo 2 letras)';
     }
     const telLimpio = telefono.trim();
-    if (telLimpio && !/^9\d{8}$/.test(telLimpio)) {
-      return 'El teléfono debe tener 9 dígitos y empezar con 9';
+    if (!telLimpio) return 'Escribe tu celular: 9 dígitos que empiecen con 9';
+    if (!/^9\d{8}$/.test(telLimpio) || telLimpio === '999999999') {
+      return 'El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real';
     }
-    if (!telLimpio) {
-      // Con cuenta el celular es obligatorio; como invitado solo si el dueño no permite pedir sin celular
-      if (clienteCuenta) return 'El teléfono debe tener 9 dígitos y empezar con 9';
-      if (!invitadoPermitido) return 'Escribe tu celular para hacer tu pedido y sumar puntos';
-    }
-    if (!clienteCuenta && telLimpio && nombre.trim().length < 2) return 'Escribe tu nombre completo para sumar puntos con tu celular';
     return null;
   };
 
@@ -1226,7 +1222,7 @@ export function FormularioCheckout({
                       ) : (
                         <div style={{ fontSize: '12px', color: 'var(--cp-soft)' }}>
                           {invitadoPermitido
-                            ? 'Sigues como invitado: solo necesitamos tu nombre. Como invitado no se suman puntos.'
+                            ? 'Sigues como invitado: necesitamos tu nombre y tu celular.'
                             : 'Tus puntos se suman con tu celular, sin contraseña. Solo necesitamos tu nombre y tu celular. ¿Quieres verlos?'}{' '}
                           <button type="button" onClick={() => cuentaCtx?.abrirPanel()} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: 'var(--cp-navy)', textDecoration: 'underline', cursor: 'pointer' }}>
                             Ver mis puntos
@@ -1311,7 +1307,7 @@ export function FormularioCheckout({
                           value={telefono}
                           onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
                           placeholder="Ej.: 987654321"
-                          required={!invitadoPermitido}
+                          required
                           style={{
                             width: '100%',
                             minHeight: '44px',
@@ -1324,9 +1320,7 @@ export function FormularioCheckout({
                           }}
                         />
                         <div style={{ fontSize: '12px', color: 'var(--cp-soft)', marginTop: '4px' }}>
-                          {invitadoPermitido
-                            ? 'Opcional. Con tu celular sumas puntos.'
-                            : 'Tu celular: sumas puntos con tu número, sin contraseña.'}
+                          Tu celular es obligatorio: sumas puntos con tu número, sin contraseña.
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--cp-soft)', marginTop: '2px' }}>
                           Te enviaremos una breve encuesta de satisfacción por WhatsApp

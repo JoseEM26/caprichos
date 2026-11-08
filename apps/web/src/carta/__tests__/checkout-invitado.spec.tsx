@@ -116,12 +116,12 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
 
     expect(screen.queryByRole('button', { name: /Continuar como invitado/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Paso 1: Tus datos \(actual\)/)).toBeInTheDocument();
-    expect(screen.getByText('Tu celular: sumas puntos con tu número, sin contraseña.')).toBeInTheDocument();
+    expect(screen.getByText('Tu celular es obligatorio: sumas puntos con tu número, sin contraseña.')).toBeInTheDocument();
     expect(screen.getByLabelText(/Teléfono celular/i)).toBeRequired();
 
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    expect(await screen.findByText('Escribe tu celular para hacer tu pedido y sumar puntos')).toBeInTheDocument();
+    expect(await screen.findByText('Escribe tu celular: 9 dígitos que empiecen con 9')).toBeInTheDocument();
     expect(screen.queryByLabelText(/Paso 2: Ubicación \(actual\)/)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '912345678' } });
@@ -141,27 +141,20 @@ describe('Checkout ▸ pedir como invitado apagado o encendido', () => {
     expect(await screen.findByText('Escribe tu celular para hacer tu pedido y sumar puntos.')).toBeInTheDocument();
   });
 
-  it('encendido: se ofrece «Continuar como invitado», el celular es opcional con su nota y el pedido va sin teléfono', async () => {
+  it('encendido: como invitado el celular sigue siendo obligatorio (nombre y celular siempre)', async () => {
     abrirPedido(true);
 
     fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
-    expect(screen.getByText('Opcional. Con tu celular sumas puntos.')).toBeInTheDocument();
-    expect(screen.getByLabelText(/Teléfono celular/i)).not.toBeRequired();
+    expect(screen.getByLabelText(/Teléfono celular/i)).toBeRequired();
 
     fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
     fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
-    expect(await screen.findByLabelText(/Paso 2: Ubicación \(actual\)/)).toBeInTheDocument();
-  });
+    expect(await screen.findByText('Escribe tu celular: 9 dígitos que empiecen con 9')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Paso 2: Ubicación \(actual\)/)).not.toBeInTheDocument();
 
-  it('encendido: el pedido sin celular no manda teléfono en el cliente', async () => {
-    abrirPedido(true);
-    fireEvent.click(screen.getByRole('button', { name: /Continuar como invitado/i }));
-    fireEvent.change(screen.getByLabelText(/Nombre completo/i), { target: { value: 'Luis' } });
-    await irAEnviar();
-
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/pedidos', expect.anything(), expect.anything()));
-    const payload = vi.mocked(api.post).mock.calls.find((c) => c[0] === '/pedidos')![1] as any;
-    expect(payload.cliente).toEqual({ nombre: 'Luis' });
+    fireEvent.change(screen.getByLabelText(/Teléfono celular/i), { target: { value: '999999999' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Continuar$/i }));
+    expect(await screen.findByText('El teléfono debe tener 9 dígitos, empezar con 9 y ser un número real')).toBeInTheDocument();
   });
 });
 
