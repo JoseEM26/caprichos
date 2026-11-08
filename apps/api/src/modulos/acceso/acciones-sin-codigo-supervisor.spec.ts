@@ -110,7 +110,7 @@ describe('acciones antes protegidas por el código del supervisor: ahora solo po
     }
   });
 
-  it('el SUPERVISOR entra a cortesías, anular pedido y devolución sin código (ya no hay código)', async () => {
+  it('el SUPERVISOR entra a cortesías, devolución y cambiar estado sin código (anular lo corta el servicio: solo Caja o Administrador)', async () => {
     expect(await entra('SUPERVISOR', CortesiasController, 'registrar')).toBe(true);
     expect(await entra('SUPERVISOR', PedidosAdminController, 'registrarDevolucion')).toBe(true);
     expect(await entra('SUPERVISOR', PedidosAdminController, 'cambiarEstado')).toBe(true);

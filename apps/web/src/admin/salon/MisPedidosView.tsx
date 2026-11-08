@@ -10,7 +10,6 @@ import { ModalNuevoPedidoMesa } from './componentes/ModalNuevoPedidoMesa';
 import { ModalVoucherPedido } from './ModalVoucherPedido';
 import { HistorialVoucher } from './HistorialVoucher';
 import { Confirmar } from '../../comun/Confirmar';
-import { ModalAnular } from '../pedidos/ModalAnular';
 import { vouchersApi } from '../vouchers/vouchersApi';
 import { ProgresoPedido } from './ProgresoPedido';
 import { SalonMozo } from './componentes/SalonMozo';
@@ -132,7 +131,6 @@ export function MisPedidosView() {
   const [quitando, setQuitando] = useState(false);
   const [errorQuitar, setErrorQuitar] = useState<string | null>(null);
   const [voucherPedido, setVoucherPedido] = useState<{ pedido: MiPedido; medio: 'YAPE' | 'PLIN' | 'TRANSFERENCIA'; monto: number } | null>(null);
-  const [anulando, setAnulando] = useState<MiPedido | null>(null);
   // Agregar extra: pedido original; el modal abre en modo «extra» (cliente y mesa o dirección bloqueados)
   const [extraDe, setExtraDe] = useState<MiPedido | null>(null);
   const [pisos, setPisos] = useState<PisoSalon[]>([]);
@@ -435,11 +433,6 @@ export function MisPedidosView() {
                         Agregar extra
                       </button>
                     )}
-                    {tiene('pedidos/anular') && ['COLA', 'PREPARANDO', 'LISTO'].includes(p.estado) && p.pagoEstado !== 'PAGADO' && (
-                      <button type="button" className="mpv-boton" onClick={() => setAnulando(p)}>
-                        Anular pedido
-                      </button>
-                    )}
                   </div>
                 )}
 
@@ -542,18 +535,6 @@ export function MisPedidosView() {
         }}
         alCancelar={() => setQuitarDe(null)}
       />
-
-      {anulando && (
-        <ModalAnular
-          pedidoId={anulando.id}
-          codigoPedido={anulando.codigo}
-          alCerrar={() => setAnulando(null)}
-          alAnularExitoso={() => {
-            setAnulando(null);
-            void cargar();
-          }}
-        />
-      )}
 
       {voucherPedido && (
         <ModalVoucherPedido

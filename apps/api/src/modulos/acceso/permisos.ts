@@ -24,6 +24,9 @@ export const ROLES: readonly DefinicionRol[] = [
 /** Roles retirados del sistema: el sincronizador les borra los permisos y nunca los recrea. */
 export const ROLES_ELIMINADOS: readonly string[] = ['CALLCENTER'];
 
+/** Únicos roles que anulan pedidos completos; el sincronizador quita pedidos/anular a cualquier otro rol. */
+export const ROLES_ANULAN_PEDIDOS: readonly string[] = ['ADMIN', 'CAJERO'];
+
 /** Permisos retirados (modulo/accion): el sincronizador los borra de la base y de todos los roles. */
 export const PERMISOS_RETIRADOS: readonly string[] = ['supervisor/ver_codigo', 'supervisor/gestionar_codigo'];
 
@@ -212,8 +215,7 @@ export const PERMISOS: readonly DefinicionPermiso[] = [
 
 export const MATRIZ: Record<string, string[]> = {
   ADMIN: PERMISOS.map((p) => `${p.modulo}/${p.accion}`),
-  // Caja y cobro, pedidos sin anular (la anulación de un entregado sin cobro la autoriza el PIN
-  // de supervisor), cocina y carta en solo lectura. Escritorio no tiene permiso propio.
+  // Caja y cobro, anular pedidos (junto con ADMIN, los únicos), cocina y carta en solo lectura. Escritorio no tiene permiso propio.
   CAJERO: [
     // Chat de WhatsApp (Mensajes): lo atienden MOZO y CAJERO (antes el rol CALLCENTER, eliminado)
     'mensajes/ver',
@@ -228,6 +230,7 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/ver',
     'pedidos/crear',
     'pedidos/cambiar_estado',
+    'pedidos/anular', // anular pedidos: solo CAJERO y ADMIN (decisión del dueño); nadie más
     'pedidos/cambiar_ubicacion',
     'pedidos/validar_cambio_cobro',
     'pedidos/editar',
@@ -264,7 +267,6 @@ export const MATRIZ: Record<string, string[]> = {
     'almacen/merma_producto',
     'pedidos/ver',
     'pedidos/cambiar_estado',
-    'pedidos/anular', // anula el pedido completo desde su comanda
     'cocina/ver',
     'cocina/despejar',
     'cocina/despachar',
@@ -300,7 +302,6 @@ export const MATRIZ: Record<string, string[]> = {
     'pedidos/corregir_cliente', // corrige celular/nombre/dirección de cualquier pedido vigente
     'pedidos/editar', // cualquier pedido aún sin cobrar, no solo los suyos (decisión del dueño)
     'pedidos/extra', // agrega un extra a cualquier pedido vigente, con su propio pago y comprobante
-    'pedidos/anular', // solo SUS pedidos en cola/preparando/listo y sin cobro, sin código de supervisor (decisión del dueño)
     'cortesias/dar', // libre: cualquier pedido sin cobrar; queda auditada con quién y por qué (decisión del dueño)
     'plano/ver',
     'mesas/ver',
@@ -390,6 +391,7 @@ MATRIZ.SUPERVISOR = [
   ...new Set([...MATRIZ.CAJERO, ...MATRIZ.MOZO, 'escritorio/operativo', 'iniciativas/cambiar_estado']),
 ].filter(
   // Sin dinero: el supervisor no cambia ubicación con cobro, ni canjea cupones, ni hace el conteo de apertura
-  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear',
+  // Tampoco anula pedidos: solo CAJERO y ADMIN (decisión del dueño, a confirmar)
+  (p) => p !== 'almacen/apertura' && p !== 'pedidos/cambiar_ubicacion' && p !== 'cupones/canjear' && p !== 'pedidos/anular',
 );
 

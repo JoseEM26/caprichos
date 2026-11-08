@@ -23,7 +23,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../comun/prisma/prisma.service';
 import { RedisService } from '../../comun/redis/redis.service';
-import { anulaConAlcanceLimitado, rolesDelUsuario } from '../acceso/roles-usuario';
+import { puedeAnularPedidos, rolesDelUsuario } from '../acceso/roles-usuario';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { EventosGateway } from '../../comun/socket/eventos.gateway';
 import { esPedidoLocalSinCaptura, exigirComprobanteDigital, mediosQueExigenCodigo, voucherCubreMedio } from '../caja/comprobante-pago.util';
@@ -910,46 +910,15 @@ export class PedidosEstadoService {
     const nuevoEstado = dto.estado.toUpperCase().trim();
     const ahora = new Date();
 
-    // COCINA y MOZO solo anulan lo suyo y mientras no sale de cocina (alcance limitado por su rol)
-    const alcanceLimitado = anulaConAlcanceLimitado(usuarioActual);
     const roles = rolesDelUsuario(usuarioActual);
-    const esCocina = roles.includes('COCINA');
 
-    // El mozo (sin rol de cocina) solo puede anular: la ruta lo deja pasar por pedidos/anular, no por cambiar_estado
-    if (alcanceLimitado && !esCocina && nuevoEstado !== 'ANULADO') {
-      throw new ForbiddenException({ codigo: 'SIN_PERMISO', mensaje: 'No tiene permiso para cambiar el estado de pedidos' });
-    }
-
-    // 1. Manejo de Anulación (DT-61)
+    // 1. Manejo de Anulación (DT-61): solo Caja o Administrador (decisión del dueño), también por API directa
     if (nuevoEstado === 'ANULADO') {
-      if (alcanceLimitado) {
-        // «Suyo»: el mozo solo anula lo que él tomó; cocina anula cualquier pedido de su cocina
-        if (!esCocina && !(pedido.canal === 'MOZO' && pedido.party_id != null && BigInt(pedido.party_id) === BigInt(usuarioActual.partyId))) {
-          throw new ForbiddenException({
-            codigo: 'PEDIDO_AJENO',
-            mensaje: 'Solo puedes anular los pedidos que tomaste tú',
-          });
-        }
-        // Sin aprobación solo hasta que sale de cocina; un entregado lo ve Caja, el ADMIN o el supervisor
-        if (!['COLA', 'PREPARANDO', 'LISTO'].includes(estadoAnterior)) {
-          throw new ConflictException({
-            codigo: 'ANULAR_REQUIERE_APROBACION',
-            mensaje: `No se puede anular un pedido en estado ${estadoAnterior} sin aprobación: pide a Caja o al supervisor`,
-          });
-        }
-        if (!esCocina) {
-          const cobroVigente = await this.prisma.cobro.findFirst({ where: { pedido_id: pedido.id, anulado_en: null }, select: { id: true } });
-          const voucherAprobado = await this.prisma.voucherPago.findFirst({
-            where: { pedido_id: pedido.id, reemplazado_en: null, retirado: false, revisado_en: { not: null } },
-            select: { id: true },
-          });
-          if (cobroVigente || voucherAprobado || pedido.pago_estado === 'PAGADO') {
-            throw new ConflictException({
-              codigo: 'PEDIDO_COBRADO',
-              mensaje: 'Este pedido ya tiene un cobro o un voucher aprobado: pide a Caja o al supervisor que lo anule',
-            });
-          }
-        }
+      if (!puedeAnularPedidos(usuarioActual)) {
+        throw new ForbiddenException({
+          codigo: 'ANULAR_SOLO_CAJA_ADMIN',
+          mensaje: 'Solo Caja o Administrador pueden anular pedidos',
+        });
       }
 
       // Estados desde los que se permite anular: COLA, PREPARANDO, LISTO; y ENTREGADO sin cobro vigente
@@ -1067,8 +1036,8 @@ export class PedidosEstadoService {
         entidad: 'pedido',
         entidadId: pedido.id,
         antes: { estado: estadoAnterior },
-        despues: { estado: 'ANULADO', motivo, ...(alcanceLimitado ? { alcanceLimitadoPorRol: true, anuladoPorElMismoUsuario: true } : {}) },
-        motivo: alcanceLimitado ? `${motivo} (anulado por el propio usuario, con el alcance de su rol)` : motivo,
+        despues: { estado: 'ANULADO', motivo },
+        motivo,
         partyId: usuarioActual.partyId,
         ip,
       });

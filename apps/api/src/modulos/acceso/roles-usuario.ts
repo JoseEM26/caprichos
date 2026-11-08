@@ -60,17 +60,9 @@ export function esSoloMozo(usuario: { rol: string; roles?: string[] }): boolean 
   return roles.includes('MOZO') && !roles.some((r) => (ROLES_ALCANCE_AMPLIO as readonly string[]).includes(r));
 }
 
-/**
- * Anulación de alcance limitado: COCINA y MOZO solo anulan lo suyo y antes de que salga de cocina; lo demás lo ve Caja,
- * el ADMIN o el supervisor. Solo vale si tiene alguno de esos roles y ningún rol de alcance amplio: el más alto manda.
- */
-export function anulaConAlcanceLimitado(usuario: { rol: string; roles?: string[] } | undefined): boolean {
-  if (!usuario) return false;
-  const roles = usuario.roles ?? [usuario.rol];
-  return (
-    (roles.includes('COCINA') || roles.includes('MOZO')) &&
-    !roles.some((r) => (ROLES_ALCANCE_AMPLIO as readonly string[]).includes(r))
-  );
+/** Solo CAJERO y ADMIN anulan pedidos completos; con varios roles basta uno de ellos. */
+export function puedeAnularPedidos(usuario: { rol: string; roles?: string[] } | undefined): boolean {
+  return rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'CAJERO');
 }
 
 /** Rol con el que se aplican las reglas por rol: MOZO si es solo mozo; si no, el de alcance amplio que tenga (o el principal). */

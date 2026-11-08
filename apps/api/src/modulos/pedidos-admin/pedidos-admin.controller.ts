@@ -122,7 +122,7 @@ export class PedidosAdminController {
   }
 
   @Post(':id/estado')
-  // El mozo solo trae pedidos/anular (no cambiar_estado): el servicio le deja anular únicamente
+  // Anular (estado ANULADO) solo lo permite el servicio a CAJERO y ADMIN (ANULAR_SOLO_CAJA_ADMIN)
   @Permiso([
     { modulo: 'pedidos', accion: 'cambiar_estado' },
     { modulo: 'pedidos', accion: 'anular' },

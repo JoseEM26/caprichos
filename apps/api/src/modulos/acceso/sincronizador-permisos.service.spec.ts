@@ -81,6 +81,14 @@ describe('SincronizadorPermisosService', () => {
     expect(PERMISOS.some((p) => p.modulo === 'supervisor')).toBe(false);
   });
 
+  it('quita pedidos/anular a todo rol que no sea ADMIN ni CAJERO', async () => {
+    const { prisma, servicio } = armar(permisosConId, vinculosDeMatriz());
+    await servicio.sincronizar();
+    expect(prisma.rolPermiso.deleteMany).toHaveBeenCalledWith({
+      where: { permiso: { modulo: 'pedidos', accion: 'anular' }, rol: { notIn: ['ADMIN', 'CAJERO'] } },
+    });
+  });
+
   it('un fallo de base al arrancar no tumba la API', async () => {
     const prisma: any = {
       permiso: { findMany: jest.fn().mockRejectedValue(new Error('sin base')) },
