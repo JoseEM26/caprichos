@@ -8,6 +8,7 @@ import {
 import { ModalNuevoCliente } from './ModalNuevoCliente';
 import { ModalFichaCliente } from './ModalFichaCliente';
 import { ModalEditarCliente } from './ModalEditarCliente';
+import { InsigniaGasta, InsigniaVerificacion } from './InsigniasVerificacion';
 import { BarraFiltros, FiltroCombo } from '../../comun/FiltroCombo';
 
 export function ClientesAdminView() {
@@ -24,6 +25,9 @@ export function ClientesAdminView() {
   const [filtroTipo, setFiltroTipo] = useState<string>('Todos');
   const [filtroCredito, setFiltroCredito] = useState<string>('Todos');
   const [filtroRegistro, setFiltroRegistro] = useState<string>('Todos');
+  const [filtroVerif, setFiltroVerif] = useState<string>('todos');
+  const [filtroGasta, setFiltroGasta] = useState<string>('Todos');
+  const [contadores, setContadores] = useState<{ verificados: number; sinVerificar: number; gastanPuntos: number } | null>(null);
 
   // Modales
   const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
@@ -44,6 +48,8 @@ export function ClientesAdminView() {
       tipo: filtroTipo !== 'Todos' ? filtroTipo : undefined,
       creditoPersonal: filtroCredito !== 'Todos' ? filtroCredito : undefined,
       estado: filtroRegistro !== 'Todos' ? filtroRegistro : undefined,
+      verificacion: filtroVerif as 'verificados' | 'sin_verificar' | 'todos',
+      gastaPuntos: filtroGasta === 'Sí',
       pagina: pg,
       limite: 6,
     };
@@ -52,6 +58,7 @@ export function ClientesAdminView() {
       .then((res) => {
         startTransition(() => {
           setClientes(res.items);
+          setContadores(res.contadores ?? null);
           setTotal(res.total);
           setPaginas(res.paginas || 1);
           setPagina(res.pagina || 1);
@@ -67,16 +74,20 @@ export function ClientesAdminView() {
 
   useEffect(() => {
     cargarDatos(1);
-  }, [busqueda, filtroTipo, filtroCredito, filtroRegistro]);
+  }, [busqueda, filtroTipo, filtroCredito, filtroRegistro, filtroVerif, filtroGasta]);
 
   const numFiltrosActivos = (filtroTipo !== 'Todos' ? 1 : 0) +
     (filtroCredito !== 'Todos' ? 1 : 0) +
-    (filtroRegistro !== 'Todos' ? 1 : 0);
+    (filtroRegistro !== 'Todos' ? 1 : 0) +
+    (filtroVerif !== 'todos' ? 1 : 0) +
+    (filtroGasta !== 'Todos' ? 1 : 0);
 
   const limpiarFiltros = () => {
     setFiltroTipo('Todos');
     setFiltroCredito('Todos');
     setFiltroRegistro('Todos');
+    setFiltroVerif('todos');
+    setFiltroGasta('Todos');
     setBusqueda('');
   };
 
@@ -280,6 +291,25 @@ export function ClientesAdminView() {
               opciones={['Todos', 'Activos', 'Desactivados'].map((o) => ({ valor: o, etiqueta: o }))}
               alCambiar={setFiltroRegistro}
             />
+            <FiltroCombo
+              etiqueta="Verificación"
+              valor={filtroVerif}
+              opciones={[
+                { valor: 'todos', etiqueta: 'Todos' },
+                { valor: 'verificados', etiqueta: `Verificados${contadores ? ` (${contadores.verificados})` : ''}` },
+                { valor: 'sin_verificar', etiqueta: `Sin verificar${contadores ? ` (${contadores.sinVerificar})` : ''}` },
+              ]}
+              alCambiar={setFiltroVerif}
+            />
+            <FiltroCombo
+              etiqueta="Pueden gastar sus puntos"
+              valor={filtroGasta}
+              opciones={[
+                { valor: 'Todos', etiqueta: 'Todos' },
+                { valor: 'Sí', etiqueta: `Sí${contadores ? ` (${contadores.gastanPuntos})` : ''}` },
+              ]}
+              alCambiar={setFiltroGasta}
+            />
 
             {/* Botones Limpiar y Listo */}
             <div
@@ -421,6 +451,11 @@ export function ClientesAdminView() {
                       Desactivado
                     </span>
                   )}
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <InsigniaVerificacion cliente={c} />
+                  <InsigniaGasta cliente={c} saldo={c.puntos} />
                 </div>
 
                 <div

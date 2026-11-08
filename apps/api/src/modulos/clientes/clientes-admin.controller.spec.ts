@@ -55,13 +55,25 @@ describe('ClientesAdminController', () => {
 
   it('listar delega a clientesService.listarAdmin', async () => {
     const req: any = { usuario: { rol: 'ADMIN' }, ip: '127.0.0.1' };
-    await controller.listar('ana', 'Persona', 'Activos', undefined, '1', '6', req);
+    await controller.listar('ana', 'Persona', 'Activos', undefined, undefined, undefined, '1', '6', req);
 
     expect(clientesServiceMock.listarAdmin).toHaveBeenCalledWith(
       expect.objectContaining({ q: 'ana', tipo: 'Persona', estado: 'Activos' }),
       req.usuario,
       '127.0.0.1',
     );
+  });
+
+  it('listar pasa los filtros de verificación y rechaza valores inválidos', async () => {
+    const req: any = { usuario: { rol: 'ADMIN' }, ip: '127.0.0.1' };
+    await controller.listar(undefined, undefined, undefined, undefined, 'verificados', 'si', '1', '6', req);
+    expect(clientesServiceMock.listarAdmin).toHaveBeenCalledWith(
+      expect.objectContaining({ verificacion: 'verificados', gastaPuntos: 'si' }),
+      req.usuario,
+      '127.0.0.1',
+    );
+    await expect(controller.listar(undefined, undefined, undefined, undefined, 'raro', undefined, '1', '6', req)).rejects.toThrow();
+    await expect(controller.listar(undefined, undefined, undefined, undefined, undefined, 'x', '1', '6', req)).rejects.toThrow();
   });
 
   it('ajustarPuntos delega a puntosService.ajustarManual', async () => {

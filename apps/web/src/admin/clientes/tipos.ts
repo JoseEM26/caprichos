@@ -1,4 +1,14 @@
-export interface ClienteItem {
+/** Verificación de la cuenta (opcional: una API anterior no lo envía) */
+export interface VerificacionCliente {
+  verificado?: boolean;
+  verificadoEn?: string | null;
+  estadoVerificacion?: 'VERIFICADO' | 'SIN_VERIFICAR' | 'ANTIGUA';
+  razonSinVerificar?: 'MOSTRADOR' | 'SIN_CONTRASENA' | null;
+  tieneContrasena?: boolean;
+  puedeGastarPuntos?: boolean;
+}
+
+export interface ClienteItem extends VerificacionCliente {
   id: string;
   nombre: string;
   tipo: 'Persona' | 'Empresa' | 'Personal';
@@ -39,7 +49,7 @@ export interface MovimientoPuntosItem {
   } | null;
 }
 
-export interface FichaCliente {
+export interface FichaCliente extends VerificacionCliente {
   id: string;
   nombre: string;
   /** Solo empresas (enmascarado salvo ADMIN) */

@@ -64,17 +64,27 @@ export class ClientesAdminController {
     @Query('tipo') tipo?: string,
     @Query('estado') estado?: string,
     @Query('creditoPersonal') creditoPersonal?: string,
+    @Query('verificacion') verificacion?: string,
+    @Query('gastaPuntos') gastaPuntos?: string,
     @Query('pagina') pagina?: string,
     @Query('limite') limite?: string,
     @Req() req?: any,
   ) {
     const ip = (req?.ip || req?.headers?.['x-forwarded-for']) as string | undefined;
+    if (verificacion && !['verificados', 'sin_verificar', 'todos'].includes(verificacion)) {
+      throw new BadRequestException({ codigo: 'FILTRO_INVALIDO', mensaje: 'verificacion: verificados, sin_verificar o todos.' });
+    }
+    if (gastaPuntos && !['si', 'no'].includes(gastaPuntos)) {
+      throw new BadRequestException({ codigo: 'FILTRO_INVALIDO', mensaje: 'gastaPuntos: si.' });
+    }
     return this.clientesService.listarAdmin(
       {
         q,
         tipo,
         estado,
         creditoPersonal,
+        verificacion: verificacion as any,
+        gastaPuntos: gastaPuntos === 'si' ? 'si' : undefined,
         pagina: pagina ? parseInt(pagina, 10) : 1,
         limite: limite ? parseInt(limite, 10) : 6,
       },
