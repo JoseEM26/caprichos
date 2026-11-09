@@ -434,6 +434,11 @@ export const impresionApi = {
     return api.post('/admin/impresion/cola/vaciar', body);
   },
 
+  /** Quita de la cola (descarta) los trabajos elegidos que aún no se imprimieron. */
+  quitarTrabajos: async (ids: string[]): Promise<{ ok: boolean; quitados: number; mensaje: string }> => {
+    return api.post('/admin/impresion/cola/quitar', { ids });
+  },
+
   descartarPedido: async (pedidoId: string): Promise<{ ok: boolean; descartadas: number; mensaje: string }> => {
     return api.post(`/admin/impresion/pedidos/${pedidoId}/descartar`, {});
   },

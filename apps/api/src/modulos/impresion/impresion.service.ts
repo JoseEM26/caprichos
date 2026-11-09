@@ -35,6 +35,7 @@ import {
   ReimprimirDto,
   ReimprimirPedidoDto,
   ResultadoTrabajoDto,
+  QuitarTrabajosDto,
   VaciarColaDto,
 } from './dto';
 import {
@@ -971,6 +972,26 @@ export class ImpresionService {
       { id: bigId, estado: { in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] } },
       motivo, 'DESCARTAR_TRABAJO', { trabajoId: bigId.toString() }, usuario, ip,
     );
+  }
+
+  /** Quita de la cola trabajos elegidos (un solo UPDATE = una transacción). Ignora ids inexistentes y lo ya impreso. */
+  async quitarTrabajos(dto: QuitarTrabajosDto, usuario?: UsuarioAutenticado, ip?: string) {
+    this.exigirRolDescartar(usuario);
+    let ids: bigint[];
+    try {
+      ids = [...new Set((dto?.ids ?? []).map((i) => String(i)))].map((i) => BigInt(i));
+    } catch {
+      throw new BadRequestException({ codigo: 'ID_INVALIDO', mensaje: 'Identificador no válido' });
+    }
+    if (ids.length === 0 || ids.length > 200) {
+      throw new BadRequestException({ codigo: 'IDS_INVALIDOS', mensaje: 'Elige entre 1 y 200 papeles' });
+    }
+    const motivo = dto.motivo?.trim() || 'Quitada de la cola de impresión (selección)';
+    const r = await this.descartar(
+      { id: { in: ids }, estado: { in: ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'] } },
+      motivo, 'QUITAR_TRABAJOS', { cantidad: ids.length, ids: ids.map(String) }, usuario, ip,
+    );
+    return { ok: true, quitados: r.descartadas, mensaje: r.descartadas > 0 ? `${r.descartadas} trabajos quitados` : 'No había trabajos para quitar' };
   }
 
   async descartarPedido(pedidoIdInput: string | number, dto: DescartarDto, usuario?: UsuarioAutenticado, ip?: string) {

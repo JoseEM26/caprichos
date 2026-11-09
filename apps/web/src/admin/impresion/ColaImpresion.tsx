@@ -67,6 +67,8 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
   const [trabajando, setTrabajando] = useState(false);
   const { tiene, usuario } = useSesion();
   const puedeReimprimir = (usuario?.rol || '').toUpperCase() === 'ADMIN' || tiene('pedidos/cambiar_estado');
+  const rolesUsuario = ((usuario as any)?.roles ?? [usuario?.rol ?? '']).map((x: string) => String(x).toUpperCase());
+  const puedeDescartar = rolesUsuario.some((x: string) => x === 'ADMIN' || x === 'CAJERO');
   const [vista, setVista] = useState<'maquina' | 'pedido'>('maquina');
   const [pestana, setPestana] = useState<PestanaMaquina>('TODO');
   const [papeles, setPapeles] = useState<{ items: TrabajoImpresionAdmin[]; conteo?: { stickers: number; tickets: number } } | null>(null);
@@ -217,6 +219,12 @@ export function ColaImpresion({ alCerrar, incrustado = false }: { alCerrar: () =
             puedeReintentar={puedeReimprimir}
             alReimprimir={async (cuerpo) => {
               const r = await impresionApi.reimprimirTrabajos(cuerpo);
+              await cargar();
+              return r;
+            }}
+            puedeDescartar={puedeDescartar}
+            alQuitar={async (ids) => {
+              const r = await impresionApi.quitarTrabajos(ids);
               await cargar();
               return r;
             }}

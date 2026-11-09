@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { rolDeTrabajo } from '@caprichos/compartido';
 import { Confirmar } from '../../comun/Confirmar';
 import { NOMBRE_PIEZA_TRABAJO, estadoDeTrabajo, motivoDeTrabajo } from './facil/logicaFacil';
@@ -41,6 +41,7 @@ export function horaDeTrabajo(iso: string, ahora = new Date()): string {
 }
 
 const REIMPRIMIBLES = ['IMPRESO', 'FALLIDO', 'VENCIDO', 'DESCARTADO'];
+const DESCARTABLES = ['PENDIENTE', 'IMPRIMIENDO', 'FALLIDO'];
 const FALLIDOS = ['FALLIDO', 'VENCIDO'];
 
 interface Accion {
@@ -60,6 +61,9 @@ interface Props {
   puedeReimprimir: boolean;
   puedeReintentar?: boolean;
   alReimprimir: (cuerpo: CuerpoReimpresion) => Promise<RespuestaReimpresion>;
+  /** Solo ADMIN/CAJERO: quitar de la cola (descartar) los trabajos elegidos. */
+  puedeDescartar?: boolean;
+  alQuitar?: (ids: string[]) => Promise<{ quitados: number }>;
   alReintentar?: (t: TrabajoImpresionAdmin) => void;
   /** Si la PC del trabajo tiene el programa abierto (motivo de lo que espera). */
   pcConectada?: (t: TrabajoImpresionAdmin) => boolean | null;
@@ -75,6 +79,8 @@ export function ListaTrabajos(p: Props) {
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [accion, setAccion] = useState<Accion | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [confirmaQuitar, setConfirmaQuitar] = useState(false);
+  const [quitando, setQuitando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
 
   const visibles = useMemo(
@@ -86,6 +92,46 @@ export function ListaTrabajos(p: Props) {
   const cuenta: Record<PestanaMaquina, number> = { TODO: stickers + tickets, ETIQUETERA: stickers, TICKETERA: tickets };
   const fallidos = (m: 'ETIQUETERA' | 'TICKETERA') => p.trabajos.filter((t) => maquinaDe(t) === m && FALLIDOS.includes(t.estado)).length;
   const selec = visibles.filter((t) => marcados.has(t.id) && REIMPRIMIBLES.includes(t.estado));
+
+  const quitables = visibles.filter((t) => DESCARTABLES.includes(t.estado));
+  const aQuitar = quitables.filter((t) => marcados.has(t.id));
+  const puedeQuitar = !!p.puedeDescartar && !!p.alQuitar;
+  const seleccionables = visibles.filter((t) => (p.puedeReimprimir && REIMPRIMIBLES.includes(t.estado)) || (puedeQuitar && DESCARTABLES.includes(t.estado)));
+  const todosMarcados = seleccionables.length > 0 && seleccionables.every((t) => marcados.has(t.id));
+
+  // La selección solo conserva ids que siguen presentes en la lista (refresco)
+  useEffect(() => {
+    setMarcados((a) => {
+      const vivos = new Set(p.trabajos.map((t) => t.id));
+      const n = new Set([...a].filter((id) => vivos.has(id)));
+      return n.size === a.size ? a : n;
+    });
+  }, [p.trabajos]);
+
+  const alternarTodos = () =>
+    setMarcados((a) => {
+      const n = new Set(a);
+      for (const t of seleccionables) {
+        if (todosMarcados) n.delete(t.id);
+        else n.add(t.id);
+      }
+      return n;
+    });
+
+  const quitar = async () => {
+    if (!p.alQuitar || quitando) return;
+    setQuitando(true);
+    try {
+      const r = await p.alQuitar(aQuitar.map((t) => t.id));
+      setResultado({ ok: true, texto: `${r.quitados} trabajos quitados` });
+      setMarcados(new Set());
+    } catch (e: any) {
+      setResultado({ ok: false, texto: e?.message || 'No se pudo quitar de la cola.' });
+    } finally {
+      setQuitando(false);
+      setConfirmaQuitar(false);
+    }
+  };
 
   const alternar = (id: string) =>
     setMarcados((a) => {
@@ -138,16 +184,28 @@ export function ListaTrabajos(p: Props) {
         <b>Reintentar</b> vuelve a mandar el mismo papel que no salió. <b>Reimprimir</b> saca una copia nueva de uno que ya salió (o falló), sin tocar el original.
       </p>
 
-      {p.puedeReimprimir && (
+      {(p.puedeReimprimir || puedeQuitar) && (
         <div className="lt-barra">
+          {seleccionables.length > 0 && (
+            <label className="lt-check lt-check--todos">
+              <input type="checkbox" checked={todosMarcados} onChange={alternarTodos} />
+              Seleccionar todos los visibles
+            </label>
+          )}
+          {marcados.size > 0 && <span data-testid="lt-contador">{marcados.size} seleccionados</span>}
+          {puedeQuitar && aQuitar.length > 0 && (
+            <button type="button" className="lt-btn lt-btn--fuerte" disabled={quitando} onClick={() => setConfirmaQuitar(true)}>
+              Quitar seleccionados de la cola
+            </button>
+          )}
           {(['ETIQUETERA', 'TICKETERA'] as const).map((m) =>
-            fallidos(m) > 0 ? (
+            p.puedeReimprimir && fallidos(m) > 0 ? (
               <button key={m} type="button" className="lt-btn" disabled={ocupado} onClick={() => porGrupo(m)}>
                 Reimprimir todos los {m === 'ETIQUETERA' ? 'stickers' : 'tickets'} fallidos ({fallidos(m)})
               </button>
             ) : null,
           )}
-          {selec.length > 0 && (
+          {p.puedeReimprimir && selec.length > 0 && (
             <button
               type="button"
               className="lt-btn lt-btn--fuerte"
@@ -180,10 +238,11 @@ export function ListaTrabajos(p: Props) {
             const motivo = motivoDeTrabajo(t, p.pcConectada ? p.pcConectada(t) : null);
             const sticker = maquinaDe(t) === 'ETIQUETERA';
             const reimprimible = p.puedeReimprimir && REIMPRIMIBLES.includes(t.estado);
+            const seleccionable = reimprimible || (puedeQuitar && DESCARTABLES.includes(t.estado));
             return (
               <li key={t.id} className="lt-fila" data-testid={`trabajo-${t.id}`}>
                 <div className="lt-fila-cab">
-                  {reimprimible && (
+                  {seleccionable && (
                     <label className="lt-check">
                       <input type="checkbox" checked={marcados.has(t.id)} onChange={() => alternar(t.id)} aria-label={`Seleccionar ${etiquetaDeTrabajo(t)} ${t.pedidoCodigo}`} />
                     </label>
@@ -212,6 +271,17 @@ export function ListaTrabajos(p: Props) {
         </ul>
       )}
 
+      <Confirmar
+        abierto={confirmaQuitar}
+        titulo="Quitar de la cola"
+        mensaje={`Se quitarán ${aQuitar.length} trabajo(s) de la cola y NO se imprimirán. ¿Continuar?`}
+        textoSi="Sí, quitar"
+        textoNo="No"
+        peligro
+        cargando={quitando}
+        alCancelar={() => setConfirmaQuitar(false)}
+        alConfirmar={() => void quitar()}
+      />
       <Confirmar
         abierto={!!accion}
         titulo={accion?.titulo}

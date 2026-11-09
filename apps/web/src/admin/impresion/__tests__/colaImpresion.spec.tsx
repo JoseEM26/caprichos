@@ -14,6 +14,7 @@ vi.mock('../impresionApi', () => ({
     reimprimirTodas: vi.fn(),
     listarTrabajos: vi.fn(),
     reimprimirTrabajos: vi.fn(),
+    quitarTrabajos: vi.fn(),
     reintentarTrabajo: vi.fn(),
   },
 }));
@@ -70,6 +71,28 @@ describe('ColaImpresion por máquina', () => {
     expect(screen.getByTestId('trabajo-4')).toHaveTextContent('TICKET · Comanda salón');
     expect(screen.getByTestId('trabajo-5')).toHaveTextContent('PRUEBA');
     expect(screen.getByTestId('trabajo-1')).toHaveTextContent('en Bebidas');
+  });
+
+  it('selecciona, selecciona todos, confirma, quita y refresca', async () => {
+    vi.mocked(impresionApi.quitarTrabajos).mockResolvedValue({ ok: true, quitados: 2, mensaje: 'x' });
+    render(<ColaImpresion alCerrar={() => {}} />);
+    await screen.findByTestId('trabajo-1');
+    expect(screen.queryByRole('button', { name: /Quitar seleccionados/ })).toBeNull();
+    // 2 y 4 son FALLIDO (quitables); el IMPRESO no cuenta
+    fireEvent.click(screen.getByLabelText('Seleccionar todos los visibles'));
+    expect(screen.getByTestId('lt-contador')).toHaveTextContent('4 seleccionados');
+    fireEvent.click(screen.getByLabelText('Seleccionar todos los visibles'));
+    expect(screen.queryByTestId('lt-contador')).toBeNull();
+    fireEvent.click(within(screen.getByTestId('trabajo-2')).getByRole('checkbox'));
+    fireEvent.click(within(screen.getByTestId('trabajo-4')).getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar seleccionados de la cola' }));
+    expect(await screen.findByText(/Se quitarán 2 trabajo\(s\)/)).toBeInTheDocument();
+    const llamadas = vi.mocked(impresionApi.listarCola).mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, quitar' }));
+    await waitFor(() => expect(impresionApi.quitarTrabajos).toHaveBeenCalledWith(['2', '4']));
+    expect(await screen.findByText('2 trabajos quitados')).toBeInTheDocument();
+    expect(vi.mocked(impresionApi.listarCola).mock.calls.length).toBeGreaterThan(llamadas);
+    expect(screen.queryByTestId('lt-contador')).toBeNull();
   });
 
   it('elegir la pestaña Tickets pide al servidor solo esa máquina', async () => {
