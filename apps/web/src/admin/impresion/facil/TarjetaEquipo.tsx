@@ -11,6 +11,7 @@ import {
 } from '@caprichos/compartido';
 import { Confirmar } from '../../../comun/Confirmar';
 import { EtiquetaBebida, EtiquetaGeneral } from '../../pedidos/EtiquetaPrevia';
+import { TITULO_PREVIA, VistaPreviaSticker, type TipoPrevia } from './VistaPreviaSticker';
 import { MUESTRA_BEBIDA, MUESTRA_GENERAL } from '../mapa/VistaPiezaEjemplo';
 import { impresionApi, type CambioConfigEquipo } from '../impresionApi';
 import './tarjeta-equipo.css';
@@ -51,7 +52,19 @@ interface Props {
   pendientes?: number;
   alRecargar: () => void;
   alAviso: (tipo: 'ok' | 'error', texto: string) => void;
+  /** Si viene, la tarjeta se muestra como ventana (modal) y esto la cierra; sin ella se dibuja en línea. */
+  alCancelar?: () => void;
+  /** Otra PC con la que se confunde (para fusionar o decir que no lo es). */
+  duplicadoDe?: { deviceKeyId: string; nombre: string } | null;
 }
+
+type Pestana = 'general' | 'ticketera' | 'etiquetera' | 'probar';
+const PESTANAS: { id: Pestana; titulo: string }[] = [
+  { id: 'general', titulo: 'General' },
+  { id: 'ticketera', titulo: 'Ticketera' },
+  { id: 'etiquetera', titulo: 'Etiquetera' },
+  { id: 'probar', titulo: 'Probar' },
+];
 
 const nombreRol = (r: RolImpresora) => (r === 'TICKETERA' ? 'ticketera' : 'etiquetera');
 const mm = (n: number) => String(n).replace('.', ',');
@@ -273,7 +286,7 @@ export function EditorTamano({
  * Una PC con el programa de impresión: su estado, su red y, sobre todo, QUÉ HACE (cada PC manda).
  * Todo se gestiona desde aquí sin estar en el local; si la PC está sin conexión, lo guardado se aplica al reconectar.
  */
-export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [], tamanosLocal, puedeEditar, pendientes = 0, alRecargar, alAviso }: Props) {
+export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [], tamanosLocal, puedeEditar, pendientes = 0, alRecargar, alAviso, alCancelar, duplicadoDe = null }: Props) {
   const servidor = configDe(equipo);
   const nueva = !servidor.configurado;
   const seleccionServidor = {
@@ -284,7 +297,9 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
   const [impresoras, setImpresoras] = useState<Record<RolImpresora, string>>(seleccionServidor);
   const [nombre, setNombre] = useState(equipo.nombre);
   const [guardando, setGuardando] = useState(false);
-  const [confirmar, setConfirmar] = useState<'general' | 'desvincular' | null>(null);
+  const [confirmar, setConfirmar] = useState<'general' | 'desvincular' | 'fusionar' | 'descartar' | null>(null);
+  const [pestana, setPestana] = useState<Pestana>('general');
+  const [previa, setPrevia] = useState<TipoPrevia | null>(null);
   const [pruebas, setPruebas] = useState<Record<string, string>>({});
   const previo = useRef({ cfg: JSON.stringify(servidor), sel: JSON.stringify(seleccionServidor), nombre: equipo.nombre });
 
@@ -370,23 +385,46 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
     }
   };
 
+  const fusionar = async () => {
+    setConfirmar(null);
+    if (!duplicadoDe) return;
+    try {
+      await impresionApi.fusionarEquipo(equipo.deviceKeyId, duplicadoDe.deviceKeyId);
+      alAviso('ok', `${equipo.nombre} y ${duplicadoDe.nombre} ahora son una sola. Nada se borró.`);
+      alRecargar();
+    } catch (err: any) {
+      alAviso('error', `No se pudo fusionar. ${err?.message ?? ''}`.trim());
+    }
+  };
+
+  const noEsLaMisma = async () => {
+    if (!duplicadoDe) return;
+    try {
+      await impresionApi.noEsLaMisma(equipo.deviceKeyId, duplicadoDe.deviceKeyId);
+      alAviso('ok', `Listo: ${equipo.nombre} y ${duplicadoDe.nombre} son computadoras distintas.`);
+      alRecargar();
+    } catch (err: any) {
+      alAviso('error', `No se pudo guardar. ${err?.message ?? ''}`.trim());
+    }
+  };
+
   const probarRol = async (rol: RolImpresora) => {
     setPruebas((p) => ({ ...p, [rol]: 'Enviando…' }));
     try {
       await impresionApi.pruebaImpresion(rol, impresoras[rol] || undefined, equipo.deviceKeyId);
-      setPruebas((p) => ({ ...p, [rol]: 'Prueba enviada. Mira si salió en la impresora.' }));
+      setPruebas((p) => ({ ...p, [rol]: `Prueba enviada a la impresora ${equipo.candidatas.find((c) => c.id === impresoras[rol])?.nombre ?? `de ${equipo.nombre}`}. Mira si salió.` }));
     } catch (err: any) {
       setPruebas((p) => ({ ...p, [rol]: err?.message || 'No se pudo enviar la prueba.' }));
     }
   };
 
-  const probarTamano = async (tipo: 'general' | 'bebida', tamano: TamanoEtiquetaPc | null) => {
-    setPruebas((p) => ({ ...p, [tipo]: 'Enviando…' }));
+  const probarTamano = async (tipo: 'general' | 'bebida', tamano: TamanoEtiquetaPc | null, clave: string = tipo) => {
+    setPruebas((p) => ({ ...p, [clave]: 'Enviando…' }));
     try {
       await impresionApi.pruebaEtiquetaEquipo(equipo.deviceKeyId, tipo, tamano);
-      setPruebas((p) => ({ ...p, [tipo]: 'Sticker de prueba enviado a esta PC.' }));
+      setPruebas((p) => ({ ...p, [clave]: `Prueba enviada a la impresora ${equipo.candidatas.find((c) => c.id === impresoras.ETIQUETERA)?.nombre ?? `de ${equipo.nombre}`}. Mira si salió.` }));
     } catch (err: any) {
-      setPruebas((p) => ({ ...p, [tipo]: err?.message || 'No se pudo enviar la prueba.' }));
+      setPruebas((p) => ({ ...p, [clave]: err?.message || 'No se pudo enviar la prueba.' }));
     }
   };
 
@@ -404,25 +442,71 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
           ))}
         </select>
       </label>
-      <button type="button" className="if-sec" data-testid={`probar-${rol}`} disabled={bloqueado} onClick={() => void probarRol(rol)}>
-        Imprimir prueba
-      </button>
-      {pruebas[rol] && (
-        <span role="status" className="ie-prueba">
-          {pruebas[rol]}
-        </span>
-      )}
     </div>
   );
 
-  return (
-    <article className={`if-pc ie-pc${nueva ? ' ie-pc--nueva' : ''}`} data-testid={`pc-${equipo.deviceKeyId}`} aria-label={equipo.nombre}>
+  const pedirCerrar = () => {
+    if (!alCancelar) return;
+    if (sucio) setConfirmar('descartar');
+    else alCancelar();
+  };
+
+  // Modo ventana: Esc cierra, el foco queda dentro y vuelve a la tarjeta al cerrar.
+  const raiz = useRef<HTMLDivElement>(null);
+  const cerrarRef = useRef(pedirCerrar);
+  cerrarRef.current = pedirCerrar;
+  const hayConfirmar = useRef(false);
+  hayConfirmar.current = confirmar !== null;
+  useEffect(() => {
+    if (!alCancelar) return;
+    const previo = document.activeElement as HTMLElement | null;
+    raiz.current?.focus();
+    const alTeclear = (e: KeyboardEvent) => {
+      if (hayConfirmar.current) return;
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        cerrarRef.current();
+      } else if (e.key === 'Tab' && raiz.current) {
+        const fuera = Array.from(raiz.current.querySelectorAll<HTMLElement>('button, input, select, summary, [href], [tabindex]:not([tabindex="-1"])')).filter((x) => !(x as HTMLButtonElement).disabled && !x.closest('.ie-panel--oculto'));
+        if (fuera.length === 0) return;
+        const a = fuera[0];
+        const z = fuera[fuera.length - 1];
+        if (e.shiftKey && (document.activeElement === a || !raiz.current.contains(document.activeElement))) { e.preventDefault(); z.focus(); }
+        else if (!e.shiftKey && (document.activeElement === z || !raiz.current.contains(document.activeElement))) { e.preventDefault(); a.focus(); }
+      }
+    };
+    document.addEventListener('keydown', alTeclear);
+    return () => {
+      document.removeEventListener('keydown', alTeclear);
+      previo?.focus?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const tamBebida = tamanoEfectivo(borrador.tamanoBebida, tamanosLocal.bebida);
+  const tamGeneral = tamanoEfectivo(borrador.tamanoGeneral, tamanosLocal.general);
+  const hayComanda = borrador.comandaSalon || borrador.comandaAreas.length > 0;
+  const hayStickerArea = borrador.stickerAreas.length > 0;
+  const hayBebida = borrador.stickerBebidaAreas.length > 0;
+  const hayAlgoQueProbar = borrador.ticketera || borrador.etiquetera;
+  const ver = (t: TipoPrevia) => (
+    <button type="button" className="if-sec ie-ver" aria-expanded={previa === t} data-testid={`ver-previa-${t}`} onClick={() => setPrevia(previa === t ? null : t)}>
+      👁 {previa === t ? 'Ocultar cómo se visualiza' : `Mostrar cómo se visualiza el ${TITULO_PREVIA[t]}`}
+    </button>
+  );
+  const probarBtn = (id: string, texto: string, alClic: () => void) => (
+    <button type="button" className="if-sec" data-testid={id} disabled={bloqueado} onClick={alClic}>
+      {texto}
+    </button>
+  );
+  const cuerpoPrueba = (clave: string) => pruebas[clave] && <span role="status" className="ie-prueba">{pruebas[clave]}</span>;
+  const nombrePc = nombre.trim() || equipo.nombre;
+
+  const articulo = (
+    <article className={`if-pc ie-pc${nueva ? ' ie-pc--nueva' : ''}${alCancelar ? ' ie-pc--modal' : ''}`} data-testid={`pc-${equipo.deviceKeyId}`} aria-label={equipo.nombre}>
       <header className="ie-cab">
-        <label className="if-campo ie-nombre">
-          <span>Nombre de la PC</span>
-          <input type="text" value={nombre} maxLength={60} disabled={bloqueado} data-testid={`nombre-${equipo.deviceKeyId}`} onChange={(e) => setNombre(e.target.value)} />
-        </label>
-        <div className="ie-insignias">
+        <div className="ie-cab-t">
+          <h4 id={`ie-t-${equipo.deviceKeyId}`}>{nombrePc}</h4>
           <span className={`ie-estado ie-estado--${equipo.conectado ? 'on' : 'off'}`} data-testid={`conexion-${equipo.deviceKeyId}`}>
             <span className="if-luz-punto" aria-hidden="true" />
             {equipo.conectado ? 'Conectada' : `Sin conexión · ${haceCuanto(equipo.ultimoLatido)}`}
@@ -437,63 +521,138 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
               En pausa
             </span>
           )}
+          {alCancelar && (
+            <button type="button" className="ie-cerrar" aria-label="Cerrar" data-testid={`cerrar-${equipo.deviceKeyId}`} onClick={pedirCerrar}>
+              ✕
+            </button>
+          )}
+        </div>
+        <div className="ie-tabs" role="tablist" aria-label="Configuración de la PC">
+          {PESTANAS.map((p) => (
+            <button key={p.id} type="button" role="tab" id={`ie-tab-${equipo.deviceKeyId}-${p.id}`} aria-selected={pestana === p.id} aria-controls={`ie-panel-${equipo.deviceKeyId}-${p.id}`} className="ie-tab" data-testid={`tab-${p.id}-${equipo.deviceKeyId}`} onClick={() => setPestana(p.id)}>
+              {p.titulo}
+            </button>
+          ))}
         </div>
       </header>
 
-      {nueva && <p className="ie-aviso">Esta PC todavía no imprime nada. Elige qué hará y pulsa «Guardar», o usa «Usar lo general».</p>}
-      {!equipo.conectado && <p className="ie-aviso ie-aviso--gris">Está sin conexión: lo que guardes queda listo y se aplica en cuanto se conecte.</p>}
-      {pendientes > 0 && <p className="ie-aviso ie-aviso--gris">{pendientes} papeles esperan a esta PC.</p>}
-
-      <dl className="ie-datos" data-testid={`datos-${equipo.deviceKeyId}`}>
-        <div><dt>IP en el local</dt><dd>{equipo.ipLocal?.length ? equipo.ipLocal.join(', ') : '—'}</dd></div>
-        <div><dt>IP pública</dt><dd>{equipo.ipPublica ?? '—'}</dd></div>
-        <div><dt>Programa</dt><dd>{equipo.version ? `versión ${equipo.version}` : '—'}</dd></div>
-        <div><dt>Computadora</dt><dd>{[equipo.hostname, equipo.sistema].filter(Boolean).join(' · ') || '—'}</dd></div>
-        <div className="ie-datos-ancho">
-          <dt>Impresoras que ve</dt>
-          <dd>
-            {equipo.candidatas.length === 0
-              ? '—'
-              : equipo.candidatas.map((c) => [c.nombre, c.puerto, c.driver, c.estado].filter(Boolean).join(' · ')).join(' | ')}
-          </dd>
+      <div className="ie-cuerpo">
+        <div role="tabpanel" id={`ie-panel-${equipo.deviceKeyId}-general`} aria-labelledby={`ie-tab-${equipo.deviceKeyId}-general`} className={`ie-panel${pestana !== 'general' ? ' ie-panel--oculto' : ''}`}>
+          {nueva && <p className="ie-aviso">Esta PC todavía no imprime nada. Elige qué hará y pulsa «Guardar», o usa «Usar lo general».</p>}
+          {!equipo.conectado && <p className="ie-aviso ie-aviso--gris">Está sin conexión: lo que guardes queda listo y se aplica en cuanto se conecte.</p>}
+          {pendientes > 0 && <p className="ie-aviso ie-aviso--gris">{pendientes} papeles esperan a esta PC.</p>}
+          {duplicadoDe && (
+            <div className="ie-aviso" data-testid={`duplicado-${equipo.deviceKeyId}`}>
+              <strong>Posible duplicado de «{duplicadoDe.nombre}».</strong> Si es la misma computadora, fusiónalas: esta hereda la configuración y la otra se archiva (nada se borra).
+              <div className="ie-fila">
+                <button type="button" className="if-sec" data-testid={`fusionar-${equipo.deviceKeyId}`} disabled={bloqueado} onClick={() => setConfirmar('fusionar')}>Fusionar</button>
+                <button type="button" className="if-sec" data-testid={`no-misma-${equipo.deviceKeyId}`} disabled={bloqueado} onClick={() => void noEsLaMisma()}>No es la misma</button>
+              </div>
+            </div>
+          )}
+          <label className="if-campo ie-nombre">
+            <span>Nombre de la PC</span>
+            <input type="text" value={nombre} maxLength={60} disabled={bloqueado} data-testid={`nombre-${equipo.deviceKeyId}`} onChange={(e) => setNombre(e.target.value)} />
+          </label>
+          <dl className="ie-datos" data-testid={`datos-${equipo.deviceKeyId}`}>
+            <div><dt>IP en el local</dt><dd>{equipo.ipLocal?.length ? equipo.ipLocal.join(', ') : '—'}</dd></div>
+            <div><dt>IP pública</dt><dd>{equipo.ipPublica ?? '—'}</dd></div>
+            <div><dt>Programa</dt><dd>{equipo.version ? `versión ${equipo.version}` : '—'}</dd></div>
+            <div><dt>Computadora</dt><dd>{[equipo.hostname, equipo.sistema].filter(Boolean).join(' · ') || '—'}</dd></div>
+            <div className="ie-datos-ancho">
+              <dt>Impresoras que ve</dt>
+              <dd>
+                {equipo.candidatas.length === 0
+                  ? '—'
+                  : equipo.candidatas.map((c) => [c.nombre, c.puerto, c.driver, c.estado].filter(Boolean).join(' · ')).join(' | ')}
+              </dd>
+            </div>
+          </dl>
+          <div className="ie-fila">
+            <button type="button" className="if-sec" data-testid={`pausar-${equipo.deviceKeyId}`} disabled={bloqueado} onClick={() => void pausar()}>
+              {servidor.pausado ? 'Reanudar PC' : 'Pausar PC'}
+            </button>
+            <button type="button" className="if-sec ie-peligro" data-testid={`desvincular-${equipo.deviceKeyId}`} disabled={bloqueado} onClick={() => setConfirmar('desvincular')}>
+              Desvincular
+            </button>
+          </div>
         </div>
-      </dl>
 
-      <section className="ie-que" aria-label="¿Qué hace esta PC?">
-        <h4>¿Qué hace esta PC?</h4>
+        <div role="tabpanel" id={`ie-panel-${equipo.deviceKeyId}-ticketera`} aria-labelledby={`ie-tab-${equipo.deviceKeyId}-ticketera`} className={`ie-panel${pestana !== 'ticketera' ? ' ie-panel--oculto' : ''}`}>
+          <Interruptor id={`sw-ticketera-${equipo.deviceKeyId}`} texto="Ticketera" ayuda="Imprime tickets y comandas de papel" activo={borrador.ticketera} deshabilitado={bloqueado} alCambiar={() => cambiar({ ticketera: !borrador.ticketera })} />
+          {borrador.ticketera && (
+            <div className="ie-sub">
+              <div className="ie-grid2">
+                <Interruptor id={`sw-pago-${equipo.deviceKeyId}`} texto="Ticket de pago" activo={borrador.ticketPago} deshabilitado={bloqueado} alCambiar={() => cambiar({ ticketPago: !borrador.ticketPago })} />
+                <Interruptor id={`sw-salon-${equipo.deviceKeyId}`} texto="Comanda de salón" activo={borrador.comandaSalon} deshabilitado={bloqueado} alCambiar={() => cambiar({ comandaSalon: !borrador.comandaSalon })} />
+              </div>
+              <Chips id={`chips-comanda-${equipo.deviceKeyId}`} titulo="Comandas de área: elige las áreas" areas={areas} marcadas={borrador.comandaAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ comandaAreas: alternarArea(borrador.comandaAreas, id) })} />
+              {selector('TICKETERA')}
+            </div>
+          )}
+        </div>
 
-        <Interruptor id={`sw-ticketera-${equipo.deviceKeyId}`} texto="Ticketera" ayuda="Imprime tickets y comandas de papel" activo={borrador.ticketera} deshabilitado={bloqueado} alCambiar={() => cambiar({ ticketera: !borrador.ticketera })} />
-        {borrador.ticketera && (
-          <div className="ie-sub">
-            <Interruptor id={`sw-pago-${equipo.deviceKeyId}`} texto="Ticket de pago" activo={borrador.ticketPago} deshabilitado={bloqueado} alCambiar={() => cambiar({ ticketPago: !borrador.ticketPago })} />
-            <Interruptor id={`sw-salon-${equipo.deviceKeyId}`} texto="Comanda de salón" activo={borrador.comandaSalon} deshabilitado={bloqueado} alCambiar={() => cambiar({ comandaSalon: !borrador.comandaSalon })} />
-            <Chips id={`chips-comanda-${equipo.deviceKeyId}`} titulo="Comandas de área: elige las áreas" areas={areas} marcadas={borrador.comandaAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ comandaAreas: alternarArea(borrador.comandaAreas, id) })} />
-            {selector('TICKETERA')}
-          </div>
-        )}
+        <div role="tabpanel" id={`ie-panel-${equipo.deviceKeyId}-etiquetera`} aria-labelledby={`ie-tab-${equipo.deviceKeyId}-etiquetera`} className={`ie-panel${pestana !== 'etiquetera' ? ' ie-panel--oculto' : ''}`}>
+          <Interruptor id={`sw-etiquetera-${equipo.deviceKeyId}`} texto="Etiquetera" ayuda="Imprime stickers" activo={borrador.etiquetera} deshabilitado={bloqueado} alCambiar={() => cambiar({ etiquetera: !borrador.etiquetera })} />
+          {borrador.etiquetera && (
+            <div className="ie-sub">
+              <Chips id={`chips-sticker-area-${equipo.deviceKeyId}`} titulo="Sticker por área: elige las áreas" areas={areasSticker} marcadas={borrador.stickerAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ stickerAreas: alternarArea(borrador.stickerAreas, id) })} />
+              <Chips id={`chips-sticker-bebida-${equipo.deviceKeyId}`} titulo="Sticker de bebida (un vaso, un sticker): elige las áreas" areas={areas} marcadas={borrador.stickerBebidaAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ stickerBebidaAreas: alternarArea(borrador.stickerBebidaAreas, id) })} />
+              {borrador.stickerBebidaAreas.length > 0 && (
+                <VasosCategorias id={equipo.deviceKeyId} cfg={borrador} categorias={categorias} configsOtras={configsOtras} deshabilitado={bloqueado} alCambiar={(v) => cambiar({ stickerBebidaCategorias: v })} alCambiarPorTipo={(v) => cambiar({ stickerBebidaCategoriasPorModalidad: v ?? undefined })} />
+              )}
+              <Interruptor id={`sw-general-${equipo.deviceKeyId}`} texto="Sticker general" ayuda="Un resumen del pedido (para llevar, recoger y delivery)" activo={borrador.stickerGeneral} deshabilitado={bloqueado} alCambiar={() => cambiar({ stickerGeneral: !borrador.stickerGeneral })} />
+              {selector('ETIQUETERA')}
+              <div className="ie-grid2">
+                {borrador.stickerBebidaAreas.length > 0 && (
+                  <EditorTamano tipo="bebida" titulo="Tamaño del sticker de bebida" valor={borrador.tamanoBebida} local={tamanosLocal.bebida} deshabilitado={bloqueado} alCambiar={(v) => cambiar({ tamanoBebida: v })} alProbar={(v) => void probarTamano('bebida', v, 'tam-bebida')} />
+                )}
+                {borrador.stickerGeneral && (
+                  <EditorTamano tipo="general" titulo="Tamaño del sticker general" valor={borrador.tamanoGeneral} local={tamanosLocal.general} deshabilitado={bloqueado} alCambiar={(v) => cambiar({ tamanoGeneral: v })} alProbar={(v) => void probarTamano('general', v, 'tam-general')} />
+                )}
+              </div>
+              {cuerpoPrueba('tam-bebida')}
+              {cuerpoPrueba('tam-general')}
+            </div>
+          )}
+        </div>
 
-        <Interruptor id={`sw-etiquetera-${equipo.deviceKeyId}`} texto="Etiquetera" ayuda="Imprime stickers" activo={borrador.etiquetera} deshabilitado={bloqueado} alCambiar={() => cambiar({ etiquetera: !borrador.etiquetera })} />
-        {borrador.etiquetera && (
-          <div className="ie-sub">
-            <Chips id={`chips-sticker-area-${equipo.deviceKeyId}`} titulo="Sticker por área: elige las áreas" areas={areasSticker} marcadas={borrador.stickerAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ stickerAreas: alternarArea(borrador.stickerAreas, id) })} />
-            <Chips id={`chips-sticker-bebida-${equipo.deviceKeyId}`} titulo="Sticker de bebida (un vaso, un sticker): elige las áreas" areas={areas} marcadas={borrador.stickerBebidaAreas} deshabilitado={bloqueado} alAlternar={(id) => cambiar({ stickerBebidaAreas: alternarArea(borrador.stickerBebidaAreas, id) })} />
-            {borrador.stickerBebidaAreas.length > 0 && (
-              <VasosCategorias id={equipo.deviceKeyId} cfg={borrador} categorias={categorias} configsOtras={configsOtras} deshabilitado={bloqueado} alCambiar={(v) => cambiar({ stickerBebidaCategorias: v })} alCambiarPorTipo={(v) => cambiar({ stickerBebidaCategoriasPorModalidad: v ?? undefined })} />
-            )}
-            <Interruptor id={`sw-general-${equipo.deviceKeyId}`} texto="Sticker general" ayuda="Un resumen del pedido (para llevar, recoger y delivery)" activo={borrador.stickerGeneral} deshabilitado={bloqueado} alCambiar={() => cambiar({ stickerGeneral: !borrador.stickerGeneral })} />
-            {selector('ETIQUETERA')}
-
-            {borrador.stickerBebidaAreas.length > 0 && (
-              <EditorTamano tipo="bebida" titulo="Tamaño del sticker de bebida" valor={borrador.tamanoBebida} local={tamanosLocal.bebida} deshabilitado={bloqueado} alCambiar={(v) => cambiar({ tamanoBebida: v })} alProbar={(v) => void probarTamano('bebida', v)} />
-            )}
-            {pruebas.bebida && <span role="status" className="ie-prueba">{pruebas.bebida}</span>}
-            {borrador.stickerGeneral && (
-              <EditorTamano tipo="general" titulo="Tamaño del sticker general" valor={borrador.tamanoGeneral} local={tamanosLocal.general} deshabilitado={bloqueado} alCambiar={(v) => cambiar({ tamanoGeneral: v })} alProbar={(v) => void probarTamano('general', v)} />
-            )}
-            {pruebas.general && <span role="status" className="ie-prueba">{pruebas.general}</span>}
-          </div>
-        )}
-      </section>
+        <div role="tabpanel" id={`ie-panel-${equipo.deviceKeyId}-probar`} aria-labelledby={`ie-tab-${equipo.deviceKeyId}-probar`} className={`ie-panel${pestana !== 'probar' ? ' ie-panel--oculto' : ''}`} data-testid={`probar-${equipo.deviceKeyId}`}>
+          <p className="if-sub">Cada prueba sale SOLO en esta PC y dice «PRUEBA — no es un pedido»: no cuenta como venta. Se prueba lo que tienes marcado (guarda antes si acabas de cambiarlo).</p>
+          {!hayAlgoQueProbar && <p className="ie-aviso ie-aviso--gris">Esta PC no tiene nada activo que probar. Marca qué imprime en «Ticketera» o «Etiquetera».</p>}
+          {borrador.ticketera && (
+            <section className="ie-probar-grupo">
+              <h5>Ticketera</h5>
+              <div className="ie-fila">
+                {probarBtn('probar-TICKETERA', borrador.ticketPago ? 'Probar ticket de pago' : hayComanda ? 'Probar comanda' : 'Probar ticketera', () => void probarRol('TICKETERA'))}
+                {borrador.ticketPago && hayComanda && probarBtn('probar-comanda', 'Probar comanda', () => void probarRol('TICKETERA'))}
+                {ver('ticket')}
+              </div>
+              {cuerpoPrueba('TICKETERA')}
+              {previa === 'ticket' && <VistaPreviaSticker tipo="ticket" tamano={tamGeneral} />}
+            </section>
+          )}
+          {borrador.etiquetera && (
+            <section className="ie-probar-grupo">
+              <h5>Etiquetera</h5>
+              <div className="ie-fila">
+                {(hayStickerArea || (!hayBebida && !borrador.stickerGeneral)) && probarBtn('probar-ETIQUETERA', hayStickerArea ? 'Probar sticker de área' : 'Probar etiquetera', () => void probarRol('ETIQUETERA'))}
+                {hayBebida && probarBtn('probar-bebida', 'Probar sticker de bebida', () => void probarTamano('bebida', borrador.tamanoBebida))}
+                {borrador.stickerGeneral && probarBtn('probar-general', 'Probar sticker general', () => void probarTamano('general', borrador.tamanoGeneral))}
+              </div>
+              {cuerpoPrueba('ETIQUETERA')}
+              {cuerpoPrueba('bebida')}
+              {cuerpoPrueba('general')}
+              <div className="ie-fila">
+                {hayStickerArea && ver('area')}
+                {hayBebida && ver('bebida')}
+                {borrador.stickerGeneral && ver('general')}
+              </div>
+              {previa && previa !== 'ticket' && <VistaPreviaSticker key={previa} tipo={previa} tamano={previa === 'bebida' ? tamBebida : tamGeneral} />}
+            </section>
+          )}
+        </div>
+      </div>
 
       <footer className="ie-acciones">
         <button type="button" className="if-grande" data-testid={`guardar-${equipo.deviceKeyId}`} disabled={bloqueado || (!sucio && !nueva)} onClick={() => void guardar()}>
@@ -502,14 +661,14 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
         <button type="button" className="if-sec" data-testid={`general-${equipo.deviceKeyId}`} disabled={bloqueado} onClick={() => setConfirmar('general')}>
           Usar lo general
         </button>
-        <button type="button" className="if-sec" data-testid={`pausar-${equipo.deviceKeyId}`} disabled={bloqueado} onClick={() => void pausar()}>
-          {servidor.pausado ? 'Reanudar PC' : 'Pausar PC'}
-        </button>
-        <button type="button" className="if-sec ie-peligro" data-testid={`desvincular-${equipo.deviceKeyId}`} disabled={bloqueado} onClick={() => setConfirmar('desvincular')}>
-          Desvincular
-        </button>
+        {alCancelar && (
+          <button type="button" className="if-sec" data-testid={`cancelar-${equipo.deviceKeyId}`} onClick={pedirCerrar}>
+            Cancelar
+          </button>
+        )}
+        {sucio && <span className="ie-sucio" role="status" data-testid={`sucio-${equipo.deviceKeyId}`}>Hay cambios sin guardar</span>}
+        {!puedeEditar && <span className="if-sub">Solo quien tiene permiso de configuración puede cambiar esto.</span>}
       </footer>
-      {!puedeEditar && <p className="if-sub">Solo quien tiene permiso de configuración puede cambiar esto.</p>}
 
       <Confirmar
         abierto={confirmar === 'general'}
@@ -529,6 +688,34 @@ export function TarjetaEquipo({ equipo, areas, categorias = [], configsOtras = [
         alConfirmar={() => void desvincular()}
         alCancelar={() => setConfirmar(null)}
       />
+      <Confirmar
+        abierto={confirmar === 'fusionar'}
+        titulo="Fusionar con la otra PC"
+        mensaje={`«${nombrePc}» hereda la configuración de «${duplicadoDe?.nombre ?? ''}» y esa queda archivada. Nada se borra.`}
+        textoSi="Sí, fusionar"
+        textoNo="No"
+        alConfirmar={() => void fusionar()}
+        alCancelar={() => setConfirmar(null)}
+      />
+      <Confirmar
+        abierto={confirmar === 'descartar'}
+        titulo="Hay cambios sin guardar"
+        mensaje="Si cierras ahora, se pierden los cambios de esta computadora."
+        textoSi="Sí, descartar"
+        textoNo="Seguir editando"
+        peligro
+        alConfirmar={() => { setConfirmar(null); alCancelar?.(); }}
+        alCancelar={() => setConfirmar(null)}
+      />
     </article>
+  );
+
+  if (!alCancelar) return articulo;
+  return (
+    <div className="ie-fondo" onMouseDown={(e) => { if (e.target === e.currentTarget) pedirCerrar(); }}>
+      <div ref={raiz} tabIndex={-1} className="ie-modal" role="dialog" aria-modal="true" aria-labelledby={`ie-t-${equipo.deviceKeyId}`} data-testid={`modal-${equipo.deviceKeyId}`}>
+        {articulo}
+      </div>
+    </div>
   );
 }

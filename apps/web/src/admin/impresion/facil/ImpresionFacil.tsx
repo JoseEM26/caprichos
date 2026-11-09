@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { TAMANO_BEBIDA_DEFECTO, TAMANO_GENERAL_DEFECTO, type EstadoAdminImpresion, type RolImpresora } from '@caprichos/compartido';
+import { TAMANO_BEBIDA_DEFECTO, TAMANO_GENERAL_DEFECTO, type EstadoAdminImpresion } from '@caprichos/compartido';
 import { useSesion } from '../../../comun/sesion';
 import { useEventos } from '../../../comun/socket';
 import { Cargando } from '../../../comun/Cargando';
@@ -9,7 +9,9 @@ import { ListaTrabajos, type PestanaMaquina } from '../ListaTrabajos';
 import { ColaImpresion } from '../ColaImpresion';
 import { PanelInstalarPrograma } from '../PanelInstalarPrograma';
 import { TarjetaEquipo } from './TarjetaEquipo';
+import { TarjetaCompacta } from './TarjetaCompacta';
 import { esNueva, ordenarEquipos } from './logicaEquipo';
+import { contadorEquipos, equiposDelListado } from './logicaListado';
 import { VistaPieza } from '../mapa/VistaPiezaEjemplo';
 import {
   ATAJOS,
@@ -25,11 +27,12 @@ import {
 } from './logicaFacil';
 import '../mapa/mapa-impresion.css';
 import './impresion-facil.css';
+import './listado-equipos.css';
 
 /**
- * Configuración › Impresión en 3 pasos: tus computadoras, qué se imprime y probar.
- * Cada computadora se configura por separado (qué imprime, de qué áreas, con qué tamaño); las reglas del local solo
- * son el punto de partida sugerido («Usar lo general») y el CUÁNDO (en mesa, llevar, delivery).
+ * Configuración › Impresión: una tarjeta compacta por computadora (su configuración completa, en una ventana), las reglas
+ * generales del local en un card aparte y plegado, y lo último que se imprimió. Cada computadora se prueba por separado.
+ * Las reglas del local son el punto de partida («Usar lo general») y el CUÁNDO (en mesa, llevar, delivery) de cada pieza.
  */
 export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => void }) {
   const { tiene, usuario } = useSesion();
@@ -44,6 +47,7 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [instalar, setInstalar] = useState(false);
+  const [abierta, setAbierta] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -93,6 +97,9 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
     [estado],
   );
   const nuevas = detalles.filter((d) => esNueva(d));
+  const listado = useMemo(() => equiposDelListado(equiposOrdenados), [equiposOrdenados]);
+  const areasSimples = useMemo(() => mapa?.areas.map((a) => ({ id: a.id, nombre: a.nombre })) ?? [], [mapa]);
+  const equipoAbierto = listado.items.find((i) => i.equipo.deviceKeyId === abierta) ?? null;
 
   if (cargando && !mapa) return <Cargando mensaje="Consultando tus computadoras de impresión..." />;
 
@@ -141,39 +148,47 @@ export function ImpresionFacil({ alVistaAvanzada }: { alVistaAvanzada: () => voi
         </div>
       )}
 
-      {/* PASO 1 */}
+      {/* TUS COMPUTADORAS */}
       <section className="if-paso" aria-labelledby="if-p1" data-testid="paso-1" data-cfg-id="impresion-paso-computadoras" tabIndex={-1}>
-        <h3 id="if-p1">
-          <span className="if-num" aria-hidden="true">1</span> Tus computadoras
-        </h3>
-        <p className="if-sub">Cada computadora con el programa de impresión aparece aquí sola. Elige qué hace cada una; puedes hacerlo sin estar en el local.</p>
-        {equiposOrdenados.length === 0 && <p className="if-vacio">Todavía no hay ninguna computadora. Pulsa «Agregar otra computadora».</p>}
-        <div className="if-pcs ie-pcs">
-          {equiposOrdenados.map((det) => (
-            <TarjetaEquipo
-              key={det.deviceKeyId}
-              equipo={det}
-              areas={mapa?.areas.map((a) => ({ id: a.id, nombre: a.nombre })) ?? []}
-              categorias={mapa?.categorias ?? []}
-              configsOtras={equiposOrdenados.filter((o) => o.deviceKeyId !== det.deviceKeyId).map((o) => o.config).filter((c): c is NonNullable<typeof c> => !!c)}
-              tamanosLocal={estado?.tamanosLocal ?? { bebida: TAMANO_BEBIDA_DEFECTO, general: TAMANO_GENERAL_DEFECTO }}
-              puedeEditar={puedeEditar}
-              pendientes={det.pendientes}
-              alRecargar={() => void cargar()}
-              alAviso={(tipo, texto) => setAviso({ tipo, texto })}
-            />
+        <div className="if-cab">
+          <div>
+            <h3 id="if-p1">Tus computadoras</h3>
+            <p className="if-sub" data-testid="contador-pcs">{contadorEquipos(listado.items.map((i) => i.equipo))}</p>
+          </div>
+          <button type="button" className="if-sec" data-testid="agregar-pc" onClick={() => setInstalar(true)}>
+            + Agregar computadora
+          </button>
+        </div>
+        {listado.items.length === 0 && <p className="if-vacio">Todavía no hay ninguna computadora. Pulsa «Agregar computadora».</p>}
+        <div className="ic-grilla" data-testid="lista-pcs">
+          {listado.items.map(({ equipo, duplicadoDe }) => (
+            <TarjetaCompacta key={equipo.deviceKeyId} equipo={equipo} areas={areasSimples} duplicadoDe={duplicadoDe} alAbrir={() => setAbierta(equipo.deviceKeyId)} />
           ))}
         </div>
-        <button type="button" className="if-grande" data-testid="agregar-pc" onClick={() => setInstalar(true)}>
-          + Agregar otra computadora
-        </button>
+        {listado.ocultas > 0 && <p className="if-sub" data-testid="pcs-ocultas">{listado.ocultas === 1 ? 'Hay 1 computadora antigua guardada' : `Hay ${listado.ocultas} computadoras antiguas guardadas`} (repetidas o reemplazadas): no se muestran aquí y nada se borró. Están en la Vista avanzada.</p>}
       </section>
+      {equipoAbierto && (
+        <TarjetaEquipo
+          key={equipoAbierto.equipo.deviceKeyId}
+          equipo={equipoAbierto.equipo}
+          areas={areasSimples}
+          categorias={mapa?.categorias ?? []}
+          configsOtras={listado.items.filter((o) => o.equipo.deviceKeyId !== abierta).map((o) => o.equipo.config).filter((c): c is NonNullable<typeof c> => !!c)}
+          tamanosLocal={estado?.tamanosLocal ?? { bebida: TAMANO_BEBIDA_DEFECTO, general: TAMANO_GENERAL_DEFECTO }}
+          puedeEditar={puedeEditar}
+          pendientes={equipoAbierto.equipo.pendientes}
+          duplicadoDe={equipoAbierto.duplicadoDe}
+          alRecargar={() => void cargar()}
+          alAviso={(tipo, texto) => setAviso({ tipo, texto })}
+          alCancelar={() => setAbierta(null)}
+        />
+      )}
 
-      {/* PASO 2 */}
+      {/* REGLAS GENERALES (card aparte, plegado) */}
       {mapa && <PasoQueSeImprime mapa={mapa} puedeEditar={puedeEditar} guardando={guardando} alGuardar={guardarReglas} />}
 
-      {/* PASO 3 */}
-      <PasoProbar mapa={mapa} estado={estado} trabajos={trabajos} puedeEditar={puedeEditar} alCambiar={() => void cargar()} />
+      {/* ÚLTIMAS IMPRESIONES */}
+      <PasoUltimos mapa={mapa} trabajos={trabajos} puedeEditar={puedeEditar} alCambiar={() => void cargar()} />
 
       <p className="if-avanzada">
         <button type="button" className="if-enlace" data-testid="vista-avanzada" onClick={alVistaAvanzada}>
@@ -203,11 +218,13 @@ function PasoQueSeImprime({
   const [atajo, setAtajo] = useState<string | null>(null);
   const elegido = ATAJOS.find((a) => a.id === atajo) ?? null;
   return (
-    <section className="if-paso" aria-labelledby="if-p2" data-testid="paso-2" data-cfg-id="impresion-paso-que-se-imprime" tabIndex={-1}>
-      <h3 id="if-p2">
-        <span className="if-num" aria-hidden="true">2</span> Reglas generales del local
-      </h3>
-      <p className="if-sub">Las reglas del local: sirven de punto de partida para una PC nueva («Usar lo general») y dicen en qué tipo de pedido sale cada cosa. Lo que imprime cada PC lo decide su propia tarjeta de arriba.</p>
+    <section className="if-paso if-reglas" aria-labelledby="if-p2" data-testid="paso-2" data-cfg-id="impresion-paso-que-se-imprime" tabIndex={-1}>
+     <details data-testid="reglas-plegado">
+      <summary>
+        <h3 id="if-p2">Reglas generales del local</h3>
+        <span className="if-sub">Punto de partida para PC nuevas y en qué tipo de pedido sale cada cosa</span>
+      </summary>
+      <p className="if-sub">Sirven para dos cosas: son lo que copia una PC cuando pulsas «Usar lo general», y dicen en qué tipo de pedido (en mesa, para llevar, delivery) sale cada papel. Qué papeles y de qué áreas imprime cada computadora lo decide su propia configuración.</p>
 
       <div className="if-atajos" role="group" aria-label="Atajos">
         {ATAJOS.map((a) => (
@@ -264,6 +281,7 @@ function PasoQueSeImprime({
         }}
         alCancelar={() => setAtajo(null)}
       />
+     </details>
     </section>
   );
 }
@@ -340,54 +358,23 @@ function FilaTabla({
   );
 }
 
-function PasoProbar({
+function PasoUltimos({
   mapa,
-  estado,
   trabajos,
   puedeEditar,
   alCambiar,
 }: {
   mapa: MapaImpresionDatos | null;
-  estado: EstadoAdminImpresion | null;
   trabajos: TrabajoImpresionAdmin[];
   puedeEditar: boolean;
   alCambiar: () => void;
 }) {
-  const [resultados, setResultados] = useState<string[] | null>(null);
-  const [probando, setProbando] = useState(false);
   const [aReintentar, setAReintentar] = useState<TrabajoImpresionAdmin | null>(null);
   const [errorReintento, setErrorReintento] = useState<string | null>(null);
   const [pestana, setPestana] = useState<PestanaMaquina>('TODO');
   const [verCola, setVerCola] = useState(false);
   const { tiene, usuario } = useSesion();
   const puedeReimprimir = (usuario?.rol || '').toUpperCase() === 'ADMIN' || tiene('pedidos/cambiar_estado');
-
-  const probarTodo = async () => {
-    if (!mapa) return;
-    setProbando(true);
-    const out: string[] = [];
-    for (const eq of mapa.equipos) {
-      const det = estado?.equipos?.find((x) => x.deviceKeyId === eq.deviceKeyId);
-      for (const rol of eq.maquinas as RolImpresora[]) {
-        const que = rol === 'TICKETERA' ? 'ticket' : 'sticker';
-        const impresoraId = det?.impresoras?.[rol]?.impresoraId;
-        if (!impresoraId) {
-          out.push(`${eq.nombre}: no elegiste impresora de ${rol === 'TICKETERA' ? 'tickets' : 'stickers'}, no se probó.`);
-          continue;
-        }
-        try {
-          await impresionApi.pruebaImpresion(rol, impresoraId, eq.deviceKeyId);
-          out.push(`${eq.nombre}: prueba de ${que} enviada.`);
-        } catch (err: any) {
-          out.push(`${eq.nombre}: no se pudo probar el ${que}. ${err?.message ?? ''}`.trim());
-        }
-      }
-    }
-    if (out.length === 0) out.push('No hay impresoras que probar. Agrega una computadora primero.');
-    setResultados(out);
-    setProbando(false);
-    alCambiar();
-  };
 
   const reintentar = async () => {
     const t = aReintentar;
@@ -410,22 +397,8 @@ function PasoProbar({
 
   return (
     <section className="if-paso" aria-labelledby="if-p3" data-testid="paso-3" data-cfg-id="impresion-paso-probar" tabIndex={-1}>
-      <h3 id="if-p3">
-        <span className="if-num" aria-hidden="true">3</span> Probar
-      </h3>
-      <p className="if-sub">Imprime una hoja de prueba en cada impresora. Dice «PRUEBA — no es un pedido»: no cuenta como venta.</p>
-      <button type="button" className="if-grande" data-testid="probar-todo" disabled={!puedeEditar || probando || !mapa} onClick={() => void probarTodo()}>
-        {probando ? 'Enviando pruebas…' : 'Imprimir una prueba en cada impresora'}
-      </button>
-      {resultados && (
-        <ul className="if-resultados" role="status" data-testid="resultados-prueba">
-          {resultados.map((x) => (
-            <li key={x}>{x}</li>
-          ))}
-        </ul>
-      )}
-
-      <h4 className="if-lista-t">Lo último que se imprimió</h4>
+      <h3 id="if-p3">Lo último que se imprimió</h3>
+      <p className="if-sub">Para probar una impresora, abre su computadora y entra en «Probar»: cada una tiene sus propias pruebas.</p>
       {errorReintento && (
         <div role="alert" className="if-alerta if-alerta--rojo">
           {errorReintento}

@@ -86,7 +86,7 @@ function PrimitivaSvg({ p }: { p: Primitiva }) {
   return null; // 'inverso' se dibuja aparte, debajo de lo invertido
 }
 
-export function EtiquetaSvg({ maqueta, etiqueta }: { maqueta: Maqueta; etiqueta: string }) {
+export function EtiquetaSvg({ maqueta, etiqueta, zoom = 1 }: { maqueta: Maqueta; etiqueta: string; zoom?: number }) {
   const { W, H, primitivas } = maqueta;
   return (
     <svg
@@ -94,7 +94,7 @@ export function EtiquetaSvg({ maqueta, etiqueta }: { maqueta: Maqueta; etiqueta:
       role="img"
       aria-label={`Vista previa de la etiqueta ${etiqueta}`}
       data-maqueta={`${W}x${H}`}
-      style={{ display: 'block', width: '100%', maxWidth: W / 2, aspectRatio: `${W} / ${H}`, background: '#fff', border: '1px solid #d8d8d8' }}
+      style={{ display: 'block', width: '100%', maxWidth: (W / 2) * zoom, aspectRatio: `${W} / ${H}`, background: '#fff', border: '1px solid #d8d8d8' }}
     >
       <rect width={W} height={H} fill="#fff" />
       {primitivas.map((p, i) => p.t === 'inverso' && <rect key={`i${i}`} x={p.x} y={p.y} width={p.w} height={p.h} fill="#000" />)}

@@ -163,4 +163,4 @@ export function VistaPieza({ clave }: { clave: ClavePieza }) {
 }
 
 /** Datos de ejemplo para la vista previa por PC (mismos del Mapa). */
-export { GENERAL as MUESTRA_GENERAL, BEBIDA as MUESTRA_BEBIDA };
+export { GENERAL as MUESTRA_GENERAL, BEBIDA as MUESTRA_BEBIDA, AREA as MUESTRA_AREA, PAGO as MUESTRA_PAGO, VARIANTES_PAGO };
