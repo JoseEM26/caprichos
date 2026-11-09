@@ -32,7 +32,7 @@ export class CierreController {
 
   /**
    * 1) Arqueo ciego: registra el conteo físico por billetes, monedas y medios digitales.
-   * La respuesta es ciega: únicamente entrega { resultado: 'CUADRA'|'NO_CUADRA', intento: n }.
+   * Registro informativo (no cuenta intentos ni bloquea el cierre): entrega { resultado: 'CUADRA'|'NO_CUADRA', intento: n }.
    */
   @Post('arqueo')
   @Permiso('caja', 'cerrar')
@@ -46,7 +46,7 @@ export class CierreController {
 
   /**
    * 2) Cierre: cierra la caja del día creando cierre_caja y cierre_medio.
-   * Exige que no haya cobros en curso. Si no cuadra, exige una nota.
+   * Exige que no haya cobros en curso. Si no cuadra se cierra igual (la nota es opcional).
    */
   @Post('cerrar')
   @Permiso('caja', 'cerrar')
@@ -96,8 +96,8 @@ export class CierreController {
   }
 
   /**
-   * Montos esperados por el sistema antes de cerrar.
-   * Solo ADMIN o SUPERVISOR; el cajero cierra a ciegas.
+   * Montos esperados por el sistema antes de cerrar, con el desglose del efectivo.
+   * Lo ve quien cierra la caja (permiso caja/ver), sin código: el conteo a ciegas ya no se usa.
    */
   @Get('esperado')
   @Permiso('caja', 'ver')

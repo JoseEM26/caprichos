@@ -32,6 +32,23 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   otros: 'No cuadra',
 };
 
+/** Suma de las diferencias de todos los medios (efectivo + digitales). */
+const difTotalCierre = (medios: Array<{ diferencia: number | null }> | undefined) =>
+  Math.round((medios ?? []).reduce((t, m) => t + (m.diferencia ?? 0), 0) * 100) / 100;
+const difSigno = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}S/ ${Math.abs(n).toFixed(2)}`;
+
+/** Etiqueta «Cerrado con diferencia» (texto + color + ícono): se muestra cuando el cierre no cuadró. */
+function EtiquetaConDiferencia({ total }: { total: number }) {
+  return (
+    <span
+      data-testid="cerrado-con-diferencia"
+      style={{ display: 'inline-block', background: '#FFF3E6', color: '#B2500F', border: '1px solid #B2500F', borderRadius: 9999, padding: '2px 10px', fontSize: 12, fontWeight: 800 }}
+    >
+      <span aria-hidden="true">▲▼ </span>Cerrado con diferencia{Math.abs(total) >= 0.005 ? `: ${difSigno(total)}` : ''}
+    </span>
+  );
+}
+
 export function HistorialCierres() {
   const { usuario } = useSesion();
   const esAdmin = usuario?.rol === 'ADMIN';
@@ -250,8 +267,14 @@ export function HistorialCierres() {
                   {h.cerradaEn ? ` · cerrada a las ${horaDeCierre(h.cerradaEn)}` : ''}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--cp-navy, #0B2C3E)' }}>
-                  {h.cerradaPorNombre ?? (h.cerradaPor ? `Usuario #${h.cerradaPor}` : 'Sin dato de cajero')}
+                  Cerró: {h.cerradaPorNombre ?? (h.cerradaPor ? `Usuario #${h.cerradaPor}` : 'Sin dato de cajero')}
                 </div>
+                {h.cierre?.resultado === 'NO_CUADRA' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    <EtiquetaConDiferencia total={difTotalCierre(h.cierre.medios)} />
+                    {h.cierre.nota && <div style={{ fontSize: 12, fontStyle: 'italic', color: 'var(--cp-soft, #2C4C5D)' }}>Nota: {h.cierre.nota}</div>}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -412,6 +435,12 @@ export function HistorialCierres() {
                     <span>{detalle.resultado === 'CUADRA' ? 'Cuadrado' : 'Diferencia'}</span>
                     <span>{detalle.resultado === 'CUADRA' ? '+s/ 0.00' : `${(detalle.medios?.find((m) => m.medio.toLowerCase() === 'efectivo')?.diferencia ?? 0).toFixed(2)}`}</span>
                   </div>
+                  {detalle.resultado === 'NO_CUADRA' && (
+                    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <EtiquetaConDiferencia total={difTotalCierre(detalle.medios)} />
+                      <div style={{ fontSize: 12 }}>Hay S/ {Math.abs(difTotalCierre(detalle.medios)).toFixed(2)} de {difTotalCierre(detalle.medios) >= 0 ? 'más' : 'menos'} en total entre todos los medios.</div>
+                    </div>
+                  )}
                   <div style={{ marginTop: 8 }}>
                     <ListaCorrecciones ajustes={detalle.ajustesMedio ?? []} titulo="Correcciones de medios digitales" />
                   </div>

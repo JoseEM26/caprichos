@@ -14,7 +14,6 @@ import { CobrosService } from '../caja/cobros.service';
 import { PuntosService } from '../clientes/puntos.service';
 import { CobrarDto } from '../caja/dto/cobrar.dto';
 import { UsuarioAutenticado } from '../acceso/acceso.tipos';
-import { rolesDelUsuario } from '../acceso/roles-usuario';
 import {
   ClienteCaja,
   MontosSistema,
@@ -43,12 +42,6 @@ import {
 import { nombresDePartes, salidaDevolucion } from '../pedidos-admin/devolucion-pedido.util';
 import { sumarAjustesCambioDigitales } from '../pedidos-admin/cambio-ubicacion.util';
 import { cerrarValidarPagoDePedido } from '../chatbot/conversacion/validar-pago-salida.util';
-
-/**
- * Arqueos que NO cuadraron antes de exigir PIN de supervisor. Un arqueo que cuadra no suma.
- * Los intentos se numeran todos (incluidos los que cuadran); solo los NO_CUADRA cuentan para el PIN.
- */
-const ARQUEOS_NO_CUADRA_PARA_NOTA = 3;
 
 /** Diferencia por medio en céntimos (visto − sistema). Cuadra si todas son cero. */
 function compararConSistema(
@@ -513,8 +506,8 @@ export class CierreService {
   /**
    * Cierra la caja del día.
    * Crea cierre_caja (inmutable) y cierre_medio por medio.
-   * Exige que no haya cobros en curso.
-   * Si no cuadra o tras 3 arqueos que no cuadraron, exige una nota explicativa.
+   * Exige que no haya cobros en curso ni repartidores sin liquidar.
+   * NO se bloquea por diferencia: si no cuadra, se cierra igual y la nota explicativa es opcional.
    */
   async cerrar(
     dto: CerrarCajaDto,
@@ -559,70 +552,46 @@ export class CierreService {
         );
       }
 
-      // 3. Conteo y medios: del body o del último intento registrado
-      let conteo = dto.conteo;
-      let medios = dto.medios;
-
-      const conteosCaja = await tx.conteoCierre.findMany({
-        where: { caja_id: caja.id },
-        orderBy: { intento: 'desc' },
-      });
-
-      if (!conteo || !medios) {
-        if (conteosCaja.length === 0) {
-          throw new HttpException(
-            {
-              codigo: 'ARQUEO_REQUERIDO',
-              mensaje: 'Debe realizar el arqueo ciego antes de cerrar la caja.',
-            },
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-        conteo = conteo ?? (conteosCaja[0].conteo as any);
-        medios = medios ?? (conteosCaja[0].medios as any);
+      // 3. Conteo y medios: lo que trae el cierre. El arqueo previo (si existe) es solo informativo:
+      // no cuenta intentos ni bloquea. El efectivo viene por denominación (conteo) o como total directo.
+      const conteo: Record<string, number> = { ...(dto.conteo ?? {}) };
+      const hayConteo = Object.keys(conteo).length > 0;
+      const totalDirecto = dto.efectivoTotal;
+      if (totalDirecto !== undefined && totalDirecto !== null && !esCentimosValidos(totalDirecto)) {
+        throw new HttpException(
+          { codigo: 'MONTO_INVALIDO', mensaje: 'El efectivo total admite como máximo dos decimales.' },
+          HttpStatus.BAD_REQUEST,
+        );
       }
+      const usaTotalDirecto = !hayConteo && totalDirecto !== undefined && totalDirecto !== null;
+      if (usaTotalDirecto) conteo['total_directo'] = totalDirecto;
 
       const montos = await this.montosCierre(tx, caja);
-      // Digitales: el valor es el del sistema o el del último ajuste aprobado (nunca lo que teclee el navegador).
-      // Si el navegador manda un monto distinto de ese, se rechaza: la corrección pasa por «Corregir» con motivo.
+      // Digitales: lo que el usuario vio en su app o POS. Si no lo escribió, vale el del sistema (o su última
+      // corrección aprobada): ese medio queda sin diferencia. Un monto distinto ya no bloquea: queda como diferencia.
       const aceptados = digitalesAceptados(montos, await this.ajustesVigentes(tx, caja.id));
-      for (const m of MEDIOS_DIGITALES) {
-        const clave = CLAVE_DIGITAL[m];
+      const visto = (clave: ClaveDigital) => {
         const enviado = dto.medios?.[clave];
-        if (enviado !== undefined && enviado !== null && aCentimos(enviado) !== aCentimos(aceptados[clave])) {
+        return enviado === undefined || enviado === null ? aceptados[clave] : Number(enviado);
+      };
+      for (const clave of Object.values(CLAVE_DIGITAL)) {
+        if (!esCentimosValidos(visto(clave))) {
           throw new HttpException(
-            {
-              codigo: 'AJUSTE_REQUERIDO',
-              mensaje: `El monto de ${m.charAt(0)}${m.slice(1).toLowerCase()} no coincide con el sistema ni con una corrección aprobada. Corrígelo con «Corregir» (con motivo) antes de cerrar.`,
-            },
-            HttpStatus.CONFLICT,
+            { codigo: 'MONTO_INVALIDO', mensaje: 'Los montos admiten como máximo dos decimales.' },
+            HttpStatus.BAD_REQUEST,
           );
         }
       }
       const vistos = {
-        efectivo: calcularTotalConteo(conteo),
-        yape: aceptados.yape,
-        plin: aceptados.plin,
-        transferencia: aceptados.transferencia,
-        tarjeta: aceptados.tarjeta,
+        efectivo: usaTotalDirecto ? Number(totalDirecto) : calcularTotalConteo(conteo),
+        yape: visto('yape'),
+        plin: visto('plin'),
+        transferencia: visto('transferencia'),
+        tarjeta: visto('tarjeta'),
       };
+      // El resultado se guarda tal cual (CUADRA / NO_CUADRA) para auditoría y reportes; la diferencia NUNCA bloquea.
       const comparacion = compararConSistema(vistos, montos);
-      const { resultado, cuadra } = comparacion;
-
-      // Si no cuadra o ya hubo 3 arqueos que no cuadraron, se exige la nota explicativa
-      const noCuadraPrevios = conteosCaja.filter((c) => c.resultado === 'NO_CUADRA').length;
-      if (!cuadra || noCuadraPrevios >= ARQUEOS_NO_CUADRA_PARA_NOTA) {
-        if (!dto.nota || typeof dto.nota !== 'string' || dto.nota.trim().length < 3) {
-          throw new HttpException(
-            {
-              codigo: 'NOTA_REQUERIDA',
-              mensaje:
-                'Se requiere una nota explicativa de al menos 3 caracteres para cerrar la caja con diferencias.',
-            },
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-      }
+      const { resultado } = comparacion;
 
       // Dinero pagado que no pasó por «cobrar» (confirmaciones de antes de esta versión): no se cierra a ciegas.
       // No bloquea (Caja no tiene cómo cobrarlo de nuevo; lo regulariza el administrador con «conciliar-cobros»),
@@ -654,7 +623,7 @@ export class CierreService {
           caja_id: caja.id,
           conteo: conteo as any,
           resultado,
-          nota: dto.nota?.trim() ?? null,
+          nota: dto.nota?.trim() || null,
         },
       });
 
@@ -679,10 +648,10 @@ export class CierreService {
         },
       });
 
-      return { caja, resultado, mediosData };
+      return { caja, resultado, mediosData, diferenciaTotal: enPesos(mediosData.reduce((t, m) => t + aCentimos(m.diferencia), 0)) };
     });
 
-    const { caja, resultado, mediosData } = cierre;
+    const { caja, resultado, mediosData, diferenciaTotal } = cierre;
 
     await this.auditoria.registrar({
       categoria: 'CAMBIO',
@@ -693,7 +662,8 @@ export class CierreService {
       entidadId: caja.id,
       despues: {
         resultado,
-        nota: dto.nota?.trim() ?? null,
+        diferenciaTotal,
+        nota: dto.nota?.trim() || null,
         ...(pagosSinCobro.length ? { pagos_sin_cobro: pagosSinCobro } : {}),
       },
       partyId: usuario.partyId,
@@ -713,25 +683,19 @@ export class CierreService {
       cajaId: Number(caja.id),
       fecha: caja.fecha,
       resultado,
-      nota: dto.nota?.trim() ?? null,
-      // El cajero no ve el esperado ni la diferencia (DT-61)
-      medios: usuario.rol === 'ADMIN' ? mediosData : undefined,
+      nota: dto.nota?.trim() || null,
+      diferenciaTotal,
+      // Quien cierra ve el esperado y la diferencia: el conteo a ciegas ya no se usa
+      medios: mediosData,
     };
   }
 
   /**
    * Montos esperados por el sistema y el turno (cobros y movimientos) de la caja ABIERTA, sea del día que sea.
-   * Solo ADMIN o SUPERVISOR (cierre ciego para cajeros): sin eso no sale ningún monto.
+   * Lo ve quien cierra la caja (permiso caja/ver), sin código: el conteo a ciegas ya no se usa.
    */
-  async obtenerEsperado(usuario: UsuarioAutenticado) {
+  async obtenerEsperado(_usuario?: UsuarioAutenticado) {
     const caja = await this.obtenerCajaAbierta();
-    // ADMIN y SUPERVISOR lo ven directo; el cajero cierra a ciegas (RQ-CIE-02-05, HU-CAP-199)
-    if (!rolesDelUsuario(usuario).some((r) => r === 'ADMIN' || r === 'SUPERVISOR')) {
-      throw new HttpException(
-        { codigo: 'ESPERADO_RESERVADO', mensaje: 'El monto esperado lo ve el administrador o el supervisor.' },
-        HttpStatus.FORBIDDEN,
-      );
-    }
     const montos = await this.calcularMontosSistema(caja.id);
     // Mismos cobros y movimientos que la caja de hoy, pero de la caja que se cierra: totales y listas cuadran
     const cobros = await this.prisma.cobro.findMany({
@@ -742,6 +706,13 @@ export class CierreService {
       where: { caja_id: caja.id },
       orderBy: { id: 'asc' },
     });
+
+    // Vueltos entregados en efectivo (informativo: el monto cobrado ya es neto de vuelto)
+    const vueltos = cobros
+      .filter((c) => !c.anulado_en)
+      .flatMap((c) => c.pagos)
+      .filter((p) => (p.medio || '').trim().toUpperCase() === 'EFECTIVO')
+      .reduce((t, p) => t + aCentimos((p as { vuelto?: unknown }).vuelto), 0);
 
     return {
       cajaId: Number(caja.id),
@@ -768,6 +739,19 @@ export class CierreService {
         ingresos: montos.ingresos,
         egresos: montos.egresos,
         liquidadoRepartidores: montos.liquidadoEfectivo,
+        // Efectivo en lenguaje llano: apertura + cobros en efectivo (con propinas, ya netos de vuelto)
+        // + efectivo de repartidores + ingresos − egresos = esperado
+        apertura: Number(caja.apertura),
+        cobrosEfectivo: enPesos(aCentimos(montos.ventasEfectivo) + aCentimos(montos.propinasEfectivo)),
+        vueltos: enPesos(vueltos),
+        esperado: montos.esperadoEfectivo,
+        porMedio: {
+          efectivo: montos.esperadoEfectivo,
+          yape: montos.sistemaYape,
+          plin: montos.sistemaPlin,
+          transferencia: montos.sistemaTransferencia,
+          tarjeta: montos.sistemaTarjeta,
+        },
       },
     };
   }

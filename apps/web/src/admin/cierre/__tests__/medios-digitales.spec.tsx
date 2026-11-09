@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { CierreView } from '../CierreView';
 import { HistorialCierres } from '../HistorialCierres';
+import { reiniciarBorradores } from '../cuadre.util';
 import { cierreApi, AjusteMedio, DigitalesCaja } from '../cierreApi';
 import { pedidosApi } from '../../pedidos/pedidosApi';
 import * as sesionModulo from '../../../comun/sesion';
@@ -50,6 +51,7 @@ const ajuste: AjusteMedio = {
 describe('cierre: medios digitales calculados por el sistema', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    reiniciarBorradores();
     vi.spyOn(pedidosApi, 'obtenerCajaActual').mockResolvedValue({
       abierta: true,
       caja: { id: 10, estado: 'ABIERTA', apertura: 50 },
@@ -73,49 +75,56 @@ describe('cierre: medios digitales calculados por el sistema', () => {
   });
 
   async function abrirConteo() {
+    // Una sola pantalla «Cuadre de caja»: ya no hay paso de verificación aparte
     fireEvent.click(await screen.findByRole('button', { name: 'Cerrar caja y cuadrar' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Ya revisé: continuar al conteo' }));
+    await screen.findByTestId('cuadre-caja');
   }
 
-  it('el modal muestra Yape, Plin, Transferencia y Tarjeta prellenados, de solo lectura y con sus cobros', async () => {
+  it('el panel muestra Yape, Plin, Transferencia y Tarjeta con el monto del sistema y el campo vacío para escribir', async () => {
     usarSesion('ADMIN');
     render(<CierreView />);
     await abrirConteo();
 
-    const yape = await screen.findByLabelText('Monto en yape');
-    expect(yape).toHaveValue('200.00');
-    expect(yape).toHaveAttribute('readonly');
-    expect(screen.getByLabelText('Monto en tarjeta')).toHaveValue('100.00');
-    expect(screen.getByLabelText('Monto en transferencia')).toHaveValue('50.00');
-    expect(screen.getAllByText('Calculado por el sistema (vouchers aprobados)')).toHaveLength(4);
-    expect(screen.getByText('2 cobros')).toBeInTheDocument();
-    expect(screen.getAllByText('1 cobro')).toHaveLength(2);
+    const yape = screen.getByTestId('digital-yape');
+    expect(yape).toHaveTextContent('Sistema S/ 200.00');
+    const campo = within(yape).getByLabelText('Lo que veo en mi app/POS');
+    expect(campo).toHaveValue('');
+    expect(screen.getByTestId('digital-tarjeta')).toHaveTextContent('Sistema S/ 100.00');
+    expect(screen.getByTestId('digital-transferencia')).toHaveTextContent('Sistema S/ 50.00');
+    expect(screen.getByTestId('digital-plin')).toHaveTextContent('Sistema S/ 0.00');
   });
 
-  it('el desglose de cada medio muestra cobrado, devoluciones en negativo y esperado', async () => {
+  it('las devoluciones del día salen informadas y el sistema ya las trae descontadas (antes: desglose cobrado/devuelto por medio)', async () => {
     usarSesion('ADMIN');
-    vi.spyOn(cierreApi, 'obtenerDigitales').mockResolvedValue({
-      ...digitales,
-      medios: { ...digitales.medios, yape: { monto: 150, sistema: 150, cobrado: 200, devuelto: -50, cobros: 1, corregido: false } },
-    });
+    vi.spyOn(cierreApi, 'obtenerEsperado').mockResolvedValue({
+      cajaId: 10,
+      fecha: `${hoy()}T00:00:00.000Z`,
+      apertura: 50,
+      efectivoEsperado: 355,
+      medios: { efectivo: 355, yape: 150, plin: 0, transferencia: 50, tarjeta: 100 },
+      desglose: { ventasEfectivo: 300, ingresos: 20, egresos: 15 },
+      cobrados: [],
+      movimientos: [],
+    } as any);
+    vi.spyOn(cierreApi, 'listarDevolucionesTurno').mockResolvedValue([
+      { id: '1', pedidoCodigo: 'PED-9', montoDevuelto: 50, medio: 'YAPE', codigoOperacion: null, motivo: null, porNombre: null, autorizadoPorNombre: null, comprobanteBajaEstado: null, creadoEn: '2026-10-21T17:00:00Z' },
+    ]);
     render(<CierreView />);
     await abrirConteo();
 
-    expect(screen.getByLabelText('Monto en yape')).toHaveValue('150.00');
-    const desglose = await screen.findByTestId('desglose-yape');
-    expect(desglose).toHaveTextContent('Cobrado: S/ 200.00');
-    expect(desglose).toHaveTextContent('Devoluciones: -S/ 50.00');
-    expect(desglose).toHaveTextContent('Esperado: S/ 150.00');
+    expect(screen.getByTestId('digital-yape')).toHaveTextContent('Sistema S/ 150.00');
+    expect(screen.getByTestId('cc-devoluciones')).toHaveTextContent('PED-9 S/ 50.00 YAPE');
+    expect(screen.getByTestId('cc-devoluciones')).toHaveTextContent('ya están descontadas');
   });
 
-  it('el cajero ve los digitales sin pedir el esperado: el efectivo sigue ciego', async () => {
+  it('el cajero también ve el esperado y el desglose del efectivo (sin código)', async () => {
     usarSesion('CAJERO');
     render(<CierreView />);
     await abrirConteo();
 
-    expect(await screen.findByLabelText('Monto en yape')).toHaveValue('200.00');
-    expect(cierreApi.obtenerEsperado).not.toHaveBeenCalled();
-    expect(screen.queryByText('Efectivo esperado', { exact: true })).not.toBeInTheDocument();
+    expect(cierreApi.obtenerEsperado).toHaveBeenCalled();
+    expect(screen.getByTestId('cc-deberia')).toHaveTextContent('S/ 355.00');
+    expect(screen.queryByLabelText(/código/i)).not.toBeInTheDocument();
   });
 
   it('corregir: el motivo es obligatorio y el cajero no escribe ningún código', async () => {
@@ -176,7 +185,7 @@ describe('cierre: medios digitales calculados por el sistema', () => {
     expect(lista).toHaveTextContent('Yape: s/ 200.00 → s/ 210.00');
     expect(lista).toHaveTextContent('Motivo: El voucher dice 210, no 200');
     expect(lista).toHaveTextContent('Hecha por Ana Cajera · aprobada por Rosa Supervisora');
-    expect(screen.getByLabelText('Monto en yape')).toHaveValue('210.00');
+    expect(screen.getByTestId('digital-yape')).toHaveTextContent('Sistema S/ 200.00');
   });
 
   it('el historial muestra en el detalle del cierre las correcciones de medios digitales', async () => {
