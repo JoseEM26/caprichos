@@ -195,6 +195,11 @@ export const catalogoApi = {
     return api.patch<ProductoAdmin>(`/admin/catalogo/productos/${id}`, data);
   },
 
+  /** Orden en que se preguntan los grupos de este producto (solo reordena; debe traer todos los del producto). */
+  async ordenarGrupos(id: string, grupoIds: string[]): Promise<{ ok: boolean; grupoIds: string[] }> {
+    return api.put(`/admin/catalogo/productos/${id}/orden-grupos`, { grupoIds });
+  },
+
   async agotarProducto(
     id: string,
     data: { alcance?: 'HOY' | 'INDEFINIDO'; agotadoHasta?: string; motivo?: string },

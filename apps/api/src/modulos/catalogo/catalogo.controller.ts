@@ -24,6 +24,7 @@ import { pngImagenInicial } from './imagen-inicial';
 import { CatalogoService } from './catalogo.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { EditarProductoDto } from './dto/editar-producto.dto';
+import { OrdenarGruposDto } from './dto/ordenar-grupos.dto';
 import { AgotarDto } from './dto/agotar.dto';
 import { ActualizarCategoriaDto, CrearCategoriaDto } from './dto/categoria.dto';
 import { FiltrarProductosDto } from './dto/filtrar-productos.dto';
@@ -122,6 +123,13 @@ export class CatalogoController {
   ) {
     const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
     return this.catalogoService.editarProducto(id, dto, req.usuario, ip);
+  }
+
+  @Put('productos/:id/orden-grupos')
+  @Permiso('catalogo', 'editar')
+  async ordenarGrupos(@Param('id') id: string, @Body() dto: OrdenarGruposDto, @Req() req: any) {
+    const ip = (req.ip || req.headers?.['x-forwarded-for']) as string | undefined;
+    return this.catalogoService.ordenarGruposProducto(id, dto.grupoIds, req.usuario, ip);
   }
 
   @Post('productos/:id/agotar')

@@ -112,3 +112,29 @@
   .eo-req { grid-template-columns: 1fr 1fr; }
   .eo-opcion { grid-template-columns: minmax(0, 1fr) 76px auto; }
 }
+
+/* Orden de las preguntas y vista previa en vivo */
+.eo-preguntas-grid { display: flex; flex-direction: column; gap: 12px; }
+.eo-preguntas-izq { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.eo-orden { background: var(--cp-white); border: 1px solid var(--cp-line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.eo-orden-cab { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.eo-orden-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.eo-orden-fila { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 1.5px solid var(--cp-line); border-radius: 12px; background: var(--cp-cream); transition: border-color .3s, background .3s, box-shadow .3s; }
+.eo-orden-fila.eo-movido { border-color: var(--cp-orange); background: var(--cp-sand); }
+.eo-orden-fila.eo-arrastrando { opacity: .6; box-shadow: 0 4px 14px rgba(11,44,62,.25); }
+.eo-orden-fila.eo-destino { border-color: var(--cp-navy); border-style: dashed; }
+.eo-asa { width: 44px; height: 44px; flex: none; border: 0; background: transparent; font-size: 22px; line-height: 1; color: var(--cp-navy); cursor: grab; touch-action: none; user-select: none; border-radius: 10px; }
+.eo-asa:active { cursor: grabbing; }
+.eo-asa:disabled { opacity: .4; cursor: not-allowed; }
+.eo-orden-num { font-size: 12px; font-weight: 800; color: var(--cp-soft); white-space: nowrap; }
+.eo-orden-nombre { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.eo-vivo-boton { width: 100%; }
+.eo-vivo-panel { display: none; flex-direction: column; gap: 8px; margin-top: 8px; }
+.eo-vivo--abierto .eo-vivo-panel { display: flex; }
+@media (min-width: 1024px) {
+  .eo-preguntas-grid { display: grid; grid-template-columns: minmax(0, 1fr) 430px; align-items: start; gap: 16px; }
+  .eo-vivo { position: sticky; top: 0; }
+  .eo-vivo-boton { display: none; }
+  .eo-vivo-panel { display: flex; margin-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .eo-orden-fila { transition: none; } }

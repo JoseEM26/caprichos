@@ -210,7 +210,7 @@ export class CatalogoService implements OnApplicationBootstrap {
               orderBy: { tamano_valor: { orden: 'asc' } },
             },
             grupos: {
-              orderBy: { orden: 'asc' },
+              orderBy: [{ orden: 'asc' }, { id: 'asc' }],
               include: {
                 grupo: {
                   include: {
@@ -429,7 +429,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           orderBy: { tamano_valor: { orden: 'asc' } },
         },
         grupos: {
-          orderBy: { orden: 'asc' },
+          orderBy: [{ orden: 'asc' }, { id: 'asc' }],
           include: {
             grupo: {
               include: {
@@ -553,6 +553,7 @@ export class CatalogoService implements OnApplicationBootstrap {
           include: { tamano_valor: true },
         },
         grupos: {
+          orderBy: [{ orden: 'asc' }, { id: 'asc' }],
           include: {
             grupo: {
               include: {
@@ -1255,6 +1256,46 @@ export class CatalogoService implements OnApplicationBootstrap {
     });
 
     return { ok: true, id: pId.toString(), oculto: true };
+  }
+
+  /**
+   * Orden en que se le preguntan al cliente los grupos de un producto (el orden es POR PRODUCTO: vive en producto_grupo.orden).
+   * `grupoIds` debe traer exactamente los grupos del producto, sin repetir ni agregar ajenos.
+   */
+  async ordenarGruposProducto(id: bigint | string | number, grupoIds: Array<string | number>, usuario?: UsuarioAutenticado, ip?: string) {
+    const pId = this.parsearId(id);
+    const producto = await this.prisma.producto.findUnique({ where: { id: pId }, select: { id: true } });
+    if (!producto) throw new NotFoundException({ codigo: 'PRODUCTO_NO_ENCONTRADO', mensaje: 'Producto no encontrado' });
+    const filas = await this.prisma.productoGrupo.findMany({
+      where: { producto_id: pId },
+      orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+      select: { grupo_id: true },
+    });
+    const actuales = filas.map((f) => f.grupo_id.toString());
+    const nuevos = grupoIds.map((g) => this.parsearId(g).toString());
+    const mismos = nuevos.length === actuales.length && new Set(nuevos).size === nuevos.length && nuevos.every((g) => actuales.includes(g));
+    if (!mismos) {
+      throw new BadRequestException({ codigo: 'GRUPOS_NO_COINCIDEN', mensaje: 'Los grupos enviados no son los del producto' });
+    }
+    await this.prisma.$transaction(
+      nuevos.map((g, orden) =>
+        this.prisma.productoGrupo.update({ where: { producto_id_grupo_id: { producto_id: pId, grupo_id: BigInt(g) } }, data: { orden } }),
+      ),
+    );
+    invalidarOpcionesMenosPedida(pId);
+    await this.auditoria.registrar({
+      categoria: 'CAMBIO',
+      modulo: 'catalogo',
+      accion: 'ORDENAR_PREGUNTAS_PRODUCTO',
+      resultado: 'OK',
+      entidad: 'producto',
+      entidadId: pId,
+      antes: { grupoIds: actuales },
+      despues: { grupoIds: nuevos },
+      partyId: usuario?.partyId,
+      ip,
+    });
+    return { ok: true, id: pId.toString(), grupoIds: nuevos };
   }
 
   async mostrarProducto(id: bigint | string | number, usuario?: UsuarioAutenticado, ip?: string) {

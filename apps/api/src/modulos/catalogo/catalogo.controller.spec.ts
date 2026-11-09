@@ -36,6 +36,7 @@ describe('CatalogoControllers', () => {
       disponibilizarProducto: jest.fn(),
       ocultarProducto: jest.fn(),
       mostrarProducto: jest.fn(),
+      ordenarGruposProducto: jest.fn(),
       asociarFotoProducto: jest.fn(),
       agotarOpcion: jest.fn(),
       disponibilizarOpcion: jest.fn(),
@@ -151,6 +152,14 @@ describe('CatalogoControllers', () => {
 
       const resMostrar = await catalogoController.mostrarProducto('10', reqMock);
       expect(resMostrar.oculto).toBe(false);
+    });
+
+    it('orden-grupos: exige catalogo/editar y delega al servicio', async () => {
+      service.ordenarGruposProducto.mockResolvedValue({ ok: true });
+      expect(Reflect.getMetadata('permiso', CatalogoController.prototype.ordenarGrupos)).toEqual({ modulo: 'catalogo', accion: 'editar' });
+      const req: any = { usuario: { partyId: BigInt(1) }, ip: '127.0.0.1' };
+      await catalogoController.ordenarGrupos('10', { grupoIds: ['2', '1'] }, req);
+      expect(service.ordenarGruposProducto).toHaveBeenCalledWith('10', ['2', '1'], req.usuario, '127.0.0.1');
     });
 
     it('debe actualizar categoría', async () => {
