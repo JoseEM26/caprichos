@@ -1209,3 +1209,23 @@
 }
 .cj2-cta-pend { color: #B2500F; font-weight: 900; }
 .cj2-cta-ok { color: #2F7A45; font-weight: 900; }
+
+/* ---- Celular y tablet angosta: paginación pegada al fondo, compacta, botones de 44 px ---- */
+.cj2-pag-txt { display: none; }
+@media (max-width: 899px) {
+  .cj2-pag {
+    position: sticky;
+    bottom: 0;
+    z-index: 25;
+    margin: 0 calc(-1 * var(--cj2-main-pad, 16px));
+    padding: 4px 12px calc(4px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -4px 12px rgba(11, 44, 62, 0.12);
+  }
+  .cj2-pag-rango { display: none; }
+  .cj2-pag-flechas { flex: 1 1 auto; justify-content: space-between; gap: 8px; }
+  .cj2-pag-flechas .cj2-btn { min-height: 44px; min-width: 44px; }
+  .cj2-pag-extremo { display: none; }
+  .cj2-pag-txt { display: inline; }
+  .cj2-pag-n, .cj2-pag-ir { flex: 1 1 auto; text-align: center; justify-content: center; font-size: 14px; }
+  .cj2 { padding-bottom: 0; }
+}

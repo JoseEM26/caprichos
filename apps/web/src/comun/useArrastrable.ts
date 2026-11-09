@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent as PEvent, RefObject } from 'react';
 
-/** Pulsación larga que activa el modo mover (ms). */
-export const MS_PULSACION = 450;
-/** Si el dedo/mouse se mueve más que esto antes de cumplirse el tiempo, era un scroll: se cancela. */
-export const PX_CANCELA = 10;
+/** Desplazamiento (px) a partir del cual un toque deja de ser tap y pasa a ser arrastre. */
+export const PX_ARRASTRE = 6;
 /** Paso del teclado. */
 export const PX_TECLADO = 20;
 const MARGEN = 8;
@@ -60,8 +58,9 @@ function zonaSegura() {
 }
 
 /**
- * Hace movible un elemento fijo: pulsación larga (mouse, táctil o lápiz) y arrastrar, o tecla M / Alt+flechas.
- * Un toque corto sigue siendo un clic. Recuerda la posición (fracción 0–1) en localStorage.
+ * Hace movible un elemento fijo: arrastrar con mouse, dedo o lápiz (Pointer Events + setPointerCapture; el elemento
+ * debe llevar `touch-action: none`), o tecla M / Alt+flechas. Se guarda el desfase entre el toque y la esquina del
+ * elemento, así sigue al dedo sin saltar. Un toque que se mueve menos de PX_ARRASTRE sigue siendo un clic. Recuerda la posición (fracción 0–1) en localStorage.
  */
 export function useArrastrable(ref: RefObject<HTMLElement | null>, { clave, dep }: OpcionesArrastrable) {
   const [frac, setFrac] = useState<Fraccion | null>(() => leerGuardado(clave));
@@ -70,7 +69,6 @@ export function useArrastrable(ref: RefObject<HTMLElement | null>, { clave, dep 
   const [anuncio, setAnuncio] = useState('');
   const [tick, setTick] = useState(0);
 
-  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inicio = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null);
   const previa = useRef<Pos | null>(null); // posición antes de mover (null = esquina por defecto), para Esc
   const suprimirClic = useRef(false);
@@ -138,12 +136,6 @@ export function useArrastrable(ref: RefObject<HTMLElement | null>, { clave, dep 
     };
   }, []);
 
-  const limpiarTemporizador = () => {
-    if (temporizador.current) clearTimeout(temporizador.current);
-    temporizador.current = null;
-  };
-  useEffect(() => limpiarTemporizador, []);
-
   const posActual = (): Pos => {
     if (posRef.current) return posRef.current;
     const r = ref.current?.getBoundingClientRect();
@@ -193,44 +185,28 @@ export function useArrastrable(ref: RefObject<HTMLElement | null>, { clave, dep 
   const alPresionar = (e: PEvent<HTMLElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const r = ref.current?.getBoundingClientRect();
+    // desfase toque → esquina del elemento: se mantiene durante todo el arrastre
     inicio.current = { x: e.clientX, y: e.clientY, dx: e.clientX - (r?.left ?? 0), dy: e.clientY - (r?.top ?? 0) };
     suprimirClic.current = false;
-    limpiarTemporizador();
-    const objetivo = e.currentTarget;
-    const id = e.pointerId;
-    temporizador.current = setTimeout(() => {
-      temporizador.current = null;
-      empezar();
-      try {
-        navigator.vibrate?.(10);
-      } catch {
-        /* sin vibración */
-      }
-      try {
-        objetivo.setPointerCapture?.(id);
-      } catch {
-        /* puntero ya liberado */
-      }
-      setAnuncio('Modo mover: arrastra y suelta donde quieras');
-    }, MS_PULSACION);
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* puntero ya liberado */
+    }
   };
 
   const alMover = (e: PEvent<HTMLElement>) => {
     const s = inicio.current;
     if (!s) return;
     if (!activo.current) {
-      if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > PX_CANCELA) {
-        limpiarTemporizador(); // era un scroll o un arrastre sin pulsación larga
-        inicio.current = null;
-      }
-      return;
+      if (Math.hypot(e.clientX - s.x, e.clientY - s.y) <= PX_ARRASTRE) return; // aún es un tap
+      empezar();
     }
     suprimirClic.current = true;
     setPos(acotar({ left: e.clientX - s.dx, top: e.clientY - s.dy }));
   };
 
   const alSoltar = () => {
-    limpiarTemporizador();
     if (activo.current) {
       suprimirClic.current = true;
       terminar(true);
@@ -240,7 +216,6 @@ export function useArrastrable(ref: RefObject<HTMLElement | null>, { clave, dep 
   };
 
   const alCancelar = () => {
-    limpiarTemporizador();
     inicio.current = null;
     if (activo.current) terminar(true);
   };
@@ -313,6 +288,7 @@ export function useArrastrable(ref: RefObject<HTMLElement | null>, { clave, dep 
       onPointerUp: alSoltar,
       onPointerCancel: alCancelar,
       onKeyDown: alTecla,
+      onLostPointerCapture: alSoltar,
       onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
     },
     /** Estilo para el contenedor fijo (undefined si nunca se movió: manda el CSS por defecto). */

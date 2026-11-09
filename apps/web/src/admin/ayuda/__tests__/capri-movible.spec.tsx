@@ -18,7 +18,6 @@ const CLAVE = 'capri.posicion';
 const bajar = (el: Element) => fireEvent.pointerDown(el, { clientX: 850, clientY: 650, pointerId: 1, pointerType: 'touch', button: 0 });
 const mover = (el: Element, x: number, y: number) => fireEvent.pointerMove(el, { clientX: x, clientY: y, pointerId: 1, pointerType: 'touch' });
 const subir = (el: Element) => fireEvent.pointerUp(el, { pointerId: 1, pointerType: 'touch' });
-const pasar = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
 
 async function montar() {
   await act(async () => {
@@ -51,7 +50,7 @@ afterEach(() => {
 describe('Capri movible', () => {
   it('el botón sigue accesible y dice cómo moverlo', async () => {
     await montar();
-    expect(fab().getAttribute('aria-label')).toMatch(/mantén presionado para mover/i);
+    expect(fab().getAttribute('aria-label')).toMatch(/arrástrala para moverla/i);
   });
 
   it('un toque corto abre la ayuda', async () => {
@@ -62,12 +61,11 @@ describe('Capri movible', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('mantener 450 ms y arrastrar mueve, muestra el aviso, guarda y NO abre la ayuda', async () => {
+  it('arrastrar (sin pulsación larga) mueve, muestra el aviso, guarda y NO abre la ayuda', async () => {
     await montar();
     bajar(fab());
-    pasar(460);
-    expect(screen.getByText('Suelta donde quieras')).toBeInTheDocument();
     mover(fab(), 300, 200);
+    expect(screen.getByText('Suelta donde quieras')).toBeInTheDocument();
     expect(caja().style.left).toBe('250px');
     expect(caja().style.top).toBe('150px');
     subir(fab());
@@ -77,21 +75,30 @@ describe('Capri movible', () => {
     expect(screen.queryByText('Suelta donde quieras')).not.toBeInTheDocument();
   });
 
-  it('moverse antes de cumplirse el tiempo cancela el modo mover (era scroll)', async () => {
+  it('moverse menos de 6 px sigue siendo un toque (no arrastra) y abre la ayuda', async () => {
     await montar();
     bajar(fab());
-    pasar(200);
-    mover(fab(), 850, 700);
-    pasar(400);
-    expect(screen.queryByText('Suelta donde quieras')).not.toBeInTheDocument();
-    mover(fab(), 300, 200);
+    mover(fab(), 854, 653);
     expect(caja().style.left).toBe('');
+    subir(fab());
+    fireEvent.click(fab());
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('sin salto: el botón queda con el mismo desfase del dedo en todo el arrastre', async () => {
+    await montar();
+    bajar(fab()); // agarra a (50,50) de la esquina
+    mover(fab(), 860, 660); // pasa el umbral: la esquina sigue al dedo, no salta
+    expect(caja().style.left).toBe('810px');
+    expect(caja().style.top).toBe('610px');
+    mover(fab(), 400, 300);
+    expect(caja().style.left).toBe('350px');
+    expect(caja().style.top).toBe('250px');
   });
 
   it('no sale de la pantalla (margen 8 px)', async () => {
     await montar();
     bajar(fab());
-    pasar(460);
     mover(fab(), -500, -500);
     expect(caja().style.left).toBe('8px');
     expect(caja().style.top).toBe('8px');
@@ -109,7 +116,6 @@ describe('Capri movible', () => {
     });
     await montar();
     bajar(fab());
-    pasar(460);
     mover(fab(), 300, 200);
     subir(fab());
     expect(caja().style.left).toBe('250px');

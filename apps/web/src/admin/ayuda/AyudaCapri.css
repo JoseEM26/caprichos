@@ -25,6 +25,7 @@
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: none; /* el scroll no le roba el gesto al arrastre */
 }
 
 /* Modo mover: botón algo más grande, halo y cursor de agarre; el dedo no desplaza la página */
@@ -32,7 +33,6 @@
   transition: none;
   touch-action: none;
   cursor: grabbing;
-  transform: scale(1.06);
   border-radius: 18px;
   box-shadow: 0 0 0 6px rgba(230, 121, 41, 0.35), 0 10px 28px rgba(11, 44, 62, 0.35);
 }
@@ -155,6 +155,12 @@
 }
 
 .ayuda-fab .tip {
+  /* fuera del flujo: el ancho del contenedor es solo el del avatar y no cambia al ocultarse (causa del salto) */
+  position: absolute;
+  right: 100%;
+  bottom: 0;
+  margin-right: 8px;
+  width: max-content;
   background: var(--cp-white, #FFFFFF);
   border: 1.5px solid var(--cp-line, #E3D6C6);
   border-radius: 14px 14px 4px 14px;
