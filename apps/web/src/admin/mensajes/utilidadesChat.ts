@@ -33,8 +33,10 @@ export const obtenerColorAvatar = (id: string) => {
 export const obtenerIniciales = (nombre: string) => {
   const partes = (nombre || '').trim().split(/\s+/).filter(Boolean);
   if (partes.length === 0) return 'WA';
-  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
-  return (partes[0][0] + partes[1][0]).toUpperCase();
+  // Array.from: un emoji al inicio del nombre no se parte en media letra (�)
+  const car = (t: string) => Array.from(t);
+  if (partes.length === 1) return car(partes[0]).slice(0, 2).join('').toUpperCase();
+  return (car(partes[0])[0] + car(partes[1])[0]).toUpperCase();
 };
 
 /** Desde cuántos minutos sin respuesta se destaca el chat en la lista. */

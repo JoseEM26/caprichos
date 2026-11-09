@@ -56,6 +56,14 @@ export function CuadroEscribir({
     if (foto) URL.revokeObjectURL(foto.url);
   }, [foto]);
 
+  // al cambiar de chat el selector no se queda abierto
+  useEffect(() => setEmojisAbierto(false), [detalle.id]);
+
+  const cerrarEmojis = () => {
+    setEmojisAbierto(false);
+    cajaRef.current?.focus();
+  };
+
   const elegirEmoji = (emoji: string) => {
     const caja = cajaRef.current;
     const r = insertarEnCursor(textoMensaje, emoji, caja?.selectionStart ?? null, caja?.selectionEnd ?? null);
@@ -231,13 +239,13 @@ export function CuadroEscribir({
               className="msg-icono-btn"
               aria-label="Elegir un emoji"
               aria-expanded={emojisAbierto}
-              title="Emojis"
+              title={detalle.ocupado ? 'Para usar emojis, toma el chat' : 'Emojis'}
               disabled={detalle.ocupado}
               onClick={() => setEmojisAbierto((v) => !v)}
             >
               😊
             </button>
-            {emojisAbierto && <SelectorEmojis onElegir={elegirEmoji} onCerrar={() => setEmojisAbierto(false)} />}
+            {emojisAbierto && <SelectorEmojis onElegir={elegirEmoji} onCerrar={cerrarEmojis} />}
           </div>
           <textarea
             ref={cajaRef}

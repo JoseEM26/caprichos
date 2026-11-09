@@ -366,6 +366,20 @@ describe('MensajesService', () => {
     expect(auditoria.registrar).toHaveBeenCalled();
   });
 
+  it('enviar conserva íntegros los emojis (ZWJ, bandera, tono) hasta el gateway', async () => {
+    const t = 'Gracias 👩‍🍳🇵🇪👍🏽🍩❤️';
+    await service.enviar('1', `  ${t}  `, usuarioAdmin);
+    expect(gateway.enviarTexto).toHaveBeenCalledWith(1n, '999888777', t, 'PERSONA');
+  });
+
+  it('el DTO acepta emojis y pulir no los pierde', async () => {
+    const { validate } = await import('class-validator');
+    const { TextoDto } = await import('./dto/mensajes.dto');
+    const d = Object.assign(new TextoDto(), { texto: 'Hola 👩‍🍳🇵🇪 gracias 🍩' });
+    expect(await validate(d)).toHaveLength(0);
+    expect(service.pulir('1', 'hola gracias 👩‍🍳🍩', 'Ana').texto).toContain('👩‍🍳🍩');
+  });
+
   it('pulir mensaje devuelve texto más formal y amable', () => {
     const p = service.pulir('1', 'ya va tu pedido', 'Ana Pérez');
     expect(p.texto).toContain('Ana');
