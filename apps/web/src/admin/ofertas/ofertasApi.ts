@@ -138,6 +138,8 @@ export interface OfertaItem {
   /** Combo: se puede armar ahora (calculado; no cambia `activo`) */
   disponible?: boolean;
   motivoAgotado?: string | null;
+  /** Solo panel: piezas que bloquean el combo y por qué. */
+  piezasBloqueadas?: { productoId: string; nombre: string; motivo: string }[];
   /** Última desactivación a mano (de la auditoría): cuándo y quién. Solo en el listado del panel. */
   desactivadaEn?: string | null;
   desactivadaPor?: string | null;

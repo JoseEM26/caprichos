@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { DetalleConversacion } from './mensajesTipos';
+import { estadoVentana } from './estadoPlantilla';
 
 export interface BarraAccionPendienteProps {
   detalle: DetalleConversacion;
-  onReabrirPlantilla: () => void;
+  onReabrirPlantilla: (forzar?: boolean) => void;
   onAprobarPago: () => void;
   onRechazarPago: () => void;
   onAplicarCambio: () => void;
@@ -27,16 +28,26 @@ export function BarraAccionPendiente({
   const filas: ReactNode[] = [];
 
   if (detalle.ventanaAbierta === false) {
+    const ventana = estadoVentana(detalle);
     filas.push(
       <div className="msg-accion" key="ventana">
         <span className="msg-accion-etiqueta">Acción pendiente</span>
-        <span className="msg-accion-texto">
-          Pasaron mas de 24 horas desde el ultimo mensaje del cliente. Solo se puede escribir con una plantilla aprobada.
-        </span>
+        <span className="msg-accion-texto" data-testid="porque-ventana">{ventana.textoPorQue}</span>
         <div className="msg-accion-botones">
-          <button type="button" className="msg-accion-neutro" onClick={onReabrirPlantilla}>
-            Reabrir con plantilla
-          </button>
+          {ventana.esperando ? (
+            <>
+              <button type="button" className="msg-accion-neutro" disabled data-testid="plantilla-enviada">
+                {ventana.textoEnviada}
+              </button>
+              <button type="button" className="msg-accion-neutro" onClick={() => onReabrirPlantilla(true)}>
+                Enviar otra plantilla de todos modos
+              </button>
+            </>
+          ) : (
+            <button type="button" className="msg-accion-neutro" onClick={() => onReabrirPlantilla()}>
+              Reabrir con plantilla
+            </button>
+          )}
         </div>
       </div>,
     );

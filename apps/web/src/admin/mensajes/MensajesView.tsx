@@ -353,16 +353,18 @@ function MensajesChats({ controles }: { controles?: React.ReactNode } = {}) {
   };
 
   // Acciones sobre el chat
-  const handleReabrirPlantilla = () => {
+  const handleReabrirPlantilla = (forzar = false) => {
     if (!detalle || !chatSeleccionadoId) return;
     setConfirmarAccion({
-      titulo: '¿Reabrir conversación con plantilla?',
-      mensaje:
-        'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. ¿Deseas enviar la plantilla aprobada para retomar el contacto?',
-      textoSi: 'Sí, reabrir',
+      titulo: forzar ? '¿Enviar otra plantilla?' : '¿Reabrir conversación con plantilla?',
+      mensaje: forzar
+        ? 'Se enviará otra plantilla; Meta puede cobrarla de nuevo. Queda registrado quién la envió y a qué hora. ¿Deseas enviarla de todos modos?'
+        : 'Pasaron mas de 24 horas desde el ultimo mensaje del cliente. ¿Deseas enviar la plantilla aprobada para retomar el contacto?',
+      textoSi: forzar ? 'Sí, enviar otra' : 'Sí, reabrir',
       accion: async () => {
         try {
-          await reabrirConversacionPlantilla(chatSeleccionadoId);
+          if (forzar) await reabrirConversacionPlantilla(chatSeleccionadoId, true);
+          else await reabrirConversacionPlantilla(chatSeleccionadoId);
           setTextoMensaje('');
           setTextoPulido(null);
           setPulirError(null);

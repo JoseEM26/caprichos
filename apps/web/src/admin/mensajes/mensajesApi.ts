@@ -121,10 +121,11 @@ export async function editarNombreContacto(
 
 export async function reabrirConversacionPlantilla(
   id: string,
+  forzar = false,
 ): Promise<{ ok: boolean; id: string }> {
   return api.post<{ ok: boolean; id: string }>(
     `/admin/mensajes/conversaciones/${id}/reabrir-plantilla`,
-    {},
+    forzar ? { forzar: true } : {},
   );
 }
 

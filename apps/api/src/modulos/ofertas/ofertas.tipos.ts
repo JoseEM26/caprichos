@@ -109,6 +109,8 @@ export interface OfertaItem {
   /** Solo combos: se puede armar ahora (no cambia `activo`). */
   disponible?: boolean;
   motivoAgotado?: string | null;
+  /** Solo panel: piezas del combo que lo bloquean y por qué («Agotado hasta 15:40», «Stock 0»). */
+  piezasBloqueadas?: { productoId: string; nombre: string; motivo: string }[];
   /** Combo no armable porque sus productos se acabaron (saldo 0): la carta dice «No disponible», no «Agotado». */
   sinStock?: boolean;
   /** Última vez que alguien la desactivó a mano (de la auditoría); solo en el listado del panel. */

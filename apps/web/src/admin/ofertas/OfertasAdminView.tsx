@@ -137,6 +137,8 @@ function insigniaEstado(o: OfertaItem, activo: string): { texto: string; title?:
 }
 
 /** «21/11/2026 14:30» en hora de Lima, para «Última vez desactivada». */
+import { PiezasBloqueadas } from './PiezasBloqueadas';
+
 function fechaHoraLima(iso: string): string {
   const f = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
   return f.format(new Date(iso)).replace(',', '');
@@ -172,6 +174,7 @@ function AvisoEstadoOferta({ o }: { o: OfertaItem }) {
       <span data-testid="insignia-agotado-auto" title={explica} aria-label={explica} style={{ ...chip, backgroundColor: 'var(--cp-orange)', color: 'var(--cp-navy)' }}>
         Agotado automáticamente · vuelve sola cuando haya stock
       </span>
+      <PiezasBloqueadas oferta={o} />
       {(motivo || conAlternativas) && (
         <span data-testid="motivo-agotado" style={{ fontSize: '11px', color: 'var(--cp-soft)' }}>
           {motivo}

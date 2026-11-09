@@ -47,9 +47,11 @@ describe('MensajesController', () => {
 
   it('reabrirPlantilla delega en service.reabrirConPlantilla', async () => {
     const req = { usuario: { partyId: 1n }, ip: '127.0.0.1' };
-    const res = await controller.reabrirPlantilla('1', req);
+    const res = await controller.reabrirPlantilla('1', undefined, req);
     expect(res).toEqual({ ok: true, id: 'msg-plantilla-1' });
-    expect(service.reabrirConPlantilla).toHaveBeenCalledWith('1', req.usuario, '127.0.0.1');
+    expect(service.reabrirConPlantilla).toHaveBeenCalledWith('1', req.usuario, '127.0.0.1', false);
+    await controller.reabrirPlantilla('1', { forzar: true }, req);
+    expect(service.reabrirConPlantilla).toHaveBeenLastCalledWith('1', req.usuario, '127.0.0.1', true);
   });
 
   it('reintentar delega en service.reintentarMensaje', async () => {

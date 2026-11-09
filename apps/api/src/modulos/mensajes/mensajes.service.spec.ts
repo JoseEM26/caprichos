@@ -156,6 +156,7 @@ describe('MensajesService', () => {
         update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 1n, ...data })),
       },
       mensajeChat: {
+        findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([
           { id: 10n, autor: 'CLIENTE', direccion: 'ENTRA', tipo: 'TEXTO', contenido: { texto: 'Hola' }, en: new Date() },
           { id: 11n, autor: 'BOT', direccion: 'SALE', tipo: 'TEXTO', contenido: { texto: '¡Hola!' }, en: new Date() },
@@ -654,6 +655,41 @@ describe('MensajesService', () => {
           entidadId: 1n,
         }),
       );
+    });
+  });
+
+  describe('Reabrir con plantilla: no repetir (cada una cuesta en Meta)', () => {
+    const montarPlantilla = (previa: Date | null) => {
+      prisma.mensajeChat.findFirst = jest.fn().mockResolvedValue(previa ? { en: previa } : null);
+      gateway.enviarPlantilla = jest.fn().mockResolvedValue({ id: 'm2', autor: 'PERSONA', texto: 'x', metaId: 'w', estado: 'ENVIADO' });
+    };
+
+    it('otra plantilla dentro de 60 min: 409 PLANTILLA_RECIENTE con la hora y no envía', async () => {
+      const antes = new Date(Date.now() - 10 * 60 * 1000);
+      montarPlantilla(antes);
+      await expect(service.reabrirConPlantilla('1', usuarioAdmin)).rejects.toMatchObject({
+        status: 409,
+        response: { codigo: 'PLANTILLA_RECIENTE', enviadaEn: antes.toISOString() },
+      });
+      expect(gateway.enviarPlantilla).not.toHaveBeenCalled();
+    });
+
+    it('con forzar envía igual y deja constancia en la auditoría', async () => {
+      montarPlantilla(new Date());
+      const res = await service.reabrirConPlantilla('1', usuarioAdmin, '1.1.1.1', true);
+      expect(res.ok).toBe(true);
+      expect(gateway.enviarPlantilla).toHaveBeenCalledTimes(1);
+      expect(auditoria.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({ accion: 'ENVIAR_PLANTILLA_REAPERTURA', despues: expect.objectContaining({ forzado: true }) }),
+      );
+    });
+
+    it('sin plantilla reciente envía normal (la consulta mira solo la última hora)', async () => {
+      montarPlantilla(null);
+      await service.reabrirConPlantilla('1', usuarioAdmin);
+      const donde = prisma.mensajeChat.findFirst.mock.calls[0][0].where;
+      expect(donde).toMatchObject({ conversacion_id: 1n, tipo: 'PLANTILLA', direccion: 'SALE' });
+      expect(gateway.enviarPlantilla).toHaveBeenCalledTimes(1);
     });
   });
 

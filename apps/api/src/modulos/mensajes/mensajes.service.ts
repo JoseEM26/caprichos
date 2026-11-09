@@ -125,6 +125,9 @@ const nombreUsuario = (p: any, fallback: string): string =>
  * Consola de chats con dueño único (FT-ATN-01..02). Todo sale de `conversacion`, `mensaje_chat`
  * y `respuesta_rapida`; los mensajes salientes pasan por la pasarela `WhatsAppGateway`.
  */
+/** Dentro de este tiempo no se envía otra plantilla de reapertura sin confirmación (cada una cuesta en Meta). */
+const VENTANA_PLANTILLA_RECIENTE_MS = 60 * 60 * 1000;
+
 @Injectable()
 export class MensajesService {
   private readonly logger = new Logger(MensajesService.name);
@@ -529,6 +532,7 @@ export class MensajesService {
               ? String(contenido.archivoId || (c.flujo as any)?.pago?.comprobanteArchivoId || '') || null
               : null,
           texto: textoDe(m),
+          plantilla: m.tipo === 'PLANTILLA',
           // Nota de voz guardada: se escucha con GET /admin/archivos/:id (siempre la escucha una persona)
           audioId: m.tipo === 'AUDIO' && contenido.audio?.archivoId ? String(contenido.audio.archivoId) : null,
           ubicacion: contenido.ubicacion ?? null,
@@ -713,7 +717,7 @@ export class MensajesService {
     return { id: m.id };
   }
 
-  async reabrirConPlantilla(id: string, usuario: UsuarioAutenticado, ip?: string) {
+  async reabrirConPlantilla(id: string, usuario: UsuarioAutenticado, ip?: string, forzar = false) {
     const c = await this.cargar(id);
     await this.exigirLibreOMio(c, usuario, 'Toca «Tomar el chat» para enviar la plantilla.');
 
@@ -726,6 +730,21 @@ export class MensajesService {
     }
 
     await this.exigirNumeroEnviable(c);
+
+    // Cada plantilla cuesta en Meta: otra dentro de la hora solo sale si quien atiende lo confirma (forzar)
+    if (!forzar) {
+      const previa = await this.prisma.mensajeChat.findFirst({
+        where: { conversacion_id: c.id, direccion: 'SALE', tipo: 'PLANTILLA', en: { gte: new Date(Date.now() - VENTANA_PLANTILLA_RECIENTE_MS) } },
+        orderBy: { en: 'desc' },
+        select: { en: true },
+      });
+      if (previa) {
+        throw new HttpException(
+          { codigo: 'PLANTILLA_RECIENTE', mensaje: 'Ya se envió una plantilla hace poco: espera la respuesta del cliente', enviadaEn: previa.en.toISOString() },
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
     await this.verificarLimiteTasaUsuario(usuario.partyId);
 
     const nombreCliente = c.nombre_contacto || (c.party as any)?.persona?.nombres || 'Cliente';
@@ -762,6 +781,7 @@ export class MensajesService {
       {
         mensajeId: m.id,
         plantilla: nombrePlantilla,
+        ...(forzar ? { forzado: true } : {}),
       },
       ip,
     );
